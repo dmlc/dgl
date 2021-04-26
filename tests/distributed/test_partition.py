@@ -120,19 +120,44 @@ def verify_hetero_graph(g, parts):
         assert len(uniq_ids) == g.number_of_edges(etype)
     # TODO(zhengda) this doesn't check 'part_id'
 
-def verify_graph_feats(g, part, node_feats):
+def verify_graph_feats(g, gpb, part, node_feats, edge_feats):
     for ntype in g.ntypes:
         ntype_id = g.get_ntype_id(ntype)
+        inner_node_mask = _get_inner_node_mask(part, ntype_id)
+        inner_nids = F.boolean_mask(part.ndata[dgl.NID],inner_node_mask)
+        ntype_ids, inner_type_nids = gpb.map_to_per_ntype(inner_nids)
+        partid = gpb.nid2partid(inner_type_nids, ntype)
+        assert np.all(F.asnumpy(ntype_ids) == ntype_id)
+        assert np.all(F.asnumpy(partid) == gpb.partid)
+
+        orig_id = F.boolean_mask(part.ndata['orig_id'], inner_node_mask)
+        local_nids = gpb.nid2localnid(inner_type_nids, gpb.partid, ntype)
+
         for name in g.nodes[ntype].data:
             if name in [dgl.NID, 'inner_node']:
                 continue
-            inner_node_mask = _get_inner_node_mask(part, ntype_id)
-            inner_nids = F.boolean_mask(part.ndata[dgl.NID],inner_node_mask)
-            min_nids = F.min(inner_nids, 0)
-            orig_id = F.boolean_mask(part.ndata['orig_id'], inner_node_mask)
             true_feats = F.gather_row(g.nodes[ntype].data[name], orig_id)
-            ndata = F.gather_row(node_feats[ntype + '/' + name], inner_nids - min_nids)
+            ndata = F.gather_row(node_feats[ntype + '/' + name], local_nids)
             assert np.all(F.asnumpy(ndata == true_feats))
+
+    for etype in g.etypes:
+        etype_id = g.get_etype_id(etype)
+        inner_edge_mask = _get_inner_edge_mask(part, etype_id)
+        inner_eids = F.boolean_mask(part.edata[dgl.EID],inner_edge_mask)
+        etype_ids, inner_type_eids = gpb.map_to_per_etype(inner_eids)
+        partid = gpb.eid2partid(inner_type_eids, etype)
+        assert np.all(F.asnumpy(etype_ids) == etype_id)
+        assert np.all(F.asnumpy(partid) == gpb.partid)
+
+        orig_id = F.boolean_mask(part.edata['orig_id'], inner_edge_mask)
+        local_eids = gpb.eid2localeid(inner_type_eids, gpb.partid, etype)
+
+        for name in g.edges[etype].data:
+            if name in [dgl.EID, 'inner_edge']:
+                continue
+            true_feats = F.gather_row(g.edges[etype].data[name], orig_id)
+            edata = F.gather_row(edge_feats[etype + '/' + name], local_eids)
+            assert np.all(F.asnumpy(edata == true_feats))
 
 def check_hetero_partition(hg, part_method):
     hg.nodes['n1'].data['labels'] = F.arange(0, hg.number_of_nodes('n1'))
@@ -184,7 +209,7 @@ def check_hetero_partition(hg, part_method):
             assert len(orig_eids1) == len(orig_eids2)
             assert np.all(F.asnumpy(orig_eids1) == F.asnumpy(orig_eids2))
         parts.append(part_g)
-        verify_graph_feats(hg, part_g, node_feats)
+        verify_graph_feats(hg, gpb, part_g, node_feats, edge_feats)
 
         shuffled_labels.append(node_feats['n1/labels'])
         shuffled_elabels.append(edge_feats['r1/labels'])
@@ -268,6 +293,7 @@ def check_partition(g, part_method, reshuffle):
         else:
             part_g.ndata['feats'] = F.gather_row(g.ndata['feats'], part_g.ndata[dgl.NID])
             part_g.edata['feats'] = F.gather_row(g.edata['feats'], part_g.edata[dgl.NID])
+
         part_g.update_all(fn.copy_src('feats', 'msg'), fn.sum('msg', 'h'))
         part_g.update_all(fn.copy_edge('feats', 'msg'), fn.sum('msg', 'eh'))
         assert F.allclose(F.gather_row(g.ndata['h'], local_nodes),
@@ -278,11 +304,15 @@ def check_partition(g, part_method, reshuffle):
         for name in ['labels', 'feats']:
             assert '_N/' + name in node_feats
             assert node_feats['_N/' + name].shape[0] == len(local_nodes)
-            assert np.all(F.asnumpy(g.ndata[name])[F.asnumpy(local_nodes)] == F.asnumpy(node_feats['_N/' + name]))
+            true_feats = F.gather_row(g.ndata[name], local_nodes)
+            ndata = F.gather_row(node_feats['_N/' + name], local_nid)
+            assert np.all(F.asnumpy(true_feats) == F.asnumpy(ndata))
         for name in ['feats']:
             assert '_E/' + name in edge_feats
             assert edge_feats['_E/' + name].shape[0] == len(local_edges)
-            assert np.all(F.asnumpy(g.edata[name])[F.asnumpy(local_edges)] == F.asnumpy(edge_feats['_E/' + name]))
+            true_feats = F.gather_row(g.edata[name], local_edges)
+            edata = F.gather_row(edge_feats['_E/' + name], local_eid)
+            assert np.all(F.asnumpy(true_feats) == F.asnumpy(edata))
 
         # This only works if node/edge IDs are shuffled.
         if reshuffle:
