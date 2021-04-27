@@ -102,8 +102,15 @@ runtime::NDArray CSRGetRowData(CSRMatrix csr, int64_t row);
 template <DLDeviceType XPU, typename IdType>
 bool CSRIsSorted(CSRMatrix csr);
 
+template <DLDeviceType XPU, typename IdType, typename DType>
+runtime::NDArray CSRGetData(
+    CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols,
+    runtime::NDArray weights, DType filler);
+
 template <DLDeviceType XPU, typename IdType>
-runtime::NDArray CSRGetData(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols);
+NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols) {
+  return CSRGetData<XPU, IdType, IdType>(csr, rows, cols, NullArray(rows->dtype), -1);
+}
 
 template <DLDeviceType XPU, typename IdType>
 std::vector<runtime::NDArray> CSRGetDataAndIndices(
