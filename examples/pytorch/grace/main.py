@@ -16,9 +16,9 @@ import warnings
 warnings.filterwarnings('ignore')
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--dataname', type=str, default='cora')
+parser.add_argument('--dataname', type=str, default='cora', choices = ['cora', 'citeseer', 'pubmed'])
 parser.add_argument('--gpu', type=int, default=0)
-parser.add_argument('--split', type=str, default='random')
+parser.add_argument('--split', type=str, default='random', choices = ['random', 'public'])
 args = parser.parse_args()
 
 if args.gpu != -1 and th.cuda.is_available():
@@ -29,7 +29,7 @@ else:
 
 if __name__ == '__main__':
 
-    # Step 1: Load hyper-parameters =================================================================== #
+    # Step 1: Load hyperparameters =================================================================== #
     config = 'config.yaml'
     config = yaml.load(open(config), Loader=SafeLoader)[args.dataname]
     lr = config['learning_rate']
@@ -49,7 +49,7 @@ if __name__ == '__main__':
     wd = config['weight_decay']
 
     # Step 2: Prepare data =================================================================== #
-    graph, feat, labels, num_class, train_mask, val_mask, test_mask = load(args.dataname)
+    graph, feat, labels, train_mask, test_mask = load(args.dataname)
 
     in_dim = feat.shape[1]
 

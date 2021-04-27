@@ -36,7 +36,7 @@ This example was implemented by [Hengrui Zhang](https://github.com/hengruizhang9
 
 ## How to run examples
 
-In the paper(as well as authors' repo), the training set and testing set are split randomly with 1:9 ratio. In order to fairly compare it with other models with public split, in this repo we also provide its results using public split. To run the examples, follow the following instructions.
+In the paper(as well as authors' repo), the training set and testing set are split randomly with 1:9 ratio. In order to fairly compare it with other models with the split they used, termed public split, in this repo we also provide experiment results using public split. To run the examples,
 
 ```python
 # Cora with random split
@@ -46,11 +46,11 @@ python main.py --dataname cora
 python main.py --dataname cora --split public
 ```
 
-replace 'cora' with 'citeseer' or 'pubmed' if you would like to run this example on other datasets.
+replace 'cora' with 'citeseer' or 'pubmed' if you would like to run this example for other datasets.
 
 ## 	Performance
 
-We use the same hyper-parameter settings as provided by the author, you can check config.yaml for detailed hyper-parameters for each dataset.
+We use the same hyperparameter settings as provided by the author, you can check config.yaml for detailed hyper-parameters for each dataset.
 
 Random split (Train/Test = 1:9)
 

@@ -46,15 +46,15 @@ class Grace(nn.Module):
     in_dim: int
         Input feature size.
     hid_dim: int
-        Hidden feature size
+        Hidden feature size.
     out_dim: int
         Output feature size.
     num_layers: int
         Number of the GNN encoder layers.
     act_fn: nn.Module
-        Activation function
+        Activation function.
     temp: float
-        temperature constant
+        Temperature constant.
     """
     def __init__(self, in_dim, hid_dim, out_dim, num_layers, act_fn, temp):
         super(Grace, self).__init__()

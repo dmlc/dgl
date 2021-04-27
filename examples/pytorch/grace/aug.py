@@ -12,8 +12,7 @@ def aug(graph, x, feat_drop_rate, edge_mask_rate):
     return ng, feat
 
 def drop_edge(graph, drop_prob):
-    N = graph.number_of_nodes()
-    E = graph.number_of_edges()
+    E = graph.num_edges()
 
     mask_rates = th.FloatTensor(np.ones(E) * drop_prob)
     masks = th.bernoulli(1 - mask_rates)

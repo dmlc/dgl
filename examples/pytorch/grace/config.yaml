@@ -37,16 +37,3 @@ pubmed:
   tau: 0.7
   num_epochs: 1500
   weight_decay: 0.00001
-dblp:
-  learning_rate: 0.001
-  num_hidden: 256
-  num_proj_hidden: 256
-  activation: 'relu'
-  num_layers: 2
-  drop_edge_rate_1: 0.1
-  drop_edge_rate_2: 0.4
-  drop_feature_rate_1: 0.1
-  drop_feature_rate_2: 0.0
-  tau: 0.7
-  num_epochs: 1000
-  weight_decay: 0.00001
