@@ -737,12 +737,12 @@ IdArray MapIds(IdArray ids, IdArray range_starts, IdArray range_ends, IdArray ty
     IdType id = ids_data[i];
     auto it = std::lower_bound(range_end_data, range_end_data + num_ranges, id);
     // The range must exist.
-    BUG_ON(it != range_end_data + num_ranges);
+    BUG_IF_FAIL(it != range_end_data + num_ranges);
     size_t range_id = it - range_end_data;
     int type_id = range_id % num_types;
     types_data[i] = type_id;
     int part_id = range_id / num_types;
-    BUG_ON(part_id < num_parts);
+    BUG_IF_FAIL(part_id < num_parts);
     if (part_id == 0) {
       per_type_ids_data[i] = id - range_start_data[range_id];
     } else {

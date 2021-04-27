@@ -198,7 +198,8 @@ class GATConv(nn.Module):
             nn.init.xavier_normal_(self.fc_dst.weight, gain=gain)
         nn.init.xavier_normal_(self.attn_l, gain=gain)
         nn.init.xavier_normal_(self.attn_r, gain=gain)
-        nn.init.constant_(self.bias, 0)
+        if self.bias is not None:
+            nn.init.constant_(self.bias, 0)
         if isinstance(self.res_fc, nn.Linear):
             nn.init.xavier_normal_(self.res_fc.weight, gain=gain)
 
@@ -304,7 +305,8 @@ class GATConv(nn.Module):
             rst = graph.dstdata['ft']
             # residual
             if self.res_fc is not None:
-                resval = self.res_fc(h_dst).view(h_dst.shape[0], self._num_heads, self._out_feats)
+                # Use -1 rather than self._num_heads to handle broadcasting
+                resval = self.res_fc(h_dst).view(h_dst.shape[0], -1, self._out_feats)
                 rst = rst + resval
             # bias
             if self.bias is not None:
