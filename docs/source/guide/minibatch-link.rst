@@ -249,8 +249,7 @@ source-destination array pairs. An example is given as follows:
            # caches the probability distribution
            self.weights = {
                etype: g.in_degrees(etype=etype).float() ** 0.75
-               for etype in g.canonical_etypes
-           }
+               for etype in g.canonical_etypes}
            self.k = k
 
        def __call__(self, g, eids_dict):
