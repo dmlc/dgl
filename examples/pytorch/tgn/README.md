@@ -56,6 +56,12 @@ If you want to change memory updating module:
 python train.py --dataset wikipedia --memory_updater [rnn/gru]
 ```
 
+If you want to use TGAT:
+
+```python
+python train.py --dataset wikipedia --not_use_memory --k_hop 2
+```
+
 ## Performance
 
 #### Without New Node in test set
@@ -96,5 +102,10 @@ Normally temporal encoding needs each node to use incoming time frame as current
 
 **What is New Node test**
 
-To test the model has the ability to predict link between unseen nodes based on neighboring information of seen nodes. This model deliberately select 10 % of node in test graph and mask them out during the training
+To test the model has the ability to predict link between unseen nodes based on neighboring information of seen nodes. This model deliberately select 10 % of node in test graph and mask them out during the training.
+
+**Why the attention module is not exactly same as TGN original paper**
+
+Attention module used in this model is adapted from DGL GATConv, considering edge feature and time encoding. It is more memory efficient and faster to compute then the attention module proposed in the paper, meanwhile, according to our test, the accuracy of our module compared with the one in paper is the same.
+
 
