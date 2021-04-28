@@ -64,6 +64,10 @@ class _ScalarDataBatcher(th.utils.data.IterableDataset):
 
         return _ScalarDataBatcherIter(dataset, self.batch_size, self.drop_last)
 
+    def __len__(self):
+        return (self.dataset.shape[0] + (0 if self.drop_last else self.batch_size - 1)) // \
+            self.batch_size
+
 def _remove_kwargs_dist(kwargs):
     if 'num_workers' in kwargs:
         del kwargs['num_workers']
@@ -209,37 +213,54 @@ def _to_device(data, device):
     return data
 
 class _NodeDataLoaderIter:
-    def __init__(self, node_dataloader):
-        self.device = node_dataloader.device
-        self.node_dataloader = node_dataloader
-        self.iter_ = iter(node_dataloader.dataloader)
+    def __init__(self, dataloader_iter, parent, device):
+        self.device = device
+        self.parent = parent
+        self.iter_ = dataloader_iter
+
+    # Make this an iterator for PyTorch Lightning compatibility
+    def __iter__(self):
+        return self
 
     def __next__(self):
         # input_nodes, output_nodes, blocks
         result_ = next(self.iter_)
-        _restore_blocks_storage(result_[-1], self.node_dataloader.collator.g)
+        _restore_blocks_storage(result_[-1], self.parent.collator.g)
 
         result = [_to_device(data, self.device) for data in result_]
         return result
 
 class _EdgeDataLoaderIter:
-    def __init__(self, edge_dataloader):
-        self.device = edge_dataloader.device
-        self.edge_dataloader = edge_dataloader
-        self.iter_ = iter(edge_dataloader.dataloader)
+    def __init__(self, dataloader_iter, parent, device):
+        self.device = device
+        self.parent = parent
+        self.iter_ = dataloader_iter
+
+    # Make this an iterator for PyTorch Lightning compatibility
+    def __iter__(self):
+        return self
 
     def __next__(self):
         result_ = next(self.iter_)
 
-        if self.edge_dataloader.collator.negative_sampler is not None:
+        if self.parent.collator.negative_sampler is not None:
             # input_nodes, pair_graph, neg_pair_graph, blocks if None.
             # Otherwise, input_nodes, pair_graph, blocks
-            _restore_subgraph_storage(result_[2], self.edge_dataloader.collator.g)
-        _restore_subgraph_storage(result_[1], self.edge_dataloader.collator.g)
-        _restore_blocks_storage(result_[-1], self.edge_dataloader.collator.g_sampling)
+            _restore_subgraph_storage(result_[2], self.parent.collator.g)
+        _restore_subgraph_storage(result_[1], self.parent.collator.g)
+        _restore_blocks_storage(result_[-1], self.parent.collator.g_sampling)
 
         result = [_to_device(data, self.device) for data in result_]
         return result
+
+class _NodeDataLoader(th.utils.data.DataLoader):
+    def __init__(self, dataset, parent, device, **kwargs):
+        super().__init__(dataset, **kwargs)
+        self.parent = parent
+        self.device = device
+
+    def __iter__(self):
+        return _NodeDataLoaderIter(super().__iter__(), self.parent, self.device)
 
 class NodeDataLoader:
     """PyTorch dataloader for batch-iterating over a set of nodes, generating the list
@@ -277,6 +298,17 @@ class NodeDataLoader:
     Please refer to
     :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`
     and :ref:`User Guide Section 6 <guide-minibatch>` for usage.
+
+    If you are using PyTorch Lightning's ``LightningDataModule`` together with DGL,
+    you need to return the ``dataloader`` attribute in the data loader methods instead.
+
+    .. code:: python
+
+       def __init__(self):
+           self.dataloader = NodeDataLoader(...)
+
+       def train_dataloader(self):
+           return self.dataloader.dataloader
     """
     collator_arglist = inspect.getfullargspec(NodeCollator).args
 
@@ -331,8 +363,12 @@ class NodeDataLoader:
                         dataloader_kwargs['shuffle'] = False
                         dataloader_kwargs['drop_last'] = False
 
-            self.dataloader = DataLoader(
+            # For compatibility with PyTorch Lightning we need to subclass the DataLoader
+            # with our own iterator.
+            self.dataloader = _NodeDataLoader(
                 dataset,
+                self,
+                device,
                 collate_fn=self.collator.collate,
                 **dataloader_kwargs)
             self.is_distributed = False
@@ -345,15 +381,20 @@ class NodeDataLoader:
 
     def __iter__(self):
         """Return the iterator of the data loader."""
-        if self.is_distributed:
-            # Directly use the iterator of DistDataLoader, which doesn't copy features anyway.
-            return iter(self.dataloader)
-        else:
-            return _NodeDataLoaderIter(self)
+        return iter(self.dataloader)
 
     def __len__(self):
         """Return the number of batches of the data loader."""
         return len(self.dataloader)
+
+class _EdgeDataLoader(th.utils.data.DataLoader):
+    def __init__(self, dataset, parent, device, **kwargs):
+        super().__init__(dataset, **kwargs)
+        self.parent = parent
+        self.device = device
+
+    def __iter__(self):
+        return _EdgeDataLoaderIter(super().__iter__(), self.parent, self.device)
 
 class EdgeDataLoader:
     """PyTorch dataloader for batch-iterating over a set of edges, generating the list
@@ -525,6 +566,17 @@ class EdgeDataLoader:
     * Link prediction on homogeneous graph: GraphSAGE for unsupervised learning
 
     * Link prediction on heterogeneous graph: RGCN for link prediction.
+
+    If you are using PyTorch Lightning's ``LightningDataModule`` together with DGL,
+    you need to return the ``dataloader`` attribute in the data loader methods instead.
+
+    .. code:: python
+
+       def __init__(self):
+           self.dataloader = EdgeDataLoader(...)
+
+       def train_dataloader(self):
+           return self.dataloader.dataloader
     """
     collator_arglist = inspect.getfullargspec(EdgeCollator).args
 
@@ -541,8 +593,9 @@ class EdgeDataLoader:
         assert not isinstance(g, DistGraph), \
                 'EdgeDataLoader does not support DistGraph for now. ' \
                 + 'Please use DistDataLoader directly.'
-        self.dataloader = DataLoader(
-            self.collator.dataset, collate_fn=self.collator.collate, **dataloader_kwargs)
+        self.dataloader = _EdgeDataLoader(
+            self.collator.dataset, self, device, collate_fn=self.collator.collate,
+            **dataloader_kwargs)
         self.device = device
 
         # Precompute the CSR and CSC representations so each subprocess does not
@@ -552,7 +605,7 @@ class EdgeDataLoader:
 
     def __iter__(self):
         """Return the iterator of the data loader."""
-        return _EdgeDataLoaderIter(self)
+        return iter(self.dataloader)
 
     def __len__(self):
         """Return the number of batches of the data loader."""
@@ -579,6 +632,17 @@ class GraphDataLoader:
     ...     dataset, batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
     >>> for batched_graph, labels in dataloader:
     ...     train_on(batched_graph, labels)
+
+    If you are using PyTorch Lightning's ``LightningDataModule`` together with DGL,
+    you need to return the ``dataloader`` attribute in the data loader methods instead.
+
+    .. code:: python
+
+       def __init__(self):
+           self.dataloader = GraphDataLoader(...)
+
+       def train_dataloader(self):
+           return self.dataloader.dataloader
     """
     collator_arglist = inspect.getfullargspec(GraphCollator).args
 
