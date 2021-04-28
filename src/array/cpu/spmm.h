@@ -37,7 +37,7 @@
 
  double procf = 2.7*1e9;
 
- #define USE_LIBXSMM 0
+ #define USE_LIBXSMM 1
 
  #if USE_LIBXSMM
  #include <libxsmm.h>
