@@ -9,9 +9,35 @@ import logging
 import time
 import json
 import multiprocessing
+import re
 from threading import Thread
 
 DEFAULT_PORT = 30050
+
+def cleanup_proc(remote_pids, conn):
+    '''This process tries to clean up the remote training tasks.
+    '''
+    print('cleanupu process runs')
+    # This process should not handle SIGINT.
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+    data = conn.recv()
+    # If the launch process exits normally, this process doesn't need to do anything.
+    if data == 'exit':
+        sys.exit(0)
+    else:
+        # Otherwise, we need to ssh to each machine and kill the training jobs.
+        for (ip, port), pids in remote_pids.items():
+            kill_process(ip, port, pids)
+
+def kill_process(ip, port, pids):
+    '''ssh to a remote machine and kill the specified processes.
+    '''
+    for pid in pids:
+        print('kill process {} on {}:{}'.format(pid, ip, port), flush=True)
+        kill_cmd = 'ssh -o StrictHostKeyChecking=no -p ' + str(port) + ' ' + ip + ' \'kill {}\''.format(pid)
+        subprocess.run(kill_cmd, shell=True)
+
 
 def execute_remote(cmd, ip, port, thread_list):
     """execute command line on remote machine via ssh"""
@@ -24,6 +50,25 @@ def execute_remote(cmd, ip, port, thread_list):
     thread.setDaemon(True)
     thread.start()
     thread_list.append(thread)
+
+def get_remote_pids(ip, port, cmd_regex):
+    """Get the process IDs that run the command in the remote machine.
+    """
+    pids = []
+    # Here we want to get the python processes. We may get some ssh processes, so we should filter them out.
+    ps_cmd = 'ssh -o StrictHostKeyChecking=no -p ' + str(port) + ' ' + ip + ' \'ps -aux | grep python | grep -v StrictHostKeyChecking\''
+    res = subprocess.run(ps_cmd, shell=True, stdout=subprocess.PIPE)
+    for p in res.stdout.decode('utf-8').split('\n'):
+        l = p.split()
+        if len(l) < 2:
+            continue
+        # We only get the processes that run the specified command.
+        res = re.search(cmd_regex, p)
+        if res is not None:
+            pids.append(l[1])
+    return pids
+
+remote_pids = {}
 
 def submit_jobs(args, udf_command):
     """Submit distributed jobs (server and client processes) via ssh"""
@@ -56,6 +101,7 @@ def submit_jobs(args, udf_command):
     assert part_metadata['num_parts'] == len(hosts), \
             'The number of graph partitions has to match the number of machines in the cluster.'
 
+    global remote_pids
     tot_num_clients = args.num_trainers * (1 + args.num_samplers) * len(hosts)
     # launch server tasks
     server_cmd = 'DGL_ROLE=server DGL_NUM_SAMPLER=' + str(args.num_samplers)
@@ -102,8 +148,36 @@ def submit_jobs(args, udf_command):
         cmd = 'cd ' + str(args.workspace) + '; ' + cmd
         execute_remote(cmd, ip, args.ssh_port, thread_list)
 
+    # Launching training jobs in remote machines takes a while.
+    # We need to wait for a while to get process IDs in the remote machine.
+    time.sleep(10)
+    for node_id, host in enumerate(hosts):
+        ip, _ = host
+        # When creating training processes in remote machines, we may insert some arguments
+        # in the commands. We need to use regular expressions to match the modified command.
+        cmds = udf_command.split()
+        new_udf_command = ' .*'.join(cmds)
+        pids = get_remote_pids(ip, args.ssh_port, new_udf_command)
+        remote_pids[(ip, args.ssh_port)] = pids
+
+    # Start a cleanup process dedicated for cleaning up remote training jobs.
+    conn1,conn2 = multiprocessing.Pipe()
+    process = multiprocessing.Process(target=cleanup_proc, args=(remote_pids, conn1))
+    process.start()
+
+    def signal_handler(signal, frame):
+        logging.info('Stop launcher')
+        # We need to tell the cleanup process to kill remote training jobs.
+        conn2.send('cleanup')
+        sys.exit(0)
+    signal.signal(signal.SIGINT, signal_handler)
+
     for thread in thread_list:
         thread.join()
+    # The training processes complete. We should tell the cleanup process to exit.
+    conn2.send('exit')
+    process.join()
+
 
 def main():
     parser = argparse.ArgumentParser(description='Launch a distributed job')
@@ -153,12 +227,7 @@ def main():
         raise RuntimeError("DGL launching script can only support Python executable file.")
     submit_jobs(args, udf_command)
 
-def signal_handler(signal, frame):
-    logging.info('Stop launcher')
-    sys.exit(0)
-
 if __name__ == '__main__':
     fmt = '%(asctime)s %(levelname)s %(message)s'
     logging.basicConfig(format=fmt, level=logging.INFO)
-    signal.signal(signal.SIGINT, signal_handler)
     main()
