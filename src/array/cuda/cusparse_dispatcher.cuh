@@ -19,7 +19,7 @@ struct CSRGEMM {
   template <typename... Args>
   static inline cusparseStatus_t bufferSizeExt(Args... args) {
     BUG_IF_FAIL(false) << "This piece of code should not be reached.";
-    return 0;
+    return static_cast<cusparseStatus_t>(0);
   }
 
   template <typename... Args>
@@ -30,7 +30,7 @@ struct CSRGEMM {
   template <typename... Args>
   static inline cusparseStatus_t compute(Args... args) {
     BUG_IF_FAIL(false) << "This piece of code should not be reached.";
-    return 0;
+    return static_cast<cusparseStatus_t>(0);
   }
 };
 
@@ -76,7 +76,7 @@ struct CSRGEAM {
   template <typename... Args>
   static inline cusparseStatus_t bufferSizeExt(Args... args) {
     BUG_IF_FAIL(false) << "This piece of code should not be reached.";
-    return 0;
+    return static_cast<cusparseStatus_t>(0);
   }
 
   template <typename... Args>
@@ -87,7 +87,7 @@ struct CSRGEAM {
   template <typename... Args>
   static inline cusparseStatus_t compute(Args... args) {
     BUG_IF_FAIL(false) << "This piece of code should not be reached.";
-    return 0;
+    return static_cast<cusparseStatus_t>(0);
   }
 };
 
