@@ -47,10 +47,11 @@ A Bayesian model adds Dirichlet priors to θ_d & β_z. This causes the posterior
 DGL usage
 ---
 The corpus is represented as a bipartite multi-graph G.
-We use DGL to propagate the information through edges to aggregate the distributions in doc/word nodes.
+We use DGL to propagate information through the edges and aggregate the distributions at doc/word nodes.
 For scalability, the phi variables are transient and updated during message passing.
 The gamma / lambda variables are updated after the nodes receive all edge messages.
-Following the conventions in [1], the gamma update is called E-step and the lambda update is called M-step, because the beta variable has smaller variance - we can further approximate a MAP solution by using a large step size for word nodes.
+Following the conventions in [1], the gamma update is called E-step and the lambda update is called M-step, because the beta variable has smaller variance.
+The lambda variable is further recorded by the trainer and we may further approximate its MAP estimate by using a large step size for word nodes.
 A separate function is used to produce perplexity, which is based on the ELBO objective function divided by the total numbers of word/doc occurrences.
 
 Example
@@ -58,7 +59,7 @@ Example
 `%run example_20newsgroups.py`
  * Approximately matches scikit-learn training perplexity after 10 rounds of training.
  * Exactly matches scikit-learn training perplexity if word_z is set to lda.components_.T
- * To compute testing perplexity, we need to fix the word beta variables via MAP estimate. This step is not taken by sklearn and its beta part seems to contain another bug for dividing the training loss by the testing word counts. Nonetheless, I recommend setting `step_size["word"]` to a larger value to approximate a MAP estimate.
+ * To compute testing perplexity, we need to fix the word beta variables via MAP estimate. This step is not taken by sklearn and its beta part seems to contain another bug by dividing the training loss by the testing word counts. Nonetheless, I recommend setting `step_size["word"]` to a larger value to approximate the corresponding MAP estimate.
  * The DGL-LDA model runs 50% faster on GPU devices compared with sklearn without joblib parallel.
 
 Advanced configurations
