@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2021 by Contributors
- * \file graph/transform/kdtree_ndarray_adapter.h
+ * \file graph/transform/cpu/kdtree_ndarray_adapter.h
  * \brief NDArray adapter for nanoflann, without
  *        duplicating the storage
  */
