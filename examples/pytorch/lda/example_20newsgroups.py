@@ -101,15 +101,15 @@ Gt = dgl.heterograph({('doc','topic','word'): tt_uv}, device=device)
 print("done in %0.3fs." % (time() - t0))
 print()
 
-print("Training dgl model...")
+print("Training dgl-lda model...")
 t0 = time()
 model = LDAModel(G, n_components)
 model.fit(G)
 print("done in %0.3fs." % (time() - t0))
 print()
 
-print(f"scikit-learn training perplexity {model.perplexity(G):.3f}")
-print(f"scikit-learn testing perplexity {model.perplexity(Gt):.3f}")
+print(f"dgl-lda training perplexity {model.perplexity(G):.3f}")
+print(f"dgl-lda testing perplexity {model.perplexity(Gt):.3f}")
 
 plot_top_words(
     type('dummy', (object,), {'components_': G.ndata['z']['word'].cpu().numpy().T}),
@@ -133,6 +133,3 @@ print()
 
 print(f"scikit-learn training perplexity {lda.perplexity(tf)}")
 print(f"scikit-learn testing perplexity {lda.perplexity(tt)}")
-
-tf_feature_names = tf_vectorizer.get_feature_names()
-plot_top_words(lda, tf_feature_names, n_top_words, 'Topics in LDA model')
