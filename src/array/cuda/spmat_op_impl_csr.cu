@@ -17,37 +17,6 @@ using runtime::NDArray;
 namespace aten {
 namespace impl {
 
-/*!
- * \brief Search adjacency list linearly for each (row, col) pair and
- * write the data under the matched position in the indices array to the output.
- *
- * If there is no match, -1 is written.
- * If there are multiple matches, only the first match is written.
- * If the given data array is null, write the matched position to the output.
- */
-template <typename IdType>
-__global__ void _LinearSearchKernel(
-    const IdType* indptr, const IdType* indices, const IdType* data,
-    const IdType* row, const IdType* col,
-    int64_t row_stride, int64_t col_stride,
-    int64_t length, IdType* out) {
-  int tx = blockIdx.x * blockDim.x + threadIdx.x;
-  const int stride_x = gridDim.x * blockDim.x;
-  while (tx < length) {
-    int rpos = tx * row_stride, cpos = tx * col_stride;
-    IdType v = -1;
-    const IdType r = row[rpos], c = col[cpos];
-    for (IdType i = indptr[r]; i < indptr[r + 1]; ++i) {
-      if (indices[i] == c) {
-        v = (data)? data[i] : i;
-        break;
-      }
-    }
-    out[tx] = v;
-    tx += stride_x;
-  }
-}
-
 ///////////////////////////// CSRIsNonZero /////////////////////////////
 
 template <DLDeviceType XPU, typename IdType>
@@ -61,12 +30,12 @@ bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col) {
   IdArray out = aten::NewIdArray(1, ctx, sizeof(IdType) * 8);
   const IdType* data = nullptr;
   // TODO(minjie): use binary search for sorted csr
-  CUDA_KERNEL_CALL(_LinearSearchKernel,
+  CUDA_KERNEL_CALL(cuda::_LinearSearchKernel,
       1, 1, 0, thr_entry->stream,
       csr.indptr.Ptr<IdType>(), csr.indices.Ptr<IdType>(), data,
       rows.Ptr<IdType>(), cols.Ptr<IdType>(),
       1, 1, 1,
-      out.Ptr<IdType>());
+      static_cast<IdType*>(nullptr), static_cast<IdType>(-1), out.Ptr<IdType>());
   out = out.CopyTo(DLContext{kDLCPU, 0});
   return *out.Ptr<IdType>() != -1;
 }
@@ -89,12 +58,12 @@ NDArray CSRIsNonZero(CSRMatrix csr, NDArray row, NDArray col) {
   const int nb = (rstlen + nt - 1) / nt;
   const IdType* data = nullptr;
   // TODO(minjie): use binary search for sorted csr
-  CUDA_KERNEL_CALL(_LinearSearchKernel,
+  CUDA_KERNEL_CALL(cuda::_LinearSearchKernel,
       nb, nt, 0, thr_entry->stream,
       csr.indptr.Ptr<IdType>(), csr.indices.Ptr<IdType>(), data,
       row.Ptr<IdType>(), col.Ptr<IdType>(),
       row_stride, col_stride, rstlen,
-      rst.Ptr<IdType>());
+      static_cast<IdType*>(nullptr), static_cast<IdType>(-1), rst.Ptr<IdType>());
   return rst != -1;
 }
 
@@ -304,41 +273,6 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {
 
 template CSRMatrix CSRSliceRows<kDLGPU, int32_t>(CSRMatrix , NDArray);
 template CSRMatrix CSRSliceRows<kDLGPU, int64_t>(CSRMatrix , NDArray);
-
-///////////////////////////// CSRGetData /////////////////////////////
-
-template <DLDeviceType XPU, typename IdType>
-IdArray CSRGetData(CSRMatrix csr, NDArray row, NDArray col) {
-  const int64_t rowlen = row->shape[0];
-  const int64_t collen = col->shape[0];
-
-  CHECK((rowlen == collen) || (rowlen == 1) || (collen == 1))
-    << "Invalid row and col id array.";
-
-  const int64_t row_stride = (rowlen == 1 && collen != 1) ? 0 : 1;
-  const int64_t col_stride = (collen == 1 && rowlen != 1) ? 0 : 1;
-
-  const int64_t rstlen = std::max(rowlen, collen);
-  IdArray rst = NDArray::Empty({rstlen}, row->dtype, row->ctx);
-  if (rstlen == 0)
-    return rst;
-
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
-  const int nt = cuda::FindNumThreads(rstlen);
-  const int nb = (rstlen + nt - 1) / nt;
-  // TODO(minjie): use binary search for sorted csr
-  CUDA_KERNEL_CALL(_LinearSearchKernel,
-      nb, nt, 0, thr_entry->stream,
-      csr.indptr.Ptr<IdType>(), csr.indices.Ptr<IdType>(),
-      CSRHasData(csr)? csr.data.Ptr<IdType>() : nullptr,
-      row.Ptr<IdType>(), col.Ptr<IdType>(),
-      row_stride, col_stride, rstlen,
-      rst.Ptr<IdType>());
-  return rst;
-}
-
-template NDArray CSRGetData<kDLGPU, int32_t>(CSRMatrix csr, NDArray rows, NDArray cols);
-template NDArray CSRGetData<kDLGPU, int64_t>(CSRMatrix csr, NDArray rows, NDArray cols);
 
 ///////////////////////////// CSRGetDataAndIndices /////////////////////////////
 

@@ -555,7 +555,7 @@ DGL_DLL void DGLLoadTensorAdapter(const char *path);
  *
  * Hints the user to file a bug report if the condition fails.
  */
-#define BUG_ON(cond) \
+#define BUG_IF_FAIL(cond) \
   CHECK(cond) << "A bug has been occurred.  " \
                  "Please file a bug report at https://github.com/dmlc/dgl/issues.  " \
                  "Message: "
