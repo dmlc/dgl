@@ -213,7 +213,7 @@ def run(args, device, data):
     loss_fcn = loss_fcn.to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     if args.dgl_sparse:
-        emb_optimizer = dgl.distributed.optim.SparseAdagrad([emb_layer.sparse_emb], lr=args.sparse_lr)
+        emb_optimizer = dgl.distributed.optim.SparseAdam([emb_layer.sparse_emb], lr=args.sparse_lr)
         print('optimize DGL sparse embedding:', emb_layer.sparse_emb)
     elif args.standalone:
         emb_optimizer = th.optim.SparseAdam(list(emb_layer.sparse_emb.parameters()), lr=args.sparse_lr)
@@ -291,7 +291,7 @@ def run(args, device, data):
             start = time.time()
             val_acc, test_acc = evaluate(args.standalone, model.module, emb_layer, g,
                                          g.ndata['labels'], val_nid, test_nid, args.batch_size_eval, device)
-            print('Part {}, Val Acc {:.4f}, Test Acc {:.4f}, time: {:.4f}'.format(g.rank(), val_acc, test_acc,
+            print('Part {}, Val Acc {:.4f}, Test Acc {:.4f}, time: {:.4f}'.format(g.rank(), val_acc, test_acc, time.time()-start))
 
 def main(args):
     dgl.distributed.initialize(args.ip_config)

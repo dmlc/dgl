@@ -52,8 +52,17 @@ class DistSparseGradOptimizer(abc.ABC):
 
                 idics = [t[0] for t in trace]
                 grads = [t[1].grad.data for t in trace]
-                idics = th.cat(idics, dim=0)
-                grads = th.cat(grads, dim=0)
+                # If the sparse embedding is not used in the previous forward step
+                # The idx and grad will be empty, initialize them as empty tensors to
+                # avoid crashing the optimizer step logic.
+                #
+                # Note: we cannot skip the gradient exchange and update steps as other
+                # working processes may send gradient update requests corresponding
+                # to certain embedding to this process.
+                idics = th.cat(idics, dim=0) if len(idics) != 0 else \
+                    th.zeros((0,), dtype=th.long, device=th.device('cpu'))
+                grads = th.cat(grads, dim=0) if len(grads) != 0 else \
+                    th.zeros((0, emb.embedding_dim), dtype=th.float32, device=th.device('cpu'))
                 device = grads.device
 
                 # will send grad to each corresponding trainer
@@ -231,3 +240,104 @@ class SparseAdagrad(DistSparseGradOptimizer):
         std_values = grad_state.add_(eps).sqrt_()
         tmp = clr * grad_values / std_values
         emb._tensor[grad_indices] -= tmp.to(th.device('cpu'), non_blocking=True)
+
+class SparseAdam(DistSparseGradOptimizer):
+    r''' Distributed Node embedding optimizer using the Adam algorithm.
+
+    This optimizer implements a distributed sparse version of Adam algorithm for
+    optimizing :class:`dgl.distributed.nn.NodeEmbedding`. Being sparse means it only updates
+    the embeddings whose gradients have updates, which are usually a very
+    small portion of the total embeddings.
+
+    Adam maintains a :math:`Gm_{t,i,j}` and `Gp_{t,i,j}` for every parameter
+    in the embeddings, where
+    :math:`Gm_{t,i,j}=beta1 * Gm_{t-1,i,j} + (1-beta1) * g_{t,i,j}`,
+    :math:`Gp_{t,i,j}=beta2 * Gp_{t-1,i,j} + (1-beta2) * g_{t,i,j}^2`,
+    :math:`g_{t,i,j} = lr * Gm_{t,i,j} / (1 - beta1^t) / \sqrt{Gp_{t,i,j} / (1 - beta2^t)}` and
+    :math:`g_{t,i,j}` is the gradient of the dimension :math:`j` of embedding :math:`i`
+    at step :math:`t`.
+
+    NOTE: The support of sparse Adam optimizer is experimental.
+
+    Parameters
+    ----------
+    params : list[dgl.distributed.nn.NodeEmbedding]
+        The list of dgl.distributed.nn.NodeEmbedding.
+    lr : float
+        The learning rate.
+    betas : tuple[float, float], Optional
+        Coefficients used for computing running averages of gradient and its square.
+        Default: (0.9, 0.999)
+    eps : float, Optional
+        The term added to the denominator to improve numerical stability
+        Default: 1e-8
+    '''
+    def __init__(self, params, lr, betas=(0.9, 0.999), eps=1e-08):
+        super(SparseAdam, self).__init__(params, lr)
+        self._eps = eps
+        # We need to register a state sum for each embedding in the kvstore.
+        self._beta1 = betas[0]
+        self._beta2 = betas[1]
+        self._state = {}
+        for emb in params:
+            assert isinstance(emb, NodeEmbedding), \
+                'SparseAdam only supports dgl.distributed.nn.NodeEmbedding'
+
+            state_step = DistTensor((emb.num_embeddings,), th.float32, emb.name + "_step",
+                               init_func=initializer, part_policy=emb.part_policy, is_gdata=False)
+            state_mem = DistTensor((emb.num_embeddings, emb.embedding_dim), th.float32, emb.name + "_mem",
+                               init_func=initializer, part_policy=emb.part_policy, is_gdata=False)
+            state_power = DistTensor((emb.num_embeddings, emb.embedding_dim), th.float32, emb.name + "_power",
+                               init_func=initializer, part_policy=emb.part_policy, is_gdata=False)
+            state = (state_step, state_mem, state_power)
+            emb.set_optm_state(state)
+            self._state[emb.name] = state
+
+    def update(self, idx, grad, emb):
+        """ Update embeddings in a sparse manner
+        Sparse embeddings are updated in mini batches. we maintains gradient states for
+        each embedding so they can be updated separately.
+
+        Parameters
+        ----------
+        idx : tensor
+            Index of the embeddings to be updated.
+        grad : tensor
+            Gradient of each embedding.
+        emb : dgl.distributed.nn.NodeEmbedding
+            Sparse embedding to update.
+        """
+        beta1 = self._beta1
+        beta2 = self._beta2
+        eps = self._eps
+        clr = self._lr
+        state_step, state_mem, state_power = emb.optm_state
+
+        state_dev = th.device('cpu')
+        exec_dev = grad.device
+        # the update is non-linear so indices must be unique
+        grad_indices, inverse, cnt = th.unique(idx, return_inverse=True, return_counts=True)
+        # update grad state
+        state_idx = grad_indices.to(state_dev)
+        state_step[state_idx] += 1
+        state_step = state_step[state_idx].to(exec_dev, non_blocking=True)
+        orig_mem = state_mem[state_idx].to(exec_dev, non_blocking=True)
+        orig_power = state_power[state_idx].to(exec_dev, non_blocking=True)
+
+        grad_values = th.zeros((grad_indices.shape[0], grad.shape[1]), device=exec_dev)
+        grad_values.index_add_(0, inverse, grad)
+        grad_values = grad_values / cnt.unsqueeze(1)
+        grad_mem = grad_values
+        grad_power = grad_values * grad_values
+        update_mem = beta1 * orig_mem + (1.-beta1) * grad_mem
+        update_power = beta2 * orig_power + (1.-beta2) * grad_power
+        state_mem[state_idx] = update_mem.to(state_dev, non_blocking=True)
+        state_power[state_idx] = update_power.to(state_dev, non_blocking=True)
+
+        update_mem_corr = update_mem / (1. - th.pow(th.tensor(beta1, device=exec_dev),
+                                                    state_step)).unsqueeze(1)
+        update_power_corr = update_power / (1. - th.pow(th.tensor(beta2, device=exec_dev),
+                                                        state_step)).unsqueeze(1)
+        std_values = clr * update_mem_corr / (th.sqrt(update_power_corr) + eps)
+
+        emb._tensor[state_idx] -= std_values.to(state_dev)
