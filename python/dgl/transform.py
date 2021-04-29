@@ -59,7 +59,7 @@ def pairwise_squared_distance(x):
     return x2s + F.swapaxes(x2s, -1, -2) - 2 * x @ F.swapaxes(x, -1, -2)
 
 #pylint: disable=invalid-name
-def knn_graph(x, k, algorithm='topk'):
+def knn_graph(x, k, algorithm='bruteforce-blas'):
     """Construct a graph from a set of points according to k-nearest-neighbor (KNN)
     and return.
 
@@ -89,11 +89,28 @@ def knn_graph(x, k, algorithm='topk'):
     algorithm : str, optional
         Algorithm used to compute the k-nearest neighbors.
 
-        * 'topk' will use topk algorithm (quick-select or sorting,
-          depending on backend implementation)
-        * 'kd-tree' will use kd-tree algorithm (only on cpu)
+        * 'bruteforce-blas' will first compute the distance matrix
+          using BLAS matrix multiplication operation provided by
+          backend frameworks. Then use topk algorithm to get
+          k-nearest neighbors. This method has the largest memory
+          overhead.
 
-        (default: 'topk')
+        * 'bruteforce' will compute distances pair by pair and
+          directly select the k-nearest neighbors during distance
+          computation. This method is slower than 'bruteforce-blas'
+          but has less memory overhead since we do not need to store
+          all distances.
+
+        * 'bruteforce-sharemem' (CUDA only) is similar to 'bruteforce'
+          but use shared memory in CUDA devices for buffer. This method is
+          faster than 'bruteforce' when the dimension of input points
+          is not large. This method is only available on CUDA device.
+
+        * 'kd-tree' will use the kd-tree algorithm (CPU only).
+          This method is suitable for low-dimensional data (e.g. 3D
+          point clouds)
+
+        (default: 'bruteforce-blas')
 
     Returns
     -------
@@ -137,8 +154,8 @@ def knn_graph(x, k, algorithm='topk'):
     (tensor([0, 1, 2, 2, 2, 3, 3, 3, 4, 5, 5, 5, 6, 6, 7, 7]),
      tensor([0, 1, 1, 2, 3, 0, 2, 3, 4, 5, 6, 7, 4, 6, 5, 7]))
     """
-    if algorithm == 'topk':
-        return _knn_graph_topk(x, k)
+    if algorithm == 'bruteforce-blas':
+        return _knn_graph_blas(x, k)
     else:
         if F.ndim(x) == 3:
             x_size = tuple(F.shape(x))
@@ -150,9 +167,12 @@ def knn_graph(x, k, algorithm='topk'):
         row, col = out[1], out[0]
         return convert.graph((row, col))
 
-def _knn_graph_topk(x, k):
-    """Construct a graph from a set of points according to k-nearest-neighbor (KNN)
-    via topk method.
+def _knn_graph_blas(x, k):
+    """Construct a graph from a set of points according to k-nearest-neighbor (KNN).
+
+    This function first compute the distance matrix using BLAS matrix multiplication
+    operation provided by backend frameworks. Then use topk algorithm to get
+    k-nearest neighbors.
 
     Parameters
     ----------
@@ -187,7 +207,7 @@ def _knn_graph_topk(x, k):
     return convert.from_scipy(adj)
 
 #pylint: disable=invalid-name
-def segmented_knn_graph(x, k, segs, algorithm='topk'):
+def segmented_knn_graph(x, k, segs, algorithm='bruteforce-blas'):
     """Construct multiple graphs from multiple sets of points according to
     k-nearest-neighbor (KNN) and return.
 
@@ -212,11 +232,28 @@ def segmented_knn_graph(x, k, segs, algorithm='topk'):
     algorithm : str, optional
         Algorithm used to compute the k-nearest neighbors.
 
-        * 'topk' will use topk algorithm (quick-select or sorting,
-          depending on backend implementation)
-        * 'kd-tree' will use kd-tree algorithm (only on cpu)
+        * 'bruteforce-blas' will first compute the distance matrix
+          using BLAS matrix multiplication operation provided by
+          backend frameworks. Then use topk algorithm to get
+          k-nearest neighbors. This method has the largest memory
+          overhead.
 
-        (default: 'topk')
+        * 'bruteforce' will compute distances pair by pair and
+          directly select the k-nearest neighbors during distance
+          computation. This method is slower than 'bruteforce-blas'
+          but has less memory overhead since we do not need to store
+          all distances.
+
+        * 'bruteforce-sharemem' (CUDA only) is similar to 'bruteforce'
+          but use shared memory in CUDA devices for buffer. This method is
+          faster than 'bruteforce' when the dimension of input points
+          is not large. This method is only available on CUDA device.
+
+        * 'kd-tree' will use the kd-tree algorithm (CPU only).
+          This method is suitable for low-dimensional data (e.g. 3D
+          point clouds)
+
+        (default: 'bruteforce-blas')
 
     Returns
     -------
@@ -252,16 +289,20 @@ def segmented_knn_graph(x, k, segs, algorithm='topk'):
     (tensor([0, 0, 1, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6, 6]),
      tensor([0, 1, 0, 1, 2, 2, 3, 5, 4, 6, 3, 5, 4, 6]))
     """
-    if algorithm == 'topk':
-        return _segmented_knn_graph_topk(x, k, segs)
+    if algorithm == 'bruteforce-blas':
+        return _segmented_knn_graph_blas(x, k, segs)
     else:
         out = knn(x, segs, x, segs, k, algorithm=algorithm)
         row, col = out[1], out[0]
         return convert.graph((row, col))
 
-def _segmented_knn_graph_topk(x, k, segs):
+def _segmented_knn_graph_blas(x, k, segs):
     """Construct multiple graphs from multiple sets of points according to
-    k-nearest-neighbor (KNN) via topk method.
+    k-nearest-neighbor (KNN).
+
+    This function first compute the distance matrix using BLAS matrix multiplication
+    operation provided by backend frameworks. Then use topk algorithm to get
+    k-nearest neighbors.
 
     Parameters
     ----------
@@ -290,7 +331,7 @@ def _segmented_knn_graph_topk(x, k, segs):
 
     return convert.from_scipy(adj)
 
-def knn(x, x_segs, y, y_segs, k, algorithm='kd-tree', dist='euclidean'):
+def knn(x, x_segs, y, y_segs, k, algorithm='bruteforce', dist='euclidean'):
     r"""For each element in each segment in :attr:`y`, find :attr:`k` nearest
     points in the same segment in :attr:`x`.
 
@@ -316,14 +357,29 @@ def knn(x, x_segs, y, y_segs, k, algorithm='kd-tree', dist='euclidean'):
         The number of nearest neighbors per node.
     algorithm : str, optional
         Algorithm used to compute the k-nearest neighbors.
-        Currently only cpu version kdtree is supported.
-        (default: 'kd-tree')
+
+        * 'bruteforce' will compute distances pair by pair and
+          directly select the k-nearest neighbors during distance
+          computation. This method is slower than 'bruteforce-blas'
+          but has less memory overhead since we do not need to store
+          all distances.
+
+        * 'bruteforce-sharemem' (CUDA only) is similar to 'bruteforce'
+          but use shared memory in CUDA devices for buffer. This method is
+          faster than 'bruteforce' when the dimension of input points
+          is not large. This method is only available on CUDA device.
+
+        * 'kd-tree' will use the kd-tree algorithm (CPU only).
+          This method is suitable for low-dimensional data (e.g. 3D
+          point clouds)
+
+        (default: 'bruteforce')
     dist : str, optional
         The distance metric used to compute distance between points. It can be the following
         metrics:
         * 'euclidean': Use Euclidean distance (L2 norm) :math:`\sqrt{\sum_{i} (x_{i} - y_{i})^{2}}`.
         * 'cosine': Use cosine distance.
-        (Default: "euclidean")
+        (default: 'euclidean')
 
     Returns
     -------
@@ -332,24 +388,13 @@ def knn(x, x_segs, y, y_segs, k, algorithm='kd-tree', dist='euclidean'):
         The first subtensor contains point indexs in :attr:`y`. The second subtensor contains
         point indexs in :attr:`x`
     """
-    # currently only cpu implementation is supported.
-    if (F.context(x) != F.cpu() or F.context(y) != F.cpu()):
-        dgl_warning("Currently only cpu implementation is supported," \
-            "copy input tensors to cpu.")
-    x = F.copy_to(x, F.cpu())
-    y = F.copy_to(y, F.cpu())
+    assert F.context(x) == F.context(y)
     if isinstance(x_segs, (tuple, list)):
         x_segs = F.tensor(x_segs)
     if isinstance(y_segs, (tuple, list)):
         y_segs = F.tensor(y_segs)
     x_segs = F.copy_to(x_segs, F.context(x))
     y_segs = F.copy_to(y_segs, F.context(y))
-
-    # supported algorithms
-    algorithm_list = ['kd-tree']
-    if algorithm not in algorithm_list:
-        raise DGLError("only {} algorithms are supported, get '{}'".format(
-            algorithm_list, algorithm))
 
     # k must less than or equal to min(x_segs)
     if k > F.min(x_segs, dim=0):
@@ -379,7 +424,7 @@ def knn(x, x_segs, y, y_segs, k, algorithm='kd-tree', dist='euclidean'):
                  F.to_dgl_nd(y), F.to_dgl_nd(y_offset),
                  k, F.zerocopy_to_dgl_ndarray_for_write(out),
                  algorithm)
-    return out
+    return F.copy_to(out, F.cpu())
 
 def to_bidirected(g, copy_ndata=False, readonly=None):
     r"""Convert the graph to a bi-directional simple graph and return.
