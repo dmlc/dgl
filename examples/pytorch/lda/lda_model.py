@@ -216,7 +216,7 @@ class LatentDirichletAllocation:
 
 
 if __name__ == '__main__':
-    print('Example test follows tests/scripts/task_example_test.sh ...')
+    print('Testing LatentDirichletAllocation via task_example_test.sh ...')
     tf_uv = np.array(np.nonzero(np.random.rand(20,10)<0.5)).T
     G = dgl.heterograph({('doc','topic','word'): tf_uv.tolist()})
     model = LatentDirichletAllocation(G, 5, verbose=False)

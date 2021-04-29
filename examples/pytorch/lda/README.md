@@ -38,17 +38,18 @@ A Bayesian model adds Dirichlet priors to θ_d & β_z. This causes the posterior
  * The evidence lower-bound is
  <img src="https://latex.codecogs.com/gif.latex?\log&space;p(G)\geq&space;\mathbb{E}_q\left[\sum_{(d,w)}\log\left(&space;\frac{\theta_{dz}\beta_{zw}}{q(z;\phi_{dw})}&space;\right)&space;&plus;\sum_{d}&space;\log\left(&space;\frac{p(\theta_d;\alpha)}{q(\theta_d;\gamma_d)}&space;\right)&space;&plus;\sum_{z}&space;\log\left(&space;\frac{p(\beta_z;\eta)}{q(\beta_z;\lambda_z)}&space;\right)\right]" title="elbo" />
 
- * ELBO factors as
+ * ELBO objective function factors as
  <img src="https://latex.codecogs.com/gif.latex?\sum_{(d,w)}&space;\phi_{dw}^{\top}\left(&space;\mathbb{E}_{\gamma_d}[\log\theta_d]&space;&plus;\mathbb{E}_{\lambda}[\log\beta_{:w}]&space;-\log\phi_{dw}&space;\right)&space;\\&space;&plus;&space;\sum_d&space;(\alpha-\gamma_d)^\top\mathbb{E}_{\gamma_d}[\log&space;\theta_d]-(\log&space;B(\alpha)-\log&space;B(\gamma_d))&space;\\&space;&plus;&space;\sum_z&space;(\eta-\lambda_z)^\top\mathbb{E}_{\lambda_z}[\log&space;\beta_z]-(\log&space;B(\eta)-\log&space;B(\lambda_z))" title="factors" />
 
- * Finally, an explicit solution for E[log X] under Dirichlet distribution can be given via digamma function.
+ * Similarly, optimization alternates between ϕ, γ, λ. Since θ, β are random, we use an explicit solution for E[log X] under Dirichlet distribution via digamma function.
 
 DGL usage
 ---
 We use DGL to propagate the information through edges to aggregate the distributions in doc/word nodes.
-The phi variables are updated during message passing.
-The theta / beta variables are updated after the nodes receive all edge messages.
-A separate function is used to produce perplexity per occurrence of a word/doc pair.
+For scalability, the phi variables are transient and updated during message passing.
+The gamma / lambda variables are updated after the nodes receive all edge messages.
+Following the conventions in [1], the gamma update is called E-step and the lambda update is called M-step, because the beta variable has smaller variance - we can further approximate a MAP solution by using a large step size for word nodes.
+A separate function is used to produce perplexity, which is based on the ELBO objective function divided by the total numbers of word/doc occurrences.
 
 Example
 ---
