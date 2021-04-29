@@ -29,6 +29,7 @@ def cleanup_proc(remote_pids, conn):
         # Otherwise, we need to ssh to each machine and kill the training jobs.
         for (ip, port), pids in remote_pids.items():
             kill_process(ip, port, pids)
+    print('cleanup process exits')
 
 def kill_process(ip, port, pids):
     '''ssh to a remote machine and kill the specified processes.
@@ -66,6 +67,14 @@ def get_remote_pids(ip, port, cmd_regex):
         res = re.search(cmd_regex, p)
         if res is not None:
             pids.append(l[1])
+
+    print('get from ps:', pids)
+    pid_str = ','.join([str(pid) for pid in pids])
+    ps_cmd = 'ssh -o StrictHostKeyChecking=no -p ' + str(port) + ' ' + ip + ' \'pgrep -P {}\''.format(pid_str)
+    res = subprocess.run(ps_cmd, shell=True, stdout=subprocess.PIPE)
+    pids1 = res.stdout.decode('utf-8').split('\n')
+    pids = list(set(pids + pids1))
+    print('merge with pgrep:', pids)
     return pids
 
 remote_pids = {}
@@ -150,7 +159,7 @@ def submit_jobs(args, udf_command):
 
     # Launching training jobs in remote machines takes a while.
     # We need to wait for a while to get process IDs in the remote machine.
-    time.sleep(10)
+    time.sleep(60)
     for node_id, host in enumerate(hosts):
         ip, _ = host
         # When creating training processes in remote machines, we may insert some arguments
