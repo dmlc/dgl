@@ -1,8 +1,9 @@
 # Copyright 2021 Yifei Ma
-# Modified from scikit-learn example with these authors:
-#     Olivier Grisel <olivier.grisel@ensta.org>
-#     Lars Buitinck
-#     Chyi-Kwei Yau <chyikwei.yau@gmail.com>
+# Modified from scikit-learn example "plot_topics_extraction_with_nmf_lda.py"
+# with the following original authors with BSD 3-Clause:
+# * Olivier Grisel <olivier.grisel@ensta.org>
+# * Lars Buitinck
+# * Chyi-Kwei Yau <chyikwei.yau@gmail.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.

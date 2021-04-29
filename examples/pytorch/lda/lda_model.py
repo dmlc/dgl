@@ -1,6 +1,7 @@
 # Copyright 2021 Yifei Ma
-# With references from
-# * Chyi-Kwei Yau (original scikit-learn implementation)
+# with references from "sklearn.decomposition.LatentDirichletAllocation"
+# with the following original authors:
+# * Chyi-Kwei Yau (the said scikit-learn implementation)
 # * Matthew D. Hoffman (original onlineldavb implementation)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
