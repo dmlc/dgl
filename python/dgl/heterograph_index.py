@@ -696,6 +696,9 @@ class HeteroGraphIndex(ObjectBase):
             indptr = utils.toindex(rst(0), self.dtype).tonumpy()
             indices = utils.toindex(rst(1), self.dtype).tonumpy()
             data = utils.toindex(rst(2)).tonumpy() if return_edge_ids else np.ones_like(indices)
+            # Check if edge ID is omitted
+            if return_edge_ids and data.shape[0] == 0:
+                data = np.arange(nnz)
             return scipy.sparse.csr_matrix((data, indices, indptr), shape=(nrows, ncols))
         elif fmt == 'coo':
             idx = utils.toindex(rst(0), self.dtype).tonumpy()
