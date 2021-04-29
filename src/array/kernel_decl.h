@@ -67,6 +67,21 @@ void SDDMMCsr(const std::string& op,
               NDArray out,
               int lhs_target,
               int rhs_target);
+/*!
+ * \brief Generalized Sampled Dense-Dense Matrix Multiplication on Csr 
+ format with heterograph support.
+  */
+template <int XPU, typename IdType, int bits>
+void SDDMMCsrHetero(const std::string& op,
+              const BcastOff& bcast,
+              const std::vector<CSRMatrix>& vec_csr,
+              std::vector<NDArray> vec_lhs,
+              std::vector<NDArray> vec_rhs,
+              std::vector<NDArray> vec_out,
+              int lhs_target,
+              int rhs_target,
+              const std::vector<dgl_type_t> ufeat_eid,
+              const std::vector<dgl_type_t> out_eid);
 
 /*!
  * \brief Generalized Sampled Dense-Dense Matrix Multiplication on Coo format.
