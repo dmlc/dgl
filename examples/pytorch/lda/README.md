@@ -2,7 +2,8 @@ Latent Dirichlet Allocation
 ===
 LDA is a classical algorithm for probabilistic graphical models. It assumes 
 hierarchical Bayes models with discrete variables on sparse doc/word graphs.
-This example shows how it can be done on DGL.
+This example shows how it can be done on DGL,
+where the corpus is represented as a bipartite multi-graph G.
 There is no back-propagation, because gradient descent is typically considered
 inefficient on probability simplex.
 On the provided small-scale example on 20 news groups dataset, our DGL-LDA model runs
@@ -45,6 +46,7 @@ A Bayesian model adds Dirichlet priors to θ_d & β_z. This causes the posterior
 
 DGL usage
 ---
+The corpus is represented as a bipartite multi-graph G.
 We use DGL to propagate the information through edges to aggregate the distributions in doc/word nodes.
 For scalability, the phi variables are transient and updated during message passing.
 The gamma / lambda variables are updated after the nodes receive all edge messages.
