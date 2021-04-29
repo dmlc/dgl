@@ -1,4 +1,7 @@
 # Transformer in DGL
+
+**This example is out-dated, please refer to [BP-Transformer](http://github.com/yzh119/bpt) for efficient (Sparse) Transformer implementation in DGL.**
+
 In this example we implement the [Transformer](https://arxiv.org/pdf/1706.03762.pdf) with ACT in DGL.
 
 The folder contains training module and inferencing module (beam decoder) for Transformer.
@@ -9,6 +12,7 @@ The folder contains training module and inferencing module (beam decoder) for Tr
 - networkx
 - tqdm
 - requests
+- matplotlib
 
 ## Usage
 

@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import numpy as np
 from scipy.linalg import block_diag
 
@@ -101,29 +102,15 @@ class DiffPoolBatchedGraphLayer(nn.Module):
         self.reg_loss.append(EntropyLoss())
 
     def forward(self, g, h):
-        feat = self.feat_gc(g, h)
-        assign_tensor = self.pool_gc(g, h)
+        feat = self.feat_gc(g, h)  # size = (sum_N, F_out), sum_N is num of nodes in this batch
         device = feat.device
-        assign_tensor_masks = []
-        batch_size = len(g.batch_num_nodes)
-        for g_n_nodes in g.batch_num_nodes:
-            mask = torch.ones((g_n_nodes,
-                               int(assign_tensor.size()[1] / batch_size)))
-            assign_tensor_masks.append(mask)
-        """
-        The first pooling layer is computed on batched graph.
-        We first take the adjacency matrix of the batched graph, which is block-wise diagonal.
-        We then compute the assignment matrix for the whole batch graph, which will also be block diagonal
-        """
-        mask = torch.FloatTensor(
-            block_diag(
-                *
-                assign_tensor_masks)).to(
-            device=device)
-        assign_tensor = masked_softmax(assign_tensor, mask,
-                                       memory_efficient=False)
+        assign_tensor = self.pool_gc(g, h)  # size = (sum_N, N_a), N_a is num of nodes in pooled graph.
+        assign_tensor = F.softmax(assign_tensor, dim=1)
+        assign_tensor = torch.split(assign_tensor, g.batch_num_nodes().tolist())
+        assign_tensor = torch.block_diag(*assign_tensor)  # size = (sum_N, batch_size * N_a)
+
         h = torch.matmul(torch.t(assign_tensor), feat)
-        adj = g.adjacency_matrix(ctx=device)
+        adj = g.adjacency_matrix(transpose=False, ctx=device)
         adj_new = torch.sparse.mm(adj, assign_tensor)
         adj_new = torch.mm(torch.t(assign_tensor), adj_new)
 

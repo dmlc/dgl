@@ -1,6 +1,7 @@
 """Module for message propagation."""
 from __future__ import absolute_import
 
+from . import backend as F
 from . import traversal as trv
 from .heterograph import DGLHeteroGraph
 
@@ -86,7 +87,11 @@ def prop_nodes_bfs(graph,
         'DGLGraph is deprecated, Please use DGLHeteroGraph'
     assert len(graph.canonical_etypes) == 1, \
         'prop_nodes_bfs only support homogeneous graph'
-    nodes_gen = trv.bfs_nodes_generator(graph, source, reverse)
+    # TODO(murphy): Graph traversal currently is only supported on
+    # CPP graphs. Move graph to CPU as a workaround,
+    # which should be fixed in the future.
+    nodes_gen = trv.bfs_nodes_generator(graph.cpu(), source, reverse)
+    nodes_gen = [F.copy_to(frontier, graph.device) for frontier in nodes_gen]
     prop_nodes(graph, nodes_gen, message_func, reduce_func, apply_node_func)
 
 def prop_nodes_topo(graph,
@@ -117,7 +122,11 @@ def prop_nodes_topo(graph,
         'DGLGraph is deprecated, Please use DGLHeteroGraph'
     assert len(graph.canonical_etypes) == 1, \
         'prop_nodes_topo only support homogeneous graph'
-    nodes_gen = trv.topological_nodes_generator(graph, reverse)
+    # TODO(murphy): Graph traversal currently is only supported on
+    # CPP graphs. Move graph to CPU as a workaround,
+    # which should be fixed in the future.
+    nodes_gen = trv.topological_nodes_generator(graph.cpu(), reverse)
+    nodes_gen = [F.copy_to(frontier, graph.device) for frontier in nodes_gen]
     prop_nodes(graph, nodes_gen, message_func, reduce_func, apply_node_func)
 
 def prop_edges_dfs(graph,
@@ -157,7 +166,11 @@ def prop_edges_dfs(graph,
         'DGLGraph is deprecated, Please use DGLHeteroGraph'
     assert len(graph.canonical_etypes) == 1, \
         'prop_edges_dfs only support homogeneous graph'
+    # TODO(murphy): Graph traversal currently is only supported on
+    # CPP graphs. Move graph to CPU as a workaround,
+    # which should be fixed in the future.
     edges_gen = trv.dfs_labeled_edges_generator(
-        graph, source, reverse, has_reverse_edge, has_nontree_edge,
+        graph.cpu(), source, reverse, has_reverse_edge, has_nontree_edge,
         return_labels=False)
+    edges_gen = [F.copy_to(frontier, graph.device) for frontier in edges_gen]
     prop_edges(graph, edges_gen, message_func, reduce_func, apply_node_func)

@@ -1,11 +1,12 @@
 /*!
  *  Copyright (c) 2020 by Contributors
  * \file array/cuda/csr_sort.cc
- * \brief Sort COO index
+ * \brief Sort CSR index
  */
 #include <dgl/array.h>
 #include "../../runtime/cuda/cuda_common.h"
 #include "./utils.h"
+#include "./dgl_cub.cuh"
 
 namespace dgl {
 
@@ -43,7 +44,8 @@ bool CSRIsSorted(CSRMatrix csr) {
   int8_t* flags = static_cast<int8_t*>(device->AllocWorkspace(ctx, csr.num_rows));
   const int nt = cuda::FindNumThreads(csr.num_rows);
   const int nb = (csr.num_rows + nt - 1) / nt;
-  _SegmentIsSorted<<<nb, nt, 0, thr_entry->stream>>>(
+  CUDA_KERNEL_CALL(_SegmentIsSorted,
+      nb, nt, 0, thr_entry->stream,
       csr.indptr.Ptr<IdType>(), csr.indices.Ptr<IdType>(),
       csr.num_rows, flags);
   bool ret = cuda::AllTrue(flags, csr.num_rows, ctx);
@@ -56,7 +58,11 @@ template bool CSRIsSorted<kDLGPU, int64_t>(CSRMatrix csr);
 
 template <DLDeviceType XPU, typename IdType>
 void CSRSort_(CSRMatrix* csr) {
-  CHECK(sizeof(IdType) == 4) << "CUDA CSRSort_ does not support int64.";
+  LOG(FATAL) << "Unreachable codes";
+}
+
+template <>
+void CSRSort_<kDLGPU, int32_t>(CSRMatrix* csr) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   auto device = runtime::DeviceAPI::Get(csr->indptr->ctx);
   // allocate cusparse handle if needed
@@ -97,6 +103,46 @@ void CSRSort_(CSRMatrix* csr) {
 
   // free resources
   CUSPARSE_CALL(cusparseDestroyMatDescr(descr));
+  device->FreeWorkspace(ctx, workspace);
+}
+
+template <>
+void CSRSort_<kDLGPU, int64_t>(CSRMatrix* csr) {
+  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  auto device = runtime::DeviceAPI::Get(csr->indptr->ctx);
+
+  const auto& ctx = csr->indptr->ctx;
+  const int64_t nnz = csr->indices->shape[0];
+  const auto nbits = csr->indptr->dtype.bits;
+  if (!aten::CSRHasData(*csr))
+    csr->data = aten::Range(0, nnz, nbits, ctx);
+
+  IdArray new_indices = csr->indices.Clone();
+  IdArray new_data = csr->data.Clone();
+
+  const int64_t* offsets = csr->indptr.Ptr<int64_t>();
+  const int64_t* key_in = csr->indices.Ptr<int64_t>();
+  int64_t* key_out = new_indices.Ptr<int64_t>();
+  const int64_t* value_in = csr->data.Ptr<int64_t>();
+  int64_t* value_out = new_data.Ptr<int64_t>();
+
+  // Allocate workspace
+  size_t workspace_size = 0;
+  cub::DeviceSegmentedRadixSort::SortPairs(nullptr, workspace_size,
+      key_in, key_out, value_in, value_out,
+      nnz, csr->num_rows, offsets, offsets + 1);
+  void* workspace = device->AllocWorkspace(ctx, workspace_size);
+
+  // Compute
+  cub::DeviceSegmentedRadixSort::SortPairs(workspace, workspace_size,
+      key_in, key_out, value_in, value_out,
+      nnz, csr->num_rows, offsets, offsets + 1);
+
+  csr->sorted = true;
+  csr->indices = new_indices;
+  csr->data = new_data;
+
+  // free resources
   device->FreeWorkspace(ctx, workspace);
 }
 

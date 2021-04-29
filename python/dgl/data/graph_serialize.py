@@ -1,11 +1,12 @@
 """For Graph Serialization"""
 from __future__ import absolute_import
-from ..graph import DGLGraph
+import os
+from ..base import dgl_warning, DGLError
 from ..heterograph import DGLHeteroGraph
 from .._ffi.object import ObjectBase, register_object
 from .._ffi.function import _init_api
 from .. import backend as F
-from .heterograph_serialize import HeteroGraphData, save_heterographs
+from .heterograph_serialize import save_heterographs
 
 _init_api("dgl.data.graph_serialize")
 
@@ -24,12 +25,22 @@ class StorageMetaData(ObjectBase):
     """
 
 
+def is_local_path(filepath):
+    return not (filepath.startswith("hdfs://") or
+                filepath.startswith("viewfs://") or
+                filepath.startswith("s3://"))
+
+
+def check_local_file_exists(filename):
+    if is_local_path(filename) and not os.path.exists(filename):
+        raise DGLError("File {} does not exist.".format(filename))
+
 @register_object("graph_serialize.GraphData")
 class GraphData(ObjectBase):
     """GraphData Object"""
 
     @staticmethod
-    def create(g: DGLGraph):
+    def create(g):
         """Create GraphData"""
         # TODO(zihao): support serialize batched graph in the future.
         assert g.batch_size == 1, "Batched DGLGraph is not supported for serialization"
@@ -51,9 +62,10 @@ class GraphData(ObjectBase):
         return _CAPI_MakeGraphData(ghandle, node_tensors, edge_tensors)
 
     def get_graph(self):
-        """Get DGLGraph from GraphData"""
+        """Get DGLHeteroGraph from GraphData"""
         ghandle = _CAPI_GDataGraphHandle(self)
-        g = DGLGraph(graph_data=ghandle, readonly=True)
+        hgi =_CAPI_DGLAsHeteroGraph(ghandle)
+        g = DGLHeteroGraph(hgi, ['_U'], ['_E'])
         node_tensors_items = _CAPI_GDataNodeTensors(self).items()
         edge_tensors_items = _CAPI_GDataEdgeTensors(self).items()
         for k, v in node_tensors_items:
@@ -64,16 +76,23 @@ class GraphData(ObjectBase):
 
 
 def save_graphs(filename, g_list, labels=None):
-    r"""
-    Save DGLGraphs/DGLHeteroGraph and graph labels to file
+    r"""Save graphs and optionally their labels to file.
+
+    Besides saving to local files, DGL supports writing the graphs directly
+    to S3 (by providing a ``"s3://..."`` path) or to HDFS (by providing
+    ``"hdfs://..."`` a path).
+
+    The function saves both the graph structure and node/edge features to file
+    in DGL's own binary format. For graph-level features, pass them via
+    the :attr:`labels` argument.
 
     Parameters
     ----------
     filename : str
-        File name to store graphs. 
+        The file name to store the graphs and labels.
     g_list: list
-        DGLGraph or list of DGLGraph/DGLHeteroGraph
-    labels: dict[str, tensor]
+        The graphs to be saved.
+    labels: dict[str, Tensor]
         labels should be dict of tensors, with str as keys
 
     Examples
@@ -81,11 +100,11 @@ def save_graphs(filename, g_list, labels=None):
     >>> import dgl
     >>> import torch as th
 
-    Create :code:`DGLGraph`/:code:`DGLHeteroGraph` objects and initialize node 
+    Create :class:`DGLGraph` objects and initialize node
     and edge features.
 
-    >>> g1 = dgl.graph(([0, 1, 2], [1, 2, 3])
-    >>> g2 = dgl.graph(([0, 2], [2, 3])
+    >>> g1 = dgl.graph(([0, 1, 2], [1, 2, 3]))
+    >>> g2 = dgl.graph(([0, 2], [2, 3]))
     >>> g2.edata["e"] = th.ones(2, 4)
 
     Save Graphs into file
@@ -94,68 +113,75 @@ def save_graphs(filename, g_list, labels=None):
     >>> graph_labels = {"glabel": th.tensor([0, 1])}
     >>> save_graphs("./data.bin", [g1, g2], graph_labels)
 
+    See Also
+    --------
+    load_graphs
     """
+    # if it is local file, do some sanity check
+    if is_local_path(filename):
+        if os.path.isdir(filename):
+            raise DGLError("Filename {} is an existing directory.".format(filename))
+        f_path = os.path.dirname(filename)
+        if f_path and not os.path.exists(f_path):
+            os.makedirs(f_path)
+
     g_sample = g_list[0] if isinstance(g_list, list) else g_list
-    if isinstance(g_sample, DGLGraph):
-        save_dglgraphs(filename, g_list, labels)
-    elif isinstance(g_sample, DGLHeteroGraph):
+    if type(g_sample) == DGLHeteroGraph:  # Doesn't support DGLHeteroGraph's derived class
         save_heterographs(filename, g_list, labels)
     else:
-        raise Exception(
-            "Invalid argument g_list. Must be a DGLGraph or a list of DGLGraphs/DGLHeteroGraphs")
+        raise DGLError(
+            "Invalid argument g_list. Must be a DGLGraph or a list of DGLGraphs.")
 
-
-def save_dglgraphs(filename, g_list, labels=None):
-    """Internal function to save DGLGraphs"""
-    if isinstance(g_list, DGLGraph):
-        g_list = [g_list]
-    if (labels is not None) and (len(labels) != 0):
-        label_dict = dict()
-        for key, value in labels.items():
-            label_dict[key] = F.zerocopy_to_dgl_ndarray(value)
-    else:
-        label_dict = None
-    gdata_list = [GraphData.create(g) for g in g_list]
-    _CAPI_SaveDGLGraphs_V0(filename, gdata_list, label_dict)
 
 
 def load_graphs(filename, idx_list=None):
-    """
-    Load DGLGraphs from file
+    """Load graphs and optionally their labels from file saved by :func:`save_graphs`.
+
+    Besides loading from local files, DGL supports loading the graphs directly
+    from S3 (by providing a ``"s3://..."`` path) or from HDFS (by providing
+    ``"hdfs://..."`` a path).
 
     Parameters
     ----------
     filename: str
-        filename to load graphs
-    idx_list: list of int
-        list of index of graph to be loaded. If not specified, will
-        load all graphs from file
+        The file name to load graphs from.
+    idx_list: list[int], optional
+        The indices of the graphs to be loaded if the file contains multiple graphs.
+        Default is loading all the graphs stored in the file.
 
     Returns
     --------
-    graph_list: list of DGLGraphs / DGLHeteroGraph
+    graph_list: list[DGLGraph]
         The loaded graphs.
     labels: dict[str, Tensor]
         The graph labels stored in file. If no label is stored, the dictionary is empty.
-        Regardless of whether the ``idx_list`` argument is given or not, the returned dictionary
-        always contains labels of all the graphs.
+        Regardless of whether the ``idx_list`` argument is given or not,
+        the returned dictionary always contains the labels of all the graphs.
 
     Examples
     ----------
-    Following the example in save_graphs.
+    Following the example in :func:`save_graphs`.
 
     >>> from dgl.data.utils import load_graphs
     >>> glist, label_dict = load_graphs("./data.bin") # glist will be [g1, g2]
     >>> glist, label_dict = load_graphs("./data.bin", [0]) # glist will be [g1]
 
+    See Also
+    --------
+    save_graphs
     """
+    # if it is local file, do some sanity check
+    check_local_file_exists(filename)
     version = _CAPI_GetFileVersion(filename)
     if version == 1:
+        dgl_warning(
+            "You are loading a graph file saved by old version of dgl.  \
+            Please consider saving it again with the current format.")
         return load_graph_v1(filename, idx_list)
     elif version == 2:
         return load_graph_v2(filename, idx_list)
     else:
-        raise Exception("Invalid DGL Version Number")
+        raise DGLError("Invalid DGL Version Number.")
 
 
 def load_graph_v2(filename, idx_list=None):
@@ -180,7 +206,6 @@ def load_graph_v1(filename, idx_list=None):
 
     return [gdata.get_graph() for gdata in metadata.graph_data], label_dict
 
-
 def load_labels(filename):
     """
     Load label dict from file
@@ -204,6 +229,9 @@ def load_labels(filename):
     >>> label_dict = load_graphs("./data.bin")
 
     """
+    # if it is local file, do some sanity check
+    check_local_file_exists(filename)
+
     version = _CAPI_GetFileVersion(filename)
     if version == 1:
         return load_labels_v1(filename)

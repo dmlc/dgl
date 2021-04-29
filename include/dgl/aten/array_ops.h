@@ -24,8 +24,9 @@ namespace aten {
 //////////////////////////////////////////////////////////////////////
 
 /*! \return A special array to represent null. */
-inline NDArray NullArray() {
-  return NDArray::Empty({0}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+inline NDArray NullArray(const DLDataType& dtype = DLDataType{kDLInt, 64, 1},
+                         const DLContext& ctx = DLContext{kDLCPU, 0}) {
+  return NDArray::Empty({0}, dtype, ctx);
 }
 
 /*!
@@ -78,6 +79,16 @@ IdArray Range(int64_t low, int64_t high, uint8_t nbits, DLContext ctx);
  */
 IdArray Full(int64_t val, int64_t length, uint8_t nbits, DLContext ctx);
 
+/*!
+ * \brief Return an array full of the given value with the given type.
+ * \param val The value to fill.
+ * \param length Number of elements.
+ * \param ctx Device context
+ * \return the result array
+ */
+template <typename DType>
+NDArray Full(DType val, int64_t length, DLContext ctx);
+
 /*! \brief Create a deep copy of the given array */
 IdArray Clone(IdArray arr);
 
@@ -89,16 +100,19 @@ IdArray Add(IdArray lhs, IdArray rhs);
 IdArray Sub(IdArray lhs, IdArray rhs);
 IdArray Mul(IdArray lhs, IdArray rhs);
 IdArray Div(IdArray lhs, IdArray rhs);
+IdArray Mod(IdArray lhs, IdArray rhs);
 
 IdArray Add(IdArray lhs, int64_t rhs);
 IdArray Sub(IdArray lhs, int64_t rhs);
 IdArray Mul(IdArray lhs, int64_t rhs);
 IdArray Div(IdArray lhs, int64_t rhs);
+IdArray Mod(IdArray lhs, int64_t rhs);
 
 IdArray Add(int64_t lhs, IdArray rhs);
 IdArray Sub(int64_t lhs, IdArray rhs);
 IdArray Mul(int64_t lhs, IdArray rhs);
 IdArray Div(int64_t lhs, IdArray rhs);
+IdArray Mod(int64_t lhs, IdArray rhs);
 
 IdArray Neg(IdArray array);
 
@@ -127,6 +141,9 @@ IdArray NE(int64_t lhs, IdArray rhs);
 /*! \brief Stack two arrays (of len L) into a 2*L length array */
 IdArray HStack(IdArray arr1, IdArray arr2);
 
+/*! \brief Return the indices of the elements that are non-zero. */
+IdArray NonZero(BoolArray bool_arr);
+
 /*!
  * \brief Return the data under the index. In numpy notation, A[I]
  * \tparam ValueType The type of return value.
@@ -147,6 +164,8 @@ NDArray IndexSelect(NDArray array, int64_t start, int64_t end);
 /*!
  * \brief Permute the elements of an array according to given indices.
  *
+ * Only support 1D arrays.
+ *
  * Equivalent to:
  *
  * <code>
@@ -155,6 +174,17 @@ NDArray IndexSelect(NDArray array, int64_t start, int64_t end);
  * </code>
  */
 NDArray Scatter(NDArray array, IdArray indices);
+
+/*!
+ * \brief Scatter data into the output array.
+ *
+ * Equivalent to:
+ *
+ * <code>
+ *     out[index] = value
+ * </code>
+ */
+void Scatter_(IdArray index, NDArray value, NDArray out);
 
 /*!
  * \brief Repeat each element a number of times.  Equivalent to np.repeat(array, repeats)
@@ -276,6 +306,33 @@ std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths);
  * \return Array after cumsum.
  */
 IdArray CumSum(IdArray array, bool prepend_zero = false);
+
+/*!
+ * \brief Return the nonzero index.
+ *
+ * Only support 1D array. The result index array is in int64.
+ *
+ * \param array The input array.
+ * \return A 1D index array storing the positions of the non zero values.
+ */
+IdArray NonZero(NDArray array);
+
+/*!
+ * \brief Sort the ID vector in ascending order.
+ *
+ * It performs both sort and arg_sort (returning the sorted index). The sorted index
+ * is always in int64.
+ *
+ * \param array Input array.
+ * \param num_bits The number of bits used in key comparison. For example, if the data type
+ *                 of the input array is int32_t and `num_bits = 8`, it only uses bits in index
+ *                 range [0, 8) for sorting. Setting it to a small value could
+ *                 speed up the sorting if the underlying sorting algorithm is radix sort (e.g., on GPU).
+ *                 Setting it to zero (default value) means using all the bits for comparison.
+ *                 On CPU, it currently has no effect.
+ * \return A pair of arrays: sorted values and sorted index to the original position.
+ */
+std::pair<IdArray, IdArray> Sort(IdArray array, int num_bits = 0);
 
 /*!
  * \brief Return a string that prints out some debug information.

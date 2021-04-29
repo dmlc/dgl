@@ -108,16 +108,19 @@ class HelloRequest(dgl.distributed.Request):
         return res
 
 def start_server(num_clients, ip_config):
+    print("Sleep 5 seconds to test client re-connect.")
+    time.sleep(5)
     server_state = dgl.distributed.ServerState(None, local_g=None, partition_book=None)
     dgl.distributed.register_service(HELLO_SERVICE_ID, HelloRequest, HelloResponse)
     dgl.distributed.start_server(server_id=0, 
                                  ip_config=ip_config, 
+                                 num_servers=1,
                                  num_clients=num_clients, 
                                  server_state=server_state)
 
 def start_client(ip_config):
     dgl.distributed.register_service(HELLO_SERVICE_ID, HelloRequest, HelloResponse)
-    dgl.distributed.connect_to_server(ip_config=ip_config)
+    dgl.distributed.connect_to_server(ip_config=ip_config, num_servers=1)
     req = HelloRequest(STR, INTEGER, TENSOR, simple_func)
     # test send and recv
     dgl.distributed.send_request(0, req)
@@ -150,14 +153,8 @@ def start_client(ip_config):
         assert res.integer == INTEGER
         assert_array_equal(F.asnumpy(res.tensor), F.asnumpy(TENSOR))
 
-    # clean up
-    time.sleep(2)
-    if dgl.distributed.get_rank() == 0:
-        dgl.distributed.shutdown_servers()
-    dgl.distributed.finalize_client()
-    print("Get rank: %d" % dgl.distributed.get_rank())
-
 def test_serialize():
+    os.environ['DGL_DIST_MODE'] = 'distributed'
     from dgl.distributed.rpc import serialize_to_payload, deserialize_from_payload
     SERVICE_ID = 12345
     dgl.distributed.register_service(SERVICE_ID, MyRequest, MyResponse)
@@ -175,6 +172,7 @@ def test_serialize():
     assert res.x == res1.x
 
 def test_rpc_msg():
+    os.environ['DGL_DIST_MODE'] = 'distributed'
     from dgl.distributed.rpc import serialize_to_payload, deserialize_from_payload, RPCMessage
     SERVICE_ID = 32452
     dgl.distributed.register_service(SERVICE_ID, MyRequest, MyResponse)
@@ -191,9 +189,10 @@ def test_rpc_msg():
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 def test_rpc():
+    os.environ['DGL_DIST_MODE'] = 'distributed'
     ip_config = open("rpc_ip_config.txt", "w")
     ip_addr = get_local_usable_addr()
-    ip_config.write('%s 1\n' % ip_addr)
+    ip_config.write('%s\n' % ip_addr)
     ip_config.close()
     ctx = mp.get_context('spawn')
     pserver = ctx.Process(target=start_server, args=(1, "rpc_ip_config.txt"))
@@ -206,9 +205,10 @@ def test_rpc():
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 def test_multi_client():
+    os.environ['DGL_DIST_MODE'] = 'distributed'
     ip_config = open("rpc_ip_config_mul_client.txt", "w")
     ip_addr = get_local_usable_addr()
-    ip_config.write('%s 1\n' % ip_addr)
+    ip_config.write('%s\n' % ip_addr)
     ip_config.close()
     ctx = mp.get_context('spawn')
     pserver = ctx.Process(target=start_server, args=(10, "rpc_ip_config_mul_client.txt"))
@@ -217,7 +217,6 @@ def test_multi_client():
         pclient = ctx.Process(target=start_client, args=("rpc_ip_config_mul_client.txt",))
         pclient_list.append(pclient)
     pserver.start()
-    time.sleep(1)
     for i in range(10):
         pclient_list[i].start()
     for i in range(10):

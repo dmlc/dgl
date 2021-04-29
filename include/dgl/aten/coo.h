@@ -11,6 +11,8 @@
 #include <dmlc/serializer.h>
 #include <vector>
 #include <utility>
+#include <tuple>
+#include <string>
 #include "./types.h"
 #include "./array_ops.h"
 #include "./spmat.h"
@@ -162,15 +164,45 @@ inline bool COOHasData(COOMatrix csr) {
  */
 std::pair<bool, bool> COOIsSorted(COOMatrix coo);
 
-/*! \brief Get data. The return type is an ndarray due to possible duplicate entries. */
-runtime::NDArray COOGetData(COOMatrix , int64_t row, int64_t col);
-
 /*!
  * \brief Get the data and the row,col indices for each returned entries.
+ *
+ * The operator supports matrix with duplicate entries and all the matched entries
+ * will be returned. The operator assumes there is NO duplicate (row, col) pair
+ * in the given input. Otherwise, the returned result is undefined.
+ *
  * \note This operator allows broadcasting (i.e, either row or col can be of length 1).
+ * \param mat Sparse matrix
+ * \param rows Row index
+ * \param cols Column index
+ * \return Three arrays {rows, cols, data}
  */
 std::vector<runtime::NDArray> COOGetDataAndIndices(
-    COOMatrix , runtime::NDArray rows, runtime::NDArray cols);
+    COOMatrix mat, runtime::NDArray rows, runtime::NDArray cols);
+
+/*! \brief Get data. The return type is an ndarray due to possible duplicate entries. */
+inline runtime::NDArray COOGetAllData(COOMatrix mat, int64_t row, int64_t col) {
+  IdArray rows = VecToIdArray<int64_t>({row}, mat.row->dtype.bits, mat.row->ctx);
+  IdArray cols = VecToIdArray<int64_t>({col}, mat.row->dtype.bits, mat.row->ctx);
+  const auto& rst = COOGetDataAndIndices(mat, rows, cols);
+  return rst[2];
+}
+
+/*!
+ * \brief Get the data for each (row, col) pair.
+ *
+ * The operator supports matrix with duplicate entries but only one matched entry
+ * will be returned for each (row, col) pair. Support duplicate input (row, col)
+ * pairs.
+ *
+ * \note This operator allows broadcasting (i.e, either row or col can be of length 1).
+ *
+ * \param mat Sparse matrix.
+ * \param rows Row index.
+ * \param cols Column index.
+ * \return Data array. The i^th element is the data of (rows[i], cols[i])
+ */
+runtime::NDArray COOGetData(COOMatrix mat, runtime::NDArray rows, runtime::NDArray cols);
 
 /*! \brief Return a transposed COO matrix */
 COOMatrix COOTranspose(COOMatrix coo);
@@ -372,7 +404,39 @@ COOMatrix COORowWiseTopk(
     bool ascending = false);
 
 /*!
- * \brief Union a list COOMatrix into one COOMatrix.
+ * \brief Union two COOMatrix into one COOMatrix.
+ * 
+ * Two Matrix must have the same shape.
+ *
+ * Example:
+ *
+ * A = [[0, 0, 1, 0],
+ *      [1, 0, 1, 1],
+ *      [0, 1, 0, 0]]
+ *
+ * B = [[0, 1, 1, 0],
+ *      [0, 0, 0, 1],
+ *      [0, 0, 1, 0]]
+ *
+ * COOMatrix_A.num_rows : 3
+ * COOMatrix_A.num_cols : 4
+ * COOMatrix_B.num_rows : 3
+ * COOMatrix_B.num_cols : 4
+ *
+ * C = UnionCoo({A, B});
+ *
+ * C = [[0, 1, 2, 0],
+ *      [1, 0, 1, 2],
+ *      [0, 1, 1, 0]]
+ *
+ * COOMatrix_C.num_rows : 3
+ * COOMatrix_C.num_cols : 4
+ */
+COOMatrix UnionCoo(
+  const std::vector<COOMatrix>& coos);
+
+/*!
+ * \brief DisjointUnion a list COOMatrix into one COOMatrix.
  *
  * Examples:
  *
@@ -405,6 +469,30 @@ COOMatrix COORowWiseTopk(
  */
 COOMatrix DisjointUnionCoo(
   const std::vector<COOMatrix>& coos);
+
+/*!
+ * \brief COOMatrix toSimple.
+ *
+ * A = [[0, 0, 0],
+ *      [3, 0, 2],
+ *      [1, 1, 0],
+ *      [0, 0, 4]]
+ * 
+ * B, cnt, edge_map = COOToSimple(A)
+ *
+ * B = [[0, 0, 0],
+ *      [1, 0, 1],
+ *      [1, 1, 0],
+ *      [0, 0, 1]]
+ * cnt = [3, 2, 1, 1, 4]
+ * edge_map = [0, 0, 0, 1, 1, 2, 3, 4, 4, 4, 4]
+ *
+ * \return The simplified COOMatrix
+ *         The count recording the number of duplicated edges from the original graph.
+ *         The edge mapping from the edge IDs of original graph to those of the
+ *         returned graph.
+ */
+std::tuple<COOMatrix, IdArray, IdArray> COOToSimple(const COOMatrix& coo);
 
 /*!
  * \brief Split a COOMatrix into multiple disjoin components.
@@ -456,6 +544,38 @@ std::vector<COOMatrix> DisjointPartitionCooBySizes(
   const std::vector<uint64_t> &edge_cumsum,
   const std::vector<uint64_t> &src_vertex_cumsum,
   const std::vector<uint64_t> &dst_vertex_cumsum);
+
+/*!
+ * \brief Create a LineGraph of input coo
+ * 
+ * A = [[0, 0, 1],
+ *      [1, 0, 1],
+ *      [1, 1, 0]]
+ * A.row = [0, 1, 1, 2, 2]
+ * A.col = [2, 0, 2, 0, 1]
+ * A.eid = [0, 1, 2, 3, 4]
+ *
+ * B = COOLineGraph(A, backtracking=False)
+ *
+ * B = [[0, 0, 0, 0, 1],
+ *      [1, 0, 0, 0, 0],
+ *      [0, 0, 0, 1, 0],
+ *      [0, 0, 0, 0, 0],
+ *      [0, 1, 0, 0, 0]]
+ *
+ * C = COOLineGraph(A, backtracking=True)
+ *
+ * C = [[0, 0, 0, 1, 1],
+ *      [1, 0, 0, 0, 0],
+ *      [0, 0, 0, 1, 1],
+ *      [1, 0, 0, 0, 0],
+ *      [0, 1, 1, 0, 0]]
+ *
+ * \param coo COOMatrix to create the LineGraph
+ * \param backtracking whether the pair of (v, u) (u, v) edges are treated as linked
+ * \return LineGraph in COO format
+ */
+COOMatrix COOLineGraph(const COOMatrix &coo, bool backtracking);
 
 }  // namespace aten
 }  // namespace dgl

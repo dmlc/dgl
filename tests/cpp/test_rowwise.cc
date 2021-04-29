@@ -268,7 +268,7 @@ template <typename Idx, typename FloatType>
 void _TestCSRTopk(bool has_data) {
   auto mat = CSR<Idx>(has_data);
   FloatArray weight = NDArray::FromVector(
-      std::vector<FloatType>({.1, .0, -.1, .2, .5}));
+      std::vector<FloatType>({.1f, .0f, -.1f, .2f, .5f}));
   // -.1, .2, .1, .0, .5
   IdArray rows = NDArray::FromVector(std::vector<Idx>({0, 3}));
 
@@ -315,7 +315,7 @@ template <typename Idx, typename FloatType>
 void _TestCOOTopk(bool has_data) {
   auto mat = COO<Idx>(has_data);
   FloatArray weight = NDArray::FromVector(
-      std::vector<FloatType>({.1, .0, -.1, .2, .5}));
+      std::vector<FloatType>({.1f, .0f, -.1f, .2f, .5f}));
   // -.1, .2, .1, .0, .5
   IdArray rows = NDArray::FromVector(std::vector<Idx>({0, 3}));
 

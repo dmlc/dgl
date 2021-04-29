@@ -36,7 +36,7 @@ def bfs_nodes_generator(graph, source, reverse=False):
              / \\
         0 - 1 - 3 - 5
 
-    >>> g = dgl.graph([(0, 1), (1, 2), (1, 3), (2, 3), (2, 4), (3, 5)])
+    >>> g = dgl.graph(([0, 1, 1, 2, 2, 3], [1, 2, 3, 3, 4, 5]))
     >>> list(dgl.bfs_nodes_generator(g, 0))
     [tensor([0]), tensor([1]), tensor([2, 3]), tensor([4, 5])]
     """
@@ -44,7 +44,8 @@ def bfs_nodes_generator(graph, source, reverse=False):
         'DGLGraph is deprecated, Please use DGLHeteroGraph'
     assert len(graph.canonical_etypes) == 1, \
         'bfs_nodes_generator only support homogeneous graph'
-    gidx = graph._graph
+    # Workaround before support for GPU graph
+    gidx = graph._graph.copy_to(utils.to_dgl_context(F.cpu()))
     source = utils.toindex(source, dtype=graph._idtype_str)
     ret = _CAPI_DGLBFSNodes_v2(gidx, source.todgltensor(), reverse)
     all_nodes = utils.toindex(ret(0), dtype=graph._idtype_str).tousertensor()
@@ -80,7 +81,7 @@ def bfs_edges_generator(graph, source, reverse=False):
              / \\
         0 - 1 - 3 - 5
 
-    >>> g = dgl.graph([(0, 1), (1, 2), (1, 3), (2, 3), (2, 4), (3, 5)])
+    >>> g = dgl.graph(([0, 1, 1, 2, 2, 3], [1, 2, 3, 3, 4, 5]))
     >>> list(dgl.bfs_edges_generator(g, 0))
     [tensor([0]), tensor([1, 2]), tensor([4, 5])]
     """
@@ -88,7 +89,8 @@ def bfs_edges_generator(graph, source, reverse=False):
         'DGLGraph is deprecated, Please use DGLHeteroGraph'
     assert len(graph.canonical_etypes) == 1, \
         'bfs_edges_generator only support homogeneous graph'
-    gidx = graph._graph
+    # Workaround before support for GPU graph
+    gidx = graph._graph.copy_to(utils.to_dgl_context(F.cpu()))
     source = utils.toindex(source, dtype=graph._idtype_str)
     ret = _CAPI_DGLBFSEdges_v2(gidx, source.todgltensor(), reverse)
     all_edges = utils.toindex(ret(0), dtype=graph._idtype_str).tousertensor()
@@ -121,7 +123,7 @@ def topological_nodes_generator(graph, reverse=False):
              / \\
         0 - 1 - 3 - 5
 
-    >>> g = dgl.graph([(0, 1), (1, 2), (1, 3), (2, 3), (2, 4), (3, 5)])
+    >>> g = dgl.graph(([0, 1, 1, 2, 2, 3], [1, 2, 3, 3, 4, 5]))
     >>> list(dgl.topological_nodes_generator(g))
     [tensor([0]), tensor([1]), tensor([2]), tensor([3, 4]), tensor([5])]
     """
@@ -129,7 +131,8 @@ def topological_nodes_generator(graph, reverse=False):
         'DGLGraph is deprecated, Please use DGLHeteroGraph'
     assert len(graph.canonical_etypes) == 1, \
         'topological_nodes_generator only support homogeneous graph'
-    gidx = graph._graph
+    # Workaround before support for GPU graph
+    gidx = graph._graph.copy_to(utils.to_dgl_context(F.cpu()))
     ret = _CAPI_DGLTopologicalNodes_v2(gidx, reverse)
     all_nodes = utils.toindex(ret(0), dtype=graph._idtype_str).tousertensor()
     # TODO(minjie): how to support directly creating python list
@@ -169,7 +172,7 @@ def dfs_edges_generator(graph, source, reverse=False):
 
     Edge addition order [(0, 1), (1, 2), (1, 3), (2, 3), (2, 4), (3, 5)]
 
-    >>> g = dgl.graph([(0, 1), (1, 2), (1, 3), (2, 3), (2, 4), (3, 5)])
+    >>> g = dgl.graph(([0, 1, 1, 2, 2, 3], [1, 2, 3, 3, 4, 5]))
     >>> list(dgl.dfs_edges_generator(g, 0))
     [tensor([0]), tensor([1]), tensor([3]), tensor([5]), tensor([4])]
     """
@@ -177,7 +180,8 @@ def dfs_edges_generator(graph, source, reverse=False):
         'DGLGraph is deprecated, Please use DGLHeteroGraph'
     assert len(graph.canonical_etypes) == 1, \
         'dfs_edges_generator only support homogeneous graph'
-    gidx = graph._graph
+    # Workaround before support for GPU graph
+    gidx = graph._graph.copy_to(utils.to_dgl_context(F.cpu()))
     source = utils.toindex(source, dtype=graph._idtype_str)
     ret = _CAPI_DGLDFSEdges_v2(gidx, source.todgltensor(), reverse)
     all_edges = utils.toindex(ret(0), dtype=graph._idtype_str).tousertensor()
@@ -243,7 +247,7 @@ def dfs_labeled_edges_generator(
 
     Edge addition order [(0, 1), (1, 2), (1, 3), (2, 3), (2, 4), (3, 5)]
 
-    >>> g = dgl.graph([(0, 1), (1, 2), (1, 3), (2, 3), (2, 4), (3, 5)])
+    >>> g = dgl.graph(([0, 1, 1, 2, 2, 3], [1, 2, 3, 3, 4, 5]))
     >>> list(dgl.dfs_labeled_edges_generator(g, 0, has_nontree_edge=True))
     (tensor([0]), tensor([1]), tensor([3]), tensor([5]), tensor([4]), tensor([2])),
     (tensor([0]), tensor([0]), tensor([0]), tensor([0]), tensor([0]), tensor([2]))
@@ -252,7 +256,8 @@ def dfs_labeled_edges_generator(
         'DGLGraph is deprecated, Please use DGLHeteroGraph'
     assert len(graph.canonical_etypes) == 1, \
         'dfs_labeled_edges_generator only support homogeneous graph'
-    gidx = graph._graph
+    # Workaround before support for GPU graph
+    gidx = graph._graph.copy_to(utils.to_dgl_context(F.cpu()))
     source = utils.toindex(source, dtype=graph._idtype_str)
     ret = _CAPI_DGLDFSLabeledEdges_v2(
         gidx,

@@ -4,21 +4,13 @@ API Reference
 .. toctree::
    :maxdepth: 2
 
-   graph
-   heterograph
-   readout
-   batch_heterograph
+   dgl
+   dgl.data
+   dgl.dataloading
+   dgl.DGLGraph
+   dgl.distributed
+   dgl.function
    nn
-   init
-   function
-   traversal
-   propagate
+   dgl.ops
+   dgl.sampling
    udf
-   sampler
-   sampling
-   data
-   transform
-   graph_store
-   nodeflow
-   random
-   model_zoo

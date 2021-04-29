@@ -15,7 +15,7 @@ using dgl::runtime::NDArray;
 
 namespace dgl {
 
-DGL_REGISTER_GLOBAL("runtime.degree_bucketing._CAPI_DGLDegreeBucketing")
+DGL_REGISTER_GLOBAL("_deprecate.runtime.degree_bucketing._CAPI_DGLDegreeBucketing")
   .set_body([](DGLArgs args, DGLRetValue* rv) {
     const IdArray msg_ids = args[0];
     const IdArray vids = args[1];
@@ -28,7 +28,7 @@ DGL_REGISTER_GLOBAL("runtime.degree_bucketing._CAPI_DGLDegreeBucketing")
     });
   });
 
-DGL_REGISTER_GLOBAL("runtime.degree_bucketing._CAPI_DGLGroupEdgeByNodeDegree")
+DGL_REGISTER_GLOBAL("_deprecate.runtime.degree_bucketing._CAPI_DGLGroupEdgeByNodeDegree")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     const IdArray uids = args[0];
     const IdArray vids = args[1];

@@ -37,7 +37,8 @@ download_path = os.path.join(get_download_dir(), data_filename)
 local_path = args.dataset_path or os.path.join(get_download_dir(), 'modelnet40_normal_resampled')
 
 if not os.path.exists(local_path):
-    download('https://shapenet.cs.stanford.edu/media/modelnet40_normal_resampled.zip', download_path)
+    download('https://shapenet.cs.stanford.edu/media/modelnet40_normal_resampled.zip',
+             download_path, verify_ssl=False)
     from zipfile import ZipFile
     with ZipFile(download_path) as z:
         z.extractall(path=get_download_dir())

@@ -17,12 +17,18 @@ namespace dgl {
  * \brief Sparse format.
  */
 enum class SparseFormat {
-  kAny = 0,
   kCOO = 1,
   kCSR = 2,
   kCSC = 3,
-  kAuto = 4   // kAuto is a placeholder that indicates it would be materialized later.
 };
+
+/*!
+ * \brief Sparse format codes
+ */
+const dgl_format_code_t ALL_CODE = 0x7;
+const dgl_format_code_t COO_CODE = 0x1;
+const dgl_format_code_t CSR_CODE = 0x2;
+const dgl_format_code_t CSC_CODE = 0x4;
 
 // Parse sparse format from string.
 inline SparseFormat ParseSparseFormat(const std::string& name) {
@@ -32,13 +38,9 @@ inline SparseFormat ParseSparseFormat(const std::string& name) {
     return SparseFormat::kCSR;
   else if (name == "csc")
     return SparseFormat::kCSC;
-  else if (name == "any")
-    return SparseFormat::kAny;
-  else if (name == "auto")
-    return SparseFormat::kAuto;
   else
     LOG(FATAL) << "Sparse format not recognized";
-  return SparseFormat::kAny;
+  return SparseFormat::kCOO;
 }
 
 // Create string from sparse format.
@@ -47,25 +49,59 @@ inline std::string ToStringSparseFormat(SparseFormat sparse_format) {
     return std::string("coo");
   else if (sparse_format == SparseFormat::kCSR)
     return std::string("csr");
-  else if (sparse_format == SparseFormat::kCSC)
-    return std::string("csc");
-  else if (sparse_format == SparseFormat::kAny)
-    return std::string("any");
   else
-    return std::string("auto");
+    return std::string("csc");
 }
 
-inline dgl_format_code_t SparseFormat2Code(SparseFormat sparse_format) {
-  if (sparse_format == SparseFormat::kCOO)
-    return 1;
-  else if (sparse_format == SparseFormat::kCSR)
-    return 2;
-  else if (sparse_format == SparseFormat::kCSC)
-    return 3;
-  else if (sparse_format == SparseFormat::kAny)
-    return 0;
-  else
-    return 4;
+inline std::vector<SparseFormat> CodeToSparseFormats(dgl_format_code_t code) {
+  std::vector<SparseFormat> ret;
+  if (code & COO_CODE)
+    ret.push_back(SparseFormat::kCOO);
+  if (code & CSR_CODE)
+    ret.push_back(SparseFormat::kCSR);
+  if (code & CSC_CODE)
+    ret.push_back(SparseFormat::kCSC);
+  return ret;
+}
+
+inline dgl_format_code_t
+SparseFormatsToCode(const std::vector<SparseFormat> &formats) {
+  dgl_format_code_t ret = 0;
+  for (auto format : formats) {
+    switch (format) {
+    case SparseFormat::kCOO:
+      ret |= COO_CODE;
+      break;
+    case SparseFormat::kCSR:
+      ret |= CSR_CODE;
+      break;
+    case SparseFormat::kCSC:
+      ret |= CSC_CODE;
+      break;
+    default:
+      LOG(FATAL) << "Only support COO/CSR/CSC formats.";
+    }
+  }
+  return ret;
+}
+
+inline std::string CodeToStr(dgl_format_code_t code) {
+  std::string ret = "";
+  if (code & COO_CODE)
+    ret += "coo ";
+  if (code & CSR_CODE)
+    ret += "csr ";
+  if (code & CSC_CODE)
+    ret += "csc ";
+  return ret;
+}
+
+inline SparseFormat DecodeFormat(dgl_format_code_t code) {
+  if (code & COO_CODE)
+    return SparseFormat::kCOO;
+  if (code & CSC_CODE)
+    return SparseFormat::kCSC;
+  return SparseFormat::kCSR;
 }
 
 // Sparse matrix object that is exposed to python API.

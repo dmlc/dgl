@@ -11,7 +11,11 @@ from .. import utils
 
 
 class RelGraphConv(gluon.Block):
-    r"""Relational graph convolution layer.
+    r"""
+
+    Description
+    -----------
+    Relational graph convolution layer.
 
     Relational graph convolution is introduced in "`Modeling Relational Data with Graph
     Convolutional Networks <https://arxiv.org/abs/1703.06103>`__"
@@ -19,8 +23,8 @@ class RelGraphConv(gluon.Block):
 
     .. math::
 
-      h_i^{(l+1)} = \sigma(\sum_{r\in\mathcal{R}}
-      \sum_{j\in\mathcal{N}^r(i)}\frac{1}{c_{i,r}}W_r^{(l)}h_j^{(l)}+W_0^{(l)}h_i^{(l)})
+       h_i^{(l+1)} = \sigma(\sum_{r\in\mathcal{R}}
+       \sum_{j\in\mathcal{N}^r(i)}\frac{1}{c_{i,r}}W_r^{(l)}h_j^{(l)}+W_0^{(l)}h_i^{(l)})
 
     where :math:`\mathcal{N}^r(i)` is the neighbor set of node :math:`i` w.r.t. relation
     :math:`r`. :math:`c_{i,r}` is the normalizer equal
@@ -31,36 +35,73 @@ class RelGraphConv(gluon.Block):
 
     .. math::
 
-      W_r^{(l)} = \sum_{b=1}^B a_{rb}^{(l)}V_b^{(l)}
+       W_r^{(l)} = \sum_{b=1}^B a_{rb}^{(l)}V_b^{(l)}
 
-    where :math:`B` is the number of bases.
+    where :math:`B` is the number of bases, :math:`V_b^{(l)}` are linearly combined
+    with coefficients :math:`a_{rb}^{(l)}`.
 
     The block-diagonal-decomposition regularization decomposes :math:`W_r` into :math:`B`
     number of block diagonal matrices. We refer :math:`B` as the number of bases.
 
+    The block regularization decomposes :math:`W_r` by:
+
+    .. math::
+
+       W_r^{(l)} = \oplus_{b=1}^B Q_{rb}^{(l)}
+
+    where :math:`B` is the number of bases, :math:`Q_{rb}^{(l)}` are block
+    bases with shape :math:`R^{(d^{(l+1)}/B)*(d^{l}/B)}`.
+
     Parameters
     ----------
     in_feat : int
-        Input feature size.
+        Input feature size; i.e, the number of dimensions of :math:`h_j^{(l)}`.
     out_feat : int
-        Output feature size.
+        Output feature size; i.e., the number of dimensions of :math:`h_i^{(l+1)}`.
     num_rels : int
-        Number of relations.
+        Number of relations. .
     regularizer : str
-        Which weight regularizer to use "basis" or "bdd"
+        Which weight regularizer to use "basis" or "bdd".
+        "basis" is short for basis-diagonal-decomposition.
+        "bdd" is short for block-diagonal-decomposition.
     num_bases : int, optional
-        Number of bases. If is none, use number of relations. Default: None.
+        Number of bases. If is none, use number of relations. Default: ``None``.
     bias : bool, optional
-        True if bias is added. Default: True
+        True if bias is added. Default: ``True``.
     activation : callable, optional
-        Activation function. Default: None
+        Activation function. Default: ``None``.
     self_loop : bool, optional
-        True to include self loop message. Default: False
+        True to include self loop message. Default: ``True``.
     low_mem : bool, optional
-        Use low-memory implementation. MXNet currently does not support this.
-        Default: False.
+        True to use low memory implementation of relation message passing function. Default: False.
+        This option trades speed with memory consumption, and will slowdown the forward/backward.
+        Turn it on when you encounter OOM problem during training or evaluation. Default: ``False``.
     dropout : float, optional
-        Dropout rate. Default: 0.0
+        Dropout rate. Default: ``0.0``
+    layer_norm: float, optional
+        Add layer norm. Default: ``False``
+
+    Examples
+    --------
+    >>> import dgl
+    >>> import numpy as np
+    >>> import mxnet as mx
+    >>> from mxnet import gluon
+    >>> from dgl.nn import RelGraphConv
+    >>>
+    >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    >>> feat = mx.nd.ones((6, 10))
+    >>> conv = RelGraphConv(10, 2, 3, regularizer='basis', num_bases=2)
+    >>> conv.initialize(ctx=mx.cpu(0))
+    >>> etype = mx.nd.array(np.array([0,1,2,0,1,2]).astype(np.int64))
+    >>> res = conv(g, feat, etype)
+    [[ 0.561324    0.33745846]
+    [ 0.61585337  0.09992217]
+    [ 0.561324    0.33745846]
+    [-0.01557937  0.01227859]
+    [ 0.61585337  0.09992217]
+    [ 0.056508   -0.00307822]]
+    <NDArray 6x2 @cpu(0)>
     """
     def __init__(self,
                  in_feat,
@@ -70,9 +111,10 @@ class RelGraphConv(gluon.Block):
                  num_bases=None,
                  bias=True,
                  activation=None,
-                 self_loop=False,
+                 self_loop=True,
                  low_mem=False,
-                 dropout=0.0):
+                 dropout=0.0,
+                 layer_norm=False):
         super(RelGraphConv, self).__init__()
         self.in_feat = in_feat
         self.out_feat = out_feat
@@ -86,6 +128,7 @@ class RelGraphConv(gluon.Block):
         self.self_loop = self_loop
 
         assert low_mem is False, 'MXNet currently does not support low-memory implementation.'
+        assert layer_norm is False, 'MXNet currently does not support layer norm.'
 
         if regularizer == "basis":
             # add basis weights
@@ -160,29 +203,35 @@ class RelGraphConv(gluon.Block):
         return {'msg': msg}
 
     def forward(self, g, x, etypes, norm=None):
-        r"""Forward computation
+        """
+        Description
+        -----------
+
+        Forward computation
 
         Parameters
         ----------
         g : DGLGraph
             The graph.
-        x : mx.ndarray.NDArray
+        feat : mx.ndarray.NDArray
             Input node features. Could be either
-              - :math:`(|V|, D)` dense tensor
-              - :math:`(|V|,)` int64 vector, representing the categorical values of each
-                node. We then treat the input feature as an one-hot encoding feature.
+
+                * :math:`(|V|, D)` dense tensor
+                * :math:`(|V|,)` int64 vector, representing the categorical values of each
+                  node. It then treat the input feature as an one-hot encoding feature.
         etypes : mx.ndarray.NDArray
             Edge type tensor. Shape: :math:`(|E|,)`
         norm : mx.ndarray.NDArray
-            Optional edge normalizer tensor. Shape: :math:`(|E|, 1)`
+            Optional edge normalizer tensor. Shape: :math:`(|E|, 1)`.
 
         Returns
         -------
         mx.ndarray.NDArray
             New node features.
         """
-        assert g.is_homograph(), \
-            "not a homograph; convert it with to_homo and pass in the edge type as argument"
+        assert g.is_homogeneous, \
+            "not a homogeneous graph; convert it with to_homogeneous " \
+            "and pass in the edge type as argument"
         with g.local_scope():
             g.ndata['h'] = x
             g.edata['type'] = etypes

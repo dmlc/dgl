@@ -3,7 +3,6 @@ from loss import *
 from optims import *
 from dataset import *
 from modules.config import *
-#from modules.viz import *
 import numpy as np
 import argparse
 import torch

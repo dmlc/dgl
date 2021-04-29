@@ -9,7 +9,11 @@ from .... import laplacian_lambda_max, broadcast_nodes, function as fn
 
 
 class ChebConv(nn.Module):
-    r"""Chebyshev Spectral Graph Convolution layer from paper `Convolutional
+    r"""
+
+    Description
+    -----------
+    Chebyshev Spectral Graph Convolution layer from paper `Convolutional
     Neural Networks on Graphs with Fast Localized Spectral Filtering
     <https://arxiv.org/pdf/1606.09375.pdf>`__.
 
@@ -18,24 +22,46 @@ class ChebConv(nn.Module):
 
         Z^{0, l} &= H^{l}
 
-        Z^{1, l} &= \hat{L} \cdot H^{l}
+        Z^{1, l} &= \tilde{L} \cdot H^{l}
 
-        Z^{k, l} &= 2 \cdot \hat{L} \cdot Z^{k-1, l} - Z^{k-2, l}
+        Z^{k, l} &= 2 \cdot \tilde{L} \cdot Z^{k-1, l} - Z^{k-2, l}
 
-        \hat{L} &= 2\left(I - \hat{D}^{-1/2} \hat{A} \hat{D}^{-1/2}\right)/\lambda_{max} - I
+        \tilde{L} &= 2\left(I - \tilde{D}^{-1/2} \tilde{A} \tilde{D}^{-1/2}\right)/\lambda_{max} - I
+
+    where :math:`\tilde{A}` is :math:`A` + :math:`I`, :math:`W` is learnable weight.
+
 
     Parameters
     ----------
     in_feats: int
-        Number of input features.
+        Dimension of input features; i.e, the number of dimensions of :math:`h_i^{(l)}`.
     out_feats: int
-        Number of output features.
+        Dimension of output features :math:`h_i^{(l+1)}`.
     k : int
-        Chebyshev filter size.
+        Chebyshev filter size :math:`K`.
     activation : function, optional
-        Activation function, default is ReLu.
+        Activation function. Default ``ReLu``.
     bias : bool, optional
         If True, adds a learnable bias to the output. Default: ``True``.
+
+    Example
+    -------
+    >>> import dgl
+    >>> import numpy as np
+    >>> import torch as th
+    >>> from dgl.nn import ChebConv
+    >>
+    >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    >>> feat = th.ones(6, 10)
+    >>> conv = ChebConv(10, 2, 2)
+    >>> res = conv(g, feat)
+    >>> res
+    tensor([[ 0.6163, -0.1809],
+            [ 0.6163, -0.1809],
+            [ 0.6163, -0.1809],
+            [ 0.9698, -1.5053],
+            [ 0.3664,  0.7556],
+            [-0.2370,  3.0164]], grad_fn=<AddBackward0>)
     """
 
     def __init__(self,
@@ -52,7 +78,11 @@ class ChebConv(nn.Module):
         self.linear = nn.Linear(k * in_feats, out_feats, bias)
 
     def forward(self, graph, feat, lambda_max=None):
-        r"""Compute ChebNet layer.
+        r"""
+
+        Description
+        -----------
+        Compute ChebNet layer.
 
         Parameters
         ----------

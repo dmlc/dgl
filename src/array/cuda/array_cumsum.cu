@@ -4,9 +4,9 @@
  * \brief Array cumsum GPU implementation
  */
 #include <dgl/array.h>
-#include <cub/cub.cuh>
 #include "../../runtime/cuda/cuda_common.h"
 #include "./utils.h"
+#include "./dgl_cub.cuh"
 
 namespace dgl {
 using runtime::NDArray;
@@ -17,7 +17,8 @@ template <DLDeviceType XPU, typename IdType>
 IdArray CumSum(IdArray array, bool prepend_zero) {
   const int64_t len = array.NumElements();
   if (len == 0)
-    return array;
+    return !prepend_zero ? array : aten::Full(0, 1, array->dtype.bits, array->ctx);
+
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   auto device = runtime::DeviceAPI::Get(array->ctx);
   const IdType* in_d = array.Ptr<IdType>();

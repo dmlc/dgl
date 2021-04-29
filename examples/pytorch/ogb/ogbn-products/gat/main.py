@@ -4,42 +4,12 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import torch.multiprocessing as mp
-from torch.utils.data import DataLoader
-import dgl.function as fn
 import dgl.nn.pytorch as dglnn
 import time
 import argparse
-from _thread import start_new_thread
-from functools import wraps
-from dgl.data import RedditDataset
 import tqdm
-import traceback
 from ogb.nodeproppred import DglNodePropPredDataset
 
-#### Neighbor sampler
-
-class NeighborSampler(object):
-    def __init__(self, g, fanouts):
-        self.g = g
-        self.fanouts = fanouts
-
-    def sample_blocks(self, seeds):
-        seeds = th.LongTensor(np.asarray(seeds))
-        blocks = []
-        for fanout in self.fanouts:
-            # For each seed node, sample ``fanout`` neighbors.
-            if fanout == 0:
-                frontier = dgl.in_subgraph(self.g, seeds)
-            else:
-                frontier = dgl.sampling.sample_neighbors(self.g, seeds, fanout, replace=True)
-            # Then we compact the frontier into a bipartite graph for message passing.
-            block = dgl.to_block(frontier, seeds)
-            # Obtain the seed nodes for next layer.
-            seeds = block.srcdata[dgl.NID]
-
-            blocks.insert(0, block)
-        return blocks
 
 class GAT(nn.Module):
     def __init__(self,
@@ -48,21 +18,18 @@ class GAT(nn.Module):
                  n_classes,
                  n_layers,
                  num_heads,
-                 activation,
-                 dropout):
+                 activation):
         super().__init__()
-        print(in_feats)
-        print(n_hidden)
-        print(n_classes)
-        print(n_layers)
         self.n_layers = n_layers
         self.n_hidden = n_hidden
         self.n_classes = n_classes
         self.layers = nn.ModuleList()
-        self.layers.append(dglnn.GATConv((in_feats, in_feats), n_hidden, num_heads=num_heads, feat_drop=0., attn_drop=0., activation=activation, negative_slope=0.2))
+        self.layers.append(dglnn.GATConv((in_feats, in_feats), n_hidden, num_heads=num_heads, activation=activation))
         for i in range(1, n_layers - 1):
-            self.layers.append(dglnn.GATConv((n_hidden * num_heads, n_hidden * num_heads), n_hidden, num_heads=num_heads, feat_drop=0., attn_drop=0., activation=activation, negative_slope=0.2))
-        self.layers.append(dglnn.GATConv((n_hidden * num_heads, n_hidden * num_heads), n_classes, num_heads=num_heads, feat_drop=0., attn_drop=0., activation=None, negative_slope=0.2))
+            self.layers.append(dglnn.GATConv((n_hidden * num_heads, n_hidden * num_heads), n_hidden,
+                                             num_heads=num_heads, activation=activation))
+        self.layers.append(dglnn.GATConv((n_hidden * num_heads, n_hidden * num_heads), n_classes,
+                                         num_heads=num_heads, activation=None))
 
     def forward(self, blocks, x):
         h = x
@@ -71,7 +38,7 @@ class GAT(nn.Module):
             # appropriate nodes on the LHS.
             # Note that the shape of h is (num_nodes_LHS, D) and the shape of h_dst
             # would be (num_nodes_RHS, D)
-            h_dst = h[:block.number_of_dst_nodes()]
+            h_dst = h[:block.num_dst_nodes()]
             # Then we compute the updated representation on the RHS.
             # The shape of h now becomes (num_nodes_RHS, D)
             if l < self.n_layers - 1:
@@ -81,7 +48,7 @@ class GAT(nn.Module):
         h = h.mean(1)
         return h.log_softmax(dim=-1)
 
-    def inference(self, g, x, batch_size, num_heads, device):
+    def inference(self, g, x, num_heads, device):
         """
         Inference with the GAT model on full neighbors (i.e. without neighbor sampling).
         g : the entire graph.
@@ -94,42 +61,38 @@ class GAT(nn.Module):
         # Therefore, we compute the representation of all nodes layer by layer.  The nodes
         # on each layer are of course splitted in batches.
         # TODO: can we standardize this?
-        nodes = th.arange(g.number_of_nodes())
         for l, layer in enumerate(self.layers):
             if l < self.n_layers - 1:
-                y = th.zeros(g.number_of_nodes(), self.n_hidden * num_heads if l != len(self.layers) - 1 else self.n_classes)
+                y = th.zeros(g.num_nodes(), self.n_hidden * num_heads if l != len(self.layers) - 1 else self.n_classes)
             else:
-                y = th.zeros(g.number_of_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
+                y = th.zeros(g.num_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
 
-            for start in tqdm.trange(0, len(nodes), batch_size):
-                end = start + batch_size
-                batch_nodes = nodes[start:end]
-                block = dgl.to_block(dgl.in_subgraph(g, batch_nodes), batch_nodes)
-                input_nodes = block.srcdata[dgl.NID]
+            sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
+            dataloader = dgl.dataloading.NodeDataLoader(
+                g,
+                th.arange(g.num_nodes()),
+                sampler,
+                batch_size=args.batch_size,
+                shuffle=True,
+                drop_last=False,
+                num_workers=args.num_workers)
+
+            for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
+                block = blocks[0].int().to(device)
 
                 h = x[input_nodes].to(device)
-                h_dst = h[:block.number_of_dst_nodes()]
+                h_dst = h[:block.num_dst_nodes()]
                 if l < self.n_layers - 1:
                     h = layer(block, (h, h_dst)).flatten(1) 
                 else:
                     h = layer(block, (h, h_dst))
                     h = h.mean(1)
                     h = h.log_softmax(dim=-1)
-                y[start:end] = h.cpu()
+
+                y[output_nodes] = h.cpu()
 
             x = y
-        return y
-
-def prepare_mp(g):
-    """
-    Explicitly materialize the CSR, CSC and COO representation of the given graph
-    so that they could be shared via copy-on-write to sampler workers and GPU
-    trainers.
-    This is a workaround before full shared memory support on heterogeneous graphs.
-    """
-    g.request_format('csr')
-    g.request_format('coo')
-    g.request_format('csc')
+        return y.to(device)
 
 def compute_acc(pred, labels):
     """
@@ -137,7 +100,7 @@ def compute_acc(pred, labels):
     """
     return (th.argmax(pred, dim=1) == labels).float().sum() / len(pred)
 
-def evaluate(model, g, labels, val_nid, test_nid, batch_size, num_heads, device):
+def evaluate(model, g, nfeat, labels, val_nid, test_nid, num_heads, device):
     """
     Evaluate the model on the validation set specified by ``val_mask``.
     g : The entire graph.
@@ -149,38 +112,37 @@ def evaluate(model, g, labels, val_nid, test_nid, batch_size, num_heads, device)
     """
     model.eval()
     with th.no_grad():
-        inputs = g.ndata['feat']
-        pred = model.inference(g, inputs, batch_size, num_heads, device)
+        pred = model.inference(g, nfeat, num_heads, device)
     model.train()
     return compute_acc(pred[val_nid], labels[val_nid]), compute_acc(pred[test_nid], labels[test_nid]), pred
 
-def load_subtensor(g, labels, seeds, input_nodes, device):
+def load_subtensor(nfeat, labels, seeds, input_nodes):
     """
-    Copys features and labels of a set of nodes onto GPU.
+    Extracts features and labels for a set of nodes.
     """
-    batch_inputs = g.ndata['feat'][input_nodes].to(device)
-    batch_labels = labels[seeds].to(device)
+    batch_inputs = nfeat[input_nodes]
+    batch_labels = labels[seeds]
     return batch_inputs, batch_labels
 
 #### Entry point
 def run(args, device, data):
     # Unpack data
-    train_nid, val_nid, test_nid, in_feats, labels, n_classes, g, num_heads = data
-
-    # Create sampler
-    sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')])
+    train_nid, val_nid, test_nid, in_feats, labels, n_classes, nfeat, g, num_heads = data
 
     # Create PyTorch DataLoader for constructing blocks
-    dataloader = DataLoader(
-        dataset=train_nid.numpy(),
+    sampler = dgl.dataloading.MultiLayerNeighborSampler(
+        [int(fanout) for fanout in args.fan_out.split(',')])
+    dataloader = dgl.dataloading.NodeDataLoader(
+        g,
+        train_nid,
+        sampler,
         batch_size=args.batch_size,
-        collate_fn=sampler.sample_blocks,
         shuffle=True,
         drop_last=False,
         num_workers=args.num_workers)
 
     # Define model and optimizer
-    model = GAT(in_feats, args.num_hidden, n_classes, args.num_layers, num_heads, F.relu, args.dropout)
+    model = GAT(in_feats, args.num_hidden, n_classes, args.num_layers, num_heads, F.relu)
     model = model.to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.wd)
 
@@ -194,16 +156,14 @@ def run(args, device, data):
 
         # Loop over the dataloader to sample the computation dependency graph as a list of
         # blocks.
-        for step, blocks in enumerate(dataloader):
+        for step, (input_nodes, seeds, blocks) in enumerate(dataloader):
             tic_step = time.time()
 
-            # The nodes for input lies at the LHS side of the first block.
-            # The nodes for output lies at the RHS side of the last block.
-            input_nodes = blocks[0].srcdata[dgl.NID]
-            seeds = blocks[-1].dstdata[dgl.NID]
+            # copy block to gpu
+            blocks = [blk.to(device) for blk in blocks]
 
             # Load the input features as well as output labels
-            batch_inputs, batch_labels = load_subtensor(g, labels, seeds, input_nodes, device)
+            batch_inputs, batch_labels = load_subtensor(nfeat, labels, seeds, input_nodes)
 
             # Compute loss and prediction
             batch_pred = model(blocks, batch_inputs)
@@ -216,7 +176,7 @@ def run(args, device, data):
             if step % args.log_every == 0:
                 acc = compute_acc(batch_pred, batch_labels)
                 gpu_mem_alloc = th.cuda.max_memory_allocated() / 1000000 if th.cuda.is_available() else 0
-                print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MiB'.format(
+                print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MB'.format(
                     epoch, step, loss.item(), acc.item(), np.mean(iter_tput[3:]), gpu_mem_alloc))
 
         toc = time.time()
@@ -224,7 +184,7 @@ def run(args, device, data):
         if epoch >= 5:
             avg += toc - tic
         if epoch % args.eval_every == 0 and epoch != 0:
-            eval_acc, test_acc, pred = evaluate(model, g, labels, val_nid, test_nid, args.val_batch_size, num_heads, device)
+            eval_acc, test_acc, pred = evaluate(model, g, nfeat, labels, val_nid, test_nid, num_heads, device)
             if args.save_pred:
                 np.savetxt(args.save_pred + '%02d' % epoch, pred.argmax(1).cpu().numpy(), '%d')
             print('Eval Acc {:.4f}'.format(eval_acc))
@@ -249,7 +209,6 @@ if __name__ == '__main__':
     argparser.add_argument('--log-every', type=int, default=20)
     argparser.add_argument('--eval-every', type=int, default=1)
     argparser.add_argument('--lr', type=float, default=0.001)
-    argparser.add_argument('--dropout', type=float, default=0.5)
     argparser.add_argument('--num-workers', type=int, default=8,
         help="Number of sampling processes. Use 0 for no extra process.")
     argparser.add_argument('--save-pred', type=str, default='')
@@ -262,32 +221,29 @@ if __name__ == '__main__':
     else:
         device = th.device('cpu')
 
-    # load reddit data
+    # load data
     data = DglNodePropPredDataset(name='ogbn-products')
     splitted_idx = data.get_idx_split()
     train_idx, val_idx, test_idx = splitted_idx['train'], splitted_idx['valid'], splitted_idx['test']
     graph, labels = data[0]
-    labels = labels[:, 0]
+    nfeat = graph.ndata.pop('feat').to(device)
+    labels = labels[:, 0].to(device)
 
-    graph.readonly(False)
-    _, _, self_e = graph.edge_ids(th.arange(graph.number_of_nodes()), th.arange(graph.number_of_nodes()), return_uv=True)
-    print('Total edges before adding self-loop {}'.format(graph.number_of_edges()))
-    # clean partial self-loop edges
-    graph.remove_edges(self_e)
-    # Add all self-loop edges
-    graph.add_edges(th.arange(graph.number_of_nodes()), th.arange(graph.number_of_nodes()))
-    print('Total edges after adding self-loop {}'.format(graph.number_of_edges()))
-    graph.readonly(True)
-    graph = dgl.as_heterograph(graph)
+    print('Total edges before adding self-loop {}'.format(graph.num_edges()))
+    graph = graph.remove_self_loop().add_self_loop()
+    print('Total edges after adding self-loop {}'.format(graph.num_edges()))
 
-    in_feats = graph.ndata['feat'].shape[1]
+    in_feats = nfeat.shape[1]
     n_classes = (labels.max() + 1).item()
-    prepare_mp(graph)
+
+    # Create csr/coo/csc formats before launching sampling processes
+    # This avoids creating certain formats in each data loader process, which saves momory and CPU.
+    graph.create_formats_()
     # Pack data
-    data = train_idx, val_idx, test_idx, in_feats, labels, n_classes, graph, args.head
+    data = train_idx, val_idx, test_idx, in_feats, labels, n_classes, nfeat, graph, args.head
 
     # Run 10 times
     test_accs = []
     for i in range(10):
-        test_accs.append(run(args, device, data))
+        test_accs.append(run(args, device, data).cpu().numpy())
         print('Average test accuracy:', np.mean(test_accs), '±', np.std(test_accs))

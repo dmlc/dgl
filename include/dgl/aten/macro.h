@@ -124,6 +124,23 @@
   }                                                           \
 } while (0)
 
+#define ATEN_FLOAT_BITS_SWITCH(val, bits, val_name, ...) do {  \
+  CHECK_EQ((val).code, kDLFloat)                              \
+    << (val_name) << " must be float type";                   \
+  if ((val).bits == 16) {                                     \
+    constexpr int bits = 16;                                  \
+    {__VA_ARGS__}                                             \
+  } else if ((val).bits == 32) {                              \
+    constexpr int bits = 32;                                  \
+    {__VA_ARGS__}                                             \
+  } else if ((val).bits == 64) {                              \
+    constexpr int bits = 64;                                  \
+    {__VA_ARGS__}                                             \
+  } else {                                                    \
+    LOG(FATAL) << (val_name) << " can only be float32 or float64";  \
+  }                                                           \
+} while (0)
+
 /*
  * Dispatch according to data type (int32, int64, float32 or float64):
  *
@@ -235,13 +252,13 @@
   CHECK_IF((value)->ndim == (_ndim), "ndim", value_name, _ndim)
 
 #define CHECK_SAME_DTYPE(VAR1, VAR2)                                            \
-  CHECK(VAR1->dtype == VAR2->dtype)                                             \
+  CHECK((VAR1)->dtype == (VAR2)->dtype)                                         \
     << "Expected " << (#VAR2) << " to be the same type as " << (#VAR1) << "("   \
     << (VAR1)->dtype << ")"                                                     \
     << ". But got " << (VAR2)->dtype << ".";
 
 #define CHECK_SAME_CONTEXT(VAR1, VAR2)                                                      \
-  CHECK(VAR1->ctx == VAR2->ctx)                                                             \
+  CHECK((VAR1)->ctx == (VAR2)->ctx)                                                         \
     << "Expected " << (#VAR2) << " to have the same device context as " << (#VAR1) << "("   \
     << (VAR1)->ctx << ")"                                                                   \
     << ". But got " << (VAR2)->ctx << ".";

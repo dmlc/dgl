@@ -5,16 +5,17 @@ from distutils.version import LooseVersion
 import scipy # Weird bug in new pytorch when import scipy after import torch
 import torch as th
 import builtins
+import numbers
 from torch.utils import dlpack
 
 from ... import ndarray as nd
-from ... import kernel as K
+from ..._deprecate import kernel as K
 from ...function.base import TargetCode
 from ...base import dgl_warning
 
-if LooseVersion(th.__version__) < LooseVersion("1.2.0"):
-    dgl_warning("Detected an old version of PyTorch. Suggest using torch>=1.2.0 "
-                "for the best experience.")
+if LooseVersion(th.__version__) < LooseVersion("1.5.0"):
+    raise Exception("Detected an old version of PyTorch. Please update torch>=1.5.0 "
+                    "for the best experience.")
 
 def data_type_dict():
     return {'float16' : th.float16,
@@ -31,7 +32,17 @@ def cpu():
     return th.device('cpu')
 
 def tensor(data, dtype=None):
-    return th.tensor(data, dtype=dtype)
+    if isinstance(data, numbers.Number):
+        data = [data]
+    if isinstance(data, list) and len(data) > 0 and isinstance(data[0], th.Tensor):
+        # prevent GPU->CPU->GPU copies
+        if data[0].ndim == 0:
+            # zero dimenion scalar tensors
+            return th.stack(data)
+    if isinstance(data, th.Tensor):
+        return th.as_tensor(data, dtype=dtype, device=data.device)
+    else:
+        return th.as_tensor(data, dtype=dtype)
 
 def as_scalar(data):
     return data.item()
@@ -98,6 +109,7 @@ def asnumpy(input):
         return input.cpu().detach().numpy()
 
 def copy_to(input, ctx, **kwargs):
+    ctx = th.device(ctx)
     if ctx.type == 'cpu':
         return input.cpu()
     elif ctx.type == 'cuda':
@@ -110,8 +122,14 @@ def copy_to(input, ctx, **kwargs):
 def sum(input, dim, keepdims=False):
     return th.sum(input, dim=dim, keepdim=keepdims)
 
+def floor_div(in1, in2):
+    return in1 // in2
+
 def reduce_sum(input):
     return input.sum()
+
+def cumsum(input, dim):
+    return th.cumsum(input, dim=dim)
 
 def mean(input, dim):
     return th.mean(input, dim=dim)
@@ -145,6 +163,9 @@ def argtopk(input, k, dim, descending=True):
 def exp(input):
     return th.exp(input)
 
+def sqrt(input):
+    return th.sqrt(input)
+
 def softmax(input, dim=-1):
     return th.softmax(input, dim=dim)
 
@@ -158,10 +179,7 @@ def split(input, sizes_or_sections, dim):
     return th.split(input, sizes_or_sections, dim)
 
 def repeat(input, repeats, dim):
-    # return th.repeat_interleave(input, repeats, dim) # PyTorch 1.1
-    if dim < 0:
-        dim += input.dim()
-    return th.flatten(th.stack([input] * repeats, dim=dim+1), dim, dim+1)
+    return th.repeat_interleave(input, repeats, dim) # PyTorch 1.1
 
 def gather_row(data, row_index):
     return th.index_select(data, 0, row_index.long())
@@ -176,11 +194,14 @@ def take(data, indices, dim):
 def narrow_row(x, start, stop):
     return x[start:stop]
 
+def index_add_inplace(data, row_idx, value):
+    data.index_add_(0, row_idx, value)
+
 def scatter_row(data, row_index, value):
     return data.index_copy(0, row_index.long(), value)
 
 def scatter_row_inplace(data, row_index, value):
-    data[row_index] = value
+    data[row_index.long()] = value
 
 def squeeze(input, dim):
     return th.squeeze(input, dim)
@@ -206,47 +227,45 @@ def ones(shape, dtype, ctx):
 def uniform(shape, dtype, ctx, low, high):
     return th.empty(shape, dtype=dtype, device=ctx).uniform_(low, high)
 
+def randint(shape, dtype, ctx, low, high):
+    return th.randint(low, high, shape, dtype=dtype, device=ctx)
+
 def pad_packed_tensor(input, lengths, value, l_min=None):
     old_shape = input.shape
-    if isinstance(lengths, th.Tensor):
-        max_len = as_scalar(lengths.max())
+    device = input.device
+    if not is_tensor(lengths):
+        lengths = th.tensor(lengths, dtype=th.int64, device=device)
     else:
-        max_len = builtins.max(lengths)
+        lengths = lengths.to(device)
+    max_len = as_scalar(lengths.max())
 
     if l_min is not None:
         max_len = builtins.max(max_len, l_min)
 
     batch_size = len(lengths)
-    device = input.device
     x = input.new(batch_size * max_len, *old_shape[1:])
     x.fill_(value)
-    index = []
-    for i, l in enumerate(lengths):
-        index.extend(range(i * max_len, i * max_len + l))
-    index = th.tensor(index).to(device)
-    return scatter_row(x, index, input).view(batch_size, max_len, *old_shape[1:])
+    index = th.ones(len(input), dtype=th.int64, device=device)
+    cum_lengths = th.cumsum(lengths, 0)
+    index[cum_lengths[:-1]] += (max_len - lengths[:-1])
+    index = th.cumsum(index, 0) - 1
+    x[index] = input
+    return x.view(batch_size, max_len, *old_shape[1:])
 
 def pack_padded_tensor(input, lengths):
-    batch_size, max_len = input.shape[:2]
+    max_len = input.shape[1]
     device = input.device
-    index = []
-    for i, l in enumerate(lengths):
-        index.extend(range(i * max_len, i * max_len + l))
-    index = th.tensor(index).to(device)
-    return gather_row(input.view(batch_size * max_len, -1), index)
-
-def unsorted_1d_segment_sum(input, seg_id, n_segs, dim):
-    y = th.zeros(n_segs, *input.shape[1:]).to(input)
-    seg_id = seg_id.view((-1,) + (1,) * (input.dim() - 1)).expand_as(input)
-    y = y.scatter_add_(dim, seg_id, input)
-    return y
-
-def unsorted_1d_segment_mean(input, seg_id, n_segs, dim):
-    w = unsorted_1d_segment_sum(th.ones_like(seg_id), seg_id, n_segs, 0).to(input)
-    w = w.clamp(min=1)   # remove 0 entries
-    y = unsorted_1d_segment_sum(input, seg_id, n_segs, dim)
-    y = y / w.view((-1,) + (1,) * (y.dim() - 1))
-    return y
+    if not is_tensor(lengths):
+        lengths = th.tensor(lengths, dtype=th.int64, device=device)
+    else:
+        lengths = lengths.to(device)
+    input = input.view(-1, *input.shape[2:])
+    out_len = lengths.sum().item()
+    index = th.ones(out_len, dtype=th.int64, device=device)
+    cum_lengths = th.cumsum(lengths, 0)
+    index[cum_lengths[:-1]] += (max_len - lengths[:-1])
+    index = th.cumsum(index, 0) - 1
+    return input[index]
 
 def boolean_mask(input, mask):
     if 'bool' not in str(mask.dtype):
@@ -265,21 +284,29 @@ def logical_and(input1, input2):
 def clone(input):
     return input.clone()
 
+def clamp(data, min_val, max_val):
+    return th.clamp(data, min_val, max_val)
+
+def replace_inf_with_zero(x):
+    return th.masked_fill(x, th.isinf(x), 0)
+
 def unique(input):
+    if input.dtype == th.bool:
+        input = input.type(th.int8)
     return th.unique(input)
 
 def full_1d(length, fill_value, dtype, ctx):
     return th.full((length,), fill_value, dtype=dtype, device=ctx)
 
 def nonzero_1d(input):
-    x = th.nonzero(input).squeeze()
+    x = th.nonzero(input, as_tuple=False).squeeze()
     return x if x.dim() == 1 else x.view(-1)
 
 def sort_1d(input):
     return th.sort(input)
 
-def arange(start, stop, dtype="int64"):
-    return th.arange(start, stop, dtype=data_type_dict()[dtype])
+def arange(start, stop, dtype=th.int64, ctx=None):
+    return th.arange(start, stop, dtype=dtype, device=ctx)
 
 def rand_shuffle(arr):
     idx = th.randperm(len(arr))
@@ -298,12 +325,21 @@ def zerocopy_to_numpy(input):
 def zerocopy_from_numpy(np_array):
     return th.as_tensor(np_array)
 
-def zerocopy_to_dgl_ndarray(input):
-    return nd.from_dlpack(dlpack.to_dlpack(input.contiguous()))
+def zerocopy_to_dgl_ndarray(data):
+    return nd.from_dlpack(dlpack.to_dlpack(data.contiguous()))
 
-def zerocopy_from_dgl_ndarray(input):
-    return dlpack.from_dlpack(input.to_dlpack())
+def zerocopy_to_dgl_ndarray_for_write(input):
+    return zerocopy_to_dgl_ndarray(input)
 
+def zerocopy_from_dgl_ndarray(data):
+    if data.shape == (0,):
+        # NOTE: PyTorch v1.5 does not accept DLPack object representing empty CUDA tensor.
+        #  Related issue: https://github.com/pytorch/pytorch/issues/41182
+        #  The issue will be fixed in v1.6 and later.
+        return th.tensor([], dtype=getattr(th, data.dtype),
+                         device=to_backend_ctx(data.ctx))
+    else:
+        return dlpack.from_dlpack(data.to_dlpack())
 
 
 class BinaryReduce(th.autograd.Function):
@@ -478,7 +514,7 @@ def _reduce_grad(grad, shape):
     num_to_squeeze = len(grad_shape) - len(in_shape)
     # pad inshape
     in_shape = (1,) * num_to_squeeze + in_shape
-    reduce_idx = th.nonzero(th.tensor(grad_shape) - th.tensor(in_shape))
+    reduce_idx = th.nonzero(th.tensor(grad_shape) - th.tensor(in_shape), as_tuple=False)
     reduce_idx += 1  # skip batch dim
     grad = grad.sum(dim=tuple(reduce_idx), keepdim=True)
     return grad.view(shape)
@@ -486,3 +522,37 @@ def _reduce_grad(grad, shape):
 def sync():
     # Pytorch performs computation synchronously, so no need for synchronization.
     pass
+
+def attach_grad(x):
+    if x.grad is not None:
+        x.grad.zero_()
+        return x
+    else:
+        return x.requires_grad_()
+
+def backward(x, head_gradient=None):
+    if head_gradient is not None and head_gradient.shape[0] == 1 and len(head_gradient.shape) == 1:
+        # Fix for torch 1.3.1
+        head_gradient = th.tensor(head_gradient.item()).to(head_gradient.device)
+    x.backward(head_gradient)
+
+def grad(x):
+    return x.grad
+
+def is_no_grad(x):
+    return x.grad is None or (x.grad == 0).all()
+
+def is_recording():
+    return th.is_grad_enabled()
+
+class record_grad(object):
+    def __init__(self):
+        pass
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        pass
+
+no_grad = th.no_grad

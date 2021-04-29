@@ -5,7 +5,7 @@ import time
 from . import rpc
 from .constants import MAX_QUEUE_SIZE
 
-def start_server(server_id, ip_config, num_clients, server_state, \
+def start_server(server_id, ip_config, num_servers, num_clients, server_state, \
     max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
     """Start DGL server, which will be shared with all the rpc services.
 
@@ -17,6 +17,8 @@ def start_server(server_id, ip_config, num_clients, server_state, \
         Current server ID (starts from 0).
     ip_config : str
         Path of IP configuration file.
+    num_servers : int
+        Server count on each machine.
     num_clients : int
         Total number of clients that will be connected to the server.
         Note that, we do not support dynamic connection for now. It means
@@ -32,11 +34,12 @@ def start_server(server_id, ip_config, num_clients, server_state, \
         Networking type. Current options are: 'socket'.
     """
     assert server_id >= 0, 'server_id (%d) cannot be a negative number.' % server_id
+    assert num_servers > 0, 'num_servers (%d) must be a positive number.' % num_servers
     assert num_clients >= 0, 'num_client (%d) cannot be a negative number.' % num_client
     assert max_queue_size > 0, 'queue_size (%d) cannot be a negative number.' % queue_size
     assert net_type in ('socket'), 'net_type (%s) can only be \'socket\'' % net_type
-    # HandleCtrlC Register for handling Ctrl+C event
-    rpc.register_ctrl_c()
+    # Register signal handler.
+    rpc.register_sig_handler()
     # Register some basic services
     rpc.register_service(rpc.CLIENT_REGISTER,
                          rpc.ClientRegisterRequest,
@@ -47,8 +50,11 @@ def start_server(server_id, ip_config, num_clients, server_state, \
     rpc.register_service(rpc.GET_NUM_CLIENT,
                          rpc.GetNumberClientsRequest,
                          rpc.GetNumberClientsResponse)
+    rpc.register_service(rpc.CLIENT_BARRIER,
+                         rpc.ClientBarrierRequest,
+                         rpc.ClientBarrierResponse)
     rpc.set_rank(server_id)
-    server_namebook = rpc.read_ip_config(ip_config)
+    server_namebook = rpc.read_ip_config(ip_config, num_servers)
     machine_id = server_namebook[server_id][0]
     rpc.set_machine_id(machine_id)
     ip_addr = server_namebook[server_id][1]

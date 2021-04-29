@@ -37,17 +37,23 @@ IdArray BinaryElewise(IdType lhs, IdArray rhs);
 template <DLDeviceType XPU, typename IdType, typename Op>
 IdArray UnaryElewise(IdArray array);
 
-template <DLDeviceType XPU, typename IdType>
-IdArray HStack(IdArray arr1, IdArray arr2);
-
 template <DLDeviceType XPU, typename DType, typename IdType>
 NDArray IndexSelect(NDArray array, IdArray index);
 
 template <DLDeviceType XPU, typename DType>
 DType IndexSelect(NDArray array, int64_t index);
 
+template <DLDeviceType XPU, typename DType>
+IdArray NonZero(BoolArray bool_arr);
+
+template <DLDeviceType XPU, typename DType>
+std::pair<IdArray, IdArray> Sort(IdArray array, int num_bits);
+
 template <DLDeviceType XPU, typename DType, typename IdType>
 NDArray Scatter(NDArray array, IdArray indices);
+
+template <DLDeviceType XPU, typename DType, typename IdType>
+void Scatter_(IdArray index, NDArray value, NDArray out);
 
 template <DLDeviceType XPU, typename DType, typename IdType>
 NDArray Repeat(NDArray array, IdArray repeats);
@@ -66,6 +72,9 @@ std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths);
 
 template <DLDeviceType XPU, typename IdType>
 IdArray CumSum(IdArray array, bool prepend_zero);
+
+template <DLDeviceType XPU, typename IdType>
+IdArray NonZero(NDArray array);
 
 // sparse arrays
 
@@ -93,11 +102,15 @@ runtime::NDArray CSRGetRowData(CSRMatrix csr, int64_t row);
 template <DLDeviceType XPU, typename IdType>
 bool CSRIsSorted(CSRMatrix csr);
 
-template <DLDeviceType XPU, typename IdType>
-runtime::NDArray CSRGetData(CSRMatrix csr, int64_t row, int64_t col);
+template <DLDeviceType XPU, typename IdType, typename DType>
+runtime::NDArray CSRGetData(
+    CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols,
+    runtime::NDArray weights, DType filler);
 
 template <DLDeviceType XPU, typename IdType>
-runtime::NDArray CSRGetData(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols);
+NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols) {
+  return CSRGetData<XPU, IdType, IdType>(csr, rows, cols, NullArray(rows->dtype), -1);
+}
 
 template <DLDeviceType XPU, typename IdType>
 std::vector<runtime::NDArray> CSRGetDataAndIndices(
@@ -152,6 +165,12 @@ template <DLDeviceType XPU, typename IdType, typename DType>
 COOMatrix CSRRowWiseTopk(
     CSRMatrix mat, IdArray rows, int64_t k, NDArray weight, bool ascending);
 
+// Union CSRMatrixes
+template <DLDeviceType XPU, typename IdType>
+CSRMatrix UnionCsr(const std::vector<CSRMatrix>& csrs);
+
+template <DLDeviceType XPU, typename IdType>
+std::tuple<CSRMatrix, IdArray, IdArray> CSRToSimple(CSRMatrix csr);
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
@@ -175,11 +194,11 @@ std::pair<runtime::NDArray, runtime::NDArray>
 COOGetRowDataAndIndices(COOMatrix coo, int64_t row);
 
 template <DLDeviceType XPU, typename IdType>
-runtime::NDArray COOGetData(COOMatrix coo, int64_t row, int64_t col);
-
-template <DLDeviceType XPU, typename IdType>
 std::vector<runtime::NDArray> COOGetDataAndIndices(
     COOMatrix coo, runtime::NDArray rows, runtime::NDArray cols);
+
+template <DLDeviceType XPU, typename IdType>
+runtime::NDArray COOGetData(COOMatrix mat, runtime::NDArray rows, runtime::NDArray cols);
 
 template <DLDeviceType XPU, typename IdType>
 COOMatrix COOTranspose(COOMatrix coo);
@@ -222,6 +241,8 @@ template <DLDeviceType XPU, typename IdType, typename FloatType>
 COOMatrix COORowWiseTopk(
     COOMatrix mat, IdArray rows, int64_t k, FloatArray weight, bool ascending);
 
+///////////////////////// Graph Traverse routines //////////////////////////
+
 template <DLDeviceType XPU, typename IdType>
 Frontiers BFSNodesFrontiers(const CSRMatrix& csr, IdArray source);
 
@@ -241,7 +262,8 @@ Frontiers DGLDFSLabeledEdges(const CSRMatrix& csr,
                              const bool has_nontree_edge,
                              const bool return_labels);
 
-
+template <DLDeviceType XPU, typename IdType>
+COOMatrix COOLineGraph(const COOMatrix &coo, bool backtracking);
 
 }  // namespace impl
 }  // namespace aten

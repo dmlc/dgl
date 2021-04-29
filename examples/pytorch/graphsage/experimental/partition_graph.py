@@ -12,10 +12,16 @@ if __name__ == '__main__':
                            help='datasets: reddit, ogb-product, ogb-paper100M')
     argparser.add_argument('--num_parts', type=int, default=4,
                            help='number of partitions')
+    argparser.add_argument('--part_method', type=str, default='metis',
+                           help='the partition method')
     argparser.add_argument('--balance_train', action='store_true',
                            help='balance the training size in each partition.')
+    argparser.add_argument('--undirected', action='store_true',
+                           help='turn the graph into an undirected graph.')
     argparser.add_argument('--balance_edges', action='store_true',
                            help='balance the number of edges in each partition.')
+    argparser.add_argument('--output', type=str, default='data',
+                           help='Output path of partitioned graph.')
     args = argparser.parse_args()
 
     start = time.time()
@@ -34,6 +40,14 @@ if __name__ == '__main__':
         balance_ntypes = g.ndata['train_mask']
     else:
         balance_ntypes = None
-    dgl.distributed.partition_graph(g, args.dataset, args.num_parts, 'data',
+
+    if args.undirected:
+        sym_g = dgl.to_bidirected(g, readonly=True)
+        for key in g.ndata:
+            sym_g.ndata[key] = g.ndata[key]
+        g = sym_g
+
+    dgl.distributed.partition_graph(g, args.dataset, args.num_parts, args.output,
+                                    part_method=args.part_method,
                                     balance_ntypes=balance_ntypes,
                                     balance_edges=args.balance_edges)

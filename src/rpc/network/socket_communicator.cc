@@ -68,13 +68,15 @@ bool SocketSender::Connect() {
       if (client_socket->Connect(ip, port)) {
         bo = true;
       } else {
-        LOG(ERROR) << "Cannot connect to Receiver: " << ip << ":" << port
-                   << ", try again ...";
+        if (try_count % 200 == 0 && try_count != 0) {
+          // every 1000 seconds show this message
+          LOG(INFO) << "Try to connect to: " << ip << ":" << port;
+        }
         try_count++;
 #ifdef _WIN32
-        Sleep(1);
+        Sleep(5);
 #else   // !_WIN32
-        sleep(1);
+        sleep(5);
 #endif  // _WIN32
       }
     }
@@ -190,7 +192,6 @@ bool SocketReceiver::Wait(const char* addr, int num_sender) {
   }
   // Initialize socket and socket-thread
   server_socket_ = new TCPSocket();
-  server_socket_->SetTimeout(kTimeOut * 60 * 1000);  // millsec
   // Bind socket
   if (server_socket_->Bind(ip.c_str(), port) == false) {
     LOG(FATAL) << "Cannot bind to " << ip << ":" << port;
@@ -262,6 +263,8 @@ void SocketReceiver::Finalize() {
   for (auto& socket : sockets_) {
     socket.second->Close();
   }
+  server_socket_->Close();
+  delete server_socket_;
 }
 
 void SocketReceiver::RecvLoop(TCPSocket* socket, MessageQueue* queue) {

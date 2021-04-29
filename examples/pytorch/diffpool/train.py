@@ -17,6 +17,7 @@ from dgl.data import tu
 from model.encoder import DiffPool
 from data_utils import pre_process
 
+global_train_time_per_epoch = []
 
 def arg_parse():
     '''
@@ -68,7 +69,7 @@ def arg_parse():
         '--save_dir',
         dest='save_dir',
         help='model saving directory: SAVE_DICT/DATASET')
-    parser.add_argument('--load_epoch', dest='load_epoch', help='load trained model params from\
+    parser.add_argument('--load_epoch', dest='load_epoch', type=int, help='load trained model params from\
                          SAVE_DICT/DATASET/model-LOAD_EPOCH')
     parser.add_argument('--data_mode', dest='data_mode', help='data\
                         preprocessing mode: default, id, degree, or one-hot\
@@ -110,12 +111,10 @@ def prepare_data(dataset, prog_args, train=False, pre_process=None):
         pre_process(dataset, prog_args)
 
     # dataset.set_fold(fold)
-    return torch.utils.data.DataLoader(dataset,
-                                       batch_size=prog_args.batch_size,
-                                       shuffle=shuffle,
-                                       collate_fn=collate_fn,
-                                       drop_last=True,
-                                       num_workers=prog_args.n_worker)
+    return dgl.dataloading.GraphDataLoader(dataset,
+                                           batch_size=prog_args.batch_size,
+                                           shuffle=shuffle,
+                                           num_workers=prog_args.n_worker)
 
 
 def graph_classify_task(prog_args):
@@ -149,8 +148,7 @@ def graph_classify_task(prog_args):
 
     # calculate assignment dimension: pool_ratio * largest graph's maximum
     # number of nodes  in the dataset
-    assign_dim = int(max_num_node * prog_args.pool_ratio) * \
-        prog_args.batch_size
+    assign_dim = int(max_num_node * prog_args.pool_ratio)
     print("++++++++++MODEL STATISTICS++++++++")
     print("model hidden dim is", hidden_dim)
     print("model embedding dim for graph instance embedding", embedding_dim)
@@ -188,27 +186,7 @@ def graph_classify_task(prog_args):
         prog_args,
         val_dataset=val_dataloader)
     result = evaluate(test_dataloader, model, prog_args, logger)
-    print("test  accuracy {}%".format(result * 100))
-
-
-def collate_fn(batch):
-    '''
-    collate_fn for dataset batching
-    transform ndata to tensor (in gpu is available)
-    '''
-    graphs, labels = map(list, zip(*batch))
-    #cuda = torch.cuda.is_available()
-
-    # batch graphs and cast to PyTorch tensor
-    for graph in graphs:
-        for (key, value) in graph.ndata.items():
-            graph.ndata[key] = torch.FloatTensor(value)
-    batched_graphs = dgl.batch(graphs)
-
-    # cast to PyTorch tensor
-    batched_labels = torch.LongTensor(np.array(labels))
-
-    return batched_graphs, batched_labels
+    print("test  accuracy {:.2f}%".format(result * 100))
 
 
 def train(dataset, model, prog_args, same_feat=True, val_dataset=None):
@@ -230,12 +208,14 @@ def train(dataset, model, prog_args, same_feat=True, val_dataset=None):
         model.train()
         accum_correct = 0
         total = 0
-        print("EPOCH ###### {} ######".format(epoch))
+        print("\nEPOCH ###### {} ######".format(epoch))
         computation_time = 0.0
         for (batch_idx, (batch_graph, graph_labels)) in enumerate(dataloader):
+            for (key, value) in batch_graph.ndata.items():
+                batch_graph.ndata[key] = value.float()
+            graph_labels = graph_labels.long()
             if torch.cuda.is_available():
-                for (key, value) in batch_graph.ndata.items():
-                    batch_graph.ndata[key] = value.cuda()
+                batch_graph = batch_graph.to(torch.cuda.current_device())
                 graph_labels = graph_labels.cuda()
 
             model.zero_grad()
@@ -253,21 +233,22 @@ def train(dataset, model, prog_args, same_feat=True, val_dataset=None):
             optimizer.step()
 
         train_accu = accum_correct / total
-        print("train accuracy for this epoch {} is {}%".format(epoch,
+        print("train accuracy for this epoch {} is {:.2f}%".format(epoch,
                                                                train_accu * 100))
         elapsed_time = time.time() - begin_time
-        print("loss {} with epoch time {} s & computation time {} s ".format(
+        print("loss {:.4f} with epoch time {:.4f} s & computation time {:.4f} s ".format(
             loss.item(), elapsed_time, computation_time))
+        global_train_time_per_epoch.append(elapsed_time)
         if val_dataset is not None:
             result = evaluate(val_dataset, model, prog_args)
-            print("validation  accuracy {}%".format(result * 100))
+            print("validation  accuracy {:.2f}%".format(result * 100))
             if result >= early_stopping_logger['val_acc'] and result <=\
                     train_accu:
                 early_stopping_logger.update(best_epoch=epoch, val_acc=result)
                 if prog_args.save_dir is not None:
                     torch.save(model.state_dict(), prog_args.save_dir + "/" + prog_args.dataset
                                + "/model.iter-" + str(early_stopping_logger['best_epoch']))
-            print("best epoch is EPOCH {}, val_acc is {}%".format(early_stopping_logger['best_epoch'],
+            print("best epoch is EPOCH {}, val_acc is {:.2f}%".format(early_stopping_logger['best_epoch'],
                                                                   early_stopping_logger['val_acc'] * 100))
         torch.cuda.empty_cache()
     return early_stopping_logger
@@ -284,9 +265,11 @@ def evaluate(dataloader, model, prog_args, logger=None):
     correct_label = 0
     with torch.no_grad():
         for batch_idx, (batch_graph, graph_labels) in enumerate(dataloader):
+            for (key, value) in batch_graph.ndata.items():
+                batch_graph.ndata[key] = value.float()
+            graph_labels = graph_labels.long()
             if torch.cuda.is_available():
-                for (key, value) in batch_graph.ndata.items():
-                    batch_graph.ndata[key] = value.cuda()
+                batch_graph = batch_graph.to(torch.cuda.current_device())
                 graph_labels = graph_labels.cuda()
             ypred = model(batch_graph)
             indi = torch.argmax(ypred, dim=1)
@@ -303,6 +286,9 @@ def main():
     prog_args = arg_parse()
     print(prog_args)
     graph_classify_task(prog_args)
+
+    print("Train time per epoch: {:.4f}".format( sum(global_train_time_per_epoch) / len(global_train_time_per_epoch) ))
+    print("Max memory usage: {:.4f}".format(torch.cuda.max_memory_allocated(0) / (1024 * 1024)))
 
 
 if __name__ == "__main__":

@@ -5,6 +5,7 @@ from ... import backend as F
 from ..._ffi.function import _init_api
 from ..._ffi.object import register_object, ObjectBase
 from ... import ndarray
+from ...base import dgl_warning
 
 __all__ = ['random_walk',
            'random_walk_with_restart',
@@ -17,11 +18,13 @@ class RandomWalkTraces(ObjectBase):
     pass
 
 def random_walk(g, seeds, num_traces, num_hops):
-    """Batch-generate random walk traces on given graph with the same length.
+    """**DEPRECATED**: please use :func:`dgl.sampling.random_walk` instead.
+
+    Batch-generate random walk traces on given graph with the same length.
 
     Parameters
     ----------
-    g : DGLGraph
+    g : DGLGraphStale
         The graph.
     seeds : Tensor
         The node ID tensor from which the random walk traces starts.
@@ -39,6 +42,9 @@ def random_walk(g, seeds, num_traces, num_hops):
 
         traces[i, j, 0] are always starting nodes (i.e. seed[i]).
     """
+    dgl_warning(
+        "This function is deprecated; please use dgl.sampling.random_walk instead",
+        DeprecationWarning)
     if len(seeds) == 0:
         return utils.toindex([]).tousertensor()
     seeds = utils.toindex(seeds).todgltensor()
@@ -77,11 +83,13 @@ def _split_traces(traces):
 def random_walk_with_restart(
         g, seeds, restart_prob, max_nodes_per_seed,
         max_visit_counts=0, max_frequent_visited_nodes=0):
-    """Batch-generate random walk traces on given graph with restart probability.
+    """**DEPRECATED**: please use :func:`dgl.sampling.random_walk` instead.
+
+    Batch-generate random walk traces on given graph with restart probability.
 
     Parameters
     ----------
-    g : DGLGraph
+    g : DGLGraphStale
         The graph.
     seeds : Tensor
         The node ID tensor from which the random walk traces starts.
@@ -109,6 +117,9 @@ def random_walk_with_restart(
     ---------
     [1] Eksombatchai et al., 2017 https://arxiv.org/abs/1711.07601
     """
+    dgl_warning(
+        "This function is deprecated; please use dgl.sampling.random_walk instead",
+        DeprecationWarning)
     if len(seeds) == 0:
         return []
     seeds = utils.toindex(seeds).todgltensor()
@@ -121,7 +132,9 @@ def random_walk_with_restart(
 def bipartite_single_sided_random_walk_with_restart(
         g, seeds, restart_prob, max_nodes_per_seed,
         max_visit_counts=0, max_frequent_visited_nodes=0):
-    """Batch-generate random walk traces on given graph with restart probability.
+    """**DEPRECATED**: please use :func:`dgl.sampling.random_walk` instead.
+
+    Batch-generate random walk traces on given graph with restart probability.
 
     The graph must be a bipartite graph.
 
@@ -130,7 +143,7 @@ def bipartite_single_sided_random_walk_with_restart(
 
     Parameters
     ----------
-    g : DGLGraph
+    g : DGLGraphStale
         The graph.
     seeds : Tensor
         The node ID tensor from which the random walk traces starts.
@@ -161,6 +174,9 @@ def bipartite_single_sided_random_walk_with_restart(
     ---------
     [1] Eksombatchai et al., 2017 https://arxiv.org/abs/1711.07601
     """
+    dgl_warning(
+        "This function is deprecated; please use dgl.sampling.random_walk instead",
+        DeprecationWarning)
     if len(seeds) == 0:
         return []
     seeds = utils.toindex(seeds).todgltensor()
@@ -171,8 +187,7 @@ def bipartite_single_sided_random_walk_with_restart(
 
 
 def metapath_random_walk(hg, etypes, seeds, num_traces):
-    """Generate random walk traces from an array of seed nodes (or starting nodes),
-    based on the given metapath.
+    """**DEPRECATED**: please use :func:`dgl.sampling.random_walk` instead.
 
     For a single seed node, ``num_traces`` traces would be generated.  A trace would
 
@@ -203,6 +218,9 @@ def metapath_random_walk(hg, etypes, seeds, num_traces):
     -----
     The traces does **not** include the seed nodes themselves.
     """
+    dgl_warning(
+        "This function is deprecated; please use dgl.sampling.random_walk instead",
+        DeprecationWarning)
     if len(etypes) == 0:
         raise ValueError('empty metapath')
     if hg.to_canonical_etype(etypes[0])[0] != hg.to_canonical_etype(etypes[-1])[2]:

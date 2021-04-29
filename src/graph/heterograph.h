@@ -7,12 +7,17 @@
 #ifndef DGL_GRAPH_HETEROGRAPH_H_
 #define DGL_GRAPH_HETEROGRAPH_H_
 
+#include <dgl/runtime/shared_mem.h>
 #include <dgl/base_heterograph.h>
 #include <dgl/lazy.h>
 #include <utility>
 #include <string>
 #include <vector>
+#include <set>
+#include <tuple>
+#include <memory>
 #include "./unit_graph.h"
+#include "shared_mem_manager.h"
 
 namespace dgl {
 
@@ -102,8 +107,12 @@ class HeteroGraph : public BaseHeteroGraph {
     return GetRelationGraph(etype)->EdgeId(0, src, dst);
   }
 
-  EdgeArray EdgeIds(dgl_type_t etype, IdArray src, IdArray dst) const override {
-    return GetRelationGraph(etype)->EdgeIds(0, src, dst);
+  EdgeArray EdgeIdsAll(dgl_type_t etype, IdArray src, IdArray dst) const override {
+    return GetRelationGraph(etype)->EdgeIdsAll(0, src, dst);
+  }
+
+  IdArray EdgeIdsOne(dgl_type_t etype, IdArray src, IdArray dst) const override {
+    return GetRelationGraph(etype)->EdgeIdsOne(0, src, dst);
   }
 
   std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_type_t etype, dgl_id_t eid) const override {
@@ -183,18 +192,16 @@ class HeteroGraph : public BaseHeteroGraph {
     return GetRelationGraph(etype)->GetCSRMatrix(0);
   }
 
-  SparseFormat SelectFormat(dgl_type_t etype, SparseFormat preferred_format) const override {
-    return GetRelationGraph(etype)->SelectFormat(0, preferred_format);
+  SparseFormat SelectFormat(dgl_type_t etype, dgl_format_code_t preferred_formats) const override {
+    return GetRelationGraph(etype)->SelectFormat(0, preferred_formats);
   }
 
-  std::string GetRestrictFormat() const override {
-    LOG(FATAL) << "Not enabled for hetero graph (with multiple relations)";
-    return std::string("");
+  dgl_format_code_t GetAllowedFormats() const override {
+    return GetRelationGraph(0)->GetAllowedFormats();
   }
 
-  dgl_format_code_t GetFormatInUse() const override {
-    LOG(FATAL) << "Not enabled for hetero graph (with multiple relations)";
-    return 0;
+  dgl_format_code_t GetCreatedFormats() const override {
+    return GetRelationGraph(0)->GetCreatedFormats();
   }
 
   HeteroSubgraph VertexSubgraph(const std::vector<IdArray>& vids) const override;
@@ -202,7 +209,7 @@ class HeteroGraph : public BaseHeteroGraph {
   HeteroSubgraph EdgeSubgraph(
       const std::vector<IdArray>& eids, bool preserve_nodes = false) const override;
 
-  HeteroGraphPtr GetGraphInFormat(SparseFormat restrict_format) const override;
+  HeteroGraphPtr GetGraphInFormat(dgl_format_code_t formats) const override;
 
   FlattenedHeteroGraphPtr Flatten(const std::vector<dgl_type_t>& etypes) const override;
 
@@ -220,6 +227,27 @@ class HeteroGraph : public BaseHeteroGraph {
   /*! \brief Copy the data to another context */
   static HeteroGraphPtr CopyTo(HeteroGraphPtr g, const DLContext& ctx);
 
+  /*! \brief Copy the data to shared memory.
+  *
+  * Also save names of node types and edge types of the HeteroGraph object to shared memory
+  */
+  static HeteroGraphPtr CopyToSharedMem(
+      HeteroGraphPtr g, const std::string& name, const std::vector<std::string>& ntypes,
+      const std::vector<std::string>& etypes, const std::set<std::string>& fmts);
+
+  /*! \brief Create a heterograph from 
+  *   \return the HeteroGraphPtr, names of node types, names of edge types
+  */
+  static std::tuple<HeteroGraphPtr, std::vector<std::string>, std::vector<std::string>>
+      CreateFromSharedMem(const std::string &name);
+
+  /*! \brief Creat a LineGraph of self */
+  HeteroGraphPtr LineGraph(bool backtracking) const;
+
+  const std::vector<UnitGraphPtr>& relation_graphs() const {
+    return relation_graphs_;
+  }
+
  private:
   // To create empty class
   friend class Serializer;
@@ -232,6 +260,12 @@ class HeteroGraph : public BaseHeteroGraph {
 
   /*! \brief A map from vert type to the number of verts in the type */
   std::vector<int64_t> num_verts_per_type_;
+
+  /*! \brief The shared memory object for meta info*/
+  std::shared_ptr<runtime::SharedMemory> shared_mem_;
+
+  /*! \brief The name of the shared memory. Return empty string if it is not in shared memory. */
+  std::string SharedMemName() const;
 
   /*! \brief template class for Flatten operation
   * 

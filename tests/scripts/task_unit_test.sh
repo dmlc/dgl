@@ -33,7 +33,6 @@ fi
 conda activate ${DGLBACKEND}-ci
 
 python3 -m pytest -v --junitxml=pytest_compute.xml tests/compute || fail "compute"
-python3 -m pytest -v --junitxml=pytest_gindex.xml tests/graph_index || fail "graph_index"
 python3 -m pytest -v --junitxml=pytest_backend.xml tests/$DGLBACKEND || fail "backend-specific"
 
 export OMP_NUM_THREADS=1

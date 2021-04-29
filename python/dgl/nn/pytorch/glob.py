@@ -5,6 +5,7 @@ import torch.nn as nn
 import numpy as np
 
 from ...backend import pytorch as F
+from ...base import dgl_warning
 from ...readout import sum_nodes, mean_nodes, max_nodes, broadcast_nodes,\
     softmax_nodes, topk_nodes
 
@@ -14,31 +15,83 @@ __all__ = ['SumPooling', 'AvgPooling', 'MaxPooling', 'SortPooling',
            'SetTransformerEncoder', 'SetTransformerDecoder', 'WeightAndSum']
 
 class SumPooling(nn.Module):
-    r"""Apply sum pooling over the nodes in the graph.
+    r"""
+
+    Description
+    -----------
+    Apply sum pooling over the nodes in a graph .
 
     .. math::
         r^{(i)} = \sum_{k=1}^{N_i} x^{(i)}_k
+
+    Notes
+    -----
+        Input: Could be one graph, or a batch of graphs. If using a batch of graphs,
+        make sure nodes in all graphs have the same feature size, and concatenate
+        nodes' feature together as the input.
+
+    Examples
+    --------
+    The following example uses PyTorch backend.
+
+    >>> import dgl
+    >>> import torch as th
+    >>> from dgl.nn import SumPooling
+    >>>
+    >>> g1 = dgl.rand_graph(3, 4)  # g1 is a random graph with 3 nodes and 4 edges
+    >>> g1_node_feats = th.rand(3, 5)  # feature size is 5
+    >>> g1_node_feats
+    tensor([[0.8948, 0.0699, 0.9137, 0.7567, 0.3637],
+            [0.8137, 0.8938, 0.8377, 0.4249, 0.6118],
+            [0.5197, 0.9030, 0.6825, 0.5725, 0.4755]])
+    >>>
+    >>> g2 = dgl.rand_graph(4, 6)  # g2 is a random graph with 4 nodes and 6 edges
+    >>> g2_node_feats = th.rand(4, 5)  # feature size is 5
+    >>> g2_node_feats
+    tensor([[0.2053, 0.2426, 0.4111, 0.9028, 0.5658],
+            [0.5278, 0.6365, 0.9990, 0.2351, 0.8945],
+            [0.3134, 0.0580, 0.4349, 0.7949, 0.3891],
+            [0.0142, 0.2709, 0.3330, 0.8521, 0.6925]])
+    >>>
+    >>> sumpool = SumPooling()  # create a sum pooling layer
+
+    Case 1: Input a single graph
+
+    >>> sumpool(g1, g1_node_feats)
+    tensor([[2.2282, 1.8667, 2.4338, 1.7540, 1.4511]])
+
+    Case 2: Input a batch of graphs
+
+    Build a batch of DGL graphs and concatenate all graphs' node features into one tensor.
+
+    >>> batch_g = dgl.batch([g1, g2])
+    >>> batch_f = th.cat([g1_node_feats, g2_node_feats])
+    >>>
+    >>> sumpool(batch_g, batch_f)
+    tensor([[2.2282, 1.8667, 2.4338, 1.7540, 1.4511],
+            [1.0608, 1.2080, 2.1780, 2.7849, 2.5420]])
     """
     def __init__(self):
         super(SumPooling, self).__init__()
 
     def forward(self, graph, feat):
-        r"""Compute sum pooling.
+        r"""
 
+        Compute sum pooling.
 
         Parameters
         ----------
         graph : DGLGraph
-            The graph.
+            a DGLGraph or a batch of DGLGraphs
         feat : torch.Tensor
-            The input feature with shape :math:`(N, *)` where
-            :math:`N` is the number of nodes in the graph.
+            The input feature with shape :math:`(N, D)`, where :math:`N` is the number
+            of nodes in the graph, and :math:`D` means the size of features.
 
         Returns
         -------
         torch.Tensor
-            The output feature with shape :math:`(B, *)`, where
-            :math:`B` refers to the batch size.
+            The output feature with shape :math:`(B, D)`, where :math:`B` refers to the
+            batch size of input graphs.
         """
         with graph.local_scope():
             graph.ndata['h'] = feat
@@ -47,30 +100,83 @@ class SumPooling(nn.Module):
 
 
 class AvgPooling(nn.Module):
-    r"""Apply average pooling over the nodes in the graph.
+    r"""
+
+    Description
+    -----------
+    Apply average pooling over the nodes in a graph.
 
     .. math::
         r^{(i)} = \frac{1}{N_i}\sum_{k=1}^{N_i} x^{(i)}_k
+
+    Notes
+    -----
+        Input: Could be one graph, or a batch of graphs. If using a batch of graphs,
+        make sure nodes in all graphs have the same feature size, and concatenate
+        nodes' feature together as the input.
+
+    Examples
+    --------
+    The following example uses PyTorch backend.
+
+    >>> import dgl
+    >>> import torch as th
+    >>> from dgl.nn import AvgPooling
+    >>>
+    >>> g1 = dgl.rand_graph(3, 4)  # g1 is a random graph with 3 nodes and 4 edges
+    >>> g1_node_feats = th.rand(3, 5)  # feature size is 5
+    >>> g1_node_feats
+    tensor([[0.8948, 0.0699, 0.9137, 0.7567, 0.3637],
+            [0.8137, 0.8938, 0.8377, 0.4249, 0.6118],
+            [0.5197, 0.9030, 0.6825, 0.5725, 0.4755]])
+    >>>
+    >>> g2 = dgl.rand_graph(4, 6)  # g2 is a random graph with 4 nodes and 6 edges
+    >>> g2_node_feats = th.rand(4, 5)  # feature size is 5
+    >>> g2_node_feats
+    tensor([[0.2053, 0.2426, 0.4111, 0.9028, 0.5658],
+            [0.5278, 0.6365, 0.9990, 0.2351, 0.8945],
+            [0.3134, 0.0580, 0.4349, 0.7949, 0.3891],
+            [0.0142, 0.2709, 0.3330, 0.8521, 0.6925]])
+    >>>
+    >>> avgpool = AvgPooling()  # create an average pooling layer
+
+    Case 1: Input single graph
+
+    >>> avgpool(g1, g1_node_feats)
+    tensor([[0.7427, 0.6222, 0.8113, 0.5847, 0.4837]])
+
+    Case 2: Input a batch of graphs
+
+    Build a batch of DGL graphs and concatenate all graphs' note features into one tensor.
+
+    >>> batch_g = dgl.batch([g1, g2])
+    >>> batch_f = th.cat([g1_node_feats, g2_node_feats])
+    >>>
+    >>> avgpool(batch_g, batch_f)
+    tensor([[0.7427, 0.6222, 0.8113, 0.5847, 0.4837],
+            [0.2652, 0.3020, 0.5445, 0.6962, 0.6355]])
     """
     def __init__(self):
         super(AvgPooling, self).__init__()
 
     def forward(self, graph, feat):
-        r"""Compute average pooling.
+        r"""
+
+        Compute average pooling.
 
         Parameters
         ----------
         graph : DGLGraph
-            The graph.
+            A DGLGraph or a batch of DGLGraphs.
         feat : torch.Tensor
-            The input feature with shape :math:`(N, *)` where
-            :math:`N` is the number of nodes in the graph.
+            The input feature with shape :math:`(N, D)`, where :math:`N` is the number
+            of nodes in the graph, and :math:`D` means the size of features.
 
         Returns
         -------
         torch.Tensor
-            The output feature with shape :math:`(B, *)`, where
-            :math:`B` refers to the batch size.
+            The output feature with shape :math:`(B, D)`, where
+            :math:`B` refers to the batch size of input graphs.
         """
         with graph.local_scope():
             graph.ndata['h'] = feat
@@ -79,10 +185,61 @@ class AvgPooling(nn.Module):
 
 
 class MaxPooling(nn.Module):
-    r"""Apply max pooling over the nodes in the graph.
+    r"""
+
+    Description
+    -----------
+    Apply max pooling over the nodes in a graph.
 
     .. math::
         r^{(i)} = \max_{k=1}^{N_i}\left( x^{(i)}_k \right)
+
+    Notes
+    -----
+        Input: Could be one graph, or a batch of graphs. If using a batch of graphs,
+        make sure nodes in all graphs have the same feature size, and concatenate
+        nodes' feature together as the input.
+
+    Examples
+    --------
+    The following example uses PyTorch backend.
+
+    >>> import dgl
+    >>> import torch as th
+    >>> from dgl.nn import MaxPooling
+    >>>
+    >>> g1 = dgl.rand_graph(3, 4)  # g1 is a random graph with 3 nodes and 4 edges
+    >>> g1_node_feats = th.rand(3, 5)  # feature size is 5
+    >>> g1_node_feats
+    tensor([[0.8948, 0.0699, 0.9137, 0.7567, 0.3637],
+            [0.8137, 0.8938, 0.8377, 0.4249, 0.6118],
+            [0.5197, 0.9030, 0.6825, 0.5725, 0.4755]])
+    >>>
+    >>> g2 = dgl.rand_graph(4, 6)  # g2 is a random graph with 4 nodes and 6 edges
+    >>> g2_node_feats = th.rand(4, 5)  # feature size is 5
+    >>> g2_node_feats
+    tensor([[0.2053, 0.2426, 0.4111, 0.9028, 0.5658],
+            [0.5278, 0.6365, 0.9990, 0.2351, 0.8945],
+            [0.3134, 0.0580, 0.4349, 0.7949, 0.3891],
+            [0.0142, 0.2709, 0.3330, 0.8521, 0.6925]])
+    >>>
+    >>> maxpool = MaxPooling()  # create a max pooling layer
+
+    Case 1: Input a single graph
+
+    >>> maxpool(g1, g1_node_feats)
+    tensor([[0.8948, 0.9030, 0.9137, 0.7567, 0.6118]])
+
+    Case 2: Input a batch of graphs
+
+    Build a batch of DGL graphs and concatenate all graphs' node features into one tensor.
+
+    >>> batch_g = dgl.batch([g1, g2])
+    >>> batch_f = th.cat([g1_node_feats, g2_node_feats])
+    >>>
+    >>> maxpool(batch_g, batch_f)
+    tensor([[0.8948, 0.9030, 0.9137, 0.7567, 0.6118],
+            [0.5278, 0.6365, 0.9990, 0.9028, 0.8945]])
     """
     def __init__(self):
         super(MaxPooling, self).__init__()
@@ -93,9 +250,9 @@ class MaxPooling(nn.Module):
         Parameters
         ----------
         graph : DGLGraph
-            The graph.
+            A DGLGraph or a batch of DGLGraphs.
         feat : torch.Tensor
-            The input feature with shape :math:`(N, *)` where
+            The input feature with shape :math:`(N, *)`, where
             :math:`N` is the number of nodes in the graph.
 
         Returns
@@ -111,48 +268,109 @@ class MaxPooling(nn.Module):
 
 
 class SortPooling(nn.Module):
-    r"""Apply Sort Pooling (`An End-to-End Deep Learning Architecture for Graph Classification
-    <https://www.cse.wustl.edu/~ychen/public/DGCNN.pdf>`__) over the nodes in the graph.
+    r"""
+
+    Description
+    -----------
+    Apply Sort Pooling (`An End-to-End Deep Learning Architecture for Graph Classification
+    <https://www.cse.wustl.edu/~ychen/public/DGCNN.pdf>`__) over the nodes in a graph.
+    Sort Pooling first sorts the node features in ascending order along the feature dimension,
+    and selects the sorted features of top-k nodes (ranked by the largest value of each node).
 
     Parameters
     ----------
     k : int
         The number of nodes to hold for each graph.
+
+    Notes
+    -----
+        Input: Could be one graph, or a batch of graphs. If using a batch of graphs,
+        make sure nodes in all graphs have the same feature size, and concatenate
+        nodes' feature together as the input.
+
+    Examples
+    --------
+
+    >>> import dgl
+    >>> import torch as th
+    >>> from dgl.nn import SortPooling
+    >>>
+    >>> g1 = dgl.rand_graph(3, 4)  # g1 is a random graph with 3 nodes and 4 edges
+    >>> g1_node_feats = th.rand(3, 5)  # feature size is 5
+    >>> g1_node_feats
+    tensor([[0.8948, 0.0699, 0.9137, 0.7567, 0.3637],
+            [0.8137, 0.8938, 0.8377, 0.4249, 0.6118],
+            [0.5197, 0.9030, 0.6825, 0.5725, 0.4755]])
+    >>>
+    >>> g2 = dgl.rand_graph(4, 6)  # g2 is a random graph with 4 nodes and 6 edges
+    >>> g2_node_feats = th.rand(4, 5)  # feature size is 5
+    >>> g2_node_feats
+    tensor([[0.2053, 0.2426, 0.4111, 0.9028, 0.5658],
+            [0.5278, 0.6365, 0.9990, 0.2351, 0.8945],
+            [0.3134, 0.0580, 0.4349, 0.7949, 0.3891],
+            [0.0142, 0.2709, 0.3330, 0.8521, 0.6925]])
+    >>>
+    >>> sortpool = SortPooling(k=2)  # create a sort pooling layer
+
+    Case 1: Input a single graph
+
+    >>> sortpool(g1, g1_node_feats)
+    tensor([[0.0699, 0.3637, 0.7567, 0.8948, 0.9137, 0.4755, 0.5197, 0.5725, 0.6825,
+             0.9030]])
+
+    Case 2: Input a batch of graphs
+
+    Build a batch of DGL graphs and concatenate all graphs' node features into one tensor.
+
+    >>> batch_g = dgl.batch([g1, g2])
+    >>> batch_f = th.cat([g1_node_feats, g2_node_feats])
+    >>>
+    >>> sortpool(batch_g, batch_f)
+    tensor([[0.0699, 0.3637, 0.7567, 0.8948, 0.9137, 0.4755, 0.5197, 0.5725, 0.6825,
+             0.9030],
+            [0.2351, 0.5278, 0.6365, 0.8945, 0.9990, 0.2053, 0.2426, 0.4111, 0.5658,
+             0.9028]])
     """
     def __init__(self, k):
         super(SortPooling, self).__init__()
         self.k = k
 
     def forward(self, graph, feat):
-        r"""Compute sort pooling.
+        r"""
+
+        Compute sort pooling.
 
         Parameters
         ----------
         graph : DGLGraph
-            The graph.
+            A DGLGraph or a batch of DGLGraphs.
         feat : torch.Tensor
-            The input feature with shape :math:`(N, D)` where
-            :math:`N` is the number of nodes in the graph.
+            The input feature with shape :math:`(N, D)`, where :math:`N` is the
+            number of nodes in the graph, and :math:`D` means the size of features.
 
         Returns
         -------
         torch.Tensor
-            The output feature with shape :math:`(B, k * D)`, where
-            :math:`B` refers to the batch size.
+            The output feature with shape :math:`(B, k * D)`, where :math:`B` refers
+            to the batch size of input graphs.
         """
         with graph.local_scope():
             # Sort the feature of each node in ascending order.
             feat, _ = feat.sort(dim=-1)
             graph.ndata['h'] = feat
             # Sort nodes according to their last features.
-            ret = topk_nodes(graph, 'h', self.k, idx=-1)[0].view(
+            ret = topk_nodes(graph, 'h', self.k, sortby=-1)[0].view(
                 -1, self.k * feat.shape[-1])
             return ret
 
 
 class GlobalAttentionPooling(nn.Module):
-    r"""Apply Global Attention Pooling (`Gated Graph Sequence Neural Networks
-    <https://arxiv.org/abs/1511.05493.pdf>`__) over the nodes in the graph.
+    r"""
+
+    Description
+    -----------
+    Apply Global Attention Pooling (`Gated Graph Sequence Neural Networks
+    <https://arxiv.org/abs/1511.05493.pdf>`__) over the nodes in a graph.
 
     .. math::
         r^{(i)} = \sum_{k=1}^{N_i}\mathrm{softmax}\left(f_{gate}
@@ -163,8 +381,57 @@ class GlobalAttentionPooling(nn.Module):
     gate_nn : torch.nn.Module
         A neural network that computes attention scores for each feature.
     feat_nn : torch.nn.Module, optional
-        A neural network applied to each feature before combining them
-        with attention scores.
+        A neural network applied to each feature before combining them with attention
+        scores.
+
+    Examples
+    --------
+    The following example uses PyTorch backend.
+
+    >>> import dgl
+    >>> import torch as th
+    >>> from dgl.nn import GlobalAttentionPooling
+    >>>
+    >>> g1 = dgl.rand_graph(3, 4)  # g1 is a random graph with 3 nodes and 4 edges
+    >>> g1_node_feats = th.rand(3, 5)  # feature size is 5
+    >>> g1_node_feats
+    tensor([[0.8948, 0.0699, 0.9137, 0.7567, 0.3637],
+            [0.8137, 0.8938, 0.8377, 0.4249, 0.6118],
+            [0.5197, 0.9030, 0.6825, 0.5725, 0.4755]])
+    >>>
+    >>> g2 = dgl.rand_graph(4, 6)  # g2 is a random graph with 4 nodes and 6 edges
+    >>> g2_node_feats = th.rand(4, 5)  # feature size is 5
+    >>> g2_node_feats
+    tensor([[0.2053, 0.2426, 0.4111, 0.9028, 0.5658],
+            [0.5278, 0.6365, 0.9990, 0.2351, 0.8945],
+            [0.3134, 0.0580, 0.4349, 0.7949, 0.3891],
+            [0.0142, 0.2709, 0.3330, 0.8521, 0.6925]])
+    >>>
+    >>> gate_nn = th.nn.Linear(5, 1)  # the gate layer that maps node feature to scalar
+    >>> gap = GlobalAttentionPooling(gate_nn)  # create a Global Attention Pooling layer
+
+    Case 1: Input a single graph
+
+    >>> gap(g1, g1_node_feats)
+    tensor([[0.7410, 0.6032, 0.8111, 0.5942, 0.4762]],
+           grad_fn=<SegmentReduceBackward>)
+
+    Case 2: Input a batch of graphs
+
+    Build a batch of DGL graphs and concatenate all graphs' node features into one tensor.
+
+    >>> batch_g = dgl.batch([g1, g2])
+    >>> batch_f = th.cat([g1_node_feats, g2_node_feats], 0)
+    >>>
+    >>> gap(batch_g, batch_f)
+    tensor([[0.7410, 0.6032, 0.8111, 0.5942, 0.4762],
+            [0.2417, 0.2743, 0.5054, 0.7356, 0.6146]],
+           grad_fn=<SegmentReduceBackward>)
+    Notes
+    -----
+    See our `GGNN example <https://github.com/dmlc/dgl/tree/master/examples/pytorch/ggnn>`_
+    on how to use GatedGraphConv and GlobalAttentionPooling layer to build a Graph Neural
+    Networks that can solve Soduku.
     """
     def __init__(self, gate_nn, feat_nn=None):
         super(GlobalAttentionPooling, self).__init__()
@@ -172,21 +439,23 @@ class GlobalAttentionPooling(nn.Module):
         self.feat_nn = feat_nn
 
     def forward(self, graph, feat):
-        r"""Compute global attention pooling.
+        r"""
+
+        Compute global attention pooling.
 
         Parameters
         ----------
         graph : DGLGraph
-            The graph.
+            A DGLGraph or a batch of DGLGraphs.
         feat : torch.Tensor
-            The input feature with shape :math:`(N, D)` where
-            :math:`N` is the number of nodes in the graph.
+            The input feature with shape :math:`(N, D)` where :math:`N` is the
+            number of nodes in the graph, and :math:`D` means the size of features.
 
         Returns
         -------
         torch.Tensor
-            The output feature with shape :math:`(B, D)`, where
-            :math:`B` refers to the batch size.
+            The output feature with shape :math:`(B, D)`, where :math:`B` refers
+            to the batch size.
         """
         with graph.local_scope():
             gate = self.gate_nn(feat)
@@ -205,9 +474,10 @@ class GlobalAttentionPooling(nn.Module):
 
 
 class Set2Set(nn.Module):
-    r"""Apply Set2Set (`Order Matters: Sequence to sequence for sets
-    <https://arxiv.org/pdf/1511.06391.pdf>`__) over the nodes in the graph.
+    r"""
 
+    Description
+    -----------
     For each individual graph in the batch, set2set computes
 
     .. math::
@@ -224,11 +494,63 @@ class Set2Set(nn.Module):
     Parameters
     ----------
     input_dim : int
-        Size of each input sample
+        The size of each input sample.
     n_iters : int
-        Number of iterations.
+        The number of iterations.
     n_layers : int
-        Number of recurrent layers.
+        The number of recurrent layers.
+
+    Examples
+    --------
+    The following example uses PyTorch backend.
+
+    >>> import dgl
+    >>> import torch as th
+    >>> from dgl.nn import Set2Set
+    >>>
+    >>> g1 = dgl.rand_graph(3, 4)  # g1 is a random graph with 3 nodes and 4 edges
+    >>> g1_node_feats = th.rand(3, 5)  # feature size is 5
+    >>> g1_node_feats
+    tensor([[0.8948, 0.0699, 0.9137, 0.7567, 0.3637],
+            [0.8137, 0.8938, 0.8377, 0.4249, 0.6118],
+            [0.5197, 0.9030, 0.6825, 0.5725, 0.4755]])
+    >>>
+    >>> g2 = dgl.rand_graph(4, 6)  # g2 is a random graph with 4 nodes and 6 edges
+    >>> g2_node_feats = th.rand(4, 5)  # feature size is 5
+    >>> g2_node_feats
+    tensor([[0.2053, 0.2426, 0.4111, 0.9028, 0.5658],
+            [0.5278, 0.6365, 0.9990, 0.2351, 0.8945],
+            [0.3134, 0.0580, 0.4349, 0.7949, 0.3891],
+            [0.0142, 0.2709, 0.3330, 0.8521, 0.6925]])
+    >>>
+    >>> s2s = Set2Set(5, 2, 1)  # create a Set2Set layer(n_iters=2, n_layers=1)
+
+    Case 1: Input a single graph
+
+    >>> s2s(g1, g1_node_feats)
+        tensor([[-0.0235, -0.2291,  0.2654,  0.0376,  0.1349,  0.7560,  0.5822,  0.8199,
+                  0.5960,  0.4760]], grad_fn=<CatBackward>)
+
+    Case 2: Input a batch of graphs
+
+    Build a batch of DGL graphs and concatenate all graphs' node features into one tensor.
+
+    >>> batch_g = dgl.batch([g1, g2])
+    >>> batch_f = th.cat([g1_node_feats, g2_node_feats], 0)
+    >>>
+    >>> s2s(batch_g, batch_f)
+    tensor([[-0.0235, -0.2291,  0.2654,  0.0376,  0.1349,  0.7560,  0.5822,  0.8199,
+              0.5960,  0.4760],
+            [-0.0483, -0.2010,  0.2324,  0.0145,  0.1361,  0.2703,  0.3078,  0.5529,
+              0.6876,  0.6399]], grad_fn=<CatBackward>)
+
+    Notes
+    -----
+    Set2Set is widely used in molecular property predictions, see
+    `dgl-lifesci's MPNN example <https://github.com/awslabs/dgl-lifesci/blob/
+    ecd95c905479ec048097777039cf9a19cfdcf223/python/dgllife/model/model_zoo/
+    mpnn_predictor.py>`__
+    on how to use DGL's Set2Set layer in graph property prediction applications.
     """
     def __init__(self, input_dim, n_iters, n_layers):
         super(Set2Set, self).__init__()
@@ -244,21 +566,22 @@ class Set2Set(nn.Module):
         self.lstm.reset_parameters()
 
     def forward(self, graph, feat):
-        r"""Compute set2set pooling.
+        r"""
+        Compute set2set pooling.
 
         Parameters
         ----------
         graph : DGLGraph
-            The graph.
+            The input graph.
         feat : torch.Tensor
-            The input feature with shape :math:`(N, D)` where
-            :math:`N` is the number of nodes in the graph.
+            The input feature with shape :math:`(N, D)` where  :math:`N` is the
+            number of nodes in the graph, and :math:`D` means the size of features.
 
         Returns
         -------
         torch.Tensor
-            The output feature with shape :math:`(B, D)`, where
-            :math:`B` refers to the batch size.
+            The output feature with shape :math:`(B, D)`, where :math:`B` refers to
+            the batch size, and :math:`D` means the size of features.
         """
         with graph.local_scope():
             batch_size = graph.batch_size
@@ -288,8 +611,57 @@ class Set2Set(nn.Module):
         return summary.format(**self.__dict__)
 
 
+def _gen_mask(lengths_x, lengths_y, max_len_x, max_len_y):
+    """ Generate binary mask array for given x and y input pairs.
+
+    Parameters
+    ----------
+    lengths_x : Tensor
+        The int tensor indicates the segment information of x.
+    lengths_y : Tensor
+        The int tensor indicates the segment information of y.
+    max_len_x : int
+        The maximum element in lengths_x.
+    max_len_y : int
+        The maximum element in lengths_y.
+
+    Returns
+    -------
+    Tensor
+        the mask tensor with shape (batch_size, 1, max_len_x, max_len_y)
+    """
+    device = lengths_x.device
+    # x_mask: (batch_size, max_len_x)
+    x_mask = th.arange(max_len_x, device=device).unsqueeze(0) < lengths_x.unsqueeze(1)
+    # y_mask: (batch_size, max_len_y)
+    y_mask = th.arange(max_len_y, device=device).unsqueeze(0) < lengths_y.unsqueeze(1)
+    # mask: (batch_size, 1, max_len_x, max_len_y)
+    mask = (x_mask.unsqueeze(-1) & y_mask.unsqueeze(-2)).unsqueeze(1)
+    return mask
+
+
 class MultiHeadAttention(nn.Module):
-    r"""Multi-Head Attention block, used in Transformer, Set Transformer and so on."""
+    r"""Multi-Head Attention block, used in Transformer, Set Transformer and so on.
+
+    Parameters
+    ----------
+    d_model : int
+        The feature size (input and output) in Multi-Head Attention layer.
+    num_heads : int
+        The number of heads.
+    d_head : int
+        The hidden size per head.
+    d_ff : int
+        The inner hidden size in the Feed-Forward Neural Network.
+    dropouth : float
+        The dropout rate of each sublayer.
+    dropouta : float
+        The dropout rate of attention heads.
+
+    Notes
+    -----
+    This module was used in SetTransformer layer.
+    """
     def __init__(self, d_model, num_heads, d_head, d_ff, dropouth=0., dropouta=0.):
         super(MultiHeadAttention, self).__init__()
         self.d_model = d_model
@@ -336,6 +708,9 @@ class MultiHeadAttention(nn.Module):
         batch_size = len(lengths_x)
         max_len_x = max(lengths_x)
         max_len_mem = max(lengths_mem)
+        device = x.device
+        lengths_x = th.tensor(lengths_x, dtype=th.int64, device=device)
+        lengths_mem = th.tensor(lengths_mem, dtype=th.int64, device=device)
 
         queries = self.proj_q(x).view(-1, self.num_heads, self.d_head)
         keys = self.proj_k(mem).view(-1, self.num_heads, self.d_head)
@@ -352,14 +727,15 @@ class MultiHeadAttention(nn.Module):
         e = e / np.sqrt(self.d_head)
 
         # generate mask
-        mask = th.zeros(batch_size, max_len_x, max_len_mem).to(e.device)
-        for i in range(batch_size):
-            mask[i, :lengths_x[i], :lengths_mem[i]].fill_(1)
-        mask = mask.unsqueeze(1)
-        e.masked_fill_(mask == 0, -float('inf'))
+        mask = _gen_mask(lengths_x, lengths_mem, max_len_x, max_len_mem)
+        e = e.masked_fill(mask == 0, -float('inf'))
 
         # apply softmax
         alpha = th.softmax(e, dim=-1)
+        # the following line addresses the NaN issue, see
+        # https://github.com/dmlc/dgl/issues/2657
+        alpha = alpha.masked_fill(mask == 0, 0.)
+
         # sum of value weighted by alpha
         out = th.einsum('bhxy,byhd->bxhd', alpha, values)
         # project to output
@@ -378,7 +754,27 @@ class MultiHeadAttention(nn.Module):
 
 
 class SetAttentionBlock(nn.Module):
-    r"""SAB block mentioned in Set-Transformer paper."""
+    r"""SAB block introduced in Set-Transformer paper.
+
+    Parameters
+    ----------
+    d_model : int
+        The feature size (input and output) in Multi-Head Attention layer.
+    num_heads : int
+        The number of heads.
+    d_head : int
+        The hidden size per head.
+    d_ff : int
+        The inner hidden size in the Feed-Forward Neural Network.
+    dropouth : float
+        The dropout rate of each sublayer.
+    dropouta : float
+        The dropout rate of attention heads.
+
+    Notes
+    -----
+    This module was used in SetTransformer layer.
+    """
     def __init__(self, d_model, num_heads, d_head, d_ff, dropouth=0., dropouta=0.):
         super(SetAttentionBlock, self).__init__()
         self.mha = MultiHeadAttention(d_model, num_heads, d_head, d_ff,
@@ -399,10 +795,35 @@ class SetAttentionBlock(nn.Module):
 
 
 class InducedSetAttentionBlock(nn.Module):
-    r"""ISAB block mentioned in Set-Transformer paper."""
+    r"""ISAB block introduced in Set-Transformer paper.
+
+    Parameters
+    ----------
+    m : int
+        The number of induced vectors.
+    d_model : int
+        The feature size (input and output) in Multi-Head Attention layer.
+    num_heads : int
+        The number of heads.
+    d_head : int
+        The hidden size per head.
+    d_ff : int
+        The inner hidden size in the Feed-Forward Neural Network.
+    dropouth : float
+        The dropout rate of each sublayer.
+    dropouta : float
+        The dropout rate of attention heads.
+
+    Notes
+    -----
+    This module was used in SetTransformer layer.
+    """
     def __init__(self, m, d_model, num_heads, d_head, d_ff, dropouth=0., dropouta=0.):
         super(InducedSetAttentionBlock, self).__init__()
         self.m = m
+        if m == 1:
+            dgl_warning("if m is set to 1, the parameters corresponding to query and key "
+                        "projections would not get updated during training.")
         self.d_model = d_model
         self.inducing_points = nn.Parameter(
             th.FloatTensor(m, d_model)
@@ -446,10 +867,35 @@ class InducedSetAttentionBlock(nn.Module):
 
 
 class PMALayer(nn.Module):
-    r"""Pooling by Multihead Attention, used in the Decoder Module of Set Transformer."""
+    r"""Pooling by Multihead Attention, used as the Decoder Module in Set Transformer.
+
+    Parameters
+    ----------
+    k : int
+        The number of seed vectors.
+    d_model : int
+        The feature size (input and output) in Multi-Head Attention layer.
+    num_heads : int
+        The number of heads.
+    d_head : int
+        The hidden size per head.
+    d_ff : int
+        The kernel size in FFN (Positionwise Feed-Forward Network) layer.
+    dropouth : float
+        The dropout rate of each sublayer.
+    dropouta : float
+        The dropout rate of attention heads.
+
+    Notes
+    -----
+    This module was used in SetTransformer layer.
+    """
     def __init__(self, k, d_model, num_heads, d_head, d_ff, dropouth=0., dropouta=0.):
         super(PMALayer, self).__init__()
         self.k = k
+        if k == 1:
+            dgl_warning("if k is set to 1, the parameters corresponding to query and key "
+                        "projections would not get updated during training.")
         self.d_model = d_model
         self.seed_vectors = nn.Parameter(
             th.FloatTensor(k, d_model)
@@ -497,31 +943,93 @@ class PMALayer(nn.Module):
 
 
 class SetTransformerEncoder(nn.Module):
-    r"""The Encoder module in `Set Transformer: A Framework for Attention-based
+    r"""
+
+    Description
+    -----------
+    The Encoder module in `Set Transformer: A Framework for Attention-based
     Permutation-Invariant Neural Networks <https://arxiv.org/pdf/1810.00825.pdf>`__.
 
     Parameters
     ----------
     d_model : int
-        Hidden size of the model.
+        The hidden size of the model.
     n_heads : int
-        Number of heads.
+        The number of heads.
     d_head : int
-        Hidden size of each head.
+        The hidden size of each head.
     d_ff : int
-        Kernel size in FFN (Positionwise Feed-Forward Network) layer.
+        The kernel size in FFN (Positionwise Feed-Forward Network) layer.
     n_layers : int
-        Number of layers.
+        The number of layers.
     block_type : str
         Building block type: 'sab' (Set Attention Block) or 'isab' (Induced
         Set Attention Block).
     m : int or None
-        Number of induced vectors in ISAB Block, set to None if block type
+        The number of induced vectors in ISAB Block. Set to None if block type
         is 'sab'.
     dropouth : float
-        Dropout rate of each sublayer.
+        The dropout rate of each sublayer.
     dropouta : float
-        Dropout rate of attention heads.
+        The dropout rate of attention heads.
+
+    Examples
+    --------
+    >>> import dgl
+    >>> import torch as th
+    >>> from dgl.nn import SetTransformerEncoder
+    >>>
+    >>> g1 = dgl.rand_graph(3, 4)  # g1 is a random graph with 3 nodes and 4 edges
+    >>> g1_node_feats = th.rand(3, 5)  # feature size is 5
+    >>> g1_node_feats
+    tensor([[0.8948, 0.0699, 0.9137, 0.7567, 0.3637],
+            [0.8137, 0.8938, 0.8377, 0.4249, 0.6118],
+            [0.5197, 0.9030, 0.6825, 0.5725, 0.4755]])
+    >>>
+    >>> g2 = dgl.rand_graph(4, 6)  # g2 is a random graph with 4 nodes and 6 edges
+    >>> g2_node_feats = th.rand(4, 5)  # feature size is 5
+    >>> g2_node_feats
+    tensor([[0.2053, 0.2426, 0.4111, 0.9028, 0.5658],
+            [0.5278, 0.6365, 0.9990, 0.2351, 0.8945],
+            [0.3134, 0.0580, 0.4349, 0.7949, 0.3891],
+            [0.0142, 0.2709, 0.3330, 0.8521, 0.6925]])
+    >>>
+    >>> set_trans_enc = SetTransformerEncoder(5, 4, 4, 20)  # create a settrans encoder.
+
+    Case 1: Input a single graph
+
+    >>> set_trans_enc(g1, g1_node_feats)
+    tensor([[ 0.1262, -1.9081,  0.7287,  0.1678,  0.8854],
+            [-0.0634, -1.1996,  0.6955, -0.9230,  1.4904],
+            [-0.9972, -0.7924,  0.6907, -0.5221,  1.6211]],
+           grad_fn=<NativeLayerNormBackward>)
+
+    Case 2: Input a batch of graphs
+
+    Build a batch of DGL graphs and concatenate all graphs' node features into one tensor.
+
+    >>> batch_g = dgl.batch([g1, g2])
+    >>> batch_f = th.cat([g1_node_feats, g2_node_feats])
+    >>>
+    >>> set_trans_enc(batch_g, batch_f)
+    tensor([[ 0.1262, -1.9081,  0.7287,  0.1678,  0.8854],
+            [-0.0634, -1.1996,  0.6955, -0.9230,  1.4904],
+            [-0.9972, -0.7924,  0.6907, -0.5221,  1.6211],
+            [-0.7973, -1.3203,  0.0634,  0.5237,  1.5306],
+            [-0.4497, -1.0920,  0.8470, -0.8030,  1.4977],
+            [-0.4940, -1.6045,  0.2363,  0.4885,  1.3737],
+            [-0.9840, -1.0913, -0.0099,  0.4653,  1.6199]],
+           grad_fn=<NativeLayerNormBackward>)
+
+    See Also
+    --------
+    SetTransformerDecoder
+
+    Notes
+    -----
+    SetTransformerEncoder is not a readout layer, the tensor it returned is nodewise
+    representation instead out graphwise representation, and the SetTransformerDecoder
+    would return a graph readout tensor.
     """
     def __init__(self, d_model, n_heads, d_head, d_ff,
                  n_layers=1, block_type='sab', m=None, dropouth=0., dropouta=0.):
@@ -554,24 +1062,28 @@ class SetTransformerEncoder(nn.Module):
         Parameters
         ----------
         graph : DGLGraph
-            The graph.
+            The input graph.
         feat : torch.Tensor
-            The input feature with shape :math:`(N, D)` where
-            :math:`N` is the number of nodes in the graph.
+            The input feature with shape :math:`(N, D)`, where :math:`N` is the
+            number of nodes in the graph.
 
         Returns
         -------
         torch.Tensor
             The output feature with shape :math:`(N, D)`.
         """
-        lengths = graph.batch_num_nodes
+        lengths = graph.batch_num_nodes()
         for layer in self.layers:
             feat = layer(feat, lengths)
         return feat
 
 
 class SetTransformerDecoder(nn.Module):
-    r"""The Decoder module in `Set Transformer: A Framework for Attention-based
+    r"""
+
+    Description
+    -----------
+    The Decoder module in `Set Transformer: A Framework for Attention-based
     Permutation-Invariant Neural Networks <https://arxiv.org/pdf/1810.00825.pdf>`__.
 
     Parameters
@@ -579,19 +1091,67 @@ class SetTransformerDecoder(nn.Module):
     d_model : int
         Hidden size of the model.
     num_heads : int
-        Number of heads.
+        The number of heads.
     d_head : int
         Hidden size of each head.
     d_ff : int
         Kernel size in FFN (Positionwise Feed-Forward Network) layer.
     n_layers : int
-        Number of layers.
+        The number of layers.
     k : int
-        Number of seed vectors in PMA (Pooling by Multihead Attention) layer.
+        The number of seed vectors in PMA (Pooling by Multihead Attention) layer.
     dropouth : float
         Dropout rate of each sublayer.
     dropouta : float
         Dropout rate of attention heads.
+
+    Examples
+    --------
+    >>> import dgl
+    >>> import torch as th
+    >>> from dgl.nn import SetTransformerDecoder
+    >>>
+    >>> g1 = dgl.rand_graph(3, 4)  # g1 is a random graph with 3 nodes and 4 edges
+    >>> g1_node_feats = th.rand(3, 5)  # feature size is 5
+    >>> g1_node_feats
+    tensor([[0.8948, 0.0699, 0.9137, 0.7567, 0.3637],
+            [0.8137, 0.8938, 0.8377, 0.4249, 0.6118],
+            [0.5197, 0.9030, 0.6825, 0.5725, 0.4755]])
+    >>>
+    >>> g2 = dgl.rand_graph(4, 6)  # g2 is a random graph with 4 nodes and 6 edges
+    >>> g2_node_feats = th.rand(4, 5)  # feature size is 5
+    >>> g2_node_feats
+    tensor([[0.2053, 0.2426, 0.4111, 0.9028, 0.5658],
+            [0.5278, 0.6365, 0.9990, 0.2351, 0.8945],
+            [0.3134, 0.0580, 0.4349, 0.7949, 0.3891],
+            [0.0142, 0.2709, 0.3330, 0.8521, 0.6925]])
+    >>>
+    >>> set_trans_dec = SetTransformerDecoder(5, 4, 4, 20, 1, 3)  # define the layer
+
+    Case 1: Input a single graph
+
+    >>> set_trans_dec(g1, g1_node_feats)
+    tensor([[-0.5538,  1.8726, -1.0470,  0.0276, -0.2994, -0.6317,  1.6754, -1.3189,
+              0.2291,  0.0461, -0.4042,  0.8387, -1.7091,  1.0845,  0.1902]],
+           grad_fn=<ViewBackward>)
+
+    Case 2: Input a batch of graphs
+
+    Build a batch of DGL graphs and concatenate all graphs' node features into one tensor.
+
+    >>> batch_g = dgl.batch([g1, g2])
+    >>> batch_f = th.cat([g1_node_feats, g2_node_feats])
+    >>>
+    >>> set_trans_dec(batch_g, batch_f)
+    tensor([[-0.5538,  1.8726, -1.0470,  0.0276, -0.2994, -0.6317,  1.6754, -1.3189,
+              0.2291,  0.0461, -0.4042,  0.8387, -1.7091,  1.0845,  0.1902],
+            [-0.5511,  1.8869, -1.0156,  0.0028, -0.3231, -0.6305,  1.6845, -1.3105,
+              0.2136,  0.0428, -0.3820,  0.8043, -1.7138,  1.1126,  0.1789]],
+           grad_fn=<ViewBackward>)
+
+    See Also
+    --------
+    SetTransformerEncoder
     """
     def __init__(self, d_model, num_heads, d_head, d_ff, n_layers, k, dropouth=0., dropouta=0.):
         super(SetTransformerDecoder, self).__init__()
@@ -615,18 +1175,18 @@ class SetTransformerDecoder(nn.Module):
         Parameters
         ----------
         graph : DGLGraph
-            The graph.
+            The input graph.
         feat : torch.Tensor
-            The input feature with shape :math:`(N, D)` where
-            :math:`N` is the number of nodes in the graph.
+            The input feature with shape :math:`(N, D)`, where :math:`N` is the
+            number of nodes in the graph, and :math:`D` means the size of features.
 
         Returns
         -------
         torch.Tensor
-            The output feature with shape :math:`(B, D)`, where
-            :math:`B` refers to the batch size.
+            The output feature with shape :math:`(B, D)`, where :math:`B` refers to
+            the batch size.
         """
-        len_pma = graph.batch_num_nodes
+        len_pma = graph.batch_num_nodes()
         len_sab = [self.k] * graph.batch_size
         feat = self.pma(feat, len_pma)
         for layer in self.layers:
@@ -641,6 +1201,57 @@ class WeightAndSum(nn.Module):
     ----------
     in_feats : int
         Input atom feature size
+
+    Examples
+    --------
+    The following example uses PyTorch backend.
+
+    >>> import dgl
+    >>> import torch as th
+    >>> from dgl.nn import WeightAndSum
+    >>>
+    >>> g1 = dgl.rand_graph(3, 4)  # g1 is a random graph with 3 nodes and 4 edges
+    >>> g1_node_feats = th.rand(3, 5)  # feature size is 5
+    >>> g1_node_feats
+    tensor([[0.8948, 0.0699, 0.9137, 0.7567, 0.3637],
+            [0.8137, 0.8938, 0.8377, 0.4249, 0.6118],
+            [0.5197, 0.9030, 0.6825, 0.5725, 0.4755]])
+    >>>
+    >>> g2 = dgl.rand_graph(4, 6)  # g2 is a random graph with 4 nodes and 6 edges
+    >>> g2_node_feats = th.rand(4, 5)  # feature size is 5
+    >>> g2_node_feats
+    tensor([[0.2053, 0.2426, 0.4111, 0.9028, 0.5658],
+            [0.5278, 0.6365, 0.9990, 0.2351, 0.8945],
+            [0.3134, 0.0580, 0.4349, 0.7949, 0.3891],
+            [0.0142, 0.2709, 0.3330, 0.8521, 0.6925]])
+    >>>
+    >>> weight_and_sum = WeightAndSum(5)  # create a weight and sum layer(in_feats=16)
+
+    Case 1: Input a single graph
+
+    >>> weight_and_sum(g1, g1_node_feats)
+    tensor([[1.2194, 0.9490, 1.3235, 0.9609, 0.7710]],
+           grad_fn=<SegmentReduceBackward>)
+
+    Case 2: Input a batch of graphs
+
+    Build a batch of DGL graphs and concatenate all graphs' node features into one tensor.
+
+    >>> batch_g = dgl.batch([g1, g2])
+    >>> batch_f = th.cat([g1_node_feats, g2_node_feats])
+    >>>
+    >>> weight_and_sum(batch_g, batch_f)
+    tensor([[1.2194, 0.9490, 1.3235, 0.9609, 0.7710],
+            [0.5322, 0.5840, 1.0729, 1.3665, 1.2360]],
+           grad_fn=<SegmentReduceBackward>)
+
+    Notes
+    -----
+    WeightAndSum module was commonly used in molecular property prediction networks,
+    see the GCN predictor in `dgl-lifesci <https://github.com/awslabs/dgl-lifesci/blob/
+    ae0491431804611ba466ff413f69d435789dbfd5/python/dgllife/model/model_zoo/
+    gcn_predictor.py>`__
+    to understand how to use WeightAndSum layer to get the graph readout output.
     """
     def __init__(self, in_feats):
         super(WeightAndSum, self).__init__()

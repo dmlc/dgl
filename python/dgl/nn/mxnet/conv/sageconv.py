@@ -9,24 +9,30 @@ from .... import function as fn
 from ....utils import expand_as_pair, check_eq_shape
 
 class SAGEConv(nn.Block):
-    r"""GraphSAGE layer from paper `Inductive Representation Learning on
+    r"""
+
+    Description
+    -----------
+    GraphSAGE layer from paper `Inductive Representation Learning on
     Large Graphs <https://arxiv.org/pdf/1706.02216.pdf>`__.
 
     .. math::
-        h_{\mathcal{N}(i)}^{(l+1)} & = \mathrm{aggregate}
+        h_{\mathcal{N}(i)}^{(l+1)} &= \mathrm{aggregate}
         \left(\{h_{j}^{l}, \forall j \in \mathcal{N}(i) \}\right)
 
-        h_{i}^{(l+1)} & = \sigma \left(W \cdot \mathrm{concat}
-        (h_{i}^{l}, h_{\mathcal{N}(i)}^{l+1} + b) \right)
+        h_{i}^{(l+1)} &= \sigma \left(W \cdot \mathrm{concat}
+        (h_{i}^{l}, h_{\mathcal{N}(i)}^{l+1}) \right)
 
-        h_{i}^{(l+1)} & = \mathrm{norm}(h_{i}^{l})
+        h_{i}^{(l+1)} &= \mathrm{norm}(h_{i}^{l})
 
     Parameters
     ----------
-    in_feats : int
-        Input feature size.
+    in_feats : int, or pair of ints
+        Input feature size; i.e, the number of dimensions of :math:`h_i^{(l)}`.
 
-        If the layer is to be applied on a unidirectional bipartite graph, ``in_feats``
+        GATConv can be applied on homogeneous graph and unidirectional
+        `bipartite graph <https://docs.dgl.ai/generated/dgl.bipartite.html?highlight=bipartite>`__.
+        If the layer applies on a unidirectional bipartite graph, ``in_feats``
         specifies the input feature size on both the source and destination nodes.  If
         a scalar is given, the source and destination node feature size would take the
         same value.
@@ -34,7 +40,7 @@ class SAGEConv(nn.Block):
         If aggregator type is ``gcn``, the feature size of source and destination nodes
         are required to be the same.
     out_feats : int
-        Output feature size.
+        Output feature size; i.e, the number of dimensions of :math:`h_i^{(l+1)}`.
     feat_drop : float
         Dropout rate on features, default: ``0``.
     aggregator_type : str
@@ -46,6 +52,45 @@ class SAGEConv(nn.Block):
     activation : callable activation function/layer or None, optional
         If not None, applies an activation function to the updated node features.
         Default: ``None``.
+
+    Examples
+    --------
+    >>> import dgl
+    >>> import numpy as np
+    >>> import mxnet as mx
+    >>> from dgl.nn import SAGEConv
+    >>>
+    >>> # Case 1: Homogeneous graph
+    >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    >>> g = dgl.add_self_loop(g)
+    >>> feat = mx.nd.ones((6, 10))
+    >>> conv = SAGEConv(10, 2, 'pool')
+    >>> conv.initialize(ctx=mx.cpu(0))
+    >>> res = conv(g, feat)
+    >>> res
+    [[ 0.32144994 -0.8729614 ]
+    [ 0.32144994 -0.8729614 ]
+    [ 0.32144994 -0.8729614 ]
+    [ 0.32144994 -0.8729614 ]
+    [ 0.32144994 -0.8729614 ]
+    [ 0.32144994 -0.8729614 ]]
+    <NDArray 6x2 @cpu(0)>
+
+    >>> # Case 2: Unidirectional bipartite graph
+    >>> u = [0, 1, 0, 0, 1]
+    >>> v = [0, 1, 2, 3, 2]
+    >>> g = dgl.bipartite((u, v))
+    >>> u_fea = mx.nd.random.randn(2, 5)
+    >>> v_fea = mx.nd.random.randn(4, 10)
+    >>> conv = SAGEConv((5, 10), 2, 'pool')
+    >>> conv.initialize(ctx=mx.cpu(0))
+    >>> res = conv(g, (u_fea, v_fea))
+    >>> res
+    [[-0.60524774  0.7196473 ]
+    [ 0.8832787  -0.5928619 ]
+    [-1.8245722   1.159798  ]
+    [-1.0509381   2.2239418 ]]
+    <NDArray 4x2 @cpu(0)>
     """
     def __init__(self,
                  in_feats,
@@ -86,8 +131,9 @@ class SAGEConv(nn.Block):
         graph : DGLGraph
             The graph.
         feat : mxnet.NDArray or pair of mxnet.NDArray
-            If a single tensor is given, the input feature of shape :math:`(N, D_{in})` where
-            :math:`D_{in}` is size of input feature, :math:`N` is the number of nodes.
+            If a single tensor is given, it represents the input feature of shape
+            :math:`(N, D_{in})`
+            where :math:`D_{in}` is size of input feature, :math:`N` is the number of nodes.
             If a pair of tensors are given, the pair must contain two tensors of shape
             :math:`(N_{in}, D_{in_{src}})` and :math:`(N_{out}, D_{in_{dst}})`.
 
@@ -103,8 +149,16 @@ class SAGEConv(nn.Block):
                 feat_dst = self.feat_drop(feat[1])
             else:
                 feat_src = feat_dst = self.feat_drop(feat)
+                if graph.is_block:
+                    feat_dst = feat_src[:graph.number_of_dst_nodes()]
 
             h_self = feat_dst
+
+            # Handle the case of graphs without edges
+            if graph.number_of_edges() == 0:
+                dst_neigh = mx.nd.zeros((graph.number_of_dst_nodes(), self._in_src_feats))
+                dst_neigh = dst_neigh.as_in_context(feat_dst.context)
+                graph.dstdata['neigh'] = dst_neigh
 
             if self._aggre_type == 'mean':
                 graph.srcdata['h'] = feat_src

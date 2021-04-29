@@ -41,7 +41,7 @@ class Model(nn.Module):
         h = x
 
         for i in range(self.num_layers):
-            g = self.nng(h)
+            g = self.nng(h).to(h.device)
             h = h.view(batch_size * n_points, -1)
             h = self.conv[i](g, h)
             h = F.leaky_relu(h, 0.2)

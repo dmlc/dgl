@@ -8,6 +8,7 @@ import torch as th
 
 import dgl
 from dgl.data.utils import download, extract_archive, get_download_dir
+from utils import to_etype_name
 
 _urls = {
     'ml-100k' : 'http://files.grouplens.org/datasets/movielens/ml-100k.zip',
@@ -210,7 +211,7 @@ class MovieLens(object):
         def _npairs(graph):
             rst = 0
             for r in self.possible_rating_values:
-                r = str(r).replace('.', '_')
+                r = to_etype_name(r)
                 rst += graph.number_of_edges(str(r))
             return rst
 
@@ -244,22 +245,20 @@ class MovieLens(object):
     def _generate_enc_graph(self, rating_pairs, rating_values, add_support=False):
         user_movie_R = np.zeros((self._num_user, self._num_movie), dtype=np.float32)
         user_movie_R[rating_pairs] = rating_values
-        movie_user_R = user_movie_R.transpose()
 
-        rating_graphs = []
+        data_dict = dict()
+        num_nodes_dict = {'user': self._num_user, 'movie': self._num_movie}
         rating_row, rating_col = rating_pairs
         for rating in self.possible_rating_values:
             ridx = np.where(rating_values == rating)
             rrow = rating_row[ridx]
             rcol = rating_col[ridx]
-            rating = str(rating).replace('.', '_')
-            bg = dgl.bipartite((rrow, rcol), 'user', rating, 'movie',
-                               num_nodes=(self._num_user, self._num_movie))
-            rev_bg = dgl.bipartite((rcol, rrow), 'movie', 'rev-%s' % rating, 'user',
-                               num_nodes=(self._num_movie, self._num_user))
-            rating_graphs.append(bg)
-            rating_graphs.append(rev_bg)
-        graph = dgl.hetero_from_relations(rating_graphs)
+            rating = to_etype_name(rating)
+            data_dict.update({
+                ('user', str(rating), 'movie'): (rrow, rcol),
+                ('movie', 'rev-%s' % str(rating), 'user'): (rcol, rrow)
+            })
+        graph = dgl.heterograph(data_dict, num_nodes_dict=num_nodes_dict)
 
         # sanity check
         assert len(rating_pairs[0]) == sum([graph.number_of_edges(et) for et in graph.etypes]) // 2
@@ -269,13 +268,13 @@ class MovieLens(object):
                 x = x.numpy().astype('float32')
                 x[x == 0.] = np.inf
                 x = th.FloatTensor(1. / np.sqrt(x))
-                return x.to(self._device).unsqueeze(1)
+                return x.unsqueeze(1)
             user_ci = []
             user_cj = []
             movie_ci = []
             movie_cj = []
             for r in self.possible_rating_values:
-                r = str(r).replace('.', '_')
+                r = to_etype_name(r)
                 user_ci.append(graph['rev-%s' % r].in_degrees())
                 movie_ci.append(graph[r].in_degrees())
                 if self._symm:
@@ -290,8 +289,8 @@ class MovieLens(object):
                 user_cj = _calc_norm(sum(user_cj))
                 movie_cj = _calc_norm(sum(movie_cj))
             else:
-                user_cj = th.ones(self.num_user,).to(self._device)
-                movie_cj = th.ones(self.num_movie,).to(self._device)
+                user_cj = th.ones(self.num_user,)
+                movie_cj = th.ones(self.num_movie,)
             graph.nodes['user'].data.update({'ci' : user_ci, 'cj' : user_cj})
             graph.nodes['movie'].data.update({'ci' : movie_ci, 'cj' : movie_cj})
 
@@ -302,7 +301,9 @@ class MovieLens(object):
         user_movie_ratings_coo = sp.coo_matrix(
             (ones, rating_pairs),
             shape=(self.num_user, self.num_movie), dtype=np.float32)
-        return dgl.bipartite(user_movie_ratings_coo, 'user', 'rate', 'movie')
+        g = dgl.bipartite_from_scipy(user_movie_ratings_coo, utype='_U', etype='_E', vtype='_V')
+        return dgl.heterograph({('user', 'rate', 'movie'): g.edges()}, 
+                               num_nodes_dict={'user': self.num_user, 'movie': self.num_movie})
 
     @property
     def num_links(self):
@@ -513,7 +514,7 @@ class MovieLens(object):
         else:
             raise NotImplementedError
 
-        TEXT = torchtext.data.Field(tokenize='spacy')
+        TEXT = torchtext.data.Field(tokenize='spacy', tokenizer_language='en_core_web_sm')
         embedding = torchtext.vocab.GloVe(name='840B', dim=300)
 
         title_embedding = np.zeros(shape=(self.movie_info.shape[0], 300), dtype=np.float32)

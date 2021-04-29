@@ -14,6 +14,7 @@ Dependencies
 
 ```bash
 pip install tensorflow requests
+DGLBACKEND=tensorflow
 ```
 
 How to run

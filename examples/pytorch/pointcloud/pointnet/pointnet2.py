@@ -39,7 +39,7 @@ def index_points(points, idx):
 
 class FixedRadiusNearNeighbors(nn.Module):
     '''
-    Find the neighbors with-in a fixed radius
+    Ball Query - Find the neighbors with-in a fixed radius
     '''
     def __init__(self, radius, n_neighbor):
         super(FixedRadiusNearNeighbors, self).__init__()
@@ -89,7 +89,7 @@ class FixedRadiusNNGraph(nn.Module):
             src_idx = inv_idx[:src.shape[0]]
             dst_idx = inv_idx[src.shape[0]:]
 
-            g = dgl.DGLGraph((src_idx.cpu(), dst_idx.cpu()), readonly=True)
+            g = dgl.graph((src_idx, dst_idx))
             g.ndata['pos'] = pos[i][uniq]
             g.ndata['center'] = center[uniq]
             if feat is not None:
@@ -129,32 +129,34 @@ class PointNetConv(nn.Module):
 
     def forward(self, nodes):
         shape = nodes.mailbox['agg_feat'].shape
-        h = nodes.mailbox['agg_feat'].view(self.batch_size, -1, shape[1], shape[2]).permute(0, 3, 1, 2)
+        h = nodes.mailbox['agg_feat'].view(self.batch_size, -1, shape[1], shape[2]).permute(0, 3, 2, 1)
         for conv, bn in zip(self.conv, self.bn):
             h = conv(h)
             h = bn(h)
             h = F.relu(h)
-        h = torch.max(h, 3)[0]
+        h = torch.max(h, 2)[0]
         feat_dim = h.shape[1]
         h = h.permute(0, 2, 1).reshape(-1, feat_dim)
         return {'new_feat': h}
-    
+
     def group_all(self, pos, feat):
         '''
-        Feature aggretation and pooling for the non-sampling layer
+        Feature aggregation and pooling for the non-sampling layer
         '''
         if feat is not None:
             h = torch.cat([pos, feat], 2)
         else:
             h = pos
-        shape = h.shape
-        h = h.permute(0, 2, 1).view(shape[0], shape[2], shape[1], 1)
+        B, N, D = h.shape
+        _, _, C = pos.shape
+        new_pos = torch.zeros(B, 1, C)
+        h = h.permute(0, 2, 1).view(B, -1, N, 1)
         for conv, bn in zip(self.conv, self.bn):
             h = conv(h)
             h = bn(h)
             h = F.relu(h)
-        h = torch.max(h[:, :, :, 0], 2)[0]
-        return h
+        h = torch.max(h[:, :, :, 0], 2)[0]  # [B,D]
+        return new_pos, h
 
 class SAModule(nn.Module):
     """
@@ -178,6 +180,7 @@ class SAModule(nn.Module):
         centroids = self.fps(pos)
         g = self.frnn_graph(pos, centroids, feat)
         g.update_all(self.message, self.conv)
+
         mask = g.ndata['center'] == 1
         pos_dim = g.ndata['pos'].shape[-1]
         feat_dim = g.ndata['new_feat'].shape[-1]
@@ -207,6 +210,7 @@ class SAMSGModule(nn.Module):
     def forward(self, pos, feat):
         centroids = self.fps(pos)
         feat_res_list = []
+
         for i in range(self.group_size):
             g = self.frnn_graph_list[i](pos, centroids, feat)
             g.update_all(self.message_list[i], self.conv_list[i])
@@ -217,8 +221,61 @@ class SAMSGModule(nn.Module):
                 pos_res = g.ndata['pos'][mask].view(self.batch_size, -1, pos_dim)
             feat_res = g.ndata['new_feat'][mask].view(self.batch_size, -1, feat_dim)
             feat_res_list.append(feat_res)
+
         feat_res = torch.cat(feat_res_list, 2)
         return pos_res, feat_res
+
+class PointNet2FP(nn.Module):
+    """
+    The Feature Propagation Layer
+    """
+    def __init__(self, input_dims, sizes):
+        super(PointNet2FP, self).__init__()
+        self.convs = nn.ModuleList()
+        self.bns = nn.ModuleList()
+
+        sizes = [input_dims] + sizes
+        for i in range(1, len(sizes)):
+            self.convs.append(nn.Conv1d(sizes[i-1], sizes[i], 1))
+            self.bns.append(nn.BatchNorm1d(sizes[i]))
+
+    def forward(self, x1, x2, feat1, feat2):
+        """
+        Adapted from https://github.com/yanx27/Pointnet_Pointnet2_pytorch
+            Input:
+                x1: input points position data, [B, N, C]
+                x2: sampled input points position data, [B, S, C]
+                feat1: input points data, [B, N, D]
+                feat2: input points data, [B, S, D]
+            Return:
+                new_feat: upsampled points data, [B, D', N]
+        """
+        B, N, C = x1.shape
+        _, S, _ = x2.shape
+
+        if S == 1:
+            interpolated_feat = feat2.repeat(1, N, 1)
+        else:
+            dists = square_distance(x1, x2)
+            dists, idx = dists.sort(dim=-1)
+            dists, idx = dists[:, :, :3], idx[:, :, :3]  # [B, N, 3]
+
+            dist_recip = 1.0 / (dists + 1e-8)
+            norm = torch.sum(dist_recip, dim=2, keepdim=True)
+            weight = dist_recip / norm
+            interpolated_feat = torch.sum(index_points(feat2, idx) * weight.view(B, N, 3, 1), dim=2)
+
+        if feat1 is not None:
+            new_feat = torch.cat([feat1, interpolated_feat], dim=-1)
+        else:
+            new_feat = interpolated_feat
+
+        new_feat = new_feat.permute(0, 2, 1)  # [B, D, S]
+        for i, conv in enumerate(self.convs):
+            bn = self.bns[i]
+            new_feat = F.relu(bn(conv(new_feat)))
+        return new_feat
+
 
 class PointNet2SSGCls(nn.Module):
     def __init__(self, output_classes, batch_size, input_dims=3, dropout_prob=0.4):
@@ -249,7 +306,7 @@ class PointNet2SSGCls(nn.Module):
             feat = None
         pos, feat = self.sa_module1(pos, feat)
         pos, feat = self.sa_module2(pos, feat)
-        h = self.sa_module3(pos, feat)
+        _, h = self.sa_module3(pos, feat)
 
         h = self.mlp1(h)
         h = self.bn1(h)
@@ -296,7 +353,7 @@ class PointNet2MSGCls(nn.Module):
             feat = None
         pos, feat = self.sa_msg_module1(pos, feat)
         pos, feat = self.sa_msg_module2(pos, feat)
-        h = self.sa_module3(pos, feat)
+        _, h = self.sa_module3(pos, feat)
 
         h = self.mlp1(h)
         h = self.bn1(h)

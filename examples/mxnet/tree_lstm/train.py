@@ -3,6 +3,7 @@ import time
 import warnings
 import zipfile
 import os
+import collections
 
 os.environ['DGLBACKEND'] = 'mxnet'
 os.environ['MXNET_GPU_MEM_POOL_TYPE'] = 'Round'
@@ -16,13 +17,15 @@ import dgl.data as data
 
 from tree_lstm import TreeLSTM
 
+SSTBatch = collections.namedtuple('SSTBatch', ['graph', 'mask', 'wordid', 'label'])
+
 def batcher(ctx):
     def batcher_dev(batch):
         batch_trees = dgl.batch(batch)
-        return data.SSTBatch(graph=batch_trees,
-                             mask=batch_trees.ndata['mask'].as_in_context(ctx),
-                             wordid=batch_trees.ndata['x'].as_in_context(ctx),
-                             label=batch_trees.ndata['y'].as_in_context(ctx))
+        return SSTBatch(graph=batch_trees,
+                        mask=batch_trees.ndata['mask'].as_in_context(ctx),
+                        wordid=batch_trees.ndata['x'].as_in_context(ctx),
+                        label=batch_trees.ndata['y'].as_in_context(ctx))
     return batcher_dev
 
 def prepare_glove():
@@ -52,30 +55,32 @@ def main(args):
         else:
             print('Requested GPU id {} was not found. Defaulting to CPU implementation'.format(args.gpu))
             ctx = mx.cpu()
+    else:
+        ctx = mx.cpu()
 
     if args.use_glove:
         prepare_glove()
 
-    trainset = data.SST()
+    trainset = data.SSTDataset()
     train_loader = gluon.data.DataLoader(dataset=trainset,
                                          batch_size=args.batch_size,
                                          batchify_fn=batcher(ctx),
                                          shuffle=True,
                                          num_workers=0)
-    devset = data.SST(mode='dev')
+    devset = data.SSTDataset(mode='dev')
     dev_loader = gluon.data.DataLoader(dataset=devset,
                                        batch_size=100,
                                        batchify_fn=batcher(ctx),
                                        shuffle=True,
                                        num_workers=0)
 
-    testset = data.SST(mode='test')
+    testset = data.SSTDataset(mode='test')
     test_loader = gluon.data.DataLoader(dataset=testset,
                                         batch_size=100,
                                         batchify_fn=batcher(ctx),
                                         shuffle=False, num_workers=0)
 
-    model = TreeLSTM(trainset.num_vocabs,
+    model = TreeLSTM(trainset.vocab_size,
                      args.x_size,
                      args.h_size,
                      trainset.num_classes,
@@ -85,7 +90,7 @@ def main(args):
                      ctx=ctx)
     print(model)
     params_ex_emb =[x for x in model.collect_params().values()
-                    if x.grad_req != 'null' and x.shape[0] != trainset.num_vocabs]
+                    if x.grad_req != 'null' and x.shape[0] != trainset.vocab_size]
     params_emb = list(model.embedding.collect_params().values())
     for p in params_emb:
         p.lr_mult = 0.1

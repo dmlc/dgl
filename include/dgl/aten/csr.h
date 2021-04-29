@@ -9,6 +9,8 @@
 #include <dmlc/io.h>
 #include <dmlc/serializer.h>
 #include <vector>
+#include <tuple>
+#include <string>
 #include "./types.h"
 #include "./array_ops.h"
 #include "./spmat.h"
@@ -148,21 +150,78 @@ inline bool CSRHasData(CSRMatrix csr) {
 /*! \brief Whether the column indices of each row is sorted. */
 bool CSRIsSorted(CSRMatrix csr);
 
-/* \brief Get data. The return type is an ndarray due to possible duplicate entries. */
-runtime::NDArray CSRGetData(CSRMatrix , int64_t row, int64_t col);
-/*!
- * \brief Batched implementation of CSRGetData.
- * \note This operator allows broadcasting (i.e, either row or col can be of length 1).
- */
-
-runtime::NDArray CSRGetData(CSRMatrix, runtime::NDArray rows, runtime::NDArray cols);
-
 /*!
  * \brief Get the data and the row,col indices for each returned entries.
+ *
+ * The operator supports matrix with duplicate entries and all the matched entries
+ * will be returned. The operator assumes there is NO duplicate (row, col) pair
+ * in the given input. Otherwise, the returned result is undefined.
+ *
+ * If some (row, col) pairs do not contain a valid non-zero elements,
+ * they will not be included in the return arrays.
+ *
  * \note This operator allows broadcasting (i.e, either row or col can be of length 1).
+ * \param mat Sparse matrix
+ * \param rows Row index
+ * \param cols Column index
+ * \return Three arrays {rows, cols, data}
  */
 std::vector<runtime::NDArray> CSRGetDataAndIndices(
     CSRMatrix , runtime::NDArray rows, runtime::NDArray cols);
+
+/* \brief Get data. The return type is an ndarray due to possible duplicate entries. */
+inline runtime::NDArray CSRGetAllData(CSRMatrix mat, int64_t row, int64_t col) {
+  const auto& nbits = mat.indptr->dtype.bits;
+  const auto& ctx = mat.indptr->ctx;
+  IdArray rows = VecToIdArray<int64_t>({row}, nbits, ctx);
+  IdArray cols = VecToIdArray<int64_t>({col}, nbits, ctx);
+  const auto& rst = CSRGetDataAndIndices(mat, rows, cols);
+  return rst[2];
+}
+
+/*!
+ * \brief Get the data for each (row, col) pair.
+ *
+ * The operator supports matrix with duplicate entries but only one matched entry
+ * will be returned for each (row, col) pair. Support duplicate input (row, col)
+ * pairs.
+ *
+ * If some (row, col) pairs do not contain a valid non-zero elements,
+ * their data values are filled with -1.
+ *
+ * \note This operator allows broadcasting (i.e, either row or col can be of length 1).
+ *
+ * \param mat Sparse matrix.
+ * \param rows Row index.
+ * \param cols Column index.
+ * \return Data array. The i^th element is the data of (rows[i], cols[i])
+ */
+runtime::NDArray CSRGetData(CSRMatrix, runtime::NDArray rows, runtime::NDArray cols);
+
+/*!
+ * \brief Get the data for each (row, col) pair, then index into the weights array.
+ *
+ * The operator supports matrix with duplicate entries but only one matched entry
+ * will be returned for each (row, col) pair. Support duplicate input (row, col)
+ * pairs.
+ *
+ * If some (row, col) pairs do not contain a valid non-zero elements to index into the
+ * weights array, DGL returns the value \a filler for that pair instead.
+ *
+ * \note This operator allows broadcasting (i.e, either row or col can be of length 1).
+ *
+ * \tparam DType the data type of the weights array.
+ * \param mat Sparse matrix.
+ * \param rows Row index.
+ * \param cols Column index.
+ * \param weights The weights array.
+ * \param filler The value to return for row-column pairs not existent in the matrix.
+ * \return Data array. The i^th element is the data of (rows[i], cols[i])
+ */
+template <typename DType>
+runtime::NDArray CSRGetData(
+    CSRMatrix, runtime::NDArray rows, runtime::NDArray cols, runtime::NDArray weights,
+    DType filler);
 
 /*! \brief Return a transposed CSR matrix */
 CSRMatrix CSRTranspose(CSRMatrix csr);
@@ -217,9 +276,13 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, runtime::NDArray rows);
  * \brief Get the submatrix specified by the row and col ids.
  *
  * In numpy notation, given matrix M, row index array I, col index array J
- * This function returns the submatrix M[I, J].
+ * This function returns the submatrix M[I, J]. It assumes that there is no
+ * duplicate (row, col) pair in the given indices. M could have duplicate
+ * entries.
  *
- * The sliced row and column IDs are relabeled to starting from zero.
+ * The sliced row and column IDs are relabeled according to the given
+ * rows and cols (i.e., row #0 in the new matrix corresponds to rows[0] in
+ * the original matrix).
  *
  * \param csr The input csr matrix
  * \param rows The row index to select
@@ -394,6 +457,38 @@ COOMatrix CSRRowWiseTopk(
  */
 NDArray CSRSortByTag_(CSRMatrix* csr, IdArray tag_array, int64_t num_tags);
 
+/*
+ * \brief Union two CSRMatrix into one CSRMatrix.
+ * 
+ * Two Matrix must have the same shape.
+ *
+ * Example:
+ *
+ * A = [[0, 0, 1, 0],
+ *      [1, 0, 1, 1],
+ *      [0, 1, 0, 0]]
+ *
+ * B = [[0, 1, 1, 0],
+ *      [0, 0, 0, 1],
+ *      [0, 0, 1, 0]]
+ *
+ * CSRMatrix_A.num_rows : 3
+ * CSRMatrix_A.num_cols : 4
+ * CSRMatrix_B.num_rows : 3
+ * CSRMatrix_B.num_cols : 4
+ *
+ * C = UnionCsr({A, B});
+ *
+ * C = [[0, 1, 2, 0],
+ *      [1, 0, 1, 2],
+ *      [0, 1, 1, 0]]
+ *
+ * CSRMatrix_C.num_rows : 3
+ * CSRMatrix_C.num_cols : 4
+ */
+CSRMatrix UnionCsr(
+  const std::vector<CSRMatrix>& csrs);
+
 /*!
  * \brief Union a list CSRMatrix into one CSRMatrix.
  *
@@ -428,6 +523,30 @@ NDArray CSRSortByTag_(CSRMatrix* csr, IdArray tag_array, int64_t num_tags);
  */
 CSRMatrix DisjointUnionCsr(
   const std::vector<CSRMatrix>& csrs);
+
+/*!
+ * \brief CSRMatrix toSimple.
+ *
+ * A = [[0, 0, 0],
+ *      [3, 0, 2],
+ *      [1, 1, 0],
+ *      [0, 0, 4]]
+ * 
+ * B, cnt, edge_map = CSRToSimple(A)
+ *
+ * B = [[0, 0, 0],
+ *      [1, 0, 1],
+ *      [1, 1, 0],
+ *      [0, 0, 1]]
+ * cnt = [3, 2, 1, 1, 4]
+ * edge_map = [0, 0, 0, 1, 1, 2, 3, 4, 4, 4, 4]
+ *
+ * \return The simplified CSRMatrix
+ *         The count recording the number of duplicated edges from the original graph.
+ *         The edge mapping from the edge IDs of original graph to those of the
+ *         returned graph.
+ */
+std::tuple<CSRMatrix, IdArray, IdArray> CSRToSimple(const CSRMatrix& csr);
 
 /*!
  * \brief Split a CSRMatrix into multiple disjoin components.

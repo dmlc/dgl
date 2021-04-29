@@ -18,7 +18,7 @@ class ShapeNet(object):
         if not os.path.exists(data_path):
             local_path = os.path.join(download_path, data_filename)
             if not os.path.exists(local_path):
-                download(SHAPENET_DOWNLOAD_URL, local_path)
+                download(SHAPENET_DOWNLOAD_URL, local_path, verify_ssl=False)
             with ZipFile(local_path) as z:
                 z.extractall(path=download_path)
 

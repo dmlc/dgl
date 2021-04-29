@@ -7,7 +7,7 @@ from collections import namedtuple
 
 import dgl.backend as F
 from ._ffi.function import _init_api
-from .nodeflow import NodeFlow
+from ._deprecate.nodeflow import NodeFlow
 from . import utils
 
 _init_api("dgl.network")

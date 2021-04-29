@@ -152,7 +152,7 @@ class SortPooling(nn.Block):
             feat = feat.sort(axis=-1)
             graph.ndata['h'] = feat
             # Sort nodes according to their last features.
-            ret = topk_nodes(graph, 'h', self.k)[0].reshape(
+            ret = topk_nodes(graph, 'h', self.k, sortby=-1)[0].reshape(
                 -1, self.k * feat.shape[-1])
             return ret
 

@@ -10,6 +10,7 @@
 #include "./binary_reduce_impl_decl.h"
 #include "./utils.h"
 #include "../c_api_common.h"
+#include "../array/check.h"
 #include "../graph/unit_graph.h"
 #include "./csr_interface.h"
 
@@ -175,20 +176,6 @@ std::string IdArrayToStr(IdArray arr) {
   return oss.str();
 }
 
-// Check whether the given arguments have the same context.
-inline void CheckCtx(
-    const DLContext& ctx,
-    const std::vector<NDArray>& arrays,
-    const std::vector<std::string>& names) {
-  for (size_t i = 0; i < arrays.size(); ++i) {
-    if (aten::IsNullArray(arrays[i]))
-      continue;
-    CHECK_EQ(ctx, arrays[i]->ctx)
-      << "Expected device context " << ctx << ". But got "
-      << arrays[i]->ctx << " for " << names[i] << ".";
-  }
-}
-
 // Check whether the given arguments use the same number of bits.
 inline void CheckIdArray(
     const uint8_t bits,
@@ -278,7 +265,7 @@ std::vector<int64_t> InferBinaryFeatureShape(
   return CalcBcastInfo(op, lhs, rhs).real_out_shape;
 }
 
-DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelInferBinaryFeatureShape")
+DGL_REGISTER_GLOBAL("_deprecate.kernel._CAPI_DGLKernelInferBinaryFeatureShape")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string op = args[0];
     NDArray lhs = args[1];
@@ -303,7 +290,7 @@ void BinaryOpReduce(
     NDArray out_mapping) {
   const auto& ctx = graph.Context();
   // sanity check
-  CheckCtx(ctx,
+  aten::CheckCtx(ctx,
       {lhs_data, rhs_data, out_data, lhs_mapping, rhs_mapping, out_mapping},
       {"lhs_data", "rhs_data", "out_data", "lhs_mapping", "rhs_mapping", "out_mapping"});
   CheckIdArray(graph.NumBits(),
@@ -354,7 +341,7 @@ void csrwrapper_switch(DGLArgValue argval,
   }
 }
 
-DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBinaryOpReduce")
+DGL_REGISTER_GLOBAL("_deprecate.kernel._CAPI_DGLKernelBinaryOpReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
     std::string op = args[1];
@@ -392,7 +379,7 @@ void BackwardLhsBinaryOpReduce(
     NDArray grad_lhs_data) {
   const auto& ctx = graph.Context();
   // sanity check
-  CheckCtx(ctx,
+  aten::CheckCtx(ctx,
       {lhs_data, rhs_data, out_data, grad_out_data, grad_lhs_data,
        lhs_mapping, rhs_mapping, out_mapping},
       {"lhs_data", "rhs_data", "out_data", "grad_out_data", "grad_lhs_data",
@@ -427,7 +414,7 @@ void BackwardLhsBinaryOpReduce(
   }
 }
 
-DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardLhsBinaryOpReduce")
+DGL_REGISTER_GLOBAL("_deprecate.kernel._CAPI_DGLKernelBackwardLhsBinaryOpReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
     std::string op = args[1];
@@ -469,7 +456,7 @@ void BackwardRhsBinaryOpReduce(
     NDArray grad_rhs_data) {
   const auto& ctx = graph.Context();
   // sanity check
-  CheckCtx(ctx,
+  aten::CheckCtx(ctx,
       {lhs_data, rhs_data, out_data, grad_out_data, grad_rhs_data,
        lhs_mapping, rhs_mapping, out_mapping},
       {"lhs_data", "rhs_data", "out_data", "grad_out_data", "grad_rhs_data",
@@ -503,7 +490,7 @@ void BackwardRhsBinaryOpReduce(
   }
 }
 
-DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardRhsBinaryOpReduce")
+DGL_REGISTER_GLOBAL("_deprecate.kernel._CAPI_DGLKernelBackwardRhsBinaryOpReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
     std::string op = args[1];
@@ -539,7 +526,7 @@ void CopyReduce(
     NDArray in_mapping, NDArray out_mapping) {
   const auto& ctx = graph.Context();
   // sanity check
-  CheckCtx(ctx,
+  aten::CheckCtx(ctx,
       {in_data, out_data, in_mapping, out_mapping},
       {"in_data", "out_data", "in_mapping", "out_mapping"});
   CheckIdArray(graph.NumBits(),
@@ -552,7 +539,7 @@ void CopyReduce(
       in_mapping, aten::NullArray(), out_mapping);
 }
 
-DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelCopyReduce")
+DGL_REGISTER_GLOBAL("_deprecate.kernel._CAPI_DGLKernelCopyReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
     int target = args[2];
@@ -582,7 +569,7 @@ void BackwardCopyReduce(
     NDArray grad_in_data) {
   const auto& ctx = graph.Context();
   // sanity check
-  CheckCtx(ctx,
+  aten::CheckCtx(ctx,
       {in_data, out_data, grad_out_data, grad_in_data, in_mapping, out_mapping},
       {"in_data", "out_data", "grad_out_data", "grad_in_data", "in_mapping", "out_mapping"});
   CheckIdArray(graph.NumBits(),
@@ -600,7 +587,7 @@ void BackwardCopyReduce(
       grad_in_data, aten::NullArray());
 }
 
-DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardCopyReduce")
+DGL_REGISTER_GLOBAL("_deprecate.kernel._CAPI_DGLKernelBackwardCopyReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
     int target = args[2];

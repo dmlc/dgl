@@ -15,6 +15,7 @@
 #include <dgl/array.h>
 #include <dgl/random.h>
 #include <dgl/zerocopy_serializer.h>
+#include "../runtime/resource_manager.h"
 #include "../c_api_common.h"
 
 using dgl::network::StringPrintf;
@@ -27,10 +28,9 @@ RPCStatus SendRPCMessage(const RPCMessage& msg, const int32_t target_id) {
   std::shared_ptr<std::string> zerocopy_blob(new std::string());
   StreamWithBuffer zc_write_strm(zerocopy_blob.get(), true);
   zc_write_strm.Write(msg);
-  int32_t ndarray_count = msg.tensors.size();
-  zerocopy_blob->append(
-    reinterpret_cast<char*>(&ndarray_count),
-    sizeof(int32_t));
+  int32_t nonempty_ndarray_count = zc_write_strm.buffer_list().size();
+  zerocopy_blob->append(reinterpret_cast<char*>(&nonempty_ndarray_count),
+                        sizeof(int32_t));
   network::Message rpc_meta_msg;
   rpc_meta_msg.data = const_cast<char*>(zerocopy_blob->data());
   rpc_meta_msg.size = zerocopy_blob->size();
@@ -61,10 +61,10 @@ RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout) {
   CHECK_EQ(RPCContext::ThreadLocal()->receiver->Recv(
     &rpc_meta_msg, &send_id), REMOVE_SUCCESS);
   char* count_ptr = rpc_meta_msg.data+rpc_meta_msg.size-sizeof(int32_t);
-  int32_t ndarray_count = *(reinterpret_cast<int32_t*>(count_ptr));
+  int32_t nonempty_ndarray_count = *(reinterpret_cast<int32_t*>(count_ptr));
   // Recv real ndarray data
-  std::vector<void* > buffer_list(ndarray_count);
-  for (int i = 0; i < ndarray_count; ++i) {
+  std::vector<void*> buffer_list(nonempty_ndarray_count);
+  for (int i = 0; i < nonempty_ndarray_count; ++i) {
     network::Message ndarray_data_msg;
     CHECK_EQ(RPCContext::ThreadLocal()->receiver->RecvFrom(
         &ndarray_data_msg, send_id), REMOVE_SUCCESS);
@@ -77,6 +77,10 @@ RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout) {
 }
 
 //////////////////////////// C APIs ////////////////////////////
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCReset")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  RPCContext::Reset();
+});
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateSender")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
@@ -207,6 +211,17 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSetMsgSeq")
   RPCContext::ThreadLocal()->msg_seq = msg_seq;
 });
 
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetBarrierCount")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  *rv = RPCContext::ThreadLocal()->barrier_count;
+});
+
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSetBarrierCount")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  const int32_t count = args[0];
+  RPCContext::ThreadLocal()->barrier_count = count;
+});
+
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetMachineID")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   *rv = RPCContext::ThreadLocal()->machine_id;
@@ -307,22 +322,24 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCMessageGetTensors")
 
 #if defined(__linux__)
 /*!
- * \brief CtrlCHandler, exits if Ctrl+C is pressed
+ * \brief The signal handler.
  * \param s signal
  */
-void CtrlCHandler(int s) {
+void SigHandler(int s) {
   LOG(INFO) << "\nUser pressed Ctrl+C, Exiting";
+  CleanupResources();
   exit(1);
 }
 
-DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCHandleCtrlC")
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCHandleSignal")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   // Ctrl+C handler
-  struct sigaction sigIntHandler;
-  sigIntHandler.sa_handler = CtrlCHandler;
-  sigemptyset(&sigIntHandler.sa_mask);
-  sigIntHandler.sa_flags = 0;
-  sigaction(SIGINT, &sigIntHandler, nullptr);
+  struct sigaction sigHandler;
+  sigHandler.sa_handler = SigHandler;
+  sigemptyset(&sigHandler.sa_mask);
+  sigHandler.sa_flags = 0;
+  sigaction(SIGINT, &sigHandler, nullptr);
+  sigaction(SIGTERM, &sigHandler, nullptr);
 });
 #endif
 
@@ -366,7 +383,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
   int group_count = args[3];
   int client_id = args[4];
   int service_id = args[5];
-  int msg_seq = args[6];
+  int64_t msg_seq = args[6];
   std::string pickle_data = args[7];
   NDArray ID = args[8];
   NDArray part_id = args[9];

@@ -79,9 +79,8 @@ class Transformer(nn.Module):
         g.apply_edges(src_dot_dst('k', 'q', 'score'), eids)
         g.apply_edges(scaled_exp('score', np.sqrt(self.d_k)), eids)
         # Send weighted values to target nodes
-        g.send_and_recv(eids,
-                        [fn.src_mul_edge('v', 'score', 'v'), fn.copy_edge('score', 'score')],
-                        [fn.sum('v', 'wv'), fn.sum('score', 'z')])
+        g.send_and_recv(eids, fn.src_mul_edge('v', 'score', 'v'), fn.sum('v', 'wv'))
+        g.send_and_recv(eids, fn.copy_edge('score', 'score'), fn.sum('score', 'z'))
 
     def update_graph(self, g, eids, pre_pairs, post_pairs):
         "Update the node states and edge states of the graph."
@@ -170,9 +169,9 @@ class Transformer(nn.Module):
             y = y.view(-1)
             tgt_embed = self.tgt_embed(y)
             g.ndata['x'][nids['dec']] = self.pos_enc.dropout(tgt_embed + tgt_pos)
-            edges_ed = g.filter_edges(lambda e: (e.dst['pos'] < step) & ~e.dst['mask'] , eids['ed'])
-            edges_dd = g.filter_edges(lambda e: (e.dst['pos'] < step) & ~e.dst['mask'], eids['dd'])
-            nodes_d = g.filter_nodes(lambda v: (v.data['pos'] < step) & ~v.data['mask'], nids['dec'])
+            edges_ed = g.filter_edges(lambda e: (e.dst['pos'] < step) & ~e.dst['mask'].bool(), eids['ed'])
+            edges_dd = g.filter_edges(lambda e: (e.dst['pos'] < step) & ~e.dst['mask'].bool(), eids['dd'])
+            nodes_d = g.filter_nodes(lambda v: (v.data['pos'] < step) & ~v.data['mask'].bool(), nids['dec'])
             for i in range(self.decoder.N):
                 pre_func, post_func = self.decoder.pre_func(i, 'qkv'), self.decoder.post_func(i)
                 nodes, edges = nodes_d, edges_dd

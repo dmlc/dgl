@@ -15,7 +15,7 @@ namespace {
  *        type, lhs array and rhs array.
  */
 bool UseBcast(const std::string& op, NDArray lhs, NDArray rhs) {
-  if (op == "copy_u" || op == "copy_e")
+  if (op == "copy_lhs" || op == "copy_rhs")
     return false;  // broadcasting is not required for copy_u/copy_e
   if (lhs->ndim != rhs->ndim)
     return true;
@@ -77,7 +77,7 @@ BcastOff CalcBcastOff(const std::string& op, NDArray lhs, NDArray rhs) {
     }
     rst.out_len = out_len;
   } else {
-    rst.out_len = (op == "copy_e") ? rst.rhs_len : rst.lhs_len;
+    rst.out_len = (op == "copy_rhs") ? rst.rhs_len : rst.lhs_len;
     if (op == "dot") {
       rst.reduce_size = lhs->shape[lhs->ndim - 1];  // set reduce_size for dot.
       rst.out_len /= rst.reduce_size;  // out_len is divied by reduce_size in dot.

@@ -416,7 +416,6 @@ HaloSubgraph GraphOp::GetSubgraphWithHalo(GraphPtr g, IdArray nodes, int num_hop
   auto orig_nodes = all_nodes;
 
   std::vector<dgl_id_t> edge_src, edge_dst, edge_eid;
-  std::vector<int> inner_edges;
 
   // When we deal with in-edges, we need to do two things:
   // * find the edges inside the partition and the edges between partitions.
@@ -436,7 +435,6 @@ HaloSubgraph GraphOp::GetSubgraphWithHalo(GraphPtr g, IdArray nodes, int num_hop
       edge_src.push_back(src_data[i]);
       edge_dst.push_back(dst_data[i]);
       edge_eid.push_back(eid_data[i]);
-      inner_edges.push_back(it1 != orig_nodes.end());
     }
     // We need to expand only if the node hasn't been seen before.
     auto it = all_nodes.find(src_data[i]);
@@ -463,7 +461,6 @@ HaloSubgraph GraphOp::GetSubgraphWithHalo(GraphPtr g, IdArray nodes, int num_hop
       edge_src.push_back(src_data[i]);
       edge_dst.push_back(dst_data[i]);
       edge_eid.push_back(eid_data[i]);
-      inner_edges.push_back(false);
       // If we haven't seen this node.
       auto it = all_nodes.find(src_data[i]);
       if (it == all_nodes.end()) {
@@ -502,8 +499,8 @@ HaloSubgraph GraphOp::GetSubgraphWithHalo(GraphPtr g, IdArray nodes, int num_hop
   halo_subg.graph = subg;
   halo_subg.induced_vertices = aten::VecToIdArray(old_node_ids);
   halo_subg.induced_edges = aten::VecToIdArray(edge_eid);
+  // TODO(zhengda) we need to switch to 8 bytes afterwards.
   halo_subg.inner_nodes = aten::VecToIdArray<int>(inner_nodes, 32);
-  halo_subg.inner_edges = aten::VecToIdArray<int>(inner_edges, 32);
   return halo_subg;
 }
 
@@ -601,14 +598,6 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_GetHaloSubgraphInnerNodes")
   auto gptr = std::dynamic_pointer_cast<HaloSubgraph>(g.sptr());
   CHECK(gptr) << "The input graph has to be immutable graph";
   *rv = gptr->inner_nodes;
-});
-
-DGL_REGISTER_GLOBAL("graph_index._CAPI_GetHaloSubgraphInnerEdges")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-  SubgraphRef g = args[0];
-  auto gptr = std::dynamic_pointer_cast<HaloSubgraph>(g.sptr());
-  CHECK(gptr) << "The input graph has to be immutable graph";
-  *rv = gptr->inner_edges;
 });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLDisjointUnion")
@@ -728,6 +717,63 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLMapSubgraphNID")
     const IdArray parent_vids = args[0];
     const IdArray query = args[1];
     *rv = GraphOp::MapParentIdToSubgraphId(parent_vids, query);
+  });
+
+template<class IdType>
+IdArray MapIds(IdArray ids, IdArray range_starts, IdArray range_ends, IdArray typed_map,
+               int num_parts, int num_types) {
+  int64_t num_ids = ids->shape[0];
+  int64_t num_ranges = range_starts->shape[0];
+  IdArray ret = IdArray::Empty({num_ids * 2}, ids->dtype, ids->ctx);
+
+  const IdType *range_start_data = static_cast<IdType *>(range_starts->data);
+  const IdType *range_end_data = static_cast<IdType *>(range_ends->data);
+  const IdType *ids_data = static_cast<IdType *>(ids->data);
+  const IdType *typed_map_data = static_cast<IdType *>(typed_map->data);
+  IdType *types_data = static_cast<IdType *>(ret->data);
+  IdType *per_type_ids_data = static_cast<IdType *>(ret->data) + num_ids;
+#pragma omp parallel for
+  for (int64_t i = 0; i < ids->shape[0]; i++) {
+    IdType id = ids_data[i];
+    auto it = std::lower_bound(range_end_data, range_end_data + num_ranges, id);
+    // The range must exist.
+    BUG_IF_FAIL(it != range_end_data + num_ranges);
+    size_t range_id = it - range_end_data;
+    int type_id = range_id % num_types;
+    types_data[i] = type_id;
+    int part_id = range_id / num_types;
+    BUG_IF_FAIL(part_id < num_parts);
+    if (part_id == 0) {
+      per_type_ids_data[i] = id - range_start_data[range_id];
+    } else {
+      per_type_ids_data[i] = id - range_start_data[range_id]
+          + typed_map_data[num_parts * type_id + part_id - 1];
+    }
+  }
+  return ret;
+}
+
+DGL_REGISTER_GLOBAL("distributed.id_map._CAPI_DGLHeteroMapIds")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    const IdArray ids = args[0];
+    const IdArray range_starts = args[1];
+    const IdArray range_ends = args[2];
+    const IdArray typed_map = args[3];
+    int num_parts = args[4];
+    int num_types = args[5];
+    int num_ranges = range_starts->shape[0];
+
+    CHECK_EQ(range_starts->dtype.bits, ids->dtype.bits);
+    CHECK_EQ(range_ends->dtype.bits, ids->dtype.bits);
+    CHECK_EQ(typed_map->dtype.bits, ids->dtype.bits);
+    CHECK_EQ(num_ranges, num_parts * num_types);
+    CHECK_EQ(num_ranges, range_ends->shape[0]);
+
+    IdArray ret;
+    ATEN_ID_TYPE_SWITCH(ids->dtype, IdType, {
+      ret = MapIds<IdType>(ids, range_starts, range_ends, typed_map, num_parts, num_types);
+    });
+    *rv = ret;
   });
 
 }  // namespace dgl

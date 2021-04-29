@@ -10,6 +10,7 @@
 #include <dgl/packed_func_ext.h>
 #include <vector>
 #include <utility>
+#include "../heterograph.h"
 #include "../unit_graph.h"
 #include "../../c_api_common.h"
 
@@ -24,51 +25,14 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>, std::vector<IdArray>>
 ToSimpleGraph(const HeteroGraphPtr graph) {
   const int64_t num_etypes = graph->NumEdgeTypes();
   const auto metagraph = graph->meta_graph();
+  const auto &ugs = std::dynamic_pointer_cast<HeteroGraph>(graph)->relation_graphs();
 
   std::vector<IdArray> counts(num_etypes), edge_maps(num_etypes);
   std::vector<HeteroGraphPtr> rel_graphs(num_etypes);
 
   for (int64_t etype = 0; etype < num_etypes; ++etype) {
-    const auto vtypes = graph->GetEndpointTypes(etype);
-    const COOMatrix adj = graph->GetCOOMatrix(etype);
-    const COOMatrix sorted_adj = COOSort(adj, true);
-    const IdArray eids_shuffled = sorted_adj.data;
-    const auto &coalesced_result = COOCoalesce(sorted_adj);
-    const COOMatrix &coalesced_adj = coalesced_result.first;
-    const IdArray &count = coalesced_result.second;
-
-    /*
-     * eids_shuffled actually already contains the mapping from old edge space to the
-     * new one:
-     *
-     * * eids_shuffled[0:count[0]] indicates the original edge IDs that coalesced into new
-     *   edge #0.
-     * * eids_shuffled[count[0]:count[0] + count[1]] indicates those that coalesced into
-     *   new edge #1.
-     * * eids_shuffled[count[0] + count[1]:count[0] + count[1] + count[2]] indicates those
-     *   that coalesced into new edge #2.
-     * * etc.
-     *
-     * Here, we need to translate eids_shuffled to an array "eids_remapped" such that
-     * eids_remapped[i] indicates the new edge ID the old edge #i is mapped to.  The
-     * translation can simply be achieved by (in numpy code):
-     *
-     *     new_eid_for_eids_shuffled = np.range(len(count)).repeat(count)
-     *     eids_remapped = np.zeros_like(new_eid_for_eids_shuffled)
-     *     eids_remapped[eids_shuffled] = new_eid_for_eids_shuffled
-     */
-    const IdArray new_eids = Range(
-        0, coalesced_adj.row->shape[0], coalesced_adj.row->dtype.bits, coalesced_adj.row->ctx);
-    const IdArray eids_remapped = Scatter(Repeat(new_eids, count), eids_shuffled);
-
-    edge_maps[etype] = eids_remapped;
-    counts[etype] = count;
-    rel_graphs[etype] = UnitGraph::CreateFromCOO(
-        vtypes.first == vtypes.second ? 1 : 2,
-        coalesced_adj.num_rows,
-        coalesced_adj.num_cols,
-        coalesced_adj.row,
-        coalesced_adj.col);
+    const auto result = ugs[etype]->ToSimple();
+    std::tie(rel_graphs[etype], counts[etype], edge_maps[etype]) = result;
   }
 
   const HeteroGraphPtr result = CreateHeteroGraph(

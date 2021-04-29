@@ -36,7 +36,8 @@ IdArray BinaryElewise(IdArray lhs, IdArray rhs) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   int nt = cuda::FindNumThreads(len);
   int nb = (len + nt - 1) / nt;
-  _BinaryElewiseKernel<IdType, Op><<<nb, nt, 0, thr_entry->stream>>>(
+  CUDA_KERNEL_CALL((_BinaryElewiseKernel<IdType, Op>),
+      nb, nt, 0, thr_entry->stream,
       lhs_data, rhs_data, ret_data, len);
   return ret;
 }
@@ -45,6 +46,7 @@ template IdArray BinaryElewise<kDLGPU, int32_t, arith::Add>(IdArray lhs, IdArray
 template IdArray BinaryElewise<kDLGPU, int32_t, arith::Sub>(IdArray lhs, IdArray rhs);
 template IdArray BinaryElewise<kDLGPU, int32_t, arith::Mul>(IdArray lhs, IdArray rhs);
 template IdArray BinaryElewise<kDLGPU, int32_t, arith::Div>(IdArray lhs, IdArray rhs);
+template IdArray BinaryElewise<kDLGPU, int32_t, arith::Mod>(IdArray lhs, IdArray rhs);
 template IdArray BinaryElewise<kDLGPU, int32_t, arith::GT>(IdArray lhs, IdArray rhs);
 template IdArray BinaryElewise<kDLGPU, int32_t, arith::LT>(IdArray lhs, IdArray rhs);
 template IdArray BinaryElewise<kDLGPU, int32_t, arith::GE>(IdArray lhs, IdArray rhs);
@@ -55,6 +57,7 @@ template IdArray BinaryElewise<kDLGPU, int64_t, arith::Add>(IdArray lhs, IdArray
 template IdArray BinaryElewise<kDLGPU, int64_t, arith::Sub>(IdArray lhs, IdArray rhs);
 template IdArray BinaryElewise<kDLGPU, int64_t, arith::Mul>(IdArray lhs, IdArray rhs);
 template IdArray BinaryElewise<kDLGPU, int64_t, arith::Div>(IdArray lhs, IdArray rhs);
+template IdArray BinaryElewise<kDLGPU, int64_t, arith::Mod>(IdArray lhs, IdArray rhs);
 template IdArray BinaryElewise<kDLGPU, int64_t, arith::GT>(IdArray lhs, IdArray rhs);
 template IdArray BinaryElewise<kDLGPU, int64_t, arith::LT>(IdArray lhs, IdArray rhs);
 template IdArray BinaryElewise<kDLGPU, int64_t, arith::GE>(IdArray lhs, IdArray rhs);
@@ -83,7 +86,8 @@ IdArray BinaryElewise(IdArray lhs, IdType rhs) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   int nt = cuda::FindNumThreads(len);
   int nb = (len + nt - 1) / nt;
-  _BinaryElewiseKernel<IdType, Op><<<nb, nt, 0, thr_entry->stream>>>(
+  CUDA_KERNEL_CALL((_BinaryElewiseKernel<IdType, Op>),
+      nb, nt, 0, thr_entry->stream,
       lhs_data, rhs, ret_data, len);
   return ret;
 }
@@ -92,6 +96,7 @@ template IdArray BinaryElewise<kDLGPU, int32_t, arith::Add>(IdArray lhs, int32_t
 template IdArray BinaryElewise<kDLGPU, int32_t, arith::Sub>(IdArray lhs, int32_t rhs);
 template IdArray BinaryElewise<kDLGPU, int32_t, arith::Mul>(IdArray lhs, int32_t rhs);
 template IdArray BinaryElewise<kDLGPU, int32_t, arith::Div>(IdArray lhs, int32_t rhs);
+template IdArray BinaryElewise<kDLGPU, int32_t, arith::Mod>(IdArray lhs, int32_t rhs);
 template IdArray BinaryElewise<kDLGPU, int32_t, arith::GT>(IdArray lhs, int32_t rhs);
 template IdArray BinaryElewise<kDLGPU, int32_t, arith::LT>(IdArray lhs, int32_t rhs);
 template IdArray BinaryElewise<kDLGPU, int32_t, arith::GE>(IdArray lhs, int32_t rhs);
@@ -102,6 +107,7 @@ template IdArray BinaryElewise<kDLGPU, int64_t, arith::Add>(IdArray lhs, int64_t
 template IdArray BinaryElewise<kDLGPU, int64_t, arith::Sub>(IdArray lhs, int64_t rhs);
 template IdArray BinaryElewise<kDLGPU, int64_t, arith::Mul>(IdArray lhs, int64_t rhs);
 template IdArray BinaryElewise<kDLGPU, int64_t, arith::Div>(IdArray lhs, int64_t rhs);
+template IdArray BinaryElewise<kDLGPU, int64_t, arith::Mod>(IdArray lhs, int64_t rhs);
 template IdArray BinaryElewise<kDLGPU, int64_t, arith::GT>(IdArray lhs, int64_t rhs);
 template IdArray BinaryElewise<kDLGPU, int64_t, arith::LT>(IdArray lhs, int64_t rhs);
 template IdArray BinaryElewise<kDLGPU, int64_t, arith::GE>(IdArray lhs, int64_t rhs);
@@ -131,7 +137,8 @@ IdArray BinaryElewise(IdType lhs, IdArray rhs) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   int nt = cuda::FindNumThreads(len);
   int nb = (len + nt - 1) / nt;
-  _BinaryElewiseKernel<IdType, Op><<<nb, nt, 0, thr_entry->stream>>>(
+  CUDA_KERNEL_CALL((_BinaryElewiseKernel<IdType, Op>),
+      nb, nt, 0, thr_entry->stream,
       lhs, rhs_data, ret_data, len);
   return ret;
 }
@@ -140,6 +147,7 @@ template IdArray BinaryElewise<kDLGPU, int32_t, arith::Add>(int32_t lhs, IdArray
 template IdArray BinaryElewise<kDLGPU, int32_t, arith::Sub>(int32_t lhs, IdArray rhs);
 template IdArray BinaryElewise<kDLGPU, int32_t, arith::Mul>(int32_t lhs, IdArray rhs);
 template IdArray BinaryElewise<kDLGPU, int32_t, arith::Div>(int32_t lhs, IdArray rhs);
+template IdArray BinaryElewise<kDLGPU, int32_t, arith::Mod>(int32_t lhs, IdArray rhs);
 template IdArray BinaryElewise<kDLGPU, int32_t, arith::GT>(int32_t lhs, IdArray rhs);
 template IdArray BinaryElewise<kDLGPU, int32_t, arith::LT>(int32_t lhs, IdArray rhs);
 template IdArray BinaryElewise<kDLGPU, int32_t, arith::GE>(int32_t lhs, IdArray rhs);
@@ -150,6 +158,7 @@ template IdArray BinaryElewise<kDLGPU, int64_t, arith::Add>(int64_t lhs, IdArray
 template IdArray BinaryElewise<kDLGPU, int64_t, arith::Sub>(int64_t lhs, IdArray rhs);
 template IdArray BinaryElewise<kDLGPU, int64_t, arith::Mul>(int64_t lhs, IdArray rhs);
 template IdArray BinaryElewise<kDLGPU, int64_t, arith::Div>(int64_t lhs, IdArray rhs);
+template IdArray BinaryElewise<kDLGPU, int64_t, arith::Mod>(int64_t lhs, IdArray rhs);
 template IdArray BinaryElewise<kDLGPU, int64_t, arith::GT>(int64_t lhs, IdArray rhs);
 template IdArray BinaryElewise<kDLGPU, int64_t, arith::LT>(int64_t lhs, IdArray rhs);
 template IdArray BinaryElewise<kDLGPU, int64_t, arith::GE>(int64_t lhs, IdArray rhs);
@@ -177,7 +186,8 @@ IdArray UnaryElewise(IdArray lhs) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   int nt = cuda::FindNumThreads(len);
   int nb = (len + nt - 1) / nt;
-  _UnaryElewiseKernel<IdType, Op><<<nb, nt, 0, thr_entry->stream>>>(
+  CUDA_KERNEL_CALL((_UnaryElewiseKernel<IdType, Op>),
+      nb, nt, 0, thr_entry->stream,
       lhs_data, ret_data, len);
   return ret;
 }
@@ -187,9 +197,9 @@ template IdArray UnaryElewise<kDLGPU, int64_t, arith::Neg>(IdArray lhs);
 
 ///////////////////////////// Full /////////////////////////////
 
-template <typename IdType>
+template <typename DType>
 __global__ void _FullKernel(
-    IdType* out, int64_t length, IdType val) {
+    DType* out, int64_t length, DType val) {
   int tx = blockIdx.x * blockDim.x + threadIdx.x;
   int stride_x = gridDim.x * blockDim.x;
   while (tx < length) {
@@ -198,19 +208,22 @@ __global__ void _FullKernel(
   }
 }
 
-template <DLDeviceType XPU, typename IdType>
-IdArray Full(IdType val, int64_t length, DLContext ctx) {
-  IdArray ret = NewIdArray(length, ctx, sizeof(IdType) * 8);
-  IdType* ret_data = static_cast<IdType*>(ret->data);
+template <DLDeviceType XPU, typename DType>
+NDArray Full(DType val, int64_t length, DLContext ctx) {
+  NDArray ret = NDArray::Empty({length}, DLDataTypeTraits<DType>::dtype, ctx);
+  DType* ret_data = static_cast<DType*>(ret->data);
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   int nt = cuda::FindNumThreads(length);
   int nb = (length + nt - 1) / nt;
-  _FullKernel<IdType><<<nb, nt, 0, thr_entry->stream>>>(ret_data, length, val);
+  CUDA_KERNEL_CALL((_FullKernel<DType>), nb, nt, 0, thr_entry->stream,
+      ret_data, length, val);
   return ret;
 }
 
 template IdArray Full<kDLGPU, int32_t>(int32_t val, int64_t length, DLContext ctx);
 template IdArray Full<kDLGPU, int64_t>(int64_t val, int64_t length, DLContext ctx);
+template IdArray Full<kDLGPU, float>(float val, int64_t length, DLContext ctx);
+template IdArray Full<kDLGPU, double>(double val, int64_t length, DLContext ctx);
 
 
 ///////////////////////////// Range /////////////////////////////
@@ -236,7 +249,9 @@ IdArray Range(IdType low, IdType high, DLContext ctx) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   int nt = cuda::FindNumThreads(length);
   int nb = (length + nt - 1) / nt;
-  _RangeKernel<IdType><<<nb, nt, 0, thr_entry->stream>>>(ret_data, low, length);
+  CUDA_KERNEL_CALL((_RangeKernel<IdType>),
+      nb, nt, 0, thr_entry->stream,
+      ret_data, low, length);
   return ret;
 }
 
@@ -264,10 +279,12 @@ IdArray AsNumBits(IdArray arr, uint8_t bits) {
   int nt = cuda::FindNumThreads(length);
   int nb = (length + nt - 1) / nt;
   if (bits == 32) {
-    _CastKernel<IdType, int32_t><<<nb, nt, 0, thr_entry->stream>>>(
+    CUDA_KERNEL_CALL((_CastKernel<IdType, int32_t>),
+        nb, nt, 0, thr_entry->stream,
         static_cast<IdType*>(arr->data), static_cast<int32_t*>(ret->data), length);
   } else {
-    _CastKernel<IdType, int64_t><<<nb, nt, 0, thr_entry->stream>>>(
+    CUDA_KERNEL_CALL((_CastKernel<IdType, int64_t>),
+        nb, nt, 0, thr_entry->stream,
         static_cast<IdType*>(arr->data), static_cast<int64_t*>(ret->data), length);
   }
   return ret;

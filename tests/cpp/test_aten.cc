@@ -111,6 +111,10 @@ void _TestArith(DLContext ctx) {
   c = c.CopyTo(CPU);
   for (int i = 0; i < N; ++i)
     ASSERT_EQ(Ptr<IDX>(c)[i], 10);
+  c = (-a) % b;
+  c = c.CopyTo(CPU);
+  for (int i = 0; i < N; ++i)
+    ASSERT_EQ(Ptr<IDX>(c)[i], 3);
 
   const int val = -3;
   c = aten::Add(a, val);
@@ -129,6 +133,11 @@ void _TestArith(DLContext ctx) {
   c = c.CopyTo(CPU);
   for (int i = 0; i < N; ++i)
     ASSERT_EQ(Ptr<IDX>(c)[i], 3);
+  c = b % 3;
+  c = c.CopyTo(CPU);
+  for (int i = 0; i < N; ++i)
+    ASSERT_EQ(Ptr<IDX>(c)[i], 1);
+
   c = aten::Add(val, b);
   c = c.CopyTo(CPU);
   for (int i = 0; i < N; ++i)
@@ -145,6 +154,10 @@ void _TestArith(DLContext ctx) {
   c = c.CopyTo(CPU);
   for (int i = 0; i < N; ++i)
     ASSERT_EQ(Ptr<IDX>(c)[i], 0);
+  c = 3 % b;
+  c = c.CopyTo(CPU);
+  for (int i = 0; i < N; ++i)
+    ASSERT_EQ(Ptr<IDX>(c)[i], 3);
 
   a = aten::Range(0, N, sizeof(IDX)*8, ctx);
   c = a < 50;
@@ -179,7 +192,7 @@ void _TestArith(DLContext ctx) {
 
 }
 
-TEST(ArrayTest, TestArith) {
+TEST(ArrayTest, Arith) {
   _TestArith<int32_t>(CPU);
   _TestArith<int64_t>(CPU);
 #ifdef DGL_USE_CUDA
@@ -189,19 +202,23 @@ TEST(ArrayTest, TestArith) {
 };
 
 template <typename IDX>
-void _TestHStack() {
-  IdArray a = aten::Range(0, 100, sizeof(IDX)*8, CTX);
-  IdArray b = aten::Range(100, 200, sizeof(IDX)*8, CTX);
-  IdArray c = aten::HStack(a, b);
+void _TestHStack(DLContext ctx) {
+  IdArray a = aten::Range(0, 100, sizeof(IDX)*8, ctx);
+  IdArray b = aten::Range(100, 200, sizeof(IDX)*8, ctx);
+  IdArray c = aten::HStack(a, b).CopyTo(aten::CPU);
   ASSERT_EQ(c->ndim, 1);
   ASSERT_EQ(c->shape[0], 200);
   for (int i = 0; i < 200; ++i)
     ASSERT_EQ(Ptr<IDX>(c)[i], i);
 }
 
-TEST(ArrayTest, TestHStack) {
-  _TestHStack<int32_t>();
-  _TestHStack<int64_t>();
+TEST(ArrayTest, HStack) {
+  _TestHStack<int32_t>(CPU);
+  _TestHStack<int64_t>(CPU);
+#ifdef DGL_USE_CUDA
+  _TestHStack<int32_t>(GPU);
+  _TestHStack<int64_t>(GPU);
+#endif
 }
 
 template <typename IDX>
@@ -257,17 +274,206 @@ void _TestConcat(DLContext ctx) {
   ASSERT_TRUE(ArrayEQ<IDX>(d, td));
 }
 
-TEST(ArrayTest, TestConcat) {
-  _TestConcat<int32_t>(CPU);
-  _TestConcat<int64_t>(CPU);
-  _TestConcat<float>(CPU);
-  _TestConcat<double>(CPU);
-#ifdef DGL_USE_CUDA
-  _TestConcat<int32_t>(GPU);
-  _TestConcat<int64_t>(GPU);
-  _TestConcat<float>(GPU);
-  _TestConcat<double>(GPU);
-#endif
+template <typename IdType>
+void _TestToSimpleCsr(DLContext ctx) {
+ /* 
+  * A = [[0, 0, 0, 0],
+  *      [1, 0, 0, 1],
+  *      [1, 1, 1, 1],
+  *      [3, 2, 2, 3],
+  *      [2, 0, 0, 2]]
+  *
+  * B = CSRToSimple(A)
+  * B = [[0, 0, 0, 0],
+  *      [1, 0, 0, 1],
+  *      [1, 1, 1, 1],
+  *      [1, 1, 1, 1],
+  *      [1, 0, 0, 1]]
+  */
+  IdArray a_indptr =
+    aten::VecToIdArray(std::vector<IdType>({0, 0, 2, 6, 16, 20}),
+                                           sizeof(IdType)*8, CTX);
+  IdArray a_indices =
+    aten::VecToIdArray(std::vector<IdType>({0, 3, 0, 1, 2, 3, 0, 0, 0,
+                                            1, 1, 2, 2, 3, 3, 3, 0, 0,
+                                            3, 3}),
+                                           sizeof(IdType)*8, CTX);
+  IdArray b_indptr =
+    aten::VecToIdArray(std::vector<IdType>({0, 0, 2, 6, 10, 12}),
+                                           sizeof(IdType)*8, CTX);
+  IdArray b_indices =
+    aten::VecToIdArray(std::vector<IdType>({0, 3, 0, 1, 2, 3, 0, 1, 2,
+                                            3, 0, 3}),
+                                           sizeof(IdType)*8, CTX);
+  IdArray cnt =
+    aten::VecToIdArray(std::vector<IdType>({1, 1, 1, 1, 1, 1, 3, 2, 2, 3, 2, 2}),
+                                           sizeof(IdType)*8, CTX);
+  IdArray map =
+    aten::VecToIdArray(std::vector<IdType>({0, 1, 2, 3, 4, 5, 6, 6, 6,
+                                            7, 7, 8, 8, 9, 9, 9, 10, 10,
+                                            11, 11}),
+                                           sizeof(IdType)*8, CTX);
+  const aten::CSRMatrix &csr_a = aten::CSRMatrix(
+    5,
+    4,
+    a_indptr,
+    a_indices,
+    aten::NullArray(),
+    true);
+  auto ret = CSRToSimple(csr_a);
+  aten::CSRMatrix csr_b = std::get<0>(ret);
+  IdArray ecnt = std::get<1>(ret);
+  IdArray emap = std::get<2>(ret);
+  ASSERT_EQ(csr_b.num_rows, 5);
+  ASSERT_EQ(csr_b.num_cols, 4);
+  ASSERT_TRUE(ArrayEQ<IdType>(csr_b.indptr, b_indptr));
+  ASSERT_TRUE(ArrayEQ<IdType>(csr_b.indices, b_indices));
+  ASSERT_TRUE(ArrayEQ<IdType>(ecnt, cnt));
+  ASSERT_TRUE(ArrayEQ<IdType>(emap, map));
+  ASSERT_TRUE(csr_b.sorted);
+
+  // a not sorted
+  a_indices =
+    aten::VecToIdArray(std::vector<IdType>({0, 3, 0, 1, 2, 3, 3, 0, 0,
+                                            1, 1, 2, 2, 3, 3, 0, 0, 3,
+                                            0, 3}),
+                                           sizeof(IdType)*8, CTX);
+  map =
+    aten::VecToIdArray(std::vector<IdType>({0, 1, 2, 3, 4, 5, 9, 6, 6,
+                                            7, 7, 8, 8, 9, 9, 6, 10, 11,
+                                            10, 11}),
+                                           sizeof(IdType)*8, CTX);
+  const aten::CSRMatrix &csr_a2 = aten::CSRMatrix(
+    5,
+    4,
+    a_indptr,
+    a_indices,
+    aten::NullArray(),
+    false);
+  ret = CSRToSimple(csr_a2);
+  csr_b = std::get<0>(ret);
+  ecnt = std::get<1>(ret);
+  emap = std::get<2>(ret);
+  ASSERT_EQ(csr_b.num_rows, 5);
+  ASSERT_EQ(csr_b.num_cols, 4);
+  ASSERT_TRUE(ArrayEQ<IdType>(csr_b.indptr, b_indptr));
+  ASSERT_TRUE(ArrayEQ<IdType>(csr_b.indices, b_indices));
+  ASSERT_TRUE(ArrayEQ<IdType>(ecnt, cnt));
+  ASSERT_TRUE(ArrayEQ<IdType>(emap, map));
+  ASSERT_TRUE(csr_b.sorted);
+}
+
+TEST(MatrixTest, TestToSimpleCsr) {
+  _TestToSimpleCsr<int32_t>(CPU);
+  _TestToSimpleCsr<int64_t>(CPU);
+}
+
+template <typename IdType>
+void _TestToSimpleCoo(DLContext ctx) {
+ /* 
+  * A = [[0, 0, 0, 0],
+  *      [1, 0, 0, 1],
+  *      [1, 1, 1, 1],
+  *      [3, 2, 2, 3],
+  *      [2, 0, 0, 2]]
+  *
+  * B = CSRToSimple(A)
+  * B = [[0, 0, 0, 0],
+  *      [1, 0, 0, 1],
+  *      [1, 1, 1, 1],
+  *      [1, 1, 1, 1],
+  *      [1, 0, 0, 1]]
+  */
+  IdArray a_row =
+    aten::VecToIdArray(std::vector<IdType>({1, 1, 2, 2, 2, 2, 3, 3, 3,
+                                            3, 3, 3, 3, 3, 3, 3, 4, 4,
+                                            4, 4}),
+                                           sizeof(IdType)*8, CTX);
+  IdArray a_col = 
+    aten::VecToIdArray(std::vector<IdType>({0, 3, 0, 1, 2, 3, 0, 0, 0,
+                                            1, 1, 2, 2, 3, 3, 3, 0, 0,
+                                            3, 3}),
+                                           sizeof(IdType)*8, CTX);
+  IdArray b_row =
+    aten::VecToIdArray(std::vector<IdType>({1, 1, 2, 2, 2, 2, 3, 3, 3,
+                                            3, 4, 4}),
+                                           sizeof(IdType)*8, CTX);
+  IdArray b_col = 
+    aten::VecToIdArray(std::vector<IdType>({0, 3, 0, 1, 2, 3, 0, 1, 2,
+                                            3, 0, 3}),
+                                           sizeof(IdType)*8, CTX);
+  IdArray cnt =
+    aten::VecToIdArray(std::vector<IdType>({1, 1, 1, 1, 1, 1, 3, 2, 2, 3, 2, 2}),
+                                           sizeof(IdType)*8, CTX);
+  IdArray map =
+    aten::VecToIdArray(std::vector<IdType>({0, 1, 2, 3, 4, 5, 6, 6, 6,
+                                            7, 7, 8, 8, 9, 9, 9, 10, 10,
+                                            11, 11}),
+                                           sizeof(IdType)*8, CTX);
+  const aten::COOMatrix &coo_a = aten::COOMatrix(
+    5,
+    4,
+    a_row,
+    a_col,
+    aten::NullArray(),
+    true,
+    true);
+  auto ret = COOToSimple(coo_a);
+  aten::COOMatrix coo_b = std::get<0>(ret);
+  IdArray ecnt = std::get<1>(ret);
+  IdArray emap = std::get<2>(ret);
+  ASSERT_EQ(coo_b.num_rows, 5);
+  ASSERT_EQ(coo_b.num_cols, 4);
+  ASSERT_TRUE(ArrayEQ<IdType>(coo_b.row, b_row));
+  ASSERT_TRUE(ArrayEQ<IdType>(coo_b.col, b_col));
+  ASSERT_TRUE(ArrayEQ<IdType>(ecnt, cnt));
+  ASSERT_TRUE(ArrayEQ<IdType>(emap, map));
+  ASSERT_FALSE(COOHasData(coo_b));
+  ASSERT_TRUE(coo_b.row_sorted);
+  ASSERT_TRUE(coo_b.col_sorted);
+
+  // a not sorted
+  a_row =
+    aten::VecToIdArray(std::vector<IdType>({1, 2, 1, 2, 2, 2, 3, 3, 3,
+                                            3, 3, 3, 3, 3, 3, 3, 4, 4,
+                                            4, 4}),
+                                           sizeof(IdType)*8, CTX);
+  a_col = 
+    aten::VecToIdArray(std::vector<IdType>({0, 0, 3, 1, 2, 3, 0, 0, 0,
+                                            1, 1, 2, 2, 3, 3, 3, 0, 3,
+                                            0, 3}),
+                                           sizeof(IdType)*8, CTX);
+  map =
+    aten::VecToIdArray(std::vector<IdType>({0, 2, 1, 3, 4, 5, 6, 6, 6,
+                                            7, 7, 8, 8, 9, 9, 9, 10, 11,
+                                            10, 11}),
+                                           sizeof(IdType)*8, CTX);
+  const aten::COOMatrix &coo_a2 = aten::COOMatrix(
+    5,
+    4,
+    a_row,
+    a_col,
+    aten::NullArray(),
+    false,
+    false);
+  ret = COOToSimple(coo_a2);
+  coo_b = std::get<0>(ret);
+  ecnt = std::get<1>(ret);
+  emap = std::get<2>(ret);
+  ASSERT_EQ(coo_b.num_rows, 5);
+  ASSERT_EQ(coo_b.num_cols, 4);
+  ASSERT_TRUE(ArrayEQ<IdType>(coo_b.row, b_row));
+  ASSERT_TRUE(ArrayEQ<IdType>(coo_b.col, b_col));
+  ASSERT_TRUE(ArrayEQ<IdType>(ecnt, cnt));
+  ASSERT_TRUE(ArrayEQ<IdType>(emap, map));
+  ASSERT_FALSE(COOHasData(coo_b));
+  ASSERT_TRUE(coo_b.row_sorted);
+  ASSERT_TRUE(coo_b.col_sorted);
+}
+
+TEST(MatrixTest, TestToSimpleCoo) {
+  _TestToSimpleCoo<int32_t>(CPU);
+  _TestToSimpleCoo<int64_t>(CPU);
 }
 
 
@@ -575,6 +781,442 @@ TEST(DisjointUnionTest, TestDisjointUnionPartitionCsr) {
 #endif
 }
 
+template <typename IdType>
+void _TestMatrixUnionCsr(DLContext ctx) {
+ /* 
+  * A = [[0, 0, 0, 0],
+  *      [0, 0, 0, 0],
+  *      [0, 1, 0, 0],
+  *      [1, 1, 1, 1],
+  *      [0, 1, 1, 0],
+  *      [1, 0, 0, 1]]
+  *
+  * B = [[0, 0, 0, 0],
+  *      [1, 0, 0, 1],
+  *      [0, 0, 1, 0],
+  *      [1, 0, 0, 1],
+  *      [1, 0, 0, 1]]
+  *      [1, 0, 0, 1]]
+  *
+  * C = UnionCsr({A, B})
+  *
+  * C = [[0, 0, 0, 0],
+  *      [1, 0, 0, 1],
+  *      [0, 1, 1, 0],
+  *      [2, 1, 1, 2],
+  *      [1, 1, 1, 1]]
+  *      [2, 0, 0, 2]]
+  *
+  * D = [[1, 0, 0, 0],
+  *      [0, 0, 0, 0],
+  *      [0, 0, 0, 0],
+  *      [0, 0, 0, 0],
+  *      [0, 0, 0, 0],
+  *      [1, 0, 0, 1]]
+  *
+  * C = UnionCsr({A, B, D})
+  *
+  * C = [[1, 0, 0, 0],
+  *      [1, 0, 0, 1],
+  *      [0, 1, 1, 0],
+  *      [2, 1, 1, 2],
+  *      [1, 1, 1, 1]]
+  *      [3, 0, 0, 3]]
+  */
+  IdArray a_indptr =
+    aten::VecToIdArray(std::vector<IdType>({0, 0, 0, 1, 5, 7, 9}),
+                                           sizeof(IdType)*8, CTX);
+  IdArray a_indices =
+    aten::VecToIdArray(std::vector<IdType>({1, 0, 1, 2, 3, 1, 2, 0, 3}),
+                                           sizeof(IdType)*8, CTX);
+  IdArray b_indptr =
+    aten::VecToIdArray(std::vector<IdType>({0, 0, 2, 3, 5, 7, 9}),
+                                           sizeof(IdType)*8, CTX);
+  IdArray b_indices =
+    aten::VecToIdArray(std::vector<IdType>({0, 3, 2, 0, 3, 0, 3, 0, 3}),
+                                           sizeof(IdType)*8, CTX);
+  IdArray c_indptr =
+    aten::VecToIdArray(std::vector<IdType>({0, 0, 2, 4, 10, 14, 18}),
+                                           sizeof(IdType)*8, CTX);
+  IdArray c_indices =
+    aten::VecToIdArray(std::vector<IdType>({0, 3, 1, 2, 0, 0, 1, 2, 3, 3, 0, 1, 2, 3, 0, 0, 3, 3}),
+                                           sizeof(IdType)*8, CTX);
+  IdArray c_data =
+    aten::VecToIdArray(std::vector<IdType>({9, 10, 0, 11, 1, 12, 2, 3, 4, 
+                                            13, 14, 5, 6, 15, 7, 16, 8, 17}),
+                                           sizeof(IdType)*8, CTX);
+
+  const aten::CSRMatrix &csr_a = aten::CSRMatrix(
+    6,
+    4,
+    a_indptr,
+    a_indices,
+    aten::NullArray(),
+    true);
+  const aten::CSRMatrix &csr_b = aten::CSRMatrix(
+    6,
+    4,
+    b_indptr,
+    b_indices,
+    aten::NullArray(),
+    true);
+
+  const aten::CSRMatrix &csr_aUb = aten::UnionCsr({csr_a, csr_b});
+  ASSERT_EQ(csr_aUb.num_rows, 6);
+  ASSERT_EQ(csr_aUb.num_cols, 4);
+  ASSERT_TRUE(ArrayEQ<IdType>(csr_aUb.indptr, c_indptr));
+  ASSERT_TRUE(ArrayEQ<IdType>(csr_aUb.indices, c_indices));
+  ASSERT_TRUE(ArrayEQ<IdType>(csr_aUb.data, c_data));
+  ASSERT_TRUE(csr_aUb.sorted);
+
+  IdArray a_data =
+    aten::VecToIdArray(std::vector<IdType>({8, 7, 6, 5, 4, 3, 2, 1, 0}),
+                                           sizeof(IdType)*8, CTX);
+
+  c_data =
+    aten::VecToIdArray(std::vector<IdType>({9, 10, 8, 11, 7, 12, 6, 5, 4, 
+                                            13, 14, 3, 2, 15, 1, 16, 0, 17}),
+                                           sizeof(IdType)*8, CTX);
+  const aten::CSRMatrix &csr_ad = aten::CSRMatrix(
+    6,
+    4,
+    a_indptr,
+    a_indices,
+    a_data,
+    true);
+  const aten::CSRMatrix &csr_adUb = aten::UnionCsr({csr_ad, csr_b});
+  ASSERT_EQ(csr_adUb.num_rows, 6);
+  ASSERT_EQ(csr_adUb.num_cols, 4);
+  ASSERT_TRUE(ArrayEQ<IdType>(csr_adUb.indptr, c_indptr));
+  ASSERT_TRUE(ArrayEQ<IdType>(csr_adUb.indices, c_indices));
+  ASSERT_TRUE(ArrayEQ<IdType>(csr_adUb.data, c_data));
+  ASSERT_TRUE(csr_adUb.sorted);
+
+  IdArray b_indices2 =
+    aten::VecToIdArray(std::vector<IdType>({0, 3, 2, 0, 3, 3, 0, 0, 3}),
+                                           sizeof(IdType)*8, CTX);
+  c_indices =
+    aten::VecToIdArray(std::vector<IdType>({0, 3, 1, 2, 0, 1, 2, 3, 0, 3, 1, 2, 3, 0, 0, 3, 0, 3}),
+                                           sizeof(IdType)*8, CTX);
+  c_data =
+    aten::VecToIdArray(std::vector<IdType>({9, 10, 0, 11, 1, 2, 3, 4, 12, 
+                                            13, 5, 6, 14, 15, 7, 8, 16, 17}),
+                                            sizeof(IdType)*8, CTX);
+  const aten::CSRMatrix &csr_b2 = aten::CSRMatrix(
+    6,
+    4,
+    b_indptr,
+    b_indices2,
+    aten::NullArray(),
+    false);
+  const aten::CSRMatrix &csr_aUb2 = aten::UnionCsr({csr_a, csr_b2});
+  ASSERT_EQ(csr_aUb2.num_rows, 6);
+  ASSERT_EQ(csr_aUb2.num_cols, 4);
+  ASSERT_TRUE(ArrayEQ<IdType>(csr_aUb2.indptr, c_indptr));
+  ASSERT_TRUE(ArrayEQ<IdType>(csr_aUb2.indices, c_indices));
+  ASSERT_TRUE(ArrayEQ<IdType>(csr_aUb2.data, c_data));
+  ASSERT_FALSE(csr_aUb2.sorted);
+
+  IdArray a_indices2 =
+    aten::VecToIdArray(std::vector<IdType>({1, 3, 2, 1, 0, 1, 2, 0, 3}),
+                                           sizeof(IdType)*8, CTX);
+  c_indices =
+    aten::VecToIdArray(std::vector<IdType>({0, 3, 1, 2, 3, 2, 1, 0, 0, 3, 1, 2, 0, 3, 0, 3, 0, 3}),
+                                           sizeof(IdType)*8, CTX);
+  const aten::CSRMatrix &csr_a2 = aten::CSRMatrix(
+    6,
+    4,
+    a_indptr,
+    a_indices2,
+    aten::NullArray(),
+    false);
+  const aten::CSRMatrix &csr_aUb3 = aten::UnionCsr({csr_a2, csr_b});
+  ASSERT_EQ(csr_aUb3.num_rows, 6);
+  ASSERT_EQ(csr_aUb3.num_cols, 4);
+  ASSERT_TRUE(ArrayEQ<IdType>(csr_aUb3.indptr, c_indptr));
+  ASSERT_TRUE(ArrayEQ<IdType>(csr_aUb3.indices, c_indices));
+  ASSERT_TRUE(ArrayEQ<IdType>(csr_aUb3.data, c_data));
+  ASSERT_FALSE(csr_aUb3.sorted);
+
+  c_indices =
+    aten::VecToIdArray(std::vector<IdType>({0, 3, 1, 2, 3, 2, 1, 0, 0, 3, 1, 2, 3, 0, 0, 3, 0, 3}),
+                                           sizeof(IdType)*8, CTX);
+  const aten::CSRMatrix &csr_aUb4 = aten::UnionCsr({csr_a2, csr_b2});
+  ASSERT_EQ(csr_aUb4.num_rows, 6);
+  ASSERT_EQ(csr_aUb4.num_cols, 4);
+  ASSERT_TRUE(ArrayEQ<IdType>(csr_aUb4.indptr, c_indptr));
+  ASSERT_TRUE(ArrayEQ<IdType>(csr_aUb4.indices, c_indices));
+  ASSERT_TRUE(ArrayEQ<IdType>(csr_aUb4.data, c_data));
+  ASSERT_FALSE(csr_aUb4.sorted);
+
+  IdArray d_indptr =
+    aten::VecToIdArray(std::vector<IdType>({0, 1, 1, 1, 1, 1, 3}),
+                                           sizeof(IdType)*8, CTX);
+  IdArray d_indices =
+    aten::VecToIdArray(std::vector<IdType>({0, 0, 3}),
+                                           sizeof(IdType)*8, CTX);
+  c_indptr =
+    aten::VecToIdArray(std::vector<IdType>({0, 1, 3, 5, 11, 15, 21}),
+                                           sizeof(IdType)*8, CTX);
+  c_indices =
+    aten::VecToIdArray(std::vector<IdType>({0, 0, 3, 1, 2, 0, 0, 1, 2, 3,
+                                            3, 0, 1, 2, 3, 0, 0, 0, 3, 3, 3}),
+                                           sizeof(IdType)*8, CTX);
+  c_data =
+    aten::VecToIdArray(std::vector<IdType>({18, 9, 10, 8, 11, 7, 12, 6, 5, 4, 
+                                            13, 14, 3, 2, 15, 1, 16, 19, 0, 17, 20}),
+                                           sizeof(IdType)*8, CTX);
+  const aten::CSRMatrix &csr_d = aten::CSRMatrix(
+    6,
+    4,
+    d_indptr,
+    d_indices,
+    aten::NullArray(),
+    true);
+  const aten::CSRMatrix &csr_aUbUd = aten::UnionCsr({csr_ad, csr_b, csr_d});
+  ASSERT_EQ(csr_aUbUd.num_rows, 6);
+  ASSERT_EQ(csr_aUbUd.num_cols, 4);
+  ASSERT_TRUE(ArrayEQ<IdType>(csr_aUbUd.indptr, c_indptr));
+  ASSERT_TRUE(ArrayEQ<IdType>(csr_aUbUd.indices, c_indices));
+  ASSERT_TRUE(ArrayEQ<IdType>(csr_aUbUd.data, c_data));
+  ASSERT_TRUE(csr_aUbUd.sorted);
+
+  c_indices =
+    aten::VecToIdArray(std::vector<IdType>({0, 0, 3, 1, 2, 3, 2, 1, 0, 0,
+                                            3, 1, 2, 3, 0, 0, 3, 0, 3, 0, 3}),
+                                           sizeof(IdType)*8, CTX);
+  c_data =
+    aten::VecToIdArray(std::vector<IdType>({18, 9, 10, 0, 11, 1, 2, 3, 4, 12, 
+                                            13, 5, 6, 14, 15, 7, 8, 16, 17, 19, 20}),
+                                           sizeof(IdType)*8, CTX);
+
+  const aten::CSRMatrix &csr_aUbUd2 = aten::UnionCsr({csr_a2, csr_b2, csr_d});
+  ASSERT_EQ(csr_aUbUd2.num_rows, 6);
+  ASSERT_EQ(csr_aUbUd2.num_cols, 4);
+  ASSERT_TRUE(ArrayEQ<IdType>(csr_aUbUd2.indptr, c_indptr));
+  ASSERT_TRUE(ArrayEQ<IdType>(csr_aUbUd2.indices, c_indices));
+  ASSERT_TRUE(ArrayEQ<IdType>(csr_aUbUd2.data, c_data));
+  ASSERT_FALSE(csr_aUbUd2.sorted);
+}
+
+TEST(MatrixUnionTest, TestMatrixUnionCsr) {
+  _TestMatrixUnionCsr<int32_t>(CPU);
+  _TestMatrixUnionCsr<int64_t>(CPU);
+}
+
+template <typename IdType>
+void _TestMatrixUnionCoo(DLContext ctx) {
+ /* 
+  * A = [[0, 0, 0, 0],
+  *      [0, 0, 0, 0],
+  *      [0, 1, 0, 0],
+  *      [1, 1, 1, 1],
+  *      [0, 1, 1, 0],
+  *      [1, 0, 0, 1]]
+  *
+  * B = [[0, 0, 0, 0],
+  *      [1, 0, 0, 1],
+  *      [0, 0, 1, 0],
+  *      [1, 0, 0, 1],
+  *      [1, 0, 0, 1]]
+  *      [1, 0, 0, 1]]
+  *
+  * C = UnionCsr({A, B})
+  *
+  * C = [[0, 0, 0, 0],
+  *      [1, 0, 0, 1],
+  *      [0, 1, 1, 0],
+  *      [2, 1, 1, 2],
+  *      [1, 1, 1, 1]]
+  *      [2, 0, 0, 2]]
+  *
+  * D = [[1, 0, 0, 0],
+  *      [0, 0, 0, 0],
+  *      [0, 0, 0, 0],
+  *      [0, 0, 0, 0],
+  *      [0, 0, 0, 0],
+  *      [1, 0, 0, 1]]
+  *
+  * C = UnionCsr({A, B, D})
+  *
+  * C = [[1, 0, 0, 0],
+  *      [1, 0, 0, 1],
+  *      [0, 1, 1, 0],
+  *      [2, 1, 1, 2],
+  *      [1, 1, 1, 1]]
+  *      [3, 0, 0, 3]]
+  */
+  IdArray a_row =
+    aten::VecToIdArray(std::vector<IdType>({2, 3, 3, 3, 3, 4, 4, 5, 5}),
+                                           sizeof(IdType)*8, CTX);
+  IdArray a_col = 
+    aten::VecToIdArray(std::vector<IdType>({1, 0, 1, 2, 3, 1, 2, 0, 3}),
+                                           sizeof(IdType)*8, CTX);
+  IdArray b_row =
+    aten::VecToIdArray(std::vector<IdType>({1, 1, 2, 3, 3, 4, 4, 5, 5}),
+                                           sizeof(IdType)*8, CTX);
+  IdArray b_col = 
+    aten::VecToIdArray(std::vector<IdType>({0, 3, 2, 0, 3, 0, 3, 0, 3}),
+                                           sizeof(IdType)*8, CTX);
+  IdArray c_row =
+    aten::VecToIdArray(std::vector<IdType>({2, 3, 3, 3, 3, 4, 4, 5, 5,
+                                            1, 1, 2, 3, 3, 4, 4, 5, 5}),
+                                           sizeof(IdType)*8, CTX);
+  IdArray c_col = 
+    aten::VecToIdArray(std::vector<IdType>({1, 0, 1, 2, 3, 1, 2, 0, 3,
+                                            0, 3, 2, 0, 3, 0, 3, 0, 3}),
+                                           sizeof(IdType)*8, CTX);
+  const aten::COOMatrix &coo_a = aten::COOMatrix(
+    6,
+    4,
+    a_row,
+    a_col,
+    aten::NullArray(),
+    true,
+    true);
+  const aten::COOMatrix &coo_b = aten::COOMatrix(
+    6,
+    4,
+    b_row,
+    b_col,
+    aten::NullArray(),
+    true,
+    true);
+  const std::vector<aten::COOMatrix> coos_ab({coo_a, coo_b});
+  const aten::COOMatrix &coo_ab = aten::UnionCoo(coos_ab);
+  ASSERT_EQ(coo_ab.num_rows, 6);
+  ASSERT_EQ(coo_ab.num_cols, 4);
+  ASSERT_TRUE(ArrayEQ<IdType>(coo_ab.row, c_row));
+  ASSERT_TRUE(ArrayEQ<IdType>(coo_ab.col, c_col));
+  ASSERT_FALSE(COOHasData(coo_ab));
+  ASSERT_FALSE(coo_ab.row_sorted);
+  ASSERT_FALSE(coo_ab.col_sorted);
+
+  IdArray a_data =
+    aten::VecToIdArray(std::vector<IdType>({2, 1, 0, 3, 4, 5, 6, 7, 8}),
+                       sizeof(IdType)*8, CTX);
+  
+  IdArray c_data =
+    aten::VecToIdArray(std::vector<IdType>({2, 1, 0, 3, 4, 5, 6, 7, 8,
+                                            9 ,10, 11, 12, 13, 14, 15, 16, 17}),
+                       sizeof(IdType)*8, CTX);
+  const aten::COOMatrix &coo_a2 = aten::COOMatrix(
+    6,
+    4,
+    a_row,
+    a_col,
+    a_data,
+    true,
+    true);
+  const std::vector<aten::COOMatrix> coos_ab2({coo_a2, coo_b});
+  const aten::COOMatrix &coo_ab2 = aten::UnionCoo(coos_ab2);
+  ASSERT_EQ(coo_ab2.num_rows, 6);
+  ASSERT_EQ(coo_ab2.num_cols, 4);
+  ASSERT_TRUE(ArrayEQ<IdType>(coo_ab2.row, c_row));
+  ASSERT_TRUE(ArrayEQ<IdType>(coo_ab2.col, c_col));
+  ASSERT_TRUE(COOHasData(coo_ab2));
+  ASSERT_TRUE(ArrayEQ<IdType>(coo_ab2.data, c_data));
+  ASSERT_FALSE(coo_ab2.row_sorted);
+  ASSERT_FALSE(coo_ab2.col_sorted);
+
+  IdArray b_data =
+    aten::VecToIdArray(std::vector<IdType>({0, 1, 2, 3, 4, 5, 6, 8, 7}),
+                       sizeof(IdType)*8, CTX);
+  c_data =
+    aten::VecToIdArray(std::vector<IdType>({2, 1, 0, 3, 4, 5, 6, 7, 8,
+                                            9 ,10, 11, 12, 13, 14, 15, 17, 16}),
+                       sizeof(IdType)*8, CTX);
+  const aten::COOMatrix &coo_b2 = aten::COOMatrix(
+    6,
+    4,
+    b_row,
+    b_col,
+    b_data,
+    true,
+    true);
+  const std::vector<aten::COOMatrix> coos_ab3({coo_a2, coo_b2});
+  const aten::COOMatrix &coo_ab3 = aten::UnionCoo(coos_ab3);
+  ASSERT_EQ(coo_ab3.num_rows, 6);
+  ASSERT_EQ(coo_ab3.num_cols, 4);
+  ASSERT_TRUE(ArrayEQ<IdType>(coo_ab3.row, c_row));
+  ASSERT_TRUE(ArrayEQ<IdType>(coo_ab3.col, c_col));
+  ASSERT_TRUE(COOHasData(coo_ab3));
+  ASSERT_TRUE(ArrayEQ<IdType>(coo_ab3.data, c_data));
+  ASSERT_FALSE(coo_ab3.row_sorted);
+  ASSERT_FALSE(coo_ab3.col_sorted);
+
+  c_data =
+    aten::VecToIdArray(std::vector<IdType>({2, 1, 0, 3, 4, 5, 6, 7, 8,
+                                            9 ,10, 11, 12, 13, 14, 15, 17, 16}),
+                       sizeof(IdType)*8, CTX);
+
+  const std::vector<aten::COOMatrix> coos_ab4({coo_a2, coo_b2});
+  const aten::COOMatrix &coo_ab4 = aten::UnionCoo(coos_ab4);
+  ASSERT_EQ(coo_ab4.num_rows, 6);
+  ASSERT_EQ(coo_ab4.num_cols, 4);
+  ASSERT_TRUE(ArrayEQ<IdType>(coo_ab4.row, c_row));
+  ASSERT_TRUE(ArrayEQ<IdType>(coo_ab4.col, c_col));
+  ASSERT_TRUE(COOHasData(coo_ab4));
+  ASSERT_TRUE(ArrayEQ<IdType>(coo_ab4.data, c_data));
+  ASSERT_FALSE(coo_ab4.row_sorted);
+  ASSERT_FALSE(coo_ab4.col_sorted);
+
+  IdArray d_row =
+    aten::VecToIdArray(std::vector<IdType>({0, 5, 5}),
+                                           sizeof(IdType)*8, CTX);
+  IdArray d_col =
+    aten::VecToIdArray(std::vector<IdType>({0, 0, 3}),
+                                           sizeof(IdType)*8, CTX);
+  c_row =
+    aten::VecToIdArray(std::vector<IdType>({2, 3, 3, 3, 3, 4, 4, 5, 5,
+                                            1, 1, 2, 3, 3, 4, 4, 5, 5,
+                                            0, 5, 5}),
+                                           sizeof(IdType)*8, CTX);
+  c_col = 
+    aten::VecToIdArray(std::vector<IdType>({1, 0, 1, 2, 3, 1, 2, 0, 3,
+                                            0, 3, 2, 0, 3, 0, 3, 0, 3,
+                                            0, 0, 3}),
+                                           sizeof(IdType)*8, CTX);
+
+  const aten::COOMatrix &coo_d = aten::COOMatrix(
+    6,
+    4,
+    d_row,
+    d_col,
+    aten::NullArray(),
+    true,
+    true);
+  const aten::COOMatrix &csr_aUbUd = aten::UnionCoo({coo_a, coo_b, coo_d});
+  ASSERT_EQ(csr_aUbUd.num_rows, 6);
+  ASSERT_EQ(csr_aUbUd.num_cols, 4);
+  ASSERT_TRUE(ArrayEQ<IdType>(csr_aUbUd.row, c_row));
+  ASSERT_TRUE(ArrayEQ<IdType>(csr_aUbUd.col, c_col));
+  ASSERT_FALSE(COOHasData(csr_aUbUd));
+  ASSERT_FALSE(csr_aUbUd.row_sorted);
+  ASSERT_FALSE(csr_aUbUd.col_sorted);
+
+  c_data =
+    aten::VecToIdArray(std::vector<IdType>({2, 1, 0, 3, 4, 5, 6, 7, 8,
+                                            9 ,10, 11, 12, 13, 14, 15, 17, 16,
+                                            18, 19, 20}),
+                       sizeof(IdType)*8, CTX);
+
+  const aten::COOMatrix &csr_aUbUd2 = aten::UnionCoo({coo_a2, coo_b2, coo_d});
+  ASSERT_EQ(csr_aUbUd2.num_rows, 6);
+  ASSERT_EQ(csr_aUbUd2.num_cols, 4);
+  ASSERT_TRUE(ArrayEQ<IdType>(csr_aUbUd2.row, c_row));
+  ASSERT_TRUE(ArrayEQ<IdType>(csr_aUbUd2.col, c_col));
+  ASSERT_TRUE(COOHasData(csr_aUbUd2));
+  ASSERT_TRUE(ArrayEQ<IdType>(csr_aUbUd2.data, c_data));
+  ASSERT_FALSE(csr_aUbUd2.row_sorted);
+  ASSERT_FALSE(csr_aUbUd2.col_sorted);
+}
+
+TEST(MatrixUnionTest, TestMatrixUnionCoo) {
+  _TestMatrixUnionCoo<int32_t>(CPU);
+  _TestMatrixUnionCoo<int64_t>(CPU);
+}
+
 template <typename IDX>
 void _TestCumSum(DLContext ctx) {
   IdArray a = aten::VecToIdArray(std::vector<IDX>({8, 6, 7, 5, 3, 0, 9}),
@@ -610,5 +1252,208 @@ TEST(ArrayTest, CumSum) {
 #ifdef DGL_USE_CUDA
   _TestCumSum<int32_t>(GPU);
   _TestCumSum<int64_t>(GPU);
+#endif
+}
+
+template <typename IDX, typename D>
+void _TestScatter_(DLContext ctx) {
+  IdArray out = aten::Full(1, 10, 8*sizeof(IDX), ctx);
+  IdArray idx = aten::VecToIdArray(std::vector<IDX>({2, 3, 9}), sizeof(IDX)*8, ctx);
+  IdArray val = aten::VecToIdArray(std::vector<IDX>({-20, 30, 90}), sizeof(IDX)*8, ctx);
+  aten::Scatter_(idx, val, out);
+  IdArray tout = aten::VecToIdArray(std::vector<IDX>({1, 1, -20, 30, 1, 1, 1, 1, 1, 90}), sizeof(IDX)*8, ctx);
+  ASSERT_TRUE(ArrayEQ<IDX>(out, tout));
+}
+
+TEST(ArrayTest, Scatter_) {
+  _TestScatter_<int32_t, int32_t>(CPU);
+  _TestScatter_<int64_t, int32_t>(CPU);
+  _TestScatter_<int32_t, int64_t>(CPU);
+  _TestScatter_<int64_t, int64_t>(CPU);
+#ifdef DGL_USE_CUDA
+  _TestScatter_<int32_t, int32_t>(GPU);
+  _TestScatter_<int64_t, int32_t>(GPU);
+  _TestScatter_<int32_t, int64_t>(GPU);
+  _TestScatter_<int64_t, int64_t>(GPU);
+#endif
+}
+
+template <typename IDX>
+void _TestNonZero(DLContext ctx) {
+  auto val = aten::VecToIdArray(std::vector<IDX>({0, 1, 2, 0, -10, 0, 0, 23}), sizeof(IDX)*8, ctx);
+  auto idx = aten::NonZero(val);
+  auto tidx = aten::VecToIdArray(std::vector<int64_t>({1, 2, 4, 7}), 64, ctx);
+  ASSERT_TRUE(ArrayEQ<IDX>(idx, tidx));
+
+  val = aten::VecToIdArray(std::vector<IDX>({}), sizeof(IDX)*8, ctx);
+  idx = aten::NonZero(val);
+  tidx = aten::VecToIdArray(std::vector<int64_t>({}), 64, ctx);
+  ASSERT_TRUE(ArrayEQ<IDX>(idx, tidx));
+
+  val = aten::VecToIdArray(std::vector<IDX>({0, 0, 0, 0}), sizeof(IDX)*8, ctx);
+  idx = aten::NonZero(val);
+  tidx = aten::VecToIdArray(std::vector<int64_t>({}), 64, ctx);
+  ASSERT_TRUE(ArrayEQ<IDX>(idx, tidx));
+
+  val = aten::Full(1, 3, sizeof(IDX)*8, ctx);
+  idx = aten::NonZero(val);
+  tidx = aten::VecToIdArray(std::vector<int64_t>({0, 1, 2}), 64, ctx);
+  ASSERT_TRUE(ArrayEQ<IDX>(idx, tidx));
+}
+
+TEST(ArrayTest, NonZero) {
+  _TestNonZero<int32_t>(CPU);
+  _TestNonZero<int64_t>(CPU);
+#ifdef DGL_USE_CUDA
+  _TestNonZero<int32_t>(GPU);
+  _TestNonZero<int64_t>(GPU);
+#endif
+}
+
+template <typename IdType>
+void _TestLineGraphCOO(DLContext ctx) {
+  /*
+   * A = [[0, 0, 1, 0],
+   *      [1, 0, 1, 0],
+   *      [1, 1, 0, 0],
+   *      [0, 0, 0, 1]]
+   * row: 0 1 1 2 2 3
+   * col: 2 0 2 0 1 3
+   * ID:  0 1 2 3 4 5
+   *
+   * B = COOLineGraph(A, backtracking=False)
+   *
+   * B = [[0, 0, 0, 0, 1, 0],
+   *      [1, 0, 0, 0, 0, 0],
+   *      [0, 0, 0, 1, 0, 0],
+   *      [0, 0, 0, 0, 0, 0],
+   *      [0, 1, 0, 0, 0, 0],
+   *      [0, 0, 0, 0, 0, 0]]
+   *
+   * C = COOLineGraph(A, backtracking=True)
+   *
+   * C = [[0, 0, 0, 1, 1, 0],
+   *      [1, 0, 0, 0, 0, 0],
+   *      [0, 0, 0, 1, 1, 0],
+   *      [1, 0, 0, 0, 0, 0],
+   *      [0, 1, 1, 0, 0, 0],
+   *      [0, 0, 0, 0, 0, 0]]
+   */
+  IdArray a_row =
+    aten::VecToIdArray(std::vector<IdType>({0, 1, 1, 2, 2, 3}), sizeof(IdType)*8, ctx);
+  IdArray a_col =
+    aten::VecToIdArray(std::vector<IdType>({2, 0, 2, 0, 1, 3}), sizeof(IdType)*8, ctx);
+  IdArray b_row =
+    aten::VecToIdArray(std::vector<IdType>({0, 1, 2, 4}), sizeof(IdType)*8, ctx);
+  IdArray b_col =
+    aten::VecToIdArray(std::vector<IdType>({4, 0, 3, 1}), sizeof(IdType)*8, ctx);
+  IdArray c_row =
+    aten::VecToIdArray(std::vector<IdType>({0, 0, 1, 2, 2, 3, 4, 4}), sizeof(IdType)*8, ctx);
+  IdArray c_col =
+    aten::VecToIdArray(std::vector<IdType>({3, 4, 0, 3, 4, 0, 1, 2}), sizeof(IdType)*8, ctx);
+
+  const aten::COOMatrix &coo_a = aten::COOMatrix(
+    4,
+    4,
+    a_row,
+    a_col,
+    aten::NullArray(),
+    true,
+    false);
+
+  const aten::COOMatrix &l_coo = COOLineGraph(coo_a, false);
+  ASSERT_EQ(l_coo.num_rows, 6);
+  ASSERT_EQ(l_coo.num_cols, 6);
+  ASSERT_TRUE(ArrayEQ<IdType>(l_coo.row, b_row));
+  ASSERT_TRUE(ArrayEQ<IdType>(l_coo.col, b_col));
+  ASSERT_FALSE(l_coo.row_sorted);
+  ASSERT_FALSE(l_coo.col_sorted);
+
+  const aten::COOMatrix &l_coo2 = COOLineGraph(coo_a, true);
+  ASSERT_EQ(l_coo2.num_rows, 6);
+  ASSERT_EQ(l_coo2.num_cols, 6);
+  ASSERT_TRUE(ArrayEQ<IdType>(l_coo2.row, c_row));
+  ASSERT_TRUE(ArrayEQ<IdType>(l_coo2.col, c_col));
+  ASSERT_FALSE(l_coo2.row_sorted);
+  ASSERT_FALSE(l_coo2.col_sorted);
+
+  IdArray a_data =
+    aten::VecToIdArray(std::vector<IdType>({4, 5, 0, 1, 2, 3}), sizeof(IdType)*8, ctx);
+  b_row =
+    aten::VecToIdArray(std::vector<IdType>({4, 5, 0, 2}), sizeof(IdType)*8, ctx);
+  b_col =
+    aten::VecToIdArray(std::vector<IdType>({2, 4, 1, 5}), sizeof(IdType)*8, ctx);
+  c_row =
+    aten::VecToIdArray(std::vector<IdType>({4, 4, 5, 0, 0, 1, 2, 2}), sizeof(IdType)*8, ctx);
+  c_col =
+    aten::VecToIdArray(std::vector<IdType>({1, 2, 4, 1, 2, 4, 5, 0}), sizeof(IdType)*8, ctx);
+  const aten::COOMatrix &coo_ad = aten::COOMatrix(
+    4,
+    4,
+    a_row,
+    a_col,
+    a_data,
+    true,
+    false);
+  const aten::COOMatrix &ld_coo = COOLineGraph(coo_ad, false);
+  ASSERT_EQ(ld_coo.num_rows, 6);
+  ASSERT_EQ(ld_coo.num_cols, 6);
+  ASSERT_TRUE(ArrayEQ<IdType>(ld_coo.row, b_row));
+  ASSERT_TRUE(ArrayEQ<IdType>(ld_coo.col, b_col));
+  ASSERT_FALSE(ld_coo.row_sorted);
+  ASSERT_FALSE(ld_coo.col_sorted);
+
+  const aten::COOMatrix &ld_coo2 = COOLineGraph(coo_ad, true);
+  ASSERT_EQ(ld_coo2.num_rows, 6);
+  ASSERT_EQ(ld_coo2.num_cols, 6);
+  ASSERT_TRUE(ArrayEQ<IdType>(ld_coo2.row, c_row));
+  ASSERT_TRUE(ArrayEQ<IdType>(ld_coo2.col, c_col));
+  ASSERT_FALSE(ld_coo2.row_sorted);
+  ASSERT_FALSE(ld_coo2.col_sorted);
+}
+
+TEST(LineGraphTest, LineGraphCOO) {
+  _TestLineGraphCOO<int32_t>(CPU);
+  _TestLineGraphCOO<int64_t>(CPU);
+}
+
+template <typename IDX>
+void _TestSort(DLContext ctx) {
+  // case 1
+  IdArray a =
+    aten::VecToIdArray(std::vector<IDX>({8, 6, 7, 5, 3, 0, 9}), sizeof(IDX)*8, ctx);
+  IdArray sorted_a =
+    aten::VecToIdArray(std::vector<IDX>({0, 3, 5, 6, 7, 8, 9}), sizeof(IDX)*8, ctx);
+  IdArray sorted_idx =
+    aten::VecToIdArray(std::vector<IDX>({5, 4, 3, 1, 2, 0, 6}), 64, ctx);
+
+  IdArray sorted, idx;
+  std::tie(sorted, idx) = aten::Sort(a);
+  ASSERT_TRUE(ArrayEQ<IDX>(sorted, sorted_a));
+  ASSERT_TRUE(ArrayEQ<IDX>(idx, sorted_idx));
+
+  // case 2: empty array
+  a = aten::VecToIdArray(std::vector<IDX>({}), sizeof(IDX)*8, ctx);
+  sorted_a = aten::VecToIdArray(std::vector<IDX>({}), sizeof(IDX)*8, ctx);
+  sorted_idx = aten::VecToIdArray(std::vector<IDX>({}), 64, ctx);
+  std::tie(sorted, idx) = aten::Sort(a);
+  ASSERT_TRUE(ArrayEQ<IDX>(sorted, sorted_a));
+  ASSERT_TRUE(ArrayEQ<IDX>(idx, sorted_idx));
+
+  // case 3: array with one element
+  a = aten::VecToIdArray(std::vector<IDX>({2}), sizeof(IDX)*8, ctx);
+  sorted_a = aten::VecToIdArray(std::vector<IDX>({2}), sizeof(IDX)*8, ctx);
+  sorted_idx = aten::VecToIdArray(std::vector<IDX>({0}), 64, ctx);
+  std::tie(sorted, idx) = aten::Sort(a);
+  ASSERT_TRUE(ArrayEQ<IDX>(sorted, sorted_a));
+  ASSERT_TRUE(ArrayEQ<IDX>(idx, sorted_idx));
+}
+
+TEST(ArrayTest, Sort) {
+  _TestSort<int32_t>(CPU);
+  _TestSort<int64_t>(CPU);
+#ifdef DGL_USE_CUDA
+  _TestSort<int32_t>(GPU);
+  _TestSort<int64_t>(GPU);
 #endif
 }

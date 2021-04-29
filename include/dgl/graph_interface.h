@@ -428,9 +428,6 @@ struct NegSubgraph: public Subgraph {
 struct HaloSubgraph: public Subgraph {
   /*! \brief Indicate if a node belongs to the partition. */
   IdArray inner_nodes;
-
-  /*! \brief Indicate if an edge belongs to the partition. */
-  IdArray inner_edges;
 };
 
 // Define SubgraphRef
