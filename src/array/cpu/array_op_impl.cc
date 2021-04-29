@@ -4,6 +4,7 @@
  * \brief Array operator CPU implementation
  */
 #include <dgl/array.h>
+#include <dgl/runtime/ndarray.h>
 #include <numeric>
 #include "../arith.h"
 
@@ -173,16 +174,18 @@ template IdArray UnaryElewise<kDLCPU, int64_t, arith::Neg>(IdArray lhs);
 
 ///////////////////////////// Full /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType>
-IdArray Full(IdType val, int64_t length, DLContext ctx) {
-  IdArray ret = NewIdArray(length, ctx, sizeof(IdType) * 8);
-  IdType* ret_data = static_cast<IdType*>(ret->data);
+template <DLDeviceType XPU, typename DType>
+NDArray Full(DType val, int64_t length, DLContext ctx) {
+  NDArray ret = NDArray::Empty({length}, DLDataTypeTraits<DType>::dtype, ctx);
+  DType* ret_data = static_cast<DType*>(ret->data);
   std::fill(ret_data, ret_data + length, val);
   return ret;
 }
 
-template IdArray Full<kDLCPU, int32_t>(int32_t val, int64_t length, DLContext ctx);
-template IdArray Full<kDLCPU, int64_t>(int64_t val, int64_t length, DLContext ctx);
+template NDArray Full<kDLCPU, int32_t>(int32_t val, int64_t length, DLContext ctx);
+template NDArray Full<kDLCPU, int64_t>(int64_t val, int64_t length, DLContext ctx);
+template NDArray Full<kDLCPU, float>(float val, int64_t length, DLContext ctx);
+template NDArray Full<kDLCPU, double>(double val, int64_t length, DLContext ctx);
 
 ///////////////////////////// Range /////////////////////////////
 
