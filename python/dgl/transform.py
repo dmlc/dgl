@@ -278,13 +278,12 @@ def _segmented_knn_graph_topk(x, k, segs):
         int(offset[i])
         for i, h_g in enumerate(h_list)]
     dst = F.cat(dst, 0)
-    src = F.arange(0, n_total_points).unsqueeze(1).expand(n_total_points, k)
+    ctx = F.context(x)
+    src = F.arange(0, n_total_points, ctx=ctx).unsqueeze(1).expand(n_total_points, k)
 
     dst = F.reshape(dst, (-1,))
     src = F.reshape(src, (-1,))
-    adj = sparse.csr_matrix((F.asnumpy(F.zeros_like(dst) + 1), (F.asnumpy(dst), F.asnumpy(src))))
-
-    return convert.from_scipy(adj)
+    return convert.graph((src, dst))
 
 def knn(x, x_segs, y, y_segs, k, algorithm='kd-tree', dist='euclidean'):
     r"""For each element in each segment in :attr:`y`, find :attr:`k` nearest
