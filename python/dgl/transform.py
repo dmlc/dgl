@@ -100,7 +100,7 @@ def knn_graph(x, k, algorithm='topk'):
     DGLGraph
         The constructred graph. The node IDs are in the same order as :attr:`x`.
 
-        The returned graph is on CPU, regardless of the context of input :attr:`x`.
+        If using the 'topk' algorithm, the returned graph is on the same device as input :attr:`x`. Else, the returned graph is on CPU, regardless of the context of the input :attr:`x`.
 
     Examples
     --------
@@ -219,7 +219,7 @@ def segmented_knn_graph(x, k, segs, algorithm='topk'):
     DGLGraph
         The graph. The node IDs are in the same order as :attr:`x`.
 
-        The returned graph is on CPU, regardless of the context of input :attr:`x`.
+        If using the 'topk' algorithm, the returned graph is on the same device as input :attr:`x`. Else, the returned graph is on CPU, regardless of the context of the input :attr:`x`.
 
     Examples
     --------
