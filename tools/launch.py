@@ -10,11 +10,12 @@ import time
 import json
 import multiprocessing
 import re
+from functools import partial
 from threading import Thread
 
 DEFAULT_PORT = 30050
 
-def cleanup_proc(remote_pids, conn):
+def cleanup_proc(get_all_remote_pids, conn):
     '''This process tries to clean up the remote training tasks.
     '''
     print('cleanupu process runs')
@@ -26,6 +27,7 @@ def cleanup_proc(remote_pids, conn):
     if data == 'exit':
         sys.exit(0)
     else:
+        remote_pids = get_all_remote_pids()
         # Otherwise, we need to ssh to each machine and kill the training jobs.
         for (ip, port), pids in remote_pids.items():
             kill_process(ip, port, pids)
@@ -34,11 +36,42 @@ def cleanup_proc(remote_pids, conn):
 def kill_process(ip, port, pids):
     '''ssh to a remote machine and kill the specified processes.
     '''
+    curr_pid = os.getpid()
+    killed_pids = []
+    # If we kill child processes first, the parent process may create more again. This happens
+    # to Python's process pool. After sorting, we always kill parent processes first.
+    pids.sort()
     for pid in pids:
+        assert curr_pid != pid
         print('kill process {} on {}:{}'.format(pid, ip, port), flush=True)
         kill_cmd = 'ssh -o StrictHostKeyChecking=no -p ' + str(port) + ' ' + ip + ' \'kill {}\''.format(pid)
         subprocess.run(kill_cmd, shell=True)
+        killed_pids.append(pid)
+    # It's possible that some of the processes are not killed. Let's try again.
+    for i in range(3):
+        killed_pids = get_killed_pids(ip, port, killed_pids)
+        if len(killed_pids) == 0:
+            break
+        else:
+            killed_pids.sort()
+            for pid in killed_pids:
+                print('kill process {} on {}:{}'.format(pid, ip, port), flush=True)
+                kill_cmd = 'ssh -o StrictHostKeyChecking=no -p ' + str(port) + ' ' + ip + ' \'kill -9 {}\''.format(pid)
+                subprocess.run(kill_cmd, shell=True)
 
+def get_killed_pids(ip, port, killed_pids):
+    '''Get the process IDs that we want to kill but are still alive.
+    '''
+    killed_pids = [str(pid) for pid in killed_pids]
+    killed_pids = ','.join(killed_pids)
+    ps_cmd = 'ssh -o StrictHostKeyChecking=no -p ' + str(port) + ' ' + ip + ' \'ps -p {} -h\''.format(killed_pids)
+    res = subprocess.run(ps_cmd, shell=True, stdout=subprocess.PIPE)
+    pids = []
+    for p in res.stdout.decode('utf-8').split('\n'):
+        l = p.split()
+        if len(l) > 0:
+            pids.append(int(l[0]))
+    return pids
 
 def execute_remote(cmd, ip, port, thread_list):
     """execute command line on remote machine via ssh"""
@@ -56,6 +89,7 @@ def get_remote_pids(ip, port, cmd_regex):
     """Get the process IDs that run the command in the remote machine.
     """
     pids = []
+    curr_pid = os.getpid()
     # Here we want to get the python processes. We may get some ssh processes, so we should filter them out.
     ps_cmd = 'ssh -o StrictHostKeyChecking=no -p ' + str(port) + ' ' + ip + ' \'ps -aux | grep python | grep -v StrictHostKeyChecking\''
     res = subprocess.run(ps_cmd, shell=True, stdout=subprocess.PIPE)
@@ -65,19 +99,34 @@ def get_remote_pids(ip, port, cmd_regex):
             continue
         # We only get the processes that run the specified command.
         res = re.search(cmd_regex, p)
-        if res is not None:
+        if res is not None and int(l[1]) != curr_pid:
             pids.append(l[1])
 
-    print('get from ps:', pids)
     pid_str = ','.join([str(pid) for pid in pids])
     ps_cmd = 'ssh -o StrictHostKeyChecking=no -p ' + str(port) + ' ' + ip + ' \'pgrep -P {}\''.format(pid_str)
     res = subprocess.run(ps_cmd, shell=True, stdout=subprocess.PIPE)
     pids1 = res.stdout.decode('utf-8').split('\n')
-    pids = list(set(pids + pids1))
-    print('merge with pgrep:', pids)
-    return pids
+    all_pids = []
+    for pid in set(pids + pids1):
+        if pid == '' or int(pid) == curr_pid:
+            continue
+        all_pids.append(int(pid))
+    all_pids.sort()
+    return all_pids
 
-remote_pids = {}
+def get_all_remote_pids(hosts, ssh_port, udf_command):
+    '''Get all remote processes.
+    '''
+    remote_pids = {}
+    for node_id, host in enumerate(hosts):
+        ip, _ = host
+        # When creating training processes in remote machines, we may insert some arguments
+        # in the commands. We need to use regular expressions to match the modified command.
+        cmds = udf_command.split()
+        new_udf_command = ' .*'.join(cmds)
+        pids = get_remote_pids(ip, ssh_port, new_udf_command)
+        remote_pids[(ip, ssh_port)] = pids
+    return remote_pids
 
 def submit_jobs(args, udf_command):
     """Submit distributed jobs (server and client processes) via ssh"""
@@ -110,7 +159,6 @@ def submit_jobs(args, udf_command):
     assert part_metadata['num_parts'] == len(hosts), \
             'The number of graph partitions has to match the number of machines in the cluster.'
 
-    global remote_pids
     tot_num_clients = args.num_trainers * (1 + args.num_samplers) * len(hosts)
     # launch server tasks
     server_cmd = 'DGL_ROLE=server DGL_NUM_SAMPLER=' + str(args.num_samplers)
@@ -157,21 +205,10 @@ def submit_jobs(args, udf_command):
         cmd = 'cd ' + str(args.workspace) + '; ' + cmd
         execute_remote(cmd, ip, args.ssh_port, thread_list)
 
-    # Launching training jobs in remote machines takes a while.
-    # We need to wait for a while to get process IDs in the remote machine.
-    time.sleep(60)
-    for node_id, host in enumerate(hosts):
-        ip, _ = host
-        # When creating training processes in remote machines, we may insert some arguments
-        # in the commands. We need to use regular expressions to match the modified command.
-        cmds = udf_command.split()
-        new_udf_command = ' .*'.join(cmds)
-        pids = get_remote_pids(ip, args.ssh_port, new_udf_command)
-        remote_pids[(ip, args.ssh_port)] = pids
-
     # Start a cleanup process dedicated for cleaning up remote training jobs.
     conn1,conn2 = multiprocessing.Pipe()
-    process = multiprocessing.Process(target=cleanup_proc, args=(remote_pids, conn1))
+    func = partial(get_all_remote_pids, hosts, args.ssh_port, udf_command)
+    process = multiprocessing.Process(target=cleanup_proc, args=(func, conn1))
     process.start()
 
     def signal_handler(signal, frame):
