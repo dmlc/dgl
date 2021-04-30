@@ -181,3 +181,14 @@ class NodeEmbedding:
             The optimizer related state.
         """
         return self._optm_state
+
+    @property
+    def weight(self):
+        """Return the tensor storing the node embeddings
+
+        Returns
+        -------
+        torch.Tensor
+            The tensor storing the node embeddings
+        """
+        return self._tensor

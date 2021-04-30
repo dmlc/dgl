@@ -14,7 +14,6 @@ import dgl.function as fn
 import dgl.nn.pytorch as dglnn
 from dgl.distributed import DistDataLoader
 from dgl.distributed.nn import NodeEmbedding
-from dgl.distributed.optim import SparseAdagrad
 
 import torch as th
 import torch.nn as nn
@@ -23,40 +22,7 @@ import torch.optim as optim
 import torch.multiprocessing as mp
 from torch.utils.data import DataLoader
 
-from train_dist import DistSAGE, compute_acc
-
-def load_subtensor(g, seeds, input_nodes, device):
-    """
-    Copys features and labels of a set of nodes onto GPU.
-    """
-    batch_labels = g.ndata['labels'][seeds].to(device)
-    return batch_labels
-
-class NeighborSampler(object):
-    def __init__(self, g, fanouts, sample_neighbors, device):
-        self.g = g
-        self.fanouts = fanouts
-        self.sample_neighbors = sample_neighbors
-        self.device = device
-
-    def sample_blocks(self, seeds):
-        seeds = th.LongTensor(np.asarray(seeds))
-        blocks = []
-        for fanout in self.fanouts:
-            # For each seed node, sample ``fanout`` neighbors.
-            frontier = self.sample_neighbors(self.g, seeds, fanout, replace=True)
-            # Then we compact the frontier into a bipartite graph for message passing.
-            block = dgl.to_block(frontier, seeds)
-            # Obtain the seed nodes for next layer.
-            seeds = block.srcdata[dgl.NID]
-
-            blocks.insert(0, block)
-
-        input_nodes = blocks[0].srcdata[dgl.NID]
-        seeds = blocks[-1].dstdata[dgl.NID]
-        batch_labels = load_subtensor(self.g, seeds, input_nodes, "cpu")
-        blocks[-1].dstdata['labels'] = batch_labels
-        return blocks
+from train_dist import DistSAGE, NeighborSampler, compute_acc
 
 class TransDistSAGE(DistSAGE):
     def __init__(self, in_feats, n_hidden, n_classes, n_layers,
@@ -86,7 +52,7 @@ class TransDistSAGE(DistSAGE):
                 y = dgl.distributed.DistTensor((g.number_of_nodes(), self.n_classes),
                                                th.float32, 'h_last', persistent=True)
 
-            sampler = NeighborSampler(g, [-1], dgl.distributed.sample_neighbors, device)
+            sampler = NeighborSampler(g, [-1], dgl.distributed.sample_neighbors, device, load_feat=False)
             print('|V|={}, eval batch size: {}'.format(g.number_of_nodes(), batch_size))
             # Create PyTorch DataLoader for constructing blocks
             dataloader = DistDataLoader(
@@ -110,9 +76,7 @@ class TransDistSAGE(DistSAGE):
                 y[output_nodes] = h.cpu()
 
             x = y
-            print('{} done infer layer {}'.format(g.rank(), l))
-            if not standalone:
-                th.distributed.barrier()
+            g.barrier()
         return y
 
 def initializer(shape, dtype):
@@ -159,7 +123,7 @@ def load_embs(standalone, emb_layer, g):
         x[idx] = embeds
 
     if not standalone:
-        th.distributed.barrier()
+        g.barrier()
 
     return x
 
@@ -187,7 +151,7 @@ def run(args, device, data):
     train_nid, val_nid, test_nid, n_classes, g = data
     # Create sampler
     sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')],
-                              dgl.distributed.sample_neighbors, device)
+                              dgl.distributed.sample_neighbors, device, load_feat=False)
 
     # Create DataLoader for constructing blocks
     dataloader = DistDataLoader(

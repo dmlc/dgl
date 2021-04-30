@@ -389,10 +389,10 @@ def run(args, device, data):
 
     if args.sparse_embedding:
         if args.dgl_sparse and args.standalone:
-            emb_optimizer = dgl.distributed.optim.SparseAdagrad(list(embed_layer.node_embeds.values()), lr=args.sparse_lr)
+            emb_optimizer = dgl.distributed.optim.SparseAdam(list(embed_layer.node_embeds.values()), lr=args.sparse_lr)
             print('optimize DGL sparse embedding:', embed_layer.node_embeds.keys())
         elif args.dgl_sparse:
-            emb_optimizer = dgl.distributed.optim.SparseAdagrad(list(embed_layer.module.node_embeds.values()), lr=args.sparse_lr)
+            emb_optimizer = dgl.distributed.optim.SparseAdam(list(embed_layer.module.node_embeds.values()), lr=args.sparse_lr)
             print('optimize DGL sparse embedding:', embed_layer.module.node_embeds.keys())
         elif args.standalone:
             emb_optimizer = th.optim.SparseAdam(list(embed_layer.node_embeds.parameters()), lr=args.sparse_lr)

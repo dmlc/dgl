@@ -24,23 +24,7 @@ from dgl.distributed import DistDataLoader
 
 from dgl.distributed.optim import SparseAdagrad
 from train_dist_unsupervised import SAGE, NeighborSampler, PosNeighborSampler, CrossEntropyLoss, compute_acc
-from train_dist_transductive import DistEmb
-
-def load_embs(emb_layer, g):
-    nodes = dgl.distributed.node_split(np.arange(g.number_of_nodes()),
-                                       g.get_partition_book(), force_even=True)
-    x = dgl.distributed.DistTensor((g.number_of_nodes(), self.n_hidden), th.float32, 'inputs',
-                                    persistent=True,  is_gdata=False)
-    num_nodes = nodes.shape[0]
-    for i in range((num_nodes + 1023) // 1024):
-        idx = nodes[i * 1024: (i+1) * 1024 \
-                    if (i+1) * 1024 < num_nodes \
-                    else num_nodes]
-        embeds = embed_layer(idx).cpu()
-        x[idx] = embeds
-    g.barrier()
-
-    return x
+from train_dist_transductive import DistEmb, load_embs
 
 def generate_emb(model, emb_layer, g, batch_size, device):
     """
@@ -91,7 +75,7 @@ def run(args, device, data):
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
     if args.dgl_sparse:
-        emb_optimizer = dgl.distributed.optim.SparseAdagrad([emb_layer.sparse_emb], lr=args.sparse_lr)
+        emb_optimizer = dgl.distributed.optim.SparseAdam([emb_layer.sparse_emb], lr=args.sparse_lr)
         print('optimize DGL sparse embedding:', emb_layer.sparse_emb)
     elif args.standalone:
         emb_optimizer = th.optim.SparseAdam(list(emb_layer.sparse_emb.parameters()), lr=args.sparse_lr)

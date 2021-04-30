@@ -118,7 +118,7 @@ The command below launches one training process on each machine and each trainin
 python3 ~/workspace/dgl/tools/launch.py \
 --workspace ~/workspace/dgl/examples/pytorch/graphsage/experimental/ \
 --num_trainers 1 \
---num_samplers 4 \
+--num_samplers 0 \
 --num_servers 1 \
 --part_config data/ogb-product.json \
 --ip_config ip_config.txt \
@@ -131,7 +131,7 @@ To run unsupervised training:
 python3 ~/workspace/dgl/tools/launch.py \
 --workspace ~/workspace/dgl/examples/pytorch/graphsage/experimental/ \
 --num_trainers 1 \
---num_samplers 4 \
+--num_samplers 0 \
 --num_servers 1 \
 --part_config data/ogb-product.json \
 --ip_config ip_config.txt \
@@ -144,7 +144,7 @@ By default, this code will run on CPU. If you have GPU support, you can just add
 python3 ~/workspace/dgl/tools/launch.py \
 --workspace ~/workspace/dgl/examples/pytorch/graphsage/experimental/ \
 --num_trainers 4 \
---num_samplers 4 \
+--num_samplers 0 \
 --num_servers 1 \
 --part_config data/ogb-product.json \
 --ip_config ip_config.txt \
@@ -155,22 +155,22 @@ To run unsupervised with transductive setting (nodes are initialized with node e
 ```bash
 python3 ~/workspace/dgl/tools/launch.py --workspace ~/workspace/dgl/examples/pytorch/graphsage/experimental/ \
 --num_trainers 4 \
---num_samplers 4 \
+--num_samplers 0 \
 --num_servers 1 \
 --part_config data/ogb-product.json \
 --ip_config ip_config.txt \
-"python3 train_dist_unsupervised_transductive.py --graph_name ogb-product --ip_config ip_config.txt --num_epochs 3 --batch_size 1000"
+"python3 train_dist_unsupervised_transductive.py --graph_name ogb-product --ip_config ip_config.txt --num_epochs 3 --batch_size 1000 --num_gpus 4"
 ```
 
 To run unsupervised transductive setting with dgl distributed NodeEmbedding
 ```bash
 python3 ~/workspace/dgl/tools/launch.py --workspace ~/workspace/dgl/examples/pytorch/graphsage/experimental/ \
 --num_trainers 4 \
---num_samplers 4 \
+--num_samplers 0 \
 --num_servers 1 \
 --part_config data/ogb-product.json \
 --ip_config ip_config.txt \
-"python3 train_dist_unsupervised_transductive.py --graph_name ogb-product --ip_config ip_config.txt --num_epochs 3 --batch_size 1000 --dgl_sparse"
+"python3 train_dist_unsupervised_transductive.py --graph_name ogb-product --ip_config ip_config.txt --num_epochs 3 --batch_size 1000 --num_gpus 4 --dgl_sparse"
 ```
 
 **Note:** if you are using conda or other virtual environments on the remote machines, you need to replace `python3` in the command string (i.e. the last argument) with the path to the Python interpreter in that environment.
