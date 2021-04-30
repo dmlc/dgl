@@ -283,12 +283,21 @@ class SparseAdam(DistSparseGradOptimizer):
             assert isinstance(emb, NodeEmbedding), \
                 'SparseAdam only supports dgl.distributed.nn.NodeEmbedding'
 
-            state_step = DistTensor((emb.num_embeddings,), th.float32, emb.name + "_step",
-                               init_func=initializer, part_policy=emb.part_policy, is_gdata=False)
-            state_mem = DistTensor((emb.num_embeddings, emb.embedding_dim), th.float32, emb.name + "_mem",
-                               init_func=initializer, part_policy=emb.part_policy, is_gdata=False)
-            state_power = DistTensor((emb.num_embeddings, emb.embedding_dim), th.float32, emb.name + "_power",
-                               init_func=initializer, part_policy=emb.part_policy, is_gdata=False)
+            state_step = DistTensor((emb.num_embeddings,),
+                                    th.float32, emb.name + "_step",
+                                    init_func=initializer,
+                                    part_policy=emb.part_policy,
+                                    is_gdata=False)
+            state_mem = DistTensor((emb.num_embeddings, emb.embedding_dim),
+                                   th.float32, emb.name + "_mem",
+                                   init_func=initializer,
+                                   part_policy=emb.part_policy,
+                                   is_gdata=False)
+            state_power = DistTensor((emb.num_embeddings, emb.embedding_dim),
+                                     th.float32, emb.name + "_power",
+                                     init_func=initializer,
+                                     part_policy=emb.part_policy,
+                                     is_gdata=False)
             state = (state_step, state_mem, state_power)
             emb.set_optm_state(state)
             self._state[emb.name] = state

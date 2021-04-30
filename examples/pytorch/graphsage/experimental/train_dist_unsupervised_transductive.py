@@ -26,7 +26,7 @@ from dgl.distributed.optim import SparseAdagrad
 from train_dist_unsupervised import SAGE, NeighborSampler, PosNeighborSampler, CrossEntropyLoss, compute_acc
 from train_dist_transductive import DistEmb, load_embs
 
-def generate_emb(model, emb_layer, g, batch_size, device):
+def generate_emb(standalone, model, emb_layer, g, batch_size, device):
     """
     Generate embeddings for each node
     emb_layer : Embedding layer
@@ -38,7 +38,7 @@ def generate_emb(model, emb_layer, g, batch_size, device):
     model.eval()
     emb_layer.eval()
     with th.no_grad():
-        inputs = load_embs(emb_layer, g)
+        inputs = load_embs(standalone, emb_layer, g)
         pred = model.inference(g, inputs, batch_size, device)
     g.barrier()
     return pred
@@ -161,9 +161,9 @@ def run(args, device, data):
 
     # evaluate the embedding using LogisticRegression
     if args.standalone:
-        pred = generate_emb(model, emb_layer, g, args.batch_size_eval, device)
+        pred = generate_emb(True, model, emb_layer, g, args.batch_size_eval, device)
     else:
-        pred = generate_emb(model.module, emb_layer, g, args.batch_size_eval, device)
+        pred = generate_emb(False, model.module, emb_layer, g, args.batch_size_eval, device)
     if g.rank() == 0:
         eval_acc, test_acc = compute_acc(pred, labels, global_train_nid, global_valid_nid, global_test_nid)
         print('eval acc {:.4f}; test acc {:.4f}'.format(eval_acc, test_acc))
