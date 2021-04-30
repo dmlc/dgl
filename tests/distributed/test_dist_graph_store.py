@@ -13,8 +13,6 @@ from dgl.heterograph_index import create_unitgraph_from_coo
 from dgl.data.utils import load_graphs, save_graphs
 from dgl.distributed import DistGraphServer, DistGraph
 from dgl.distributed import partition_graph, load_partition, load_partition_book, node_split, edge_split
-from dgl.distributed.optim import SparseAdagrad
-from dgl.distributed.nn import NodeEmbedding
 from numpy.testing import assert_almost_equal
 import backend as F
 import math
@@ -159,6 +157,8 @@ def run_emb_client(graph_name, part_id, server_count, num_clients, num_nodes, nu
     check_dist_emb(g, num_clients, num_nodes, num_edges)
 
 def check_dist_emb(g, num_clients, num_nodes, num_edges):
+    from dgl.distributed.optim import SparseAdagrad
+    from dgl.distributed.nn import NodeEmbedding
     # Test sparse emb
     try:
         emb = NodeEmbedding(g.number_of_nodes(), 1, 'emb1', emb_init)
