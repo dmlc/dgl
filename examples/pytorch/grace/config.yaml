@@ -1,0 +1,39 @@
+cora:
+  learning_rate: 0.0005
+  num_hidden: 128
+  num_proj_hidden: 128
+  activation: 'relu'
+  num_layers: 2
+  drop_edge_rate_1: 0.2
+  drop_edge_rate_2: 0.4
+  drop_feature_rate_1: 0.3
+  drop_feature_rate_2: 0.4
+  tau: 0.4
+  num_epochs: 400
+  weight_decay: 0.00001
+citeseer:
+  learning_rate: 0.001
+  num_hidden: 256
+  num_proj_hidden: 256
+  activation: 'prelu'
+  num_layers: 2
+  drop_edge_rate_1: 0.2
+  drop_edge_rate_2: 0.0
+  drop_feature_rate_1: 0.3
+  drop_feature_rate_2: 0.2
+  tau: 0.9
+  num_epochs: 200
+  weight_decay: 0.00001
+pubmed:
+  learning_rate: 0.001
+  num_hidden: 256
+  num_proj_hidden: 256
+  activation: 'relu'
+  num_layers: 2
+  drop_edge_rate_1: 0.4
+  drop_edge_rate_2: 0.1
+  drop_feature_rate_1: 0.0
+  drop_feature_rate_2: 0.2
+  tau: 0.7
+  num_epochs: 1500
+  weight_decay: 0.00001
