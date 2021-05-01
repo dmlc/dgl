@@ -68,8 +68,8 @@ class SAGE(nn.Module):
         for l, layer in enumerate(self.layers):
             y = th.zeros(g.number_of_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
 
-            sampler = dgl.sampling.MultiLayerNeighborSampler([None])
-            dataloader = dgl.sampling.NodeDataLoader(
+            sampler = dgl.dataloading.MultiLayerNeighborSampler([None])
+            dataloader = dgl.dataloading.NodeDataLoader(
                 g,
                 th.arange(g.number_of_nodes()),
                 sampler,
@@ -80,7 +80,6 @@ class SAGE(nn.Module):
 
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
                 block = blocks[0]
-
                 block = block.int().to(device)
                 h = x[input_nodes].to(device)
                 h = layer(block, h)
@@ -92,7 +91,6 @@ class SAGE(nn.Module):
 
             x = y
         return y
-
 
 class NegativeSampler(object):
     def __init__(self, g, neg_nseeds):

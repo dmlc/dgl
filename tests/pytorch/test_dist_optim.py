@@ -109,9 +109,9 @@ def run_client(graph_name, cli_id, part_id, server_count):
 
     assert F.allclose(dgl_emb.weight[0 : num_nodes//2], torch_emb.weight[0 : num_nodes//2])
 
-def test_sparse_adam(num_trainer=1, shared_mem=True):
+def check_sparse_adam(num_trainer=1, shared_mem=True):
     prepare_dist()
-    g = create_random_graph(1000)
+    g = create_random_graph(2000)
     num_servers = num_trainer
     num_clients = num_trainer
     num_parts = 1
@@ -145,8 +145,8 @@ def test_sparse_adam(num_trainer=1, shared_mem=True):
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 def test_sparse_opt():
     os.environ['DGL_DIST_MODE'] = 'distributed'
-    test_sparse_adam(1, True)
-    test_sparse_adam(1, False)
+    check_sparse_adam(1, True)
+    check_sparse_adam(1, False)
 
 if __name__ == '__main__':
     os.makedirs('/tmp/dist_graph', exist_ok=True)

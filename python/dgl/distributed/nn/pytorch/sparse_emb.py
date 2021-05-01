@@ -161,16 +161,6 @@ class NodeEmbedding:
         """
         return self._embedding_dim
 
-    def set_optm_state(self, state):
-        """Store the optimizer related state tensor.
-
-        Parameters
-        ----------
-        state : tuple of torch.Tensor
-            Optimizer related state.
-        """
-        self._optm_state = state
-
     @property
     def optm_state(self):
         """Return the optimizer related state tensor.

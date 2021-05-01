@@ -203,7 +203,8 @@ class SparseAdagrad(DistSparseGradOptimizer):
             name = emb.name + "_sum"
             state = DistTensor((emb.num_embeddings, emb.embedding_dim), th.float32, name,
                                init_func=initializer, part_policy=emb.part_policy, is_gdata=False)
-            emb.set_optm_state(state)
+            assert emb.name not in self._state, \
+                "{} already registered in the optimizer".format(emb.name)
             self._state[emb.name] = state
 
     def update(self, idx, grad, emb):
@@ -299,7 +300,8 @@ class SparseAdam(DistSparseGradOptimizer):
                                      part_policy=emb.part_policy,
                                      is_gdata=False)
             state = (state_step, state_mem, state_power)
-            emb.set_optm_state(state)
+            assert emb.name not in self._state, \
+                "{} already registered in the optimizer".format(emb.name)
             self._state[emb.name] = state
 
     def update(self, idx, grad, emb):
@@ -320,7 +322,7 @@ class SparseAdam(DistSparseGradOptimizer):
         beta2 = self._beta2
         eps = self._eps
         clr = self._lr
-        state_step, state_mem, state_power = emb.optm_state
+        state_step, state_mem, state_power = self._state[emb.name]
 
         state_dev = th.device('cpu')
         exec_dev = grad.device
