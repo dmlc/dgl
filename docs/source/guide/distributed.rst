@@ -67,8 +67,6 @@ to the cluster's machines and launch the training job on all machines.
 
 **Note**: The current distributed training API only supports the Pytorch backend.
 
-**Note**: The current implementation only supports graphs with one node type and one edge type.
-
 DGL implements a few distributed components to support distributed training. The figure below
 shows the components and their interactions.
 
