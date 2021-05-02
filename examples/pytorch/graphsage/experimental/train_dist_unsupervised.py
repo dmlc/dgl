@@ -73,10 +73,10 @@ class SAGE(nn.Module):
                 g,
                 th.arange(g.number_of_nodes()),
                 sampler,
-                batch_size=args.batch_size,
+                batch_size=batch_size,
                 shuffle=True,
                 drop_last=False,
-                num_workers=args.num_workers)
+                num_workers=0)
 
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
                 block = blocks[0]

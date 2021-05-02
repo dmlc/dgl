@@ -20,6 +20,9 @@ class DistEmbedding:
     Because distributed embeddings are sharded
     in the same way as nodes and edges of a distributed graph, it is usually much more
     efficient to access than the sparse embeddings provided by the deep learning frameworks.
+
+    DEPRECATED: Please use dgl.distributed.nn.NodeEmbedding instead.
+
     Parameters
     ----------
     num_embeddings : int

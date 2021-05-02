@@ -39,6 +39,9 @@ Distributed embedding optimizer
 .. autoclass:: SparseAdagrad
     :members: step
 
+.. autoclass:: SparseAdam
+    :members: step
+
 Distributed workload split
 --------------------------
 
