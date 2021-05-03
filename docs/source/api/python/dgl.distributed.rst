@@ -25,12 +25,21 @@ Distributed Tensor
 .. autoclass:: DistTensor
     :members: part_policy, shape, dtype, name
 
-Distributed Embedding
+Distributed Node Embedding
 ---------------------
+.. currentmodule:: dgl.distributed.nn.pytorch
 
-.. autoclass:: DistEmbedding
+.. autoclass:: NodeEmbedding
+
+
+Distributed embedding optimizer
+-------------------------
+.. currentmodule:: dgl.distributed.optim.pytorch
 
 .. autoclass:: SparseAdagrad
+    :members: step
+
+.. autoclass:: SparseAdam
     :members: step
 
 Distributed workload split
