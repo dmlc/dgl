@@ -144,6 +144,8 @@ class LatentDirichletAllocation:
             print(f'e-step num_iters={i+1} with mean_change={mean_change:.4f}')
         return doc_data
 
+    transform = _e_step
+
     def _m_step(self, G):
         """_m_step implements word data sampling and stores word_z stats
         """
@@ -158,12 +160,16 @@ class LatentDirichletAllocation:
         )
         return word_data
 
+    def partial_fit(self, G):
+        self._last_word_z = self.word_z
+        self._e_step(G)
+        self._m_step(G)
+        return self
+
     def fit(self, G, mean_change_tol=1e-3, max_epochs=10):
         for i in range(max_epochs):
-            word_z = self.word_z
-            self._e_step(G)
-            self._m_step(G)
-            mean_change = (self.word_z - word_z).abs().mean()
+            self.partial_fit(G)
+            mean_change = (self.word_z - self._last_word_z).abs().mean()
             if self.verbose:
                 print(f'epoch {i+1}, '
                       f'perplexity: {self.perplexity(G, False)}, '
@@ -171,8 +177,6 @@ class LatentDirichletAllocation:
             if mean_change < mean_change_tol:
                 break
         return self
-
-    transform = _e_step
 
     def perplexity(self, G, reinit_doc=True):
         """ppl = exp{-sum[log(p(w1,...,wn|d))] / n}

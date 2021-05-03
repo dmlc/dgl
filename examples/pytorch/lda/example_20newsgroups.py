@@ -131,5 +131,5 @@ lda.fit(tf)
 print("done in %0.3fs." % (time() - t0))
 print()
 
-print(f"scikit-learn training perplexity {lda.perplexity(tf)}")
-print(f"scikit-learn testing perplexity {lda.perplexity(tt)}")
+print(f"scikit-learn training perplexity {lda.perplexity(tf):.3f}")
+print(f"scikit-learn testing perplexity {lda.perplexity(tt):.3f}")
