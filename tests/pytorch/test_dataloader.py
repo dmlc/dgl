@@ -3,6 +3,7 @@ import backend as F
 import unittest
 from torch.utils.data import DataLoader
 from collections import defaultdict
+from collections.abc import Iterator
 from itertools import product
 
 def _check_neighbor_sampling_dataloader(g, nids, dl, mode, collator):
