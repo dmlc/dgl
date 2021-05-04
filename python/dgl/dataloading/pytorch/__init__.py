@@ -14,7 +14,7 @@ class _ScalarDataBatcherIter:
         self.batch_size = batch_size
         self.index = 0
         self.drop_last = drop_last
-        
+
     def __iter__(self):
         return self
 
@@ -216,7 +216,7 @@ class _NodeDataLoaderIter:
         self.device = node_dataloader.device
         self.node_dataloader = node_dataloader
         self.iter_ = iter(node_dataloader.dataloader)
-        
+
     def __iter__(self):
         return self
 
@@ -233,7 +233,7 @@ class _EdgeDataLoaderIter:
         self.device = edge_dataloader.device
         self.edge_dataloader = edge_dataloader
         self.iter_ = iter(edge_dataloader.dataloader)
-        
+
     def __iter__(self):
         return self
 
