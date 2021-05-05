@@ -13,6 +13,7 @@ from dgl.data.utils import load_graphs
 import dgl.function as fn
 import dgl.nn.pytorch as dglnn
 from dgl.distributed import DistDataLoader
+from dgl.distributed.nn import NodeEmbedding
 
 import torch as th
 import torch.nn as nn
@@ -21,68 +22,14 @@ import torch.optim as optim
 import torch.multiprocessing as mp
 from torch.utils.data import DataLoader
 
-def load_subtensor(g, seeds, input_nodes, device, load_feat=True):
-    """
-    Copys features and labels of a set of nodes onto GPU.
-    """
-    batch_inputs = g.ndata['features'][input_nodes].to(device) if load_feat else None
-    batch_labels = g.ndata['labels'][seeds].to(device)
-    return batch_inputs, batch_labels
+from train_dist import DistSAGE, NeighborSampler, compute_acc
 
-class NeighborSampler(object):
-    def __init__(self, g, fanouts, sample_neighbors, device, load_feat=True):
-        self.g = g
-        self.fanouts = fanouts
-        self.sample_neighbors = sample_neighbors
-        self.device = device
-        self.load_feat=load_feat
-
-    def sample_blocks(self, seeds):
-        seeds = th.LongTensor(np.asarray(seeds))
-        blocks = []
-        for fanout in self.fanouts:
-            # For each seed node, sample ``fanout`` neighbors.
-            frontier = self.sample_neighbors(self.g, seeds, fanout, replace=True)
-            # Then we compact the frontier into a bipartite graph for message passing.
-            block = dgl.to_block(frontier, seeds)
-            # Obtain the seed nodes for next layer.
-            seeds = block.srcdata[dgl.NID]
-
-            blocks.insert(0, block)
-
-        input_nodes = blocks[0].srcdata[dgl.NID]
-        seeds = blocks[-1].dstdata[dgl.NID]
-        batch_inputs, batch_labels = load_subtensor(self.g, seeds, input_nodes, "cpu", self.load_feat)
-        if self.load_feat:
-            blocks[0].srcdata['features'] = batch_inputs
-        blocks[-1].dstdata['labels'] = batch_labels
-        return blocks
-
-class DistSAGE(nn.Module):
+class TransDistSAGE(DistSAGE):
     def __init__(self, in_feats, n_hidden, n_classes, n_layers,
                  activation, dropout):
-        super().__init__()
-        self.n_layers = n_layers
-        self.n_hidden = n_hidden
-        self.n_classes = n_classes
-        self.layers = nn.ModuleList()
-        self.layers.append(dglnn.SAGEConv(in_feats, n_hidden, 'mean'))
-        for i in range(1, n_layers - 1):
-            self.layers.append(dglnn.SAGEConv(n_hidden, n_hidden, 'mean'))
-        self.layers.append(dglnn.SAGEConv(n_hidden, n_classes, 'mean'))
-        self.dropout = nn.Dropout(dropout)
-        self.activation = activation
+        super(TransDistSAGE, self).__init__(in_feats, n_hidden, n_classes, n_layers, activation, dropout)
 
-    def forward(self, blocks, x):
-        h = x
-        for l, (layer, block) in enumerate(zip(self.layers, blocks)):
-            h = layer(block, h)
-            if l != len(self.layers) - 1:
-                h = self.activation(h)
-                h = self.dropout(h)
-        return h
-
-    def inference(self, g, x, batch_size, device):
+    def inference(self, standalone, g, x, batch_size, device):
         """
         Inference with the GraphSAGE model on full neighbors (i.e. without neighbor sampling).
         g : the entire graph.
@@ -105,7 +52,7 @@ class DistSAGE(nn.Module):
                 y = dgl.distributed.DistTensor((g.number_of_nodes(), self.n_classes),
                                                th.float32, 'h_last', persistent=True)
 
-            sampler = NeighborSampler(g, [-1], dgl.distributed.sample_neighbors, device)
+            sampler = NeighborSampler(g, [-1], dgl.distributed.sample_neighbors, device, load_feat=False)
             print('|V|={}, eval batch size: {}'.format(g.number_of_nodes(), batch_size))
             # Create PyTorch DataLoader for constructing blocks
             dataloader = DistDataLoader(
@@ -132,14 +79,55 @@ class DistSAGE(nn.Module):
             g.barrier()
         return y
 
-def compute_acc(pred, labels):
-    """
-    Compute the accuracy of prediction given the labels.
-    """
-    labels = labels.long()
-    return (th.argmax(pred, dim=1) == labels).float().sum() / len(pred)
+def initializer(shape, dtype):
+    arr = th.zeros(shape, dtype=dtype)
+    arr.uniform_(-1, 1)
+    return arr
 
-def evaluate(model, g, inputs, labels, val_nid, test_nid, batch_size, device):
+class DistEmb(nn.Module):
+    def __init__(self, num_nodes, emb_size, dgl_sparse_emb=False, dev_id='cpu'):
+        super().__init__()
+        self.dev_id = dev_id
+        self.emb_size = emb_size
+        self.dgl_sparse_emb = dgl_sparse_emb
+        if dgl_sparse_emb:
+            self.sparse_emb = NodeEmbedding(num_nodes, emb_size, name='sage', init_func=initializer)
+        else:
+            self.sparse_emb = th.nn.Embedding(num_nodes, emb_size, sparse=True)
+            nn.init.uniform_(self.sparse_emb.weight, -1.0, 1.0)
+
+    def forward(self, idx):
+        # embeddings are stored in cpu
+        idx = idx.cpu()
+        if self.dgl_sparse_emb:
+            return self.sparse_emb(idx, device=self.dev_id)
+        else:
+            return self.sparse_emb(idx).to(self.dev_id)
+
+def load_embs(standalone, emb_layer, g):
+    nodes = dgl.distributed.node_split(np.arange(g.number_of_nodes()),
+                                       g.get_partition_book(), force_even=True)
+    x = dgl.distributed.DistTensor(
+        (g.number_of_nodes(),
+         emb_layer.module.emb_size \
+            if isinstance(emb_layer, th.nn.parallel.DistributedDataParallel) \
+            else emb_layer.emb_size),
+        th.float32, 'eval_embs',
+        persistent=True)
+    num_nodes = nodes.shape[0]
+    for i in range((num_nodes + 1023) // 1024):
+        idx = nodes[i * 1024: (i+1) * 1024 \
+                    if (i+1) * 1024 < num_nodes \
+                    else num_nodes]
+        embeds = emb_layer(idx).cpu()
+        x[idx] = embeds
+
+    if not standalone:
+        g.barrier()
+
+    return x
+
+def evaluate(standalone, model, emb_layer, g, labels, val_nid, test_nid, batch_size, device):
     """
     Evaluate the model on the validation set specified by ``val_nid``.
     g : The entire graph.
@@ -150,17 +138,20 @@ def evaluate(model, g, inputs, labels, val_nid, test_nid, batch_size, device):
     device : The GPU device to evaluate on.
     """
     model.eval()
+    emb_layer.eval()
     with th.no_grad():
-        pred = model.inference(g, inputs, batch_size, device)
+        inputs = load_embs(standalone, emb_layer, g)
+        pred = model.inference(standalone, g, inputs, batch_size, device)
     model.train()
+    emb_layer.train()
     return compute_acc(pred[val_nid], labels[val_nid]), compute_acc(pred[test_nid], labels[test_nid])
 
 def run(args, device, data):
     # Unpack data
-    train_nid, val_nid, test_nid, in_feats, n_classes, g = data
+    train_nid, val_nid, test_nid, n_classes, g = data
     # Create sampler
     sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')],
-                              dgl.distributed.sample_neighbors, device)
+                              dgl.distributed.sample_neighbors, device, load_feat=False)
 
     # Create DataLoader for constructing blocks
     dataloader = DistDataLoader(
@@ -171,7 +162,8 @@ def run(args, device, data):
         drop_last=False)
 
     # Define model and optimizer
-    model = DistSAGE(in_feats, args.num_hidden, n_classes, args.num_layers, F.relu, args.dropout)
+    emb_layer = DistEmb(g.num_nodes(), args.num_hidden, dgl_sparse_emb=args.dgl_sparse, dev_id=device)
+    model = TransDistSAGE(args.num_hidden, args.num_hidden, n_classes, args.num_layers, F.relu, args.dropout)
     model = model.to(device)
     if not args.standalone:
         if args.num_gpus == -1:
@@ -179,9 +171,21 @@ def run(args, device, data):
         else:
             dev_id = g.rank() % args.num_gpus
             model = th.nn.parallel.DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id)
+            if not args.dgl_sparse:
+                emb_layer = th.nn.parallel.DistributedDataParallel(emb_layer)
     loss_fcn = nn.CrossEntropyLoss()
     loss_fcn = loss_fcn.to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
+    if args.dgl_sparse:
+        emb_optimizer = dgl.distributed.optim.SparseAdam([emb_layer.sparse_emb], lr=args.sparse_lr)
+        print('optimize DGL sparse embedding:', emb_layer.sparse_emb)
+    elif args.standalone:
+        emb_optimizer = th.optim.SparseAdam(list(emb_layer.sparse_emb.parameters()), lr=args.sparse_lr)
+        print('optimize Pytorch sparse embedding:', emb_layer.sparse_emb)
+    else:
+        emb_optimizer = th.optim.SparseAdam(list(emb_layer.module.sparse_emb.parameters()), lr=args.sparse_lr)
+        print('optimize Pytorch sparse embedding:', emb_layer.module.sparse_emb)
+
 
     train_size = th.sum(g.ndata['train_mask'][0:g.number_of_nodes()])
 
@@ -207,7 +211,7 @@ def run(args, device, data):
 
             # The nodes for input lies at the LHS side of the first block.
             # The nodes for output lies at the RHS side of the last block.
-            batch_inputs = blocks[0].srcdata['features']
+            batch_inputs = blocks[0].srcdata[dgl.NID]
             batch_labels = blocks[-1].dstdata['labels']
             batch_labels = batch_labels.long()
 
@@ -217,15 +221,18 @@ def run(args, device, data):
             batch_labels = batch_labels.to(device)
             # Compute loss and prediction
             start = time.time()
+            batch_inputs = emb_layer(batch_inputs)
             batch_pred = model(blocks, batch_inputs)
             loss = loss_fcn(batch_pred, batch_labels)
             forward_end = time.time()
+            emb_optimizer.zero_grad()
             optimizer.zero_grad()
             loss.backward()
             compute_end = time.time()
             forward_time += forward_end - start
             backward_time += compute_end - forward_end
 
+            emb_optimizer.step()
             optimizer.step()
             update_time += time.time() - compute_end
 
@@ -244,13 +251,11 @@ def run(args, device, data):
             g.rank(), toc - tic, sample_time, forward_time, backward_time, update_time, num_seeds, num_inputs))
         epoch += 1
 
-
         if epoch % args.eval_every == 0 and epoch != 0:
             start = time.time()
-            val_acc, test_acc = evaluate(model.module, g, g.ndata['features'],
+            val_acc, test_acc = evaluate(args.standalone, model.module, emb_layer, g,
                                          g.ndata['labels'], val_nid, test_nid, args.batch_size_eval, device)
-            print('Part {}, Val Acc {:.4f}, Test Acc {:.4f}, time: {:.4f}'.format(g.rank(), val_acc, test_acc,
-                                                                                  time.time() - start))
+            print('Part {}, Val Acc {:.4f}, Test Acc {:.4f}, time: {:.4f}'.format(g.rank(), val_acc, test_acc, time.time()-start))
 
 def main(args):
     dgl.distributed.initialize(args.ip_config)
@@ -277,8 +282,7 @@ def main(args):
     print('#labels:', n_classes)
 
     # Pack data
-    in_feats = g.ndata['features'].shape[1]
-    data = train_nid, val_nid, test_nid, in_feats, n_classes, g
+    data = train_nid, val_nid, test_nid, n_classes, g
     run(args, device, data)
     print("parent ends")
 
@@ -305,6 +309,10 @@ if __name__ == '__main__':
     parser.add_argument('--dropout', type=float, default=0.5)
     parser.add_argument('--local_rank', type=int, help='get rank of the process')
     parser.add_argument('--standalone', action='store_true', help='run in the standalone mode')
+    parser.add_argument("--dgl_sparse", action='store_true',
+            help='Whether to use DGL sparse embedding')
+    parser.add_argument("--sparse_lr", type=float, default=1e-2,
+            help="sparse lr rate")
     args = parser.parse_args()
 
     print(args)
