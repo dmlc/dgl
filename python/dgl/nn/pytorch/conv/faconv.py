@@ -123,7 +123,27 @@ class FAConv(nn.Module):
             nn.init.zeros_(self.bias)
 
     def forward(self, graph, feat):
+        r"""
 
+        Description
+        -----------
+        Compute Frequency Adaptation Graph Convolutional layer.
+
+        Parameters
+        ----------
+        graph : DGLGraph
+            The graph.
+        feat : torch.Tensor or pair of torch.Tensor
+            If a torch.Tensor is given, the input feature of shape :math:`(N, D_{in})` where
+            :math:`D_{in}` is size of input feature, :math:`N` is the number of nodes.
+
+        Returns
+        -------
+        torch.Tensor
+            The output feature of shape :math:`(N, H, D_{out})` where :math:`H`
+            is the number of heads, and :math:`D_{out}` is size of output feature.
+
+        """
         with graph.local_scope():
 
             deg = graph.in_degrees().to(graph.device).float().clamp(min=1)
@@ -134,6 +154,7 @@ class FAConv(nn.Module):
             h = th.relu(self.W1(feat))
             h = F.dropout(h, p=self._dropout, training=self.training)
             raw = h
+
             graph.ndata["h"] = h
 
             for _ in range(self._num_layers):
@@ -155,13 +176,19 @@ class FAConv(nn.Module):
             return rst
 
     def edge_udf(self, edges):
+        r"""
 
+        Description
+        -----------
+        edge udf.
+
+        """
         cat_h = th.cat([edges.dst["h"], edges.src["h"]], dim=1)
         g = th.tanh(self.gate(cat_h)).squeeze()
         e = g * edges.dst["d"] * edges.src["d"]
         e = F.dropout(e, p=self._dropout, training=self.training)
 
-        return {"e": e, "m": g}
+        return {"e": e}
 
     def extra_repr(self):
 
