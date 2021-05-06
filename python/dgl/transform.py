@@ -2256,6 +2256,10 @@ def adj_product_graph(A, B, weight_name, etype='_E'):
 
     Notes
     -----
+    This function works on both CPU and GPU.  For GPU, the number of nodes and
+    edges must be less than the maximum of ``int32`` (i.e. ``2 ** 31 - 1``) due
+    to restriction of cuSPARSE.
+
     The edge weights returned by this function is differentiable w.r.t. the
     input edge weights.
 
@@ -2282,6 +2286,55 @@ def adj_product_graph(A, B, weight_name, etype='_E'):
 
     Examples
     --------
+    The following shows weighted adjacency matrix multiplication between two
+    bipartite graphs.  You can also perform this between two homogeneous
+    graphs, or one homogeneous graph and one bipartite graph, as long as the
+    number of nodes of the same type match.
+
+    >>> A = dgl.heterograph({
+    ...     ('A', 'AB', 'B'): ([2, 2, 0, 2, 0, 1], [2, 1, 0, 0, 2, 2])},
+    ...     num_nodes_dict={'A': 3, 'B': 4})
+    >>> B = dgl.heterograph({
+    ...     ('B', 'BA', 'A'): ([0, 3, 2, 1, 3, 3], [1, 2, 0, 2, 1, 0])},
+    ...     num_nodes_dict={'A': 3, 'B': 4})
+    >>> A.edata['w'] = torch.randn(6).requires_grad_()
+    >>> B.edata['w'] = torch.randn(6).requires_grad_()
+    >>> C = dgl.adj_product_graph(A, B, 'w')
+    >>> C.edges()
+    (tensor([0, 0, 1, 2, 2, 2]), tensor([0, 1, 0, 0, 2, 1]))
+
+    >>> C.edata['w']
+    tensor([0.6906, 0.2002, 0.0591, 0.3672, 0.1066, 0.1328],
+           grad_fn=<CSRMMBackward>)
+
+    Note that this function is differentiable:
+
+    >>> C.edata['w'].sum().backward()
+    >>> A.edata['w'].grad
+    tensor([0.7153, 0.2775, 0.7141, 0.7141, 0.7153, 0.7153])
+
+    >>> B.edata['w'].grad
+    tensor([0.4664, 0.0000, 1.5614, 0.3840, 0.0000, 0.0000])
+
+    If the source node type of the left operand is the same as the destination
+    node type of the right operand, this function returns a homogeneous graph:
+
+    >>> C.ntypes
+    ['A']
+
+    Otherwise, it returns a bipartite graph instead:
+
+    >>> A = dgl.heterograph({
+    ...     ('A', 'AB', 'B'): ([2, 2, 0, 2, 0, 1], [2, 1, 0, 0, 2, 2])},
+    ...     num_nodes_dict={'A': 3, 'B': 4})
+    >>> B = dgl.heterograph({
+    ...     ('B', 'BC', 'C'): ([0, 3, 2, 1, 3, 3], [1, 2, 0, 2, 1, 0])},
+    ...     num_nodes_dict={'C': 3, 'B': 4})
+    >>> A.edata['w'] = torch.randn(6).requires_grad_()
+    >>> B.edata['w'] = torch.randn(6).requires_grad_()
+    >>> C = dgl.adj_product_graph(A, B, 'w')
+    >>> C.ntypes
+    ['A', 'C']
     """
     A_srctype, _, A_dsttype = A.canonical_etypes[0]
     B_srctype, _, B_dsttype = B.canonical_etypes[0]
@@ -2320,6 +2373,10 @@ def adj_sum_graph(graphs, weight_name):
 
     Notes
     -----
+    This function works on both CPU and GPU.  For GPU, the number of nodes and
+    edges must be less than the maximum of ``int32`` (i.e. ``2 ** 31 - 1``) due
+    to restriction of cuSPARSE.
+
     The edge weights returned by this function is differentiable w.r.t. the
     input edge weights.
 
@@ -2342,6 +2399,30 @@ def adj_sum_graph(graphs, weight_name):
 
     Examples
     --------
+    The following shows weighted adjacency matrix summation between two
+    bipartite graphs.  You can also perform this between homogeneous graphs.
+
+    >>> A = dgl.heterograph(
+    ...     {('A', 'AB', 'B'): ([2, 2, 0, 2, 0, 1], [2, 1, 0, 0, 2, 2])},
+    ...     num_nodes_dict={'A': 3, 'B': 4})
+    >>> B = dgl.heterograph(
+    ...     {('A', 'AB', 'B'): ([1, 2, 0, 2, 1, 0], [0, 3, 2, 1, 3, 3])},
+    ...     num_nodes_dict={'A': 3, 'B': 4})
+    >>> A.edata['w'] = torch.randn(6).requires_grad_()
+    >>> B.edata['w'] = torch.randn(6).requires_grad_()
+    >>> C = dgl.adj_sum_graph([A, B], 'w')
+    >>> C.edges()
+    (tensor([0, 0, 0, 1, 1, 1, 2, 2, 2, 2]),
+     tensor([0, 2, 3, 2, 0, 3, 0, 1, 2, 3]))
+
+    Note that this function is differentiable:
+
+    >>> C.edata['w'].sum().backward()
+    >>> A.edata['w'].grad
+    tensor([1., 1., 1., 1., 1., 1.])
+
+    >>> B.edata['w'].grad
+    tensor([1., 1., 1., 1., 1., 1.])
     """
     metagraph = graphs[0]._graph.metagraph
     num_nodes = utils.toindex(

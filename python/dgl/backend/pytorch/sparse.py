@@ -310,8 +310,7 @@ class CSRMM(th.autograd.Function):
     @staticmethod
     def forward(ctx, gidxA, A_weights, gidxB, B_weights, num_vtypes):
         gidxC, C_weights = _csrmm(gidxA, A_weights, gidxB, B_weights, num_vtypes)
-        nrows, ncols, C_indptr, C_indices, C_eids = gidxC.adjacency_matrix_tensors(
-            0, True, 'csr')
+        nrows, ncols, C_indptr, C_indices, C_eids = gidxC.adjacency_matrix_tensors(0, True, 'csr')
         # Note: the returned C_indptr, C_indices and C_eids tensors MUST be the same
         # as the underlying tensors of the created graph gidxC.
         ctx.backward_cache = gidxA, gidxB, gidxC
@@ -320,6 +319,7 @@ class CSRMM(th.autograd.Function):
 
     @staticmethod
     def backward(ctx, dnrows, dncols, dC_indptr, dC_indices, dC_eids, dC_weights):
+        # Only the last argument is meaningful.
         gidxA, gidxB, gidxC = ctx.backward_cache
         A_weights, B_weights = ctx.saved_tensors
         dgidxA, dA_weights = csrmm(
@@ -341,14 +341,13 @@ class CSRSum(th.autograd.Function):
         # Note: the returned C_indptr, C_indices and C_eids tensors MUST be the same
         # as the underlying tensors of the created graph gidxC.
         ctx.backward_cache = gidxs, gidxC
-        ctx.save_for_backward(*weights)
         return th.tensor(nrows), th.tensor(ncols), C_indptr, C_indices, C_eids, C_weights
 
     @staticmethod
     def backward(ctx, dnrows, dncols, dC_indptr, dC_indices, dC_eids, dC_weights):
+        # Only the last argument is meaningful.
         gidxs, gidxC = ctx.backward_cache
-        weights = ctx.saved_tensors
-        return tuple([None] + [csrmask(gidxC, dC_weights, gidx) for gidx in gidxs])
+        return (None,) + tuple(csrmask(gidxC, dC_weights, gidx) for gidx in gidxs)
 
 
 class CSRMask(th.autograd.Function):
@@ -360,7 +359,7 @@ class CSRMask(th.autograd.Function):
     @staticmethod
     def backward(ctx, dB_weights):
         gidxA, gidxB = ctx.backward_cache
-        return csrmask(gidxB, dB_weights, gidxA)
+        return None, csrmask(gidxB, dB_weights, gidxA), None
 
 
 def gspmm(gidx, op, reduce_op, lhs_data, rhs_data):
@@ -382,17 +381,17 @@ def scatter_add(x, idx, m):
     return ScatterAdd.apply(x, idx, m)
 
 def csrmm(gidxA, A_weights, gidxB, B_weights, num_vtypes):
-    nrows, ncols, C_indptr, C_indices, C_data, C_weights = \
+    nrows, ncols, C_indptr, C_indices, C_eids, C_weights = \
         CSRMM.apply(gidxA, A_weights, gidxB, B_weights, num_vtypes)
     gidxC = create_unitgraph_from_csr(
-        num_vtypes, nrows.item(), ncols.item(), C_indptr, C_indices, C_data,
+        num_vtypes, nrows.item(), ncols.item(), C_indptr, C_indices, C_eids,
         ["coo", "csr", "csc"])
     return gidxC, C_weights
 
 def csrsum(gidxs, weights):
-    nrows, ncols, C_indptr, C_indices, C_data, C_weights = CSRSum.apply(gidxs, *weights)
+    nrows, ncols, C_indptr, C_indices, C_eids, C_weights = CSRSum.apply(gidxs, *weights)
     gidxC = create_unitgraph_from_csr(
-        gidxs[0].number_of_ntypes(), nrows.item(), ncols.item(), C_indptr, C_indices, C_data,
+        gidxs[0].number_of_ntypes(), nrows.item(), ncols.item(), C_indptr, C_indices, C_eids,
         ["coo", "csr", "csc"])
     return gidxC, C_weights
 

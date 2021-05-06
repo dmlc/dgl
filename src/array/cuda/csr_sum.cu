@@ -78,14 +78,6 @@ std::pair<CSRMatrix, NDArray> CusparseCsrgeam2(
       B.indices.Ptr<IdType>(),
       matC, dC_csrOffsets_data, &nnzC, workspace));
 
-  std::cout << m << ' ' << n << std::endl;
-  std::cout << A.indptr << std::endl;
-  std::cout << A.indices << std::endl;
-  std::cout << B.indptr << std::endl;
-  std::cout << B.indices << std::endl;
-  std::cout << nnzA << ' ' << nnzB << ' ' << nnzC << std::endl;
-  std::cout << std::is_same<IdType, int32_t>::value << ' ' << std::is_same<DType, float>::value << std::endl;
-  std::cout << dC_csrOffsets << std::endl;
   dC_columns = IdArray::Empty({nnzC}, A.indptr->dtype, ctx);
   dC_weights = NDArray::Empty({nnzC}, A_weights_array->dtype, ctx);
   dC_columns_data = dC_columns.Ptr<IdType>();
@@ -107,7 +99,7 @@ std::pair<CSRMatrix, NDArray> CusparseCsrgeam2(
   CUSPARSE_CALL(cusparseDestroyMatDescr(matA));
   CUSPARSE_CALL(cusparseDestroyMatDescr(matB));
   CUSPARSE_CALL(cusparseDestroyMatDescr(matC));
-  return {CSRMatrix(A.num_rows, A.num_cols, dC_csrOffsets, dC_columns),
+  return {CSRMatrix(A.num_rows, A.num_cols, dC_csrOffsets, dC_columns, NullArray(), true),
     dC_weights};
 }
 }  // namespace cusparse
@@ -122,22 +114,31 @@ std::pair<CSRMatrix, NDArray> CSRSum(
 
   // Cast 64 bit indices to 32 bit
   std::vector<CSRMatrix> newAs;
+  newAs.reserve(n);
   bool cast = false;
   if (As[0].indptr->dtype.bits == 64) {
-    newAs.reserve(n);
     for (int i = 0; i < n; ++i)
       newAs.emplace_back(
         As[i].num_rows, As[i].num_cols, AsNumBits(As[i].indptr, 32),
         AsNumBits(As[i].indices, 32), AsNumBits(As[i].data, 32));
     cast = true;
+  } else {
+    for (int i = 0; i < n; ++i)
+      newAs.push_back(As[i]);
   }
-  const std::vector<CSRMatrix> &As_ref = cast ? newAs : As;
+
+  // cuSPARSE csrgeam2 requires the CSR to be sorted.
+  // TODO(BarclayII): ideally the sorted CSR should be cached but I'm not sure how to do it.
+  for (int i = 0; i < n; ++i) {
+    if (!newAs[i].sorted)
+      newAs[i] = CSRSort(newAs[i]);
+  }
 
   // Reorder weights if A[i] has edge IDs
   std::vector<NDArray> A_weights_reordered(n);
   for (int i = 0; i < n; ++i) {
-    if (CSRHasData(As[i]))
-      A_weights_reordered[i] = IndexSelect(A_weights[i], As[i].data);
+    if (CSRHasData(newAs[i]))
+      A_weights_reordered[i] = IndexSelect(A_weights[i], newAs[i].data);
     else
       A_weights_reordered[i] = A_weights[i];
   }
@@ -145,12 +146,12 @@ std::pair<CSRMatrix, NDArray> CSRSum(
   // Loop and sum
   auto result = std::make_pair(
       CSRMatrix(
-        As_ref[0].num_rows, As_ref[0].num_cols,
-        As_ref[0].indptr, As_ref[0].indices),
+        newAs[0].num_rows, newAs[0].num_cols,
+        newAs[0].indptr, newAs[0].indices),
       A_weights_reordered[0]);  // Weights already reordered so we don't need As[0].data
   for (int64_t i = 1; i < n; ++i)
     result = cusparse::CusparseCsrgeam2<DType, int32_t>(
-        result.first, result.second, As_ref[i], A_weights_reordered[i]);
+        result.first, result.second, newAs[i], A_weights_reordered[i]);
 
   // Cast 32 bit indices back to 64 bit if necessary
   if (cast) {
