@@ -4401,18 +4401,18 @@ class DGLHeteroGraph(object):
                 [0.],
                 [1.]])
 
-        **send_and_recv using user-defined functions**
+        **``send_and_recv`` using user-defined functions**
 
         >>> import torch as th
-        >>> g = dgl.graph([0, 1], [1, 2])
+        >>> g = dgl.graph(([0, 1], [1, 2]))
         >>> g.ndata['x'] = th.tensor([[1.], [2.], [3.]])
 
         >>> # Define the function for sending node features as messages.
         >>> def send_source(edges):
-        >>>     return {'m': edges.src['x']}
+        ...     return {'m': edges.src['x']}
         >>> # Sum the messages received and use this to replace the original node feature.
         >>> def simple_reduce(nodes):
-        >>>     return {'x': nodes.mailbox['m'].sum(1)}
+        ...     return {'x': nodes.mailbox['m'].sum(1)}
 
         Send and receive messages.
 
