@@ -97,7 +97,9 @@ std::pair<CSRMatrix, NDArray> CusparseCsrgeam2(
   CUSPARSE_CALL(cusparseDestroyMatDescr(matA));
   CUSPARSE_CALL(cusparseDestroyMatDescr(matB));
   CUSPARSE_CALL(cusparseDestroyMatDescr(matC));
-  return {CSRMatrix(A.num_rows, A.num_cols, dC_csrOffsets, dC_columns, NullArray(), true),
+  return {
+    CSRMatrix(A.num_rows, A.num_cols, dC_csrOffsets, dC_columns,
+              NullArray(dC_csrOffsets->dtype, dC_csrOffsets->ctx), true),
     dC_weights};
 }
 }  // namespace cusparse
@@ -145,7 +147,8 @@ std::pair<CSRMatrix, NDArray> CSRSum(
   auto result = std::make_pair(
       CSRMatrix(
         newAs[0].num_rows, newAs[0].num_cols,
-        newAs[0].indptr, newAs[0].indices),
+        newAs[0].indptr, newAs[0].indices,
+        NullArray(newAs[0].indptr->dtype, newAs[0].indptr->ctx)),
       A_weights_reordered[0]);  // Weights already reordered so we don't need As[0].data
   for (int64_t i = 1; i < n; ++i)
     result = cusparse::CusparseCsrgeam2<DType, int32_t>(
@@ -155,7 +158,8 @@ std::pair<CSRMatrix, NDArray> CSRSum(
   if (cast) {
     CSRMatrix C = result.first;
     return {
-      CSRMatrix(C.num_rows, C.num_cols, AsNumBits(C.indptr, 64), AsNumBits(C.indices, 64)),
+      CSRMatrix(C.num_rows, C.num_cols, AsNumBits(C.indptr, 64), AsNumBits(C.indices, 64),
+                AsNumBits(C.data, 64), true),
       result.second};
   } else {
     return result;

@@ -695,7 +695,7 @@ class HeteroGraphIndex(ObjectBase):
         if fmt == "csr":
             indptr = utils.toindex(rst(0), self.dtype).tousertensor()
             indices = utils.toindex(rst(1), self.dtype).tousertensor()
-            data = utils.toindex(rst(2)).tousertensor()
+            data = utils.toindex(rst(2), self.dtype).tousertensor()
             return nrows, ncols, indptr, indices, data
         elif fmt == 'coo':
             idx = utils.toindex(rst(0), self.dtype).tousertensor()
@@ -758,7 +758,7 @@ class HeteroGraphIndex(ObjectBase):
             row = F.asnumpy(row)
             col = F.asnumpy(col)
             data = np.arange(self.number_of_edges(etype)) if return_edge_ids \
-                   else np.ones_like(indices)
+                   else np.ones_like(row)
             return scipy.sparse.coo_matrix((data, (row, col)), shape=(nrows, ncols))
         else:
             raise ValueError("unknown format")
