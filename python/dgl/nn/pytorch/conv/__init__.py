@@ -12,7 +12,6 @@ from .graphconv import GraphConv, EdgeWeightNorm
 from .nnconv import NNConv
 from .relgraphconv import RelGraphConv
 from .sageconv import SAGEConv
-from .sageconv_opt import SAGEConvOpt
 from .sgconv import SGConv
 from .tagconv import TAGConv
 from .gatedgraphconv import GatedGraphConv
@@ -24,6 +23,6 @@ from .cfconv import CFConv
 from .dotgatconv import DotGatConv
 
 __all__ = ['GraphConv', 'EdgeWeightNorm', 'GATConv', 'TAGConv', 'RelGraphConv', 'SAGEConv',
-           'SAGEConvOpt','SGConv', 'APPNPConv', 'GINConv', 'GatedGraphConv', 'GMMConv',
+           'SGConv', 'APPNPConv', 'GINConv', 'GatedGraphConv', 'GMMConv',
            'ChebConv', 'AGNNConv', 'NNConv', 'DenseGraphConv', 'DenseSAGEConv',
            'DenseChebConv', 'EdgeConv', 'AtomicConv', 'CFConv', 'DotGatConv']
