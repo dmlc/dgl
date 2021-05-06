@@ -9,8 +9,6 @@
 #include "./cusparse_dispatcher.cuh"
 #include "../../runtime/cuda/cuda_common.h"
 
-#include <type_traits>
-
 namespace dgl {
 
 using namespace dgl::runtime;
