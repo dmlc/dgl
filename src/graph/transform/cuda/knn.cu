@@ -31,12 +31,12 @@ template <typename Type>
 struct SharedMemory {
   __device__ inline operator Type* () {
     extern __shared__ int __smem[];
-    return (Type*)__smem;
+    return reinterpret_cast<Type*>(__smem);
   }
 
   __device__ inline operator const Type* () const {
     extern __shared__ int __smem[];
-    return (Type)__smem;
+    return reinterpret_cast<Type*>(__smem);
   }
 };
 
@@ -46,12 +46,12 @@ template <>
 struct SharedMemory<double> {
   __device__ inline operator double* () {
     extern __shared__ double __smem_d[];
-    return (double*)__smem_d;
+    return reinterpret_cast<double*>(__smem_d);
   }
 
   __device__ inline operator const double* () const {
     extern __shared__ double __smem_d[];
-    return (double*)__smem_d;
+    return reinterpret_cast<double*>(__smem_d);
   }
 };
 
