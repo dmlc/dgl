@@ -4720,7 +4720,8 @@ class DGLHeteroGraph(object):
                 after the message reduction. It must be a :ref:`apiudf`.
 
         cross_reducer : str or callable function
-            Cross type reducer. One of ``"sum"``, ``"min"``, ``"max"``, ``"mean"``, ``"stack"`` or a callable function
+            Cross type reducer. One of ``"sum"``, ``"min"``, ``"max"``, ``"mean"``, ``"stack"``
+            or a callable function
         apply_node_func : callable, optional
             An optional apply function after the messages are reduced both
             type-wisely and across different types.
@@ -5922,7 +5923,7 @@ def reduce_dict_data(frames, reducer, order=None):
             redfn = reducer
         else:
             redfn = getattr(F, reducer, None)
-        
+
         if redfn is None:
             raise DGLError('Invalid cross type reducer. Must be one of '
                            '"sum", "max", "min", "mean" or "stack".')
