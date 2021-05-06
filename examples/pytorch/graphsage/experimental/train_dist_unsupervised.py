@@ -68,19 +68,18 @@ class SAGE(nn.Module):
         for l, layer in enumerate(self.layers):
             y = th.zeros(g.number_of_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
 
-            sampler = dgl.sampling.MultiLayerNeighborSampler([None])
-            dataloader = dgl.sampling.NodeDataLoader(
+            sampler = dgl.dataloading.MultiLayerNeighborSampler([None])
+            dataloader = dgl.dataloading.NodeDataLoader(
                 g,
                 th.arange(g.number_of_nodes()),
                 sampler,
-                batch_size=args.batch_size,
+                batch_size=batch_size,
                 shuffle=True,
                 drop_last=False,
-                num_workers=args.num_workers)
+                num_workers=0)
 
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
                 block = blocks[0]
-
                 block = block.int().to(device)
                 h = x[input_nodes].to(device)
                 h = layer(block, h)
@@ -92,7 +91,6 @@ class SAGE(nn.Module):
 
             x = y
         return y
-
 
 class NegativeSampler(object):
     def __init__(self, g, neg_nseeds):
@@ -270,7 +268,7 @@ def generate_emb(model, g, inputs, batch_size, device):
 def compute_acc(emb, labels, train_nids, val_nids, test_nids):
     """
     Compute the accuracy of prediction given the labels.
-    
+
     We will fist train a LogisticRegression model using the trained embeddings,
     the training set, validation set and test set is provided as the arguments.
 
@@ -459,7 +457,7 @@ if __name__ == '__main__':
     parser.add_argument('--ip_config', type=str, help='The file for IP configuration')
     parser.add_argument('--part_config', type=str, help='The path to the partition config file')
     parser.add_argument('--n_classes', type=int, help='the number of classes')
-    parser.add_argument('--num_gpus', type=int, default=-1, 
+    parser.add_argument('--num_gpus', type=int, default=-1,
                         help="the number of GPU device. Use -1 for CPU training")
     parser.add_argument('--num_epochs', type=int, default=20)
     parser.add_argument('--num_hidden', type=int, default=16)
@@ -479,6 +477,5 @@ if __name__ == '__main__':
     parser.add_argument('--remove_edge', default=False, action='store_true',
         help="whether to remove edges during sampling")
     args = parser.parse_args()
-    
     print(args)
     main(args)
