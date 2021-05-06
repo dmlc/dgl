@@ -20,37 +20,37 @@ def _random_simple_graph(idtype, dtype, ctx, M, N, max_nnz, srctype, dsttype, et
     return a, A
 
 @parametrize_dtype
-def test_csrmm(idtype):
-    for dtype in [F.float32, F.float64]:
-        a, A = _random_simple_graph(idtype, dtype, F.ctx(), 500, 600, 9000, 'A', 'B', 'AB')
-        b, B = _random_simple_graph(idtype, dtype, F.ctx(), 600, 700, 9000, 'B', 'C', 'BC')
-        C, C_weights = dgl.sparse.csrmm(A._graph, A.edata['w'], B._graph, B.edata['w'], 2)
-        C_adj = C.adjacency_matrix_scipy(0, True, 'csr')
-        C_adj.data = F.asnumpy(C_weights)
-        C_adj = F.tensor(C_adj.todense(), dtype=dtype)
-        c = F.tensor((a * b).todense(), dtype=dtype)
-        assert F.allclose(C_adj, c)
+@pytest.mark.parametrize('dtype', [F.float32, F.float64])
+def test_csrmm(idtype, dtype):
+    a, A = _random_simple_graph(idtype, dtype, F.ctx(), 500, 600, 9000, 'A', 'B', 'AB')
+    b, B = _random_simple_graph(idtype, dtype, F.ctx(), 600, 700, 9000, 'B', 'C', 'BC')
+    C, C_weights = dgl.sparse.csrmm(A._graph, A.edata['w'], B._graph, B.edata['w'], 2)
+    C_adj = C.adjacency_matrix_scipy(0, True, 'csr')
+    C_adj.data = F.asnumpy(C_weights)
+    C_adj = F.tensor(C_adj.todense(), dtype=dtype)
+    c = F.tensor((a * b).todense(), dtype=dtype)
+    assert F.allclose(C_adj, c)
 
 @parametrize_dtype
-def test_csrsum(idtype):
-    for dtype in [F.float32, F.float64]:
-        a, A = _random_simple_graph(idtype, dtype, F.ctx(), 500, 600, 9000, 'A', 'B', 'AB')
-        b, B = _random_simple_graph(idtype, dtype, F.ctx(), 500, 600, 9000, 'A', 'B', 'AB')
-        C, C_weights = dgl.sparse.csrsum([A._graph, B._graph], [A.edata['w'], B.edata['w']])
-        C_adj = C.adjacency_matrix_scipy(0, True, 'csr')
-        C_adj.data = F.asnumpy(C_weights)
-        C_adj = F.tensor(C_adj.todense(), dtype=dtype)
-        c = F.tensor((a + b).todense(), dtype=dtype)
-        assert F.allclose(C_adj, c)
+@pytest.mark.parametrize('dtype', [F.float32, F.float64])
+def test_csrsum(idtype, dtype):
+    a, A = _random_simple_graph(idtype, dtype, F.ctx(), 500, 600, 9000, 'A', 'B', 'AB')
+    b, B = _random_simple_graph(idtype, dtype, F.ctx(), 500, 600, 9000, 'A', 'B', 'AB')
+    C, C_weights = dgl.sparse.csrsum([A._graph, B._graph], [A.edata['w'], B.edata['w']])
+    C_adj = C.adjacency_matrix_scipy(0, True, 'csr')
+    C_adj.data = F.asnumpy(C_weights)
+    C_adj = F.tensor(C_adj.todense(), dtype=dtype)
+    c = F.tensor((a + b).todense(), dtype=dtype)
+    assert F.allclose(C_adj, c)
 
 @parametrize_dtype
-def test_csrmask(idtype):
-    for dtype in [F.float32, F.float64]:
-        a, A = _random_simple_graph(idtype, dtype, F.ctx(), 500, 600, 9000, 'A', 'B', 'AB')
-        b, B = _random_simple_graph(idtype, dtype, F.ctx(), 500, 600, 9000, 'A', 'B', 'AB')
-        C = dgl.sparse.csrmask(A._graph, A.edata['w'], B._graph)
-        c = F.tensor(a.tocsr()[b != 0], dtype)
-        assert F.allclose(C, c)
+@pytest.mark.parametrize('dtype', [F.float32, F.float64])
+def test_csrmask(idtype, dtype):
+    a, A = _random_simple_graph(idtype, dtype, F.ctx(), 500, 600, 9000, 'A', 'B', 'AB')
+    b, B = _random_simple_graph(idtype, dtype, F.ctx(), 500, 600, 9000, 'A', 'B', 'AB')
+    C = dgl.sparse.csrmask(A._graph, A.edata['w'], B._graph)
+    c = F.tensor(a.tocsr()[b != 0], dtype)
+    assert F.allclose(C, c)
 
 if __name__ == '__main__':
     test_csrmm(F.int32)

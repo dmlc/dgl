@@ -9,6 +9,8 @@
 #include "./cusparse_dispatcher.cuh"
 #include "../../runtime/cuda/cuda_common.h"
 
+#include <type_traits>
+
 namespace dgl {
 
 using namespace dgl::runtime;
@@ -41,14 +43,14 @@ std::pair<CSRMatrix, NDArray> CusparseCsrgeam2(
   CUSPARSE_CALL(cusparseSetStream(thr_entry->cusparse_handle, thr_entry->stream));
 
   cusparseMatDescr_t matA, matB, matC;
-  CUSPARSE_CALL(cusparseCreateMatDescr(&matA));
-  CUSPARSE_CALL(cusparseCreateMatDescr(&matB));
-  CUSPARSE_CALL(cusparseCreateMatDescr(&matC));
+  cusparse_create_descr(&matA);
+  cusparse_create_descr(&matB);
+  cusparse_create_descr(&matC);
 
   cusparseSetPointerMode(thr_entry->cusparse_handle, CUSPARSE_POINTER_MODE_HOST);
   size_t workspace_size = 0;
   /* prepare output C */
-  IdArray dC_csrOffsets = IdArray::Empty({A.num_rows+1}, A.indptr->dtype, ctx);
+  IdArray dC_csrOffsets = IdArray::Empty({m + 1}, A.indptr->dtype, ctx);
   IdType* dC_csrOffsets_data = dC_csrOffsets.Ptr<IdType>();
   IdArray dC_columns;
   NDArray dC_weights;
@@ -76,6 +78,14 @@ std::pair<CSRMatrix, NDArray> CusparseCsrgeam2(
       B.indices.Ptr<IdType>(),
       matC, dC_csrOffsets_data, &nnzC, workspace));
 
+  std::cout << m << ' ' << n << std::endl;
+  std::cout << A.indptr << std::endl;
+  std::cout << A.indices << std::endl;
+  std::cout << B.indptr << std::endl;
+  std::cout << B.indices << std::endl;
+  std::cout << nnzA << ' ' << nnzB << ' ' << nnzC << std::endl;
+  std::cout << std::is_same<IdType, int32_t>::value << ' ' << std::is_same<DType, float>::value << std::endl;
+  std::cout << dC_csrOffsets << std::endl;
   dC_columns = IdArray::Empty({nnzC}, A.indptr->dtype, ctx);
   dC_weights = NDArray::Empty({nnzC}, A_weights_array->dtype, ctx);
   dC_columns_data = dC_columns.Ptr<IdType>();

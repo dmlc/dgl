@@ -9,6 +9,7 @@ from ._ffi.function import _init_api
 from .base import dgl_warning, DGLError
 from . import convert
 from .heterograph import DGLHeteroGraph, DGLBlock
+from .heterograph_index import create_metagraph_index, create_heterograph_from_relations
 from .frame import Frame
 from . import ndarray as nd
 from . import backend as F
@@ -46,7 +47,9 @@ __all__ = [
     'metis_partition_assignment',
     'partition_graph_with_halo',
     'metis_partition',
-    'as_heterograph']
+    'as_heterograph',
+    'adj_product_graph',
+    'adj_sum_graph']
 
 
 def pairwise_squared_distance(x):
@@ -2228,6 +2231,129 @@ def to_simple(g,
     return simple_graph
 
 DGLHeteroGraph.to_simple = utils.alias_func(to_simple)
+
+def adj_product_graph(A, B, weight_name, etype='_E'):
+    r"""Create a weighted graph whose adjacency matrix is the product of
+    the adjacency matrices of the given two graphs.
+
+    Namely, given two weighted graphs :attr:`A` and :attr:`B`, whose rows
+    represent source nodes and columns represent destination nodes, this function
+    returns a new graph whose weighted adjacency matrix is
+    :math:`\mathrm{adj}(A) \times \mathrm{adj}(B)`.
+
+    The two graphs must be simple graphs, and must have only one edge type.
+    Moreover, the number of nodes of the destination node type of :attr:`A` must
+    be the same as the number of nodes of the source node type of :attr:`B`.
+
+    The source node type of the returned graph will be the same as the source
+    node type of graph :attr:`A`.  The destination node type of the returned
+    graph will be the same as the destination node type of graph :attr:`B`.
+    If the two node types are the same, the returned graph will be homogeneous.
+    Otherwise, it will be a bipartite graph.
+
+    Unlike ``scipy``, if an edge in the result graph has zero weight, it will
+    not be removed from the graph.
+
+    Notes
+    -----
+    The edge weights returned by this function is differentiable w.r.t. the
+    input edge weights.
+
+    If the graph format is restricted, both graphs must have CSR available.
+
+    Parameters
+    ----------
+    A : DGLGraph
+        The graph as left operand.
+    B : DGLGraph
+        The graph as right operand.
+    weight_name : str
+        The feature name of edge weight of both graphs.
+
+        The corresponding edge feature must be scalar.
+    etype : str, optional
+        The edge type of the returned graph.
+
+    Returns
+    -------
+    DGLGraph
+        The new graph.  The edge weight of the returned graph will have the
+        same feature name as :attr:`weight_name`.
+
+    Examples
+    --------
+    """
+    A_srctype, _, A_dsttype = A.canonical_etypes[0]
+    B_srctype, _, B_dsttype = B.canonical_etypes[0]
+    num_vtypes = 1 if A_srctype == B_dsttype else 2
+    srctype = A_srctype
+    dsttype = B_dsttype
+    ntypes = [srctype] if num_vtypes == 1 else [srctype, dsttype]
+
+    C_gidx, C_weights = F.csrmm(
+        A._graph, A.edata[weight_name], B._graph, B.edata[weight_name], num_vtypes)
+    num_nodes_dict = {srctype: A.num_nodes(srctype), dsttype: B.num_nodes(dsttype)}
+    C_metagraph, ntypes, etypes, canonical_etypes = \
+        create_metagraph_index(ntypes, [(srctype, etype, dsttype)])
+    num_nodes_per_type = [num_nodes_dict[ntype] for ntype in ntypes]
+    C_gidx = create_heterograph_from_relations(
+        C_metagraph, [C_gidx], utils.toindex(num_nodes_per_type))
+
+    C = DGLHeteroGraph(C_gidx, ntypes, etypes)
+    C.edata[weight_name] = C_weights
+    return C
+
+def adj_sum_graph(graphs, weight_name):
+    r"""Create a weighted graph whose adjacency matrix is the sum of the 
+    adjacency matrices of the given graphs, whose rows represent source nodes
+    and columns represent destination nodes.
+
+    All the graphs must be simple graphs, and must have only one edge type.
+    They also must have the same metagraph, i.e. have the same source node type
+    and the same destination node type.  Moreover, the number of nodes for every
+    graph must also be the same.
+
+    The metagraph of the returned graph will be the same as the input graphs.
+
+    Unlike ``scipy``, if an edge in the result graph has zero weight, it will
+    not be removed from the graph.
+
+    Notes
+    -----
+    The edge weights returned by this function is differentiable w.r.t. the
+    input edge weights.
+
+    If the graph format is restricted, both graphs must have CSR available.
+
+    Parameters
+    ----------
+    graphs : list[DGLGraph]
+        The list of graphs.  Must have at least one element.
+    weight_name : str
+        The feature name of edge weight of both graphs.
+
+        The corresponding edge feature must be scalar.
+
+    Returns
+    -------
+    DGLGraph
+        The new graph.  The edge weight of the returned graph will have the
+        same feature name as :attr:`weight_name`.
+
+    Examples
+    --------
+    """
+    metagraph = graphs[0]._graph.metagraph
+    num_nodes = utils.toindex(
+        [graphs[0]._graph.number_of_nodes(i) for i in range(graphs[0]._graph.number_of_ntypes())])
+    weights = [A.edata[weight_name] for A in graphs]
+    gidxs = [A._graph for A in graphs]
+    C_gidx, C_weights = F.csrsum(gidxs, weights)
+    C_gidx = create_heterograph_from_relations(metagraph, [C_gidx], num_nodes)
+
+    C = DGLHeteroGraph(C_gidx, graphs[0].ntypes, graphs[0].etypes)
+    C.edata[weight_name] = C_weights
+    return C
 
 def as_heterograph(g, ntype='_U', etype='_E'):  # pylint: disable=unused-argument
     """Convert a DGLGraph to a DGLHeteroGraph with one node and edge type.
