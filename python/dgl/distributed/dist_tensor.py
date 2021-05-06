@@ -78,6 +78,8 @@ class DistTensor:
         The system determines the right partition policy automatically.
     persistent : bool
         Whether the created tensor lives after the ``DistTensor`` object is destroyed.
+    is_gdata : bool
+        Whether the created tensor is a ndata/edata or not.
 
     Examples
     --------
@@ -100,7 +102,7 @@ class DistTensor:
     do the same.
     '''
     def __init__(self, shape, dtype, name=None, init_func=None, part_policy=None,
-                 persistent=False):
+                 persistent=False, is_gdata=True):
         self.kvstore = get_kvstore()
         assert self.kvstore is not None, \
                 'Distributed module is not initialized. Please call dgl.distributed.initialize.'
@@ -126,6 +128,7 @@ class DistTensor:
                     + 'its first dimension does not match the number of nodes or edges ' \
                     + 'of a distributed graph or there does not exist a distributed graph.'
 
+        self._tensor_name = name
         self._part_policy = part_policy
         assert part_policy.get_size() == shape[0], \
                 'The partition policy does not match the input shape.'
@@ -147,7 +150,7 @@ class DistTensor:
         self._name = str(data_name)
         self._persistent = persistent
         if self._name not in exist_names:
-            self.kvstore.init_data(self._name, shape, dtype, part_policy, init_func)
+            self.kvstore.init_data(self._name, shape, dtype, part_policy, init_func, is_gdata)
             self._owner = True
         else:
             self._owner = False
@@ -218,3 +221,14 @@ class DistTensor:
             The name of the tensor.
         '''
         return self._name
+
+    @property
+    def tensor_name(self):
+        '''Return the tensor name
+
+        Returns
+        -------
+        str
+            The name of the tensor.
+        '''
+        return self._tensor_name
