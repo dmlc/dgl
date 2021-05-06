@@ -51,8 +51,11 @@ def test_knn_cpu(algorithm):
     check_knn(g, x, 0, 3)
     check_knn(g, x, 3, 8)
 
+
 @pytest.mark.parametrize('algorithm', ['bruteforce-blas', 'bruteforce', 'bruteforce-sharemem'])
 def test_knn_cuda(algorithm):
+    if not th.cuda.is_available():
+        return
     x = th.randn(8, 3).to(F.cuda())
     kg = dgl.nn.KNNGraph(3)
     d = th.cdist(x, x).to(F.cpu())
