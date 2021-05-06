@@ -2349,12 +2349,13 @@ def adj_product_graph(A, B, weight_name, etype='_E'):
     num_nodes_per_type = [num_nodes_dict[ntype] for ntype in ntypes]
     C_gidx = create_heterograph_from_relations(
         C_metagraph, [C_gidx], utils.toindex(num_nodes_per_type))
+
     C = DGLHeteroGraph(C_gidx, ntypes, etypes)
     C.edata[weight_name] = C_weights
     return C
 
 def adj_sum_graph(graphs, weight_name):
-    r"""Create a weighted graph whose adjacency matrix is the sum of the 
+    r"""Create a weighted graph whose adjacency matrix is the sum of the
     adjacency matrices of the given graphs, whose rows represent source nodes
     and columns represent destination nodes.
 
