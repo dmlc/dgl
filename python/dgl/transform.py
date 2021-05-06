@@ -117,9 +117,6 @@ def knn_graph(x, k, algorithm='bruteforce-blas'):
     DGLGraph
         The constructred graph. The node IDs are in the same order as :attr:`x`.
 
-        If using the 'topk' algorithm, the returned graph is on the same device as input :attr:`x`.
-        Else, the returned graph is on CPU, regardless of the context of the input :attr:`x`.
-
     Examples
     --------
 
@@ -256,9 +253,6 @@ def segmented_knn_graph(x, k, segs, algorithm='bruteforce-blas'):
     -------
     DGLGraph
         The graph. The node IDs are in the same order as :attr:`x`.
-
-        If using the 'topk' algorithm, the returned graph is on the same device as input :attr:`x`.
-        Else, the returned graph is on CPU, regardless of the context of the input :attr:`x`.
 
     Examples
     --------
@@ -418,7 +412,7 @@ def knn(x, x_segs, y, y_segs, k, algorithm='bruteforce', dist='euclidean'):
                  F.to_dgl_nd(y), F.to_dgl_nd(y_offset),
                  k, F.zerocopy_to_dgl_ndarray_for_write(out),
                  algorithm)
-    return F.copy_to(out, F.cpu())
+    return out
 
 def to_bidirected(g, copy_ndata=False, readonly=None):
     r"""Convert the graph to a bi-directional simple graph and return.
