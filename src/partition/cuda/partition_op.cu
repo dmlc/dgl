@@ -4,6 +4,14 @@
  * \brief DGL utilities for working with the partitioned NDArrays 
  */
 
+#include "../partition_op.h"
+
+#include <dgl/runtime/device_api.h>
+
+#include "../../array/cuda/dgl_cub.cuh"
+#include "../../runtime/cuda/cuda_common.h"
+
+using namespace dgl::runtime;
 
 namespace dgl {
 namespace partition {
@@ -53,17 +61,18 @@ GeneratePermutationFromRemainder(
   CHECK_GE(num_parts, 1);
   if (num_parts == 1) {
     // no permutation
-    result.first = aten::Range(0, num_in, ctx);
-    result.second = aten::Full(num_in, num_parts, ctx); 
+    result.first = aten::Range(0, num_in, sizeof(IdType)*8, ctx);
+    result.second = aten::Full(num_in, num_parts, sizeof(int64_t)*8, ctx); 
 
-    return results;
+    return result;
   }
 
-  IdArray& out_counts = results.second = aten::Full(0, num_parts, ctx);
+  result.second = aten::Full(0, num_parts, sizeof(int64_t)*8, ctx);
+  int64_t * out_counts = static_cast<int64_t*>(result.second->data);
   if (num_in == 0) {
     // now that we've zero'd out_counts, nothing left to do for an empty
     // mapping
-    return results;
+    return result;
   }
 
   const int64_t part_bits =
@@ -76,17 +85,17 @@ GeneratePermutationFromRemainder(
     const dim3 block(256);
     const dim3 grid((num_in+block.x-1)/block.x);
 
-    if (comm_size < (1 << part_bits)) {
-      // comm_size is not a power of 2
-      _MapProcByRemainder<<<grid, block, 0, stream>>>(
+    if (num_parts < (1 << part_bits)) {
+      // num_parts is not a power of 2
+      _MapProcByRemainder<<<grid, block>>>(
           static_cast<const IdType*>(in_idx->data),
           num_in,
           num_parts,
           proc_id_in);
       CUDA_CALL(cudaGetLastError());
     } else {
-      // comm_size is a power of 2
-      _MapProcByMaskRemainder<<<grid, block, 0, stream>>>(
+      // num_parts is a power of 2
+      _MapProcByMaskRemainder<<<grid, block>>>(
           static_cast<const IdType*>(in_idx->data),
           num_in,
           static_cast<IdType>(num_parts-1),  // bit mask
@@ -99,20 +108,20 @@ GeneratePermutationFromRemainder(
   // performing a radix sort
   IdType * proc_id_out = static_cast<IdType*>(
       device->AllocWorkspace(ctx, sizeof(IdType)*num_in));
-  results.first = aten::NewIdArray(num_in, ctx, sizeof(IdType)*8);
-  IdType * perm_out = static_cast<IdType*>(results.first->data);
+  result.first = aten::NewIdArray(num_in, ctx, sizeof(IdType)*8);
+  IdType * perm_out = static_cast<IdType*>(result.first->data);
   {
     IdArray perm_in = aten::Range(0, num_in, sizeof(IdType)*8, ctx);
 
     size_t sort_workspace_size;
     CUDA_CALL(cub::DeviceRadixSort::SortPairs(nullptr, sort_workspace_size,
         proc_id_in, proc_id_out, static_cast<IdType*>(perm_in->data), perm_out,
-        num_in, 0, comm_bits, stream));
+        num_in, 0, part_bits));
 
     void * sort_workspace = device->AllocWorkspace(ctx, sort_workspace_size);
     CUDA_CALL(cub::DeviceRadixSort::SortPairs(sort_workspace, sort_workspace_size,
         proc_id_in, proc_id_out, static_cast<IdType*>(perm_in->data), perm_out,
-        num_in, 0, comm_bits, stream));
+        num_in, 0, part_bits));
     device->FreeWorkspace(ctx, sort_workspace);
   }
   device->FreeWorkspace(ctx, proc_id_in);
@@ -122,7 +131,7 @@ GeneratePermutationFromRemainder(
   // Count the number of values to be sent to each processor
   {
     using AtomicCount = unsigned long long; // NOLINT
-    static_assert(sizeof(AtomicCount) == sizeof(int64_t),
+    static_assert(sizeof(AtomicCount) == sizeof(*out_counts),
         "AtomicCount must be the same width as int64_t for atomicAdd "
         "in cub::DeviceHistogram::HistogramEven() to work");
 
@@ -139,11 +148,10 @@ GeneratePermutationFromRemainder(
         hist_workspace_size,
         proc_id_out,
         reinterpret_cast<AtomicCount*>(out_counts),
-        comm_size+1,
+        num_parts+1,
         static_cast<IdType>(0),
-        static_cast<IdType>(comm_size+1),
-        static_cast<int>(num_in),
-        stream));
+        static_cast<IdType>(num_parts+1),
+        static_cast<int>(num_in)));
 
     void * hist_workspace = device->AllocWorkspace(ctx, hist_workspace_size);
     CUDA_CALL(cub::DeviceHistogram::HistogramEven(
@@ -151,15 +159,14 @@ GeneratePermutationFromRemainder(
         hist_workspace_size,
         proc_id_out,
         reinterpret_cast<AtomicCount*>(out_counts),
-        comm_size+1,
+        num_parts+1,
         static_cast<IdType>(0),
-        static_cast<IdType>(comm_size+1),
-        static_cast<int>(num_in),
-        stream));
+        static_cast<IdType>(num_parts+1),
+        static_cast<int>(num_in)));
     device->FreeWorkspace(ctx, hist_workspace);
   }
 
-  return results;
+  return result;
 }
 
 
