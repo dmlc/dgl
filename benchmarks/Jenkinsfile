@@ -46,11 +46,11 @@ pipeline {
                         }
                         pullRequest.comment("Finished the Regression test. Result table is at https://dgl-asv-data.s3-us-west-2.amazonaws.com/${env.GIT_COMMIT}_${instance_type}/results/result.csv. Jenkins job link is ${RUN_DISPLAY_URL}. ")
                     } else {
-                        if (prOpenTriggerCause) {
-                            if (env.BUILD_ID == "1") {
-                                pullRequest.comment('To trigger regression tests: \n - `@dgl-bot run [instance-type] [which tests] [compare-with-branch]`; \n For example: `@dgl-bot run g4dn.4xlarge all dmlc/master` or `@dgl-bot run c5.9xlarge kernel,api dmlc/master`')
-                            }
-                        }
+                        // if (prOpenTriggerCause) {
+                        //     if (env.BUILD_ID == "1") {
+                        //         pullRequest.comment('To trigger regression tests: \n - `@dgl-bot run [instance-type] [which tests] [compare-with-branch]`; \n For example: `@dgl-bot run g4dn.4xlarge all dmlc/master` or `@dgl-bot run c5.9xlarge kernel,api dmlc/master`')
+                        //     }
+                        // }
                         echo('Build was not started by a trigger')
                     }
                 // echo("Comment: ${commentTriggerCause.getComment()}")

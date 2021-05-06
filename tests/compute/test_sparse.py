@@ -283,6 +283,5 @@ def test_segment_reduce(reducer):
         assert F.allclose(grad1, grad2)
         print('backward passed')
 
-
 if __name__ == '__main__':
     test_spmm(F.int32, graphs[0], spmm_shapes[0], 'mul', 'sum')

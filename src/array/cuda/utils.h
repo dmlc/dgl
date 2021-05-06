@@ -138,6 +138,40 @@ void _Fill(DType* ptr, size_t length, DType val) {
   CUDA_KERNEL_CALL(cuda::_FillKernel, nb, nt, 0, thr_entry->stream, ptr, length, val);
 }
 
+/*!
+ * \brief Search adjacency list linearly for each (row, col) pair and
+ * write the data under the matched position in the indices array to the output.
+ *
+ * If there is no match, the value in \c filler is written.
+ * If there are multiple matches, only the first match is written.
+ * If the given data array is null, write the matched position to the output.
+ */
+template <typename IdType, typename DType>
+__global__ void _LinearSearchKernel(
+    const IdType* indptr, const IdType* indices, const IdType* data,
+    const IdType* row, const IdType* col,
+    int64_t row_stride, int64_t col_stride,
+    int64_t length, const DType* weights, DType filler, DType* out) {
+  int tx = blockIdx.x * blockDim.x + threadIdx.x;
+  const int stride_x = gridDim.x * blockDim.x;
+  while (tx < length) {
+    int rpos = tx * row_stride, cpos = tx * col_stride;
+    IdType v = -1;
+    const IdType r = row[rpos], c = col[cpos];
+    for (IdType i = indptr[r]; i < indptr[r + 1]; ++i) {
+      if (indices[i] == c) {
+        v = data ? data[i] : i;
+        break;
+      }
+    }
+    if (v == -1)
+      out[tx] = filler;
+    else
+      out[tx] = weights ? weights[v] : v;
+    tx += stride_x;
+  }
+}
+
 }  // namespace cuda
 }  // namespace dgl
 
