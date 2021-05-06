@@ -2336,17 +2336,15 @@ def adj_product_graph(A, B, weight_name, etype='_E'):
     >>> C.ntypes
     ['A', 'C']
     """
-    A_srctype, _, A_dsttype = A.canonical_etypes[0]
-    B_srctype, _, B_dsttype = B.canonical_etypes[0]
-    num_vtypes = 1 if A_srctype == B_dsttype else 2
-    srctype = A_srctype
-    dsttype = B_dsttype
+    srctype, _, _ = A.canonical_etypes[0]
+    _, _, dsttype = B.canonical_etypes[0]
+    num_vtypes = 1 if srctype == dsttype else 2
     ntypes = [srctype] if num_vtypes == 1 else [srctype, dsttype]
 
     C_gidx, C_weights = F.csrmm(
         A._graph, A.edata[weight_name], B._graph, B.edata[weight_name], num_vtypes)
     num_nodes_dict = {srctype: A.num_nodes(srctype), dsttype: B.num_nodes(dsttype)}
-    C_metagraph, ntypes, etypes, canonical_etypes = \
+    C_metagraph, ntypes, etypes, _ = \
         create_metagraph_index(ntypes, [(srctype, etype, dsttype)])
     num_nodes_per_type = [num_nodes_dict[ntype] for ntype in ntypes]
     C_gidx = create_heterograph_from_relations(
