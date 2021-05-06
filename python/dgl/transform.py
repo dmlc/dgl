@@ -2349,7 +2349,6 @@ def adj_product_graph(A, B, weight_name, etype='_E'):
     num_nodes_per_type = [num_nodes_dict[ntype] for ntype in ntypes]
     C_gidx = create_heterograph_from_relations(
         C_metagraph, [C_gidx], utils.toindex(num_nodes_per_type))
-
     C = DGLHeteroGraph(C_gidx, ntypes, etypes)
     C.edata[weight_name] = C_weights
     return C
