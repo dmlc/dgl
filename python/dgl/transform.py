@@ -100,7 +100,8 @@ def knn_graph(x, k, algorithm='topk'):
     DGLGraph
         The constructred graph. The node IDs are in the same order as :attr:`x`.
 
-        The returned graph is on CPU, regardless of the context of input :attr:`x`.
+        If using the 'topk' algorithm, the returned graph is on the same device as input :attr:`x`.
+        Else, the returned graph is on CPU, regardless of the context of the input :attr:`x`.
 
     Examples
     --------
@@ -170,21 +171,17 @@ def _knn_graph_topk(x, k):
         x = F.unsqueeze(x, 0)
     n_samples, n_points, _ = F.shape(x)
 
+    ctx = F.context(x)
     dist = pairwise_squared_distance(x)
     k_indices = F.argtopk(dist, k, 2, descending=False)
-    dst = F.copy_to(k_indices, F.cpu())
-
-    src = F.zeros_like(dst) + F.reshape(F.arange(0, n_points), (1, -1, 1))
-
-    per_sample_offset = F.reshape(F.arange(0, n_samples) * n_points, (-1, 1, 1))
-    dst += per_sample_offset
-    src += per_sample_offset
-    dst = F.reshape(dst, (-1,))
-    src = F.reshape(src, (-1,))
-    adj = sparse.csr_matrix(
-        (F.asnumpy(F.zeros_like(dst) + 1), (F.asnumpy(dst), F.asnumpy(src))),
-        shape=(n_samples * n_points, n_samples * n_points))
-    return convert.from_scipy(adj)
+    # index offset for each sample
+    offset = F.arange(0, n_samples, ctx=ctx) * n_points
+    offset = F.unsqueeze(offset, 1)
+    src = F.reshape(k_indices, (n_samples, n_points * k))
+    src = F.unsqueeze(src, 0) + offset
+    dst = F.repeat(F.arange(0, n_points, ctx=ctx), k, dim=0)
+    dst = F.unsqueeze(dst, 0) + offset
+    return convert.graph((F.reshape(src, (-1,)), F.reshape(dst, (-1,))))
 
 #pylint: disable=invalid-name
 def segmented_knn_graph(x, k, segs, algorithm='topk'):
@@ -223,7 +220,8 @@ def segmented_knn_graph(x, k, segs, algorithm='topk'):
     DGLGraph
         The graph. The node IDs are in the same order as :attr:`x`.
 
-        The returned graph is on CPU, regardless of the context of input :attr:`x`.
+        If using the 'topk' algorithm, the returned graph is on the same device as input :attr:`x`.
+        Else, the returned graph is on CPU, regardless of the context of the input :attr:`x`.
 
     Examples
     --------
@@ -277,18 +275,14 @@ def _segmented_knn_graph_topk(x, k, segs):
     offset = np.insert(np.cumsum(segs), 0, 0)
 
     h_list = F.split(x, segs, 0)
-    dst = [
+    src = [
         F.argtopk(pairwise_squared_distance(h_g), k, 1, descending=False) +
         int(offset[i])
         for i, h_g in enumerate(h_list)]
-    dst = F.cat(dst, 0)
-    src = F.arange(0, n_total_points).unsqueeze(1).expand(n_total_points, k)
-
-    dst = F.reshape(dst, (-1,))
-    src = F.reshape(src, (-1,))
-    adj = sparse.csr_matrix((F.asnumpy(F.zeros_like(dst) + 1), (F.asnumpy(dst), F.asnumpy(src))))
-
-    return convert.from_scipy(adj)
+    src = F.cat(src, 0)
+    ctx = F.context(x)
+    dst = F.repeat(F.arange(0, n_total_points, ctx=ctx), k, dim=0)
+    return convert.graph((F.reshape(src, (-1,)), F.reshape(dst, (-1,))))
 
 def knn(x, x_segs, y, y_segs, k, algorithm='kd-tree', dist='euclidean'):
     r"""For each element in each segment in :attr:`y`, find :attr:`k` nearest
