@@ -57,6 +57,20 @@ IdArray Full(int64_t val, int64_t length, uint8_t nbits, DLContext ctx) {
   return ret;
 }
 
+template <typename DType>
+NDArray Full(DType val, int64_t length, DLContext ctx) {
+  NDArray ret;
+  ATEN_XPU_SWITCH_CUDA(ctx.device_type, XPU, "Full", {
+    ret = impl::Full<XPU, DType>(val, length, ctx);
+  });
+  return ret;
+}
+
+template NDArray Full<int32_t>(int32_t val, int64_t length, DLContext ctx);
+template NDArray Full<int64_t>(int64_t val, int64_t length, DLContext ctx);
+template NDArray Full<float>(float val, int64_t length, DLContext ctx);
+template NDArray Full<double>(double val, int64_t length, DLContext ctx);
+
 IdArray AsNumBits(IdArray arr, uint8_t bits) {
   CHECK(bits == 32 || bits == 64)
     << "Invalid ID type. Must be int32 or int64, but got int"
@@ -406,6 +420,25 @@ NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols) {
   return ret;
 }
 
+template <typename DType>
+NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols, NDArray weights, DType filler) {
+  NDArray ret;
+  CHECK_SAME_DTYPE(csr.indices, rows);
+  CHECK_SAME_DTYPE(csr.indices, cols);
+  CHECK_SAME_CONTEXT(csr.indices, rows);
+  CHECK_SAME_CONTEXT(csr.indices, cols);
+  CHECK_SAME_CONTEXT(csr.indices, weights);
+  ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRGetData", {
+    ret = impl::CSRGetData<XPU, IdType, DType>(csr, rows, cols, weights, filler);
+  });
+  return ret;
+}
+
+template NDArray CSRGetData<float>(
+    CSRMatrix csr, NDArray rows, NDArray cols, NDArray weights, float filler);
+template NDArray CSRGetData<double>(
+    CSRMatrix csr, NDArray rows, NDArray cols, NDArray weights, double filler);
+
 std::vector<NDArray> CSRGetDataAndIndices(
     CSRMatrix csr, NDArray rows, NDArray cols) {
   CHECK_SAME_DTYPE(csr.indices, rows);
@@ -507,16 +540,18 @@ CSRMatrix CSRRemove(CSRMatrix csr, IdArray entries) {
 COOMatrix CSRRowWiseSampling(
     CSRMatrix mat, IdArray rows, int64_t num_samples, FloatArray prob, bool replace) {
   COOMatrix ret;
-  ATEN_CSR_SWITCH(mat, XPU, IdType, "CSRRowWiseSampling", {
-    if (IsNullArray(prob)) {
+  if (IsNullArray(prob)) {
+    ATEN_CSR_SWITCH_CUDA(mat, XPU, IdType, "CSRRowWiseSampling", {
       ret = impl::CSRRowWiseSamplingUniform<XPU, IdType>(mat, rows, num_samples, replace);
-    } else {
+    });
+  } else {
+    ATEN_CSR_SWITCH(mat, XPU, IdType, "CSRRowWiseSampling", {
       ATEN_FLOAT_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
         ret = impl::CSRRowWiseSampling<XPU, IdType, FloatType>(
             mat, rows, num_samples, prob, replace);
       });
-    }
-  });
+    });
+  }
   return ret;
 }
 
