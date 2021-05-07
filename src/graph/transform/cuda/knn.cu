@@ -95,7 +95,7 @@ __global__ void bruteforce_knn_kernel(const FloatType* data_points, const IdType
       - data_points[d_idx * feature_size + dim_idx + 3];
       tmp_dist += diff0 * diff0 + diff1 * diff1 + diff2 * diff2 + diff3 * diff3;
 
-      // stop if curent distance > all top-k distances.
+      // stop if current distance > all top-k distances.
       if (tmp_dist > worst_dist) {
         early_stop = true;
         dim_idx = feature_size;
@@ -108,6 +108,11 @@ __global__ void bruteforce_knn_kernel(const FloatType* data_points, const IdType
       FloatType diff = query_points[q_idx * feature_size + dim_idx]
         - data_points[d_idx * feature_size + dim_idx];
       tmp_dist += diff * diff;
+
+      if (tmp_dist > worst_dist) {
+        early_stop = true;
+        break;
+      }
     }
 
     if (early_stop) continue;
@@ -218,6 +223,11 @@ __global__ void bruteforce_knn_share_kernel(const FloatType* data_points,
           const FloatType diff = query_buff[threadIdx.x + dim_idx * block_size]
             - data_buff[d_idx * feature_size + dim_idx];
           tmp_dist += diff * diff;
+
+          if (tmp_dist > worst_dist) {
+            early_stop = true;
+            break;
+          }
         }
 
         if (early_stop) continue;
