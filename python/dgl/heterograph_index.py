@@ -693,12 +693,12 @@ class HeteroGraphIndex(ObjectBase):
         ncols = self.number_of_nodes(dsttype) if transpose else self.number_of_nodes(srctype)
         nnz = self.number_of_edges(etype)
         if fmt == "csr":
-            indptr = utils.toindex(rst(0), self.dtype).tousertensor()
-            indices = utils.toindex(rst(1), self.dtype).tousertensor()
-            data = utils.toindex(rst(2), self.dtype).tousertensor()
+            indptr = F.from_dgl_nd(rst(0))
+            indices = F.from_dgl_nd(rst(1))
+            data = F.from_dgl_nd(rst(2))
             return nrows, ncols, indptr, indices, data
         elif fmt == 'coo':
-            idx = utils.toindex(rst(0), self.dtype).tousertensor()
+            idx = F.from_dgl_nd(rst(0))
             row, col = F.reshape(idx, (2, nnz))
             return nrows, ncols, row, col
         else:
