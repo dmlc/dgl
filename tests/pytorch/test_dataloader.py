@@ -3,6 +3,7 @@ import backend as F
 import unittest
 from torch.utils.data import DataLoader
 from collections import defaultdict
+from collections.abc import Iterator
 from itertools import product
 
 def _check_neighbor_sampling_dataloader(g, nids, dl, mode, collator):
@@ -179,6 +180,7 @@ def test_neighbor_sampler_dataloader():
     for _g, nid, collator, mode in zip(graphs, nids, collators, modes):
         dl = DataLoader(
             collator.dataset, collate_fn=collator.collate, batch_size=2, shuffle=True, drop_last=False)
+        assert isinstance(iter(dl), Iterator)
         _check_neighbor_sampling_dataloader(_g, nid, dl, mode, collator)
 
 def test_graph_dataloader():
@@ -186,6 +188,7 @@ def test_graph_dataloader():
     num_batches = 2
     minigc_dataset = dgl.data.MiniGCDataset(batch_size * num_batches, 10, 20)
     data_loader = dgl.dataloading.GraphDataLoader(minigc_dataset, batch_size=batch_size, shuffle=True)
+    assert isinstance(iter(data_loader), Iterator)
     for graph, label in data_loader:
         assert isinstance(graph, dgl.DGLGraph)
         assert F.asnumpy(label).shape[0] == batch_size
@@ -226,6 +229,7 @@ def test_node_dataloader():
     dataloader = dgl.dataloading.NodeDataLoader(
         g2, {nty: g2.nodes(nty) for nty in g2.ntypes},
         sampler, device=F.ctx(), batch_size=batch_size)
+    assert isinstance(iter(dataloader), Iterator)
     for input_nodes, output_nodes, blocks in dataloader:
         _check_device(input_nodes)
         _check_device(output_nodes)
@@ -280,6 +284,8 @@ def test_edge_dataloader():
         g2, {ety: g2.edges(form='eid', etype=ety) for ety in g2.canonical_etypes},
         sampler, device=F.ctx(), negative_sampler=neg_sampler,
         batch_size=batch_size)
+    
+    assert isinstance(iter(dataloader), Iterator)
     for input_nodes, pos_pair_graph, neg_pair_graph, blocks in dataloader:
         _check_device(input_nodes)
         _check_device(pos_pair_graph)
