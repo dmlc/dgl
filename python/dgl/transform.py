@@ -2310,11 +2310,11 @@ def sort_out_edges(g, tag=None, tag_pos="_TAG_POS"):
         tag_data = g.nodes[dsttype].data[tag]
         num_tags = int(F.asnumpy(F.max(tag_data, 0))) + 1
         tag_arr = F.zerocopy_to_dgl_ndarray(tag_data)
-    # sort_out_edges_(new_g, tag, tag_pos)
-    new_gidx, tag_pos_array = _CAPI_DGLHeteroSortOutEdges(g, tag_arr, num_tags)
-    print(new_gidx, tag_pos_array)
     new_g = g.clone()
-    return None
+    new_g._graph, tag_pos_arr = _CAPI_DGLHeteroSortOutEdges(g._graph, tag_arr, num_tags)
+    if tag is not None:
+        new_g.srcdata[tag_pos] = F.from_dgl_nd(tag_pos_arr)
+    return new_g
 
 
 def sort_in_edges(g, tag=None, tag_pos="_TAG_POS"):
@@ -2341,8 +2341,19 @@ def sort_in_edges(g, tag=None, tag_pos="_TAG_POS"):
     """
     if len(g.etypes) > 1:
         raise DGLError("Only support homograph and bipartite graph")
+    srctype = g.srctypes[0]
+    dsttype = g.dsttypes[0]
+    if tag is None:
+        tag_arr = nd.NULL["int32"]
+        num_tags = 0
+    else:
+        tag_data = g.nodes[srctype].data[tag]
+        num_tags = int(F.asnumpy(F.max(tag_data, 0))) + 1
+        tag_arr = F.zerocopy_to_dgl_ndarray(tag_data)
     new_g = g.clone()
-    sort_in_edges_(new_g, tag, tag_pos)
+    new_g._graph, tag_pos_arr = _CAPI_DGLHeteroSortInEdges(g._graph, tag_arr, num_tags)
+    if tag is not None:
+        new_g.dstdata[tag_pos] = F.from_dgl_nd(tag_pos_arr)
     return new_g
 
 _init_api("dgl.transform")

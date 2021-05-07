@@ -80,6 +80,7 @@ template void CSRSort_<kDLCPU, int32_t>(CSRMatrix* csr);
 
 template <DLDeviceType XPU, typename IdType, typename TagType>
 NDArray CSRSortByTag(const CSRMatrix* csr, const IdArray tag_array, int64_t num_tags, CSRMatrix* output) {
+std::cerr << "Called" << std::endl;
   const auto indptr_data = static_cast<const IdType *>(csr->indptr->data);
   const auto indices_data = static_cast<const IdType *>(csr->indices->data);
   const auto eid_array = aten::CSRHasData(*csr) ? csr->data :
@@ -91,34 +92,37 @@ NDArray CSRSortByTag(const CSRMatrix* csr, const IdArray tag_array, int64_t num_
   NDArray tag_pos = NDArray::Empty({csr->num_rows, num_tags + 1},
       csr->indptr->dtype, csr->indptr->ctx);
   auto tag_pos_data = static_cast<IdType *>(tag_pos->data);
+  std::fill(tag_pos_data, tag_pos_data + csr->num_rows * (num_tags + 1), 0);
 
   auto out_indptr_data = static_cast<IdType *>(output->indptr->data);
   auto out_indices_data = static_cast<IdType *>(output->indices->data);
   auto out_eid_data = static_cast<IdType *>(output->data->data);
 
-#pragma omp parallel for
+// #pragma omp parallel for
   for (IdType src = 0 ; src < num_rows ; ++src) {
     const IdType start = indptr_data[src];
     const IdType end = indptr_data[src + 1];
 
-    std::vector<IdType> pointer(num_tags);
+    auto tag_pos_row = tag_pos_data + src * (num_tags + 1);
+    std::vector<IdType> pointer(num_tags, 0);
 
     for (IdType ptr = start ; ptr < end ; ++ptr) {
       const IdType dst = indices_data[ptr];
       const TagType tag = tag_data[dst];
       CHECK_LT(tag, num_tags);
-      ++tag_pos_data[src * (num_tags + 1) + tag + 1];
+      ++tag_pos_row[tag + 1];
     } // count
 
-    for (TagType tag = 1 ; tag < num_tags; ++tag) {
-      tag_pos_data[src * (num_tags + 1) + tag] += tag_pos_data[src * (num_tags + 1) + tag - 1];
+    for (TagType tag = 1 ; tag <= num_tags; ++tag) {
+      tag_pos_row[tag] += tag_pos_row[tag - 1];
     } // cumulate
 
     for (IdType ptr = start ; ptr < end ; ++ptr) {
       IdType dst = indices_data[ptr];
       IdType eid = eid_data[ptr];
       TagType tag = tag_data[dst];
-      IdType offset = tag_pos_data[tag] + pointer[tag];
+      IdType offset = tag_pos_row[tag] + pointer[tag];
+      CHECK_LT(offset, tag_pos_row[tag + 1]);
       ++pointer[tag];
 
       out_indices_data[start + offset] = dst;
