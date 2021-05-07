@@ -33,7 +33,7 @@ def read_ip_config(filename):
         172.31.47.147 30050 2
         172.31.30.180 30050 2
 
-    Note that, DGL KVStore supports multiple servers that can share data with each other 
+    Note that, DGL KVStore supports multiple servers that can share data with each other
     on the same machine via shared-tensor. So the server_count should be >= 1.
 
     Parameters
@@ -103,11 +103,11 @@ def get_type_str(dtype):
 class KVServer(object):
     """KVServer is a lightweight key-value store service for DGL distributed training.
 
-    In practice, developers can use KVServer to hold large-scale graph features or 
-    graph embeddings across machines in a distributed setting. Also, user can re-wriite _push_handler() 
+    In practice, developers can use KVServer to hold large-scale graph features or
+    graph embeddings across machines in a distributed setting. Also, user can re-wriite _push_handler()
     and _pull_handler() API to support flexibale algorithms.
 
-    DGL kvstore supports multiple-servers on single-machine. That means we can lunach many servers on the same machine and all of 
+    DGL kvstore supports multiple-servers on single-machine. That means we can lunach many servers on the same machine and all of
     these servers will share the same shared-memory tensor for load-balance.
 
     Note that, DO NOT use KVServer in multiple threads on Python because this behavior is not defined.
@@ -119,7 +119,7 @@ class KVServer(object):
     server_id : int
         KVServer's ID (start from 0).
     server_namebook: dict
-        IP address namebook of KVServer, where key is the KVServer's ID 
+        IP address namebook of KVServer, where key is the KVServer's ID
         (start from 0) and value is the server's machine_id, IP address and port, e.g.,
 
           {0:'[0, 172.31.40.143, 30050],
@@ -196,7 +196,7 @@ class KVServer(object):
         name : str
             data name
         global2local : list or tensor (mx.ndarray or torch.tensor)
-            A data mapping of global ID to local ID. KVStore will use global ID by default 
+            A data mapping of global ID to local ID. KVStore will use global ID by default
             if the global2local is not been set.
 
             Note that, if the global2local is None KVServer will read shared-tensor.
@@ -260,7 +260,7 @@ class KVServer(object):
                     time.sleep(2) # wait writing finish
                     break
                 else:
-                    time.sleep(2) # wait until the file been created    
+                    time.sleep(2) # wait until the file been created
             data_shape, data_type = self._read_data_shape_type(name+'-part-shape-'+str(self._machine_id))
             assert data_type == 'int64'
             shared_data = empty_shared_mem(name+'-part-', False, data_shape, 'int64')
@@ -526,8 +526,8 @@ class KVServer(object):
                         c_ptr=None)
                     for client_id in range(self._client_count):
                         _send_kv_msg(self._sender, back_msg, client_id)
-                    self._barrier_count = 0  
-            # Final message              
+                    self._barrier_count = 0
+            # Final message
             elif msg.type == KVMsgType.FINAL:
                 print("Exit KVStore service %d, solved message count: %d" % (self.get_id(), self.get_message_count()))
                 break # exit loop
@@ -639,7 +639,7 @@ class KVServer(object):
 
 
     def _default_push_handler(self, name, ID, data, target):
-        """Default handler for PUSH message. 
+        """Default handler for PUSH message.
 
         On default, _push_handler perform update operation for the tensor.
 
@@ -680,7 +680,7 @@ class KVServer(object):
 
 
 class KVClient(object):
-    """KVClient is used to push/pull tensors to/from KVServer. If the server node and client node are on the 
+    """KVClient is used to push/pull tensors to/from KVServer. If the server node and client node are on the
     same machine, they can commuincate with each other using local shared-memory tensor, instead of TCP/IP connections.
 
     Note that, DO NOT use KVClient in multiple threads on Python because this behavior is not defined.
@@ -690,7 +690,7 @@ class KVClient(object):
     Parameters
     ----------
     server_namebook: dict
-        IP address namebook of KVServer, where key is the KVServer's ID 
+        IP address namebook of KVServer, where key is the KVServer's ID
         (start from 0) and value is the server's machine_id, IP address and port, and group_count, e.g.,
 
           {0:'[0, 172.31.40.143, 30050, 2],
@@ -807,7 +807,7 @@ class KVClient(object):
                     if (os.path.exists(tensor_name+'shape-'+str(self._machine_id))):
                         break
                     else:
-                        time.sleep(1) # wait until the file been created 
+                        time.sleep(1) # wait until the file been created
                 shape, data_type = self._read_data_shape_type(tensor_name+'shape-'+str(self._machine_id))
                 assert data_type == dtype
                 shared_data = empty_shared_mem(tensor_name, False, shape, dtype)
@@ -825,7 +825,7 @@ class KVClient(object):
                 type=KVMsgType.GET_SHAPE,
                 rank=self._client_id,
                 name=name,
-                id=None, 
+                id=None,
                 data=None,
                 shape=None,
                 c_ptr=None)
@@ -844,12 +844,12 @@ class KVClient(object):
 
 
     def init_data(self, name, shape, dtype, target_name):
-        """Send message to kvserver to initialize new data and 
-        get corresponded shared-tensor (e.g., partition_book, g2l) on kvclient. 
+        """Send message to kvserver to initialize new data and
+        get corresponded shared-tensor (e.g., partition_book, g2l) on kvclient.
 
         The new data will be initialized to zeros.
 
-        Note that, this API must be invoked after the conenct() API. 
+        Note that, this API must be invoked after the conenct() API.
 
         Parameters
         ----------
@@ -1034,10 +1034,10 @@ class KVClient(object):
                 local_data = partial_data
             else: # push data to remote server
                 msg = KVStoreMsg(
-                    type=KVMsgType.PUSH, 
-                    rank=self._client_id, 
+                    type=KVMsgType.PUSH,
+                    rank=self._client_id,
                     name=name,
-                    id=partial_id, 
+                    id=partial_id,
                     data=partial_data,
                     shape=None,
                     c_ptr=None)
@@ -1052,7 +1052,7 @@ class KVClient(object):
                 self._udf_push_handler(name+'-data-', local_id, local_data, self._data_store, self._udf_push_param)
             else:
                 self._default_push_handler(name+'-data-', local_id, local_data, self._data_store)
-    
+
 
     def pull(self, name, id_tensor):
         """Pull message from KVServer.
@@ -1081,8 +1081,8 @@ class KVClient(object):
                         self._group_count,
                         self._machine_id,
                         self._client_id,
-                        self._data_store[name+'-part-'], 
-                        g2l, 
+                        self._data_store[name+'-part-'],
+                        g2l,
                         self._data_store[name+'-data-'],
                         self._sender,
                         self._receiver)
@@ -1116,9 +1116,9 @@ class KVClient(object):
                         local_id = partial_id
                 else: # pull data from remote server
                     msg = KVStoreMsg(
-                        type=KVMsgType.PULL, 
-                        rank=self._client_id, 
-                        name=name, 
+                        type=KVMsgType.PULL,
+                        rank=self._client_id,
+                        name=name,
                         id=partial_id,
                         data=None,
                         shape=None,
@@ -1128,16 +1128,16 @@ class KVClient(object):
                     _send_kv_msg(self._sender, msg, s_id)
                     pull_count += 1
 
-                start += count[idx]           
+                start += count[idx]
 
             msg_list = []
             if local_id is not None: # local pull
                 local_data = self._udf_pull_handler(name+'-data-', local_id, self._data_store)
                 s_id = random.randint(self._machine_id*self._group_count, (self._machine_id+1)*self._group_count-1)
                 local_msg = KVStoreMsg(
-                    type=KVMsgType.PULL_BACK, 
+                    type=KVMsgType.PULL_BACK,
                     rank=s_id,
-                    name=name, 
+                    name=name,
                     id=None,
                     data=local_data,
                     shape=None,
@@ -1157,13 +1157,13 @@ class KVClient(object):
 
             return data_tensor[back_sorted_id] # return data with original index order
 
-        
+
     def barrier(self):
         """Barrier for all client nodes
 
         This API will be blocked untill all the clients call this API.
         """
-        msg = KVStoreMsg( 
+        msg = KVStoreMsg(
             type=KVMsgType.BARRIER,
             rank=self._client_id,
             name=None,
@@ -1215,7 +1215,7 @@ class KVClient(object):
             IP = '127.0.0.1'
         finally:
             s.close()
-        
+
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.bind(("",0))
         s.listen(1)
@@ -1365,7 +1365,7 @@ class KVClient(object):
 
 
     def _default_push_handler(self, name, ID, data, target):
-        """Default handler for PUSH message. 
+        """Default handler for PUSH message.
 
         On default, _push_handler perform update operation for the tensor.
 
@@ -1381,4 +1381,4 @@ class KVClient(object):
             self._data_store
         """
         target[name][ID] = data
-    
+
