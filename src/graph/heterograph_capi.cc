@@ -657,28 +657,40 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLAsImmutableGraph")
     *rv = GraphRef(hg->AsImmutableGraph());
   });
 
-DGL_REGISTER_GLOBAL("transform._CAPI_DGLHeteroSortOutEdges_")
+DGL_REGISTER_GLOBAL("transform._CAPI_DGLHeteroSortOutEdges")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     NDArray tag = args[1];
     int64_t num_tag = args[2];
-    auto csr = hg->GetCSRMatrix(0);
-    if (!num_tag)
-      aten::CSRSort_(&csr);
-    else
-      *rv = aten::CSRSortByTag_(&csr, tag, num_tag);
+    const auto csr = hg->GetCSRMatrix(0);
+    aten::CSRMatrix output(csr.num_rows, csr.num_cols,
+                           csr.indptr, csr.indices.Clone(),
+                           CSRHasData(csr)? csr.data.Clone() : csr.data,
+                           csr.sorted);
+    NDArray tag_pos = aten::NullArray();
+    if (!num_tag) {
+      aten::CSRSort_(&output);
+    } else {
+      tag_pos = aten::CSRSortByTag(&csr, tag, num_tag, &output);
+    }
+    HeteroGraphPtr output_hg = CreateFromCSR(hg->NumVertexTypes(), output, CSR_CODE);
+    List<ObjectRef> ret;
+    ret.push_back(HeteroGraphRef(output_hg));
+    ret.push_back(Value(MakeValue(tag_pos)));
   });
 
-DGL_REGISTER_GLOBAL("transform._CAPI_DGLHeteroSortInEdges_")
+DGL_REGISTER_GLOBAL("transform._CAPI_DGLHeteroSortInEdges")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    HeteroGraphRef hg = args[0];
-    NDArray tag = args[1];
-    int64_t num_tag = args[2];
-    auto csc = hg->GetCSCMatrix(0);
-    if (!num_tag)
-      aten::CSRSort_(&csc);
-    else
-      *rv = aten::CSRSortByTag_(&csc, tag, num_tag);
+    // HeteroGraphRef hg = args[0];
+    // NDArray tag = args[1];
+    // int64_t num_tag = args[2];
+    // const auto csc = hg->GetCSCMatrix(0);
+    // auto output_csc = output->GetCSCMatrix(0);
+    // if (!num_tag) {
+    //   aten::CSRSort_(&output_csc);
+    // } else {
+    //   *rv = aten::CSRSortByTag(&csc, tag, num_tag, &output_csc);
+    // }
   });
 
 DGL_REGISTER_GLOBAL("heterograph._CAPI_DGLFindSrcDstNtypes")

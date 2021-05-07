@@ -45,58 +45,9 @@ def check_sort(spm, tag_arr=None, tag_pos=None):
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sorting by tag not implemented")
 @parametrize_dtype
-def test_sort_inplace(index_dtype):
+def test_sort_outplace(idtype):
     num_nodes, num_adj, num_tags = 200, [20, 40], 5
-    g = create_test_heterograph(num_nodes, num_adj, num_tags, index_dtype=index_dtype)
-    g.ndata['tag'] = F.tensor(np.random.choice(num_tags, g.number_of_nodes()))
-
-    dgl.sort_out_edges_(g)
-    csr = g.adjacency_matrix(transpose=True, scipy_fmt='csr')
-    # 'transpose' may be removed in the future if the semantics of adjacency_matrix will change.
-    assert(check_sort(csr))    
-
-    dgl.sort_in_edges_(g)
-    csr = g.adjacency_matrix(scipy_fmt='csr')
-    assert(check_sort(csr))    
-
-    dgl.sort_out_edges_(g, 'tag')
-    csr = g.adjacency_matrix(transpose=True, scipy_fmt='csr')
-    assert(check_sort(csr, g.ndata['tag'], g.ndata['_TAG_POS']))
-
-    dgl.sort_in_edges_(g, 'tag')
-    csc = g.adjacency_matrix(scipy_fmt='csr')
-    assert(check_sort(csc, g.ndata['tag'], g.ndata['_TAG_POS']))
-
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sorting by tag not implemented")
-@parametrize_dtype
-def test_sort_inplace_bipartite(index_dtype):
-    num_nodes, num_adj, num_tags = 200, [20, 40], 5
-    g = create_test_heterograph(num_nodes, num_adj, num_tags, index_dtype=index_dtype)
-    g = dgl.bipartite(g.edges(), index_dtype=index_dtype)
-    g.nodes['_U'].data['tag'] = F.tensor(np.random.choice(num_tags, g.number_of_nodes('_U')))
-    g.nodes['_V'].data['tag'] = F.tensor(np.random.choice(num_tags, g.number_of_nodes('_V')))
-    
-    dgl.sort_out_edges_(g)
-    csr = g.adjacency_matrix(transpose=True, scipy_fmt='csr')
-    assert(check_sort(csr))   
-
-    dgl.sort_in_edges_(g)
-    csc = g.adjacency_matrix(scipy_fmt='csr')
-    assert(check_sort(csc))   
-
-    dgl.sort_out_edges_(g, 'tag')
-    csr = g.adjacency_matrix(etype='_E', transpose=True, scipy_fmt='csr')
-    assert(check_sort(csr, g.nodes['_V'].data['tag'], g.nodes['_U'].data['_TAG_POS']))
-
-    dgl.sort_in_edges_(g, 'tag')
-    csc = g.adjacency_matrix(etype='_E', scipy_fmt='csr')
-    assert(check_sort(csc, g.nodes['_U'].data['tag'], g.nodes['_V'].data['_TAG_POS']))
-
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sorting by tag not implemented")
-@parametrize_dtype
-def test_sort_outplace(index_dtype):
-    num_nodes, num_adj, num_tags = 200, [20, 40], 5
-    g = create_test_heterograph(num_nodes, num_adj, num_tags, index_dtype=index_dtype)
+    g = create_test_heterograph(num_nodes, num_adj, num_tags, idtype=idtype)
     g.ndata['tag'] = F.tensor(np.random.choice(num_tags, g.number_of_nodes()))
     
     new_g = dgl.sort_out_edges(g, 'tag')
@@ -113,10 +64,10 @@ def test_sort_outplace(index_dtype):
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sorting by tag not implemented")
 @parametrize_dtype
-def test_sort_outplace_bipartite(index_dtype):
+def test_sort_outplace_bipartite(idtype):
     num_nodes, num_adj, num_tags = 200, [20, 40], 5
-    g = create_test_heterograph(num_nodes, num_adj, num_tags, index_dtype=index_dtype)
-    g = dgl.bipartite(g.edges(), index_dtype=index_dtype)
+    g = create_test_heterograph(num_nodes, num_adj, num_tags, idtype=idtype)
+    g = dgl.bipartite(g.edges(), idtype=idtype)
     utag = np.random.choice(num_tags, g.number_of_nodes('_U'))
     vtag = np.random.choice(num_tags, g.number_of_nodes('_U'))
 
@@ -136,7 +87,5 @@ def test_sort_outplace_bipartite(index_dtype):
     assert(not check_sort(old_csc, g.nodes['_U'].data['tag']))
 
 if __name__ == "__main__":
-    test_sort_inplace("int32")
-    test_sort_inplace_bipartite("int32")
     test_sort_outplace("int32")
     test_sort_outplace_bipartite("int32")

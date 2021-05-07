@@ -2251,9 +2251,8 @@ def as_immutable_graph(hg):
                 '\tdgl.as_immutable_graph will do nothing and can be removed safely in all cases.')
     return hg
 
-def sort_out_edges_(g, tag=None, tag_pos="_TAG_POS"):
-    """Sort the out edges of the internal storage.
-
+def sort_out_edges(g, tag=None, tag_pos="_TAG_POS"):
+    """A copy of the given graph whose out edges are sorted.
     After sorting, edges whose destination shares the same
     tag will be arranged in a consecutive range. Note that this
     will not change the edge ID. It only changes the order in the
@@ -2288,78 +2287,6 @@ def sort_out_edges_(g, tag=None, tag_pos="_TAG_POS"):
     g : DGLHeteroGraph
         The heterograph
     tag : str
-        The name of the node feature used as tag.
-        The tag array must be integer.
-        When tag is None, sort by the node id of destination nodes.
-    tag_pos: str
-        The name of the node feature to store split positions of different tags in the
-        adjancency list.
-    """
-    if len(g.etypes) > 1:
-        raise DGLError("Only support homograph and bipartite graph")
-    srctype = g.srctypes[0]
-    dsttype = g.dsttypes[0]
-    if tag is None:
-        tag_arr = nd.NULL["int32"]
-        num_tags = 0
-    else:
-        tag_data = g.nodes[dsttype].data[tag]
-        num_tags = int(F.asnumpy(F.max(tag_data, 0))) + 1
-        tag_arr = F.zerocopy_to_dgl_ndarray(tag_data)
-    ret = _CAPI_DGLHeteroSortOutEdges_(g._graph, tag_arr, num_tags)
-    if tag is not None:
-        g.nodes[srctype].data[tag_pos] = F.zerocopy_from_dgl_ndarray(ret)
-
-def sort_in_edges_(g, tag=None, tag_pos="_TAG_POS"):
-    """Sort the in edges of the internal storage.
-
-    After sorting, edges whose destination shares the same
-    tag will be arranged in a consecutive range. Note that this
-    will not change the edge ID. It only changes the order in the
-    internal CSC storage. As such, the graph must allow CSR storage.
-
-    For bipartite graph, we get the tag data from the node feature `tag`
-    of source nodes and store the `tag_pos` in the node feature of
-    destination nodes.
-
-    Parameters
-    ----------
-    g : DGLHeteroGraph
-        The heterograph
-    tag : str
-        The name of the node feature used as tag
-        When tag is None, sort by the node id of destination nodes.
-    tag_pos : str
-        The name of the node feature to store split positions of different tags in the
-        adjancency list.
-
-    """
-    if len(g.etypes) > 1:
-        raise DGLError("Only support homograph and bipartite graph")
-    srctype = g.srctypes[0]
-    dsttype = g.dsttypes[0]
-    if tag is None:
-        tag_arr = nd.NULL["int32"]
-        num_tags = 0
-    else:
-        tag_data = g.nodes[srctype].data[tag]
-        num_tags = int(F.asnumpy(F.max(tag_data, 0))) + 1
-        tag_arr = F.zerocopy_to_dgl_ndarray(tag_data)
-    ret = _CAPI_DGLHeteroSortInEdges_(g._graph, tag_arr, num_tags)
-    if tag is not None:
-        g.nodes[dsttype].data[tag_pos] = F.zerocopy_from_dgl_ndarray(ret)
-
-def sort_out_edges(g, tag=None, tag_pos="_TAG_POS"):
-    """A copy of the given graph whose out edges are sorted.
-
-    The outplace version of sort_out_edges_
-    Node frames and edges frames are shallow copy of the original graph.
-
-    Parameters
-    ----------
-    g : DGLHeteroGraph
-        The heterograph
-    tag : str
         The name of the node feature used as tag
         When tag is None, sort by the node id of destination nodes.
     tag_pos : str
@@ -2374,16 +2301,27 @@ def sort_out_edges(g, tag=None, tag_pos="_TAG_POS"):
     """
     if len(g.etypes) > 1:
         raise DGLError("Only support homograph and bipartite graph")
+    srctype = g.srctypes[0]
+    dsttype = g.dsttypes[0]
+    if tag is None:
+        tag_arr = nd.NULL["int32"]
+        num_tags = 0
+    else:
+        tag_data = g.nodes[dsttype].data[tag]
+        num_tags = int(F.asnumpy(F.max(tag_data, 0))) + 1
+        tag_arr = F.zerocopy_to_dgl_ndarray(tag_data)
+    # sort_out_edges_(new_g, tag, tag_pos)
+    new_gidx, tag_pos_array = _CAPI_DGLHeteroSortOutEdges(g, tag_arr, num_tags)
+    print(new_gidx, tag_pos_array)
     new_g = g.clone()
-    sort_out_edges_(new_g, tag, tag_pos)
-    return new_g
+    return None
+
 
 def sort_in_edges(g, tag=None, tag_pos="_TAG_POS"):
     """A copy of the given graph whose in edges are sorted.
 
     The outplace version of sort_in_edges_
     Node frames and edges frames are shallow copy of the original graph.
-
     Parameters
     ----------
     g : DGLHeteroGraph
