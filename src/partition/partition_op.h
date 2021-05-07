@@ -13,6 +13,7 @@
 
 namespace dgl {
 namespace partition {
+namespace impl { 
 
 template <DLDeviceType XPU, typename IdType>
 std::pair<IdArray, IdArray>
@@ -21,6 +22,7 @@ GeneratePermutationFromRemainder(
         int num_parts,
         IdArray in_idx);
 
+}
 }
 }
 

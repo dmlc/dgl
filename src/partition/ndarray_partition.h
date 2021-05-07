@@ -21,7 +21,7 @@ class NDArrayPartition : public runtime::Object {
       int64_t array_size,
       int num_parts);
 
-  virtual ~NDarrayPartition() = default;
+  virtual ~NDArrayPartition() = default;
 
   static constexpr const char* _type_key = "partition.NDArrayPartition";
 
@@ -50,3 +50,11 @@ class NDArrayPartition : public runtime::Object {
 DGL_DEFINE_OBJECT_REF(NDArrayPartitionRef, NDArrayPartition);
 
 
+NDArrayPartitionRef CreatePartitionRemainderBased(
+    int64_t array_size,
+    int num_parts);
+
+}  // namespace partition
+}  // namespace dgl
+
+#endif

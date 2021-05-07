@@ -6,9 +6,12 @@
 
 #include "ndarray_partition.h"
 
+#include <utility>
+
+#include "partition_op.h"
+
 namespace dgl {
 namespace partition {
-
 
 NDArrayPartition::NDArrayPartition(
     const int64_t array_size, const int num_parts) :
@@ -30,13 +33,14 @@ int NDArrayPartition::NumParts() const
 
 class RemainderPartition : public NDArrayPartition {
  public:
-  RemainderPartition::RemainderPartition(
+  RemainderPartition(
       const int64_t array_size, const int num_parts) :
     NDArrayPartition(array_size, num_parts)
   {
+    // do nothing
   }
 
-  std::tuple<IdArray, IdArray>
+  std::pair<IdArray, IdArray>
   GeneratePermutation(
       IdArray in_idx) const override
   {
@@ -50,8 +54,16 @@ class RemainderPartition : public NDArrayPartition {
 
     LOG(FATAL) << "Only GPU is supported";
     // should be unreachable
-    return std::array<IdArray, IdArray>;
+    return std::pair<IdArray, IdArray>;
   }
+}
+
+NDArrayPartitionRef CreatePartitionRemainderBased(
+    const int64_t array_size,
+    const int num_parts)
+{
+  return NDArrayPartitionRef(std::make_shared<RemainderPartition>(
+          array_size, num_parts));
 }
 
 DGL_REGISTER_GLOBAL("partition._CAPI_DGLNDArrayPartitionCreateRemainderBased")
@@ -59,9 +71,8 @@ DGL_REGISTER_GLOBAL("partition._CAPI_DGLNDArrayPartitionCreateRemainderBased")
   int64_t array_size = args[0];
   int num_parts = args[1];
 
-  *rv = NDArrayPartitionRef(std::make_shared<RemainderPartition>(
-        array_size, num_parts));
+  *rv = CreatePartitionRemainderBased(array_size, num_parts); 
 });
 
-}
-}
+}  // namespace partition
+}  // namespace dgl
