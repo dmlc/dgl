@@ -133,7 +133,7 @@ class DataModule(LightningDataModule):
             batch_size=self.batch_size,
             shuffle=True,
             drop_last=False,
-            num_workers=self.num_workers).dataloader
+            num_workers=self.num_workers)
 
     def val_dataloader(self):
         # Note that the validation data loader is a NodeDataLoader
@@ -146,7 +146,7 @@ class DataModule(LightningDataModule):
             batch_size=self.batch_size,
             shuffle=False,
             drop_last=False,
-            num_workers=self.num_workers).dataloader
+            num_workers=self.num_workers)
 
 
 class UnsupervisedClassification(Callback):

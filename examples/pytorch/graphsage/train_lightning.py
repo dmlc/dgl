@@ -103,7 +103,7 @@ class DataModule(LightningDataModule):
             batch_size=self.batch_size,
             shuffle=True,
             drop_last=False,
-            num_workers=self.num_workers).dataloader
+            num_workers=self.num_workers)
 
     def val_dataloader(self):
         return dgl.dataloading.NodeDataLoader(
@@ -114,7 +114,7 @@ class DataModule(LightningDataModule):
             batch_size=self.batch_size,
             shuffle=True,
             drop_last=False,
-            num_workers=self.num_workers).dataloader
+            num_workers=self.num_workers)
 
 
 def evaluate(model, g, val_nid, device):
