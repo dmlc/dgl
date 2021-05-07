@@ -5910,7 +5910,9 @@ def reduce_dict_data(frames, reducer, order=None):
         # Directly return the only one input. Stack reducer requires
         # modifying tensor shape.
         return frames[0]
-    if reducer == 'stack':
+    if callable(reducer):
+        merger = reducer
+    elif reducer == 'stack':
         # Stack order does not matter. However, it must be consistent!
         if order:
             assert len(order) == len(frames)
@@ -5919,11 +5921,7 @@ def reduce_dict_data(frames, reducer, order=None):
         def merger(flist):
             return F.stack(flist, 1)
     else:
-        if callable(reducer):
-            redfn = reducer
-        else:
-            redfn = getattr(F, reducer, None)
-
+        redfn = getattr(F, reducer, None)
         if redfn is None:
             raise DGLError('Invalid cross type reducer. Must be one of '
                            '"sum", "max", "min", "mean" or "stack".')
