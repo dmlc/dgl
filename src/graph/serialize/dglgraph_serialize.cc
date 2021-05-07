@@ -163,7 +163,11 @@ StorageMetaData LoadDGLGraphs(const std::string &filename,
     // Would be better if idx_list is sorted. However the returned the graphs
     // should be the same order as the idx_list
     for (uint64_t i = 0; i < idx_list.size(); ++i) {
-      fs->Seek(graph_indices[idx_list[i]]);
+      auto gid = idx_list[i];
+      CHECK((gid < graph_indices.size()) && (gid >= 0))
+        << "ID " << gid
+        << " in idx_list is out of bound. Please check your idx_list.";
+      fs->Seek(graph_indices[gid]);
       GraphData gdata = GraphData::Create();
       GraphDataObject *gdata_ptr =
         const_cast<GraphDataObject *>(gdata.as<GraphDataObject>());

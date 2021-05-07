@@ -366,124 +366,87 @@ def _bwd_segment_cmp(feat, arg, m):
                                  to_dgl_nd_for_write(out))
     return out
 
-class CSRMatrix(object):
-    """Device- and backend-agnostic sparse matrix in CSR format.
+def csrmm(A, A_weights, B, B_weights, num_vtypes):
+    """Return a graph whose adjacency matrix is the sparse matrix multiplication
+    of those of two given graphs.
+
+    Note that the edge weights of both graphs must be scalar, i.e. :attr:`A_weights`
+    and :attr:`B_weights` must be 1D vectors.
 
     Parameters
     ----------
-    data : Tensor
-        The data array.
-    indices : Tensor
-        The column indices array.
-    indptr : Tensor
-        The row index pointer array.
-    num_rows : int
-        The number of rows.
-    num_cols : int
-        The number of columns.
-    """
-    def __init__(self, data, indices, indptr, num_rows, num_cols):
-        self.indptr = indptr
-        self.indices = indices
-        self.data = data
-        self.shape = (num_rows, num_cols)
-
-def csrmm(A, B):
-    """Sparse-sparse matrix multiplication.
-
-    This is an internal function whose interface is subject to changes.
-
-    Parameters
-    ----------
-    A : dgl.sparse.CSRMatrix
-        The left operand
-    B : dgl.sparse.CSRMatrix
-        The right operand
+    A : HeteroGraphIndex
+        The input graph index as left operand.
+    A_weights : Tensor
+        The edge weights of graph A as 1D tensor.
+    B : HeteroGraphIndex
+        The input graph index as right operand.
+    B_weights : Tensor
+        The edge weights of graph B as 1D tensor.
+    num_vtypes : int
+        The number of node types for the returned graph (must be either 1 or 2).
 
     Returns
     -------
-    dgl.sparse.CSRMatrix
-        The result
+    C : HeteroGraphIndex
+        The output graph index.
+    C_weights : Tensor
+        The edge weights of the output graph.
     """
-    A_indptr = F.zerocopy_from_numpy(A.indptr)
-    A_indices = F.zerocopy_from_numpy(A.indices)
-    A_data = F.zerocopy_from_numpy(A.data)
-    B_indptr = F.zerocopy_from_numpy(B.indptr)
-    B_indices = F.zerocopy_from_numpy(B.indices)
-    B_data = F.zerocopy_from_numpy(B.data)
-    C_indptr, C_indices, C_data = _CAPI_DGLCSRMM(
-        A.shape[0], A.shape[1], B.shape[1],
-        F.to_dgl_nd(A_indptr),
-        F.to_dgl_nd(A_indices),
-        F.to_dgl_nd(A_data),
-        F.to_dgl_nd(B_indptr),
-        F.to_dgl_nd(B_indices),
-        F.to_dgl_nd(B_data))
-    return CSRMatrix(
-        F.from_dgl_nd(C_data),
-        F.from_dgl_nd(C_indices),
-        F.from_dgl_nd(C_indptr),
-        A.shape[0],
-        B.shape[1])
+    C, C_weights = _CAPI_DGLCSRMM(
+        A, F.to_dgl_nd(A_weights), B, F.to_dgl_nd(B_weights), num_vtypes)
+    return C, F.from_dgl_nd(C_weights)
 
-def csrsum(As):
-    """Sparse-sparse matrix summation.
+def csrsum(As, A_weights):
+    """Return a graph whose adjacency matrix is the sparse matrix summation
+    of the given list of graphs.
 
-    This is an internal function whose interface is subject to changes.
+    Note that the edge weights of all graphs must be scalar, i.e. the arrays in
+    :attr:`A_weights` must be 1D vectors.
 
     Parameters
     ----------
-    As : List[dgl.sparse.CSRMatrix]
-        List of scipy sparse matrices in CSR format.
+    As : list[HeteroGraphIndex]
+        The input graph indices.
+    A_weights : list[Tensor]
+        The edge weights of graph A as 1D tensor.
 
     Returns
     -------
-    dgl.sparse.CSRMatrix
-        The result
+    C : HeteroGraphIndex
+        The output graph index.
+    C_weights : Tensor
+        The edge weights of the output graph.
     """
-    A_indptr = [F.zerocopy_from_numpy(x.indptr) for x in As]
-    A_indices = [F.zerocopy_from_numpy(x.indices) for x in As]
-    A_data = [F.zerocopy_from_numpy(x.data) for x in As]
-    C_indptr, C_indices, C_data = _CAPI_DGLCSRSum(
-        As[0].shape[0], As[0].shape[1],
-        [F.to_dgl_nd(x) for x in A_indptr],
-        [F.to_dgl_nd(x) for x in A_indices],
-        [F.to_dgl_nd(x) for x in A_data])
-    return CSRMatrix(
-        F.from_dgl_nd(C_data),
-        F.from_dgl_nd(C_indices),
-        F.from_dgl_nd(C_indptr),
-        As[0].shape[0], As[0].shape[1])
+    C, C_weights = _CAPI_DGLCSRSum(As, [F.to_dgl_nd(w) for w in A_weights])
+    return C, F.from_dgl_nd(C_weights)
 
-def csrmask(A, B):
-    """Sparse-sparse matrix masking operation that computes ``A[B != 0]``.
+def csrmask(A, A_weights, B):
+    """Return the weights of A at the locations identical to the sparsity pattern
+    of B.
 
-    This is an internal function whose interface is subject to changes.
+    If a non-zero entry in B does not exist in A, DGL returns 0 for that location
+    instead.
+
+    Note that the edge weights of the graph must be scalar, i.e. :attr:`A_weights`
+    must be a 1D vector.
+
+    In scipy notation this is identical to ``A[B != 0]``.
 
     Parameters
     ----------
-    A : dgl.sparse.CSRMatrix
-        The left operand
-    B : dgl.sparse.CSRMatrix
-        The right operand
+    A : HeteroGraphIndex
+        The input graph index as left operand.
+    A_weights : Tensor
+        The edge weights of graph A as 1D tensor.
+    B : HeteroGraphIndex
+        The input graph index as right operand.
 
     Returns
     -------
-    Tensor
-        The result
+    B_weights : Tensor
+        The output weights.
     """
-    A_indptr = F.zerocopy_from_numpy(A.indptr)
-    A_indices = F.zerocopy_from_numpy(A.indices)
-    A_data = F.zerocopy_from_numpy(A.data)
-    B_indptr = F.zerocopy_from_numpy(B.indptr)
-    B_indices = F.zerocopy_from_numpy(B.indices)
-    B_data = _CAPI_DGLCSRMask(
-        A.shape[0], A.shape[1],
-        F.to_dgl_nd(A_indptr),
-        F.to_dgl_nd(A_indices),
-        F.to_dgl_nd(A_data),
-        F.to_dgl_nd(B_indptr),
-        F.to_dgl_nd(B_indices))
-    return F.from_dgl_nd(B_data)
+    return F.from_dgl_nd(_CAPI_DGLCSRMask(A, F.to_dgl_nd(A_weights), B))
 
 _init_api("dgl.sparse")
