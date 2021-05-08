@@ -32,6 +32,7 @@ def test_knn_cpu(algorithm):
     d = th.cdist(x, x).to(F.cpu())
 
     def check_knn(g, x, start, end):
+        assert g.device == x.device
         for v in range(start, end):
             src, _ = g.in_edges(v)
             src = set(src.numpy())
@@ -61,6 +62,7 @@ def test_knn_cuda(algorithm):
     d = th.cdist(x, x).to(F.cpu())
 
     def check_knn(g, x, start, end):
+        assert g.device == x.device
         g = g.to(F.cpu())
         for v in range(start, end):
             src, _ = g.in_edges(v)
