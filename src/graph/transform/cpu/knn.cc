@@ -74,12 +74,19 @@ void HeapInsert(IdType* out, FloatType* dist,
     if (left_idx >= k) {
       break;
     } else if (right_idx >= k) {
-      if (dist[left_idx] > new_dist) swap_idx = left_idx;
-      else break;
+      if (dist[left_idx] > new_dist) { 
+        swap_idx = left_idx;
+      } else {
+        break;
+      }
     } else {
-      if (dist[left_idx] > new_dist && dist[left_idx] > dist[right_idx]) swap_idx = left_idx;
-      else if (dist[right_idx] > new_dist) swap_idx = right_idx;
-      else break;
+      if (dist[left_idx] > new_dist && dist[left_idx] > dist[right_idx]) {
+        swap_idx = left_idx;
+      } else if (dist[right_idx] > new_dist) {
+        swap_idx = right_idx;
+      } else {
+        break;
+      }
     }
 
     dist[curr_idx] = dist[swap_idx];
@@ -156,7 +163,8 @@ void BruteForceKNN(const NDArray& data_points, const IdArray& data_offsets,
         if (early_stop) continue;
 
         IdType out_offset = q_idx * k;
-        HeapInsert<FloatType, IdType>(data_out + out_offset, dist_buffer.data(), d_idx, tmp_dist, k);
+        HeapInsert<FloatType, IdType>(
+          data_out + out_offset, dist_buffer.data(), d_idx, tmp_dist, k);
         worst_dist = dist_buffer[0];
       }
     }
