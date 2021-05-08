@@ -62,6 +62,35 @@ void KdTreeKNN(const NDArray& data_points, const IdArray& data_offsets,
 }
 
 template <typename FloatType, typename IdType>
+void HeapInsert(IdType* out, FloatType* dist,
+                IdType new_id, FloatType new_dist,
+                int k) {
+  // we assume new distance <= worst distance
+  IdType left_idx = 0, right_idx = 0, curr_idx = 0, swap_idx = 0;
+  while (true) {
+    left_idx = 2 * curr_idx + 1;
+    right_idx = left_idx + 1;
+
+    if (left_idx >= k) {
+      break;
+    } else if (right_idx >= k) {
+      if (dist[left_idx] > new_dist) swap_idx = left_idx;
+      else break;
+    } else {
+      if (dist[left_idx] > new_dist && dist[left_idx] > dist[right_idx]) swap_idx = left_idx;
+      else if (dist[right_idx] > new_dist) swap_idx = right_idx;
+      else break;
+    }
+
+    dist[curr_idx] = dist[swap_idx];
+    out[curr_idx] = out[swap_idx];
+    curr_idx = swap_idx;
+  }
+  dist[curr_idx] = new_dist;
+  out[curr_idx] = new_id;
+}
+
+template <typename FloatType, typename IdType>
 void BruteForceKNN(const NDArray& data_points, const IdArray& data_offsets,
                    const NDArray& query_points, const IdArray& query_offsets,
                    const int k, IdArray result) {
@@ -86,9 +115,11 @@ void BruteForceKNN(const NDArray& data_points, const IdArray& data_offsets,
         query_out[q_idx * k + k_idx] = q_idx;
         dist_buffer[k_idx] = std::numeric_limits<FloatType>::max();
       }
+      FloatType worst_dist = std::numeric_limits<FloatType>::max();
 
       for (IdType d_idx = d_start; d_idx < d_end; ++d_idx) {
         FloatType tmp_dist = 0;
+        bool early_stop = false;
 
         // expand loop (x4)
         IdType dim_idx = 0;
@@ -103,6 +134,11 @@ void BruteForceKNN(const NDArray& data_points, const IdArray& data_offsets,
             - data_points_data[d_idx * feature_size + dim_idx + 3];
           tmp_dist += diff0 * diff0 + diff1 * diff1 + diff2 * diff2 + diff3 * diff3;
           dim_idx += 4;
+          if (tmp_dist > worst_dist) {
+            early_stop = true;
+            dim_idx = feature_size;
+            break;
+          }
         }
 
         // last 3 elements
@@ -111,20 +147,17 @@ void BruteForceKNN(const NDArray& data_points, const IdArray& data_offsets,
             - data_points_data[d_idx * feature_size + dim_idx];
           tmp_dist += diff * diff;
           ++dim_idx;
-        }
-
-        IdType out_offset = q_idx * k;
-        for (IdType k1 = 0; k1 < k; ++k1) {
-          if (dist_buffer[k1] > tmp_dist) {
-            for (IdType k2 = k - 1; k2 > k1; --k2) {
-              dist_buffer[k2] = dist_buffer[k2 - 1];
-              data_out[out_offset + k2] = data_out[out_offset + k2 - 1];
-            }
-            dist_buffer[k1] = tmp_dist;
-            data_out[out_offset + k1] = d_idx;
+          if (tmp_dist > worst_dist) {
+            early_stop = true;
             break;
           }
         }
+
+        if (early_stop) continue;
+
+        IdType out_offset = q_idx * k;
+        HeapInsert<FloatType, IdType>(data_out + out_offset, dist_buffer.data(), d_idx, tmp_dist, k);
+        worst_dist = dist_buffer[0];
       }
     }
   }
