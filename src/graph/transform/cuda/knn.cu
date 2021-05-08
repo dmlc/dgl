@@ -17,12 +17,6 @@
 namespace dgl {
 namespace transform {
 namespace impl {
-// This value can depend on the device, although in fact
-// this value is the good value for almost all cards.
-// Can use a better approach (e.g. a function) to determine
-// this value in the future.
-static constexpr size_t MAX_SHAREDMEM_PER_BLOCK = 49152;
-
 /*!
  * \brief Utility class used to avoid linker errors with extern
  *  unsized shared memory arrays with templated type
@@ -330,6 +324,11 @@ void BruteForceKNNSharedCuda(const NDArray& data_points, const IdArray& data_off
   IdType* query_out = result.Ptr<IdType>();
   IdType* data_out = query_out + k * query_points->shape[0];
 
+  // get max shared memory per block in bytes
+  int max_sharedmem_per_block = 0;
+  CUDA_CALL(cudaDeviceGetAttribute(
+    &max_sharedmem_per_block, cudaDevAttrMaxSharedMemoryPerBlock, ctx.device_id));
+
   // determine block size and number of blocks according to share memory size per block
   // This could be improved by using GPU implementation in future
   ::std::vector<IdType> data_offsets_host(data_offsets->shape[0]);
@@ -338,7 +337,7 @@ void BruteForceKNNSharedCuda(const NDArray& data_points, const IdArray& data_off
                          ctx, DLContext{kDLCPU, 0}, data_offsets->dtype,
                          nullptr);
   int64_t single_shared_mem = (k + 2 * feature_size) * sizeof(FloatType) + k * sizeof(IdType);
-  const int64_t block_size = cuda::FindNumThreads(MAX_SHAREDMEM_PER_BLOCK / single_shared_mem);
+  const int64_t block_size = cuda::FindNumThreads(max_sharedmem_per_block / single_shared_mem);
   int64_t num_blocks = 0;
 
 #pragma omp parallel for reduction(+:num_blocks)
