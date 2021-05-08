@@ -74,7 +74,7 @@ void HeapInsert(IdType* out, FloatType* dist,
     if (left_idx >= k) {
       break;
     } else if (right_idx >= k) {
-      if (dist[left_idx] > new_dist) { 
+      if (dist[left_idx] > new_dist) {
         swap_idx = left_idx;
       } else {
         break;
