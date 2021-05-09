@@ -453,7 +453,8 @@ COOMatrix CSRRowWiseTopk(
  * \param csr The csr matrix to be sorted
  * \param tag_array Tag of each column. IdArray with length num_cols
  * \param num_tags Number of tags. It should be equal to max(tag_array)+1.
- * \return the split positions of different tags. NDArray of shape (num_rows, num_tags + 1)
+ * \return 1. A sorted copy of the given CSR matrix
+ *         2. The split positions of different tags. NDArray of shape (num_rows, num_tags + 1)
  */
 std::pair<CSRMatrix, NDArray> CSRSortByTag(
     const CSRMatrix &csr,
