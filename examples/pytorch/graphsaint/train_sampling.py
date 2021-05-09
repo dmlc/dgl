@@ -22,7 +22,7 @@ def main(args):
     test_mask = g.ndata['test_mask']
     labels = g.ndata['label']
 
-    train_nid = np.nonzero(train_mask.data.numpy())[0].astype(np.int64)
+    train_nid = data.train_nid
 
     in_feats = g.ndata['feat'].shape[1]
     n_classes = data.num_classes
@@ -66,7 +66,7 @@ def main(args):
         g = g.to(args.gpu)
 
     print('labels shape:', g.ndata['label'].shape)
-    print("features shape, ", g.ndata['feat'].shape)
+    print("features shape:", g.ndata['feat'].shape)
 
     model = GCNNet(
         in_dim=in_feats,
@@ -74,7 +74,7 @@ def main(args):
         out_dim=n_classes,
         arch=args.arch,
         dropout=args.dropout,
-        batch_norm=args.batch_norm,
+        batch_norm=not args.no_batch_norm,
         aggr=args.aggr
     )
 
@@ -88,13 +88,12 @@ def main(args):
 
     # use optimizer
     optimizer = torch.optim.Adam(model.parameters(),
-                                 lr=args.lr,
-                                 weight_decay=args.weight_decay)
+                                 lr=args.lr)
 
     # set train_nids to cuda tensor
     if cuda:
         train_nid = torch.from_numpy(train_nid).cuda()
-        print("current memory after model before training",
+        print("GPU memory allocated before training(MB)",
               torch.cuda.memory_allocated(device=train_nid.device) / 1024 / 1024)
     start_time = time.time()
     best_f1 = -1
@@ -140,7 +139,7 @@ def main(args):
     print(f'training using time {end_time - start_time}')
 
     # test
-    if True:
+    if args.use_val:
         model.load_state_dict(torch.load(os.path.join(
             log_dir, 'best_model.pkl')))
     test_f1_mic, test_f1_mac = evaluate(
@@ -149,7 +148,7 @@ def main(args):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='GCN')
+    parser = argparse.ArgumentParser(description='GraphSAINT')
     # data source params
     parser.add_argument("--dataset", type=str, choices=['ppi', 'flickr', 'reddit', 'yelp', 'amazon'], default='ppi',
                         help="Name of dataset.")
@@ -170,7 +169,7 @@ if __name__ == '__main__':
     parser.add_argument("--length", type=int, default=2,
                         help="The length of random walk when using random walk sampler")
     parser.add_argument("--num-repeat", type=int, default=50,
-                        help="Number of repeating sampling one node to estimate edge / node probability")
+                        help="Number of times of repeating sampling one node to estimate edge / node probability")
 
     # model params
     parser.add_argument("--n-hidden", type=int, default=512,
@@ -180,7 +179,7 @@ if __name__ == '__main__':
                              "feature), and 0 means an order-0 layer (self feature only)")
     parser.add_argument("--dropout", type=float, default=0,
                         help="Dropout rate")
-    parser.add_argument("--batch-norm", action='store_true',
+    parser.add_argument("--no-batch-norm", action='store_true',
                         help="Whether to use batch norm")
     parser.add_argument("--aggr", type=str, default="concat", choices=['mean', 'concat'],
                         help="How to aggregate the self feature and neighbor features")
@@ -190,10 +189,10 @@ if __name__ == '__main__':
                         help="Number of training epochs")
     parser.add_argument("--lr", type=float, default=0.01,
                         help="Learning rate")
-    parser.add_argument("--weight-decay", type=float, default=0,
-                        help="Weight for L2 reg")
     parser.add_argument("--val-every", type=int, default=1,
                         help="Frequency of evaluation on the validation set in number of epochs")
+    parser.add_argument("--use-val", action='store_true',
+                        help="whether to use validated best model to test")
     parser.add_argument("--note", type=str, default='none',
                         help="Note for log dir")
 

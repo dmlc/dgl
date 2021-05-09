@@ -50,8 +50,8 @@ class GCNLayer(nn.Module):
         h_in = self.dropout(features)
         h_hop = [h_in]
 
+        D_norm = g.ndata['train_D_norm'] if 'train_D_norm' in g.ndata else g.ndata['full_D_norm']
         for _ in range(self.order):
-            D_norm = g.ndata['train_D_norm'] if 'train_D_norm' in g.ndata else g.ndata['full_D_norm']
             g.ndata['h'] = h_hop[-1]
             if 'w' not in g.edata:
                 g.edata['w'] = th.ones((g.num_edges(), )).to(features.device)

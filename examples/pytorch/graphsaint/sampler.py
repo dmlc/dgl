@@ -10,6 +10,7 @@ from dgl.sampling import random_walk, pack_traces
 
 
 # The base class of sampler
+# (TODO): online sampling
 class SAINTSampler(object):
     def __init__(self, dn, g, train_nid, node_budget, num_repeat=50):
         """
@@ -17,7 +18,7 @@ class SAINTSampler(object):
         :param g: full graph
         :param train_nid: ids of training nodes
         :param node_budget: expected number of sampled nodes
-        :param num_repeat: number of repeating sampling one node
+        :param num_repeat: number of times of repeating sampling one node
         """
         self.g = g
         self.train_g: dgl.graph = g.subgraph(train_nid)
@@ -38,7 +39,7 @@ class SAINTSampler(object):
             self.N, sampled_nodes = 0, 0
 
             t = time.perf_counter()
-            while sampled_nodes < self.train_g.num_nodes() * num_repeat:
+            while sampled_nodes <= self.train_g.num_nodes() * num_repeat:
                 subgraph = self.__sample__()
                 self.subgraphs.append(subgraph)
                 sampled_nodes += subgraph.shape[0]
@@ -89,7 +90,7 @@ class SAINTSampler(object):
 
         self.train_g.ndata['n_c'] = self.node_counter
         self.train_g.edata['e_c'] = self.edge_counter
-        self.train_g.apply_edges(fn.u_div_e('n_c', 'e_c', 'a_n'))
+        self.train_g.apply_edges(fn.v_div_e('n_c', 'e_c', 'a_n'))
         aggr_norm = self.train_g.edata.pop('a_n')
 
         self.train_g.ndata.pop('n_c')
@@ -131,7 +132,7 @@ class SAINTNodeSampler(SAINTSampler):
         graph_fn = os.path.join('./subgraphs/{}_Node_{}_{}.npy'.format(self.dn, self.node_budget,
                                                                        self.num_repeat))
         norm_fn = os.path.join('./subgraphs/{}_Node_{}_{}_norm.npy'.format(self.dn, self.node_budget,
-                                                                          self.num_repeat))
+                                                                           self.num_repeat))
         return graph_fn, norm_fn
 
     def __sample__(self):
@@ -149,9 +150,9 @@ class SAINTEdgeSampler(SAINTSampler):
 
     def __generate_fn__(self):
         graph_fn = os.path.join('./subgraphs/{}_Edge_{}_{}.npy'.format(self.dn, self.edge_budget,
-                                                                      self.num_repeat))
+                                                                       self.num_repeat))
         norm_fn = os.path.join('./subgraphs/{}_Edge_{}_{}_norm.npy'.format(self.dn, self.edge_budget,
-                                                                          self.num_repeat))
+                                                                           self.num_repeat))
         return graph_fn, norm_fn
 
     def __sample__(self):
@@ -177,11 +178,11 @@ class SAINTRandomWalkSampler(SAINTSampler):
         graph_fn = os.path.join('./subgraphs/{}_RW_{}_{}_{}.npy'.format(self.dn, self.num_roots,
                                                                         self.length, self.num_repeat))
         norm_fn = os.path.join('./subgraphs/{}_RW_{}_{}_{}_norm.npy'.format(self.dn, self.num_roots,
-                                                                           self.length, self.num_repeat))
+                                                                            self.length, self.num_repeat))
         return graph_fn, norm_fn
 
     def __sample__(self):
-        sampled_roots = th.randint(0, self.train_g.num_nodes(), (self.num_roots, )).unique()
+        sampled_roots = th.randint(0, self.train_g.num_nodes(), (self.num_roots, ))
         traces, types = random_walk(self.train_g, nodes=sampled_roots, length=self.length)
         sampled_nodes, _, _, _ = pack_traces(traces, types)
         sampled_nodes = sampled_nodes.unique()

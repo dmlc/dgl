@@ -14,7 +14,7 @@ class Logger(object):
     def __init__(self, path):
         """Initialize the logger.
 
-        Paramters
+        Parameters
         ---------
         path : str
             The file path to be stored in.
@@ -55,14 +55,17 @@ def evaluate(model, g, labels, mask, multilabel=False):
         return f1_mic, f1_mac
 
 
-# load data of GraphSaint and translate them to the format of dgl
+# load data of GraphSAINT and convert them to the format of dgl
 def load_data(args, multilabel):
     prefix = "data/{}".format(args.dataset)
-    DataType = namedtuple('Dataset', ['num_classes', 'g'])
+    DataType = namedtuple('Dataset', ['num_classes', 'train_nid', 'g'])
 
     adj_full = scipy.sparse.load_npz('./{}/adj_full.npz'.format(prefix)).astype(np.bool)
     g = dgl.from_scipy(adj_full)
-    num_nodes = g.number_of_nodes()
+    num_nodes = g.num_nodes()
+
+    adj_train = scipy.sparse.load_npz('./{}/adj_train.npz'.format(prefix)).astype(np.bool)
+    train_nid = np.array(list(set(adj_train.nonzero()[0])))
 
     role = json.load(open('./{}/role.json'.format(prefix)))
     mask = np.zeros((num_nodes,), dtype=bool)
@@ -75,7 +78,7 @@ def load_data(args, multilabel):
 
     feats = np.load('./{}/feats.npy'.format(prefix))
     scaler = StandardScaler()
-    scaler.fit(feats[train_mask])
+    scaler.fit(feats[train_nid])
     feats = scaler.transform(feats)
 
     class_map = json.load(open('./{}/class_map.json'.format(prefix)))
@@ -97,5 +100,5 @@ def load_data(args, multilabel):
     g.ndata['val_mask'] = torch.tensor(val_mask, dtype=torch.bool)
     g.ndata['test_mask'] = torch.tensor(test_mask, dtype=torch.bool)
 
-    data = DataType(g=g, num_classes=num_classes)
+    data = DataType(g=g, num_classes=num_classes, train_nid=train_nid)
     return data
