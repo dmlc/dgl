@@ -100,6 +100,7 @@ std::pair<CSRMatrix, NDArray> CSRSortByTag(
 
   auto out_indices_data = static_cast<IdType *>(output.indices->data);
   auto out_eid_data = static_cast<IdType *>(output.data->data);
+
 #pragma omp parallel for
   for (IdType src = 0 ; src < num_rows ; ++src) {
     const IdType start = indptr_data[src];
@@ -113,11 +114,11 @@ std::pair<CSRMatrix, NDArray> CSRSortByTag(
       const TagType tag = tag_data[dst];
       CHECK_LT(tag, num_tags);
       ++tag_pos_row[tag + 1];
-    } // count
+    }  // count
 
     for (TagType tag = 1 ; tag <= num_tags; ++tag) {
       tag_pos_row[tag] += tag_pos_row[tag - 1];
-    } // cumulate
+    }  // cumulate
 
     for (IdType ptr = start ; ptr < end ; ++ptr) {
       IdType dst = indices_data[ptr];

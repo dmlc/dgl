@@ -11,6 +11,7 @@
 #include <vector>
 #include <tuple>
 #include <string>
+#include <utility>
 #include "./types.h"
 #include "./array_ops.h"
 #include "./spmat.h"
