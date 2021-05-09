@@ -79,25 +79,28 @@ template void CSRSort_<kDLCPU, int64_t>(CSRMatrix* csr);
 template void CSRSort_<kDLCPU, int32_t>(CSRMatrix* csr);
 
 template <DLDeviceType XPU, typename IdType, typename TagType>
-NDArray CSRSortByTag(const CSRMatrix* csr, const IdArray tag_array, int64_t num_tags, CSRMatrix* output) {
-  const auto indptr_data = static_cast<const IdType *>(csr->indptr->data);
-  const auto indices_data = static_cast<const IdType *>(csr->indices->data);
-  const auto eid_array = aten::CSRHasData(*csr) ? csr->data :
-    aten::Range(0, csr->indices->shape[0], csr->indptr->dtype.bits, csr->indptr->ctx);
-  const auto eid_data = static_cast<const IdType *>(csr->data->data);
+std::pair<CSRMatrix, NDArray> CSRSortByTag(
+    const CSRMatrix &csr, const IdArray tag_array, int64_t num_tags) {
+  const auto indptr_data = static_cast<const IdType *>(csr.indptr->data);
+  const auto indices_data = static_cast<const IdType *>(csr.indices->data);
+  const auto eid_array = aten::CSRHasData(csr) ? csr.data :
+    aten::Range(0, csr.indices->shape[0], csr.indptr->dtype.bits, csr.indptr->ctx);
+  const auto eid_data = static_cast<const IdType *>(csr.data->data);
   const auto tag_data = static_cast<const TagType *>(tag_array->data);
-  const int64_t num_rows = csr->num_rows;
+  const int64_t num_rows = csr.num_rows;
 
-  NDArray tag_pos = NDArray::Empty({csr->num_rows, num_tags + 1},
-      csr->indptr->dtype, csr->indptr->ctx);
+  NDArray tag_pos = NDArray::Empty({csr.num_rows, num_tags + 1},
+      csr.indptr->dtype, csr.indptr->ctx);
   auto tag_pos_data = static_cast<IdType *>(tag_pos->data);
-  std::fill(tag_pos_data, tag_pos_data + csr->num_rows * (num_tags + 1), 0);
+  std::fill(tag_pos_data, tag_pos_data + csr.num_rows * (num_tags + 1), 0);
 
-  auto out_indptr_data = static_cast<IdType *>(output->indptr->data);
-  auto out_indices_data = static_cast<IdType *>(output->indices->data);
-  auto out_eid_data = static_cast<IdType *>(output->data->data);
+  aten::CSRMatrix output(csr.num_rows, csr.num_cols,
+                         csr.indptr.Clone(), csr.indices.Clone(),
+                         eid_array.Clone(), csr.sorted);
 
-// #pragma omp parallel for
+  auto out_indices_data = static_cast<IdType *>(output.indices->data);
+  auto out_eid_data = static_cast<IdType *>(output.data->data);
+#pragma omp parallel for
   for (IdType src = 0 ; src < num_rows ; ++src) {
     const IdType start = indptr_data[src];
     const IdType end = indptr_data[src + 1];
@@ -128,19 +131,18 @@ NDArray CSRSortByTag(const CSRMatrix* csr, const IdArray tag_array, int64_t num_
       out_eid_data[start + offset] = eid;
     }
   }
-
-  output->sorted = false;
-  return tag_pos;
+  output.sorted = false;
+  return std::make_pair(output, tag_pos);
 }
 
-template NDArray CSRSortByTag<kDLCPU, int64_t, int64_t>(
-    const CSRMatrix* csr, const IdArray tag, int64_t num_tags, CSRMatrix* output);
-template NDArray CSRSortByTag<kDLCPU, int64_t, int32_t>(
-    const CSRMatrix* csr, const IdArray tag, int64_t num_tags, CSRMatrix* output);
-template NDArray CSRSortByTag<kDLCPU, int32_t, int64_t>(
-    const CSRMatrix* csr, const IdArray tag, int64_t num_tags, CSRMatrix* output);
-template NDArray CSRSortByTag<kDLCPU, int32_t, int32_t>(
-    const CSRMatrix* csr, const IdArray tag, int64_t num_tags, CSRMatrix* output);
+template std::pair<CSRMatrix, NDArray> CSRSortByTag<kDLCPU, int64_t, int64_t>(
+    const CSRMatrix &csr, const IdArray tag, int64_t num_tags);
+template std::pair<CSRMatrix, NDArray> CSRSortByTag<kDLCPU, int64_t, int32_t>(
+    const CSRMatrix &csr, const IdArray tag, int64_t num_tags);
+template std::pair<CSRMatrix, NDArray> CSRSortByTag<kDLCPU, int32_t, int64_t>(
+    const CSRMatrix &csr, const IdArray tag, int64_t num_tags);
+template std::pair<CSRMatrix, NDArray> CSRSortByTag<kDLCPU, int32_t, int32_t>(
+    const CSRMatrix &csr, const IdArray tag, int64_t num_tags);
 
 }  // namespace impl
 }  // namespace aten
