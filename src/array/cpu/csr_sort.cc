@@ -80,7 +80,6 @@ template void CSRSort_<kDLCPU, int32_t>(CSRMatrix* csr);
 
 template <DLDeviceType XPU, typename IdType, typename TagType>
 NDArray CSRSortByTag(const CSRMatrix* csr, const IdArray tag_array, int64_t num_tags, CSRMatrix* output) {
-std::cerr << "Called" << std::endl;
   const auto indptr_data = static_cast<const IdType *>(csr->indptr->data);
   const auto indices_data = static_cast<const IdType *>(csr->indices->data);
   const auto eid_array = aten::CSRHasData(*csr) ? csr->data :
