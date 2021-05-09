@@ -527,7 +527,6 @@ std::pair<CSRMatrix, NDArray> CSRSortByTag(
       << "The length of the tag array should be equal to the number of columns ";
   CHECK_SAME_CONTEXT(csr.indices, tag);
   CHECK_INT(tag, "tag");
-  // should check csr and output are of the same shape and type.
   std::pair<CSRMatrix, NDArray> ret;
   ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRSortByTag", {
     ATEN_ID_TYPE_SWITCH(tag->dtype, TagType, {
