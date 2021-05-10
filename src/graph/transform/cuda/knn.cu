@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 #include <limits>
+#include "../../../array/cuda/dgl_cub.cuh"
 #include "../../../runtime/cuda/cuda_common.h"
 #include "../../../array/cuda/utils.h"
 #include "../knn.h"
@@ -57,10 +58,10 @@ template <typename FloatType, typename IdType>
 __global__ void bruteforce_knn_kernel(const FloatType* data_points, const IdType* data_offsets,
                                       const FloatType* query_points, const IdType* query_offsets,
                                       const int k, FloatType* dists, IdType* query_out,
-                                      IdType* data_out, const int num_batches,
-                                      const int feature_size) {
-  const int64_t q_idx = blockIdx.x * blockDim.x + threadIdx.x;
-  int64_t batch_idx = 0;
+                                      IdType* data_out, const int64_t num_batches,
+                                      const int64_t feature_size) {
+  const IdType q_idx = blockIdx.x * blockDim.x + threadIdx.x;
+  IdType batch_idx = 0;
   for (IdType b = 0; b < num_batches + 1; ++b) {
     if (query_offsets[b] > q_idx) { batch_idx = b - 1; break; }
   }
@@ -143,8 +144,8 @@ __global__ void bruteforce_knn_share_kernel(const FloatType* data_points,
                                             const IdType* local_block_id,
                                             const int k, FloatType* dists,
                                             IdType* query_out, IdType* data_out,
-                                            const int num_batches,
-                                            const int feature_size) {
+                                            const int64_t num_batches,
+                                            const int64_t feature_size) {
   const IdType block_idx = static_cast<IdType>(blockIdx.x);
   const IdType block_size = static_cast<IdType>(blockDim.x);
   const IdType batch_idx = block_batch_id[block_idx];
@@ -252,6 +253,35 @@ __global__ void bruteforce_knn_share_kernel(const FloatType* data_points,
   }
 }
 
+/*! \brief determine the number of blocks for each segment */
+template <typename IdType>
+__global__ void get_num_block_per_segment(const IdType* offsets, IdType* out,
+                                          const int64_t batch_size,
+                                          const int64_t block_size) {
+  const IdType idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < batch_size) {
+    out[idx] = (offsets[idx + 1] - offsets[idx] - 1) / block_size + 1;
+  }
+}
+
+/*! \brief Get the batch index and local index in segment for each block */
+template <typename IdType>
+__global__ void get_block_info(const IdType* num_block_prefixsum,
+                               IdType* block_batch_id, IdType* local_block_id,
+                               size_t batch_size, size_t num_blocks) {
+  const IdType idx = blockIdx.x * blockDim.x + threadIdx.x;
+  IdType i = 0;
+
+  if (idx < num_blocks) {
+    for (; i < batch_size; ++i) {
+      if (num_block_prefixsum[i] > idx) break;
+    }
+    i--;
+    block_batch_id[idx] = i;
+    local_block_id[idx] = idx - num_block_prefixsum[i];
+  }
+}
+
 /*!
  * \brief Brute force kNN. Compute distance for each pair of input points and get
  *  the result directly (without a distance matrix).
@@ -325,57 +355,64 @@ void BruteForceKNNSharedCuda(const NDArray& data_points, const IdArray& data_off
   IdType* data_out = query_out + k * query_points->shape[0];
 
   // get max shared memory per block in bytes
+  // determine block size according to this value
   int max_sharedmem_per_block = 0;
   CUDA_CALL(cudaDeviceGetAttribute(
     &max_sharedmem_per_block, cudaDevAttrMaxSharedMemoryPerBlock, ctx.device_id));
-
-  // determine block size and number of blocks according to share memory size per block
-  // This could be improved by using GPU implementation in future
-  ::std::vector<IdType> data_offsets_host(data_offsets->shape[0]);
-  device->CopyDataFromTo(data_offsets_data, 0, data_offsets_host.data(),
-                         0, data_offsets->shape[0] * sizeof(IdType),
-                         ctx, DLContext{kDLCPU, 0}, data_offsets->dtype,
-                         nullptr);
-  int64_t single_shared_mem = (k + 2 * feature_size) * sizeof(FloatType) + k * sizeof(IdType);
+  const int64_t single_shared_mem = (k + 2 * feature_size) * sizeof(FloatType) +
+    k * sizeof(IdType);
   const int64_t block_size = cuda::FindNumThreads(max_sharedmem_per_block / single_shared_mem);
-  int64_t num_blocks = 0;
 
-#pragma omp parallel for reduction(+:num_blocks)
-  for (auto i = 0; i < batch_size; ++i) {
-    IdType curr_batch_length = data_offsets_host[i + 1] - data_offsets_host[i];
-    num_blocks += (curr_batch_length - 1) / block_size + 1;
-  }
+  // Determine the number of blocks. We first get the number of blocks for each
+  // segment. Then we get the block id offset via prefix sum.
+  IdType* num_block_per_segment = static_cast<IdType*>(
+    device->AllocWorkspace(ctx, batch_size * sizeof(IdType)));
+  IdType* num_block_prefixsum = static_cast<IdType*>(
+    device->AllocWorkspace(ctx, batch_size * sizeof(IdType)));
 
-  // for each block, find its batch id
-  ::std::vector<IdType> block_batch_id_host(num_blocks), local_block_id_host(num_blocks);
-  int64_t prefix_index = 0;
-  for (auto i = 0; i < batch_size; ++i) {
-    IdType curr_batch_length = data_offsets_host[i + 1] - data_offsets_host[i];
-    int64_t batch_blocks = (curr_batch_length - 1) / block_size + 1;
+  // block size for get_num_block_per_segment computation
+  int64_t temp_block_size = cuda::FindNumThreads(batch_size);
+  int64_t temp_num_blocks = (batch_size - 1) / temp_block_size + 1;
+  CUDA_KERNEL_CALL(get_num_block_per_segment, temp_num_blocks,
+                   temp_block_size, 0, thr_entry->stream,
+                   query_offsets_data, num_block_per_segment,
+                   batch_size, block_size);
+  size_t prefix_temp_size = 0;
+  CUDA_CALL(cub::DeviceScan::ExclusiveSum(
+    nullptr, prefix_temp_size, num_block_per_segment,
+    num_block_prefixsum, batch_size));
+  void* prefix_temp = device->AllocWorkspace(ctx, prefix_temp_size);
+  CUDA_CALL(cub::DeviceScan::ExclusiveSum(
+    prefix_temp, prefix_temp_size, num_block_per_segment,
+    num_block_prefixsum, batch_size, thr_entry->stream));
 
-#pragma omp parallel for
-    for (auto j = 0; j < batch_blocks; ++j) {
-      block_batch_id_host[j + prefix_index] = static_cast<IdType>(i);
-      local_block_id_host[j + prefix_index] = static_cast<IdType>(j);
-    }
-    prefix_index += batch_blocks;
-  }
+  int64_t num_blocks = 0, final_elem = 0, copyoffset = (batch_size - 1) * sizeof(IdType);
+  device->CopyDataFromTo(
+    num_block_prefixsum, copyoffset, &num_blocks, 0,
+    sizeof(IdType), ctx, DLContext{kDLCPU, 0},
+    query_offsets->dtype, thr_entry->stream);
+  device->CopyDataFromTo(
+    num_block_per_segment, copyoffset, &final_elem, 0,
+    sizeof(IdType), ctx, DLContext{kDLCPU, 0},
+    query_offsets->dtype, thr_entry->stream);
+  num_blocks += final_elem;
+  device->FreeWorkspace(ctx, num_block_per_segment);
+  device->FreeWorkspace(ctx, num_block_prefixsum);
 
+  // get batch id and local id in segment
+  temp_block_size = cuda::FindNumThreads(num_blocks);
+  temp_num_blocks = (num_blocks - 1) / temp_block_size + 1;
   IdType* block_batch_id = static_cast<IdType*>(device->AllocWorkspace(
     ctx, num_blocks * sizeof(IdType)));
   IdType* local_block_id = static_cast<IdType*>(device->AllocWorkspace(
     ctx, num_blocks * sizeof(IdType)));
+  CUDA_KERNEL_CALL(
+    get_block_info, temp_num_blocks, temp_block_size, 0,
+    thr_entry->stream, num_block_prefixsum, block_batch_id,
+    local_block_id, batch_size, num_blocks);
+
   FloatType* dists = static_cast<FloatType*>(device->AllocWorkspace(
     ctx, k * query_points->shape[0] * sizeof(FloatType)));
-  device->CopyDataFromTo(
-    block_batch_id_host.data(), 0, block_batch_id, 0,
-    num_blocks * sizeof(IdType), DLContext{kDLCPU, 0},
-    ctx, data_offsets->dtype, thr_entry->stream);
-  device->CopyDataFromTo(
-    local_block_id_host.data(), 0, local_block_id, 0,
-    num_blocks * sizeof(IdType), DLContext{kDLCPU, 0},
-    ctx, data_offsets->dtype, thr_entry->stream);
-
   CUDA_KERNEL_CALL(bruteforce_knn_share_kernel, num_blocks, block_size,
     single_shared_mem * block_size, thr_entry->stream, data_points_data,
     data_offsets_data, query_points_data, query_offsets_data,
