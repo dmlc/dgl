@@ -23,9 +23,9 @@ def check_sort(spm, tag_arr=None, tag_pos=None):
     if tag_arr is None:
         tag_arr = np.arange(spm.shape[0])
     else:
-        tag_arr = tag_arr.numpy()
+        tag_arr = F.asnumpy(tag_arr)
     if tag_pos is not None:
-        tag_pos = tag_pos.numpy()
+        tag_pos = F.asnumpy(tag_pos)
     for i in range(spm.shape[0]):
         row = spm.getrow(i)
         dst = row.nonzero()[1]
