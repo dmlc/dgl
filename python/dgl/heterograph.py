@@ -4721,7 +4721,8 @@ class DGLHeteroGraph(object):
 
         cross_reducer : str or callable function
             Cross type reducer. One of ``"sum"``, ``"min"``, ``"max"``, ``"mean"``, ``"stack"``
-            or a callable function
+            or a callable function. If a callable function is provided, the input arguments is 
+            a list of tensors from cross types, and the output of function must be a single tensor
         apply_node_func : callable, optional
             An optional apply function after the messages are reduced both
             type-wisely and across different types.
@@ -5893,7 +5894,9 @@ def reduce_dict_data(frames, reducer, order=None):
     frames : list[dict[str, Tensor]]
         Input tensor dictionaries
     reducer : str or callable function
-        One of "sum", "max", "min", "mean", "stack" or a callable function
+        One of "sum", "max", "min", "mean", "stack" or a callable function.
+        If a callable function is provided, the input arguments is a list of tensors
+        from cross types, and the output of function must be a single tensor
     order : list[Int], optional
         Merge order hint. Useful for "stack" reducer.
         If provided, each integer indicates the relative order
