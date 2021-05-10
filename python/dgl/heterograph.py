@@ -4744,7 +4744,7 @@ class DGLHeteroGraph(object):
 
         cross_reducer : str or callable function
             Cross type reducer. One of ``"sum"``, ``"min"``, ``"max"``, ``"mean"``, ``"stack"``
-            or a callable function. If a callable function is provided, the input arguments is 
+            or a callable function. If a callable function is provided, the input arguments is
             a list of tensors from cross types, and the output of function must be a single tensor
         apply_node_func : callable, optional
             An optional apply function after the messages are reduced both
