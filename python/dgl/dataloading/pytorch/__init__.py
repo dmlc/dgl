@@ -15,6 +15,9 @@ class _ScalarDataBatcherIter:
         self.index = 0
         self.drop_last = drop_last
 
+    def __iter__(self):
+        return self
+
     def __next__(self):
         num_items = self.dataset.shape[0]
         if self.index >= num_items:
@@ -214,6 +217,9 @@ class _NodeDataLoaderIter:
         self.node_dataloader = node_dataloader
         self.iter_ = iter(node_dataloader.dataloader)
 
+    def __iter__(self):
+        return self
+
     def __next__(self):
         # input_nodes, output_nodes, blocks
         result_ = next(self.iter_)
@@ -227,6 +233,9 @@ class _EdgeDataLoaderIter:
         self.device = edge_dataloader.device
         self.edge_dataloader = edge_dataloader
         self.iter_ = iter(edge_dataloader.dataloader)
+
+    def __iter__(self):
+        return self
 
     def __next__(self):
         result_ = next(self.iter_)
