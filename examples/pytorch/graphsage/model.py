@@ -53,7 +53,7 @@ class SAGE(nn.Module):
             sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
             dataloader = dgl.dataloading.NodeDataLoader(
                 g,
-                th.arange(g.num_nodes()),
+                th.arange(g.num_nodes()).to(g.device),
                 sampler,
                 batch_size=batch_size,
                 shuffle=True,

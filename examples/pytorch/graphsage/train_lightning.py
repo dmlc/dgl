@@ -13,7 +13,7 @@ import os
 
 from load_graph import load_reddit, inductive_split, load_ogb
 
-from pytorch_lightning.metrics import Accuracy
+from torchmetrics import Accuracy
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning import LightningDataModule, LightningModule, Trainer
 from model import SAGE
@@ -31,7 +31,10 @@ class SAGELightning(LightningModule):
         self.save_hyperparameters()
         self.module = SAGE(in_feats, n_hidden, n_classes, n_layers, activation, dropout)
         self.lr = lr
-        self.acc = Accuracy()
+        # The usage of `train_acc` and `val_acc` is the recommended practice from now on as per
+        # https://torchmetrics.readthedocs.io/en/latest/pages/lightning.html
+        self.train_acc = Accuracy()
+        self.val_acc = Accuracy()
 
     def training_step(self, batch, batch_idx):
         input_nodes, output_nodes, mfgs = batch
@@ -40,8 +43,8 @@ class SAGELightning(LightningModule):
         batch_labels = mfgs[-1].dstdata['labels']
         batch_pred = self.module(mfgs, batch_inputs)
         loss = F.cross_entropy(batch_pred, batch_labels)
-        acc = self.acc(th.softmax(batch_pred, 1), batch_labels)
-        self.log('train_acc', acc, prog_bar=True, on_step=False, on_epoch=True)
+        self.train_acc(th.softmax(batch_pred, 1), batch_labels)
+        self.log('train_acc', self.train_acc, prog_bar=True, on_step=True, on_epoch=False)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -50,9 +53,8 @@ class SAGELightning(LightningModule):
         batch_inputs = mfgs[0].srcdata['features']
         batch_labels = mfgs[-1].dstdata['labels']
         batch_pred = self.module(mfgs, batch_inputs)
-        acc = self.acc(th.softmax(batch_pred, 1), batch_labels)
-        self.log('val_acc', acc, prog_bar=True, on_step=False, on_epoch=True, sync_dist=True)
-        return acc
+        self.val_acc(th.softmax(batch_pred, 1), batch_labels)
+        self.log('val_acc', self.val_acc, prog_bar=True, on_step=True, on_epoch=True, sync_dist=True)
 
     def configure_optimizers(self):
         optimizer = th.optim.Adam(self.parameters(), lr=self.lr)
@@ -130,7 +132,8 @@ def evaluate(model, g, val_nid, device):
     with th.no_grad():
         pred = model.module.inference(g, nfeat, device, args.batch_size, args.num_workers)
     model.train()
-    return model.acc(th.softmax(pred[val_nid], -1), labels[val_nid].to(pred.device))
+    test_acc = Accuracy()
+    return test_acc(th.softmax(pred[val_nid], -1), labels[val_nid].to(pred.device))
 
 
 if __name__ == '__main__':
@@ -147,7 +150,7 @@ if __name__ == '__main__':
     argparser.add_argument('--eval-every', type=int, default=5)
     argparser.add_argument('--lr', type=float, default=0.003)
     argparser.add_argument('--dropout', type=float, default=0.5)
-    argparser.add_argument('--num-workers', type=int, default=4,
+    argparser.add_argument('--num-workers', type=int, default=0,
                            help="Number of sampling processes. Use 0 for no extra process.")
     argparser.add_argument('--inductive', action='store_true',
                            help="Inductive learning setting")

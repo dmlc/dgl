@@ -50,7 +50,6 @@ class SAGELightning(LightningModule):
         self.module = SAGE(in_feats, n_hidden, n_classes, n_layers, activation, dropout)
         self.lr = lr
         self.loss_fcn = CrossEntropyLoss()
-        self.acc = Accuracy()
 
     def training_step(self, batch, batch_idx):
         input_nodes, pos_graph, neg_graph, mfgs = batch
