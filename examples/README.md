@@ -8,8 +8,10 @@ The folder contains example implementations of selected research papers related 
 
 | Paper                                                        | node classification | link prediction / classification | graph property prediction | sampling           | OGB                |
 | ------------------------------------------------------------ | ------------------- | -------------------------------- | ------------------------- | ------------------ | ------------------ |
+| [Network Embedding with Completely-imbalanced Labels](#rect) | :heavy_check_mark:  |                                  |                           |                    |                    |
 | [Boost then Convolve: Gradient Boosting Meets Graph Neural Networks](#bgnn) | :heavy_check_mark:  |                                  |                           |                    |                    |
 | [Contrastive Multi-View Representation Learning on Graphs](#mvgrl) | :heavy_check_mark: |  | :heavy_check_mark: |  |  |
+| [Deep Graph Contrastive Representation Learning](#grace) | :heavy_check_mark: | |  | | |
 | [Graph Random Neural Network for Semi-Supervised Learning on Graphs](#grand) | :heavy_check_mark:  |                                  |                           |                    |                    |
 | [Heterogeneous Graph Transformer](#hgt)                      | :heavy_check_mark:  | :heavy_check_mark:               |                           |                    |                    |
 | [Graph Convolutional Networks for Graphs with Multi-Dimensionally Weighted Edges](#mwe) | :heavy_check_mark:  |                                  |                           |                    | :heavy_check_mark: |
@@ -90,6 +92,9 @@ The folder contains example implementations of selected research papers related 
 | [GNNExplainer: Generating Explanations for Graph Neural Networks](#gnnexplainer) |  :heavy_check_mark: |                                  |                                  |                                  |                                  |
 | [Interaction Networks for Learning about Objects, Relations and Physics](#graphsim) |  |                                 |:heavy_check_mark:                 |                    |                    |
 | [Representation Learning on Graphs with Jumping Knowledge Networks](#jknet) |  :heavy_check_mark: |                                  |                                  |                                  |                                  |
+| [DeeperGCN: All You Need to Train Deeper GCNs](#deepergcn)                                                                        |                                  |                                  | :heavy_check_mark:        |                    | :heavy_check_mark: |
+| [Diffusion Convolutional Recurrent Neural Network: Data-Driven Traffic Forcasting](#dcrnn) |                     |                                  | :heavy_check_mark:        |                    |                    |
+| [GaAN: Gated Attention Networks for Learning on large and Spatiotemporal Graphs](#gaan) |                     |                                  | :heavy_check_mark:        |                    |                    |
 
 ## 2021
 
@@ -99,9 +104,15 @@ The folder contains example implementations of selected research papers related 
 
 ## 2020
 
+- <a name="rect"></a> Wang et al. Network Embedding with Completely-imbalanced Labels. [Paper link](https://ieeexplore.ieee.org/document/8979355). 
+    - Example code: [PyTorch](../examples/pytorch/rect)
+    - Tags:  node classification, network embedding, completely-imbalanced labels
 - <a name="mvgrl"></a> Hassani and Khasahmadi. Contrastive Multi-View Representation Learning on Graphs. [Paper link](https://arxiv.org/abs/2006.05582). 
     - Example code: [PyTorch](../examples/pytorch/mvgrl)
     - Tags: graph diffusion, self-supervised learning on graphs.
+- <a name="grace"></a> Zhu et al. Deep Graph Contrastive Representation Learning. [Paper link](https://arxiv.org/abs/2006.04131). 
+    - Example code: [PyTorch](../examples/pytorch/grace)
+    - Tags: contrastive learning for node classification.
 - <a name="grand"></a> Feng et al. Graph Random Neural Network for Semi-Supervised Learning on Graphs. [Paper link](https://arxiv.org/abs/2005.11079). 
     - Example code: [PyTorch](../examples/pytorch/grand)
     - Tags: semi-supervised node classification, simplifying graph convolution, data augmentation
@@ -129,18 +140,15 @@ The folder contains example implementations of selected research papers related 
 - <a name="dimenet"></a> Klicpera et al. Directional Message Passing for Molecular Graphs. [Paper link](https://arxiv.org/abs/2003.03123).
     - Example code: [PyTorch](../examples/pytorch/dimenet)
     - Tags: molecules, molecular property prediction, quantum chemistry
-
-- <a name="dagnn"></a> Rossi et al. Temporal Graph Networks For Deep Learning on Dynamic Graphs. [Paper link](https://arxiv.org/abs/2006.10637).
+- <a name="tgn"></a> Rossi et al. Temporal Graph Networks For Deep Learning on Dynamic Graphs. [Paper link](https://arxiv.org/abs/2006.10637).
     - Example code: [Pytorch](../examples/pytorch/tgn)
     - Tags: over-smoothing, node classification 
-
-- <a name="dagnn"></a> Rossi et al. Temporal Graph Networks For Deep Learning on Dynamic Graphs. [Paper link](https://arxiv.org/abs/2006.10637).
-    - Example code: [Pytorch](../examples/pytorch/tgn)
-    - Tags: over-smoothing, node classification 
-
 - <a name="compgcn"></a> Vashishth, Shikhar, et al. Composition-based Multi-Relational Graph Convolutional Networks. [Paper link](https://arxiv.org/abs/1911.03082).
-    - Example code: [Pytorch](../examples/pytorch/compGCN)
+    - Example code: [PyTorch](../examples/pytorch/compGCN)
     - Tags: multi-relational graphs, graph neural network
+- <a name="deepergcn"></a> Li et al. DeeperGCN: All You Need to Train Deeper GCNs. [Paper link](https://arxiv.org/abs/2006.07739).
+    - Example code: [PyTorch](../examples/pytorch/deepergcn)
+    - Tags: over-smoothing, deeper gnn, OGB
 
 ## 2019
 
@@ -257,13 +265,16 @@ The folder contains example implementations of selected research papers related 
     - Tags: graph classification
 
 - <a name="seal"></a>  Zhang et al. Link Prediction Based on Graph Neural Networks. [Paper link](https://papers.nips.cc/paper/2018/file/53f0d7c537d99b3824f0f99d62ea2428-Paper.pdf).
-    - Example code: [pytorch](../examples/pytorch/seal)
+    - Example code: [PyTorch](../examples/pytorch/seal)
     - Tags: link prediction, sampling
 
 - <a name="jknet"></a>  Xu et al. Representation Learning on Graphs with Jumping Knowledge Networks. [Paper link](https://arxiv.org/abs/1806.03536).
-    - Example code: [pytorch](../examples/pytorch/jknet)
+    - Example code: [PyTorch](../examples/pytorch/jknet)
     - Tags: message passing, neighborhood
 
+- <a name="gaan"></a> Zhang et al. GaAN: Gated Attention Networks for Learning on Large and Spatiotemporal Graphs. [Paper link](https://arxiv.org/abs/1803.07294).
+    - Example code: [pytorch](../examples/pytorch/dtgrnn)
+    - Tags: Static discrete temporal graph, traffic forcasting
 
 ## 2017
 
@@ -318,6 +329,10 @@ The folder contains example implementations of selected research papers related 
 - <a name="schnet"></a> Schütt et al. SchNet: A continuous-filter convolutional neural network for modeling quantum interactions. [Paper link](https://arxiv.org/abs/1706.08566).
     - Example code: [PyTorch](https://github.com/awslabs/dgl-lifesci/tree/master/examples/property_prediction/alchemy)
     - Tags: molecules, quantum chemistry
+
+- <a name="dcrnn"></a> Li et al. Diffusion Convolutional Recurrent Neural Network: Data-Driven Traffic Forcasting. [Paper link](https://arxiv.org/abs/1707.01926).
+    - Example code: [Pytorch](../examples/pytorch/dtgrnn)
+    - Tags: Static discrete temporal graph, traffic forcasting.
 
 ## 2016
 
