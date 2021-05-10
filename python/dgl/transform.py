@@ -2271,11 +2271,11 @@ def sort_out_edges(g, tag=None, tag_pos="_TAG_POS"):
         indptr  = [0, 5, 8]
         indices = [2, 4, 0, 1, 3, 2, 0, 1]
         (tag)   = [0, 0, 1, 1, 2, 0, 1, 1]
-                       ^     ^
-                                   ^     ^
+                  ^    ^     ^  ^
+                                ^  ^     ^^
 
         tag_pos:
-        [[2, 4], [1, 3]] (marked with ^)
+        [[0, 2, 4, 5], [0, 1, 3, 3]] (marked with ^)
 
     - For homogeneous graph, we we store the `tag_pos` in the node feature.
     - For bipartite graph, we get the tag data from the node feature `tag`
