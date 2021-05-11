@@ -2275,6 +2275,7 @@ def sort_out_edges(g, tag=None, tag_pos="_TAG_POS"):
     - For bipartite graph, we get the tag data from the node feature `tag`
       of destination nodes and store the `tag_pos` in the node feature of
       source nodes.
+    - The shape of `tag_pos` is (number of source nodes, number of tags + 1)
 
     Parameters
     ----------
@@ -2311,6 +2312,12 @@ def sort_out_edges(g, tag=None, tag_pos="_TAG_POS"):
 
 def sort_in_edges(g, tag=None, tag_pos="_TAG_POS"):
     """A copy of the given graph whose in edges are sorted.
+
+    - For homogeneous graph, we we store the `tag_pos` in the node feature.
+    - For bipartite graph, we get the tag data from the node feature `tag`
+      of source nodes and store the `tag_pos` in the node feature of
+      destination nodes.
+    - The shape of `tag_pos` is (number of destination nodes, number of tags + 1)
 
     Node frames and edges frames are shallow copy of the original graph.
     Parameters
