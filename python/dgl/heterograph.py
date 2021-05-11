@@ -2447,13 +2447,6 @@ class DGLHeteroGraph(object):
         else:
             return self._graph.number_of_edges(self.get_etype_id(etype))
 
-    def __len__(self):
-        """Deprecated: please directly call :func:`number_of_nodes`
-        """
-        dgl_warning('DGLGraph.__len__ is deprecated.'
-                    'Please directly call DGLGraph.number_of_nodes.')
-        return self.number_of_nodes()
-
     @property
     def is_multigraph(self):
         """Return whether the graph is a multigraph with parallel edges.
