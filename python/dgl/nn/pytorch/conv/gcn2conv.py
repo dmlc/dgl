@@ -17,19 +17,19 @@ class GCN2Conv(nn.Module):
     -----------
     The Graph Convolutional Network via Initial residual
     and Identity mapping (GCNII) was introduced in `"Simple and Deep Graph Convolutional
-    Networks" <https://arxiv.org/abs/2007.02133>`_ paper
-    and mathematically is defined as follows:
+    Networks" <https://arxiv.org/abs/2007.02133>`_ paper.
+    It is mathematically is defined as follows:
     .. math::
         \mathbf{h}^{(l+1)} =\left( (1 - \alpha)(\mathbf{D}^{-1/2} \mathbf{\hat{A}}
         \mathbf{D}^{-1/2})\mathbf{h}^{(l)} + \alpha {\mathbf{h}^{(0)}} \right)
         \left( (1 - \beta) \mathbf{I} + \beta \mathbf{W} \right)
 
-    where :math:`\mathbf{\hat{A}}` denotes the adjacency matrix with self-loops,
-    :math:`\mathbf{D}_{ii} = \sum_{j=0} \mathbf{A}_{ij}` its diagonal degree matrix ,
-    :math:`\mathbf{h}^{(0)}` is initial features,
-    :math:`\mathbf{h}^{(l)}` is feature of the current layer
-    :math:` \alpha` for  fraction of initial features
-    :math:`\hyper-lambda` hyperparameter to tune strength of indentity mapping
+    where :math:`\mathbf{\hat{A}}` is the adjacency matrix with self-loops,
+    :math:`\mathbf{D}_{ii} = \sum_{j=0} \mathbf{A}_{ij}` is its diagonal degree matrix,
+    :math:`\mathbf{h}^{(0)}` is the initial node features,
+    :math:`\mathbf{h}^{(l)}` is the feature of layer :math:`l`,
+    :math:`\alpha` is the fraction of initial node features, and
+    :math:`\beta` is the hyperparameter to tune the strength of identity mapping.
 
     Parameters
     ----------
