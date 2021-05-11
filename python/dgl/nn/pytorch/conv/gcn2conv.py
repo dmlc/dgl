@@ -30,21 +30,24 @@ class GCN2Conv(nn.Module):
     :math:`\mathbf{h}^{(l)}` is the feature of layer :math:`l`,
     :math:`\alpha` is the fraction of initial node features, and
     :math:`\beta` is the hyperparameter to tune the strength of identity mapping.
-
+    It is defined by :math:`\beta_l = \log(\frac{\lambda}{l}+1)\approx\frac{\lambda}{l}`,
+    where :math:`\lambda` is a hyperparameter. :math: `\beta` ensures that the decay of
+    the weight matrix adaptively increases as we stack more layers.
+    
     Parameters
     ----------
     in_feats : int
         Input feature size; i.e, the number of dimensions of :math:`h_j^{(l)}`.
-    alpha : float
-        a fraction of the initial input feature. Default: ``0.1``
-    hyper_lambda : float
-        a hypermeter to ensure the decay of the weight matrix
-         adaptively increases. Default: ``1``
     layer : int
-        the index of current layer. Default: ``1``
-    share_weight : bool
+        the index of current layer.
+    alpha : float
+        The fraction of the initial input features. Default: ``0.1``
+    lambda_ : float
+        The hyperparameter to ensure the decay of the weight matrix
+        adaptively increases. Default: ``1``
+    project_initial_features : bool
         Whether to share a weight matrix between initial features and
-        smoothed features. Default: ``False``
+        smoothed features. Default: ``True``
     bias : bool, optional
         If True, adds a learnable bias to the output. Default: ``True``.
     activation : callable activation function/layer or None, optional
@@ -83,35 +86,38 @@ class GCN2Conv(nn.Module):
     >>> # Homogeneous graph
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
     >>> feat = th.ones(6, 3)
-    >>> g=dgl.add_self_loop(g)
-    >>> conv = GCN2Conv(3,alpha=0.5,share_weights=True,allow_zero_in_degree=True)
-    >>> res = conv(g, feat, feat/2.)
+    >>> g = dgl.add_self_loop(g)
+    >>> conv1 = GCN2Conv(3, layer=1, alpha=0.5, project_initial_features=True, allow_zero_in_degree=True)
+    >>> conv2 = GCN2Conv(3, layer=2, alpha=0.5, project_initial_features=True, allow_zero_in_degree=True)
+    >>> res = feat
+    >>> res = conv1(g, res, feat)
+    >>> res = conv2(g, res, feat)
     >>> print(res)
-    tensor([[2.6484, 0.8584, 0.9750],
-            [2.6484, 0.8584, 0.9750],
-            [2.6484, 0.8584, 0.9750],
-            [2.9989, 0.8283, 0.9696],
-            [2.5476, 0.8670, 0.9765],
-            [2.6484, 0.8584, 0.9750]], grad_fn=<AddBackward0>)
+    tensor([[1.3803, 3.3191, 2.9572],
+            [1.3803, 3.3191, 2.9572],
+            [1.3803, 3.3191, 2.9572],
+            [1.4770, 3.8326, 3.2451],
+            [1.3623, 3.2102, 2.8679],
+            [1.3803, 3.3191, 2.9572]], grad_fn=<AddBackward0>)
 
     """
 
     def __init__(self,
                  in_feats,
+                 layer,
                  alpha=0.1,
-                 hyper_lambda=1,
-                 layer=1,
-                 share_weights=True,
+                 lambda_=1,
+                 project_initial_features=True,
                  allow_zero_in_degree=False,
                  bias=True,
                  activation=None):
         super().__init__()
 
         self._in_feats = in_feats
-        self._share_weights = share_weights
+        self._project_initial_features = project_initial_features
 
         self.alpha = alpha
-        self.beta = math.log(hyper_lambda / layer + 1)
+        self.beta = math.log(lambda_ / layer + 1)
 
         self._bias = bias
         self._activation = activation
@@ -119,7 +125,7 @@ class GCN2Conv(nn.Module):
 
         self.weight1 = nn.Parameter(th.Tensor(self._in_feats, self._in_feats))
 
-        if self._share_weights:
+        if self._project_initial_features:
             self.register_parameter("weight2", None)
         else:
             self.weight2 = nn.Parameter(th.Tensor(self._in_feats, self._in_feats))
@@ -140,7 +146,7 @@ class GCN2Conv(nn.Module):
 
         """
         nn.init.normal_(self.weight1)
-        if not self._share_weights:
+        if not self._project_initial_features:
             nn.init.normal_(self.weight2)
         if self._bias is not None:
             nn.init.zeros_(self.bias)
@@ -171,11 +177,11 @@ class GCN2Conv(nn.Module):
         graph : DGLGraph
             The graph.
         feat : torch.Tensor
-             it represents the input feature of shape
+             The input feature of shape
             :math:`(N, D_{in})`
-            where :math:`D_{in}` is size of input feature, :math:`N` is the number of nodes.
+            where :math:`D_{in}` is the size of input feature and :math:`N` is the number of nodes.
         feat_0 : torch.Tensor
-                it represents the initial feature of shape :math:`(N, D_{in})`
+                The initial feature of shape :math:`(N, D_{in})`
 
         Returns
         -------
@@ -185,7 +191,6 @@ class GCN2Conv(nn.Module):
         Raises
         ------
         DGLError
-            Case 1:
             If there are 0-in-degree nodes in the input graph, it will raise DGLError
             since no message will be passed to those nodes. This will cause invalid output.
             The error can be ignored by setting ``allow_zero_in_degree`` parameter to ``True``.
@@ -229,7 +234,7 @@ class GCN2Conv(nn.Module):
             # initial residual connection to the first layer
             feat_0 = feat_0[: feat.size(0)] * self.alpha
 
-            if self._share_weights:
+            if self._project_initial_features:
                 rst = feat.add_(feat_0)
                 rst = th.addmm(
                     feat, feat, self.weight1, beta=(1 - self.beta), alpha=self.beta
