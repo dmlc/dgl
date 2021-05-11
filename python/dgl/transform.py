@@ -2318,7 +2318,6 @@ def sort_out_edges(g, tag=None, tag_pos="_TAG_POS"):
 def sort_in_edges(g, tag=None, tag_pos="_TAG_POS"):
     """A copy of the given graph whose in edges are sorted.
 
-    The outplace version of sort_in_edges_
     Node frames and edges frames are shallow copy of the original graph.
     Parameters
     ----------

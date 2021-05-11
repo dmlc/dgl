@@ -121,10 +121,10 @@ std::pair<CSRMatrix, NDArray> CSRSortByTag(
     }  // cumulate
 
     for (IdType ptr = start ; ptr < end ; ++ptr) {
-      IdType dst = indices_data[ptr];
-      IdType eid = eid_data[ptr];
-      TagType tag = tag_data[dst];
-      IdType offset = tag_pos_row[tag] + pointer[tag];
+      const IdType dst = indices_data[ptr];
+      const IdType eid = eid_data[ptr];
+      const TagType tag = tag_data[dst];
+      const IdType offset = tag_pos_row[tag] + pointer[tag];
       CHECK_LT(offset, tag_pos_row[tag + 1]);
       ++pointer[tag];
 
