@@ -79,6 +79,16 @@ IdArray Range(int64_t low, int64_t high, uint8_t nbits, DLContext ctx);
  */
 IdArray Full(int64_t val, int64_t length, uint8_t nbits, DLContext ctx);
 
+/*!
+ * \brief Return an array full of the given value with the given type.
+ * \param val The value to fill.
+ * \param length Number of elements.
+ * \param ctx Device context
+ * \return the result array
+ */
+template <typename DType>
+NDArray Full(DType val, int64_t length, DLContext ctx);
+
 /*! \brief Create a deep copy of the given array */
 IdArray Clone(IdArray arr);
 
