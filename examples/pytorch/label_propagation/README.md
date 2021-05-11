@@ -1,4 +1,4 @@
-# DGL Implementation of LabelPropagation
+# DGL Implementation of Label Propagation
 
 This DGL example implements the method proposed in the paper [Learning from Labeled and Unlabeled Data with Label Propagation](https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.14.3864&rep=rep1&type=pdf).
 

@@ -91,7 +91,7 @@ The folder contains example implementations of selected research papers related 
 | [GNNExplainer: Generating Explanations for Graph Neural Networks](#gnnexplainer) |  :heavy_check_mark: |                                  |                                  |                                  |                                  |
 | [Interaction Networks for Learning about Objects, Relations and Physics](#graphsim) |  |                                 |:heavy_check_mark:                 |                    |                    |
 | [Representation Learning on Graphs with Jumping Knowledge Networks](#jknet) |  :heavy_check_mark: |                                  |                                  |                                  |                                  |
-| [Combining Label Propagation and Simple Models Out-performs Graph Neural Networks](#correct_and_smooth) |  :heavy_check_mark: |                                  |                                  |                                  |                                  |
+| [Combining Label Propagation and Simple Models Out-performs Graph Neural Networks](#correct_and_smooth) |  :heavy_check_mark: |                                  |                                  |                                  | :heavy_check_mark:                                 |
 | [Learning from Labeled and Unlabeled Data with Label Propagation](#label_propagation) |  :heavy_check_mark: |                                  |                                  |                                  |                                  |
 
 ## 2021
@@ -99,7 +99,7 @@ The folder contains example implementations of selected research papers related 
 - <a name="bgnn"></a> Ivanov et al. Boost then Convolve: Gradient Boosting Meets Graph Neural Networks. [Paper link](https://openreview.net/forum?id=ebS5NUfoMKL). 
     - Example code: [PyTorch](../examples/pytorch/bgnn)
     - Tags: semi-supervised node classification, tabular data, GBDT
-- <a name="correct-and-smooth"></a> Huang et al. Combining Label Propagation and Simple Models Out-performs Graph Neural Networks. [Paper link](https://arxiv.org/abs/2010.13993). 
+- <a name="correct_and_smooth"></a> Huang et al. Combining Label Propagation and Simple Models Out-performs Graph Neural Networks. [Paper link](https://arxiv.org/abs/2010.13993). 
     - Example code: [PyTorch](../examples/pytorch/correct_and_smooth)
     - Tags: efficiency, node classification, label propagation
 
@@ -410,7 +410,7 @@ The folder contains example implementations of selected research papers related 
 
 ## 2002
 
-- <a name="label-propagation"></a> Zhu et al. Learning from Labeled and Unlabeled Data with Label Propagation. [Paper link](https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.14.3864&rep=rep1&type=pdf).
+- <a name="label_propagation"></a> Zhu & Ghahramani. Learning from Labeled and Unlabeled Data with Label Propagation. [Paper link](https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.14.3864&rep=rep1&type=pdf).
     - Example code: [PyTorch](../examples/pytorch/label_propagation)
     - Tags: node classification, label propagation
 
