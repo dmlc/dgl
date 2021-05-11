@@ -11,7 +11,7 @@ from utils import Logger, evaluate, save_log_dir, load_data
 
 def main(args):
 
-    multilabel_data = set(['ppi', 'yelp', 'amazon'])
+    multilabel_data = set(['ppi'])
     multilabel = args.dataset in multilabel_data
 
     # load and preprocess dataset
