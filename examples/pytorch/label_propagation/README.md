@@ -29,7 +29,7 @@ The DGL's built-in Cora, Pubmed and Citeseer datasets. Dataset summary:
 python main.py
 
 # Citeseer
-python main.py --dataset Citeseer
+python main.py --dataset Citeseer --num-layers 100 --alpha 0.99
 
 # Pubmed
 python main.py --dataset Pubmed --num-layers 60 --alpha 1
@@ -39,4 +39,4 @@ python main.py --dataset Pubmed --num-layers 60 --alpha 1
 
 |   Dataset    | Cora  | Citeseer | Pubmed |
 | :----------: | :---: | :------: | :----: |
-| Results(DGL) | 68.00 |  51.40   | 69.20  |
+| Results(DGL) | 69.20 | 51.30 | 71.40 |

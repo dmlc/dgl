@@ -51,5 +51,6 @@ class LabelPropagation(nn.Module):
                 g.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
                 y = last + self.alpha * g.ndata.pop('h') * norm
                 y = post_step(y)
+                last = (1 - self.alpha) * y
             
             return y
