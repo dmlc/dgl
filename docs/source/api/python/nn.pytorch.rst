@@ -136,6 +136,20 @@ DotGatConv
     :members: forward
     :show-inheritance:
 
+TWIRLSConv
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.conv.TWIRLSConv
+    :members: forward
+    :show-inheritance:
+
+TWIRLSUnfoldingAndAttention
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.conv.TWIRLSUnfoldingAndAttention
+    :members: forward
+    :show-inheritance:
+
 .. _apinn-pytorch-dense-conv:
 
 Dense Conv Layers

@@ -86,7 +86,7 @@ def device_type(ctx):
 def device_id(ctx):
     ctx = th.device(ctx)
     if ctx.index is None:
-        return 0
+        return 0 if ctx.type == 'cpu' else th.cuda.current_device()
     else:
         return ctx.index
 
