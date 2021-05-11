@@ -2447,13 +2447,6 @@ class DGLHeteroGraph(object):
         else:
             return self._graph.number_of_edges(self.get_etype_id(etype))
 
-    def __len__(self):
-        """Deprecated: please directly call :func:`number_of_nodes`
-        """
-        dgl_warning('DGLGraph.__len__ is deprecated.'
-                    'Please directly call DGLGraph.number_of_nodes.')
-        return self.number_of_nodes()
-
     @property
     def is_multigraph(self):
         """Return whether the graph is a multigraph with parallel edges.
@@ -4400,6 +4393,29 @@ class DGLHeteroGraph(object):
         tensor([[0.],
                 [0.],
                 [1.]])
+
+        **``send_and_recv`` using user-defined functions**
+
+        >>> import torch as th
+        >>> g = dgl.graph(([0, 1], [1, 2]))
+        >>> g.ndata['x'] = th.tensor([[1.], [2.], [3.]])
+
+        >>> # Define the function for sending node features as messages.
+        >>> def send_source(edges):
+        ...     return {'m': edges.src['x']}
+        >>> # Sum the messages received and use this to replace the original node feature.
+        >>> def simple_reduce(nodes):
+        ...     return {'x': nodes.mailbox['m'].sum(1)}
+
+        Send and receive messages.
+
+        >>> g.send_and_recv(g.edges())
+        >>> g.ndata['x']
+        tensor([[1.],
+                [1.],
+                [2.]])
+
+        Note that the feature of node 0 remains the same as it has no incoming edges.
         """
         if inplace:
             raise DGLError('The `inplace` option is removed in v0.5.')
