@@ -235,7 +235,7 @@ class UnitGraph::COO : public BaseHeteroGraph {
 
   EdgeArray FindEdges(dgl_type_t etype, IdArray eids) const override {
     CHECK(aten::IsValidIdArray(eids)) << "Invalid edge id array";
-    BUG_ON(aten::IsNullArray(adj_.data)) <<
+    BUG_IF_FAIL(aten::IsNullArray(adj_.data)) <<
       "FindEdges requires the internal COO matrix not having EIDs.";
     return EdgeArray{aten::IndexSelect(adj_.row, eids),
                      aten::IndexSelect(adj_.col, eids),

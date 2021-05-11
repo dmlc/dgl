@@ -871,8 +871,8 @@ class CoraBinary(DGLBuiltinDataset):
         self.graphs, labels = load_graphs(str(graph_path))
 
         self.labels = []
-        for i in range(len(lables)):
-            self.labels.append(labels['{}'.format(i)].asnumpy())
+        for i in range(len(labels)):
+            self.labels.append(F.asnumpy(labels['{}'.format(i)]))
         # load pmpds under self.raw_path
         with open("{}/pmpds.pkl".format(self.raw_path), 'rb') as f:
             self.pmpds = _pickle_load(f)
