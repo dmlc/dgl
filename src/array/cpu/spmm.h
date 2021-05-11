@@ -37,7 +37,7 @@
 
  double procf = 2.7*1e9;
 
- #define USE_LIBXSMM 1
+ #define USE_LIBXSMM 0
 
  #if USE_LIBXSMM
  #include <libxsmm.h>
@@ -222,7 +222,8 @@ inline void eltwise_op_cmp_embedding(
     DType *out_ptr, IdType *out_matrix1, IdType *out_matrix2,
     DType *in_matrix1, DType *in_matrix2,
     IdType *indices1, IdType *indices2,
-    IdType num_nbrs, IdType N, __mmask16 mask)
+    IdType num_nbrs, IdType N, __mmask16 mask,
+    IdType offset)
 {
     if(std::is_same<DType, uint16_t>::value)
     {
@@ -251,7 +252,7 @@ inline void eltwise_op_cmp_embedding(
                 __m512 val512 = Op::Call_simd(Bptr, NULL);
                 __mmask16 cmp_mask = Cmp::Call_simd(c512, val512);
                 c512 = _mm512_mask_blend_ps(cmp_mask, c512, val512);
-                __m512i id1_512 = _mm512_set1_epi32(indices1[eid]);
+                __m512i id1_512 = _mm512_set1_epi32(indices1[offset + eid]);
                 argB512 = _mm512_mask_blend_epi32(cmp_mask, argB512, id1_512);
             }
             _mm512_storeu_ps(Cptr, c512);
@@ -263,11 +264,11 @@ inline void eltwise_op_cmp_embedding(
         __m512i argB512 = _mm512_mask_loadu_epi32(zero512i, mask, argBptr);
         for(IdType eid = 0; eid < num_nbrs; eid++)
         {
-            DType *Bptr = &in_matrix1[indices1[eid] * N + j];
+            DType *Bptr = &in_matrix1[indices1[offset + eid] * N + j];
             __m512 val512 = Op::Call_mask_simd(Bptr, NULL, zero512, mask);
             __mmask16 cmp_mask = Cmp::Call_simd(c512, val512);
             c512 = _mm512_mask_blend_ps(cmp_mask, c512, val512);
-            __m512i id1_512 = _mm512_set1_epi32(indices1[eid]);
+            __m512i id1_512 = _mm512_set1_epi32(indices1[offset + eid]);
             argB512 = _mm512_mask_blend_epi32(cmp_mask, argB512, id1_512);
         }
         _mm512_mask_storeu_ps(Cptr, mask, c512);
@@ -284,11 +285,11 @@ inline void eltwise_op_cmp_embedding(
                 __m512i argE512 = _mm512_loadu_si512(argEptr);
                 for(IdType eid = 0; eid < num_nbrs; eid++)
                 {
-                    DType *Eptr = &in_matrix2[eid * N + j];
+                    DType *Eptr = &in_matrix2[(offset + eid) * N + j];
                     __m512 val512 = Op::Call_simd(NULL, Eptr);
                     __mmask16 cmp_mask = Cmp::Call_simd(c512, val512);
                     c512 = _mm512_mask_blend_ps(cmp_mask, c512, val512);
-                    __m512i id2_512 = _mm512_set1_epi32(eid);
+                    __m512i id2_512 = _mm512_set1_epi32(offset + eid);
                     argE512 = _mm512_mask_blend_epi32(cmp_mask, argE512, id2_512);
                 }
                 _mm512_storeu_ps(Cptr, c512);
@@ -300,11 +301,11 @@ inline void eltwise_op_cmp_embedding(
             __m512i argE512 = _mm512_mask_loadu_epi32(zero512i, mask, argEptr);
             for(IdType eid = 0; eid < num_nbrs; eid++)
             {
-                DType *Eptr = &in_matrix2[eid * N + j];
+                DType *Eptr = &in_matrix2[(offset + eid) * N + j];
                 __m512 val512 = Op::Call_mask_simd(NULL, Eptr, zero512, mask);
                 __mmask16 cmp_mask = Cmp::Call_simd(c512, val512);
                 c512 = _mm512_mask_blend_ps(cmp_mask, c512, val512);
-                __m512i id2_512 = _mm512_set1_epi32(eid);
+                __m512i id2_512 = _mm512_set1_epi32(offset + eid);
                 argE512 = _mm512_mask_blend_epi32(cmp_mask, argE512, id2_512);
             }
             _mm512_mask_storeu_ps(Cptr, mask, c512);
@@ -354,46 +355,59 @@ inline void eltwise_op_cmp_embedding(
             for(j = 0; j < N - 16; j+=16)
             {
                 __m512 c512 = _mm512_loadu_ps(Cptr);
-                __m512i argB512 = _mm512_loadu_si512(argBptr);
+                //__m512i argB512 = _mm512_loadu_si512(argBptr);
                 __m512i argE512 = _mm512_loadu_si512(argEptr);
                 for(IdType eid = 0; eid < num_nbrs; eid++)
                 {
-                    DType *Bptr = &in_matrix1[indices1[eid] * N + j];
-                    DType *Eptr = &in_matrix2[eid * N + j];
+                    DType *Bptr = &in_matrix1[indices1[offset + eid] * N + j];
+                    DType *Eptr = &in_matrix2[(offset + eid) * N + j];
                     MM_PREFETCH(Bptr + PFD);
                     __m512 val512 = Op::Call_simd(Bptr, Eptr);
                     __mmask16 cmp_mask = Cmp::Call_simd(c512, val512);
                     c512 = _mm512_mask_blend_ps(cmp_mask, c512, val512);
-                    __m512i id1_512 = _mm512_set1_epi32(indices1[eid]);
-                    argB512 = _mm512_mask_blend_epi32(cmp_mask, argB512, id1_512);
-                    __m512i id2_512 = _mm512_set1_epi32(eid);
+                    //__m512i id1_512 = _mm512_set1_epi32(indices1[eid]);
+                    //argB512 = _mm512_mask_blend_epi32(cmp_mask, argB512, id1_512);
+                    __m512i id2_512 = _mm512_set1_epi32(offset + eid);
                     argE512 = _mm512_mask_blend_epi32(cmp_mask, argE512, id2_512);
                 }
                 _mm512_storeu_ps(Cptr, c512);
-                _mm512_storeu_si512(argBptr, argB512);
+                //_mm512_storeu_si512(argBptr, argB512);
                 _mm512_storeu_si512(argEptr, argE512);
                 Cptr += 16;
-                argBptr += 16;
+                //argBptr += 16;
                 argEptr += 16;
             }
             __m512 c512 = _mm512_mask_loadu_ps(zero512, mask, Cptr);
-            __m512i argB512 = _mm512_mask_loadu_epi32(zero512i, mask, argBptr);
+            //__m512i argB512 = _mm512_mask_loadu_epi32(zero512i, mask, argBptr);
             __m512i argE512 = _mm512_mask_loadu_epi32(zero512i, mask, argEptr);
             for(IdType eid = 0; eid < num_nbrs; eid++)
             {
-                DType *Bptr = &in_matrix1[indices1[eid] * N + j];
-                DType *Eptr = &in_matrix2[eid * N + j];
+                DType *Bptr = &in_matrix1[indices1[offset + eid] * N + j];
+                DType *Eptr = &in_matrix2[(offset + eid) * N + j];
                 __m512 val512 = Op::Call_mask_simd(Bptr, Eptr, zero512, mask);
                 __mmask16 cmp_mask = Cmp::Call_simd(c512, val512);
                 c512 = _mm512_mask_blend_ps(cmp_mask, c512, val512);
-                __m512i id1_512 = _mm512_set1_epi32(indices1[eid]);
-                argB512 = _mm512_mask_blend_epi32(cmp_mask, argB512, id1_512);
-                __m512i id2_512 = _mm512_set1_epi32(eid);
+                //__m512i id1_512 = _mm512_set1_epi32(indices1[eid]);
+                //argB512 = _mm512_mask_blend_epi32(cmp_mask, argB512, id1_512);
+                __m512i id2_512 = _mm512_set1_epi32(offset + eid);
                 argE512 = _mm512_mask_blend_epi32(cmp_mask, argE512, id2_512);
             }
             _mm512_mask_storeu_ps(Cptr, mask, c512);
-            _mm512_mask_storeu_epi32(argBptr, mask, argB512);
+            //_mm512_mask_storeu_epi32(argBptr, mask, argB512);
             _mm512_mask_storeu_epi32(argEptr, mask, argE512);
+
+            argEptr = out_matrix2;
+            for(j = 0; j < N - 16; j+=16)
+            {
+                __m512i eid512 = _mm512_loadu_si512(argEptr);
+                __m512i id1_512 = _mm512_i32gather_epi32 (eid512, indices1, 4);
+                _mm512_storeu_si512(argBptr, id1_512);
+                argBptr += 16;
+                argEptr += 16;
+            }
+            __m512i eid512 = _mm512_mask_loadu_epi32(zero512i, mask, argEptr);
+            __m512i id1_512 = _mm512_i32gather_epi32 (eid512, indices1, 4);
+            _mm512_mask_storeu_epi32(argBptr, mask, id1_512);
         }
         else
         {
@@ -401,7 +415,7 @@ inline void eltwise_op_cmp_embedding(
             for(j = 0; j < N - 16; j+=16)
             {
                 __m512 c512 = _mm512_loadu_ps(Cptr);
-                __m512i argB512 = _mm512_loadu_si512(argBptr);
+                //__m512i argB512 = _mm512_loadu_si512(argBptr);
                 __m512i argE512 = _mm512_loadu_si512(argEptr);
                 for(IdType eid = 0; eid < num_nbrs; eid++)
                 {
@@ -411,20 +425,20 @@ inline void eltwise_op_cmp_embedding(
                     __m512 val512 = Op::Call_simd(Bptr, Eptr);
                     __mmask16 cmp_mask = Cmp::Call_simd(c512, val512);
                     c512 = _mm512_mask_blend_ps(cmp_mask, c512, val512);
-                    __m512i id1_512 = _mm512_set1_epi32(indices1[eid]);
-                    argB512 = _mm512_mask_blend_epi32(cmp_mask, argB512, id1_512);
+                    //__m512i id1_512 = _mm512_set1_epi32(indices1[eid]);
+                    //argB512 = _mm512_mask_blend_epi32(cmp_mask, argB512, id1_512);
                     __m512i id2_512 = _mm512_set1_epi32(indices2[eid]);
                     argE512 = _mm512_mask_blend_epi32(cmp_mask, argE512, id2_512);
                 }
                 _mm512_storeu_ps(Cptr, c512);
-                _mm512_storeu_si512(argBptr, argB512);
+                //_mm512_storeu_si512(argBptr, argB512);
                 _mm512_storeu_si512(argEptr, argE512);
                 Cptr += 16;
-                argBptr += 16;
+                //argBptr += 16;
                 argEptr += 16;
             }
             __m512 c512 = _mm512_mask_loadu_ps(zero512, mask, Cptr);
-            __m512i argB512 = _mm512_mask_loadu_epi32(zero512i, mask, argBptr);
+            //__m512i argB512 = _mm512_mask_loadu_epi32(zero512i, mask, argBptr);
             __m512i argE512 = _mm512_mask_loadu_epi32(zero512i, mask, argEptr);
             for(IdType eid = 0; eid < num_nbrs; eid++)
             {
@@ -433,14 +447,31 @@ inline void eltwise_op_cmp_embedding(
                 __m512 val512 = Op::Call_mask_simd(Bptr, Eptr, zero512, mask);
                 __mmask16 cmp_mask = Cmp::Call_simd(c512, val512);
                 c512 = _mm512_mask_blend_ps(cmp_mask, c512, val512);
-                __m512i id1_512 = _mm512_set1_epi32(indices1[eid]);
-                argB512 = _mm512_mask_blend_epi32(cmp_mask, argB512, id1_512);
+                //__m512i id1_512 = _mm512_set1_epi32(indices1[eid]);
+                //argB512 = _mm512_mask_blend_epi32(cmp_mask, argB512, id1_512);
                 __m512i id2_512 = _mm512_set1_epi32(indices2[eid]);
                 argE512 = _mm512_mask_blend_epi32(cmp_mask, argE512, id2_512);
             }
             _mm512_mask_storeu_ps(Cptr, mask, c512);
-            _mm512_mask_storeu_epi32(argBptr, mask, argB512);
+            //_mm512_mask_storeu_epi32(argBptr, mask, argB512);
             _mm512_mask_storeu_epi32(argEptr, mask, argE512);
+
+            argEptr = out_matrix2;
+            for(j = 0; j < N - 16; j+=16)
+            {
+                __m512i eid512 = _mm512_loadu_si512(argEptr);
+                __m512i id1_512 = _mm512_i32gather_epi32 (eid512, indices1, 4);
+                _mm512_storeu_si512(argBptr, id1_512);
+                __m512i id2_512 = _mm512_i32gather_epi32 (eid512, indices2, 4);
+                _mm512_storeu_si512(argEptr, id2_512);
+                argBptr += 16;
+                argEptr += 16;
+            }
+            __m512i eid512 = _mm512_mask_loadu_epi32(zero512i, mask, argEptr);
+            __m512i id1_512 = _mm512_i32gather_epi32 (eid512, indices1, 4);
+            _mm512_mask_storeu_epi32(argBptr, mask, id1_512);
+            __m512i id2_512 = _mm512_i32gather_epi32 (eid512, indices2, 4);
+            _mm512_mask_storeu_epi32(argEptr, mask, id2_512);
         }
     }
 #undef PFD
@@ -584,7 +615,8 @@ inline libxsmm_meltwfunction_opreduce_vecs_idx SpMMCreateLibxsmmKernel(
     bool has_idx,
     IdType N,
     int32_t _ld,
-    libxsmm_meltw_opreduce_vecs_flags redop_flag)
+    libxsmm_meltw_opreduce_vecs_flags redop_flag,
+    bool is_cmp)
 {
     libxsmm_meltw_opreduce_vecs_flags opredop_flags;
     if(std::is_same<Op, op::Add<DType>>::value)
@@ -636,6 +668,19 @@ inline libxsmm_meltwfunction_opreduce_vecs_idx SpMMCreateLibxsmmKernel(
         }
     }
     opredop_flags = (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags | redop_flag);
+    if(is_cmp)
+    {
+        if(Op::use_lhs)
+        {
+            opredop_flags = (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags | LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_RECORD_ARGOP_OFF_VEC_0);
+            //opredop_flags = (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags | LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_RECORD_ARGOP_OFF_VEC_1);
+        }
+        if(Op::use_rhs)
+        {
+            //opredop_flags = (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags | LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_RECORD_ARGOP_OFF_VEC_0);
+            opredop_flags = (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags | LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_RECORD_ARGOP_OFF_VEC_1);
+        }
+    }
     libxsmm_meltwfunction_opreduce_vecs_idx kernel=NULL;
     if(std::is_same<DType, uint16_t>::value)
         kernel = libxsmm_dispatch_meltw_opreduce_vecs_idx(N, &_ld, &_ld, LIBXSMM_DATATYPE_BF16, LIBXSMM_DATATYPE_BF16, (sizeof(IdType) == 8) ? LIBXSMM_DATATYPE_I64 : LIBXSMM_DATATYPE_I32, opredop_flags);
@@ -730,13 +775,25 @@ inline void SpMMBlockwiseOpSum(
     }
 }
 
+#if USE_LIBXSMM
+template <typename IdType, typename DType, typename Op, typename Cmp>
+inline void SpMMBlockwiseOpCmp(
+    CSRM<IdType, IdType> *block_csr_array,
+    DType *B, DType *E, DType *C, IdType *argB, IdType *argE,
+    bool has_idx, IdType N,
+    IdType num_M_blocks, IdType num_K_blocks, IdType M_BLOCK_SIZE,
+    libxsmm_meltwfunction_opreduce_vecs_idx kernel)
+#else
 template <typename IdType, typename DType, typename Op, typename Cmp>
 inline void SpMMBlockwiseOpCmp(
     CSRM<IdType, IdType> *block_csr_array,
     DType *B, DType *E, DType *C, IdType *argB, IdType *argE,
     bool has_idx, IdType N,
     IdType num_M_blocks, IdType num_K_blocks, IdType M_BLOCK_SIZE)
+#endif
 {
+    DType (*in_matrix1)[N] = (DType (*)[N])B;
+    DType (*in_matrix2)[N] = (DType (*)[N])E;
     DType (*output)[N] = (DType (*)[N])C;
     IdType (*out_matrix1)[N] = (IdType (*)[N])argB;
     IdType (*out_matrix2)[N] = (IdType (*)[N])argE;
@@ -783,10 +840,31 @@ inline void SpMMBlockwiseOpCmp(
                     const IdType row_end   = cur_csr.indptr.Ptr()[i + 1];
                     IdType dst = i + M_start;
 
+#if USE_LIBXSMM
+                    libxsmm_meltw_opreduce_vecs_idx_param params;
+                    params.n = row_end - row_start;
+                    params.indices = &cur_csr.indices.Ptr()[row_start];
+                    params.in_matrix = in_matrix1;
+                    params.out_vec = &output[dst][0];
+                    params.argop_off_vec_0 = &out_matrix1[dst][0];
+                    params.argop_off_vec_1 = &out_matrix2[dst][0];
+                    params.scale_vals = NULL;
                     if(has_idx)
-                        eltwise_op_cmp_embedding<IdType, DType, Op, Cmp>(&C[dst * N], &out_matrix1[dst][0], &out_matrix2[dst][0], B, E, &cur_csr.indices.Ptr()[row_start], &cur_csr.data.Ptr()[row_start], row_end - row_start, N, mask);
+                    {
+                        params.in_matrix2 = in_matrix2;
+                        params.indices2 = &cur_csr.data.Ptr()[row_start];
+                    }
                     else
-                        eltwise_op_cmp_embedding<IdType, DType, Op, Cmp>(&C[dst * N], &out_matrix1[dst][0], &out_matrix2[dst][0], B, E + row_start * N, &cur_csr.indices.Ptr()[row_start], NULL, row_end - row_start, N, mask);
+                    {
+                        params.in_matrix2 = &in_matrix2[row_start];
+                    }
+                    kernel(&params);
+#else
+                    if(Op::use_rhs && has_idx)
+                        eltwise_op_cmp_embedding<IdType, DType, Op, Cmp>(&C[dst * N], &out_matrix1[dst][0], &out_matrix2[dst][0], B, E, &cur_csr.indices.Ptr()[row_start], &cur_csr.data.Ptr()[row_start], row_end - row_start, N, mask, row_start);
+                    else
+                        eltwise_op_cmp_embedding<IdType, DType, Op, Cmp>(&C[dst * N], &out_matrix1[dst][0], &out_matrix2[dst][0], B, E, &cur_csr.indices.Ptr()[0], NULL, row_end - row_start, N, mask, row_start);
+#endif
                 }
             }
         }
@@ -881,7 +959,8 @@ void SpMMSumCsrOpt(
 #endif
 #if USE_LIBXSMM
   int _ld = N;
-  libxsmm_meltwfunction_opreduce_vecs_idx kernel = SpMMCreateLibxsmmKernel<IdType, DType, Op>(has_idx, N, _ld, LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_REDOP_SUM);
+  libxsmm_meltwfunction_opreduce_vecs_idx kernel = NULL;
+  kernel = SpMMCreateLibxsmmKernel<IdType, DType, Op>(has_idx, N, _ld, LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_REDOP_SUM, false);
 #endif
 #if SPMM_LOG_INFO
   endTick = __rdtsc();
@@ -982,13 +1061,29 @@ void SpMMCmpCsrOpt(
 #if SPMM_LOG_INFO
   startTick = __rdtsc();
 #endif
+#if USE_LIBXSMM
+  int _ld = N;
+  libxsmm_meltwfunction_opreduce_vecs_idx kernel = NULL;
+  if(std::is_same<Cmp, op::Max<DType>>::value)
+  {
+    kernel = SpMMCreateLibxsmmKernel<IdType, DType, Op>(has_idx, N, _ld, LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_REDOP_MAX, true);
+  }
+  else
+  {
+    kernel = SpMMCreateLibxsmmKernel<IdType, DType, Op>(has_idx, N, _ld, LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_REDOP_MIN, true);
+  }
+#endif
 #if SPMM_LOG_INFO
   endTick = __rdtsc();
   printf("stage2: %ld ticks\n", endTick - startTick);
 
   startTick = __rdtsc();
 #endif
+#if USE_LIBXSMM
+  SpMMBlockwiseOpCmp<IdType, DType, Op, Cmp>(block_csr_array, B, E, C, argB, argE, has_idx, N, num_M_blocks, num_K_blocks, M_BLOCK_SIZE, kernel);
+#else
   SpMMBlockwiseOpCmp<IdType, DType, Op, Cmp>(block_csr_array, B, E, C, argB, argE, has_idx, N, num_M_blocks, num_K_blocks, M_BLOCK_SIZE);
+#endif
 #if SPMM_LOG_INFO
   endTick = __rdtsc();
 #endif
