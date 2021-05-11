@@ -33,7 +33,7 @@ class GCN2Conv(nn.Module):
     :math:`\beta` is the hyperparameter to tune the strength of identity mapping.
     It is defined by :math:`\beta_l = \log(\frac{\lambda}{l}+1)\approx\frac{\lambda}{l}`,
     where :math:`\lambda` is a hyperparameter. :math: `\beta` ensures that the decay of
-    the weight matrix adaptively increases as we stack more layers.
+    the weight matrix adaptively increases as we stack more layers.    
     
     Parameters
     ----------
@@ -88,8 +88,10 @@ class GCN2Conv(nn.Module):
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
     >>> feat = th.ones(6, 3)
     >>> g = dgl.add_self_loop(g)
-    >>> conv1 = GCN2Conv(3, layer=1, alpha=0.5, project_initial_features=True, allow_zero_in_degree=True)
-    >>> conv2 = GCN2Conv(3, layer=2, alpha=0.5, project_initial_features=True, allow_zero_in_degree=True)
+    >>> conv1 = GCN2Conv(3, layer=1, alpha=0.5, \
+                project_initial_features=True, allow_zero_in_degree=True)
+    >>> conv2 = GCN2Conv(3, layer=2, alpha=0.5, \
+                project_initial_features=True, allow_zero_in_degree=True)
     >>> res = feat
     >>> res = conv1(g, res, feat)
     >>> res = conv2(g, res, feat)
