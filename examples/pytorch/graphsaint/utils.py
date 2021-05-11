@@ -29,7 +29,7 @@ class Logger(object):
 
 
 def save_log_dir(args):
-    log_dir = './log/{}/{}'.format(args.dataset, args.note)
+    log_dir = './log/{}/{}'.format(args.dataset, args.log_dir)
     os.makedirs(log_dir, exist_ok=True)
     return log_dir
 
@@ -84,6 +84,7 @@ def load_data(args, multilabel):
     class_map = json.load(open('./{}/class_map.json'.format(prefix)))
     class_map = {int(k): v for k, v in class_map.items()}
     if multilabel:
+        # Multi-label binary classification
         num_classes = len(list(class_map.values())[0])
         class_arr = np.zeros((num_nodes, num_classes))
         for k, v in class_map.items():
