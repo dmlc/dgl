@@ -7,7 +7,6 @@
 #define DGL_ARRAY_CPU_SPMM_BINARY_OPS_H_
 #include <dgl/array.h>
 #include <dgl/bcast.h>
-#include <x86intrin.h>
 #include <limits>
 namespace dgl {
 namespace aten {
@@ -24,14 +23,6 @@ struct Add {
   inline static DType Call(const DType* lhs_off, const DType* rhs_off) {
     return *lhs_off + *rhs_off;
   }
-
-  inline static __m512 Call_simd(const DType* lhs_off, const DType* rhs_off) {
-      return _mm512_add_ps(_mm512_loadu_ps(lhs_off), _mm512_loadu_ps(rhs_off));
-  }
-
-  inline static __m512 Call_mask_simd(const DType* lhs_off, const DType* rhs_off, __m512 zero512, __mmask16 mask) {
-      return _mm512_add_ps(_mm512_mask_loadu_ps(zero512, mask, lhs_off), _mm512_mask_loadu_ps(zero512, mask, rhs_off));
-  }
 };
 template <typename DType>
 constexpr bool Add<DType>::use_lhs;
@@ -45,14 +36,6 @@ struct Sub {
   static constexpr bool use_rhs = true;
   inline static DType Call(const DType* lhs_off, const DType* rhs_off) {
     return *lhs_off - *rhs_off;
-  }
-
-  inline static __m512 Call_simd(const DType* lhs_off, const DType* rhs_off) {
-      return _mm512_sub_ps(_mm512_loadu_ps(lhs_off), _mm512_loadu_ps(rhs_off));
-  }
-
-  inline static __m512 Call_mask_simd(const DType* lhs_off, const DType* rhs_off, __m512 zero512, __mmask16 mask) {
-      return _mm512_sub_ps(_mm512_mask_loadu_ps(zero512, mask, lhs_off), _mm512_mask_loadu_ps(zero512, mask, rhs_off));
   }
 };
 template <typename DType>
@@ -68,16 +51,6 @@ struct Mul {
   inline static DType Call(const DType* lhs_off, const DType* rhs_off) {
     return *lhs_off * *rhs_off;
   }
-
-  inline static __m512 Call_simd(const DType* lhs_off, const DType* rhs_off) {
-      __m512 t1 = _mm512_loadu_ps(lhs_off);
-      __m512 t2 = _mm512_loadu_ps(rhs_off);
-      return _mm512_mul_ps(t1, t2);
-  }
-
-  inline static __m512 Call_mask_simd(const DType* lhs_off, const DType* rhs_off, __m512 zero512, __mmask16 mask) {
-      return _mm512_mul_ps(_mm512_mask_loadu_ps(zero512, mask, lhs_off), _mm512_mask_loadu_ps(zero512, mask, rhs_off));
-  }
 };
 template <typename DType>
 constexpr bool Mul<DType>::use_lhs;
@@ -91,14 +64,6 @@ struct Div {
   static constexpr bool use_rhs = true;
   inline static DType Call(const DType* lhs_off, const DType* rhs_off) {
     return *lhs_off / *rhs_off;
-  }
-
-  inline static __m512 Call_simd(const DType* lhs_off, const DType* rhs_off) {
-      return _mm512_div_ps(_mm512_loadu_ps(lhs_off), _mm512_loadu_ps(rhs_off));
-  }
-
-  inline static __m512 Call_mask_simd(const DType* lhs_off, const DType* rhs_off, __m512 zero512, __mmask16 mask) {
-      return _mm512_div_ps(_mm512_mask_loadu_ps(zero512, mask, lhs_off), _mm512_mask_loadu_ps(zero512, mask, rhs_off));
   }
 };
 template <typename DType>
@@ -114,14 +79,6 @@ struct CopyLhs {
   inline static DType Call(const DType* lhs_off, const DType*) {
     return *lhs_off;
   }
-
-  inline static __m512 Call_simd(const DType* lhs_off, const DType* rhs_off) {
-      return _mm512_loadu_ps(lhs_off);
-  }
-
-  inline static __m512 Call_mask_simd(const DType* lhs_off, const DType* rhs_off, __m512 zero512, __mmask16 mask) {
-      return _mm512_mask_loadu_ps(zero512, mask, lhs_off);
-  }
 };
 template <typename DType>
 constexpr bool CopyLhs<DType>::use_lhs;
@@ -135,14 +92,6 @@ struct CopyRhs {
   static constexpr bool use_rhs = true;
   inline static DType Call(const DType*, const DType* rhs_off) {
     return *rhs_off;
-  }
-
-  inline static __m512 Call_simd(const DType* lhs_off, const DType* rhs_off) {
-      return _mm512_loadu_ps(rhs_off);
-  }
-
-  inline static __m512 Call_mask_simd(const DType* lhs_off, const DType* rhs_off, __m512 zero512, __mmask16 mask) {
-      return _mm512_mask_loadu_ps(zero512, mask, rhs_off);
   }
 };
 template <typename DType>
@@ -158,10 +107,6 @@ struct Max {
   static constexpr DType zero = -std::numeric_limits<DType>::infinity();
   // return true if accum should be replaced
   inline static DType Call(DType accum, DType val) { return accum < val; }
-
-  inline static __mmask16 Call_simd(__m512 accum, __m512 val) {
-      return _mm512_cmplt_ps_mask(accum, val);
-  }
 };
 template <typename DType>
 constexpr DType Max<DType>::zero;
@@ -172,10 +117,6 @@ struct Min {
   static constexpr DType zero = std::numeric_limits<DType>::infinity();
   // return true if accum should be replaced
   inline static DType Call(DType accum, DType val) { return accum > val; }
-
-  inline static __mmask16 Call_simd(__m512 accum, __m512 val) {
-      return _mm512_cmplt_ps_mask(val, accum);
-  }
 };
 template <typename DType>
 constexpr DType Min<DType>::zero;
