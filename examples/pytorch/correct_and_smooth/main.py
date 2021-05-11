@@ -2,7 +2,6 @@ import argparse
 import copy
 import os
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import dgl
@@ -25,7 +24,7 @@ def main():
     evaluator = Evaluator(name=args.dataset)
 
     split_idx = dataset.get_idx_split()
-    g, labels = dataset[0] # graph: dgl graph object, label: torch tensor of shape (num_nodes, num_tasks)
+    g, labels = dataset[0] # graph: DGLGraph object, label: torch tensor of shape (num_nodes, num_tasks)
     
     if args.dataset == 'ogbn-arxiv':
         if args.model == 'gat':
@@ -159,8 +158,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Base predictor(C&S)')
 
     # Dataset
-    parser.add_argument('--gpu', type=int, default=0)
-    parser.add_argument('--dataset', type=str, default='ogbn-arxiv')
+    parser.add_argument('--gpu', type=int, default=0, help='-1 for cpu')
+    parser.add_argument('--dataset', type=str, default='ogbn-arxiv', choices=['ogbn-arxiv', 'ogbn-products'])
     # Base predictor
     parser.add_argument('--model', type=str, default='mlp', choices=['mlp', 'linear', 'gat'])
     parser.add_argument('--num-layers', type=int, default=3)
@@ -172,7 +171,7 @@ if __name__ == '__main__':
     parser.add_argument('--n-heads', type=int, default=3)
     parser.add_argument('--attn_drop', type=float, default=0.05)
     # C & S
-    parser.add_argument('--pretrain', action='store_true')
+    parser.add_argument('--pretrain', action='store_true', help='Whether to perform C & S')
     parser.add_argument('--num-correction-layers', type=int, default=50)
     parser.add_argument('--correction-alpha', type=float, default=0.979)
     parser.add_argument('--num-smoothing-layers', type=int, default=50)

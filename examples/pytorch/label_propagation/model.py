@@ -9,7 +9,7 @@ class LabelPropagation(nn.Module):
 
     Description
     -----------
-    Introduced in `Learning from Labeled and Unlabeled Datawith Label Propagation <https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.14.3864&rep=rep1&type=pdf>`_
+    Introduced in `Learning from Labeled and Unlabeled Data with Label Propagation <https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.14.3864&rep=rep1&type=pdf>`_
 
     .. math::
         \mathbf{Y}^{\prime} = \alpha \cdot \mathbf{D}^{-1/2} \mathbf{A}
@@ -42,10 +42,11 @@ class LabelPropagation(nn.Module):
                 y[mask] = labels[mask]
             
             last = (1 - self.alpha) * y
+            degs = g.in_degrees().float().clamp(min=1)
+            norm = torch.pow(degs, -0.5).to(labels.device).unsqueeze(1)
 
             for _ in range(self.num_layers):
-                degs = g.in_degrees().float().clamp(min=1)
-                norm = torch.pow(degs, -0.5).to(labels.device).unsqueeze(1)
+                # Assume the graphs to be undirected
                 g.ndata['h'] = y * norm
                 g.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
                 y = last + self.alpha * g.ndata.pop('h') * norm
