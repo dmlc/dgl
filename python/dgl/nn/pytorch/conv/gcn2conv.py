@@ -1,4 +1,5 @@
-"""Torch Module for Topology Adaptive Graph Convolutional layer"""
+"""Torch Module for Graph Convolutional Network via Initial residual
+    and Identity mapping (GCNII) layer"""
 # pylint: disable= no-member, arguments-differ, invalid-name
 import math
 
