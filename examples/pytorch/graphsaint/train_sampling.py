@@ -36,7 +36,7 @@ def main(args):
     print("""----Data statistics------'
     #Nodes %d
     #Edges %d
-    #Classes %d
+    #Classes/Labels (multi binary labels) %d
     #Train samples %d
     #Val samples %d
     #Test samples %d""" %
@@ -150,7 +150,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GraphSAINT')
     # data source params
-    parser.add_argument("--dataset", type=str, choices=['ppi', 'flickr', 'reddit', 'yelp', 'amazon'], default='ppi',
+    parser.add_argument("--dataset", type=str, choices=['ppi', 'flickr'], default='ppi',
                         help="Name of dataset.")
 
     # cuda params
@@ -193,8 +193,8 @@ if __name__ == '__main__':
                         help="Frequency of evaluation on the validation set in number of epochs")
     parser.add_argument("--use-val", action='store_true',
                         help="whether to use validated best model to test")
-    parser.add_argument("--note", type=str, default='none',
-                        help="Note for log dir")
+    parser.add_argument("--log-dir", type=str, default='none',
+                        help="Log file will be saved to log/{dataset}/{log_dir}")
 
     args = parser.parse_args()
 
