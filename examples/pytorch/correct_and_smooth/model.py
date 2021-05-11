@@ -78,15 +78,14 @@ class GAT(nn.Module):
                  attn_drop=0.0):
         super().__init__()
         self.in_feats = in_feats
-        self.n_hidden = n_hidden
         self.n_classes = n_classes
+        self.n_hidden = n_hidden
         self.n_layers = n_layers
         self.num_heads = n_heads
 
         self.convs = nn.ModuleList()
         self.linear = nn.ModuleList()
         self.bns = nn.ModuleList()
-        self.biases = nn.ModuleList()
 
         for i in range(n_layers):
             in_hidden = n_heads * n_hidden if i > 0 else in_feats
@@ -133,7 +132,7 @@ class LabelPropagation(nn.Module):
 
     Description
     -----------
-    Introduced in `Learning from Labeled and Unlabeled Datawith Label Propagation <https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.14.3864&rep=rep1&type=pdf>`_
+    Introduced in `Learning from Labeled and Unlabeled Data with Label Propagation <https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.14.3864&rep=rep1&type=pdf>`_
 
     .. math::
         \mathbf{Y}^{\prime} = \alpha \cdot \mathbf{D}^{-1/2} \mathbf{A}
@@ -166,10 +165,11 @@ class LabelPropagation(nn.Module):
                 y[mask] = labels[mask]
             
             last = (1 - self.alpha) * y
+            degs = g.in_degrees().float().clamp(min=1)
+            norm = torch.pow(degs, -0.5).to(labels.device).unsqueeze(1)
 
             for _ in range(self.num_layers):
-                degs = g.in_degrees().float().clamp(min=1)
-                norm = torch.pow(degs, -0.5).to(labels.device).unsqueeze(1)
+                # Assume the graphs to be undirected
                 g.ndata['h'] = y * norm
                 g.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
                 y = last + self.alpha * g.ndata.pop('h') * norm

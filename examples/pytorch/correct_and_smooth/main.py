@@ -86,7 +86,6 @@ def main():
                               correction_alpha=args.correction_alpha,
                               num_smoothing_layers=args.num_smoothing_layers,
                               smoothing_alpha=args.smoothing_alpha,
-                              autoscale=args.autoscale,
                               scale=args.scale)
         y_soft = cs.correct(g, y_soft, labels[train_idx], train_idx)
         y_soft = cs.smooth(g, y_soft, labels[train_idx], train_idx)
@@ -145,7 +144,7 @@ def main():
         test_acc = evaluate(y_pred, labels, test_idx, evaluator)
         print(f'Test acc: {test_acc:.4f}')
 
-        if os.path.exists('base') is False:
+        if not os.path.exists('base'):
             os.makedirs('base')
 
         torch.save(best_model.state_dict(), f'base/{args.dataset}-{args.model}.pt')
@@ -176,7 +175,6 @@ if __name__ == '__main__':
     parser.add_argument('--correction-alpha', type=float, default=0.979)
     parser.add_argument('--num-smoothing-layers', type=int, default=50)
     parser.add_argument('--smoothing-alpha', type=float, default=0.756)
-    parser.add_argument('--autoscale', type=bool, default=True)
     parser.add_argument('--scale', type=float, default=20.)
 
     args = parser.parse_args()
