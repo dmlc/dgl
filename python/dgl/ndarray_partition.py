@@ -1,6 +1,7 @@
 """ API for managing array partitionings """
 
-from ..base import DGLError
+from .base import DGLError
+from ._ffi.function import _init_api
 
 _MODES_MAP = {
     'remainder': 0
