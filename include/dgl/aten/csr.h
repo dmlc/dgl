@@ -198,6 +198,31 @@ inline runtime::NDArray CSRGetAllData(CSRMatrix mat, int64_t row, int64_t col) {
  */
 runtime::NDArray CSRGetData(CSRMatrix, runtime::NDArray rows, runtime::NDArray cols);
 
+/*!
+ * \brief Get the data for each (row, col) pair, then index into the weights array.
+ *
+ * The operator supports matrix with duplicate entries but only one matched entry
+ * will be returned for each (row, col) pair. Support duplicate input (row, col)
+ * pairs.
+ *
+ * If some (row, col) pairs do not contain a valid non-zero elements to index into the
+ * weights array, DGL returns the value \a filler for that pair instead.
+ *
+ * \note This operator allows broadcasting (i.e, either row or col can be of length 1).
+ *
+ * \tparam DType the data type of the weights array.
+ * \param mat Sparse matrix.
+ * \param rows Row index.
+ * \param cols Column index.
+ * \param weights The weights array.
+ * \param filler The value to return for row-column pairs not existent in the matrix.
+ * \return Data array. The i^th element is the data of (rows[i], cols[i])
+ */
+template <typename DType>
+runtime::NDArray CSRGetData(
+    CSRMatrix, runtime::NDArray rows, runtime::NDArray cols, runtime::NDArray weights,
+    DType filler);
+
 /*! \brief Return a transposed CSR matrix */
 CSRMatrix CSRTranspose(CSRMatrix csr);
 

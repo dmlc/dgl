@@ -118,4 +118,56 @@ template void RandomEngine::UniformChoice<int64_t>(int64_t num,
                                                    int64_t population,
                                                    int64_t* out, bool replace);
 
+template <typename IdxType, typename FloatType>
+void RandomEngine::BiasedChoice(
+    IdxType num, const IdxType *split, FloatArray bias, IdxType* out, bool replace) {
+  const int64_t num_tags = bias->shape[0];
+  const FloatType *bias_data = static_cast<FloatType *>(bias->data);
+  IdxType total_node_num = 0;
+  FloatArray prob = NDArray::Empty({num_tags}, bias->dtype, bias->ctx);
+  FloatType *prob_data = static_cast<FloatType *>(prob->data);
+  for (int64_t tag = 0 ; tag < num_tags; ++tag) {
+    int64_t tag_num_nodes = split[tag+1] - split[tag];
+    total_node_num += tag_num_nodes;
+    FloatType tag_bias = bias_data[tag];
+    prob_data[tag] = tag_num_nodes * tag_bias;
+  }
+  if (replace) {
+    auto sampler = utils::TreeSampler<IdxType, FloatType, true>(this, prob);
+    for (IdxType i = 0; i < num; ++i) {
+      const int64_t tag = sampler.Draw();
+      const IdxType tag_num_nodes = split[tag+1] - split[tag];
+      out[i] = RandInt(tag_num_nodes) + split[tag];
+    }
+  } else {
+    utils::TreeSampler<int64_t, FloatType, false> sampler(this, prob, bias_data);
+    CHECK_GE(total_node_num, num)
+        << "Cannot take more sample than population when 'replace=false'";
+    // we use hash set here. Maybe in the future we should support reservoir algorithm
+    std::vector<std::unordered_set<IdxType>> selected(num_tags);
+    for (IdxType i = 0 ; i < num ; ++i) {
+      const int64_t tag = sampler.Draw();
+      bool inserted = false;
+      const IdxType tag_num_nodes = split[tag+1] - split[tag];
+      IdxType selected_node;
+      while (!inserted) {
+        CHECK_LT(selected[tag].size(), tag_num_nodes)
+            << "Cannot take more sample than population when 'replace=false'";
+        selected_node = RandInt(tag_num_nodes);
+        inserted = selected[tag].insert(selected_node).second;
+      }
+      out[i] = selected_node + split[tag];
+    }
+  }
+}
+
+template void RandomEngine::BiasedChoice<int32_t, float>(
+    int32_t, const int32_t*, FloatArray, int32_t*, bool);
+template void RandomEngine::BiasedChoice<int32_t, double>(
+    int32_t, const int32_t*, FloatArray, int32_t*, bool);
+template void RandomEngine::BiasedChoice<int64_t, float>(
+    int64_t, const int64_t*, FloatArray, int64_t*, bool);
+template void RandomEngine::BiasedChoice<int64_t, double>(
+    int64_t, const int64_t*, FloatArray, int64_t*, bool);
+
 };  // namespace dgl
