@@ -23,14 +23,14 @@ class GCN2Conv(nn.Module):
     .. math::
         \mathbf{h}^{(l+1)} =\left( (1 - \alpha)(\mathbf{D}^{-1/2} \mathbf{\hat{A}}
         \mathbf{D}^{-1/2})\mathbf{h}^{(l)} + \alpha {\mathbf{h}^{(0)}} \right)
-        \left( (1 - \beta) \mathbf{I} + \beta \mathbf{W} \right)
+        \left( (1 - \beta_l) \mathbf{I} + \beta_l \mathbf{W} \right)
 
     where :math:`\mathbf{\hat{A}}` is the adjacency matrix with self-loops,
     :math:`\mathbf{D}_{ii} = \sum_{j=0} \mathbf{A}_{ij}` is its diagonal degree matrix,
     :math:`\mathbf{h}^{(0)}` is the initial node features,
     :math:`\mathbf{h}^{(l)}` is the feature of layer :math:`l`,
     :math:`\alpha` is the fraction of initial node features, and
-    :math:`\beta` is the hyperparameter to tune the strength of identity mapping.
+    :math:`\beta_l` is the hyperparameter to tune the strength of identity mapping.
     It is defined by :math:`\beta_l = \log(\frac{\lambda}{l}+1)\approx\frac{\lambda}{l}`,
     where :math:`\lambda` is a hyperparameter. :math: `\beta` ensures that the decay of
     the weight matrix adaptively increases as we stack more layers.
