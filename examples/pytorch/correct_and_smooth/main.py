@@ -6,7 +6,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 import dgl
 from ogb.nodeproppred import DglNodePropPredDataset, Evaluator
-from model import MLP, MLPLinear, GAT, CorrectAndSmooth
+from model import MLP, MLPLinear, CorrectAndSmooth
 
 
 def evaluate(y_pred, y_true, idx, evaluator):
@@ -27,12 +27,11 @@ def main():
     g, labels = dataset[0] # graph: DGLGraph object, label: torch tensor of shape (num_nodes, num_tasks)
     
     if args.dataset == 'ogbn-arxiv':
-        if args.model == 'gat':
-            srcs, dsts = g.all_edges()
-            g.add_edges(dsts, srcs)
-            g = g.add_self_loop()
-        else:
-            g = dgl.to_bidirected(g, copy_ndata=True)
+        g = dgl.to_bidirected(g, copy_ndata=True)
+        
+        feat = g.ndata['feat']
+        feat = (feat - feat.mean(0)) / feat.std(0)
+        g.ndata['feat'] = feat
 
     g = g.to(device)
     feats = g.ndata['feat']
@@ -51,15 +50,6 @@ def main():
         model = MLP(n_features, args.hid_dim, n_classes, args.num_layers, args.dropout)
     elif args.model == 'linear':
         model = MLPLinear(n_features, n_classes)
-    elif args.model == 'gat':
-        model = GAT(in_feats=n_features,
-                    n_classes=n_classes,
-                    n_hidden=args.hid_dim,
-                    n_layers=args.num_layers,
-                    n_heads=args.n_heads,
-                    activation=F.relu,
-                    dropout=args.dropout,
-                    attn_drop=args.attn_drop)
     else:
         raise NotImplementedError(f'Model {args.model} is not supported.')
 
@@ -71,10 +61,7 @@ def main():
         model.load_state_dict(torch.load(f'base/{args.dataset}-{args.model}.pt'))
         model.eval()
 
-        if args.model == 'gat':
-            y_soft = model(g, feats).exp()
-        else:
-            y_soft = model(feats).exp()
+        y_soft = model(feats).exp()
 
         y_pred = y_soft.argmax(dim=-1, keepdim=True)
         valid_acc = evaluate(y_pred, labels, valid_idx, evaluator)
@@ -87,17 +74,17 @@ def main():
                               num_smoothing_layers=args.num_smoothing_layers,
                               smoothing_alpha=args.smoothing_alpha,
                               scale=args.scale)
-        y_soft = cs.correct(g, y_soft, labels[train_idx], train_idx)
-        y_soft = cs.smooth(g, y_soft, labels[train_idx], train_idx)
+
+        mask_idx = torch.cat([train_idx, valid_idx])
+        y_soft = cs.correct(g, y_soft, labels[mask_idx], mask_idx)
+        y_soft = cs.smooth(g, y_soft, labels[mask_idx], mask_idx)
+
         y_pred = y_soft.argmax(dim=-1, keepdim=True)
         valid_acc = evaluate(y_pred, labels, valid_idx, evaluator)
         test_acc = evaluate(y_pred, labels, test_idx, evaluator)
         print(f'Valid acc: {valid_acc:.4f} | Test acc: {test_acc:.4f}')
     else:
-        if args.model == 'gat':
-            opt = optim.RMSprop(model.parameters(), lr=args.lr)
-        else:
-            opt = optim.Adam(model.parameters(), lr=args.lr)
+        opt = optim.Adam(model.parameters(), lr=args.lr)
 
         best_acc = 0
         best_model = copy.deepcopy(model)
@@ -105,13 +92,11 @@ def main():
         # training
         print('---------- Training ----------')
         for i in range(args.epochs):
+
             model.train()
             opt.zero_grad()
 
-            if args.model == 'gat':
-                logits = model(g, feats)
-            else:
-                logits = model(feats)
+            logits = model(feats)
             
             train_loss = F.nll_loss(logits[train_idx], labels.squeeze(1)[train_idx])
             train_loss.backward()
@@ -120,6 +105,8 @@ def main():
             
             model.eval()
             with torch.no_grad():
+                logits = model(feats)
+                
                 y_pred = logits.argmax(dim=-1, keepdim=True)
 
                 train_acc = evaluate(y_pred, labels, train_idx, evaluator)
@@ -135,10 +122,7 @@ def main():
         print('---------- Testing ----------')
         best_model.eval()
         
-        if args.model == 'gat':
-            logits = best_model(g, feats)
-        else:
-            logits = best_model(feats)
+        logits = best_model(feats)
         
         y_pred = logits.argmax(dim=-1, keepdim=True)
         test_acc = evaluate(y_pred, labels, test_idx, evaluator)
@@ -160,7 +144,7 @@ if __name__ == '__main__':
     parser.add_argument('--gpu', type=int, default=0, help='-1 for cpu')
     parser.add_argument('--dataset', type=str, default='ogbn-arxiv', choices=['ogbn-arxiv', 'ogbn-products'])
     # Base predictor
-    parser.add_argument('--model', type=str, default='mlp', choices=['mlp', 'linear', 'gat'])
+    parser.add_argument('--model', type=str, default='mlp', choices=['mlp', 'linear'])
     parser.add_argument('--num-layers', type=int, default=3)
     parser.add_argument('--hid-dim', type=int, default=256)
     parser.add_argument('--dropout', type=float, default=0.4)

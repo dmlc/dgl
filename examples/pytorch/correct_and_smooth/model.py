@@ -3,8 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import dgl.function as fn
 
-from dgl.nn.pytorch.conv import GATConv
-
 
 class MLPLinear(nn.Module):
     def __init__(self, in_dim, out_dim):
@@ -45,87 +43,13 @@ class MLP(nn.Module):
 
     def forward(self, x):
         for linear, bn in zip(self.linears[:-1], self.bns):
-            x = bn(linear(x))
+            x = linear(x)
             x = F.relu(x, inplace=True)
+            x = bn(x)
             x = F.dropout(x, p=self.dropout, training=self.training)
         x = self.linears[-1](x)
         return F.log_softmax(x, dim=-1)
 
-
-class Bias(nn.Module):
-    def __init__(self, size):
-        super().__init__()
-
-        self.bias = nn.Parameter(torch.Tensor(size))
-        self.reset_parameters()
-
-    def reset_parameters(self):
-        nn.init.zeros_(self.bias)
-
-    def forward(self, x):
-        return x + self.bias
-
-
-class GAT(nn.Module):
-    def __init__(self,
-                 in_feats,
-                 n_classes,
-                 n_hidden,
-                 n_layers,
-                 n_heads,
-                 activation,
-                 dropout=0.0,
-                 attn_drop=0.0):
-        super().__init__()
-        self.in_feats = in_feats
-        self.n_classes = n_classes
-        self.n_hidden = n_hidden
-        self.n_layers = n_layers
-        self.num_heads = n_heads
-
-        self.convs = nn.ModuleList()
-        self.linear = nn.ModuleList()
-        self.bns = nn.ModuleList()
-
-        for i in range(n_layers):
-            in_hidden = n_heads * n_hidden if i > 0 else in_feats
-            out_hidden = n_hidden if i < n_layers - 1 else n_classes
-            out_channels = n_heads
-
-            self.convs.append(GATConv(in_hidden,
-                                      out_hidden,
-                                      num_heads=n_heads,
-                                      attn_drop=attn_drop))
-            self.linear.append(nn.Linear(in_hidden, out_channels * out_hidden, bias=False))
-            if i < n_layers - 1:
-                self.bns.append(nn.BatchNorm1d(out_channels * out_hidden))
-
-        self.bias_last = Bias(n_classes)
-
-        self.dropout0 = nn.Dropout(min(0.1, dropout))
-        self.dropout = nn.Dropout(dropout)
-        self.activation = activation
-
-    def forward(self, graph, feat):
-        h = feat
-        h = self.dropout0(h)
-
-        for i in range(self.n_layers):
-            conv = self.convs[i](graph, h)
-            linear = self.linear[i](h).view(conv.shape)
-
-            h = conv + linear
-
-            if i < self.n_layers - 1:
-                h = h.flatten(1)
-                h = self.bns[i](h)
-                h = self.activation(h)
-                h = self.dropout(h)
-
-        h = h.mean(1)
-        h = self.bias_last(h)
-
-        return F.log_softmax(h, dim=-1)
 
 class LabelPropagation(nn.Module):
     r"""
@@ -174,7 +98,6 @@ class LabelPropagation(nn.Module):
                 g.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
                 y = last + self.alpha * g.ndata.pop('h') * norm
                 y = post_step(y)
-                last = (1 - self.alpha) * y
             
             return y
 
