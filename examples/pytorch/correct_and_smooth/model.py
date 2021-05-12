@@ -72,8 +72,8 @@ class LabelPropagation(nn.Module):
             The :math:`\alpha` coefficient.
         adj: str
             'DAD': D^-0.5 * A * D^-0.5
-            'DA': D * A
-            'AD': A * D
+            'DA': D^-1 * A
+            'AD': A * D^-1
     """
     def __init__(self, num_layers, alpha, adj='DAD'):
         super(LabelPropagation, self).__init__()
@@ -95,25 +95,19 @@ class LabelPropagation(nn.Module):
             
             last = (1 - self.alpha) * y
             degs = g.in_degrees().float().clamp(min=1)
-            norm = torch.pow(degs, -0.5).to(labels.device).unsqueeze(1)
+            norm = torch.pow(degs, -0.5 if self.adj == 'DAD' else -1).to(labels.device).unsqueeze(1)
 
             for _ in range(self.num_layers):
                 # Assume the graphs to be undirected
-                if self.adj != 'AD':
-                    # DAD or DA
+                if self.adj in ['DAD', 'AD']:
                     y = norm * y
-                    if self.adj == 'DA':
-                        y = norm * y
                 
                 g.ndata['h'] = y
                 g.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
                 y = self.alpha * g.ndata.pop('h')
 
-                if self.adj != 'DA':
-                    # DAD or AD
+                if self.adj in ['DAD', 'DA']:
                     y = y * norm
-                    if self.adj == 'AD':
-                        y = y * norm
                 
                 y = post_step(last + y)
             
@@ -135,16 +129,16 @@ class CorrectAndSmooth(nn.Module):
             The coefficient of correction.
         correction_adj: str
             'DAD': D^-0.5 * A * D^-0.5
-            'DA': D * A
-            'AD': A * D
+            'DA': D^-1 * A
+            'AD': A * D^-1
         num_smoothing_layers: int
             The number of smooth propagations.
         smoothing_alpha: float
             The coefficient of smoothing.
         smoothing_adj: str
             'DAD': D^-0.5 * A * D^-0.5
-            'DA': D * A
-            'AD': A * D
+            'DA': D^-1 * A
+            'AD': A * D^-1
         autoscale: bool, optional
             If set to True, will automatically determine the scaling factor :math:`\sigma`. Default is True.
         scale: float, optional
