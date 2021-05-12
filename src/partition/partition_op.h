@@ -15,6 +15,18 @@ namespace dgl {
 namespace partition {
 namespace impl {
 
+/**
+ * @brief Create a permutation that groups indices by the part id.
+ *
+ * @tparam XPU The type of device to run on.
+ * @tparam IdType The type of the index.
+ * @param array_size The total size of the partitioned array.
+ * @param num_parts The number parts the array id divided into.
+ * @param in_idx The array of indices to group by part id.
+ *
+ * @return The permutation to group the indices by part id, and the number of
+ * indices in each part.
+ */
 template <DLDeviceType XPU, typename IdType>
 std::pair<IdArray, IdArray>
 GeneratePermutationFromRemainder(

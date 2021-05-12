@@ -24,7 +24,7 @@ class NDArrayPartition(object):
     def __init__(self, array_size, num_parts, mode='remainder', part_ranges=None):
         assert num_parts > 0, 'Invalid "num_parts", must be > 0.'
         if mode == 'range':
-            assert part_ranges not is None, 'When using a range-based ' \
+            assert not part_ranges is None, 'When using a range-based ' \
                     'partitioning, the range must be provided.'
             assert part_ranges[-1] == array_size, '"part_ranges" must cover ' \
                     'the entire array.'
@@ -35,7 +35,7 @@ class NDArrayPartition(object):
             assert part_ranges is None, 'When using remainder-based ' \
                     'partitioning, "part_ranges" should not be specified.'
             self._partition = _CAPI_DGLNDArrayPartitionCreateRemainderBased(
-                    array_size, num_parts)
+                array_size, num_parts)
         else:
             assert False, 'Unknown partition mode "{}"'.format(mode)
 
