@@ -4,7 +4,7 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import torch.multiprocessing as mp
+import dgl.multiprocessing as mp
 import dgl.function as fn
 import dgl.nn.pytorch as dglnn
 import time
@@ -12,8 +12,6 @@ import argparse
 import tqdm
 import traceback
 import math
-from _thread import start_new_thread
-from functools import wraps
 from dgl.data import RedditDataset
 from torch.utils.data import DataLoader
 from torch.nn.parallel import DistributedDataParallel
@@ -148,34 +146,6 @@ class NeighborSampler(object):
             hist_blocks.insert(0, hist_block)
         return blocks, hist_blocks
 
-# According to https://github.com/pytorch/pytorch/issues/17199, this decorator
-# is necessary to make fork() and openmp work together.
-#
-# TODO: confirm if this is necessary for MXNet and Tensorflow.  If so, we need
-# to standardize worker process creation since our operators are implemented with
-# OpenMP.
-def thread_wrapped_func(func):
-    @wraps(func)
-    def decorated_function(*args, **kwargs):
-        queue = mp.Queue()
-        def _queue_result():
-            exception, trace, res = None, None, None
-            try:
-                res = func(*args, **kwargs)
-            except Exception as e:
-                exception = e
-                trace = traceback.format_exc()
-            queue.put((res, exception, trace))
-
-        start_new_thread(_queue_result, ())
-        result, exception, trace = queue.get()
-        if exception is None:
-            return result
-        else:
-            assert isinstance(exception, Exception)
-            raise exception.__class__(trace)
-    return decorated_function
-
 def compute_acc(pred, labels):
     """
     Compute the accuracy of prediction given the labels.
@@ -245,7 +215,6 @@ def update_history(g, blocks):
             h_new = block.dstdata['h_new'].cpu()
             g.ndata[hist_col][ids] = h_new
 
-@thread_wrapped_func
 def run(proc_id, n_gpus, args, devices, data):
     dropout = 0.2
 

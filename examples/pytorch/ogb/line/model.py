@@ -4,10 +4,8 @@ import torch.nn.functional as F
 from torch.nn import init
 import random
 import numpy as np
-import torch.multiprocessing as mp
-from torch.multiprocessing import Queue
-
-from utils import thread_wrapped_func
+import dgl.multiprocessing as mp
+from dgl.multiprocessing import Queue
 
 def init_emb2neg_index(negative, batch_size):
     '''select embedding of negative nodes from a batch of node embeddings 
@@ -44,7 +42,6 @@ def adam(grad, state_sum, nodes, lr, device, only_gpu):
 
     return grad
 
-@thread_wrapped_func
 def async_update(num_threads, model, queue):
     """ Asynchronous embedding update for entity embeddings.
     """
