@@ -70,12 +70,17 @@ class LabelPropagation(nn.Module):
             The number of propagations.
         alpha: float
             The :math:`\alpha` coefficient.
+        adj: str
+            'DAD': D^-0.5 * A * D^-0.5
+            'DA': D * A
+            'AD': A * D
     """
-    def __init__(self, num_layers, alpha):
+    def __init__(self, num_layers, alpha, adj='DAD'):
         super(LabelPropagation, self).__init__()
 
         self.num_layers = num_layers
         self.alpha = alpha
+        self.adj = adj
     
     @torch.no_grad()
     def forward(self, g, labels, mask=None, post_step=lambda y: y.clamp_(0., 1.)):
@@ -94,10 +99,23 @@ class LabelPropagation(nn.Module):
 
             for _ in range(self.num_layers):
                 # Assume the graphs to be undirected
-                g.ndata['h'] = y * norm
+                if self.adj != 'AD':
+                    # DAD or DA
+                    y = norm * y
+                    if self.adj == 'DA':
+                        y = norm * y
+                
+                g.ndata['h'] = y
                 g.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
-                y = last + self.alpha * g.ndata.pop('h') * norm
-                y = post_step(y)
+                y = self.alpha * g.ndata.pop('h')
+
+                if self.adj != 'DA':
+                    # DAD or AD
+                    y = y * norm
+                    if self.adj == 'AD':
+                        y = y * norm
+                
+                y = post_step(last + y)
             
             return y
 
@@ -115,10 +133,18 @@ class CorrectAndSmooth(nn.Module):
             The number of correct propagations.
         correction_alpha: float
             The coefficient of correction.
+        correction_adj: str
+            'DAD': D^-0.5 * A * D^-0.5
+            'DA': D * A
+            'AD': A * D
         num_smoothing_layers: int
             The number of smooth propagations.
         smoothing_alpha: float
             The coefficient of smoothing.
+        smoothing_adj: str
+            'DAD': D^-0.5 * A * D^-0.5
+            'DA': D * A
+            'AD': A * D
         autoscale: bool, optional
             If set to True, will automatically determine the scaling factor :math:`\sigma`. Default is True.
         scale: float, optional
@@ -127,8 +153,10 @@ class CorrectAndSmooth(nn.Module):
     def __init__(self,
                  num_correction_layers,
                  correction_alpha,
+                 correction_adj,
                  num_smoothing_layers,
                  smoothing_alpha,
+                 smoothing_adj,
                  autoscale=True,
                  scale=1.):
         super(CorrectAndSmooth, self).__init__()
@@ -136,8 +164,12 @@ class CorrectAndSmooth(nn.Module):
         self.autoscale = autoscale
         self.scale = scale
 
-        self.prop1 = LabelPropagation(num_correction_layers, correction_alpha)
-        self.prop2 = LabelPropagation(num_smoothing_layers, smoothing_alpha)
+        self.prop1 = LabelPropagation(num_correction_layers,
+                                      correction_alpha,
+                                      correction_adj)
+        self.prop2 = LabelPropagation(num_smoothing_layers,
+                                      smoothing_alpha,
+                                      correction_adj)
 
     def correct(self, g, y_soft, y_true, mask):
         with g.local_scope():
@@ -156,14 +188,20 @@ class CorrectAndSmooth(nn.Module):
                 sigma = error[mask].abs().sum() / numel
                 scale = sigma / smoothed_error.abs().sum(dim=1, keepdim=True)
                 scale[scale.isinf() | (scale > 1000)] = 1.0
-                return y_soft + scale * smoothed_error
+
+                result = y_soft + scale * smoothed_error
+                result[result.isnan()] = y_soft[result.isnan()]
+                return result
             else:
                 def fix_input(x):
                     x[mask] = error[mask]
                     return x
                 
                 smoothed_error = self.prop1(g, error, post_step=fix_input)
-                return y_soft + self.scale * smoothed_error
+
+                result = y_soft + self.scale * smoothed_error
+                result[result.isnan()] = y_soft[result.isnan()]
+                return result
 
     def smooth(self, g, y_soft, y_true, mask):
         with g.local_scope():

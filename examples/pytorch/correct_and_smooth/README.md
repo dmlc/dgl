@@ -32,14 +32,14 @@ Training a **Base predictor** and using **Correct&Smooth** which follows the ori
 
 ```bash
 python main.py --dropout 0.5
-python main.py --pretrain
+python main.py --pretrain --correction-adj DA --smoothing-adj AD
 ```
 
 * **Linear + C&S**
 
 ```bash
 python main.py --model linear --dropout 0.5 --epochs 1000
-python main.py --model linear --pretrain --correction-alpha 0.8 --smoothing-alpha 0.6
+python main.py --model linear --pretrain --correction-alpha 0.8 --smoothing-alpha 0.6 --correction-adj AD
 ```
 
 ##### ogbn-products
@@ -58,7 +58,7 @@ python main.py --dataset ogbn-products --model linear --pretrain --correction-al
 |                 |  MLP  | MLP + C&S | Linear | Linear + C&S |
 | :-------------: | :---: | :-------: | :----: | :----------: |
 | Results(Author) | 55.58 |   68.72   | 51.06  |    70.24     |
-|  Results(DGL)   | 56.12 |   72.52   | 52.49  |    72.66     |
+|  Results(DGL)   | 56.12 |   72.20   | 52.49  |    70.04     |
 
 #### ogbn-products
 
