@@ -9,7 +9,7 @@ This section covers the distributed APIs used in the training script. DGL provid
 data structures and various APIs for initialization, distributed sampling and workload split.
 For distributed training/inference, DGL provides three distributed data structures:
 :class:`~dgl.distributed.DistGraph` for distributed graphs, :class:`~dgl.distributed.DistTensor` for
-distributed tensors and :class:`~dgl.distributed.DistEmbedding` for distributed learnable embeddings.
+distributed tensors and :class:`~dgl.distributed.nn.NodeEmbedding` for distributed learnable embeddings.
 
 Initialization of the DGL distributed module
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -27,7 +27,7 @@ Typically, the initialization APIs should be invoked in the following order:
     th.distributed.init_process_group(backend='gloo')
 
 **Note**: If the training script contains user-defined functions (UDFs) that have to be invoked on
-the servers (see the section of DistTensor and DistEmbedding for more details), these UDFs have to
+the servers (see the section of DistTensor and NodeEmbedding for more details), these UDFs have to
 be declared before :func:`~dgl.distributed.initialize`.
 
 Distributed graph
@@ -125,7 +125,7 @@ in the cluster even if the :class:`~dgl.distributed.DistTensor` object disappear
     tensor = dgl.distributed.DistTensor((g.number_of_nodes(), 10), th.float32, name='test')
 
 **Note**: :class:`~dgl.distributed.DistTensor` creation is a synchronized operation. All trainers
-have to invoke the creation and the creation succeeds only when all trainers call it. 
+have to invoke the creation and the creation succeeds only when all trainers call it.
 
 A user can add a :class:`~dgl.distributed.DistTensor` to a :class:`~dgl.distributed.DistGraph`
 object as one of the node data or edge data.
@@ -153,10 +153,10 @@ computation operators, such as sum and mean.
 when a machine runs multiple servers. This may result in data corruption. One way to avoid concurrent
 writes to the same row of data is to run one server process on a machine.
 
-Distributed Embedding
+Distributed NodeEmbedding
 ~~~~~~~~~~~~~~~~~~~~~
 
-DGL provides :class:`~dgl.distributed.DistEmbedding` to support transductive models that require
+DGL provides :class:`~dgl.distributed.nn.NodeEmbedding` to support transductive models that require
 node embeddings. Creating distributed embeddings is very similar to creating distributed tensors.
 
 .. code:: python
@@ -165,7 +165,7 @@ node embeddings. Creating distributed embeddings is very similar to creating dis
         arr = th.zeros(shape, dtype=dtype)
         arr.uniform_(-1, 1)
         return arr
-    emb = dgl.distributed.DistEmbedding(g.number_of_nodes(), 10, init_func=initializer)
+    emb = dgl.distributed.nn.NodeEmbedding(g.number_of_nodes(), 10, init_func=initializer)
 
 Internally, distributed embeddings are built on top of distributed tensors, and, thus, has
 very similar behaviors to distributed tensors. For example, when embeddings are created, they
@@ -192,7 +192,7 @@ the other for dense model parameters, as shown in the code below:
     optimizer.step()
     sparse_optimizer.step()
 
-**Note**: :class:`~dgl.distributed.DistEmbedding` is not an Pytorch nn module, so we cannot
+**Note**: :class:`~dgl.distributed.nn.NodeEmbedding` is not an Pytorch nn module, so we cannot
 get access to it from parameters of a Pytorch nn module.
 
 Distributed sampling
@@ -252,7 +252,7 @@ the same as single-process sampling.
     dataloader = dgl.sampling.NodeDataLoader(g, train_nid, sampler,
                                              batch_size=batch_size, shuffle=True)
     for batch in dataloader:
-        ... 
+        ...
 
 
 Split workloads
