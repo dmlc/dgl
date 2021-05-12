@@ -56,7 +56,7 @@ class Communicator(object):
         self._rank = rank
         self._size = size
 
-    def sparse_all_to_all_push(self, idx, value, mode):
+    def sparse_all_to_all_push(self, idx, value, partition):
         """ Perform an all-to-all-v operation, where by all processors send out
             a set of indices and corresponding values.
 
@@ -67,8 +67,9 @@ class Communicator(object):
             value : NDArray
                 The multi-dimension set of values to send to other processors.
                 The 0th dimension must match that of `idx`.
-            mode : int
-                The method for assigning indices to processors.
+            partition : NDArrayPartition
+                The object containing information for assigning indices to
+                processors.
 
             Returns
             -------
@@ -78,16 +79,14 @@ class Communicator(object):
                 The set of recieved values.
 
         """
-        mode_id = _COMM_MODES_MAP[mode]
-
         out_idx, out_value = _CAPI_DGLNCCLSparseAllToAllPush(
             self.get(), F.zerocopy_to_dgl_ndarray(idx),
             F.zerocopy_to_dgl_ndarray(value),
-            mode_id)
+            partition.get())
         return (F.zerocopy_from_dgl_ndarray(out_idx),
                 F.zerocopy_from_dgl_ndarray(out_value))
 
-    def sparse_all_to_all_pull(self, req_idx, value, mode):
+    def sparse_all_to_all_pull(self, req_idx, value, partition):
         """ Perform an all-to-all-v operation, where by all processors request
             the values corresponding to ther set of indices.
 
@@ -98,8 +97,9 @@ class Communicator(object):
             value : NDArray
                 The multi-dimension set of values that can be requested from
                 this processor.
-            mode : int
-                The method for assigning indices to processors.
+            partition : NDArrayPartition
+                The object containing information for assigning indices to
+                processors.
 
             Returns
             -------
@@ -107,12 +107,10 @@ class Communicator(object):
                 The set of recieved values, corresponding to `req_idx`.
 
         """
-        mode_id = _COMM_MODES_MAP[mode]
-
         out_value = _CAPI_DGLNCCLSparseAllToAllPull(
             self.get(), F.zerocopy_to_dgl_ndarray(req_idx),
             F.zerocopy_to_dgl_ndarray(value),
-            mode_id)
+            partition.get())
         return F.zerocopy_from_dgl_ndarray(out_value)
 
     def get(self):

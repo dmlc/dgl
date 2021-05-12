@@ -45,13 +45,13 @@ __global__ void _MapProcByMaskRemainder(
 
 
 template <DLDeviceType XPU, typename IdType>
-std::pair<IdArray, IdArray>
+std::pair<IdArray, NDArray>
 GeneratePermutationFromRemainder(
         int64_t array_size,
         int num_parts,
         IdArray in_idx)
 {
-  std::pair<IdArray, IdArray> result;
+  std::pair<IdArray, NDArray> result;
 
   const auto& ctx = in_idx->ctx;
   auto device = DeviceAPI::Get(ctx);

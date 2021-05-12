@@ -44,7 +44,7 @@ class RemainderPartition : public NDArrayPartition {
     // do nothing
   }
 
-  std::pair<IdArray, IdArray>
+  std::pair<IdArray, NDArray>
   GeneratePermutation(
       IdArray in_idx) const override
   {
@@ -58,7 +58,7 @@ class RemainderPartition : public NDArrayPartition {
 
     LOG(FATAL) << "Only GPU is supported";
     // should be unreachable
-    return std::pair<IdArray, IdArray>{};
+    return std::pair<IdArray, NDArray>{};
   }
 };
 

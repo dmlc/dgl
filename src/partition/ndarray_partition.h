@@ -33,9 +33,9 @@ class NDArrayPartition : public runtime::Object {
    * @param in_idx The input indices to map.
    *
    * @return A pair containing 0) the permutation to re-order the indices by
-   * partition, 1) the number of indices per partition.
+   * partition, 1) the number of indices per partition (int64_t).
    */
-  virtual std::pair<IdArray, IdArray>
+  virtual std::pair<IdArray, NDArray>
   GeneratePermutation(
       const IdArray in_idx) const = 0;
 

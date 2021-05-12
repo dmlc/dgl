@@ -26,6 +26,7 @@
 #include <limits>
 
 #include "cuda_common.h"
+#include "../../partition/ndarray_partition.h"
 #include "../../kernel/cuda/atomic.cuh"
 #include "../../array/cuda/dgl_cub.cuh"
 #include "../../array/cuda/array_index_select.cuh"
@@ -42,6 +43,7 @@
 namespace dgl {
 
 using namespace kernel::cuda;
+using namespace partition;
 
 namespace runtime {
 namespace cuda {
@@ -208,278 +210,12 @@ void NCCLUniqueId::FromString(
   }
 }
 
-template<typename IdType>
-void GenerateSparseBufferFromRemainder(
-    DeviceAPI* const device,
-    const DGLContext& ctx,
-    const int64_t comm_size,
-    const int64_t num_in,
-    const IdType * const in_idx,
-    IdType * const out_idx,
-    IdType * const out_perm,
-    int64_t * const out_counts,
-    cudaStream_t stream) {
-  const int64_t comm_bits =
-      static_cast<int64_t>(std::ceil(std::log2(comm_size)));
-
-  // this should only run when we have things to send, otherwise comm_bits
-  // will be zero, and several operations will fail
-  CHECK_GT(comm_size, 1);
-
-  CUDA_CALL(cudaMemsetAsync(
-      out_counts, 0, sizeof(*out_counts)*(comm_size+1), stream));
-
-  if (num_in == 0) {
-    // now that we've zero'd out_counts, nothing left to do
-    return;
-  }
-
-  // First, generate a mapping of indexes to processors
-  IdType * proc_id_in = static_cast<IdType*>(
-      device->AllocWorkspace(ctx, sizeof(IdType)*num_in));
-  {
-    const dim3 block(256);
-    const dim3 grid((num_in+block.x-1)/block.x);
-
-    if (comm_size < (1 << comm_bits)) {
-      // comm_size is not a power of 2
-      _MapProcByRemainder<<<grid, block, 0, stream>>>(
-          in_idx,
-          num_in,
-          comm_size,
-          proc_id_in);
-      CUDA_CALL(cudaGetLastError());
-    } else {
-      // comm_size is a power of 2
-      _MapProcByMaskRemainder<<<grid, block, 0, stream>>>(
-          in_idx,
-          num_in,
-          static_cast<IdType>(comm_size-1),  // bit mask
-          proc_id_in);
-      CUDA_CALL(cudaGetLastError());
-    }
-  }
-
-  // then create a permutation array that groups processors together by
-  // performing a radix sort
-  IdType * proc_id_out = static_cast<IdType*>(
-      device->AllocWorkspace(ctx, sizeof(IdType)*num_in));
-  {
-    IdArray perm_in = aten::Range(0, num_in, sizeof(IdType)*8, ctx);
-
-    size_t sort_workspace_size;
-    CUDA_CALL(cub::DeviceRadixSort::SortPairs(nullptr, sort_workspace_size,
-        proc_id_in, proc_id_out, static_cast<IdType*>(perm_in->data), out_perm,
-        num_in, 0, comm_bits, stream));
-
-    void * sort_workspace = device->AllocWorkspace(ctx, sort_workspace_size);
-    CUDA_CALL(cub::DeviceRadixSort::SortPairs(sort_workspace, sort_workspace_size,
-        proc_id_in, proc_id_out, static_cast<IdType*>(perm_in->data), out_perm,
-        num_in, 0, comm_bits, stream));
-    device->FreeWorkspace(ctx, sort_workspace);
-  }
-  device->FreeWorkspace(ctx, proc_id_in);
-
-  // finally, permute the input arrays
-  // sort the data into continuous buffers for sending
-  {
-    const dim3 block(256);
-    const dim3 grid((num_in+block.x-1)/block.x);
-
-    aten::impl::IndexSelectSingleKernel<<<grid, block, 0, stream>>>(
-        in_idx,
-        out_perm,
-        num_in,
-        out_idx);
-    CUDA_CALL(cudaGetLastError());
-  }
-
-  // Count the number of values to be sent to each processor
-  {
-    using AtomicCount = unsigned long long; // NOLINT
-    static_assert(sizeof(AtomicCount) == sizeof(int64_t),
-        "AtomicCount must be the same width as int64_t for atomicAdd "
-        "in cub::DeviceHistogram::HistogramEven() to work");
-
-    // TODO(dlasalle): Once https://github.com/NVIDIA/cub/pull/287 is merged,
-    // add a compile time check against the cub version to allow
-    // num_in > (2 << 31).
-    CHECK(num_in < static_cast<int64_t>(std::numeric_limits<int>::max())) <<
-        "number of values to insert into histogram must be less than max "
-        "value of int.";
-
-    size_t hist_workspace_size;
-    CUDA_CALL(cub::DeviceHistogram::HistogramEven(
-        nullptr,
-        hist_workspace_size,
-        proc_id_out,
-        reinterpret_cast<AtomicCount*>(out_counts),
-        comm_size+1,
-        static_cast<IdType>(0),
-        static_cast<IdType>(comm_size+1),
-        static_cast<int>(num_in),
-        stream));
-
-    void * hist_workspace = device->AllocWorkspace(ctx, hist_workspace_size);
-    CUDA_CALL(cub::DeviceHistogram::HistogramEven(
-        hist_workspace,
-        hist_workspace_size,
-        proc_id_out,
-        reinterpret_cast<AtomicCount*>(out_counts),
-        comm_size+1,
-        static_cast<IdType>(0),
-        static_cast<IdType>(comm_size+1),
-        static_cast<int>(num_in),
-        stream));
-    device->FreeWorkspace(ctx, hist_workspace);
-  }
-  device->FreeWorkspace(ctx, proc_id_out);
-}
-
-template<typename IdType, typename DType>
-void GenerateSparseBuffersFromRemainder(
-    DeviceAPI* const device,
-    const DGLContext& ctx,
-    const int64_t comm_size,
-    const int64_t num_in,
-    const int64_t num_feat,
-    const IdType * const in_idx,
-    const DType * const in_value,
-    IdType * const out_idx,
-    DType * const out_value,
-    int64_t * const out_counts,
-    cudaStream_t stream) {
-  const int64_t comm_bits =
-      static_cast<int64_t>(std::ceil(std::log2(comm_size)));
-
-  // this should only run when we have things to send, otherwise comm_bits
-  // will be zero, and several operations will fail
-  CHECK_GT(comm_size, 1);
-
-  CUDA_CALL(cudaMemsetAsync(
-      out_counts, 0, sizeof(*out_counts)*(comm_size+1), stream));
-
-  if (num_in == 0) {
-    // now that we've zero'd out_counts, nothing left to do
-    return;
-  }
-
-  // First, generate a mapping of indexes to processors
-  IdType * proc_id_in = static_cast<IdType*>(
-      device->AllocWorkspace(ctx, sizeof(IdType)*num_in));
-  {
-    const dim3 block(256);
-    const dim3 grid((num_in+block.x-1)/block.x);
-
-    if (comm_size < (1 << comm_bits)) {
-      // comm_size is not a power of 2
-      _MapProcByRemainder<<<grid, block, 0, stream>>>(
-          in_idx,
-          num_in,
-          comm_size,
-          proc_id_in);
-      CUDA_CALL(cudaGetLastError());
-    } else {
-      // comm_size is a power of 2
-      _MapProcByMaskRemainder<<<grid, block, 0, stream>>>(
-          in_idx,
-          num_in,
-          static_cast<IdType>(comm_size-1),  // bit mask
-          proc_id_in);
-      CUDA_CALL(cudaGetLastError());
-    }
-  }
-
-  // then create a permutation array that groups processors together by
-  // performing a radix sort
-  IdType * proc_id_out = static_cast<IdType*>(
-      device->AllocWorkspace(ctx, sizeof(IdType)*num_in));
-  IdType * perm_out = static_cast<IdType*>(device->AllocWorkspace(ctx,
-          sizeof(IdType)*num_in));
-  {
-    IdArray perm_in = aten::Range(0, num_in, sizeof(IdType)*8, ctx);
-
-    size_t sort_workspace_size;
-    CUDA_CALL(cub::DeviceRadixSort::SortPairs(nullptr, sort_workspace_size,
-        proc_id_in, proc_id_out, static_cast<IdType*>(perm_in->data), perm_out,
-        num_in, 0, comm_bits, stream));
-
-    void * sort_workspace = device->AllocWorkspace(ctx, sort_workspace_size);
-    CUDA_CALL(cub::DeviceRadixSort::SortPairs(sort_workspace, sort_workspace_size,
-        proc_id_in, proc_id_out, static_cast<IdType*>(perm_in->data), perm_out,
-        num_in, 0, comm_bits, stream));
-    device->FreeWorkspace(ctx, sort_workspace);
-  }
-  device->FreeWorkspace(ctx, proc_id_in);
-
-  // perform a histogram and then prefixsum on the sorted proc_id vector
-
-  // finally, permute the input arrays
-  // sort the data into continuous buffers for sending
-  {
-    const dim3 block(256);
-    const dim3 grid((num_in+block.x-1)/block.x);
-
-    _DualPermKernel<<<grid, block, 0, stream>>>(
-        in_idx,
-        in_value,
-        perm_out,
-        num_in,
-        num_feat,
-        out_idx,
-        out_value);
-    CUDA_CALL(cudaGetLastError());
-  }
-  device->FreeWorkspace(ctx, perm_out);
-
-  // Count the number of values to be sent to each processor
-  {
-    using AtomicCount = unsigned long long; // NOLINT
-    static_assert(sizeof(AtomicCount) == sizeof(int64_t),
-        "AtomicCount must be the same width as int64_t for atomicAdd "
-        "in cub::DeviceHistogram::HistogramEven() to work");
-
-    // TODO(dlasalle): Once https://github.com/NVIDIA/cub/pull/287 is merged,
-    // add a compile time check against the cub version to allow
-    // num_in > (2 << 31).
-    CHECK(num_in < static_cast<int64_t>(std::numeric_limits<int>::max())) <<
-        "number of values to insert into histogram must be less than max "
-        "value of int.";
-
-    size_t hist_workspace_size;
-    CUDA_CALL(cub::DeviceHistogram::HistogramEven(
-        nullptr,
-        hist_workspace_size,
-        proc_id_out,
-        reinterpret_cast<AtomicCount*>(out_counts),
-        comm_size+1,
-        static_cast<IdType>(0),
-        static_cast<IdType>(comm_size+1),
-        static_cast<int>(num_in),
-        stream));
-
-    void * hist_workspace = device->AllocWorkspace(ctx, hist_workspace_size);
-    CUDA_CALL(cub::DeviceHistogram::HistogramEven(
-        hist_workspace,
-        hist_workspace_size,
-        proc_id_out,
-        reinterpret_cast<AtomicCount*>(out_counts),
-        comm_size+1,
-        static_cast<IdType>(0),
-        static_cast<IdType>(comm_size+1),
-        static_cast<int>(num_in),
-        stream));
-    device->FreeWorkspace(ctx, hist_workspace);
-  }
-  device->FreeWorkspace(ctx, proc_id_out);
-}
-
 template<typename IdType, typename DType>
 std::pair<IdArray, NDArray> SparsePush(
     NCCLCommunicatorRef comm,
     IdArray in_idx,
     NDArray in_value,
-    const int mode_id) {
+    NDArrayPartitionRef part) {
   CHECK_EQ(in_idx->shape[0], in_value->shape[0]);
 
   const auto& ctx = in_idx->ctx;
@@ -504,26 +240,31 @@ std::pair<IdArray, NDArray> SparsePush(
     return std::pair<IdArray, NDArray>(in_idx, in_value);
   }
 
+  std::pair<IdArray, NDArray> part_perm = part->GeneratePermutation(in_idx);
+  const IdType * const perm = static_cast<const IdType*>(part_perm.first->data);
+  const int64_t * const send_sum =
+      static_cast<const int64_t*>(part_perm.second->data);
+
   IdType * send_idx = static_cast<IdType*>(device->AllocWorkspace(ctx,
       num_in*sizeof(IdType)));
   DType * send_value = static_cast<DType*>(device->AllocWorkspace(ctx,
       num_in*num_feat*sizeof(DType)));
-  int64_t * send_sum = static_cast<int64_t*>(device->AllocWorkspace(ctx,
-      (comm_size+1)*sizeof(int64_t)));
 
-  CHECK_EQ(mode_id, static_cast<int>(AllToAllMode::REMAINDER));
-  GenerateSparseBuffersFromRemainder(
-      device,
-      ctx,
-      comm_size,
-      num_in,
-      num_feat,
-      static_cast<const IdType*>(in_idx->data),
-      static_cast<const DType*>(in_value->data),
-      send_idx,
-      send_value,
-      send_sum,
-      stream);
+  // permute the indices and values
+  {
+    const dim3 block(256);
+    const dim3 grid((num_in+block.x-1)/block.x);
+
+    _DualPermKernel<<<grid, block, 0, stream>>>(
+        static_cast<const IdType*>(in_idx->data),
+        static_cast<const DType*>(in_value->data),
+        perm,
+        num_in,
+        num_feat,
+        send_idx,
+        send_value);
+    CUDA_CALL(cudaGetLastError());
+  }
 
   // compute the prefix sum of the send values
   int64_t * send_prefix = static_cast<int64_t*>(
@@ -559,7 +300,6 @@ std::pair<IdArray, NDArray> SparsePush(
   int64_t * recv_sum = static_cast<int64_t*>(
       device->AllocWorkspace(ctx, sizeof(int64_t)*(comm_size+1)));
   comm->AllToAll(send_sum, recv_sum, 1, stream);
-  device->FreeWorkspace(ctx, send_sum);
 
   // compute the prefix sum of the recv values
   int64_t * recv_prefix = static_cast<int64_t*>(
@@ -630,7 +370,7 @@ NDArray SparsePull(
     NCCLCommunicatorRef comm,
     IdArray req_idx,
     NDArray local_tensor,
-    const int mode_id) {
+    NDArrayPartitionRef part) {
   const auto& ctx = req_idx->ctx;
   CHECK_EQ(ctx, local_tensor->ctx);
   auto device = DeviceAPI::Get(ctx);
@@ -662,24 +402,24 @@ NDArray SparsePull(
   // the buffer for us to re-order our requests in
   IdType * send_idx = static_cast<IdType*>(device->AllocWorkspace(ctx,
       num_in*sizeof(IdType)));
-  IdType * perm = static_cast<IdType*>(
-      device->AllocWorkspace(ctx, sizeof(IdType)*num_in));
 
-  // the number of indexes we need to send to each processor
-  int64_t * send_sum = static_cast<int64_t*>(device->AllocWorkspace(ctx,
-      (comm_size+1)*sizeof(int64_t)));
+  std::pair<IdArray, NDArray> part_perm = part->GeneratePermutation(req_idx);
+  const IdType * const perm = static_cast<const IdType*>(part_perm.first->data);
+  const int64_t * const send_sum =
+      static_cast<const int64_t*>(part_perm.second->data);
 
-  CHECK_EQ(mode_id, static_cast<int>(AllToAllMode::REMAINDER));
-  GenerateSparseBufferFromRemainder(
-      device,
-      ctx,
-      comm_size,
-      num_in,
-      static_cast<const IdType*>(req_idx->data),
-      send_idx,
-      perm,
-      send_sum,
-      stream);
+  // permute requests
+  {
+    const dim3 block(256);
+    const dim3 grid((num_in+block.x-1)/block.x);
+
+    aten::impl::IndexSelectSingleKernel<<<grid, block, 0, stream>>>(
+        static_cast<const IdType*>(req_idx->data),
+        perm,
+        num_in,
+        send_idx);
+    CUDA_CALL(cudaGetLastError());
+  }
 
   // compute the prefix sum of the indexes this process is requesting
   int64_t * request_prefix = static_cast<int64_t*>(
@@ -714,7 +454,6 @@ NDArray SparsePull(
   int64_t * recv_sum = static_cast<int64_t*>(
       device->AllocWorkspace(ctx, sizeof(int64_t)*(comm_size+1)));
   comm->AllToAll(send_sum, recv_sum, 1, stream);
-  device->FreeWorkspace(ctx, send_sum);
 
   // compute the prefix sum of the requested indexes
   int64_t * response_prefix = static_cast<int64_t*>(
@@ -840,7 +579,6 @@ NDArray SparsePull(
     CUDA_CALL(cudaGetLastError());
   }
   device->FreeWorkspace(ctx, filled_request_value);
-  device->FreeWorkspace(ctx, perm);
 
   return result;
 }
@@ -1054,12 +792,12 @@ DGL_REGISTER_GLOBAL("cuda.nccl._CAPI_DGLNCCLSparseAllToAllPush")
   NCCLCommunicatorRef comm = args[0];
   IdArray in_idx = args[1];
   NDArray in_values = args[2];
-  const int mode_id = args[3];
+  NDArrayPartitionRef part = args[3];
 
   List<ObjectRef> ret;
   ATEN_ID_TYPE_SWITCH(in_idx->dtype, IdType, {
     ATEN_DTYPE_SWITCH(in_values->dtype, DType, "values", {
-      auto result = SparsePush<IdType, DType>(comm, in_idx, in_values, mode_id);
+      auto result = SparsePush<IdType, DType>(comm, in_idx, in_values, part);
       ret.push_back(Value(MakeValue(result.first)));
       ret.push_back(Value(MakeValue(result.second)));
     });
@@ -1076,11 +814,11 @@ DGL_REGISTER_GLOBAL("cuda.nccl._CAPI_DGLNCCLSparseAllToAllPull")
 
   // the tensor this process has to fulfill other requests
   NDArray tensor = args[2];
-  const int mode_id = args[3];
+  NDArrayPartitionRef part = args[3];
 
   ATEN_ID_TYPE_SWITCH(req_idx->dtype, IdType, {
     ATEN_DTYPE_SWITCH(tensor->dtype, DType, "values", {
-      *rv = SparsePull<IdType, DType>(comm, req_idx, tensor, mode_id);
+      *rv = SparsePull<IdType, DType>(comm, req_idx, tensor, part);
     });
   });
 });
