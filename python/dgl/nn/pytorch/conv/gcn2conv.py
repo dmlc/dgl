@@ -89,9 +89,9 @@ class GCN2Conv(nn.Module):
     >>> feat = th.ones(6, 3)
     >>> g = dgl.add_self_loop(g)
     >>> conv1 = GCN2Conv(3, layer=1, alpha=0.5, \
-                project_initial_features=True, allow_zero_in_degree=True)
+    ...         project_initial_features=True, allow_zero_in_degree=True)
     >>> conv2 = GCN2Conv(3, layer=2, alpha=0.5, \
-                project_initial_features=True, allow_zero_in_degree=True)
+    ...         project_initial_features=True, allow_zero_in_degree=True)
     >>> res = feat
     >>> res = conv1(g, res, feat)
     >>> res = conv2(g, res, feat)
