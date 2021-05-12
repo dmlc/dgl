@@ -3,15 +3,24 @@
 from .base import DGLError
 from ._ffi.function import _init_api
 
-_MODES_MAP = {
-    'remainder': 0
-    'range': 1
-}
-
-MODES = list(_MODES_MAP.keys())
-
 
 class NDArrayPartition(object):
+    """ Create a new partition of an NDArray. That is, an object which assigns
+    each row of an NDArray to a specific partition.
+
+    Parameters
+    ----------
+    array_size : int
+        The first dimension of the array being partitioned.
+    num_parts : int
+        The number of parts to divide the array into.
+    mode : String
+        The type of partition. Currently, the only valid value is 'remainder',
+        which assigns rows based on remainder when dividing the row id by the
+        number of parts (e.g., i % num_parts).
+    part_ranges : List
+        Currently unused.
+    """
     def __init__(self, array_size, num_parts, mode='remainder', part_ranges=None):
         assert num_parts > 0, 'Invalid "num_parts", must be > 0.'
         if mode == 'range':
