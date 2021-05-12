@@ -78,6 +78,5 @@ python main.py --dataset ogbn-products --model linear --pretrain --correction-al
 
 |      ogb-arxiv       |      Time     | GPU Memory | Params  |
 | :------------------: | :-----------: | :--------: | :-----: |
-|       ogb, GCN       |    0.3349     |   3,166M   | 110,120 |
 | Author, Linear + C&S | 6.3 * 10 ^ -3 |   1,248M   |  5,160  |
 |   DGL, Linear + C&S  | 5.6 * 10 ^ -3 |   1,252M   |  5,160  |
