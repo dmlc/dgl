@@ -1,19 +1,19 @@
 /*!
  *  Copyright (c) 2021 by Contributors
- * \file ndarray_partition.h 
- * \brief DGL utilities for working with the partitioned NDArrays 
+ * \file ndarray_partition.h
+ * \brief DGL utilities for working with the partitioned NDArrays
  */
 
 
-#ifndef DGL_PARTITION_PARTITION_OPS_H
-#define DGL_PARTITION_PARTITION_OPS_H
+#ifndef DGL_PARTITION_PARTITION_OP_H_
+#define DGL_PARTITION_PARTITION_OP_H_
 
 #include <dgl/array.h>
 #include <utility>
 
 namespace dgl {
 namespace partition {
-namespace impl { 
+namespace impl {
 
 template <DLDeviceType XPU, typename IdType>
 std::pair<IdArray, IdArray>
@@ -22,9 +22,8 @@ GeneratePermutationFromRemainder(
         int num_parts,
         IdArray in_idx);
 
-}
-}
-}
+}  // namespace impl
+}  // namespace partition
+}  // namespace dgl
 
-#endif
-
+#endif  // DGL_PARTITION_PARTITION_OP_H_

@@ -57,4 +57,4 @@ NDArrayPartitionRef CreatePartitionRemainderBased(
 }  // namespace partition
 }  // namespace dgl
 
-#endif
+#endif  // DGL_PARTITION_NDARRAY_PARTITION_H_

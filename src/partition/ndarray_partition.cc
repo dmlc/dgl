@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2021 by Contributors
  * \file ndarray_partition.cc
- * \brief DGL utilities for working with the partitioned NDArrays 
+ * \brief DGL utilities for working with the partitioned NDArrays
  */
 
 #include "ndarray_partition.h"
@@ -9,6 +9,7 @@
 #include <dgl/runtime/registry.h>
 #include <dgl/runtime/packed_func.h>
 #include <utility>
+#include <memory>
 
 #include "partition_op.h"
 
@@ -20,17 +21,14 @@ namespace partition {
 NDArrayPartition::NDArrayPartition(
     const int64_t array_size, const int num_parts) :
   array_size_(array_size),
-  num_parts_(num_parts)
-{
+  num_parts_(num_parts) {
 }
 
-int64_t NDArrayPartition::ArraySize() const
-{
+int64_t NDArrayPartition::ArraySize() const {
   return array_size_;
 }
 
-int NDArrayPartition::NumParts() const
-{
+int NDArrayPartition::NumParts() const {
   return num_parts_;
 }
 
@@ -39,15 +37,13 @@ class RemainderPartition : public NDArrayPartition {
  public:
   RemainderPartition(
       const int64_t array_size, const int num_parts) :
-    NDArrayPartition(array_size, num_parts)
-  {
+    NDArrayPartition(array_size, num_parts) {
     // do nothing
   }
 
   std::pair<IdArray, NDArray>
   GeneratePermutation(
-      IdArray in_idx) const override
-  {
+      IdArray in_idx) const override {
     auto ctx = in_idx->ctx;
     if (ctx.device_type == kDLGPU) {
       ATEN_ID_TYPE_SWITCH(in_idx->dtype, IdType, {
@@ -64,8 +60,7 @@ class RemainderPartition : public NDArrayPartition {
 
 NDArrayPartitionRef CreatePartitionRemainderBased(
     const int64_t array_size,
-    const int num_parts)
-{
+    const int num_parts) {
   return NDArrayPartitionRef(std::make_shared<RemainderPartition>(
           array_size, num_parts));
 }
@@ -75,7 +70,7 @@ DGL_REGISTER_GLOBAL("partition._CAPI_DGLNDArrayPartitionCreateRemainderBased")
   int64_t array_size = args[0];
   int num_parts = args[1];
 
-  *rv = CreatePartitionRemainderBased(array_size, num_parts); 
+  *rv = CreatePartitionRemainderBased(array_size, num_parts);
 });
 
 }  // namespace partition

@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2021 by Contributors
- * \file ndarray_partition.h 
- * \brief DGL utilities for working with the partitioned NDArrays 
+ * \file ndarray_partition.h
+ * \brief Operations on partition implemented in CUDA. 
  */
 
 #include "../partition_op.h"
@@ -49,8 +49,7 @@ std::pair<IdArray, NDArray>
 GeneratePermutationFromRemainder(
         int64_t array_size,
         int num_parts,
-        IdArray in_idx)
-{
+        IdArray in_idx) {
   std::pair<IdArray, NDArray> result;
 
   const auto& ctx = in_idx->ctx;
@@ -62,7 +61,7 @@ GeneratePermutationFromRemainder(
   if (num_parts == 1) {
     // no permutation
     result.first = aten::Range(0, num_in, sizeof(IdType)*8, ctx);
-    result.second = aten::Full(num_in, num_parts, sizeof(int64_t)*8, ctx); 
+    result.second = aten::Full(num_in, num_parts, sizeof(int64_t)*8, ctx);
 
     return result;
   }
@@ -181,7 +180,6 @@ GeneratePermutationFromRemainder<kDLGPU, int64_t>(
         int num_parts,
         IdArray in_idx);
 
-}
-}
-}
-
+}  // namespace impl
+}  // namespace partition
+}  // namespace dgl
