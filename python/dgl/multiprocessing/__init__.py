@@ -12,5 +12,6 @@ if F.get_preferred_backend() == 'pytorch':
     # ... and override the Process initializer
     from .pytorch import Process
 else:
-    # Just import multiprocessing
+    # Just import multiprocessing module.
+    # pylint: disable=redefined-builtin
     from multiprocessing import *
