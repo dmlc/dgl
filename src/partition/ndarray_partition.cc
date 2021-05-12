@@ -6,9 +6,13 @@
 
 #include "ndarray_partition.h"
 
+#include <dgl/runtime/registry.h>
+#include <dgl/runtime/packed_func.h>
 #include <utility>
 
 #include "partition_op.h"
+
+using namespace dgl::runtime;
 
 namespace dgl {
 namespace partition {
@@ -54,9 +58,9 @@ class RemainderPartition : public NDArrayPartition {
 
     LOG(FATAL) << "Only GPU is supported";
     // should be unreachable
-    return std::pair<IdArray, IdArray>;
+    return std::pair<IdArray, IdArray>{};
   }
-}
+};
 
 NDArrayPartitionRef CreatePartitionRemainderBased(
     const int64_t array_size,
