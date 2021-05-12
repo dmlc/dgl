@@ -64,9 +64,10 @@ std::pair<aten::CSRMatrix, NDArray> CSR_A(DLContext ctx = CTX) {
   auto csr = aten::CSRMatrix(
       4, 5,
       NDArray::FromVector(std::vector<IdType>({0, 2, 4, 7, 8}), ctx),
-      NDArray::FromVector(std::vector<IdType>({2, 3, 2, 3, 0, 1, 3, 4}), ctx));
+      NDArray::FromVector(std::vector<IdType>({2, 3, 2, 3, 0, 1, 3, 4}), ctx),
+      NDArray::FromVector(std::vector<IdType>({1, 0, 2, 3, 4, 5, 6, 7}), ctx));
   auto weights = NDArray::FromVector(
-      std::vector<DType>({1.0, 0.7, 0.5, 0.0, 0.4, 0.7, 0.2, 0.2}), ctx);
+      std::vector<DType>({0.7, 1.0, 0.5, 0.0, 0.4, 0.7, 0.2, 0.2}), ctx);
   return {csr, weights};
 }
 
@@ -162,7 +163,8 @@ template <typename IdType, typename DType>
 void _TestCsrmask(DLContext ctx = CTX) {
   auto A = CSR_A<IdType, DType>(ctx);
   auto C = CSR_C<IdType, DType>(ctx);
-  auto A_mask_C = aten::CSRMask(A.first, A.second, C.first);
+  auto C_coo = CSRToCOO(C.first, false);
+  auto A_mask_C = aten::CSRGetData<DType>(A.first, C_coo.row, C_coo.col, A.second, 0);
   auto A_mask_C2 = CSR_A_mask_C<DType>(ctx);
   ASSERT_TRUE(ArrayEQ<DType>(A_mask_C, A_mask_C2));
 }

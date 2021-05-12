@@ -249,8 +249,7 @@ source-destination array pairs. An example is given as follows:
            # caches the probability distribution
            self.weights = {
                etype: g.in_degrees(etype=etype).float() ** 0.75
-               for _, etype, _ in g.canonical_etypes
-           }
+               for etype in g.canonical_etypes}
            self.k = k
 
        def __call__(self, g, eids_dict):
@@ -268,8 +267,8 @@ sampler.  For instance, the following iterates over all edges of the heterogeneo
 .. code:: python
 
     train_eid_dict = {
-        g.edges(etype=etype, form='eid')
-        for etype in g.etypes}
+        etype: g.edges(etype=etype, form='eid')
+        for etype in g.canonical_etypes}
 
     dataloader = dgl.dataloading.EdgeDataLoader(
         g, train_eid_dict, sampler,
