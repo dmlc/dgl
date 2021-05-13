@@ -49,8 +49,10 @@ void _TestRemainder()
 }
 
 TEST(PartitionTest, TestRemainderPartition) {
+#ifdef DGL_USE_CUDA
   _TestRemainder<kDLGPU, int32_t>();
   _TestRemainder<kDLGPU, int64_t>();
+#endif
 
   // CPU is not implemented
 }
