@@ -59,7 +59,6 @@ def test_query():
     def _test_one(g):
         assert g.number_of_nodes() == 10
         assert g.number_of_edges() == 20
-        assert len(g) == 10
 
         for i in range(10):
             assert g.has_node(i)
@@ -131,7 +130,6 @@ def test_query():
     def _test_csr_one(g):
         assert g.number_of_nodes() == 10
         assert g.number_of_edges() == 20
-        assert len(g) == 10
 
         for i in range(10):
             assert g.has_node(i)
