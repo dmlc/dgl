@@ -12,6 +12,7 @@
 
 #include <string>
 #include <vector>
+#include <utility>
 
 namespace dgl {
 namespace aten {
@@ -91,6 +92,40 @@ template <int XPU, typename IdType, int bits>
 void BackwardSegmentCmp(NDArray feat,
                         NDArray arg,
                         NDArray out);
+
+/*!
+ * \brief Sparse-sparse matrix multiplication
+ *
+ * \param A The left operand.
+ * \param A_weights The weights of matrix as a 1D tensor.
+ * \param B The right operand.
+ * \param B_weights The weights of matrix as a 1D tensor.
+ *
+ * \note GPU implementation will cast the indices to 32 bit.
+ * \note The zero entries in the result are not removed.
+ * \note The CSR matrix should not have duplicate entries.
+ */
+template <int XPU, typename IdType, typename DType>
+std::pair<CSRMatrix, NDArray> CSRMM(
+    const CSRMatrix& A,
+    NDArray A_weights,
+    const CSRMatrix& B,
+    NDArray B_weights);
+
+/*!
+ * \brief Sparse-sparse matrix summation.
+ *
+ * \param A The sparse matrices with the same size.
+ * \param A_weights The weights of each sparse matrix as a 1D tensor.
+ *
+ * \note GPU implementation will cast the indices to 32 bit.
+ * \note The zero entries in the result are not removed.
+ * \note The CSR matrix should not have duplicate entries.
+ */
+template <int XPU, typename IdType, typename DType>
+std::pair<CSRMatrix, NDArray> CSRSum(
+    const std::vector<CSRMatrix>& A,
+    const std::vector<NDArray>& A_weights);
 
 }  // namespace aten
 }  // namespace dgl

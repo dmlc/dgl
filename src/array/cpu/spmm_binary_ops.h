@@ -148,14 +148,16 @@ constexpr DType Min<DType>::zero;
 
 #define SWITCH_BITS(bits, DType, ...)                           \
   do {                                                          \
-    if ((bits) == 16 || (bits) == 32) {                         \
+    if ((bits) == 16) {                                         \
+      LOG(FATAL) << "FP16 not supported on CPU";                \
+    } else if ((bits) == 32) {                                  \
       typedef float DType;                                      \
       { __VA_ARGS__ }                                           \
     } else if ((bits) == 64) {                                  \
       typedef double DType;                                     \
       { __VA_ARGS__ }                                           \
     } else {                                                    \
-      LOG(FATAL) << "Data type not renogized with bits " << bits; \
+      LOG(FATAL) << "Data type not recognized with bits " << bits; \
     }                                                           \
   } while (0)
 

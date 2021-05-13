@@ -1,7 +1,7 @@
 """Module for sparse matrix operators."""
 # pylint: disable= invalid-name
 from __future__ import absolute_import
-import dgl.ndarray as nd
+from . import ndarray as nd
 from ._ffi.function import _init_api
 from .base import DGLError
 from . import backend as F
@@ -366,5 +366,87 @@ def _bwd_segment_cmp(feat, arg, m):
                                  to_dgl_nd_for_write(out))
     return out
 
+def csrmm(A, A_weights, B, B_weights, num_vtypes):
+    """Return a graph whose adjacency matrix is the sparse matrix multiplication
+    of those of two given graphs.
+
+    Note that the edge weights of both graphs must be scalar, i.e. :attr:`A_weights`
+    and :attr:`B_weights` must be 1D vectors.
+
+    Parameters
+    ----------
+    A : HeteroGraphIndex
+        The input graph index as left operand.
+    A_weights : Tensor
+        The edge weights of graph A as 1D tensor.
+    B : HeteroGraphIndex
+        The input graph index as right operand.
+    B_weights : Tensor
+        The edge weights of graph B as 1D tensor.
+    num_vtypes : int
+        The number of node types for the returned graph (must be either 1 or 2).
+
+    Returns
+    -------
+    C : HeteroGraphIndex
+        The output graph index.
+    C_weights : Tensor
+        The edge weights of the output graph.
+    """
+    C, C_weights = _CAPI_DGLCSRMM(
+        A, F.to_dgl_nd(A_weights), B, F.to_dgl_nd(B_weights), num_vtypes)
+    return C, F.from_dgl_nd(C_weights)
+
+def csrsum(As, A_weights):
+    """Return a graph whose adjacency matrix is the sparse matrix summation
+    of the given list of graphs.
+
+    Note that the edge weights of all graphs must be scalar, i.e. the arrays in
+    :attr:`A_weights` must be 1D vectors.
+
+    Parameters
+    ----------
+    As : list[HeteroGraphIndex]
+        The input graph indices.
+    A_weights : list[Tensor]
+        The edge weights of graph A as 1D tensor.
+
+    Returns
+    -------
+    C : HeteroGraphIndex
+        The output graph index.
+    C_weights : Tensor
+        The edge weights of the output graph.
+    """
+    C, C_weights = _CAPI_DGLCSRSum(As, [F.to_dgl_nd(w) for w in A_weights])
+    return C, F.from_dgl_nd(C_weights)
+
+def csrmask(A, A_weights, B):
+    """Return the weights of A at the locations identical to the sparsity pattern
+    of B.
+
+    If a non-zero entry in B does not exist in A, DGL returns 0 for that location
+    instead.
+
+    Note that the edge weights of the graph must be scalar, i.e. :attr:`A_weights`
+    must be a 1D vector.
+
+    In scipy notation this is identical to ``A[B != 0]``.
+
+    Parameters
+    ----------
+    A : HeteroGraphIndex
+        The input graph index as left operand.
+    A_weights : Tensor
+        The edge weights of graph A as 1D tensor.
+    B : HeteroGraphIndex
+        The input graph index as right operand.
+
+    Returns
+    -------
+    B_weights : Tensor
+        The output weights.
+    """
+    return F.from_dgl_nd(_CAPI_DGLCSRMask(A, F.to_dgl_nd(A_weights), B))
 
 _init_api("dgl.sparse")

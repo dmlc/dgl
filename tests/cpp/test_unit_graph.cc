@@ -82,19 +82,19 @@ void _TestUnitGraph(DLContext ctx) {
 
   auto src = aten::VecToIdArray<int64_t>({1, 2, 5, 3});
   auto dst = aten::VecToIdArray<int64_t>({1, 6, 2, 6});
-  auto mg = dgl::UnitGraph::CreateFromCOO(2, 9, 8, src, dst, coo_code);
+  auto mg = dgl::UnitGraph::CreateFromCOO(2, 9, 8, src, dst, COO_CODE);
   ASSERT_EQ(mg->GetCreatedFormats(), 1);
-  auto hmg = dgl::UnitGraph::CreateFromCOO(1, 8, 8, src, dst, coo_code);
+  auto hmg = dgl::UnitGraph::CreateFromCOO(1, 8, 8, src, dst, COO_CODE);
   auto img = std::dynamic_pointer_cast<ImmutableGraph>(hmg->AsImmutableGraph());
   ASSERT_TRUE(img != nullptr);
-  mg = dgl::UnitGraph::CreateFromCOO(2, 9, 8, src, dst, csr_code | coo_code);
+  mg = dgl::UnitGraph::CreateFromCOO(2, 9, 8, src, dst, CSR_CODE | COO_CODE);
   ASSERT_EQ(mg->GetCreatedFormats(), 1);
-  hmg = dgl::UnitGraph::CreateFromCOO(1, 8, 8, src, dst, csr_code | coo_code);
+  hmg = dgl::UnitGraph::CreateFromCOO(1, 8, 8, src, dst, CSR_CODE | COO_CODE);
   img = std::dynamic_pointer_cast<ImmutableGraph>(hmg->AsImmutableGraph());
   ASSERT_TRUE(img != nullptr);
-  mg = dgl::UnitGraph::CreateFromCOO(2, 9, 8, src, dst, csc_code | coo_code);
+  mg = dgl::UnitGraph::CreateFromCOO(2, 9, 8, src, dst, CSC_CODE | COO_CODE);
   ASSERT_EQ(mg->GetCreatedFormats(), 1);
-  hmg = dgl::UnitGraph::CreateFromCOO(1, 8, 8, src, dst, csc_code | coo_code);
+  hmg = dgl::UnitGraph::CreateFromCOO(1, 8, 8, src, dst, CSC_CODE | COO_CODE);
   img = std::dynamic_pointer_cast<ImmutableGraph>(hmg->AsImmutableGraph());
   ASSERT_TRUE(img != nullptr);
 
@@ -121,7 +121,7 @@ void _TestUnitGraph_GetInCSR(DLContext ctx) {
 
   // test out csr
   g = CreateFromCSR(2, csr);
-  auto g_ptr = g->GetGraphInFormat(csc_code);
+  auto g_ptr = g->GetGraphInFormat(CSC_CODE);
   in_csr_matrix = g_ptr->GetCSCMatrix(0);
   ASSERT_EQ(in_csr_matrix.num_cols, csr.num_rows);
   ASSERT_EQ(in_csr_matrix.num_rows, csr.num_cols);
@@ -133,7 +133,7 @@ void _TestUnitGraph_GetInCSR(DLContext ctx) {
 
   // test out coo
   g = CreateFromCOO(2, coo);
-  g_ptr = g->GetGraphInFormat(csc_code);
+  g_ptr = g->GetGraphInFormat(CSC_CODE);
   in_csr_matrix = g_ptr->GetCSCMatrix(0);
   ASSERT_EQ(in_csr_matrix.num_cols, coo.num_rows);
   ASSERT_EQ(in_csr_matrix.num_rows, coo.num_cols);
@@ -151,7 +151,7 @@ void _TestUnitGraph_GetOutCSR(DLContext ctx) {
   const aten::COOMatrix &coo = COO1<IdType>(ctx);
 
   auto g = CreateFromCSC(2, csr);
-  auto g_ptr = g->GetGraphInFormat(csr_code);
+  auto g_ptr = g->GetGraphInFormat(CSR_CODE);
   auto out_csr_matrix = g_ptr->GetCSRMatrix(0);
   ASSERT_EQ(out_csr_matrix.num_cols, csr.num_rows);
   ASSERT_EQ(out_csr_matrix.num_rows, csr.num_cols);
@@ -170,7 +170,7 @@ void _TestUnitGraph_GetOutCSR(DLContext ctx) {
 
   // test out coo
   g = CreateFromCOO(2, coo);
-  g_ptr = g->GetGraphInFormat(csr_code);
+  g_ptr = g->GetGraphInFormat(CSR_CODE);
   out_csr_matrix = g_ptr->GetCSRMatrix(0);
   ASSERT_EQ(out_csr_matrix.num_rows, coo.num_rows);
   ASSERT_EQ(out_csr_matrix.num_cols, coo.num_cols);
@@ -188,7 +188,7 @@ void _TestUnitGraph_GetCOO(DLContext ctx) {
   const aten::COOMatrix &coo = COO1<IdType>(ctx);
 
   auto g = CreateFromCSC(2, csr);
-  auto g_ptr = g->GetGraphInFormat(coo_code);
+  auto g_ptr = g->GetGraphInFormat(COO_CODE);
   auto out_coo_matrix = g_ptr->GetCOOMatrix(0);
   ASSERT_EQ(out_coo_matrix.num_cols, csr.num_rows);
   ASSERT_EQ(out_coo_matrix.num_rows, csr.num_cols);
@@ -200,7 +200,7 @@ void _TestUnitGraph_GetCOO(DLContext ctx) {
 
   // test out csr
   g = CreateFromCSR(2, csr);
-  g_ptr = g->GetGraphInFormat(coo_code);
+  g_ptr = g->GetGraphInFormat(COO_CODE);
   out_coo_matrix = g_ptr->GetCOOMatrix(0);
   ASSERT_EQ(out_coo_matrix.num_rows, csr.num_rows);
   ASSERT_EQ(out_coo_matrix.num_cols, csr.num_cols);

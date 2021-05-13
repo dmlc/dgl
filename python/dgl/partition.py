@@ -7,6 +7,7 @@ from .heterograph import DGLHeteroGraph
 from . import backend as F
 from . import utils
 from .base import EID, NID, NTYPE, ETYPE
+from .subgraph import edge_subgraph
 
 __all__ = ["metis_partition", "metis_partition_assignment",
            "partition_graph_with_halo"]
@@ -146,6 +147,12 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
     --------
     a dict of DGLGraphs
         The key is the partition ID and the value is the DGLGraph of the partition.
+    Tensor
+        1D tensor that stores the mapping between the reshuffled node IDs and
+        the original node IDs if 'reshuffle=True'. Otherwise, return None.
+    Tensor
+        1D tensor that stores the mapping between the reshuffled edge IDs and
+        the original edge IDs if 'reshuffle=True'. Otherwise, return None.
     '''
     assert len(node_part) == g.number_of_nodes()
     if reshuffle:
@@ -167,8 +174,16 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
     # This creaets a subgraph from subgraphs returned from the CAPI above.
     def create_subgraph(subg, induced_nodes, induced_edges):
         subg1 = DGLHeteroGraph(gidx=subg.graph, ntypes=['_N'], etypes=['_E'])
-        subg1.ndata[NID] = induced_nodes[0]
-        subg1.edata[EID] = induced_edges[0]
+        # If IDs are shuffled, we should shuffled edges. This will help us collect edge data
+        # from the distributed graph after training.
+        if reshuffle:
+            sorted_edges, index = F.sort_1d(induced_edges[0])
+            subg1 = edge_subgraph(subg1, index, preserve_nodes=True)
+            subg1.ndata[NID] = induced_nodes[0]
+            subg1.edata[EID] = sorted_edges
+        else:
+            subg1.ndata[NID] = induced_nodes[0]
+            subg1.edata[EID] = induced_edges[0]
         return subg1
 
     for i, subg in enumerate(subgs):
@@ -194,7 +209,10 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
         subg.edata['inner_edge'] = inner_edge
         subg_dict[i] = subg
     print('Construct subgraphs: {:.3f} seconds'.format(time.time() - start))
-    return subg_dict
+    if reshuffle:
+        return subg_dict, orig_nids, orig_eids
+    else:
+        return subg_dict, None, None
 
 
 def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False):
@@ -342,6 +360,6 @@ def metis_partition(g, k, extra_cached_hops=0, reshuffle=False,
         return None
 
     # Then we split the original graph into parts based on the METIS partitioning results.
-    return partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle)
+    return partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle)[0]
 
 _init_api("dgl.partition")

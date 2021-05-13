@@ -33,11 +33,11 @@ class HaloHeteroSubgraph : public HeteroSubgraph {
 HeteroGraphPtr ReorderUnitGraph(UnitGraphPtr ug, IdArray new_order) {
   auto format = ug->GetCreatedFormats();
   // We only need to reorder one of the graph structure.
-  if (format & csc_code) {
+  if (format & CSC_CODE) {
     auto cscmat = ug->GetCSCMatrix(0);
     auto new_cscmat = aten::CSRReorder(cscmat, new_order, new_order);
     return UnitGraph::CreateFromCSC(ug->NumVertexTypes(), new_cscmat, ug->GetAllowedFormats());
-  } else if (format & csr_code) {
+  } else if (format & CSR_CODE) {
     auto csrmat = ug->GetCSRMatrix(0);
     auto new_csrmat = aten::CSRReorder(csrmat, new_order, new_order);
     return UnitGraph::CreateFromCSR(ug->NumVertexTypes(), new_csrmat, ug->GetAllowedFormats());

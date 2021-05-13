@@ -162,7 +162,7 @@ class DistEmbedLayer(nn.Module):
                     # We only create embeddings for nodes without node features.
                     if feat_name not in g.nodes[ntype].data:
                         part_policy = g.get_node_partition_policy(ntype)
-                        self.node_embeds[ntype] = dgl.distributed.DistEmbedding(g.number_of_nodes(ntype),
+                        self.node_embeds[ntype] = dgl.distributed.nn.NodeEmbedding(g.number_of_nodes(ntype),
                                 self.embed_size,
                                 embed_name + '_' + ntype,
                                 init_emb,
@@ -389,10 +389,10 @@ def run(args, device, data):
 
     if args.sparse_embedding:
         if args.dgl_sparse and args.standalone:
-            emb_optimizer = dgl.distributed.SparseAdagrad(list(embed_layer.node_embeds.values()), lr=args.sparse_lr)
+            emb_optimizer = dgl.distributed.optim.SparseAdam(list(embed_layer.node_embeds.values()), lr=args.sparse_lr)
             print('optimize DGL sparse embedding:', embed_layer.node_embeds.keys())
         elif args.dgl_sparse:
-            emb_optimizer = dgl.distributed.SparseAdagrad(list(embed_layer.module.node_embeds.values()), lr=args.sparse_lr)
+            emb_optimizer = dgl.distributed.optim.SparseAdam(list(embed_layer.module.node_embeds.values()), lr=args.sparse_lr)
             print('optimize DGL sparse embedding:', embed_layer.module.node_embeds.keys())
         elif args.standalone:
             emb_optimizer = th.optim.SparseAdam(list(embed_layer.node_embeds.parameters()), lr=args.sparse_lr)
@@ -497,7 +497,7 @@ def run(args, device, data):
                                                                          time.time() - start))
 
 def main(args):
-    dgl.distributed.initialize(args.ip_config, args.num_servers, num_workers=args.num_workers)
+    dgl.distributed.initialize(args.ip_config)
     if not args.standalone:
         th.distributed.init_process_group(backend='gloo')
 
@@ -532,11 +532,9 @@ if __name__ == '__main__':
     parser.add_argument('--id', type=int, help='the partition id')
     parser.add_argument('--ip-config', type=str, help='The file for IP configuration')
     parser.add_argument('--conf-path', type=str, help='The path to the partition config file')
-    parser.add_argument('--num-client', type=int, help='The number of clients')
-    parser.add_argument('--num-servers', type=int, default=1, help='Server count on each machine.')
 
     # rgcn related
-    parser.add_argument('--num_gpus', type=int, default=-1, 
+    parser.add_argument('--num_gpus', type=int, default=-1,
                         help="the number of GPU device. Use -1 for CPU training")
     parser.add_argument("--dropout", type=float, default=0,
             help="dropout probability")
@@ -569,8 +567,6 @@ if __name__ == '__main__':
     parser.add_argument("--eval-batch-size", type=int, default=128,
             help="Mini-batch size. ")
     parser.add_argument('--log-every', type=int, default=20)
-    parser.add_argument("--num-workers", type=int, default=1,
-            help="Number of workers for distributed dataloader.")
     parser.add_argument("--low-mem", default=False, action='store_true',
             help="Whether use low mem RelGraphCov")
     parser.add_argument("--sparse-embedding", action='store_true',

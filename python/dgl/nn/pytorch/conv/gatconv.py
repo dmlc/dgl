@@ -60,6 +60,8 @@ class GATConv(nn.Module):
         causing silent performance regression. This module will raise a DGLError if it detects
         0-in-degree nodes in input graph. By setting ``True``, it will suppress the check
         and let the users handle it by themselves. Defaults: ``False``.
+    bias : bool, optional
+        If True, learns a bias term. Defaults: ``True``.
 
     Note
     ----
@@ -141,7 +143,8 @@ class GATConv(nn.Module):
                  negative_slope=0.2,
                  residual=False,
                  activation=None,
-                 allow_zero_in_degree=False):
+                 allow_zero_in_degree=False,
+                 bias=True):
         super(GATConv, self).__init__()
         self._num_heads = num_heads
         self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
@@ -160,6 +163,10 @@ class GATConv(nn.Module):
         self.feat_drop = nn.Dropout(feat_drop)
         self.attn_drop = nn.Dropout(attn_drop)
         self.leaky_relu = nn.LeakyReLU(negative_slope)
+        if bias:
+            self.bias = nn.Parameter(th.FloatTensor(size=(num_heads * out_feats,)))
+        else:
+            self.register_buffer('bias', None)
         if residual:
             if self._in_dst_feats != out_feats:
                 self.res_fc = nn.Linear(
@@ -191,6 +198,8 @@ class GATConv(nn.Module):
             nn.init.xavier_normal_(self.fc_dst.weight, gain=gain)
         nn.init.xavier_normal_(self.attn_l, gain=gain)
         nn.init.xavier_normal_(self.attn_r, gain=gain)
+        if self.bias is not None:
+            nn.init.constant_(self.bias, 0)
         if isinstance(self.res_fc, nn.Linear):
             nn.init.xavier_normal_(self.res_fc.weight, gain=gain)
 
@@ -296,8 +305,12 @@ class GATConv(nn.Module):
             rst = graph.dstdata['ft']
             # residual
             if self.res_fc is not None:
+                # Use -1 rather than self._num_heads to handle broadcasting
                 resval = self.res_fc(h_dst).view(h_dst.shape[0], -1, self._out_feats)
                 rst = rst + resval
+            # bias
+            if self.bias is not None:
+                rst = rst + self.bias.view(1, self._num_heads, self._out_feats)
             # activation
             if self.activation:
                 rst = self.activation(rst)

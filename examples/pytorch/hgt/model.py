@@ -78,7 +78,7 @@ class HGTLayer(nn.Module):
 
                 sub_graph.srcdata['k'] = k
                 sub_graph.dstdata['q'] = q
-                sub_graph.srcdata['v'] = v
+                sub_graph.srcdata['v_%d' % e_id] = v
 
                 sub_graph.apply_edges(fn.v_dot_u('q', 'k', 't'))
                 attn_score = sub_graph.edata.pop('t').sum(-1) * relation_pri / self.sqrt_dk
@@ -86,8 +86,8 @@ class HGTLayer(nn.Module):
 
                 sub_graph.edata['t'] = attn_score.unsqueeze(-1)
 
-            G.multi_update_all({etype : (fn.u_mul_e('v', 't', 'm'), fn.sum('m', 't')) \
-                                for etype in edge_dict}, cross_reducer = 'mean')
+            G.multi_update_all({etype : (fn.u_mul_e('v_%d' % e_id, 't', 'm'), fn.sum('m', 't')) \
+                                for etype, e_id in edge_dict.items()}, cross_reducer = 'mean')
 
             new_h = {}
             for ntype in G.ntypes:
