@@ -1,4 +1,5 @@
 from dgl.cuda import nccl
+from dgl.partition import NDArrayPartition
 import unittest
 import backend as F
 
@@ -31,7 +32,9 @@ def test_nccl_sparse_push_single():
     index = F.randint([10000], F.int32, F.ctx(), 0, 10000)
     value = F.uniform([10000, 100], F.float32, F.ctx(), -1.0, 1.0)
 
-    ri, rv = comm.sparse_all_to_all_push(index, value, 'remainder')
+    part = NDArrayPartition(10000, 1, 'remainder')
+
+    ri, rv = comm.sparse_all_to_all_push(index, value, part)
     assert F.array_equal(ri, index)
     assert F.array_equal(rv, value)
 
@@ -43,7 +46,9 @@ def test_nccl_sparse_pull_single():
     req_index = F.randint([10000], F.int64, F.ctx(), 0, 100000)
     value = F.uniform([100000, 100], F.float32, F.ctx(), -1.0, 1.0)
 
-    rv = comm.sparse_all_to_all_pull(req_index, value, 'remainder')
+    part = NDArrayPartition(100000, 1, 'remainder')
+
+    rv = comm.sparse_all_to_all_pull(req_index, value, part)
     exp_rv = F.gather_row(value, req_index)
     assert F.array_equal(rv, exp_rv)
 
