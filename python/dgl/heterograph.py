@@ -5919,8 +5919,9 @@ def reduce_dict_data(frames, reducer, order=None):
         Input tensor dictionaries
     reducer : str or callable function
         One of "sum", "max", "min", "mean", "stack" or a callable function.
-        If a callable function is provided, the input arguments is a list of tensors
-        from cross types, and the output of function must be a single tensor
+        If a callable function is provided, the input arguments must be a single list
+        of tensors containing aggregation results from each edge type, and the
+        output of function must be a single tensor.
     order : list[Int], optional
         Merge order hint. Useful for "stack" reducer.
         If provided, each integer indicates the relative order
