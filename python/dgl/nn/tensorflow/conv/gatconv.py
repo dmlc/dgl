@@ -245,18 +245,18 @@ class GATConv(layers.Layer):
 
             if isinstance(feat, tuple):
                 prefix_shape = tuple(feat[0].shape[:-1])
-                feat_dim = feat[0].shape[-1]
                 h_src = self.feat_drop(feat[0])
                 h_dst = self.feat_drop(feat[1])
                 if not hasattr(self, 'fc_src'):
                     self.fc_src, self.fc_dst = self.fc, self.fc
-                feat_src = tf.reshape(self.fc_src(h_src),
+                feat_src = tf.reshape(
+                    self.fc_src(h_src),
                     prefix_shape + (self._num_heads, self._out_feats))
-                feat_dst = tf.reshape(self.fc_dst(h_dst),
+                feat_dst = tf.reshape(
+                    self.fc_dst(h_dst),
                     prefix_shape + (self._num_heads, self._out_feats))
             else:
                 prefix_shape = tuple(feat.shape[:-1])
-                feat_dim = feat.shape[-1]
                 h_src = h_dst = self.feat_drop(feat)
                 feat_src = feat_dst = tf.reshape(
                     self.fc(h_src), prefix_shape + (self._num_heads, self._out_feats))
