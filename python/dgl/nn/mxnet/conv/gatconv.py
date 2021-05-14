@@ -213,20 +213,20 @@ class GATConv(nn.Block):
         graph : DGLGraph
             The graph.
         feat : mxnet.NDArray or pair of mxnet.NDArray
-            If a mxnet.NDArray is given, the input feature of shape :math:`(N, D_{in})` where
+            If a mxnet.NDArray is given, the input feature of shape :math:`(N, *, D_{in})` where
             :math:`D_{in}` is size of input feature, :math:`N` is the number of nodes.
             If a pair of mxnet.NDArray is given, the pair must contain two tensors of shape
-            :math:`(N_{in}, D_{in_{src}})` and :math:`(N_{out}, D_{in_{dst}})`.
+            :math:`(N_{in}, *, D_{in_{src}})` and :math:`(N_{out}, *, D_{in_{dst}})`.
         get_attention : bool, optional
             Whether to return the attention values. Default to False.
 
         Returns
         -------
         mxnet.NDArray
-            The output feature of shape :math:`(N, H, D_{out})` where :math:`H`
+            The output feature of shape :math:`(N, *, H, D_{out})` where :math:`H`
             is the number of heads, and :math:`D_{out}` is size of output feature.
         mxnet.NDArray, optional
-            The attention values of shape :math:`(E, H, 1)`, where :math:`E` is the number of
+            The attention values of shape :math:`(E, *, H, 1)`, where :math:`E` is the number of
             edges. This is returned only when :attr:`get_attention` is ``True``.
 
         Raises
