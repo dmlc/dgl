@@ -4,10 +4,9 @@ import torch.nn.functional as F
 from torch.nn import init
 import random
 import numpy as np
-import torch.multiprocessing as mp
-from torch.multiprocessing import Queue
+import dgl.multiprocessing as mp
+from dgl.multiprocessing import Queue
 
-from utils import thread_wrapped_func
 
 def init_emb2pos_index(walk_length, window_size, batch_size):
     ''' select embedding of positive nodes from a batch of node embeddings
@@ -110,7 +109,6 @@ def adam(grad, state_sum, nodes, lr, device, only_gpu):
 
     return grad
 
-@thread_wrapped_func
 def async_update(num_threads, model, queue):
     """ asynchronous embedding update """
     torch.set_num_threads(num_threads)

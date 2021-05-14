@@ -12,8 +12,8 @@ import time
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.multiprocessing as mp
-from torch.multiprocessing import Queue
+import dgl.multiprocessing as mp
+from dgl.multiprocessing import Queue
 from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader
 import dgl
@@ -23,7 +23,6 @@ from functools import partial
 from dgl.data.rdf import AIFBDataset, MUTAGDataset, BGSDataset, AMDataset
 from model import RelGraphEmbedLayer
 from dgl.nn import RelGraphConv
-from utils import thread_wrapped_func
 import tqdm
 
 from ogb.nodeproppred import DglNodePropPredDataset
@@ -195,7 +194,6 @@ def evaluate(model, embed_layer, eval_loader, node_feats):
 
     return eval_logits, eval_seeds
 
-@thread_wrapped_func
 def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
     dev_id = devices[proc_id] if devices[proc_id] != 'cpu' else -1
     g, node_feats, num_of_ntype, num_classes, num_rels, target_idx, \
