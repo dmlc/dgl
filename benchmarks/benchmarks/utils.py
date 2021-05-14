@@ -488,6 +488,19 @@ def skip_if_gpu():
         return func
     return _wrapper
 
+def skip_if_not_4gpu():
+    """skip if DGL_BENCH_DEVICE is gpu
+    """
+    gpu_count = torch.cuda.device_count()
+
+    def _wrapper(func):
+        if gpu_count != 4:
+            # skip if not enabled
+            print("Skip {}".format(func.benchmark_name))
+            func.benchmark_name = "skip_" + func.__name__
+        return func
+    return _wrapper
+
 
 def benchmark(track_type, timeout=60):
     """Decorator for indicating the benchmark type.
