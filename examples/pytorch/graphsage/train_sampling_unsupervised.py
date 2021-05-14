@@ -4,7 +4,7 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import torch.multiprocessing as mp
+import dgl.multiprocessing as mp
 import dgl.function as fn
 import dgl.nn.pytorch as dglnn
 import time
@@ -13,7 +13,6 @@ from dgl.data import RedditDataset
 from torch.nn.parallel import DistributedDataParallel
 import tqdm
 
-from utils import thread_wrapped_func
 from model import SAGE, compute_acc_unsupervised as compute_acc
 from negative_sampler import NegativeSampler
 
@@ -191,8 +190,7 @@ def main(args, devices):
     else:
         procs = []
         for proc_id in range(n_gpus):
-            p = mp.Process(target=thread_wrapped_func(run),
-                           args=(proc_id, n_gpus, args, devices, data))
+            p = mp.Process(target=run, args=(proc_id, n_gpus, args, devices, data))
             p.start()
             procs.append(p)
         for p in procs:

@@ -1,7 +1,7 @@
 import torch
 import argparse
 import dgl
-import torch.multiprocessing as mp
+import dgl.multiprocessing as mp
 from torch.utils.data import DataLoader
 import os
 import random
@@ -10,7 +10,7 @@ import numpy as np
 
 from reading_data import DeepwalkDataset
 from model import SkipGramModel
-from utils import thread_wrapped_func, shuffle_walks, sum_up_params
+from utils import shuffle_walks, sum_up_params
 
 class DeepwalkTrainer:
     def __init__(self, args):
@@ -110,7 +110,6 @@ class DeepwalkTrainer:
         else:
             self.emb_model.save_embedding(self.dataset, self.args.output_emb_file)
 
-    @thread_wrapped_func
     def fast_train_sp(self, rank, gpu_id):
         """ a subprocess for fast_train_mp """
         if self.args.mix:
