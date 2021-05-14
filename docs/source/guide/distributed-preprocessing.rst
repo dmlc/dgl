@@ -100,7 +100,7 @@ the mapping for each node type; the second dictionary contains the mapping for e
                                                          return_mapping=True)
     # Let's assume that node_emb is saved from the distributed training.
     orig_node_emb = th.zeros(node_emb.shape, dtype=node_emb.dtype)
-    orig_labels[node_map] = node_emb
+    orig_node_emb[node_map] = node_emb
 
 
 7.1.1 Distributed partitioning

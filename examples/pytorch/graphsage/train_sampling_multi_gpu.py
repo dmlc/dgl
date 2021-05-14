@@ -4,7 +4,7 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import torch.multiprocessing as mp
+import dgl.multiprocessing as mp
 import dgl.nn.pytorch as dglnn
 import time
 import math
@@ -13,7 +13,6 @@ from torch.nn.parallel import DistributedDataParallel
 import tqdm
 
 from model import SAGE
-from utils import thread_wrapped_func
 from load_graph import load_reddit, inductive_split
 
 def compute_acc(pred, labels):
@@ -217,8 +216,7 @@ if __name__ == '__main__':
     else:
         procs = []
         for proc_id in range(n_gpus):
-            p = mp.Process(target=thread_wrapped_func(run),
-                           args=(proc_id, n_gpus, args, devices, data))
+            p = mp.Process(target=run, args=(proc_id, n_gpus, args, devices, data))
             p.start()
             procs.append(p)
         for p in procs:
