@@ -244,16 +244,22 @@ class GATConv(layers.Layer):
                                    'suppress the check and let the code run.')
 
             if isinstance(feat, tuple):
+                prefix_shape = tuple(feat[0].shape[:-1])
+                feat_dim = feat[0].shape[-1]
                 h_src = self.feat_drop(feat[0])
                 h_dst = self.feat_drop(feat[1])
                 if not hasattr(self, 'fc_src'):
                     self.fc_src, self.fc_dst = self.fc, self.fc
-                feat_src = tf.reshape(self.fc_src(h_src), (-1, self._num_heads, self._out_feats))
-                feat_dst = tf.reshape(self.fc_dst(h_dst), (-1, self._num_heads, self._out_feats))
+                feat_src = tf.reshape(self.fc_src(h_src),
+                    prefix_shape + (self._num_heads, self._out_feats))
+                feat_dst = tf.reshape(self.fc_dst(h_dst),
+                    prefix_shape + (self._num_heads, self._out_feats))
             else:
+                prefix_shape = tuple(feat.shape[:-1])
+                feat_dim = feat.shape[-1]
                 h_src = h_dst = self.feat_drop(feat)
                 feat_src = feat_dst = tf.reshape(
-                    self.fc(h_src), (-1, self._num_heads, self._out_feats))
+                    self.fc(h_src), prefix_shape + (self._num_heads, self._out_feats))
                 if graph.is_block:
                     feat_dst = feat_src[:graph.number_of_dst_nodes()]
             # NOTE: GAT paper uses "first concatenation then linear projection"
@@ -282,7 +288,7 @@ class GATConv(layers.Layer):
             # residual
             if self.res_fc is not None:
                 resval = tf.reshape(self.res_fc(
-                    h_dst), (h_dst.shape[0], -1, self._out_feats))
+                    h_dst), prefix_shape + (-1, self._out_feats))
                 rst = rst + resval
             # activation
             if self.activation:

@@ -250,18 +250,22 @@ class GATConv(nn.Block):
                                    'suppress the check and let the code run.')
 
             if isinstance(feat, tuple):
+                prefix_shape = feat[0].shape[:-1]
+                feat_dim = feat[0].shape[-1]
                 h_src = self.feat_drop(feat[0])
                 h_dst = self.feat_drop(feat[1])
                 if not hasattr(self, 'fc_src'):
                     self.fc_src, self.fc_dst = self.fc, self.fc
-                feat_src = self.fc_src(h_src).reshape(
-                    -1, self._num_heads, self._out_feats)
-                feat_dst = self.fc_dst(h_dst).reshape(
-                    -1, self._num_heads, self._out_feats)
+                feat_src = self.fc_src(h_src.reshape(-1, feat_dim)).reshape(
+                    *prefix_shape, self._num_heads, self._out_feats)
+                feat_dst = self.fc_dst(h_dst.reshape(-1, feat_dim)).reshape(
+                    *prefix_shape, self._num_heads, self._out_feats)
             else:
+                prefix_shape = feat.shape[:-1]
+                feat_dim = feat[0].shape[-1]
                 h_src = h_dst = self.feat_drop(feat)
-                feat_src = feat_dst = self.fc(h_src).reshape(
-                    -1, self._num_heads, self._out_feats)
+                feat_src = feat_dst = self.fc(h_src.reshape(-1, feat_dim)).reshape(
+                    *prefix_shape, self._num_heads, self._out_feats)
                 if graph.is_block:
                     feat_dst = feat_src[:graph.number_of_dst_nodes()]
             # NOTE: GAT paper uses "first concatenation then linear projection"
@@ -288,7 +292,8 @@ class GATConv(nn.Block):
             rst = graph.dstdata['ft']
             # residual
             if self.res_fc is not None:
-                resval = self.res_fc(h_dst).reshape(h_dst.shape[0], -1, self._out_feats)
+                resval = self.res_fc(h_dst.reshape(-1, feat_dim)).reshape(
+                    *prefix_shape, -1, self._out_feats)
                 rst = rst + resval
             # activation
             if self.activation:
