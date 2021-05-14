@@ -11,11 +11,10 @@ import dgl.nn as dglnn
 import torch.nn as nn
 import torch.nn.functional as F
 import argparse
-import torch.multiprocessing as mp
+import dgl.multiprocessing as mp
 import sys
 from torch.nn.parallel import DistributedDataParallel
 from collections import OrderedDict
-from utils import thread_wrapped_func
 
 
 class RGAT(nn.Module):
@@ -285,7 +284,7 @@ if __name__ == '__main__':
 
     procs = []
     for proc_id in range(n_gpus):
-        p = mp.Process(target=thread_wrapped_func(train), args=(proc_id, n_gpus, args, dataset, g, feats, paper_offset))
+        p = mp.Process(target=train, args=(proc_id, n_gpus, args, dataset, g, feats, paper_offset))
         p.start()
         procs.append(p)
 

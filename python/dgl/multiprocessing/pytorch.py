@@ -1,16 +1,8 @@
-#### Miscellaneous functions
-
-# According to https://github.com/pytorch/pytorch/issues/17199, this decorator
-# is necessary to make fork() and openmp work together.
-#
-# TODO: confirm if this is necessary for MXNet and Tensorflow.  If so, we need
-# to standardize worker process creation since our operators are implemented with
-# OpenMP.
-
-import torch.multiprocessing as mp
-from _thread import start_new_thread
+"""PyTorch multiprocessing wrapper."""
 from functools import wraps
 import traceback
+from _thread import start_new_thread
+import torch.multiprocessing as mp
 
 def thread_wrapped_func(func):
     """
@@ -23,7 +15,7 @@ def thread_wrapped_func(func):
             exception, trace, res = None, None, None
             try:
                 res = func(*args, **kwargs)
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-except
                 exception = e
                 trace = traceback.format_exc()
             queue.put((res, exception, trace))
@@ -36,3 +28,10 @@ def thread_wrapped_func(func):
             assert isinstance(exception, Exception)
             raise exception.__class__(trace)
     return decorated_function
+
+# pylint: disable=missing-docstring
+class Process(mp.Process):
+    # pylint: disable=dangerous-default-value
+    def __init__(self, group=None, target=None, name=None, args=(), kwargs={}, *, daemon=None):
+        target = thread_wrapped_func(target)
+        super().__init__(group, target, name, args, kwargs, daemon=daemon)

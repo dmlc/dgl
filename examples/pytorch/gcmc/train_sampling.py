@@ -14,16 +14,14 @@ import numpy as np
 import tqdm
 import torch as th
 import torch.nn as nn
-import torch.multiprocessing as mp
 from torch.utils.data import DataLoader
-from torch.multiprocessing import Queue
 from torch.nn.parallel import DistributedDataParallel
-from _thread import start_new_thread
-from functools import wraps
 from data import MovieLens
 from model import GCMCLayer, DenseBiDecoder, BiDecoder
 from utils import get_activation, get_optimizer, torch_total_param_num, torch_net_info, MetricLogger, to_etype_name
 import dgl
+import dgl.multiprocessing as mp
+from dgl.multiprocessing import Queue
 
 class Net(nn.Module):
     def __init__(self, args, dev_id):
@@ -135,33 +133,6 @@ def evaluate(args, dev_id, net, dataset, dataloader, segment='valid'):
     rmse = ((real_pred_ratings - true_rel_ratings) ** 2.).mean().item()
     rmse = np.sqrt(rmse)
     return rmse
-
-# According to https://github.com/pytorch/pytorch/issues/17199, this decorator
-# is necessary to make fork() and openmp work together.
-def thread_wrapped_func(func):
-    """
-    Wraps a process entry point to make it work with OpenMP.
-    """
-    @wraps(func)
-    def decorated_function(*args, **kwargs):
-        queue = Queue()
-        def _queue_result():
-            exception, trace, res = None, None, None
-            try:
-                res = func(*args, **kwargs)
-            except Exception as e:
-                exception = e
-                trace = traceback.format_exc()
-            queue.put((res, exception, trace))
-
-        start_new_thread(_queue_result, ())
-        result, exception, trace = queue.get()
-        if exception is None:
-            return result
-        else:
-            assert isinstance(exception, Exception)
-            raise exception.__class__(trace)
-    return decorated_function
 
 def config():
     parser = argparse.ArgumentParser(description='GCMC')
@@ -409,7 +380,7 @@ if __name__ == '__main__':
         dataset.train_dec_graph.create_formats_()
         procs = []
         for proc_id in range(n_gpus):
-            p = mp.Process(target=thread_wrapped_func(run), args=(proc_id, n_gpus, args, devices, dataset))
+            p = mp.Process(target=run, args=(proc_id, n_gpus, args, devices, dataset))
             p.start()
             procs.append(p)
         for p in procs:

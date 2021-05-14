@@ -1,7 +1,7 @@
 import torch
 import argparse
 import dgl
-import torch.multiprocessing as mp
+import dgl.multiprocessing as mp
 from torch.utils.data import DataLoader
 import os
 import random
@@ -10,7 +10,7 @@ import numpy as np
 
 from reading_data import LineDataset
 from model import SkipGramModel
-from utils import thread_wrapped_func, sum_up_params, check_args
+from utils import sum_up_params, check_args
 
 class LineTrainer:
     def __init__(self, args):
@@ -102,7 +102,6 @@ class LineTrainer:
         else:
             self.emb_model.save_embedding(self.dataset, self.args.output_emb_file)
 
-    @thread_wrapped_func
     def fast_train_sp(self, rank, gpu_id):
         """ a subprocess for fast_train_mp """
         if self.args.mix:
