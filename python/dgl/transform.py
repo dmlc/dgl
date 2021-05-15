@@ -2232,7 +2232,7 @@ def _less_than_int32(g):
     """
     num_edges = g.num_edges()
     num_nodes = max(g.num_nodes(g.ntypes[0]), g.num_nodes(g.ntypes[-1]))
-    return max(num_nodes, num_edges) > (1 << 31) - 1
+    return max(num_nodes, num_edges) <= (1 << 31) - 1
 
 def adj_product_graph(A, B, weight_name, etype='_E'):
     r"""Create a weighted graph whose adjacency matrix is the product of
