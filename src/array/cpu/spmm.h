@@ -650,12 +650,7 @@ void SpMMSumCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
 #if !defined(_WIN32)
 #ifdef USE_AVX
   
-  const bool sorted = csr.sorted;
-  if(!sorted)
-  {
-    printf("CSR is not sorted!\n");
-  }
-  bool special_condition = (!sorted) || bcast.use_bcast || (Op::use_lhs && (dim != lhs_dim)) || (Op::use_rhs && (dim != rhs_dim));
+  bool special_condition = bcast.use_bcast || (Op::use_lhs && (dim != lhs_dim)) || (Op::use_rhs && (dim != rhs_dim));
   if(!special_condition)
   {
       SpMMSumCsrOpt<IdType, DType, Op>(bcast, csr, ufeat, efeat, out);
@@ -724,12 +719,7 @@ void SpMMCmpCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
 #if !defined(_WIN32)
 #ifdef USE_AVX
   
-  const bool sorted = csr.sorted;
-  if(!sorted)
-  {
-    printf("CSR is not sorted!\n");
-  }
-  bool special_condition = (!sorted) || bcast.use_bcast || (Op::use_lhs && (dim != lhs_dim)) || (Op::use_rhs && (dim != rhs_dim));
+  bool special_condition = bcast.use_bcast || (Op::use_lhs && (dim != lhs_dim)) || (Op::use_rhs && (dim != rhs_dim));
   if(!special_condition)
   {
       SpMMCmpCsrOpt<IdType, DType, Op, Cmp>(bcast, csr, ufeat, efeat, out, argu, arge);
