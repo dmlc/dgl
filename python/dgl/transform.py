@@ -2226,6 +2226,14 @@ def to_simple(g,
 
 DGLHeteroGraph.to_simple = utils.alias_func(to_simple)
 
+def _less_than_int32(g):
+    """Check if a graph with only one edge type has more than 2 ** 31 - 1
+    nodes or edges.
+    """
+    num_edges = g.num_edges()
+    num_nodes = max(g.num_nodes(g.ntypes[0]), g.num_nodes(g.ntypes[-1]))
+    return max(num_nodes, num_edges) > (1 << 31) - 1
+
 def adj_product_graph(A, B, weight_name, etype='_E'):
     r"""Create a weighted graph whose adjacency matrix is the product of
     the adjacency matrices of the given two graphs.
@@ -2335,6 +2343,11 @@ def adj_product_graph(A, B, weight_name, etype='_E'):
     num_vtypes = 1 if srctype == dsttype else 2
     ntypes = [srctype] if num_vtypes == 1 else [srctype, dsttype]
 
+    if A.device != F.cpu():
+        if not (_less_than_int32(A) and _less_than_int32(B)):
+            raise ValueError(
+                'For GPU graphs the number of nodes and edges must be less than 2 ** 31 - 1.')
+
     C_gidx, C_weights = F.csrmm(
         A._graph, A.edata[weight_name], B._graph, B.edata[weight_name], num_vtypes)
     num_nodes_dict = {srctype: A.num_nodes(srctype), dsttype: B.num_nodes(dsttype)}
@@ -2416,6 +2429,13 @@ def adj_sum_graph(graphs, weight_name):
     >>> B.edata['w'].grad
     tensor([1., 1., 1., 1., 1., 1.])
     """
+    if len(graphs) == 0:
+        raise ValueError('The list of graphs must not be empty.')
+
+    if graphs[0].device != F.cpu():
+        if not all(_less_than_int32(A) for A in graphs):
+            raise ValueError(
+                'For GPU graphs the number of nodes and edges must be less than 2 ** 31 - 1.')
     metagraph = graphs[0]._graph.metagraph
     num_nodes = utils.toindex(
         [graphs[0]._graph.number_of_nodes(i) for i in range(graphs[0]._graph.number_of_ntypes())])

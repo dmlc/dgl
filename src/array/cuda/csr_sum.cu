@@ -41,9 +41,9 @@ std::pair<CSRMatrix, NDArray> CusparseCsrgeam2(
   CUSPARSE_CALL(cusparseSetStream(thr_entry->cusparse_handle, thr_entry->stream));
 
   cusparseMatDescr_t matA, matB, matC;
-  cusparse_create_descr(&matA);
-  cusparse_create_descr(&matB);
-  cusparse_create_descr(&matC);
+  CUSPARSE_CALL(cusparseCreateMatDescr(&matA));
+  CUSPARSE_CALL(cusparseCreateMatDescr(&matB));
+  CUSPARSE_CALL(cusparseCreateMatDescr(&matC));
 
   cusparseSetPointerMode(thr_entry->cusparse_handle, CUSPARSE_POINTER_MODE_HOST);
   size_t workspace_size = 0;

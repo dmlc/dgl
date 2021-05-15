@@ -1579,7 +1579,8 @@ def csrmm(A, A_weights, B, B_weights, num_vtypes):
 
     Notes
     -----
-    Both A and B must allow creation of CSR representations, and must be simple graphs.
+    Both A and B must allow creation of CSR representations, and must be simple graphs
+    (i.e. having at most one edge between two nodes).
 
     The output unit graph has no format restriction.
 
@@ -1610,7 +1611,8 @@ def csrsum(gidxs, weights):
 
     Notes
     -----
-    All unit graphs must allow creation of CSR representations, and must be simple graphs.
+    All unit graphs must allow creation of CSR representations, and must be simple graphs
+    (i.e. having at most one edge between two nodes).
 
     The output unit graph has no format restriction.
 
@@ -1638,7 +1640,8 @@ def csrmask(A, A_weights, B):
 
     Notes
     -----
-    Both A and B must allow creation of CSR representations, and must be simple graphs.
+    Both A and B must allow creation of CSR representations, and must be simple graphs
+    (i.e. having at most one edge between two nodes).
 
     Parameters
     ----------
