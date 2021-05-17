@@ -2447,13 +2447,6 @@ class DGLHeteroGraph(object):
         else:
             return self._graph.number_of_edges(self.get_etype_id(etype))
 
-    def __len__(self):
-        """Deprecated: please directly call :func:`number_of_nodes`
-        """
-        dgl_warning('DGLGraph.__len__ is deprecated.'
-                    'Please directly call DGLGraph.number_of_nodes.')
-        return self.number_of_nodes()
-
     @property
     def is_multigraph(self):
         """Return whether the graph is a multigraph with parallel edges.
@@ -4742,8 +4735,11 @@ class DGLHeteroGraph(object):
                 An optional apply function to further update the node features
                 after the message reduction. It must be a :ref:`apiudf`.
 
-        cross_reducer : str
-            Cross type reducer. One of ``"sum"``, ``"min"``, ``"max"``, ``"mean"``, ``"stack"``.
+        cross_reducer : str or callable function
+            Cross type reducer. One of ``"sum"``, ``"min"``, ``"max"``, ``"mean"``, ``"stack"``
+            or a callable function. If a callable function is provided, the input argument must be
+            a single list of tensors containing aggregation results from each edge type, and the
+            output of function must be a single tensor.
         apply_node_func : callable, optional
             An optional apply function after the messages are reduced both
             type-wisely and across different types.
@@ -5914,8 +5910,11 @@ def reduce_dict_data(frames, reducer, order=None):
     ----------
     frames : list[dict[str, Tensor]]
         Input tensor dictionaries
-    reducer : str
-        One of "sum", "max", "min", "mean", "stack"
+    reducer : str or callable function
+        One of "sum", "max", "min", "mean", "stack" or a callable function.
+        If a callable function is provided, the input arguments must be a single list
+        of tensors containing aggregation results from each edge type, and the
+        output of function must be a single tensor.
     order : list[Int], optional
         Merge order hint. Useful for "stack" reducer.
         If provided, each integer indicates the relative order
@@ -5932,7 +5931,9 @@ def reduce_dict_data(frames, reducer, order=None):
         # Directly return the only one input. Stack reducer requires
         # modifying tensor shape.
         return frames[0]
-    if reducer == 'stack':
+    if callable(reducer):
+        merger = reducer
+    elif reducer == 'stack':
         # Stack order does not matter. However, it must be consistent!
         if order:
             assert len(order) == len(frames)
