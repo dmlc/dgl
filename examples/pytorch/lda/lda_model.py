@@ -28,7 +28,8 @@ def _lbeta(alpha, axis):
     return torch.lgamma(alpha).sum(axis) - torch.lgamma(alpha.sum(axis))
 
 # Taken from scikit-learn.  Worked better than uniform.
-_sklearn_random_init = torch.distributions.gamma.Gamma(100, 0.01)
+# Perhaps this is due to concentration around one.
+_sklearn_random_init = torch.distributions.gamma.Gamma(100, 100)
 
 
 def _edge_update(edges, step_size=1):
