@@ -9,13 +9,13 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.multiprocessing as mp
 from torch.nn.parallel import DistributedDataParallel
 from tqdm.auto import tqdm
 from numpy import random
 from torch.nn.parameter import Parameter
 import dgl
 import dgl.function as fn
+import dgl.multiprocessing as mp
 
 from utils import *
 
@@ -481,10 +481,7 @@ def train_model(network_data):
     else:
         procs = []
         for proc_id in range(n_gpus):
-            p = mp.Process(
-                target=thread_wrapped_func(run),
-                args=(proc_id, n_gpus, args, devices, data),
-            )
+            p = mp.Process(target=run, args=(proc_id, n_gpus, args, devices, data))
             p.start()
             procs.append(p)
         for p in procs:
