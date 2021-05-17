@@ -751,6 +751,7 @@ class DistGraph:
         """Return the out-degree(s) of the given nodes.
 
         It computes the out-degree(s) w.r.t. to the edges of the given edge type.
+        It does not support heterogeneous graphs yet.
 
         Parameters
         ----------
@@ -763,14 +764,6 @@ class DistGraph:
             * iterable[int]: Each element is a node ID.
 
             If not given, return the in-degrees of all the nodes.
-        etype : str or (str, str, str), optional
-            The type names of the edges. The allowed type name formats are:
-
-            * ``(str, str, str)`` for source node type, edge type and destination node type.
-            * or one ``str`` edge type name if the name can uniquely identify a
-              triplet format in the graph.
-
-            Can be omitted if the graph has only one type of edges.
 
         Returns
         -------
@@ -785,10 +778,6 @@ class DistGraph:
         >>> import dgl
         >>> import torch
 
-        Create a homogeneous graph.
-
-        >>> g = dgl.graph((torch.tensor([0, 0, 1, 1]), torch.tensor([1, 1, 2, 3])))
-
         Query for all nodes.
 
         >>> g.out_degrees()
@@ -798,15 +787,6 @@ class DistGraph:
 
         >>> g.out_degrees(torch.tensor([1, 2]))
         tensor([2, 0])
-
-        For a graph of multiple edge types, it is required to specify the edge type in query.
-
-        >>> hg = dgl.heterograph({
-        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
-        ...     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
-        ... })
-        >>> hg.out_degrees(torch.tensor([1, 0]), etype='follows')
-        tensor([1, 1])
 
         See Also
         --------
@@ -820,6 +800,7 @@ class DistGraph:
         """Return the in-degree(s) of the given nodes.
 
         It computes the in-degree(s) w.r.t. to the edges of the given edge type.
+        It does not support heterogeneous graphs yet.
 
         Parameters
         ----------
@@ -832,14 +813,6 @@ class DistGraph:
             * iterable[int]: Each element is a node ID.
 
             If not given, return the in-degrees of all the nodes.
-        etype : str or (str, str, str), optional
-            The type name of the edges. The allowed type name formats are:
-
-            * ``(str, str, str)`` for source node type, edge type and destination node type.
-            * or one ``str`` edge type name if the name can uniquely identify a
-              triplet format in the graph.
-
-            Can be omitted if the graph has only one type of edges.
 
         Returns
         -------
@@ -854,10 +827,6 @@ class DistGraph:
         >>> import dgl
         >>> import torch
 
-        Create a homogeneous graph.
-
-        >>> g = dgl.graph((torch.tensor([0, 0, 1, 1]), torch.tensor([1, 1, 2, 3])))
-
         Query for all nodes.
 
         >>> g.in_degrees()
@@ -867,15 +836,6 @@ class DistGraph:
 
         >>> g.in_degrees(torch.tensor([1, 2]))
         tensor([2, 1])
-
-        For a graph of multiple edge types, it is required to specify the edge type in query.
-
-        >>> hg = dgl.heterograph({
-        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
-        ...     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
-        ... })
-        >>> hg.in_degrees(torch.tensor([1, 0]), etype='follows')
-        tensor([1, 0])
 
         See Also
         --------
