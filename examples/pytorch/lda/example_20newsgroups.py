@@ -37,7 +37,7 @@ n_samples = 2000
 n_features = 1000
 n_components = 10
 n_top_words = 20
-device='cuda'
+device = 'cuda'
 
 def plot_top_words(model, feature_names, n_top_words, title):
     fig, axes = plt.subplots(2, 5, figsize=(30, 15), sharex=True)
