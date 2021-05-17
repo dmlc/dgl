@@ -2226,7 +2226,7 @@ def to_simple(g,
 
 DGLHeteroGraph.to_simple = utils.alias_func(to_simple)
 
-def _less_than_int32(g):
+def _unitgraph_less_than_int32(g):
     """Check if a graph with only one edge type has more than 2 ** 31 - 1
     nodes or edges.
     """
@@ -2291,7 +2291,7 @@ def adj_product_graph(A, B, weight_name, etype='_E'):
     The following shows weighted adjacency matrix multiplication between two
     bipartite graphs.  You can also perform this between two homogeneous
     graphs, or one homogeneous graph and one bipartite graph, as long as the
-    number of nodes of the same type match.
+    numbers of nodes of the same type match.
 
     >>> A = dgl.heterograph({
     ...     ('A', 'AB', 'B'): ([2, 2, 0, 2, 0, 1], [2, 1, 0, 0, 2, 2])},
@@ -2301,6 +2301,13 @@ def adj_product_graph(A, B, weight_name, etype='_E'):
     ...     num_nodes_dict={'A': 3, 'B': 4})
     >>> A.edata['w'] = torch.randn(6).requires_grad_()
     >>> B.edata['w'] = torch.randn(6).requires_grad_()
+
+    If your graph is a multigraph, you will need to call :func:`dgl.to_simple`
+    to convert it into a simple graph first.
+
+    >>> A = dgl.to_simple(A)
+    >>> B = dgl.to_simple(B)
+
     >>> C = dgl.adj_product_graph(A, B, 'w')
     >>> C.edges()
     (tensor([0, 0, 1, 2, 2, 2]), tensor([0, 1, 0, 0, 2, 1]))
@@ -2344,7 +2351,7 @@ def adj_product_graph(A, B, weight_name, etype='_E'):
     ntypes = [srctype] if num_vtypes == 1 else [srctype, dsttype]
 
     if A.device != F.cpu():
-        if not (_less_than_int32(A) and _less_than_int32(B)):
+        if not (_unitgraph_less_than_int32(A) and _unitgraph_less_than_int32(B)):
             raise ValueError(
                 'For GPU graphs the number of nodes and edges must be less than 2 ** 31 - 1.')
 
@@ -2415,6 +2422,13 @@ def adj_sum_graph(graphs, weight_name):
     ...     num_nodes_dict={'A': 3, 'B': 4})
     >>> A.edata['w'] = torch.randn(6).requires_grad_()
     >>> B.edata['w'] = torch.randn(6).requires_grad_()
+
+    If your graph is a multigraph, you will need to call :func:`dgl.to_simple`
+    to convert it into a simple graph first.
+
+    >>> A = dgl.to_simple(A)
+    >>> B = dgl.to_simple(B)
+
     >>> C = dgl.adj_sum_graph([A, B], 'w')
     >>> C.edges()
     (tensor([0, 0, 0, 1, 1, 1, 2, 2, 2, 2]),
@@ -2433,7 +2447,7 @@ def adj_sum_graph(graphs, weight_name):
         raise ValueError('The list of graphs must not be empty.')
 
     if graphs[0].device != F.cpu():
-        if not all(_less_than_int32(A) for A in graphs):
+        if not all(_unitgraph_less_than_int32(A) for A in graphs):
             raise ValueError(
                 'For GPU graphs the number of nodes and edges must be less than 2 ** 31 - 1.')
     metagraph = graphs[0]._graph.metagraph
