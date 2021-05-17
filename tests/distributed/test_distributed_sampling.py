@@ -50,7 +50,7 @@ def start_find_edges_client(rank, tmpdir, disable_shared_mem, eids):
     dgl.distributed.exit_client()
     return u, v
 
-def start_get_degrees_client(rank, tmpdir, disable_shared_mem, nids):
+def start_get_degrees_client(rank, tmpdir, disable_shared_mem, nids=None):
     gpb = None
     if disable_shared_mem:
         _, _, _, gpb, _, _, _ = load_partition(tmpdir / 'test_get_degrees.json', rank)
@@ -58,12 +58,14 @@ def start_get_degrees_client(rank, tmpdir, disable_shared_mem, nids):
     dist_graph = DistGraph("test_get_degrees", gpb=gpb)
     try:
         in_deg = dist_graph.in_degrees(nids)
+        all_in_deg = dist_graph.in_degrees()
         out_deg = dist_graph.out_degrees(nids)
+        all_out_deg = dist_graph.out_degrees()
     except Exception as e:
         print(e)
-        in_deg, out_deg = None, None
+        in_deg, out_deg, all_in_deg, all_out_deg = None, None, None, None
     dgl.distributed.exit_client()
-    return in_deg, out_deg
+    return in_deg, out_deg, all_in_deg, all_out_deg
 
 def check_rpc_sampling(tmpdir, num_server):
     ip_config = open("rpc_ip_config.txt", "w")
@@ -166,18 +168,17 @@ def check_rpc_get_degree_shuffle(tmpdir, num_server):
     time.sleep(3)
 
     nids = F.tensor(np.random.randint(g.number_of_nodes(), size=100))
-    in_degs, out_degs = start_get_degrees_client(0, tmpdir, num_server > 1, nids)
+    in_degs, out_degs, all_in_degs, all_out_degs = start_get_degrees_client(0, tmpdir, num_server > 1, nids)
 
     print("Done get_degree")
     for p in pserver_list:
         p.join()
 
     print('check results')
-    deg = g.in_degrees(orig_nid[nids])
-    assert F.array_equal(deg, in_degs)
-    deg = g.out_degrees(orig_nid[nids])
-    print(deg, out_degs)
-    assert F.array_equal(deg, out_degs)
+    assert F.array_equal(g.in_degrees(orig_nid[nids]), in_degs)
+    assert F.array_equal(g.in_degrees(orig_nid), all_in_degs)
+    assert F.array_equal(g.out_degrees(orig_nid[nids]), out_degs)
+    assert F.array_equal(g.out_degrees(orig_nid), all_out_degs)
 
 #@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 #@unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
