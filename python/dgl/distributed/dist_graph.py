@@ -793,7 +793,7 @@ class DistGraph:
         in_degrees
         """
         if is_all(u):
-            u = F.arange(self.number_of_nodes())
+            u = F.arange(0, self.number_of_nodes())
         return dist_out_degrees(self, u)
 
     def in_degrees(self, v=ALL):
@@ -842,7 +842,7 @@ class DistGraph:
         out_degrees
         """
         if is_all(v):
-            v = F.arange(self.number_of_nodes())
+            v = F.arange(0, self.number_of_nodes())
         return dist_in_degrees(self, v)
 
     def node_attr_schemes(self):
