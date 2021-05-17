@@ -140,6 +140,16 @@ def check_rpc_find_edges_shuffle(tmpdir, num_server):
     assert F.array_equal(u, du)
     assert F.array_equal(v, dv)
 
+# Wait non shared memory graph store
+@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
+@unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
+@pytest.mark.parametrize("num_server", [1, 2])
+def test_rpc_find_edges_shuffle(num_server):
+    import tempfile
+    os.environ['DGL_DIST_MODE'] = 'distributed'
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        check_rpc_find_edges_shuffle(Path(tmpdirname), num_server)
+
 def check_rpc_get_degree_shuffle(tmpdir, num_server):
     ip_config = open("rpc_ip_config.txt", "w")
     for _ in range(num_server):
@@ -179,6 +189,16 @@ def check_rpc_get_degree_shuffle(tmpdir, num_server):
     assert F.array_equal(g.in_degrees(orig_nid), all_in_degs)
     assert F.array_equal(g.out_degrees(orig_nid[nids]), out_degs)
     assert F.array_equal(g.out_degrees(orig_nid), all_out_degs)
+
+# Wait non shared memory graph store
+@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
+@unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
+@pytest.mark.parametrize("num_server", [1, 2])
+def test_rpc_get_degree_shuffle(num_server):
+    import tempfile
+    os.environ['DGL_DIST_MODE'] = 'distributed'
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        check_rpc_get_degree_shuffle(Path(tmpdirname), num_server)
 
 #@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 #@unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
