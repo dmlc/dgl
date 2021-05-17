@@ -182,6 +182,17 @@ def config():
 
 def run(proc_id, n_gpus, args, devices, dataset):
     dev_id = devices[proc_id]
+    if n_gpus > 1:
+        dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
+            master_ip='127.0.0.1', master_port='12345')
+        world_size = n_gpus
+        th.distributed.init_process_group(backend="nccl",
+                                          init_method=dist_init_method,
+                                          world_size=world_size,
+                                          rank=dev_id)
+    if n_gpus > 0:
+        th.cuda.set_device(dev_id)
+
     train_labels = dataset.train_labels
     train_truths = dataset.train_truths
     num_edges = train_truths.shape[0]
@@ -196,6 +207,7 @@ def run(proc_id, n_gpus, args, devices, dataset):
             dataset.train_enc_graph.number_of_edges(etype=to_etype_name(k)))
          for k in dataset.possible_rating_values},
         sampler,
+        use_ddp=n_gpus > 1,
         batch_size=args.minibatch_size,
         shuffle=True,
         drop_last=False)
@@ -217,17 +229,6 @@ def run(proc_id, n_gpus, args, devices, dataset):
             batch_size=args.minibatch_size,
             shuffle=False,
             drop_last=False)
-
-    if n_gpus > 1:
-        dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
-            master_ip='127.0.0.1', master_port='12345')
-        world_size = n_gpus
-        th.distributed.init_process_group(backend="nccl",
-                                          init_method=dist_init_method,
-                                          world_size=world_size,
-                                          rank=dev_id)
-    if n_gpus > 0:
-        th.cuda.set_device(dev_id)
 
     nd_possible_rating_values = \
         th.FloatTensor(dataset.possible_rating_values)
@@ -254,6 +255,8 @@ def run(proc_id, n_gpus, args, devices, dataset):
     iter_idx = 1
 
     for epoch in range(1, args.train_max_epoch):
+        if n_gpus > 1:
+            dataloader.set_epoch(epoch)
         if epoch > 1:
             t0 = time.time()
         net.train()
@@ -340,7 +343,8 @@ def run(proc_id, n_gpus, args, devices, dataset):
             if n_gpus > 1:
                 th.distributed.barrier()
 
-        print(logging_str)
+        if proc_id == 0:
+            print(logging_str)
     if proc_id == 0:
         print('Best epoch Idx={}, Best Valid RMSE={:.4f}, Best Test RMSE={:.4f}'.format(
               best_epoch, best_valid_rmse, best_test_rmse))
