@@ -149,6 +149,13 @@ TWIRLSUnfoldingAndAttention
 .. autoclass:: dgl.nn.pytorch.conv.TWIRLSUnfoldingAndAttention
     :members: forward
     :show-inheritance:
+    
+GCN2Conv
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.conv.GCN2Conv
+    :members: forward
+    :show-inheritance:
 
 .. _apinn-pytorch-dense-conv:
 
