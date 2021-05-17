@@ -27,7 +27,7 @@ from dgl import function as fn
 def _lbeta(alpha, axis):
     return torch.lgamma(alpha).sum(axis) - torch.lgamma(alpha.sum(axis))
 
-
+# Taken from scikit-learn.  Worked better than uniform.
 _sklearn_random_init = torch.distributions.gamma.Gamma(100, 0.01)
 
 
