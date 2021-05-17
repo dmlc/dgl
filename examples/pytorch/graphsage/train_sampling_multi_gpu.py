@@ -85,9 +85,7 @@ def run(proc_id, n_gpus, args, devices, data):
     train_nid = train_mask.nonzero().squeeze()
     val_nid = val_mask.nonzero().squeeze()
     test_nid = test_mask.nonzero().squeeze()
-
-    # Split train_nid
-    train_nid = th.split(train_nid, math.ceil(len(train_nid) / n_gpus))[proc_id]
+    train_nid = train_nid[:n_gpus * args.batch_size + 1]
 
     # Create PyTorch DataLoader for constructing blocks
     sampler = dgl.dataloading.MultiLayerNeighborSampler(
@@ -96,6 +94,7 @@ def run(proc_id, n_gpus, args, devices, data):
         train_g,
         train_nid,
         sampler,
+        use_ddp=n_gpus > 1,
         batch_size=args.batch_size,
         shuffle=True,
         drop_last=False,
@@ -113,6 +112,8 @@ def run(proc_id, n_gpus, args, devices, data):
     avg = 0
     iter_tput = []
     for epoch in range(args.num_epochs):
+        if n_gpus > 1:
+            dataloader.set_epoch(epoch)
         tic = time.time()
 
         # Loop over the dataloader to sample the computation dependency graph as a list of
