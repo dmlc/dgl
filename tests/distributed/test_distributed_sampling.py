@@ -2,7 +2,7 @@ import dgl
 import unittest
 import os
 from dgl.data import CitationGraphDataset
-from dgl.distributed import sample_neighbors, find_edges
+from dgl.distributed import sample_neighbors
 from dgl.distributed import partition_graph, load_partition, load_partition_book
 import sys
 import multiprocessing as mp
@@ -43,12 +43,27 @@ def start_find_edges_client(rank, tmpdir, disable_shared_mem, eids):
     dgl.distributed.initialize("rpc_ip_config.txt")
     dist_graph = DistGraph("test_find_edges", gpb=gpb)
     try:
-        u, v = find_edges(dist_graph, eids)
+        u, v = dist_graph.find_edges(eids)
     except Exception as e:
         print(e)
         u, v = None, None
     dgl.distributed.exit_client()
     return u, v
+
+def start_get_degrees_client(rank, tmpdir, disable_shared_mem, nids):
+    gpb = None
+    if disable_shared_mem:
+        _, _, _, gpb, _, _, _ = load_partition(tmpdir / 'test_get_degrees.json', rank)
+    dgl.distributed.initialize("rpc_ip_config.txt", 1)
+    dist_graph = DistGraph("test_get_degrees", gpb=gpb)
+    try:
+        in_deg = dist_graph.in_degrees(nids)
+        out_deg = dist_graph.out_degrees(nids)
+    except Exception as e:
+        print(e)
+        in_deg, out_deg = None, None
+    dgl.distributed.exit_client()
+    return in_deg, out_deg
 
 def check_rpc_sampling(tmpdir, num_server):
     ip_config = open("rpc_ip_config.txt", "w")
@@ -107,8 +122,8 @@ def check_rpc_find_edges_shuffle(tmpdir, num_server):
         time.sleep(1)
         pserver_list.append(p)
 
-    orig_nid = F.zeros((g.number_of_nodes(),), dtype=F.int64)
-    orig_eid = F.zeros((g.number_of_edges(),), dtype=F.int64)
+    orig_nid = F.zeros((g.number_of_nodes(),), dtype=F.int64, ctx=F.cpu())
+    orig_eid = F.zeros((g.number_of_edges(),), dtype=F.int64, ctx=F.cpu())
     for i in range(num_server):
         part, _, _, _, _, _, _ = load_partition(tmpdir / 'test_find_edges.json', i)
         orig_nid[part.ndata[dgl.NID]] = part.ndata['orig_id']
@@ -122,6 +137,47 @@ def check_rpc_find_edges_shuffle(tmpdir, num_server):
     dv = orig_nid[dv]
     assert F.array_equal(u, du)
     assert F.array_equal(v, dv)
+
+def check_rpc_get_degree_shuffle(tmpdir, num_server):
+    ip_config = open("rpc_ip_config.txt", "w")
+    for _ in range(num_server):
+        ip_config.write('{}\n'.format(get_local_usable_addr()))
+    ip_config.close()
+
+    g = CitationGraphDataset("cora")[0]
+    g.readonly()
+    num_parts = num_server
+
+    partition_graph(g, 'test_get_degrees', num_parts, tmpdir,
+                    num_hops=1, part_method='metis', reshuffle=True)
+
+    pserver_list = []
+    ctx = mp.get_context('spawn')
+    for i in range(num_server):
+        p = ctx.Process(target=start_server, args=(i, tmpdir, num_server > 1, 'test_get_degrees'))
+        p.start()
+        time.sleep(1)
+        pserver_list.append(p)
+
+    orig_nid = F.zeros((g.number_of_nodes(),), dtype=F.int64, ctx=F.cpu())
+    for i in range(num_server):
+        part, _, _, _, _, _, _ = load_partition(tmpdir / 'test_get_degrees.json', i)
+        orig_nid[part.ndata[dgl.NID]] = part.ndata['orig_id']
+    time.sleep(3)
+
+    nids = F.tensor(np.random.randint(g.number_of_nodes(), size=100))
+    in_degs, out_degs = start_get_degrees_client(0, tmpdir, num_server > 1, nids)
+
+    print("Done get_degree")
+    for p in pserver_list:
+        p.join()
+
+    print('check results')
+    deg = g.in_degrees(orig_nid[nids])
+    assert F.array_equal(deg, in_degs)
+    deg = g.out_degrees(orig_nid[nids])
+    print(deg, out_degs)
+    assert F.array_equal(deg, out_degs)
 
 #@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 #@unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
@@ -160,8 +216,8 @@ def check_rpc_sampling_shuffle(tmpdir, num_server):
     for p in pserver_list:
         p.join()
 
-    orig_nid = F.zeros((g.number_of_nodes(),), dtype=F.int64)
-    orig_eid = F.zeros((g.number_of_edges(),), dtype=F.int64)
+    orig_nid = F.zeros((g.number_of_nodes(),), dtype=F.int64, ctx=F.cpu())
+    orig_eid = F.zeros((g.number_of_edges(),), dtype=F.int64, ctx=F.cpu())
     for i in range(num_server):
         part, _, _, _, _, _, _ = load_partition(tmpdir / 'test_sampling.json', i)
         orig_nid[part.ndata[dgl.NID]] = part.ndata['orig_id']
@@ -366,8 +422,8 @@ def check_rpc_in_subgraph_shuffle(tmpdir, num_server):
         p.join()
 
 
-    orig_nid = F.zeros((g.number_of_nodes(),), dtype=F.int64)
-    orig_eid = F.zeros((g.number_of_edges(),), dtype=F.int64)
+    orig_nid = F.zeros((g.number_of_nodes(),), dtype=F.int64, ctx=F.cpu())
+    orig_eid = F.zeros((g.number_of_edges(),), dtype=F.int64, ctx=F.cpu())
     for i in range(num_server):
         part, _, _, _, _, _, _ = load_partition(tmpdir / 'test_in_subgraph.json', i)
         orig_nid[part.ndata[dgl.NID]] = part.ndata['orig_id']
@@ -404,6 +460,8 @@ if __name__ == "__main__":
         os.environ['DGL_DIST_MODE'] = 'distributed'
         check_rpc_sampling(Path(tmpdirname), 2)
         check_rpc_sampling(Path(tmpdirname), 1)
+        check_rpc_get_degree_shuffle(Path(tmpdirname), 1)
+        check_rpc_get_degree_shuffle(Path(tmpdirname), 2)
         check_rpc_find_edges_shuffle(Path(tmpdirname), 2)
         check_rpc_find_edges_shuffle(Path(tmpdirname), 1)
         check_rpc_in_subgraph_shuffle(Path(tmpdirname), 2)

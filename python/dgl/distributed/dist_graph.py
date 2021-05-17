@@ -9,7 +9,7 @@ import numpy as np
 from ..heterograph import DGLHeteroGraph
 from .. import heterograph_index
 from .. import backend as F
-from ..base import NID, EID, NTYPE, ETYPE
+from ..base import NID, EID, NTYPE, ETYPE, ALL, is_all
 from .kvstore import KVServer, get_kvstore
 from .._ffi.ndarray import empty_shared_mem
 from ..frame import infer_scheme
@@ -23,6 +23,8 @@ from . import role
 from .server_state import ServerState
 from .rpc_server import start_server
 from .graph_services import find_edges as dist_find_edges
+from .graph_services import out_degrees as dist_out_degrees
+from .graph_services import in_degrees as dist_in_degrees
 from .dist_tensor import DistTensor
 
 INIT_GRAPH = 800001
@@ -744,6 +746,144 @@ class DistGraph:
             else:
                 return sum([self._gpb._num_edges(etype) for etype in self.etypes])
         return self._gpb._num_edges(etype)
+
+    def out_degrees(self, u=ALL):
+        """Return the out-degree(s) of the given nodes.
+
+        It computes the out-degree(s) w.r.t. to the edges of the given edge type.
+
+        Parameters
+        ----------
+        u : node IDs
+            The node IDs. The allowed formats are:
+
+            * ``int``: A single node.
+            * Int Tensor: Each element is a node ID. The tensor must have the same device type
+              and ID data type as the graph's.
+            * iterable[int]: Each element is a node ID.
+
+            If not given, return the in-degrees of all the nodes.
+        etype : str or (str, str, str), optional
+            The type names of the edges. The allowed type name formats are:
+
+            * ``(str, str, str)`` for source node type, edge type and destination node type.
+            * or one ``str`` edge type name if the name can uniquely identify a
+              triplet format in the graph.
+
+            Can be omitted if the graph has only one type of edges.
+
+        Returns
+        -------
+        int or Tensor
+            The out-degree(s) of the node(s) in a Tensor. The i-th element is the out-degree
+            of the i-th input node. If :attr:`v` is an ``int``, return an ``int`` too.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Create a homogeneous graph.
+
+        >>> g = dgl.graph((torch.tensor([0, 0, 1, 1]), torch.tensor([1, 1, 2, 3])))
+
+        Query for all nodes.
+
+        >>> g.out_degrees()
+        tensor([2, 2, 0, 0])
+
+        Query for nodes 1 and 2.
+
+        >>> g.out_degrees(torch.tensor([1, 2]))
+        tensor([2, 0])
+
+        For a graph of multiple edge types, it is required to specify the edge type in query.
+
+        >>> hg = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
+        ... })
+        >>> hg.out_degrees(torch.tensor([1, 0]), etype='follows')
+        tensor([1, 1])
+
+        See Also
+        --------
+        in_degrees
+        """
+        if is_all(u):
+            u = F.arange(self.number_of_nodes())
+        return dist_out_degrees(self, u)
+
+    def in_degrees(self, v=ALL):
+        """Return the in-degree(s) of the given nodes.
+
+        It computes the in-degree(s) w.r.t. to the edges of the given edge type.
+
+        Parameters
+        ----------
+        v : node IDs
+            The node IDs. The allowed formats are:
+
+            * ``int``: A single node.
+            * Int Tensor: Each element is a node ID. The tensor must have the same device type
+              and ID data type as the graph's.
+            * iterable[int]: Each element is a node ID.
+
+            If not given, return the in-degrees of all the nodes.
+        etype : str or (str, str, str), optional
+            The type name of the edges. The allowed type name formats are:
+
+            * ``(str, str, str)`` for source node type, edge type and destination node type.
+            * or one ``str`` edge type name if the name can uniquely identify a
+              triplet format in the graph.
+
+            Can be omitted if the graph has only one type of edges.
+
+        Returns
+        -------
+        int or Tensor
+            The in-degree(s) of the node(s) in a Tensor. The i-th element is the in-degree
+            of the i-th input node. If :attr:`v` is an ``int``, return an ``int`` too.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Create a homogeneous graph.
+
+        >>> g = dgl.graph((torch.tensor([0, 0, 1, 1]), torch.tensor([1, 1, 2, 3])))
+
+        Query for all nodes.
+
+        >>> g.in_degrees()
+        tensor([0, 2, 1, 1])
+
+        Query for nodes 1 and 2.
+
+        >>> g.in_degrees(torch.tensor([1, 2]))
+        tensor([2, 1])
+
+        For a graph of multiple edge types, it is required to specify the edge type in query.
+
+        >>> hg = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+        ...     ('user', 'plays', 'game'): (torch.tensor([3, 4]), torch.tensor([5, 6]))
+        ... })
+        >>> hg.in_degrees(torch.tensor([1, 0]), etype='follows')
+        tensor([1, 0])
+
+        See Also
+        --------
+        out_degrees
+        """
+        if is_all(v):
+            v = F.arange(self.number_of_nodes())
+        return dist_in_degrees(self, v)
 
     def node_attr_schemes(self):
         """Return the node feature schemes.
