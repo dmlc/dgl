@@ -82,7 +82,7 @@ def _update_all(G, ntype, prior, step_size, return_obj=False):
 
 
 class LatentDirichletAllocation:
-    """LDA model that wors with a HeteroGraph with doc/word node types.
+    """LDA model that works with a HeteroGraph with doc/word node types.
     The model alters the attributes of G arbitrarily,
     but always load word_z if needed.
     This is inspired by [1] and its corresponding scikit-learn implementation.
