@@ -137,13 +137,10 @@ pipeline {
               } else {
                 pullRequest.comment("Start the Regression test. View at ${RUN_DISPLAY_URL}")
               }
-              def git_url =  sh (
-                    script: 'git remote -v | grep origin | head -1',
-                    returnStdout: true
-                ).trim().split(' ')[1]
+              def prNumber = env.BRANCH_NAME.replace('PR-', '')
               dir('benchmarks/scripts') {
                 sh('python3 -m pip install boto3')
-                sh("PYTHONUNBUFFERED=1 GIT_URL=${git_url} GIT_BRANCH=${env.CHANGE_BRANCH} python3 run_reg_test.py --data-folder ${env.GIT_COMMIT}_${instance_type} --run-cmd '${comment}'")
+                sh("PYTHONUNBUFFERED=1 GIT_PR_ID=${prNumber} GIT_URL=${env.GIT_URL} GIT_BRANCH=${env.CHANGE_BRANCH} python3 run_reg_test.py --data-folder ${env.GIT_COMMIT}_${instance_type} --run-cmd '${comment}'")
               }
               pullRequest.comment("Finished the Regression test. Result table is at https://dgl-asv-data.s3-us-west-2.amazonaws.com/${env.GIT_COMMIT}_${instance_type}/results/result.csv. Jenkins job link is ${RUN_DISPLAY_URL}. ")
               currentBuild.result = 'SUCCESS'
