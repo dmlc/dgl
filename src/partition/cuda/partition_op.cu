@@ -43,7 +43,18 @@ __global__ void _MapProcByMaskRemainder(
   }
 }
 
+template<typename IdType>
+__global__ void _MapLocalIndexByRemainder(
+    const IdType * const in,
+    IdType * const out,
+    const int64_t num_items,
+    const int comm_size) {
+  const int64_t idx = threadIdx.x+blockDim.x*blockIdx.x;
 
+  if (idx < num_items) {
+    out[idx] = in[idx] / comm_size;
+  }
+}
 
 template <DLDeviceType XPU, typename IdType>
 std::pair<IdArray, NDArray>
@@ -177,6 +188,43 @@ GeneratePermutationFromRemainder<kDLGPU, int64_t>(
         int64_t array_size,
         int num_parts,
         IdArray in_idx);
+
+
+template <DLDeviceType XPU, typename IdType>
+IdArray MapToLocalFromRemainder(
+    const int num_parts,
+    IdArray global_idx)
+{
+  const auto& ctx = global_idx->ctx;
+  IdArray local_idx = aten::NewIdArray(global_idx->shape[0], ctx,
+      sizeof(IdType)*8);
+
+  const dim3 block(128);
+  const dim3 grid((global_idx->shape[0] +block.x-1)/block.x);
+  
+  CUDA_KERNEL_CALL(
+      _MapLocalIndexByRemainder,
+      grid,
+      block,
+      0, 
+      CUDAThreadEntry::ThreadLocal()->stream,
+      static_cast<const IdType*>(global_idx->data), 
+      static_cast<IdType*>(local_idx->data),
+      global_idx->shape[0],
+      num_parts);
+
+  return local_idx;
+}
+
+template IdArray
+MapToLocalFromRemainder<kDLGPU, int32_t>(
+        int num_parts,
+        IdArray in_idx);
+template IdArray
+MapToLocalFromRemainder<kDLGPU, int64_t>(
+        int num_parts,
+        IdArray in_idx);
+
 
 }  // namespace impl
 }  // namespace partition

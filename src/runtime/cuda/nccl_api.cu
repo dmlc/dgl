@@ -74,31 +74,6 @@ template<> ncclDataType_t NCCLType<double>() {
 }
 
 
-template<typename IdType> __global__ void _MapProcByRemainder(
-    const IdType * const index,
-    const int64_t num_index,
-    const int64_t num_proc,
-    IdType * const proc_id) {
-  const int64_t idx = blockDim.x*static_cast<int64_t>(blockIdx.x)+threadIdx.x;
-
-  if (idx < num_index) {
-    proc_id[idx] = index[idx] % num_proc;
-  }
-}
-
-template<typename IdType>
-__global__ void _MapProcByMaskRemainder(
-    const IdType * const index,
-    const int64_t num_index,
-    const IdType mask,
-    IdType * const proc_id) {
-  const int64_t idx = blockDim.x*static_cast<int64_t>(blockIdx.x)+threadIdx.x;
-
-  if (idx < num_index) {
-    proc_id[idx] = index[idx] & mask;
-  }
-}
-
 template<typename IdType, typename DType>
 __global__ void _DualPermKernel(
     const IdType * const in_idx,
@@ -131,18 +106,6 @@ __global__ void _DualPermKernel(
       const IdType perm_idx = perm[tidx];
       out_value[tidx] = in_value[perm_idx];
     }
-  }
-}
-
-template<typename IdType>
-__global__ void _ConvertToLocalByRemainder(
-    IdType * const items,
-    const int64_t num_items,
-    const int comm_size) {
-  const int64_t idx = threadIdx.x+blockDim.x*blockIdx.x;
-
-  if (idx < num_items) {
-    items[idx] = items[idx] / comm_size;
   }
 }
 
@@ -483,21 +446,19 @@ NDArray SparsePull(
   cudaEventDestroy(d2h);
 
   // gather requested indexes
-  Workspace<IdType> recv_idx(device, ctx, response_prefix_host.back());
+  IdArray recv_idx = aten::NewIdArray(
+      response_prefix_host.back(), ctx, sizeof(IdType)*8);
   comm->AllToAllV(
       send_idx.get(),
       request_prefix_host.data(),
-      recv_idx.get(),
+      static_cast<IdType*>(recv_idx->data),
       response_prefix_host.data(),
       stream);
   send_idx.free();
 
   // convert requested indices to local indices depending on partition
   if (response_prefix_host.back() > 0) {
-    const dim3 block(128);
-    const dim3 grid((response_prefix_host.back()+block.x-1)/block.x);
-    _ConvertToLocalByRemainder<<<grid, block, 0, stream>>>(
-        recv_idx.get(), response_prefix_host.back(), comm_size);
+    recv_idx = part->MapToLocal(recv_idx);
   }
 
   // and then index select them into place
@@ -514,12 +475,11 @@ NDArray SparsePull(
     aten::impl::IndexSelectMultiKernel<<<grid, block, 0, stream>>>(
         static_cast<const DType*>(local_tensor->data),
         num_feat,
-        recv_idx.get(),
+        static_cast<IdType*>(recv_idx->data),
         response_prefix_host.back(),
         filled_response_value.get());
     CUDA_CALL(cudaGetLastError());
   }
-  recv_idx.free();
 
   // we will collect recieved values in this array
   std::vector<int64_t> value_shape(local_tensor->ndim, 0);

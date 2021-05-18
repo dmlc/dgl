@@ -60,6 +60,26 @@ class RemainderPartition : public NDArrayPartition {
     // should be unreachable
     return std::pair<IdArray, NDArray>{};
   }
+
+  IdArray MapToLocal(
+      IdArray in_idx) const override {
+
+    auto ctx = in_idx->ctx;
+#ifdef DGL_USE_CUDA
+    if (ctx.device_type == kDLGPU) {
+      ATEN_ID_TYPE_SWITCH(in_idx->dtype, IdType, {
+        return impl::MapToLocalFromRemainder<kDLGPU, IdType>(
+            NumParts(), in_idx);
+      });
+    }
+#endif
+
+    LOG(FATAL) << "Remainder based partitioning for the CPU is not yet "
+        "implemented.";
+    // should be unreachable
+    return IdArray{};
+
+  }
 };
 
 NDArrayPartitionRef CreatePartitionRemainderBased(

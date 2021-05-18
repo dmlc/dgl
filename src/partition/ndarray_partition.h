@@ -51,7 +51,18 @@ class NDArrayPartition : public runtime::Object {
    */
   virtual std::pair<IdArray, NDArray>
   GeneratePermutation(
-      const IdArray in_idx) const = 0;
+      IdArray in_idx) const = 0;
+
+  /**
+   * @brief Generate the local indices (the numbering within each processor)
+   * from a set of global indices.
+   *
+   * @param in_idx The global indices.
+   *
+   * @return The local indices.
+   */
+  virtual IdArray MapToLocal(
+      IdArray in_idx) const = 0;
 
   /**
    * @brief Get the first dimension of the partitioned array.
