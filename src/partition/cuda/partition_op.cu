@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2021 by Contributors
  * \file ndarray_partition.h
- * \brief Operations on partition implemented in CUDA. 
+ * \brief Operations on partition implemented in CUDA.
  */
 
 #include "../partition_op.h"
@@ -43,6 +43,88 @@ __global__ void _MapProcByMaskRemainder(
 }
 
 
+template<typename T>
+class Workspace {
+ public:
+  Workspace(DeviceAPI* device, DGLContext ctx, const size_t size) :
+      device_(device),
+      ctx_(ctx),
+      ptr_(static_cast<T*>(device_->AllocWorkspace(ctx_, sizeof(T)*size))) {
+  }
+
+  ~Workspace() {
+    if (*this) {
+      free();
+    }
+  }
+
+  operator bool() const {
+    return ptr_ != nullptr;
+  }
+
+  T * get() {
+    assert(*this);
+    return ptr_;
+  }
+
+  T const * get() const {
+    assert(*this);
+    return ptr_;
+  }
+
+  void free() {
+    assert(*this);
+    device_->FreeWorkspace(ctx_, ptr_);
+    ptr_ = nullptr;
+  }
+
+ private:
+  DeviceAPI* device_;
+  DGLContext ctx_;
+  T * ptr_;
+};
+
+template<>
+class Workspace<void> {
+ public:
+  Workspace(DeviceAPI* device, DGLContext ctx, const size_t size) :
+      device_(device),
+      ctx_(ctx),
+      ptr_(static_cast<void*>(device_->AllocWorkspace(ctx_, size))) {
+  }
+
+  ~Workspace() {
+    if (*this) {
+      free();
+    }
+  }
+
+  operator bool() const {
+    return ptr_ != nullptr;
+  }
+
+  void * get() {
+    assert(*this);
+    return ptr_;
+  }
+
+  void const * get() const {
+    assert(*this);
+    return ptr_;
+  }
+
+  void free() {
+    assert(*this);
+    device_->FreeWorkspace(ctx_, ptr_);
+    ptr_ = nullptr;
+  }
+
+ private:
+  DeviceAPI* device_;
+  DGLContext ctx_;
+  void * ptr_;
+};
+
 
 template <DLDeviceType XPU, typename IdType>
 std::pair<IdArray, NDArray>
@@ -78,8 +160,7 @@ GeneratePermutationFromRemainder(
       static_cast<int64_t>(std::ceil(std::log2(num_parts)));
 
   // First, generate a mapping of indexes to processors
-  IdType * proc_id_in = static_cast<IdType*>(
-      device->AllocWorkspace(ctx, sizeof(IdType)*num_in));
+  Workspace<IdType> proc_id_in(device, ctx, num_in);
   {
     const dim3 block(256);
     const dim3 grid((num_in+block.x-1)/block.x);
@@ -90,7 +171,7 @@ GeneratePermutationFromRemainder(
           static_cast<const IdType*>(in_idx->data),
           num_in,
           num_parts,
-          proc_id_in);
+          proc_id_in.get());
       CUDA_CALL(cudaGetLastError());
     } else {
       // num_parts is a power of 2
@@ -98,15 +179,14 @@ GeneratePermutationFromRemainder(
           static_cast<const IdType*>(in_idx->data),
           num_in,
           static_cast<IdType>(num_parts-1),  // bit mask
-          proc_id_in);
+          proc_id_in.get());
       CUDA_CALL(cudaGetLastError());
     }
   }
 
   // then create a permutation array that groups processors together by
   // performing a radix sort
-  IdType * proc_id_out = static_cast<IdType*>(
-      device->AllocWorkspace(ctx, sizeof(IdType)*num_in));
+  Workspace<IdType> proc_id_out(device, ctx, num_in);
   result.first = aten::NewIdArray(num_in, ctx, sizeof(IdType)*8);
   IdType * perm_out = static_cast<IdType*>(result.first->data);
   {
@@ -114,16 +194,16 @@ GeneratePermutationFromRemainder(
 
     size_t sort_workspace_size;
     CUDA_CALL(cub::DeviceRadixSort::SortPairs(nullptr, sort_workspace_size,
-        proc_id_in, proc_id_out, static_cast<IdType*>(perm_in->data), perm_out,
+        proc_id_in.get(), proc_id_out.get(), static_cast<IdType*>(perm_in->data), perm_out,
         num_in, 0, part_bits));
 
-    void * sort_workspace = device->AllocWorkspace(ctx, sort_workspace_size);
-    CUDA_CALL(cub::DeviceRadixSort::SortPairs(sort_workspace, sort_workspace_size,
-        proc_id_in, proc_id_out, static_cast<IdType*>(perm_in->data), perm_out,
+    Workspace<void> sort_workspace(device, ctx, sort_workspace_size);
+    CUDA_CALL(cub::DeviceRadixSort::SortPairs(sort_workspace.get(), sort_workspace_size,
+        proc_id_in.get(), proc_id_out.get(), static_cast<IdType*>(perm_in->data), perm_out,
         num_in, 0, part_bits));
-    device->FreeWorkspace(ctx, sort_workspace);
   }
-  device->FreeWorkspace(ctx, proc_id_in);
+  // explicitly free so workspace can be re-used
+  proc_id_in.free();
 
   // perform a histogram and then prefixsum on the sorted proc_id vector
 
@@ -145,24 +225,23 @@ GeneratePermutationFromRemainder(
     CUDA_CALL(cub::DeviceHistogram::HistogramEven(
         nullptr,
         hist_workspace_size,
-        proc_id_out,
+        proc_id_out.get(),
         reinterpret_cast<AtomicCount*>(out_counts),
         num_parts+1,
         static_cast<IdType>(0),
         static_cast<IdType>(num_parts+1),
         static_cast<int>(num_in)));
 
-    void * hist_workspace = device->AllocWorkspace(ctx, hist_workspace_size);
+    Workspace<void> hist_workspace(device, ctx, hist_workspace_size);
     CUDA_CALL(cub::DeviceHistogram::HistogramEven(
-        hist_workspace,
+        hist_workspace.get(),
         hist_workspace_size,
-        proc_id_out,
+        proc_id_out.get(),
         reinterpret_cast<AtomicCount*>(out_counts),
         num_parts+1,
         static_cast<IdType>(0),
         static_cast<IdType>(num_parts+1),
         static_cast<int>(num_in)));
-    device->FreeWorkspace(ctx, hist_workspace);
   }
 
   return result;
