@@ -92,6 +92,43 @@ void SDDMMCsr(const std::string& op,
 }
 
 /*!
+ * \brief CUDA implementation of g-SDDMM on heterograph using 
+    Csr format.
+ */
+template <int XPU, typename IdType, int bits>
+void SDDMMCsrHetero(const std::string& op,
+              const BcastOff& bcast,
+              const std::vector<CSRMatrix>& vec_csr,
+              std::vector<NDArray> vec_lhs,
+              std::vector<NDArray> vec_rhs,
+              std::vector<NDArray> vec_out,
+              int lhs_target,
+              int rhs_target,
+              const std::vector<dgl_type_t> lhs_eid,
+              const std::vector<dgl_type_t> rhs_eid) {
+  int maxstrm = 16;
+  cudaStream_t stream[maxstrm];
+  for (int i = 0; i < maxstrm; i++)
+    cudaStreamCreate(&(stream[i]));
+  SWITCH_BITS(bits, DType, {
+    SWITCH_OP(op, Op, {
+      SWITCH_TARGET(lhs_target, rhs_target, LhsTarget, RhsTarget, {
+        /* Call  SDDMM for each relation type */
+        for (dgl_type_t etype = 0; etype < lhs_eid.size(); ++etype) {
+          CSRMatrix csr = vec_csr[etype];
+          NDArray lhs = vec_lhs[lhs_eid[etype]];
+          NDArray rhs = vec_rhs[rhs_eid[etype]];
+          NDArray out = vec_out[etype];
+          cuda::SDDMMCsrHetero<IdType, DType, Op, LhsTarget, RhsTarget>(
+            bcast, csr, lhs, rhs, out, stream[etype]);
+        }
+      });
+    });
+  });
+}
+
+
+/*!
  * \brief CUDA implementation of g-SDDMM on Coo format.
  */
 template <int XPU, typename IdType, int bits>
@@ -136,6 +173,50 @@ template void SDDMMCsr<kDLGPU, int64_t, 64>(
     const std::string& op, const BcastOff& bcast, const CSRMatrix& csr,
     NDArray lhs, NDArray rhs, NDArray out,
     int lhs_target, int rhs_target);
+
+template void SDDMMCsrHetero<kDLGPU, int32_t, 16>(
+    const std::string& op, const BcastOff& bcast, 
+    const std::vector<CSRMatrix>& vec_csr,
+    std::vector<NDArray>  lhs, std::vector<NDArray> rhs, 
+    std::vector<NDArray> out, int lhs_target, int rhs_target, 
+    const std::vector<dgl_type_t> in_eid, 
+    const std::vector<dgl_type_t> out_eid);
+template void SDDMMCsrHetero<kDLGPU, int64_t, 16>(
+    const std::string& op, const BcastOff& bcast, 
+    const std::vector<CSRMatrix>& vec_csr,
+    std::vector<NDArray>  lhs, std::vector<NDArray> rhs, 
+    std::vector<NDArray> out, int lhs_target, int rhs_target, 
+    const std::vector<dgl_type_t> in_eid, 
+    const std::vector<dgl_type_t> out_eid);
+template void SDDMMCsrHetero<kDLGPU, int32_t, 32>(
+    const std::string& op, const BcastOff& bcast, 
+    const std::vector<CSRMatrix>& vec_csr,
+    std::vector<NDArray>  lhs, std::vector<NDArray> rhs, 
+    std::vector<NDArray> out, int lhs_target, int rhs_target, 
+    const std::vector<dgl_type_t> in_eid, 
+    const std::vector<dgl_type_t> out_eid);
+template void SDDMMCsrHetero<kDLGPU, int64_t, 32>(
+    const std::string& op, const BcastOff& bcast, 
+    const std::vector<CSRMatrix>& vec_csr,
+    std::vector<NDArray>  lhs, std::vector<NDArray> rhs, 
+    std::vector<NDArray> out, int lhs_target, int rhs_target, 
+    const std::vector<dgl_type_t> in_eid, 
+    const std::vector<dgl_type_t> out_eid);
+template void SDDMMCsrHetero<kDLGPU, int32_t, 64>(
+    const std::string& op, const BcastOff& bcast, 
+    const std::vector<CSRMatrix>& vec_csr,
+    std::vector<NDArray>  lhs, std::vector<NDArray> rhs, 
+    std::vector<NDArray> out, int lhs_target, int rhs_target, 
+    const std::vector<dgl_type_t> in_eid, 
+    const std::vector<dgl_type_t> out_eid);
+template void SDDMMCsrHetero<kDLGPU, int64_t, 64>(
+    const std::string& op, const BcastOff& bcast, 
+    const std::vector<CSRMatrix>& vec_csr,
+    std::vector<NDArray>  lhs, std::vector<NDArray> rhs, 
+    std::vector<NDArray> out, int lhs_target, int rhs_target, 
+    const std::vector<dgl_type_t> in_eid, 
+    const std::vector<dgl_type_t> out_eid);
+
 
 template void SDDMMCoo<kDLGPU, int32_t, 16>(
     const std::string& op, const BcastOff& bcast, const COOMatrix& coo,
