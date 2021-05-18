@@ -51,7 +51,8 @@ class Communicator(object):
             unique_id : NCCLUniqueId
                 The unique id of the root process (rank=0).
         """
-        assert rank < size
+        assert rank < size, "The rank of a process must be less than the " \
+            "size of the communicator."
         self._handle = _CAPI_DGLNCCLCreateComm(size, rank, unique_id.get())
         self._rank = rank
         self._size = size
@@ -62,9 +63,9 @@ class Communicator(object):
 
             Parameters
             ----------
-            idx : IdArray
+            idx : tensor
                 The 1D set of indices to send to other processors.
-            value : NDArray
+            value : tensor
                 The multi-dimension set of values to send to other processors.
                 The 0th dimension must match that of `idx`.
             partition : NDArrayPartition
@@ -73,9 +74,9 @@ class Communicator(object):
 
             Returns
             -------
-            IdArray
-                The set of recieved indices.
-            NDArray
+            tensor
+                The 1D tensor of the recieved indices.
+            tensor
                 The set of recieved values.
 
         """
@@ -103,7 +104,7 @@ class Communicator(object):
 
             Returns
             -------
-            NDArray
+            tensor
                 The set of recieved values, corresponding to `req_idx`.
 
         """
