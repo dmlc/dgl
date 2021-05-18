@@ -750,7 +750,7 @@ class DistGraph:
     def out_degrees(self, u=ALL):
         """Return the out-degree(s) of the given nodes.
 
-        It computes the out-degree(s) w.r.t. to the edges of the given edge type.
+        It computes the out-degree(s).
         It does not support heterogeneous graphs yet.
 
         Parameters
@@ -799,7 +799,7 @@ class DistGraph:
     def in_degrees(self, v=ALL):
         """Return the in-degree(s) of the given nodes.
 
-        It computes the in-degree(s) w.r.t. to the edges of the given edge type.
+        It computes the in-degree(s).
         It does not support heterogeneous graphs yet.
 
         Parameters
