@@ -63,7 +63,6 @@ class RemainderPartition : public NDArrayPartition {
 
   IdArray MapToLocal(
       IdArray in_idx) const override {
-
     auto ctx = in_idx->ctx;
 #ifdef DGL_USE_CUDA
     if (ctx.device_type == kDLGPU) {
@@ -78,7 +77,6 @@ class RemainderPartition : public NDArrayPartition {
         "implemented.";
     // should be unreachable
     return IdArray{};
-
   }
 };
 

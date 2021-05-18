@@ -99,4 +99,4 @@ class Workspace<void> {
 }  // namespace runtime
 }  // namespace dgl
 
-#endif
+#endif  // DGL_RUNTIME_WORKSPACE_H_

@@ -180,16 +180,19 @@ std::pair<IdArray, NDArray> SparsePush(
     IdArray in_idx,
     NDArray in_value,
     NDArrayPartitionRef part) {
-  CHECK_EQ(in_idx->shape[0], in_value->shape[0]);
+  CHECK_EQ(in_idx->shape[0], in_value->shape[0]) <<
+      "Leading dimension of indices (" << in_idx->shape[0] << ") must match "
+      "leading dimension of values (" << in_value->shape[0] << ").";
 
   const auto& ctx = in_idx->ctx;
-  CHECK_EQ(ctx, in_value->ctx);
+  CHECK_EQ(ctx, in_value->ctx) << "Indices and values must be on the same "
+      "device";
   auto device = DeviceAPI::Get(ctx);
 
   // TODO(dlasalle): Get the stream from the device context.
   cudaStream_t stream = 0;
 
-  CHECK_EQ(in_idx->ndim, 1);
+  CHECK_EQ(in_idx->ndim, 1) << "Indices must be 1-dimensional";
 
   const int64_t num_in = in_idx->shape[0];
   int64_t num_feat = 1;
@@ -237,7 +240,7 @@ std::pair<IdArray, NDArray> SparsePush(
 
     Workspace<void> prefix_workspace(device, ctx, prefix_workspace_size);
     CUDA_CALL(cub::DeviceScan::ExclusiveSum(prefix_workspace.get(),
-        prefix_workspace_size, send_sum, send_prefix.get(), 
+        prefix_workspace_size, send_sum, send_prefix.get(),
         comm_size+1, stream));
   }
 
@@ -254,7 +257,9 @@ std::pair<IdArray, NDArray> SparsePush(
       stream);
   send_prefix.free();
 
-  CHECK_EQ(send_prefix_host.back(), num_in);
+  CHECK_EQ(send_prefix_host.back(), num_in) << "Internal Error: "
+      "send_prefix_host.back() = " << send_prefix_host.back() <<
+      ", and num_in = " << num_in;
 
   // communicate the amount to send
   Workspace<int64_t> recv_sum(device, ctx, comm_size+1);
@@ -328,13 +333,14 @@ NDArray SparsePull(
     NDArray local_tensor,
     NDArrayPartitionRef part) {
   const auto& ctx = req_idx->ctx;
-  CHECK_EQ(ctx, local_tensor->ctx);
+  CHECK_EQ(ctx, local_tensor->ctx) << "The request indices and set of local "
+      "values must be on the same device";
   auto device = DeviceAPI::Get(ctx);
 
-  // TODO(dlasalle): Get the stream from the device context.
-  cudaStream_t stream = 0;
+  cudaStream_t stream = CUDAThreadEntry::ThreadLocal()->stream;
 
-  CHECK_EQ(req_idx->ndim, 1);
+  CHECK_EQ(req_idx->ndim, 1) << "The tensor of requested indices must be of "
+      "dimension one.";
 
   const int64_t num_in = req_idx->shape[0];
   int64_t num_feat = 1;
@@ -404,7 +410,9 @@ NDArray SparsePull(
       DGLType{kDLInt, sizeof(*request_prefix.get())*8, 1},
       stream);
   request_prefix.free();
-  CHECK_EQ(request_prefix_host.back(), num_in);
+  CHECK_EQ(request_prefix_host.back(), num_in) << "Internal Error: "
+      "request_prefix_host.back() = " << request_prefix_host.back() <<
+      ", num_in = " << num_in;
 
   // communicate the amount requested
   Workspace<int64_t> recv_sum(device, ctx, comm_size+1);
@@ -540,8 +548,10 @@ NCCLCommunicator::NCCLCommunicator(
   comm_(),
   size_(size),
   rank_(rank) {
-  CHECK_LT(rank, size);
-  CHECK_GE(rank, 0);
+  CHECK_LT(rank, size) << "The rank (" << rank << ") must be smaller than "
+      "the size of the communicator (" << size << ").";
+  CHECK_GE(rank, 0) << "The rank (" << rank << ") must be greater than or "
+      "equal to 0.";
 
   NCCL_CALL(ncclCommInitRank(&comm_, size_, id, rank_));
 }

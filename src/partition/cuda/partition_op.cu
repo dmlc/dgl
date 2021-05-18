@@ -66,10 +66,12 @@ GeneratePermutationFromRemainder(
 
   const auto& ctx = in_idx->ctx;
   auto device = DeviceAPI::Get(ctx);
+  cudaStream_t stream = CUDAThreadEntry::ThreadLocal()->stream;
 
   const int64_t num_in = in_idx->shape[0];
 
-  CHECK_GE(num_parts, 1);
+  CHECK_GE(num_parts, 1) << "The number of partitions (" << num_parts <<
+      ") must be at least 1.";
   if (num_parts == 1) {
     // no permutation
     result.first = aten::Range(0, num_in, sizeof(IdType)*8, ctx);
@@ -97,20 +99,18 @@ GeneratePermutationFromRemainder(
 
     if (num_parts < (1 << part_bits)) {
       // num_parts is not a power of 2
-      _MapProcByRemainder<<<grid, block>>>(
+      CUDA_KERNEL_CALL(_MapProcByRemainder, grid, block, 0, stream,
           static_cast<const IdType*>(in_idx->data),
           num_in,
           num_parts,
           proc_id_in.get());
-      CUDA_CALL(cudaGetLastError());
     } else {
       // num_parts is a power of 2
-      _MapProcByMaskRemainder<<<grid, block>>>(
+      CUDA_KERNEL_CALL(_MapProcByMaskRemainder, grid, block, 0, stream,
           static_cast<const IdType*>(in_idx->data),
           num_in,
           static_cast<IdType>(num_parts-1),  // bit mask
           proc_id_in.get());
-      CUDA_CALL(cudaGetLastError());
     }
   }
 
@@ -125,12 +125,12 @@ GeneratePermutationFromRemainder(
     size_t sort_workspace_size;
     CUDA_CALL(cub::DeviceRadixSort::SortPairs(nullptr, sort_workspace_size,
         proc_id_in.get(), proc_id_out.get(), static_cast<IdType*>(perm_in->data), perm_out,
-        num_in, 0, part_bits));
+        num_in, 0, part_bits, stream));
 
     Workspace<void> sort_workspace(device, ctx, sort_workspace_size);
     CUDA_CALL(cub::DeviceRadixSort::SortPairs(sort_workspace.get(), sort_workspace_size,
         proc_id_in.get(), proc_id_out.get(), static_cast<IdType*>(perm_in->data), perm_out,
-        num_in, 0, part_bits));
+        num_in, 0, part_bits, stream));
   }
   // explicitly free so workspace can be re-used
   proc_id_in.free();
@@ -160,7 +160,8 @@ GeneratePermutationFromRemainder(
         num_parts+1,
         static_cast<IdType>(0),
         static_cast<IdType>(num_parts+1),
-        static_cast<int>(num_in)));
+        static_cast<int>(num_in),
+        stream));
 
     Workspace<void> hist_workspace(device, ctx, hist_workspace_size);
     CUDA_CALL(cub::DeviceHistogram::HistogramEven(
@@ -171,7 +172,8 @@ GeneratePermutationFromRemainder(
         num_parts+1,
         static_cast<IdType>(0),
         static_cast<IdType>(num_parts+1),
-        static_cast<int>(num_in)));
+        static_cast<int>(num_in),
+        stream));
   }
 
   return result;
@@ -193,22 +195,23 @@ GeneratePermutationFromRemainder<kDLGPU, int64_t>(
 template <DLDeviceType XPU, typename IdType>
 IdArray MapToLocalFromRemainder(
     const int num_parts,
-    IdArray global_idx)
-{
+    IdArray global_idx) {
   const auto& ctx = global_idx->ctx;
+  cudaStream_t stream = CUDAThreadEntry::ThreadLocal()->stream;
+
   IdArray local_idx = aten::NewIdArray(global_idx->shape[0], ctx,
       sizeof(IdType)*8);
 
   const dim3 block(128);
   const dim3 grid((global_idx->shape[0] +block.x-1)/block.x);
-  
+
   CUDA_KERNEL_CALL(
       _MapLocalIndexByRemainder,
       grid,
       block,
-      0, 
-      CUDAThreadEntry::ThreadLocal()->stream,
-      static_cast<const IdType*>(global_idx->data), 
+      0,
+      stream,
+      static_cast<const IdType*>(global_idx->data),
       static_cast<IdType*>(local_idx->data),
       global_idx->shape[0],
       num_parts);
