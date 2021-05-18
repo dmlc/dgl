@@ -194,7 +194,7 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
             # contiguous edge IDs and their ID range starts with 0. In other words, we want to
             # place these edge IDs in the front of the edge list. To ensure that, we add the IDs
             # of outer edges with a large value, so we will get the sorted list as we want.
-            max_eid = F.max(induced_edges[0], 0)
+            max_eid = F.max(induced_edges[0], 0) + 1
             inner_edge = get_inner_edge(subg1, inner_node)
             eid = F.astype(induced_edges[0], F.int64) + max_eid * F.astype(inner_edge == 0, F.int64)
 
