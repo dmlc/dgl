@@ -35,8 +35,6 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
  */
 template <int XPU, typename IdType, int bits>
 void SpMMCsrHetero(const std::string& op, const std::string& reduce,
-             const BcastOff& bcast,
-             const std::vector<CSRMatrix>& csr,
              const std::vector<NDArray>& ufeat,
              const std::vector<NDArray>& efeat,
              std::vector<NDArray> out,
