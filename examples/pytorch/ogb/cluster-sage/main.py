@@ -10,8 +10,6 @@ import dgl.function as fn
 import dgl.nn.pytorch as dglnn
 import time
 import argparse
-from _thread import start_new_thread
-from functools import wraps
 from dgl.data import RedditDataset
 import tqdm
 import traceback
