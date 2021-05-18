@@ -119,6 +119,8 @@ pipeline {
         script {
               def comment = env.GITHUB_COMMENT
               def author = env.GITHUB_COMMENT_AUTHOR
+              echo("${env.GIT_URL}")
+              echo("${env}")
               if (!is_authorized(author)) {
             error('Not authorized to launch regression tests')
               }
