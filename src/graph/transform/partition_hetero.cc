@@ -98,32 +98,6 @@ HaloHeteroSubgraph GetSubgraphWithHalo(std::shared_ptr<HeteroGraph> hg,
     }
   }
 
-  if (num_hops > 0) {
-    EdgeArray out_edges = hg->OutEdges(0, nodes);
-    auto src = out_edges.src;
-    auto dst = out_edges.dst;
-    auto eid = out_edges.id;
-    auto num_edges = eid->shape[0];
-    const dgl_id_t *src_data = static_cast<dgl_id_t *>(src->data);
-    const dgl_id_t *dst_data = static_cast<dgl_id_t *>(dst->data);
-    const dgl_id_t *eid_data = static_cast<dgl_id_t *>(eid->data);
-    for (int64_t i = 0; i < num_edges; i++) {
-      // If the outer edge isn't in the partition.
-      auto it1 = orig_nodes.find(dst_data[i]);
-      if (it1 == orig_nodes.end()) {
-        edge_src.push_back(src_data[i]);
-        edge_dst.push_back(dst_data[i]);
-        edge_eid.push_back(eid_data[i]);
-      }
-      // We don't expand along the out-edges.
-      auto it = all_nodes.find(dst_data[i]);
-      if (it == all_nodes.end()) {
-        all_nodes[dst_data[i]] = false;
-        old_node_ids.push_back(dst_data[i]);
-      }
-    }
-  }
-
   // Now we need to traverse the graph with the in-edges to access nodes
   // and edges more hops away.
   for (int k = 1; k < num_hops; k++) {
@@ -151,6 +125,32 @@ HaloHeteroSubgraph GetSubgraphWithHalo(std::shared_ptr<HeteroGraph> hg,
         all_nodes[src_data[i]] = false;
         old_node_ids.push_back(src_data[i]);
         outer_nodes[k].push_back(src_data[i]);
+      }
+    }
+  }
+
+  if (num_hops > 0) {
+    EdgeArray out_edges = hg->OutEdges(0, nodes);
+    auto src = out_edges.src;
+    auto dst = out_edges.dst;
+    auto eid = out_edges.id;
+    auto num_edges = eid->shape[0];
+    const dgl_id_t *src_data = static_cast<dgl_id_t *>(src->data);
+    const dgl_id_t *dst_data = static_cast<dgl_id_t *>(dst->data);
+    const dgl_id_t *eid_data = static_cast<dgl_id_t *>(eid->data);
+    for (int64_t i = 0; i < num_edges; i++) {
+      // If the outer edge isn't in the partition.
+      auto it1 = orig_nodes.find(dst_data[i]);
+      if (it1 == orig_nodes.end()) {
+        edge_src.push_back(src_data[i]);
+        edge_dst.push_back(dst_data[i]);
+        edge_eid.push_back(eid_data[i]);
+      }
+      // We don't expand along the out-edges.
+      auto it = all_nodes.find(dst_data[i]);
+      if (it == all_nodes.end()) {
+        all_nodes[dst_data[i]] = false;
+        old_node_ids.push_back(dst_data[i]);
       }
     }
   }

@@ -252,12 +252,17 @@ def check_partition(g, part_method, reshuffle):
         assert len(gpb.partid2eids(i)) == gpb_meta[i]['num_edges']
         part_sizes.append((gpb_meta[i]['num_nodes'], gpb_meta[i]['num_edges']))
 
-        local_nid = gpb.nid2localnid(F.boolean_mask(part_g.ndata[dgl.NID], part_g.ndata['inner_node']), i)
+        nid = F.boolean_mask(part_g.ndata[dgl.NID], part_g.ndata['inner_node'])
+        local_nid = gpb.nid2localnid(nid, i)
         assert F.dtype(local_nid) in (F.int64, F.int32)
         assert np.all(F.asnumpy(local_nid) == np.arange(0, len(local_nid)))
-        local_eid = gpb.eid2localeid(F.boolean_mask(part_g.edata[dgl.EID], part_g.edata['inner_edge']), i)
+        assert np.all(F.asnumpy(part_g.ndata[dgl.NID][local_nid] == nid))
+        eid = F.boolean_mask(part_g.edata[dgl.EID], part_g.edata['inner_edge'])
+        print(part_g.edata['inner_edge'])
+        local_eid = gpb.eid2localeid(eid, i)
         assert F.dtype(local_eid) in (F.int64, F.int32)
         assert np.all(F.asnumpy(local_eid) == np.arange(0, len(local_eid)))
+        assert np.all(F.asnumpy(part_g.edata[dgl.EID][local_eid] == eid))
 
         # Check the node map.
         local_nodes = F.boolean_mask(part_g.ndata[dgl.NID], part_g.ndata['inner_node'])
