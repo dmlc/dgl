@@ -379,6 +379,15 @@ class NDArrayPartition(object):
         number of parts (e.g., i % num_parts).
     part_ranges : List
         Currently unused.
+
+    Examples
+    --------
+
+    A partition of a homgeonous graph `g`, where the vertices are
+    striped across processes can be generated via:
+    
+    >>> from dgl.partition import NDArrayPartition
+    >>> part = NDArrayPartition(g.num_nodes(), num_parts, mode='remainder' )
     """
     def __init__(self, array_size, num_parts, mode='remainder', part_ranges=None):
         assert num_parts > 0, 'Invalid "num_parts", must be > 0.'
