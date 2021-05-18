@@ -488,13 +488,26 @@ def skip_if_gpu():
         return func
     return _wrapper
 
+def _cuda_device_count(q):
+    import torch
+    q.put(torch.cuda.device_count())
+
+def get_num_gpu():
+    import multiprocessing as mp
+    q = mp.Queue()
+    p = mp.Process(target=_cuda_device_count, args=(q, ))
+    p.start()
+    p.join()
+    return q.get(block=False)
+
+GPU_COUNT = get_num_gpu()
+
 def skip_if_not_4gpu():
     """skip if DGL_BENCH_DEVICE is gpu
     """
-    gpu_count = torch.cuda.device_count()
 
     def _wrapper(func):
-        if gpu_count != 4:
+        if GPU_COUNT != 4:
             # skip if not enabled
             print("Skip {}".format(func.benchmark_name))
             func.benchmark_name = "skip_" + func.__name__
