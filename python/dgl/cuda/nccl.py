@@ -106,7 +106,7 @@ class Communicator(object):
             To perform a sparse_all_to_all_push(), a partition object must be
             provided. A partition of a homgeonous graph, where the vertices are
             striped across processes can be generated via:
-            
+
             >>> from dgl.partition import NDArrayPartition
             >>> part = NDArrayPartition(g.num_nodes(), comm.size(), mode='remainder' )
 
@@ -161,7 +161,7 @@ class Communicator(object):
             To perform a sparse_all_to_all_pull(), a partition object must be
             provided. A partition of a homgeonous graph, where the vertices are
             striped across processes can be generated via:
-            
+
             >>> from dgl.partition import NDArrayPartition
             >>> part = NDArrayPartition(g.num_nodes(), comm.size(), mode='remainder' )
 

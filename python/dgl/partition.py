@@ -385,7 +385,7 @@ class NDArrayPartition(object):
 
     A partition of a homgeonous graph `g`, where the vertices are
     striped across processes can be generated via:
-    
+
     >>> from dgl.partition import NDArrayPartition
     >>> part = NDArrayPartition(g.num_nodes(), num_parts, mode='remainder' )
     """
