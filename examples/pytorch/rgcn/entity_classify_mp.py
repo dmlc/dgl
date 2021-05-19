@@ -541,7 +541,7 @@ def main(args, devices):
     n_gpus = len(devices)
     n_cpus = mp.cpu_count()
     # cpu
-    if devices[0] == -1 and n_gpus == 1:
+    if devices[0] == -1:
         run(0, 0, n_cpus, args, ['cpu'],
             (g, node_feats, num_of_ntype, num_classes, num_rels, target_idx,
              train_idx, val_idx, test_idx, labels), None, None)
