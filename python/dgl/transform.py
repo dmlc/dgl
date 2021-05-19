@@ -59,7 +59,7 @@ def pairwise_squared_distance(x):
     return x2s + F.swapaxes(x2s, -1, -2) - 2 * x @ F.swapaxes(x, -1, -2)
 
 #pylint: disable=invalid-name
-def knn_graph(x, k, algorithm='bruteforce-blas'):
+def knn_graph(x, k, algorithm='bruteforce-blas', dist='euclidean'):
     """Construct a graph from a set of points according to k-nearest-neighbor (KNN)
     and return.
 
@@ -92,14 +92,16 @@ def knn_graph(x, k, algorithm='bruteforce-blas'):
         * 'bruteforce-blas' will first compute the distance matrix
           using BLAS matrix multiplication operation provided by
           backend frameworks. Then use topk algorithm to get
-          k-nearest neighbors. This method has the largest memory
-          overhead.
+          k-nearest neighbors. This method is fast when the point
+          set is small but has :math:`O(N^2)` memory complexity where
+          :math:`N` is the number of points.
 
         * 'bruteforce' will compute distances pair by pair and
           directly select the k-nearest neighbors during distance
           computation. This method is slower than 'bruteforce-blas'
-          but has less memory overhead since we do not need to store
-          all distances.
+          but has less memory overhead (i.e., :math:`O(Nk)` where :math:`N`
+          is the number of points, :math:`k` is the number of nearest
+          neighbors per node) since we do not need to store all distances.
 
         * 'bruteforce-sharemem' (CUDA only) is similar to 'bruteforce'
           but use shared memory in CUDA devices for buffer. This method is
@@ -111,6 +113,12 @@ def knn_graph(x, k, algorithm='bruteforce-blas'):
           point clouds)
 
         (default: 'bruteforce-blas')
+    dist : str, optional
+        The distance metric used to compute distance between points. It can be the following
+        metrics:
+        * 'euclidean': Use Euclidean distance (L2 norm) :math:`\sqrt{\sum_{i} (x_{i} - y_{i})^{2}}`.
+        * 'cosine': Use cosine distance.
+        (default: 'euclidean')
 
     Returns
     -------
@@ -153,7 +161,7 @@ def knn_graph(x, k, algorithm='bruteforce-blas'):
      tensor([0, 1, 1, 2, 3, 0, 2, 3, 4, 5, 6, 7, 4, 6, 5, 7]))
     """
     if algorithm == 'bruteforce-blas':
-        return _knn_graph_blas(x, k)
+        return _knn_graph_blas(x, k, dist=dist)
     else:
         if F.ndim(x) == 3:
             x_size = tuple(F.shape(x))
@@ -161,11 +169,11 @@ def knn_graph(x, k, algorithm='bruteforce-blas'):
             x_seg = x_size[0] * [x_size[1]]
         else:
             x_seg = [F.shape(x)[0]]
-        out = knn(x, x_seg, x, x_seg, k, algorithm=algorithm)
+        out = knn(x, x_seg, x, x_seg, k, algorithm=algorithm, dist=dist)
         row, col = out[1], out[0]
         return convert.graph((row, col))
 
-def _knn_graph_blas(x, k):
+def _knn_graph_blas(x, k, dist='euclidean'):
     """Construct a graph from a set of points according to k-nearest-neighbor (KNN).
 
     This function first compute the distance matrix using BLAS matrix multiplication
@@ -183,10 +191,22 @@ def _knn_graph_blas(x, k):
           ``x[i][j]`` corresponds to the j-th node in the i-th KNN graph.
     k : int
         The number of nearest neighbors per node.
+    dist : str, optional
+        The distance metric used to compute distance between points. It can be the following
+        metrics:
+        * 'euclidean': Use Euclidean distance (L2 norm) :math:`\sqrt{\sum_{i} (x_{i} - y_{i})^{2}}`.
+        * 'cosine': Use cosine distance.
+        (default: 'euclidean')
     """
     if F.ndim(x) == 2:
         x = F.unsqueeze(x, 0)
     n_samples, n_points, _ = F.shape(x)
+
+    # if use cosine distance, normalize input points first
+    # thus we can use euclidean distance to find knn equivalently.
+    if dist == 'cosine':
+        l2_norm = lambda v: F.sqrt(F.sum(v * v, dim=2, keepdims=True))
+        x = x / (l2_norm(x) + 1e-5)
 
     ctx = F.context(x)
     dist = pairwise_squared_distance(x)
@@ -201,7 +221,7 @@ def _knn_graph_blas(x, k):
     return convert.graph((F.reshape(src, (-1,)), F.reshape(dst, (-1,))))
 
 #pylint: disable=invalid-name
-def segmented_knn_graph(x, k, segs, algorithm='bruteforce-blas'):
+def segmented_knn_graph(x, k, segs, algorithm='bruteforce-blas', dist='euclidean'):
     """Construct multiple graphs from multiple sets of points according to
     k-nearest-neighbor (KNN) and return.
 
@@ -229,14 +249,16 @@ def segmented_knn_graph(x, k, segs, algorithm='bruteforce-blas'):
         * 'bruteforce-blas' will first compute the distance matrix
           using BLAS matrix multiplication operation provided by
           backend frameworks. Then use topk algorithm to get
-          k-nearest neighbors. This method has the largest memory
-          overhead.
+          k-nearest neighbors. This method is fast when the point
+          set is small but has :math:`O(N^2)` memory complexity where
+          :math:`N` is the number of points.
 
         * 'bruteforce' will compute distances pair by pair and
           directly select the k-nearest neighbors during distance
           computation. This method is slower than 'bruteforce-blas'
-          but has less memory overhead since we do not need to store
-          all distances.
+          but has less memory overhead (i.e., :math:`O(Nk)` where :math:`N`
+          is the number of points, :math:`k` is the number of nearest
+          neighbors per node) since we do not need to store all distances.
 
         * 'bruteforce-sharemem' (CUDA only) is similar to 'bruteforce'
           but use shared memory in CUDA devices for buffer. This method is
@@ -248,6 +270,12 @@ def segmented_knn_graph(x, k, segs, algorithm='bruteforce-blas'):
           point clouds)
 
         (default: 'bruteforce-blas')
+    dist : str, optional
+        The distance metric used to compute distance between points. It can be the following
+        metrics:
+        * 'euclidean': Use Euclidean distance (L2 norm) :math:`\sqrt{\sum_{i} (x_{i} - y_{i})^{2}}`.
+        * 'cosine': Use cosine distance.
+        (default: 'euclidean')
 
     Returns
     -------
@@ -282,13 +310,13 @@ def segmented_knn_graph(x, k, segs, algorithm='bruteforce-blas'):
      tensor([0, 1, 0, 1, 2, 2, 3, 5, 4, 6, 3, 5, 4, 6]))
     """
     if algorithm == 'bruteforce-blas':
-        return _segmented_knn_graph_blas(x, k, segs)
+        return _segmented_knn_graph_blas(x, k, segs, dist=dist)
     else:
-        out = knn(x, segs, x, segs, k, algorithm=algorithm)
+        out = knn(x, segs, x, segs, k, algorithm=algorithm, dist=dist)
         row, col = out[1], out[0]
         return convert.graph((row, col))
 
-def _segmented_knn_graph_blas(x, k, segs):
+def _segmented_knn_graph_blas(x, k, segs, dist='euclidean'):
     """Construct multiple graphs from multiple sets of points according to
     k-nearest-neighbor (KNN).
 
@@ -305,7 +333,19 @@ def _segmented_knn_graph_blas(x, k, segs):
     segs : list[int]
         Number of points in each point set. The numbers in :attr:`segs`
         must sum up to the number of rows in :attr:`x`.
+    dist : str, optional
+        The distance metric used to compute distance between points. It can be the following
+        metrics:
+        * 'euclidean': Use Euclidean distance (L2 norm) :math:`\sqrt{\sum_{i} (x_{i} - y_{i})^{2}}`.
+        * 'cosine': Use cosine distance.
+        (default: 'euclidean')
     """
+    # if use cosine distance, normalize input points first
+    # thus we can use euclidean distance to find knn equivalently.
+    if dist == 'cosine':
+        l2_norm = lambda v: F.sqrt(F.sum(v * v, dim=1, keepdims=True))
+        x = x / (l2_norm(x) + 1e-5)
+
     n_total_points, _ = F.shape(x)
     offset = np.insert(np.cumsum(segs), 0, 0)
 
@@ -349,8 +389,9 @@ def knn(x, x_segs, y, y_segs, k, algorithm='bruteforce', dist='euclidean'):
         * 'bruteforce' will compute distances pair by pair and
           directly select the k-nearest neighbors during distance
           computation. This method is slower than 'bruteforce-blas'
-          but has less memory overhead since we do not need to store
-          all distances.
+          but has less memory overhead (i.e., :math:`O(Nk)` where :math:`N`
+          is the number of points, :math:`k` is the number of nearest
+          neighbors per node) since we do not need to store all distances.
 
         * 'bruteforce-sharemem' (CUDA only) is similar to 'bruteforce'
           but use shared memory in CUDA devices for buffer. This method is

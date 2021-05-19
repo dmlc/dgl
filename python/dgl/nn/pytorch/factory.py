@@ -67,7 +67,7 @@ class KNNGraph(nn.Module):
         self.k = k
 
     #pylint: disable=invalid-name
-    def forward(self, x, algorithm='bruteforce-blas'):
+    def forward(self, x, algorithm='bruteforce-blas', dist='euclidean'):
         """
 
         Forward computation.
@@ -84,14 +84,16 @@ class KNNGraph(nn.Module):
             * 'bruteforce-blas' will first compute the distance matrix
               using BLAS matrix multiplication operation provided by
               backend frameworks. Then use topk algorithm to get
-              k-nearest neighbors. This method has the largest memory
-              overhead.
+              k-nearest neighbors. This method is fast when the point
+              set is small but has :math:`O(N^2)` memory complexity where
+              :math:`N` is the number of points.
 
             * 'bruteforce' will compute distances pair by pair and
               directly select the k-nearest neighbors during distance
               computation. This method is slower than 'bruteforce-blas'
-              but has less memory overhead since we do not need to store
-              all distances.
+              but has less memory overhead (i.e., :math:`O(Nk)` where :math:`N`
+              is the number of points, :math:`k` is the number of nearest
+              neighbors per node) since we do not need to store all distances.
 
             * 'bruteforce-sharemem' (CUDA only) is similar to 'bruteforce'
               but use shared memory in CUDA devices for buffer. This method is
@@ -103,13 +105,19 @@ class KNNGraph(nn.Module):
               point clouds)
 
             (default: 'bruteforce-blas')
+        dist : str, optional
+            The distance metric used to compute distance between points. It can be the following
+            metrics:
+            * 'euclidean': Use Euclidean distance (L2 norm) :math:`\sqrt{\sum_{i} (x_{i} - y_{i})^{2}}`.
+            * 'cosine': Use cosine distance.
+            (default: 'euclidean')
 
         Returns
         -------
         DGLGraph
             A DGLGraph without features.
         """
-        return knn_graph(x, self.k, algorithm)
+        return knn_graph(x, self.k, algorithm=algorithm, dist=dist)
 
 
 class SegmentedKNNGraph(nn.Module):
@@ -165,7 +173,7 @@ class SegmentedKNNGraph(nn.Module):
         self.k = k
 
     #pylint: disable=invalid-name
-    def forward(self, x, segs, algorithm='bruteforce-blas'):
+    def forward(self, x, segs, algorithm='bruteforce-blas', dist='euclidean'):
         r"""Forward computation.
 
         Parameters
@@ -183,14 +191,16 @@ class SegmentedKNNGraph(nn.Module):
             * 'bruteforce-blas' will first compute the distance matrix
               using BLAS matrix multiplication operation provided by
               backend frameworks. Then use topk algorithm to get
-              k-nearest neighbors. This method has the largest memory
-              overhead.
+              k-nearest neighbors. This method is fast when the point
+              set is small but has :math:`O(N^2)` memory complexity where
+              :math:`N` is the number of points.
 
             * 'bruteforce' will compute distances pair by pair and
               directly select the k-nearest neighbors during distance
               computation. This method is slower than 'bruteforce-blas'
-              but has less memory overhead since we do not need to store
-              all distances.
+              but has less memory overhead (i.e., :math:`O(Nk)` where :math:`N`
+              is the number of points, :math:`k` is the number of nearest
+              neighbors per node) since we do not need to store all distances.
 
             * 'bruteforce-sharemem' (CUDA only) is similar to 'bruteforce'
               but use shared memory in CUDA devices for buffer. This method is
@@ -202,6 +212,12 @@ class SegmentedKNNGraph(nn.Module):
               point clouds)
 
             (default: 'bruteforce-blas')
+        dist : str, optional
+            The distance metric used to compute distance between points. It can be the following
+            metrics:
+            * 'euclidean': Use Euclidean distance (L2 norm) :math:`\sqrt{\sum_{i} (x_{i} - y_{i})^{2}}`.
+            * 'cosine': Use cosine distance.
+            (default: 'euclidean')
 
         Returns
         -------
@@ -209,4 +225,4 @@ class SegmentedKNNGraph(nn.Module):
             A DGLGraph without features.
         """
 
-        return segmented_knn_graph(x, self.k, segs, algorithm)
+        return segmented_knn_graph(x, self.k, segs, algorithm=algorithm, dist=dist)
