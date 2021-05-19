@@ -60,7 +60,7 @@ def pairwise_squared_distance(x):
 
 #pylint: disable=invalid-name
 def knn_graph(x, k, algorithm='bruteforce-blas', dist='euclidean'):
-    """Construct a graph from a set of points according to k-nearest-neighbor (KNN)
+    r"""Construct a graph from a set of points according to k-nearest-neighbor (KNN)
     and return.
 
     The function transforms the coordinates/features of a point set
@@ -160,6 +160,14 @@ def knn_graph(x, k, algorithm='bruteforce-blas', dist='euclidean'):
     (tensor([0, 1, 2, 2, 2, 3, 3, 3, 4, 5, 5, 5, 6, 6, 7, 7]),
      tensor([0, 1, 1, 2, 3, 0, 2, 3, 4, 5, 6, 7, 4, 6, 5, 7]))
     """
+    # check invalid k
+    if k <= 0:
+        raise DGLError("Invalid k value. expect k > 0, got k = {}".format(k))
+
+    # check empty point set
+    if F.shape(x)[0] == 0:
+        raise DGLError("Find empty point set")
+
     if algorithm == 'bruteforce-blas':
         return _knn_graph_blas(x, k, dist=dist)
     else:
@@ -174,7 +182,7 @@ def knn_graph(x, k, algorithm='bruteforce-blas', dist='euclidean'):
         return convert.graph((row, col))
 
 def _knn_graph_blas(x, k, dist='euclidean'):
-    """Construct a graph from a set of points according to k-nearest-neighbor (KNN).
+    r"""Construct a graph from a set of points according to k-nearest-neighbor (KNN).
 
     This function first compute the distance matrix using BLAS matrix multiplication
     operation provided by backend frameworks. Then use topk algorithm to get
@@ -202,6 +210,11 @@ def _knn_graph_blas(x, k, dist='euclidean'):
         x = F.unsqueeze(x, 0)
     n_samples, n_points, _ = F.shape(x)
 
+    if k > n_points:
+        dgl_warning("'k' should be less than or equal to the number of points in 'x'" \
+                    "expect k <= {0}, got k = {1}, use k = {0}".format(n_points, k))
+        k = n_points
+
     # if use cosine distance, normalize input points first
     # thus we can use euclidean distance to find knn equivalently.
     if dist == 'cosine':
@@ -222,7 +235,7 @@ def _knn_graph_blas(x, k, dist='euclidean'):
 
 #pylint: disable=invalid-name
 def segmented_knn_graph(x, k, segs, algorithm='bruteforce-blas', dist='euclidean'):
-    """Construct multiple graphs from multiple sets of points according to
+    r"""Construct multiple graphs from multiple sets of points according to
     k-nearest-neighbor (KNN) and return.
 
     Compared with :func:`dgl.knn_graph`, this allows multiple point sets with
@@ -309,6 +322,14 @@ def segmented_knn_graph(x, k, segs, algorithm='bruteforce-blas', dist='euclidean
     (tensor([0, 0, 1, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6, 6]),
      tensor([0, 1, 0, 1, 2, 2, 3, 5, 4, 6, 3, 5, 4, 6]))
     """
+    # check invalid k
+    if k <= 0:
+        raise DGLError("Invalid k value. expect k > 0, got k = {}".format(k))
+
+    # check empty point set
+    if F.shape(x)[0] == 0:
+        raise DGLError("Find empty point set")
+
     if algorithm == 'bruteforce-blas':
         return _segmented_knn_graph_blas(x, k, segs, dist=dist)
     else:
@@ -317,7 +338,7 @@ def segmented_knn_graph(x, k, segs, algorithm='bruteforce-blas', dist='euclidean
         return convert.graph((row, col))
 
 def _segmented_knn_graph_blas(x, k, segs, dist='euclidean'):
-    """Construct multiple graphs from multiple sets of points according to
+    r"""Construct multiple graphs from multiple sets of points according to
     k-nearest-neighbor (KNN).
 
     This function first compute the distance matrix using BLAS matrix multiplication
@@ -348,6 +369,11 @@ def _segmented_knn_graph_blas(x, k, segs, dist='euclidean'):
 
     n_total_points, _ = F.shape(x)
     offset = np.insert(np.cumsum(segs), 0, 0)
+    min_seg_size = np.min(segs)
+    if k > min_seg_size:
+        dgl_warning("'k' should be less than or equal to the number of points in 'x'" \
+                    "expect k <= {0}, got k = {1}, use k = {0}".format(min_seg_size, k))
+        k = min_seg_size
 
     h_list = F.split(x, segs, 0)
     src = [
@@ -425,10 +451,21 @@ def knn(x, x_segs, y, y_segs, k, algorithm='bruteforce', dist='euclidean'):
     x_segs = F.copy_to(x_segs, F.context(x))
     y_segs = F.copy_to(y_segs, F.context(y))
 
-    # k must less than or equal to min(x_segs)
-    if k > F.min(x_segs, dim=0):
-        raise DGLError("'k' must be less than or equal to the number of points in 'x'"
-                       "expect k <= {}, got k = {}".format(F.min(x_segs, dim=0), k))
+    # k shoule be less than or equal to min(x_segs)
+    min_num_points = F.min(x_segs, dim=0)
+    if k > min_num_points:
+        dgl_warning("'k' should be less than or equal to the number of points in 'x'" \
+                    "expect k <= {0}, got k = {1}, use k = {0}".format(min_num_points, k))
+        k = F.as_scalar(min_num_points)
+
+    # invalid k
+    if k <= 0:
+        raise DGLError("Invalid k value. expect k > 0, got k = {}".format(k))
+
+    # empty point set
+    if F.shape(x)[0] == 0 or F.shape(y)[0] == 0:
+        raise DGLError("Find empty point set")
+
     dist = dist.lower()
     dist_metric_list = ['euclidean', 'cosine']
     if dist not in dist_metric_list:

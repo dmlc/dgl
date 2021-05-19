@@ -68,7 +68,7 @@ class KNNGraph(nn.Module):
 
     #pylint: disable=invalid-name
     def forward(self, x, algorithm='bruteforce-blas', dist='euclidean'):
-        """
+        r"""
 
         Forward computation.
 
@@ -108,7 +108,8 @@ class KNNGraph(nn.Module):
         dist : str, optional
             The distance metric used to compute distance between points. It can be the following
             metrics:
-            * 'euclidean': Use Euclidean distance (L2 norm) :math:`\sqrt{\sum_{i} (x_{i} - y_{i})^{2}}`.
+            * 'euclidean': Use Euclidean distance (L2 norm)
+              :math:`\sqrt{\sum_{i} (x_{i} - y_{i})^{2}}`.
             * 'cosine': Use cosine distance.
             (default: 'euclidean')
 
@@ -215,7 +216,8 @@ class SegmentedKNNGraph(nn.Module):
         dist : str, optional
             The distance metric used to compute distance between points. It can be the following
             metrics:
-            * 'euclidean': Use Euclidean distance (L2 norm) :math:`\sqrt{\sum_{i} (x_{i} - y_{i})^{2}}`.
+            * 'euclidean': Use Euclidean distance (L2 norm)
+              :math:`\sqrt{\sum_{i} (x_{i} - y_{i})^{2}}`.
             * 'cosine': Use cosine distance.
             (default: 'euclidean')
 
