@@ -111,15 +111,46 @@ HaloHeteroSubgraph GetSubgraphWithHalo(std::shared_ptr<HeteroGraph> hg,
     const dgl_id_t *dst_data = static_cast<dgl_id_t *>(dst->data);
     const dgl_id_t *eid_data = static_cast<dgl_id_t *>(eid->data);
     for (int64_t i = 0; i < num_edges; i++) {
-      edge_src.push_back(src_data[i]);
-      edge_dst.push_back(dst_data[i]);
-      edge_eid.push_back(eid_data[i]);
+      auto it1 = orig_nodes.find(src_data[i]);
+      // If the source node is in the partition, we have got this edge when we iterate over
+      // the out-edges above.
+      if (it1 == orig_nodes.end()) {
+        edge_src.push_back(src_data[i]);
+        edge_dst.push_back(dst_data[i]);
+        edge_eid.push_back(eid_data[i]);
+      }
       // If we haven't seen this node.
       auto it = all_nodes.find(src_data[i]);
       if (it == all_nodes.end()) {
         all_nodes[src_data[i]] = false;
         old_node_ids.push_back(src_data[i]);
         outer_nodes[k].push_back(src_data[i]);
+      }
+    }
+  }
+
+  if (num_hops > 0) {
+    EdgeArray out_edges = hg->OutEdges(0, nodes);
+    auto src = out_edges.src;
+    auto dst = out_edges.dst;
+    auto eid = out_edges.id;
+    auto num_edges = eid->shape[0];
+    const dgl_id_t *src_data = static_cast<dgl_id_t *>(src->data);
+    const dgl_id_t *dst_data = static_cast<dgl_id_t *>(dst->data);
+    const dgl_id_t *eid_data = static_cast<dgl_id_t *>(eid->data);
+    for (int64_t i = 0; i < num_edges; i++) {
+      // If the outer edge isn't in the partition.
+      auto it1 = orig_nodes.find(dst_data[i]);
+      if (it1 == orig_nodes.end()) {
+        edge_src.push_back(src_data[i]);
+        edge_dst.push_back(dst_data[i]);
+        edge_eid.push_back(eid_data[i]);
+      }
+      // We don't expand along the out-edges.
+      auto it = all_nodes.find(dst_data[i]);
+      if (it == all_nodes.end()) {
+        all_nodes[dst_data[i]] = false;
+        old_node_ids.push_back(dst_data[i]);
       }
     }
   }
@@ -213,11 +244,12 @@ DGL_REGISTER_GLOBAL("partition._CAPI_DGLPartitionWithHalo_Hetero")
       part_ids.push_back(it->first);
       part_nodes.push_back(it->second);
     }
-    // When we construct subgraphs, we only access in-edges.
-    // We need to make sure the in-CSR exists. Otherwise, we'll
-    // try to construct in-CSR in openmp for loop, which will lead
+    // When we construct subgraphs, we need to access both in-edges and out-edges.
+    // We need to make sure the in-CSR and out-CSR exist. Otherwise, we'll
+    // try to construct in-CSR and out-CSR in openmp for loop, which will lead
     // to some unexpected results.
     ugptr->GetInCSR();
+    ugptr->GetOutCSR();
     std::vector<std::shared_ptr<HaloHeteroSubgraph>> subgs(max_part_id + 1);
     int num_partitions = part_nodes.size();
 #pragma omp parallel for

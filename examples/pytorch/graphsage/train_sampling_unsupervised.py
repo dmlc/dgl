@@ -4,7 +4,7 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import torch.multiprocessing as mp
+import dgl.multiprocessing as mp
 import dgl.function as fn
 import dgl.nn.pytorch as dglnn
 import time
@@ -13,7 +13,6 @@ from dgl.data import RedditDataset
 from torch.nn.parallel import DistributedDataParallel
 import tqdm
 
-from utils import thread_wrapped_func
 from model import SAGE, compute_acc_unsupervised as compute_acc
 from negative_sampler import NegativeSampler
 
@@ -77,12 +76,6 @@ def run(proc_id, n_gpus, args, devices, data):
     # Create PyTorch DataLoader for constructing blocks
     n_edges = g.num_edges()
     train_seeds = np.arange(n_edges)
-    if n_gpus > 0:
-        num_per_gpu = (train_seeds.shape[0] + n_gpus -1) // n_gpus
-        train_seeds = train_seeds[proc_id * num_per_gpu :
-                                  (proc_id + 1) * num_per_gpu \
-                                  if (proc_id + 1) * num_per_gpu < train_seeds.shape[0]
-                                  else train_seeds.shape[0]]
 
     # Create sampler
     sampler = dgl.dataloading.MultiLayerNeighborSampler(
@@ -94,6 +87,7 @@ def run(proc_id, n_gpus, args, devices, data):
             th.arange(n_edges // 2, n_edges),
             th.arange(0, n_edges // 2)]),
         negative_sampler=NegativeSampler(g, args.num_negs, args.neg_share),
+        use_ddp=n_gpus > 1,
         batch_size=args.batch_size,
         shuffle=True,
         drop_last=False,
@@ -117,6 +111,8 @@ def run(proc_id, n_gpus, args, devices, data):
     best_eval_acc = 0
     best_test_acc = 0
     for epoch in range(args.num_epochs):
+        if n_gpus > 1:
+            dataloader.set_epoch(epoch)
         tic = time.time()
 
         # Loop over the dataloader to sample the computation dependency graph as a list of
@@ -191,8 +187,7 @@ def main(args, devices):
     else:
         procs = []
         for proc_id in range(n_gpus):
-            p = mp.Process(target=thread_wrapped_func(run),
-                           args=(proc_id, n_gpus, args, devices, data))
+            p = mp.Process(target=run, args=(proc_id, n_gpus, args, devices, data))
             p.start()
             procs.append(p)
         for p in procs:
