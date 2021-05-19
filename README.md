@@ -319,6 +319,8 @@ We are currently in Beta stage.  More features and improvements are coming.
 
 1. [**Chemistry-informed Macromolecule Graph Representation for Similarity Computation and Supervised Learning**](https://arxiv.org/abs/2103.02565), *Somesh Mohapatra, Joyce An, Rafael Gómez-Bombarelli*
 
+1. [**GIPA: General Information Propagation Algorithm for Graph Learning**](https://arxiv.org/abs/2105.06035), *Qinkai Zheng, Houyi Li, Peng Zhang, Zhixiong Yang, Guowei Zhang, Xintan Zeng, Yongchao Liu*
+
 </details>
 
 ## Installation
