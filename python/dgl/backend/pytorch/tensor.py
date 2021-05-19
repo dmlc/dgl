@@ -34,6 +34,11 @@ def cpu():
 def tensor(data, dtype=None):
     if isinstance(data, numbers.Number):
         data = [data]
+    if isinstance(data, list) and len(data) > 0 and isinstance(data[0], th.Tensor):
+        # prevent GPU->CPU->GPU copies
+        if data[0].ndim == 0:
+            # zero dimenion scalar tensors
+            return th.stack(data)
     if isinstance(data, th.Tensor):
         return th.as_tensor(data, dtype=dtype, device=data.device)
     else:
@@ -81,7 +86,7 @@ def device_type(ctx):
 def device_id(ctx):
     ctx = th.device(ctx)
     if ctx.index is None:
-        return 0
+        return 0 if ctx.type == 'cpu' else th.cuda.current_device()
     else:
         return ctx.index
 

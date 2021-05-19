@@ -15,6 +15,8 @@ __all__ = ['sample_neighbors', 'in_subgraph', 'find_edges']
 SAMPLING_SERVICE_ID = 6657
 INSUBGRAPH_SERVICE_ID = 6658
 EDGES_SERVICE_ID = 6659
+OUTDEGREE_SERVICE_ID = 6660
+INDEGREE_SERVICE_ID = 6661
 
 class SubgraphResponse(Response):
     """The response for sampling and in_subgraph"""
@@ -75,6 +77,20 @@ def _find_edges(local_g, partition_book, seed_edges):
     global_src = global_nid_mapping[local_src]
     global_dst = global_nid_mapping[local_dst]
     return global_src, global_dst
+
+def _in_degrees(local_g, partition_book, n):
+    """Get in-degree of the nodes in the local partition.
+    """
+    local_nids = partition_book.nid2localnid(n, partition_book.partid)
+    local_nids = F.astype(local_nids, local_g.idtype)
+    return local_g.in_degrees(local_nids)
+
+def _out_degrees(local_g, partition_book, n):
+    """Get out-degree of the nodes in the local partition.
+    """
+    local_nids = partition_book.nid2localnid(n, partition_book.partid)
+    local_nids = F.astype(local_nids, local_g.idtype)
+    return local_g.out_degrees(local_nids)
 
 def _in_subgraph(local_g, partition_book, seed_nodes):
     """ Get in subgraph from local partition.
@@ -139,6 +155,72 @@ class EdgesRequest(Request):
         global_src, global_dst = _find_edges(local_g, partition_book, self.edge_ids)
 
         return FindEdgeResponse(global_src, global_dst, self.order_id)
+
+class InDegreeRequest(Request):
+    """In-degree Request"""
+
+    def __init__(self, n, order_id):
+        self.n = n
+        self.order_id = order_id
+
+    def __setstate__(self, state):
+        self.n, self.order_id = state
+
+    def __getstate__(self):
+        return self.n, self.order_id
+
+    def process_request(self, server_state):
+        local_g = server_state.graph
+        partition_book = server_state.partition_book
+        deg = _in_degrees(local_g, partition_book, self.n)
+
+        return InDegreeResponse(deg, self.order_id)
+
+class InDegreeResponse(Response):
+    """The response for in-degree"""
+
+    def __init__(self, deg, order_id):
+        self.val = deg
+        self.order_id = order_id
+
+    def __setstate__(self, state):
+        self.val, self.order_id = state
+
+    def __getstate__(self):
+        return self.val, self.order_id
+
+class OutDegreeRequest(Request):
+    """Out-degree Request"""
+
+    def __init__(self, n, order_id):
+        self.n = n
+        self.order_id = order_id
+
+    def __setstate__(self, state):
+        self.n, self.order_id = state
+
+    def __getstate__(self):
+        return self.n, self.order_id
+
+    def process_request(self, server_state):
+        local_g = server_state.graph
+        partition_book = server_state.partition_book
+        deg = _out_degrees(local_g, partition_book, self.n)
+
+        return OutDegreeResponse(deg, self.order_id)
+
+class OutDegreeResponse(Response):
+    """The response for out-degree"""
+
+    def __init__(self, deg, order_id):
+        self.val = deg
+        self.order_id = order_id
+
+    def __setstate__(self, state):
+        self.val, self.order_id = state
+
+    def __getstate__(self):
+        return self.val, self.order_id
 
 class InSubgraphRequest(Request):
     """InSubgraph Request"""
@@ -410,11 +492,11 @@ def find_edges(g, edge_ids):
     tensor
         The destination node ID array.
     """
-    def issue_remove_req(edge_ids, order_id):
+    def issue_remote_req(edge_ids, order_id):
         return EdgesRequest(edge_ids, order_id)
     def local_access(local_g, partition_book, edge_ids):
         return _find_edges(local_g, partition_book, edge_ids)
-    return _distributed_edge_access(g, edge_ids, issue_remove_req, local_access)
+    return _distributed_edge_access(g, edge_ids, issue_remote_req, local_access)
 
 def in_subgraph(g, nodes):
     """Return the subgraph induced on the inbound edges of the given nodes.
@@ -452,6 +534,70 @@ def in_subgraph(g, nodes):
         return _in_subgraph(local_g, partition_book, local_nids)
     return _distributed_access(g, nodes, issue_remote_req, local_access)
 
+def _distributed_get_node_property(g, n, issue_remote_req, local_access):
+    req_list = []
+    partition_book = g.get_partition_book()
+    n = toindex(n).tousertensor()
+    partition_id = partition_book.nid2partid(n)
+    local_nids = None
+    reorder_idx = []
+    for pid in range(partition_book.num_partitions()):
+        mask = (partition_id == pid)
+        nid = F.boolean_mask(n, mask)
+        reorder_idx.append(F.nonzero_1d(mask))
+        if pid == partition_book.partid and g.local_partition is not None:
+            assert local_nids is None
+            local_nids = nid
+        elif len(nid) != 0:
+            req = issue_remote_req(nid, pid)
+            req_list.append((pid, req))
+
+    # send requests to the remote machine.
+    msgseq2pos = None
+    if len(req_list) > 0:
+        msgseq2pos = send_requests_to_machine(req_list)
+
+    # handle edges in local partition.
+    vals = None
+    if local_nids is not None:
+        local_vals = local_access(g.local_partition, partition_book, local_nids)
+        shape = list(F.shape(local_vals))
+        shape[0] = len(n)
+        vals = F.zeros(shape, F.dtype(local_vals), F.cpu())
+        vals = F.scatter_row(vals, reorder_idx[partition_book.partid], local_vals)
+
+    # receive responses from remote machines.
+    if msgseq2pos is not None:
+        results = recv_responses(msgseq2pos)
+        if len(results) > 0 and vals is None:
+            shape = list(F.shape(results[0].val))
+            shape[0] = len(n)
+            vals = F.zeros(shape, F.dtype(results[0].val), F.cpu())
+        for result in results:
+            val = result.val
+            vals = F.scatter_row(vals, reorder_idx[result.order_id], val)
+    return vals
+
+def in_degrees(g, v):
+    '''Get in-degrees
+    '''
+    def issue_remote_req(v, order_id):
+        return InDegreeRequest(v, order_id)
+    def local_access(local_g, partition_book, v):
+        return _in_degrees(local_g, partition_book, v)
+    return _distributed_get_node_property(g, v, issue_remote_req, local_access)
+
+def out_degrees(g, u):
+    '''Get out-degrees
+    '''
+    def issue_remote_req(u, order_id):
+        return OutDegreeRequest(u, order_id)
+    def local_access(local_g, partition_book, u):
+        return _out_degrees(local_g, partition_book, u)
+    return _distributed_get_node_property(g, u, issue_remote_req, local_access)
+
 register_service(SAMPLING_SERVICE_ID, SamplingRequest, SubgraphResponse)
 register_service(EDGES_SERVICE_ID, EdgesRequest, FindEdgeResponse)
 register_service(INSUBGRAPH_SERVICE_ID, InSubgraphRequest, SubgraphResponse)
+register_service(OUTDEGREE_SERVICE_ID, OutDegreeRequest, OutDegreeResponse)
+register_service(INDEGREE_SERVICE_ID, InDegreeRequest, InDegreeResponse)
