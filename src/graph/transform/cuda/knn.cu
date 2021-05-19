@@ -385,6 +385,7 @@ void BruteForceKNNSharedCuda(const NDArray& data_points, const IdArray& data_off
   CUDA_CALL(cub::DeviceScan::ExclusiveSum(
     prefix_temp, prefix_temp_size, num_block_per_segment,
     num_block_prefixsum, batch_size, thr_entry->stream));
+  device->FreeWorkspace(ctx, prefix_temp);
 
   int64_t num_blocks = 0, final_elem = 0, copyoffset = (batch_size - 1) * sizeof(IdType);
   device->CopyDataFromTo(
