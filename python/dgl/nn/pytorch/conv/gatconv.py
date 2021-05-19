@@ -168,7 +168,7 @@ class GATConv(nn.Module):
         else:
             self.register_buffer('bias', None)
         if residual:
-            if self._in_dst_feats != out_feats:
+            if self._in_dst_feats != out_feats * num_heads:
                 self.res_fc = nn.Linear(
                     self._in_dst_feats, num_heads * out_feats, bias=False)
             else:
