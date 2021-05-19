@@ -90,7 +90,7 @@ eids = np.random.permutation(eids)
 test_size = int(len(eids) * 0.1)
 train_size = g.number_of_edges() - test_size
 test_pos_u, test_pos_v = u[eids[:test_size]], v[eids[:test_size]]
-train_pos_u, train_pos_v = u[eids[test_size:]], v[eids[test_size:]]
+train_pos_u, train_pos_v = u[eids[train_size:]], v[eids[train_size:]]
 
 # Find all negative edges and split them for training and testing
 adj = sp.coo_matrix((np.ones(len(u)), (u.numpy(), v.numpy())))
