@@ -543,7 +543,7 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
               nullptr,
               static_cast<DType*>(vec_out[dst_id]->data),
               x_length,
-              stream[etype]);
+              stream[etype % maxstrm]);
         } 
         else if (op == "mul" && is_scalar_efeat && cusparse_available<bits, IdType>()) {  // cusparse
           int64_t x_length = 1;

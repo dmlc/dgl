@@ -120,7 +120,7 @@ void SDDMMCsrHetero(const std::string& op,
           NDArray rhs = vec_rhs[rhs_eid[etype]];
           NDArray out = vec_out[etype];
           cuda::SDDMMCsrHetero<IdType, DType, Op, LhsTarget, RhsTarget>(
-            bcast, csr, lhs, rhs, out, stream[etype]);
+            bcast, csr, lhs, rhs, out, stream[etype % maxstrm]);
         }
       });
     });
