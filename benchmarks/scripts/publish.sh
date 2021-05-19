@@ -59,7 +59,7 @@ if [[ $DEVICE == "cpu" ]]; then
         --hostname=$MACHINE -dit dgllib/dgl-ci-gpu:conda /bin/bash
 else
     docker run --name dgl-reg \
-        --rm --runtime=nvidia \
+        --rm --gpus all \
         $DOCKER_MOUNT_OPT \
         $DOCKER_ENV_OPT \
         --shm-size="4g" \
