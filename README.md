@@ -321,6 +321,8 @@ We are currently in Beta stage.  More features and improvements are coming.
   
 1. [**Characterizing and Forecasting User Engagement with In-app Action Graph: A Case Study of Snapchat**](https://arxiv.org/pdf/1906.00355.pdf), *Yozen Liu, Xiaolin Shi, Lucas Pierce, Xiang Ren*
 
+1. [**GIPA: General Information Propagation Algorithm for Graph Learning**](https://arxiv.org/abs/2105.06035), *Qinkai Zheng, Houyi Li, Peng Zhang, Zhixiong Yang, Guowei Zhang, Xintan Zeng, Yongchao Liu*
+
 </details>
 
 ## Installation
