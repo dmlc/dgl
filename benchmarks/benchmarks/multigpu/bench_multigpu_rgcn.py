@@ -299,8 +299,8 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
         queue.put(np.array(time_records))
 
 
+# @utils.skip_if_not_4gpu()
 @utils.benchmark('time')
-@utils.skip_if_not_4gpu()
 @utils.parametrize('data', ['am'])
 @utils.parametrize('low_mem', [True, False])
 @utils.parametrize('dgl_sparse', [True, False])
