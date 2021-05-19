@@ -5,6 +5,7 @@ import torch as th
 
 from ...utils import get_shared_mem_array, create_shared_mem_array
 from ...nn.pytorch import NodeEmbedding
+from ...cuda import nccl
 
 class SparseGradOptimizer(abc.ABC):
     r''' The abstract sparse optimizer.
@@ -27,6 +28,7 @@ class SparseGradOptimizer(abc.ABC):
         self._clean_grad = False
         self._opt_meta = {}
         self._comm = None
+        self._first_step = True
         # hold released shared memory to let other process to munmap it first
         # otherwise it will crash the training
         self.shmem_buffer_holder = []
@@ -45,49 +47,77 @@ class SparseGradOptimizer(abc.ABC):
                 assert self._world_size == emb.world_size, \
                     'MultiGPU world_size for each embedding should be same.'
 
-            emb_name = emb.name
-
-            if emb.comm:
-                # nccl
-                if self._comm is None:
-                    self._comm = emb.comm
-                else:
-                    assert not emb.comm is None
-            else:
-                # shared memory
-                if self._rank == 0: # the master gpu process
-                    opt_meta = create_shared_mem_array(emb_name+'_opt_meta', \
-                        (self._world_size, self._world_size), th.int32).zero_()
-                if self._rank == 0:
-                    emb.store.set(emb_name+'_opt_meta', emb_name)
-                    self._opt_meta[emb_name] = opt_meta
-                elif self._rank > 0:
-                    # receive
-                    emb.store.wait([emb_name+'_opt_meta'])
-                    opt_meta = get_shared_mem_array(emb_name+'_opt_meta', \
-                        (self._world_size, self._world_size), th.int32)
-                    self._opt_meta[emb_name] = opt_meta
-
     def step(self):
         ''' The step function.
 
         The step function is invoked at the end of every batch to update embeddings
         '''
+        # on the first step, check to see if the grads are on the GPU
+        if self._first_step:
+            grad_gpu = False
+            for emb in self._params:
+                for _, data in emb._trace:
+                    if data.grad.data.device.type == 'cuda':
+                        # create a communicator
+                        grad_gpu = True
+                        break
+                    assert not grad_gpu, "All gradients must be on the same device"
+            if grad_gpu:
+                self._comm_setup()
+            else:
+                self._shared_setup()
+
         if self._comm:
             self._comm_step()
         else:
             self._shared_step()
+        self._first_step = False
 
+    def _comm_setup(self):
+        # find a store to communicate the unique id through
+        if len(self._params) > 0:
+            store = self._params[0].store
+
+            if self._rank < 0:
+                self._comm = nccl.Communicator(1, 0, nccl.UniqueId())
+            else:
+                if rank == 0:
+                    # root process broadcasts nccl id
+                    nccl_id = nccl.UniqueId()
+                    store.set('nccl_root_id', str(nccl_id))
+                else:
+                    nccl_id = nccl.UniqueId(store.get('nccl_root_id'))
+                # needs to be set for nccl to work
+                th.cuda.set_device(device)
+                self._comm = nccl.Communicator(self._world_size,
+                                               self._rank,
+                                               nccl_id)
+
+
+    def _shared_setup(self):
+        for emb in self._params:
+            emb_name = emb.name
+            if self._rank == 0: # the master gpu process
+                opt_meta = create_shared_mem_array(emb_name+'_opt_meta', \
+                    (self._world_size, self._world_size), th.int32).zero_()
+
+            if self._rank == 0:
+                emb.store.set(emb_name+'_opt_meta', emb_name)
+                self._opt_meta[emb_name] = opt_meta
+            elif self._rank > 0:
+                # receive
+                emb.store.wait([emb_name+'_opt_meta'])
+                opt_meta = get_shared_mem_array(emb_name+'_opt_meta', \
+                    (self._world_size, self._world_size), th.int32)
+                self._opt_meta[emb_name] = opt_meta
 
     def _comm_step(self):
+        comm = self._comm 
         with th.no_grad():
             idx_in = {}
             grad_in = {}
             for emb in self._params: # pylint: disable=too-many-nested-blocks
                 emb_name = emb.name
-
-                # use the comm of the embedding
-                comm = emb.comm
 
                 # we need to combine gradients from multiple forward paths
                 idx = []
