@@ -288,7 +288,8 @@ class Column(object):
         if self.index is None:
             return Column(self.storage, self.scheme, rowids, self.device)
         else:
-            if not isinstance(self.index, _LazyIndex):
+            index = self.index
+            if not isinstance(index, _LazyIndex):
                 index = _LazyIndex(self.index)
             index = index.slice(rowids)
             return Column(self.storage, self.scheme, index, self.device)
