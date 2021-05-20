@@ -199,24 +199,29 @@ IdArray MapToLocalFromRemainder(
   const auto& ctx = global_idx->ctx;
   cudaStream_t stream = CUDAThreadEntry::ThreadLocal()->stream;
 
-  IdArray local_idx = aten::NewIdArray(global_idx->shape[0], ctx,
-      sizeof(IdType)*8);
+  if (num_parts > 1) {
+    IdArray local_idx = aten::NewIdArray(global_idx->shape[0], ctx,
+        sizeof(IdType)*8);
 
-  const dim3 block(128);
-  const dim3 grid((global_idx->shape[0] +block.x-1)/block.x);
+    const dim3 block(128);
+    const dim3 grid((global_idx->shape[0] +block.x-1)/block.x);
 
-  CUDA_KERNEL_CALL(
-      _MapLocalIndexByRemainder,
-      grid,
-      block,
-      0,
-      stream,
-      static_cast<const IdType*>(global_idx->data),
-      static_cast<IdType*>(local_idx->data),
-      global_idx->shape[0],
-      num_parts);
+    CUDA_KERNEL_CALL(
+        _MapLocalIndexByRemainder,
+        grid,
+        block,
+        0,
+        stream,
+        static_cast<const IdType*>(global_idx->data),
+        static_cast<IdType*>(local_idx->data),
+        global_idx->shape[0],
+        num_parts);
 
-  return local_idx;
+    return local_idx;
+  } else {
+    // no mapping to be done
+    return global_idx;
+  }
 }
 
 template IdArray

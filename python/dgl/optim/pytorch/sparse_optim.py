@@ -128,13 +128,16 @@ class SparseGradOptimizer(abc.ABC):
                         mode='remainder')
 
                 # we need to combine gradients from multiple forward paths
-                idx = []
-                grad = []
-                for i, data in emb._trace:
-                    idx.append(i)
-                    grad.append(data.grad.data)
-                idx = th.cat(idx, dim=0)
-                grad = th.cat(grad, dim=0)
+                if len(emb._trace) > 1:
+                    idx = []
+                    grad = []
+                    for i, data in emb._trace:
+                        idx.append(i)
+                        grad.append(data.grad.data)
+                    idx = th.cat(idx, dim=0)
+                    grad = th.cat(grad, dim=0)
+                else:
+                    idx, grad = emb._trace[0]
 
                 idx_in[emb_name], grad_in[emb_name] = \
                     comm.sparse_all_to_all_push(
