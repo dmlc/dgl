@@ -19,6 +19,8 @@ class _LazyIndex(object):
         return len(self._indices[-1])
 
     def slice(self, index):
+        """ Create a new _LazyIndex object sliced by the given index tensor.
+        """
         # if our indices are in the same context, lets just slice now and free
         # memory, otherwise do nothing until we have to
         if F.context(self._indices[-1]) == F.context(index):
@@ -26,9 +28,13 @@ class _LazyIndex(object):
         return _LazyIndex(self._indices + [index])
 
     def flatten(self):
+        """ Evaluate the chain of indices, and return a single index tensor.
+        """
         flat_index = self._indices[0]
         # here we actually need to resolve it
         for index in self._indices[1:]:
+            if F.context(index) != F.context(flat_index):
+                index = F.copy_to(index, F.context(flat_index))
             flat_index = F.gather_row(flat_index, index)
         return flat_index
 
