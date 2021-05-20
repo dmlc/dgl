@@ -337,6 +337,11 @@ def test_in_subgraph(idtype):
     assert edge_set == {(2,0),(2,1),(1,0),(0,0)}
     assert subg['flips'].number_of_edges() == 0
 
+    # Test store_ids
+    subg = dgl.in_subgraph(hg, {'user': [0, 1], 'game': 0}, store_ids=False)
+    for etype in ['follow', 'play', 'liked-by']:
+        assert dgl.EID not in subg.edges[etype].data
+
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @parametrize_dtype
 def test_out_subgraph(idtype):
@@ -366,6 +371,11 @@ def test_out_subgraph(idtype):
     edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
     assert edge_set == {(0,0),(1,0)}
     assert F.array_equal(hg['flips'].edge_ids(u, v), subg['flips'].edata[dgl.EID])
+
+    # Test store_ids
+    subg = dgl.out_subgraph(hg, {'user' : [0,1], 'game' : 0}, store_ids=False)
+    for etype in subg.canonical_etypes:
+        assert dgl.EID not in subg.edges[etype].data
 
 def test_subgraph_message_passing():
     # Unit test for PR #2055
