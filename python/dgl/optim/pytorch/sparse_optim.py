@@ -6,6 +6,7 @@ import torch as th
 from ...utils import get_shared_mem_array, create_shared_mem_array
 from ...nn.pytorch import NodeEmbedding
 from ...cuda import nccl
+from ...partition import NDArrayPartition
 
 class SparseGradOptimizer(abc.ABC):
     r''' The abstract sparse optimizer.
@@ -118,6 +119,13 @@ class SparseGradOptimizer(abc.ABC):
             grad_in = {}
             for emb in self._params: # pylint: disable=too-many-nested-blocks
                 emb_name = emb.name
+                partition = emb.partition
+                if not partition:
+                    # use default partitioning
+                    partition = NDArrayPartition(
+                        emb.num_embeddings,
+                        self._world_size if self._world_size > 0 else 1,
+                        mode='remainder')
 
                 # we need to combine gradients from multiple forward paths
                 idx = []
@@ -130,10 +138,8 @@ class SparseGradOptimizer(abc.ABC):
 
                 idx_in[emb_name], grad_in[emb_name] = \
                     comm.sparse_all_to_all_push(
-                        idx, grad, mode=emb.partition_mode)
-                # convert idx to local indices via 'remainder'
-                assert emb.partition_mode == 'remainder'
-                idx_in[emb_name] = idx_in[emb_name] // self._comm.size()
+                        idx, grad, partition=partition)
+                idx_in[emb_name] = partition.map_to_local(idx_in[emb_name])
 
             if self._clean_grad:
                 # clean gradient track

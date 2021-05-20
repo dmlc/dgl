@@ -4,6 +4,7 @@ import torch as th
 from ...backend import pytorch as F
 from ...utils import get_shared_mem_array, create_shared_mem_array
 from ...cuda import nccl
+from ...partition import NDArrayPartition
 
 _STORE = None
 _COMM = None
@@ -40,8 +41,8 @@ class NodeEmbedding: # NodeEmbedding
         the values of the embeddings are initialized to zero.
     device : th.device
         Device to store the embeddings on.
-    parittion : String
-        The type of partitioning to use to distributed the embeddings between
+    parittion : NDArrayPartition
+        The partition to use to distributed the embeddings between
         processes.
 
     Examples
@@ -83,7 +84,7 @@ class NodeEmbedding: # NodeEmbedding
         self._world_size = world_size
         self._store = None
         self._comm = None
-        self._partition = None
+        self._partition = partition
 
         host_name = '127.0.0.1'
         port = 12346
@@ -97,12 +98,6 @@ class NodeEmbedding: # NodeEmbedding
             self._store = _STORE
 
         if device == th.device('cpu'):
-            if partition:
-                assert self._partition == 'shared'
-            else:
-                partition = 'shared'
-            self._partition = partition
-
             if rank <= 0:
                 emb = create_shared_mem_array(name, (num_embeddings, embedding_dim), th.float32)
                 if init_func is not None:
@@ -117,13 +112,6 @@ class NodeEmbedding: # NodeEmbedding
                 emb = get_shared_mem_array(name, (num_embeddings, embedding_dim), th.float32)
             self._tensor = emb
         else:
-            if partition:
-                assert self._partition == 'remainder', \
-                        "Only 'remainder' partition scheme is currently supported."
-            else:
-                partition = 'remainder'
-            self._partition = partition
-
             # setup nccl communicator
             if _COMM is None:
                 if rank < 0:
@@ -141,14 +129,16 @@ class NodeEmbedding: # NodeEmbedding
                                               nccl_id)
             self._comm = _COMM
 
-            # create local tensors for the weights
-            local_size = num_embeddings
-            if rank >= 0:
-                assert self._rank == self._comm.rank()
-                assert self._world_size == self._comm.size()
+            if not self._partition:
+                # for communication we need a partition
+                self._partition = NDArrayPartition(
+                    num_embeddings,
+                    self._world_size if self._world_size > 0 else 1,
+                    mode='remainder')
 
-                local_size = (num_embeddings // world_size) + \
-                    (rank < (num_embeddings % world_size))
+            # create local tensors for the weights
+            local_size = self._partition.local_size(self._comm.rank())
+
             # TODO(dlasalle): support 16-bit/half embeddings
             emb = th.empty([local_size, embedding_dim], dtype=th.float32,
                            requires_grad=False, device=device)
@@ -180,7 +170,7 @@ class NodeEmbedding: # NodeEmbedding
             emb = emb.to(device)
         if F.is_recording():
             emb = F.attach_grad(emb)
-            self._trace.append((node_ids.to(device, non_blocking=True), emb))
+            self._trace.append((node_ids.to(device), emb))
 
         return emb
 
@@ -209,8 +199,8 @@ class NodeEmbedding: # NodeEmbedding
         return self._comm
 
     @property
-    def partition_mode(self):
-        """Return String for identifying how the tensor is split across
+    def partition(self):
+        """Return the partition identifying how the tensor is split across
         processes.
 
         Returns

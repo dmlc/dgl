@@ -65,6 +65,16 @@ class NDArrayPartition : public runtime::Object {
       IdArray in_idx) const = 0;
 
   /**
+   * @brief Get the number of rows/items assigned to the given part.
+   *
+   * @param part_id The part id.
+   *
+   * @return The size.
+   */
+  virtual int64_t PartSize(
+          int part_id) const = 0;
+
+  /**
    * @brief Get the first dimension of the partitioned array.
    *
    * @return The size.
