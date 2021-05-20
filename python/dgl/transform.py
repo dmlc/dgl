@@ -188,7 +188,7 @@ def knn_graph(x, k, algorithm='bruteforce-blas', dist='euclidean'):
             return convert.graph((row, col))
 
 def _knn_graph_blas(x, k, dist='euclidean'):
-    """Construct a graph from a set of points according to k-nearest-neighbor (KNN).
+    r"""Construct a graph from a set of points according to k-nearest-neighbor (KNN).
 
     This function first compute the distance matrix using BLAS matrix multiplication
     operation provided by backend frameworks. Then use topk algorithm to get
@@ -395,7 +395,7 @@ def _segmented_knn_graph_blas(x, k, segs, dist='euclidean'):
 
 def nndescent_knn_graph(x, k, segs, num_iters=None, max_candidates=None,
                         delta=0.001, sample_rate=0.5):
-    """Construct multiple graphs from multiple sets of points according to
+    r"""Construct multiple graphs from multiple sets of points according to
     **approximate** k-nearest-neighbor using NN-descent algorithm from paper
     `Efficient k-nearest neighbor graph construction for generic similarity
     measures <https://www.cs.princeton.edu/cass/papers/www11.pdf>`_.
