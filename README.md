@@ -309,6 +309,22 @@ We are currently in Beta stage.  More features and improvements are coming.
 
 1. [**Tensor Decompositions in Recursive Neural Networks for Tree-Structured Data**](https://github.com/danielecastellana22/tensor-tree-nn), ESANN'20, *Daniele Castellana, Davide Bacciu*
 
+1. [**Combining Self-Organizing and Graph Neural Networks for Modeling Deformable Objects in Robotic Manipulation**](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7806087/), Frotiers in Robotics and AI, *Valencia, Angel J., and Pierre Payeur*
+
+1. [**Joint stroke classification and text line grouping in online handwritten documents with edge pooling attention networks**](https://www.sciencedirect.com/science/article/abs/pii/S0031320321000467), Pattern Recognition, *Jun-Yu Ye, Yan-Ming Zhang, Qing Yang, Cheng-Lin Liu*
+
+1. [**Toward Accurate Predictions of Atomic Properties via Quantum Mechanics Descriptors Augmented Graph Convolutional Neural Network: Application of This Novel Approach in NMR Chemical Shifts Predictions**](https://pubs.acs.org/doi/full/10.1021/acs.jpclett.0c02654), The Journal of Physical Chemistry Letters, *Peng Gao, Jie Zhang, Yuzhu Sun, and Jianguo Yu*
+
+1. [**A Graph Neural Network to Model User Comfort in Robot Navigation**](https://arxiv.org/abs/2102.08863), *Pilar Bachiller, Daniel Rodriguez-Criado, Ronit R. Jorvekar, Pablo Bustos, Diego R. Faria, Luis J. Manso*
+
+1. [**Medical Entity Disambiguation Using Graph Neural Networks**](https://arxiv.org/abs/2104.01488), *Alina Vretinaris, Chuan Lei, Vasilis Efthymiou, Xiao Qin, Fatma Özcan*
+
+1. [**Chemistry-informed Macromolecule Graph Representation for Similarity Computation and Supervised Learning**](https://arxiv.org/abs/2103.02565), *Somesh Mohapatra, Joyce An, Rafael Gómez-Bombarelli*
+  
+1. [**Characterizing and Forecasting User Engagement with In-app Action Graph: A Case Study of Snapchat**](https://arxiv.org/pdf/1906.00355.pdf), *Yozen Liu, Xiaolin Shi, Lucas Pierce, Xiang Ren*
+
+1. [**GIPA: General Information Propagation Algorithm for Graph Learning**](https://arxiv.org/abs/2105.06035), *Qinkai Zheng, Houyi Li, Peng Zhang, Zhixiong Yang, Guowei Zhang, Xintan Zeng, Yongchao Liu*
+
 </details>
 
 ## Installation
@@ -332,6 +348,7 @@ conda install -c dglteam dgl-cuda9.2   # CUDA 9.2
 conda install -c dglteam dgl-cuda10.1  # CUDA 10.1
 conda install -c dglteam dgl-cuda10.2  # CUDA 10.2
 conda install -c dglteam dgl-cuda11.0  # CUDA 11.0
+conda install -c dglteam dgl-cuda11.1  # CUDA 11.1
 ```
 
 ### Using pip
@@ -344,6 +361,7 @@ conda install -c dglteam dgl-cuda11.0  # CUDA 11.0
 | CUDA 10.1 | `pip install --pre dgl-cu101` | `pip install dgl-cu101` |
 | CUDA 10.2 | `pip install --pre dgl-cu102` | `pip install dgl-cu102` |
 | CUDA 11.0 | `pip install --pre dgl-cu110` | `pip install dgl-cu110` |
+| CUDA 11.1 | `pip install --pre dgl-cu111` | `pip install dgl-cu111` |
 
 ### Built from source code
 
