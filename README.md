@@ -317,6 +317,8 @@ We are currently in Beta stage.  More features and improvements are coming.
 
 1. [**A Graph Neural Network to Model User Comfort in Robot Navigation**](https://arxiv.org/abs/2102.08863), *Pilar Bachiller, Daniel Rodriguez-Criado, Ronit R. Jorvekar, Pablo Bustos, Diego R. Faria, Luis J. Manso*
 
+1. [**Medical Entity Disambiguation Using Graph Neural Networks**](https://arxiv.org/abs/2104.01488), *Alina Vretinaris, Chuan Lei, Vasilis Efthymiou, Xiao Qin, Fatma Özcan*
+
 1. [**Chemistry-informed Macromolecule Graph Representation for Similarity Computation and Supervised Learning**](https://arxiv.org/abs/2103.02565), *Somesh Mohapatra, Joyce An, Rafael Gómez-Bombarelli*
   
 1. [**Characterizing and Forecasting User Engagement with In-app Action Graph: A Case Study of Snapchat**](https://arxiv.org/pdf/1906.00355.pdf), *Yozen Liu, Xiaolin Shi, Lucas Pierce, Xiang Ren*
