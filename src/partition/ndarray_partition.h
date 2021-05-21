@@ -9,6 +9,7 @@
 #define DGL_PARTITION_NDARRAY_PARTITION_H_
 
 #include <dgl/runtime/object.h>
+#include <dgl/packed_func_ext.h>
 #include <dgl/array.h>
 #include <utility>
 
