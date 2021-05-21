@@ -97,7 +97,7 @@ class NodeEmbedding: # NodeEmbedding
                     host_name, port, world_size, rank == 0, timedelta(seconds=10*60))
             self._store = _STORE
 
-        if device == th.device('cpu'):
+        if th.device(device) == th.device('cpu'):
             if rank <= 0:
                 emb = create_shared_mem_array(name, (num_embeddings, embedding_dim), th.float32)
                 if init_func is not None:

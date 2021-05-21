@@ -30,6 +30,7 @@ class SparseGradOptimizer(abc.ABC):
         self._opt_meta = {}
         self._comm = None
         self._first_step = True
+        self._device = None
         # hold released shared memory to let other process to munmap it first
         # otherwise it will crash the training
         self.shmem_buffer_holder = []
@@ -55,15 +56,20 @@ class SparseGradOptimizer(abc.ABC):
         '''
         # on the first step, check to see if the grads are on the GPU
         if self._first_step:
-            grad_gpu = False
             for emb in self._params:
                 for _, data in emb._trace:
                     if data.grad.data.device.type == 'cuda':
                         # create a communicator
-                        grad_gpu = True
-                        break
-                    assert not grad_gpu, "All gradients must be on the same device"
-            if grad_gpu:
+                        if self._device:
+                            assert self._device == data.grad.device, \
+                                "All gradients must be on the same device"
+                        else:
+                            self._device = data.grad.device
+                    else:
+                        assert not self._device, \
+                            "All gradients must be on the same device"
+            if self._device:
+                # device is only set if the grads are on a GPU
                 self._comm_setup()
             else:
                 self._shared_setup()
@@ -89,11 +95,10 @@ class SparseGradOptimizer(abc.ABC):
                 else:
                     nccl_id = nccl.UniqueId(store.get('nccl_root_id'))
                 # needs to be set for nccl to work
-                th.cuda.set_device(device)
+                th.cuda.set_device(self._device)
                 self._comm = nccl.Communicator(self._world_size,
                                                self._rank,
                                                nccl_id)
-
 
     def _shared_setup(self):
         for emb in self._params:
@@ -120,6 +125,7 @@ class SparseGradOptimizer(abc.ABC):
             for emb in self._params: # pylint: disable=too-many-nested-blocks
                 emb_name = emb.name
                 partition = emb.partition
+
                 if not partition:
                     # use default partitioning
                     partition = NDArrayPartition(
@@ -128,7 +134,16 @@ class SparseGradOptimizer(abc.ABC):
                         mode='remainder')
 
                 # we need to combine gradients from multiple forward paths
-                if len(emb._trace) > 1:
+                if len(emb._trace) == 0:
+                    idx = th.zeros((0,), dtype=th.long, device=self._device)
+                    grad = th.zeros((0, emb.embedding_dim), dtype=th.float32,
+                        device=self._device)
+                elif len(emb._trace) == 1:
+                    # the special case where we can use the tensors as is
+                    # without any memcpy's
+                    idx, grad = emb._trace[0]
+                    grad = grad.grad.data
+                else:
                     idx = []
                     grad = []
                     for i, data in emb._trace:
@@ -136,8 +151,6 @@ class SparseGradOptimizer(abc.ABC):
                         grad.append(data.grad.data)
                     idx = th.cat(idx, dim=0)
                     grad = th.cat(grad, dim=0)
-                else:
-                    idx, grad = emb._trace[0]
 
                 idx_in[emb_name], grad_in[emb_name] = \
                     comm.sparse_all_to_all_push(
@@ -381,9 +394,9 @@ class SparseAdagrad(SparseGradOptimizer):
             assert isinstance(emb, NodeEmbedding), \
                 'SparseAdagrad only supports dgl.nn.NodeEmbedding'
 
-            if not emb.comm:
+            emb_name = emb.name
+            if not self._comm:
                 if self._rank <= 0:
-                    emb_name = emb.name
                     state = create_shared_mem_array(emb_name+'_state', \
                         emb.weight.shape, th.float32).zero_()
                 if self._rank == 0:
@@ -391,13 +404,11 @@ class SparseAdagrad(SparseGradOptimizer):
                         emb.store.set(emb_name+'_opt', emb_name)
                 elif self._rank > 0:
                     # receive
-                    emb_name = emb.name
                     emb.store.wait([emb_name+'_opt'])
                     state = get_shared_mem_array(emb_name+'_state', \
                         emb.weight.shape, th.float32)
             else:
                 # distributed state on on gpu
-                emb_name = emb.name
                 state = th.empty(
                     emb.emb_tensor.shape,
                     dtype=th.float32,
@@ -495,9 +506,9 @@ class SparseAdam(SparseGradOptimizer):
         for emb in params:
             assert isinstance(emb, NodeEmbedding), \
                 'SparseAdam only supports dgl.nn.NodeEmbedding'
-            if not emb.comm:
+            emb_name = emb.name
+            if not self._comm:
                 if self._rank <= 0:
-                    emb_name = emb.name
                     state_step = create_shared_mem_array(emb_name+'_step', \
                         (emb.weight.shape[0],), th.float32).zero_()
                     state_mem = create_shared_mem_array(emb_name+'_mem', \
@@ -505,12 +516,10 @@ class SparseAdam(SparseGradOptimizer):
                     state_power = create_shared_mem_array(emb_name+'_power', \
                         emb.weight.shape, th.float32).zero_()
                 if self._rank == 0:
-                    emb_name = emb.name
                     if self._world_size > 1:
                         emb.store.set(emb_name+'_opt', emb_name)
                 elif self._rank > 0:
                     # receive
-                    emb_name = emb.name
                     emb.store.wait([emb_name+'_opt'])
                     state_step = get_shared_mem_array(emb_name+'_step', \
                         (emb.weight.shape[0],), th.float32)
@@ -520,7 +529,6 @@ class SparseAdam(SparseGradOptimizer):
                         emb.weight.shape, th.float32)
             else:
                 # distributed state on on gpu
-                emb_name = emb.name
                 state_step = th.empty(
                     [emb.emb_tensor.shape[0]],
                     dtype=th.float32,
