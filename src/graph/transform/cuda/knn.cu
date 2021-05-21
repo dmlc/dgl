@@ -584,10 +584,12 @@ __global__ void random_init_neighrbors_kernel(const FloatType* points,
                                               const int k,
                                               const int64_t feature_size,
                                               const int64_t batch_size,
-                                              curandState* states) {
+                                              const uint64_t seed) {
   const IdType point_idx = blockIdx.x * blockDim.x + threadIdx.x;
   IdType batch_idx = 0;
   if (point_idx >= offsets[batch_size]) return;
+  curandState state;
+  curand_init(seed, point_idx, 0, &state);
 
   // find the segment location in the input batch
   for (IdType b = 0; b < batch_size + 1; ++b) {
@@ -610,7 +612,7 @@ __global__ void random_init_neighrbors_kernel(const FloatType* points,
     current_central_nodes[i] = point_idx;
   }
   for (IdType i = k; i < segment_size; ++i) {
-    const IdType j = static_cast<IdType>(curand(&states[point_idx]) % (i + 1));
+    const IdType j = static_cast<IdType>(curand(&state) % (i + 1));
     if (j < k) current_neighbors[j] = i + segment_start;
   }
 
@@ -631,11 +633,13 @@ __global__ void random_init_neighrbors_kernel(const FloatType* points,
 template <typename IdType>
 __global__ void find_candidates_kernel(const IdType* offsets, IdType* new_candidates,
                                        IdType* old_candidates, IdType* neighbors, bool* flags,
-                                       curandState* states, const int64_t batch_size,
+                                       const uint64_t seed, const int64_t batch_size,
                                        const int num_candidates, const int k) {
   const IdType point_idx = blockIdx.x * blockDim.x + threadIdx.x;
   IdType batch_idx = 0;
   if (point_idx >= offsets[batch_size]) return;
+  curandState state;
+  curand_init(seed, point_idx, 0, &state);
 
   // find the segment location in the input batch
   for (IdType b = 0; b < batch_size + 1; ++b) {
@@ -667,7 +671,7 @@ __global__ void find_candidates_kernel(const IdType* offsets, IdType* new_candid
     if (curr_num < num_candidates) {
       candidate_data[curr_num] = candidate;
     } else {
-      IdType pos = static_cast<IdType>(curand(&states[point_idx]) % (curr_num + 1));
+      IdType pos = static_cast<IdType>(curand(&state) % (curr_num + 1));
       if (pos < num_candidates) candidate_data[pos] = candidate;
     }
     ++candidate_array[0];
@@ -687,7 +691,7 @@ __global__ void find_candidates_kernel(const IdType* offsets, IdType* new_candid
       if (curr_num < num_candidates) {
         candidate_data[curr_num] = reverse_candidate;
       } else {
-        IdType pos = static_cast<IdType>(curand(&states[point_idx]) % (curr_num + 1));
+        IdType pos = static_cast<IdType>(curand(&state) % (curr_num + 1));
         if (pos < num_candidates) candidate_data[pos] = reverse_candidate;
       }
       ++candidate_array[0];
@@ -840,15 +844,16 @@ void NNDescent(const NDArray& points, const IdArray& offsets,
   IdType* neighbors = central_nodes + k * num_nodes;
 
   // rng state space allocation and initialization
-  curandState* states = static_cast<curandState*>(
-    device->AllocWorkspace(ctx, num_nodes * sizeof(curandState)));
-  uint64_t seed = RandomEngine::ThreadLocal()->RandInt<uint64_t>(
-    std::numeric_limits<uint64_t>::max());
+  // curandState* states = static_cast<curandState*>(
+  //   device->AllocWorkspace(ctx, num_nodes * sizeof(curandState)));
+  // uint64_t seed = RandomEngine::ThreadLocal()->RandInt<uint64_t>(
+  //   std::numeric_limits<uint64_t>::max());
+  uint64_t seed;
   int64_t block_size = cuda::FindNumThreads(num_nodes);
   int64_t num_blocks = (num_nodes - 1) / block_size + 1;
-  CUDA_KERNEL_CALL(
-    impl::setup_rng_kernel, num_blocks, block_size, 0,
-    thr_entry->stream, states, seed, num_nodes);
+  // CUDA_KERNEL_CALL(
+  //   impl::setup_rng_kernel, num_blocks, block_size, 0,
+  //   thr_entry->stream, states, seed, num_nodes);
 
   // allocate space for candidates, distances and flags
   // we use the first element in candidate array to represent length
@@ -874,17 +879,21 @@ void NNDescent(const NDArray& points, const IdArray& offsets,
     device->AllocWorkspace(ctx, sum_temp_size));
 
   // random initialize neighbors
+  seed = RandomEngine::ThreadLocal()->RandInt<uint64_t>(
+    std::numeric_limits<uint64_t>::max());
   CUDA_KERNEL_CALL(
     impl::random_init_neighrbors_kernel, num_blocks, block_size, 0, thr_entry->stream,
     points_data, offsets_data, central_nodes, neighbors, distances, flags, k,
-    feature_size, batch_size, states);
+    feature_size, batch_size, seed);
 
   for (int i = 0; i < num_iters; ++i) {
     // select candidates
+    seed = RandomEngine::ThreadLocal()->RandInt<uint64_t>(
+      std::numeric_limits<uint64_t>::max());
     CUDA_KERNEL_CALL(
       impl::find_candidates_kernel, num_blocks, block_size, 0,
       thr_entry->stream, offsets_data, new_candidates, old_candidates, neighbors,
-      flags, states, batch_size, num_candidates, k);
+      flags, seed, batch_size, num_candidates, k);
 
     // update
     CUDA_KERNEL_CALL(
@@ -905,7 +914,7 @@ void NNDescent(const NDArray& points, const IdArray& offsets,
     }
   }
 
-  device->FreeWorkspace(ctx, states);
+  // device->FreeWorkspace(ctx, states);
   device->FreeWorkspace(ctx, new_candidates);
   device->FreeWorkspace(ctx, old_candidates);
   device->FreeWorkspace(ctx, num_updates);
