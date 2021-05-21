@@ -19,19 +19,21 @@ def test_column_subcolumn():
     l1 = original.subcolumn(i1)
 
     assert len(l1) == i1.shape[0]
-    assert F.array_equal(l1.data, data[i1])
+    assert F.array_equal(l1.data, F.gather_row(data, i1))
 
     # next subcolumn from target context
     i2 = F.copy_to(F.tensor([0, 2], dtype=F.int64), F.ctx())
     l2 = l1.subcolumn(i2)
 
     assert len(l2) == i2.shape[0]
-    assert F.array_equal(l2.data, data[i1[i2]])
+    i1i2 = F.copy_to(F.gather_row(i1, F.copy_to(i2, F.context(i1))), F.ctx())
+    assert F.array_equal(l2.data, F.gather_row(data,i1i2))
 
     # next subcolumn also from target context
     i3 = F.copy_to(F.tensor([1], dtype=F.int64), F.ctx())
     l3 = l2.subcolumn(i3)
 
     assert len(l3) == i3.shape[0]
-    assert F.array_equal(l3.data, data[i1[i2[i3]]])
+    i1i2i3 = F.copy_to(F.gather_row(i1i2, F.copy_to(i3, F.context(i1i2))), F.ctx())
+    assert F.array_equal(l3.data, F.gather_row(data, i1i2i3))
 
