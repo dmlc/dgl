@@ -431,6 +431,6 @@ class NDArrayPartition(object):
         return F.zerocopy_from_dgl_ndarray(_CAPI_DGLNDArrayPartitionMapToLocal(
             self._partition,
             F.zerocopy_to_dgl_ndarray(idxs)))
-        
+
 
 _init_api("dgl.partition")

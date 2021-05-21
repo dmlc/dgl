@@ -113,7 +113,7 @@ class SparseGradOptimizer(abc.ABC):
                 self._opt_meta[emb_name] = opt_meta
 
     def _comm_step(self):
-        comm = self._comm 
+        comm = self._comm
         with th.no_grad():
             idx_in = {}
             grad_in = {}
