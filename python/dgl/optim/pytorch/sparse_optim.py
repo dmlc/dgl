@@ -136,8 +136,9 @@ class SparseGradOptimizer(abc.ABC):
                 # we need to combine gradients from multiple forward paths
                 if len(emb._trace) == 0:
                     idx = th.zeros((0,), dtype=th.long, device=self._device)
-                    grad = th.zeros((0, emb.embedding_dim), dtype=th.float32,
-                        device=self._device)
+                    grad = th.zeros((0, emb.embedding_dim),
+                                    dtype=th.float32,
+                                    device=self._device)
                 elif len(emb._trace) == 1:
                     # the special case where we can use the tensors as is
                     # without any memcpy's
