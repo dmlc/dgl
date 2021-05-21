@@ -81,6 +81,10 @@ class FraudDataset(DGLBuiltinDataset):
         'yelp': 'YelpChi.mat',
         'amazon': 'Amazon.mat'
     }
+    node_name = {
+        'yelp': 'user',
+        'amazon': 'review'
+    }
 
     def __init__(self, name, raw_dir=None, random_seed=2, train_size=0.7, val_size=0.1):
         url = _get_dgl_url(self.file_urls[name])
@@ -103,7 +107,7 @@ class FraudDataset(DGLBuiltinDataset):
         graph_data = {}
         for relation in self.relations[self.name]:
             u, v, _, _ = graphdata2tensors(data[relation])
-            graph_data[('node', relation, 'node')] = (u, v)
+            graph_data[(self.node_name[self.name], relation, self.node_name[self.name])] = (u, v)
         g = heterograph(graph_data)
 
         g.ndata['feature'] = node_features
@@ -168,16 +172,16 @@ class FraudDataset(DGLBuiltinDataset):
     def _random_split(self, x, node_labels, seed=2, train_size=0.7, val_size=0.1):
         """split the dataset into training set, validation set and testing set"""
         N = x.shape[0]
-        if self.name == 'yelp':
-            index = list(range(N))
-            train_idx, test_idx, _, y = train_test_split(index, node_labels, stratify=node_labels,
+        index = list(range(N))
+        train_idx, test_idx, _, y = train_test_split(index, node_labels, stratify=node_labels,
                                                          train_size=train_size,
                                                          random_state=seed, shuffle=True)
-        elif self.name == 'amazon':
+        if self.name == 'amazon':
             # 0-3304 are unlabeled nodes
             index = list(range(3305, N))
             train_idx, test_idx, _, y = train_test_split(index, node_labels[3305:], stratify=node_labels[3305:],
                                                          test_size=train_size, random_state=seed, shuffle=True)
+
         val_idx, test_idx, _, _ = train_test_split(test_idx, y, stratify=y, train_size=val_size / (1 - train_size),
                                                    random_state=seed, shuffle=True)
         train_mask = torch.zeros(N, dtype=torch.bool)
