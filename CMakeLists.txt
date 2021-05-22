@@ -23,6 +23,7 @@ endif()
 # and add set(OPTION VALUE) to override these build options.
 # Alernatively, use cmake -DOPTION=VALUE through command-line.
 dgl_option(USE_CUDA "Build with CUDA" OFF)
+dgl_option(USE_SYSTEM_NCCL "Build using system's NCCL library" OFF)
 dgl_option(USE_OPENMP "Build with OpenMP" ON)
 dgl_option(USE_AVX "Build with AVX optimization" ON)
 dgl_option(USE_FP16 "Build with fp16 support to enable mixed precision training" OFF)
@@ -159,7 +160,12 @@ if(USE_CUDA)
   dgl_config_cuda(DGL_CUDA_SRC)
   list(APPEND DGL_SRC ${DGL_CUDA_SRC})
 
-  include(cmake/util/FindNccl.cmake)
+  if (USE_SYSTEM_NCCL)
+    include(cmake/util/FindNccl.cmake)
+  else()
+    include(cmake/modules/NCCL.cmake)
+  endif()
+
   include_directories(${NCCL_INCLUDE_DIR})
   list(APPEND DGL_LINKER_LIBS ${NCCL_LIBRARY})
 endif(USE_CUDA)
