@@ -73,12 +73,12 @@ class SparseGradOptimizer(abc.ABC):
                 self._comm_setup()
             else:
                 self._shared_setup()
+            self._first_step = False
 
         if self._comm:
             self._comm_step()
         else:
             self._shared_step()
-        self._first_step = False
 
     def _comm_setup(self):
         # find a store to communicate the unique id through
