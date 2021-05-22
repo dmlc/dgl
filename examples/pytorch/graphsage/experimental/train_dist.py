@@ -247,7 +247,7 @@ def run(args, device, data):
 
         if epoch % args.eval_every == 0 and epoch != 0:
             start = time.time()
-            val_acc, test_acc = evaluate(model.module, g, g.ndata['features'],
+            val_acc, test_acc = evaluate(model, g, g.ndata['features'],
                                          g.ndata['labels'], val_nid, test_nid, args.batch_size_eval, device)
             print('Part {}, Val Acc {:.4f}, Test Acc {:.4f}, time: {:.4f}'.format(g.rank(), val_acc, test_acc,
                                                                                   time.time() - start))
