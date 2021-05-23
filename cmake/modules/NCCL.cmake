@@ -11,10 +11,10 @@ ExternalProject_Add(nccl_external
   BUILD_COMMAND
     env
     make
-    "-j"
     "src.build"
+    "-j"
     "BUILDDIR=${NCCL_BUILD_DIR}"
-    BUILD_BYPRODUCTS "${NCCL_BUILD_DIR}/lib/libnccl_static.a"
+  BUILD_BYPRODUCTS "${NCCL_BUILD_DIR}/lib/libnccl_static.a"
   INSTALL_COMMAND ""
   )
 
