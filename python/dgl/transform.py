@@ -2654,6 +2654,12 @@ def sort_out_edges(g, tag, tag_offset_name='_TAG_OFFSET'):
     >>> g_sorted.adjacency_matrix(scipy_fmt='csr').nonzero()
     (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
      array([2, 4, 0, 1, 3, 2, 0, 1], dtype=int32))
+    >>> g_sorted.ndata['_TAG_OFFSET']
+    tensor([[0, 2, 4, 5],
+            [0, 1, 3, 3],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0]])
 
     Parameters
     ------------
@@ -2735,6 +2741,12 @@ def sort_in_edges(g, tag, tag_offset_name='_TAG_OFFSET'):
     >>> g_sorted.adjacency_matrix(scipy_fmt='csr', transpose=False).nonzero()
     (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
      array([2, 4, 0, 1, 3, 2, 0, 1], dtype=int32))
+    >>> g_sorted.ndata['_TAG_OFFSET']
+    tensor([[0, 2, 4, 5],
+            [0, 1, 3, 3],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0]])
 
     Parameters
     ------------
