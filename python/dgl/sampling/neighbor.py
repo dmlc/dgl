@@ -9,6 +9,7 @@ from .. import utils
 
 __all__ = [
     'sample_neighbors',
+    'sample_neighbors_biased'
     'select_topk']
 
 def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
@@ -178,6 +179,11 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
             ret.edges[etype].data[EID] = induced_edges[i]
 
     return ret
+
+def sample_neighbors(g, nodes, fanout, bias, edge_dir='in', tag_offset_name='TAG_OFFSET',
+                     copy_ndata=True, copy_edata=True, _dist_training=False):
+    
+
 
 def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False,
                 copy_ndata=True, copy_edata=True):
