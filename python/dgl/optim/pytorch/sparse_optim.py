@@ -48,6 +48,8 @@ class SparseGradOptimizer(abc.ABC):
                     'MultiGPU rank for each embedding should be same.'
                 assert self._world_size == emb.world_size, \
                     'MultiGPU world_size for each embedding should be same.'
+        assert not self._rank is None
+        assert not self._world_size is None
 
     def step(self):
         ''' The step function.
@@ -88,7 +90,7 @@ class SparseGradOptimizer(abc.ABC):
             if self._rank < 0:
                 self._comm = nccl.Communicator(1, 0, nccl.UniqueId())
             else:
-                if rank == 0:
+                if self._rank == 0:
                     # root process broadcasts nccl id
                     nccl_id = nccl.UniqueId()
                     store.set('nccl_root_id', str(nccl_id))
