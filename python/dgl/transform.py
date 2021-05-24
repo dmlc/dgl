@@ -2731,7 +2731,7 @@ def sort_in_edges(g, tag, tag_offset_name='_TAG_OFFSET'):
     (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
      array([0, 1, 2, 3, 4, 0, 1, 2], dtype=int32)))
     >>> tag = torch.IntTensor([1,1,0,2,0])
-    >>> g_sorted = dgl.transform.sort_out_edges(g, tag)
+    >>> g_sorted = dgl.transform.sort_in_edges(g, tag)
     >>> g_sorted.adjacency_matrix(scipy_fmt='csr', transpose=False).nonzero()
     (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
      array([2, 4, 0, 1, 3, 2, 0, 1], dtype=int32))
