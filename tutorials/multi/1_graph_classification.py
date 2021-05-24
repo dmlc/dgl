@@ -41,14 +41,14 @@ labels = labels.to(device)
 # multiple GPUs, we need to partition it into multiple mutually exclusive
 # subsets of a similar size, one per GPU. We need to repeat the random
 # partition every epoch to guarantee randomness. We can use
-# :func:`dgl.dataloading.GraphDataLoader`, which wraps some PyTorch APIs and
-# does the job for graph classification in data loading.
+# :func:`~dgl.dataloading.pytorch.GraphDataLoader`, which wraps some PyTorch 
+# APIs and does the job for graph classification in data loading.
 #
 # Once all GPUs have finished the backward computation for its minibatch,
 # we need to synchronize the model parameter update across them. Specifically,
 # this involves collecting gradients from all GPUs, averaging them and updating
 # the model parameters on each GPU. We can wrap a PyTorch model with
-# :func:`torch.nn.parallel.DistributedDataParallel` so that the model
+# :func:`~torch.nn.parallel.DistributedDataParallel` so that the model
 # parameter update will invoke gradient synchronization first under the hood.
 #
 # That’s the core behind this tutorial. We will explore it in more detail with
@@ -80,8 +80,8 @@ def init_process_group(world_size, rank):
 # splitting, we need to use a same random seed across processes to ensure a
 # same split. We follow the common practice to train with multiple GPUs and
 # evaluate with a single GPU, thus only set `use_ddp` to True in the
-# :func:`dgl.dataloading.GraphDataLoader` for the training set, where `ddp`
-# stands for :func:`torch.nn.parallel.DistributedDataParallel`.
+# :func:`~dgl.dataloading.pytorch.GraphDataLoader` for the training set, where 
+# `ddp` stands for :func:`~torch.nn.parallel.DistributedDataParallel`.
 #
 
 from dgl.data import split_dataset
@@ -128,7 +128,7 @@ class GIN(nn.Module):
 ###############################################################################
 # To ensure same initial model parameters across processes, we need to set a
 # same random seed before model initialization. Once constructed, we wrap the
-# model instance with :func:`torch.nn.parallel.DistributedDataParallel`.
+# model instance with :func:`~torch.nn.parallel.DistributedDataParallel`.
 #
 
 import torch
