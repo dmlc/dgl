@@ -662,19 +662,16 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLHeteroSortOutEdges")
     HeteroGraphRef hg = args[0];
     NDArray tag = args[1];
     int64_t num_tag = args[2];
+
+    CHECK_EQ(hg->Context().device_type, kDLCPU) << "Only support sorting by tag on cpu";
+    CHECK(aten::IsValidIdArray(tag));
+    CHECK_EQ(tag->ctx, kDLCPU) << "Only support sorting by tag on cpu";
+
     const auto csr = hg->GetCSRMatrix(0);
 
     NDArray tag_pos = aten::NullArray();
     aten::CSRMatrix output;
-    if (!num_tag) {
-      output = aten::CSRMatrix(csr.num_rows, csr.num_cols,
-                          csr.indptr.Clone(), csr.indices.Clone(),
-                          CSRHasData(csr)? csr.data.Clone() : csr.data,
-                          csr.sorted);
-      aten::CSRSort_(&output);
-    } else {
-      std::tie(output, tag_pos) = aten::CSRSortByTag(csr, tag, num_tag);
-    }
+    std::tie(output, tag_pos) = aten::CSRSortByTag(csr, tag, num_tag);
     HeteroGraphPtr output_hg = CreateFromCSR(hg->NumVertexTypes(), output, ALL_CODE);
     List<ObjectRef> ret;
     ret.push_back(HeteroGraphRef(output_hg));
@@ -687,19 +684,17 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLHeteroSortInEdges")
     HeteroGraphRef hg = args[0];
     NDArray tag = args[1];
     int64_t num_tag = args[2];
+
+    CHECK_EQ(hg->Context().device_type, kDLCPU) << "Only support sorting by tag on cpu";
+    CHECK(aten::IsValidIdArray(tag));
+    CHECK_EQ(tag->ctx, kDLCPU) << "Only support sorting by tag on cpu";
+
     const auto csc = hg->GetCSCMatrix(0);
 
     NDArray tag_pos = aten::NullArray();
     aten::CSRMatrix output;
-    if (!num_tag) {
-      output = aten::CSRMatrix(csc.num_rows, csc.num_cols,
-                               csc.indptr.Clone(), csc.indices.Clone(),
-                               CSRHasData(csc)? csc.data.Clone() : csc.data,
-                               csc.sorted);
-      aten::CSRSort_(&output);
-    } else {
-      std::tie(output, tag_pos) = aten::CSRSortByTag(csc, tag, num_tag);
-    }
+    std::tie(output, tag_pos) = aten::CSRSortByTag(csc, tag, num_tag);
+
     HeteroGraphPtr output_hg = CreateFromCSC(hg->NumVertexTypes(), output, ALL_CODE);
     List<ObjectRef> ret;
     ret.push_back(HeteroGraphRef(output_hg));

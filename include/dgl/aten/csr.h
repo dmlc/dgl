@@ -439,7 +439,7 @@ COOMatrix CSRRowWiseTopk(
  *
  * tag     = [1, 1, 0, 2, 0]
  *
- *  After CSRSortByTar
+ *  After CSRSortByTag
  *
  * indptr  = [0, 5, 8]
  * indices = [2, 4, 0, 1, 3, 2, 0, 1]
