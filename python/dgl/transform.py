@@ -2741,7 +2741,7 @@ def sort_in_edges(g, tag, tag_offset_name='_TAG_OFFSET'):
     g : DGLGraph
         The input graph.
     tag : Tensor
-        Integer tensor of shape `(N,)`, `N` being the number of (destination) nodes.
+        Integer tensor of shape `(N,)`, `N` being the number of (source) nodes.
     tag_offset_name : str
         The name of the node feature to store tag offsets.
 
