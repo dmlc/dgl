@@ -2678,8 +2678,7 @@ def sort_out_edges(g, tag, tag_offset_name='_TAG_OFFSET'):
     tag_arr = F.zerocopy_to_dgl_ndarray(tag)
     new_g = g.clone()
     new_g._graph, tag_pos_arr = _CAPI_DGLHeteroSortOutEdges(g._graph, tag_arr, num_tags)
-    if tag is not None:
-        new_g.srcdata[tag_offset_name] = F.from_dgl_nd(tag_pos_arr)
+    new_g.srcdata[tag_offset_name] = F.from_dgl_nd(tag_pos_arr)
     return new_g
 
 
@@ -2760,8 +2759,7 @@ def sort_in_edges(g, tag, tag_offset_name='_TAG_OFFSET'):
     tag_arr = F.zerocopy_to_dgl_ndarray(tag)
     new_g = g.clone()
     new_g._graph, tag_pos_arr = _CAPI_DGLHeteroSortInEdges(g._graph, tag_arr, num_tags)
-    if tag is not None:
-        new_g.dstdata[tag_offset_name] = F.from_dgl_nd(tag_pos_arr)
+    new_g.dstdata[tag_offset_name] = F.from_dgl_nd(tag_pos_arr)
     return new_g
 
 _init_api("dgl.transform")
