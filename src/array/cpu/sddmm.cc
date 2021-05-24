@@ -84,16 +84,16 @@ void SDDMMCsrHetero(const std::string& op,
               std::vector<NDArray> vec_out,
               int lhs_target,
               int rhs_target,
-              const std::vector<dgl_type_t> lhs_eid,
-              const std::vector<dgl_type_t> rhs_eid) {
+              const std::vector<dgl_type_t> lhs_nid,
+              const std::vector<dgl_type_t> rhs_nid) {
   SWITCH_BITS(bits, DType, {
     SWITCH_OP(op, Op, {
       SWITCH_TARGET(lhs_target, rhs_target, LhsTarget, RhsTarget, {
         /* Call  SDDMM for each relation type */
-        for (dgl_type_t etype = 0; etype < lhs_eid.size(); ++etype) {
+        for (dgl_type_t etype = 0; etype < lhs_nid.size(); ++etype) {
           CSRMatrix csr = vec_csr[etype];
-          NDArray lhs = vec_lhs[lhs_eid[etype]];
-          NDArray rhs = vec_rhs[rhs_eid[etype]];
+          NDArray lhs = vec_lhs[lhs_nid[etype]];
+          NDArray rhs = vec_rhs[rhs_nid[etype]];
           NDArray out = vec_out[etype];
           cpu::SDDMMCsr<IdType, DType, Op, LhsTarget, RhsTarget>(bcast, csr, lhs, rhs, out);
         }

@@ -85,12 +85,13 @@ void SpMMHetero(const std::string& op, const std::string& reduce,
               op, reduce, bcast, vec_graph,
               ufeat_vec, efeat_vec, out, out_aux,
               ufeat_eid, out_eid);
-        } //else if (format == SparseFormat::kCOO) {
+        //TODO:: Enable it when CUDA support is added
+        //} else if (format == SparseFormat::kCOO) {
         //   SpMMCoo<XPU, IdType, bits>(
         //       op, reduce, bcast, graph->GetCOOMatrix(0),
         //       ufeat, vec_efeat, out, out_aux);
         // } 
-        else {
+        }else {
           LOG(FATAL) << "SpMM only supports CSC foramt for heterpgraph";
         }
       });
@@ -162,12 +163,13 @@ void SDDMMHetero(const std::string& op,
               op, bcast, vec_csr,
               lhs, rhs, out, lhs_target, rhs_target,
               lhs_eid, rhs_eid);
+        //TODO:: Enable it when CUDA support is added
         // } else if (format == SparseFormat::kCOO) {
         //   SDDMMCoo<XPU, IdType, bits>(
         //       op, bcast, graph->GetCOOMatrix(0),
         //       lhs, rhs, out, lhs_target, rhs_target);
         } else {
-          LOG(FATAL) << "SDDMM only supports CSR formats";
+          LOG(FATAL) << "SDDMM only supports CSR foramts";
         }
       });
     });
@@ -339,7 +341,6 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSpMMHetero")
     std::vector<NDArray> U_vec;
     std::vector<NDArray> V_vec;
     std::vector<NDArray> E_vec;
-    // CHECK_EQ(list_U.size(), list_V.size());
     U_vec.reserve(list_U.size());
     V_vec.reserve(list_V.size());
     E_vec.reserve(list_E.size());
@@ -352,7 +353,6 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSpMMHetero")
     for (Value val : list_E) {
       E_vec.push_back(val->data);
     }
-
     for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
       auto pair = graph->meta_graph()->FindEdge(etype); 
       const dgl_id_t src_id = pair.first;
@@ -363,11 +363,6 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSpMMHetero")
           {"U_data", "E_data", "out", "Arg_U", "Arg_E"});
       CheckContiguous({U, E, V_vec[dst_id], ArgU, ArgE},
           {"U_data", "E_data", "out", "Arg_U", "Arg_E"});
-      // CheckShape(
-      //     {graph->NumVertices(src_id), graph->NumEdges(etype), graph->NumVertices(dst_id)},
-      //     {0, 1, 2, 2, 2},
-      //     {U_vec[src_id], E, V_vec[dst_id], ArgU, ArgE},
-      //     {"U_data", "E_data", "out", "Arg_U", "Arg_E"});
     }
     SpMMHetero(op, reduce_op, graph.sptr(), U_vec, E_vec, V_vec, {ArgU, ArgE});
   });
@@ -406,8 +401,6 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSDDMMHetero")
     List<Value> list_out = args[4];
     int lhs_target = args[5];
     int rhs_target = args[6];
-    
-    // CHECK_EQ(list_U.size(), list_V.size());
     std::vector<NDArray> vec_lhs;
     std::vector<NDArray> vec_rhs;
     std::vector<NDArray> vec_out;
@@ -424,22 +417,6 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSDDMMHetero")
     }
     for (Value val : list_out) {
       vec_out.push_back(val->data);
-    }
-    // CheckCtx(graph->Context(), {lhs, rhs, out}, {"lhs", "rhs", "out"});
-    // CheckContiguous({lhs, rhs, out}, {"lhs", "rhs", "out"});
-    // CHECK_EQ(graph->NumEdgeTypes(), 1);
-    for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
-      // CHECK_EQ(graph->NumEdgeTypes(), 1);
-      auto pair = graph->meta_graph()->FindEdge(etype); 
-
-      const dgl_type_t src_id = pair.first;
-      const dgl_type_t dst_id = pair.second;
-    
-      // CheckShape(
-      //     {graph->NumVertices(src_id), graph->NumEdges(etype), graph->NumVertices(dst_id)},
-      //     {lhs_target, rhs_target, 1},
-      //     {vec_lhs[src_id], vec_rhs[src_id], vec_out[dst_id]},
-      //     {"U_data", "E_data", "V_data"});
     }
     SDDMMHetero(op, graph.sptr(), vec_lhs, vec_rhs, vec_out, lhs_target, rhs_target);
   });
