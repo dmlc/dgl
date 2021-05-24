@@ -142,6 +142,7 @@ file(GLOB DGL_SRC
   src/geometry/*.cc
   src/geometry/cpu/*.cc
   src/dataloading/*.cc
+  src/partition/*.cc
 )
 
 file(GLOB_RECURSE DGL_SRC_1
@@ -157,6 +158,10 @@ list(APPEND DGL_SRC ${DGL_SRC_1})
 if(USE_CUDA)
   dgl_config_cuda(DGL_CUDA_SRC)
   list(APPEND DGL_SRC ${DGL_CUDA_SRC})
+
+  include(cmake/util/FindNccl.cmake)
+  include_directories(${NCCL_INCLUDE_DIR})
+  list(APPEND DGL_LINKER_LIBS ${NCCL_LIBRARY})
 endif(USE_CUDA)
 
 if(USE_CUDA)
@@ -175,6 +180,7 @@ target_include_directories(dgl PRIVATE "third_party/phmap/")
 target_include_directories(dgl PRIVATE "third_party/xbyak/")
 target_include_directories(dgl PRIVATE "third_party/METIS/include/")
 target_include_directories(dgl PRIVATE "tensoradapter/include")
+target_include_directories(dgl PRIVATE "third_party/nanoflann/include")
 
 # For serialization
 if (USE_HDFS)
