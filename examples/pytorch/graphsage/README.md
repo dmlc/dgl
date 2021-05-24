@@ -66,3 +66,14 @@ Notably,
   in the paper.
 
 Micro F1 score reaches 0.9212 on test set.
+
+### Training with PyTorch Lightning
+
+We also provide minibatch training scripts with PyTorch Lightning in `train_lightning.py` and `train_lightning_unsupervised.py`.
+
+Requires `pytorch_lightning` and `torchmetrics`.
+
+```bash
+python3 train_lightning.py
+python3 train_lightning_unsupervised.py
+```

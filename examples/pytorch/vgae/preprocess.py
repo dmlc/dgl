@@ -88,7 +88,7 @@ def mask_test_edges(adj):
 def mask_test_edges_dgl(graph, adj):
     src, dst = graph.edges()
     edges_all = torch.stack([src, dst], dim=0)
-    edges_all = edges_all.t().numpy()
+    edges_all = edges_all.t().cpu().numpy()
     num_test = int(np.floor(edges_all.shape[0] / 10.))
     num_val = int(np.floor(edges_all.shape[0] / 20.))
 
