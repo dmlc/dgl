@@ -47,19 +47,6 @@ def check_sort(spm, tag_arr=None, tag_pos=None):
                 tag_pos_ptr = tag_arr[dst[j+1]]
     return True
 
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sorting by tag not implemented")
-@parametrize_dtype
-def test_sort_without_tag(idtype):
-    num_nodes, num_adj = 200, [20, 50]
-    g = create_test_heterograph(num_nodes, num_adj, idtype=idtype)
-    
-    new_g = dgl.sort_out_edges(g)
-    new_csr = new_g.adjacency_matrix(scipy_fmt='csr')
-    assert(check_sort(new_csr))
-
-    new_g = dgl.sort_in_edges(g)
-    new_csc = new_g.adjacency_matrix(transpose=False, scipy_fmt='csr')
-    assert(check_sort(new_csc))
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sorting by tag not implemented")
 @parametrize_dtype
@@ -105,6 +92,5 @@ def test_sort_with_tag_bipartite(idtype):
     assert(not check_sort(old_csc, g.nodes['_U'].data['tag']))
 
 if __name__ == "__main__":
-    test_sort_without_tag(F.int32)
     test_sort_with_tag(F.int32)
     test_sort_with_tag_bipartite(F.int32)

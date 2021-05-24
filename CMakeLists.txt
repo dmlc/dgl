@@ -224,7 +224,6 @@ if(MSVC)
     TARGET dgl POST_BUILD COMMAND
     cmd.exe /c "COPY /Y Release\\dgl.dll .")
 endif(MSVC)
-
 # Tensor adapter libraries
 # Linking against LibTorch involves linking against a bunch of other libraries
 # returned by PyTorch's CMake (e.g. C10 or NVTools).  Because CMake caches
