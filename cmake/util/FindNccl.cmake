@@ -57,9 +57,6 @@ find_path(NCCL_INCLUDE_DIR
   NAMES nccl.h
   PATHS $ENV{NCCL_ROOT}/include ${NCCL_ROOT}/include)
 
-message(${BUILD_WITH_SHARED_NCCL} ", " $ENV{NCCL_ROOT} ", " ${NCCL_ROOT} ", " ${NCCL_INCLUDE_DIR})
-
-
 # make sure it has point to point support
 file(STRINGS "${NCCL_INCLUDE_DIR}/nccl.h" NCCL_VERSION_CODE REGEX "^#define[ \t]+NCCL_VERSION_CODE[ \t]+[0-9]+.*$" LIMIT_COUNT 1)
 string(REGEX REPLACE "^.*NCCL_VERSION_CODE[ \t]+([0-9]+).*$" "\\1" NCCL_VERSION "${NCCL_VERSION_CODE}")
@@ -68,8 +65,6 @@ string(REGEX REPLACE "^.*NCCL_VERSION_CODE[ \t]+([0-9]+).*$" "\\1" NCCL_VERSION 
 find_library(NCCL_LIBRARY
   NAMES ${NCCL_LIB_NAME}
   PATHS $ENV{NCCL_ROOT}/lib/ ${NCCL_ROOT}/lib)
-
-message("NCCL_LIB " ${NCCL_LIBRARY} )
 
 if ("${NCCL_VERSION}" LESS "2700")
   message(FATAL_ERROR "Require nccl >= 2700, but found ${NCCL_LIBRARY}==${NCCL_VERSION}")

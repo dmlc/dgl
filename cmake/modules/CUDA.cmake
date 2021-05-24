@@ -183,8 +183,8 @@ macro(dgl_cuda_compile objlist_variable)
     list(APPEND CUDA_NVCC_FLAGS -Xcompiler -Wno-unused-function)
   endif()
 
-
   set(CUDA_NVCC_FLAGS_DEBUG "${CUDA_NVCC_FLAGS_DEBUG} -G")
+
   if(MSVC)
     # disable noisy warnings:
     # 4819: The file contains a character that cannot be represented in the current code page (number).
@@ -206,7 +206,6 @@ macro(dgl_cuda_compile objlist_variable)
     list(APPEND CUDA_NVCC_FLAGS "--keep --keep-dir ${CUDA_NVCC_INTERMEDIATE_DIR}")
   endif()
 
-  list(APPEND CUDA_NVCC_FLAGS --generate-dependencies)
   cuda_compile(cuda_objcs ${ARGN})
 
   foreach(var CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_RELEASE CMAKE_CXX_FLAGS_DEBUG)
