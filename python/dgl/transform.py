@@ -2752,7 +2752,7 @@ def sort_in_edges(g, tag, tag_offset_name='_TAG_OFFSET'):
         A new graph whose out edges are sorted. The node/edge features of the
         input graph is shallow-copied over.
         - `g_sorted.ndata[tag_offset_name]` : Tensor of shape `(N, max_tag + 2)`. If
-        `g` is heterogeneous, get from `g_sorted.srcdata`.
+        `g` is heterogeneous, get from `g_sorted.dstdata`.
     """
     if len(g.etypes) > 1:
         raise DGLError("Only support homograph and bipartite graph")
