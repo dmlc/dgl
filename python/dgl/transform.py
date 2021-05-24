@@ -2639,11 +2639,21 @@ def sort_out_edges(g, tag, tag_offset_name='_TAG_OFFSET'):
     and the tag offsets are stored in the source node data.
 
     The sorted graph and the calculated tag offsets are needed by
-    certain operators that consider node tags. See xxx for an example.
+    certain operators that consider node tags. See `sample_neighbors_biased`
+    for an example.
 
     Examples
     -----------
-    ...
+
+    >>> g = dgl.graph(([0,0,0,0,0,1,1,1],[0,1,2,3,4,0,1,2]))
+    >>> g.adjacency_matrix(scipy_fmt='csr').nonzero()
+    (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
+     array([0, 1, 2, 3, 4, 0, 1, 2], dtype=int32))
+    >>> tag = torch.IntTensor([1,1,0,2,0])
+    >>> g_sorted = dgl.transform.sort_out_edges(g, tag)
+    >>> g_sorted.adjacency_matrix(scipy_fmt='csr').nonzero()
+    (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
+     array([2, 4, 0, 1, 3, 2, 0, 1], dtype=int32))
 
     Parameters
     ------------
@@ -2664,9 +2674,8 @@ def sort_out_edges(g, tag, tag_offset_name='_TAG_OFFSET'):
     """
     if len(g.etypes) > 1:
         raise DGLError("Only support homograph and bipartite graph")
-    tag_data = g.dstdata[tag]
-    num_tags = int(F.asnumpy(F.max(tag_data, 0))) + 1
-    tag_arr = F.zerocopy_to_dgl_ndarray(tag_data)
+    num_tags = int(F.asnumpy(F.max(tag, 0))) + 1
+    tag_arr = F.zerocopy_to_dgl_ndarray(tag)
     new_g = g.clone()
     new_g._graph, tag_pos_arr = _CAPI_DGLHeteroSortOutEdges(g._graph, tag_arr, num_tags)
     if tag is not None:
@@ -2681,7 +2690,18 @@ def sort_in_edges(g, tag, tag_offset_name='_TAG_OFFSET'):
     A typical use case is to sort the edges by the source node types, where
     the tags represent source node types. After sorting, edges sharing
     the same tag will be arranged in a consecutive range in
-    a node's adjacency list.
+    a node's adjacency list. Following is an example:
+
+        Consider a graph as follows:
+
+        0 <- 0, 1, 2, 3, 4
+        1 <- 0, 1, 2
+
+        Given node tags [1, 1, 0, 2, 0], each node's adjacency list
+        will be sorted as follows:
+
+        0 <- 2, 4, 0, 1, 3
+        1 <- 2, 0, 1
 
     The function will also returns the starting offsets of the tag
     segments in a tensor of shape `(N, max_tag+2)`. For node `i`,
@@ -2700,6 +2720,23 @@ def sort_in_edges(g, tag, tag_offset_name='_TAG_OFFSET'):
     In this case, the provided node tags are for the source nodes,
     and the tag offsets are stored in the destination node data.
 
+    The sorted graph and the calculated tag offsets are needed by
+    certain operators that consider node tags. See `sample_neighbors_biased`
+    for an example.
+
+    Examples
+    -----------
+
+    >>> g = dgl.graph(([0,1,2,3,4,0,1,2],[0,0,0,0,0,1,1,1]))
+    >>> g.adjacency_matrix(scipy_fmt='csr', transpose=False).nonzero()
+    (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
+     array([0, 1, 2, 3, 4, 0, 1, 2], dtype=int32)))
+    >>> tag = torch.IntTensor([1,1,0,2,0])
+    >>> g_sorted = dgl.transform.sort_out_edges(g, tag)
+    >>> g_sorted.adjacency_matrix(scipy_fmt='csr', transpose=False).nonzero()
+    (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
+     array([2, 4, 0, 1, 3, 2, 0, 1], dtype=int32))
+
     Parameters
     ------------
     g : DGLGraph
@@ -2719,9 +2756,8 @@ def sort_in_edges(g, tag, tag_offset_name='_TAG_OFFSET'):
     """
     if len(g.etypes) > 1:
         raise DGLError("Only support homograph and bipartite graph")
-    tag_data = g.srcdata[tag]
-    num_tags = int(F.asnumpy(F.max(tag_data, 0))) + 1
-    tag_arr = F.zerocopy_to_dgl_ndarray(tag_data)
+    num_tags = int(F.asnumpy(F.max(tag, 0))) + 1
+    tag_arr = F.zerocopy_to_dgl_ndarray(tag)
     new_g = g.clone()
     new_g._graph, tag_pos_arr = _CAPI_DGLHeteroSortInEdges(g._graph, tag_arr, num_tags)
     if tag is not None:
