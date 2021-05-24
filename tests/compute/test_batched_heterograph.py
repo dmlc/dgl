@@ -308,6 +308,7 @@ def test_empty_relation(idtype):
     dgl.batch([g1, g2])
 
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="Issue is not related with GPU")
 @parametrize_dtype
 def test_unbatch2(idtype):
     # batch 3 graphs but unbatch to 2
@@ -353,7 +354,7 @@ def test_batch_netypes():
     import networkx as nx
     B = nx.DiGraph()
     B.add_nodes_from([1, 2, 3, 4], bipartite=0,
-                     some_attr=F.copy_to(F.tensor([1, 2, 3, 4], dtype=F.float32), F.cpu()))
+                     some_attr=F.tensor([1, 2, 3, 4], dtype=F.float32))
     B.add_nodes_from(["a", "b", "c"], bipartite=1)
     B.add_edges_from([(1, "a"), (1, "b"), (2, "b"),
                       (2, "c"), (3, "c"), (4, "a")])
