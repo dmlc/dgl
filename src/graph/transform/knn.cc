@@ -64,7 +64,6 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLNNDescent")
         });
       });
     });
-
   });
 
 }  // namespace transform

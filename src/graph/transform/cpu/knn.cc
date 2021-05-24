@@ -30,7 +30,7 @@ static constexpr int NN_DESCENT_BLOCK_SIZE = 16384;
  */
 template <typename FloatType, typename IdType>
 FloatType EuclideanDistWithCheck(const FloatType* vec1, const FloatType* vec2, int64_t dim,
-                                 FloatType worst_dist=std::numeric_limits<FloatType>::max()) {
+                                 FloatType worst_dist = std::numeric_limits<FloatType>::max()) {
   FloatType dist = 0;
   bool early_stop = false;
   IdType idx = 0;
@@ -59,8 +59,12 @@ FloatType EuclideanDistWithCheck(const FloatType* vec1, const FloatType* vec2, i
     }
   }
 
-  if (early_stop) return std::numeric_limits<FloatType>::max();
-  else return dist;
+  if (early_stop) {
+    return std::numeric_limits<FloatType>::max();
+  }
+  else {
+    return dist;
+  }
 }
 
 /*! \brief Compute Euclidean distance between two vectors */
@@ -91,7 +95,7 @@ FloatType EuclideanDist(const FloatType* vec1, const FloatType* vec2, int64_t di
 template <typename FloatType, typename IdType>
 void HeapInsert(IdType* out, FloatType* dist,
                 IdType new_id, FloatType new_dist,
-                int k, bool check_repeat=false) {
+                int k, bool check_repeat = false) {
   if (new_dist > dist[0]) return;
 
   // check if we have it
@@ -128,7 +132,7 @@ void HeapInsert(IdType* out, FloatType* dist,
 template <typename FloatType, typename IdType>
 int FlagedHeapInsert(IdType* out, FloatType* dist, bool* flag,
                       IdType new_id, FloatType new_dist, bool new_flag,
-                      int k, bool check_repeat=false) {
+                      int k, bool check_repeat = false) {
   if (new_dist > dist[0]) return 0;
 
   if (check_repeat) {

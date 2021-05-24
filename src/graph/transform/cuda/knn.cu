@@ -113,8 +113,12 @@ __device__ FloatType euclidean_dist_with_check(const FloatType* vec1,
     }
   }
 
-  if (early_stop) return std::numeric_limits<FloatType>::max();
-  else return dist;
+  if (early_stop) {
+    return std::numeric_limits<FloatType>::max();
+  }
+  else {
+    return dist;
+  }
 }
 
 template <typename FloatType, typename IdType>
@@ -150,7 +154,7 @@ __device__ void build_heap(IdType* indices, FloatType* dists, int size) {
 template <typename FloatType, typename IdType>
 __device__ void heap_insert(IdType* indices, FloatType* dist,
                            IdType new_idx, FloatType new_dist,
-                           int size, bool check_repeat=false) {
+                           int size, bool check_repeat = false) {
   if (new_dist > dist[0]) return;
 
   // check if we have it
@@ -191,7 +195,7 @@ __device__ void heap_insert(IdType* indices, FloatType* dist,
 template <typename FloatType, typename IdType>
 __device__ bool flaged_heap_insert(IdType* indices, FloatType* dist, bool* flags,
                                   IdType new_idx, FloatType new_dist, bool new_flag,
-                                  int size, bool check_repeat=false) {
+                                  int size, bool check_repeat = false) {
   if (new_dist > dist[0]) return false;
 
   // check if we have it
