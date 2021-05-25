@@ -264,6 +264,7 @@ pipeline {
                 docker {
                   label 'linux-gpu-node'
                   image 'dgllib/dgl-ci-gpu:conda'
+                  args '--runtime nvidia'
                   alwaysPull true
                 }
               }
