@@ -18,15 +18,25 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
              NDArray efeat,
              NDArray out,
              std::vector<NDArray> out_aux) {
+  const int64_t dim = bcast.out_len;
   if (reduce == "sum") {
     SWITCH_BITS(bits, DType, {
       SWITCH_OP(op, Op, {
+        DType *out_off = out.Ptr<DType>();
+        std::fill(out_off, out_off + csr.num_rows * dim, 0);
         cpu::SpMMSumCsr<IdType, DType, Op>(bcast, csr, ufeat, efeat, out);
       });
     });
   } else if (reduce == "max" || reduce == "min") {
     SWITCH_BITS(bits, DType, {
       SWITCH_OP(op, Op, {
+        DType *out_off = out.Ptr<DType>();
+        std::fill(out_off, out_off + csr.num_rows * dim, 
+          cpu::op::Max<DType>::zero);
+        IdType* argX = Op::use_lhs ? static_cast<IdType*>(out_aux[0]->data) : nullptr;
+        IdType* argW = Op::use_rhs ? static_cast<IdType*>(out_aux[1]->data) : nullptr;
+        if (Op::use_lhs) std::fill(argX, argX + csr.num_rows * dim, 0);
+        if (Op::use_rhs) std::fill(argW, argW + csr.num_rows * dim, 0);
         if (reduce == "max")
           cpu::SpMMCmpCsr<IdType, DType, Op, cpu::op::Max<DType>>(
               bcast, csr, ufeat, efeat, out, out_aux[0], out_aux[1]);
@@ -51,9 +61,15 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
              std::vector<NDArray> out_aux,
              const std::vector<dgl_type_t> ufeat_nid,
              const std::vector<dgl_type_t> out_eid) {
+  const int64_t dim = bcast.out_len;
   if (reduce == "sum") {
     SWITCH_BITS(bits, DType, {
       SWITCH_OP(op, Op, {
+        //TODO:: (IN) Ideally the for loop should go over num_ntypes
+        for (dgl_type_t etype = 0; etype < ufeat_nid.size(); ++etype){
+          DType *out_off = vec_out[out_eid[etype]].Ptr<DType>();
+          std::fill(out_off, out_off + vec_csr[etype].num_rows * dim, 0);
+        }
         /* Call  SpMM for each relation type */
         for (dgl_type_t etype = 0; etype < ufeat_nid.size(); ++etype) {
           const dgl_type_t src_id = ufeat_nid[etype];
@@ -70,6 +86,15 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
   else if (reduce == "max" || reduce == "min") {
     SWITCH_BITS(bits, DType, {
       SWITCH_OP(op, Op, {
+         //TODO:: (IN) Ideally the for loop should go over num_ntypes
+        for (dgl_type_t etype = 0; etype < ufeat_nid.size(); ++etype){
+          DType *out_off = vec_out[out_eid[etype]].Ptr<DType>();
+          IdType* argX = Op::use_lhs ? static_cast<IdType*>(out_aux[0]->data) : nullptr;
+          IdType* argW = Op::use_rhs ? static_cast<IdType*>(out_aux[1]->data) : nullptr;   
+          std::fill(out_off, out_off + dim, cpu::op::Max<DType>::zero);
+          if (Op::use_lhs) std::fill(argX, argX + vec_csr[etype].num_rows * dim, 0);
+          if (Op::use_rhs) std::fill(argW, argW + vec_csr[etype].num_rows * dim, 0);
+        }
         /* Call  SpMM for each relation type */
         for (dgl_type_t etype = 0; etype < ufeat_nid.size(); ++etype) {
           const dgl_type_t src_id = ufeat_nid[etype];
