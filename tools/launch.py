@@ -185,6 +185,7 @@ def submit_jobs(args, udf_command):
         client_cmd = client_cmd + ' ' + 'OMP_NUM_THREADS=' + str(args.num_omp_threads)
     if os.environ.get('PYTHONPATH') is not None:
         client_cmd = client_cmd + ' ' + 'PYTHONPATH=' + os.environ.get('PYTHONPATH')
+    client_cmd = client_cmd + ' ' + 'DGL_GRAPH_FORMAT=' + str(args.graph_format)
 
     torch_cmd = '-m torch.distributed.launch'
     torch_cmd = torch_cmd + ' ' + '--nproc_per_node=' + str(args.num_trainers)
@@ -248,6 +249,10 @@ def main():
                         help='The number of OMP threads in the server process. \
                         It should be small if server processes and trainer processes run on \
                         the same machine. By default, it is 1.')
+    parser.add_argument('--graph_format', type=str, default='csc',
+                        help='The format of the graph structure of each partition. \
+                        The allowed formats are csr, csc and coo. A user can specify multiple
+                        formats, separated by ",". For example, the graph format is "csr,csc".')
     args, udf_command = parser.parse_known_args()
     assert len(udf_command) == 1, 'Please provide user command line.'
     assert args.num_trainers is not None and args.num_trainers > 0, \
