@@ -59,7 +59,7 @@ class FakeNewsDataset(DGLBuiltinDataset):
     Parameters
     ----------
     name : str
-        Name of the dataset
+        Name of the dataset (gossipcop, or politifact)
     feature_name : str
         Name of the feature (bert, content, profile, or spacy)
     raw_dir : str
@@ -70,6 +70,8 @@ class FakeNewsDataset(DGLBuiltinDataset):
 
     Attributes
     ----------
+    name : str
+        Name of the dataset (gossipcop, or politifact)
     num_classes : int
         Number of label classes
     num_graphs : int
@@ -77,18 +79,17 @@ class FakeNewsDataset(DGLBuiltinDataset):
     graphs : list
         A list of DGLGraph objects
     labels : Tensor
-        graph labels
+        Graph labels
     feature_name : str
-        name of the feature, one of
-        (``'bert'``, ``'content'``, ``'profile'``, ``'spacy'``)
+        Name of the feature (bert, content, profile, or spacy)
     feature : scipy.sparse.csr.csr_matrix
-        node features
+        Node features
     train_mask : Tensor
-        mask of training set
+        Mask of training set
     val_mask : Tensor
-        mask of validation set
+        Mask of validation set
     test_mask : Tensor
-        mask of testing set
+        Mask of testing set
 
     Examples
     --------
@@ -104,7 +105,10 @@ class FakeNewsDataset(DGLBuiltinDataset):
     }
 
     def __init__(self, name, feature_name, raw_dir=None):
+        assert name in ['gossipcop', 'politifact']
         url = _get_dgl_url(self.file_urls[name])
+
+        assert feature_name in ['bert', 'content', 'profile', 'spacy']
         self.feature_name = feature_name
         super(FakeNewsDataset, self).__init__(name=name,
                                               url=url,
