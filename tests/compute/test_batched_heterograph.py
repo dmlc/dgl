@@ -308,7 +308,6 @@ def test_empty_relation(idtype):
     dgl.batch([g1, g2])
 
 
-@unittest.skipIf(F._default_context_str == 'gpu', reason="Issue is not related with GPU")
 @parametrize_dtype
 def test_unbatch2(idtype):
     # batch 3 graphs but unbatch to 2
@@ -349,6 +348,7 @@ def test_batch_keeps_empty_data(idtype):
     assert "eh" in g.edges[("a", "to", "a")].data
 
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="Issue is not related with GPU")
 def test_batch_netypes():
     # Test for https://github.com/dmlc/dgl/issues/2808
     import networkx as nx
