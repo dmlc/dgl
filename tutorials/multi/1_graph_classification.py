@@ -4,7 +4,7 @@ Single Machine Multi-GPU Minibatch Graph Classification
 
 In this tutorial, you will learn how to use multiple GPUs in training a
 graph neural network (GNN) for graph classification. This tutorial assumes
-expertise in GNNs for graph classification and we recommend you to check
+knowledge in GNNs for graph classification and we recommend you to check
 :doc:`Training a GNN for Graph Classification <../blitz/5_graph_classification>` otherwise.
 
 (Time estimate: 8 minutes)
@@ -51,7 +51,7 @@ labels = labels.to(device)
 # :func:`~torch.nn.parallel.DistributedDataParallel` so that the model
 # parameter update will invoke gradient synchronization first under the hood.
 #
-# That’s the core behind this tutorial. We will explore it in more detail with
+# That’s the core behind this tutorial. We will explore it more in detail with
 # a complete example below.
 #
 # Distributed Process Group Initialization
@@ -126,7 +126,7 @@ class GIN(nn.Module):
         return self.pool(g, feats)
 
 ###############################################################################
-# To ensure same initial model parameters across processes, we need to set a
+# To ensure same initial model parameters across processes, we need to set the
 # same random seed before model initialization. Once constructed, we wrap the
 # model instance with :func:`~torch.nn.parallel.DistributedDataParallel`.
 #
@@ -142,7 +142,7 @@ def init_model(seed, device):
     return model
 
 ###############################################################################
-# Main Function for One Process
+# Main Function for Each Process
 # -----------------------------
 #
 # Define the model evaluation function as in the single-GPU setting.
@@ -168,10 +168,10 @@ def evaluate(model, dataloader, device):
     return 1.0 * total_correct / total
 
 ###############################################################################
-# Define the main function for one process. Since different processes handle
+# Define the main function for each process. Since different processes handle
 # different data batches, some of them can finish their tasks earlier.
 # `dist.barrier()` forces faster processes to wait until all processes
-# have encountered the barrier.
+# have reached the barrier.
 #
 
 from torch.optim import Adam
