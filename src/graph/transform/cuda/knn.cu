@@ -115,8 +115,7 @@ __device__ FloatType euclidean_dist_with_check(const FloatType* vec1,
 
   if (early_stop) {
     return std::numeric_limits<FloatType>::max();
-  }
-  else {
+  } else {
     return dist;
   }
 }

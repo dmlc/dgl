@@ -61,8 +61,7 @@ FloatType EuclideanDistWithCheck(const FloatType* vec1, const FloatType* vec2, i
 
   if (early_stop) {
     return std::numeric_limits<FloatType>::max();
-  }
-  else {
+  } else {
     return dist;
   }
 }
