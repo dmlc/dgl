@@ -169,7 +169,7 @@ def evaluate(model, dataloader, device):
 
 ###############################################################################
 # Define the main function for one process. Since different processes handle
-# different data batches, some of them can finish their task earlier.
+# different data batches, some of them can finish their tasks earlier.
 # `dist.barrier()` forces faster processes to wait until all processes
 # have encountered the barrier.
 #
