@@ -9,6 +9,7 @@ from ._ffi.function import _init_api
 from .base import dgl_warning, DGLError
 from . import convert
 from .heterograph import DGLHeteroGraph, DGLBlock
+from .heterograph_index import create_metagraph_index, create_heterograph_from_relations
 from .frame import Frame
 from . import ndarray as nd
 from . import backend as F
@@ -46,7 +47,9 @@ __all__ = [
     'metis_partition_assignment',
     'partition_graph_with_halo',
     'metis_partition',
-    'as_heterograph']
+    'as_heterograph',
+    'adj_product_graph',
+    'adj_sum_graph']
 
 
 def pairwise_squared_distance(x):
@@ -59,8 +62,8 @@ def pairwise_squared_distance(x):
     return x2s + F.swapaxes(x2s, -1, -2) - 2 * x @ F.swapaxes(x, -1, -2)
 
 #pylint: disable=invalid-name
-def knn_graph(x, k):
-    """Construct a graph from a set of points according to k-nearest-neighbor (KNN)
+def knn_graph(x, k, algorithm='bruteforce-blas', dist='euclidean'):
+    r"""Construct a graph from a set of points according to k-nearest-neighbor (KNN)
     and return.
 
     The function transforms the coordinates/features of a point set
@@ -86,13 +89,44 @@ def knn_graph(x, k):
           ``x[i][j]`` corresponds to the j-th node in the i-th KNN graph.
     k : int
         The number of nearest neighbors per node.
+    algorithm : str, optional
+        Algorithm used to compute the k-nearest neighbors.
+
+        * 'bruteforce-blas' will first compute the distance matrix
+          using BLAS matrix multiplication operation provided by
+          backend frameworks. Then use topk algorithm to get
+          k-nearest neighbors. This method is fast when the point
+          set is small but has :math:`O(N^2)` memory complexity where
+          :math:`N` is the number of points.
+
+        * 'bruteforce' will compute distances pair by pair and
+          directly select the k-nearest neighbors during distance
+          computation. This method is slower than 'bruteforce-blas'
+          but has less memory overhead (i.e., :math:`O(Nk)` where :math:`N`
+          is the number of points, :math:`k` is the number of nearest
+          neighbors per node) since we do not need to store all distances.
+
+        * 'bruteforce-sharemem' (CUDA only) is similar to 'bruteforce'
+          but use shared memory in CUDA devices for buffer. This method is
+          faster than 'bruteforce' when the dimension of input points
+          is not large. This method is only available on CUDA device.
+
+        * 'kd-tree' will use the kd-tree algorithm (CPU only).
+          This method is suitable for low-dimensional data (e.g. 3D
+          point clouds)
+
+        (default: 'bruteforce-blas')
+    dist : str, optional
+        The distance metric used to compute distance between points. It can be the following
+        metrics:
+        * 'euclidean': Use Euclidean distance (L2 norm) :math:`\sqrt{\sum_{i} (x_{i} - y_{i})^{2}}`.
+        * 'cosine': Use cosine distance.
+        (default: 'euclidean')
 
     Returns
     -------
     DGLGraph
         The constructred graph. The node IDs are in the same order as :attr:`x`.
-
-        The returned graph is on CPU, regardless of the context of input :attr:`x`.
 
     Examples
     --------
@@ -129,30 +163,82 @@ def knn_graph(x, k):
     (tensor([0, 1, 2, 2, 2, 3, 3, 3, 4, 5, 5, 5, 6, 6, 7, 7]),
      tensor([0, 1, 1, 2, 3, 0, 2, 3, 4, 5, 6, 7, 4, 6, 5, 7]))
     """
+    # check invalid k
+    if k <= 0:
+        raise DGLError("Invalid k value. expect k > 0, got k = {}".format(k))
+
+    # check empty point set
+    if F.shape(x)[0] == 0:
+        raise DGLError("Find empty point set")
+
+    if algorithm == 'bruteforce-blas':
+        return _knn_graph_blas(x, k, dist=dist)
+    else:
+        if F.ndim(x) == 3:
+            x_size = tuple(F.shape(x))
+            x = F.reshape(x, (x_size[0] * x_size[1], x_size[2]))
+            x_seg = x_size[0] * [x_size[1]]
+        else:
+            x_seg = [F.shape(x)[0]]
+        out = knn(x, x_seg, x, x_seg, k, algorithm=algorithm, dist=dist)
+        row, col = out[1], out[0]
+        return convert.graph((row, col))
+
+def _knn_graph_blas(x, k, dist='euclidean'):
+    r"""Construct a graph from a set of points according to k-nearest-neighbor (KNN).
+
+    This function first compute the distance matrix using BLAS matrix multiplication
+    operation provided by backend frameworks. Then use topk algorithm to get
+    k-nearest neighbors.
+
+    Parameters
+    ----------
+    x : Tensor
+        The point coordinates. It can be either on CPU or GPU.
+
+        * If is 2D, ``x[i]`` corresponds to the i-th node in the KNN graph.
+
+        * If is 3D, ``x[i]`` corresponds to the i-th KNN graph and
+          ``x[i][j]`` corresponds to the j-th node in the i-th KNN graph.
+    k : int
+        The number of nearest neighbors per node.
+    dist : str, optional
+        The distance metric used to compute distance between points. It can be the following
+        metrics:
+        * 'euclidean': Use Euclidean distance (L2 norm) :math:`\sqrt{\sum_{i} (x_{i} - y_{i})^{2}}`.
+        * 'cosine': Use cosine distance.
+        (default: 'euclidean')
+    """
     if F.ndim(x) == 2:
         x = F.unsqueeze(x, 0)
     n_samples, n_points, _ = F.shape(x)
 
+    if k > n_points:
+        dgl_warning("'k' should be less than or equal to the number of points in 'x'" \
+                    "expect k <= {0}, got k = {1}, use k = {0}".format(n_points, k))
+        k = n_points
+
+    # if use cosine distance, normalize input points first
+    # thus we can use euclidean distance to find knn equivalently.
+    if dist == 'cosine':
+        l2_norm = lambda v: F.sqrt(F.sum(v * v, dim=2, keepdims=True))
+        x = x / (l2_norm(x) + 1e-5)
+
+    ctx = F.context(x)
     dist = pairwise_squared_distance(x)
     k_indices = F.argtopk(dist, k, 2, descending=False)
-    dst = F.copy_to(k_indices, F.cpu())
-
-    src = F.zeros_like(dst) + F.reshape(F.arange(0, n_points), (1, -1, 1))
-
-    per_sample_offset = F.reshape(F.arange(0, n_samples) * n_points, (-1, 1, 1))
-    dst += per_sample_offset
-    src += per_sample_offset
-    dst = F.reshape(dst, (-1,))
-    src = F.reshape(src, (-1,))
-    adj = sparse.csr_matrix(
-        (F.asnumpy(F.zeros_like(dst) + 1), (F.asnumpy(dst), F.asnumpy(src))),
-        shape=(n_samples * n_points, n_samples * n_points))
-
-    return convert.from_scipy(adj)
+    # index offset for each sample
+    offset = F.arange(0, n_samples, ctx=ctx) * n_points
+    offset = F.unsqueeze(offset, 1)
+    src = F.reshape(k_indices, (n_samples, n_points * k))
+    src = F.unsqueeze(src, 0) + offset
+    dst = F.repeat(F.arange(0, n_points, ctx=ctx), k, dim=0)
+    dst = F.unsqueeze(dst, 0) + offset
+    return convert.graph((F.reshape(src, (-1,)), F.reshape(dst, (-1,))))
 
 #pylint: disable=invalid-name
-def segmented_knn_graph(x, k, segs):
-    """Construct multiple graphs from multiple sets of points according to
+def segmented_knn_graph(x, k, segs, algorithm='bruteforce-blas', dist='euclidean'):
+    r"""Construct multiple graphs from multiple sets of points according to
     k-nearest-neighbor (KNN) and return.
 
     Compared with :func:`dgl.knn_graph`, this allows multiple point sets with
@@ -173,13 +259,44 @@ def segmented_knn_graph(x, k, segs):
     segs : list[int]
         Number of points in each point set. The numbers in :attr:`segs`
         must sum up to the number of rows in :attr:`x`.
+    algorithm : str, optional
+        Algorithm used to compute the k-nearest neighbors.
+
+        * 'bruteforce-blas' will first compute the distance matrix
+          using BLAS matrix multiplication operation provided by
+          backend frameworks. Then use topk algorithm to get
+          k-nearest neighbors. This method is fast when the point
+          set is small but has :math:`O(N^2)` memory complexity where
+          :math:`N` is the number of points.
+
+        * 'bruteforce' will compute distances pair by pair and
+          directly select the k-nearest neighbors during distance
+          computation. This method is slower than 'bruteforce-blas'
+          but has less memory overhead (i.e., :math:`O(Nk)` where :math:`N`
+          is the number of points, :math:`k` is the number of nearest
+          neighbors per node) since we do not need to store all distances.
+
+        * 'bruteforce-sharemem' (CUDA only) is similar to 'bruteforce'
+          but use shared memory in CUDA devices for buffer. This method is
+          faster than 'bruteforce' when the dimension of input points
+          is not large. This method is only available on CUDA device.
+
+        * 'kd-tree' will use the kd-tree algorithm (CPU only).
+          This method is suitable for low-dimensional data (e.g. 3D
+          point clouds)
+
+        (default: 'bruteforce-blas')
+    dist : str, optional
+        The distance metric used to compute distance between points. It can be the following
+        metrics:
+        * 'euclidean': Use Euclidean distance (L2 norm) :math:`\sqrt{\sum_{i} (x_{i} - y_{i})^{2}}`.
+        * 'cosine': Use cosine distance.
+        (default: 'euclidean')
 
     Returns
     -------
     DGLGraph
         The graph. The node IDs are in the same order as :attr:`x`.
-
-        The returned graph is on CPU, regardless of the context of input :attr:`x`.
 
     Examples
     --------
@@ -208,22 +325,175 @@ def segmented_knn_graph(x, k, segs):
     (tensor([0, 0, 1, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6, 6]),
      tensor([0, 1, 0, 1, 2, 2, 3, 5, 4, 6, 3, 5, 4, 6]))
     """
+    # check invalid k
+    if k <= 0:
+        raise DGLError("Invalid k value. expect k > 0, got k = {}".format(k))
+
+    # check empty point set
+    if F.shape(x)[0] == 0:
+        raise DGLError("Find empty point set")
+
+    if algorithm == 'bruteforce-blas':
+        return _segmented_knn_graph_blas(x, k, segs, dist=dist)
+    else:
+        out = knn(x, segs, x, segs, k, algorithm=algorithm, dist=dist)
+        row, col = out[1], out[0]
+        return convert.graph((row, col))
+
+def _segmented_knn_graph_blas(x, k, segs, dist='euclidean'):
+    r"""Construct multiple graphs from multiple sets of points according to
+    k-nearest-neighbor (KNN).
+
+    This function first compute the distance matrix using BLAS matrix multiplication
+    operation provided by backend frameworks. Then use topk algorithm to get
+    k-nearest neighbors.
+
+    Parameters
+    ----------
+    x : Tensor
+        Coordinates/features of points. Must be 2D. It can be either on CPU or GPU.
+    k : int
+        The number of nearest neighbors per node.
+    segs : list[int]
+        Number of points in each point set. The numbers in :attr:`segs`
+        must sum up to the number of rows in :attr:`x`.
+    dist : str, optional
+        The distance metric used to compute distance between points. It can be the following
+        metrics:
+        * 'euclidean': Use Euclidean distance (L2 norm) :math:`\sqrt{\sum_{i} (x_{i} - y_{i})^{2}}`.
+        * 'cosine': Use cosine distance.
+        (default: 'euclidean')
+    """
+    # if use cosine distance, normalize input points first
+    # thus we can use euclidean distance to find knn equivalently.
+    if dist == 'cosine':
+        l2_norm = lambda v: F.sqrt(F.sum(v * v, dim=1, keepdims=True))
+        x = x / (l2_norm(x) + 1e-5)
+
     n_total_points, _ = F.shape(x)
     offset = np.insert(np.cumsum(segs), 0, 0)
+    min_seg_size = np.min(segs)
+    if k > min_seg_size:
+        dgl_warning("'k' should be less than or equal to the number of points in 'x'" \
+                    "expect k <= {0}, got k = {1}, use k = {0}".format(min_seg_size, k))
+        k = min_seg_size
 
     h_list = F.split(x, segs, 0)
-    dst = [
+    src = [
         F.argtopk(pairwise_squared_distance(h_g), k, 1, descending=False) +
         int(offset[i])
         for i, h_g in enumerate(h_list)]
-    dst = F.cat(dst, 0)
-    src = F.arange(0, n_total_points).unsqueeze(1).expand(n_total_points, k)
+    src = F.cat(src, 0)
+    ctx = F.context(x)
+    dst = F.repeat(F.arange(0, n_total_points, ctx=ctx), k, dim=0)
+    return convert.graph((F.reshape(src, (-1,)), F.reshape(dst, (-1,))))
 
-    dst = F.reshape(dst, (-1,))
-    src = F.reshape(src, (-1,))
-    adj = sparse.csr_matrix((F.asnumpy(F.zeros_like(dst) + 1), (F.asnumpy(dst), F.asnumpy(src))))
+def knn(x, x_segs, y, y_segs, k, algorithm='bruteforce', dist='euclidean'):
+    r"""For each element in each segment in :attr:`y`, find :attr:`k` nearest
+    points in the same segment in :attr:`x`.
 
-    return convert.from_scipy(adj)
+    This function allows multiple point sets with different capacity. The points
+    from different sets are stored contiguously in the :attr:`x` and :attr:`y` tensor.
+    :attr:`x_segs` and :attr:`y_segs` specifies the number of points in each point set.
+
+    Parameters
+    ----------
+    x : Tensor
+        The point coordinates in x. It can be either on CPU or GPU (must be the
+        same as :attr:`y`). Must be 2D.
+    x_segs : Union[List[int], Tensor]
+        Number of points in each point set in :attr:`x`. The numbers in :attr:`x_segs`
+        must sum up to the number of rows in :attr:`x`.
+    y : Tensor
+        The point coordinates in y. It can be either on CPU or GPU (must be the
+        same as :attr:`x`). Must be 2D.
+    y_segs : Union[List[int], Tensor]
+        Number of points in each point set in :attr:`y`. The numbers in :attr:`y_segs`
+        must sum up to the number of rows in :attr:`y`.
+    k : int
+        The number of nearest neighbors per node.
+    algorithm : str, optional
+        Algorithm used to compute the k-nearest neighbors.
+
+        * 'bruteforce' will compute distances pair by pair and
+          directly select the k-nearest neighbors during distance
+          computation. This method is slower than 'bruteforce-blas'
+          but has less memory overhead (i.e., :math:`O(Nk)` where :math:`N`
+          is the number of points, :math:`k` is the number of nearest
+          neighbors per node) since we do not need to store all distances.
+
+        * 'bruteforce-sharemem' (CUDA only) is similar to 'bruteforce'
+          but use shared memory in CUDA devices for buffer. This method is
+          faster than 'bruteforce' when the dimension of input points
+          is not large. This method is only available on CUDA device.
+
+        * 'kd-tree' will use the kd-tree algorithm (CPU only).
+          This method is suitable for low-dimensional data (e.g. 3D
+          point clouds)
+
+        (default: 'bruteforce')
+    dist : str, optional
+        The distance metric used to compute distance between points. It can be the following
+        metrics:
+        * 'euclidean': Use Euclidean distance (L2 norm) :math:`\sqrt{\sum_{i} (x_{i} - y_{i})^{2}}`.
+        * 'cosine': Use cosine distance.
+        (default: 'euclidean')
+
+    Returns
+    -------
+    Tensor
+        Tensor with size `(2, k * num_points(y))`
+        The first subtensor contains point indexs in :attr:`y`. The second subtensor contains
+        point indexs in :attr:`x`
+    """
+    assert F.context(x) == F.context(y)
+    if isinstance(x_segs, (tuple, list)):
+        x_segs = F.tensor(x_segs)
+    if isinstance(y_segs, (tuple, list)):
+        y_segs = F.tensor(y_segs)
+    x_segs = F.copy_to(x_segs, F.context(x))
+    y_segs = F.copy_to(y_segs, F.context(y))
+
+    # k shoule be less than or equal to min(x_segs)
+    min_num_points = F.min(x_segs, dim=0)
+    if k > min_num_points:
+        dgl_warning("'k' should be less than or equal to the number of points in 'x'" \
+                    "expect k <= {0}, got k = {1}, use k = {0}".format(min_num_points, k))
+        k = F.as_scalar(min_num_points)
+
+    # invalid k
+    if k <= 0:
+        raise DGLError("Invalid k value. expect k > 0, got k = {}".format(k))
+
+    # empty point set
+    if F.shape(x)[0] == 0 or F.shape(y)[0] == 0:
+        raise DGLError("Find empty point set")
+
+    dist = dist.lower()
+    dist_metric_list = ['euclidean', 'cosine']
+    if dist not in dist_metric_list:
+        raise DGLError('Only {} are supported for distance'
+                       'computation, got {}'.format(dist_metric_list, dist))
+
+    x_offset = F.zeros((F.shape(x_segs)[0] + 1,), F.dtype(x_segs), F.context(x_segs))
+    x_offset[1:] = F.cumsum(x_segs, dim=0)
+    y_offset = F.zeros((F.shape(y_segs)[0] + 1,), F.dtype(y_segs), F.context(y_segs))
+    y_offset[1:] = F.cumsum(y_segs, dim=0)
+
+    out = F.zeros((2, F.shape(y)[0] * k), F.dtype(x_segs), F.context(x_segs))
+
+    # if use cosine distance, normalize input points first
+    # thus we can use euclidean distance to find knn equivalently.
+    if dist == 'cosine':
+        l2_norm = lambda v: F.sqrt(F.sum(v * v, dim=1, keepdims=True))
+        x = x / (l2_norm(x) + 1e-5)
+        y = y / (l2_norm(y) + 1e-5)
+
+    _CAPI_DGLKNN(F.to_dgl_nd(x), F.to_dgl_nd(x_offset),
+                 F.to_dgl_nd(y), F.to_dgl_nd(y_offset),
+                 k, F.zerocopy_to_dgl_ndarray_for_write(out),
+                 algorithm)
+    return out
 
 def to_bidirected(g, copy_ndata=False, readonly=None):
     r"""Convert the graph to a bi-directional simple graph and return.
@@ -2072,6 +2342,242 @@ def to_simple(g,
     return simple_graph
 
 DGLHeteroGraph.to_simple = utils.alias_func(to_simple)
+
+def _unitgraph_less_than_int32(g):
+    """Check if a graph with only one edge type has more than 2 ** 31 - 1
+    nodes or edges.
+    """
+    num_edges = g.num_edges()
+    num_nodes = max(g.num_nodes(g.ntypes[0]), g.num_nodes(g.ntypes[-1]))
+    return max(num_nodes, num_edges) <= (1 << 31) - 1
+
+def adj_product_graph(A, B, weight_name, etype='_E'):
+    r"""Create a weighted graph whose adjacency matrix is the product of
+    the adjacency matrices of the given two graphs.
+
+    Namely, given two weighted graphs :attr:`A` and :attr:`B`, whose rows
+    represent source nodes and columns represent destination nodes, this function
+    returns a new graph whose weighted adjacency matrix is
+    :math:`\mathrm{adj}(A) \times \mathrm{adj}(B)`.
+
+    The two graphs must be simple graphs, and must have only one edge type.
+    Moreover, the number of nodes of the destination node type of :attr:`A` must
+    be the same as the number of nodes of the source node type of :attr:`B`.
+
+    The source node type of the returned graph will be the same as the source
+    node type of graph :attr:`A`.  The destination node type of the returned
+    graph will be the same as the destination node type of graph :attr:`B`.
+    If the two node types are the same, the returned graph will be homogeneous.
+    Otherwise, it will be a bipartite graph.
+
+    Unlike ``scipy``, if an edge in the result graph has zero weight, it will
+    not be removed from the graph.
+
+    Notes
+    -----
+    This function works on both CPU and GPU.  For GPU, the number of nodes and
+    edges must be less than the maximum of ``int32`` (i.e. ``2 ** 31 - 1``) due
+    to restriction of cuSPARSE.
+
+    The edge weights returned by this function is differentiable w.r.t. the
+    input edge weights.
+
+    If the graph format is restricted, both graphs must have CSR available.
+
+    Parameters
+    ----------
+    A : DGLGraph
+        The graph as left operand.
+    B : DGLGraph
+        The graph as right operand.
+    weight_name : str
+        The feature name of edge weight of both graphs.
+
+        The corresponding edge feature must be scalar.
+    etype : str, optional
+        The edge type of the returned graph.
+
+    Returns
+    -------
+    DGLGraph
+        The new graph.  The edge weight of the returned graph will have the
+        same feature name as :attr:`weight_name`.
+
+    Examples
+    --------
+    The following shows weighted adjacency matrix multiplication between two
+    bipartite graphs.  You can also perform this between two homogeneous
+    graphs, or one homogeneous graph and one bipartite graph, as long as the
+    numbers of nodes of the same type match.
+
+    >>> A = dgl.heterograph({
+    ...     ('A', 'AB', 'B'): ([2, 2, 0, 2, 0, 1], [2, 1, 0, 0, 2, 2])},
+    ...     num_nodes_dict={'A': 3, 'B': 4})
+    >>> B = dgl.heterograph({
+    ...     ('B', 'BA', 'A'): ([0, 3, 2, 1, 3, 3], [1, 2, 0, 2, 1, 0])},
+    ...     num_nodes_dict={'A': 3, 'B': 4})
+    >>> A.edata['w'] = torch.randn(6).requires_grad_()
+    >>> B.edata['w'] = torch.randn(6).requires_grad_()
+
+    If your graph is a multigraph, you will need to call :func:`dgl.to_simple`
+    to convert it into a simple graph first.
+
+    >>> A = dgl.to_simple(A)
+    >>> B = dgl.to_simple(B)
+
+    >>> C = dgl.adj_product_graph(A, B, 'w')
+    >>> C.edges()
+    (tensor([0, 0, 1, 2, 2, 2]), tensor([0, 1, 0, 0, 2, 1]))
+
+    >>> C.edata['w']
+    tensor([0.6906, 0.2002, 0.0591, 0.3672, 0.1066, 0.1328],
+           grad_fn=<CSRMMBackward>)
+
+    Note that this function is differentiable:
+
+    >>> C.edata['w'].sum().backward()
+    >>> A.edata['w'].grad
+    tensor([0.7153, 0.2775, 0.7141, 0.7141, 0.7153, 0.7153])
+
+    >>> B.edata['w'].grad
+    tensor([0.4664, 0.0000, 1.5614, 0.3840, 0.0000, 0.0000])
+
+    If the source node type of the left operand is the same as the destination
+    node type of the right operand, this function returns a homogeneous graph:
+
+    >>> C.ntypes
+    ['A']
+
+    Otherwise, it returns a bipartite graph instead:
+
+    >>> A = dgl.heterograph({
+    ...     ('A', 'AB', 'B'): ([2, 2, 0, 2, 0, 1], [2, 1, 0, 0, 2, 2])},
+    ...     num_nodes_dict={'A': 3, 'B': 4})
+    >>> B = dgl.heterograph({
+    ...     ('B', 'BC', 'C'): ([0, 3, 2, 1, 3, 3], [1, 2, 0, 2, 1, 0])},
+    ...     num_nodes_dict={'C': 3, 'B': 4})
+    >>> A.edata['w'] = torch.randn(6).requires_grad_()
+    >>> B.edata['w'] = torch.randn(6).requires_grad_()
+    >>> C = dgl.adj_product_graph(A, B, 'w')
+    >>> C.ntypes
+    ['A', 'C']
+    """
+    srctype, _, _ = A.canonical_etypes[0]
+    _, _, dsttype = B.canonical_etypes[0]
+    num_vtypes = 1 if srctype == dsttype else 2
+    ntypes = [srctype] if num_vtypes == 1 else [srctype, dsttype]
+
+    if A.device != F.cpu():
+        if not (_unitgraph_less_than_int32(A) and _unitgraph_less_than_int32(B)):
+            raise ValueError(
+                'For GPU graphs the number of nodes and edges must be less than 2 ** 31 - 1.')
+
+    C_gidx, C_weights = F.csrmm(
+        A._graph, A.edata[weight_name], B._graph, B.edata[weight_name], num_vtypes)
+    num_nodes_dict = {srctype: A.num_nodes(srctype), dsttype: B.num_nodes(dsttype)}
+    C_metagraph, ntypes, etypes, _ = \
+        create_metagraph_index(ntypes, [(srctype, etype, dsttype)])
+    num_nodes_per_type = [num_nodes_dict[ntype] for ntype in ntypes]
+    C_gidx = create_heterograph_from_relations(
+        C_metagraph, [C_gidx], utils.toindex(num_nodes_per_type))
+
+    C = DGLHeteroGraph(C_gidx, ntypes, etypes)
+    C.edata[weight_name] = C_weights
+    return C
+
+def adj_sum_graph(graphs, weight_name):
+    r"""Create a weighted graph whose adjacency matrix is the sum of the
+    adjacency matrices of the given graphs, whose rows represent source nodes
+    and columns represent destination nodes.
+
+    All the graphs must be simple graphs, and must have only one edge type.
+    They also must have the same metagraph, i.e. have the same source node type
+    and the same destination node type.  Moreover, the number of nodes for every
+    graph must also be the same.
+
+    The metagraph of the returned graph will be the same as the input graphs.
+
+    Unlike ``scipy``, if an edge in the result graph has zero weight, it will
+    not be removed from the graph.
+
+    Notes
+    -----
+    This function works on both CPU and GPU.  For GPU, the number of nodes and
+    edges must be less than the maximum of ``int32`` (i.e. ``2 ** 31 - 1``) due
+    to restriction of cuSPARSE.
+
+    The edge weights returned by this function is differentiable w.r.t. the
+    input edge weights.
+
+    If the graph format is restricted, both graphs must have CSR available.
+
+    Parameters
+    ----------
+    graphs : list[DGLGraph]
+        The list of graphs.  Must have at least one element.
+    weight_name : str
+        The feature name of edge weight of both graphs.
+
+        The corresponding edge feature must be scalar.
+
+    Returns
+    -------
+    DGLGraph
+        The new graph.  The edge weight of the returned graph will have the
+        same feature name as :attr:`weight_name`.
+
+    Examples
+    --------
+    The following shows weighted adjacency matrix summation between two
+    bipartite graphs.  You can also perform this between homogeneous graphs.
+
+    >>> A = dgl.heterograph(
+    ...     {('A', 'AB', 'B'): ([2, 2, 0, 2, 0, 1], [2, 1, 0, 0, 2, 2])},
+    ...     num_nodes_dict={'A': 3, 'B': 4})
+    >>> B = dgl.heterograph(
+    ...     {('A', 'AB', 'B'): ([1, 2, 0, 2, 1, 0], [0, 3, 2, 1, 3, 3])},
+    ...     num_nodes_dict={'A': 3, 'B': 4})
+    >>> A.edata['w'] = torch.randn(6).requires_grad_()
+    >>> B.edata['w'] = torch.randn(6).requires_grad_()
+
+    If your graph is a multigraph, you will need to call :func:`dgl.to_simple`
+    to convert it into a simple graph first.
+
+    >>> A = dgl.to_simple(A)
+    >>> B = dgl.to_simple(B)
+
+    >>> C = dgl.adj_sum_graph([A, B], 'w')
+    >>> C.edges()
+    (tensor([0, 0, 0, 1, 1, 1, 2, 2, 2, 2]),
+     tensor([0, 2, 3, 2, 0, 3, 0, 1, 2, 3]))
+
+    Note that this function is differentiable:
+
+    >>> C.edata['w'].sum().backward()
+    >>> A.edata['w'].grad
+    tensor([1., 1., 1., 1., 1., 1.])
+
+    >>> B.edata['w'].grad
+    tensor([1., 1., 1., 1., 1., 1.])
+    """
+    if len(graphs) == 0:
+        raise ValueError('The list of graphs must not be empty.')
+
+    if graphs[0].device != F.cpu():
+        if not all(_unitgraph_less_than_int32(A) for A in graphs):
+            raise ValueError(
+                'For GPU graphs the number of nodes and edges must be less than 2 ** 31 - 1.')
+    metagraph = graphs[0]._graph.metagraph
+    num_nodes = utils.toindex(
+        [graphs[0]._graph.number_of_nodes(i) for i in range(graphs[0]._graph.number_of_ntypes())])
+    weights = [A.edata[weight_name] for A in graphs]
+    gidxs = [A._graph for A in graphs]
+    C_gidx, C_weights = F.csrsum(gidxs, weights)
+    C_gidx = create_heterograph_from_relations(metagraph, [C_gidx], num_nodes)
+
+    C = DGLHeteroGraph(C_gidx, graphs[0].ntypes, graphs[0].etypes)
+    C.edata[weight_name] = C_weights
+    return C
 
 def as_heterograph(g, ntype='_U', etype='_E'):  # pylint: disable=unused-argument
     """Convert a DGLGraph to a DGLHeteroGraph with one node and edge type.

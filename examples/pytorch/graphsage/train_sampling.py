@@ -9,78 +9,8 @@ import time
 import argparse
 import tqdm
 
-from load_graph import load_reddit, inductive_split
-
-class SAGE(nn.Module):
-    def __init__(self,
-                 in_feats,
-                 n_hidden,
-                 n_classes,
-                 n_layers,
-                 activation,
-                 dropout):
-        super().__init__()
-        self.n_layers = n_layers
-        self.n_hidden = n_hidden
-        self.n_classes = n_classes
-        self.layers = nn.ModuleList()
-        self.layers.append(dglnn.SAGEConv(in_feats, n_hidden, 'mean'))
-        for i in range(1, n_layers - 1):
-            self.layers.append(dglnn.SAGEConv(n_hidden, n_hidden, 'mean'))
-        self.layers.append(dglnn.SAGEConv(n_hidden, n_classes, 'mean'))
-        self.dropout = nn.Dropout(dropout)
-        self.activation = activation
-
-    def forward(self, blocks, x):
-        h = x
-        for l, (layer, block) in enumerate(zip(self.layers, blocks)):
-            h = layer(block, h)
-            if l != len(self.layers) - 1:
-                h = self.activation(h)
-                h = self.dropout(h)
-        return h
-
-    def inference(self, g, x, device):
-        """
-        Inference with the GraphSAGE model on full neighbors (i.e. without neighbor sampling).
-        g : the entire graph.
-        x : the input of entire node set.
-
-        The inference code is written in a fashion that it could handle any number of nodes and
-        layers.
-        """
-        # During inference with sampling, multi-layer blocks are very inefficient because
-        # lots of computations in the first few layers are repeated.
-        # Therefore, we compute the representation of all nodes layer by layer.  The nodes
-        # on each layer are of course splitted in batches.
-        # TODO: can we standardize this?
-        for l, layer in enumerate(self.layers):
-            y = th.zeros(g.num_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
-
-            sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
-            dataloader = dgl.dataloading.NodeDataLoader(
-                g,
-                th.arange(g.num_nodes()),
-                sampler,
-                batch_size=args.batch_size,
-                shuffle=True,
-                drop_last=False,
-                num_workers=args.num_workers)
-
-            for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
-                block = blocks[0]
-
-                block = block.int().to(device)
-                h = x[input_nodes].to(device)
-                h = layer(block, h)
-                if l != len(self.layers) - 1:
-                    h = self.activation(h)
-                    h = self.dropout(h)
-
-                y[output_nodes] = h.cpu()
-
-            x = y
-        return y
+from model import SAGE
+from load_graph import load_reddit, inductive_split, load_ogb
 
 def compute_acc(pred, labels):
     """
@@ -100,7 +30,7 @@ def evaluate(model, g, nfeat, labels, val_nid, device):
     """
     model.eval()
     with th.no_grad():
-        pred = model.inference(g, nfeat, device)
+        pred = model.inference(g, nfeat, device, args.batch_size, args.num_workers)
     model.train()
     return compute_acc(pred[val_nid], labels[val_nid].to(pred.device))
 
@@ -122,6 +52,14 @@ def run(args, device, data):
     val_nid = th.nonzero(val_g.ndata['val_mask'], as_tuple=True)[0]
     test_nid = th.nonzero(~(test_g.ndata['train_mask'] | test_g.ndata['val_mask']), as_tuple=True)[0]
 
+    dataloader_device = th.device('cpu')
+    if args.sample_gpu:
+        train_nid = train_nid.to(device)
+        # copy only the csc to the GPU
+        train_g = train_g.formats(['csc'])
+        train_g = train_g.to(device)
+        dataloader_device = device
+
     # Create PyTorch DataLoader for constructing blocks
     sampler = dgl.dataloading.MultiLayerNeighborSampler(
         [int(fanout) for fanout in args.fan_out.split(',')])
@@ -129,6 +67,7 @@ def run(args, device, data):
         train_g,
         train_nid,
         sampler,
+        device=dataloader_device,
         batch_size=args.batch_size,
         shuffle=True,
         drop_last=False,
@@ -183,7 +122,7 @@ def run(args, device, data):
     print('Avg epoch time: {}'.format(avg / (epoch - 4)))
 
 if __name__ == '__main__':
-    argparser = argparse.ArgumentParser("multi-gpu training")
+    argparser = argparse.ArgumentParser()
     argparser.add_argument('--gpu', type=int, default=0,
                            help="GPU device ID. Use -1 for CPU training")
     argparser.add_argument('--dataset', type=str, default='reddit')
@@ -198,6 +137,8 @@ if __name__ == '__main__':
     argparser.add_argument('--dropout', type=float, default=0.5)
     argparser.add_argument('--num-workers', type=int, default=4,
                            help="Number of sampling processes. Use 0 for no extra process.")
+    argparser.add_argument('--sample-gpu', action='store_true',
+                           help="Perform the sampling process on the GPU. Must have 0 workers.")
     argparser.add_argument('--inductive', action='store_true',
                            help="Inductive learning setting")
     argparser.add_argument('--data-cpu', action='store_true',
@@ -214,6 +155,8 @@ if __name__ == '__main__':
 
     if args.dataset == 'reddit':
         g, n_classes = load_reddit()
+    elif args.dataset == 'ogbn-products':
+        g, n_classes = load_ogb('ogbn-products')
     else:
         raise Exception('unknown dataset')
 
@@ -234,11 +177,6 @@ if __name__ == '__main__':
         train_nfeat = train_nfeat.to(device)
         train_labels = train_labels.to(device)
 
-    # Create csr/coo/csc formats before launching training processes with multi-gpu.
-    # This avoids creating certain formats in each sub-process, which saves momory and CPU.
-    train_g.create_formats_()
-    val_g.create_formats_()
-    test_g.create_formats_()
     # Pack data
     data = n_classes, train_g, val_g, test_g, train_nfeat, train_labels, \
            val_nfeat, val_labels, test_nfeat, test_labels

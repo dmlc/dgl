@@ -313,7 +313,7 @@ g = DGLGraph((data.edge_src, data.edge_dst))
 g.edata.update({'rel_type': edge_type, 'norm': edge_norm})
 
 # create model
-model = Model(len(g),
+model = Model(g.num_nodes(),
               n_hidden,
               num_classes,
               num_rels,

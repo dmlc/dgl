@@ -197,9 +197,9 @@ template IdArray UnaryElewise<kDLGPU, int64_t, arith::Neg>(IdArray lhs);
 
 ///////////////////////////// Full /////////////////////////////
 
-template <typename IdType>
+template <typename DType>
 __global__ void _FullKernel(
-    IdType* out, int64_t length, IdType val) {
+    DType* out, int64_t length, DType val) {
   int tx = blockIdx.x * blockDim.x + threadIdx.x;
   int stride_x = gridDim.x * blockDim.x;
   while (tx < length) {
@@ -208,20 +208,22 @@ __global__ void _FullKernel(
   }
 }
 
-template <DLDeviceType XPU, typename IdType>
-IdArray Full(IdType val, int64_t length, DLContext ctx) {
-  IdArray ret = NewIdArray(length, ctx, sizeof(IdType) * 8);
-  IdType* ret_data = static_cast<IdType*>(ret->data);
+template <DLDeviceType XPU, typename DType>
+NDArray Full(DType val, int64_t length, DLContext ctx) {
+  NDArray ret = NDArray::Empty({length}, DLDataTypeTraits<DType>::dtype, ctx);
+  DType* ret_data = static_cast<DType*>(ret->data);
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   int nt = cuda::FindNumThreads(length);
   int nb = (length + nt - 1) / nt;
-  CUDA_KERNEL_CALL((_FullKernel<IdType>), nb, nt, 0, thr_entry->stream,
+  CUDA_KERNEL_CALL((_FullKernel<DType>), nb, nt, 0, thr_entry->stream,
       ret_data, length, val);
   return ret;
 }
 
 template IdArray Full<kDLGPU, int32_t>(int32_t val, int64_t length, DLContext ctx);
 template IdArray Full<kDLGPU, int64_t>(int64_t val, int64_t length, DLContext ctx);
+template IdArray Full<kDLGPU, float>(float val, int64_t length, DLContext ctx);
+template IdArray Full<kDLGPU, double>(double val, int64_t length, DLContext ctx);
 
 
 ///////////////////////////// Range /////////////////////////////
