@@ -336,7 +336,7 @@ def zerocopy_from_dgl_ndarray(data):
         # NOTE: PyTorch v1.5 does not accept DLPack object representing empty CUDA tensor.
         #  Related issue: https://github.com/pytorch/pytorch/issues/41182
         #  The issue will be fixed in v1.6 and later.
-        return th.empty(data.shape, dtype=getattr(th, data.dtype),
+        return th.empty([], dtype=getattr(th, data.dtype),
                         device=to_backend_ctx(data.ctx))
     else:
         return dlpack.from_dlpack(data.to_dlpack())
