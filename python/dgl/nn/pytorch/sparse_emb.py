@@ -112,7 +112,7 @@ class NodeEmbedding: # NodeEmbedding
                 self._store.wait([name])
                 emb = get_shared_mem_array(name, (num_embeddings, embedding_dim), th.float32)
             self._tensor = emb
-        else:
+        else: # embeddings is stored in GPU memory.
             # setup nccl communicator
             if _COMM is None:
                 if rank < 0:
