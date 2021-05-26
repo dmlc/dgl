@@ -121,9 +121,9 @@ class AliasSampler: public BaseSampler<Idx> {
   ~AliasSampler() {}
 
   Idx Draw() {
-    const DType *_prob_data = static_cast<DType *>(_prob->data);
     DType avg = accum / N;
     if (!replace) {
+      const DType *_prob_data = static_cast<DType *>(_prob->data);
       if (2 * taken >= accum)
         Reconstruct(_prob);
       while (true) {
@@ -219,9 +219,9 @@ class CDFSampler: public BaseSampler<Idx> {
   ~CDFSampler() {}
 
   Idx Draw() {
-    const DType *_prob_data = static_cast<DType *>(_prob->data);
     DType eps = std::numeric_limits<DType>::min();
     if (!replace) {
+      const DType *_prob_data = static_cast<DType *>(_prob->data);
       if (2 * taken >= accum)
         Reconstruct(_prob);
       while (true) {
