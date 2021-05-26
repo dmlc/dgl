@@ -105,10 +105,12 @@ class FakeNewsDataset(DGLBuiltinDataset):
     }
 
     def __init__(self, name, feature_name, raw_dir=None):
-        assert name in ['gossipcop', 'politifact']
+        assert name in ['gossipcop', 'politifact'], \
+            "Only supports 'gossipcop' or 'politifact'."
         url = _get_dgl_url(self.file_urls[name])
 
-        assert feature_name in ['bert', 'content', 'profile', 'spacy']
+        assert feature_name in ['bert', 'content', 'profile', 'spacy'], \
+            "Only supports 'bert', 'content', 'profile', or 'spacy'"
         self.feature_name = feature_name
         super(FakeNewsDataset, self).__init__(name=name,
                                               url=url,
