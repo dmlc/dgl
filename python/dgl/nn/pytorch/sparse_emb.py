@@ -117,16 +117,21 @@ class NodeEmbedding: # NodeEmbedding
                 if rank < 0:
                     _COMM = nccl.Communicator(1, 0, nccl.UniqueId())
                 else:
+                    # needs to be set for nccl to work
+                    th.cuda.set_device(device)
                     if rank == 0:
                         # root process broadcasts nccl id
                         nccl_id = nccl.UniqueId()
                         self._store.set('nccl_root_id', str(nccl_id))
                     else:
                         nccl_id = nccl.UniqueId(self._store.get('nccl_root_id'))
-                    # needs to be set for nccl to work
-                    th.cuda.set_device(device)
                     _COMM = nccl.Communicator(self._world_size, self._rank,
                                               nccl_id)
+                    if self._rank == 0:
+                        # clear the store entry for future communicators
+                        self._store.delete_key('nccl_root_id')
+                    th.distributed.barrier()
+
             self._comm = _COMM
 
             if not self._partition:

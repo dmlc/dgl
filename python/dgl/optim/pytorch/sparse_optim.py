@@ -75,12 +75,25 @@ class SparseGradOptimizer(abc.ABC):
                 self._comm_setup()
             else:
                 self._shared_setup()
+            self.setup(self._params)
             self._first_step = False
 
         if self._comm:
             self._comm_step()
         else:
             self._shared_step()
+
+    def setup(self, params):
+        ''' This is function where subclasses can perform any setup they need
+            to. It will be called during the first step, and communicators or
+            shared memory will have been setup before this call.
+
+            Parameters
+            ----------
+            params : list of NodeEmbedding
+                The list of NodeEmbeddings.
+        '''
+
 
     def _comm_setup(self):
         # find a store to communicate the unique id through
@@ -90,17 +103,23 @@ class SparseGradOptimizer(abc.ABC):
             if self._rank < 0:
                 self._comm = nccl.Communicator(1, 0, nccl.UniqueId())
             else:
+                th.cuda.set_device(self._device)
                 if self._rank == 0:
                     # root process broadcasts nccl id
                     nccl_id = nccl.UniqueId()
-                    store.set('nccl_root_id', str(nccl_id))
+                    uid = str(nccl_id)
+                    store.set('nccl_root_id', uid)
                 else:
-                    nccl_id = nccl.UniqueId(store.get('nccl_root_id'))
+                    uid = store.get('nccl_root_id')
+                    nccl_id = nccl.UniqueId(uid)
                 # needs to be set for nccl to work
-                th.cuda.set_device(self._device)
                 self._comm = nccl.Communicator(self._world_size,
                                                self._rank,
                                                nccl_id)
+                if self._rank == 0:
+                    # clear the store entry for future communicators
+                    store.delete_key('nccl_root_id')
+                th.distributed.barrier()
 
     def _shared_setup(self):
         for emb in self._params:
@@ -392,6 +411,8 @@ class SparseAdagrad(SparseGradOptimizer):
     def __init__(self, params, lr, eps=1e-10):
         super(SparseAdagrad, self).__init__(params, lr)
         self._eps = eps
+
+    def setup(self, params):
         # We need to register a state sum for each embedding in the kvstore.
         for emb in params:
             assert isinstance(emb, NodeEmbedding), \
@@ -505,6 +526,7 @@ class SparseAdam(SparseGradOptimizer):
         self._beta2 = betas[1]
         self._eps = eps
 
+    def setup(self, params):
         # We need to register a state sum for each embedding in the kvstore.
         for emb in params:
             assert isinstance(emb, NodeEmbedding), \
