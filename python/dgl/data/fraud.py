@@ -87,6 +87,7 @@ class FraudDataset(DGLBuiltinDataset):
     }
 
     def __init__(self, name, raw_dir=None, random_seed=2, train_size=0.7, val_size=0.1):
+        assert name in ['yelp', 'amazon'], "only supports 'yelp', or 'amazon'"
         url = _get_dgl_url(self.file_urls[name])
         self.seed = random_seed
         self.train_size = train_size
@@ -122,7 +123,7 @@ class FraudDataset(DGLBuiltinDataset):
         Parameters
         ----------
         idx : int
-            Item index, KarateClubDataset has only one graph object
+            Item index
 
         Returns
         -------
@@ -173,17 +174,29 @@ class FraudDataset(DGLBuiltinDataset):
         """split the dataset into training set, validation set and testing set"""
         N = x.shape[0]
         index = list(range(N))
-        train_idx, test_idx, _, y = train_test_split(index, node_labels, stratify=node_labels,
-                                                         train_size=train_size,
-                                                         random_state=seed, shuffle=True)
+        train_idx, test_idx, _, y = train_test_split(index,
+                                                     node_labels,
+                                                     stratify=node_labels,
+                                                     train_size=train_size,
+                                                     random_state=seed,
+                                                     shuffle=True)
+
         if self.name == 'amazon':
             # 0-3304 are unlabeled nodes
             index = list(range(3305, N))
-            train_idx, test_idx, _, y = train_test_split(index, node_labels[3305:], stratify=node_labels[3305:],
-                                                         test_size=train_size, random_state=seed, shuffle=True)
+            train_idx, test_idx, _, y = train_test_split(index,
+                                                         node_labels[3305:],
+                                                         stratify=node_labels[3305:],
+                                                         test_size=train_size,
+                                                         random_state=seed,
+                                                         shuffle=True)
 
-        val_idx, test_idx, _, _ = train_test_split(test_idx, y, stratify=y, train_size=val_size / (1 - train_size),
-                                                   random_state=seed, shuffle=True)
+        val_idx, test_idx, _, _ = train_test_split(test_idx,
+                                                   y,
+                                                   stratify=y,
+                                                   train_size=val_size / (1 - train_size),
+                                                   random_state=seed,
+                                                   shuffle=True)
         train_mask = torch.zeros(N, dtype=torch.bool)
         val_mask = torch.zeros(N, dtype=torch.bool)
         test_mask = torch.zeros(N, dtype=torch.bool)
@@ -266,7 +279,7 @@ class FraudAmazonDataset(FraudDataset):
 
     Users are nodes in the graph, and three relations are:
         1. U-P-U : it connects users reviewing at least one same product
-        2. U-S-V : it connects users having at least one same star rating within one week
+        2. U-S-U : it connects users having at least one same star rating within one week
         3. U-V-U : it connects users with top 5% mutual review text similarities (measured by
                    TF-IDF) among all users.
 
