@@ -516,7 +516,7 @@ void NNDescent(const NDArray& points, const IdArray& offsets,
                 std::max(worst_c1_dist, worst_c2_dist));
 
               if (new_dist < worst_c1_dist || new_dist < worst_c2_dist) {
-                updates[i - block_start].push_back({new_c1, new_c2, new_dist});
+                updates[i - block_start].push_back(std::make_tuple(new_c1, new_c2, new_dist));
               }
             }
 
@@ -535,7 +535,7 @@ void NNDescent(const NDArray& points, const IdArray& offsets,
                 std::max(worst_c1_dist, worst_c2_dist));
 
               if (new_dist < worst_c1_dist || new_dist < worst_c2_dist) {
-                updates[i - block_start].push_back({new_c1, old_c2, new_dist});
+                updates[i - block_start].push_back(std::make_tuple(new_c1, old_c2, new_dist));
               }
             }
           }

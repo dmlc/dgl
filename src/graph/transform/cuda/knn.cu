@@ -845,18 +845,9 @@ void NNDescent(const NDArray& points, const IdArray& offsets,
 
   IdType* central_nodes = result.Ptr<IdType>();
   IdType* neighbors = central_nodes + k * num_nodes;
-
-  // rng state space allocation and initialization
-  // curandState* states = static_cast<curandState*>(
-  //   device->AllocWorkspace(ctx, num_nodes * sizeof(curandState)));
-  // uint64_t seed = RandomEngine::ThreadLocal()->RandInt<uint64_t>(
-  //   std::numeric_limits<uint64_t>::max());
   uint64_t seed;
   int64_t block_size = cuda::FindNumThreads(num_nodes);
   int64_t num_blocks = (num_nodes - 1) / block_size + 1;
-  // CUDA_KERNEL_CALL(
-  //   impl::setup_rng_kernel, num_blocks, block_size, 0,
-  //   thr_entry->stream, states, seed, num_nodes);
 
   // allocate space for candidates, distances and flags
   // we use the first element in candidate array to represent length
