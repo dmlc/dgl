@@ -32,3 +32,6 @@
 [submodule "third_party/nanoflann"]
 	path = third_party/nanoflann
 	url = https://github.com/jlblancoc/nanoflann
+[submodule "third_party/nccl"]
+	path = third_party/nccl
+	url = https://github.com/nvidia/nccl

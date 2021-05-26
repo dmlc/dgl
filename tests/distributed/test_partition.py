@@ -252,10 +252,12 @@ def check_partition(g, part_method, reshuffle):
         assert len(gpb.partid2eids(i)) == gpb_meta[i]['num_edges']
         part_sizes.append((gpb_meta[i]['num_nodes'], gpb_meta[i]['num_edges']))
 
-        local_nid = gpb.nid2localnid(F.boolean_mask(part_g.ndata[dgl.NID], part_g.ndata['inner_node']), i)
+        nid = F.boolean_mask(part_g.ndata[dgl.NID], part_g.ndata['inner_node'])
+        local_nid = gpb.nid2localnid(nid, i)
         assert F.dtype(local_nid) in (F.int64, F.int32)
         assert np.all(F.asnumpy(local_nid) == np.arange(0, len(local_nid)))
-        local_eid = gpb.eid2localeid(F.boolean_mask(part_g.edata[dgl.EID], part_g.edata['inner_edge']), i)
+        eid = F.boolean_mask(part_g.edata[dgl.EID], part_g.edata['inner_edge'])
+        local_eid = gpb.eid2localeid(eid, i)
         assert F.dtype(local_eid) in (F.int64, F.int32)
         assert np.all(F.asnumpy(local_eid) == np.arange(0, len(local_eid)))
 
@@ -265,12 +267,15 @@ def check_partition(g, part_method, reshuffle):
         local_nodes1 = gpb.partid2nids(i)
         assert F.dtype(local_nodes1) in (F.int32, F.int64)
         assert np.all(np.sort(F.asnumpy(local_nodes)) == np.sort(F.asnumpy(local_nodes1)))
+        assert np.all(F.asnumpy(llocal_nodes) == np.arange(len(llocal_nodes)))
 
         # Check the edge map.
         local_edges = F.boolean_mask(part_g.edata[dgl.EID], part_g.edata['inner_edge'])
+        llocal_edges = F.nonzero_1d(part_g.edata['inner_edge'])
         local_edges1 = gpb.partid2eids(i)
         assert F.dtype(local_edges1) in (F.int32, F.int64)
         assert np.all(np.sort(F.asnumpy(local_edges)) == np.sort(F.asnumpy(local_edges1)))
+        assert np.all(F.asnumpy(llocal_edges) == np.arange(len(llocal_edges)))
 
         # Verify the mapping between the reshuffled IDs and the original IDs.
         part_src_ids, part_dst_ids = part_g.edges()
