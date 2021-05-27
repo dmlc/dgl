@@ -181,9 +181,9 @@ def knn_graph(x, k, algorithm='bruteforce-blas', dist='euclidean'):
         else:
             x_seg = [F.shape(x)[0]]
         if algorithm == 'nn-descent':
-            return nndescent_knn_graph(x, k, x_seg)
+            return nndescent_knn_graph(x, k, x_seg, dist=dist)
         else:
-            out = knn(x, x_seg, x, x_seg, k, algorithm=algorithm)
+            out = knn(x, x_seg, x, x_seg, k, algorithm=algorithm, dist=dist)
             row, col = out[1], out[0]
             return convert.graph((row, col))
 
@@ -339,7 +339,7 @@ def segmented_knn_graph(x, k, segs, algorithm='bruteforce-blas', dist='euclidean
     if algorithm == 'bruteforce-blas':
         return _segmented_knn_graph_blas(x, k, segs, dist=dist)
     elif algorithm == 'nn-descent':
-        return nndescent_knn_graph(x, k, segs)
+        return nndescent_knn_graph(x, k, segs, dist=dist)
     else:
         out = knn(x, segs, x, segs, k, algorithm=algorithm, dist=dist)
         row, col = out[1], out[0]
@@ -394,7 +394,7 @@ def _segmented_knn_graph_blas(x, k, segs, dist='euclidean'):
     return convert.graph((F.reshape(src, (-1,)), F.reshape(dst, (-1,))))
 
 def nndescent_knn_graph(x, k, segs, num_iters=None, max_candidates=None,
-                        delta=0.001, sample_rate=0.5):
+                        delta=0.001, sample_rate=0.5, dist='euclidean'):
     r"""Construct multiple graphs from multiple sets of points according to
     **approximate** k-nearest-neighbor using NN-descent algorithm from paper
     `Efficient k-nearest neighbor graph construction for generic similarity
@@ -429,6 +429,12 @@ def nndescent_knn_graph(x, k, segs, num_iters=None, max_candidates=None,
         between 0 and 1. Larger values will provide higher accuracy and converge
         speed but with higher time cost.
         (Default: 0.5)
+    dist : str, optional
+        The distance metric used to compute distance between points. It can be the following
+        metrics:
+        * 'euclidean': Use Euclidean distance (L2 norm) :math:`\sqrt{\sum_{i} (x_{i} - y_{i})^{2}}`.
+        * 'cosine': Use cosine distance.
+        (default: 'euclidean')
 
     Returns
     -------
@@ -445,6 +451,12 @@ def nndescent_knn_graph(x, k, segs, num_iters=None, max_candidates=None,
     if num_iters is None:
         num_iters = max(10, int(round(np.log2(num_points))))
     max_candidates = int(sample_rate * max_candidates)
+
+    # if use cosine distance, normalize input points first
+    # thus we can use euclidean distance to find knn equivalently.
+    if dist == 'cosine':
+        l2_norm = lambda v: F.sqrt(F.sum(v * v, dim=1, keepdims=True))
+        x = x / (l2_norm(x) + 1e-5)
 
     # k must less than or equal to min(segs)
     if k > F.min(segs, dim=0):
