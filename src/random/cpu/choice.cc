@@ -108,7 +108,7 @@ void RandomEngine::UniformChoice(IdxType num, IdxType population, IdxType* out,
       // complexity O(num). In the case of `num >= population/10`, we don't need to worry about
       // memory complexity because `num` is usually small. So is `population`. Allocating a small
       // piece of memory is very efficient.
-	  std::vector<IdxType> seq(population);
+      std::vector<IdxType> seq(population);
       for (size_t i = 0; i < seq.size(); i++) seq[i] = i;
       for (IdxType i = 0; i < num; i++) {
         IdxType j = RandInt(i, population);
