@@ -108,8 +108,9 @@ void SDDMMCsrHetero(const std::string& op,
               const std::vector<dgl_type_t> rhs_eid) {
   int maxstrm = 16;
   cudaStream_t stream[maxstrm];
-  for (int i = 0; i < maxstrm; i++)
-    cudaStreamCreate(&(stream[i]));
+  for (int i = 0; i < maxstrm; i++) {
+    CUDA_CALL(cudaStreamCreate(&(stream[i])));
+  }
   SWITCH_BITS(bits, DType, {
     SWITCH_OP(op, Op, {
       SWITCH_TARGET(lhs_target, rhs_target, LhsTarget, RhsTarget, {
@@ -125,6 +126,9 @@ void SDDMMCsrHetero(const std::string& op,
       });
     });
   });
+  for (int i = 0; i < maxstrm; i++) {
+    CUDA_CALL(cudaStreamDestroy(stream[i]));
+  }
 }
 
 
@@ -175,46 +179,46 @@ template void SDDMMCsr<kDLGPU, int64_t, 64>(
     int lhs_target, int rhs_target);
 
 template void SDDMMCsrHetero<kDLGPU, int32_t, 16>(
-    const std::string& op, const BcastOff& bcast, 
+    const std::string& op, const BcastOff& bcast,
     const std::vector<CSRMatrix>& vec_csr,
-    std::vector<NDArray>  lhs, std::vector<NDArray> rhs, 
-    std::vector<NDArray> out, int lhs_target, int rhs_target, 
-    const std::vector<dgl_type_t> in_eid, 
+    std::vector<NDArray>  lhs, std::vector<NDArray> rhs,
+    std::vector<NDArray> out, int lhs_target, int rhs_target,
+    const std::vector<dgl_type_t> in_eid,
     const std::vector<dgl_type_t> out_eid);
 template void SDDMMCsrHetero<kDLGPU, int64_t, 16>(
-    const std::string& op, const BcastOff& bcast, 
+    const std::string& op, const BcastOff& bcast,
     const std::vector<CSRMatrix>& vec_csr,
-    std::vector<NDArray>  lhs, std::vector<NDArray> rhs, 
-    std::vector<NDArray> out, int lhs_target, int rhs_target, 
-    const std::vector<dgl_type_t> in_eid, 
+    std::vector<NDArray>  lhs, std::vector<NDArray> rhs,
+    std::vector<NDArray> out, int lhs_target, int rhs_target,
+    const std::vector<dgl_type_t> in_eid,
     const std::vector<dgl_type_t> out_eid);
 template void SDDMMCsrHetero<kDLGPU, int32_t, 32>(
-    const std::string& op, const BcastOff& bcast, 
+    const std::string& op, const BcastOff& bcast,
     const std::vector<CSRMatrix>& vec_csr,
-    std::vector<NDArray>  lhs, std::vector<NDArray> rhs, 
-    std::vector<NDArray> out, int lhs_target, int rhs_target, 
-    const std::vector<dgl_type_t> in_eid, 
+    std::vector<NDArray>  lhs, std::vector<NDArray> rhs,
+    std::vector<NDArray> out, int lhs_target, int rhs_target,
+    const std::vector<dgl_type_t> in_eid,
     const std::vector<dgl_type_t> out_eid);
 template void SDDMMCsrHetero<kDLGPU, int64_t, 32>(
-    const std::string& op, const BcastOff& bcast, 
+    const std::string& op, const BcastOff& bcast,
     const std::vector<CSRMatrix>& vec_csr,
-    std::vector<NDArray>  lhs, std::vector<NDArray> rhs, 
-    std::vector<NDArray> out, int lhs_target, int rhs_target, 
-    const std::vector<dgl_type_t> in_eid, 
+    std::vector<NDArray>  lhs, std::vector<NDArray> rhs,
+    std::vector<NDArray> out, int lhs_target, int rhs_target,
+    const std::vector<dgl_type_t> in_eid,
     const std::vector<dgl_type_t> out_eid);
 template void SDDMMCsrHetero<kDLGPU, int32_t, 64>(
-    const std::string& op, const BcastOff& bcast, 
+    const std::string& op, const BcastOff& bcast,
     const std::vector<CSRMatrix>& vec_csr,
-    std::vector<NDArray>  lhs, std::vector<NDArray> rhs, 
-    std::vector<NDArray> out, int lhs_target, int rhs_target, 
-    const std::vector<dgl_type_t> in_eid, 
+    std::vector<NDArray>  lhs, std::vector<NDArray> rhs,
+    std::vector<NDArray> out, int lhs_target, int rhs_target,
+    const std::vector<dgl_type_t> in_eid,
     const std::vector<dgl_type_t> out_eid);
 template void SDDMMCsrHetero<kDLGPU, int64_t, 64>(
-    const std::string& op, const BcastOff& bcast, 
+    const std::string& op, const BcastOff& bcast,
     const std::vector<CSRMatrix>& vec_csr,
-    std::vector<NDArray>  lhs, std::vector<NDArray> rhs, 
-    std::vector<NDArray> out, int lhs_target, int rhs_target, 
-    const std::vector<dgl_type_t> in_eid, 
+    std::vector<NDArray>  lhs, std::vector<NDArray> rhs,
+    std::vector<NDArray> out, int lhs_target, int rhs_target,
+    const std::vector<dgl_type_t> in_eid,
     const std::vector<dgl_type_t> out_eid);
 
 
