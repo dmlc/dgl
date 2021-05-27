@@ -114,6 +114,10 @@ void RandomEngine::UniformChoice(IdxType num, IdxType population, IdxType* out,
         IdxType j = RandInt(i, population);
         std::swap(seq[i], seq[j]);
       }
+      // Save the randomly sampled numbers.
+      for (IdxType i = 0; i < num; i++) {
+        out[i] = seq[i];
+      }
     }
   }
 }
