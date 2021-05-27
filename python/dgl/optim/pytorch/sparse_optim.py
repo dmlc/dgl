@@ -177,7 +177,10 @@ class SparseGradOptimizer(abc.ABC):
                 idx_in[emb_name], grad_in[emb_name] = \
                     comm.sparse_all_to_all_push(
                         idx, grad, partition=partition)
-                idx_in[emb_name] = partition.map_to_local(idx_in[emb_name])
+                if emb.partition:
+                    # if the embedding is partitioned, map back to indexes
+                    # into the local tensor
+                    idx_in[emb_name] = partition.map_to_local(idx_in[emb_name])
 
             if self._clean_grad:
                 # clean gradient track
@@ -419,7 +422,8 @@ class SparseAdagrad(SparseGradOptimizer):
                 'SparseAdagrad only supports dgl.nn.NodeEmbedding'
 
             emb_name = emb.name
-            if not self._comm:
+            if th.device(emb.emb_tensor.device) == th.device('cpu'):
+                # if our embedding is on the CPU, our state also has to be
                 if self._rank <= 0:
                     state = create_shared_mem_array(emb_name+'_state', \
                         emb.weight.shape, th.float32).zero_()
@@ -532,7 +536,8 @@ class SparseAdam(SparseGradOptimizer):
             assert isinstance(emb, NodeEmbedding), \
                 'SparseAdam only supports dgl.nn.NodeEmbedding'
             emb_name = emb.name
-            if not self._comm:
+            if th.device(emb.emb_tensor.device) == th.device('cpu'):
+                # if our embedding is on the CPU, our state also has to be
                 if self._rank <= 0:
                     state_step = create_shared_mem_array(emb_name+'_step', \
                         (emb.weight.shape[0],), th.float32).zero_()
