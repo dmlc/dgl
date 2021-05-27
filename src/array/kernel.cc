@@ -67,16 +67,16 @@ void SpMMHetero(const std::string& op, const std::string& reduce,
   std::vector<dgl_type_t> out_eid;
   for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
     vec_graph.push_back(graph->GetCSCMatrix(etype));
-    auto pair = graph->meta_graph()->FindEdge(etype); 
+    auto pair = graph->meta_graph()->FindEdge(etype);
     ufeat_eid.push_back(pair.first);
     efeat_eid.push_back(etype);
     out_eid.push_back(pair.second);
   }
   NDArray efeat = (efeat_vec.size() == 0) ? NullArray() : efeat_vec[efeat_eid[0]];
   NDArray ufeat = (ufeat_vec.size() == 0) ? NullArray() : ufeat_vec[ufeat_eid[0]];
-  const auto& bcast = CalcBcastOff(op, ufeat, efeat); //TODO: might be none
+  const auto& bcast = CalcBcastOff(op, ufeat, efeat);
 
-  //TODO:: change it to ATEN_XPU_SWITCH_CUDA when cuda codes are modified 
+  //TODO(Israt): Change it to ATEN_XPU_SWITCH_CUDA when cuda codes are modified 
   ATEN_XPU_SWITCH(graph->Context().device_type, XPU, "SpMM", {
     ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
       ATEN_FLOAT_BITS_SWITCH(out[out_eid[0]]->dtype, bits, "Feature data", {
@@ -85,13 +85,13 @@ void SpMMHetero(const std::string& op, const std::string& reduce,
               op, reduce, bcast, vec_graph,
               ufeat_vec, efeat_vec, out, out_aux,
               ufeat_eid, out_eid);
-        //TODO:: Enable it when CUDA support is added
+        //TODO(Israt): Enable it when COO support is added
         //} else if (format == SparseFormat::kCOO) {
         //   SpMMCoo<XPU, IdType, bits>(
         //       op, reduce, bcast, graph->GetCOOMatrix(0),
         //       ufeat, vec_efeat, out, out_aux);
-        // } 
-        }else {
+        // }
+        } else {
           LOG(FATAL) << "SpMM only supports CSC foramt for heterpgraph";
         }
       });
@@ -140,7 +140,7 @@ void SDDMMHetero(const std::string& op,
            std::vector<NDArray> out,
            int lhs_target,
            int rhs_target) {
-  // TODO(Israt): change it to COO_CODE
+  //TODO(Israt): change it to COO_CODE
   SparseFormat format = graph->SelectFormat(0, CSR_CODE);
 
   std::vector<CSRMatrix> vec_csr;
@@ -148,13 +148,13 @@ void SDDMMHetero(const std::string& op,
   std::vector<dgl_type_t> rhs_eid;
   for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
     vec_csr.push_back(graph->GetCSRMatrix(etype));
-    auto pair = graph->meta_graph()->FindEdge(etype); 
+    auto pair = graph->meta_graph()->FindEdge(etype);
     lhs_eid.push_back(pair.first);
     rhs_eid.push_back(pair.second);
   }
   const auto &bcast = CalcBcastOff(op, lhs[lhs_eid[0]], rhs[rhs_eid[0]]);
 
-  //TODO:: change it to ATEN_XPU_SWITCH_CUDA when cuda codes are modified 
+  //TODO(Israt): change it to ATEN_XPU_SWITCH_CUDA when cuda codes are modified
   ATEN_XPU_SWITCH(graph->Context().device_type, XPU, "SDDMM", {
     ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
       ATEN_FLOAT_BITS_SWITCH(out[rhs_eid[0]]->dtype, bits, "Feature data", { //TODO index
@@ -163,7 +163,7 @@ void SDDMMHetero(const std::string& op,
               op, bcast, vec_csr,
               lhs, rhs, out, lhs_target, rhs_target,
               lhs_eid, rhs_eid);
-        //TODO:: Enable it when CUDA support is added
+        //TODO(Israt): Enable it when COO support is added
         // } else if (format == SparseFormat::kCOO) {
         //   SDDMMCoo<XPU, IdType, bits>(
         //       op, bcast, graph->GetCOOMatrix(0),
@@ -336,7 +336,7 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSpMMHetero")
       E_vec.push_back(val->data);
     }
     for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
-      auto pair = graph->meta_graph()->FindEdge(etype); 
+      auto pair = graph->meta_graph()->FindEdge(etype);
       const dgl_id_t src_id = pair.first;
       const dgl_id_t dst_id = pair.second;
       NDArray U = (U_vec.size() == 0) ? NullArray() : U_vec[src_id];
