@@ -332,12 +332,19 @@ def zerocopy_to_dgl_ndarray_for_write(input):
     return zerocopy_to_dgl_ndarray(input)
 
 def zerocopy_from_dgl_ndarray(data):
-    if len(data.shape) == 0 or builtins.min(data.shape) == 0:
+    if data.shape == (0,):
         # NOTE: PyTorch v1.5 does not accept DLPack object representing empty CUDA tensor.
         #  Related issue: https://github.com/pytorch/pytorch/issues/41182
         #  The issue will be fixed in v1.6 and later.
         return th.tensor([], dtype=getattr(th, data.dtype),
                          device=to_backend_ctx(data.ctx))
+    elif len(data.shape) == 0 or builtins.min(data.shape) == 0:
+        # Workaround the same issue as above, but preserve the shape of the
+        # empty tensor. This is needed by the sparse optimizer when one of
+        # processors may receive no gradients to update, but we want to keep
+        # the dimension of the embedding.
+        return th.empty(data.shape, dtype=getattr(th, data.dtype),
+                        device=to_backend_ctx(data.ctx))
     else:
         return dlpack.from_dlpack(data.to_dlpack())
 
