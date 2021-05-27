@@ -98,6 +98,7 @@ The folder contains example implementations of selected research papers related 
 | [GaAN: Gated Attention Networks for Learning on large and Spatiotemporal Graphs](#gaan) |                     |                                  | :heavy_check_mark:        |                    |                    |
 | [Combining Label Propagation and Simple Models Out-performs Graph Neural Networks](#correct_and_smooth) |  :heavy_check_mark: |                                  |                                  |                                  | :heavy_check_mark:                                 |
 | [Learning from Labeled and Unlabeled Data with Label Propagation](#label_propagation) |  :heavy_check_mark: |                                  |                                  |                                  |                                  |
+| [Heterogeneous Graph Neural Network](#hetgnn) | :heavy_check_mark: | :heavy_check_mark: | | | |
 
 ## 2021
 
@@ -233,6 +234,9 @@ The folder contains example implementations of selected research papers related 
 - <a name='gnnexplainer'></a> Ying, Rex, et al. GNNExplainer: Generating Explanations for Graph Neural Networks. [Paper link](https://arxiv.org/abs/1903.03894).
     - Example code: [PyTorch](../examples/pytorch/gnn_explainer)
     - Tags: Graph Neural Network, Explainability
+- <a name='hetgnn'></a> Zhang C, Song D, et al. Heterogeneous graph neural network. [Paper link](https://dl.acm.org/doi/abs/10.1145/3292500.3330961).
+    - Example code: [PyTorch](https://github.com/BUPT-GAMMA/OpenHGNN/tree/main/openhgnn/output/HetGNN)
+    - Tags: Heterogeneous graphs, Graph neural networks, Graph embedding
 
 ## 2018
 
