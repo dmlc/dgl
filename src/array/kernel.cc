@@ -134,6 +134,9 @@ std::pair<CSRMatrix, NDArray> CSRMM(
     NDArray A_weights,
     CSRMatrix B,
     NDArray B_weights) {
+  CHECK_EQ(A.num_cols, B.num_rows) <<
+    "The number of nodes of destination node type of the first graph must be the "
+    "same as the number of nodes of source node type of the second graph.";
   CheckCtx(
       A.indptr->ctx,
       {A_weights, B_weights},
@@ -143,8 +146,7 @@ std::pair<CSRMatrix, NDArray> CSRMM(
   CHECK_EQ(A_weights->dtype, B_weights->dtype) << "Data types of two edge weights must match.";
 
   std::pair<CSRMatrix, NDArray> ret;
-  // TODO(BarclayII): change to ATEN_XPU_SWITCH_CUDA once the GPU kernels are implemented
-  ATEN_XPU_SWITCH(A.indptr->ctx.device_type, XPU, "CSRMM", {
+  ATEN_XPU_SWITCH_CUDA(A.indptr->ctx.device_type, XPU, "CSRMM", {
     ATEN_ID_TYPE_SWITCH(A.indptr->dtype, IdType, {
       ATEN_FLOAT_TYPE_SWITCH(A_weights->dtype, DType, "Edge weights", {
         ret = CSRMM<XPU, IdType, DType>(A, A_weights, B, B_weights);
@@ -160,9 +162,11 @@ std::pair<CSRMatrix, NDArray> CSRSum(
   CHECK(A.size() > 0) << "The list of graphs must not be empty.";
   CHECK_EQ(A.size(), A_weights.size()) <<
     "The list of edge weights must have the same length as the list of graphs.";
-  auto ctx = A[0].indptr->ctx;
-  auto idtype = A[0].indptr->dtype;
-  auto dtype = A_weights[0]->dtype;
+  const auto ctx = A[0].indptr->ctx;
+  const auto idtype = A[0].indptr->dtype;
+  const auto dtype = A_weights[0]->dtype;
+  const auto num_rows = A[0].num_rows;
+  const auto num_cols = A[0].num_cols;
   for (size_t i = 0; i < A.size(); ++i) {
     CHECK_EQ(A[i].indptr->ctx, ctx) << "The devices of all graphs must be equal.";
     CHECK_EQ(A[i].indptr->dtype, idtype) << "The ID types of all graphs must be equal.";
@@ -172,37 +176,15 @@ std::pair<CSRMatrix, NDArray> CSRSum(
       "The devices of edge weights must be the same as that of the graphs.";
     CHECK_EQ(A_weights[i]->dtype, dtype) <<
       "The data types of all edge weights must be equal.";
+    CHECK_EQ(A[i].num_rows, num_rows) << "Graphs must have the same number of nodes.";
+    CHECK_EQ(A[i].num_cols, num_cols) << "Graphs must have the same number of nodes.";
   }
 
   std::pair<CSRMatrix, NDArray> ret;
-  // TODO(BarclayII): change to ATEN_XPU_SWITCH_CUDA once the GPU kernels are implemented
-  ATEN_XPU_SWITCH(ctx.device_type, XPU, "CSRSum", {
+  ATEN_XPU_SWITCH_CUDA(ctx.device_type, XPU, "CSRSum", {
     ATEN_ID_TYPE_SWITCH(idtype, IdType, {
       ATEN_FLOAT_TYPE_SWITCH(dtype, DType, "Edge weights", {
         ret = CSRSum<XPU, IdType, DType>(A, A_weights);
-      });
-    });
-  });
-  return ret;
-}
-
-NDArray CSRMask(const CSRMatrix& A, NDArray A_weights, const CSRMatrix& B) {
-  CHECK_EQ(A.indptr->ctx, A_weights->ctx) <<
-    "Device of the graph and the edge weights must match.";
-  CHECK_EQ(A.indptr->ctx, B.indptr->ctx) << "Device of two graphs must match.";
-  CHECK_EQ(A.indptr->dtype, B.indptr->dtype) << "ID types of two graphs must match.";
-  CHECK_EQ(A_weights->shape[0], A.indices->shape[0]) <<
-    "Shape of edge weights does not match the number of edges.";
-  auto ctx = A.indptr->ctx;
-  auto idtype = A.indptr->dtype;
-  auto dtype = A_weights->dtype;
-
-  NDArray ret;
-  // TODO(BarclayII): change to ATEN_XPU_SWITCH_CUDA once the GPU kernels are implemented
-  ATEN_XPU_SWITCH(ctx.device_type, XPU, "CSRMask", {
-    ATEN_ID_TYPE_SWITCH(idtype, IdType, {
-      ATEN_FLOAT_TYPE_SWITCH(dtype, DType, "Edge weights", {
-        ret = CSRMask<XPU, IdType, DType>(A, A_weights, B);
       });
     });
   });
@@ -296,61 +278,83 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelGetEdgeMapping")
     *rv = GetEdgeMapping(graph);
   });
 
+/*!
+ * \brief Sparse matrix multiplication with graph interface.
+ *
+ * \param A_ref The left operand.
+ * \param A_weights The edge weights of graph A.
+ * \param B_ref The right operand.
+ * \param B_weights The edge weights of graph B.
+ * \param num_vtypes The number of vertex types of the graph to be returned.
+ * \return A pair consisting of the new graph as well as its edge weights.
+ */
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLCSRMM")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    int M = args[0];
-    int N = args[1];
-    int P = args[2];
-    NDArray A_indptr = args[3];
-    NDArray A_indices = args[4];
-    NDArray A_data = args[5];
-    NDArray B_indptr = args[6];
-    NDArray B_indices = args[7];
-    NDArray B_data = args[8];
-    auto result = CSRMM(
-        CSRMatrix(M, N, A_indptr, A_indices),
-        A_data,
-        CSRMatrix(N, P, B_indptr, B_indices),
-        B_data);
-    List<Value> ret;
-    ret.push_back(Value(MakeValue(result.first.indptr)));
-    ret.push_back(Value(MakeValue(result.first.indices)));
+    const HeteroGraphRef A_ref = args[0];
+    NDArray A_weights = args[1];
+    const HeteroGraphRef B_ref = args[2];
+    NDArray B_weights = args[3];
+    int num_vtypes = args[4];
+
+    const HeteroGraphPtr A = A_ref.sptr();
+    const HeteroGraphPtr B = B_ref.sptr();
+    CHECK_EQ(A->NumEdgeTypes(), 1) << "The first graph must have only one edge type.";
+    CHECK_EQ(B->NumEdgeTypes(), 1) << "The second graph must have only one edge type.";
+    const auto A_csr = A->GetCSRMatrix(0);
+    const auto B_csr = B->GetCSRMatrix(0);
+    auto result = CSRMM(A_csr, A_weights, B_csr, B_weights);
+
+    List<ObjectRef> ret;
+    ret.push_back(HeteroGraphRef(CreateFromCSR(num_vtypes, result.first, ALL_CODE)));
     ret.push_back(Value(MakeValue(result.second)));
     *rv = ret;
   });
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLCSRSum")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    int M = args[0];
-    int N = args[1];
-    List<Value> A_indptr = args[2];
-    List<Value> A_indices = args[3];
-    List<Value> A_data = args[4];
-    std::vector<NDArray> weights = ListValueToVector<NDArray>(A_data);
-    std::vector<CSRMatrix> mats(A_indptr.size());
-    for (int i = 0; i < A_indptr.size(); ++i)
-      mats[i] = CSRMatrix(M, N, A_indptr[i]->data, A_indices[i]->data);
+    List<HeteroGraphRef> A_refs = args[0];
+    List<Value> A_weights = args[1];
+
+    std::vector<NDArray> weights = ListValueToVector<NDArray>(A_weights);
+    std::vector<CSRMatrix> mats;
+    mats.reserve(A_refs.size());
+    int num_vtypes = 0;
+    for (auto A_ref : A_refs) {
+      const HeteroGraphPtr A = A_ref.sptr();
+      CHECK_EQ(A->NumEdgeTypes(), 1) << "Graphs must have only one edge type.";
+      mats.push_back(A->GetCSRMatrix(0));
+      if (num_vtypes == 0)
+        num_vtypes = A->NumVertexTypes();
+    }
     auto result = CSRSum(mats, weights);
-    List<Value> ret;
-    ret.push_back(Value(MakeValue(result.first.indptr)));
-    ret.push_back(Value(MakeValue(result.first.indices)));
+
+    List<ObjectRef> ret;
+    ret.push_back(HeteroGraphRef(CreateFromCSR(num_vtypes, result.first, ALL_CODE)));
     ret.push_back(Value(MakeValue(result.second)));
     *rv = ret;
   });
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLCSRMask")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    int M = args[0];
-    int N = args[1];
-    NDArray A_indptr = args[2];
-    NDArray A_indices = args[3];
-    NDArray A_data = args[4];
-    NDArray B_indptr = args[5];
-    NDArray B_indices = args[6];
-    auto result = CSRMask(
-        CSRMatrix(M, N, A_indptr, A_indices),
-        A_data,
-        CSRMatrix(M, N, B_indptr, B_indices));
+    const HeteroGraphRef A_ref = args[0];
+    NDArray A_weights = args[1];
+    const HeteroGraphRef B_ref = args[2];
+
+    const HeteroGraphPtr A = A_ref.sptr();
+    const HeteroGraphPtr B = B_ref.sptr();
+    CHECK_EQ(A->NumEdgeTypes(), 1) << "Both graphs must have only one edge type.";
+    CHECK_EQ(B->NumEdgeTypes(), 1) << "Both graphs must have only one edge type.";
+    const CSRMatrix& A_csr = A->GetCSRMatrix(0);
+    const COOMatrix& B_coo = B->GetCOOMatrix(0);
+    CHECK_EQ(A_csr.num_rows, B_coo.num_rows) <<
+      "Both graphs must have the same number of nodes.";
+    CHECK_EQ(A_csr.num_cols, B_coo.num_cols) <<
+      "Both graphs must have the same number of nodes.";
+
+    NDArray result;
+    ATEN_FLOAT_TYPE_SWITCH(A_weights->dtype, DType, "Edge weights", {
+      result = aten::CSRGetData<DType>(A_csr, B_coo.row, B_coo.col, A_weights, 0.);
+    });
     *rv = result;
   });
 

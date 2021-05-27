@@ -19,6 +19,8 @@ from .dist_tensor import DistTensor
 from .partition import partition_graph, load_partition, load_partition_book
 from .graph_partition_book import GraphPartitionBook, PartitionPolicy
 from .sparse_emb import SparseAdagrad, DistEmbedding
+from . import nn
+from . import optim
 
 from .rpc import *
 from .rpc_server import start_server
@@ -27,4 +29,4 @@ from .dist_context import initialize, exit_client
 from .kvstore import KVServer, KVClient
 from .server_state import ServerState
 from .dist_dataloader import DistDataLoader
-from .graph_services import sample_neighbors, in_subgraph, find_edges
+from .graph_services import sample_neighbors, in_subgraph
