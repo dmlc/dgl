@@ -100,9 +100,6 @@ def is_authorized(name) {
 }
 
 pipeline {
-  triggers {
-        issueCommentTrigger('@dgl-bot .*')
-  }
   agent {
     kubernetes {
       yaml """\
@@ -140,8 +137,19 @@ pipeline {
         defaultContainer "dgl-ci-lint"
     }
   }
+  triggers {
+        issueCommentTrigger('@dgl-bot .*')
+  }
   stages {
     stage('Regression Test Trigger') {
+
+      agent {
+          docker {
+              label 'linux-benchmark-node'
+              image 'dgllib/dgl-ci-lint'
+              alwaysPull true
+          }
+      }
       when { triggeredBy 'IssueCommentCause' }
       steps {
         container('dgl-ci-lint'){
