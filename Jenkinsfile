@@ -108,7 +108,7 @@ pipeline {
     stage('Regression Test Trigger') {
       agent {
         kubernetes {
-          yamlFile 'pods.yaml'
+          yamlFile 'docker/pods/ci-lint.yaml'
           defaultContainer 'dgl-ci-lint'
         }
       }
@@ -167,15 +167,15 @@ pipeline {
       }
     }
     stage('CI') {
-      agent {
-        kubernetes {
-          yamlFile 'pods.yaml'
-          defaultContainer 'dgl-ci-lint'
-        }
-      }
       when { not { triggeredBy 'IssueCommentCause' } }
       stages {
         stage('Lint Check') {
+          agent {
+            kubernetes {
+              yamlFile 'docker/pods/ci-lint.yaml'
+              defaultContainer 'dgl-ci-lint'
+            }
+          }
           steps {
             init_git()
             sh 'bash tests/scripts/task_lint.sh'
@@ -191,10 +191,9 @@ pipeline {
           parallel {
             stage('CPU Build') {
               agent {
-                docker {
-                  label 'linux-c52x-node'
-                  image 'dgllib/dgl-ci-cpu:conda'
-                  alwaysPull true
+                kubernetes {
+                  yamlFile 'docker/pods/ci-compile.yaml'
+                  defaultContainer 'dgl-ci-cpu-compile'
                 }
               }
               steps {
@@ -208,11 +207,9 @@ pipeline {
             }
             stage('GPU Build') {
               agent {
-                docker {
-                  label 'linux-c52x-node'
-                  image 'dgllib/dgl-ci-gpu:conda'
-                  args '-u root'
-                  alwaysPull true
+                kubernetes {
+                  yamlFile 'docker/pods/ci-compile.yaml'
+                  defaultContainer 'dgl-ci-cpu-compile'
                 }
               }
               steps {
