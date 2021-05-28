@@ -6,6 +6,9 @@ spec:
     image: dgllib/dgl-ci-lint
     imagePullPolicy: Always
     tty: true
+    securityContext:
+      allowPrivilegeEscalation: false
+      runAsUser: 0
   # - name: dgl-ci-cpu-compile
   #   image: dgllib/dgl-ci-cpu:conda
   #   imagePullPolicy: Always
