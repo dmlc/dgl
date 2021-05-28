@@ -137,6 +137,7 @@ pipeline {
               limits:
                 nvidia.com/gpu: 1 # requesting 1 GPU
         """.stripIndent()
+        defaultContainer "dgl-ci-lint"
     }
   }
   stages {
