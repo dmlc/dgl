@@ -107,11 +107,10 @@ pipeline {
   stages {
     stage('Regression Test Trigger') {
       agent {
-          docker {
-              label 'linux-benchmark-node'
-              image 'dgllib/dgl-ci-lint'
-              alwaysPull true
-          }
+        kubernetes {
+          yamlFile 'pods.yaml'
+          defaultContainer 'dgl-ci-lint'
+        }
       }
       when { triggeredBy 'IssueCommentCause' }
       steps {
@@ -170,8 +169,6 @@ pipeline {
     stage('CI') {
       when { not { triggeredBy 'IssueCommentCause' } }
       stages {
-      podTemplate(yamlFile: "pods.yaml"){
-      node(POD_LABEL){
         stage('Lint Check') {
           steps {
             container('dgl-ci-lint'){
@@ -185,8 +182,6 @@ pipeline {
             }
           }
         }
-      }
-      }
         
         stage('Build') {
           parallel {
