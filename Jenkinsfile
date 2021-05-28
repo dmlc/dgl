@@ -100,49 +100,12 @@ def is_authorized(name) {
 }
 
 pipeline {
-  agent {
-    kubernetes {
-      yaml """\
-      apiVersion: v1
-        kind: Pod
-        metadata:
-          labels:
-            dglci: ciworker
-        spec:
-          containers:
-          - name: dgl-ci-lint
-            image: dgllib/dgl-ci-lint
-            imagePullPolicy: Always
-            tty: true
-          - name: dgl-ci-cpu-compile
-            image: dgllib/dgl-ci-cpu:conda
-            imagePullPolicy: Always
-            tty: true
-            requests:
-              cpu: 24
-          - name: dgl-ci-cpu
-            image: dgllib/dgl-ci-cpu:conda
-            imagePullPolicy: Always
-            tty: true
-            requests:
-              cpu: 8
-          - name: dgl-ci-gpu
-            image: dgllib/dgl-ci-gpu:conda
-            imagePullPolicy: Always
-            tty: true
-            resources:
-              limits:
-                nvidia.com/gpu: 1 # requesting 1 GPU
-        """.stripIndent()
-        defaultContainer "dgl-ci-lint"
-    }
-  }
   triggers {
         issueCommentTrigger('@dgl-bot .*')
   }
+  agent any
   stages {
     stage('Regression Test Trigger') {
-
       agent {
           docker {
               label 'linux-benchmark-node'
@@ -152,7 +115,6 @@ pipeline {
       }
       when { triggeredBy 'IssueCommentCause' }
       steps {
-        container('dgl-ci-lint'){
         checkout scm
         script {
               def comment = env.GITHUB_COMMENT
@@ -181,7 +143,6 @@ pipeline {
               currentBuild.result = 'SUCCESS'
               return
         }
-      }
       }
     }
     stage('Bot Instruction') {
