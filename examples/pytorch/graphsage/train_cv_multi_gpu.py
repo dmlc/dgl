@@ -234,20 +234,26 @@ def run(proc_id, n_gpus, args, devices, data):
     train_nid = train_mask.nonzero().squeeze()
     val_nid = val_mask.nonzero().squeeze()
 
-    # Split train_nid
-    train_nid = th.split(train_nid, math.ceil(len(train_nid) / n_gpus))[proc_id]
-
     # Create sampler
     sampler = NeighborSampler(g, [int(_) for _ in args.fan_out.split(',')])
 
     # Create PyTorch DataLoader for constructing blocks
-    dataloader = DataLoader(
-        dataset=train_nid.numpy(),
-        batch_size=args.batch_size,
-        collate_fn=sampler.sample_blocks,
-        shuffle=True,
-        drop_last=False,
-        num_workers=args.num_workers_per_gpu)
+    if n_gpus > 1:
+        dist_sampler = torch.utils.data.distributed.DistributedSampler(train_nid.numpy(), shuffle=True, drop_last=False)
+        dataloader = DataLoader(
+            dataset=train_nid.numpy(),
+            batch_size=args.batch_size,
+            collate_fn=sampler.sample_blocks,
+            sampler=dist_sampler,
+            num_workers=args.num_workers_per_gpu)
+    else:
+        dataloader = DataLoader(
+            dataset=train_nid.numpy(),
+            batch_size=args.batch_size,
+            collate_fn=sampler.sample_blocks,
+            shuffle=True,
+            drop_last=False,
+            num_workers=args.num_workers_per_gpu)
 
     # Define model
     model = SAGE(in_feats, args.num_hidden, n_classes, args.num_layers, F.relu)
@@ -274,6 +280,8 @@ def run(proc_id, n_gpus, args, devices, data):
     avg = 0
     iter_tput = []
     for epoch in range(args.num_epochs):
+        if n_gpus > 1:
+            dist_sampler.set_epoch(epoch)
         tic = time.time()
         model.train()
         for step, (blocks, hist_blocks) in enumerate(dataloader):
