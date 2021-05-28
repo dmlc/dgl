@@ -100,10 +100,43 @@ def is_authorized(name) {
 }
 
 pipeline {
+  // agent {
+  //   kubernetes {
+  //     yaml '''\
+  //       apiVersion: v1
+  //       kind: Pod
+  //       spec:
+  //         containers:
+  //         - name: dgl-ci-lint
+  //           image: dgllib/dgl-ci-lint
+  //           imagePullPolicy: Always
+  //           tty: true
+  //         - name: dgl-ci-cpu-compile
+  //           image: dgllib/dgl-ci-cpu:conda
+  //           imagePullPolicy: Always
+  //           tty: true
+  //           requests:
+  //             cpu: 24
+  //         - name: dgl-ci-cpu
+  //           image: dgllib/dgl-ci-cpu:conda
+  //           imagePullPolicy: Always
+  //           tty: true
+  //           requests:
+  //             cpu: 8
+  //         - name: dgl-ci-gpu
+  //           image: dgllib/dgl-ci-gpu:conda
+  //           imagePullPolicy: Always
+  //           tty: true
+  //           resources:
+  //             limits:
+  //               nvidia.com/gpu: 1 # requesting 1 GPU
+  //       '''.stripIndent()
+  //       defaultContainer 'dgl-ci-lint'
+  //   }
+  // }
   triggers {
         issueCommentTrigger('@dgl-bot .*')
   }
-  agent any
   stages {
     stage('Regression Test Trigger') {
       agent {
@@ -115,25 +148,26 @@ pipeline {
       }
       when { triggeredBy 'IssueCommentCause' }
       steps {
-        checkout scm
-        script {
+        // container('dgl-ci-lint') {
+          checkout scm
+          script {
               def comment = env.GITHUB_COMMENT
               def author = env.GITHUB_COMMENT_AUTHOR
               if (!is_authorized(author)) {
-            error('Not authorized to launch regression tests')
+              error('Not authorized to launch regression tests')
               }
               dir('benchmark_scripts_repo') {
-            checkout([$class: 'GitSCM', branches: [[name: '*/master']],
-                      userRemoteConfigs: [[credentialsId: 'github', url: 'https://github.com/dglai/DGL_scripts.git']]])
+                checkout([$class: 'GitSCM', branches: [[name: '*/master']],
+                        userRemoteConfigs: [[credentialsId: 'github', url: 'https://github.com/dglai/DGL_scripts.git']]])
               }
               sh('cp benchmark_scripts_repo/benchmark/* benchmarks/scripts/')
               def command_lists = comment.split(' ')
               def instance_type = command_lists[2].replace('.', '')
               if (command_lists.size() != 5) {
-                pullRequest.comment('Cannot run the regression test due to unknown command')
-                error('Unknown command')
+              pullRequest.comment('Cannot run the regression test due to unknown command')
+              error('Unknown command')
               } else {
-                pullRequest.comment("Start the Regression test. View at ${RUN_DISPLAY_URL}")
+              pullRequest.comment("Start the Regression test. View at ${RUN_DISPLAY_URL}")
               }
               dir('benchmarks/scripts') {
                 sh('python3 -m pip install boto3')
@@ -142,7 +176,8 @@ pipeline {
               pullRequest.comment("Finished the Regression test. Result table is at https://dgl-asv-data.s3-us-west-2.amazonaws.com/${env.GIT_COMMIT}_${instance_type}/results/result.csv. Jenkins job link is ${RUN_DISPLAY_URL}. ")
               currentBuild.result = 'SUCCESS'
               return
-        }
+          }
+        // }
       }
     }
     stage('Bot Instruction') {
@@ -165,26 +200,51 @@ pipeline {
         }
       }
     }
-    stage('CI'){
-      when { not {triggeredBy 'IssueCommentCause'} }
-      stages{
+    stage('CI') {
+      when { not { triggeredBy 'IssueCommentCause' } }
+      stages {
+        podTemplate(yaml:'''\
+        apiVersion: v1
+        kind: Pod
+        spec:
+          containers:
+          - name: dgl-ci-lint
+            image: dgllib/dgl-ci-lint
+            imagePullPolicy: Always
+            tty: true
+          - name: dgl-ci-cpu-compile
+            image: dgllib/dgl-ci-cpu:conda
+            imagePullPolicy: Always
+            tty: true
+            requests:
+              cpu: 24
+          - name: dgl-ci-cpu
+            image: dgllib/dgl-ci-cpu:conda
+            imagePullPolicy: Always
+            tty: true
+            requests:
+              cpu: 8
+          - name: dgl-ci-gpu
+            image: dgllib/dgl-ci-gpu:conda
+            imagePullPolicy: Always
+            tty: true
+            resources:
+              limits:
+                nvidia.com/gpu: 1 # requesting 1 GPU
+        '''.stripIndent()){
         stage('Lint Check') {
-          agent {
-            docker {
-              label 'linux-c52x-node'
-              image 'dgllib/dgl-ci-lint'
-              alwaysPull true
-            }
-          }
           steps {
+            container('dgl-ci-lint'){
             init_git()
             sh 'bash tests/scripts/task_lint.sh'
+            }
           }
           post {
             always {
               cleanWs disableDeferredWipeout: true, deleteDirs: true
             }
           }
+        }
         }
         stage('Build') {
           parallel {
