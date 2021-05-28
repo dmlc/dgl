@@ -100,12 +100,7 @@ def is_authorized(name) {
 }
 
 pipeline {
-  agent {
-    kubernetes {
-      yamlFile 'pods.yaml'
-      defaultContainer 'dgl-ci-lint'
-    }
-  }
+  agent any
   triggers {
         issueCommentTrigger('@dgl-bot .*')
   }
@@ -175,6 +170,8 @@ pipeline {
     stage('CI') {
       when { not { triggeredBy 'IssueCommentCause' } }
       stages {
+      podTemplate(yamlFile: "pods.yaml"){
+      node(POD_LABEL){
         stage('Lint Check') {
           steps {
             container('dgl-ci-lint'){
@@ -188,6 +185,8 @@ pipeline {
             }
           }
         }
+      }
+      }
         
         stage('Build') {
           parallel {
