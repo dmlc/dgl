@@ -167,14 +167,18 @@ pipeline {
       }
     }
     stage('CI') {
+      agent {
+        kubernetes {
+          yamlFile 'pods.yaml'
+          defaultContainer 'dgl-ci-lint'
+        }
+      }
       when { not { triggeredBy 'IssueCommentCause' } }
       stages {
         stage('Lint Check') {
           steps {
-            container('dgl-ci-lint'){
             init_git()
             sh 'bash tests/scripts/task_lint.sh'
-            }
           }
           post {
             always {
