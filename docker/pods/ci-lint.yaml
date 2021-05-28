@@ -8,5 +8,6 @@ spec:
     image: dgllib/dgl-ci-lint
     imagePullPolicy: Always
     tty: true
-    requests:
-      cpu: 4
+    resources:
+      requests:
+        cpu: 4
