@@ -4,16 +4,10 @@ spec:
   securityContext:
     runAsUser: 0
   containers:
-  - name: dgl-ci-cpu-compile
-    image: dgllib/dgl-ci-cpu:conda
-    imagePullPolicy: Always
-    tty: true
-    requests:
-      cpu: 24
-  - name: dgl-ci-gpu
-    image: dgllib/dgl-ci-gpu:conda
-    imagePullPolicy: Always
-    tty: true
-    resources:
-      limits:
-        nvidia.com/gpu: 1 # requesting 1 GPU
+    - name: dgl-ci-gpu
+      image: dgllib/dgl-ci-gpu:conda
+      imagePullPolicy: Always
+      tty: true
+      resources:
+        limits:
+          nvidia.com/gpu: 1 # requesting 1 GPU
