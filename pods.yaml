@@ -7,7 +7,7 @@ spec:
     imagePullPolicy: Always
     tty: true
     securityContext:
-      allowPrivilegeEscalation: false
+      allowPrivilegeEscalation: true
       runAsUser: 0
   # - name: dgl-ci-cpu-compile
   #   image: dgllib/dgl-ci-cpu:conda
