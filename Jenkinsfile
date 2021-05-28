@@ -141,11 +141,9 @@ pipeline {
   }
   stages {
     stage('Regression Test Trigger') {
-      agent {
-          container('dgl-ci-lint')
-      }
       when { triggeredBy 'IssueCommentCause' }
       steps {
+        container('dgl-ci-lint'){
         checkout scm
         script {
               def comment = env.GITHUB_COMMENT
@@ -174,6 +172,7 @@ pipeline {
               currentBuild.result = 'SUCCESS'
               return
         }
+      }
       }
     }
     stage('Bot Instruction') {
