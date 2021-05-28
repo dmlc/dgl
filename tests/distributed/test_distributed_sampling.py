@@ -16,9 +16,10 @@ from scipy import sparse as spsp
 from dgl.distributed import DistGraphServer, DistGraph
 
 
-def start_server(rank, tmpdir, disable_shared_mem, graph_name):
+def start_server(rank, tmpdir, disable_shared_mem, graph_name, graph_format='csc'):
     g = DistGraphServer(rank, "rpc_ip_config.txt", 1, 1,
-                        tmpdir / (graph_name + '.json'), disable_shared_mem=disable_shared_mem)
+                        tmpdir / (graph_name + '.json'), disable_shared_mem=disable_shared_mem,
+                        graph_format=graph_format)
     g.start()
 
 
@@ -119,7 +120,8 @@ def check_rpc_find_edges_shuffle(tmpdir, num_server):
     pserver_list = []
     ctx = mp.get_context('spawn')
     for i in range(num_server):
-        p = ctx.Process(target=start_server, args=(i, tmpdir, num_server > 1, 'test_find_edges'))
+        p = ctx.Process(target=start_server, args=(i, tmpdir, num_server > 1,
+                                                   'test_find_edges', ['csr', 'coo']))
         p.start()
         time.sleep(1)
         pserver_list.append(p)
