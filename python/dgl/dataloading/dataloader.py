@@ -173,7 +173,7 @@ class BlockSampler(object):
         self.return_eids = return_eids
         self.set_output_context(output_ctx)
 
-    def sample_frontier(self, block_id, g, seed_nodes):
+    def sample_frontier(self, block_id, g, seed_nodes, exclude_eids=None):
         """Generate the frontier given the destination nodes.
 
         The subclasses should override this function.
@@ -189,6 +189,11 @@ class BlockSampler(object):
 
             If the graph only has one node type, one can just specify a single tensor
             of node IDs.
+        exclude_eids: Tensor or dict
+            Edge IDs to exclude during sampling neighbors for the seed nodes.
+
+            This argument can take a single ID tensor or a dictionary of edge types and ID tensors.
+            If a single tensor is given, the graph must only have one type of nodes.
 
         Returns
         -------
@@ -248,33 +253,8 @@ class BlockSampler(object):
                     for ntype, nodes in seed_nodes_in.items()}
             else:
                 seed_nodes_in = seed_nodes_in.to(graph_device)
-            frontier = self.sample_frontier(block_id, g, seed_nodes_in)
 
-            # Removing edges from the frontier for link prediction training falls
-            # into the category of frontier postprocessing
-            if exclude_eids is not None:
-                parent_eids = frontier.edata[EID]
-                parent_eids_np = _tensor_or_dict_to_numpy(parent_eids)
-                located_eids = _locate_eids_to_exclude(parent_eids_np, exclude_eids)
-                if not isinstance(located_eids, Mapping):
-                    # (BarclayII) If frontier already has a EID field and located_eids is empty,
-                    # the returned graph will keep EID intact.  Otherwise, EID will change
-                    # to the mapping from the new graph to the old frontier.
-                    # So we need to test if located_eids is empty, and do the remapping ourselves.
-                    if len(located_eids) > 0:
-                        frontier = transform.remove_edges(
-                            frontier, located_eids, store_ids=True)
-                        frontier.edata[EID] = F.gather_row(parent_eids, frontier.edata[EID])
-                else:
-                    # (BarclayII) remove_edges only accepts removing one type of edges,
-                    # so I need to keep track of the edge IDs left one by one.
-                    new_eids = parent_eids.copy()
-                    for k, v in located_eids.items():
-                        if len(v) > 0:
-                            frontier = transform.remove_edges(
-                                frontier, v, etype=k, store_ids=True)
-                            new_eids[k] = F.gather_row(parent_eids[k], frontier.edges[k].data[EID])
-                    frontier.edata[EID] = new_eids
+            frontier = self.sample_frontier(block_id, g, seed_nodes_in, exclude_eids=exclude_eids)
 
             if self.output_device is not None:
                 frontier = frontier.to(self.output_device)

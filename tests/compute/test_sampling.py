@@ -3,6 +3,7 @@ import backend as F
 import numpy as np
 import unittest
 from collections import defaultdict
+import pytest
 
 def check_random_walk(g, metapath, traces, ntypes, prob=None, trace_eids=None):
     traces = F.asnumpy(traces)
@@ -819,6 +820,98 @@ def test_sample_neighbors_etype_homogeneous():
             csc_g, seeds, dgl.ETYPE, 5, edge_dir='out', replace=True)
         check_num2(subg.edges()[0], True)
 
+@pytest.mark.parametrize('dtype', ['int32', 'int64'])
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
+def test_sample_neighbors_exclude_edges_heteroG(dtype):
+    d_i_d_u_nodes = F.zerocopy_from_numpy(np.unique(np.random.randint(300, size=100, dtype=dtype)))
+    d_i_d_v_nodes = F.zerocopy_from_numpy(np.random.randint(25, size=d_i_d_u_nodes.shape, dtype=dtype))
+    d_i_g_u_nodes = F.zerocopy_from_numpy(np.unique(np.random.randint(300, size=100, dtype=dtype)))
+    d_i_g_v_nodes = F.zerocopy_from_numpy(np.random.randint(25, size=d_i_g_u_nodes.shape, dtype=dtype))
+    d_t_d_u_nodes = F.zerocopy_from_numpy(np.unique(np.random.randint(300, size=100, dtype=dtype)))
+    d_t_d_v_nodes = F.zerocopy_from_numpy(np.random.randint(25, size=d_t_d_u_nodes.shape, dtype=dtype))
+
+    g = dgl.heterograph({
+        ('drug', 'interacts', 'drug'): (d_i_d_u_nodes, d_i_d_v_nodes),
+        ('drug', 'interacts', 'gene'): (d_i_g_u_nodes, d_i_g_v_nodes),
+        ('drug', 'treats', 'disease'): (d_t_d_u_nodes, d_t_d_v_nodes)
+    })
+
+    (U, V, EID) = (0, 1, 2)
+
+    nd_b_idx = np.random.randint(low=1, high=24, dtype=dtype)
+    nd_e_idx = np.random.randint(low=25, high=49, dtype=dtype)
+    did_b_idx = np.random.randint(low=1, high=24, dtype=dtype)
+    did_e_idx = np.random.randint(low=25, high=49, dtype=dtype)
+    sampled_amount = np.random.randint(low=1, high=10, dtype=dtype)
+
+    drug_i_drug_edges = g.all_edges(form='all', etype=('drug','interacts','drug'))
+    excluded_d_i_d_edges = drug_i_drug_edges[EID][did_b_idx:did_e_idx]
+    sampled_drug_node = drug_i_drug_edges[V][nd_b_idx:nd_e_idx]
+    did_excluded_nodes_U = drug_i_drug_edges[U][did_b_idx:did_e_idx]
+    did_excluded_nodes_V = drug_i_drug_edges[V][did_b_idx:did_e_idx]
+
+    nd_b_idx = np.random.randint(low=1, high=24, dtype=dtype)
+    nd_e_idx = np.random.randint(low=25, high=49, dtype=dtype)
+    dig_b_idx = np.random.randint(low=1, high=24, dtype=dtype)
+    dig_e_idx = np.random.randint(low=25, high=49, dtype=dtype)
+    drug_i_gene_edges = g.all_edges(form='all', etype=('drug','interacts','gene'))
+    excluded_d_i_g_edges = drug_i_gene_edges[EID][dig_b_idx:dig_e_idx]
+    dig_excluded_nodes_U = drug_i_gene_edges[U][dig_b_idx:dig_e_idx]
+    dig_excluded_nodes_V = drug_i_gene_edges[V][dig_b_idx:dig_e_idx]
+    sampled_gene_node = drug_i_gene_edges[V][nd_b_idx:nd_e_idx]
+
+    nd_b_idx = np.random.randint(low=1, high=24, dtype=dtype)
+    nd_e_idx = np.random.randint(low=25, high=49, dtype=dtype)
+    dtd_b_idx = np.random.randint(low=1, high=24, dtype=dtype)
+    dtd_e_idx = np.random.randint(low=25, high=49, dtype=dtype)
+    drug_t_dis_edges = g.all_edges(form='all', etype=('drug','treats','disease'))
+    excluded_d_t_d_edges = drug_t_dis_edges[EID][dtd_b_idx:dtd_e_idx]
+    dtd_excluded_nodes_U = drug_t_dis_edges[U][dtd_b_idx:dtd_e_idx]
+    dtd_excluded_nodes_V = drug_t_dis_edges[V][dtd_b_idx:dtd_e_idx]
+    sampled_disease_node = drug_t_dis_edges[V][nd_b_idx:nd_e_idx]
+    excluded_edges  = {('drug', 'interacts', 'drug'): excluded_d_i_d_edges,
+                       ('drug', 'interacts', 'gene'): excluded_d_i_g_edges,
+                       ('drug', 'treats', 'disease'): excluded_d_t_d_edges
+                      }
+
+    sg = dgl.sampling.sample_neighbors(g, {'drug': sampled_drug_node,
+                                           'gene': sampled_gene_node,
+                                           'disease': sampled_disease_node},
+                                       sampled_amount, exclude_edges=excluded_edges)
+
+    assert not np.any(F.asnumpy(sg.has_edges_between(did_excluded_nodes_U,did_excluded_nodes_V,
+                                                     etype=('drug','interacts','drug'))))
+    assert not np.any(F.asnumpy(sg.has_edges_between(dig_excluded_nodes_U,dig_excluded_nodes_V,
+                                                     etype=('drug','interacts','gene'))))
+    assert not np.any(F.asnumpy(sg.has_edges_between(dtd_excluded_nodes_U,dtd_excluded_nodes_V,
+                                                     etype=('drug','treats','disease'))))
+
+@pytest.mark.parametrize('dtype', ['int32', 'int64'])
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
+def test_sample_neighbors_exclude_edges_homoG(dtype):
+    u_nodes = F.zerocopy_from_numpy(np.unique(np.random.randint(300,size=100, dtype=dtype)))
+    v_nodes = F.zerocopy_from_numpy(np.random.randint(25, size=u_nodes.shape, dtype=dtype))
+    g = dgl.graph((u_nodes, v_nodes))
+
+    (U, V, EID) = (0, 1, 2)
+
+    nd_b_idx = np.random.randint(low=1,high=24, dtype=dtype)
+    nd_e_idx = np.random.randint(low=25,high=49, dtype=dtype)
+    b_idx = np.random.randint(low=1,high=24, dtype=dtype)
+    e_idx = np.random.randint(low=25,high=49, dtype=dtype)
+    sampled_amount = np.random.randint(low=1,high=10, dtype=dtype)
+
+    g_edges = g.all_edges(form='all')
+    excluded_edges = g_edges[EID][b_idx:e_idx]
+    sampled_node = g_edges[V][nd_b_idx:nd_e_idx]
+    excluded_nodes_U = g_edges[U][b_idx:e_idx]
+    excluded_nodes_V = g_edges[V][b_idx:e_idx]
+
+    sg = dgl.sampling.sample_neighbors(g, sampled_node,
+                                       sampled_amount, exclude_edges=excluded_edges)
+
+    assert not np.any(F.asnumpy(sg.has_edges_between(excluded_nodes_U,excluded_nodes_V)))
+
 
 if __name__ == '__main__':
     test_sample_neighbors_etype_homogeneous()
@@ -831,3 +924,5 @@ if __name__ == '__main__':
     test_sample_neighbors_with_0deg()
     test_sample_neighbors_biased_homogeneous()
     test_sample_neighbors_biased_bipartite()
+    test_sample_neighbors_exclude_edges_heteroG('int32')
+    test_sample_neighbors_exclude_edges_homoG('int32')
