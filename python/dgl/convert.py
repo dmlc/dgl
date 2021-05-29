@@ -631,8 +631,10 @@ def to_heterogeneous(G, ntypes, etypes, ntype_field=NTYPE,
 
     Notes
     -----
-    The returned node and edge types may not necessarily be in the same order as
-    ``ntypes`` and ``etypes``.
+    * The returned node and edge types may not necessarily be in the same order as
+      ``ntypes`` and ``etypes``.
+    * Calling :func:`~dgl.to_homogeneous` then calling :func:`~dgl.to_heterogeneous` again
+      yields the same result.
 
     Examples
     --------
@@ -848,6 +850,8 @@ def to_homogeneous(G, ndata=None, edata=None, store_type=True, return_count=Fals
       to its memory efficiency.
     * The ``ntype_count`` and ``etype_count`` lists can help speed up some operations.
       See :class:`~dgl.nn.pytorch.conv.RelGraphConv` for such an example.
+    * Calling :func:`~dgl.to_homogeneous` then calling :func:`~dgl.to_heterogeneous` again
+      yields the same result.
 
     Examples
     --------
