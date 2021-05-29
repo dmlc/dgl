@@ -705,7 +705,7 @@ def to_heterogeneous(G, ntypes, etypes, ntype_field=NTYPE,
     # relabel nodes to per-type local IDs
     ntype_count = np.bincount(ntype_ids, minlength=num_ntypes)
     ntype_offset = np.insert(np.cumsum(ntype_count), 0, 0)
-    ntype_ids_sortidx = np.argsort(ntype_ids)
+    ntype_ids_sortidx = np.argsort(ntype_ids, kind='stable')
     ntype_local_ids = np.zeros_like(ntype_ids)
     node_groups = []
     for i in range(num_ntypes):
