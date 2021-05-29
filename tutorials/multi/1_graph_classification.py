@@ -51,6 +51,10 @@ labels = labels.to(device)
 # :func:`~torch.nn.parallel.DistributedDataParallel` so that the model
 # parameter update will invoke gradient synchronization first under the hood.
 #
+# .. image:: https://data.dgl.ai/tutorial/mgpu_gc.png
+#   :width: 450px
+#   :align: center
+#
 # That’s the core behind this tutorial. We will explore it more in detail with
 # a complete example below.
 #
@@ -76,7 +80,7 @@ def init_process_group(world_size, rank):
 # Data Loader Preparation
 # -----------------------
 #
-# Split the dataset into training, validation and test subsets. In dataset
+# We split the dataset into training, validation and test subsets. In dataset
 # splitting, we need to use a same random seed across processes to ensure a
 # same split. We follow the common practice to train with multiple GPUs and
 # evaluate with a single GPU, thus only set `use_ddp` to True in the
@@ -127,8 +131,8 @@ class GIN(nn.Module):
 
 ###############################################################################
 # To ensure same initial model parameters across processes, we need to set the
-# same random seed before model initialization. Once constructed, we wrap the
-# model instance with :func:`~torch.nn.parallel.DistributedDataParallel`.
+# same random seed before model initialization. Once we construct a model
+# instance, we wrap it with :func:`~torch.nn.parallel.DistributedDataParallel`.
 #
 
 import torch
