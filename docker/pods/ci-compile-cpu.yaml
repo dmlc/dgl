@@ -8,6 +8,9 @@ spec:
     image: dgllib/dgl-ci-cpu:conda
     imagePullPolicy: Always
     tty: true
+    resources:
+      requests:
+        cpu: 16
   affinity:
     nodeAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
