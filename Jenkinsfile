@@ -108,7 +108,7 @@ pipeline {
     stage('Regression Test Trigger') {
       agent {
         kubernetes {
-          yamlFile 'docker/pods/ci_pods.yaml'
+          yamlFile 'docker/pods/ci-lint.yaml'
           defaultContainer 'dgl-ci-lint'
         }
       }
@@ -172,7 +172,7 @@ pipeline {
         stage('Lint Check') {
           agent {
             kubernetes {
-              yamlFile 'docker/pods/ci_pods.yaml'
+              yamlFile 'docker/pods/ci-lint.yaml'
               defaultContainer 'dgl-ci-lint'
             }
           }
@@ -192,7 +192,7 @@ pipeline {
             stage('CPU Build') {
               agent {
                 kubernetes {
-                  yamlFile 'docker/pods/ci_pods.yaml'
+                  yamlFile 'docker/pods/ci-compile-cpu.yaml'
                   defaultContainer 'dgl-ci-cpu-compile'
                 }
               }
@@ -208,7 +208,7 @@ pipeline {
             stage('GPU Build') {
               agent {
                 kubernetes {
-                  yamlFile 'docker/pods/ci_pods.yaml'
+                  yamlFile 'docker/pods/ci-compile-gpu.yaml'
                   defaultContainer 'dgl-ci-gpu-compile'
                 }
               }
