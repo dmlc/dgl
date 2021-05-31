@@ -172,10 +172,7 @@ def evaluate(model, dataloader, device):
     return 1.0 * total_correct / total
 
 ###############################################################################
-# Define the main function for each process. Since different processes handle
-# different data batches, some of them can finish their tasks earlier.
-# `dist.barrier()` forces faster processes to wait until all processes
-# have reached the barrier.
+# Define the main function for each process.
 #
 
 from torch.optim import Adam
@@ -214,15 +211,12 @@ def main(rank, world_size, dataset, seed=0):
             optimizer.step()
         loss = total_loss
         print('Loss: {:.4f}'.format(loss))
-        dist.barrier()
 
         val_acc = evaluate(model, val_loader, device)
         print('Val acc: {:.4f}'.format(val_acc))
-        dist.barrier()
 
     test_acc = evaluate(model, test_loader, device)
     print('Test acc: {:.4f}'.format(test_acc))
-    dist.barrier()
     dist.destroy_process_group()
 
 ###############################################################################
