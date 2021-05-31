@@ -1238,14 +1238,14 @@ def slice_gidx(graph, num_nodes, start_nid, start_eid, end_eid):
     ----------
     graph : HeteroGraphIndex
         The batched graph to slice.
-    num_nodes : list of int
-        num_nodes[t] gives the number of nodes with t-th type in the result graph.
-    start_nid : list of int
-        start_nid[t] gives the start node ID with t-th type in the batched graph.
-    start_eid : list of int
-        start_eid[t] gives the start edge ID with t-th type in the batched graph.
-    end_eid : list of int
-        end_eid[t] gives the end edge ID with t-th type in the batched graph.
+    num_nodes : utils.Index
+        Number of nodes per node type in the result graph.
+    start_nid : utils.Index
+        Start node ID per node type in the result graph.
+    start_eid : utils.Index
+        Start edge ID per edge type in the result graph.
+    end_eid : utils.Index
+        End edge ID per edge type in the result graph.
 
     Returns
     -------
@@ -1253,11 +1253,8 @@ def slice_gidx(graph, num_nodes, start_nid, start_eid, end_eid):
         The sliced graph.
     """
     return _CAPI_DGLHeteroSlice(
-        graph,
-        utils.toindex(num_nodes).todgltensor(),
-        utils.toindex(start_nid).todgltensor(),
-        utils.toindex(start_eid).todgltensor(),
-        utils.toindex(end_eid).todgltensor())
+        graph, num_nodes.todgltensor(), start_nid.todgltensor(),
+        start_eid.todgltensor(), end_eid.todgltensor())
 
 #################################################################
 # Data structure used by C APIs

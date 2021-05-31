@@ -454,7 +454,8 @@ def slice(bg, gid):
         end_eid.append(end)
 
     # Slice graph structure
-    gidx = slice_gidx(bg._graph, num_nodes, start_nid, start_eid, end_eid)
+    gidx = slice_gidx(bg._graph, utils.toindex(num_nodes), utils.toindex(start_nid),
+                      utils.toindex(start_eid), utils.toindex(end_eid))
     retg = DGLHeteroGraph(gidx, bg.ntypes, bg.etypes)
 
     # Slice node features
