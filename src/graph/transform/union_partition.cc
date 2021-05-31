@@ -295,6 +295,7 @@ HeteroGraphPtr SliceHeteroGraph(
     auto pair = meta_graph->FindEdge(etype);
     const dgl_type_t src_vtype = pair.first;
     const dgl_type_t dst_vtype = pair.second;
+    HeteroGraphPtr rgptr = nullptr;
     const dgl_format_code_t code = batched_graph->GetRelationGraph(etype)->GetAllowedFormats();
 
     std::vector<uint64_t> edge_cumsum;
