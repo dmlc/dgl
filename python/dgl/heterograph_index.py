@@ -1231,13 +1231,11 @@ def disjoint_partition(graph, bnn_all_types, bne_all_types):
     return _CAPI_DGLHeteroDisjointPartitionBySizes_v2(
         graph, bnn_all_types.todgltensor(), bne_all_types.todgltensor())
 
-def slice_gidx(metagraph, graph, num_nodes, start_nid, start_eid, end_eid):
+def slice_gidx(graph, num_nodes, start_nid, start_eid, end_eid):
     """Slice a chunk of the graph.
 
     Parameters
     ----------
-    metagraph : GraphIndex
-        Meta-graph.
     graph : HeteroGraphIndex
         The batched graph to slice.
     num_nodes : list of int
@@ -1255,7 +1253,7 @@ def slice_gidx(metagraph, graph, num_nodes, start_nid, start_eid, end_eid):
         The sliced graph.
     """
     return _CAPI_DGLHeteroSlice(
-        metagraph, graph,
+        graph,
         utils.toindex(num_nodes).todgltensor(),
         utils.toindex(start_nid).todgltensor(),
         utils.toindex(start_eid).todgltensor(),

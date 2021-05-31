@@ -334,6 +334,30 @@ def test_unbatch2(idtype):
 
 
 @parametrize_dtype
+def test_slice(idtype):
+    g1 = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 1], [1, 2]),
+        ('user', 'plays', 'game'): ([], []),
+        ('user', 'follows', 'game'): ([0, 0], [1, 4])
+    }, idtype=idtype, device=F.ctx())
+    g2 = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 1], [1, 2]),
+        ('user', 'plays', 'game'): ([0, 1], [0, 0]),
+        ('user', 'follows', 'game'): ([0, 1], [1, 4])
+    }, num_nodes_dict={'user': 4, 'game': 6}, idtype=idtype, device=F.ctx())
+    g3 = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0], [2]),
+        ('user', 'plays', 'game'): ([1, 2], [3, 4]),
+        ('user', 'follows', 'game'): ([], [])
+    }, idtype=idtype, device=F.ctx())
+    bg = dgl.batch([g1, g2, g3])
+    bg.nodes['user'].data['h1'] = F.randn((bg.num_nodes('user'), 2))
+    bg.nodes['user'].data['h2'] = F.randn((bg.num_nodes('user'), 5))
+    bg.edges[('user', 'follows', 'user')].data['h1'] = F.randn((
+        bg.num_edges(('user', 'follows', 'user')), 2))
+
+
+@parametrize_dtype
 def test_batch_keeps_empty_data(idtype):
     g1 = dgl.heterograph({("a", "to", "a"): ([], [])}
                          ).astype(idtype).to(F.ctx())
