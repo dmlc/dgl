@@ -4,7 +4,7 @@ spec:
   securityContext:
     runAsUser: 0
   containers:
-  - name: dgl-ci-cpu-compile
+  - name: dgl-ci-cpu
     image: dgllib/dgl-ci-cpu:conda
     imagePullPolicy: Always
     tty: true
