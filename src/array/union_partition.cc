@@ -110,6 +110,37 @@ std::vector<COOMatrix> DisjointPartitionCooBySizes(
   return ret;
 }
 
+COOMatrix COOSliceContiguousChunk(
+  const COOMatrix &coo,
+  const std::vector<uint64_t> &edge_cumsum,
+  const std::vector<uint64_t> &src_vertex_cumsum,
+  const std::vector<uint64_t> &dst_vertex_cumsum) {
+  IdArray result_src = IndexSelect(coo.row,
+                                   edge_cumsum[0],
+                                   edge_cumsum[1]) - src_vertex_cumsum[0];
+  IdArray result_dst = IndexSelect(coo.col,
+                                   edge_cumsum[0],
+                                   edge_cumsum[1]) - dst_vertex_cumsum[0];
+  IdArray result_data = NullArray();
+  // has data index array
+  if (COOHasData(coo)) {
+    result_data = IndexSelect(coo.data,
+                              edge_cumsum[0],
+                              edge_cumsum[1]) - edge_cumsum[0];
+  }
+
+  COOMatrix sub_coo = COOMatrix(
+      src_vertex_cumsum[1]-src_vertex_cumsum[0],
+      dst_vertex_cumsum[1]-dst_vertex_cumsum[0],
+      result_src,
+      result_dst,
+      result_data,
+      coo.row_sorted,
+      coo.col_sorted);
+
+  return sub_coo;
+}
+
 ///////////////////////// CSR Based Operations/////////////////////////
 CSRMatrix DisjointUnionCsr(const std::vector<CSRMatrix>& csrs) {
   uint64_t src_offset = 0, dst_offset = 0;
@@ -220,6 +251,40 @@ std::vector<CSRMatrix> DisjointPartitionCsrBySizes(
   }
 
   return ret;
+}
+
+CSRMatrix CSRSliceContiguousChunk(
+  const CSRMatrix &csr,
+  const std::vector<uint64_t> &edge_cumsum,
+  const std::vector<uint64_t> &src_vertex_cumsum,
+  const std::vector<uint64_t> &dst_vertex_cumsum) {
+  uint64_t num_src = src_vertex_cumsum[1]-src_vertex_cumsum[0];
+  IdArray result_indptr;
+  result_indptr = IndexSelect(csr.indptr,
+                              src_vertex_cumsum[0],
+                              src_vertex_cumsum[1] + 1) - edge_cumsum[0];
+
+  IdArray result_indices = IndexSelect(csr.indices,
+                                       edge_cumsum[0],
+                                       edge_cumsum[1]) - dst_vertex_cumsum[0];
+
+  IdArray result_data = NullArray();
+  // has data index array
+  if (CSRHasData(csr)) {
+    result_data = IndexSelect(csr.data,
+                              edge_cumsum[0],
+                              edge_cumsum[1]) - edge_cumsum[0];
+  }
+
+  CSRMatrix sub_csr = CSRMatrix(
+    num_src,
+    dst_vertex_cumsum[1]-dst_vertex_cumsum[0],
+    result_indptr,
+    result_indices,
+    result_data,
+    csr.sorted);
+
+  return sub_csr;
 }
 
 }  // namespace aten

@@ -90,6 +90,7 @@ operators for computing graph-level representation for both single and batched g
 
     batch
     unbatch
+    slice
     readout_nodes
     readout_edges
     sum_nodes

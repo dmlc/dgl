@@ -3,13 +3,13 @@ from collections.abc import Mapping
 
 from . import backend as F
 from .base import ALL, is_all, DGLError, dgl_warning
-from .heterograph_index import disjoint_union
+from .heterograph_index import disjoint_union, slice_gidx
 from .heterograph import DGLHeteroGraph
 from . import convert
 from . import utils
 
 
-__all__ = ['batch', 'unbatch', 'batch_hetero', 'unbatch_hetero']
+__all__ = ['batch', 'unbatch', 'slice', 'batch_hetero', 'unbatch_hetero']
 
 def batch(graphs, ndata=ALL, edata=ALL, *,
           node_attrs=None, edge_attrs=None):
@@ -416,6 +416,61 @@ def unbatch(g, node_split=None, edge_split=None):
 
     return gs
 
+def slice(bg, gid):
+    """Get a particular graph from a batch of graphs.
+
+    Parameters
+    ----------
+    bg : DGLGraph
+        Input batched graph.
+    gid : int
+        The ID of the graph to retrieve.
+
+    Returns
+    -------
+    DGLGraph
+        Retrieved graph.
+    """
+    num_nodes = []
+    start_nid = []
+    for ntype in bg.ntypes:
+        batch_num_nodes = bg.batch_num_nodes(ntype)
+        num_nodes.append(F.as_scalar(batch_num_nodes[gid]))
+        if gid == 0:
+            start_nid.append(0)
+        else:
+            start_nid.append(F.as_scalar(F.cumsum(F.slice_axis(batch_num_nodes, 0, 0, gid), 0)))
+
+    start_eid = []
+    end_eid = []
+    for etype in bg.canonical_etypes:
+        batch_num_edges = bg.batch_num_edges(etype)
+        if gid == 0:
+            start = 0
+        else:
+            start = F.as_scalar(F.cumsum(F.slice_axis(batch_num_edges, 0, 0, gid), 0))
+        end = start + F.as_scalar(batch_num_edges[gid])
+        start_eid.append(start)
+        end_eid.append(end)
+
+    # Slice graph structure
+    gidx = slice_gidx(bg._graph.metagraph, bg._graph, num_nodes, start_nid, start_eid, end_eid)
+    retg = DGLHeteroGraph(gidx, bg.ntypes, bg.etypes)
+
+    # Slice node features
+    for ntid, ntype in enumerate(bg.ntypes):
+        for key, feat in bg.nodes[ntype].data.items():
+            stnid = start_nid[ntid]
+            subfeats = F.slice_axis(feat, 0, stnid, stnid+num_nodes[ntid])
+            retg.nodes[ntype].data[key] = subfeats
+
+    # Slice edge features
+    for etid, etype in enumerate(bg.canonical_etypes):
+        for key, feat in bg.edges[etype].data.items():
+            subfeats = F.slice_axis(feat, 0, start_eid[etid], end_eid[etid])
+            retg.edges[etype].data[key] = subfeats
+
+    return retg
 
 #### DEPRECATED APIS ####
 def batch_hetero(*args, **kwargs):

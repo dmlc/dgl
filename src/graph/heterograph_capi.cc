@@ -581,6 +581,19 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroDisjointPartitionBySizes")
     *rv = ret_list;
 });
 
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroSlice")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphRef meta_graph = args[0];
+    HeteroGraphRef hg = args[1];
+    IdArray num_nodes_per_type = args[2];
+    IdArray start_nid_per_type = args[3];
+    IdArray start_eid_per_type = args[4];
+    IdArray end_eid_per_type = args[5];
+    auto hgptr = SliceHeteroGraph(meta_graph.sptr(), hg.sptr(), num_nodes_per_type,
+                                  start_nid_per_type, start_eid_per_type, end_eid_per_type);
+    *rv = HeteroGraphRef(hgptr);
+});
+
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetCreatedFormats")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
