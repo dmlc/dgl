@@ -11,12 +11,12 @@ spec:
     resources:
       requests:
         cpu: 32
-  affinity:
-    nodeAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        nodeSelectorTerms:
-        - matchExpressions:
-          - key: beta.kubernetes.io/instance-type
-            operator: In
-            values:
-            - c5.9xlarge
+  # affinity:
+  #   nodeAffinity:
+  #     requiredDuringSchedulingIgnoredDuringExecution:
+  #       nodeSelectorTerms:
+  #       - matchExpressions:
+  #         - key: beta.kubernetes.io/instance-type
+  #           operator: In
+  #           values:
+  #           - c5.9xlarge
