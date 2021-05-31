@@ -34,7 +34,7 @@ implementation would be like:
     def concat_message_function(edges):
          return {'cat_feat': torch.cat([edges.src['feat'], edges.dst['feat']])}
     g.apply_edges(concat_message_function)
-    g.edata['out'] = g.edata['cat_feat'] * linear
+    g.edata['out'] = g.edata['cat_feat'] @ linear
 
 The suggested implementation splits the linear operation into two,
 one applies on ``src`` feature, the other applies on ``dst`` feature.
@@ -50,8 +50,8 @@ respectively:
 
     linear_src = nn.Parameter(torch.FloatTensor(size=(1, node_feat_dim)))
     linear_dst = nn.Parameter(torch.FloatTensor(size=(1, node_feat_dim)))
-    out_src = g.ndata['feat'] * linear_src
-    out_dst = g.ndata['feat'] * linear_dst
+    out_src = g.ndata['feat'] @ linear_src
+    out_dst = g.ndata['feat'] @ linear_dst
     g.srcdata.update({'out_src': out_src})
     g.dstdata.update({'out_dst': out_dst})
     g.apply_edges(fn.u_add_v('out_src', 'out_dst', 'out'))
