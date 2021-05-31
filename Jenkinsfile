@@ -108,7 +108,7 @@ pipeline {
     stage('Regression Test Trigger') {
       agent {
         kubernetes {
-          yamlFile 'docker/pods/ci-pods.yaml'
+          yamlFile 'docker/pods/ci-lint.yaml'
           defaultContainer 'dgl-ci-lint'
         }
       }
@@ -149,7 +149,7 @@ pipeline {
     stage('Bot Instruction') {
       agent {
         kubernetes {
-          yamlFile 'docker/pods/ci-pods.yaml'
+          yamlFile 'docker/pods/ci-lint.yaml'
           defaultContainer 'dgl-ci-lint'
         }
       }
@@ -171,7 +171,7 @@ pipeline {
         stage('Lint Check') {
           agent {
             kubernetes {
-              yamlFile 'docker/pods/ci-pods.yaml'
+              yamlFile 'docker/pods/ci-lint.yaml'
               defaultContainer 'dgl-ci-lint'
             }
           }
@@ -191,7 +191,7 @@ pipeline {
             stage('CPU Build') {
               agent {
                 kubernetes {
-                  yamlFile 'docker/pods/ci-pods.yaml'
+                  yamlFile 'docker/pods/ci-compile-cpu.yaml'
                   defaultContainer 'dgl-ci-cpu-compile'
                 }
               }
@@ -207,7 +207,7 @@ pipeline {
             stage('GPU Build') {
               agent {
                 kubernetes {
-                  yamlFile 'docker/pods/ci-pods.yaml'
+                  yamlFile 'docker/pods/ci-compile-gpu.yaml'
                   defaultContainer 'dgl-ci-gpu-compile'
                 }
               }
@@ -242,7 +242,7 @@ pipeline {
             stage('C++ CPU') {
               agent {
                 kubernetes {
-                  yamlFile 'docker/pods/ci-pods.yaml'
+                  yamlFile 'docker/pods/ci-cpu.yaml'
                   defaultContainer 'dgl-ci-cpu'
                 }
               }
@@ -269,7 +269,7 @@ pipeline {
             stage('Tensorflow CPU') {
               agent {
                 kubernetes {
-                  yamlFile 'docker/pods/ci-pods.yaml'
+                  yamlFile 'docker/pods/ci-cpu.yaml'
                   defaultContainer 'dgl-ci-cpu'
                 }
               }
@@ -289,7 +289,7 @@ pipeline {
             stage('Tensorflow GPU') {
               agent {
                 kubernetes {
-                  yamlFile 'docker/pods/ci-pods.yaml'
+                  yamlFile 'docker/pods/ci-gpu.yaml'
                   defaultContainer 'dgl-ci-gpu'
                 }
               }
@@ -309,7 +309,7 @@ pipeline {
             stage('Torch CPU') {
               agent {
                 kubernetes {
-                  yamlFile 'docker/pods/ci-pods.yaml'
+                  yamlFile 'docker/pods/ci-cpu.yaml'
                   defaultContainer 'dgl-ci-cpu'
                 }
               }
@@ -359,7 +359,7 @@ pipeline {
             stage('Torch GPU') {
               agent {
                 kubernetes {
-                  yamlFile 'docker/pods/ci-pods.yaml'
+                  yamlFile 'docker/pods/ci-gpu.yaml'
                   defaultContainer 'dgl-ci-gpu'
                 }
               }
@@ -385,7 +385,7 @@ pipeline {
             stage('MXNet CPU') {
               agent {
                 kubernetes {
-                  yamlFile 'docker/pods/ci-pods.yaml'
+                  yamlFile 'docker/pods/ci-cpu.yaml'
                   defaultContainer 'dgl-ci-cpu'
                 }
               }
@@ -410,7 +410,7 @@ pipeline {
             stage('MXNet GPU') {
               agent {
                 kubernetes {
-                  yamlFile 'docker/pods/ci-pods.yaml'
+                  yamlFile 'docker/pods/ci-gpu.yaml'
                   defaultContainer 'dgl-ci-gpu'
                 }
               }
