@@ -148,10 +148,9 @@ pipeline {
     }
     stage('Bot Instruction') {
       agent {
-        docker {
-            label 'linux-benchmark-node'
-            image 'dgllib/dgl-ci-lint'
-            alwaysPull true
+        kubernetes {
+          yamlFile 'docker/pods/ci-lint.yaml'
+          defaultContainer 'dgl-ci-lint'
         }
       }
       steps {
@@ -242,10 +241,9 @@ pipeline {
           parallel {
             stage('C++ CPU') {
               agent {
-                docker {
-                  label 'linux-c52x-node'
-                  image 'dgllib/dgl-ci-cpu:conda'
-                  alwaysPull true
+                kubernetes {
+                  yamlFile 'docker/pods/ci-cpu.yaml'
+                  defaultContainer 'dgl-ci-cpu'
                 }
               }
               steps {
@@ -270,10 +268,9 @@ pipeline {
             }
             stage('Tensorflow CPU') {
               agent {
-                docker {
-                  label 'linux-c52x-node'
-                  image 'dgllib/dgl-ci-cpu:conda'
-                  alwaysPull true
+                kubernetes {
+                  yamlFile 'docker/pods/ci-cpu.yaml'
+                  defaultContainer 'dgl-ci-cpu'
                 }
               }
               stages {
@@ -291,11 +288,9 @@ pipeline {
             }
             stage('Tensorflow GPU') {
               agent {
-                docker {
-                  label 'linux-gpu-node'
-                  image 'dgllib/dgl-ci-gpu:conda'
-                  args '--runtime nvidia'
-                  alwaysPull true
+                kubernetes {
+                  yamlFile 'docker/pods/ci-gpu.yaml'
+                  defaultContainer 'dgl-ci-gpu'
                 }
               }
               stages {
@@ -313,10 +308,9 @@ pipeline {
             }
             stage('Torch CPU') {
               agent {
-                docker {
-                  label 'linux-c52x-node'
-                  image 'dgllib/dgl-ci-cpu:conda'
-                  alwaysPull true
+                kubernetes {
+                  yamlFile 'docker/pods/ci-cpu.yaml'
+                  defaultContainer 'dgl-ci-cpu'
                 }
               }
               stages {
@@ -364,11 +358,9 @@ pipeline {
             }
             stage('Torch GPU') {
               agent {
-                docker {
-                  label 'linux-gpu-node'
-                  image 'dgllib/dgl-ci-gpu:conda'
-                  args '--runtime nvidia'
-                  alwaysPull true
+                kubernetes {
+                  yamlFile 'docker/pods/ci-gpu.yaml'
+                  defaultContainer 'dgl-ci-gpu'
                 }
               }
               stages {
@@ -392,10 +384,9 @@ pipeline {
             }
             stage('MXNet CPU') {
               agent {
-                docker {
-                  label 'linux-c52x-node'
-                  image 'dgllib/dgl-ci-cpu:conda'
-                  alwaysPull true
+                kubernetes {
+                  yamlFile 'docker/pods/ci-cpu.yaml'
+                  defaultContainer 'dgl-ci-cpu'
                 }
               }
               stages {
@@ -418,11 +409,9 @@ pipeline {
             }
             stage('MXNet GPU') {
               agent {
-                docker {
-                  label 'linux-gpu-node'
-                  image 'dgllib/dgl-ci-gpu:conda'
-                  args '--runtime nvidia'
-                  alwaysPull true
+                kubernetes {
+                  yamlFile 'docker/pods/ci-gpu.yaml'
+                  defaultContainer 'dgl-ci-gpu'
                 }
               }
               stages {
