@@ -533,14 +533,14 @@ def test_gat_conv(g, idtype, out_dim, num_heads):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
     gat = nn.GATConv(5, out_dim, num_heads)
-    feat = F.randn((g.number_of_nodes(), 5))
+    feat = F.randn((g.number_of_src_nodes(), 5))
     gat = gat.to(ctx)
     h = gat(g, feat)
 
     # test pickle
     th.save(gat, tmp_buffer)
 
-    assert h.shape == (g.number_of_nodes(), num_heads, out_dim)
+    assert h.shape == (g.number_of_dst_nodes(), num_heads, out_dim)
     _, a = gat(g, feat, get_attention=True)
     assert a.shape == (g.number_of_edges(), num_heads, 1)
 
@@ -570,7 +570,7 @@ def test_gat_conv_bi(g, idtype, out_dim, num_heads):
 def test_sage_conv(idtype, g, aggre_type):
     g = g.astype(idtype).to(F.ctx())
     sage = nn.SAGEConv(5, 10, aggre_type)
-    feat = F.randn((g.number_of_nodes(), 5))
+    feat = F.randn((g.number_of_src_nodes(), 5))
     sage = sage.to(F.ctx())
     # test pickle
     th.save(sage, tmp_buffer)
@@ -664,14 +664,14 @@ def test_gin_conv(g, idtype, aggregator_type):
         th.nn.Linear(5, 12),
         aggregator_type
     )
-    feat = F.randn((g.number_of_nodes(), 5))
+    feat = F.randn((g.number_of_src_nodes(), 5))
     gin = gin.to(ctx)
     h = gin(g, feat)
 
     # test pickle
     th.save(h, tmp_buffer)
     
-    assert h.shape == (g.number_of_nodes(), 12)
+    assert h.shape == (g.number_of_dst_nodes(), 12)
 
 @parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['bipartite'], exclude=['zero-degree']))
@@ -694,10 +694,10 @@ def test_agnn_conv(g, idtype):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
     agnn = nn.AGNNConv(1)
-    feat = F.randn((g.number_of_nodes(), 5))
+    feat = F.randn((g.number_of_src_nodes(), 5))
     agnn = agnn.to(ctx)
     h = agnn(g, feat)
-    assert h.shape == (g.number_of_nodes(), 5)
+    assert h.shape == (g.number_of_dst_nodes(), 5)
 
 @parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['bipartite'], exclude=['zero-degree']))
@@ -732,7 +732,7 @@ def test_nn_conv(g, idtype):
     ctx = F.ctx()
     edge_func = th.nn.Linear(4, 5 * 10)
     nnconv = nn.NNConv(5, 10, edge_func, 'mean')
-    feat = F.randn((g.number_of_nodes(), 5))
+    feat = F.randn((g.number_of_src_nodes(), 5))
     efeat = F.randn((g.number_of_edges(), 4))
     nnconv = nnconv.to(ctx)
     h = nnconv(g, feat, efeat)
@@ -837,9 +837,9 @@ def test_edge_conv(g, idtype, out_dim):
     # test pickle
     th.save(edge_conv, tmp_buffer)
     
-    h0 = F.randn((g.number_of_nodes(), 5))
+    h0 = F.randn((g.number_of_src_nodes(), 5))
     h1 = edge_conv(g, h0)
-    assert h1.shape == (g.number_of_nodes(), out_dim)
+    assert h1.shape == (g.number_of_dst_nodes(), out_dim)
 
 @parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['bipartite'], exclude=['zero-degree']))
@@ -862,14 +862,14 @@ def test_dotgat_conv(g, idtype, out_dim, num_heads):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
     dotgat = nn.DotGatConv(5, out_dim, num_heads)
-    feat = F.randn((g.number_of_nodes(), 5))
+    feat = F.randn((g.number_of_src_nodes(), 5))
     dotgat = dotgat.to(ctx)
     
     # test pickle
     th.save(dotgat, tmp_buffer)
     
     h = dotgat(g, feat)
-    assert h.shape == (g.number_of_nodes(), num_heads, out_dim)
+    assert h.shape == (g.number_of_dst_nodes(), num_heads, out_dim)
     _, a = dotgat(g, feat, get_attention=True)
     assert a.shape == (g.number_of_edges(), num_heads, 1)
 
