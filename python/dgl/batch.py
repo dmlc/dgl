@@ -168,9 +168,9 @@ def batch(graphs, ndata=ALL, edata=ALL, *,
     if any(g.is_block for g in graphs):
         raise DGLError("Batching a MFG is not supported.")
 
-    relations = list(sorted(graphs[0].canonical_etypes))
+    relations = list(graphs[0].canonical_etypes)
     relation_ids = [graphs[0].get_etype_id(r) for r in relations]
-    ntypes = list(sorted(graphs[0].ntypes))
+    ntypes = list(graphs[0].ntypes)
     ntype_ids = [graphs[0].get_ntype_id(n) for n in ntypes]
     etypes = [etype for _, etype, _ in relations]
 
