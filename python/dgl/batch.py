@@ -439,7 +439,7 @@ def slice(bg, gid):
         if gid == 0:
             start_nid.append(0)
         else:
-            start_nid.append(F.as_scalar(F.cumsum(F.slice_axis(batch_num_nodes, 0, 0, gid), 0)))
+            start_nid.append(F.as_scalar(F.sum(F.slice_axis(batch_num_nodes, 0, 0, gid), 0)))
 
     start_eid = []
     end_eid = []
@@ -448,7 +448,7 @@ def slice(bg, gid):
         if gid == 0:
             start = 0
         else:
-            start = F.as_scalar(F.cumsum(F.slice_axis(batch_num_edges, 0, 0, gid), 0))
+            start = F.as_scalar(F.sum(F.slice_axis(batch_num_edges, 0, 0, gid), 0))
         end = start + F.as_scalar(batch_num_edges[gid])
         start_eid.append(start)
         end_eid.append(end)
