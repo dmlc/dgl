@@ -119,8 +119,10 @@ pipeline {
         script {
               def comment = env.GITHUB_COMMENT
               def author = env.GITHUB_COMMENT_AUTHOR
+              echo("${env.GIT_URL}")
+              echo("${env}")
               if (!is_authorized(author)) {
-            error('Not authorized to launch regression tests')
+                error('Not authorized to launch regression tests')
               }
               dir('benchmark_scripts_repo') {
             checkout([$class: 'GitSCM', branches: [[name: '*/master']],
@@ -135,9 +137,10 @@ pipeline {
               } else {
                 pullRequest.comment("Start the Regression test. View at ${RUN_DISPLAY_URL}")
               }
+              def prNumber = env.BRANCH_NAME.replace('PR-', '')
               dir('benchmarks/scripts') {
                 sh('python3 -m pip install boto3')
-                sh("PYTHONUNBUFFERED=1 GIT_URL=${env.GIT_URL} GIT_BRANCH=${env.CHANGE_BRANCH} python3 run_reg_test.py --data-folder ${env.GIT_COMMIT}_${instance_type} --run-cmd '${comment}'")
+                sh("PYTHONUNBUFFERED=1 GIT_PR_ID=${prNumber} GIT_URL=${env.GIT_URL} GIT_BRANCH=${env.CHANGE_BRANCH} python3 run_reg_test.py --data-folder ${env.GIT_COMMIT}_${instance_type} --run-cmd '${comment}'")
               }
               pullRequest.comment("Finished the Regression test. Result table is at https://dgl-asv-data.s3-us-west-2.amazonaws.com/${env.GIT_COMMIT}_${instance_type}/results/result.csv. Jenkins job link is ${RUN_DISPLAY_URL}. ")
               currentBuild.result = 'SUCCESS'
