@@ -115,10 +115,10 @@ COOMatrix COOSliceContiguousChunk(
   const std::vector<uint64_t> &edge_cumsum,
   const std::vector<uint64_t> &src_vertex_cumsum,
   const std::vector<uint64_t> &dst_vertex_cumsum) {
-
+  uint64_t num_edges = edge_cumsum[1]-edge_cumsum[0];
   IdArray result_src = NullArray();
   IdArray result_dst = NullArray();
-  if (edge_cumsum[1] - edge_cumsum[0] != 0) {
+  if (!num_edges) {
     // The chunk has edges
     IdArray result_src = IndexSelect(coo.row,
                                      edge_cumsum[0],
@@ -266,10 +266,10 @@ CSRMatrix CSRSliceContiguousChunk(
   const std::vector<uint64_t> &src_vertex_cumsum,
   const std::vector<uint64_t> &dst_vertex_cumsum) {
   uint64_t num_src = src_vertex_cumsum[1]-src_vertex_cumsum[0];
-
+  uint64_t num_edges = edge_cumsum[1]-edge_cumsum[0];
   IdArray result_indptr = NullArray();
   IdArray result_indices = NullArray();
-  if (edge_cumsum[1] - edge_cumsum[0] != 0) {
+  if (!num_edges) {
     // The chunk has edges
     IdArray result_indptr = IndexSelect(csr.indptr,
                                         src_vertex_cumsum[0],
