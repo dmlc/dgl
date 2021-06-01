@@ -350,11 +350,28 @@ def test_slice(idtype):
         ('user', 'plays', 'game'): ([1, 2], [3, 4]),
         ('user', 'follows', 'game'): ([], [])
     }, idtype=idtype, device=F.ctx())
-    bg = dgl.batch([g1, g2, g3])
+    g_list = [g1, g2, g3]
+    bg = dgl.batch(g_list)
     bg.nodes['user'].data['h1'] = F.randn((bg.num_nodes('user'), 2))
     bg.nodes['user'].data['h2'] = F.randn((bg.num_nodes('user'), 5))
     bg.edges[('user', 'follows', 'user')].data['h1'] = F.randn((
         bg.num_edges(('user', 'follows', 'user')), 2))
+    for i in range(len(g_list)):
+        g_i = g_list[i]
+        g_slice = dgl.slice(bg, i)
+        assert g_i.ntypes == g_slice.ntypes
+        assert g_i.canonical_etypes == g_slice.canonical_etypes
+        assert g_i.idtype == g_slice.idtype
+        assert g_i.device == g_slice.device
+        for nty in g_i.ntypes:
+            assert g_i.num_nodes(nty) == g_slice.num_nodes(nty)
+            for feat in g_i.nodes[nty].data:
+                assert F.allclose(g_i.nodes[nty].data[feat], g_slice.nodes[nty].data[feat])
+
+        for ety in g_i.canonical_etypes:
+            assert g_i.num_edges(ety) == g_slice.num_edges(ety)
+            for feat in g_i.edges[ety].data:
+                assert F.allclose(g_i.edges[ety].data[feat], g_slice.edges[ety].data[feat])
 
 
 @parametrize_dtype
