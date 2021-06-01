@@ -266,7 +266,6 @@ CSRMatrix CSRSliceContiguousChunk(
   const std::vector<uint64_t> &src_vertex_cumsum,
   const std::vector<uint64_t> &dst_vertex_cumsum) {
   uint64_t num_src = src_vertex_cumsum[1]-src_vertex_cumsum[0];
-  IdArray result_indptr;
 
   IdArray result_indptr = NullArray();
   IdArray result_indices = NullArray();
