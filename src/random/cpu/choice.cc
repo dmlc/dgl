@@ -100,12 +100,23 @@ void RandomEngine::UniformChoice(IdxType num, IdxType population, IdxType* out,
       }
 
     } else {
-      // reservoir algorithm
-      // time: O(population), space: O(num)
-      for (IdxType i = 0; i < num; ++i) out[i] = i;
-      for (IdxType i = num; i < population; ++i) {
-        const IdxType j = RandInt(i + 1);
-        if (j < num) out[j] = i;
+      // In this case, `num >= population / 10`. To reduce the computation overhead,
+      // we should reduce the number of random number generations. Even though
+      // reservior algorithm is more memory effficient (it has O(num) memory complexity),
+      // it generates O(population) random numbers, which is computationally expensive.
+      // This algorithm has memory complexity of O(population) but generates much fewer random
+      // numbers O(num). In the case of `num >= population/10`, we don't need to worry about
+      // memory complexity because `num` is usually small. So is `population`. Allocating a small
+      // piece of memory is very efficient.
+      std::vector<IdxType> seq(population);
+      for (size_t i = 0; i < seq.size(); i++) seq[i] = i;
+      for (IdxType i = 0; i < num; i++) {
+        IdxType j = RandInt(i, population);
+        std::swap(seq[i], seq[j]);
+      }
+      // Save the randomly sampled numbers.
+      for (IdxType i = 0; i < num; i++) {
+        out[i] = seq[i];
       }
     }
   }
