@@ -298,6 +298,7 @@ HeteroGraphPtr SliceHeteroGraph(
     HeteroGraphPtr rgptr = nullptr;
     const dgl_format_code_t code = batched_graph->GetRelationGraph(etype)->GetAllowedFormats();
 
+    // handle graph without edges
     std::vector<uint64_t> edge_cumsum;
     edge_cumsum.push_back(start_eid_per_type_data[etype]);
     edge_cumsum.push_back(start_eid_per_type_data[etype] + num_edges_per_type_data[etype]);
