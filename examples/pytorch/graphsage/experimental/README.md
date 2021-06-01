@@ -135,6 +135,7 @@ python3 ~/workspace/dgl/tools/launch.py \
 --num_servers 1 \
 --part_config data/ogb-product.json \
 --ip_config ip_config.txt \
+--graph_format csc,coo \
 "python3 train_dist_unsupervised.py --graph_name ogb-product --ip_config ip_config.txt --num_epochs 3 --batch_size 1000"
 ```
 
@@ -183,6 +184,7 @@ python3 ~/workspace/dgl/tools/launch.py --workspace ~/workspace/dgl/examples/pyt
 --num_servers 1 \
 --part_config data/ogb-product.json \
 --ip_config ip_config.txt \
+--graph_format csc,coo \
 "python3 train_dist_unsupervised_transductive.py --graph_name ogb-product --ip_config ip_config.txt --num_epochs 3 --batch_size 1000 --num_gpus 4"
 ```
 
@@ -194,6 +196,7 @@ python3 ~/workspace/dgl/tools/launch.py --workspace ~/workspace/dgl/examples/pyt
 --num_servers 1 \
 --part_config data/ogb-product.json \
 --ip_config ip_config.txt \
+--graph_format csc,coo \
 "python3 train_dist_unsupervised_transductive.py --graph_name ogb-product --ip_config ip_config.txt --num_epochs 3 --batch_size 1000 --num_gpus 4 --dgl_sparse"
 ```
 
