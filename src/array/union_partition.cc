@@ -115,17 +115,16 @@ COOMatrix COOSliceContiguousChunk(
   const std::vector<uint64_t> &edge_cumsum,
   const std::vector<uint64_t> &src_vertex_cumsum,
   const std::vector<uint64_t> &dst_vertex_cumsum) {
-  uint64_t num_edges = edge_cumsum[1]-edge_cumsum[0];
   IdArray result_src = NullArray();
   IdArray result_dst = NullArray();
-  if (num_edges) {
+  if (edge_cumsum[1] != edge_cumsum[0]) {
     // The chunk has edges
-    IdArray result_src = IndexSelect(coo.row,
-                                     edge_cumsum[0],
-                                     edge_cumsum[1]) - src_vertex_cumsum[0];
-    IdArray result_dst = IndexSelect(coo.col,
-                                     edge_cumsum[0],
-                                     edge_cumsum[1]) - dst_vertex_cumsum[0];
+    result_src = IndexSelect(coo.row,
+                             edge_cumsum[0],
+			     edge_cumsum[1]) - src_vertex_cumsum[0];
+    result_dst = IndexSelect(coo.col,
+                             edge_cumsum[0],
+			     edge_cumsum[1]) - dst_vertex_cumsum[0];
   }
 
   IdArray result_data = NullArray();
@@ -266,17 +265,16 @@ CSRMatrix CSRSliceContiguousChunk(
   const std::vector<uint64_t> &src_vertex_cumsum,
   const std::vector<uint64_t> &dst_vertex_cumsum) {
   uint64_t num_src = src_vertex_cumsum[1]-src_vertex_cumsum[0];
-  uint64_t num_edges = edge_cumsum[1]-edge_cumsum[0];
   IdArray result_indptr = NullArray();
   IdArray result_indices = NullArray();
-  if (num_edges) {
+  if (edge_cumsum[1] != edge_cumsum[0]) {
     // The chunk has edges
-    IdArray result_indptr = IndexSelect(csr.indptr,
-                                        src_vertex_cumsum[0],
-                                        src_vertex_cumsum[1] + 1) - edge_cumsum[0];
-    IdArray result_indices = IndexSelect(csr.indices,
-                                         edge_cumsum[0],
-                                         edge_cumsum[1]) - dst_vertex_cumsum[0];
+    result_indptr = IndexSelect(csr.indptr,
+                                src_vertex_cumsum[0],
+                                src_vertex_cumsum[1] + 1) - edge_cumsum[0];
+    result_indices = IndexSelect(csr.indices,
+                                 edge_cumsum[0],
+                                 edge_cumsum[1]) - dst_vertex_cumsum[0];
   }
 
   IdArray result_data = NullArray();
