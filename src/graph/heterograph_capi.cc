@@ -586,10 +586,10 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroSlice")
     HeteroGraphRef hg = args[0];
     const IdArray num_nodes_per_type = args[1];
     const IdArray start_nid_per_type = args[2];
-    const IdArray start_eid_per_type = args[3];
-    const IdArray end_eid_per_type = args[4];
+    const IdArray num_edges_per_type = args[3];
+    const IdArray start_eid_per_type = args[4];
     auto hgptr = SliceHeteroGraph(hg->meta_graph(), hg.sptr(), num_nodes_per_type,
-                                  start_nid_per_type, start_eid_per_type, end_eid_per_type);
+                                  start_nid_per_type, num_edges_per_type, start_eid_per_type);
     *rv = HeteroGraphRef(hgptr);
 });
 

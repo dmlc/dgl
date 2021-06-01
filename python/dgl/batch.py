@@ -431,8 +431,8 @@ def slice(bg, gid):
     DGLGraph
         Retrieved graph.
     """
-    num_nodes = []
     start_nid = []
+    num_nodes = []
     for ntype in bg.ntypes:
         batch_num_nodes = bg.batch_num_nodes(ntype)
         num_nodes.append(F.as_scalar(batch_num_nodes[gid]))
@@ -442,20 +442,18 @@ def slice(bg, gid):
             start_nid.append(F.as_scalar(F.sum(F.slice_axis(batch_num_nodes, 0, 0, gid), 0)))
 
     start_eid = []
-    end_eid = []
+    num_edges = []
     for etype in bg.canonical_etypes:
         batch_num_edges = bg.batch_num_edges(etype)
+        num_edges.append(F.as_scalar(batch_num_edges[gid]))
         if gid == 0:
-            start = 0
+            start_eid.append(0)
         else:
-            start = F.as_scalar(F.sum(F.slice_axis(batch_num_edges, 0, 0, gid), 0))
-        end = start + F.as_scalar(batch_num_edges[gid])
-        start_eid.append(start)
-        end_eid.append(end)
+            start_eid.append(F.as_scalar(F.sum(F.slice_axis(batch_num_edges, 0, 0, gid), 0)))
 
     # Slice graph structure
     gidx = slice_gidx(bg._graph, utils.toindex(num_nodes), utils.toindex(start_nid),
-                      utils.toindex(start_eid), utils.toindex(end_eid))
+                      utils.toindex(num_edges), utils.toindex(start_eid))
     retg = DGLHeteroGraph(gidx, bg.ntypes, bg.etypes)
 
     # Slice node features
@@ -468,7 +466,8 @@ def slice(bg, gid):
     # Slice edge features
     for etid, etype in enumerate(bg.canonical_etypes):
         for key, feat in bg.edges[etype].data.items():
-            subfeats = F.slice_axis(feat, 0, start_eid[etid], end_eid[etid])
+            steid = start_eid[etid]
+            subfeats = F.slice_axis(feat, 0, steid, steid+num_edges[etid])
             retg.edges[etype].data[key] = subfeats
 
     return retg

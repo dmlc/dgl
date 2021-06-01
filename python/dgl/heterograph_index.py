@@ -1231,7 +1231,7 @@ def disjoint_partition(graph, bnn_all_types, bne_all_types):
     return _CAPI_DGLHeteroDisjointPartitionBySizes_v2(
         graph, bnn_all_types.todgltensor(), bne_all_types.todgltensor())
 
-def slice_gidx(graph, num_nodes, start_nid, start_eid, end_eid):
+def slice_gidx(graph, num_nodes, start_nid, num_edges, start_eid):
     """Slice a chunk of the graph.
 
     Parameters
@@ -1242,10 +1242,10 @@ def slice_gidx(graph, num_nodes, start_nid, start_eid, end_eid):
         Number of nodes per node type in the result graph.
     start_nid : utils.Index
         Start node ID per node type in the result graph.
+    num_edges : utils.Index
+        Number of edges per edge type in the result graph.
     start_eid : utils.Index
         Start edge ID per edge type in the result graph.
-    end_eid : utils.Index
-        End edge ID per edge type in the result graph.
 
     Returns
     -------
@@ -1254,7 +1254,7 @@ def slice_gidx(graph, num_nodes, start_nid, start_eid, end_eid):
     """
     return _CAPI_DGLHeteroSlice(
         graph, num_nodes.todgltensor(), start_nid.todgltensor(),
-        start_eid.todgltensor(), end_eid.todgltensor())
+        num_edges.todgltensor(), start_eid.todgltensor())
 
 #################################################################
 # Data structure used by C APIs

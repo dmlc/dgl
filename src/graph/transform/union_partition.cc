@@ -271,13 +271,13 @@ std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes2(
 
 HeteroGraphPtr SliceHeteroGraph(
     GraphPtr meta_graph, HeteroGraphPtr batched_graph, IdArray num_nodes_per_type,
-    IdArray start_nid_per_type, IdArray start_eid_per_type, IdArray end_eid_per_type) {
+    IdArray start_nid_per_type, IdArray num_edges_per_type, IdArray start_eid_per_type) {
   std::vector<HeteroGraphPtr> rel_graphs(meta_graph->NumEdges());
 
   const uint64_t* start_nid_per_type_data = static_cast<uint64_t*>(start_nid_per_type->data);
   const uint64_t* num_nodes_per_type_data = static_cast<uint64_t*>(num_nodes_per_type->data);
   const uint64_t* start_eid_per_type_data = static_cast<uint64_t*>(start_eid_per_type->data);
-  const uint64_t* end_eid_per_type_data = static_cast<uint64_t*>(end_eid_per_type->data);
+  const uint64_t* num_edges_per_type_data = static_cast<uint64_t*>(num_edges_per_type->data);
 
   // Map vertex type to the corresponding node cum sum
   const uint64_t num_vertex_types = meta_graph->NumVertices();
@@ -300,7 +300,7 @@ HeteroGraphPtr SliceHeteroGraph(
 
     std::vector<uint64_t> edge_cumsum;
     edge_cumsum.push_back(start_eid_per_type_data[etype]);
-    edge_cumsum.push_back(end_eid_per_type_data[etype]);
+    edge_cumsum.push_back(start_eid_per_type_data[etype] + num_edges_per_type_data[etype]);
 
     // prefer COO
     if (FORMAT_HAS_COO(code)) {

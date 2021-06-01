@@ -741,8 +741,8 @@ HeteroGraphPtr DisjointUnionHeteroGraph2(
  * \param batched_graph Input graph.
  * \param num_nodes_per_type Number of vertices of each type in the result.
  * \param start_nid_per_type Start vertex ID of each type to slice.
+ * \param num_edges_per_type Number of edges of each type in the result.
  * \param start_eid_per_type Start edge ID of each type to slice.
- * \param end_eid_per_type End edge ID of each type to slice.
  * \return Sliced graph
  */
  HeteroGraphPtr SliceHeteroGraph(
@@ -750,8 +750,8 @@ HeteroGraphPtr DisjointUnionHeteroGraph2(
      HeteroGraphPtr batched_graph,
      IdArray num_nodes_per_type,
      IdArray start_nid_per_type,
-     IdArray start_eid_per_type,
-     IdArray end_eid_per_type);
+     IdArray num_edges_per_type,
+     IdArray start_eid_per_type);
 
 /*!
  * \brief Split a graph into multiple disjoin components.
