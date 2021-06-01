@@ -305,30 +305,31 @@ HeteroGraphPtr SliceHeteroGraph(
     // prefer COO
     if (FORMAT_HAS_COO(code)) {
       aten::COOMatrix coo = batched_graph->GetCOOMatrix(etype);
-      auto res = aten::COOSliceContiguousChunk(coo,
-                                               edge_cumsum,
-                                               vertex_cumsum[src_vtype],
-                                               vertex_cumsum[dst_vtype]);
-      HeteroGraphPtr rgptr = UnitGraph::CreateFromCOO(
+      aten::COOMatrix res = aten::COOSliceContiguousChunk(coo,
+                                                          edge_cumsum,
+                                                          vertex_cumsum[src_vtype],
+                                                          vertex_cumsum[dst_vtype]);
+      rgptr = UnitGraph::CreateFromCOO(
         (src_vtype == dst_vtype) ? 1 : 2, res, code);
     } else if (FORMAT_HAS_CSR(code)) {
       aten::CSRMatrix csr = batched_graph->GetCSRMatrix(etype);
-      auto res = aten::CSRSliceContiguousChunk(csr,
-                                               edge_cumsum,
-                                               vertex_cumsum[src_vtype],
-                                               vertex_cumsum[dst_vtype]);
-      HeteroGraphPtr rgptr = UnitGraph::CreateFromCSR(
+      aten::CSRMatrix res = aten::CSRSliceContiguousChunk(csr,
+                                                          edge_cumsum,
+                                                          vertex_cumsum[src_vtype],
+                                                          vertex_cumsum[dst_vtype]);
+      rgptr = UnitGraph::CreateFromCSR(
         (src_vtype == dst_vtype) ? 1 : 2, res, code);
     } else if (FORMAT_HAS_CSC(code)) {
       // CSR and CSC have the same storage format, i.e. CSRMatrix
       aten::CSRMatrix csc = batched_graph->GetCSCMatrix(etype);
-      auto res = aten::CSRSliceContiguousChunk(csc,
-                                               edge_cumsum,
-                                               vertex_cumsum[dst_vtype],
-                                               vertex_cumsum[src_vtype]);
+      aten::CSRMatrix res = aten::CSRSliceContiguousChunk(csc,
+                                                          edge_cumsum,
+                                                          vertex_cumsum[dst_vtype],
+                                                          vertex_cumsum[src_vtype]);
       HeteroGraphPtr rgptr = UnitGraph::CreateFromCSC(
         (src_vtype == dst_vtype) ? 1 : 2, res, code);
     }
+  
     rel_graphs[etype] = rgptr;
   }
 
