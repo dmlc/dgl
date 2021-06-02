@@ -1936,7 +1936,7 @@ def compact_graphs(graphs, always_preserve=None, copy_ndata=True, copy_edata=Tru
 
     return new_graphs
 
-def to_block(g, dst_nodes=None, include_dst_in_src=True):
+def to_block(g, dst_nodes=None, include_dst_in_src=True, src_nodes=None):
     """Convert a graph into a bipartite-structured *block* for message passing.
 
     A block is a graph consisting of two sets of nodes: the
@@ -1971,6 +1971,12 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
         If False, do not include destination nodes in source nodes.
 
         (Default: True)
+
+    src_nodes : Tensor or disct[str, Tensor], optional
+        The list of source nodes (and prefixed by destination nodes if
+        `include_dst_in_src` is True).
+
+        If a tensor is given, the graph must have only one node type.
 
     Returns
     -------
@@ -2097,15 +2103,36 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
         if g._graph.ctx != d.ctx:
             raise ValueError('g and dst_nodes need to have the same context.')
 
-    new_graph_index, src_nodes_nd, induced_edges_nd = _CAPI_DGLToBlock(
-        g._graph, dst_node_ids_nd, include_dst_in_src)
+    src_node_ids = None
+    src_node_ids_nd = None
+    if src_nodes is not None and not isinstance(src_nodes, Mapping):
+        # src_nodes is a Tensor, check if the g has only one type.
+        if len(g.ntypes) > 1:
+            raise DGLError(
+                'Graph has more than one node type; please specify a dict for src_nodes.')
+        src_nodes = {g.ntypes[0]: src_nodes}
+        src_node_ids = [
+            utils.toindex(src_nodes.get(ntype, []), g._idtype_str).tousertensor(
+                ctx=F.to_backend_ctx(g._graph.ctx))
+            for ntype in g.ntypes]
+        src_node_ids_nd = [F.to_dgl_nd(nodes) for nodes in src_node_ids]
+
+        for d in src_node_ids_nd:
+            if g._graph.ctx != d.ctx:
+                raise ValueError('g and src_nodes need to have the same context.')
+    else:
+        # use an empty list to signal we need to generate it
+        src_node_ids_nd = []
+
+    new_graph_index, src_nodes_ids_nd, induced_edges_nd = _CAPI_DGLToBlock(
+        g._graph, dst_node_ids_nd, include_dst_in_src, src_node_ids_nd)
 
     # The new graph duplicates the original node types to SRC and DST sets.
     new_ntypes = (g.ntypes, g.ntypes)
     new_graph = DGLBlock(new_graph_index, new_ntypes, g.etypes)
     assert new_graph.is_unibipartite  # sanity check
 
-    src_node_ids = [F.from_dgl_nd(src) for src in src_nodes_nd]
+    src_node_ids = [F.from_dgl_nd(src) for src in src_nodes_ids_nd]
     edge_ids = [F.from_dgl_nd(eid) for eid in induced_edges_nd]
 
     node_frames = utils.extract_node_subframes_for_block(g, src_node_ids, dst_node_ids)

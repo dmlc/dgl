@@ -19,7 +19,7 @@ namespace transform {
 template<DLDeviceType XPU, typename IdType>
 std::tuple<HeteroGraphPtr, std::vector<IdArray>, std::vector<IdArray>>
 ToBlock(HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes,
-        bool include_rhs_in_lhs);
+        bool include_rhs_in_lhs, std::vector<IdArray> lhs_nodes);
 
 }  // namespace transform
 }  // namespace dgl
