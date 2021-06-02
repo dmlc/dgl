@@ -44,6 +44,8 @@ __all__ = [
     'to_simple',
     'to_simple_graph',
     'as_immutable_graph',
+    'sort_out_edges',
+    'sort_in_edges',
     'metis_partition_assignment',
     'partition_graph_with_halo',
     'metis_partition',
@@ -2598,5 +2600,178 @@ def as_immutable_graph(hg):
     dgl_warning('DEPRECATED: DGLGraph and DGLHeteroGraph have been merged in v0.5.\n'
                 '\tdgl.as_immutable_graph will do nothing and can be removed safely in all cases.')
     return hg
+
+def sort_out_edges(g, tag, tag_offset_name='_TAG_OFFSET'):
+    """Return a new graph which sorts the out edges of each node.
+
+    Sort the out edges according to the given destination node tags in integer.
+    A typical use case is to sort the edges by the destination node types, where
+    the tags represent destination node types. After sorting, edges sharing
+    the same tag will be arranged in a consecutive range in
+    a node's adjacency list. Following is an example:
+
+        Consider a graph as follows:
+
+        0 -> 0, 1, 2, 3, 4
+        1 -> 0, 1, 2
+
+        Given node tags [1, 1, 0, 2, 0], each node's adjacency list
+        will be sorted as follows:
+
+        0 -> 2, 4, 0, 1, 3
+        1 -> 2, 0, 1
+
+    The function will also returns the starting offsets of the tag
+    segments in a tensor of shape `(N, max_tag+2)`. For node `i`,
+    its out-edges connecting to node tag `j` is stored between
+    `tag_offsets[i][j]` ~ `tag_offsets[i][j+1]`. Since the offsets
+    can be viewed node data, we store it in the
+    `ndata` of the returned graph. Users can specify the
+    ndata name by the `tag_pos_name` argument.
+
+    Note that the function will not change the edge ID neither
+    how the edge features are stored. The input graph must
+    allow CSR format. Graph must be on CPU.
+
+    If the input graph is heterogenous, it must have only one edge
+    type and two node types (i.e., source and destination node types).
+    In this case, the provided node tags are for the destination nodes,
+    and the tag offsets are stored in the source node data.
+
+    The sorted graph and the calculated tag offsets are needed by
+    certain operators that consider node tags. See `sample_neighbors_biased`
+    for an example.
+
+    Examples
+    -----------
+
+    >>> g = dgl.graph(([0,0,0,0,0,1,1,1],[0,1,2,3,4,0,1,2]))
+    >>> g.adjacency_matrix(scipy_fmt='csr').nonzero()
+    (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
+     array([0, 1, 2, 3, 4, 0, 1, 2], dtype=int32))
+    >>> tag = torch.IntTensor([1,1,0,2,0])
+    >>> g_sorted = dgl.transform.sort_out_edges(g, tag)
+    >>> g_sorted.adjacency_matrix(scipy_fmt='csr').nonzero()
+    (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
+     array([2, 4, 0, 1, 3, 2, 0, 1], dtype=int32))
+    >>> g_sorted.ndata['_TAG_OFFSET']
+    tensor([[0, 2, 4, 5],
+            [0, 1, 3, 3],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0]])
+
+    Parameters
+    ------------
+    g : DGLGraph
+        The input graph.
+    tag : Tensor
+        Integer tensor of shape `(N,)`, `N` being the number of (destination) nodes.
+    tag_offset_name : str
+        The name of the node feature to store tag offsets.
+
+    Returns
+    -------
+    g_sorted : DGLGraph
+        A new graph whose out edges are sorted. The node/edge features of the
+        input graph is shallow-copied over.
+        - `g_sorted.ndata[tag_offset_name]` : Tensor of shape `(N, max_tag + 2)`. If
+        `g` is heterogeneous, get from `g_sorted.srcdata`.
+    """
+    if len(g.etypes) > 1:
+        raise DGLError("Only support homograph and bipartite graph")
+    num_tags = int(F.asnumpy(F.max(tag, 0))) + 1
+    tag_arr = F.zerocopy_to_dgl_ndarray(tag)
+    new_g = g.clone()
+    new_g._graph, tag_pos_arr = _CAPI_DGLHeteroSortOutEdges(g._graph, tag_arr, num_tags)
+    new_g.srcdata[tag_offset_name] = F.from_dgl_nd(tag_pos_arr)
+    return new_g
+
+
+def sort_in_edges(g, tag, tag_offset_name='_TAG_OFFSET'):
+    """Return a new graph which sorts the in edges of each node.
+
+    Sort the in edges according to the given source node tags in integer.
+    A typical use case is to sort the edges by the source node types, where
+    the tags represent source node types. After sorting, edges sharing
+    the same tag will be arranged in a consecutive range in
+    a node's adjacency list. Following is an example:
+
+        Consider a graph as follows:
+
+        0 <- 0, 1, 2, 3, 4
+        1 <- 0, 1, 2
+
+        Given node tags [1, 1, 0, 2, 0], each node's adjacency list
+        will be sorted as follows:
+
+        0 <- 2, 4, 0, 1, 3
+        1 <- 2, 0, 1
+
+    The function will also returns the starting offsets of the tag
+    segments in a tensor of shape `(N, max_tag+2)`. For node `i`,
+    its in-edges connecting to node tag `j` is stored between
+    `tag_offsets[i][j]` ~ `tag_offsets[i][j+1]`. Since the offsets
+    can be viewed node data, we store it in the
+    `ndata` of the returned graph. Users can specify the
+    ndata name by the `tag_pos_name` argument.
+
+    Note that the function will not change the edge ID neither
+    how the edge features are stored. The input graph must
+    allow CSR format. Graph must be on CPU.
+
+    If the input graph is heterogenous, it must have only one edge
+    type and two node types (i.e., source and destination node types).
+    In this case, the provided node tags are for the source nodes,
+    and the tag offsets are stored in the destination node data.
+
+    The sorted graph and the calculated tag offsets are needed by
+    certain operators that consider node tags. See `sample_neighbors_biased`
+    for an example.
+
+    Examples
+    -----------
+
+    >>> g = dgl.graph(([0,1,2,3,4,0,1,2],[0,0,0,0,0,1,1,1]))
+    >>> g.adjacency_matrix(scipy_fmt='csr', transpose=False).nonzero()
+    (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
+     array([0, 1, 2, 3, 4, 0, 1, 2], dtype=int32)))
+    >>> tag = torch.IntTensor([1,1,0,2,0])
+    >>> g_sorted = dgl.transform.sort_in_edges(g, tag)
+    >>> g_sorted.adjacency_matrix(scipy_fmt='csr', transpose=False).nonzero()
+    (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
+     array([2, 4, 0, 1, 3, 2, 0, 1], dtype=int32))
+    >>> g_sorted.ndata['_TAG_OFFSET']
+    tensor([[0, 2, 4, 5],
+            [0, 1, 3, 3],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0]])
+
+    Parameters
+    ------------
+    g : DGLGraph
+        The input graph.
+    tag : Tensor
+        Integer tensor of shape `(N,)`, `N` being the number of (source) nodes.
+    tag_offset_name : str
+        The name of the node feature to store tag offsets.
+
+    Returns
+    -------
+    g_sorted : DGLGraph
+        A new graph whose out edges are sorted. The node/edge features of the
+        input graph is shallow-copied over.
+        - `g_sorted.ndata[tag_offset_name]` : Tensor of shape `(N, max_tag + 2)`. If
+        `g` is heterogeneous, get from `g_sorted.dstdata`.
+    """
+    if len(g.etypes) > 1:
+        raise DGLError("Only support homograph and bipartite graph")
+    num_tags = int(F.asnumpy(F.max(tag, 0))) + 1
+    tag_arr = F.zerocopy_to_dgl_ndarray(tag)
+    new_g = g.clone()
+    new_g._graph, tag_pos_arr = _CAPI_DGLHeteroSortInEdges(g._graph, tag_arr, num_tags)
+    new_g.dstdata[tag_offset_name] = F.from_dgl_nd(tag_pos_arr)
+    return new_g
 
 _init_api("dgl.transform")
