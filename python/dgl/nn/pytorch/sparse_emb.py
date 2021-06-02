@@ -349,7 +349,7 @@ class NodeEmbedding: # NodeEmbedding
         if self._partition:
             if self._world_size == 0:
                 # non-multiprocessing
-                return self._tensor.to(torch.device('cpu'))
+                return self._tensor.to(th.device('cpu'))
             else:
                 # create a shared memory tensor
                 shared_name = self._name + "_gather"
