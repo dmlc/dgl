@@ -1,6 +1,6 @@
 # DGL Implementation of the TAHIN
 
-This DGL example implements the TAHIN module proposed in the paper [HCDIR](https://arxiv.org/pdf/2007.15293.pdf). Since the code and dataset have not been published yet, we implement its main idea and emperiment on two other datasets.
+This DGL example implements the TAHIN module proposed in the paper [HCDIR](https://arxiv.org/pdf/2007.15293.pdf). Since the code and dataset have not been published yet, we implement its main idea and experiment on two other datasets.
 
 Example implementor
 ----------------------

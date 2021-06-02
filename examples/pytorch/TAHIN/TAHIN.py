@@ -18,6 +18,13 @@ class SemanticAttention(nn.Module):
         )
 
     def forward(self, z):
+        '''
+        Shape of z: (N, M , D*K)
+        N: number of nodes
+        M: number of metapath patterns
+        D: hidden_size
+        K: number of heads
+        '''
         w = self.project(z).mean(0)                    # (M, 1)
         beta = torch.softmax(w, dim=0)                 # (M, 1)
         beta = beta.expand((z.shape[0],) + beta.shape) # (N, M, 1)
@@ -26,17 +33,17 @@ class SemanticAttention(nn.Module):
 
 #Metapath-based aggregation (the same as the HANLayer)
 class HANLayer(nn.Module):
-    def __init__(self, meta_paths, in_size, out_size, layer_num_heads, dropout):
+    def __init__(self, meta_path_patterns, in_size, out_size, layer_num_heads, dropout):
         super(HANLayer, self).__init__()
 
         # One GAT layer for each meta path based adjacency matrix
         self.gat_layers = nn.ModuleList()
-        for i in range(len(meta_paths)):
+        for i in range(len(meta_path_patterns)):
             self.gat_layers.append(GATConv(in_size, out_size, layer_num_heads,
                                            dropout, dropout, activation=F.elu,
                                            allow_zero_in_degree=True))
         self.semantic_attention = SemanticAttention(in_size=out_size * layer_num_heads)
-        self.meta_paths = list(tuple(meta_path) for meta_path in meta_paths)
+        self.meta_path_patterns = list(tuple(meta_path_pattern) for meta_path_pattern in meta_path_patterns)
 
         self._cached_graph = None
         self._cached_coalesced_graph = {}
@@ -47,12 +54,12 @@ class HANLayer(nn.Module):
         if self._cached_graph is None or self._cached_graph is not g:
             self._cached_graph = g
             self._cached_coalesced_graph.clear()
-            for meta_path in self.meta_paths:
-                self._cached_coalesced_graph[meta_path] = dgl.metapath_reachable_graph(
-                        g, meta_path)
+            for meta_path_pattern in self.meta_path_patterns:
+                self._cached_coalesced_graph[meta_path_pattern] = dgl.metapath_reachable_graph(
+                        g, meta_path_pattern)
 
-        for i, meta_path in enumerate(self.meta_paths):
-            new_g = self._cached_coalesced_graph[meta_path]
+        for i, meta_path_pattern in enumerate(self.meta_path_patterns):
+            new_g = self._cached_coalesced_graph[meta_path_pattern]
             semantic_embeddings.append(self.gat_layers[i](new_g, h).flatten(1))
         semantic_embeddings = torch.stack(semantic_embeddings, dim=1)                  # (N, M, D * K)
 
@@ -111,7 +118,7 @@ class RelationalAGG(nn.Module):
         return feat_dict
 
 class TAHIN(nn.Module):
-    def __init__(self, g, meta_paths, in_size, out_size, num_heads, dropout):
+    def __init__(self, g, meta_path_patterns, in_size, out_size, num_heads, dropout):
         super(TAHIN, self).__init__()
 
         #embeddings for different types of nodes, h0
@@ -124,10 +131,10 @@ class TAHIN(nn.Module):
         self.RelationalAGG = RelationalAGG(g, in_size, out_size)
 
         #metapath-based aggregation modules for user and item, this produces h2
-        self.meta_paths = meta_paths 
+        self.meta_path_patterns = meta_path_patterns 
         #one HANLayer for user, one HANLayer for item
         self.hans = nn.ModuleDict({
-            key: HANLayer(value, in_size, out_size, num_heads, dropout) for key, value in self.meta_paths.items()
+            key: HANLayer(value, in_size, out_size, num_heads, dropout) for key, value in self.meta_path_patterns.items()
         })
 
         #layers to combine h0, h1, and h2
@@ -147,12 +154,11 @@ class TAHIN(nn.Module):
 
     def forward(self, g, user_key, item_key, user_idx, item_idx):
         #relational neighbor aggregation, h1
-        h1={}
         h1 = self.RelationalAGG(g, self.feature_dict)
 
         #metapath-based aggregation, h2
         h2 = {}
-        for key in self.meta_paths.keys():
+        for key in self.meta_path_patterns.keys():
             h2[key] = self.hans[key](g, self.feature_dict[key])
 
         #update node embeddings

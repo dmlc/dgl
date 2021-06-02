@@ -6,6 +6,39 @@ import pickle as pkl
 import numpy as np
 import random
 
+# Split data into train/eval/test
+def split_data(hg, etype_name):
+    src, dst = hg.edges(etype=etype_name)
+    user_item_src = src.numpy().tolist()
+    user_item_dst = dst.numpy().tolist()
+    
+    num_link = len(user_item_src)
+    pos_label=[1]*num_link
+    pos_data=list(zip(user_item_src,user_item_dst,pos_label))
+
+    ui_adj = np.array(hg.adj(etype=etype_name).to_dense())
+    full_idx = np.where(ui_adj==0)
+
+    sample = random.sample(range(0, len(full_idx[0])), num_link)
+    neg_label = [0]*num_link
+    neg_data = list(zip(full_idx[0][sample],full_idx[1][sample],neg_label))
+    
+    full_data = pos_data + neg_data
+    random.shuffle(full_data)
+
+    train_size = int(len(full_data) * 0.6)
+    eval_size = int(len(full_data) * 0.2)
+    test_size = len(full_data) - train_size - eval_size
+    train_data = full_data[:train_size]
+    eval_data = full_data[train_size : train_size+eval_size]
+    test_data = full_data[train_size+eval_size : train_size+eval_size+test_size]
+    train_data = np.array(train_data)
+    eval_data = np.array(eval_data)
+    test_data = np.array(test_data)
+    
+    return train_data, eval_data, test_data
+    
+
 def process_amazon(root_path):
     # User-Item 3584 2753 50903 UIUI
     # Item-View 2753 3857 5694 UIVI
@@ -15,6 +48,8 @@ def process_amazon(root_path):
     #Construct graph from raw data.
     # load data of amazon
     data_path = os.path.join(root_path, 'Amazon')
+    if not (os.path.exists(data_path)):
+        print('Can not find amazon in {}, please download the dataset first.'.format(data_path))
     
     # item_view
     item_view_src=[]
@@ -71,29 +106,7 @@ def process_amazon(root_path):
     print("Graph constructed.")
 
     # Split data into train/eval/test
-    num_link = len(user_item_src)
-    pos_label=[1]*num_link
-    pos_data=list(zip(user_item_src,user_item_dst,pos_label))
-
-    ui_adj = np.array(hg.adj(etype='ui').to_dense())
-    full_idx = np.where(ui_adj==0)
-
-    sample = random.sample(range(0, len(full_idx[0])), num_link)
-    neg_label = [0]*num_link
-    neg_data = list(zip(full_idx[0][sample],full_idx[1][sample],neg_label))
-    
-    full_data = pos_data + neg_data
-    random.shuffle(full_data)
-
-    train_size = int(len(full_data) * 0.6)
-    eval_size = int(len(full_data) * 0.2)
-    test_size = len(full_data) - train_size - eval_size
-    train_data = full_data[:train_size]
-    eval_data = full_data[train_size : train_size+eval_size]
-    test_data = full_data[train_size+eval_size : train_size+eval_size+test_size]
-    train_data = np.array(train_data)
-    eval_data = np.array(eval_data)
-    test_data = np.array(test_data)
+    train_data, eval_data, test_data = split_data(hg, 'ui')
 
     #delete the positive edges in eval/test data in the original graph
     train_pos = np.nonzero(train_data[:,2])
@@ -129,6 +142,7 @@ def process_amazon(root_path):
         pkl.dump(test_data, file)
     with open(os.path.join(root_path, 'amazon_eval.pkl'), 'wb') as file: 
         pkl.dump(eval_data, file)
+
     return hg_processed, train_data, eval_data, test_data
 
 
@@ -139,6 +153,8 @@ def process_movielens(root_path):
     # Movie-Genre 1682 18 2861 UMGM
 
     data_path = os.path.join(root_path, 'Movielens')
+    if not (os.path.exists(data_path)):
+        print('Can not find movielens in {}, please download the dataset first.'.format(data_path))
 
     #Construct graph from raw data.
     # movie_genre
@@ -196,29 +212,7 @@ def process_movielens(root_path):
     print("Graph constructed.")
 
     # Split data into train/eval/test
-    num_link = len(user_movie_src)
-    pos_label=[1]*num_link
-    pos_data=list(zip(user_movie_src,user_movie_dst,pos_label))
-
-    um_adj = np.array(hg.adj(etype='um').to_dense())
-    full_idx = np.where(um_adj==0)
-
-    sample = random.sample(range(0, len(full_idx[0])), num_link)
-    neg_label = [0]*num_link
-    neg_data = list(zip(full_idx[0][sample],full_idx[1][sample],neg_label))
-    
-    full_data = pos_data + neg_data
-    random.shuffle(full_data)
-
-    train_size = int(len(full_data) * 0.6)
-    eval_size = int(len(full_data) * 0.2)
-    test_size = len(full_data) - train_size - eval_size
-    train_data = full_data[:train_size]
-    eval_data = full_data[train_size : train_size+eval_size]
-    test_data = full_data[train_size+eval_size : train_size+eval_size+test_size]
-    train_data = np.array(train_data)
-    eval_data = np.array(eval_data)
-    test_data = np.array(test_data)
+    train_data, eval_data, test_data = split_data(hg, 'um')
 
     #delete the positive edges in eval/test data in the original graph
     train_pos = np.nonzero(train_data[:,2])
@@ -254,6 +248,7 @@ def process_movielens(root_path):
         pkl.dump(test_data, file)
     with open(os.path.join(root_path, 'movielens_eval.pkl'), 'wb') as file: 
         pkl.dump(eval_data, file)
+
     return hg_processed, train_data, eval_data, test_data
 
 class MyDataset(Dataset):
@@ -289,6 +284,7 @@ def load_data(dataset, batch_size=128, num_workers = 10, root_path = './data'):
         elif dataset == 'amazon':
             hg, train_set, eval_set, test_set = process_amazon(root_path)
         else:
+            print('Available datasets: movielens, amazon.')
             raise NotImplementedError
 
     if dataset == 'movielens':
@@ -306,6 +302,7 @@ def load_data(dataset, batch_size=128, num_workers = 10, root_path = './data'):
         user_key = 'user'
         item_key = 'item'
     else:
+        print('Available datasets: movielens, amazon.')
         raise NotImplementedError
     
     train_set = torch.Tensor(train_set).long()
