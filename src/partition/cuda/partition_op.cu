@@ -56,6 +56,22 @@ __global__ void _MapLocalIndexByRemainder(
   }
 }
 
+template<typename IdType>
+__global__ void _MapGlobalIndexByRemainder(
+    const IdType * const in,
+    IdType * const out,
+    const int part_id,
+    const int64_t num_items,
+    const int comm_size) {
+  const int64_t idx = threadIdx.x+blockDim.x*blockIdx.x;
+
+  assert(part_id < comm_size);
+
+  if (idx < num_items) {
+    out[idx] = (in[idx] * comm_size) + part_id;
+  }
+}
+
 template <DLDeviceType XPU, typename IdType>
 std::pair<IdArray, NDArray>
 GeneratePermutationFromRemainder(
@@ -232,6 +248,57 @@ template IdArray
 MapToLocalFromRemainder<kDLGPU, int64_t>(
         int num_parts,
         IdArray in_idx);
+
+template <DLDeviceType XPU, typename IdType>
+IdArray MapToGlobalFromRemainder(
+    const int num_parts,
+    IdArray local_idx,
+    const int part_id) {
+  CHECK_LT(part_id, num_parts) << "Invalid partition id " << part_id <<
+      "/" << num_parts;
+  CHECK_GE(part_id, 0) << "Invalid partition id " << part_id <<
+      "/" << num_parts;
+
+  const auto& ctx = local_idx->ctx;
+  cudaStream_t stream = CUDAThreadEntry::ThreadLocal()->stream;
+
+  if (num_parts > 1) {
+    IdArray global_idx = aten::NewIdArray(local_idx->shape[0], ctx,
+        sizeof(IdType)*8);
+
+    const dim3 block(128);
+    const dim3 grid((local_idx->shape[0] +block.x-1)/block.x);
+
+    CUDA_KERNEL_CALL(
+        _MapGlobalIndexByRemainder,
+        grid,
+        block,
+        0,
+        stream,
+        static_cast<const IdType*>(local_idx->data),
+        static_cast<IdType*>(global_idx->data),
+        part_id,
+        global_idx->shape[0],
+        num_parts);
+
+    return global_idx;
+  } else {
+    // no mapping to be done
+    return local_idx;
+  }
+}
+
+template IdArray
+MapToGlobalFromRemainder<kDLGPU, int32_t>(
+        int num_parts,
+        IdArray in_idx,
+        int part_id);
+template IdArray
+MapToGlobalFromRemainder<kDLGPU, int64_t>(
+        int num_parts,
+        IdArray in_idx,
+        int part_id);
+
 
 
 }  // namespace impl

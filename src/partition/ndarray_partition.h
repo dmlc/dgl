@@ -66,6 +66,19 @@ class NDArrayPartition : public runtime::Object {
       IdArray in_idx) const = 0;
 
   /**
+   * @brief Generate the global indices (the numbering unique across all
+   * processors) from a set of local indices.
+   *
+   * @param in_idx The local indices.
+   * @param part_id The part id.
+   *
+   * @return The global indices.
+   */
+  virtual IdArray MapToGlobal(
+      IdArray in_idx,
+      int part_id) const = 0;
+
+  /**
    * @brief Get the number of rows/items assigned to the given part.
    *
    * @param part_id The part id.

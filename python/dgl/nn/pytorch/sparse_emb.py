@@ -334,3 +334,46 @@ class NodeEmbedding: # NodeEmbedding
             The tensor storing the node embeddings
         """
         return self._tensor
+
+    def gather_embedding(self):
+        """Return a copy of the embedding stored in CPU memory. If this is a
+        multi-processing instance, the tensor will be returned in shared
+        memory. If the embedding is currently stored on multiple GPUs, all
+        processes must call this method in the same order.
+
+        Returns
+        -------
+        torch.Tensor
+            The tensor storing the node embeddings.
+        """
+        if self._partition:
+            if self._world_size == 0:
+                # non-multiprocessing
+                return self._tensor.to(torch.device('cpu'))
+            else:
+                # create a shared memory tensor
+                shared_name = self._name + "_gather"
+                if self._rank == 0:
+                    # root process creates shared memory
+                    emb = create_shared_mem_array(
+                        shared_name,
+                        (sel._num_embeddings, self._embedding_dim),
+                        self._tensor.dtype)
+                    self._store.set(shared_name)
+                else:
+                    self._store.wait([shared_name])
+                    emb = get_shared_mem_array(
+                        shared_name, (self._num_embeddings, self._embedding_dim),
+                        self._tensor.dtype)
+                # need to map indices and slice into existing tensor
+                idxs = self._partition.map_to_global(
+                    F.range(0, self._tensor.shape[0],
+                            device=self._tensor.device)).to(emb.device)
+                emb[idxs] = self._tensor.to(emb.device)
+
+                # wait for all processes to finish
+                th.distributed.barrier()
+                return emb
+        else:
+            # already stored in CPU memory
+            return self._tensor
