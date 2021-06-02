@@ -15,8 +15,7 @@
 #include <dgl/runtime/container.h>
 #include <vector>
 #include <tuple>
-// TODO(BarclayII): currently ToBlock depend on IdHashMap<IdType> implementation which
-// only works on CPU.  Should fix later to make it device agnostic.
+#include <utility>
 #include "../../array/cpu/array_utils.h"
 
 namespace dgl {
