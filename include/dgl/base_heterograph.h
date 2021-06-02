@@ -745,13 +745,13 @@ HeteroGraphPtr DisjointUnionHeteroGraph2(
  * \param start_eid_per_type Start edge ID of each type to slice.
  * \return Sliced graph
  */
- HeteroGraphPtr SliceHeteroGraph(
-     GraphPtr meta_graph,
-     HeteroGraphPtr batched_graph,
-     IdArray num_nodes_per_type,
-     IdArray start_nid_per_type,
-     IdArray num_edges_per_type,
-     IdArray start_eid_per_type);
+HeteroGraphPtr SliceHeteroGraph(
+    GraphPtr meta_graph,
+    HeteroGraphPtr batched_graph,
+    IdArray num_nodes_per_type,
+    IdArray start_nid_per_type,
+    IdArray num_edges_per_type,
+    IdArray start_eid_per_type);
 
 /*!
  * \brief Split a graph into multiple disjoin components.

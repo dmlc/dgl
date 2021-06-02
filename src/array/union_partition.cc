@@ -136,13 +136,13 @@ COOMatrix COOSliceContiguousChunk(
   }
 
   COOMatrix sub_coo = COOMatrix(
-      src_vertex_cumsum[1]-src_vertex_cumsum[0],
-      dst_vertex_cumsum[1]-dst_vertex_cumsum[0],
-      result_src,
-      result_dst,
-      result_data,
-      coo.row_sorted,
-      coo.col_sorted);
+    src_vertex_cumsum[1]-src_vertex_cumsum[0],
+    dst_vertex_cumsum[1]-dst_vertex_cumsum[0],
+    result_src,
+    result_dst,
+    result_data,
+    coo.row_sorted,
+    coo.col_sorted);
 
   return sub_coo;
 }

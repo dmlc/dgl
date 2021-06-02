@@ -270,8 +270,8 @@ std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes2(
 }
 
 HeteroGraphPtr SliceHeteroGraph(
-    GraphPtr meta_graph, HeteroGraphPtr batched_graph, IdArray num_nodes_per_type,
-    IdArray start_nid_per_type, IdArray num_edges_per_type, IdArray start_eid_per_type) {
+  GraphPtr meta_graph, HeteroGraphPtr batched_graph, IdArray num_nodes_per_type,
+  IdArray start_nid_per_type, IdArray num_edges_per_type, IdArray start_eid_per_type) {
   std::vector<HeteroGraphPtr> rel_graphs(meta_graph->NumEdges());
 
   const uint64_t* start_nid_per_type_data = static_cast<uint64_t*>(start_nid_per_type->data);
@@ -286,8 +286,7 @@ HeteroGraphPtr SliceHeteroGraph(
   // Loop over all vertex types
   for (uint64_t vtype = 0; vtype < num_vertex_types; ++vtype) {
     vertex_cumsum[vtype].push_back(start_nid_per_type_data[vtype]);
-    vertex_cumsum[vtype].push_back(
-        start_nid_per_type_data[vtype] + num_nodes_per_type_data[vtype]);
+    vertex_cumsum[vtype].push_back(start_nid_per_type_data[vtype] + num_nodes_per_type_data[vtype]);
   }
 
   // Loop over all canonical etypes
