@@ -328,7 +328,7 @@ HeteroGraphPtr SliceHeteroGraph(
       HeteroGraphPtr rgptr = UnitGraph::CreateFromCSC(
         (src_vtype == dst_vtype) ? 1 : 2, res, code);
     }
-  
+
     rel_graphs[etype] = rgptr;
   }
 

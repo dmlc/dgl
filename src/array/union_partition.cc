@@ -121,10 +121,10 @@ COOMatrix COOSliceContiguousChunk(
     // The chunk has edges
     result_src = IndexSelect(coo.row,
                              edge_cumsum[0],
-			     edge_cumsum[1]) - src_vertex_cumsum[0];
+                             edge_cumsum[1]) - src_vertex_cumsum[0];
     result_dst = IndexSelect(coo.col,
                              edge_cumsum[0],
-			     edge_cumsum[1]) - dst_vertex_cumsum[0];
+                             edge_cumsum[1]) - dst_vertex_cumsum[0];
   }
 
   IdArray result_data = NullArray();
