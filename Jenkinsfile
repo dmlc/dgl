@@ -42,9 +42,9 @@ def build_dgl_win64(dev) {
   pack_lib("dgl-${dev}-win64", dgl_win64_libs)
 }
 
-def cpp_unit_test_linux() {
+def cpp_unit_test_linux(dev) {
   init_git()
-  unpack_lib('dgl-cpu-linux', dgl_linux_libs)
+  unpack_lib("dgl-${dev}-linux", dgl_linux_libs)
   sh 'bash tests/scripts/task_cpp_unit_test.sh'
 }
 
@@ -251,7 +251,25 @@ pipeline {
                 }
               }
               steps {
-                cpp_unit_test_linux()
+                cpp_unit_test_linux('cpu')
+              }
+              post {
+                always {
+                  cleanWs disableDeferredWipeout: true, deleteDirs: true
+                }
+              }
+            }
+            stage('C++ GPU') {
+              agent {
+                docker {
+                  label 'linux-gpu-node'
+                  image 'dgllib/dgl-ci-gpu:conda'
+                  args '--runtime nvidia'
+                  alwaysPull true
+                }
+              }
+              steps {
+                cpp_unit_test_linux('gpu')
               }
               post {
                 always {
