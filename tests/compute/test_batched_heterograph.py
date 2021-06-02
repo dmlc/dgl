@@ -334,7 +334,7 @@ def test_unbatch2(idtype):
 
 
 @parametrize_dtype
-def test_slice(idtype):
+def test_slice_batch(idtype):
     g1 = dgl.heterograph({
         ('user', 'follows', 'user'): ([0, 1], [1, 2]),
         ('user', 'plays', 'game'): ([], []),
@@ -358,7 +358,7 @@ def test_slice(idtype):
         bg.num_edges(('user', 'follows', 'user')), 2))
     for i in range(len(g_list)):
         g_i = g_list[i]
-        g_slice = dgl.slice(bg, i)
+        g_slice = dgl.slice_batch(bg, i)
         assert g_i.ntypes == g_slice.ntypes
         assert g_i.canonical_etypes == g_slice.canonical_etypes
         assert g_i.idtype == g_slice.idtype
