@@ -270,11 +270,15 @@ def test_gat_conv(g, idtype, out_dim, num_heads):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
     gat = nn.GATConv(5, out_dim, num_heads)
-    feat = F.randn((g.number_of_nodes(), 5))
+    feat = F.randn((g.number_of_src_nodes(), 5))
     h = gat(g, feat)
-    assert h.shape == (g.number_of_nodes(), num_heads, out_dim)
+    assert h.shape == (g.number_of_dst_nodes(), num_heads, out_dim)
     _, a = gat(g, feat, get_attention=True)
     assert a.shape == (g.number_of_edges(), num_heads, 1)
+
+    # test residual connection
+    gat = nn.GATConv(5, out_dim, num_heads, residual=True)
+    h = gat(g, feat)
 
 @parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['bipartite'], exclude=['zero-degree']))
@@ -297,7 +301,7 @@ def test_gat_conv_bi(g, idtype, out_dim, num_heads):
 def test_sage_conv(idtype, g, aggre_type, out_dim):
     g = g.astype(idtype).to(F.ctx())
     sage = nn.SAGEConv(5, out_dim, aggre_type)
-    feat = F.randn((g.number_of_nodes(), 5))
+    feat = F.randn((g.number_of_src_nodes(), 5))
     h = sage(g, feat)
     assert h.shape[-1] == out_dim
 
@@ -374,9 +378,9 @@ def test_gin_conv(g, idtype, aggregator_type):
         tf.keras.layers.Dense(12),
         aggregator_type
     )
-    feat = F.randn((g.number_of_nodes(), 5))
+    feat = F.randn((g.number_of_src_nodes(), 5))
     h = gin(g, feat)
-    assert h.shape == (g.number_of_nodes(), 12)
+    assert h.shape == (g.number_of_dst_nodes(), 12)
 
 @parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['bipartite']))
@@ -398,9 +402,9 @@ def test_edge_conv(g, idtype, out_dim):
     g = g.astype(idtype).to(F.ctx())
     edge_conv = nn.EdgeConv(out_dim)
 
-    h0 = F.randn((g.number_of_nodes(), 5))
+    h0 = F.randn((g.number_of_src_nodes(), 5))
     h1 = edge_conv(g, h0)
-    assert h1.shape == (g.number_of_nodes(), out_dim)
+    assert h1.shape == (g.number_of_dst_nodes(), out_dim)
 
 @parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['bipartite'], exclude=['zero-degree']))
