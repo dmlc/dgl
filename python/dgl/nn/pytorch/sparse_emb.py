@@ -357,9 +357,9 @@ class NodeEmbedding: # NodeEmbedding
                     # root process creates shared memory
                     emb = create_shared_mem_array(
                         shared_name,
-                        (sel._num_embeddings, self._embedding_dim),
+                        (self._num_embeddings, self._embedding_dim),
                         self._tensor.dtype)
-                    self._store.set(shared_name)
+                    self._store.set(shared_name, shared_name)
                 else:
                     self._store.wait([shared_name])
                     emb = get_shared_mem_array(
