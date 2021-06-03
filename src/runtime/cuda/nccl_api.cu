@@ -329,7 +329,7 @@ NDArray SparsePull(
       static_cast<const int64_t*>(part_perm.second->data);
 
   // permute requests
-  {
+  if (num_in > 0) {
     const dim3 block(256);
     const dim3 grid((num_in+block.x-1)/block.x);
 

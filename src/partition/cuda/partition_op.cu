@@ -96,6 +96,7 @@ GeneratePermutationFromRemainder(
     return result;
   }
 
+  result.first = aten::NewIdArray(num_in, ctx, sizeof(IdType)*8);
   result.second = aten::Full(0, num_parts, sizeof(int64_t)*8, ctx);
   int64_t * out_counts = static_cast<int64_t*>(result.second->data);
   if (num_in == 0) {
@@ -133,7 +134,6 @@ GeneratePermutationFromRemainder(
   // then create a permutation array that groups processors together by
   // performing a radix sort
   Workspace<IdType> proc_id_out(device, ctx, num_in);
-  result.first = aten::NewIdArray(num_in, ctx, sizeof(IdType)*8);
   IdType * perm_out = static_cast<IdType*>(result.first->data);
   {
     IdArray perm_in = aten::Range(0, num_in, sizeof(IdType)*8, ctx);
