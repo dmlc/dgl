@@ -143,14 +143,14 @@ class RelGraphEmbedLayer(nn.Module):
         """
         embeds = th.empty(node_ids.shape[0], self.embed_size, device=self.out_dev_id)
 
-        # transfer input to the correct device 
+        # transfer input to the correct device
         type_ids = type_ids.to(self.dev_id)
         node_tids = node_tids.to(self.dev_id)
 
         # build locs first
         locs = [None for i in range(self.num_of_ntype)]
         for ntype in range(self.num_of_ntype):
-            locs[ntype] = (node_tids == ntype).nonzero().squeeze()
+            locs[ntype] = (node_tids == ntype).nonzero().squeeze(-1)
         for ntype in range(self.num_of_ntype):
             loc = locs[ntype]
             if isinstance(features[ntype], int):
