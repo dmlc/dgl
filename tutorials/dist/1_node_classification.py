@@ -48,21 +48,21 @@ graph.ndata['val_mask'] = val_mask
 graph.ndata['test_mask'] = test_mask
 
 #####################################################
-#Then we call the partition_graph function to partition the graph with
+#Then we call the `partition_graph` function to partition the graph with
 #`METIS <http://glaros.dtc.umn.edu/gkhome/metis/metis/overview>`_ and save the partitioned results
-#in the specified folder. **Note**: partition_graph runs on a single machine with a single thread.
+#in the specified folder. **Note**: `partition_graph` runs on a single machine with a single thread.
 #You can go to `our user guide <https://docs.dgl.ai/en/latest/guide/distributed-preprocessing.html#distributed-partitioning>`_
 #to see more information on distributed graph partitioning.
 #
 #The code below shows an example of invoking the partitioning algorithm and generate four partitions.
-#The partitioned results are stored in a folder called 4part_data. While partitioning a graph,
+#The partitioned results are stored in a folder called `4part_data`. While partitioning a graph,
 #we allow users to specify how to balance the partitions. By default, the algorithm balances the number
 #of nodes in each partition as much as possible. However, this balancing strategy is not sufficient
 #for distributed GNN training because some partitions may have many more training nodes than other partitions
-#or some partitions may have more edges than others. As such, partition_graph provides two additional arguments
-#balance_ntypes and balance_edges to enforce more balancing criteria. For example, we can use the training mask
+#or some partitions may have more edges than others. As such, `partition_graph` provides two additional arguments
+#`balance_ntypes` and `balance_edges` to enforce more balancing criteria. For example, we can use the training mask
 #to balance the number of training nodes in each partition, as shown in the example below. We can also turn on
-#the balance_edges flag to ensure that all partitions have roughly the same number of edges.
+#the `balance_edges` flag to ensure that all partitions have roughly the same number of edges.
 #
 
 dgl.distributed.partition_graph(graph, graph_name='ogbn-products', num_parts=4,
@@ -74,12 +74,12 @@ dgl.distributed.partition_graph(graph, graph_name='ogbn-products', num_parts=4,
 #When partitioning a graph, DGL shuffles node IDs and edge IDs so that nodes/edges assigned to
 #a partition have contiguous IDs. This is necessary for DGL to maintain the mappings of global
 #node/edge IDs and partition IDs. If a user needs to map the shuffled node/edge IDs to their original IDs,
-#they can turn on the return_mapping flag of partition_graph, which returns a vector for the node ID mapping
+#they can turn on the `return_mapping` flag of `partition_graph`, which returns a vector for the node ID mapping
 #and edge ID mapping. Below shows an example of using the ID mapping to save the node embeddings after
 #distributed training. This is a common use case when users want to use the trained node embeddings
-#in their downstream task. Below let's assume that the trained node embeddings are stored in the node_emb tensor,
+#in their downstream task. Below let's assume that the trained node embeddings are stored in the `node_emb` tensor,
 #which is indexed by the shuffled node IDs. We shuffle the embeddings again and store them in
-#the orig_node_emb tensor, which is indexed by the original node IDs.
+#the `orig_node_emb` tensor, which is indexed by the original node IDs.
 #
 
 nmap, emap = dgl.distributed.partition_graph(graph, graph_name='ogbn-products',
@@ -117,7 +117,7 @@ import torch as th
 dgl.distributed.initialize(ip_config='ip_config.txt')
 
 #####################################################################
-#The configuration file ip_config.txt has the following format:
+#The configuration file `ip_config.txt` has the following format:
 #
 #.. code-block:: shell
 #
@@ -142,15 +142,15 @@ g = dgl.distributed.DistGraph('ogbn-products')
 
 #######################################################################
 #As shown in the code, we refer to a distributed graph by its name. This name is basically the one passed
-#to the partition_graph function as shown in the section above.
+#to the `partition_graph` function as shown in the section above.
 #
 #Get training and validation node IDs
 #^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 #
 #For distributed training, each trainer can run its own set of training nodes.
-#The training nodes of the entire graph are stored in a distributed tensor as the train_mask node data,
-#which was constructed before we partitioned the graph. Each trainer can invoke node_split to its set
-#of training nodes. The node_split function splits the full training set evenly and returns
+#The training nodes of the entire graph are stored in a distributed tensor as the `train_mask` node data,
+#which was constructed before we partitioned the graph. Each trainer can invoke `node_split` to its set
+#of training nodes. The `node_split` function splits the full training set evenly and returns
 #the training nodes, majority of which are stored in the local partition, to ensure good data locality.
 #
 train_nid = dgl.distributed.node_split(g.ndata['train_mask'])
@@ -204,7 +204,7 @@ optimizer = optim.Adam(model.parameters(), lr=lr)
 
 ###################################################################
 #For distributed training, we need to convert the model into a distributed model with
-#Pytorch's DistributedDataParalle.
+#Pytorch's `DistributedDataParalle`.
 #
 model = th.nn.parallel.DistributedDataParallel(model)
 
@@ -212,7 +212,7 @@ model = th.nn.parallel.DistributedDataParallel(model)
 #Distributed mini-batch sampler
 #^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 #
-#We can use the same NodeDataLoader to create a distributed mini-batch sampler for
+#We can use the same `NodeDataLoader` to create a distributed mini-batch sampler for
 #node classification.
 #
 sampler = dgl.dataloading.MultiLayerNeighborSampler([25,10])
@@ -290,7 +290,7 @@ for epoch in range(10):
 #  mkdir -p /home/ubuntu/workspace
 #
 #We assume that the all servers are under a subnet with ip range 192.168.0.0 to 192.168.255.255.
-#We need to add the following line to /etc/exports
+#We need to add the following line to `/etc/exports`
 #
 #.. code-block:: shell
 #
@@ -320,14 +320,19 @@ for epoch in range(10):
 #  mkdir -p /home/ubuntu/workspace
 #  sudo mount -t nfs <nfs-server-ip>:/home/ubuntu/workspace /home/ubuntu/workspace
 #
-#or add the following line to /etc/fstab so the folder will be mounted automatically
+#or add the following line to `/etc/fstab` so the folder will be mounted automatically
 #
 #.. code-block:: shell
 #
 #  <nfs-server-ip>:/home/ubuntu/workspace   /home/ubuntu/workspace   nfs   defaults    0 0
 #
-#Then run mount -a.
-#Now go to /home/ubuntu/workspace and save the training script and the partitioned data in the folder.
+#Then run
+#
+#.. code-block:: shell
+#
+#  mount -a
+#
+#Now go to `/home/ubuntu/workspace` and save the training script and the partitioned data in the folder.
 #
 #SSH Access
 #^^^^^^^^^^
@@ -335,7 +340,7 @@ for epoch in range(10):
 #The launch script accesses the machines in the cluster via SSH. Users should follow the instruction
 #in `this document <https://linuxize.com/post/how-to-setup-passwordless-ssh-login/>`_ to set up
 #the passwordless SSH login on every machine in the cluster. After setting up the passwordless SSH,
-#users need to authenticate the connection to each machine and add their key fingerprints to ~/.ssh/known_hosts.
+#users need to authenticate the connection to each machine and add their key fingerprints to `~/.ssh/known_hosts`.
 #This can be done automatically when we ssh to a machine for the first time.
 #
 #Launch the distributed training job
@@ -355,7 +360,7 @@ for epoch in range(10):
 #  --ip_config ip_config.txt \
 #  "python3 train_dist.py"
 #
-#If we split the graph into four partitions as demonstrated at the beginning of the tutorial, the cluster has to have four machines. The command above launches one trainer and one server on each machine in the cluster. ip_config.txt lists the IP addresses of all machines in the cluster as follows:
+#If we split the graph into four partitions as demonstrated at the beginning of the tutorial, the cluster has to have four machines. The command above launches one trainer and one server on each machine in the cluster. `ip_config.txt` lists the IP addresses of all machines in the cluster as follows:
 #
 #.. code-block:: shell
 #
