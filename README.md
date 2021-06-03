@@ -360,12 +360,12 @@ conda install -c dglteam dgl-cuda11.1  # CUDA 11.1
 
 |           | Latest Nightly Build Version  | Stable Version          |
 |-----------|-------------------------------|-------------------------|
-| CPU       | `pip install --pre dgl`       | `pip install dgl`       |
-| CUDA 9.2  | `pip install --pre dgl-cu92`  | `pip install dgl-cu92`  |
-| CUDA 10.1 | `pip install --pre dgl-cu101` | `pip install dgl-cu101` |
-| CUDA 10.2 | `pip install --pre dgl-cu102` | `pip install dgl-cu102` |
-| CUDA 11.0 | `pip install --pre dgl-cu110` | `pip install dgl-cu110` |
-| CUDA 11.1 | `pip install --pre dgl-cu111` | `pip install dgl-cu111` |
+| CPU       | `pip install --pre dgl -f https://data.dgl.ai/wheels-test/repo.html`       | `pip install dgl`       |
+| CUDA 9.2  | `pip install --pre dgl-cu92 -f https://data.dgl.ai/wheels-test/repo.html`  | `pip install dgl-cu92`  |
+| CUDA 10.1 | `pip install --pre dgl-cu101 -f https://data.dgl.ai/wheels-test/repo.html` | `pip install dgl-cu101` |
+| CUDA 10.2 | `pip install --pre dgl-cu102 -f https://data.dgl.ai/wheels-test/repo.html` | `pip install dgl-cu102` |
+| CUDA 11.0 | `pip install --pre dgl-cu110 -f https://data.dgl.ai/wheels-test/repo.html` | `pip install dgl-cu110` |
+| CUDA 11.1 | `pip install --pre dgl-cu111 -f https://data.dgl.ai/wheels-test/repo.html` | `pip install dgl-cu111` |
 
 ### Built from source code
 
