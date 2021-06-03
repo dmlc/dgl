@@ -51,7 +51,7 @@ graph.ndata['test_mask'] = test_mask
 #Then we call the partition_graph function to partition the graph with
 #`METIS <http://glaros.dtc.umn.edu/gkhome/metis/metis/overview>`_ and save the partitioned results
 #in the specified folder. **Note**: partition_graph runs on a single machine with a single thread.
-#You can go to `our user guide <https://docs.dgl.ai/en/latest/guide/distributed-preprocessing.html#distributed-partitioning>`
+#You can go to `our user guide <https://docs.dgl.ai/en/latest/guide/distributed-preprocessing.html#distributed-partitioning>`_
 #to see more information on distributed graph partitioning.
 #
 #The code below shows an example of invoking the partitioning algorithm and generate four partitions.
@@ -119,8 +119,10 @@ dgl.distributed.initialize(ip_config='ip_config.txt')
 #####################################################################
 #The configuration file ip_config.txt has the following format:
 #
-#ip_addr1 [port1]
-#ip_addr2 [port2]
+#.. code-block:: shell
+#
+#  ip_addr1 [port1]
+#  ip_addr2 [port2]
 #
 #Each row is a machine. The first column is the IP address and the second column is the port for
 #connecting to the DGL server on the machine. The port is optional and the default port is 30050.
@@ -164,8 +166,8 @@ valid_nid = dgl.distributed.node_split(g.ndata['val_mask'])
 #^^^^^^^^^^^^^^^^^^
 #
 #For distributed training, we define a GNN model exactly in the same way as
-#`mini-batch training <https://doc.dgl.ai/guide/minibatch.html#>` or
-#`full-graph training <https://doc.dgl.ai/guide/training-node.html#guide-training-node-classification>`.
+#`mini-batch training <https://doc.dgl.ai/guide/minibatch.html#>`_ or
+#`full-graph training <https://doc.dgl.ai/guide/training-node.html#guide-training-node-classification>`_.
 #The code below defines the GraphSage model.
 #
 import torch.nn as nn
@@ -277,21 +279,28 @@ for epoch in range(10):
 #
 #First, install essential libs on the storage server
 #
-#sudo apt-get install nfs-kernel-server
+#.. code-block:: shell
+#
+#  sudo apt-get install nfs-kernel-server
 #
 #Below we assume the user account is ubuntu and we create a directory of workspace in the home directory.
 #
-#mkdir -p /home/ubuntu/workspace
+#.. code-block:: shell
+#
+#  mkdir -p /home/ubuntu/workspace
 #
 #We assume that the all servers are under a subnet with ip range 192.168.0.0 to 192.168.255.255.
-#The exports configuration needs to be modifed to
+#We need to add the following line to /etc/exports
 #
-#sudo vim /etc/exports# add the following line
-#/home/ubuntu/workspace  192.168.0.0/16(rw,sync,no_subtree_check)
+#.. code-block:: shell
+#
+#  /home/ubuntu/workspace  192.168.0.0/16(rw,sync,no_subtree_check)
 #
 #Then restart NFS, the setup on server side is finished.
 #
-#sudo systemctl restart nfs-kernel-server
+#.. code-block:: shell
+#
+#  sudo systemctl restart nfs-kernel-server
 #
 #For configuration details, please refer to NFS ArchWiki (https://wiki.archlinux.org/index.php/NFS).
 #
@@ -300,18 +309,22 @@ for epoch in range(10):
 #
 #To use NFS, clients also require to install essential packages
 #
-#sudo apt-get install nfs-common
+#.. code-block:: shell
+#
+#  sudo apt-get install nfs-common
 #
 #You can either mount the NFS manually
 #
-#mkdir -p /home/ubuntu/workspace
-#sudo mount -t nfs <nfs-server-ip>:/home/ubuntu/workspace /home/ubuntu/workspace
+#.. code-block:: shell
 #
-#or edit the fstab so the folder will be mounted automatically
+#  mkdir -p /home/ubuntu/workspace
+#  sudo mount -t nfs <nfs-server-ip>:/home/ubuntu/workspace /home/ubuntu/workspace
 #
-# vim /etc/fstab
-## append the following line to the file
-#<nfs-server-ip>:/home/ubuntu/workspace   /home/ubuntu/workspace   nfs   defaults    0 0
+#or add the following line to /etc/fstab so the folder will be mounted automatically
+#
+#.. code-block:: shell
+#
+#  <nfs-server-ip>:/home/ubuntu/workspace   /home/ubuntu/workspace   nfs   defaults    0 0
 #
 #Then run mount -a.
 #Now go to /home/ubuntu/workspace and save the training script and the partitioned data in the folder.
@@ -320,7 +333,7 @@ for epoch in range(10):
 #^^^^^^^^^^
 #
 #The launch script accesses the machines in the cluster via SSH. Users should follow the instruction
-#in `this document <https://linuxize.com/post/how-to-setup-passwordless-ssh-login/>` to set up
+#in `this document <https://linuxize.com/post/how-to-setup-passwordless-ssh-login/>`_ to set up
 #the passwordless SSH login on every machine in the cluster. After setting up the passwordless SSH,
 #users need to authenticate the connection to each machine and add their key fingerprints to ~/.ssh/known_hosts.
 #This can be done automatically when we ssh to a machine for the first time.
@@ -331,18 +344,22 @@ for epoch in range(10):
 #After everything is ready, we can now use the launch script provided by DGL to launch the distributed
 #training job in the cluster. We can run the launch script on any machine in the cluster. 
 #
-#python3 ~/workspace/dgl/tools/launch.py \
-#--workspace ~/workspace/ \
-#--num_trainers 1 \
-#--num_samplers 0 \
-#--num_servers 1 \
-#--part_config 4part_data/ogbn-products.json \
-#--ip_config ip_config.txt \
-#"python3 train_dist.py"
+#.. code-block:: shell
+#
+#  python3 ~/workspace/dgl/tools/launch.py \
+#  --workspace ~/workspace/ \
+#  --num_trainers 1 \
+#  --num_samplers 0 \
+#  --num_servers 1 \
+#  --part_config 4part_data/ogbn-products.json \
+#  --ip_config ip_config.txt \
+#  "python3 train_dist.py"
 #
 #If we split the graph into four partitions as demonstrated at the beginning of the tutorial, the cluster has to have four machines. The command above launches one trainer and one server on each machine in the cluster. ip_config.txt lists the IP addresses of all machines in the cluster as follows:
 #
-#ip_addr1
-#ip_addr2
-#ip_addr3
-#ip_addr4
+#.. code-block:: shell
+#
+#  ip_addr1
+#  ip_addr2
+#  ip_addr3
+#  ip_addr4
