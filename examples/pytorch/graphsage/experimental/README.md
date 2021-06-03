@@ -1,4 +1,57 @@
-## Distributed training
+### DistGNN
+
+Set pythonpath:
+export PYTHONPATH=$PYTHONPATH:<path_to_dgl>/dgl/examples/pytorch/graphsage/
+
+1. Single Socket experiments
+cd <path_to_dgl>/dgl/examples/pytorch/graphsage
+python train_full.py --dataset reddit --n-epochs 10
+
+
+
+2. Distributed-memory experiments
+cd <path_to_dgl>/dgl/examples/pytorch/graphsage/experimental
+
+2.1 Graph paritioning
+python ../../../../python/dgl/distgnn/partition/main_Libra.py cora
+python ../../../../python/dgl/distgnn/partition/main_Libra.py reddit
+python ../../../../python/dgl/distgnn/partition/main_Libra.py ogbn-products
+python ../../../../python/dgl/distgnn/partition/main_Libra.py proteins
+python ../../../../python/dgl/distgnn/partition/main_Libra.py ogbn-papers100M
+
+Note:
+a. Output partitions are created in the current directory.
+b. By default it creates 2, 4, & 8 partitions of the input graph. The number of partitions can be changed in main_Libra.py.
+c. As of now the Libra partitioning code is single threaded, so for large dataset, its takes time (in hrs) to produce the partitions.
+
+
+2.2 Distributed-memory runs
+
+Note: By default the partitions are read from current directory.
+
+cd-0:
+sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_sym.py --dataset reddit --n-epochs 200 --nr 1  --lr 0.03
+sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_sym_ogbn-products.py --dataset ogbn-products --n-epochs 300 --nr 1 --lr 0.03
+sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_sym_proteins.py --dataset proteins --n-epochs 200 --nr 1  --lr 0.03
+sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_sym_ogbn-papers.py --dataset ogbn-papers100M --n-epochs 200 --nr 1 --lr 0.08
+
+
+cd-5:
+sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_sym.py --dataset reddit --n-epochs 200 --nr 5  --lr 0.03
+sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_sym_ogbn-products.py --dataset ogbn-products --n-epochs 300 --nr 5 --lr 0.03
+sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_sym_proteins.py --dataset proteins --n-epochs 200 --nr 5  --lr 0.08
+sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_sym_ogbn-papers.py --dataset ogbn-papers100M --n-epochs 200 --nr 5 --lr 0.08
+
+0c:
+sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_sym.py --dataset reddit --n-epochs 200 --nr -1  --lr 0.03
+sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_sym_ogbn-products.py --dataset ogbn-products --n-epochs 300 --nr -1 --lr 0.03
+sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_sym_proteins.py --dataset proteins --n-epochs 200 --nr -1  --lr 0.08
+sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_sym_ogbn-papers.py --dataset ogbn-papers100M --n-epochs 200 --nr -1 --lr 0.08
+
+## DistGNN Ends
+
+
+## Distributed training in-built in DGL
 
 This is an example of training GraphSage in a distributed fashion. Before training, please install some python libs by pip:
 
