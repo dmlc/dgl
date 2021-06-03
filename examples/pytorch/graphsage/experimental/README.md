@@ -7,55 +7,55 @@ export KMP_AFFINITY=compact,granularity=fine,1,0
 
 
 1. Single Socket experiments
-cd <path_to_dgl>/dgl/examples/pytorch/graphsage
-numactl -N 0 -m 0 python train_full.py --n-epochs 200 --dataset reddit
-numactl -N 0 -m 0 python train_full_ogbn-products.py --n-epochs 300 --dataset ogbn-products
-numactl -N 0 -m 0 python train_full_proteins.py --n-epochs 200 --dataset proteins  
+cd <path_to_dgl>/dgl/examples/pytorch/graphsage  
+numactl -N 0 -m 0 python train_full.py --n-epochs 200 --dataset reddit  
+numactl -N 0 -m 0 python train_full_ogbn-products.py --n-epochs 300 --dataset ogbn-products   
+numactl -N 0 -m 0 python train_full_proteins.py --n-epochs 200 --dataset proteins     
 
 
-cd <path_to_dgl>/dgl/examples/pytorch/rgcn-hetero
-numactl -m 0 -N 0 python entity_classify.py -d am --l2norm 5e-4 --n-bases 40 --testing --gpu -1 --n-epochs 20 
+cd <path_to_dgl>/dgl/examples/pytorch/rgcn-hetero   
+numactl -m 0 -N 0 python entity_classify.py -d am --l2norm 5e-4 --n-bases 40 --testing --gpu -1 --n-epochs 20    
 
 
 
-2. Distributed-memory experiments
-cd <path_to_dgl>/dgl/examples/pytorch/graphsage/experimental
+2. Distributed-memory experiments   
+cd <path_to_dgl>/dgl/examples/pytorch/graphsage/experimental   
 
-2.1 Graph paritioning
-python ../../../../python/dgl/distgnn/partition/main_Libra.py cora
-python ../../../../python/dgl/distgnn/partition/main_Libra.py reddit
-python ../../../../python/dgl/distgnn/partition/main_Libra.py ogbn-products
-python ../../../../python/dgl/distgnn/partition/main_Libra.py proteins
-python ../../../../python/dgl/distgnn/partition/main_Libra.py ogbn-papers100M
+2.1 Graph paritioning   
+python ../../../../python/dgl/distgnn/partition/main_Libra.py cora   
+python ../../../../python/dgl/distgnn/partition/main_Libra.py reddit      
+python ../../../../python/dgl/distgnn/partition/main_Libra.py ogbn-products     
+python ../../../../python/dgl/distgnn/partition/main_Libra.py proteins   
+python ../../../../python/dgl/distgnn/partition/main_Libra.py ogbn-papers100M    
 
-Note:
-a. Output partitions are created in the current directory.
-b. By default it creates 2, 4, & 8 partitions of the input graph. The number of partitions can be changed in main_Libra.py.
-c. As of now the Libra partitioning code is single threaded, so for large dataset, its takes time (in hrs) to produce the partitions.
-
-
-2.2 Distributed-memory runs
-
-Note: By default the partitions are read from current directory.
-
-cd-0:
-sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_sym.py --dataset reddit --n-epochs 200 --nr 1  --lr 0.03
-sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_sym_ogbn-products.py --dataset ogbn-products --n-epochs 300 --nr 1 --lr 0.03
-sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_sym_proteins.py --dataset proteins --n-epochs 200 --nr 1  --lr 0.03
-sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_sym_ogbn-papers.py --dataset ogbn-papers100M --n-epochs 200 --nr 1 --lr 0.08
+Note:    
+a. Output partitions are created in the current directory.    
+b. By default it creates 2, 4, & 8 partitions of the input graph. The number of partitions can be changed in main_Libra.py.    
+c. As of now the Libra partitioning code is single threaded, so for large dataset, its takes time (in hrs) to produce the partitions.    
 
 
-cd-5:
-sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_sym.py --dataset reddit --n-epochs 200 --nr 5  --lr 0.03
-sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_sym_ogbn-products.py --dataset ogbn-products --n-epochs 300 --nr 5 --lr 0.03
-sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_sym_proteins.py --dataset proteins --n-epochs 200 --nr 5  --lr 0.08
-sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_sym_ogbn-papers.py --dataset ogbn-papers100M --n-epochs 200 --nr 5 --lr 0.08
+2.2 Distributed-memory runs   
 
-0c:
-sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_sym.py --dataset reddit --n-epochs 200 --nr -1  --lr 0.03
-sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_sym_ogbn-products.py --dataset ogbn-products --n-epochs 300 --nr -1 --lr 0.03
-sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_sym_proteins.py --dataset proteins --n-epochs 200 --nr -1  --lr 0.08
-sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_sym_ogbn-papers.py --dataset ogbn-papers100M --n-epochs 200 --nr -1 --lr 0.08
+Note: By default the partitions are read from current directory.   
+
+cd-0:    
+sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_sym.py --dataset reddit --n-epochs 200 --nr 1  --lr 0.03   
+sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_sym_ogbn-products.py --dataset ogbn-products --n-epochs 300 --nr 1 --lr 0.03   
+sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_sym_proteins.py --dataset proteins --n-epochs 200 --nr 1  --lr 0.03    
+sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_sym_ogbn-papers.py --dataset ogbn-papers100M --n-epochs 200 --nr 1 --lr 0.08   
+
+
+cd-5:   
+sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_sym.py --dataset reddit --n-epochs 200 --nr 5  --lr 0.03    
+sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_sym_ogbn-products.py --dataset ogbn-products --n-epochs 300 --nr 5 --lr 0.03   
+sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_sym_proteins.py --dataset proteins --n-epochs 200 --nr 5  --lr 0.08    
+sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_sym_ogbn-papers.py --dataset ogbn-papers100M --n-epochs 200 --nr 5 --lr 0.08   
+
+0c:   
+sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_sym.py --dataset reddit --n-epochs 200 --nr -1  --lr 0.03   
+sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_sym_ogbn-products.py --dataset ogbn-products --n-epochs 300 --nr -1 --lr 0.03   
+sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_sym_proteins.py --dataset proteins --n-epochs 200 --nr -1  --lr 0.08   
+sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_sym_ogbn-papers.py --dataset ogbn-papers100M --n-epochs 200 --nr -1 --lr 0.08    
    
 ## DistGNN Ends
 
