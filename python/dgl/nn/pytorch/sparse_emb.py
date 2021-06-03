@@ -367,8 +367,9 @@ class NodeEmbedding: # NodeEmbedding
                         self._tensor.dtype)
                 # need to map indices and slice into existing tensor
                 idxs = self._partition.map_to_global(
-                    F.range(0, self._tensor.shape[0],
-                            device=self._tensor.device)).to(emb.device)
+                    F.arange(0, self._tensor.shape[0],
+                             ctx=F.context(self._tensor)),
+                    self._rank).to(emb.device)
                 emb[idxs] = self._tensor.to(emb.device)
 
                 # wait for all processes to finish

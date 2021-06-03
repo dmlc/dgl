@@ -432,12 +432,11 @@ class NDArrayPartition(object):
             self._partition,
             F.zerocopy_to_dgl_ndarray(idxs)))
 
-    def map_to_global(self, idxs):
+    def map_to_global(self, idxs, part_id):
         """ Convert the set of local indices ot global indices
         """
         return F.zerocopy_from_dgl_ndarray(_CAPI_DGLNDArrayPartitionMapToGlobal(
-            self._partition,
-            F.zerocopy_to_dgl_ndarray(idxs)))
+            self._partition, F.zerocopy_to_dgl_ndarray(idxs), part_id))
 
 
 _init_api("dgl.partition")
