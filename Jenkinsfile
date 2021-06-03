@@ -42,9 +42,9 @@ def build_dgl_win64(dev) {
   pack_lib("dgl-${dev}-win64", dgl_win64_libs)
 }
 
-def cpp_unit_test_linux() {
+def cpp_unit_test_linux(dev) {
   init_git()
-  unpack_lib('dgl-cpu-linux', dgl_linux_libs)
+  unpack_lib("dgl-${dev}-linux", dgl_linux_libs)
   sh 'bash tests/scripts/task_cpp_unit_test.sh'
 }
 
@@ -119,8 +119,10 @@ pipeline {
         script {
               def comment = env.GITHUB_COMMENT
               def author = env.GITHUB_COMMENT_AUTHOR
+              echo("${env.GIT_URL}")
+              echo("${env}")
               if (!is_authorized(author)) {
-            error('Not authorized to launch regression tests')
+                error('Not authorized to launch regression tests')
               }
               dir('benchmark_scripts_repo') {
             checkout([$class: 'GitSCM', branches: [[name: '*/master']],
@@ -135,9 +137,10 @@ pipeline {
               } else {
                 pullRequest.comment("Start the Regression test. View at ${RUN_DISPLAY_URL}")
               }
+              def prNumber = env.BRANCH_NAME.replace('PR-', '')
               dir('benchmarks/scripts') {
                 sh('python3 -m pip install boto3')
-                sh("PYTHONUNBUFFERED=1 GIT_URL=${env.GIT_URL} GIT_BRANCH=${env.CHANGE_BRANCH} python3 run_reg_test.py --data-folder ${env.GIT_COMMIT}_${instance_type} --run-cmd '${comment}'")
+                sh("PYTHONUNBUFFERED=1 GIT_PR_ID=${prNumber} GIT_URL=${env.GIT_URL} GIT_BRANCH=${env.CHANGE_BRANCH} python3 run_reg_test.py --data-folder ${env.GIT_COMMIT}_${instance_type} --run-cmd '${comment}'")
               }
               pullRequest.comment("Finished the Regression test. Result table is at https://dgl-asv-data.s3-us-west-2.amazonaws.com/${env.GIT_COMMIT}_${instance_type}/results/result.csv. Jenkins job link is ${RUN_DISPLAY_URL}. ")
               currentBuild.result = 'SUCCESS'
@@ -251,7 +254,25 @@ pipeline {
                 }
               }
               steps {
-                cpp_unit_test_linux()
+                cpp_unit_test_linux('cpu')
+              }
+              post {
+                always {
+                  cleanWs disableDeferredWipeout: true, deleteDirs: true
+                }
+              }
+            }
+            stage('C++ GPU') {
+              agent {
+                docker {
+                  label 'linux-gpu-node'
+                  image 'dgllib/dgl-ci-gpu:conda'
+                  args '--runtime nvidia'
+                  alwaysPull true
+                }
+              }
+              steps {
+                cpp_unit_test_linux('gpu')
               }
               post {
                 always {
