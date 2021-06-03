@@ -68,7 +68,7 @@ graph.ndata['test_mask'] = test_mask
 dgl.distributed.partition_graph(graph, graph_name='ogbn-products', num_parts=4,
                                 out_path='4part_data',
                                 balance_ntypes=graph.ndata['train_mask'],
-                                balance_edges=*True*)
+                                balance_edges=True)
 
 ###################################################
 #When partitioning a graph, DGL shuffles node IDs and edge IDs so that nodes/edges assigned to
@@ -86,8 +86,8 @@ nmap, emap = dgl.distributed.partition_graph(graph, graph_name='ogbn-products',
                                              num_parts=4,
                                              out_path='4part_data',
                                              balance_ntypes=graph.ndata['train_mask'],,
-                                             balance_edges=*True*,
-                                             return_mapping=*True*)
+                                             balance_edges=True,
+                                             return_mapping=True)
 orig_node_emb = th.zeros(node_emb.shape, dtype=node_emb.dtype)
 orig_node_emb[nmap] = node_emb
 
