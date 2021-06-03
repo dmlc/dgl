@@ -447,7 +447,7 @@ class drpa_core(torch.autograd.Function):
             input_sr.append(torch.tensor([buckets[i]], dtype=torch.int64))
 
 
-        if False:
+        if True:
             output_sr = output_sr_ar[roundn].copy()   ## computed during drpa_init             
         else:
             output_sr = [torch.zeros(1, dtype=torch.int64) for i in range(0, num_parts)]
@@ -600,7 +600,7 @@ class drpa_core(torch.autograd.Function):
             lim = fstorage_comm_iter.pop()
             out_size_nodes_ar = []                
             for i in range(lim):
-                #print("i: ", i, flush=True)
+                
                 if rank == 0 and display:                
                     tic = time.time()
 
@@ -608,7 +608,7 @@ class drpa_core(torch.autograd.Function):
                 req.wait()
                 req = gfqueue2.pop()
                 req.wait()
-                
+            
                 if rank == 0 and display:
                     print("Time for async comms I: {:4f}".format(time.time() - tic), flush=True)
                     

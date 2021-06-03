@@ -4,6 +4,7 @@ import networkx as nx
 import numpy as np
 import csv
 from statistics import mean
+from dgl.data.utils import load_graphs, save_graphs, load_tensors, save_tensors
 import random
 
 import sys
@@ -13,13 +14,87 @@ from dgl.data import register_data_args, load_data
 from load_graph import load_reddit, load_ogb
 from dgl.sparse import libra_vertex_cut
 from dgl.data.utils import load_tensors, load_graphs
+from scipy.io import mmread
 import libra2dgl
+import requests
+
+def download_proteins():
+    print("Downloading dataset...")
+    url = "https://portal.nersc.gov/project/m1982/GNN/subgraph3_iso_vs_iso_30_70length_ALL.m100.propermm.mtx"
+    r = requests.get(url)
+    with open("proteins.mtx", "wb") as handle:
+        handle.write(r.content)
+    
+
+def proteins_mtx2dgl():
+    print("Converting mtx2dgl..")
+    #a = mmread('subgraph3_iso_vs_iso_30_70length_ALL.m100.propermm.mtx')
+    a = mmread('proteins.mtx')
+    coo = a.tocoo()
+    u = th.tensor(coo.row, dtype=th.int64)
+    v = th.tensor(coo.col, dtype=th.int64)
+    #print("Edges in the graph: ", u.shape[0])
+    g = dgl.DGLGraph()
+    g.add_edges(u,v)
+    #g.add_edges(v,u)
+
+    n = g.number_of_nodes()
+    feat_size = 128
+    feats = th.empty([n, feat_size], dtype=th.float32)
+
+    train_size = 1000000
+    test_size = 500000
+    val_size = 5000
+    nlabels = 256
+
+    train_mask = th.zeros(n, dtype=th.bool)
+    test_mask  = th.zeros(n, dtype=th.bool)
+    val_mask   = th.zeros(n, dtype=th.bool)
+    label      = th.zeros(n, dtype=th.int64)
+
+    for i in range(train_size):
+        train_mask[i] = True
+
+    for i in range(test_size):
+        test_mask[train_size + i] = True
+
+    for i in range(val_size):
+        val_mask[train_size + test_size + i] = True
+
+    for i in range(n):
+        label[i] = random.choice(range(nlabels))
+
+    g.ndata['feat'] = feats
+    g.ndata['train_mask'] = train_mask
+    g.ndata['test_mask'] = test_mask
+    g.ndata['val_mask'] = val_mask
+    g.ndata['label'] = label
+
+    print(g)
+    return g
 
 
-def load_ucb(dataset):
-    part_dir = os.path.join("/cold_storage/omics/gnn/graph_partitioning/cagnet_datasets/" + dataset)
+def save(g, dataset):
+    print("Saving dataset..")
+    part_dir = os.path.join("./" + dataset)
+    node_feat_file = os.path.join(part_dir, "node_feat.dgl")
+    part_graph_file = os.path.join(part_dir, "graph.dgl")
+    os.makedirs(part_dir, mode=0o775, exist_ok=True)
+    save_tensors(node_feat_file, g.ndata)
+    save_graphs(part_graph_file, [g])
+    #print("Graph saved successfully !!")
+    
+
+def load_proteins(dataset):    
+    part_dir = dataset
     #node_feats_file = os.path.join(part_dir + "/node_feat.dgl")
     graph_file = os.path.join(part_dir + "/graph.dgl")
+
+    if not os.path.exists("proteins.mtx"):
+        download_proteins()
+    if not os.path.exists(graph_file):        
+        g = proteins_mtx2dgl()
+        save(g, dataset)
     
     #node_feats = load_tensors(node_feats_file)
     graph = load_graphs(graph_file)[0][0]
@@ -48,7 +123,7 @@ def vertexCut_v2(num_community, dataset, prefix):    #gexf file
         print("Loading ogbn-papers100M")
         G,_ = load_ogb('ogbn-papers100M')
     elif args.dataset == 'proteins':
-        G = load_ucb('proteins')
+        G = load_proteins('proteins')
     elif args.dataset == 'ogbn-arxiv':
         print("Loading ogbn-arxiv")
         G, _ = load_ogb('ogbn-arxiv')                                
@@ -59,7 +134,7 @@ def vertexCut_v2(num_community, dataset, prefix):    #gexf file
             print("Dataset {} not found !!!".format(dataset))
             sys.exit(1)
 
-    print("Done loading...", flush=True)
+    print("Done loading", flush=True)
 
     N_n = G.number_of_nodes()  # number of nodes
     N_c = num_community

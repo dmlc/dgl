@@ -245,15 +245,18 @@ def main_ext(resultdir, dataset, nc):
 
 
 def load_proteins(dataset):
-    part_dir = os.path.join("/cold_storage/omics/gnn/graph_partitioning/cagnet_datasets/" + dataset)
-    #node_feats_file = os.path.join(part_dir + "/node_feat.dgl")
+    part_dir = dataset
     graph_file = os.path.join(part_dir + "/graph.dgl")
-    
-    #node_feats = load_tensors(node_feats_file)
     graph = load_graphs(graph_file)[0][0]
-    #graph.ndata = node_feats
-    
     return graph
+    
+    #part_dir = os.path.join("/cold_storage/omics/gnn/graph_partitioning/cagnet_datasets/" + dataset)
+    ##node_feats_file = os.path.join(part_dir + "/node_feat.dgl")
+    #graph_file = os.path.join(part_dir + "/graph.dgl")    
+    ##node_feats = load_tensors(node_feats_file)
+    #graph = load_graphs(graph_file)[0][0]
+    ##graph.ndata = node_feats    
+    #return graph
 
 
 def main_ext2(resultdir, dataset, nc):
