@@ -154,7 +154,7 @@ def evaluate(model, embed_layer, eval_loader, node_feats, inv_target):
 def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
     dev_id = devices[proc_id] if devices[proc_id] != 'cpu' else -1
     g, node_feats, num_of_ntype, num_classes, num_rels, target_idx, \
-        train_idx, val_idx, test_idx, labels = dataset
+        inv_target, train_idx, val_idx, test_idx, labels = dataset
     if split is not None:
         train_seed, val_seed, test_seed = split
         train_idx = train_idx[train_seed]
@@ -163,6 +163,23 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
 
     fanouts = [int(fanout) for fanout in args.fanout.split(',')]
     node_tids = g.ndata[dgl.NTYPE]
+
+    world_size = n_gpus
+    if n_gpus > 1:
+        dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
+            master_ip='127.0.0.1', master_port='12345')
+        backend = 'nccl'
+
+        # using sparse embedding or usnig mix_cpu_gpu model (embedding model can not be stored in GPU)
+        if dev_id < 0 or args.dgl_sparse is False:
+            backend = 'gloo'
+        print("backend using {}".format(backend))
+        th.distributed.init_process_group(backend=backend,
+                                          init_method=dist_init_method,
+                                          world_size=world_size,
+                                          rank=proc_id)
+
+
 
     sampler = dgl.dataloading.MultiLayerNeighborSampler(fanouts)
     loader = dgl.dataloading.NodeDataLoader(
@@ -197,26 +214,6 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
         shuffle=False,
         drop_last=False,
         num_workers=args.num_workers)
-
-    # make a mapping from target type back to global id
-    inv_target = th.empty([g.number_of_nodes()], dtype=th.long, device=dev_id)
-    inv_target[target_idx] = th.arange(0, target_idx.shape[0], dtype=th.long,
-        device=dev_id)
-
-    world_size = n_gpus
-    if n_gpus > 1:
-        dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
-            master_ip='127.0.0.1', master_port='12345')
-        backend = 'nccl'
-
-        # using sparse embedding or usig mix_cpu_gpu model (embedding model can not be stored in GPU)
-        if dev_id < 0 or args.dgl_sparse is False:
-            backend = 'gloo'
-        print("backend using {}".format(backend))
-        th.distributed.init_process_group(backend=backend,
-                                          init_method=dist_init_method,
-                                          world_size=world_size,
-                                          rank=proc_id)
 
     # node features
     # None for one-hot feature, if not none, it should be the feature tensor.
@@ -516,6 +513,16 @@ def main(args, devices):
     train_idx.share_memory_()
     val_idx.share_memory_()
     test_idx.share_memory_()
+
+    # make a mapping from target type back to global id
+    inv_target = th.empty(node_ids.shape,
+        dtype=node_ids.dtype)
+    inv_target.share_memory_()
+    inv_target[target_idx] = th.arange(0, target_idx.shape[0],
+                                       dtype=inv_target.dtype)
+
+
+
     # Create csr/coo/csc formats before launching training processes with multi-gpu.
     # This avoids creating certain formats in each sub-process, which saves momory and CPU.
     g.create_formats_()
@@ -526,12 +533,12 @@ def main(args, devices):
     if devices[0] == -1:
         run(0, 0, n_cpus, args, ['cpu'],
             (g, node_feats, num_of_ntype, num_classes, num_rels, target_idx,
-             train_idx, val_idx, test_idx, labels), None, None)
+             inv_target, train_idx, val_idx, test_idx, labels), None, None)
     # gpu
     elif n_gpus == 1:
         run(0, n_gpus, n_cpus, args, devices,
             (g, node_feats, num_of_ntype, num_classes, num_rels, target_idx,
-            train_idx, val_idx, test_idx, labels), None, None)
+             inv_target, train_idx, val_idx, test_idx, labels), None, None)
     # multi gpu
     else:
         queue = mp.Queue(n_gpus)
@@ -561,8 +568,10 @@ def main(args, devices):
                                          if (proc_id + 1) * tstseeds_per_proc < num_test_seeds \
                                          else num_test_seeds]
             p = mp.Process(target=run, args=(proc_id, n_gpus, n_cpus // n_gpus, args, devices,
-                                             (g, node_feats, num_of_ntype, num_classes, num_rels, target_idx,
-                                             train_idx, val_idx, test_idx, labels),
+                                             (g, node_feats, num_of_ntype,
+                                              num_classes, num_rels, target_idx,
+                                              inv_target, train_idx, val_idx,
+                                              test_idx, labels),
                                              (proc_train_seeds, proc_valid_seeds, proc_test_seeds),
                                              queue))
             p.start()
