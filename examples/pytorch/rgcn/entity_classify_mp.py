@@ -123,54 +123,7 @@ def gen_norm(g):
     norm = norm.unsqueeze(1)
     g.edata['norm'] = norm
 
-class NeighborSampler:
-    """Neighbor sampler
-    Parameters
-    ----------
-    g : DGLHeterograph
-        Full graph
-    target_idx : tensor
-        The target training node IDs in g
-    fanouts : list of int
-        Fanout of each hop starting from the seed nodes. If a fanout is None,
-        sample full neighbors.
-    """
-    def __init__(self, g, target_idx, fanouts):
-        self.g = g
-        self.target_idx = target_idx
-        self.fanouts = fanouts
-
-    """Do neighbor sample
-    Parameters
-    ----------
-    seeds :
-        Seed nodes
-    Returns
-    -------
-    tensor
-        Seed nodes, also known as target nodes
-    blocks
-        Sampled subgraphs
-    """
-    def sample_blocks(self, seeds):
-        blocks = []
-        etypes = []
-        norms = []
-        ntypes = []
-        seeds = th.tensor(seeds).long()
-        cur = self.target_idx[seeds]
-        for fanout in self.fanouts:
-            if fanout is None or fanout == -1:
-                frontier = dgl.in_subgraph(self.g, cur)
-            else:
-                frontier = dgl.sampling.sample_neighbors(self.g, cur, fanout)
-            block = dgl.to_block(frontier, cur)
-            gen_norm(block)
-            cur = block.srcdata[dgl.NID]
-            blocks.insert(0, block)
-        return seeds, blocks
-
-def evaluate(model, embed_layer, eval_loader, node_feats):
+def evaluate(model, embed_layer, eval_loader, node_feats, inv_target):
     model.eval()
     embed_layer.eval()
     eval_logits = []
@@ -179,7 +132,11 @@ def evaluate(model, embed_layer, eval_loader, node_feats):
     with th.no_grad():
         th.cuda.empty_cache()
         for sample_data in tqdm.tqdm(eval_loader):
-            seeds, blocks = sample_data
+            inputs, seeds, blocks = sample_data
+            seeds = inv_target[seeds]
+
+            for block in blocks:
+                gen_norm(block)
 
             feats = embed_layer(blocks[0].srcdata[dgl.NID],
                                 blocks[0].srcdata['ntype'],
@@ -206,28 +163,45 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
 
     fanouts = [int(fanout) for fanout in args.fanout.split(',')]
     node_tids = g.ndata[dgl.NTYPE]
-    sampler = NeighborSampler(g, target_idx, fanouts)
-    loader = DataLoader(dataset=train_idx.numpy(),
-                        batch_size=args.batch_size,
-                        collate_fn=sampler.sample_blocks,
-                        shuffle=True,
-                        num_workers=args.num_workers)
+
+    sampler = dgl.dataloading.MultiLayerNeighborSampler(fanouts)
+    loader = dgl.dataloading.NodeDataLoader(
+        g,
+        target_idx[train_idx],
+        sampler,
+        use_ddp=n_gpus > 1,
+        batch_size=args.batch_size,
+        shuffle=True,
+        drop_last=False,
+        num_workers=args.num_workers)
 
     # validation sampler
-    val_sampler = NeighborSampler(g, target_idx, fanouts)
-    val_loader = DataLoader(dataset=val_idx.numpy(),
-                            batch_size=args.batch_size,
-                            collate_fn=val_sampler.sample_blocks,
-                            shuffle=False,
-                            num_workers=args.num_workers)
+    val_loader = dgl.dataloading.NodeDataLoader(
+        g,
+        target_idx[val_idx],
+        sampler,
+        use_ddp=n_gpus > 1,
+        batch_size=args.batch_size,
+        shuffle=False,
+        drop_last=False,
+        num_workers=args.num_workers)
 
     # test sampler
-    test_sampler = NeighborSampler(g, target_idx, [None] * args.n_layers)
-    test_loader = DataLoader(dataset=test_idx.numpy(),
-                             batch_size=args.eval_batch_size,
-                             collate_fn=test_sampler.sample_blocks,
-                             shuffle=False,
-                             num_workers=args.num_workers)
+    test_sampler = dgl.dataloading.MultiLayerNeighborSampler([None] * args.n_layers)
+    test_loader = dgl.dataloading.NodeDataLoader(
+        g,
+        target_idx[test_idx],
+        test_sampler,
+        use_ddp=n_gpus > 1,
+        batch_size=args.eval_batch_size,
+        shuffle=False,
+        drop_last=False,
+        num_workers=args.num_workers)
+
+    # make a mapping from target type back to global id
+    inv_target = th.empty([g.number_of_nodes()], dtype=th.long, device=dev_id)
+    inv_target[target_idx] = th.arange(0, target_idx.shape[0], dtype=th.long,
+        device=dev_id)
 
     world_size = n_gpus
     if n_gpus > 1:
@@ -333,7 +307,12 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
         embed_layer.train()
 
         for i, sample_data in enumerate(loader):
-            seeds, blocks = sample_data
+            input_nodes, seeds, blocks = sample_data
+            seeds = inv_target[seeds]
+
+            for block in blocks:
+                gen_norm(block)
+
             t0 = time.time()
             feats = embed_layer(blocks[0].srcdata[dgl.NID],
                                 blocks[0].srcdata['ntype'],
@@ -381,7 +360,8 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
 
         vstart = time.time()
         if (queue is not None) or (proc_id == 0):
-            val_logits, val_seeds = evaluate(model, embed_layer, val_loader, node_feats)
+            val_logits, val_seeds = evaluate(model, embed_layer, val_loader,
+                                             node_feats, inv_target)
             if queue is not None:
                 queue.put((val_logits, val_seeds))
 
@@ -409,7 +389,9 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
         if epoch > 0 and do_test:
             tstart = time.time()
             if (queue is not None) or (proc_id == 0):
-                test_logits, test_seeds = evaluate(model, embed_layer, test_loader, node_feats)
+                test_logits, test_seeds = evaluate(model, embed_layer,
+                                                   test_loader, node_feats,
+                                                   inv_target)
                 if queue is not None:
                     queue.put((test_logits, test_seeds))
 
