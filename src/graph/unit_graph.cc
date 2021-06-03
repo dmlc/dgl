@@ -235,7 +235,7 @@ class UnitGraph::COO : public BaseHeteroGraph {
 
   EdgeArray FindEdges(dgl_type_t etype, IdArray eids) const override {
     CHECK(aten::IsValidIdArray(eids)) << "Invalid edge id array";
-    BUG_ON(aten::IsNullArray(adj_.data)) <<
+    BUG_IF_FAIL(aten::IsNullArray(adj_.data)) <<
       "FindEdges requires the internal COO matrix not having EIDs.";
     return EdgeArray{aten::IndexSelect(adj_.row, eids),
                      aten::IndexSelect(adj_.col, eids),
@@ -453,9 +453,9 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     : BaseHeteroGraph(metagraph) {
     CHECK(aten::IsValidIdArray(indptr));
     CHECK(aten::IsValidIdArray(indices));
-    CHECK(aten::IsValidIdArray(edge_ids));
-    CHECK_EQ(indices->shape[0], edge_ids->shape[0])
-      << "indices and edge id arrays should have the same length";
+    if (aten::IsValidIdArray(edge_ids))
+      CHECK((indices->shape[0] == edge_ids->shape[0]) || aten::IsNullArray(edge_ids))
+        << "edge id arrays should have the same length as indices if not empty";
 
     adj_ = aten::CSRMatrix{num_src, num_dst, indptr, indices, edge_ids};
   }

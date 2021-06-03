@@ -2447,13 +2447,6 @@ class DGLHeteroGraph(object):
         else:
             return self._graph.number_of_edges(self.get_etype_id(etype))
 
-    def __len__(self):
-        """Deprecated: please directly call :func:`number_of_nodes`
-        """
-        dgl_warning('DGLGraph.__len__ is deprecated.'
-                    'Please directly call DGLGraph.number_of_nodes.')
-        return self.number_of_nodes()
-
     @property
     def is_multigraph(self):
         """Return whether the graph is a multigraph with parallel edges.
@@ -4400,6 +4393,29 @@ class DGLHeteroGraph(object):
         tensor([[0.],
                 [0.],
                 [1.]])
+
+        **``send_and_recv`` using user-defined functions**
+
+        >>> import torch as th
+        >>> g = dgl.graph(([0, 1], [1, 2]))
+        >>> g.ndata['x'] = th.tensor([[1.], [2.], [3.]])
+
+        >>> # Define the function for sending node features as messages.
+        >>> def send_source(edges):
+        ...     return {'m': edges.src['x']}
+        >>> # Sum the messages received and use this to replace the original node feature.
+        >>> def simple_reduce(nodes):
+        ...     return {'x': nodes.mailbox['m'].sum(1)}
+
+        Send and receive messages.
+
+        >>> g.send_and_recv(g.edges())
+        >>> g.ndata['x']
+        tensor([[1.],
+                [1.],
+                [2.]])
+
+        Note that the feature of node 0 remains the same as it has no incoming edges.
         """
         if inplace:
             raise DGLError('The `inplace` option is removed in v0.5.')
@@ -4719,8 +4735,11 @@ class DGLHeteroGraph(object):
                 An optional apply function to further update the node features
                 after the message reduction. It must be a :ref:`apiudf`.
 
-        cross_reducer : str
-            Cross type reducer. One of ``"sum"``, ``"min"``, ``"max"``, ``"mean"``, ``"stack"``.
+        cross_reducer : str or callable function
+            Cross type reducer. One of ``"sum"``, ``"min"``, ``"max"``, ``"mean"``, ``"stack"``
+            or a callable function. If a callable function is provided, the input argument must be
+            a single list of tensors containing aggregation results from each edge type, and the
+            output of function must be a single tensor.
         apply_node_func : callable, optional
             An optional apply function after the messages are reduced both
             type-wisely and across different types.
@@ -5577,7 +5596,6 @@ class DGLHeteroGraph(object):
         gidx = self._graph.shared_memory(name, self.ntypes, self.etypes, formats)
         return DGLHeteroGraph(gidx, self.ntypes, self.etypes)
 
-
     def long(self):
         """Cast the graph to one with idtype int64
 
@@ -5891,8 +5909,11 @@ def reduce_dict_data(frames, reducer, order=None):
     ----------
     frames : list[dict[str, Tensor]]
         Input tensor dictionaries
-    reducer : str
-        One of "sum", "max", "min", "mean", "stack"
+    reducer : str or callable function
+        One of "sum", "max", "min", "mean", "stack" or a callable function.
+        If a callable function is provided, the input arguments must be a single list
+        of tensors containing aggregation results from each edge type, and the
+        output of function must be a single tensor.
     order : list[Int], optional
         Merge order hint. Useful for "stack" reducer.
         If provided, each integer indicates the relative order
@@ -5909,7 +5930,9 @@ def reduce_dict_data(frames, reducer, order=None):
         # Directly return the only one input. Stack reducer requires
         # modifying tensor shape.
         return frames[0]
-    if reducer == 'stack':
+    if callable(reducer):
+        merger = reducer
+    elif reducer == 'stack':
         # Stack order does not matter. However, it must be consistent!
         if order:
             assert len(order) == len(frames)

@@ -96,7 +96,7 @@ def batched_graph0():
     g3 = dgl.add_self_loop(dgl.graph(([0], [1])))
     return dgl.batch([g1, g2, g3])
 
-@register_case(['block', 'bipartite', 'block-biparitite'])
+@register_case(['block', 'bipartite', 'block-bipartite'])
 def block_graph0():
     g = dgl.graph(([2, 3, 4], [5, 6, 7]), num_nodes=100)
     g = g.to(F.cpu())

@@ -4,7 +4,7 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import torch.multiprocessing as mp
+import dgl.multiprocessing as mp
 import dgl.function as fn
 import dgl.nn.pytorch as dglnn
 import time
@@ -12,8 +12,6 @@ import argparse
 import tqdm
 import traceback
 import math
-from _thread import start_new_thread
-from functools import wraps
 from dgl.data import RedditDataset
 from torch.utils.data import DataLoader
 from torch.nn.parallel import DistributedDataParallel
@@ -148,34 +146,6 @@ class NeighborSampler(object):
             hist_blocks.insert(0, hist_block)
         return blocks, hist_blocks
 
-# According to https://github.com/pytorch/pytorch/issues/17199, this decorator
-# is necessary to make fork() and openmp work together.
-#
-# TODO: confirm if this is necessary for MXNet and Tensorflow.  If so, we need
-# to standardize worker process creation since our operators are implemented with
-# OpenMP.
-def thread_wrapped_func(func):
-    @wraps(func)
-    def decorated_function(*args, **kwargs):
-        queue = mp.Queue()
-        def _queue_result():
-            exception, trace, res = None, None, None
-            try:
-                res = func(*args, **kwargs)
-            except Exception as e:
-                exception = e
-                trace = traceback.format_exc()
-            queue.put((res, exception, trace))
-
-        start_new_thread(_queue_result, ())
-        result, exception, trace = queue.get()
-        if exception is None:
-            return result
-        else:
-            assert isinstance(exception, Exception)
-            raise exception.__class__(trace)
-    return decorated_function
-
 def compute_acc(pred, labels):
     """
     Compute the accuracy of prediction given the labels.
@@ -245,7 +215,6 @@ def update_history(g, blocks):
             h_new = block.dstdata['h_new'].cpu()
             g.ndata[hist_col][ids] = h_new
 
-@thread_wrapped_func
 def run(proc_id, n_gpus, args, devices, data):
     dropout = 0.2
 
@@ -265,20 +234,26 @@ def run(proc_id, n_gpus, args, devices, data):
     train_nid = train_mask.nonzero().squeeze()
     val_nid = val_mask.nonzero().squeeze()
 
-    # Split train_nid
-    train_nid = th.split(train_nid, math.ceil(len(train_nid) / n_gpus))[proc_id]
-
     # Create sampler
     sampler = NeighborSampler(g, [int(_) for _ in args.fan_out.split(',')])
 
     # Create PyTorch DataLoader for constructing blocks
-    dataloader = DataLoader(
-        dataset=train_nid.numpy(),
-        batch_size=args.batch_size,
-        collate_fn=sampler.sample_blocks,
-        shuffle=True,
-        drop_last=False,
-        num_workers=args.num_workers_per_gpu)
+    if n_gpus > 1:
+        dist_sampler = torch.utils.data.distributed.DistributedSampler(train_nid.numpy(), shuffle=True, drop_last=False)
+        dataloader = DataLoader(
+            dataset=train_nid.numpy(),
+            batch_size=args.batch_size,
+            collate_fn=sampler.sample_blocks,
+            sampler=dist_sampler,
+            num_workers=args.num_workers_per_gpu)
+    else:
+        dataloader = DataLoader(
+            dataset=train_nid.numpy(),
+            batch_size=args.batch_size,
+            collate_fn=sampler.sample_blocks,
+            shuffle=True,
+            drop_last=False,
+            num_workers=args.num_workers_per_gpu)
 
     # Define model
     model = SAGE(in_feats, args.num_hidden, n_classes, args.num_layers, F.relu)
@@ -305,6 +280,8 @@ def run(proc_id, n_gpus, args, devices, data):
     avg = 0
     iter_tput = []
     for epoch in range(args.num_epochs):
+        if n_gpus > 1:
+            dist_sampler.set_epoch(epoch)
         tic = time.time()
         model.train()
         for step, (blocks, hist_blocks) in enumerate(dataloader):
