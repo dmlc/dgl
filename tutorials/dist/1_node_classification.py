@@ -85,7 +85,7 @@ dgl.distributed.partition_graph(graph, graph_name='ogbn-products', num_parts=4,
 nmap, emap = dgl.distributed.partition_graph(graph, graph_name='ogbn-products',
                                              num_parts=4,
                                              out_path='4part_data',
-                                             balance_ntypes=graph.ndata['train_mask'],,
+                                             balance_ntypes=graph.ndata['train_mask'],
                                              balance_edges=True,
                                              return_mapping=True)
 orig_node_emb = th.zeros(node_emb.shape, dtype=node_emb.dtype)
