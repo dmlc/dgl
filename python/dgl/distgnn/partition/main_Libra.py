@@ -20,6 +20,7 @@ import requests
 
 def download_proteins():
     print("Downloading dataset...")
+    print("This might a take while..")
     url = "https://portal.nersc.gov/project/m1982/GNN/subgraph3_iso_vs_iso_30_70length_ALL.m100.propermm.mtx"
     r = requests.get(url)
     with open("proteins.mtx", "wb") as handle:
@@ -28,6 +29,7 @@ def download_proteins():
 
 def proteins_mtx2dgl():
     print("Converting mtx2dgl..")
+    print("This might a take while..")
     #a = mmread('subgraph3_iso_vs_iso_30_70length_ALL.m100.propermm.mtx')
     a = mmread('proteins.mtx')
     coo = a.tocoo()

@@ -1,11 +1,20 @@
 ### DistGNN
 
-Set pythonpath:
+Set environmental variables:
 export PYTHONPATH=$PYTHONPATH:<path_to_dgl>/dgl/examples/pytorch/graphsage/
+export OMP_NUM_THREADS=<#cores_single_socket>
+export KMP_AFFINITY=compact,granularity=fine,1,0
+
 
 1. Single Socket experiments
 cd <path_to_dgl>/dgl/examples/pytorch/graphsage
-python train_full.py --dataset reddit --n-epochs 10
+numactl -N 0 -m 0 python train_full.py --n-epochs 200 --dataset reddit
+numactl -N 0 -m 0 python train_full_ogbn-products.py --n-epochs 300 --dataset ogbn-products
+numactl -N 0 -m 0 python train_full_proteins.py --n-epochs 200 --dataset proteins  
+
+
+cd <path_to_dgl>/dgl/examples/pytorch/rgcn-hetero
+numactl -m 0 -N 0 python entity_classify.py -d am --l2norm 5e-4 --n-bases 40 --testing --gpu -1 --n-epochs 20 
 
 
 
@@ -47,7 +56,7 @@ sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_sym.py --dataset red
 sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_sym_ogbn-products.py --dataset ogbn-products --n-epochs 300 --nr -1 --lr 0.03
 sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_sym_proteins.py --dataset proteins --n-epochs 200 --nr -1  --lr 0.08
 sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_sym_ogbn-papers.py --dataset ogbn-papers100M --n-epochs 200 --nr -1 --lr 0.08
-
+   
 ## DistGNN Ends
 
 

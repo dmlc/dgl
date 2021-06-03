@@ -63,140 +63,15 @@ fp2_fstorage_comm_iter = gqueue()
 fstorage_comm_nodes_async_fp22_ext = gqueue()
 
 
-class drpa_:
-    ## static variables
-    rank = -1
-    num_parts = 0
-    node_map = 0
-    nrounds = 0
-    output_sr_ar = []
-    selected_nodes = []
-    epochs_ar = []
-    epochi = 0
-    nlayer = 0
-    dist = 0
-    gather_q41 = 0
-    
-    @staticmethod
-    def drpa_initialize(g, rank, num_parts, node_map, nrounds, dist, nlayers):
-        drpa.rank = rank
-        drpa.num_parts = num_parts
-        drpa.node_map = node_map
-        drpa.nrounds = nrounds
-        drpa.dist = dist
-
-        drpa.epochs_ar = [0 for i in range(nlayers)]
-        drpa.epochi = 0
-        drpa.nalyers = nlayers
-        drpa.gather_q41 = gqueue()
-        drpa.output_sr_ar = []
-        
-        ## Creates buckets based on ndrounds
-        drpa.drpa_create_buckets(g)
-
-        adj = g.dstdata['adj']
-        lf = g.dstdata['lf']
-        width = adj.shape[1]
-        
-        ## groups send data according to 'send to rank'
-        ## communicates and fill output_sr_ar for data to be recd.
-        drpa.drpa_init_buckets(g, adj, lf, drpa.selected_nodes, num_parts,
-                               nrounds, rank, node_map, width)
-
-    @staticmethod
-    def drpa_update_all(self, g, message_func, reduce_func, apply_node_func):
-        assert rank != -1, "drpa not initialized !!!"
-        neigh = g.dstdata['neigh']
-        adj = g.dstdata['adj']
-        inner_node = g.dstdata['inner_node']
-        lftensor = g.dstdata['lf']
-
-        epoch = drpa.epochs_ar[epoci]
-        
-        in_degs = g.in_degrees().to(feat_dst)
-        self.dstdata['neigh'] = call_drpa_core(neigh, adj, inner_node, lftensor, drpa.selected_nodes,
-                                               drpa.node_map, drpa.num_parts, epoch, drpa.rank,
-                                               in_degs,
-                                               drpa.output_sr_ar,
-                                               drpa.gather_q41)
-        
-        drpa.epochs_ar[epochi]
-        epochi = (epochi + 1) % drpa.nlayers
-        
-        self.ndata['par_in_degs'] = in_degs
-        #return in_degs
-    
-
-    @staticmethod
-    def drpa_init_buckets(g, adj, lf, selected_nodes, num_parts, nrounds, rank, node_map, width):
-
-        for l in range(nrounds):
-            buckets = torch.tensor([0 for i in range(num_parts)], dtype=torch.int32)
-            ## fill buckets here
-            fdrpa_init_buckets_v4(adj, selected_nodes[l], node_map, buckets,
-                                  lf, width, drpa.num_parts, rank)
-            input_sr = []
-            for i in range(0, num_parts):
-                input_sr.append(torch.tensor([buckets[i]], dtype=torch.int64))
-                
-            output_sr = [torch.zeros(1, dtype=torch.int64) for i in range(0, num_parts)]
-            sync_req = dist.all_to_all(output_sr, input_sr, async_op=True)   # make it async            
-            sync_req.wait() ## recv the #nodes communicated
-            drpa.output_sr_ar.append(output_sr)  ## output
-
-
-        
-    @staticmethod
-    def drpa_create_buckets(g, nrounds, rank):
-        inner_nodex = g.ndata['inner_node'].tolist() ##.count(1)
-        n = len(inner_nodex)
-        idx = inner_nodex.count(1)
-        
-        nrounds_ = nrounds
-        drpa_relay.selected_nodes = [ [] for i in range(nrounds_)]  ## #native nodes
-
-        # randomly divide the nodes in 5 rounds for comms
-        total_alien_nodes = inner_nodex.count(0)  ## count split nodes
-        alien_nodes_per_round = int((total_alien_nodes + nrounds_ -1) / nrounds_)
-        
-        counter = 0
-        pos = 0
-        r = 0
-        while counter < n:
-            if inner_nodex[counter] == 0:    ##split node
-                drpa_relay.selected_nodes[r].append(counter)
-                pos += 1
-                if pos % alien_nodes_per_round == 0:
-                    r = r + 1
-                    
-            counter += 1
-                    
-
-        if (counter != len(inner_nodex)):
-            print("counter: ", counter, " ", len(inner_nodex))
-            
-        assert counter == len(inner_nodex), "assertion"
-        #if pos == total_alien_nodes:
-        #    print("pos: ", pos, " ", total_alien_nodes)
-        assert pos == total_alien_nodes, "pos alien not matching!!"
-        
-        #return ## selected_nodes
-        if rank == 0:
-            print("Selected nodes in each round: ", flush=True)
-            for i in range(nrounds_):
-                print("round: ", i,  " nodes: ", len(drpa_relay.selected_nodes[i]), flush=True);
-
-
 ## DRPA
 def drpa(gobj, rank, num_parts, node_map, nrounds, dist, nlayers):
-    #d = drpa_master(gobj, rank, num_parts, node_map, nrounds, dist, nlayers)
     d = drpa_master(gobj._graph, gobj._ntypes, gobj._etypes, gobj._node_frames, gobj._edge_frames)
     d.drpa_init(rank, num_parts, node_map, nrounds, dist, nlayers)
     return d
-    
+
+
 class drpa_master(DGLHeteroGraph):
-    
-        
+            
     def drpa_init(self, rank, num_parts, node_map, nrounds, dist, nlayers):
         #print("In drpa Init....")
         self.rank = rank
@@ -258,9 +133,7 @@ class drpa_master(DGLHeteroGraph):
         if self.rank == 0:
             print("Clearning backlogs ends ", flush=True)
 
-        
-    #@staticmethod ## overload
-    ## not used for now
+            
     def update_all(self,
                    message_func,
                    reduce_func,
@@ -268,13 +141,11 @@ class drpa_master(DGLHeteroGraph):
                    etype=None):
         assert self.rank != -1, "drpa not initialized !!!"
 
-        #print("rfunc: ", reduce_func.name)
         mean = 0
         if reduce_func.name == "mean":
             reduce_func = fn.sum('m', 'neigh')
             mean = 1
             
-        #print("rfunc: ", reduce_func.name)
         
         tic = time.time()
         DGLHeteroGraph.update_all(self, message_func, reduce_func)
@@ -447,7 +318,7 @@ class drpa_core(torch.autograd.Function):
             input_sr.append(torch.tensor([buckets[i]], dtype=torch.int64))
 
 
-        if True:
+        if False:
             output_sr = output_sr_ar[roundn].copy()   ## computed during drpa_init             
         else:
             output_sr = [torch.zeros(1, dtype=torch.int64) for i in range(0, num_parts)]
