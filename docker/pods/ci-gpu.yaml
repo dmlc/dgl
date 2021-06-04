@@ -11,3 +11,12 @@ spec:
       resources:
         limits:
           nvidia.com/gpu: 1 # requesting 1 GPU
+  affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: beta.kubernetes.io/instance-type
+          operator: In
+          values:
+          - g4dn.2xlarge
