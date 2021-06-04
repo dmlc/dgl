@@ -204,7 +204,7 @@ optimizer = optim.Adam(model.parameters(), lr=lr)
 
 ###################################################################
 #For distributed training, we need to convert the model into a distributed model with
-#Pytorch's `DistributedDataParalle`.
+#Pytorch's `DistributedDataParallel`.
 #
 model = th.nn.parallel.DistributedDataParallel(model)
 
