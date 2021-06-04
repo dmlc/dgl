@@ -1,4 +1,3 @@
-"""Package for geometry common components."""
 """The ``dgl.geometry`` package contains geometry operations:
 
 * Farthest point sampling for point cloud sampling
