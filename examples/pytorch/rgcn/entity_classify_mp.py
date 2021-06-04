@@ -170,7 +170,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
             master_ip='127.0.0.1', master_port='12345')
         backend = 'nccl'
 
-        # using sparse embedding or usnig mix_cpu_gpu model (embedding model can not be stored in GPU)
+        # using sparse embedding or using mix_cpu_gpu model (embedding model can not be stored in GPU)
         if dev_id < 0 or args.dgl_sparse is False:
             backend = 'gloo'
         print("backend using {}".format(backend))
@@ -520,8 +520,6 @@ def main(args, devices):
     inv_target.share_memory_()
     inv_target[target_idx] = th.arange(0, target_idx.shape[0],
                                        dtype=inv_target.dtype)
-
-
 
     # Create csr/coo/csc formats before launching training processes with multi-gpu.
     # This avoids creating certain formats in each sub-process, which saves momory and CPU.
