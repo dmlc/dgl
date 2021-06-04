@@ -347,7 +347,8 @@ pipeline {
                 }
                 stage('Tutorial test') {
                   steps {
-                    sh 'ls -l /tmp/dataset'
+                    sh 'ls -l /tmp/dataset/*'
+                    sh 'ls -l /tmp/dataset/'
                     tutorial_test_linux('pytorch')
                   }
                 }
