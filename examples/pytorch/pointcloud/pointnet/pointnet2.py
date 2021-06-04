@@ -5,7 +5,7 @@ from torch.autograd import Variable
 import numpy as np
 import dgl
 import dgl.function as fn
-from dgl.geometry.pytorch import FarthestPointSampler
+from dgl.geometry.pytorch import farthest_point_sampler
 
 '''
 Part of the code are adapted from
@@ -167,7 +167,7 @@ class SAModule(nn.Module):
         super(SAModule, self).__init__()
         self.group_all = group_all
         if not group_all:
-            self.fps = FarthestPointSampler(npoints)
+            self.npoints = npoints
             self.frnn_graph = FixedRadiusNNGraph(radius, n_neighbor)
         self.message = RelativePositionMessage(n_neighbor)
         self.conv = PointNetConv(mlp_sizes, batch_size)
@@ -177,7 +177,7 @@ class SAModule(nn.Module):
         if self.group_all:
             return self.conv.group_all(pos, feat)
 
-        centroids = self.fps(pos)
+        centroids = farthest_point_sampler(pos, self.npoints)
         g = self.frnn_graph(pos, centroids, feat)
         g.update_all(self.message, self.conv)
 
@@ -197,7 +197,7 @@ class SAMSGModule(nn.Module):
         self.batch_size = batch_size
         self.group_size = len(radius_list)
 
-        self.fps = FarthestPointSampler(npoints)
+        self.npoints = npoints
         self.frnn_graph_list = nn.ModuleList()
         self.message_list = nn.ModuleList()
         self.conv_list = nn.ModuleList()
@@ -208,7 +208,7 @@ class SAMSGModule(nn.Module):
             self.conv_list.append(PointNetConv(mlp_sizes_list[i], batch_size))
 
     def forward(self, pos, feat):
-        centroids = self.fps(pos)
+        centroids = farthest_point_sampler(pos, self.npoints)
         feat_res_list = []
 
         for i in range(self.group_size):

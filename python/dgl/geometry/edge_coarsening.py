@@ -1,44 +1,11 @@
-"""Edge coarsening procedure used in Metis and Graclus, for mxnet"""
-# pylint: disable=no-member, invalid-name, W0235
-import dgl
-import mxnet as mx
-from ..capi import _neighbor_matching
+"""Edge coarsening procedure used in Metis and Graclus, for pytorch"""
+# pylint: disable=no-member, invalid-name, W0613
+from .. import remove_self_loop
+from .capi import _neighbor_matching
 
 __all__ = ['neighbor_matching']
 
-
-class NeighborMatchingFn(mx.autograd.Function):
-    r"""
-    Description
-    -----------
-    AutoGrad function for neighbor matching
-    """
-    def __init__(self, gidx, num_nodes, e_weights, relabel_idx):
-        super(NeighborMatchingFn, self).__init__()
-        self.gidx = gidx
-        self.num_nodes = num_nodes
-        self.e_weights = e_weights
-        self.relabel_idx = relabel_idx
-
-    def forward(self):
-        r"""
-        Description
-        -----------
-        Perform forward computation
-        """
-        return _neighbor_matching(
-            self.gidx, self.num_nodes, self.e_weights, self.relabel_idx)
-
-    def backward(self):
-        r"""
-        Description
-        -----------
-        Perform backward computation
-        """
-        pass # pylint: disable=unnecessary-pass
-
-
-def neighbor_matching(graph, e_weights, relabel_idx):
+def neighbor_matching(graph, e_weights=None, relabel_idx=True):
     r"""
     Description
     -----------
@@ -63,22 +30,31 @@ def neighbor_matching(graph, e_weights, relabel_idx):
     ----------
     graph : DGLGraph
         The input homogeneous graph.
-    edge_weight : mxnet.NDArray, optional
+    edge_weight : torch.Tensor, optional
         The edge weight tensor holding non-negative scalar weight for each edge.
         default: :obj:`None`
     relabel_idx : bool, optional
         If true, relabel resulting node labels to have consecutive node ids.
         default: :obj:`True`
+
+    Examples
+    --------
+    The following example uses PyTorch backend.
+
+    >>> import torch, dgl
+    >>> from dgl.geometry import neighbor_matching
+    >>>
+    >>> g = dgl.graph(([0, 1, 1, 2], [1, 0, 2, 1]))
+    >>> res = neighbor_matching(g)
+        tensor([0, 1, 1])
     """
     assert graph.is_homogeneous, \
         "The graph used in graph node matching must be homogeneous"
     if e_weights is not None:
         graph.edata['e_weights'] = e_weights
-        graph = dgl.remove_self_loop(graph)
+        graph = remove_self_loop(graph)
         e_weights = graph.edata['e_weights']
         graph.edata.pop('e_weights')
     else:
-        graph = dgl.remove_self_loop(graph)
-
-    func = NeighborMatchingFn(graph._graph, graph.num_nodes(), e_weights, relabel_idx)
-    return func()
+        graph = remove_self_loop(graph)
+    return _neighbor_matching(graph._graph, graph.num_nodes(), e_weights, relabel_idx)
