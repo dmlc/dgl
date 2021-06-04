@@ -260,11 +260,9 @@ pipeline {
             }
             stage('C++ GPU') {
               agent {
-                docker {
-                  label 'linux-gpu-node'
-                  image 'dgllib/dgl-ci-gpu:conda'
-                  args '--runtime nvidia'
-                  alwaysPull true
+                kubernetes {
+                  yamlFile 'docker/pods/ci-gpu.yaml'
+                  defaultContainer 'dgl-ci-gpu'
                 }
               }
               steps {
