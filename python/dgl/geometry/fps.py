@@ -44,17 +44,17 @@ def farthest_point_sampler(pos, npoints, start_idx=None):
         tensor([[5, 6],
                 [7, 8]])
     """
-    device = pos.device
+    ctx = F.context(pos)
     B, N, C = pos.shape
     pos = pos.reshape(-1, C)
-    dist = F.zeros((B * N), dtype=pos.dtype, ctx=device)
+    dist = F.zeros((B * N), dtype=pos.dtype, ctx=ctx)
     if start_idx is None:
-        start_idx = F.randint(shape=(B, ), dtype=F.int64, ctx=device, low=0, high=N-1)
+        start_idx = F.randint(shape=(B, ), dtype=F.int64, ctx=ctx, low=0, high=N-1)
     else:
         if start_idx >= N or start_idx < 0:
             raise DGLError("Invalid start_idx, expected 0 <= start_idx < {}, got {}".format(
                 N, start_idx))
-        start_idx = F.full_1d((B, ), start_idx, dtype=F.int64, ctx=device)
-    result = F.zeros((npoints * B), dtype=F.int64, ctx=device)
+        start_idx = F.full_1d((B, ), start_idx, dtype=F.int64, ctx=ctx)
+    result = F.zeros((npoints * B), dtype=F.int64, ctx=ctx)
     _farthest_point_sampler(pos, B, npoints, dist, start_idx, result)
     return result.reshape(B, npoints)
