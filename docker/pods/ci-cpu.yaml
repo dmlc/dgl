@@ -18,4 +18,4 @@ spec:
   volumes:
   - name: persistent-storage
     persistentVolumeClaim:
-      claimName: efs-claim
+      claimName: ogb-efs-claim
