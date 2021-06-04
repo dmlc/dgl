@@ -217,10 +217,10 @@ model = th.nn.parallel.DistributedDataParallel(model)
 #
 sampler = dgl.dataloading.MultiLayerNeighborSampler([25,10])
 train_dataloader = dgl.dataloading.NodeDataLoader(
-                             g, train_nid, sampler,batch_size=1024,
+                             g, train_nid, sampler, batch_size=1024,
                              shuffle=True, drop_last=False)
 valid_dataloader = dgl.dataloading.NodeDataLoader(
-                             g, valid_nid, sampler,batch_size=1024,
+                             g, valid_nid, sampler, batch_size=1024,
                              shuffle=False, drop_last=False)
 
 ###################################################################
