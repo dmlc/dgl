@@ -11,3 +11,11 @@ spec:
     resources:
       requests:
         cpu: 8
+    volumeMounts:
+        - name: persistent-storage
+          mountPath: /tmp/dataset
+          readOnly: true
+  volumes:
+  - name: persistent-storage
+    persistentVolumeClaim:
+      claimName: efs-claim
