@@ -6,8 +6,7 @@ import pytest
 import torch as th
 from dgl import DGLError
 from dgl.base import DGLWarning
-from dgl.geometry.pytorch import farthest_point_sampler
-from dgl.geometry import neighbor_matching
+from dgl.geometry import neighbor_matching, farthest_point_sampler
 from test_utils import parametrize_dtype
 from test_utils.graph_cases import get_cases
 

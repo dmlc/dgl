@@ -1,5 +1,5 @@
 import mxnet as mx
-from dgl.geometry.mxnet import farthest_point_sampler
+from dgl.geometry import farthest_point_sampler
 import backend as F
 
 import numpy as np
