@@ -310,12 +310,12 @@ def u_mul_e_udf(edges):
 
 ######################################################################
 # You can also write your own reduce function. For example, the following
-# is equivalent to the builtin ``fn.sum('m', 'h')`` function that sums up
+# is equivalent to the builtin ``fn.mean('m', 'h_N')`` function that averages
 # the incoming messages:
 # 
 
-def sum_udf(nodes):
-    return {'h': nodes.mailbox['m'].sum(1)}
+def mean_udf(nodes):
+    return {'h_N': nodes.mailbox['m'].mean(1)}
 
 
 ######################################################################
