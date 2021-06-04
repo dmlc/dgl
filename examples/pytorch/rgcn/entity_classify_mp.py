@@ -218,7 +218,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
     # node features
     # None for one-hot feature, if not none, it should be the feature tensor.
     #
-    embed_layer = RelGraphEmbedLayer(dev_id if args.embedding_gpu else -1,
+    embed_layer = RelGraphEmbedLayer(dev_id if args.embedding_gpu or not args.dgl_sparse else -1,
                                      dev_id,
                                      g.number_of_nodes(),
                                      node_tids,

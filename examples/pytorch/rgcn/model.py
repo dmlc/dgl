@@ -109,7 +109,7 @@ class RelGraphEmbedLayer(nn.Module):
                     self.node_embeds[str(ntype)] = sparse_emb
             else:
                 input_emb_size = input_size[ntype].shape[1]
-                embed = nn.Parameter(th.Tensor(input_emb_size, self.embed_size, device=self.dev_id))
+                embed = nn.Parameter(th.empty([input_emb_size, self.embed_size], device=self.dev_id))
                 nn.init.xavier_uniform_(embed)
                 self.embeds[str(ntype)] = embed
 
