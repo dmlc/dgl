@@ -279,9 +279,9 @@ class Model(nn.Module):
         self.conv2 = WeightedSAGEConv(h_feats, num_classes)
     
     def forward(self, g, in_feat):
-        h = self.conv1(g, in_feat, torch.ones(g.num_edges()).to(g.device))
+        h = self.conv1(g, in_feat, torch.ones(g.num_edges(), 1).to(g.device))
         h = F.relu(h)
-        h = self.conv2(g, h, torch.ones(g.num_edges()).to(g.device))
+        h = self.conv2(g, h, torch.ones(g.num_edges(), 1).to(g.device))
         return h
     
 model = Model(g.ndata['feat'].shape[1], 16, dataset.num_classes)
