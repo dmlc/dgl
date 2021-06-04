@@ -122,7 +122,8 @@ def run(proc_id, devices):
         device=device,      # Put the sampled MFGs on CPU or GPU
         use_ddp=True,       # Make it work with distributed data parallel
         # The following arguments are inherited from PyTorch DataLoader.
-        batch_size=1024,    # Batch size
+        batch_size=1024,    # Per-device batch size.
+                            # The effective batch size is this number times the number of GPUs.
         shuffle=True,       # Whether to shuffle the nodes for every epoch
         drop_last=False,    # Whether to drop the last incomplete batch
         num_workers=0       # Number of sampler processes
@@ -235,10 +236,11 @@ graph.create_formats_()
 # 
 
 # Say you have four GPUs.
+num_gpus = 4
 import dgl.multiprocessing as mp
-devices = list(range(4))
+devices = list(range(num_gpus))
 procs = []
-for proc_id in range(4):
+for proc_id in range(num_gpus):
     p = mp.Process(target=run, args=(proc_id, devices))
     p.start()
     procs.append(p)
