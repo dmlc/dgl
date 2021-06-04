@@ -11,3 +11,4 @@ spec:
     resources:
       requests:
         cpu: 4
+  serviceAccountName: dglciuser
