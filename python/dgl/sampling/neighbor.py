@@ -180,9 +180,44 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
 
     return ret
 
-def sample_neighbors(g, nodes, fanout, bias, edge_dir='in', tag_offset_name='TAG_OFFSET',
+def sample_neighbors_biased(g, nodes, fanout, bias, edge_dir='in', tag_offset_name='TAG_OFFSET', replace=False,
                      copy_ndata=True, copy_edata=True, _dist_training=False):
-    
+    if len(g.ntypes) > 1:
+        raise DGLError("Only homogeneous or bipartite graphs are supported.")
+
+    nodes_array = F.to_dgl_nd(nodes)
+    bias_array = F.to_dgl_nd(bias)
+    if edge_dir == 'in':
+        tag_offset_array = F.to_dgl_nd(g.dstdata[tag_offset_name])
+    elif edge_dir == 'out':
+        tag_offset_array = F.to_dgl_nd(g.srcdata[tag_offset_name])
+    else:
+        raise DGLError("edge_dir can only be 'in' or 'out'")
+
+
+    subgidx = _CAPI_DGLSampleNeighborsBiased(g._graph, nodes_array, fanout, bias_array, tag_offset_array,
+                                       edge_dir, replace)
+    induced_edges = subgidx.induced_edges
+    ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
+
+    # handle features
+    # (TODO) (BarclayII) DGL distributed fails with bus error, freezes, or other
+    # incomprehensible errors with lazy feature copy.
+    # So in distributed training context, we fall back to old behavior where we
+    # only set the edge IDs.
+    if not _dist_training:
+        if copy_ndata:
+            node_frames = utils.extract_node_subframes(g, None)
+            utils.set_new_frames(ret, node_frames=node_frames)
+
+        if copy_edata:
+            edge_frames = utils.extract_edge_subframes(g, induced_edges)
+            utils.set_new_frames(ret, edge_frames=edge_frames)
+    else:
+        for i, etype in enumerate(ret.canonical_etypes):
+            ret.edges[etype].data[EID] = induced_edges[i]
+
+    return ret
 
 
 def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False,

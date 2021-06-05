@@ -430,6 +430,15 @@ COOMatrix CSRRowWiseTopk(
     FloatArray weight,
     bool ascending = false);
 
+COOMatrix CSRRowWiseSamplingBiased(
+    CSRMatrix mat,
+    IdArray rows,
+    int64_t num_samples,
+    NDArray tag_offset,
+    FloatArray bias,
+    bool replace = true
+);
+
 /*!
  * \brief Sort the column index according to the tag of each column.
  *
