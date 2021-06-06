@@ -42,9 +42,9 @@ def build_dgl_win64(dev) {
   pack_lib("dgl-${dev}-win64", dgl_win64_libs)
 }
 
-def cpp_unit_test_linux(dev) {
+def cpp_unit_test_linux() {
   init_git()
-  unpack_lib("dgl-${dev}-linux", dgl_linux_libs)
+  unpack_lib('dgl-cpu-linux', dgl_linux_libs)
   sh 'bash tests/scripts/task_cpp_unit_test.sh'
 }
 
@@ -57,7 +57,7 @@ def cpp_unit_test_win64() {
 def unit_test_linux(backend, dev) {
   init_git()
   unpack_lib("dgl-${dev}-linux", dgl_linux_libs)
-  timeout(time: 20, unit: 'MINUTES') {
+  timeout(time: 15, unit: 'MINUTES') {
     sh "bash tests/scripts/task_unit_test.sh ${backend} ${dev}"
   }
 }
@@ -100,60 +100,57 @@ def is_authorized(name) {
 }
 
 pipeline {
-  agent any
   triggers {
         issueCommentTrigger('@dgl-bot .*')
   }
+  agent any
   stages {
     stage('Regression Test Trigger') {
       agent {
-        kubernetes {
-          yamlFile 'docker/pods/ci-lint.yaml'
-          defaultContainer 'dgl-ci-lint'
-        }
+          docker {
+              label 'linux-benchmark-node'
+              image 'dgllib/dgl-ci-lint'
+              alwaysPull true
+          }
       }
       when { triggeredBy 'IssueCommentCause' }
       steps {
-        // container('dgl-ci-lint') {
-          checkout scm
-          script {
+        checkout scm
+        script {
               def comment = env.GITHUB_COMMENT
               def author = env.GITHUB_COMMENT_AUTHOR
-              echo("${env.GIT_URL}")
-              echo("${env}")
               if (!is_authorized(author)) {
-                error('Not authorized to launch regression tests')
+            error('Not authorized to launch regression tests')
               }
               dir('benchmark_scripts_repo') {
-                checkout([$class: 'GitSCM', branches: [[name: '*/master']],
-                        userRemoteConfigs: [[credentialsId: 'github', url: 'https://github.com/dglai/DGL_scripts.git']]])
+            checkout([$class: 'GitSCM', branches: [[name: '*/master']],
+                      userRemoteConfigs: [[credentialsId: 'github', url: 'https://github.com/dglai/DGL_scripts.git']]])
               }
               sh('cp benchmark_scripts_repo/benchmark/* benchmarks/scripts/')
               def command_lists = comment.split(' ')
               def instance_type = command_lists[2].replace('.', '')
               if (command_lists.size() != 5) {
-              pullRequest.comment('Cannot run the regression test due to unknown command')
-              error('Unknown command')
+                pullRequest.comment('Cannot run the regression test due to unknown command')
+                error('Unknown command')
               } else {
-              pullRequest.comment("Start the Regression test. View at ${RUN_DISPLAY_URL}")
+                pullRequest.comment("Start the Regression test. View at ${RUN_DISPLAY_URL}")
               }
-              def prNumber = env.BRANCH_NAME.replace('PR-', '')
               dir('benchmarks/scripts') {
                 sh('python3 -m pip install boto3')
-                sh("PYTHONUNBUFFERED=1 GIT_PR_ID=${prNumber} GIT_URL=${env.GIT_URL} GIT_BRANCH=${env.CHANGE_BRANCH} python3 run_reg_test.py --data-folder ${env.GIT_COMMIT}_${instance_type} --run-cmd '${comment}'")
+                sh("PYTHONUNBUFFERED=1 GIT_URL=${env.GIT_URL} GIT_BRANCH=${env.CHANGE_BRANCH} python3 run_reg_test.py --data-folder ${env.GIT_COMMIT}_${instance_type} --run-cmd '${comment}'")
               }
               pullRequest.comment("Finished the Regression test. Result table is at https://dgl-asv-data.s3-us-west-2.amazonaws.com/${env.GIT_COMMIT}_${instance_type}/results/result.csv. Jenkins job link is ${RUN_DISPLAY_URL}. ")
               currentBuild.result = 'SUCCESS'
               return
-          }
-        // }
+        }
       }
     }
     stage('Bot Instruction') {
       agent {
-        kubernetes {
-          yamlFile 'docker/pods/ci-lint.yaml'
-          defaultContainer 'dgl-ci-lint'
+        docker {
+            label 'linux-benchmark-node'
+            image 'dgllib/dgl-ci-lint'
+            alwaysPull true
         }
       }
       steps {
@@ -168,14 +165,15 @@ pipeline {
         }
       }
     }
-    stage('CI') {
-      when { not { triggeredBy 'IssueCommentCause' } }
-      stages {
+    stage('CI'){
+      when { not {triggeredBy 'IssueCommentCause'} }
+      stages{
         stage('Lint Check') {
           agent {
-            kubernetes {
-              yamlFile 'docker/pods/ci-lint.yaml'
-              defaultContainer 'dgl-ci-lint'
+            docker {
+              label 'linux-c52x-node'
+              image 'dgllib/dgl-ci-lint'
+              alwaysPull true
             }
           }
           steps {
@@ -188,14 +186,14 @@ pipeline {
             }
           }
         }
-        
         stage('Build') {
           parallel {
             stage('CPU Build') {
               agent {
-                kubernetes {
-                  yamlFile 'docker/pods/ci-compile-cpu.yaml'
-                  defaultContainer 'dgl-ci-cpu-compile'
+                docker {
+                  label 'linux-c52x-node'
+                  image 'dgllib/dgl-ci-cpu:conda'
+                  alwaysPull true
                 }
               }
               steps {
@@ -209,9 +207,11 @@ pipeline {
             }
             stage('GPU Build') {
               agent {
-                kubernetes {
-                  yamlFile 'docker/pods/ci-compile-gpu.yaml'
-                  defaultContainer 'dgl-ci-gpu-compile'
+                docker {
+                  label 'linux-c52x-node'
+                  image 'dgllib/dgl-ci-gpu:conda'
+                  args '-u root'
+                  alwaysPull true
                 }
               }
               steps {
@@ -244,29 +244,14 @@ pipeline {
           parallel {
             stage('C++ CPU') {
               agent {
-                kubernetes {
-                  yamlFile 'docker/pods/ci-cpu.yaml'
-                  defaultContainer 'dgl-ci-cpu'
+                docker {
+                  label 'linux-c52x-node'
+                  image 'dgllib/dgl-ci-cpu:conda'
+                  alwaysPull true
                 }
               }
               steps {
-                cpp_unit_test_linux('cpu')
-              }
-              post {
-                always {
-                  cleanWs disableDeferredWipeout: true, deleteDirs: true
-                }
-              }
-            }
-            stage('C++ GPU') {
-              agent {
-                kubernetes {
-                  yamlFile 'docker/pods/ci-gpu.yaml'
-                  defaultContainer 'dgl-ci-gpu'
-                }
-              }
-              steps {
-                cpp_unit_test_linux('gpu')
+                cpp_unit_test_linux()
               }
               post {
                 always {
@@ -287,9 +272,10 @@ pipeline {
             }
             stage('Tensorflow CPU') {
               agent {
-                kubernetes {
-                  yamlFile 'docker/pods/ci-cpu.yaml'
-                  defaultContainer 'dgl-ci-cpu'
+                docker {
+                  label 'linux-c52x-node'
+                  image 'dgllib/dgl-ci-cpu:conda'
+                  alwaysPull true
                 }
               }
               stages {
@@ -307,9 +293,11 @@ pipeline {
             }
             stage('Tensorflow GPU') {
               agent {
-                kubernetes {
-                  yamlFile 'docker/pods/ci-gpu.yaml'
-                  defaultContainer 'dgl-ci-gpu'
+                docker {
+                  label 'linux-gpu-node'
+                  image 'dgllib/dgl-ci-gpu:conda'
+                  args '--runtime nvidia'
+                  alwaysPull true
                 }
               }
               stages {
@@ -327,9 +315,10 @@ pipeline {
             }
             stage('Torch CPU') {
               agent {
-                kubernetes {
-                  yamlFile 'docker/pods/ci-cpu.yaml'
-                  defaultContainer 'dgl-ci-cpu'
+                docker {
+                  label 'linux-c52x-node'
+                  image 'dgllib/dgl-ci-cpu:conda'
+                  alwaysPull true
                 }
               }
               stages {
@@ -345,8 +334,6 @@ pipeline {
                 }
                 stage('Tutorial test') {
                   steps {
-                    sh 'ls -l /tmp/dataset/*'
-                    sh 'ls -l /tmp/dataset/'
                     tutorial_test_linux('pytorch')
                   }
                 }
@@ -379,9 +366,11 @@ pipeline {
             }
             stage('Torch GPU') {
               agent {
-                kubernetes {
-                  yamlFile 'docker/pods/ci-gpu.yaml'
-                  defaultContainer 'dgl-ci-gpu'
+                docker {
+                  label 'linux-gpu-node'
+                  image 'dgllib/dgl-ci-gpu:conda'
+                  args '--runtime nvidia'
+                  alwaysPull true
                 }
               }
               stages {
@@ -405,9 +394,10 @@ pipeline {
             }
             stage('MXNet CPU') {
               agent {
-                kubernetes {
-                  yamlFile 'docker/pods/ci-cpu.yaml'
-                  defaultContainer 'dgl-ci-cpu'
+                docker {
+                  label 'linux-c52x-node'
+                  image 'dgllib/dgl-ci-cpu:conda'
+                  alwaysPull true
                 }
               }
               stages {
@@ -430,9 +420,11 @@ pipeline {
             }
             stage('MXNet GPU') {
               agent {
-                kubernetes {
-                  yamlFile 'docker/pods/ci-gpu.yaml'
-                  defaultContainer 'dgl-ci-gpu'
+                docker {
+                  label 'linux-gpu-node'
+                  image 'dgllib/dgl-ci-gpu:conda'
+                  args '--runtime nvidia'
+                  alwaysPull true
                 }
               }
               stages {

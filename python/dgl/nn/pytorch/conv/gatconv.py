@@ -168,7 +168,7 @@ class GATConv(nn.Module):
         else:
             self.register_buffer('bias', None)
         if residual:
-            if self._in_dst_feats != out_feats * num_heads:
+            if self._in_dst_feats != out_feats:
                 self.res_fc = nn.Linear(
                     self._in_dst_feats, num_heads * out_feats, bias=False)
             else:
@@ -287,8 +287,6 @@ class GATConv(nn.Module):
                     *src_prefix_shape, self._num_heads, self._out_feats)
                 if graph.is_block:
                     feat_dst = feat_src[:graph.number_of_dst_nodes()]
-                    h_dst = h_dst[:graph.number_of_dst_nodes()]
-                    dst_prefix_shape = (graph.number_of_dst_nodes(),) + dst_prefix_shape[1:]
             # NOTE: GAT paper uses "first concatenation then linear projection"
             # to compute attention scores, while ours is "first projection then
             # addition", the two approaches are mathematically equivalent:

@@ -335,16 +335,30 @@ def heterograph(data_dict,
                                ' the max ID in the data, but got {} and {}.'.format(
                                    dty, num_nodes_dict[dty], vrange - 1))
     # Create the graph
-    metagraph, ntypes, etypes, relations = heterograph_index.create_metagraph_index(
-        num_nodes_dict.keys(), node_tensor_dict.keys())
+
+    # Sort the ntypes and relation tuples to have a deterministic order for the same set
+    # of type names.
+    ntypes = list(sorted(num_nodes_dict.keys()))
+    relations = list(sorted(node_tensor_dict.keys()))
+
     num_nodes_per_type = utils.toindex([num_nodes_dict[ntype] for ntype in ntypes], "int64")
+    ntype_dict = {ntype: i for i, ntype in enumerate(ntypes)}
+
+    meta_edges_src = []
+    meta_edges_dst = []
+    etypes = []
     rel_graphs = []
     for srctype, etype, dsttype in relations:
+        meta_edges_src.append(ntype_dict[srctype])
+        meta_edges_dst.append(ntype_dict[dsttype])
+        etypes.append(etype)
         src, dst = node_tensor_dict[(srctype, etype, dsttype)]
         g = create_from_edges(src, dst, srctype, etype, dsttype,
                               num_nodes_dict[srctype], num_nodes_dict[dsttype])
         rel_graphs.append(g)
 
+    # metagraph is DGLGraph, currently still using int64 as index dtype
+    metagraph = graph_index.from_coo(len(ntypes), meta_edges_src, meta_edges_dst, True)
     # create graph index
     hgidx = heterograph_index.create_heterograph_from_relations(
         metagraph, [rgrh._graph for rgrh in rel_graphs], num_nodes_per_type)
@@ -631,10 +645,8 @@ def to_heterogeneous(G, ntypes, etypes, ntype_field=NTYPE,
 
     Notes
     -----
-    * The returned node and edge types may not necessarily be in the same order as
-      ``ntypes`` and ``etypes``.
-    * Calling :func:`~dgl.to_homogeneous` then calling :func:`~dgl.to_heterogeneous` again
-      yields the same result.
+    The returned node and edge types may not necessarily be in the same order as
+    ``ntypes`` and ``etypes``.
 
     Examples
     --------
@@ -707,7 +719,7 @@ def to_heterogeneous(G, ntypes, etypes, ntype_field=NTYPE,
     # relabel nodes to per-type local IDs
     ntype_count = np.bincount(ntype_ids, minlength=num_ntypes)
     ntype_offset = np.insert(np.cumsum(ntype_count), 0, 0)
-    ntype_ids_sortidx = np.argsort(ntype_ids, kind='stable')
+    ntype_ids_sortidx = np.argsort(ntype_ids)
     ntype_local_ids = np.zeros_like(ntype_ids)
     node_groups = []
     for i in range(num_ntypes):
@@ -850,8 +862,6 @@ def to_homogeneous(G, ndata=None, edata=None, store_type=True, return_count=Fals
       to its memory efficiency.
     * The ``ntype_count`` and ``etype_count`` lists can help speed up some operations.
       See :class:`~dgl.nn.pytorch.conv.RelGraphConv` for such an example.
-    * Calling :func:`~dgl.to_homogeneous` then calling :func:`~dgl.to_heterogeneous` again
-      yields the same result.
 
     Examples
     --------

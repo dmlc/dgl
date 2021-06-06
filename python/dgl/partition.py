@@ -171,37 +171,16 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
     node_part = node_part.tousertensor()
     start = time.time()
 
-    # This function determines whether an edge belongs to a partition.
-    # An edge is assigned to a partition based on its destination node. If its destination node
-    # is assigned to a partition, we assign the edge to the partition as well.
-    def get_inner_edge(subg, inner_node):
-        inner_edge = F.zeros((subg.number_of_edges(),), F.int8, F.cpu())
-        inner_nids = F.nonzero_1d(inner_node)
-        # TODO(zhengda) we need to fix utils.toindex() to avoid the dtype cast below.
-        inner_nids = F.astype(inner_nids, F.int64)
-        inner_eids = subg.in_edges(inner_nids, form='eid')
-        inner_edge = F.scatter_row(inner_edge, inner_eids,
-                                   F.ones((len(inner_eids),), F.dtype(inner_edge), F.cpu()))
-        return inner_edge
-
     # This creaets a subgraph from subgraphs returned from the CAPI above.
-    def create_subgraph(subg, induced_nodes, induced_edges, inner_node):
+    def create_subgraph(subg, induced_nodes, induced_edges):
         subg1 = DGLHeteroGraph(gidx=subg.graph, ntypes=['_N'], etypes=['_E'])
         # If IDs are shuffled, we should shuffled edges. This will help us collect edge data
         # from the distributed graph after training.
         if reshuffle:
-            # When we shuffle edges, we need to make sure that the inner edges are assigned with
-            # contiguous edge IDs and their ID range starts with 0. In other words, we want to
-            # place these edge IDs in the front of the edge list. To ensure that, we add the IDs
-            # of outer edges with a large value, so we will get the sorted list as we want.
-            max_eid = F.max(induced_edges[0], 0) + 1
-            inner_edge = get_inner_edge(subg1, inner_node)
-            eid = F.astype(induced_edges[0], F.int64) + max_eid * F.astype(inner_edge == 0, F.int64)
-
-            _, index = F.sort_1d(eid)
+            sorted_edges, index = F.sort_1d(induced_edges[0])
             subg1 = edge_subgraph(subg1, index, preserve_nodes=True)
             subg1.ndata[NID] = induced_nodes[0]
-            subg1.edata[EID] = F.gather_row(induced_edges[0], index)
+            subg1.edata[EID] = sorted_edges
         else:
             subg1.ndata[NID] = induced_nodes[0]
             subg1.edata[EID] = induced_edges[0]
@@ -209,8 +188,8 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
 
     for i, subg in enumerate(subgs):
         inner_node = _get_halo_heterosubgraph_inner_node(subg)
+        subg = create_subgraph(subg, subg.induced_nodes, subg.induced_edges)
         inner_node = F.zerocopy_from_dlpack(inner_node.to_dlpack())
-        subg = create_subgraph(subg, subg.induced_nodes, subg.induced_edges, inner_node)
         subg.ndata['inner_node'] = inner_node
         subg.ndata['part_id'] = F.gather_row(node_part, subg.ndata[NID])
         if reshuffle:
@@ -218,7 +197,13 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
             subg.edata['orig_id'] = F.gather_row(orig_eids, subg.edata[EID])
 
         if extra_cached_hops >= 1:
-            inner_edge = get_inner_edge(subg, inner_node)
+            inner_edge = F.zeros((subg.number_of_edges(),), F.int8, F.cpu())
+            inner_nids = F.nonzero_1d(subg.ndata['inner_node'])
+            # TODO(zhengda) we need to fix utils.toindex() to avoid the dtype cast below.
+            inner_nids = F.astype(inner_nids, F.int64)
+            inner_eids = subg.in_edges(inner_nids, form='eid')
+            inner_edge = F.scatter_row(inner_edge, inner_eids,
+                                       F.ones((len(inner_eids),), F.dtype(inner_edge), F.cpu()))
         else:
             inner_edge = F.ones((subg.number_of_edges(),), F.int8, F.cpu())
         subg.edata['inner_edge'] = inner_edge
@@ -376,49 +361,5 @@ def metis_partition(g, k, extra_cached_hops=0, reshuffle=False,
 
     # Then we split the original graph into parts based on the METIS partitioning results.
     return partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle)[0]
-
-
-class NDArrayPartition(object):
-    """ Create a new partition of an NDArray. That is, an object which assigns
-    each row of an NDArray to a specific partition.
-
-    Parameters
-    ----------
-    array_size : int
-        The first dimension of the array being partitioned.
-    num_parts : int
-        The number of parts to divide the array into.
-    mode : String
-        The type of partition. Currently, the only valid value is 'remainder',
-        which assigns rows based on remainder when dividing the row id by the
-        number of parts (e.g., i % num_parts).
-    part_ranges : List
-        Currently unused.
-
-    Examples
-    --------
-
-    A partition of a homgeonous graph `g`, where the vertices are
-    striped across processes can be generated via:
-
-    >>> from dgl.partition import NDArrayPartition
-    >>> part = NDArrayPartition(g.num_nodes(), num_parts, mode='remainder' )
-    """
-    def __init__(self, array_size, num_parts, mode='remainder', part_ranges=None):
-        assert num_parts > 0, 'Invalid "num_parts", must be > 0.'
-        if mode == 'remainder':
-            assert part_ranges is None, 'When using remainder-based ' \
-                    'partitioning, "part_ranges" should not be specified.'
-            self._partition = _CAPI_DGLNDArrayPartitionCreateRemainderBased(
-                array_size, num_parts)
-        else:
-            assert False, 'Unknown partition mode "{}"'.format(mode)
-
-
-    def get(self):
-        """ Get the C-handle for this object.
-        """
-        return self._partition
-
 
 _init_api("dgl.partition")

@@ -23,7 +23,6 @@ endif()
 # and add set(OPTION VALUE) to override these build options.
 # Alernatively, use cmake -DOPTION=VALUE through command-line.
 dgl_option(USE_CUDA "Build with CUDA" OFF)
-dgl_option(USE_SYSTEM_NCCL "Build using system's NCCL library" OFF)
 dgl_option(USE_OPENMP "Build with OpenMP" ON)
 dgl_option(USE_AVX "Build with AVX optimization" ON)
 dgl_option(USE_FP16 "Build with fp16 support to enable mixed precision training" OFF)
@@ -143,7 +142,6 @@ file(GLOB DGL_SRC
   src/geometry/*.cc
   src/geometry/cpu/*.cc
   src/dataloading/*.cc
-  src/partition/*.cc
 )
 
 file(GLOB_RECURSE DGL_SRC_1
@@ -159,23 +157,10 @@ list(APPEND DGL_SRC ${DGL_SRC_1})
 if(USE_CUDA)
   dgl_config_cuda(DGL_CUDA_SRC)
   list(APPEND DGL_SRC ${DGL_CUDA_SRC})
-
-  if (USE_SYSTEM_NCCL)
-    include(cmake/util/FindNccl.cmake)
-    include_directories(${NCCL_INCLUDE_DIR})
-  else()
-    include(cmake/modules/NCCL.cmake)
-    cuda_include_directories(BEFORE ${NCCL_INCLUDE_DIR})
-  endif()
-
-  list(APPEND DGL_LINKER_LIBS ${NCCL_LIBRARY})
 endif(USE_CUDA)
 
 if(USE_CUDA)
   cuda_add_library(dgl SHARED ${DGL_SRC})
-  if (NOT USE_SYSTEM_NCCL)
-    add_dependencies(dgl nccl_external)
-  endif()
 else(USE_CUDA)
   add_library(dgl SHARED ${DGL_SRC} src/graph/sampling/randomwalks/node2vec_impl.h)
 endif(USE_CUDA)

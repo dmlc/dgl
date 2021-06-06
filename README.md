@@ -317,18 +317,6 @@ We are currently in Beta stage.  More features and improvements are coming.
 
 1. [**A Graph Neural Network to Model User Comfort in Robot Navigation**](https://arxiv.org/abs/2102.08863), *Pilar Bachiller, Daniel Rodriguez-Criado, Ronit R. Jorvekar, Pablo Bustos, Diego R. Faria, Luis J. Manso*
 
-1. [**Medical Entity Disambiguation Using Graph Neural Networks**](https://arxiv.org/abs/2104.01488), *Alina Vretinaris, Chuan Lei, Vasilis Efthymiou, Xiao Qin, Fatma Özcan*
-
-1. [**Chemistry-informed Macromolecule Graph Representation for Similarity Computation and Supervised Learning**](https://arxiv.org/abs/2103.02565), *Somesh Mohapatra, Joyce An, Rafael Gómez-Bombarelli*
-  
-1. [**Characterizing and Forecasting User Engagement with In-app Action Graph: A Case Study of Snapchat**](https://arxiv.org/pdf/1906.00355.pdf), *Yozen Liu, Xiaolin Shi, Lucas Pierce, Xiang Ren*
-
-1. [**GIPA: General Information Propagation Algorithm for Graph Learning**](https://arxiv.org/abs/2105.06035), *Qinkai Zheng, Houyi Li, Peng Zhang, Zhixiong Yang, Guowei Zhang, Xintan Zeng, Yongchao Liu*
-
-1. [**Graph Ensemble Learning over Multiple Dependency Trees for Aspect-level Sentiment Classification**](https://arxiv.org/abs/2103.11794), NAACL'21, *Xiaochen Hou, Peng Qi, Guangtao Wang, Rex Ying, Jing Huang, Xiaodong He, Bowen Zhou*
-
-1. [**Enhancing Scientific Papers Summarization with Citation Graph**](https://arxiv.org/abs/2104.03057), AAAI'21, *Chenxin An, Ming Zhong, Yiran Chen, Danqing Wang, Xipeng Qiu, Xuanjing Huang*
-
 </details>
 
 ## Installation
@@ -360,12 +348,12 @@ conda install -c dglteam dgl-cuda11.1  # CUDA 11.1
 
 |           | Latest Nightly Build Version  | Stable Version          |
 |-----------|-------------------------------|-------------------------|
-| CPU       | `pip install --pre dgl -f https://data.dgl.ai/wheels-test/repo.html`       | `pip install dgl`       |
-| CUDA 9.2  | `pip install --pre dgl-cu92 -f https://data.dgl.ai/wheels-test/repo.html`  | `pip install dgl-cu92`  |
-| CUDA 10.1 | `pip install --pre dgl-cu101 -f https://data.dgl.ai/wheels-test/repo.html` | `pip install dgl-cu101` |
-| CUDA 10.2 | `pip install --pre dgl-cu102 -f https://data.dgl.ai/wheels-test/repo.html` | `pip install dgl-cu102` |
-| CUDA 11.0 | `pip install --pre dgl-cu110 -f https://data.dgl.ai/wheels-test/repo.html` | `pip install dgl-cu110` |
-| CUDA 11.1 | `pip install --pre dgl-cu111 -f https://data.dgl.ai/wheels-test/repo.html` | `pip install dgl-cu111` |
+| CPU       | `pip install --pre dgl`       | `pip install dgl`       |
+| CUDA 9.2  | `pip install --pre dgl-cu92`  | `pip install dgl-cu92`  |
+| CUDA 10.1 | `pip install --pre dgl-cu101` | `pip install dgl-cu101` |
+| CUDA 10.2 | `pip install --pre dgl-cu102` | `pip install dgl-cu102` |
+| CUDA 11.0 | `pip install --pre dgl-cu110` | `pip install dgl-cu110` |
+| CUDA 11.1 | `pip install --pre dgl-cu111` | `pip install dgl-cu111` |
 
 ### Built from source code
 

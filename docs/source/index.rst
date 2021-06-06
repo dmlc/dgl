@@ -25,8 +25,6 @@ Welcome to Deep Graph Library Tutorials and Documentation
    guide/index
    guide_cn/index
    tutorials/large/index
-   tutorials/multi/index
-   tutorials/dist/index
    tutorials/models/index
 
 .. toctree::

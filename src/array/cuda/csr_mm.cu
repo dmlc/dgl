@@ -118,10 +118,7 @@ std::pair<CSRMatrix, NDArray> CusparseSpgemm(
   CUSPARSE_CALL(cusparseDestroySpMat(matA));
   CUSPARSE_CALL(cusparseDestroySpMat(matB));
   CUSPARSE_CALL(cusparseDestroySpMat(matC));
-  return {
-      CSRMatrix(A.num_rows, B.num_cols, dC_csrOffsets, dC_columns,
-                NullArray(dC_csrOffsets->dtype, dC_csrOffsets->ctx)),
-      dC_weights};
+  return {CSRMatrix(A.num_rows, B.num_cols, dC_csrOffsets, dC_columns), dC_weights};
 }
 
 #else   // __CUDACC_VER_MAJOR__ != 11
@@ -200,9 +197,7 @@ std::pair<CSRMatrix, NDArray> CusparseSpgemm(
   CUSPARSE_CALL(cusparseDestroyMatDescr(matC));
   CUSPARSE_CALL(cusparseDestroyMatDescr(matD));
 
-  return {
-      CSRMatrix(m, k, C_indptr, C_indices, NullArray(C_indptr->dtype, C_indptr->ctx)),
-      C_weights};
+  return {CSRMatrix(m, k, C_indptr, C_indices), C_weights};
 }
 
 #endif  // __CUDACC_VER_MAJOR__ == 11
@@ -245,8 +240,7 @@ std::pair<CSRMatrix, NDArray> CSRMM(
   if (cast) {
     CSRMatrix C = result.first;
     return {
-      CSRMatrix(C.num_rows, C.num_cols, AsNumBits(C.indptr, 64), AsNumBits(C.indices, 64),
-                AsNumBits(C.data, 64)),
+      CSRMatrix(C.num_rows, C.num_cols, AsNumBits(C.indptr, 64), AsNumBits(C.indices, 64)),
       result.second};
   } else {
     return result;

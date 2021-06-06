@@ -1,2 +1,0 @@
-Training on Multiple GPUs
-=========================

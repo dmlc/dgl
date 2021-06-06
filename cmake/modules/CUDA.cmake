@@ -235,7 +235,6 @@ macro(dgl_config_cuda out_variable)
     src/array/cuda/*.cu
     src/kernel/cuda/*.cc
     src/kernel/cuda/*.cu
-    src/partition/cuda/*.cu
     src/runtime/cuda/*.cc
     src/runtime/cuda/*.cu
     src/geometry/cuda/*.cu

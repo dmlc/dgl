@@ -30,7 +30,3 @@ Render locally
 cd build/html
 python3 -m http.server 8000
 ```
-
-Add new folders
----------------
-Add the path of the new folder in the two lists `examples_dirs` and `gallery_dirs` in docs/source/conf.py.

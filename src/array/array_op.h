@@ -104,19 +104,12 @@ bool CSRIsSorted(CSRMatrix csr);
 
 template <DLDeviceType XPU, typename IdType, typename DType>
 runtime::NDArray CSRGetData(
-    CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols, bool return_eids,
-    runtime::NDArray weights, DType filler);
-
-template <DLDeviceType XPU, typename IdType, typename DType>
-runtime::NDArray CSRGetData(
     CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols,
-    runtime::NDArray weights, DType filler) {
-  return CSRGetData<XPU, IdType, DType>(csr, rows, cols, false, weights, filler);
-}
+    runtime::NDArray weights, DType filler);
 
 template <DLDeviceType XPU, typename IdType>
 NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols) {
-  return CSRGetData<XPU, IdType, IdType>(csr, rows, cols, true, NullArray(rows->dtype), -1);
+  return CSRGetData<XPU, IdType, IdType>(csr, rows, cols, NullArray(rows->dtype), -1);
 }
 
 template <DLDeviceType XPU, typename IdType>
@@ -145,10 +138,6 @@ CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray 
 
 template <DLDeviceType XPU, typename IdType>
 void CSRSort_(CSRMatrix* csr);
-
-template <DLDeviceType XPU, typename IdType, typename TagType>
-std::pair<CSRMatrix, NDArray> CSRSortByTag(
-    const CSRMatrix &csr, IdArray tag_array, int64_t num_tags);
 
 template <DLDeviceType XPU, typename IdType>
 CSRMatrix CSRReorder(CSRMatrix csr, runtime::NDArray new_row_ids, runtime::NDArray new_col_ids);
