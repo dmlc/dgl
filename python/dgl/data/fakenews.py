@@ -37,7 +37,9 @@ class FakeNewsDataset(DGLBuiltinDataset):
         - Graphs: 314
         - Nodes: 41,054
         - Edges: 40,740
-        - Number of Classes: 2
+        - Classes:
+            Fake: 157
+            Real: 157
         - Node feature size:
             bert: 768
             content: 310
@@ -49,7 +51,9 @@ class FakeNewsDataset(DGLBuiltinDataset):
         - Graphs: 5464
         - Nodes: 314,262
         - Edges: 308,798
-        - Number of Classes: 2
+        - Classes:
+            Fake: 2732
+            Real: 2732
         - Node feature size:
             bert: 768
             content: 310
