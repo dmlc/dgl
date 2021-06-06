@@ -6,7 +6,7 @@
 #ifndef DGL_RUNTIME_PARALLEL_FOR_H_
 #define DGL_RUNTIME_PARALLEL_FOR_H_
 
-#include <omp.h>
+#include <dmlc/omp.h>
 #include <algorithm>
 
 namespace {
