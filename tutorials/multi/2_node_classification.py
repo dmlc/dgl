@@ -88,11 +88,12 @@ class Model(nn.Module):
 # ---------------------------
 # 
 # The training procedure will be slightly different from what you saw
-# previously, in the sense that you will need to \* Initialize a
-# distributed training context with ``torch.distributed``. \* Wrap your
-# model with ``torch.nn.parallel.DistributedDataParallel``. \* Add a
-# ``use_ddp=True`` argument to the DGL dataloader you wish to run together
-# with DDP.
+# previously, in the sense that you will need to
+#
+# * Initialize a distributed training context with ``torch.distributed``.
+# * Wrap your model with ``torch.nn.parallel.DistributedDataParallel``.
+# * Add a ``use_ddp=True`` argument to the DGL dataloader you wish to run
+#   together with DDP.
 # 
 # You will also need to wrap the training loop inside a function so that
 # you can spawn subprocesses to run it.

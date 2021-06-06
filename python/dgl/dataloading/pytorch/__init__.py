@@ -112,21 +112,21 @@ class _ScalarDataBatcher(th.utils.data.IterableDataset):
             # deterministically shuffle based on epoch and seed
             g = th.Generator()
             g.manual_seed(self.seed + self.epoch)
-            indices = th.randperm(len(self.dataset), generator=g).tolist()  # type: ignore
+            indices = th.randperm(len(self.dataset), generator=g)
         else:
-            indices = list(range(len(self.dataset)))  # type: ignore
+            indices = th.arange(len(self.dataset))
 
         if not self.drop_last:
             # add extra samples to make it evenly divisible
-            indices += indices[:(self.total_size - len(indices))]
+            indices = th.cat([indices, indices[:(self.total_size - indices.shape[0])]])
         else:
             # remove tail of data to make it evenly divisible.
             indices = indices[:self.total_size]
-        assert len(indices) == self.total_size
+        assert indices.shape[0] == self.total_size
 
         # subsample
         indices = indices[self.rank:self.total_size:self.num_replicas]
-        assert len(indices) == self.num_samples
+        assert indices.shape[0] == self.num_samples
 
         # Dividing by worker is our own stuff.
         dataset = self._divide_by_worker(self.dataset[indices])
