@@ -26,6 +26,13 @@ size_t compute_num_threads(size_t begin, size_t end, size_t grain_size) {
 }
 }
 
+/*!
+ * \brief OpenMP-based parallel for loop.
+ *
+ * It requires each thread's workload to have at least \a grain_size elements.
+ * The loop body will be a function that takes in a single argument \a i, which
+ * stands for the index of the workload.
+ */
 template <typename F>
 void parallel_for(
     const size_t begin,
