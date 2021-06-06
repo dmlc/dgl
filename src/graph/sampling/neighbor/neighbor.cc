@@ -210,7 +210,7 @@ HeteroSubgraph SampleNeighborsBiased(
   CHECK_EQ(tag_offset->ndim, 2) << "The shape of tag_offset should be [num_nodes, num_tags + 1]";
   CHECK_EQ(tag_offset->shape[0], hg->NumVertices(nodes_ntype))
     << "The shape of tag_offset should be [num_nodes, num_tags + 1]";
-  CHECK_EQ(tag_offset->shape[1], bias->shape[0]) << "The sizes of tag_offset and bias are inconsistent";
+  CHECK_EQ(tag_offset->shape[1], bias->shape[0] + 1) << "The sizes of tag_offset and bias are inconsistent";
 
   const int64_t num_nodes = nodes->shape[0];
   HeteroGraphPtr subrel;

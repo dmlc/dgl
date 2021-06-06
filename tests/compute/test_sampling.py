@@ -562,12 +562,39 @@ def test_sample_neighbors_with_0deg():
     sg = dgl.sampling.sample_neighbors(g, F.tensor([1, 2], dtype=F.int64), 2, edge_dir='out', replace=True)
     assert sg.number_of_edges() == 0
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
+def test_sample_neighbors_biased():
+    """
+    0 -> 1, 2, 3, 4
+    2 -> 3, 4, 5
+    """
+    g = dgl.graph(([0, 0, 0, 0, 2, 2, 2], [1, 2, 3, 4, 3, 4, 5]))
+    bias = F.tensor([0, 0.5])
+    tag = F.tensor([0, 0, 0, 1, 1, 1])
+    g_sorted = dgl.sort_out_edges(g, tag)
+
+    # without replacement
+    for _ in range(10):
+        subg = dgl.sampling.sample_neighbors_biased(g_sorted, F.tensor([0, 2]), 2, bias, edge_dir='out')
+        u, v = subg.edges()
+        uv = set(zip(F.asnumpy(u), F.asnumpy(v)))
+        assert (0, 1) not in uv
+        assert (0, 2) not in uv
+
+    # with replacement
+    bias = F.tensor([0.1 , 1])
+    for _ in range(50):
+        subg = dgl.sampling.sample_neighbors_biased(g_sorted, F.tensor([0, 2]), 100, bias, edge_dir='out', replace=True)
+        u, v = subg.edges()
+        assert 5 * sum(F.asnumpy(v < 3)) < sum(F.asnumpy(v>=3))
+
 if __name__ == '__main__':
-    test_random_walk()
-    test_pack_traces()
-    test_pinsage_sampling()
-    test_sample_neighbors()
-    test_sample_neighbors_outedge()
-    test_sample_neighbors_topk()
-    test_sample_neighbors_topk_outedge()
-    test_sample_neighbors_with_0deg()
+    # test_random_walk()
+    # test_pack_traces()
+    # test_pinsage_sampling()
+    # test_sample_neighbors()
+    # test_sample_neighbors_outedge()
+    # test_sample_neighbors_topk()
+    # test_sample_neighbors_topk_outedge()
+    # test_sample_neighbors_with_0deg()
+    test_sample_neighbors_biased()

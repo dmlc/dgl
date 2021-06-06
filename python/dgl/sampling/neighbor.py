@@ -9,7 +9,7 @@ from .. import utils
 
 __all__ = [
     'sample_neighbors',
-    'sample_neighbors_biased'
+    'sample_neighbors_biased',
     'select_topk']
 
 def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
@@ -180,7 +180,7 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
 
     return ret
 
-def sample_neighbors_biased(g, nodes, fanout, bias, edge_dir='in', tag_offset_name='TAG_OFFSET', replace=False,
+def sample_neighbors_biased(g, nodes, fanout, bias, edge_dir='in', tag_offset_name='_TAG_OFFSET', replace=False,
                      copy_ndata=True, copy_edata=True, _dist_training=False):
     if len(g.ntypes) > 1:
         raise DGLError("Only homogeneous or bipartite graphs are supported.")

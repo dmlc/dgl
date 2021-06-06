@@ -119,13 +119,8 @@ COOMatrix CSRRowWiseSamplingBiased(
     FloatArray bias,
     bool replace
 ) {
-  if (replace) {
-    // normal biased sampling
-    LOG(FATAL) << "not implemented";
-  } else {
-    auto pick_fn = GetSamplingBiasedPickFn<IdxType, FloatType>(num_samples, tag_offset, bias, replace);
-    return CSRRowWisePick(mat, rows, num_samples, replace, pick_fn);
-  }
+  auto pick_fn = GetSamplingBiasedPickFn<IdxType, FloatType>(num_samples, tag_offset, bias, replace);
+  return CSRRowWisePick(mat, rows, num_samples, replace, pick_fn);
 }
 
 template COOMatrix CSRRowWiseSamplingBiased<kDLCPU, int32_t, float>(

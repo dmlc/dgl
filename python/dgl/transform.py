@@ -2654,6 +2654,15 @@ def sort_out_edges(g, tag, tag_offset_name='_TAG_OFFSET'):
     >>> g_sorted.adjacency_matrix(scipy_fmt='csr').nonzero()
     (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
      array([2, 4, 0, 1, 3, 2, 0, 1], dtype=int32))
+<<<<<<< HEAD
+=======
+    >>> g_sorted.ndata['_TAG_OFFSET']
+    tensor([[0, 2, 4, 5],
+            [0, 1, 3, 3],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0]])
+>>>>>>> e20d89532477c17db421ccceb045355521332a47
 
     Parameters
     ------------
@@ -2678,8 +2687,12 @@ def sort_out_edges(g, tag, tag_offset_name='_TAG_OFFSET'):
     tag_arr = F.zerocopy_to_dgl_ndarray(tag)
     new_g = g.clone()
     new_g._graph, tag_pos_arr = _CAPI_DGLHeteroSortOutEdges(g._graph, tag_arr, num_tags)
+<<<<<<< HEAD
     if tag is not None:
         new_g.srcdata[tag_offset_name] = F.from_dgl_nd(tag_pos_arr)
+=======
+    new_g.srcdata[tag_offset_name] = F.from_dgl_nd(tag_pos_arr)
+>>>>>>> e20d89532477c17db421ccceb045355521332a47
     return new_g
 
 
@@ -2732,17 +2745,34 @@ def sort_in_edges(g, tag, tag_offset_name='_TAG_OFFSET'):
     (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
      array([0, 1, 2, 3, 4, 0, 1, 2], dtype=int32)))
     >>> tag = torch.IntTensor([1,1,0,2,0])
+<<<<<<< HEAD
     >>> g_sorted = dgl.transform.sort_out_edges(g, tag)
     >>> g_sorted.adjacency_matrix(scipy_fmt='csr', transpose=False).nonzero()
     (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
      array([2, 4, 0, 1, 3, 2, 0, 1], dtype=int32))
+=======
+    >>> g_sorted = dgl.transform.sort_in_edges(g, tag)
+    >>> g_sorted.adjacency_matrix(scipy_fmt='csr', transpose=False).nonzero()
+    (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
+     array([2, 4, 0, 1, 3, 2, 0, 1], dtype=int32))
+    >>> g_sorted.ndata['_TAG_OFFSET']
+    tensor([[0, 2, 4, 5],
+            [0, 1, 3, 3],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0]])
+>>>>>>> e20d89532477c17db421ccceb045355521332a47
 
     Parameters
     ------------
     g : DGLGraph
         The input graph.
     tag : Tensor
+<<<<<<< HEAD
         Integer tensor of shape `(N,)`, `N` being the number of (destination) nodes.
+=======
+        Integer tensor of shape `(N,)`, `N` being the number of (source) nodes.
+>>>>>>> e20d89532477c17db421ccceb045355521332a47
     tag_offset_name : str
         The name of the node feature to store tag offsets.
 
@@ -2752,7 +2782,11 @@ def sort_in_edges(g, tag, tag_offset_name='_TAG_OFFSET'):
         A new graph whose out edges are sorted. The node/edge features of the
         input graph is shallow-copied over.
         - `g_sorted.ndata[tag_offset_name]` : Tensor of shape `(N, max_tag + 2)`. If
+<<<<<<< HEAD
         `g` is heterogeneous, get from `g_sorted.srcdata`.
+=======
+        `g` is heterogeneous, get from `g_sorted.dstdata`.
+>>>>>>> e20d89532477c17db421ccceb045355521332a47
     """
     if len(g.etypes) > 1:
         raise DGLError("Only support homograph and bipartite graph")
@@ -2760,8 +2794,12 @@ def sort_in_edges(g, tag, tag_offset_name='_TAG_OFFSET'):
     tag_arr = F.zerocopy_to_dgl_ndarray(tag)
     new_g = g.clone()
     new_g._graph, tag_pos_arr = _CAPI_DGLHeteroSortInEdges(g._graph, tag_arr, num_tags)
+<<<<<<< HEAD
     if tag is not None:
         new_g.dstdata[tag_offset_name] = F.from_dgl_nd(tag_pos_arr)
+=======
+    new_g.dstdata[tag_offset_name] = F.from_dgl_nd(tag_pos_arr)
+>>>>>>> e20d89532477c17db421ccceb045355521332a47
     return new_g
 
 _init_api("dgl.transform")

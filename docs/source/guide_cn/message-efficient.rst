@@ -20,11 +20,11 @@ DGL建议用户尽量减少边的特征维数。
     import torch
     import torch.nn as nn
 
-    linear = nn.Parameter(torch.FloatTensor(size=(1, node_feat_dim * 2)))
+    linear = nn.Parameter(torch.FloatTensor(size=(node_feat_dim * 2, out_dim)))
     def concat_message_function(edges):
          return {'cat_feat': torch.cat([edges.src.ndata['feat'], edges.dst.ndata['feat']])}
     g.apply_edges(concat_message_function)
-    g.edata['out'] = g.edata['cat_feat'] * linear
+    g.edata['out'] = g.edata['cat_feat'] @ linear
 
 建议的实现是将线性操作分成两部分，一个应用于 ``源`` 节点特征，另一个应用于 ``目标`` 节点特征。
 在最后一个阶段，在边上将以上两部分线性操作的结果相加，即执行 :math:`W_l\times u + W_r \times v`，
@@ -35,10 +35,10 @@ DGL建议用户尽量减少边的特征维数。
 
     import dgl.function as fn
 
-    linear_src = nn.Parameter(torch.FloatTensor(size=(1, node_feat_dim)))
-    linear_dst = nn.Parameter(torch.FloatTensor(size=(1, node_feat_dim)))
-    out_src = g.ndata['feat'] * linear_src
-    out_dst = g.ndata['feat'] * linear_dst
+    linear_src = nn.Parameter(torch.FloatTensor(size=(node_feat_dim, out_dim)))
+    linear_dst = nn.Parameter(torch.FloatTensor(size=(node_feat_dim, out_dim)))
+    out_src = g.ndata['feat'] @ linear_src
+    out_dst = g.ndata['feat'] @ linear_dst
     g.srcdata.update({'out_src': out_src})
     g.dstdata.update({'out_dst': out_dst})
     g.apply_edges(fn.u_add_v('out_src', 'out_dst', 'out'))

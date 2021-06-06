@@ -380,7 +380,6 @@ void _TestCSRSamplingBiased(bool has_data) {
     auto rst = CSRRowWiseSamplingBiased(mat, rows, 1, tag_offset, bias, false);
     CheckSampledResult<Idx>(rst, rows, has_data);
     auto eset = ToEdgeSet<Idx>(rst);
-    //   IdArray data = NDArray::FromVector(std::vector<Idx>({2, 3, 0, 1, 4}));
     if (has_data) {
       ASSERT_TRUE(eset.count(std::make_tuple(0, 1, 3)));
       ASSERT_TRUE(eset.count(std::make_tuple(1, 1, 0)));
@@ -389,6 +388,24 @@ void _TestCSRSamplingBiased(bool has_data) {
       ASSERT_TRUE(eset.count(std::make_tuple(0, 1, 1)));
       ASSERT_TRUE(eset.count(std::make_tuple(1, 1, 2)));
       ASSERT_TRUE(eset.count(std::make_tuple(3, 3, 4)));
+    }
+  }
+  for (int k = 0 ; k < 10 ; ++k) {
+    auto rst = CSRRowWiseSamplingBiased(mat, rows, 3, tag_offset, bias, true);
+    CheckSampledResult<Idx>(rst, rows, has_data);
+    auto eset = ToEdgeSet<Idx>(rst);
+    if (has_data) {
+      ASSERT_TRUE(eset.count(std::make_tuple(0, 1, 3)));
+      ASSERT_TRUE(eset.count(std::make_tuple(1, 1, 0)));
+      ASSERT_TRUE(eset.count(std::make_tuple(3, 3, 4)));
+      ASSERT_FALSE(eset.count(std::make_tuple(0, 0, 2)));
+      ASSERT_FALSE(eset.count(std::make_tuple(3, 2, 1)));
+    } else {
+      ASSERT_TRUE(eset.count(std::make_tuple(0, 1, 1)));
+      ASSERT_TRUE(eset.count(std::make_tuple(1, 1, 2)));
+      ASSERT_TRUE(eset.count(std::make_tuple(3, 3, 4)));
+      ASSERT_FALSE(eset.count(std::make_tuple(0, 0, 0)));
+      ASSERT_FALSE(eset.count(std::make_tuple(3, 2, 3)));
     }
   }
 }
