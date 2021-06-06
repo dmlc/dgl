@@ -173,7 +173,7 @@ template <DLDeviceType XPU, typename IdType, typename DType>
 COOMatrix CSRRowWiseTopk(
     CSRMatrix mat, IdArray rows, int64_t k, NDArray weight, bool ascending);
 
-template <DLDeviceType XPU, typename IdType, typename DType>
+template <DLDeviceType XPU, typename IdType, typename FloatType>
 COOMatrix CSRRowWiseSamplingBiased(
     CSRMatrix mat,
     IdArray rows,
