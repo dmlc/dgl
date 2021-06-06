@@ -197,10 +197,12 @@ from sphinx_gallery.sorting import FileNameSortKey
 
 examples_dirs = ['../../tutorials/blitz',
                  '../../tutorials/large',
+                 '../../tutorials/dist',
                  '../../tutorials/models',
                  '../../tutorials/multi']  # path to find sources
 gallery_dirs = ['tutorials/blitz/',
                 'tutorials/large/',
+                'tutorials/dist/',
                 'tutorials/models/',
                 'tutorials/multi/']  # path to generate docs
 reference_url = {
