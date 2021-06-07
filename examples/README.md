@@ -93,6 +93,7 @@ The folder contains example implementations of selected research papers related 
 | [GNNExplainer: Generating Explanations for Graph Neural Networks](#gnnexplainer) |  :heavy_check_mark: |                                  |                                  |                                  |                                  |
 | [Interaction Networks for Learning about Objects, Relations and Physics](#graphsim) |  |                                 |:heavy_check_mark:                 |                    |                    |
 | [Representation Learning on Graphs with Jumping Knowledge Networks](#jknet) |  :heavy_check_mark: |                                  |                                  |                                  |                                  |
+| [A Heterogeneous Information Network based Cross Domain Insurance Recommendation System for Cold Start Users](#tahin) |  |     :heavy_check_mark:       |                 |                    |                    |
 | [DeeperGCN: All You Need to Train Deeper GCNs](#deepergcn)                                                                        |                                  |                                  | :heavy_check_mark:        |                    | :heavy_check_mark: |
 | [Diffusion Convolutional Recurrent Neural Network: Data-Driven Traffic Forcasting](#dcrnn) |                     |                                  | :heavy_check_mark:        |                    |                    |
 | [GaAN: Gated Attention Networks for Learning on large and Spatiotemporal Graphs](#gaan) |                     |                                  | :heavy_check_mark:        |                    |                    |
@@ -159,6 +160,9 @@ The folder contains example implementations of selected research papers related 
 - <a name="deepergcn"></a> Li et al. DeeperGCN: All You Need to Train Deeper GCNs. [Paper link](https://arxiv.org/abs/2006.07739).
     - Example code: [PyTorch](../examples/pytorch/deepergcn)
     - Tags: over-smoothing, deeper gnn, OGB
+- <a name="tahin"></a> Bi, Ye, et al. A Heterogeneous Information Network based Cross DomainInsurance Recommendation System for Cold Start Users. [Paper link](https://arxiv.org/abs/2007.15293).
+    - Example code: [Pytorch](../examples/pytorch/TAHIN)
+    - Tags: cross-domain recommendation, graph neural network
 - <a name="magnn"></a> Fu X, Zhang J, Meng Z, et al. MAGNN: metapath aggregated graph neural network for heterogeneous graph embedding. [Paper link](https://dl.acm.org/doi/abs/10.1145/3366423.3380297).
     - Example code: [OpenHGNN](https://github.com/BUPT-GAMMA/OpenHGNN/tree/main/openhgnn/output/MAGNN)
     - Tags: Heterogeneous graph, Graph neural network, Graph embedding
