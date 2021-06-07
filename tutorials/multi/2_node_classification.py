@@ -214,12 +214,19 @@ def run(proc_id, devices):
 # 
 # To alleviate the problem we recommend using ``multiprocessing.Process``,
 # which *forks* from the main process and allows sharing the same graph
-# object to trainer processes via *copy-on-write*, as long as the graph
-# object is not mutated. This can greatly reduce the memory consumption.
-# 
-# To keep the graph object from mutating, you need to call
-# ``create_formats_`` so that no new sparse matrix representations of the
-# graph will be created on the fly.
+# object to trainer processes via *copy-on-write*. This can greatly reduce
+# the memory consumption.
+#
+# Normally, DGL maintains only one sparse matrix representation (usually COO)
+# for each graph, and will create new formats when some APIs are called for
+# efficiency.  For instance, calling ``in_degrees`` will create a CSC
+# representation for the graph, and calling ``out_degrees`` will create a
+# CSR representation.  A consequence is that if a graph is shared to
+# trainer processes via copy-on-write *before* having its CSC/CSR
+# created, each trainer will create its own CSC/CSR replica once ``in_degrees``
+# or ``out_degrees`` is called.  To avoid this, you need to create
+# all sparse matrix representations beforehand using the ``create_formats_``
+# method:
 # 
 
 graph.create_formats_()
