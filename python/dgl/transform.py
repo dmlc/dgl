@@ -291,7 +291,7 @@ def segmented_knn_graph(x, k, segs, algorithm='bruteforce-blas', dist='euclidean
         * 'kd-tree' will use the kd-tree algorithm (CPU only).
           This method is suitable for low-dimensional data (e.g. 3D
           point clouds)
-        
+
         * 'nn-descent' is a approximate approach from paper
           `Efficient k-nearest neighbor graph construction for generic similarity
           measures <https://www.cs.princeton.edu/cass/papers/www11.pdf>`_. This method
@@ -527,12 +527,12 @@ def knn(k, x, x_segs, y=None, y_segs=None, algorithm='bruteforce', dist='euclide
         * 'kd-tree' will use the kd-tree algorithm (CPU only).
           This method is suitable for low-dimensional data (e.g. 3D
           point clouds)
-        
+
         * 'nn-descent' is a approximate approach from paper
           `Efficient k-nearest neighbor graph construction for generic similarity
           measures <https://www.cs.princeton.edu/cass/papers/www11.pdf>`_. This method
           will search for nearest neighbor candidates in "neighbors' neighbors".
-        
+
         Note: Currently, 'nn-descent' only supports self-query cases, i.e. :attr:`y` is None.
         (default: 'bruteforce')
     dist : str, optional
