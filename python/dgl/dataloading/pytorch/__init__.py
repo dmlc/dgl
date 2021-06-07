@@ -61,7 +61,7 @@ class _ScalarDataBatcher(th.utils.data.IterableDataset):
             # comes from PyTorch.  See torch/utils/data/distributed.py for details.
 
             # If the dataset length is evenly divisible by # of replicas, then there
-            # is no need to drop any data, since the dataset will be split equally.
+            # is no need to drop any sample, since the dataset will be split evenly.
             if self.drop_last and len(self.dataset) % self.num_replicas != 0:  # type: ignore
                 # Split to nearest available length that is evenly divisible.
                 # This is to ensure each rank receives the same amount of data when

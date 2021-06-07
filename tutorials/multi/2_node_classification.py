@@ -3,7 +3,7 @@ Single Machine Multi-GPU Minibatch Node Classification
 ======================================================
 
 In this tutorial, you will learn how to use multiple GPUs in training a
-graph neural network (GNN) for graph classification.
+graph neural network (GNN) for node classification.
 
 (Time estimate: 8 minutes)
 
@@ -14,7 +14,9 @@ models with multi-GPU with ``DistributedDataParallel``.
 
 .. note::
 
-   See :doc:`the multi-GPU graph classification
+   See `this tutorial <https://pytorch.org/tutorials/intermediate/ddp_tutorial.html>`__
+   from PyTorch for general multi-GPU training with ``DistributedDataParallel``.  Also,
+   see the first section of :doc:`the multi-GPU graph classification
    tutorial <1_graph_classification>`
    for an overview of using ``DistributedDataParallel`` with DGL.
 
@@ -25,7 +27,7 @@ models with multi-GPU with ``DistributedDataParallel``.
 # Loading Dataset
 # ---------------
 # 
-# OGB already prepared the data as DGL graph. The following code is
+# OGB already prepared the data as a ``DGLGraph`` object. The following code is
 # copy-pasted from the :doc:`Training GNN with Neighbor Sampling for Node
 # Classification <../large/L1_large_node_classification>`
 # tutorial.
@@ -55,7 +57,7 @@ num_classes = (node_labels.max() + 1).item()
 idx_split = dataset.get_idx_split()
 train_nids = idx_split['train']
 valid_nids = idx_split['valid']
-test_nids = idx_split['test']
+test_nids = idx_split['test']    # Test node IDs, not used in the tutorial though.
 
 
 ######################################################################
