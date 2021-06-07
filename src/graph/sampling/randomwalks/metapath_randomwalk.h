@@ -74,7 +74,7 @@ std::pair<dgl_id_t, bool> MetapathRandomWalkStep(
   if (size == 0)
     return std::make_pair(-1, true);
 
-  // Use a reference to the original array instead of copying 
+  // Use a reference to the original array instead of copying
   // This avoids updating the ref counts atomically from different threads
   // and avoids cache ping-ponging in the tight loop
   const FloatArray &prob_etype = prob[etype];
@@ -179,14 +179,15 @@ IdArray MetapathBasedRandomWalk(
   for (dgl_type_t etype = 0; etype < hg->NumEdgeTypes(); ++etype)
     edges_by_type.push_back(hg->GetAdj(etype, true, "csr"));
 
-  // Hoist the check for Uniform vs Non uniform edge distribution to avoid putting it on the hot path
+  // Hoist the check for Uniform vs Non uniform edge distribution
+  // to avoid putting it on the hot path
   StepFunc<IdxType> step;
   bool isUniform = true;
-  for (const auto &etype_prob: prob) {
+  for (const auto &etype_prob : prob) {
     if (!IsNullArray(etype_prob)) {
       isUniform = false;
-      break;      
-    } 
+      break;
+    }
   }
   if (!isUniform) {
     step =
@@ -196,7 +197,7 @@ IdArray MetapathBasedRandomWalk(
             data, curr, len, edges_by_type, metapath_data, prob, terminate);
       };
   } else {
-    step = 
+    step =
       [&edges_by_type, metapath_data, &prob, terminate]
       (IdxType *data, dgl_id_t curr, int64_t len) {
         return MetapathRandomWalkStepUniform<XPU, IdxType>(
