@@ -44,7 +44,7 @@ feats = g.ndata.pop('h')
 label_pred = model(g, feats)
 print(smiles)                   # CCOc1ccc2nc(S(N)(=O)=O)sc2c1
 print(label_pred[:, mask != 0]) # Mask non-existing labels
-# tensor([[ 1.4190, -0.1820,  1.2974,  1.4416,  0.6914,  
+# tensor([[ 1.4190, -0.1820,  1.2974,  1.4416,  0.6914,
 # 2.0957,  0.5919,  0.7715, 1.7273,  0.2070]])
 ```
 
@@ -61,7 +61,7 @@ class GCN(nn.Module):
         super(GCN, self).__init__()
         self.gcn_layer1 = GraphConv(in_feats, h_feats)
         self.gcn_layer2 = GraphConv(h_feats, num_classes)
-    
+
     def forward(self, graph, inputs):
         h = self.gcn_layer1(graph, inputs)
         h = F.relu(h)
@@ -80,21 +80,21 @@ class GATLayer(nn.Module):
         super(GATLayer, self).__init__()
         self.linear_func = nn.Linear(in_feats, out_feats, bias=False)
         self.attention_func = nn.Linear(2 * out_feats, 1, bias=False)
-        
+
     def edge_attention(self, edges):
         concat_z = torch.cat([edges.src['z'], edges.dst['z']], dim=1)
         src_e = self.attention_func(concat_z)
         src_e = F.leaky_relu(src_e)
         return {'e': src_e}
-    
+
     def message_func(self, edges):
         return {'z': edges.src['z'], 'e':edges.data['e']}
-        
+
     def reduce_func(self, nodes):
         a = F.softmax(nodes.mailbox['e'], dim=1)
         h = torch.sum(a * nodes.mailbox['z'], dim=1)
         return {'h': h}
-                               
+
     def forward(self, graph, h):
         z = self.linear_func(h)
         graph.ndata['z'] = z
@@ -138,7 +138,7 @@ High memory utilization allows DGL to push the limit of single-GPU performance, 
   <img src="http://data.dgl.ai/asset/image/one-four-GPUs.png" width="600">
 </p>
 
-| <img src="http://data.dgl.ai/asset/image/one-four-GPUs-DGLvsGraphVite.png"> |  <img src="http://data.dgl.ai/asset/image/one-fourMachines.png"> | 
+| <img src="http://data.dgl.ai/asset/image/one-four-GPUs-DGLvsGraphVite.png"> |  <img src="http://data.dgl.ai/asset/image/one-fourMachines.png"> |
 | :---------------------------------------: | -- |
 
 
@@ -275,7 +275,7 @@ We are currently in Beta stage.  More features and improvements are coming.
 
 1. [**PGM-Explainer: Probabilistic Graphical Model Explanations for Graph Neural Networks**](https://proceedings.neurips.cc/paper/2020/file/8fb134f258b1f7865a6ab2d935a897c9-Paper.pdf), *Minh N. Vu, My T. Thai*
 
-1. [**A Generalization of Transformer Networks to Graphs**](https://arxiv.org/pdf/2012.09699.pdf), *Vijay Prakash Dwivedi, Xavier Bresson* 
+1. [**A Generalization of Transformer Networks to Graphs**](https://arxiv.org/pdf/2012.09699.pdf), *Vijay Prakash Dwivedi, Xavier Bresson*
 
 1. [**Discourse-Aware Neural Extractive Text Summarization**](https://www.aclweb.org/anthology/2020.acl-main.451.pdf), ACL'20, *Jiacheng Xu, Zhe Gan, Yu Cheng, Jingjing Liu*
 
@@ -291,7 +291,7 @@ We are currently in Beta stage.  More features and improvements are coming.
 
 1. [**Transfer Learning with Graph Neural Networks for Optoelectronic Properties of Conjugated Oligomers**](https://aip.scitation.org/doi/10.1063/5.0037863), J. Chem. Phys. 154, *Chee-Kong Lee, Chengqiang Lu, Yue Yu, Qiming Sun, Chang-Yu Hsieh, Shengyu Zhang, Qi Liu, and  Liang Shi*
 
-1. [**Jet tagging in the Lund plane with graph networks**](https://link.springer.com/article/10.1007/JHEP03(2021)052), Journal of High Energy Physics 2021, *Frédéric A. Dreyer and Huilin Qu* 
+1. [**Jet tagging in the Lund plane with graph networks**](https://link.springer.com/article/10.1007/JHEP03(2021)052), Journal of High Energy Physics 2021, *Frédéric A. Dreyer and Huilin Qu*
 
 1. [**Global Attention Improves Graph Networks Generalization**](https://arxiv.org/abs/2006.07846), *Omri Puny, Heli Ben-Hamu, and Yaron Lipman*
 
@@ -320,7 +320,7 @@ We are currently in Beta stage.  More features and improvements are coming.
 1. [**Medical Entity Disambiguation Using Graph Neural Networks**](https://arxiv.org/abs/2104.01488), *Alina Vretinaris, Chuan Lei, Vasilis Efthymiou, Xiao Qin, Fatma Özcan*
 
 1. [**Chemistry-informed Macromolecule Graph Representation for Similarity Computation and Supervised Learning**](https://arxiv.org/abs/2103.02565), *Somesh Mohapatra, Joyce An, Rafael Gómez-Bombarelli*
-  
+
 1. [**Characterizing and Forecasting User Engagement with In-app Action Graph: A Case Study of Snapchat**](https://arxiv.org/pdf/1906.00355.pdf), *Yozen Liu, Xiaolin Shi, Lucas Pierce, Xiang Ren*
 
 1. [**GIPA: General Information Propagation Algorithm for Graph Learning**](https://arxiv.org/abs/2105.06035), *Qinkai Zheng, Houyi Li, Peng Zhang, Zhixiong Yang, Guowei Zhang, Xintan Zeng, Yongchao Liu*
@@ -328,6 +328,8 @@ We are currently in Beta stage.  More features and improvements are coming.
 1. [**Graph Ensemble Learning over Multiple Dependency Trees for Aspect-level Sentiment Classification**](https://arxiv.org/abs/2103.11794), NAACL'21, *Xiaochen Hou, Peng Qi, Guangtao Wang, Rex Ying, Jing Huang, Xiaodong He, Bowen Zhou*
 
 1. [**Enhancing Scientific Papers Summarization with Citation Graph**](https://arxiv.org/abs/2104.03057), AAAI'21, *Chenxin An, Ming Zhong, Yiran Chen, Danqing Wang, Xipeng Qiu, Xuanjing Huang*
+
+1. [**Improving Graph Representation Learning by Contrastive Regularization**](https://arxiv.org/pdf/2101.11525.pdf), *Kaili Ma, Haochen Yang, Han Yang, Tatiana Jin, Pengfei Chen, Yongqiang Chen, Barakeel Fanseu Kamhoua, James Cheng*
 
 </details>
 
@@ -377,7 +379,7 @@ Refer to the guide [here](https://docs.dgl.ai/install/index.html#install-from-so
 | Releases  | Date   | Features |
 |-----------|--------|-------------------------|
 | v0.4.3    | 03/31/2020 | - TensorFlow support <br> - DGL-KE <br> - DGL-LifeSci <br> - Heterograph sampling APIs (experimental) |
-| v0.4.2      | 01/24/2020 |  - Heterograph support <br> - TensorFlow support (experimental) <br> - MXNet GNN modules <br> | 
+| v0.4.2      | 01/24/2020 |  - Heterograph support <br> - TensorFlow support (experimental) <br> - MXNet GNN modules <br> |
 | v0.3.1 | 08/23/2019 | - APIs for GNN modules <br> - Model zoo (DGL-Chem) <br> - New installation |
 | v0.2 | 03/09/2019 | - Graph sampling APIs <br> - Speed improvement |
 | v0.1 | 12/07/2018 | - Basic DGL APIs <br> - PyTorch and MXNet support <br> - GNN model examples and tutorials |
