@@ -30,6 +30,20 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
              std::vector<NDArray> out_aux);
 
 /*!
+ * \brief Generalized Sparse Matrix Dense Matrix Multiplication on Csr format
+ with heterograph support.
+ */
+template <int XPU, typename IdType, int bits>
+void SpMMCsrHetero(const std::string& op, const std::string& reduce,
+             const BcastOff& bcast,
+             const std::vector<CSRMatrix>& csr,
+             const std::vector<NDArray>& ufeat,
+             const std::vector<NDArray>& efeat,
+             std::vector<NDArray> out,
+             const std::vector<NDArray>& out_aux,
+             const std::vector<dgl_type_t>& ufeat_eid,
+             const std::vector<dgl_type_t>& out_eid);
+/*!
  * \brief Generalized Sparse Matrix Dense Matrix Multiplication on Coo format.
  */
 template <int XPU, typename IdType, int bits>
@@ -53,6 +67,21 @@ void SDDMMCsr(const std::string& op,
               NDArray out,
               int lhs_target,
               int rhs_target);
+/*!
+ * \brief Generalized Sampled Dense-Dense Matrix Multiplication on Csr 
+ format with heterograph support.
+  */
+template <int XPU, typename IdType, int bits>
+void SDDMMCsrHetero(const std::string& op,
+              const BcastOff& bcast,
+              const std::vector<CSRMatrix>& vec_csr,
+              const std::vector<NDArray>& vec_lhs,
+              const std::vector<NDArray>& vec_rhs,
+              std::vector<NDArray> vec_out,
+              int lhs_target,
+              int rhs_target,
+              const std::vector<dgl_type_t>& ufeat_eid,
+              const std::vector<dgl_type_t>& out_eid);
 
 /*!
  * \brief Generalized Sampled Dense-Dense Matrix Multiplication on Coo format.
@@ -96,7 +125,14 @@ void BackwardSegmentCmp(NDArray feat,
 /*!
  * \brief Sparse-sparse matrix multiplication
  *
- * \note B is transposed (i.e. in CSC format).
+ * \param A The left operand.
+ * \param A_weights The weights of matrix as a 1D tensor.
+ * \param B The right operand.
+ * \param B_weights The weights of matrix as a 1D tensor.
+ *
+ * \note GPU implementation will cast the indices to 32 bit.
+ * \note The zero entries in the result are not removed.
+ * \note The CSR matrix should not have duplicate entries.
  */
 template <int XPU, typename IdType, typename DType>
 std::pair<CSRMatrix, NDArray> CSRMM(
@@ -107,17 +143,18 @@ std::pair<CSRMatrix, NDArray> CSRMM(
 
 /*!
  * \brief Sparse-sparse matrix summation.
+ *
+ * \param A The sparse matrices with the same size.
+ * \param A_weights The weights of each sparse matrix as a 1D tensor.
+ *
+ * \note GPU implementation will cast the indices to 32 bit.
+ * \note The zero entries in the result are not removed.
+ * \note The CSR matrix should not have duplicate entries.
  */
 template <int XPU, typename IdType, typename DType>
 std::pair<CSRMatrix, NDArray> CSRSum(
     const std::vector<CSRMatrix>& A,
     const std::vector<NDArray>& A_weights);
-
-/*!
- * \brief Return a sparse matrix with the values of A but nonzero entry locations of B.
- */
-template <int XPU, typename IdType, typename DType>
-NDArray CSRMask(const CSRMatrix& A, NDArray A_weights, const CSRMatrix& B);
 
 }  // namespace aten
 }  // namespace dgl

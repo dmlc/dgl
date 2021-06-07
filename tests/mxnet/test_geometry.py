@@ -1,5 +1,5 @@
 import mxnet as mx
-from dgl.geometry.mxnet import FarthestPointSampler
+from dgl.geometry import farthest_point_sampler
 import backend as F
 
 import numpy as np
@@ -12,8 +12,7 @@ def test_fps():
     ctx = F.ctx()
     if F.gpu_ctx():
         x = x.as_in_context(ctx)
-    fps = FarthestPointSampler(sample_points)
-    res = fps(x)
+    res = farthest_point_sampler(x, sample_points)
     assert res.shape[0] == batch_size
     assert res.shape[1] == sample_points
     assert res.sum() > 0

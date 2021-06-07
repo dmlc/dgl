@@ -37,6 +37,8 @@ def graph(data,
           num_nodes=None,
           idtype=None,
           device=None,
+          row_sorted=False,
+          col_sorted=False,
           **deprecated_kwargs):
     """Create a graph and return.
 
@@ -72,6 +74,11 @@ def graph(data,
         the :attr:`data` argument. If :attr:`data` is not a tuple of node-tensors, the
         returned graph is on CPU.  If the specified :attr:`device` differs from that of the
         provided tensors, it casts the given tensors to the specified device first.
+    row_sorted : bool, optional
+        Whether or not the rows of the COO are in ascending order.
+    col_sorted : bool, optional
+        Whether or not the columns of the COO are in ascending order within
+        each row. This only has an effect when ``row_sorted`` is True.
 
     Returns
     -------
@@ -158,7 +165,9 @@ def graph(data,
                            ' but got {} and {}.'.format(num_nodes, max(urange, vrange) - 1))
         urange, vrange = num_nodes, num_nodes
 
-    g = create_from_edges(u, v, '_N', '_E', '_N', urange, vrange, validate=False)
+    g = create_from_edges(u, v, '_N', '_E', '_N', urange, vrange,
+                          row_sorted=row_sorted, col_sorted=col_sorted,
+                          validate=False)
 
     return g.to(device)
 
@@ -326,30 +335,16 @@ def heterograph(data_dict,
                                ' the max ID in the data, but got {} and {}.'.format(
                                    dty, num_nodes_dict[dty], vrange - 1))
     # Create the graph
-
-    # Sort the ntypes and relation tuples to have a deterministic order for the same set
-    # of type names.
-    ntypes = list(sorted(num_nodes_dict.keys()))
-    relations = list(sorted(node_tensor_dict.keys()))
-
+    metagraph, ntypes, etypes, relations = heterograph_index.create_metagraph_index(
+        num_nodes_dict.keys(), node_tensor_dict.keys())
     num_nodes_per_type = utils.toindex([num_nodes_dict[ntype] for ntype in ntypes], "int64")
-    ntype_dict = {ntype: i for i, ntype in enumerate(ntypes)}
-
-    meta_edges_src = []
-    meta_edges_dst = []
-    etypes = []
     rel_graphs = []
     for srctype, etype, dsttype in relations:
-        meta_edges_src.append(ntype_dict[srctype])
-        meta_edges_dst.append(ntype_dict[dsttype])
-        etypes.append(etype)
         src, dst = node_tensor_dict[(srctype, etype, dsttype)]
         g = create_from_edges(src, dst, srctype, etype, dsttype,
                               num_nodes_dict[srctype], num_nodes_dict[dsttype])
         rel_graphs.append(g)
 
-    # metagraph is DGLGraph, currently still using int64 as index dtype
-    metagraph = graph_index.from_coo(len(ntypes), meta_edges_src, meta_edges_dst, True)
     # create graph index
     hgidx = heterograph_index.create_heterograph_from_relations(
         metagraph, [rgrh._graph for rgrh in rel_graphs], num_nodes_per_type)
@@ -636,8 +631,10 @@ def to_heterogeneous(G, ntypes, etypes, ntype_field=NTYPE,
 
     Notes
     -----
-    The returned node and edge types may not necessarily be in the same order as
-    ``ntypes`` and ``etypes``.
+    * The returned node and edge types may not necessarily be in the same order as
+      ``ntypes`` and ``etypes``.
+    * Calling :func:`~dgl.to_homogeneous` then calling :func:`~dgl.to_heterogeneous` again
+      yields the same result.
 
     Examples
     --------
@@ -710,7 +707,7 @@ def to_heterogeneous(G, ntypes, etypes, ntype_field=NTYPE,
     # relabel nodes to per-type local IDs
     ntype_count = np.bincount(ntype_ids, minlength=num_ntypes)
     ntype_offset = np.insert(np.cumsum(ntype_count), 0, 0)
-    ntype_ids_sortidx = np.argsort(ntype_ids)
+    ntype_ids_sortidx = np.argsort(ntype_ids, kind='stable')
     ntype_local_ids = np.zeros_like(ntype_ids)
     node_groups = []
     for i in range(num_ntypes):
@@ -853,6 +850,8 @@ def to_homogeneous(G, ndata=None, edata=None, store_type=True, return_count=Fals
       to its memory efficiency.
     * The ``ntype_count`` and ``etype_count`` lists can help speed up some operations.
       See :class:`~dgl.nn.pytorch.conv.RelGraphConv` for such an example.
+    * Calling :func:`~dgl.to_homogeneous` then calling :func:`~dgl.to_heterogeneous` again
+      yields the same result.
 
     Examples
     --------
@@ -1590,7 +1589,9 @@ DGLHeteroGraph.to_networkx = to_networkx
 def create_from_edges(u, v,
                       utype, etype, vtype,
                       urange, vrange,
-                      validate=True):
+                      validate=True,
+                      row_sorted=False,
+                      col_sorted=False):
     """Internal function to create a graph from incident nodes with types.
 
     utype could be equal to vtype
@@ -1615,6 +1616,12 @@ def create_from_edges(u, v,
         maximum of the destination node IDs in the edge list plus 1. (Default: None)
     validate : bool, optional
         If True, checks if node IDs are within range.
+    row_sorted : bool, optional
+        Whether or not the rows of the COO are in ascending order.
+    col_sorted : bool, optional
+        Whether or not the columns of the COO are in ascending order within
+        each row. This only has an effect when ``row_sorted`` is True.
+
 
     Returns
     -------
@@ -1636,7 +1643,8 @@ def create_from_edges(u, v,
         num_ntypes = 2
 
     hgidx = heterograph_index.create_unitgraph_from_coo(
-        num_ntypes, urange, vrange, u, v, ['coo', 'csr', 'csc'])
+        num_ntypes, urange, vrange, u, v, ['coo', 'csr', 'csc'],
+        row_sorted, col_sorted)
     if utype == vtype:
         return DGLHeteroGraph(hgidx, [utype], [etype])
     else:
