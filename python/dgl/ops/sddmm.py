@@ -3,7 +3,7 @@ from itertools import product
 import sys
 
 from ..backend import gsddmm as gsddmm_internal
-# from ..backend import gsddmm_hetero as gsddmm_internal_hetero
+from ..backend import gsddmm_hetero as gsddmm_internal_hetero
 from .. import backend as F
 
 __all__ = ['gsddmm', 'copy_u', 'copy_v', 'copy_e']
@@ -91,7 +91,7 @@ def gsddmm(g, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
             rhs_list[dst_id] = rhs_data
         lhs_and_rhs_tuple = tuple(lhs_list + rhs_list)
         # With max and min reducers infinity will be returned for zero degree nodes
-        return gsddmm_internal_hetero(g, op, *lhs_and_rhs_tuple, lhs_target, rhs_target)
+        return gsddmm_internal_hetero(g, op, lhs_target, rhs_target, *lhs_and_rhs_tuple)
 
 def _gen_sddmm_func(lhs_target, rhs_target, binary_op):
     name = "{}_{}_{}".format(lhs_target, binary_op, rhs_target)

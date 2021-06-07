@@ -1,7 +1,7 @@
 import torch as th
 from distutils.version import LooseVersion
 from ...base import is_all, ALL
-from ...sparse import _gspmm, _gspmm_hetero, _gsddmm, _segment_reduce, _bwd_segment_cmp, _scatter_add
+from ...sparse import _gspmm, _gspmm_hetero, _gsddmm, _gsddmm_hetero, _segment_reduce, _bwd_segment_cmp, _scatter_add
 from ...sparse import _csrmm, _csrsum, _csrmask
 from ...heterograph_index import create_unitgraph_from_csr
 
@@ -276,71 +276,71 @@ class GSDDMM(th.autograd.Function):
         return None, None, dX, dY, None, None
 
 
-# class GSDDMM_hetero(th.autograd.Function):
-#     @staticmethod
-#     @custom_fwd(cast_inputs=th.float16)
-#     # TODO (Israt) : The order needs to be fixed
-#     def forward(ctx, g, op, lhs_target, rhs_target, *X): # X = X+Y
-#         out = _gsddmm_hetero(g, op, lhs_target, rhs_target, X) 
-#         ctx.backward_cache = g, op, lhs_target, rhs_target
-#         ctx.save_for_backward(*X)
-#         return out
+class GSDDMM_hetero(th.autograd.Function):
+    @staticmethod
+    @custom_fwd(cast_inputs=th.float16)
+    # TODO (Israt) : The order needs to be fixed
+    def forward(ctx, g, op, lhs_target, rhs_target, *X): # X = X+Y
+        out = _gsddmm_hetero(g, op, lhs_target, rhs_target, X) 
+        ctx.backward_cache = g, op, lhs_target, rhs_target
+        ctx.save_for_backward(*X)
+        return out
 
-#     @staticmethod
-#     @custom_bwd
-#     def backward(ctx, *dZ):
-#         g, op, lhs_target, rhs_target = ctx.backward_cache
-#         gidx = g._graph
-#         X = ctx.saved_tensors
-#         if op != 'copy_rhs' and ctx.needs_input_grad[2]:
-#             if lhs_target in ['u', 'v']:
-#                 # _gidx = gidx if lhs_target == 'v' else gidx.reverse()
-#                 _g = g if lhs_target == 'v' else g.reverse()
-#                 if op in ['add', 'sub', 'copy_lhs']:
-#                     dX = gspmm_hetero(_g, 'copy_rhs', 'sum', None, *dZ)
-#                 else:  # mul, div, dot
-#                     if rhs_target == lhs_target:
-#                         dX = gspmm_hetero(_g, 'copy_rhs', 'sum', None, *dZ) * _muldiv(op, Y)
-#                     elif rhs_target == 'e':
-#                         dX = gspmm_hetero(_g, 'copy_rhs', 'sum', None, *dZ * _muldiv(op, Y))
-#                     else:  # rhs_target = !lhs_target
-#                         dX = gspmm_hetero(_g, 'mul', 'sum', _muldiv(op, Y), *dZ)
-#             else:  # lhs_target == 'e'
-#                 if op in ['add', 'sub', 'copy_lhs']:
-#                     dX = dZ
-#                 else:  # mul, div, dot
-#                     dX = gsddmm_hetero(g, 'mul', dZ, _muldiv(op, Y), 'e', rhs_target)
-#             dX = tuple([_reduce_grad(dX[i], X[i].shape) if X[i] is not None else None 
-#                 for i in range(len(X))])
-#         else:
-#             dX = None
-#         if op != 'copy_lhs' and ctx.needs_input_grad[3]:
-#             if rhs_target in ['u', 'v']:
-#                 # _gidx = gidx if rhs_target == 'v' else gidx.reverse()
-#                 _g = g if lhs_target == 'v' else g.reverse()
-#                 if op in ['add', 'sub', 'copy_rhs']:
-#                     dY = gspmm_hetero(_g, 'copy_rhs', 'sum', None, _addsub(op, dZ))
-#                 else:  # mul, div, dot
-#                     if lhs_target == rhs_target:
-#                         dY = gspmm_hetero(_g, 'copy_rhs', 'sum', None, dZ) * X
-#                     elif lhs_target == 'e':
-#                         dY = gspmm_hetero(_g, 'copy_rhs', 'sum', None, dZ * X)
-#                     else:  # rhs_target = !lhs_target
-#                         dY = gspmm_hetero(_g, 'mul', 'sum', X, dZ)
-#                     if op == 'div':
-#                         dY = -dY / (Y ** 2)
-#             else:
-#                 if op in ['add', 'sub', 'copy_rhs']:
-#                     dY = _addsub(op, dZ)
-#                 else:  # mul, div, dot
-#                     dY = gsddmm(g, 'mul', dZ, X, 'e', lhs_target)
-#                     if op == 'div':
-#                         dY = -dY / (Y ** 2)
-#             dY = _reduce_grad(dY, Y.shape)
-#         else:
-#             dY = None
-#         return (None, None) + dX + dY + ( None, None)
-#         # return (None, None, dX, dY, None, None
+    @staticmethod
+    @custom_bwd
+    def backward(ctx, *dZ):
+        g, op, lhs_target, rhs_target = ctx.backward_cache
+        gidx = g._graph
+        X = ctx.saved_tensors
+        if op != 'copy_rhs' and ctx.needs_input_grad[2]:
+            if lhs_target in ['u', 'v']:
+                # _gidx = gidx if lhs_target == 'v' else gidx.reverse()
+                _g = g if lhs_target == 'v' else g.reverse()
+                if op in ['add', 'sub', 'copy_lhs']:
+                    dX = gspmm_hetero(_g, 'copy_rhs', 'sum', None, *dZ)
+                else:  # mul, div, dot
+                    if rhs_target == lhs_target:
+                        dX = gspmm_hetero(_g, 'copy_rhs', 'sum', None, *dZ) * _muldiv(op, Y)
+                    elif rhs_target == 'e':
+                        dX = gspmm_hetero(_g, 'copy_rhs', 'sum', None, *dZ * _muldiv(op, Y))
+                    else:  # rhs_target = !lhs_target
+                        dX = gspmm_hetero(_g, 'mul', 'sum', _muldiv(op, Y), *dZ)
+            else:  # lhs_target == 'e'
+                if op in ['add', 'sub', 'copy_lhs']:
+                    dX = dZ
+                else:  # mul, div, dot
+                    dX = gsddmm_hetero(g, 'mul', dZ, _muldiv(op, Y), 'e', rhs_target)
+            dX = tuple([_reduce_grad(dX[i], X[i].shape) if X[i] is not None else None 
+                for i in range(len(X))])
+        else:
+            dX = None
+        if op != 'copy_lhs' and ctx.needs_input_grad[3]:
+            if rhs_target in ['u', 'v']:
+                # _gidx = gidx if rhs_target == 'v' else gidx.reverse()
+                _g = g if lhs_target == 'v' else g.reverse()
+                if op in ['add', 'sub', 'copy_rhs']:
+                    dY = gspmm_hetero(_g, 'copy_rhs', 'sum', None, _addsub(op, dZ))
+                else:  # mul, div, dot
+                    if lhs_target == rhs_target:
+                        dY = gspmm_hetero(_g, 'copy_rhs', 'sum', None, dZ) * X
+                    elif lhs_target == 'e':
+                        dY = gspmm_hetero(_g, 'copy_rhs', 'sum', None, dZ * X)
+                    else:  # rhs_target = !lhs_target
+                        dY = gspmm_hetero(_g, 'mul', 'sum', X, dZ)
+                    if op == 'div':
+                        dY = -dY / (Y ** 2)
+            else:
+                if op in ['add', 'sub', 'copy_rhs']:
+                    dY = _addsub(op, dZ)
+                else:  # mul, div, dot
+                    dY = gsddmm(g, 'mul', dZ, X, 'e', lhs_target)
+                    if op == 'div':
+                        dY = -dY / (Y ** 2)
+            dY = _reduce_grad(dY, Y.shape)
+        else:
+            dY = None
+        return (None, None) + dX + dY + ( None, None)
+        # return (None, None, dX, dY, None, None
 
 class EdgeSoftmax(th.autograd.Function):
     @staticmethod
@@ -507,8 +507,8 @@ def gsddmm(gidx, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
 def gspmm_hetero(g, op, reduce_op, *lhs_data):
     return GSpMM_hetero.apply(g, op, reduce_op, *lhs_data)
 
-# def gsddmm_hetero(g, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
-#     return GSDDMM_hetero.apply(g, op, lhs_data, rhs_data, lhs_target, rhs_target)
+def gsddmm_hetero(g, op, lhs_target='u', rhs_target='v', *lhs_and_rhs_tuple):
+    return GSDDMM_hetero.apply(g, op, lhs_target, rhs_target, *lhs_and_rhs_tuple)
 
 def edge_softmax(gidx, logits, eids=ALL, norm_by='dst'):
     return EdgeSoftmax.apply(gidx, logits, eids, norm_by)
