@@ -924,7 +924,7 @@ void _TestSliceContiguousChunkCsr(DLContext ctx) {
     dst_vertex_cumsum_c);
 
   int64_t indptr_len = src_vertex_cumsum_c[1] - src_vertex_cumsum_c[0] + 1;
-  IdArray c_indptr = IdArray::Empty({indptr_len}, csr_a.indptr->dtype, CTX);
+  IdArray c_indptr = aten::Full(0, indptr_len, sizeof(IdType)*8, CTX);
   IdArray c_indices = aten::VecToIdArray(std::vector<IdType>({}), sizeof(IdType)*8, CTX);
   const aten::CSRMatrix &csr_c_raw = aten::CSRMatrix(
     1,

@@ -265,8 +265,9 @@ CSRMatrix CSRSliceContiguousChunk(
   const std::vector<uint64_t> &src_vertex_cumsum,
   const std::vector<uint64_t> &dst_vertex_cumsum) {
   int64_t indptr_len = src_vertex_cumsum[1] - src_vertex_cumsum[0] + 1;
-  IdArray result_indptr = IdArray::Empty({indptr_len}, csr.indptr->dtype, csr.indptr->ctx);
+  IdArray result_indptr = Full(0, indptr_len, csr.indptr->dtype.bits, csr.indptr->ctx);
   IdArray result_indices = NullArray(csr.indptr->dtype, csr.indptr->ctx);
+  IdArray result_data = NullArray();
   if (edge_cumsum[1] != edge_cumsum[0]) {
     // The chunk has edges
     result_indptr = IndexSelect(csr.indptr,
@@ -275,14 +276,11 @@ CSRMatrix CSRSliceContiguousChunk(
     result_indices = IndexSelect(csr.indices,
                                  edge_cumsum[0],
                                  edge_cumsum[1]) - dst_vertex_cumsum[0];
-  }
-
-  IdArray result_data = NullArray();
-  // has data index array
-  if (CSRHasData(csr)) {
-    result_data = IndexSelect(csr.data,
-                              edge_cumsum[0],
-                              edge_cumsum[1]) - edge_cumsum[0];
+    if (CSRHasData(csr)) {
+      result_data = IndexSelect(csr.data,
+		                edge_cumsum[0],
+				edge_cumsum[1]) - edge_cumsum[0];
+    }
   }
 
   CSRMatrix sub_csr = CSRMatrix(
