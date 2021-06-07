@@ -160,6 +160,7 @@ The folder contains example implementations of selected research papers related 
 - <a name="deepergcn"></a> Li et al. DeeperGCN: All You Need to Train Deeper GCNs. [Paper link](https://arxiv.org/abs/2006.07739).
     - Example code: [PyTorch](../examples/pytorch/deepergcn)
     - Tags: over-smoothing, deeper gnn, OGB
+
 - <a name="tahin"></a> Bi, Ye, et al. A Heterogeneous Information Network based Cross DomainInsurance Recommendation System for Cold Start Users. [Paper link](https://arxiv.org/abs/2007.15293).
     - Example code: [Pytorch](../examples/pytorch/TAHIN)
     - Tags: cross-domain recommendation, graph neural network
