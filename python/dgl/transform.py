@@ -117,6 +117,11 @@ def knn_graph(x, k, algorithm='bruteforce-blas', dist='euclidean'):
           This method is suitable for low-dimensional data (e.g. 3D
           point clouds)
 
+        * 'nn-descent' is a approximate approach from paper
+          `Efficient k-nearest neighbor graph construction for generic similarity
+          measures <https://www.cs.princeton.edu/cass/papers/www11.pdf>`_. This method
+          will search for nearest neighbor candidates in "neighbors' neighbors".
+
         (default: 'bruteforce-blas')
     dist : str, optional
         The distance metric used to compute distance between points. It can be the following
@@ -182,12 +187,9 @@ def knn_graph(x, k, algorithm='bruteforce-blas', dist='euclidean'):
             x_seg = x_size[0] * [x_size[1]]
         else:
             x_seg = [F.shape(x)[0]]
-        if algorithm == 'nn-descent':
-            return nndescent_knn_graph(x, k, x_seg, dist=dist)
-        else:
-            out = knn(x, x_seg, x, x_seg, k, algorithm=algorithm, dist=dist)
-            row, col = out[1], out[0]
-            return convert.graph((row, col))
+        out = knn(k, x, x_seg, algorithm=algorithm, dist=dist)
+        row, col = out[1], out[0]
+        return convert.graph((row, col))
 
 def _knn_graph_blas(x, k, dist='euclidean'):
     r"""Construct a graph from a set of points according to k-nearest-neighbor (KNN).
@@ -289,6 +291,11 @@ def segmented_knn_graph(x, k, segs, algorithm='bruteforce-blas', dist='euclidean
         * 'kd-tree' will use the kd-tree algorithm (CPU only).
           This method is suitable for low-dimensional data (e.g. 3D
           point clouds)
+        
+        * 'nn-descent' is a approximate approach from paper
+          `Efficient k-nearest neighbor graph construction for generic similarity
+          measures <https://www.cs.princeton.edu/cass/papers/www11.pdf>`_. This method
+          will search for nearest neighbor candidates in "neighbors' neighbors".
 
         (default: 'bruteforce-blas')
     dist : str, optional
@@ -340,10 +347,8 @@ def segmented_knn_graph(x, k, segs, algorithm='bruteforce-blas', dist='euclidean
 
     if algorithm == 'bruteforce-blas':
         return _segmented_knn_graph_blas(x, k, segs, dist=dist)
-    elif algorithm == 'nn-descent':
-        return nndescent_knn_graph(x, k, segs, dist=dist)
     else:
-        out = knn(x, segs, x, segs, k, algorithm=algorithm, dist=dist)
+        out = knn(k, x, segs, algorithm=algorithm, dist=dist)
         row, col = out[1], out[0]
         return convert.graph((row, col))
 
@@ -395,8 +400,8 @@ def _segmented_knn_graph_blas(x, k, segs, dist='euclidean'):
     dst = F.repeat(F.arange(0, n_total_points, ctx=ctx), k, dim=0)
     return convert.graph((F.reshape(src, (-1,)), F.reshape(dst, (-1,))))
 
-def nndescent_knn_graph(x, k, segs, num_iters=None, max_candidates=None,
-                        delta=0.001, sample_rate=0.5, dist='euclidean'):
+def _nndescent_knn_graph(x, k, segs, num_iters=None, max_candidates=None,
+                         delta=0.001, sample_rate=0.5, dist='euclidean'):
     r"""Construct multiple graphs from multiple sets of points according to
     **approximate** k-nearest-neighbor using NN-descent algorithm from paper
     `Efficient k-nearest neighbor graph construction for generic similarity
@@ -475,12 +480,12 @@ def nndescent_knn_graph(x, k, segs, num_iters=None, max_candidates=None,
     _CAPI_DGLNNDescent(F.to_dgl_nd(x), F.to_dgl_nd(offset),
                        F.zerocopy_to_dgl_ndarray_for_write(out),
                        k, num_iters, max_candidates, delta)
-    row, col = out[1], out[0]
-    return convert.graph((row, col))
+    return out
 
-def knn(x, x_segs, y, y_segs, k, algorithm='bruteforce', dist='euclidean'):
+def knn(k, x, x_segs, y=None, y_segs=None, algorithm='bruteforce', dist='euclidean'):
     r"""For each element in each segment in :attr:`y`, find :attr:`k` nearest
-    points in the same segment in :attr:`x`.
+    points in the same segment in :attr:`x`. If :attr:`y` is None, perform a self-query
+    over :attr:`x`.
 
     This function allows multiple point sets with different capacity. The points
     from different sets are stored contiguously in the :attr:`x` and :attr:`y` tensor.
@@ -488,20 +493,22 @@ def knn(x, x_segs, y, y_segs, k, algorithm='bruteforce', dist='euclidean'):
 
     Parameters
     ----------
+    k : int
+        The number of nearest neighbors per node.
     x : Tensor
         The point coordinates in x. It can be either on CPU or GPU (must be the
         same as :attr:`y`). Must be 2D.
     x_segs : Union[List[int], Tensor]
         Number of points in each point set in :attr:`x`. The numbers in :attr:`x_segs`
         must sum up to the number of rows in :attr:`x`.
-    y : Tensor
+    y : Tensor, optional
         The point coordinates in y. It can be either on CPU or GPU (must be the
         same as :attr:`x`). Must be 2D.
-    y_segs : Union[List[int], Tensor]
+        (default: None)
+    y_segs : Union[List[int], Tensor], optional
         Number of points in each point set in :attr:`y`. The numbers in :attr:`y_segs`
         must sum up to the number of rows in :attr:`y`.
-    k : int
-        The number of nearest neighbors per node.
+        (default: None)
     algorithm : str, optional
         Algorithm used to compute the k-nearest neighbors.
 
@@ -520,7 +527,13 @@ def knn(x, x_segs, y, y_segs, k, algorithm='bruteforce', dist='euclidean'):
         * 'kd-tree' will use the kd-tree algorithm (CPU only).
           This method is suitable for low-dimensional data (e.g. 3D
           point clouds)
-
+        
+        * 'nn-descent' is a approximate approach from paper
+          `Efficient k-nearest neighbor graph construction for generic similarity
+          measures <https://www.cs.princeton.edu/cass/papers/www11.pdf>`_. This method
+          will search for nearest neighbor candidates in "neighbors' neighbors".
+        
+        Note: Currently, 'nn-descent' only supports self-query cases, i.e. :attr:`y` is None.
         (default: 'bruteforce')
     dist : str, optional
         The distance metric used to compute distance between points. It can be the following
@@ -536,6 +549,17 @@ def knn(x, x_segs, y, y_segs, k, algorithm='bruteforce', dist='euclidean'):
         The first subtensor contains point indexs in :attr:`y`. The second subtensor contains
         point indexs in :attr:`x`
     """
+    # TODO(lygztq) add support for querying different point sets using nn-descent.
+    if algorithm == "nn-descent":
+        if y is not None or y_segs is not None:
+            raise DGLError("Currently 'nn-descent' only supports self-query cases.")
+        return _nndescent_knn_graph(x, k, x_segs, dist=dist)
+
+    # self query
+    if y is None:
+        y = x
+        y_segs = x_segs
+
     assert F.context(x) == F.context(y)
     if isinstance(x_segs, (tuple, list)):
         x_segs = F.tensor(x_segs)
