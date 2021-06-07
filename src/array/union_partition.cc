@@ -278,8 +278,8 @@ CSRMatrix CSRSliceContiguousChunk(
                                  edge_cumsum[1]) - dst_vertex_cumsum[0];
     if (CSRHasData(csr)) {
       result_data = IndexSelect(csr.data,
-		                edge_cumsum[0],
-				edge_cumsum[1]) - edge_cumsum[0];
+                                edge_cumsum[0],
+                                edge_cumsum[1]) - edge_cumsum[0];
     }
   }
 
