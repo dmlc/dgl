@@ -424,12 +424,6 @@ class DistGraph:
 
     Note
     ----
-    ``DistGraph`` currently only supports graphs with only one node type and one edge type.
-    For heterogeneous graphs, users need to convert them into DGL graphs with one node type and
-    one edge type and store the actual node types and edge types as node data and edge data.
-
-    Note
-    ----
     DGL's distributed training by default runs server processes and trainer processes on the same
     set of machines. If users need to run them on different sets of machines, it requires
     manually setting up servers and trainers. The setup is not fully tested yet.

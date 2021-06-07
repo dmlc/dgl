@@ -162,11 +162,12 @@ if(USE_CUDA)
 
   if (USE_SYSTEM_NCCL)
     include(cmake/util/FindNccl.cmake)
+    include_directories(${NCCL_INCLUDE_DIR})
   else()
     include(cmake/modules/NCCL.cmake)
+    cuda_include_directories(BEFORE ${NCCL_INCLUDE_DIR})
   endif()
 
-  include_directories(${NCCL_INCLUDE_DIR})
   list(APPEND DGL_LINKER_LIBS ${NCCL_LIBRARY})
 endif(USE_CUDA)
 

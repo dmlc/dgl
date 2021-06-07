@@ -6,7 +6,7 @@ from .. import backend as F
 from .. import ndarray as nd
 
 
-def farthest_point_sampler(data, batch_size, sample_points, dist, start_idx, result):
+def _farthest_point_sampler(data, batch_size, sample_points, dist, start_idx, result):
     r"""Farthest Point Sampler
 
     Parameters
