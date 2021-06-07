@@ -4,8 +4,9 @@ import dgl
 import numpy as np
 import pytest
 import torch as th
-from dgl.geometry.pytorch import FarthestPointSampler
-from dgl.geometry import neighbor_matching
+from dgl import DGLError
+from dgl.base import DGLWarning
+from dgl.geometry import neighbor_matching, farthest_point_sampler
 from test_utils import parametrize_dtype
 from test_utils.graph_cases import get_cases
 
@@ -18,8 +19,7 @@ def test_fps():
     ctx = F.ctx()
     if F.gpu_ctx():
         x = x.to(ctx)
-    fps = FarthestPointSampler(sample_points)
-    res = fps(x)
+    res = farthest_point_sampler(x, sample_points)
     assert res.shape[0] == batch_size
     assert res.shape[1] == sample_points
     assert res.sum() > 0
