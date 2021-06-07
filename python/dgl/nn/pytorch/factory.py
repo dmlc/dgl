@@ -67,8 +67,8 @@ class KNNGraph(nn.Module):
         self.k = k
 
     #pylint: disable=invalid-name
-    def forward(self, x, algorithm='topk'):
-        """
+    def forward(self, x, algorithm='bruteforce-blas', dist='euclidean'):
+        r"""
 
         Forward computation.
 
@@ -81,18 +81,44 @@ class KNNGraph(nn.Module):
         algorithm : str, optional
             Algorithm used to compute the k-nearest neighbors.
 
-            * 'topk' will use topk algorithm (quick-select or sorting,
-            depending on backend implementation)
-            * 'kd-tree' will use kd-tree algorithm (cpu version)
+            * 'bruteforce-blas' will first compute the distance matrix
+              using BLAS matrix multiplication operation provided by
+              backend frameworks. Then use topk algorithm to get
+              k-nearest neighbors. This method is fast when the point
+              set is small but has :math:`O(N^2)` memory complexity where
+              :math:`N` is the number of points.
 
-            (default: 'topk')
+            * 'bruteforce' will compute distances pair by pair and
+              directly select the k-nearest neighbors during distance
+              computation. This method is slower than 'bruteforce-blas'
+              but has less memory overhead (i.e., :math:`O(Nk)` where :math:`N`
+              is the number of points, :math:`k` is the number of nearest
+              neighbors per node) since we do not need to store all distances.
+
+            * 'bruteforce-sharemem' (CUDA only) is similar to 'bruteforce'
+              but use shared memory in CUDA devices for buffer. This method is
+              faster than 'bruteforce' when the dimension of input points
+              is not large. This method is only available on CUDA device.
+
+            * 'kd-tree' will use the kd-tree algorithm (CPU only).
+              This method is suitable for low-dimensional data (e.g. 3D
+              point clouds)
+
+            (default: 'bruteforce-blas')
+        dist : str, optional
+            The distance metric used to compute distance between points. It can be the following
+            metrics:
+            * 'euclidean': Use Euclidean distance (L2 norm)
+              :math:`\sqrt{\sum_{i} (x_{i} - y_{i})^{2}}`.
+            * 'cosine': Use cosine distance.
+            (default: 'euclidean')
 
         Returns
         -------
         DGLGraph
             A DGLGraph without features.
         """
-        return knn_graph(x, self.k, algorithm)
+        return knn_graph(x, self.k, algorithm=algorithm, dist=dist)
 
 
 class SegmentedKNNGraph(nn.Module):
@@ -148,7 +174,7 @@ class SegmentedKNNGraph(nn.Module):
         self.k = k
 
     #pylint: disable=invalid-name
-    def forward(self, x, segs, algorithm='topk'):
+    def forward(self, x, segs, algorithm='bruteforce-blas', dist='euclidean'):
         r"""Forward computation.
 
         Parameters
@@ -163,11 +189,37 @@ class SegmentedKNNGraph(nn.Module):
         algorithm : str, optional
             Algorithm used to compute the k-nearest neighbors.
 
-            * 'topk' will use topk algorithm (quick-select or sorting,
-            depending on backend implementation)
-            * 'kd-tree' will use kd-tree algorithm (cpu version)
+            * 'bruteforce-blas' will first compute the distance matrix
+              using BLAS matrix multiplication operation provided by
+              backend frameworks. Then use topk algorithm to get
+              k-nearest neighbors. This method is fast when the point
+              set is small but has :math:`O(N^2)` memory complexity where
+              :math:`N` is the number of points.
 
-            (default: 'topk')
+            * 'bruteforce' will compute distances pair by pair and
+              directly select the k-nearest neighbors during distance
+              computation. This method is slower than 'bruteforce-blas'
+              but has less memory overhead (i.e., :math:`O(Nk)` where :math:`N`
+              is the number of points, :math:`k` is the number of nearest
+              neighbors per node) since we do not need to store all distances.
+
+            * 'bruteforce-sharemem' (CUDA only) is similar to 'bruteforce'
+              but use shared memory in CUDA devices for buffer. This method is
+              faster than 'bruteforce' when the dimension of input points
+              is not large. This method is only available on CUDA device.
+
+            * 'kd-tree' will use the kd-tree algorithm (CPU only).
+              This method is suitable for low-dimensional data (e.g. 3D
+              point clouds)
+
+            (default: 'bruteforce-blas')
+        dist : str, optional
+            The distance metric used to compute distance between points. It can be the following
+            metrics:
+            * 'euclidean': Use Euclidean distance (L2 norm)
+              :math:`\sqrt{\sum_{i} (x_{i} - y_{i})^{2}}`.
+            * 'cosine': Use cosine distance.
+            (default: 'euclidean')
 
         Returns
         -------
@@ -175,4 +227,4 @@ class SegmentedKNNGraph(nn.Module):
             A DGLGraph without features.
         """
 
-        return segmented_knn_graph(x, self.k, segs, algorithm)
+        return segmented_knn_graph(x, self.k, segs, algorithm=algorithm, dist=dist)

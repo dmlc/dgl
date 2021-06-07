@@ -508,7 +508,10 @@ def test_partition_with_halo():
     for part_id, subg in subgs.items():
         node_ids = np.nonzero(node_part == part_id)[0]
         lnode_ids = np.nonzero(F.asnumpy(subg.ndata['inner_node']))[0]
-        assert np.all(np.sort(F.asnumpy(subg.ndata['orig_id'])[lnode_ids]) == node_ids)
+        orig_nids = F.asnumpy(subg.ndata['orig_id'])[lnode_ids]
+        assert np.all(np.sort(orig_nids) == node_ids)
+        assert np.all(F.asnumpy(subg.in_degrees(lnode_ids)) == F.asnumpy(g.in_degrees(orig_nids)))
+        assert np.all(F.asnumpy(subg.out_degrees(lnode_ids)) == F.asnumpy(g.out_degrees(orig_nids)))
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(F._default_context_str == 'gpu', reason="METIS doesn't support GPU")
@@ -1478,4 +1481,4 @@ def test_remove_selfloop(idtype):
     assert raise_error
 
 if __name__ == '__main__':
-    pass
+    test_partition_with_halo()

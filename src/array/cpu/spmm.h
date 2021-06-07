@@ -57,7 +57,6 @@ void SpMMSumCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
     for (IdType rid = 0; rid < csr.num_rows; ++rid) {
       const IdType row_start = indptr[rid], row_end = indptr[rid + 1];
       DType* out_off = O + rid * dim;
-      std::fill(out_off, out_off + dim, 0);
       for (IdType j = row_start; j < row_end; ++j) {
         const IdType cid = indices[j];
         const IdType eid = has_idx ? edges[j] : j;
@@ -72,7 +71,6 @@ void SpMMSumCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
     for (IdType rid = 0; rid < csr.num_rows; ++rid) {
       const IdType row_start = indptr[rid], row_end = indptr[rid + 1];
       DType* out_off = O + rid * dim;
-      std::fill(out_off, out_off + dim, 0);
       for (IdType j = row_start; j < row_end; ++j) {
         const IdType cid = indices[j];
         const IdType eid = has_idx ? edges[j] : j;
@@ -180,9 +178,6 @@ void SpMMCmpCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
     DType* out_off = O + rid * dim;
     IdType* argx_off = argX + rid * dim;
     IdType* argw_off = argW + rid * dim;
-    std::fill(out_off, out_off + dim, Cmp::zero);
-    if (Op::use_lhs) std::fill(argx_off, argx_off + dim, 0);
-    if (Op::use_rhs) std::fill(argw_off, argw_off + dim, 0);
     for (IdType j = row_start; j < row_end; ++j) {
       const IdType cid = indices[j];
       const IdType eid = has_idx ? edges[j] : j;

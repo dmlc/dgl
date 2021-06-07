@@ -2,6 +2,7 @@
 import inspect
 import torch as th
 from torch.utils.data import DataLoader
+from torch.utils.data.distributed import DistributedSampler
 from ..dataloader import NodeCollator, EdgeCollator, GraphCollator
 from ...distributed import DistGraph
 from ...distributed import DistDataLoader
@@ -272,6 +273,12 @@ class NodeDataLoader:
     device : device context, optional
         The device of the generated MFGs in each iteration, which should be a
         PyTorch device object (e.g., ``torch.device``).
+    use_ddp : boolean, optional
+        If True, tells the DataLoader to split the training set for each
+        participating process appropriately using
+        :mod:`torch.utils.data.distributed.DistributedSampler`.
+
+        Overrides the :attr:`sampler` argument of :class:`torch.utils.data.DataLoader`.
     kwargs : dict
         Arguments being passed to :py:class:`torch.utils.data.DataLoader`.
 
@@ -288,6 +295,21 @@ class NodeDataLoader:
     >>> for input_nodes, output_nodes, blocks in dataloader:
     ...     train_on(input_nodes, output_nodes, blocks)
 
+    **Using with Distributed Data Parallel**
+
+    If you are using PyTorch's distributed training (e.g. when using
+    :mod:`torch.nn.parallel.DistributedDataParallel`), you can train the model by turning
+    on the `use_ddp` option:
+
+    >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
+    >>> dataloader = dgl.dataloading.NodeDataLoader(
+    ...     g, train_nid, sampler, use_ddp=True,
+    ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
+    >>> for epoch in range(start_epoch, n_epochs):
+    ...     dataloader.set_epoch(epoch)
+    ...     for input_nodes, output_nodes, blocks in dataloader:
+    ...         train_on(input_nodes, output_nodes, blocks)
+
     Notes
     -----
     Please refer to
@@ -296,7 +318,7 @@ class NodeDataLoader:
     """
     collator_arglist = inspect.getfullargspec(NodeCollator).args
 
-    def __init__(self, g, nids, block_sampler, device='cpu', **kwargs):
+    def __init__(self, g, nids, block_sampler, device='cpu', use_ddp=False, **kwargs):
         collator_kwargs = {}
         dataloader_kwargs = {}
         for k, v in kwargs.items():
@@ -347,10 +369,21 @@ class NodeDataLoader:
                         dataloader_kwargs['shuffle'] = False
                         dataloader_kwargs['drop_last'] = False
 
+            self.use_ddp = use_ddp
+            if use_ddp:
+                self.dist_sampler = DistributedSampler(
+                    dataset,
+                    shuffle=dataloader_kwargs['shuffle'],
+                    drop_last=dataloader_kwargs['drop_last'])
+                dataloader_kwargs['shuffle'] = False
+                dataloader_kwargs['drop_last'] = False
+                dataloader_kwargs['sampler'] = self.dist_sampler
+
             self.dataloader = DataLoader(
                 dataset,
                 collate_fn=self.collator.collate,
                 **dataloader_kwargs)
+
             self.is_distributed = False
 
             # Precompute the CSR and CSC representations so each subprocess does not
@@ -370,6 +403,24 @@ class NodeDataLoader:
     def __len__(self):
         """Return the number of batches of the data loader."""
         return len(self.dataloader)
+
+    def set_epoch(self, epoch):
+        """Sets the epoch number for the underlying sampler which ensures all replicas
+        to use a different ordering for each epoch.
+
+        Only available when :attr:`use_ddp` is True.
+
+        Calls :meth:`torch.utils.data.distributed.DistributedSampler.set_epoch`.
+
+        Parameters
+        ----------
+        epoch : int
+            The epoch number.
+        """
+        if self.use_ddp:
+            self.dist_sampler.set_epoch(epoch)
+        else:
+            raise DGLError('set_epoch is only available when use_ddp is True.')
 
 class EdgeDataLoader:
     """PyTorch dataloader for batch-iterating over a set of edges, generating the list
@@ -442,6 +493,15 @@ class EdgeDataLoader:
 
         See the description of the argument with the same name in the docstring of
         :class:`~dgl.dataloading.EdgeCollator` for more details.
+    use_ddp : boolean, optional
+        If True, tells the DataLoader to split the training set for each
+        participating process appropriately using
+        :mod:`torch.utils.data.distributed.DistributedSampler`.
+
+        The dataloader will have a :attr:`dist_sampler` attribute to set the
+        epoch number, as recommended by PyTorch.
+
+        Overrides the :attr:`sampler` argument of :class:`torch.utils.data.DataLoader`.
     kwargs : dict
         Arguments being passed to :py:class:`torch.utils.data.DataLoader`.
 
@@ -524,6 +584,22 @@ class EdgeDataLoader:
     >>> for input_nodes, pos_pair_graph, neg_pair_graph, blocks in dataloader:
     ...     train_on(input_nodes, pair_graph, neg_pair_graph, blocks)
 
+    **Using with Distributed Data Parallel**
+
+    If you are using PyTorch's distributed training (e.g. when using
+    :mod:`torch.nn.parallel.DistributedDataParallel`), you can train the model by
+    turning on the :attr:`use_ddp` option:
+
+    >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
+    >>> dataloader = dgl.dataloading.EdgeDataLoader(
+    ...     g, train_eid, sampler, use_ddp=True, exclude='reverse_id',
+    ...     reverse_eids=reverse_eids,
+    ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
+    >>> for epoch in range(start_epoch, n_epochs):
+    ...     dataloader.set_epoch(epoch)
+    ...     for input_nodes, pair_graph, blocks in dataloader:
+    ...         train_on(input_nodes, pair_graph, blocks)
+
     See also
     --------
     dgl.dataloading.dataloader.EdgeCollator
@@ -544,7 +620,7 @@ class EdgeDataLoader:
     """
     collator_arglist = inspect.getfullargspec(EdgeCollator).args
 
-    def __init__(self, g, eids, block_sampler, device='cpu', **kwargs):
+    def __init__(self, g, eids, block_sampler, device='cpu', use_ddp=False, **kwargs):
         collator_kwargs = {}
         dataloader_kwargs = {}
         for k, v in kwargs.items():
@@ -553,12 +629,27 @@ class EdgeDataLoader:
             else:
                 dataloader_kwargs[k] = v
         self.collator = _EdgeCollator(g, eids, block_sampler, **collator_kwargs)
+        dataset = self.collator.dataset
 
         assert not isinstance(g, DistGraph), \
                 'EdgeDataLoader does not support DistGraph for now. ' \
                 + 'Please use DistDataLoader directly.'
+
+        self.use_ddp = use_ddp
+        if use_ddp:
+            self.dist_sampler = DistributedSampler(
+                dataset,
+                shuffle=dataloader_kwargs['shuffle'],
+                drop_last=dataloader_kwargs['drop_last'])
+            dataloader_kwargs['shuffle'] = False
+            dataloader_kwargs['drop_last'] = False
+            dataloader_kwargs['sampler'] = self.dist_sampler
+
         self.dataloader = DataLoader(
-            self.collator.dataset, collate_fn=self.collator.collate, **dataloader_kwargs)
+            dataset,
+            collate_fn=self.collator.collate,
+            **dataloader_kwargs)
+
         self.device = device
 
         # Precompute the CSR and CSC representations so each subprocess does not
@@ -573,6 +664,24 @@ class EdgeDataLoader:
     def __len__(self):
         """Return the number of batches of the data loader."""
         return len(self.dataloader)
+
+    def set_epoch(self, epoch):
+        """Sets the epoch number for the underlying sampler which ensures all replicas
+        to use a different ordering for each epoch.
+
+        Only available when :attr:`use_ddp` is True.
+
+        Calls :meth:`torch.utils.data.distributed.DistributedSampler.set_epoch`.
+
+        Parameters
+        ----------
+        epoch : int
+            The epoch number.
+        """
+        if self.use_ddp:
+            self.dist_sampler.set_epoch(epoch)
+        else:
+            raise DGLError('set_epoch is only available when use_ddp is True.')
 
 class GraphDataLoader:
     """PyTorch dataloader for batch-iterating over a set of graphs, generating the batched
@@ -595,10 +704,23 @@ class GraphDataLoader:
     ...     dataset, batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
     >>> for batched_graph, labels in dataloader:
     ...     train_on(batched_graph, labels)
+
+    **Using with Distributed Data Parallel**
+
+    If you are using PyTorch's distributed training (e.g. when using
+    :mod:`torch.nn.parallel.DistributedDataParallel`), you can train the model by
+    turning on the :attr:`use_ddp` option:
+
+    >>> dataloader = dgl.dataloading.GraphDataLoader(
+    ...     dataset, use_ddp=True, batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
+    >>> for epoch in range(start_epoch, n_epochs):
+    ...     dataloader.set_epoch(epoch)
+    ...     for batched_graph, labels in dataloader:
+    ...         train_on(batched_graph, labels)
     """
     collator_arglist = inspect.getfullargspec(GraphCollator).args
 
-    def __init__(self, dataset, collate_fn=None, **kwargs):
+    def __init__(self, dataset, collate_fn=None, use_ddp=False, **kwargs):
         collator_kwargs = {}
         dataloader_kwargs = {}
         for k, v in kwargs.items():
@@ -612,6 +734,16 @@ class GraphDataLoader:
         else:
             self.collate = collate_fn
 
+        self.use_ddp = use_ddp
+        if use_ddp:
+            self.dist_sampler = DistributedSampler(
+                dataset,
+                shuffle=dataloader_kwargs['shuffle'],
+                drop_last=dataloader_kwargs['drop_last'])
+            dataloader_kwargs['shuffle'] = False
+            dataloader_kwargs['drop_last'] = False
+            dataloader_kwargs['sampler'] = self.dist_sampler
+
         self.dataloader = DataLoader(dataset=dataset,
                                      collate_fn=self.collate,
                                      **dataloader_kwargs)
@@ -623,3 +755,21 @@ class GraphDataLoader:
     def __len__(self):
         """Return the number of batches of the data loader."""
         return len(self.dataloader)
+
+    def set_epoch(self, epoch):
+        """Sets the epoch number for the underlying sampler which ensures all replicas
+        to use a different ordering for each epoch.
+
+        Only available when :attr:`use_ddp` is True.
+
+        Calls :meth:`torch.utils.data.distributed.DistributedSampler.set_epoch`.
+
+        Parameters
+        ----------
+        epoch : int
+            The epoch number.
+        """
+        if self.use_ddp:
+            self.dist_sampler.set_epoch(epoch)
+        else:
+            raise DGLError('set_epoch is only available when use_ddp is True.')
