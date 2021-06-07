@@ -9,13 +9,13 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.multiprocessing as mp
 from torch.nn.parallel import DistributedDataParallel
 from tqdm.auto import tqdm
 from numpy import random
 from torch.nn.parameter import Parameter
 import dgl
 import dgl.function as fn
+import dgl.multiprocessing as mp
 
 from utils import *
 
@@ -264,18 +264,28 @@ def run(proc_id, n_gpus, args, devices, data):
     neighbor_samples = args.neighbor_samples
     num_workers = args.workers
 
-    train_pairs = torch.split(
-        torch.tensor(train_pairs), math.ceil(len(train_pairs) / n_gpus)
-    )[proc_id]
     neighbor_sampler = NeighborSampler(g, [neighbor_samples])
-    train_dataloader = torch.utils.data.DataLoader(
-        train_pairs,
-        batch_size=batch_size,
-        collate_fn=neighbor_sampler.sample,
-        shuffle=True,
-        num_workers=num_workers,
-        pin_memory=True,
-    )
+    if n_gpus > 1:
+        train_sampler = torch.utils.data.distributed.DistributedSampler(
+            train_pairs, num_replicas=world_size, rank=proc_id, shuffle=True, drop_last=False)
+        train_dataloader = torch.utils.data.DataLoader(
+            train_pairs,
+            batch_size=batch_size,
+            collate_fn=neighbor_sampler.sample,
+            num_workers=num_workers,
+            sampler=train_sampler,
+            pin_memory=True,
+        )
+    else:
+        train_dataloader = torch.utils.data.DataLoader(
+            train_pairs,
+            batch_size=batch_size,
+            collate_fn=neighbor_sampler.sample,
+            num_workers=num_workers,
+            shuffle=True,
+            drop_last=False,
+            pin_memory=True,
+        )
 
     model = DGLGATNE(
         num_nodes, embedding_size, embedding_u_size, edge_types, edge_type_count, dim_a,
@@ -333,6 +343,8 @@ def run(proc_id, n_gpus, args, devices, data):
         start = time.time()
 
     for epoch in range(epochs):
+        if n_gpus > 1:
+            train_sampler.set_epoch(epoch)
         model.train()
 
         data_iter = train_dataloader
@@ -481,10 +493,7 @@ def train_model(network_data):
     else:
         procs = []
         for proc_id in range(n_gpus):
-            p = mp.Process(
-                target=thread_wrapped_func(run),
-                args=(proc_id, n_gpus, args, devices, data),
-            )
+            p = mp.Process(target=run, args=(proc_id, n_gpus, args, devices, data))
             p.start()
             procs.append(p)
         for p in procs:

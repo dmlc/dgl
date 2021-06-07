@@ -110,7 +110,7 @@ computes loss.
     def compute_loss(pos_score, neg_score):
         # Margin loss
         n_edges = pos_score.shape[0]
-        return (1 - pos_score.unsqueeze(1) + neg_score.view(n_edges, -1)).clamp(min=0).mean()
+        return (1 - pos_score + neg_score.view(n_edges, -1)).clamp(min=0).mean()
     
     node_features = graph.ndata['feat']
     n_features = node_features.shape[1]
@@ -195,7 +195,7 @@ The training loop is similar to that of homogeneous graphs.
     def compute_loss(pos_score, neg_score):
         # Margin loss
         n_edges = pos_score.shape[0]
-        return (1 - pos_score.unsqueeze(1) + neg_score.view(n_edges, -1)).clamp(min=0).mean()
+        return (1 - pos_score + neg_score.view(n_edges, -1)).clamp(min=0).mean()
     
     k = 5
     model = Model(10, 20, 5, hetero_graph.etypes)

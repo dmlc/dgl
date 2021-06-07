@@ -26,7 +26,7 @@ rm -rf _download
 
 pushd build
 cmake $CMAKE_VARS ..
-make -j8
+make -j
 popd
 
 pushd python

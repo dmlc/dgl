@@ -8,6 +8,7 @@ The folder contains example implementations of selected research papers related 
 
 | Paper                                                        | node classification | link prediction / classification | graph property prediction | sampling           | OGB                |
 | ------------------------------------------------------------ | ------------------- | -------------------------------- | ------------------------- | ------------------ | ------------------ |
+| [Latent Dirichlet Allocation](#lda) | :heavy_check_mark:  |    :heavy_check_mark:  |  |  |  |
 | [Network Embedding with Completely-imbalanced Labels](#rect) | :heavy_check_mark:  |                                  |                           |                    |                    |
 | [Boost then Convolve: Gradient Boosting Meets Graph Neural Networks](#bgnn) | :heavy_check_mark:  |                                  |                           |                    |                    |
 | [Contrastive Multi-View Representation Learning on Graphs](#mvgrl) | :heavy_check_mark: |  | :heavy_check_mark: |  |  |
@@ -92,15 +93,21 @@ The folder contains example implementations of selected research papers related 
 | [GNNExplainer: Generating Explanations for Graph Neural Networks](#gnnexplainer) |  :heavy_check_mark: |                                  |                                  |                                  |                                  |
 | [Interaction Networks for Learning about Objects, Relations and Physics](#graphsim) |  |                                 |:heavy_check_mark:                 |                    |                    |
 | [Representation Learning on Graphs with Jumping Knowledge Networks](#jknet) |  :heavy_check_mark: |                                  |                                  |                                  |                                  |
+| [A Heterogeneous Information Network based Cross Domain Insurance Recommendation System for Cold Start Users](#tahin) |  |     :heavy_check_mark:       |                 |                    |                    |
 | [DeeperGCN: All You Need to Train Deeper GCNs](#deepergcn)                                                                        |                                  |                                  | :heavy_check_mark:        |                    | :heavy_check_mark: |
 | [Diffusion Convolutional Recurrent Neural Network: Data-Driven Traffic Forcasting](#dcrnn) |                     |                                  | :heavy_check_mark:        |                    |                    |
 | [GaAN: Gated Attention Networks for Learning on large and Spatiotemporal Graphs](#gaan) |                     |                                  | :heavy_check_mark:        |                    |                    |
+| [Combining Label Propagation and Simple Models Out-performs Graph Neural Networks](#correct_and_smooth) |  :heavy_check_mark: |                                  |                                  |                                  | :heavy_check_mark:                                 |
+| [Learning from Labeled and Unlabeled Data with Label Propagation](#label_propagation) |  :heavy_check_mark: |                                  |                                  |                                  |                                  |
 
 ## 2021
 
 - <a name="bgnn"></a> Ivanov et al. Boost then Convolve: Gradient Boosting Meets Graph Neural Networks. [Paper link](https://openreview.net/forum?id=ebS5NUfoMKL). 
     - Example code: [PyTorch](../examples/pytorch/bgnn)
     - Tags: semi-supervised node classification, tabular data, GBDT
+- <a name="correct_and_smooth"></a> Huang et al. Combining Label Propagation and Simple Models Out-performs Graph Neural Networks. [Paper link](https://arxiv.org/abs/2010.13993). 
+    - Example code: [PyTorch](../examples/pytorch/correct_and_smooth)
+    - Tags: efficiency, node classification, label propagation
 
 ## 2020
 
@@ -142,7 +149,7 @@ The folder contains example implementations of selected research papers related 
     - Tags: molecules, molecular property prediction, quantum chemistry
 - <a name="tgn"></a> Rossi et al. Temporal Graph Networks For Deep Learning on Dynamic Graphs. [Paper link](https://arxiv.org/abs/2006.10637).
     - Example code: [Pytorch](../examples/pytorch/tgn)
-    - Tags: over-smoothing, node classification 
+    - Tags: temporal, node classification 
 - <a name="compgcn"></a> Vashishth, Shikhar, et al. Composition-based Multi-Relational Graph Convolutional Networks. [Paper link](https://arxiv.org/abs/1911.03082).
     - Example code: [PyTorch](../examples/pytorch/compGCN)
     - Tags: multi-relational graphs, graph neural network
@@ -150,8 +157,11 @@ The folder contains example implementations of selected research papers related 
     - Example code: [PyTorch](../examples/pytorch/deepergcn)
     - Tags: over-smoothing, deeper gnn, OGB
 
-## 2019
+- <a name="tahin"></a> Bi, Ye, et al. A Heterogeneous Information Network based Cross DomainInsurance Recommendation System for Cold Start Users. [Paper link](https://arxiv.org/abs/2007.15293).
+    - Example code: [Pytorch](../examples/pytorch/TAHIN)
+    - Tags: cross-domain recommendation, graph neural network
 
+## 2019
 
 - <a name="infograph"></a> Sun et al. InfoGraph: Unsupervised and Semi-supervised Graph-Level Representation Learning via Mutual Information Maximization. [Paper link](https://arxiv.org/abs/1908.01000). 
     - Example code: [PyTorch](../examples/pytorch/infograph)
@@ -228,7 +238,6 @@ The folder contains example implementations of selected research papers related 
 - <a name='gnnexplainer'></a> Ying, Rex, et al. GNNExplainer: Generating Explanations for Graph Neural Networks. [Paper link](https://arxiv.org/abs/1903.03894).
     - Example code: [PyTorch](../examples/pytorch/gnn_explainer)
     - Tags: Graph Neural Network, Explainability
-
 
 ## 2018
 
@@ -407,6 +416,12 @@ The folder contains example implementations of selected research papers related 
     - Example code: [PyTorch](https://github.com/awslabs/dgl-ke/tree/master/examples), [PyTorch for custom data](https://aws-dglke.readthedocs.io/en/latest/commands.html)
     - Tags: knowledge graph embedding
 
+## 2010
+
+- <a name="lda"></a> Hoffman et al. Online Learning for Latent Dirichlet Allocation. [Paper link](https://papers.nips.cc/paper/2010/file/71f6278d140af599e06ad9bf1ba03cb0-Paper.pdf).
+    - Example code: [PyTorch](../examples/pytorch/lda)
+    - Tags: sklearn, decomposition, latent Dirichlet allocation
+
 ## 2009
 
 - <a name="astar"></a> Riesen et al. Speeding Up Graph Edit Distance Computation with a Bipartite Heuristic. [Paper link](https://core.ac.uk/download/pdf/33054885.pdf).
@@ -418,6 +433,12 @@ The folder contains example implementations of selected research papers related 
 - <a name="beam"></a> Neuhaus et al. Fast Suboptimal Algorithms for the Computation of Graph Edit Distance. [Paper link](https://link.springer.com/chapter/10.1007/11815921_17).
     - Example code: [PyTorch](../examples/pytorch/graph_matching)
     - Tags: graph edit distance, graph matching
+
+## 2002
+
+- <a name="label_propagation"></a> Zhu & Ghahramani. Learning from Labeled and Unlabeled Data with Label Propagation. [Paper link](https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.14.3864&rep=rep1&type=pdf).
+    - Example code: [PyTorch](../examples/pytorch/label_propagation)
+    - Tags: node classification, label propagation
 
 ## 1998
 
