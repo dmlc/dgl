@@ -10,6 +10,7 @@ import unittest, pytest
 from dgl import DGLError
 import test_utils
 from test_utils import parametrize_dtype, get_cases
+from utils import assert_is_identical_hetero
 from scipy.sparse import rand
 
 def create_test_heterograph(idtype):
@@ -1110,6 +1111,14 @@ def test_to_homo2(idtype):
         assert count == hg.num_nodes(hg.ntypes[i])
     for i, count in enumerate(etype_count):
         assert count == hg.num_edges(hg.canonical_etypes[i])
+
+@parametrize_dtype
+def test_invertible_conversion(idtype):
+    # Test whether to_homogeneous and to_heterogeneous are invertible
+    hg = create_test_heterograph(idtype)
+    g = dgl.to_homogeneous(hg)
+    hg2 = dgl.to_heterogeneous(g, hg.ntypes, hg.etypes)
+    assert_is_identical_hetero(hg, hg2, True)
 
 @parametrize_dtype
 def test_metagraph_reachable(idtype):
