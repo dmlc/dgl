@@ -2,10 +2,24 @@
 import sys
 
 from ..backend import gspmm as gspmm_internal
+from ..backend import gspmm_hetero as gspmm_internal_hetero
 from .. import backend as F
+import torch
 
 __all__ = ['gspmm']
 
+def reshape_lhs_rhs(lhs_data, rhs_data):
+    lhs_shape = F.shape(lhs_data)
+    rhs_shape = F.shape(rhs_data)
+    if len(lhs_shape) != len(rhs_shape):
+        max_ndims = max(len(lhs_shape), len(rhs_shape))
+        lhs_pad_ndims = max_ndims - len(lhs_shape)
+        rhs_pad_ndims = max_ndims - len(rhs_shape)
+        new_lhs_shape = (lhs_shape[0],) + (1,) * lhs_pad_ndims + lhs_shape[1:]
+        new_rhs_shape = (rhs_shape[0],) + (1,) * rhs_pad_ndims + rhs_shape[1:]
+        lhs_data = F.reshape(lhs_data, new_lhs_shape)
+        rhs_data = F.reshape(rhs_data, new_rhs_shape)
+    return lhs_data, rhs_data
 
 def gspmm(g, op, reduce_op, lhs_data, rhs_data):
     r""" Generalized Sparse Matrix Multiplication interface.
@@ -43,29 +57,64 @@ def gspmm(g, op, reduce_op, lhs_data, rhs_data):
     tensor
         The result tensor.
     """
-    if op not in ['copy_lhs', 'copy_rhs']:
-        # Expand dims so that there will be no broadcasting issues with different
-        # number of dimensions. For example, given two shapes (N, 3, 1), (E, 5, 3, 4)
-        # that are valid broadcastable shapes, change them to (N, 1, 3, 1) and
-        # (E, 5, 3, 4)
-        lhs_shape = F.shape(lhs_data)
-        rhs_shape = F.shape(rhs_data)
-        if len(lhs_shape) != len(rhs_shape):
-            max_ndims = max(len(lhs_shape), len(rhs_shape))
-            lhs_pad_ndims = max_ndims - len(lhs_shape)
-            rhs_pad_ndims = max_ndims - len(rhs_shape)
-            new_lhs_shape = (lhs_shape[0],) + (1,) * lhs_pad_ndims + lhs_shape[1:]
-            new_rhs_shape = (rhs_shape[0],) + (1,) * rhs_pad_ndims + rhs_shape[1:]
-            lhs_data = F.reshape(lhs_data, new_lhs_shape)
-            rhs_data = F.reshape(rhs_data, new_rhs_shape)
-    # With max and min reducers infinity will be returned for zero degree nodes
-    ret = gspmm_internal(g._graph, op,
-                         'sum' if reduce_op == 'mean' else reduce_op,
-                         lhs_data, rhs_data)
-    # Replace infinity with zero for isolated nodes when reducer is min/max
-    if reduce_op in ['min', 'max']:
-        ret = F.replace_inf_with_zero(ret)
+    use_u = op != 'copy_rhs'
+    use_e = op != 'copy_lhs'
+    
+    if g._graph.number_of_etypes() == 1:
+        if op not in ['copy_lhs', 'copy_rhs']:
+            # Expand dims so that there will be no broadcasting issues with different
+            # number of dimensions. For example, given two shapes (N, 3, 1), (E, 5, 3, 4)
+            # that are valid broadcastable shapes, change them to (N, 1, 3, 1) and
+            # (E, 5, 3, 4)
+            lhs_shape = F.shape(lhs_data)
+            rhs_shape = F.shape(rhs_data)
+            if len(lhs_shape) != len(rhs_shape):
+                max_ndims = max(len(lhs_shape), len(rhs_shape))
+                lhs_pad_ndims = max_ndims - len(lhs_shape)
+                rhs_pad_ndims = max_ndims - len(rhs_shape)
+                new_lhs_shape = (lhs_shape[0],) + (1,) * lhs_pad_ndims + lhs_shape[1:]
+                new_rhs_shape = (rhs_shape[0],) + (1,) * rhs_pad_ndims + rhs_shape[1:]
+                lhs_data = F.reshape(lhs_data, new_lhs_shape)
+                rhs_data = F.reshape(rhs_data, new_rhs_shape)
+        # With max and min reducers infinity will be returned for zero degree nodes
+        ret = gspmm_internal(g._graph, op,
+                             'sum' if reduce_op == 'mean' else reduce_op,
+                             lhs_data, rhs_data)
+        # Replace infinity with zero for isolated nodes when reducer is min/max
+        if reduce_op in ['min', 'max']:
+            ret = F.replace_inf_with_zero(ret)
+    else:
+        lhs_data_dict = lhs_data
+        rhs_data_dict = rhs_data
+        lhs_list = [None] * g._graph.number_of_ntypes()
+        rhs_list = [None] * g._graph.number_of_etypes()
 
+        for srctype, etype, dsttype in g.canonical_etypes:
+            src_id = g.get_ntype_id(srctype)
+            etid = g.get_etype_id(etype)
+            tag = srctype, etype, dsttype
+            lhs_data = lhs_data_dict[srctype] if use_u else None
+            rhs_data = rhs_data_dict[tag] if use_e else None
+            if op not in ['copy_lhs', 'copy_rhs']:
+                lhs_data, rhs_data = reshape_lhs_rhs(lhs_data, rhs_data)
+            lhs_list[src_id] = lhs_data
+            rhs_list[etid] = rhs_data
+
+        lhs_and_rhs_tuple = tuple(lhs_list + rhs_list)
+        # With max and min reducers infinity will be returned for zero degree nodes
+        ret = gspmm_internal_hetero(g, op,
+                             'sum' if reduce_op == 'mean' else reduce_op,
+                             *lhs_and_rhs_tuple)
+        # Replace infinity with zero for isolated nodes when reducer is min/max
+        # if reduce_op in ['min', 'max']:
+        #     # TODO (Israt): Following code "often" throws 'free(): invalid pointer  
+        #     ret = list(ret)
+        #     for i in range(g._graph.number_of_ntypes()):
+        #         if(len(ret[i]) > 0):
+        #             ret[i] = F.replace_inf_with_zero(ret[i])
+        #     ret = tuple(ret)
+
+    # TODO (Israt): Add support for 'mean' in heterograph
     # divide in degrees for mean reducer.
     if reduce_op == 'mean':
         ret_shape = F.shape(ret)

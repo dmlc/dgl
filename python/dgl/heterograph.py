@@ -4799,6 +4799,30 @@ class DGLHeteroGraph(object):
             if apply_node_func is not None:
                 self.apply_nodes(apply_node_func, ALL, self.ntypes[dtid])
 
+    
+    #################################################################
+    # New Message passing on heterograph // will replace *update_all
+    #################################################################
+    def update_all_new(self,
+                   mfunc,
+                   rfunc,
+                   afunc=None,
+                   etype=None):
+        g = self
+        all_out = core.message_passing(g, mfunc, rfunc, afunc)
+        key = list(all_out.keys())[0]
+        out_tensor_tuples = all_out[key]
+
+        dst_tensor = {}
+        for _, _, dsttype in g.canonical_etypes:
+            dtid = g.get_ntype_id(dsttype)
+            dst_tensor[key]=out_tensor_tuples[dtid]
+            self._node_frames[dtid].update(dst_tensor)
+        # TODO (Israt): Add apply function in heterograph
+        # if apply_node_func is not None:
+        #     self.apply_nodes(apply_node_func, ALL, self.ntypes[dtid])
+
+
     #################################################################
     # Message propagation
     #################################################################
@@ -5595,6 +5619,7 @@ class DGLHeteroGraph(object):
             assert fmt in ("coo", "csr", "csc"), '{} is not coo, csr or csc'.format(fmt)
         gidx = self._graph.shared_memory(name, self.ntypes, self.etypes, formats)
         return DGLHeteroGraph(gidx, self.ntypes, self.etypes)
+
 
     def long(self):
         """Cast the graph to one with idtype int64

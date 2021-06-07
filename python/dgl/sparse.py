@@ -5,7 +5,7 @@ from . import ndarray as nd
 from ._ffi.function import _init_api
 from .base import DGLError
 from . import backend as F
-
+import torch
 
 def infer_broadcast_shape(op, shp1, shp2):
     r"""Check the shape validity, and infer the output shape given input shape and operator.
@@ -179,6 +179,107 @@ def _gspmm(gidx, op, reduce_op, u, e):
     return v, (arg_u, arg_e)
 
 
+def _gspmm_hetero(g, op, reduce_op, u_and_e_tuple):
+    r""" Generalized Sparse Matrix Multiplication interface. 
+    """
+    num_ntypes = g._graph.number_of_ntypes()
+
+    u_tuple, e_tuple = u_and_e_tuple[:num_ntypes], u_and_e_tuple[num_ntypes:]
+    print("SPMM for heterogeneous:")
+    gidx = g._graph
+    use_u = op != 'copy_rhs'
+    use_e = op != 'copy_lhs'
+    if use_u and use_e:
+        if F.dtype(u) != F.dtype(e):
+            raise DGLError("The node features' data type {} doesn't match edge"
+                           " features' data type {}, please convert them to the"
+                           " same type.".format(F.dtype(u), F.dtype(e)))
+    # deal with scalar features.
+    expand_u, expand_e = False, False
+    
+    # multiple etypes and one src type
+    # tmp_u = {}
+    # if  use_u and type(u_tuple) is not dict:
+    #     tmp_u[g.srctypes[0]] = u_tuple
+    #     u_tuple = tmp_u
+    
+    if use_u:
+        for idx in range(len(u_tuple)):  
+            if u_tuple[idx] is not None:    
+                if F.ndim(u_tuple[idx]) == 1:
+                    expand_u = True
+    if use_e:
+        for idx in range(len(e_tuple)):  
+            if e_tuple[idx] is not None:    
+                if F.ndim(e_tuple[idx]) == 1:
+                    expand_e = True
+
+    list_u = [None] * gidx.number_of_ntypes()
+    list_v = [None] * gidx.number_of_ntypes()
+    list_e = [None] * gidx.number_of_etypes()
+
+    for srctype, etype, dsttype in g.canonical_etypes:
+        etid = g.get_etype_id(etype)
+        src_id = g.get_ntype_id(srctype)
+        dst_id = g.get_ntype_id(dsttype)
+        
+        u = u_tuple[src_id] if use_u else None
+        e = e_tuple[etid] if use_e else None
+        if use_u:
+            if u is not None and F.ndim(u) == 1:
+                u = F.unsqueeze(u, -1)
+        if use_e:
+            if e is not None and F.ndim(e) == 1:
+                e = F.unsqueeze(e, -1)   
+        ctx = F.context(u) if use_u else F.context(e) # TODO(Israt): Put outside of loop
+        dtype = F.dtype(u) if use_u else F.dtype(e) # TODO(Israt): Put outside of loop
+        u_shp = F.shape(u) if use_u else (0,)
+        e_shp = F.shape(e) if use_e else (0,)     
+        if use_u:
+            list_u[src_id] = u if use_u else None
+        if use_e:
+            list_e[etid] = e if use_e else None
+        v_shp = (gidx.number_of_nodes(dst_id), ) +\
+            infer_broadcast_shape(op, u_shp[1:], e_shp[1:])
+        list_v[dst_id] = F.zeros(v_shp, dtype, ctx) # to_dgl_nd_for_write(
+    
+    use_cmp = reduce_op in ['max', 'min']
+    arg_u, arg_e = None, None
+    idtype = getattr(F, gidx.dtype)
+    if use_cmp:
+        if use_u:
+            arg_u = F.zeros(v_shp, idtype, ctx)
+        if use_e:
+            arg_e = F.zeros(v_shp, idtype, ctx)
+    arg_u_nd = to_dgl_nd_for_write(arg_u)
+    arg_e_nd = to_dgl_nd_for_write(arg_e)
+    tuple_v = tuple(list_v)
+    if gidx.number_of_edges(0) > 0:
+        _CAPI_DGLKernelSpMMHetero(gidx, op, reduce_op,
+                            [to_dgl_nd(u_i) for u_i in list_u],
+                            [to_dgl_nd(e_i) for e_i in list_e],
+                            [to_dgl_nd_for_write(v_i) for v_i in list_v],
+                            arg_u_nd,
+                            arg_e_nd)
+    arg_u = None if arg_u is None else F.zerocopy_from_dgl_ndarray(arg_u_nd)
+    arg_e = None if arg_e is None else F.zerocopy_from_dgl_ndarray(arg_e_nd)
+    # To deal with scalar node/edge features.
+
+    for l in range(len(list_v)):   
+        # replace None by empty tensor. Forward func doesn't accept None in tuple.
+        v = list_v[l]
+        v = torch.tensor([]) if v is None else v
+        list_v[l] = F.squeeze(v, -1)
+    out = tuple(list_v) 
+   
+    # if (expand_u or not use_u) and (expand_e or not use_e):
+    if expand_u and use_cmp:
+        arg_u = F.squeeze(arg_u, -1)
+    if expand_e and use_cmp:
+        arg_e = F.squeeze(arg_e, -1)
+    return out, (arg_u, arg_e)
+
+
 def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
     r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface. It
     takes the result of :attr:`op` on source node feature and destination node
@@ -254,6 +355,91 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
                              lhs_target, rhs_target)
     if (expand_lhs or not use_lhs) and (expand_rhs or not use_rhs):
         out = F.squeeze(out, -1)
+    return out
+
+# TODO (Israt): Wrong order
+def _gsddmm_hetero(g, op, lhs_and_rhs_dict, lhs_target='u', rhs_target='v'):
+    r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface. 
+    """
+    num_ntypes = g._graph.number_of_ntypes()
+    lhs_dict, rhs_dict = lhs_and_rhs_dict[:num_ntypes], lhs_and_rhs_dict[num_ntypes:]
+    print(lhs_dict, "rhs_dict", rhs_dict, "u,v", lhs_target,rhs_target)
+    print("SDDMM for heterogeneous:")
+    gidx = g._graph
+    # if gidx.number_of_etypes() != 1:
+    #     raise DGLError("We only support gsddmm on graph with one edge type")
+    use_lhs = op != 'copy_rhs'
+    use_rhs = op != 'copy_lhs'
+
+    # multiple etypes and one src/dest node type
+    tmp_u = {}
+    if  use_lhs and type(lhs_dict) is not dict:
+        tmp_u[g.srctypes[0]] = lhs_dict
+        lhs_dict = tmp_u
+    
+    tmp_v = {}
+    if  use_rhs and type(rhs_dict) is not dict:
+        tmp_v[g.dsttypes[0]] = rhs_dict
+        rhs_dict = tmp_v
+
+    if use_lhs and use_rhs:
+        for srctype, etype, dsttype in g.canonical_etypes:
+            if F.dtype(lhs_dict[srctype]) != F.dtype(rhs_dict[dsttype]):
+                raise DGLError("The operands data type don't match: {} and {}, please convert them"
+                               " to the same type.".format(F.dtype(lhs_dict[srctype]), F.dtype(rhs_dict[srctype])))
+    # deal with scalar features.
+    expand_lhs, expand_rhs = False, False
+    if use_lhs:
+        for key in lhs_dict.keys():
+            lhs = lhs_dict[key]
+            if F.ndim(lhs) == 1:
+                lhs = F.unsqueeze(lhs, -1)
+                expand_lhs = True
+    if use_rhs:
+        for key in rhs_dict.keys():
+            rhs = rhs_dict[key]
+            if F.ndim(rhs) == 1:
+                rhs = F.unsqueeze(rhs, -1)
+                expand_rhs = True
+    lhs_target = target_mapping[lhs_target]
+    rhs_target = target_mapping[rhs_target]
+
+    lhs_list = [None] * gidx.number_of_ntypes()
+    rhs_list = [None] * gidx.number_of_ntypes()
+    out_list = [None] * gidx.number_of_etypes()
+
+    for srctype, etype, dsttype in g.canonical_etypes:
+        etid = g.get_etype_id(etype)
+        src_id = g.get_ntype_id(srctype)
+        dst_id = g.get_ntype_id(dsttype)
+        lhs = lhs_dict[srctype]
+        rhs = rhs_dict[dsttype]
+        
+        ctx = F.context(lhs) if use_lhs else F.context(rhs)
+        dtype = F.dtype(lhs) if use_lhs else F.dtype(rhs)
+        lhs_shp = F.shape(lhs) if use_lhs else (0,)
+        rhs_shp = F.shape(rhs) if use_rhs else (0,)
+        lhs_list[src_id] = to_dgl_nd(lhs if use_lhs else None)
+        rhs_list[dst_id] = to_dgl_nd(rhs if use_rhs else None)
+        out_shp = (gidx.number_of_edges(etid), ) +\
+            infer_broadcast_shape(op, lhs_shp[1:], rhs_shp[1:])
+        out_list[etid] = to_dgl_nd_for_write(F.zeros(out_shp, dtype, ctx))
+
+    if gidx.number_of_edges(0) > 0:
+        _CAPI_DGLKernelSDDMMHetero(gidx, op,
+                             lhs_list,
+                             rhs_list,
+                             out_list,
+                             lhs_target, rhs_target)
+    
+    for l in range(len(out_list)):   
+        #replace None by empty tensor. Forward func doesn't accept None in tuple.
+        e = out_list[l]
+        e = torch.tensor([]) if e is None else F.zerocopy_from_dgl_ndarray(e)
+        if (expand_lhs or not use_lhs) and (expand_rhs or not use_rhs):
+            e = F.squeeze(v, -1)
+        out_list[l] = e
+    out = tuple(out_list) 
     return out
 
 
