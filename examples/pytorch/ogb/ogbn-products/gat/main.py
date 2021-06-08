@@ -245,5 +245,5 @@ if __name__ == '__main__':
     # Run 10 times
     test_accs = []
     for i in range(10):
-        test_accs.append(run(args, device, data))
+        test_accs.append(run(args, device, data).cpu().numpy())
         print('Average test accuracy:', np.mean(test_accs), '±', np.std(test_accs))

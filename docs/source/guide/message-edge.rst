@@ -20,9 +20,10 @@ For example:
 
     import dgl.function as fn
 
-    graph.edata['a'] = affinity
+    # Suppose eweight is a tensor of shape (E, *), where E is the number of edges.
+    graph.edata['a'] = eweight
     graph.update_all(fn.u_mul_e('ft', 'a', 'm'),
                      fn.sum('m', 'ft'))
 
-The example above uses affinity as the edge weight. The edge weight should
+The example above uses eweight as the edge weight. The edge weight should
 usually be a scalar.

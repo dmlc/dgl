@@ -261,7 +261,7 @@ def test_segment_reduce(reducer):
     value = F.tensor(np.random.rand(10, 5))
     v1 = F.attach_grad(F.clone(value))
     v2 = F.attach_grad(F.clone(value))
-    seglen = F.tensor([2, 3, 0, 4, 1])
+    seglen = F.tensor([2, 3, 0, 4, 1, 0, 0])
     u = F.copy_to(F.arange(0, F.shape(value)[0], F.int32), ctx)
     v = F.repeat(F.copy_to(F.arange(0, len(seglen), F.int32), ctx),
                  seglen, dim=0)
@@ -282,7 +282,6 @@ def test_segment_reduce(reducer):
         grad2 = F.grad(v2)
         assert F.allclose(grad1, grad2)
         print('backward passed')
-
 
 if __name__ == '__main__':
     test_spmm(F.int32, graphs[0], spmm_shapes[0], 'mul', 'sum')

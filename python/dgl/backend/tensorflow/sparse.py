@@ -2,9 +2,12 @@ import tensorflow as tf
 import numpy as np
 from .tensor import tensor, copy_to, context, asnumpy, zerocopy_from_numpy
 from ...base import is_all, ALL
-from ...sparse import _gspmm, _gsddmm, _segment_reduce, _bwd_segment_cmp
+from ...sparse import _gspmm, _gsddmm, _segment_reduce, _bwd_segment_cmp, _scatter_add
+from ...sparse import _csrmm, _csrsum, _csrmask
+from ...heterograph_index import create_unitgraph_from_csr
 
-__all__ = ['gspmm', 'gsddmm', 'edge_softmax', 'segment_reduce']
+__all__ = ['gspmm', 'gsddmm', 'edge_softmax', 'segment_reduce', 'scatter_add',
+           'csrmm', 'csrsum', 'csrmask']
 
 
 def _scatter_nd(index, src, n_rows):
@@ -261,10 +264,10 @@ def segment_reduce_real(op, x, offsets):
     def segment_reduce_backward(dy):
         m = x.shape[0]
         if op == 'sum':
-            offsets_np = asnumpy(offsets[1:-1])
-            indices_np = np.zeros((m,), dtype=offsets_np.dtype)
+            offsets_np = asnumpy(offsets[1:])
+            indices_np = np.zeros((m + 1,), dtype=offsets_np.dtype)
             np.add.at(indices_np, offsets_np, np.ones_like(offsets_np))
-            indices_np = np.cumsum(indices_np, -1)
+            indices_np = np.cumsum(indices_np, -1)[:-1]
             indices = zerocopy_from_numpy(indices_np)
             dx = tf.gather(dy, indices)
         else:
@@ -279,3 +282,80 @@ def segment_reduce(op, x, offsets):
     def _lambda(x):
         return segment_reduce_real(op, x, offsets)
     return _lambda(x)
+
+
+def scatter_add_real(x, idx, m):
+    y = _scatter_add(x, idx, m)
+
+    def scatter_add_backward(dy):
+        return tf.gather(dy, idx)
+    
+    return y, scatter_add_backward
+
+
+def scatter_add(x, idx, m):
+    @tf.custom_gradient
+    def _lambda(x):
+        return scatter_add_real(x, idx, m)
+    return _lambda(x)
+
+
+def csrmm_real(gidxA, A_weights, gidxB, B_weights, num_vtypes):
+    gidxC, C_weights = _csrmm(gidxA, A_weights, gidxB, B_weights, num_vtypes)
+    nrows, ncols, C_indptr, C_indices, C_eids = gidxC.adjacency_matrix_tensors(0, True, 'csr')
+
+    def grad(dnrows, dncols, dC_indptr, dC_indices, dC_eids, dC_weights):
+        # Only the last argument is meaningful.
+        dgidxA, dA_weights = _csrmm(
+            gidxC, dC_weights, gidxB.reverse(), B_weights, gidxA.number_of_ntypes())
+        dgidxB, dB_weights = _csrmm(
+            gidxA.reverse(), A_weights, gidxC, dC_weights, gidxB.number_of_ntypes())
+        dA_weights = _csrmask(dgidxA, dA_weights, gidxA)
+        dB_weights = _csrmask(dgidxB, dB_weights, gidxB)
+        return dA_weights, dB_weights
+    return (tf.constant(nrows), tf.constant(ncols), C_indptr, C_indices, C_eids, C_weights), grad
+
+def csrmm(gidxA, A_weights, gidxB, B_weights, num_vtypes):
+    @tf.custom_gradient
+    def _lambda(A_weights, B_weights):
+        return csrmm_real(gidxA, A_weights, gidxB, B_weights, num_vtypes)
+    nrows, ncols, C_indptr, C_indices, C_eids, C_weights = _lambda(A_weights, B_weights)
+    gidxC = create_unitgraph_from_csr(
+        num_vtypes, nrows.numpy(), ncols.numpy(), C_indptr, C_indices, C_eids,
+        ["coo", "csr", "csc"])
+    return gidxC, C_weights
+
+
+def csrsum_real(gidxs, weights):
+    gidxC, C_weights = _csrsum(gidxs, weights)
+    nrows, ncols, C_indptr, C_indices, C_eids = gidxC.adjacency_matrix_tensors(0, True, 'csr')
+
+    def grad(dnrows, dncols, dC_indptr, dC_indices, dC_eids, dC_weights):
+        # Only the last argument is meaningful.
+        return tuple(_csrmask(gidxC, dC_weights, gidx) for gidx in gidxs)
+    return (tf.constant(nrows), tf.constant(ncols), C_indptr, C_indices, C_eids, C_weights), grad
+
+def csrsum(gidxs, weights):
+    @tf.custom_gradient
+    def _lambda(*weights):
+        return csrsum_real(gidxs, weights)
+    nrows, ncols, C_indptr, C_indices, C_eids, C_weights = _lambda(*weights)
+    num_vtypes = gidxs[0].number_of_ntypes()
+    gidxC = create_unitgraph_from_csr(
+        num_vtypes, nrows.numpy(), ncols.numpy(), C_indptr, C_indices, C_eids,
+        ["coo", "csr", "csc"])
+    return gidxC, C_weights
+
+
+def csrmask_real(gidxA, A_weights, gidxB):
+    B_weights = _csrmask(gidxA, A_weights, gidxB)
+
+    def grad(dB_weights):
+        return _csrmask(gidxB, dB_weights, gidxA)
+    return B_weights, grad
+
+def csrmask(gidxA, A_weights, gidxB):
+    @tf.custom_gradient
+    def _lambda(A_weights):
+        return csrmask_real(gidxA, A_weights, gidxB)
+    return _lambda(A_weights)

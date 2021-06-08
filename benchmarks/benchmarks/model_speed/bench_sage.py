@@ -54,7 +54,7 @@ def track_time(data):
     test_mask = g.ndata['test_mask']
 
     in_feats = features.shape[1]
-    n_classes = data.num_labels
+    n_classes = data.num_classes
 
     g = dgl.remove_self_loop(g)
     g = dgl.add_self_loop(g)

@@ -11,6 +11,7 @@
 #include <vector>
 #include <tuple>
 #include <string>
+#include <utility>
 #include "./types.h"
 #include "./array_ops.h"
 #include "./spmat.h"
@@ -198,6 +199,31 @@ inline runtime::NDArray CSRGetAllData(CSRMatrix mat, int64_t row, int64_t col) {
  */
 runtime::NDArray CSRGetData(CSRMatrix, runtime::NDArray rows, runtime::NDArray cols);
 
+/*!
+ * \brief Get the data for each (row, col) pair, then index into the weights array.
+ *
+ * The operator supports matrix with duplicate entries but only one matched entry
+ * will be returned for each (row, col) pair. Support duplicate input (row, col)
+ * pairs.
+ *
+ * If some (row, col) pairs do not contain a valid non-zero elements to index into the
+ * weights array, DGL returns the value \a filler for that pair instead.
+ *
+ * \note This operator allows broadcasting (i.e, either row or col can be of length 1).
+ *
+ * \tparam DType the data type of the weights array.
+ * \param mat Sparse matrix.
+ * \param rows Row index.
+ * \param cols Column index.
+ * \param weights The weights array.
+ * \param filler The value to return for row-column pairs not existent in the matrix.
+ * \return Data array. The i^th element is the data of (rows[i], cols[i])
+ */
+template <typename DType>
+runtime::NDArray CSRGetData(
+    CSRMatrix, runtime::NDArray rows, runtime::NDArray cols, runtime::NDArray weights,
+    DType filler);
+
 /*! \brief Return a transposed CSR matrix */
 CSRMatrix CSRTranspose(CSRMatrix csr);
 
@@ -205,7 +231,7 @@ CSRMatrix CSRTranspose(CSRMatrix csr);
  * \brief Convert CSR matrix to COO matrix.
  *
  * Complexity: O(nnz)
- * 
+ *
  * - If data_as_order is false, the column and data arrays of the
  *   result COO are equal to the indices and data arrays of the
  *   input CSR. The result COO is also row sorted.
@@ -405,8 +431,40 @@ COOMatrix CSRRowWiseTopk(
     bool ascending = false);
 
 /*!
+ * \brief Sort the column index according to the tag of each column.
+ *
+ * Example:
+ * indptr  = [0, 5, 8]
+ * indices = [0, 1, 2, 3, 4, 0, 1, 2]
+ *
+ * tag     = [1, 1, 0, 2, 0]
+ *
+ *  After CSRSortByTag
+ *
+ * indptr  = [0, 5, 8]
+ * indices = [2, 4, 0, 1, 3, 2, 0, 1]
+ * (tag)   = [0, 0, 1, 1, 2, 0, 1, 1]
+ *           ^    ^     ^  ^
+ *                         ^  ^     ^^
+ * (the tag array itself is unchanged.)
+ *
+ * Return:
+ * [[0, 2, 4, 5], [0, 1, 3, 3]] (marked with ^)
+ *
+ * \param csr The csr matrix to be sorted
+ * \param tag_array Tag of each column. IdArray with length num_cols
+ * \param num_tags Number of tags. It should be equal to max(tag_array)+1.
+ * \return 1. A sorted copy of the given CSR matrix
+ *         2. The split positions of different tags. NDArray of shape (num_rows, num_tags + 1)
+ */
+std::pair<CSRMatrix, NDArray> CSRSortByTag(
+    const CSRMatrix &csr,
+    const IdArray tag_array,
+    int64_t num_tags);
+
+/*
  * \brief Union two CSRMatrix into one CSRMatrix.
- * 
+ *
  * Two Matrix must have the same shape.
  *
  * Example:
@@ -478,7 +536,7 @@ CSRMatrix DisjointUnionCsr(
  *      [3, 0, 2],
  *      [1, 1, 0],
  *      [0, 0, 4]]
- * 
+ *
  * B, cnt, edge_map = CSRToSimple(A)
  *
  * B = [[0, 0, 0],

@@ -87,7 +87,7 @@ def bmm_maybe_select(A, B, index):
         return tf.gather(B, flatidx)
     else:
         BB = tf.gather(B, index)
-        return tf.squeeze(tf.matmul(tf.expand_dims(A, 1), BB))
+        return tf.squeeze(tf.matmul(tf.expand_dims(A, 1), BB), 1)
 
 
 class Identity(layers.Layer):

@@ -42,6 +42,9 @@
 
    批次化的图
 
+需要注意，DGL里对图进行变换的函数会去掉图上的批次信息。用户可以通过 :func:`dgl.DGLGraph.set_batch_num_nodes`
+和 :func:`dgl.DGLGraph.set_batch_num_edges` 两个函数在变换后的图上重新加入批次信息。
+
 图读出
 ^^^^^^^^^^^^^
 
@@ -165,7 +168,7 @@ DGL内置了常见的图读出函数，例如 :func:`dgl.readout_nodes` 就实�
     opt = torch.optim.Adam(model.parameters())
     for epoch in range(20):
         for batched_graph, labels in dataloader:
-            feats = batched_graph.ndata['attr'].float()
+            feats = batched_graph.ndata['attr']
             logits = model(batched_graph, feats)
             loss = F.cross_entropy(logits, labels)
             opt.zero_grad()

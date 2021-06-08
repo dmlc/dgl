@@ -168,6 +168,8 @@ def sum(input, dim, keepdims=False):
         input = tf.cast(input, tf.int32)
     return tf.reduce_sum(input, axis=dim, keepdims=keepdims)
 
+def floor_div(in1, in2):
+    return astype(in1 / in2, dtype(in1))
 
 def reduce_sum(input):
     if input.dtype == tf.bool:

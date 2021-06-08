@@ -1,11 +1,19 @@
 """
 .. _model-line-graph:
 
-Line graph neural network
+Line Graph Neural Network
 =========================
 
 **Author**: `Qi Huang <https://github.com/HQ01>`_, Yu Gai,
 `Minjie Wang <https://jermainewang.github.io/>`_, Zheng Zhang
+
+.. warning::
+
+    The tutorial aims at gaining insights into the paper, with code as a mean
+    of explanation. The implementation thus is NOT optimized for running
+    efficiency. For recommended implementation, please refer to the `official
+    examples <https://github.com/dmlc/dgl/tree/master/examples>`_.
+
 """
 
 ###########################################################################################

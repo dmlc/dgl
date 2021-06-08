@@ -21,7 +21,6 @@ import torch.nn.functional as F
 import torch.optim as optim
 import torch.multiprocessing as mp
 from dgl.distributed import DistDataLoader
-#from pyinstrument import Profiler
 
 class SAGE(nn.Module):
     def __init__(self,
@@ -69,19 +68,18 @@ class SAGE(nn.Module):
         for l, layer in enumerate(self.layers):
             y = th.zeros(g.number_of_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
 
-            sampler = dgl.sampling.MultiLayerNeighborSampler([None])
-            dataloader = dgl.sampling.NodeDataLoader(
+            sampler = dgl.dataloading.MultiLayerNeighborSampler([None])
+            dataloader = dgl.dataloading.NodeDataLoader(
                 g,
                 th.arange(g.number_of_nodes()),
                 sampler,
-                batch_size=args.batch_size,
+                batch_size=batch_size,
                 shuffle=True,
                 drop_last=False,
-                num_workers=args.num_workers)
+                num_workers=0)
 
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
                 block = blocks[0]
-
                 block = block.int().to(device)
                 h = x[input_nodes].to(device)
                 h = layer(block, h)
@@ -93,7 +91,6 @@ class SAGE(nn.Module):
 
             x = y
         return y
-
 
 class NegativeSampler(object):
     def __init__(self, g, neg_nseeds):
@@ -271,7 +268,7 @@ def generate_emb(model, g, inputs, batch_size, device):
 def compute_acc(emb, labels, train_nids, val_nids, test_nids):
     """
     Compute the accuracy of prediction given the labels.
-    
+
     We will fist train a LogisticRegression model using the trained embeddings,
     the training set, validation set and test set is provided as the arguments.
 
@@ -328,8 +325,6 @@ def run(args, device, data):
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
     # Training loop
-    #profiler = Profiler()
-    #profiler.start()
     epoch = 0
     for epoch in range(args.num_epochs):
         sample_time = 0
@@ -424,7 +419,7 @@ def run(args, device, data):
         th.save(pred, 'emb.pt')
 
 def main(args):
-    dgl.distributed.initialize(args.ip_config, args.num_servers, num_workers=args.num_workers)
+    dgl.distributed.initialize(args.ip_config)
     if not args.standalone:
         th.distributed.init_process_group(backend='gloo')
     g = dgl.distributed.DistGraph(args.graph_name, part_config=args.part_config)
@@ -461,9 +456,8 @@ if __name__ == '__main__':
     parser.add_argument('--id', type=int, help='the partition id')
     parser.add_argument('--ip_config', type=str, help='The file for IP configuration')
     parser.add_argument('--part_config', type=str, help='The path to the partition config file')
-    parser.add_argument('--num_servers', type=int, default=1, help='Server count on each machine.')
     parser.add_argument('--n_classes', type=int, help='the number of classes')
-    parser.add_argument('--num_gpus', type=int, default=-1, 
+    parser.add_argument('--num_gpus', type=int, default=-1,
                         help="the number of GPU device. Use -1 for CPU training")
     parser.add_argument('--num_epochs', type=int, default=20)
     parser.add_argument('--num_hidden', type=int, default=16)
@@ -475,8 +469,6 @@ if __name__ == '__main__':
     parser.add_argument('--eval_every', type=int, default=5)
     parser.add_argument('--lr', type=float, default=0.003)
     parser.add_argument('--dropout', type=float, default=0.5)
-    parser.add_argument('--num_workers', type=int, default=0,
-        help="Number of sampling processes. Use 0 for no extra process.")
     parser.add_argument('--local_rank', type=int, help='get rank of the process')
     parser.add_argument('--standalone', action='store_true', help='run in the standalone mode')
     parser.add_argument('--num_negs', type=int, default=1)
@@ -485,10 +477,5 @@ if __name__ == '__main__':
     parser.add_argument('--remove_edge', default=False, action='store_true',
         help="whether to remove edges during sampling")
     args = parser.parse_args()
-    assert args.num_workers == int(os.environ.get('DGL_NUM_SAMPLER')), \
-    'The num_workers should be the same value with DGL_NUM_SAMPLER.'
-    assert args.num_servers == int(os.environ.get('DGL_NUM_SERVER')), \
-    'The num_servers should be the same value with DGL_NUM_SERVER.'
-    
     print(args)
     main(args)

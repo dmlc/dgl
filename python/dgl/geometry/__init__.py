@@ -1,12 +1,12 @@
-"""Package for geometry common components."""
-import importlib
-import sys
-from ..backend import backend_name
+"""The ``dgl.geometry`` package contains geometry operations:
 
-def _load_backend(mod_name):
-    mod = importlib.import_module('.%s' % mod_name, __name__)
-    thismod = sys.modules[__name__]
-    for api, obj in mod.__dict__.items():
-        setattr(thismod, api, obj)
+* Farthest point sampling for point cloud sampling
 
-_load_backend(backend_name)
+* Neighbor matching module for graclus pooling
+
+.. note::
+    This package is experimental and the interfaces may be subject
+    to changes in future releases.
+"""
+from .fps import *
+from .edge_coarsening import *

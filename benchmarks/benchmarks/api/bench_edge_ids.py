@@ -9,7 +9,7 @@ from .. import utils
 @utils.benchmark('time', timeout=1200)
 @utils.parametrize_cpu('graph_name', ['cora', 'livejournal', 'friendster'])
 @utils.parametrize_gpu('graph_name', ['cora', 'livejournal'])
-@utils.parametrize('format', ['csr'])  # csr/csc is not supported
+@utils.parametrize('format', ['coo', 'csr', 'csc'])
 @utils.parametrize('fraction', [0.01, 0.1])
 @utils.parametrize('return_uv', [True, False])
 def track_time(graph_name, format, fraction, return_uv):
@@ -29,9 +29,9 @@ def track_time(graph_name, format, fraction, return_uv):
         out = graph.edge_ids(u[0], v[0])
 
     # timing
-    t0 = time.time()
-    for i in range(10):
-        edges = graph.edge_ids(u, v, return_uv=return_uv)
-    t1 = time.time()
 
-    return (t1 - t0) / 10
+    with utils.Timer() as t:
+        for i in range(3):
+            edges = graph.edge_ids(u, v, return_uv=return_uv)
+
+    return t.elapsed_secs / 3

@@ -59,6 +59,14 @@ def node_subgraph(graph, nodes, store_ids=True):
     G : DGLGraph
         The subgraph.
 
+    Notes
+    -----
+
+    This function discards the batch information. Please use
+    :func:`dgl.DGLGraph.set_batch_num_nodes`
+    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+    to maintain the information.
+
     Examples
     --------
     The following example uses PyTorch backend.
@@ -173,7 +181,7 @@ def edge_subgraph(graph, edges, preserve_nodes=False, store_ids=True):
 
         If the graph is homogeneous, one can directly pass the above formats.
         Otherwise, the argument must be a dictionary with keys being edge types
-        and values being the nodes.
+        and values being the edge IDs.
     preserve_nodes : bool, optional
         If True, do not relabel the incident nodes and remove the isolated nodes
         in the extracted subgraph. (Default: False)
@@ -186,6 +194,14 @@ def edge_subgraph(graph, edges, preserve_nodes=False, store_ids=True):
     -------
     G : DGLGraph
         The subgraph.
+
+    Notes
+    -----
+
+    This function discards the batch information. Please use
+    :func:`dgl.DGLGraph.set_batch_num_nodes`
+    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+    to maintain the information.
 
     Examples
     --------
@@ -322,6 +338,14 @@ def in_subgraph(g, nodes):
     DGLGraph
         The subgraph.
 
+    Notes
+    -----
+
+    This function discards the batch information. Please use
+    :func:`dgl.DGLGraph.set_batch_num_nodes`
+    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+    to maintain the information.
+
     Examples
     --------
     The following example uses PyTorch backend.
@@ -420,6 +444,14 @@ def out_subgraph(g, nodes):
     DGLGraph
         The subgraph.
 
+    Notes
+    -----
+
+    This function discards the batch information. Please use
+    :func:`dgl.DGLGraph.set_batch_num_nodes`
+    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+    to maintain the information.
+
     Examples
     --------
     The following example uses PyTorch backend.
@@ -501,6 +533,14 @@ def node_type_subgraph(graph, ntypes):
     G : DGLGraph
         The subgraph.
 
+    Notes
+    -----
+
+    This function discards the batch information. Please use
+    :func:`dgl.DGLGraph.set_batch_num_nodes`
+    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+    to maintain the information.
+
     Examples
     --------
     The following example uses PyTorch backend.
@@ -543,6 +583,8 @@ def node_type_subgraph(graph, ntypes):
     for stid, dtid, etid in zip(stids, dtids, etids):
         if stid in ntid and dtid in ntid:
             etypes.append(graph.canonical_etypes[etid])
+    if len(etypes) == 0:
+        raise DGLError('There are no edges among nodes of the specified types.')
     return edge_type_subgraph(graph, etypes)
 
 DGLHeteroGraph.node_type_subgraph = utils.alias_func(node_type_subgraph)
@@ -551,7 +593,8 @@ def edge_type_subgraph(graph, etypes):
     """Return the subgraph induced on given edge types.
 
     An edge-type-induced subgraph contains all the edges of the given subset of
-    the edge types of a graph and the nodes incident by those edges.
+    the edge types of a graph. It also contains all nodes of a particular type
+    if some nodes of the type are incident to these edges.
     In addition to extracting the subgraph, DGL also copies the features of the
     extracted nodes and edges to the resulting graph.
     The copy is *lazy* and incurs data movement only when needed.
@@ -572,6 +615,14 @@ def edge_type_subgraph(graph, etypes):
     -------
     G : DGLGraph
         The subgraph.
+
+    Notes
+    -----
+
+    This function discards the batch information. Please use
+    :func:`dgl.DGLGraph.set_batch_num_nodes`
+    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+    to maintain the information.
 
     Examples
     --------

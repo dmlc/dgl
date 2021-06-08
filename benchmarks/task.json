@@ -1,5 +1,5 @@
 {
-    "c5.9xlarge": {
+    "r5.16xlarge": {
         "tests": [
             ""
         ],

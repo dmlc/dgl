@@ -308,10 +308,9 @@ DGL确保块的输出节点将始终出现在输入节点中。如下代码所�
 .. code:: python
 
     class MultiLayerDropoutSampler(dgl.dataloading.BlockSampler):
-        def __init__(self, p, n_layers):
-            super().__init__()
-    
-            self.n_layers = n_layers
+        def __init__(self, p, num_layers):
+            super().__init__(num_layers)
+
             self.p = p
     
         def sample_frontier(self, block_id, g, seed_nodes, *args, **kwargs):
@@ -326,7 +325,7 @@ DGL确保块的输出节点将始终出现在输入节点中。如下代码所�
             return frontier
     
         def __len__(self):
-            return self.n_layers
+            return self.num_layers
 
 在实现自定义采样器后，用户可以创建一个数据加载器。这个数据加载器使用用户自定义的采样器，
 并且遍历种子节点生成一系列的块。
@@ -365,10 +364,9 @@ DGL确保块的输出节点将始终出现在输入节点中。如下代码所�
 .. code:: python
 
     class MultiLayerDropoutSampler(dgl.dataloading.BlockSampler):
-        def __init__(self, p, n_layers):
-            super().__init__()
-    
-            self.n_layers = n_layers
+        def __init__(self, p, num_layers):
+            super().__init__(num_layers)
+
             self.p = p
     
         def sample_frontier(self, block_id, g, seed_nodes, *args, **kwargs):
@@ -387,4 +385,5 @@ DGL确保块的输出节点将始终出现在输入节点中。如下代码所�
             return frontier
     
         def __len__(self):
-            return self.n_layers
+            return self.num_layers
+            

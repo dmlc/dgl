@@ -6,9 +6,7 @@ Code: https://github.com/MichSchli/RelationPrediction
 Difference compared to MichSchli/RelationPrediction
 * Report raw metrics instead of filtered metrics.
 * By default, we use uniform edge sampling instead of neighbor-based edge
-  sampling used in author's code. In practice, we find it achieves similar MRR
-  probably because the model only uses one GNN layer so messages are propagated
-  among immediate neighbors. User could specify "--edge-sampler=neighbor" to switch
+  sampling used in author's code. In practice, we find it achieves similar MRR. User could specify "--edge-sampler=neighbor" to switch
   to neighbor-based edge sampling.
 """
 
@@ -191,13 +189,13 @@ def main(args):
                                  valid_data, test_data, hits=[1, 3, 10], eval_bz=args.eval_batch_size,
                                  eval_p=args.eval_protocol)
             # save best model
-            if mrr < best_mrr:
-                if epoch >= args.n_epochs:
-                    break
-            else:
+            if best_mrr < mrr:
                 best_mrr = mrr
-                torch.save({'state_dict': model.state_dict(), 'epoch': epoch},
-                           model_state_file)
+                torch.save({'state_dict': model.state_dict(), 'epoch': epoch}, model_state_file)
+            
+            if epoch >= args.n_epochs:
+                break
+            
             if use_cuda:
                 model.cuda()
 

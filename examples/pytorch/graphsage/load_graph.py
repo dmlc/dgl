@@ -9,7 +9,7 @@ def load_reddit():
     g = data[0]
     g.ndata['features'] = g.ndata['feat']
     g.ndata['labels'] = g.ndata['label']
-    return g, data.num_labels
+    return g, data.num_classes
 
 def load_ogb(name):
     from ogb.nodeproppred import DglNodePropPredDataset

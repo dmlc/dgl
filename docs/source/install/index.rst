@@ -1,7 +1,5 @@
-Install DGL
-===========
-
-This topic explains how to install DGL. We recommend installing DGL by using ``conda`` or ``pip``.
+Install and Setup
+=================
 
 System requirements
 -------------------
@@ -22,7 +20,8 @@ CPU build, then the CPU build is overwritten.
 Install from Conda or Pip
 -------------------------
 
-Check out the `Get Started page <https://www.dgl.ai/pages/start.html>`_.
+We recommend installing DGL by ``conda`` or ``pip``.
+Check out the instructions on the `Get Started page <https://www.dgl.ai/pages/start.html>`_.
 
 .. _install-from-source:
 
@@ -63,20 +62,19 @@ configuration as you wish. For example, change ``USE_CUDA`` to ``ON`` will
 enable a CUDA build. You could also pass ``-DKEY=VALUE`` to the cmake command
 for the same purpose.
 
-- CPU-only build
-   .. code:: bash
+* CPU-only build::
 
-      mkdir build
-      cd build
-      cmake ..
-      make -j4
-- CUDA build
-   .. code:: bash
+     mkdir build
+     cd build
+     cmake ..
+     make -j4
 
-      mkdir build
-      cd build
-      cmake -DUSE_CUDA=ON ..
-      make -j4
+* CUDA build::
+
+     mkdir build
+     cd build
+     cmake -DUSE_CUDA=ON ..
+     make -j4
 
 Finally, install the Python binding.
 
@@ -125,8 +123,7 @@ You can build DGL with MSBuild.  With `MS Build Tools <https://go.microsoft.com/
 and `CMake on Windows <https://cmake.org/download/>`_ installed, run the following
 in VS2019 x64 Native tools command prompt.
 
-- CPU only build
-  .. code::
+* CPU only build::
 
      MD build
      CD build
@@ -134,8 +131,8 @@ in VS2019 x64 Native tools command prompt.
      msbuild dgl.sln /m
      CD ..\python
      python setup.py install
-- CUDA build
-  .. code::
+
+* CUDA build::
 
      MD build
      CD build
@@ -144,9 +141,61 @@ in VS2019 x64 Native tools command prompt.
      CD ..\python
      python setup.py install
 
-Optional Flags
-``````````````
+Compilation Flags
+`````````````````
 
-- If you are using PyTorch, you can add ``-DBUILD_TORCH=ON`` flag in CMake
-  to build PyTorch plugins for further performance optimization.  This applies for Linux,
-  Windows, and Mac.
+See `config.cmake <https://github.com/dmlc/dgl/blob/master/cmake/config.cmake>`_.
+
+
+.. _backends:
+
+Working with different backends
+-------------------------------
+
+DGL supports PyTorch, MXNet and Tensorflow backends. 
+DGL will choose the backend on the following options (high priority to low priority)
+
+* Use the ``DGLBACKEND`` environment variable:
+
+   - You can use ``DGLBACKEND=[BACKEND] python gcn.py ...`` to specify the backend
+   - Or ``export DGLBACKEND=[BACKEND]`` to set the global environment variable 
+
+* Modify the ``config.json`` file under "~/.dgl":
+
+   - You can use ``python -m dgl.backend.set_default_backend [BACKEND]`` to set the default backend
+
+Currently BACKEND can be chosen from mxnet, pytorch, tensorflow.
+
+PyTorch backend
+```````````````
+
+Export ``DGLBACKEND`` as ``pytorch`` to specify PyTorch backend. The required PyTorch
+version is 1.5.0 or later. See `pytorch.org <https://pytorch.org>`_ for installation instructions.
+
+MXNet backend
+`````````````
+
+Export ``DGLBACKEND`` as ``mxnet`` to specify MXNet backend. The required MXNet version is
+1.5 or later. See `mxnet.apache.org <https://mxnet.apache.org/get_started>`_ for installation
+instructions.
+
+MXNet uses uint32 as the default data type for integer tensors, which only supports graph of
+size smaller than 2^32. To enable large graph training, *build* MXNet with ``USE_INT64_TENSOR_SIZE=1``
+flag. See `this FAQ <https://mxnet.apache.org/api/faq/large_tensor_support>`_ for more information.
+
+MXNet 1.5 and later has an option to enable Numpy shape mode for ``NDArray`` objects, some DGL models
+need this mode to be enabled to run correctly. However, this mode may not compatible with pretrained
+model parameters with this mode disabled, e.g. pretrained models from GluonCV and GluonNLP.
+By setting ``DGL_MXNET_SET_NP_SHAPE``, users can switch this mode on or off.
+
+Tensorflow backend
+``````````````````
+
+Export ``DGLBACKEND`` as ``tensorflow`` to specify Tensorflow backend. The required Tensorflow
+version is 2.2.0 or later. See `tensorflow.org <https://www.tensorflow.org/install>`_ for installation
+instructions. In addition, DGL will set ``TF_FORCE_GPU_ALLOW_GROWTH`` to ``true`` to prevent Tensorflow take over the whole GPU memory:
+
+.. code:: bash
+
+   pip install "tensorflow>=2.2.0"  # when using tensorflow cpu version
+

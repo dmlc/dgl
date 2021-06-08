@@ -173,7 +173,7 @@ class RelGraphEmbedLayer(nn.Module):
 
         return embeds
 
-@utils.benchmark('time', 3600)
+@utils.benchmark('time', 600)
 @utils.parametrize('data', ['am', 'ogbn-mag'])
 def track_time(data):
     dataset = utils.process_data(data)
@@ -195,7 +195,6 @@ def track_time(data):
     dropout = 0.5
     use_self_loop = True
     lr = 0.01
-    n_epochs = 5
     low_mem = True
     num_workers = 4
 
@@ -241,14 +240,16 @@ def track_time(data):
     target_nids = node_ids[loc]
     train_nids = target_nids[train_idx]
 
-    # Create csr/coo/csc formats before launching training processes with multi-gpu.
-    # This avoids creating certain formats in each sub-process, which saves momory and CPU.
-    g.create_formats_()
+    g = g.formats('csc')
     sampler = dgl.dataloading.MultiLayerNeighborSampler(fanouts)
-    collator = dgl.dataloading.NodeCollator(g, train_nids, sampler, return_indices=True)
-    loader = dgl.dataloading.DataLoader(
-        collator.dataset, collate_fn=collator.collate,
-        batch_size=batch_size, shuffle=True, num_workers=4)
+    loader = dgl.dataloading.NodeDataLoader(
+        g,
+        target_nids[train_idx],
+        sampler,
+        batch_size=batch_size,
+        shuffle=True,
+        drop_last=False,
+        num_workers=num_workers)
 
     # node features
     # None for one-hot feature, if not none, it should be the feature tensor.
@@ -282,27 +283,49 @@ def track_time(data):
     optimizer = th.optim.Adam(all_params, lr=lr, weight_decay=l2norm)
     emb_optimizer = th.optim.SparseAdam(list(embed_layer.node_embeds.parameters()), lr=lr)
 
+    # dry run
+    for i, sample_data in enumerate(loader):
+        input_nodes, output_nodes, blocks = sample_data
+        feats = embed_layer(input_nodes,
+                            blocks[0].srcdata['ntype'],
+                            blocks[0].srcdata['type_id'],
+                            node_feats)
+        logits = model(blocks, feats)
+        seed_idx = blocks[-1].dstdata['type_id']
+        loss = F.cross_entropy(logits, labels[seed_idx])
+        optimizer.zero_grad()
+        emb_optimizer.zero_grad()
+
+        loss.backward()
+        optimizer.step()
+        emb_optimizer.step()
+
+        if i >= 3:
+            break
+
     print("start training...")
+    model.train()
+    embed_layer.train()
+
     t0 = time.time()
-    for epoch in range(n_epochs):
-        model.train()
-        embed_layer.train()
+    for i, sample_data in enumerate(loader):
+        input_nodes, output_nodes, blocks = sample_data
+        feats = embed_layer(input_nodes,
+                            blocks[0].srcdata['ntype'],
+                            blocks[0].srcdata['type_id'],
+                            node_feats)
+        logits = model(blocks, feats)
+        seed_idx = blocks[-1].dstdata['type_id']
+        loss = F.cross_entropy(logits, labels[seed_idx])
+        optimizer.zero_grad()
+        emb_optimizer.zero_grad()
 
-        for i, sample_data in enumerate(loader):
-            input_nodes, output_nodes, seed_idx, blocks = sample_data
-            feats = embed_layer(input_nodes,
-                                blocks[0].srcdata['ntype'],
-                                blocks[0].srcdata['type_id'],
-                                node_feats)
-            logits = model(blocks, feats)
-            loss = F.cross_entropy(logits, labels[train_idx][seed_idx])
-            optimizer.zero_grad()
-            emb_optimizer.zero_grad()
-
-            loss.backward()
-            optimizer.step()
-            emb_optimizer.step()
-
+        loss.backward()
+        optimizer.step()
+        emb_optimizer.step()
+        
+        if i >= 9:  # time 10 loops
+            break
     t1 = time.time()
 
-    return (t1 - t0) / n_epochs
+    return (t1 - t0) / (i + 1)

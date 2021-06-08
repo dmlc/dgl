@@ -358,7 +358,7 @@ class PinSAGECollator(object):
         assign_features_to_blocks(blocks, self.g, self.textset, self.ntype)
         return blocks
 
-@utils.benchmark('time', 36000)
+@utils.benchmark('time', 600)
 @utils.parametrize('data', ['nowplaying_rs'])
 def track_time(data):
     dataset = utils.process_data(data)
@@ -377,8 +377,6 @@ def track_time(data):
     num_workers = 0
     hidden_dims = 16
     lr = 3e-5
-    num_epochs = 5
-    batches_per_epoch = 20000
 
     g = dataset[0]
     # Sampler
@@ -398,7 +396,6 @@ def track_time(data):
         batch_size=batch_size,
         collate_fn=collator.collate_test,
         num_workers=num_workers)
-    dataloader_it = iter(dataloader)
 
     # Model
     model = PinSAGEModel(g, item_ntype, textset, hidden_dims, num_layers).to(device)
@@ -406,8 +403,7 @@ def track_time(data):
     opt = torch.optim.Adam(model.parameters(), lr=lr)
 
     model.train()
-    for batch_id in range(batches_per_epoch):
-        pos_graph, neg_graph, blocks = next(dataloader_it)
+    for batch_id, (pos_graph, neg_graph, blocks) in enumerate(dataloader):
         # Copy to GPU
         for i in range(len(blocks)):
             blocks[i] = blocks[i].to(device)
@@ -419,24 +415,27 @@ def track_time(data):
         loss.backward()
         opt.step()
 
+        if batch_id >= 3:
+            break
+
     print("start training...")
     t0 = time.time()
     # For each batch of head-tail-negative triplets...
-    for epoch_id in range(num_epochs):
-        model.train()
-        for batch_id in range(batches_per_epoch):
-            pos_graph, neg_graph, blocks = next(dataloader_it)
-            # Copy to GPU
-            for i in range(len(blocks)):
-                blocks[i] = blocks[i].to(device)
-            pos_graph = pos_graph.to(device)
-            neg_graph = neg_graph.to(device)
+    for batch_id, (pos_graph, neg_graph, blocks) in enumerate(dataloader):
+        # Copy to GPU
+        for i in range(len(blocks)):
+            blocks[i] = blocks[i].to(device)
+        pos_graph = pos_graph.to(device)
+        neg_graph = neg_graph.to(device)
 
-            loss = model(pos_graph, neg_graph, blocks).mean()
-            opt.zero_grad()
-            loss.backward()
-            opt.step()
+        loss = model(pos_graph, neg_graph, blocks).mean()
+        opt.zero_grad()
+        loss.backward()
+        opt.step()
+
+        if batch_id >= 10:  # time 10 loops
+            break
 
     t1 = time.time()
 
-    return (t1 - t0) / num_epochs
+    return (t1 - t0) / (batch_id + 1)

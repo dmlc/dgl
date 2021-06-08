@@ -1,14 +1,13 @@
 .. _tutorials1-index:
 
 Graph neural networks and its variants
-====================================
+--------------------------------------------
 
 * **Graph convolutional network (GCN)** `[research paper] <https://arxiv.org/abs/1609.02907>`__ `[tutorial]
   <1_gnn/1_gcn.html>`__ `[Pytorch code]
   <https://github.com/dmlc/dgl/blob/master/examples/pytorch/gcn>`__
   `[MXNet code]
   <https://github.com/dmlc/dgl/tree/master/examples/mxnet/gcn>`__:
-  This is the most basic GCN. The tutorial covers the basic uses of DGL APIs.
 
 * **Graph attention network (GAT)** `[research paper] <https://arxiv.org/abs/1710.10903>`__ `[tutorial]
   <1_gnn/9_gat.html>`__ `[Pytorch code]

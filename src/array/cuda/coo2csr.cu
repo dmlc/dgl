@@ -32,12 +32,8 @@ CSRMatrix COOToCSR<kDLGPU, int32_t>(COOMatrix coo) {
   bool row_sorted = coo.row_sorted;
   bool col_sorted = coo.col_sorted;
   if (!row_sorted) {
-    // It is possible that the flag is simply not set (default value is false),
-    // so we still perform a linear scan to check the flag.
-    std::tie(row_sorted, col_sorted) = COOIsSorted(coo);
-  }
-  if (!row_sorted) {
-    coo = COOSort(coo);
+    // we only need to sort the rows to perform conversion
+    coo = COOSort(coo, false);
     col_sorted = coo.col_sorted;
   }
 
@@ -110,12 +106,7 @@ CSRMatrix COOToCSR<kDLGPU, int64_t>(COOMatrix coo) {
   bool row_sorted = coo.row_sorted;
   bool col_sorted = coo.col_sorted;
   if (!row_sorted) {
-    // It is possible that the flag is simply not set (default value is false),
-    // so we still perform a linear scan to check the flag.
-    std::tie(row_sorted, col_sorted) = COOIsSorted(coo);
-  }
-  if (!row_sorted) {
-    coo = COOSort(coo);
+    coo = COOSort(coo, false);
     col_sorted = coo.col_sorted;
   }
 

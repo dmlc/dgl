@@ -10,6 +10,7 @@
 #include "macro.cuh"
 #include "atomic.cuh"
 #include "functor.cuh"
+#include "fp16.cuh"
 #include "./utils.h"
 #include "../selector.h"
 #include "../../runtime/cuda/cuda_common.h"
@@ -105,7 +106,7 @@ __global__ void SDDMMCooTreeReduceKernel(
     for (int i = blockIdx.y; i < out_len; i += gridDim.y) {  // over output feature dimension
       const Idx lhs_add = UseBcast ? __ldg(lhs_off + i) : i;
       const Idx rhs_add = UseBcast ? __ldg(rhs_off + i) : i;
-      DType val = 0.;
+      DType val = reduce::Sum<Idx, DType>::zero();;
       for (int j = tx; j < reduce_size; j += 64) {
         val += lhsoff[lhs_add * reduce_size + j] * rhsoff[rhs_add * reduce_size + j];
         if (j + 32 < reduce_size)

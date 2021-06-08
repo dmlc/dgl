@@ -40,12 +40,18 @@ macro(find_cuda use_cuda)
       find_library(CUDA_CUBLAS_LIBRARY cublas
         ${CUDA_TOOLKIT_ROOT_DIR}/lib/x64
         ${CUDA_TOOLKIT_ROOT_DIR}/lib/Win32)
+      find_library(CUDA_CURAND_LIBRARY curand
+        ${CUDA_TOOLKIT_ROOT_DIR}/lib/x64
+        ${CUDA_TOOLKIT_ROOT_DIR}/lib/Win32)
     else(MSVC)
       #find_library(CUDA_CUDA_LIBRARY cuda
       #  PATHS ${CUDA_TOOLKIT_ROOT_DIR}
       #  PATH_SUFFIXES lib lib64 targets/x86_64-linux/lib
       #  NO_DEFAULT_PATH)
       find_library(CUDA_CUBLAS_LIBRARY cublas
+        ${CUDA_TOOLKIT_ROOT_DIR}/lib64
+        ${CUDA_TOOLKIT_ROOT_DIR}/lib)
+      find_library(CUDA_CURAND_LIBRARY curand
         ${CUDA_TOOLKIT_ROOT_DIR}/lib64
         ${CUDA_TOOLKIT_ROOT_DIR}/lib)
     endif(MSVC)
@@ -55,5 +61,6 @@ macro(find_cuda use_cuda)
     #message(STATUS "Found CUDA_NVRTC_LIBRARY=" ${CUDA_NVRTC_LIBRARY})
     #message(STATUS "Found CUDA_CUDNN_LIBRARY=" ${CUDA_CUDNN_LIBRARY})
     message(STATUS "Found CUDA_CUBLAS_LIBRARY=" ${CUDA_CUBLAS_LIBRARY})
+    message(STATUS "Found CUDA_CURAND_LIBRARY=" ${CUDA_CURAND_LIBRARY})
   endif(CUDA_FOUND)
 endmacro(find_cuda)

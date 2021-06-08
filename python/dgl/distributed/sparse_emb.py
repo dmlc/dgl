@@ -6,23 +6,22 @@ from .dist_tensor import DistTensor
 
 class DistEmbedding:
     '''Distributed embeddings.
-
     DGL provides a distributed embedding to support models that require learnable embeddings.
     DGL's distributed embeddings are mainly used for learning node embeddings of graph models.
     Because distributed embeddings are part of a model, they are updated by mini-batches.
     The distributed embeddings have to be updated by DGL's optimizers instead of
     the optimizers provided by the deep learning frameworks (e.g., Pytorch and MXNet).
-
     To support efficient training on a graph with many nodes, the embeddings support sparse
     updates. That is, only the embeddings involved in a mini-batch computation are updated.
     Currently, DGL provides only one optimizer: `SparseAdagrad`. DGL will provide more
     optimizers in the future.
-
     Distributed embeddings are sharded and stored in a cluster of machines in the same way as
     py:meth:`dgl.distributed.DistTensor`, except that distributed embeddings are trainable.
     Because distributed embeddings are sharded
     in the same way as nodes and edges of a distributed graph, it is usually much more
     efficient to access than the sparse embeddings provided by the deep learning frameworks.
+
+    DEPRECATED: Please use dgl.distributed.nn.NodeEmbedding instead.
 
     Parameters
     ----------
@@ -41,7 +40,6 @@ class DistEmbedding:
         The partition policy that assigns embeddings to different machines in the cluster.
         Currently, it only supports node partition policy or edge partition policy.
         The system determines the right partition policy automatically.
-
     Examples
     --------
     >>> def initializer(shape, dtype):
@@ -55,7 +53,6 @@ class DistEmbedding:
     ...     loss = F.sum(feats + 1, 0)
     ...     loss.backward()
     ...     optimizer.step()
-
     Note
     ----
     When a ``DistEmbedding``  object is used when the deep learning framework is recording
@@ -76,9 +73,13 @@ class DistEmbedding:
             self._trace.append((idx, emb))
         return emb
 
+    def reset_trace(self):
+        '''Reset the traced data.
+        '''
+        self._trace = []
+
 class SparseAdagradUDF:
     ''' The UDF to update the embeddings with sparse Adagrad.
-
     Parameters
     ----------
     lr : float
@@ -89,10 +90,8 @@ class SparseAdagradUDF:
 
     def __call__(self, data_store, name, indices, data):
         ''' Update the embeddings with sparse Adagrad.
-
         This function runs on the KVStore server. It updates the gradients by scaling them
         according to the state sum.
-
         Parameters
         ----------
         data_store : dict of data
@@ -120,27 +119,20 @@ def _init_state(shape, dtype):
 
 class SparseAdagrad:
     r''' The sparse Adagrad optimizer.
-
     This optimizer implements a lightweight version of Adagrad algorithm for optimizing
     :func:`dgl.distributed.DistEmbedding`. In each mini-batch, it only updates the embeddings
     involved in the mini-batch to support efficient training on a graph with many
     nodes and edges.
-
     Adagrad maintains a :math:`G_{t,i,j}` for every parameter in the embeddings, where
     :math:`G_{t,i,j}=G_{t-1,i,j} + g_{t,i,j}^2` and :math:`g_{t,i,j}` is the gradient of
     the dimension :math:`j` of embedding :math:`i` at step :math:`t`.
-
     Instead of maintaining :math:`G_{t,i,j}`, this implementation maintains :math:`G_{t,i}`
     for every embedding :math:`i`:
-
     .. math::
       G_{t,i}=G_{t-1,i}+ \frac{1}{p} \sum_{0 \le j \lt p}g_{t,i,j}^2
-
     where :math:`p` is the dimension size of an embedding.
-
     The benefit of the implementation is that it consumes much smaller memory and runs
     much faster if users' model requires learnable embeddings for nodes or edges.
-
     Parameters
     ----------
     params : list of DistEmbeddings
@@ -151,6 +143,7 @@ class SparseAdagrad:
     def __init__(self, params, lr):
         self._params = params
         self._lr = lr
+        self._clean_grad = False
         # We need to register a state sum for each embedding in the kvstore.
         for emb in params:
             assert isinstance(emb, DistEmbedding), 'SparseAdagrad only supports DistEmbeding'
@@ -164,7 +157,6 @@ class SparseAdagrad:
 
     def step(self):
         ''' The step function.
-
         The step function is invoked at the end of every batch to push the gradients
         of the embeddings involved in a mini-batch to DGL's servers and update the embeddings.
         '''
@@ -185,5 +177,15 @@ class SparseAdagrad:
                     # after we push them.
                     grads = F.cat(grads, 0)
                     kvstore.push(name, idxs, grads)
-                # Clean up the old traces.
-                emb._trace = []
+
+            if self._clean_grad:
+                # clean gradient track
+                for emb in self._params:
+                    emb.reset_trace()
+                self._clean_grad = False
+
+
+    def zero_grad(self):
+        """clean grad cache
+        """
+        self._clean_grad = True

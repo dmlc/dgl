@@ -6,7 +6,7 @@ import numpy as np
 from .. import utils
 
 
-@utils.benchmark('time', timeout=1200)
+@utils.benchmark('time', timeout=600)
 @utils.parametrize_cpu('graph_name', ['cora', 'livejournal', 'friendster'])
 @utils.parametrize_gpu('graph_name', ['cora', 'livejournal'])
 @utils.parametrize('format', ['coo'])  # csc is not supported
@@ -25,9 +25,9 @@ def track_time(graph_name, format, fraction):
             i*10, dtype=torch.int64, device=device))
 
     # timing
-    t0 = time.time()
-    for i in range(10):
-        edges = graph.find_edges(eids)
-    t1 = time.time()
+    
+    with utils.Timer() as t:
+        for i in range(10):
+            edges = graph.find_edges(eids)
 
-    return (t1 - t0) / 10
+    return t.elapsed_secs / 10
