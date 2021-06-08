@@ -52,7 +52,7 @@ struct SharedMemory<double> {
   }
 };
 
-/*! \brief Compute Euclidean distance between two vectors */
+/*! \brief Compute Euclidean distance between two vectors in a cuda kernel */
 template <typename FloatType, typename IdType>
 __device__ FloatType EuclideanDist(const FloatType* vec1,
                                    const FloatType* vec2,
@@ -77,9 +77,9 @@ __device__ FloatType EuclideanDist(const FloatType* vec1,
 }
 
 /*!
- * \brief Compute Euclidean distance between two vectors, return positive
- *  infinite value if the intermediate distance is greater than the worst
- *  distance.
+ * \brief Compute Euclidean distance between two vectors in a cuda kernel,
+ *  return positive infinite value if the intermediate distance is greater
+ *  than the worst distance.
  */
 template <typename FloatType, typename IdType>
 __device__ FloatType EuclideanDistWithCheck(const FloatType* vec1,
