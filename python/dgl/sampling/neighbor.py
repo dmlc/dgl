@@ -190,9 +190,9 @@ def sample_neighbors_biased(g, nodes, fanout, bias, edge_dir='in',
     will be randomly chosen.  The graph returned will then contain all the nodes in the
     original graph, but only the sampled edges.
 
-    This version of neighbor sampling can support the scenario where different types of nodes
-    might have different probability to be picked. Each node is assigned an integer(tag) which
-    represents its type. Tag is an analogue of node type under the framework of homogeneous
+    This version of neighbor sampling can support the scenario where adjacent nodes with different
+    types might have different probability to be picked. Each node is assigned an integer(tag)
+    which represents its type. Tag is an analogue of node type under the framework of homogeneous
     graphs. In order to sample efficiently, we need to first sort the CSR matrix of the graph
     according to the tag (See `dgl.transform.sort_in_edges` and `dgl.transform.sort_out_edges`
     for details), which will arrange the neighbors with the same tag in a consecutive range
@@ -202,6 +202,10 @@ def sample_neighbors_biased(g, nodes, fanout, bias, edge_dir='in',
     the edge direction ('in' or 'out'). This function itself will not check whether the graph is
     sorted. Note that the input `tag_offset_name` should be consistent with that in the sorting
     function.
+
+    Only homogeneous or bipartite graphs are supported. For bipartite graphs, only candidate
+    frontier nodes have tags(source nodes when edge_dir='in' and destination nodes when
+    edge_dir='out')
 
     Node/edge features are not preserved. The original IDs of
     the sampled edges are stored as the `dgl.EID` feature in the returned graph.
@@ -312,8 +316,8 @@ def sample_neighbors_biased(g, nodes, fanout, bias, edge_dir='in',
     else:
         raise DGLError("edge_dir can only be 'in' or 'out'")
 
-    subgidx = _CAPI_DGLSampleNeighborsBiased(g._graph, nodes_array, fanout, bias_array, tag_offset_array,
-                                       edge_dir, replace)
+    subgidx = _CAPI_DGLSampleNeighborsBiased(g._graph, nodes_array, fanout, bias_array,
+                                             tag_offset_array, edge_dir, replace)
     induced_edges = subgidx.induced_edges
     ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
 
