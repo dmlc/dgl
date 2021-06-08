@@ -237,8 +237,8 @@ HeteroSubgraph SampleNeighborsBiased(
       induced_edges = earr.id;
     } else {
       // sample from one relation graph
-      auto req_fmt = (dir == EdgeDir::kOut)? CSR_CODE : CSC_CODE;
-      auto created_fmt = hg->GetCreatedFormats();
+      const auto req_fmt = (dir == EdgeDir::kOut)? CSR_CODE : CSC_CODE;
+      const auto created_fmt = hg->GetCreatedFormats();
       COOMatrix sampled_coo;
 
       switch (req_fmt) {

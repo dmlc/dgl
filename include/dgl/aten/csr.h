@@ -457,8 +457,8 @@ COOMatrix CSRRowWiseTopk(
  * // csr.num_cols = 4;
  * // csr.indptr = [0, 2, 4, 5, 5]
  * // csr.indices =                [1, 2, 2, 3, 3]
- * // tag of each element's column: 0, 0, 0, 1, 0
- * // tag_offset = [[0, 2, 2], [0, 1, 2], [0, 1, 1]]
+ * // tag of each element's column: 0, 0, 0, 1, 1
+ * // tag_offset = [[0, 2, 2], [0, 1, 2], [0, 0, 1]]
  * // csr.data = [2, 3, 0, 1, 4]
  * // bias = [1.0, 0.0]
  * CSRMatrix mat = ...;
