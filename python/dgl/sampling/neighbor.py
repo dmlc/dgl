@@ -193,7 +193,14 @@ def sample_neighbors_biased(g, nodes, fanout, bias, edge_dir='in',
     This version of neighbor sampling can support the scenario where adjacent nodes with different
     types might have different probability to be picked. Each node is assigned an integer(tag)
     which represents its type. Tag is an analogue of node type under the framework of homogeneous
-    graphs. In order to sample efficiently, we need to first sort the CSR matrix of the graph
+    graphs. Nodes with the same tag share the same probability.
+
+    For example, assume a node has (a+b) neighbors, and a of them have tag 0 while b of them have
+    tag 1. Assume a node of tag 0 has an unnormalized probability p to be picked while a node of
+    tag 1 has q. This function first chooses a tag according to the unnormalized probability
+    distribution (ap, bq), and then run a uniform sampling within the nodes with the chosen tag.
+
+    In order to sample efficiently, we need to first sort the CSR matrix of the graph
     according to the tag (See `dgl.transform.sort_in_edges` and `dgl.transform.sort_out_edges`
     for details), which will arrange the neighbors with the same tag in a consecutive range
     and store the offset of these ranges in a node feature with tag_offset_name as its name.
