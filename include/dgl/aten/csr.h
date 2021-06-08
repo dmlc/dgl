@@ -439,9 +439,9 @@ COOMatrix CSRRowWiseTopk(
  * Each column is assigned an integer tag which determines its probability to be sampled.
  * Users can assign different probability to different tags.
  *
- * This function only works with a CSR matrix sorted according to the tag so that columns with
- * the same tag are arranged in a consecutive range, and the input `tag_offset` represents the
- * boundaries of these ranges. However, the function itself will not check if the input matrix
+ * This function only works with a CSR matrix sorted according to the tag so that entries with
+ * the same column tag are arranged in a consecutive range, and the input `tag_offset` represents
+ * the boundaries of these ranges. However, the function itself will not check if the input matrix
  * has been sorted. It's the caller's responsibility to ensure the input matrix has been sorted
  * by `CSRSortByTag` (it will also return a NDArray `tag_offset` which should be used as an input
  * of this function).
@@ -456,8 +456,8 @@ COOMatrix CSRRowWiseTopk(
  * // csr.num_rows = 4;
  * // csr.num_cols = 4;
  * // csr.indptr = [0, 2, 4, 5, 5]
- * // csr.indices =      [1, 2, 2, 3, 3]
- * // tag of each column: 0, 0, 0, 1, 0
+ * // csr.indices =                [1, 2, 2, 3, 3]
+ * // tag of each element's column: 0, 0, 0, 1, 0
  * // tag_offset = [[0, 2, 2], [0, 1, 2], [0, 1, 1]]
  * // csr.data = [2, 3, 0, 1, 4]
  * // bias = [1.0, 0.0]

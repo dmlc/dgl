@@ -243,6 +243,7 @@ HeteroSubgraph SampleNeighborsBiased(
 
       switch (req_fmt) {
         case CSR_CODE:
+// std::cerr << "You should be here" << std::endl;
           CHECK(created_fmt & CSR_CODE) << "A sorted CSR Matrix is required.";
           sampled_coo = aten::CSRRowWiseSamplingBiased(
             hg->GetCSRMatrix(etype), nodes, fanout, tag_offset, bias, replace);
