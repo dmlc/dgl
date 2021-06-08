@@ -99,6 +99,10 @@ The folder contains example implementations of selected research papers related 
 | [GaAN: Gated Attention Networks for Learning on large and Spatiotemporal Graphs](#gaan) |                     |                                  | :heavy_check_mark:        |                    |                    |
 | [Combining Label Propagation and Simple Models Out-performs Graph Neural Networks](#correct_and_smooth) |  :heavy_check_mark: |                                  |                                  |                                  | :heavy_check_mark:                                 |
 | [Learning from Labeled and Unlabeled Data with Label Propagation](#label_propagation) |  :heavy_check_mark: |                                  |                                  |                                  |                                  |
+| [Heterogeneous Graph Neural Network](#hetgnn) | :heavy_check_mark: | :heavy_check_mark: | |                    | |
+| [Graph Transformer Networks](#gtn) | :heavy_check_mark: |  | |  | |
+| [Metapath Aggregated Graph Neural Network for Heterogeneous Graph Embedding](#magnn) | :heavy_check_mark: |  | |  | |
+| [Network Schema Preserving Heterogeneous Information Network Embedding](#nshe) | :heavy_check_mark: |  | |  | |
 
 ## 2021
 
@@ -160,6 +164,12 @@ The folder contains example implementations of selected research papers related 
 - <a name="tahin"></a> Bi, Ye, et al. A Heterogeneous Information Network based Cross DomainInsurance Recommendation System for Cold Start Users. [Paper link](https://arxiv.org/abs/2007.15293).
     - Example code: [Pytorch](../examples/pytorch/TAHIN)
     - Tags: cross-domain recommendation, graph neural network
+- <a name="magnn"></a> Fu X, Zhang J, Meng Z, et al. MAGNN: metapath aggregated graph neural network for heterogeneous graph embedding. [Paper link](https://dl.acm.org/doi/abs/10.1145/3366423.3380297).
+    - Example code: [OpenHGNN](https://github.com/BUPT-GAMMA/OpenHGNN/tree/main/openhgnn/output/MAGNN)
+    - Tags: Heterogeneous graph, Graph neural network, Graph embedding
+- <a name="nshe"></a> Zhao J, Wang X, et al. Network Schema Preserving Heterogeneous Information Network Embedding. [Paper link](https://www.ijcai.org/Proceedings/2020/0190.pdf).
+    - Example code: [OpenHGNN](https://github.com/BUPT-GAMMA/OpenHGNN/tree/main/openhgnn/output/NSHE)
+    - Tags: Heterogeneous graph, Graph neural network, Graph embedding, Network Schema
 
 ## 2019
 
@@ -191,7 +201,7 @@ The folder contains example implementations of selected research papers related 
     - Example code: [PyTorch](../examples/pytorch/graphwriter)
     - Tags: knowledge graph, text generation
 - <a name="han"></a> Wang et al. Heterogeneous Graph Attention Network. [Paper link](https://arxiv.org/abs/1903.07293).
-    - Example code: [PyTorch](../examples/pytorch/han)
+    - Example code: [PyTorch](../examples/pytorch/han), [OpenHGNN](https://github.com/BUPT-GAMMA/OpenHGNN/tree/main/openhgnn/output/HAN)
     - Tags: heterogeneous graphs, node classification
 - <a name="lgnn"></a> Chen et al. Supervised Community Detection with Line Graph Neural Networks. [Paper link](https://arxiv.org/abs/1705.08415).
     - Example code: [PyTorch](../examples/pytorch/line_graph)
@@ -238,6 +248,12 @@ The folder contains example implementations of selected research papers related 
 - <a name='gnnexplainer'></a> Ying, Rex, et al. GNNExplainer: Generating Explanations for Graph Neural Networks. [Paper link](https://arxiv.org/abs/1903.03894).
     - Example code: [PyTorch](../examples/pytorch/gnn_explainer)
     - Tags: Graph Neural Network, Explainability
+- <a name='hetgnn'></a> Zhang C, Song D, et al. Heterogeneous graph neural network. [Paper link](https://dl.acm.org/doi/abs/10.1145/3292500.3330961).
+    - Example code: [OpenHGNN](https://github.com/BUPT-GAMMA/OpenHGNN/tree/main/openhgnn/output/HetGNN)
+    - Tags:  Heterogeneous graphs, Graph neural networks, Graph embedding
+- <a name='gtn'></a> Yun S, Jeong M, et al. Graph transformer networks. [Paper link](https://arxiv.org/abs/1911.06455).
+    - Example code: [OpenHGNN](https://github.com/BUPT-GAMMA/OpenHGNN/tree/main/openhgnn/output/GTN)
+    - Tags:  Heterogeneous graphs, Graph neural networks, Graph structure
 
 ## 2018
 
