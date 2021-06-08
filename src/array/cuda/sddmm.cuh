@@ -334,7 +334,6 @@ void SDDMMCsrHetero(
   const DType *lhs_data = lhs.Ptr<DType>();
   const DType *rhs_data = rhs.Ptr<DType>();
   DType *out_data = out.Ptr<DType>();
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   int64_t N = csr.num_rows, M = csr.num_cols, E = csr.indices->shape[0];
 
   int64_t *lhs_off = nullptr, *rhs_off = nullptr;

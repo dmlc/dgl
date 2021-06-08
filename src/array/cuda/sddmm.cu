@@ -99,14 +99,16 @@ template <int XPU, typename IdType, int bits>
 void SDDMMCsrHetero(const std::string& op,
               const BcastOff& bcast,
               const std::vector<CSRMatrix>& vec_csr,
-              std::vector<NDArray> vec_lhs,
-              std::vector<NDArray> vec_rhs,
+              const std::vector<NDArray>& vec_lhs,
+              const std::vector<NDArray>& vec_rhs,
               std::vector<NDArray> vec_out,
               int lhs_target,
               int rhs_target,
-              const std::vector<dgl_type_t> lhs_eid,
-              const std::vector<dgl_type_t> rhs_eid) {
-  int maxstrm = 16;
+              const std::vector<dgl_type_t>& lhs_eid,
+              const std::vector<dgl_type_t>& rhs_eid) {
+  // TODO (Israt): Resolve PR - https://github.com/dmlc/dgl/issues/2995
+  // to use maxstream > 1
+  int maxstrm = 1;
   cudaStream_t stream[maxstrm];
   for (int i = 0; i < maxstrm; i++) {
     CUDA_CALL(cudaStreamCreate(&(stream[i])));
@@ -121,7 +123,7 @@ void SDDMMCsrHetero(const std::string& op,
           NDArray rhs = vec_rhs[rhs_eid[etype]];
           NDArray out = vec_out[etype];
           cuda::SDDMMCsrHetero<IdType, DType, Op, LhsTarget, RhsTarget>(
-            bcast, csr, lhs, rhs, out, stream[etype % maxstrm]);
+            bcast, csr, lhs, rhs, out, stream[0]);
         }
       });
     });
@@ -181,45 +183,45 @@ template void SDDMMCsr<kDLGPU, int64_t, 64>(
 template void SDDMMCsrHetero<kDLGPU, int32_t, 16>(
     const std::string& op, const BcastOff& bcast,
     const std::vector<CSRMatrix>& vec_csr,
-    std::vector<NDArray>  lhs, std::vector<NDArray> rhs,
+    const std::vector<NDArray>& lhs, const std::vector<NDArray>& rhs,
     std::vector<NDArray> out, int lhs_target, int rhs_target,
-    const std::vector<dgl_type_t> in_eid,
-    const std::vector<dgl_type_t> out_eid);
+    const std::vector<dgl_type_t>& in_eid,
+    const std::vector<dgl_type_t>& out_eid);
 template void SDDMMCsrHetero<kDLGPU, int64_t, 16>(
     const std::string& op, const BcastOff& bcast,
     const std::vector<CSRMatrix>& vec_csr,
-    std::vector<NDArray>  lhs, std::vector<NDArray> rhs,
+    const std::vector<NDArray>& lhs, const std::vector<NDArray>& rhs,
     std::vector<NDArray> out, int lhs_target, int rhs_target,
-    const std::vector<dgl_type_t> in_eid,
-    const std::vector<dgl_type_t> out_eid);
+    const std::vector<dgl_type_t>& in_eid,
+    const std::vector<dgl_type_t>& out_eid);
 template void SDDMMCsrHetero<kDLGPU, int32_t, 32>(
     const std::string& op, const BcastOff& bcast,
     const std::vector<CSRMatrix>& vec_csr,
-    std::vector<NDArray>  lhs, std::vector<NDArray> rhs,
+    const std::vector<NDArray>& lhs, const std::vector<NDArray>& rhs,
     std::vector<NDArray> out, int lhs_target, int rhs_target,
-    const std::vector<dgl_type_t> in_eid,
-    const std::vector<dgl_type_t> out_eid);
+    const std::vector<dgl_type_t>& in_eid,
+    const std::vector<dgl_type_t>& out_eid);
 template void SDDMMCsrHetero<kDLGPU, int64_t, 32>(
     const std::string& op, const BcastOff& bcast,
     const std::vector<CSRMatrix>& vec_csr,
-    std::vector<NDArray>  lhs, std::vector<NDArray> rhs,
+    const std::vector<NDArray>& lhs, const std::vector<NDArray>& rhs,
     std::vector<NDArray> out, int lhs_target, int rhs_target,
-    const std::vector<dgl_type_t> in_eid,
-    const std::vector<dgl_type_t> out_eid);
+    const std::vector<dgl_type_t>& in_eid,
+    const std::vector<dgl_type_t>& out_eid);
 template void SDDMMCsrHetero<kDLGPU, int32_t, 64>(
     const std::string& op, const BcastOff& bcast,
     const std::vector<CSRMatrix>& vec_csr,
-    std::vector<NDArray>  lhs, std::vector<NDArray> rhs,
+    const std::vector<NDArray>& lhs, const std::vector<NDArray>& rhs,
     std::vector<NDArray> out, int lhs_target, int rhs_target,
-    const std::vector<dgl_type_t> in_eid,
-    const std::vector<dgl_type_t> out_eid);
+    const std::vector<dgl_type_t>& in_eid,
+    const std::vector<dgl_type_t>& out_eid);
 template void SDDMMCsrHetero<kDLGPU, int64_t, 64>(
     const std::string& op, const BcastOff& bcast,
     const std::vector<CSRMatrix>& vec_csr,
-    std::vector<NDArray>  lhs, std::vector<NDArray> rhs,
+    const std::vector<NDArray>& lhs, const std::vector<NDArray>& rhs,
     std::vector<NDArray> out, int lhs_target, int rhs_target,
-    const std::vector<dgl_type_t> in_eid,
-    const std::vector<dgl_type_t> out_eid);
+    const std::vector<dgl_type_t>& in_eid,
+    const std::vector<dgl_type_t>& out_eid);
 
 
 template void SDDMMCoo<kDLGPU, int32_t, 16>(
