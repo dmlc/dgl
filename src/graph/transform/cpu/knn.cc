@@ -33,26 +33,9 @@ FloatType EuclideanDistWithCheck(const FloatType* vec1, const FloatType* vec2, i
                                  FloatType worst_dist = std::numeric_limits<FloatType>::max()) {
   FloatType dist = 0;
   bool early_stop = false;
-  IdType idx = 0;
-  while (idx < dim - 3) {
-    FloatType diff0 = vec1[idx] - vec2[idx];
-    FloatType diff1 = vec1[idx + 1] - vec2[idx + 1];
-    FloatType diff2 = vec1[idx + 2] - vec2[idx + 2];
-    FloatType diff3 = vec1[idx + 3] - vec2[idx + 3];
-    dist += diff0 * diff0 + diff1 * diff1 + diff2 * diff2 + diff3 * diff3;
-    idx += 4;
-    if (dist > worst_dist) {
-      early_stop = true;
-      idx = dim;
-      break;
-    }
-  }
 
-  // last 3 elements
-  while (idx < dim) {
-    FloatType diff = vec1[idx] - vec2[idx];
-    dist += diff * diff;
-    ++idx;
+  for (IdType idx = 0; idx < dim; ++idx) {
+    dist += (vec1[idx] - vec2[idx]) * (vec1[idx] - vec2[idx]);
     if (dist > worst_dist) {
       early_stop = true;
       break;
@@ -70,21 +53,9 @@ FloatType EuclideanDistWithCheck(const FloatType* vec1, const FloatType* vec2, i
 template <typename FloatType, typename IdType>
 FloatType EuclideanDist(const FloatType* vec1, const FloatType* vec2, int64_t dim) {
   FloatType dist = 0;
-  IdType idx = 0;
-  while (idx < dim - 3) {
-    FloatType diff0 = vec1[idx] - vec2[idx];
-    FloatType diff1 = vec1[idx + 1] - vec2[idx + 1];
-    FloatType diff2 = vec1[idx + 2] - vec2[idx + 2];
-    FloatType diff3 = vec1[idx + 3] - vec2[idx + 3];
-    dist += diff0 * diff0 + diff1 * diff1 + diff2 * diff2 + diff3 * diff3;
-    idx += 4;
-  }
 
-  // last 3 elements
-  while (idx < dim) {
-    FloatType diff = vec1[idx] - vec2[idx];
-    dist += diff * diff;
-    ++idx;
+  for (IdType idx = 0; idx < dim; ++idx) {
+    dist += (vec1[idx] - vec2[idx]) * (vec1[idx] - vec2[idx]);
   }
 
   return dist;
