@@ -467,7 +467,8 @@ def slice_batch(g, gid, store_ids=False):
             retg.nodes[ntype].data[key] = subfeats
 
         if store_ids:
-            retg.nodes[ntype].data[NID] = F.arange(stnid, stnid+num_nodes[ntid], retg.idtype, retg.device)
+            retg.nodes[ntype].data[NID] = F.arange(stnid, stnid+num_nodes[ntid], 
+                                                   retg.idtype, retg.device)
 
     # Slice edge features
     for etid, etype in enumerate(g.canonical_etypes):
@@ -477,7 +478,8 @@ def slice_batch(g, gid, store_ids=False):
             retg.edges[etype].data[key] = subfeats
 
         if store_ids:
-            retg.edges[etype].data[EID] = F.arange(steid, steid+num_edges[etid], retg.idtype, retg.device)
+            retg.edges[etype].data[EID] = F.arange(steid, steid+num_edges[etid], 
+                                                   retg.idtype, retg.device)
 
     return retg
 
