@@ -129,7 +129,7 @@ void HeapInsert(IdType* out, FloatType* dist,
 
 /*! \brief Insert a new element and its flag into heap, return 1 if insert successfully */
 template <typename FloatType, typename IdType>
-int FlagedHeapInsert(IdType* out, FloatType* dist, bool* flag,
+int FlaggedHeapInsert(IdType* out, FloatType* dist, bool* flag,
                       IdType new_id, FloatType new_dist, bool new_flag,
                       int k, bool check_repeat = false) {
   if (new_dist > dist[0]) return 0;
@@ -214,7 +214,7 @@ int UpdateNeighbors(IdType* neighbors, FloatType* dists, const FloatType* points
     ++num_updates;
 #pragma omp critical
     {
-      FlagedHeapInsert<FloatType, IdType>(
+      FlaggedHeapInsert<FloatType, IdType>(
         neighbors + c1 * k,
         dists + c1_local * k,
         flags + c1_local * k,
@@ -225,7 +225,7 @@ int UpdateNeighbors(IdType* neighbors, FloatType* dists, const FloatType* points
     ++num_updates;
 #pragma omp critical
     {
-      FlagedHeapInsert<FloatType, IdType>(
+      FlaggedHeapInsert<FloatType, IdType>(
         neighbors + c2 * k,
         dists + c2_local * k,
         flags + c2_local * k,
@@ -554,14 +554,14 @@ void NNDescent(const NDArray& points, const IdArray& offsets,
               IdType p2_local = p2 - point_idx_start;
 
               if (p1 % num_threads == tid) {
-                num_updates += impl::FlagedHeapInsert<FloatType, IdType>(
+                num_updates += impl::FlaggedHeapInsert<FloatType, IdType>(
                   neighbors + p1 * k,
                   neighbors_dists + p1_local * k,
                   flags + p1_local * k,
                   p2, d, true, k, true);
               }
               if (p2 % num_threads == tid) {
-                num_updates += impl::FlagedHeapInsert<FloatType, IdType>(
+                num_updates += impl::FlaggedHeapInsert<FloatType, IdType>(
                   neighbors + p2 * k,
                   neighbors_dists + p2_local * k,
                   flags + p2_local * k,

@@ -54,9 +54,9 @@ struct SharedMemory<double> {
 
 /*! \brief Compute Euclidean distance between two vectors */
 template <typename FloatType, typename IdType>
-__device__ FloatType euclidean_dist(const FloatType* vec1,
-                                    const FloatType* vec2,
-                                    const int64_t dim) {
+__device__ FloatType EuclideanDist(const FloatType* vec1,
+                                   const FloatType* vec2,
+                                   const int64_t dim) {
   FloatType dist = 0;
   IdType idx = 0;
   for (; idx < dim - 3; idx += 4) {
@@ -82,10 +82,10 @@ __device__ FloatType euclidean_dist(const FloatType* vec1,
  *  distance.
  */
 template <typename FloatType, typename IdType>
-__device__ FloatType euclidean_dist_with_check(const FloatType* vec1,
-                                               const FloatType* vec2,
-                                               const int64_t dim,
-                                               const FloatType worst_dist) {
+__device__ FloatType EuclideanDistWithCheck(const FloatType* vec1,
+                                            const FloatType* vec2,
+                                            const int64_t dim,
+                                            const FloatType worst_dist) {
   FloatType dist = 0;
   IdType idx = 0;
   bool early_stop = false;
@@ -121,7 +121,7 @@ __device__ FloatType euclidean_dist_with_check(const FloatType* vec1,
 }
 
 template <typename FloatType, typename IdType>
-__device__ void build_heap(IdType* indices, FloatType* dists, int size) {
+__device__ void BuildHeap(IdType* indices, FloatType* dists, int size) {
   for (int i = size / 2 - 1; i >= 0; --i) {
     IdType idx = i;
     while (true) {
@@ -151,7 +151,7 @@ __device__ void build_heap(IdType* indices, FloatType* dists, int size) {
 }
 
 template <typename FloatType, typename IdType>
-__device__ void heap_insert(IdType* indices, FloatType* dist,
+__device__ void HeapInsert(IdType* indices, FloatType* dist,
                            IdType new_idx, FloatType new_dist,
                            int size, bool check_repeat = false) {
   if (new_dist > dist[0]) return;
@@ -192,7 +192,7 @@ __device__ void heap_insert(IdType* indices, FloatType* dist,
 }
 
 template <typename FloatType, typename IdType>
-__device__ bool flaged_heap_insert(IdType* indices, FloatType* dist, bool* flags,
+__device__ bool FlaggedHeapInsert(IdType* indices, FloatType* dist, bool* flags,
                                   IdType new_idx, FloatType new_dist, bool new_flag,
                                   int size, bool check_repeat = false) {
   if (new_dist > dist[0]) return false;
@@ -243,11 +243,11 @@ __device__ bool flaged_heap_insert(IdType* indices, FloatType* dist, bool* flags
  *  the result directly (without a distance matrix).
  */
 template <typename FloatType, typename IdType>
-__global__ void bruteforce_knn_kernel(const FloatType* data_points, const IdType* data_offsets,
-                                      const FloatType* query_points, const IdType* query_offsets,
-                                      const int k, FloatType* dists, IdType* query_out,
-                                      IdType* data_out, const int64_t num_batches,
-                                      const int64_t feature_size) {
+__global__ void BruteforceKnnKernel(const FloatType* data_points, const IdType* data_offsets,
+                                    const FloatType* query_points, const IdType* query_offsets,
+                                    const int k, FloatType* dists, IdType* query_out,
+                                    IdType* data_out, const int64_t num_batches,
+                                    const int64_t feature_size) {
   const IdType q_idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (q_idx >= query_offsets[num_batches]) return;
   IdType batch_idx = 0;
@@ -263,34 +263,34 @@ __global__ void bruteforce_knn_kernel(const FloatType* data_points, const IdType
   FloatType worst_dist = std::numeric_limits<FloatType>::max();
 
   for (IdType d_idx = data_start; d_idx < data_end; ++d_idx) {
-    FloatType tmp_dist = euclidean_dist_with_check<FloatType, IdType>(
+    FloatType tmp_dist = EuclideanDistWithCheck<FloatType, IdType>(
       query_points + q_idx * feature_size,
       data_points + d_idx * feature_size,
       feature_size, worst_dist);
 
     IdType out_offset = q_idx * k;
-    heap_insert<FloatType, IdType>(data_out + out_offset, dists + out_offset, d_idx, tmp_dist, k);
+    HeapInsert<FloatType, IdType>(data_out + out_offset, dists + out_offset, d_idx, tmp_dist, k);
     worst_dist = dists[q_idx * k];
   }
 }
 
 /*!
- * \brief Same as bruteforce_knn_kernel, but use shared memory as buffer.
+ * \brief Same as BruteforceKnnKernel, but use shared memory as buffer.
  *  This kernel divides query points and data points into blocks. For each
  *  query block, it will make a loop over all data blocks and compute distances.
  *  This kernel is faster when the dimension of input points is not large.
  */
 template <typename FloatType, typename IdType>
-__global__ void bruteforce_knn_share_kernel(const FloatType* data_points,
-                                            const IdType* data_offsets,
-                                            const FloatType* query_points,
-                                            const IdType* query_offsets,
-                                            const IdType* block_batch_id,
-                                            const IdType* local_block_id,
-                                            const int k, FloatType* dists,
-                                            IdType* query_out, IdType* data_out,
-                                            const int64_t num_batches,
-                                            const int64_t feature_size) {
+__global__ void BruteforceKnnShareKernel(const FloatType* data_points,
+                                         const IdType* data_offsets,
+                                         const FloatType* query_points,
+                                         const IdType* query_offsets,
+                                         const IdType* block_batch_id,
+                                         const IdType* local_block_id,
+                                         const int k, FloatType* dists,
+                                         IdType* query_out, IdType* data_out,
+                                         const int64_t num_batches,
+                                         const int64_t feature_size) {
   const IdType block_idx = static_cast<IdType>(blockIdx.x);
   const IdType block_size = static_cast<IdType>(blockDim.x);
   const IdType batch_idx = block_batch_id[block_idx];
@@ -373,7 +373,7 @@ __global__ void bruteforce_knn_share_kernel(const FloatType* data_points,
 
         if (early_stop) continue;
 
-        heap_insert<FloatType, IdType>(
+        HeapInsert<FloatType, IdType>(
           res_buff + threadIdx.x * k, dist_buff + threadIdx.x * k,
           d_idx + tile_start, tmp_dist, k);
         worst_dist = dist_buff[threadIdx.x * k];
@@ -393,9 +393,9 @@ __global__ void bruteforce_knn_share_kernel(const FloatType* data_points,
 
 /*! \brief determine the number of blocks for each segment */
 template <typename IdType>
-__global__ void get_num_block_per_segment(const IdType* offsets, IdType* out,
-                                          const int64_t batch_size,
-                                          const int64_t block_size) {
+__global__ void GetNumBlockPerSegment(const IdType* offsets, IdType* out,
+                                      const int64_t batch_size,
+                                      const int64_t block_size) {
   const IdType idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < batch_size) {
     out[idx] = (offsets[idx + 1] - offsets[idx] - 1) / block_size + 1;
@@ -404,9 +404,9 @@ __global__ void get_num_block_per_segment(const IdType* offsets, IdType* out,
 
 /*! \brief Get the batch index and local index in segment for each block */
 template <typename IdType>
-__global__ void get_block_info(const IdType* num_block_prefixsum,
-                               IdType* block_batch_id, IdType* local_block_id,
-                               size_t batch_size, size_t num_blocks) {
+__global__ void GetBlockInfo(const IdType* num_block_prefixsum,
+                             IdType* block_batch_id, IdType* local_block_id,
+                             size_t batch_size, size_t num_blocks) {
   const IdType idx = blockIdx.x * blockDim.x + threadIdx.x;
   IdType i = 0;
 
@@ -454,7 +454,7 @@ void BruteForceKNNCuda(const NDArray& data_points, const IdArray& data_offsets,
 
   const int64_t block_size = cuda::FindNumThreads(query_points->shape[0]);
   const int64_t num_blocks = (query_points->shape[0] - 1) / block_size + 1;
-  CUDA_KERNEL_CALL(bruteforce_knn_kernel, num_blocks, block_size, 0, thr_entry->stream,
+  CUDA_KERNEL_CALL(BruteforceKnnKernel, num_blocks, block_size, 0, thr_entry->stream,
     data_points_data, data_offsets_data, query_points_data, query_offsets_data,
     k, dists, query_out, data_out, batch_size, feature_size);
 
@@ -508,10 +508,10 @@ void BruteForceKNNSharedCuda(const NDArray& data_points, const IdArray& data_off
   IdType* num_block_prefixsum = static_cast<IdType*>(
     device->AllocWorkspace(ctx, batch_size * sizeof(IdType)));
 
-  // block size for get_num_block_per_segment computation
+  // block size for GetNumBlockPerSegment computation
   int64_t temp_block_size = cuda::FindNumThreads(batch_size);
   int64_t temp_num_blocks = (batch_size - 1) / temp_block_size + 1;
-  CUDA_KERNEL_CALL(get_num_block_per_segment, temp_num_blocks,
+  CUDA_KERNEL_CALL(GetNumBlockPerSegment, temp_num_blocks,
                    temp_block_size, 0, thr_entry->stream,
                    query_offsets_data, num_block_per_segment,
                    batch_size, block_size);
@@ -546,13 +546,13 @@ void BruteForceKNNSharedCuda(const NDArray& data_points, const IdArray& data_off
   IdType* local_block_id = static_cast<IdType*>(device->AllocWorkspace(
     ctx, num_blocks * sizeof(IdType)));
   CUDA_KERNEL_CALL(
-    get_block_info, temp_num_blocks, temp_block_size, 0,
+    GetBlockInfo, temp_num_blocks, temp_block_size, 0,
     thr_entry->stream, num_block_prefixsum, block_batch_id,
     local_block_id, batch_size, num_blocks);
 
   FloatType* dists = static_cast<FloatType*>(device->AllocWorkspace(
     ctx, k * query_points->shape[0] * sizeof(FloatType)));
-  CUDA_KERNEL_CALL(bruteforce_knn_share_kernel, num_blocks, block_size,
+  CUDA_KERNEL_CALL(BruteforceKnnShareKernel, num_blocks, block_size,
     single_shared_mem * block_size, thr_entry->stream, data_points_data,
     data_offsets_data, query_points_data, query_offsets_data,
     block_batch_id, local_block_id, k, dists, query_out,
@@ -564,9 +564,9 @@ void BruteForceKNNSharedCuda(const NDArray& data_points, const IdArray& data_off
 }
 
 /*! \brief Setup rng state for nn-descent */
-__global__ void setup_rng_kernel(curandState* states,
-                                 const uint64_t seed,
-                                 const size_t n) {
+__global__ void SetupRngKernel(curandState* states,
+                               const uint64_t seed,
+                               const size_t n) {
   size_t id = blockIdx.x * blockDim.x + threadIdx.x;
   if (id < n) {
     curand_init(seed, id, 0, states + id);
@@ -578,16 +578,16 @@ __global__ void setup_rng_kernel(curandState* states,
  * for each nodes
  */
 template <typename FloatType, typename IdType>
-__global__ void random_init_neighrbors_kernel(const FloatType* points,
-                                              const IdType* offsets,
-                                              IdType* central_nodes,
-                                              IdType* neighbors,
-                                              FloatType* dists,
-                                              bool* flags,
-                                              const int k,
-                                              const int64_t feature_size,
-                                              const int64_t batch_size,
-                                              const uint64_t seed) {
+__global__ void RandomInitNeighborsKernel(const FloatType* points,
+                                          const IdType* offsets,
+                                          IdType* central_nodes,
+                                          IdType* neighbors,
+                                          FloatType* dists,
+                                          bool* flags,
+                                          const int k,
+                                          const int64_t feature_size,
+                                          const int64_t batch_size,
+                                          const uint64_t seed) {
   const IdType point_idx = blockIdx.x * blockDim.x + threadIdx.x;
   IdType batch_idx = 0;
   if (point_idx >= offsets[batch_size]) return;
@@ -622,22 +622,22 @@ __global__ void random_init_neighrbors_kernel(const FloatType* points,
   // compute distances and set flags
   for (IdType i = 0; i < k; ++i) {
     current_flags[i] = true;
-    current_dists[i] = euclidean_dist<FloatType, IdType>(
+    current_dists[i] = EuclideanDist<FloatType, IdType>(
       points + point_idx * feature_size,
       points + current_neighbors[i] * feature_size,
       feature_size);
   }
 
   // build heap
-  build_heap<FloatType, IdType>(neighbors + point_idx * k, current_dists, k);
+  BuildHeap<FloatType, IdType>(neighbors + point_idx * k, current_dists, k);
 }
 
 /*! \brief Randomly select candidates from current knn and reverse-knn graph for nn-descent */
 template <typename IdType>
-__global__ void find_candidates_kernel(const IdType* offsets, IdType* new_candidates,
-                                       IdType* old_candidates, IdType* neighbors, bool* flags,
-                                       const uint64_t seed, const int64_t batch_size,
-                                       const int num_candidates, const int k) {
+__global__ void FindCandidatesKernel(const IdType* offsets, IdType* new_candidates,
+                                     IdType* old_candidates, IdType* neighbors, bool* flags,
+                                     const uint64_t seed, const int64_t batch_size,
+                                     const int num_candidates, const int k) {
   const IdType point_idx = blockIdx.x * blockDim.x + threadIdx.x;
   IdType batch_idx = 0;
   if (point_idx >= offsets[batch_size]) return;
@@ -723,12 +723,12 @@ __global__ void find_candidates_kernel(const IdType* offsets, IdType* new_candid
 
 /*! \brief Update knn graph according to selected candidates for nn-descent */
 template <typename FloatType, typename IdType>
-__global__ void update_neighbors_kernel(const FloatType* points, const IdType* offsets,
-                                        IdType* neighbors, IdType* new_candidates,
-                                        IdType* old_candidates, FloatType* distances,
-                                        bool* flags, IdType* num_updates,
-                                        const int64_t batch_size, const int num_candidates,
-                                        const int k, const int64_t feature_size) {
+__global__ void UpdateNeighborsKernel(const FloatType* points, const IdType* offsets,
+                                      IdType* neighbors, IdType* new_candidates,
+                                      IdType* old_candidates, FloatType* distances,
+                                      bool* flags, IdType* num_updates,
+                                      const int64_t batch_size, const int num_candidates,
+                                      const int k, const int64_t feature_size) {
   const IdType point_idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (point_idx >= offsets[batch_size]) return;
   IdType* current_neighbors = neighbors + point_idx * k;
@@ -754,12 +754,12 @@ __global__ void update_neighbors_kernel(const FloatType* points, const IdType* o
     // new - new
     for (IdType j = 1; j <= num_twohop_new; ++j) {
       IdType twohop_new_c = twohop_new_ptr[j];
-      FloatType new_dist = euclidean_dist_with_check<FloatType, IdType>(
+      FloatType new_dist = EuclideanDistWithCheck<FloatType, IdType>(
         points + point_idx * feature_size,
         points + twohop_new_c * feature_size,
         feature_size, worst_dist);
 
-      if (flaged_heap_insert<FloatType, IdType>(
+      if (FlaggedHeapInsert<FloatType, IdType>(
           current_neighbors, current_dists, current_flags,
           twohop_new_c, new_dist, true, k, true)) {
             ++current_num_updates;
@@ -770,12 +770,12 @@ __global__ void update_neighbors_kernel(const FloatType* points, const IdType* o
     // new - old
     for (IdType j = 1; j <= num_twohop_old; ++j) {
       IdType twohop_old_c = twohop_old_ptr[j];
-      FloatType new_dist = euclidean_dist_with_check<FloatType, IdType>(
+      FloatType new_dist = EuclideanDistWithCheck<FloatType, IdType>(
         points + point_idx * feature_size,
         points + twohop_old_c * feature_size,
         feature_size, worst_dist);
 
-      if (flaged_heap_insert<FloatType, IdType>(
+      if (FlaggedHeapInsert<FloatType, IdType>(
         current_neighbors, current_dists, current_flags,
         twohop_old_c, new_dist, true, k, true)) {
           ++current_num_updates;
@@ -796,12 +796,12 @@ __global__ void update_neighbors_kernel(const FloatType* points, const IdType* o
     // old - new
     for (IdType j = 1; j <= num_twohop_new; ++j) {
       IdType twohop_new_c = twohop_new_ptr[j];
-      FloatType new_dist = euclidean_dist_with_check<FloatType, IdType>(
+      FloatType new_dist = EuclideanDistWithCheck<FloatType, IdType>(
         points + point_idx * feature_size,
         points + twohop_new_c * feature_size,
         feature_size, worst_dist);
 
-      if (flaged_heap_insert<FloatType, IdType>(
+      if (FlaggedHeapInsert<FloatType, IdType>(
         current_neighbors, current_dists, current_flags,
         twohop_new_c, new_dist, true, k, true)) {
           ++current_num_updates;
@@ -876,7 +876,7 @@ void NNDescent(const NDArray& points, const IdArray& offsets,
   seed = RandomEngine::ThreadLocal()->RandInt<uint64_t>(
     std::numeric_limits<uint64_t>::max());
   CUDA_KERNEL_CALL(
-    impl::random_init_neighrbors_kernel, num_blocks, block_size, 0, thr_entry->stream,
+    impl::RandomInitNeighborsKernel, num_blocks, block_size, 0, thr_entry->stream,
     points_data, offsets_data, central_nodes, neighbors, distances, flags, k,
     feature_size, batch_size, seed);
 
@@ -885,13 +885,13 @@ void NNDescent(const NDArray& points, const IdArray& offsets,
     seed = RandomEngine::ThreadLocal()->RandInt<uint64_t>(
       std::numeric_limits<uint64_t>::max());
     CUDA_KERNEL_CALL(
-      impl::find_candidates_kernel, num_blocks, block_size, 0,
+      impl::FindCandidatesKernel, num_blocks, block_size, 0,
       thr_entry->stream, offsets_data, new_candidates, old_candidates, neighbors,
       flags, seed, batch_size, num_candidates, k);
 
     // update
     CUDA_KERNEL_CALL(
-      impl::update_neighbors_kernel, num_blocks, block_size, 0, thr_entry->stream,
+      impl::UpdateNeighborsKernel, num_blocks, block_size, 0, thr_entry->stream,
       points_data, offsets_data, neighbors, new_candidates, old_candidates, distances,
       flags, num_updates, batch_size, num_candidates, k, feature_size);
 
