@@ -816,14 +816,14 @@ void _TestSliceContiguousChunkCoo(DLContext ctx) {
     true,
     false);
 
-  const std::vector<uint64_t> edge_cumsum_b({0, 2});
-  const std::vector<uint64_t> src_vertex_cumsum_b({0, 2});
-  const std::vector<uint64_t> dst_vertex_cumsum_b({0, 3});
+  const std::vector<uint64_t> edge_range_b({0, 2});
+  const std::vector<uint64_t> src_vertex_range_b({0, 2});
+  const std::vector<uint64_t> dst_vertex_range_b({0, 3});
   const aten::COOMatrix &coo_b = aten::COOSliceContiguousChunk(
     coo_a,
-    edge_cumsum_b,
-    src_vertex_cumsum_b,
-    dst_vertex_cumsum_b);
+    edge_range_b,
+    src_vertex_range_b,
+    dst_vertex_range_b);
   ASSERT_EQ(coo_b_raw.num_rows, coo_b.num_rows);
   ASSERT_EQ(coo_b_raw.num_cols, coo_b.num_cols);
   ASSERT_TRUE(ArrayEQ<IdType>(coo_b_raw.row, coo_b.row));
@@ -842,14 +842,14 @@ void _TestSliceContiguousChunkCoo(DLContext ctx) {
     true,
     false);
 
-  const std::vector<uint64_t> edge_cumsum_c({2, 2});
-  const std::vector<uint64_t> src_vertex_cumsum_c({2, 3});
-  const std::vector<uint64_t> dst_vertex_cumsum_c({3, 4});
+  const std::vector<uint64_t> edge_range_c({2, 2});
+  const std::vector<uint64_t> src_vertex_range_c({2, 3});
+  const std::vector<uint64_t> dst_vertex_range_c({3, 4});
   const aten::COOMatrix &coo_c = aten::COOSliceContiguousChunk(
     coo_a,
-    edge_cumsum_c,
-    src_vertex_cumsum_c,
-    dst_vertex_cumsum_c);
+    edge_range_c,
+    src_vertex_range_c,
+    dst_vertex_range_c);
   ASSERT_EQ(coo_c_raw.num_rows, coo_c.num_rows);
   ASSERT_EQ(coo_c_raw.num_cols, coo_c.num_cols);
   ASSERT_TRUE(ArrayEQ<IdType>(coo_c.row, c_row));
@@ -900,30 +900,30 @@ void _TestSliceContiguousChunkCsr(DLContext ctx) {
     aten::NullArray(),
     false);
 
-  const std::vector<uint64_t> edge_cumsum_b({0, 2});
-  const std::vector<uint64_t> src_vertex_cumsum_b({0, 2});
-  const std::vector<uint64_t> dst_vertex_cumsum_b({0, 3});
+  const std::vector<uint64_t> edge_range_b({0, 2});
+  const std::vector<uint64_t> src_vertex_range_b({0, 2});
+  const std::vector<uint64_t> dst_vertex_range_b({0, 3});
   const aten::CSRMatrix &csr_b = aten::CSRSliceContiguousChunk(
     csr_a,
-    edge_cumsum_b,
-    src_vertex_cumsum_b,
-    dst_vertex_cumsum_b);
+    edge_range_b,
+    src_vertex_range_b,
+    dst_vertex_range_b);
   ASSERT_EQ(csr_b.num_rows, csr_b_raw.num_rows);
   ASSERT_EQ(csr_b.num_cols, csr_b_raw.num_cols);
   ASSERT_TRUE(ArrayEQ<IdType>(csr_b.indptr, csr_b_raw.indptr));
   ASSERT_TRUE(ArrayEQ<IdType>(csr_b.indices, csr_b_raw.indices));
   ASSERT_FALSE(csr_b.sorted);
 
-  const std::vector<uint64_t> edge_cumsum_c({2, 2});
-  const std::vector<uint64_t> src_vertex_cumsum_c({2, 3});
-  const std::vector<uint64_t> dst_vertex_cumsum_c({3, 4});
+  const std::vector<uint64_t> edge_range_c({2, 2});
+  const std::vector<uint64_t> src_vertex_range_c({2, 3});
+  const std::vector<uint64_t> dst_vertex_range_c({3, 4});
   const aten::CSRMatrix &csr_c = aten::CSRSliceContiguousChunk(
     csr_a,
-    edge_cumsum_c,
-    src_vertex_cumsum_c,
-    dst_vertex_cumsum_c);
+    edge_range_c,
+    src_vertex_range_c,
+    dst_vertex_range_c);
 
-  int64_t indptr_len = src_vertex_cumsum_c[1] - src_vertex_cumsum_c[0] + 1;
+  int64_t indptr_len = src_vertex_range_c[1] - src_vertex_range_c[0] + 1;
   IdArray c_indptr = aten::Full(0, indptr_len, sizeof(IdType)*8, CTX);
   IdArray c_indices = aten::VecToIdArray(std::vector<IdType>({}), sizeof(IdType)*8, CTX);
   const aten::CSRMatrix &csr_c_raw = aten::CSRMatrix(

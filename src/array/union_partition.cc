@@ -112,32 +112,32 @@ std::vector<COOMatrix> DisjointPartitionCooBySizes(
 
 COOMatrix COOSliceContiguousChunk(
   const COOMatrix &coo,
-  const std::vector<uint64_t> &edge_cumsum,
-  const std::vector<uint64_t> &src_vertex_cumsum,
-  const std::vector<uint64_t> &dst_vertex_cumsum) {
+  const std::vector<uint64_t> &edge_range,
+  const std::vector<uint64_t> &src_vertex_range,
+  const std::vector<uint64_t> &dst_vertex_range) {
   IdArray result_src = NullArray(coo.row->dtype, coo.row->ctx);
   IdArray result_dst = NullArray(coo.row->dtype, coo.row->ctx);
-  if (edge_cumsum[1] != edge_cumsum[0]) {
+  if (edge_range[1] != edge_range[0]) {
     // The chunk has edges
     result_src = IndexSelect(coo.row,
-                             edge_cumsum[0],
-                             edge_cumsum[1]) - src_vertex_cumsum[0];
+                             edge_range[0],
+                             edge_range[1]) - src_vertex_range[0];
     result_dst = IndexSelect(coo.col,
-                             edge_cumsum[0],
-                             edge_cumsum[1]) - dst_vertex_cumsum[0];
+                             edge_range[0],
+                             edge_range[1]) - dst_vertex_range[0];
   }
 
   IdArray result_data = NullArray();
   // has data index array
   if (COOHasData(coo)) {
     result_data = IndexSelect(coo.data,
-                              edge_cumsum[0],
-                              edge_cumsum[1]) - edge_cumsum[0];
+                              edge_range[0],
+                              edge_range[1]) - edge_range[0];
   }
 
   COOMatrix sub_coo = COOMatrix(
-    src_vertex_cumsum[1]-src_vertex_cumsum[0],
-    dst_vertex_cumsum[1]-dst_vertex_cumsum[0],
+    src_vertex_range[1]-src_vertex_range[0],
+    dst_vertex_range[1]-dst_vertex_range[0],
     result_src,
     result_dst,
     result_data,
@@ -261,31 +261,31 @@ std::vector<CSRMatrix> DisjointPartitionCsrBySizes(
 
 CSRMatrix CSRSliceContiguousChunk(
   const CSRMatrix &csr,
-  const std::vector<uint64_t> &edge_cumsum,
-  const std::vector<uint64_t> &src_vertex_cumsum,
-  const std::vector<uint64_t> &dst_vertex_cumsum) {
-  int64_t indptr_len = src_vertex_cumsum[1] - src_vertex_cumsum[0] + 1;
+  const std::vector<uint64_t> &edge_range,
+  const std::vector<uint64_t> &src_vertex_range,
+  const std::vector<uint64_t> &dst_vertex_range) {
+  int64_t indptr_len = src_vertex_range[1] - src_vertex_range[0] + 1;
   IdArray result_indptr = Full(0, indptr_len, csr.indptr->dtype.bits, csr.indptr->ctx);
   IdArray result_indices = NullArray(csr.indptr->dtype, csr.indptr->ctx);
   IdArray result_data = NullArray();
-  if (edge_cumsum[1] != edge_cumsum[0]) {
+  if (edge_range[1] != edge_range[0]) {
     // The chunk has edges
     result_indptr = IndexSelect(csr.indptr,
-                                src_vertex_cumsum[0],
-                                src_vertex_cumsum[1] + 1) - edge_cumsum[0];
+                                src_vertex_range[0],
+                                src_vertex_range[1] + 1) - edge_range[0];
     result_indices = IndexSelect(csr.indices,
-                                 edge_cumsum[0],
-                                 edge_cumsum[1]) - dst_vertex_cumsum[0];
+                                 edge_range[0],
+                                 edge_range[1]) - dst_vertex_range[0];
     if (CSRHasData(csr)) {
       result_data = IndexSelect(csr.data,
-                                edge_cumsum[0],
-                                edge_cumsum[1]) - edge_cumsum[0];
+                                edge_range[0],
+                                edge_range[1]) - edge_range[0];
     }
   }
 
   CSRMatrix sub_csr = CSRMatrix(
-    src_vertex_cumsum[1]-src_vertex_cumsum[0],
-    dst_vertex_cumsum[1]-dst_vertex_cumsum[0],
+    src_vertex_range[1]-src_vertex_range[0],
+    dst_vertex_range[1]-dst_vertex_range[0],
     result_indptr,
     result_indices,
     result_data,

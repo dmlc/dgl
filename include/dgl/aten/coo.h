@@ -559,14 +559,14 @@ std::vector<COOMatrix> DisjointPartitionCooBySizes(
  * COOMatrix_C.num_rows : 6
  * COOMatrix_C.num_cols : 5
  *
- * edge_cumsum : [4, 6]
- * src_vertex_cumsum : [3, 6]
- * dst_vertex_cumsum : [3, 5]
+ * edge_range : [4, 6]
+ * src_vertex_range : [3, 6]
+ * dst_vertex_range : [3, 5]
  *
  * ret = COOSliceContiguousChunk(C,
- *                               edge_cumsum,
- *                               src_vertex_cumsum,
- *                               dst_vertex_cumsum)
+ *                               edge_range,
+ *                               src_vertex_range,
+ *                               dst_vertex_range)
  *
  * ret = [[0, 0],
  *        [1, 0],
@@ -575,16 +575,16 @@ std::vector<COOMatrix> DisjointPartitionCooBySizes(
  * COOMatrix_ret.num_cols : 2
  *
  * \param coo COOMatrix to slice.
- * \param edge_cumsum Number of edges in the chunk
- * \param src_vertex_cumsum Number of src vertices in the chunk.
- * \param dst_vertex_cumsum Number of dst vertices in the chunk.
+ * \param edge_range ID range of the edges in the chunk
+ * \param src_vertex_range ID range of the src vertices in the chunk.
+ * \param dst_vertex_range ID range of the dst vertices in the chunk.
  * \return COOMatrix representing the chunk.
  */
 COOMatrix COOSliceContiguousChunk(
   const COOMatrix &coo,
-  const std::vector<uint64_t> &edge_cumsum,
-  const std::vector<uint64_t> &src_vertex_cumsum,
-  const std::vector<uint64_t> &dst_vertex_cumsum);
+  const std::vector<uint64_t> &edge_range,
+  const std::vector<uint64_t> &src_vertex_range,
+  const std::vector<uint64_t> &dst_vertex_range);
 
 /*!
  * \brief Create a LineGraph of input coo

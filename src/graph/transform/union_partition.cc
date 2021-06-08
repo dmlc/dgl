@@ -279,14 +279,14 @@ HeteroGraphPtr SliceHeteroGraph(
   const uint64_t* start_eid_per_type_data = static_cast<uint64_t*>(start_eid_per_type->data);
   const uint64_t* num_edges_per_type_data = static_cast<uint64_t*>(num_edges_per_type->data);
 
-  // Map vertex type to the corresponding node cum sum
+  // Map vertex type to the corresponding node range
   const uint64_t num_vertex_types = meta_graph->NumVertices();
-  std::vector<std::vector<uint64_t>> vertex_cumsum;
-  vertex_cumsum.resize(num_vertex_types);
+  std::vector<std::vector<uint64_t>> vertex_range;
+  vertex_range.resize(num_vertex_types);
   // Loop over all vertex types
   for (uint64_t vtype = 0; vtype < num_vertex_types; ++vtype) {
-    vertex_cumsum[vtype].push_back(start_nid_per_type_data[vtype]);
-    vertex_cumsum[vtype].push_back(
+    vertex_range[vtype].push_back(start_nid_per_type_data[vtype]);
+    vertex_range[vtype].push_back(
       start_nid_per_type_data[vtype] + num_nodes_per_type_data[vtype]);
   }
 
@@ -299,32 +299,32 @@ HeteroGraphPtr SliceHeteroGraph(
     const dgl_format_code_t code = batched_graph->GetRelationGraph(etype)->GetAllowedFormats();
 
     // handle graph without edges
-    std::vector<uint64_t> edge_cumsum;
-    edge_cumsum.push_back(start_eid_per_type_data[etype]);
-    edge_cumsum.push_back(start_eid_per_type_data[etype] + num_edges_per_type_data[etype]);
+    std::vector<uint64_t> edge_range;
+    edge_range.push_back(start_eid_per_type_data[etype]);
+    edge_range.push_back(start_eid_per_type_data[etype] + num_edges_per_type_data[etype]);
 
     // prefer COO
     if (FORMAT_HAS_COO(code)) {
       aten::COOMatrix coo = batched_graph->GetCOOMatrix(etype);
       aten::COOMatrix res = aten::COOSliceContiguousChunk(coo,
-                                                          edge_cumsum,
-                                                          vertex_cumsum[src_vtype],
-                                                          vertex_cumsum[dst_vtype]);
+                                                          edge_range,
+                                                          vertex_range[src_vtype],
+                                                          vertex_range[dst_vtype]);
       rgptr = UnitGraph::CreateFromCOO((src_vtype == dst_vtype) ? 1 : 2, res, code);
     } else if (FORMAT_HAS_CSR(code)) {
       aten::CSRMatrix csr = batched_graph->GetCSRMatrix(etype);
       aten::CSRMatrix res = aten::CSRSliceContiguousChunk(csr,
-                                                          edge_cumsum,
-                                                          vertex_cumsum[src_vtype],
-                                                          vertex_cumsum[dst_vtype]);
+                                                          edge_range,
+                                                          vertex_range[src_vtype],
+                                                          vertex_range[dst_vtype]);
       rgptr = UnitGraph::CreateFromCSR((src_vtype == dst_vtype) ? 1 : 2, res, code);
     } else if (FORMAT_HAS_CSC(code)) {
       // CSR and CSC have the same storage format, i.e. CSRMatrix
       aten::CSRMatrix csc = batched_graph->GetCSCMatrix(etype);
       aten::CSRMatrix res = aten::CSRSliceContiguousChunk(csc,
-                                                          edge_cumsum,
-                                                          vertex_cumsum[dst_vtype],
-                                                          vertex_cumsum[src_vtype]);
+                                                          edge_range,
+                                                          vertex_range[dst_vtype],
+                                                          vertex_range[src_vtype]);
       rgptr = UnitGraph::CreateFromCSC((src_vtype == dst_vtype) ? 1 : 2, res, code);
     }
 

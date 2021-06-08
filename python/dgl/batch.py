@@ -2,7 +2,7 @@
 from collections.abc import Mapping
 
 from . import backend as F
-from .base import ALL, is_all, DGLError, dgl_warning
+from .base import ALL, is_all, DGLError, dgl_warning, NID, EID
 from .heterograph_index import disjoint_union, slice_gidx
 from .heterograph import DGLHeteroGraph
 from . import convert
@@ -416,7 +416,7 @@ def unbatch(g, node_split=None, edge_split=None):
 
     return gs
 
-def slice_batch(g, gid):
+def slice_batch(g, gid, store_ids=False):
     """Get a particular graph from a batch of graphs.
 
     Parameters
@@ -425,6 +425,9 @@ def slice_batch(g, gid):
         Input batched graph.
     gid : int
         The ID of the graph to retrieve.
+    store_ids : bool
+        If True, it will store the raw IDs of the extracted nodes and edges in the ``ndata`` and
+        ``edata`` of the resulting graph under name ``dgl.NID`` and ``dgl.EID``, respectively.
 
     Returns
     -------
@@ -458,17 +461,23 @@ def slice_batch(g, gid):
 
     # Slice node features
     for ntid, ntype in enumerate(g.ntypes):
+        stnid = start_nid[ntid]
         for key, feat in g.nodes[ntype].data.items():
-            stnid = start_nid[ntid]
             subfeats = F.slice_axis(feat, 0, stnid, stnid+num_nodes[ntid])
             retg.nodes[ntype].data[key] = subfeats
 
+        if store_ids:
+            retg.nodes[ntype].data[NID] = F.arange(stnid, stnid+num_nodes[ntid], retg.idtype, retg.device)
+
     # Slice edge features
     for etid, etype in enumerate(g.canonical_etypes):
+        steid = start_eid[etid]
         for key, feat in g.edges[etype].data.items():
-            steid = start_eid[etid]
             subfeats = F.slice_axis(feat, 0, steid, steid+num_edges[etid])
             retg.edges[etype].data[key] = subfeats
+
+        if store_ids:
+            retg.edges[etype].data[EID] = F.arange(steid, steid+num_edges[etid], retg.idtype, retg.device)
 
     return retg
 
