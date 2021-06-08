@@ -1,0 +1,10 @@
+CC5=CC1=C(C2=C(C=C1)C3=C(C=C2)C=C([N]3C)C4CC4)[N]5C
+CC5=CC1=C(C2=C(C=C1)C4=C(C=C2)C=C(C3=CC=CS3)[N]4C)[N]5C
+CC6=CC1=C(C2=C(C=C1)C5=C(C=C2)C=C(C4=CC=C(C3=CC=CS3)S4)[N]5C)[N]6C
+CC6=CC1=C(C2=C(C=C1)C5=C(C=C2)C=C(C4=CC=C(C3=CC=C(C)S3)S4)[N]5C)[N]6C
+C1=NC9=C(S1)C2=C(N=C(S2)C8=CC3=C(C4=C(C=C3)C7=C(C=C4)C=C(C6=CC=C(C5=CC=C(C)S5)S6)[N]7C)[N]8C)[Si]9(C)C
+C2=CC=C(C1=CC=C(C)S1)S2
+C%13=CC1=C(C2=C(C=C1)C%12=C(C=C2)C=C(C3=NC%11=C(S3)C4=C(N=C(S4)C%10=CC5=C(C6=C(C=C5)C9=C(C=C6)C=C(C8=CC=C(C7=CC=C(C)S7)S8)[N]9C)[N]%10C)[Si]%11(C)C)[N]%12C)[N]%13C
+Cc1ccc(-c2ccc(-c3cc4ccc5c(ccc6cc(-c7nc8c(s7)-c7sc(-c9cc%10ccc%11c(ccc%12cc(-c%13ccc(-c%14ccc(C)s%14)s%13)n(C)c%12%11)c%10n9C)nc7[Si]8(C)C)n(C)c65)c4n3C)s2)s1
+CC5=CC1=C(C2=C(C=C1)C4=C(C=C2)C=C(C3=CC=CS3)[N]4C)[N]5C
+Cc1ccc(-c2ccc(-c3cc4ccc5c(ccc6cc(-c7nc8c(s7)-c7sc(-c9cc%10ccc%11c(ccc%12cc(-c%13ccc(-c%14ccc(C)s%14)s%13)n(C)c%12%11)c%10n9C)nc7[Si]8(C)C)n(C)c65)c4n3C)s2)s1

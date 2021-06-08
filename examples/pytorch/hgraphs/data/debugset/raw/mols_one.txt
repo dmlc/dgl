@@ -1,0 +1,3 @@
+CC1(C)CC1
+C(C)C
+CC1(C)CCCO1
