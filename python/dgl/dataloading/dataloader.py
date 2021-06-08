@@ -158,9 +158,10 @@ class BlockSampler(object):
     :ref:`User Guide Section 6 <guide-minibatch>` and
     :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
     """
-    def __init__(self, num_layers, return_eids=False):
+    def __init__(self, num_layers, return_eids=False, output_device=None):
         self.num_layers = num_layers
         self.return_eids = return_eids
+        self.output_device = output_device
 
     def sample_frontier(self, block_id, g, seed_nodes):
         """Generate the frontier given the destination nodes.
@@ -221,8 +222,10 @@ class BlockSampler(object):
         blocks = []
         exclude_eids = (
             _tensor_or_dict_to_numpy(exclude_eids) if exclude_eids is not None else None)
+        seed_nodes_in = seed_nodes
+        seed_nodes_out = None
         for block_id in reversed(range(self.num_layers)):
-            frontier = self.sample_frontier(block_id, g, seed_nodes)
+            frontier = self.sample_frontier(block_id, g, seed_nodes_in)
 
             # Removing edges from the frontier for link prediction training falls
             # into the category of frontier postprocessing
@@ -250,12 +253,23 @@ class BlockSampler(object):
                             new_eids[k] = F.gather_row(parent_eids[k], frontier.edges[k].data[EID])
                     frontier.edata[EID] = new_eids
 
-            block = transform.to_block(frontier, seed_nodes)
+            if self.output_device is not None:
+                frontier = frontier.to(self.output_device)
+                if seed_nodes_out is None:
+                    if isinstance(seed_nodes_in, dict):
+                        seed_nodes_out = {ntype: nodes.to(self.output_device) for ntype, nodes in seed_nodes_in.items()}
+                    else:
+                        seed_nodes_out = seed_nodes_in.to(self.output_device)
+
+            block = transform.to_block(frontier, seed_nodes_out)
 
             if self.return_eids:
                 assign_block_eids(block, frontier)
 
-            seed_nodes = {ntype: block.srcnodes[ntype].data[NID] for ntype in block.srctypes}
+            seed_nodes_out = {ntype: block.srcnodes[ntype].data[NID] for ntype in block.srctypes}
+
+
+            seed_nodes_in = {ntype: nodes.to(g.device) for ntype, nodes in seed_nodes_out.items()}
 
             blocks.insert(0, block)
         return blocks
