@@ -4,6 +4,7 @@
  * \brief Array scatter CPU implementation
  */
 #include <dgl/array.h>
+#include <dgl/runtime/parallel_for.h>
 
 namespace dgl {
 using runtime::NDArray;
@@ -39,9 +40,9 @@ void Scatter_(IdArray index, NDArray value, NDArray out) {
   const IdType* idx = index.Ptr<IdType>();
   const DType* val = value.Ptr<DType>();
   DType* outd = out.Ptr<DType>();
-#pragma omp parallel for
-  for (int64_t i = 0; i < len; ++i)
+  runtime::parallel_for(0, len, [&](size_t i) {
     outd[idx[i]] = val[i];
+  });
 }
 
 template void Scatter_<kDLCPU, int32_t, int32_t>(IdArray, NDArray, NDArray);

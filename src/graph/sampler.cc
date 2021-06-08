@@ -9,6 +9,7 @@
 #include <dgl/runtime/container.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/random.h>
+#include <dgl/runtime/parallel_for.h>
 #include <dmlc/omp.h>
 #include <algorithm>
 #include <cstdlib>
@@ -850,8 +851,7 @@ std::vector<NodeFlow> NeighborSamplingImpl(const ImmutableGraphPtr gptr,
     BuildCsr(*gptr, neigh_type);
     // generate node flows
     std::vector<NodeFlow> nflows(num_workers);
-#pragma omp parallel for
-    for (int i = 0; i < num_workers; i++) {
+    runtime::parallel_for(0, num_workers, [&](size_t i) {
       // create per-worker seed nodes.
       const int64_t start = (batch_start_id + i) * batch_size;
       const int64_t end = std::min(start + batch_size, num_seeds);
@@ -862,7 +862,7 @@ std::vector<NodeFlow> NeighborSamplingImpl(const ImmutableGraphPtr gptr,
       nflows[i] = SamplerOp::NeighborSample(
           gptr.get(), worker_seeds, neigh_type, num_hops, expand_factor,
           add_self_loop, probability);
-    }
+    });
     return nflows;
 }
 
@@ -977,8 +977,7 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_LayerSampling")
     BuildCsr(*gptr, neigh_type);
     // generate node flows
     std::vector<NodeFlow> nflows(num_workers);
-#pragma omp parallel for
-    for (int i = 0; i < num_workers; i++) {
+    runtime::parallel_for(0, num_workers, [&](size_t i) {
       // create per-worker seed nodes.
       const int64_t start = (batch_start_id + i) * batch_size;
       const int64_t end = std::min(start + batch_size, num_seeds);
@@ -988,7 +987,7 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_LayerSampling")
                 worker_seeds.begin());
       nflows[i] = SamplerOp::LayerUniformSample(
           gptr.get(), worker_seeds, neigh_type, layer_sizes);
-    }
+    });
     *rv = List<NodeFlow>(nflows);
   });
 
@@ -1466,8 +1465,7 @@ public:
     std::vector<SubgraphRef> positive_subgs(num_workers);
     std::vector<SubgraphRef> negative_subgs(num_workers);
 
-#pragma omp parallel for
-    for (int64_t i = 0; i < num_workers; i++) {
+    runtime::parallel_for(0, num_workers, [&](size_t i) {
       const int64_t start = (batch_curr_id_ + i) * batch_size_;
       const int64_t end = std::min(start + batch_size_, num_seeds_);
       const int64_t num_edges = end - start;
@@ -1513,7 +1511,7 @@ public:
                                                   check_false_neg_);
         negative_subgs[i] = ConvertRef(neg_subg);
       }
-    }
+    });
     if (neg_mode_.size() > 0) {
       positive_subgs.insert(positive_subgs.end(), negative_subgs.begin(), negative_subgs.end());
     }

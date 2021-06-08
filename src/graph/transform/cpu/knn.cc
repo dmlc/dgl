@@ -6,6 +6,7 @@
 
 #include <dgl/runtime/device_api.h>
 #include <dgl/random.h>
+#include <dgl/runtime/parallel_for.h>
 #include <dmlc/omp.h>
 #include <vector>
 #include <tuple>
@@ -234,10 +235,10 @@ void KdTreeKNN(const NDArray& data_points, const IdArray& data_offsets,
     KDTreeNDArrayAdapter<FloatType, IdType> kdtree(feature_size, current_data_points);
 
     // query
-    std::vector<IdType> out_buffer(k);
-    std::vector<FloatType> out_dist_buffer(k);
-#pragma omp parallel for firstprivate(out_buffer) firstprivate(out_dist_buffer)
-    for (IdType q = 0; q < q_length; ++q) {
+    parallel_for(0, q_length, [&](IdType q) {
+      std::vector<IdType> out_buffer(k);
+      std::vector<FloatType> out_dist_buffer(k);
+
       auto curr_out_offset = k * q + out_offset;
       const FloatType* q_point = current_query_pts_data + q * feature_size;
       size_t num_matches = kdtree.GetIndex()->knnSearch(
@@ -248,7 +249,7 @@ void KdTreeKNN(const NDArray& data_points, const IdArray& data_offsets,
         data_out[curr_out_offset] = out_buffer[i] + d_offset;
         curr_out_offset++;
       }
-    }
+    });
   }
 }
 
@@ -271,8 +272,8 @@ void BruteForceKNN(const NDArray& data_points, const IdArray& data_offsets,
 
     std::vector<FloatType> dist_buffer(k);
 
-#pragma omp parallel for firstprivate(dist_buffer)
-    for (IdType q_idx = q_start; q_idx < q_end; ++q_idx) {
+    parallel_for(q_start, q_end, [&](IdType q_idx) {
+      std::vector<FloatType> dist_buffer(k);
       for (IdType k_idx = 0; k_idx < k; ++k_idx) {
         query_out[q_idx * k + k_idx] = q_idx;
         dist_buffer[k_idx] = std::numeric_limits<FloatType>::max();
@@ -294,7 +295,7 @@ void BruteForceKNN(const NDArray& data_points, const IdArray& data_offsets,
           data_out + out_offset, dist_buffer.data(), d_idx, tmp_dist, k);
         worst_dist = dist_buffer[0];
       }
-    }
+    });
   }
 }
 }  // namespace impl
@@ -356,8 +357,7 @@ void NNDescent(const NDArray& points, const IdArray& offsets,
     IdType segment_size = point_idx_end - point_idx_start;
 
     // random initialization
-#pragma omp parallel for
-    for (IdType i = point_idx_start; i < point_idx_end; ++i) {
+    runtime::parallel_for(point_idx_start, point_idx_end, [&](size_t i) {
       IdType local_idx = i - point_idx_start;
 
       dgl::RandomEngine::ThreadLocal()->UniformChoice<IdType>(
@@ -373,15 +373,14 @@ void NNDescent(const NDArray& points, const IdArray& offsets,
           feature_size);
       }
       impl::BuildHeap<FloatType, IdType>(neighbors + i * k, neighbors_dists + local_idx * k, k);
-    }
+    });
 
     size_t num_updates = 0;
     for (int iter = 0; iter < num_iters; ++iter) {
       num_updates = 0;
 
       // initialize candidates array as empty value
-#pragma omp parallel for
-      for (IdType i = point_idx_start; i < point_idx_end; ++i) {
+      runtime::parallel_for(point_idx_start, point_idx_end, [&](size_t i) {
         IdType local_idx = i - point_idx_start;
         for (IdType c = 0; c < num_candidates; ++c) {
           new_candidates[local_idx * num_candidates + c] = num_nodes;
@@ -391,14 +390,11 @@ void NNDescent(const NDArray& points, const IdArray& offsets,
           old_candidates_dists[local_idx * num_candidates + c] =
             std::numeric_limits<FloatType>::max();
         }
-      }
+      });
 
       // randomly select neighbors as candidates
-      int tid, num_threads;
-#pragma omp parallel private(tid, num_threads)
-      {
-        tid = omp_get_thread_num();
-        num_threads = omp_get_num_threads();
+      int num_threads = omp_get_max_threads();
+      runtime::parallel_for(0, num_threads, [&](size_t tid) {
         for (IdType i = point_idx_start; i < point_idx_end; ++i) {
           IdType local_idx = i - point_idx_start;
           for (IdType n = 0; n < k; ++n) {
@@ -436,11 +432,10 @@ void NNDescent(const NDArray& points, const IdArray& offsets,
             }
           }
         }
-      }
+      });
 
       // mark all elements in new_candidates as false
-#pragma omp parallel for
-      for (IdType i = point_idx_start; i < point_idx_end; ++i) {
+      runtime::parallel_for(point_idx_start, point_idx_end, [&](size_t i) {
         IdType local_idx = i - point_idx_start;
         for (IdType n = 0; n < k; ++n) {
           IdType n_idx = neighbors[i * k + n];
@@ -452,7 +447,7 @@ void NNDescent(const NDArray& points, const IdArray& offsets,
             }
           }
         }
-      }
+      });
 
       // update neighbors block by block
       for (IdType block_start = point_idx_start;
@@ -463,10 +458,8 @@ void NNDescent(const NDArray& points, const IdArray& offsets,
         nnd_updates_t updates(block_size);
 
         // generate updates
-#pragma omp parallel for
-        for (IdType i = block_start; i < block_end; ++i) {
+        runtime::parallel_for(block_start, block_end, [&](size_t i) {
           IdType local_idx = i - point_idx_start;
-
           for (IdType c1 = 0; c1 < num_candidates; ++c1) {
             IdType new_c1 = new_candidates[local_idx * num_candidates + c1];
             if (new_c1 == num_nodes) continue;
@@ -510,8 +503,9 @@ void NNDescent(const NDArray& points, const IdArray& offsets,
               }
             }
           }
-        }
+        });
 
+        int tid;
 #pragma omp parallel private(tid, num_threads) reduction(+:num_updates)
         {
           tid = omp_get_thread_num();

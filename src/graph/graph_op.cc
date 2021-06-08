@@ -8,6 +8,7 @@
 #include <dgl/immutable_graph.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/runtime/container.h>
+#include <dgl/runtime/parallel_for.h>
 #include <algorithm>
 #include "../c_api_common.h"
 
@@ -261,8 +262,7 @@ IdArray GraphOp::MapParentIdToSubgraphId(IdArray parent_vids, IdArray query) {
 
   const bool is_sorted = std::is_sorted(parent_data, parent_data + parent_len);
   if (is_sorted) {
-#pragma omp parallel for
-    for (int64_t i = 0; i < query_len; i++) {
+    runtime::parallel_for(0, query_len, [&](size_t i) {
       const dgl_id_t id = query_data[i];
       const auto it = std::find(parent_data, parent_data + parent_len, id);
       // If the vertex Id doesn't exist, the vid in the subgraph is -1.
@@ -271,15 +271,14 @@ IdArray GraphOp::MapParentIdToSubgraphId(IdArray parent_vids, IdArray query) {
       } else {
         rst_data[i] = -1;
       }
-    }
+    });
   } else {
     std::unordered_map<dgl_id_t, dgl_id_t> parent_map;
     for (int64_t i = 0; i < parent_len; i++) {
       const dgl_id_t id = parent_data[i];
       parent_map[id] = i;
     }
-#pragma omp parallel for
-    for (int64_t i = 0; i < query_len; i++) {
+    runtime::parallel_for(0, query_len, [&](size_t i) {
       const dgl_id_t id = query_data[i];
       auto it = parent_map.find(id);
       // If the vertex Id doesn't exist, the vid in the subgraph is -1.
@@ -288,7 +287,7 @@ IdArray GraphOp::MapParentIdToSubgraphId(IdArray parent_vids, IdArray query) {
       } else {
         rst_data[i] = -1;
       }
-    }
+    });
   }
   return rst;
 }
@@ -567,14 +566,13 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLPartitionWithHalo")
     graph_ptr->GetInCSR();
     std::vector<std::shared_ptr<HaloSubgraph> > subgs(max_part_id + 1);
     int num_partitions = part_nodes.size();
-#pragma omp parallel for
-    for (int i = 0; i < num_partitions; i++) {
+    runtime::parallel_for(0, num_partitions, [&](size_t i) {
       auto nodes = aten::VecToIdArray(part_nodes[i]);
       HaloSubgraph subg = GraphOp::GetSubgraphWithHalo(graph_ptr, nodes, num_hops);
       std::shared_ptr<HaloSubgraph> subg_ptr(new HaloSubgraph(subg));
       int part_id = part_ids[i];
       subgs[part_id] = subg_ptr;
-    }
+    });
     List<SubgraphRef> ret_list;
     for (size_t i = 0; i < subgs.size(); i++) {
       ret_list.push_back(SubgraphRef(subgs[i]));
@@ -732,8 +730,7 @@ IdArray MapIds(IdArray ids, IdArray range_starts, IdArray range_ends, IdArray ty
   const IdType *typed_map_data = static_cast<IdType *>(typed_map->data);
   IdType *types_data = static_cast<IdType *>(ret->data);
   IdType *per_type_ids_data = static_cast<IdType *>(ret->data) + num_ids;
-#pragma omp parallel for
-  for (int64_t i = 0; i < ids->shape[0]; i++) {
+  runtime::parallel_for(0, ids->shape[0], [&](size_t i) {
     IdType id = ids_data[i];
     auto it = std::lower_bound(range_end_data, range_end_data + num_ranges, id);
     // The range must exist.
@@ -749,7 +746,7 @@ IdArray MapIds(IdArray ids, IdArray range_starts, IdArray range_ends, IdArray ty
       per_type_ids_data[i] = id - range_start_data[range_id]
           + typed_map_data[num_parts * type_id + part_id - 1];
     }
-  }
+  });
   return ret;
 }
 

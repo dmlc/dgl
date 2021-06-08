@@ -4,6 +4,7 @@
  * \brief Retrieve entries of a CSR matrix
  */
 #include <dgl/array.h>
+#include <dgl/runtime/parallel_for.h>
 #include <vector>
 #include <unordered_set>
 #include <numeric>
@@ -12,7 +13,7 @@
 namespace dgl {
 
 using runtime::NDArray;
-
+using runtime::parallel_for;
 namespace aten {
 namespace impl {
 
@@ -70,8 +71,7 @@ NDArray CSRGetData(
 
   if (csr.sorted) {
     // use binary search on each row
-#pragma omp parallel for
-    for (int64_t p = 0; p < retlen; ++p) {
+    parallel_for(0, retlen, [&](int64_t p) {
       const IdType row_id = row_data[p * row_stride], col_id = col_data[p * col_stride];
       CHECK(row_id >= 0 && row_id < csr.num_rows) << "Invalid row index: " << row_id;
       CHECK(col_id >= 0 && col_id < csr.num_cols) << "Invalid col index: " << col_id;
@@ -83,11 +83,10 @@ NDArray CSRGetData(
         IdType eid = data ? data[idx] : idx;
         ret_data[p] = return_eids ? eid : weight_data[eid];
       }
-    }
+    });
   } else {
     // linear search on each row
-#pragma omp parallel for
-    for (int64_t p = 0; p < retlen; ++p) {
+    parallel_for(0, retlen, [&](int64_t p) {
       const IdType row_id = row_data[p * row_stride], col_id = col_data[p * col_stride];
       CHECK(row_id >= 0 && row_id < csr.num_rows) << "Invalid row index: " << row_id;
       CHECK(col_id >= 0 && col_id < csr.num_cols) << "Invalid col index: " << col_id;
@@ -98,7 +97,7 @@ NDArray CSRGetData(
           break;
         }
       }
-    }
+    });
   }
   return ret;
 }

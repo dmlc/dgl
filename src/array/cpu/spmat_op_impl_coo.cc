@@ -4,6 +4,7 @@
  * \brief CPU implementation of COO sparse matrix operators
  */
 #include <dmlc/omp.h>
+#include <dgl/runtime/parallel_for.h>
 #include <vector>
 #include <unordered_set>
 #include <unordered_map>
@@ -14,6 +15,7 @@
 namespace dgl {
 
 using runtime::NDArray;
+using runtime::parallel_for;
 
 namespace aten {
 namespace impl {
@@ -55,12 +57,11 @@ NDArray COOIsNonZero(COOMatrix coo, NDArray row, NDArray col) {
   const int64_t row_stride = (rowlen == 1 && collen != 1) ? 0 : 1;
   const int64_t col_stride = (collen == 1 && rowlen != 1) ? 0 : 1;
   const int64_t kmax = std::max(rowlen, collen);
-#pragma omp parallel for
-  for (int64_t k = 0; k < kmax; ++k) {
+  parallel_for(0, kmax, [=](size_t k) {
     int64_t i = row_stride * k;
     int64_t j = col_stride * k;
     rst_data[k] = COOIsNonZero<XPU, IdType>(coo, row_data[i], col_data[j])? 1 : 0;
-  }
+  });
   return rst;
 }
 
@@ -114,8 +115,9 @@ NDArray COOGetRowNNZ(COOMatrix coo, NDArray rows) {
   NDArray rst = NDArray::Empty({len}, rows->dtype, rows->ctx);
   IdType* rst_data = static_cast<IdType*>(rst->data);
 #pragma omp parallel for
-  for (int64_t i = 0; i < len; ++i)
+  for (int64_t i = 0; i < len; ++i) {
     rst_data[i] = COOGetRowNNZ<XPU, IdType>(coo, vid_data[i]);
+  }
   return rst;
 }
 
@@ -178,8 +180,7 @@ IdArray COOGetData(COOMatrix coo, IdArray rows, IdArray cols) {
   //   the choice.
 
   if (coo.row_sorted) {
-#pragma omp parallel for
-    for (int64_t p = 0; p < retlen; ++p) {
+    parallel_for(0, retlen, [&](size_t p) {
       const IdType row_id = row_data[p * row_stride], col_id = col_data[p * col_stride];
       auto it = std::lower_bound(coo_row, coo_row + nnz, row_id);
       for (; it < coo_row + nnz && *it == row_id; ++it) {
@@ -189,7 +190,7 @@ IdArray COOGetData(COOMatrix coo, IdArray rows, IdArray cols) {
           break;
         }
       }
-    }
+    });
   } else {
 #pragma omp parallel for
     for (int64_t p = 0; p < retlen; ++p) {
@@ -328,11 +329,8 @@ CSRMatrix COOToCSR(COOMatrix coo) {
     IdType * const fill_data = data ? nullptr : static_cast<IdType*>(coo.data->data);
 
     if (NNZ > 0) {
-      #pragma omp parallel
-      {
-        const int num_threads = omp_get_num_threads();
-        const int thread_id = omp_get_thread_num();
-
+      auto num_threads = omp_get_max_threads();
+      parallel_for(0, num_threads, [&](int thread_id) {
         // We partition the set the of non-zeros among the threads
         const int64_t nz_chunk = (NNZ+num_threads-1)/num_threads;
         const int64_t nz_start = thread_id*nz_chunk;
@@ -388,7 +386,7 @@ CSRMatrix COOToCSR(COOMatrix coo) {
                       nz_start);
           }
         }
-      }
+      });
     } else {
       std::fill(Bp, Bp+N+1, 0);
     }
@@ -627,11 +625,10 @@ COOMatrix COOReorder(COOMatrix coo, runtime::NDArray new_row_id_arr,
   IdType *out_row = static_cast<IdType*>(out_row_arr->data);
   IdType *out_col = static_cast<IdType*>(out_col_arr->data);
 
-#pragma omp parallel for
-  for (int64_t i = 0; i < nnz; i++) {
+  parallel_for(0, nnz, [=](size_t i) {
     out_row[i] = new_row_ids[in_rows[i]];
     out_col[i] = new_col_ids[in_cols[i]];
-  }
+  });
   return COOMatrix(num_rows, num_cols, out_row_arr, out_col_arr, out_data_arr);
 }
 

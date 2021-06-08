@@ -4,6 +4,7 @@
  * \brief CSR matrix operator CPU implementation
  */
 #include <dgl/array.h>
+#include <dgl/runtime/parallel_for.h>
 #include <vector>
 #include <unordered_set>
 #include <numeric>
@@ -12,6 +13,7 @@
 namespace dgl {
 
 using runtime::NDArray;
+using runtime::parallel_for;
 
 namespace aten {
 namespace impl {
@@ -491,11 +493,10 @@ CSRMatrix CSRReorder(CSRMatrix csr, runtime::NDArray new_row_id_arr,
 
   // Compute the length of rows for the new matrix.
   std::vector<IdType> new_row_lens(num_rows, -1);
-#pragma omp parallel for
-  for (int64_t i = 0; i < num_rows; i++) {
+  parallel_for(0, num_rows, [=, &new_row_lens](size_t i) {
     int64_t new_row_id = new_row_ids[i];
     new_row_lens[new_row_id] = in_indptr[i + 1] - in_indptr[i];
-  }
+  });
   // Compute the starting location of each row in the new matrix.
   out_indptr[0] = 0;
   // This is sequential. It should be pretty fast.
@@ -506,8 +507,7 @@ CSRMatrix CSRReorder(CSRMatrix csr, runtime::NDArray new_row_id_arr,
   CHECK_EQ(out_indptr[num_rows], nnz);
   // Copy indieces and data with the new order.
   // Here I iterate rows in the order of the old matrix.
-#pragma omp parallel for
-  for (int64_t i = 0; i < num_rows; i++) {
+  parallel_for(0, num_rows, [=](size_t i) {
     const IdType *in_row = in_indices + in_indptr[i];
     const IdType *in_row_data = in_data + in_indptr[i];
 
@@ -522,7 +522,7 @@ CSRMatrix CSRReorder(CSRMatrix csr, runtime::NDArray new_row_id_arr,
       out_row_data[j] = in_row_data[j];
     }
     // TODO(zhengda) maybe we should sort the column indices.
-  }
+  });
   return CSRMatrix(num_rows, num_cols,
     out_indptr_arr, out_indices_arr, out_data_arr);
 }

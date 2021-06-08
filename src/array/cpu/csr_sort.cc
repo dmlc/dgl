@@ -4,6 +4,7 @@
  * \brief CSR sorting
  */
 #include <dgl/array.h>
+#include <dgl/runtime/parallel_for.h>
 #include <numeric>
 #include <algorithm>
 #include <vector>
@@ -48,30 +49,27 @@ void CSRSort_(CSRMatrix* csr) {
     csr->data = aten::Range(0, nnz, csr->indptr->dtype.bits, csr->indptr->ctx);
   }
   IdType* eid_data = static_cast<IdType*>(csr->data->data);
-#pragma omp parallel
-  {
-    std::vector<ShufflePair> reorder_vec;
-#pragma omp for
-    for (int64_t row = 0; row < num_rows; row++) {
-      const int64_t num_cols = indptr_data[row + 1] - indptr_data[row];
-      IdType *col = indices_data + indptr_data[row];
-      IdType *eid = eid_data + indptr_data[row];
 
-      reorder_vec.resize(num_cols);
-      for (int64_t i = 0; i < num_cols; i++) {
-        reorder_vec[i].first = col[i];
-        reorder_vec[i].second = eid[i];
-      }
-      std::sort(reorder_vec.begin(), reorder_vec.end(),
-                [](const ShufflePair &e1, const ShufflePair &e2) {
-                  return e1.first < e2.first;
-                });
-      for (int64_t i = 0; i < num_cols; i++) {
-        col[i] = reorder_vec[i].first;
-        eid[i] = reorder_vec[i].second;
-      }
+  runtime::parallel_for(0, num_rows, [=](uint64_t row) {
+    const int64_t num_cols = indptr_data[row + 1] - indptr_data[row];
+    std::vector<ShufflePair> reorder_vec(num_cols);
+    IdType *col = indices_data + indptr_data[row];
+    IdType *eid = eid_data + indptr_data[row];
+
+    for (int64_t i = 0; i < num_cols; i++) {
+      reorder_vec[i].first = col[i];
+      reorder_vec[i].second = eid[i];
     }
-  }
+    std::sort(reorder_vec.begin(), reorder_vec.end(),
+              [](const ShufflePair &e1, const ShufflePair &e2) {
+                return e1.first < e2.first;
+              });
+    for (int64_t i = 0; i < num_cols; i++) {
+      col[i] = reorder_vec[i].first;
+      eid[i] = reorder_vec[i].second;
+    }
+  });
+
   csr->sorted = true;
 }
 
@@ -101,8 +99,7 @@ std::pair<CSRMatrix, NDArray> CSRSortByTag(
   auto out_indices_data = static_cast<IdType *>(output.indices->data);
   auto out_eid_data = static_cast<IdType *>(output.data->data);
 
-#pragma omp parallel for
-  for (IdType src = 0 ; src < num_rows ; ++src) {
+  runtime::parallel_for(0, num_rows, [&](size_t src) {
     const IdType start = indptr_data[src];
     const IdType end = indptr_data[src + 1];
 
@@ -131,7 +128,7 @@ std::pair<CSRMatrix, NDArray> CSRSortByTag(
       out_indices_data[start + offset] = dst;
       out_eid_data[start + offset] = eid;
     }
-  }
+  });
   output.sorted = false;
   return std::make_pair(output, tag_pos);
 }
