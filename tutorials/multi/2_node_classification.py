@@ -105,13 +105,15 @@ def run(proc_id, devices):
     # Initialize distributed training context.
     dev_id = devices[proc_id]
     dist_init_method = 'tcp://{master_ip}:{master_port}'.format(master_ip='127.0.0.1', master_port='12345')
-    # To use Multi-GPU, change 'gloo' to 'nccl'.
-    torch.distributed.init_process_group(
-        backend='gloo', init_method=dist_init_method, world_size=len(devices), rank=proc_id)
-    device = torch.device('cpu')
-    # Uncomment the following two lines to use GPU.
-    #torch.cuda.set_device(dev_id)
-    #device = torch.device('cuda:' + str(dev_id))
+    if torch.cuda.device_count() < 1:
+        device = torch.device('cpu')
+        torch.distributed.init_process_group(
+            backend='gloo', init_method=dist_init_method, world_size=len(devices), rank=proc_id)
+    else:
+        torch.cuda.set_device(dev_id)
+        device = torch.device('cuda:' + str(dev_id))
+        torch.distributed.init_process_group(
+            backend='nccl', init_method=dist_init_method, world_size=len(devices), rank=proc_id)
     
     # Define training and validation dataloader, copied from the previous tutorial
     # but with one line of difference: use_ddp to enable distributed data parallel
@@ -133,12 +135,12 @@ def run(proc_id, devices):
     )
     valid_dataloader = dgl.dataloading.NodeDataLoader(
         graph, valid_nids, sampler,
+        device=device,
+        use_ddp=False,
         batch_size=1024,
         shuffle=False,
         drop_last=False,
         num_workers=0,
-        device=device,
-        use_ddp=False
     )
     
     model = Model(num_features, 128, num_classes).to(device)
@@ -195,7 +197,7 @@ def run(proc_id, devices):
                     best_accuracy = accuracy
                     torch.save(model.state_dict(), best_model_path)
 
-        # Note that this tutorial do not train the whole model to the end.
+        # Note that this tutorial does not train the whole model to the end.
         break
 
 
