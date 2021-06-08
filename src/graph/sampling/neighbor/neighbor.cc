@@ -199,7 +199,6 @@ HeteroSubgraph SampleNeighborsBiased(
     const EdgeDir dir,
     const bool replace
 ) {
-
   CHECK_EQ(hg->NumEdgeTypes(), 1) << "Only homogeneous or bipartite graphs are supported";
   auto pair = hg->meta_graph()->FindEdge(0);
   const dgl_type_t src_vtype = pair.first;
@@ -210,7 +209,8 @@ HeteroSubgraph SampleNeighborsBiased(
   CHECK_EQ(tag_offset->ndim, 2) << "The shape of tag_offset should be [num_nodes, num_tags + 1]";
   CHECK_EQ(tag_offset->shape[0], hg->NumVertices(nodes_ntype))
     << "The shape of tag_offset should be [num_nodes, num_tags + 1]";
-  CHECK_EQ(tag_offset->shape[1], bias->shape[0] + 1) << "The sizes of tag_offset and bias are inconsistent";
+  CHECK_EQ(tag_offset->shape[1], bias->shape[0] + 1)
+    << "The sizes of tag_offset and bias are inconsistent";
 
   const int64_t num_nodes = nodes->shape[0];
   HeteroGraphPtr subrel;
@@ -243,7 +243,6 @@ HeteroSubgraph SampleNeighborsBiased(
 
       switch (req_fmt) {
         case CSR_CODE:
-// std::cerr << "You should be here" << std::endl;
           CHECK(created_fmt & CSR_CODE) << "A sorted CSR Matrix is required.";
           sampled_coo = aten::CSRRowWiseSamplingBiased(
             hg->GetCSRMatrix(etype), nodes, fanout, tag_offset, bias, replace);
