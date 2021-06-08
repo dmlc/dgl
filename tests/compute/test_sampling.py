@@ -579,7 +579,8 @@ def test_sample_neighbors_biased_homogeneous():
     g = create_test_graph(100, 30)
 
     def check_num(nodes, tag):
-        cnt = [sum(F.asnumpy(F.equal(tag[nodes], i))) for i in range(4)]
+        nodes, tag = F.asnumpy(nodes), F.asnumpy(tag)
+        cnt = [sum(tag[nodes] == i) for i in range(4)]
         # No tag 0
         assert cnt[0] == 0
 
@@ -588,7 +589,7 @@ def test_sample_neighbors_biased_homogeneous():
         assert cnt[3] > 10 * cnt[1]
 
     tag = F.tensor(np.random.choice(4, 100))
-    bias = F.tensor([0, 0.1, 10, 10])
+    bias = F.tensor([0, 0.1, 10, 10], dtype=F.float32)
     # inedge / without replacement
     g_sorted = dgl.sort_in_edges(g, tag)
     for _ in range(5):
@@ -621,9 +622,10 @@ def test_sample_neighbors_biased_homogeneous():
 def test_sample_neighbors_biased_bipartite():
     g = create_test_graph(100, 30, )
     num_dst = g.number_of_dst_nodes()
-    bias = F.tensor([0, 0.1, 10, 10])
+    bias = F.tensor([0, 0.1, 10, 10], dtype=F.float32)
     def check_num(nodes, tag):
-        cnt = [sum(F.asnumpy(F.equal(tag[nodes], i))) for i in range(4)]
+        nodes, tag = F.asnumpy(nodes), F.asnumpy(tag)
+        cnt = [sum(tag[nodes] == i) for i in range(4)]
         # No tag 0
         assert cnt[0] == 0
 
@@ -662,13 +664,13 @@ def test_sample_neighbors_biased_bipartite():
         check_num(subg.edges()[1], tag)
 
 if __name__ == '__main__':
-    test_random_walk()
-    test_pack_traces()
-    test_pinsage_sampling()
-    # test_sample_neighbors()
-    test_sample_neighbors_outedge()
-    test_sample_neighbors_topk()
-    test_sample_neighbors_topk_outedge()
-    test_sample_neighbors_with_0deg()
+    # test_random_walk()
+    # test_pack_traces()
+    # test_pinsage_sampling()
+    # # test_sample_neighbors()
+    # test_sample_neighbors_outedge()
+    # test_sample_neighbors_topk()
+    # test_sample_neighbors_topk_outedge()
+    # test_sample_neighbors_with_0deg()
     test_sample_neighbors_biased_homogeneous()
     test_sample_neighbors_biased_bipartite()
