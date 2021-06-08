@@ -7,6 +7,7 @@
 #define DGL_ARRAY_CPU_ROWWISE_PICK_H_
 
 #include <dgl/array.h>
+#include <dgl/runtime/parallel_for.h>
 #include <functional>
 #include <algorithm>
 
@@ -83,14 +84,13 @@ COOMatrix CSRRowWisePick(CSRMatrix mat, IdArray rows,
     all_has_fanout = all_has_fanout && (len >= (replace ? 1 : num_picks));
   }
 
-#pragma omp parallel for
-  for (int64_t i = 0; i < num_rows; ++i) {
+  runtime::parallel_for(0, num_rows, [=](size_t i) {
     const IdxType rid = rows_data[i];
     CHECK_LT(rid, mat.num_rows);
     const IdxType off = indptr[rid];
     const IdxType len = indptr[rid + 1] - off;
     if (len == 0)
-      continue;
+      return;
 
     if (len <= num_picks && !replace) {
       // nnz <= num_picks and w/o replacement, take all nnz
@@ -110,7 +110,7 @@ COOMatrix CSRRowWisePick(CSRMatrix mat, IdArray rows,
         picked_idata[i * num_picks + j] = data? data[picked] : picked;
       }
     }
-  }
+  });
 
   if (!all_has_fanout) {
     // correct the array by remove_if

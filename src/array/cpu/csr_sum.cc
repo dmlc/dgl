@@ -5,6 +5,7 @@
  */
 
 #include <dgl/array.h>
+#include <dgl/runtime/parallel_for.h>
 #include <parallel_hashmap/phmap.h>
 #include <vector>
 #include "array_utils.h"
@@ -25,16 +26,15 @@ void CountNNZPerRow(
     IdType* C_indptr_data,
     int64_t M) {
   int64_t n = A_indptr.size();
-  phmap::flat_hash_set<IdType> set;
-#pragma omp parallel for firstprivate(set)
-  for (IdType i = 0; i < M; ++i) {
-    set.clear();
+
+  runtime::parallel_for(0, M, [=](size_t i) {
+    phmap::flat_hash_set<IdType> set;
     for (int64_t k = 0; k < n; ++k) {
       for (IdType u = A_indptr[k][i]; u < A_indptr[k][i + 1]; ++u)
         set.insert(A_indices[k][u]);
     }
     C_indptr_data[i] = set.size();
-  }
+  });
 }
 
 template <typename IdType>
@@ -61,10 +61,8 @@ void ComputeIndicesAndData(
     DType* C_weights_data,
     int64_t M) {
   int64_t n = A_indptr.size();
-  phmap::flat_hash_map<IdType, DType> map;
-#pragma omp parallel for firstprivate(map)
-  for (int64_t i = 0; i < M; ++i) {
-    map.clear();
+  runtime::parallel_for(0, M, [=](size_t i) {
+    phmap::flat_hash_map<IdType, DType> map;
     for (int64_t k = 0; k < n; ++k) {
       for (IdType u = A_indptr[k][i]; u < A_indptr[k][i + 1]; ++u) {
         IdType kA = A_indices[k][u];
@@ -72,14 +70,13 @@ void ComputeIndicesAndData(
         map[kA] += vA;
       }
     }
-
     IdType j = C_indptr_data[i];
     for (auto it : map) {
       C_indices_data[j] = it.first;
       C_weights_data[j] = it.second;
       ++j;
     }
-  }
+  });
 }
 
 };  // namespace

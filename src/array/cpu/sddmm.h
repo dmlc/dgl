@@ -8,6 +8,7 @@
 
 #include <dgl/array.h>
 #include <dgl/bcast.h>
+#include <dgl/runtime/parallel_for.h>
 #include "../selector.h"
 
 namespace dgl {
@@ -40,8 +41,7 @@ void SDDMMCsr(const BcastOff& bcast,
                 rhs_dim = bcast.rhs_len,
                 reduce_size = bcast.reduce_size;
   DType* O = out.Ptr<DType>();
-#pragma omp parallel for
-  for (IdType rid = 0; rid < csr.num_rows; ++rid) {
+  runtime::parallel_for(0, csr.num_rows, [=](IdType rid) {
     const IdType row_start = indptr[rid], row_end = indptr[rid + 1];
     for (IdType j = row_start; j < row_end; ++j) {
       const IdType cid = indices[j];
@@ -57,7 +57,7 @@ void SDDMMCsr(const BcastOff& bcast,
         out_off[k] = Op::Call(lhs_off, rhs_off, reduce_size);
       }
     }
-  }
+  });
 }
 
 /*!
@@ -86,9 +86,7 @@ void SDDMMCoo(const BcastOff& bcast,
                 rhs_dim = bcast.rhs_len,
                 reduce_size = bcast.reduce_size;
   DType* O = out.Ptr<DType>();
-  const int64_t nnz = coo.row->shape[0];
-#pragma omp parallel for
-  for (IdType i = 0; i < nnz; ++i) {
+  runtime::parallel_for(0, coo.row->shape[0], [=](size_t i) {
     const IdType rid = row[i];
     const IdType cid = col[i];
     const IdType eid = has_idx? edges[i] : i;
@@ -102,7 +100,7 @@ void SDDMMCoo(const BcastOff& bcast,
         Y + Selector<RhsTarget>::Call(rid, eid, cid) * rhs_dim + rhs_add * reduce_size : nullptr;
       out_off[k] = Op::Call(lhs_off, rhs_off, bcast.reduce_size);
     }
-  }
+  });
 }
 
 namespace op {
