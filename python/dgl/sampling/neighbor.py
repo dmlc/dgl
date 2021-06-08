@@ -205,7 +205,7 @@ def sample_neighbors_biased(g, nodes, fanout, bias, edge_dir='in',
 
     Only homogeneous or bipartite graphs are supported. For bipartite graphs, only candidate
     frontier nodes have tags(source nodes when edge_dir='in' and destination nodes when
-    edge_dir='out')
+    edge_dir='out'), and the offset of tags should be stored as a node feature of the seed nodes.
 
     Node/edge features are not preserved. The original IDs of
     the sampled edges are stored as the `dgl.EID` feature in the returned graph.

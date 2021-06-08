@@ -562,39 +562,113 @@ def test_sample_neighbors_with_0deg():
     sg = dgl.sampling.sample_neighbors(g, F.tensor([1, 2], dtype=F.int64), 2, edge_dir='out', replace=True)
     assert sg.number_of_edges() == 0
 
+def create_test_graph(num_nodes, num_edges_per_node, bipartite=False):
+    src = np.concatenate(
+        [np.array([i] * num_edges_per_node) for i in range(num_nodes)])
+    dst = np.concatenate(
+        [np.random.choice(num_nodes, num_edges_per_node, replace=False) for i in range(num_nodes)]
+    )
+    if bipartite:
+        g = dgl.heterograph({("u", "e", "v") : (src, dst)})
+    else:
+        g = dgl.graph((src, dst))
+    return g
+
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
-def test_sample_neighbors_biased():
-    """
-    0 -> 1, 2, 3, 4
-    2 -> 3, 4, 5
-    """
-    g = dgl.graph(([0, 0, 0, 0, 2, 2, 2], [1, 2, 3, 4, 3, 4, 5]))
-    bias = F.tensor([0, 0.5])
-    tag = F.tensor([0, 0, 0, 1, 1, 1])
+def test_sample_neighbors_biased_homogeneous():
+    g = create_test_graph(100, 30)
+
+    def check_num(nodes, tag):
+        cnt = [sum(F.asnumpy(F.equal(tag[nodes], i))) for i in range(4)]
+        # No tag 0
+        assert cnt[0] == 0
+
+        # very little tag 1
+        assert cnt[2] > 10 * cnt[1]
+        assert cnt[3] > 10 * cnt[1]
+
+    tag = F.tensor(np.random.choice(4, 100))
+    bias = F.tensor([0, 0.1, 10, 10])
+    # inedge / without replacement
+    g_sorted = dgl.sort_in_edges(g, tag)
+    for _ in range(5):
+        subg = dgl.sampling.sample_neighbors_biased(g_sorted, g.nodes(), 5, bias, replace=False)
+        check_num(subg.edges()[0], tag)
+        u, v = subg.edges()
+        edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+        assert len(edge_set) == subg.number_of_edges()
+
+    # inedge / with replacement
+    for _ in range(5):
+        subg = dgl.sampling.sample_neighbors_biased(g_sorted, g.nodes(), 5, bias, replace=True)
+        check_num(subg.edges()[0], tag)
+
+    # outedge / without replacement
     g_sorted = dgl.sort_out_edges(g, tag)
-
-    # without replacement
-    for _ in range(10):
-        subg = dgl.sampling.sample_neighbors_biased(g_sorted, F.tensor([0, 2]), 2, bias, edge_dir='out')
+    for _ in range(5):
+        subg = dgl.sampling.sample_neighbors_biased(g_sorted, g.nodes(), 5, bias, edge_dir='out', replace=False)
+        check_num(subg.edges()[1], tag)
         u, v = subg.edges()
-        uv = set(zip(F.asnumpy(u), F.asnumpy(v)))
-        assert (0, 1) not in uv
-        assert (0, 2) not in uv
+        edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+        assert len(edge_set) == subg.number_of_edges()
 
-    # with replacement
-    bias = F.tensor([0.1 , 1])
-    for _ in range(50):
-        subg = dgl.sampling.sample_neighbors_biased(g_sorted, F.tensor([0, 2]), 100, bias, edge_dir='out', replace=True)
+    # outedge / with replacement
+    for _ in range(5):
+        subg = dgl.sampling.sample_neighbors_biased(g_sorted, g.nodes(), 5, bias, edge_dir='out', replace=True)
+        check_num(subg.edges()[1], tag)
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
+def test_sample_neighbors_biased_bipartite():
+    g = create_test_graph(100, 30, )
+    num_dst = g.number_of_dst_nodes()
+    bias = F.tensor([0, 0.1, 10, 10])
+    def check_num(nodes, tag):
+        cnt = [sum(F.asnumpy(F.equal(tag[nodes], i))) for i in range(4)]
+        # No tag 0
+        assert cnt[0] == 0
+
+        # very little tag 1
+        assert cnt[2] > 10 * cnt[1]
+        assert cnt[3] > 10 * cnt[1]
+
+    # inedge / without replacement
+    tag = F.tensor(np.random.choice(4, 100))
+    g_sorted = dgl.sort_in_edges(g, tag)
+    for _ in range(5):
+        subg = dgl.sampling.sample_neighbors_biased(g_sorted, g.dstnodes(), 5, bias, replace=False)
+        check_num(subg.edges()[0], tag)
         u, v = subg.edges()
-        assert 5 * sum(F.asnumpy(v < 3)) < sum(F.asnumpy(v>=3))
+        edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+        assert len(edge_set) == subg.number_of_edges()
+
+    # inedge / with replacement
+    for _ in range(5):
+        subg = dgl.sampling.sample_neighbors_biased(g_sorted, g.dstnodes(), 5, bias, replace=True)
+        check_num(subg.edges()[0], tag)
+
+    # outedge / without replacement
+    tag = F.tensor(np.random.choice(4, num_dst))
+    g_sorted = dgl.sort_out_edges(g, tag)
+    for _ in range(5):
+        subg = dgl.sampling.sample_neighbors_biased(g_sorted, g.srcnodes(), 5, bias, edge_dir='out', replace=False)
+        check_num(subg.edges()[1], tag)
+        u, v = subg.edges()
+        edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+        assert len(edge_set) == subg.number_of_edges()
+
+    # outedge / with replacement
+    for _ in range(5):
+        subg = dgl.sampling.sample_neighbors_biased(g_sorted, g.srcnodes(), 5, bias, edge_dir='out', replace=True)
+        check_num(subg.edges()[1], tag)
 
 if __name__ == '__main__':
-    # test_random_walk()
-    # test_pack_traces()
-    # test_pinsage_sampling()
+    test_random_walk()
+    test_pack_traces()
+    test_pinsage_sampling()
     # test_sample_neighbors()
-    # test_sample_neighbors_outedge()
-    # test_sample_neighbors_topk()
-    # test_sample_neighbors_topk_outedge()
-    # test_sample_neighbors_with_0deg()
-    test_sample_neighbors_biased()
+    test_sample_neighbors_outedge()
+    test_sample_neighbors_topk()
+    test_sample_neighbors_topk_outedge()
+    test_sample_neighbors_with_0deg()
+    test_sample_neighbors_biased_homogeneous()
+    test_sample_neighbors_biased_bipartite()
