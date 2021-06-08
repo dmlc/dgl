@@ -519,10 +519,10 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
   int64_t feat_len = bcast.out_len;
   bool is_scalar_efeat = vec_efeat.size() != 0;
   bool use_efeat = op != "copy_lhs";
-  const DLContext& ctx = DLContext{kDLGPU, 0};
-  // TODO (Israt): 1:Resolve PR-https://github.com/dmlc/dgl/issues/2995 to use maxstream > 1
+  // TODO(Israt): 1:Resolve PR-https://github.com/dmlc/dgl/issues/2995
+  // to use maxstream > 1
   int maxstrm = 1;
-  cudaStream_t stream[maxstrm];
+  std::vector<cudaStream_t> stream(maxstrm);
   for (int i = 0; i < maxstrm; i++) {
     CUDA_CALL(cudaStreamCreate(&(stream[i])));
   }
@@ -536,23 +536,23 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
         if (op == "copy_lhs" && cusparse_available<bits, IdType>()) {  // cusparse
           int64_t x_length = 1;
           NDArray nd_ufeat = vec_ufeat[ufeat_eid[0]];
-          for (int i = 1; i < nd_ufeat->ndim; ++i){
-            x_length *= nd_ufeat->shape[i]; //TODO:: All ufeat shares same shape?
+          for (int i = 1; i < nd_ufeat->ndim; ++i) {
+            x_length *= nd_ufeat->shape[i];
           }
           cusparse::CusparseCsrmm2Hetero<DType, IdType>(
-              ctx, csr,
+              csr.indptr->ctx, csr,
               static_cast<DType*>(vec_ufeat[src_id]->data),
               nullptr,
               static_cast<DType*>(vec_out[dst_id]->data),
               x_length,
               stream[0]);
-        }
-        else if (op == "mul" && is_scalar_efeat && cusparse_available<bits, IdType>()) {  // cusparse
+        } else if (op == "mul" && is_scalar_efeat &&
+            cusparse_available<bits, IdType>()) {  // cusparse
           NDArray efeat = vec_efeat[dst_id];
           int64_t x_length = 1;
           NDArray nd_ufeat = vec_ufeat[ufeat_eid[0]];
-          for (int i = 1; i < nd_ufeat->ndim; ++i){
-            x_length *= nd_ufeat->shape[i]; //TODO:: All ufeat shares same shape?
+          for (int i = 1; i < nd_ufeat->ndim; ++i) {
+            x_length *= nd_ufeat->shape[i];
           }
           if (!IsNullArray(csr.data)) {
             SWITCH_BITS(bits, DType, {
@@ -561,15 +561,14 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
           }
           SWITCH_BITS(bits, DType, {
             cusparse::CusparseCsrmm2Hetero<DType, IdType>(
-                ctx, csr,
+                csr.indptr->ctx, csr,
                 static_cast<DType*>(vec_ufeat[src_id]->data),
                 static_cast<DType*>(efeat->data),
                 static_cast<DType*>(vec_out[dst_id]->data),
                 x_length,
                 stream[0]);
           });
-        }
-        else { // general kernel
+        } else {  // general kernel
           NDArray ufeat = (vec_ufeat.size() == 0) ?
             NullArray() : vec_ufeat[src_id];
           NDArray efeat = (vec_efeat.size() == 0) ?

@@ -106,10 +106,10 @@ void SDDMMCsrHetero(const std::string& op,
               int rhs_target,
               const std::vector<dgl_type_t>& lhs_eid,
               const std::vector<dgl_type_t>& rhs_eid) {
-  // TODO (Israt): Resolve PR - https://github.com/dmlc/dgl/issues/2995
+  // TODO(Israt): Resolve PR - https://github.com/dmlc/dgl/issues/2995
   // to use maxstream > 1
   int maxstrm = 1;
-  cudaStream_t stream[maxstrm];
+  std::vector<cudaStream_t> stream(maxstrm);
   for (int i = 0; i < maxstrm; i++) {
     CUDA_CALL(cudaStreamCreate(&(stream[i])));
   }
