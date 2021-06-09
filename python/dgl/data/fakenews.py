@@ -30,6 +30,9 @@ class FakeNewsDataset(DGLBuiltinDataset):
         spacy: the 300-dimensional node feature composed of Twitter user
                historical tweets encoded by the spaCy word2vec encoder.
 
+    Note: this dataset is for academic use only, commercial use requires
+    the approval from Twitter.
+
     Statistics:
 
         Politifact:
