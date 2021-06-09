@@ -116,6 +116,7 @@ std::pair<dgl_id_t, bool> MetapathRandomWalkStep(
  * \param terminate Predicate for terminating the current random walk path.
  *
  * \return A pair of ID of next successor (-1 if not exist), as well as whether to terminate.
+ * \note This function is called only if all the probability arrays are null.
  */
 template<DLDeviceType XPU, typename IdxType>
 std::pair<dgl_id_t, bool> MetapathRandomWalkStepUniform(
