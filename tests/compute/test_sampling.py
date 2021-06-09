@@ -584,9 +584,9 @@ def test_sample_neighbors_biased_homogeneous():
         # No tag 0
         assert cnt[0] == 0
 
-        # very little tag 1
-        assert cnt[2] > 10 * cnt[1]
-        assert cnt[3] > 10 * cnt[1]
+        # very rare tag 1
+        assert cnt[2] > 2 * cnt[1]
+        assert cnt[3] > 2 * cnt[1]
 
     tag = F.tensor(np.random.choice(4, 100))
     bias = F.tensor([0, 0.1, 10, 10], dtype=F.float32)
