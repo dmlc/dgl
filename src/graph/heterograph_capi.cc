@@ -657,6 +657,51 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLAsImmutableGraph")
     *rv = GraphRef(hg->AsImmutableGraph());
   });
 
+DGL_REGISTER_GLOBAL("transform._CAPI_DGLHeteroSortOutEdges")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    NDArray tag = args[1];
+    int64_t num_tag = args[2];
+
+    CHECK_EQ(hg->Context().device_type, kDLCPU) << "Only support sorting by tag on cpu";
+    CHECK(aten::IsValidIdArray(tag));
+    CHECK_EQ(tag->ctx.device_type, kDLCPU) << "Only support sorting by tag on cpu";
+
+    const auto csr = hg->GetCSRMatrix(0);
+
+    NDArray tag_pos = aten::NullArray();
+    aten::CSRMatrix output;
+    std::tie(output, tag_pos) = aten::CSRSortByTag(csr, tag, num_tag);
+    HeteroGraphPtr output_hg = CreateFromCSR(hg->NumVertexTypes(), output, ALL_CODE);
+    List<ObjectRef> ret;
+    ret.push_back(HeteroGraphRef(output_hg));
+    ret.push_back(Value(MakeValue(tag_pos)));
+    *rv = ret;
+  });
+
+DGL_REGISTER_GLOBAL("transform._CAPI_DGLHeteroSortInEdges")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    NDArray tag = args[1];
+    int64_t num_tag = args[2];
+
+    CHECK_EQ(hg->Context().device_type, kDLCPU) << "Only support sorting by tag on cpu";
+    CHECK(aten::IsValidIdArray(tag));
+    CHECK_EQ(tag->ctx.device_type, kDLCPU) << "Only support sorting by tag on cpu";
+
+    const auto csc = hg->GetCSCMatrix(0);
+
+    NDArray tag_pos = aten::NullArray();
+    aten::CSRMatrix output;
+    std::tie(output, tag_pos) = aten::CSRSortByTag(csc, tag, num_tag);
+
+    HeteroGraphPtr output_hg = CreateFromCSC(hg->NumVertexTypes(), output, ALL_CODE);
+    List<ObjectRef> ret;
+    ret.push_back(HeteroGraphRef(output_hg));
+    ret.push_back(Value(MakeValue(tag_pos)));
+    *rv = ret;
+  });
+
 DGL_REGISTER_GLOBAL("heterograph._CAPI_DGLFindSrcDstNtypes")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphRef metagraph = args[0];
