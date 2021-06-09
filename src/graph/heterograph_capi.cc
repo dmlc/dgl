@@ -379,6 +379,8 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroVertexSubgraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     List<Value> vids = args[1];
+    bool relabel_nodes = args[2];
+    CHECK(relabel_nodes) << "Only node relabeling is supported.";
     std::vector<IdArray> vid_vec;
     vid_vec.reserve(vids.size());
     for (Value val : vids) {
