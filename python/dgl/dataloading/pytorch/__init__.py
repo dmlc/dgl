@@ -13,17 +13,17 @@ from ...ndarray import NDArray as DGLNDArray
 from ... import backend as F
 from ...base import DGLError
 
-pytorch_ver = LooseVersion(th.__version__)
-pytorch_16 = pytorch_ver >= LooseVersion("1.6.0")
-pytorch_17 = pytorch_ver >= LooseVersion("1.7.0")
+PYTORCH_VER = LooseVersion(th.__version__)
+PYTORCH_16 = PYTORCH_VER >= LooseVersion("1.6.0")
+PYTORCH_17 = PYTORCH_VER >= LooseVersion("1.7.0")
 
 def _create_dist_sampler(dataset, dataloader_kwargs, ddp_seed):
     # Note: will change the content of dataloader_kwargs
     dist_sampler_kwargs = {'shuffle': dataloader_kwargs['shuffle']}
     dataloader_kwargs['shuffle'] = False
-    if pytorch_16:
+    if PYTORCH_16:
         dist_sampler_kwargs['seed'] = ddp_seed
-    if pytorch_17:
+    if PYTORCH_17:
         dist_sampler_kwargs['drop_last'] = dataloader_kwargs['drop_last']
         dataloader_kwargs['drop_last'] = False
 
