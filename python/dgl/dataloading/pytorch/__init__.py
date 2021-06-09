@@ -466,7 +466,7 @@ class NodeDataLoader:
             self.use_ddp = use_ddp
             self.use_scalar_batcher = use_scalar_batcher
             if use_ddp and not use_scalar_batcher:
-                self.dist_sampler = DistributedSampler(dataset, dataloader_kwargs, ddp_seed)
+                self.dist_sampler = _create_dist_sampler(dataset, dataloader_kwargs, ddp_seed)
                 dataloader_kwargs['sampler'] = self.dist_sampler
 
             self.dataloader = DataLoader(
@@ -735,7 +735,7 @@ class EdgeDataLoader:
 
         self.use_ddp = use_ddp
         if use_ddp:
-            self.dist_sampler = DistributedSampler(dataset, dataloader_kwargs, ddp_seed)
+            self.dist_sampler = _create_dist_sampler(dataset, dataloader_kwargs, ddp_seed)
             dataloader_kwargs['sampler'] = self.dist_sampler
 
         self.dataloader = DataLoader(
@@ -840,7 +840,7 @@ class GraphDataLoader:
 
         self.use_ddp = use_ddp
         if use_ddp:
-            self.dist_sampler = DistributedSampler(dataset, dataloader_kwargs, ddp_seed)
+            self.dist_sampler = _create_dist_sampler(dataset, dataloader_kwargs, ddp_seed)
             dataloader_kwargs['sampler'] = self.dist_sampler
 
         self.dataloader = DataLoader(dataset=dataset,
