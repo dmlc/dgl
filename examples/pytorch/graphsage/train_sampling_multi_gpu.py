@@ -82,9 +82,9 @@ def run(proc_id, n_gpus, args, devices, data):
     train_mask = train_g.ndata['train_mask']
     val_mask = val_g.ndata['val_mask']
     test_mask = ~(test_g.ndata['train_mask'] | test_g.ndata['val_mask'])
-    train_nid = train_mask.nonzero().sqeeze(0)
-    val_nid = val_mask.nonzero().squeeze(0)
-    test_nid = test_mask.nonzero().squeeze(0)
+    train_nid = train_mask.nonzero().squeeze(-1)
+    val_nid = val_mask.nonzero().squeeze(-1)
+    test_nid = test_mask.nonzero().squeeze(-1)
 
     # Create PyTorch DataLoader for constructing blocks
     sampler = dgl.dataloading.MultiLayerNeighborSampler(
