@@ -222,9 +222,12 @@ class BlockSampler(object):
         blocks = []
         exclude_eids = (
             _tensor_or_dict_to_numpy(exclude_eids) if exclude_eids is not None else None)
-        seed_nodes_in = seed_nodes
-        seed_nodes_out = None
         for block_id in reversed(range(self.num_layers)):
+            seed_nodes_in = seed_nodes
+            if isinstance(seed_nodes_in, dict):
+                seed_nodes_in = {ntype: nodes.to(g.device) for ntype, nodes in seed_nodes_in.items()}
+            else:
+                seed_nodes_in = seed_nodes_in.to(g.device)
             frontier = self.sample_frontier(block_id, g, seed_nodes_in)
 
             # Removing edges from the frontier for link prediction training falls
@@ -255,22 +258,16 @@ class BlockSampler(object):
 
             if self.output_device is not None:
                 frontier = frontier.to(self.output_device)
-                if seed_nodes_out is None:
-                    if isinstance(seed_nodes_in, dict):
-                        seed_nodes_out = {ntype: nodes.to(self.output_device) for ntype, nodes in seed_nodes_in.items()}
-                    else:
-                        seed_nodes_out = seed_nodes_in.to(self.output_device)
+                if isinstance(seed_nodes, dict):
+                    seed_nodes_out = {ntype: nodes.to(self.output_device) for ntype, nodes in seed_nodes.items()}
+                else:
+                    seed_nodes_out = seed_nodes.to(self.output_device)
 
             block = transform.to_block(frontier, seed_nodes_out)
-
             if self.return_eids:
                 assign_block_eids(block, frontier)
 
-            seed_nodes_out = {ntype: block.srcnodes[ntype].data[NID] for ntype in block.srctypes}
-
-
-            seed_nodes_in = {ntype: nodes.to(g.device) for ntype, nodes in seed_nodes_out.items()}
-
+            seed_nodes = {ntype: block.srcnodes[ntype].data[NID] for ntype in block.srctypes}
             blocks.insert(0, block)
         return blocks
 
