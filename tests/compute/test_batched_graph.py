@@ -274,7 +274,7 @@ def test_set_batch_info(idtype):
 
     # test homogeneous edge subgraph
     sg_e = dgl.edge_subgraph(bg, list(range(40, 70)) + list(range(150, 200)), relabel_nodes=False)
-    induced_nodes = sg_e.ndata['_ID']
+    induced_nodes = F.arange(0, bg.num_nodes(), idtype, ctx)
     induced_edges = sg_e.edata['_ID']
     new_batch_num_nodes = _get_subgraph_batch_info(bg.ntypes, [induced_nodes], batch_num_nodes)
     new_batch_num_edges = _get_subgraph_batch_info(bg.canonical_etypes, [induced_edges], batch_num_edges)

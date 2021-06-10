@@ -32,9 +32,6 @@ def build_train_graph(g, train_indices, utype, itype, etype, etype_rev):
     train_g = g.edge_subgraph(
         {etype: train_indices, etype_rev: train_indices},
         relabel_nodes=False)
-    # remove the induced node IDs - should be assigned by model instead
-    del train_g.nodes[utype].data[dgl.NID]
-    del train_g.nodes[itype].data[dgl.NID]
 
     # copy features
     for ntype in g.ntypes:

@@ -318,7 +318,7 @@ def test_in_subgraph(idtype):
         ('user', 'play', 'game'): ([0, 0, 1, 3], [0, 1, 2, 2]),
         ('game', 'liked-by', 'user'): ([2, 2, 2, 1, 1, 0], [0, 1, 2, 0, 3, 0]),
         ('user', 'flips', 'coin'): ([0, 1, 2, 3], [0, 0, 0, 0])
-    }, idtype=idtype)
+    }, idtype=idtype, num_nodes_dict={'user': 5, 'game': 10, 'coin': 8})
     subg = dgl.in_subgraph(hg, {'user' : [0,1], 'game' : 0})
     assert subg.idtype == idtype
     assert len(subg.ntypes) == 3
@@ -336,11 +336,37 @@ def test_in_subgraph(idtype):
     assert F.array_equal(hg['liked-by'].edge_ids(u, v), subg['liked-by'].edata[dgl.EID])
     assert edge_set == {(2,0),(2,1),(1,0),(0,0)}
     assert subg['flips'].number_of_edges() == 0
+    for ntype in subg.ntypes:
+        assert dgl.NID not in subg.nodes[ntype].data
 
     # Test store_ids
     subg = dgl.in_subgraph(hg, {'user': [0, 1], 'game': 0}, store_ids=False)
     for etype in ['follow', 'play', 'liked-by']:
         assert dgl.EID not in subg.edges[etype].data
+    for ntype in subg.ntypes:
+        assert dgl.NID not in subg.nodes[ntype].data
+
+    # Test relabel nodes
+    subg = dgl.in_subgraph(hg, {'user': [0, 1], 'game': 0}, relabel_nodes=True)
+    assert subg.idtype == idtype
+    assert len(subg.ntypes) == 2
+    assert len(subg.etypes) == 3
+    u, v = subg['follow'].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert F.array_equal(hg['follow'].edge_ids(u, v), subg['follow'].edata[dgl.EID])
+    assert edge_set == {(1,0),(2,0),(3,0),(0,1),(2,1),(3,1)}
+    u, v = subg['play'].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert F.array_equal(hg['play'].edge_ids(u, v), subg['play'].edata[dgl.EID])
+    assert edge_set == {(0,0)}
+    u, v = subg['liked-by'].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert F.array_equal(hg['liked-by'].edge_ids(u, v), subg['liked-by'].edata[dgl.EID])
+    assert edge_set == {(2,0),(2,1),(1,0),(0,0)}
+    assert subg.num_nodes('user') == 4
+    assert subg.num_nodes('game') == 3
+    assert F.array_equal(F.tensor([0, 1, 2, 3], dtype=idtype), subg.nodes['user'].ndata[dgl.NID])
+    assert F.array_equal(F.tensor([0, 1, 2], dtype=idtype), subg.nodes['game'].ndata[dgl.NID])
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @parametrize_dtype
@@ -371,11 +397,42 @@ def test_out_subgraph(idtype):
     edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
     assert edge_set == {(0,0),(1,0)}
     assert F.array_equal(hg['flips'].edge_ids(u, v), subg['flips'].edata[dgl.EID])
+    for ntype in subg.ntypes:
+        assert dgl.NID not in subg.nodes[ntype].data
 
     # Test store_ids
     subg = dgl.out_subgraph(hg, {'user' : [0,1], 'game' : 0}, store_ids=False)
     for etype in subg.canonical_etypes:
         assert dgl.EID not in subg.edges[etype].data
+    for ntype in subg.ntypes:
+        assert dgl.NID not in subg.nodes[ntype].data
+
+    # Test relabel nodes
+    subg = dgl.out_subgraph(hg, {'user': [1], 'game': 0}, relabel_nodes=True)
+    assert subg.idtype == idtype
+    assert len(subg.ntypes) == 4
+    assert len(subg.ntypes) == 3
+    u, v = subg['follow'].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert edge_set == {(1, 0)}
+    u, v = subg['play'].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert edge_set == {(1,1)}
+    assert F.array_equal(hg['play'].edge_ids(u, v), subg['play'].edata[dgl.EID])
+    u, v = subg['liked-by'].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert edge_set == {(0,0)}
+    assert F.array_equal(hg['liked-by'].edge_ids(u, v), subg['liked-by'].edata[dgl.EID])
+    u, v = subg['flips'].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert edge_set == {(1,0)}
+    assert F.array_equal(hg['flips'].edge_ids(u, v), subg['flips'].edata[dgl.EID])
+    assert subg.num_nodes('user') == 2
+    assert subg.num_nodes('game') == 2
+    assert subg.num_nodes('coin') == 1
+    assert F.array_equal(F.tensor([0, 1]), subg.nodes['user'].ndata[dgl.NID])
+    assert F.array_equal(F.tensor([0, 2]), subg.nodes['game'].ndata[dgl.NID])
+    assert F.array_equal(F.tensor([0]), subg.nodes['coin'].ndata[dgl.NID])
 
 def test_subgraph_message_passing():
     # Unit test for PR #2055
