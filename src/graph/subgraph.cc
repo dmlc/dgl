@@ -37,6 +37,7 @@ HeteroSubgraph OutEdgeGraph(
     if (aten::IsNullArray(vids[src_vtype])) {
       induced_edges[etype] = IdArray::Empty({0}, graph->DataType(), graph->Context());
     } else {
+      const auto& earr = graph->OutEdges(etype, {vids[src_vtype]});
       induced_edges[etype] = earr.id;
     }
   }
