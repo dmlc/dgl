@@ -733,6 +733,27 @@ HeteroGraphPtr DisjointUnionHeteroGraph2(
     GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& component_graphs);
 
 /*!
+ * \brief Slice a contiguous subgraph, e.g. retrieve a component graph from a batched graph.
+ *
+ * TODO(mufei): remove the meta_graph argument
+ *
+ * \param meta_graph Metagraph of the input and result.
+ * \param batched_graph Input graph.
+ * \param num_nodes_per_type Number of vertices of each type in the result.
+ * \param start_nid_per_type Start vertex ID of each type to slice.
+ * \param num_edges_per_type Number of edges of each type in the result.
+ * \param start_eid_per_type Start edge ID of each type to slice.
+ * \return Sliced graph
+ */
+HeteroGraphPtr SliceHeteroGraph(
+    GraphPtr meta_graph,
+    HeteroGraphPtr batched_graph,
+    IdArray num_nodes_per_type,
+    IdArray start_nid_per_type,
+    IdArray num_edges_per_type,
+    IdArray start_eid_per_type);
+
+/*!
  * \brief Split a graph into multiple disjoin components.
  *
  * Edges across different components are ignored. All the result graphs have the same
