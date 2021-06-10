@@ -82,7 +82,7 @@ class NodeEmbedding: # NodeEmbedding
             # embeding status synchronization across GPU processes
             if _STORE is None:
                 _STORE = th.distributed.TCPStore(
-                    host_name, port, world_size, True, timedelta(seconds=30))
+                    host_name, port, world_size, True, timedelta(seconds=10*60))
             for _ in range(1, world_size):
                 # send embs
                 _STORE.set(name, name)
@@ -90,7 +90,7 @@ class NodeEmbedding: # NodeEmbedding
             # receive
             if _STORE is None:
                 _STORE = th.distributed.TCPStore(
-                    host_name, port, world_size, False, timedelta(seconds=30))
+                    host_name, port, world_size, False, timedelta(seconds=10*60))
             _STORE.wait([name])
             emb = get_shared_mem_array(name, (num_embeddings, embedding_dim), th.float32)
 
@@ -171,6 +171,17 @@ class NodeEmbedding: # NodeEmbedding
         """
         return self._num_embeddings
 
+    @property
+    def embedding_dim(self):
+        """Return the dimension of embeddings.
+
+        Returns
+        -------
+        int
+            The dimension of embeddings.
+        """
+        return self._embedding_dim
+
     def set_optm_state(self, state):
         """Store the optimizer related state tensor.
 
@@ -212,6 +223,19 @@ class NodeEmbedding: # NodeEmbedding
 
     @property
     def emb_tensor(self):
+        """Return the tensor storing the node embeddings
+
+        DEPRECATED: renamed weight
+
+        Returns
+        -------
+        torch.Tensor
+            The tensor storing the node embeddings
+        """
+        return self._tensor
+
+    @property
+    def weight(self):
         """Return the tensor storing the node embeddings
 
         Returns

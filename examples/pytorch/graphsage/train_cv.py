@@ -4,14 +4,12 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import torch.multiprocessing as mp
+import dgl.multiprocessing as mp
 import dgl.function as fn
 import dgl.nn.pytorch as dglnn
 import time
 import argparse
 import tqdm
-from _thread import start_new_thread
-from functools import wraps
 from dgl.data import RedditDataset
 from torch.utils.data import DataLoader
 from torch.nn.parallel import DistributedDataParallel
