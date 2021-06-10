@@ -44,7 +44,7 @@ def node_subgraph(graph, nodes, *, relabel_nodes=True, store_ids=True):
 
         If the graph is homogeneous, one can directly pass the above formats.
         Otherwise, the argument must be a dictionary with keys being node types
-        and values being the nodes in the above formats.
+        and values being the node IDs in the above formats.
     relabel_nodes : bool, optional
         If True, the extracted subgraph will only have the nodes in the specified node set
         and it will relabel the nodes in order.
@@ -88,17 +88,6 @@ def node_subgraph(graph, nodes, *, relabel_nodes=True, store_ids=True):
     tensor([0, 1, 4])
     >>> sg.edata[dgl.EID]  # original edge IDs
     tensor([0, 4])
-
-    Extract the subgraph without relabeling the nodes.
-
-    >>> sg = dgl.node_subgraph(g, [0, 1, 4], relabel_nodes=False)
-
-    Since it did not relabel the nodes, there is no need to store the original node IDs.
-
-    >>> sg
-    Graph(num_nodes=5, num_edges=2,
-          ndata_schemes={}
-          edata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64)})
 
     Specify nodes using a boolean mask.
 
@@ -163,14 +152,13 @@ def node_subgraph(graph, nodes, *, relabel_nodes=True, store_ids=True):
 
 DGLHeteroGraph.subgraph = utils.alias_func(node_subgraph)
 
-def edge_subgraph(graph, edges, preserve_nodes=False, store_ids=True):
+def edge_subgraph(graph, edges, *, relabel_nodes=True, store_ids=True, **deprecated_kwargs):
     """Return a subgraph induced on the given edges.
 
-    An edge-induced subgraph is equivalent to creating a new graph using the given edges.
-    In addition to extracting the subgraph, DGL conducts the following:
-
-    * Copy the features of the extracted nodes and edges to the resulting graph.
-      The copy is *lazy* and incurs data movement only when needed.
+    An edge-induced subgraph is equivalent to creating a new graph using the given
+    edges. In addition to extracting the subgraph, DGL also copies the features
+    of the extracted nodes and edges to the resulting graph. The copy is *lazy*
+    and incurs data movement only when needed.
 
     If the graph is heterogeneous, DGL extracts a subgraph per relation and composes
     them as the resulting graph. Thus, the resulting graph has the same set of relations
@@ -191,14 +179,15 @@ def edge_subgraph(graph, edges, preserve_nodes=False, store_ids=True):
 
         If the graph is homogeneous, one can directly pass the above formats.
         Otherwise, the argument must be a dictionary with keys being edge types
-        and values being the edge IDs.
-    preserve_nodes : bool, optional
-        If False, it will remove the isolated nodes and relabel the nodes in the
-        extracted subgraph. (Default: False)
+        and values being the edge IDs in the above formats.
+    relabel_nodes : bool, optional
+        If True, it will remove the isolated nodes and relabel the incident nodes in the
+        extracted subgraph.
     store_ids : bool, optional
-        If True, it will store the IDs of the extracted nodes and edges in the ``ndata``
-        and ``edata`` of the resulting graph under name ``dgl.NID`` and ``dgl.EID``,
-        respectively.
+        If True, it will store the raw IDs of the extracted edges in the ``edata`` of the
+        resulting graph under name ``dgl.EID``; if ``relabel_nodes`` is ``True``, it will
+        also store the raw IDs of the incident nodes in the ``ndata`` of the resulting
+        graph under name ``dgl.NID``.
 
     Returns
     -------
@@ -237,10 +226,10 @@ def edge_subgraph(graph, edges, preserve_nodes=False, store_ids=True):
 
     Extract a subgraph without node relabeling.
 
-    >>> sg = dgl.edge_subgraph(g, [0, 4], preserve_nodes=True)
+    >>> sg = dgl.edge_subgraph(g, [0, 4], relabel_nodes=False)
     >>> sg
     Graph(num_nodes=5, num_edges=2,
-          ndata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64)}
+          ndata_schemes={}
           edata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64)})
     >>> sg.edges()
     (tensor([0, 4]), tensor([1, 0]))
@@ -286,7 +275,10 @@ def edge_subgraph(graph, edges, preserve_nodes=False, store_ids=True):
     --------
     node_subgraph
     """
-    if graph.is_block and not preserve_nodes:
+    if len(deprecated_kwargs) != 0:
+        raise DGLError("Key word argument preserve_nodes is deprecated. "
+                       "Use relabel_nodes instead.")
+    if graph.is_block and relabel_nodes:
         raise DGLError('Extracting subgraph from a block graph is not allowed.')
     if not isinstance(edges, Mapping):
         assert len(graph.canonical_etypes) == 1, \
@@ -304,26 +296,22 @@ def edge_subgraph(graph, edges, preserve_nodes=False, store_ids=True):
     for cetype in graph.canonical_etypes:
         eids = edges.get(cetype, F.copy_to(F.tensor([], graph.idtype), graph.device))
         induced_edges.append(_process_edges(cetype, eids))
-    sgi = graph._graph.edge_subgraph(induced_edges, preserve_nodes)
+    sgi = graph._graph.edge_subgraph(induced_edges, not relabel_nodes)
     induced_nodes = sgi.induced_nodes
+    store_nids = store_ids and relabel_nodes
     return _create_hetero_subgraph(graph, sgi, induced_nodes, induced_edges,
-                                   store_nids=store_ids, store_eids=store_ids)
+                                   store_nids=store_nids, store_eids=store_ids)
 
 DGLHeteroGraph.edge_subgraph = utils.alias_func(edge_subgraph)
 
-def in_subgraph(graph, nodes, store_ids=True):
+def in_subgraph(graph, nodes, *, relabel_nodes=False, store_ids=True):
     """Return the subgraph induced on the inbound edges of all the edge types of the
     given nodes.
 
-    An edge-induced subgraph is equivalent to creating a new graph
-    with the same number of nodes using the given edges.  In addition to extracting
-    the subgraph, DGL conducts the following:
-
-    * Copy the features of the extracted nodes and edges to the resulting graph.
-      The copy is *lazy* and incurs data movement only when needed.
-
-    * Store the IDs of the extracted edges in the ``edata``
-      of the resulting graph under name ``dgl.EID``.
+    An edge-induced subgraph is equivalent to creating a new graph using the given edges.
+    In addition to extracting the subgraph, DGL also copies the features of the extracted
+    nodes and edges to the resulting graph. The copy is *lazy* and incurs data movement
+    only when needed.
 
     If the graph is heterogeneous, DGL extracts a subgraph per relation and composes
     them as the resulting graph. Thus, the resulting graph has the same set of relations
@@ -342,10 +330,15 @@ def in_subgraph(graph, nodes, store_ids=True):
 
         If the graph is homogeneous, one can directly pass the above formats.
         Otherwise, the argument must be a dictionary with keys being node types
-        and values being the nodes.
+        and values being the node IDs in the above formats.
+    relabel_nodes : bool, optional
+        If True, it will remove the isolated nodes and relabel the rest nodes in the
+        extracted subgraph.
     store_ids : bool, optional
         If True, it will store the raw IDs of the extracted edges in the ``edata`` of the
-        resulting graph under name ``dgl.EID``.
+        resulting graph under name ``dgl.EID``; if ``relabel_nodes`` is ``True``, it will
+        also store the raw IDs of the extracted nodes in the ``ndata`` of the resulting
+        graph under name ``dgl.NID``.
 
     Returns
     -------
@@ -385,6 +378,21 @@ def in_subgraph(graph, nodes, store_ids=True):
     tensor([[2, 3],
             [8, 9]])
 
+    Extract a subgraph with node labeling.
+
+    >>> sg = dgl.in_subgraph(g, [2, 0], relabel_nodes=True)
+    >>> sg
+    Graph(num_nodes=4, num_edges=2,
+          ndata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64}
+          edata_schemes={'w': Scheme(shape=(2,), dtype=torch.int64),
+                         '_ID': Scheme(shape=(), dtype=torch.int64)})
+    >>> sg.edges()
+    (tensor([1, 3]), tensor([2, 0]))
+    >>> sg.edata[dgl.EID]  # original edge IDs
+    tensor([1, 4])
+    >>> sg.ndata[dgl.NID]  # original node IDs
+    tensor([0, 1, 2, 4])
+
     Extract a subgraph from a heterogeneous graph.
 
     >>> g = dgl.heterograph({
@@ -414,9 +422,11 @@ def in_subgraph(graph, nodes, store_ids=True):
         else:
             nodes_all_types.append(nd.NULL[graph._idtype_str])
 
-    sgi = _CAPI_DGLInSubgraph(graph._graph, nodes_all_types)
+    sgi = _CAPI_DGLInSubgraph(graph._graph, nodes_all_types, relabel_nodes)
     induced_edges = sgi.induced_edges
-    return _create_hetero_subgraph(graph, sgi, None, induced_edges, store_eids=store_ids)
+    store_nids = store_ids and relabel_nodes
+    return _create_hetero_subgraph(graph, sgi, None, induced_edges,
+                                   store_nids=store_nids, store_eids=store_ids)
 
 DGLHeteroGraph.in_subgraph = utils.alias_func(in_subgraph)
 

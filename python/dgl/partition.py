@@ -199,7 +199,7 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
             eid = F.astype(induced_edges[0], F.int64) + max_eid * F.astype(inner_edge == 0, F.int64)
 
             _, index = F.sort_1d(eid)
-            subg1 = edge_subgraph(subg1, index, preserve_nodes=True)
+            subg1 = edge_subgraph(subg1, index, relabel_nodes=False)
             subg1.ndata[NID] = induced_nodes[0]
             subg1.edata[EID] = F.gather_row(induced_edges[0], index)
         else:

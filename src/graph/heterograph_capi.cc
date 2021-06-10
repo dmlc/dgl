@@ -639,8 +639,9 @@ DGL_REGISTER_GLOBAL("subgraph._CAPI_DGLInSubgraph")
 .set_body([] (DGLArgs args, DGLRetValue *rv) {
     HeteroGraphRef hg = args[0];
     const auto& nodes = ListValueToVector<IdArray>(args[1]);
+    bool relabel_nodes = args[2];
     std::shared_ptr<HeteroSubgraph> ret(new HeteroSubgraph);
-    *ret = InEdgeGraph(hg.sptr(), nodes);
+    *ret = InEdgeGraph(hg.sptr(), nodes, relabel_nodes);
     *rv = HeteroGraphRef(ret);
   });
 

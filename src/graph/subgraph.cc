@@ -8,7 +8,21 @@ using namespace dgl::runtime;
 
 namespace dgl {
 
-HeteroSubgraph InEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArray>& vids) {
+HeteroSubgraph InEdgeGraphRelabelNodes(
+    const HeteroGraphPtr graph, const std::vector<IdArray>& vids) {
+  CHECK(graph->Context().device_type != kDLGPU)
+    << "In subgraph with relabeling does not support GPU.";
+  CHECK(vids.size(), graph->NumVertexTypes())
+    << "Invalid input: the input list size must be the same as the number of vertex types.";
+  HeteroSubgraph ret;
+  ret.induced_vertices.resize(graph->NumVertexTypes());
+  // NOTE(mufei): InEdgeGraph
+  std::vector<HeteroGraphPtr> subrels(graph->NumEdgeTypes());
+  std::vector<IdArray> induced_edges(graph->NumEdgeTypes());
+}
+
+HeteroSubgraph InEdgeGraphNoRelabelNodes(
+    const HeteroGraphPtr graph, const std::vector<IdArray>& vids) {
   CHECK_EQ(vids.size(), graph->NumVertexTypes())
     << "Invalid input: the input list size must be the same as the number of vertex types.";
   std::vector<HeteroGraphPtr> subrels(graph->NumEdgeTypes());
@@ -41,6 +55,24 @@ HeteroSubgraph InEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArray
   ret.graph = CreateHeteroGraph(graph->meta_graph(), subrels, graph->NumVerticesPerType());
   ret.induced_edges = std::move(induced_edges);
   return ret;
+}
+
+HeteroSubgraph InEdgeGraph(
+    const HeteroGraphPtr graph, const std::vector<IdArray>& vids, bool relabel_nodes) {
+  CHECK_EQ(vids.size(), graph->NumVertexTypes())
+    << "Invalid input: the input list size must be the same as the number of vertex types.";
+  std::vector<IdArray> induced_edges(graph->NumEdgeTypes());
+  for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
+    auto pair = graph->meta_graph()->FindEdge(etype);
+    const dgl_type_t dst_vtype = pair.second;
+    if (aten::IsNullArray(vids[dst_vtype])) {
+      induced_edges[etype] = IdArray::Empty({0}, graph->DataType(), graph->Context());
+    } else {
+      const auto& earr = graph->InEdges(etype, {vids[dst_vtype]});
+      induced_edges[etype] = earr.id;
+    }
+  }
+  return graph->EdgeSubgraph(induced_edges, !relabel_nodes);
 }
 
 HeteroSubgraph OutEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArray>& vids) {
