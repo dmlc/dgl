@@ -156,6 +156,17 @@ def run_emb_client(graph_name, part_id, server_count, num_clients, num_nodes, nu
     g = DistGraph(graph_name, gpb=gpb)
     check_dist_emb(g, num_clients, num_nodes, num_edges)
 
+def run_client_hierarchy(graph_name, part_id, server_count, node_mask, return_dict):
+    time.sleep(5)
+    os.environ['DGL_NUM_SERVER'] = str(server_count)
+    dgl.distributed.initialize("kv_ip_config.txt")
+    gpb, graph_name, _, _ = load_partition_book('/tmp/dist_graph/{}.json'.format(graph_name),
+                                                part_id, None)
+    g = DistGraph(graph_name, gpb=gpb)
+    print(g.ndata.keys())
+    nodes = node_split(node_mask, g.get_partition_book(), node_trainer_ids=g.ndata['trainer_id'])
+    return_dict[part_id] = nodes
+
 def check_dist_emb(g, num_clients, num_nodes, num_edges):
     from dgl.distributed.optim import SparseAdagrad
     from dgl.distributed.nn import NodeEmbedding
@@ -360,6 +371,50 @@ def check_server_client(shared_mem, num_servers, num_clients):
 
     print('clients have terminated')
 
+def check_server_client_hierarchy(shared_mem, num_servers, num_clients):
+    prepare_dist()
+    g = create_random_graph(10000)
+
+    # Partition the graph
+    num_parts = 1
+    graph_name = 'dist_graph_test_2'
+    g.ndata['features'] = F.unsqueeze(F.arange(0, g.number_of_nodes()), 1)
+    g.edata['features'] = F.unsqueeze(F.arange(0, g.number_of_edges()), 1)
+    partition_graph(g, graph_name, num_parts, '/tmp/dist_graph', num_trainers_per_machine=num_clients)
+
+    # let's just test on one partition for now.
+    # We cannot run multiple servers and clients on the same machine.
+    serv_ps = []
+    ctx = mp.get_context('spawn')
+    for serv_id in range(num_servers):
+        p = ctx.Process(target=run_server, args=(graph_name, serv_id, num_servers,
+                                                 num_clients, shared_mem))
+        serv_ps.append(p)
+        p.start()
+
+    cli_ps = []
+    manager = mp.Manager()
+    return_dict = manager.dict()
+    node_mask = F.zeros((g.number_of_nodes(),), F.int32, F.cpu())
+    nodes = F.tensor(np.random.choice(g.number_of_nodes(), g.number_of_nodes() // 10, replace=False))
+    F.scatter_row_inplace(node_mask, nodes, 1)
+    for cli_id in range(num_clients):
+        print('start client', cli_id)
+        p = ctx.Process(target=run_client_hierarchy, args=(graph_name, 0, num_servers, node_mask,
+                                                           return_dict))
+        p.start()
+        cli_ps.append(p)
+
+    for p in cli_ps:
+        p.join()
+    for p in serv_ps:
+        p.join()
+
+    nodes1, _ = F.sort(F.cat(list(return_dict.values()), 0))
+    assert np.all(F.asnumpy(nodes1), F.asnumpy(nodes))
+
+    print('clients have terminated')
+
 
 def run_client_hetero(graph_name, part_id, server_count, num_clients, num_nodes, num_edges):
     time.sleep(5)
@@ -502,6 +557,7 @@ def check_server_client_hetero(shared_mem, num_servers, num_clients):
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support some of operations in DistGraph")
 def test_server_client():
     os.environ['DGL_DIST_MODE'] = 'distributed'
+    check_server_client_hierarchy(False, 1, 4)
     check_server_client_empty(True, 1, 1)
     check_server_client_hetero(True, 1, 1)
     check_server_client_hetero(False, 1, 1)
@@ -693,9 +749,9 @@ def prepare_dist():
 
 if __name__ == '__main__':
     os.makedirs('/tmp/dist_graph', exist_ok=True)
+    test_server_client()
     test_split()
     test_split_even()
-    test_server_client()
     test_standalone()
 
     test_standalone_node_emb()
