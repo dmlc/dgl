@@ -482,18 +482,19 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                 # First partition the whole graph to each trainer and save the trainer ids in
                 # the node feature "trainer_id".
                 node_parts = metis_partition_assignment(
-                        sim_g, num_parts * num_trainers_per_machine,
-                        balance_ntypes=balance_ntypes,
-                        balance_edges=balance_edges,
-                        mode='k-way')
+                    sim_g, num_parts * num_trainers_per_machine,
+                    balance_ntypes=balance_ntypes,
+                    balance_edges=balance_edges,
+                    mode='k-way')
                 g.ndata['trainer_id'] = node_parts
 
                 # And then coalesce the partitions of trainers on the same machine into one
                 # larger partition.
                 node_parts = node_parts // num_trainers_per_machine
             else:
-                node_parts = metis_partition_assignment(sim_g, num_parts, balance_ntypes=balance_ntypes,
-                        balance_edges=balance_edges)
+                node_parts = metis_partition_assignment(sim_g, num_parts,
+                                                        balance_ntypes=balance_ntypes,
+                                                        balance_edges=balance_edges)
         else:
             node_parts = random_choice(num_parts, sim_g.number_of_nodes())
         parts, orig_nids, orig_eids = partition_graph_with_halo(sim_g, node_parts, num_hops,
