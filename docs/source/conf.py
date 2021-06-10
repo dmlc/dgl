@@ -197,10 +197,14 @@ from sphinx_gallery.sorting import FileNameSortKey
 
 examples_dirs = ['../../tutorials/blitz',
                  '../../tutorials/large',
-                 '../../tutorials/models']  # path to find sources
+                 '../../tutorials/dist',
+                 '../../tutorials/models',
+                 '../../tutorials/multi']  # path to find sources
 gallery_dirs = ['tutorials/blitz/',
                 'tutorials/large/',
-                'tutorials/models/']  # path to generate docs
+                'tutorials/dist/',
+                'tutorials/models/',
+                'tutorials/multi/']  # path to generate docs
 reference_url = {
     'dgl' : None,
     'numpy': 'http://docs.scipy.org/doc/numpy/',
