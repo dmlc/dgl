@@ -521,11 +521,7 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
   bool use_efeat = op != "copy_lhs";
   // TODO(Israt): 1:Resolve PR-https://github.com/dmlc/dgl/issues/2995
   // to use maxstream > 1
-  int maxstrm = 1;
-  std::vector<cudaStream_t> stream(maxstrm);
-  for (int i = 0; i < maxstrm; i++) {
-    CUDA_CALL(cudaStreamCreate(&(stream[i])));
-  }
+  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   for (dgl_type_t etype = 0; etype < ufeat_eid.size(); ++etype) {
     const dgl_type_t src_id = ufeat_eid[etype];
     const dgl_type_t dst_id = out_eid[etype];
@@ -545,7 +541,7 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
               nullptr,
               static_cast<DType*>(vec_out[dst_id]->data),
               x_length,
-              stream[0]);
+              thr_entry->stream);
         } else if (op == "mul" && is_scalar_efeat &&
             cusparse_available<bits, IdType>()) {  // cusparse
           NDArray efeat = vec_efeat[dst_id];
@@ -566,7 +562,7 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
                 static_cast<DType*>(efeat->data),
                 static_cast<DType*>(vec_out[dst_id]->data),
                 x_length,
-                stream[0]);
+                thr_entry->stream);
           });
         } else {  // general kernel
           NDArray ufeat = (vec_ufeat.size() == 0) ?
@@ -576,7 +572,7 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
           SWITCH_OP(op, Op, {
             cuda::SpMMCsrHetero<IdType, DType, Op, cuda::reduce::Sum<IdType, DType> >(
                 bcast, csr, ufeat, efeat, vec_out[dst_id],
-                NullArray(), NullArray(), stream[0]);
+                NullArray(), NullArray(), thr_entry->stream);
           });
         }
       });
@@ -589,7 +585,7 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
               NullArray() : vec_efeat[dst_id];
           cuda::SpMMCsrHetero<IdType, DType, Op, cuda::reduce::Max<IdType, DType> >(
               bcast, csr, ufeat, efeat, vec_out[dst_id],
-              out_aux[0], out_aux[1], stream[0]);
+              out_aux[0], out_aux[1], thr_entry->stream);
         });
       });
     } else if (reduce == "min") {
@@ -601,15 +597,12 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
               NullArray() : vec_efeat[dst_id];
           cuda::SpMMCsrHetero<IdType, DType, Op, cuda::reduce::Min<IdType, DType> >(
               bcast, csr, ufeat, efeat, vec_out[dst_id],
-              out_aux[0], out_aux[1], stream[0]);
+              out_aux[0], out_aux[1], thr_entry->stream);
         });
       });
     } else {
       LOG(FATAL) << "Not implemented";
     }
-  }
-  for (int i = 0; i < maxstrm; i++) {
-    CUDA_CALL(cudaStreamDestroy(stream[i]));
   }
 }
 

@@ -108,11 +108,7 @@ void SDDMMCsrHetero(const std::string& op,
               const std::vector<dgl_type_t>& rhs_eid) {
   // TODO(Israt): Resolve PR - https://github.com/dmlc/dgl/issues/2995
   // to use maxstream > 1
-  int maxstrm = 1;
-  std::vector<cudaStream_t> stream(maxstrm);
-  for (int i = 0; i < maxstrm; i++) {
-    CUDA_CALL(cudaStreamCreate(&(stream[i])));
-  }
+  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   SWITCH_BITS(bits, DType, {
     SWITCH_OP(op, Op, {
       SWITCH_TARGET(lhs_target, rhs_target, LhsTarget, RhsTarget, {
@@ -123,14 +119,11 @@ void SDDMMCsrHetero(const std::string& op,
           NDArray rhs = vec_rhs[rhs_eid[etype]];
           NDArray out = vec_out[etype];
           cuda::SDDMMCsrHetero<IdType, DType, Op, LhsTarget, RhsTarget>(
-            bcast, csr, lhs, rhs, out, stream[0]);
+            bcast, csr, lhs, rhs, out, thr_entry->stream);
         }
       });
     });
   });
-  for (int i = 0; i < maxstrm; i++) {
-    CUDA_CALL(cudaStreamDestroy(stream[i]));
-  }
 }
 
 
