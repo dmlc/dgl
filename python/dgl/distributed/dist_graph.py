@@ -1120,7 +1120,7 @@ def _split_random_within_part(partition_book, rank, part_eles):
     np.random.seed(partition_book.partid)
     rand_idx = np.random.permutation(len(part_eles))
     rand_idx = rand_idx[offset[client_id_in_part] : offset[client_id_in_part + 1]]
-    return part_eles[np.sort(rand_idx)]
+    return F.gather_row(part_eles, np.sort(rand_idx))
 
 def node_split(nodes, partition_book=None, ntype='_N', rank=None, force_even=True, g=None):
     ''' Split nodes and return a subset for the local rank.
