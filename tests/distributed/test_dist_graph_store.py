@@ -53,7 +53,7 @@ def create_random_graph(n):
     return dgl.from_scipy(arr)
 
 def run_server(graph_name, server_id, server_count, num_clients, shared_mem):
-    g = DistGraphServer(server_id, "kv_ip_config.txt", num_clients, server_count,
+    g = DistGraphServer(server_id, "kv_ip_config.txt", server_count, num_clients,
                         '/tmp/dist_graph/{}.json'.format(graph_name),
                         disable_shared_mem=not shared_mem)
     print('start server', server_id)
@@ -156,16 +156,17 @@ def run_emb_client(graph_name, part_id, server_count, num_clients, num_nodes, nu
     g = DistGraph(graph_name, gpb=gpb)
     check_dist_emb(g, num_clients, num_nodes, num_edges)
 
-def run_client_hierarchy(graph_name, part_id, server_count, node_mask, return_dict):
+def run_client_hierarchy(graph_name, part_id, server_count, node_mask, edge_mask, return_dict):
     time.sleep(5)
     os.environ['DGL_NUM_SERVER'] = str(server_count)
     dgl.distributed.initialize("kv_ip_config.txt")
     gpb, graph_name, _, _ = load_partition_book('/tmp/dist_graph/{}.json'.format(graph_name),
                                                 part_id, None)
     g = DistGraph(graph_name, gpb=gpb)
-    print(g.ndata.keys())
     nodes = node_split(node_mask, g.get_partition_book(), node_trainer_ids=g.ndata['trainer_id'])
-    return_dict[part_id] = nodes
+    edges = edge_split(edge_mask, g.get_partition_book(), edge_trainer_ids=g.edata['trainer_id'])
+    rank = g.rank()
+    return_dict[rank] = (nodes, edges)
 
 def check_dist_emb(g, num_clients, num_nodes, num_edges):
     from dgl.distributed.optim import SparseAdagrad
@@ -396,12 +397,17 @@ def check_server_client_hierarchy(shared_mem, num_servers, num_clients):
     manager = mp.Manager()
     return_dict = manager.dict()
     node_mask = F.zeros((g.number_of_nodes(),), F.int32, F.cpu())
+    edge_mask = F.zeros((g.number_of_edges(),), F.int32, F.cpu())
     nodes = F.tensor(np.random.choice(g.number_of_nodes(), g.number_of_nodes() // 10, replace=False))
+    edges = F.tensor(np.random.choice(g.number_of_edges(), g.number_of_edges() // 10, replace=False))
     F.scatter_row_inplace(node_mask, nodes, 1)
+    F.scatter_row_inplace(edge_mask, edges, 1)
+    nodes, _ = F.sort_1d(nodes)
+    edges, _ = F.sort_1d(edges)
     for cli_id in range(num_clients):
         print('start client', cli_id)
-        p = ctx.Process(target=run_client_hierarchy, args=(graph_name, 0, num_servers, node_mask,
-                                                           return_dict))
+        p = ctx.Process(target=run_client_hierarchy, args=(graph_name, 0, num_servers,
+                                                           node_mask, edge_mask, return_dict))
         p.start()
         cli_ps.append(p)
 
@@ -410,8 +416,15 @@ def check_server_client_hierarchy(shared_mem, num_servers, num_clients):
     for p in serv_ps:
         p.join()
 
-    nodes1, _ = F.sort(F.cat(list(return_dict.values()), 0))
-    assert np.all(F.asnumpy(nodes1), F.asnumpy(nodes))
+    nodes1 = []
+    edges1 = []
+    for n, e in return_dict.values():
+        nodes1.append(n)
+        edges1.append(e)
+    nodes1, _ = F.sort_1d(F.cat(nodes1, 0))
+    edges1, _ = F.sort_1d(F.cat(edges1, 0))
+    assert np.all(F.asnumpy(nodes1) == F.asnumpy(nodes))
+    assert np.all(F.asnumpy(edges1) == F.asnumpy(edges))
 
     print('clients have terminated')
 
