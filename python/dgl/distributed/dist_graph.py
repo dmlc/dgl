@@ -1123,7 +1123,39 @@ def _split_random_within_part(partition_book, rank, part_eles):
     idx, _ = F.sort_1d(F.tensor(rand_idx))
     return F.gather_row(part_eles, idx)
 
-def node_split(nodes, partition_book=None, ntype='_N', rank=None, force_even=True, g=None):
+def _split_by_trainer_id(partition_book, part_eles, trainer_id,
+                         num_client_per_part, client_id_in_part):
+    part_id = trainer_id // num_client_per_part
+    trainer_id = trainer_id % num_client_per_part
+    local_eles = part_eles[F.nonzero_1d(part_id[part_eles] == partition_book.partid)]
+    # these are the Ids of the local elements in the partition. The Ids are global Ids.
+    remote_eles = part_eles[F.nonzero_1d(part_id[part_eles] != partition_book.partid)]
+    # these are the Ids of the remote nodes in the partition. The Ids are global Ids.
+    local_eles_idx = F.cat(
+        [F.nonzero_1d(trainer_id[local_eles] == i) for i in range(num_client_per_part)],
+        # trainer_id[local_eles] is the trainer ids of local nodes in the partition and we
+        # pick out the indices where the node belongs to each trainer i respectively, and
+        # concatenate them.
+        dim=0
+    )
+    # `local_eles_idx` is used to sort `local_eles` according to `trainer_id`. It is a
+    # permutation of 0...(len(local_eles)-1)
+    local_eles = local_eles[local_eles_idx]
+
+    # evenly split local nodes to trainers
+    local_offsets = _even_offset(len(local_eles), num_client_per_part)
+    # evenly split remote nodes to trainers
+    remote_offsets = _even_offset(len(remote_eles), num_client_per_part)
+
+    client_local_eles = local_eles[
+        local_offsets[client_id_in_part]:local_offsets[client_id_in_part + 1]]
+    client_remote_eles = remote_eles[
+        remote_offsets[client_id_in_part]:remote_offsets[client_id_in_part + 1]]
+    client_eles = F.cat([client_local_eles, client_remote_eles], dim=0)
+    return F.tensor(client_eles)
+
+def node_split(nodes, partition_book=None, ntype='_N', rank=None, force_even=True,
+               node_trainer_ids=None):
     ''' Split nodes and return a subset for the local rank.
 
     This function splits the input nodes based on the partition book and
@@ -1156,9 +1188,10 @@ def node_split(nodes, partition_book=None, ntype='_N', rank=None, force_even=Tru
         The rank of a process. If not given, the rank of the current process is used.
     force_even : bool, optional
         Force the nodes are split evenly.
-    g : DistGraph
-        If not None, split the training nodes to the trainers on the same machine according to
-        'trainer_id' field of its node data. Otherwise, split randomly.
+    node_trainer_ids : 1D tensor or DistTensor, optional
+        If not None, split the nodes to the trainers on the same machine according to
+        trainer IDs assigned to each node. Otherwise, split randomly.
+
     Returns
     -------
     1D-tensor
@@ -1175,57 +1208,33 @@ def node_split(nodes, partition_book=None, ntype='_N', rank=None, force_even=Tru
         rank = role.get_trainer_rank()
     if force_even:
         part_nid = _split_even_to_part(partition_book, nodes)
-        if g is None or (not "trainer_id" in g.ndata.keys()):
+        num_clients = role.get_num_trainers()
+        num_client_per_part = num_clients // partition_book.num_partitions()
+        if num_client_per_part == 1:
+            return part_nid
+        elif node_trainer_ids is None:
             return _split_random_within_part(partition_book, rank, part_nid)
         else:
-            assert isinstance(g, DistGraph)
-            num_clients = role.get_num_trainers()
-            num_client_per_part = num_clients // partition_book.num_partitions()
+            trainer_id = node_trainer_ids[0:len(node_trainer_ids)]
+            max_trainer_id = F.as_scalar(F.reduce_max(trainer_id)) + 1
+
+            if max_trainer_id > num_clients:
+                # We hope the partition scheme with trainer_id could be used when the number of
+                # trainers is less than the `num_trainers_per_machine` previously assigned during
+                # partitioning.
+                assert max_trainer_id % num_clients == 0
+                trainer_id //= (max_trainer_id // num_clients)
+
             client_id_in_part = rank % num_client_per_part
-            trainer_id = g.ndata["trainer_id"][0:g.number_of_nodes()]
-            part_id = trainer_id // num_client_per_part
-
-            # sanity check
-            assert F.as_scalar(F.reduce_max(trainer_id)) < num_clients, \
-                "the maximal trainer id should be less than the number of clients"
-            local_nids = partition_book.partid2nids(partition_book.partid)
-            assert len(F.nonzero_1d(part_id == partition_book.partid) == len(local_nids)), \
-                "trainer_id array is inconsistent with the partition"
-
-            trainer_id = trainer_id % num_client_per_part
-            local_eles = part_nid[F.nonzero_1d(part_id[part_nid] == partition_book.partid)]
-            # these are the Ids of the local nodes in the partition. The Ids are global Ids.
-            remote_eles = part_nid[F.nonzero_1d(part_id[part_nid] != partition_book.partid)]
-            # these are the Ids of the remote nodes in the partition. The Ids are global Ids.
-
-            local_eles_idx = F.cat(
-                [F.nonzero_1d(trainer_id[local_eles] == i) for i in range(num_client_per_part)],
-                # trainer_id[local_eles] is the trainer ids of local nodes in the partition and we
-                # pick out the indices where the node belongs to each trainer i respectively, and
-                # concatenate them.
-                dim=0
-            )
-            # `local_eles_idx` is used to sort `local_eles` according to `trainer_id`. It is a
-            # permutation of 0...(len(local_eles)-1)
-            local_eles = local_eles[local_eles_idx] #reorder
-
-            # evenly split local nodes to trainers
-            local_offsets = _even_offset(len(local_eles), num_client_per_part)
-            # evenly split remote nodes to trainers
-            remote_offsets = _even_offset(len(remote_eles), num_client_per_part)
-
-            client_local_eles = local_eles[
-                local_offsets[client_id_in_part]:local_offsets[client_id_in_part + 1]]
-            client_remote_eles = remote_eles[
-                remote_offsets[client_id_in_part]:remote_offsets[client_id_in_part + 1]]
-            client_eles = F.cat([client_local_eles, client_remote_eles], dim=0)
-            return F.tensor(client_eles)
+            return _split_by_trainer_id(partition_book, part_nid, trainer_id,
+                                        num_client_per_part, client_id_in_part)
     else:
         # Get all nodes that belong to the rank.
         local_nids = partition_book.partid2nids(partition_book.partid)
         return _split_local(partition_book, rank, nodes, local_nids)
 
-def edge_split(edges, partition_book=None, etype='_E', rank=None, force_even=True):
+def edge_split(edges, partition_book=None, etype='_E', rank=None, force_even=True,
+               edge_trainer_ids=None):
     ''' Split edges and return a subset for the local rank.
 
     This function splits the input edges based on the partition book and
@@ -1258,6 +1267,9 @@ def edge_split(edges, partition_book=None, etype='_E', rank=None, force_even=Tru
         The rank of a process. If not given, the rank of the current process is used.
     force_even : bool, optional
         Force the edges are split evenly.
+    edge_trainer_ids : 1D tensor or DistTensor, optional
+        If not None, split the edges to the trainers on the same machine according to
+        trainer IDs assigned to each edge. Otherwise, split randomly.
 
     Returns
     -------
@@ -1270,10 +1282,30 @@ def edge_split(edges, partition_book=None, etype='_E', rank=None, force_even=Tru
         partition_book = edges.part_policy.partition_book
     assert len(edges) == partition_book._num_edges(etype), \
             'The length of boolean mask vector should be the number of edges in the graph.'
-
+    if rank is None:
+        rank = role.get_trainer_rank()
     if force_even:
-        edges_part = _split_even_to_part(partition_book, edges)
-        return _split_random_within_part(partition_book, rank, edges_part)
+        part_eid = _split_even_to_part(partition_book, edges)
+        num_clients = role.get_num_trainers()
+        num_client_per_part = num_clients // partition_book.num_partitions()
+        if num_client_per_part == 1:
+            return part_eid
+        elif edge_trainer_ids is None:
+            return _split_random_within_part(partition_book, rank, part_eid)
+        else:
+            trainer_id = edge_trainer_ids[0:len(edge_trainer_ids)]
+            max_trainer_id = F.as_scalar(F.reduce_max(trainer_id)) + 1
+
+            if max_trainer_id > num_clients:
+                # We hope the partition scheme with trainer_id could be used when the number of
+                # trainers is less than the `num_trainers_per_machine` previously assigned during
+                # partitioning.
+                assert max_trainer_id % num_clients == 0
+                trainer_id //= (max_trainer_id // num_clients)
+
+            client_id_in_part = rank % num_client_per_part
+            return _split_by_trainer_id(partition_book, part_eid, trainer_id,
+                                        num_client_per_part, client_id_in_part)
     else:
         # Get all edges that belong to the rank.
         local_eids = partition_book.partid2eids(partition_book.partid)
