@@ -61,6 +61,7 @@ class GatedGraphConv(nn.Module):
             [ 0.6393,  0.3447,  0.3893,  0.4279,  0.3342,  0.3809,  0.0406,  0.5030,
             0.1342,  0.0425]], grad_fn=<AddBackward0>)
     """
+
     def __init__(self,
                  in_feats,
                  out_feats,
@@ -141,19 +142,22 @@ class GatedGraphConv(nn.Module):
                 "and pass in the edge type as argument"
             assert etypes.min() >= 0 and etypes.max() < self._n_etypes, \
                 "edge type indices out of range [0, {})".format(self._n_etypes)
-            zero_pad = feat.new_zeros((feat.shape[0], self._out_feats - feat.shape[1]))
+            zero_pad = feat.new_zeros(
+                (feat.shape[0], self._out_feats - feat.shape[1]))
             feat = th.cat([feat, zero_pad], -1)
 
             for _ in range(self._n_steps):
                 graph.ndata['h'] = feat
                 for i in range(self._n_etypes):
-                    eids = th.nonzero(etypes == i, as_tuple=False).view(-1).type(graph.idtype)
+                    eids = th.nonzero(
+                        etypes == i, as_tuple=False).view(-1).type(graph.idtype)
                     if len(eids) > 0:
                         graph.apply_edges(
-                            lambda edges: {'W_e*h': self.linears[i](edges.src['h'])},
+                            lambda edges: {
+                                'W_e*h': self.linears[i](edges.src['h'])},
                             eids
                         )
                 graph.update_all(fn.copy_e('W_e*h', 'm'), fn.sum('m', 'a'))
-                a = graph.ndata.pop('a') # (N, D)
+                a = graph.ndata.pop('a')  # (N, D)
                 feat = self.gru(a, feat)
             return feat
