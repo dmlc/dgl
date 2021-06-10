@@ -460,6 +460,18 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
 
     if num_parts == 1:
         sim_g = to_homogeneous(g)
+        assert num_trainers_per_machine >= 1
+        if num_trainers_per_machine > 1:
+            # First partition the whole graph to each trainer and save the trainer ids in
+            # the node feature "trainer_id".
+            node_parts = metis_partition_assignment(
+                sim_g, num_parts * num_trainers_per_machine,
+                balance_ntypes=balance_ntypes,
+                balance_edges=balance_edges,
+                mode='k-way')
+            g.ndata['trainer_id'] = node_parts
+            g.edata['trainer_id'] = node_parts[g.edges()[1]]
+
         node_parts = F.zeros((sim_g.number_of_nodes(),), F.int64, F.cpu())
         parts = {}
         if reshuffle:
