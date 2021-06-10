@@ -74,7 +74,10 @@ std::pair<dgl_id_t, bool> MetapathRandomWalkStep(
   if (size == 0)
     return std::make_pair(-1, true);
 
-  FloatArray prob_etype = prob[etype];
+  // Use a reference to the original array instead of copying
+  // This avoids updating the ref counts atomically from different threads
+  // and avoids cache ping-ponging in the tight loop
+  const FloatArray &prob_etype = prob[etype];
   IdxType idx = 0;
   if (IsNullArray(prob_etype)) {
     // empty probability array; assume uniform
@@ -93,6 +96,56 @@ std::pair<dgl_id_t, bool> MetapathRandomWalkStep(
       idx = RandomEngine::ThreadLocal()->Choice<IdxType>(prob_selected);
     });
   }
+  curr = succ[idx];
+
+  return std::make_pair(curr, terminate(data, curr, len));
+}
+
+/*!
+ * \brief Select one successor of metapath-based random walk, given the path generated
+ * so far specifically for the uniform probability distribution.
+ *
+ * \param data The path generated so far, of type \c IdxType.
+ * \param curr The last node ID generated.
+ * \param len The number of nodes generated so far.  Note that the seed node is always
+ *            included as \c data[0], and the successors start from \c data[1].
+ *
+ * \param edges_by_type Vector of results from \c GetAdj() by edge type.
+ * \param metapath_data Edge types of given metapath.
+ * \param prob Transition probability per edge type, for this special case this will be a NullArray
+ * \param terminate Predicate for terminating the current random walk path.
+ *
+ * \return A pair of ID of next successor (-1 if not exist), as well as whether to terminate.
+ * \note This function is called only if all the probability arrays are null.
+ */
+template<DLDeviceType XPU, typename IdxType>
+std::pair<dgl_id_t, bool> MetapathRandomWalkStepUniform(
+    IdxType *data,
+    dgl_id_t curr,
+    int64_t len,
+    const std::vector<std::vector<IdArray> > &edges_by_type,
+    const IdxType *metapath_data,
+    const std::vector<FloatArray> &prob,
+    TerminatePredicate<IdxType> terminate) {
+  dgl_type_t etype = metapath_data[len];
+
+  // Note that since the selection of successors is very lightweight (especially in the
+  // uniform case), we want to reduce the overheads (even from object copies or object
+  // construction) as much as possible.
+  // Using Successors() slows down by 2x.
+  // Using OutEdges() slows down by 10x.
+  const std::vector<NDArray> &csr_arrays = edges_by_type[etype];
+  const IdxType *offsets = static_cast<IdxType *>(csr_arrays[0]->data);
+  const IdxType *all_succ = static_cast<IdxType *>(csr_arrays[1]->data);
+  const IdxType *succ = all_succ + offsets[curr];
+
+  const int64_t size = offsets[curr + 1] - offsets[curr];
+  if (size == 0)
+    return std::make_pair(-1, true);
+
+  IdxType idx = 0;
+  // Guaranteed uniform distribution
+  idx = RandomEngine::ThreadLocal()->RandInt(size);
   curr = succ[idx];
 
   return std::make_pair(curr, terminate(data, curr, len));
@@ -127,12 +180,31 @@ IdArray MetapathBasedRandomWalk(
   for (dgl_type_t etype = 0; etype < hg->NumEdgeTypes(); ++etype)
     edges_by_type.push_back(hg->GetAdj(etype, true, "csr"));
 
-  StepFunc<IdxType> step =
-    [&edges_by_type, metapath_data, &prob, terminate]
-    (IdxType *data, dgl_id_t curr, int64_t len) {
-      return MetapathRandomWalkStep<XPU, IdxType>(
-          data, curr, len, edges_by_type, metapath_data, prob, terminate);
-    };
+  // Hoist the check for Uniform vs Non uniform edge distribution
+  // to avoid putting it on the hot path
+  StepFunc<IdxType> step;
+  bool isUniform = true;
+  for (const auto &etype_prob : prob) {
+    if (!IsNullArray(etype_prob)) {
+      isUniform = false;
+      break;
+    }
+  }
+  if (!isUniform) {
+    step =
+      [&edges_by_type, metapath_data, &prob, terminate]
+      (IdxType *data, dgl_id_t curr, int64_t len) {
+        return MetapathRandomWalkStep<XPU, IdxType>(
+            data, curr, len, edges_by_type, metapath_data, prob, terminate);
+      };
+  } else {
+    step =
+      [&edges_by_type, metapath_data, &prob, terminate]
+      (IdxType *data, dgl_id_t curr, int64_t len) {
+        return MetapathRandomWalkStepUniform<XPU, IdxType>(
+            data, curr, len, edges_by_type, metapath_data, prob, terminate);
+      };
+  }
 
   return GenericRandomWalk<XPU, IdxType>(seeds, max_num_steps, step);
 }
