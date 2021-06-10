@@ -696,10 +696,12 @@ HeteroSubgraph InEdgeGraph(
  * \brief Extract the subgraph of the out edges of the given nodes.
  * \param graph Graph
  * \param nodes Node IDs of each type
+ * \param relabel_nodes Whether to remove isolated nodes and relabel the rest ones
  * \return Subgraph containing only the out edges. The returned graph has the same
  *         schema as the original one.
  */
-HeteroSubgraph OutEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArray>& nodes);
+HeteroSubgraph OutEdgeGraph(
+    const HeteroGraphPtr graph, const std::vector<IdArray>& nodes, bool relabel_nodes = false);
 
 /*!
  * \brief Joint union multiple graphs into one graph.

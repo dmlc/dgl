@@ -146,9 +146,8 @@ def node_subgraph(graph, nodes, *, relabel_nodes=True, store_ids=True):
         induced_nodes.append(_process_nodes(ntype, nids))
     sgi = graph._graph.node_subgraph(induced_nodes, relabel_nodes)
     induced_edges = sgi.induced_edges
-    store_nids = store_ids and relabel_nodes
-    return _create_hetero_subgraph(graph, sgi, induced_nodes, induced_edges,
-                                   store_nids=store_nids, store_eids=store_ids)
+    induced_nodes = sgi.induced_nodes if relabel_nodes else None
+    return _create_hetero_subgraph(graph, sgi, induced_nodes, induced_edges, store_ids=store_ids)
 
 DGLHeteroGraph.subgraph = utils.alias_func(node_subgraph)
 
@@ -297,10 +296,8 @@ def edge_subgraph(graph, edges, *, relabel_nodes=True, store_ids=True, **depreca
         eids = edges.get(cetype, F.copy_to(F.tensor([], graph.idtype), graph.device))
         induced_edges.append(_process_edges(cetype, eids))
     sgi = graph._graph.edge_subgraph(induced_edges, not relabel_nodes)
-    induced_nodes = sgi.induced_nodes
-    store_nids = store_ids and relabel_nodes
-    return _create_hetero_subgraph(graph, sgi, induced_nodes, induced_edges,
-                                   store_nids=store_nids, store_eids=store_ids)
+    induced_nodes = sgi.induced_nodes if relabel_nodes else None
+    return _create_hetero_subgraph(graph, sgi, induced_nodes, induced_edges, store_ids=store_ids)
 
 DGLHeteroGraph.edge_subgraph = utils.alias_func(edge_subgraph)
 
@@ -324,9 +321,9 @@ def in_subgraph(graph, nodes, *, relabel_nodes=False, store_ids=True):
     nodes : nodes or dict[str, nodes]
         The nodes to form the subgraph. The allowed nodes formats are:
 
-        * Int Tensor: Each element is an ID. The tensor must have the same device type
+        * Int Tensor: Each element is a node ID. The tensor must have the same device type
           and ID data type as the graph's.
-        * iterable[int]: Each element is an ID.
+        * iterable[int]: Each element is a node ID.
 
         If the graph is homogeneous, one can directly pass the above formats.
         Otherwise, the argument must be a dictionary with keys being node types
@@ -423,23 +420,20 @@ def in_subgraph(graph, nodes, *, relabel_nodes=False, store_ids=True):
             nodes_all_types.append(nd.NULL[graph._idtype_str])
 
     sgi = _CAPI_DGLInSubgraph(graph._graph, nodes_all_types, relabel_nodes)
+    induced_nodes = sgi.induced_nodes if relabel_nodes else None
     induced_edges = sgi.induced_edges
-    store_nids = store_ids and relabel_nodes
-    return _create_hetero_subgraph(graph, sgi, None, induced_edges,
-                                   store_nids=store_nids, store_eids=store_ids)
+    return _create_hetero_subgraph(graph, sgi, induced_nodes, induced_edges, store_ids=store_ids)
 
 DGLHeteroGraph.in_subgraph = utils.alias_func(in_subgraph)
 
-def out_subgraph(graph, nodes, store_ids=True):
-    """Return the subgraph induced on the out-bound edges of all the edge types of the
+def out_subgraph(graph, nodes, *, relabel_nodes=False, store_ids=True):
+    """Return the subgraph induced on the outbound edges of all the edge types of the
     given nodes.
 
-    An edge-induced subgraph is equivalent to creating a new graph
-    with the same number of nodes using the given edges.  In addition to extracting
-    the subgraph, DGL conducts the following:
-
-    * Copy the features of the extracted nodes and edges to the resulting graph.
-      The copy is *lazy* and incurs data movement only when needed.
+    An edge-induced subgraph is equivalent to creating a new graph using the given edges.
+    In addition to extracting the subgraph, DGL also copies the features of the extracted
+    nodes and edges to the resulting graph. The copy is *lazy* and incurs data movement
+    only when needed.
 
     If the graph is heterogeneous, DGL extracts a subgraph per relation and composes
     them as the resulting graph. Thus, the resulting graph has the same set of relations
@@ -458,10 +452,15 @@ def out_subgraph(graph, nodes, store_ids=True):
 
         If the graph is homogeneous, one can directly pass the above formats.
         Otherwise, the argument must be a dictionary with keys being node types
-        and values being the nodes.
+        and values being the node IDs in the above formats.
+    relabel_nodes : bool, optional
+        If True, it will remove the isolated nodes and relabel the rest nodes in the
+        extracted subgraph.
     store_ids : bool, optional
         If True, it will store the raw IDs of the extracted edges in the ``edata`` of the
-        resulting graph under name ``dgl.EID``.
+        resulting graph under name ``dgl.EID``; if ``relabel_nodes`` is ``True``, it will
+        also store the raw IDs of the extracted nodes in the ``ndata`` of the resulting
+        graph under name ``dgl.NID``.
 
     Returns
     -------
@@ -501,6 +500,21 @@ def out_subgraph(graph, nodes, store_ids=True):
     tensor([[4, 5],
             [0, 1]])
 
+    Extract a subgraph with node labeling.
+
+    >>> sg = dgl.out_subgraph(g, [2, 0], relabel_nodes=True)
+    >>> sg
+    Graph(num_nodes=4, num_edges=2,
+          ndata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64)}
+          edata_schemes={'w': Scheme(shape=(2,), dtype=torch.int64),
+                         '_ID': Scheme(shape=(), dtype=torch.int64)})
+    >>> sg.edges()
+    (tensor([2, 0]), tensor([3, 1]))
+    >>> sg.edata[dgl.EID]  # original edge IDs
+    tensor([2, 0])
+    >>> sg.ndata[dgl.NID]  # original node IDs
+    tensor([0, 1, 2, 3])
+
     Extract a subgraph from a heterogeneous graph.
 
     >>> g = dgl.heterograph({
@@ -530,9 +544,10 @@ def out_subgraph(graph, nodes, store_ids=True):
         else:
             nodes_all_types.append(nd.NULL[graph._idtype_str])
 
-    sgi = _CAPI_DGLOutSubgraph(graph._graph, nodes_all_types)
+    sgi = _CAPI_DGLOutSubgraph(graph._graph, nodes_all_types, relabel_nodes)
+    induced_nodes = sgi.induced_nodes if relabel_nodes else None
     induced_edges = sgi.induced_edges
-    return _create_hetero_subgraph(graph, sgi, None, induced_edges, store_eids=store_ids)
+    return _create_hetero_subgraph(graph, sgi, induced_nodes, induced_edges, store_ids=store_ids)
 
 DGLHeteroGraph.out_subgraph = utils.alias_func(out_subgraph)
 
@@ -709,8 +724,7 @@ DGLHeteroGraph.edge_type_subgraph = utils.alias_func(edge_type_subgraph)
 
 #################### Internal functions ####################
 
-def _create_hetero_subgraph(parent, sgi, induced_nodes, induced_edges,
-                            store_nids=True, store_eids=True):
+def _create_hetero_subgraph(parent, sgi, induced_nodes, induced_edges, store_ids=True):
     """Internal function to create a subgraph.
 
     Parameters
@@ -725,20 +739,19 @@ def _create_hetero_subgraph(parent, sgi, induced_nodes, induced_edges,
     induced_edges : list[Tensor] or None
         Induced edge IDs. Will store it as the dgl.EID ndata unless it
         is None, which means the induced edge IDs are the same as the parent edge IDs.
-    store_nids : bool
-        If True, it will store the raw IDs of the extracted nodes in
-        the ``ndata`` of the resulting graph under name ``dgl.NID``.
-    store_eids : bool
-        If True, it will store the raw IDs of the extracted edges in
-        the ``edata`` of the resulting graph under name ``dgl.EID``.
+    store_ids : bool
+        If True and induced_nodes is not None, it will store the raw IDs of the extracted
+        nodes in the ``ndata`` of the resulting graph under name ``dgl.NID``.
+        If True and induced_edges is not None, it will store the raw IDs of the extracted
+        edges in the ``edata`` of the resulting graph under name ``dgl.EID``.
 
     Returns
     -------
     DGLGraph
         Graph
     """
-    node_frames = utils.extract_node_subframes(parent, induced_nodes, store_nids)
-    edge_frames = utils.extract_edge_subframes(parent, induced_edges, store_eids)
+    node_frames = utils.extract_node_subframes(parent, induced_nodes, store_ids)
+    edge_frames = utils.extract_edge_subframes(parent, induced_edges, store_ids)
     hsg = DGLHeteroGraph(sgi.graph, parent.ntypes, parent.etypes)
     utils.set_new_frames(hsg, node_frames=node_frames, edge_frames=edge_frames)
     return hsg
