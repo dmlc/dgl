@@ -624,9 +624,9 @@ class SparseAdam(SparseGradOptimizer):
             update_mem = beta1 * orig_mem + (1.-beta1) * grad_mem
             update_power = beta2 * orig_power + (1.-beta2) * grad_power
             state_mem[state_idx] = update_mem.to(state_dev,
-                non_blocking=state_nonblock)
+                                                 non_blocking=state_nonblock)
             state_power[state_idx] = update_power.to(state_dev,
-                non_blocking=state_nonblock)
+                                                     non_blocking=state_nonblock)
 
             update_mem_corr = update_mem / (1. - th.pow(th.tensor(beta1, device=exec_dev),
                                                         state_step)).unsqueeze(1)
