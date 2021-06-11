@@ -1082,6 +1082,7 @@ def test_convert(idtype):
     assert hg.device == g.device
     assert g.number_of_nodes() == 5
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="Test on cpu is enough")
 @parametrize_dtype
 def test_to_homo_zero_nodes(idtype):
     # Fix gihub issue #2870
