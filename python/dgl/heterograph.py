@@ -4803,16 +4803,77 @@ class DGLHeteroGraph(object):
     # New Message passing on heterograph // will replace *update_all
     #################################################################
     def update_all_new(self,
-                   mfunc,
-                   rfunc,
-                   afunc=None,
-                   etype=None):
-        if rfunc.name in ['max', 'min', 'mean'] :
+                       mfunc,
+                       rfunc,
+                       afunc=None):
+        r"""Send messages along all the edges, reduce them by type-wisely
+        and across different types at the same time. Then, update the node features of all
+        the nodes.
+
+        Parameters
+        ----------
+        message_func : dgl.function.BuiltinFunction or callable
+            The message function to generate messages along the edges.
+            It must be either a :ref:`api-built-in` or a :ref:`apiudf`.
+        reduce_func : dgl.function.BuiltinFunction or callable
+            The reduce function to aggregate the messages.
+            It must be either a :ref:`api-built-in` or a :ref:`apiudf`.
+        apply_node_func : callable, optional
+            An optional apply function to further update the node features
+            after the message reduction. It must be a :ref:`apiudf`.
+
+            * ``(str, str, str)`` for source node type, edge type and destination node type.
+            * or one ``str`` edge type name if the name can uniquely identify a
+              triplet format in the graph.
+
+            Can be omitted if the graph has only one type of edges.
+
+        cross_reducer : str or callable function
+            Cross type reducer. One of ``"sum"``, ``"min"``, ``"max"``, ``"mean"``, ``"stack"``
+            or a callable function. If a callable function is provided, the input argument must be
+            a single list of tensors containing aggregation results from each edge type, and the
+            output of function must be a single tensor.
+        apply_node_func : callable, optional
+            An optional apply function after the messages are reduced both
+            type-wisely and across different types.
+            It must be a :ref:`apiudf`.
+
+        Notes
+        -----
+        DGL recommends using DGL's bulit-in function for the message_func
+        and the reduce_func in the type-wise message passing arguments,
+        because DGL will invoke efficient kernels that avoids copying node features to
+        edge features in this case.
+
+
+        Examples
+        --------
+        >>> import dgl
+        >>> import dgl.function as fn
+        >>> import torch
+
+        Instantiate a heterograph.
+
+        >>> g = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): ([0, 1], [1, 1]),
+        ...     ('game', 'attracts', 'user'): ([0], [1])
+        ... })
+        >>> g.nodes['user'].data['h'] = torch.tensor([[1.], [2.]])
+        >>> g.nodes['game'].data['h'] = torch.tensor([[1.]])
+
+        Update all.
+
+        >>> g.update_all_new(fn.copy_src('h', 'm'), fn.sum('m', 'h'))
+        >>> g.nodes['user'].data['h']
+        tensor([[0.],
+                [4.]])
+        """
+        if rfunc.name in ['max', 'min', 'mean']:
             raise NotImplementedError("Reduce op \'" + rfunc.name + "\' is not supported in "
-                "the new heterograph API. Use multi_update_all().")
-        if mfunc.name not in ['copy_u', 'copy_e'] :
+                                      "the new heterograph API. Use multi_update_all().")
+        if mfunc.name not in ['copy_u', 'copy_e']:
              raise NotImplementedError("Op \'" + mfunc.name + "\' is not supported in "
-                "the new heterograph API. Use multi_update_all().")
+                                       "the new heterograph API. Use multi_update_all().")
         g = self
         all_out = core.message_passing(g, mfunc, rfunc, afunc)
         key = list(all_out.keys())[0]
@@ -4821,7 +4882,7 @@ class DGLHeteroGraph(object):
         dst_tensor = {}
         for _, _, dsttype in g.canonical_etypes:
             dtid = g.get_ntype_id(dsttype)
-            dst_tensor[key]=out_tensor_tuples[dtid]
+            dst_tensor[key] = out_tensor_tuples[dtid]
             self._node_frames[dtid].update(dst_tensor)
         # TODO (Israt): Add apply function in heterograph
         # if apply_node_func is not None:

@@ -4,7 +4,6 @@ import sys
 from ..backend import gspmm as gspmm_internal
 from ..backend import gspmm_hetero as gspmm_internal_hetero
 from .. import backend as F
-import torch
 
 __all__ = ['gspmm']
 
@@ -59,7 +58,6 @@ def gspmm(g, op, reduce_op, lhs_data, rhs_data):
     """
     use_u = op != 'copy_rhs'
     use_e = op != 'copy_lhs'
-    
     if g._graph.number_of_etypes() == 1:
         if op not in ['copy_lhs', 'copy_rhs']:
             # Expand dims so that there will be no broadcasting issues with different
@@ -103,11 +101,11 @@ def gspmm(g, op, reduce_op, lhs_data, rhs_data):
         lhs_and_rhs_tuple = tuple(lhs_list + rhs_list)
         # With max and min reducers infinity will be returned for zero degree nodes
         ret = gspmm_internal_hetero(g, op,
-                             'sum' if reduce_op == 'mean' else reduce_op,
-                             *lhs_and_rhs_tuple)
+                                    'sum' if reduce_op == 'mean' else reduce_op,
+                                    *lhs_and_rhs_tuple)
         # Replace infinity with zero for isolated nodes when reducer is min/max
         # if reduce_op in ['min', 'max']:
-        #     # TODO (Israt): Following code "often" throws 'free(): invalid pointer  
+        #     # TODO (Israt): Following code "often" throws 'free(): invalid pointer
         #     ret = list(ret)
         #     for i in range(g._graph.number_of_ntypes()):
         #         if(len(ret[i]) > 0):

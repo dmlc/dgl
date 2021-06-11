@@ -9,6 +9,15 @@ from .. import backend as F
 __all__ = ['gsddmm', 'copy_u', 'copy_v', 'copy_e']
 
 def reshape_lhs_rhs(lhs_data, rhs_data):
+    r""" Reshape the dimension of lhs and rhs data
+
+    Parameters
+    ----------
+    lhs_data : tensor or None
+        The left operand, could be None if it's not required by op.
+    rhs_data : tensor or None
+        The right operand, could be None if it's not required by op.
+    """
     lhs_shape = F.shape(lhs_data)
     rhs_shape = F.shape(rhs_data)
     if len(lhs_shape) != len(rhs_shape):
@@ -75,16 +84,15 @@ def gsddmm(g, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
         return gsddmm_internal(
             g._graph, op, lhs_data, rhs_data, lhs_target, rhs_target)
     else:
-        pass
         lhs_data_dict = lhs_data
         rhs_data_dict = rhs_data
         lhs_list = [None] * g._graph.number_of_ntypes()
         rhs_list = [None] * g._graph.number_of_ntypes()
-        for srctype, etype, dsttype in g.canonical_etypes:
+        for srctype, _, dsttype in g.canonical_etypes:
             src_id = g.get_ntype_id(srctype)
             dst_id = g.get_ntype_id(dsttype)
             lhs_data = lhs_data_dict[srctype]
-            rhs_data = rhs_data_dict[dsttype] 
+            rhs_data = rhs_data_dict[dsttype]
             if op not in ['copy_lhs', 'copy_rhs']:
                 lhs_data, rhs_data = reshape_lhs_rhs(lhs_data, rhs_data)
             lhs_list[src_id] = lhs_data

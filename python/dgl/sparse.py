@@ -1,11 +1,12 @@
 """Module for sparse matrix operators."""
 # pylint: disable= invalid-name
 from __future__ import absolute_import
+import torch
 from . import ndarray as nd
 from ._ffi.function import _init_api
 from .base import DGLError
 from . import backend as F
-import torch
+
 
 def infer_broadcast_shape(op, shp1, shp2):
     r"""Check the shape validity, and infer the output shape given input shape and operator.
@@ -233,19 +234,18 @@ def _gspmm_hetero(g, op, reduce_op, u_and_e_tuple):
             arg_e = F.zeros(v_shp, idtype, ctx)
     arg_u_nd = to_dgl_nd_for_write(arg_u)
     arg_e_nd = to_dgl_nd_for_write(arg_e)
-    tuple_v = tuple(list_v)
     if gidx.number_of_edges(0) > 0:
         _CAPI_DGLKernelSpMMHetero(gidx, op, reduce_op,
-                              [to_dgl_nd(u_i) for u_i in list_u],
-                              [to_dgl_nd(e_i) for e_i in list_e],
-                              [to_dgl_nd_for_write(v_i) for v_i in list_v],
-                              arg_u_nd,
-                              arg_e_nd)
+                                  [to_dgl_nd(u_i) for u_i in list_u],
+                                  [to_dgl_nd(e_i) for e_i in list_e],
+                                  [to_dgl_nd_for_write(v_i) for v_i in list_v],
+                                  arg_u_nd,
+                                  arg_e_nd)
     arg_u = None if arg_u is None else F.zerocopy_from_dgl_ndarray(arg_u_nd)
     arg_e = None if arg_e is None else F.zerocopy_from_dgl_ndarray(arg_e_nd)
     # To deal with scalar node/edge features.
 
-    for l in range(len(list_v)):   
+    for l in range(gidx.number_of_ntypes()):
         # replace None by empty tensor. Forward func doesn't accept None in tuple.
         v = list_v[l]
         v = torch.tensor([]) if v is None else v
@@ -341,7 +341,7 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
 
 
 def _gsddmm_hetero(g, op, lhs_target='u', rhs_target='v', lhs_and_rhs_tuple=None):
-    r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface. 
+    r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface.
     """
     num_ntypes = g._graph.number_of_ntypes()
     lhs_tuple, rhs_tuple = lhs_and_rhs_tuple[:num_ntypes], lhs_and_rhs_tuple[num_ntypes:]
@@ -392,14 +392,14 @@ def _gsddmm_hetero(g, op, lhs_target='u', rhs_target='v', lhs_and_rhs_tuple=None
                                    [to_dgl_nd_for_write(out) for out in out_list],
                                    lhs_target, rhs_target)
 
-    for l in range(len(out_list)):   
+    for l in range(gidx.number_of_ntypes()):
         # Replace None by empty tensor. Forward func doesn't accept None in tuple.
         e = out_list[l]
         e = torch.tensor([]) if e is None else e
         if (expand_lhs or not use_lhs) and (expand_rhs or not use_rhs):
             e = F.squeeze(v, -1)
         out_list[l] = e
-    out = tuple(out_list) 
+    out = tuple(out_list)
     return out
 
 
