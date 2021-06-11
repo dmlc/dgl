@@ -201,7 +201,6 @@ def _gspmm_hetero(g, op, reduce_op, u_and_e_tuple):
         etid = g.get_etype_id(etype)
         src_id = g.get_ntype_id(srctype)
         dst_id = g.get_ntype_id(dsttype)
-        
         u = u_tuple[src_id] if use_u else None
         e = e_tuple[etid] if use_e else None
         if use_u:
@@ -215,7 +214,7 @@ def _gspmm_hetero(g, op, reduce_op, u_and_e_tuple):
         ctx = F.context(u) if use_u else F.context(e) # TODO(Israt): Put outside of loop
         dtype = F.dtype(u) if use_u else F.dtype(e) # TODO(Israt): Put outside of loop
         u_shp = F.shape(u) if use_u else (0,)
-        e_shp = F.shape(e) if use_e else (0,)     
+        e_shp = F.shape(e) if use_e else (0,)
         if use_u:
             list_u[src_id] = u if use_u else None
         if use_e:
@@ -223,7 +222,7 @@ def _gspmm_hetero(g, op, reduce_op, u_and_e_tuple):
         v_shp = (gidx.number_of_nodes(dst_id), ) +\
             infer_broadcast_shape(op, u_shp[1:], e_shp[1:])
         list_v[dst_id] = F.zeros(v_shp, dtype, ctx)
-    
+
     use_cmp = reduce_op in ['max', 'min']
     arg_u, arg_e = None, None
     idtype = getattr(F, gidx.dtype)
