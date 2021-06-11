@@ -1125,18 +1125,23 @@ def _split_random_within_part(partition_book, rank, part_eles):
 
 def _split_by_trainer_id(partition_book, part_eles, trainer_id,
                          num_client_per_part, client_id_in_part):
+    # TODO(zhengda): MXNet cannot deal with empty tensors, which makes the implementation
+    # much more difficult. Let's just use numpy for the computation for now. We just
+    # perform operations on vectors. It shouldn't be too difficult.
+    trainer_id = F.asnumpy(trainer_id)
+    part_eles = F.asnumpy(part_eles)
     part_id = trainer_id // num_client_per_part
     trainer_id = trainer_id % num_client_per_part
-    local_eles = part_eles[F.nonzero_1d(part_id[part_eles] == partition_book.partid)]
+    local_eles = part_eles[np.nonzero(part_id[part_eles] == partition_book.partid)[0]]
     # these are the Ids of the local elements in the partition. The Ids are global Ids.
-    remote_eles = part_eles[F.nonzero_1d(part_id[part_eles] != partition_book.partid)]
+    remote_eles = part_eles[np.nonzero(part_id[part_eles] != partition_book.partid)[0]]
     # these are the Ids of the remote nodes in the partition. The Ids are global Ids.
-    local_eles_idx = F.cat(
-        [F.nonzero_1d(trainer_id[local_eles] == i) for i in range(num_client_per_part)],
+    local_eles_idx = np.concatenate(
+        [np.nonzero(trainer_id[local_eles] == i)[0] for i in range(num_client_per_part)],
         # trainer_id[local_eles] is the trainer ids of local nodes in the partition and we
         # pick out the indices where the node belongs to each trainer i respectively, and
         # concatenate them.
-        dim=0
+        axis=0
     )
     # `local_eles_idx` is used to sort `local_eles` according to `trainer_id`. It is a
     # permutation of 0...(len(local_eles)-1)
@@ -1151,7 +1156,7 @@ def _split_by_trainer_id(partition_book, part_eles, trainer_id,
         local_offsets[client_id_in_part]:local_offsets[client_id_in_part + 1]]
     client_remote_eles = remote_eles[
         remote_offsets[client_id_in_part]:remote_offsets[client_id_in_part + 1]]
-    client_eles = F.cat([client_local_eles, client_remote_eles], dim=0)
+    client_eles = np.concatenate([client_local_eles, client_remote_eles], axis=0)
     return F.tensor(client_eles)
 
 def node_split(nodes, partition_book=None, ntype='_N', rank=None, force_even=True,
