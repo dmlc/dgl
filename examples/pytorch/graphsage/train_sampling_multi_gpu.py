@@ -93,6 +93,7 @@ def run(proc_id, n_gpus, args, devices, data):
         train_g,
         train_nid,
         sampler,
+        device=dev_id,
         use_ddp=n_gpus > 1,
         batch_size=args.batch_size,
         shuffle=True,

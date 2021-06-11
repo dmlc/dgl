@@ -151,6 +151,11 @@ class BlockSampler(object):
     return_eids : bool, default False
         Whether to return the edge IDs involved in message passing in the MFG.
         If True, the edge IDs will be stored as an edge feature named ``dgl.EID``.
+    output_ctx : DGLContext, default None
+        The context the sampled blocks will be stored on. This should only be
+        a CUDA context if multiprocessing is not used in the dataloader (e.g.,
+        num_workers is 0). If this is None, the sampled blocks will be stored
+        on the same device as the input graph.
 
     Notes
     -----
@@ -158,10 +163,10 @@ class BlockSampler(object):
     :ref:`User Guide Section 6 <guide-minibatch>` and
     :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
     """
-    def __init__(self, num_layers, return_eids=False, output_device=None):
+    def __init__(self, num_layers, return_eids=False, output_ctx=None):
         self.num_layers = num_layers
         self.return_eids = return_eids
-        self.output_device = output_device
+        self.set_output_context(output_ctx)
 
     def sample_frontier(self, block_id, g, seed_nodes):
         """Generate the frontier given the destination nodes.
@@ -270,6 +275,26 @@ class BlockSampler(object):
             seed_nodes = {ntype: block.srcnodes[ntype].data[NID] for ntype in block.srctypes}
             blocks.insert(0, block)
         return blocks
+
+    def set_output_context(self, ctx):
+        """Set the device the generated block will be output to. This should
+        only be set to a cuda device, when multi-processing is not used in
+        the dataloader (e.g., num_workers is 0).
+
+        Parameters
+        ----------
+        output_ctx : DGLContext, default None
+            The device context the sampled blocks will be stored on. This
+            should only be a CUDA context if multiprocessing is not used in
+            the dataloader (e.g., num_workers is 0). If this is None, the
+            sampled blocks will be stored on the same device as the input
+            graph.
+        """
+        if ctx is not None:
+            self.output_device = F.to_backend_ctx(ctx)
+        else:
+            self.output_device = None
+
 
 class Collator(ABC):
     """Abstract DGL collator for training GNNs on downstream tasks stochastically.
