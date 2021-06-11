@@ -5,6 +5,8 @@ import torch as th
 
 from ...utils import get_shared_mem_array, create_shared_mem_array
 from ...nn.pytorch import NodeEmbedding
+from ...cuda import nccl
+from ...partition import NDArrayPartition
 
 class SparseGradOptimizer(abc.ABC):
     r''' The abstract sparse optimizer.
@@ -26,10 +28,14 @@ class SparseGradOptimizer(abc.ABC):
         self._shared_cache = {}
         self._clean_grad = False
         self._opt_meta = {}
+        self._comm = None
+        self._first_step = True
+        self._device = None
         # hold released shared memory to let other process to munmap it first
         # otherwise it will crash the training
         self.shmem_buffer_holder = []
 
+        # if we are using shared memory for communication
         for emb in params:
             assert isinstance(emb, NodeEmbedding), \
                 'DGL SparseOptimizer only supports dgl.nn.NodeEmbedding'
@@ -42,11 +48,86 @@ class SparseGradOptimizer(abc.ABC):
                     'MultiGPU rank for each embedding should be same.'
                 assert self._world_size == emb.world_size, \
                     'MultiGPU world_size for each embedding should be same.'
+        assert not self._rank is None
+        assert not self._world_size is None
 
+    def step(self):
+        ''' The step function.
+
+        The step function is invoked at the end of every batch to update embeddings
+        '''
+        # on the first step, check to see if the grads are on the GPU
+        if self._first_step:
+            for emb in self._params:
+                for _, data in emb._trace:
+                    if data.grad.data.device.type == 'cuda':
+                        # create a communicator
+                        if self._device:
+                            assert self._device == data.grad.device, \
+                                "All gradients must be on the same device"
+                        else:
+                            self._device = data.grad.device
+                    else:
+                        assert not self._device, \
+                            "All gradients must be on the same device"
+            if self._device:
+                # device is only set if the grads are on a GPU
+                self._comm_setup()
+            else:
+                self._shared_setup()
+            self.setup(self._params)
+            self._first_step = False
+
+        if self._comm:
+            self._comm_step()
+        else:
+            self._shared_step()
+
+    def setup(self, params):
+        ''' This is function where subclasses can perform any setup they need
+            to. It will be called during the first step, and communicators or
+            shared memory will have been setup before this call.
+
+            Parameters
+            ----------
+            params : list of NodeEmbedding
+                The list of NodeEmbeddings.
+        '''
+
+
+    def _comm_setup(self):
+        # find a store to communicate the unique id through
+        if len(self._params) > 0:
+            store = self._params[0].store
+
+            if self._rank < 0:
+                self._comm = nccl.Communicator(1, 0, nccl.UniqueId())
+            else:
+                th.cuda.set_device(self._device)
+                if self._rank == 0:
+                    # root process broadcasts nccl id
+                    nccl_id = nccl.UniqueId()
+                    uid = str(nccl_id)
+                    store.set('nccl_root_id', uid)
+                else:
+                    uid = store.get('nccl_root_id')
+                    nccl_id = nccl.UniqueId(uid)
+                # needs to be set for nccl to work
+                self._comm = nccl.Communicator(self._world_size,
+                                               self._rank,
+                                               nccl_id)
+                if self._rank == 0:
+                    # clear the store entry for future communicators
+                    store.delete_key('nccl_root_id')
+                th.distributed.barrier()
+
+    def _shared_setup(self):
+        for emb in self._params:
             emb_name = emb.name
             if self._rank == 0: # the master gpu process
                 opt_meta = create_shared_mem_array(emb_name+'_opt_meta', \
                     (self._world_size, self._world_size), th.int32).zero_()
+
             if self._rank == 0:
                 emb.store.set(emb_name+'_opt_meta', emb_name)
                 self._opt_meta[emb_name] = opt_meta
@@ -57,11 +138,64 @@ class SparseGradOptimizer(abc.ABC):
                     (self._world_size, self._world_size), th.int32)
                 self._opt_meta[emb_name] = opt_meta
 
-    def step(self):
-        ''' The step function.
+    def _comm_step(self):
+        comm = self._comm
+        with th.no_grad():
+            idx_in = {}
+            grad_in = {}
+            for emb in self._params: # pylint: disable=too-many-nested-blocks
+                emb_name = emb.name
+                partition = emb.partition
 
-        The step function is invoked at the end of every batch to update embeddings
-        '''
+                if not partition:
+                    # use default partitioning
+                    partition = NDArrayPartition(
+                        emb.num_embeddings,
+                        self._world_size if self._world_size > 0 else 1,
+                        mode='remainder')
+
+                # we need to combine gradients from multiple forward paths
+                if len(emb._trace) == 0:
+                    idx = th.zeros((0,), dtype=th.long, device=self._device)
+                    grad = th.zeros((0, emb.embedding_dim),
+                                    dtype=th.float32,
+                                    device=self._device)
+                elif len(emb._trace) == 1:
+                    # the special case where we can use the tensors as is
+                    # without any memcpy's
+                    idx, grad = emb._trace[0]
+                    grad = grad.grad.data
+                else:
+                    idx = []
+                    grad = []
+                    for i, data in emb._trace:
+                        idx.append(i)
+                        grad.append(data.grad.data)
+                    idx = th.cat(idx, dim=0)
+                    grad = th.cat(grad, dim=0)
+
+                idx_in[emb_name], grad_in[emb_name] = \
+                    comm.sparse_all_to_all_push(
+                        idx, grad, partition=partition)
+                if emb.partition:
+                    # if the embedding is partitioned, map back to indexes
+                    # into the local tensor
+                    idx_in[emb_name] = partition.map_to_local(idx_in[emb_name])
+
+            if self._clean_grad:
+                # clean gradient track
+                for emb in self._params:
+                    emb.reset_trace()
+                self._clean_grad = False
+
+            for emb in self._params:
+                emb_name = emb.name
+                idx = idx_in[emb_name]
+                grad = grad_in[emb_name]
+                self.update(idx, grad, emb)
+
+
+    def _shared_step(self):
         with th.no_grad():
             # Frequently alloc and free shared memory to hold intermediate tensor is expensive
             # We cache shared memory buffers in shared_emb.
@@ -280,24 +414,33 @@ class SparseAdagrad(SparseGradOptimizer):
     def __init__(self, params, lr, eps=1e-10):
         super(SparseAdagrad, self).__init__(params, lr)
         self._eps = eps
+
+    def setup(self, params):
         # We need to register a state sum for each embedding in the kvstore.
         for emb in params:
             assert isinstance(emb, NodeEmbedding), \
                 'SparseAdagrad only supports dgl.nn.NodeEmbedding'
 
-            if self._rank <= 0:
-                emb_name = emb.name
-                state = create_shared_mem_array(emb_name+'_state', \
-                    emb.weight.shape, th.float32).zero_()
-            if self._rank == 0:
-                if self._world_size > 1:
-                    emb.store.set(emb_name+'_opt', emb_name)
-            elif self._rank > 0:
-                # receive
-                emb_name = emb.name
-                emb.store.wait([emb_name+'_opt'])
-                state = get_shared_mem_array(emb_name+'_state', \
-                    emb.weight.shape, th.float32)
+            emb_name = emb.name
+            if th.device(emb.emb_tensor.device) == th.device('cpu'):
+                # if our embedding is on the CPU, our state also has to be
+                if self._rank <= 0:
+                    state = create_shared_mem_array(emb_name+'_state', \
+                        emb.weight.shape, th.float32).zero_()
+                if self._rank == 0:
+                    if self._world_size > 1:
+                        emb.store.set(emb_name+'_opt', emb_name)
+                elif self._rank > 0:
+                    # receive
+                    emb.store.wait([emb_name+'_opt'])
+                    state = get_shared_mem_array(emb_name+'_state', \
+                        emb.weight.shape, th.float32)
+            else:
+                # distributed state on on gpu
+                state = th.empty(
+                    emb.emb_tensor.shape,
+                    dtype=th.float32,
+                    device=emb.emb_tensor.device).zero_()
             emb.set_optm_state(state)
 
     def update(self, idx, grad, emb):
@@ -386,34 +529,48 @@ class SparseAdam(SparseGradOptimizer):
         self._beta1 = betas[0]
         self._beta2 = betas[1]
         self._eps = eps
+
+    def setup(self, params):
         # We need to register a state sum for each embedding in the kvstore.
         for emb in params:
             assert isinstance(emb, NodeEmbedding), \
                 'SparseAdam only supports dgl.nn.NodeEmbedding'
-
-            if self._rank <= 0:
-                emb_name = emb.name
-                state_step = create_shared_mem_array(emb_name+'_step', \
-                    (emb.weight.shape[0],), th.float32).zero_()
-                state_mem = create_shared_mem_array(emb_name+'_mem', \
-                    emb.weight.shape, th.float32).zero_()
-                state_power = create_shared_mem_array(emb_name+'_power', \
-                    emb.weight.shape, th.float32).zero_()
-            if self._rank == 0:
-                emb_name = emb.name
-                if self._world_size > 1:
-                    emb.store.set(emb_name+'_opt', emb_name)
-            elif self._rank > 0:
-                # receive
-                emb_name = emb.name
-                emb.store.wait([emb_name+'_opt'])
-                state_step = get_shared_mem_array(emb_name+'_step', \
-                    (emb.weight.shape[0],), th.float32)
-                state_mem = get_shared_mem_array(emb_name+'_mem', \
-                    emb.weight.shape, th.float32)
-                state_power = get_shared_mem_array(emb_name+'_power', \
-                    emb.weight.shape, th.float32)
-
+            emb_name = emb.name
+            if th.device(emb.emb_tensor.device) == th.device('cpu'):
+                # if our embedding is on the CPU, our state also has to be
+                if self._rank <= 0:
+                    state_step = create_shared_mem_array(emb_name+'_step', \
+                        (emb.weight.shape[0],), th.float32).zero_()
+                    state_mem = create_shared_mem_array(emb_name+'_mem', \
+                        emb.weight.shape, th.float32).zero_()
+                    state_power = create_shared_mem_array(emb_name+'_power', \
+                        emb.weight.shape, th.float32).zero_()
+                if self._rank == 0:
+                    if self._world_size > 1:
+                        emb.store.set(emb_name+'_opt', emb_name)
+                elif self._rank > 0:
+                    # receive
+                    emb.store.wait([emb_name+'_opt'])
+                    state_step = get_shared_mem_array(emb_name+'_step', \
+                        (emb.weight.shape[0],), th.float32)
+                    state_mem = get_shared_mem_array(emb_name+'_mem', \
+                        emb.weight.shape, th.float32)
+                    state_power = get_shared_mem_array(emb_name+'_power', \
+                        emb.weight.shape, th.float32)
+            else:
+                # distributed state on on gpu
+                state_step = th.empty(
+                    [emb.emb_tensor.shape[0]],
+                    dtype=th.float32,
+                    device=emb.emb_tensor.device).zero_()
+                state_mem = th.empty(
+                    emb.emb_tensor.shape,
+                    dtype=th.float32,
+                    device=emb.emb_tensor.device).zero_()
+                state_power = th.empty(
+                    emb.emb_tensor.shape,
+                    dtype=th.float32,
+                    device=emb.emb_tensor.device).zero_()
             state = (state_step, state_mem, state_power)
             emb.set_optm_state(state)
 

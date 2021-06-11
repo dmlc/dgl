@@ -554,7 +554,7 @@ CSRMatrix DisjointUnionCsr(
 std::tuple<CSRMatrix, IdArray, IdArray> CSRToSimple(const CSRMatrix& csr);
 
 /*!
- * \brief Split a CSRMatrix into multiple disjoin components.
+ * \brief Split a CSRMatrix into multiple disjoint components.
  *
  * Examples:
  *
@@ -603,6 +603,47 @@ std::vector<CSRMatrix> DisjointPartitionCsrBySizes(
   const std::vector<uint64_t> &edge_cumsum,
   const std::vector<uint64_t> &src_vertex_cumsum,
   const std::vector<uint64_t> &dst_vertex_cumsum);
+
+/*!
+ * \brief Slice a contiguous chunk from a CSRMatrix
+ *
+ * Examples:
+ *
+ * C = [[0, 0, 1, 0, 0],
+ *      [1, 0, 1, 0, 0],
+ *      [0, 1, 0, 0, 0],
+ *      [0, 0, 0, 0, 0],
+ *      [0, 0, 0, 1, 0],
+ *      [0, 0, 0, 0, 1]]
+ * CSRMatrix_C.num_rows : 6
+ * CSRMatrix_C.num_cols : 5
+ *
+ * edge_range : [4, 6]
+ * src_vertex_range : [3, 6]
+ * dst_vertex_range : [3, 5]
+ *
+ * ret = CSRSliceContiguousChunk(C,
+ *                               edge_range,
+ *                               src_vertex_range,
+ *                               dst_vertex_range)
+ *
+ * ret = [[0, 0],
+ *        [1, 0],
+ *        [0, 1]]
+ * CSRMatrix_ret.num_rows : 3
+ * CSRMatrix_ret.num_cols : 2
+ *
+ * \param csr CSRMatrix to slice.
+ * \param edge_range ID range of the edges in the chunk
+ * \param src_vertex_range ID range of the src vertices in the chunk.
+ * \param dst_vertex_range ID range of the dst vertices in the chunk.
+ * \return CSRMatrix representing the chunk.
+ */
+CSRMatrix CSRSliceContiguousChunk(
+  const CSRMatrix &csr,
+  const std::vector<uint64_t> &edge_range,
+  const std::vector<uint64_t> &src_vertex_range,
+  const std::vector<uint64_t> &dst_vertex_range);
 
 }  // namespace aten
 }  // namespace dgl
