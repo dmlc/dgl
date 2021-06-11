@@ -1,14 +1,15 @@
 """Fraud Dataset
 """
-import torch
 import os
 from scipy import io
+import numpy as np
 from sklearn.model_selection import train_test_split
 
 from .utils import save_graphs, load_graphs, _get_dgl_url
 from ..convert import heterograph
 from ..utils import graphdata2tensors
 from .dgl_dataset import DGLBuiltinDataset
+from .. import backend as F
 
 
 class FraudDataset(DGLBuiltinDataset):
@@ -101,9 +102,8 @@ class FraudDataset(DGLBuiltinDataset):
         file_path = os.path.join(self.raw_path, self.file_names[self.name])
 
         data = io.loadmat(file_path)
-        node_features = torch.from_numpy(data['features'].todense())
-        node_labels = torch.from_numpy(data['label'])
-        node_labels = node_labels.transpose(0, 1)
+        node_features = data['features'].todense()
+        node_labels = data['label']
 
         graph_data = {}
         for relation in self.relations[self.name]:
@@ -111,8 +111,8 @@ class FraudDataset(DGLBuiltinDataset):
             graph_data[(self.node_name[self.name], relation, self.node_name[self.name])] = (u, v)
         g = heterograph(graph_data)
 
-        g.ndata['feature'] = node_features
-        g.ndata['label'] = node_labels
+        g.ndata['feature'] = F.tensor(node_features)
+        g.ndata['label'] = F.tensor(node_labels.T)
         self.graph = g
 
         self._random_split(g.ndata['feature'], g.ndata['label'], self.seed, self.train_size, self.val_size)
@@ -197,15 +197,15 @@ class FraudDataset(DGLBuiltinDataset):
                                                    train_size=val_size / (1 - train_size),
                                                    random_state=seed,
                                                    shuffle=True)
-        train_mask = torch.zeros(N, dtype=torch.bool)
-        val_mask = torch.zeros(N, dtype=torch.bool)
-        test_mask = torch.zeros(N, dtype=torch.bool)
+        train_mask = np.zeros(N, dtype=np.bool)
+        val_mask = np.zeros(N, dtype=np.bool)
+        test_mask = np.zeros(N, dtype=np.bool)
         train_mask[train_idx] = True
         val_mask[val_idx] = True
         test_mask[test_idx] = True
-        self.graph.ndata['train_mask'] = train_mask
-        self.graph.ndata['val_mask'] = val_mask
-        self.graph.ndata['test_mask'] = test_mask
+        self.graph.ndata['train_mask'] = F.tensor(train_mask)
+        self.graph.ndata['val_mask'] = F.tensor(val_mask)
+        self.graph.ndata['test_mask'] = F.tensor(test_mask)
 
 
 class FraudYelpDataset(FraudDataset):

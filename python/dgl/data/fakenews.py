@@ -1,4 +1,3 @@
-import torch
 import os
 import numpy as np
 import pandas as pd
@@ -8,6 +7,7 @@ from .dgl_dataset import DGLBuiltinDataset
 from .utils import save_graphs, load_graphs, _get_dgl_url
 from .utils import save_info, load_info
 from ..convert import graph
+from .. import backend as F
 
 
 class FakeNewsDataset(DGLBuiltinDataset):
@@ -89,7 +89,7 @@ class FakeNewsDataset(DGLBuiltinDataset):
         Graph labels
     feature_name : str
         Name of the feature (bert, content, profile, or spacy)
-    feature : scipy.sparse.csr.csr_matrix
+    feature : Tensor
         Node features
     train_mask : Tensor
         Mask of training set
@@ -125,8 +125,7 @@ class FakeNewsDataset(DGLBuiltinDataset):
 
     def process(self):
         """process raw data to graph, labels and masks"""
-        self.labels = np.load(os.path.join(self.raw_path, 'graph_labels.npy'))
-        self.labels = torch.LongTensor(self.labels)
+        self.labels = F.tensor(np.load(os.path.join(self.raw_path, 'graph_labels.npy')))
         num_graphs = self.labels.shape[0]
 
         node_graph_id = np.load(os.path.join(self.raw_path, 'node_graph_id.npy'))
@@ -145,18 +144,18 @@ class FakeNewsDataset(DGLBuiltinDataset):
         train_idx = np.load(os.path.join(self.raw_path, 'train_idx.npy'))
         val_idx = np.load(os.path.join(self.raw_path, 'val_idx.npy'))
         test_idx = np.load(os.path.join(self.raw_path, 'test_idx.npy'))
-        train_mask = torch.zeros(num_graphs, dtype=torch.bool)
-        val_mask = torch.zeros(num_graphs, dtype=torch.bool)
-        test_mask = torch.zeros(num_graphs, dtype=torch.bool)
+        train_mask = np.zeros(num_graphs, dtype=np.bool)
+        val_mask = np.zeros(num_graphs, dtype=np.bool)
+        test_mask = np.zeros(num_graphs, dtype=np.bool)
         train_mask[train_idx] = True
         val_mask[val_idx] = True
         test_mask[test_idx] = True
-        self.train_mask = train_mask
-        self.val_mask = val_mask
-        self.test_mask = test_mask
+        self.train_mask = F.tensor(train_mask)
+        self.val_mask = F.tensor(val_mask)
+        self.test_mask = F.tensor(test_mask)
 
         feature_file = 'new_' + self.feature_name + '_feature.npz'
-        self.feature = sp.load_npz(os.path.join(self.raw_path, feature_file))
+        self.feature = F.tensor(sp.load_npz(os.path.join(self.raw_path, feature_file)).todense())
 
     def save(self):
         """save the graph list and the labels"""
