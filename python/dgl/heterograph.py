@@ -5990,7 +5990,7 @@ def combine_frames(frames, ids, col_names=None):
                 if key in frame.schemes:
                     if frame.schemes[key] != scheme:
                         raise DGLError('Cannot concatenate column %s with shape %s and shape %s' %
-                                    (key, frame.schemes[key], scheme))
+                                       (key, frame.schemes[key], scheme))
                 else:
                     del schemes[key]
 
