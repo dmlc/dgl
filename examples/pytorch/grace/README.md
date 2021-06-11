@@ -72,7 +72,7 @@ python main.py --dataname pubmed --split public --epochs 1500 --lr 1e-3 --wd 1e-
 
 ## 	Performance
 
-We use the same hyper-parameter settings as provided by the author, you can check config.yaml for detailed hyper-parameters for each dataset.
+For random split, we use the hyper-parameters as stated in the paper. For public split,  we find the given hyper-parameters lead to poor performance, so we select the hyperparameters via  a small grid search.
 
 Random split (Train/Test = 1:9)
 
