@@ -602,7 +602,7 @@ class SparseAdam(SparseGradOptimizer):
             # when copying to the cpu, so as to ensure the copy is finished
             # before operating on the data on the cpu
             state_nonblock = state_dev != th.device('cpu')
-            exec_nonblock = state_dev != th.device('cpu')
+            exec_nonblock = exec_dev != th.device('cpu')
 
             # There can be duplicated indices due to sampling.
             # Thus unique them here and average the gradient here.
