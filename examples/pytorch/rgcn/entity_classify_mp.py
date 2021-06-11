@@ -305,6 +305,8 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
 
         for i, sample_data in enumerate(loader):
             input_nodes, seeds, blocks = sample_data
+            # map the seed nodes back to their type-specific ids, so that they
+            # can be used to look up their respective labels
             seeds = inv_target[seeds]
 
             for block in blocks:
@@ -514,7 +516,10 @@ def main(args, devices):
     val_idx.share_memory_()
     test_idx.share_memory_()
 
-    # make a mapping from target type back to global id
+    # This is a graph with multiple node types, so we want a way to map
+    # our target node from their global node numberings, back to their
+    # numberings within their type. This is used when taking the nodes in a
+    # mini-batch, and looking up their type-specific labels
     inv_target = th.empty(node_ids.shape,
         dtype=node_ids.dtype)
     inv_target.share_memory_()
