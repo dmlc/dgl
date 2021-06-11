@@ -230,7 +230,8 @@ class BlockSampler(object):
         for block_id in reversed(range(self.num_layers)):
             seed_nodes_in = seed_nodes
             if isinstance(seed_nodes_in, dict):
-                seed_nodes_in = {ntype: nodes.to(g.device) for ntype, nodes in seed_nodes_in.items()}
+                seed_nodes_in = {ntype: nodes.to(g.device) \
+                    for ntype, nodes in seed_nodes_in.items()}
             else:
                 seed_nodes_in = seed_nodes_in.to(g.device)
             frontier = self.sample_frontier(block_id, g, seed_nodes_in)
@@ -264,7 +265,8 @@ class BlockSampler(object):
             if self.output_device is not None:
                 frontier = frontier.to(self.output_device)
                 if isinstance(seed_nodes, dict):
-                    seed_nodes_out = {ntype: nodes.to(self.output_device) for ntype, nodes in seed_nodes.items()}
+                    seed_nodes_out = {ntype: nodes.to(self.output_device) \
+                        for ntype, nodes in seed_nodes.items()}
                 else:
                     seed_nodes_out = seed_nodes.to(self.output_device)
 
