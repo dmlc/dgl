@@ -23,6 +23,7 @@ template<typename IdType> __global__ void _MapProcByRemainder(
     const int64_t num_index,
     const int64_t num_proc,
     IdType * const proc_id) {
+  assert(num_index <= gridDim.x*blockDim.x);
   const int64_t idx = blockDim.x*static_cast<int64_t>(blockIdx.x)+threadIdx.x;
 
   if (idx < num_index) {
@@ -36,6 +37,7 @@ __global__ void _MapProcByMaskRemainder(
     const int64_t num_index,
     const IdType mask,
     IdType * const proc_id) {
+  assert(num_index <= gridDim.x*blockDim.x);
   const int64_t idx = blockDim.x*static_cast<int64_t>(blockIdx.x)+threadIdx.x;
 
   if (idx < num_index) {
@@ -49,6 +51,7 @@ __global__ void _MapLocalIndexByRemainder(
     IdType * const out,
     const int64_t num_items,
     const int comm_size) {
+  assert(num_items <= gridDim.x*blockDim.x);
   const int64_t idx = threadIdx.x+blockDim.x*blockIdx.x;
 
   if (idx < num_items) {
@@ -63,6 +66,7 @@ __global__ void _MapGlobalIndexByRemainder(
     const int part_id,
     const int64_t num_items,
     const int comm_size) {
+  assert(num_items <= gridDim.x*blockDim.x);
   const int64_t idx = threadIdx.x+blockDim.x*blockIdx.x;
 
   assert(part_id < comm_size);
