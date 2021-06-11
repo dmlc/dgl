@@ -180,40 +180,18 @@ def _gspmm(gidx, op, reduce_op, u, e):
 
 
 def _gspmm_hetero(g, op, reduce_op, u_and_e_tuple):
-    r""" Generalized Sparse Matrix Multiplication interface. 
+    r""" Generalized Sparse Matrix Multiplication interface.
     """
     num_ntypes = g._graph.number_of_ntypes()
-
     u_tuple, e_tuple = u_and_e_tuple[:num_ntypes], u_and_e_tuple[num_ntypes:]
-    print("SPMM for heterogeneous:")
     gidx = g._graph
     use_u = op != 'copy_rhs'
     use_e = op != 'copy_lhs'
-    if use_u and use_e:
-        if F.dtype(u) != F.dtype(e):
-            raise DGLError("The node features' data type {} doesn't match edge"
-                           " features' data type {}, please convert them to the"
-                           " same type.".format(F.dtype(u), F.dtype(e)))
+
+    # TODO (Israt): Add check - F.dtype(u) != F.dtype(e):
+
     # deal with scalar features.
     expand_u, expand_e = False, False
-    
-    # multiple etypes and one src type
-    # tmp_u = {}
-    # if  use_u and type(u_tuple) is not dict:
-    #     tmp_u[g.srctypes[0]] = u_tuple
-    #     u_tuple = tmp_u
-    
-    if use_u:
-        for idx in range(len(u_tuple)):  
-            if u_tuple[idx] is not None:    
-                if F.ndim(u_tuple[idx]) == 1:
-                    expand_u = True
-    if use_e:
-        for idx in range(len(e_tuple)):  
-            if e_tuple[idx] is not None:    
-                if F.ndim(e_tuple[idx]) == 1:
-                    expand_e = True
-
     list_u = [None] * gidx.number_of_ntypes()
     list_v = [None] * gidx.number_of_ntypes()
     list_e = [None] * gidx.number_of_etypes()
@@ -228,9 +206,11 @@ def _gspmm_hetero(g, op, reduce_op, u_and_e_tuple):
         if use_u:
             if u is not None and F.ndim(u) == 1:
                 u = F.unsqueeze(u, -1)
+                expand_u = True
         if use_e:
             if e is not None and F.ndim(e) == 1:
-                e = F.unsqueeze(e, -1)   
+                e = F.unsqueeze(e, -1)
+                expand_e = True
         ctx = F.context(u) if use_u else F.context(e) # TODO(Israt): Put outside of loop
         dtype = F.dtype(u) if use_u else F.dtype(e) # TODO(Israt): Put outside of loop
         u_shp = F.shape(u) if use_u else (0,)
@@ -241,7 +221,7 @@ def _gspmm_hetero(g, op, reduce_op, u_and_e_tuple):
             list_e[etid] = e if use_e else None
         v_shp = (gidx.number_of_nodes(dst_id), ) +\
             infer_broadcast_shape(op, u_shp[1:], e_shp[1:])
-        list_v[dst_id] = F.zeros(v_shp, dtype, ctx) # to_dgl_nd_for_write(
+        list_v[dst_id] = F.zeros(v_shp, dtype, ctx)
     
     use_cmp = reduce_op in ['max', 'min']
     arg_u, arg_e = None, None
@@ -256,11 +236,11 @@ def _gspmm_hetero(g, op, reduce_op, u_and_e_tuple):
     tuple_v = tuple(list_v)
     if gidx.number_of_edges(0) > 0:
         _CAPI_DGLKernelSpMMHetero(gidx, op, reduce_op,
-                            [to_dgl_nd(u_i) for u_i in list_u],
-                            [to_dgl_nd(e_i) for e_i in list_e],
-                            [to_dgl_nd_for_write(v_i) for v_i in list_v],
-                            arg_u_nd,
-                            arg_e_nd)
+                              [to_dgl_nd(u_i) for u_i in list_u],
+                              [to_dgl_nd(e_i) for e_i in list_e],
+                              [to_dgl_nd_for_write(v_i) for v_i in list_v],
+                              arg_u_nd,
+                              arg_e_nd)
     arg_u = None if arg_u is None else F.zerocopy_from_dgl_ndarray(arg_u_nd)
     arg_e = None if arg_e is None else F.zerocopy_from_dgl_ndarray(arg_e_nd)
     # To deal with scalar node/edge features.
@@ -269,10 +249,11 @@ def _gspmm_hetero(g, op, reduce_op, u_and_e_tuple):
         # replace None by empty tensor. Forward func doesn't accept None in tuple.
         v = list_v[l]
         v = torch.tensor([]) if v is None else v
-        list_v[l] = F.squeeze(v, -1)
-    out = tuple(list_v) 
-   
-    # if (expand_u or not use_u) and (expand_e or not use_e):
+        if ((expand_u or not use_u) and (expand_e or not use_e)):
+            v = F.squeeze(v, -1)  # To deal with scalar node/edge features.
+        list_v[l] = v
+    out = tuple(list_v)
+
     if expand_u and use_cmp:
         arg_u = F.squeeze(arg_u, -1)
     if expand_e and use_cmp:
@@ -340,6 +321,7 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
             expand_rhs = True
     lhs_target = target_mapping[lhs_target]
     rhs_target = target_mapping[rhs_target]
+
     ctx = F.context(lhs) if use_lhs else F.context(rhs)
     dtype = F.dtype(lhs) if use_lhs else F.dtype(rhs)
     lhs_shp = F.shape(lhs) if use_lhs else (0,)
@@ -357,36 +339,17 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
         out = F.squeeze(out, -1)
     return out
 
-# TODO (Israt): Wrong order
+
 def _gsddmm_hetero(g, op, lhs_target='u', rhs_target='v', lhs_and_rhs_tuple=None):
     r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface. 
     """
     num_ntypes = g._graph.number_of_ntypes()
     lhs_tuple, rhs_tuple = lhs_and_rhs_tuple[:num_ntypes], lhs_and_rhs_tuple[num_ntypes:]
-    print(lhs_tuple, "rhs_tuple", rhs_tuple, "u,v", lhs_target,rhs_target)
-    print("SDDMM for heterogeneous:")
     gidx = g._graph
-    # if gidx.number_of_etypes() != 1:
-    #     raise DGLError("We only support gsddmm on graph with one edge type")
     use_lhs = op != 'copy_rhs'
     use_rhs = op != 'copy_lhs'
 
-    # multiple etypes and one src/dest node type
-    # tmp_u = {}
-    # if  use_lhs and type(lhs_tuple) is not dict:
-    #     tmp_u[g.srctypes[0]] = lhs_tuple
-    #     lhs_tuple = tmp_u
-    
-    # tmp_v = {}
-    # if  use_rhs and type(rhs_tuple) is not dict:
-    #     tmp_v[g.dsttypes[0]] = rhs_tuple
-    #     rhs_tuple = tmp_v
-
-    # if use_lhs and use_rhs:
-    #     for srctype, etype, dsttype in g.canonical_etypes:
-    #         if F.dtype(lhs_tuple[srctype]) != F.dtype(rhs_tuple[dsttype]):
-    #             raise DGLError("The operands data type don't match: {} and {}, please convert them"
-    #                            " to the same type.".format(F.dtype(lhs_tuple[srctype]), F.dtype(rhs_tuple[srctype])))
+    # TODO (Israt): Add check - F.dtype(u) != F.dtype(e):
     # deal with scalar features.
     expand_lhs, expand_rhs = False, False
 
@@ -403,7 +366,6 @@ def _gsddmm_hetero(g, op, lhs_target='u', rhs_target='v', lhs_and_rhs_tuple=None
         dst_id = g.get_ntype_id(dsttype)
         lhs = lhs_tuple[src_id]
         rhs = rhs_tuple[dst_id]
-        
         if use_lhs:
             if lhs is not None and F.ndim(lhs) == 1:
                 lhs = F.unsqueeze(lhs, -1)
@@ -425,13 +387,13 @@ def _gsddmm_hetero(g, op, lhs_target='u', rhs_target='v', lhs_and_rhs_tuple=None
 
     if gidx.number_of_edges(0) > 0:
         _CAPI_DGLKernelSDDMMHetero(gidx, op,
-                             [to_dgl_nd(lhs) for lhs in lhs_list],
-                             [to_dgl_nd(rhs) for rhs in rhs_list],
-                             [to_dgl_nd_for_write(out) for out in out_list],
-                             lhs_target, rhs_target)
-    
+                                   [to_dgl_nd(lhs) for lhs in lhs_list],
+                                   [to_dgl_nd(rhs) for rhs in rhs_list],
+                                   [to_dgl_nd_for_write(out) for out in out_list],
+                                   lhs_target, rhs_target)
+
     for l in range(len(out_list)):   
-        #replace None by empty tensor. Forward func doesn't accept None in tuple.
+        # Replace None by empty tensor. Forward func doesn't accept None in tuple.
         e = out_list[l]
         e = torch.tensor([]) if e is None else e
         if (expand_lhs or not use_lhs) and (expand_rhs or not use_rhs):

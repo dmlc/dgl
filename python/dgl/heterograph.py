@@ -4798,7 +4798,6 @@ class DGLHeteroGraph(object):
             # apply
             if apply_node_func is not None:
                 self.apply_nodes(apply_node_func, ALL, self.ntypes[dtid])
-
     
     #################################################################
     # New Message passing on heterograph // will replace *update_all
@@ -4808,6 +4807,12 @@ class DGLHeteroGraph(object):
                    rfunc,
                    afunc=None,
                    etype=None):
+        if rfunc.name in ['max', 'min', 'mean'] :
+            raise NotImplementedError("Reduce op \'" + rfunc.name + "\' is not supported in "
+                "the new heterograph API. Use multi_update_all().")
+        if mfunc.name not in ['copy_u', 'copy_e'] :
+             raise NotImplementedError("Op \'" + mfunc.name + "\' is not supported in "
+                "the new heterograph API. Use multi_update_all().")
         g = self
         all_out = core.message_passing(g, mfunc, rfunc, afunc)
         key = list(all_out.keys())[0]
@@ -4821,7 +4826,6 @@ class DGLHeteroGraph(object):
         # TODO (Israt): Add apply function in heterograph
         # if apply_node_func is not None:
         #     self.apply_nodes(apply_node_func, ALL, self.ntypes[dtid])
-
 
     #################################################################
     # Message propagation

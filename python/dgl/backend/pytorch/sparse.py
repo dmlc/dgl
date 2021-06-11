@@ -150,21 +150,23 @@ class GSpMM_hetero(th.autograd.Function):
     @custom_fwd(cast_inputs=th.float16)
     def forward(ctx, g, op, reduce_op, *X): # X = X + Y
         out, (argX, argY) = _gspmm_hetero(g, op, reduce_op, X)
-        ctx.backward_cache = g, op, reduce_op # g._graph
+        ctx.backward_cache = g, op, reduce_op
         ctx.save_for_backward(*X, argX, argY)
         return out
 
     @staticmethod
     @custom_bwd
     def backward(ctx, *dZ):
-        print("In backward")
         g, op, reduce_op = ctx.backward_cache 
         X = ctx.saved_tensors[:-2]
         argX=ctx.saved_tensors[-2]  
-        argY=ctx.saved_tensors[-1]  
+        argY=ctx.saved_tensors[-1]
+        num_ntypes = g._graph.number_of_ntypes()
+        X ,Y = X[:num_ntypes], X[num_ntypes:]
 
-        if op != 'copy_rhs' and ctx.needs_input_grad[3]:
-            g_rev = g.reverse() #gidx.reverse()
+
+        if op != 'copy_rhs' and any([x is not None for x in X]):
+            g_rev = g.reverse()
             if reduce_op == 'sum':
                 if op in ['mul', 'div']:
                     dX = gspmm_hetero(g_rev, 'mul', 'sum', dZ, _muldiv(op, Y))
@@ -181,21 +183,23 @@ class GSpMM_hetero(th.autograd.Function):
                     dX.scatter_add_(0, argX.long(), grad)
                 elif op in ['add', 'sub', 'copy_lhs']:
                     dX.scatter_add_(0, argX.long(), dZ)
-            print("Backward:: DX: ", dX)
             dX = tuple([_reduce_grad(dX[i], X[i].shape) if X[i] is not None else None 
                 for i in range(len(X))])
         else:  # X has not gradient
             dX = None
-        if op != 'copy_lhs' and ctx.needs_input_grad[4]:
+        if op != 'copy_lhs' and any([y is not None for y in Y]):
             if reduce_op == 'sum':
                 if op == 'mul' and _need_reduce_last_dim(X, Y):
-                    dY = gsddmm_hetero(gidx, 'dot', X, dZ)
+                    dY = gsddmm_hetero(g, 'dot', X, dZ)
                 elif op in ['mul', 'div']:
-                    dY = gsddmm_hetero(gidx, 'mul', X, dZ)
+                    dY = gsddmm_hetero(g, 'mul', X, dZ)
                     if op == 'div':
                         dY = -dY / (Y ** 2)
                 elif op in ['add', 'sub', 'copy_rhs']:
-                    dY = gsddmm_hetero(gidx, 'copy_rhs', X, _addsub(op, dZ))
+                    tmp_Z = tuple([_addsub(op, dZ[i]) if dZ[i] is not None else None
+                    for i in range(len(dZ))])
+                    tmp = tuple(X + tmp_Z)
+                    dY = gsddmm_hetero(g, 'copy_rhs', 'u', 'v', *tmp)
             else:  # max/min
                 dY = th.zeros((Y.shape[0],) + dZ.shape[1:],
                               dtype=Y.dtype, device=Y.device)
@@ -207,13 +211,17 @@ class GSpMM_hetero(th.autograd.Function):
                         dY = -dY / (Y ** 2)
                 elif op in ['add', 'sub', 'copy_rhs']:
                     dY.scatter_add_(0, argY.long(), _addsub(op, dZ))
-            dY = _reduce_grad(dY, Y.shape)
+            dY = tuple([_reduce_grad(dY[i], Y[i].shape) if Y[i] is not None else None
+            for i in range(len(Y))])
         else:  # Y has no gradient
             dY = None
-        print("DX, DY: ", dX, dY)
-        return (None, None, None) + dX
-        # return None, None, None, dX
-
+        if dX is None:
+            tmp = tuple([None] * num_ntypes)
+            return (None, None, None) + tmp + dY
+        if dY is None:
+            tmp = tuple([None] * g._graph.number_of_etypes())
+            return (None, None, None) + dX + tmp
+        return (None, None, None) + dX + dY
 
 class GSDDMM(th.autograd.Function):
     @staticmethod
@@ -279,9 +287,8 @@ class GSDDMM(th.autograd.Function):
 class GSDDMM_hetero(th.autograd.Function):
     @staticmethod
     @custom_fwd(cast_inputs=th.float16)
-    # TODO (Israt) : The order needs to be fixed
     def forward(ctx, g, op, lhs_target, rhs_target, *X): # X = X+Y
-        out = _gsddmm_hetero(g, op, lhs_target, rhs_target, X) 
+        out = _gsddmm_hetero(g, op, lhs_target, rhs_target, X)
         ctx.backward_cache = g, op, lhs_target, rhs_target
         ctx.save_for_backward(*X)
         return out
@@ -341,6 +348,7 @@ class GSDDMM_hetero(th.autograd.Function):
             dY = None
         return (None, None) + dX + dY + ( None, None)
         # return (None, None, dX, dY, None, None
+
 
 class EdgeSoftmax(th.autograd.Function):
     @staticmethod
