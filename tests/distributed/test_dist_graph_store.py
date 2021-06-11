@@ -163,6 +163,8 @@ def run_client_hierarchy(graph_name, part_id, server_count, node_mask, edge_mask
     gpb, graph_name, _, _ = load_partition_book('/tmp/dist_graph/{}.json'.format(graph_name),
                                                 part_id, None)
     g = DistGraph(graph_name, gpb=gpb)
+    node_mask = F.tensor(node_mask)
+    edge_mask = F.tensor(edge_mask)
     nodes = node_split(node_mask, g.get_partition_book(), node_trainer_ids=g.ndata['trainer_id'])
     edges = edge_split(edge_mask, g.get_partition_book(), edge_trainer_ids=g.edata['trainer_id'])
     rank = g.rank()
@@ -396,14 +398,14 @@ def check_server_client_hierarchy(shared_mem, num_servers, num_clients):
     cli_ps = []
     manager = mp.Manager()
     return_dict = manager.dict()
-    node_mask = F.zeros((g.number_of_nodes(),), F.int32, F.cpu())
-    edge_mask = F.zeros((g.number_of_edges(),), F.int32, F.cpu())
-    nodes = F.tensor(np.random.choice(g.number_of_nodes(), g.number_of_nodes() // 10, replace=False))
-    edges = F.tensor(np.random.choice(g.number_of_edges(), g.number_of_edges() // 10, replace=False))
-    F.scatter_row_inplace(node_mask, nodes, 1)
-    F.scatter_row_inplace(edge_mask, edges, 1)
-    nodes, _ = F.sort_1d(nodes)
-    edges, _ = F.sort_1d(edges)
+    node_mask = np.zeros((g.number_of_nodes(),), np.int32)
+    edge_mask = np.zeros((g.number_of_edges(),), np.int32)
+    nodes = np.random.choice(g.number_of_nodes(), g.number_of_nodes() // 10, replace=False)
+    edges = np.random.choice(g.number_of_edges(), g.number_of_edges() // 10, replace=False)
+    node_mask[nodes] = 1
+    edge_mask[edges] = 1
+    nodes = np.sort(nodes)
+    edges = np.sort(edges)
     for cli_id in range(num_clients):
         print('start client', cli_id)
         p = ctx.Process(target=run_client_hierarchy, args=(graph_name, 0, num_servers,
@@ -423,8 +425,8 @@ def check_server_client_hierarchy(shared_mem, num_servers, num_clients):
         edges1.append(e)
     nodes1, _ = F.sort_1d(F.cat(nodes1, 0))
     edges1, _ = F.sort_1d(F.cat(edges1, 0))
-    assert np.all(F.asnumpy(nodes1) == F.asnumpy(nodes))
-    assert np.all(F.asnumpy(edges1) == F.asnumpy(edges))
+    assert np.all(F.asnumpy(nodes1) == nodes)
+    assert np.all(F.asnumpy(edges1) == edges)
 
     print('clients have terminated')
 
