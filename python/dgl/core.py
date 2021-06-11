@@ -292,15 +292,16 @@ def message_passing(g, mfunc, rfunc, afunc):
         # reduce phase
         if is_builtin(rfunc):
             # Converting msgdata from tuple of tensors to dict of tensors for heterographs
+            mdict = dict()
             if g._graph.number_of_etypes() > 1:
                 msgdata_dict = {}
-                msgdata = msgdata['m'] # TODO (Israt): Dont hardcode
+                key = list(msgdata.keys())[0]
+                msgdata = msgdata[key]
                 for srctype, etype, dsttype in g.canonical_etypes:
-                    eid = g.get_etype_id(etype)
                     dst_id = g.get_ntype_id(dsttype)
                     msgdata_dict[srctype, etype, dsttype] = msgdata[dst_id]
-                msgdata_dict = dict(m=msgdata_dict) # TODO (Israt): Dont hardcode 
-                msgdata = msgdata_dict
+                mdict[key] = msgdata_dict
+                msgdata = mdict
             msg = rfunc.msg_field
             ndata = invoke_gspmm(g, fn.copy_e(msg, msg), rfunc, edata=msgdata)
         else:

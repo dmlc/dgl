@@ -8,6 +8,15 @@ from .. import backend as F
 __all__ = ['gspmm']
 
 def reshape_lhs_rhs(lhs_data, rhs_data):
+    r""" Reshape the dimension of lhs and rhs data
+
+    Parameters
+    ----------
+    lhs_data : tensor or None
+        The left operand, could be None if it's not required by op.
+    rhs_data : tensor or None
+        The right operand, could be None if it's not required by op.
+    """
     lhs_shape = F.shape(lhs_data)
     rhs_shape = F.shape(rhs_data)
     if len(lhs_shape) != len(rhs_shape):
