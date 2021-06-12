@@ -77,7 +77,6 @@ def get_graph(name, format):
 
 
 def get_ogb_graph(name):
-    os.symlink('/tmp/dataset/', os.path.join(os.getcwd(), 'dataset'))
     data = DglNodePropPredDataset(name=name)
     return data[0][0]
 

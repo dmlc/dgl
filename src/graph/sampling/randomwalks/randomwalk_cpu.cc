@@ -31,7 +31,7 @@ IdArray RandomWalk(
       return false;
     };
 
-  return MetapathBasedRandomWalk<XPU, IdxType>(hg, seeds, metapath, prob, terminate);
+  return MetapathBasedRandomWalk<XPU, IdxType>(hg, seeds, metapath, prob, terminate).first;
 }
 
 template

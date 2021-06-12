@@ -30,8 +30,8 @@ namespace impl {
 template <typename IdxType>
 using Node2vecStepFunc = std::function<std::pair<dgl_id_t, bool>(
     IdxType *,  // node IDs generated so far
-    dgl_id_t,   // last node id generated
-    dgl_id_t,   // las last node id generated
+    dgl_id_t,   // last node ID generated
+    dgl_id_t,   // second-to-last node ID generated
     int64_t)>;  // of steps
 
 /*!

@@ -23,17 +23,6 @@ namespace sampling {
 namespace impl {
 
 /*!
- * \brief Random walk step function
- */
-template<typename IdxType>
-using StepFunc = std::function<
-  //        ID        terminate?
-  std::pair<dgl_id_t, bool>(
-      IdxType *,    // node IDs generated so far
-      dgl_id_t,     // last node ID
-      int64_t)>;    // # of steps
-
-/*!
  * \brief Get the node types traversed by the metapath.
  * \return A 1D array of shape (len(metapath) + 1,) with node type IDs.
  */

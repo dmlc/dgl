@@ -177,7 +177,7 @@ if(USE_CUDA)
     add_dependencies(dgl nccl_external)
   endif()
 else(USE_CUDA)
-  add_library(dgl SHARED ${DGL_SRC} src/graph/sampling/randomwalks/node2vec_impl.h)
+  add_library(dgl SHARED ${DGL_SRC})
 endif(USE_CUDA)
 
 # include directories

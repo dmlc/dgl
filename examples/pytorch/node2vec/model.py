@@ -17,9 +17,10 @@ class Node2vec(nn.Module):
     walk_length: int
         Length of each trace.
     p: float
-        Likelihood of immediately revisiting a node in the walk.
+        Likelihood of immediately revisiting a node in the walk.  Same notation as in the paper.
     q: float
         Control parameter to interpolate between breadth-first strategy and depth-first strategy.
+        Same notation as in the paper.
     num_walks: int
         Number of random walks for each node. Default: 10.
     window_size: int
@@ -27,7 +28,7 @@ class Node2vec(nn.Module):
     num_negatives: int
         The number of negative samples for each positive sample.  Default: 5.
     use_sparse: bool
-        If set to True, node embedding matrix will be sparse. Default: ``True``.
+        If set to True, use PyTorch's sparse embedding and optimizer. Default: ``True``.
     weight_name : str, optional
         The name of the edge feature tensor on the graph storing the (unnormalized)
         probabilities associated with each edge for choosing the next node.
@@ -194,7 +195,7 @@ class Node2vecModel(object):
     num_negatives: int
         The number of negative samples for each positive sample.  Default: 5.
     use_sparse: bool
-        If set to True, node embedding matrix will be sparse. Default: ``True``.
+        If set to True, uses PyTorch's sparse embedding and optimizer. Default: ``True``.
     weight_name : str, optional
         The name of the edge feature tensor on the graph storing the (unnormalized)
         probabilities associated with each edge for choosing the next node.

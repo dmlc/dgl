@@ -20,7 +20,7 @@ def time_randomwalk(graph, args):
         node2vec_randomwalk(graph, graph.nodes(), **params)
     end_time = time.time()
     cost_time_avg = (end_time-start_time)/args.runs
-    print("Run dataset {} {} trails, mean cost time: {:.3f}s".format(args.dataset, args.runs, cost_time_avg))
+    print("Run dataset {} {} trials, mean run time: {:.3f}s".format(args.dataset, args.runs, cost_time_avg))
 
 
 def train_node2vec(graph, eval_set, args):
@@ -48,8 +48,8 @@ if __name__ == '__main__':
     if args.task == 'train':
         print("Perform training node2vec model")
         train_node2vec(graph, eval_set, args)
-    elif args.task == 'test':
-        print("Perform testing random walk")
+    elif args.task == 'time':
+        print("Timing random walks")
         time_randomwalk(graph, args)
     else:
         raise ValueError('Task type error!')

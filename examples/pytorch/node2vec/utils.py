@@ -34,12 +34,6 @@ def load_graph(name):
         nodes_val, y_val = nodes[val_idx], y[val_idx]
         eval_set = [(nodes_train, y_train), (nodes_val, y_val)]
 
-    elif name.startswith('ogbl'):
-        # link prediction graph dataset can not be evaluated.
-        dataset = DglLinkPropPredDataset(name)
-        eval_set = {}
-        graph = dataset[0]
-
     else:
         raise ValueError("Dataset name error!")
 
@@ -52,7 +46,7 @@ def parse_arguments():
     """
     parser = argparse.ArgumentParser(description='Node2vec')
     parser.add_argument('--dataset', type=str, default='cora')
-    # 'train' for training node2vec model, 'test' for testing speed of random walk
+    # 'train' for training node2vec model, 'time' for testing speed of random walk
     parser.add_argument('--task', type=str, default='train')
     parser.add_argument('--runs', type=int, default=10)
     parser.add_argument('--device', type=str, default='cpu')

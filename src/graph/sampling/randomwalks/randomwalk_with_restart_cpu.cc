@@ -33,7 +33,7 @@ IdArray RandomWalkWithRestart(
     [restart_prob] (IdxType *data, dgl_id_t curr, int64_t len) {
       return RandomEngine::ThreadLocal()->Uniform<double>() < restart_prob;
     };
-  return MetapathBasedRandomWalk<XPU, IdxType>(hg, seeds, metapath, prob, terminate);
+  return MetapathBasedRandomWalk<XPU, IdxType>(hg, seeds, metapath, prob, terminate).first;
 }
 
 template
@@ -66,7 +66,7 @@ IdArray RandomWalkWithStepwiseRestart(
       [restart_prob_data] (IdxType *data, dgl_id_t curr, int64_t len) {
         return RandomEngine::ThreadLocal()->Uniform<DType>() < restart_prob_data[len];
       };
-    result = MetapathBasedRandomWalk<XPU, IdxType>(hg, seeds, metapath, prob, terminate);
+    result = MetapathBasedRandomWalk<XPU, IdxType>(hg, seeds, metapath, prob, terminate).first;
   });
 
   return result;
