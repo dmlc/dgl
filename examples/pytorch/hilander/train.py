@@ -31,6 +31,7 @@ parser.add_argument('--gat', action='store_true')
 parser.add_argument('--gat_k', type=int, default=1)
 parser.add_argument('--balance', action='store_true')
 parser.add_argument('--use_cluster_feat', action='store_true')
+parser.add_argument('--use_focal_loss', action='store_true')
 
 # Training
 parser.add_argument('--epochs', type=int, default=100)
@@ -71,7 +72,8 @@ model = LANDER(feature_dim=feature_dim, nhid=args.hidden,
                num_conv=args.num_conv, dropout=args.dropout,
                use_GAT=args.gat, K=args.gat_k,
                balance=args.balance,
-               use_cluster_feat=args.use_cluster_feat)
+               use_cluster_feat=args.use_cluster_feat,
+               use_focal_loss=args.use_focal_loss)
 model = model.to(device)
 model.train()
 best_model = None

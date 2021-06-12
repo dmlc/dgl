@@ -10,11 +10,12 @@ import dgl
 import dgl.function as fn
 
 from .graphconv import GraphConv
+from .focal_loss import FocalLoss
 
 class LANDER(nn.Module):
     def __init__(self, feature_dim, nhid, num_conv=4, dropout=0,
                  use_GAT=True, K=1, balance=False,
-                 use_cluster_feat = True, **kwargs):
+                 use_cluster_feat = True, use_focal_loss = True, **kwargs):
         super(LANDER, self).__init__()
         nhid_half = int(nhid / 2)
         self.use_cluster_feat = use_cluster_feat
@@ -38,7 +39,10 @@ class LANDER(nn.Module):
                                           nn.PReLU(nhid_half),
                                           nn.Linear(nhid_half, 2))
 
-        self.loss_conn = nn.CrossEntropyLoss()
+        if self.use_focal_loss:
+            self.loss_conn = FocalLoss(2)
+        else:
+            self.loss_conn = nn.CrossEntropyLoss()
         self.loss_den = nn.MSELoss()
 
         self.balance = balance

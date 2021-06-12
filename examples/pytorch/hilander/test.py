@@ -34,6 +34,7 @@ parser.add_argument('--gat', action='store_true')
 parser.add_argument('--gat_k', type=int, default=1)
 parser.add_argument('--balance', action='store_true')
 parser.add_argument('--use_cluster_feat', action='store_true')
+parser.add_argument('--use_focal_loss', action='store_true')
 parser.add_argument('--use_gt', action='store_true')
 
 args = parser.parse_args()
@@ -67,7 +68,8 @@ if not args.use_gt:
                    num_conv=args.num_conv, dropout=args.dropout,
                    use_GAT=args.gat, K=args.gat_k,
                    balance=args.balance,
-                   use_cluster_feat=args.use_cluster_feat)
+                   use_cluster_feat=args.use_cluster_feat,
+                   use_focal_loss=args.use_focal_loss)
     model.load_state_dict(torch.load(args.model_filename))
     model = model.to(device)
     model.eval()
