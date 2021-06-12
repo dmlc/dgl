@@ -19,6 +19,7 @@ class LANDER(nn.Module):
         super(LANDER, self).__init__()
         nhid_half = int(nhid / 2)
         self.use_cluster_feat = use_cluster_feat
+        self.use_focal_loss = use_focal_loss
         if self.use_cluster_feat:
             self.feature_dim = feature_dim * 2
         else:
