@@ -269,6 +269,8 @@ class BlockSampler(object):
                         for ntype, nodes in seed_nodes.items()}
                 else:
                     seed_nodes_out = seed_nodes.to(self.output_device)
+            else:
+                seed_nodes_out = seed_nodes
 
             block = transform.to_block(frontier, seed_nodes_out)
             if self.return_eids:
