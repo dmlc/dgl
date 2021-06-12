@@ -420,5 +420,23 @@ class NDArrayPartition(object):
         """
         return self._partition
 
+    def local_size(self, part):
+        """ Get the number of rows/items assigned to the given part.
+        """
+        return _CAPI_DGLNDArrayPartitionGetPartSize(self._partition, part)
+
+    def map_to_local(self, idxs):
+        """ Convert the set of global indices to local indices
+        """
+        return F.zerocopy_from_dgl_ndarray(_CAPI_DGLNDArrayPartitionMapToLocal(
+            self._partition,
+            F.zerocopy_to_dgl_ndarray(idxs)))
+
+    def map_to_global(self, idxs, part_id):
+        """ Convert the set of local indices ot global indices
+        """
+        return F.zerocopy_from_dgl_ndarray(_CAPI_DGLNDArrayPartitionMapToGlobal(
+            self._partition, F.zerocopy_to_dgl_ndarray(idxs), part_id))
+
 
 _init_api("dgl.partition")

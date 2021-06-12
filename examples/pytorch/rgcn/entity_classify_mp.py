@@ -123,54 +123,7 @@ def gen_norm(g):
     norm = norm.unsqueeze(1)
     g.edata['norm'] = norm
 
-class NeighborSampler:
-    """Neighbor sampler
-    Parameters
-    ----------
-    g : DGLHeterograph
-        Full graph
-    target_idx : tensor
-        The target training node IDs in g
-    fanouts : list of int
-        Fanout of each hop starting from the seed nodes. If a fanout is None,
-        sample full neighbors.
-    """
-    def __init__(self, g, target_idx, fanouts):
-        self.g = g
-        self.target_idx = target_idx
-        self.fanouts = fanouts
-
-    """Do neighbor sample
-    Parameters
-    ----------
-    seeds :
-        Seed nodes
-    Returns
-    -------
-    tensor
-        Seed nodes, also known as target nodes
-    blocks
-        Sampled subgraphs
-    """
-    def sample_blocks(self, seeds):
-        blocks = []
-        etypes = []
-        norms = []
-        ntypes = []
-        seeds = th.tensor(seeds).long()
-        cur = self.target_idx[seeds]
-        for fanout in self.fanouts:
-            if fanout is None or fanout == -1:
-                frontier = dgl.in_subgraph(self.g, cur)
-            else:
-                frontier = dgl.sampling.sample_neighbors(self.g, cur, fanout)
-            block = dgl.to_block(frontier, cur)
-            gen_norm(block)
-            cur = block.srcdata[dgl.NID]
-            blocks.insert(0, block)
-        return seeds, blocks
-
-def evaluate(model, embed_layer, eval_loader, node_feats):
+def evaluate(model, embed_layer, eval_loader, node_feats, inv_target):
     model.eval()
     embed_layer.eval()
     eval_logits = []
@@ -179,7 +132,11 @@ def evaluate(model, embed_layer, eval_loader, node_feats):
     with th.no_grad():
         th.cuda.empty_cache()
         for sample_data in tqdm.tqdm(eval_loader):
-            seeds, blocks = sample_data
+            inputs, seeds, blocks = sample_data
+            seeds = inv_target[seeds]
+
+            for block in blocks:
+                gen_norm(block)
 
             feats = embed_layer(blocks[0].srcdata[dgl.NID],
                                 blocks[0].srcdata['ntype'],
@@ -197,7 +154,7 @@ def evaluate(model, embed_layer, eval_loader, node_feats):
 def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
     dev_id = devices[proc_id] if devices[proc_id] != 'cpu' else -1
     g, node_feats, num_of_ntype, num_classes, num_rels, target_idx, \
-        train_idx, val_idx, test_idx, labels = dataset
+        inv_target, train_idx, val_idx, test_idx, labels = dataset
     if split is not None:
         train_seed, val_seed, test_seed = split
         train_idx = train_idx[train_seed]
@@ -206,28 +163,6 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
 
     fanouts = [int(fanout) for fanout in args.fanout.split(',')]
     node_tids = g.ndata[dgl.NTYPE]
-    sampler = NeighborSampler(g, target_idx, fanouts)
-    loader = DataLoader(dataset=train_idx.numpy(),
-                        batch_size=args.batch_size,
-                        collate_fn=sampler.sample_blocks,
-                        shuffle=True,
-                        num_workers=args.num_workers)
-
-    # validation sampler
-    val_sampler = NeighborSampler(g, target_idx, fanouts)
-    val_loader = DataLoader(dataset=val_idx.numpy(),
-                            batch_size=args.batch_size,
-                            collate_fn=val_sampler.sample_blocks,
-                            shuffle=False,
-                            num_workers=args.num_workers)
-
-    # test sampler
-    test_sampler = NeighborSampler(g, target_idx, [None] * args.n_layers)
-    test_loader = DataLoader(dataset=test_idx.numpy(),
-                             batch_size=args.eval_batch_size,
-                             collate_fn=test_sampler.sample_blocks,
-                             shuffle=False,
-                             num_workers=args.num_workers)
 
     world_size = n_gpus
     if n_gpus > 1:
@@ -235,19 +170,56 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
             master_ip='127.0.0.1', master_port='12345')
         backend = 'nccl'
 
-        # using sparse embedding or usig mix_cpu_gpu model (embedding model can not be stored in GPU)
-        if args.dgl_sparse is False:
+        # using sparse embedding or using mix_cpu_gpu model (embedding model can not be stored in GPU)
+        if dev_id < 0 or args.dgl_sparse is False:
             backend = 'gloo'
         print("backend using {}".format(backend))
         th.distributed.init_process_group(backend=backend,
                                           init_method=dist_init_method,
                                           world_size=world_size,
-                                          rank=dev_id)
+                                          rank=proc_id)
+
+
+
+    sampler = dgl.dataloading.MultiLayerNeighborSampler(fanouts)
+    loader = dgl.dataloading.NodeDataLoader(
+        g,
+        target_idx[train_idx],
+        sampler,
+        use_ddp=n_gpus > 1,
+        batch_size=args.batch_size,
+        shuffle=True,
+        drop_last=False,
+        num_workers=args.num_workers)
+
+    # validation sampler
+    val_loader = dgl.dataloading.NodeDataLoader(
+        g,
+        target_idx[val_idx],
+        sampler,
+        use_ddp=n_gpus > 1,
+        batch_size=args.batch_size,
+        shuffle=False,
+        drop_last=False,
+        num_workers=args.num_workers)
+
+    # test sampler
+    test_sampler = dgl.dataloading.MultiLayerNeighborSampler([None] * args.n_layers)
+    test_loader = dgl.dataloading.NodeDataLoader(
+        g,
+        target_idx[test_idx],
+        test_sampler,
+        use_ddp=n_gpus > 1,
+        batch_size=args.eval_batch_size,
+        shuffle=False,
+        drop_last=False,
+        num_workers=args.num_workers)
 
     # node features
     # None for one-hot feature, if not none, it should be the feature tensor.
     #
-    embed_layer = RelGraphEmbedLayer(dev_id,
+    embed_layer = RelGraphEmbedLayer(dev_id if args.embedding_gpu or not args.dgl_sparse else -1,
+                                     dev_id,
                                      g.number_of_nodes(),
                                      node_tids,
                                      num_of_ntype,
@@ -279,7 +251,8 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
 
     if n_gpus > 1:
         labels = labels.to(dev_id)
-        model.cuda(dev_id)
+        if dev_id >= 0:
+            model.cuda(dev_id)
         model = DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id)
         if args.dgl_sparse:
             embed_layer.cuda(dev_id)
@@ -331,7 +304,14 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
         embed_layer.train()
 
         for i, sample_data in enumerate(loader):
-            seeds, blocks = sample_data
+            input_nodes, seeds, blocks = sample_data
+            # map the seed nodes back to their type-specific ids, so that they
+            # can be used to look up their respective labels
+            seeds = inv_target[seeds]
+
+            for block in blocks:
+                gen_norm(block)
+
             t0 = time.time()
             feats = embed_layer(blocks[0].srcdata[dgl.NID],
                                 blocks[0].srcdata['ntype'],
@@ -353,7 +333,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
             forward_time.append(t1 - t0)
             backward_time.append(t2 - t1)
             train_acc = th.sum(logits.argmax(dim=1) == labels[seeds]).item() / len(seeds)
-            if i % 100 and proc_id == 0:
+            if i % 100 == 0 and proc_id == 0:
                 print("Train Accuracy: {:.4f} | Train Loss: {:.4f}".
                     format(train_acc, loss.item()))
         gc.collect()
@@ -379,7 +359,8 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
 
         vstart = time.time()
         if (queue is not None) or (proc_id == 0):
-            val_logits, val_seeds = evaluate(model, embed_layer, val_loader, node_feats)
+            val_logits, val_seeds = evaluate(model, embed_layer, val_loader,
+                                             node_feats, inv_target)
             if queue is not None:
                 queue.put((val_logits, val_seeds))
 
@@ -407,7 +388,9 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
         if epoch > 0 and do_test:
             tstart = time.time()
             if (queue is not None) or (proc_id == 0):
-                test_logits, test_seeds = evaluate(model, embed_layer, test_loader, node_feats)
+                test_logits, test_seeds = evaluate(model, embed_layer,
+                                                   test_loader, node_feats,
+                                                   inv_target)
                 if queue is not None:
                     queue.put((test_logits, test_seeds))
 
@@ -532,6 +515,17 @@ def main(args, devices):
     train_idx.share_memory_()
     val_idx.share_memory_()
     test_idx.share_memory_()
+
+    # This is a graph with multiple node types, so we want a way to map
+    # our target node from their global node numberings, back to their
+    # numberings within their type. This is used when taking the nodes in a
+    # mini-batch, and looking up their type-specific labels
+    inv_target = th.empty(node_ids.shape,
+        dtype=node_ids.dtype)
+    inv_target.share_memory_()
+    inv_target[target_idx] = th.arange(0, target_idx.shape[0],
+                                       dtype=inv_target.dtype)
+
     # Create csr/coo/csc formats before launching training processes with multi-gpu.
     # This avoids creating certain formats in each sub-process, which saves momory and CPU.
     g.create_formats_()
@@ -542,12 +536,12 @@ def main(args, devices):
     if devices[0] == -1:
         run(0, 0, n_cpus, args, ['cpu'],
             (g, node_feats, num_of_ntype, num_classes, num_rels, target_idx,
-             train_idx, val_idx, test_idx, labels), None, None)
+             inv_target, train_idx, val_idx, test_idx, labels), None, None)
     # gpu
     elif n_gpus == 1:
         run(0, n_gpus, n_cpus, args, devices,
             (g, node_feats, num_of_ntype, num_classes, num_rels, target_idx,
-            train_idx, val_idx, test_idx, labels), None, None)
+             inv_target, train_idx, val_idx, test_idx, labels), None, None)
     # multi gpu
     else:
         queue = mp.Queue(n_gpus)
@@ -577,8 +571,10 @@ def main(args, devices):
                                          if (proc_id + 1) * tstseeds_per_proc < num_test_seeds \
                                          else num_test_seeds]
             p = mp.Process(target=run, args=(proc_id, n_gpus, n_cpus // n_gpus, args, devices,
-                                             (g, node_feats, num_of_ntype, num_classes, num_rels, target_idx,
-                                             train_idx, val_idx, test_idx, labels),
+                                             (g, node_feats, num_of_ntype,
+                                              num_classes, num_rels, target_idx,
+                                              inv_target, train_idx, val_idx,
+                                              test_idx, labels),
                                              (proc_train_seeds, proc_valid_seeds, proc_test_seeds),
                                              queue))
             p.start()
@@ -626,6 +622,8 @@ def config():
             help="Whether use low mem RelGraphCov")
     parser.add_argument("--dgl-sparse", default=False, action='store_true',
             help='Use sparse embedding for node embeddings.')
+    parser.add_argument("--embedding-gpu", default=False, action='store_true',
+            help='Store the node embeddings on the GPU.')
     parser.add_argument('--node-feats', default=False, action='store_true',
             help='Whether use node features')
     parser.add_argument('--layer-norm', default=False, action='store_true',

@@ -23,6 +23,7 @@ template<typename IdType> __global__ void _MapProcByRemainder(
     const int64_t num_index,
     const int64_t num_proc,
     IdType * const proc_id) {
+  assert(num_index <= gridDim.x*blockDim.x);
   const int64_t idx = blockDim.x*static_cast<int64_t>(blockIdx.x)+threadIdx.x;
 
   if (idx < num_index) {
@@ -36,6 +37,7 @@ __global__ void _MapProcByMaskRemainder(
     const int64_t num_index,
     const IdType mask,
     IdType * const proc_id) {
+  assert(num_index <= gridDim.x*blockDim.x);
   const int64_t idx = blockDim.x*static_cast<int64_t>(blockIdx.x)+threadIdx.x;
 
   if (idx < num_index) {
@@ -49,10 +51,28 @@ __global__ void _MapLocalIndexByRemainder(
     IdType * const out,
     const int64_t num_items,
     const int comm_size) {
+  assert(num_items <= gridDim.x*blockDim.x);
   const int64_t idx = threadIdx.x+blockDim.x*blockIdx.x;
 
   if (idx < num_items) {
     out[idx] = in[idx] / comm_size;
+  }
+}
+
+template<typename IdType>
+__global__ void _MapGlobalIndexByRemainder(
+    const IdType * const in,
+    IdType * const out,
+    const int part_id,
+    const int64_t num_items,
+    const int comm_size) {
+  assert(num_items <= gridDim.x*blockDim.x);
+  const int64_t idx = threadIdx.x+blockDim.x*blockIdx.x;
+
+  assert(part_id < comm_size);
+
+  if (idx < num_items) {
+    out[idx] = (in[idx] * comm_size) + part_id;
   }
 }
 
@@ -80,6 +100,7 @@ GeneratePermutationFromRemainder(
     return result;
   }
 
+  result.first = aten::NewIdArray(num_in, ctx, sizeof(IdType)*8);
   result.second = aten::Full(0, num_parts, sizeof(int64_t)*8, ctx);
   int64_t * out_counts = static_cast<int64_t*>(result.second->data);
   if (num_in == 0) {
@@ -117,7 +138,6 @@ GeneratePermutationFromRemainder(
   // then create a permutation array that groups processors together by
   // performing a radix sort
   Workspace<IdType> proc_id_out(device, ctx, num_in);
-  result.first = aten::NewIdArray(num_in, ctx, sizeof(IdType)*8);
   IdType * perm_out = static_cast<IdType*>(result.first->data);
   {
     IdArray perm_in = aten::Range(0, num_in, sizeof(IdType)*8, ctx);
@@ -199,24 +219,29 @@ IdArray MapToLocalFromRemainder(
   const auto& ctx = global_idx->ctx;
   cudaStream_t stream = CUDAThreadEntry::ThreadLocal()->stream;
 
-  IdArray local_idx = aten::NewIdArray(global_idx->shape[0], ctx,
-      sizeof(IdType)*8);
+  if (num_parts > 1) {
+    IdArray local_idx = aten::NewIdArray(global_idx->shape[0], ctx,
+        sizeof(IdType)*8);
 
-  const dim3 block(128);
-  const dim3 grid((global_idx->shape[0] +block.x-1)/block.x);
+    const dim3 block(128);
+    const dim3 grid((global_idx->shape[0] +block.x-1)/block.x);
 
-  CUDA_KERNEL_CALL(
-      _MapLocalIndexByRemainder,
-      grid,
-      block,
-      0,
-      stream,
-      static_cast<const IdType*>(global_idx->data),
-      static_cast<IdType*>(local_idx->data),
-      global_idx->shape[0],
-      num_parts);
+    CUDA_KERNEL_CALL(
+        _MapLocalIndexByRemainder,
+        grid,
+        block,
+        0,
+        stream,
+        static_cast<const IdType*>(global_idx->data),
+        static_cast<IdType*>(local_idx->data),
+        global_idx->shape[0],
+        num_parts);
 
-  return local_idx;
+    return local_idx;
+  } else {
+    // no mapping to be done
+    return global_idx;
+  }
 }
 
 template IdArray
@@ -227,6 +252,57 @@ template IdArray
 MapToLocalFromRemainder<kDLGPU, int64_t>(
         int num_parts,
         IdArray in_idx);
+
+template <DLDeviceType XPU, typename IdType>
+IdArray MapToGlobalFromRemainder(
+    const int num_parts,
+    IdArray local_idx,
+    const int part_id) {
+  CHECK_LT(part_id, num_parts) << "Invalid partition id " << part_id <<
+      "/" << num_parts;
+  CHECK_GE(part_id, 0) << "Invalid partition id " << part_id <<
+      "/" << num_parts;
+
+  const auto& ctx = local_idx->ctx;
+  cudaStream_t stream = CUDAThreadEntry::ThreadLocal()->stream;
+
+  if (num_parts > 1) {
+    IdArray global_idx = aten::NewIdArray(local_idx->shape[0], ctx,
+        sizeof(IdType)*8);
+
+    const dim3 block(128);
+    const dim3 grid((local_idx->shape[0] +block.x-1)/block.x);
+
+    CUDA_KERNEL_CALL(
+        _MapGlobalIndexByRemainder,
+        grid,
+        block,
+        0,
+        stream,
+        static_cast<const IdType*>(local_idx->data),
+        static_cast<IdType*>(global_idx->data),
+        part_id,
+        global_idx->shape[0],
+        num_parts);
+
+    return global_idx;
+  } else {
+    // no mapping to be done
+    return local_idx;
+  }
+}
+
+template IdArray
+MapToGlobalFromRemainder<kDLGPU, int32_t>(
+        int num_parts,
+        IdArray in_idx,
+        int part_id);
+template IdArray
+MapToGlobalFromRemainder<kDLGPU, int64_t>(
+        int num_parts,
+        IdArray in_idx,
+        int part_id);
+
 
 
 }  // namespace impl
