@@ -912,7 +912,6 @@ void NNDescent(const NDArray& points, const IdArray& offsets,
     }
   }
 
-  // device->FreeWorkspace(ctx, states);
   device->FreeWorkspace(ctx, new_candidates);
   device->FreeWorkspace(ctx, old_candidates);
   device->FreeWorkspace(ctx, num_updates);
