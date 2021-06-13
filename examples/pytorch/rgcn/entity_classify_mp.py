@@ -385,7 +385,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
         vend = time.time()
         validation_time += (vend - vstart)
 
-        if epoch > 0 and do_test:
+        if epoch == args.n_epochs - 1 or (epoch > 0 and do_test):
             tstart = time.time()
             if (queue is not None) or (proc_id == 0):
                 test_logits, test_seeds = evaluate(model, embed_layer,
