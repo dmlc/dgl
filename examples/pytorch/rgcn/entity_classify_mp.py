@@ -187,6 +187,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
         target_idx[train_idx],
         sampler,
         use_ddp=n_gpus > 1,
+        device=dev_id if args.num_workers == 0 else None,
         batch_size=args.batch_size,
         shuffle=True,
         drop_last=False,
@@ -198,6 +199,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
         target_idx[val_idx],
         sampler,
         use_ddp=n_gpus > 1,
+        device=dev_id if args.num_workers == 0 else None,
         batch_size=args.batch_size,
         shuffle=False,
         drop_last=False,
@@ -210,6 +212,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
         target_idx[test_idx],
         test_sampler,
         use_ddp=n_gpus > 1,
+        device=dev_id if args.num_workers == 0 else None,
         batch_size=args.eval_batch_size,
         shuffle=False,
         drop_last=False,
@@ -385,7 +388,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
         vend = time.time()
         validation_time += (vend - vstart)
 
-        if epoch > 0 and do_test:
+        if epoch == args.n_epochs - 1 or (epoch > 0 and do_test):
             tstart = time.time()
             if (queue is not None) or (proc_id == 0):
                 test_logits, test_seeds = evaluate(model, embed_layer,
