@@ -227,13 +227,22 @@ class BlockSampler(object):
         blocks = []
         exclude_eids = (
             _tensor_or_dict_to_numpy(exclude_eids) if exclude_eids is not None else None)
+
+        if isinstance(g, DistGraph):
+            # TODO:(nv-dlasalle) dist graphs may not have an associated graph,
+            # causing an error when trying to fetch the device, so for now,
+            # always assume the distributed graph's device is CPU.
+            graph_device = F.cpu()
+        else:
+            graph_device = g.device
+
         for block_id in reversed(range(self.num_layers)):
             seed_nodes_in = seed_nodes
             if isinstance(seed_nodes_in, dict):
-                seed_nodes_in = {ntype: nodes.to(g.device) \
+                seed_nodes_in = {ntype: nodes.to(graph_device) \
                     for ntype, nodes in seed_nodes_in.items()}
             else:
-                seed_nodes_in = seed_nodes_in.to(g.device)
+                seed_nodes_in = seed_nodes_in.to(graph_device)
             frontier = self.sample_frontier(block_id, g, seed_nodes_in)
 
             # Removing edges from the frontier for link prediction training falls
