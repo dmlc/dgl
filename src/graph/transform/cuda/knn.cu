@@ -846,7 +846,11 @@ void NNDescent(const NDArray& points, const IdArray& offsets,
   IdType* central_nodes = result.Ptr<IdType>();
   IdType* neighbors = central_nodes + k * num_nodes;
   uint64_t seed;
-  int64_t block_size = cuda::FindNumThreads(num_nodes);
+  int warp_size = 0;
+  CUDA_CALL(cudaDeviceGetAttribute(
+    &warp_size, cudaDevAttrWarpSize, ctx.device_id));
+  // We don't need large block sizes, since there's not much inter-thread communication
+  int64_t block_size = warp_size;
   int64_t num_blocks = (num_nodes - 1) / block_size + 1;
 
   // allocate space for candidates, distances and flags
