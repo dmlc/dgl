@@ -19,6 +19,29 @@ def _gen_missing_api(api, mod_name):
     return _missing_api
 
 def load_backend(mod_name):
+    # Load backend does four things:
+    # (1) Import backend framework (PyTorch, MXNet, Tensorflow, etc.)
+    # (2) Import DGL C library.  DGL imports it *after* PyTorch/MXNet/Tensorflow.  Otherwise
+    #     DGL will crash with errors like `munmap_chunk(): invalid pointer`.
+    # (3) Sets up the tensoradapter library path.
+    # (4) Import the Python wrappers of the backend framework.  DGL does this last because
+    #     it already depends on both the backend framework and the DGL C library.
+    if mod_name == 'pytorch':
+        import torch
+        mod = torch
+    elif mod_name == 'mxnet':
+        import mxnet
+        mod = mxnet
+    elif mod_name == 'tensorflow':
+        import tensorflow
+        mod = tensorflow
+    else:
+        raise NotImplementedError('Unsupported backend: %s' % mod_name)
+
+    from .._ffi.base import load_tensor_adapter # imports DGL C library
+    version = mod.__version__
+    load_tensor_adapter(mod_name, version)
+
     print('Using backend: %s' % mod_name, file=sys.stderr)
     mod = importlib.import_module('.%s' % mod_name, __name__)
     thismod = sys.modules[__name__]
@@ -49,7 +72,6 @@ def load_backend(mod_name):
                 setattr(thismod, api, mod.__dict__[api])
             else:
                 setattr(thismod, api, _gen_missing_api(api, mod_name))
-
 
 def get_preferred_backend():
     config_path = os.path.join(os.path.expanduser('~'), '.dgl', 'config.json')

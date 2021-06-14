@@ -33,7 +33,7 @@
 #endif
 
 // DGL version
-#define DGL_VERSION "0.6"
+#define DGL_VERSION "0.7"
 
 
 // DGL Runtime is DLPack compatible.
@@ -541,6 +541,11 @@ DGL_DLL int DGLStreamStreamSynchronize(int device_type,
                                        DGLStreamHandle dst);
 
 /*!
+ * \brief Load tensor adapter.
+ */
+DGL_DLL void DGLLoadTensorAdapter(const char *path);
+
+/*!
  * \brief Bug report macro.
  *
  * This serves as a sanity check on system side to make sure the code is correct by
@@ -550,7 +555,7 @@ DGL_DLL int DGLStreamStreamSynchronize(int device_type,
  *
  * Hints the user to file a bug report if the condition fails.
  */
-#define BUG_ON(cond) \
+#define BUG_IF_FAIL(cond) \
   CHECK(cond) << "A bug has been occurred.  " \
                  "Please file a bug report at https://github.com/dmlc/dgl/issues.  " \
                  "Message: "

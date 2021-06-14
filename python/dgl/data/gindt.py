@@ -1,6 +1,6 @@
-"""Dataset for Graph Isomorphism Network(GIN)
-(chen jun): Used for compacted graph kernel dataset in GIN
-Data sets include:
+"""Datasets used in How Powerful Are Graph Neural Networks?
+(chen jun)
+Datasets include:
 MUTAG, COLLAB, IMDBBINARY, IMDBMULTI, NCI1, PROTEINS, PTC, REDDITBINARY, REDDITMULTI5K
 https://github.com/weihua916/powerful-gnns/blob/master/dataset.zip
 """
@@ -17,11 +17,20 @@ from ..convert import graph as dgl_graph
 
 
 class GINDataset(DGLBuiltinDataset):
-    """Datasets for Graph Isomorphism Network (GIN)
-    Adapted from `<https://github.com/weihua916/powerful-gnns/blob/master/dataset.zip>`_.
+    """Dataset Class for `How Powerful Are Graph Neural Networks? <https://arxiv.org/abs/1810.00826>`_.
+    
+    This is adapted from `<https://github.com/weihua916/powerful-gnns/blob/master/dataset.zip>`_.
+    
+    The class provides an interface for nine datasets used in the paper along with the paper-specific
+    settings. The datasets are ``'MUTAG'``, ``'COLLAB'``, ``'IMDBBINARY'``, ``'IMDBMULTI'``,
+    ``'NCI1'``, ``'PROTEINS'``, ``'PTC'``, ``'REDDITBINARY'``, ``'REDDITMULTI5K'``.
 
-    The dataset contains the compact format of popular graph kernel datasets.
-    For more graph kernel datasets, see :class:`TUDataset`.
+    If ``degree_as_nlabel`` is set to ``False``, then ``ndata['label']`` stores the provided node label,
+    otherwise ``ndata['label']`` stores the node in-degrees.
+
+    For graphs that have node attributes, ``ndata['attr']`` stores the node attributes.
+    For graphs that have no attribute, ``ndata['attr']`` stores the corresponding one-hot encoding
+    of ``ndata['label']``.
 
     Parameters
     ---------
@@ -47,7 +56,7 @@ class GINDataset(DGLBuiltinDataset):
     >>> g, label = data[128]
     >>> g
     Graph(num_nodes=13, num_edges=26,
-          ndata_schemes={'label': Scheme(shape=(), dtype=torch.int64), 'attr': Scheme(shape=(7,), dtype=torch.float64)}
+          ndata_schemes={'label': Scheme(shape=(), dtype=torch.int64), 'attr': Scheme(shape=(7,), dtype=torch.float32)}
           edata_schemes={})
     >>> label
     tensor(1)
@@ -59,7 +68,7 @@ class GINDataset(DGLBuiltinDataset):
     >>> batched_labels = torch.tensor(labels)
     >>> batched_graphs
     Graph(num_nodes=330, num_edges=748,
-          ndata_schemes={'label': Scheme(shape=(), dtype=torch.int64), 'attr': Scheme(shape=(7,), dtype=torch.float64)}
+          ndata_schemes={'label': Scheme(shape=(), dtype=torch.int64), 'attr': Scheme(shape=(7,), dtype=torch.float32)}
           edata_schemes={})
     """
 
@@ -173,7 +182,6 @@ class GINDataset(DGLBuiltinDataset):
                     if tmp == len(nrow):
                         # no node attributes
                         nrow = [int(w) for w in nrow]
-                        nattr = None
                     elif tmp > len(nrow):
                         nrow = [int(w) for w in nrow[:tmp]]
                         nattr = [float(w) for w in nrow[tmp:]]
@@ -206,10 +214,8 @@ class GINDataset(DGLBuiltinDataset):
 
                 if nattrs != []:
                     nattrs = np.stack(nattrs)
-                    g.ndata['attr'] = F.tensor(nattrs)
+                    g.ndata['attr'] = F.tensor(nattrs, F.float32)
                     self.nattrs_flag = True
-                else:
-                    nattrs = None
 
                 g.ndata['label'] = F.tensor(nlabels)
                 if len(self.nlabel_dict) > 1:
@@ -228,7 +234,6 @@ class GINDataset(DGLBuiltinDataset):
         if not self.nattrs_flag:
             if self.verbose:
                 print('there are no node features in this dataset!')
-            label2idx = {}
             # generate node attr by node degree
             if self.degree_as_nlabel:
                 if self.verbose:
@@ -246,7 +251,8 @@ class GINDataset(DGLBuiltinDataset):
                 nlabel_set = nlabel_set.union(
                     set([F.as_scalar(nl) for nl in g.ndata['label']]))
             nlabel_set = list(nlabel_set)
-            if len(nlabel_set) == np.max(nlabel_set) + 1 and np.min(nlabel_set) == 0:
+            is_label_valid = all([label in self.nlabel_dict for label in nlabel_set])
+            if is_label_valid and len(nlabel_set) == np.max(nlabel_set) + 1 and np.min(nlabel_set) == 0:
                 # Note this is different from the author's implementation. In weihua916's implementation,
                 # the labels are relabeled anyway. But here we didn't relabel it if the labels are contiguous
                 # to make it consistent with the original dataset
@@ -262,7 +268,7 @@ class GINDataset(DGLBuiltinDataset):
                     g.number_of_nodes(), len(label2idx)))
                 attr[range(g.number_of_nodes()), [label2idx[nl]
                                                   for nl in F.asnumpy(g.ndata['label']).tolist()]] = 1
-                g.ndata['attr'] = F.tensor(attr)
+                g.ndata['attr'] = F.tensor(attr, F.float32)
 
         # after load, get the #classes and #dim
         self.gclasses = len(self.glabel_dict)

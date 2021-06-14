@@ -17,6 +17,13 @@ GraphConv
     :members: weight, bias, forward, reset_parameters
     :show-inheritance:
 
+EdgeWeightNorm
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.conv.EdgeWeightNorm
+    :members: forward
+    :show-inheritance:
+
 RelGraphConv
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -129,6 +136,27 @@ DotGatConv
     :members: forward
     :show-inheritance:
 
+TWIRLSConv
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.conv.TWIRLSConv
+    :members: forward
+    :show-inheritance:
+
+TWIRLSUnfoldingAndAttention
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.conv.TWIRLSUnfoldingAndAttention
+    :members: forward
+    :show-inheritance:
+    
+GCN2Conv
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.conv.GCN2Conv
+    :members: forward
+    :show-inheritance:
+
 .. _apinn-pytorch-dense-conv:
 
 Dense Conv Layers
@@ -187,6 +215,13 @@ SortPooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: dgl.nn.pytorch.glob.SortPooling
+    :members:
+    :show-inheritance:
+
+WeightAndSum
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.glob.WeightAndSum
     :members:
     :show-inheritance:
 
@@ -254,3 +289,12 @@ SegmentedKNNGraph
     :members:
     :show-inheritance:
 
+NodeEmbedding Module
+----------------------------------------
+
+NodeEmbedding
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.sparse_emb.NodeEmbedding
+    :members:
+    :show-inheritance:

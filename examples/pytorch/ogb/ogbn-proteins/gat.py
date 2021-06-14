@@ -4,6 +4,7 @@
 import argparse
 import os
 import random
+import sys
 import time
 
 import dgl
@@ -60,6 +61,7 @@ def preprocess(graph, labels, train_idx):
     # Only the labels in the training set are used as features, while others are filled with zeros.
     graph.ndata["train_labels_onehot"] = torch.zeros(graph.number_of_nodes(), n_classes)
     graph.ndata["train_labels_onehot"][train_idx, labels[train_idx, 0]] = 1
+    graph.ndata["deg"] = graph.out_degrees().float().clamp(min=1)
 
     graph.create_formats_()
 
@@ -105,10 +107,10 @@ def train(args, model, dataloader, _labels, _train_idx, criterion, optimizer, _e
 
     for input_nodes, output_nodes, subgraphs in dataloader:
         subgraphs = [b.to(device) for b in subgraphs]
-        new_train_idx = torch.arange(len(output_nodes))
+        new_train_idx = torch.arange(len(output_nodes), device=device)
 
         if args.use_labels:
-            train_labels_idx = torch.arange(len(output_nodes), len(input_nodes))
+            train_labels_idx = torch.arange(len(output_nodes), len(input_nodes), device=device)
             train_pred_idx = new_train_idx
 
             add_labels(subgraphs[0], train_labels_idx)
@@ -125,7 +127,7 @@ def train(args, model, dataloader, _labels, _train_idx, criterion, optimizer, _e
         loss_sum += loss.item() * count
         total += count
 
-        torch.cuda.empty_cache()
+        # torch.cuda.empty_cache()
 
     return loss_sum / total
 
@@ -136,7 +138,7 @@ def evaluate(args, model, dataloader, labels, train_idx, val_idx, test_idx, crit
 
     preds = torch.zeros(labels.shape).to(device)
 
-    # Due to the limitation of memory capacity, we calculate the average of logits 'eval_times' times.
+    # Due to the memory capacity constraints, we use sampling for inference and calculate the average of the predictions 'eval_times' times.
     eval_times = 1
 
     for _ in range(eval_times):
@@ -150,7 +152,7 @@ def evaluate(args, model, dataloader, labels, train_idx, val_idx, test_idx, crit
             pred = model(subgraphs)
             preds[output_nodes] += pred
 
-            torch.cuda.empty_cache()
+            # torch.cuda.empty_cache()
 
     preds /= eval_times
 
@@ -174,7 +176,7 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
 
     train_batch_size = (len(train_idx) + 9) // 10
     # batch_size = len(train_idx)
-    train_sampler = MultiLayerNeighborSampler([16 for _ in range(args.n_layers)])
+    train_sampler = MultiLayerNeighborSampler([32 for _ in range(args.n_layers)])
     # sampler = MultiLayerFullNeighborSampler(args.n_layers)
     train_dataloader = DataLoaderWrapper(
         NodeDataLoader(
@@ -182,19 +184,19 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
             train_idx.cpu(),
             train_sampler,
             batch_sampler=BatchSampler(len(train_idx), batch_size=train_batch_size),
-            num_workers=4,
+            num_workers=10,
         )
     )
 
-    eval_sampler = MultiLayerNeighborSampler([60 for _ in range(args.n_layers)])
+    eval_sampler = MultiLayerNeighborSampler([100 for _ in range(args.n_layers)])
     # sampler = MultiLayerFullNeighborSampler(args.n_layers)
     eval_dataloader = DataLoaderWrapper(
         NodeDataLoader(
             graph.cpu(),
             torch.cat([train_idx.cpu(), val_idx.cpu(), test_idx.cpu()]),
             eval_sampler,
-            batch_sampler=BatchSampler(graph.number_of_nodes(), batch_size=32768),
-            num_workers=4,
+            batch_sampler=BatchSampler(graph.number_of_nodes(), batch_size=65536),
+            num_workers=10,
         )
     )
 
@@ -252,7 +254,7 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
     print(f"Best val score: {best_val_score}, Final test score: {final_test_score}")
     print("*" * 50)
 
-    if args.plot_curves:
+    if args.plot:
         fig = plt.figure(figsize=(24, 24))
         ax = fig.gca()
         ax.set_xticks(np.arange(0, args.n_epochs, 100))
@@ -326,7 +328,7 @@ def main():
     argparser.add_argument("--wd", type=float, default=0, help="weight decay")
     argparser.add_argument("--eval-every", type=int, default=5, help="evaluate every EVAL_EVERY epochs")
     argparser.add_argument("--log-every", type=int, default=5, help="log every LOG_EVERY epochs")
-    argparser.add_argument("--plot-curves", action="store_true", help="plot learning curves")
+    argparser.add_argument("--plot", action="store_true", help="plot learning curves")
     argparser.add_argument("--save-pred", action="store_true", help="save final predictions")
     args = argparser.parse_args()
 
@@ -336,7 +338,9 @@ def main():
         device = torch.device(f"cuda:{args.gpu}")
 
     # load data & preprocess
+    print("Loading data")
     graph, labels, train_idx, val_idx, test_idx, evaluator = load_data(dataset)
+    print("Preprocessing")
     graph, labels = preprocess(graph, labels, train_idx)
 
     labels, train_idx, val_idx, test_idx = map(lambda x: x.to(device), (labels, train_idx, val_idx, test_idx))
@@ -345,11 +349,13 @@ def main():
     val_scores, test_scores = [], []
 
     for i in range(args.n_runs):
+        print("Running", i)
         seed(args.seed + i)
         val_score, test_score = run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, i + 1)
         val_scores.append(val_score)
         test_scores.append(test_score)
 
+    print(" ".join(sys.argv))
     print(args)
     print(f"Runned {args.n_runs} times")
     print("Val scores:", val_scores)
@@ -362,34 +368,18 @@ def main():
 if __name__ == "__main__":
     main()
 
-# Namespace(attn_drop=0.0, cpu=False, dropout=0.25, edge_drop=0.1, eval_every=5, gpu=3, input_drop=0.1, log_every=5, lr=0.01, n_epochs=1200, n_heads=6, n_hidden=80, n_layers=6, n_runs=10, no_attn_dst=False, plot_curves=True, seed=0, wd=0)
+# Namespace(attn_drop=0.0, cpu=False, dropout=0.25, edge_drop=0.1, eval_every=5, gpu=6, input_drop=0.1, log_every=5, lr=0.01, n_epochs=1200, n_heads=6, n_hidden=80, n_layers=6, n_runs=10, no_attn_dst=False, plot=True, save_pred=False, seed=0, use_labels=False, wd=0)
 # Runned 10 times
-# Val scores: [0.9191360923559534, 0.9190902739433363, 0.91955548684813, 0.91938196250152, 0.9188466895131054, 0.9197077629866909, 0.9197391599757976, 0.9195898788031738, 0.9193022233033481, 0.9193399302341642]
-# Test scores: [0.8667826604519867, 0.8687609429765975, 0.8672772211837847, 0.8681650855671987, 0.8699117519793396, 0.8690210391385448, 0.8728497958960492, 0.8685245877500837, 0.864323193259458, 0.8668325831720998]
-# Average val score: 0.9193689460465219 ± 0.0002730491100383192
-# Average test score: 0.8682448861375143 ± 0.0021303924285955614
+# Val scores: [0.927741031859485, 0.9272113161947824, 0.9271363901359605, 0.9275579074100136, 0.9264291968462317, 0.9275278541203443, 0.9286381790529751, 0.9288245051991526, 0.9269289529175155, 0.9278177920224489]
+# Test scores: [0.8754403567694566, 0.8749781870941457, 0.8735933245353141, 0.8759835445000637, 0.8745950242855286, 0.8742530369108132, 0.8784892022402326, 0.873345314887444, 0.8724393129004984, 0.874077975765639]
+# Average val score: 0.927581312575891 ± 0.0006953509986591492
+# Average test score: 0.8747195279889135 ± 0.001593598488797452
 # Number of params: 2475232
 
-# Namespace(attn_drop=0.0, cpu=False, dropout=0.25, edge_drop=0.1, eval_every=5, gpu=3, input_drop=0.1, log_every=5, lr=0.01, n_epochs=1200, n_heads=6, n_hidden=80, n_layers=6, n_runs=10, no_attn_dst=True, plot_curves=True, seed=0, wd=0)
+# Namespace(attn_drop=0.0, cpu=False, dropout=0.25, edge_drop=0.1, eval_every=5, gpu=7, input_drop=0.1, log_every=5, lr=0.01, n_epochs=1200, n_heads=6, n_hidden=80, n_layers=6, n_runs=10, no_attn_dst=False, plot=True, save_pred=False, seed=0, use_labels=True, wd=0)
 # Runned 10 times
-# Val scores: [0.9189444999090346, 0.9195528736759115, 0.9182374839397544, 0.9195157117554997, 0.920224160572496, 0.9178686384904079, 0.9187506919340453, 0.9201368191117556, 0.9194343717555682, 0.9195504427450948]
-# Test scores: [0.8700498833734864, 0.8668706856410779, 0.865478472559448, 0.8684981160429261, 0.8678271665110211, 0.868009225355837, 0.8698801263531729, 0.86619033217202, 0.86611749081188, 0.8682289996146542]
-# Average val score: 0.9192215693889567 ± 0.0007273194066010714
-# Average test score: 0.8677150498435523 ± 0.0014733512146035438
-# Number of params: 2460352
-
-# Namespace(attn_drop=0.0, cpu=False, dropout=0.25, edge_drop=0.1, eval_every=5, gpu=2, input_drop=0.1, log_every=5, lr=0.01, n_epochs=1200, n_heads=6, n_hidden=80, n_layers=6, n_runs=10, no_attn_dst=False, plot_curves=True, save_pred=True, seed=0, use_labels=True, wd=0)
-# Runned 10 times
-# Val scores: [0.9193633060213451, 0.9203779746344914, 0.9195503776044667, 0.9204148252631666, 0.9197779087259136, 0.9197003603681911, 0.9195532731827772, 0.922506395625185, 0.919422123176764, 0.9199306234551046]
-# Test scores: [0.870916533260643, 0.8700907586514337, 0.8709149989849309, 0.8703713415321251, 0.8692511011576054, 0.8697195043658038, 0.8703150627771118, 0.8713241547443762, 0.8705168321417875, 0.8704109119325667]
-# Average val score: 0.9200597168057406 ± 0.0008857917602566399
-# Average test score: 0.8703831199548384 ± 0.0005730375838682381
+# Val scores: [0.9293776332568928, 0.9281066322254939, 0.9286775378440911, 0.9270252685136046, 0.9267937838323375, 0.9277731792338011, 0.9285615428437761, 0.9270819730221879, 0.9276822010553241, 0.9287115722177839]
+# Test scores: [0.8761623033485811, 0.8773002619440896, 0.8756680817047869, 0.8751873860287073, 0.875781797307807, 0.8764533839446703, 0.8771202308989311, 0.8765888651476396, 0.8773581283481205, 0.8777751912293709]
+# Average val score: 0.9279791324045293 ± 0.0008115348697502517
+# Average test score: 0.8765395629902706 ± 0.0008016806017700173
 # Number of params: 2484192
-
-# Namespace(attn_drop=0.0, cpu=False, dropout=0.25, edge_drop=0.1, eval_every=5, gpu=3, input_drop=0.1, log_every=5, lr=0.01, mask_rate=0.5, n_epochs=1200, n_heads=6, n_hidden=80, n_layers=6, n_runs=10, no_attn_dst=True, plot_curves=True, save_pred=True, seed=0, use_labels=True, wd=0)
-# Runned 10 times
-# Val scores: [0.9201914811111254, 0.9192274705491178, 0.919879421956308, 0.9196867019385541, 0.9183223561502032, 0.9183705549340395, 0.9218517411140457, 0.9201241253883999, 0.9188730796076038, 0.9201345948410253]
-# Test scores: [0.8711975317887513, 0.8668941041310539, 0.8677566735523206, 0.8691143485031099, 0.8705658833997728, 0.8715691068027097, 0.8691939716278808, 0.8675799123628813, 0.8689518849798558, 0.8677289586466419]
-# Average val score: 0.9196661527590424 ± 0.000991646077118204
-# Average test score: 0.8690552375794978 ± 0.0015335189388864584
-# Number of params: 2469312

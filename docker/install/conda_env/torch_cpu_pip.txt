@@ -11,3 +11,6 @@ matplotlib
 nltk
 requests[security]
 tqdm  
+pandas
+scikit-learn
+ogb

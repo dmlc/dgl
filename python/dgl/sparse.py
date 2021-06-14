@@ -1,8 +1,7 @@
 """Module for sparse matrix operators."""
 # pylint: disable= invalid-name
 from __future__ import absolute_import
-
-import dgl.ndarray as nd
+from . import ndarray as nd
 from ._ffi.function import _init_api
 from .base import DGLError
 from . import backend as F
@@ -120,6 +119,11 @@ def _gspmm(gidx, op, reduce_op, u, e):
         raise DGLError("We only support gspmm on graph with one edge type")
     use_u = op != 'copy_rhs'
     use_e = op != 'copy_lhs'
+    if use_u and use_e:
+        if F.dtype(u) != F.dtype(e):
+            raise DGLError("The node features' data type {} doesn't match edge"
+                           " features' data type {}, please convert them to the"
+                           " same type.".format(F.dtype(u), F.dtype(e)))
     # deal with scalar features.
     expand_u, expand_e = False, False
     if use_u:
@@ -130,6 +134,7 @@ def _gspmm(gidx, op, reduce_op, u, e):
         if F.ndim(e) == 1:
             e = F.unsqueeze(e, -1)
             expand_e = True
+
     ctx = F.context(u) if use_u else F.context(e)
     dtype = F.dtype(u) if use_u else F.dtype(e)
     u_shp = F.shape(u) if use_u else (0,)
@@ -167,6 +172,10 @@ def _gspmm(gidx, op, reduce_op, u, e):
     # To deal with scalar node/edge features.
     if (expand_u or not use_u) and (expand_e or not use_e):
         v = F.squeeze(v, -1)
+    if expand_u and use_cmp:
+        arg_u = F.squeeze(arg_u, -1)
+    if expand_e and use_cmp:
+        arg_e = F.squeeze(arg_e, -1)
     return v, (arg_u, arg_e)
 
 
@@ -214,6 +223,10 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
         raise DGLError("We only support gsddmm on graph with one edge type")
     use_lhs = op != 'copy_rhs'
     use_rhs = op != 'copy_lhs'
+    if use_lhs and use_rhs:
+        if F.dtype(lhs) != F.dtype(rhs):
+            raise DGLError("The operands data type don't match: {} and {}, please convert them"
+                           " to the same type.".format(F.dtype(lhs), F.dtype(rhs)))
     # deal with scalar features.
     expand_lhs, expand_rhs = False, False
     if use_lhs:
@@ -243,5 +256,197 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
         out = F.squeeze(out, -1)
     return out
 
+
+def _segment_reduce(op, feat, offsets):
+    r"""Segment reduction operator.
+
+    It aggregates the value tensor along the first dimension by segments.
+    The argument ``offsets`` specifies the start offset of each segment (and
+    the upper bound of the last segment). Zero-length segments are allowed.
+
+    .. math::
+      y_i = \Phi_{j=\mathrm{offsets}_i}^{\mathrm{offsets}_{i+1}-1} x_j
+
+    where :math:`\Phi` is the reduce operator.
+
+    Parameters
+    ----------
+    op : str
+        Aggregation method. Can be ``sum``, ``max``, ``min``.
+    x : Tensor
+        Value to aggregate.
+    offsets : Tensor
+        The start offsets of segments.
+
+    Returns
+    -------
+    tuple(Tensor)
+        The first tensor correspond to aggregated tensor of shape
+        ``(len(seglen), value.shape[1:])``, and the second tensor records
+        the argmin/max at each position for computing gradients.
+
+    Notes
+    -----
+    This function does not handle gradients.
+    """
+    n = F.shape(offsets)[0] - 1
+    out_shp = (n,) + F.shape(feat)[1:]
+    ctx = F.context(feat)
+    dtype = F.dtype(feat)
+    idtype = F.dtype(offsets)
+    out = F.zeros(out_shp, dtype, ctx)
+    arg = None
+    if op in ['min', 'max']:
+        arg = F.zeros(out_shp, idtype, ctx)
+    arg_nd = to_dgl_nd_for_write(arg)
+    _CAPI_DGLKernelSegmentReduce(op,
+                                 to_dgl_nd(feat),
+                                 to_dgl_nd(offsets),
+                                 to_dgl_nd_for_write(out),
+                                 arg_nd)
+    arg = None if arg is None else F.zerocopy_from_dgl_ndarray(arg_nd)
+    return out, arg
+
+
+def _scatter_add(x, idx, m):
+    r""" Scatter add operator (on first dimension) implementation.
+
+    Math: y[idx[i], *] += x[i, *]
+
+    Parameters
+    ----------
+    x : Tensor
+        The input feature.
+    idx : Tensor
+        The indices array.
+    m : int
+        The length of output.
+
+    Returns
+    -------
+    Tensor
+        The output tensor.
+    """
+    out_shp = (m,) + F.shape(x)[1:]
+    ctx = F.context(x)
+    dtype = F.dtype(x)
+    out = F.zeros(out_shp, dtype, ctx)
+    _CAPI_DGLKernelScatterAdd(to_dgl_nd(x),
+                              to_dgl_nd(idx),
+                              to_dgl_nd_for_write(out))
+    return out
+
+
+def _bwd_segment_cmp(feat, arg, m):
+    r""" Backward phase of segment reduction (for 'min'/'max' reduction).
+
+    It computes the gradient of input feature given output gradient of
+    the segment reduction result.
+
+    Parameters
+    ----------
+    feat : Tensor
+        The output gradient
+    arg : Tensor
+        The ArgMin/Max tensor produced by segment_reduce op.
+    m : int
+        The length of input gradients' first dimension.
+
+    Returns
+    -------
+    Tensor
+        The input gradient.
+    """
+    out_shp = (m,) + F.shape(feat)[1:]
+    ctx = F.context(feat)
+    dtype = F.dtype(feat)
+    out = F.zeros(out_shp, dtype, ctx)
+    _CAPI_DGLKernelBwdSegmentCmp(to_dgl_nd(feat),
+                                 to_dgl_nd(arg),
+                                 to_dgl_nd_for_write(out))
+    return out
+
+def _csrmm(A, A_weights, B, B_weights, num_vtypes):
+    """Return a graph whose adjacency matrix is the sparse matrix multiplication
+    of those of two given graphs.
+
+    Note that the edge weights of both graphs must be scalar, i.e. :attr:`A_weights`
+    and :attr:`B_weights` must be 1D vectors.
+
+    Parameters
+    ----------
+    A : HeteroGraphIndex
+        The input graph index as left operand.
+    A_weights : Tensor
+        The edge weights of graph A as 1D tensor.
+    B : HeteroGraphIndex
+        The input graph index as right operand.
+    B_weights : Tensor
+        The edge weights of graph B as 1D tensor.
+    num_vtypes : int
+        The number of node types for the returned graph (must be either 1 or 2).
+
+    Returns
+    -------
+    C : HeteroGraphIndex
+        The output graph index.
+    C_weights : Tensor
+        The edge weights of the output graph.
+    """
+    C, C_weights = _CAPI_DGLCSRMM(
+        A, F.to_dgl_nd(A_weights), B, F.to_dgl_nd(B_weights), num_vtypes)
+    return C, F.from_dgl_nd(C_weights)
+
+def _csrsum(As, A_weights):
+    """Return a graph whose adjacency matrix is the sparse matrix summation
+    of the given list of graphs.
+
+    Note that the edge weights of all graphs must be scalar, i.e. the arrays in
+    :attr:`A_weights` must be 1D vectors.
+
+    Parameters
+    ----------
+    As : list[HeteroGraphIndex]
+        The input graph indices.
+    A_weights : list[Tensor]
+        The edge weights of graph A as 1D tensor.
+
+    Returns
+    -------
+    C : HeteroGraphIndex
+        The output graph index.
+    C_weights : Tensor
+        The edge weights of the output graph.
+    """
+    C, C_weights = _CAPI_DGLCSRSum(As, [F.to_dgl_nd(w) for w in A_weights])
+    return C, F.from_dgl_nd(C_weights)
+
+def _csrmask(A, A_weights, B):
+    """Return the weights of A at the locations identical to the sparsity pattern
+    of B.
+
+    If a non-zero entry in B does not exist in A, DGL returns 0 for that location
+    instead.
+
+    Note that the edge weights of the graph must be scalar, i.e. :attr:`A_weights`
+    must be a 1D vector.
+
+    In scipy notation this is identical to ``A[B != 0]``.
+
+    Parameters
+    ----------
+    A : HeteroGraphIndex
+        The input graph index as left operand.
+    A_weights : Tensor
+        The edge weights of graph A as 1D tensor.
+    B : HeteroGraphIndex
+        The input graph index as right operand.
+
+    Returns
+    -------
+    B_weights : Tensor
+        The output weights.
+    """
+    return F.from_dgl_nd(_CAPI_DGLCSRMask(A, F.to_dgl_nd(A_weights), B))
 
 _init_api("dgl.sparse")

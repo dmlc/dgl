@@ -31,15 +31,17 @@ class DGLError(Exception):
 def _load_lib():
     """Load libary by searching possible path."""
     lib_path = libinfo.find_lib_path()
-    lib = ctypes.CDLL(lib_path[0], ctypes.RTLD_GLOBAL)
+    lib = ctypes.CDLL(lib_path[0])
+    dirname = os.path.dirname(lib_path[0])
+    basename = os.path.basename(lib_path[0])
     # DMatrix functions
     lib.DGLGetLastError.restype = ctypes.c_char_p
-    return lib, os.path.basename(lib_path[0])
+    return lib, basename, dirname
 
 # version number
 __version__ = libinfo.__version__
 # library instance of nnvm
-_LIB, _LIB_NAME = _load_lib()
+_LIB, _LIB_NAME, _DIR_NAME = _load_lib()
 
 # The FFI mode of DGL
 _FFI_MODE = os.environ.get("DGL_FFI", "auto")
@@ -109,3 +111,26 @@ def decorate(func, fwrapped):
     """
     import decorator
     return decorator.decorate(func, fwrapped)
+
+
+def load_tensor_adapter(backend, version):
+    """Tell DGL to load a tensoradapter library for given backend and version.
+
+    Parameters
+    ----------
+    backend : str
+        The backend (currently ``pytorch``, ``mxnet`` or ``tensorflow``).
+    version : str
+        The version number of the backend.
+    """
+    version = version.split('+')[0]
+    if sys.platform.startswith('linux'):
+        basename = 'libtensoradapter_%s_%s.so' % (backend, version)
+    elif sys.platform.startswith('darwin'):
+        basename = 'libtensoradapter_%s_%s.dylib' % (backend, version)
+    elif sys.platform.startswith('win'):
+        basename = 'tensoradapter_%s_%s.dll' % (backend, version)
+    else:
+        raise NotImplementedError('Unsupported system: %s' % sys.platform)
+    path = os.path.join(_DIR_NAME, 'tensoradapter', backend, basename)
+    _LIB.DGLLoadTensorAdapter(path.encode('utf-8'))

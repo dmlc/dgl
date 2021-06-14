@@ -227,6 +227,8 @@ class BucketSampler(torch.utils.data.Sampler):
         random.shuffle(datas)
         idxs = sum(datas, [])
         batch = []
+        
+        lens = torch.Tensor([len(x) for x in self.data_source])
         for idx in idxs:
             batch.append(idx)
             mlen = max([0]+[lens[x] for x in batch])

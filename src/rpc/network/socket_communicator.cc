@@ -263,6 +263,8 @@ void SocketReceiver::Finalize() {
   for (auto& socket : sockets_) {
     socket.second->Close();
   }
+  server_socket_->Close();
+  delete server_socket_;
 }
 
 void SocketReceiver::RecvLoop(TCPSocket* socket, MessageQueue* queue) {

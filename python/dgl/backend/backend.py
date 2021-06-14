@@ -235,7 +235,7 @@ def context(input):
 
 def device_type(ctx):
     """Return a str representing device type.
-    
+
     Parameters
     ----------
     ctx : Device context object.
@@ -252,7 +252,7 @@ def device_id(ctx):
 
     For CPU, the index does not matter. For GPU, the index means which GPU
     device on the machine.
-    
+
     Parameters
     ----------
     ctx : Device context object.
@@ -355,6 +355,22 @@ def sum(input, dim, keepdims=False):
     """
     pass
 
+def floor_div(in1, in2):
+    """Element-wise integer division and rounds each quotient towards zero.
+
+    Parameters
+    ----------
+    in1 : Tensor
+        The input tensor
+    in2 : Tensor or integer
+        The input
+
+    Returns
+    -------
+    Tensor
+        A framework-specific tensor.
+    """
+
 def reduce_sum(input):
     """Returns the sum of all elements in the input tensor.
 
@@ -367,6 +383,23 @@ def reduce_sum(input):
     -------
     Tensor
         A framework-specific tensor with shape (1,)
+    """
+    pass
+
+def cumsum(input, dim):
+    """Return the cumulative sum of the elements along a given axis.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor.
+    dim : int
+        The cumulative dimension.
+
+    Returns
+    -------
+    Tensor
+        A framework-specific tensor.
     """
     pass
 
@@ -1168,7 +1201,7 @@ def sort_1d(input):
     """
     pass
 
-def arange(start, stop, dtype):
+def arange(start, stop, dtype, ctx):
     """Create a 1D range int64 tensor.
 
     Parameters
@@ -1178,7 +1211,9 @@ def arange(start, stop, dtype):
     stop : int
         The range stop.
     dtype: str
-        The dtype of result tensor
+        The dtype of result tensor.
+    ctx : Device context object.
+        Device context.
 
     Returns
     -------
@@ -1487,6 +1522,142 @@ def edge_softmax(gidx, logits, eids, norm_by):
     Tensor
         Softmax value
     """
+    pass
+
+def segment_reduce(op, x, offsets):
+    """Segment reduction operator.
+
+    It aggregates the value tensor along the first dimension by segments.
+    The argument ``offsets`` specifies the start offset of each segment (and
+    the upper bound of the last segment). Zero-length segments are allowed.
+
+    .. math::
+      y_i = \Phi_{j=\mathrm{offsets}_i}^{\mathrm{offsets}_{i+1}-1} x_j
+
+    where :math:`\Phi` is the reduce operator.
+
+    Parameters
+    ----------
+    op : str
+        Aggregation method. Can be ``sum``, ``max``, ``min``.
+    x : Tensor
+        Value to aggregate.
+    offsets : Tensor
+        The start offsets of segments.
+
+    Returns
+    -------
+    Tensor
+        Aggregated tensor of shape ``(len(offsets) - 1, value.shape[1:])``.
+    """
+    pass
+
+def scatter_add(x, idx, m):
+
+    """Scatter add (on first dimension) operator.
+
+    Math: y[idx[i], *] += x[i, *]
+
+    Parameters
+    ----------
+    x : Tensor
+        The input feature.
+    idx : Tensor
+        The indices array.
+    m : int
+        The length of output.
+    
+    Returns
+    -------
+    Tensor
+        The output tensor.
+    """
+    pass
+
+def csrmm(A, A_weights, B, B_weights, num_vtypes):
+    """Compute weighted adjacency matrix multiplication.
+
+    Notes
+    -----
+    Both A and B must allow creation of CSR representations, and must be simple graphs
+    (i.e. having at most one edge between two nodes).
+
+    The output unit graph has no format restriction.
+
+    Parameters
+    ----------
+    A : HeteroGraphIndex
+        The unit graph as left operand.
+    A_weights : Tensor
+        The edge weights of A.  Must be a 1D vector.
+    B : HeteroGraphIndex
+        The unit graph as right operand.
+    B_weights : Tensor
+        The edge weights of B.  Must be a 1D vector.
+    num_vtypes : int
+        The number of node types of the output graph.  Must be either 1 or 2.
+
+    Returns
+    -------
+    HeteroGraphIndex
+        The output unit graph.
+    Tensor
+        The output edge weights.
+    """
+    pass
+
+def csrsum(gidxs, weights):
+    """Compute weighted adjacency matrix summation.
+
+    Notes
+    -----
+    All unit graphs must allow creation of CSR representations, and must be simple graphs
+    (i.e. having at most one edge between two nodes).
+
+    The output unit graph has no format restriction.
+
+    Parameters
+    ----------
+    gidxs : list[HeteroGraphIndex]
+        The unit graphs.
+    weights : list[Tensor]
+        The edge weights of each graph.  Must be 1D vectors.
+
+    Returns
+    -------
+    HeteroGraphIndex
+        The output unit graph.
+    Tensor
+        The output edge weights.
+    """
+    pass
+
+def csrmask(A, A_weights, B):
+    """Retrieve the values in the weighted adjacency matrix of graph :attr:`A` at the
+    non-zero positions of graph :attr:`B`'s adjacency matrix.
+
+    In scipy, this is equivalent to ``A[B != 0]``.
+
+    Notes
+    -----
+    Both A and B must allow creation of CSR representations, and must be simple graphs
+    (i.e. having at most one edge between two nodes).
+
+    Parameters
+    ----------
+    A : HeteroGraphIndex
+        The unit graph as left operand.
+    A_weights : Tensor
+        The edge weights of A.  Must be a 1D vector.
+    B : HeteroGraphIndex
+        The unit graph as right operand.
+
+    Returns
+    -------
+    Tensor
+        The output tensor.
+    """
+    pass
 
 
 ###############################################################################
@@ -1543,6 +1714,17 @@ class record_grad(object):
 
 class no_grad(object):
     """Context manager that explicitly disables gradient computation"""
+    def __init__(self):
+        pass
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        pass
+
+class NodeEmbedding(object):
+    """Sparse node embeddings"""
     def __init__(self):
         pass
 

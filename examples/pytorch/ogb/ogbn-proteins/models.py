@@ -1,12 +1,19 @@
 import math
+from functools import partial
 
 import dgl.function as fn
+import dgl.nn.pytorch as dglnn
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from dgl import function as fn
+from dgl._ffi.base import DGLError
+from dgl.base import ALL
+from dgl.nn.pytorch.utils import Identity
 from dgl.ops import edge_softmax
 from dgl.utils import expand_as_pair
+from torch.nn import init
+from torch.utils.checkpoint import checkpoint
 
 
 class MWEConv(nn.Module):
@@ -229,7 +236,8 @@ class GATConv(nn.Module):
                 feat_dst = feat_src
 
             if self._use_symmetric_norm:
-                degs = graph.out_degrees().float().clamp(min=1)
+                degs = graph.srcdata["deg"]
+                # degs = graph.out_degrees().float().clamp(min=1)
                 norm = torch.pow(degs, -0.5)
                 shp = norm.shape + (1,) * (feat_src.dim() - 1)
                 norm = torch.reshape(norm, shp)
@@ -250,6 +258,8 @@ class GATConv(nn.Module):
             # addition could be optimized with DGL's built-in function u_add_v,
             # which further speeds up computation and saves memory footprint.
             graph.srcdata.update({"feat_src_fc": feat_src_fc, "attn_src": attn_src})
+
+            graph.update_all(fn.copy_src(src="feat_src_fc", out="m"), fn.mean(msg="m", out="feat_src_fc"))  # TAG:GCN
 
             if self.attn_dst_fc is not None:
                 attn_dst = self.attn_dst_fc(feat_dst).view(-1, self._n_heads, 1)
@@ -276,10 +286,12 @@ class GATConv(nn.Module):
 
             # message passing
             graph.update_all(fn.u_mul_e("feat_src_fc", "a", "m"), fn.sum("m", "feat_src_fc"))
+
             rst = graph.dstdata["feat_src_fc"]
 
             if self._use_symmetric_norm:
-                degs = graph.in_degrees().float().clamp(min=1)
+                degs = graph.dstdata["deg"]
+                # degs = graph.in_degrees().float().clamp(min=1)
                 norm = torch.pow(degs, 0.5)
                 shp = norm.shape + (1,) * (feat_dst.dim())
                 norm = torch.reshape(norm, shp)
@@ -328,15 +340,13 @@ class GAT(nn.Module):
         self.node_encoder = nn.Linear(node_feats, n_hidden)
         if edge_emb > 0:
             self.edge_encoder = nn.ModuleList()
-        else:
-            self.edge_encoder = None
 
         for i in range(n_layers):
             in_hidden = n_heads * n_hidden if i > 0 else n_hidden
             out_hidden = n_hidden
             # bias = i == n_layers - 1
 
-            if self.edge_encoder is not None:
+            if edge_emb > 0:
                 self.edge_encoder.append(nn.Linear(edge_feats, edge_emb))
             self.convs.append(
                 GATConv(
@@ -348,6 +358,7 @@ class GAT(nn.Module):
                     edge_drop=edge_drop,
                     use_attn_dst=use_attn_dst,
                     allow_zero_in_degree=allow_zero_in_degree,
+                    use_symmetric_norm=True,  # TAG: GCN
                 )
             )
             self.norms.append(nn.BatchNorm1d(n_heads * out_hidden))
@@ -393,4 +404,3 @@ class GAT(nn.Module):
         h = self.pred_linear(h)
 
         return h
-

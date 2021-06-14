@@ -139,11 +139,15 @@ class NDArray {
   /*!
    * \brief Copy data content from another array.
    * \param other The source array to be copied from.
+   * \param stream The stream to perform the copy on if it involves a GPU
+   *        context, otherwise this parameter is ignored.
    * \note The copy may happen asynchrously if it involves a GPU context.
    *       DGLSynchronize is necessary.
    */
-  inline void CopyFrom(DLTensor* other);
-  inline void CopyFrom(const NDArray& other);
+  inline void CopyFrom(DLTensor* other,
+      DGLStreamHandle stream = nullptr);
+  inline void CopyFrom(const NDArray& other,
+      DGLStreamHandle stream = nullptr);
   /*!
    * \brief Copy data content into another array.
    * \param other The source array to be copied from.
@@ -384,15 +388,17 @@ inline void NDArray::reset() {
   }
 }
 
-inline void NDArray::CopyFrom(DLTensor* other) {
+inline void NDArray::CopyFrom(DLTensor* other,
+                              DGLStreamHandle stream) {
   CHECK(data_ != nullptr);
-  CopyFromTo(other, &(data_->dl_tensor));
+  CopyFromTo(other, &(data_->dl_tensor), stream);
 }
 
-inline void NDArray::CopyFrom(const NDArray& other) {
+inline void NDArray::CopyFrom(const NDArray& other,
+                              DGLStreamHandle stream) {
   CHECK(data_ != nullptr);
   CHECK(other.data_ != nullptr);
-  CopyFromTo(&(other.data_->dl_tensor), &(data_->dl_tensor));
+  CopyFromTo(&(other.data_->dl_tensor), &(data_->dl_tensor), stream);
 }
 
 inline void NDArray::CopyTo(DLTensor* other) const {

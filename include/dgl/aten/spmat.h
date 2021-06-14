@@ -25,10 +25,10 @@ enum class SparseFormat {
 /*!
  * \brief Sparse format codes
  */
-const dgl_format_code_t all_code = 0x7;
-const dgl_format_code_t coo_code = 0x1;
-const dgl_format_code_t csr_code = 0x2;
-const dgl_format_code_t csc_code = 0x4;
+const dgl_format_code_t ALL_CODE = 0x7;
+const dgl_format_code_t COO_CODE = 0x1;
+const dgl_format_code_t CSR_CODE = 0x2;
+const dgl_format_code_t CSC_CODE = 0x4;
 
 // Parse sparse format from string.
 inline SparseFormat ParseSparseFormat(const std::string& name) {
@@ -55,11 +55,11 @@ inline std::string ToStringSparseFormat(SparseFormat sparse_format) {
 
 inline std::vector<SparseFormat> CodeToSparseFormats(dgl_format_code_t code) {
   std::vector<SparseFormat> ret;
-  if (code & coo_code)
+  if (code & COO_CODE)
     ret.push_back(SparseFormat::kCOO);
-  if (code & csr_code)
+  if (code & CSR_CODE)
     ret.push_back(SparseFormat::kCSR);
-  if (code & csc_code)
+  if (code & CSC_CODE)
     ret.push_back(SparseFormat::kCSC);
   return ret;
 }
@@ -70,13 +70,13 @@ SparseFormatsToCode(const std::vector<SparseFormat> &formats) {
   for (auto format : formats) {
     switch (format) {
     case SparseFormat::kCOO:
-      ret |= coo_code;
+      ret |= COO_CODE;
       break;
     case SparseFormat::kCSR:
-      ret |= csr_code;
+      ret |= CSR_CODE;
       break;
     case SparseFormat::kCSC:
-      ret |= csc_code;
+      ret |= CSC_CODE;
       break;
     default:
       LOG(FATAL) << "Only support COO/CSR/CSC formats.";
@@ -87,19 +87,19 @@ SparseFormatsToCode(const std::vector<SparseFormat> &formats) {
 
 inline std::string CodeToStr(dgl_format_code_t code) {
   std::string ret = "";
-  if (code & coo_code)
+  if (code & COO_CODE)
     ret += "coo ";
-  if (code & csr_code)
+  if (code & CSR_CODE)
     ret += "csr ";
-  if (code & csc_code)
+  if (code & CSC_CODE)
     ret += "csc ";
   return ret;
 }
 
 inline SparseFormat DecodeFormat(dgl_format_code_t code) {
-  if (code & coo_code)
+  if (code & COO_CODE)
     return SparseFormat::kCOO;
-  if (code & csc_code)
+  if (code & CSC_CODE)
     return SparseFormat::kCSC;
   return SparseFormat::kCSR;
 }

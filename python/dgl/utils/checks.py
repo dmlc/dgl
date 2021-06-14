@@ -119,51 +119,41 @@ def check_all_same_device(glist, name):
             raise DGLError('Expect {}[{}] to be on device {}, but got {}.'.format(
                 name, i, device, g.device))
 
-def check_all_same_keys(dict_list, name):
-    """Check all the dictionaries have the same set of keys."""
-    if len(dict_list) == 0:
+def check_all_same_schema(schemas, name):
+    """Check the list of schemas are the same."""
+    if len(schemas) == 0:
         return
-    keys = dict_list[0].keys()
-    for dct in dict_list:
-        if keys != dct.keys():
-            raise DGLError('Expect all {} to have the same set of keys, but got'
-                           ' {} and {}.'.format(name, keys, dct.keys()))
 
-def check_all_have_keys(dict_list, keys, name):
-    """Check the dictionaries all have the given keys."""
-    if len(dict_list) == 0:
+    for i, schema in enumerate(schemas):
+        if schema != schemas[0]:
+            raise DGLError(
+                'Expect all graphs to have the same schema on {}, '
+                'but graph {} got\n\t{}\nwhich is different from\n\t{}.'.format(
+                    name, i, schema, schemas[0]))
+
+def check_all_same_schema_for_keys(schemas, keys, name):
+    """Check the list of schemas are the same on the given keys."""
+    if len(schemas) == 0:
         return
+
+    head = None
     keys = set(keys)
-    for dct in dict_list:
-        if not keys.issubset(dct.keys()):
-            raise DGLError('Expect all {} to include keys {}, but got {}.'.format(
-                name, keys, dct.keys()))
+    for i, schema in enumerate(schemas):
+        if not keys.issubset(schema.keys()):
+            raise DGLError(
+                'Expect all graphs to have keys {} on {}, '
+                'but graph {} got keys {}.'.format(
+                    keys, name, i, schema.keys()))
 
-def check_all_same_schema(feat_dict_list, keys, name):
-    """Check the features of the given keys all have the same schema.
-
-    Suggest calling ``check_all_have_keys`` first.
-
-    Parameters
-    ----------
-    feat_dict_list : list[dict[str, Tensor]]
-        Feature dictionaries.
-    keys : list[str]
-        Keys
-    name : str
-        Name of this feature dict.
-    """
-    if len(feat_dict_list) == 0:
-        return
-    for fdict in feat_dict_list:
-        for k in keys:
-            t1 = feat_dict_list[0][k]
-            t2 = fdict[k]
-            if F.dtype(t1) != F.dtype(t2) or F.shape(t1)[1:] != F.shape(t2)[1:]:
-                raise DGLError('Expect all features {}["{}"] to have the same data type'
-                               ' and feature size, but got\n\t{} {}\nand\n\t{} {}.'.format(
-                                   name, k, F.dtype(t1), F.shape(t1)[1:],
-                                   F.dtype(t2), F.shape(t2)[1:]))
+        if head is None:
+            head = {k: schema[k] for k in keys}
+        else:
+            target = {k: schema[k] for k in keys}
+            if target != head:
+                raise DGLError(
+                    'Expect all graphs to have the same schema for keys {} on {}, '
+                    'but graph {} got \n\t{}\n which is different from\n\t{}.'.format(
+                        keys, name, i, target, head))
 
 def check_valid_idtype(idtype):
     """Check whether the value of the idtype argument is valid (int32/int64)

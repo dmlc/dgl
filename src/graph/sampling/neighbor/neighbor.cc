@@ -62,7 +62,7 @@ HeteroSubgraph SampleNeighbors(
       induced_edges[etype] = earr.id;
     } else {
       // sample from one relation graph
-      auto req_fmt = (dir == EdgeDir::kOut)? csr_code : csc_code;
+      auto req_fmt = (dir == EdgeDir::kOut)? CSR_CODE : CSC_CODE;
       auto avail_fmt = hg->SelectFormat(etype, req_fmt);
       COOMatrix sampled_coo;
       switch (avail_fmt) {
@@ -148,7 +148,7 @@ HeteroSubgraph SampleNeighborsTopk(
       induced_edges[etype] = earr.id;
     } else {
       // sample from one relation graph
-      auto req_fmt = (dir == EdgeDir::kOut)? csr_code : csc_code;
+      auto req_fmt = (dir == EdgeDir::kOut)? CSR_CODE : CSC_CODE;
       auto avail_fmt = hg->SelectFormat(etype, req_fmt);
       COOMatrix sampled_coo;
       switch (avail_fmt) {

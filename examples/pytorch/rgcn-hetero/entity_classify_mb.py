@@ -7,10 +7,7 @@ import itertools
 import numpy as np
 import time
 import torch as th
-import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import DataLoader
-from functools import partial
 
 import dgl
 from dgl.data.rdf import AIFBDataset, MUTAGDataset, BGSDataset, AMDataset
@@ -32,7 +29,7 @@ def evaluate(model, loader, node_embed, labels, category, device):
         blocks = [blk.to(device) for blk in blocks]
         seeds = seeds[category]
         emb = extract_embed(node_embed, input_nodes)
-        emb = {k : e.to(device) for k, e in emb.items()}
+        emb = {k: e.to(device) for k, e in emb.items()}
         lbl = labels[seeds].to(device)
         logits = model(emb, blocks)[category]
         loss = F.cross_entropy(logits, lbl)
@@ -43,6 +40,13 @@ def evaluate(model, loader, node_embed, labels, category, device):
     return total_loss / count, total_acc / count
 
 def main(args):
+    # check cuda
+    device = 'cpu'
+    use_cuda = args.gpu >= 0 and th.cuda.is_available()
+    if use_cuda:
+        th.cuda.set_device(args.gpu)
+        device = 'cuda:%d' % args.gpu
+
     # load graph data
     if args.dataset == 'aifb':
         dataset = AIFBDataset()
@@ -60,8 +64,8 @@ def main(args):
     num_classes = dataset.num_classes
     train_mask = g.nodes[category].data.pop('train_mask')
     test_mask = g.nodes[category].data.pop('test_mask')
-    train_idx = th.nonzero(train_mask).squeeze()
-    test_idx = th.nonzero(test_mask).squeeze()
+    train_idx = th.nonzero(train_mask, as_tuple=False).squeeze()
+    test_idx = th.nonzero(test_mask, as_tuple=False).squeeze()
     labels = g.nodes[category].data.pop('labels')
 
     # split dataset into train, validate, test
@@ -71,19 +75,13 @@ def main(args):
     else:
         val_idx = train_idx
 
-    # check cuda
-    device = 'cpu'
-    use_cuda = args.gpu >= 0 and th.cuda.is_available()
-    if use_cuda:
-        th.cuda.set_device(args.gpu)
-        device = 'cuda:%d' % args.gpu
-
-    train_label = labels[train_idx]
-    val_label = labels[val_idx]
-    test_label = labels[test_idx]
-
     # create embeddings
     embed_layer = RelGraphEmbed(g, args.n_hidden)
+
+    if not args.data_cpu:
+        labels = labels.to(device)
+        embed_layer = embed_layer.to(device)
+
     node_embed = embed_layer()
     # create model
     model = EntityClassify(g,
@@ -187,6 +185,11 @@ if __name__ == '__main__':
             help="Mini-batch size. If -1, use full graph training.")
     parser.add_argument("--fanout", type=int, default=4,
             help="Fan-out of neighbor sampling.")
+    parser.add_argument('--data-cpu', action='store_true',
+            help="By default the script puts all node features and labels "
+                 "on GPU when using it to save time for data copy. This may "
+                 "be undesired if they cannot fit in GPU memory at once. "
+                 "This flag disables that.")
     fp = parser.add_mutually_exclusive_group(required=False)
     fp.add_argument('--validation', dest='validation', action='store_true')
     fp.add_argument('--testing', dest='validation', action='store_false')

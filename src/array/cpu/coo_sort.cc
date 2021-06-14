@@ -151,6 +151,11 @@ struct CooIterator : public std::iterator<std::random_access_iterator_tag,
     return TupleRef<IdType>(row, col, data);
   }
 
+  // required for random access iterators in VS2019
+  TupleRef<IdType> operator[](size_t offset) const {
+    return TupleRef<IdType>(row + offset, col + offset, data + offset);
+  }
+
   IdType *row, *col, *data;
 };
 

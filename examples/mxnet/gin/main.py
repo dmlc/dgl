@@ -21,7 +21,7 @@ def train(args, net, trainloader, trainer, criterion, epoch):
     for pos, (graphs, labels) in zip(bar, trainloader):
         # batch graphs will be shipped to device in forward part of model
         labels = labels.as_in_context(args.device)
-        feat = graphs.ndata['attr'].astype('float32').as_in_context(args.device)
+        feat = graphs.ndata['attr'].as_in_context(args.device)
 
         with mx.autograd.record():
             graphs = graphs.to(args.device)
@@ -52,7 +52,7 @@ def eval_net(args, net, dataloader, criterion):
     for data in dataloader:
         graphs, labels = data
         labels = labels.as_in_context(args.device)
-        feat = graphs.ndata['attr'].astype('float32').as_in_context(args.device)
+        feat = graphs.ndata['attr'].as_in_context(args.device)
 
         total += len(labels)
         graphs = graphs.to(args.device)

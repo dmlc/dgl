@@ -3,6 +3,8 @@
 6.6 Exact Offline Inference on Large Graphs
 ------------------------------------------------------
 
+:ref:`(中文版) <guide_cn-minibatch-inference>`
+
 Both subgraph sampling and neighborhood sampling are to reduce the
 memory and time consumption for training GNNs with GPUs. When performing
 inference it is usually better to truly aggregate over all neighbors
@@ -34,7 +36,8 @@ that for every layer only the first three minibatches are drawn).
 Implementing Offline Inference
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Consider the two-layer GCN we have mentioned in Section 6.5.1. The way
+Consider the two-layer GCN we have mentioned in Section 6.1
+:ref:`guide-minibatch-node-classification-model`. The way
 to implement offline inference still involves using
 :class:`~dgl.dataloading.neighbor.MultiLayerFullNeighborSampler`, but sampling for
 only one layer at a time. Note that offline inference is implemented as

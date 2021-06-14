@@ -216,11 +216,15 @@ class DGLHeteroGraph(object):
 
         * Inplace update is applied to the current graph.
         * If the key of ``data`` does not contain some existing feature fields,
-        those features for the new nodes will be created by initializers
-        defined with :func:`set_n_initializer` (default initializer fills zeros).
+          those features for the new nodes will be created by initializers
+          defined with :func:`set_n_initializer` (default initializer fills zeros).
         * If the key of ``data`` contains new feature fields, those features for
-        the old nodes will be created by initializers defined with
-        :func:`set_n_initializer` (default initializer fills zeros).
+          the old nodes will be created by initializers defined with
+          :func:`set_n_initializer` (default initializer fills zeros).
+        * This function discards the batch information. Please use
+          :func:`dgl.DGLGraph.set_batch_num_nodes`
+          and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+          to maintain the information.
 
         Examples
         --------
@@ -366,16 +370,20 @@ class DGLHeteroGraph(object):
 
         * Inplace update is applied to the current graph.
         * If end nodes of adding edges does not exists, add_nodes is invoked
-        to add new nodes. The node features of the new nodes will be created
-        by initializers defined with :func:`set_n_initializer` (default
-        initializer fills zeros). In certain cases, it is recommanded to
-        add_nodes first and then add_edges.
+          to add new nodes. The node features of the new nodes will be created
+          by initializers defined with :func:`set_n_initializer` (default
+          initializer fills zeros). In certain cases, it is recommanded to
+          add_nodes first and then add_edges.
         * If the key of ``data`` does not contain some existing feature fields,
-        those features for the new edges will be created by initializers
-        defined with :func:`set_n_initializer` (default initializer fills zeros).
+          those features for the new edges will be created by initializers
+          defined with :func:`set_n_initializer` (default initializer fills zeros).
         * If the key of ``data`` contains new feature fields, those features for
-        the old edges will be created by initializers defined with
-        :func:`set_n_initializer` (default initializer fills zeros).
+          the old edges will be created by initializers defined with
+          :func:`set_n_initializer` (default initializer fills zeros).
+        * This function discards the batch information. Please use
+          :func:`dgl.DGLGraph.set_batch_num_nodes`
+          and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+          to maintain the information.
 
         Examples
         --------
@@ -520,7 +528,7 @@ class DGLHeteroGraph(object):
             self._edge_frames[etid].append(data)
         self._reset_cached_info()
 
-    def remove_edges(self, eids, etype=None):
+    def remove_edges(self, eids, etype=None, store_ids=False):
         r"""Remove multiple edges with the specified edge type
 
         Nodes will not be removed. After removing edges, the rest
@@ -536,6 +544,18 @@ class DGLHeteroGraph(object):
         etype : str or tuple of str, optional
             The type of the edges to remove. Can be omitted if there is
             only one edge type in the graph.
+        store_ids : bool, optional
+            If True, it will store the raw IDs of the extracted nodes and edges in the ``ndata``
+            and ``edata`` of the resulting graph under name ``dgl.NID`` and ``dgl.EID``,
+            respectively.
+
+        Notes
+        -----
+
+        This function discards the batch information. Please use
+        :func:`dgl.DGLGraph.set_batch_num_nodes`
+        and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+        to maintain the information.
 
         Examples
         --------
@@ -602,12 +622,12 @@ class DGLHeteroGraph(object):
             else:
                 edges[c_etype] = self.edges(form='eid', order='eid', etype=c_etype)
 
-        sub_g = self.edge_subgraph(edges, preserve_nodes=True)
+        sub_g = self.edge_subgraph(edges, preserve_nodes=True, store_ids=store_ids)
         self._graph = sub_g._graph
         self._node_frames = sub_g._node_frames
         self._edge_frames = sub_g._edge_frames
 
-    def remove_nodes(self, nids, ntype=None):
+    def remove_nodes(self, nids, ntype=None, store_ids=False):
         r"""Remove multiple nodes with the specified node type
 
         Edges that connect to the nodes will be removed as well. After removing
@@ -623,6 +643,18 @@ class DGLHeteroGraph(object):
         ntype : str, optional
             The type of the nodes to remove. Can be omitted if there is
             only one node type in the graph.
+        store_ids : bool, optional
+            If True, it will store the raw IDs of the extracted nodes and edges in the ``ndata``
+            and ``edata`` of the resulting graph under name ``dgl.NID`` and ``dgl.EID``,
+            respectively.
+
+        Notes
+        -----
+
+        This function discards the batch information. Please use
+        :func:`dgl.DGLGraph.set_batch_num_nodes`
+        and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
+        to maintain the information.
 
         Examples
         --------
@@ -694,7 +726,7 @@ class DGLHeteroGraph(object):
                 nodes[c_ntype] = self.nodes(c_ntype)
 
         # node_subgraph
-        sub_g = self.subgraph(nodes)
+        sub_g = self.subgraph(nodes, store_ids=store_ids)
         self._graph = sub_g._graph
         self._node_frames = sub_g._node_frames
         self._edge_frames = sub_g._edge_frames
@@ -1257,7 +1289,83 @@ class DGLHeteroGraph(object):
         return self._batch_num_nodes[ntype]
 
     def set_batch_num_nodes(self, val):
-        """TBD"""
+        """Manually set the number of nodes for each graph in the batch with the specified node
+        type.
+
+        Parameters
+        ----------
+        val : Tensor or Mapping[str, Tensor]
+            The dictionary storing number of nodes for each graph in the batch for all node types.
+            If the graph has only one node type, ``val`` can also be a single array indicating the
+            number of nodes per graph in the batch.
+
+        Notes
+        -----
+        This API is always used together with ``set_batch_num_edges`` to specify batching
+        information of a graph, it also do not check the correspondance between the graph structure
+        and batching information and user must guarantee there will be no cross-graph edges in the
+        batch.
+
+        Examples
+        --------
+
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Create a homogeneous graph.
+
+        >>> g = dgl.graph(([0, 1, 2, 3, 4, 5], [1, 2, 0, 4, 5, 3]))
+
+        Manually set batch information
+
+        >>> g.set_batch_num_nodes(torch.tensor([3, 3]))
+        >>> g.set_batch_num_edges(torch.tensor([3, 3]))
+
+        Unbatch the graph.
+
+        >>> dgl.unbatch(g)
+        [Graph(num_nodes=3, num_edges=3,
+              ndata_schemes={}
+              edata_schemes={}), Graph(num_nodes=3, num_edges=3,
+              ndata_schemes={}
+              edata_schemes={})]
+
+        Create a heterogeneous graph.
+
+        >>> hg = dgl.heterograph({
+        ...      ('user', 'plays', 'game') : ([0, 1, 2, 3, 4, 5], [0, 1, 1, 3, 3, 2]),
+        ...      ('developer', 'develops', 'game') : ([0, 1, 2, 3], [1, 0, 3, 2])})
+
+        Manually set batch information.
+
+        >>> hg.set_batch_num_nodes({
+        ...     'user': torch.tensor([3, 3]),
+        ...     'game': torch.tensor([2, 2]),
+        ...     'developer': torch.tensor([2, 2])})
+        >>> hg.set_batch_num_edges({
+        ...     ('user', 'plays', 'game'): torch.tensor([3, 3]),
+        ...     ('developer', 'develops', 'game'): torch.tensor([2, 2])})
+
+        Unbatch the graph.
+
+        >>> g1, g2 = dgl.unbatch(hg)
+        >>> g1
+        Graph(num_nodes={'developer': 2, 'game': 2, 'user': 3},
+              num_edges={('developer', 'develops', 'game'): 2, ('user', 'plays', 'game'): 3},
+              metagraph=[('developer', 'game', 'develops'), ('user', 'game', 'plays')])
+        >>> g2
+        Graph(num_nodes={'developer': 2, 'game': 2, 'user': 3},
+              num_edges={('developer', 'develops', 'game'): 2, ('user', 'plays', 'game'): 3},
+              metagraph=[('developer', 'game', 'develops'), ('user', 'game', 'plays')])
+
+        See Also
+        --------
+        set_batch_num_edges
+        batch
+        unbatch
+        """
         if not isinstance(val, Mapping):
             if len(self.ntypes) != 1:
                 raise DGLError('Must provide a dictionary when there are multiple node types.')
@@ -1326,7 +1434,83 @@ class DGLHeteroGraph(object):
         return self._batch_num_edges[etype]
 
     def set_batch_num_edges(self, val):
-        """TBD"""
+        """Manually set the number of edges for each graph in the batch with the specified edge
+        type.
+
+        Parameters
+        ----------
+        val : Tensor or Mapping[str, Tensor]
+            The dictionary storing number of edges for each graph in the batch for all edge types.
+            If the graph has only one edge type, ``val`` can also be a single array indicating the
+            number of edges per graph in the batch.
+
+        Notes
+        -----
+        This API is always used together with ``set_batch_num_nodes`` to specify batching
+        information of a graph, it also do not check the correspondance between the graph structure
+        and batching information and user must guarantee there will be no cross-graph edges in the
+        batch.
+
+        Examples
+        --------
+
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Create a homogeneous graph.
+
+        >>> g = dgl.graph(([0, 1, 2, 3, 4, 5], [1, 2, 0, 4, 5, 3]))
+
+        Manually set batch information
+
+        >>> g.set_batch_num_nodes(torch.tensor([3, 3]))
+        >>> g.set_batch_num_edges(torch.tensor([3, 3]))
+
+        Unbatch the graph.
+
+        >>> dgl.unbatch(g)
+        [Graph(num_nodes=3, num_edges=3,
+              ndata_schemes={}
+              edata_schemes={}), Graph(num_nodes=3, num_edges=3,
+              ndata_schemes={}
+              edata_schemes={})]
+
+        Create a heterogeneous graph.
+
+        >>> hg = dgl.heterograph({
+        ...      ('user', 'plays', 'game') : ([0, 1, 2, 3, 4, 5], [0, 1, 1, 3, 3, 2]),
+        ...      ('developer', 'develops', 'game') : ([0, 1, 2, 3], [1, 0, 3, 2])})
+
+        Manually set batch information.
+
+        >>> hg.set_batch_num_nodes({
+        ...     'user': torch.tensor([3, 3]),
+        ...     'game': torch.tensor([2, 2]),
+        ...     'developer': torch.tensor([2, 2])})
+        >>> hg.set_batch_num_edges(
+        ...     {('user', 'plays', 'game'): torch.tensor([3, 3]),
+        ...     ('developer', 'develops', 'game'): torch.tensor([2, 2])})
+
+        Unbatch the graph.
+
+        >>> g1, g2 = dgl.unbatch(hg)
+        >>> g1
+        Graph(num_nodes={'developer': 2, 'game': 2, 'user': 3},
+              num_edges={('developer', 'develops', 'game'): 2, ('user', 'plays', 'game'): 3},
+              metagraph=[('developer', 'game', 'develops'), ('user', 'game', 'plays')])
+        >>> g2
+        Graph(num_nodes={'developer': 2, 'game': 2, 'user': 3},
+              num_edges={('developer', 'develops', 'game'): 2, ('user', 'plays', 'game'): 3},
+              metagraph=[('developer', 'game', 'develops'), ('user', 'game', 'plays')])
+
+        See Also
+        --------
+        set_batch_num_nodes
+        batch
+        unbatch
+        """
         if not isinstance(val, Mapping):
             if len(self.etypes) != 1:
                 raise DGLError('Must provide a dictionary when there are multiple edge types.')
@@ -2262,13 +2446,6 @@ class DGLHeteroGraph(object):
                         for etid in range(len(self.canonical_etypes))])
         else:
             return self._graph.number_of_edges(self.get_etype_id(etype))
-
-    def __len__(self):
-        """Deprecated: please directly call :func:`number_of_nodes`
-        """
-        dgl_warning('DGLGraph.__len__ is deprecated.'
-                    'Please directly call DGLGraph.number_of_nodes.')
-        return self.number_of_nodes()
 
     @property
     def is_multigraph(self):
@@ -4016,10 +4193,10 @@ class DGLHeteroGraph(object):
         ntid = self.get_ntype_id(ntype)
         ntype = self.ntypes[ntid]
         if is_all(v):
-            v = self.nodes(ntype)
+            v_id = self.nodes(ntype)
         else:
-            v = utils.prepare_tensor(self, v, 'v')
-        ndata = core.invoke_node_udf(self, v, ntype, func, orig_nid=v)
+            v_id = utils.prepare_tensor(self, v, 'v')
+        ndata = core.invoke_node_udf(self, v_id, ntype, func, orig_nid=v_id)
         self._set_n_repr(ntid, v, ndata)
 
     def apply_edges(self, func, edges=ALL, etype=None, inplace=False):
@@ -4216,6 +4393,29 @@ class DGLHeteroGraph(object):
         tensor([[0.],
                 [0.],
                 [1.]])
+
+        **``send_and_recv`` using user-defined functions**
+
+        >>> import torch as th
+        >>> g = dgl.graph(([0, 1], [1, 2]))
+        >>> g.ndata['x'] = th.tensor([[1.], [2.], [3.]])
+
+        >>> # Define the function for sending node features as messages.
+        >>> def send_source(edges):
+        ...     return {'m': edges.src['x']}
+        >>> # Sum the messages received and use this to replace the original node feature.
+        >>> def simple_reduce(nodes):
+        ...     return {'x': nodes.mailbox['m'].sum(1)}
+
+        Send and receive messages.
+
+        >>> g.send_and_recv(g.edges())
+        >>> g.ndata['x']
+        tensor([[1.],
+                [1.],
+                [2.]])
+
+        Note that the feature of node 0 remains the same as it has no incoming edges.
         """
         if inplace:
             raise DGLError('The `inplace` option is removed in v0.5.')
@@ -4231,9 +4431,9 @@ class DGLHeteroGraph(object):
         u, v = self.find_edges(eid, etype=etype)
         # call message passing onsubgraph
         g = self if etype is None else self[etype]
-        ndata = core.message_passing(_create_compute_graph(g, u, v, eid),
-                                     message_func, reduce_func, apply_node_func)
-        dstnodes = F.unique(v)
+        compute_graph, _, dstnodes, _ = _create_compute_graph(g, u, v, eid)
+        ndata = core.message_passing(
+            compute_graph, message_func, reduce_func, apply_node_func)
         self._set_n_repr(dtid, dstnodes, ndata)
 
     def pull(self,
@@ -4335,9 +4535,10 @@ class DGLHeteroGraph(object):
         g = self if etype is None else self[etype]
         # call message passing on subgraph
         src, dst, eid = g.in_edges(v, form='all')
-        ndata = core.message_passing(_create_compute_graph(g, src, dst, eid, v),
-                                     message_func, reduce_func, apply_node_func)
-        self._set_n_repr(dtid, v, ndata)
+        compute_graph, _, dstnodes, _ = _create_compute_graph(g, src, dst, eid, v)
+        ndata = core.message_passing(
+            compute_graph, message_func, reduce_func, apply_node_func)
+        self._set_n_repr(dtid, dstnodes, ndata)
 
     def push(self,
              u,
@@ -4534,8 +4735,11 @@ class DGLHeteroGraph(object):
                 An optional apply function to further update the node features
                 after the message reduction. It must be a :ref:`apiudf`.
 
-        cross_reducer : str
-            Cross type reducer. One of ``"sum"``, ``"min"``, ``"max"``, ``"mean"``, ``"stack"``.
+        cross_reducer : str or callable function
+            Cross type reducer. One of ``"sum"``, ``"min"``, ``"max"``, ``"mean"``, ``"stack"``
+            or a callable function. If a callable function is provided, the input argument must be
+            a single list of tensors containing aggregation results from each edge type, and the
+            output of function must be a single tensor.
         apply_node_func : callable, optional
             An optional apply function after the messages are reduced both
             type-wisely and across different types.
@@ -5235,7 +5439,7 @@ class DGLHeteroGraph(object):
 
             * If formats is None, return the usage status of sparse formats
             * Otherwise, it can be ``'coo'``/``'csr'``/``'csc'`` or a sublist of
-            them, specifying the sparse formats to use.
+              them, specifying the sparse formats to use.
 
         Returns
         -------
@@ -5391,7 +5595,6 @@ class DGLHeteroGraph(object):
             assert fmt in ("coo", "csr", "csc"), '{} is not coo, csr or csc'.format(fmt)
         gidx = self._graph.shared_memory(name, self.ntypes, self.etypes, formats)
         return DGLHeteroGraph(gidx, self.ntypes, self.etypes)
-
 
     def long(self):
         """Cast the graph to one with idtype int64
@@ -5706,8 +5909,11 @@ def reduce_dict_data(frames, reducer, order=None):
     ----------
     frames : list[dict[str, Tensor]]
         Input tensor dictionaries
-    reducer : str
-        One of "sum", "max", "min", "mean", "stack"
+    reducer : str or callable function
+        One of "sum", "max", "min", "mean", "stack" or a callable function.
+        If a callable function is provided, the input arguments must be a single list
+        of tensors containing aggregation results from each edge type, and the
+        output of function must be a single tensor.
     order : list[Int], optional
         Merge order hint. Useful for "stack" reducer.
         If provided, each integer indicates the relative order
@@ -5724,7 +5930,9 @@ def reduce_dict_data(frames, reducer, order=None):
         # Directly return the only one input. Stack reducer requires
         # modifying tensor shape.
         return frames[0]
-    if reducer == 'stack':
+    if callable(reducer):
+        merger = reducer
+    elif reducer == 'stack':
         # Stack order does not matter. However, it must be consistent!
         if order:
             assert len(order) == len(frames)
@@ -5906,6 +6114,6 @@ def _create_compute_graph(graph, u, v, eid, recv_nodes=None):
 
     return DGLHeteroGraph(hgidx, ([srctype], [dsttype]), [etype],
                           node_frames=[srcframe, dstframe],
-                          edge_frames=[eframe])
+                          edge_frames=[eframe]), unique_src, unique_dst, eid
 
 _init_api("dgl.heterograph")

@@ -235,15 +235,15 @@ def src_mul_edge(src, edge, out):
     ----------
     src : str
         The source feature field.
-    dst : str
-        The destination feature field.
+    edge : str
+        The edge feature field.
     out : str
         The output message field.
 
     Examples
     --------
     >>> import dgl
-    >>> message_func = dgl.function.src_mul_edge('h', 'h', 'm')
+    >>> message_func = dgl.function.src_mul_edge('h', 'e', 'm')
     """
     return getattr(sys.modules[__name__], "u_mul_e")(src, edge, out)
 

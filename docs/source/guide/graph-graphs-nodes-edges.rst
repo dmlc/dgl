@@ -3,6 +3,8 @@
 1.2 Graphs, Nodes, and Edges
 ----------------------------
 
+:ref:`(中文版)<guide_cn-graph-graphs-nodes-edges>`
+
 DGL represents each node by a unique integer, called its node ID, and each edge by a pair
 of integers corresponding to the IDs of its end nodes. DGL assigns to each edge a unique
 integer, called its **edge ID**, based on the order in which it was added to the graph. The

@@ -2,7 +2,7 @@
 # pylint: disable=not-callable
 import numpy as np
 
-from .base import DGLError, is_all, NID, EID, ALL
+from .base import DGLError, is_all, NID, EID, ALL, dgl_warning
 from . import backend as F
 from . import function as fn
 from .frame import Frame
@@ -20,7 +20,7 @@ def invoke_node_udf(graph, nid, ntype, func, *, ndata=None, orig_nid=None):
     ----------
     graph : DGLGraph
         The input graph.
-    eid : Tensor
+    nid : Tensor
         The IDs of the nodes to invoke UDF on.
     ntype : str
         Node type.
@@ -75,6 +75,9 @@ def invoke_edge_udf(graph, eid, etype, func, *, orig_eid=None):
     else:
         u, v = graph.find_edges(eid)
         edata = graph._edge_frames[etid].subframe(eid)
+    if len(u) == 0:
+        dgl_warning('The input graph for the user-defined edge function ' \
+                    'does not contain valid edges')
     srcdata = graph._node_frames[stid].subframe(u)
     dstdata = graph._node_frames[dtid].subframe(v)
     ebatch = EdgeBatch(graph, eid if orig_eid is None else orig_eid,
@@ -274,11 +277,8 @@ def message_passing(g, mfunc, rfunc, afunc):
     dict[str, Tensor]
         Results from the message passing computation.
     """
-    if g.number_of_edges() == 0:
-        # No message passing is triggered.
-        ndata = {}
-    elif (is_builtin(mfunc) and is_builtin(rfunc) and
-          getattr(ops, '{}_{}'.format(mfunc.name, rfunc.name), None) is not None):
+    if (is_builtin(mfunc) and is_builtin(rfunc) and
+            getattr(ops, '{}_{}'.format(mfunc.name, rfunc.name), None) is not None):
         # invoke fused message passing
         ndata = invoke_gspmm(g, mfunc, rfunc)
     else:

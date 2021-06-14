@@ -10,12 +10,21 @@
 #include <dgl/runtime/device_api.h>
 #include <dgl/runtime/shared_mem.h>
 #include <dgl/zerocopy_serializer.h>
+#include <dgl/runtime/tensordispatch.h>
 #include "runtime_base.h"
 
 // deleter for arrays used by DLPack exporter
 extern "C" void NDArrayDLPackDeleter(DLManagedTensor* tensor);
 
 namespace dgl {
+
+constexpr DLDataType DLDataTypeTraits<int32_t>::dtype;
+constexpr DLDataType DLDataTypeTraits<int64_t>::dtype;
+constexpr DLDataType DLDataTypeTraits<uint32_t>::dtype;
+constexpr DLDataType DLDataTypeTraits<uint64_t>::dtype;
+constexpr DLDataType DLDataTypeTraits<float>::dtype;
+constexpr DLDataType DLDataTypeTraits<double>::dtype;
+
 namespace runtime {
 
 inline void VerifyDataType(DLDataType dtype) {
@@ -200,6 +209,10 @@ NDArray NDArray::EmptyShared(const std::string &name,
 NDArray NDArray::Empty(std::vector<int64_t> shape,
                        DLDataType dtype,
                        DLContext ctx) {
+  TensorDispatcher* td = TensorDispatcher::Global();
+  if (td->IsAvailable())
+    return td->Empty(shape, dtype, ctx);
+
   NDArray ret = Internal::Create(shape, dtype, ctx);
   // setup memory content
   size_t size = GetDataSize(ret.data_->dl_tensor);
@@ -246,7 +259,7 @@ template<typename T>
 NDArray NDArray::FromVector(const std::vector<T>& vec, DLContext ctx) {
   const DLDataType dtype = DLDataTypeTraits<T>::dtype;
   int64_t size = static_cast<int64_t>(vec.size());
-  NDArray ret = NDArray::Empty({size}, dtype, DLContext{kDLCPU, 0});
+  NDArray ret = NDArray::Empty({size}, dtype, ctx);
   DeviceAPI::Get(ctx)->CopyDataFromTo(
       vec.data(),
       0,

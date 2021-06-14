@@ -13,7 +13,7 @@ from model import *
 import argparse
 
 torch.manual_seed(0)
-data_url = 'https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/ACM.mat'
+data_url = 'https://data.dgl.ai/dataset/ACM.mat'
 data_file_path = '/tmp/ACM.mat'
 
 urllib.request.urlretrieve(data_url, data_file_path)
@@ -42,9 +42,9 @@ def get_n_params(model):
     return pp
 
 def train(model, G):
-    best_val_acc = 0
-    best_test_acc = 0
-    train_step = 0
+    best_val_acc = torch.tensor(0)
+    best_test_acc = torch.tensor(0)
+    train_step = torch.tensor(0)
     for epoch in np.arange(args.n_epoch) + 1:
         model.train()
         logits = model(G, 'paper')

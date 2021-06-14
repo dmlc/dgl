@@ -13,6 +13,7 @@ def gsddmm(g, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
     It computes edge features by :attr:`op` lhs features and rhs features.
 
     .. math::
+
         x_{e} = \phi(x_{lhs}, x_{rhs}), \forall (u,e,v)\in \mathcal{G}
 
     where :math:`x_{e}` is the returned feature on edges and :math:`x_u`,
@@ -33,9 +34,9 @@ def gsddmm(g, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
     rhs_data : tensor or None
         The right operand, could be None if it's not required by op.
     lhs_target: str
-        Choice of `u`(source), `e`(edge) or `v`(destination) for left operand.
+        Choice of ``u``(source), ``e``(edge) or ``v``(destination) for left operand.
     rhs_target: str
-        Choice of `u`(source), `e`(edge) or `v`(destination) for right operand.
+        Choice of ``u``(source), ``e``(edge) or ``v``(destination) for right operand.
 
     Returns
     -------

@@ -3,8 +3,9 @@
 5.2 Edge Classification/Regression
 ---------------------------------------------
 
-Sometimes you wish to predict the attributes on the edges of the graph,
-or even whether an edge exists or not between two given nodes. In that
+:ref:`(中文版) <guide_cn-training-edge-classification>`
+
+Sometimes you wish to predict the attributes on the edges of the graph. In that
 case, you would like to have an *edge classification/regression* model.
 
 Here we generate a random graph for edge prediction as a demonstration.
@@ -40,7 +41,7 @@ Model Implementation Difference from Node Classification
 Assuming that you compute the node representation with the model from
 the previous section, you only need to write another component that
 computes the edge prediction with the
-:meth:`~dgl.DGLHeteroGraph.apply_edges` method.
+:meth:`~dgl.DGLGraph.apply_edges` method.
 
 For instance, if you would like to compute a score for each edge for
 edge regression, the following code computes the dot product of incident

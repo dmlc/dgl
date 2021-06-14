@@ -3,6 +3,8 @@
 Chapter 1: Graph
 ======================
 
+:ref:`(中文版)<guide_cn-graph>`
+
 Graphs express entities (nodes) along with their relations (edges), and both nodes and
 edges can be typed (e.g., ``"user"`` and ``"item"`` are two different types of nodes). DGL provides a
 graph-centric programming abstraction with its core data structure -- :class:`~dgl.DGLGraph`. :class:`~dgl.DGLGraph`

@@ -236,19 +236,30 @@ The following is an example showing how GSDDMM works:
 
 Like GSpMM, GSDDMM operators support both homogeneous and bipartite graph.
 
-Edge Softmax module
--------------------
+Segment Reduce Module
+---------------------
 
-We also provide framework agnostic edge softmax module which was frequently used in
-GNN-like structures, e.g. 
-`Graph Attention Network <https://arxiv.org/pdf/1710.10903.pdf>`_,
-`Transformer <https://papers.nips.cc/paper/7181-attention-is-all-you-need.pdf>`_,
-`Capsule <https://arxiv.org/pdf/1710.09829.pdf>`_, etc.
+DGL provide operators to reduce value tensor along the first dimension by segments.
 
 .. autosummary::
-    :toctree: ../../generated/
+   :toctree: ../../generated/
 
-    edge_softmax
+   segment_reduce
+
+Supported Data types
+--------------------
+Operators defined in ``dgl.ops`` support floating point data types, i.e. the operands
+must be ``half`` (``float16``) /``float``/``double`` tensors.
+The input tensors must have the same data type (if one input tensor has type float16
+and the other input tensor has data type float32, user must convert one of them to
+align with the other one).
+
+``float16`` data type support is disabled by default as it has a minimum GPU
+compute capacity requirement of ``sm_53`` (Pascal, Volta, Turing and Ampere
+architectures).
+
+User can enable float16 for mixed precision training by compiling DGL from source
+(see :doc:`Mixed Precision Training </guide/mixed_precision>` tutorial for details).
 
 Relation with Message Passing APIs
 ----------------------------------

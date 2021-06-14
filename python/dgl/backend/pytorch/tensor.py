@@ -14,8 +14,8 @@ from ...function.base import TargetCode
 from ...base import dgl_warning
 
 if LooseVersion(th.__version__) < LooseVersion("1.5.0"):
-    dgl_warning("Detected an old version of PyTorch. Suggest using torch>=1.5.0 "
-                "for the best experience.")
+    raise Exception("Detected an old version of PyTorch. Please update torch>=1.5.0 "
+                    "for the best experience.")
 
 def data_type_dict():
     return {'float16' : th.float16,
@@ -34,6 +34,11 @@ def cpu():
 def tensor(data, dtype=None):
     if isinstance(data, numbers.Number):
         data = [data]
+    if isinstance(data, list) and len(data) > 0 and isinstance(data[0], th.Tensor):
+        # prevent GPU->CPU->GPU copies
+        if data[0].ndim == 0:
+            # zero dimenion scalar tensors
+            return th.stack(data)
     if isinstance(data, th.Tensor):
         return th.as_tensor(data, dtype=dtype, device=data.device)
     else:
@@ -81,7 +86,7 @@ def device_type(ctx):
 def device_id(ctx):
     ctx = th.device(ctx)
     if ctx.index is None:
-        return 0
+        return 0 if ctx.type == 'cpu' else th.cuda.current_device()
     else:
         return ctx.index
 
@@ -117,8 +122,14 @@ def copy_to(input, ctx, **kwargs):
 def sum(input, dim, keepdims=False):
     return th.sum(input, dim=dim, keepdim=keepdims)
 
+def floor_div(in1, in2):
+    return in1 // in2
+
 def reduce_sum(input):
     return input.sum()
+
+def cumsum(input, dim):
+    return th.cumsum(input, dim=dim)
 
 def mean(input, dim):
     return th.mean(input, dim=dim)
@@ -221,32 +232,40 @@ def randint(shape, dtype, ctx, low, high):
 
 def pad_packed_tensor(input, lengths, value, l_min=None):
     old_shape = input.shape
-    if isinstance(lengths, th.Tensor):
-        max_len = as_scalar(lengths.max())
+    device = input.device
+    if not is_tensor(lengths):
+        lengths = th.tensor(lengths, dtype=th.int64, device=device)
     else:
-        max_len = builtins.max(lengths)
+        lengths = lengths.to(device)
+    max_len = as_scalar(lengths.max())
 
     if l_min is not None:
         max_len = builtins.max(max_len, l_min)
 
     batch_size = len(lengths)
-    device = input.device
     x = input.new(batch_size * max_len, *old_shape[1:])
     x.fill_(value)
-    index = []
-    for i, l in enumerate(lengths):
-        index.extend(range(i * max_len, i * max_len + l))
-    index = th.tensor(index).to(device)
-    return scatter_row(x, index, input).view(batch_size, max_len, *old_shape[1:])
+    index = th.ones(len(input), dtype=th.int64, device=device)
+    cum_lengths = th.cumsum(lengths, 0)
+    index[cum_lengths[:-1]] += (max_len - lengths[:-1])
+    index = th.cumsum(index, 0) - 1
+    x[index] = input
+    return x.view(batch_size, max_len, *old_shape[1:])
 
 def pack_padded_tensor(input, lengths):
-    batch_size, max_len = input.shape[:2]
+    max_len = input.shape[1]
     device = input.device
-    index = []
-    for i, l in enumerate(lengths):
-        index.extend(range(i * max_len, i * max_len + l))
-    index = th.tensor(index).to(device)
-    return gather_row(input.view(batch_size * max_len, -1), index)
+    if not is_tensor(lengths):
+        lengths = th.tensor(lengths, dtype=th.int64, device=device)
+    else:
+        lengths = lengths.to(device)
+    input = input.view(-1, *input.shape[2:])
+    out_len = lengths.sum().item()
+    index = th.ones(out_len, dtype=th.int64, device=device)
+    cum_lengths = th.cumsum(lengths, 0)
+    index[cum_lengths[:-1]] += (max_len - lengths[:-1])
+    index = th.cumsum(index, 0) - 1
+    return input[index]
 
 def boolean_mask(input, mask):
     if 'bool' not in str(mask.dtype):
@@ -286,8 +305,8 @@ def nonzero_1d(input):
 def sort_1d(input):
     return th.sort(input)
 
-def arange(start, stop, dtype=th.int64):
-    return th.arange(start, stop, dtype=dtype)
+def arange(start, stop, dtype=th.int64, ctx=None):
+    return th.arange(start, stop, dtype=dtype, device=ctx)
 
 def rand_shuffle(arr):
     idx = th.randperm(len(arr))
@@ -319,6 +338,13 @@ def zerocopy_from_dgl_ndarray(data):
         #  The issue will be fixed in v1.6 and later.
         return th.tensor([], dtype=getattr(th, data.dtype),
                          device=to_backend_ctx(data.ctx))
+    elif len(data.shape) == 0 or builtins.min(data.shape) == 0:
+        # Workaround the same issue as above, but preserve the shape of the
+        # empty tensor. This is needed by the sparse optimizer when one of
+        # processors may receive no gradients to update, but we want to keep
+        # the dimension of the embedding.
+        return th.empty(data.shape, dtype=getattr(th, data.dtype),
+                        device=to_backend_ctx(data.ctx))
     else:
         return dlpack.from_dlpack(data.to_dlpack())
 
@@ -495,7 +521,7 @@ def _reduce_grad(grad, shape):
     num_to_squeeze = len(grad_shape) - len(in_shape)
     # pad inshape
     in_shape = (1,) * num_to_squeeze + in_shape
-    reduce_idx = th.nonzero(th.tensor(grad_shape) - th.tensor(in_shape))
+    reduce_idx = th.nonzero(th.tensor(grad_shape) - th.tensor(in_shape), as_tuple=False)
     reduce_idx += 1  # skip batch dim
     grad = grad.sum(dim=tuple(reduce_idx), keepdim=True)
     return grad.view(shape)

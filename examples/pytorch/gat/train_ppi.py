@@ -18,11 +18,7 @@ import argparse
 from sklearn.metrics import f1_score
 from gat import GAT
 from dgl.data.ppi import PPIDataset
-from torch.utils.data import DataLoader
-
-def collate(graphs):
-    graph = dgl.batch(graphs)
-    return graph
+from dgl.dataloading import GraphDataLoader
 
 def evaluate(feats, model, subgraph, labels, loss_fcn):
     with torch.no_grad():
@@ -54,9 +50,9 @@ def main(args):
     train_dataset = PPIDataset(mode='train')
     valid_dataset = PPIDataset(mode='valid')
     test_dataset = PPIDataset(mode='test')
-    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, collate_fn=collate)
-    valid_dataloader = DataLoader(valid_dataset, batch_size=batch_size, collate_fn=collate)
-    test_dataloader = DataLoader(test_dataset, batch_size=batch_size, collate_fn=collate)
+    train_dataloader = GraphDataLoader(train_dataset, batch_size=batch_size)
+    valid_dataloader = GraphDataLoader(valid_dataset, batch_size=batch_size)
+    test_dataloader = GraphDataLoader(test_dataset, batch_size=batch_size)
     g = train_dataset[0]
     n_classes = train_dataset.num_labels
     num_feats = g.ndata['feat'].shape[1]

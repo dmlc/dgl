@@ -79,6 +79,16 @@ IdArray Range(int64_t low, int64_t high, uint8_t nbits, DLContext ctx);
  */
 IdArray Full(int64_t val, int64_t length, uint8_t nbits, DLContext ctx);
 
+/*!
+ * \brief Return an array full of the given value with the given type.
+ * \param val The value to fill.
+ * \param length Number of elements.
+ * \param ctx Device context
+ * \return the result array
+ */
+template <typename DType>
+NDArray Full(DType val, int64_t length, DLContext ctx);
+
 /*! \brief Create a deep copy of the given array */
 IdArray Clone(IdArray arr);
 
@@ -314,9 +324,15 @@ IdArray NonZero(NDArray array);
  * is always in int64.
  *
  * \param array Input array.
+ * \param num_bits The number of bits used in key comparison. For example, if the data type
+ *                 of the input array is int32_t and `num_bits = 8`, it only uses bits in index
+ *                 range [0, 8) for sorting. Setting it to a small value could
+ *                 speed up the sorting if the underlying sorting algorithm is radix sort (e.g., on GPU).
+ *                 Setting it to zero (default value) means using all the bits for comparison.
+ *                 On CPU, it currently has no effect.
  * \return A pair of arrays: sorted values and sorted index to the original position.
  */
-std::pair<IdArray, IdArray> Sort(IdArray array);
+std::pair<IdArray, IdArray> Sort(IdArray array, int num_bits = 0);
 
 /*!
  * \brief Return a string that prints out some debug information.

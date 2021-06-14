@@ -1,7 +1,7 @@
 import torch
 import math
 import dgl.function as fn
-from dgl.nn.pytorch import edge_softmax
+from dgl.nn.functional import edge_softmax
 from utlis import *
 from torch import nn
 import torch.nn.functional as F

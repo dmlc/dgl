@@ -557,14 +557,14 @@ class AIFBDataset(RDFGraphDataset):
             >>> dataset = AIFBDataset()
             >>> graph = dataset[0]
             >>> train_mask = graph.nodes[dataset.category].data['train_mask']
-            >>> train_idx = th.nonzero(train_mask).squeeze()
+            >>> train_idx = th.nonzero(train_mask, as_tuple=False).squeeze()
 
         - ``test_idx`` is deprecated, it can be replaced by:
 
             >>> dataset = AIFBDataset()
             >>> graph = dataset[0]
             >>> test_mask = graph.nodes[dataset.category].data['test_mask']
-            >>> test_idx = th.nonzero(test_mask).squeeze()
+            >>> test_idx = th.nonzero(test_mask, as_tuple=False).squeeze()
 
     AIFB DataSet is a Semantic Web (RDF) dataset used as a benchmark in
     data mining.  It records the organizational structure of AIFB at the

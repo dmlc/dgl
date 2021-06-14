@@ -70,7 +70,7 @@ def train():
             dataset,
             batch_size=batch_size,
             shuffle=True,
-            num_workers=0,
+            num_workers=4,
             collate_fn=JTNNCollator(vocab, True),
             drop_last=True,
             worker_init_fn=worker_init_fn)

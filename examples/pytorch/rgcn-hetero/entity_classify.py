@@ -30,8 +30,8 @@ def main(args):
     num_classes = dataset.num_classes
     train_mask = g.nodes[category].data.pop('train_mask')
     test_mask = g.nodes[category].data.pop('test_mask')
-    train_idx = th.nonzero(train_mask).squeeze()
-    test_idx = th.nonzero(test_mask).squeeze()
+    train_idx = th.nonzero(train_mask, as_tuple=False).squeeze()
+    test_idx = th.nonzero(test_mask, as_tuple=False).squeeze()
     labels = g.nodes[category].data.pop('labels')
     category_id = len(g.ntypes)
     for i, ntype in enumerate(g.ntypes):

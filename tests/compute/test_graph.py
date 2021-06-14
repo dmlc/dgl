@@ -59,7 +59,6 @@ def test_query():
     def _test_one(g):
         assert g.number_of_nodes() == 10
         assert g.number_of_edges() == 20
-        assert len(g) == 10
 
         for i in range(10):
             assert g.has_node(i)
@@ -131,7 +130,6 @@ def test_query():
     def _test_csr_one(g):
         assert g.number_of_nodes() == 10
         assert g.number_of_edges() == 20
-        assert len(g) == 10
 
         for i in range(10):
             assert g.has_node(i)
@@ -337,6 +335,14 @@ def test_hypersparse_query():
     assert g.in_degree(1) == 1
     assert g.out_degree(0) == 1
     assert g.out_degree(1) == 0
+
+def test_empty_data_initialized():
+    g = dgl.DGLGraph()
+    g = g.to(F.ctx())
+    g.ndata["ha"] = F.tensor([])
+    g.add_nodes(1, {"hb": F.tensor([1])})
+    assert "ha" in g.ndata
+    assert len(g.ndata["ha"]) == 1
 
 if __name__ == '__main__':
     test_query()
