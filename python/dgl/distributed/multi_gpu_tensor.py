@@ -1,6 +1,7 @@
 from .. import utils
 from .. import ndarray
 from .. import backend as F
+from ..partition import NDArrayPartition
 
 class MultiGPUTensor:
     def __init__(self, shape, dtype, device, comm, partition=None):
@@ -23,9 +24,9 @@ class MultiGPUTensor:
             GPUs.
         """
         if partition is None:
-            parition = NDArrayPartition(
+            partition = NDArrayPartition(
                 shape[0],
-                self._comm.size(),
+                comm.size(),
                 mode='remainder')
         assert partition.num_parts() == comm.size(), "The partition " \
             "must have the same number of parts as the communicator has ranks."
@@ -75,7 +76,9 @@ class MultiGPUTensor:
             The tensor to replace the current one with. It must be of the same
             shape as this local tensor.
         """
-        self._tensor = values
+        assert self._tensor.shape == values.shape, "Can only replace local " \
+            "tensor with one of same shape."
+        self._tensor = F.copy_to(values, ctx=F.context(self._tensor))
 
     def update_local(self, index, values):
         """ Independently set rows of the local tensor to the given values.

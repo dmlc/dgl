@@ -7,6 +7,7 @@ import torch.optim as optim
 import dgl.multiprocessing as mp
 import dgl.nn.pytorch as dglnn
 from dgl.distributed.multi_gpu_tensor import MultiGPUTensor
+from dgl.cuda import nccl
 import time
 import math
 import argparse
@@ -93,8 +94,8 @@ def run(proc_id, n_gpus, args, devices, data, nccl_id=None):
             nccl_comm = nccl.Communicator(n_gpus, proc_id, nccl_id)
 
             # split features across GPUs
-            train_nfeat = distribute_tensor(train_nfeat, dev_id, comm)
-            train_labels = distribute_tensor(train_labels, dev_id, comm)
+            train_nfeat = distribute_tensor(train_nfeat, dev_id, nccl_comm)
+            train_labels = distribute_tensor(train_labels, dev_id, nccl_comm)
         else:
             train_nfeat = train_nfeat.to(dev_id)
             train_labels = train_labels.to(dev_id)
