@@ -6,6 +6,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 import dgl.multiprocessing as mp
 import dgl.nn.pytorch as dglnn
+from dgl.distributed.multi_gpu_tensor import MultiGPUTensor
 import time
 import math
 import argparse
@@ -36,17 +37,31 @@ def evaluate(model, g, nfeat, labels, val_nid, device):
     model.train()
     return compute_acc(pred[val_nid], labels[val_nid])
 
+def distribute_tensor(tensor, device, comm):
+    dist_tensor = MultiGPUTensor(tensor.shape, tensor.dtype, device,
+        comm)
+    dist_tensor.set_global(tensor)
+    return dist_tensor
+
 def load_subtensor(nfeat, labels, seeds, input_nodes, dev_id):
     """
     Extracts features and labels for a subset of nodes.
     """
-    batch_inputs = nfeat[input_nodes].to(dev_id)
-    batch_labels = labels[seeds].to(dev_id)
+    if isinstance(nfeat, MultiGPUTensor):
+        batch_inputs = nfeat.get_global(input_nodes).to(dev_id)
+    else:
+        batch_inputs = nfeat[input_nodes].to(dev_id)
+
+    if isinstance(labels, MultiGPUTensor):
+        batch_labels = labels.get_global(seeds).to(dev_id)
+    else:
+        batch_labels = labels[seeds].to(dev_id)
+
     return batch_inputs, batch_labels
 
 #### Entry point
 
-def run(proc_id, n_gpus, args, devices, data):
+def run(proc_id, n_gpus, args, devices, data, nccl_id=None):
     # Start up distributed training, if enabled.
     dev_id = devices[proc_id]
     if n_gpus > 1:
@@ -74,8 +89,15 @@ def run(proc_id, n_gpus, args, devices, data):
         train_labels = val_labels = test_labels = g.ndata.pop('labels')
 
     if not args.data_cpu:
-        train_nfeat = train_nfeat.to(dev_id)
-        train_labels = train_labels.to(dev_id)
+        if nccl_id:
+            nccl_comm = nccl.Communicator(n_gpus, proc_id, nccl_id)
+
+            # split features across GPUs
+            train_nfeat = distribute_tensor(train_nfeat, dev_id, comm)
+            train_labels = distribute_tensor(train_labels, dev_id, comm)
+        else:
+            train_nfeat = train_nfeat.to(dev_id)
+            train_labels = train_labels.to(dev_id)
 
     in_feats = train_nfeat.shape[1]
 
@@ -222,9 +244,10 @@ if __name__ == '__main__':
     if n_gpus == 1:
         run(0, n_gpus, args, devices, data)
     else:
+        nccl_id = nccl.UniqueId()
         procs = []
         for proc_id in range(n_gpus):
-            p = mp.Process(target=run, args=(proc_id, n_gpus, args, devices, data))
+            p = mp.Process(target=run, args=(proc_id, n_gpus, args, devices, data, nccl_id))
             p.start()
             procs.append(p)
         for p in procs:
