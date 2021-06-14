@@ -1,6 +1,5 @@
 import os
 import numpy as np
-import pandas as pd
 import scipy.sparse as sp
 
 from .dgl_dataset import DGLBuiltinDataset
@@ -129,9 +128,9 @@ class FakeNewsDataset(DGLBuiltinDataset):
         num_graphs = self.labels.shape[0]
 
         node_graph_id = np.load(os.path.join(self.raw_path, 'node_graph_id.npy'))
-        edges = pd.read_csv(os.path.join(self.raw_path, 'A.txt'), header=None)
-        src = edges[0].to_numpy()
-        dst = edges[1].to_numpy()
+        edges = np.genfromtxt(os.path.join(self.raw_path, 'A.txt'), delimiter=',', dtype=int)
+        src = edges[:, 0]
+        dst = edges[:, 1]
         g = graph((src, dst))
 
         node_idx_list = []
