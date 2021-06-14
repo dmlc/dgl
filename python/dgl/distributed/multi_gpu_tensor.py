@@ -1,4 +1,6 @@
-
+from .. import utils
+from .. import ndarray
+from .. import backend as F
 
 class MultiGPUTensor:
     def __init__(self, shape, dtype, device, comm, partition=None):
@@ -13,7 +15,7 @@ class MultiGPUTensor:
             allowed.
         device : 
             The current device.
-        comm : NCCLCommunicator
+        comm : nccl.Communicator
             The NCCL communicator to use.
         partition : NDArrayPartition, optional
             The partition describing how the tensor is split across the GPUs.
@@ -34,8 +36,7 @@ class MultiGPUTensor:
         self._partition = partition
         local_shape = list(shape)
         local_shape[0] = self._partition.local_size(self._comm.rank())
-        self._tensor = ndarray.empty(local_shape, dtype=dtype,
-            ctx=utils.to_dgl_context(device))
+        self._tensor = F.zeros(shape, dtype, device)
 
     def get_global(self, index):
         """ Synchronously with all other GPUs the tensor is stored on, gather
@@ -52,7 +53,7 @@ class MultiGPUTensor:
         Tensor
             The rows matching the set of requested indices.
         """
-        return self._comm.spasre_all_to_all_pull(
+        return self._comm.sparse_all_to_all_pull(
             index, self._tensor, self._partition)
 
     def get_local(self):
@@ -74,9 +75,9 @@ class MultiGPUTensor:
             The tensor to replace the current one with. It must be of the same
             shape as this local tensor.
         """
-        self._tensor.compfrom(values)
+        self._tensor = values
 
-    def set_local(self, index, values):
+    def update_local(self, index, values):
         """ Independently set rows of the local tensor to the given values.
 
         Parameters
@@ -87,4 +88,4 @@ class MultiGPUTensor:
             The set of values to set in the tensor stored on the current GPU.
         """
         self._tensor[index] = values
-        
+
