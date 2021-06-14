@@ -1,6 +1,6 @@
 # DGL examples for ogbn-arxiv
 
-DGL implementation of GCN and GAT for [ogbn-arxiv](https://ogb.stanford.edu/docs/nodeprop/). Using some of the techniques from *Bag of Tricks for Node Classification with Graph Neural Networks* (https://arxiv.org/abs/2103.13355).
+DGL implementation of GCN and GAT for [ogbn-arxiv](https://ogb.stanford.edu/docs/nodeprop/). Using some of the techniques from *Bag of Tricks for Node Classification with Graph Neural Networks* ([https://arxiv.org/abs/2103.13355](https://arxiv.org/abs/2103.13355)).
 
 Requires DGL 0.5 or later versions.
 
