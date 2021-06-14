@@ -91,6 +91,8 @@ def run(proc_id, n_gpus, args, devices, data, nccl_id=None):
         train_nfeat = val_nfeat = test_nfeat = g.ndata.pop('features')
         train_labels = val_labels = test_labels = g.ndata.pop('labels')
 
+    in_feats = train_nfeat.shape[1]
+
     if not args.data_cpu:
         if nccl_id:
             nccl_comm = nccl.Communicator(n_gpus, proc_id, nccl_id)
@@ -101,8 +103,6 @@ def run(proc_id, n_gpus, args, devices, data, nccl_id=None):
         else:
             train_nfeat = train_nfeat.to(dev_id)
             train_labels = train_labels.to(dev_id)
-
-    in_feats = train_nfeat.shape[1]
 
     train_mask = train_g.ndata['train_mask']
     val_mask = val_g.ndata['val_mask']
