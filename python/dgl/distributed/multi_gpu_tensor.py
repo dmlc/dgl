@@ -37,7 +37,7 @@ class MultiGPUTensor:
         self._partition = partition
         local_shape = list(shape)
         local_shape[0] = self._partition.local_size(self._comm.rank())
-        self._tensor = F.zeros(shape, dtype, device)
+        self._tensor = F.zeros(local_shape, dtype, device)
 
     def get_global(self, index):
         """ Synchronously with all other GPUs the tensor is stored on, gather
@@ -56,6 +56,23 @@ class MultiGPUTensor:
         """
         return self._comm.sparse_all_to_all_pull(
             index, self._tensor, self._partition)
+
+    def set_global(self, values):
+        """ Set this process's portition of the global tensor. It will use the
+        partition to select which rows of the global tensor should be stored in
+        the current device.
+
+        Parameters
+        ----------
+        values : Tensor
+            The global tensor to pull values from.
+        """
+        idxs = F.copy_to(
+            self._partition.get_local_indices(
+                self._comm.rank(),
+                ctx=F.context(self._tensor)),
+            F.context(values))
+        self.set_local(F.copy_to(values[idxs], ctx=F.context(self._tensor)))
 
     def get_local(self):
         """ Independently get the local tensor of this GPU.
@@ -77,18 +94,8 @@ class MultiGPUTensor:
             shape as this local tensor.
         """
         assert self._tensor.shape == values.shape, "Can only replace local " \
-            "tensor with one of same shape."
+            "tensor with one of same shape: {} vs. {}".format(
+                self._tensor.shape, values.shape)
         self._tensor = F.copy_to(values, ctx=F.context(self._tensor))
 
-    def update_local(self, index, values):
-        """ Independently set rows of the local tensor to the given values.
-
-        Parameters
-        ----------
-        index : Tensor
-            The set of indices, in local space, to set on the current GPU.
-        values : Tensor
-            The set of values to set in the tensor stored on the current GPU.
-        """
-        self._tensor[index] = values
 
