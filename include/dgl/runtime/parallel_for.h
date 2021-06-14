@@ -8,6 +8,8 @@
 
 #include <dmlc/omp.h>
 #include <algorithm>
+#include <string>
+#include <cstdlib>
 
 namespace {
 int64_t divup(int64_t x, int64_t y) {
@@ -24,7 +26,27 @@ size_t compute_num_threads(size_t begin, size_t end, size_t grain_size) {
 
   return std::min(static_cast<int64_t>(omp_get_max_threads()), divup(end - begin, grain_size));
 }
-}
+
+struct DefaultGrainSizeT {
+  size_t grain_size;
+
+  DefaultGrainSizeT() {
+    auto var = std::getenv("DGL_PARALLEL_FOR_GRAIN_SIZE");
+
+    if (!var) {
+      grain_size = 1;
+    } else {
+      grain_size = std::stoul(var);
+    }
+  }
+
+  size_t operator()() {
+    return grain_size;
+  }
+};
+}  // namespace
+
+static DefaultGrainSizeT default_grain_size;
 
 /*!
  * \brief OpenMP-based parallel for loop.
@@ -61,6 +83,22 @@ void parallel_for(
   for (auto i = begin; i < end; i++)
     f(i);
 #endif
+}
+
+/*!
+ * \brief OpenMP-based parallel for loop with default grain size.
+ *
+ * parallel_for with grain size to default value, either 1 or controlled through
+ * environment variable DGL_PARALLEL_FOR_GRAIN_SIZE.
+ * If grain size is set to 1, the function behaves the same way as OpenMP
+ * parallel for pragma with static scheduling.
+ */
+template <typename F>
+void parallel_for(
+    const size_t begin,
+    const size_t end,
+    F&& f) {
+  parallel_for(begin, end, default_grain_size(), f);
 }
 }  // namespace runtime
 }  // namespace dgl

@@ -726,6 +726,23 @@ def test_gated_graph_conv(g, idtype):
     assert h.shape[-1] == 10
 
 @parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
+def test_gated_graph_conv_one_etype(g, idtype):
+    ctx = F.ctx()
+    g = g.astype(idtype).to(ctx)
+    ggconv = nn.GatedGraphConv(5, 10, 5, 1)
+    etypes = th.zeros(g.number_of_edges())
+    feat = F.randn((g.number_of_nodes(), 5))
+    ggconv = ggconv.to(ctx)
+    etypes = etypes.to(ctx)
+
+    h = ggconv(g, feat, etypes)
+    h2 = ggconv(g, feat)
+    # current we only do shape check
+    assert F.allclose(h, h2)
+    assert h.shape[-1] == 10
+
+@parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite'], exclude=['zero-degree']))
 def test_nn_conv(g, idtype):
     g = g.astype(idtype).to(F.ctx())
@@ -1113,6 +1130,7 @@ if __name__ == '__main__':
     test_gin_conv()
     test_agnn_conv()
     test_gated_graph_conv()
+    test_gated_graph_conv_one_etype()
     test_nn_conv()
     test_gmm_conv()
     test_dotgat_conv()
