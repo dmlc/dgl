@@ -259,8 +259,6 @@ class GATConv(nn.Module):
             # which further speeds up computation and saves memory footprint.
             graph.srcdata.update({"feat_src_fc": feat_src_fc, "attn_src": attn_src})
 
-            graph.update_all(fn.copy_src(src="feat_src_fc", out="m"), fn.mean(msg="m", out="feat_src_fc"))  # TAG:GCN
-
             if self.attn_dst_fc is not None:
                 attn_dst = self.attn_dst_fc(feat_dst).view(-1, self._n_heads, 1)
                 graph.dstdata.update({"attn_dst": attn_dst})
@@ -358,7 +356,7 @@ class GAT(nn.Module):
                     edge_drop=edge_drop,
                     use_attn_dst=use_attn_dst,
                     allow_zero_in_degree=allow_zero_in_degree,
-                    use_symmetric_norm=True,  # TAG: GCN
+                    use_symmetric_norm=False,
                 )
             )
             self.norms.append(nn.BatchNorm1d(n_heads * out_hidden))

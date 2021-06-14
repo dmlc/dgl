@@ -1,8 +1,10 @@
 # DGL for ogbn-proteins
 
+## GAT
+
 DGL implementation of GAT for [ogbn-proteins](https://ogb.stanford.edu/docs/nodeprop/). Using some of the techniques from *Bag of Tricks for Node Classification with Graph Neural Networks* (https://arxiv.org/abs/2103.13355).
 
-## GAT
+Requires DGL 0.5 or later versions.
 
 ### Usage
 
@@ -24,8 +26,8 @@ Here are the results over 10 runs.
 
 |   Method   | Validation ROC-AUC |  Test ROC-AUC   | #Parameters |
 |:----------:|:------------------:|:---------------:|:-----------:|
-|    GAT     |  0.9194 ± 0.0003   | 0.8682 ± 0.0021 |  2,475,232  |
-| GAT+labels |  0.9201 ± 0.0009   | 0.8704 ± 0.0006 |  2,484,192  |
+|    GAT     |  0.9276 ± 0.0007   | 0.8747 ± 0.0016 |  2,475,232  |
+| GAT+labels |  0.9280 ± 0.0008   | 0.8765 ± 0.0008 |  2,484,192  |
 
 ## MWE-GCN and MWE-DGCN
 
