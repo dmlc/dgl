@@ -871,8 +871,8 @@ void NNDescent(const NDArray& points, const IdArray& offsets,
   IdType* total_num_updates_d = static_cast<IdType*>(
     device->AllocWorkspace(ctx, sizeof(IdType)));
 
-  cub::DeviceReduce::Sum(
-    nullptr, sum_temp_size, num_updates, total_num_updates_d, num_nodes);
+  CUDA_CALL(cub::DeviceReduce::Sum(
+    nullptr, sum_temp_size, num_updates, total_num_updates_d, num_nodes));
   IdType* sum_temp_storage = static_cast<IdType*>(
     device->AllocWorkspace(ctx, sum_temp_size));
 
@@ -900,8 +900,8 @@ void NNDescent(const NDArray& points, const IdArray& offsets,
       flags, num_updates, batch_size, num_candidates, k, feature_size);
 
     total_num_updates = 0;
-    cub::DeviceReduce::Sum(
-      sum_temp_storage, sum_temp_size, num_updates, total_num_updates_d, num_nodes);
+    CUDA_CALL(cub::DeviceReduce::Sum(
+      sum_temp_storage, sum_temp_size, num_updates, total_num_updates_d, num_nodes));
     device->CopyDataFromTo(
       total_num_updates_d, 0, &total_num_updates, 0,
       sizeof(IdType), ctx, DLContext{kDLCPU, 0},
