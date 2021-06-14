@@ -280,7 +280,7 @@ MapEdges(
   const int64_t num_edge_sets = static_cast<int64_t>(edge_sets.size());
   for (int64_t etype = 0; etype < num_edge_sets; ++etype) {
     const EdgeArray& edges = edge_sets[etype];
-    if (edges.id.defined()) {
+    if (edges.id.defined() && edges.src->shape[0] > 0) {
       const int64_t num_edges = edges.src->shape[0];
 
       new_lhs.emplace_back(NewIdArray(num_edges, ctx, sizeof(IdType)*8));
@@ -308,8 +308,10 @@ MapEdges(
         node_map.RhsHashTable(dst_type).DeviceHandle());
       CUDA_CALL(cudaGetLastError());
     } else {
-      new_lhs.emplace_back(aten::NullArray());
-      new_rhs.emplace_back(aten::NullArray());
+      new_lhs.emplace_back(
+          aten::NullArray(DLDataType{kDLInt, sizeof(IdType)*8, 1}, ctx));
+      new_rhs.emplace_back(
+          aten::NullArray(DLDataType{kDLInt, sizeof(IdType)*8, 1}, ctx));
     }
   }
 
