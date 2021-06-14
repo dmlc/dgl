@@ -116,7 +116,7 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
 
     # training loop
     total_time = 0
-    best_val_acc, best_test_acc, best_val_loss = 0, 0, float("inf")
+    best_val_acc, final_test_acc, best_val_loss = 0, 0, float("inf")
 
     accs, train_accs, val_accs, test_accs = [], [], [], []
     losses, train_losses, val_losses, test_losses = [], [], [], []
@@ -141,14 +141,14 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             best_val_acc = val_acc
-            best_test_acc = test_acc
+            final_test_acc = test_acc
 
         if epoch % args.log_every == 0:
             print(
                 f"Run: {n_running}/{args.n_runs}, Epoch: {epoch}/{args.n_epochs}, Average epoch time: {total_time / epoch:.2f}\n"
                 f"Loss: {loss.item():.4f}, Acc: {acc:.4f}\n"
                 f"Train/Val/Test loss: {train_loss:.4f}/{val_loss:.4f}/{test_loss:.4f}\n"
-                f"Train/Val/Test/Best val/Best test acc: {train_acc:.4f}/{val_acc:.4f}/{test_acc:.4f}/{best_val_acc:.4f}/{best_test_acc:.4f}"
+                f"Train/Val/Test/Best val/Final test acc: {train_acc:.4f}/{val_acc:.4f}/{test_acc:.4f}/{best_val_acc:.4f}/{final_test_acc:.4f}"
             )
 
         for l, e in zip(
@@ -197,7 +197,7 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
         plt.tight_layout()
         plt.savefig(f"gcn_loss_{n_running}.png")
 
-    return best_val_acc, best_test_acc
+    return best_val_acc, final_test_acc
 
 
 def count_parameters(args):
