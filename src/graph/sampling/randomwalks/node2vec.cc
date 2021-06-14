@@ -29,19 +29,20 @@ void CheckNode2vecInputs(const HeteroGraphPtr hg, const IdArray seeds,
   CHECK_NDIM(prob, 1, "probability");
 }
 
-IdArray Node2vec(const HeteroGraphPtr hg, const IdArray seeds, const double p,
-                 const double q, const int64_t walk_length,
-                 const FloatArray &prob) {
+std::pair<IdArray, IdArray> Node2vec(
+    const HeteroGraphPtr hg, const IdArray seeds, const double p,
+    const double q, const int64_t walk_length,
+    const FloatArray &prob) {
   CheckNode2vecInputs(hg, seeds, p, q, walk_length, prob);
 
-  IdArray vids;
+  std::pair<IdArray, IdArray> result;
   ATEN_XPU_SWITCH(hg->Context().device_type, XPU, "Node2vec", {
     ATEN_ID_TYPE_SWITCH(seeds->dtype, IdxType, {
-      vids = impl::Node2vec<XPU, IdxType>(hg, seeds, p, q, walk_length, prob);
+      result = impl::Node2vec<XPU, IdxType>(hg, seeds, p, q, walk_length, prob);
     });
   });
 
-  return vids;
+  return result;
 }
 
 DGL_REGISTER_GLOBAL("sampling.randomwalks._CAPI_DGLSamplingNode2vec")
@@ -56,7 +57,10 @@ DGL_REGISTER_GLOBAL("sampling.randomwalks._CAPI_DGLSamplingNode2vec")
       auto result =
           sampling::Node2vec(hg.sptr(), seeds, p, q, walk_length, prob);
 
-      *rv = result;
+      List<Value> ret;
+      ret.push_back(Value(MakeValue(result.first)));
+      ret.push_back(Value(MakeValue(result.second)));
+      *rv = ret;
     });
 
 }  // namespace

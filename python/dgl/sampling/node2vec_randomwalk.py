@@ -7,7 +7,7 @@ from .. import utils
 # pylint: disable=invalid-name
 
 
-def node2vec_randomwalk(g, nodes, p, q, walk_length, prob=None):
+def node2vec_random_walk(g, nodes, p, q, walk_length, prob=None, return_eids=False):
     """
     Generate random walk traces from an array of starting nodes based on the node2vec model.
     Paper:`"node2vec: Scalable Feature Learning for Networks"<https://arxiv.org/abs/1607.00653>`
@@ -42,13 +42,19 @@ def node2vec_randomwalk(g, nodes, p, q, walk_length, prob=None):
         to sum up to one).  The result will be undefined otherwise.
 
         If omitted, DGL assumes that the neighbors are picked uniformly.
+    return_eids : bool, optional
+        If True, additionally return the edge IDs traversed.
+
+        Default: False.
 
 
     Returns
     -------
     traces : Tensor
         A 2-dimensional node ID tensor with shape ``(num_seeds, walk_length + 1)``.
-
+    eids : Tensor, optional
+        A 2-dimensional edge ID tensor with shape ``(num_seeds, length)``.
+        Only returned if :attr:`return_eids` is True.
     """
     assert g.device == F.cpu(), "Graph must be on CPU."
 
@@ -60,11 +66,12 @@ def node2vec_randomwalk(g, nodes, p, q, walk_length, prob=None):
     else:
         prob_nd = F.to_dgl_nd(g.edata[prob])
 
-    traces = _CAPI_DGLSamplingNode2vec(gidx, nodes, p, q, walk_length, prob_nd)
+    traces, eids = _CAPI_DGLSamplingNode2vec(gidx, nodes, p, q, walk_length, prob_nd)
 
     traces = F.from_dgl_nd(traces)
+    eids = F.from_dgl_nd(eids)
 
-    return traces
+    return (traces, eids) if return_eids else traces
 
 
 _init_api('dgl.sampling.randomwalks', __name__)

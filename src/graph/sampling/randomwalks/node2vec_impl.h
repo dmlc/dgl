@@ -14,6 +14,7 @@
 #include <functional>
 #include <utility>
 #include <vector>
+#include <tuple>
 
 namespace dgl {
 
@@ -28,7 +29,7 @@ namespace impl {
  * \brief Node2vec random walk step function
  */
 template <typename IdxType>
-using Node2vecStepFunc = std::function<std::pair<dgl_id_t, bool>(
+using Node2vecStepFunc = std::function<std::tuple<dgl_id_t, dgl_id_t, bool>(
     IdxType *,  // node IDs generated so far
     dgl_id_t,   // last node ID generated
     dgl_id_t,   // second-to-last node ID generated
@@ -38,19 +39,22 @@ using Node2vecStepFunc = std::function<std::pair<dgl_id_t, bool>(
  * \brief Node2vec random walk.
  * \param hg The heterograph.
  * \param seeds A 1D array of seed nodes, with the type the source type of the
- * first edge type in the metapath. \param p Float, indicating likelihood of
- * immediately revisiting a node in the walk. \param q Float, control parameter
- * to interpolate between breadth-first strategy and depth-first strategy.
+ * first edge type in the metapath.
+ * \param p Float, indicating likelihood of immediately revisiting a node in the walk.
+ * \param q Float, control parameter to interpolate between breadth-first strategy and
+ *        depth-first strategy.
  * \param walk_length Int, length of walk.
  * \param prob A vector of 1D float arrays, indicating the transition
- * probability of each edge by edge type.  An empty float array assumes uniform
- * transition. \return A 2D array of shape (len(seeds), len(walk_length) + 1)
- * with node IDs.  The paths that terminated early are padded with -1.
+ *        probability of each edge by edge type.  An empty float array assumes uniform
+ *        transition.
+ * \return A 2D array of shape (len(seeds), len(walk_length) + 1)
+ *         with node IDs.  The paths that terminated early are padded with -1.
  */
 template <DLDeviceType XPU, typename IdxType>
-IdArray Node2vec(const HeteroGraphPtr hg, const IdArray seeds, const double p,
-                 const double q, const int64_t walk_length,
-                 const FloatArray &prob);
+std::pair<IdArray, IdArray> Node2vec(
+    const HeteroGraphPtr hg, const IdArray seeds, const double p,
+    const double q, const int64_t walk_length,
+    const FloatArray &prob);
 
 };  // namespace impl
 

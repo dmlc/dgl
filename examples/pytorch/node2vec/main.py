@@ -1,5 +1,5 @@
 import time
-from dgl.sampling.node2vec import node2vec_randomwalk
+from dgl.sampling import node2vec_random_walk
 from model import Node2vecModel
 from utils import load_graph, parse_arguments
 
@@ -17,7 +17,7 @@ def time_randomwalk(graph, args):
               'walk_length': 50}
 
     for i in range(args.runs):
-        node2vec_randomwalk(graph, graph.nodes(), **params)
+        node2vec_random_walk(graph, graph.nodes(), **params)
     end_time = time.time()
     cost_time_avg = (end_time-start_time)/args.runs
     print("Run dataset {} {} trials, mean run time: {:.3f}s".format(args.dataset, args.runs, cost_time_avg))

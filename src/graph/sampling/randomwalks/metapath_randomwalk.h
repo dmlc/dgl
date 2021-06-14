@@ -14,6 +14,7 @@
 #include <tuple>
 #include <vector>
 #include "randomwalks_impl.h"
+#include "randomwalks_cpu.h"
 
 namespace dgl {
 
@@ -88,8 +89,8 @@ std::tuple<dgl_id_t, dgl_id_t, bool> MetapathRandomWalkStep(
   } else {
     ATEN_FLOAT_TYPE_SWITCH(prob_etype->dtype, DType, "probability", {
       FloatArray prob_selected = FloatArray::Empty({size}, prob_etype->dtype, prob_etype->ctx);
-      DType *prob_selected_data = static_cast<DType *>(prob_selected->data);
-      const DType *prob_etype_data = static_cast<DType *>(prob_etype->data);
+      DType *prob_selected_data = prob_selected.Ptr<DType>();
+      const DType *prob_etype_data = prob_etype.Ptr<DType>();
       for (int64_t j = 0; j < size; ++j)
         prob_selected_data[j] = prob_etype_data[eids ? eids[j] : j + offsets[curr]];
       idx = RandomEngine::ThreadLocal()->Choice<IdxType>(prob_selected);
@@ -153,53 +154,6 @@ std::tuple<dgl_id_t, dgl_id_t, bool> MetapathRandomWalkStepUniform(
 }
 
 /*!
- * \brief Generic Random Walk.
- * \param seeds A 1D array of seed nodes, with the type the source type of the first
- *        edge type in the metapath.
- * \param max_num_steps The maximum number of steps of a random walk path.
- * \param step The random walk step function with type \c StepFunc.
- * \return A 2D array of shape (len(seeds), max_num_steps + 1) with node IDs.
- *         A 2D array of shape (len(seeds), len(metapath)) with edge IDs.
- * \note The graph itself should be bounded in the closure of \c step.
- */
-template<DLDeviceType XPU, typename IdxType>
-std::pair<IdArray, IdArray> GenericRandomWalk(
-    const IdArray seeds,
-    int64_t max_num_steps,
-    StepFunc<IdxType> step) {
-  int64_t num_seeds = seeds->shape[0];
-  int64_t trace_length = max_num_steps + 1;
-  IdArray traces = IdArray::Empty({num_seeds, trace_length}, seeds->dtype, seeds->ctx);
-  IdArray eids = IdArray::Empty({num_seeds, max_num_steps}, seeds->dtype, seeds->ctx);
-
-  const IdxType *seed_data = seeds.Ptr<IdxType>();
-  IdxType *traces_data = traces.Ptr<IdxType>();
-  IdxType *eids_data = eids.Ptr<IdxType>();
-
-#pragma omp parallel for
-  for (int64_t seed_id = 0; seed_id < num_seeds; ++seed_id) {
-    int64_t i;
-    dgl_id_t curr = seed_data[seed_id];
-    traces_data[seed_id * trace_length] = curr;
-
-    for (i = 0; i < max_num_steps; ++i) {
-      const auto &succ = step(traces_data + seed_id * max_num_steps, curr, i);
-      traces_data[seed_id * trace_length + i + 1] = curr = std::get<0>(succ);
-      eids_data[seed_id * max_num_steps + i] = std::get<1>(succ);
-      if (std::get<2>(succ))
-        break;
-    }
-
-    for (; i < max_num_steps; ++i) {
-      traces_data[seed_id * trace_length + i + 1] = -1;
-      eids_data[seed_id * trace_length + i] = -1;
-    }
-  }
-
-  return std::make_pair(traces, eids);
-}
-
-/*!
  * \brief Metapath-based random walk.
  * \param hg The heterograph.
  * \param seeds A 1D array of seed nodes, with the type the source type of the first
@@ -231,7 +185,6 @@ std::pair<IdArray, IdArray> MetapathBasedRandomWalk(
 
   // Hoist the check for Uniform vs Non uniform edge distribution
   // to avoid putting it on the hot path
-  StepFunc<IdxType> step;
   bool isUniform = true;
   for (const auto &etype_prob : prob) {
     if (!IsNullArray(etype_prob)) {
@@ -240,22 +193,22 @@ std::pair<IdArray, IdArray> MetapathBasedRandomWalk(
     }
   }
   if (!isUniform) {
-    step =
+    StepFunc<IdxType> step =
       [&edges_by_type, metapath_data, &prob, terminate]
       (IdxType *data, dgl_id_t curr, int64_t len) {
         return MetapathRandomWalkStep<XPU, IdxType>(
             data, curr, len, edges_by_type, metapath_data, prob, terminate);
       };
+    return GenericRandomWalk<XPU, IdxType>(seeds, max_num_steps, step);
   } else {
-    step =
+    StepFunc<IdxType> step =
       [&edges_by_type, metapath_data, &prob, terminate]
       (IdxType *data, dgl_id_t curr, int64_t len) {
         return MetapathRandomWalkStepUniform<XPU, IdxType>(
             data, curr, len, edges_by_type, metapath_data, prob, terminate);
       };
+    return GenericRandomWalk<XPU, IdxType>(seeds, max_num_steps, step);
   }
-
-  return {traces, eids};
 }
 
 };  // namespace

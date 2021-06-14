@@ -16,8 +16,11 @@
 #include <functional>
 #include <utility>
 #include <vector>
+#include <tuple>
 
-#include "metapath_randomwalk.h"
+#include "node2vec_impl.h"
+#include "randomwalks_cpu.h"
+#include "metapath_randomwalk.h"  // for TerminatePredicate
 
 namespace dgl {
 
@@ -30,21 +33,11 @@ namespace impl {
 
 namespace {
 
-/*!
- * \brief Random walk step function
- */
 template <typename IdxType>
-using Node2vecStepFunc = std::function<std::pair<dgl_id_t, bool>(
-    IdxType *,  // node IDs generated so far
-    dgl_id_t,   // last node id generated
-    dgl_id_t,   // last last node id generated
-    int64_t)>;  // # of steps
-
-template <typename IdxType>
-bool has_edge_between(const std::vector<IdArray> &edges, dgl_id_t u,
+bool has_edge_between(const CSRMatrix &csr, dgl_id_t u,
                       dgl_id_t v) {
-  const IdxType *offsets = static_cast<IdxType *>(edges[0]->data);
-  const IdxType *all_succ = static_cast<IdxType *>(edges[1]->data);
+  const IdxType *offsets = csr.indptr.Ptr<IdxType>();
+  const IdxType *all_succ = csr.indices.Ptr<IdxType>();
   const IdxType *u_succ = all_succ + offsets[u];
   const int64_t size = offsets[u + 1] - offsets[u];
 
@@ -57,28 +50,33 @@ bool has_edge_between(const std::vector<IdArray> &edges, dgl_id_t u,
  * \param curr The last node ID generated.
  * \param pre The last last node ID generated
  * \param p Float, indicating likelihood of immediately revisiting a node in the
- * walk. \param q Float, control parameter to interpolate between breadth-first
- * strategy and depth-first strategy. \param len The number of nodes generated
- * so far.  Note that the seed node is always included as \c data[0], and the
- * successors start from \c data[1]. \param edges Vector of results from \c
- * GetAdj() \param prob Transition probability \param terminate Predicate for
- * terminating the current random walk path. \return A pair of ID of next
- * successor (-1 if not exist), as well as whether to terminate.
+ *        walk.
+ * \param q Float, control parameter to interpolate between breadth-first
+ *        strategy and depth-first strategy.
+ * \param len The number of nodes generated so far.  Note that the seed node is
+ *        always included as \c data[0], and the successors start from \c data[1].
+ * \param csr The CSR matrix
+ * \param prob Transition probability
+ * \param terminate Predicate for terminating the current random walk path.
+ * \return A tuple of ID of next successor (-1 if not exist), the edge ID traversed,
+ *         as well as whether to terminate.
  */
 
 template <DLDeviceType XPU, typename IdxType>
-std::pair<dgl_id_t, bool> Node2vecRandomWalkStep(
+std::tuple<dgl_id_t, dgl_id_t, bool> Node2vecRandomWalkStep(
     IdxType *data, dgl_id_t curr, dgl_id_t pre, const double p, const double q,
-    int64_t len, const std::vector<IdArray> &edges, const FloatArray &probs,
+    int64_t len, const CSRMatrix &csr, const FloatArray &probs,
     TerminatePredicate<IdxType> terminate) {
-  const IdxType *offsets = static_cast<IdxType *>(edges[0]->data);
-  const IdxType *all_succ = static_cast<IdxType *>(edges[1]->data);
+  const IdxType *offsets = csr.indptr.Ptr<IdxType>();
+  const IdxType *all_succ = csr.indices.Ptr<IdxType>();
+  const IdxType *all_eids = CSRHasData(csr) ? csr.data.Ptr<IdxType>() : nullptr;
   const IdxType *succ = all_succ + offsets[curr];
+  const IdxType *eids = all_eids ? (all_eids + offsets[curr]) : nullptr;
 
   const int64_t size = offsets[curr + 1] - offsets[curr];
 
   // Isolated node
-  if (size == 0) return std::make_pair(-1, true);
+  if (size == 0) return std::make_tuple(-1, -1, true);
 
   IdxType idx = 0;
 
@@ -105,7 +103,7 @@ std::pair<dgl_id_t, bool> Node2vecRandomWalkStep(
         next_node = succ[idx];
         if (next_node == pre) {
           if (r < prob0) break;
-        } else if (has_edge_between<IdxType>(edges, next_node, pre)) {
+        } else if (has_edge_between<IdxType>(csr, next_node, pre)) {
           if (r < prob1) break;
         } else if (r < prob2) {
           break;
@@ -113,15 +111,13 @@ std::pair<dgl_id_t, bool> Node2vecRandomWalkStep(
       }
     }
   } else {
-    const IdxType *all_eids = static_cast<IdxType *>(edges[2]->data);
-    const IdxType *eids = all_eids + offsets[curr];
     FloatArray prob_selected;
     ATEN_FLOAT_TYPE_SWITCH(probs->dtype, DType, "probability", {
       prob_selected = FloatArray::Empty({size}, probs->dtype, probs->ctx);
-      DType *prob_selected_data = static_cast<DType *>(prob_selected->data);
-      const DType *prob_etype_data = static_cast<DType *>(probs->data);
+      DType *prob_selected_data = prob_selected.Ptr<DType>();
+      const DType *prob_etype_data = probs.Ptr<DType>();
       for (int64_t j = 0; j < size; ++j)
-        prob_selected_data[j] = prob_etype_data[eids[j]];
+        prob_selected_data[j] = prob_etype_data[eids ? eids[j] : j + offsets[curr]];
     });
 
     if (len == 0) {
@@ -134,7 +130,7 @@ std::pair<dgl_id_t, bool> Node2vecRandomWalkStep(
         next_node = succ[idx];
         if (next_node == pre) {
           if (r < prob0) break;
-        } else if (has_edge_between<IdxType>(edges, next_node, pre)) {
+        } else if (has_edge_between<IdxType>(csr, next_node, pre)) {
           if (r < prob1) break;
         } else if (r < prob2) {
           break;
@@ -142,70 +138,28 @@ std::pair<dgl_id_t, bool> Node2vecRandomWalkStep(
       }
     }
   }
-  curr = next_node;
+  dgl_id_t eid = eids ? eids[idx] : (idx + offsets[curr]);
 
-  return std::make_pair(curr, terminate(data, curr, len));
-}
-
-/*!
- * \brief Node2vec Random Walk
- * \param seeds A 1D array of seed nodes, with the type the source type of the
- * first edge type in the metapath. \param walk_length The length of a random
- * walk path. \param step The random walk step function with type \c
- * Node2vecStepFunc. \return A 2D array of shape (len(seeds), walk_length + 1)
- * with node IDs. \note The graph itself should be bounded in the closure of \c
- * step.
- */
-template <DLDeviceType XPU, typename IdxType>
-IdArray Node2vecGenericRandomWalk(const IdArray seeds, int64_t walk_length,
-                                  Node2vecStepFunc<IdxType> step) {
-  int64_t num_seeds = seeds->shape[0];
-  walk_length = walk_length + 1;  //
-
-  IdArray traces =
-      IdArray::Empty({num_seeds, walk_length}, seeds->dtype, seeds->ctx);
-
-  const IdxType *seed_data = static_cast<IdxType *>(seeds->data);
-  IdxType *traces_data = static_cast<IdxType *>(traces->data);
-
-#pragma omp parallel for
-  for (int64_t seed_id = 0; seed_id < num_seeds; ++seed_id) {
-    int64_t i;
-    dgl_id_t curr = seed_data[seed_id];
-    dgl_id_t pre = curr;
-    traces_data[seed_id * walk_length] = curr;
-
-    for (i = 0; i < walk_length; ++i) {
-      const auto &succ =
-          step(traces_data + seed_id * walk_length, curr, pre, i);
-      pre = curr;
-      curr = succ.first;
-      traces_data[seed_id * walk_length + i + 1] = curr;
-      if (succ.second) break;
-    }
-
-    for (; i < walk_length; ++i)
-      traces_data[seed_id * walk_length + i + 1] = -1;
-  }
-  return traces;
+  return std::make_tuple(next_node, eid, terminate(data, next_node, len));
 }
 
 template <DLDeviceType XPU, typename IdxType>
-IdArray Node2vecRandomWalk(const HeteroGraphPtr g, const IdArray seeds,
-                           const double p, const double q,
-                           const int64_t walk_length, const FloatArray &prob,
-                           TerminatePredicate<IdxType> terminate) {
-  std::vector<IdArray> edges;
-  edges = g->GetAdj(0, true, "csr");  // homogeneous graph.
+std::pair<IdArray, IdArray> Node2vecRandomWalk(
+    const HeteroGraphPtr g, const IdArray seeds,
+    const double p, const double q,
+    const int64_t max_num_steps, const FloatArray &prob,
+    TerminatePredicate<IdxType> terminate) {
+  const CSRMatrix &edges = g->GetCSRMatrix(0);  // homogeneous graph.
 
-  Node2vecStepFunc<IdxType> step = [&edges, &prob, p, q, terminate](
-                                       IdxType *data, dgl_id_t curr,
-                                       dgl_id_t pre, int64_t len) {
-    return Node2vecRandomWalkStep<XPU, IdxType>(data, curr, pre, p, q, len,
-                                                edges, prob, terminate);
-  };
+  StepFunc<IdxType> step =
+    [&edges, &prob, p, q, terminate]
+    (IdxType *data, dgl_id_t curr, int64_t len) {
+      dgl_id_t pre = (len != 0) ? data[len - 1] : curr;
+      return Node2vecRandomWalkStep<XPU, IdxType>(data, curr, pre, p, q, len,
+                                                  edges, prob, terminate);
+    };
 
-  return Node2vecGenericRandomWalk<XPU, IdxType>(seeds, walk_length, step);
+  return GenericRandomWalk<XPU, IdxType>(seeds, max_num_steps, step);
 }
 
 };  // namespace

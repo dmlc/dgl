@@ -6,6 +6,7 @@
 
 #include <dgl/array.h>
 #include <dgl/base_heterograph.h>
+#include <utility>
 
 #include "node2vec_randomwalk.h"
 
@@ -19,9 +20,10 @@ namespace sampling {
 namespace impl {
 
 template <DLDeviceType XPU, typename IdxType>
-IdArray Node2vec(const HeteroGraphPtr hg, const IdArray seeds, const double p,
-                 const double q, const int64_t walk_length,
-                 const FloatArray &prob) {
+std::pair<IdArray, IdArray> Node2vec(
+    const HeteroGraphPtr hg, const IdArray seeds, const double p,
+    const double q, const int64_t walk_length,
+    const FloatArray &prob) {
   TerminatePredicate<IdxType> terminate = [](IdxType *data, dgl_id_t curr,
                                              int64_t len) { return false; };
 
@@ -29,16 +31,18 @@ IdArray Node2vec(const HeteroGraphPtr hg, const IdArray seeds, const double p,
                                           terminate);
 }
 
-template IdArray Node2vec<kDLCPU, int32_t>(const HeteroGraphPtr hg,
-                                           const IdArray seeds, const double p,
-                                           const double q,
-                                           const int64_t walk_length,
-                                           const FloatArray &prob);
-template IdArray Node2vec<kDLCPU, int64_t>(const HeteroGraphPtr hg,
-                                           const IdArray seeds, const double p,
-                                           const double q,
-                                           const int64_t walk_length,
-                                           const FloatArray &prob);
+template std::pair<IdArray, IdArray> Node2vec<kDLCPU, int32_t>(
+    const HeteroGraphPtr hg,
+    const IdArray seeds, const double p,
+    const double q,
+    const int64_t walk_length,
+    const FloatArray &prob);
+template std::pair<IdArray, IdArray> Node2vec<kDLCPU, int64_t>(
+    const HeteroGraphPtr hg,
+    const IdArray seeds, const double p,
+    const double q,
+    const int64_t walk_length,
+    const FloatArray &prob);
 
 };  // namespace impl
 

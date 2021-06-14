@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from sklearn.linear_model import LogisticRegression
-from dgl.sampling.node2vec import node2vec_randomwalk
+from dgl.sampling import node2vec_random_walk
 
 
 class Node2vec(nn.Module):
@@ -77,7 +77,7 @@ class Node2vec(nn.Module):
 
         batch = batch.repeat(self.num_walks)
         # positive
-        pos_traces = node2vec_randomwalk(self.g, batch, self.p, self.q, self.walk_length, self.prob)
+        pos_traces = node2vec_random_walk(self.g, batch, self.p, self.q, self.walk_length, self.prob)
         pos_traces = pos_traces.unfold(1, self.window_size, 1)  # rolling window
         pos_traces = pos_traces.contiguous().view(-1, self.window_size)
 
@@ -271,7 +271,7 @@ class Node2vecModel(object):
         self.model = self.model.to(self.device)
         loader = self.model.loader(batch_size)
         if self.use_sparse:
-            optimizer = torch.optim.SparseAdam(self.model.parameters(), lr=learning_rate)
+            optimizer = torch.optim.SparseAdam(list(self.model.parameters()), lr=learning_rate)
         else:
             optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate)
         for i in range(epochs):
