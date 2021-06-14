@@ -49,11 +49,13 @@ def load_subtensor(nfeat, labels, seeds, input_nodes, dev_id):
     Extracts features and labels for a subset of nodes.
     """
     if isinstance(nfeat, MultiGPUTensor):
+        input_nodes = input_nodes.to(nfeat.get_local().device)
         batch_inputs = nfeat.get_global(input_nodes).to(dev_id)
     else:
         batch_inputs = nfeat[input_nodes].to(dev_id)
 
     if isinstance(labels, MultiGPUTensor):
+        seeds = seeds.to(labels.get_local().device)
         batch_labels = labels.get_global(seeds).to(dev_id)
     else:
         batch_labels = labels[seeds].to(dev_id)
