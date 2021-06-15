@@ -138,10 +138,6 @@ std::pair<IdArray, NDArray> SparsePush(
     IdArray in_idx,
     NDArray in_value,
     NDArrayPartitionRef part) {
-  CHECK_EQ(in_idx->shape[0], in_value->shape[0]) <<
-      "Leading dimension of indices (" << in_idx->shape[0] << ") must match "
-      "leading dimension of values (" << in_value->shape[0] << ").";
-
   const auto& ctx = in_idx->ctx;
   CHECK_EQ(ctx, in_value->ctx) << "Indices and values must be on the same "
       "device";
@@ -150,9 +146,15 @@ std::pair<IdArray, NDArray> SparsePush(
   // TODO(dlasalle): Get the stream from the device context.
   cudaStream_t stream = 0;
 
-  CHECK_EQ(in_idx->ndim, 1) << "Indices must be 1-dimensional";
+  CHECK_LE(in_idx->ndim, 1) << "The tensor of sending indices must be of "
+      "dimension one (or empty).";
+  const int64_t num_in = in_idx->ndim > 0 ? in_idx->shape[0] : 0;
 
-  const int64_t num_in = in_idx->shape[0];
+  CHECK_EQ(num_in, in_value->ndim > 0 ? in_value->shape[0] : 0) <<
+      "Leading dimension of indices (" << num_in << ") must match "
+      "leading dimension of values (" <<
+      (in_value->ndim > 0 ? in_value->shape[0] : 0) << ").";
+
   int64_t num_feat = 1;
   for (int d = 1; d < in_value->ndim; ++d) {
     num_feat *= in_value->shape[d];
@@ -297,10 +299,9 @@ NDArray SparsePull(
 
   cudaStream_t stream = CUDAThreadEntry::ThreadLocal()->stream;
 
-  CHECK_EQ(req_idx->ndim, 1) << "The tensor of requested indices must be of "
-      "dimension one.";
-
-  const int64_t num_in = req_idx->shape[0];
+  CHECK_LE(req_idx->ndim, 1) << "The tensor of requested indices must be of "
+      "dimension one (or empty).";
+  const int64_t num_in = req_idx->ndim > 0 ? req_idx->shape[0] : 0;
   int64_t num_feat = 1;
   for (int d = 1; d < local_tensor->ndim; ++d) {
     num_feat *= local_tensor->shape[d];
@@ -328,7 +329,7 @@ NDArray SparsePull(
       static_cast<const int64_t*>(part_perm.second->data);
 
   // permute requests
-  {
+  if (num_in > 0) {
     const dim3 block(256);
     const dim3 grid((num_in+block.x-1)/block.x);
 

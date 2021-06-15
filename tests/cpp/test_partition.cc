@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include "../../src/partition/ndarray_partition.h"
+#include "./common.h"
 
 
 using namespace dgl;
@@ -7,17 +8,16 @@ using namespace dgl::partition;
 
 
 template<DLDeviceType XPU, typename IdType>
-void _TestRemainder()
-{
+void _TestRemainder_GeneratePermutation() {
   const int64_t size = 160000;
   const int num_parts = 7;
   NDArrayPartitionRef part = CreatePartitionRemainderBased(
       size,  num_parts);
 
   IdArray idxs = aten::Range(0, size/10, sizeof(IdType)*8,
-      DGLContext{XPU, 0}); 
+      DGLContext{XPU, 0});
 
-  std::pair<IdArray, IdArray> result = part->GeneratePermutation(idxs); 
+  std::pair<IdArray, IdArray> result = part->GeneratePermutation(idxs);
 
   // first part of result should be the permutation
   IdArray perm = result.first.CopyTo(DGLContext{kDLCPU, 0});
@@ -48,10 +48,43 @@ void _TestRemainder()
   }
 }
 
+template<DLDeviceType XPU, typename IdType>
+void _TestRemainder_MapToX() {
+  const int64_t size = 160000;
+  const int num_parts = 7;
+  NDArrayPartitionRef part = CreatePartitionRemainderBased(
+      size,  num_parts);
+
+  for (int part_id = 0; part_id < num_parts; ++part_id) {
+    IdArray local = aten::Range(0, part->PartSize(part_id), sizeof(IdType)*8,
+        DGLContext{XPU, 0});
+    IdArray global = part->MapToGlobal(local, part_id);
+    IdArray act_local = part->MapToLocal(global).CopyTo(CPU);
+
+    // every global index should have the same remainder as the part id
+    ASSERT_EQ(global->shape[0], local->shape[0]);
+    global = global.CopyTo(CPU);
+    for (size_t i = 0; i < global->shape[0]; ++i) {
+      EXPECT_EQ(Ptr<IdType>(global)[i] % num_parts, part_id) << "i=" << i <<
+          ", num_parts=" << num_parts << ", part_id=" << part_id;
+    }
+
+    // the remapped local indices to should match the original
+    local = local.CopyTo(CPU);
+    ASSERT_EQ(local->shape[0], act_local->shape[0]);
+    for (size_t i = 0; i < act_local->shape[0]; ++i) {
+      EXPECT_EQ(Ptr<IdType>(local)[i], Ptr<IdType>(act_local)[i]);
+    }
+  }
+}
+
 TEST(PartitionTest, TestRemainderPartition) {
 #ifdef DGL_USE_CUDA
-  _TestRemainder<kDLGPU, int32_t>();
-  _TestRemainder<kDLGPU, int64_t>();
+  _TestRemainder_GeneratePermutation<kDLGPU, int32_t>();
+  _TestRemainder_GeneratePermutation<kDLGPU, int64_t>();
+
+  _TestRemainder_MapToX<kDLGPU, int32_t>();
+  _TestRemainder_MapToX<kDLGPU, int64_t>();
 #endif
 
   // CPU is not implemented
