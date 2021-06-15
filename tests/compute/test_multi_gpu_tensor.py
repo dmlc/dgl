@@ -12,7 +12,7 @@ class DummyCommunicator:
     def sparse_all_to_all_pull(self, req_idx, value, partition):
         # assume all indices are local
         idxs = partition.map_to_local(req_idx)
-        return value[idxs]
+        return F.gather_row(value, idxs)
 
     def rank(self):
         return self._rank
