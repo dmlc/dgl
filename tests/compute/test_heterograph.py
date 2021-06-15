@@ -1082,6 +1082,19 @@ def test_convert(idtype):
     assert hg.device == g.device
     assert g.number_of_nodes() == 5
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="Test on cpu is enough")
+@parametrize_dtype
+def test_to_homo_zero_nodes(idtype):
+    # Fix gihub issue #2870
+    g = dgl.heterograph({
+        ('A', 'AB', 'B'): (np.random.randint(0, 200, (1000,)), np.random.randint(0, 200, (1000,))),
+        ('B', 'BA', 'A'): (np.random.randint(0, 200, (1000,)), np.random.randint(0, 200, (1000,))),
+    }, num_nodes_dict={'A': 200, 'B': 200, 'C': 0}, idtype=idtype)
+    g.nodes['A'].data['x'] = F.randn((200, 3))
+    g.nodes['B'].data['x'] = F.randn((200, 3))
+    gg = dgl.to_homogeneous(g, ['x'])
+    assert 'x' in gg.ndata
+
 @parametrize_dtype
 def test_to_homo2(idtype):
     # test the result homogeneous graph has nodes and edges sorted by their types
