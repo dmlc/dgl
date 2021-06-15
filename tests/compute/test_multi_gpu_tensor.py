@@ -30,7 +30,7 @@ def test_get_global_1part():
 
     idxs = F.copy_to(F.tensor([1,3], dtype=F.int64), ctx=F.ctx())
     act = mt.get_global(idxs)
-    exp = t[idxs]
+    exp = F.gather_row(t, idxs)
 
     assert F.array_equal(exp, act)
 
@@ -70,7 +70,7 @@ def test_get_local_3part():
     mt.set_global(t)
 
     act = mt.get_local()
-    exp = t[F.tensor([2], dtype=F.int64)]
+    exp = F.gather_row(t, F.tensor([2], dtype=F.int64))
 
     assert F.array_equal(exp, act)
 
@@ -94,7 +94,7 @@ def test_set_local_3part():
     t = F.copy_to(F.tensor([[1,2,3],[4,5,6],[7,8,9],[10,11,12]]), F.ctx())
     comm = DummyCommunicator(2, 3)
     mt = MultiGPUTensor(t.shape, t.dtype, F.ctx(), comm)
-    t_local = t[F.tensor([2], dtype=F.int64)]
+    t_local = F.gather_row(t, F.tensor([2], dtype=F.int64))
     mt.set_local(t_local)
 
     act = mt.get_local()
