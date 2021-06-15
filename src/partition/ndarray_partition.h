@@ -9,6 +9,7 @@
 #define DGL_PARTITION_NDARRAY_PARTITION_H_
 
 #include <dgl/runtime/object.h>
+#include <dgl/packed_func_ext.h>
 #include <dgl/array.h>
 #include <utility>
 
@@ -63,6 +64,29 @@ class NDArrayPartition : public runtime::Object {
    */
   virtual IdArray MapToLocal(
       IdArray in_idx) const = 0;
+
+  /**
+   * @brief Generate the global indices (the numbering unique across all
+   * processors) from a set of local indices.
+   *
+   * @param in_idx The local indices.
+   * @param part_id The part id.
+   *
+   * @return The global indices.
+   */
+  virtual IdArray MapToGlobal(
+      IdArray in_idx,
+      int part_id) const = 0;
+
+  /**
+   * @brief Get the number of rows/items assigned to the given part.
+   *
+   * @param part_id The part id.
+   *
+   * @return The size.
+   */
+  virtual int64_t PartSize(
+          int part_id) const = 0;
 
   /**
    * @brief Get the first dimension of the partitioned array.
