@@ -4,7 +4,7 @@
  * \brief COO sorting
  */
 #include <dgl/array.h>
-
+#include <dgl/runtime/parallel_for.h>
 #include <numeric>
 #include <algorithm>
 #include <vector>
@@ -50,8 +50,7 @@ CSRMatrix UnionCsr(const std::vector<CSRMatrix>& csrs) {
   res_indptr[0] = 0;
 
   if (sorted) {  // all csrs are sorted
-#pragma omp for
-    for (int64_t i = 1; i <= csrs[0].num_rows; ++i) {
+    runtime::parallel_for(1, csrs[0].num_rows, [&](size_t i) {
       std::vector<int64_t> indices_off;
       res_indptr[i] = indptr_data[0][i];
       indices_off.push_back(indptr_data[0][i-1]);
@@ -80,10 +79,9 @@ CSRMatrix UnionCsr(const std::vector<CSRMatrix>& csrs) {
         indices_off[min_idx] += 1;
         ++off;
       }  // while
-    }  // omp for
+    });
   } else {  // some csrs are not sorted
-#pragma omp for
-    for (int64_t i = 1; i <= csrs[0].num_rows; ++i) {
+    runtime::parallel_for(1, csrs[0].num_rows, [&](size_t i) {
       IdType off = res_indptr[i-1];
       res_indptr[i] = 0;
 
@@ -97,7 +95,7 @@ CSRMatrix UnionCsr(const std::vector<CSRMatrix>& csrs) {
         off += indptr_data[j][i] - indptr_data[j][i-1];
       }
       res_indptr[i] = off;
-    }  // omp for
+    });  // parallel_for
   }
 
   return CSRMatrix(

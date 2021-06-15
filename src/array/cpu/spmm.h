@@ -8,6 +8,7 @@
 
 #include <dgl/array.h>
 #include <dgl/bcast.h>
+#include <dgl/runtime/parallel_for.h>
 #include <algorithm>
 #include <limits>
 #include <memory>
@@ -53,8 +54,7 @@ void SpMMSumCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
                             ? asm_kernel_ptr.get()
                             : nullptr;
   if (cpu_spec && dim > 16 && !bcast.use_bcast) {
-#pragma omp parallel for
-    for (IdType rid = 0; rid < csr.num_rows; ++rid) {
+    runtime::parallel_for(0, csr.num_rows, [=](IdType rid) {
       const IdType row_start = indptr[rid], row_end = indptr[rid + 1];
       DType* out_off = O + rid * dim;
       for (IdType j = row_start; j < row_end; ++j) {
@@ -62,13 +62,11 @@ void SpMMSumCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
         const IdType eid = has_idx ? edges[j] : j;
         cpu_spec->run(out_off, X + cid * lhs_dim, W + eid * rhs_dim, dim);
       }
-    }
+    });
   } else {
 #endif  // USE_AVX
 #endif  // _WIN32
-
-#pragma omp parallel for
-    for (IdType rid = 0; rid < csr.num_rows; ++rid) {
+    runtime::parallel_for(0, csr.num_rows, [=](IdType rid) {
       const IdType row_start = indptr[rid], row_end = indptr[rid + 1];
       DType* out_off = O + rid * dim;
       for (IdType j = row_start; j < row_end; ++j) {
@@ -84,7 +82,7 @@ void SpMMSumCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
           out_off[k] += Op::Call(lhs_off, rhs_off);
         }
       }
-    }
+    });
 #if !defined(_WIN32)
 #ifdef USE_AVX
   }
@@ -172,8 +170,8 @@ void SpMMCmpCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
   DType* O = static_cast<DType*>(out->data);
   IdType* argX = Op::use_lhs ? static_cast<IdType*>(argu->data) : nullptr;
   IdType* argW = Op::use_rhs ? static_cast<IdType*>(arge->data) : nullptr;
-#pragma omp parallel for
-  for (IdType rid = 0; rid < csr.num_rows; ++rid) {
+
+  runtime::parallel_for(0, csr.num_rows, [=](IdType rid) {
     const IdType row_start = indptr[rid], row_end = indptr[rid + 1];
     DType* out_off = O + rid * dim;
     IdType* argx_off = argX + rid * dim;
@@ -196,7 +194,7 @@ void SpMMCmpCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
         }
       }
     }
-  }
+  });
 }
 
 /*!
