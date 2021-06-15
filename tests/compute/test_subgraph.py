@@ -353,22 +353,22 @@ def test_in_subgraph(idtype):
     assert len(subg.etypes) == 4
 
     u, v = subg['follow'].edges()
-    old_u = F.tensor([F.as_scalar(subg.nodes['user'].data[dgl.NID][nid]) for nid in u], idtype)
-    old_v = F.tensor([F.as_scalar(subg.nodes['user'].data[dgl.NID][nid]) for nid in v], idtype)
+    old_u = F.gather_row(subg.nodes['user'].data[dgl.NID], u)
+    old_v = F.gather_row(subg.nodes['user'].data[dgl.NID], v)
     assert F.array_equal(hg['follow'].edge_ids(old_u, old_v), subg['follow'].edata[dgl.EID])
     edge_set = set(zip(list(F.asnumpy(old_u)), list(F.asnumpy(old_v))))
     assert edge_set == {(1,0),(2,0),(3,0),(0,1),(2,1),(3,1)}
 
     u, v = subg['play'].edges()
-    old_u = F.tensor([F.as_scalar(subg.nodes['user'].data[dgl.NID][nid]) for nid in u], idtype)
-    old_v = F.tensor([F.as_scalar(subg.nodes['game'].data[dgl.NID][nid]) for nid in v], idtype)
+    old_u = F.gather_row(subg.nodes['user'].data[dgl.NID], u)
+    old_v = F.gather_row(subg.nodes['game'].data[dgl.NID], v)
     assert F.array_equal(hg['play'].edge_ids(old_u, old_v), subg['play'].edata[dgl.EID])
     edge_set = set(zip(list(F.asnumpy(old_u)), list(F.asnumpy(old_v))))
     assert edge_set == {(0,0)}
 
     u, v = subg['liked-by'].edges()
-    old_u = F.tensor([F.as_scalar(subg.nodes['game'].data[dgl.NID][nid]) for nid in u], idtype)
-    old_v = F.tensor([F.as_scalar(subg.nodes['user'].data[dgl.NID][nid]) for nid in v], idtype)
+    old_u = F.gather_row(subg.nodes['game'].data[dgl.NID], u)
+    old_v = F.gather_row(subg.nodes['user'].data[dgl.NID], v)
     assert F.array_equal(hg['liked-by'].edge_ids(old_u, old_v), subg['liked-by'].edata[dgl.EID])
     edge_set = set(zip(list(F.asnumpy(old_u)), list(F.asnumpy(old_v))))
     assert edge_set == {(2,0),(2,1),(1,0),(0,0)}
@@ -424,29 +424,29 @@ def test_out_subgraph(idtype):
     assert len(subg.etypes) == 4
 
     u, v = subg['follow'].edges()
-    old_u = F.tensor([F.as_scalar(subg.nodes['user'].data[dgl.NID][nid]) for nid in u], idtype)
-    old_v = F.tensor([F.as_scalar(subg.nodes['user'].data[dgl.NID][nid]) for nid in v], idtype)
+    old_u = F.gather_row(subg.nodes['user'].data[dgl.NID], u)
+    old_v = F.gather_row(subg.nodes['user'].data[dgl.NID], v)
     edge_set = set(zip(list(F.asnumpy(old_u)), list(F.asnumpy(old_v))))
     assert edge_set == {(1, 0)}
     assert F.array_equal(hg['follow'].edge_ids(old_u, old_v), subg['follow'].edata[dgl.EID])
 
     u, v = subg['play'].edges()
-    old_u = F.tensor([F.as_scalar(subg.nodes['user'].data[dgl.NID][nid]) for nid in u], idtype)
-    old_v = F.tensor([F.as_scalar(subg.nodes['game'].data[dgl.NID][nid]) for nid in v], idtype)
+    old_u = F.gather_row(subg.nodes['user'].data[dgl.NID], u)
+    old_v = F.gather_row(subg.nodes['game'].data[dgl.NID], v)
     edge_set = set(zip(list(F.asnumpy(old_u)), list(F.asnumpy(old_v))))
     assert edge_set == {(1, 2)}
     assert F.array_equal(hg['play'].edge_ids(old_u, old_v), subg['play'].edata[dgl.EID])
 
     u, v = subg['liked-by'].edges()
-    old_u = F.tensor([F.as_scalar(subg.nodes['game'].data[dgl.NID][nid]) for nid in u], idtype)
-    old_v = F.tensor([F.as_scalar(subg.nodes['user'].data[dgl.NID][nid]) for nid in v], idtype)
+    old_u = F.gather_row(subg.nodes['game'].data[dgl.NID], u)
+    old_v = F.gather_row(subg.nodes['user'].data[dgl.NID], v)
     edge_set = set(zip(list(F.asnumpy(old_u)), list(F.asnumpy(old_v))))
     assert edge_set == {(0,0)}
     assert F.array_equal(hg['liked-by'].edge_ids(old_u, old_v), subg['liked-by'].edata[dgl.EID])
 
     u, v = subg['flips'].edges()
-    old_u = F.tensor([F.as_scalar(subg.nodes['user'].data[dgl.NID][nid]) for nid in u], idtype)
-    old_v = F.tensor([F.as_scalar(subg.nodes['coin'].data[dgl.NID][nid]) for nid in v], idtype)
+    old_u = F.gather_row(subg.nodes['user'].data[dgl.NID], u)
+    old_v = F.gather_row(subg.nodes['coin'].data[dgl.NID], v)
     edge_set = set(zip(list(F.asnumpy(old_u)), list(F.asnumpy(old_v))))
     assert edge_set == {(1,0)}
     assert F.array_equal(hg['flips'].edge_ids(old_u, old_v), subg['flips'].edata[dgl.EID])
