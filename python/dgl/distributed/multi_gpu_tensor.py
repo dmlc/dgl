@@ -96,7 +96,7 @@ class MultiGPUTensor:
                 self._comm.rank(),
                 ctx=F.context(self._tensor)),
             F.context(values))
-        self.set_local(F.copy_to(F.gather_rows(values, idxs),
+        self.set_local(F.copy_to(F.gather_row(values, idxs),
                                  ctx=F.context(self._tensor)))
 
     def get_local(self):
