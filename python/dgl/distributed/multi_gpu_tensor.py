@@ -1,9 +1,31 @@
-from .. import utils
-from .. import ndarray
+""" The MultiGPUTensor class. """
+
 from .. import backend as F
 from ..partition import NDArrayPartition
 
 class MultiGPUTensor:
+    """ Class for storing a large tensor split across GPU memory. When reading
+    memory from otehr GPUs, the call must be from all GPUs storing the tensor.
+
+    Example:
+    --------
+
+    It can be created via the shape and data type information from the tensor
+    to split across gpus `large_cpu_tensor` in the below code:
+
+    >>> split_tensor = MultiGPUTensor(large_cpu_tensor.shape,
+                                      large_cpu_tensor.dtype,
+                                      dev_id,
+                                      nccl_comm)
+    >>> split_tensor.set_global(large_cpu_tensor)
+
+    Then, once it is stored across GPU memory, during training, feature for
+    mini-batches can be fetched via the `get_global()` method. If we have the
+    tensor of mini-batch nodes `input_nodes` we can use the following code to
+    fetch the features for the mini-batch:
+    ...
+    >>> batch_features = split_tensor.get_global(input_nodes)
+    """
     def __init__(self, shape, dtype, device, comm, partition=None):
         """ Create a new Tensor stored across multiple GPUs according to
         `partition`. This funciton must be called by all processes.
@@ -14,8 +36,10 @@ class MultiGPUTensor:
             The shape of the tensor. The tensor will be partitioned across its
             first dimension. As a result, dimensionless tensors are not
             allowed.
-        device : 
-            The current device.
+        dtype : DType
+            The backend data type.
+        device : Device
+            The current backend device.
         comm : nccl.Communicator
             The NCCL communicator to use.
         partition : NDArrayPartition, optional
@@ -48,7 +72,7 @@ class MultiGPUTensor:
         ----------
         index : Tensor
             The set of indices, in global space, to fetch from across all GPUs.
-        
+
         Returns
         -------
         Tensor
@@ -97,5 +121,3 @@ class MultiGPUTensor:
             "tensor with one of same shape: {} vs. {}".format(
                 self._tensor.shape, values.shape)
         self._tensor = F.copy_to(values, ctx=F.context(self._tensor))
-
-
