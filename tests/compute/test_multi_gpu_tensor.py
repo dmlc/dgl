@@ -44,7 +44,7 @@ def test_get_global_3part():
 
     idxs = F.copy_to(F.tensor([2], dtype=F.int64), ctx=F.ctx())
     act = mt.get_global(idxs)
-    exp = t[idxs]
+    exp = F.gather_row(t, idxs)
 
     assert F.array_equal(exp, act)
 
