@@ -225,6 +225,10 @@ if __name__ == '__main__':
         g, n_classes = load_reddit()
     elif args.dataset == 'ogbn-products':
         g, n_classes = load_ogb('ogbn-products')
+    elif args.dataset == 'ogbn-papers100M':
+        g, n_classes = load_ogb('ogbn-papers100M')
+        # convert labels to interger
+        g.ndata['labels'] = th.as_tensor(g.ndata['labels'], dtype=th.int64)
     else:
         raise Exception('unknown dataset')
 
