@@ -36,7 +36,7 @@ This example was implemented by [Hengrui Zhang](https://github.com/hengruizhang9
 --lr               float   Learning rate.                         Default is 0.001.
 --wd               float   Weight decay.                          Default is 1e-5.
 --temp             float   Temperature.                           Default is 1.0.
---act_fn           str     Activation function.                   Default is relu.001
+--act_fn           str     Activation function.                   Default is relu.
 --hid_dim          int     Hidden dimension.                      Default is 256.
 --out_dim          int     Output dimension.                      Default is 256.
 --num_layers       int     Number of GNN layers.                  Default is 2.
@@ -48,7 +48,7 @@ This example was implemented by [Hengrui Zhang](https://github.com/hengruizhang9
 
 ## How to run examples
 
-In the paper(as well as authors' repo), the training set and testing set are split randomly with 1:9 ratio.  In order to fairly compare it with other methods with public split (20 training nodes each class), in this repo we also provide its results using public split (with fine-tuned hyper-parameters). To run the examples, follow the following instructions.
+In the paper(as well as authors' repo), the training set and testing set are split randomly with 1:9 ratio. In order to fairly compare it with other methods with the public split (20 training nodes each class), in this repo we also provide its results using the public split (with fine-tuned hyper-parameters). To run the examples, follow the following instructions.
 
 ```python
 # Cora with random split
@@ -72,7 +72,7 @@ python main.py --dataname pubmed --split public --epochs 1500 --lr 1e-3 --wd 1e-
 
 ## 	Performance
 
-For random split, we use the hyper-parameters as stated in the paper. For public split,  we find the given hyper-parameters lead to poor performance, so we select the hyperparameters via  a small grid search.
+For random split, we use the hyper-parameters as stated in the paper. For public split,  we find the given hyper-parameters lead to poor performance, so we select the hyperparameters via a small grid search.
 
 Random split (Train/Test = 1:9)
 

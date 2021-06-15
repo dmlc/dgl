@@ -64,7 +64,7 @@ if __name__ == '__main__':
     epochs = args.epochs
     wd = args.wd
 
-    # Step 2: Prepare data =================================================================== =#
+    # Step 2: Prepare data =================================================================== #
     graph, feat, labels, train_mask, test_mask = load(args.dataname)
     in_dim = feat.shape[1]
 
