@@ -49,15 +49,6 @@ template <typename IdType, typename DType>
   };
 
 int32_t get_llc_size() {
-#if 0
-  unsigned int eax = 0;
-  unsigned int ebx = 0;
-  unsigned int ecx = 0;
-  unsigned int edx = 0;
-
-  __get_cpuid_count(4, 3, &eax, &ebx, &ecx, &edx);
-  unsigned int cache_size = ((ebx >> 22) + 1) * (((ebx >> 12) & 0x3ff) + 1) * ((ebx & 0xfff) + 1) * (ecx + 1);
-#endif
   int32_t cache_size = sysconf(_SC_LEVEL3_CACHE_SIZE);
   if(cache_size < 0) cache_size = DGL_CPU_LLC_SIZE;
   return cache_size;
