@@ -151,6 +151,11 @@ class BlockSampler(object):
     return_eids : bool, default False
         Whether to return the edge IDs involved in message passing in the MFG.
         If True, the edge IDs will be stored as an edge feature named ``dgl.EID``.
+    output_ctx : DGLContext, default None
+        The context the sampled blocks will be stored on. This should only be
+        a CUDA context if multiprocessing is not used in the dataloader (e.g.,
+        num_workers is 0). If this is None, the sampled blocks will be stored
+        on the same device as the input graph.
 
     Notes
     -----
@@ -158,9 +163,10 @@ class BlockSampler(object):
     :ref:`User Guide Section 6 <guide-minibatch>` and
     :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
     """
-    def __init__(self, num_layers, return_eids=False):
+    def __init__(self, num_layers, return_eids=False, output_ctx=None):
         self.num_layers = num_layers
         self.return_eids = return_eids
+        self.set_output_context(output_ctx)
 
     def sample_frontier(self, block_id, g, seed_nodes):
         """Generate the frontier given the destination nodes.
@@ -221,8 +227,23 @@ class BlockSampler(object):
         blocks = []
         exclude_eids = (
             _tensor_or_dict_to_numpy(exclude_eids) if exclude_eids is not None else None)
+
+        if isinstance(g, DistGraph):
+            # TODO:(nv-dlasalle) dist graphs may not have an associated graph,
+            # causing an error when trying to fetch the device, so for now,
+            # always assume the distributed graph's device is CPU.
+            graph_device = F.cpu()
+        else:
+            graph_device = g.device
+
         for block_id in reversed(range(self.num_layers)):
-            frontier = self.sample_frontier(block_id, g, seed_nodes)
+            seed_nodes_in = seed_nodes
+            if isinstance(seed_nodes_in, dict):
+                seed_nodes_in = {ntype: nodes.to(graph_device) \
+                    for ntype, nodes in seed_nodes_in.items()}
+            else:
+                seed_nodes_in = seed_nodes_in.to(graph_device)
+            frontier = self.sample_frontier(block_id, g, seed_nodes_in)
 
             # Removing edges from the frontier for link prediction training falls
             # into the category of frontier postprocessing
@@ -250,15 +271,43 @@ class BlockSampler(object):
                             new_eids[k] = F.gather_row(parent_eids[k], frontier.edges[k].data[EID])
                     frontier.edata[EID] = new_eids
 
-            block = transform.to_block(frontier, seed_nodes)
+            if self.output_device is not None:
+                frontier = frontier.to(self.output_device)
+                if isinstance(seed_nodes, dict):
+                    seed_nodes_out = {ntype: nodes.to(self.output_device) \
+                        for ntype, nodes in seed_nodes.items()}
+                else:
+                    seed_nodes_out = seed_nodes.to(self.output_device)
+            else:
+                seed_nodes_out = seed_nodes
 
+            block = transform.to_block(frontier, seed_nodes_out)
             if self.return_eids:
                 assign_block_eids(block, frontier)
 
             seed_nodes = {ntype: block.srcnodes[ntype].data[NID] for ntype in block.srctypes}
-
             blocks.insert(0, block)
         return blocks
+
+    def set_output_context(self, ctx):
+        """Set the device the generated block will be output to. This should
+        only be set to a cuda device, when multi-processing is not used in
+        the dataloader (e.g., num_workers is 0).
+
+        Parameters
+        ----------
+        output_ctx : DGLContext, default None
+            The device context the sampled blocks will be stored on. This
+            should only be a CUDA context if multiprocessing is not used in
+            the dataloader (e.g., num_workers is 0). If this is None, the
+            sampled blocks will be stored on the same device as the input
+            graph.
+        """
+        if ctx is not None:
+            self.output_device = F.to_backend_ctx(ctx)
+        else:
+            self.output_device = None
+
 
 class Collator(ABC):
     """Abstract DGL collator for training GNNs on downstream tasks stochastically.
