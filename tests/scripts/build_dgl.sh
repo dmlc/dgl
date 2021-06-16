@@ -24,8 +24,11 @@ mkdir build
 
 rm -rf _download
 
+echo "Show"
+echo $CMAKE_CACHE_EXTRA_ARGS
+
 pushd build
-cmake $CMAKE_VARS ..
+cmake $CMAKE_VARS $CMAKE_CACHE_EXTRA_ARGS ..
 make -j
 popd
 
