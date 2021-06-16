@@ -198,7 +198,7 @@ def _gspmm_hetero(g, op, reduce_op, u_and_e_tuple):
     list_e = [None] * gidx.number_of_etypes()
 
     for rel in g.canonical_etypes:
-        srctype, etype, dsttype = rel
+        srctype, _, dsttype = rel
         etid = g.get_etype_id(rel)
         src_id = g.get_ntype_id(srctype)
         dst_id = g.get_ntype_id(dsttype)
@@ -359,7 +359,7 @@ def _gsddmm_hetero(g, op, lhs_target='u', rhs_target='v', lhs_and_rhs_tuple=None
     out_list = [None] * gidx.number_of_etypes()
 
     for rel in g.canonical_etypes:
-        srctype, etype, dsttype = rel
+        srctype, _, dsttype = rel
         etid = g.get_etype_id(rel)
         src_id = g.get_ntype_id(srctype)
         dst_id = g.get_ntype_id(dsttype)
