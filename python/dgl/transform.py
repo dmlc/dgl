@@ -44,6 +44,8 @@ __all__ = [
     'to_simple',
     'to_simple_graph',
     'as_immutable_graph',
+    'sort_out_edges',
+    'sort_in_edges',
     'metis_partition_assignment',
     'partition_graph_with_halo',
     'metis_partition',
@@ -62,8 +64,8 @@ def pairwise_squared_distance(x):
     return x2s + F.swapaxes(x2s, -1, -2) - 2 * x @ F.swapaxes(x, -1, -2)
 
 #pylint: disable=invalid-name
-def knn_graph(x, k, algorithm='topk'):
-    """Construct a graph from a set of points according to k-nearest-neighbor (KNN)
+def knn_graph(x, k, algorithm='bruteforce-blas', dist='euclidean'):
+    r"""Construct a graph from a set of points according to k-nearest-neighbor (KNN)
     and return.
 
     The function transforms the coordinates/features of a point set
@@ -92,19 +94,41 @@ def knn_graph(x, k, algorithm='topk'):
     algorithm : str, optional
         Algorithm used to compute the k-nearest neighbors.
 
-        * 'topk' will use topk algorithm (quick-select or sorting,
-          depending on backend implementation)
-        * 'kd-tree' will use kd-tree algorithm (only on cpu)
+        * 'bruteforce-blas' will first compute the distance matrix
+          using BLAS matrix multiplication operation provided by
+          backend frameworks. Then use topk algorithm to get
+          k-nearest neighbors. This method is fast when the point
+          set is small but has :math:`O(N^2)` memory complexity where
+          :math:`N` is the number of points.
 
-        (default: 'topk')
+        * 'bruteforce' will compute distances pair by pair and
+          directly select the k-nearest neighbors during distance
+          computation. This method is slower than 'bruteforce-blas'
+          but has less memory overhead (i.e., :math:`O(Nk)` where :math:`N`
+          is the number of points, :math:`k` is the number of nearest
+          neighbors per node) since we do not need to store all distances.
+
+        * 'bruteforce-sharemem' (CUDA only) is similar to 'bruteforce'
+          but use shared memory in CUDA devices for buffer. This method is
+          faster than 'bruteforce' when the dimension of input points
+          is not large. This method is only available on CUDA device.
+
+        * 'kd-tree' will use the kd-tree algorithm (CPU only).
+          This method is suitable for low-dimensional data (e.g. 3D
+          point clouds)
+
+        (default: 'bruteforce-blas')
+    dist : str, optional
+        The distance metric used to compute distance between points. It can be the following
+        metrics:
+        * 'euclidean': Use Euclidean distance (L2 norm) :math:`\sqrt{\sum_{i} (x_{i} - y_{i})^{2}}`.
+        * 'cosine': Use cosine distance.
+        (default: 'euclidean')
 
     Returns
     -------
     DGLGraph
         The constructred graph. The node IDs are in the same order as :attr:`x`.
-
-        If using the 'topk' algorithm, the returned graph is on the same device as input :attr:`x`.
-        Else, the returned graph is on CPU, regardless of the context of the input :attr:`x`.
 
     Examples
     --------
@@ -141,8 +165,16 @@ def knn_graph(x, k, algorithm='topk'):
     (tensor([0, 1, 2, 2, 2, 3, 3, 3, 4, 5, 5, 5, 6, 6, 7, 7]),
      tensor([0, 1, 1, 2, 3, 0, 2, 3, 4, 5, 6, 7, 4, 6, 5, 7]))
     """
-    if algorithm == 'topk':
-        return _knn_graph_topk(x, k)
+    # check invalid k
+    if k <= 0:
+        raise DGLError("Invalid k value. expect k > 0, got k = {}".format(k))
+
+    # check empty point set
+    if F.shape(x)[0] == 0:
+        raise DGLError("Find empty point set")
+
+    if algorithm == 'bruteforce-blas':
+        return _knn_graph_blas(x, k, dist=dist)
     else:
         if F.ndim(x) == 3:
             x_size = tuple(F.shape(x))
@@ -150,13 +182,16 @@ def knn_graph(x, k, algorithm='topk'):
             x_seg = x_size[0] * [x_size[1]]
         else:
             x_seg = [F.shape(x)[0]]
-        out = knn(x, x_seg, x, x_seg, k, algorithm=algorithm)
+        out = knn(x, x_seg, x, x_seg, k, algorithm=algorithm, dist=dist)
         row, col = out[1], out[0]
         return convert.graph((row, col))
 
-def _knn_graph_topk(x, k):
-    """Construct a graph from a set of points according to k-nearest-neighbor (KNN)
-    via topk method.
+def _knn_graph_blas(x, k, dist='euclidean'):
+    r"""Construct a graph from a set of points according to k-nearest-neighbor (KNN).
+
+    This function first compute the distance matrix using BLAS matrix multiplication
+    operation provided by backend frameworks. Then use topk algorithm to get
+    k-nearest neighbors.
 
     Parameters
     ----------
@@ -169,10 +204,27 @@ def _knn_graph_topk(x, k):
           ``x[i][j]`` corresponds to the j-th node in the i-th KNN graph.
     k : int
         The number of nearest neighbors per node.
+    dist : str, optional
+        The distance metric used to compute distance between points. It can be the following
+        metrics:
+        * 'euclidean': Use Euclidean distance (L2 norm) :math:`\sqrt{\sum_{i} (x_{i} - y_{i})^{2}}`.
+        * 'cosine': Use cosine distance.
+        (default: 'euclidean')
     """
     if F.ndim(x) == 2:
         x = F.unsqueeze(x, 0)
     n_samples, n_points, _ = F.shape(x)
+
+    if k > n_points:
+        dgl_warning("'k' should be less than or equal to the number of points in 'x'" \
+                    "expect k <= {0}, got k = {1}, use k = {0}".format(n_points, k))
+        k = n_points
+
+    # if use cosine distance, normalize input points first
+    # thus we can use euclidean distance to find knn equivalently.
+    if dist == 'cosine':
+        l2_norm = lambda v: F.sqrt(F.sum(v * v, dim=2, keepdims=True))
+        x = x / (l2_norm(x) + 1e-5)
 
     ctx = F.context(x)
     dist = pairwise_squared_distance(x)
@@ -187,8 +239,8 @@ def _knn_graph_topk(x, k):
     return convert.graph((F.reshape(src, (-1,)), F.reshape(dst, (-1,))))
 
 #pylint: disable=invalid-name
-def segmented_knn_graph(x, k, segs, algorithm='topk'):
-    """Construct multiple graphs from multiple sets of points according to
+def segmented_knn_graph(x, k, segs, algorithm='bruteforce-blas', dist='euclidean'):
+    r"""Construct multiple graphs from multiple sets of points according to
     k-nearest-neighbor (KNN) and return.
 
     Compared with :func:`dgl.knn_graph`, this allows multiple point sets with
@@ -212,19 +264,41 @@ def segmented_knn_graph(x, k, segs, algorithm='topk'):
     algorithm : str, optional
         Algorithm used to compute the k-nearest neighbors.
 
-        * 'topk' will use topk algorithm (quick-select or sorting,
-          depending on backend implementation)
-        * 'kd-tree' will use kd-tree algorithm (only on cpu)
+        * 'bruteforce-blas' will first compute the distance matrix
+          using BLAS matrix multiplication operation provided by
+          backend frameworks. Then use topk algorithm to get
+          k-nearest neighbors. This method is fast when the point
+          set is small but has :math:`O(N^2)` memory complexity where
+          :math:`N` is the number of points.
 
-        (default: 'topk')
+        * 'bruteforce' will compute distances pair by pair and
+          directly select the k-nearest neighbors during distance
+          computation. This method is slower than 'bruteforce-blas'
+          but has less memory overhead (i.e., :math:`O(Nk)` where :math:`N`
+          is the number of points, :math:`k` is the number of nearest
+          neighbors per node) since we do not need to store all distances.
+
+        * 'bruteforce-sharemem' (CUDA only) is similar to 'bruteforce'
+          but use shared memory in CUDA devices for buffer. This method is
+          faster than 'bruteforce' when the dimension of input points
+          is not large. This method is only available on CUDA device.
+
+        * 'kd-tree' will use the kd-tree algorithm (CPU only).
+          This method is suitable for low-dimensional data (e.g. 3D
+          point clouds)
+
+        (default: 'bruteforce-blas')
+    dist : str, optional
+        The distance metric used to compute distance between points. It can be the following
+        metrics:
+        * 'euclidean': Use Euclidean distance (L2 norm) :math:`\sqrt{\sum_{i} (x_{i} - y_{i})^{2}}`.
+        * 'cosine': Use cosine distance.
+        (default: 'euclidean')
 
     Returns
     -------
     DGLGraph
         The graph. The node IDs are in the same order as :attr:`x`.
-
-        If using the 'topk' algorithm, the returned graph is on the same device as input :attr:`x`.
-        Else, the returned graph is on CPU, regardless of the context of the input :attr:`x`.
 
     Examples
     --------
@@ -253,16 +327,28 @@ def segmented_knn_graph(x, k, segs, algorithm='topk'):
     (tensor([0, 0, 1, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6, 6]),
      tensor([0, 1, 0, 1, 2, 2, 3, 5, 4, 6, 3, 5, 4, 6]))
     """
-    if algorithm == 'topk':
-        return _segmented_knn_graph_topk(x, k, segs)
+    # check invalid k
+    if k <= 0:
+        raise DGLError("Invalid k value. expect k > 0, got k = {}".format(k))
+
+    # check empty point set
+    if F.shape(x)[0] == 0:
+        raise DGLError("Find empty point set")
+
+    if algorithm == 'bruteforce-blas':
+        return _segmented_knn_graph_blas(x, k, segs, dist=dist)
     else:
-        out = knn(x, segs, x, segs, k, algorithm=algorithm)
+        out = knn(x, segs, x, segs, k, algorithm=algorithm, dist=dist)
         row, col = out[1], out[0]
         return convert.graph((row, col))
 
-def _segmented_knn_graph_topk(x, k, segs):
-    """Construct multiple graphs from multiple sets of points according to
-    k-nearest-neighbor (KNN) via topk method.
+def _segmented_knn_graph_blas(x, k, segs, dist='euclidean'):
+    r"""Construct multiple graphs from multiple sets of points according to
+    k-nearest-neighbor (KNN).
+
+    This function first compute the distance matrix using BLAS matrix multiplication
+    operation provided by backend frameworks. Then use topk algorithm to get
+    k-nearest neighbors.
 
     Parameters
     ----------
@@ -273,9 +359,26 @@ def _segmented_knn_graph_topk(x, k, segs):
     segs : list[int]
         Number of points in each point set. The numbers in :attr:`segs`
         must sum up to the number of rows in :attr:`x`.
+    dist : str, optional
+        The distance metric used to compute distance between points. It can be the following
+        metrics:
+        * 'euclidean': Use Euclidean distance (L2 norm) :math:`\sqrt{\sum_{i} (x_{i} - y_{i})^{2}}`.
+        * 'cosine': Use cosine distance.
+        (default: 'euclidean')
     """
+    # if use cosine distance, normalize input points first
+    # thus we can use euclidean distance to find knn equivalently.
+    if dist == 'cosine':
+        l2_norm = lambda v: F.sqrt(F.sum(v * v, dim=1, keepdims=True))
+        x = x / (l2_norm(x) + 1e-5)
+
     n_total_points, _ = F.shape(x)
     offset = np.insert(np.cumsum(segs), 0, 0)
+    min_seg_size = np.min(segs)
+    if k > min_seg_size:
+        dgl_warning("'k' should be less than or equal to the number of points in 'x'" \
+                    "expect k <= {0}, got k = {1}, use k = {0}".format(min_seg_size, k))
+        k = min_seg_size
 
     h_list = F.split(x, segs, 0)
     src = [
@@ -287,7 +390,7 @@ def _segmented_knn_graph_topk(x, k, segs):
     dst = F.repeat(F.arange(0, n_total_points, ctx=ctx), k, dim=0)
     return convert.graph((F.reshape(src, (-1,)), F.reshape(dst, (-1,))))
 
-def knn(x, x_segs, y, y_segs, k, algorithm='kd-tree', dist='euclidean'):
+def knn(x, x_segs, y, y_segs, k, algorithm='bruteforce', dist='euclidean'):
     r"""For each element in each segment in :attr:`y`, find :attr:`k` nearest
     points in the same segment in :attr:`x`.
 
@@ -313,14 +416,30 @@ def knn(x, x_segs, y, y_segs, k, algorithm='kd-tree', dist='euclidean'):
         The number of nearest neighbors per node.
     algorithm : str, optional
         Algorithm used to compute the k-nearest neighbors.
-        Currently only cpu version kdtree is supported.
-        (default: 'kd-tree')
+
+        * 'bruteforce' will compute distances pair by pair and
+          directly select the k-nearest neighbors during distance
+          computation. This method is slower than 'bruteforce-blas'
+          but has less memory overhead (i.e., :math:`O(Nk)` where :math:`N`
+          is the number of points, :math:`k` is the number of nearest
+          neighbors per node) since we do not need to store all distances.
+
+        * 'bruteforce-sharemem' (CUDA only) is similar to 'bruteforce'
+          but use shared memory in CUDA devices for buffer. This method is
+          faster than 'bruteforce' when the dimension of input points
+          is not large. This method is only available on CUDA device.
+
+        * 'kd-tree' will use the kd-tree algorithm (CPU only).
+          This method is suitable for low-dimensional data (e.g. 3D
+          point clouds)
+
+        (default: 'bruteforce')
     dist : str, optional
         The distance metric used to compute distance between points. It can be the following
         metrics:
         * 'euclidean': Use Euclidean distance (L2 norm) :math:`\sqrt{\sum_{i} (x_{i} - y_{i})^{2}}`.
         * 'cosine': Use cosine distance.
-        (Default: "euclidean")
+        (default: 'euclidean')
 
     Returns
     -------
@@ -329,12 +448,7 @@ def knn(x, x_segs, y, y_segs, k, algorithm='kd-tree', dist='euclidean'):
         The first subtensor contains point indexs in :attr:`y`. The second subtensor contains
         point indexs in :attr:`x`
     """
-    # currently only cpu implementation is supported.
-    if (F.context(x) != F.cpu() or F.context(y) != F.cpu()):
-        dgl_warning("Currently only cpu implementation is supported," \
-            "copy input tensors to cpu.")
-    x = F.copy_to(x, F.cpu())
-    y = F.copy_to(y, F.cpu())
+    assert F.context(x) == F.context(y)
     if isinstance(x_segs, (tuple, list)):
         x_segs = F.tensor(x_segs)
     if isinstance(y_segs, (tuple, list)):
@@ -342,16 +456,21 @@ def knn(x, x_segs, y, y_segs, k, algorithm='kd-tree', dist='euclidean'):
     x_segs = F.copy_to(x_segs, F.context(x))
     y_segs = F.copy_to(y_segs, F.context(y))
 
-    # supported algorithms
-    algorithm_list = ['kd-tree']
-    if algorithm not in algorithm_list:
-        raise DGLError("only {} algorithms are supported, get '{}'".format(
-            algorithm_list, algorithm))
+    # k shoule be less than or equal to min(x_segs)
+    min_num_points = F.min(x_segs, dim=0)
+    if k > min_num_points:
+        dgl_warning("'k' should be less than or equal to the number of points in 'x'" \
+                    "expect k <= {0}, got k = {1}, use k = {0}".format(min_num_points, k))
+        k = F.as_scalar(min_num_points)
 
-    # k must less than or equal to min(x_segs)
-    if k > F.min(x_segs, dim=0):
-        raise DGLError("'k' must be less than or equal to the number of points in 'x'"
-                       "expect k <= {}, got k = {}".format(F.min(x_segs, dim=0), k))
+    # invalid k
+    if k <= 0:
+        raise DGLError("Invalid k value. expect k > 0, got k = {}".format(k))
+
+    # empty point set
+    if F.shape(x)[0] == 0 or F.shape(y)[0] == 0:
+        raise DGLError("Find empty point set")
+
     dist = dist.lower()
     dist_metric_list = ['euclidean', 'cosine']
     if dist not in dist_metric_list:
@@ -2481,5 +2600,178 @@ def as_immutable_graph(hg):
     dgl_warning('DEPRECATED: DGLGraph and DGLHeteroGraph have been merged in v0.5.\n'
                 '\tdgl.as_immutable_graph will do nothing and can be removed safely in all cases.')
     return hg
+
+def sort_out_edges(g, tag, tag_offset_name='_TAG_OFFSET'):
+    """Return a new graph which sorts the out edges of each node.
+
+    Sort the out edges according to the given destination node tags in integer.
+    A typical use case is to sort the edges by the destination node types, where
+    the tags represent destination node types. After sorting, edges sharing
+    the same tag will be arranged in a consecutive range in
+    a node's adjacency list. Following is an example:
+
+        Consider a graph as follows:
+
+        0 -> 0, 1, 2, 3, 4
+        1 -> 0, 1, 2
+
+        Given node tags [1, 1, 0, 2, 0], each node's adjacency list
+        will be sorted as follows:
+
+        0 -> 2, 4, 0, 1, 3
+        1 -> 2, 0, 1
+
+    The function will also returns the starting offsets of the tag
+    segments in a tensor of shape `(N, max_tag+2)`. For node `i`,
+    its out-edges connecting to node tag `j` is stored between
+    `tag_offsets[i][j]` ~ `tag_offsets[i][j+1]`. Since the offsets
+    can be viewed node data, we store it in the
+    `ndata` of the returned graph. Users can specify the
+    ndata name by the `tag_pos_name` argument.
+
+    Note that the function will not change the edge ID neither
+    how the edge features are stored. The input graph must
+    allow CSR format. Graph must be on CPU.
+
+    If the input graph is heterogenous, it must have only one edge
+    type and two node types (i.e., source and destination node types).
+    In this case, the provided node tags are for the destination nodes,
+    and the tag offsets are stored in the source node data.
+
+    The sorted graph and the calculated tag offsets are needed by
+    certain operators that consider node tags. See `sample_neighbors_biased`
+    for an example.
+
+    Examples
+    -----------
+
+    >>> g = dgl.graph(([0,0,0,0,0,1,1,1],[0,1,2,3,4,0,1,2]))
+    >>> g.adjacency_matrix(scipy_fmt='csr').nonzero()
+    (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
+     array([0, 1, 2, 3, 4, 0, 1, 2], dtype=int32))
+    >>> tag = torch.IntTensor([1,1,0,2,0])
+    >>> g_sorted = dgl.transform.sort_out_edges(g, tag)
+    >>> g_sorted.adjacency_matrix(scipy_fmt='csr').nonzero()
+    (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
+     array([2, 4, 0, 1, 3, 2, 0, 1], dtype=int32))
+    >>> g_sorted.ndata['_TAG_OFFSET']
+    tensor([[0, 2, 4, 5],
+            [0, 1, 3, 3],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0]])
+
+    Parameters
+    ------------
+    g : DGLGraph
+        The input graph.
+    tag : Tensor
+        Integer tensor of shape `(N,)`, `N` being the number of (destination) nodes.
+    tag_offset_name : str
+        The name of the node feature to store tag offsets.
+
+    Returns
+    -------
+    g_sorted : DGLGraph
+        A new graph whose out edges are sorted. The node/edge features of the
+        input graph is shallow-copied over.
+        - `g_sorted.ndata[tag_offset_name]` : Tensor of shape `(N, max_tag + 2)`. If
+        `g` is heterogeneous, get from `g_sorted.srcdata`.
+    """
+    if len(g.etypes) > 1:
+        raise DGLError("Only support homograph and bipartite graph")
+    num_tags = int(F.asnumpy(F.max(tag, 0))) + 1
+    tag_arr = F.zerocopy_to_dgl_ndarray(tag)
+    new_g = g.clone()
+    new_g._graph, tag_pos_arr = _CAPI_DGLHeteroSortOutEdges(g._graph, tag_arr, num_tags)
+    new_g.srcdata[tag_offset_name] = F.from_dgl_nd(tag_pos_arr)
+    return new_g
+
+
+def sort_in_edges(g, tag, tag_offset_name='_TAG_OFFSET'):
+    """Return a new graph which sorts the in edges of each node.
+
+    Sort the in edges according to the given source node tags in integer.
+    A typical use case is to sort the edges by the source node types, where
+    the tags represent source node types. After sorting, edges sharing
+    the same tag will be arranged in a consecutive range in
+    a node's adjacency list. Following is an example:
+
+        Consider a graph as follows:
+
+        0 <- 0, 1, 2, 3, 4
+        1 <- 0, 1, 2
+
+        Given node tags [1, 1, 0, 2, 0], each node's adjacency list
+        will be sorted as follows:
+
+        0 <- 2, 4, 0, 1, 3
+        1 <- 2, 0, 1
+
+    The function will also returns the starting offsets of the tag
+    segments in a tensor of shape `(N, max_tag+2)`. For node `i`,
+    its in-edges connecting to node tag `j` is stored between
+    `tag_offsets[i][j]` ~ `tag_offsets[i][j+1]`. Since the offsets
+    can be viewed node data, we store it in the
+    `ndata` of the returned graph. Users can specify the
+    ndata name by the `tag_pos_name` argument.
+
+    Note that the function will not change the edge ID neither
+    how the edge features are stored. The input graph must
+    allow CSR format. Graph must be on CPU.
+
+    If the input graph is heterogenous, it must have only one edge
+    type and two node types (i.e., source and destination node types).
+    In this case, the provided node tags are for the source nodes,
+    and the tag offsets are stored in the destination node data.
+
+    The sorted graph and the calculated tag offsets are needed by
+    certain operators that consider node tags. See `sample_neighbors_biased`
+    for an example.
+
+    Examples
+    -----------
+
+    >>> g = dgl.graph(([0,1,2,3,4,0,1,2],[0,0,0,0,0,1,1,1]))
+    >>> g.adjacency_matrix(scipy_fmt='csr', transpose=False).nonzero()
+    (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
+     array([0, 1, 2, 3, 4, 0, 1, 2], dtype=int32)))
+    >>> tag = torch.IntTensor([1,1,0,2,0])
+    >>> g_sorted = dgl.transform.sort_in_edges(g, tag)
+    >>> g_sorted.adjacency_matrix(scipy_fmt='csr', transpose=False).nonzero()
+    (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
+     array([2, 4, 0, 1, 3, 2, 0, 1], dtype=int32))
+    >>> g_sorted.ndata['_TAG_OFFSET']
+    tensor([[0, 2, 4, 5],
+            [0, 1, 3, 3],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0]])
+
+    Parameters
+    ------------
+    g : DGLGraph
+        The input graph.
+    tag : Tensor
+        Integer tensor of shape `(N,)`, `N` being the number of (source) nodes.
+    tag_offset_name : str
+        The name of the node feature to store tag offsets.
+
+    Returns
+    -------
+    g_sorted : DGLGraph
+        A new graph whose out edges are sorted. The node/edge features of the
+        input graph is shallow-copied over.
+        - `g_sorted.ndata[tag_offset_name]` : Tensor of shape `(N, max_tag + 2)`. If
+        `g` is heterogeneous, get from `g_sorted.dstdata`.
+    """
+    if len(g.etypes) > 1:
+        raise DGLError("Only support homograph and bipartite graph")
+    num_tags = int(F.asnumpy(F.max(tag, 0))) + 1
+    tag_arr = F.zerocopy_to_dgl_ndarray(tag)
+    new_g = g.clone()
+    new_g._graph, tag_pos_arr = _CAPI_DGLHeteroSortInEdges(g._graph, tag_arr, num_tags)
+    new_g.dstdata[tag_offset_name] = F.from_dgl_nd(tag_pos_arr)
+    return new_g
 
 _init_api("dgl.transform")
