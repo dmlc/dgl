@@ -26,7 +26,7 @@ else:
             return bwd(*args, **kwargs)
         return decorate_bwd
 
-__all__ = ['gspmm', 'gsddmm', 'edge_softmax', 'segment_reduce', 'scatter_add',
+__all__ = ['gspmm', 'gsddmm', 'gspmm_hetero', 'gsddmm_hetero', 'edge_softmax', 'segment_reduce', 'scatter_add',
            'csrmm', 'csrsum', 'csrmask']
 
 
@@ -512,8 +512,8 @@ def gspmm(gidx, op, reduce_op, lhs_data, rhs_data):
 def gsddmm(gidx, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
     return GSDDMM.apply(gidx, op, lhs_data, rhs_data, lhs_target, rhs_target)
 
-def gspmm_hetero(g, op, reduce_op, *lhs_data):
-    return GSpMM_hetero.apply(g, op, reduce_op, *lhs_data)
+def gspmm_hetero(g, op, reduce_op, *lhs_and_rhs_tuple):
+    return GSpMM_hetero.apply(g, op, reduce_op, *lhs_and_rhs_tuple)
 
 def gsddmm_hetero(g, op, lhs_target='u', rhs_target='v', *lhs_and_rhs_tuple):
     return GSDDMM_hetero.apply(g, op, lhs_target, rhs_target, *lhs_and_rhs_tuple)

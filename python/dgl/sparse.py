@@ -197,8 +197,9 @@ def _gspmm_hetero(g, op, reduce_op, u_and_e_tuple):
     list_v = [None] * gidx.number_of_ntypes()
     list_e = [None] * gidx.number_of_etypes()
 
-    for srctype, etype, dsttype in g.canonical_etypes:
-        etid = g.get_etype_id(etype)
+    for rel in g.canonical_etypes:
+        srctype, etype, dsttype = rel
+        etid = g.get_etype_id(rel)
         src_id = g.get_ntype_id(srctype)
         dst_id = g.get_ntype_id(dsttype)
         u = u_tuple[src_id] if use_u else None
@@ -207,18 +208,16 @@ def _gspmm_hetero(g, op, reduce_op, u_and_e_tuple):
             if u is not None and F.ndim(u) == 1:
                 u = F.unsqueeze(u, -1)
                 expand_u = True
+            list_u[src_id] = u if use_u else None
         if use_e:
             if e is not None and F.ndim(e) == 1:
                 e = F.unsqueeze(e, -1)
                 expand_e = True
+            list_e[etid] = e if use_e else None
         ctx = F.context(u) if use_u else F.context(e) # TODO(Israt): Put outside of loop
         dtype = F.dtype(u) if use_u else F.dtype(e) # TODO(Israt): Put outside of loop
         u_shp = F.shape(u) if use_u else (0,)
         e_shp = F.shape(e) if use_e else (0,)
-        if use_u:
-            list_u[src_id] = u if use_u else None
-        if use_e:
-            list_e[etid] = e if use_e else None
         v_shp = (gidx.number_of_nodes(dst_id), ) +\
             infer_broadcast_shape(op, u_shp[1:], e_shp[1:])
         list_v[dst_id] = F.zeros(v_shp, dtype, ctx)
@@ -359,8 +358,9 @@ def _gsddmm_hetero(g, op, lhs_target='u', rhs_target='v', lhs_and_rhs_tuple=None
     rhs_list = [None] * gidx.number_of_ntypes()
     out_list = [None] * gidx.number_of_etypes()
 
-    for srctype, etype, dsttype in g.canonical_etypes:
-        etid = g.get_etype_id(etype)
+    for rel in g.canonical_etypes:
+        srctype, etype, dsttype = rel
+        etid = g.get_etype_id(rel)
         src_id = g.get_ntype_id(srctype)
         dst_id = g.get_ntype_id(dsttype)
         lhs = lhs_tuple[src_id]

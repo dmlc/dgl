@@ -4803,9 +4803,9 @@ class DGLHeteroGraph(object):
     # New Message passing on heterograph // will replace *update_all
     #################################################################
     def update_all_new(self,
-                       mfunc,
-                       rfunc,
-                       afunc=None):
+                       message_func,
+                       reduce_func,
+                       apply_node_func=None):
         r"""Send messages along all the edges, reduce them by type-wisely
         and across different types at the same time. Then, update the node features of all
         the nodes.
@@ -4868,14 +4868,14 @@ class DGLHeteroGraph(object):
         tensor([[0.],
                 [4.]])
         """
-        if rfunc.name in ['max', 'min', 'mean']:
-            raise NotImplementedError("Reduce op \'" + rfunc.name + "\' is not supported in "
+        if reduce_func.name in ['max', 'min', 'mean']:
+            raise NotImplementedError("Reduce op \'" + reduce_func.name + "\' is not supported in "
                                       "the new heterograph API. Use multi_update_all().")
-        # if mfunc.name not in ['copy_u', 'copy_e']:
-        #     raise NotImplementedError("Op \'" + mfunc.name + "\' is not supported in "
-        #                               "the new heterograph API. Use multi_update_all().")
+        if message_func.name not in ['copy_u', 'copy_e']:
+            raise NotImplementedError("Op \'" + message_func.name + "\' is not supported in "
+                                      "the new heterograph API. Use multi_update_all().")
         g = self
-        all_out = core.message_passing(g, mfunc, rfunc, afunc)
+        all_out = core.message_passing(g, message_func, reduce_func, apply_node_func)
         key = list(all_out.keys())[0]
         out_tensor_tuples = all_out[key]
 
@@ -4884,9 +4884,9 @@ class DGLHeteroGraph(object):
             dtid = g.get_ntype_id(dsttype)
             dst_tensor[key] = out_tensor_tuples[dtid]
             self._node_frames[dtid].update(dst_tensor)
-        # TODO (Israt): Add apply function in heterograph
-        # if apply_node_func is not None:
-        #     self.apply_nodes(apply_node_func, ALL, self.ntypes[dtid])
+        # apply
+        if apply_node_func is not None:
+            self.apply_nodes(apply_node_func, ALL, self.ntypes[dtid])
 
     #################################################################
     # Message propagation

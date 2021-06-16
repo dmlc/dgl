@@ -8,7 +8,8 @@ from .. import backend as F
 __all__ = ['gspmm']
 
 def reshape_lhs_rhs(lhs_data, rhs_data):
-    r""" Reshape the dimension of lhs and rhs data
+    r""" Reshape the dimension of lhs and rhs data to avoid broadcasting
+    issues with different number of dimensions.
 
     Parameters
     ----------
@@ -96,9 +97,10 @@ def gspmm(g, op, reduce_op, lhs_data, rhs_data):
         lhs_list = [None] * g._graph.number_of_ntypes()
         rhs_list = [None] * g._graph.number_of_etypes()
 
-        for srctype, etype, dsttype in g.canonical_etypes:
+        for rel in g.canonical_etypes:
+            srctype, etype, dsttype = rel
             src_id = g.get_ntype_id(srctype)
-            etid = g.get_etype_id(etype)
+            etid = g.get_etype_id(rel)
             tag = srctype, etype, dsttype
             lhs_data = lhs_data_dict[srctype] if use_u else None
             rhs_data = rhs_data_dict[tag] if use_e else None
