@@ -58,6 +58,11 @@ labels = labels.to(device)
 # That’s the core behind this tutorial. We will explore it more in detail with
 # a complete example below.
 #
+# .. note::
+#
+#    See `this tutorial <https://pytorch.org/tutorials/intermediate/ddp_tutorial.html>`__
+#    from PyTorch for general multi-GPU training with ``DistributedDataParallel``.
+#
 # Distributed Process Group Initialization
 # ----------------------------------------
 #
@@ -221,10 +226,17 @@ def main(rank, world_size, dataset, seed=0):
 
 ###############################################################################
 # Finally we load the dataset and launch the processes.
+# 
+# .. note::
+# 
+#    You will need to use ``dgl.multiprocessing`` instead of the Python
+#    ``multiprocessing`` package. ``dgl.multiprocessing`` is identical to
+#    Python’s built-in ``multiprocessing`` except that it handles the
+#    subtleties between forking and multithreading in Python.
 #
 
 if __name__ == '__main__':
-    import torch.multiprocessing as mp
+    import dgl.multiprocessing as mp
 
     from dgl.data import GINDataset
 
