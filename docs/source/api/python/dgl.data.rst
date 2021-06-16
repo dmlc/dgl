@@ -117,19 +117,6 @@ Symmetric Stochastic Block Model Mixture dataset
 .. autoclass:: SBMMixtureDataset
     :members: __getitem__, __len__, collate_fn
 
-.. _frauddata:
-
-Fraud dataset
-``````````````
-.. autoclass:: FraudDataset
-    :members: __getitem__, __len__
-
-.. autoclass:: FraudYelpDataset
-    :members: __getitem__, __len__
-
-.. autoclass:: FraudAmazonDataset
-    :members: __getitem__, __len__
-
 
 Edge Prediction Datasets
 ---------------------------------------
@@ -218,13 +205,6 @@ Graph isomorphism network dataset
 ```````````````````````````````````
 
 .. autoclass:: GINDataset
-    :members: __getitem__, __len__
-
-.. _fakenewsdata:
-
-Fake news dataset
-```````````````````````````````````
-.. autoclass:: FakeNewsDataset
     :members: __getitem__, __len__
 
 Utilities
