@@ -214,7 +214,8 @@ def load_partition_book(part_config, part_id, graph=None):
                 part_metadata['graph_name'], ntypes, etypes
 
 def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method="metis",
-                    reshuffle=True, balance_ntypes=None, balance_edges=False, return_mapping=False):
+                    reshuffle=True, balance_ntypes=None, balance_edges=False, return_mapping=False,
+                    num_trainers_per_machine=1):
     ''' Partition a graph for distributed training and store the partitions on files.
 
     The partitioning occurs in three steps: 1) run a partition algorithm (e.g., Metis) to
@@ -388,6 +389,12 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     return_mapping : bool
         If `reshuffle=True`, this indicates to return the mapping between shuffled node/edge IDs
         and the original node/edge IDs.
+    num_trainers_per_machine : int, optional
+        The number of trainers per machine. If is not 1, the whole graph will be first partitioned
+        to each trainer, that is num_parts*num_trainers_per_machine parts. And the trainer ids of
+        each node will be stored in the node feature 'trainer_id'. Then the partitions of trainers
+        on the same machine will be coalesced into one larger partition. The final number of
+        partitions is `num_part`.
 
     Returns
     -------
@@ -453,6 +460,18 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
 
     if num_parts == 1:
         sim_g = to_homogeneous(g)
+        assert num_trainers_per_machine >= 1
+        if num_trainers_per_machine > 1:
+            # First partition the whole graph to each trainer and save the trainer ids in
+            # the node feature "trainer_id".
+            node_parts = metis_partition_assignment(
+                sim_g, num_parts * num_trainers_per_machine,
+                balance_ntypes=balance_ntypes,
+                balance_edges=balance_edges,
+                mode='k-way')
+            g.ndata['trainer_id'] = node_parts
+            g.edata['trainer_id'] = node_parts[g.edges()[1]]
+
         node_parts = F.zeros((sim_g.number_of_nodes(),), F.int64, F.cpu())
         parts = {}
         if reshuffle:
@@ -470,8 +489,24 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     elif part_method in ('metis', 'random'):
         sim_g, balance_ntypes = get_homogeneous(g, balance_ntypes)
         if part_method == 'metis':
-            node_parts = metis_partition_assignment(sim_g, num_parts, balance_ntypes=balance_ntypes,
-                                                    balance_edges=balance_edges)
+            assert num_trainers_per_machine >= 1
+            if num_trainers_per_machine > 1:
+                # First partition the whole graph to each trainer and save the trainer ids in
+                # the node feature "trainer_id".
+                node_parts = metis_partition_assignment(
+                    sim_g, num_parts * num_trainers_per_machine,
+                    balance_ntypes=balance_ntypes,
+                    balance_edges=balance_edges,
+                    mode='k-way')
+                g.ndata['trainer_id'] = node_parts
+
+                # And then coalesce the partitions of trainers on the same machine into one
+                # larger partition.
+                node_parts = node_parts // num_trainers_per_machine
+            else:
+                node_parts = metis_partition_assignment(sim_g, num_parts,
+                                                        balance_ntypes=balance_ntypes,
+                                                        balance_edges=balance_edges)
         else:
             node_parts = random_choice(num_parts, sim_g.number_of_nodes())
         parts, orig_nids, orig_eids = partition_graph_with_halo(sim_g, node_parts, num_hops,
