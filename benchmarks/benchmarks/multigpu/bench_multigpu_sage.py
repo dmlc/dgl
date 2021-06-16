@@ -135,7 +135,7 @@ def run(result_queue, proc_id, n_gpus, args, devices, data):
         result_queue.put(np.array(timing_records))
 
 
-@utils.benchmark('time')
+@utils.benchmark('time', timeout=600)
 # @utils.skip_if_not_4gpu()
 @utils.parametrize('data', ['reddit', 'ogbn-products'])
 def track_time(data):
