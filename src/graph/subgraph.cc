@@ -102,9 +102,9 @@ HeteroSubgraph InEdgeGraphNoRelabelNodes(
       // create a placeholder graph
       subrels[etype] = UnitGraph::Empty(
         relgraph->NumVertexTypes(),
-	graph->NumVertices(src_vtype),
-	graph->NumVertices(dst_vtype),
-	graph->DataType(), graph->Context());
+        graph->NumVertices(src_vtype),
+        graph->NumVertices(dst_vtype),
+        graph->DataType(), graph->Context());
       induced_edges[etype] = IdArray::Empty({0}, graph->DataType(), graph->Context());
     } else {
       const auto& earr = graph->InEdges(etype, {vids[dst_vtype]});
@@ -192,8 +192,8 @@ HeteroSubgraph OutEdgeGraphRelabelNodes(
       // create a placeholder graph
       subrels[etype] = UnitGraph::Empty(
         (src_vtype == dst_vtype)? 1 : 2,
-	ret.induced_vertices[src_vtype]->shape[0],
-	ret.induced_vertices[dst_vtype]->shape[0],
+        ret.induced_vertices[src_vtype]->shape[0],
+        ret.induced_vertices[dst_vtype]->shape[0],
         graph->DataType(), graph->Context());
       ret.induced_edges[etype] = IdArray::Empty({0}, graph->DataType(), graph->Context());
     } else {
