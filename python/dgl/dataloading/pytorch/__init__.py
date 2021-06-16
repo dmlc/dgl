@@ -1,6 +1,7 @@
 """DGL PyTorch DataLoaders"""
 import inspect
 import math
+from distutils.version import LooseVersion
 import torch as th
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
@@ -11,6 +12,23 @@ from ...distributed import DistDataLoader
 from ...ndarray import NDArray as DGLNDArray
 from ... import backend as F
 from ...base import DGLError
+from ...utils import to_dgl_context
+
+PYTORCH_VER = LooseVersion(th.__version__)
+PYTORCH_16 = PYTORCH_VER >= LooseVersion("1.6.0")
+PYTORCH_17 = PYTORCH_VER >= LooseVersion("1.7.0")
+
+def _create_dist_sampler(dataset, dataloader_kwargs, ddp_seed):
+    # Note: will change the content of dataloader_kwargs
+    dist_sampler_kwargs = {'shuffle': dataloader_kwargs['shuffle']}
+    dataloader_kwargs['shuffle'] = False
+    if PYTORCH_16:
+        dist_sampler_kwargs['seed'] = ddp_seed
+    if PYTORCH_17:
+        dist_sampler_kwargs['drop_last'] = dataloader_kwargs['drop_last']
+        dataloader_kwargs['drop_last'] = False
+
+    return DistributedSampler(dataset, **dist_sampler_kwargs)
 
 class _ScalarDataBatcherIter:
     def __init__(self, dataset, batch_size, drop_last):
@@ -390,7 +408,7 @@ class NodeDataLoader:
     """
     collator_arglist = inspect.getfullargspec(NodeCollator).args
 
-    def __init__(self, g, nids, block_sampler, device='cpu', use_ddp=False, ddp_seed=0, **kwargs):
+    def __init__(self, g, nids, block_sampler, device=None, use_ddp=False, ddp_seed=0, **kwargs):
         collator_kwargs = {}
         dataloader_kwargs = {}
         for k, v in kwargs.items():
@@ -400,6 +418,9 @@ class NodeDataLoader:
                 dataloader_kwargs[k] = v
 
         if isinstance(g, DistGraph):
+            if device is None:
+                # for the distributed case default to the CPU
+                device = 'cpu'
             assert device == 'cpu', 'Only cpu is supported in the case of a DistGraph.'
             # Distributed DataLoader currently does not support heterogeneous graphs
             # and does not copy features.  Fallback to normal solution
@@ -410,6 +431,15 @@ class NodeDataLoader:
                                              **dataloader_kwargs)
             self.is_distributed = True
         else:
+            if device is None:
+                # default to the same device the graph is on
+                device = th.device(g.device)
+
+            # if the sampler supports it, tell it to output to the
+            # specified device
+            if callable(getattr(block_sampler, "set_output_context", None)):
+                block_sampler.set_output_context(to_dgl_context(device))
+
             self.collator = _NodeCollator(g, nids, block_sampler, **collator_kwargs)
             dataset = self.collator.dataset
             use_scalar_batcher = False
@@ -419,7 +449,7 @@ class NodeDataLoader:
                 # doens't seem to have a performance benefit on the CPU.
                 assert 'num_workers' not in dataloader_kwargs or \
                     dataloader_kwargs['num_workers'] == 0, \
-                    'When performing dataloading from the GPU, num_workers ' \
+                    'When performing dataloading on the GPU, num_workers ' \
                     'must be zero.'
 
                 batch_size = dataloader_kwargs.get('batch_size', 0)
@@ -449,13 +479,7 @@ class NodeDataLoader:
             self.use_ddp = use_ddp
             self.use_scalar_batcher = use_scalar_batcher
             if use_ddp and not use_scalar_batcher:
-                self.dist_sampler = DistributedSampler(
-                    dataset,
-                    shuffle=dataloader_kwargs['shuffle'],
-                    drop_last=dataloader_kwargs['drop_last'],
-                    seed=ddp_seed)
-                dataloader_kwargs['shuffle'] = False
-                dataloader_kwargs['drop_last'] = False
+                self.dist_sampler = _create_dist_sampler(dataset, dataloader_kwargs, ddp_seed)
                 dataloader_kwargs['sampler'] = self.dist_sampler
 
             self.dataloader = DataLoader(
@@ -724,13 +748,7 @@ class EdgeDataLoader:
 
         self.use_ddp = use_ddp
         if use_ddp:
-            self.dist_sampler = DistributedSampler(
-                dataset,
-                shuffle=dataloader_kwargs['shuffle'],
-                drop_last=dataloader_kwargs['drop_last'],
-                seed=ddp_seed)
-            dataloader_kwargs['shuffle'] = False
-            dataloader_kwargs['drop_last'] = False
+            self.dist_sampler = _create_dist_sampler(dataset, dataloader_kwargs, ddp_seed)
             dataloader_kwargs['sampler'] = self.dist_sampler
 
         self.dataloader = DataLoader(
@@ -835,13 +853,7 @@ class GraphDataLoader:
 
         self.use_ddp = use_ddp
         if use_ddp:
-            self.dist_sampler = DistributedSampler(
-                dataset,
-                shuffle=dataloader_kwargs['shuffle'],
-                drop_last=dataloader_kwargs['drop_last'],
-                seed=ddp_seed)
-            dataloader_kwargs['shuffle'] = False
-            dataloader_kwargs['drop_last'] = False
+            self.dist_sampler = _create_dist_sampler(dataset, dataloader_kwargs, ddp_seed)
             dataloader_kwargs['sampler'] = self.dist_sampler
 
         self.dataloader = DataLoader(dataset=dataset,
