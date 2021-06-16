@@ -246,7 +246,7 @@ def _gspmm_hetero(g, op, reduce_op, u_and_e_tuple):
     for l in range(gidx.number_of_ntypes()):
         # replace None by empty tensor. Forward func doesn't accept None in tuple.
         v = list_v[l]
-        v = torch.tensor([]) if v is None else v
+        v = F.tensor([]) if v is None else v
         if ((expand_u or not use_u) and (expand_e or not use_e)):
             v = F.squeeze(v, -1)  # To deal with scalar node/edge features.
         list_v[l] = v
@@ -394,7 +394,7 @@ def _gsddmm_hetero(g, op, lhs_target='u', rhs_target='v', lhs_and_rhs_tuple=None
     for l in range(gidx.number_of_ntypes()):
         # Replace None by empty tensor. Forward func doesn't accept None in tuple.
         e = out_list[l]
-        e = torch.tensor([]) if e is None else e
+        e = F.tensor([]) if e is None else e
         if (expand_lhs or not use_lhs) and (expand_rhs or not use_rhs):
             e = F.squeeze(v, -1)
         out_list[l] = e
