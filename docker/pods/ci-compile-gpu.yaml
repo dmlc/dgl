@@ -17,6 +17,7 @@ spec:
         curl "https://data.dgl.ai/assets/sccache" -o "/usr/local/bin/sccache"
         chmod +x /usr/local/bin/sccache
         sccache -s
+        sleep 99d
     env:
       - name: CMAKE_CACHE_EXTRA_ARGS
         value: " -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache "
