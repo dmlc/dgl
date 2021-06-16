@@ -244,6 +244,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
     model.train()
     embed_layer.train()
 
+    # Warm up
     for i, sample_data in enumerate(loader):
         seeds, blocks = sample_data
         t0 = time.time()
@@ -265,7 +266,8 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
         gc.collect()
         if i >= 3:
             break
-
+    
+    # real time
     for i, sample_data in enumerate(loader):
         seeds, blocks = sample_data
         t0 = time.time()
@@ -299,7 +301,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
         queue.put(np.array(time_records))
 
 
-# @utils.skip_if_not_4gpu()
+@utils.skip_if_not_4gpu()
 @utils.benchmark('time', timeout=600)
 @utils.parametrize('data', ['am'])
 @utils.parametrize('low_mem', [True, False])
@@ -453,7 +455,11 @@ def track_time(data, low_mem, dgl_sparse):
     for p in procs:
         p.join()
     time_records = queue.get(block=False)
-    return np.mean(time_records)
+    num_exclude = 10 # exclude first 10 iterations
+    if len(time_records) < 15:
+        # exclude less if less records
+        num_exclude = int(len(time_records)*0.3)
+    return np.mean(time_records[num_exclude:])
 
 
 def config():
