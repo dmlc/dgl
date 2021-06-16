@@ -11,7 +11,6 @@ from dgl import DGLError
 import test_utils
 from test_utils import parametrize_dtype, get_cases
 from scipy.sparse import rand
-import torch
 
 rfuncs = {'sum': fn.sum, 'max': fn.max, 'min': fn.min, 'mean': fn.mean}
 fill_value = {'sum': 0, 'max': float("-inf")}
@@ -113,10 +112,10 @@ def test_unary_copy_e(idtype):
         F.attach_grad(x2)
         F.attach_grad(x3)
         F.attach_grad(x4)
-        g['plays'].edata['eid'] = x1 #torch.full((4, 2), 5.0)
-        g['follows'].edata['eid'] = x2  #torch.full((4, 2), 10.0)
-        g['develops'].edata['eid'] = x3 #F.ones((3,feat_size)) # torch.full((3, 2), 20.0)
-        g['wishes'].edata['eid'] = x4 #F.ones((3,feat_size)) #torch.full((3, 2), 15.0)
+        g['plays'].edata['eid'] = x1
+        g['follows'].edata['eid'] = x2
+        g['develops'].edata['eid'] = x3
+        g['wishes'].edata['eid'] = x4
 
         #################################################################
         #  multi_update_all(): call msg_passing separately for each etype
