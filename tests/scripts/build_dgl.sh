@@ -27,6 +27,8 @@ rm -rf _download
 echo "Show"
 echo $CMAKE_CACHE_EXTRA_ARGS
 
+sccache -s
+
 pushd build
 cmake $CMAKE_VARS $CMAKE_CACHE_EXTRA_ARGS ..
 make -j
