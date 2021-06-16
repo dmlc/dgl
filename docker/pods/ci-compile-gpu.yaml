@@ -9,8 +9,9 @@ spec:
     image: dgllib/dgl-ci-gpu:conda
     imagePullPolicy: Always
     tty: true
-    args:
+    command:
       - "bash"
+    args:
       - "-c"
       - |
         curl "https://data.dgl.ai/assets/sccache" -o "/usr/local/bin/sccache"
