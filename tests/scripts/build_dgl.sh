@@ -20,17 +20,24 @@ fi
 if [ -d build ]; then
     rm -rf build
 fi
+
+CCACHE_BASEDIR=$PWD
+
 mkdir build
 
 rm -rf _download
 
-echo "Show"
-echo $CMAKE_CACHE_EXTRA_ARGS
-
-sccache -s
+if ! command -v ccache &> /dev/null
+then
+    echo "Didn't find ccache"
+else
+    ccache -s
+    CMAKE_VARS=" -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache $CMAKE_VARS"
+fi
 
 pushd build
-cmake $CMAKE_VARS $CMAKE_CACHE_EXTRA_ARGS ..
+echo $CMAKE_VARS
+cmake $CMAKE_VARS ..
 make -j
 popd
 
