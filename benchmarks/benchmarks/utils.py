@@ -32,7 +32,37 @@ def _download(url, path, filename):
 
 
 # GRAPH_CACHE = {}
+import torch.multiprocessing as mp
+from _thread import start_new_thread
+import traceback
 
+def thread_wrapped_func(func):
+    """
+    Wraps a process entry point to make it work with OpenMP.
+    """
+
+    @wraps(func)
+    def decorated_function(*args, **kwargs):
+        queue = mp.Queue()
+
+        def _queue_result():
+            exception, trace, res = None, None, None
+            try:
+                res = func(*args, **kwargs)
+            except Exception as e:
+                exception = e
+                trace = traceback.format_exc()
+            queue.put((res, exception, trace))
+
+        start_new_thread(_queue_result, ())
+        result, exception, trace = queue.get()
+        if exception is None:
+            return result
+        else:
+            assert isinstance(exception, Exception)
+            raise exception.__class__(trace)
+
+    return decorated_function
 
 def get_graph(name, format):
     # global GRAPH_CACHE
@@ -451,6 +481,32 @@ def skip_if_gpu():
     def _wrapper(func):
         if device == "gpu":
             # skip if not enabled
+            func.benchmark_name = "skip_" + func.__name__
+        return func
+    return _wrapper
+
+def _cuda_device_count(q):
+    import torch
+    q.put(torch.cuda.device_count())
+
+def get_num_gpu():
+    import multiprocessing as mp
+    q = mp.Queue()
+    p = mp.Process(target=_cuda_device_count, args=(q, ))
+    p.start()
+    p.join()
+    return q.get(block=False)
+
+GPU_COUNT = get_num_gpu()
+
+def skip_if_not_4gpu():
+    """skip if DGL_BENCH_DEVICE is gpu
+    """
+
+    def _wrapper(func):
+        if GPU_COUNT != 4:
+            # skip if not enabled
+            print("Skip {}".format(func.benchmark_name))
             func.benchmark_name = "skip_" + func.__name__
         return func
     return _wrapper
