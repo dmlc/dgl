@@ -303,7 +303,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
 
 @utils.skip_if_not_4gpu()
 @utils.benchmark('time', timeout=600)
-@utils.parametrize('data', ['am'])
+@utils.parametrize('data', ['am', 'ogbn-mag'])
 @utils.parametrize('low_mem', [True, False])
 @utils.parametrize('dgl_sparse', [True, False])
 def track_time(data, low_mem, dgl_sparse):
