@@ -1212,9 +1212,11 @@ def node_split(nodes, partition_book=None, ntype='_N', rank=None, force_even=Tru
     if rank is None:
         rank = role.get_trainer_rank()
     if force_even:
-        part_nid = _split_even_to_part(partition_book, nodes)
         num_clients = role.get_num_trainers()
         num_client_per_part = num_clients // partition_book.num_partitions()
+        assert num_clients % partition_book.num_partitions() == 0, \
+                'The total number of clients should be multiple of the number of partitions.'
+        part_nid = _split_even_to_part(partition_book, nodes)
         if num_client_per_part == 1:
             return part_nid
         elif node_trainer_ids is None:
@@ -1290,9 +1292,11 @@ def edge_split(edges, partition_book=None, etype='_E', rank=None, force_even=Tru
     if rank is None:
         rank = role.get_trainer_rank()
     if force_even:
-        part_eid = _split_even_to_part(partition_book, edges)
         num_clients = role.get_num_trainers()
         num_client_per_part = num_clients // partition_book.num_partitions()
+        assert num_clients % partition_book.num_partitions() == 0, \
+                'The total number of clients should be multiple of the number of partitions.'
+        part_eid = _split_even_to_part(partition_book, edges)
         if num_client_per_part == 1:
             return part_eid
         elif edge_trainer_ids is None:
