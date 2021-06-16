@@ -5985,13 +5985,14 @@ def combine_frames(frames, ids, col_names=None):
         schemes = {key: frames[ids[0]].schemes[key] for key in col_names}
     for frame_id in ids:
         frame = frames[frame_id]
-        for key, scheme in list(schemes.items()):
-            if key in frame.schemes:
-                if frame.schemes[key] != scheme:
-                    raise DGLError('Cannot concatenate column %s with shape %s and shape %s' %
-                                   (key, frame.schemes[key], scheme))
-            else:
-                del schemes[key]
+        if frame.num_rows != 0:
+            for key, scheme in list(schemes.items()):
+                if key in frame.schemes:
+                    if frame.schemes[key] != scheme:
+                        raise DGLError('Cannot concatenate column %s with shape %s and shape %s' %
+                                       (key, frame.schemes[key], scheme))
+                else:
+                    del schemes[key]
 
     if len(schemes) == 0:
         return None
