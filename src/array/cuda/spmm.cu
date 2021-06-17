@@ -304,7 +304,7 @@ void CusparseCsrmm2Hetero(
   const int k = csr.num_cols;
   const int nnz = csr.indices->shape[0];
   const DType alpha = 1.0;
-  const DType beta = 0.0;
+  const DType beta = 1.0;
   // device
   auto device = runtime::DeviceAPI::Get(ctx);
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
@@ -544,7 +544,7 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
               thr_entry->stream);
         } else if (op == "mul" && is_scalar_efeat &&
             cusparse_available<bits, IdType>()) {  // cusparse
-          NDArray efeat = vec_efeat[dst_id];
+          NDArray efeat = vec_efeat[etype];
           int64_t x_length = 1;
           NDArray nd_ufeat = vec_ufeat[ufeat_eid[0]];
           for (int i = 1; i < nd_ufeat->ndim; ++i) {
@@ -552,7 +552,7 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
           }
           if (!IsNullArray(csr.data)) {
             SWITCH_BITS(bits, DType, {
-              efeat = _IndexSelect<DType, IdType>(vec_efeat[dst_id], csr.data);
+              efeat = _IndexSelect<DType, IdType>(vec_efeat[etype], csr.data);
             });
           }
           SWITCH_BITS(bits, DType, {
@@ -568,7 +568,7 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
           NDArray ufeat = (vec_ufeat.size() == 0) ?
             NullArray() : vec_ufeat[src_id];
           NDArray efeat = (vec_efeat.size() == 0) ?
-            NullArray() : vec_efeat[dst_id];
+            NullArray() : vec_efeat[etype];
           SWITCH_OP(op, Op, {
             cuda::SpMMCsrHetero<IdType, DType, Op, cuda::reduce::Sum<IdType, DType> >(
                 bcast, csr, ufeat, efeat, vec_out[dst_id],
@@ -582,7 +582,7 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
           NDArray ufeat = (vec_ufeat.size() == 0) ?
               NullArray() : vec_ufeat[src_id];
           NDArray efeat = (vec_efeat.size() == 0) ?
-              NullArray() : vec_efeat[dst_id];
+              NullArray() : vec_efeat[etype];
           cuda::SpMMCsrHetero<IdType, DType, Op, cuda::reduce::Max<IdType, DType> >(
               bcast, csr, ufeat, efeat, vec_out[dst_id],
               out_aux[0], out_aux[1], thr_entry->stream);
@@ -594,7 +594,7 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
           NDArray ufeat = (vec_ufeat.size() == 0) ?
               NullArray() : vec_ufeat[src_id];
           NDArray efeat = (vec_efeat.size() == 0) ?
-              NullArray() : vec_efeat[dst_id];
+              NullArray() : vec_efeat[etype];
           cuda::SpMMCsrHetero<IdType, DType, Op, cuda::reduce::Min<IdType, DType> >(
               bcast, csr, ufeat, efeat, vec_out[dst_id],
               out_aux[0], out_aux[1], thr_entry->stream);
