@@ -347,7 +347,6 @@ class GSDDMM_hetero(th.autograd.Function):
         else:
             dY = None
         return (None, None) + dX + dY + ( None, None)
-        # return (None, None, dX, dY, None, None
 
 
 class EdgeSoftmax(th.autograd.Function):
