@@ -41,5 +41,30 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLKNN")
     });
   });
 
+DGL_REGISTER_GLOBAL("transform._CAPI_DGLNNDescent")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    const NDArray points = args[0];
+    const IdArray offsets = args[1];
+    const IdArray result = args[2];
+    const int k = args[3];
+    const int num_iters = args[4];
+    const int num_candidates = args[5];
+    const double delta = args[6];
+
+    aten::CheckContiguous(
+      {points, offsets, result}, {"points", "offsets", "result"});
+    aten::CheckCtx(
+      points->ctx, {points, offsets, result}, {"points", "offsets", "result"});
+
+    ATEN_XPU_SWITCH_CUDA(points->ctx.device_type, XPU, "NNDescent", {
+      ATEN_FLOAT_TYPE_SWITCH(points->dtype, FloatType, "points", {
+        ATEN_ID_TYPE_SWITCH(result->dtype, IdType, {
+          NNDescent<XPU, FloatType, IdType>(
+            points, offsets, result, k, num_iters, num_candidates, delta);
+        });
+      });
+    });
+  });
+
 }  // namespace transform
 }  // namespace dgl

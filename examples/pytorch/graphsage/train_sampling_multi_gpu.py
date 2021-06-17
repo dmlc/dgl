@@ -94,6 +94,7 @@ def run(proc_id, n_gpus, args, devices, data):
         train_nid,
         sampler,
         use_ddp=n_gpus > 1,
+        device=dev_id if args.num_workers == 0 else None,
         batch_size=args.batch_size,
         shuffle=True,
         drop_last=False,
