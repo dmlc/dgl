@@ -230,7 +230,7 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
         return subg_dict, None, None
 
 
-def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False):
+def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False, mode="k-way"):
     ''' This assigns nodes to different partitions with Metis partitioning algorithm.
 
     When performing Metis partitioning, we can put some constraint on the partitioning.
@@ -255,12 +255,15 @@ def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False):
         Node type of each node
     balance_edges : bool
         Indicate whether to balance the edges.
+    mode : str, "k-way" or "recursive"
+        Whether use multilevel recursive bisection or multilevel k-way paritioning.
 
     Returns
     -------
     a 1-D tensor
         A vector with each element that indicates the partition ID of a vertex.
     '''
+    assert mode in ("k-way", "recursive"), "'mode' can only be 'k-way' or 'recursive'"
     # METIS works only on symmetric graphs.
     # The METIS runs on the symmetric graph to generate the node assignment to partitions.
     start = time.time()
@@ -312,7 +315,7 @@ def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False):
         vwgt = F.to_dgl_nd(vwgt)
 
     start = time.time()
-    node_part = _CAPI_DGLMetisPartition_Hetero(sym_g._graph, k, vwgt)
+    node_part = _CAPI_DGLMetisPartition_Hetero(sym_g._graph, k, vwgt, mode)
     print('Metis partitioning: {:.3f} seconds'.format(time.time() - start))
     if len(node_part) == 0:
         return None
@@ -322,7 +325,7 @@ def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False):
 
 
 def metis_partition(g, k, extra_cached_hops=0, reshuffle=False,
-                    balance_ntypes=None, balance_edges=False):
+                    balance_ntypes=None, balance_edges=False, mode="k-way"):
     ''' This is to partition a graph with Metis partitioning.
 
     Metis assigns vertices to partitions. This API constructs subgraphs with the vertices assigned
@@ -364,13 +367,16 @@ def metis_partition(g, k, extra_cached_hops=0, reshuffle=False,
         Node type of each node
     balance_edges : bool
         Indicate whether to balance the edges.
+    mode : str, "k-way" or "recursive"
+        Whether use multilevel recursive bisection or multilevel k-way paritioning.
 
     Returns
     --------
     a dict of DGLGraphs
         The key is the partition ID and the value is the DGLGraph of the partition.
     '''
-    node_part = metis_partition_assignment(g, k, balance_ntypes, balance_edges)
+    assert mode in ("k-way", "recursive"), "'mode' can only be 'k-way' or 'recursive'"
+    node_part = metis_partition_assignment(g, k, balance_ntypes, balance_edges, mode)
     if node_part is None:
         return None
 
