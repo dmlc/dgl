@@ -68,6 +68,7 @@ This example was implemented by [Hengrui Zhang](https://github.com/hengruizhang9
 --wd2              float   Weight decay of linear classifier.     Default is 0.0.
 --epsilon          float   Edge mask threshold.                   Default is 0.01.
 --hid_dim          int     Embedding dimension.                   Default is 512.
+--sample_size      int     Subgraph size.                         Default is 2000.
 ```
 
 ## How to run examples

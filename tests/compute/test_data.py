@@ -24,6 +24,12 @@ def test_gin():
         assert len(ds) == n_graphs, (len(ds), name)
 
 
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
+def test_tudataset_regression():    
+    ds = data.TUDataset('ZINC_test', force_reload=True)
+    assert len(ds) == 5000
+
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
 def test_data_hash():
     class HashTestDataset(data.DGLDataset):

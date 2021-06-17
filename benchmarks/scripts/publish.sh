@@ -26,7 +26,7 @@ else
 fi
 
 WS_ROOT=/asv/dgl
-docker pull dgllib/dgl-ci-gpu:conda
+docker pull public.ecr.aws/s1o7b3d9/benchmakrk_pyg_dgl:cu111_torch181_pyg170
 if [ -z "$DGL_REG_CONF"]; then
     DOCKER_ENV_OPT="$DOCKER_ENV_OPT"
 else
@@ -56,14 +56,14 @@ if [[ $DEVICE == "cpu" ]]; then
         $DOCKER_MOUNT_OPT \
         $DOCKER_ENV_OPT \
         --shm-size="4g" \
-        --hostname=$MACHINE -dit dgllib/dgl-ci-gpu:conda /bin/bash
+        --hostname=$MACHINE -dit public.ecr.aws/s1o7b3d9/benchmakrk_pyg_dgl:cu111_torch181_pyg170 /bin/bash
 else
     docker run --name dgl-reg \
-        --rm --runtime=nvidia \
+        --rm --gpus all \
         $DOCKER_MOUNT_OPT \
         $DOCKER_ENV_OPT \
         --shm-size="4g" \
-        --hostname=$MACHINE -dit dgllib/dgl-ci-gpu:conda /bin/bash
+        --hostname=$MACHINE -dit public.ecr.aws/s1o7b3d9/benchmakrk_pyg_dgl:cu111_torch181_pyg170 /bin/bash
 fi
 
 docker exec dgl-reg mkdir -p $WS_ROOT
