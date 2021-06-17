@@ -27,8 +27,6 @@ from .dgl_dataset import DGLDataset, DGLBuiltinDataset
 from .citation_graph import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
 from .knowledge_graph import FB15k237Dataset, FB15kDataset, WN18Dataset
 from .rdf import AIFBDataset, MUTAGDataset, BGSDataset, AMDataset
-from .fraud import FraudDataset, FraudYelpDataset, FraudAmazonDataset
-from .fakenews import FakeNewsDataset
 
 
 def register_data_args(parser):

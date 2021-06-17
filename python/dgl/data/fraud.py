@@ -1,14 +1,14 @@
 """Fraud Dataset
 """
+import torch
 import os
 from scipy import io
-import numpy as np
+from sklearn.model_selection import train_test_split
 
 from .utils import save_graphs, load_graphs, _get_dgl_url
 from ..convert import heterograph
 from ..utils import graphdata2tensors
 from .dgl_dataset import DGLBuiltinDataset
-from .. import backend as F
 
 
 class FraudDataset(DGLBuiltinDataset):
@@ -37,6 +37,9 @@ class FraudDataset(DGLBuiltinDataset):
         downloaded data or the directory that
         already stores the input data.
         Default: ~/.dgl/
+    random_seed : int
+        Specifying the random seed in splitting the dataset.
+        Default: 2
     train_size : float
         training set size of the dataset.
         Default: 0.7
@@ -51,6 +54,8 @@ class FraudDataset(DGLBuiltinDataset):
         Number of label classes
     graph : dgl.heterograph.DGLHeteroGraph
         Graph structure, etc.
+    seed : int
+        Random seed in splitting the dataset.
     train_size : float
         Training set size of the dataset.
     val_size : float
@@ -81,9 +86,10 @@ class FraudDataset(DGLBuiltinDataset):
         'amazon': 'review'
     }
 
-    def __init__(self, name, raw_dir=None, train_size=0.7, val_size=0.1):
+    def __init__(self, name, raw_dir=None, random_seed=2, train_size=0.7, val_size=0.1):
         assert name in ['yelp', 'amazon'], "only supports 'yelp', or 'amazon'"
         url = _get_dgl_url(self.file_urls[name])
+        self.seed = random_seed
         self.train_size = train_size
         self.val_size = val_size
         super(FraudDataset, self).__init__(name=name,
@@ -95,8 +101,9 @@ class FraudDataset(DGLBuiltinDataset):
         file_path = os.path.join(self.raw_path, self.file_names[self.name])
 
         data = io.loadmat(file_path)
-        node_features = data['features'].todense()
-        node_labels = data['label']
+        node_features = torch.from_numpy(data['features'].todense())
+        node_labels = torch.from_numpy(data['label'])
+        node_labels = node_labels.transpose(0, 1)
 
         graph_data = {}
         for relation in self.relations[self.name]:
@@ -104,11 +111,11 @@ class FraudDataset(DGLBuiltinDataset):
             graph_data[(self.node_name[self.name], relation, self.node_name[self.name])] = (u, v)
         g = heterograph(graph_data)
 
-        g.ndata['feature'] = F.tensor(node_features)
-        g.ndata['label'] = F.tensor(node_labels.T)
+        g.ndata['feature'] = node_features
+        g.ndata['label'] = node_labels
         self.graph = g
 
-        self._random_split(g.ndata['feature'], g.ndata['label'], self.train_size, self.val_size)
+        self._random_split(g.ndata['feature'], g.ndata['label'], self.seed, self.train_size, self.val_size)
 
     def __getitem__(self, idx):
         r""" Get graph object
@@ -163,32 +170,42 @@ class FraudDataset(DGLBuiltinDataset):
         graph_path = os.path.join(self.save_path, self.name + '_dgl_graph.bin')
         return os.path.exists(graph_path)
 
-    def _random_split(self, x, train_size=0.7, val_size=0.1):
+    def _random_split(self, x, node_labels, seed=2, train_size=0.7, val_size=0.1):
         """split the dataset into training set, validation set and testing set"""
-
-        assert 0 <= train_size + val_size <= 1, \
-            "The sum of valid training set size and validation set size " \
-            "must between 0 and 1 (inclusive)."
-
         N = x.shape[0]
         index = list(range(N))
+        train_idx, test_idx, _, y = train_test_split(index,
+                                                     node_labels,
+                                                     stratify=node_labels,
+                                                     train_size=train_size,
+                                                     random_state=seed,
+                                                     shuffle=True)
+
         if self.name == 'amazon':
             # 0-3304 are unlabeled nodes
             index = list(range(3305, N))
+            train_idx, test_idx, _, y = train_test_split(index,
+                                                         node_labels[3305:],
+                                                         stratify=node_labels[3305:],
+                                                         test_size=train_size,
+                                                         random_state=seed,
+                                                         shuffle=True)
 
-        np.random.permutation(index)
-        train_idx = index[:int(train_size * N)]
-        val_idx = index[int(N - val_size * N):]
-        test_idx = index[int(train_size * N):int(N - val_size * N)]
-        train_mask = np.zeros(N, dtype=np.bool)
-        val_mask = np.zeros(N, dtype=np.bool)
-        test_mask = np.zeros(N, dtype=np.bool)
+        val_idx, test_idx, _, _ = train_test_split(test_idx,
+                                                   y,
+                                                   stratify=y,
+                                                   train_size=val_size / (1 - train_size),
+                                                   random_state=seed,
+                                                   shuffle=True)
+        train_mask = torch.zeros(N, dtype=torch.bool)
+        val_mask = torch.zeros(N, dtype=torch.bool)
+        test_mask = torch.zeros(N, dtype=torch.bool)
         train_mask[train_idx] = True
         val_mask[val_idx] = True
         test_mask[test_idx] = True
-        self.graph.ndata['train_mask'] = F.tensor(train_mask)
-        self.graph.ndata['val_mask'] = F.tensor(val_mask)
-        self.graph.ndata['test_mask'] = F.tensor(test_mask)
+        self.graph.ndata['train_mask'] = train_mask
+        self.graph.ndata['val_mask'] = val_mask
+        self.graph.ndata['test_mask'] = test_mask
 
 
 class FraudYelpDataset(FraudDataset):
@@ -224,6 +241,10 @@ class FraudYelpDataset(FraudDataset):
         downloaded data or the directory that
         already stores the input data.
         Default: ~/.dgl/
+    random_seed : int
+        Specifying the random seed in splitting the
+        dataset.
+        Default: 2
     train_size : float
         training set size of the dataset.
         Default: 0.7
@@ -241,9 +262,10 @@ class FraudYelpDataset(FraudDataset):
     >>> label = dataset.ndata['label']
     """
 
-    def __init__(self, raw_dir=None, train_size=0.7, val_size=0.1):
+    def __init__(self, raw_dir=None, random_seed=2, train_size=0.7, val_size=0.1):
         super(FraudYelpDataset, self).__init__(name='yelp',
                                                raw_dir=raw_dir,
+                                               random_seed=random_seed,
                                                train_size=train_size,
                                                val_size=val_size)
 
@@ -285,6 +307,10 @@ class FraudAmazonDataset(FraudDataset):
         downloaded data or the directory that
         already stores the input data.
         Default: ~/.dgl/
+    random_seed : int
+        Specifying the random seed in splitting the
+        dataset.
+        Default: 2
     train_size : float
         training set size of the dataset.
         Default: 0.7
@@ -302,8 +328,9 @@ class FraudAmazonDataset(FraudDataset):
     >>> label = dataset.ndata['label']
     """
 
-    def __init__(self, raw_dir=None, train_size=0.7, val_size=0.1):
+    def __init__(self, raw_dir=None, random_seed=2, train_size=0.7, val_size=0.1):
         super(FraudAmazonDataset, self).__init__(name='amazon',
                                                  raw_dir=raw_dir,
+                                                 random_seed=random_seed,
                                                  train_size=train_size,
                                                  val_size=val_size)
