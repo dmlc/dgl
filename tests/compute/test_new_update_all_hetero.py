@@ -16,6 +16,8 @@ rfuncs = {'sum': fn.sum, 'max': fn.max, 'min': fn.min, 'mean': fn.mean}
 fill_value = {'sum': 0, 'max': float("-inf")}
 feat_size = 2
 
+@unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
+
 def create_test_heterograph(idtype):
     # test heterograph from the docstring, plus a user -- wishes -- game relation
     # 3 users, 2 games, 2 developers
