@@ -260,9 +260,17 @@ def main(args):
     print('rank:', g.rank())
 
     pb = g.get_partition_book()
-    train_nid = dgl.distributed.node_split(g.ndata['train_mask'], pb, force_even=True)
-    val_nid = dgl.distributed.node_split(g.ndata['val_mask'], pb, force_even=True)
-    test_nid = dgl.distributed.node_split(g.ndata['test_mask'], pb, force_even=True)
+    if 'trainer_id' in g.ndata:
+        train_nid = dgl.distributed.node_split(g.ndata['train_mask'], pb, force_even=True,
+                                               node_trainer_ids=g.ndata['trainer_id'])
+        val_nid = dgl.distributed.node_split(g.ndata['val_mask'], pb, force_even=True,
+                                             node_trainer_ids=g.ndata['trainer_id'])
+        test_nid = dgl.distributed.node_split(g.ndata['test_mask'], pb, force_even=True,
+                                              node_trainer_ids=g.ndata['trainer_id'])
+    else:
+        train_nid = dgl.distributed.node_split(g.ndata['train_mask'], pb, force_even=True)
+        val_nid = dgl.distributed.node_split(g.ndata['val_mask'], pb, force_even=True)
+        test_nid = dgl.distributed.node_split(g.ndata['test_mask'], pb, force_even=True)
     local_nid = pb.partid2nids(pb.partid).detach().numpy()
     print('part {}, train: {} (local: {}), val: {} (local: {}), test: {} (local: {})'.format(
         g.rank(), len(train_nid), len(np.intersect1d(train_nid.numpy(), local_nid)),

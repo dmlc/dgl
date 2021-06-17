@@ -88,7 +88,7 @@ class Communicator(object):
                 The 1D set of indices to send to other processors.
             value : tensor
                 The multi-dimension set of values to send to other processors.
-                The 0th dimension must match that of `idx`.
+                The first dimension must match that of `idx`.
             partition : NDArrayPartition
                 The object containing information for assigning indices to
                 processors.
@@ -137,7 +137,7 @@ class Communicator(object):
 
     def sparse_all_to_all_pull(self, req_idx, value, partition):
         """ Perform an all-to-all-v operation, where by all processors request
-            the values corresponding to ther set of indices.
+            the values corresponding to their set of indices.
 
             Parameters
             ----------
