@@ -151,15 +151,10 @@ def evaluate(model, embed_layer, eval_loader, node_feats, inv_target):
 
     return eval_logits, eval_seeds
 
-def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
+def run(proc_id, n_gpus, n_cpus, args, devices, dataset, queue=None):
     dev_id = devices[proc_id] if devices[proc_id] != 'cpu' else -1
     g, node_feats, num_of_ntype, num_classes, num_rels, target_idx, \
         inv_target, train_idx, val_idx, test_idx, labels = dataset
-    if split is not None:
-        train_seed, val_seed, test_seed = split
-        train_idx = train_idx[train_seed]
-        val_idx = val_idx[val_seed]
-        test_idx = test_idx[test_seed]
 
     fanouts = [int(fanout) for fanout in args.fanout.split(',')]
     node_tids = g.ndata[dgl.NTYPE]
@@ -557,7 +552,6 @@ def main(args, devices):
                                               num_classes, num_rels, target_idx,
                                               inv_target, train_idx, val_idx,
                                               test_idx, labels),
-                                             (train_idx, valid_idx, test_idx),
                                              queue))
             p.start()
             procs.append(p)
