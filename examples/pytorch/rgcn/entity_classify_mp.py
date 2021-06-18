@@ -549,36 +549,15 @@ def main(args, devices):
     else:
         queue = mp.Queue(n_gpus)
         procs = []
-        num_train_seeds = train_idx.shape[0]
-        num_valid_seeds = val_idx.shape[0]
-        num_test_seeds = test_idx.shape[0]
-        train_seeds = th.randperm(num_train_seeds)
-        valid_seeds = th.randperm(num_valid_seeds)
-        test_seeds = th.randperm(num_test_seeds)
-        tseeds_per_proc = num_train_seeds // n_gpus
-        vseeds_per_proc = num_valid_seeds // n_gpus
-        tstseeds_per_proc = num_test_seeds // n_gpus
         for proc_id in range(n_gpus):
-            # we have multi-gpu for training, evaluation and testing
-            # so split trian set, valid set and test set into num-of-gpu parts.
-            proc_train_seeds = train_seeds[proc_id * tseeds_per_proc :
-                                           (proc_id + 1) * tseeds_per_proc \
-                                           if (proc_id + 1) * tseeds_per_proc < num_train_seeds \
-                                           else num_train_seeds]
-            proc_valid_seeds = valid_seeds[proc_id * vseeds_per_proc :
-                                           (proc_id + 1) * vseeds_per_proc \
-                                           if (proc_id + 1) * vseeds_per_proc < num_valid_seeds \
-                                           else num_valid_seeds]
-            proc_test_seeds = test_seeds[proc_id * tstseeds_per_proc :
-                                         (proc_id + 1) * tstseeds_per_proc \
-                                         if (proc_id + 1) * tstseeds_per_proc < num_test_seeds \
-                                         else num_test_seeds]
+            # We use distributed data parallel dataloader to handle the data
+            # splitting
             p = mp.Process(target=run, args=(proc_id, n_gpus, n_cpus // n_gpus, args, devices,
                                              (g, node_feats, num_of_ntype,
                                               num_classes, num_rels, target_idx,
                                               inv_target, train_idx, val_idx,
                                               test_idx, labels),
-                                             (proc_train_seeds, proc_valid_seeds, proc_test_seeds),
+                                             (train_idx, valid_idx, test_idx),
                                              queue))
             p.start()
             procs.append(p)
