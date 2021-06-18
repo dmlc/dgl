@@ -178,7 +178,7 @@ std::pair<IdArray, NDArray> SparsePush(
   // permute the indices and values
   {
     const dim3 block(256);
-    const dim3 grid((num_in+block.x-1)/block.x);
+    const dim3 grid((num_in+block.x-1)/block.x == 0 ? 1 : (num_in+block.x-1)/block.x);
 
     _DualPermKernel<<<grid, block, 0, stream>>>(
         static_cast<const IdType*>(in_idx->data),

@@ -109,9 +109,9 @@ def start_sparse_adam_worker(rank, world_size, weight, tensor_dev='cpu', has_zer
     start = (num_embs // world_size) * rank
     end = (num_embs // world_size) * (rank + 1)
     th.manual_seed(rank)
-    idx = th.randint(start, end, size=(4,))
-    dgl_value = dgl_emb(idx, device).cpu()
-    labels = th.ones((4,)).long()
+    idx = th.randint(start, end, size=(4,)).to(device)
+    dgl_value = dgl_emb(idx, device)
+    labels = th.ones((4,)).long().to(device)
     dgl_adam.zero_grad()
     dgl_loss = th.nn.functional.cross_entropy(dgl_value, labels)
     dgl_loss.backward()
@@ -167,8 +167,6 @@ def start_torch_adam_worker(rank, world_size, weight, has_zero_grad=False,
 
     if rank == 0:
         weight[:] = torch_emb.module.weight.cpu()[:]
-        time.sleep(1)
-    print('done')
     th.distributed.barrier()
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
@@ -182,9 +180,9 @@ def test_multiprocess_sparse_adam(num_workers, backend):
     num_embs=128
     emb_dim=10
     dgl_weight = th.empty((num_embs, emb_dim))
-    mp.set_start_method('spawn')
+    ctx = mp.get_context('spawn')
     for i in range(num_workers):
-        p = mp.Process(target=start_sparse_adam_worker,
+        p = ctx.Process(target=start_sparse_adam_worker,
                         args=(i, num_workers, dgl_weight, 'cpu', True, backend))
         p.start()
         worker_list.append(p)
@@ -194,7 +192,7 @@ def test_multiprocess_sparse_adam(num_workers, backend):
     worker_list = []
     torch_weight = th.empty((num_embs, emb_dim))
     for i in range(num_workers):
-        p = mp.Process(target=start_torch_adam_worker,
+        p = ctx.Process(target=start_torch_adam_worker,
                         args=(i, num_workers, torch_weight, False))
         p.start()
         worker_list.append(p)
@@ -214,24 +212,25 @@ def test_multiprocess_sparse_adam_cuda_tensor(num_workers):
 
     backend = 'nccl'
     worker_list = []
-    queue = mp.Queue(1)
-    mp.set_start_method('spawn')
+    num_embs=128
+    emb_dim=10
+    dgl_weight = th.empty((num_embs, emb_dim))
+    ctx = mp.get_context('spawn')
     for i in range(num_workers):
-        p = mp.Process(target=start_sparse_adam_worker,
-                        args=(i, num_workers, queue, i, False, backend))
+        p = ctx.Process(target=start_sparse_adam_worker,
+                        args=(i, num_workers, dgl_weight, i, False, backend))
         p.start()
         worker_list.append(p)
-    dgl_weight = queue.get()
     for p in worker_list:
         p.join()
 
     worker_list = []
+    torch_weight = th.empty((num_embs, emb_dim))
     for i in range(num_workers):
-        p = mp.Process(target=start_torch_adam_worker,
-                        args=(i, num_workers, queue, False))
+        p = ctx.Process(target=start_torch_adam_worker,
+                        args=(i, num_workers, torch_weight, False))
         p.start()
         worker_list.append(p)
-    torch_weight = queue.get()
     for p in worker_list:
         p.join()
 
@@ -245,24 +244,25 @@ def test_multiprocess_sparse_adam_zero_step(num_workers, backend):
         pytest.skip("Not enough GPUs to run test.")
 
     worker_list = []
-    queue = mp.Queue(1)
-    mp.set_start_method('spawn')
+    num_embs=128
+    emb_dim=10
+    dgl_weight = th.empty((num_embs, emb_dim))
+    ctx = mp.get_context('spawn')
     for i in range(num_workers):
-        p = mp.Process(target=start_sparse_adam_worker,
-                        args=(i, num_workers, queue, 'cpu', True, backend))
+        p = ctx.Process(target=start_sparse_adam_worker,
+                        args=(i, num_workers, dgl_weight, 'cpu', True, backend))
         p.start()
         worker_list.append(p)
-    dgl_weight = queue.get()
     for p in worker_list:
         p.join()
 
     worker_list = []
+    torch_weight = th.empty((num_embs, emb_dim))
     for i in range(num_workers):
-        p = mp.Process(target=start_torch_adam_worker,
-                        args=(i, num_workers, queue, False))
+        p = ctx.Process(target=start_torch_adam_worker,
+                        args=(i, num_workers, torch_weight, False))
         p.start()
         worker_list.append(p)
-    torch_weight = queue.get()
     for p in worker_list:
         p.join()
 
@@ -277,24 +277,25 @@ def test_multiprocess_sparse_adam_zero_step_cuda_tensor(num_workers):
 
     backend = 'nccl'
     worker_list = []
-    queue = mp.Queue(1)
-    mp.set_start_method('spawn')
+    num_embs=128
+    emb_dim=10
+    dgl_weight = th.empty((num_embs, emb_dim))
+    ctx = mp.get_context('spawn')
     for i in range(num_workers):
         p = ctx.Process(target=start_sparse_adam_worker,
-                        args=(i, num_workers, True))
+                        args=(i, num_workers, dgl_weight, i, True))
         p.start()
         worker_list.append(p)
-    dgl_weight = queue.get()
     for p in worker_list:
         p.join()
 
     worker_list = []
+    torch_weight = th.empty((num_embs, emb_dim))
     for i in range(num_workers):
-        p = mp.Process(target=start_torch_adam_worker,
-                        args=(i, num_workers, queue, False))
+        p = ctx.Process(target=start_torch_adam_worker,
+                        args=(i, num_workers, torch_weight, False))
         p.start()
         worker_list.append(p)
-    torch_weight = queue.get()
     for p in worker_list:
         p.join()
 
@@ -304,11 +305,11 @@ if __name__ == '__main__':
     #test_sparse_adam()
     #test_sparse_adam_zero_step()
 
-    test_multiprocess_sparse_adam(2, backend='gloo')
-    test_multiprocess_sparse_adam(4, backend='nccl')
+    #test_multiprocess_sparse_adam(2, backend='gloo')
+    #test_multiprocess_sparse_adam(4, backend='nccl')
 
-    test_multiprocess_sparse_adam_zero_step(2, backend='gloo')
-    test_multiprocess_sparse_adam_zero_step(4, backend='nccl')
+    #test_multiprocess_sparse_adam_zero_step(2, backend='gloo')
+    #test_multiprocess_sparse_adam_zero_step(4, backend='nccl')
 
     test_multiprocess_sparse_adam_cuda_tensor(2)
     test_multiprocess_sparse_adam_zero_step_cuda_tensor(2)
