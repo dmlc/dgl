@@ -8,7 +8,4 @@ spec:
     image: dgllib/dgl-ci-lint
     imagePullPolicy: Always
     tty: true
-    resources:
-      requests:
-        cpu: 1
   serviceAccountName: dglciuser
