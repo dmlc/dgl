@@ -534,12 +534,12 @@ def main(args, devices):
     if devices[0] == -1:
         run(0, 0, n_cpus, args, ['cpu'],
             (g, node_feats, num_of_ntype, num_classes, num_rels, target_idx,
-             inv_target, train_idx, val_idx, test_idx, labels), None, None)
+             inv_target, train_idx, val_idx, test_idx, labels), None)
     # gpu
     elif n_gpus == 1:
         run(0, n_gpus, n_cpus, args, devices,
             (g, node_feats, num_of_ntype, num_classes, num_rels, target_idx,
-             inv_target, train_idx, val_idx, test_idx, labels), None, None)
+             inv_target, train_idx, val_idx, test_idx, labels), None)
     # multi gpu
     else:
         queue = mp.Queue(n_gpus)
