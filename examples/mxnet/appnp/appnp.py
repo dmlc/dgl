@@ -4,8 +4,9 @@ import dgl
 import mxnet as mx
 from mxnet import nd, gluon
 from mxnet.gluon import nn
-from dgl import DGLGraph
-from dgl.data import register_data_args, load_data
+import dgl
+from dgl.data import register_data_args
+from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
 from dgl.nn.mxnet.conv import APPNPConv
 
 class APPNP(nn.Block):
@@ -57,13 +58,29 @@ def evaluate(model, features, labels, mask):
 
 def main(args):
     # load and preprocess dataset
-    data = load_data(args)
-    features = nd.array(data.features)
-    labels = nd.array(data.labels)
-    train_mask = nd.array(data.train_mask)
-    val_mask = nd.array(data.val_mask)
-    test_mask = nd.array(data.test_mask)
+    if args.dataset == 'cora':
+        data = CoraGraphDataset()
+    elif args.dataset == 'citeseer':
+        data = CiteseerGraphDataset()
+    elif args.dataset == 'pubmed':
+        data = PubmedGraphDataset()
+    else:
+        raise ValueError('Unknown dataset: {}'.format(args.dataset))
 
+    g = data[0]
+    if args.gpu < 0:
+        cuda = False
+        ctx = mx.cpu(0)
+    else:
+        cuda = True
+        ctx = mx.gpu(args.gpu)
+        g = g.to(ctx)
+
+    features = g.ndata['feat']
+    labels = mx.nd.array(g.ndata['label'], dtype="float32", ctx=ctx)
+    train_mask = g.ndata['train_mask']
+    val_mask = g.ndata['val_mask']
+    test_mask = g.ndata['test_mask']
     in_feats = features.shape[1]
     n_classes = data.num_labels
     n_edges = data.graph.number_of_edges()
@@ -78,24 +95,9 @@ def main(args):
            val_mask.sum().asscalar(),
            test_mask.sum().asscalar()))
 
-    if args.gpu < 0:
-        ctx = mx.cpu()
-    else:
-        ctx = mx.gpu(args.gpu)
-
-    features = features.as_in_context(ctx)
-    labels = labels.as_in_context(ctx)
-    train_mask = train_mask.as_in_context(ctx)
-    val_mask = val_mask.as_in_context(ctx)
-    test_mask = test_mask.as_in_context(ctx)
-
-    # graph preprocess and calculate normalization factor
-    g = DGLGraph(data.graph)
-    n_edges = g.number_of_edges()
     # add self loop
-    g.add_edges(g.nodes(), g.nodes())
-    g.set_n_initializer(dgl.init.zero_initializer)
-    g.set_e_initializer(dgl.init.zero_initializer)
+    g = dgl.remove_self_loop(g)
+    g = dgl.add_self_loop(g)
 
     # create APPNP model
     model = APPNP(g,

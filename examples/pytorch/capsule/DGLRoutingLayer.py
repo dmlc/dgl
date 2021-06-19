@@ -26,12 +26,8 @@ class DGLRoutingLayer(nn.Module):
             else:
                 return {'m': edges.data['c'] * edges.data['u_hat']}
 
-        self.g.register_message_func(cap_message)
-
         def cap_reduce(nodes):
             return {'s': th.sum(nodes.mailbox['m'], dim=1)}
-
-        self.g.register_reduce_func(cap_reduce)
 
         for r in range(routing_num):
             # step 1 (line 4): normalize over out edges
@@ -39,7 +35,7 @@ class DGLRoutingLayer(nn.Module):
             self.g.edata['c'] = F.softmax(edges_b, dim=1).view(-1, 1)
 
             # Execute step 1 & 2
-            self.g.update_all()
+            self.g.update_all(message_func=cap_message, reduce_func=cap_reduce)
 
             # step 3 (line 6)
             if self.batch_size:
@@ -73,5 +69,6 @@ def init_graph(in_nodes, out_nodes, f_size, device='cpu'):
     for u in in_indx:
         g.add_edges(u, out_indx)
 
+    g = g.to(device)
     g.edata['b'] = th.zeros(in_nodes * out_nodes, 1).to(device)
     return g

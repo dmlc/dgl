@@ -8,6 +8,7 @@
 
 #include <dgl/runtime/device_api.h>
 #include <vector>
+#include <memory>
 
 namespace dgl {
 namespace runtime {

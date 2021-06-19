@@ -139,6 +139,15 @@ class GraphOp {
    * \return a new immutable bidirected graph.
    */
   static GraphPtr ToBidirectedImmutableGraph(GraphPtr graph);
+  /*!
+   * \brief Same as BidirectedMutableGraph except that the returned graph is immutable
+   * and call gk_csr_MakeSymmetric in GKlib. This is more efficient than ToBidirectedImmutableGraph.
+   * It return a null pointer if the conversion fails.
+   *
+   * \param graph The input graph.
+   * \return a new immutable bidirected graph.
+   */
+  static GraphPtr ToBidirectedSimpleImmutableGraph(ImmutableGraphPtr ig);
 
   /*!
    * \brief Get a induced subgraph with HALO nodes.
@@ -149,6 +158,14 @@ class GraphOp {
    * \return the induced subgraph with HALO nodes.
    */
   static HaloSubgraph GetSubgraphWithHalo(GraphPtr graph, IdArray nodes, int num_hops);
+
+  /*!
+   * \brief Reorder the nodes in the immutable graph.
+   * \param graph The input graph.
+   * \param new_order The node Ids in the new graph. The index in `new_order` is old node Ids.
+   * \return the graph with reordered node Ids
+   */
+  static GraphPtr ReorderImmutableGraph(ImmutableGraphPtr ig, IdArray new_order);
 };
 
 }  // namespace dgl

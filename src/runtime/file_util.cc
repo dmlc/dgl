@@ -7,6 +7,7 @@
 #include <dgl/runtime/serializer.h>
 #include <fstream>
 #include <vector>
+#include <unordered_map>
 
 #include "file_util.h"
 

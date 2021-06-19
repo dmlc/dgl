@@ -184,9 +184,9 @@ class RGCNLinkDataset(object):
         test_path = os.path.join(self.dir, 'test.txt')
         entity_dict = _read_dictionary(entity_path)
         relation_dict = _read_dictionary(relation_path)
-        self.train = np.array(_read_triplets_as_list(train_path, entity_dict, relation_dict))
-        self.valid = np.array(_read_triplets_as_list(valid_path, entity_dict, relation_dict))
-        self.test = np.array(_read_triplets_as_list(test_path, entity_dict, relation_dict))
+        self.train = np.asarray(_read_triplets_as_list(train_path, entity_dict, relation_dict))
+        self.valid = np.asarray(_read_triplets_as_list(valid_path, entity_dict, relation_dict))
+        self.test = np.asarray(_read_triplets_as_list(test_path, entity_dict, relation_dict))
         self.num_nodes = len(entity_dict)
         print("# entities: {}".format(self.num_nodes))
         self.num_rels = len(relation_dict)
@@ -417,10 +417,10 @@ def _load_data(dataset_str='aifb', dataset_path=None):
 
             # sort indices by destination
             edge_list = sorted(edge_list, key=lambda x: (x[1], x[0], x[2]))
-            edge_list = np.array(edge_list, dtype=np.int)
+            edge_list = np.asarray(edge_list, dtype=np.int)
             print('Number of edges: ', len(edge_list))
 
-            np.savez(edge_file, edges=edge_list, n=np.array(num_node), nrel=np.array(num_rel))
+            np.savez(edge_file, edges=edge_list, n=np.asarray(num_node), nrel=np.asarray(num_rel))
 
         nodes_u_dict = {np.unicode(to_unicode(key)): val for key, val in
                         nodes_dict.items()}

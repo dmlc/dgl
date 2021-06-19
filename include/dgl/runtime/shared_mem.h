@@ -11,7 +11,6 @@
 namespace dgl {
 namespace runtime {
 
-#ifndef _WIN32
 /*
  * \brief This class owns shared memory.
  *
@@ -26,7 +25,15 @@ class SharedMemory {
    * If shared memory is created in the object, it'll be owned by the object
    * and will be responsible for deleting it when the object is destroyed.
    */
-  bool own;
+  bool own_;
+
+  /* \brief the file descripter of the shared memory. */
+  int fd_;
+  /* \brief the address of the shared memory. */
+  void *ptr_;
+  /* \brief the size of the shared memory. */
+  size_t size_;
+
   /*
    * \brief the name of the object.
    *
@@ -34,14 +41,12 @@ class SharedMemory {
    * the file name that identifies the shared memory.
    */
   std::string name;
-  /* \brief the file descripter of the shared memory. */
-  int fd;
-  /* \brief the address of the shared memory. */
-  void *ptr;
-  /* \brief the size of the shared memory. */
-  size_t size;
 
  public:
+  /* \brief Get the filename of shared memory file
+   */
+  std::string GetName() const { return name; }
+
   /*
    * \brief constructor of the shared memory.
    * \param name The file corresponding to the shared memory.
@@ -55,18 +60,24 @@ class SharedMemory {
   /*
    * \brief create shared memory.
    * It creates the file and shared memory.
-   * \param size the size of the shared memory.
+   * \param sz the size of the shared memory.
    * \return the address of the shared memory
    */
-  void *create_new(size_t size);
+  void *CreateNew(size_t sz);
   /*
    * \brief allocate shared memory that has been created.
-   * \param size the size of the shared memory.
+   * \param sz the size of the shared memory.
    * \return the address of the shared memory
    */
-  void *open(size_t size);
+  void *Open(size_t sz);
+
+  /*
+   * \brief check if the shared memory exist.
+   * \param name the name of the shared memory.
+   * \return a boolean value to indicate if the shared memory exists.
+   */
+  static bool Exist(const std::string &name);
 };
-#endif  // _WIN32
 
 }  // namespace runtime
 }  // namespace dgl

@@ -1,15 +1,15 @@
-from dgl import DGLGraph
+import dgl
 import rdkit.Chem as Chem
 from .chemutils import get_clique_mol, tree_decomp, get_mol, get_smiles, \
                        set_atommap, enum_assemble_nx, decode_stereo
 import numpy as np
 
-class DGLMolTree(DGLGraph):
+class DGLMolTree(object):
     def __init__(self, smiles):
-        DGLGraph.__init__(self)
         self.nodes_dict = {}
 
         if smiles is None:
+            self.graph = dgl.graph(([], []))
             return
 
         self.smiles = smiles
@@ -34,7 +34,6 @@ class DGLMolTree(DGLGraph):
                     )
             if min(c) == 0:
                 root = i
-        self.add_nodes(len(cliques))
 
         # The clique with atom ID 0 becomes root
         if root > 0:
@@ -51,16 +50,16 @@ class DGLMolTree(DGLGraph):
             dst[2 * i] = y
             src[2 * i + 1] = y
             dst[2 * i + 1] = x
-        self.add_edges(src, dst)
+        self.graph = dgl.graph((src, dst), num_nodes=len(cliques))
 
         for i in self.nodes_dict:
             self.nodes_dict[i]['nid'] = i + 1
-            if self.out_degree(i) > 1:    # Leaf node mol is not marked
+            if self.graph.out_degrees(i) > 1:    # Leaf node mol is not marked
                 set_atommap(self.nodes_dict[i]['mol'], self.nodes_dict[i]['nid'])
-            self.nodes_dict[i]['is_leaf'] = (self.out_degree(i) == 1)
+            self.nodes_dict[i]['is_leaf'] = (self.graph.out_degrees(i) == 1)
 
     def treesize(self):
-        return self.number_of_nodes()
+        return self.graph.number_of_nodes()
 
     def _recover_node(self, i, original_mol):
         node = self.nodes_dict[i]
@@ -71,7 +70,7 @@ class DGLMolTree(DGLGraph):
             for cidx in node['clique']:
                 original_mol.GetAtomWithIdx(cidx).SetAtomMapNum(node['nid'])
 
-        for j in self.successors(i).numpy():
+        for j in self.graph.successors(i).numpy():
             nei_node = self.nodes_dict[j]
             clique.extend(nei_node['clique'])
             if nei_node['is_leaf']: # Leaf node, no need to mark
@@ -93,10 +92,10 @@ class DGLMolTree(DGLGraph):
         return node['label']
 
     def _assemble_node(self, i):
-        neighbors = [self.nodes_dict[j] for j in self.successors(i).numpy()
+        neighbors = [self.nodes_dict[j] for j in self.graph.successors(i).numpy()
                      if self.nodes_dict[j]['mol'].GetNumAtoms() > 1]
         neighbors = sorted(neighbors, key=lambda x: x['mol'].GetNumAtoms(), reverse=True)
-        singletons = [self.nodes_dict[j] for j in self.successors(i).numpy()
+        singletons = [self.nodes_dict[j] for j in self.graph.successors(i).numpy()
                       if self.nodes_dict[j]['mol'].GetNumAtoms() == 1]
         neighbors = singletons + neighbors
 

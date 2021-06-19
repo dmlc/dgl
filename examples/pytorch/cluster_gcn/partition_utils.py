@@ -1,20 +1,21 @@
 from time import time
 
-import metis
 import numpy as np
 
 from utils import arg_list
 
+from dgl.transform import metis_partition
+from dgl import backend as F
+import dgl
+
 def get_partition_list(g, psize):
-    tmp_time = time()
-    ng = g.to_networkx()
-    print("getting adj using time{:.4f}".format(time() - tmp_time))
-    print("run metis with partition size {}".format(psize))
-    _, nd_group = metis.part_graph(ng, psize)
-    print("metis finished in {} seconds.".format(time() - tmp_time))
-    print("train group {}".format(len(nd_group)))
-    al = arg_list(nd_group)
-    return al
+    p_gs = metis_partition(g, psize)
+    graphs = []
+    for k, val in p_gs.items():
+        nids = val.ndata[dgl.NID]
+        nids = F.asnumpy(nids)
+        graphs.append(nids)
+    return graphs
 
 def get_subgraph(g, par_arr, i, psize, batch_size):
     par_batch_ind_arr = [par_arr[s] for s in range(

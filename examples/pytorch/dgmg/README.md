@@ -4,7 +4,7 @@ This is an implementation of [Learning Deep Generative Models of Graphs](https:/
 Yujia Li, Oriol Vinyals, Chris Dyer, Razvan Pascanu, Peter Battaglia.
 
 For molecule generation, see 
-[our model zoo for Chemistry](https://github.com/dmlc/dgl/tree/master/examples/pytorch/model_zoo/chem/generative_models/dgmg).
+[DGL-LifeSci](https://github.com/awslabs/dgl-lifesci/tree/master/examples/generative_models/dgmg).
 
 ## Dependencies
 - Python 3.5.2
@@ -13,8 +13,7 @@ For molecule generation, see
 
 ## Usage
 
-- Train with batch size 1: `python3 main.py`
-- Train with batch size larger than 1: `python3 main_batch.py`.
+`python3 main.py`
 
 ## Performance
 
@@ -22,8 +21,7 @@ For molecule generation, see
 
 ## Speed
 
-On AWS p3.2x instance (w/ V100), one epoch takes ~526s for batch size 1 and takes
-~238s for batch size 10.
+On AWS p3.2x instance (w/ V100), one epoch takes ~526s.
 
 ## Acknowledgement
 

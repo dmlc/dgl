@@ -11,8 +11,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import dgl.function as fn
-from dgl import DGLGraph
-from dgl.data import register_data_args, load_data
+import dgl
+from dgl.data import register_data_args
+from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
 from dgl.nn.pytorch.conv import SGConv
 
 
@@ -27,17 +28,27 @@ def evaluate(model, g, features, labels, mask):
 
 def main(args):
     # load and preprocess dataset
-    data = load_data(args)
-    features = torch.FloatTensor(data.features)
-    labels = torch.LongTensor(data.labels)
-    if hasattr(torch, 'BoolTensor'):
-        train_mask = torch.BoolTensor(data.train_mask)
-        val_mask = torch.BoolTensor(data.val_mask)
-        test_mask = torch.BoolTensor(data.test_mask)
+    if args.dataset == 'cora':
+        data = CoraGraphDataset()
+    elif args.dataset == 'citeseer':
+        data = CiteseerGraphDataset()
+    elif args.dataset == 'pubmed':
+        data = PubmedGraphDataset()
     else:
-        train_mask = torch.ByteTensor(data.train_mask)
-        val_mask = torch.ByteTensor(data.val_mask)
-        test_mask = torch.ByteTensor(data.test_mask)
+        raise ValueError('Unknown dataset: {}'.format(args.dataset))
+
+    g = data[0]
+    if args.gpu < 0:
+        cuda = False
+    else:
+        cuda = True
+        g = g.int().to(args.gpu)
+
+    features = g.ndata['feat']
+    labels = g.ndata['label']
+    train_mask = g.ndata['train_mask']
+    val_mask = g.ndata['val_mask']
+    test_mask = g.ndata['test_mask']
     in_feats = features.shape[1]
     n_classes = data.num_labels
     n_edges = data.graph.number_of_edges()
@@ -52,22 +63,10 @@ def main(args):
               val_mask.int().sum().item(),
               test_mask.int().sum().item()))
 
-    if args.gpu < 0:
-        cuda = False
-    else:
-        cuda = True
-        torch.cuda.set_device(args.gpu)
-        features = features.cuda()
-        labels = labels.cuda()
-        train_mask = train_mask.cuda()
-        val_mask = val_mask.cuda()
-        test_mask = test_mask.cuda()
-
-    # graph preprocess and calculate normalization factor
-    g = DGLGraph(data.graph)
     n_edges = g.number_of_edges()
     # add self loop
-    g.add_edges(g.nodes(), g.nodes())
+    g = dgl.remove_self_loop(g)
+    g = dgl.add_self_loop(g)
 
     # create SGC model
     model = SGConv(in_feats,
@@ -76,7 +75,8 @@ def main(args):
                    cached=True,
                    bias=args.bias)
 
-    if cuda: model.cuda()
+    if cuda:
+        model.cuda()
     loss_fcn = torch.nn.CrossEntropyLoss()
 
     # use optimizer

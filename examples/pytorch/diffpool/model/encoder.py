@@ -180,7 +180,7 @@ class DiffPool(nn.Module):
             out_all.append(readout)
 
         adj, h = self.first_diffpool_layer(g, g_embedding)
-        node_per_pool_graph = int(adj.size()[0] / self.batch_size)
+        node_per_pool_graph = int(adj.size()[0] / len(g.batch_num_nodes()))
 
         h, adj = batch2tensor(adj, h, node_per_pool_graph)
         h = self.gcn_forward_tensorized(

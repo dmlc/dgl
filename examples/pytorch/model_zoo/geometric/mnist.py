@@ -8,7 +8,6 @@ import torch.nn.functional as F
 import dgl
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
-from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
 from dgl.nn.pytorch.conv import ChebConv, GMMConv
 from dgl.nn.pytorch.glob import MaxPooling
@@ -33,7 +32,7 @@ A = grid_graph(28, 8, metric)
 
 coarsening_levels = 4
 L, perm = coarsen(A, coarsening_levels)
-g_arr = [DGLGraph(csr) for csr in L]
+g_arr = [dgl.from_scipy(csr) for csr in L]
 
 coordinate_arr = get_coordinates(g_arr, grid_side, coarsening_levels, perm)
 for g, coordinate_arr in zip(g_arr, coordinate_arr):
@@ -45,7 +44,7 @@ def batcher(batch):
     x_batch = []
     y_batch = []
     for x, y in batch:
-        x = torch.cat([x.view(-1), x.new_zeros(928 - 28 ** 2)], 0)
+        x = torch.cat([x.view(-1), x.new_zeros(len(perm) - 28 ** 2)], 0)
         x = x[perm]
         x_batch.append(x)
         y_batch.append(y)
@@ -97,9 +96,11 @@ class MoNet(nn.Module):
 
     def forward(self, g_arr, feat):
         for g, layer in zip(g_arr, self.layers):
-            u = g.edata['u'].to(feat.device)
+            u = g.edata['u']
             feat = self.pool(layer(g, feat, u).transpose(-1, -2).unsqueeze(0))\
                 .squeeze(0).transpose(-1, -2)
+            print(feat.shape)
+        print(g_arr[-1].batch_size)
         return self.cls(self.readout(g_arr[-1], feat))
 
 class ChebNet(nn.Module):
@@ -155,6 +156,7 @@ for epoch in range(10):
     for i, (g, x, y) in enumerate(train_loader):
         x = x.to(device)
         y = y.to(device)
+        g = [g_i.to(device) for g_i in g]
         out = model(g, x)
         hit += (out.max(-1)[1] == y).sum().item()
         tot += len(y)

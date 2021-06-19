@@ -15,9 +15,9 @@ class TargetCode(object):
     EDGE = 2
 
     CODE2STR = {
-        0: "src",
-        1: "dst",
-        2: "edge",
+        0: "u",
+        1: "v",
+        2: "e",
     }
 
 

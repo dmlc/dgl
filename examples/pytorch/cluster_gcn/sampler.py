@@ -31,7 +31,6 @@ class ClusterIter(object):
         """
         self.use_pp = use_pp
         self.g = g.subgraph(seed_nid)
-        self.g.copy_from_parent()
 
         # precalc the aggregated features from training graph only
         if use_pp:
@@ -58,21 +57,21 @@ class ClusterIter(object):
     def precalc(self, g):
         norm = self.get_norm(g)
         g.ndata['norm'] = norm
-        features = g.ndata['features']
+        features = g.ndata['feat']
         print("features shape, ", features.shape)
         with torch.no_grad():
-            g.update_all(fn.copy_src(src='features', out='m'),
-                         fn.sum(msg='m', out='features'),
+            g.update_all(fn.copy_src(src='feat', out='m'),
+                         fn.sum(msg='m', out='feat'),
                          None)
-            pre_feats = g.ndata['features'] * norm
+            pre_feats = g.ndata['feat'] * norm
             # use graphsage embedding aggregation style
-            g.ndata['features'] = torch.cat([features, pre_feats], dim=1)
+            g.ndata['feat'] = torch.cat([features, pre_feats], dim=1)
 
     # use one side normalization
     def get_norm(self, g):
         norm = 1. / g.in_degrees().float().unsqueeze(1)
         norm[torch.isinf(norm)] = 0
-        norm = norm.to(self.g.ndata['features'].device)
+        norm = norm.to(self.g.ndata['feat'].device)
         return norm
 
     def __len__(self):

@@ -1,7 +1,7 @@
 """
 .. _model-capsule:
 
-Capsule network tutorial
+Capsule Network
 ===========================
 
 **Author**: Jinjing Zhou, `Jake Zhao <https://cs.nyu.edu/~jakezhao/>`_, Zheng Zhang, Jinyang Li
@@ -9,6 +9,14 @@ Capsule network tutorial
 In this tutorial, you learn how to describe one of the more classical models in terms of graphs. The approach
 offers a different perspective. The tutorial describes how to implement a Capsule model for the
 `capsule network <http://arxiv.org/abs/1710.09829>`__.
+
+.. warning::
+
+    The tutorial aims at gaining insights into the paper, with code as a mean
+    of explanation. The implementation thus is NOT optimized for running
+    efficiency. For recommended implementation, please refer to the `official
+    examples <https://github.com/dmlc/dgl/tree/master/examples>`_.
+
 """
 #######################################################################################
 # Key ideas of Capsule
@@ -68,18 +76,11 @@ import dgl
 
 
 def init_graph(in_nodes, out_nodes, f_size):
-    g = dgl.DGLGraph()
-    all_nodes = in_nodes + out_nodes
-    g.add_nodes(all_nodes)
-
-    in_indx = list(range(in_nodes))
-    out_indx = list(range(in_nodes, in_nodes + out_nodes))
-    # add edges use edge broadcasting
-    for u in in_indx:
-        g.add_edges(u, out_indx)
-
+    u = np.repeat(np.arange(in_nodes), out_nodes)
+    v = np.tile(np.arange(in_nodes, in_nodes + out_nodes), in_nodes)
+    g = dgl.DGLGraph((u, v))
     # init states
-    g.ndata['v'] = th.zeros(all_nodes, f_size)
+    g.ndata['v'] = th.zeros(in_nodes + out_nodes, f_size)
     g.edata['b'] = th.zeros(in_nodes * out_nodes, 1)
     return g
 
@@ -113,6 +114,8 @@ def init_graph(in_nodes, out_nodes, f_size):
 #    -  The scalar product :math:`\hat{u}_{j|i}\cdot v_j` can be considered as how well capsule :math:`i` agrees with :math:`j`. It is used to update
 #       :math:`b_{ij}=b_{ij}+\hat{u}_{j|i}\cdot v_j`
 
+import dgl.function as fn
+
 class DGLRoutingLayer(nn.Module):
     def __init__(self, in_nodes, out_nodes, f_size):
         super(DGLRoutingLayer, self).__init__()
@@ -125,24 +128,14 @@ class DGLRoutingLayer(nn.Module):
     def forward(self, u_hat, routing_num=1):
         self.g.edata['u_hat'] = u_hat
 
-        # step 2 (line 5)
-        def cap_message(edges):
-            return {'m': edges.data['c'] * edges.data['u_hat']}
-
-        self.g.register_message_func(cap_message)
-
-        def cap_reduce(nodes):
-            return {'s': th.sum(nodes.mailbox['m'], dim=1)}
-
-        self.g.register_reduce_func(cap_reduce)
-
         for r in range(routing_num):
             # step 1 (line 4): normalize over out edges
             edges_b = self.g.edata['b'].view(self.in_nodes, self.out_nodes)
             self.g.edata['c'] = F.softmax(edges_b, dim=1).view(-1, 1)
+            self.g.edata['c u_hat'] = self.g.edata['c'] * self.g.edata['u_hat']
 
             # Execute step 1 & 2
-            self.g.update_all()
+            self.g.update_all(fn.copy_e('c u_hat', 'm'), fn.sum('m', 's'))
 
             # step 3 (line 6)
             self.g.nodes[self.out_indx].data['v'] = self.squash(self.g.nodes[self.out_indx].data['s'], dim=1)

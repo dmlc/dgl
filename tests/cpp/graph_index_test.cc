@@ -7,7 +7,7 @@
 #include <dgl/graph.h>
 
 TEST(GraphTest, TestNumVertices){
-  dgl::Graph g(false);
+  dgl::Graph g;
   g.AddVertices(10);
   ASSERT_EQ(g.NumVertices(), 10);
 };

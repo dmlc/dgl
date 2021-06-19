@@ -14,7 +14,7 @@
 #include <string>
 
 #include "../c_api_common.h"
-#include "./network/msg_queue.h"
+#include "../rpc/network/msg_queue.h"
 
 using dgl::runtime::NDArray;
 
@@ -64,8 +64,17 @@ enum MessageType {
   /*!
    * \brief IP and ID msg for KVStore
    */  
-  kIPIDMsg = 7
+  kIPIDMsg = 7,
+  /*!
+   * \brief Get data shape msg for KVStore
+   */  
+  kGetShapeMsg = 8,
+  /*!
+   * \brief Get data shape back msg for KVStore
+   */ 
+  kGetShapeBackMsg = 9
 };
+
 
 /*!
  * \brief Meta data for NDArray message
@@ -134,6 +143,11 @@ class ArrayMeta {
   int ndarray_count_;
 
   /*!
+   * \brief DataType for each NDArray
+   */
+  std::vector<DLDataType> data_type_;
+
+  /*!
    * \brief We first write the ndim to data_shape_ 
    * and then write the data shape. 
    */
@@ -194,6 +208,10 @@ class KVStoreMsg {
   * \brief data matrix
   */
   NDArray data;
+  /*!
+  * \brief data shape
+  */
+  NDArray shape;
 };
 
 }  // namespace network

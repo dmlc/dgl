@@ -1,4 +1,7 @@
-"""Training script"""
+"""Training GCMC model on the MovieLens data set.
+
+The script loads the full graph to the training device.
+"""
 import os, time
 import argparse
 import logging
@@ -8,7 +11,7 @@ import numpy as np
 import torch as th
 import torch.nn as nn
 from data import MovieLens
-from model import GCMCLayer, BiDecoder
+from model import BiDecoder, GCMCLayer
 from utils import get_activation, get_optimizer, torch_total_param_num, torch_net_info, MetricLogger
 
 class Net(nn.Module):
@@ -23,10 +26,11 @@ class Net(nn.Module):
                                  args.gcn_dropout,
                                  args.gcn_agg_accum,
                                  agg_act=self._act,
-                                 share_user_item_param=args.share_param)
-        self.decoder = BiDecoder(args.rating_vals,
-                                 in_units=args.gcn_out_units,
-                                 num_basis_functions=args.gen_r_num_basis_func)
+                                 share_user_item_param=args.share_param,
+                                 device=args.device)
+        self.decoder = BiDecoder(in_units=args.gcn_out_units,
+                                 num_classes=len(args.rating_vals),
+                                 num_basis=args.gen_r_num_basis_func)
 
     def forward(self, enc_graph, dec_graph, ufeat, ifeat):
         user_out, movie_out = self.encoder(
@@ -101,6 +105,13 @@ def train(args):
     count_num = 0
     count_loss = 0
 
+    dataset.train_enc_graph = dataset.train_enc_graph.int().to(args.device)
+    dataset.train_dec_graph = dataset.train_dec_graph.int().to(args.device)
+    dataset.valid_enc_graph = dataset.train_enc_graph
+    dataset.valid_dec_graph = dataset.valid_dec_graph.int().to(args.device)
+    dataset.test_enc_graph = dataset.test_enc_graph.int().to(args.device)
+    dataset.test_dec_graph = dataset.test_dec_graph.int().to(args.device)
+
     print("Start training ...")
     dur = []
     for iter_idx in range(1, args.train_max_iter):
@@ -160,6 +171,7 @@ def train(args):
                 if no_better_valid > args.train_decay_patience:
                     new_lr = max(learning_rate * args.train_lr_decay_factor, args.train_min_lr)
                     if new_lr < learning_rate:
+                        learning_rate = new_lr
                         logging.info("\tChange the LR to %g" % new_lr)
                         for p in optimizer.param_groups:
                             p['lr'] = learning_rate

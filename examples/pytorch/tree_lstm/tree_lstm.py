@@ -82,12 +82,14 @@ class TreeLSTM(nn.Module):
         cell = TreeLSTMCell if cell_type == 'nary' else ChildSumTreeLSTMCell
         self.cell = cell(x_size, h_size)
 
-    def forward(self, batch, h, c):
+    def forward(self, batch, g, h, c):
         """Compute tree-lstm prediction given a batch.
         Parameters
         ----------
         batch : dgl.data.SSTBatch
             The data batch.
+        g : dgl.DGLGraph
+            Tree for computation.
         h : Tensor
             Initial hidden state.
         c : Tensor
@@ -97,17 +99,13 @@ class TreeLSTM(nn.Module):
         logits : Tensor
             The prediction of each node.
         """
-        g = batch.graph
-        g.register_message_func(self.cell.message_func)
-        g.register_reduce_func(self.cell.reduce_func)
-        g.register_apply_node_func(self.cell.apply_node_func)
         # feed embedding
         embeds = self.embedding(batch.wordid * batch.mask)
         g.ndata['iou'] = self.cell.W_iou(self.dropout(embeds)) * batch.mask.float().unsqueeze(-1)
         g.ndata['h'] = h
         g.ndata['c'] = c
         # propagate
-        dgl.prop_nodes_topo(g)
+        dgl.prop_nodes_topo(g, self.cell.message_func, self.cell.reduce_func, apply_node_func=self.cell.apply_node_func)
         # compute logits
         h = self.dropout(g.ndata.pop('h'))
         logits = self.linear(h)

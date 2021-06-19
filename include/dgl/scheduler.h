@@ -17,6 +17,7 @@ namespace sched {
 
 /*!
  * \brief Generate degree bucketing schedule
+ * \tparam IdType Graph's index data type, can be int32_t or int64_t
  * \param msg_ids The edge id for each message
  * \param vids The destination vertex for each message
  * \param recv_ids The recv nodes (for checking zero degree nodes)
@@ -29,11 +30,13 @@ namespace sched {
  *         mids: message ids
  *         mid_section: number of messages in each bucket (used to split mids)
  */
+template <class IdType>
 std::vector<IdArray> DegreeBucketing(const IdArray& msg_ids, const IdArray& vids,
         const IdArray& recv_ids);
 
 /*!
  * \brief Generate degree bucketing schedule for group_apply edge
+ * \tparam IdType Graph's index data type, can be int32_t or int64_t
  * \param uids One end vertex of edge by which edges are grouped
  * \param vids The other end vertex of edge
  * \param eids Edge ids
@@ -49,6 +52,7 @@ std::vector<IdArray> DegreeBucketing(const IdArray& msg_ids, const IdArray& vids
  *         sections: number of edges in each degree bucket (used to partition
  *                   new_uids, new_vids, and new_eids)
  */
+template <class IdType>
 std::vector<IdArray> GroupEdgeByNodeDegree(const IdArray& uids,
         const IdArray& vids, const IdArray& eids);
 

@@ -7,6 +7,7 @@
 #define DGL_RUNTIME_FILE_UTIL_H_
 
 #include <string>
+#include <unordered_map>
 #include "meta_data.h"
 
 namespace dgl {

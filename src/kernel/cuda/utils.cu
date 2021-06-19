@@ -25,7 +25,7 @@ void Fill(const DLContext& ctx, DType* ptr, size_t length, DType val) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   int nt = utils::FindNumThreads(length, 1024);
   int nb = (length + nt - 1) / nt;
-  _FillKernel<<<nb, nt, 0, thr_entry->stream>>>(ptr, length, val);
+  CUDA_KERNEL_CALL(_FillKernel, nb, nt, 0, thr_entry->stream, ptr, length, val);
 }
 
 template void Fill<kDLGPU, float>(const DLContext& ctx, float* ptr, size_t length, float val);

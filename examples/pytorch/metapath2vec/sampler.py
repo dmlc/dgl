@@ -74,11 +74,11 @@ def construct_graph():
     f_1.close()
     f_2.close()
 
-    pa = dgl.bipartite((paper_author_src, paper_author_dst), 'paper', 'pa', 'author')
-    ap = dgl.bipartite((paper_author_dst, paper_author_src), 'author', 'ap', 'paper')
-    pc = dgl.bipartite((paper_conf_src, paper_conf_dst), 'paper', 'pc', 'conf')
-    cp = dgl.bipartite((paper_conf_dst, paper_conf_src), 'conf', 'cp', 'paper')
-    hg = dgl.hetero_from_relations([pa, ap, pc, cp])
+    hg = dgl.heterograph({
+        ('paper', 'pa', 'author') : (paper_author_src, paper_author_dst),
+        ('author', 'ap', 'paper') : (paper_author_dst, paper_author_src),
+        ('paper', 'pc', 'conf') : (paper_conf_src, paper_conf_dst),
+        ('conf', 'cp', 'paper') : (paper_conf_dst, paper_conf_src)})
     return hg, author_names, conf_names, paper_names
 
 #"conference - paper - Author - paper - conference" metapath sampling
@@ -89,11 +89,9 @@ def generate_metapath():
     hg, author_names, conf_names, paper_names = construct_graph()
 
     for conf_idx in tqdm.trange(hg.number_of_nodes('conf')):
-        traces = dgl.contrib.sampling.metapath_random_walk(
-                hg, ['cp', 'pa', 'ap', 'pc'] * walk_length, [conf_idx], num_walks_per_node)
-        traces = traces[0]
-        for trace in traces:
-            tr = np.insert(trace.numpy(), 0, conf_idx)
+        traces, _ = dgl.sampling.random_walk(
+                hg, [conf_idx] * num_walks_per_node, metapath=['cp', 'pa', 'ap', 'pc'] * walk_length)
+        for tr in traces:
             outline = ' '.join(
                     (conf_names if i % 4 == 0 else author_names)[tr[i]]
                     for i in range(0, len(tr), 2))  # skip paper

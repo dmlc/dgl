@@ -5,23 +5,22 @@ import os
 import sys
 import hashlib
 import warnings
-import zipfile
-import tarfile
+import requests
+import pickle
+import errno
 import numpy as np
-import warnings
+
+import pickle
+import errno
 
 from .graph_serialize import save_graphs, load_graphs, load_labels
+from .tensor_serialize import save_tensors, load_tensors
 
-try:
-    import requests
-except ImportError:
-    class requests_failed_to_import(object):
-        pass
-    requests = requests_failed_to_import
+from .. import backend as F
 
 __all__ = ['loadtxt','download', 'check_sha1', 'extract_archive',
            'get_download_dir', 'Subset', 'split_dataset',
-           'save_graphs', "load_graphs", "load_labels"]
+           'save_graphs', "load_graphs", "load_labels", "save_tensors", "load_tensors"]
 
 def loadtxt(path, delimiter, dtype=None):
     try:
@@ -35,7 +34,7 @@ def loadtxt(path, delimiter, dtype=None):
 
 def _get_dgl_url(file_url):
     """Get DGL online url for download."""
-    dgl_repo_url = 'https://s3.us-east-2.amazonaws.com/dgl.ai/'
+    dgl_repo_url = 'https://data.dgl.ai/'
     repo_url = os.environ.get('DGL_REPO', dgl_repo_url)
     if repo_url[-1] != '/':
         repo_url = repo_url + '/'
@@ -71,7 +70,7 @@ def split_dataset(dataset, frac_list=None, shuffle=False, random_state=None):
     from itertools import accumulate
     if frac_list is None:
         frac_list = [0.8, 0.1, 0.1]
-    frac_list = np.array(frac_list)
+    frac_list = np.asarray(frac_list)
     assert np.allclose(np.sum(frac_list), 1.), \
         'Expect frac_list sum to 1, got {:.4f}'.format(np.sum(frac_list))
     num_data = len(dataset)
@@ -85,7 +84,7 @@ def split_dataset(dataset, frac_list=None, shuffle=False, random_state=None):
     return [Subset(dataset, indices[offset - length:offset]) for offset, length in zip(accumulate(lengths), lengths)]
 
 
-def download(url, path=None, overwrite=False, sha1_hash=None, retries=5, verify_ssl=True, log=True):
+def download(url, path=None, overwrite=True, sha1_hash=None, retries=5, verify_ssl=True, log=True):
     """Download a given URL.
 
     Codes borrowed from mxnet/gluon/utils.py
@@ -99,6 +98,7 @@ def download(url, path=None, overwrite=False, sha1_hash=None, retries=5, verify_
         current directory with the same name as in url.
     overwrite : bool, optional
         Whether to overwrite the destination file if it already exists.
+        By default always overwrites the downloaded file.
     sha1_hash : str, optional
         Expected sha1 hash in hexadecimal digits. Will ignore existing file when hash is specified
         but doesn't match.
@@ -195,7 +195,7 @@ def check_sha1(filename, sha1_hash):
     return sha1.hexdigest() == sha1_hash
 
 
-def extract_archive(file, target_dir):
+def extract_archive(file, target_dir, overwrite=False):
     """Extract archive file.
 
     Parameters
@@ -204,18 +204,29 @@ def extract_archive(file, target_dir):
         Absolute path of the archive file.
     target_dir : str
         Target directory of the archive to be uncompressed.
+    overwrite : bool, default True
+        Whether to overwrite the contents inside the directory.
+        By default always overwrites.
     """
-    if os.path.exists(target_dir):
+    if os.path.exists(target_dir) and not overwrite:
         return
-    if file.endswith('.gz') or file.endswith('.tar') or file.endswith('.tgz'):
-        archive = tarfile.open(file, 'r')
+    print('Extracting file to {}'.format(target_dir))
+    if file.endswith('.tar.gz') or file.endswith('.tar') or file.endswith('.tgz'):
+        import tarfile
+        with tarfile.open(file, 'r') as archive:
+            archive.extractall(path=target_dir)
+    elif file.endswith('.gz'):
+        import gzip
+        import shutil
+        with gzip.open(file, 'rb') as f_in:
+            with open(file[:-3], 'wb') as f_out:
+                shutil.copyfileobj(f_in, f_out)
     elif file.endswith('.zip'):
-        archive = zipfile.ZipFile(file, 'r')
+        import zipfile
+        with zipfile.ZipFile(file, 'r') as archive:
+            archive.extractall(path=target_dir)
     else:
         raise Exception('Unrecognized file type: ' + file)
-    print('Extracting file to {}'.format(target_dir))
-    archive.extractall(path=target_dir)
-    archive.close()
 
 
 def get_download_dir():
@@ -232,6 +243,76 @@ def get_download_dir():
         os.makedirs(dirname)
     return dirname
 
+def makedirs(path):
+    try:
+        os.makedirs(os.path.expanduser(os.path.normpath(path)))
+    except OSError as e:
+        if e.errno != errno.EEXIST and os.path.isdir(path):
+            raise e
+
+def save_info(path, info):
+    """ Save dataset related information into disk.
+
+    Parameters
+    ----------
+    path : str
+        File to save information.
+    info : dict
+        A python dict storing information to save on disk.
+    """
+    with open(path, "wb" ) as pf:
+        pickle.dump(info, pf)
+
+
+def load_info(path):
+    """ Load dataset related information from disk.
+
+    Parameters
+    ----------
+    path : str
+        File to load information from.
+
+    Returns
+    -------
+    info : dict
+        A python dict storing information loaded from disk.
+    """
+    with open(path, "rb") as pf:
+        info = pickle.load(pf)
+    return info
+
+def deprecate_property(old, new):
+    warnings.warn('Property {} will be deprecated, please use {} instead.'.format(old, new))
+
+
+def deprecate_function(old, new):
+    warnings.warn('Function {} will be deprecated, please use {} instead.'.format(old, new))
+
+
+def deprecate_class(old, new):
+    warnings.warn('Class {} will be deprecated, please use {} instead.'.format(old, new))
+
+def idx2mask(idx, len):
+    """Create mask."""
+    mask = np.zeros(len)
+    mask[idx] = 1
+    return mask
+
+def generate_mask_tensor(mask):
+    """Generate mask tensor according to different backend
+    For torch and tensorflow, it will create a bool tensor
+    For mxnet, it will create a float tensor
+    Parameters
+    ----------
+    mask: numpy ndarray
+        input mask tensor
+    """
+    assert isinstance(mask, np.ndarray), "input for generate_mask_tensor" \
+        "should be an numpy ndarray"
+    if F.backend_name == 'mxnet':
+        return F.tensor(mask, dtype=F.data_type_dict['float32'])
+    else:
+        return F.tensor(mask, dtype=F.data_type_dict['bool'])
 
 class Subset(object):
     """Subset of a dataset at specified indices

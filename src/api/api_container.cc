@@ -71,6 +71,13 @@ DGL_REGISTER_GLOBAL("_Map")
     }
   });
 
+DGL_REGISTER_GLOBAL("_EmptyStrMap").set_body([](DGLArgs args, DGLRetValue* rv) {
+  StrMapObject::ContainerType data;
+  auto obj = std::make_shared<StrMapObject>();
+  obj->data = std::move(data);
+  *rv = obj;
+});
+
 DGL_REGISTER_GLOBAL("_MapSize")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     auto& sptr = args[0].obj_sptr();

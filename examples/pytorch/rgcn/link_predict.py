@@ -6,9 +6,7 @@ Code: https://github.com/MichSchli/RelationPrediction
 Difference compared to MichSchli/RelationPrediction
 * Report raw metrics instead of filtered metrics.
 * By default, we use uniform edge sampling instead of neighbor-based edge
-  sampling used in author's code. In practice, we find it achieves similar MRR
-  probably because the model only uses one GNN layer so messages are propagated
-  among immediate neighbors. User could specify "--edge-sampler=neighbor" to switch
+  sampling used in author's code. In practice, we find it achieves similar MRR. User could specify "--edge-sampler=neighbor" to switch
   to neighbor-based edge sampling.
 """
 
@@ -19,7 +17,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import random
-from dgl.contrib.data import load_data
+from dgl.data.knowledge_graph import load_data
 from dgl.nn.pytorch import RelGraphConv
 
 from model import BaseRGCN
@@ -161,6 +159,7 @@ def main(args):
             node_id, deg = node_id.cuda(), deg.cuda()
             edge_type, edge_norm = edge_type.cuda(), edge_norm.cuda()
             data, labels = data.cuda(), labels.cuda()
+            g = g.to(args.gpu)
 
         t0 = time.time()
         embed = model(g, node_id, edge_type, edge_norm)
@@ -186,16 +185,17 @@ def main(args):
             model.eval()
             print("start eval")
             embed = model(test_graph, test_node_id, test_rel, test_norm)
-            mrr = utils.calc_mrr(embed, model.w_relation, valid_data,
-                                 hits=[1, 3, 10], eval_bz=args.eval_batch_size)
+            mrr = utils.calc_mrr(embed, model.w_relation, torch.LongTensor(train_data),
+                                 valid_data, test_data, hits=[1, 3, 10], eval_bz=args.eval_batch_size,
+                                 eval_p=args.eval_protocol)
             # save best model
-            if mrr < best_mrr:
-                if epoch >= args.n_epochs:
-                    break
-            else:
+            if best_mrr < mrr:
                 best_mrr = mrr
-                torch.save({'state_dict': model.state_dict(), 'epoch': epoch},
-                           model_state_file)
+                torch.save({'state_dict': model.state_dict(), 'epoch': epoch}, model_state_file)
+            
+            if epoch >= args.n_epochs:
+                break
+            
             if use_cuda:
                 model.cuda()
 
@@ -212,8 +212,8 @@ def main(args):
     model.load_state_dict(checkpoint['state_dict'])
     print("Using best epoch: {}".format(checkpoint['epoch']))
     embed = model(test_graph, test_node_id, test_rel, test_norm)
-    utils.calc_mrr(embed, model.w_relation, test_data,
-                   hits=[1, 3, 10], eval_bz=args.eval_batch_size)
+    utils.calc_mrr(embed, model.w_relation, torch.LongTensor(train_data), valid_data,
+                   test_data, hits=[1, 3, 10], eval_bz=args.eval_batch_size, eval_p=args.eval_protocol)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='RGCN')
@@ -235,6 +235,8 @@ if __name__ == '__main__':
             help="dataset to use")
     parser.add_argument("--eval-batch-size", type=int, default=500,
             help="batch size when evaluating")
+    parser.add_argument("--eval-protocol", type=str, default="filtered",
+            help="type of evaluation protocol: 'raw' or 'filtered' mrr")
     parser.add_argument("--regularization", type=float, default=0.01,
             help="regularization weight")
     parser.add_argument("--grad-norm", type=float, default=1.0,

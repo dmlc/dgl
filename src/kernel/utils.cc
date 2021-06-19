@@ -3,6 +3,7 @@
  * \file kernel/utils.cc
  * \brief Kernel utilities
  */
+#include <dgl/array.h>
 #include <vector>
 #include <string>
 
@@ -21,6 +22,12 @@ int FindNumThreads(int dim, int max_nthrs) {
   return ret;
 }
 
+int FindNumBlocks(int nblks, int max_nblks) {
+  if (nblks < max_nblks)
+    return nblks;
+  return max_nblks;
+}
+
 int64_t ComputeXLength(runtime::NDArray feat_array) {
   int64_t ret = 1;
   for (int i = 1; i < feat_array->ndim; ++i) {
@@ -30,7 +37,7 @@ int64_t ComputeXLength(runtime::NDArray feat_array) {
 }
 
 int64_t NElements(const runtime::NDArray& array) {
-  if (IsNoneArray(array)) {
+  if (aten::IsNullArray(array)) {
     return 0;
   } else {
     int64_t ret = 1;

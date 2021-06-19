@@ -22,7 +22,7 @@ Results
 
 Run with following (available dataset: "cora", "citeseer", "pubmed")
 ```bash
-DGLBACKEND=mxnet python3 train.py --dataset cora --gpu 0
+DGLBACKEND=mxnet python3 appnp.py --dataset cora --gpu 0
 ```
 
 * cora: 0.8370 (paper: 0.850)

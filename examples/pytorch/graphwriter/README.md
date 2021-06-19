@@ -21,7 +21,7 @@ In this example we implement the GraphWriter, [Text Generation from Knowledge Gr
 | |BLEU|METEOR| training time per epoch|
 |-|-|-|-|
 |Author's implementation|14.3+-1.01| 18.8+-0.28| 1970s|
-|DGL implementation|14.31+-0.34|19.74+-0.69| 1192s|
+|DGL implementation|14.31+-0.34|19.74+-0.69| 1080s|
 
 We use the author's code for the speed test, and our testbed is V100 GPU.
 
@@ -39,6 +39,6 @@ We repeat the experiment five times.
 ### Examples
 
 We also provide the output of our implementation on test set together with the reference text.
-- [GraphWriter's output](https://s3.us-east-2.amazonaws.com/dgl.ai/models/graphwriter/tmp_pred.txt)
-- [Reference text](https://s3.us-east-2.amazonaws.com/dgl.ai/models/graphwriter/tmp_gold.txt)
+- [GraphWriter's output](https://data.dgl.ai/models/graphwriter/tmp_pred.txt)
+- [Reference text](https://data.dgl.ai/models/graphwriter/tmp_gold.txt)
 

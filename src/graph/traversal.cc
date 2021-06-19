@@ -132,8 +132,8 @@ DGL_REGISTER_GLOBAL("traversal._CAPI_DGLBFSNodes")
     const IdArray src = args[1];
     bool reversed = args[2];
     const auto& front = BFSNodesFrontiers(*(g.sptr()), src, reversed);
-    IdArray node_ids = CopyVectorToNDArray(front.ids);
-    IdArray sections = CopyVectorToNDArray(front.sections);
+    IdArray node_ids = CopyVectorToNDArray<int64_t>(front.ids);
+    IdArray sections = CopyVectorToNDArray<int64_t>(front.sections);
     *rv = ConvertNDArrayVectorToPackedFunc({node_ids, sections});
   });
 
@@ -162,8 +162,8 @@ DGL_REGISTER_GLOBAL("traversal._CAPI_DGLBFSEdges")
     const IdArray src = args[1];
     bool reversed = args[2];
     const auto& front = BFSEdgesFrontiers(*(g.sptr()), src, reversed);
-    IdArray edge_ids = CopyVectorToNDArray(front.ids);
-    IdArray sections = CopyVectorToNDArray(front.sections);
+    IdArray edge_ids = CopyVectorToNDArray<int64_t>(front.ids);
+    IdArray sections = CopyVectorToNDArray<int64_t>(front.sections);
     *rv = ConvertNDArrayVectorToPackedFunc({edge_ids, sections});
   });
 
@@ -186,8 +186,8 @@ DGL_REGISTER_GLOBAL("traversal._CAPI_DGLTopologicalNodes")
     GraphRef g = args[0];
     bool reversed = args[1];
     const auto& front = TopologicalNodesFrontiers(*g.sptr(), reversed);
-    IdArray node_ids = CopyVectorToNDArray(front.ids);
-    IdArray sections = CopyVectorToNDArray(front.sections);
+    IdArray node_ids = CopyVectorToNDArray<int64_t>(front.ids);
+    IdArray sections = CopyVectorToNDArray<int64_t>(front.sections);
     *rv = ConvertNDArrayVectorToPackedFunc({node_ids, sections});
   });
 
