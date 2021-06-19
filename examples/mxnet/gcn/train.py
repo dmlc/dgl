@@ -1,7 +1,6 @@
 """Training GCN model on citation graphs."""
 import argparse, time
 import numpy as np
-import networkx as nx
 import mxnet as mx
 from mxnet import gluon
 
@@ -20,14 +19,14 @@ def evaluate(model, features, labels, mask):
 
 def main(args):
     # load and preprocess dataset
-    if args.dataset == 'cora':
+    if args.dataset_name == 'cora':
         data = CoraGraphDataset()
-    elif args.dataset == 'citeseer':
+    elif args.dataset_name == 'citeseer':
         data = CiteseerGraphDataset()
-    elif args.dataset == 'pubmed':
+    elif args.dataset_name == 'pubmed':
         data = PubmedGraphDataset()
     else:
-        raise ValueError('Unknown dataset: {}'.format(args.dataset))
+        raise ValueError('Unknown dataset: {}'.format(args.dataset_name))
 
     g = data[0]
     if args.gpu < 0:
@@ -113,6 +112,8 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GCN')
     register_data_args(parser)
+    parser.add_argument("--dataset_name", type=str, default="cora",
+                        help="dataset name")
     parser.add_argument("--dropout", type=float, default=0.5,
             help="dropout probability")
     parser.add_argument("--gpu", type=int, default=-1,
