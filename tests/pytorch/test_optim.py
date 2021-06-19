@@ -87,12 +87,14 @@ def initializer(emb):
     emb.uniform_(-1.0, 1.0)
     return emb
 
-def start_sparse_adam_worker(rank, world_size, weight, tensor_dev='cpu', has_zero_grad=False,
+def start_sparse_adam_worker(rank, device, world_size, weight, tensor_dev='cpu', has_zero_grad=False,
                              backend='gloo', num_embs=128, emb_dim=10):
     print('start sparse worker for adam {}'.format(rank))
     dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
         master_ip='127.0.0.1', master_port='12345')
-    device=rank
+
+    if device.type == 'cuda':
+        th.cuda.set_device(device)
 
     th.distributed.init_process_group(backend=backend,
                                       init_method=dist_init_method,
@@ -109,7 +111,7 @@ def start_sparse_adam_worker(rank, world_size, weight, tensor_dev='cpu', has_zer
     start = (num_embs // world_size) * rank
     end = (num_embs // world_size) * (rank + 1)
     th.manual_seed(rank)
-    idx = th.randint(start, end, size=(4,)).to(device)
+    idx = th.randint(start, end, size=(4,)).to(tensor_dev)
     dgl_value = dgl_emb(idx, device)
     labels = th.ones((4,)).long().to(device)
     dgl_adam.zero_grad()
@@ -182,8 +184,12 @@ def test_multiprocess_sparse_adam(num_workers, backend):
     dgl_weight = th.empty((num_embs, emb_dim))
     ctx = mp.get_context('spawn')
     for i in range(num_workers):
+        device = F.ctx()
+        if device.type == 'cuda':
+            # make sure each process has a unique GPU
+            device = th.device(i)
         p = ctx.Process(target=start_sparse_adam_worker,
-                        args=(i, num_workers, dgl_weight, 'cpu', True, backend))
+                        args=(i, device, num_workers, dgl_weight, th.device('cpu'), True, backend))
         p.start()
         worker_list.append(p)
     for p in worker_list:
@@ -217,8 +223,9 @@ def test_multiprocess_sparse_adam_cuda_tensor(num_workers):
     dgl_weight = th.empty((num_embs, emb_dim))
     ctx = mp.get_context('spawn')
     for i in range(num_workers):
+        device = th.device(i)
         p = ctx.Process(target=start_sparse_adam_worker,
-                        args=(i, num_workers, dgl_weight, i, False, backend))
+                        args=(i, device, num_workers, dgl_weight, device, False, backend))
         p.start()
         worker_list.append(p)
     for p in worker_list:
@@ -249,8 +256,12 @@ def test_multiprocess_sparse_adam_zero_step(num_workers, backend):
     dgl_weight = th.empty((num_embs, emb_dim))
     ctx = mp.get_context('spawn')
     for i in range(num_workers):
+        device = F.ctx()
+        if device.type == 'cuda':
+            # make sure each process has a unique GPU
+            device = th.device(i)
         p = ctx.Process(target=start_sparse_adam_worker,
-                        args=(i, num_workers, dgl_weight, 'cpu', True, backend))
+                        args=(i, device, num_workers, dgl_weight, th.device('cpu'), True, backend))
         p.start()
         worker_list.append(p)
     for p in worker_list:
@@ -282,8 +293,9 @@ def test_multiprocess_sparse_adam_zero_step_cuda_tensor(num_workers):
     dgl_weight = th.empty((num_embs, emb_dim))
     ctx = mp.get_context('spawn')
     for i in range(num_workers):
+        device = th.device(i)
         p = ctx.Process(target=start_sparse_adam_worker,
-                        args=(i, num_workers, dgl_weight, i, True))
+                        args=(i, device, num_workers, dgl_weight, device, True))
         p.start()
         worker_list.append(p)
     for p in worker_list:
@@ -312,4 +324,4 @@ if __name__ == '__main__':
     #test_multiprocess_sparse_adam_zero_step(4, backend='nccl')
 
     test_multiprocess_sparse_adam_cuda_tensor(2)
-    test_multiprocess_sparse_adam_zero_step_cuda_tensor(2)
+    #test_multiprocess_sparse_adam_zero_step_cuda_tensor(2)
