@@ -290,7 +290,7 @@ void CusparseCsrmm2Hetero(
     const CSRMatrix& csr,
     const DType* B_data, const DType* A_data,
     DType* C_data,
-    int x_length,
+    int64_t x_length,
     cudaStream_t strm_id) {
   // We use csrmm2 to perform following operation:
   // C = A x B, where A is a sparse matrix in csr format, B is the dense matrix for node
@@ -299,6 +299,10 @@ void CusparseCsrmm2Hetero(
   // C = trans(A x trans(B)).
   // Currently, we use cublasXgeam to implement transposition and allocate intermediate
   // workspace memory for this.
+  int int_maxlimit = std::numeric_limits<int>::max();
+  CHECK_GE(int_maxlimit, (csr.num_rows));
+  CHECK_GE(int_maxlimit, csr.num_cols);
+  CHECK_GE(int_maxlimit, csr.indices->shape[0]);
   const int m = csr.num_rows;
   const int n = x_length;
   const int k = csr.num_cols;
@@ -514,24 +518,24 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
              const std::vector<NDArray>& vec_efeat,
              std::vector<NDArray> vec_out,
              const std::vector<NDArray>& out_aux,
-             const std::vector<dgl_type_t>& ufeat_eid,
-             const std::vector<dgl_type_t>& out_eid) {
+             const std::vector<dgl_type_t>& ufeat_ntids,  // ufeat node type id
+             const std::vector<dgl_type_t>& out_ntids) {  // output node type id
   int64_t feat_len = bcast.out_len;
   bool is_scalar_efeat = vec_efeat.size() != 0;
   bool use_efeat = op != "copy_lhs";
   // TODO(Israt): 1:Resolve PR-https://github.com/dmlc/dgl/issues/2995
   // to use maxstream > 1
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
-  for (dgl_type_t etype = 0; etype < ufeat_eid.size(); ++etype) {
-    const dgl_type_t src_id = ufeat_eid[etype];
-    const dgl_type_t dst_id = out_eid[etype];
+  for (dgl_type_t etype = 0; etype < ufeat_ntids.size(); ++etype) {
+    const dgl_type_t src_id = ufeat_ntids[etype];
+    const dgl_type_t dst_id = out_ntids[etype];
     CSRMatrix csr = vec_csr[etype];
     if (reduce == "sum") {
       SWITCH_BITS(bits, DType, {
         /* Call  SpMM for each relation type */
         if (op == "copy_lhs" && cusparse_available<bits, IdType>()) {  // cusparse
           int64_t x_length = 1;
-          NDArray nd_ufeat = vec_ufeat[ufeat_eid[0]];
+          NDArray nd_ufeat = vec_ufeat[ufeat_ntids[0]];
           for (int i = 1; i < nd_ufeat->ndim; ++i) {
             x_length *= nd_ufeat->shape[i];
           }
@@ -546,7 +550,7 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
             cusparse_available<bits, IdType>()) {  // cusparse
           NDArray efeat = vec_efeat[etype];
           int64_t x_length = 1;
-          NDArray nd_ufeat = vec_ufeat[ufeat_eid[0]];
+          NDArray nd_ufeat = vec_ufeat[ufeat_ntids[0]];
           for (int i = 1; i < nd_ufeat->ndim; ++i) {
             x_length *= nd_ufeat->shape[i];
           }
@@ -673,37 +677,37 @@ template void SpMMCsrHetero<kDLGPU, int32_t, 16>(
     const BcastOff& bcast, const std::vector<CSRMatrix>& csr,
     const std::vector<NDArray>& ufeat, const std::vector<NDArray>& efeat,
     std::vector<NDArray> out, const std::vector<NDArray>& out_aux,
-    const std::vector<dgl_type_t>& ufeat_eid, const std::vector<dgl_type_t>& out_eid);
+    const std::vector<dgl_type_t>& ufeat_ntids, const std::vector<dgl_type_t>& out_ntids);
 template void SpMMCsrHetero<kDLGPU, int64_t, 16>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const std::vector<CSRMatrix>& csr,
     const std::vector<NDArray>& ufeat, const std::vector<NDArray>& efeat,
     std::vector<NDArray> out, const std::vector<NDArray>& out_aux,
-    const std::vector<dgl_type_t>& ufeat_eid, const std::vector<dgl_type_t>& out_eid);
+    const std::vector<dgl_type_t>& ufeat_ntids, const std::vector<dgl_type_t>& out_ntids);
 template void SpMMCsrHetero<kDLGPU, int32_t, 32>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const std::vector<CSRMatrix>& csr,
     const std::vector<NDArray>& ufeat, const std::vector<NDArray>& efeat,
     std::vector<NDArray> out, const std::vector<NDArray>& out_aux,
-    const std::vector<dgl_type_t>& ufeat_eid, const std::vector<dgl_type_t>& out_eid);
+    const std::vector<dgl_type_t>& ufeat_ntids, const std::vector<dgl_type_t>& out_ntids);
 template void SpMMCsrHetero<kDLGPU, int64_t, 32>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const std::vector<CSRMatrix>& csr,
     const std::vector<NDArray>& ufeat, const std::vector<NDArray>& efeat,
     std::vector<NDArray> out, const std::vector<NDArray>& out_aux,
-    const std::vector<dgl_type_t>& ufeat_eid, const std::vector<dgl_type_t>& out_eid);
+    const std::vector<dgl_type_t>& ufeat_ntids, const std::vector<dgl_type_t>& out_ntids);
 template void SpMMCsrHetero<kDLGPU, int32_t, 64>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const std::vector<CSRMatrix>& csr,
     const std::vector<NDArray>& ufeat, const std::vector<NDArray>& efeat,
     std::vector<NDArray> out, const std::vector<NDArray>& out_aux,
-    const std::vector<dgl_type_t>& ufeat_eid, const std::vector<dgl_type_t>& out_eid);
+    const std::vector<dgl_type_t>& ufeat_ntids, const std::vector<dgl_type_t>& out_ntids);
 template void SpMMCsrHetero<kDLGPU, int64_t, 64>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const std::vector<CSRMatrix>& csr,
     const std::vector<NDArray>& ufeat, const std::vector<NDArray>& efeat,
     std::vector<NDArray> out, const std::vector<NDArray>& out_aux,
-    const std::vector<dgl_type_t>& ufeat_eid, const std::vector<dgl_type_t>& out_eid);
+    const std::vector<dgl_type_t>& ufeat_ntids, const std::vector<dgl_type_t>& out_ntids);
 
 template void SpMMCoo<kDLGPU, int32_t, 16>(
     const std::string& op, const std::string& reduce,
