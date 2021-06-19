@@ -306,13 +306,10 @@ def sample_neighbors_biased(g, nodes, fanout, bias, edge_dir='in',
     >>> sg.edges(order='eid')
     (tensor([0, 0, 2, 2]), tensor([1, 2, 0, 2]))
     """
-    if len(g.ntypes) > 1:
-        raise DGLError("Only homogeneous or bipartite graphs are supported.")
-
     if isinstance(nodes, list):
         nodes = F.tensor(nodes)
     if isinstance(bias, list):
-        bias = F.tenosr(bias)
+        bias = F.tensor(bias)
 
     nodes_array = F.to_dgl_nd(nodes)
     bias_array = F.to_dgl_nd(bias)

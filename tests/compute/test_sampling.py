@@ -620,7 +620,7 @@ def test_sample_neighbors_biased_homogeneous():
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
 def test_sample_neighbors_biased_bipartite():
-    g = create_test_graph(100, 30, )
+    g = create_test_graph(100, 30, True)
     num_dst = g.number_of_dst_nodes()
     bias = F.tensor([0, 0.01, 10, 10], dtype=F.float32)
     def check_num(nodes, tag):
