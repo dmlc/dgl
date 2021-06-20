@@ -10,6 +10,7 @@ import unittest, pytest
 from dgl import DGLError
 import test_utils
 from test_utils import parametrize_dtype, get_cases
+from utils import assert_is_identical_hetero
 from scipy.sparse import rand
 
 def create_test_heterograph(idtype):
@@ -1081,6 +1082,19 @@ def test_convert(idtype):
     assert hg.device == g.device
     assert g.number_of_nodes() == 5
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="Test on cpu is enough")
+@parametrize_dtype
+def test_to_homo_zero_nodes(idtype):
+    # Fix gihub issue #2870
+    g = dgl.heterograph({
+        ('A', 'AB', 'B'): (np.random.randint(0, 200, (1000,)), np.random.randint(0, 200, (1000,))),
+        ('B', 'BA', 'A'): (np.random.randint(0, 200, (1000,)), np.random.randint(0, 200, (1000,))),
+    }, num_nodes_dict={'A': 200, 'B': 200, 'C': 0}, idtype=idtype)
+    g.nodes['A'].data['x'] = F.randn((200, 3))
+    g.nodes['B'].data['x'] = F.randn((200, 3))
+    gg = dgl.to_homogeneous(g, ['x'])
+    assert 'x' in gg.ndata
+
 @parametrize_dtype
 def test_to_homo2(idtype):
     # test the result homogeneous graph has nodes and edges sorted by their types
@@ -1110,6 +1124,14 @@ def test_to_homo2(idtype):
         assert count == hg.num_nodes(hg.ntypes[i])
     for i, count in enumerate(etype_count):
         assert count == hg.num_edges(hg.canonical_etypes[i])
+
+@parametrize_dtype
+def test_invertible_conversion(idtype):
+    # Test whether to_homogeneous and to_heterogeneous are invertible
+    hg = create_test_heterograph(idtype)
+    g = dgl.to_homogeneous(hg)
+    hg2 = dgl.to_heterogeneous(g, hg.ntypes, hg.etypes)
+    assert_is_identical_hetero(hg, hg2, True)
 
 @parametrize_dtype
 def test_metagraph_reachable(idtype):
