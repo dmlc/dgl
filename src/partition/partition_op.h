@@ -51,6 +51,25 @@ IdArray MapToLocalFromRemainder(
     int num_parts,
     IdArray global_idx);
 
+/**
+ * @brief Generate the set of global indices from the local indices, using
+ * remainder. That is, for each index `i` in `local_idx`, the global index
+ * is computed as `local_idx[i] * num_parts + part_id`.
+ *
+ * @tparam XPU The type of device to run on.
+ * @tparam IdType The type of the index.
+ * @param num_parts The number parts the array id divided into.
+ * @param local_idx The array of local indices to map.
+ * @param part_id The id of the current part.
+ *
+ * @return The array of global indices.
+ */
+template <DLDeviceType XPU, typename IdType>
+IdArray MapToGlobalFromRemainder(
+    int num_parts,
+    IdArray local_idx,
+    int part_id);
+
 
 }  // namespace impl
 }  // namespace partition

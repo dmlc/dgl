@@ -20,6 +20,9 @@ if __name__ == '__main__':
                            help='turn the graph into an undirected graph.')
     argparser.add_argument('--balance_edges', action='store_true',
                            help='balance the number of edges in each partition.')
+    argparser.add_argument('--num_trainers_per_machine', type=int, default=1,
+                           help='the number of trainers per machine. The trainer ids are stored\
+                                in the node feature \'trainer_id\'')
     argparser.add_argument('--output', type=str, default='data',
                            help='Output path of partitioned graph.')
     args = argparser.parse_args()
@@ -50,4 +53,5 @@ if __name__ == '__main__':
     dgl.distributed.partition_graph(g, args.dataset, args.num_parts, args.output,
                                     part_method=args.part_method,
                                     balance_ntypes=balance_ntypes,
-                                    balance_edges=args.balance_edges)
+                                    balance_edges=args.balance_edges,
+                                    num_trainers_per_machine=args.num_trainers_per_machine)
