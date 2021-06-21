@@ -12,8 +12,6 @@ pip install --upgrade pip
 pip install asv
 pip uninstall -y dgl
 
-nvidia-smi
-
 export DGL_BENCH_DEVICE=$DEVICE
 echo "DGL_BENCH_DEVICE=$DGL_BENCH_DEVICE"
 pushd $ROOT/benchmarks
