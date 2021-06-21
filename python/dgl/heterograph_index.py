@@ -1106,7 +1106,7 @@ def create_unitgraph_from_coo(num_ntypes, num_src, num_dst, row, col,
         formats, row_sorted, col_sorted)
 
 def create_unitgraph_from_csr(num_ntypes, num_src, num_dst, indptr, indices, edge_ids,
-                              formats):
+                              formats, transpose=False):
     """Create a unitgraph graph index from CSR format
 
     Parameters
@@ -1125,6 +1125,8 @@ def create_unitgraph_from_csr(num_ntypes, num_src, num_dst, indptr, indices, edg
         Edge shuffle id.
     formats : str
         Restrict the storage formats allowed for the unit graph.
+    transpose : bool, optional
+        If True, treats the input matrix as CSC.
 
     Returns
     -------
@@ -1135,7 +1137,7 @@ def create_unitgraph_from_csr(num_ntypes, num_src, num_dst, indptr, indices, edg
     return _CAPI_DGLHeteroCreateUnitGraphFromCSR(
         int(num_ntypes), int(num_src), int(num_dst),
         F.to_dgl_nd(indptr), F.to_dgl_nd(indices), F.to_dgl_nd(edge_ids),
-        formats)
+        formats, transpose)
 
 def create_heterograph_from_relations(metagraph, rel_graphs, num_nodes_per_type):
     """Create a heterograph from metagraph and graphs of every relation.

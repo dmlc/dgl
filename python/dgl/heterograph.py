@@ -69,9 +69,14 @@ class DGLHeteroGraph(object):
         if not isinstance(gidx, heterograph_index.HeteroGraphIndex):
             dgl_warning('Recommend creating graphs by `dgl.graph(data)`'
                         ' instead of `dgl.DGLGraph(data)`.')
-            u, v, num_src, num_dst = utils.graphdata2tensors(gidx)
-            gidx = heterograph_index.create_unitgraph_from_coo(
-                1, num_src, num_dst, u, v, ['coo', 'csr', 'csc'])
+            (sparse_fmt, arrays), num_src, num_dst = utils.graphdata2tensors(gidx)
+            if sparse_fmt == 'coo':
+                gidx = heterograph_index.create_unitgraph_from_coo(
+                    1, num_src, num_dst, arrays[0], arrays[1], ['coo', 'csr', 'csc'])
+            else:
+                gidx = heterograph_index.create_unitgraph_from_csr(
+                    1, num_src, num_dst, arrays[0], arrays[1], arrays[2], ['coo', 'csr', 'csc'],
+                    sparse_fmt == 'csc')
         if len(deprecate_kwargs) != 0:
             dgl_warning('Keyword arguments {} are deprecated in v0.5, and can be safely'
                         ' removed in all cases.'.format(list(deprecate_kwargs.keys())))

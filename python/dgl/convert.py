@@ -53,8 +53,18 @@ def graph(data,
           DGL calls this format "tuple of node-tensors". The tensors should have the same
           data type of int32/int64 and device context (see below the descriptions of
           :attr:`idtype` and :attr:`device`).
-        - ``(iterable[int], iterable[int])``: Similar to the tuple of node-tensors
-          format, but stores node IDs in two sequences (e.g. list, tuple, numpy.ndarray).
+        - ``('coo', (Tensor, Tensor))``: Same as ``(Tensor, Tensor)``.
+        - ``('csr', (Tensor, Tensor, Tensor))``: The three tensors form the CSR representation
+          of the graph's adjacency matrix.  The first one is the row index pointer.  The
+          second one is the column indices.  The third one is the edge IDs, which can be empty
+          to represent consecutive integer IDs starting from 0.
+        - ``('csc', (Tensor, Tensor, Tensor))``: The three tensors form the CSC representation
+          of the graph's adjacency matrix.  The first one is the column index pointer.  The
+          second one is the row indices.  The third one is the edge IDs, which can be empty
+          to represent consecutive integer IDs starting from 0.
+
+        The tensors can be replaced with any iterable of integers (e.g. list, tuple,
+        numpy.ndarray).
     ntype : str, optional
         Deprecated. To construct a graph with named node types, use :func:`dgl.heterograph`.
     etype : str, optional
@@ -131,6 +141,15 @@ def graph(data,
 
     >>> g = dgl.graph((src_ids, dst_ids), idtype=torch.int32, device='cuda:0')
 
+    Create the same graph with CSR representation.
+
+    >>> g = dgl.graph(('csr', ([0, 0, 0, 1, 2, 3], [1, 2, 3], [0, 1, 2])))
+
+    Or equivalently the following since the edge IDs are already consecutive
+    integers starting from 0:
+
+    >>> g = dgl.graph(('csr', ([0, 0, 0, 1, 2, 3], [1, 2, 3], [])))
+
     See Also
     --------
     from_scipy
@@ -158,14 +177,14 @@ def graph(data,
                        " Please refer to their API documents for more details.".format(
                            deprecated_kwargs.keys()))
 
-    u, v, urange, vrange = utils.graphdata2tensors(data, idtype)
+    (sparse_fmt, arrays), urange, vrange = utils.graphdata2tensors(data, idtype)
     if num_nodes is not None:  # override the number of nodes
         if num_nodes < max(urange, vrange):
             raise DGLError('The num_nodes argument must be larger than the max ID in the data,'
                            ' but got {} and {}.'.format(num_nodes, max(urange, vrange) - 1))
         urange, vrange = num_nodes, num_nodes
 
-    g = create_from_edges(u, v, '_N', '_E', '_N', urange, vrange,
+    g = create_from_edges(sparse_fmt, arrays, '_N', '_E', '_N', urange, vrange,
                           row_sorted=row_sorted, col_sorted=col_sorted,
                           validate=False)
 
@@ -226,8 +245,18 @@ def heterograph(data_dict,
           this format "tuple of node-tensors". The tensors should have the same data type,
           which must be either int32 or int64. They should also have the same device context
           (see below the descriptions of :attr:`idtype` and :attr:`device`).
-        - ``(iterable[int], iterable[int])``: Similar to the tuple of node-tensors
-          format, but stores node IDs in two sequences (e.g. list, tuple, numpy.ndarray).
+        - ``('coo', (Tensor, Tensor))``: Same as ``(Tensor, Tensor)``.
+        - ``('csr', (Tensor, Tensor, Tensor))``: The three tensors form the CSR representation
+          of the graph's adjacency matrix.  The first one is the row index pointer.  The
+          second one is the column indices.  The third one is the edge IDs, which can be empty
+          to represent consecutive integer IDs starting from 0.
+        - ``('csc', (Tensor, Tensor, Tensor))``: The three tensors form the CSC representation
+          of the graph's adjacency matrix.  The first one is the column index pointer.  The
+          second one is the row indices.  The third one is the edge IDs, which can be empty
+          to represent consecutive integer IDs starting from 0.
+
+        The tensors can be replaced with any iterable of integers (e.g. list, tuple,
+        numpy.ndarray).
     num_nodes_dict : dict[str, int], optional
         The number of nodes for some node types, which is a dictionary mapping a node type
         :math:`T` to the number of :math:`T`-typed nodes. If not given for a node type
@@ -320,8 +349,9 @@ def heterograph(data_dict,
             raise DGLError("dgl.heterograph no longer supports graph construction from a NetworkX "
                            "graph, use dgl.from_networkx instead.")
         is_bipartite = (sty != dty)
-        u, v, urange, vrange = utils.graphdata2tensors(data, idtype, bipartite=is_bipartite)
-        node_tensor_dict[(sty, ety, dty)] = (u, v)
+        (sparse_fmt, arrays), urange, vrange = utils.graphdata2tensors(
+            data, idtype, bipartite=is_bipartite)
+        node_tensor_dict[(sty, ety, dty)] = (sparse_fmt, arrays)
         if need_infer:
             num_nodes_dict[sty] = max(num_nodes_dict[sty], urange)
             num_nodes_dict[dty] = max(num_nodes_dict[dty], vrange)
@@ -340,8 +370,8 @@ def heterograph(data_dict,
     num_nodes_per_type = utils.toindex([num_nodes_dict[ntype] for ntype in ntypes], "int64")
     rel_graphs = []
     for srctype, etype, dsttype in relations:
-        src, dst = node_tensor_dict[(srctype, etype, dsttype)]
-        g = create_from_edges(src, dst, srctype, etype, dsttype,
+        sparse_fmt, arrays = node_tensor_dict[(srctype, etype, dsttype)]
+        g = create_from_edges(sparse_fmt, arrays, srctype, etype, dsttype,
                               num_nodes_dict[srctype], num_nodes_dict[dsttype])
         rel_graphs.append(g)
 
@@ -368,8 +398,18 @@ def create_block(data_dict, num_src_nodes=None, num_dst_nodes=None, idtype=None,
           this format "tuple of node-tensors". The tensors should have the same data type,
           which must be either int32 or int64. They should also have the same device context
           (see below the descriptions of :attr:`idtype` and :attr:`device`).
-        - ``(iterable[int], iterable[int])``: Similar to the tuple of node-tensors
-          format, but stores node IDs in two sequences (e.g. list, tuple, numpy.ndarray).
+        - ``('coo', (Tensor, Tensor))``: Same as ``(Tensor, Tensor)``.
+        - ``('csr', (Tensor, Tensor, Tensor))``: The three tensors form the CSR representation
+          of the graph's adjacency matrix.  The first one is the row index pointer.  The
+          second one is the column indices.  The third one is the edge IDs, which can be empty
+          to represent consecutive integer IDs starting from 0.
+        - ``('csc', (Tensor, Tensor, Tensor))``: The three tensors form the CSC representation
+          of the graph's adjacency matrix.  The first one is the column index pointer.  The
+          second one is the row indices.  The third one is the edge IDs, which can be empty
+          to represent consecutive integer IDs starting from 0.
+
+        The tensors can be replaced with any iterable of integers (e.g. list, tuple,
+        numpy.ndarray).
 
         If you would like to create a MFG with a single source node type, a single destination
         node type, and a single edge type, then you can pass in the graph data directly
@@ -489,8 +529,9 @@ def create_block(data_dict, num_src_nodes=None, num_dst_nodes=None, idtype=None,
     # Convert all data to node tensors first
     node_tensor_dict = {}
     for (sty, ety, dty), data in data_dict.items():
-        u, v, urange, vrange = utils.graphdata2tensors(data, idtype, bipartite=True)
-        node_tensor_dict[(sty, ety, dty)] = (u, v)
+        (sparse_fmt, arrays ), urange, vrange = utils.graphdata2tensors(
+            data, idtype, bipartite=True)
+        node_tensor_dict[(sty, ety, dty)] = (sparse_fmt, arrays)
         if need_infer:
             num_src_nodes[sty] = max(num_src_nodes[sty], urange)
             num_dst_nodes[dty] = max(num_dst_nodes[dty], vrange)
@@ -525,8 +566,8 @@ def create_block(data_dict, num_src_nodes=None, num_dst_nodes=None, idtype=None,
         meta_edges_src.append(srctype_dict[srctype])
         meta_edges_dst.append(dsttype_dict[dsttype])
         etypes.append(etype)
-        src, dst = node_tensor_dict[(srctype, etype, dsttype)]
-        g = create_from_edges(src, dst, 'SRC/' + srctype, etype, 'DST/' + dsttype,
+        sparse_fmt, arrays = node_tensor_dict[(srctype, etype, dsttype)]
+        g = create_from_edges(sparse_fmt, arrays, 'SRC/' + srctype, etype, 'DST/' + dsttype,
                               num_src_nodes[srctype], num_dst_nodes[dsttype])
         rel_graphs.append(g)
 
@@ -1041,8 +1082,13 @@ def from_scipy(sp_mat,
         raise DGLError('Expect the number of rows to be the same as the number of columns for '
                        'sp_mat, got {:d} and {:d}.'.format(num_rows, num_cols))
 
-    u, v, urange, vrange = utils.graphdata2tensors(sp_mat, idtype)
-    g = create_from_edges(u, v, '_N', '_E', '_N', urange, vrange)
+    if sp_mat.format in ['csr', 'csc']:
+        data = (sp_mat.format, (sp_mat.indptr, sp_mat.indices, np.array([], dtype=sp_mat.indptr.dtype)))
+    else:
+        sp_mat = sp_mat.tocoo()
+        data = (sp_mat.format, (sp_mat.row, sp_mat.col))
+    (sparse_fmt, arrays), urange, vrange = utils.graphdata2tensors(sp_mat, idtype)
+    g = create_from_edges(sparse_fmt, arrays, '_N', '_E', '_N', urange, vrange)
     if eweight_name is not None:
         g.edata[eweight_name] = F.tensor(sp_mat.data)
     return g.to(device)
@@ -1135,9 +1181,13 @@ def bipartite_from_scipy(sp_mat,
     heterograph
     bipartite_from_networkx
     """
-    # Sanity check
-    u, v, urange, vrange = utils.graphdata2tensors(sp_mat, idtype, bipartite=True)
-    g = create_from_edges(u, v, utype, etype, vtype, urange, vrange)
+    if sp_mat.format in ['csr', 'csc']:
+        data = (sp_mat.format, (sp_mat.indptr, sp_mat.indices, np.array([], dtype=sp_mat.indptr.dtype)))
+    else:
+        sp_mat = sp_mat.tocoo()
+        data = (sp_mat.format, (sp_mat.row, sp_mat.col))
+    (sparse_fmt, arrays), urange, vrange = utils.graphdata2tensors(sp_mat, idtype, bipartite=True)
+    g = create_from_edges(sparse_fmt, arrays, utype, etype, vtype, urange, vrange)
     if eweight_name is not None:
         g.edata[eweight_name] = F.tensor(sp_mat.data)
     return g.to(device)
@@ -1255,10 +1305,10 @@ def from_networkx(nx_graph,
     if not nx_graph.is_directed():
         nx_graph = nx_graph.to_directed()
 
-    u, v, urange, vrange = utils.graphdata2tensors(
+    (sparse_fmt, arrays), urange, vrange = utils.graphdata2tensors(
         nx_graph, idtype, edge_id_attr_name=edge_id_attr_name)
 
-    g = create_from_edges(u, v, '_N', '_E', '_N', urange, vrange)
+    g = create_from_edges(sparse_fmt, arrays, '_N', '_E', '_N', urange, vrange)
 
     # nx_graph.edges(data=True) returns src, dst, attr_dict
     has_edge_id = nx_graph.number_of_edges() > 0 and edge_id_attr_name is not None
@@ -1450,12 +1500,12 @@ def bipartite_from_networkx(nx_graph,
     bottom_map = {n : i for i, n in enumerate(bottom_nodes)}
 
     # Get the node tensors and the number of nodes
-    u, v, urange, vrange = utils.graphdata2tensors(
+    (sparse_fmt, arrays), urange, vrange = utils.graphdata2tensors(
         nx_graph, idtype, bipartite=True,
         edge_id_attr_name=edge_id_attr_name,
         top_map=top_map, bottom_map=bottom_map)
 
-    g = create_from_edges(u, v, utype, etype, vtype, urange, vrange)
+    g = create_from_edges(sparse_fmt, arrays, utype, etype, vtype, urange, vrange)
 
     # nx_graph.edges(data=True) returns src, dst, attr_dict
     has_edge_id = nx_graph.number_of_edges() > 0 and edge_id_attr_name is not None
@@ -1586,7 +1636,7 @@ DGLHeteroGraph.to_networkx = to_networkx
 # Internal APIs
 ############################################################
 
-def create_from_edges(u, v,
+def create_from_edges(sparse_fmt, arrays,
                       utype, etype, vtype,
                       urange, vrange,
                       validate=True,
@@ -1598,10 +1648,10 @@ def create_from_edges(u, v,
 
     Parameters
     ----------
-    u : Tensor
-        Source node IDs.
-    v : Tensor
-        Dest node IDs.
+    sparse_fmt : str
+        The sparse adjacency matrix format.
+    arrays : tuple[Tensor]
+        The sparse adjacency matrix arrays.
     utype : str
         Source node type name.
     etype : str
@@ -1628,23 +1678,30 @@ def create_from_edges(u, v,
     DGLHeteroGraph
     """
     if validate:
-        if urange is not None and len(u) > 0 and \
-            urange <= F.as_scalar(F.max(u, dim=0)):
-            raise DGLError('Invalid node id {} (should be less than cardinality {}).'.format(
-                urange, F.as_scalar(F.max(u, dim=0))))
-        if vrange is not None and len(v) > 0 and \
-            vrange <= F.as_scalar(F.max(v, dim=0)):
-            raise DGLError('Invalid node id {} (should be less than cardinality {}).'.format(
-                vrange, F.as_scalar(F.max(v, dim=0))))
+        urange_inferred, vrange_inferred = utils.infer_num_nodes(
+            (sparse_fmt, arrays), utype != vtype)
+        if urange < urange_inferred:
+            raise DGLError('Source node IDs should be less than cardinality {}.'.format(
+                urange))
+        if vrange < vrange_inferred:
+            raise DGLError('Destination node IDs should be less than cardinality {}.'.format(
+                vrange))
 
     if utype == vtype:
         num_ntypes = 1
     else:
         num_ntypes = 2
 
-    hgidx = heterograph_index.create_unitgraph_from_coo(
-        num_ntypes, urange, vrange, u, v, ['coo', 'csr', 'csc'],
-        row_sorted, col_sorted)
+    if sparse_fmt == 'coo':
+        u, v = arrays
+        hgidx = heterograph_index.create_unitgraph_from_coo(
+            num_ntypes, urange, vrange, u, v, ['coo', 'csr', 'csc'],
+            row_sorted, col_sorted)
+    else:   # 'csr' or 'csc'
+        indptr, indices, eids = arrays
+        hgidx = heterograph_index.create_unitgraph_from_csr(
+            num_ntypes, urange, vrange, indptr, indices, eids, ['coo', 'csr', 'csc'],
+            sparse_fmt == 'csc')
     if utype == vtype:
         return DGLHeteroGraph(hgidx, [utype], [etype])
     else:
