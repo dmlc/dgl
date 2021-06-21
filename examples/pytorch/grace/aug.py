@@ -18,7 +18,7 @@ def drop_edge(graph, drop_prob):
     masks = th.bernoulli(1 - mask_rates)
     edge_idx = masks.nonzero().squeeze(1)
 
-    sg = dgl.edge_subgraph(graph, edge_idx, preserve_nodes=True)
+    sg = dgl.edge_subgraph(graph, edge_idx, relabel_nodes=False)
     
     return sg
 
