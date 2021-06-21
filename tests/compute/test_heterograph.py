@@ -1299,11 +1299,11 @@ def test_subgraph(idtype):
         # TODO(minjie): enable this later
         sg1_graph = g_graph.edge_subgraph([1])
         _check_subgraph_single_ntype(g_graph, sg1_graph)
-        sg1_graph = g_graph.edge_subgraph([1], preserve_nodes=True)
+        sg1_graph = g_graph.edge_subgraph([1], relabel_nodes=False)
         _check_subgraph_single_ntype(g_graph, sg1_graph, True)
         sg2_bipartite = g_bipartite.edge_subgraph([0, 1])
         _check_subgraph_single_etype(g_bipartite, sg2_bipartite)
-        sg2_bipartite = g_bipartite.edge_subgraph([0, 1], preserve_nodes=True)
+        sg2_bipartite = g_bipartite.edge_subgraph([0, 1], relabel_nodes=False)
         _check_subgraph_single_etype(g_bipartite, sg2_bipartite, True)
 
     def _check_typed_subgraph1(g, sg):
