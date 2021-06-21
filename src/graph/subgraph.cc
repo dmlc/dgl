@@ -28,6 +28,7 @@ HeteroSubgraph InEdgeGraphRelabelNodes(
 
 HeteroSubgraph InEdgeGraphNoRelabelNodes(
     const HeteroGraphPtr graph, const std::vector<IdArray>& vids) {
+  // TODO(mufei): This should also use EdgeSubgraph once it is supported for CSR graphs
   CHECK_EQ(vids.size(), graph->NumVertexTypes())
     << "Invalid input: the input list size must be the same as the number of vertex types.";
   std::vector<HeteroGraphPtr> subrels(graph->NumEdgeTypes());
@@ -91,6 +92,7 @@ HeteroSubgraph OutEdgeGraphRelabelNodes(
 
 HeteroSubgraph OutEdgeGraphNoRelabelNodes(
     const HeteroGraphPtr graph, const std::vector<IdArray>& vids) {
+  // TODO(mufei): This should also use EdgeSubgraph once it is supported for CSR graphs
   CHECK_EQ(vids.size(), graph->NumVertexTypes())
     << "Invalid input: the input list size must be the same as the number of vertex types.";
   std::vector<HeteroGraphPtr> subrels(graph->NumEdgeTypes());
