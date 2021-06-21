@@ -1959,7 +1959,7 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
     Parameters
     ----------
     graph : DGLGraph
-        The graph.
+        The graph.  Can be either on CPU or GPU.
     dst_nodes : Tensor or dict[str, Tensor], optional
         The list of destination nodes.
 
