@@ -6,7 +6,7 @@ For stochastic subgraph extraction, please see functions under :mod:`dgl.samplin
 from collections.abc import Mapping
 
 from ._ffi.function import _init_api
-from .base import DGLError
+from .base import DGLError, dgl_warning
 from . import backend as F
 from . import graph_index
 from . import heterograph_index
@@ -275,8 +275,9 @@ def edge_subgraph(graph, edges, *, relabel_nodes=True, store_ids=True, **depreca
     node_subgraph
     """
     if len(deprecated_kwargs) != 0:
-        raise DGLError("Key word argument preserve_nodes is deprecated. "
-                       "Use relabel_nodes instead.")
+        dgl_warning(
+            "Key word argument preserve_nodes is deprecated. Use relabel_nodes instead.")
+        relabel_nodes = not deprecated_kwargs.get('preserve_nodes')
     if graph.is_block and relabel_nodes:
         raise DGLError('Extracting subgraph from a block graph is not allowed.')
     if not isinstance(edges, Mapping):
@@ -305,10 +306,10 @@ def in_subgraph(graph, nodes, *, relabel_nodes=False, store_ids=True):
     """Return the subgraph induced on the inbound edges of all the edge types of the
     given nodes.
 
-    An edge-induced subgraph is equivalent to creating a new graph using the given edges.
-    In addition to extracting the subgraph, DGL also copies the features of the extracted
-    nodes and edges to the resulting graph. The copy is *lazy* and incurs data movement
-    only when needed.
+    An in subgraph is equivalent to creating a new graph using the incoming edges of the
+    given nodes. In addition to extracting the subgraph, DGL also copies the features of
+    the extracted nodes and edges to the resulting graph. The copy is *lazy* and incurs
+    data movement only when needed.
 
     If the graph is heterogeneous, DGL extracts a subgraph per relation and composes
     them as the resulting graph. Thus, the resulting graph has the same set of relations
@@ -430,10 +431,10 @@ def out_subgraph(graph, nodes, *, relabel_nodes=False, store_ids=True):
     """Return the subgraph induced on the outbound edges of all the edge types of the
     given nodes.
 
-    An edge-induced subgraph is equivalent to creating a new graph using the given edges.
-    In addition to extracting the subgraph, DGL also copies the features of the extracted
-    nodes and edges to the resulting graph. The copy is *lazy* and incurs data movement
-    only when needed.
+    An out subgraph is equivalent to creating a new graph using the outcoming edges of
+    the given nodes. In addition to extracting the subgraph, DGL also copies the features
+    of the extracted nodes and edges to the resulting graph. The copy is *lazy* and incurs
+    data movement only when needed.
 
     If the graph is heterogeneous, DGL extracts a subgraph per relation and composes
     them as the resulting graph. Thus, the resulting graph has the same set of relations
