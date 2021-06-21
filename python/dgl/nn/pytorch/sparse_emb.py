@@ -335,11 +335,40 @@ class NodeEmbedding: # NodeEmbedding
         """
         return self._tensor
 
-    def gather_embedding(self):
-        """Return a copy of the embedding stored in CPU memory. If this is a
+    def all_set_embedding(self, values):
+        """ Set the values of the embedding. This method must be called by all
+        processes sharing the embedding with identical tensors for
+        :attr:`values`.
+
+        NOTE: This method must be called by all processes sharing the
+        embedding, or it may result in a deadlock.
+
+        Parameters
+        ----------
+        values : Tensor
+            The global tensor to pull values from.
+        """
+        if self._partition:
+            idxs = F.copy_to(
+                self._partition.get_local_indices(
+                    self._comm.rank(),
+                    ctx=F.context(self._tensor)),
+                F.context(values))
+            self._tensor[:] = F.copy_to(F.gather_row(values, idxs),
+                                        ctx=F.context(self._tensor))[:]
+        else:
+            if self._rank == 0:
+                self._tensor[:] = F.copy_to(values,
+                                            ctx=F.context(self._tensor))[:]
+
+    def all_get_embedding(self):
+        """ Return a copy of the embedding stored in CPU memory. If this is a
         multi-processing instance, the tensor will be returned in shared
         memory. If the embedding is currently stored on multiple GPUs, all
         processes must call this method in the same order.
+
+        NOTE: This method must be called by all processes sharing the
+        embedding, or it may result in a deadlock.
 
         Returns
         -------
