@@ -106,7 +106,7 @@ class FraudDataset(DGLBuiltinDataset):
 
         graph_data = {}
         for relation in self.relations[self.name]:
-            sparse_fmt, arrays = graphdata2tensors(data[relation])
+            (sparse_fmt, arrays), _, _ = graphdata2tensors(data[relation])
             graph_data[(self.node_name[self.name], relation, self.node_name[self.name])] = (sparse_fmt, arrays)
         g = heterograph(graph_data)
 
