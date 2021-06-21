@@ -360,6 +360,8 @@ class NodeEmbedding: # NodeEmbedding
             if self._rank == 0:
                 self._tensor[:] = F.copy_to(values,
                                             ctx=F.context(self._tensor))[:]
+        if th.distributed.is_initialized():
+            th.distributed.barrier()
 
     def all_get_embedding(self):
         """ Return a copy of the embedding stored in CPU memory. If this is a

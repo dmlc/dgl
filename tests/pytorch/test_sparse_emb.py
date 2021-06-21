@@ -58,6 +58,8 @@ def test_multiprocess_sparse_emb_get_set(num_workers):
 
     for p in worker_list:
         p.join()
+    for p in worker_list:
+        assert p.exitcode == 0
 
 
 if __name__ == '__main__':
