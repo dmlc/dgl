@@ -369,6 +369,7 @@ void CusparseCsrmm2Hetero(
   CUSPARSE_CALL(cusparseCreateMatDescr(&descr));
   CUSPARSE_CALL(cusparseSetMatType(descr, CUSPARSE_MATRIX_TYPE_GENERAL));
   CUSPARSE_CALL(cusparseSetMatIndexBase(descr, CUSPARSE_INDEX_BASE_ZERO));
+  CHECK_EQ(sizeof(IdType), sizeof(int32_t));
   CUSPARSE_CALL(Xcsrmm2<DType>(
       thr_entry->cusparse_handle,
       CUSPARSE_OPERATION_NON_TRANSPOSE,
