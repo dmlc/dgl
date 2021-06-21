@@ -8,8 +8,10 @@ from .. import backend as F
 __all__ = ['gspmm']
 
 def reshape_lhs_rhs(lhs_data, rhs_data):
-    r""" Reshape the dimension of lhs and rhs data to avoid broadcasting
-    issues with different number of dimensions.
+    r""" Expand dims so that there will be no broadcasting issues with different
+    number of dimensions. For example, given two shapes (N, 3, 1), (E, 5, 3, 4)
+    that are valid broadcastable shapes, change them to (N, 1, 3, 1) and
+    (E, 5, 3, 4)
 
     Parameters
     ----------
@@ -70,20 +72,7 @@ def gspmm(g, op, reduce_op, lhs_data, rhs_data):
     use_e = op != 'copy_lhs'
     if g._graph.number_of_etypes() == 1:
         if op not in ['copy_lhs', 'copy_rhs']:
-            # Expand dims so that there will be no broadcasting issues with different
-            # number of dimensions. For example, given two shapes (N, 3, 1), (E, 5, 3, 4)
-            # that are valid broadcastable shapes, change them to (N, 1, 3, 1) and
-            # (E, 5, 3, 4)
-            lhs_shape = F.shape(lhs_data)
-            rhs_shape = F.shape(rhs_data)
-            if len(lhs_shape) != len(rhs_shape):
-                max_ndims = max(len(lhs_shape), len(rhs_shape))
-                lhs_pad_ndims = max_ndims - len(lhs_shape)
-                rhs_pad_ndims = max_ndims - len(rhs_shape)
-                new_lhs_shape = (lhs_shape[0],) + (1,) * lhs_pad_ndims + lhs_shape[1:]
-                new_rhs_shape = (rhs_shape[0],) + (1,) * rhs_pad_ndims + rhs_shape[1:]
-                lhs_data = F.reshape(lhs_data, new_lhs_shape)
-                rhs_data = F.reshape(rhs_data, new_rhs_shape)
+            lhs_data, rhs_data = reshape_lhs_rhs(lhs_data, rhs_data)
         # With max and min reducers infinity will be returned for zero degree nodes
         ret = gspmm_internal(g._graph, op,
                              'sum' if reduce_op == 'mean' else reduce_op,
@@ -125,7 +114,11 @@ def gspmm(g, op, reduce_op, lhs_data, rhs_data):
 
     # TODO (Israt): Add support for 'mean' in heterograph
     # divide in degrees for mean reducer.
+
     if reduce_op == 'mean':
+        if g._graph.number_of_etypes() > 1:
+            raise NotImplementedError("Reduce op 'mean' is not supported in "
+                                      "the new heterograph API. Use multi_update_all().")
         ret_shape = F.shape(ret)
         deg = g.in_degrees()
         deg = F.astype(F.clamp(deg, 1, max(g.number_of_edges(), 1)), F.dtype(ret))
