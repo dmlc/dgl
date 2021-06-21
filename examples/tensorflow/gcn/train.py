@@ -3,7 +3,6 @@ import time
 import numpy as np
 import tensorflow as tf
 import dgl
-from dgl.data import register_data_args
 from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
 from gcn import GCN
 
@@ -19,14 +18,14 @@ def evaluate(model, features, labels, mask):
 
 def main(args):
     # load and preprocess dataset
-    if args.dataset_name == 'cora':
+    if args.dataset == 'cora':
         data = CoraGraphDataset()
-    elif args.dataset_name == 'citeseer':
+    elif args.dataset == 'citeseer':
         data = CiteseerGraphDataset()
-    elif args.dataset_name == 'pubmed':
+    elif args.dataset == 'pubmed':
         data = PubmedGraphDataset()
     else:
-        raise ValueError('Unknown dataset: {}'.format(args.dataset_name))
+        raise ValueError('Unknown dataset: {}'.format(args.dataset))
 
     g = data[0]
     if args.gpu < 0:
@@ -115,9 +114,8 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GCN')
-    register_data_args(parser)
-    parser.add_argument("--dataset_name", type=str, default="cora",
-                        help="dataset name")
+    parser.add_argument("--dataset", type=str, default="cora",
+                        help="Dataset name ('cora', 'citeseer', 'pubmed').")
     parser.add_argument("--dropout", type=float, default=0.5,
                         help="dropout probability")
     parser.add_argument("--gpu", type=int, default=-1,
