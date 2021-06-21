@@ -93,8 +93,7 @@ def gspmm(g, op, reduce_op, lhs_data, rhs_data):
             tag = srctype, etype, dsttype
             lhs_data = lhs_data_dict[srctype] if use_u else None
             rhs_data = rhs_data_dict[tag] if use_e else None
-            if op not in ['copy_lhs', 'copy_rhs']:
-                lhs_data, rhs_data = reshape_lhs_rhs(lhs_data, rhs_data)
+            # TODO(Israt): Reshape lhs and rhs data for binary operations
             lhs_list[src_id] = lhs_data
             rhs_list[etid] = rhs_data
 
