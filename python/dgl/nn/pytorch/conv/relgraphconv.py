@@ -342,7 +342,7 @@ class RelGraphConv(nn.Module):
                 # list, where each element is the number of edges of the type.
                 # Sort the graph based on the etypes
                 sorted_etypes, index = th.sort(etypes)
-                g = edge_subgraph(g, index, preserve_nodes=True)
+                g = edge_subgraph(g, index, relabel_nodes=False)
                 # Create a new etypes to be an integer list of number of edges.
                 pos = _searchsorted(sorted_etypes, th.arange(self.num_rels, device=g.device))
                 num = th.tensor([len(etypes)], device=g.device)
