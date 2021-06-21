@@ -529,7 +529,7 @@ def create_block(data_dict, num_src_nodes=None, num_dst_nodes=None, idtype=None,
     # Convert all data to node tensors first
     node_tensor_dict = {}
     for (sty, ety, dty), data in data_dict.items():
-        (sparse_fmt, arrays ), urange, vrange = utils.graphdata2tensors(
+        (sparse_fmt, arrays), urange, vrange = utils.graphdata2tensors(
             data, idtype, bipartite=True)
         node_tensor_dict[(sty, ety, dty)] = (sparse_fmt, arrays)
         if need_infer:
@@ -1082,11 +1082,6 @@ def from_scipy(sp_mat,
         raise DGLError('Expect the number of rows to be the same as the number of columns for '
                        'sp_mat, got {:d} and {:d}.'.format(num_rows, num_cols))
 
-    if sp_mat.format in ['csr', 'csc']:
-        data = (sp_mat.format, (sp_mat.indptr, sp_mat.indices, np.array([], dtype=sp_mat.indptr.dtype)))
-    else:
-        sp_mat = sp_mat.tocoo()
-        data = (sp_mat.format, (sp_mat.row, sp_mat.col))
     (sparse_fmt, arrays), urange, vrange = utils.graphdata2tensors(sp_mat, idtype)
     g = create_from_edges(sparse_fmt, arrays, '_N', '_E', '_N', urange, vrange)
     if eweight_name is not None:
@@ -1181,11 +1176,6 @@ def bipartite_from_scipy(sp_mat,
     heterograph
     bipartite_from_networkx
     """
-    if sp_mat.format in ['csr', 'csc']:
-        data = (sp_mat.format, (sp_mat.indptr, sp_mat.indices, np.array([], dtype=sp_mat.indptr.dtype)))
-    else:
-        sp_mat = sp_mat.tocoo()
-        data = (sp_mat.format, (sp_mat.row, sp_mat.col))
     (sparse_fmt, arrays), urange, vrange = utils.graphdata2tensors(sp_mat, idtype, bipartite=True)
     g = create_from_edges(sparse_fmt, arrays, utype, etype, vtype, urange, vrange)
     if eweight_name is not None:

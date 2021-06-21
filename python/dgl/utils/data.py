@@ -161,6 +161,7 @@ def graphdata2tensors(data, idtype=None, bipartite=False, **kwargs):
         # preferred default idtype is int64
         # if data is tensor and idtype is None, infer the idtype from tensor
         idtype = F.int64
+    checks.check_valid_idtype(idtype)
 
     if isinstance(data, SparseAdjTuple) and (not all(F.is_tensor(a) for a in data.arrays)):
         # (Iterable, Iterable) type data, convert it to (Tensor, Tensor)
