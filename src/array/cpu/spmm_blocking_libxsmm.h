@@ -378,97 +378,8 @@ inline void SpMMFreeBlocks(
   free(block_csr_array);
 }
 
-template <typename IdType, typename DType, typename Op>
-void SpMMSumCsrOpt(
-	const BcastOff& bcast,
-    const CSRMatrix& csr,
-    NDArray ufeat, NDArray efeat,
-    NDArray out) {
-
-  int32_t LLC_SIZE = get_llc_size();
-
-#ifdef DEBUG
-  uint64_t startTick, endTick;
-  startTick = __rdtsc();
-#endif
-
-  const bool has_idx = !IsNullArray(csr.data);
-
-  DType* C = out.Ptr<DType>();
-  DType* B = ufeat.Ptr<DType>();
-  DType* E = efeat.Ptr<DType>();
-
-  int nthreads = omp_get_max_threads();
-  const IdType M = csr.num_rows;
-  const IdType N = bcast.out_len;
-  const IdType K = csr.num_cols;
-  IdType* IndPtr = csr.indptr.Ptr<IdType>();
-  assert(IndPtr != nullptr);
-  int total_nnz = IndPtr[M];
-  if(M <= 0 || K <= 0 || N <= 0 || total_nnz <= 0) return;
-
-  float avgDegree = total_nnz * 1.0 / M;
-  float nnz_prob = avgDegree / K;
-
-  IdType K_BLOCK_SIZE = LLC_SIZE / (N * sizeof(DType) * nnz_prob * 500);
-  IdType M_BLOCK_SIZE = M / (nthreads * 20);
-  if (M_BLOCK_SIZE == 0) M_BLOCK_SIZE = 1;
-  if (K_BLOCK_SIZE == 0) K_BLOCK_SIZE = 1;
-
-  IdType num_M_blocks = (M + M_BLOCK_SIZE - 1) / M_BLOCK_SIZE;
-  IdType num_K_blocks = (K + K_BLOCK_SIZE - 1) / K_BLOCK_SIZE;
-
-  CSRM<IdType, IdType> *block_csr_array = (CSRM<IdType, IdType> *)aligned_alloc(64, sizeof(CSRM<IdType, IdType>) * num_M_blocks * num_K_blocks);
-
-#ifdef DEBUG
-  endTick = __rdtsc();
-  LOG(INFO) << "spmmsumcsr nthreads = " << nthreads << ", LLC_SIZE = " << LLC_SIZE;
-  LOG(INFO) << "M = " << M << ", K = " << K << ", N = " << N << ", use_lhs = " << Op::use_lhs << ", use_rhs = " << Op::use_rhs;
-  LOG(INFO) << "total_nnz = " << total_nnz << ", avgDegree = " << avgDegree;
-  LOG(INFO) << "has_idx = " << has_idx;
-  LOG(INFO) << "nnz_prob = " << nnz_prob;
-  LOG(INFO) << "K_BLOCK_SIZE = " << K_BLOCK_SIZE << ", M_BLOCK_SIZE = " << M_BLOCK_SIZE;
-  LOG(INFO) << "num_K_blocks = " << num_K_blocks << ", num_M_blocks = " << num_M_blocks;
-  LOG(INFO) << "stage0 ticks = " << (endTick - startTick);
-  startTick = __rdtsc();
-#endif
-
-  SpMMCreateBlocks(csr, block_csr_array, num_M_blocks, num_K_blocks, M_BLOCK_SIZE, K_BLOCK_SIZE, C, N, Op::use_lhs, Op::use_rhs);
-
-#ifdef DEBUG
-  endTick = __rdtsc();
-  LOG(INFO) << "stage1 ticks = " << (endTick - startTick);
-  startTick = __rdtsc();
-#endif
-
-  int _ld = N;
-  libxsmm_meltwfunction_opreduce_vecs_idx kernel = nullptr;
-  kernel = SpMMCreateLibxsmmKernel<IdType, DType, Op>(has_idx, N, _ld, LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_REDOP_SUM, false);
-
-#ifdef DEBUG
-  endTick = __rdtsc();
-  LOG(INFO) << "stage2 ticks = " << (endTick - startTick);
-  startTick = __rdtsc();
-#endif
-
-  SpMMBlockwiseOpSum(block_csr_array, B, E, C, has_idx, N, num_M_blocks, num_K_blocks, M_BLOCK_SIZE, kernel);
-
-#ifdef DEBUG
-  endTick = __rdtsc();
-  LOG(INFO) << "stage3 ticks = " << (endTick - startTick);
-  startTick = __rdtsc();
-#endif
-
-  SpMMFreeBlocks(block_csr_array, num_M_blocks, num_K_blocks, Op::use_lhs, Op::use_rhs);
-
-#ifdef DEBUG
-  endTick = __rdtsc();
-  LOG(INFO) << "stage4 ticks = " << (endTick - startTick);
-#endif
-}
- 
-template <typename IdType, typename DType, typename Op, typename Cmp>
-void SpMMCmpCsrOpt(
+template <typename IdType, typename DType, typename Op, typename Redop>
+void SpMMRedopCsrOpt(
     const BcastOff& bcast,
     const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat,
@@ -487,8 +398,12 @@ void SpMMCmpCsrOpt(
   DType* C = out.Ptr<DType>();
   DType* B = ufeat.Ptr<DType>();
   DType* E = efeat.Ptr<DType>();
-  IdType *argB = argu.Ptr<IdType>();
-  IdType *argE = arge.Ptr<IdType>();
+  IdType *argB, *argE;
+  if(std::is_same<Redop, op::Max<DType>>::value || std::is_same<Redop, op::Min<DType>>::value)
+  {
+    argB = argu.Ptr<IdType>();
+    argE = arge.Ptr<IdType>();
+  }
 
   int nthreads = omp_get_max_threads();
   const IdType M = csr.num_rows;
@@ -514,7 +429,19 @@ void SpMMCmpCsrOpt(
 
 #ifdef DEBUG
   endTick = __rdtsc();
-  LOG(INFO) << "spmmcmpcsr nthreads = " << nthreads << ", LLC_SIZE = " << LLC_SIZE;
+  if(std::is_same<Redop, op::Max<DType>>::value)
+  {
+    LOG(INFO) << "Redop = Max";
+  }
+  else if(std::is_same<Redop, op::Min<DType>>::value)
+  {
+    LOG(INFO) << "Redop = Min";
+  }
+  else if(std::is_same<Redop, op::Add<DType>>::value)
+  {
+    LOG(INFO) << "Redop = Add";
+  }
+  LOG(INFO) << "nthreads = " << nthreads << ", LLC_SIZE = " << LLC_SIZE;
   LOG(INFO) << "M = " << M << ", K = " << K << ", N = " << N << ", use_lhs = " << Op::use_lhs << ", use_rhs = " << Op::use_rhs;
   LOG(INFO) << "total_nnz = " << total_nnz << ", avgDegree = " << avgDegree;
   LOG(INFO) << "has_idx = " << has_idx;
@@ -535,13 +462,17 @@ void SpMMCmpCsrOpt(
 
   int _ld = N;
   libxsmm_meltwfunction_opreduce_vecs_idx kernel = nullptr;
-  if(std::is_same<Cmp, op::Max<DType>>::value)
+  if(std::is_same<Redop, op::Max<DType>>::value)
   {
     kernel = SpMMCreateLibxsmmKernel<IdType, DType, Op>(has_idx, N, _ld, LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_REDOP_MAX, true);
   }
-  else
+  else if(std::is_same<Redop, op::Min<DType>>::value)
   {
     kernel = SpMMCreateLibxsmmKernel<IdType, DType, Op>(has_idx, N, _ld, LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_REDOP_MIN, true);
+  }
+  else if(std::is_same<Redop, op::Add<DType>>::value)
+  {
+    kernel = SpMMCreateLibxsmmKernel<IdType, DType, Op>(has_idx, N, _ld, LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_REDOP_SUM, false);
   }
 
 #ifdef DEBUG
@@ -550,7 +481,14 @@ void SpMMCmpCsrOpt(
   startTick = __rdtsc();
 #endif
 
-  SpMMBlockwiseOpCmp<IdType, DType, Op, Cmp>(block_csr_array, B, E, C, argB, argE, has_idx, N, num_M_blocks, num_K_blocks, M_BLOCK_SIZE, kernel);
+  if(std::is_same<Redop, op::Max<DType>>::value || std::is_same<Redop, op::Min<DType>>::value)
+  {
+    SpMMBlockwiseOpCmp<IdType, DType, Op, Redop>(block_csr_array, B, E, C, argB, argE, has_idx, N, num_M_blocks, num_K_blocks, M_BLOCK_SIZE, kernel);
+  }
+  else
+  {
+    SpMMBlockwiseOpSum(block_csr_array, B, E, C, has_idx, N, num_M_blocks, num_K_blocks, M_BLOCK_SIZE, kernel);
+  }
 
 #ifdef DEBUG
   endTick = __rdtsc();
@@ -564,6 +502,28 @@ void SpMMCmpCsrOpt(
   endTick = __rdtsc();
   LOG(INFO) << "stage4 ticks = " << (endTick - startTick);
 #endif
+}
+
+template <typename IdType, typename DType, typename Op>
+void SpMMSumCsrOpt(
+	const BcastOff& bcast,
+    const CSRMatrix& csr,
+    NDArray ufeat, NDArray efeat,
+    NDArray out) {
+  
+  NDArray dummy;
+  SpMMRedopCsrOpt<IdType, DType, Op, op::Add<DType>>(bcast, csr, ufeat, efeat, out, dummy, dummy);
+}
+ 
+template <typename IdType, typename DType, typename Op, typename Cmp>
+void SpMMCmpCsrOpt(
+    const BcastOff& bcast,
+    const CSRMatrix& csr,
+    NDArray ufeat, NDArray efeat,
+    NDArray out,
+    NDArray argu, NDArray arge) {
+
+  SpMMRedopCsrOpt<IdType, DType, Op, Cmp>(bcast, csr, ufeat, efeat, out, argu, arge);
 }
 
 }  // namespace cpu
