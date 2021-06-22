@@ -1,7 +1,7 @@
 import unittest
 import backend as F
 import dgl
-from dgl.distributed.multi_gpu_tensor import MultiGPUTensor
+from dgl.contrib.multi_gpu_tensor import MultiGPUTensor
 
 
 class DummyCommunicator:
@@ -26,10 +26,10 @@ def test_get_global_1part():
     t = F.copy_to(F.tensor([[1,2,3],[4,5,6],[7,8,9],[10,11,12]]), F.ctx())
     comm = DummyCommunicator(0, 1)
     mt = MultiGPUTensor(t.shape, t.dtype, F.ctx(), comm)
-    mt.set_global(t)
+    mt.all_set_global(t)
 
     idxs = F.copy_to(F.tensor([1,3], dtype=F.int64), ctx=F.ctx())
-    act = mt.get_global(idxs)
+    act = mt.all_gather_row(idxs)
     exp = F.gather_row(t, idxs)
 
     assert F.array_equal(exp, act)
@@ -40,10 +40,10 @@ def test_get_global_3part():
     t = F.copy_to(F.tensor([[1,2,3],[4,5,6],[7,8,9],[10,11,12]]), F.ctx())
     comm = DummyCommunicator(2, 3)
     mt = MultiGPUTensor(t.shape, t.dtype, F.ctx(), comm)
-    mt.set_global(t)
+    mt.all_set_global(t)
 
     idxs = F.copy_to(F.tensor([2], dtype=F.int64), ctx=F.ctx())
-    act = mt.get_global(idxs)
+    act = mt.all_gather_row(idxs)
     exp = F.gather_row(t, idxs)
 
     assert F.array_equal(exp, act)
@@ -54,7 +54,7 @@ def test_get_local_1part():
     t = F.copy_to(F.tensor([[1,2,3],[4,5,6],[7,8,9],[10,11,12]]), F.ctx())
     comm = DummyCommunicator(0, 1)
     mt = MultiGPUTensor(t.shape, t.dtype, F.ctx(), comm)
-    mt.set_global(t)
+    mt.all_set_global(t)
 
     act = mt.get_local()
     exp = t
@@ -67,7 +67,7 @@ def test_get_local_3part():
     t = F.copy_to(F.tensor([[1,2,3],[4,5,6],[7,8,9],[10,11,12]]), F.ctx())
     comm = DummyCommunicator(2, 3)
     mt = MultiGPUTensor(t.shape, t.dtype, F.ctx(), comm)
-    mt.set_global(t)
+    mt.all_set_global(t)
 
     act = mt.get_local()
     exp = F.gather_row(t, F.tensor([2], dtype=F.int64))

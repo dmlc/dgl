@@ -6,7 +6,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 import dgl.multiprocessing as mp
 import dgl.nn.pytorch as dglnn
-from dgl.distributed.multi_gpu_tensor import MultiGPUTensor
+from dgl.contrib.multi_gpu_tensor import MultiGPUTensor
 from dgl.cuda import nccl
 import time
 import math
@@ -41,7 +41,7 @@ def evaluate(model, g, nfeat, labels, val_nid, device):
 def distribute_tensor(tensor, device, comm):
     dist_tensor = MultiGPUTensor(tensor.shape, tensor.dtype, device,
         comm)
-    dist_tensor.set_global(tensor)
+    dist_tensor.all_set_global(tensor)
     return dist_tensor
 
 def load_subtensor(nfeat, labels, seeds, input_nodes, dev_id):
@@ -50,13 +50,13 @@ def load_subtensor(nfeat, labels, seeds, input_nodes, dev_id):
     """
     if isinstance(nfeat, MultiGPUTensor):
         input_nodes = input_nodes.to(nfeat.get_local().device)
-        batch_inputs = nfeat.get_global(input_nodes).to(dev_id)
+        batch_inputs = nfeat.all_gather_row(input_nodes).to(dev_id)
     else:
         batch_inputs = nfeat[input_nodes].to(dev_id)
 
     if isinstance(labels, MultiGPUTensor):
         seeds = seeds.to(labels.get_local().device)
-        batch_labels = labels.get_global(seeds).to(dev_id)
+        batch_labels = labels.all_gather_row(seeds).to(dev_id)
     else:
         batch_labels = labels[seeds].to(dev_id)
 
