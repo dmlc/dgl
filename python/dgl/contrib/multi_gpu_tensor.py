@@ -63,7 +63,7 @@ class MultiGPUTensor:
         local_shape[0] = self._partition.local_size(self._comm.rank())
         self._tensor = F.zeros(local_shape, dtype, device)
 
-    def get_global(self, index):
+    def all_gather_row(self, index):
         """ Synchronously with all other GPUs the tensor is stored on, gather
         the rows associated with the given set of indices on this GPU.
         This function must be called in all processes.
@@ -81,7 +81,7 @@ class MultiGPUTensor:
         return self._comm.sparse_all_to_all_pull(
             index, self._tensor, self._partition)
 
-    def set_global(self, values):
+    def all_set_global(self, values):
         """ Set this process's portition of the global tensor. It will use the
         partition to select which rows of the global tensor should be stored in
         the current device.

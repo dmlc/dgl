@@ -5,7 +5,7 @@ from ...backend import pytorch as F
 from ...utils import get_shared_mem_array, create_shared_mem_array
 from ...cuda import nccl
 from ...partition import NDArrayPartition
-from ...distributed.multi_gpu_tensor import MultiGPUTensor
+from ...contrib.multi_gpu_tensor import MultiGPUTensor
 
 _STORE = None
 _COMM = None
@@ -164,7 +164,7 @@ class NodeEmbedding: # NodeEmbedding
             Target device to put the collected embeddings.
         """
         if isinstance(self._tensor, MultiGPUTensor):
-            emb = self._tensor.get_global(node_ids)
+            emb = self._tensor.all_gather_row(node_ids)
         else:
             emb = self._tensor[node_ids]
         emb = emb.to(device)
