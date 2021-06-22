@@ -164,7 +164,6 @@ class Column(object):
     def data(self, val):
         """Update the column data."""
         self.index = None
-        self.delay_indices = []
         self.storage = val
 
     def to(self, device, **kwargs): # pylint: disable=invalid-name
