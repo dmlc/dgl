@@ -337,6 +337,11 @@ We are currently in Beta stage.  More features and improvements are coming.
 
 1. [**Extract the Knowledge of Graph Neural Networks and Go Beyond it: An Effective Knowledge Distillation Framework**](https://arxiv.org/pdf/2103.02885.pdf), WWW'21, *Cheng Yang, Jiawei Liu, Chuan Shi*
 
+1. [**VIKING: Adversarial Attack on Network Embeddings via Supervised Network Poisoning**](https://arxiv.org/pdf/2102.07164.pdf), PAKDD'21, *Viresh Gupta, Tanmoy Chakraborty*
+
+1. [**Knowledge Graph Embedding using Graph Convolutional Networks with Relation-Aware Attention**](https://arxiv.org/pdf/2102.07200.pdf), *Nasrullah Sheikh, Xiao Qin, Berthold Reinwald, Christoph Miksovic, Thomas Gschwind, Paolo Scotton*
+
+
 </details>
 
 ## Installation

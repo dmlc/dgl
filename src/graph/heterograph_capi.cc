@@ -379,6 +379,8 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroVertexSubgraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     List<Value> vids = args[1];
+    bool relabel_nodes = args[2];
+    CHECK(relabel_nodes) << "Node subgraph only supports relabel_nodes=True.";
     std::vector<IdArray> vid_vec;
     vid_vec.reserve(vids.size());
     for (Value val : vids) {
@@ -649,8 +651,9 @@ DGL_REGISTER_GLOBAL("subgraph._CAPI_DGLInSubgraph")
 .set_body([] (DGLArgs args, DGLRetValue *rv) {
     HeteroGraphRef hg = args[0];
     const auto& nodes = ListValueToVector<IdArray>(args[1]);
+    bool relabel_nodes = args[2];
     std::shared_ptr<HeteroSubgraph> ret(new HeteroSubgraph);
-    *ret = InEdgeGraph(hg.sptr(), nodes);
+    *ret = InEdgeGraph(hg.sptr(), nodes, relabel_nodes);
     *rv = HeteroGraphRef(ret);
   });
 
@@ -658,8 +661,9 @@ DGL_REGISTER_GLOBAL("subgraph._CAPI_DGLOutSubgraph")
 .set_body([] (DGLArgs args, DGLRetValue *rv) {
     HeteroGraphRef hg = args[0];
     const auto& nodes = ListValueToVector<IdArray>(args[1]);
+    bool relabel_nodes = args[2];
     std::shared_ptr<HeteroSubgraph> ret(new HeteroSubgraph);
-    *ret = OutEdgeGraph(hg.sptr(), nodes);
+    *ret = OutEdgeGraph(hg.sptr(), nodes, relabel_nodes);
     *rv = HeteroGraphRef(ret);
   });
 
