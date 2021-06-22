@@ -782,6 +782,175 @@ TEST(DisjointUnionTest, TestDisjointUnionPartitionCsr) {
 }
 
 template <typename IdType>
+void _TestSliceContiguousChunkCoo(DLContext ctx) {
+  /*
+   * A = [[1, 0, 0, 0],
+   *      [0, 0, 1, 0],
+   *      [0, 0, 0, 0]]
+   *
+   * B = [[1, 0, 0],
+   *      [0, 0, 1]]
+   *
+   * C = [[0]]
+   *
+   */
+  IdArray a_row = aten::VecToIdArray(std::vector<IdType>({0, 1}), sizeof(IdType)*8, CTX);
+  IdArray a_col = aten::VecToIdArray(std::vector<IdType>({0, 2}), sizeof(IdType)*8, CTX);
+  const aten::COOMatrix &coo_a = aten::COOMatrix(
+    3,
+    4,
+    a_row,
+    a_col,
+    aten::NullArray(),
+    true,
+    false);
+
+  IdArray b_row = aten::VecToIdArray(std::vector<IdType>({0, 1}), sizeof(IdType)*8, CTX);
+  IdArray b_col = aten::VecToIdArray(std::vector<IdType>({0, 2}), sizeof(IdType)*8, CTX);
+  const aten::COOMatrix &coo_b_raw = aten::COOMatrix(
+    2,
+    3,
+    b_row,
+    b_col,
+    aten::NullArray(),
+    true,
+    false);
+
+  const std::vector<uint64_t> edge_range_b({0, 2});
+  const std::vector<uint64_t> src_vertex_range_b({0, 2});
+  const std::vector<uint64_t> dst_vertex_range_b({0, 3});
+  const aten::COOMatrix &coo_b = aten::COOSliceContiguousChunk(
+    coo_a,
+    edge_range_b,
+    src_vertex_range_b,
+    dst_vertex_range_b);
+  ASSERT_EQ(coo_b_raw.num_rows, coo_b.num_rows);
+  ASSERT_EQ(coo_b_raw.num_cols, coo_b.num_cols);
+  ASSERT_TRUE(ArrayEQ<IdType>(coo_b_raw.row, coo_b.row));
+  ASSERT_TRUE(ArrayEQ<IdType>(coo_b_raw.col, coo_b.col));
+  ASSERT_TRUE(coo_b.row_sorted);
+  ASSERT_FALSE(coo_b.col_sorted);
+
+  IdArray c_row = aten::VecToIdArray(std::vector<IdType>({}), sizeof(IdType)*8, CTX);
+  IdArray c_col = aten::VecToIdArray(std::vector<IdType>({}), sizeof(IdType)*8, CTX);
+  const aten::COOMatrix &coo_c_raw = aten::COOMatrix(
+    1,
+    1,
+    c_row,
+    c_col,
+    aten::NullArray(),
+    true,
+    false);
+
+  const std::vector<uint64_t> edge_range_c({2, 2});
+  const std::vector<uint64_t> src_vertex_range_c({2, 3});
+  const std::vector<uint64_t> dst_vertex_range_c({3, 4});
+  const aten::COOMatrix &coo_c = aten::COOSliceContiguousChunk(
+    coo_a,
+    edge_range_c,
+    src_vertex_range_c,
+    dst_vertex_range_c);
+  ASSERT_EQ(coo_c_raw.num_rows, coo_c.num_rows);
+  ASSERT_EQ(coo_c_raw.num_cols, coo_c.num_cols);
+  ASSERT_TRUE(ArrayEQ<IdType>(coo_c.row, c_row));
+  ASSERT_TRUE(ArrayEQ<IdType>(coo_c.col, c_col));
+  ASSERT_TRUE(coo_c.row_sorted);
+  ASSERT_FALSE(coo_c.col_sorted);
+}
+
+TEST(SliceContiguousChunk, TestSliceContiguousChunkCoo) {
+  _TestSliceContiguousChunkCoo<int32_t>(CPU);
+  _TestSliceContiguousChunkCoo<int64_t>(CPU);
+#ifdef DGL_USE_CUDA
+  _TestSliceContiguousChunkCoo<int32_t>(GPU);
+  _TestSliceContiguousChunkCoo<int64_t>(GPU);
+#endif
+}
+
+template <typename IdType>
+void _TestSliceContiguousChunkCsr(DLContext ctx) {
+  /*
+   * A = [[1, 0, 0, 0],
+   *      [0, 0, 1, 0],
+   *      [0, 0, 0, 0]]
+   *
+   * B = [[1, 0, 0],
+   *      [0, 0, 1]]
+   *
+   * C = [[0]]
+   *
+   */
+  IdArray a_indptr = aten::VecToIdArray(std::vector<IdType>({0, 1, 2, 2}), sizeof(IdType)*8, CTX);
+  IdArray a_indices = aten::VecToIdArray(std::vector<IdType>({0, 2}), sizeof(IdType)*8, CTX);
+  const aten::CSRMatrix &csr_a = aten::CSRMatrix(
+    3,
+    4,
+    a_indptr,
+    a_indices,
+    aten::NullArray(),
+    false);
+
+  IdArray b_indptr = aten::VecToIdArray(std::vector<IdType>({0, 1, 2}), sizeof(IdType)*8, CTX);
+  IdArray b_indices = aten::VecToIdArray(std::vector<IdType>({0, 2}), sizeof(IdType)*8, CTX);
+  const aten::CSRMatrix &csr_b_raw = aten::CSRMatrix(
+    2,
+    3,
+    b_indptr,
+    b_indices,
+    aten::NullArray(),
+    false);
+
+  const std::vector<uint64_t> edge_range_b({0, 2});
+  const std::vector<uint64_t> src_vertex_range_b({0, 2});
+  const std::vector<uint64_t> dst_vertex_range_b({0, 3});
+  const aten::CSRMatrix &csr_b = aten::CSRSliceContiguousChunk(
+    csr_a,
+    edge_range_b,
+    src_vertex_range_b,
+    dst_vertex_range_b);
+  ASSERT_EQ(csr_b.num_rows, csr_b_raw.num_rows);
+  ASSERT_EQ(csr_b.num_cols, csr_b_raw.num_cols);
+  ASSERT_TRUE(ArrayEQ<IdType>(csr_b.indptr, csr_b_raw.indptr));
+  ASSERT_TRUE(ArrayEQ<IdType>(csr_b.indices, csr_b_raw.indices));
+  ASSERT_FALSE(csr_b.sorted);
+
+  const std::vector<uint64_t> edge_range_c({2, 2});
+  const std::vector<uint64_t> src_vertex_range_c({2, 3});
+  const std::vector<uint64_t> dst_vertex_range_c({3, 4});
+  const aten::CSRMatrix &csr_c = aten::CSRSliceContiguousChunk(
+    csr_a,
+    edge_range_c,
+    src_vertex_range_c,
+    dst_vertex_range_c);
+
+  int64_t indptr_len = src_vertex_range_c[1] - src_vertex_range_c[0] + 1;
+  IdArray c_indptr = aten::Full(0, indptr_len, sizeof(IdType)*8, CTX);
+  IdArray c_indices = aten::VecToIdArray(std::vector<IdType>({}), sizeof(IdType)*8, CTX);
+  const aten::CSRMatrix &csr_c_raw = aten::CSRMatrix(
+    1,
+    1,
+    c_indptr,
+    c_indices,
+    aten::NullArray(),
+    false);
+
+  ASSERT_EQ(csr_c.num_rows, csr_c_raw.num_rows);
+  ASSERT_EQ(csr_c.num_cols, csr_c_raw.num_cols);
+  ASSERT_TRUE(ArrayEQ<IdType>(csr_c.indptr, c_indptr));
+  ASSERT_TRUE(ArrayEQ<IdType>(csr_c.indices, c_indices));
+  ASSERT_FALSE(csr_c.sorted);
+}
+
+TEST(SliceContiguousChunk, TestSliceContiguousChunkCsr) {
+  _TestSliceContiguousChunkCsr<int32_t>(CPU);
+  _TestSliceContiguousChunkCsr<int64_t>(CPU);
+#ifdef DGL_USE_CUDA
+  _TestSliceContiguousChunkCsr<int32_t>(GPU);
+  _TestSliceContiguousChunkCsr<int64_t>(GPU);
+#endif
+}
+
+template <typename IdType>
 void _TestMatrixUnionCsr(DLContext ctx) {
  /* 
   * A = [[0, 0, 0, 0],

@@ -31,10 +31,7 @@ def train_test_split_by_time(df, timestamp, user):
 def build_train_graph(g, train_indices, utype, itype, etype, etype_rev):
     train_g = g.edge_subgraph(
         {etype: train_indices, etype_rev: train_indices},
-        preserve_nodes=True)
-    # remove the induced node IDs - should be assigned by model instead
-    del train_g.nodes[utype].data[dgl.NID]
-    del train_g.nodes[itype].data[dgl.NID]
+        relabel_nodes=False)
 
     # copy features
     for ntype in g.ntypes:
