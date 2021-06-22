@@ -58,7 +58,7 @@ class RGAT(nn.Module):
             mfg = dgl.block_to_graph(mfg)
             x_skip = self.skips[i](x_dst)
             for j in range(self.num_etypes):
-                subg = mfg.edge_subgraph(mfg.edata['etype'] == j, preserve_nodes=True)
+                subg = mfg.edge_subgraph(mfg.edata['etype'] == j, relabel_nodes=False)
                 x_skip += self.convs[i][j](subg, (x, x_dst)).view(-1, self.hidden_channels)
             x = self.norms[i](x_skip)
             x = F.elu(x)
