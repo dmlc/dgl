@@ -12,6 +12,7 @@
 
 #include <dgl/array.h>
 #include <dgl/bcast.h>
+#include <dmlc/logging.h>
 #include <algorithm>
 
 #if !defined(_WIN32)
@@ -19,8 +20,7 @@
 #ifdef USE_LIBXSMM
 #include <unistd.h>
 #include <libxsmm.h>
-#define SPMM_LOG_INFO 0
-#if SPMM_LOG_INFO
+#ifdef DEBUG
 #include <x86intrin.h>
 #endif
 #include <omp.h>
@@ -247,8 +247,7 @@ inline libxsmm_meltwfunction_opreduce_vecs_idx SpMMCreateLibxsmmKernel(
     kernel = libxsmm_dispatch_meltw_opreduce_vecs_idx(N, &_ld, &_ld, LIBXSMM_DATATYPE_F32, LIBXSMM_DATATYPE_F32, (sizeof(IdType) == 8) ? LIBXSMM_DATATYPE_I64 : LIBXSMM_DATATYPE_I32, opredop_flags);
   if(kernel == nullptr)
   {
-    printf("Op-redop kernel is nullptr! Bailing...\n");
-    exit(-1);
+    LOG(FATAL) << "libxsmm Op-redop kernel is nullptr! Bailing...\n";
   }
   return kernel;
 }
@@ -388,7 +387,7 @@ void SpMMSumCsrOpt(
 
   int32_t LLC_SIZE = get_llc_size();
 
-#if SPMM_LOG_INFO
+#ifdef DEBUG
   uint64_t startTick, endTick;
   startTick = __rdtsc();
 #endif
@@ -420,50 +419,51 @@ void SpMMSumCsrOpt(
   IdType num_K_blocks = (K + K_BLOCK_SIZE - 1) / K_BLOCK_SIZE;
 
   CSRM<IdType, IdType> *block_csr_array = (CSRM<IdType, IdType> *)aligned_alloc(64, sizeof(CSRM<IdType, IdType>) * num_M_blocks * num_K_blocks);
-#if SPMM_LOG_INFO
-  endTick = __rdtsc();
-  printf("spmmsumcsr nthreads = %d, LLC_SIZE = %d\n", nthreads, LLC_SIZE);
-  printf("M = %d, K = %d, N = %d, use_lhs = %d, use_rhs = %d\n", M, K, N, Op::use_lhs, Op::use_rhs);
-  printf("total_nnz = %d, avgDegree = %f\n", total_nnz, avgDegree);
-  printf("has_idx = %d\n", has_idx);
-  printf("nnz_prob = %lf\n", nnz_prob);
-  printf("K_BLOCK_SIZE = %d, M_BLOCK_SIZE = %d\n", K_BLOCK_SIZE, M_BLOCK_SIZE);
-  printf("num_K_blocks = %d, num_M_blocks = %d\n", num_K_blocks, num_M_blocks);
-  printf("stage0: %ld ticks\n", endTick - startTick);
 
+#ifdef DEBUG
+  endTick = __rdtsc();
+  LOG(INFO) << "spmmsumcsr nthreads = " << nthreads << ", LLC_SIZE = " << LLC_SIZE;
+  LOG(INFO) << "M = " << M << ", K = " << K << ", N = " << N << ", use_lhs = " << Op::use_lhs << ", use_rhs = " << Op::use_rhs;
+  LOG(INFO) << "total_nnz = " << total_nnz << ", avgDegree = " << avgDegree;
+  LOG(INFO) << "has_idx = " << has_idx;
+  LOG(INFO) << "nnz_prob = " << nnz_prob;
+  LOG(INFO) << "K_BLOCK_SIZE = " << K_BLOCK_SIZE << ", M_BLOCK_SIZE = " << M_BLOCK_SIZE;
+  LOG(INFO) << "num_K_blocks = " << num_K_blocks << ", num_M_blocks = " << num_M_blocks;
+  LOG(INFO) << "stage0 ticks = " << (endTick - startTick);
   startTick = __rdtsc();
 #endif
+
   SpMMCreateBlocks(csr, block_csr_array, num_M_blocks, num_K_blocks, M_BLOCK_SIZE, K_BLOCK_SIZE, C, N, Op::use_lhs, Op::use_rhs);
-#if SPMM_LOG_INFO
-  endTick = __rdtsc();
-  printf("stage1: %ld ticks\n", endTick - startTick);
-#endif
 
-#if SPMM_LOG_INFO
+#ifdef DEBUG
+  endTick = __rdtsc();
+  LOG(INFO) << "stage1 ticks = " << (endTick - startTick);
   startTick = __rdtsc();
 #endif
+
   int _ld = N;
   libxsmm_meltwfunction_opreduce_vecs_idx kernel = nullptr;
   kernel = SpMMCreateLibxsmmKernel<IdType, DType, Op>(has_idx, N, _ld, LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_REDOP_SUM, false);
-#if SPMM_LOG_INFO
-  endTick = __rdtsc();
-  printf("stage2: %ld ticks\n", endTick - startTick);
 
+#ifdef DEBUG
+  endTick = __rdtsc();
+  LOG(INFO) << "stage2 ticks = " << (endTick - startTick);
   startTick = __rdtsc();
 #endif
+
   SpMMBlockwiseOpSum(block_csr_array, B, E, C, has_idx, N, num_M_blocks, num_K_blocks, M_BLOCK_SIZE, kernel);
-#if SPMM_LOG_INFO
+
+#ifdef DEBUG
   endTick = __rdtsc();
-#endif
-#if SPMM_LOG_INFO
-  printf("stage3: %ld ticks\n", endTick - startTick);
+  LOG(INFO) << "stage3 ticks = " << (endTick - startTick);
   startTick = __rdtsc();
 #endif
 
   SpMMFreeBlocks(block_csr_array, num_M_blocks, num_K_blocks, Op::use_lhs, Op::use_rhs);
-#if SPMM_LOG_INFO
+
+#ifdef DEBUG
   endTick = __rdtsc();
-  printf("stage4: %ld ticks\n", endTick - startTick);
+  LOG(INFO) << "stage4 ticks = " << (endTick - startTick);
 #endif
 }
  
@@ -477,7 +477,7 @@ void SpMMCmpCsrOpt(
 
   int32_t LLC_SIZE = get_llc_size();
 
-#if SPMM_LOG_INFO
+#ifdef DEBUG
   uint64_t startTick, endTick;
   startTick = __rdtsc();
 #endif
@@ -511,28 +511,28 @@ void SpMMCmpCsrOpt(
   IdType num_K_blocks = (K + K_BLOCK_SIZE - 1) / K_BLOCK_SIZE;
 
   CSRM<IdType, IdType> *block_csr_array = (CSRM<IdType, IdType> *)aligned_alloc(64, sizeof(CSRM<IdType, IdType>) * num_M_blocks * num_K_blocks);
-#if SPMM_LOG_INFO
-  endTick = __rdtsc();
-  printf("spmmcmpcsr nthreads = %d, LLC_SIZE = %d\n", nthreads, LLC_SIZE);
-  printf("M = %d, K = %d, N = %d, use_lhs = %d, use_rhs = %d\n", M, K, N, Op::use_lhs, Op::use_rhs);
-  printf("total_nnz = %d, avgDegree = %f\n", total_nnz, avgDegree);
-  printf("has_idx = %d\n", has_idx);
-  printf("nnz_prob = %lf\n", nnz_prob);
-  printf("K_BLOCK_SIZE = %d, M_BLOCK_SIZE = %d\n", K_BLOCK_SIZE, M_BLOCK_SIZE);
-  printf("num_K_blocks = %d, num_M_blocks = %d\n", num_K_blocks, num_M_blocks);
-  printf("stage0: %ld ticks\n", endTick - startTick);
 
+#ifdef DEBUG
+  endTick = __rdtsc();
+  LOG(INFO) << "spmmcmpcsr nthreads = " << nthreads << ", LLC_SIZE = " << LLC_SIZE;
+  LOG(INFO) << "M = " << M << ", K = " << K << ", N = " << N << ", use_lhs = " << Op::use_lhs << ", use_rhs = " << Op::use_rhs;
+  LOG(INFO) << "total_nnz = " << total_nnz << ", avgDegree = " << avgDegree;
+  LOG(INFO) << "has_idx = " << has_idx;
+  LOG(INFO) << "nnz_prob = " << nnz_prob;
+  LOG(INFO) << "K_BLOCK_SIZE = " << K_BLOCK_SIZE << ", M_BLOCK_SIZE = " << M_BLOCK_SIZE;
+  LOG(INFO) << "num_K_blocks = " << num_K_blocks << ", num_M_blocks = " << num_M_blocks;
+  LOG(INFO) << "stage0 ticks = " << (endTick - startTick);
   startTick = __rdtsc();
 #endif
+
   SpMMCreateBlocks(csr, block_csr_array, num_M_blocks, num_K_blocks, M_BLOCK_SIZE, K_BLOCK_SIZE, C, N, Op::use_lhs, Op::use_rhs);
-#if SPMM_LOG_INFO
-  endTick = __rdtsc();
-  printf("stage1: %ld ticks\n", endTick - startTick);
-#endif
 
-#if SPMM_LOG_INFO
+#ifdef DEBUG
+  endTick = __rdtsc();
+  LOG(INFO) << "stage1 ticks = " << (endTick - startTick);
   startTick = __rdtsc();
 #endif
+
   int _ld = N;
   libxsmm_meltwfunction_opreduce_vecs_idx kernel = nullptr;
   if(std::is_same<Cmp, op::Max<DType>>::value)
@@ -543,25 +543,26 @@ void SpMMCmpCsrOpt(
   {
     kernel = SpMMCreateLibxsmmKernel<IdType, DType, Op>(has_idx, N, _ld, LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_REDOP_MIN, true);
   }
-#if SPMM_LOG_INFO
-  endTick = __rdtsc();
-  printf("stage2: %ld ticks\n", endTick - startTick);
 
+#ifdef DEBUG
+  endTick = __rdtsc();
+  LOG(INFO) << "stage2 ticks = " << (endTick - startTick);
   startTick = __rdtsc();
 #endif
+
   SpMMBlockwiseOpCmp<IdType, DType, Op, Cmp>(block_csr_array, B, E, C, argB, argE, has_idx, N, num_M_blocks, num_K_blocks, M_BLOCK_SIZE, kernel);
-#if SPMM_LOG_INFO
+
+#ifdef DEBUG
   endTick = __rdtsc();
-#endif
-#if SPMM_LOG_INFO
-  printf("stage3: %ld ticks\n", endTick - startTick);
+  LOG(INFO) << "stage3 ticks = " << (endTick - startTick);
   startTick = __rdtsc();
 #endif
 
   SpMMFreeBlocks(block_csr_array, num_M_blocks, num_K_blocks, Op::use_lhs, Op::use_rhs);
-#if SPMM_LOG_INFO
+
+#ifdef DEBUG
   endTick = __rdtsc();
-  printf("stage4: %ld ticks\n", endTick - startTick);
+  LOG(INFO) << "stage4 ticks = " << (endTick - startTick);
 #endif
 }
 
