@@ -118,12 +118,12 @@ def start_sparse_adam_worker(rank, device, world_size, weight, tensor_dev='cpu',
     dgl_loss = th.nn.functional.cross_entropy(dgl_value, labels)
     dgl_loss.backward()
     dgl_adam.step()
+    dgl_weight = dgl_emb.all_get_embedding().detach()
 
     if rank == 0:
         after_step = dgl_emb(idx, device).cpu()
         dgl_value = dgl_value.detach().cpu()
         assert F.allclose(dgl_value, after_step) is False
-        dgl_weight = dgl_emb.weight.detach().cpu()
         weight[:] = dgl_weight[:]
     th.distributed.barrier()
 
@@ -314,8 +314,8 @@ def test_multiprocess_sparse_adam_zero_step_cuda_tensor(num_workers):
     assert F.allclose(dgl_weight, torch_weight)
 
 if __name__ == '__main__':
-    #test_sparse_adam()
-    #test_sparse_adam_zero_step()
+    test_sparse_adam()
+    test_sparse_adam_zero_step()
 
     #test_multiprocess_sparse_adam(2, backend='gloo')
     #test_multiprocess_sparse_adam(4, backend='nccl')
@@ -323,5 +323,5 @@ if __name__ == '__main__':
     #test_multiprocess_sparse_adam_zero_step(2, backend='gloo')
     #test_multiprocess_sparse_adam_zero_step(4, backend='nccl')
 
-    test_multiprocess_sparse_adam_cuda_tensor(2)
+    #test_multiprocess_sparse_adam_cuda_tensor(2)
     #test_multiprocess_sparse_adam_zero_step_cuda_tensor(2)
