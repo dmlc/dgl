@@ -68,8 +68,6 @@ def gspmm(g, op, reduce_op, lhs_data, rhs_data):
     tensor
         The result tensor.
     """
-    use_u = op != 'copy_rhs'
-    use_e = op != 'copy_lhs'
     if g._graph.number_of_etypes() == 1:
         if op not in ['copy_lhs', 'copy_rhs']:
             lhs_data, rhs_data = reshape_lhs_rhs(lhs_data, rhs_data)
@@ -82,7 +80,7 @@ def gspmm(g, op, reduce_op, lhs_data, rhs_data):
             ret = F.replace_inf_with_zero(ret)
     else:
         if op in ['copy_lhs', 'copy_rhs']:
-            lhs_and_rhs_tuple = lhs_data if rhs_data == None else rhs_data
+            lhs_and_rhs_tuple = lhs_data if rhs_data is None else rhs_data
         ret = gspmm_internal_hetero(g, op,
                                     'sum' if reduce_op == 'mean' else reduce_op,
                                     *lhs_and_rhs_tuple)

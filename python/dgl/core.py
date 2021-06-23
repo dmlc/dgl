@@ -260,7 +260,7 @@ def invoke_gspmm(graph, mfunc, rfunc, *, srcdata=None, dstdata=None, edata=None)
             lhs_list = [None] * graph._graph.number_of_ntypes()
             rhs_list = [None] * graph._graph.number_of_etypes()
             if mfunc.name == "copy_u":
-                for srctype,_,_ in graph.canonical_etypes:
+                for srctype, _, _ in graph.canonical_etypes:
                     src_id = graph.get_ntype_id(srctype)
                     lhs_list[src_id] = x[srctype]
             elif mfunc.name == "copy_e":
