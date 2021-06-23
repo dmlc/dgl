@@ -45,28 +45,28 @@ void SpMMSumCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
   const DType* W = efeat.Ptr<DType>();
   int64_t dim = bcast.out_len, lhs_dim = bcast.lhs_len, rhs_dim = bcast.rhs_len;
   DType* O = out.Ptr<DType>();
-  assert(indptr != nullptr);
-  assert(O != nullptr);
-  if(Op::use_lhs)
+  CHECK_NOTNULL(indptr);
+  CHECK_NOTNULL(O);
+  if (Op::use_lhs)
   {
-      assert(indices != nullptr);
-      assert(X != nullptr);
+    CHECK_NOTNULL(indices);
+    CHECK_NOTNULL(X);
   }
-  if(Op::use_rhs)
+  if (Op::use_rhs)
   {
-      if(has_idx)
-          assert(edges != nullptr);
-      assert(W != nullptr);
+    if(has_idx)
+      CHECK_NOTNULL(edges);
+    CHECK_NOTNULL(W);
   }
 #if !defined(_WIN32)
 #ifdef USE_AVX
 #ifdef USE_LIBXSMM  
   bool special_condition = bcast.use_bcast || (Op::use_lhs && (dim != lhs_dim)) || (Op::use_rhs && (dim != rhs_dim));
-  if(!special_condition)
+  if (!special_condition)
   {
       SpMMSumCsrOpt<IdType, DType, Op>(bcast, csr, ufeat, efeat, out);
   } else {
-#endif
+#endif  // USE_LIBXSMM
     typedef dgl::ElemWiseAddUpdate<Op> ElemWiseUpd;
     /* Prepare an assembler kernel */
     static std::unique_ptr<ElemWiseUpd> asm_kernel_ptr(
@@ -198,27 +198,27 @@ void SpMMCmpCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
   DType* O = static_cast<DType*>(out->data);
   IdType* argX = Op::use_lhs ? static_cast<IdType*>(argu->data) : nullptr;
   IdType* argW = Op::use_rhs ? static_cast<IdType*>(arge->data) : nullptr;
-  assert(indptr != nullptr);
-  assert(O != nullptr);
-  if(Op::use_lhs)
+  CHECK_NOTNULL(indptr);
+  CHECK_NOTNULL(O);
+  if (Op::use_lhs)
   {
-      assert(indices != nullptr);
-      assert(X != nullptr);
-      assert(argX != nullptr);
+    CHECK_NOTNULL(indices);
+    CHECK_NOTNULL(X);
+    CHECK_NOTNULL(argX);
   }
-  if(Op::use_rhs)
+  if (Op::use_rhs)
   {
-      if(has_idx)
-          assert(edges != nullptr);
-      assert(W != nullptr);
-      assert(argW != nullptr);
+    if(has_idx)
+      CHECK_NOTNULL(edges);
+    CHECK_NOTNULL(W);
+    CHECK_NOTNULL(argW);
   }
 #if !defined(_WIN32)
 #ifdef USE_AVX
 #ifdef USE_LIBXSMM  
   
   bool special_condition = bcast.use_bcast || (Op::use_lhs && (dim != lhs_dim)) || (Op::use_rhs && (dim != rhs_dim));
-  if(!special_condition)
+  if (!special_condition)
   {
       SpMMCmpCsrOpt<IdType, DType, Op, Cmp>(bcast, csr, ufeat, efeat, out, argu, arge);
   } else {
