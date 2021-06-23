@@ -600,11 +600,11 @@ class HeteroGraphIndex(ObjectBase):
     def adjacency_matrix(self, etype, transpose, ctx):
         """Return the adjacency matrix representation of this graph.
 
-        By default, a row of returned adjacency matrix represents the destination
-        of an edge and the column represents the source.
+        By default, a row of returned adjacency matrix represents the source
+        of an edge and the column represents the destination.
 
-        When transpose is True, a row represents the source and a column represents
-        a destination.
+        When transpose is True, a row represents the destination and a column represents
+        the source.
 
         Parameters
         ----------
@@ -630,8 +630,8 @@ class HeteroGraphIndex(ObjectBase):
         rst = _CAPI_DGLHeteroGetAdj(self, int(etype), transpose, fmt)
         # convert to framework-specific sparse matrix
         srctype, dsttype = self.metagraph.find_edge(etype)
-        nrows = self.number_of_nodes(srctype) if transpose else self.number_of_nodes(dsttype)
-        ncols = self.number_of_nodes(dsttype) if transpose else self.number_of_nodes(srctype)
+        nrows = self.number_of_nodes(dsttype) if transpose else self.number_of_nodes(srctype)
+        ncols = self.number_of_nodes(srctype) if transpose else self.number_of_nodes(dsttype)
         nnz = self.number_of_edges(etype)
         if fmt == "csr":
             indptr = F.copy_to(F.from_dgl_nd(rst(0)), ctx)
@@ -653,11 +653,11 @@ class HeteroGraphIndex(ObjectBase):
     def adjacency_matrix_tensors(self, etype, transpose, fmt):
         """Return the adjacency matrix as a triplet of tensors.
 
-        By default, a row of returned adjacency matrix represents the destination
-        of an edge and the column represents the source.
+        By default, a row of returned adjacency matrix represents the source
+        of an edge and the column represents the destination.
 
-        When transpose is True, a row represents the source and a column represents
-        a destination.
+        When transpose is True, a row represents the destination and a column represents
+        the source.
 
         Parameters
         ----------
@@ -689,8 +689,8 @@ class HeteroGraphIndex(ObjectBase):
 
         rst = _CAPI_DGLHeteroGetAdj(self, int(etype), transpose, fmt)
         srctype, dsttype = self.metagraph.find_edge(etype)
-        nrows = self.number_of_nodes(srctype) if transpose else self.number_of_nodes(dsttype)
-        ncols = self.number_of_nodes(dsttype) if transpose else self.number_of_nodes(srctype)
+        nrows = self.number_of_nodes(dsttype) if transpose else self.number_of_nodes(srctype)
+        ncols = self.number_of_nodes(srctype) if transpose else self.number_of_nodes(dsttype)
         nnz = self.number_of_edges(etype)
         if fmt == "csr":
             indptr = F.from_dgl_nd(rst(0))
@@ -919,9 +919,9 @@ class HeteroGraphIndex(ObjectBase):
             The first element of the tuple is the shuffle order for outward graph
             The second element of the tuple is the shuffle order for inward graph
         """
-        csr = _CAPI_DGLHeteroGetAdj(self, int(etype), True, "csr")
+        csr = _CAPI_DGLHeteroGetAdj(self, int(etype), False, "csr")
         order = csr(2)
-        rev_csr = _CAPI_DGLHeteroGetAdj(self, int(etype), False, "csr")
+        rev_csr = _CAPI_DGLHeteroGetAdj(self, int(etype), True, "csr")
         rev_order = rev_csr(2)
         return utils.toindex(order, self.dtype), utils.toindex(rev_order, self.dtype)
 

@@ -1070,10 +1070,10 @@ std::vector<IdArray> UnitGraph::GetAdj(
   //   to_scipy_sparse_matrix. With the upcoming custom kernel change, we should change the
   //   behavior and make row for src and col for dst.
   if (fmt == std::string("csr")) {
-    return transpose? GetOutCSR()->GetAdj(etype, false, "csr")
+    return !transpose ? GetOutCSR()->GetAdj(etype, false, "csr")
       : GetInCSR()->GetAdj(etype, false, "csr");
   } else if (fmt == std::string("coo")) {
-    return GetCOO()->GetAdj(etype, !transpose, fmt);
+    return GetCOO()->GetAdj(etype, transpose, fmt);
   } else {
     LOG(FATAL) << "unsupported adjacency matrix format: " << fmt;
     return {};

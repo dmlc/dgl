@@ -141,14 +141,13 @@ def graph(data,
 
     >>> g = dgl.graph((src_ids, dst_ids), idtype=torch.int32, device='cuda:0')
 
-    Create the same graph with CSR representation.
-
-    >>> g = dgl.graph(('csr', ([0, 0, 0, 1, 2, 3], [1, 2, 3], [0, 1, 2])))
-
-    Or equivalently the following since the edge IDs are already consecutive
-    integers starting from 0:
+    Creating a graph with CSR representation:
 
     >>> g = dgl.graph(('csr', ([0, 0, 0, 1, 2, 3], [1, 2, 3], [])))
+
+    Create the same graph with CSR representation and edge IDs.
+
+    >>> g = dgl.graph(('csr', ([0, 0, 0, 1, 2, 3], [1, 2, 3], [0, 1, 2])))
 
     See Also
     --------
@@ -185,8 +184,7 @@ def graph(data,
         urange, vrange = num_nodes, num_nodes
 
     g = create_from_edges(sparse_fmt, arrays, '_N', '_E', '_N', urange, vrange,
-                          row_sorted=row_sorted, col_sorted=col_sorted,
-                          validate=False)
+                          row_sorted=row_sorted, col_sorted=col_sorted)
 
     return g.to(device)
 
@@ -249,7 +247,7 @@ def heterograph(data_dict,
         - ``('csr', (Tensor, Tensor, Tensor))``: The three tensors form the CSR representation
           of the graph's adjacency matrix.  The first one is the row index pointer.  The
           second one is the column indices.  The third one is the edge IDs, which can be empty
-          to represent consecutive integer IDs starting from 0.
+          (i.e. with 0 elements) to represent consecutive integer IDs starting from 0.
         - ``('csc', (Tensor, Tensor, Tensor))``: The three tensors form the CSC representation
           of the graph's adjacency matrix.  The first one is the column index pointer.  The
           second one is the row indices.  The third one is the edge IDs, which can be empty
@@ -1629,7 +1627,6 @@ DGLHeteroGraph.to_networkx = to_networkx
 def create_from_edges(sparse_fmt, arrays,
                       utype, etype, vtype,
                       urange, vrange,
-                      validate=True,
                       row_sorted=False,
                       col_sorted=False):
     """Internal function to create a graph from incident nodes with types.
@@ -1654,8 +1651,6 @@ def create_from_edges(sparse_fmt, arrays,
     vrange : int, optional
         The destination node ID range. If None, the value is the
         maximum of the destination node IDs in the edge list plus 1. (Default: None)
-    validate : bool, optional
-        If True, checks if node IDs are within range.
     row_sorted : bool, optional
         Whether or not the rows of the COO are in ascending order.
     col_sorted : bool, optional
@@ -1667,16 +1662,6 @@ def create_from_edges(sparse_fmt, arrays,
     -------
     DGLHeteroGraph
     """
-    if validate:
-        urange_inferred, vrange_inferred = utils.infer_num_nodes(
-            (sparse_fmt, arrays), utype != vtype)
-        if urange < urange_inferred:
-            raise DGLError('Source node IDs should be less than cardinality {}.'.format(
-                urange))
-        if vrange < vrange_inferred:
-            raise DGLError('Destination node IDs should be less than cardinality {}.'.format(
-                vrange))
-
     if utype == vtype:
         num_ntypes = 1
     else:

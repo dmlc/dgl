@@ -140,12 +140,10 @@ def graphdata2tensors(data, idtype=None, bipartite=False, **kwargs):
 
     Returns
     -------
-    src : Tensor
-        Src nodes.
-    dst : Tensor
-        Dst nodes.
+    data : SparseAdjTuple
+        A tuple with the sparse matrix format and the adjacency matrix tensors.
     num_src : int
-        Number of source nodes
+        Number of source nodes.
     num_dst : int
         Number of destination nodes.
     """
@@ -271,9 +269,11 @@ def infer_num_nodes(data, bipartite=False):
     ----------
     data : graph data
         Supported types are:
-        * Tensor pair (u, v)
-        * SciPy matrix
-        * NetworkX graph
+
+        * SparseTuple ``(sparse_fmt, arrays)`` where ``arrays`` can be either ``(src, dst)`` or
+          ``(indptr, indices, data)``.
+        * SciPy matrix.
+        * NetworkX graph.
     bipartite : bool, optional
         Whether infer number of nodes of a bipartite graph --
         num_src and num_dst can be different.
@@ -291,29 +291,25 @@ def infer_num_nodes(data, bipartite=False):
         If the inference failed.
     """
     if isinstance(data, tuple) and len(data) == 2:
-        if F.is_tensor(data[0]):
-            # (src, dst) format
-            u, v = data
+        if not isinstance(data[0], str):
+            raise TypeError('Expected sparse format as a str, but got %s' % type(data[0]))
+        elif data[0] == 'coo':
+            # ('coo', (src, dst)) format
+            u, v = data[1]
             nsrc = F.as_scalar(F.max(u, dim=0)) + 1 if len(u) > 0 else 0
             ndst = F.as_scalar(F.max(v, dim=0)) + 1 if len(v) > 0 else 0
-        elif isinstance(data[0], str):
-            if data[0] == 'coo':
-                # ('coo', (src, dst)) format
-                u, v = data[1]
-                nsrc = F.as_scalar(F.max(u, dim=0)) + 1 if len(u) > 0 else 0
-                ndst = F.as_scalar(F.max(v, dim=0)) + 1 if len(v) > 0 else 0
-            elif data[0] == 'csr':
-                # ('csr', (indptr, indices, eids)) format
-                indptr, indices, _ = data[1]
-                nsrc = F.shape(indptr)[0] - 1
-                ndst = F.as_scalar(F.max(indices, dim=0)) + 1 if len(indices) > 0 else 0
-            elif data[0] == 'csc':
-                # ('csc', (indptr, indices, eids)) format
-                indptr, indices, _ = data[1]
-                ndst = F.shape(indptr)[0] - 1
-                nsrc = F.as_scalar(F.max(indices, dim=0)) + 1 if len(indices) > 0 else 0
-            else:
-                raise ValueError('unknown format %s' % data[0])
+        elif data[0] == 'csr':
+            # ('csr', (indptr, indices, eids)) format
+            indptr, indices, _ = data[1]
+            nsrc = F.shape(indptr)[0] - 1
+            ndst = F.as_scalar(F.max(indices, dim=0)) + 1 if len(indices) > 0 else 0
+        elif data[0] == 'csc':
+            # ('csc', (indptr, indices, eids)) format
+            indptr, indices, _ = data[1]
+            ndst = F.shape(indptr)[0] - 1
+            nsrc = F.as_scalar(F.max(indices, dim=0)) + 1 if len(indices) > 0 else 0
+        else:
+            raise ValueError('unknown format %s' % data[0])
     elif isinstance(data, sp.sparse.spmatrix):
         nsrc, ndst = data.shape[0], data.shape[1]
     elif isinstance(data, nx.Graph):
