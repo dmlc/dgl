@@ -106,6 +106,7 @@ class GSpMM(th.autograd.Function):
             x_shape = th.Size(x_shape)
         else:
             X, Y, argX, argY = ctx.saved_tensors
+            x_shape = X.shape
         if op != 'copy_rhs' and ctx.needs_input_grad[3]:
             g_rev = gidx.reverse()
             if reduce_op == 'sum':
