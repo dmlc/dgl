@@ -178,6 +178,38 @@ def start_torch_adam_worker(rank, world_size, weight, has_zero_grad=False,
     th.distributed.barrier()
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
+@unittest.skipIf(F.ctx().type == 'gpu', reason='cpu only test')
+@pytest.mark.parametrize("num_workers", [2, 4])
+def test_multiprocess_cpu_sparse_adam(num_workers):
+    backend = 'gloo'
+    worker_list = []
+    num_embs=128
+    emb_dim=10
+    dgl_weight = th.empty((num_embs, emb_dim))
+    ctx = mp.get_context('spawn')
+    for i in range(num_workers):
+        device = F.ctx()
+        p = ctx.Process(target=start_sparse_adam_worker,
+                        args=(i, device, num_workers, dgl_weight, th.device('cpu'), True, backend))
+        p.start()
+        worker_list.append(p)
+    for p in worker_list:
+        p.join()
+
+    worker_list = []
+    torch_weight = th.empty((num_embs, emb_dim))
+    for i in range(num_workers):
+        p = ctx.Process(target=start_torch_adam_worker,
+                        args=(i, num_workers, torch_weight, False))
+        p.start()
+        worker_list.append(p)
+    for p in worker_list:
+        p.join()
+
+    assert F.allclose(dgl_weight, torch_weight)
+
+@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
+@unittest.skipIf(F.ctx().type == 'cpu', reason='gpu only test')
 @pytest.mark.parametrize("num_workers", [2, 4, 8])
 @pytest.mark.parametrize("backend", ['nccl', 'gloo'])
 def test_multiprocess_sparse_adam(num_workers, backend):
@@ -250,6 +282,39 @@ def test_multiprocess_sparse_adam_cuda_tensor(num_workers):
     assert F.allclose(dgl_weight, torch_weight)
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
+@unittest.skipIf(F.ctx().type == 'gpu', reason='cpu only test')
+@pytest.mark.parametrize("num_workers", [2, 4])
+def test_multiprocess_sparse_adam_cpu_zero_step(num_workers):
+    backend = 'gloo'
+
+    worker_list = []
+    num_embs=128
+    emb_dim=10
+    dgl_weight = th.empty((num_embs, emb_dim))
+    ctx = mp.get_context('spawn')
+    for i in range(num_workers):
+        device = F.ctx()
+        p = ctx.Process(target=start_sparse_adam_worker,
+                        args=(i, device, num_workers, dgl_weight, th.device('cpu'), True, backend))
+        p.start()
+        worker_list.append(p)
+    for p in worker_list:
+        p.join()
+
+    worker_list = []
+    torch_weight = th.empty((num_embs, emb_dim))
+    for i in range(num_workers):
+        p = ctx.Process(target=start_torch_adam_worker,
+                        args=(i, num_workers, torch_weight, False))
+        p.start()
+        worker_list.append(p)
+    for p in worker_list:
+        p.join()
+
+    assert F.allclose(dgl_weight, torch_weight)
+
+@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
+@unittest.skipIf(F.ctx().type == 'cpu', reason='gpu only test')
 @pytest.mark.parametrize("num_workers", [2, 4, 8])
 @pytest.mark.parametrize("backend", ['nccl', 'gloo'])
 def test_multiprocess_sparse_adam_zero_step(num_workers, backend):
@@ -323,6 +388,11 @@ if __name__ == '__main__':
     test_sparse_adam()
     test_sparse_adam_zero_step()
 
+    test_multiprocess_cpu_sparse_adam(2)
+    test_multiprocess_cpu_sparse_adam(4)
+    test_multiprocess_cpu_sparse_adam(8)
+    test_multiprocess_sparse_adam_cpu_zero_step(2)
+    '''
     test_multiprocess_sparse_adam(2, backend='gloo')
     test_multiprocess_sparse_adam(4, backend='gloo')
     test_multiprocess_sparse_adam(8, backend='gloo')
@@ -335,3 +405,4 @@ if __name__ == '__main__':
 
     test_multiprocess_sparse_adam_cuda_tensor(2)
     test_multiprocess_sparse_adam_zero_step_cuda_tensor(4)
+    '''
