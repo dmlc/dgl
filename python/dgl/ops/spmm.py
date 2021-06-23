@@ -81,39 +81,15 @@ def gspmm(g, op, reduce_op, lhs_data, rhs_data):
         if reduce_op in ['min', 'max']:
             ret = F.replace_inf_with_zero(ret)
     else:
-        lhs_data_dict = lhs_data
-        rhs_data_dict = rhs_data
-        lhs_list = [None] * g._graph.number_of_ntypes()
-        rhs_list = [None] * g._graph.number_of_etypes()
-
-        for rel in g.canonical_etypes:
-            srctype, etype, dsttype = rel
-            src_id = g.get_ntype_id(srctype)
-            etid = g.get_etype_id(rel)
-            tag = srctype, etype, dsttype
-            lhs_data = lhs_data_dict[srctype] if use_u else None
-            rhs_data = rhs_data_dict[tag] if use_e else None
-            # TODO(Israt): Reshape lhs and rhs data for binary operations
-            lhs_list[src_id] = lhs_data
-            rhs_list[etid] = rhs_data
-
-        lhs_and_rhs_tuple = tuple(lhs_list + rhs_list)
-        # With max and min reducers infinity will be returned for zero degree nodes
+        if op in ['copy_lhs', 'copy_rhs']:
+            lhs_and_rhs_tuple = lhs_data if rhs_data == None else rhs_data
         ret = gspmm_internal_hetero(g, op,
                                     'sum' if reduce_op == 'mean' else reduce_op,
                                     *lhs_and_rhs_tuple)
-        # Replace infinity with zero for isolated nodes when reducer is min/max
-        # if reduce_op in ['min', 'max']:
-        #     # TODO (Israt): Following code "often" throws 'free(): invalid pointer
-        #     ret = list(ret)
-        #     for i in range(g._graph.number_of_ntypes()):
-        #         if(len(ret[i]) > 0):
-        #             ret[i] = F.replace_inf_with_zero(ret[i])
-        #     ret = tuple(ret)
 
-    # TODO (Israt): Add support for 'mean' in heterograph
+    # TODO (Israt): Add support for 'max', 'min', 'mean' in heterograph
+
     # divide in degrees for mean reducer.
-
     if reduce_op == 'mean':
         if g._graph.number_of_etypes() > 1:
             raise NotImplementedError("Reduce op 'mean' is not supported in "

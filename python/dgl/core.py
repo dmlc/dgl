@@ -255,6 +255,19 @@ def invoke_gspmm(graph, mfunc, rfunc, *, srcdata=None, dstdata=None, edata=None)
     else:
         x = alldata[mfunc.target][mfunc.in_field]
         op = getattr(ops, '{}_{}'.format(mfunc.name, rfunc.name))
+        if graph._graph.number_of_etypes() > 1:
+            # Convert to list as dict is unordered.
+            lhs_list = [None] * graph._graph.number_of_ntypes()
+            rhs_list = [None] * graph._graph.number_of_etypes()
+            if mfunc.name == "copy_u":
+                for srctype,_,_ in graph.canonical_etypes:
+                    src_id = graph.get_ntype_id(srctype)
+                    lhs_list[src_id] = x[srctype]
+            elif mfunc.name == "copy_e":
+                for rel in graph.canonical_etypes:
+                    etid = graph.get_etype_id(rel)
+                    rhs_list[etid] = x[rel]
+            x = tuple(lhs_list + rhs_list)
         z = op(graph, x)
     return {rfunc.out_field : z}
 
@@ -291,17 +304,6 @@ def message_passing(g, mfunc, rfunc, afunc):
             msgdata = invoke_edge_udf(g, ALL, g.canonical_etypes[0], mfunc, orig_eid=orig_eid)
         # reduce phase
         if is_builtin(rfunc):
-            # Converting msgdata from tuple of tensors to dict of tensors for heterographs
-            mdict = dict()
-            if g._graph.number_of_etypes() > 1:
-                msgdata_dict = {}
-                key = list(msgdata.keys())[0]
-                msgdata = msgdata[key]
-                for srctype, etype, dsttype in g.canonical_etypes:
-                    dst_id = g.get_ntype_id(dsttype)
-                    msgdata_dict[srctype, etype, dsttype] = msgdata[dst_id]
-                mdict[key] = msgdata_dict
-                msgdata = mdict
             msg = rfunc.msg_field
             ndata = invoke_gspmm(g, fn.copy_e(msg, msg), rfunc, edata=msgdata)
         else:
