@@ -68,13 +68,14 @@ inline void SpMMCreateBlocks(
     CHECK_NOTNULL(Edges);
 
   if (num_K_blocks > 1) {
-    IdType *indptr = (IdType *)aligned_alloc(64,
-                                             (M_block_size + 1) * num_M_blocks *
-                                             num_K_blocks * sizeof(IdType));
+    IdType *indptr = reinterpret_cast<IdType *>(aligned_alloc(64,
+                                                             (M_block_size + 1) * num_M_blocks *
+                                                             num_K_blocks * sizeof(IdType)));
 
 #pragma omp parallel
     {
-      IdType *my_cur_col_id = (IdType *)aligned_alloc(64, 2 * M_block_size * sizeof(IdType));
+      IdType *my_cur_col_id = reinterpret_cast<IdType *>(aligned_alloc(64, 2 * M_block_size *
+                                                                          sizeof(IdType)));
 
 #pragma omp for
       for (IdType m = 0; m < num_M_blocks; m++) {
@@ -86,9 +87,9 @@ inline void SpMMCreateBlocks(
         IdType cur_indices_id = 0;
         IdType *indices, *edges;
         if (use_lhs)
-          indices = (IdType *)aligned_alloc(64, nnz * sizeof(IdType));
+          indices = reinterpret_cast<IdType *>(aligned_alloc(64, nnz * sizeof(IdType)));
         if (use_rhs)
-          edges = (IdType *)aligned_alloc(64, nnz * sizeof(IdType));
+          edges = reinterpret_cast<IdType *>(aligned_alloc(64, nnz * sizeof(IdType)));
 
         for (IdType i = M_start; i < M_end; i++) {
           my_cur_col_id[(i - M_start) * 2] = IndPtr[i];
@@ -137,14 +138,12 @@ inline void SpMMCreateBlocks(
           if (use_rhs)
             cur_csr.data = cur_csr_edges;
           block_csr_array[m * num_K_blocks + k] = cur_csr;
-
         }
         CHECK_EQ(nnz, cur_indices_id);
       }
       free(my_cur_col_id);
     }
-  }
-  else {
+  } else {
 #pragma omp for
     for (IdType m = 0; m < num_M_blocks; m++) {
       IdType M_start = m * M_block_size;
@@ -175,42 +174,34 @@ inline libxsmm_meltwfunction_opreduce_vecs_idx SpMMCreateLibxsmmKernel(
   libxsmm_meltw_opreduce_vecs_flags opredop_flags;
   if (std::is_same<Op, op::Add<DType>>::value) {
     opredop_flags = LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_OP_ADD;
-  }
-  else if (std::is_same<Op, op::Sub<DType>>::value) {
+  } else if (std::is_same<Op, op::Sub<DType>>::value) {
     opredop_flags = LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_OP_SUB;
-  }
-  else if (std::is_same<Op, op::Mul<DType>>::value) {
+  } else if (std::is_same<Op, op::Mul<DType>>::value) {
     opredop_flags = LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_OP_MUL;
-  }
-  else if (std::is_same<Op, op::Div<DType>>::value) {
+  } else if (std::is_same<Op, op::Div<DType>>::value) {
     opredop_flags = LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_OP_DIV;
-  }
-  else if (std::is_same<Op, op::CopyLhs<DType>>::value) {
+  } else if (std::is_same<Op, op::CopyLhs<DType>>::value) {
     opredop_flags = LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_OP_COPY;
-  }
-  else if (std::is_same<Op, op::CopyRhs<DType>>::value) {
+  } else if (std::is_same<Op, op::CopyRhs<DType>>::value) {
     opredop_flags = LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_OP_COPY;
   }
   if (std::is_same<Op, op::CopyLhs<DType>>::value) {
     opredop_flags = (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags |
                      LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_OPORDER_VECIDX_VECIN);
-  }
-  else if (std::is_same<Op, op::CopyRhs<DType>>::value) {
+  } else if (std::is_same<Op, op::CopyRhs<DType>>::value) {
     opredop_flags = (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags |
                      LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_OPORDER_VECIN_VECIDX);
     if (!has_idx) {
       opredop_flags = (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags |
                        LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_IMPLICIT_INDEXED_VECIDX);
     }
-  }
-  else {
+  } else {
     opredop_flags = (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags |
                      LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_OPORDER_VECIDX_VECIN);
     if (has_idx) {
       opredop_flags = (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags |
                        LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_INDEXED_VEC);
-    }
-    else {
+    } else {
       opredop_flags = (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags |
                        LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_IMPLICIT_INDEXED_VEC);
     }
@@ -227,14 +218,15 @@ inline libxsmm_meltwfunction_opreduce_vecs_idx SpMMCreateLibxsmmKernel(
     }
   }
   libxsmm_meltwfunction_opreduce_vecs_idx kernel = nullptr;
-  if (std::is_same<DType, uint16_t>::value)
+  if (std::is_same<DType, uint16_t>::value) {
     kernel = libxsmm_dispatch_meltw_opreduce_vecs_idx(
                N, &_ld, &_ld, LIBXSMM_DATATYPE_BF16, LIBXSMM_DATATYPE_BF16,
                (sizeof(IdType) == 8) ? LIBXSMM_DATATYPE_I64 : LIBXSMM_DATATYPE_I32, opredop_flags);
-  else if (std::is_same<DType, DType>::value)
+  } else if (std::is_same<DType, DType>::value) {
     kernel = libxsmm_dispatch_meltw_opreduce_vecs_idx(
                N, &_ld, &_ld, LIBXSMM_DATATYPE_F32, LIBXSMM_DATATYPE_F32,
                (sizeof(IdType) == 8) ? LIBXSMM_DATATYPE_I64 : LIBXSMM_DATATYPE_I32, opredop_flags);
+  }
   if (kernel == nullptr) {
     LOG(FATAL) << "libxsmm Op-redop kernel is nullptr!";
   }
@@ -275,8 +267,7 @@ inline void SpMMBlockwiseOpSum(
           if (has_idx) {
             params.in_matrix2 = in_matrix2;
             params.indices2 = &cur_csr.data[row_start];
-          }
-          else {
+          } else {
             params.in_matrix2 = &in_matrix2[row_start];
           }
           kernel(&params);
@@ -326,8 +317,7 @@ inline void SpMMBlockwiseOpCmp(
           if (has_idx) {
             params.in_matrix2 = in_matrix2;
             params.indices2 = &cur_csr.data[row_start];
-          }
-          else {
+          } else {
             params.in_matrix2 = &in_matrix2[row_start];
           }
           kernel(&params);
@@ -409,11 +399,9 @@ void SpMMRedopCsrOpt(
   endTick = __rdtsc();
   if (std::is_same<Redop, op::Max<DType>>::value) {
     LOG(INFO) << "Redop = Max";
-  }
-  else if (std::is_same<Redop, op::Min<DType>>::value) {
+  } else if (std::is_same<Redop, op::Min<DType>>::value) {
     LOG(INFO) << "Redop = Min";
-  }
-  else if (std::is_same<Redop, op::Add<DType>>::value) {
+  } else if (std::is_same<Redop, op::Add<DType>>::value) {
     LOG(INFO) << "Redop = Add";
   }
   LOG(INFO) << "nthreads = " << nthreads << ", llc_size = " << llc_size;
@@ -443,13 +431,11 @@ void SpMMRedopCsrOpt(
     kernel = SpMMCreateLibxsmmKernel<IdType, DType, Op>(has_idx, N, _ld,
                                                         LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_REDOP_MAX,
                                                         true);
-  }
-  else if (std::is_same<Redop, op::Min<DType>>::value) {
+  } else if (std::is_same<Redop, op::Min<DType>>::value) {
     kernel = SpMMCreateLibxsmmKernel<IdType, DType, Op>(has_idx, N, _ld,
                                                         LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_REDOP_MIN,
                                                         true);
-  }
-  else if (std::is_same<Redop, op::Add<DType>>::value) {
+  } else if (std::is_same<Redop, op::Add<DType>>::value) {
     kernel = SpMMCreateLibxsmmKernel<IdType, DType, Op>(has_idx, N, _ld,
                                                         LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_REDOP_SUM,
                                                         false);
@@ -464,8 +450,7 @@ void SpMMRedopCsrOpt(
   if (std::is_same<Redop, op::Max<DType>>::value || std::is_same<Redop, op::Min<DType>>::value) {
     SpMMBlockwiseOpCmp<IdType, DType, Op, Redop>(block_csr_array, B, E, C, argB, argE, has_idx, N,
                                                  num_M_blocks, num_K_blocks, M_block_size, kernel);
-  }
-  else {
+  } else {
     SpMMBlockwiseOpSum(block_csr_array, B, E, C, has_idx, N, num_M_blocks, num_K_blocks,
                        M_block_size, kernel);
   }
@@ -485,23 +470,16 @@ void SpMMRedopCsrOpt(
 }
 
 template <typename IdType, typename DType, typename Op>
-void SpMMSumCsrOpt(
-	const BcastOff& bcast,
-    const CSRMatrix& csr,
-    NDArray ufeat, NDArray efeat,
-    NDArray out) {
-  
+void SpMMSumCsrOpt(const BcastOff& bcast, const CSRMatrix& csr,
+                   NDArray ufeat, NDArray efeat, NDArray out) {
+
   NDArray dummy;
   SpMMRedopCsrOpt<IdType, DType, Op, op::Add<DType>>(bcast, csr, ufeat, efeat, out, dummy, dummy);
 }
- 
+
 template <typename IdType, typename DType, typename Op, typename Cmp>
-void SpMMCmpCsrOpt(
-    const BcastOff& bcast,
-    const CSRMatrix& csr,
-    NDArray ufeat, NDArray efeat,
-    NDArray out,
-    NDArray argu, NDArray arge) {
+void SpMMCmpCsrOpt(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
+                   NDArray efeat, NDArray out, NDArray argu, NDArray arge) {
 
   SpMMRedopCsrOpt<IdType, DType, Op, Cmp>(bcast, csr, ufeat, efeat, out, argu, arge);
 }
