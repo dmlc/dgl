@@ -1082,6 +1082,19 @@ def test_convert(idtype):
     assert hg.device == g.device
     assert g.number_of_nodes() == 5
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="Test on cpu is enough")
+@parametrize_dtype
+def test_to_homo_zero_nodes(idtype):
+    # Fix gihub issue #2870
+    g = dgl.heterograph({
+        ('A', 'AB', 'B'): (np.random.randint(0, 200, (1000,)), np.random.randint(0, 200, (1000,))),
+        ('B', 'BA', 'A'): (np.random.randint(0, 200, (1000,)), np.random.randint(0, 200, (1000,))),
+    }, num_nodes_dict={'A': 200, 'B': 200, 'C': 0}, idtype=idtype)
+    g.nodes['A'].data['x'] = F.randn((200, 3))
+    g.nodes['B'].data['x'] = F.randn((200, 3))
+    gg = dgl.to_homogeneous(g, ['x'])
+    assert 'x' in gg.ndata
+
 @parametrize_dtype
 def test_to_homo2(idtype):
     # test the result homogeneous graph has nodes and edges sorted by their types
@@ -1286,11 +1299,11 @@ def test_subgraph(idtype):
         # TODO(minjie): enable this later
         sg1_graph = g_graph.edge_subgraph([1])
         _check_subgraph_single_ntype(g_graph, sg1_graph)
-        sg1_graph = g_graph.edge_subgraph([1], preserve_nodes=True)
+        sg1_graph = g_graph.edge_subgraph([1], relabel_nodes=False)
         _check_subgraph_single_ntype(g_graph, sg1_graph, True)
         sg2_bipartite = g_bipartite.edge_subgraph([0, 1])
         _check_subgraph_single_etype(g_bipartite, sg2_bipartite)
-        sg2_bipartite = g_bipartite.edge_subgraph([0, 1], preserve_nodes=True)
+        sg2_bipartite = g_bipartite.edge_subgraph([0, 1], relabel_nodes=False)
         _check_subgraph_single_etype(g_bipartite, sg2_bipartite, True)
 
     def _check_typed_subgraph1(g, sg):

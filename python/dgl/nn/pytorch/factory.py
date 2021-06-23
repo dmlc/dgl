@@ -104,6 +104,11 @@ class KNNGraph(nn.Module):
               This method is suitable for low-dimensional data (e.g. 3D
               point clouds)
 
+            * 'nn-descent' is a approximate approach from paper
+              `Efficient k-nearest neighbor graph construction for generic similarity
+              measures <https://www.cs.princeton.edu/cass/papers/www11.pdf>`_. This method
+              will search for nearest neighbor candidates in "neighbors' neighbors".
+
             (default: 'bruteforce-blas')
         dist : str, optional
             The distance metric used to compute distance between points. It can be the following
@@ -211,6 +216,11 @@ class SegmentedKNNGraph(nn.Module):
             * 'kd-tree' will use the kd-tree algorithm (CPU only).
               This method is suitable for low-dimensional data (e.g. 3D
               point clouds)
+
+            * 'nn-descent' is a approximate approach from paper
+              `Efficient k-nearest neighbor graph construction for generic similarity
+              measures <https://www.cs.princeton.edu/cass/papers/www11.pdf>`_. This method
+              will search for nearest neighbor candidates in "neighbors' neighbors".
 
             (default: 'bruteforce-blas')
         dist : str, optional

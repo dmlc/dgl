@@ -9,6 +9,7 @@ from .. import utils
 
 __all__ = [
     'sample_neighbors',
+    'sample_neighbors_biased',
     'select_topk']
 
 def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
@@ -178,6 +179,163 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
             ret.edges[etype].data[EID] = induced_edges[i]
 
     return ret
+
+def sample_neighbors_biased(g, nodes, fanout, bias, edge_dir='in',
+                            tag_offset_name='_TAG_OFFSET', replace=False,
+                            copy_ndata=True, copy_edata=True):
+    """Sample neighboring edges of the given nodes and return the induced subgraph, where each
+       neighbor's probability to be picked is determined by its tag.
+
+    For each node, a number of inbound (or outbound when ``edge_dir == 'out'``) edges
+    will be randomly chosen.  The graph returned will then contain all the nodes in the
+    original graph, but only the sampled edges.
+
+    This version of neighbor sampling can support the scenario where adjacent nodes with different
+    types might have different probability to be picked. Each node is assigned an integer(tag)
+    which represents its type. Tag is an analogue of node type under the framework of homogeneous
+    graphs. Nodes with the same tag share the same probability.
+
+    For example, assume a node has (a+b) neighbors, and a of them have tag 0 while b of them have
+    tag 1. Assume a node of tag 0 has an unnormalized probability p to be picked while a node of
+    tag 1 has q. This function first chooses a tag according to the unnormalized probability
+    distribution (ap, bq), and then run a uniform sampling within the nodes with the chosen tag.
+
+    In order to sample efficiently, we need to first sort the CSR matrix of the graph
+    according to the tag (See `dgl.transform.sort_in_edges` and `dgl.transform.sort_out_edges`
+    for details), which will arrange the neighbors with the same tag in a consecutive range
+    and store the offset of these ranges in a node feature with tag_offset_name as its name.
+
+    Please make sure that the graph has been sorted by the sorting function corresponding to
+    the edge direction ('in' or 'out'). This function itself will not check whether the graph is
+    sorted. Note that the input `tag_offset_name` should be consistent with that in the sorting
+    function.
+
+    Only homogeneous or bipartite graphs are supported. For bipartite graphs, only candidate
+    frontier nodes have tags(source nodes when edge_dir='in' and destination nodes when
+    edge_dir='out'), and the offset of tags should be stored as a node feature of the seed nodes.
+
+    Node/edge features are not preserved. The original IDs of
+    the sampled edges are stored as the `dgl.EID` feature in the returned graph.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The graph. Must be homogeneous or bipartite (only one edge type). Must be on CPU.
+    nodes : tensor or list
+        Node IDs to sample neighbors from.
+    fanout : int
+        The number of edges to be sampled for each node on each edge type.
+
+        If -1 is given, all the neighboring edges will be selected.
+    bias : tensor or list
+        The (unnormalized) probabilities associated with each tag. Its length should be equal
+        to the number of tags.
+
+        Entries of this array must be non-negative floats, and the sum of the entries must be
+        positive (though they don't have to sum up to one). Otherwise, the result will be
+        undefined.
+    edge_dir : str, optional
+        Determines whether to sample inbound or outbound edges.
+
+        Can take either ``in`` for inbound edges or ``out`` for outbound edges.
+    tag_offset_name : str, optional
+        The name of the node feature storing tag offsets.
+
+        (Default: "_TAG_OFFSET")
+    replace : bool, optional
+        If True, sample with replacement.
+    copy_ndata: bool, optional
+        If True, the node features of the new graph are copied from
+        the original graph. If False, the new graph will not have any
+        node features.
+
+        (Default: True)
+    copy_edata: bool, optional
+        If True, the edge features of the new graph are copied from
+        the original graph.  If False, the new graph will not have any
+        edge features.
+
+        (Default: True)
+
+    Returns
+    -------
+    DGLGraph
+        A sampled subgraph containing only the sampled neighboring edges.  It is on CPU.
+
+    Notes
+    -----
+    If :attr:`copy_ndata` or :attr:`copy_edata` is True, same tensors are used as
+    the node or edge features of the original graph and the new graph.
+    As a result, users should avoid performing in-place operations
+    on the node features of the new graph to avoid feature corruption.
+
+    Examples
+    --------
+    Assume that you have the following graph
+
+    >>> g = dgl.graph(([0, 0, 1, 1, 2, 2], [1, 2, 0, 1, 2, 0]))
+
+    And the tags
+
+    >>> tag = torch.IntTensor([0, 0, 1])
+
+    Sort the graph (necessary!)
+
+    >>> g_sorted = dgl.transform.sort_out_edges(g, tag)
+    >>> g_sorted.ndata['_TAG_OFFSET']
+    tensor([[0, 1, 2],
+            [0, 2, 2],
+            [0, 1, 2]])
+
+    Set the probability of each tag:
+    >>> bias = torch.tensor([1.0, 0.001])
+        # node 2 is almost impossible to be sampled because it has tag 1.
+
+    To sample one out bound edge for node 0 and node 2:
+
+    >>> sg = dgl.sampling.sample_neighbors_biased(g_sorted, [0, 2], 1, bias, edge_dir='out')
+    >>> sg.edges(order='eid')
+    (tensor([0, 2]), tensor([1, 0]))
+    >>> sg.edata[dgl.EID]
+    tensor([0, 5])
+
+    With ``fanout`` greater than the number of actual neighbors and without replacement,
+    DGL will take all neighbors instead:
+
+    >>> sg = dgl.sampling.sample_neighbors_biased(g_sorted, [0, 2], 3, bias, edge_dir='out')
+    >>> sg.edges(order='eid')
+    (tensor([0, 0, 2, 2]), tensor([1, 2, 0, 2]))
+    """
+    if isinstance(nodes, list):
+        nodes = F.tensor(nodes)
+    if isinstance(bias, list):
+        bias = F.tensor(bias)
+
+    nodes_array = F.to_dgl_nd(nodes)
+    bias_array = F.to_dgl_nd(bias)
+    if edge_dir == 'in':
+        tag_offset_array = F.to_dgl_nd(g.dstdata[tag_offset_name])
+    elif edge_dir == 'out':
+        tag_offset_array = F.to_dgl_nd(g.srcdata[tag_offset_name])
+    else:
+        raise DGLError("edge_dir can only be 'in' or 'out'")
+
+    subgidx = _CAPI_DGLSampleNeighborsBiased(g._graph, nodes_array, fanout, bias_array,
+                                             tag_offset_array, edge_dir, replace)
+    induced_edges = subgidx.induced_edges
+    ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
+
+    if copy_ndata:
+        node_frames = utils.extract_node_subframes(g, None)
+        utils.set_new_frames(ret, node_frames=node_frames)
+
+    if copy_edata:
+        edge_frames = utils.extract_edge_subframes(g, induced_edges)
+        utils.set_new_frames(ret, edge_frames=edge_frames)
+
+    ret.edata[EID] = induced_edges[0]
+    return ret
+
 
 def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False,
                 copy_ndata=True, copy_edata=True):
