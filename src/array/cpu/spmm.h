@@ -47,23 +47,21 @@ void SpMMSumCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
   DType* O = out.Ptr<DType>();
   CHECK_NOTNULL(indptr);
   CHECK_NOTNULL(O);
-  if (Op::use_lhs)
-  {
+  if (Op::use_lhs) {
     CHECK_NOTNULL(indices);
     CHECK_NOTNULL(X);
   }
-  if (Op::use_rhs)
-  {
-    if(has_idx)
+  if (Op::use_rhs) {
+    if (has_idx)
       CHECK_NOTNULL(edges);
     CHECK_NOTNULL(W);
   }
 #if !defined(_WIN32)
 #ifdef USE_AVX
-#ifdef USE_LIBXSMM  
-  bool special_condition = bcast.use_bcast || (Op::use_lhs && (dim != lhs_dim)) || (Op::use_rhs && (dim != rhs_dim));
-  if (!special_condition)
-  {
+#ifdef USE_LIBXSMM
+  bool special_condition =
+       bcast.use_bcast || (Op::use_lhs && (dim != lhs_dim)) || (Op::use_rhs && (dim != rhs_dim));
+  if (!special_condition) {
       SpMMSumCsrOpt<IdType, DType, Op>(bcast, csr, ufeat, efeat, out);
   } else {
 #endif  // USE_LIBXSMM
@@ -200,27 +198,25 @@ void SpMMCmpCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
   IdType* argW = Op::use_rhs ? static_cast<IdType*>(arge->data) : nullptr;
   CHECK_NOTNULL(indptr);
   CHECK_NOTNULL(O);
-  if (Op::use_lhs)
-  {
+  if (Op::use_lhs) {
     CHECK_NOTNULL(indices);
     CHECK_NOTNULL(X);
     CHECK_NOTNULL(argX);
   }
-  if (Op::use_rhs)
-  {
-    if(has_idx)
+  if (Op::use_rhs) {
+    if (has_idx)
       CHECK_NOTNULL(edges);
     CHECK_NOTNULL(W);
     CHECK_NOTNULL(argW);
   }
 #if !defined(_WIN32)
 #ifdef USE_AVX
-#ifdef USE_LIBXSMM  
-  
-  bool special_condition = bcast.use_bcast || (Op::use_lhs && (dim != lhs_dim)) || (Op::use_rhs && (dim != rhs_dim));
-  if (!special_condition)
-  {
-      SpMMCmpCsrOpt<IdType, DType, Op, Cmp>(bcast, csr, ufeat, efeat, out, argu, arge);
+#ifdef USE_LIBXSMM
+
+  bool special_condition =
+       bcast.use_bcast || (Op::use_lhs && (dim != lhs_dim)) || (Op::use_rhs && (dim != rhs_dim));
+  if (!special_condition) {
+    SpMMCmpCsrOpt<IdType, DType, Op, Cmp>(bcast, csr, ufeat, efeat, out, argu, arge);
   } else {
 #endif  // USE_LIBXSMM
 #endif  // USE_AVX
