@@ -451,20 +451,23 @@ class NodeDataLoader:
     :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`
     and :ref:`User Guide Section 6 <guide-minibatch>` for usage.
 
-    If you would like to perform GPU-based neighbor sampling, we recommend you
-    
-    * Feed in the graph on GPU.
-    * Set :attr:`device` to GPU.
-    * Set :attr:`num_workers` to 0.
+    **Tips for selecting the proper device**
 
-    If your graph is too big, we recommend you
+    * If the input graph :attr:`g` is on GPU, the output device :attr:`device` must be the same GPU
+      and :attr:`num_workers` must be zero. In this case, the sampling and subgraph construction
+      will take place on the GPU. This is the recommended setting when using a single-GPU and
+      the whole graph fits in GPU memory.
 
-    * Feed in the graph on CPU.
-    * Set :attr:`device` to GPU.
-    * (You can set :attr:`num_workers` to anything you like.)
+    * If the input graph :attr:`g` is on CPU while the output device :attr:`device` is GPU, then
+      depending on the value of :attr:`num_workers`:
 
-    If you still want to enjoy GPU-based neighbor sampling, you will need to pop the features
-    outside the graph.
+      - If :attr:`num_workers` is set to 0, the sampling will happen on the CPU, and then the
+        subgraphs will be constructed directly on the GPU. This is the recommend setting in
+        multi-GPU configurations.
+
+      - Otherwise, if :attr:`num_workers` is greater than 0, both the sampling and subgraph
+        construction will take place on the CPU. This is the recommended setting when using a
+        single-GPU and the whole graph does not fit in GPU memory.
     """
     collator_arglist = inspect.getfullargspec(NodeCollator).args
 
