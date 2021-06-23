@@ -123,6 +123,9 @@ void _TestCSRSampling(bool has_data) {
   }
 }
 
+
+
+
 TEST(RowwiseTest, TestCSRSampling) {
   _TestCSRSampling<int32_t, float>(true);
   _TestCSRSampling<int64_t, float>(true);
@@ -355,4 +358,65 @@ TEST(RowwiseTest, TestCOOTopk) {
   _TestCOOTopk<int64_t, float>(false);
   _TestCOOTopk<int32_t, double>(false);
   _TestCOOTopk<int64_t, double>(false);
+}
+
+template <typename Idx, typename FloatType>
+void _TestCSRSamplingBiased(bool has_data) {
+  auto mat = CSR<Idx>(has_data);
+  // 0 - 0,1
+  // 1 - 1
+  // 3 - 2,3
+  NDArray tag_offset = NDArray::FromVector(
+      std::vector<Idx>({0, 1, 2,
+                        0, 0, 1,
+                        0, 0, 0,
+                        0, 1, 2}));
+  tag_offset = tag_offset.CreateView({4, 3}, tag_offset->dtype);
+  IdArray rows = NDArray::FromVector(std::vector<Idx>({0, 1, 3}));
+  FloatArray bias = NDArray::FromVector(
+      std::vector<FloatType>({0, 0.5})
+  );
+  for (int k = 0 ; k < 10 ; ++k) {
+    auto rst = CSRRowWiseSamplingBiased(mat, rows, 1, tag_offset, bias, false);
+    CheckSampledResult<Idx>(rst, rows, has_data);
+    auto eset = ToEdgeSet<Idx>(rst);
+    if (has_data) {
+      ASSERT_TRUE(eset.count(std::make_tuple(0, 1, 3)));
+      ASSERT_TRUE(eset.count(std::make_tuple(1, 1, 0)));
+      ASSERT_TRUE(eset.count(std::make_tuple(3, 3, 4)));
+    } else {
+      ASSERT_TRUE(eset.count(std::make_tuple(0, 1, 1)));
+      ASSERT_TRUE(eset.count(std::make_tuple(1, 1, 2)));
+      ASSERT_TRUE(eset.count(std::make_tuple(3, 3, 4)));
+    }
+  }
+  for (int k = 0 ; k < 10 ; ++k) {
+    auto rst = CSRRowWiseSamplingBiased(mat, rows, 3, tag_offset, bias, true);
+    CheckSampledResult<Idx>(rst, rows, has_data);
+    auto eset = ToEdgeSet<Idx>(rst);
+    if (has_data) {
+      ASSERT_TRUE(eset.count(std::make_tuple(0, 1, 3)));
+      ASSERT_TRUE(eset.count(std::make_tuple(1, 1, 0)));
+      ASSERT_TRUE(eset.count(std::make_tuple(3, 3, 4)));
+      ASSERT_FALSE(eset.count(std::make_tuple(0, 0, 2)));
+      ASSERT_FALSE(eset.count(std::make_tuple(3, 2, 1)));
+    } else {
+      ASSERT_TRUE(eset.count(std::make_tuple(0, 1, 1)));
+      ASSERT_TRUE(eset.count(std::make_tuple(1, 1, 2)));
+      ASSERT_TRUE(eset.count(std::make_tuple(3, 3, 4)));
+      ASSERT_FALSE(eset.count(std::make_tuple(0, 0, 0)));
+      ASSERT_FALSE(eset.count(std::make_tuple(3, 2, 3)));
+    }
+  }
+}
+
+TEST(RowwiseTest, TestCSRSamplingBiased) {
+  _TestCSRSamplingBiased<int32_t, float>(true);
+  _TestCSRSamplingBiased<int32_t, float>(false);
+  _TestCSRSamplingBiased<int64_t, float>(true);
+  _TestCSRSamplingBiased<int64_t, float>(false);
+  _TestCSRSamplingBiased<int32_t, double>(true);
+  _TestCSRSamplingBiased<int32_t, double>(false);
+  _TestCSRSamplingBiased<int64_t, double>(true);
+  _TestCSRSamplingBiased<int64_t, double>(false);
 }
