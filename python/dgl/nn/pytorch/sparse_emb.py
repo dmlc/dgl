@@ -347,14 +347,8 @@ class NodeEmbedding: # NodeEmbedding
         values : Tensor
             The global tensor to pull values from.
         """
-        if self._partition:
-            idxs = F.copy_to(
-                self._partition.get_local_indices(
-                    self._comm.rank(),
-                    ctx=F.context(self._tensor)),
-                F.context(values))
-            self._tensor[:] = F.copy_to(F.gather_row(values, idxs),
-                                        ctx=F.context(self._tensor))[:]
+        if isinstance(self._tensor, MultiGPUTensor):
+            self._tensor.all_set_global(values)
         else:
             if self._rank == 0:
                 self._tensor[:] = F.copy_to(values,
@@ -398,7 +392,7 @@ class NodeEmbedding: # NodeEmbedding
                 # need to map indices and slice into existing tensor
                 idxs = self._partition.map_to_global(
                     F.arange(0, self._tensor.shape[0],
-                             ctx=F.context(self._tensor)),
+                             ctx=self._tensor.ctx),
                     self._rank).to(emb.device)
                 emb[idxs] = self._tensor.get_local().to(emb.device)
 

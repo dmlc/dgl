@@ -59,6 +59,7 @@ class MultiGPUTensor:
 
         self._comm = comm
         self._partition = partition
+        self._shape = shape
         local_shape = list(shape)
         local_shape[0] = self._partition.local_size(self._comm.rank())
         self._tensor = F.zeros(local_shape, dtype, device)
@@ -122,3 +123,15 @@ class MultiGPUTensor:
             "tensor with one of same shape: {} vs. {}".format(
                 self._tensor.shape, values.shape)
         self._tensor = F.copy_to(values, ctx=F.context(self._tensor))
+
+    @property
+    def shape(self):
+        return self._shape
+
+    @property
+    def dtype(self):
+        return F.dtype(self._tensor)
+
+    @property
+    def ctx(self):
+        return F.context(self._tensor)
