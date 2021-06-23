@@ -101,7 +101,12 @@ def start_sparse_adam_worker(rank, device, world_size, weight, tensor_dev='cpu',
                                       world_size=world_size,
                                       rank=rank)
 
+    init_weight = th.empty((num_embs, emb_dim))
+    th.manual_seed(0)
+    th.nn.init.uniform_(init_weight, -1.0, 1.0)
     dgl_emb = NodeEmbedding(num_embs, emb_dim, 'test', init_func=initializer, device=tensor_dev)
+    dgl_emb.all_set_embedding(init_weight)
+
     if has_zero_grad:
         dgl_emb_zero = NodeEmbedding(num_embs, emb_dim, 'zero', init_func=initializer, device=tensor_dev)
         dgl_adam = SparseAdam(params=[dgl_emb, dgl_emb_zero], lr=0.01)
@@ -119,9 +124,9 @@ def start_sparse_adam_worker(rank, device, world_size, weight, tensor_dev='cpu',
     dgl_loss.backward()
     dgl_adam.step()
     dgl_weight = dgl_emb.all_get_embedding().detach()
+    after_step = dgl_emb(idx, device).cpu()
 
     if rank == 0:
-        after_step = dgl_emb(idx, device).cpu()
         dgl_value = dgl_value.detach().cpu()
         assert F.allclose(dgl_value, after_step) is False
         weight[:] = dgl_weight[:]
@@ -295,7 +300,7 @@ def test_multiprocess_sparse_adam_zero_step_cuda_tensor(num_workers):
     for i in range(num_workers):
         device = th.device(i)
         p = ctx.Process(target=start_sparse_adam_worker,
-                        args=(i, device, num_workers, dgl_weight, device, True))
+                        args=(i, device, num_workers, dgl_weight, device, True, backend))
         p.start()
         worker_list.append(p)
     for p in worker_list:
@@ -317,11 +322,11 @@ if __name__ == '__main__':
     test_sparse_adam()
     test_sparse_adam_zero_step()
 
-    #test_multiprocess_sparse_adam(2, backend='gloo')
-    #test_multiprocess_sparse_adam(4, backend='nccl')
+    test_multiprocess_sparse_adam(2, backend='gloo')
+    test_multiprocess_sparse_adam(4, backend='nccl')
 
-    #test_multiprocess_sparse_adam_zero_step(2, backend='gloo')
-    #test_multiprocess_sparse_adam_zero_step(4, backend='nccl')
+    test_multiprocess_sparse_adam_zero_step(2, backend='gloo')
+    test_multiprocess_sparse_adam_zero_step(4, backend='nccl')
 
-    #test_multiprocess_sparse_adam_cuda_tensor(2)
-    #test_multiprocess_sparse_adam_zero_step_cuda_tensor(2)
+    test_multiprocess_sparse_adam_cuda_tensor(2)
+    test_multiprocess_sparse_adam_zero_step_cuda_tensor(4)
