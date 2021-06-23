@@ -329,11 +329,18 @@ We are currently in Beta stage.  More features and improvements are coming.
 
 1. [**Enhancing Scientific Papers Summarization with Citation Graph**](https://arxiv.org/abs/2104.03057), AAAI'21, *Chenxin An, Ming Zhong, Yiran Chen, Danqing Wang, Xipeng Qiu, Xuanjing Huang*
 
+1. [**Graph Ensemble Learning over Multiple Dependency Trees for Aspect-level Sentiment Classification**](https://arxiv.org/abs/2103.11794), NAACL'21, *Xiaochen Hou, Peng Qi, Guangtao Wang, Rex Ying, Jing Huang, Xiaodong He, Bowen Zhou*
+
+1. [**Enhancing Scientific Papers Summarization with Citation Graph**](https://arxiv.org/abs/2104.03057), AAAI'21, *Chenxin An, Ming Zhong, Yiran Chen, Danqing Wang, Xipeng Qiu, Xuanjing Huang*
+
 1. [**Improving Graph Representation Learning by Contrastive Regularization**](https://arxiv.org/pdf/2101.11525.pdf), *Kaili Ma, Haochen Yang, Han Yang, Tatiana Jin, Pengfei Chen, Yongqiang Chen, Barakeel Fanseu Kamhoua, James Cheng*
+
+1. [**Extract the Knowledge of Graph Neural Networks and Go Beyond it: An Effective Knowledge Distillation Framework**](https://arxiv.org/pdf/2103.02885.pdf), WWW'21, *Cheng Yang, Jiawei Liu, Chuan Shi*
 
 1. [**VIKING: Adversarial Attack on Network Embeddings via Supervised Network Poisoning**](https://arxiv.org/pdf/2102.07164.pdf), PAKDD'21, *Viresh Gupta, Tanmoy Chakraborty*
 
 1. [**Knowledge Graph Embedding using Graph Convolutional Networks with Relation-Aware Attention**](https://arxiv.org/pdf/2102.07200.pdf), *Nasrullah Sheikh, Xiao Qin, Berthold Reinwald, Christoph Miksovic, Thomas Gschwind, Paolo Scotton*
+
 
 </details>
 

@@ -9,6 +9,8 @@
 
 #include <dgl/base_heterograph.h>
 #include <dgl/array.h>
+#include <tuple>
+#include <utility>
 #include "randomwalks_impl.h"
 
 namespace dgl {
@@ -32,16 +34,18 @@ namespace {
  * \note The graph itself should be bounded in the closure of \c step.
  */
 template<DLDeviceType XPU, typename IdxType>
-IdArray GenericRandomWalk(
+std::pair<IdArray, IdArray> GenericRandomWalk(
     const IdArray seeds,
     int64_t max_num_steps,
     StepFunc<IdxType> step) {
   int64_t num_seeds = seeds->shape[0];
   int64_t trace_length = max_num_steps + 1;
   IdArray traces = IdArray::Empty({num_seeds, trace_length}, seeds->dtype, seeds->ctx);
+  IdArray eids = IdArray::Empty({num_seeds, max_num_steps}, seeds->dtype, seeds->ctx);
 
-  const IdxType *seed_data = static_cast<IdxType *>(seeds->data);
-  IdxType *traces_data = static_cast<IdxType *>(traces->data);
+  const IdxType *seed_data = seeds.Ptr<IdxType>();
+  IdxType *traces_data = traces.Ptr<IdxType>();
+  IdxType *eids_data = eids.Ptr<IdxType>();
 
 #pragma omp parallel for
   for (int64_t seed_id = 0; seed_id < num_seeds; ++seed_id) {
@@ -51,16 +55,19 @@ IdArray GenericRandomWalk(
 
     for (i = 0; i < max_num_steps; ++i) {
       const auto &succ = step(traces_data + seed_id * max_num_steps, curr, i);
-      traces_data[seed_id * trace_length + i + 1] = curr = succ.first;
-      if (succ.second)
+      traces_data[seed_id * trace_length + i + 1] = curr = std::get<0>(succ);
+      eids_data[seed_id * max_num_steps + i] = std::get<1>(succ);
+      if (std::get<2>(succ))
         break;
     }
 
-    for (; i < max_num_steps; ++i)
+    for (; i < max_num_steps; ++i) {
       traces_data[seed_id * trace_length + i + 1] = -1;
+      eids_data[seed_id * max_num_steps + i] = -1;
+    }
   }
 
-  return traces;
+  return std::make_pair(traces, eids);
 }
 
 };  // namespace
