@@ -2663,12 +2663,16 @@ def test_adj_sparse(idtype, fmt):
         indptr = F.tensor(A.indptr, idtype)
         indices = F.tensor(A.indices, idtype)
         g = dgl.graph(('csr', (indptr, indices, [])))
+        with pytest.raises(DGLError):
+            g2 = dgl.graph(('csr', (indptr[:-1], indices, [])))
     elif fmt == 'csc':
         A = ssp.random(10, 10, 0.2).tocsc()
         A.data = np.arange(20)
         indptr = F.tensor(A.indptr, idtype)
         indices = F.tensor(A.indices, idtype)
         g = dgl.graph(('csc', (indptr, indices, [])))
+        with pytest.raises(DGLError):
+            g2 = dgl.graph(('csr', (indptr[:-1], indices, [])))
 
     A_coo = A.tocoo()
     A_csr = A.tocsr()
