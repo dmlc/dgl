@@ -119,10 +119,11 @@ def start_sparse_adam_worker(rank, device, world_size, weight, tensor_dev='cpu',
     idx = th.randint(start, end, size=(4,)).to(tensor_dev)
     dgl_value = dgl_emb(idx, device)
     labels = th.ones((4,)).long().to(device)
-    dgl_adam.zero_grad()
     dgl_loss = th.nn.functional.cross_entropy(dgl_value, labels)
+    dgl_adam.zero_grad()
     dgl_loss.backward()
     dgl_adam.step()
+    th.distributed.barrier()
     dgl_weight = dgl_emb.all_get_embedding().detach()
     after_step = dgl_emb(idx, device).cpu()
 
@@ -323,7 +324,11 @@ if __name__ == '__main__':
     test_sparse_adam_zero_step()
 
     test_multiprocess_sparse_adam(2, backend='gloo')
+    test_multiprocess_sparse_adam(4, backend='gloo')
+    test_multiprocess_sparse_adam(8, backend='gloo')
+    test_multiprocess_sparse_adam(2, backend='nccl')
     test_multiprocess_sparse_adam(4, backend='nccl')
+    test_multiprocess_sparse_adam(8, backend='nccl')
 
     test_multiprocess_sparse_adam_zero_step(2, backend='gloo')
     test_multiprocess_sparse_adam_zero_step(4, backend='nccl')
