@@ -134,4 +134,15 @@ class MultiGPUTensor:
 
     @property
     def ctx(self):
+        # handle being treated like a dgl ndarray
+        return F.context(self._tensor)
+
+    @property
+    def context(self):
+        # handle being treated like a mxnet tensor
+        return F.context(self._tensor)
+
+    @property
+    def device(self):
+        # handle being treated like pytorch or tensorflow tensor
         return F.context(self._tensor)
