@@ -13,7 +13,7 @@ from torch.nn.parallel import DistributedDataParallel
 import tqdm
 
 from model import SAGE
-from load_graph import load_reddit, inductive_split
+from load_graph import load_reddit, inductive_split, load_ogb
 
 def compute_acc(pred, labels):
     """
@@ -85,7 +85,6 @@ def run(proc_id, n_gpus, args, devices, data):
     train_nid = train_mask.nonzero().squeeze()
     val_nid = val_mask.nonzero().squeeze()
     test_nid = test_mask.nonzero().squeeze()
-    train_nid = train_nid[:n_gpus * args.batch_size + 1]
 
     # Create PyTorch DataLoader for constructing blocks
     sampler = dgl.dataloading.MultiLayerNeighborSampler(
@@ -95,6 +94,7 @@ def run(proc_id, n_gpus, args, devices, data):
         train_nid,
         sampler,
         use_ddp=n_gpus > 1,
+        device=dev_id if args.num_workers == 0 else None,
         batch_size=args.batch_size,
         shuffle=True,
         drop_last=False,
@@ -172,6 +172,7 @@ if __name__ == '__main__':
     argparser = argparse.ArgumentParser("multi-gpu training")
     argparser.add_argument('--gpu', type=str, default='0',
                            help="Comma separated list of GPU device IDs.")
+    argparser.add_argument('--dataset', type=str, default='reddit')
     argparser.add_argument('--num-epochs', type=int, default=20)
     argparser.add_argument('--num-hidden', type=int, default=16)
     argparser.add_argument('--num-layers', type=int, default=2)
@@ -195,7 +196,13 @@ if __name__ == '__main__':
     devices = list(map(int, args.gpu.split(',')))
     n_gpus = len(devices)
 
-    g, n_classes = load_reddit()
+    if args.dataset == 'reddit':
+        g, n_classes = load_reddit()
+    elif args.dataset == 'ogbn-products':
+        g, n_classes = load_ogb('ogbn-products')
+    else:
+        raise Exception('unknown dataset')
+
     # Construct graph
     g = dgl.as_heterograph(g)
 

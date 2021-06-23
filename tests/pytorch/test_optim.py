@@ -144,6 +144,9 @@ def start_sparse_adam_worker(rank, world_size, has_zero_grad=False, num_embs=128
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @pytest.mark.parametrize("num_workers", [2, 4, 8])
 def test_multiprocess_sparse_adam(num_workers):
+    if F.ctx().type == 'cuda' and th.cuda.device_count() < num_workers:
+        pytest.skip("Not enough GPUs to run test.")
+
     worker_list = []
 
     ctx = mp.get_context('spawn')
@@ -159,6 +162,9 @@ def test_multiprocess_sparse_adam(num_workers):
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @pytest.mark.parametrize("num_workers", [2, 4, 8])
 def test_multiprocess_sparse_adam_zero_step(num_workers):
+    if F.ctx().type == 'cuda' and th.cuda.device_count() < num_workers:
+        pytest.skip("Not enough GPUs to run test.")
+
     worker_list = []
 
     ctx = mp.get_context('spawn')
