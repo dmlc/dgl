@@ -172,6 +172,7 @@ inline libxsmm_meltwfunction_opreduce_vecs_idx SpMMCreateLibxsmmKernel(
     bool is_cmp) {
 
   libxsmm_meltw_opreduce_vecs_flags opredop_flags;
+  // First, set the Op in the opredop_flags
   if (std::is_same<Op, op::Add<DType>>::value) {
     opredop_flags = LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_OP_ADD;
   } else if (std::is_same<Op, op::Sub<DType>>::value) {
@@ -185,6 +186,10 @@ inline libxsmm_meltwfunction_opreduce_vecs_idx SpMMCreateLibxsmmKernel(
   } else if (std::is_same<Op, op::CopyRhs<DType>>::value) {
     opredop_flags = LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_OP_COPY;
   }
+  // Second, set which of lhs or rhs is considered first and second operand.
+  // This is needed since libxsmm assumes that the copy operation always copies the first operand.
+  // So, if we need to copy rhs, we need to set that as the first operand.
+  // For rhs, we also set whether to use implicit indices or provided indices.
   if (std::is_same<Op, op::CopyLhs<DType>>::value) {
     opredop_flags = (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags |
                      LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_OPORDER_VECIDX_VECIN);
@@ -206,7 +211,9 @@ inline libxsmm_meltwfunction_opreduce_vecs_idx SpMMCreateLibxsmmKernel(
                        LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_IMPLICIT_INDEXED_VEC);
     }
   }
+  // Third, we set the Redop in the opredop_flags
   opredop_flags = (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags | redop_flag);
+  // Fourth, in case of Cmp Redop, set whether to record argmax/argmin for lhs/rhs
   if (is_cmp) {
     if (Op::use_lhs) {
       opredop_flags = (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags |
@@ -472,7 +479,6 @@ void SpMMRedopCsrOpt(
 template <typename IdType, typename DType, typename Op>
 void SpMMSumCsrOpt(const BcastOff& bcast, const CSRMatrix& csr,
                    NDArray ufeat, NDArray efeat, NDArray out) {
-
   NDArray dummy;
   SpMMRedopCsrOpt<IdType, DType, Op, op::Add<DType>>(bcast, csr, ufeat, efeat, out, dummy, dummy);
 }
@@ -480,7 +486,6 @@ void SpMMSumCsrOpt(const BcastOff& bcast, const CSRMatrix& csr,
 template <typename IdType, typename DType, typename Op, typename Cmp>
 void SpMMCmpCsrOpt(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
                    NDArray efeat, NDArray out, NDArray argu, NDArray arge) {
-
   SpMMRedopCsrOpt<IdType, DType, Op, Cmp>(bcast, csr, ufeat, efeat, out, argu, arge);
 }
 
