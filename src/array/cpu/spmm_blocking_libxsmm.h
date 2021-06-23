@@ -30,13 +30,13 @@ namespace aten {
 namespace cpu {
 
 template <typename IdType, typename DType>
-  struct CSRMatrixInternal {
-    IdType num_rows;
-    IdType num_cols;
-    IdType *indptr;
-    IdType *indices;
-    DType *data;
-  };
+struct CSRMatrixInternal {
+  IdType num_rows;
+  IdType num_cols;
+  IdType *indptr;
+  IdType *indices;
+  DType *data;
+};
 
 int32_t getLLCSize() {
   int32_t cache_size = sysconf(_SC_LEVEL3_CACHE_SIZE);
@@ -67,17 +67,17 @@ inline void SpMMCreateBlocks(
   if (use_rhs)
     CHECK_NOTNULL(Edges);
 
-  if (num_K_blocks > 1)
-  {
-    IdType *indptr = (IdType *)aligned_alloc(64, (M_block_size + 1) * num_M_blocks * num_K_blocks * sizeof(IdType));
+  if (num_K_blocks > 1) {
+    IdType *indptr = (IdType *)aligned_alloc(64,
+                                             (M_block_size + 1) * num_M_blocks *
+                                             num_K_blocks * sizeof(IdType));
 
 #pragma omp parallel
     {
       IdType *my_cur_col_id = (IdType *)aligned_alloc(64, 2 * M_block_size * sizeof(IdType));
 
 #pragma omp for
-      for (IdType m = 0; m < num_M_blocks; m++)
-      {
+      for (IdType m = 0; m < num_M_blocks; m++) {
         IdType M_start = m * M_block_size;
         IdType M_end = (m + 1) * M_block_size;
         if (M_end > M) M_end = M;
@@ -90,13 +90,11 @@ inline void SpMMCreateBlocks(
         if (use_rhs)
           edges = (IdType *)aligned_alloc(64, nnz * sizeof(IdType));
 
-        for (IdType i = M_start; i < M_end; i++)
-        {
+        for (IdType i = M_start; i < M_end; i++) {
           my_cur_col_id[(i - M_start) * 2] = IndPtr[i];
           my_cur_col_id[(i - M_start) * 2 + 1] = IndPtr[i + 1];
         }
-        for (IdType k = 0; k < num_K_blocks; k++)
-        {
+        for (IdType k = 0; k < num_K_blocks; k++) {
           IdType K_start = k * K_block_size;
           IdType K_end = (k + 1) * K_block_size;
           if (K_end > K) K_end = K;
@@ -111,18 +109,15 @@ inline void SpMMCreateBlocks(
           if (use_rhs)
             cur_csr_edges = edges + cur_indices_id;
           IdType cur_nnz = 0;
-          for (IdType i = M_start; i < M_end; i++)
-          {
+          for (IdType i = M_start; i < M_end; i++) {
             const IdType row_start = my_cur_col_id[(i - M_start) * 2];
             const IdType row_end   = my_cur_col_id[(i - M_start) * 2 + 1];
             cur_csr_indptr[i - M_start] = cur_nnz;
             IdType eid;
-            for (eid = row_start; eid < row_end; eid++)
-            {
+            for (eid = row_start; eid < row_end; eid++) {
               const IdType src = Indices[eid];
               const IdType edge = Edges[eid];
-              if (src >= K_end)
-              {
+              if (src >= K_end) {
                 break;
               }
               CHECK_LT(cur_indices_id + cur_nnz, nnz);
@@ -149,11 +144,9 @@ inline void SpMMCreateBlocks(
       free(my_cur_col_id);
     }
   }
-  else
-  {
+  else {
 #pragma omp for
-    for (IdType m = 0; m < num_M_blocks; m++)
-    {
+    for (IdType m = 0; m < num_M_blocks; m++) {
       IdType M_start = m * M_block_size;
       IdType M_end = (m + 1) * M_block_size;
       if (M_end > M) M_end = M;
@@ -180,73 +173,69 @@ inline libxsmm_meltwfunction_opreduce_vecs_idx SpMMCreateLibxsmmKernel(
     bool is_cmp) {
 
   libxsmm_meltw_opreduce_vecs_flags opredop_flags;
-  if (std::is_same<Op, op::Add<DType>>::value)
-  {
+  if (std::is_same<Op, op::Add<DType>>::value) {
     opredop_flags = LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_OP_ADD;
   }
-  else if (std::is_same<Op, op::Sub<DType>>::value)
-  {
+  else if (std::is_same<Op, op::Sub<DType>>::value) {
     opredop_flags = LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_OP_SUB;
   }
-  else if (std::is_same<Op, op::Mul<DType>>::value)
-  {
+  else if (std::is_same<Op, op::Mul<DType>>::value) {
     opredop_flags = LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_OP_MUL;
   }
-  else if (std::is_same<Op, op::Div<DType>>::value)
-  {
+  else if (std::is_same<Op, op::Div<DType>>::value) {
     opredop_flags = LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_OP_DIV;
   }
-  else if (std::is_same<Op, op::CopyLhs<DType>>::value)
-  {
+  else if (std::is_same<Op, op::CopyLhs<DType>>::value) {
     opredop_flags = LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_OP_COPY;
   }
-  else if (std::is_same<Op, op::CopyRhs<DType>>::value)
-  {
+  else if (std::is_same<Op, op::CopyRhs<DType>>::value) {
     opredop_flags = LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_OP_COPY;
   }
-  if (std::is_same<Op, op::CopyLhs<DType>>::value)
-  {
-    opredop_flags = (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags | LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_OPORDER_VECIDX_VECIN);
+  if (std::is_same<Op, op::CopyLhs<DType>>::value) {
+    opredop_flags = (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags |
+                     LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_OPORDER_VECIDX_VECIN);
   }
-  else if (std::is_same<Op, op::CopyRhs<DType>>::value)
-  {
-    opredop_flags = (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags | LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_OPORDER_VECIN_VECIDX);
-    if (!has_idx)
-    {
-      opredop_flags = (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags | LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_IMPLICIT_INDEXED_VECIDX);
+  else if (std::is_same<Op, op::CopyRhs<DType>>::value) {
+    opredop_flags = (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags |
+                     LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_OPORDER_VECIN_VECIDX);
+    if (!has_idx) {
+      opredop_flags = (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags |
+                       LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_IMPLICIT_INDEXED_VECIDX);
     }
   }
-  else
-  {
-    opredop_flags = (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags | LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_OPORDER_VECIDX_VECIN);
-    if (has_idx)
-    {
-      opredop_flags = (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags | LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_INDEXED_VEC);
+  else {
+    opredop_flags = (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags |
+                     LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_OPORDER_VECIDX_VECIN);
+    if (has_idx) {
+      opredop_flags = (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags |
+                       LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_INDEXED_VEC);
     }
-    else
-    {
-      opredop_flags = (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags | LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_IMPLICIT_INDEXED_VEC);
+    else {
+      opredop_flags = (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags |
+                       LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_IMPLICIT_INDEXED_VEC);
     }
   }
   opredop_flags = (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags | redop_flag);
-  if (is_cmp)
-  {
-    if (Op::use_lhs)
-    {
-      opredop_flags = (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags | LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_RECORD_ARGOP_OFF_VEC_0);
+  if (is_cmp) {
+    if (Op::use_lhs) {
+      opredop_flags = (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags |
+                       LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_RECORD_ARGOP_OFF_VEC_0);
     }
-    if (Op::use_rhs)
-    {
-      opredop_flags = (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags | LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_RECORD_ARGOP_OFF_VEC_1);
+    if (Op::use_rhs) {
+      opredop_flags = (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags |
+                       LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_RECORD_ARGOP_OFF_VEC_1);
     }
   }
-  libxsmm_meltwfunction_opreduce_vecs_idx kernel=nullptr;
+  libxsmm_meltwfunction_opreduce_vecs_idx kernel = nullptr;
   if (std::is_same<DType, uint16_t>::value)
-    kernel = libxsmm_dispatch_meltw_opreduce_vecs_idx(N, &_ld, &_ld, LIBXSMM_DATATYPE_BF16, LIBXSMM_DATATYPE_BF16, (sizeof(IdType) == 8) ? LIBXSMM_DATATYPE_I64 : LIBXSMM_DATATYPE_I32, opredop_flags);
+    kernel = libxsmm_dispatch_meltw_opreduce_vecs_idx(
+               N, &_ld, &_ld, LIBXSMM_DATATYPE_BF16, LIBXSMM_DATATYPE_BF16,
+               (sizeof(IdType) == 8) ? LIBXSMM_DATATYPE_I64 : LIBXSMM_DATATYPE_I32, opredop_flags);
   else if (std::is_same<DType, DType>::value)
-    kernel = libxsmm_dispatch_meltw_opreduce_vecs_idx(N, &_ld, &_ld, LIBXSMM_DATATYPE_F32, LIBXSMM_DATATYPE_F32, (sizeof(IdType) == 8) ? LIBXSMM_DATATYPE_I64 : LIBXSMM_DATATYPE_I32, opredop_flags);
-  if (kernel == nullptr)
-  {
+    kernel = libxsmm_dispatch_meltw_opreduce_vecs_idx(
+               N, &_ld, &_ld, LIBXSMM_DATATYPE_F32, LIBXSMM_DATATYPE_F32,
+               (sizeof(IdType) == 8) ? LIBXSMM_DATATYPE_I64 : LIBXSMM_DATATYPE_I32, opredop_flags);
+  if (kernel == nullptr) {
     LOG(FATAL) << "libxsmm Op-redop kernel is nullptr!";
   }
   return kernel;
@@ -264,18 +253,15 @@ inline void SpMMBlockwiseOpSum(
   DType (*output)[N] = (DType (*)[N])C;
 #pragma omp parallel
   {
-    for (IdType k = 0; k < num_K_blocks; k++)
-    {
+    for (IdType k = 0; k < num_K_blocks; k++) {
 #pragma omp for schedule(dynamic)
-      for (IdType m = 0; m < num_M_blocks; m++)
-      {
+      for (IdType m = 0; m < num_M_blocks; m++) {
         CSRMatrixInternal<IdType, IdType> cur_csr = block_csr_array[m * num_K_blocks + k];
 
         int32_t cur_M = cur_csr.num_rows;
 
         IdType M_start = m * M_block_size;
-        for (IdType i = 0; i < cur_M; i++)
-        {
+        for (IdType i = 0; i < cur_M; i++) {
           const IdType row_start = cur_csr.indptr[i];
           const IdType row_end   = cur_csr.indptr[i + 1];
           IdType dst = i + M_start;
@@ -286,13 +272,11 @@ inline void SpMMBlockwiseOpSum(
           params.in_matrix = in_matrix1;
           params.out_vec = &output[dst][0];
           params.scale_vals = nullptr;
-          if (has_idx)
-          {
+          if (has_idx) {
             params.in_matrix2 = in_matrix2;
             params.indices2 = &cur_csr.data[row_start];
           }
-          else
-          {
+          else {
             params.in_matrix2 = &in_matrix2[row_start];
           }
           kernel(&params);
@@ -318,18 +302,15 @@ inline void SpMMBlockwiseOpCmp(
 
 #pragma omp parallel
   {
-    for (IdType k = 0; k < num_K_blocks; k++)
-    {
+    for (IdType k = 0; k < num_K_blocks; k++) {
 #pragma omp for schedule(dynamic)
-      for (IdType m = 0; m < num_M_blocks; m++)
-      {
+      for (IdType m = 0; m < num_M_blocks; m++) {
         CSRMatrixInternal<IdType, IdType> cur_csr = block_csr_array[m * num_K_blocks + k];
 
         int32_t cur_M = cur_csr.num_rows;
 
         IdType M_start = m * M_block_size;
-        for (IdType i = 0; i < cur_M; i++)
-        {
+        for (IdType i = 0; i < cur_M; i++) {
           const IdType row_start = cur_csr.indptr[i];
           const IdType row_end   = cur_csr.indptr[i + 1];
           IdType dst = i + M_start;
@@ -342,13 +323,11 @@ inline void SpMMBlockwiseOpCmp(
           params.argop_off_vec_0 = &out_matrix1[dst][0];
           params.argop_off_vec_1 = &out_matrix2[dst][0];
           params.scale_vals = nullptr;
-          if (has_idx)
-          {
+          if (has_idx) {
             params.in_matrix2 = in_matrix2;
             params.indices2 = &cur_csr.data[row_start];
           }
-          else
-          {
+          else {
             params.in_matrix2 = &in_matrix2[row_start];
           }
           kernel(&params);
@@ -364,10 +343,8 @@ inline void SpMMFreeBlocks(
     IdType num_M_blocks, IdType num_K_blocks,
     bool use_lhs, bool use_rhs) {
 
-  if (num_K_blocks > 1)
-  {
-    for (int m = 0; m < num_M_blocks; m++)
-    {
+  if (num_K_blocks > 1) {
+    for (int m = 0; m < num_M_blocks; m++) {
       if (use_lhs)
         free(block_csr_array[m * num_K_blocks].indices);
       if (use_rhs)
@@ -399,8 +376,7 @@ void SpMMRedopCsrOpt(
   DType* B = ufeat.Ptr<DType>();
   DType* E = efeat.Ptr<DType>();
   IdType *argB, *argE;
-  if (std::is_same<Redop, op::Max<DType>>::value || std::is_same<Redop, op::Min<DType>>::value)
-  {
+  if (std::is_same<Redop, op::Max<DType>>::value || std::is_same<Redop, op::Min<DType>>::value) {
     argB = argu.Ptr<IdType>();
     argE = arge.Ptr<IdType>();
   }
@@ -425,24 +401,24 @@ void SpMMRedopCsrOpt(
   IdType num_M_blocks = (M + M_block_size - 1) / M_block_size;
   IdType num_K_blocks = (K + K_block_size - 1) / K_block_size;
 
-  CSRMatrixInternal<IdType, IdType> *block_csr_array = (CSRMatrixInternal<IdType, IdType> *)aligned_alloc(64, sizeof(CSRMatrixInternal<IdType, IdType>) * num_M_blocks * num_K_blocks);
+  CSRMatrixInternal<IdType, IdType> *block_csr_array =
+    (CSRMatrixInternal<IdType, IdType> *)aligned_alloc(64,
+      sizeof(CSRMatrixInternal<IdType, IdType>) * num_M_blocks * num_K_blocks);
 
 #ifdef DEBUG
   endTick = __rdtsc();
-  if (std::is_same<Redop, op::Max<DType>>::value)
-  {
+  if (std::is_same<Redop, op::Max<DType>>::value) {
     LOG(INFO) << "Redop = Max";
   }
-  else if (std::is_same<Redop, op::Min<DType>>::value)
-  {
+  else if (std::is_same<Redop, op::Min<DType>>::value) {
     LOG(INFO) << "Redop = Min";
   }
-  else if (std::is_same<Redop, op::Add<DType>>::value)
-  {
+  else if (std::is_same<Redop, op::Add<DType>>::value) {
     LOG(INFO) << "Redop = Add";
   }
   LOG(INFO) << "nthreads = " << nthreads << ", llc_size = " << llc_size;
-  LOG(INFO) << "M = " << M << ", K = " << K << ", N = " << N << ", use_lhs = " << Op::use_lhs << ", use_rhs = " << Op::use_rhs;
+  LOG(INFO) << "M = " << M << ", K = " << K << ", N = " << N;
+  LOG(INFO) << "use_lhs = " << Op::use_lhs << ", use_rhs = " << Op::use_rhs;
   LOG(INFO) << "total_nnz = " << total_nnz << ", avgDegree = " << avgDegree;
   LOG(INFO) << "has_idx = " << has_idx;
   LOG(INFO) << "nnz_prob = " << nnz_prob;
@@ -452,7 +428,8 @@ void SpMMRedopCsrOpt(
   startTick = __rdtsc();
 #endif  // DEBUG
 
-  SpMMCreateBlocks(csr, block_csr_array, num_M_blocks, num_K_blocks, M_block_size, K_block_size, C, N, Op::use_lhs, Op::use_rhs);
+  SpMMCreateBlocks(csr, block_csr_array, num_M_blocks, num_K_blocks, M_block_size, K_block_size, C,
+                   N, Op::use_lhs, Op::use_rhs);
 
 #ifdef DEBUG
   endTick = __rdtsc();
@@ -462,17 +439,20 @@ void SpMMRedopCsrOpt(
 
   int _ld = N;
   libxsmm_meltwfunction_opreduce_vecs_idx kernel = nullptr;
-  if (std::is_same<Redop, op::Max<DType>>::value)
-  {
-    kernel = SpMMCreateLibxsmmKernel<IdType, DType, Op>(has_idx, N, _ld, LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_REDOP_MAX, true);
+  if (std::is_same<Redop, op::Max<DType>>::value) {
+    kernel = SpMMCreateLibxsmmKernel<IdType, DType, Op>(has_idx, N, _ld,
+                                                        LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_REDOP_MAX,
+                                                        true);
   }
-  else if (std::is_same<Redop, op::Min<DType>>::value)
-  {
-    kernel = SpMMCreateLibxsmmKernel<IdType, DType, Op>(has_idx, N, _ld, LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_REDOP_MIN, true);
+  else if (std::is_same<Redop, op::Min<DType>>::value) {
+    kernel = SpMMCreateLibxsmmKernel<IdType, DType, Op>(has_idx, N, _ld,
+                                                        LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_REDOP_MIN,
+                                                        true);
   }
-  else if (std::is_same<Redop, op::Add<DType>>::value)
-  {
-    kernel = SpMMCreateLibxsmmKernel<IdType, DType, Op>(has_idx, N, _ld, LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_REDOP_SUM, false);
+  else if (std::is_same<Redop, op::Add<DType>>::value) {
+    kernel = SpMMCreateLibxsmmKernel<IdType, DType, Op>(has_idx, N, _ld,
+                                                        LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_REDOP_SUM,
+                                                        false);
   }
 
 #ifdef DEBUG
@@ -481,13 +461,13 @@ void SpMMRedopCsrOpt(
   startTick = __rdtsc();
 #endif  // DEBUG
 
-  if (std::is_same<Redop, op::Max<DType>>::value || std::is_same<Redop, op::Min<DType>>::value)
-  {
-    SpMMBlockwiseOpCmp<IdType, DType, Op, Redop>(block_csr_array, B, E, C, argB, argE, has_idx, N, num_M_blocks, num_K_blocks, M_block_size, kernel);
+  if (std::is_same<Redop, op::Max<DType>>::value || std::is_same<Redop, op::Min<DType>>::value) {
+    SpMMBlockwiseOpCmp<IdType, DType, Op, Redop>(block_csr_array, B, E, C, argB, argE, has_idx, N,
+                                                 num_M_blocks, num_K_blocks, M_block_size, kernel);
   }
-  else
-  {
-    SpMMBlockwiseOpSum(block_csr_array, B, E, C, has_idx, N, num_M_blocks, num_K_blocks, M_block_size, kernel);
+  else {
+    SpMMBlockwiseOpSum(block_csr_array, B, E, C, has_idx, N, num_M_blocks, num_K_blocks,
+                       M_block_size, kernel);
   }
 
 #ifdef DEBUG
@@ -534,4 +514,4 @@ void SpMMCmpCsrOpt(
 #endif  // USE_AVX
 #endif  // _WIN32
 
-#endif  // DGL_ARRAY_CPU_SPMM_H_
+#endif  // DGL_ARRAY_CPU_SPMM_BLOCKING_LIBXSMM_H_
