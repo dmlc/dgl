@@ -41,7 +41,10 @@ bool has_edge_between(const CSRMatrix &csr, dgl_id_t u,
   const IdxType *u_succ = all_succ + offsets[u];
   const int64_t size = offsets[u + 1] - offsets[u];
 
-  return std::find(u_succ, u_succ + size, v) != u_succ + size;
+  if (csr.sorted)
+    return std::binary_search(u_succ, u_succ + size, v);
+  else
+    return std::find(u_succ, u_succ + size, v) != u_succ + size;
 }
 
 /*!

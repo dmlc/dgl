@@ -6,11 +6,14 @@ from .. import ndarray as nd
 from .. import utils
 # pylint: disable=invalid-name
 
+__all__ = ['node2vec_random_walk']
+
 
 def node2vec_random_walk(g, nodes, p, q, walk_length, prob=None, return_eids=False):
     """
     Generate random walk traces from an array of starting nodes based on the node2vec model.
-    Paper:`"node2vec: Scalable Feature Learning for Networks"<https://arxiv.org/abs/1607.00653>`
+    Paper: `node2vec: Scalable Feature Learning for Networks
+    <https://arxiv.org/abs/1607.00653>`__.
 
     The returned traces all have length ``walk_length + 1``, where the first node
     is the starting node itself.
@@ -47,7 +50,6 @@ def node2vec_random_walk(g, nodes, p, q, walk_length, prob=None, return_eids=Fal
 
         Default: False.
 
-
     Returns
     -------
     traces : Tensor
@@ -55,6 +57,25 @@ def node2vec_random_walk(g, nodes, p, q, walk_length, prob=None, return_eids=Fal
     eids : Tensor, optional
         A 2-dimensional edge ID tensor with shape ``(num_seeds, length)``.
         Only returned if :attr:`return_eids` is True.
+
+    Examples
+    --------
+    >>> g1 = dgl.graph(([0, 1, 1, 2, 3], [1, 2, 3, 0, 0]))
+    >>> dgl.sampling.node2vec_random_walk(g1, [0, 1, 2, 0], 1, 1, length=4)
+    tensor([[0, 1, 3, 0, 1],
+            [1, 2, 0, 1, 3],
+            [2, 0, 1, 3, 0],
+            [0, 1, 2, 0, 1]])
+
+    >>> dgl.sampling.node2vec_random_walk(g1, [0, 1, 2, 0], 1, 1, length=4, return_eids=True)
+    (tensor([[0, 1, 3, 0, 1],
+             [1, 2, 0, 1, 2],
+             [2, 0, 1, 2, 0],
+             [0, 1, 2, 0, 1]]),
+     tensor([[0, 2, 4, 0],
+             [1, 3, 0, 1],
+             [3, 0, 1, 3],
+             [0, 1, 3, 0]]))
     """
     assert g.device == F.cpu(), "Graph must be on CPU."
 

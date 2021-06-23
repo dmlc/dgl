@@ -26,16 +26,6 @@ namespace sampling {
 namespace impl {
 
 /*!
- * \brief Node2vec random walk step function
- */
-template <typename IdxType>
-using Node2vecStepFunc = std::function<std::tuple<dgl_id_t, dgl_id_t, bool>(
-    IdxType *,  // node IDs generated so far
-    dgl_id_t,   // last node ID generated
-    dgl_id_t,   // second-to-last node ID generated
-    int64_t)>;  // of steps
-
-/*!
  * \brief Node2vec random walk.
  * \param hg The heterograph.
  * \param seeds A 1D array of seed nodes, with the type the source type of the

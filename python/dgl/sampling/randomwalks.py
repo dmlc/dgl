@@ -99,6 +99,19 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
              [2, 0, 1, 3, 0],
              [0, 1, 2, 0, 1]]), tensor([0, 0, 0, 0, 0]))
 
+    Or returning edge IDs:
+
+    >>> dgl.sampling.random_walk(g1, [0, 1, 2, 0], length=4, return_eids=True)
+    (tensor([[0, 1, 2, 0, 1],
+             [1, 3, 0, 1, 2],
+             [2, 0, 1, 3, 0],
+             [0, 1, 3, 0, 1]]),
+     tensor([[0, 1, 3, 0],
+             [2, 4, 0, 1],
+             [3, 0, 2, 4],
+             [0, 2, 4, 0]]),
+     tensor([0, 0, 0, 0, 0]))
+
     The first tensor indicates the random walk path for each seed node.
     The j-th element in the second tensor indicates the node type ID of the j-th node
     in every path.  In this case, it is returning all 0.

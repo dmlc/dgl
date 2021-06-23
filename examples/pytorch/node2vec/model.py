@@ -6,11 +6,10 @@ from dgl.sampling import node2vec_random_walk
 
 
 class Node2vec(nn.Module):
-    """
-    Node2vec model from paper node2vec: Scalable Feature Learning for Networks <https://arxiv.org/abs/1607.00653>
+    """Node2vec model from paper node2vec: Scalable Feature Learning for Networks <https://arxiv.org/abs/1607.00653>
     Attributes
     ----------
-    g: Graph
+    g: DGLGraph
         The graph.
     embedding_dim: int
         Dimension of node embedding.
@@ -38,7 +37,6 @@ class Node2vec(nn.Module):
         to sum up to one).  The result will be undefined otherwise.
 
         If omitted, DGL assumes that the neighbors are picked uniformly.
-
     """
 
     def __init__(self, g, embedding_dim, walk_length, p, q, num_walks=10, window_size=5, num_negatives=5,
@@ -175,10 +173,10 @@ class Node2vec(nn.Module):
 
 class Node2vecModel(object):
     """
-    Wrapper of node2vec model.
+    Wrapper of the ``Node2Vec`` class with a ``train`` method.
     Attributes
     ----------
-    g: Graph
+    g: DGLGraph
         The graph.
     embedding_dim: int
         Dimension of node embedding.
@@ -205,18 +203,14 @@ class Node2vecModel(object):
         to sum up to one).  The result will be undefined otherwise.
 
         If omitted, DGL assumes that the neighbors are picked uniformly. Default: ``None``.
-
     eval_set: list of tuples (Tensor, Tensor)
         [(nodes_train,y_train),(nodes_val,y_val)]
         If omitted, model will not be evaluated. Default: ``None``.
-
     eval_steps: int
         Interval steps of evaluation.
         if set <= 0, model will not be evaluated. Default: ``None``.
-
     device: str
         device, default 'cpu'.
-
     """
 
     def __init__(self, g, embedding_dim, walk_length, p=1.0, q=1.0, num_walks=1, window_size=5,
