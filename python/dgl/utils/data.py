@@ -293,7 +293,8 @@ def infer_num_nodes(data, bipartite=False):
     if isinstance(data, tuple) and len(data) == 2:
         if not isinstance(data[0], str):
             raise TypeError('Expected sparse format as a str, but got %s' % type(data[0]))
-        elif data[0] == 'coo':
+
+        if data[0] == 'coo':
             # ('coo', (src, dst)) format
             u, v = data[1]
             nsrc = F.as_scalar(F.max(u, dim=0)) + 1 if len(u) > 0 else 0
