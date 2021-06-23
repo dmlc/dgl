@@ -456,7 +456,6 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     if (aten::IsValidIdArray(edge_ids))
       CHECK((indices->shape[0] == edge_ids->shape[0]) || aten::IsNullArray(edge_ids))
         << "edge id arrays should have the same length as indices if not empty";
-    std::cout << num_src << num_dst << indptr->shape[0] - 1 << std::endl;
     CHECK_EQ(num_src, indptr->shape[0] - 1)
       << "number of nodes do not match the length of indptr minus 1.";
 
