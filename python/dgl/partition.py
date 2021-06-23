@@ -199,7 +199,7 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
             eid = F.astype(induced_edges[0], F.int64) + max_eid * F.astype(inner_edge == 0, F.int64)
 
             _, index = F.sort_1d(eid)
-            subg1 = edge_subgraph(subg1, index, preserve_nodes=True)
+            subg1 = edge_subgraph(subg1, index, relabel_nodes=False)
             subg1.ndata[NID] = induced_nodes[0]
             subg1.edata[EID] = F.gather_row(induced_edges[0], index)
         else:
@@ -419,12 +419,28 @@ class NDArrayPartition(object):
                 array_size, num_parts)
         else:
             assert False, 'Unknown partition mode "{}"'.format(mode)
+        self._array_size = array_size
+        self._num_parts = num_parts
 
+    def num_parts(self):
+        """ Get the number of partitions.
+        """
+        return self._num_parts
+
+    def array_size(self):
+        """ Get the total size of the first dimension of the partitioned array.
+        """
+        return self._array_size
 
     def get(self):
         """ Get the C-handle for this object.
         """
         return self._partition
+
+    def get_local_indices(self, part, ctx):
+        """ Get the set of global indices in this given partition.
+        """
+        return self.map_to_global(F.arange(0, self.local_size(part), ctx=ctx), part)
 
     def local_size(self, part):
         """ Get the number of rows/items assigned to the given part.
