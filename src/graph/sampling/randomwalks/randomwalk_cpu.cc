@@ -7,6 +7,7 @@
 #include <dgl/array.h>
 #include <dgl/base_heterograph.h>
 #include <vector>
+#include <utility>
 #include "randomwalks_impl.h"
 #include "randomwalks_cpu.h"
 #include "metapath_randomwalk.h"
@@ -21,7 +22,7 @@ namespace sampling {
 namespace impl {
 
 template<DLDeviceType XPU, typename IdxType>
-IdArray RandomWalk(
+std::pair<IdArray, IdArray> RandomWalk(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
@@ -35,13 +36,13 @@ IdArray RandomWalk(
 }
 
 template
-IdArray RandomWalk<kDLCPU, int32_t>(
+std::pair<IdArray, IdArray> RandomWalk<kDLCPU, int32_t>(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
     const std::vector<FloatArray> &prob);
 template
-IdArray RandomWalk<kDLCPU, int64_t>(
+std::pair<IdArray, IdArray> RandomWalk<kDLCPU, int64_t>(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,

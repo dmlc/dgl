@@ -843,7 +843,7 @@ class HeteroGraphIndex(ObjectBase):
             raise DGLError('Invalid incidence matrix type: %s' % str(typestr))
         return inc, shuffle_idx
 
-    def node_subgraph(self, induced_nodes):
+    def node_subgraph(self, induced_nodes, relabel_nodes):
         """Return the induced node subgraph.
 
         Parameters
@@ -851,6 +851,9 @@ class HeteroGraphIndex(ObjectBase):
         induced_nodes : list of utils.Index
             Induced nodes. The length should be equal to the number of
             node types in this heterograph.
+        relabel_nodes : bool
+            If True, the extracted subgraph will only have the nodes in the specified node set
+            and it will relabel the nodes in order.
 
         Returns
         -------
@@ -858,7 +861,7 @@ class HeteroGraphIndex(ObjectBase):
             The subgraph index.
         """
         vids = [F.to_dgl_nd(nodes) for nodes in induced_nodes]
-        return _CAPI_DGLHeteroVertexSubgraph(self, vids)
+        return _CAPI_DGLHeteroVertexSubgraph(self, vids, relabel_nodes)
 
     def edge_subgraph(self, induced_edges, preserve_nodes):
         """Return the induced edge subgraph.
@@ -1230,6 +1233,31 @@ def disjoint_partition(graph, bnn_all_types, bne_all_types):
     bne_all_types = utils.toindex(list(itertools.chain.from_iterable(bne_all_types)))
     return _CAPI_DGLHeteroDisjointPartitionBySizes_v2(
         graph, bnn_all_types.todgltensor(), bne_all_types.todgltensor())
+
+def slice_gidx(graph, num_nodes, start_nid, num_edges, start_eid):
+    """Slice a chunk of the graph.
+
+    Parameters
+    ----------
+    graph : HeteroGraphIndex
+        The batched graph to slice.
+    num_nodes : utils.Index
+        Number of nodes per node type in the result graph.
+    start_nid : utils.Index
+        Start node ID per node type in the result graph.
+    num_edges : utils.Index
+        Number of edges per edge type in the result graph.
+    start_eid : utils.Index
+        Start edge ID per edge type in the result graph.
+
+    Returns
+    -------
+    HeteroGraphIndex
+        The sliced graph.
+    """
+    return _CAPI_DGLHeteroSlice(
+        graph, num_nodes.todgltensor(), start_nid.todgltensor(),
+        num_edges.todgltensor(), start_eid.todgltensor())
 
 #################################################################
 # Data structure used by C APIs

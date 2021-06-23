@@ -379,6 +379,8 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroVertexSubgraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     List<Value> vids = args[1];
+    bool relabel_nodes = args[2];
+    CHECK(relabel_nodes) << "Node subgraph only supports relabel_nodes=True.";
     std::vector<IdArray> vid_vec;
     vid_vec.reserve(vids.size());
     for (Value val : vids) {
@@ -581,6 +583,18 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroDisjointPartitionBySizes")
     *rv = ret_list;
 });
 
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroSlice")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    const IdArray num_nodes_per_type = args[1];
+    const IdArray start_nid_per_type = args[2];
+    const IdArray num_edges_per_type = args[3];
+    const IdArray start_eid_per_type = args[4];
+    auto hgptr = SliceHeteroGraph(hg->meta_graph(), hg.sptr(), num_nodes_per_type,
+                                  start_nid_per_type, num_edges_per_type, start_eid_per_type);
+    *rv = HeteroGraphRef(hgptr);
+});
+
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetCreatedFormats")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
@@ -637,8 +651,9 @@ DGL_REGISTER_GLOBAL("subgraph._CAPI_DGLInSubgraph")
 .set_body([] (DGLArgs args, DGLRetValue *rv) {
     HeteroGraphRef hg = args[0];
     const auto& nodes = ListValueToVector<IdArray>(args[1]);
+    bool relabel_nodes = args[2];
     std::shared_ptr<HeteroSubgraph> ret(new HeteroSubgraph);
-    *ret = InEdgeGraph(hg.sptr(), nodes);
+    *ret = InEdgeGraph(hg.sptr(), nodes, relabel_nodes);
     *rv = HeteroGraphRef(ret);
   });
 
@@ -646,8 +661,9 @@ DGL_REGISTER_GLOBAL("subgraph._CAPI_DGLOutSubgraph")
 .set_body([] (DGLArgs args, DGLRetValue *rv) {
     HeteroGraphRef hg = args[0];
     const auto& nodes = ListValueToVector<IdArray>(args[1]);
+    bool relabel_nodes = args[2];
     std::shared_ptr<HeteroSubgraph> ret(new HeteroSubgraph);
-    *ret = OutEdgeGraph(hg.sptr(), nodes);
+    *ret = OutEdgeGraph(hg.sptr(), nodes, relabel_nodes);
     *rv = HeteroGraphRef(ret);
   });
 
