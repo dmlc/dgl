@@ -392,7 +392,7 @@ if __name__ == '__main__':
     test_multiprocess_cpu_sparse_adam(4)
     test_multiprocess_cpu_sparse_adam(8)
     test_multiprocess_sparse_adam_cpu_zero_step(2)
-    '''
+
     test_multiprocess_sparse_adam(2, backend='gloo')
     test_multiprocess_sparse_adam(4, backend='gloo')
     test_multiprocess_sparse_adam(8, backend='gloo')
@@ -405,4 +405,3 @@ if __name__ == '__main__':
 
     test_multiprocess_sparse_adam_cuda_tensor(2)
     test_multiprocess_sparse_adam_zero_step_cuda_tensor(4)
-    '''
