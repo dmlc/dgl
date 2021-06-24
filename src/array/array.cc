@@ -580,6 +580,23 @@ COOMatrix CSRRowWiseTopk(
   return ret;
 }
 
+COOMatrix CSRRowWiseSamplingBiased(
+    CSRMatrix mat,
+    IdArray rows,
+    int64_t num_samples,
+    NDArray tag_offset,
+    FloatArray bias,
+    bool replace) {
+  COOMatrix ret;
+  ATEN_CSR_SWITCH(mat, XPU, IdType, "CSRRowWiseSamplingBiased", {
+    ATEN_FLOAT_TYPE_SWITCH(bias->dtype, FloatType, "bias", {
+        ret = impl::CSRRowWiseSamplingBiased<XPU, IdType, FloatType>(
+          mat, rows, num_samples, tag_offset, bias, replace);
+    });
+  });
+  return ret;
+}
+
 
 CSRMatrix UnionCsr(const std::vector<CSRMatrix>& csrs) {
   CSRMatrix ret;
