@@ -24,11 +24,32 @@ def test_gin():
         assert len(ds) == n_graphs, (len(ds), name)
 
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
+def test_fraud():
+    g = data.FraudDataset('amazon')[0]
+    assert g.num_nodes() == 11944
+
+    g = data.FraudAmazonDataset()[0]
+    assert g.num_nodes() == 11944
+
+    g = data.FraudYelpDataset()[0]
+    assert g.num_nodes() == 45954
+
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
+def test_fakenews():
+    ds = data.FakeNewsDataset('politifact', 'bert')
+    assert len(ds) == 314
+
+    ds = data.FakeNewsDataset('gossipcop', 'profile')
+    assert len(ds) == 5464
+
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
 def test_tudataset_regression():    
     ds = data.TUDataset('ZINC_test', force_reload=True)
     assert len(ds) == 5000
+
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
 def test_data_hash():
@@ -44,7 +65,11 @@ def test_data_hash():
     assert a.hash == b.hash
     assert a.hash != c.hash
 
+
 if __name__ == '__main__':
     test_minigc()
     test_gin()
     test_data_hash()
+    test_tudataset_regression()
+    test_fraud()
+    test_fakenews()
