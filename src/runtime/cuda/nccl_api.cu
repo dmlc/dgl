@@ -4,6 +4,7 @@
  * \brief Implementation of wrapper around NCCL routines.
  */
 
+#ifdef DGL_USE_NCCL
 
 #include "nccl_api.h"
 
@@ -782,5 +783,5 @@ DGL_REGISTER_GLOBAL("cuda.nccl._CAPI_DGLNCCLSparseAllToAllPull")
 }  // namespace runtime
 }  // namespace dgl
 
-
+#endif
 
