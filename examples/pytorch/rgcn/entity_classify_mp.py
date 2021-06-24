@@ -297,6 +297,8 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, queue=None):
     if n_gpus > 1 and n_cpus - args.num_workers > 0:
         th.set_num_threads(n_cpus-args.num_workers)
     for epoch in range(args.n_epochs):
+        if n_gpus > 1:
+            loader.set_epoch(epoch)
         tstart = time.time()
         model.train()
         embed_layer.train()
