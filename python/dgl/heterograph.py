@@ -622,7 +622,7 @@ class DGLHeteroGraph(object):
             else:
                 edges[c_etype] = self.edges(form='eid', order='eid', etype=c_etype)
 
-        sub_g = self.edge_subgraph(edges, preserve_nodes=True, store_ids=store_ids)
+        sub_g = self.edge_subgraph(edges, relabel_nodes=False, store_ids=store_ids)
         self._graph = sub_g._graph
         self._node_frames = sub_g._node_frames
         self._edge_frames = sub_g._edge_frames
@@ -4294,7 +4294,7 @@ class DGLHeteroGraph(object):
             eid = utils.parse_edges_arg_to_eid(self, edges, etid, 'edges')
         if core.is_builtin(func):
             if not is_all(eid):
-                g = g.edge_subgraph(eid, preserve_nodes=True)
+                g = g.edge_subgraph(eid, relabel_nodes=False)
             edata = core.invoke_gsddmm(g, func)
         else:
             edata = core.invoke_edge_udf(g, eid, etype, func)
