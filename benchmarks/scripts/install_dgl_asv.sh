@@ -2,11 +2,7 @@
 
 set -e
 
-. /opt/conda/etc/profile.d/conda.sh
-
-pip install -r /asv/torch_gpu_pip.txt
-pip install pandas rdflib ogb
-
+# . /opt/conda/etc/profile.d/conda.sh
 
 # install
 pushd python

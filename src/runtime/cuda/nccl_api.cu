@@ -176,7 +176,7 @@ std::pair<IdArray, NDArray> SparsePush(
   Workspace<DType> send_value(device, ctx, num_in*num_feat);
 
   // permute the indices and values
-  {
+  if (num_in > 0) {
     const dim3 block(256);
     const dim3 grid((num_in+block.x-1)/block.x);
 

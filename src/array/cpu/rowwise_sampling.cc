@@ -59,6 +59,24 @@ inline PickFn<IdxType> GetSamplingUniformPickFn(
     };
   return pick_fn;
 }
+
+template <typename IdxType, typename FloatType>
+inline PickFn<IdxType> GetSamplingBiasedPickFn(
+    int64_t num_samples, IdArray split, FloatArray bias, bool replace) {
+  PickFn<IdxType> pick_fn = [num_samples, split, bias, replace]
+    (IdxType rowid, IdxType off, IdxType len,
+     const IdxType* col, const IdxType* data,
+     IdxType* out_idx) {
+    const IdxType *tag_offset = static_cast<IdxType *>(split->data) + rowid * split->shape[1];
+    RandomEngine::ThreadLocal()->BiasedChoice<IdxType, FloatType>(
+            num_samples, tag_offset, bias, out_idx, replace);
+    for (int64_t j = 0; j < num_samples; ++j) {
+      out_idx[j] += off;
+    }
+  };
+  return pick_fn;
+}
+
 }  // namespace
 
 /////////////////////////////// CSR ///////////////////////////////
@@ -91,6 +109,33 @@ template COOMatrix CSRRowWiseSamplingUniform<kDLCPU, int32_t>(
     CSRMatrix, IdArray, int64_t, bool);
 template COOMatrix CSRRowWiseSamplingUniform<kDLCPU, int64_t>(
     CSRMatrix, IdArray, int64_t, bool);
+
+template <DLDeviceType XPU, typename IdxType, typename FloatType>
+COOMatrix CSRRowWiseSamplingBiased(
+    CSRMatrix mat,
+    IdArray rows,
+    int64_t num_samples,
+    NDArray tag_offset,
+    FloatArray bias,
+    bool replace
+) {
+  auto pick_fn = GetSamplingBiasedPickFn<IdxType, FloatType>(
+      num_samples, tag_offset, bias, replace);
+  return CSRRowWisePick(mat, rows, num_samples, replace, pick_fn);
+}
+
+template COOMatrix CSRRowWiseSamplingBiased<kDLCPU, int32_t, float>(
+  CSRMatrix, IdArray, int64_t, NDArray, FloatArray, bool);
+
+template COOMatrix CSRRowWiseSamplingBiased<kDLCPU, int64_t, float>(
+  CSRMatrix, IdArray, int64_t, NDArray, FloatArray, bool);
+
+template COOMatrix CSRRowWiseSamplingBiased<kDLCPU, int32_t, double>(
+  CSRMatrix, IdArray, int64_t, NDArray, FloatArray, bool);
+
+template COOMatrix CSRRowWiseSamplingBiased<kDLCPU, int64_t, double>(
+  CSRMatrix, IdArray, int64_t, NDArray, FloatArray, bool);
+
 
 /////////////////////////////// COO ///////////////////////////////
 
