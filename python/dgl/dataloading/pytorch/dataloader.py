@@ -403,10 +403,15 @@ class NodeDataLoader:
     device : device context, optional
         The device of the generated MFGs in each iteration, which should be a
         PyTorch device object (e.g., ``torch.device``).
+
+        By default this value is the same as the device of :attr:`g`.
     use_ddp : boolean, optional
         If True, tells the DataLoader to split the training set for each
         participating process appropriately using
         :class:`torch.utils.data.distributed.DistributedSampler`.
+
+        Note that :func:`~dgl.dataloading.NodeDataLoader.set_epoch` must be called
+        at the beginning of every epoch if :attr:`use_ddp` is True.
 
         Overrides the :attr:`sampler` argument of :class:`torch.utils.data.DataLoader`.
     ddp_seed : int, optional
@@ -583,6 +588,8 @@ class EdgeDataLoader:
     device : device context, optional
         The device of the generated MFGs and graphs in each iteration, which should be a
         PyTorch device object (e.g., ``torch.device``).
+
+        By default this value is the same as the device of :attr:`g`.
     g_sampling : DGLGraph, optional
         The graph where neighborhood sampling is performed.
 
@@ -625,6 +632,9 @@ class EdgeDataLoader:
         If True, tells the DataLoader to split the training set for each
         participating process appropriately using
         :mod:`torch.utils.data.distributed.DistributedSampler`.
+
+        Note that :func:`~dgl.dataloading.NodeDataLoader.set_epoch` must be called
+        at the beginning of every epoch if :attr:`use_ddp` is True.
 
         The dataloader will have a :attr:`dist_sampler` attribute to set the
         epoch number, as recommended by PyTorch.
