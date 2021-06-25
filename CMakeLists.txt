@@ -176,7 +176,7 @@ endif(USE_CUDA)
 
 if(USE_CUDA)
   cuda_add_library(dgl SHARED ${DGL_SRC})
-  if (NOT USE_SYSTEM_NCCL AND USE_NCCL)
+  if (USE_NCCL AND NOT USE_SYSTEM_NCCL)
     add_dependencies(dgl nccl_external)
   endif()
 else(USE_CUDA)
