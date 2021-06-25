@@ -68,7 +68,7 @@ void SDDMMCsr(const std::string& op,
               int lhs_target,
               int rhs_target);
 /*!
- * \brief Generalized Sampled Dense-Dense Matrix Multiplication on Csr 
+ * \brief Generalized Sampled Dense-Dense Matrix Multiplication on Csr
  format with heterograph support.
   */
 template <int XPU, typename IdType, int bits>

@@ -70,7 +70,10 @@ class SparseGradOptimizer(abc.ABC):
                     else:
                         assert not self._device, \
                             "All gradients must be on the same device"
-            if self._device:
+
+            # distributed backend use nccl
+            if self._device and \
+                (not th.distributed.is_initialized() or th.distributed.get_backend() == 'nccl'):
                 # device is only set if the grads are on a GPU
                 self._comm_setup()
             else:
@@ -284,9 +287,11 @@ class SparseGradOptimizer(abc.ABC):
                                 # The overall buffer cost will be smaller than three times
                                 # the maximum memory requirement for sharing gradients.
                                 buffer_size = 128 if idx_i.shape[0] < 128 else idx_i.shape[0] * 2
-                                idx_shmem = create_shared_mem_array(idx_shmem_name, \
+                                idx_shmem = create_shared_mem_array(
+                                    '{}_{}'.format(idx_shmem_name, buffer_size), \
                                     (buffer_size,), idx_dtype)
-                                grad_shmem = create_shared_mem_array(grad_shmem_name, \
+                                grad_shmem = create_shared_mem_array(
+                                    '{}_{}'.format(grad_shmem_name, buffer_size), \
                                     (buffer_size, grad_dim), grad_dtype)
                                 self._shared_cache[emb_name][idx_shmem_name] = idx_shmem
                                 self._shared_cache[emb_name][grad_shmem_name] = grad_shmem
@@ -321,9 +326,11 @@ class SparseGradOptimizer(abc.ABC):
                             if idx_shmem_name not in self._shared_cache[emb_name] or \
                                 self._shared_cache[emb_name][idx_shmem_name].shape[0] < size:
                                 buffer_size = 128 if size < 128 else size * 2
-                                idx_shmem = get_shared_mem_array(idx_shmem_name, \
+                                idx_shmem = get_shared_mem_array(
+                                    '{}_{}'.format(idx_shmem_name, buffer_size), \
                                     (buffer_size,), idx_dtype)
-                                grad_shmem = get_shared_mem_array(grad_shmem_name, \
+                                grad_shmem = get_shared_mem_array(
+                                    '{}_{}'.format(grad_shmem_name, buffer_size), \
                                     (buffer_size, grad_dim), grad_dtype)
                                 self._shared_cache[emb_name][idx_shmem_name] = idx_shmem
                                 self._shared_cache[emb_name][grad_shmem_name] = grad_shmem
@@ -424,10 +431,15 @@ class SparseAdagrad(SparseGradOptimizer):
             emb_name = emb.name
             if th.device(emb.emb_tensor.device) == th.device('cpu'):
                 # if our embedding is on the CPU, our state also has to be
-                if self._rank <= 0:
+                if self._rank < 0:
+                    state = th.empty(
+                        emb.weight.shape,
+                        dtype=th.float32,
+                        device=eth.device('cpu')).zero_()
+                elif self._rank == 0:
                     state = create_shared_mem_array(emb_name+'_state', \
                         emb.weight.shape, th.float32).zero_()
-                if self._rank == 0:
+
                     if self._world_size > 1:
                         emb.store.set(emb_name+'_opt', emb_name)
                 elif self._rank > 0:
@@ -538,14 +550,27 @@ class SparseAdam(SparseGradOptimizer):
             emb_name = emb.name
             if th.device(emb.emb_tensor.device) == th.device('cpu'):
                 # if our embedding is on the CPU, our state also has to be
-                if self._rank <= 0:
+                if self._rank < 0:
+                    state_step = th.empty(
+                        (emb.weight.shape[0],),
+                        dtype=th.float32,
+                        device=th.device('cpu')).zero_()
+                    state_mem = th.empty(
+                        emb.weight.shape,
+                        dtype=th.float32,
+                        device=th.device('cpu')).zero_()
+                    state_power = th.empty(
+                        emb.weight.shape,
+                        dtype=th.float32,
+                        device=th.device('cpu')).zero_()
+                elif self._rank == 0:
                     state_step = create_shared_mem_array(emb_name+'_step', \
                         (emb.weight.shape[0],), th.float32).zero_()
                     state_mem = create_shared_mem_array(emb_name+'_mem', \
                         emb.weight.shape, th.float32).zero_()
                     state_power = create_shared_mem_array(emb_name+'_power', \
                         emb.weight.shape, th.float32).zero_()
-                if self._rank == 0:
+
                     if self._world_size > 1:
                         emb.store.set(emb_name+'_opt', emb_name)
                 elif self._rank > 0:
@@ -598,6 +623,12 @@ class SparseAdam(SparseGradOptimizer):
             exec_dev = grad.device
             state_dev = state_step.device
 
+            # only perform async copies cpu -> gpu, or gpu-> gpu, but block
+            # when copying to the cpu, so as to ensure the copy is finished
+            # before operating on the data on the cpu
+            state_nonblock = False # state_dev != th.device('cpu')
+            exec_nonblock = False # exec_dev != th.device('cpu')
+
             # There can be duplicated indices due to sampling.
             # Thus unique them here and average the gradient here.
             grad_indices, inverse, cnt = th.unique(idx,
@@ -605,9 +636,9 @@ class SparseAdam(SparseGradOptimizer):
                                                    return_counts=True)
             state_idx = grad_indices.to(state_dev)
             state_step[state_idx] += 1
-            state_step = state_step[state_idx].to(exec_dev, non_blocking=True)
-            orig_mem = state_mem[state_idx].to(exec_dev, non_blocking=True)
-            orig_power = state_power[state_idx].to(exec_dev, non_blocking=True)
+            state_step = state_step[state_idx].to(exec_dev, non_blocking=exec_nonblock)
+            orig_mem = state_mem[state_idx].to(exec_dev, non_blocking=exec_nonblock)
+            orig_power = state_power[state_idx].to(exec_dev, non_blocking=exec_nonblock)
 
             grad_values = th.zeros((grad_indices.shape[0], grad.shape[1]), device=exec_dev)
             grad_values.index_add_(0, inverse, grad)
@@ -617,8 +648,10 @@ class SparseAdam(SparseGradOptimizer):
             grad_power = grad_values * grad_values
             update_mem = beta1 * orig_mem + (1.-beta1) * grad_mem
             update_power = beta2 * orig_power + (1.-beta2) * grad_power
-            state_mem[state_idx] = update_mem.to(state_dev, non_blocking=True)
-            state_power[state_idx] = update_power.to(state_dev, non_blocking=True)
+            state_mem[state_idx] = update_mem.to(state_dev,
+                                                 non_blocking=state_nonblock)
+            state_power[state_idx] = update_power.to(state_dev,
+                                                     non_blocking=state_nonblock)
 
             update_mem_corr = update_mem / (1. - th.pow(th.tensor(beta1, device=exec_dev),
                                                         state_step)).unsqueeze(1)

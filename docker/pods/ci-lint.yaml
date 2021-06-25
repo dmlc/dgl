@@ -10,5 +10,5 @@ spec:
     tty: true
     resources:
       requests:
-        cpu: 4
+        cpu: 1
   serviceAccountName: dglciuser
