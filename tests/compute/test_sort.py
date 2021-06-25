@@ -62,8 +62,8 @@ def test_sort_with_tag(idtype):
     assert(not check_sort(old_csr, tag))  # Check the original csr is not modified.
 
     new_g = dgl.sort_in_edges(g, tag)
-    old_csc = g.adjacency_matrix(transpose=False, scipy_fmt='csr')
-    new_csc = new_g.adjacency_matrix(transpose=False, scipy_fmt='csr')
+    old_csc = g.adjacency_matrix(transpose=True, scipy_fmt='csr')
+    new_csc = new_g.adjacency_matrix(transpose=True, scipy_fmt='csr')
     assert(check_sort(new_csc, tag, new_g.ndata["_TAG_OFFSET"]))
     assert(not check_sort(old_csc, tag))
 
@@ -83,8 +83,8 @@ def test_sort_with_tag_bipartite(idtype):
     assert(not check_sort(old_csr, vtag))
 
     new_g = dgl.sort_in_edges(g, utag)
-    old_csc = g.adjacency_matrix(transpose=False, scipy_fmt='csr')
-    new_csc = new_g.adjacency_matrix(transpose=False, scipy_fmt='csr')
+    old_csc = g.adjacency_matrix(transpose=True, scipy_fmt='csr')
+    new_csc = new_g.adjacency_matrix(transpose=True, scipy_fmt='csr')
     assert(check_sort(new_csc, utag, new_g.nodes['_V'].data['_TAG_OFFSET']))
     assert(not check_sort(old_csc, utag))
 

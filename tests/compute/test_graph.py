@@ -118,9 +118,9 @@ def test_query():
         assert F.allclose(g.out_degrees([8, 9]), F.tensor([0, 1]))
 
         assert np.array_equal(
-                F.sparse_to_numpy(g.adjacency_matrix(transpose=False)), scipy_coo_input().toarray().T)
+                F.sparse_to_numpy(g.adjacency_matrix(transpose=True)), scipy_coo_input().toarray().T)
         assert np.array_equal(
-                F.sparse_to_numpy(g.adjacency_matrix(transpose=True)), scipy_coo_input().toarray())
+                F.sparse_to_numpy(g.adjacency_matrix(transpose=False)), scipy_coo_input().toarray())
 
     def _test(g):
         # test twice to see whether the cached format works or not
@@ -192,9 +192,9 @@ def test_query():
         assert F.allclose(g.out_degrees([8, 9]), F.tensor([0, 1]))
 
         assert np.array_equal(
-                F.sparse_to_numpy(g.adjacency_matrix(transpose=False)), scipy_coo_input().toarray().T)
+                F.sparse_to_numpy(g.adjacency_matrix(transpose=True)), scipy_coo_input().toarray().T)
         assert np.array_equal(
-                F.sparse_to_numpy(g.adjacency_matrix(transpose=True)), scipy_coo_input().toarray())
+                F.sparse_to_numpy(g.adjacency_matrix(transpose=False)), scipy_coo_input().toarray())
 
     def _test_csr(g):
         # test twice to see whether the cached format works or not
@@ -253,8 +253,8 @@ def test_scipy_adjmat():
     adj_1 = g.adj(scipy_fmt='coo')
     assert np.array_equal(adj_0.toarray(), adj_1.toarray())
 
-    adj_t0 = g.adj(transpose=True, scipy_fmt='csr')
-    adj_t_1 = g.adj(transpose=True, scipy_fmt='coo')
+    adj_t0 = g.adj(transpose=False, scipy_fmt='csr')
+    adj_t_1 = g.adj(transpose=False, scipy_fmt='coo')
     assert np.array_equal(adj_0.toarray(), adj_1.toarray())
 
 def test_incmat():
