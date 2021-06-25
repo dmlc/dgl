@@ -26,7 +26,7 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
     Parameters
     ----------
     g : DGLGraph
-        The graph.  Must be on CPU.
+        The graph.  Can be either on CPU or GPU.
     nodes : tensor or dict
         Node IDs to sample neighbors from.
 
@@ -53,6 +53,8 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
         The features must be non-negative floats, and the sum of the features of
         inbound/outbound edges for every node must be positive (though they don't have
         to sum up to one).  Otherwise, the result will be undefined.
+
+        If :attr:`prob` is not None, GPU sampling is not supported.
     replace : bool, optional
         If True, sample with replacement.
     copy_ndata: bool, optional
@@ -75,7 +77,8 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
     Returns
     -------
     DGLGraph
-        A sampled subgraph containing only the sampled neighboring edges.  It is on CPU.
+        A sampled subgraph containing only the sampled neighboring edges, with the
+        same device as the input graph.
 
     Notes
     -----
