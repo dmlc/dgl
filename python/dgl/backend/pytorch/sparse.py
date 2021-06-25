@@ -310,7 +310,7 @@ class CSRMM(th.autograd.Function):
     @staticmethod
     def forward(ctx, gidxA, A_weights, gidxB, B_weights, num_vtypes):
         gidxC, C_weights = _csrmm(gidxA, A_weights, gidxB, B_weights, num_vtypes)
-        nrows, ncols, C_indptr, C_indices, C_eids = gidxC.adjacency_matrix_tensors(0, True, 'csr')
+        nrows, ncols, C_indptr, C_indices, C_eids = gidxC.adjacency_matrix_tensors(0, False, 'csr')
         # Note: the returned C_indptr, C_indices and C_eids tensors MUST be the same
         # as the underlying tensors of the created graph gidxC.
         ctx.backward_cache = gidxA, gidxB, gidxC
@@ -337,7 +337,7 @@ class CSRSum(th.autograd.Function):
         # PyTorch tensors must be explicit arguments of the forward function
         gidxC, C_weights = _csrsum(gidxs, weights)
         nrows, ncols, C_indptr, C_indices, C_eids = gidxC.adjacency_matrix_tensors(
-            0, True, 'csr')
+            0, False, 'csr')
         # Note: the returned C_indptr, C_indices and C_eids tensors MUST be the same
         # as the underlying tensors of the created graph gidxC.
         ctx.backward_cache = gidxs, gidxC
