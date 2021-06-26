@@ -25,6 +25,9 @@
 #endif  // DEBUG
 #include <dmlc/omp.h>
 
+#define NUM_BLOCKS_PER_THREAD 20
+#define BLOCKING_HEURISTIC_PARAM 500
+
 namespace dgl {
 namespace aten {
 namespace cpu {
@@ -58,17 +61,17 @@ inline void SpMMCreateBlocks(
 
   const IdType M = csr.num_rows;
   const IdType K = csr.num_cols;
-  IdType* IndPtr = csr.indptr.Ptr<IdType>();
-  IdType* Indices = csr.indices.Ptr<IdType>();
-  IdType* Edges = csr.data.Ptr<IdType>();
-  CHECK_NOTNULL(IndPtr);
+  IdType* indptr = csr.indptr.Ptr<IdType>();
+  IdType* indices = csr.indices.Ptr<IdType>();
+  IdType* edges = csr.data.Ptr<IdType>();
+  CHECK_NOTNULL(indptr);
   if (use_lhs)
-    CHECK_NOTNULL(Indices);
+    CHECK_NOTNULL(indices);
   if (use_rhs)
-    CHECK_NOTNULL(Edges);
+    CHECK_NOTNULL(edges);
 
   if (num_K_blocks > 1) {
-    IdType *indptr = reinterpret_cast<IdType *>(aligned_alloc(64,
+    IdType *indptr_block_buf = reinterpret_cast<IdType *>(aligned_alloc(64,
                                                              (M_block_size + 1) * num_M_blocks *
                                                              num_K_blocks * sizeof(IdType)));
 
@@ -82,18 +85,18 @@ inline void SpMMCreateBlocks(
         IdType M_start = m * M_block_size;
         IdType M_end = (m + 1) * M_block_size;
         if (M_end > M) M_end = M;
-        IdType nnz = IndPtr[M_end] - IndPtr[M_start];
+        IdType nnz = indptr[M_end] - indptr[M_start];
 
         IdType cur_indices_id = 0;
-        IdType *indices, *edges;
+        IdType *indices_block_buf, *edges_block_buf;
         if (use_lhs)
-          indices = reinterpret_cast<IdType *>(aligned_alloc(64, nnz * sizeof(IdType)));
+          indices_block_buf = reinterpret_cast<IdType *>(aligned_alloc(64, nnz * sizeof(IdType)));
         if (use_rhs)
-          edges = reinterpret_cast<IdType *>(aligned_alloc(64, nnz * sizeof(IdType)));
+          edges_block_buf = reinterpret_cast<IdType *>(aligned_alloc(64, nnz * sizeof(IdType)));
 
         for (IdType i = M_start; i < M_end; i++) {
-          my_cur_col_id[(i - M_start) * 2] = IndPtr[i];
-          my_cur_col_id[(i - M_start) * 2 + 1] = IndPtr[i + 1];
+          my_cur_col_id[(i - M_start) * 2] = indptr[i];
+          my_cur_col_id[(i - M_start) * 2 + 1] = indptr[i + 1];
         }
         for (IdType k = 0; k < num_K_blocks; k++) {
           IdType K_start = k * K_block_size;
@@ -103,12 +106,12 @@ inline void SpMMCreateBlocks(
           cur_csr.num_rows = M_end - M_start;
           cur_csr.num_cols = K_end - K_start;
           // Create csr_ij
-          IdType *cur_csr_indptr = indptr + (m * num_K_blocks + k) * (M_block_size + 1);
+          IdType *cur_csr_indptr = indptr_block_buf + (m * num_K_blocks + k) * (M_block_size + 1);
           IdType *cur_csr_indices = nullptr, *cur_csr_edges = nullptr;
           if (use_lhs)
-            cur_csr_indices = indices + cur_indices_id;
+            cur_csr_indices = indices_block_buf + cur_indices_id;
           if (use_rhs)
-            cur_csr_edges = edges + cur_indices_id;
+            cur_csr_edges = edges_block_buf + cur_indices_id;
           IdType cur_nnz = 0;
           for (IdType i = M_start; i < M_end; i++) {
             const IdType row_start = my_cur_col_id[(i - M_start) * 2];
@@ -116,8 +119,8 @@ inline void SpMMCreateBlocks(
             cur_csr_indptr[i - M_start] = cur_nnz;
             IdType eid;
             for (eid = row_start; eid < row_end; eid++) {
-              const IdType src = Indices[eid];
-              const IdType edge = Edges[eid];
+              const IdType src = indices[eid];
+              const IdType edge = edges[eid];
               if (src >= K_end) {
                 break;
               }
@@ -153,9 +156,9 @@ inline void SpMMCreateBlocks(
       CSRMatrixInternal<IdType, IdType> cur_csr;
       cur_csr.num_rows = M_end - M_start;
       cur_csr.num_cols = K;
-      cur_csr.indptr = IndPtr + M_start;
-      cur_csr.indices = Indices;
-      cur_csr.data = Edges;
+      cur_csr.indptr = indptr + M_start;
+      cur_csr.indices = indices;
+      cur_csr.data = edges;
 
       block_csr_array[m] = cur_csr;
     }
@@ -243,7 +246,7 @@ inline libxsmm_meltwfunction_opreduce_vecs_idx SpMMCreateLibxsmmKernel(
 template <typename IdType, typename DType>
 inline void SpMMBlockwiseOpSum(
     CSRMatrixInternal<IdType, IdType> *block_csr_array,
-    DType *B, DType *E, DType *C, bool has_idx, IdType N,
+    const DType *B, const DType *E, DType *C, bool has_idx, IdType N,
     IdType num_M_blocks, IdType num_K_blocks, IdType M_block_size,
     libxsmm_meltwfunction_opreduce_vecs_idx kernel) {
 
@@ -287,7 +290,7 @@ inline void SpMMBlockwiseOpSum(
 template <typename IdType, typename DType, typename Op, typename Cmp>
 inline void SpMMBlockwiseOpCmp(
     CSRMatrixInternal<IdType, IdType> *block_csr_array,
-    DType *B, DType *E, DType *C, IdType *argB, IdType *argE,
+    const DType *B, const DType *E, DType *C, IdType *argB, IdType *argE,
     bool has_idx, IdType N,
     IdType num_M_blocks, IdType num_K_blocks, IdType M_block_size,
     libxsmm_meltwfunction_opreduce_vecs_idx kernel) {
@@ -370,8 +373,8 @@ void SpMMRedopCsrOpt(
   const bool has_idx = !IsNullArray(csr.data);
 
   DType* C = out.Ptr<DType>();
-  DType* B = ufeat.Ptr<DType>();
-  DType* E = efeat.Ptr<DType>();
+  const DType* B = ufeat.Ptr<DType>();
+  const DType* E = efeat.Ptr<DType>();
   IdType *argB, *argE;
   if (std::is_same<Redop, op::Max<DType>>::value || std::is_same<Redop, op::Min<DType>>::value) {
     argB = argu.Ptr<IdType>();
@@ -382,16 +385,16 @@ void SpMMRedopCsrOpt(
   const IdType M = csr.num_rows;
   const IdType N = bcast.out_len;
   const IdType K = csr.num_cols;
-  IdType* IndPtr = csr.indptr.Ptr<IdType>();
-  CHECK_NOTNULL(IndPtr);
-  int total_nnz = IndPtr[M];
+  const IdType* indptr = csr.indptr.Ptr<IdType>();
+  CHECK_NOTNULL(indptr);
+  int total_nnz = indptr[M];
   if (M <= 0 || K <= 0 || N <= 0 || total_nnz <= 0) return;
 
   float avgDegree = total_nnz * 1.0 / M;
   float nnz_prob = avgDegree / K;
 
-  IdType K_block_size = llc_size / (N * sizeof(DType) * nnz_prob * 500);
-  IdType M_block_size = M / (nthreads * 20);
+  IdType K_block_size = llc_size / (N * sizeof(DType) * nnz_prob * BLOCKING_HEURISTIC_PARAM);
+  IdType M_block_size = M / (nthreads * NUM_BLOCKS_PER_THREAD);
   if (M_block_size == 0) M_block_size = 1;
   if (K_block_size == 0) K_block_size = 1;
 
