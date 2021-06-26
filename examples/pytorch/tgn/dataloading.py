@@ -174,7 +174,7 @@ class TemporalEdgeCollator(EdgeCollator):
     def _collate_with_negative_sampling(self, items):
         items = _prepare_tensor(self.g_sampling, items, 'items', False)
         # Here node id will not change
-        pair_graph = self.g.edge_subgraph(items, preserve_nodes=True)
+        pair_graph = self.g.edge_subgraph(items, relabel_nodes=False)
         induced_edges = pair_graph.edata[dgl.EID]
 
         neg_srcdst_raw = self.negative_sampler(self.g, items)
@@ -546,7 +546,7 @@ class FastTemporalEdgeCollator(EdgeCollator):
     def _collate_with_negative_sampling(self, items):
         items = _prepare_tensor(self.g_sampling, items, 'items', False)
         # Here node id will not change
-        pair_graph = self.g.edge_subgraph(items, preserve_nodes=True)
+        pair_graph = self.g.edge_subgraph(items, relabel_nodes=False)
         induced_edges = pair_graph.edata[dgl.EID]
 
         neg_srcdst_raw = self.negative_sampler(self.g, items)

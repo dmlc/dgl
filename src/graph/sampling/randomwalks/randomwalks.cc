@@ -42,7 +42,7 @@ void CheckRandomWalkInputs(
 
 };  // namespace
 
-std::pair<IdArray, TypeArray> RandomWalk(
+std::tuple<IdArray, IdArray, TypeArray> RandomWalk(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
@@ -50,18 +50,18 @@ std::pair<IdArray, TypeArray> RandomWalk(
   CheckRandomWalkInputs(hg, seeds, metapath, prob);
 
   TypeArray vtypes;
-  IdArray vids;
+  std::pair<IdArray, IdArray> result;
   ATEN_XPU_SWITCH(hg->Context().device_type, XPU, "RandomWalk", {
     ATEN_ID_TYPE_SWITCH(seeds->dtype, IdxType, {
       vtypes = impl::GetNodeTypesFromMetapath<XPU, IdxType>(hg, metapath);
-      vids = impl::RandomWalk<XPU, IdxType>(hg, seeds, metapath, prob);
+      result = impl::RandomWalk<XPU, IdxType>(hg, seeds, metapath, prob);
     });
   });
 
-  return std::make_pair(vids, vtypes);
+  return std::make_tuple(result.first, result.second, vtypes);
 }
 
-std::pair<IdArray, TypeArray> RandomWalkWithRestart(
+std::tuple<IdArray, IdArray, TypeArray> RandomWalkWithRestart(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
@@ -71,18 +71,18 @@ std::pair<IdArray, TypeArray> RandomWalkWithRestart(
   CHECK(restart_prob >= 0 && restart_prob < 1) << "restart probability must belong to [0, 1)";
 
   TypeArray vtypes;
-  IdArray vids;
+  std::pair<IdArray, IdArray> result;
   ATEN_XPU_SWITCH(hg->Context().device_type, XPU, "RandomWalkWithRestart", {
     ATEN_ID_TYPE_SWITCH(seeds->dtype, IdxType, {
       vtypes = impl::GetNodeTypesFromMetapath<XPU, IdxType>(hg, metapath);
-      vids = impl::RandomWalkWithRestart<XPU, IdxType>(hg, seeds, metapath, prob, restart_prob);
+      result = impl::RandomWalkWithRestart<XPU, IdxType>(hg, seeds, metapath, prob, restart_prob);
     });
   });
 
-  return std::make_pair(vids, vtypes);
+  return std::make_tuple(result.first, result.second, vtypes);
 }
 
-std::pair<IdArray, TypeArray> RandomWalkWithStepwiseRestart(
+std::tuple<IdArray, IdArray, TypeArray> RandomWalkWithStepwiseRestart(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
@@ -92,16 +92,16 @@ std::pair<IdArray, TypeArray> RandomWalkWithStepwiseRestart(
   // TODO(BarclayII): check the elements of restart probability
 
   TypeArray vtypes;
-  IdArray vids;
+  std::pair<IdArray, IdArray> result;
   ATEN_XPU_SWITCH(hg->Context().device_type, XPU, "RandomWalkWithStepwiseRestart", {
     ATEN_ID_TYPE_SWITCH(seeds->dtype, IdxType, {
       vtypes = impl::GetNodeTypesFromMetapath<XPU, IdxType>(hg, metapath);
-      vids = impl::RandomWalkWithStepwiseRestart<XPU, IdxType>(
+      result = impl::RandomWalkWithStepwiseRestart<XPU, IdxType>(
           hg, seeds, metapath, prob, restart_prob);
     });
   });
 
-  return std::make_pair(vids, vtypes);
+  return std::make_tuple(result.first, result.second, vtypes);
 }
 
 };  // namespace sampling
@@ -117,8 +117,9 @@ DGL_REGISTER_GLOBAL("sampling.randomwalks._CAPI_DGLSamplingRandomWalk")
 
     auto result = sampling::RandomWalk(hg.sptr(), seeds, metapath, prob_vec);
     List<Value> ret;
-    ret.push_back(Value(MakeValue(result.first)));
-    ret.push_back(Value(MakeValue(result.second)));
+    ret.push_back(Value(MakeValue(std::get<0>(result))));
+    ret.push_back(Value(MakeValue(std::get<1>(result))));
+    ret.push_back(Value(MakeValue(std::get<2>(result))));
     *rv = ret;
   });
 
@@ -135,8 +136,9 @@ DGL_REGISTER_GLOBAL("sampling.randomwalks._CAPI_DGLSamplingRandomWalkWithRestart
     auto result = sampling::RandomWalkWithRestart(
         hg.sptr(), seeds, metapath, prob_vec, restart_prob);
     List<Value> ret;
-    ret.push_back(Value(MakeValue(result.first)));
-    ret.push_back(Value(MakeValue(result.second)));
+    ret.push_back(Value(MakeValue(std::get<0>(result))));
+    ret.push_back(Value(MakeValue(std::get<1>(result))));
+    ret.push_back(Value(MakeValue(std::get<2>(result))));
     *rv = ret;
   });
 
@@ -153,8 +155,9 @@ DGL_REGISTER_GLOBAL("sampling.randomwalks._CAPI_DGLSamplingRandomWalkWithStepwis
     auto result = sampling::RandomWalkWithStepwiseRestart(
         hg.sptr(), seeds, metapath, prob_vec, restart_prob);
     List<Value> ret;
-    ret.push_back(Value(MakeValue(result.first)));
-    ret.push_back(Value(MakeValue(result.second)));
+    ret.push_back(Value(MakeValue(std::get<0>(result))));
+    ret.push_back(Value(MakeValue(std::get<1>(result))));
+    ret.push_back(Value(MakeValue(std::get<2>(result))));
     *rv = ret;
   });
 

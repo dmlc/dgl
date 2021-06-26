@@ -69,9 +69,14 @@ class DGLHeteroGraph(object):
         if not isinstance(gidx, heterograph_index.HeteroGraphIndex):
             dgl_warning('Recommend creating graphs by `dgl.graph(data)`'
                         ' instead of `dgl.DGLGraph(data)`.')
-            u, v, num_src, num_dst = utils.graphdata2tensors(gidx)
-            gidx = heterograph_index.create_unitgraph_from_coo(
-                1, num_src, num_dst, u, v, ['coo', 'csr', 'csc'])
+            (sparse_fmt, arrays), num_src, num_dst = utils.graphdata2tensors(gidx)
+            if sparse_fmt == 'coo':
+                gidx = heterograph_index.create_unitgraph_from_coo(
+                    1, num_src, num_dst, arrays[0], arrays[1], ['coo', 'csr', 'csc'])
+            else:
+                gidx = heterograph_index.create_unitgraph_from_csr(
+                    1, num_src, num_dst, arrays[0], arrays[1], arrays[2], ['coo', 'csr', 'csc'],
+                    sparse_fmt == 'csc')
         if len(deprecate_kwargs) != 0:
             dgl_warning('Keyword arguments {} are deprecated in v0.5, and can be safely'
                         ' removed in all cases.'.format(list(deprecate_kwargs.keys())))
@@ -622,7 +627,7 @@ class DGLHeteroGraph(object):
             else:
                 edges[c_etype] = self.edges(form='eid', order='eid', etype=c_etype)
 
-        sub_g = self.edge_subgraph(edges, preserve_nodes=True, store_ids=store_ids)
+        sub_g = self.edge_subgraph(edges, relabel_nodes=False, store_ids=store_ids)
         self._graph = sub_g._graph
         self._node_frames = sub_g._node_frames
         self._edge_frames = sub_g._edge_frames
@@ -3506,23 +3511,23 @@ class DGLHeteroGraph(object):
         else:
             return deg
 
-    def adjacency_matrix(self, transpose=True, ctx=F.cpu(), scipy_fmt=None, etype=None):
+    def adjacency_matrix(self, transpose=False, ctx=F.cpu(), scipy_fmt=None, etype=None):
         """Alias of :meth:`adj`"""
         return self.adj(transpose, ctx, scipy_fmt, etype)
 
-    def adj(self, transpose=True, ctx=F.cpu(), scipy_fmt=None, etype=None):
+    def adj(self, transpose=False, ctx=F.cpu(), scipy_fmt=None, etype=None):
         """Return the adjacency matrix of edges of the given edge type.
 
         By default, a row of returned adjacency matrix represents the
-        destination of an edge and the column represents the source.
+        source of an edge and the column represents the destination.
 
-        When transpose is True, a row represents the source and a column
-        represents a destination.
+        When transpose is True, a row represents the destination and a column
+        represents the source.
 
         Parameters
         ----------
         transpose : bool, optional
-            A flag to transpose the returned adjacency matrix. (Default: True)
+            A flag to transpose the returned adjacency matrix. (Default: False)
         ctx : context, optional
             The context of returned adjacency matrix. (Default: cpu)
         scipy_fmt : str, optional
@@ -3578,8 +3583,52 @@ class DGLHeteroGraph(object):
         else:
             return self._graph.adjacency_matrix_scipy(etid, transpose, scipy_fmt, False)
 
+    def adj_sparse(self, fmt, etype=None):
+        """Return the adjacency matrix of edges of the given edge type as tensors of
+        a sparse matrix representation.
 
-    def adjacency_matrix_scipy(self, transpose=True, fmt='csr', return_edge_ids=None):
+        By default, a row of returned adjacency matrix represents the
+        source of an edge and the column represents the destination.
+
+        Parameters
+        ----------
+        fmt : str
+            Either ``coo``, ``csr`` or ``csc``.
+        etype : str or (str, str, str), optional
+            The type names of the edges. The allowed type name formats are:
+
+            * ``(str, str, str)`` for source node type, edge type and destination node type.
+            * or one ``str`` edge type name if the name can uniquely identify a
+              triplet format in the graph.
+
+            Can be omitted if the graph has only one type of edges.
+
+        Returns
+        -------
+        tuple[Tensor]
+            If :attr:`fmt` is ``coo``, returns a pair of source and destination node ID
+            tensors.
+
+            If :attr:`fmt` is ``csr`` or ``csc``, return the CSR or CSC representation
+            of the adjacency matrix as a triplet of tensors
+            ``(indptr, indices, edge_ids)``.  Namely ``edge_ids`` could be an empty
+            tensor with 0 elements, in which case the edge IDs are consecutive
+            integers starting from 0.
+
+        Examples
+        --------
+        >>> g = dgl.graph(([0, 1, 2], [1, 2, 3]))
+        >>> g.adj_sparse('coo')
+        >>> g.adj_sparse('csr')
+        """
+        etid = self.get_etype_id(etype)
+        if fmt == 'csc':
+            # The first two elements are number of rows and columns
+            return self._graph.adjacency_matrix_tensors(etid, True, 'csr')[2:]
+        else:
+            return self._graph.adjacency_matrix_tensors(etid, False, fmt)[2:]
+
+    def adjacency_matrix_scipy(self, transpose=False, fmt='csr', return_edge_ids=None):
         """DEPRECATED: please use ``dgl.adjacency_matrix(transpose, scipy_fmt=fmt)``.
         """
         dgl_warning('DGLGraph.adjacency_matrix_scipy is deprecated. '
@@ -4294,7 +4343,7 @@ class DGLHeteroGraph(object):
             eid = utils.parse_edges_arg_to_eid(self, edges, etid, 'edges')
         if core.is_builtin(func):
             if not is_all(eid):
-                g = g.edge_subgraph(eid, preserve_nodes=True)
+                g = g.edge_subgraph(eid, relabel_nodes=False)
             edata = core.invoke_gsddmm(g, func)
         else:
             edata = core.invoke_edge_udf(g, eid, etype, func)
@@ -5985,13 +6034,14 @@ def combine_frames(frames, ids, col_names=None):
         schemes = {key: frames[ids[0]].schemes[key] for key in col_names}
     for frame_id in ids:
         frame = frames[frame_id]
-        for key, scheme in list(schemes.items()):
-            if key in frame.schemes:
-                if frame.schemes[key] != scheme:
-                    raise DGLError('Cannot concatenate column %s with shape %s and shape %s' %
-                                   (key, frame.schemes[key], scheme))
-            else:
-                del schemes[key]
+        if frame.num_rows != 0:
+            for key, scheme in list(schemes.items()):
+                if key in frame.schemes:
+                    if frame.schemes[key] != scheme:
+                        raise DGLError('Cannot concatenate column %s with shape %s and shape %s' %
+                                       (key, frame.schemes[key], scheme))
+                else:
+                    del schemes[key]
 
     if len(schemes) == 0:
         return None

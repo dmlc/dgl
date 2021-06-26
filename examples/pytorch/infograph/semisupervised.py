@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import dgl
 from dgl.dataloading import GraphDataLoader
 from dgl.data.utils import Subset
-from qm9_v2 import QM9DatasetV2
+from dgl.data import QM9EdgeDataset
 from model import InfoGraphS
 import argparse
 
@@ -39,6 +39,69 @@ def argument():
 
     return args
 
+class DenseQM9EdgeDataset(QM9EdgeDataset):
+    def __getitem__(self, idx):
+        r""" Get graph and label by index 
+        
+        Parameters
+        ----------
+        idx : int
+            Item index
+            
+        Returns
+        -------
+        dgl.DGLGraph
+           The graph contains:
+           
+           - ``ndata['pos']``: the coordinates of each atom
+           - ``ndata['attr']``: the features of each atom
+           - ``edata['edge_attr']``: the features of each bond
+           
+        Tensor
+            Property values of molecular graphs
+        """
+        
+        pos = self.node_pos[self.n_cumsum[idx]:self.n_cumsum[idx+1]]
+        src = self.src[self.ne_cumsum[idx]:self.ne_cumsum[idx+1]]
+        dst = self.dst[self.ne_cumsum[idx]:self.ne_cumsum[idx+1]]
+
+        g = dgl.graph((src, dst))
+          
+        g.ndata['pos'] = th.tensor(pos).float()
+        g.ndata['attr'] = th.tensor(self.node_attr[self.n_cumsum[idx]:self.n_cumsum[idx+1]]).float()
+        g.edata['edge_attr'] = th.tensor(self.edge_attr[self.ne_cumsum[idx]:self.ne_cumsum[idx+1]]).float()
+        
+        
+        label = th.tensor(self.targets[idx][self.label_keys]).float()
+    
+        n_nodes = g.num_nodes()
+        row = th.arange(n_nodes)
+        col = th.arange(n_nodes)
+
+        row = row.view(-1,1).repeat(1, n_nodes).view(-1)
+        col = col.repeat(n_nodes)
+
+        src = g.edges()[0]
+        dst = g.edges()[1]
+
+        idx = src * n_nodes + dst
+        size = list(g.edata['edge_attr'].size())
+        size[0] = n_nodes * n_nodes
+        edge_attr = g.edata['edge_attr'].new_zeros(size)
+
+        edge_attr[idx] = g.edata['edge_attr']
+
+        pos = g.ndata['pos']
+        dist = th.norm(pos[col] - pos[row], p=2, dim=-1).view(-1, 1)
+
+        new_edge_attr =  th.cat([edge_attr, dist.type_as(edge_attr)], dim = -1)
+
+        graph = dgl.graph((row,col))
+        graph.ndata['attr'] = g.ndata['attr']
+        graph.edata['edge_attr'] = new_edge_attr
+        graph = graph.remove_self_loop()
+        
+        return graph, label
 
 def collate(samples):
     ''' collate function for building graph dataloader '''
@@ -76,13 +139,10 @@ if __name__ == '__main__':
     label_keys = [args.target]
     print(args)
 
-    dataset = QM9DatasetV2(label_keys)
-    dataset.to_dense()
-
-    graphs = dataset.graphs
-
+    dataset = DenseQM9EdgeDataset(label_keys = label_keys)
+    
     # Train/Val/Test Splitting
-    N = len(graphs)
+    N = dataset.targets.shape[0]
     all_idx = np.arange(N)
     np.random.shuffle(all_idx)
 
@@ -114,7 +174,6 @@ if __name__ == '__main__':
                                    shuffle=True)
 
     # generate validation & testing dataloader
-
     val_loader = GraphDataLoader(val_data,
                                  batch_size=args.val_batch_size,
                                  collate_fn=collate,
@@ -128,13 +187,6 @@ if __name__ == '__main__':
                                   shuffle=True)
 
     print('======== target = {} ========'.format(args.target))
-
-    mean = dataset.labels.mean().item()
-    std = dataset.labels.std().item()
-
-
-    print('mean = {:4f}'.format(mean))
-    print('std = {:4f}'.format(std))
 
     in_dim = dataset[0][0].ndata['attr'].shape[1]
 
@@ -169,9 +221,9 @@ if __name__ == '__main__':
             sup_graph = sup_graph.to(args.device)
             unsup_graph = unsup_graph.to(args.device)
             
-            sup_nfeat, sup_efeat = sup_graph.ndata['attr'], sup_graph.ndata['edge_attr']
+            sup_nfeat, sup_efeat = sup_graph.ndata['attr'], sup_graph.edata['edge_attr']
             unsup_nfeat, unsup_efeat, unsup_graph_id = unsup_graph.ndata['attr'],\
-                                                       unsup_graph.edata['edge_attr'], unsup_graph.edata['graph_id']
+                                                       unsup_graph.edata['edge_attr'], unsup_graph.ndata['graph_id']
 
             sup_target = sup_target
             sup_target = sup_target.to(args.device)
