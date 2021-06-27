@@ -4725,12 +4725,13 @@ class DGLHeteroGraph(object):
             self._set_n_repr(dtid, ALL, ndata)
         else:   # heterogeneous graph with number of relation types > 1
             if reduce_func.name in ['max', 'min']:
-                raise NotImplementedError("Reduce op \'" + reduce_func.name + "\' is not yet supported "
-                                          "in update_all for heterogeneous graphs. Please use"
-                                          "multi_update_all instead.")
+                raise NotImplementedError("Reduce op \'" + reduce_func.name + "\' is not yet "
+                                          "supported in update_all for heterogeneous graphs. "
+                                          "Please use multi_update_all instead.")
             if reduce_func.name in ['mean']:
-                raise NotImplementedError("Cannot set both intra-type and inter-type reduce operators as "
-                                          "'mean' using update_all. Please use multi_update_all instead.")
+                raise NotImplementedError("Cannot set both intra-type and inter-type reduce "
+                                          "operators as 'mean' using update_all. Please use "
+                                          "multi_update_all instead.")
             if message_func.name not in ['copy_u', 'copy_e']:
                 raise NotImplementedError("Op \'" + message_func.name + "\' is not yet supported"
                                           "in update_all for heterogeneous graphs. Please use"
