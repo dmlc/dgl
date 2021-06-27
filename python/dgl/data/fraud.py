@@ -6,7 +6,6 @@ import numpy as np
 
 from .utils import save_graphs, load_graphs, _get_dgl_url
 from ..convert import heterograph
-from ..utils import graphdata2tensors
 from .dgl_dataset import DGLBuiltinDataset
 from .. import backend as F
 
@@ -106,8 +105,9 @@ class FraudDataset(DGLBuiltinDataset):
 
         graph_data = {}
         for relation in self.relations[self.name]:
-            u, v, _, _ = graphdata2tensors(data[relation])
-            graph_data[(self.node_name[self.name], relation, self.node_name[self.name])] = (u, v)
+            adj = data[relation].tocoo()
+            row, col = adj.row, adj.col
+            graph_data[(self.node_name[self.name], relation, self.node_name[self.name])] = (row, col)
         g = heterograph(graph_data)
 
         g.ndata['feature'] = F.tensor(node_features)

@@ -302,7 +302,7 @@ def scatter_add(x, idx, m):
 
 def csrmm_real(gidxA, A_weights, gidxB, B_weights, num_vtypes):
     gidxC, C_weights = _csrmm(gidxA, A_weights, gidxB, B_weights, num_vtypes)
-    nrows, ncols, C_indptr, C_indices, C_eids = gidxC.adjacency_matrix_tensors(0, True, 'csr')
+    nrows, ncols, C_indptr, C_indices, C_eids = gidxC.adjacency_matrix_tensors(0, False, 'csr')
 
     def grad(dnrows, dncols, dC_indptr, dC_indices, dC_eids, dC_weights):
         # Only the last argument is meaningful.
@@ -328,7 +328,7 @@ def csrmm(gidxA, A_weights, gidxB, B_weights, num_vtypes):
 
 def csrsum_real(gidxs, weights):
     gidxC, C_weights = _csrsum(gidxs, weights)
-    nrows, ncols, C_indptr, C_indices, C_eids = gidxC.adjacency_matrix_tensors(0, True, 'csr')
+    nrows, ncols, C_indptr, C_indices, C_eids = gidxC.adjacency_matrix_tensors(0, False, 'csr')
 
     def grad(dnrows, dncols, dC_indptr, dC_indices, dC_eids, dC_weights):
         # Only the last argument is meaningful.
