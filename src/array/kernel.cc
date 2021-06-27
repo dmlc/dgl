@@ -86,8 +86,8 @@ void SpMMHetero(const std::string& op, const std::string& reduce,
               ufeat_eid, out_eid);
         } else {
           // TODO(Israt): Add support for COO format
-          LOG(FATAL) << "SpMM only supports CSC format for graphs with number \
-                        of relation types > 1";
+          LOG(FATAL) << "SpMM only supports CSC format for graphs with number "
+                     << "of relation types > 1";
         }
       });
     });
@@ -159,8 +159,8 @@ void SDDMMHetero(const std::string& op,
               lhs_eid, rhs_eid);
         } else {
           // TODO(Israt): Add support for COO format
-          LOG(FATAL) << "SDDMM only supports CSC format for graphs with number \
-                        of relation types > 1";
+          LOG(FATAL) << "SDDMM only supports CSC format for graphs with number "
+                     << "of relation types > 1";
         }
       });
     });
