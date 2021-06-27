@@ -89,9 +89,6 @@ def gspmm(g, op, reduce_op, lhs_data, rhs_data):
 
     # divide in degrees for mean reducer.
     if reduce_op == 'mean':
-        if g._graph.number_of_etypes() > 1:
-            raise NotImplementedError("Reduce op 'mean' is not supported in "
-                                      "the new heterograph API. Use multi_update_all().")
         ret_shape = F.shape(ret)
         deg = g.in_degrees()
         deg = F.astype(F.clamp(deg, 1, max(g.number_of_edges(), 1)), F.dtype(ret))

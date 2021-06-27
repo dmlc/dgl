@@ -17,7 +17,6 @@ fill_value = {'sum': 0, 'max': float("-inf")}
 feat_size = 2
 
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 
 def create_test_heterograph(idtype):
     # test heterograph from the docstring, plus a user -- wishes -- game relation
@@ -72,10 +71,10 @@ def test_unary_copy_u(idtype):
             g.nodes['game'].data.clear()
 
         #################################################################
-        #  update_all_new(): call msg_passing for all etypes
+        #  update_all(): call msg_passing for all etypes
         #################################################################
 
-        g.update_all_new(mfunc('h', 'm'), rfunc('m', 'y'))
+        g.update_all(mfunc('h', 'm'), rfunc('m', 'y'))
         r2 = g.nodes['game'].data['y']
         F.backward(r2, F.randn(r2.shape))
         n_grad2 = F.grad(g.nodes['user'].data['h'])
@@ -137,12 +136,12 @@ def test_unary_copy_e(idtype):
 
 
         #################################################################
-        #  update_all_new(): call msg_passing for all etypes
+        #  update_all(): call msg_passing for all etypes
         #################################################################
 
         # TODO(Israt): output type can be None in multi_update and empty
         # tensor in new_update_all
-        g.update_all_new(mfunc('eid', 'm'), rfunc('m', 'y'))
+        g.update_all(mfunc('eid', 'm'), rfunc('m', 'y'))
         r2 = g.nodes['game'].data['y']
         F.backward(r2, F.randn(r2.shape))
         e_grad2 = F.grad(g['develops'].edata['eid'])

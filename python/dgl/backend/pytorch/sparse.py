@@ -166,30 +166,26 @@ class GSpMM_hetero(th.autograd.Function):
 
         if op != 'copy_rhs' and any([x is not None for x in X]):
             g_rev = g.reverse()
+            # TODO(Israt): implement other combinations of message and reduce functions
             if reduce_op == 'sum':
                 if op == 'copy_lhs':
-                    dX = gspmm_hetero(g_rev, 'copy_lhs', 'sum', *dZ, None)
+                    dX = gspmm_hetero(g_rev, 'copy_lhs', 'sum', *dZ)
             dX = tuple([_reduce_grad(dX[i], X[i].shape) if X[i] is not None else None 
                 for i in range(len(X))])
         else:  # X has not gradient
-            dX = None
+            dX = tuple([None] * len(X))
         if op != 'copy_lhs' and any([y is not None for y in Y]):
+            # TODO(Israt): implement other combinations of message and reduce functions
             if reduce_op == 'sum':
                 if op in ['copy_rhs']:
                     tmp_Z = tuple([_addsub(op, dZ[i]) if dZ[i] is not None else None
-                    for i in range(len(dZ))])
+                        for i in range(len(dZ))])
                     tmp = tuple(X + tmp_Z)
                     dY = gsddmm_hetero(g, 'copy_rhs', 'u', 'v', *tmp)
             dY = tuple([_reduce_grad(dY[i], Y[i].shape) if Y[i] is not None else None
-            for i in range(len(Y))])
+                for i in range(len(Y))])
         else:  # Y has no gradient
-            dY = None
-        if dX is None:
-            tmp = tuple([None] * num_ntypes)
-            return (None, None, None) + tmp + dY
-        if dY is None:
-            tmp = tuple([None] * g._graph.number_of_etypes())
-            return (None, None, None) + dX + tmp
+            dY = tuple([None] * len(Y))
         return (None, None, None) + dX + dY
 
 class GSDDMM(th.autograd.Function):
@@ -269,8 +265,8 @@ class GSDDMM_hetero(th.autograd.Function):
         g, op, lhs_target, rhs_target = ctx.backward_cache
         gidx = g._graph
         X = ctx.saved_tensors
-        dX = None
-        dY = None
+        dX = tuple([None] * len(lhs_target))
+        dY = tuple([None] * len(rhs_target))
         return (None, None) + dX + dY + ( None, None)
 
 
