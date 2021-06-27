@@ -5,7 +5,6 @@ from ...backend import pytorch as F
 from ...utils import get_shared_mem_array, create_shared_mem_array
 from ...cuda import nccl
 from ...partition import NDArrayPartition
-from ...contrib.multi_gpu_tensor import MultiGPUTensor
 
 _STORE = None
 _COMM = None
@@ -67,8 +66,7 @@ class NodeEmbedding: # NodeEmbedding
     '''
 
     def __init__(self, num_embeddings, embedding_dim, name,
-                 init_func=None, device=None, partition=None,
-                 dtype=th.float32):
+                 init_func=None, device=None, partition=None):
         global _STORE
         global _COMM
 
@@ -102,7 +100,7 @@ class NodeEmbedding: # NodeEmbedding
         # embeddings is stored in CPU memory.
         if th.device(device) == th.device('cpu'):
             if rank <= 0:
-                emb = create_shared_mem_array(name, (num_embeddings, embedding_dim), dtype)
+                emb = create_shared_mem_array(name, (num_embeddings, embedding_dim), th.float32)
                 if init_func is not None:
                     emb = init_func(emb)
             if rank == 0: # the master gpu process
@@ -112,7 +110,7 @@ class NodeEmbedding: # NodeEmbedding
             elif rank > 0:
                 # receive
                 self._store.wait([name])
-                emb = get_shared_mem_array(name, (num_embeddings, embedding_dim), dtype)
+                emb = get_shared_mem_array(name, (num_embeddings, embedding_dim), th.float32)
             self._tensor = emb
         else: # embeddings is stored in GPU memory.
             # setup nccl communicator
@@ -139,13 +137,14 @@ class NodeEmbedding: # NodeEmbedding
                     self._world_size if self._world_size > 0 else 1,
                     mode='remainder')
 
-            emb = MultiGPUTensor((num_embeddings, embedding_dim),
-                                 dtype=dtype, device=device, comm=self._comm,
-                                 partition=self._partition)
-
             # create local tensors for the weights
+            local_size = self._partition.local_size(self._comm.rank())
+
+            # TODO(dlasalle): support 16-bit/half embeddings
+            emb = th.empty([local_size, embedding_dim], dtype=th.float32,
+                           requires_grad=False, device=device)
             if init_func:
-                emb.set_local(init_func(emb.get_local()))
+                emb = init_func(emb)
             self._tensor = emb
 
         self._num_embeddings = num_embeddings
@@ -155,20 +154,21 @@ class NodeEmbedding: # NodeEmbedding
         self._trace = [] # track minibatch
 
     def __call__(self, node_ids, device=th.device('cpu')):
-        """ If this embedding is split across multiple GPUs, __call__ must
-        be invoked on all GPU, or the invokation will deadlock.
-
+        """
         node_ids : th.tensor
             Index of the embeddings to collect.
         device : th.device
             Target device to put the collected embeddings.
         """
-        if isinstance(self._tensor, MultiGPUTensor):
-            emb = self._tensor.all_gather_row(node_ids)
+        if not self._comm or self._comm.size() == 1:
+            emb = self._tensor[node_ids].to(device)
         else:
-            emb = self._tensor[node_ids]
-        emb = emb.to(device)
-
+            if self.world_size > 0:
+                emb = self._comm.sparse_all_to_all_pull(
+                    node_ids, self._tensor, self._partition)
+            else:
+                emb = self._tensor[node_ids]
+            emb = emb.to(device)
         if F.is_recording():
             emb = F.attach_grad(emb)
             self._trace.append((node_ids.to(device), emb))
@@ -317,8 +317,6 @@ class NodeEmbedding: # NodeEmbedding
         torch.Tensor
             The tensor storing the node embeddings
         """
-        if isinstance(self._tensor, MultiGPUTensor):
-            return self._tensor.get_local()
         return self._tensor
 
     @property
@@ -330,8 +328,6 @@ class NodeEmbedding: # NodeEmbedding
         torch.Tensor
             The tensor storing the node embeddings
         """
-        if isinstance(self._tensor, MultiGPUTensor):
-            return self._tensor.get_local()
         return self._tensor
 
     def all_set_embedding(self, values):
@@ -347,8 +343,14 @@ class NodeEmbedding: # NodeEmbedding
         values : Tensor
             The global tensor to pull values from.
         """
-        if isinstance(self._tensor, MultiGPUTensor):
-            self._tensor.all_set_global(values)
+        if self._partition:
+            idxs = F.copy_to(
+                self._partition.get_local_indices(
+                    self._comm.rank(),
+                    ctx=F.context(self._tensor)),
+                F.context(values))
+            self._tensor[:] = F.copy_to(F.gather_row(values, idxs),
+                                        ctx=F.context(self._tensor))[:]
         else:
             if self._rank == 0:
                 self._tensor[:] = F.copy_to(values,
@@ -370,10 +372,10 @@ class NodeEmbedding: # NodeEmbedding
         torch.Tensor
             The tensor storing the node embeddings.
         """
-        if isinstance(self._tensor, MultiGPUTensor):
+        if self._partition:
             if self._world_size == 0:
                 # non-multiprocessing
-                return self._tensor.get_local().to(th.device('cpu'))
+                return self._tensor.to(th.device('cpu'))
             else:
                 # create a shared memory tensor
                 shared_name = self._name + "_gather"
@@ -392,9 +394,9 @@ class NodeEmbedding: # NodeEmbedding
                 # need to map indices and slice into existing tensor
                 idxs = self._partition.map_to_global(
                     F.arange(0, self._tensor.shape[0],
-                             ctx=self._tensor.ctx),
+                             ctx=F.context(self._tensor)),
                     self._rank).to(emb.device)
-                emb[idxs] = self._tensor.get_local().to(emb.device)
+                emb[idxs] = self._tensor.to(emb.device)
 
                 # wait for all processes to finish
                 th.distributed.barrier()
