@@ -4765,7 +4765,7 @@ class DGLHeteroGraph(object):
                 [4.]])
         """
         # Graph with one relation type
-        if self._graph.number_of_etypes() == 1:
+        if self._graph.number_of_etypes() == 1 or etype != None :
             etid = self.get_etype_id(etype)
             etype = self.canonical_etypes[etid]
             _, dtid = self._graph.metagraph.find_edge(etid)
@@ -4773,6 +4773,10 @@ class DGLHeteroGraph(object):
             ndata = core.message_passing(g, message_func, reduce_func, apply_node_func)
             self._set_n_repr(dtid, ALL, ndata)
         else:   # heterogeneous graph with number of relation types > 1
+            if not core.is_builtin(message_func) or not core.is_builtin(reduce_func):
+                raise DGLError("User defined functions are not yet "
+                                "supported in update_all for heterogeneous graphs. "
+                                "Please use multi_update_all instead.")
             if reduce_func.name in ['max', 'min']:
                 raise NotImplementedError("Reduce op \'" + reduce_func.name + "\' is not yet "
                                           "supported in update_all for heterogeneous graphs. "
@@ -4795,10 +4799,6 @@ class DGLHeteroGraph(object):
                 dtid = g.get_ntype_id(dsttype)
                 dst_tensor[key] = out_tensor_tuples[dtid]
                 self._node_frames[dtid].update(dst_tensor)
-            # apply
-            if apply_node_func is not None:
-                self.apply_nodes(apply_node_func, ALL, self.ntypes[dtid])
-
 
     #################################################################
     # Message passing on heterograph
