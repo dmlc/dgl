@@ -1,13 +1,14 @@
 """A set of graph services of getting subgraphs from DistGraph"""
+import numpy as np
 from collections import namedtuple
 
 from .rpc import Request, Response, send_requests_to_machine, recv_responses
 from ..sampling import sample_neighbors as local_sample_neighbors
 from ..subgraph import in_subgraph as local_in_subgraph
 from .rpc import register_service
-from ..convert import graph, to_heterogeneous
+from ..convert import graph, to_heterogeneous, heterograph
 from ..base import NID, EID, NTYPE, ETYPE
-from ..utils import toindex
+from ..utils import toindex, make_invmap
 from .. import backend as F
 
 __all__ = ['sample_neighbors', 'in_subgraph', 'find_edges']
@@ -397,10 +398,43 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
     frontier = _distributed_access(g, nodes, issue_remote_req, local_access)
     if len(gpb.etypes) > 1:
         frontier.edata[ETYPE], frontier.edata[EID] = gpb.map_to_per_etype(frontier.edata[EID])
-        # TODO(zhengda) This is not scalable.
-        frontier.ndata[NTYPE], frontier.ndata[NID] = gpb.map_to_per_ntype(F.arange(0, frontier.number_of_nodes()))
-        frontier = to_heterogeneous(frontier, gpb.ntypes, gpb.etypes, ntype_field=NTYPE, etype_field=ETYPE)
-        return frontier
+
+        src, dst = frontier.edges()
+        etype_ids, idx = F.sort_1d(frontier.edata[ETYPE])
+        src, dst, eid = src[idx], dst[idx], frontier.edata[EID][idx]
+        src_tids, src = gpb.map_to_per_ntype(src)
+        dst_tids, dst = gpb.map_to_per_ntype(dst)
+
+        # a 2D tensor of shape (E, 3). Each row represents the (stid, etid, dtid) tuple.
+        edge_ctids = np.stack([src_tids, etype_ids, dst_tids], 1)
+        # infer metagraph and canonical edge types
+        # The code generates a 2D tensor of shape (E_m, 3),
+        # E_m is the set of all possible canonical edge tuples. Each row represents the
+        # (stid, dtid, dtid) tuple. We then compute a 2D tensor of shape (E, E_m) using the
+        # above ``edge_ctids`` matrix. Each element i,j indicates whether the edge i is of the
+        # canonical edge type j. We can then group the edges of the same type together.
+        canonical_etids, _, etype_remapped = \
+                make_invmap(list(tuple(_) for _ in edge_ctids), False)
+        etype_mask = (etype_remapped[None, :] == np.arange(len(canonical_etids))[:, None])
+        edge_groups = [etype_mask[i].nonzero()[0] for i in range(len(canonical_etids))]
+
+        data_dict = dict()
+        canonical_etypes = []
+        edge_ids = {}
+        for i, (stid, etid, dtid) in enumerate(canonical_etids):
+            etype = g.etypes[etid]
+            type_idx = etype_ids == etid
+            if F.sum(type_idx, 0) > 0:
+                canonical_etypes.append((g.ntypes[stid], g.etypes[etid], g.ntypes[dtid]))
+                data_dict[canonical_etypes[-1]] = (src[type_idx], dst[type_idx])
+                edge_ids[etype] = eid[type_idx]
+        hg = heterograph(data_dict,
+                         {ntype: g.number_of_nodes(ntype) for ntype in g.ntypes},
+                         idtype=g.idtype)
+
+        for etype in edge_ids:
+            hg.edges[etype].data[EID] = edge_ids[etype]
+        return hg
     else:
         return frontier
 
