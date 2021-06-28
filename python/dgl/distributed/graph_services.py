@@ -5,8 +5,8 @@ from .rpc import Request, Response, send_requests_to_machine, recv_responses
 from ..sampling import sample_neighbors as local_sample_neighbors
 from ..subgraph import in_subgraph as local_in_subgraph
 from .rpc import register_service
-from ..convert import graph
-from ..base import NID, EID
+from ..convert import graph, to_heterogeneous
+from ..base import NID, EID, NTYPE, ETYPE
 from ..utils import toindex
 from .. import backend as F
 
@@ -337,19 +337,8 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
     Node/edge features are not preserved. The original IDs of
     the sampled edges are stored as the `dgl.EID` feature in the returned graph.
 
-    This version provides an experimental support for heterogeneous graphs.
-    When the input graph is heterogeneous, the sampled subgraph is still stored in
-    the homogeneous graph format. That is, all nodes and edges are assigned with
-    unique IDs (in contrast, we typically use a type name and a node/edge ID to
-    identify a node or an edge in ``DGLGraph``). We refer to this type of IDs
-    as *homogeneous ID*.
-    Users can use :func:`dgl.distributed.GraphPartitionBook.map_to_per_ntype`
-    and :func:`dgl.distributed.GraphPartitionBook.map_to_per_etype`
-    to identify their node/edge types and node/edge IDs of that type.
-
-    For heterogeneous graphs, ``nodes`` can be a dictionary whose key is node type
-    and the value is type-specific node IDs; ``nodes`` can also be a tensor of
-    *homogeneous ID*.
+    For heterogeneous graphs, ``nodes`` is a dictionary whose key is node type
+    and the value is type-specific node IDs.
 
     Parameters
     ----------
@@ -388,7 +377,8 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
         A sampled subgraph containing only the sampled neighboring edges.  It is on CPU.
     """
     gpb = g.get_partition_book()
-    if isinstance(nodes, dict):
+    if len(gpb.etypes) > 1:
+        assert isinstance(nodes, dict)
         homo_nids = []
         for ntype in nodes:
             assert ntype in g.ntypes, 'The sampled node type does not exist in the input graph'
@@ -404,7 +394,15 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
     def local_access(local_g, partition_book, local_nids):
         return _sample_neighbors(local_g, partition_book, local_nids,
                                  fanout, edge_dir, prob, replace)
-    return _distributed_access(g, nodes, issue_remote_req, local_access)
+    frontier = _distributed_access(g, nodes, issue_remote_req, local_access)
+    if len(gpb.etypes) > 1:
+        frontier.edata[ETYPE], frontier.edata[EID] = gpb.map_to_per_etype(frontier.edata[EID])
+        # TODO(zhengda) This is not scalable.
+        frontier.ndata[NTYPE], frontier.ndata[NID] = gpb.map_to_per_ntype(F.arange(0, frontier.number_of_nodes()))
+        frontier = to_heterogeneous(frontier, gpb.ntypes, gpb.etypes, ntype_field=NTYPE, etype_field=ETYPE)
+        return frontier
+    else:
+        return frontier
 
 def _distributed_edge_access(g, edges, issue_remote_req, local_access):
     """A routine that fetches local edges from distributed graph.

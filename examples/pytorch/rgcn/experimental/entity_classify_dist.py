@@ -401,10 +401,6 @@ class NeighborSampler:
             # For a heterogeneous input graph, the returned frontier is stored in
             # the homogeneous graph format.
             frontier = self.sample_neighbors(self.g, cur, fanout, replace=False)
-            frontier.edata[dgl.ETYPE], frontier.edata[dgl.EID] = gpb.map_to_per_etype(frontier.edata[dgl.EID])
-            # TODO(zhengda) This is not scalable.
-            frontier.ndata[dgl.NTYPE], frontier.ndata[dgl.NID] = gpb.map_to_per_ntype(th.arange(frontier.number_of_nodes()))
-            frontier = dgl.to_heterogeneous(frontier, gpb.ntypes, gpb.etypes, ntype_field=dgl.NTYPE, etype_field=dgl.ETYPE)
 
             block = dgl.to_block(frontier, cur)
             cur = {ntype: block.srcnodes[ntype].data[dgl.NID] for ntype in block.srctypes}
