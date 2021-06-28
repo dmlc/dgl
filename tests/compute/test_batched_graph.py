@@ -273,16 +273,16 @@ def test_set_batch_info(idtype):
     assert subg_n2.num_edges() == subg2.num_edges()
 
     # test homogeneous edge subgraph
-    sg_e = dgl.edge_subgraph(bg, list(range(40, 70)) + list(range(150, 200)), preserve_nodes=True)
-    induced_nodes = sg_e.ndata['_ID']
+    sg_e = dgl.edge_subgraph(bg, list(range(40, 70)) + list(range(150, 200)), relabel_nodes=False)
+    induced_nodes = F.arange(0, bg.num_nodes(), idtype)
     induced_edges = sg_e.edata['_ID']
     new_batch_num_nodes = _get_subgraph_batch_info(bg.ntypes, [induced_nodes], batch_num_nodes)
     new_batch_num_edges = _get_subgraph_batch_info(bg.canonical_etypes, [induced_edges], batch_num_edges)
     sg_e.set_batch_num_nodes(new_batch_num_nodes)
     sg_e.set_batch_num_edges(new_batch_num_edges)
     subg_e1, subg_e2 = dgl.unbatch(sg_e)
-    subg1 = dgl.edge_subgraph(g1, list(range(40, 70)), preserve_nodes=True)
-    subg2 = dgl.edge_subgraph(g2, list(range(50, 100)), preserve_nodes=True)
+    subg1 = dgl.edge_subgraph(g1, list(range(40, 70)), relabel_nodes=False)
+    subg2 = dgl.edge_subgraph(g2, list(range(50, 100)), relabel_nodes=False)
     assert subg_e1.num_nodes() == subg1.num_nodes()
     assert subg_e2.num_nodes() == subg2.num_nodes()
 

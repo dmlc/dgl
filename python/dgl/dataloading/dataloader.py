@@ -577,7 +577,7 @@ class EdgeCollator(Collator):
     >>> neg_sampler = dgl.dataloading.negative_sampler.Uniform(5)
     >>> collator = dgl.dataloading.EdgeCollator(
     ...     g, train_eid, sampler, exclude='reverse_id',
-    ...     reverse_eids=reverse_eids, negative_sampler=neg_sampler,
+    ...     reverse_eids=reverse_eids, negative_sampler=neg_sampler)
     >>> dataloader = torch.utils.data.DataLoader(
     ...     collator.dataset, collate_fn=collator.collate,
     ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
@@ -696,7 +696,7 @@ class EdgeCollator(Collator):
         else:
             items = _prepare_tensor(self.g_sampling, items, 'items', self._is_distributed)
 
-        pair_graph = self.g.edge_subgraph(items, preserve_nodes=True)
+        pair_graph = self.g.edge_subgraph(items, relabel_nodes=False)
         induced_edges = pair_graph.edata[EID]
 
         neg_srcdst = self.negative_sampler(self.g, items)
