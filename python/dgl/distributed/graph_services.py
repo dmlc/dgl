@@ -1,14 +1,13 @@
 """A set of graph services of getting subgraphs from DistGraph"""
-import numpy as np
 from collections import namedtuple
 
 from .rpc import Request, Response, send_requests_to_machine, recv_responses
 from ..sampling import sample_neighbors as local_sample_neighbors
 from ..subgraph import in_subgraph as local_in_subgraph
 from .rpc import register_service
-from ..convert import graph, to_heterogeneous, heterograph
-from ..base import NID, EID, NTYPE, ETYPE
-from ..utils import toindex, make_invmap
+from ..convert import graph, heterograph
+from ..base import NID, EID
+from ..utils import toindex
 from .. import backend as F
 
 __all__ = ['sample_neighbors', 'in_subgraph', 'find_edges']
@@ -397,10 +396,9 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
                                  fanout, edge_dir, prob, replace)
     frontier = _distributed_access(g, nodes, issue_remote_req, local_access)
     if len(gpb.etypes) > 1:
-        frontier.edata[ETYPE], frontier.edata[EID] = gpb.map_to_per_etype(frontier.edata[EID])
-
+        etype_ids, frontier.edata[EID] = gpb.map_to_per_etype(frontier.edata[EID])
         src, dst = frontier.edges()
-        etype_ids, idx = F.sort_1d(frontier.edata[ETYPE])
+        etype_ids, idx = F.sort_1d(etype_ids)
         src, dst, eid = src[idx], dst[idx], frontier.edata[EID][idx]
         _, src = gpb.map_to_per_ntype(src)
         _, dst = gpb.map_to_per_ntype(dst)

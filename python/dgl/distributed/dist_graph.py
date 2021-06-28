@@ -296,7 +296,7 @@ class DistGraphServer(KVServer):
     '''
     def __init__(self, server_id, ip_config, num_servers,
                  num_clients, part_config, disable_shared_mem=False,
-                 graph_format=['csc', 'coo']):
+                 graph_format='csc'):
         super(DistGraphServer, self).__init__(server_id=server_id,
                                               ip_config=ip_config,
                                               num_servers=num_servers,
