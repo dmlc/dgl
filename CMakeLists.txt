@@ -219,13 +219,13 @@ if(NOT MSVC)
 endif(NOT MSVC)
 
 # Compile LIBXSMM
-if(USE_LIBXSMM)
+if((NOT MSVC) AND USE_LIBXSMM)
   add_custom_target(libxsmm COMMAND make realclean COMMAND make -j BLAS=0
                      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/third_party/libxsmm
                      )
   add_dependencies(dgl libxsmm)
   list(APPEND DGL_LINKER_LIBS -L${CMAKE_SOURCE_DIR}/third_party/libxsmm/lib/ xsmm)
-endif(USE_LIBXSMM)
+endif((NOT MSVC) AND USE_LIBXSMM)
 
 # Compile TVM Runtime and Featgraph
 # (NOTE) We compile a dynamic library called featgraph_runtime, which the DGL library links to.
