@@ -296,7 +296,7 @@ class DistGraphServer(KVServer):
     '''
     def __init__(self, server_id, ip_config, num_servers,
                  num_clients, part_config, disable_shared_mem=False,
-                 graph_format='csc'):
+                 graph_format=['csc', 'coo']):
         super(DistGraphServer, self).__init__(server_id=server_id,
                                               ip_config=ip_config,
                                               num_servers=num_servers,
@@ -483,6 +483,7 @@ class DistGraph:
         self._etype_map = {etype:i for i, etype in enumerate(self.etypes)}
 
         # Get canonical edge types.
+        # TODO(zhengda) this requires the server to store the graph with coo format.
         eid = []
         for etype in self.etypes:
             type_eid = F.zeros((1,), F.int64, F.cpu())
@@ -591,7 +592,7 @@ class DistGraph:
         int
         """
         # TODO(da?): describe when self._g is None and idtype shouldn't be called.
-        return self._g.idtype
+        return F.int64
 
     @property
     def device(self):
@@ -613,7 +614,7 @@ class DistGraph:
         Device context object
         """
         # TODO(da?): describe when self._g is None and device shouldn't be called.
-        return self._g.device
+        return F.cpu()
 
     @property
     def ntypes(self):

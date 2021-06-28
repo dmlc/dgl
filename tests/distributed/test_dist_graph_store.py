@@ -464,6 +464,13 @@ def check_dist_graph_hetero(g, num_clients, num_nodes, num_edges):
     for etype in num_edges:
         assert etype in g.etypes
         assert num_edges[etype] == g.number_of_edges(etype)
+    etypes = [('n1', 'r1', 'n2'),
+              ('n1', 'r2', 'n3'),
+              ('n2', 'r3', 'n3')]
+    for i, etype in enumerate(g.canonical_etypes):
+        assert etype[0] == etypes[i][0]
+        assert etype[1] == etypes[i][1]
+        assert etype[2] == etypes[i][2]
     assert g.number_of_nodes() == sum([num_nodes[ntype] for ntype in num_nodes])
     assert g.number_of_edges() == sum([num_edges[etype] for etype in num_edges])
 
