@@ -9,28 +9,28 @@ Given a dataset of ``N`` samples with ``D`` dimensions, the common use case of K
 
 Empirically, the three parameters, ``N``, ``D``, and ``K``, all have impact on the computation cost. To benchmark the algorithms, we pick a few represensitive datasets to cover most common scenarios:
 
-- A synthetic dataset with mixed gaussian samples: ``N = 1000``, ``D = 3``.
-- A point cloud sample from ModelNet: ``N = 10000``, ``D = 3``.
-- Subsets of MNIST
+* A synthetic dataset with mixed gaussian samples: ``N = 1000``, ``D = 3``.
+* A point cloud sample from ModelNet: ``N = 10000``, ``D = 3``.
+* Subsets of MNIST
     - A small subset: ``N = 1000``, ``D = 784``
     - A medium subset: ``N = 10000``, ``D = 784``
     - A large subset: ``N = 50000``, ``D = 784``
 
 Some notes:
 
-- ``bruteforce-sharemem`` is an optimized implementation of ``bruteforce`` on GPU.
-- ``kd-tree`` is currently only implemented on CPU.
-- ``bruteforce-blas`` conducts matrix multiplication, thus is memory inefficient.
-- ``nn-descent`` is an approximate algorithm, and we also report the recall rate of its result. 
+* ``bruteforce-sharemem`` is an optimized implementation of ``bruteforce`` on GPU.
+* ``kd-tree`` is currently only implemented on CPU.
+* ``bruteforce-blas`` conducts matrix multiplication, thus is memory inefficient.
+* ``nn-descent`` is an approximate algorithm, and we also report the recall rate of its result.
 
 Results
 -------
 
 In this section, we show the runtime and recall rate (where applicable) for the algorithms under various scenarios.
 
-The experiments are run on an Amazon EC2 P3.2xlarge instance. This instance has 8 vCPUs with 61GB RAM, and one Tesla V100 GPU with 16GB RAM.
+The experiments are run on an Amazon EC2 P3.2xlarge instance. This instance has 8 vCPUs with 61GB RAM, and one Tesla V100 GPU with 16GB RAM. In terms of the environment, we obtain the numbers with DGL==0.7.0(`64d0f3f <https://github.com/dmlc/dgl/commit/64d0f3f3554911ec06d015f1c9659180796adf9a>`_), PyTorch==1.8.1, CUDA==11.1 on Ubuntu 18.04.5 LTS.
 
-- **Mixed Gaussian:**
+* **Mixed Gaussian:**
 
 +---------------------+------------------+-------------------+------------------+------------------+
 | Model               | CPU                                  | GPU                                 |
@@ -48,7 +48,7 @@ The experiments are run on an Amazon EC2 P3.2xlarge instance. This instance has 
 | nn-descent          | 0.014 (R: 0.985) | 0.148 (R: 1.000)  | 0.016 (R: 0.973) | 0.077 (R: 1.000) |
 +---------------------+------------------+-------------------+------------------+------------------+
 
-- **Point Cloud**
+* **Point Cloud**
 
 +---------------------+------------------+-------------------+------------------+------------------+
 | Model               | CPU                                  | GPU                                 |
@@ -66,7 +66,7 @@ The experiments are run on an Amazon EC2 P3.2xlarge instance. This instance has 
 | nn-descent          | 0.161 (R: 0.977) | 1.345 (R: 0.999)  | 0.086 (R: 0.966) | 0.445 (R: 0.999) |
 +---------------------+------------------+-------------------+------------------+------------------+
 
-- **Small MNIST**
+* **Small MNIST**
 
 +---------------------+------------------+-------------------+------------------+------------------+
 | Model               | CPU                                  | GPU                                 |
@@ -84,7 +84,7 @@ The experiments are run on an Amazon EC2 P3.2xlarge instance. This instance has 
 | nn-descent          | 0.060 (R: 0.878) | 1.077 (R: 0.999)  | 0.030 (R: 0.952) | 0.457 (R: 0.999) |
 +---------------------+------------------+-------------------+------------------+------------------+
 
-- **Medium MNIST**
+* **Medium MNIST**
 
 +---------------------+------------------+-------------------+------------------+------------------+
 | Model               | CPU                                  | GPU                                 |
@@ -102,7 +102,7 @@ The experiments are run on an Amazon EC2 P3.2xlarge instance. This instance has 
 | nn-descent          | 0.804 (R: 0.755) | 14.108 (R: 0.999) | 0.158 (R: 0.900) | 1.794 (R: 0.999) |
 +---------------------+------------------+-------------------+------------------+------------------+
 
-- **Large MNIST**
+* **Large MNIST**
 
 +---------------------+------------------+-------------------+------------------+------------------+
 | Model               | CPU                                  | GPU                                 |
