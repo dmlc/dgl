@@ -4765,7 +4765,7 @@ class DGLHeteroGraph(object):
                 [4.]])
         """
         # Graph with one relation type
-        if self._graph.number_of_etypes() == 1 or etype != None :
+        if self._graph.number_of_etypes() == 1 or etype is not None:
             etid = self.get_etype_id(etype)
             etype = self.canonical_etypes[etid]
             _, dtid = self._graph.metagraph.find_edge(etid)
@@ -4775,8 +4775,8 @@ class DGLHeteroGraph(object):
         else:   # heterogeneous graph with number of relation types > 1
             if not core.is_builtin(message_func) or not core.is_builtin(reduce_func):
                 raise DGLError("User defined functions are not yet "
-                                "supported in update_all for heterogeneous graphs. "
-                                "Please use multi_update_all instead.")
+                               "supported in update_all for heterogeneous graphs. "
+                               "Please use multi_update_all instead.")
             if reduce_func.name in ['max', 'min']:
                 raise NotImplementedError("Reduce op \'" + reduce_func.name + "\' is not yet "
                                           "supported in update_all for heterogeneous graphs. "
