@@ -396,8 +396,7 @@ class NeighborSampler:
         # We need to map the per-type node IDs to homogeneous IDs.
         # TODO(zhengda): we only support sample for one node type.
         ntype = 'paper'
-        cur = gpb.map_to_homo_nid(seeds, ntype)
-        hetero_cur = {ntype: seeds}
+        cur = {ntype: seeds}
         for fanout in self.fanouts:
             # For a heterogeneous input graph, the returned frontier is stored in
             # the homogeneous graph format.
@@ -407,14 +406,8 @@ class NeighborSampler:
             frontier.ndata[dgl.NTYPE], frontier.ndata[dgl.NID] = gpb.map_to_per_ntype(th.arange(frontier.number_of_nodes()))
             frontier = dgl.to_heterogeneous(frontier, gpb.ntypes, gpb.etypes, ntype_field=dgl.NTYPE, etype_field=dgl.ETYPE)
 
-            block = dgl.to_block(frontier, hetero_cur)
-            hetero_cur = {}
-            cur = []
-            for ntype in block.srctypes:
-                type_cur = block.srcnodes[ntype].data[dgl.NID]
-                hetero_cur[ntype] = type_cur
-                cur.append(gpb.map_to_homo_nid(type_cur, ntype))
-            cur = th.cat(cur)
+            block = dgl.to_block(frontier, cur)
+            cur = {ntype: block.srcnodes[ntype].data[dgl.NID] for ntype in block.srctypes}
 
             block.edata[dgl.EID] = frontier.edata[dgl.EID]
             ## Map the homogeneous edge Ids to their edge type.
