@@ -80,6 +80,8 @@ def knn_graph(x, k, algorithm='bruteforce-blas', dist='euclidean'):
     into a separate graph. DGL then composes the graphs into a large
     graph of multiple connected components.
 
+    See :doc:`the benchmark <../api/python/knn_benchmark>` for a complete benchmark result.
+
     Parameters
     ----------
     x : Tensor
@@ -954,7 +956,7 @@ def khop_adj(g, k):
     """
     assert g.is_homogeneous, \
         'only homogeneous graph is supported'
-    adj_k = g.adj(scipy_fmt=g.formats()['created'][0]) ** k
+    adj_k = g.adj(transpose=True, scipy_fmt=g.formats()['created'][0]) ** k
     return F.tensor(adj_k.todense().astype(np.float32))
 
 def khop_graph(g, k, copy_ndata=True):
@@ -1024,7 +1026,7 @@ def khop_graph(g, k, copy_ndata=True):
     assert g.is_homogeneous, \
         'only homogeneous graph is supported'
     n = g.number_of_nodes()
-    adj_k = g.adj(transpose=True, scipy_fmt=g.formats()['created'][0]) ** k
+    adj_k = g.adj(transpose=False, scipy_fmt=g.formats()['created'][0]) ** k
     adj_k = adj_k.tocoo()
     multiplicity = adj_k.data
     row = np.repeat(adj_k.row, multiplicity)
@@ -1280,7 +1282,7 @@ def laplacian_lambda_max(g):
     rst = []
     for g_i in g_arr:
         n = g_i.number_of_nodes()
-        adj = g_i.adj(scipy_fmt=g_i.formats()['created'][0]).astype(float)
+        adj = g_i.adj(transpose=True, scipy_fmt=g_i.formats()['created'][0]).astype(float)
         norm = sparse.diags(F.asnumpy(g_i.in_degrees()).clip(1) ** -0.5, dtype=float)
         laplacian = sparse.eye(n) - norm * adj * norm
         rst.append(sparse.linalg.eigs(laplacian, 1, which='LM',
@@ -1336,7 +1338,7 @@ def metapath_reachable_graph(g, metapath):
     """
     adj = 1
     for etype in metapath:
-        adj = adj * g.adj(etype=etype, scipy_fmt='csr', transpose=True)
+        adj = adj * g.adj(etype=etype, scipy_fmt='csr', transpose=False)
 
     adj = (adj != 0).tocsr()
     srctype = g.to_canonical_etype(metapath[0])[0]
@@ -2071,7 +2073,7 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
     Parameters
     ----------
     graph : DGLGraph
-        The graph.
+        The graph.  Can be either on CPU or GPU.
     dst_nodes : Tensor or dict[str, Tensor], optional
         The list of destination nodes.
 
@@ -2845,12 +2847,12 @@ def sort_in_edges(g, tag, tag_offset_name='_TAG_OFFSET'):
     -----------
 
     >>> g = dgl.graph(([0,1,2,3,4,0,1,2],[0,0,0,0,0,1,1,1]))
-    >>> g.adjacency_matrix(scipy_fmt='csr', transpose=False).nonzero()
+    >>> g.adjacency_matrix(scipy_fmt='csr', transpose=True).nonzero()
     (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
      array([0, 1, 2, 3, 4, 0, 1, 2], dtype=int32)))
     >>> tag = torch.IntTensor([1,1,0,2,0])
     >>> g_sorted = dgl.transform.sort_in_edges(g, tag)
-    >>> g_sorted.adjacency_matrix(scipy_fmt='csr', transpose=False).nonzero()
+    >>> g_sorted.adjacency_matrix(scipy_fmt='csr', transpose=True).nonzero()
     (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
      array([2, 4, 0, 1, 3, 2, 0, 1], dtype=int32))
     >>> g_sorted.ndata['_TAG_OFFSET']

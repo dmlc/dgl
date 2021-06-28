@@ -115,7 +115,6 @@ def test_edge_removal(idtype):
     assert g.number_of_nodes() == 5
     assert g.number_of_edges() == 11
     assert F.array_equal(g.edata['id'], F.tensor([0, 1, 10, 11, 12, 20, 21, 22, 23, 24, 0]))
-    assert dgl.NID in g.ndata
     assert dgl.EID in g.edata
 
 @parametrize_dtype
