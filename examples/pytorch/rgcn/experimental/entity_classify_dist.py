@@ -310,14 +310,6 @@ def compute_acc(results, labels):
     labels = labels.long()
     return (results == labels).float().sum() / len(results)
 
-def gen_norm(g):
-    _, v, eid = g.all_edges(form='all')
-    _, inverse_index, count = th.unique(v, return_inverse=True, return_counts=True)
-    degrees = count[inverse_index]
-    norm = th.ones(eid.shape[0], device=eid.device) / degrees
-    norm = norm.unsqueeze(1)
-    g.edata['norm'] = norm
-
 def evaluate(g, model, embed_layer, labels, eval_loader, test_loader, all_val_nid, all_test_nid):
     model.eval()
     embed_layer.eval()
@@ -329,10 +321,11 @@ def evaluate(g, model, embed_layer, labels, eval_loader, test_loader, all_val_ni
     with th.no_grad():
         for sample_data in tqdm.tqdm(eval_loader):
             seeds, blocks = sample_data
-            for block in blocks:
-                gen_norm(block)
-            feats = embed_layer(blocks[0].srcdata[dgl.NID], blocks[0].srcdata[dgl.NTYPE])
+            seeds = seeds['paper']
+            feats = embed_layer({ntype: blocks[0].srcnodes[ntype].data[dgl.NID] for ntype in blocks[0].srctypes})
             logits = model(blocks, feats)
+            assert len(logits) == 1
+            logits = logits['paper']
             eval_logits.append(logits.cpu().detach())
             assert np.all(seeds.numpy() < g.number_of_nodes('paper'))
             eval_seeds.append(seeds.cpu().detach())
@@ -345,10 +338,11 @@ def evaluate(g, model, embed_layer, labels, eval_loader, test_loader, all_val_ni
     with th.no_grad():
         for sample_data in tqdm.tqdm(test_loader):
             seeds, blocks = sample_data
-            for block in blocks:
-                gen_norm(block)
-            feats = embed_layer(blocks[0].srcdata[dgl.NID], blocks[0].srcdata[dgl.NTYPE])
+            seeds = seeds['paper']
+            feats = embed_layer({ntype: blocks[0].srcnodes[ntype].data[dgl.NID] for ntype in blocks[0].srctypes})
             logits = model(blocks, feats)
+            assert len(logits) == 1
+            logits = logits['paper']
             test_logits.append(logits.cpu().detach())
             assert np.all(seeds.numpy() < g.number_of_nodes('paper'))
             test_seeds.append(seeds.cpu().detach())
@@ -454,7 +448,7 @@ def run(args, device, data):
         shuffle=False,
         drop_last=False)
 
-    test_sampler = NeighborSampler(g, [-1] * args.n_layers, dgl.distributed.sample_neighbors)
+    test_sampler = NeighborSampler(g, val_fanouts, dgl.distributed.sample_neighbors)
     # Create DataLoader for constructing blocks
     test_dataloader = DistDataLoader(
         dataset=test_nid,
@@ -559,8 +553,6 @@ def run(args, device, data):
             sample_time += tic_step - start
             sample_t.append(tic_step - start)
 
-            #for block in blocks:
-            #    gen_norm(block)
             feats = embed_layer({ntype: blocks[0].srcnodes[ntype].data[dgl.NID] for ntype in blocks[0].srctypes})
             label = labels[seeds].to(device)
             copy_time = time.time()
