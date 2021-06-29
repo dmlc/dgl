@@ -291,7 +291,8 @@ void CusparseCsrmm2Hetero(
     const DType* B_data, const DType* A_data,
     DType* C_data,
     int64_t x_length,
-    cudaStream_t strm_id) {
+    cudaStream_t strm_id,
+    bool trans_C) {
   // We use csrmm2 to perform following operation:
   // C = A x B, where A is a sparse matrix in csr format, B is the dense matrix for node
   // feature tensor. However, since cusparse only supports column-major, while our tensor
@@ -362,9 +363,6 @@ void CusparseCsrmm2Hetero(
   CUSPARSE_CALL(cusparseDestroyDnMat(matB));
   CUSPARSE_CALL(cusparseDestroyDnMat(matC));
 #else
-  // allocate matrix for temporary transposed output
-  DType* trans_out = static_cast<DType*>(device->AllocWorkspace(ctx, m * n * sizeof(DType)));
-
   cusparseMatDescr_t descr;
   CUSPARSE_CALL(cusparseCreateMatDescr(&descr));
   CUSPARSE_CALL(cusparseSetMatType(descr, CUSPARSE_MATRIX_TYPE_GENERAL));
@@ -378,11 +376,17 @@ void CusparseCsrmm2Hetero(
       descr, (valptr)? valptr : A_data,
       static_cast<int32_t*>(csr.indptr->data),
       static_cast<int32_t*>(csr.indices->data),
-      B_data, n, &beta, trans_out, m));
+      B_data, n, &beta, C_data, m));
   CUSPARSE_CALL(cusparseDestroyMatDescr(descr));
-  // transpose the output matrix
-  _Transpose(trans_out, C_data, n, m);
-  device->FreeWorkspace(ctx, trans_out);
+
+  if (trans_C) {
+    // allocate matrix for temporary transposed output
+    DType* trans_out = static_cast<DType*>(device->AllocWorkspace(ctx, m * n * sizeof(DType)));
+    // transpose the output matrix
+    _Transpose(C_data, trans_out, n, m);
+    GPU_copy(trans_out, C_data, m * n * sizeof(DType), cudaMemcpyDeviceToDevice, strm_id);
+    device->FreeWorkspace(ctx, trans_out);
+  }
 #endif
   if (valptr)
     device->FreeWorkspace(ctx, valptr);
@@ -531,6 +535,7 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
     const dgl_type_t src_id = ufeat_ntids[etype];
     const dgl_type_t dst_id = out_ntids[etype];
     CSRMatrix csr = vec_csr[etype];
+    bool trans_C = (etype == ufeat_ntids.size() - 1) ? 1 : 0;
     if (reduce == "sum") {
       SWITCH_BITS(bits, DType, {
         /* Call  SpMM for each relation type */
@@ -545,8 +550,7 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
               static_cast<DType*>(vec_ufeat[src_id]->data),
               nullptr,
               static_cast<DType*>(vec_out[dst_id]->data),
-              x_length,
-              thr_entry->stream);
+              x_length, thr_entry->stream, trans_C);
         } else if (op == "mul" && is_scalar_efeat &&
             cusparse_available<bits, IdType>()) {  // cusparse
           NDArray efeat = vec_efeat[etype];
@@ -566,8 +570,7 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
                 static_cast<DType*>(vec_ufeat[src_id]->data),
                 static_cast<DType*>(efeat->data),
                 static_cast<DType*>(vec_out[dst_id]->data),
-                x_length,
-                thr_entry->stream);
+                x_length, thr_entry->stream, trans_C);
           });
         } else {  // general kernel
           NDArray ufeat = (vec_ufeat.size() == 0) ?
