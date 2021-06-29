@@ -1491,14 +1491,11 @@ def test_reorder(idtype):
     # call with default args
     rg = dgl.reorder(g)
 
-    assert 'h' in rg.ndata.keys()
-    assert 'w' in rg.edata.keys()
-    assert dgl.NID in rg.ndata.keys()
-    assert dgl.EID in rg.edata.keys()
-    for i, e in enumerate(rg.ndata[dgl.NID]):
-        assert F.array_equal(rg.ndata['h'][i], g.ndata['h'][e])
-    for i, e in enumerate(rg.edata[dgl.EID]):
-        assert F.array_equal(rg.edata['w'][i], g.edata['w'][e])
+    # reorder back to original according to stored ids
+    rg2 = dgl.reorder(rg, 'custom', permute_config={
+                      'nodes_perm': np.argsort(F.asnumpy(rg.ndata[dgl.NID]))})
+    assert F.array_equal(g.ndata['h'], rg2.ndata['h'])
+    assert F.array_equal(g.edata['w'], rg2.edata['w'])
 
     # do not store ids
     rg = dgl.reorder(g, store_ids=False)
