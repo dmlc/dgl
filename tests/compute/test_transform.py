@@ -1485,10 +1485,8 @@ def test_remove_selfloop(idtype):
 def test_reorder(idtype):
     g = dgl.graph(([0, 1, 2, 3, 4], [2, 2, 3, 2, 3]),
                   idtype=idtype, device=F.ctx())
-    g.ndata['h'] = F.copy_to(F.tensor([0, 1, 2, 3, 4],
-                                      dtype=idtype), ctx=F.ctx())
-    g.edata['w'] = F.copy_to(F.tensor([5, 6, 7, 8, 9],
-                                      dtype=idtype), ctx=F.ctx())
+    g.ndata['h'] = F.copy_to(F.randn((g.num_nodes(), 3)), ctx=F.ctx())
+    g.edata['w'] = F.copy_to(F.randn((g.num_edges(), 2)), ctx=F.ctx())
 
     # call with default args
     rg = dgl.reorder(g)
@@ -1498,9 +1496,9 @@ def test_reorder(idtype):
     assert dgl.NID in rg.ndata.keys()
     assert dgl.EID in rg.edata.keys()
     for i, e in enumerate(rg.ndata[dgl.NID]):
-        assert rg.ndata['h'][i] == g.ndata['h'][e]
+        assert F.array_equal(rg.ndata['h'][i], g.ndata['h'][e])
     for i, e in enumerate(rg.edata[dgl.EID]):
-        assert rg.edata['w'][i] == g.edata['w'][e]
+        assert F.array_equal(rg.edata['w'][i], g.edata['w'][e])
 
     # do not store ids
     rg = dgl.reorder(g, store_ids=False)
