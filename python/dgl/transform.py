@@ -80,6 +80,8 @@ def knn_graph(x, k, algorithm='bruteforce-blas', dist='euclidean'):
     into a separate graph. DGL then composes the graphs into a large
     graph of multiple connected components.
 
+    See :doc:`the benchmark <../api/python/knn_benchmark>` for a complete benchmark result.
+
     Parameters
     ----------
     x : Tensor
