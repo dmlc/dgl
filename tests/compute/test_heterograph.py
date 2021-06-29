@@ -51,8 +51,8 @@ def create_test_heterograph2(idtype):
     g = dgl.heterograph({
         ('user', 'follows', 'user'): ([0, 1], [1, 2]),
         ('user', 'plays', 'game'): ([0, 1, 2, 1], [0, 0, 1, 1]),
-        ('user', 'wishes', 'game'): ([0, 2], [1, 0]),
-        ('developer', 'develops', 'game'): ([0, 1], [0, 1]),
+        ('user', 'wishes', 'game'): ('csr', ([0, 1, 1, 2], [1, 0], [])),
+        ('developer', 'develops', 'game'): ('csc', ([0, 1, 2], [0, 1], [0, 1])),
         }, idtype=idtype, device=F.ctx())
     assert g.idtype == idtype
     assert g.device == F.ctx()
@@ -488,53 +488,53 @@ def _test_edge_ids():
 @parametrize_dtype
 def test_adj(idtype):
     g = create_test_heterograph(idtype)
-    adj = F.sparse_to_numpy(g.adj(transpose=False, etype='follows'))
+    adj = F.sparse_to_numpy(g.adj(transpose=True, etype='follows'))
     assert np.allclose(
             adj,
             np.array([[0., 0., 0.],
                       [1., 0., 0.],
                       [0., 1., 0.]]))
-    adj = F.sparse_to_numpy(g.adj(transpose=True, etype='follows'))
+    adj = F.sparse_to_numpy(g.adj(transpose=False, etype='follows'))
     assert np.allclose(
             adj,
             np.array([[0., 1., 0.],
                       [0., 0., 1.],
                       [0., 0., 0.]]))
-    adj = F.sparse_to_numpy(g.adj(transpose=False, etype='plays'))
+    adj = F.sparse_to_numpy(g.adj(transpose=True, etype='plays'))
     assert np.allclose(
             adj,
             np.array([[1., 1., 0.],
                       [0., 1., 1.]]))
-    adj = F.sparse_to_numpy(g.adj(transpose=True, etype='plays'))
+    adj = F.sparse_to_numpy(g.adj(transpose=False, etype='plays'))
     assert np.allclose(
             adj,
             np.array([[1., 0.],
                       [1., 1.],
                       [0., 1.]]))
 
-    adj = g.adj(transpose=False, scipy_fmt='csr', etype='follows')
+    adj = g.adj(transpose=True, scipy_fmt='csr', etype='follows')
     assert np.allclose(
             adj.todense(),
             np.array([[0., 0., 0.],
                       [1., 0., 0.],
                       [0., 1., 0.]]))
-    adj = g.adj(transpose=False, scipy_fmt='coo', etype='follows')
+    adj = g.adj(transpose=True, scipy_fmt='coo', etype='follows')
     assert np.allclose(
             adj.todense(),
             np.array([[0., 0., 0.],
                       [1., 0., 0.],
                       [0., 1., 0.]]))
-    adj = g.adj(transpose=False, scipy_fmt='csr', etype='plays')
+    adj = g.adj(transpose=True, scipy_fmt='csr', etype='plays')
     assert np.allclose(
             adj.todense(),
             np.array([[1., 1., 0.],
                       [0., 1., 1.]]))
-    adj = g.adj(transpose=False, scipy_fmt='coo', etype='plays')
+    adj = g.adj(transpose=True, scipy_fmt='coo', etype='plays')
     assert np.allclose(
             adj.todense(),
             np.array([[1., 1., 0.],
                       [0., 1., 1.]]))
-    adj = F.sparse_to_numpy(g['follows'].adj(transpose=False))
+    adj = F.sparse_to_numpy(g['follows'].adj(transpose=True))
     assert np.allclose(
             adj,
             np.array([[0., 0., 0.],
@@ -2647,6 +2647,63 @@ def test_create_block(idtype):
     assert hg.nodes['B_dst'].data['x'] is dbx
     assert hg.edges['AB'].data['x'] is eabx
     assert hg.edges['BA'].data['x'] is ebax
+
+@parametrize_dtype
+@pytest.mark.parametrize('fmt', ['coo', 'csr', 'csc'])
+def test_adj_sparse(idtype, fmt):
+    if fmt == 'coo':
+        A = ssp.random(10, 10, 0.2).tocoo()
+        A.data = np.arange(20)
+        row = F.tensor(A.row, idtype)
+        col = F.tensor(A.col, idtype)
+        g = dgl.graph((row, col))
+    elif fmt == 'csr':
+        A = ssp.random(10, 10, 0.2).tocsr()
+        A.data = np.arange(20)
+        indptr = F.tensor(A.indptr, idtype)
+        indices = F.tensor(A.indices, idtype)
+        g = dgl.graph(('csr', (indptr, indices, [])))
+        with pytest.raises(DGLError):
+            g2 = dgl.graph(('csr', (indptr[:-1], indices, [])), num_nodes=10)
+    elif fmt == 'csc':
+        A = ssp.random(10, 10, 0.2).tocsc()
+        A.data = np.arange(20)
+        indptr = F.tensor(A.indptr, idtype)
+        indices = F.tensor(A.indices, idtype)
+        g = dgl.graph(('csc', (indptr, indices, [])))
+        with pytest.raises(DGLError):
+            g2 = dgl.graph(('csr', (indptr[:-1], indices, [])), num_nodes=10)
+
+    A_coo = A.tocoo()
+    A_csr = A.tocsr()
+    A_csc = A.tocsc()
+    row, col = g.adj_sparse('coo')
+    assert np.array_equal(F.asnumpy(row), A_coo.row)
+    assert np.array_equal(F.asnumpy(col), A_coo.col)
+
+    indptr, indices, eids = g.adj_sparse('csr')
+    assert np.array_equal(F.asnumpy(indptr), A_csr.indptr)
+    if fmt == 'csr':
+        assert len(eids) == 0
+        assert np.array_equal(F.asnumpy(indices), A_csr.indices)
+    else:
+        indices_sorted = F.zeros(len(indices), idtype)
+        indices_sorted = F.scatter_row(indices_sorted, eids, indices)
+        indices_sorted_np = np.zeros(len(indices), dtype=A_csr.indices.dtype)
+        indices_sorted_np[A_csr.data] = A_csr.indices
+        assert np.array_equal(F.asnumpy(indices_sorted), indices_sorted_np)
+
+    indptr, indices, eids = g.adj_sparse('csc')
+    assert np.array_equal(F.asnumpy(indptr), A_csc.indptr)
+    if fmt == 'csc':
+        assert len(eids) == 0
+        assert np.array_equal(F.asnumpy(indices), A_csc.indices)
+    else:
+        indices_sorted = F.zeros(len(indices), idtype)
+        indices_sorted = F.scatter_row(indices_sorted, eids, indices)
+        indices_sorted_np = np.zeros(len(indices), dtype=A_csc.indices.dtype)
+        indices_sorted_np[A_csc.data] = A_csc.indices
+        assert np.array_equal(F.asnumpy(indices_sorted), indices_sorted_np)
 
 
 if __name__ == '__main__':
