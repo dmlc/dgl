@@ -1498,9 +1498,9 @@ def test_reorder(idtype):
     assert dgl.NID in rg.ndata.keys()
     assert dgl.EID in rg.edata.keys()
     for i, e in enumerate(rg.ndata[dgl.NID]):
-        assert F.array_equal(rg.ndata['h'][i], g.ndata['h'][e])
+        assert rg.ndata['h'][i] == g.ndata['h'][e]
     for i, e in enumerate(rg.edata[dgl.EID]):
-        assert F.array_equal(rg.edata['w'][i], g.edata['w'][e])
+        assert rg.edata['w'][i] == g.edata['w'][e]
 
     # do not store ids
     rg = dgl.reorder(g, store_ids=False)
