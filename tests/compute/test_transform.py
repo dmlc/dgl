@@ -1485,9 +1485,9 @@ def test_remove_selfloop(idtype):
 def test_reorder(idtype):
     g = dgl.graph(([0, 1, 2, 3, 4], [2, 2, 3, 2, 3]),
                   idtype=idtype, device=F.ctx())
-    g.ndata['h'] = F.copy_to(F.tensor([[0], [1], [2], [3], [4]],
+    g.ndata['h'] = F.copy_to(F.tensor([0, 1, 2, 3, 4],
                                       dtype=idtype), ctx=F.ctx())
-    g.edata['w'] = F.copy_to(F.tensor([[5], [6], [7], [8], [9]],
+    g.edata['w'] = F.copy_to(F.tensor([5, 6, 7, 8, 9],
                                       dtype=idtype), ctx=F.ctx())
 
     # call with default args
@@ -1497,6 +1497,10 @@ def test_reorder(idtype):
     assert 'w' in rg.edata.keys()
     assert dgl.NID in rg.ndata.keys()
     assert dgl.EID in rg.edata.keys()
+    for i, e in enumerate(rg.ndata[dgl.NID]):
+        assert F.array_equal(rg.ndata['h'][i], g.ndata['h'][e])
+    for i, e in enumerate(rg.edata[dgl.EID]):
+        assert F.array_equal(rg.edata['w'][i], g.edata['w'][e])
 
     # do not store ids
     rg = dgl.reorder(g, store_ids=False)
@@ -1507,10 +1511,13 @@ def test_reorder(idtype):
     if os.name == 'nt':
         pass
     else:
+        # metis_partition may fail for small graph.
+        mg = create_large_graph(1000).to(F.ctx())
+
         # call with metis strategy, but k is not specified
         raise_error = False
         try:
-            dgl.reorder(g, permute_algo='metis')
+            dgl.reorder(mg, permute_algo='metis')
         except:
             raise_error = True
         assert raise_error
@@ -1518,7 +1525,7 @@ def test_reorder(idtype):
         # call with metis strategy, k is specified
         raise_error = False
         try:
-            dgl.reorder(create_large_graph(1000),
+            dgl.reorder(mg,
                         permute_algo='metis', permute_config={'k': 2})
         except:
             raise_error = True
