@@ -3048,6 +3048,7 @@ def METISPerm(g, k):
     """
     pids = metis_partition_assignment(
         g if g.device == F.cpu() else g.to(F.cpu()), k)
+    pids = F.asnumpy(pids)
     perm = np.zeros(pids.shape, np.int64)
     bincnt = np.bincount(pids)
     idcnt = np.cumsum(bincnt)
