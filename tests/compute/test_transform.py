@@ -1507,22 +1507,26 @@ def test_reorder(idtype):
     assert not dgl.NID in rg.ndata.keys()
     assert not dgl.EID in rg.edata.keys()
 
-    # call with metis strategy, but k is not specified
-    raise_error = False
-    try:
-        dgl.reorder(g, permute_algo='metis')
-    except:
-        raise_error = True
-    assert raise_error
+    # metis does not work on windows.
+    if os.name == 'nt':
+        pass
+    else:
+        # call with metis strategy, but k is not specified
+        raise_error = False
+        try:
+            dgl.reorder(g, permute_algo='metis')
+        except:
+            raise_error = True
+        assert raise_error
 
-    # call with metis strategy, k is specified
-    raise_error = False
-    try:
-        dgl.reorder(create_large_graph(1000),
-                    permute_algo='metis', permute_config={'k': 2})
-    except:
-        raise_error = True
-    assert not raise_error
+        # call with metis strategy, k is specified
+        raise_error = False
+        try:
+            dgl.reorder(create_large_graph(1000),
+                        permute_algo='metis', permute_config={'k': 2})
+        except:
+            raise_error = True
+        assert not raise_error
 
     # call with qualified nodes_perm specified
     nodes_perm = np.random.permutation(g.num_nodes())
@@ -1562,7 +1566,7 @@ def test_reorder(idtype):
     assert raise_error
 
     # add 'csr' format if needed
-    fg = g.formats('coo')
+    fg = g.formats('csc')
     assert 'csr' not in sum(fg.formats().values(), [])
     rfg = dgl.reorder(fg)
     assert 'csr' in sum(rfg.formats().values(), [])
