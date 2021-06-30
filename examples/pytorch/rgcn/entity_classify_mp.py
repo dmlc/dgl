@@ -151,15 +151,10 @@ def evaluate(model, embed_layer, eval_loader, node_feats, inv_target):
 
     return eval_logits, eval_seeds
 
-def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
+def run(proc_id, n_gpus, n_cpus, args, devices, dataset, queue=None):
     dev_id = devices[proc_id] if devices[proc_id] != 'cpu' else -1
     g, node_feats, num_of_ntype, num_classes, num_rels, target_idx, \
         inv_target, train_idx, val_idx, test_idx, labels = dataset
-    if split is not None:
-        train_seed, val_seed, test_seed = split
-        train_idx = train_idx[train_seed]
-        val_idx = val_idx[val_seed]
-        test_idx = test_idx[test_seed]
 
     fanouts = [int(fanout) for fanout in args.fanout.split(',')]
     node_tids = g.ndata[dgl.NTYPE]
@@ -302,6 +297,8 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
     if n_gpus > 1 and n_cpus - args.num_workers > 0:
         th.set_num_threads(n_cpus-args.num_workers)
     for epoch in range(args.n_epochs):
+        if n_gpus > 1:
+            loader.set_epoch(epoch)
         tstart = time.time()
         model.train()
         embed_layer.train()
@@ -539,46 +536,24 @@ def main(args, devices):
     if devices[0] == -1:
         run(0, 0, n_cpus, args, ['cpu'],
             (g, node_feats, num_of_ntype, num_classes, num_rels, target_idx,
-             inv_target, train_idx, val_idx, test_idx, labels), None, None)
+             inv_target, train_idx, val_idx, test_idx, labels), None)
     # gpu
     elif n_gpus == 1:
         run(0, n_gpus, n_cpus, args, devices,
             (g, node_feats, num_of_ntype, num_classes, num_rels, target_idx,
-             inv_target, train_idx, val_idx, test_idx, labels), None, None)
+             inv_target, train_idx, val_idx, test_idx, labels), None)
     # multi gpu
     else:
         queue = mp.Queue(n_gpus)
         procs = []
-        num_train_seeds = train_idx.shape[0]
-        num_valid_seeds = val_idx.shape[0]
-        num_test_seeds = test_idx.shape[0]
-        train_seeds = th.randperm(num_train_seeds)
-        valid_seeds = th.randperm(num_valid_seeds)
-        test_seeds = th.randperm(num_test_seeds)
-        tseeds_per_proc = num_train_seeds // n_gpus
-        vseeds_per_proc = num_valid_seeds // n_gpus
-        tstseeds_per_proc = num_test_seeds // n_gpus
         for proc_id in range(n_gpus):
-            # we have multi-gpu for training, evaluation and testing
-            # so split trian set, valid set and test set into num-of-gpu parts.
-            proc_train_seeds = train_seeds[proc_id * tseeds_per_proc :
-                                           (proc_id + 1) * tseeds_per_proc \
-                                           if (proc_id + 1) * tseeds_per_proc < num_train_seeds \
-                                           else num_train_seeds]
-            proc_valid_seeds = valid_seeds[proc_id * vseeds_per_proc :
-                                           (proc_id + 1) * vseeds_per_proc \
-                                           if (proc_id + 1) * vseeds_per_proc < num_valid_seeds \
-                                           else num_valid_seeds]
-            proc_test_seeds = test_seeds[proc_id * tstseeds_per_proc :
-                                         (proc_id + 1) * tstseeds_per_proc \
-                                         if (proc_id + 1) * tstseeds_per_proc < num_test_seeds \
-                                         else num_test_seeds]
+            # We use distributed data parallel dataloader to handle the data
+            # splitting
             p = mp.Process(target=run, args=(proc_id, n_gpus, n_cpus // n_gpus, args, devices,
                                              (g, node_feats, num_of_ntype,
                                               num_classes, num_rels, target_idx,
                                               inv_target, train_idx, val_idx,
                                               test_idx, labels),
-                                             (proc_train_seeds, proc_valid_seeds, proc_test_seeds),
                                              queue))
             p.start()
             procs.append(p)
