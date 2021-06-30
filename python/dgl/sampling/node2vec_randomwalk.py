@@ -20,10 +20,12 @@ def node2vec_random_walk(g, nodes, p, q, walk_length, prob=None, return_eids=Fal
 
     Note that if a random walk stops in advance, DGL pads the trace with -1 to have the same
     length.
+
     Parameters
     ----------
     g : DGLGraph
         The graph.  Must be on CPU.
+
         Note that node2vec only support homogeneous graph.
     nodes : Tensor
         Node ID tensor from which the random walk traces starts.
