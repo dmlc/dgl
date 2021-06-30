@@ -350,7 +350,7 @@ DGL should work on
 
 * all Linux distributions no earlier than Ubuntu 16.04
 * macOS X
-* Windows 10
+* Windows 10 (with [VC2015 Redistributable](https://www.microsoft.com/en-us/download/details.aspx?id=48145) Installed)
 
 DGL requires Python 3.6 or later.
 
