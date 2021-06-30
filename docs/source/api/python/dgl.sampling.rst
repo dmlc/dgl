@@ -12,6 +12,7 @@ Random walk
     :toctree: ../../generated/
 
     random_walk
+    node2vec_random_walk
     pack_traces
 
 Neighbor sampling

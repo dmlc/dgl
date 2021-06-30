@@ -419,12 +419,28 @@ class NDArrayPartition(object):
                 array_size, num_parts)
         else:
             assert False, 'Unknown partition mode "{}"'.format(mode)
+        self._array_size = array_size
+        self._num_parts = num_parts
 
+    def num_parts(self):
+        """ Get the number of partitions.
+        """
+        return self._num_parts
+
+    def array_size(self):
+        """ Get the total size of the first dimension of the partitioned array.
+        """
+        return self._array_size
 
     def get(self):
         """ Get the C-handle for this object.
         """
         return self._partition
+
+    def get_local_indices(self, part, ctx):
+        """ Get the set of global indices in this given partition.
+        """
+        return self.map_to_global(F.arange(0, self.local_size(part), ctx=ctx), part)
 
     def local_size(self, part):
         """ Get the number of rows/items assigned to the given part.
