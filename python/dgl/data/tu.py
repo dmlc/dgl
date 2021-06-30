@@ -252,6 +252,13 @@ class TUDataset(DGLBuiltinDataset):
     num_labels : int
         Number of classes
 
+    Notes
+    -----
+    **IMPORTANT:** Some of the datasets have duplicate edges exist in the graphs, e.g.
+    the edges in ``IMDB-BINARY`` are all duplicated.  DGL faithfully keeps the duplicates
+    as per the original data.  Other frameworks such as PyTorch Geometric removes the
+    duplicates by default.  You can remove the duplicate edges with :func:`dgl.to_simple`.
+
     Examples
     --------
     >>> data = TUDataset('DD')
