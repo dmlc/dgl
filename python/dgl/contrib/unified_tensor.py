@@ -9,10 +9,10 @@ class UnifiedTensor: #UnifiedTensor
 
     Parameters
     ----------
-    input : torch tensor
-        Torch tensor which we want to convert into the
+    input : Tensor
+        Tensor which we want to convert into the
         unified tensor.
-    device : th.device
+    device : device
         Device to create the mapping of the unified tensor.
     '''
 
@@ -24,7 +24,6 @@ class UnifiedTensor: #UnifiedTensor
         self._array = F.zerocopy_to_dgl_ndarray(self._input)
         self._device = device
 
-        # Pin & map the host memory space
         self._array.pin_memory_(utils.to_dgl_context(device))
 
     def __len__(self):
@@ -40,6 +39,15 @@ class UnifiedTensor: #UnifiedTensor
         self._input[key] = val
 
     def gather_row(self, index):
+        '''Gather the rows designated by the index. Performs
+        a direct GPU to CPU access using the unified virtual
+        memory (UVM) capability of CUDA.
+
+        Parameters
+        ----------
+        index : Tensor
+            Tensor which contains the row indicies
+        '''        
         return F.zerocopy_from_dgl_ndarray(
                 _CAPI_DGLIndexSelectCPUFromGPU(self._array, 
                             F.zerocopy_to_dgl_ndarray(index)))
