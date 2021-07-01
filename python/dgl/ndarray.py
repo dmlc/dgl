@@ -139,24 +139,6 @@ def exist_shared_mem_array(name):
     """
     return _CAPI_DGLExistSharedMemArray(name)
 
-def uvm_gather(arr, indices):
-    """ Gather host memory data from GPU directly using zero-copy.
-
-    Parameters
-    ----------
-    arr : NDArray
-        Input array located in host memory
-    indices: NDArray
-        Index array
-
-
-    Returns
-    -------
-    NDArray
-        Gathered result
-    """
-    return _CAPI_DGLArrayIndexSelectUVM(arr, indices)
-
 class SparseFormat:
     """Format code"""
     ANY = 0

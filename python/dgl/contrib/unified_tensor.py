@@ -1,8 +1,8 @@
 """Unified Tensor."""
-from dgl._ffi.runtime_ctypes import DGLContext
-import torch as th
-from ...backend import pytorch as F
+from .. import backend as F
 import dgl.ndarray as nd
+from .._ffi.function import _init_api
+from .. import utils
 
 
 class UnifiedTensor: #UnifiedTensor
@@ -18,7 +18,7 @@ class UnifiedTensor: #UnifiedTensor
     '''
 
     def __init__(self, input, device):
-        if device.type != 'cuda':
+        if F.device_type(device) != 'cuda':
             raise ValueError("Target device must be a cuda device")
 
         self._input = input
@@ -26,16 +26,24 @@ class UnifiedTensor: #UnifiedTensor
         self._device = device
 
         # Pin & map the host memory space
-        self._array.pin_memory_(nd.gpu(self._device.index))
+        self._array.pin_memory_(utils.to_dgl_context(device))
 
     def __len__(self):
         return len(self._array)
 
     def __repr__(self):
-        pass
+        return self._input.__repr__()
 
     def __getitem__(self, key):
-        return F.zerocopy_from_dgl_ndarray(nd.uvm_gather(self._array, F.zerocopy_to_dgl_ndarray(key)))
+        return self._input[key]
+
+    def __setitem__(self, key, val):
+        self._input[key] = val
+
+    def gather_row(self, index):
+        return F.zerocopy_from_dgl_ndarray(
+                _CAPI_DGLIndexSelectCPUFromGPU(self._array, 
+                            F.zerocopy_to_dgl_ndarray(index)))
 
     @property
     def shape(self):
@@ -51,3 +59,5 @@ class UnifiedTensor: #UnifiedTensor
     def device(self):
         """Device of this tensor"""
         return self._device
+
+_init_api("dgl.ndarray.uvm", __name__)

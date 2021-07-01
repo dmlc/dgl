@@ -172,7 +172,7 @@ class CUDADeviceAPI final : public DeviceAPI {
 
   void PinData(DGLContext ctx, void* ptr, size_t nbytes) {
     CUDA_CALL(cudaSetDevice(ctx.device_id));
-    CUDA_CALL(cudaHostRegister(ptr, nbytes, cudaHostRegisterMapped));
+    CUDA_CALL(cudaHostRegister(ptr, nbytes, cudaHostRegisterDefault));
   }
 
   void UnpinData(DGLContext ctx, void* ptr) {

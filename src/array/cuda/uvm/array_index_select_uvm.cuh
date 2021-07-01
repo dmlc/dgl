@@ -4,8 +4,8 @@
  * \brief Array index select GPU kernel implementation
  */
 
-#ifndef DGL_ARRAY_CUDA_ARRAY_INDEX_SELECT_CUH_
-#define DGL_ARRAY_CUDA_ARRAY_INDEX_SELECT_CUH_
+#ifndef DGL_ARRAY_CUDA_ARRAY_INDEX_SELECT_UVM_CUH_
+#define DGL_ARRAY_CUDA_ARRAY_INDEX_SELECT_UVM_CUH_
 
 namespace dgl {
 namespace aten {

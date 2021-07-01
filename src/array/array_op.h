@@ -40,9 +40,6 @@ IdArray UnaryElewise(IdArray array);
 template <DLDeviceType XPU, typename DType, typename IdType>
 NDArray IndexSelect(NDArray array, IdArray index);
 
-template <typename DType, typename IdType>
-NDArray IndexSelectUVM(NDArray array, IdArray index);
-
 template <DLDeviceType XPU, typename DType>
 DType IndexSelect(NDArray array, int64_t index);
 

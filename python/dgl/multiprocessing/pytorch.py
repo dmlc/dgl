@@ -30,47 +30,9 @@ def thread_wrapped_func(func):
             raise exception.__class__(trace)
     return decorated_function
 
-<<<<<<< HEAD:examples/pytorch/graphsage/utils.py
-# Get user id
-def mps_get_user_id():
-    result = subprocess.run(['id', '-u'], stdout=subprocess.PIPE)
-    return result.stdout.decode('utf-8').rstrip()
-
-# Start MPS daemon
-def mps_daemon_start():
-    result = subprocess.run(['nvidia-cuda-mps-control', '-d'], stdout=subprocess.PIPE)
-    print(result.stdout.decode('utf-8').rstrip())
-
-# Start MPS server with user id
-def mps_server_start(user_id):
-    ps = subprocess.Popen(('echo', 'start_server -uid ' + user_id), stdout=subprocess.PIPE)
-    output = subprocess.check_output(('nvidia-cuda-mps-control'), stdin=ps.stdout)
-    ps.wait()
-
-# Get created server pid
-def mps_get_server_pid():
-    ps = subprocess.Popen(('echo', 'get_server_list'), stdout=subprocess.PIPE)
-    output = subprocess.check_output(('nvidia-cuda-mps-control'), stdin=ps.stdout)
-    ps.wait()
-    return output.decode('utf-8').rstrip()
-
-# Set active thread percentage with the pid for producer
-def mps_set_active_thread_percentage(server_pid, percentage):
-    ps = subprocess.Popen(('echo', 'set_active_thread_percentage ' + server_pid + ' ' + str(percentage)), stdout=subprocess.PIPE)
-    output = subprocess.check_output(('nvidia-cuda-mps-control'), stdin=ps.stdout)
-    ps.wait()
-    print('Setting set_active_thread_percentage to', output.decode('utf-8').rstrip())
-
-# Quit MPS
-def mps_quit():
-    ps = subprocess.Popen(('echo', 'quit'), stdout=subprocess.PIPE)
-    output = subprocess.check_output(('nvidia-cuda-mps-control'), stdin=ps.stdout)
-    ps.wait()
-=======
 # pylint: disable=missing-docstring
 class Process(mp.Process):
     # pylint: disable=dangerous-default-value
     def __init__(self, group=None, target=None, name=None, args=(), kwargs={}, *, daemon=None):
         target = thread_wrapped_func(target)
         super().__init__(group, target, name, args, kwargs, daemon=daemon)
->>>>>>> upstream/master:python/dgl/multiprocessing/pytorch.py

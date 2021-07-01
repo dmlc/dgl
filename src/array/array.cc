@@ -125,29 +125,6 @@ NDArray IndexSelect(NDArray array, IdArray index) {
   return ret;
 }
 
-NDArray IndexSelectUVM(NDArray array, IdArray index) {
-  NDArray ret;
-
-  // Fall back to the non-UVM version if both array and index are
-  // in the same context
-  if (array->ctx == index->ctx)
-    return IndexSelect(array, index);
-
-  CHECK(array->ctx.device_type == kDLCPU && index->ctx.device_type == kDLGPU) <<
-  "Only the following permutation is allowed: array->ctx.device_type == " <<
-  DeviceTypeCode2Str(kDLCPU) <<
-  " && index->ctx.device_type == " << DeviceTypeCode2Str(kDLGPU);
-
-  CHECK_GE(array->ndim, 1) << "Only support array with at least 1 dimension";
-  CHECK_EQ(index->ndim, 1) << "Index array must be an 1D array.";
-  ATEN_DTYPE_BITS_ONLY_SWITCH(array->dtype, DType, "values", {
-    ATEN_ID_TYPE_SWITCH(index->dtype, IdType, {
-      ret = impl::IndexSelectUVM<DType, IdType>(array, index);
-    });
-  });
-  return ret;
-}
-
 template<typename ValueType>
 ValueType IndexSelect(NDArray array, int64_t index) {
   CHECK_EQ(array->ndim, 1) << "Only support select values from 1D array.";
@@ -1098,13 +1075,6 @@ DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLArrayCastToSigned")
     DLDataType dtype = array->dtype;
     dtype.code = kDLInt;
     *rv = array.CreateView(shape, dtype, 0);
-  });
-
-DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLArrayIndexSelectUVM")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    NDArray array = args[0];
-    IdArray index = args[1];
-    *rv = IndexSelectUVM(array, index);
   });
 
 }  // namespace aten

@@ -1,12 +1,12 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file array/cpu/array_index_select.cu
+ * \file array/cpu/array_index_select_uvm.cu
  * \brief Array index select GPU implementation
  */
 #include <dgl/array.h>
-#include "../../runtime/cuda/cuda_common.h"
+#include "../../../runtime/cuda/cuda_common.h"
 #include "./array_index_select_uvm.cuh"
-#include "../cuda/utils.h"
+#include "../utils.h"
 
 namespace dgl {
 using runtime::NDArray;
@@ -14,7 +14,7 @@ namespace aten {
 namespace impl {
 
 template<typename DType, typename IdType>
-NDArray IndexSelectUVM(NDArray array, IdArray index) {
+NDArray IndexSelectCPUFromGPU(NDArray array, IdArray index) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   const DType* array_data = static_cast<DType*>(array->data);
   const IdType* idx_data = static_cast<IdType*>(index->data);
@@ -51,14 +51,14 @@ NDArray IndexSelectUVM(NDArray array, IdArray index) {
   return ret;
 }
 
-template NDArray IndexSelectUVM<int8_t, int32_t>(NDArray, IdArray);
-template NDArray IndexSelectUVM<int8_t, int64_t>(NDArray, IdArray);
-template NDArray IndexSelectUVM<int16_t, int32_t>(NDArray, IdArray);
-template NDArray IndexSelectUVM<int16_t, int64_t>(NDArray, IdArray);
-template NDArray IndexSelectUVM<int32_t, int32_t>(NDArray, IdArray);
-template NDArray IndexSelectUVM<int32_t, int64_t>(NDArray, IdArray);
-template NDArray IndexSelectUVM<int64_t, int32_t>(NDArray, IdArray);
-template NDArray IndexSelectUVM<int64_t, int64_t>(NDArray, IdArray);
+template NDArray IndexSelectCPUFromGPU<int8_t, int32_t>(NDArray, IdArray);
+template NDArray IndexSelectCPUFromGPU<int8_t, int64_t>(NDArray, IdArray);
+template NDArray IndexSelectCPUFromGPU<int16_t, int32_t>(NDArray, IdArray);
+template NDArray IndexSelectCPUFromGPU<int16_t, int64_t>(NDArray, IdArray);
+template NDArray IndexSelectCPUFromGPU<int32_t, int32_t>(NDArray, IdArray);
+template NDArray IndexSelectCPUFromGPU<int32_t, int64_t>(NDArray, IdArray);
+template NDArray IndexSelectCPUFromGPU<int64_t, int32_t>(NDArray, IdArray);
+template NDArray IndexSelectCPUFromGPU<int64_t, int64_t>(NDArray, IdArray);
 
 }  // namespace impl
 }  // namespace aten

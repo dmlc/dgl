@@ -6,4 +6,3 @@ from .factory import *
 from .hetero import *
 from .utils import Sequential, WeightBasis
 from .sparse_emb import NodeEmbedding
-from .unified_tensor import UnifiedTensor
