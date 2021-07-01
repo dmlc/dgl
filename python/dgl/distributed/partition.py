@@ -285,7 +285,7 @@ def _set_trainer_ids(g, sim_g, node_parts):
             trainer_id = F.zeros((len(orig_nid),), F.dtype(node_parts), F.cpu())
             trainer_id[orig_nid] = node_parts[type_idx]
             g.nodes[ntype].data['trainer_id'] = trainer_id
-        for src_type, etype, dst_type in g.canonical_etypes:
+        for _, etype, dst_type in g.canonical_etypes:
             trainer_id = g.nodes[dst_type].data['trainer_id'][g.edges(etype=etype)[1]]
             g.edges[etype].data['trainer_id'] = trainer_id
 
