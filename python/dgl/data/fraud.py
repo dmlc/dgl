@@ -177,15 +177,15 @@ class FraudDataset(DGLBuiltinDataset):
             "must between 0 and 1 (inclusive)."
 
         N = x.shape[0]
-        index = list(range(N))
+        index = np.arange(N)
         if self.name == 'amazon':
             # 0-3304 are unlabeled nodes
-            index = list(range(3305, N))
+            index = np.arange(3305, N)
 
-        np.random.RandomState(seed).permutation(index)
-        train_idx = index[:int(train_size * N)]
-        val_idx = index[int(N - val_size * N):]
-        test_idx = index[int(train_size * N):int(N - val_size * N)]
+        index = np.random.RandomState(seed).permutation(index)
+        train_idx = index[:int(train_size * len(index))]
+        val_idx = index[len(index) - int(val_size * len(index)):]
+        test_idx = index[int(train_size * len(index)):len(index) - int(val_size * len(index))]
         train_mask = np.zeros(N, dtype=np.bool)
         val_mask = np.zeros(N, dtype=np.bool)
         test_mask = np.zeros(N, dtype=np.bool)
