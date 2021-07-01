@@ -1,6 +1,5 @@
 """PyTorch multiprocessing wrapper."""
 from functools import wraps
-import subprocess
 import traceback
 from _thread import start_new_thread
 import torch.multiprocessing as mp

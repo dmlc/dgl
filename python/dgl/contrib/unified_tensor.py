@@ -1,6 +1,5 @@
 """Unified Tensor."""
 from .. import backend as F
-import dgl.ndarray as nd
 from .._ffi.function import _init_api
 from .. import utils
 

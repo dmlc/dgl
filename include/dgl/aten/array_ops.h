@@ -157,11 +157,6 @@ ValueType IndexSelect(NDArray array, int64_t index);
 NDArray IndexSelect(NDArray array, IdArray index);
 
 /*!
- * \brief Return the data under the index. In numpy notation, A[I], UVM-version
- */
-NDArray IndexSelectUVM(NDArray array, IdArray index);
-
-/*!
  * \brief Return the data from `start` (inclusive) to `end` (exclusive).
  */
 NDArray IndexSelect(NDArray array, int64_t start, int64_t end);
