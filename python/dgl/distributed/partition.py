@@ -535,7 +535,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                     "For heterogeneous graphs, reshuffle must be enabled.")
 
     if num_parts == 1:
-        sim_g = to_homogeneous(g)
+        sim_g, balance_ntypes = get_homogeneous(g, balance_ntypes)
         assert num_trainers_per_machine >= 1
         if num_trainers_per_machine > 1:
             # First partition the whole graph to each trainer and save the trainer ids in
