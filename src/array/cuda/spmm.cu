@@ -520,7 +520,6 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
   // TODO(Israt): Resolve PR-https://github.com/dmlc/dgl/issues/2995 and use multistream
   auto device = runtime::DeviceAPI::Get(vec_csr[0].indptr->ctx);
   SWITCH_BITS(bits, DType, {
-
     std::vector<DType*> trans_out(vec_out.size(), NULL);
 #if CUDART_VERSION < 11000
     // Create temporary output buffer to store non-transposed output
