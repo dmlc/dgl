@@ -515,7 +515,7 @@ int DGLArrayPinData(DGLArrayHandle handle,
                     DLContext ctx) {
   API_BEGIN();
   CHECK_EQ(ctx.device_type, kDLGPU);
-  DeviceAPI::Get(ctx)->PinData(ctx, handle->data, 
+  DeviceAPI::Get(ctx)->PinData(ctx, handle->data,
                                         GetDataSize(*handle));
   API_END();
 }
