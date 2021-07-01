@@ -125,11 +125,11 @@ void DeviceAPI::SyncStreamFromTo(DGLContext ctx,
 }
 
 void DeviceAPI::PinData(DGLContext ctx, void* ptr, size_t nbytes) {
-  LOG(FATAL) << "Device does not support stream api.";
+  LOG(FATAL) << "Device does not support cudaHostRegister api.";
 }
 
 void DeviceAPI::UnpinData(DGLContext ctx, void* ptr) {
-  LOG(FATAL) << "Device does not support stream api.";
+  LOG(FATAL) << "Device does not support cudaHostUnregister api.";
 }
 }  // namespace runtime
 }  // namespace dgl
