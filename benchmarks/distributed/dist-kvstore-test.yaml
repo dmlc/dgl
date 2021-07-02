@@ -35,7 +35,7 @@ spec:
                 export PYTHONUNBUFFERED=1
                 pip install --pre dgl -f https://data.dgl.ai/wheels-test/repo.html
                 python -c "import dgl"
-                python3 benchmark.py --server_id $MACHINE_ID --machine_id $MACHINE_ID & python3 benchmark.py --machine_id $MACHINE_ID
+                python3 benchmark_kvstore.py.py --server_id $MACHINE_ID --machine_id $MACHINE_ID & python3 benchmark_kvstore.py.py --machine_id $MACHINE_ID
           affinity: # Specify instance type and seperate two pods on to two machines
             nodeAffinity:
               requiredDuringSchedulingIgnoredDuringExecution:
