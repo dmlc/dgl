@@ -185,13 +185,13 @@ def check_hetero_partition(hg, part_method, num_parts=4, num_trainers_per_machin
                 name = ntype + '/trainer_id'
                 assert name in node_feats
                 part_ids = F.floor_div(node_feats[name], num_trainers_per_machine)
-                assert np.all(part_ids.numpy() == i)
+                assert np.all(F.asnumpy(part_ids) == i)
 
             for etype in hg.etypes:
                 name = etype + '/trainer_id'
                 assert name in edge_feats
                 part_ids = F.floor_div(edge_feats[name], num_trainers_per_machine)
-                assert np.all(part_ids.numpy() == i)
+                assert np.all(F.asnumpy(part_ids) == i)
         # Verify the mapping between the reshuffled IDs and the original IDs.
         # These are partition-local IDs.
         part_src_ids, part_dst_ids = part_g.edges()
@@ -257,13 +257,13 @@ def check_partition(g, part_method, reshuffle, num_parts=4, num_trainers_per_mac
                 name = ntype + '/trainer_id'
                 assert name in node_feats
                 part_ids = F.floor_div(node_feats[name], num_trainers_per_machine)
-                assert np.all(part_ids.numpy() == i)
+                assert np.all(F.asnumpy(part_ids) == i)
 
             for etype in g.etypes:
                 name = etype + '/trainer_id'
                 assert name in edge_feats
                 part_ids = F.floor_div(edge_feats[name], num_trainers_per_machine)
-                assert np.all(part_ids.numpy() == i)
+                assert np.all(F.asnumpy(part_ids) == i)
 
         # Check the metadata
         assert gpb._num_nodes() == g.number_of_nodes()
