@@ -262,12 +262,7 @@ class GSDDMM_hetero(th.autograd.Function):
     @custom_bwd
     # TODO(Israt): Implement the backward operator
     def backward(ctx, *dZ):
-        g, op, lhs_target, rhs_target = ctx.backward_cache
-        gidx = g._graph
-        X = ctx.saved_tensors
-        dX = tuple([None] * len(lhs_target))
-        dY = tuple([None] * len(rhs_target))
-        return (None, None) + dX + dY + ( None, None)
+        raise NotImplementedError('Homogenized GSDDMM backward operation is not implemented.')
 
 
 class EdgeSoftmax(th.autograd.Function):
