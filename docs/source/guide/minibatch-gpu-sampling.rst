@@ -3,7 +3,16 @@
 6.7 Using GPU for Neighborhood Sampling
 ---------------------------------------
 
-DGL since 0.7 has been supporting GPU-based neighborhood sampling, which we discuss in this section.
+DGL since 0.7 has been supporting GPU-based neighborhood sampling, which has a significant
+speed advantage over CPU-based neighborhood sampling.  If you estimate that your graph and
+its features can fit onto GPU and your model does not take a lot of GPU memory, then it is
+best to put the GPU into memory and use GPU-based neighbor sampling.
+
+For example, `OGB Products <https://ogb.stanford.edu/docs/nodeprop/#ogbn-products>`_ has
+2.4M nodes and 61M edges, each node having 100-dimensional features.  The node feature
+themselves take less than 1GB memory, and the graph also takes less than 1GB since the
+memory consumption of a graph depends on the number of edges.  Therefore it is entirely
+possible to fit the whole graph onto GPU.
 
 .. note::
 
@@ -13,28 +22,34 @@ DGL since 0.7 has been supporting GPU-based neighborhood sampling, which we disc
 Using GPU-based neighborhood sampling in DGL data loaders
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If one is using both
+One can use GPU-based neighborhood sampling with DGL data loaders via
 
-* DGL's builtin data loader (i.e. :class:`~dgl.dataloading.pytorch.NodeDataLoader`), and
+* Putting the graph onto GPU.
 
-* :ref:`DGL's builtin neighborhood sampler <api-dataloading-neighbor-sampling>`, or
-  neighborhood samplers subclassed from :class:`~dgl.dataloading.neighbor.BlockSampler`.
+* Set ``num_workers`` argument to 0, because CUDA does not allow multiple processes
+  accessing the same context.
+  
+* Set ``device`` argument to a GPU device.
 
-Then DGL data loaders will select the device to sample neighbors and construct MFGs
-depending on the device of the input graph:
+All the other arguments for the :class:`~dgl.dataloading.pytorch.NodeDataLoader` can be
+the same as the other user guides and tutorials.
 
-* If the input graph is on GPU, the argument :attr:`device` must be on GPU and
-  :attr:`num_workers` must be 0.  In this case, both neighbor sampling and conversion
-  to MFG happens on GPU.  This is best for when one can fit the graph onto GPU.
+.. code:: python
 
-* If the input graph is on CPU, device selection depends on the argument :attr:`device`
-  and :attr:`num_workers`:
-
-  * If :attr:`device` is GPU and :attr:`num_workers` is 0, neighbor sampling will be
-    performed on CPU, but conversion to MFG happens on GPU.
-
-  * If :attr:`device` is GPU but :attr:`num_workers` is not 0, both neighbor sampling
-    and conversion to MFG happens on CPU.  The resulting MFGs are later copied to GPU.
+   g = g.to('cuda:0')
+   dataloader = dgl.dataloading.NodeDataLoader(
+       g,                                # The graph must be on GPU.
+       train_nid,
+       sampler,
+       device=torch.device('cuda:0'),    # The device argument must be GPU.
+       num_workers=0,                    # Number of workers must be 0.
+       batch_size=1000,
+       drop_last=False,
+       shuffle=True)
+       
+GPU-based neighbor sampling also works for custom neighborhood samplers as long as
+(1) your sampler is subclassed from :class:`~dgl.dataloading.BlockSampler`, and (2)
+your code in the sampler entirely works on GPU.
 
 .. note::
 
