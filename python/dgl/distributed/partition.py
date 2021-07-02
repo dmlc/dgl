@@ -578,7 +578,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
 
                 # And then coalesce the partitions of trainers on the same machine into one
                 # larger partition.
-                node_parts = node_parts // num_trainers_per_machine
+                node_parts = F.floor_div(node_parts, num_trainers_per_machine)
             else:
                 node_parts = metis_partition_assignment(sim_g, num_parts,
                                                         balance_ntypes=balance_ntypes,
