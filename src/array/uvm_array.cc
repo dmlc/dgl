@@ -14,8 +14,7 @@ namespace dgl {
 namespace aten {
 
 NDArray IndexSelectCPUFromGPU(NDArray array, IdArray index) {
-  NDArray ret;
-
+#ifdef DGL_USE_CUDA
   CHECK_EQ(array->ctx.device_type, kDLCPU) << "Only the CPU device type input "
                                            << "array supported";
   CHECK_EQ(index->ctx.device_type, kDLGPU) << "Only the GPU device type input "
@@ -25,10 +24,13 @@ NDArray IndexSelectCPUFromGPU(NDArray array, IdArray index) {
   CHECK_EQ(index->ndim, 1) << "Index array must be an 1D array.";
   ATEN_DTYPE_BITS_ONLY_SWITCH(array->dtype, DType, "values", {
     ATEN_ID_TYPE_SWITCH(index->dtype, IdType, {
-      ret = impl::IndexSelectCPUFromGPU<DType, IdType>(array, index);
+      return impl::IndexSelectCPUFromGPU<DType, IdType>(array, index);
     });
   });
-  return ret;
+#endif
+  LOG(FATAL) << "IndexSelectCPUFromGPU requires CUDA";
+  // Should be unreachable
+  return NDArray{};
 }
 
 DGL_REGISTER_GLOBAL("ndarray.uvm._CAPI_DGLIndexSelectCPUFromGPU")
