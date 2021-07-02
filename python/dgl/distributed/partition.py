@@ -498,7 +498,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     '''
     def get_homogeneous(g, balance_ntypes):
         if len(g.etypes) == 1:
-            sim_g = g
+            sim_g = to_homogeneous(g)
             if isinstance(balance_ntypes, dict):
                 assert len(balance_ntypes) == 1
                 bal_ntypes = list(balance_ntypes.values())[0]
