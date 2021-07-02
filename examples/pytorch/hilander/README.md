@@ -5,11 +5,19 @@ This folder contains the official code for "Learning Hierarchical Graph Neural N
 
 ## Setup
 
-Besides DGL (>=0.5.2) and PyTorch, we depend on
-- [faiss](https://github.com/facebookresearch/faiss) for K-Nearest Neighbor search.
-- [clustering-benchmark](https://github.com/yjxiong/clustering-benchmark) for some of the evaluation metrics.
-
-To set up faiss properly, please refer to their [install instruction](https://github.com/facebookresearch/faiss/blob/master/INSTALL.md). Note that the CUDA version should be aligned with DGL.
+We use python 3.7 and CUDA version is 10.2. Besides DGL (>=0.5.2), we depend on several packages. To install dependencies using conda:
+```bash
+conda create -n Hilander # create env
+conda activate Hilander # activate env
+conda install pytorch==1.7.0 torchvision==0.8.0 cudatoolkit=10.2 -c pytorch # install pytorch 1.7 version
+conda install -c pytorch faiss-gpu cudatoolkit=10.2 # install faiss gpu version matching cuda 10.2
+pip install dgl-cu102 # install dgl for cuda 10.2
+pip install tqdm # install tqdm
+git clone https://github.com/yjxiong/clustering-benchmark.git # install clustering-benchmark for evaluation 
+cd clustering-benchmark
+python setup.py install
+cd ../
+```
 
 ## Data
 
