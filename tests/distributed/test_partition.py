@@ -385,6 +385,7 @@ def test_partition():
     check_partition(g, 'random', True)
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support some of operations in DistGraph")
 def test_hetero_partition():
     hg = create_random_hetero()
     check_hetero_partition(hg, 'metis')
