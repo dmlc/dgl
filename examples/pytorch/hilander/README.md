@@ -5,15 +5,17 @@ This folder contains the official code for "Learning Hierarchical Graph Neural N
 
 ## Setup
 
-Besides DGL (>=0.5.2) and PyTorch, we depend on [faiss](https://github.com/facebookresearch/faiss) for K-Nearest Neighbor search.
+Besides DGL (>=0.5.2) and PyTorch, we depend on
+- [faiss](https://github.com/facebookresearch/faiss) for K-Nearest Neighbor search.
+- [clustering-benchmark](https://github.com/yjxiong/clustering-benchmark) for some of the evaluation metrics.
 
-Please refer to their [install instruction](https://github.com/facebookresearch/faiss/blob/master/INSTALL.md) to set up. Note that the CUDA version should be aligned with DGL.
+To set up faiss properly, please refer to their [install instruction](https://github.com/facebookresearch/faiss/blob/master/INSTALL.md). Note that the CUDA version should be aligned with DGL.
 
 ## Data
 
 The datasets used for training and test are hosted by several services.
 
-AWS S3(link needed) | Google Drive(link needed) | BaiduPan(link needed)
+[AWS S3](https://dgl-data.s3.us-west-2.amazonaws.com/dataset/hilander/data.tar.gz) | [Google Drive](https://drive.google.com/file/d/1KLa3uu9ndaCc7YjnSVRLHpcJVMSz868v/view?usp=sharing) | [BaiduPan](https://pan.baidu.com/s/11iRcp84esfkkvdcw3kmPAw) | pwd: wbmh
 
 After download, unpack the pickled files into `data/`.
 
