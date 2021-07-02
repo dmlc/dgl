@@ -118,7 +118,6 @@ for level in range(args.levels):
         global_edges, global_pred_labels, global_peaks = decode(g, args.tau, args.threshold, args.use_gt,
                                                                 ids, global_edges, global_num_nodes,
                                                                 global_peaks)
-    evaluation(global_pred_labels, global_labels, args.metrics)
     ids = ids[peaks]
     new_global_edges_len = len(global_edges[0])
     num_edges_add_this_level = new_global_edges_len - global_edges_len
