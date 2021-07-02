@@ -5,7 +5,7 @@ This folder contains the official code for "Learning Hierarchical Graph Neural N
 
 ## Setup
 
-We use python 3.7 and CUDA version is 10.2. Besides DGL (>=0.5.2), we depend on several packages. To install dependencies using conda:
+We use python 3.7. The CUDA version needs to be 10.2. Besides DGL (>=0.5.2), we depend on several packages. To install dependencies using conda:
 ```bash
 conda create -n Hilander # create env
 conda activate Hilander # activate env
@@ -69,7 +69,7 @@ bash scripts/test_inat.sh
 |                 Fp |                           0.793 |                           0.330 |
 |                 Fb |                           0.795 |                           0.350 |
 |                NMI |                           0.947 |                           0.774 |
-
+* The results might fluctuate a little due to the randomness introduced by gpu knn building using faiss-gpu.
 
 
 For Clustering with Unseen Test Data Distribution, one can run
@@ -88,4 +88,5 @@ bash scripts/test_inat_train_on_resampled_1_in_6_per_class.sh
 |                 Fp |                           0.720 |                           0.765 |                           0.294 |
 |                 Fb |                           0.700 |                           0.796 |                           0.352 |
 |                NMI |                           0.810 |                           0.953 |                           0.764 |
+* The results might fluctuate a little due to the randomness introduced by gpu knn building using faiss-gpu.
 
