@@ -24,7 +24,7 @@ class UnifiedTensor: #UnifiedTensor
         self._array = F.zerocopy_to_dgl_ndarray(self._input)
         self._device = device
 
-        self._array.pin_memory_(utils.to_dgl_context(device))
+        self._array.pin_memory_(utils.to_dgl_context(self._device))
 
     def __len__(self):
         return len(self._array)
@@ -38,6 +38,11 @@ class UnifiedTensor: #UnifiedTensor
     def __setitem__(self, key, val):
         self._input[key] = val
 
+    def __del__(self):
+        self._array.unpin_memory_(utils.to_dgl_context(self._device))
+        self._array = None
+        self._input = None
+
     def gather_row(self, index):
         '''Gather the rows designated by the index. Performs
         a direct GPU to CPU access using the unified virtual
@@ -47,9 +52,9 @@ class UnifiedTensor: #UnifiedTensor
         ----------
         index : Tensor
             Tensor which contains the row indicies
-        '''        
+        '''
         return F.zerocopy_from_dgl_ndarray(
-                _CAPI_DGLIndexSelectCPUFromGPU(self._array, 
+                _CAPI_DGLIndexSelectCPUFromGPU(self._array,
                             F.zerocopy_to_dgl_ndarray(index)))
 
     @property
