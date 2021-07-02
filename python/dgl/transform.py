@@ -2120,6 +2120,7 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
     Examples
     --------
     Converting a homogeneous graph to a block as described above:
+
     >>> g = dgl.graph(([1, 2], [2, 3]))
     >>> block = dgl.to_block(g, torch.LongTensor([3, 2]))
 
