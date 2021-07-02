@@ -107,7 +107,6 @@ The folder contains example implementations of selected research papers related 
 
 ## 2021
 
-- Xing et al. Learning Hierarchical Graph Neural Networks for Image Clustering. 
 - <a name="hilander"></a> Xing et al. Learning Hierarchical Graph Neural Networks for Image Clustering.
     - Example code: [PyTorch](../examples/pytorch/hilander)
     - Tags: clustering
