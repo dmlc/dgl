@@ -277,16 +277,18 @@ def _set_trainer_ids(g, sim_g, node_parts):
     '''
     if len(g.etypes) == 1:
         g.ndata['trainer_id'] = node_parts
-        g.edata['trainer_id'] = node_parts[g.edges()[1]]
+        # An edge is assigned to a partition based on its destination node.
+        g.edata['trainer_id'] = F.gather_row(node_parts, g.edges()[1])
     else:
         for ntype_id, ntype in enumerate(g.ntypes):
             type_idx = sim_g.ndata[NTYPE] == ntype_id
-            orig_nid = sim_g.ndata[NID][type_idx]
+            orig_nid = F.boolean_mask(sim_g.ndata[NID], type_idx)
             trainer_id = F.zeros((len(orig_nid),), F.dtype(node_parts), F.cpu())
-            trainer_id[orig_nid] = node_parts[type_idx]
+            F.scatter_row_inplace(trainer_id, orig_nid, F.boolean_mask(node_parts, type_idx))
             g.nodes[ntype].data['trainer_id'] = trainer_id
         for _, etype, dst_type in g.canonical_etypes:
-            trainer_id = g.nodes[dst_type].data['trainer_id'][g.edges(etype=etype)[1]]
+            # An edge is assigned to a partition based on its destination node.
+            trainer_id = F.gather_row(g.nodes[dst_type].data['trainer_id'], g.edges(etype=etype)[1])
             g.edges[etype].data['trainer_id'] = trainer_id
 
 def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method="metis",
