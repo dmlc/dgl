@@ -184,14 +184,14 @@ def check_hetero_partition(hg, part_method, num_parts=4, num_trainers_per_machin
             for ntype in hg.ntypes:
                 name = ntype + '/trainer_id'
                 assert name in node_feats
-                part_ids = node_feats[name] // num_trainers_per_machine
-                assert np.all(part_ids.numpy() == i)
+                part_ids = F.floor_div(node_feats[name], num_trainers_per_machine)
+                assert np.all(F.asnumpy(part_ids) == i)
 
             for etype in hg.etypes:
                 name = etype + '/trainer_id'
                 assert name in edge_feats
-                part_ids = edge_feats[name] // num_trainers_per_machine
-                assert np.all(part_ids.numpy() == i)
+                part_ids = F.floor_div(edge_feats[name], num_trainers_per_machine)
+                assert np.all(F.asnumpy(part_ids) == i)
         # Verify the mapping between the reshuffled IDs and the original IDs.
         # These are partition-local IDs.
         part_src_ids, part_dst_ids = part_g.edges()
@@ -256,14 +256,14 @@ def check_partition(g, part_method, reshuffle, num_parts=4, num_trainers_per_mac
             for ntype in g.ntypes:
                 name = ntype + '/trainer_id'
                 assert name in node_feats
-                part_ids = node_feats[name] // num_trainers_per_machine
-                assert np.all(part_ids.numpy() == i)
+                part_ids = F.floor_div(node_feats[name], num_trainers_per_machine)
+                assert np.all(F.asnumpy(part_ids) == i)
 
             for etype in g.etypes:
                 name = etype + '/trainer_id'
                 assert name in edge_feats
-                part_ids = edge_feats[name] // num_trainers_per_machine
-                assert np.all(part_ids.numpy() == i)
+                part_ids = F.floor_div(edge_feats[name], num_trainers_per_machine)
+                assert np.all(F.asnumpy(part_ids) == i)
 
         # Check the metadata
         assert gpb._num_nodes() == g.number_of_nodes()
@@ -385,6 +385,7 @@ def test_partition():
     check_partition(g, 'random', True)
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support some of operations in DistGraph")
 def test_hetero_partition():
     hg = create_random_hetero()
     check_hetero_partition(hg, 'metis')

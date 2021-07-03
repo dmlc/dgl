@@ -277,16 +277,18 @@ def _set_trainer_ids(g, sim_g, node_parts):
     '''
     if len(g.etypes) == 1:
         g.ndata['trainer_id'] = node_parts
-        g.edata['trainer_id'] = node_parts[g.edges()[1]]
+        # An edge is assigned to a partition based on its destination node.
+        g.edata['trainer_id'] = F.gather_row(node_parts, g.edges()[1])
     else:
         for ntype_id, ntype in enumerate(g.ntypes):
             type_idx = sim_g.ndata[NTYPE] == ntype_id
-            orig_nid = sim_g.ndata[NID][type_idx]
+            orig_nid = F.boolean_mask(sim_g.ndata[NID], type_idx)
             trainer_id = F.zeros((len(orig_nid),), F.dtype(node_parts), F.cpu())
-            trainer_id[orig_nid] = node_parts[type_idx]
+            F.scatter_row_inplace(trainer_id, orig_nid, F.boolean_mask(node_parts, type_idx))
             g.nodes[ntype].data['trainer_id'] = trainer_id
-        for src_type, etype, dst_type in g.canonical_etypes:
-            trainer_id = g.nodes[dst_type].data['trainer_id'][g.edges(etype=etype)[1]]
+        for _, etype, dst_type in g.canonical_etypes:
+            # An edge is assigned to a partition based on its destination node.
+            trainer_id = F.gather_row(g.nodes[dst_type].data['trainer_id'], g.edges(etype=etype)[1])
             g.edges[etype].data['trainer_id'] = trainer_id
 
 def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method="metis",
@@ -496,7 +498,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     '''
     def get_homogeneous(g, balance_ntypes):
         if len(g.etypes) == 1:
-            sim_g = g
+            sim_g = to_homogeneous(g)
             if isinstance(balance_ntypes, dict):
                 assert len(balance_ntypes) == 1
                 bal_ntypes = list(balance_ntypes.values())[0]
@@ -535,7 +537,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                     "For heterogeneous graphs, reshuffle must be enabled.")
 
     if num_parts == 1:
-        sim_g = to_homogeneous(g)
+        sim_g, balance_ntypes = get_homogeneous(g, balance_ntypes)
         assert num_trainers_per_machine >= 1
         if num_trainers_per_machine > 1:
             # First partition the whole graph to each trainer and save the trainer ids in
@@ -576,7 +578,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
 
                 # And then coalesce the partitions of trainers on the same machine into one
                 # larger partition.
-                node_parts = node_parts // num_trainers_per_machine
+                node_parts = F.floor_div(node_parts, num_trainers_per_machine)
             else:
                 node_parts = metis_partition_assignment(sim_g, num_parts,
                                                         balance_ntypes=balance_ntypes,
