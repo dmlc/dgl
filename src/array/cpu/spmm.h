@@ -60,7 +60,8 @@ void SpMMSumCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
 #ifdef USE_AVX
 #ifdef USE_LIBXSMM
   bool special_condition =
-       bcast.use_bcast || (Op::use_lhs && (dim != lhs_dim)) || (Op::use_rhs && (dim != rhs_dim));
+       bcast.use_bcast || (Op::use_lhs && (dim != lhs_dim)) || (Op::use_rhs && (dim != rhs_dim))
+       || std::is_same<DType, double>::value;
   if (!special_condition) {
       SpMMSumCsrOpt<IdType, DType, Op>(bcast, csr, ufeat, efeat, out);
   } else {
@@ -214,7 +215,8 @@ void SpMMCmpCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
 #ifdef USE_LIBXSMM
 
   bool special_condition =
-       bcast.use_bcast || (Op::use_lhs && (dim != lhs_dim)) || (Op::use_rhs && (dim != rhs_dim));
+       bcast.use_bcast || (Op::use_lhs && (dim != lhs_dim)) || (Op::use_rhs && (dim != rhs_dim))
+       || std::is_same<DType, double>::value;
   if (!special_condition) {
     SpMMCmpCsrOpt<IdType, DType, Op, Cmp>(bcast, csr, ufeat, efeat, out, argu, arge);
   } else {

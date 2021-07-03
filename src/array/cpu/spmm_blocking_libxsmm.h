@@ -232,7 +232,7 @@ inline libxsmm_meltwfunction_opreduce_vecs_idx SpMMCreateLibxsmmKernel(
     kernel = libxsmm_dispatch_meltw_opreduce_vecs_idx(
                N, &_ld, &_ld, LIBXSMM_DATATYPE_BF16, LIBXSMM_DATATYPE_BF16,
                (sizeof(IdType) == 8) ? LIBXSMM_DATATYPE_I64 : LIBXSMM_DATATYPE_I32, opredop_flags);
-  } else if (std::is_same<DType, DType>::value) {
+  } else if (std::is_same<DType, float>::value) {
     kernel = libxsmm_dispatch_meltw_opreduce_vecs_idx(
                N, &_ld, &_ld, LIBXSMM_DATATYPE_F32, LIBXSMM_DATATYPE_F32,
                (sizeof(IdType) == 8) ? LIBXSMM_DATATYPE_I64 : LIBXSMM_DATATYPE_I32, opredop_flags);
