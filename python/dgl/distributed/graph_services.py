@@ -399,7 +399,8 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
         etype_ids, frontier.edata[EID] = gpb.map_to_per_etype(frontier.edata[EID])
         src, dst = frontier.edges()
         etype_ids, idx = F.sort_1d(etype_ids)
-        src, dst, eid = src[idx], dst[idx], frontier.edata[EID][idx]
+        src, dst = F.gather_row(src, idx), F.gather_row(dst, idx)
+        eid = F.gather_row(frontier.edata[EID], idx)
         _, src = gpb.map_to_per_ntype(src)
         _, dst = gpb.map_to_per_ntype(dst)
 
@@ -410,8 +411,9 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
             canonical_etype = g.canonical_etypes[etid]
             type_idx = etype_ids == etid
             if F.sum(type_idx, 0) > 0:
-                data_dict[canonical_etype] = (src[type_idx], dst[type_idx])
-                edge_ids[etype] = eid[type_idx]
+                data_dict[canonical_etype] = (F.boolean_mask(src, type_idx), \
+                        F.boolean_mask(dst, type_idx))
+                edge_ids[etype] = F.boolean_mask(eid, type_idx)
         hg = heterograph(data_dict,
                          {ntype: g.number_of_nodes(ntype) for ntype in g.ntypes},
                          idtype=g.idtype)
