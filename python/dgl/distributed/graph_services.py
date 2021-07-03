@@ -388,6 +388,10 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
                 typed_nodes = toindex(nodes[ntype]).tousertensor()
             homo_nids.append(gpb.map_to_homo_nid(typed_nodes, ntype))
         nodes = F.cat(homo_nids, 0)
+    elif isinstance(nodes, dict):
+        assert len(nodes) == 1
+        nodes = list(nodes.values())[0]
+
     def issue_remote_req(node_ids):
         return SamplingRequest(node_ids, fanout, edge_dir=edge_dir,
                                prob=prob, replace=replace)
