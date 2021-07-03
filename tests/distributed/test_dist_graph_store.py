@@ -55,7 +55,8 @@ def create_random_graph(n):
 def run_server(graph_name, server_id, server_count, num_clients, shared_mem):
     g = DistGraphServer(server_id, "kv_ip_config.txt", server_count, num_clients,
                         '/tmp/dist_graph/{}.json'.format(graph_name),
-                        disable_shared_mem=not shared_mem)
+                        disable_shared_mem=not shared_mem,
+                        graph_format=['csc', 'coo'])
     print('start server', server_id)
     g.start()
 
