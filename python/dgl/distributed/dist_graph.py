@@ -495,6 +495,9 @@ class DistGraph:
         self._canonical_etypes = []
         etype_ids = F.arange(0, len(self.etypes))
         for src_tid, etype_id, dst_tid in zip(src_tids, etype_ids, dst_tids):
+            src_tid = F.as_scalar(src_tid)
+            etype_id = F.as_scalar(etype_id)
+            dst_tid = F.as_scalar(dst_tid)
             self._canonical_etypes.append((self.ntypes[src_tid], self.etypes[etype_id],
                                            self.ntypes[dst_tid]))
 
