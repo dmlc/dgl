@@ -13,7 +13,7 @@ conda install pytorch==1.7.0 torchvision==0.8.0 cudatoolkit=10.2 -c pytorch # in
 conda install -c pytorch faiss-gpu cudatoolkit=10.2 # install faiss gpu version matching cuda 10.2
 pip install dgl-cu102 # install dgl for cuda 10.2
 pip install tqdm # install tqdm
-git clone https://github.com/yjxiong/clustering-benchmark.git # install clustering-benchmark for evaluation 
+git clone https://github.com/yjxiong/clustering-benchmark.git # install clustering-benchmark for evaluation
 cd clustering-benchmark
 python setup.py install
 cd ../
@@ -44,7 +44,7 @@ For training on full iNatualist dataset, one can run
 bash scripts/train_inat.sh
 ```
 
-For training on re-bsampled iNatualist dataset, one can run
+For training on re-sampled iNatualist dataset, one can run
 
 ```bash
 bash scripts/train_inat_resampled_1_in_6_per_class.sh
@@ -82,7 +82,7 @@ bash scripts/test_deepglint_imdb.sh
 bash scripts/test_inat_train_on_resampled_1_in_6_per_class.sh
 ```
 
-**Clustering with Seen Test Data Distribution Performance**
+**Clustering with Unseen Test Data Distribution Performance**
 |                    |                          Hannah |                            IMDB |                   iNat2018-Test |
 | ------------------ | ------------------------------: | ------------------------------: | ------------------------------: |
 |                 Fp |                           0.720 |                           0.765 |                           0.294 |
