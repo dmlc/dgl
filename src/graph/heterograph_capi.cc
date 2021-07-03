@@ -52,14 +52,20 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateUnitGraphFromCSR")
     IdArray indices = args[4];
     IdArray edge_ids = args[5];
     List<Value> formats = args[6];
+    bool transpose = args[7];
     std::vector<SparseFormat> formats_vec;
     for (Value val : formats) {
       std::string fmt = val->data;
       formats_vec.push_back(ParseSparseFormat(fmt));
     }
     const auto code = SparseFormatsToCode(formats_vec);
-    auto hgptr = CreateFromCSR(nvtypes, num_src, num_dst, indptr, indices, edge_ids, code);
-    *rv = HeteroGraphRef(hgptr);
+    if (!transpose) {
+      auto hgptr = CreateFromCSR(nvtypes, num_src, num_dst, indptr, indices, edge_ids, code);
+      *rv = HeteroGraphRef(hgptr);
+    } else {
+      auto hgptr = CreateFromCSC(nvtypes, num_src, num_dst, indptr, indices, edge_ids, code);
+      *rv = HeteroGraphRef(hgptr);
+    }
   });
 
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateHeteroGraph")

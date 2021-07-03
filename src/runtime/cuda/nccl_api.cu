@@ -4,6 +4,7 @@
  * \brief Implementation of wrapper around NCCL routines.
  */
 
+#ifdef DGL_USE_NCCL
 
 #include "nccl_api.h"
 
@@ -176,7 +177,7 @@ std::pair<IdArray, NDArray> SparsePush(
   Workspace<DType> send_value(device, ctx, num_in*num_feat);
 
   // permute the indices and values
-  {
+  if (num_in > 0) {
     const dim3 block(256);
     const dim3 grid((num_in+block.x-1)/block.x);
 
@@ -782,5 +783,5 @@ DGL_REGISTER_GLOBAL("cuda.nccl._CAPI_DGLNCCLSparseAllToAllPull")
 }  // namespace runtime
 }  // namespace dgl
 
-
+#endif
 

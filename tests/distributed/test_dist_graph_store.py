@@ -176,6 +176,7 @@ def check_dist_emb(g, num_clients, num_nodes, num_edges):
     # Test sparse emb
     try:
         emb = NodeEmbedding(g.number_of_nodes(), 1, 'emb1', emb_init)
+        nids = F.arange(0, int(g.number_of_nodes()))
         lr = 0.001
         optimizer = SparseAdagrad([emb], lr=lr)
         with F.record_grad():
