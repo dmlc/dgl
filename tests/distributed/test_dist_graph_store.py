@@ -588,7 +588,6 @@ def test_server_client():
     check_server_client(True, 1, 1)
     check_server_client(False, 1, 1)
     check_server_client(True, 2, 2)
-    check_server_client(False, 2, 2)
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support distributed NodeEmbedding")
