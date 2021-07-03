@@ -326,11 +326,13 @@ def check_rpc_hetero_sampling_shuffle(tmpdir, num_server):
         ntype_ids, type_nids = gpb.map_to_per_ntype(part.ndata[dgl.NID])
         for ntype_id, ntype in enumerate(g.ntypes):
             idx = ntype_ids == ntype_id
-            F.scatter_row_inplace(orig_nid_map[ntype], type_nids[idx], part.ndata['orig_id'][idx])
+            F.scatter_row_inplace(orig_nid_map[ntype], F.boolean_mask(type_nids, idx),
+                                  F.boolean_mask(part.ndata['orig_id'], idx))
         etype_ids, type_eids = gpb.map_to_per_etype(part.edata[dgl.EID])
         for etype_id, etype in enumerate(g.etypes):
             idx = etype_ids == etype_id
-            F.scatter_row_inplace(orig_eid_map[etype], type_eids[idx], part.edata['orig_id'][idx])
+            F.scatter_row_inplace(orig_eid_map[etype], F.boolean_mask(type_eids, idx),
+                                  F.boolean_mask(part.edata['orig_id'], idx))
 
     for src_type, etype, dst_type in block.canonical_etypes:
         src, dst = block.edges(etype=etype)
