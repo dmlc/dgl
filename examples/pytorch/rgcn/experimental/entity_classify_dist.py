@@ -320,9 +320,9 @@ def evaluate(g, model, embed_layer, labels, eval_loader, test_loader, all_val_ni
 
     with th.no_grad():
         for sample_data in tqdm.tqdm(eval_loader):
-            seeds, blocks = sample_data
+            input_nodes, seeds, blocks = sample_data
             seeds = seeds['paper']
-            feats = embed_layer({ntype: blocks[0].srcnodes[ntype].data[dgl.NID] for ntype in blocks[0].srctypes})
+            feats = embed_layer(input_nodes)
             logits = model(blocks, feats)
             assert len(logits) == 1
             logits = logits['paper']
@@ -337,9 +337,9 @@ def evaluate(g, model, embed_layer, labels, eval_loader, test_loader, all_val_ni
     test_seeds = []
     with th.no_grad():
         for sample_data in tqdm.tqdm(test_loader):
-            seeds, blocks = sample_data
+            input_nodes, seeds, blocks = sample_data
             seeds = seeds['paper']
-            feats = embed_layer({ntype: blocks[0].srcnodes[ntype].data[dgl.NID] for ntype in blocks[0].srctypes})
+            feats = embed_layer(input_nodes)
             logits = model(blocks, feats)
             assert len(logits) == 1
             logits = logits['paper']
@@ -357,92 +357,36 @@ def evaluate(g, model, embed_layer, labels, eval_loader, test_loader, all_val_ni
     else:
         return -1, -1
 
-class NeighborSampler:
-    """Neighbor sampler
-    Parameters
-    ----------
-    g : DGLHeterograph
-        Full graph
-    target_idx : tensor
-        The target training node IDs in g
-    fanouts : list of int
-        Fanout of each hop starting from the seed nodes. If a fanout is None,
-        sample full neighbors.
-    """
-    def __init__(self, g, fanouts, sample_neighbors):
-        self.g = g
-        self.fanouts = fanouts
-        self.sample_neighbors = sample_neighbors
-
-    def sample_blocks(self, seeds):
-        """Do neighbor sample
-        Parameters
-        ----------
-        seeds : tensor
-            Seed paper nodes
-        Returns
-        -------
-        tensor
-            Seed nodes, also known as target nodes
-        blocks
-            Sampled subgraphs
-        """
-        blocks = []
-        etypes = []
-        norms = []
-        ntypes = []
-        seeds = th.LongTensor(np.asarray(seeds))
-        gpb = self.g.get_partition_book()
-        # We need to map the per-type node IDs to homogeneous IDs.
-        # TODO(zhengda): we only support sample for one node type.
-        ntype = 'paper'
-        cur = {ntype: seeds}
-        for fanout in self.fanouts:
-            # For a heterogeneous input graph, the returned frontier is stored in
-            # the homogeneous graph format.
-            frontier = self.sample_neighbors(self.g, cur, fanout, replace=False)
-
-            block = dgl.to_block(frontier, cur)
-            cur = {ntype: block.srcnodes[ntype].data[dgl.NID] for ntype in block.srctypes}
-
-            block.edata[dgl.EID] = frontier.edata[dgl.EID]
-            ## Map the homogeneous edge Ids to their edge type.
-            #block.edata[dgl.ETYPE], block.edata[dgl.EID] = gpb.map_to_per_etype(block.edata[dgl.EID])
-            ## Map the homogeneous node Ids to their node types and per-type Ids.
-            #block.srcdata[dgl.NTYPE], block.srcdata[dgl.NID] = gpb.map_to_per_ntype(block.srcdata[dgl.NID])
-            #block.dstdata[dgl.NTYPE], block.dstdata[dgl.NID] = gpb.map_to_per_ntype(block.dstdata[dgl.NID])
-            blocks.insert(0, block)
-        return {ntype: seeds}, blocks
-
 def run(args, device, data):
     g, num_classes, train_nid, val_nid, test_nid, labels, all_val_nid, all_test_nid = data
 
     fanouts = [int(fanout) for fanout in args.fanout.split(',')]
     val_fanouts = [int(fanout) for fanout in args.validation_fanout.split(',')]
-    sampler = NeighborSampler(g, fanouts, dgl.distributed.sample_neighbors)
-    # Create DataLoader for constructing blocks
-    dataloader = DistDataLoader(
-        dataset=train_nid,
+
+    sampler = dgl.dataloading.MultiLayerNeighborSampler(fanouts)
+    dataloader = dgl.dataloading.NodeDataLoader(
+        g,
+        {'paper': train_nid},
+        sampler,
         batch_size=args.batch_size,
-        collate_fn=sampler.sample_blocks,
         shuffle=True,
         drop_last=False)
 
-    valid_sampler = NeighborSampler(g, val_fanouts, dgl.distributed.sample_neighbors)
-    # Create DataLoader for constructing blocks
-    valid_dataloader = DistDataLoader(
-        dataset=val_nid,
+    valid_sampler = dgl.dataloading.MultiLayerNeighborSampler(val_fanouts)
+    valid_dataloader = dgl.dataloading.NodeDataLoader(
+        g,
+        {'paper': val_nid},
+        valid_sampler,
         batch_size=args.batch_size,
-        collate_fn=valid_sampler.sample_blocks,
         shuffle=False,
         drop_last=False)
 
-    test_sampler = NeighborSampler(g, val_fanouts, dgl.distributed.sample_neighbors)
-    # Create DataLoader for constructing blocks
-    test_dataloader = DistDataLoader(
-        dataset=test_nid,
+    test_sampler = dgl.dataloading.MultiLayerNeighborSampler(val_fanouts)
+    test_dataloader = dgl.dataloading.NodeDataLoader(
+        g,
+        {'paper': test_nid},
+        test_sampler,
         batch_size=args.batch_size,
-        collate_fn=test_sampler.sample_blocks,
         shuffle=False,
         drop_last=False)
 
@@ -533,7 +477,7 @@ def run(args, device, data):
         # blocks.
         step_time = []
         for step, sample_data in enumerate(dataloader):
-            seeds, blocks = sample_data
+            input_nodes, seeds, blocks = sample_data
             seeds = seeds['paper']
             number_train += seeds.shape[0]
             number_input += np.sum([blocks[0].num_src_nodes(ntype) for ntype in blocks[0].ntypes])
@@ -541,7 +485,7 @@ def run(args, device, data):
             sample_time += tic_step - start
             sample_t.append(tic_step - start)
 
-            feats = embed_layer({ntype: blocks[0].srcnodes[ntype].data[dgl.NID] for ntype in blocks[0].srctypes})
+            feats = embed_layer(input_nodes)
             label = labels[seeds].to(device)
             copy_time = time.time()
             feat_copy_t.append(copy_time - tic_step)
