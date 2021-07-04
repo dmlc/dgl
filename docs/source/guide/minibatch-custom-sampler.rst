@@ -439,7 +439,7 @@ all edge types, so that it can work on heterogeneous graphs as well.
     
             # Return a new graph with the same nodes as the original graph as a
             # frontier
-            frontier = dgl.edge_subgraph(new_edge_masks, preserve_nodes=True)
+            frontier = dgl.edge_subgraph(new_edges_masks, relabel_nodes=False)
             return frontier
     
         def __len__(self):

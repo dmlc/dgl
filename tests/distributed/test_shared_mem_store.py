@@ -134,7 +134,7 @@ def check_compute_func(worker_id, graph_name, return_dict):
         in_feats = g.nodes[0].data['feat'].shape[1]
         # Test update all.
         g.update_all(fn.copy_src(src='feat', out='m'), fn.sum(msg='m', out='preprocess'))
-        adj = g.adjacency_matrix()
+        adj = g.adjacency_matrix(transpose=True)
         tmp = F.spmm(adj, g.nodes[:].data['feat'])
         assert_almost_equal(F.asnumpy(g.nodes[:].data['preprocess']), F.asnumpy(tmp))
         g._sync_barrier(60)
@@ -261,13 +261,13 @@ def check_mem(gidx, cond_v, shared_v):
     cond_v.release()
 
     gidx1 = dgl.graph_index.from_shared_mem_graph_index("test_graph5")
-    in_csr = gidx.adjacency_matrix_scipy(False, "csr")
-    out_csr = gidx.adjacency_matrix_scipy(True, "csr")
+    in_csr = gidx.adjacency_matrix_scipy(True, "csr")
+    out_csr = gidx.adjacency_matrix_scipy(False, "csr")
 
-    in_csr1 = gidx1.adjacency_matrix_scipy(False, "csr")
+    in_csr1 = gidx1.adjacency_matrix_scipy(True, "csr")
     assert_array_equal(in_csr.indptr, in_csr1.indptr)
     assert_array_equal(in_csr.indices, in_csr1.indices)
-    out_csr1 = gidx1.adjacency_matrix_scipy(True, "csr")
+    out_csr1 = gidx1.adjacency_matrix_scipy(False, "csr")
     assert_array_equal(out_csr.indptr, out_csr1.indptr)
     assert_array_equal(out_csr.indices, out_csr1.indices)
 

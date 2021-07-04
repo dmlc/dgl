@@ -75,7 +75,7 @@ def run(proc_id, n_gpus, args, devices, data):
 
     # Create PyTorch DataLoader for constructing blocks
     n_edges = g.num_edges()
-    train_seeds = np.arange(n_edges)
+    train_seeds = th.arange(n_edges)
 
     # Create sampler
     sampler = dgl.dataloading.MultiLayerNeighborSampler(
@@ -85,13 +85,13 @@ def run(proc_id, n_gpus, args, devices, data):
         # For each edge with ID e in Reddit dataset, the reverse edge is e ± |E|/2.
         reverse_eids=th.cat([
             th.arange(n_edges // 2, n_edges),
-            th.arange(0, n_edges // 2)]),
+            th.arange(0, n_edges // 2)]).to(train_seeds),
         negative_sampler=NegativeSampler(g, args.num_negs, args.neg_share),
+        device=device,
         use_ddp=n_gpus > 1,
         batch_size=args.batch_size,
         shuffle=True,
         drop_last=False,
-        pin_memory=True,
         num_workers=args.num_workers)
 
     # Define model and optimizer
@@ -174,7 +174,7 @@ def main(args, devices):
     test_mask = g.ndata['test_mask']
 
     # Create csr/coo/csc formats before launching training processes with multi-gpu.
-    # This avoids creating certain formats in each sub-process, which saves momory and CPU.
+    # This avoids creating certain formats in each sub-process, which saves memory and CPU.
     g.create_formats_()
     # Pack data
     data = train_mask, val_mask, test_mask, n_classes, g
