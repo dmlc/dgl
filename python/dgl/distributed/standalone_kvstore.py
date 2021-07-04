@@ -22,6 +22,11 @@ class KVClient(object):
         """Get all possible partition policies"""
         return self._all_possible_part_policy
 
+    @property
+    def num_servers(self):
+        """Get the number of servers"""
+        return 1
+
     def barrier(self):
         '''barrier'''
 
@@ -39,7 +44,7 @@ class KVClient(object):
         if part_policy.policy_str not in self._all_possible_part_policy:
             self._all_possible_part_policy[part_policy.policy_str] = part_policy
 
-    def init_data(self, name, shape, dtype, part_policy, init_func):
+    def init_data(self, name, shape, dtype, part_policy, init_func, is_gdata=True):
         '''add new data to the client'''
         self._data[name] = init_func(shape, dtype)
         if part_policy.policy_str not in self._all_possible_part_policy:
