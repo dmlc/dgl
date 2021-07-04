@@ -8,7 +8,7 @@ from dgl.distributed import sample_neighbors
 import argparse
 
 def start_client(machine_id):
-    datadir = Path(folder_name = os.environ.get("PARTITION_DATA_BASE_PATH", "partition_data"))
+    datadir = Path(os.environ.get("PARTITION_DATA_BASE_PATH", "partition_data"))
     print(datadir)
     print(datadir / 'partition_data.json')
     _, _, _, gpb, _, _, _ = load_partition(datadir / 'partition_data.json', machine_id)
