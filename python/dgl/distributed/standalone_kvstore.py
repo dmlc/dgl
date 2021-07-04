@@ -62,6 +62,10 @@ class KVClient(object):
         '''get the names of all data'''
         return list(self._data.keys())
 
+    def gdata_name_list(self):
+        '''get the names of graph data'''
+        return list(self._gdata_name_list)
+
     def get_data_meta(self, name):
         '''get the metadata of data'''
         return F.dtype(self._data[name]), F.shape(self._data[name]), None

@@ -193,7 +193,7 @@ def check_dist_emb(g, num_clients, num_nodes, num_edges):
         assert np.all(F.asnumpy(feats1) == np.zeros((len(rest), 1)))
 
         policy = dgl.distributed.PartitionPolicy('node', g.get_partition_book())
-        grad_sum = dgl.distributed.DistTensor((g.number_of_nodes(),), F.float32,
+        grad_sum = dgl.distributed.DistTensor((g.number_of_nodes(), 1), F.float32,
                                               'emb1_sum', policy)
         if num_clients == 1:
             assert np.all(F.asnumpy(grad_sum[nids]) == np.ones((len(nids), 1)) * num_clients)
