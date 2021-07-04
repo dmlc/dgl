@@ -8,6 +8,7 @@ from dgl.distributed import sample_neighbors
 import argparse
 
 def start_client(machine_id):
+    os.environ['DGL_DIST_MODE'] = 'distributed'
     datadir = Path(os.environ.get("PARTITION_DATA_BASE_PATH", "partition_data"))
     print(datadir)
     print(datadir / 'partition_data.json')
