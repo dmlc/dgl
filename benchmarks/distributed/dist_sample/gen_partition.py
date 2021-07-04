@@ -7,7 +7,7 @@ from ogb.nodeproppred import DglNodePropPredDataset
 import argparse
 
 def gen_partition(num_parts, num_hops=1, reshuffle=True):
-    # os.symlink('/tmp/dataset/', os.path.join(os.getcwd(), 'dataset'))
+    os.symlink('/tmp/dataset/', os.path.join(os.getcwd(), 'dataset'))
     data = DglNodePropPredDataset(name="ogbn-products")
     g = data[0][0]
     num_hops = 1
