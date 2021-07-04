@@ -16,6 +16,8 @@ class KVClient(object):
         self._all_possible_part_policy = {}
         self._push_handlers = {}
         self._pull_handlers = {}
+        # Store all graph data name
+        self._gdata_name_list = set()
 
     @property
     def all_possible_part_policy(self):
@@ -49,6 +51,8 @@ class KVClient(object):
         self._data[name] = init_func(shape, dtype)
         if part_policy.policy_str not in self._all_possible_part_policy:
             self._all_possible_part_policy[part_policy.policy_str] = part_policy
+        if is_gdata:
+            self._gdata_name_list.add(name)
 
     def delete_data(self, name):
         '''delete the data'''
