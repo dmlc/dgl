@@ -31,8 +31,8 @@ class SAGE(nn.Module):
         h = x
         for l, (layer, block) in enumerate(zip(self.layers, blocks)):
             h = layer(block, h)
+            h = self.activation(h)
             if l != len(self.layers) - 1:
-                h = self.activation(h)
                 h = self.dropout(h)
         return h
 
@@ -69,8 +69,8 @@ class SAGE(nn.Module):
                 block = block.int().to(device)
                 h = x[input_nodes].to(device)
                 h = layer(block, h)
+                h = self.activation(h)
                 if l != len(self.layers) - 1:
-                    h = self.activation(h)
                     h = self.dropout(h)
 
                 y[output_nodes] = h.cpu()
