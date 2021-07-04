@@ -7,8 +7,8 @@ from ogb.nodeproppred import DglNodePropPredDataset
 
 
 def start_server(server_id, num_servers, num_clients):
-    folder_name = "partition_data"
+    folder_name = os.environ.get("PARTITION_DATA_BASE_PATH", "partition_data")
     g = DistGraphServer(server_id, "ip_config.txt", num_servers, num_clients,
-                        Path(folder_name) / (folder_name + '.json'),
+                        Path(folder_name) / 'partition_data.json',
                         graph_format='csc')
     g.start()
