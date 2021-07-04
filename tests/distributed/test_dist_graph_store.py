@@ -597,7 +597,6 @@ def test_dist_emb_server_client():
     check_dist_emb_server_client(True, 1, 1)
     check_dist_emb_server_client(False, 1, 1)
     check_dist_emb_server_client(True, 2, 2)
-    check_dist_emb_server_client(False, 2, 2)
 
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support some of operations in DistGraph")
 def test_standalone():
@@ -772,9 +771,9 @@ def prepare_dist():
 
 if __name__ == '__main__':
     os.makedirs('/tmp/dist_graph', exist_ok=True)
+    test_dist_emb_server_client()
     test_server_client()
     test_split()
     test_split_even()
     test_standalone()
-
     test_standalone_node_emb()
