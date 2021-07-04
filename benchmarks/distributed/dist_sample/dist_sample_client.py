@@ -13,8 +13,12 @@ def start_client(machine_id):
     print(datadir)
     print(datadir / 'partition_data.json')
     _, _, _, gpb, _, _, _ = load_partition(datadir / 'partition_data.json', machine_id)
+    print("Finish client loading Partition book")
     dgl.distributed.initialize("ip_config.txt")
+    
+    print("Before initialize server")
     dist_graph = DistGraph("partition_data", gpb=gpb)
+    print("After initialize server")
     try:
         sampled_graph = sample_neighbors(dist_graph, [0, 10, 99, 66, 1024, 2008], 3)
     except Exception as e:
