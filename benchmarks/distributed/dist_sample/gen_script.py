@@ -44,7 +44,7 @@ def generate_script(machine_id, num_servers_per_machine, num_machines):
         server_command_list.append(f"python dist_sample_server.py --server-id {server_id} --num-servers {num_servers_per_machine} --num-clients {num_clients}")
     # Current assume only 1 client per machine
     client_command_list.append(f"python dist_sample_client.py --machine-id {machine_id}")
-    full_commands = " & ".join(server_command_list+client_command_list) + " & "
+    full_commands = " & ".join(server_command_list+client_command_list)
     print("==========================Full command==========================")
     print(full_commands)
     print("==========================Full command==========================")
