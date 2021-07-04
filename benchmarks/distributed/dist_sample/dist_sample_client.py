@@ -10,7 +10,7 @@ import argparse
 def start_client(machine_id):
     datadir = Path(folder_name = os.environ.get("PARTITION_DATA_BASE_PATH", "partition_data"))
     print(datadir)
-    print((datadir / 'partition_data.json')
+    print(datadir / 'partition_data.json')
     _, _, _, gpb, _, _, _ = load_partition(datadir / 'partition_data.json', machine_id)
     dgl.distributed.initialize("ip_config.txt")
     dist_graph = DistGraph("partition_data", gpb=gpb)
