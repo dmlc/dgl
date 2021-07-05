@@ -56,13 +56,13 @@ class FakeNewsDataset(DGLBuiltinDataset):
 
         Gossipcop:
 
-        - Graphs: 5464
+        - Graphs: 5,464
         - Nodes: 314,262
         - Edges: 308,798
         - Classes:
 
-            - Fake: 2732
-            - Real: 2732
+            - Fake: 2,732
+            - Real: 2,732
 
         - Node feature size:
 

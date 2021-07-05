@@ -214,10 +214,9 @@ class FraudYelpDataset(FraudDataset):
     - Nodes: 45,954
     - Edges:
 
-        - R-U-R: 49,315
-        - R-T-R: 573,616
-        - R-S-R: 3,402,743
-        - ALL: 3,846,979
+        - R-U-R: 98,630
+        - R-T-R: 1,147,232
+        - R-S-R: 6,805,486
 
     - Classes:
 
@@ -283,17 +282,17 @@ class FraudAmazonDataset(FraudDataset):
     - Nodes: 11,944
     - Edges:
 
-        - U-P-U: 175,608
-        - U-S-U: 3,566,479
-        - U-V-U: 1,036,737
-        - ALL: 4,398,392
+        - U-P-U: 351,216
+        - U-S-U: 7,132,958
+        - U-V-U: 2,073,474
 
     - Classes:
 
         - Positive (fraudulent): 821
-        - Negative (benign): 11,123
+        - Negative (benign): 7,818
+        - Unlabeled: 3,305
 
-    - Positive-Negative ratio: 1 : 13.5
+    - Positive-Negative ratio: 1 : 10.5
     - Node feature size: 25
 
     Parameters
