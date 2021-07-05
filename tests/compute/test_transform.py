@@ -1480,5 +1480,94 @@ def test_remove_selfloop(idtype):
         raise_error = True
     assert raise_error
 
+
+@parametrize_dtype
+def test_reorder(idtype):
+    g = dgl.graph(([0, 1, 2, 3, 4], [2, 2, 3, 2, 3]),
+                  idtype=idtype, device=F.ctx())
+    g.ndata['h'] = F.copy_to(F.randn((g.num_nodes(), 3)), ctx=F.ctx())
+    g.edata['w'] = F.copy_to(F.randn((g.num_edges(), 2)), ctx=F.ctx())
+
+    # call with default args
+    rg = dgl.reorder(g)
+
+    # reorder back to original according to stored ids
+    rg2 = dgl.reorder(rg, 'custom', permute_config={
+                      'nodes_perm': np.argsort(F.asnumpy(rg.ndata[dgl.NID]))})
+    assert F.array_equal(g.ndata['h'], rg2.ndata['h'])
+    assert F.array_equal(g.edata['w'], rg2.edata['w'])
+
+    # do not store ids
+    rg = dgl.reorder(g, store_ids=False)
+    assert not dgl.NID in rg.ndata.keys()
+    assert not dgl.EID in rg.edata.keys()
+
+    # metis does not work on windows.
+    if os.name == 'nt':
+        pass
+    else:
+        # metis_partition may fail for small graph.
+        mg = create_large_graph(1000).to(F.ctx())
+
+        # call with metis strategy, but k is not specified
+        raise_error = False
+        try:
+            dgl.reorder(mg, permute_algo='metis')
+        except:
+            raise_error = True
+        assert raise_error
+
+        # call with metis strategy, k is specified
+        raise_error = False
+        try:
+            dgl.reorder(mg,
+                        permute_algo='metis', permute_config={'k': 2})
+        except:
+            raise_error = True
+        assert not raise_error
+
+    # call with qualified nodes_perm specified
+    nodes_perm = np.random.permutation(g.num_nodes())
+    raise_error = False
+    try:
+        dgl.reorder(g, permute_algo='custom', permute_config={
+                    'nodes_perm': nodes_perm})
+    except:
+        raise_error = True
+    assert not raise_error
+
+    # call with unqualified nodes_perm specified
+    raise_error = False
+    try:
+        dgl.reorder(g, permute_algo='custom', permute_config={
+                    'nodes_perm':  nodes_perm[:g.num_nodes() - 1]})
+    except:
+        raise_error = True
+    assert raise_error
+
+    # call with unsupported strategy
+    raise_error = False
+    try:
+        dgl.reorder(g, permute_algo='cmk')
+    except:
+        raise_error = True
+    assert raise_error
+
+    # heterograph: not supported
+    raise_error = False
+    try:
+        hg = dgl.heterogrpah({('user', 'follow', 'user'): (
+            [0, 1], [1, 2])}, idtype=idtype, device=F.ctx())
+        dgl.reorder(hg)
+    except:
+        raise_error = True
+    assert raise_error
+
+    # add 'csr' format if needed
+    fg = g.formats('csc')
+    assert 'csr' not in sum(fg.formats().values(), [])
+    rfg = dgl.reorder(fg)
+    assert 'csr' in sum(rfg.formats().values(), [])
+
 if __name__ == '__main__':
     test_partition_with_halo()
