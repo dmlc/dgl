@@ -216,12 +216,15 @@ def check_dist_emb(g, num_clients, num_nodes, num_edges):
         with F.no_grad():
             feats = emb(nids)
         if num_clients == 1:
-            assert_almost_equal(F.asnumpy(feats), np.ones((len(nids), 1)) * math.sqrt(2) * -lr)
+            assert_almost_equal(F.asnumpy(feats), np.ones((len(nids), 1)) * 1 * -lr)
         rest = np.setdiff1d(np.arange(g.number_of_nodes()), F.asnumpy(nids))
         feats1 = emb(rest)
         assert np.all(F.asnumpy(feats1) == np.zeros((len(rest), 1)))
     except NotImplementedError as e:
         pass
+    except Exception as e:
+        print(e)
+        sys.exit(-1)
 
 def check_dist_graph(g, num_clients, num_nodes, num_edges):
     # Test API
@@ -332,6 +335,7 @@ def check_dist_emb_server_client(shared_mem, num_servers, num_clients):
 
     for p in cli_ps:
         p.join()
+        assert p.exitcode == 0
 
     for p in serv_ps:
         p.join()
