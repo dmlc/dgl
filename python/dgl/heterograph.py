@@ -3619,7 +3619,9 @@ class DGLHeteroGraph(object):
         --------
         >>> g = dgl.graph(([0, 1, 2], [1, 2, 3]))
         >>> g.adj_sparse('coo')
+        (tensor([0, 1, 2]), tensor([1, 2, 3]))
         >>> g.adj_sparse('csr')
+        (tensor([0, 1, 2, 3, 3]), tensor([1, 2, 3]), tensor([0, 1, 2]))
         """
         etid = self.get_etype_id(etype)
         if fmt == 'csc':
