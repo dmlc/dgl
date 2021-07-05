@@ -24,6 +24,81 @@ namespace dgl {
 namespace aten {
 namespace cpu {
 
+#if !defined(_WIN32)
+#ifdef USE_AVX
+/*!
+ * \brief CPU kernel of SpMM on Csr format using Xbyak.
+ * \param cpu_spec JIT'ed kernel
+ * \param bcast Broadcast information.
+ * \param csr The Csr matrix.
+ * \param X The feature on source nodes.
+ * \param W The feature on edges.
+ * \param O The result feature on destination nodes.
+ * \note it uses node parallel strategy, different threads are responsible
+ *       for the computation of different nodes. For each edge, it uses the
+ *       JIT'ed kernel.
+ */
+template <typename IdType, typename DType, typename Op>
+void SpMMSumCsrXbyak(dgl::ElemWiseAddUpdate<Op>* cpu_spec, const BcastOff& bcast,
+                     const CSRMatrix& csr, const DType* X, const DType* W, DType* O) {
+  const bool has_idx = !IsNullArray(csr.data);
+  const IdType* indptr = csr.indptr.Ptr<IdType>();
+  const IdType* indices = csr.indices.Ptr<IdType>();
+  const IdType* edges = csr.data.Ptr<IdType>();
+  int64_t dim = bcast.out_len, lhs_dim = bcast.lhs_len, rhs_dim = bcast.rhs_len;
+#pragma omp parallel for
+  for (IdType rid = 0; rid < csr.num_rows; ++rid) {
+    const IdType row_start = indptr[rid], row_end = indptr[rid + 1];
+    DType* out_off = O + rid * dim;
+    for (IdType j = row_start; j < row_end; ++j) {
+      const IdType cid = indices[j];
+      const IdType eid = has_idx ? edges[j] : j;
+      cpu_spec->run(out_off, X + cid * lhs_dim, W + eid * rhs_dim, dim);
+    }
+  }
+}
+#endif  // USE_AVX
+#endif  // _WIN32
+
+/*!
+ * \brief Naive CPU kernel of SpMM on Csr format.
+ * \param cpu_spec JIT'ed kernel
+ * \param bcast Broadcast information.
+ * \param csr The Csr matrix.
+ * \param X The feature on source nodes.
+ * \param W The feature on edges.
+ * \param O The result feature on destination nodes.
+ * \note it uses node parallel strategy, different threads are responsible
+ *       for the computation of different nodes.
+ */
+template <typename IdType, typename DType, typename Op>
+void SpMMSumCsrNaive(const BcastOff& bcast, const CSRMatrix& csr, const DType* X,
+                     const DType* W, DType* O) {
+  const bool has_idx = !IsNullArray(csr.data);
+  const IdType* indptr = csr.indptr.Ptr<IdType>();
+  const IdType* indices = csr.indices.Ptr<IdType>();
+  const IdType* edges = csr.data.Ptr<IdType>();
+  int64_t dim = bcast.out_len, lhs_dim = bcast.lhs_len, rhs_dim = bcast.rhs_len;
+#pragma omp parallel for
+  for (IdType rid = 0; rid < csr.num_rows; ++rid) {
+    const IdType row_start = indptr[rid], row_end = indptr[rid + 1];
+    DType* out_off = O + rid * dim;
+    for (IdType j = row_start; j < row_end; ++j) {
+      const IdType cid = indices[j];
+      const IdType eid = has_idx ? edges[j] : j;
+      for (int64_t k = 0; k < dim; ++k) {
+        const int64_t lhs_add = bcast.use_bcast ? bcast.lhs_offset[k] : k;
+        const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
+        const DType* lhs_off =
+          Op::use_lhs ? X + cid * lhs_dim + lhs_add : nullptr;
+        const DType* rhs_off =
+          Op::use_rhs ? W + eid * rhs_dim + rhs_add : nullptr;
+        out_off[k] += Op::Call(lhs_off, rhs_off);
+      }
+    }
+  }
+}
+
 /*!
  * \brief CPU kernel of SpMM on Csr format.
  * \param bcast Broadcast information.
@@ -59,11 +134,11 @@ void SpMMSumCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
 #if !defined(_WIN32)
 #ifdef USE_AVX
 #ifdef USE_LIBXSMM
-  bool special_condition =
+  bool libxsmm_condition =
        bcast.use_bcast || (Op::use_lhs && (dim != lhs_dim)) || (Op::use_rhs && (dim != rhs_dim))
        || std::is_same<DType, double>::value;
-  if (!special_condition) {
-      SpMMSumCsrOpt<IdType, DType, Op>(bcast, csr, ufeat, efeat, out);
+  if (!libxsmm_condition) {
+      SpMMSumCsrLibxsmm<IdType, DType, Op>(bcast, csr, ufeat, efeat, out);
   } else {
 #endif  // USE_LIBXSMM
     typedef dgl::ElemWiseAddUpdate<Op> ElemWiseUpd;
@@ -75,38 +150,11 @@ void SpMMSumCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
       ? asm_kernel_ptr.get()
       : nullptr;
     if (cpu_spec && dim > 16 && !bcast.use_bcast) {
-#pragma omp parallel for
-      for (IdType rid = 0; rid < csr.num_rows; ++rid) {
-        const IdType row_start = indptr[rid], row_end = indptr[rid + 1];
-        DType* out_off = O + rid * dim;
-        for (IdType j = row_start; j < row_end; ++j) {
-          const IdType cid = indices[j];
-          const IdType eid = has_idx ? edges[j] : j;
-          cpu_spec->run(out_off, X + cid * lhs_dim, W + eid * rhs_dim, dim);
-        }
-      }
+      SpMMSumCsrXbyak<IdType, DType, Op>(cpu_spec, bcast, csr, X, W, O);
     } else {
 #endif  // USE_AVX
 #endif  // _WIN32
-
-#pragma omp parallel for
-      for (IdType rid = 0; rid < csr.num_rows; ++rid) {
-        const IdType row_start = indptr[rid], row_end = indptr[rid + 1];
-        DType* out_off = O + rid * dim;
-        for (IdType j = row_start; j < row_end; ++j) {
-          const IdType cid = indices[j];
-          const IdType eid = has_idx ? edges[j] : j;
-          for (int64_t k = 0; k < dim; ++k) {
-            const int64_t lhs_add = bcast.use_bcast ? bcast.lhs_offset[k] : k;
-            const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
-            const DType* lhs_off =
-              Op::use_lhs ? X + cid * lhs_dim + lhs_add : nullptr;
-            const DType* rhs_off =
-              Op::use_rhs ? W + eid * rhs_dim + rhs_add : nullptr;
-            out_off[k] += Op::Call(lhs_off, rhs_off);
-          }
-        }
-      }
+    SpMMSumCsrNaive<IdType, DType, Op>(bcast, csr, X, W, O);
 #if !defined(_WIN32)
 #ifdef USE_AVX
     }
@@ -214,11 +262,11 @@ void SpMMCmpCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
 #ifdef USE_AVX
 #ifdef USE_LIBXSMM
 
-  bool special_condition =
+  bool libxsmm_condition =
        bcast.use_bcast || (Op::use_lhs && (dim != lhs_dim)) || (Op::use_rhs && (dim != rhs_dim))
        || std::is_same<DType, double>::value;
-  if (!special_condition) {
-    SpMMCmpCsrOpt<IdType, DType, Op, Cmp>(bcast, csr, ufeat, efeat, out, argu, arge);
+  if (!libxsmm_condition) {
+    SpMMCmpCsrLibxsmm<IdType, DType, Op, Cmp>(bcast, csr, ufeat, efeat, out, argu, arge);
   } else {
 #endif  // USE_LIBXSMM
 #endif  // USE_AVX
