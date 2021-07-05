@@ -204,18 +204,18 @@ def sample_neighbors_biased(g, nodes, fanout, bias, edge_dir='in',
     has :math:`q`. This function first chooses a tag according to the
     unnormalized probability distribution
     :math:`\frac{P(tag=0)}{P(tag=1)}=\frac{Np}{Mq}`, and then run a uniform
-    sampling to get the node of the chosen tag.
+    sampling to get a node of the chosen tag.
 
-    In order to make the sampling more efficient, the input graph must have its
-    CSR matrix sorted according to the tag. The API
-    :func:`~dgl.sort_in_edges` and
-    :func:`~dgl.sort_out_edges` are designed for this purpose, which
-    will arrange the neighbors with the same tag in a consecutive range and
-    store the offset of these ranges in a node feature with
-    :attr:`tag_offset_name` as its name.
+    In order to make sampling more efficient, the input graph must have its
+    CSC matrix (or CSR matrix if ``edge_dir='out'``) sorted according to the tag. The API
+    :func:`~dgl.sort_csc_by_tag` and
+    :func:`~dgl.sort_csr_by_tag` are designed for this purpose, which
+    will internally reorder the neighbors by tags so that neighbors of the same tags are
+    stored in a consecutive range. The two APIs will also store the offsets of these ranges
+    in a node feature with :attr:`tag_offset_name` as its name.
 
-    Please make sure that the CSR matrix of the graph has been sorted before
-    calling this function.  This function itself will not check whether the
+    **Please make sure that the CSR (or CSC) matrix of the graph has been sorted before
+    calling this function.**  This function itself will not check whether the
     input graph is sorted. Note that the input :attr:`tag_offset_name` should
     be consistent with that in the sorting function.
 
@@ -280,8 +280,8 @@ def sample_neighbors_biased(g, nodes, fanout, bias, edge_dir='in',
 
     See Also
     --------
-    dgl.sort_in_edges
-    dgl.sort_out_edges
+    dgl.sort_csc_by_tag
+    dgl.sort_csr_by_tag
 
     Examples
     --------
@@ -295,7 +295,7 @@ def sample_neighbors_biased(g, nodes, fanout, bias, edge_dir='in',
 
     Sort the graph (necessary!)
 
-    >>> g_sorted = dgl.transform.sort_out_edges(g, tag)
+    >>> g_sorted = dgl.transform.sort_csr_by_tag(g, tag)
     >>> g_sorted.ndata['_TAG_OFFSET']
     tensor([[0, 1, 2],
             [0, 2, 2],

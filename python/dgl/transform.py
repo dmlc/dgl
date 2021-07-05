@@ -45,8 +45,8 @@ __all__ = [
     'to_simple',
     'to_simple_graph',
     'as_immutable_graph',
-    'sort_out_edges',
-    'sort_in_edges',
+    'sort_csr_by_tag',
+    'sort_csc_by_tag',
     'metis_partition_assignment',
     'partition_graph_with_halo',
     'metis_partition',
@@ -2719,13 +2719,12 @@ def as_immutable_graph(hg):
                 '\tdgl.as_immutable_graph will do nothing and can be removed safely in all cases.')
     return hg
 
-def sort_out_edges(g, tag, tag_offset_name='_TAG_OFFSET'):
-    r"""Return a new graph which sorts the out edges of each node.
+def sort_csr_by_tag(g, tag, tag_offset_name='_TAG_OFFSET'):
+    r"""Return a new graph whose CSR matrix is sorted by the given tag.
 
-    Sort the out edges according to the given destination node tags in integer.
-    A typical use case is to sort the edges by the destination node types, where
-    the tags represent destination node types. After sorting, edges sharing
-    the same tag will be arranged in a consecutive range in
+    Sort the internal CSR matrix of the graph so that the adjacency list of each node
+    , which contains the out-edges, is sorted by the tag of the out-neighbors.
+    After sorting, edges sharing the same tag will be arranged in a consecutive range in
     a node's adjacency list. Following is an example:
 
         Consider a graph as follows::
@@ -2772,7 +2771,7 @@ def sort_out_edges(g, tag, tag_offset_name='_TAG_OFFSET'):
     Returns
     -------
     g_sorted : DGLGraph
-        A new graph whose out edges are sorted. The node/edge features of the
+        A new graph whose CSR is sorted. The node/edge features of the
         input graph is shallow-copied over.
 
         - ``g_sorted.ndata[tag_offset_name]`` : Tensor of shape :math:`(N, max\_tag + 2)`.
@@ -2786,7 +2785,7 @@ def sort_out_edges(g, tag, tag_offset_name='_TAG_OFFSET'):
     (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
      array([0, 1, 2, 3, 4, 0, 1, 2], dtype=int32))
     >>> tag = torch.IntTensor([1,1,0,2,0])
-    >>> g_sorted = dgl.sort_out_edges(g, tag)
+    >>> g_sorted = dgl.sort_csr_by_tag(g, tag)
     >>> g_sorted.adjacency_matrix(scipy_fmt='csr').nonzero()
     (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
      array([2, 4, 0, 1, 3, 2, 0, 1], dtype=int32))
@@ -2811,14 +2810,14 @@ def sort_out_edges(g, tag, tag_offset_name='_TAG_OFFSET'):
     return new_g
 
 
-def sort_in_edges(g, tag, tag_offset_name='_TAG_OFFSET'):
-    r"""Return a new graph which sorts the in edges of each node.
+def sort_csc_by_tag(g, tag, tag_offset_name='_TAG_OFFSET'):
+    r"""Return a new graph whose CSC matrix is sorted by the given tag.
 
-    Sort the in edges according to the given source node tags in integer.
-    A typical use case is to sort the edges by the source node types, where
-    the tags represent source node types. After sorting, edges sharing
-    the same tag will be arranged in a consecutive range in
+    Sort the internal CSC matrix of the graph so that the adjacency list of each node
+    , which contains the in-edges, is sorted by the tag of the in-neighbors.
+    After sorting, edges sharing the same tag will be arranged in a consecutive range in
     a node's adjacency list. Following is an example:
+
 
         Consider a graph as follows::
 
@@ -2841,7 +2840,7 @@ def sort_in_edges(g, tag, tag_offset_name='_TAG_OFFSET'):
 
     Note that the function will not change the edge ID neither
     how the edge features are stored. The input graph must
-    allow CSR format. The graph must be on CPU.
+    allow CSC format. The graph must be on CPU.
 
     If the input graph is heterogenous, it must have only one edge
     type and two node types (i.e., source and destination node types).
@@ -2864,7 +2863,7 @@ def sort_in_edges(g, tag, tag_offset_name='_TAG_OFFSET'):
     Returns
     -------
     g_sorted : DGLGraph
-        A new graph whose out edges are sorted. The node/edge features of the
+        A new graph whose CSC matrix is sorted. The node/edge features of the
         input graph is shallow-copied over.
 
         - ``g_sorted.ndata[tag_offset_name]`` : Tensor of shape :math:`(N, max\_tag + 2)`.
@@ -2878,7 +2877,7 @@ def sort_in_edges(g, tag, tag_offset_name='_TAG_OFFSET'):
     (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
      array([0, 1, 2, 3, 4, 0, 1, 2], dtype=int32)))
     >>> tag = torch.IntTensor([1,1,0,2,0])
-    >>> g_sorted = dgl.sort_in_edges(g, tag)
+    >>> g_sorted = dgl.sort_csc_by_tag(g, tag)
     >>> g_sorted.adjacency_matrix(scipy_fmt='csr', transpose=True).nonzero()
     (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
      array([2, 4, 0, 1, 3, 2, 0, 1], dtype=int32))
