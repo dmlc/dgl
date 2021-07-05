@@ -173,6 +173,16 @@ template <DLDeviceType XPU, typename IdType, typename DType>
 COOMatrix CSRRowWiseTopk(
     CSRMatrix mat, IdArray rows, int64_t k, NDArray weight, bool ascending);
 
+template <DLDeviceType XPU, typename IdType, typename FloatType>
+COOMatrix CSRRowWiseSamplingBiased(
+    CSRMatrix mat,
+    IdArray rows,
+    int64_t num_samples,
+    NDArray tag_offset,
+    FloatArray bias,
+    bool replace
+);
+
 // Union CSRMatrixes
 template <DLDeviceType XPU, typename IdType>
 CSRMatrix UnionCsr(const std::vector<CSRMatrix>& csrs);
