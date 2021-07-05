@@ -5,7 +5,7 @@ from torch import nn
 import torch.nn.functional as F
 
 from ....base import dgl_warning
-from .... import laplacian_lambda_max, broadcast_nodes, function as fn
+from .... import broadcast_nodes, function as fn
 
 
 class ChebConv(nn.Module):
@@ -95,8 +95,9 @@ class ChebConv(nn.Module):
             A list(tensor) with length :math:`B`, stores the largest eigenvalue
             of the normalized laplacian of each individual graph in ``graph``,
             where :math:`B` is the batch size of the input graph. Default: None.
-            If None, this method would compute the list by calling
-            ``dgl.laplacian_lambda_max``.
+
+            If None, this method would set the default value to 2.
+            One can use :func:`dgl.laplacian_lambda_max` to compute this value.
 
         Returns
         -------
