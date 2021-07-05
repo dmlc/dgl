@@ -32,7 +32,8 @@ class DistSparseGradOptimizer(abc.ABC):
             self._rank = th.distributed.get_rank()
             self._world_size = th.distributed.get_world_size()
         else:
-            assert 'th.distributed shoud be initialized'
+            self._rank = 0
+            self._world_size = 1
 
     def step(self):
         ''' The step function.
