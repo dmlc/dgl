@@ -159,16 +159,16 @@ def verify_graph_feats(g, gpb, part, node_feats, edge_feats):
             edata = F.gather_row(edge_feats[etype + '/' + name], local_eids)
             assert np.all(F.asnumpy(edata == true_feats))
 
-def check_hetero_partition(hg, part_method):
+def check_hetero_partition(hg, part_method, num_parts=4, num_trainers_per_machine=1):
     hg.nodes['n1'].data['labels'] = F.arange(0, hg.number_of_nodes('n1'))
     hg.nodes['n1'].data['feats'] = F.tensor(np.random.randn(hg.number_of_nodes('n1'), 10), F.float32)
     hg.edges['r1'].data['feats'] = F.tensor(np.random.randn(hg.number_of_edges('r1'), 10), F.float32)
     hg.edges['r1'].data['labels'] = F.arange(0, hg.number_of_edges('r1'))
-    num_parts = 4
     num_hops = 1
 
     orig_nids, orig_eids = partition_graph(hg, 'test', num_parts, '/tmp/partition', num_hops=num_hops,
-                                           part_method=part_method, reshuffle=True, return_mapping=True)
+                                           part_method=part_method, reshuffle=True, return_mapping=True,
+                                           num_trainers_per_machine=num_trainers_per_machine)
     assert len(orig_nids) == len(hg.ntypes)
     assert len(orig_eids) == len(hg.etypes)
     for ntype in hg.ntypes:
@@ -180,6 +180,18 @@ def check_hetero_partition(hg, part_method):
     shuffled_elabels = []
     for i in range(num_parts):
         part_g, node_feats, edge_feats, gpb, _, ntypes, etypes = load_partition('/tmp/partition/test.json', i)
+        if num_trainers_per_machine > 1:
+            for ntype in hg.ntypes:
+                name = ntype + '/trainer_id'
+                assert name in node_feats
+                part_ids = F.floor_div(node_feats[name], num_trainers_per_machine)
+                assert np.all(F.asnumpy(part_ids) == i)
+
+            for etype in hg.etypes:
+                name = etype + '/trainer_id'
+                assert name in edge_feats
+                part_ids = F.floor_div(edge_feats[name], num_trainers_per_machine)
+                assert np.all(F.asnumpy(part_ids) == i)
         # Verify the mapping between the reshuffled IDs and the original IDs.
         # These are partition-local IDs.
         part_src_ids, part_dst_ids = part_g.edges()
@@ -224,22 +236,34 @@ def check_hetero_partition(hg, part_method):
     assert np.all(orig_labels == F.asnumpy(hg.nodes['n1'].data['labels']))
     assert np.all(orig_elabels == F.asnumpy(hg.edges['r1'].data['labels']))
 
-def check_partition(g, part_method, reshuffle):
+def check_partition(g, part_method, reshuffle, num_parts=4, num_trainers_per_machine=1):
     g.ndata['labels'] = F.arange(0, g.number_of_nodes())
     g.ndata['feats'] = F.tensor(np.random.randn(g.number_of_nodes(), 10), F.float32)
     g.edata['feats'] = F.tensor(np.random.randn(g.number_of_edges(), 10), F.float32)
     g.update_all(fn.copy_src('feats', 'msg'), fn.sum('msg', 'h'))
     g.update_all(fn.copy_edge('feats', 'msg'), fn.sum('msg', 'eh'))
-    num_parts = 4
     num_hops = 2
 
     orig_nids, orig_eids = partition_graph(g, 'test', num_parts, '/tmp/partition', num_hops=num_hops,
-                                           part_method=part_method, reshuffle=reshuffle, return_mapping=True)
+                                           part_method=part_method, reshuffle=reshuffle, return_mapping=True,
+                                           num_trainers_per_machine=num_trainers_per_machine)
     part_sizes = []
     shuffled_labels = []
     shuffled_edata = []
     for i in range(num_parts):
         part_g, node_feats, edge_feats, gpb, _, ntypes, etypes = load_partition('/tmp/partition/test.json', i)
+        if num_trainers_per_machine > 1:
+            for ntype in g.ntypes:
+                name = ntype + '/trainer_id'
+                assert name in node_feats
+                part_ids = F.floor_div(node_feats[name], num_trainers_per_machine)
+                assert np.all(F.asnumpy(part_ids) == i)
+
+            for etype in g.etypes:
+                name = etype + '/trainer_id'
+                assert name in edge_feats
+                part_ids = F.floor_div(edge_feats[name], num_trainers_per_machine)
+                assert np.all(F.asnumpy(part_ids) == i)
 
         # Check the metadata
         assert gpb._num_nodes() == g.number_of_nodes()
@@ -355,13 +379,18 @@ def test_partition():
     g = create_random_graph(1000)
     check_partition(g, 'metis', False)
     check_partition(g, 'metis', True)
+    check_partition(g, 'metis', True, 4, 8)
+    check_partition(g, 'metis', True, 1, 8)
     check_partition(g, 'random', False)
     check_partition(g, 'random', True)
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support some of operations in DistGraph")
 def test_hetero_partition():
     hg = create_random_hetero()
     check_hetero_partition(hg, 'metis')
+    check_hetero_partition(hg, 'metis', 1, 8)
+    check_hetero_partition(hg, 'metis', 4, 8)
     check_hetero_partition(hg, 'random')
 
 
