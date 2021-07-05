@@ -15,7 +15,7 @@ if os.name != 'nt':
 def local_ip4_addr_list():
     """Return a set of IPv4 address
 
-    You can use 
+    You can use
     `logging.getLogger("dgl-distributed-socket").setLevel(logging.WARNING+1)`
     to disable the warning here
     """
