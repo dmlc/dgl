@@ -15,7 +15,9 @@ if os.name != 'nt':
 def local_ip4_addr_list():
     """Return a set of IPv4 address
 
-    You can use logging.getLogger("dgl-distributed-socket").setLevel(logging.WARNING+1) to disable the warning here
+    You can use 
+    `logging.getLogger("dgl-distributed-socket").setLevel(logging.WARNING+1)`
+    to disable the warning here
     """
     assert os.name != 'nt', 'Do not support Windows rpc yet.'
     nic = set()
@@ -30,7 +32,8 @@ def local_ip4_addr_list():
         except OSError as e:
             if e.errno == 99: # EADDRNOTAVAIL
                 logger.warning(
-                    "Warning! Interface: {} \n IP address not available for interface.".format(name))
+                    "Warning! Interface: %s \n"
+                    "IP address not available for interface.", name)
                 continue
             else:
                 raise e
