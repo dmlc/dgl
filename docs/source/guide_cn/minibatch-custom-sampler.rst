@@ -381,7 +381,7 @@ DGL确保块的输出节点将始终出现在输入节点中。如下代码所�
                 new_edges_masks[etype] = edge_mask.bool()
     
             # 返回一个与初始图有相同节点的图作为边界
-            frontier = dgl.edge_subgraph(new_edge_masks, preserve_nodes=True)
+            frontier = dgl.edge_subgraph(new_edges_masks, relabel_nodes=False)
             return frontier
     
         def __len__(self):

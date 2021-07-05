@@ -213,8 +213,87 @@ def load_partition_book(part_config, part_id, graph=None):
         return BasicPartitionBook(part_id, num_parts, node_map, edge_map, graph), \
                 part_metadata['graph_name'], ntypes, etypes
 
+def _get_orig_ids(g, sim_g, reshuffle, orig_nids, orig_eids):
+    '''Convert/construct the original node IDs and edge IDs.
+
+    It handles multiple cases:
+     * If the graph has been reshuffled and it's a homogeneous graph, we just return
+       the original node IDs and edge IDs in the inputs.
+     * If the graph has been reshuffled and it's a heterogeneous graph, we need to
+       split the original node IDs and edge IDs in the inputs based on the node types
+       and edge types.
+     * If the graph is not shuffled, the original node IDs and edge IDs don't change.
+
+    Parameters
+    ----------
+    g : DGLGraph
+       The input graph for partitioning.
+    sim_g : DGLGraph
+        The homogeneous version of the input graph.
+    reshuffle : bool
+        Whether the input graph is reshuffled during partitioning.
+    orig_nids : tensor or None
+        The original node IDs after the input graph is reshuffled.
+    orig_eids : tensor or None
+        The original edge IDs after the input graph is reshuffled.
+
+    Returns
+    -------
+    tensor or dict of tensors, tensor or dict of tensors
+    '''
+    is_hetero = len(g.etypes) > 1 or len(g.ntypes) > 1
+    if reshuffle and is_hetero:
+        # Get the type IDs
+        orig_ntype = F.gather_row(sim_g.ndata[NTYPE], orig_nids)
+        orig_etype = F.gather_row(sim_g.edata[ETYPE], orig_eids)
+        # Mapping between shuffled global IDs to original per-type IDs
+        orig_nids = F.gather_row(sim_g.ndata[NID], orig_nids)
+        orig_eids = F.gather_row(sim_g.edata[EID], orig_eids)
+        orig_nids = {ntype: F.boolean_mask(orig_nids, orig_ntype == g.get_ntype_id(ntype)) \
+                for ntype in g.ntypes}
+        orig_eids = {etype: F.boolean_mask(orig_eids, orig_etype == g.get_etype_id(etype)) \
+                for etype in g.etypes}
+    elif not reshuffle and not is_hetero:
+        orig_nids = F.arange(0, sim_g.number_of_nodes())
+        orig_eids = F.arange(0, sim_g.number_of_edges())
+    elif not reshuffle:
+        orig_nids = {ntype: F.arange(0, g.number_of_nodes(ntype)) for ntype in g.ntypes}
+        orig_eids = {etype: F.arange(0, g.number_of_edges(etype)) for etype in g.etypes}
+    return orig_nids, orig_eids
+
+def _set_trainer_ids(g, sim_g, node_parts):
+    '''Set the trainer IDs for each node and edge on the input graph.
+
+    The trainer IDs will be stored as node data and edge data in the input graph.
+
+    Parameters
+    ----------
+    g : DGLGraph
+       The input graph for partitioning.
+    sim_g : DGLGraph
+        The homogeneous version of the input graph.
+    node_parts : tensor
+        The node partition ID for each node in `sim_g`.
+    '''
+    if len(g.etypes) == 1:
+        g.ndata['trainer_id'] = node_parts
+        # An edge is assigned to a partition based on its destination node.
+        g.edata['trainer_id'] = F.gather_row(node_parts, g.edges()[1])
+    else:
+        for ntype_id, ntype in enumerate(g.ntypes):
+            type_idx = sim_g.ndata[NTYPE] == ntype_id
+            orig_nid = F.boolean_mask(sim_g.ndata[NID], type_idx)
+            trainer_id = F.zeros((len(orig_nid),), F.dtype(node_parts), F.cpu())
+            F.scatter_row_inplace(trainer_id, orig_nid, F.boolean_mask(node_parts, type_idx))
+            g.nodes[ntype].data['trainer_id'] = trainer_id
+        for _, etype, dst_type in g.canonical_etypes:
+            # An edge is assigned to a partition based on its destination node.
+            trainer_id = F.gather_row(g.nodes[dst_type].data['trainer_id'], g.edges(etype=etype)[1])
+            g.edges[etype].data['trainer_id'] = trainer_id
+
 def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method="metis",
-                    reshuffle=True, balance_ntypes=None, balance_edges=False, return_mapping=False):
+                    reshuffle=True, balance_ntypes=None, balance_edges=False, return_mapping=False,
+                    num_trainers_per_machine=1):
     ''' Partition a graph for distributed training and store the partitions on files.
 
     The partitioning occurs in three steps: 1) run a partition algorithm (e.g., Metis) to
@@ -388,6 +467,12 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     return_mapping : bool
         If `reshuffle=True`, this indicates to return the mapping between shuffled node/edge IDs
         and the original node/edge IDs.
+    num_trainers_per_machine : int, optional
+        The number of trainers per machine. If is not 1, the whole graph will be first partitioned
+        to each trainer, that is num_parts*num_trainers_per_machine parts. And the trainer ids of
+        each node will be stored in the node feature 'trainer_id'. Then the partitions of trainers
+        on the same machine will be coalesced into one larger partition. The final number of
+        partitions is `num_part`.
 
     Returns
     -------
@@ -413,7 +498,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     '''
     def get_homogeneous(g, balance_ntypes):
         if len(g.etypes) == 1:
-            sim_g = g
+            sim_g = to_homogeneous(g)
             if isinstance(balance_ntypes, dict):
                 assert len(balance_ntypes) == 1
                 bal_ntypes = list(balance_ntypes.values())[0]
@@ -452,48 +537,58 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                     "For heterogeneous graphs, reshuffle must be enabled.")
 
     if num_parts == 1:
-        sim_g = to_homogeneous(g)
+        sim_g, balance_ntypes = get_homogeneous(g, balance_ntypes)
+        assert num_trainers_per_machine >= 1
+        if num_trainers_per_machine > 1:
+            # First partition the whole graph to each trainer and save the trainer ids in
+            # the node feature "trainer_id".
+            node_parts = metis_partition_assignment(
+                sim_g, num_parts * num_trainers_per_machine,
+                balance_ntypes=balance_ntypes,
+                balance_edges=balance_edges,
+                mode='k-way')
+            _set_trainer_ids(g, sim_g, node_parts)
+
         node_parts = F.zeros((sim_g.number_of_nodes(),), F.int64, F.cpu())
-        parts = {}
+        parts = {0: sim_g.clone()}
+        orig_nids = parts[0].ndata[NID] = F.arange(0, sim_g.number_of_nodes())
+        orig_eids = parts[0].edata[EID] = F.arange(0, sim_g.number_of_edges())
+        # For one partition, we don't really shuffle nodes and edges. We just need to simulate
+        # it and set node data and edge data of orig_id.
         if reshuffle:
-            parts[0] = sim_g.clone()
-            parts[0].ndata[NID] = parts[0].ndata['orig_id'] = F.arange(0, sim_g.number_of_nodes())
-            parts[0].edata[EID] = parts[0].edata['orig_id'] = F.arange(0, sim_g.number_of_edges())
-            orig_nids = parts[0].ndata['orig_id']
-            orig_eids = parts[0].edata['orig_id']
-        else:
-            parts[0] = sim_g.clone()
-            orig_nids = parts[0].ndata[NID] = F.arange(0, sim_g.number_of_nodes())
-            orig_eids = parts[0].edata[EID] = F.arange(0, sim_g.number_of_edges())
+            parts[0].ndata['orig_id'] = orig_nids
+            parts[0].edata['orig_id'] = orig_eids
+        if return_mapping:
+            orig_nids, orig_eids = _get_orig_ids(g, sim_g, False, orig_nids, orig_eids)
         parts[0].ndata['inner_node'] = F.ones((sim_g.number_of_nodes(),), F.int8, F.cpu())
         parts[0].edata['inner_edge'] = F.ones((sim_g.number_of_edges(),), F.int8, F.cpu())
     elif part_method in ('metis', 'random'):
         sim_g, balance_ntypes = get_homogeneous(g, balance_ntypes)
         if part_method == 'metis':
-            node_parts = metis_partition_assignment(sim_g, num_parts, balance_ntypes=balance_ntypes,
-                                                    balance_edges=balance_edges)
+            assert num_trainers_per_machine >= 1
+            if num_trainers_per_machine > 1:
+                # First partition the whole graph to each trainer and save the trainer ids in
+                # the node feature "trainer_id".
+                node_parts = metis_partition_assignment(
+                    sim_g, num_parts * num_trainers_per_machine,
+                    balance_ntypes=balance_ntypes,
+                    balance_edges=balance_edges,
+                    mode='k-way')
+                _set_trainer_ids(g, sim_g, node_parts)
+
+                # And then coalesce the partitions of trainers on the same machine into one
+                # larger partition.
+                node_parts = F.floor_div(node_parts, num_trainers_per_machine)
+            else:
+                node_parts = metis_partition_assignment(sim_g, num_parts,
+                                                        balance_ntypes=balance_ntypes,
+                                                        balance_edges=balance_edges)
         else:
             node_parts = random_choice(num_parts, sim_g.number_of_nodes())
         parts, orig_nids, orig_eids = partition_graph_with_halo(sim_g, node_parts, num_hops,
                                                                 reshuffle=reshuffle)
-        is_hetero = len(g.etypes) > 1 or len(g.ntypes) > 1
-        if reshuffle and return_mapping and is_hetero:
-            # Get the type IDs
-            orig_ntype = F.gather_row(sim_g.ndata[NTYPE], orig_nids)
-            orig_etype = F.gather_row(sim_g.edata[ETYPE], orig_eids)
-            # Mapping between shuffled global IDs to original per-type IDs
-            orig_nids = F.gather_row(sim_g.ndata[NID], orig_nids)
-            orig_eids = F.gather_row(sim_g.edata[EID], orig_eids)
-            orig_nids = {ntype: F.boolean_mask(orig_nids, orig_ntype == g.get_ntype_id(ntype)) \
-                    for ntype in g.ntypes}
-            orig_eids = {etype: F.boolean_mask(orig_eids, orig_etype == g.get_etype_id(etype)) \
-                    for etype in g.etypes}
-        elif not reshuffle and not is_hetero and return_mapping:
-            orig_nids = F.arange(0, sim_g.number_of_nodes())
-            orig_eids = F.arange(0, sim_g.number_of_edges())
-        elif not reshuffle and return_mapping:
-            orig_nids = {ntype: F.arange(0, g.number_of_nodes(ntype)) for ntype in g.ntypes}
-            orig_eids = {etype: F.arange(0, g.number_of_edges(etype)) for etype in g.etypes}
+        if return_mapping:
+            orig_nids, orig_eids = _get_orig_ids(g, sim_g, reshuffle, orig_nids, orig_eids)
     else:
         raise Exception('Unknown partitioning method: ' + part_method)
 
