@@ -1123,9 +1123,13 @@ class KVClient(object):
             self._gdata_name_list.add(name)
         self.barrier()
 
+    def gdata_name_list(self):
+        """Get all the graph data name"""
+        return list(self._gdata_name_list)
+
     def data_name_list(self):
         """Get all the data name"""
-        return list(self._gdata_name_list)
+        return list(self._data_name_list)
 
     def get_data_meta(self, name):
         """Get meta data (data_type, data_shape, partition_policy)
