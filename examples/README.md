@@ -10,6 +10,7 @@ The folder contains example implementations of selected research papers related 
 | ------------------------------------------------------------ | ------------------- | -------------------------------- | ------------------------- | ------------------ | ------------------ |
 | [Latent Dirichlet Allocation](#lda) | :heavy_check_mark:  |    :heavy_check_mark:  |  |  |  |
 | [Network Embedding with Completely-imbalanced Labels](#rect) | :heavy_check_mark:  |                                  |                           |                    |                    |
+| [Learning Hierarchical Graph Neural Networks for Image Clustering](#hilander) |   |                                  |                           |                    |                    |
 | [Boost then Convolve: Gradient Boosting Meets Graph Neural Networks](#bgnn) | :heavy_check_mark:  |                                  |                           |                    |                    |
 | [Contrastive Multi-View Representation Learning on Graphs](#mvgrl) | :heavy_check_mark: |  | :heavy_check_mark: |  |  |
 | [Deep Graph Contrastive Representation Learning](#grace) | :heavy_check_mark: | |  | | |
@@ -106,6 +107,9 @@ The folder contains example implementations of selected research papers related 
 
 ## 2021
 
+- <a name="hilander"></a> Xing et al. Learning Hierarchical Graph Neural Networks for Image Clustering.
+    - Example code: [PyTorch](../examples/pytorch/hilander)
+    - Tags: clustering
 - <a name="bgnn"></a> Ivanov et al. Boost then Convolve: Gradient Boosting Meets Graph Neural Networks. [Paper link](https://openreview.net/forum?id=ebS5NUfoMKL). 
     - Example code: [PyTorch](../examples/pytorch/bgnn)
     - Tags: semi-supervised node classification, tabular data, GBDT

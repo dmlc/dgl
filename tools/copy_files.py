@@ -53,11 +53,11 @@ def main():
         graph_name = part_metadata['graph_name']
         node_map = part_metadata['node_map']
         edge_map = part_metadata['edge_map']
-        if not isinstance(node_map, list):
+        if not isinstance(node_map, dict):
             assert node_map[-4:] == '.npy', 'node map should be stored in a NumPy array.'
             tmp_part_metadata['node_map'] = '{}/{}/node_map.npy'.format(args.workspace,
                                                                         args.rel_data_path)
-        if not isinstance(edge_map, list):
+        if not isinstance(edge_map, dict):
             assert edge_map[-4:] == '.npy', 'edge map should be stored in a NumPy array.'
             tmp_part_metadata['edge_map'] = '{}/{}/edge_map.npy'.format(args.workspace,
                                                                         args.rel_data_path)
@@ -80,9 +80,9 @@ def main():
         copy_file(tmp_part_config, ip, '{}/{}'.format(args.workspace, args.rel_data_path))
         node_map = part_metadata['node_map']
         edge_map = part_metadata['edge_map']
-        if not isinstance(node_map, list):
+        if not isinstance(node_map, dict):
             copy_file(node_map, ip, tmp_part_metadata['node_map'])
-        if not isinstance(edge_map, list):
+        if not isinstance(edge_map, dict):
             copy_file(edge_map, ip, tmp_part_metadata['edge_map'])
         remote_path = '{}/{}/part{}'.format(args.workspace, args.rel_data_path, part_id)
         exec_cmd(ip, 'mkdir -p {}'.format(remote_path))
