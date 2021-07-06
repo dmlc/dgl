@@ -12,6 +12,7 @@ pip install --upgrade pip
 pip install asv
 pip uninstall -y dgl
 
+export DGL_CPU_INTEL_KERNEL_ENABLED=1
 export DGL_BENCH_DEVICE=$DEVICE
 echo "DGL_BENCH_DEVICE=$DGL_BENCH_DEVICE"
 pushd $ROOT/benchmarks
