@@ -424,6 +424,7 @@ def run(args, device, data):
         backward_time = 0
         update_time = 0
         number_train = 0
+        number_input = 0
 
         step_time = []
         iter_t = []
@@ -441,6 +442,7 @@ def run(args, device, data):
         for step, sample_data in enumerate(dataloader):
             seeds, blocks = sample_data
             number_train += seeds.shape[0]
+            number_input += np.sum([blocks[0].num_src_nodes(ntype) for ntype in blocks[0].ntypes])
             tic_step = time.time()
             sample_time += tic_step - start
             sample_t.append(tic_step - start)
@@ -484,8 +486,8 @@ def run(args, device, data):
                     np.sum(backward_t[-args.log_every:]), np.sum(update_t[-args.log_every:])))
             start = time.time()
 
-        print('[{}]Epoch Time(s): {:.4f}, sample: {:.4f}, data copy: {:.4f}, forward: {:.4f}, backward: {:.4f}, update: {:.4f}, #number_train: {}'.format(
-            g.rank(), np.sum(step_time), np.sum(sample_t), np.sum(feat_copy_t), np.sum(forward_t), np.sum(backward_t), np.sum(update_t), number_train))
+        print('[{}]Epoch Time(s): {:.4f}, sample: {:.4f}, data copy: {:.4f}, forward: {:.4f}, backward: {:.4f}, update: {:.4f}, #train: {}, #input: {}'.format(
+            g.rank(), np.sum(step_time), np.sum(sample_t), np.sum(feat_copy_t), np.sum(forward_t), np.sum(backward_t), np.sum(update_t), number_train, number_input))
         epoch += 1
 
         start = time.time()
@@ -505,9 +507,23 @@ def main(args):
     print('rank:', g.rank())
 
     pb = g.get_partition_book()
-    train_nid = dgl.distributed.node_split(g.nodes['paper'].data['train_mask'], pb, ntype='paper', force_even=True)
-    val_nid = dgl.distributed.node_split(g.nodes['paper'].data['val_mask'], pb, ntype='paper', force_even=True)
-    test_nid = dgl.distributed.node_split(g.nodes['paper'].data['test_mask'], pb, ntype='paper', force_even=True)
+    if 'trainer_id' in g.nodes['paper'].data:
+        train_nid = dgl.distributed.node_split(g.nodes['paper'].data['train_mask'],
+                                               pb, ntype='paper', force_even=True,
+                                               node_trainer_ids=g.nodes['paper'].data['trainer_id'])
+        val_nid = dgl.distributed.node_split(g.nodes['paper'].data['val_mask'],
+                                             pb, ntype='paper', force_even=True,
+                                             node_trainer_ids=g.nodes['paper'].data['trainer_id'])
+        test_nid = dgl.distributed.node_split(g.nodes['paper'].data['test_mask'],
+                                              pb, ntype='paper', force_even=True,
+                                              node_trainer_ids=g.nodes['paper'].data['trainer_id'])
+    else:
+        train_nid = dgl.distributed.node_split(g.nodes['paper'].data['train_mask'],
+                                               pb, ntype='paper', force_even=True)
+        val_nid = dgl.distributed.node_split(g.nodes['paper'].data['val_mask'],
+                                             pb, ntype='paper', force_even=True)
+        test_nid = dgl.distributed.node_split(g.nodes['paper'].data['test_mask'],
+                                              pb, ntype='paper', force_even=True)
     local_nid = pb.partid2nids(pb.partid, 'paper').detach().numpy()
     print('part {}, train: {} (local: {}), val: {} (local: {}), test: {} (local: {})'.format(
           g.rank(), len(train_nid), len(np.intersect1d(train_nid.numpy(), local_nid)),
