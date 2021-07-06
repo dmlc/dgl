@@ -5,7 +5,8 @@ from .. import utils
 
 
 class UnifiedTensor: #UnifiedTensor
-    '''Class for storing unified tensor.
+    '''Class for storing unified tensor. Declaration of
+    UnifiedTensor automatically pins the input tensor.
 
     Parameters
     ----------
@@ -19,6 +20,8 @@ class UnifiedTensor: #UnifiedTensor
     def __init__(self, input, device):
         if F.device_type(device) != 'cuda':
             raise ValueError("Target device must be a cuda device")
+        if F.device_type(F.context(input)) != 'cpu':
+            raise ValueError("Input tensor must be a cpu tensor")
 
         self._input = input
         self._array = F.zerocopy_to_dgl_ndarray(self._input)
@@ -33,29 +36,32 @@ class UnifiedTensor: #UnifiedTensor
         return self._input.__repr__()
 
     def __getitem__(self, key):
-        return self._input[key]
+        '''Perform zero-copy access from GPU if the context of
+        the key is cuda. Otherwise, just safely fallback to the
+        backend specific indexing scheme.
+
+        Parameters
+        ----------
+        key : Tensor
+            Tensor which contains the index ids
+        '''
+        if F.device_type(F.context(key)) != 'cuda':
+            return self._input[key]
+        else:
+            return F.zerocopy_from_dgl_ndarray(
+                    _CAPI_DGLIndexSelectCPUFromGPU(self._array,
+                                F.zerocopy_to_dgl_ndarray(key)))
 
     def __setitem__(self, key, val):
         self._input[key] = val
 
     def __del__(self):
-        self._array.unpin_memory_(utils.to_dgl_context(self._device))
-        self._array = None
-        self._input = None
+        if hasattr(self, '_array') and self._array != None:
+            self._array.unpin_memory_(utils.to_dgl_context(self._device))
+            self._array = None
 
-    def gather_row(self, index):
-        '''Gather the rows designated by the index. Performs
-        a direct GPU to CPU access using the unified virtual
-        memory (UVM) capability of CUDA.
-
-        Parameters
-        ----------
-        index : Tensor
-            Tensor which contains the row indicies
-        '''
-        return F.zerocopy_from_dgl_ndarray(
-                _CAPI_DGLIndexSelectCPUFromGPU(self._array,
-                            F.zerocopy_to_dgl_ndarray(index)))
+        if hasattr(self, '_input'):
+            self._input = None
 
     @property
     def shape(self):
