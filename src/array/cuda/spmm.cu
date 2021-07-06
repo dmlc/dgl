@@ -362,9 +362,6 @@ void CusparseCsrmm2Hetero(
   CUSPARSE_CALL(cusparseDestroyDnMat(matB));
   CUSPARSE_CALL(cusparseDestroyDnMat(matC));
 #else
-  // allocate matrix for temporary transposed output
-  DType* trans_out = static_cast<DType*>(device->AllocWorkspace(ctx, m * n * sizeof(DType)));
-
   cusparseMatDescr_t descr;
   CUSPARSE_CALL(cusparseCreateMatDescr(&descr));
   CUSPARSE_CALL(cusparseSetMatType(descr, CUSPARSE_MATRIX_TYPE_GENERAL));
@@ -378,11 +375,8 @@ void CusparseCsrmm2Hetero(
       descr, (valptr)? valptr : A_data,
       static_cast<int32_t*>(csr.indptr->data),
       static_cast<int32_t*>(csr.indices->data),
-      B_data, n, &beta, trans_out, m));
+      B_data, n, &beta, C_data, m));
   CUSPARSE_CALL(cusparseDestroyMatDescr(descr));
-  // transpose the output matrix
-  _Transpose(trans_out, C_data, n, m);
-  device->FreeWorkspace(ctx, trans_out);
 #endif
   if (valptr)
     device->FreeWorkspace(ctx, valptr);
@@ -521,54 +515,85 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
              const std::vector<NDArray>& out_aux,
              const std::vector<dgl_type_t>& ufeat_ntids,  // ufeat node type id
              const std::vector<dgl_type_t>& out_ntids) {  // output node type id
-  int64_t feat_len = bcast.out_len;
   bool is_scalar_efeat = vec_efeat.size() != 0;
   bool use_efeat = op != "copy_lhs";
-  // TODO(Israt): 1:Resolve PR-https://github.com/dmlc/dgl/issues/2995
-  // to use maxstream > 1
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
-  for (dgl_type_t etype = 0; etype < ufeat_ntids.size(); ++etype) {
-    const dgl_type_t src_id = ufeat_ntids[etype];
-    const dgl_type_t dst_id = out_ntids[etype];
-    CSRMatrix csr = vec_csr[etype];
-    if (reduce == "sum") {
-      SWITCH_BITS(bits, DType, {
-        /* Call  SpMM for each relation type */
+  // TODO(Israt): Resolve PR-https://github.com/dmlc/dgl/issues/2995 and use multistream
+  auto device = runtime::DeviceAPI::Get(vec_csr[0].indptr->ctx);
+  SWITCH_BITS(bits, DType, {
+    std::vector<DType*> trans_out(vec_out.size(), NULL);
+
+    bool use_legacy_cusparsemm =
+        (CUDART_VERSION < 11000) &&
+        ((op == "copy_lhs" && cusparse_available<bits, IdType>()) ||
+         (op == "mul" && is_scalar_efeat && cusparse_available<bits, IdType>()));
+#if CUDART_VERSION < 11000
+    // Create temporary output buffer to store non-transposed output
+    if (use_legacy_cusparsemm) {
+      for (dgl_type_t ntype = 0; ntype < vec_out.size(); ++ntype) {
+        const int m = vec_out[ntype]->shape[0];
+        const int n = vec_out[ntype]->shape[1];
+        if (m == 0) continue;
+        DType *out = static_cast<DType*>(device->AllocWorkspace(vec_csr[0].indptr->ctx,
+          m * n * sizeof(DType)));
+        CUDA_CALL(cudaMemset(out, 0, m * n * sizeof(DType)));
+        trans_out[ntype] = out;
+      }
+    }
+#endif
+
+    // Check shape of ufeat for all relation type and compute feature size
+    int64_t x_length = 1;
+    for (dgl_type_t etype = 0; etype < (ufeat_ntids.size() - 1); ++etype) {
+      NDArray ufeat = vec_ufeat[ufeat_ntids[etype]];
+      NDArray next_ufeat = vec_ufeat[ufeat_ntids[etype + 1]];
+      CHECK_EQ(ufeat->ndim, next_ufeat->ndim) << "Input features have different shapes";
+      for (int i = 1; i < ufeat->ndim; ++i) {
+        if (ufeat->shape[i] != next_ufeat->shape[i]) {
+          if (ufeat->shape[i] == 1 || next_ufeat->shape[i] == 1)
+            LOG(FATAL) <<
+              "Homogenized message passing on heterogeneous graphs does not support " <<
+              "automatic broadcasting.  Please manually broadcast it before calling " <<
+              "message passing functions.";
+          else
+            LOG(FATAL) << "Input features have different shapes.";
+          return;
+        }
+
+        if (etype == 0)
+          x_length *= ufeat->shape[i];
+      }
+    }
+
+    auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+    for (dgl_type_t etype = 0; etype < ufeat_ntids.size(); ++etype) {
+      const dgl_type_t src_id = ufeat_ntids[etype];
+      const dgl_type_t dst_id = out_ntids[etype];
+      CSRMatrix csr = vec_csr[etype];
+      if (reduce == "sum") {
+          /* Call  SpMM for each relation type */
         if (op == "copy_lhs" && cusparse_available<bits, IdType>()) {  // cusparse
-          int64_t x_length = 1;
-          NDArray nd_ufeat = vec_ufeat[ufeat_ntids[0]];
-          for (int i = 1; i < nd_ufeat->ndim; ++i) {
-            x_length *= nd_ufeat->shape[i];
-          }
+          /* If CUDA is less than 11.0, put the output in trans_out for later transposition */
+          DType *out = (CUDART_VERSION < 11000) ? trans_out[dst_id] :
+            static_cast<DType*>(vec_out[dst_id]->data);
           cusparse::CusparseCsrmm2Hetero<DType, IdType>(
               csr.indptr->ctx, csr,
               static_cast<DType*>(vec_ufeat[src_id]->data),
               nullptr,
-              static_cast<DType*>(vec_out[dst_id]->data),
-              x_length,
-              thr_entry->stream);
+              out,
+              x_length, thr_entry->stream);
         } else if (op == "mul" && is_scalar_efeat &&
             cusparse_available<bits, IdType>()) {  // cusparse
           NDArray efeat = vec_efeat[etype];
-          int64_t x_length = 1;
-          NDArray nd_ufeat = vec_ufeat[ufeat_ntids[0]];
-          for (int i = 1; i < nd_ufeat->ndim; ++i) {
-            x_length *= nd_ufeat->shape[i];
-          }
-          if (!IsNullArray(csr.data)) {
-            SWITCH_BITS(bits, DType, {
-              efeat = _IndexSelect<DType, IdType>(vec_efeat[etype], csr.data);
-            });
-          }
-          SWITCH_BITS(bits, DType, {
-            cusparse::CusparseCsrmm2Hetero<DType, IdType>(
-                csr.indptr->ctx, csr,
-                static_cast<DType*>(vec_ufeat[src_id]->data),
-                static_cast<DType*>(efeat->data),
-                static_cast<DType*>(vec_out[dst_id]->data),
-                x_length,
-                thr_entry->stream);
-          });
+          if (!IsNullArray(csr.data))
+            efeat = _IndexSelect<DType, IdType>(vec_efeat[etype], csr.data);
+
+          cusparse::CusparseCsrmm2Hetero<DType, IdType>(
+              csr.indptr->ctx, csr,
+              static_cast<DType*>(vec_ufeat[src_id]->data),
+              static_cast<DType*>(efeat->data),
+              // TODO(Israt): Change vec_out to trans_out to support CUDA version < 11
+              static_cast<DType*>(vec_out[dst_id]->data),
+              x_length, thr_entry->stream);
         } else {  // general kernel
           NDArray ufeat = (vec_ufeat.size() == 0) ?
             NullArray() : vec_ufeat[src_id];
@@ -580,35 +605,49 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
                 NullArray(), NullArray(), thr_entry->stream);
           });
         }
-      });
-    } else if (reduce == "max") {
-      SWITCH_BITS(bits, DType, {
-        SWITCH_OP(op, Op, {
-          NDArray ufeat = (vec_ufeat.size() == 0) ?
-              NullArray() : vec_ufeat[src_id];
-          NDArray efeat = (vec_efeat.size() == 0) ?
-              NullArray() : vec_efeat[etype];
-          cuda::SpMMCsrHetero<IdType, DType, Op, cuda::reduce::Max<IdType, DType> >(
-              bcast, csr, ufeat, efeat, vec_out[dst_id],
-              out_aux[0], out_aux[1], thr_entry->stream);
+      } else if (reduce == "max") {
+        // SWITCH_BITS(bits, DType, {
+          SWITCH_OP(op, Op, {
+            NDArray ufeat = (vec_ufeat.size() == 0) ?
+                NullArray() : vec_ufeat[src_id];
+            NDArray efeat = (vec_efeat.size() == 0) ?
+                NullArray() : vec_efeat[etype];
+            cuda::SpMMCsrHetero<IdType, DType, Op, cuda::reduce::Max<IdType, DType> >(
+                bcast, csr, ufeat, efeat, vec_out[dst_id],
+                out_aux[0], out_aux[1], thr_entry->stream);
+          });
+        // });
+      } else if (reduce == "min") {
+        // SWITCH_BITS(bits, DType, {
+          SWITCH_OP(op, Op, {
+            NDArray ufeat = (vec_ufeat.size() == 0) ?
+                NullArray() : vec_ufeat[src_id];
+            NDArray efeat = (vec_efeat.size() == 0) ?
+                NullArray() : vec_efeat[etype];
+            cuda::SpMMCsrHetero<IdType, DType, Op, cuda::reduce::Min<IdType, DType> >(
+                bcast, csr, ufeat, efeat, vec_out[dst_id],
+                out_aux[0], out_aux[1], thr_entry->stream);
+          // });
         });
-      });
-    } else if (reduce == "min") {
-      SWITCH_BITS(bits, DType, {
-        SWITCH_OP(op, Op, {
-          NDArray ufeat = (vec_ufeat.size() == 0) ?
-              NullArray() : vec_ufeat[src_id];
-          NDArray efeat = (vec_efeat.size() == 0) ?
-              NullArray() : vec_efeat[etype];
-          cuda::SpMMCsrHetero<IdType, DType, Op, cuda::reduce::Min<IdType, DType> >(
-              bcast, csr, ufeat, efeat, vec_out[dst_id],
-              out_aux[0], out_aux[1], thr_entry->stream);
-        });
-      });
-    } else {
-      LOG(FATAL) << "Not implemented";
+      } else {
+        LOG(FATAL) << "Not implemented";
+      }
     }
-  }
+
+#if CUDART_VERSION < 11000
+    if (use_legacy_cusparsemm) {
+      // transpose output
+      for (dgl_type_t ntype = 0; ntype < vec_out.size(); ++ntype) {
+        const int m = vec_out[ntype]->shape[0];
+        const int n = vec_out[ntype]->shape[1];
+        if (m == 0) continue;
+        DType *C_data = static_cast<DType*>(vec_out[ntype]->data);
+        _Transpose(trans_out[ntype], C_data, n, m);
+        device->FreeWorkspace(vec_csr[0].indptr->ctx, trans_out[ntype]);
+      }
+    }
+#endif
+  });
 }
 
 /*!
