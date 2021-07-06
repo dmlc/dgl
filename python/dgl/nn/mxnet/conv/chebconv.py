@@ -5,6 +5,7 @@ import mxnet as mx
 from mxnet import nd
 from mxnet.gluon import nn
 
+from ....base import dgl_warning
 from .... import broadcast_nodes, function as fn
 
 
