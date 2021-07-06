@@ -77,6 +77,8 @@ Operators for generating new graphs by manipulating the structure of the existin
     adj_product_graph
     adj_sum_graph
     reorder
+    sort_csr_by_tag
+    sort_csc_by_tag
 
 .. _api-batch:
 

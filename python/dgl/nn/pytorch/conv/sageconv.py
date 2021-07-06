@@ -197,8 +197,9 @@ class SAGEConv(nn.Module):
         Returns
         -------
         torch.Tensor
-            The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
-            is size of output feature.
+            The output feature of shape :math:`(N_{dst}, D_{out})`
+            where :math:`N_{dst}` is the number of destination nodes in the input graph,
+            math:`D_{out}` is size of output feature.
         """
         self._compatibility_check()
         with graph.local_scope():
