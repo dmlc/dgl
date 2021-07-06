@@ -1,7 +1,7 @@
 Learning Hierarchical Graph Neural Networks for Image Clustering
 ================================================================
 
-This folder contains the official code for "Learning Hierarchical Graph Neural Networks for Image Clustering"(link needed).
+This folder contains the official code for [Learning Hierarchical Graph Neural Networks for Image Clustering](https://arxiv.org/abs/2107.01319).
 
 ## Setup
 
