@@ -14,6 +14,7 @@ import os, sys
 from .utils import save_graphs, load_graphs, save_info, load_info, makedirs, _get_dgl_url
 from .utils import generate_mask_tensor
 from .utils import deprecate_property, deprecate_function
+from .utils import reorder_graph
 from .dgl_dataset import DGLBuiltinDataset
 from .. import convert
 from .. import batch
@@ -71,7 +72,7 @@ class CitationGraphDataset(DGLBuiltinDataset):
                                                    verbose=verbose)
 
     def process(self):
-        """Loads input data from data directory
+        """Loads input data from data directory and reorder graph for better locality
 
         ind.name.x => the feature vectors of the training instances as scipy.sparse.csr.csr_matrix object;
         ind.name.tx => the feature vectors of the test instances as scipy.sparse.csr.csr_matrix object;
@@ -136,7 +137,7 @@ class CitationGraphDataset(DGLBuiltinDataset):
         g.ndata['feat'] = F.tensor(_preprocess_features(features), dtype=F.data_type_dict['float32'])
         self._num_classes = onehot_labels.shape[1]
         self._labels = labels
-        self._g = g
+        self._g = reorder_graph(g)
 
         if self.verbose:
             print('Finished data loading and preprocessing.')

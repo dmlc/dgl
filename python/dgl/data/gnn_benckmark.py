@@ -5,6 +5,7 @@ import os
 
 from .dgl_dataset import DGLBuiltinDataset
 from .utils import save_graphs, load_graphs, _get_dgl_url, deprecate_property, deprecate_class
+from .utils import reorder_graph
 from ..convert import graph as dgl_graph
 from .. import backend as F
 from .. import transform
@@ -38,6 +39,7 @@ class GNNBenchmarkDataset(DGLBuiltinDataset):
     def process(self):
         npz_path = os.path.join(self.raw_path, self.name + '.npz')
         g = self._load_npz(npz_path)
+        g = reorder_graph(g)
         self._graph = g
         self._data = [g]
         self._print_info()

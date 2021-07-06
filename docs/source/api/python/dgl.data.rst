@@ -241,6 +241,7 @@ Utilities
     utils.load_labels
     utils.save_info
     utils.load_info
+    utils.reorder_graph
 
 .. autoclass:: dgl.data.utils.Subset
     :members: __getitem__, __len__
