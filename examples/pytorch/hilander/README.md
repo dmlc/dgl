@@ -1,7 +1,7 @@
 Learning Hierarchical Graph Neural Networks for Image Clustering
 ================================================================
 
-This folder contains the official code for "Learning Hierarchical Graph Neural Networks for Image Clustering"(link needed).
+This folder contains the official code for [Learning Hierarchical Graph Neural Networks for Image Clustering](https://arxiv.org/abs/2107.01319).
 
 ## Setup
 
@@ -10,7 +10,7 @@ We use python 3.7. The CUDA version needs to be 10.2. Besides DGL (>=0.5.2), we 
 conda create -n Hilander # create env
 conda activate Hilander # activate env
 conda install pytorch==1.7.0 torchvision==0.8.0 cudatoolkit=10.2 -c pytorch # install pytorch 1.7 version
-conda install -c pytorch faiss-gpu cudatoolkit=10.2 # install faiss gpu version matching cuda 10.2
+conda install -y cudatoolkit=10.2 faiss-gpu=1.6.5 -c pytorch # install faiss gpu version matching cuda 10.2
 pip install dgl-cu102 # install dgl for cuda 10.2
 pip install tqdm # install tqdm
 git clone https://github.com/yjxiong/clustering-benchmark.git # install clustering-benchmark for evaluation
