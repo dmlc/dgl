@@ -10,7 +10,7 @@ import argparse
 import itertools
 import numpy as np
 import time
-import os
+import os, gc
 os.environ['DGLBACKEND']='pytorch'
 
 import torch as th
@@ -162,7 +162,7 @@ class DistEmbedLayer(nn.Module):
                     # We only create embeddings for nodes without node features.
                     if feat_name not in g.nodes[ntype].data:
                         part_policy = g.get_node_partition_policy(ntype)
-                        self.node_embeds[ntype] = dgl.distributed.nn.NodeEmbedding(g.number_of_nodes(ntype),
+                        self.node_embeds[ntype] = dgl.distributed.DistEmbedding(g.number_of_nodes(ntype),
                                 self.embed_size,
                                 embed_name + '_' + ntype,
                                 init_emb,
@@ -229,6 +229,7 @@ def evaluate(g, model, embed_layer, labels, eval_loader, test_loader, all_val_ni
     global_results = dgl.distributed.DistTensor(labels.shape, th.long, 'results', persistent=True)
 
     with th.no_grad():
+        th.cuda.empty_cache()
         for sample_data in tqdm.tqdm(eval_loader):
             seeds, blocks = sample_data
             for block in blocks:
@@ -245,6 +246,7 @@ def evaluate(g, model, embed_layer, labels, eval_loader, test_loader, all_val_ni
     test_logits = []
     test_seeds = []
     with th.no_grad():
+        th.cuda.empty_cache()
         for sample_data in tqdm.tqdm(test_loader):
             seeds, blocks = sample_data
             for block in blocks:
@@ -347,7 +349,7 @@ def run(args, device, data):
     # Create DataLoader for constructing blocks
     test_dataloader = DistDataLoader(
         dataset=test_nid,
-        batch_size=args.batch_size,
+        batch_size=args.eval_batch_size,
         collate_fn=test_sampler.sample_blocks,
         shuffle=False,
         drop_last=False)
@@ -486,6 +488,7 @@ def run(args, device, data):
                     np.sum(backward_t[-args.log_every:]), np.sum(update_t[-args.log_every:])))
             start = time.time()
 
+        gc.collect()
         print('[{}]Epoch Time(s): {:.4f}, sample: {:.4f}, data copy: {:.4f}, forward: {:.4f}, backward: {:.4f}, update: {:.4f}, #train: {}, #input: {}'.format(
             g.rank(), np.sum(step_time), np.sum(sample_t), np.sum(feat_copy_t), np.sum(forward_t), np.sum(backward_t), np.sum(update_t), number_train, number_input))
         epoch += 1

@@ -172,10 +172,10 @@ def run_client_hierarchy(graph_name, part_id, server_count, node_mask, edge_mask
 
 def check_dist_emb(g, num_clients, num_nodes, num_edges):
     from dgl.distributed.optim import SparseAdagrad
-    from dgl.distributed.nn import NodeEmbedding
+    from dgl.distributed import DistEmbedding
     # Test sparse emb
     try:
-        emb = NodeEmbedding(g.number_of_nodes(), 1, 'emb1', emb_init)
+        emb = DistEmbedding(g.number_of_nodes(), 1, 'emb1', emb_init)
         nids = F.arange(0, int(g.number_of_nodes()))
         lr = 0.001
         optimizer = SparseAdagrad([emb], lr=lr)
@@ -199,7 +199,7 @@ def check_dist_emb(g, num_clients, num_nodes, num_edges):
             assert np.all(F.asnumpy(grad_sum[nids]) == np.ones((len(nids), 1)) * num_clients)
         assert np.all(F.asnumpy(grad_sum[rest]) == np.zeros((len(rest), 1)))
 
-        emb = NodeEmbedding(g.number_of_nodes(), 1, 'emb2', emb_init)
+        emb = DistEmbedding(g.number_of_nodes(), 1, 'emb2', emb_init)
         with F.no_grad():
             feats1 = emb(nids)
         assert np.all(F.asnumpy(feats1) == 0)
@@ -587,8 +587,8 @@ def test_server_client():
     check_server_client(False, 2, 2)
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
-@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support distributed NodeEmbedding")
-@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Mxnet doesn't support distributed NodeEmbedding")
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support distributed DistEmbedding")
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Mxnet doesn't support distributed DistEmbedding")
 def test_dist_emb_server_client():
     os.environ['DGL_DIST_MODE'] = 'distributed'
     check_dist_emb_server_client(True, 1, 1)
@@ -615,8 +615,8 @@ def test_standalone():
         print(e)
     dgl.distributed.exit_client() # this is needed since there's two test here in one process
 
-@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support distributed NodeEmbedding")
-@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Mxnet doesn't support distributed NodeEmbedding")
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support distributed DistEmbedding")
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Mxnet doesn't support distributed DistEmbedding")
 def test_standalone_node_emb():
     os.environ['DGL_DIST_MODE'] = 'standalone'
 

@@ -29,7 +29,7 @@ Distributed Node Embedding
 ---------------------
 .. currentmodule:: dgl.distributed.nn.pytorch
 
-.. autoclass:: NodeEmbedding
+.. autoclass:: DistEmbedding
 
 
 Distributed embedding optimizer
