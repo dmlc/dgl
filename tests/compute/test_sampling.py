@@ -617,7 +617,7 @@ def test_sample_neighbors_biased_homogeneous():
     tag = F.tensor(np.random.choice(4, 100))
     bias = F.tensor([0, 0.1, 10, 10], dtype=F.float32)
     # inedge / without replacement
-    g_sorted = dgl.sort_in_edges(g, tag)
+    g_sorted = dgl.sort_csc_by_tag(g, tag)
     for _ in range(5):
         subg = dgl.sampling.sample_neighbors_biased(g_sorted, g.nodes(), 5, bias, replace=False)
         check_num(subg.edges()[0], tag)
@@ -631,7 +631,7 @@ def test_sample_neighbors_biased_homogeneous():
         check_num(subg.edges()[0], tag)
 
     # outedge / without replacement
-    g_sorted = dgl.sort_out_edges(g, tag)
+    g_sorted = dgl.sort_csr_by_tag(g, tag)
     for _ in range(5):
         subg = dgl.sampling.sample_neighbors_biased(g_sorted, g.nodes(), 5, bias, edge_dir='out', replace=False)
         check_num(subg.edges()[1], tag)
@@ -661,7 +661,7 @@ def test_sample_neighbors_biased_bipartite():
 
     # inedge / without replacement
     tag = F.tensor(np.random.choice(4, 100))
-    g_sorted = dgl.sort_in_edges(g, tag)
+    g_sorted = dgl.sort_csc_by_tag(g, tag)
     for _ in range(5):
         subg = dgl.sampling.sample_neighbors_biased(g_sorted, g.dstnodes(), 5, bias, replace=False)
         check_num(subg.edges()[0], tag)
@@ -676,7 +676,7 @@ def test_sample_neighbors_biased_bipartite():
 
     # outedge / without replacement
     tag = F.tensor(np.random.choice(4, num_dst))
-    g_sorted = dgl.sort_out_edges(g, tag)
+    g_sorted = dgl.sort_csr_by_tag(g, tag)
     for _ in range(5):
         subg = dgl.sampling.sample_neighbors_biased(g_sorted, g.srcnodes(), 5, bias, edge_dir='out', replace=False)
         check_num(subg.edges()[1], tag)
