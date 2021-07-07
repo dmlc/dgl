@@ -278,8 +278,8 @@ class GraphConv(nn.Module):
                  activation=None,
                  allow_zero_in_degree=False):
         super(GraphConv, self).__init__()
-        if norm not in ('none', 'both', 'right'):
-            raise DGLError('Invalid norm value. Must be either "none", "both" or "right".'
+        if norm not in ('none', 'both', 'right', 'left'):
+            raise DGLError('Invalid norm value. Must be either "none", "both", "right" or "left".'
                            ' But got "{}".'.format(norm))
         self._in_feats = in_feats
         self._out_feats = out_feats
