@@ -6081,20 +6081,23 @@ def combine_frames(frames, ids, col_names=None):
         The resulting frame
     """
     # find common columns and check if their schemes match
-    if col_names is None:
-        schemes = {key: scheme for key, scheme in frames[ids[0]].schemes.items()}
-    else:
-        schemes = {key: frames[ids[0]].schemes[key] for key in col_names}
+    schemes = None
     for frame_id in ids:
         frame = frames[frame_id]
-        if frame.num_rows != 0:
-            for key, scheme in list(schemes.items()):
-                if key in frame.schemes:
-                    if frame.schemes[key] != scheme:
-                        raise DGLError('Cannot concatenate column %s with shape %s and shape %s' %
-                                       (key, frame.schemes[key], scheme))
-                else:
-                    del schemes[key]
+        if frame.num_rows == 0:
+            continue
+        if schemes is None:
+            schemes = frame.schemes
+            if col_names is not None:
+                schemes = {key: frame.schemes[key] for key in col_names}
+            continue
+        for key, scheme in list(schemes.items()):
+            if key in frame.schemes:
+                if frame.schemes[key] != scheme:
+                    raise DGLError('Cannot concatenate column %s with shape %s and shape %s' %
+                                   (key, frame.schemes[key], scheme))
+            else:
+                del schemes[key]
 
     if len(schemes) == 0:
         return None
