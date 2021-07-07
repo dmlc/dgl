@@ -41,7 +41,7 @@ struct CSRMatrixInternal {
   DType *data;
 };
 
-int32_t getLLCSize() {
+int32_t GetLLCSize() {
   int32_t cache_size = sysconf(_SC_LEVEL3_CACHE_SIZE);
   if (cache_size < 0) cache_size = DGL_CPU_LLC_SIZE;
   return cache_size;
@@ -93,10 +93,9 @@ inline void SpMMCreateBlocks(
 
 #pragma omp for
       for (IdType m = 0; m < num_M_blocks; m++) {
-        IdType M_start = m * M_block_size;
-        IdType M_end = (m + 1) * M_block_size;
-        if (M_end > M) M_end = M;
-        IdType nnz = indptr[M_end] - indptr[M_start];
+        const IdType M_start = m * M_block_size;
+        const IdType M_end = std::min((m + 1) * M_block_size, M);
+        const IdType nnz = indptr[M_end] - indptr[M_start];
 
         IdType cur_indices_id = 0;
         IdType *indices_block_buf, *edges_block_buf;
@@ -110,9 +109,8 @@ inline void SpMMCreateBlocks(
           my_cur_col_id[(i - M_start) * 2 + 1] = indptr[i + 1];
         }
         for (IdType k = 0; k < num_K_blocks; k++) {
-          IdType K_start = k * K_block_size;
-          IdType K_end = (k + 1) * K_block_size;
-          if (K_end > K) K_end = K;
+          const IdType K_start = k * K_block_size;
+          const IdType K_end = std::min((k + 1) * K_block_size, K);
           CSRMatrixInternal<IdType, IdType> cur_csr;
           cur_csr.num_rows = M_end - M_start;
           cur_csr.num_cols = K_end - K_start;
@@ -160,9 +158,8 @@ inline void SpMMCreateBlocks(
   } else {
 #pragma omp for
     for (IdType m = 0; m < num_M_blocks; m++) {
-      IdType M_start = m * M_block_size;
-      IdType M_end = (m + 1) * M_block_size;
-      if (M_end > M) M_end = M;
+      const IdType M_start = m * M_block_size;
+      const IdType M_end = std::min((m + 1) * M_block_size, M);
 
       CSRMatrixInternal<IdType, IdType> cur_csr;
       cur_csr.num_rows = M_end - M_start;
@@ -257,17 +254,13 @@ inline libxsmm_meltwfunction_opreduce_vecs_idx SpMMCreateLibxsmmKernel(
     }
   }
   libxsmm_meltwfunction_opreduce_vecs_idx kernel = nullptr;
-  if (std::is_same<DType, uint16_t>::value) {
-    kernel = libxsmm_dispatch_meltw_opreduce_vecs_idx(
-               N, &_ld, &_ld, LIBXSMM_DATATYPE_BF16, LIBXSMM_DATATYPE_BF16,
-               (sizeof(IdType) == 8) ? LIBXSMM_DATATYPE_I64 : LIBXSMM_DATATYPE_I32, opredop_flags);
-  } else if (std::is_same<DType, float>::value) {
+  if (std::is_same<DType, float>::value) {
     kernel = libxsmm_dispatch_meltw_opreduce_vecs_idx(
                N, &_ld, &_ld, LIBXSMM_DATATYPE_F32, LIBXSMM_DATATYPE_F32,
                (sizeof(IdType) == 8) ? LIBXSMM_DATATYPE_I64 : LIBXSMM_DATATYPE_I32, opredop_flags);
   }
   if (kernel == nullptr) {
-    LOG(FATAL) << "libxsmm Op-redop kernel is nullptr!";
+    LOG(FATAL) << "Failed to generate libxsmm kernel for the SpMM operation!";
   }
   return kernel;
 }
@@ -302,13 +295,11 @@ inline void SpMMBlockwiseOpSum(
       for (IdType m = 0; m < num_M_blocks; m++) {
         CSRMatrixInternal<IdType, IdType> cur_csr = block_csr_array[m * num_K_blocks + k];
 
-        int32_t cur_M = cur_csr.num_rows;
-
-        IdType M_start = m * M_block_size;
-        for (IdType i = 0; i < cur_M; i++) {
+        const IdType M_start = m * M_block_size;
+        for (IdType i = 0; i < cur_csr.num_rows; i++) {
           const IdType row_start = cur_csr.indptr[i];
           const IdType row_end   = cur_csr.indptr[i + 1];
-          IdType dst = i + M_start;
+          const IdType dst = i + M_start;
 
           libxsmm_meltw_opreduce_vecs_idx_param params;
           params.n = row_end - row_start;
@@ -365,13 +356,11 @@ inline void SpMMBlockwiseOpCmp(
       for (IdType m = 0; m < num_M_blocks; m++) {
         CSRMatrixInternal<IdType, IdType> cur_csr = block_csr_array[m * num_K_blocks + k];
 
-        int32_t cur_M = cur_csr.num_rows;
-
-        IdType M_start = m * M_block_size;
-        for (IdType i = 0; i < cur_M; i++) {
+        const IdType M_start = m * M_block_size;
+        for (IdType i = 0; i < cur_csr.num_rows; i++) {
           const IdType row_start = cur_csr.indptr[i];
           const IdType row_end   = cur_csr.indptr[i + 1];
-          IdType dst = i + M_start;
+          const IdType dst = i + M_start;
 
           libxsmm_meltw_opreduce_vecs_idx_param params;
           params.n = row_end - row_start;
@@ -439,7 +428,7 @@ void SpMMRedopCsrOpt(
     NDArray out,
     NDArray argu, NDArray arge) {
 
-  int32_t llc_size = getLLCSize();
+  int32_t llc_size = GetLLCSize();
 
 #ifdef DEBUG
   uint64_t startTick, endTick;
@@ -457,17 +446,17 @@ void SpMMRedopCsrOpt(
     argE = arge.Ptr<IdType>();
   }
 
-  int nthreads = omp_get_max_threads();
+  const int nthreads = omp_get_max_threads();
   const IdType M = csr.num_rows;
   const IdType N = bcast.out_len;
   const IdType K = csr.num_cols;
   const IdType* indptr = csr.indptr.Ptr<IdType>();
   CHECK_NOTNULL(indptr);
-  int total_nnz = indptr[M];
+  const int total_nnz = indptr[M];
   if (M <= 0 || K <= 0 || N <= 0 || total_nnz <= 0) return;
 
-  float avgDegree = total_nnz * 1.0 / M;
-  float nnz_prob = avgDegree / K;
+  const float avg_degree = total_nnz * 1.0 / M;
+  const float nnz_prob = avg_degree / K;
 
   IdType K_block_size = llc_size / (N * sizeof(DType) * nnz_prob * BLOCKING_HEURISTIC_PARAM);
   IdType M_block_size = M / (nthreads * NUM_BLOCKS_PER_THREAD);
@@ -493,7 +482,7 @@ void SpMMRedopCsrOpt(
   LOG(INFO) << "nthreads = " << nthreads << ", llc_size = " << llc_size;
   LOG(INFO) << "M = " << M << ", K = " << K << ", N = " << N;
   LOG(INFO) << "use_lhs = " << Op::use_lhs << ", use_rhs = " << Op::use_rhs;
-  LOG(INFO) << "total_nnz = " << total_nnz << ", avgDegree = " << avgDegree;
+  LOG(INFO) << "total_nnz = " << total_nnz << ", avg_degree = " << avg_degree;
   LOG(INFO) << "has_idx = " << has_idx;
   LOG(INFO) << "nnz_prob = " << nnz_prob;
   LOG(INFO) << "K_block_size = " << K_block_size << ", M_block_size = " << M_block_size;
