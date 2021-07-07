@@ -19,15 +19,19 @@ class FakeNewsDataset(DGLBuiltinDataset):
     the root node represents the news, the leaf nodes are Twitter users
     who retweeted the root news. Besides, the node features are encoded
     user historical tweets using different pretrained language models:
-        bert: the 768-dimensional node feature composed of Twitter user
-              historical tweets encoded by the bert-as-service
-        content: the 310-dimensional node feature composed of a
-                 300-dimensional “spacy” vector plus a 10-dimensional
-                 “profile” vector
-        profile: the 10-dimensional node feature composed of ten Twitter
-                 user profile attributes.
-        spacy: the 300-dimensional node feature composed of Twitter user
-               historical tweets encoded by the spaCy word2vec encoder.
+
+    - bert: the 768-dimensional node feature composed of Twitter user
+    historical tweets encoded by the bert-as-service
+
+    - content: the 310-dimensional node feature composed of a
+    300-dimensional “spacy” vector plus a 10-dimensional
+    “profile” vector
+
+    - profile: the 10-dimensional node feature composed of ten Twitter
+    user profile attributes.
+
+    - spacy: the 300-dimensional node feature composed of Twitter user
+    historical tweets encoded by the spaCy word2vec encoder.
 
     Note: this dataset is for academic use only, and commercial use is prohibited.
 
@@ -39,27 +43,33 @@ class FakeNewsDataset(DGLBuiltinDataset):
         - Nodes: 41,054
         - Edges: 40,740
         - Classes:
-            Fake: 157
-            Real: 157
+
+            - Fake: 157
+            - Real: 157
+
         - Node feature size:
-            bert: 768
-            content: 310
-            profile: 10
-            spacy: 300
+
+            - bert: 768
+            - content: 310
+            - profile: 10
+            - spacy: 300
 
         Gossipcop:
 
-        - Graphs: 5464
+        - Graphs: 5,464
         - Nodes: 314,262
         - Edges: 308,798
         - Classes:
-            Fake: 2732
-            Real: 2732
+
+            - Fake: 2,732
+            - Real: 2,732
+
         - Node feature size:
-            bert: 768
-            content: 310
-            profile: 10
-            spacy: 300
+
+            - bert: 768
+            - content: 310
+            - profile: 10
+            - spacy: 300
 
     Parameters
     ----------
