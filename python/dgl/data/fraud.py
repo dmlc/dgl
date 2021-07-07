@@ -177,15 +177,15 @@ class FraudDataset(DGLBuiltinDataset):
             "must between 0 and 1 (inclusive)."
 
         N = x.shape[0]
-        index = list(range(N))
+        index = np.arange(N)
         if self.name == 'amazon':
             # 0-3304 are unlabeled nodes
-            index = list(range(3305, N))
+            index = np.arange(3305, N)
 
-        np.random.RandomState(seed).permutation(index)
-        train_idx = index[:int(train_size * N)]
-        val_idx = index[int(N - val_size * N):]
-        test_idx = index[int(train_size * N):int(N - val_size * N)]
+        index = np.random.RandomState(seed).permutation(index)
+        train_idx = index[:int(train_size * len(index))]
+        val_idx = index[len(index) - int(val_size * len(index)):]
+        test_idx = index[int(train_size * len(index)):len(index) - int(val_size * len(index))]
         train_mask = np.zeros(N, dtype=np.bool)
         val_mask = np.zeros(N, dtype=np.bool)
         test_mask = np.zeros(N, dtype=np.bool)
@@ -202,9 +202,9 @@ class FraudYelpDataset(FraudDataset):
 
     The Yelp dataset includes hotel and restaurant reviews filtered (spam) and recommended
     (legitimate) by Yelp. A spam review detection task can be conducted, which is a binary
-    classification task. 32 handcrafted features from
-    <http://dx.doi.org/10.1145/2783258.2783370> are taken as the raw node features. Reviews
-    are nodes in the graph, and three relations are:
+    classification task. 32 handcrafted features from <http://dx.doi.org/10.1145/2783258.2783370>
+    are taken as the raw node features. Reviews are nodes in the graph, and three relations are:
+
         1. R-U-R: it connects reviews posted by the same user
         2. R-S-R: it connects reviews under the same product with the same star rating (1-5 stars)
         3. R-T-R: it connects two reviews under the same product posted in the same month.
@@ -213,13 +213,16 @@ class FraudYelpDataset(FraudDataset):
 
     - Nodes: 45,954
     - Edges:
-        R-U-R: 49,315
-        R-T-R: 573,616
-        R-S-R: 3,402,743
-        ALL: 3,846,979
+
+        - R-U-R: 98,630
+        - R-T-R: 1,147,232
+        - R-S-R: 6,805,486
+
     - Classes:
-        Positive (spam): 6,677
-        Negative (legitimate): 39,277
+
+        - Positive (spam): 6,677
+        - Negative (legitimate): 39,277
+
     - Positive-Negative ratio: 1 : 5.9
     - Node feature size: 32
 
@@ -269,23 +272,27 @@ class FraudAmazonDataset(FraudDataset):
     the raw node features .
 
     Users are nodes in the graph, and three relations are:
-        1. U-P-U : it connects users reviewing at least one same product
-        2. U-S-U : it connects users having at least one same star rating within one week
-        3. U-V-U : it connects users with top 5% mutual review text similarities (measured by
-                   TF-IDF) among all users.
+    1. U-P-U : it connects users reviewing at least one same product
+    2. U-S-U : it connects users having at least one same star rating within one week
+    3. U-V-U : it connects users with top 5% mutual review text similarities (measured by
+    TF-IDF) among all users.
 
     Statistics:
 
     - Nodes: 11,944
     - Edges:
-        U-P-U: 175,608
-        U-S-U: 3,566,479
-        U-V-U: 1,036,737
-        ALL: 4,398,392
+
+        - U-P-U: 351,216
+        - U-S-U: 7,132,958
+        - U-V-U: 2,073,474
+
     - Classes:
-        Positive (fraudulent): 821
-        Negative (benign): 11,123
-    - Positive-Negative ratio: 1 : 13.5
+
+        - Positive (fraudulent): 821
+        - Negative (benign): 7,818
+        - Unlabeled: 3,305
+
+    - Positive-Negative ratio: 1 : 10.5
     - Node feature size: 25
 
     Parameters
