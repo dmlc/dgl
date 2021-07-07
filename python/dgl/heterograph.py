@@ -619,30 +619,31 @@ class DGLHeteroGraph(object):
 
         # edge_subgraph
         edges = {}
+        batch_num_edges = {}
         u_type, e_type, v_type = self.to_canonical_etype(etype)
         for c_etype in self.canonical_etypes:
             # the target edge type
             if c_etype == (u_type, e_type, v_type):
                 origin_eids = self.edges(form='eid', order='eid', etype=c_etype)
                 edges[c_etype] = utils.compensate(eids, origin_eids)
+
+                # update batch information
+                one_hot_removed_edges = F.zeros((self.num_edges(c_etype),),
+                                                F.float32, self.device)
+                one_hot_removed_edges[eids] = 1.
+                c_etype_batch_num_edges = self._batch_num_edges[c_etype]
+                batch_num_removed_edges = segment.segment_reduce(
+                    c_etype_batch_num_edges, one_hot_removed_edges, reducer='sum')
+                batch_num_edges[c_etype] = c_etype_batch_num_edges - \
+                                           F.astype(batch_num_removed_edges, F.int64)
             else:
                 edges[c_etype] = self.edges(form='eid', order='eid', etype=c_etype)
+                batch_num_edges[c_etype] = self._batch_num_edges[c_etype]
 
         sub_g = self.edge_subgraph(edges, relabel_nodes=False, store_ids=store_ids)
         self._graph = sub_g._graph
         self._node_frames = sub_g._node_frames
         self._edge_frames = sub_g._edge_frames
-
-        # Update batch information
-        c_etype = (u_type, e_type, v_type)
-        batch_num_edges = self._batch_num_edges
-        one_hot_removed_edges = F.zeros((self.num_edges(c_etype),),
-                                        F.float32, self.device)
-        one_hot_removed_edges[eids] = 1.
-        batch_num_removed_edges = segment.segment_reduce(
-            batch_num_edges[c_etype], one_hot_removed_edges, reducer='sum')
-        batch_num_edges[c_etype] = batch_num_edges[c_etype] - \
-                                   F.astype(batch_num_removed_edges, F.int64)
         self._batch_num_edges = batch_num_edges
 
     def remove_nodes(self, nids, ntype=None, store_ids=False):
