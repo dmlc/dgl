@@ -9,6 +9,7 @@ import networkx as nx
 import numpy as np
 
 from ._ffi.function import _init_api
+from .ops import segment
 from .base import ALL, SLICE_FULL, NTYPE, NID, ETYPE, EID, is_all, DGLError, dgl_warning
 from . import core
 from . import graph_index
@@ -631,6 +632,17 @@ class DGLHeteroGraph(object):
         self._graph = sub_g._graph
         self._node_frames = sub_g._node_frames
         self._edge_frames = sub_g._edge_frames
+
+        # Update batch information
+        c_etype = (u_type, e_type, v_type)
+        batch_num_edges = self._batch_num_edges
+        one_hot_removed_edges = F.zeros((self.num_edges(c_etype),),
+                                        F.int64, self.device)
+        one_hot_removed_edges[eids] = 1
+        batch_num_removed_edges = segment.segment_reduce(
+            batch_num_edges[c_etype], one_hot_removed_edges, reducer='sum')
+        batch_num_edges[c_etype] = batch_num_edges[c_etype] - batch_num_removed_edges
+        self._batch_num_edges = batch_num_edges
 
     def remove_nodes(self, nids, ntype=None, store_ids=False):
         r"""Remove multiple nodes with the specified node type

@@ -6,7 +6,6 @@ import dgl
 import dgl.function as fn
 import dgl.partition
 import backend as F
-from dgl.graph_index import from_scipy_sparse_matrix
 import unittest
 from utils import parametrize_dtype
 
@@ -1206,6 +1205,31 @@ def test_add_nodes(idtype):
     assert F.array_equal(g.nodes['user'].data['h'], F.tensor([1, 1, 1, 0], dtype=idtype))
     assert F.array_equal(g.nodes['game'].data['h'], F.tensor([2, 2, 2, 2], dtype=idtype))
 
+def test_batch_graph(idtype):
+    ctx = F.ctx()
+    g1 = dgl.graph(([0, 1], [1, 2]), num_nodes=5, idtype=idtype, device=ctx)
+    g2 = dgl.graph(([], []), idtype=idtype, device=ctx)
+    g3 = dgl.graph(([2, 3, 4], [3, 2, 1]), idtype=idtype, device=ctx)
+
+    return dgl.batch([g1, g2, g3])
+
+def test_batch_hetero_graph(idtype):
+    ctx = F.ctx()
+    g1 = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 1], [1, 2]),
+        ('user', 'plays', 'game'): ([1, 3], [0, 1])
+    }, num_nodes_dict={'user': 4, 'game': 3}, idtype=idtype, device=ctx)
+    g2 = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 2], [3, 4]),
+        ('user', 'plays', 'game'): ([], [])
+    }, num_nodes_dict={'user': 6, 'game': 2}, idtype=idtype, device=ctx)
+    g3 = dgl.heterograph({
+        ('user', 'follows', 'user'): ([], []),
+        ('user', 'plays', 'game'): ([1, 2], [1, 2])
+    }, idtype=idtype, device=ctx)
+
+    return dgl.batch([g1, g2, g3])
+
 @parametrize_dtype
 def test_remove_edges(idtype):
     # homogeneous Graphs
@@ -1297,6 +1321,68 @@ def test_remove_edges(idtype):
     assert F.array_equal(g.nodes['user'].data['h'], F.tensor([1, 1, 1], dtype=idtype))
     assert F.array_equal(g.nodes['game'].data['h'], F.tensor([2, 2], dtype=idtype))
     assert F.array_equal(g.nodes['developer'].data['h'], F.tensor([3, 3], dtype=idtype))
+
+    # batched graph
+    bg = test_batch_graph(idtype)
+    bg_r = dgl.remove_edges(bg, 2)
+    assert bg.batch_size == bg_r.batch_size
+    assert F.array_equal(bg.batch_num_nodes(), bg_r.batch_num_nodes())
+    assert F.array_equal(bg_r.batch_num_edges(), F.tensor([2, 0, 2], dtype=idtype))
+
+    bg_r = dgl.remove_edges(bg, [0, 2])
+    assert bg.batch_size == bg_r.batch_size
+    assert F.array_equal(bg.batch_num_nodes(), bg_r.batch_num_nodes())
+    assert F.array_equal(bg_r.batch_num_edges(), F.tensor([1, 0, 2], dtype=idtype))
+
+    bg_r = dgl.remove_edges(bg, F.tensor([0, 2], dtype=idtype))
+    assert bg.batch_size == bg_r.batch_size
+    assert F.array_equal(bg.batch_num_nodes(), bg_r.batch_num_nodes())
+    assert F.array_equal(bg_r.batch_num_edges(), F.tensor([1, 0, 2], dtype=idtype))
+
+    # batched heterogeneous graph
+    bg = test_batch_hetero_graph(idtype)
+    bg_r = dgl.remove_edges(bg, 1, etype='follows')
+    assert bg.batch_size == bg_r.batch_size
+    ntypes = bg.ntypes
+    for nty in ntypes:
+        assert F.array_equal(bg.batch_num_nodes(nty), bg_r.batch_num_nodes(nty))
+    assert F.array_equal(bg_r.batch_num_edges('follows'), F.tensor([1, 2, 0], dtype=idtype))
+    assert F.array_equal(bg_r.batch_num_edges('plays'), bg.batch_num_edges('plays'))
+
+    bg_r = dgl.remove_edges(bg, 2, etype='plays')
+    assert bg.batch_size == bg_r.batch_size
+    for nty in ntypes:
+        assert F.array_equal(bg.batch_num_nodes(nty), bg_r.batch_num_nodes(nty))
+    assert F.array_equal(bg.batch_num_edges('follows'), bg_r.batch_num_edges('follows'))
+    assert F.array_equal(bg_r.batch_num_edges('plays'), F.tensor([2, 0, 1], dtype=idtype))
+
+    bg_r = dgl.remove_edges(bg, [0, 1, 3], etype='follows')
+    assert bg.batch_size == bg_r.batch_size
+    for nty in ntypes:
+        assert F.array_equal(bg.batch_num_nodes(nty), bg_r.batch_num_nodes(nty))
+    assert F.array_equal(bg_r.batch_num_edges('follows'), F.tensor([0, 1, 0], dtype=idtype))
+    assert F.array_equal(bg.batch_num_edges('plays'), bg_r.batch_num_edges('plays'))
+
+    bg_r = dgl.remove_edges(bg, [1, 2], etype='plays')
+    assert bg.batch_size == bg_r.batch_size
+    for nty in ntypes:
+        assert F.array_equal(bg.batch_num_nodes(nty), bg_r.batch_num_nodes(nty))
+    assert F.array_equal(bg.batch_num_edges('plays'), bg_r.batch_num_edges('plays'))
+    assert F.array_equal(bg_r.batch_num_edges('plays'), F.tensor([1, 0, 1], dtype=idtype))
+
+    bg_r = dgl.remove_edges(bg, F.tensor([0, 1, 3], dtype=idtype), etype='follows')
+    assert bg.batch_size == bg_r.batch_size
+    for nty in ntypes:
+        assert F.array_equal(bg.batch_num_nodes(nty), bg_r.batch_num_nodes(nty))
+    assert F.array_equal(bg_r.batch_num_edges('follows'), F.tensor([0, 1, 0], dtype=idtype))
+    assert F.array_equal(bg.batch_num_edges('plays'), bg_r.batch_num_edges('plays'))
+
+    bg_r = dgl.remove_edges(bg, F.tensor([1, 2], dtype=idtype), etype='plays')
+    assert bg.batch_size == bg_r.batch_size
+    for nty in ntypes:
+        assert F.array_equal(bg.batch_num_nodes(nty), bg_r.batch_num_nodes(nty))
+    assert F.array_equal(bg.batch_num_edges('plays'), bg_r.batch_num_edges('plays'))
+    assert F.array_equal(bg_r.batch_num_edges('plays'), F.tensor([1, 0, 1], dtype=idtype))
 
 @parametrize_dtype
 def test_remove_nodes(idtype):
@@ -1395,6 +1481,67 @@ def test_remove_nodes(idtype):
     u, v = g.edges(form='uv', order='eid', etype='develops')
     assert F.array_equal(u, F.tensor([1], dtype=idtype))
     assert F.array_equal(v, F.tensor([0], dtype=idtype))
+
+    # batched graph
+    bg = test_batch_graph(idtype)
+    bg_r = dgl.remove_nodes(bg, 1)
+    assert bg_r.batch_size == bg.batch_size
+    assert F.array_equal(bg_r.batch_num_nodes(), F.tensor([4, 0, 5], dtype=idtype))
+    assert F.array_equal(bg_r.batch_num_edges(), F.tensor([0, 0, 5], dtype=idtype))
+
+    bg_r = dgl.remove_nodes(bg, [1, 7])
+    assert bg_r.batch_size == bg.batch_size
+    assert F.array_equal(bg_r.batch_num_nodes(), F.tensor([4, 0, 4], dtype=idtype))
+    assert F.array_equal(bg_r.batch_num_edges(), F.tensor([0, 0, 1], dtype=idtype))
+
+    bg_r = dgl.remove_nodes(bg, F.tensor([1, 7], dtype=idtype))
+    assert bg_r.batch_size == bg.batch_size
+    assert F.array_equal(bg_r.batch_num_nodes(), F.tensor([4, 0, 4], dtype=idtype))
+    assert F.array_equal(bg_r.batch_num_edges(), F.tensor([0, 0, 1], dtype=idtype))
+
+    # batched heterogeneous graph
+    bg = test_batch_hetero_graph(idtype)
+    bg_r = dgl.remove_nodes(bg, 1, ntype='user')
+    assert bg_r.batch_size == bg.batch_size
+    assert F.array_equal(bg_r.batch_num_nodes('user'), F.tensor([3, 6, 3], dtype=idtype))
+    assert F.array_equal(bg.batch_num_nodes('game'), bg_r.batch_num_nodes('game'))
+    assert F.array_equal(bg_r.batch_num_edges('follows'), F.tensor([0, 2, 0], dtype=idtype))
+    assert F.array_equal(bg_r.batch_num_edges('plays'), F.tensor([1, 0, 2], dtype=idtype))
+
+    bg_r = dgl.remove_nodes(bg, 6, ntype='game')
+    assert bg_r.batch_size == bg.batch_size
+    assert F.array_equal(bg.batch_num_nodes('user'), bg_r.batch_num_nodes('user'))
+    assert F.array_equal(bg_r.batch_num_nodes('game'), F.tensor([3, 2, 2], dtype=idtype))
+    assert F.array_equal(bg.batch_num_edges('follows'), bg_r.batch_num_edges('follows'))
+    assert F.array_equal(bg_r.batch_num_edges('plays'), F.tensor([2, 0, 1], dtype=idtype))
+
+    bg_r = dgl.remove_nodes(bg, [1, 5, 6, 11], ntype='user')
+    assert bg_r.batch_size == bg.batch_size
+    assert F.array_equal(bg_r.batch_num_nodes('user'), F.tensor([3, 4, 2], dtype=idtype))
+    assert F.array_equal(bg.batch_num_nodes('game'), bg_r.batch_num_nodes('game'))
+    assert F.array_equal(bg_r.batch_num_edges('follows'), F.tensor([0, 1, 0], dtype=idtype))
+    assert F.array_equal(bg_r.batch_num_edges('plays'), F.tensor([0, 0, 1], dtype=idtype))
+
+    bg_r = dgl.remove_nodes(bg, [0, 3, 4, 7], ntype='game')
+    assert bg_r.batch_size == bg.batch_size
+    assert F.array_equal(bg.batch_num_nodes('user'), bg_r.batch_num_nodes('user'))
+    assert F.array_equal(bg_r.batch_num_nodes('game'), F.tensor([2, 0, 2], dtype=idtype))
+    assert F.array_equal(bg.batch_num_edges('follows'), bg_r.batch_num_edges('follows'))
+    assert F.array_equal(bg.batch_num_edges('plays'), F.tensor([1, 0, 1], dtype=idtype))
+
+    bg_r = dgl.remove_nodes(bg, F.tensor([1, 5, 6, 11], dtype=idtype), ntype='user')
+    assert bg_r.batch_size == bg.batch_size
+    assert F.array_equal(bg_r.batch_num_nodes('user'), F.tensor([3, 4, 2], dtype=idtype))
+    assert F.array_equal(bg.batch_num_nodes('game'), bg_r.batch_num_nodes('game'))
+    assert F.array_equal(bg_r.batch_num_edges('follows'), F.tensor([0, 1, 0], dtype=idtype))
+    assert F.array_equal(bg_r.batch_num_edges('plays'), F.tensor([0, 0, 1], dtype=idtype))
+
+    bg_r = dgl.remove_nodes(bg, F.tensor([0, 3, 4, 7], dtype=idtype), ntype='game')
+    assert bg_r.batch_size == bg.batch_size
+    assert F.array_equal(bg.batch_num_nodes('user'), bg_r.batch_num_nodes('user'))
+    assert F.array_equal(bg_r.batch_num_nodes('game'), F.tensor([2, 0, 2], dtype=idtype))
+    assert F.array_equal(bg.batch_num_edges('follows'), bg_r.batch_num_edges('follows'))
+    assert F.array_equal(bg.batch_num_edges('plays'), F.tensor([1, 0, 1], dtype=idtype))
 
 @parametrize_dtype
 def test_add_selfloop(idtype):
