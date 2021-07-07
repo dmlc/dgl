@@ -637,11 +637,12 @@ class DGLHeteroGraph(object):
         c_etype = (u_type, e_type, v_type)
         batch_num_edges = self._batch_num_edges
         one_hot_removed_edges = F.zeros((self.num_edges(c_etype),),
-                                        F.int64, self.device)
-        one_hot_removed_edges[eids] = 1
+                                        F.float32, self.device)
+        one_hot_removed_edges[eids] = 1.
         batch_num_removed_edges = segment.segment_reduce(
             batch_num_edges[c_etype], one_hot_removed_edges, reducer='sum')
-        batch_num_edges[c_etype] = batch_num_edges[c_etype] - batch_num_removed_edges
+        batch_num_edges[c_etype] = batch_num_edges[c_etype] - \
+                                   F.astype(batch_num_removed_edges, F.int64)
         self._batch_num_edges = batch_num_edges
 
     def remove_nodes(self, nids, ntype=None, store_ids=False):
