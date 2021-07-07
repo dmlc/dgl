@@ -775,8 +775,8 @@ class DGLHeteroGraph(object):
             self._batch_num_edges[c_etype] = F.astype(batch_num_left_edges, F.int64)
 
         if not store_ids:
-            for ntype in self.ntypes:
-                self.nodes[ntype].data.pop(NID)
+            for c_ntype in self.ntypes:
+                self.nodes[c_ntype].data.pop(NID)
             for c_etype in self.canonical_etypes:
                 self.edges[c_etype].data.pop(EID)
 
