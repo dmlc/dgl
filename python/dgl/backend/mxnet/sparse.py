@@ -393,7 +393,7 @@ class CSRMM(mx.autograd.Function):
 
     def forward(self, A_weights, B_weights):
         gidxC, C_weights = _csrmm(self.gidxA, A_weights, self.gidxB, B_weights, self.num_vtypes)
-        nrows, ncols, C_indptr, C_indices, C_eids = gidxC.adjacency_matrix_tensors(0, True, 'csr')
+        nrows, ncols, C_indptr, C_indices, C_eids = gidxC.adjacency_matrix_tensors(0, False, 'csr')
         # Note: the returned C_indptr, C_indices and C_eids tensors MUST be the same
         # as the underlying tensors of the created graph gidxC.
         self.backward_cache = gidxC
@@ -430,7 +430,7 @@ class CSRSum(mx.autograd.Function):
     def forward(self, *weights):
         gidxC, C_weights = _csrsum(self.gidxs, weights)
         nrows, ncols, C_indptr, C_indices, C_eids = gidxC.adjacency_matrix_tensors(
-            0, True, 'csr')
+            0, False, 'csr')
         # Note: the returned C_indptr, C_indices and C_eids tensors MUST be the same
         # as the underlying tensors of the created graph gidxC.
         self.backward_cache = gidxC

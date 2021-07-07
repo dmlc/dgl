@@ -69,9 +69,14 @@ class DGLHeteroGraph(object):
         if not isinstance(gidx, heterograph_index.HeteroGraphIndex):
             dgl_warning('Recommend creating graphs by `dgl.graph(data)`'
                         ' instead of `dgl.DGLGraph(data)`.')
-            u, v, num_src, num_dst = utils.graphdata2tensors(gidx)
-            gidx = heterograph_index.create_unitgraph_from_coo(
-                1, num_src, num_dst, u, v, ['coo', 'csr', 'csc'])
+            (sparse_fmt, arrays), num_src, num_dst = utils.graphdata2tensors(gidx)
+            if sparse_fmt == 'coo':
+                gidx = heterograph_index.create_unitgraph_from_coo(
+                    1, num_src, num_dst, arrays[0], arrays[1], ['coo', 'csr', 'csc'])
+            else:
+                gidx = heterograph_index.create_unitgraph_from_csr(
+                    1, num_src, num_dst, arrays[0], arrays[1], arrays[2], ['coo', 'csr', 'csc'],
+                    sparse_fmt == 'csc')
         if len(deprecate_kwargs) != 0:
             dgl_warning('Keyword arguments {} are deprecated in v0.5, and can be safely'
                         ' removed in all cases.'.format(list(deprecate_kwargs.keys())))
@@ -3506,23 +3511,23 @@ class DGLHeteroGraph(object):
         else:
             return deg
 
-    def adjacency_matrix(self, transpose=True, ctx=F.cpu(), scipy_fmt=None, etype=None):
+    def adjacency_matrix(self, transpose=False, ctx=F.cpu(), scipy_fmt=None, etype=None):
         """Alias of :meth:`adj`"""
         return self.adj(transpose, ctx, scipy_fmt, etype)
 
-    def adj(self, transpose=True, ctx=F.cpu(), scipy_fmt=None, etype=None):
+    def adj(self, transpose=False, ctx=F.cpu(), scipy_fmt=None, etype=None):
         """Return the adjacency matrix of edges of the given edge type.
 
         By default, a row of returned adjacency matrix represents the
-        destination of an edge and the column represents the source.
+        source of an edge and the column represents the destination.
 
-        When transpose is True, a row represents the source and a column
-        represents a destination.
+        When transpose is True, a row represents the destination and a column
+        represents the source.
 
         Parameters
         ----------
         transpose : bool, optional
-            A flag to transpose the returned adjacency matrix. (Default: True)
+            A flag to transpose the returned adjacency matrix. (Default: False)
         ctx : context, optional
             The context of returned adjacency matrix. (Default: cpu)
         scipy_fmt : str, optional
@@ -3578,8 +3583,54 @@ class DGLHeteroGraph(object):
         else:
             return self._graph.adjacency_matrix_scipy(etid, transpose, scipy_fmt, False)
 
+    def adj_sparse(self, fmt, etype=None):
+        """Return the adjacency matrix of edges of the given edge type as tensors of
+        a sparse matrix representation.
 
-    def adjacency_matrix_scipy(self, transpose=True, fmt='csr', return_edge_ids=None):
+        By default, a row of returned adjacency matrix represents the
+        source of an edge and the column represents the destination.
+
+        Parameters
+        ----------
+        fmt : str
+            Either ``coo``, ``csr`` or ``csc``.
+        etype : str or (str, str, str), optional
+            The type names of the edges. The allowed type name formats are:
+
+            * ``(str, str, str)`` for source node type, edge type and destination node type.
+            * or one ``str`` edge type name if the name can uniquely identify a
+              triplet format in the graph.
+
+            Can be omitted if the graph has only one type of edges.
+
+        Returns
+        -------
+        tuple[Tensor]
+            If :attr:`fmt` is ``coo``, returns a pair of source and destination node ID
+            tensors.
+
+            If :attr:`fmt` is ``csr`` or ``csc``, return the CSR or CSC representation
+            of the adjacency matrix as a triplet of tensors
+            ``(indptr, indices, edge_ids)``.  Namely ``edge_ids`` could be an empty
+            tensor with 0 elements, in which case the edge IDs are consecutive
+            integers starting from 0.
+
+        Examples
+        --------
+        >>> g = dgl.graph(([0, 1, 2], [1, 2, 3]))
+        >>> g.adj_sparse('coo')
+        (tensor([0, 1, 2]), tensor([1, 2, 3]))
+        >>> g.adj_sparse('csr')
+        (tensor([0, 1, 2, 3, 3]), tensor([1, 2, 3]), tensor([0, 1, 2]))
+        """
+        etid = self.get_etype_id(etype)
+        if fmt == 'csc':
+            # The first two elements are number of rows and columns
+            return self._graph.adjacency_matrix_tensors(etid, True, 'csr')[2:]
+        else:
+            return self._graph.adjacency_matrix_tensors(etid, False, fmt)[2:]
+
+    def adjacency_matrix_scipy(self, transpose=False, fmt='csr', return_edge_ids=None):
         """DEPRECATED: please use ``dgl.adjacency_matrix(transpose, scipy_fmt=fmt)``.
         """
         dgl_warning('DGLGraph.adjacency_matrix_scipy is deprecated. '
@@ -4633,6 +4684,10 @@ class DGLHeteroGraph(object):
         """Send messages along all the edges of the specified type
         and update all the nodes of the corresponding destination type.
 
+        For heterogeneous graphs with number of relation types > 1, send messages
+        along all the edges, reduce them by type-wisely and across different types
+        at the same time. Then, update the node features of all the nodes.
+
         Parameters
         ----------
         message_func : dgl.function.BuiltinFunction or callable
@@ -4694,13 +4749,58 @@ class DGLHeteroGraph(object):
         tensor([[0.],
                 [0.],
                 [3.]])
+
+        **Heterogenenous graph (number relation types > 1)**
+
+        >>> g = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): ([0, 1], [1, 1]),
+        ...     ('game', 'attracts', 'user'): ([0], [1])
+        ... })
+
+        Update all.
+
+        >>> g.nodes['user'].data['h'] = torch.tensor([[1.], [2.]])
+        >>> g.nodes['game'].data['h'] = torch.tensor([[1.]])
+        >>> g.update_all(fn.copy_src('h', 'm'), fn.sum('m', 'h'))
+        >>> g.nodes['user'].data['h']
+        tensor([[0.],
+                [4.]])
         """
-        etid = self.get_etype_id(etype)
-        etype = self.canonical_etypes[etid]
-        _, dtid = self._graph.metagraph.find_edge(etid)
-        g = self if etype is None else self[etype]
-        ndata = core.message_passing(g, message_func, reduce_func, apply_node_func)
-        self._set_n_repr(dtid, ALL, ndata)
+        # Graph with one relation type
+        if self._graph.number_of_etypes() == 1 or etype is not None:
+            etid = self.get_etype_id(etype)
+            etype = self.canonical_etypes[etid]
+            _, dtid = self._graph.metagraph.find_edge(etid)
+            g = self if etype is None else self[etype]
+            ndata = core.message_passing(g, message_func, reduce_func, apply_node_func)
+            self._set_n_repr(dtid, ALL, ndata)
+        else:   # heterogeneous graph with number of relation types > 1
+            if not core.is_builtin(message_func) or not core.is_builtin(reduce_func):
+                raise DGLError("User defined functions are not yet "
+                               "supported in update_all for heterogeneous graphs. "
+                               "Please use multi_update_all instead.")
+            if reduce_func.name in ['max', 'min']:
+                raise NotImplementedError("Reduce op \'" + reduce_func.name + "\' is not yet "
+                                          "supported in update_all for heterogeneous graphs. "
+                                          "Please use multi_update_all instead.")
+            if reduce_func.name in ['mean']:
+                raise NotImplementedError("Cannot set both intra-type and inter-type reduce "
+                                          "operators as 'mean' using update_all. Please use "
+                                          "multi_update_all instead.")
+            if message_func.name not in ['copy_u', 'copy_e']:
+                raise NotImplementedError("Op \'" + message_func.name + "\' is not yet supported"
+                                          "in update_all for heterogeneous graphs. Please use"
+                                          "multi_update_all instead.")
+            g = self
+            all_out = core.message_passing(g, message_func, reduce_func, apply_node_func)
+            key = list(all_out.keys())[0]
+            out_tensor_tuples = all_out[key]
+
+            dst_tensor = {}
+            for _, _, dsttype in g.canonical_etypes:
+                dtid = g.get_ntype_id(dsttype)
+                dst_tensor[key] = out_tensor_tuples[dtid]
+                self._node_frames[dtid].update(dst_tensor)
 
     #################################################################
     # Message passing on heterograph
@@ -4798,6 +4898,7 @@ class DGLHeteroGraph(object):
             # apply
             if apply_node_func is not None:
                 self.apply_nodes(apply_node_func, ALL, self.ntypes[dtid])
+
 
     #################################################################
     # Message propagation
@@ -5595,6 +5696,7 @@ class DGLHeteroGraph(object):
             assert fmt in ("coo", "csr", "csc"), '{} is not coo, csr or csc'.format(fmt)
         gidx = self._graph.shared_memory(name, self.ntypes, self.etypes, formats)
         return DGLHeteroGraph(gidx, self.ntypes, self.etypes)
+
 
     def long(self):
         """Cast the graph to one with idtype int64
