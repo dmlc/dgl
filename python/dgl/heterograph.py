@@ -738,14 +738,47 @@ class DGLHeteroGraph(object):
             if self.get_ntype_id(c_ntype) == ntid:
                 original_nids = self.nodes(c_ntype)
                 nodes[c_ntype] = utils.compensate(nids, original_nids)
+
+                # update batch_num_nodes
+                one_hot_removed_nodes = F.zeros((self.num_nodes(c_ntype),),
+                                                F.float32, self.device)
+                one_hot_removed_nodes[nids] = 1.
+                c_ntype_batch_num_nodes = self._batch_num_nodes[c_ntype]
+                batch_num_removed_nodes = segment.segment_reduce(
+                    c_ntype_batch_num_nodes, one_hot_removed_nodes, reducer='sum')
+                self._batch_num_nodes[c_ntype] = c_ntype_batch_num_nodes - \
+                                                 F.astype(batch_num_removed_nodes, F.int64)
             else:
                 nodes[c_ntype] = self.nodes(c_ntype)
 
+        old_num_edges = {c_etype: self._graph.number_of_edges(self.get_etype_id(c_etype))
+                         for c_etype in self.canonical_etypes}
         # node_subgraph
-        sub_g = self.subgraph(nodes, store_ids=store_ids)
+        sub_g = self.subgraph(nodes, store_ids=True)
         self._graph = sub_g._graph
         self._node_frames = sub_g._node_frames
         self._edge_frames = sub_g._edge_frames
+
+        # update batch_num_edges
+        canonical_etypes = [
+            c_etype for c_etype in self.canonical_etypes
+            if self._graph.number_of_edges(self.get_etype_id(c_etype)) != old_num_edges[c_etype]]
+        for c_etype in canonical_etypes:
+            if self._graph.number_of_edges(self.get_etype_id(c_etype)) == 0:
+                self._batch_num_edges[c_etype] = F.zeros((self.batch_size,), F.int64, self.device)
+                continue
+
+            one_hot_left_edges = F.zeros((old_num_edges[c_etype],), F.float32, self.device)
+            one_hot_left_edges[self.edges[c_etype].data[EID]] = 1.
+            batch_num_left_edges = segment.segment_reduce(
+                self._batch_num_edges[c_etype], one_hot_left_edges, reducer='sum')
+            self._batch_num_edges[c_etype] = F.astype(batch_num_left_edges, F.int64)
+
+        if not store_ids:
+            for ntype in self.ntypes:
+                self.nodes[ntype].pop(NID)
+            for c_etype in self.canonical_etypes:
+                self.edges[c_etype].pop(EID)
 
     def _reset_cached_info(self):
         """Some info like batch_num_nodes may be stale after mutation
