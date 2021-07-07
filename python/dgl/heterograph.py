@@ -619,7 +619,6 @@ class DGLHeteroGraph(object):
 
         # edge_subgraph
         edges = {}
-        batch_num_edges = {}
         u_type, e_type, v_type = self.to_canonical_etype(etype)
         for c_etype in self.canonical_etypes:
             # the target edge type
@@ -634,17 +633,15 @@ class DGLHeteroGraph(object):
                 c_etype_batch_num_edges = self._batch_num_edges[c_etype]
                 batch_num_removed_edges = segment.segment_reduce(
                     c_etype_batch_num_edges, one_hot_removed_edges, reducer='sum')
-                batch_num_edges[c_etype] = c_etype_batch_num_edges - \
-                                           F.astype(batch_num_removed_edges, F.int64)
+                self._batch_num_edges[c_etype] = c_etype_batch_num_edges - \
+                                                 F.astype(batch_num_removed_edges, F.int64)
             else:
                 edges[c_etype] = self.edges(form='eid', order='eid', etype=c_etype)
-                batch_num_edges[c_etype] = self._batch_num_edges[c_etype]
 
         sub_g = self.edge_subgraph(edges, relabel_nodes=False, store_ids=store_ids)
         self._graph = sub_g._graph
         self._node_frames = sub_g._node_frames
         self._edge_frames = sub_g._edge_frames
-        self._batch_num_edges = batch_num_edges
 
     def remove_nodes(self, nids, ntype=None, store_ids=False):
         r"""Remove multiple nodes with the specified node type
@@ -5339,6 +5336,10 @@ class DGLHeteroGraph(object):
         # Clone the frames
         ret._node_frames = [fr.clone() for fr in self._node_frames]
         ret._edge_frames = [fr.clone() for fr in self._edge_frames]
+
+        # Copy the batch information
+        ret._batch_num_nodes = copy.copy(self._batch_num_nodes)
+        ret._batch_num_edges = copy.copy(self._batch_num_edges)
 
         return ret
 
