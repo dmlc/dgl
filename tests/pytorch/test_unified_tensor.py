@@ -2,11 +2,11 @@ import unittest, os
 
 import torch as th
 import dgl
+import backend as F
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
+@unittest.skipIf(F.ctx().type == 'cpu', reason='gpu only test')
 def test_unified_tensor():
-    assert th.cuda.is_available()
-
     test_row_size = 65536
     test_col_size = 128
 
