@@ -776,9 +776,9 @@ class DGLHeteroGraph(object):
 
         if not store_ids:
             for ntype in self.ntypes:
-                self.nodes[ntype].pop(NID)
+                self.nodes[ntype].data.pop(NID)
             for c_etype in self.canonical_etypes:
-                self.edges[c_etype].pop(EID)
+                self.edges[c_etype].data.pop(EID)
 
     def _reset_cached_info(self):
         """Some info like batch_num_nodes may be stale after mutation
