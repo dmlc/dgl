@@ -17,6 +17,7 @@ from . import utils, batch
 from .partition import metis_partition_assignment
 from .partition import partition_graph_with_halo
 from .partition import metis_partition
+from . import subgraph
 
 # TO BE DEPRECATED
 from ._deprecate.graph import DGLGraph as DGLGraphStale
@@ -44,14 +45,16 @@ __all__ = [
     'to_simple',
     'to_simple_graph',
     'as_immutable_graph',
-    'sort_out_edges',
-    'sort_in_edges',
+    'sort_csr_by_tag',
+    'sort_csc_by_tag',
     'metis_partition_assignment',
     'partition_graph_with_halo',
     'metis_partition',
     'as_heterograph',
     'adj_product_graph',
-    'adj_sum_graph']
+    'adj_sum_graph',
+    'reorder'
+    ]
 
 
 def pairwise_squared_distance(x):
@@ -79,6 +82,8 @@ def knn_graph(x, k, algorithm='bruteforce-blas', dist='euclidean'):
     If :attr:`x` is a 3D tensor, then each submatrix will be transformed
     into a separate graph. DGL then composes the graphs into a large
     graph of multiple connected components.
+
+    See :doc:`the benchmark <../api/python/knn_benchmark>` for a complete benchmark result.
 
     Parameters
     ----------
@@ -954,7 +959,7 @@ def khop_adj(g, k):
     """
     assert g.is_homogeneous, \
         'only homogeneous graph is supported'
-    adj_k = g.adj(scipy_fmt=g.formats()['created'][0]) ** k
+    adj_k = g.adj(transpose=True, scipy_fmt=g.formats()['created'][0]) ** k
     return F.tensor(adj_k.todense().astype(np.float32))
 
 def khop_graph(g, k, copy_ndata=True):
@@ -1024,7 +1029,7 @@ def khop_graph(g, k, copy_ndata=True):
     assert g.is_homogeneous, \
         'only homogeneous graph is supported'
     n = g.number_of_nodes()
-    adj_k = g.adj(transpose=True, scipy_fmt=g.formats()['created'][0]) ** k
+    adj_k = g.adj(transpose=False, scipy_fmt=g.formats()['created'][0]) ** k
     adj_k = adj_k.tocoo()
     multiplicity = adj_k.data
     row = np.repeat(adj_k.row, multiplicity)
@@ -1280,7 +1285,7 @@ def laplacian_lambda_max(g):
     rst = []
     for g_i in g_arr:
         n = g_i.number_of_nodes()
-        adj = g_i.adj(scipy_fmt=g_i.formats()['created'][0]).astype(float)
+        adj = g_i.adj(transpose=True, scipy_fmt=g_i.formats()['created'][0]).astype(float)
         norm = sparse.diags(F.asnumpy(g_i.in_degrees()).clip(1) ** -0.5, dtype=float)
         laplacian = sparse.eye(n) - norm * adj * norm
         rst.append(sparse.linalg.eigs(laplacian, 1, which='LM',
@@ -1336,7 +1341,7 @@ def metapath_reachable_graph(g, metapath):
     """
     adj = 1
     for etype in metapath:
-        adj = adj * g.adj(etype=etype, scipy_fmt='csr', transpose=True)
+        adj = adj * g.adj(etype=etype, scipy_fmt='csr', transpose=False)
 
     adj = (adj != 0).tocsr()
     srctype = g.to_canonical_etype(metapath[0])[0]
@@ -2071,7 +2076,7 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
     Parameters
     ----------
     graph : DGLGraph
-        The graph.
+        The graph.  Can be either on CPU or GPU.
     dst_nodes : Tensor or dict[str, Tensor], optional
         The list of destination nodes.
 
@@ -2115,6 +2120,7 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
     Examples
     --------
     Converting a homogeneous graph to a block as described above:
+
     >>> g = dgl.graph(([1, 2], [2, 3]))
     >>> block = dgl.to_block(g, torch.LongTensor([3, 2]))
 
@@ -2713,37 +2719,36 @@ def as_immutable_graph(hg):
                 '\tdgl.as_immutable_graph will do nothing and can be removed safely in all cases.')
     return hg
 
-def sort_out_edges(g, tag, tag_offset_name='_TAG_OFFSET'):
-    """Return a new graph which sorts the out edges of each node.
+def sort_csr_by_tag(g, tag, tag_offset_name='_TAG_OFFSET'):
+    r"""Return a new graph whose CSR matrix is sorted by the given tag.
 
-    Sort the out edges according to the given destination node tags in integer.
-    A typical use case is to sort the edges by the destination node types, where
-    the tags represent destination node types. After sorting, edges sharing
-    the same tag will be arranged in a consecutive range in
+    Sort the internal CSR matrix of the graph so that the adjacency list of each node
+    , which contains the out-edges, is sorted by the tag of the out-neighbors.
+    After sorting, edges sharing the same tag will be arranged in a consecutive range in
     a node's adjacency list. Following is an example:
 
-        Consider a graph as follows:
+        Consider a graph as follows::
 
-        0 -> 0, 1, 2, 3, 4
-        1 -> 0, 1, 2
+            0 -> 0, 1, 2, 3, 4
+            1 -> 0, 1, 2
 
-        Given node tags [1, 1, 0, 2, 0], each node's adjacency list
-        will be sorted as follows:
+        Given node tags ``[1, 1, 0, 2, 0]``, each node's adjacency list
+        will be sorted as follows::
 
-        0 -> 2, 4, 0, 1, 3
-        1 -> 2, 0, 1
+            0 -> 2, 4, 0, 1, 3
+            1 -> 2, 0, 1
 
     The function will also returns the starting offsets of the tag
-    segments in a tensor of shape `(N, max_tag+2)`. For node `i`,
-    its out-edges connecting to node tag `j` is stored between
-    `tag_offsets[i][j]` ~ `tag_offsets[i][j+1]`. Since the offsets
+    segments in a tensor of shape :math:`(N, max\_tag+2)`. For node ``i``,
+    its out-edges connecting to node tag ``j`` is stored between
+    ``tag_offsets[i][j]`` ~ ``tag_offsets[i][j+1]``. Since the offsets
     can be viewed node data, we store it in the
-    `ndata` of the returned graph. Users can specify the
-    ndata name by the `tag_pos_name` argument.
+    ``ndata`` of the returned graph. Users can specify the
+    ndata name by the :attr:`tag_pos_name` argument.
 
     Note that the function will not change the edge ID neither
     how the edge features are stored. The input graph must
-    allow CSR format. Graph must be on CPU.
+    allow CSR format. The graph must be on CPU.
 
     If the input graph is heterogenous, it must have only one edge
     type and two node types (i.e., source and destination node types).
@@ -2751,8 +2756,26 @@ def sort_out_edges(g, tag, tag_offset_name='_TAG_OFFSET'):
     and the tag offsets are stored in the source node data.
 
     The sorted graph and the calculated tag offsets are needed by
-    certain operators that consider node tags. See `sample_neighbors_biased`
-    for an example.
+    certain operators that consider node tags. See
+    :func:`~dgl.sampling.sample_neighbors_biased` for an example.
+
+    Parameters
+    ------------
+    g : DGLGraph
+        The input graph.
+    tag : Tensor
+        Integer tensor of shape :math:`(N,)`, :math:`N` being the number of (destination) nodes.
+    tag_offset_name : str
+        The name of the node feature to store tag offsets.
+
+    Returns
+    -------
+    g_sorted : DGLGraph
+        A new graph whose CSR is sorted. The node/edge features of the
+        input graph is shallow-copied over.
+
+        - ``g_sorted.ndata[tag_offset_name]`` : Tensor of shape :math:`(N, max\_tag + 2)`.
+        - If ``g`` is heterogeneous, get from ``g_sorted.srcdata``.
 
     Examples
     -----------
@@ -2762,7 +2785,7 @@ def sort_out_edges(g, tag, tag_offset_name='_TAG_OFFSET'):
     (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
      array([0, 1, 2, 3, 4, 0, 1, 2], dtype=int32))
     >>> tag = torch.IntTensor([1,1,0,2,0])
-    >>> g_sorted = dgl.transform.sort_out_edges(g, tag)
+    >>> g_sorted = dgl.sort_csr_by_tag(g, tag)
     >>> g_sorted.adjacency_matrix(scipy_fmt='csr').nonzero()
     (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
      array([2, 4, 0, 1, 3, 2, 0, 1], dtype=int32))
@@ -2773,22 +2796,9 @@ def sort_out_edges(g, tag, tag_offset_name='_TAG_OFFSET'):
             [0, 0, 0, 0],
             [0, 0, 0, 0]])
 
-    Parameters
-    ------------
-    g : DGLGraph
-        The input graph.
-    tag : Tensor
-        Integer tensor of shape `(N,)`, `N` being the number of (destination) nodes.
-    tag_offset_name : str
-        The name of the node feature to store tag offsets.
-
-    Returns
-    -------
-    g_sorted : DGLGraph
-        A new graph whose out edges are sorted. The node/edge features of the
-        input graph is shallow-copied over.
-        - `g_sorted.ndata[tag_offset_name]` : Tensor of shape `(N, max_tag + 2)`. If
-        `g` is heterogeneous, get from `g_sorted.srcdata`.
+    See Also
+    --------
+    dgl.sampling.sample_neighbors_biased
     """
     if len(g.etypes) > 1:
         raise DGLError("Only support homograph and bipartite graph")
@@ -2800,37 +2810,37 @@ def sort_out_edges(g, tag, tag_offset_name='_TAG_OFFSET'):
     return new_g
 
 
-def sort_in_edges(g, tag, tag_offset_name='_TAG_OFFSET'):
-    """Return a new graph which sorts the in edges of each node.
+def sort_csc_by_tag(g, tag, tag_offset_name='_TAG_OFFSET'):
+    r"""Return a new graph whose CSC matrix is sorted by the given tag.
 
-    Sort the in edges according to the given source node tags in integer.
-    A typical use case is to sort the edges by the source node types, where
-    the tags represent source node types. After sorting, edges sharing
-    the same tag will be arranged in a consecutive range in
+    Sort the internal CSC matrix of the graph so that the adjacency list of each node
+    , which contains the in-edges, is sorted by the tag of the in-neighbors.
+    After sorting, edges sharing the same tag will be arranged in a consecutive range in
     a node's adjacency list. Following is an example:
 
-        Consider a graph as follows:
 
-        0 <- 0, 1, 2, 3, 4
-        1 <- 0, 1, 2
+        Consider a graph as follows::
 
-        Given node tags [1, 1, 0, 2, 0], each node's adjacency list
-        will be sorted as follows:
+            0 <- 0, 1, 2, 3, 4
+            1 <- 0, 1, 2
 
-        0 <- 2, 4, 0, 1, 3
-        1 <- 2, 0, 1
+        Given node tags ``[1, 1, 0, 2, 0]``, each node's adjacency list
+        will be sorted as follows::
 
-    The function will also returns the starting offsets of the tag
-    segments in a tensor of shape `(N, max_tag+2)`. For node `i`,
-    its in-edges connecting to node tag `j` is stored between
-    `tag_offsets[i][j]` ~ `tag_offsets[i][j+1]`. Since the offsets
+            0 <- 2, 4, 0, 1, 3
+            1 <- 2, 0, 1
+
+    The function will also return the starting offsets of the tag
+    segments in a tensor of shape :math:`(N, max\_tag+2)`. For a node ``i``,
+    its in-edges connecting to node tag ``j`` is stored between
+    ``tag_offsets[i][j]`` ~ ``tag_offsets[i][j+1]``. Since the offsets
     can be viewed node data, we store it in the
-    `ndata` of the returned graph. Users can specify the
-    ndata name by the `tag_pos_name` argument.
+    ``ndata`` of the returned graph. Users can specify the
+    ndata name by the ``tag_pos_name`` argument.
 
     Note that the function will not change the edge ID neither
     how the edge features are stored. The input graph must
-    allow CSR format. Graph must be on CPU.
+    allow CSC format. The graph must be on CPU.
 
     If the input graph is heterogenous, it must have only one edge
     type and two node types (i.e., source and destination node types).
@@ -2838,19 +2848,37 @@ def sort_in_edges(g, tag, tag_offset_name='_TAG_OFFSET'):
     and the tag offsets are stored in the destination node data.
 
     The sorted graph and the calculated tag offsets are needed by
-    certain operators that consider node tags. See `sample_neighbors_biased`
+    certain operators that consider node tags. See :func:`~dgl.sampling.sample_neighbors_biased`
     for an example.
+
+    Parameters
+    ------------
+    g : DGLGraph
+        The input graph.
+    tag : Tensor
+        Integer tensor of shape :math:`(N,)`, :math:`N` being the number of (source) nodes.
+    tag_offset_name : str
+        The name of the node feature to store tag offsets.
+
+    Returns
+    -------
+    g_sorted : DGLGraph
+        A new graph whose CSC matrix is sorted. The node/edge features of the
+        input graph is shallow-copied over.
+
+        - ``g_sorted.ndata[tag_offset_name]`` : Tensor of shape :math:`(N, max\_tag + 2)`.
+        - If ``g`` is heterogeneous, get from ``g_sorted.dstdata``.
 
     Examples
     -----------
 
     >>> g = dgl.graph(([0,1,2,3,4,0,1,2],[0,0,0,0,0,1,1,1]))
-    >>> g.adjacency_matrix(scipy_fmt='csr', transpose=False).nonzero()
+    >>> g.adjacency_matrix(scipy_fmt='csr', transpose=True).nonzero()
     (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
      array([0, 1, 2, 3, 4, 0, 1, 2], dtype=int32)))
     >>> tag = torch.IntTensor([1,1,0,2,0])
-    >>> g_sorted = dgl.transform.sort_in_edges(g, tag)
-    >>> g_sorted.adjacency_matrix(scipy_fmt='csr', transpose=False).nonzero()
+    >>> g_sorted = dgl.sort_csc_by_tag(g, tag)
+    >>> g_sorted.adjacency_matrix(scipy_fmt='csr', transpose=True).nonzero()
     (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
      array([2, 4, 0, 1, 3, 2, 0, 1], dtype=int32))
     >>> g_sorted.ndata['_TAG_OFFSET']
@@ -2860,22 +2888,9 @@ def sort_in_edges(g, tag, tag_offset_name='_TAG_OFFSET'):
             [0, 0, 0, 0],
             [0, 0, 0, 0]])
 
-    Parameters
-    ------------
-    g : DGLGraph
-        The input graph.
-    tag : Tensor
-        Integer tensor of shape `(N,)`, `N` being the number of (source) nodes.
-    tag_offset_name : str
-        The name of the node feature to store tag offsets.
-
-    Returns
-    -------
-    g_sorted : DGLGraph
-        A new graph whose out edges are sorted. The node/edge features of the
-        input graph is shallow-copied over.
-        - `g_sorted.ndata[tag_offset_name]` : Tensor of shape `(N, max_tag + 2)`. If
-        `g` is heterogeneous, get from `g_sorted.dstdata`.
+    See Also
+    --------
+    dgl.sampling.sample_neighbors_biased
     """
     if len(g.etypes) > 1:
         raise DGLError("Only support homograph and bipartite graph")
@@ -2885,5 +2900,204 @@ def sort_in_edges(g, tag, tag_offset_name='_TAG_OFFSET'):
     new_g._graph, tag_pos_arr = _CAPI_DGLHeteroSortInEdges(g._graph, tag_arr, num_tags)
     new_g.dstdata[tag_offset_name] = F.from_dgl_nd(tag_pos_arr)
     return new_g
+
+
+def reorder(g, permute_algo='rcmk', store_ids=True, permute_config=None):
+    r"""Return a new graph which re-order and re-label the nodes
+    according to the specified permute algorithm.
+
+    Support homogeneous graph only for the moment.
+
+    This API is basically implemented by leveraging :func:`~dgl.node_subgraph`,
+    so the function signature is similar and raw IDs could be stored
+    in ``dgl.NID`` and ``dgl.EID``.
+
+    Please note that edges are re-ordered/re-labeled according to re-ordered
+    ``'src'`` nodes. This behavior is realized in :func:`dgl.node_subgraph`.
+    What's more, if user wants to re-order/re-label according to ``'dst'`` nodes
+    or any other algorithms, please use :func:`dgl.edge_subgraph` with new edge
+    permutation.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The homogeneous graph.
+    permute_algo: str, optional
+        can be ``'rcmk'`` or ``'metis'`` or ``'custom'``. ``'rcmk'`` is the default value.
+
+        * ``'rcmk'``: Call `Reverse Cuthill–McKee <https://docs.scipy.org/doc/scipy/reference/
+          generated/scipy.sparse.csgraph.reverse_cuthill_mckee.html#
+          scipy-sparse-csgraph-reverse-cuthill-mckee>`__ from ``'scipy'`` to generate nodes
+          permutation and pass it into :func:`~dgl.node_subgraph` to generate new graph.
+        * ``'metis'``: Call :func:`~dgl.partition.metis_partition_assignment` from ``'DGL'``
+          to generate nodes permutation and pass it into :func:`~dgl.node_subgraph` to generate
+          new graph.
+        * ``'custom'``: This enables user to pass in self-designed reorder algorithm.
+          User should pass in ``'nodes_perm'`` via another argument :attr:`permute_config` with
+          ``'custom'`` is specified here. By this way, can the graph be reordered according to
+          passed in nodes permutation.
+    store_ids: bool, optional
+        It is passed into :func:`~dgl.node_subgraph()`. If True, it will store
+        the raw IDs of the extracted nodes and edges in the ndata and edata of
+        the resulting graph under name ``'dgl.NID'`` and ``'dgl.EID'``, respectively.
+    permute_config: dict, optional
+        Additional config data for specified :attr:`permute_algo`.
+
+        * For ``'rcmk'``, this argument is not required.
+        * For ``'metis'``, partition part number ``'k'`` is required and specified in this
+          argument like this: {'k':10}.
+        * For ``'custom'``, ``'nodes_perm'`` should be specified in the format of
+          ``'Int Tensor'`` or ``'iterable[int]'`` like :attr:`nodes` in :func:`~dgl.node_subgraph`.
+
+    Returns
+    -------
+    DGLGraph
+        The re-ordered graph.
+
+    Examples
+    --------
+    >>> import dgl
+    >>> import torch
+    >>> g = dgl.graph((torch.tensor([0, 1, 2, 3, 4]), torch.tensor([2, 2, 3, 2, 3])))
+    >>> g.ndata['h'] = torch.arange(g.num_nodes() * 2).view(g.num_nodes(), 2)
+    >>> g.edata['w'] = torch.arange(g.num_edges() * 1).view(g.num_edges(), 1)
+    >>> g.ndata
+    {'h': tensor([[0, 1],
+            [2, 3],
+            [4, 5],
+            [6, 7],
+            [8, 9]])}
+    >>> g.edata
+    {'w': tensor([[0],
+            [1],
+            [2],
+            [3],
+            [4]])}
+
+    Reorder according to ``'rcmk'`` permute algorithm.
+
+    >>> rg = dgl.reorder(g)
+    >>> rg.ndata
+    {'h': tensor([[8, 9],
+            [6, 7],
+            [2, 3],
+            [4, 5],
+            [0, 1]]), '_ID': tensor([4, 3, 1, 2, 0])}
+    >>> rg.edata
+    {'w': tensor([[4],
+            [3],
+            [1],
+            [2],
+            [0]]), '_ID': tensor([4, 3, 1, 2, 0])}
+
+    Reorder with according to ``'metis'`` permute algorithm.
+
+    >>> rg = dgl.reorder(g, 'metis', permute_config={'k':2})
+    >>> rg.ndata
+    {'h': tensor([[4, 5],
+            [2, 3],
+            [0, 1],
+            [8, 9],
+            [6, 7]]), '_ID': tensor([2, 1, 0, 4, 3])}
+    >>> rg.edata
+    {'w': tensor([[2],
+            [1],
+            [0],
+            [4],
+            [3]]), '_ID': tensor([2, 1, 0, 4, 3])}
+
+    Reorder according to ``'custom'`` permute algorithm with user-provided nodes_perm.
+
+    >>> nodes_perm = torch.randperm(g.num_nodes())
+    >>> nodes_perm
+    tensor([3, 2, 0, 4, 1])
+    >>> rg = dgl.reorder(g, 'custom', permute_config={'nodes_perm':nodes_perm})
+    >>> rg.ndata
+    {'h': tensor([[6, 7],
+            [4, 5],
+            [0, 1],
+            [8, 9],
+            [2, 3]]), '_ID': tensor([3, 2, 0, 4, 1])}
+    >>> rg.edata
+    {'w': tensor([[3],
+            [2],
+            [0],
+            [4],
+            [1]]), '_ID': tensor([3, 2, 0, 4, 1])}
+
+    """
+    if not g.is_homogeneous:
+        raise DGLError("Homograph is supported only.")
+    expected_algo = ['rcmk', 'metis', 'custom']
+    if permute_algo not in expected_algo:
+        raise DGLError("Unexpected permute_algo is specified: {}. Expected algos: {}".format(
+            permute_algo, expected_algo))
+    if permute_algo == 'rcmk':
+        nodes_perm = rcmk_perm(g)
+    elif permute_algo == 'metis':
+        if permute_config is None or 'k' not in permute_config:
+            raise DGLError(
+                "Partition parts 'k' is required for metis. Please specify in permute_config.")
+        nodes_perm = metis_perm(g, permute_config['k'])
+    else:
+        if permute_config is None or 'nodes_perm' not in permute_config:
+            raise DGLError(
+                "permute_algo is specified as custom, but no 'nodes_perm' is specified in \
+                    permute_config.")
+        nodes_perm = permute_config['nodes_perm']
+        if len(nodes_perm) != g.num_nodes():
+            raise DGLError("Length of passed in nodes_perm[{}] does not \
+                    match graph num_nodes[{}].".format(len(nodes_perm), g.num_nodes()))
+    return subgraph.node_subgraph(g, nodes_perm, store_ids=store_ids)
+
+
+DGLHeteroGraph.reorder = utils.alias_func(reorder)
+
+
+def metis_perm(g, k):
+    r"""Return nodes permutation according to ``'metis'`` algorithm.
+
+    For internal use.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The homogeneous graph.
+    k: int
+        The partition parts number.
+
+    Returns
+    -------
+    iterable[int]
+        The nodes permutation.
+    """
+    pids = metis_partition_assignment(
+        g if g.device == F.cpu() else g.to(F.cpu()), k)
+    pids = F.asnumpy(pids)
+    return np.argsort(pids).copy()
+
+
+def rcmk_perm(g):
+    r"""Return nodes permutation according to ``'rcmk'`` algorithm.
+
+    For internal use.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The homogeneous graph.
+
+    Returns
+    -------
+    iterable[int]
+        The nodes permutation.
+    """
+    fmat = 'csr'
+    allowed_fmats = sum(g.formats().values(), [])
+    if fmat not in allowed_fmats:
+        g = g.formats(allowed_fmats + [fmat])
+    csr_adj = g.adj(scipy_fmt=fmat)
+    perm = sparse.csgraph.reverse_cuthill_mckee(csr_adj)
+    return perm.copy()
 
 _init_api("dgl.transform")
