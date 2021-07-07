@@ -143,6 +143,7 @@ Methods for getting the adjacency and the incidence matrix of the graph.
     :toctree: ../../generated/
 
     DGLGraph.adj
+    DGLGraph.adj_sparse
     DGLGraph.adjacency_matrix
     DGLGraph.inc
     DGLGraph.incidence_matrix
