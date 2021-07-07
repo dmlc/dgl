@@ -85,6 +85,10 @@ inline void SpMMCreateBlocks(
     IdType *indptr_block_buf = reinterpret_cast<IdType *>(aligned_alloc(64,
                                                              (M_block_size + 1) * num_M_blocks *
                                                              num_K_blocks * sizeof(IdType)));
+    IdType *indices_block_buf = reinterpret_cast<IdType *>(aligned_alloc(64,
+                                                              indptr[M] * sizeof(IdType)));
+    IdType *edges_block_buf = reinterpret_cast<IdType *>(aligned_alloc(64,
+                                                            indptr[M] * sizeof(IdType)));
 
 #pragma omp parallel
     {
@@ -98,11 +102,11 @@ inline void SpMMCreateBlocks(
         const IdType nnz = indptr[M_end] - indptr[M_start];
 
         IdType cur_indices_id = 0;
-        IdType *indices_block_buf, *edges_block_buf;
+        IdType *my_indices_block_buf, *my_edges_block_buf;
         if (use_lhs)
-          indices_block_buf = reinterpret_cast<IdType *>(aligned_alloc(64, nnz * sizeof(IdType)));
+          my_indices_block_buf = indices_block_buf + indptr[M_start];
         if (use_rhs)
-          edges_block_buf = reinterpret_cast<IdType *>(aligned_alloc(64, nnz * sizeof(IdType)));
+          my_edges_block_buf = edges_block_buf + indptr[M_start];
 
         for (IdType i = M_start; i < M_end; i++) {
           my_cur_col_id[(i - M_start) * 2] = indptr[i];
@@ -118,9 +122,9 @@ inline void SpMMCreateBlocks(
           IdType *cur_csr_indptr = indptr_block_buf + (m * num_K_blocks + k) * (M_block_size + 1);
           IdType *cur_csr_indices = nullptr, *cur_csr_edges = nullptr;
           if (use_lhs)
-            cur_csr_indices = indices_block_buf + cur_indices_id;
+            cur_csr_indices = my_indices_block_buf + cur_indices_id;
           if (use_rhs)
-            cur_csr_edges = edges_block_buf + cur_indices_id;
+            cur_csr_edges = my_edges_block_buf + cur_indices_id;
           IdType cur_nnz = 0;
           for (IdType i = M_start; i < M_end; i++) {
             const IdType row_start = my_cur_col_id[(i - M_start) * 2];
@@ -398,13 +402,11 @@ inline void SpMMFreeBlocks(
     bool use_lhs, bool use_rhs) {
 
   if (num_K_blocks > 1) {
-    for (int m = 0; m < num_M_blocks; m++) {
-      if (use_lhs)
-        free(block_csr_array[m * num_K_blocks].indices);
-      if (use_rhs)
-        free(block_csr_array[m * num_K_blocks].data);
-    }
     free(block_csr_array[0].indptr);
+    if (use_lhs)
+      free(block_csr_array[0].indices);
+    if (use_rhs)
+      free(block_csr_array[0].data);
   }
   free(block_csr_array);
 }
