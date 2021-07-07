@@ -5,7 +5,7 @@ spec:
     runAsUser: 0
   containers:
   - name: dgl-ci-cpu
-    image: dgllib/dgl-ci-cpu:conda
+    image: dgllib/dgl-ci-cpu:conda_210707
     imagePullPolicy: Always
     tty: true
     resources:

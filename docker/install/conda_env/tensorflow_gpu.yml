@@ -1,9 +1,9 @@
 name: tensorflow-ci
 dependencies:
-  - python=3.6.9
+  - python=3.7.9
   - pip
   - pip:
-    - tensorflow==2.2.0
+    - tensorflow==2.4.0
     - tfdlpack-gpu
     - pytest
     - nose

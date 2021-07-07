@@ -1,6 +1,6 @@
 --find-links https://download.pytorch.org/whl/torch_stable.html
-torch==1.5.1+cu101
-torchvision==0.6.1+cu101
+torch==1.9.0+cu111
+torchvision==0.10.0+cu111
 pytest
 nose
 numpy

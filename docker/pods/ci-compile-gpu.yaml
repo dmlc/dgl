@@ -5,12 +5,12 @@ spec:
     runAsUser: 0
   containers:
   - name: dgl-ci-gpu-compile
-    image: dgllib/dgl-ci-gpu:conda
+    image: dgllib/dgl-ci-gpu:conda_cu111
     imagePullPolicy: Always
     tty: true
     resources:
       requests:
-        cpu: 32
+        cpu: 24
   # affinity:
   #   nodeAffinity:
   #     requiredDuringSchedulingIgnoredDuringExecution:
