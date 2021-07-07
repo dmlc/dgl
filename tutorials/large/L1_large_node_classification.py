@@ -123,6 +123,15 @@ train_dataloader = dgl.dataloading.NodeDataLoader(
 
 
 ######################################################################
+# .. note::
+#
+#    Since DGL 0.7 neighborhood sampling on GPU is supported.  Please
+#    refer to :ref:`guide-minibatch-gpu-sampling` if you are
+#    interested.
+#
+
+
+######################################################################
 # You can iterate over the data loader and see what it yields.
 #
 

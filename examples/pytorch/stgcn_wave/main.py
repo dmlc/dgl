@@ -91,7 +91,7 @@ test_iter = torch.utils.data.DataLoader(test_data, batch_size)
 
 loss = nn.MSELoss()
 G = G.to(device)
-model = STGCN_WAVE(blocks, n_his, n_route, G, drop_prob, num_layers, args.control_str).to(device)
+model = STGCN_WAVE(blocks, n_his, n_route, G, drop_prob, num_layers, device, args.control_str).to(device)
 optimizer = torch.optim.RMSprop(model.parameters(), lr=lr)
 
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.7)
