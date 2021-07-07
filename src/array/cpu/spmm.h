@@ -134,11 +134,9 @@ void SpMMSumCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
 #if !defined(_WIN32)
 #ifdef USE_AVX
 #ifdef USE_LIBXSMM
-  //printf("use_bcast = %d\n", bcast.use_bcast);
   const bool no_libxsmm =
        bcast.use_bcast || std::is_same<DType, double>::value;
   if (!no_libxsmm) {
-    //printf("libxsmm\n");  
     SpMMSumCsrLibxsmm<IdType, DType, Op>(bcast, csr, ufeat, efeat, out);
   } else {
 #endif  // USE_LIBXSMM
@@ -151,12 +149,10 @@ void SpMMSumCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
       ? asm_kernel_ptr.get()
       : nullptr;
     if (cpu_spec && dim > 16 && !bcast.use_bcast) {
-      //printf("xbyak\n");  
       SpMMSumCsrXbyak<IdType, DType, Op>(cpu_spec, bcast, csr, X, W, O);
     } else {
 #endif  // USE_AVX
 #endif  // _WIN32
-    //printf("naive\n");  
     SpMMSumCsrNaive<IdType, DType, Op>(bcast, csr, X, W, O);
 #if !defined(_WIN32)
 #ifdef USE_AVX
