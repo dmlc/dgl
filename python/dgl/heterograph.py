@@ -4682,6 +4682,10 @@ class DGLHeteroGraph(object):
         """Send messages along all the edges of the specified type
         and update all the nodes of the corresponding destination type.
 
+        For heterogeneous graphs with number of relation types > 1, send messages
+        along all the edges, reduce them by type-wisely and across different types
+        at the same time. Then, update the node features of all the nodes.
+
         Parameters
         ----------
         message_func : dgl.function.BuiltinFunction or callable
@@ -4743,13 +4747,58 @@ class DGLHeteroGraph(object):
         tensor([[0.],
                 [0.],
                 [3.]])
+
+        **Heterogenenous graph (number relation types > 1)**
+
+        >>> g = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): ([0, 1], [1, 1]),
+        ...     ('game', 'attracts', 'user'): ([0], [1])
+        ... })
+
+        Update all.
+
+        >>> g.nodes['user'].data['h'] = torch.tensor([[1.], [2.]])
+        >>> g.nodes['game'].data['h'] = torch.tensor([[1.]])
+        >>> g.update_all(fn.copy_src('h', 'm'), fn.sum('m', 'h'))
+        >>> g.nodes['user'].data['h']
+        tensor([[0.],
+                [4.]])
         """
-        etid = self.get_etype_id(etype)
-        etype = self.canonical_etypes[etid]
-        _, dtid = self._graph.metagraph.find_edge(etid)
-        g = self if etype is None else self[etype]
-        ndata = core.message_passing(g, message_func, reduce_func, apply_node_func)
-        self._set_n_repr(dtid, ALL, ndata)
+        # Graph with one relation type
+        if self._graph.number_of_etypes() == 1 or etype is not None:
+            etid = self.get_etype_id(etype)
+            etype = self.canonical_etypes[etid]
+            _, dtid = self._graph.metagraph.find_edge(etid)
+            g = self if etype is None else self[etype]
+            ndata = core.message_passing(g, message_func, reduce_func, apply_node_func)
+            self._set_n_repr(dtid, ALL, ndata)
+        else:   # heterogeneous graph with number of relation types > 1
+            if not core.is_builtin(message_func) or not core.is_builtin(reduce_func):
+                raise DGLError("User defined functions are not yet "
+                               "supported in update_all for heterogeneous graphs. "
+                               "Please use multi_update_all instead.")
+            if reduce_func.name in ['max', 'min']:
+                raise NotImplementedError("Reduce op \'" + reduce_func.name + "\' is not yet "
+                                          "supported in update_all for heterogeneous graphs. "
+                                          "Please use multi_update_all instead.")
+            if reduce_func.name in ['mean']:
+                raise NotImplementedError("Cannot set both intra-type and inter-type reduce "
+                                          "operators as 'mean' using update_all. Please use "
+                                          "multi_update_all instead.")
+            if message_func.name not in ['copy_u', 'copy_e']:
+                raise NotImplementedError("Op \'" + message_func.name + "\' is not yet supported"
+                                          "in update_all for heterogeneous graphs. Please use"
+                                          "multi_update_all instead.")
+            g = self
+            all_out = core.message_passing(g, message_func, reduce_func, apply_node_func)
+            key = list(all_out.keys())[0]
+            out_tensor_tuples = all_out[key]
+
+            dst_tensor = {}
+            for _, _, dsttype in g.canonical_etypes:
+                dtid = g.get_ntype_id(dsttype)
+                dst_tensor[key] = out_tensor_tuples[dtid]
+                self._node_frames[dtid].update(dst_tensor)
 
     #################################################################
     # Message passing on heterograph
@@ -4847,6 +4896,7 @@ class DGLHeteroGraph(object):
             # apply
             if apply_node_func is not None:
                 self.apply_nodes(apply_node_func, ALL, self.ntypes[dtid])
+
 
     #################################################################
     # Message propagation
@@ -5644,6 +5694,7 @@ class DGLHeteroGraph(object):
             assert fmt in ("coo", "csr", "csc"), '{} is not coo, csr or csc'.format(fmt)
         gidx = self._graph.shared_memory(name, self.ntypes, self.etypes, formats)
         return DGLHeteroGraph(gidx, self.ntypes, self.etypes)
+
 
     def long(self):
         """Cast the graph to one with idtype int64

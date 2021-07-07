@@ -160,6 +160,17 @@ __global__ void SpMMCsrKernel(
         DType out = BinaryOp::Call(uoff + lhs_add, eoff + rhs_add);
         ReduceOp::Call(&local_accum, &local_argu, &local_arge, out, cid, eid);
       }
+
+      // TODO(isratnisa, BarclayII)
+      // The use of += is a quick hack to compute for cross-type reducing
+      //     C = SpMM(SpA, B) + C
+      // To make it work on max-reducer and min-reducer, i.e.
+      //     C = Max(SpMM<BinaryOp, Max>(SpA, B), C)
+      // it requires at least the following:
+      // 1. Initialize the output buffer with ReducerOp::zero.
+      // 2. Record also which edge type has the maximum/minimum in argmax/argmin.
+      //    This requires non-trivial changes in SpMMCsrKernel itself or writing a new kernel.
+      //    So we leave it to future PRs.
       out[ty * out_len + tx] += local_accum;
       if (ReduceOp::require_arg && BinaryOp::use_lhs)
         arg_u[ty * out_len + tx] = local_argu;
