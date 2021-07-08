@@ -2913,12 +2913,14 @@ def reorder_graph(g, node_permute_algo='rcmk', edge_permute_algo='src',
     and :func:`~dgl.edge_subgraph`, so the function signature is similar and
     raw IDs could be stored in ``dgl.NID`` and ``dgl.EID`` via :attr:`store_ids`.
 
-    Nodes are re-ordered and re-labeled first by calling :func:`~dgl.node_subgraph`
-    with the nodes permutation generated according to specified :attr:`node_permute_algo`
+    Graph is re-ordered in 2 steps: re-order nodes first and edges then.
+
+    Nodes are re-ordered and re-labeled by calling :func:`~dgl.node_subgraph` with
+    the nodes permutation generated according to specified :attr:`node_permute_algo`
     or the one user provides in :attr:`permute_config`.
 
-    Edges are re-ordered and re-labeled then by calling :func:`~dgl.edge_subgraph`
-    with the edges permutation generated according to sepcified :attr:`edge_permute_algo`.
+    Edges are re-ordered and re-labeled by calling :func:`~dgl.edge_subgraph` with
+    the edges permutation generated according to sepcified :attr:`edge_permute_algo`.
     ``src`` and ``dst`` are the only ones supported in this API. In detail,
     edge permutation is generated according to ``src`` nodes of edges or ``dst``
     nodes of edges. These are supposed to be applicable for most scenarios. But if
