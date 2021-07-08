@@ -625,18 +625,20 @@ class DGLHeteroGraph(object):
             if c_etype == (u_type, e_type, v_type):
                 origin_eids = self.edges(form='eid', order='eid', etype=c_etype)
                 edges[c_etype] = utils.compensate(eids, origin_eids)
-
-                # update batch information
-                one_hot_removed_edges = F.zeros((self.num_edges(c_etype),),
-                                                F.float32, self.device)
-                one_hot_removed_edges[eids] = 1.
-                c_etype_batch_num_edges = self._batch_num_edges[c_etype]
-                batch_num_removed_edges = segment.segment_reduce(
-                    c_etype_batch_num_edges, one_hot_removed_edges, reducer='sum')
-                self._batch_num_edges[c_etype] = c_etype_batch_num_edges - \
-                                                 F.astype(batch_num_removed_edges, F.int64)
             else:
                 edges[c_etype] = self.edges(form='eid', order='eid', etype=c_etype)
+
+        # If the graph is batched, update batch_num_edges
+        batched = self._batch_num_edges is not None
+        if batched:
+            c_etype = (u_type, e_type, v_type)
+            one_hot_removed_edges = F.zeros((self.num_edges(c_etype),), F.float32, self.device)
+            one_hot_removed_edges[eids] = 1.
+            c_etype_batch_num_edges = self._batch_num_edges[c_etype]
+            batch_num_removed_edges = segment.segment_reduce(c_etype_batch_num_edges,
+                                                             one_hot_removed_edges, reducer='sum')
+            self._batch_num_edges[c_etype] = c_etype_batch_num_edges - \
+                                             F.astype(batch_num_removed_edges, F.int64)
 
         sub_g = self.edge_subgraph(edges, relabel_nodes=False, store_ids=store_ids)
         self._graph = sub_g._graph
@@ -736,45 +738,53 @@ class DGLHeteroGraph(object):
         nodes = {}
         for c_ntype in self.ntypes:
             if self.get_ntype_id(c_ntype) == ntid:
+                target_ntype = c_ntype
                 original_nids = self.nodes(c_ntype)
                 nodes[c_ntype] = utils.compensate(nids, original_nids)
-
-                # update batch_num_nodes
-                one_hot_removed_nodes = F.zeros((self.num_nodes(c_ntype),),
-                                                F.float32, self.device)
-                one_hot_removed_nodes[nids] = 1.
-                c_ntype_batch_num_nodes = self._batch_num_nodes[c_ntype]
-                batch_num_removed_nodes = segment.segment_reduce(
-                    c_ntype_batch_num_nodes, one_hot_removed_nodes, reducer='sum')
-                self._batch_num_nodes[c_ntype] = c_ntype_batch_num_nodes - \
-                                                 F.astype(batch_num_removed_nodes, F.int64)
             else:
                 nodes[c_ntype] = self.nodes(c_ntype)
 
-        old_num_edges = {c_etype: self._graph.number_of_edges(self.get_etype_id(c_etype))
-                         for c_etype in self.canonical_etypes}
+        # If the graph is batched, update batch_num_nodes
+        batched = self._batch_num_nodes is not None
+        if batched:
+            one_hot_removed_nodes = F.zeros((self.num_nodes(target_ntype),),
+                                            F.float32, self.device)
+            one_hot_removed_nodes[nids] = 1.
+            c_ntype_batch_num_nodes = self._batch_num_nodes[target_ntype]
+            batch_num_removed_nodes = segment.segment_reduce(
+                c_ntype_batch_num_nodes, one_hot_removed_nodes, reducer='sum')
+            self._batch_num_nodes[target_ntype] = c_ntype_batch_num_nodes - \
+                                                  F.astype(batch_num_removed_nodes, F.int64)
+            # Record old num_edges to check later whether some edges were removed
+            old_num_edges = {c_etype: self._graph.number_of_edges(self.get_etype_id(c_etype))
+                             for c_etype in self.canonical_etypes}
+
         # node_subgraph
-        sub_g = self.subgraph(nodes, store_ids=True)
+        # If batch_num_edges is to be updated, record the original edge IDs
+        sub_g = self.subgraph(nodes, store_ids=store_ids or batched)
         self._graph = sub_g._graph
         self._node_frames = sub_g._node_frames
         self._edge_frames = sub_g._edge_frames
 
-        # update batch_num_edges
-        canonical_etypes = [
-            c_etype for c_etype in self.canonical_etypes
-            if self._graph.number_of_edges(self.get_etype_id(c_etype)) != old_num_edges[c_etype]]
-        for c_etype in canonical_etypes:
-            if self._graph.number_of_edges(self.get_etype_id(c_etype)) == 0:
-                self._batch_num_edges[c_etype] = F.zeros((self.batch_size,), F.int64, self.device)
-                continue
+        # If the graph is batched, update batch_num_edges
+        if batched:
+            canonical_etypes = [
+                c_etype for c_etype in self.canonical_etypes if
+                self._graph.number_of_edges(self.get_etype_id(c_etype)) != old_num_edges[c_etype]]
 
-            one_hot_left_edges = F.zeros((old_num_edges[c_etype],), F.float32, self.device)
-            one_hot_left_edges[self.edges[c_etype].data[EID]] = 1.
-            batch_num_left_edges = segment.segment_reduce(
-                self._batch_num_edges[c_etype], one_hot_left_edges, reducer='sum')
-            self._batch_num_edges[c_etype] = F.astype(batch_num_left_edges, F.int64)
+            for c_etype in canonical_etypes:
+                if self._graph.number_of_edges(self.get_etype_id(c_etype)) == 0:
+                    self._batch_num_edges[c_etype] = F.zeros(
+                        (self.batch_size,), F.int64, self.device)
+                    continue
 
-        if not store_ids:
+                one_hot_left_edges = F.zeros((old_num_edges[c_etype],), F.float32, self.device)
+                one_hot_left_edges[self.edges[c_etype].data[EID]] = 1.
+                batch_num_left_edges = segment.segment_reduce(
+                    self._batch_num_edges[c_etype], one_hot_left_edges, reducer='sum')
+                self._batch_num_edges[c_etype] = F.astype(batch_num_left_edges, F.int64)
+
+        if batched and not store_ids:
             for c_ntype in self.ntypes:
                 self.nodes[c_ntype].data.pop(NID)
             for c_etype in self.canonical_etypes:
