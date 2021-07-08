@@ -633,7 +633,8 @@ class DGLHeteroGraph(object):
         if batched:
             c_etype = (u_type, e_type, v_type)
             one_hot_removed_edges = F.zeros((self.num_edges(c_etype),), F.float32, self.device)
-            one_hot_removed_edges[F.astype(eids, F.int64)] = 1.
+            one_hot_removed_edges = F.scatter_row(one_hot_removed_edges, eids,
+                                                  F.full_1d(len(eids), 1., F.float32, self.device))
             c_etype_batch_num_edges = self._batch_num_edges[c_etype]
             batch_num_removed_edges = segment.segment_reduce(c_etype_batch_num_edges,
                                                              one_hot_removed_edges, reducer='sum')
@@ -749,7 +750,8 @@ class DGLHeteroGraph(object):
         if batched:
             one_hot_removed_nodes = F.zeros((self.num_nodes(target_ntype),),
                                             F.float32, self.device)
-            one_hot_removed_nodes[F.astype(nids, F.int64)] = 1.
+            one_hot_removed_nodes = F.scatter_row(one_hot_removed_nodes, nids,
+                                                  F.full_1d(len(nids), 1., F.float32, self.device))
             c_ntype_batch_num_nodes = self._batch_num_nodes[target_ntype]
             batch_num_removed_nodes = segment.segment_reduce(
                 c_ntype_batch_num_nodes, one_hot_removed_nodes, reducer='sum')
@@ -779,7 +781,9 @@ class DGLHeteroGraph(object):
                     continue
 
                 one_hot_left_edges = F.zeros((old_num_edges[c_etype],), F.float32, self.device)
-                one_hot_left_edges[F.astype(self.edges[c_etype].data[EID], F.int64)] = 1.
+                eids = self.edges[c_etype].data[EID]
+                one_hot_left_edges = F.scatter_row(one_hot_left_edges, eids,
+                                                   F.full_1d(len(eids), 1., F.float32, self.device))
                 batch_num_left_edges = segment.segment_reduce(
                     self._batch_num_edges[c_etype], one_hot_left_edges, reducer='sum')
                 self._batch_num_edges[c_etype] = F.astype(batch_num_left_edges, F.int64)

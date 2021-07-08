@@ -1205,31 +1205,6 @@ def test_add_nodes(idtype):
     assert F.array_equal(g.nodes['user'].data['h'], F.tensor([1, 1, 1, 0], dtype=idtype))
     assert F.array_equal(g.nodes['game'].data['h'], F.tensor([2, 2, 2, 2], dtype=idtype))
 
-def test_batch_graph(idtype):
-    ctx = F.ctx()
-    g1 = dgl.graph(([0, 1], [1, 2]), num_nodes=5, idtype=idtype, device=ctx)
-    g2 = dgl.graph(([], []), idtype=idtype, device=ctx)
-    g3 = dgl.graph(([2, 3, 4], [3, 2, 1]), idtype=idtype, device=ctx)
-
-    return dgl.batch([g1, g2, g3])
-
-def test_batch_hetero_graph(idtype):
-    ctx = F.ctx()
-    g1 = dgl.heterograph({
-        ('user', 'follows', 'user'): ([0, 1], [1, 2]),
-        ('user', 'plays', 'game'): ([1, 3], [0, 1])
-    }, num_nodes_dict={'user': 4, 'game': 3}, idtype=idtype, device=ctx)
-    g2 = dgl.heterograph({
-        ('user', 'follows', 'user'): ([0, 2], [3, 4]),
-        ('user', 'plays', 'game'): ([], [])
-    }, num_nodes_dict={'user': 6, 'game': 2}, idtype=idtype, device=ctx)
-    g3 = dgl.heterograph({
-        ('user', 'follows', 'user'): ([], []),
-        ('user', 'plays', 'game'): ([1, 2], [1, 2])
-    }, idtype=idtype, device=ctx)
-
-    return dgl.batch([g1, g2, g3])
-
 @parametrize_dtype
 def test_remove_edges(idtype):
     # homogeneous Graphs
@@ -1323,7 +1298,11 @@ def test_remove_edges(idtype):
     assert F.array_equal(g.nodes['developer'].data['h'], F.tensor([3, 3], dtype=idtype))
 
     # batched graph
-    bg = test_batch_graph(idtype)
+    ctx = F.ctx()
+    g1 = dgl.graph(([0, 1], [1, 2]), num_nodes=5, idtype=idtype, device=ctx)
+    g2 = dgl.graph(([], []), idtype=idtype, device=ctx)
+    g3 = dgl.graph(([2, 3, 4], [3, 2, 1]), idtype=idtype, device=ctx)
+    bg = dgl.batch([g1, g2, g3])
     bg_r = dgl.remove_edges(bg, 2)
     assert bg.batch_size == bg_r.batch_size
     assert F.array_equal(bg.batch_num_nodes(), bg_r.batch_num_nodes())
@@ -1340,7 +1319,19 @@ def test_remove_edges(idtype):
     assert F.array_equal(bg_r.batch_num_edges(), F.tensor([1, 0, 2], dtype=F.int64))
 
     # batched heterogeneous graph
-    bg = test_batch_hetero_graph(idtype)
+    g1 = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 1], [1, 2]),
+        ('user', 'plays', 'game'): ([1, 3], [0, 1])
+    }, num_nodes_dict={'user': 4, 'game': 3}, idtype=idtype, device=ctx)
+    g2 = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 2], [3, 4]),
+        ('user', 'plays', 'game'): ([], [])
+    }, num_nodes_dict={'user': 6, 'game': 2}, idtype=idtype, device=ctx)
+    g3 = dgl.heterograph({
+        ('user', 'follows', 'user'): ([], []),
+        ('user', 'plays', 'game'): ([1, 2], [1, 2])
+    }, idtype=idtype, device=ctx)
+    bg = dgl.batch([g1, g2, g3])
     bg_r = dgl.remove_edges(bg, 1, etype='follows')
     assert bg.batch_size == bg_r.batch_size
     ntypes = bg.ntypes
@@ -1483,7 +1474,11 @@ def test_remove_nodes(idtype):
     assert F.array_equal(v, F.tensor([0], dtype=idtype))
 
     # batched graph
-    bg = test_batch_graph(idtype)
+    ctx = F.ctx()
+    g1 = dgl.graph(([0, 1], [1, 2]), num_nodes=5, idtype=idtype, device=ctx)
+    g2 = dgl.graph(([], []), idtype=idtype, device=ctx)
+    g3 = dgl.graph(([2, 3, 4], [3, 2, 1]), idtype=idtype, device=ctx)
+    bg = dgl.batch([g1, g2, g3])
     bg_r = dgl.remove_nodes(bg, 1)
     assert bg_r.batch_size == bg.batch_size
     assert F.array_equal(bg_r.batch_num_nodes(), F.tensor([4, 0, 5], dtype=F.int64))
@@ -1500,7 +1495,19 @@ def test_remove_nodes(idtype):
     assert F.array_equal(bg_r.batch_num_edges(), F.tensor([0, 0, 1], dtype=F.int64))
 
     # batched heterogeneous graph
-    bg = test_batch_hetero_graph(idtype)
+    g1 = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 1], [1, 2]),
+        ('user', 'plays', 'game'): ([1, 3], [0, 1])
+    }, num_nodes_dict={'user': 4, 'game': 3}, idtype=idtype, device=ctx)
+    g2 = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 2], [3, 4]),
+        ('user', 'plays', 'game'): ([], [])
+    }, num_nodes_dict={'user': 6, 'game': 2}, idtype=idtype, device=ctx)
+    g3 = dgl.heterograph({
+        ('user', 'follows', 'user'): ([], []),
+        ('user', 'plays', 'game'): ([1, 2], [1, 2])
+    }, idtype=idtype, device=ctx)
+    bg = dgl.batch([g1, g2, g3])
     bg_r = dgl.remove_nodes(bg, 1, ntype='user')
     assert bg_r.batch_size == bg.batch_size
     assert F.array_equal(bg_r.batch_num_nodes('user'), F.tensor([3, 6, 3], dtype=F.int64))
