@@ -1367,7 +1367,7 @@ def test_remove_edges(idtype):
     assert bg.batch_size == bg_r.batch_size
     for nty in ntypes:
         assert F.array_equal(bg.batch_num_nodes(nty), bg_r.batch_num_nodes(nty))
-    assert F.array_equal(bg.batch_num_edges('plays'), bg_r.batch_num_edges('plays'))
+    assert F.array_equal(bg.batch_num_edges('follows'), bg_r.batch_num_edges('follows'))
     assert F.array_equal(bg_r.batch_num_edges('plays'), F.tensor([1, 0, 1], dtype=idtype))
 
     bg_r = dgl.remove_edges(bg, F.tensor([0, 1, 3], dtype=idtype), etype='follows')
