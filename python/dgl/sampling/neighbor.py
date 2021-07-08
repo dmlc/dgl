@@ -12,6 +12,117 @@ __all__ = [
     'sample_neighbors_biased',
     'select_topk']
 
+
+def sample_neighbors_homogeneous(g, nodes, etype_field, fanout, edge_dir='in', prob=None,
+                                 replace=False, copy_ndata=True, copy_edata=True):
+    """Sample neighboring edges of the given nodes and return the induced subgraph.
+
+    For each node, a number of inbound (or outbound when ``edge_dir == 'out'``) edges
+    will be randomly chosen.  The graph returned will then contain all the nodes in the
+    original graph, but only the sampled edges.
+
+    Node/edge features are not preserved. The original IDs of
+    the sampled edges are stored as the `dgl.EID` feature in the returned graph.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The graph.  Can only be in CPU. Should only have one node type and one edge type.
+    nodes : tensor or dict
+        Node IDs to sample neighbors from.
+
+        This argument can take a single ID tensor or a dictionary of node types and ID tensors.
+        If a single tensor is given, the graph must only have one type of nodes.
+    etype_field : string
+        The field in g.edata storing the edge type.
+    fanout : int
+        The number of edges to be sampled for each node on each edge type.
+
+        This argument can only take a single int. DGL will sample this number of edges for
+        each node for every edge type.
+
+        If -1 is given for a single edge type, all the neighboring edges with that edge
+        type will be selected.
+    edge_dir : str, optional
+        Determines whether to sample inbound or outbound edges.
+
+        Can take either ``in`` for inbound edges or ``out`` for outbound edges.
+    prob : str, optional
+        Feature name used as the (unnormalized) probabilities associated with each
+        neighboring edge of a node.  The feature must have only one element for each
+        edge.
+
+        The features must be non-negative floats, and the sum of the features of
+        inbound/outbound edges for every node must be positive (though they don't have
+        to sum up to one).  Otherwise, the result will be undefined.
+
+        If :attr:`prob` is not None, GPU sampling is not supported.
+    replace : bool, optional
+        If True, sample with replacement.
+    copy_ndata: bool, optional
+        If True, the node features of the new graph are copied from
+        the original graph. If False, the new graph will not have any
+        node features.
+
+        (Default: True)
+    copy_edata: bool, optional
+        If True, the edge features of the new graph are copied from
+        the original graph.  If False, the new graph will not have any
+        edge features.
+
+        (Default: True)
+
+    Returns
+    -------
+    DGLGraph
+        A sampled subgraph containing only the sampled neighboring edges, with the
+        same device as the input graph.
+
+    Notes
+    -----
+    If :attr:`copy_ndata` or :attr:`copy_edata` is True, same tensors are used as
+    the node or edge features of the original graph and the new graph.
+    As a result, users should avoid performing in-place operations
+    on the node features of the new graph to avoid feature corruption.
+    """
+    return None
+    '''
+    if g.device != F.cpu():
+        raise DGLError("The graph should be in cpu.")
+    if etype_field not in g.edata:
+        raise DGLError("The graph should have {} in the edge data representing the edge type.".format(etype_field))
+    if isinstance(fanout, int) is False:
+        raise DGLError("The fanout should be an integer")
+    nodes = F.to_dgl_nd(utils.prepare_tensor(g, nodes, 'nodes'))
+    etypes = g.edata[etype_field]
+
+    if prob is None:
+        prob = nd.array([], ctx=nd.cpu())
+    elif isinstance(prob, nd.NDArray):
+        prob_array = prob
+    else:
+        if prob in g.edata:
+            prob_array = F.to_dgl_nd(g.edata[prob])
+        else:
+            prob_array = F.to_dgl_nd(F.tensor(prob, dtype=F.float32))
+
+    subgidx = _CAPI_DGLSampleNeighborsHomogeneous(g._graph, nodes, etypes, fanout,
+                                                  edge_dir, prob_array, replace)
+    induced_edges = subgidx.induced_edges
+    ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
+
+    # handle features
+    if copy_ndata:
+        node_frames = utils.extract_node_subframes(g, None)
+        utils.set_new_frames(ret, node_frames=node_frames)
+
+    if copy_edata:
+        edge_frames = utils.extract_edge_subframes(g, induced_edges)
+        utils.set_new_frames(ret, edge_frames=edge_frames)
+
+    return ret
+    '''
+
 def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
                      copy_ndata=True, copy_edata=True, _dist_training=False):
     """Sample neighboring edges of the given nodes and return the induced subgraph.
