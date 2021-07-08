@@ -3,7 +3,7 @@ dependencies:
   - python=3.7.9
   - pip
   - pip:
-    - mxnet-cu101==1.8.0
+    - mxnet-cu110==1.8.0.post0
     - pytest
     - nose
     - numpy
