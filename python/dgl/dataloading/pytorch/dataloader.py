@@ -604,6 +604,7 @@ class EdgeDataLoader:
         minibatch.  Possible values are
 
         * None,
+        * ``self``,
         * ``reverse_id``,
         * ``reverse_types``
 
