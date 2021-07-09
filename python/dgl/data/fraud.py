@@ -81,8 +81,8 @@ class FraudDataset(DGLBuiltinDataset):
         'amazon': 'Amazon.mat'
     }
     node_name = {
-        'yelp': 'user',
-        'amazon': 'review'
+        'yelp': 'review',
+        'amazon': 'user'
     }
 
     def __init__(self, name, raw_dir=None, random_seed=717, train_size=0.7, val_size=0.1):
