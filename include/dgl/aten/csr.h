@@ -398,7 +398,7 @@ COOMatrix CSRRowWiseSampling(
  * If replace is false and a row has fewer non-zero values than num_samples,
  * all the values are picked.
  *
- * Examples:
+ * Examples: TODO
  *
  * // csr.num_rows = 4;
  * // csr.num_cols = 4;

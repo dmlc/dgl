@@ -110,7 +110,7 @@ HeteroSubgraph SampleNeighborsHomogeneous(
     const IdArray etypes,
     const int64_t fanout,
     EdgeDir dir,
-    const IdArray prob
+    const IdArray prob,
     bool replace) {
 
   CHECK_EQ(1, hg->NumVertexTypes())
@@ -121,10 +121,9 @@ HeteroSubgraph SampleNeighborsHomogeneous(
   std::vector<HeteroGraphPtr> subrels(1);
   std::vector<IdArray> induced_edges(1);
   const int64_t num_nodes = nodes->shape[0];
-  dgl_type_t etype = 0
+  dgl_type_t etype = 0;
   const dgl_type_t src_vtype = 0;
   const dgl_type_t dst_vtype = 0;
-  IdArray induced_edges;
   if (num_nodes == 0 || fanout == 0) {
     subrels[etype] = UnitGraph::Empty(1,
       hg->NumVertices(src_vtype),
@@ -154,7 +153,6 @@ HeteroSubgraph SampleNeighborsHomogeneous(
           sampled_coo = aten::COOTranspose(aten::COORowWisePerEtypeSampling(
             aten::COOTranspose(hg->GetCOOMatrix(etype)),
             nodes, etypes, fanout, prob, replace));
-          )
         } else {
           sampled_coo = aten::COORowWisePerEtypeSampling(
             hg->GetCOOMatrix(etype), nodes, etypes, fanout, prob, replace);
@@ -360,7 +358,7 @@ DGL_REGISTER_GLOBAL("sampling.neighbor._CAPI_DGLSampleNeighborsHomogeneous")
     IdArray etypes = args[2];
     const int64_t fanout = args[3];
     const std::string dir_str = args[4];
-    IdArray prob = args[5]
+    IdArray prob = args[5];
     const bool replace = args[6];
 
     CHECK(dir_str == "in" || dir_str == "out")
