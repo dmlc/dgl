@@ -179,6 +179,85 @@ def _gspmm(gidx, op, reduce_op, u, e):
     return v, (arg_u, arg_e)
 
 
+def _gspmm_hetero(g, op, reduce_op, u_and_e_tuple):
+    r""" Generalized Sparse Matrix Multiplication interface.
+    """
+    num_ntypes = g._graph.number_of_ntypes()
+    u_tuple, e_tuple = u_and_e_tuple[:num_ntypes], u_and_e_tuple[num_ntypes:]
+    gidx = g._graph
+    use_u = op != 'copy_rhs'
+    use_e = op != 'copy_lhs'
+
+    # TODO (Israt): Add check - F.dtype(u) != F.dtype(e):
+
+    # deal with scalar features.
+    expand_u, expand_e = False, False
+    list_u = [None] * gidx.number_of_ntypes()
+    list_v = [None] * gidx.number_of_ntypes()
+    list_e = [None] * gidx.number_of_etypes()
+
+    for rel in g.canonical_etypes:
+        srctype, _, dsttype = rel
+        etid = g.get_etype_id(rel)
+        src_id = g.get_ntype_id(srctype)
+        dst_id = g.get_ntype_id(dsttype)
+        u = u_tuple[src_id] if use_u else None
+        e = e_tuple[etid] if use_e else None
+        if use_u:
+            if u is not None and F.ndim(u) == 1:
+                u = F.unsqueeze(u, -1)
+                expand_u = True
+            list_u[src_id] = u if use_u else None
+        if use_e:
+            if e is not None and F.ndim(e) == 1:
+                e = F.unsqueeze(e, -1)
+                expand_e = True
+            list_e[etid] = e if use_e else None
+        ctx = F.context(u) if use_u else F.context(e) # TODO(Israt): Put outside of loop
+        dtype = F.dtype(u) if use_u else F.dtype(e) # TODO(Israt): Put outside of loop
+        u_shp = F.shape(u) if use_u else (0,)
+        e_shp = F.shape(e) if use_e else (0,)
+        v_shp = (gidx.number_of_nodes(dst_id), ) +\
+            infer_broadcast_shape(op, u_shp[1:], e_shp[1:])
+        list_v[dst_id] = F.zeros(v_shp, dtype, ctx)
+
+    use_cmp = reduce_op in ['max', 'min']
+    arg_u, arg_e = None, None
+    idtype = getattr(F, gidx.dtype)
+    if use_cmp:
+        if use_u:
+            arg_u = F.zeros(v_shp, idtype, ctx)
+        if use_e:
+            arg_e = F.zeros(v_shp, idtype, ctx)
+    arg_u_nd = to_dgl_nd_for_write(arg_u)
+    arg_e_nd = to_dgl_nd_for_write(arg_e)
+    if gidx.number_of_edges(0) > 0:
+        _CAPI_DGLKernelSpMMHetero(gidx, op, reduce_op,
+                                  [to_dgl_nd(u_i) for u_i in list_u],
+                                  [to_dgl_nd(e_i) for e_i in list_e],
+                                  [to_dgl_nd_for_write(v_i) for v_i in list_v],
+                                  arg_u_nd,
+                                  arg_e_nd)
+    arg_u = None if arg_u is None else F.zerocopy_from_dgl_ndarray(arg_u_nd)
+    arg_e = None if arg_e is None else F.zerocopy_from_dgl_ndarray(arg_e_nd)
+    # To deal with scalar node/edge features.
+
+    for l in range(gidx.number_of_ntypes()):
+        # replace None by empty tensor. Forward func doesn't accept None in tuple.
+        v = list_v[l]
+        v = F.tensor([]) if v is None else v
+        if ((expand_u or not use_u) and (expand_e or not use_e)):
+            v = F.squeeze(v, -1)  # To deal with scalar node/edge features.
+        list_v[l] = v
+    out = tuple(list_v)
+
+    if expand_u and use_cmp:
+        arg_u = F.squeeze(arg_u, -1)
+    if expand_e and use_cmp:
+        arg_e = F.squeeze(arg_e, -1)
+    return out, (arg_u, arg_e)
+
+
 def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
     r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface. It
     takes the result of :attr:`op` on source node feature and destination node
@@ -239,6 +318,7 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
             expand_rhs = True
     lhs_target = target_mapping[lhs_target]
     rhs_target = target_mapping[rhs_target]
+
     ctx = F.context(lhs) if use_lhs else F.context(rhs)
     dtype = F.dtype(lhs) if use_lhs else F.dtype(rhs)
     lhs_shp = F.shape(lhs) if use_lhs else (0,)
@@ -254,6 +334,70 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
                              lhs_target, rhs_target)
     if (expand_lhs or not use_lhs) and (expand_rhs or not use_rhs):
         out = F.squeeze(out, -1)
+    return out
+
+
+def _gsddmm_hetero(g, op, lhs_target='u', rhs_target='v', lhs_and_rhs_tuple=None):
+    r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface.
+    """
+    num_ntypes = g._graph.number_of_ntypes()
+    lhs_tuple, rhs_tuple = lhs_and_rhs_tuple[:num_ntypes], lhs_and_rhs_tuple[num_ntypes:]
+    gidx = g._graph
+    use_lhs = op != 'copy_rhs'
+    use_rhs = op != 'copy_lhs'
+
+    # TODO (Israt): Add check - F.dtype(u) != F.dtype(e):
+    # deal with scalar features.
+    expand_lhs, expand_rhs = False, False
+
+    lhs_target = target_mapping[lhs_target]
+    rhs_target = target_mapping[rhs_target]
+
+    lhs_list = [None] * gidx.number_of_ntypes()
+    rhs_list = [None] * gidx.number_of_ntypes()
+    out_list = [None] * gidx.number_of_etypes()
+
+    for rel in g.canonical_etypes:
+        srctype, _, dsttype = rel
+        etid = g.get_etype_id(rel)
+        src_id = g.get_ntype_id(srctype)
+        dst_id = g.get_ntype_id(dsttype)
+        lhs = lhs_tuple[src_id]
+        rhs = rhs_tuple[dst_id]
+        if use_lhs:
+            if lhs is not None and F.ndim(lhs) == 1:
+                lhs = F.unsqueeze(lhs, -1)
+                expand_lhs = True
+        if use_rhs:
+            if rhs is not None and F.ndim(rhs) == 1:
+                rhs = F.unsqueeze(lhs, -1)
+                expand_rhs = True
+
+        ctx = F.context(lhs) if use_lhs else F.context(rhs)
+        dtype = F.dtype(lhs) if use_lhs else F.dtype(rhs)
+        lhs_shp = F.shape(lhs) if use_lhs else (0,)
+        rhs_shp = F.shape(rhs) if use_rhs else (0,)
+        lhs_list[src_id] = lhs if use_lhs else None
+        rhs_list[dst_id] = rhs if use_rhs else None
+        out_shp = (gidx.number_of_edges(etid), ) +\
+            infer_broadcast_shape(op, lhs_shp[1:], rhs_shp[1:])
+        out_list[etid] = F.zeros(out_shp, dtype, ctx)
+
+    if gidx.number_of_edges(0) > 0:
+        _CAPI_DGLKernelSDDMMHetero(gidx, op,
+                                   [to_dgl_nd(lhs) for lhs in lhs_list],
+                                   [to_dgl_nd(rhs) for rhs in rhs_list],
+                                   [to_dgl_nd_for_write(out) for out in out_list],
+                                   lhs_target, rhs_target)
+
+    for l in range(gidx.number_of_ntypes()):
+        # Replace None by empty tensor. Forward func doesn't accept None in tuple.
+        e = out_list[l]
+        e = F.tensor([]) if e is None else e
+        if (expand_lhs or not use_lhs) and (expand_rhs or not use_rhs):
+            e = F.squeeze(v, -1)
+        out_list[l] = e
+    out = tuple(out_list)
     return out
 
 
@@ -366,124 +510,87 @@ def _bwd_segment_cmp(feat, arg, m):
                                  to_dgl_nd_for_write(out))
     return out
 
-class CSRMatrix(object):
-    """Device- and backend-agnostic sparse matrix in CSR format.
+def _csrmm(A, A_weights, B, B_weights, num_vtypes):
+    """Return a graph whose adjacency matrix is the sparse matrix multiplication
+    of those of two given graphs.
+
+    Note that the edge weights of both graphs must be scalar, i.e. :attr:`A_weights`
+    and :attr:`B_weights` must be 1D vectors.
 
     Parameters
     ----------
-    data : Tensor
-        The data array.
-    indices : Tensor
-        The column indices array.
-    indptr : Tensor
-        The row index pointer array.
-    num_rows : int
-        The number of rows.
-    num_cols : int
-        The number of columns.
-    """
-    def __init__(self, data, indices, indptr, num_rows, num_cols):
-        self.indptr = indptr
-        self.indices = indices
-        self.data = data
-        self.shape = (num_rows, num_cols)
-
-def csrmm(A, B):
-    """Sparse-sparse matrix multiplication.
-
-    This is an internal function whose interface is subject to changes.
-
-    Parameters
-    ----------
-    A : dgl.sparse.CSRMatrix
-        The left operand
-    B : dgl.sparse.CSRMatrix
-        The right operand
+    A : HeteroGraphIndex
+        The input graph index as left operand.
+    A_weights : Tensor
+        The edge weights of graph A as 1D tensor.
+    B : HeteroGraphIndex
+        The input graph index as right operand.
+    B_weights : Tensor
+        The edge weights of graph B as 1D tensor.
+    num_vtypes : int
+        The number of node types for the returned graph (must be either 1 or 2).
 
     Returns
     -------
-    dgl.sparse.CSRMatrix
-        The result
+    C : HeteroGraphIndex
+        The output graph index.
+    C_weights : Tensor
+        The edge weights of the output graph.
     """
-    A_indptr = F.zerocopy_from_numpy(A.indptr)
-    A_indices = F.zerocopy_from_numpy(A.indices)
-    A_data = F.zerocopy_from_numpy(A.data)
-    B_indptr = F.zerocopy_from_numpy(B.indptr)
-    B_indices = F.zerocopy_from_numpy(B.indices)
-    B_data = F.zerocopy_from_numpy(B.data)
-    C_indptr, C_indices, C_data = _CAPI_DGLCSRMM(
-        A.shape[0], A.shape[1], B.shape[1],
-        F.to_dgl_nd(A_indptr),
-        F.to_dgl_nd(A_indices),
-        F.to_dgl_nd(A_data),
-        F.to_dgl_nd(B_indptr),
-        F.to_dgl_nd(B_indices),
-        F.to_dgl_nd(B_data))
-    return CSRMatrix(
-        F.from_dgl_nd(C_data),
-        F.from_dgl_nd(C_indices),
-        F.from_dgl_nd(C_indptr),
-        A.shape[0],
-        B.shape[1])
+    C, C_weights = _CAPI_DGLCSRMM(
+        A, F.to_dgl_nd(A_weights), B, F.to_dgl_nd(B_weights), num_vtypes)
+    return C, F.from_dgl_nd(C_weights)
 
-def csrsum(As):
-    """Sparse-sparse matrix summation.
+def _csrsum(As, A_weights):
+    """Return a graph whose adjacency matrix is the sparse matrix summation
+    of the given list of graphs.
 
-    This is an internal function whose interface is subject to changes.
+    Note that the edge weights of all graphs must be scalar, i.e. the arrays in
+    :attr:`A_weights` must be 1D vectors.
 
     Parameters
     ----------
-    As : List[dgl.sparse.CSRMatrix]
-        List of scipy sparse matrices in CSR format.
+    As : list[HeteroGraphIndex]
+        The input graph indices.
+    A_weights : list[Tensor]
+        The edge weights of graph A as 1D tensor.
 
     Returns
     -------
-    dgl.sparse.CSRMatrix
-        The result
+    C : HeteroGraphIndex
+        The output graph index.
+    C_weights : Tensor
+        The edge weights of the output graph.
     """
-    A_indptr = [F.zerocopy_from_numpy(x.indptr) for x in As]
-    A_indices = [F.zerocopy_from_numpy(x.indices) for x in As]
-    A_data = [F.zerocopy_from_numpy(x.data) for x in As]
-    C_indptr, C_indices, C_data = _CAPI_DGLCSRSum(
-        As[0].shape[0], As[0].shape[1],
-        [F.to_dgl_nd(x) for x in A_indptr],
-        [F.to_dgl_nd(x) for x in A_indices],
-        [F.to_dgl_nd(x) for x in A_data])
-    return CSRMatrix(
-        F.from_dgl_nd(C_data),
-        F.from_dgl_nd(C_indices),
-        F.from_dgl_nd(C_indptr),
-        As[0].shape[0], As[0].shape[1])
+    C, C_weights = _CAPI_DGLCSRSum(As, [F.to_dgl_nd(w) for w in A_weights])
+    return C, F.from_dgl_nd(C_weights)
 
-def csrmask(A, B):
-    """Sparse-sparse matrix masking operation that computes ``A[B != 0]``.
+def _csrmask(A, A_weights, B):
+    """Return the weights of A at the locations identical to the sparsity pattern
+    of B.
 
-    This is an internal function whose interface is subject to changes.
+    If a non-zero entry in B does not exist in A, DGL returns 0 for that location
+    instead.
+
+    Note that the edge weights of the graph must be scalar, i.e. :attr:`A_weights`
+    must be a 1D vector.
+
+    In scipy notation this is identical to ``A[B != 0]``.
 
     Parameters
     ----------
-    A : dgl.sparse.CSRMatrix
-        The left operand
-    B : dgl.sparse.CSRMatrix
-        The right operand
+    A : HeteroGraphIndex
+        The input graph index as left operand.
+    A_weights : Tensor
+        The edge weights of graph A as 1D tensor.
+    B : HeteroGraphIndex
+        The input graph index as right operand.
 
     Returns
     -------
-    Tensor
-        The result
+    B_weights : Tensor
+        The output weights.
     """
-    A_indptr = F.zerocopy_from_numpy(A.indptr)
-    A_indices = F.zerocopy_from_numpy(A.indices)
-    A_data = F.zerocopy_from_numpy(A.data)
-    B_indptr = F.zerocopy_from_numpy(B.indptr)
-    B_indices = F.zerocopy_from_numpy(B.indices)
-    B_data = _CAPI_DGLCSRMask(
-        A.shape[0], A.shape[1],
-        F.to_dgl_nd(A_indptr),
-        F.to_dgl_nd(A_indices),
-        F.to_dgl_nd(A_data),
-        F.to_dgl_nd(B_indptr),
-        F.to_dgl_nd(B_indices))
-    return F.from_dgl_nd(B_data)
+    return F.from_dgl_nd(_CAPI_DGLCSRMask(A, F.to_dgl_nd(A_weights), B))
 
 _init_api("dgl.sparse")

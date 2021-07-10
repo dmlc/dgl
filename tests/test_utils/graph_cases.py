@@ -64,6 +64,18 @@ def graph1():
     g.edata['scalar_w'] = F.copy_to(F.abs(F.randn((g.number_of_edges(),))), F.cpu())
     return g
 
+@register_case(['homo', 'row_sorted'])
+def graph2():
+    return dgl.graph(([0, 0, 0, 1, 1, 2, 2, 2, 3, 3, 3, 4, 6, 6, 7, 8, 9],
+                      [4, 5, 1, 2, 4, 7, 9, 8 ,6, 4, 1, 0, 1, 0, 2, 3, 5]),
+                      row_sorted=True)
+
+@register_case(['homo', 'row_sorted', 'col_sorted'])
+def graph3():
+    return dgl.graph(([0, 0, 0, 1, 1, 2, 2, 2, 3, 3, 3, 4, 6, 6, 7, 8, 9],
+                      [1, 4, 5, 2, 4, 7, 8, 9 ,1, 4, 6, 0, 0, 1, 2, 3, 5]),
+                      row_sorted=True, col_sorted=True)
+
 @register_case(['hetero', 'has_feature'])
 def heterograph0():
     g = dgl.heterograph({
@@ -84,7 +96,7 @@ def batched_graph0():
     g3 = dgl.add_self_loop(dgl.graph(([0], [1])))
     return dgl.batch([g1, g2, g3])
 
-@register_case(['block', 'bipartite', 'block-biparitite'])
+@register_case(['block', 'bipartite', 'block-bipartite'])
 def block_graph0():
     g = dgl.graph(([2, 3, 4], [5, 6, 7]), num_nodes=100)
     g = g.to(F.cpu())

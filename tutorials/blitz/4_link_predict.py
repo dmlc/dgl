@@ -99,7 +99,7 @@ neg_u, neg_v = np.where(adj_neg != 0)
 
 neg_eids = np.random.choice(len(neg_u), g.number_of_edges())
 test_neg_u, test_neg_v = neg_u[neg_eids[:test_size]], neg_v[neg_eids[:test_size]]
-train_neg_u, train_neg_v = neg_u[neg_eids[test_size:]], neg_v[neg_eids[test_size:]]
+train_neg_u, train_neg_v = neg_u[neg_eids[train_size:]], neg_v[neg_eids[train_size:]]
 
 
 ######################################################################
@@ -172,7 +172,7 @@ class GraphSAGE(nn.Module):
 # The *positive graph* and the *negative graph* will contain the same set
 # of nodes as the original graph.  This makes it easier to pass node
 # features among multiple graphs for computation.  As you will see later,
-# you can directly fed the node representations computed on the entire
+# you can directly feed the node representations computed on the entire
 # graph to the positive and the negative graphs for computing pair-wise
 # scores.
 #

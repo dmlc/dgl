@@ -4,7 +4,7 @@ import numpy as np
 import unittest
 from collections import defaultdict
 
-def check_random_walk(g, metapath, traces, ntypes, prob=None):
+def check_random_walk(g, metapath, traces, ntypes, prob=None, trace_eids=None):
     traces = F.asnumpy(traces)
     ntypes = F.asnumpy(ntypes)
     for j in range(traces.shape[1] - 1):
@@ -19,6 +19,9 @@ def check_random_walk(g, metapath, traces, ntypes, prob=None):
                 p = F.asnumpy(g.edges[metapath[j]].data['p'])
                 eids = g.edge_ids(traces[i, j], traces[i, j+1], etype=metapath[j])
                 assert p[eids] != 0
+            if trace_eids is not None:
+                u, v = g.find_edges(trace_eids[i, j], etype=metapath[j])
+                assert (u == traces[i, j]) and (v == traces[i, j + 1])
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU random walk not implemented")
 def test_random_walk():
@@ -42,10 +45,10 @@ def test_random_walk():
     g4.edges['follow'].data['p'] = F.tensor([3, 0, 3, 3, 3], dtype=F.float32)
     g4.edges['viewed-by'].data['p'] = F.tensor([1, 1, 1, 1, 1, 1], dtype=F.float32)
 
-    traces, ntypes = dgl.sampling.random_walk(g1, [0, 1, 2, 0, 1, 2], length=4)
-    check_random_walk(g1, ['follow'] * 4, traces, ntypes)
-    traces, ntypes = dgl.sampling.random_walk(g1, [0, 1, 2, 0, 1, 2], length=4, restart_prob=0.)
-    check_random_walk(g1, ['follow'] * 4, traces, ntypes)
+    traces, eids, ntypes = dgl.sampling.random_walk(g1, [0, 1, 2, 0, 1, 2], length=4, return_eids=True)
+    check_random_walk(g1, ['follow'] * 4, traces, ntypes, trace_eids=eids)
+    traces, eids, ntypes = dgl.sampling.random_walk(g1, [0, 1, 2, 0, 1, 2], length=4, restart_prob=0., return_eids=True)
+    check_random_walk(g1, ['follow'] * 4, traces, ntypes, trace_eids=eids)
     traces, ntypes = dgl.sampling.random_walk(
         g1, [0, 1, 2, 0, 1, 2], length=4, restart_prob=F.zeros((4,), F.float32, F.cpu()))
     check_random_walk(g1, ['follow'] * 4, traces, ntypes)
@@ -56,13 +59,13 @@ def test_random_walk():
         g1, ['follow'] * 4, F.slice_axis(traces, 1, 0, 5), F.slice_axis(ntypes, 0, 0, 5))
     assert (F.asnumpy(traces)[:, 5] == -1).all()
 
-    traces, ntypes = dgl.sampling.random_walk(
-        g2, [0, 1, 2, 3, 0, 1, 2, 3], length=4)
-    check_random_walk(g2, ['follow'] * 4, traces, ntypes)
+    traces, eids, ntypes = dgl.sampling.random_walk(
+        g2, [0, 1, 2, 3, 0, 1, 2, 3], length=4, return_eids=True)
+    check_random_walk(g2, ['follow'] * 4, traces, ntypes, trace_eids=eids)
 
-    traces, ntypes = dgl.sampling.random_walk(
-        g2, [0, 1, 2, 3, 0, 1, 2, 3], length=4, prob='p')
-    check_random_walk(g2, ['follow'] * 4, traces, ntypes, 'p')
+    traces, eids, ntypes = dgl.sampling.random_walk(
+        g2, [0, 1, 2, 3, 0, 1, 2, 3], length=4, prob='p', return_eids=True)
+    check_random_walk(g2, ['follow'] * 4, traces, ntypes, 'p', trace_eids=eids)
 
     try:
         traces, ntypes = dgl.sampling.random_walk(
@@ -73,31 +76,54 @@ def test_random_walk():
     assert fail
 
     metapath = ['follow', 'view', 'viewed-by'] * 2
-    traces, ntypes = dgl.sampling.random_walk(
-        g3, [0, 1, 2, 0, 1, 2], metapath=metapath)
-    check_random_walk(g3, metapath, traces, ntypes)
+    traces, eids, ntypes = dgl.sampling.random_walk(
+        g3, [0, 1, 2, 0, 1, 2], metapath=metapath, return_eids=True)
+    check_random_walk(g3, metapath, traces, ntypes, trace_eids=eids)
 
     metapath = ['follow', 'view', 'viewed-by'] * 2
-    traces, ntypes = dgl.sampling.random_walk(
-        g4, [0, 1, 2, 3, 0, 1, 2, 3], metapath=metapath)
-    check_random_walk(g4, metapath, traces, ntypes)
+    traces, eids, ntypes = dgl.sampling.random_walk(
+        g4, [0, 1, 2, 3, 0, 1, 2, 3], metapath=metapath, return_eids=True)
+    check_random_walk(g4, metapath, traces, ntypes, trace_eids=eids)
+
+    traces, eids, ntypes = dgl.sampling.random_walk(
+        g4, [0, 1, 2, 0, 1, 2], metapath=metapath, return_eids=True)
+    check_random_walk(g4, metapath, traces, ntypes, trace_eids=eids)
 
     metapath = ['follow', 'view', 'viewed-by'] * 2
-    traces, ntypes = dgl.sampling.random_walk(
-        g4, [0, 1, 2, 3, 0, 1, 2, 3], metapath=metapath, prob='p')
-    check_random_walk(g4, metapath, traces, ntypes, 'p')
-    traces, ntypes = dgl.sampling.random_walk(
-        g4, [0, 1, 2, 3, 0, 1, 2, 3], metapath=metapath, prob='p', restart_prob=0.)
-    check_random_walk(g4, metapath, traces, ntypes, 'p')
-    traces, ntypes = dgl.sampling.random_walk(
+    traces, eids, ntypes = dgl.sampling.random_walk(
+        g4, [0, 1, 2, 3, 0, 1, 2, 3], metapath=metapath, prob='p', return_eids=True)
+    check_random_walk(g4, metapath, traces, ntypes, 'p', trace_eids=eids)
+    traces, eids, ntypes = dgl.sampling.random_walk(
+        g4, [0, 1, 2, 3, 0, 1, 2, 3], metapath=metapath, prob='p', restart_prob=0., return_eids=True)
+    check_random_walk(g4, metapath, traces, ntypes, 'p', trace_eids=eids)
+    traces, eids, ntypes = dgl.sampling.random_walk(
         g4, [0, 1, 2, 3, 0, 1, 2, 3], metapath=metapath, prob='p',
-        restart_prob=F.zeros((6,), F.float32, F.cpu()))
-    check_random_walk(g4, metapath, traces, ntypes, 'p')
-    traces, ntypes = dgl.sampling.random_walk(
+        restart_prob=F.zeros((6,), F.float32, F.cpu()), return_eids=True)
+    check_random_walk(g4, metapath, traces, ntypes, 'p', trace_eids=eids)
+    traces, eids, ntypes = dgl.sampling.random_walk(
         g4, [0, 1, 2, 3, 0, 1, 2, 3], metapath=metapath + ['follow'], prob='p',
-        restart_prob=F.tensor([0, 0, 0, 0, 0, 0, 1], F.float32))
-    check_random_walk(g4, metapath, traces[:, :7], ntypes[:7], 'p')
+        restart_prob=F.tensor([0, 0, 0, 0, 0, 0, 1], F.float32), return_eids=True)
+    check_random_walk(g4, metapath, traces[:, :7], ntypes[:7], 'p', trace_eids=eids)
     assert (F.asnumpy(traces[:, 7]) == -1).all()
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU random walk not implemented")
+def test_node2vec():
+    g1 = dgl.heterograph({
+        ('user', 'follow', 'user'): ([0, 1, 2], [1, 2, 0])
+        })
+    g2 = dgl.heterograph({
+        ('user', 'follow', 'user'): ([0, 1, 1, 2, 3], [1, 2, 3, 0, 0])
+        })
+    g2.edata['p'] = F.tensor([3, 0, 3, 3, 3], dtype=F.float32)
+
+    ntypes = F.zeros((5,), dtype=F.int64)
+
+    traces, eids = dgl.sampling.node2vec_random_walk(g1, [0, 1, 2, 0, 1, 2], 1, 1, 4, return_eids=True)
+    check_random_walk(g1, ['follow'] * 4, traces, ntypes, trace_eids=eids)
+
+    traces, eids = dgl.sampling.node2vec_random_walk(
+        g2, [0, 1, 2, 3, 0, 1, 2, 3], 1, 1, 4, prob='p', return_eids=True)
+    check_random_walk(g2, ['follow'] * 4, traces, ntypes, 'p', trace_eids=eids)
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU pack traces not implemented")
 def test_pack_traces():
@@ -157,6 +183,7 @@ def _gen_neighbor_sampling_test_graph(hypersparse, reverse):
         g = dgl.heterograph({
             ('user', 'follow', 'user'): ([0, 0, 0, 1, 1, 1, 2], [1, 2, 3, 0, 2, 3, 0])
         }, {'user': card if card is not None else 4})
+        g = g.to(F.ctx())
         g.edata['prob'] = F.tensor([.5, .5, 0., .5, .5, 0., 1.], dtype=F.float32)
         hg = dgl.heterograph({
             ('user', 'follow', 'user'): ([0, 0, 0, 1, 1, 1, 2],
@@ -165,10 +192,12 @@ def _gen_neighbor_sampling_test_graph(hypersparse, reverse):
             ('user', 'liked-by', 'game'): ([0, 1, 2, 0, 3, 0], [2, 2, 2, 1, 1, 0]),
             ('coin', 'flips', 'user'): ([0, 0, 0, 0], [0, 1, 2, 3])
         }, num_nodes_dict)
+        hg = hg.to(F.ctx())
     else:
         g = dgl.heterograph({
             ('user', 'follow', 'user'): ([1, 2, 3, 0, 2, 3, 0], [0, 0, 0, 1, 1, 1, 2])
         }, {'user': card if card is not None else 4})
+        g = g.to(F.ctx())
         g.edata['prob'] = F.tensor([.5, .5, 0., .5, .5, 0., 1.], dtype=F.float32)
         hg = dgl.heterograph({
             ('user', 'follow', 'user'): ([1, 2, 3, 0, 2, 3, 0],
@@ -177,6 +206,7 @@ def _gen_neighbor_sampling_test_graph(hypersparse, reverse):
             ('game', 'liked-by', 'user'): ([2, 2, 2, 1, 1, 0], [0, 1, 2, 0, 3, 0]),
             ('user', 'flips', 'coin'): ([0, 1, 2, 3], [0, 0, 0, 0])
         }, num_nodes_dict)
+        hg = hg.to(F.ctx())
     hg.edges['follow'].data['prob'] = F.tensor([.5, .5, 0., .5, .5, 0., 1.], dtype=F.float32)
     hg.edges['play'].data['prob'] = F.tensor([.8, .5, .5, .5], dtype=F.float32)
     hg.edges['liked-by'].data['prob'] = F.tensor([.3, .5, .2, .5, .1, .1], dtype=F.float32)
@@ -220,7 +250,7 @@ def _gen_neighbor_topk_test_graph(hypersparse, reverse):
     hg.edges['flips'].data['weight'] = F.tensor([10, 2, 13, -1], dtype=F.float32)
     return g, hg
 
-def _test_sample_neighbors(hypersparse):
+def _test_sample_neighbors(hypersparse, prob):
     g, hg = _gen_neighbor_sampling_test_graph(hypersparse, False)
 
     def _test1(p, replace):
@@ -247,10 +277,8 @@ def _test_sample_neighbors(hypersparse):
             if p is not None:
                 assert not (3, 0) in edge_set
                 assert not (3, 1) in edge_set
-    _test1(None, True)   # w/ replacement, uniform
-    _test1(None, False)  # w/o replacement, uniform
-    _test1('prob', True)   # w/ replacement
-    _test1('prob', False)  # w/o replacement
+    _test1(prob, True)   # w/ replacement, uniform
+    _test1(prob, False)  # w/o replacement, uniform
 
     def _test2(p, replace):  # fanout > #neighbors
         subg = dgl.sampling.sample_neighbors(g, [0, 2], -1, prob=p, replace=replace)
@@ -276,10 +304,8 @@ def _test_sample_neighbors(hypersparse):
                 assert len(edge_set) == num_edges
             if p is not None:
                 assert not (3, 0) in edge_set
-    _test2(None, True)   # w/ replacement, uniform
-    _test2(None, False)  # w/o replacement, uniform
-    _test2('prob', True)   # w/ replacement
-    _test2('prob', False)  # w/o replacement
+    _test2(prob, True)   # w/ replacement, uniform
+    _test2(prob, False)  # w/o replacement, uniform
 
     def _test3(p, replace):
         subg = dgl.sampling.sample_neighbors(hg, {'user': [0, 1], 'game': 0}, -1, prob=p, replace=replace)
@@ -299,10 +325,8 @@ def _test_sample_neighbors(hypersparse):
             assert subg['liked-by'].number_of_edges() == 4 if replace else 3
             assert subg['flips'].number_of_edges() == 0
 
-    _test3(None, True)   # w/ replacement, uniform
-    _test3(None, False)  # w/o replacement, uniform
-    _test3('prob', True)   # w/ replacement
-    _test3('prob', False)  # w/o replacement
+    _test3(prob, True)   # w/ replacement, uniform
+    _test3(prob, False)  # w/o replacement, uniform
 
     # test different fanouts for different relations
     for i in range(10):
@@ -528,9 +552,13 @@ def _test_sample_neighbors_topk_outedge(hypersparse):
         assert subg['flips'].number_of_edges() == 0
     _test3()
 
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
-def test_sample_neighbors():
-    _test_sample_neighbors(False)
+def test_sample_neighbors_noprob():
+    _test_sample_neighbors(False, None)
+    #_test_sample_neighbors(True)
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors with probability is not implemented")
+def test_sample_neighbors_prob():
+    _test_sample_neighbors(False, 'prob')
     #_test_sample_neighbors(True)
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
@@ -560,12 +588,115 @@ def test_sample_neighbors_with_0deg():
     sg = dgl.sampling.sample_neighbors(g, F.tensor([1, 2], dtype=F.int64), 2, edge_dir='out', replace=True)
     assert sg.number_of_edges() == 0
 
+def create_test_graph(num_nodes, num_edges_per_node, bipartite=False):
+    src = np.concatenate(
+        [np.array([i] * num_edges_per_node) for i in range(num_nodes)])
+    dst = np.concatenate(
+        [np.random.choice(num_nodes, num_edges_per_node, replace=False) for i in range(num_nodes)]
+    )
+    if bipartite:
+        g = dgl.heterograph({("u", "e", "v") : (src, dst)})
+    else:
+        g = dgl.graph((src, dst))
+    return g
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
+def test_sample_neighbors_biased_homogeneous():
+    g = create_test_graph(100, 30)
+
+    def check_num(nodes, tag):
+        nodes, tag = F.asnumpy(nodes), F.asnumpy(tag)
+        cnt = [sum(tag[nodes] == i) for i in range(4)]
+        # No tag 0
+        assert cnt[0] == 0
+
+        # very rare tag 1
+        assert cnt[2] > 2 * cnt[1]
+        assert cnt[3] > 2 * cnt[1]
+
+    tag = F.tensor(np.random.choice(4, 100))
+    bias = F.tensor([0, 0.1, 10, 10], dtype=F.float32)
+    # inedge / without replacement
+    g_sorted = dgl.sort_csc_by_tag(g, tag)
+    for _ in range(5):
+        subg = dgl.sampling.sample_neighbors_biased(g_sorted, g.nodes(), 5, bias, replace=False)
+        check_num(subg.edges()[0], tag)
+        u, v = subg.edges()
+        edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+        assert len(edge_set) == subg.number_of_edges()
+
+    # inedge / with replacement
+    for _ in range(5):
+        subg = dgl.sampling.sample_neighbors_biased(g_sorted, g.nodes(), 5, bias, replace=True)
+        check_num(subg.edges()[0], tag)
+
+    # outedge / without replacement
+    g_sorted = dgl.sort_csr_by_tag(g, tag)
+    for _ in range(5):
+        subg = dgl.sampling.sample_neighbors_biased(g_sorted, g.nodes(), 5, bias, edge_dir='out', replace=False)
+        check_num(subg.edges()[1], tag)
+        u, v = subg.edges()
+        edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+        assert len(edge_set) == subg.number_of_edges()
+
+    # outedge / with replacement
+    for _ in range(5):
+        subg = dgl.sampling.sample_neighbors_biased(g_sorted, g.nodes(), 5, bias, edge_dir='out', replace=True)
+        check_num(subg.edges()[1], tag)
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
+def test_sample_neighbors_biased_bipartite():
+    g = create_test_graph(100, 30, True)
+    num_dst = g.number_of_dst_nodes()
+    bias = F.tensor([0, 0.01, 10, 10], dtype=F.float32)
+    def check_num(nodes, tag):
+        nodes, tag = F.asnumpy(nodes), F.asnumpy(tag)
+        cnt = [sum(tag[nodes] == i) for i in range(4)]
+        # No tag 0
+        assert cnt[0] == 0
+
+        # very rare tag 1
+        assert cnt[2] > 2 * cnt[1]
+        assert cnt[3] > 2 * cnt[1]
+
+    # inedge / without replacement
+    tag = F.tensor(np.random.choice(4, 100))
+    g_sorted = dgl.sort_csc_by_tag(g, tag)
+    for _ in range(5):
+        subg = dgl.sampling.sample_neighbors_biased(g_sorted, g.dstnodes(), 5, bias, replace=False)
+        check_num(subg.edges()[0], tag)
+        u, v = subg.edges()
+        edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+        assert len(edge_set) == subg.number_of_edges()
+
+    # inedge / with replacement
+    for _ in range(5):
+        subg = dgl.sampling.sample_neighbors_biased(g_sorted, g.dstnodes(), 5, bias, replace=True)
+        check_num(subg.edges()[0], tag)
+
+    # outedge / without replacement
+    tag = F.tensor(np.random.choice(4, num_dst))
+    g_sorted = dgl.sort_csr_by_tag(g, tag)
+    for _ in range(5):
+        subg = dgl.sampling.sample_neighbors_biased(g_sorted, g.srcnodes(), 5, bias, edge_dir='out', replace=False)
+        check_num(subg.edges()[1], tag)
+        u, v = subg.edges()
+        edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+        assert len(edge_set) == subg.number_of_edges()
+
+    # outedge / with replacement
+    for _ in range(5):
+        subg = dgl.sampling.sample_neighbors_biased(g_sorted, g.srcnodes(), 5, bias, edge_dir='out', replace=True)
+        check_num(subg.edges()[1], tag)
+
 if __name__ == '__main__':
     test_random_walk()
     test_pack_traces()
     test_pinsage_sampling()
-    test_sample_neighbors()
+    # test_sample_neighbors()
     test_sample_neighbors_outedge()
     test_sample_neighbors_topk()
     test_sample_neighbors_topk_outedge()
     test_sample_neighbors_with_0deg()
+    test_sample_neighbors_biased_homogeneous()
+    test_sample_neighbors_biased_bipartite()
