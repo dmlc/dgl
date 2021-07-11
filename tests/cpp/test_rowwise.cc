@@ -84,8 +84,8 @@ void CheckSampledResult(COOMatrix mat, IdArray rows, bool has_data) {
 
 template <typename Idx>
 void CheckSampledPerEtypeReplaceResult(COOMatrix mat, IdArray rows, bool has_data) {
-  ASSERT_EQ(mat.num_rows, 8);
-  ASSERT_EQ(mat.num_cols, 8);
+  ASSERT_EQ(mat.num_rows, 4);
+  ASSERT_EQ(mat.num_cols, 4);
   Idx* row = static_cast<Idx*>(mat.row->data);
   Idx* col = static_cast<Idx*>(mat.col->data);
   Idx* data = static_cast<Idx*>(mat.data->data);
@@ -98,8 +98,8 @@ void CheckSampledPerEtypeReplaceResult(COOMatrix mat, IdArray rows, bool has_dat
 
 template <typename Idx>
 void CheckSampledPerEtypeResult(COOMatrix mat, IdArray rows, bool has_data) {
-  ASSERT_EQ(mat.num_rows, 5);
-  ASSERT_EQ(mat.num_cols, 5);
+  ASSERT_EQ(mat.num_rows, 4);
+  ASSERT_EQ(mat.num_cols, 4);
   Idx* row = static_cast<Idx*>(mat.row->data);
   Idx* col = static_cast<Idx*>(mat.col->data);
   Idx* data = static_cast<Idx*>(mat.data->data);
@@ -261,7 +261,9 @@ void _TestCSRPerEtypeSampling(bool has_data) {
   FloatArray prob = NDArray::FromVector(
       std::vector<FloatType>({.5, .5, .5, .5, .5, .5, .5}));
   IdArray rows = NDArray::FromVector(std::vector<Idx>({0, 3}));
-  IdArray etypes = NDArray::FromVector(std::vector<Idx>({0, 0, 0, 3, 0, 1, 2}));
+  IdArray etypes = has_data ?
+      NDArray::FromVector(std::vector<Idx>({0, 1, 0, 0, 2, 0, 3})) :
+      NDArray::FromVector(std::vector<Idx>({0, 0, 0, 3, 0, 1, 2}));
   for (int k = 0; k < 10; ++k) {
     auto rst = CSRRowWisePerEtypeSampling(mat, rows, etypes, 2, prob, true);
     CheckSampledPerEtypeReplaceResult<Idx>(rst, rows, has_data);
@@ -309,7 +311,10 @@ void _TestCSRPerEtypeSampling(bool has_data) {
     }
   }
 
-  prob = NDArray::FromVector(
+  prob = has_data ?
+    NDArray::FromVector(
+      std::vector<FloatType>({.0, .5, .0, .5, .5, .0, .5})) :
+    NDArray::FromVector(
       std::vector<FloatType>({.0, .5, .0, .5, .0, .5, .5}));
   for (int k = 0; k < 10; ++k) {
     auto rst = CSRRowWisePerEtypeSampling(mat, rows, etypes, 2, prob, true);
@@ -341,7 +346,9 @@ void _TestCSRPerEtypeSamplingUniform(bool has_data) {
   auto mat = CSREtypes<Idx>(has_data);
   FloatArray prob = aten::NullArray();
   IdArray rows = NDArray::FromVector(std::vector<Idx>({0, 3}));
-  IdArray etypes = NDArray::FromVector(std::vector<Idx>({0, 0, 0, 3, 0, 1, 2}));
+  IdArray etypes = has_data ?
+      NDArray::FromVector(std::vector<Idx>({0, 1, 0, 0, 2, 0, 3})) :
+      NDArray::FromVector(std::vector<Idx>({0, 0, 0, 3, 0, 1, 2}));
   for (int k = 0; k < 10; ++k) {
     auto rst = CSRRowWisePerEtypeSampling(mat, rows, etypes, 2, prob, true);
     CheckSampledPerEtypeReplaceResult<Idx>(rst, rows, has_data);
@@ -500,7 +507,9 @@ void _TestCOOerEtypeSampling(bool has_data) {
   FloatArray prob = NDArray::FromVector(
       std::vector<FloatType>({.5, .5, .5, .5, .5, .5, .5}));
   IdArray rows = NDArray::FromVector(std::vector<Idx>({0, 3}));
-  IdArray etypes = NDArray::FromVector(std::vector<Idx>({0, 0, 0, 3, 0, 1, 2}));
+  IdArray etypes = has_data ?
+      NDArray::FromVector(std::vector<Idx>({0, 1, 0, 0, 2, 0, 3})) :
+      NDArray::FromVector(std::vector<Idx>({0, 0, 0, 3, 0, 1, 2}));
   for (int k = 0; k < 10; ++k) {
     auto rst = COORowWisePerEtypeSampling(mat, rows, etypes, 2, prob, true);
     CheckSampledPerEtypeReplaceResult<Idx>(rst, rows, has_data);
@@ -548,7 +557,10 @@ void _TestCOOerEtypeSampling(bool has_data) {
     }
   }
 
-  prob = NDArray::FromVector(
+  prob = has_data ?
+    NDArray::FromVector(
+      std::vector<FloatType>({.0, .5, .0, .5, .5, .0, .5})) :
+    NDArray::FromVector(
       std::vector<FloatType>({.0, .5, .0, .5, .0, .5, .5}));
   for (int k = 0; k < 10; ++k) {
     auto rst = COORowWisePerEtypeSampling(mat, rows, etypes, 2, prob, true);
@@ -563,7 +575,6 @@ void _TestCOOerEtypeSampling(bool has_data) {
     }
   }
 }
-
 
 TEST(RowwiseTest, TestCOOerEtypeSampling) {
   _TestCOOerEtypeSampling<int32_t, float>(true);
@@ -581,7 +592,9 @@ void _TestCOOPerEtypeSamplingUniform(bool has_data) {
   auto mat = COOEtypes<Idx>(has_data);
   FloatArray prob = aten::NullArray();
   IdArray rows = NDArray::FromVector(std::vector<Idx>({0, 3}));
-  IdArray etypes = NDArray::FromVector(std::vector<Idx>({0, 0, 0, 3, 0, 1, 2}));
+  IdArray etypes = has_data ?
+      NDArray::FromVector(std::vector<Idx>({0, 1, 0, 0, 2, 0, 3})) :
+      NDArray::FromVector(std::vector<Idx>({0, 0, 0, 3, 0, 1, 2}));
   for (int k = 0; k < 10; ++k) {
     auto rst = COORowWisePerEtypeSampling(mat, rows, etypes, 2, prob, true);
     CheckSampledPerEtypeReplaceResult<Idx>(rst, rows, has_data);
