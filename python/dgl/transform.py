@@ -122,7 +122,7 @@ def knn_graph(x, k, algorithm='bruteforce-blas', dist='euclidean'):
           This method is suitable for low-dimensional data (e.g. 3D
           point clouds)
 
-        * 'nn-descent' is a approximate approach from paper
+        * 'nn-descent' is an approximate approach from paper
           `Efficient k-nearest neighbor graph construction for generic similarity
           measures <https://www.cs.princeton.edu/cass/papers/www11.pdf>`_. This method
           will search for nearest neighbor candidates in "neighbors' neighbors".
@@ -156,7 +156,7 @@ def knn_graph(x, k, algorithm='bruteforce-blas', dist='euclidean'):
     ...                   [0.3, 0.2, 0.4]])
     >>> knn_g = dgl.knn_graph(x, 2)  # Each node has two predecessors
     >>> knn_g.edges()
-    >>> (tensor([0, 1, 2, 2, 2, 3, 3, 3]), tensor([0, 1, 1, 2, 3, 0, 2, 3]))
+    (tensor([0, 1, 2, 2, 2, 3, 3, 3]), tensor([0, 1, 1, 2, 3, 0, 2, 3]))
 
     When :attr:`x` is a 3D tensor, DGL constructs multiple KNN graphs and
     and then composes them into a graph of multiple connected components.
@@ -297,7 +297,7 @@ def segmented_knn_graph(x, k, segs, algorithm='bruteforce-blas', dist='euclidean
           This method is suitable for low-dimensional data (e.g. 3D
           point clouds)
 
-        * 'nn-descent' is a approximate approach from paper
+        * 'nn-descent' is an approximate approach from paper
           `Efficient k-nearest neighbor graph construction for generic similarity
           measures <https://www.cs.princeton.edu/cass/papers/www11.pdf>`_. This method
           will search for nearest neighbor candidates in "neighbors' neighbors".
@@ -533,7 +533,7 @@ def knn(k, x, x_segs, y=None, y_segs=None, algorithm='bruteforce', dist='euclide
           This method is suitable for low-dimensional data (e.g. 3D
           point clouds)
 
-        * 'nn-descent' is a approximate approach from paper
+        * 'nn-descent' is an approximate approach from paper
           `Efficient k-nearest neighbor graph construction for generic similarity
           measures <https://www.cs.princeton.edu/cass/papers/www11.pdf>`_. This method
           will search for nearest neighbor candidates in "neighbors' neighbors".
