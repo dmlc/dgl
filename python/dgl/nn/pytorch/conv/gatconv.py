@@ -217,7 +217,7 @@ class GATConv(nn.Module):
         """
         self._allow_zero_in_degree = set_value
 
-    def forward(self, graph, feat, get_attention=False):
+    def forward(self, graph, feat, get_attention=True):
         r"""
 
         Description
