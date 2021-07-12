@@ -65,7 +65,7 @@ class TensorDispatcher {
   }
 
   /*! \brief Load symbols from the given tensor adapter library path */
-  void Load(const char *path_cstr);
+  bool Load(const char *path_cstr);
 
   /*!
    * \brief Allocate an empty tensor.

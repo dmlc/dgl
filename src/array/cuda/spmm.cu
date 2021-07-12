@@ -526,7 +526,6 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
         (CUDART_VERSION < 11000) &&
         ((op == "copy_lhs" && cusparse_available<bits, IdType>()) ||
          (op == "mul" && is_scalar_efeat && cusparse_available<bits, IdType>()));
-#if CUDART_VERSION < 11000
     // Create temporary output buffer to store non-transposed output
     if (use_legacy_cusparsemm) {
       for (dgl_type_t ntype = 0; ntype < vec_out.size(); ++ntype) {
@@ -539,7 +538,6 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
         trans_out[ntype] = out;
       }
     }
-#endif
 
     // Check shape of ufeat for all relation type and compute feature size
     int64_t x_length = 1;
@@ -634,7 +632,6 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
       }
     }
 
-#if CUDART_VERSION < 11000
     if (use_legacy_cusparsemm) {
       // transpose output
       for (dgl_type_t ntype = 0; ntype < vec_out.size(); ++ntype) {
@@ -646,7 +643,6 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
         device->FreeWorkspace(vec_csr[0].indptr->ctx, trans_out[ntype]);
       }
     }
-#endif
   });
 }
 

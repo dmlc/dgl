@@ -43,17 +43,17 @@ python n_body_sim.py --num_traj <num_traj> --steps <num_steps>
 
 
 ```python
-python train.py --number_workers 15
+python train.py --num_workers 15
 ```
 
 Training with GPU
 ```python
-python train.py --gpu 0 --number_workers 15
+python train.py --gpu 0 --num_workers 15
 ```
 
 Training with visualization: for valid visualization, it might take full 40000 epoch of training
 ```python
-python train.py --gpu 0 --number_workers 15 --visualize
+python train.py --gpu 0 --num_workers 15 --visualize
 ```
 
 One Step Loss Performance, Loss of test data after 40000 training epochs.
