@@ -1125,6 +1125,21 @@ def replace_inf_with_zero(x):
     """
     pass
 
+def count_nonzero(input):
+    """Return the count of non-zero values in the tensor input.
+
+    Parameters
+    ----------
+    input : Tensor
+        The tensor to be counted
+
+    Returns
+    -------
+    Integer
+        The result
+    """
+    pass
+
 ###############################################################################
 # Tensor functions used *only* on index tensor
 # ----------------
@@ -1643,7 +1658,7 @@ def scatter_add(x, idx, m):
         The indices array.
     m : int
         The length of output.
-    
+
     Returns
     -------
     Tensor

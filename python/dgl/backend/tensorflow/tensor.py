@@ -409,6 +409,10 @@ def clamp(data, min_val, max_val):
 def replace_inf_with_zero(x):
     return tf.where(tf.abs(x) == np.inf, 0, x)
 
+def count_nonzero(input):
+    return int(tf.math.count_nonzero(input))
+
+
 def unique(input):
     return tf.unique(input).y
 
