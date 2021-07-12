@@ -534,8 +534,8 @@ def test_gat_conv(g, idtype, out_dim, num_heads):
     ctx = F.ctx()
     gat = nn.GATConv(5, out_dim, num_heads)
     feat = F.randn((g.number_of_src_nodes(), 5))
-    gat = gat.to(ctx)
-    h = gat[0](g, feat)
+    gat = gat[0].to(ctx)
+    h = gat(g, feat)
 
     # test pickle
     th.save(gat, tmp_buffer)
@@ -546,8 +546,8 @@ def test_gat_conv(g, idtype, out_dim, num_heads):
 
     # test residual connection
     gat = nn.GATConv(5, out_dim, num_heads, residual=True)
-    gat = gat.to(ctx)
-    h = gat[0](g, feat)
+    gat = gat[0].to(ctx)
+    h = gat(g, feat)
 
 @parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['bipartite'], exclude=['zero-degree']))
@@ -558,8 +558,8 @@ def test_gat_conv_bi(g, idtype, out_dim, num_heads):
     ctx = F.ctx()
     gat = nn.GATConv(5, out_dim, num_heads)
     feat = (F.randn((g.number_of_src_nodes(), 5)), F.randn((g.number_of_dst_nodes(), 5)))
-    gat = gat.to(ctx)
-    h = gat[0](g, feat)
+    gat = gat[0].to(ctx)
+    h = gat(g, feat)
     assert h.shape == (g.number_of_dst_nodes(), num_heads, out_dim)
     _, a = gat(g, feat, get_attention=True)
     assert a.shape == (g.number_of_edges(), num_heads, 1)
