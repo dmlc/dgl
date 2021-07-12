@@ -559,7 +559,7 @@ def test_gat_conv_bi(g, idtype, out_dim, num_heads):
     gat = nn.GATConv(5, out_dim, num_heads)
     feat = (F.randn((g.number_of_src_nodes(), 5)), F.randn((g.number_of_dst_nodes(), 5)))
     gat = gat.to(ctx)
-    h = gat(g, feat)
+    h = gat(g[0], feat)
     assert h.shape == (g.number_of_dst_nodes(), num_heads, out_dim)
     _, a = gat(g, feat, get_attention=True)
     assert a.shape == (g.number_of_edges(), num_heads, 1)
