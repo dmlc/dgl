@@ -112,6 +112,7 @@ def decorate(func, fwrapped):
     import decorator
     return decorator.decorate(func, fwrapped)
 
+tensor_adapter_loaded = False
 
 def load_tensor_adapter(backend, version):
     """Tell DGL to load a tensoradapter library for given backend and version.
@@ -123,6 +124,7 @@ def load_tensor_adapter(backend, version):
     version : str
         The version number of the backend.
     """
+    global tensor_adapter_loaded
     version = version.split('+')[0]
     if sys.platform.startswith('linux'):
         basename = 'libtensoradapter_%s_%s.so' % (backend, version)
@@ -133,4 +135,4 @@ def load_tensor_adapter(backend, version):
     else:
         raise NotImplementedError('Unsupported system: %s' % sys.platform)
     path = os.path.join(_DIR_NAME, 'tensoradapter', backend, basename)
-    _LIB.DGLLoadTensorAdapter(path.encode('utf-8'))
+    tensor_adapter_loaded = (_LIB.DGLLoadTensorAdapter(path.encode('utf-8')) == 0)

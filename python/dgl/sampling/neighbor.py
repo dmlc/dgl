@@ -186,39 +186,45 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
 def sample_neighbors_biased(g, nodes, fanout, bias, edge_dir='in',
                             tag_offset_name='_TAG_OFFSET', replace=False,
                             copy_ndata=True, copy_edata=True):
-    """Sample neighboring edges of the given nodes and return the induced subgraph, where each
-       neighbor's probability to be picked is determined by its tag.
+    r"""Sample neighboring edges of the given nodes and return the induced subgraph, where each
+    neighbor's probability to be picked is determined by its tag.
 
     For each node, a number of inbound (or outbound when ``edge_dir == 'out'``) edges
     will be randomly chosen.  The graph returned will then contain all the nodes in the
     original graph, but only the sampled edges.
 
     This version of neighbor sampling can support the scenario where adjacent nodes with different
-    types might have different probability to be picked. Each node is assigned an integer(tag)
+    types have different sampling probability. Each node is assigned an integer (called a *tag*)
     which represents its type. Tag is an analogue of node type under the framework of homogeneous
     graphs. Nodes with the same tag share the same probability.
 
-    For example, assume a node has (a+b) neighbors, and a of them have tag 0 while b of them have
-    tag 1. Assume a node of tag 0 has an unnormalized probability p to be picked while a node of
-    tag 1 has q. This function first chooses a tag according to the unnormalized probability
-    distribution (ap, bq), and then run a uniform sampling within the nodes with the chosen tag.
+    For example, assume a node has :math:`N+M` neighbors, and :math:`N` of them
+    have tag 0 while :math:`M` of them have tag 1. Assume a node of tag 0 has
+    an unnormalized probability :math:`p` to be picked while a node of tag 1
+    has :math:`q`. This function first chooses a tag according to the
+    unnormalized probability distribution
+    :math:`\frac{P(tag=0)}{P(tag=1)}=\frac{Np}{Mq}`, and then run a uniform
+    sampling to get a node of the chosen tag.
 
-    In order to sample efficiently, we need to first sort the CSR matrix of the graph
-    according to the tag (See `dgl.transform.sort_in_edges` and `dgl.transform.sort_out_edges`
-    for details), which will arrange the neighbors with the same tag in a consecutive range
-    and store the offset of these ranges in a node feature with tag_offset_name as its name.
+    In order to make sampling more efficient, the input graph must have its
+    CSC matrix (or CSR matrix if ``edge_dir='out'``) sorted according to the tag. The API
+    :func:`~dgl.sort_csc_by_tag` and
+    :func:`~dgl.sort_csr_by_tag` are designed for this purpose, which
+    will internally reorder the neighbors by tags so that neighbors of the same tags are
+    stored in a consecutive range. The two APIs will also store the offsets of these ranges
+    in a node feature with :attr:`tag_offset_name` as its name.
 
-    Please make sure that the graph has been sorted by the sorting function corresponding to
-    the edge direction ('in' or 'out'). This function itself will not check whether the graph is
-    sorted. Note that the input `tag_offset_name` should be consistent with that in the sorting
-    function.
+    **Please make sure that the CSR (or CSC) matrix of the graph has been sorted before
+    calling this function.**  This function itself will not check whether the
+    input graph is sorted. Note that the input :attr:`tag_offset_name` should
+    be consistent with that in the sorting function.
 
-    Only homogeneous or bipartite graphs are supported. For bipartite graphs, only candidate
-    frontier nodes have tags(source nodes when edge_dir='in' and destination nodes when
-    edge_dir='out'), and the offset of tags should be stored as a node feature of the seed nodes.
+    Only homogeneous or bipartite graphs are supported. For bipartite graphs,
+    the tag offsets of the source nodes when ``edge_dir='in'`` (or the destination
+    nodes when ``edge_dir='out'``) will be used in sampling.
 
     Node/edge features are not preserved. The original IDs of
-    the sampled edges are stored as the `dgl.EID` feature in the returned graph.
+    the sampled edges are stored as the ``dgl.EID`` feature in the returned graph.
 
     Parameters
     ----------
@@ -272,6 +278,11 @@ def sample_neighbors_biased(g, nodes, fanout, bias, edge_dir='in',
     As a result, users should avoid performing in-place operations
     on the node features of the new graph to avoid feature corruption.
 
+    See Also
+    --------
+    dgl.sort_csc_by_tag
+    dgl.sort_csr_by_tag
+
     Examples
     --------
     Assume that you have the following graph
@@ -284,7 +295,7 @@ def sample_neighbors_biased(g, nodes, fanout, bias, edge_dir='in',
 
     Sort the graph (necessary!)
 
-    >>> g_sorted = dgl.transform.sort_out_edges(g, tag)
+    >>> g_sorted = dgl.transform.sort_csr_by_tag(g, tag)
     >>> g_sorted.ndata['_TAG_OFFSET']
     tensor([[0, 1, 2],
             [0, 2, 2],
