@@ -23,6 +23,9 @@ NDArray IndexSelectCPUFromGPU(NDArray array, IdArray index) {
   int64_t num_feat = 1;
   std::vector<int64_t> shape{len};
 
+  CHECK_EQ(array->ctx.device_type, kDLCPU);
+  CHECK_EQ(index->ctx.device_type, kDLGPU);
+
   for (int d = 1; d < array->ndim; ++d) {
     num_feat *= array->shape[d];
     shape.emplace_back(array->shape[d]);

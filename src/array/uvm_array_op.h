@@ -13,6 +13,7 @@ namespace dgl {
 namespace aten {
 namespace impl {
 
+// Take CPU array and GPU index, and then index with GPU.
 template <typename DType, typename IdType>
 NDArray IndexSelectCPUFromGPU(NDArray array, IdArray index);
 

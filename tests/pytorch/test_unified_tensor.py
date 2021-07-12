@@ -18,10 +18,12 @@ def test_unified_tensor():
     seq_idx = th.arange(0, test_row_size)
     assert th.all(th.eq(input[seq_idx], input_unified[seq_idx]))
 
-    rand_idx = th.randint(0, test_row_size, (rand_test_size,))
+    seq_idx = seq_idx.to(th.device('cuda'))
+    assert th.all(th.eq(input[seq_idx].to(th.device('cuda')), input_unified[seq_idx]))
+
     rand_idx = th.randint(0, test_row_size, (rand_test_size,))
     assert th.all(th.eq(input[rand_idx], input_unified[rand_idx]))
-    
+
     rand_idx = rand_idx.to(th.device('cuda'))
     assert th.all(th.eq(input[rand_idx].to(th.device('cuda')), input_unified[rand_idx]))
 
