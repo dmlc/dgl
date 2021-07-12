@@ -1627,7 +1627,7 @@ def remove_edges(g, eids, etype=None, store_ids=False):
     ...     })
     >>> g = dgl.remove_edges(g, torch.tensor([0, 1]), 'plays')
     >>> g.edges('all', etype='plays')
-    (tensor([0, 1]), tensor([0, 0]), tensor([0, 1]))
+    (tensor([1, 2]), tensor([1, 1]), tensor([0, 1]))
 
     See Also
     --------
