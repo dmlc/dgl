@@ -132,7 +132,7 @@ under the ``dgl`` namespace.
     DGLGraph.add_self_loop
     DGLGraph.remove_self_loop
     DGLGraph.to_simple
-    DGLGraph.reorder
+    DGLGraph.reorder_graph
 
 Adjacency and incidence matrix
 ---------------------------------
