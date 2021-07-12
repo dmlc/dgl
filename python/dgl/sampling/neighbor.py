@@ -8,6 +8,7 @@ from .. import ndarray as nd
 from .. import utils
 
 __all__ = [
+    'sample_neighbors_homogeneous',
     'sample_neighbors',
     'sample_neighbors_biased',
     'select_topk']
@@ -85,8 +86,6 @@ def sample_neighbors_homogeneous(g, nodes, etype_field, fanout, edge_dir='in', p
     As a result, users should avoid performing in-place operations
     on the node features of the new graph to avoid feature corruption.
     """
-    return None
-    '''
     if g.device != F.cpu():
         raise DGLError("The graph should be in cpu.")
     if etype_field not in g.edata:
@@ -94,10 +93,10 @@ def sample_neighbors_homogeneous(g, nodes, etype_field, fanout, edge_dir='in', p
     if isinstance(fanout, int) is False:
         raise DGLError("The fanout should be an integer")
     nodes = F.to_dgl_nd(utils.prepare_tensor(g, nodes, 'nodes'))
-    etypes = g.edata[etype_field]
+    etypes = F.to_dgl_nd(g.edata[etype_field])
 
     if prob is None:
-        prob = nd.array([], ctx=nd.cpu())
+        prob_array = nd.array([], ctx=nd.cpu())
     elif isinstance(prob, nd.NDArray):
         prob_array = prob
     else:
@@ -121,7 +120,6 @@ def sample_neighbors_homogeneous(g, nodes, etype_field, fanout, edge_dir='in', p
         utils.set_new_frames(ret, edge_frames=edge_frames)
 
     return ret
-    '''
 
 def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
                      copy_ndata=True, copy_edata=True, _dist_training=False):

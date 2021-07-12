@@ -182,7 +182,6 @@ COOMatrix CSRRowWisePerEtypePick(CSRMatrix mat, IdArray rows, IdArray etypes,
 
     // do something here
     if (len == 0) {
-      LOG(INFO) << "rid " << i << " nothing";
       picked_rows[i] = NewIdArray(0, ctx, sizeof(IdxType) * 8);
       picked_cols[i] = NewIdArray(0, ctx, sizeof(IdxType) * 8);
       picked_idxs[i] = NewIdArray(0, ctx, sizeof(IdxType) * 8);
@@ -191,7 +190,6 @@ COOMatrix CSRRowWisePerEtypePick(CSRMatrix mat, IdArray rows, IdArray etypes,
 
     //fast path
     if (len <= num_picks && !replace) {
-      LOG(INFO) << "rid " << rid << " len " << len << " <= 2";
       IdArray rows = Full(rid, len, sizeof(IdxType) * 8, ctx);
       IdArray cols = Full(-1, len, sizeof(IdxType) * 8, ctx);
       IdArray idx = Full(-1, len, sizeof(IdxType) * 8, ctx);
@@ -218,19 +216,6 @@ COOMatrix CSRRowWisePerEtypePick(CSRMatrix mat, IdArray rows, IdArray etypes,
       }
       std::sort(et_idx.begin(), et_idx.end(),
                 [&et](IdxType i1, IdxType i2) {return et[i1] < et[i2];});
-      LOG(INFO) << "idx " << i << " rid " << rid;
-      LOG(INFO) << len;
-
-      std::string et_value = "et ";
-      for (auto it=et.begin(); it<et.end(); it++) {
-        et_value = et_value + " " + std::to_string(*it);
-      }
-      LOG(INFO) << et_value;
-      std::string et_idx_value = "et_idx ";
-      for (auto it=et_idx.begin(); it<et_idx.end(); it++) {
-        et_idx_value = et_idx_value + " " + std::to_string(*it);
-      }
-      LOG(INFO) << et_idx_value;
 
       IdxType cur_et = et[et_idx[0]];
       int64_t et_offset = 0;
@@ -240,11 +225,9 @@ COOMatrix CSRRowWisePerEtypePick(CSRMatrix mat, IdArray rows, IdArray etypes,
           // 1) end of the current etype
           // 2) end of the row
           // random pick for current etype
-          LOG(INFO) << "type " << cur_et << "len " << et_len;
           if (et_len <= num_picks && !replace) {
             // fast path, select all
             for (int64_t k = 0; k < et_len; ++k) {
-              LOG(INFO) << "num_picks " << et_len << " " << et_offset;
               rows.push_back(rid);
               cols.push_back(indices[off+et_idx[et_offset+k]]);
               if (data)
@@ -260,10 +243,8 @@ COOMatrix CSRRowWisePerEtypePick(CSRMatrix mat, IdArray rows, IdArray etypes,
             pick_fn(off, et_offset,
                     et_len, et_idx,
                     data, picked_idata);
-            LOG(INFO) << "num_picks " << num_picks;
             for (int64_t k = 0; k < num_picks; ++k) {
               const IdxType picked = picked_idata[k];
-              LOG(INFO) << k;
               rows.push_back(rid);
               cols.push_back(indices[off+et_idx[et_offset+picked]]);
               if (data)
