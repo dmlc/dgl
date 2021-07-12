@@ -535,7 +535,7 @@ def test_gat_conv(g, idtype, out_dim, num_heads):
     gat = nn.GATConv(5, out_dim, num_heads)
     feat = F.randn((g.number_of_src_nodes(), 5))
     gat = gat.to(ctx)
-    h = gat(g, feat)
+    h = gat[0](g, feat)
 
     # test pickle
     th.save(gat, tmp_buffer)
@@ -547,7 +547,7 @@ def test_gat_conv(g, idtype, out_dim, num_heads):
     # test residual connection
     gat = nn.GATConv(5, out_dim, num_heads, residual=True)
     gat = gat.to(ctx)
-    h = gat(g, feat)
+    h = gat[0](g, feat)
 
 @parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['bipartite'], exclude=['zero-degree']))
