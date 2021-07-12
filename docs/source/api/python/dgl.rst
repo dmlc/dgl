@@ -76,7 +76,7 @@ Operators for generating new graphs by manipulating the structure of the existin
     metapath_reachable_graph
     adj_product_graph
     adj_sum_graph
-    reorder
+    reorder_graph
     sort_csr_by_tag
     sort_csc_by_tag
 
