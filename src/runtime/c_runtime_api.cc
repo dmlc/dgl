@@ -379,8 +379,8 @@ int DGLCbArgToReturn(DGLValue* value, int code) {
   API_END();
 }
 
-void DGLLoadTensorAdapter(const char *path) {
-  TensorDispatcher::Global()->Load(path);
+int DGLLoadTensorAdapter(const char *path) {
+  return TensorDispatcher::Global()->Load(path) ? 0 : -1;
 }
 
 // set device api
