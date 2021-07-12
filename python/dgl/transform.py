@@ -2909,55 +2909,51 @@ def reorder_graph(g, node_permute_algo='rcmk', edge_permute_algo='src',
 
     Support homogeneous graph only for the moment.
 
-    The re-ordering has two 2 steps: first re-order nodes and then re-order endges.
+    The re-ordering has two 2 steps: first re-order nodes and then re-order edges.
 
-    Nodes are re-ordered and re-labeled by calling :func:`~dgl.node_subgraph` with
-    the nodes permutation generated according to specified :attr:`node_permute_algo`
-    or the one user provides in :attr:`permute_config`.
-
-    Edges are re-ordered and re-labeled by calling :func:`~dgl.edge_subgraph` with
-    the edges permutation generated according to sepcified :attr:`edge_permute_algo`.
-    ``src`` and ``dst`` are the only ones supported in this API. In detail,
-    edge permutation is generated according to ``src`` nodes of edges or ``dst``
-    nodes of edges. These are supposed to be applicable for most scenarios. But if
-    user wants to apply more sophisticated edges permutation, it's workable.
-    Please refer to below examples for more details.
+    For node permutation, users can re-order by the :attr:`node_permute_algo`
+    argument. For edge permutation, user can re-arrange edges according to their
+    source nodes or destination nodes by the :attr:`edge_permute_algo` argument.
+    Some of the permutation algorithms are only implemented in CPU, so if the
+    input graph is on GPU, it will be copied to CPU first. The storage order of
+    the node and edge features in the graph are permuted accordingly.
 
     Parameters
     ----------
     g : DGLGraph
         The homogeneous graph.
     node_permute_algo: str, optional
-        can be ``'rcmk'`` or ``'metis'`` or ``'custom'``. ``'rcmk'`` is the default value.
+        The permutation algorithm to re-order nodes. Options are ``rcmk`` or
+        ``metis`` or ``custom``. ``rcmk`` is the default value.
 
-        * ``'rcmk'``: Call `Reverse Cuthill–McKee <https://docs.scipy.org/doc/scipy/reference/
+        * ``rcmk``: Use the `Reverse Cuthill–McKee <https://docs.scipy.org/doc/scipy/reference/
           generated/scipy.sparse.csgraph.reverse_cuthill_mckee.html#
-          scipy-sparse-csgraph-reverse-cuthill-mckee>`__ from ``'scipy'`` to generate nodes
-          permutation and pass it into :func:`~dgl.node_subgraph` to generate new graph.
-        * ``'metis'``: Call :func:`~dgl.partition.metis_partition_assignment` from ``'DGL'``
-          to generate nodes permutation and pass it into :func:`~dgl.node_subgraph` to generate
-          new graph.
-        * ``'custom'``: This enables user to pass in self-designed reorder algorithm.
-          User should pass in ``'nodes_perm'`` via another argument :attr:`permute_config` with
-          ``'custom'`` is specified here. By this way, can the graph be reordered according to
-          passed in nodes permutation.
+          scipy-sparse-csgraph-reverse-cuthill-mckee>`__ from ``scipy`` to generate nodes
+          permutation.
+        * ``metis``: Use the :func:`~dgl.partition.metis_partition_assignment` function
+          to partition the input graph, which gives a cluster assignment of each node.
+          DGL then sorts the assignment array so the new node order will put nodes of
+          the same cluster together.
+        * ``custom``: Reorder the graph according to the user-provided node permutation
+          array (provided in :attr:`permute_config`).
     edge_permute_algo: str, optional
-        can be ``src`` or ``dst`` only. ``src`` is the default value.
+        The permutation algorithm to reorder edges. Options are ``src`` or ``dst``.
+        ``src`` is the default value.
 
-        * ``src``: generate edges permutation according to the src nodes of edges.
-        * ``dst``: generate edges permutation according to the dst nodes of edges.
+        * ``src``: Edges are arranged according to their source nodes.
+        * ``dst``: Edges are arranged according to their destination nodes.
     store_ids: bool, optional
-        It is passed into :func:`~dgl.node_subgraph()`. If True, it will store
-        the raw IDs of the extracted nodes and edges in the ndata and edata of
-        the resulting graph under name ``'dgl.NID'`` and ``'dgl.EID'``, respectively.
+        If True, DGL will store the original node and edge IDs in the ndata and edata
+        of the resulting graph under name ``dgl.NID`` and ``dgl.EID``, respectively.
     permute_config: dict, optional
-        Additional config data for specified :attr:`permute_algo`.
+        Additional key-value config data for the specified permutation algorithm.
 
-        * For ``'rcmk'``, this argument is not required.
-        * For ``'metis'``, partition part number ``'k'`` is required and specified in this
-          argument like this: {'k':10}.
-        * For ``'custom'``, ``'nodes_perm'`` should be specified in the format of
-          ``'Int Tensor'`` or ``'iterable[int]'`` like :attr:`nodes` in :func:`~dgl.node_subgraph`.
+        * For ``rcmk``, this argument is not required.
+        * For ``metis``, users should specify the number of partitions ``k`` (e.g.,
+          ``permute_config={'k':10}`` to partition the graph to 10 clusters).
+        * For ``custom``, users should provide a node permutation array ``nodes_perm``.
+          The array must be an integer list or a tensor with the same device of the
+          input graph.
 
     Returns
     -------
