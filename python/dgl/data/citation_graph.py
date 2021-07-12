@@ -14,13 +14,13 @@ import os, sys
 from .utils import save_graphs, load_graphs, save_info, load_info, makedirs, _get_dgl_url
 from .utils import generate_mask_tensor
 from .utils import deprecate_property, deprecate_function
-from .utils import reorder_graph
 from .dgl_dataset import DGLBuiltinDataset
 from .. import convert
 from .. import batch
 from .. import backend as F
 from ..convert import graph as dgl_graph
 from ..convert import from_networkx, to_networkx
+from ..transform import reorder_graph
 
 backend = os.environ.get('DGLBACKEND', 'pytorch')
 
@@ -137,7 +137,8 @@ class CitationGraphDataset(DGLBuiltinDataset):
         g.ndata['feat'] = F.tensor(_preprocess_features(features), dtype=F.data_type_dict['float32'])
         self._num_classes = onehot_labels.shape[1]
         self._labels = labels
-        self._g = reorder_graph(g)
+        self._g = reorder_graph(
+            g, node_permute_algo='rcmk', edge_permute_algo='dst', store_ids=False)
 
         if self.verbose:
             print('Finished data loading and preprocessing.')

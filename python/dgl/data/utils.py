@@ -15,15 +15,12 @@ import errno
 
 from .graph_serialize import save_graphs, load_graphs, load_labels
 from .tensor_serialize import save_tensors, load_tensors
-from .. import subgraph
-from .. import transform
 
 from .. import backend as F
 
-__all__ = ['loadtxt', 'download', 'check_sha1', 'extract_archive',
+__all__ = ['loadtxt','download', 'check_sha1', 'extract_archive',
            'get_download_dir', 'Subset', 'split_dataset',
-           'save_graphs', "load_graphs", "load_labels", "save_tensors",
-           "load_tensors", "reorder_graph"]
+           'save_graphs', "load_graphs", "load_labels", "save_tensors", "load_tensors"]
 
 def loadtxt(path, delimiter, dtype=None):
     try:
@@ -353,33 +350,3 @@ class Subset(object):
             Number of datapoints in the subset
         """
         return len(self.indices)
-
-
-def reorder_graph(g):
-    r"""Return a new graph with nodes and edges are reordered.
-
-    Firstly, nodes are reordered via calling :func:`dgl.reorder` with
-    ``'rcmk'`` permute algorithm.
-
-    Secondly, edges are reordered in ascending order of ``'dst'`` nodes.
-    Node ids remain the same in this stage.
-
-    Finally, such graph has better locality both in node-wise and edge-wise
-    which could probably obtain better performance in the following stages.
-
-    Homogeneous graph is supported only for the moement.
-
-    Parameters
-    ----------
-    g : DGLGraph
-        The homogeneous graph.
-
-    Returns
-    -------
-    DGLGraph
-        The reordered graph.
-    """
-    rg = transform.reorder(g, permute_algo='rcmk', store_ids=False)
-    edge_idx = np.argsort(F.asnumpy(rg.edges()[1]))
-    return subgraph.edge_subgraph(
-        rg, edge_idx, relabel_nodes=False, store_ids=False)

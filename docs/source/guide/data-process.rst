@@ -133,15 +133,17 @@ a single graph. As such, splits of the dataset are on the nodes of the
 graph. DGL recommends using node masks to specify the splits. The section uses
 builtin dataset `CitationGraphDataset <https://docs.dgl.ai/en/0.5.x/_modules/dgl/data/citation_graph.html#CitationGraphDataset>`__ as an example:
 
-What's more, generated graph could be refined by calling :func:`dgl.data.utils.reorder_graph`
-to obtain better locality both in node-wise and edge-wise. Such better locality could probably
-result in better performance in following stages. Please refer to ``process()`` part in below
-example for more details.
+In addition, DGL recommends re-arrange the nodes and edges so that nodes
+near to each other have IDs in a close range. The procedure could improve
+the locality to access a node's neighbors, which may benefit follow-up
+computation and analysis conducted on the graph. DGL provides an API called
+:func:`dgl.reorder_graph` for this purpose. Please refer to ``process()``
+part in below example for more details.
 
 .. code:: 
 
     from dgl.data import DGLBuiltinDataset
-    from dgl.data.utils import _get_dgl_url, reorder_graph
+    from dgl.data.utils import _get_dgl_url
     
     class CitationGraphDataset(DGLBuiltinDataset):
         _urls = {
@@ -179,7 +181,7 @@ example for more details.
             self._num_labels = onehot_labels.shape[1]
             self._labels = labels
             # reorder graph to obtain better locality.
-            self._g = reorder_graph(g)
+            self._g = dgl.reorder_graph(g)
     
         def __getitem__(self, idx):
             assert idx == 0, "This dataset has only one graph"
