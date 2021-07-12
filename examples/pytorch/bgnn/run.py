@@ -61,7 +61,12 @@ class GNNModelDGL(torch.nn.Module):
             h = self.l1(graph, h)
             h = self.l2(graph, h)
             logits = self.lin2(h)
-        elif self.name in ['gcn', 'cheb']:
+        elif self.name == 'che3b':
+            lambda_max = dgl.laplacian_lambda_max(graph)
+            h = self.drop(h)
+            h = self.l1(graph, h, lambda_max)
+            logits = self.l2(graph, h, lambda_max)
+        elif self.name == 'gcn':
             h = self.drop(h)
             h = self.l1(graph, h)
             logits = self.l2(graph, h)
