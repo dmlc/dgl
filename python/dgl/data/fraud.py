@@ -51,7 +51,7 @@ class FraudDataset(DGLBuiltinDataset):
     ----------
     num_classes : int
         Number of label classes
-    graph : dgl.heterograph.DGLHeteroGraph
+    graph : dgl.DGLGraph
         Graph structure, etc.
     seed : int
         Random seed in splitting the dataset.
@@ -65,8 +65,8 @@ class FraudDataset(DGLBuiltinDataset):
     >>> dataset = FraudDataset('yelp')
     >>> graph = dataset[0]
     >>> num_classes = dataset.num_classes
-    >>> feat = dataset.ndata['feature']
-    >>> label = dataset.ndata['label']
+    >>> feat = graph.ndata['feature']
+    >>> label = graph.ndata['label']
     """
     file_urls = {
         'yelp': 'dataset/FraudYelp.zip',
@@ -81,8 +81,8 @@ class FraudDataset(DGLBuiltinDataset):
         'amazon': 'Amazon.mat'
     }
     node_name = {
-        'yelp': 'user',
-        'amazon': 'review'
+        'yelp': 'review',
+        'amazon': 'user'
     }
 
     def __init__(self, name, raw_dir=None, random_seed=717, train_size=0.7, val_size=0.1):
@@ -126,7 +126,7 @@ class FraudDataset(DGLBuiltinDataset):
 
         Returns
         -------
-        :class:`dgl.heterograph.DGLHeteroGraph`
+        :class:`dgl.DGLGraph`
             graph structure, node features, node labels and masks
 
             - ``ndata['feature']``: node features
@@ -249,8 +249,8 @@ class FraudYelpDataset(FraudDataset):
     >>> dataset = FraudYelpDataset()
     >>> graph = dataset[0]
     >>> num_classes = dataset.num_classes
-    >>> feat = dataset.ndata['feature']
-    >>> label = dataset.ndata['label']
+    >>> feat = graph.ndata['feature']
+    >>> label = graph.ndata['label']
     """
 
     def __init__(self, raw_dir=None, random_seed=717, train_size=0.7, val_size=0.1):
@@ -318,8 +318,8 @@ class FraudAmazonDataset(FraudDataset):
     >>> dataset = FraudAmazonDataset()
     >>> graph = dataset[0]
     >>> num_classes = dataset.num_classes
-    >>> feat = dataset.ndata['feature']
-    >>> label = dataset.ndata['label']
+    >>> feat = graph.ndata['feature']
+    >>> label = graph.ndata['label']
     """
 
     def __init__(self, raw_dir=None, random_seed=717, train_size=0.7, val_size=0.1):
