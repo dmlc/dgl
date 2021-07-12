@@ -2904,16 +2904,12 @@ def sort_csc_by_tag(g, tag, tag_offset_name='_TAG_OFFSET'):
 
 def reorder_graph(g, node_permute_algo='rcmk', edge_permute_algo='src',
                   store_ids=True, permute_config=None):
-    r"""Return a new graph with nodes and edges are re-ordered/re-labeled
+    r"""Return a new graph with nodes and edges re-ordered/re-labeled
     according to the specified permute algorithm.
 
     Support homogeneous graph only for the moment.
 
-    This API is basically implemented by leveraging :func:`~dgl.node_subgraph`
-    and :func:`~dgl.edge_subgraph`, so the function signature is similar and
-    raw IDs could be stored in ``dgl.NID`` and ``dgl.EID`` via :attr:`store_ids`.
-
-    Graph is re-ordered in 2 steps: re-order nodes first and edges then.
+    The re-ordering has two 2 steps: first re-order nodes and then re-order endges.
 
     Nodes are re-ordered and re-labeled by calling :func:`~dgl.node_subgraph` with
     the nodes permutation generated according to specified :attr:`node_permute_algo`
