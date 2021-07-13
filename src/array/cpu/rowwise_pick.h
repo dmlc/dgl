@@ -256,25 +256,25 @@ COOMatrix CSRRowWisePerEtypePick(CSRMatrix mat, IdArray rows, IdArray etypes,
             }
           }
 
-          if (j+1==len)
+          if (j+1 == len)
             break;
           // next etype
           cur_et = et[et_idx[j+1]];
           et_offset = j+1;
           et_len = 1;
         } else {
-          et_len ++;
+          et_len++;
         }
       }
 
       picked_rows[i] = VecToIdArray(rows, sizeof(IdxType) * 8, ctx);
       picked_cols[i] = VecToIdArray(cols, sizeof(IdxType) * 8, ctx);
       picked_idxs[i] = VecToIdArray(idx, sizeof(IdxType) * 8, ctx);
-    } // end processing one row
+    }  // end processing one row
 
     CHECK_EQ(picked_rows[i]->shape[0], picked_cols[i]->shape[0]);
     CHECK_EQ(picked_rows[i]->shape[0], picked_idxs[i]->shape[0]);
-  } // end processing all rows
+  }  // end processing all rows
 
 
   IdArray picked_row = Concat(picked_rows);
