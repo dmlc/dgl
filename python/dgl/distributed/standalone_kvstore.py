@@ -43,6 +43,7 @@ class KVClient(object):
     def add_data(self, name, tensor, part_policy):
         '''add data to the client'''
         self._data[name] = tensor
+        self._gdata_name_list.add(name)
         if part_policy.policy_str not in self._all_possible_part_policy:
             self._all_possible_part_policy[part_policy.policy_str] = part_policy
 
