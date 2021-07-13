@@ -152,3 +152,102 @@ class MultiLayerFullNeighborSampler(MultiLayerNeighborSampler):
     """
     def __init__(self, n_layers, return_eids=False):
         super().__init__([None] * n_layers, return_eids=return_eids)
+
+
+class MultiLayerEtypeNeighborSampler(BlockSampler):
+    """Sampler that builds computational dependency of node representations via
+    neighbor sampling for multilayer GNN.
+
+    This sampler will make every node gather messages from a fixed number of neighbors
+    per edge type. The neighbors are picked uniformly.
+
+    This sampler only work with a to_homogeneous-ed graph (A ``DGLGraph`` with only one node
+    type and one edge type) with the TRUE edge type information stored as the edge data
+    in `etype_field`.
+
+    Parameters
+    ----------
+    fanouts : list[int] or None]
+        List of neighbors to sample per edge type for each GNN layer, starting from the
+        first layer. The fanout for each edge type is equal.
+
+        If None is provided for one layer, all neighbors will be included regardless of
+        edge types.
+
+        If -1 is provided all inbound edge of that edge type will be included.
+    etype_field : string
+        The field in g.edata storing the edge type.
+    replace : bool, default True
+        Whether to sample with replacement
+    return_eids : bool, default False
+        Whether to return the edge IDs involved in message passing in the MFG.
+        If True, the edge IDs will be stored as an edge feature named ``dgl.EID``.
+
+    Examples
+    --------
+    To train a 3-layer GNN for node classification on a set of nodes ``train_nid`` on
+    a homogeneous graph where each node takes messages from 5, 10, 15 neighbors for
+    the first, second, and third layer respectively (assuming the backend is PyTorch):
+
+    >>> g = dgl.to_homogeneous(hg) # hg is a heterogeneous graph
+    >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([5, 10, 15], dgl.ETYPE)
+    >>> collator = dgl.dataloading.NodeCollator(g, train_nid, sampler)
+    >>> dataloader = torch.utils.data.DataLoader(
+    ...     collator.dataset, collate_fn=collator.collate,
+    ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
+    >>> for blocks in dataloader:
+    ...     train_on(blocks)
+
+    Notes
+    -----
+    For the concept of MFGs, please refer to
+    :ref:`User Guide Section 6 <guide-minibatch>` and
+    :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
+    """
+    def __init__(self, fanouts, etype_field, replace=False, return_eids=False):
+        super().__init__(len(fanouts), return_eids)
+
+        self.fanouts = fanouts
+        self.replace = replace
+        self.etype_field = etype_field
+
+        # used to cache computations and memory allocations
+        self.fanout_arrays = []
+        self.prob_arrays = None
+
+    def sample_frontier(self, block_id, g, seed_nodes):
+        fanout = self.fanouts[block_id]
+        if isinstance(g, distributed.DistGraph):
+            if fanout is None:
+                # TODO(zhengda) There is a bug in the distributed version of in_subgraph.
+                # let's use sample_neighbors to replace in_subgraph for now.
+                frontier = distributed.sample_neighbors_homogeneous(
+                    g, seed_nodes, self.etype_field, -1, replace=False)
+            else:
+                frontier = distributed.sample_neighbors_homogeneous(
+                    g, seed_nodes, self.etype_field, fanout, replace=self.replace)
+        else:
+            if fanout is None:
+                frontier = subgraph.in_subgraph(g, seed_nodes)
+            else:
+                self._build_fanout(block_id, g)
+                self._build_prob_arrays(g)
+
+                frontier = sampling.sample_neighbors_homogeneous(
+                    g, seed_nodes, self.etype_field, self.fanout_arrays[block_id],
+                    replace=self.replace, prob=self.prob_arrays)
+        return frontier
+
+    def _build_prob_arrays(self, g):
+        # build prob_arrays only once
+        if self.prob_arrays is None:
+            self.prob_arrays = nd.array([], ctx=nd.cpu())
+
+    def _build_fanout(self, block_id, g):
+        assert not self.fanouts is None, \
+            "_build_fanout() should only be called when fanouts is not None"
+        # build fanout_arrays only once for each layer
+        while block_id >= len(self.fanout_arrays):
+            for i in range(len(self.fanouts)):
+                fanout = self.fanouts[i]
+                self.fanout_arrays.append(int(fanout))

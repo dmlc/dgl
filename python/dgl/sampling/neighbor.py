@@ -13,7 +13,6 @@ __all__ = [
     'sample_neighbors_biased',
     'select_topk']
 
-
 def sample_neighbors_homogeneous(g, nodes, etype_field, fanout, edge_dir='in', prob=None,
                                  replace=False, copy_ndata=True, copy_edata=True):
     """Sample neighboring edges of the given nodes and return the induced subgraph.
