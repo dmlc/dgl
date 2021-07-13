@@ -38,6 +38,8 @@ class GNNBenchmarkDataset(DGLBuiltinDataset):
     def process(self):
         npz_path = os.path.join(self.raw_path, self.name + '.npz')
         g = self._load_npz(npz_path)
+        g = transform.reorder_graph(
+            g, node_permute_algo='rcmk', edge_permute_algo='dst', store_ids=False)
         self._graph = g
         self._data = [g]
         self._print_info()
