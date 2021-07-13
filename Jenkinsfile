@@ -245,8 +245,8 @@ pipeline {
             stage('C++ CPU') {
               agent {
                 kubernetes {
-                  yamlFile 'docker/pods/ci-cpu.yaml'
-                  defaultContainer 'dgl-ci-cpu'
+                  yamlFile 'docker/pods/ci-cpp-test-tmp.yaml'
+                  defaultContainer 'dgl-ci-cpp'
                 }
               }
               steps {
