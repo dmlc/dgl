@@ -9,6 +9,8 @@
 #include <dgl/array.h>
 #include <functional>
 #include <algorithm>
+#include <string>
+#include <vector>
 
 namespace dgl {
 namespace aten {
@@ -188,7 +190,7 @@ COOMatrix CSRRowWisePerEtypePick(CSRMatrix mat, IdArray rows, IdArray etypes,
       continue;
     }
 
-    //fast path
+    // fast path
     if (len <= num_picks && !replace) {
       IdArray rows = Full(rid, len, sizeof(IdxType) * 8, ctx);
       IdArray cols = Full(-1, len, sizeof(IdxType) * 8, ctx);
@@ -221,9 +223,9 @@ COOMatrix CSRRowWisePerEtypePick(CSRMatrix mat, IdArray rows, IdArray etypes,
       int64_t et_offset = 0;
       int64_t et_len = 1;
       for (int64_t j = 0; j < len; ++j) {
-        if ((j+1==len) || cur_et != et[et_idx[j+1]]) {
-          // 1) end of the current etype
-          // 2) end of the row
+        if ((j+1 == len) || cur_et != et[et_idx[j+1]]) {
+          // 1 end of the current etype
+          // 2 end of the row
           // random pick for current etype
           if (et_len <= num_picks && !replace) {
             // fast path, select all
