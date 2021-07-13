@@ -116,6 +116,11 @@ DGL建议让 ``__getitem__(idx)`` 返回如上面代码所示的元组 ``(图，
 DGL建议使用节点掩码来指定数据集的划分。
 本节以内置数据集 `CitationGraphDataset <https://docs.dgl.ai/en/0.5.x/_modules/dgl/data/citation_graph.html#CitationGraphDataset>`__ 为例：
 
+此外，DGL推荐重新排列图的节点/边，使得相邻节点/边的ID位于邻近区间内。这个过程
+可以提高节点/边的邻居的局部性，为后续在图上进行的计算与分析的性能改善提供可能。
+DGL提供了名为 :func:`dgl.reorder_graph` 的API用于此优化。更多细节，请参考
+下面例子中的 ``process()`` 的部分。
+
 .. code::
 
     from dgl.data import DGLBuiltinDataset
@@ -159,7 +164,8 @@ DGL建议使用节点掩码来指定数据集的划分。
                                            dtype=F.data_type_dict['float32'])
             self._num_labels = onehot_labels.shape[1]
             self._labels = labels
-            self._g = g
+            # 重排图以获得更优的局部性
+            self._g = dgl.reorder_graph(g)
     
         def __getitem__(self, idx):
             assert idx == 0, "这个数据集里只有一个图"

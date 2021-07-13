@@ -995,7 +995,7 @@ class DistGraph:
     def _get_ndata_names(self, ntype=None):
         ''' Get the names of all node data.
         '''
-        names = self._client.data_name_list()
+        names = self._client.gdata_name_list()
         ndata_names = []
         for name in names:
             name = parse_hetero_data_name(name)
@@ -1007,7 +1007,7 @@ class DistGraph:
     def _get_edata_names(self, etype=None):
         ''' Get the names of all edge data.
         '''
-        names = self._client.data_name_list()
+        names = self._client.gdata_name_list()
         edata_names = []
         for name in names:
             name = parse_hetero_data_name(name)

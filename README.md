@@ -341,6 +341,9 @@ We are currently in Beta stage.  More features and improvements are coming.
 
 1. [**Knowledge Graph Embedding using Graph Convolutional Networks with Relation-Aware Attention**](https://arxiv.org/pdf/2102.07200.pdf), *Nasrullah Sheikh, Xiao Qin, Berthold Reinwald, Christoph Miksovic, Thomas Gschwind, Paolo Scotton*
 
+1. [**SLAPS: Self-Supervision Improves Structure Learning for Graph Neural Networks**](https://arxiv.org/pdf/2102.05034.pdf), *Bahare Fatemi, Layla El Asri, Seyed Mehran Kazemi*
+
+1. [**Finding Needles in Heterogeneous Haystacks**](https://homepage.divms.uiowa.edu/~badhikari/assets/doc/papers/CONGCNIAAI2021.pdf), AAAI'21, *Bijaya Adhikari, Liangyue Li, Nikhil Rao, Karthik Subbian*
 
 </details>
 
