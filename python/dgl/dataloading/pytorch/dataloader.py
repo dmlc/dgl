@@ -14,7 +14,10 @@ from ... import backend as F
 from ...base import DGLError
 from ...utils import to_dgl_context
 
-__all__ = ['NodeDataLoader', 'EdgeDataLoader', 'GraphDataLoader']
+__all__ = ['NodeDataLoader', 'EdgeDataLoader', 'GraphDataLoader',
+           # Temporary exposure.
+           '_pop_subgraph_storage', '_pop_blocks_storage',
+           '_restore_subgraph_storage', '_restore_blocks_storage']
 
 PYTORCH_VER = LooseVersion(th.__version__)
 PYTORCH_16 = PYTORCH_VER >= LooseVersion("1.6.0")
