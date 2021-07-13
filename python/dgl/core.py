@@ -184,6 +184,40 @@ def _bucketing(val):
         return bkts
     return unique_val, bucketor
 
+def data_dict_to_tuple(graph, data_dict, op, lhs_list=None, rhs_list=None):
+    """Get node or edge feature data of the given name for all the types.
+
+    Parameters
+    -------------
+    graph :  DGLGraph
+        The input graph.
+    data_dict : dict[str, Tensor] or dict[(str, str, str), Tensor]]
+        Node or edge data stored in DGLGraph. The key of the dictionary
+        is the node type name or edge type name.
+    op : str
+        The binary op's name, could be ``add``, ``sub``, ``mul``, ``div``, ``dot``,
+        ``copy_lhs``, ``copy_rhs``.
+    lhs_list : list[tensor] or list[None]
+        The feature on source nodes, could be list of None if op is ``copy_rhs``.
+    rhs_list : list[tensor] or list[None]
+        The feature on edges, could be list of None if op is ``copy_lhs``.
+
+    Returns
+    --------
+    data_tuple : tuple(Tensor)
+        Feature data stored in tuple of tensors. The i^th tensor stores the feature
+        data of type ``types[i]``.
+    """
+    if op == "copy_u":
+        for srctype, _, _ in graph.canonical_etypes:
+            src_id = graph.get_ntype_id(srctype)
+            lhs_list[src_id] = data_dict[srctype]
+    elif op == "copy_e":
+        for rel in graph.canonical_etypes:
+            etid = graph.get_etype_id(rel)
+            rhs_list[etid] = data_dict[rel]
+    return tuple(lhs_list + rhs_list)
+
 def invoke_gsddmm(graph, func):
     """Invoke g-SDDMM computation on the graph.
 
@@ -255,6 +289,11 @@ def invoke_gspmm(graph, mfunc, rfunc, *, srcdata=None, dstdata=None, edata=None)
     else:
         x = alldata[mfunc.target][mfunc.in_field]
         op = getattr(ops, '{}_{}'.format(mfunc.name, rfunc.name))
+        if graph._graph.number_of_etypes() > 1:
+            # Convert to list as dict is unordered.
+            lhs_list = [None] * graph._graph.number_of_ntypes()
+            rhs_list = [None] * graph._graph.number_of_etypes()
+            x = data_dict_to_tuple(graph, x, mfunc.name, lhs_list, rhs_list)
         z = op(graph, x)
     return {rfunc.out_field : z}
 
