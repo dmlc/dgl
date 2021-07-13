@@ -707,8 +707,10 @@ class DGLHeteroGraph(object):
         >>> bg.batch_num_nodes()
         tensor([3, 5])
         >>> bg.remove_nodes([1, 4])
-        >>> bg.batch_num_edges()
+        >>> bg.batch_num_nodes()
         tensor([2, 4])
+        >>> bg.batch_num_edges()
+        tensor([2, 2])
 
         **Heterogeneous Graphs with Multiple Node Types**
 
