@@ -1482,23 +1482,41 @@ def test_remove_selfloop(idtype):
 
 
 @parametrize_dtype
-def test_reorder(idtype):
+def test_reorder_graph(idtype):
     g = dgl.graph(([0, 1, 2, 3, 4], [2, 2, 3, 2, 3]),
                   idtype=idtype, device=F.ctx())
     g.ndata['h'] = F.copy_to(F.randn((g.num_nodes(), 3)), ctx=F.ctx())
     g.edata['w'] = F.copy_to(F.randn((g.num_edges(), 2)), ctx=F.ctx())
 
-    # call with default args
-    rg = dgl.reorder(g)
+    # call with default args: node_permute_algo='rcmk', edge_permute_algo='src', store_ids=True
+    rg = dgl.reorder_graph(g)
+    assert dgl.NID in rg.ndata.keys()
+    assert dgl.EID in rg.edata.keys()
+    src = F.asnumpy(rg.edges()[0])
+    assert np.array_equal(src, np.sort(src))
+
+    # call with 'dst' edge_permute_algo
+    rg = dgl.reorder_graph(g, edge_permute_algo='dst')
+    dst = F.asnumpy(rg.edges()[1])
+    assert np.array_equal(dst, np.sort(dst))
+
+    # call with unknown edge_permute_algo
+    raise_error = False
+    try:
+        dgl.reorder_graph(g, edge_permute_algo='none')
+    except:
+        raise_error = True
+    assert raise_error
 
     # reorder back to original according to stored ids
-    rg2 = dgl.reorder(rg, 'custom', permute_config={
-                      'nodes_perm': np.argsort(F.asnumpy(rg.ndata[dgl.NID]))})
+    rg = dgl.reorder_graph(g)
+    rg2 = dgl.reorder_graph(rg, 'custom', permute_config={
+        'nodes_perm': np.argsort(F.asnumpy(rg.ndata[dgl.NID]))})
     assert F.array_equal(g.ndata['h'], rg2.ndata['h'])
     assert F.array_equal(g.edata['w'], rg2.edata['w'])
 
     # do not store ids
-    rg = dgl.reorder(g, store_ids=False)
+    rg = dgl.reorder_graph(g, store_ids=False)
     assert not dgl.NID in rg.ndata.keys()
     assert not dgl.EID in rg.edata.keys()
 
@@ -1512,7 +1530,7 @@ def test_reorder(idtype):
         # call with metis strategy, but k is not specified
         raise_error = False
         try:
-            dgl.reorder(mg, permute_algo='metis')
+            dgl.reorder_graph(mg, node_permute_algo='metis')
         except:
             raise_error = True
         assert raise_error
@@ -1520,8 +1538,8 @@ def test_reorder(idtype):
         # call with metis strategy, k is specified
         raise_error = False
         try:
-            dgl.reorder(mg,
-                        permute_algo='metis', permute_config={'k': 2})
+            dgl.reorder_graph(mg,
+                              node_permute_algo='metis', permute_config={'k': 2})
         except:
             raise_error = True
         assert not raise_error
@@ -1530,8 +1548,8 @@ def test_reorder(idtype):
     nodes_perm = np.random.permutation(g.num_nodes())
     raise_error = False
     try:
-        dgl.reorder(g, permute_algo='custom', permute_config={
-                    'nodes_perm': nodes_perm})
+        dgl.reorder_graph(g, node_permute_algo='custom', permute_config={
+            'nodes_perm': nodes_perm})
     except:
         raise_error = True
     assert not raise_error
@@ -1539,8 +1557,8 @@ def test_reorder(idtype):
     # call with unqualified nodes_perm specified
     raise_error = False
     try:
-        dgl.reorder(g, permute_algo='custom', permute_config={
-                    'nodes_perm':  nodes_perm[:g.num_nodes() - 1]})
+        dgl.reorder_graph(g, node_permute_algo='custom', permute_config={
+            'nodes_perm':  nodes_perm[:g.num_nodes() - 1]})
     except:
         raise_error = True
     assert raise_error
@@ -1548,7 +1566,7 @@ def test_reorder(idtype):
     # call with unsupported strategy
     raise_error = False
     try:
-        dgl.reorder(g, permute_algo='cmk')
+        dgl.reorder_graph(g, node_permute_algo='cmk')
     except:
         raise_error = True
     assert raise_error
@@ -1558,7 +1576,7 @@ def test_reorder(idtype):
     try:
         hg = dgl.heterogrpah({('user', 'follow', 'user'): (
             [0, 1], [1, 2])}, idtype=idtype, device=F.ctx())
-        dgl.reorder(hg)
+        dgl.reorder_graph(hg)
     except:
         raise_error = True
     assert raise_error
@@ -1566,7 +1584,7 @@ def test_reorder(idtype):
     # add 'csr' format if needed
     fg = g.formats('csc')
     assert 'csr' not in sum(fg.formats().values(), [])
-    rfg = dgl.reorder(fg)
+    rfg = dgl.reorder_graph(fg)
     assert 'csr' in sum(rfg.formats().values(), [])
 
 if __name__ == '__main__':
