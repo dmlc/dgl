@@ -557,11 +557,7 @@ class DGLHeteroGraph(object):
 
         Notes
         -----
-
-        This function discards the batch information. Please use
-        :func:`dgl.DGLGraph.set_batch_num_nodes`
-        and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
-        to maintain the information.
+        This function preserves the batch information.
 
         Examples
         --------
@@ -582,6 +578,17 @@ class DGLHeteroGraph(object):
         (tensor([2]), tensor([2]), tensor([0]))
         >>> g.edata['he']
         tensor([[2.]])
+
+        Removing edges from a batched graph preserves batch information.
+
+        >>> g = dgl.graph((torch.tensor([0, 0, 2]), torch.tensor([0, 1, 2])))
+        >>> g2 = dgl.graph((torch.tensor([1, 2, 3]), torch.tensor([1, 3, 4])))
+        >>> bg = dgl.batch([g, g2])
+        >>> bg.batch_num_edges()
+        tensor([3, 3])
+        >>> bg.remove_edges([1, 4])
+        >>> bg.batch_num_edges()
+        tensor([2, 2])
 
         **Heterogeneous Graphs with Multiple Edge Types**
 
@@ -669,11 +676,7 @@ class DGLHeteroGraph(object):
 
         Notes
         -----
-
-        This function discards the batch information. Please use
-        :func:`dgl.DGLGraph.set_batch_num_nodes`
-        and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
-        to maintain the information.
+        This function preserves the batch information.
 
         Examples
         --------
@@ -695,6 +698,17 @@ class DGLHeteroGraph(object):
         tensor([[2.]])
         >>> g.edata['he']
         tensor([[2.]])
+
+        Removing nodes from a batched graph preserves batch information.
+
+        >>> g = dgl.graph((torch.tensor([0, 0, 2]), torch.tensor([0, 1, 2])))
+        >>> g2 = dgl.graph((torch.tensor([1, 2, 3]), torch.tensor([1, 3, 4])))
+        >>> bg = dgl.batch([g, g2])
+        >>> bg.batch_num_nodes()
+        tensor([3, 5])
+        >>> bg.remove_nodes([1, 4])
+        >>> bg.batch_num_edges()
+        tensor([2, 4])
 
         **Heterogeneous Graphs with Multiple Node Types**
 
