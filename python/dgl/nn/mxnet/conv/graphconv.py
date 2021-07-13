@@ -39,11 +39,11 @@ class GraphConv(gluon.Block):
 
         * ``none``, where no normalization is applied.
 
-        * ``both`` (default), where the messages are scaled with :math:`c_{ji}` above, equivalent
-          to symmetric Laplacian normalization.
+        * ``both`` (default), where the messages are scaled with :math:`1/c_{ji}` above, equivalent
+          to symmetric normalization.
 
         * ``left``, to divide the messages sent out from each node by its out-degrees,
-          equivalent to random walk Laplacian normalziation.
+          equivalent to random walk normalization.
     weight : bool, optional
         If True, apply a linear layer. Otherwise, aggregating the messages
         without a weight matrix.
