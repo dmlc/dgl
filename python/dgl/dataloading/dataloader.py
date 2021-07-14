@@ -77,6 +77,9 @@ def _find_exclude_eids(g, exclude_mode, eids, **kwargs):
         None (default)
             Does not exclude any edge.
 
+        'self'
+            Exclude the given edges themselves but nothing else.
+
         'reverse_id'
             Exclude all edges specified in ``eids``, as well as their reverse edges
             of the same edge type.
@@ -105,6 +108,8 @@ def _find_exclude_eids(g, exclude_mode, eids, **kwargs):
     """
     if exclude_mode is None:
         return None
+    elif exclude_mode == 'self':
+        return eids
     elif exclude_mode == 'reverse_id':
         return _find_exclude_eids_with_reverse_id(g, eids, kwargs['reverse_eid_map'])
     elif exclude_mode == 'reverse_types':
@@ -492,6 +497,8 @@ class EdgeCollator(Collator):
         minibatch.  Possible values are
 
         * None, which excludes nothing.
+
+        * ``'self'``, which excludes the sampled edges themselves but nothing else.
 
         * ``'reverse_id'``, which excludes the reverse edges of the sampled edges.  The said
           reverse edges have the same edge type as the sampled edges.  Only works
