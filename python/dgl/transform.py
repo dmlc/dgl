@@ -2942,7 +2942,7 @@ def reorder_graph(g, node_permute_algo='rcmk', edge_permute_algo='src',
           generated/scipy.sparse.csgraph.reverse_cuthill_mckee.html#
           scipy-sparse-csgraph-reverse-cuthill-mckee>`__ from ``scipy`` to generate nodes
           permutation.
-        * ``metis``: Use the :func:`~dgl.partition.metis_partition_assignment` function
+        * ``metis``: Use the :func:`~dgl.metis_partition_assignment` function
           to partition the input graph, which gives a cluster assignment of each node.
           DGL then sorts the assignment array so the new node order will put nodes of
           the same cluster together.
