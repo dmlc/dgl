@@ -18,6 +18,7 @@ INSUBGRAPH_SERVICE_ID = 6658
 EDGES_SERVICE_ID = 6659
 OUTDEGREE_SERVICE_ID = 6660
 INDEGREE_SERVICE_ID = 6661
+ETYPE_SAMPLING_SERVICE_ID = 6662
 
 class SubgraphResponse(Response):
     """The response for sampling and in_subgraph"""
@@ -157,7 +158,7 @@ class SamplingRequest(Request):
                                                                 self.prob, self.replace)
         return SubgraphResponse(global_src, global_dst, global_eids)
 
-class SamplingRequestHomogeneous(Request):
+class SamplingRequestEtype(Request):
     """Sampling Request"""
 
     def __init__(self, nodes, etype_field, fan_out, edge_dir='in', prob=None, replace=False):
@@ -450,11 +451,12 @@ def sample_etype_neighbors(g, nodes, etype_field, fanout, edge_dir='in', prob=No
             homo_nids.append(gpb.map_to_homo_nid(typed_nodes, ntype))
         nodes = F.cat(homo_nids, 0)
     def issue_remote_req(node_ids):
-        return SamplingRequestHomogeneous(node_ids, etype_field, fanout, edge_dir=edge_dir,
-                               prob=prob, replace=replace)
+        return SamplingRequestEtype(node_ids, etype_field, fanout, edge_dir=edge_dir,
+                                    prob=prob, replace=replace)
     def local_access(local_g, partition_book, local_nids):
+        print(local_g.edata.keys())
         return _sample_etype_neighbors(local_g, partition_book, local_nids,
-                                             etype_field, fanout, edge_dir, prob, replace)
+                                       etype_field, fanout, edge_dir, prob, replace)
     return _distributed_access(g, nodes, issue_remote_req, local_access)
 
 def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
@@ -731,3 +733,4 @@ register_service(EDGES_SERVICE_ID, EdgesRequest, FindEdgeResponse)
 register_service(INSUBGRAPH_SERVICE_ID, InSubgraphRequest, SubgraphResponse)
 register_service(OUTDEGREE_SERVICE_ID, OutDegreeRequest, OutDegreeResponse)
 register_service(INDEGREE_SERVICE_ID, InDegreeRequest, InDegreeResponse)
+register_service(ETYPE_SAMPLING_SERVICE_ID, SamplingRequestEtype, SubgraphResponse)

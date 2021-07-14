@@ -14,7 +14,7 @@ __all__ = [
     'select_topk']
 
 def sample_etype_neighbors(g, nodes, etype_field, fanout, edge_dir='in', prob=None,
-                           replace=False, copy_ndata=True, copy_edata=True):
+                           replace=False, copy_ndata=True, copy_edata=True, _dist_training=False):
     """Sample neighboring edges of the given nodes and return the induced subgraph.
 
     For each node, a number of inbound (or outbound when ``edge_dir == 'out'``) edges
@@ -71,6 +71,10 @@ def sample_etype_neighbors(g, nodes, etype_field, fanout, edge_dir='in', prob=No
         edge features.
 
         (Default: True)
+    _dist_training : bool, optional
+        Internal argument.  Do not use.
+
+        (Default: False)
 
     Returns
     -------
@@ -95,7 +99,9 @@ def sample_etype_neighbors(g, nodes, etype_field, fanout, edge_dir='in', prob=No
         assert len(nodes) == 1, "The input graph should not have node types"
         nodes = list(nodes.values())[0]
     nodes = F.to_dgl_nd(utils.prepare_tensor(g, nodes, 'nodes'))
-    etypes = F.to_dgl_nd(g.edata[etype_field])
+    # treat etypes as int32, it is much cheaper than int64
+    # TODO(xiangsx): int8 can be a better choice.
+    etypes = F.to_dgl_nd(F.astype(g.edata[etype_field], ty=F.int32))
 
     if prob is None:
         prob_array = nd.array([], ctx=nd.cpu())
@@ -113,13 +119,21 @@ def sample_etype_neighbors(g, nodes, etype_field, fanout, edge_dir='in', prob=No
     ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
 
     # handle features
-    if copy_ndata:
-        node_frames = utils.extract_node_subframes(g, None)
-        utils.set_new_frames(ret, node_frames=node_frames)
+    # (TODO) (BarclayII) DGL distributed fails with bus error, freezes, or other
+    # incomprehensible errors with lazy feature copy.
+    # So in distributed training context, we fall back to old behavior where we
+    # only set the edge IDs.
+    if not _dist_training:
+        if copy_ndata:
+            node_frames = utils.extract_node_subframes(g, None)
+            utils.set_new_frames(ret, node_frames=node_frames)
 
-    if copy_edata:
-        edge_frames = utils.extract_edge_subframes(g, induced_edges)
-        utils.set_new_frames(ret, edge_frames=edge_frames)
+        if copy_edata:
+            edge_frames = utils.extract_edge_subframes(g, induced_edges)
+            utils.set_new_frames(ret, edge_frames=edge_frames)
+    else:
+        for i, etype in enumerate(ret.canonical_etypes):
+            ret.edges[etype].data[EID] = induced_edges[i]
 
     return ret
 
