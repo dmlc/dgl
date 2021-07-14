@@ -152,7 +152,8 @@ class CoraFullDataset(GNNBenchmarkDataset):
     Statistics:
 
     - Nodes: 19,793
-    - Edges: 130,622
+    - Edges: 126,842 (note that the original dataset has 65,311 edges but DGL adds
+      the reverse edges and remove the duplicates, hence with a different number)
     - Number of Classes: 70
     - Node feature size: 8,710
 
