@@ -4955,17 +4955,6 @@ class DGLHeteroGraph(object):
         User-defined cross reducer equivalent to "sum".
 
         >>> def cross_sum(flist):
-        ...     """
-        ...     Parameters
-        ...     ----------
-        ...     flist : list[Tensor]
-        ...         Aggregation results from each edge type.
-        ...
-        ...     Returns
-        ...     -------
-        ...     Tensor
-        ...         Final representation.
-        ...     """
         ...     return torch.sum(torch.stack(flist, dim=0), dim=0) if len(flist) > 1 else flist[0]
 
         Use the user-defined cross reducer.
