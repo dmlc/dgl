@@ -221,10 +221,10 @@ class MultiLayerEtypeNeighborSampler(BlockSampler):
             if fanout is None:
                 # TODO(zhengda) There is a bug in the distributed version of in_subgraph.
                 # let's use sample_neighbors to replace in_subgraph for now.
-                frontier = distributed.sample_neighbors_homogeneous(
+                frontier = distributed.sample_etype_neighbors(
                     g, seed_nodes, self.etype_field, -1, replace=False)
             else:
-                frontier = distributed.sample_neighbors_homogeneous(
+                frontier = distributed.sample_etype_neighbors(
                     g, seed_nodes, self.etype_field, fanout, replace=self.replace)
         else:
             if fanout is None:
@@ -233,7 +233,7 @@ class MultiLayerEtypeNeighborSampler(BlockSampler):
                 self._build_fanout(block_id, g)
                 self._build_prob_arrays(g)
 
-                frontier = sampling.sample_neighbors_homogeneous(
+                frontier = sampling.sample_etype_neighbors(
                     g, seed_nodes, self.etype_field, self.fanout_arrays[block_id],
                     replace=self.replace, prob=self.prob_arrays)
         return frontier

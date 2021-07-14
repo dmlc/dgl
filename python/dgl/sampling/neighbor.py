@@ -8,13 +8,13 @@ from .. import ndarray as nd
 from .. import utils
 
 __all__ = [
-    'sample_neighbors_homogeneous',
+    'sample_etype_neighbors',
     'sample_neighbors',
     'sample_neighbors_biased',
     'select_topk']
 
-def sample_neighbors_homogeneous(g, nodes, etype_field, fanout, edge_dir='in', prob=None,
-                                 replace=False, copy_ndata=True, copy_edata=True):
+def sample_etype_neighbors(g, nodes, etype_field, fanout, edge_dir='in', prob=None,
+                           replace=False, copy_ndata=True, copy_edata=True):
     """Sample neighboring edges of the given nodes and return the induced subgraph.
 
     For each node, a number of inbound (or outbound when ``edge_dir == 'out'``) edges
@@ -91,6 +91,9 @@ def sample_neighbors_homogeneous(g, nodes, etype_field, fanout, edge_dir='in', p
         raise DGLError("The graph should have {} in the edge data representing the edge type.".format(etype_field))
     if isinstance(fanout, int) is False:
         raise DGLError("The fanout should be an integer")
+    if isinstance(nodes, dict) is True:
+        assert len(nodes) == 1, "The input graph should not have node types"
+        nodes = list(nodes.values())[0]
     nodes = F.to_dgl_nd(utils.prepare_tensor(g, nodes, 'nodes'))
     etypes = F.to_dgl_nd(g.edata[etype_field])
 

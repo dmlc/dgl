@@ -3,7 +3,7 @@ from collections import namedtuple
 
 from .rpc import Request, Response, send_requests_to_machine, recv_responses
 from ..sampling import sample_neighbors as local_sample_neighbors
-from ..sampling import sample_neighbors_homogeneous as local_sample_neighbors_homogeneous
+from ..sampling import sample_etype_neighbors as local_sample_etype_neighbors
 from ..subgraph import in_subgraph as local_in_subgraph
 from .rpc import register_service
 from ..convert import graph
@@ -67,7 +67,7 @@ def _sample_neighbors(local_g, partition_book, seed_nodes, fan_out, edge_dir, pr
     global_eids = F.gather_row(local_g.edata[EID], sampled_graph.edata[EID])
     return global_src, global_dst, global_eids
 
-def _sample_neighbors_homogeneous(local_g, partition_book, seed_nodes, etype_field, fan_out, edge_dir, prob, replace):
+def _sample_etype_neighbors(local_g, partition_book, seed_nodes, etype_field, fan_out, edge_dir, prob, replace):
     """ Sample from local partition.
 
     The input nodes use global IDs. We need to map the global node IDs to local node IDs,
@@ -78,7 +78,7 @@ def _sample_neighbors_homogeneous(local_g, partition_book, seed_nodes, etype_fie
     local_ids = partition_book.nid2localnid(seed_nodes, partition_book.partid)
     local_ids = F.astype(local_ids, local_g.idtype)
     # local_ids = self.seed_nodes
-    sampled_graph = local_sample_neighbors_homogeneous(
+    sampled_graph = local_sample_etype_neighbors(
         local_g, local_ids, etype_field, fan_out, edge_dir, prob, replace, _dist_training=True)
     global_nid_mapping = local_g.ndata[NID]
     src, dst = sampled_graph.edges()
@@ -179,14 +179,14 @@ class SamplingRequestHomogeneous(Request):
     def process_request(self, server_state):
         local_g = server_state.graph
         partition_book = server_state.partition_book
-        global_src, global_dst, global_eids = _sample_neighbors_homogeneous(local_g,
-                                                                            partition_book,
-                                                                            self.seed_nodes,
-                                                                            self.etype_field,
-                                                                            self.fan_out,
-                                                                            self.edge_dir,
-                                                                            self.prob,
-                                                                            self.replace)
+        global_src, global_dst, global_eids = _sample_etype_neighbors(local_g,
+                                                                      partition_book,
+                                                                      self.seed_nodes,
+                                                                      self.etype_field,
+                                                                      self.fan_out,
+                                                                      self.edge_dir,
+                                                                      self.prob,
+                                                                      self.replace)
         return SubgraphResponse(global_src, global_dst, global_eids)
 
 class EdgesRequest(Request):
@@ -380,7 +380,7 @@ def _distributed_access(g, nodes, issue_remote_req, local_access):
     sampled_graph = merge_graphs(res_list, g.number_of_nodes())
     return sampled_graph
 
-def sample_neighbors_homogeneous(g, nodes, etype_field, fanout, edge_dir='in', prob=None, replace=False):
+def sample_etype_neighbors(g, nodes, etype_field, fanout, edge_dir='in', prob=None, replace=False):
     """Sample from the neighbors of the given nodes from a distributed graph.
 
     For each node, a number of inbound (or outbound when ``edge_dir == 'out'``) edges
@@ -453,7 +453,7 @@ def sample_neighbors_homogeneous(g, nodes, etype_field, fanout, edge_dir='in', p
         return SamplingRequestHomogeneous(node_ids, etype_field, fanout, edge_dir=edge_dir,
                                prob=prob, replace=replace)
     def local_access(local_g, partition_book, local_nids):
-        return _sample_neighbors_homogeneous(local_g, partition_book, local_nids,
+        return _sample_etype_neighbors(local_g, partition_book, local_nids,
                                              etype_field, fanout, edge_dir, prob, replace)
     return _distributed_access(g, nodes, issue_remote_req, local_access)
 

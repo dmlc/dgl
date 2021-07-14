@@ -375,18 +375,19 @@ COOMatrix COORowWiseSampling(
  *
  * // coo.num_rows = 4;
  * // coo.num_cols = 4;
- * // coo.rows = [0, 0, 1, 3, 3]
- * // coo.cols = [0, 1, 1, 2, 3]
+ * // coo.rows = [0, 0, 0, 0, 3]
+ * // coo.cols = [0, 1, 3, 2, 3]
  * // coo.data = [2, 3, 0, 1, 4]
+ * // etype = [0, 0, 0, 2, 1]
  * COOMatrix coo = ...;
- * IdArray rows = ... ; // [1, 3]
- * COOMatrix sampled = COORowWisePerEtypeSampling(coo, rows, 2, FloatArray(), false);
+ * IdArray rows = ... ; // [0, 3]
+ * COOMatrix sampled = COORowWisePerEtypeSampling(coo, rows, etype, 2, FloatArray(), false);
  * // possible sampled coo matrix:
  * // sampled.num_rows = 4
  * // sampled.num_cols = 4
- * // sampled.rows = [1, 3, 3]
- * // sampled.cols = [1, 2, 3]
- * // sampled.data = [3, 0, 4]
+ * // sampled.rows = [0, 0, 0, 3]
+ * // sampled.cols = [0, 3, 2, 3]
+ * // sampled.data = [2, 0, 1, 4]
  *
  * \param mat Input coo matrix.
  * \param rows Rows to sample from.

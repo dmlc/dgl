@@ -745,32 +745,32 @@ def test_sample_neighbors_etype_homogeneous():
     # graph with coo format
     coo_g = h_g.formats('coo')
     for _ in range(5):
-        subg = dgl.sampling.sample_neighbors_homogeneous(coo_g, seeds, dgl.ETYPE, 10, replace=False)
+        subg = dgl.sampling.sample_etype_neighbors(coo_g, seeds, dgl.ETYPE, 10, replace=False)
         check_num(subg.edges()[1], False)
 
     for _ in range(5):
-        subg = dgl.sampling.sample_neighbors_homogeneous(coo_g, seeds, dgl.ETYPE, 10, replace=True)
+        subg = dgl.sampling.sample_etype_neighbors(coo_g, seeds, dgl.ETYPE, 10, replace=True)
         check_num(subg.edges()[1], True)
 
     # graph with csr format
     csr_g = h_g.formats('csr')
     csr_g = csr_g.formats(['csr','csc','coo'])
     for _ in range(5):
-        subg = dgl.sampling.sample_neighbors_homogeneous(csr_g, seeds, dgl.ETYPE, 10, replace=False)
+        subg = dgl.sampling.sample_etype_neighbors(csr_g, seeds, dgl.ETYPE, 10, replace=False)
         check_num(subg.edges()[1], False)
 
     for _ in range(5):
-        subg = dgl.sampling.sample_neighbors_homogeneous(csr_g, seeds, dgl.ETYPE, 10, replace=True)
+        subg = dgl.sampling.sample_etype_neighbors(csr_g, seeds, dgl.ETYPE, 10, replace=True)
         check_num(subg.edges()[1], True)
 
     # graph with csc format
     csc_g = h_g.formats('csc')
     for _ in range(5):
-        subg = dgl.sampling.sample_neighbors_homogeneous(csc_g, seeds, dgl.ETYPE, 10, replace=False)
+        subg = dgl.sampling.sample_etype_neighbors(csc_g, seeds, dgl.ETYPE, 10, replace=False)
         check_num(subg.edges()[1], False)
 
     for _ in range(5):
-        subg = dgl.sampling.sample_neighbors_homogeneous(csc_g, seeds, dgl.ETYPE, 10, replace=True)
+        subg = dgl.sampling.sample_etype_neighbors(csc_g, seeds, dgl.ETYPE, 10, replace=True)
         check_num(subg.edges()[1], True)
 
     def check_num2(nodes, replace):
@@ -822,14 +822,13 @@ def test_sample_neighbors_etype_homogeneous():
 
 if __name__ == '__main__':
     test_sample_neighbors_etype_homogeneous()
-
-    # test_random_walk()
-    # test_pack_traces()
-    # test_pinsage_sampling()
-    # test_sample_neighbors()
-    # test_sample_neighbors_outedge()
-    # test_sample_neighbors_topk()
-    # test_sample_neighbors_topk_outedge()
-    # test_sample_neighbors_with_0deg()
-    # test_sample_neighbors_biased_homogeneous()
-    # test_sample_neighbors_biased_bipartite()
+    test_random_walk()
+    test_pack_traces()
+    test_pinsage_sampling()
+    test_sample_neighbors()
+    test_sample_neighbors_outedge()
+    test_sample_neighbors_topk()
+    test_sample_neighbors_topk_outedge()
+    test_sample_neighbors_with_0deg()
+    test_sample_neighbors_biased_homogeneous()
+    test_sample_neighbors_biased_bipartite()

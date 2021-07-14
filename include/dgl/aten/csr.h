@@ -402,18 +402,19 @@ COOMatrix CSRRowWiseSampling(
  *
  * // csr.num_rows = 4;
  * // csr.num_cols = 4;
- * // csr.indptr = [0, 2, 3, 3, 5]
- * // csr.indices = [0, 1, 1, 2, 3]
+ * // csr.indptr = [0, 4, 4, 4, 5]
+ * // csr.cols = [0, 1, 3, 2, 3]
  * // csr.data = [2, 3, 0, 1, 4]
+ * // etype = [0, 0, 0, 2, 1]
  * CSRMatrix csr = ...;
- * IdArray rows = ... ; // [1, 3]
- * COOMatrix sampled = CSRRowWisePerEtypeSampling(csr, rows, 2, FloatArray(), false);
+ * IdArray rows = ... ; // [0, 3]
+ * COOMatrix sampled = CSRRowWisePerEtypeSampling(csr, rows, etype, 2, FloatArray(), false);
  * // possible sampled coo matrix:
  * // sampled.num_rows = 4
  * // sampled.num_cols = 4
- * // sampled.rows = [1, 3, 3]
- * // sampled.cols = [1, 2, 3]
- * // sampled.data = [3, 0, 4]
+ * // sampled.rows = [0, 0, 0, 3]
+ * // sampled.cols = [0, 3, 2, 3]
+ * // sampled.data = [2, 0, 1, 4]
  *
  * \param mat Input CSR matrix.
  * \param rows Rows to sample from.
