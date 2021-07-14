@@ -12,6 +12,8 @@ Requirements
 pip install -r requirements.txt
 ```
 
+Also requires PyTorch 1.7.0+.
+
 Datasets
 --------
 

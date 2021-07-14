@@ -3,10 +3,35 @@ from itertools import product
 import sys
 
 from ..backend import gsddmm as gsddmm_internal
+from ..backend import gsddmm_hetero as gsddmm_internal_hetero
 from .. import backend as F
 
 __all__ = ['gsddmm', 'copy_u', 'copy_v', 'copy_e']
 
+def reshape_lhs_rhs(lhs_data, rhs_data):
+    r""" Expand dims so that there will be no broadcasting issues with different
+    number of dimensions. For example, given two shapes (N, 3, 1), (E, 5, 3, 4)
+    that are valid broadcastable shapes, change them to (N, 1, 3, 1) and
+    (E, 5, 3, 4)
+
+    Parameters
+    ----------
+    lhs_data : tensor or None
+        The left operand, could be None if it's not required by op.
+    rhs_data : tensor or None
+        The right operand, could be None if it's not required by op.
+    """
+    lhs_shape = F.shape(lhs_data)
+    rhs_shape = F.shape(rhs_data)
+    if len(lhs_shape) != len(rhs_shape):
+        max_ndims = max(len(lhs_shape), len(rhs_shape))
+        lhs_pad_ndims = max_ndims - len(lhs_shape)
+        rhs_pad_ndims = max_ndims - len(rhs_shape)
+        new_lhs_shape = (lhs_shape[0],) + (1,) * lhs_pad_ndims + lhs_shape[1:]
+        new_rhs_shape = (rhs_shape[0],) + (1,) * rhs_pad_ndims + rhs_shape[1:]
+        lhs_data = F.reshape(lhs_data, new_lhs_shape)
+        rhs_data = F.reshape(rhs_data, new_rhs_shape)
+    return lhs_data, rhs_data
 
 def gsddmm(g, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
     r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface.
@@ -43,24 +68,28 @@ def gsddmm(g, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
     tensor
         The result tensor.
     """
-    if op not in ['copy_lhs', 'copy_rhs']:
-        # Expand dims so that there will be no broadcasting issues with different
-        # number of dimensions. For example, given two shapes (N, 3, 1), (E, 5, 3, 4)
-        # that are valid broadcastable shapes, change them to (N, 1, 3, 1) and
-        # (E, 5, 3, 4)
-        lhs_shape = F.shape(lhs_data)
-        rhs_shape = F.shape(rhs_data)
-        if len(lhs_shape) != len(rhs_shape):
-            max_ndims = max(len(lhs_shape), len(rhs_shape))
-            lhs_pad_ndims = max_ndims - len(lhs_shape)
-            rhs_pad_ndims = max_ndims - len(rhs_shape)
-            new_lhs_shape = (lhs_shape[0],) + (1,) * lhs_pad_ndims + lhs_shape[1:]
-            new_rhs_shape = (rhs_shape[0],) + (1,) * rhs_pad_ndims + rhs_shape[1:]
-            lhs_data = F.reshape(lhs_data, new_lhs_shape)
-            rhs_data = F.reshape(rhs_data, new_rhs_shape)
-    return gsddmm_internal(
-        g._graph, op, lhs_data, rhs_data, lhs_target, rhs_target)
-
+    if g._graph.number_of_etypes() == 1:
+        if op not in ['copy_lhs', 'copy_rhs']:
+            lhs_data, rhs_data = reshape_lhs_rhs(lhs_data, rhs_data)
+        return gsddmm_internal(
+            g._graph, op, lhs_data, rhs_data, lhs_target, rhs_target)
+    else:
+        lhs_data_dict = lhs_data
+        rhs_data_dict = rhs_data
+        lhs_list = [None] * g._graph.number_of_ntypes()
+        rhs_list = [None] * g._graph.number_of_ntypes()
+        for srctype, _, dsttype in g.canonical_etypes:
+            src_id = g.get_ntype_id(srctype)
+            dst_id = g.get_ntype_id(dsttype)
+            lhs_data = lhs_data_dict[srctype]
+            rhs_data = rhs_data_dict[dsttype]
+            if op not in ['copy_lhs', 'copy_rhs']:
+                lhs_data, rhs_data = reshape_lhs_rhs(lhs_data, rhs_data)
+            lhs_list[src_id] = lhs_data
+            rhs_list[dst_id] = rhs_data
+        lhs_and_rhs_tuple = tuple(lhs_list + rhs_list)
+        # With max and min reducers infinity will be returned for zero degree nodes
+        return gsddmm_internal_hetero(g, op, lhs_target, rhs_target, *lhs_and_rhs_tuple)
 
 def _gen_sddmm_func(lhs_target, rhs_target, binary_op):
     name = "{}_{}_{}".format(lhs_target, binary_op, rhs_target)

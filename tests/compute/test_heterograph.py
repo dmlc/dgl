@@ -1082,6 +1082,22 @@ def test_convert(idtype):
     assert hg.device == g.device
     assert g.number_of_nodes() == 5
 
+    # hetero_to_subgraph_to_homo
+    hg = dgl.heterograph({
+        ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
+        ('user', 'follows', 'user'): ([0, 1, 1], [1, 2, 2])
+    }, idtype=idtype, device=F.ctx())
+    hg.nodes['user'].data['h'] = F.copy_to(
+        F.tensor([[1, 0], [0, 1], [1, 1]], dtype=idtype), ctx=F.ctx())
+    sg = dgl.node_subgraph(hg, {'user': [1, 2]})
+    assert len(sg.ntypes) == 2
+    assert len(sg.etypes) == 2
+    assert sg.num_nodes('user') == 2
+    assert sg.num_nodes('game') == 0
+    g = dgl.to_homogeneous(sg, ndata=['h'])
+    assert 'h' in g.ndata.keys()
+    assert g.num_nodes() == 2
+
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Test on cpu is enough")
 @parametrize_dtype
 def test_to_homo_zero_nodes(idtype):
