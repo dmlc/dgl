@@ -92,7 +92,7 @@ def gen_model(args):
         input_drop=args.input_drop,
         attn_drop=args.attn_dropout,
         edge_drop=args.edge_drop,
-        use_attn_dst=not args.use_attn_dst,
+        use_attn_dst=not args.no_attn_dst,
         allow_zero_in_degree=True,
         residual=False,
     )
@@ -402,6 +402,8 @@ def main():
     argparser.add_argument("--log-every", type=int, default=2, help="log every LOG_EVERY epochs")
     argparser.add_argument("--plot-curves", action="store_true", help="plot learning curves")
     args = argparser.parse_args()
+
+    print('no-attn-dst', args.no_attn_dst)
 
     if args.cpu:
         device = torch.device("cpu")
