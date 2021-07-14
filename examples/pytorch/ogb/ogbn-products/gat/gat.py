@@ -403,8 +403,6 @@ def main():
     argparser.add_argument("--plot-curves", action="store_true", help="plot learning curves")
     args = argparser.parse_args()
 
-    print('no-attn-dst', args.no_attn_dst)
-
     if args.cpu:
         device = torch.device("cpu")
     else:
