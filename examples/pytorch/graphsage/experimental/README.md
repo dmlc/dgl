@@ -164,7 +164,7 @@ python3 ~/workspace/dgl/tools/launch.py --workspace ~/workspace/dgl/examples/pyt
 "python3 train_dist_transductive.py --graph_name ogb-product --ip_config ip_config.txt --batch_size 1000 --num_gpu 4 --eval_every 5"
 ```
 
-To run supervised with transductive setting using dgl distributed NodeEmbedding
+To run supervised with transductive setting using dgl distributed DistEmbedding
 ```bash
 python3 ~/workspace/dgl/tools/launch.py --workspace ~/workspace/dgl/examples/pytorch/graphsage/experimental/ \
 --num_trainers 4 \
@@ -188,7 +188,7 @@ python3 ~/workspace/dgl/tools/launch.py --workspace ~/workspace/dgl/examples/pyt
 "python3 train_dist_unsupervised_transductive.py --graph_name ogb-product --ip_config ip_config.txt --num_epochs 3 --batch_size 1000 --num_gpus 4"
 ```
 
-To run unsupervised with transductive setting using dgl distributed NodeEmbedding
+To run unsupervised with transductive setting using dgl distributed DistEmbedding
 ```bash
 python3 ~/workspace/dgl/tools/launch.py --workspace ~/workspace/dgl/examples/pytorch/graphsage/experimental/ \
 --num_trainers 4 \
