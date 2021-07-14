@@ -121,10 +121,10 @@ The folder contains example implementations of selected research papers related 
 
 - <a name="rect"></a> Wang et al. Network Embedding with Completely-imbalanced Labels. [Paper link](https://ieeexplore.ieee.org/document/8979355). 
     - Example code: [PyTorch](../examples/pytorch/rect)
-    - Tags:  node classification, network embedding, completely-imbalanced labels
+    - Tags: node classification, network embedding, completely-imbalanced labels
 - <a name="mvgrl"></a> Hassani and Khasahmadi. Contrastive Multi-View Representation Learning on Graphs. [Paper link](https://arxiv.org/abs/2006.05582). 
     - Example code: [PyTorch](../examples/pytorch/mvgrl)
-    - Tags: graph diffusion, self-supervised learning on graphs.
+    - Tags: graph diffusion, self-supervised learning
 - <a name="grace"></a> Zhu et al. Deep Graph Contrastive Representation Learning. [Paper link](https://arxiv.org/abs/2006.04131). 
     - Example code: [PyTorch](../examples/pytorch/grace)
     - Tags: contrastive learning for node classification.
@@ -133,13 +133,13 @@ The folder contains example implementations of selected research papers related 
     - Tags: semi-supervised node classification, simplifying graph convolution, data augmentation
 - <a name="hgt"></a> Hu et al. Heterogeneous Graph Transformer. [Paper link](https://arxiv.org/abs/2003.01332).
     - Example code: [PyTorch](../examples/pytorch/hgt)
-    - Tags: dynamic heterogeneous graphs, large-scale, node classification, link prediction
+    - Tags: dynamic heterogeneous graph, large-scale, node classification, link prediction
 - <a name="mwe"></a> Chen. Graph Convolutional Networks for Graphs with Multi-Dimensionally Weighted Edges. [Paper link](https://cims.nyu.edu/~chenzh/files/GCN_with_edge_weights.pdf).
     - Example code: [PyTorch on ogbn-proteins](../examples/pytorch/ogb/ogbn-proteins)
     - Tags: node classification, weighted graphs, OGB
 - <a name="sign"></a> Frasca et al. SIGN: Scalable Inception Graph Neural Networks. [Paper link](https://arxiv.org/abs/2004.11198).
     - Example code: [PyTorch on ogbn-arxiv/products/mag](../examples/pytorch/ogb/sign), [PyTorch](../examples/pytorch/sign)
-    - Tags: node classification, OGB, large-scale, heterogeneous graphs
+    - Tags: node classification, OGB, large-scale, heterogeneous graph
 - <a name="prestrategy"></a> Hu et al. Strategies for Pre-training Graph Neural Networks. [Paper link](https://arxiv.org/abs/1905.12265).
     - Example code: [Molecule embedding](https://github.com/awslabs/dgl-lifesci/tree/master/examples/molecule_embeddings), [PyTorch for custom data](https://github.com/awslabs/dgl-lifesci/tree/master/examples/property_prediction/csv_data_configuration)
     - Tags: molecules, graph classification, unsupervised learning, self-supervised learning, molecular property prediction
@@ -197,7 +197,7 @@ The folder contains example implementations of selected research papers related 
     - Tags: pooling, graph classification, graph coarsening
 - <a name="gatne-t"></a> Cen et al. Representation Learning for Attributed Multiplex Heterogeneous Network. [Paper link](https://arxiv.org/abs/1905.01669v2).
     - Example code: [PyTorch](../examples/pytorch/GATNE-T)
-    - Tags: heterogeneous graphs, link prediction, large-scale
+    - Tags: heterogeneous graph, link prediction, large-scale
 - <a name="gin"></a> Xu et al. How Powerful are Graph Neural Networks? [Paper link](https://arxiv.org/abs/1810.00826).
     - Example code: [PyTorch on graph classification](../examples/pytorch/gin), [PyTorch on node classification](../examples/pytorch/model_zoo/citation_network), [PyTorch on ogbg-ppa](https://github.com/awslabs/dgl-lifesci/tree/master/examples/property_prediction/ogbg_ppa), [MXNet](../examples/mxnet/gin)
     - Tags: graph classification, node classification, OGB
@@ -206,7 +206,7 @@ The folder contains example implementations of selected research papers related 
     - Tags: knowledge graph, text generation
 - <a name="han"></a> Wang et al. Heterogeneous Graph Attention Network. [Paper link](https://arxiv.org/abs/1903.07293).
     - Example code: [PyTorch](../examples/pytorch/han), [OpenHGNN](https://github.com/BUPT-GAMMA/OpenHGNN/tree/main/openhgnn/output/HAN)
-    - Tags: heterogeneous graphs, node classification
+    - Tags: heterogeneous graph, node classification
 - <a name="lgnn"></a> Chen et al. Supervised Community Detection with Line Graph Neural Networks. [Paper link](https://arxiv.org/abs/1705.08415).
     - Example code: [PyTorch](../examples/pytorch/line_graph)
     - Tags: line graph, community detection
@@ -233,7 +233,7 @@ The folder contains example implementations of selected research papers related 
     - Tags: molecules, molecular property prediction
 - <a name="rotate"></a> Sun et al. RotatE: Knowledge Graph Embedding by Relational Rotation in Complex Space. [Paper link](https://arxiv.org/pdf/1902.10197.pdf).
     - Example code: [PyTorch](https://github.com/awslabs/dgl-ke/tree/master/examples), [PyTorch for custom data](https://aws-dglke.readthedocs.io/en/latest/commands.html)
-    - Tags: knowledge graph embedding
+    - Tags: knowledge graph
 - <a name="mixhop"></a> Abu-El-Haija et al. MixHop: Higher-Order Graph Convolutional Architectures via Sparsified Neighborhood Mixing. [Paper link](https://arxiv.org/abs/1905.00067).
     - Example code: [PyTorch](../examples/pytorch/mixhop)
     - Tags: node classification
@@ -248,16 +248,16 @@ The folder contains example implementations of selected research papers related 
     - Tags: node classification, graph attention
 - <a name='ngcf'></a> Wang, Xiang, et al. Neural Graph Collaborative Filtering. [Paper link](https://arxiv.org/abs/1905.08108).
     - Example code: [PyTorch](../examples/pytorch/NGCF)
-    - Tags: Collaborative Filtering, Recommendation, Graph Neural Network 
+    - Tags: Collaborative Filtering, recommender system, Graph Neural Network 
 - <a name='gnnexplainer'></a> Ying, Rex, et al. GNNExplainer: Generating Explanations for Graph Neural Networks. [Paper link](https://arxiv.org/abs/1903.03894).
     - Example code: [PyTorch](../examples/pytorch/gnn_explainer)
     - Tags: Graph Neural Network, Explainability
 - <a name='hetgnn'></a> Zhang C, Song D, et al. Heterogeneous graph neural network. [Paper link](https://dl.acm.org/doi/abs/10.1145/3292500.3330961).
     - Example code: [OpenHGNN](https://github.com/BUPT-GAMMA/OpenHGNN/tree/main/openhgnn/output/HetGNN)
-    - Tags:  Heterogeneous graphs, Graph neural networks, Graph embedding
+    - Tags:  Heterogeneous graph, Graph neural network, Graph embedding
 - <a name='gtn'></a> Yun S, Jeong M, et al. Graph transformer networks. [Paper link](https://arxiv.org/abs/1911.06455).
     - Example code: [OpenHGNN](https://github.com/BUPT-GAMMA/OpenHGNN/tree/main/openhgnn/output/GTN)
-    - Tags:  Heterogeneous graphs, Graph neural networks, Graph structure
+    - Tags:  Heterogeneous graph, Graph neural network, Graph structure
 
 ## 2018
 
@@ -303,7 +303,7 @@ The folder contains example implementations of selected research papers related 
 
 - <a name="gaan"></a> Zhang et al. GaAN: Gated Attention Networks for Learning on Large and Spatiotemporal Graphs. [Paper link](https://arxiv.org/abs/1803.07294).
     - Example code: [pytorch](../examples/pytorch/dtgrnn)
-    - Tags: Static discrete temporal graph, traffic forcasting
+    - Tags: Static discrete temporal graph, traffic forecasting
 
 ## 2017
 
@@ -325,7 +325,7 @@ The folder contains example implementations of selected research papers related 
 
 - <a name="metapath2vec"></a> Dong et al. metapath2vec: Scalable Representation Learning for Heterogeneous Networks. [Paper link](https://dl.acm.org/doi/10.1145/3097983.3098036).
     - Example code: [PyTorch](../examples/pytorch/metapath2vec)
-    - Tags: heterogeneous graphs, network embedding, large-scale, node classification
+    - Tags: heterogeneous graph, network embedding, large-scale, node classification
 
 - <a name="tagcn"></a> Du et al. Topology Adaptive Graph Convolutional Networks. [Paper link](https://arxiv.org/abs/1710.10370).
     - Example code: [PyTorch](../examples/pytorch/tagcn), [MXNet](../examples/mxnet/tagcn)
@@ -341,7 +341,7 @@ The folder contains example implementations of selected research papers related 
     
 - <a name="rgcn"></a> Schlichtkrull. Modeling Relational Data with Graph Convolutional Networks. [Paper link](https://arxiv.org/abs/1703.06103).
     - Example code: [PyTorch example using homogeneous DGLGraphs](../examples/pytorch/rgcn), [PyTorch](../examples/pytorch/rgcn-hetero), [TensorFlow](../examples/tensorflow/rgcn), [MXNet](../examples/mxnet/rgcn)
-    - Tags: node classification, link prediction, heterogeneous graphs, sampling
+    - Tags: node classification, link prediction, heterogeneous graph, sampling
 
 - <a name="transformer"></a> Vaswani et al. Attention Is All You Need. [Paper link](https://arxiv.org/abs/1706.03762).
     - Example code: [PyTorch](../examples/pytorch/transformer)
@@ -361,7 +361,7 @@ The folder contains example implementations of selected research papers related 
 
 - <a name="dcrnn"></a> Li et al. Diffusion Convolutional Recurrent Neural Network: Data-Driven Traffic Forcasting. [Paper link](https://arxiv.org/abs/1707.01926).
     - Example code: [Pytorch](../examples/pytorch/dtgrnn)
-    - Tags: Static discrete temporal graph, traffic forcasting.
+    - Tags: Static discrete temporal graph, traffic forecasting
 
 ## 2016
 
@@ -379,7 +379,7 @@ The folder contains example implementations of selected research papers related 
     - Tags: molecular property prediction
 - <a name="complex"></a> Trouillon et al. Complex Embeddings for Simple Link Prediction. [Paper link](http://proceedings.mlr.press/v48/trouillon16.pdf).
     - Example code: [PyTorch](https://github.com/awslabs/dgl-ke/tree/master/examples), [PyTorch for custom data](https://aws-dglke.readthedocs.io/en/latest/commands.html)
-    - Tags: knowledge graph embedding
+    - Tags: knowledge graph
 - <a name="vgae"></a> Thomas et al. Variational Graph Auto-Encoders. [Paper link](https://arxiv.org/abs/1611.07308).
     - Example code: [PyTorch](../examples/pytorch/vgae)
     - Tags: link prediction
@@ -400,11 +400,11 @@ The folder contains example implementations of selected research papers related 
     
 - <a name="transr"></a> Lin et al. Learning Entity and Relation Embeddings for Knowledge Graph Completion. [Paper link](https://www.aaai.org/ocs/index.php/AAAI/AAAI15/paper/viewPaper/9571).
     - Example code: [PyTorch](https://github.com/awslabs/dgl-ke/tree/master/examples), [PyTorch for custom data](https://aws-dglke.readthedocs.io/en/latest/commands.html)
-    - Tags: knowledge graph embedding
+    - Tags: knowledge graph
 
 - <a name="distmul"></a> Yang et al. Embedding Entities and Relations for Learning and Inference in Knowledge Bases. [Paper link](https://arxiv.org/abs/1412.6575).
     - Example code: [PyTorch](https://github.com/awslabs/dgl-ke/tree/master/examples), [PyTorch for custom data](https://aws-dglke.readthedocs.io/en/latest/commands.html)
-    - Tags: knowledge graph embedding
+    - Tags: knowledge graph
 
 - <a name="nf"></a> Duvenaud et al. Convolutional Networks on Graphs for Learning Molecular Fingerprints. [Paper link](https://arxiv.org/abs/1509.09292).
     - Example code: [PyTorch](https://github.com/awslabs/dgl-lifesci/tree/master/examples/property_prediction/moleculenet), [PyTorch for custom data](https://github.com/awslabs/dgl-lifesci/tree/master/examples/property_prediction/csv_data_configuration)
@@ -424,7 +424,7 @@ The folder contains example implementations of selected research papers related 
 
 - <a name="transe"></a> Bordes et al. Translating Embeddings for Modeling Multi-relational Data. [Paper link](https://proceedings.neurips.cc/paper/2013/file/1cecc7a77928ca8133fa24680a88d2f9-Paper.pdf).
     - Example code: [PyTorch](https://github.com/awslabs/dgl-ke/tree/master/examples), [PyTorch for custom data](https://aws-dglke.readthedocs.io/en/latest/commands.html)
-    - Tags: knowledge graph embedding
+    - Tags: knowledge graph
 
 ## 2011
 
@@ -434,7 +434,7 @@ The folder contains example implementations of selected research papers related 
 
 - <a name="rescal"></a> Nickel et al. A Three-Way Model for Collective Learning on Multi-Relational Data. [Paper link](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.383.2015&rep=rep1&type=pdf).
     - Example code: [PyTorch](https://github.com/awslabs/dgl-ke/tree/master/examples), [PyTorch for custom data](https://aws-dglke.readthedocs.io/en/latest/commands.html)
-    - Tags: knowledge graph embedding
+    - Tags: knowledge graph
 
 ## 2010
 
