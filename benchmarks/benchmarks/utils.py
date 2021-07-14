@@ -99,7 +99,7 @@ def get_graph(name, format = None):
             g_list, _ = dgl.load_graphs(bin_path)
             g = g_list[0]
         else:
-            g = dgl.data.RedditDataset(self_loop=True)[0].formats([format])
+            g = dgl.data.RedditDataset(self_loop=True)[0].formats(format)
             dgl.save_graphs(bin_path, [g])
     elif name.startswith("ogb"):
         g = get_ogb_graph(name)
