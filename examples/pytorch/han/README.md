@@ -11,10 +11,7 @@ The authors' implementation can be found [here](https://github.com/Jhy1993/HAN).
 [here](https://github.com/Jhy1993/HAN/tree/master/data/acm).  The dataset is noisy
 because there are same author occurring multiple times as different nodes.
 
-For sampling-based training,
-```bash
-python train_sampling.py
-```
+For sampling-based training, `python train_sampling.py`
 
 ## Performance
 
