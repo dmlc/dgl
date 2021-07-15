@@ -310,7 +310,7 @@ class NeighborSampler:
             # For a heterogeneous input graph, the returned frontier is stored in
             # the homogeneous graph format.
             if self.per_etype_fanout:
-                frontier = self.sample_neighbors(self.g, dgl.ETYPE, cur, fanout, replace=False)
+                frontier = self.sample_neighbors(self.g, cur, dgl.ETYPE, fanout, replace=False)
             else:
                 frontier = self.sample_neighbors(self.g, cur, fanout, replace=False)
             block = dgl.to_block(frontier, cur)
@@ -515,6 +515,7 @@ def main(args):
         th.distributed.init_process_group(backend='gloo')
 
     g = dgl.distributed.DistGraph(args.graph_name, part_config=args.conf_path)
+    print(g)
     print('rank:', g.rank())
 
     pb = g.get_partition_book()

@@ -787,22 +787,22 @@ def test_sample_neighbors_etype_homogeneous():
     # graph with coo format
     coo_g = h_g.formats('coo')
     for _ in range(5):
-        subg = dgl.sampling.sample_neighbors_homogeneous(
+        subg = dgl.sampling.sample_etype_neighbors(
             coo_g, seeds, dgl.ETYPE, 5, edge_dir='out', replace=False)
         check_num2(subg.edges()[0], False)
     for _ in range(5):
-        subg = dgl.sampling.sample_neighbors_homogeneous(
+        subg = dgl.sampling.sample_etype_neighbors(
             coo_g, seeds, dgl.ETYPE, 5, edge_dir='out', replace=True)
         check_num2(subg.edges()[0], True)
     # graph with csr format
     csr_g = h_g.formats('csr')
     for _ in range(5):
-        subg = dgl.sampling.sample_neighbors_homogeneous(
+        subg = dgl.sampling.sample_etype_neighbors(
             csr_g, seeds, dgl.ETYPE, 5, edge_dir='out', replace=False)
         check_num2(subg.edges()[0], False)
 
     for _ in range(5):
-        subg = dgl.sampling.sample_neighbors_homogeneous(
+        subg = dgl.sampling.sample_etype_neighbors(
             csr_g, seeds, dgl.ETYPE, 5, edge_dir='out', replace=True)
         check_num2(subg.edges()[0], True)
 
@@ -810,12 +810,12 @@ def test_sample_neighbors_etype_homogeneous():
     csc_g = h_g.formats('csc')
     csc_g = csc_g.formats(['csc','csr','coo'])
     for _ in range(5):
-        subg = dgl.sampling.sample_neighbors_homogeneous(
+        subg = dgl.sampling.sample_etype_neighbors(
             csc_g, seeds, dgl.ETYPE, 5, edge_dir='out', replace=False)
         check_num2(subg.edges()[0], False)
 
     for _ in range(5):
-        subg = dgl.sampling.sample_neighbors_homogeneous(
+        subg = dgl.sampling.sample_etype_neighbors(
             csc_g, seeds, dgl.ETYPE, 5, edge_dir='out', replace=True)
         check_num2(subg.edges()[0], True)
 
