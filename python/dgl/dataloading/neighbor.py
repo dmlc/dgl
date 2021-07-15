@@ -216,6 +216,8 @@ class MultiLayerEtypeNeighborSampler(BlockSampler):
         self.prob_arrays = None
 
     def sample_frontier(self, block_id, g, seed_nodes):
+        assert len(g.etypes) == 1 and len(g.ntypes) == 1, \
+            "MultiLayerEtypeNeighborSampler only work with homogeneous graphs."
         fanout = self.fanouts[block_id]
         if isinstance(g, distributed.DistGraph):
             if fanout is None:
@@ -231,19 +233,19 @@ class MultiLayerEtypeNeighborSampler(BlockSampler):
                 frontier = subgraph.in_subgraph(g, seed_nodes)
             else:
                 self._build_fanout(block_id, g)
-                self._build_prob_arrays(g)
+                self._build_prob_arrays()
 
                 frontier = sampling.sample_etype_neighbors(
                     g, seed_nodes, self.etype_field, self.fanout_arrays[block_id],
                     replace=self.replace, prob=self.prob_arrays)
         return frontier
 
-    def _build_prob_arrays(self, g):
+    def _build_prob_arrays(self):
         # build prob_arrays only once
         if self.prob_arrays is None:
             self.prob_arrays = nd.array([], ctx=nd.cpu())
 
-    def _build_fanout(self, block_id, g):
+    def _build_fanout(self, block_id):
         assert not self.fanouts is None, \
             "_build_fanout() should only be called when fanouts is not None"
         # build fanout_arrays only once for each layer

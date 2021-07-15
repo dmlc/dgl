@@ -440,7 +440,7 @@ def check_rpc_hetero_etype_sampling_shuffle(tmpdir, num_server):
         F.scatter_row_inplace(orig_eid_map, part.edata[dgl.EID], part.edata['orig_id'])
 
     src, dst = block.edges()
-    assert len(src) == 6 * 2 * 3
+    assert len(src) == 36
     # These are global Ids after shuffling.
     shuffled_src = F.gather_row(block.srcdata[dgl.NID], src)
     shuffled_dst = F.gather_row(block.dstdata[dgl.NID], dst)

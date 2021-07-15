@@ -92,7 +92,8 @@ def sample_etype_neighbors(g, nodes, etype_field, fanout, edge_dir='in', prob=No
     if g.device != F.cpu():
         raise DGLError("The graph should be in cpu.")
     if etype_field not in g.edata:
-        raise DGLError("The graph should have {} in the edge data representing the edge type.".format(etype_field))
+        raise DGLError("The graph should have {} in the edge data" \
+                       "representing the edge type.".format(etype_field))
     if isinstance(fanout, int) is False:
         raise DGLError("The fanout should be an integer")
     if isinstance(nodes, dict) is True:

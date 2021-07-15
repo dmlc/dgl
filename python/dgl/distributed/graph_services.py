@@ -68,7 +68,8 @@ def _sample_neighbors(local_g, partition_book, seed_nodes, fan_out, edge_dir, pr
     global_eids = F.gather_row(local_g.edata[EID], sampled_graph.edata[EID])
     return global_src, global_dst, global_eids
 
-def _sample_etype_neighbors(local_g, partition_book, seed_nodes, etype_field, fan_out, edge_dir, prob, replace):
+def _sample_etype_neighbors(local_g, partition_book, seed_nodes, etype_field,
+                            fan_out, edge_dir, prob, replace):
     """ Sample from local partition.
 
     The input nodes use global IDs. We need to map the global node IDs to local node IDs,
