@@ -2536,14 +2536,19 @@ def adj_product_graph(A, B, weight_name, etype='_E'):
     >>> B = dgl.heterograph({
     ...     ('B', 'BA', 'A'): ([0, 3, 2, 1, 3, 3], [1, 2, 0, 2, 1, 0])},
     ...     num_nodes_dict={'A': 3, 'B': 4})
-    >>> A.edata['w'] = torch.randn(6).requires_grad_()
-    >>> B.edata['w'] = torch.randn(6).requires_grad_()
 
     If your graph is a multigraph, you will need to call :func:`dgl.to_simple`
     to convert it into a simple graph first.
 
     >>> A = dgl.to_simple(A)
     >>> B = dgl.to_simple(B)
+
+    Initialize learnable edge weights.
+
+    >>> A.edata['w'] = torch.randn(6).requires_grad_()
+    >>> B.edata['w'] = torch.randn(6).requires_grad_()
+
+    Take the product.
 
     >>> C = dgl.adj_product_graph(A, B, 'w')
     >>> C.edges()
@@ -2660,11 +2665,18 @@ def adj_sum_graph(graphs, weight_name):
     >>> A.edata['w'] = torch.randn(6).requires_grad_()
     >>> B.edata['w'] = torch.randn(6).requires_grad_()
 
-    If your graph is a multigraph, you will need to call :func:`dgl.to_simple`
+    If your graph is a multigraph, call :func:`dgl.to_simple`
     to convert it into a simple graph first.
 
     >>> A = dgl.to_simple(A)
     >>> B = dgl.to_simple(B)
+
+    Initialize learnable edge weights.
+
+    >>> A.edata['w'] = torch.randn(6).requires_grad_()
+    >>> B.edata['w'] = torch.randn(6).requires_grad_()
+
+    Take the sum.
 
     >>> C = dgl.adj_sum_graph([A, B], 'w')
     >>> C.edges()
@@ -2930,7 +2942,7 @@ def reorder_graph(g, node_permute_algo='rcmk', edge_permute_algo='src',
           generated/scipy.sparse.csgraph.reverse_cuthill_mckee.html#
           scipy-sparse-csgraph-reverse-cuthill-mckee>`__ from ``scipy`` to generate nodes
           permutation.
-        * ``metis``: Use the :func:`~dgl.partition.metis_partition_assignment` function
+        * ``metis``: Use the :func:`~dgl.metis_partition_assignment` function
           to partition the input graph, which gives a cluster assignment of each node.
           DGL then sorts the assignment array so the new node order will put nodes of
           the same cluster together.
