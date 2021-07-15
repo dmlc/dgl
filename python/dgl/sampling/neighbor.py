@@ -302,8 +302,9 @@ def sample_neighbors_biased(g, nodes, fanout, bias, edge_dir='in',
             [0, 1, 2]])
 
     Set the probability of each tag:
+
     >>> bias = torch.tensor([1.0, 0.001])
-        # node 2 is almost impossible to be sampled because it has tag 1.
+    >>> # node 2 is almost impossible to be sampled because it has tag 1.
 
     To sample one out bound edge for node 0 and node 2:
 

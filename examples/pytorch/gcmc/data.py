@@ -466,11 +466,11 @@ class MovieLens(object):
             file_path = os.path.join(self._dir, 'u.item')
             self.movie_info = pd.read_csv(file_path, sep='|', header=None,
                                           names=['id', 'title', 'release_date', 'video_release_date', 'url'] + GENRES,
-                                          engine='python')
+                                          encoding='iso-8859-1')
         elif self._name == 'ml-1m' or self._name == 'ml-10m':
             file_path = os.path.join(self._dir, 'movies.dat')
             movie_info = pd.read_csv(file_path, sep='::', header=None,
-                                     names=['id', 'title', 'genres'], engine='python')
+                                     names=['id', 'title', 'genres'], encoding='iso-8859-1')
             genre_map = {ele: i for i, ele in enumerate(GENRES)}
             genre_map['Children\'s'] = genre_map['Children']
             genre_map['Childrens'] = genre_map['Children']
