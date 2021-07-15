@@ -24,7 +24,7 @@ def _AXWb(A, X, W, b):
 def test_graph_conv0(out_dim):
     g = dgl.DGLGraph(nx.path_graph(3)).to(F.ctx())
     ctx = F.ctx()
-    adj = g.adjacency_matrix(transpose=False, ctx=ctx)
+    adj = g.adjacency_matrix(transpose=True, ctx=ctx)
 
     conv = nn.GraphConv(5, out_dim, norm='none', bias=True)
     conv = conv.to(ctx)
@@ -81,7 +81,7 @@ def test_graph_conv0(out_dim):
 
 @parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['homo', 'bipartite'], exclude=['zero-degree', 'dglgraph']))
-@pytest.mark.parametrize('norm', ['none', 'both', 'right'])
+@pytest.mark.parametrize('norm', ['none', 'both', 'right', 'left'])
 @pytest.mark.parametrize('weight', [True, False])
 @pytest.mark.parametrize('bias', [True, False])
 @pytest.mark.parametrize('out_dim', [1, 2])
@@ -186,7 +186,7 @@ def test_tagconv(out_dim):
     g = dgl.DGLGraph(nx.path_graph(3))
     g = g.to(F.ctx())
     ctx = F.ctx()
-    adj = g.adjacency_matrix(transpose=False, ctx=ctx)
+    adj = g.adjacency_matrix(transpose=True, ctx=ctx)
     norm = th.pow(g.in_degrees().float(), -0.5)
 
     conv = nn.TAGConv(5, out_dim, bias=True)
@@ -726,6 +726,23 @@ def test_gated_graph_conv(g, idtype):
     assert h.shape[-1] == 10
 
 @parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
+def test_gated_graph_conv_one_etype(g, idtype):
+    ctx = F.ctx()
+    g = g.astype(idtype).to(ctx)
+    ggconv = nn.GatedGraphConv(5, 10, 5, 1)
+    etypes = th.zeros(g.number_of_edges())
+    feat = F.randn((g.number_of_nodes(), 5))
+    ggconv = ggconv.to(ctx)
+    etypes = etypes.to(ctx)
+
+    h = ggconv(g, feat, etypes)
+    h2 = ggconv(g, feat)
+    # current we only do shape check
+    assert F.allclose(h, h2)
+    assert h.shape[-1] == 10
+
+@parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite'], exclude=['zero-degree']))
 def test_nn_conv(g, idtype):
     g = g.astype(idtype).to(F.ctx())
@@ -789,7 +806,7 @@ def test_dense_graph_conv(norm_type, g, idtype, out_dim):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
     # TODO(minjie): enable the following option after #1385
-    adj = g.adjacency_matrix(transpose=False, ctx=ctx).to_dense()
+    adj = g.adjacency_matrix(transpose=True, ctx=ctx).to_dense()
     conv = nn.GraphConv(5, out_dim, norm=norm_type, bias=True)
     dense_conv = nn.DenseGraphConv(5, out_dim, norm=norm_type, bias=True)
     dense_conv.weight.data = conv.weight.data
@@ -807,7 +824,7 @@ def test_dense_graph_conv(norm_type, g, idtype, out_dim):
 def test_dense_sage_conv(g, idtype, out_dim):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
-    adj = g.adjacency_matrix(transpose=False, ctx=ctx).to_dense()
+    adj = g.adjacency_matrix(transpose=True, ctx=ctx).to_dense()
     sage = nn.SAGEConv(5, out_dim, 'gcn')
     dense_sage = nn.DenseSAGEConv(5, out_dim)
     dense_sage.fc.weight.data = sage.fc_neigh.weight.data
@@ -894,7 +911,7 @@ def test_dense_cheb_conv(out_dim):
         ctx = F.ctx()
         g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
         g = g.to(F.ctx())
-        adj = g.adjacency_matrix(transpose=False, ctx=ctx).to_dense()
+        adj = g.adjacency_matrix(transpose=True, ctx=ctx).to_dense()
         cheb = nn.ChebConv(5, out_dim, k, None)
         dense_cheb = nn.DenseChebConv(5, out_dim, k)
         #for i in range(len(cheb.fc)):
@@ -1113,6 +1130,7 @@ if __name__ == '__main__':
     test_gin_conv()
     test_agnn_conv()
     test_gated_graph_conv()
+    test_gated_graph_conv_one_etype()
     test_nn_conv()
     test_gmm_conv()
     test_dotgat_conv()

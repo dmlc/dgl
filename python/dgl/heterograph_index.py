@@ -600,11 +600,11 @@ class HeteroGraphIndex(ObjectBase):
     def adjacency_matrix(self, etype, transpose, ctx):
         """Return the adjacency matrix representation of this graph.
 
-        By default, a row of returned adjacency matrix represents the destination
-        of an edge and the column represents the source.
+        By default, a row of returned adjacency matrix represents the source
+        of an edge and the column represents the destination.
 
-        When transpose is True, a row represents the source and a column represents
-        a destination.
+        When transpose is True, a row represents the destination and a column represents
+        the source.
 
         Parameters
         ----------
@@ -630,8 +630,8 @@ class HeteroGraphIndex(ObjectBase):
         rst = _CAPI_DGLHeteroGetAdj(self, int(etype), transpose, fmt)
         # convert to framework-specific sparse matrix
         srctype, dsttype = self.metagraph.find_edge(etype)
-        nrows = self.number_of_nodes(srctype) if transpose else self.number_of_nodes(dsttype)
-        ncols = self.number_of_nodes(dsttype) if transpose else self.number_of_nodes(srctype)
+        nrows = self.number_of_nodes(dsttype) if transpose else self.number_of_nodes(srctype)
+        ncols = self.number_of_nodes(srctype) if transpose else self.number_of_nodes(dsttype)
         nnz = self.number_of_edges(etype)
         if fmt == "csr":
             indptr = F.copy_to(F.from_dgl_nd(rst(0)), ctx)
@@ -653,11 +653,11 @@ class HeteroGraphIndex(ObjectBase):
     def adjacency_matrix_tensors(self, etype, transpose, fmt):
         """Return the adjacency matrix as a triplet of tensors.
 
-        By default, a row of returned adjacency matrix represents the destination
-        of an edge and the column represents the source.
+        By default, a row of returned adjacency matrix represents the source
+        of an edge and the column represents the destination.
 
-        When transpose is True, a row represents the source and a column represents
-        a destination.
+        When transpose is True, a row represents the destination and a column represents
+        the source.
 
         Parameters
         ----------
@@ -689,8 +689,8 @@ class HeteroGraphIndex(ObjectBase):
 
         rst = _CAPI_DGLHeteroGetAdj(self, int(etype), transpose, fmt)
         srctype, dsttype = self.metagraph.find_edge(etype)
-        nrows = self.number_of_nodes(srctype) if transpose else self.number_of_nodes(dsttype)
-        ncols = self.number_of_nodes(dsttype) if transpose else self.number_of_nodes(srctype)
+        nrows = self.number_of_nodes(dsttype) if transpose else self.number_of_nodes(srctype)
+        ncols = self.number_of_nodes(srctype) if transpose else self.number_of_nodes(dsttype)
         nnz = self.number_of_edges(etype)
         if fmt == "csr":
             indptr = F.from_dgl_nd(rst(0))
@@ -843,7 +843,7 @@ class HeteroGraphIndex(ObjectBase):
             raise DGLError('Invalid incidence matrix type: %s' % str(typestr))
         return inc, shuffle_idx
 
-    def node_subgraph(self, induced_nodes):
+    def node_subgraph(self, induced_nodes, relabel_nodes):
         """Return the induced node subgraph.
 
         Parameters
@@ -851,6 +851,9 @@ class HeteroGraphIndex(ObjectBase):
         induced_nodes : list of utils.Index
             Induced nodes. The length should be equal to the number of
             node types in this heterograph.
+        relabel_nodes : bool
+            If True, the extracted subgraph will only have the nodes in the specified node set
+            and it will relabel the nodes in order.
 
         Returns
         -------
@@ -858,7 +861,7 @@ class HeteroGraphIndex(ObjectBase):
             The subgraph index.
         """
         vids = [F.to_dgl_nd(nodes) for nodes in induced_nodes]
-        return _CAPI_DGLHeteroVertexSubgraph(self, vids)
+        return _CAPI_DGLHeteroVertexSubgraph(self, vids, relabel_nodes)
 
     def edge_subgraph(self, induced_edges, preserve_nodes):
         """Return the induced edge subgraph.
@@ -916,9 +919,9 @@ class HeteroGraphIndex(ObjectBase):
             The first element of the tuple is the shuffle order for outward graph
             The second element of the tuple is the shuffle order for inward graph
         """
-        csr = _CAPI_DGLHeteroGetAdj(self, int(etype), True, "csr")
+        csr = _CAPI_DGLHeteroGetAdj(self, int(etype), False, "csr")
         order = csr(2)
-        rev_csr = _CAPI_DGLHeteroGetAdj(self, int(etype), False, "csr")
+        rev_csr = _CAPI_DGLHeteroGetAdj(self, int(etype), True, "csr")
         rev_order = rev_csr(2)
         return utils.toindex(order, self.dtype), utils.toindex(rev_order, self.dtype)
 
@@ -1103,7 +1106,7 @@ def create_unitgraph_from_coo(num_ntypes, num_src, num_dst, row, col,
         formats, row_sorted, col_sorted)
 
 def create_unitgraph_from_csr(num_ntypes, num_src, num_dst, indptr, indices, edge_ids,
-                              formats):
+                              formats, transpose=False):
     """Create a unitgraph graph index from CSR format
 
     Parameters
@@ -1122,6 +1125,8 @@ def create_unitgraph_from_csr(num_ntypes, num_src, num_dst, indptr, indices, edg
         Edge shuffle id.
     formats : str
         Restrict the storage formats allowed for the unit graph.
+    transpose : bool, optional
+        If True, treats the input matrix as CSC.
 
     Returns
     -------
@@ -1132,7 +1137,7 @@ def create_unitgraph_from_csr(num_ntypes, num_src, num_dst, indptr, indices, edg
     return _CAPI_DGLHeteroCreateUnitGraphFromCSR(
         int(num_ntypes), int(num_src), int(num_dst),
         F.to_dgl_nd(indptr), F.to_dgl_nd(indices), F.to_dgl_nd(edge_ids),
-        formats)
+        formats, transpose)
 
 def create_heterograph_from_relations(metagraph, rel_graphs, num_nodes_per_type):
     """Create a heterograph from metagraph and graphs of every relation.
@@ -1230,6 +1235,31 @@ def disjoint_partition(graph, bnn_all_types, bne_all_types):
     bne_all_types = utils.toindex(list(itertools.chain.from_iterable(bne_all_types)))
     return _CAPI_DGLHeteroDisjointPartitionBySizes_v2(
         graph, bnn_all_types.todgltensor(), bne_all_types.todgltensor())
+
+def slice_gidx(graph, num_nodes, start_nid, num_edges, start_eid):
+    """Slice a chunk of the graph.
+
+    Parameters
+    ----------
+    graph : HeteroGraphIndex
+        The batched graph to slice.
+    num_nodes : utils.Index
+        Number of nodes per node type in the result graph.
+    start_nid : utils.Index
+        Start node ID per node type in the result graph.
+    num_edges : utils.Index
+        Number of edges per edge type in the result graph.
+    start_eid : utils.Index
+        Start edge ID per edge type in the result graph.
+
+    Returns
+    -------
+    HeteroGraphIndex
+        The sliced graph.
+    """
+    return _CAPI_DGLHeteroSlice(
+        graph, num_nodes.todgltensor(), start_nid.todgltensor(),
+        num_edges.todgltensor(), start_eid.todgltensor())
 
 #################################################################
 # Data structure used by C APIs

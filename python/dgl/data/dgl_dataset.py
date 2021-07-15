@@ -12,7 +12,7 @@ from ..utils import retry_method_with_fix
 class DGLDataset(object):
     r"""The basic DGL dataset for creating graph datasets.
     This class defines a basic template class for DGL Dataset.
-    The following steps will are executed automatically:
+    The following steps will be executed automatically:
 
       1. Check whether there is a dataset cache on disk
          (already processed and stored on the disk) by
@@ -105,9 +105,9 @@ class DGLDataset(object):
         r"""Overwite to realize your own logic of
         saving the processed dataset into files.
 
-        It is recommended to use ``dgl.utils.data.save_graphs``
+        It is recommended to use ``dgl.data.utils.save_graphs``
         to save dgl graph into files and use
-        ``dgl.utils.data.save_info`` to save extra
+        ``dgl.data.utils.save_info`` to save extra
         information into files.
         """
         pass
@@ -116,9 +116,9 @@ class DGLDataset(object):
         r"""Overwite to realize your own logic of
         loading the saved dataset from files.
 
-        It is recommended to use ``dgl.utils.data.load_graphs``
+        It is recommended to use ``dgl.data.utils.load_graphs``
         to load dgl graph from files and use
-        ``dgl.utils.data.load_info`` to load extra information
+        ``dgl.data.utils.load_info`` to load extra information
         into python dict object.
         """
         pass

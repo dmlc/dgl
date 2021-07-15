@@ -53,7 +53,7 @@ def create_random_graph(n):
     return dgl.from_scipy(arr)
 
 def run_server(graph_name, server_id, server_count, num_clients, shared_mem):
-    g = DistGraphServer(server_id, "kv_ip_config.txt", num_clients, server_count,
+    g = DistGraphServer(server_id, "kv_ip_config.txt", server_count, num_clients,
                         '/tmp/dist_graph/{}.json'.format(graph_name),
                         disable_shared_mem=not shared_mem)
     print('start server', server_id)
@@ -156,12 +156,27 @@ def run_emb_client(graph_name, part_id, server_count, num_clients, num_nodes, nu
     g = DistGraph(graph_name, gpb=gpb)
     check_dist_emb(g, num_clients, num_nodes, num_edges)
 
+def run_client_hierarchy(graph_name, part_id, server_count, node_mask, edge_mask, return_dict):
+    time.sleep(5)
+    os.environ['DGL_NUM_SERVER'] = str(server_count)
+    dgl.distributed.initialize("kv_ip_config.txt")
+    gpb, graph_name, _, _ = load_partition_book('/tmp/dist_graph/{}.json'.format(graph_name),
+                                                part_id, None)
+    g = DistGraph(graph_name, gpb=gpb)
+    node_mask = F.tensor(node_mask)
+    edge_mask = F.tensor(edge_mask)
+    nodes = node_split(node_mask, g.get_partition_book(), node_trainer_ids=g.ndata['trainer_id'])
+    edges = edge_split(edge_mask, g.get_partition_book(), edge_trainer_ids=g.edata['trainer_id'])
+    rank = g.rank()
+    return_dict[rank] = (nodes, edges)
+
 def check_dist_emb(g, num_clients, num_nodes, num_edges):
     from dgl.distributed.optim import SparseAdagrad
-    from dgl.distributed.nn import NodeEmbedding
+    from dgl.distributed import DistEmbedding
     # Test sparse emb
     try:
-        emb = NodeEmbedding(g.number_of_nodes(), 1, 'emb1', emb_init)
+        emb = DistEmbedding(g.number_of_nodes(), 1, 'emb1', emb_init)
+        nids = F.arange(0, int(g.number_of_nodes()))
         lr = 0.001
         optimizer = SparseAdagrad([emb], lr=lr)
         with F.record_grad():
@@ -178,13 +193,13 @@ def check_dist_emb(g, num_clients, num_nodes, num_edges):
         assert np.all(F.asnumpy(feats1) == np.zeros((len(rest), 1)))
 
         policy = dgl.distributed.PartitionPolicy('node', g.get_partition_book())
-        grad_sum = dgl.distributed.DistTensor((g.number_of_nodes(),), F.float32,
+        grad_sum = dgl.distributed.DistTensor((g.number_of_nodes(), 1), F.float32,
                                               'emb1_sum', policy)
         if num_clients == 1:
             assert np.all(F.asnumpy(grad_sum[nids]) == np.ones((len(nids), 1)) * num_clients)
         assert np.all(F.asnumpy(grad_sum[rest]) == np.zeros((len(rest), 1)))
 
-        emb = NodeEmbedding(g.number_of_nodes(), 1, 'emb2', emb_init)
+        emb = DistEmbedding(g.number_of_nodes(), 1, 'emb2', emb_init)
         with F.no_grad():
             feats1 = emb(nids)
         assert np.all(F.asnumpy(feats1) == 0)
@@ -201,12 +216,15 @@ def check_dist_emb(g, num_clients, num_nodes, num_edges):
         with F.no_grad():
             feats = emb(nids)
         if num_clients == 1:
-            assert_almost_equal(F.asnumpy(feats), np.ones((len(nids), 1)) * math.sqrt(2) * -lr)
+            assert_almost_equal(F.asnumpy(feats), np.ones((len(nids), 1)) * 1 * -lr)
         rest = np.setdiff1d(np.arange(g.number_of_nodes()), F.asnumpy(nids))
         feats1 = emb(rest)
         assert np.all(F.asnumpy(feats1) == np.zeros((len(rest), 1)))
     except NotImplementedError as e:
         pass
+    except Exception as e:
+        print(e)
+        sys.exit(-1)
 
 def check_dist_graph(g, num_clients, num_nodes, num_edges):
     # Test API
@@ -317,6 +335,7 @@ def check_dist_emb_server_client(shared_mem, num_servers, num_clients):
 
     for p in cli_ps:
         p.join()
+        assert p.exitcode == 0
 
     for p in serv_ps:
         p.join()
@@ -357,6 +376,62 @@ def check_server_client(shared_mem, num_servers, num_clients):
 
     for p in serv_ps:
         p.join()
+
+    print('clients have terminated')
+
+def check_server_client_hierarchy(shared_mem, num_servers, num_clients):
+    prepare_dist()
+    g = create_random_graph(10000)
+
+    # Partition the graph
+    num_parts = 1
+    graph_name = 'dist_graph_test_2'
+    g.ndata['features'] = F.unsqueeze(F.arange(0, g.number_of_nodes()), 1)
+    g.edata['features'] = F.unsqueeze(F.arange(0, g.number_of_edges()), 1)
+    partition_graph(g, graph_name, num_parts, '/tmp/dist_graph', num_trainers_per_machine=num_clients)
+
+    # let's just test on one partition for now.
+    # We cannot run multiple servers and clients on the same machine.
+    serv_ps = []
+    ctx = mp.get_context('spawn')
+    for serv_id in range(num_servers):
+        p = ctx.Process(target=run_server, args=(graph_name, serv_id, num_servers,
+                                                 num_clients, shared_mem))
+        serv_ps.append(p)
+        p.start()
+
+    cli_ps = []
+    manager = mp.Manager()
+    return_dict = manager.dict()
+    node_mask = np.zeros((g.number_of_nodes(),), np.int32)
+    edge_mask = np.zeros((g.number_of_edges(),), np.int32)
+    nodes = np.random.choice(g.number_of_nodes(), g.number_of_nodes() // 10, replace=False)
+    edges = np.random.choice(g.number_of_edges(), g.number_of_edges() // 10, replace=False)
+    node_mask[nodes] = 1
+    edge_mask[edges] = 1
+    nodes = np.sort(nodes)
+    edges = np.sort(edges)
+    for cli_id in range(num_clients):
+        print('start client', cli_id)
+        p = ctx.Process(target=run_client_hierarchy, args=(graph_name, 0, num_servers,
+                                                           node_mask, edge_mask, return_dict))
+        p.start()
+        cli_ps.append(p)
+
+    for p in cli_ps:
+        p.join()
+    for p in serv_ps:
+        p.join()
+
+    nodes1 = []
+    edges1 = []
+    for n, e in return_dict.values():
+        nodes1.append(n)
+        edges1.append(e)
+    nodes1, _ = F.sort_1d(F.cat(nodes1, 0))
+    edges1, _ = F.sort_1d(F.cat(edges1, 0))
+    assert np.all(F.asnumpy(nodes1) == nodes)
+    assert np.all(F.asnumpy(edges1) == edges)
 
     print('clients have terminated')
 
@@ -502,6 +577,7 @@ def check_server_client_hetero(shared_mem, num_servers, num_clients):
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support some of operations in DistGraph")
 def test_server_client():
     os.environ['DGL_DIST_MODE'] = 'distributed'
+    check_server_client_hierarchy(False, 1, 4)
     check_server_client_empty(True, 1, 1)
     check_server_client_hetero(True, 1, 1)
     check_server_client_hetero(False, 1, 1)
@@ -511,14 +587,13 @@ def test_server_client():
     check_server_client(False, 2, 2)
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
-@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support distributed NodeEmbedding")
-@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Mxnet doesn't support distributed NodeEmbedding")
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support distributed DistEmbedding")
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Mxnet doesn't support distributed DistEmbedding")
 def test_dist_emb_server_client():
     os.environ['DGL_DIST_MODE'] = 'distributed'
     check_dist_emb_server_client(True, 1, 1)
     check_dist_emb_server_client(False, 1, 1)
     check_dist_emb_server_client(True, 2, 2)
-    check_dist_emb_server_client(False, 2, 2)
 
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support some of operations in DistGraph")
 def test_standalone():
@@ -540,8 +615,8 @@ def test_standalone():
         print(e)
     dgl.distributed.exit_client() # this is needed since there's two test here in one process
 
-@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support distributed NodeEmbedding")
-@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Mxnet doesn't support distributed NodeEmbedding")
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support distributed DistEmbedding")
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Mxnet doesn't support distributed DistEmbedding")
 def test_standalone_node_emb():
     os.environ['DGL_DIST_MODE'] = 'standalone'
 
@@ -693,9 +768,9 @@ def prepare_dist():
 
 if __name__ == '__main__':
     os.makedirs('/tmp/dist_graph', exist_ok=True)
+    test_dist_emb_server_client()
+    test_server_client()
     test_split()
     test_split_even()
-    test_server_client()
     test_standalone()
-
     test_standalone_node_emb()

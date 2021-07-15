@@ -3,8 +3,11 @@ from datetime import timedelta
 import torch as th
 from ...backend import pytorch as F
 from ...utils import get_shared_mem_array, create_shared_mem_array
+from ...cuda import nccl
+from ...partition import NDArrayPartition
 
 _STORE = None
+_COMM = None
 
 class NodeEmbedding: # NodeEmbedding
     '''Class for storing node embeddings.
@@ -36,6 +39,11 @@ class NodeEmbedding: # NodeEmbedding
     init_func : callable, optional
         The function to create the initial data. If the init function is not provided,
         the values of the embeddings are initialized to zero.
+    device : th.device
+        Device to store the embeddings on.
+    parittion : NDArrayPartition
+        The partition to use to distributed the embeddings between
+        processes.
 
     Examples
     --------
@@ -58,8 +66,12 @@ class NodeEmbedding: # NodeEmbedding
     '''
 
     def __init__(self, num_embeddings, embedding_dim, name,
-                 init_func=None):
+                 init_func=None, device=None, partition=None):
         global _STORE
+        global _COMM
+
+        if device is None:
+            device = th.device('cpu')
 
         # Check whether it is multi-gpu training or not.
         if th.distributed.is_initialized():
@@ -70,32 +82,71 @@ class NodeEmbedding: # NodeEmbedding
             world_size = 0
         self._rank = rank
         self._world_size = world_size
+        self._store = None
+        self._comm = None
+        self._partition = partition
+
         host_name = '127.0.0.1'
         port = 12346
 
-        if rank <= 0:
-            emb = create_shared_mem_array(name, (num_embeddings, embedding_dim), th.float32)
-            if init_func is not None:
-                emb = init_func(emb)
-        if rank == 0: # the master gpu process
+        if rank >= 0:
             # for multi-gpu training, setup a TCPStore for
             # embeding status synchronization across GPU processes
             if _STORE is None:
                 _STORE = th.distributed.TCPStore(
-                    host_name, port, world_size, True, timedelta(seconds=10*60))
-            for _ in range(1, world_size):
-                # send embs
-                _STORE.set(name, name)
-        elif rank > 0:
-            # receive
-            if _STORE is None:
-                _STORE = th.distributed.TCPStore(
-                    host_name, port, world_size, False, timedelta(seconds=10*60))
-            _STORE.wait([name])
-            emb = get_shared_mem_array(name, (num_embeddings, embedding_dim), th.float32)
+                    host_name, port, world_size, rank == 0, timedelta(seconds=10*60))
+            self._store = _STORE
 
-        self._store = _STORE
-        self._tensor = emb
+        # embeddings is stored in CPU memory.
+        if th.device(device) == th.device('cpu'):
+            if rank <= 0:
+                emb = create_shared_mem_array(name, (num_embeddings, embedding_dim), th.float32)
+                if init_func is not None:
+                    emb = init_func(emb)
+            if rank == 0: # the master gpu process
+                for _ in range(1, world_size):
+                    # send embs
+                    self._store.set(name, name)
+            elif rank > 0:
+                # receive
+                self._store.wait([name])
+                emb = get_shared_mem_array(name, (num_embeddings, embedding_dim), th.float32)
+            self._tensor = emb
+        else: # embeddings is stored in GPU memory.
+            # setup nccl communicator
+            if _COMM is None:
+                if rank < 0:
+                    _COMM = nccl.Communicator(1, 0, nccl.UniqueId())
+                else:
+                    # needs to be set for nccl to work
+                    th.cuda.set_device(device)
+                    if rank == 0:
+                        # root process broadcasts nccl id
+                        nccl_id = nccl.UniqueId()
+                        self._store.set('nccl_root_id_sparse_emb', str(nccl_id))
+                    else:
+                        nccl_id = nccl.UniqueId(self._store.get('nccl_root_id_sparse_emb'))
+                    _COMM = nccl.Communicator(self._world_size, self._rank,
+                                              nccl_id)
+            self._comm = _COMM
+
+            if not self._partition:
+                # for communication we need a partition
+                self._partition = NDArrayPartition(
+                    num_embeddings,
+                    self._world_size if self._world_size > 0 else 1,
+                    mode='remainder')
+
+            # create local tensors for the weights
+            local_size = self._partition.local_size(self._comm.rank())
+
+            # TODO(dlasalle): support 16-bit/half embeddings
+            emb = th.empty([local_size, embedding_dim], dtype=th.float32,
+                           requires_grad=False, device=device)
+            if init_func:
+                emb = init_func(emb)
+            self._tensor = emb
+
         self._num_embeddings = num_embeddings
         self._embedding_dim = embedding_dim
         self._name = name
@@ -109,10 +160,19 @@ class NodeEmbedding: # NodeEmbedding
         device : th.device
             Target device to put the collected embeddings.
         """
-        emb = self._tensor[node_ids].to(device)
+        if not self._comm or self._comm.size() == 1:
+            emb = self._tensor[node_ids].to(device)
+        else:
+            if self.world_size > 0:
+                emb = self._comm.sparse_all_to_all_pull(
+                    node_ids, self._tensor, self._partition)
+            else:
+                emb = self._tensor[node_ids]
+            emb = emb.to(device)
         if F.is_recording():
             emb = F.attach_grad(emb)
-            self._trace.append((node_ids.to(device, non_blocking=True), emb))
+            self._trace.append((node_ids.to(device), emb))
+
         return emb
 
     @property
@@ -126,6 +186,31 @@ class NodeEmbedding: # NodeEmbedding
             KVStore used for meta data sharing.
         """
         return self._store
+
+    @property
+    def comm(self):
+        """Return dgl.cuda.nccl.Communicator for data
+        sharing across processes.
+
+        Returns
+        -------
+        dgl.cuda.nccl.Communicator
+            Communicator used for data sharing.
+        """
+        return self._comm
+
+    @property
+    def partition(self):
+        """Return the partition identifying how the tensor is split across
+        processes.
+
+        Returns
+        -------
+        String
+            The mode.
+        """
+
+        return self._partition
 
     @property
     def rank(self):
@@ -244,3 +329,78 @@ class NodeEmbedding: # NodeEmbedding
             The tensor storing the node embeddings
         """
         return self._tensor
+
+    def all_set_embedding(self, values):
+        """ Set the values of the embedding. This method must be called by all
+        processes sharing the embedding with identical tensors for
+        :attr:`values`.
+
+        NOTE: This method must be called by all processes sharing the
+        embedding, or it may result in a deadlock.
+
+        Parameters
+        ----------
+        values : Tensor
+            The global tensor to pull values from.
+        """
+        if self._partition:
+            idxs = F.copy_to(
+                self._partition.get_local_indices(
+                    self._comm.rank(),
+                    ctx=F.context(self._tensor)),
+                F.context(values))
+            self._tensor[:] = F.copy_to(F.gather_row(values, idxs),
+                                        ctx=F.context(self._tensor))[:]
+        else:
+            if self._rank == 0:
+                self._tensor[:] = F.copy_to(values,
+                                            ctx=F.context(self._tensor))[:]
+        if th.distributed.is_initialized():
+            th.distributed.barrier()
+
+    def all_get_embedding(self):
+        """ Return a copy of the embedding stored in CPU memory. If this is a
+        multi-processing instance, the tensor will be returned in shared
+        memory. If the embedding is currently stored on multiple GPUs, all
+        processes must call this method in the same order.
+
+        NOTE: This method must be called by all processes sharing the
+        embedding, or it may result in a deadlock.
+
+        Returns
+        -------
+        torch.Tensor
+            The tensor storing the node embeddings.
+        """
+        if self._partition:
+            if self._world_size == 0:
+                # non-multiprocessing
+                return self._tensor.to(th.device('cpu'))
+            else:
+                # create a shared memory tensor
+                shared_name = self._name + "_gather"
+                if self._rank == 0:
+                    # root process creates shared memory
+                    emb = create_shared_mem_array(
+                        shared_name,
+                        (self._num_embeddings, self._embedding_dim),
+                        self._tensor.dtype)
+                    self._store.set(shared_name, shared_name)
+                else:
+                    self._store.wait([shared_name])
+                    emb = get_shared_mem_array(
+                        shared_name, (self._num_embeddings, self._embedding_dim),
+                        self._tensor.dtype)
+                # need to map indices and slice into existing tensor
+                idxs = self._partition.map_to_global(
+                    F.arange(0, self._tensor.shape[0],
+                             ctx=F.context(self._tensor)),
+                    self._rank).to(emb.device)
+                emb[idxs] = self._tensor.to(emb.device)
+
+                # wait for all processes to finish
+                th.distributed.barrier()
+                return emb
+        else:
+            # already stored in CPU memory
+            return self._tensor
