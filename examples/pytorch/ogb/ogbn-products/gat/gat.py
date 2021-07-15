@@ -92,7 +92,7 @@ def gen_model(args):
         input_drop=args.input_drop,
         attn_drop=args.attn_dropout,
         edge_drop=args.edge_drop,
-        use_attn_dst=not args.use_attn_dst,
+        use_attn_dst=not args.no_attn_dst,
         allow_zero_in_degree=True,
         residual=False,
     )
