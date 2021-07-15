@@ -2945,7 +2945,8 @@ def reorder_graph(g, node_permute_algo='rcmk', edge_permute_algo='src',
         * ``metis``: Use the :func:`~dgl.metis_partition_assignment` function
           to partition the input graph, which gives a cluster assignment of each node.
           DGL then sorts the assignment array so the new node order will put nodes of
-          the same cluster together.
+          the same cluster together. Please note that the generated nodes permutation
+          of ``metis`` is non-deterministic due to algorithm's nature.
         * ``custom``: Reorder the graph according to the user-provided node permutation
           array (provided in :attr:`permute_config`).
     edge_permute_algo: str, optional
