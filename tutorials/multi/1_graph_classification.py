@@ -245,3 +245,6 @@ if __name__ == '__main__':
         procs.append(p)
     for p in procs:
         p.join()
+
+# Thumbnail credits: DGL
+# sphinx_gallery_thumbnail_path = '_static/blitz_5_graph_classification.png'

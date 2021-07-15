@@ -259,3 +259,5 @@ for proc_id in range(num_gpus):
 for p in procs:
     p.join()
 
+# Thumbnail credits: Stanford CS224W Notes
+# sphinx_gallery_thumbnail_path = '_static/blitz_1_introduction.png'
