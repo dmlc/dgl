@@ -13,7 +13,7 @@ from .sbm import SBMMixture, SBMMixtureDataset
 from .reddit import RedditDataset
 from .ppi import PPIDataset, LegacyPPIDataset
 from .tu import TUDataset, LegacyTUDataset
-from .gnn_benckmark import AmazonCoBuy, CoraFull, Coauthor, AmazonCoBuyComputerDataset, \
+from .gnn_benchmark import AmazonCoBuy, CoraFull, Coauthor, AmazonCoBuyComputerDataset, \
     AmazonCoBuyPhotoDataset, CoauthorPhysicsDataset, CoauthorCSDataset, CoraFullDataset
 from .karate import KarateClub, KarateClubDataset
 from .gindt import GINDataset

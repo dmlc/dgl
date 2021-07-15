@@ -24,6 +24,8 @@ All datasets used are provided by Author's [code](https://github.com/GraphSAINT/
 | PPI | 14,755 | 225,270 | 15 | 50 | 121(m) | 0.66/0.12/0.22 |
 | Flickr | 89,250 | 899,756 | 10 | 500 | 7(s) | 0.50/0.25/0.25 |
 
+Note that the PPI dataset here is different from DGL's built-in variant.
+
 ## Minibatch training
 
 Run with following:
