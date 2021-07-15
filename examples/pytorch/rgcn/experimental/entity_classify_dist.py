@@ -279,10 +279,11 @@ class NeighborSampler:
         Fanout of each hop starting from the seed nodes. If a fanout is None,
         sample full neighbors.
     """
-    def __init__(self, g, fanouts, sample_neighbors):
+    def __init__(self, g, fanouts, sample_neighbors, per_etype_fanout):
         self.g = g
         self.fanouts = fanouts
         self.sample_neighbors = sample_neighbors
+        self.per_etype_fanout = per_etype_fanout
 
     def sample_blocks(self, seeds):
         """Do neighbor sample
@@ -308,7 +309,10 @@ class NeighborSampler:
         for fanout in self.fanouts:
             # For a heterogeneous input graph, the returned frontier is stored in
             # the homogeneous graph format.
-            frontier = self.sample_neighbors(self.g, cur, fanout, replace=False)
+            if self.per_etype_fanout:
+                frontier = self.sample_neighbors(self.g, dgl.ETYPE, cur, fanout, replace=False)
+            else:
+                frontier = self.sample_neighbors(self.g, cur, fanout, replace=False)
             block = dgl.to_block(frontier, cur)
             cur = block.srcdata[dgl.NID]
 
@@ -327,7 +331,11 @@ def run(args, device, data):
 
     fanouts = [int(fanout) for fanout in args.fanout.split(',')]
     val_fanouts = [int(fanout) for fanout in args.validation_fanout.split(',')]
-    sampler = NeighborSampler(g, fanouts, dgl.distributed.sample_neighbors)
+    if args.per_etype_fanout:
+        sample_neighbors = dgl.distributed.sample_etype_neighbors
+    else:
+        sample_neighbors = dgl.distributed.sample_neighbors
+    sampler = NeighborSampler(g, fanouts, sample_neighbors, args.per_etype_fanout)
     # Create DataLoader for constructing blocks
     dataloader = DistDataLoader(
         dataset=train_nid,
@@ -336,7 +344,7 @@ def run(args, device, data):
         shuffle=True,
         drop_last=False)
 
-    valid_sampler = NeighborSampler(g, val_fanouts, dgl.distributed.sample_neighbors)
+    valid_sampler = NeighborSampler(g, val_fanouts, sample_neighbors, args.per_etype_fanout)
     # Create DataLoader for constructing blocks
     valid_dataloader = DistDataLoader(
         dataset=val_nid,
@@ -345,7 +353,7 @@ def run(args, device, data):
         shuffle=False,
         drop_last=False)
 
-    test_sampler = NeighborSampler(g, [-1] * args.n_layers, dgl.distributed.sample_neighbors)
+    test_sampler = NeighborSampler(g, [-1] * args.n_layers, sample_neighbors, args.per_etype_fanout)
     # Create DataLoader for constructing blocks
     test_dataloader = DistDataLoader(
         dataset=test_nid,
@@ -596,6 +604,8 @@ if __name__ == '__main__':
             help='Use layer norm')
     parser.add_argument('--local_rank', type=int, help='get rank of the process')
     parser.add_argument('--standalone', action='store_true', help='run in the standalone mode')
+    parser.add_argument('--per-etype-fanout', default=False, action='store_true',
+            help='Use per edge type neighbor sample instead of general neighbor sample.')
     args = parser.parse_args()
 
     # if validation_fanout is None, set it with args.fanout
