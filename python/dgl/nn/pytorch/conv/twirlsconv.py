@@ -444,7 +444,7 @@ def D_power_bias_X(graph, X, power, coeff, bias):
     return Y
 
 
-class UnfoldingAndAttention(nn.Module):
+class TWIRLSUnfoldingAndAttention(nn.Module):
     r"""
 
     Description
