@@ -232,7 +232,7 @@ class MultiLayerEtypeNeighborSampler(BlockSampler):
             if fanout is None:
                 frontier = subgraph.in_subgraph(g, seed_nodes)
             else:
-                self._build_fanout(block_id, g)
+                self._build_fanout(block_id)
                 self._build_prob_arrays()
 
                 frontier = sampling.sample_etype_neighbors(
