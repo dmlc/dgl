@@ -174,9 +174,10 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, queue=None):
                                           world_size=world_size,
                                           rank=proc_id)
 
-
-
-    sampler = dgl.dataloading.MultiLayerNeighborSampler(fanouts)
+    if args.per_etype_fanout:
+        sampler = dgl.dataloading.MultiLayerEtypeNeighborSampler(fanouts, etype_field='etype')
+    else:
+        sampler = dgl.dataloading.MultiLayerNeighborSampler(fanouts)
     loader = dgl.dataloading.NodeDataLoader(
         g,
         target_idx[train_idx],
@@ -554,7 +555,7 @@ def main(args, devices):
                                               num_classes, num_rels, target_idx,
                                               inv_target, train_idx, val_idx,
                                               test_idx, labels),
-                                             queue))
+                                              queue))
             p.start()
             procs.append(p)
         for p in procs:
@@ -606,6 +607,8 @@ def config():
             help='Whether use node features')
     parser.add_argument('--layer-norm', default=False, action='store_true',
             help='Use layer norm')
+    parser.add_argument('--per-etype-fanout', default=False, action='store_true',
+            help='Use per edge type neighbor sample instead of general neighbor sample.')
     parser.set_defaults(validation=True)
     args = parser.parse_args()
     return args
