@@ -12,14 +12,14 @@ pip install pandas rdflib ogb
 
 # build
 if [[ $DEVICE == "cpu" ]]; then
-    CMAKE_VARS=""
+   pip install dgl==0.7.0rc2 -f https://data.dgl.ai/wheels/repo.html
 else
-    CMAKE_VARS="-DUSE_CUDA=ON"
+   pip install dgl-cu111==0.7.0rc2 -f https://data.dgl.ai/wheels/repo.html
 fi
-mkdir -p build
-pushd build
-cmake -DCUDA_TOOLKIT_ROOT_DIR=/usr/local/cuda -DBUILD_TORCH=ON $CMAKE_VARS ..
-make -j
-popd
+# mkdir -p build
+# pushd build
+# cmake -DCUDA_TOOLKIT_ROOT_DIR=/usr/local/cuda -DBUILD_TORCH=ON $CMAKE_VARS ..
+# make -j
+# popd
 
 # conda deactivate
