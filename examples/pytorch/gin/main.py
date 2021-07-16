@@ -8,7 +8,7 @@ import torch.optim as optim
 
 from dgl.data import GINDataset
 from dataloader import GINDataLoader
-from parser import Parser
+from ginparser import Parser
 from gin import GIN
 
 
