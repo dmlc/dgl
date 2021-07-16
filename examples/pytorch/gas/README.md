@@ -15,7 +15,7 @@ Dependencies
 
 Dataset
 ---------------------------------------
-The datasets used for edge classification are variants of DGL's built-in fake news datasets. The statistics are summarized as followings:
+The datasets used for edge classification are variants of DGL's built-in fake news datasets. **NOTE**: Same as the original fake news dataset, this variant is for academic use only as well, and commercial use is prohibited. The statistics are summarized as followings:
 
 **Politifact**
 
