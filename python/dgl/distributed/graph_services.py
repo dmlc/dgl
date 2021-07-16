@@ -455,7 +455,6 @@ def sample_etype_neighbors(g, nodes, etype_field, fanout, edge_dir='in', prob=No
         return SamplingRequestEtype(node_ids, etype_field, fanout, edge_dir=edge_dir,
                                     prob=prob, replace=replace)
     def local_access(local_g, partition_book, local_nids):
-        print(local_g.edata.keys())
         return _sample_etype_neighbors(local_g, partition_book, local_nids,
                                        etype_field, fanout, edge_dir, prob, replace)
     return _distributed_access(g, nodes, issue_remote_req, local_access)

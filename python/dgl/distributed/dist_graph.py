@@ -73,6 +73,7 @@ def _copy_graph_to_shared_mem(g, graph_name, graph_format):
     new_g.edata['inner_edge'] = _to_shared_mem(g.edata['inner_edge'],
                                                _get_edata_path(graph_name, 'inner_edge'))
     new_g.edata[EID] = _to_shared_mem(g.edata[EID], _get_edata_path(graph_name, EID))
+    new_g.edata[ETYPE] = _to_shared_mem(g.edata[ETYPE], _get_edata_path(graph_name, ETYPE))
     return new_g
 
 FIELD_DICT = {'inner_node': F.int32,    # A flag indicates whether the node is inside a partition.
