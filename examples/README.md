@@ -104,6 +104,7 @@ The folder contains example implementations of selected research papers related 
 | [Graph Transformer Networks](#gtn) | :heavy_check_mark: |  | |  | |
 | [Metapath Aggregated Graph Neural Network for Heterogeneous Graph Embedding](#magnn) | :heavy_check_mark: |  | |  | |
 | [Network Schema Preserving Heterogeneous Information Network Embedding](#nshe) | :heavy_check_mark: |  | |  | |
+| [Spam Review Detection with Graph Convolutional Networks](#gas) | | :heavy_check_mark: | | :heavy_check_mark: | |
 
 ## 2021
 
@@ -258,6 +259,9 @@ The folder contains example implementations of selected research papers related 
 - <a name='gtn'></a> Yun S, Jeong M, et al. Graph transformer networks. [Paper link](https://arxiv.org/abs/1911.06455).
     - Example code: [OpenHGNN](https://github.com/BUPT-GAMMA/OpenHGNN/tree/main/openhgnn/output/GTN)
     - Tags:  Heterogeneous graph, Graph neural network, Graph structure
+- <a name='gas'></a> Li A, Qin Z, et al. Spam Review Detection with Graph Convolutional Networks. [Paper link](https://arxiv.org/abs/1908.10679).
+    - Example code: [PyTorch](../examples/pytorch/gas)
+    - Tags:  Fraud detection, Heterogeneous graph, Edge classification
 
 ## 2018
 
