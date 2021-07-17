@@ -510,3 +510,20 @@ int DGLArrayCopyToBytes(DGLArrayHandle handle,
       nbytes, handle->ctx, cpu_ctx, handle->dtype, nullptr);
   API_END();
 }
+
+int DGLArrayPinData(DGLArrayHandle handle,
+                    DLContext ctx) {
+  API_BEGIN();
+  CHECK_EQ(ctx.device_type, kDLGPU);
+  DeviceAPI::Get(ctx)->PinData(ctx, handle->data,
+                                        GetDataSize(*handle));
+  API_END();
+}
+
+int DGLArrayUnpinData(DGLArrayHandle handle,
+                      DLContext ctx) {
+  API_BEGIN();
+  CHECK_EQ(ctx.device_type, kDLGPU);
+  DeviceAPI::Get(ctx)->UnpinData(ctx, handle->data);
+  API_END();
+}

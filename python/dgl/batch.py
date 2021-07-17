@@ -433,6 +433,28 @@ def slice_batch(g, gid, store_ids=False):
     -------
     DGLGraph
         Retrieved graph.
+
+    Examples
+    --------
+
+    The following example uses PyTorch backend.
+
+    >>> import dgl
+    >>> import torch
+
+    Create a batched graph.
+
+    >>> g1 = dgl.graph(([0, 1], [2, 3]))
+    >>> g2 = dgl.graph(([1], [2]))
+    >>> bg = dgl.batch([g1, g2])
+
+    Get the second component graph.
+
+    >>> g = dgl.slice_batch(bg, 1)
+    >>> print(g)
+    Graph(num_nodes=3, num_edges=1,
+          ndata_schemes={}
+          edata_schemes={})
     """
     start_nid = []
     num_nodes = []

@@ -173,10 +173,10 @@ def run_client_hierarchy(graph_name, part_id, server_count, node_mask, edge_mask
 
 def check_dist_emb(g, num_clients, num_nodes, num_edges):
     from dgl.distributed.optim import SparseAdagrad
-    from dgl.distributed.nn import NodeEmbedding
+    from dgl.distributed import DistEmbedding
     # Test sparse emb
     try:
-        emb = NodeEmbedding(g.number_of_nodes(), 1, 'emb1', emb_init)
+        emb = DistEmbedding(g.number_of_nodes(), 1, 'emb1', emb_init)
         nids = F.arange(0, int(g.number_of_nodes()))
         lr = 0.001
         optimizer = SparseAdagrad([emb], lr=lr)
@@ -200,7 +200,7 @@ def check_dist_emb(g, num_clients, num_nodes, num_edges):
             assert np.all(F.asnumpy(grad_sum[nids]) == np.ones((len(nids), 1)) * num_clients)
         assert np.all(F.asnumpy(grad_sum[rest]) == np.zeros((len(rest), 1)))
 
-        emb = NodeEmbedding(g.number_of_nodes(), 1, 'emb2', emb_init)
+        emb = DistEmbedding(g.number_of_nodes(), 1, 'emb2', emb_init)
         with F.no_grad():
             feats1 = emb(nids)
         assert np.all(F.asnumpy(feats1) == 0)
@@ -217,12 +217,15 @@ def check_dist_emb(g, num_clients, num_nodes, num_edges):
         with F.no_grad():
             feats = emb(nids)
         if num_clients == 1:
-            assert_almost_equal(F.asnumpy(feats), np.ones((len(nids), 1)) * math.sqrt(2) * -lr)
+            assert_almost_equal(F.asnumpy(feats), np.ones((len(nids), 1)) * 1 * -lr)
         rest = np.setdiff1d(np.arange(g.number_of_nodes()), F.asnumpy(nids))
         feats1 = emb(rest)
         assert np.all(F.asnumpy(feats1) == np.zeros((len(rest), 1)))
     except NotImplementedError as e:
         pass
+    except Exception as e:
+        print(e)
+        sys.exit(-1)
 
 def check_dist_graph(g, num_clients, num_nodes, num_edges):
     # Test API
@@ -333,6 +336,7 @@ def check_dist_emb_server_client(shared_mem, num_servers, num_clients):
 
     for p in cli_ps:
         p.join()
+        assert p.exitcode == 0
 
     for p in serv_ps:
         p.join()
@@ -590,8 +594,8 @@ def test_server_client():
     check_server_client(True, 2, 2)
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
-@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support distributed NodeEmbedding")
-@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Mxnet doesn't support distributed NodeEmbedding")
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support distributed DistEmbedding")
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Mxnet doesn't support distributed DistEmbedding")
 def test_dist_emb_server_client():
     os.environ['DGL_DIST_MODE'] = 'distributed'
     check_dist_emb_server_client(True, 1, 1)
@@ -618,8 +622,8 @@ def test_standalone():
         print(e)
     dgl.distributed.exit_client() # this is needed since there's two test here in one process
 
-@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support distributed NodeEmbedding")
-@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Mxnet doesn't support distributed NodeEmbedding")
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support distributed DistEmbedding")
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Mxnet doesn't support distributed DistEmbedding")
 def test_standalone_node_emb():
     os.environ['DGL_DIST_MODE'] = 'standalone'
 
