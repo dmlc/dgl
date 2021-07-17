@@ -390,6 +390,7 @@ def zerocopy_to_numpy(arr):
     return arr.asnumpy()
 
 def zerocopy_from_numpy(np_data):
+    np_data = np.asarray(np_data, order='C')
     return mx.nd.from_numpy(np_data, zero_copy=True)
 
 def zerocopy_to_dgl_ndarray(arr):
