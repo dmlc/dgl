@@ -443,8 +443,9 @@ def sample_etype_neighbors(g, nodes, etype_field, fanout, edge_dir='in', prob=No
     gpb = g.get_partition_book()
     if isinstance(nodes, dict):
         homo_nids = []
-        for ntype in nodes:
-            assert ntype in g.ntypes, 'The sampled node type does not exist in the input graph'
+        for ntype in nodes.keys():
+            assert ntype in g.ntypes, \
+                'The sampled node type {} does not exist in the input graph'.format(ntype)
             if F.is_tensor(nodes[ntype]):
                 typed_nodes = nodes[ntype]
             else:
@@ -457,7 +458,35 @@ def sample_etype_neighbors(g, nodes, etype_field, fanout, edge_dir='in', prob=No
     def local_access(local_g, partition_book, local_nids):
         return _sample_etype_neighbors(local_g, partition_book, local_nids,
                                        etype_field, fanout, edge_dir, prob, replace)
-    return _distributed_access(g, nodes, issue_remote_req, local_access)
+    frontier = _distributed_access(g, nodes, issue_remote_req, local_access)
+    if len(gpb.etypes) > 1:
+        etype_ids, frontier.edata[EID] = gpb.map_to_per_etype(frontier.edata[EID])
+        src, dst = frontier.edges()
+        etype_ids, idx = F.sort_1d(etype_ids)
+        src, dst = F.gather_row(src, idx), F.gather_row(dst, idx)
+        eid = F.gather_row(frontier.edata[EID], idx)
+        _, src = gpb.map_to_per_ntype(src)
+        _, dst = gpb.map_to_per_ntype(dst)
+
+        data_dict = dict()
+        edge_ids = {}
+        for etid in range(len(g.etypes)):
+            etype = g.etypes[etid]
+            canonical_etype = g.canonical_etypes[etid]
+            type_idx = etype_ids == etid
+            if F.sum(type_idx, 0) > 0:
+                data_dict[canonical_etype] = (F.boolean_mask(src, type_idx), \
+                        F.boolean_mask(dst, type_idx))
+                edge_ids[etype] = F.boolean_mask(eid, type_idx)
+        hg = heterograph(data_dict,
+                         {ntype: g.number_of_nodes(ntype) for ntype in g.ntypes},
+                         idtype=g.idtype)
+
+        for etype in edge_ids:
+            hg.edges[etype].data[EID] = edge_ids[etype]
+        return hg
+    else:
+        return frontier
 
 def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
     """Sample from the neighbors of the given nodes from a distributed graph.

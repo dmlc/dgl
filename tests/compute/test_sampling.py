@@ -825,7 +825,6 @@ if __name__ == '__main__':
     test_random_walk()
     test_pack_traces()
     test_pinsage_sampling()
-    test_sample_neighbors()
     test_sample_neighbors_outedge()
     test_sample_neighbors_topk()
     test_sample_neighbors_topk_outedge()
