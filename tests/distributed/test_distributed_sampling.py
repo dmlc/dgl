@@ -480,6 +480,7 @@ def check_rpc_hetero_etype_sampling_shuffle(tmpdir, num_server):
 # Wait non shared memory graph store
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Turn off Mxnet support")
 @pytest.mark.parametrize("num_server", [1, 2])
 def test_rpc_sampling_shuffle(num_server):
     import tempfile

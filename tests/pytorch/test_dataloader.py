@@ -440,8 +440,8 @@ def test_edge_dataloader():
         _check_device(blocks)
 
 if __name__ == '__main__':
-    # test_neighbor_sampler_dataloader()
-    # test_graph_dataloader()
-    # test_node_dataloader()
-    # test_edge_dataloader()
+    test_neighbor_sampler_dataloader()
+    test_graph_dataloader()
+    test_node_dataloader()
+    test_edge_dataloader()
     test_etype_neighbor_sampler_dataloader()
