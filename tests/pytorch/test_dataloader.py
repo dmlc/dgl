@@ -245,7 +245,7 @@ def test_etype_neighbor_sampler_dataloader():
     g.edata['feat'] = F.randn((10, 4))
     reverse_eids = F.tensor([5, 6, 7, 8, 9, 0, 1, 2, 3, 4], dtype=F.int64)
     ho_g, ntype_count, etype_count = dgl.to_homogeneous(g, ndata=['feat'], edata=['feat'], return_count=True)
-    g_sampler1 = dgl.dataloading.MultiLayerEtypeNeighborSampler([2, 2], dgl.ETYPE, return_eids=True)
+    g_sampler1 = dgl.dataloading.MultiLayerNeighborSampler([2, 2], return_eids=True)
 
     hg = dgl.heterograph({
          ('user', 'follow', 'user'): ([0, 0, 0, 1, 1, 1, 2], [1, 2, 3, 0, 2, 3, 0]),
@@ -258,8 +258,8 @@ def test_etype_neighbor_sampler_dataloader():
     for etype in hg.canonical_etypes:
         hg.edges[etype].data['feat'] = F.randn((hg.number_of_edges(etype), 4))
     ho_hg, ntype_count, etype_count = dgl.to_homogeneous(hg, ndata=['feat'], edata=['feat'], return_count=True)
-    hg_sampler1 = dgl.dataloading.MultiLayerEtypeNeighborSampler(
-        [2, 2], dgl.ETYPE, return_eids=True)
+    hg_sampler1 = dgl.dataloading.MultiLayerNeighborSampler(
+        [2, 2], return_eids=True)
 
     collators = []
     modes = []
