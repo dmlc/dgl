@@ -770,16 +770,20 @@ class RangePartitionBook(GraphPartitionBook):
         """
         ids = utils.toindex(ids).tousertensor()
         partids = self.nid2partid(ids, ntype)
-        end_diff = F.tensor(self._typed_max_node_ids[ntype])[partids] - ids
-        return F.tensor(self._typed_nid_range[ntype][:, 1])[partids] - end_diff
+        typed_max_nids = F.zerocopy_from_numpy(self._typed_max_node_ids[ntype])
+        end_diff = F.gather_row(typed_max_nids, partids) - ids
+        typed_nid_range = F.zerocopy_from_numpy(self._typed_nid_range[ntype][:, 1])
+        return F.gather_row(typed_nid_range, partids) - end_diff
 
     def map_to_homo_eid(self, ids, etype):
         """Map per-edge-type IDs to global edge IDs in the homoenegeous format.
         """
         ids = utils.toindex(ids).tousertensor()
         partids = self.eid2partid(ids, etype)
-        end_diff = F.tensor(self._typed_max_edge_ids[etype][partids]) - ids
-        return F.tensor(self._typed_eid_range[etype][:, 1])[partids] - end_diff
+        typed_max_eids = F.zerocopy_from_numpy(self._typed_max_edge_ids[etype])
+        end_diff = F.gather_row(typed_max_eids, partids) - ids
+        typed_eid_range = F.zerocopy_from_numpy(self._typed_eid_range[etype][:, 1])
+        return F.gather_row(typed_eid_range, partids) - end_diff
 
     def nid2partid(self, nids, ntype='_N'):
         """From global node IDs to partition IDs
