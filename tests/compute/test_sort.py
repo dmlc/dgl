@@ -55,15 +55,15 @@ def test_sort_with_tag(idtype):
     g = create_test_heterograph(num_nodes, num_adj, idtype=idtype)
     tag = F.tensor(np.random.choice(num_tags, g.number_of_nodes()))
 
-    new_g = dgl.sort_out_edges(g, tag)
+    new_g = dgl.sort_csr_by_tag(g, tag)
     old_csr = g.adjacency_matrix(scipy_fmt='csr')
     new_csr = new_g.adjacency_matrix(scipy_fmt='csr')
     assert(check_sort(new_csr, tag, new_g.ndata["_TAG_OFFSET"]))
     assert(not check_sort(old_csr, tag))  # Check the original csr is not modified.
 
-    new_g = dgl.sort_in_edges(g, tag)
-    old_csc = g.adjacency_matrix(transpose=False, scipy_fmt='csr')
-    new_csc = new_g.adjacency_matrix(transpose=False, scipy_fmt='csr')
+    new_g = dgl.sort_csc_by_tag(g, tag)
+    old_csc = g.adjacency_matrix(transpose=True, scipy_fmt='csr')
+    new_csc = new_g.adjacency_matrix(transpose=True, scipy_fmt='csr')
     assert(check_sort(new_csc, tag, new_g.ndata["_TAG_OFFSET"]))
     assert(not check_sort(old_csc, tag))
 
@@ -76,15 +76,15 @@ def test_sort_with_tag_bipartite(idtype):
     utag = F.tensor(np.random.choice(num_tags, g.number_of_nodes('_U')))
     vtag = F.tensor(np.random.choice(num_tags, g.number_of_nodes('_V')))
 
-    new_g = dgl.sort_out_edges(g, vtag)
+    new_g = dgl.sort_csr_by_tag(g, vtag)
     old_csr = g.adjacency_matrix(scipy_fmt='csr')
     new_csr = new_g.adjacency_matrix(scipy_fmt='csr')
     assert(check_sort(new_csr, vtag, new_g.nodes['_U'].data['_TAG_OFFSET']))
     assert(not check_sort(old_csr, vtag))
 
-    new_g = dgl.sort_in_edges(g, utag)
-    old_csc = g.adjacency_matrix(transpose=False, scipy_fmt='csr')
-    new_csc = new_g.adjacency_matrix(transpose=False, scipy_fmt='csr')
+    new_g = dgl.sort_csc_by_tag(g, utag)
+    old_csc = g.adjacency_matrix(transpose=True, scipy_fmt='csr')
+    new_csc = new_g.adjacency_matrix(transpose=True, scipy_fmt='csr')
     assert(check_sort(new_csc, utag, new_g.nodes['_V'].data['_TAG_OFFSET']))
     assert(not check_sort(old_csc, utag))
 

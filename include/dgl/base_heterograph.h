@@ -685,19 +685,23 @@ HeteroGraphPtr CreateFromCSC(
  * \brief Extract the subgraph of the in edges of the given nodes.
  * \param graph Graph
  * \param nodes Node IDs of each type
+ * \param relabel_nodes Whether to remove isolated nodes and relabel the rest ones
  * \return Subgraph containing only the in edges. The returned graph has the same
  *         schema as the original one.
  */
-HeteroSubgraph InEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArray>& nodes);
+HeteroSubgraph InEdgeGraph(
+    const HeteroGraphPtr graph, const std::vector<IdArray>& nodes, bool relabel_nodes = false);
 
 /*!
  * \brief Extract the subgraph of the out edges of the given nodes.
  * \param graph Graph
  * \param nodes Node IDs of each type
+ * \param relabel_nodes Whether to remove isolated nodes and relabel the rest ones
  * \return Subgraph containing only the out edges. The returned graph has the same
  *         schema as the original one.
  */
-HeteroSubgraph OutEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArray>& nodes);
+HeteroSubgraph OutEdgeGraph(
+    const HeteroGraphPtr graph, const std::vector<IdArray>& nodes, bool relabel_nodes = false);
 
 /*!
  * \brief Joint union multiple graphs into one graph.
@@ -731,6 +735,27 @@ HeteroGraphPtr DisjointUnionHeteroGraph(
 
 HeteroGraphPtr DisjointUnionHeteroGraph2(
     GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& component_graphs);
+
+/*!
+ * \brief Slice a contiguous subgraph, e.g. retrieve a component graph from a batched graph.
+ *
+ * TODO(mufei): remove the meta_graph argument
+ *
+ * \param meta_graph Metagraph of the input and result.
+ * \param batched_graph Input graph.
+ * \param num_nodes_per_type Number of vertices of each type in the result.
+ * \param start_nid_per_type Start vertex ID of each type to slice.
+ * \param num_edges_per_type Number of edges of each type in the result.
+ * \param start_eid_per_type Start edge ID of each type to slice.
+ * \return Sliced graph
+ */
+HeteroGraphPtr SliceHeteroGraph(
+    GraphPtr meta_graph,
+    HeteroGraphPtr batched_graph,
+    IdArray num_nodes_per_type,
+    IdArray start_nid_per_type,
+    IdArray num_edges_per_type,
+    IdArray start_eid_per_type);
 
 /*!
  * \brief Split a graph into multiple disjoin components.

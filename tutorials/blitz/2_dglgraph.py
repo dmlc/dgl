@@ -226,5 +226,5 @@ print(sg2)
 # 
 
 
-# Thumbnail Courtesy: Wikipedia
+# Thumbnail credits: Wikipedia
 # sphinx_gallery_thumbnail_path = '_static/blitz_2_dglgraph.png'

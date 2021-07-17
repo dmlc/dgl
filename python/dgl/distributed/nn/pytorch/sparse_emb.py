@@ -5,7 +5,7 @@ from .... import backend as F
 from .... import utils
 from ...dist_tensor import DistTensor
 
-class NodeEmbedding:
+class DistEmbedding:
     '''Distributed node embeddings.
 
     DGL provides a distributed embedding to support models that require learnable embeddings.
@@ -34,7 +34,7 @@ class NodeEmbedding:
         The dimension size of embeddings.
     name : str, optional
         The name of the embeddings. The name can uniquely identify embeddings in a system
-        so that another NodeEmbedding object can referent to the same embeddings.
+        so that another DistEmbedding object can referent to the same embeddings.
     init_func : callable, optional
         The function to create the initial data. If the init function is not provided,
         the values of the embeddings are initialized to zero.
@@ -49,7 +49,7 @@ class NodeEmbedding:
             arr = th.zeros(shape, dtype=dtype)
             arr.uniform_(-1, 1)
             return arr
-    >>> emb = dgl.distributed.nn.NodeEmbedding(g.number_of_nodes(), 10, init_func=initializer)
+    >>> emb = dgl.distributed.DistEmbedding(g.number_of_nodes(), 10, init_func=initializer)
     >>> optimizer = dgl.distributed.optim.SparseAdagrad([emb], lr=0.001)
     >>> for blocks in dataloader:
     ...     feats = emb(nids)
@@ -59,7 +59,7 @@ class NodeEmbedding:
 
     Note
     ----
-    When a ``NodeEmbedding``  object is used when the deep learning framework is recording
+    When a ``DistEmbedding``  object is used when the deep learning framework is recording
     the forward computation, users have to invoke
     py:meth:`~dgl.distributed.optim.SparseAdagrad.step` afterwards. Otherwise, there will be
     some memory leak.
