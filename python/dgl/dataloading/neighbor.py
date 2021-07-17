@@ -81,7 +81,7 @@ class MultiLayerNeighborSampler(BlockSampler):
             else:
                 if len(g.etypes) > 1: # heterogeneous distributed graph
                     # The edge type is stored in g.edata[dgl.ETYPE]
-                    assert isinstance(fanout, int), "For distributed training, "
+                    assert isinstance(fanout, int), "For distributed training, " \
                         "we can only sample same number of neighbors for each edge type"
                     frontier = distributed.sample_etype_neighbors(
                         g, seed_nodes, ETYPE, fanout, replace=self.replace)
