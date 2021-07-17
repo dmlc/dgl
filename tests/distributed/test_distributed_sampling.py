@@ -281,11 +281,10 @@ def create_random_hetero_dense():
               ('n1', 'r2', 'n3'),
               ('n2', 'r3', 'n3')]
     edges = {}
-    random.seed(42)
     for etype in etypes:
         src_ntype, _, dst_ntype = etype
         arr = spsp.random(num_nodes[src_ntype], num_nodes[dst_ntype], density=0.01, format='coo',
-                          random_state=100)
+                          random_state=42)
         edges[etype] = (arr.row, arr.col)
     g = dgl.heterograph(edges, num_nodes)
     g.nodes['n1'].data['feat'] = F.ones((g.number_of_nodes('n1'), 10), F.float32, F.cpu())
@@ -620,6 +619,7 @@ if __name__ == "__main__":
 
     test_rpc_sampling_shuffle(2)
 
+    '''
     with tempfile.TemporaryDirectory() as tmpdirname:
         os.environ['DGL_DIST_MODE'] = 'standalone'
         check_standalone_etype_sampling(Path(tmpdirname), True)
@@ -638,3 +638,4 @@ if __name__ == "__main__":
         check_rpc_sampling_shuffle(Path(tmpdirname), 2)
         check_rpc_hetero_sampling_shuffle(Path(tmpdirname), 1)
         check_rpc_hetero_sampling_shuffle(Path(tmpdirname), 2)
+    '''
