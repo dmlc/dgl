@@ -276,14 +276,14 @@ def create_random_hetero():
     return g
 
 def create_random_hetero_dense():
-    num_nodes = {'n1': 1010, 'n2': 1000, 'n3': 1020}
+    num_nodes = {'n1': 210, 'n2': 200, 'n3': 220}
     etypes = [('n1', 'r1', 'n2'),
               ('n1', 'r2', 'n3'),
               ('n2', 'r3', 'n3')]
     edges = {}
     for etype in etypes:
         src_ntype, _, dst_ntype = etype
-        arr = spsp.random(num_nodes[src_ntype], num_nodes[dst_ntype], density=0.01, format='coo',
+        arr = spsp.random(num_nodes[src_ntype], num_nodes[dst_ntype], density=0.05, format='coo',
                           random_state=42)
         edges[etype] = (arr.row, arr.col)
     g = dgl.heterograph(edges, num_nodes)
@@ -619,7 +619,6 @@ if __name__ == "__main__":
 
     test_rpc_sampling_shuffle(2)
 
-    '''
     with tempfile.TemporaryDirectory() as tmpdirname:
         os.environ['DGL_DIST_MODE'] = 'standalone'
         check_standalone_etype_sampling(Path(tmpdirname), True)
@@ -638,4 +637,3 @@ if __name__ == "__main__":
         check_rpc_sampling_shuffle(Path(tmpdirname), 2)
         check_rpc_hetero_sampling_shuffle(Path(tmpdirname), 1)
         check_rpc_hetero_sampling_shuffle(Path(tmpdirname), 2)
-    '''
