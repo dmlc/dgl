@@ -296,7 +296,7 @@ class DistGraphServer(KVServer):
     '''
     def __init__(self, server_id, ip_config, num_servers,
                  num_clients, part_config, disable_shared_mem=False,
-                 graph_format='csc'):
+                 graph_format=('csc', 'coo')):
         super(DistGraphServer, self).__init__(server_id=server_id,
                                               ip_config=ip_config,
                                               num_servers=num_servers,
@@ -482,6 +482,25 @@ class DistGraph:
         self._ntype_map = {ntype:i for i, ntype in enumerate(self.ntypes)}
         self._etype_map = {etype:i for i, etype in enumerate(self.etypes)}
 
+        # Get canonical edge types.
+        # TODO(zhengda) this requires the server to store the graph with coo format.
+        eid = []
+        for etype in self.etypes:
+            type_eid = F.zeros((1,), F.int64, F.cpu())
+            eid.append(self._gpb.map_to_homo_eid(type_eid, etype))
+        eid = F.cat(eid, 0)
+        src, dst = dist_find_edges(self, eid)
+        src_tids, _ = self._gpb.map_to_per_ntype(src)
+        dst_tids, _ = self._gpb.map_to_per_ntype(dst)
+        self._canonical_etypes = []
+        etype_ids = F.arange(0, len(self.etypes))
+        for src_tid, etype_id, dst_tid in zip(src_tids, etype_ids, dst_tids):
+            src_tid = F.as_scalar(src_tid)
+            etype_id = F.as_scalar(etype_id)
+            dst_tid = F.as_scalar(dst_tid)
+            self._canonical_etypes.append((self.ntypes[src_tid], self.etypes[etype_id],
+                                           self.ntypes[dst_tid]))
+
     def _init(self):
         self._client = get_kvstore()
         assert self._client is not None, \
@@ -576,7 +595,7 @@ class DistGraph:
         int
         """
         # TODO(da?): describe when self._g is None and idtype shouldn't be called.
-        return self._g.idtype
+        return F.int64
 
     @property
     def device(self):
@@ -598,7 +617,7 @@ class DistGraph:
         Device context object
         """
         # TODO(da?): describe when self._g is None and device shouldn't be called.
-        return self._g.device
+        return F.cpu()
 
     @property
     def ntypes(self):
@@ -634,6 +653,42 @@ class DistGraph:
         """
         # Currently, we only support a graph with one edge type.
         return self._gpb.etypes
+
+    @property
+    def canonical_etypes(self):
+        """Return all the canonical edge types in the graph.
+
+        A canonical edge type is a string triplet ``(str, str, str)``
+        for source node type, edge type and destination node type.
+
+        Returns
+        -------
+        list[(str, str, str)]
+            All the canonical edge type triplets in a list.
+
+        Notes
+        -----
+        DGL internally assigns an integer ID for each edge type. The returned
+        edge type names are sorted according to their IDs.
+
+        See Also
+        --------
+        etypes
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        >>> g = DistGraph("test")
+        >>> g.canonical_etypes
+        [('user', 'follows', 'user'),
+         ('user', 'follows', 'game'),
+         ('user', 'plays', 'game')]
+        """
+        return self._canonical_etypes
 
     def get_ntype_id(self, ntype):
         """Return the ID of the given node type.

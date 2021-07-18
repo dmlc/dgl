@@ -361,7 +361,8 @@ class Collator(ABC):
 def _prepare_tensor_dict(g, data, name, is_distributed):
     if is_distributed:
         x = F.tensor(next(iter(data.values())))
-        return {k: F.copy_to(F.astype(v, F.dtype(x)), F.context(x)) for k, v in data.items()}
+        return {k: F.copy_to(F.astype(F.tensor(v), F.dtype(x)), F.context(x)) \
+                for k, v in data.items()}
     else:
         return utils.prepare_tensor_dict(g, data, name)
 

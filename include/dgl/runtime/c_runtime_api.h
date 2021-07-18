@@ -547,6 +547,16 @@ DGL_DLL int DGLStreamStreamSynchronize(int device_type,
 DGL_DLL int DGLLoadTensorAdapter(const char *path);
 
 /*!
+ * \brief Pin host memory.
+ */
+int DGLArrayPinData(DGLArrayHandle handle, DLContext ctx);
+
+/*!
+ * \brief Unpin host memory.
+ */
+int DGLArrayUnpinData(DGLArrayHandle handle, DLContext ctx);
+
+/*!
  * \brief Bug report macro.
  *
  * This serves as a sanity check on system side to make sure the code is correct by
