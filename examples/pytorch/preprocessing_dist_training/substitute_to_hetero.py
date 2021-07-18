@@ -19,6 +19,6 @@ remove_column_name = ["distributed_src_id", "distributed_dest_id", "src_id", "de
 removed_df = pd.read_csv(args.removed, sep=" ", usecols=[0, 1, 2, 3], names=["src_id", "dest_id", "id", "type"])
 
 for edge_file in edges_file:
-    part_df = pd.read_csv(edge_file, sep=" ", usecols=remove_column_index, names=remove_column_name).drop_duplicates(["src_id", "dest_id"])
+    part_df = pd.read_csv(edge_file, sep=" ", usecols=remove_column_index, names=remove_column_name)
     merge_df = pd.merge(part_df, removed_df, how='inner', on=["src_id", "dest_id"])
     merge_df.to_csv(edge_file, mode='a', header=False, index=False, sep=" ")

@@ -44,6 +44,8 @@ for node_type_name in nodes_list:
                 df_entity[weight_num] = 0
         nodes_count += len(df_entity.index)
         column_list.append(args.node_key)
+        #This loop is trying to create file which servers as an input for Metis Algorithm.
+        #More details about metis input can been found here : https://docs.dgl.ai/en/0.6.x/guide/distributed-preprocessing.html#input-format-for-parmetis
         df_entity.to_csv("{}_nodes.txt".format(args.name), columns=column_list, sep=" ", index=False, header=False, mode='a')
     schema_dict['nid'][os.path.basename(node_type_name)] = [all_nodes_count, nodes_count + all_nodes_count]
     all_nodes_count += nodes_count
@@ -69,6 +71,8 @@ for edge_type_name in edges_list:
         df_entity = df_entity.reset_index()
         df_entity['number'] = df_entity.index + edge_count
         edge_count += len(df_entity.index)
+        #This loop is trying to create file which servers as an input for Metis Algorithm.
+        #More details about metis input can been found here : https://docs.dgl.ai/en/0.6.x/guide/distributed-preprocessing.html#input-format-for-parmetis
         df_entity.to_csv("{}_edges.txt".format(args.name), columns=[args.edge_start, args.edge_end, 'number', 'type'], sep=" ", index=False, header=False, mode='a')
     schema_dict['eid'][os.path.basename(edge_type_name)] = [all_edges_count, all_edges_count + edge_count]
     edge_type_id += 1
