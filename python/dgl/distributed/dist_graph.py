@@ -80,8 +80,8 @@ FIELD_DICT = {'inner_node': F.int32,    # A flag indicates whether the node is i
               'inner_edge': F.int32,    # A flag indicates whether the edge is inside a partition.
               NID: F.int64,
               EID: F.int64,
-              NTYPE: F.int16,
-              ETYPE: F.int16}
+              NTYPE: F.int32,
+              ETYPE: F.int32}
 
 def _get_shared_mem_ndata(g, graph_name, name):
     ''' Get shared-memory node data from DistGraph server.

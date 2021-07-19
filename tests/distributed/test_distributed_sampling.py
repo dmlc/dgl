@@ -397,7 +397,6 @@ def check_rpc_hetero_etype_sampling_shuffle(tmpdir, num_server):
     for _ in range(num_server):
         ip_config.write('{}\n'.format(get_local_usable_addr()))
     ip_config.close()
-
     g = create_random_hetero_dense()
     num_parts = num_server
     num_hops = 1
@@ -617,8 +616,8 @@ if __name__ == "__main__":
         os.environ['DGL_DIST_MODE'] = 'standalone'
         check_standalone_etype_sampling_heterograph(Path(tmpdirname), True)
 
+    test_rpc_sampling_shuffle(1)
     test_rpc_sampling_shuffle(2)
-
     with tempfile.TemporaryDirectory() as tmpdirname:
         os.environ['DGL_DIST_MODE'] = 'standalone'
         check_standalone_etype_sampling(Path(tmpdirname), True)
