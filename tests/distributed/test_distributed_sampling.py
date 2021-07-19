@@ -283,7 +283,7 @@ def create_random_hetero_dense():
     edges = {}
     for etype in etypes:
         src_ntype, _, dst_ntype = etype
-        arr = spsp.random(num_nodes[src_ntype], num_nodes[dst_ntype], density=0.05, format='coo',
+        arr = spsp.random(num_nodes[src_ntype], num_nodes[dst_ntype], density=0.1, format='coo',
                           random_state=42)
         edges[etype] = (arr.row, arr.col)
     g = dgl.heterograph(edges, num_nodes)
