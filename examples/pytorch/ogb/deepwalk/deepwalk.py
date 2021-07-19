@@ -291,8 +291,13 @@ if __name__ == '__main__':
     parser.add_argument('--async_update', default=False, action="store_true", 
             help="mixed training asynchronously, not recommended")
 
-    parser.add_argument('--fast_neg', default=False, action="store_true", 
-            help="do negative sampling inside a batch")
+    parser.add_argument('--true_neg', default=False, action="store_true",
+                        help="If not specified, this program will use "
+                        "a faster negative sampling method, "
+                        "but the samples might be false negative "
+                        "with a small probability. If specified, "
+                        "this program will generate a true negative sample table,"
+                        "and select from it when doing negative samling")
     parser.add_argument('--num_threads', default=8, type=int, 
             help="number of threads used for each CPU-core/GPU")
     parser.add_argument('--num_sampler_threads', default=2, type=int, 
@@ -302,7 +307,7 @@ if __name__ == '__main__':
             help="count the params, exit once counting over")
 
     args = parser.parse_args()
-
+    args.fast_neg = not args.true_neg
     if args.async_update:
         assert args.mix, "--async_update only with --mix"
 

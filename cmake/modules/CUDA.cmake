@@ -238,6 +238,8 @@ macro(dgl_config_cuda out_variable)
   file(GLOB_RECURSE DGL_CUDA_SRC
     src/array/cuda/*.cc
     src/array/cuda/*.cu
+    src/array/cuda/uvm/*.cc
+    src/array/cuda/uvm/*.cu
     src/kernel/cuda/*.cc
     src/kernel/cuda/*.cu
     src/partition/cuda/*.cu

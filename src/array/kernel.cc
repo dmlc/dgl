@@ -45,7 +45,7 @@ void SpMM(const std::string& op, const std::string& reduce,
               op, reduce, bcast, graph->GetCOOMatrix(0),
               ufeat, efeat, out, out_aux);
         } else {
-          LOG(FATAL) << "SpMM only supports CSC and COO foramts";
+          LOG(FATAL) << "SpMM only supports CSC and COO formats";
         }
       });
     });
@@ -76,8 +76,7 @@ void SpMMHetero(const std::string& op, const std::string& reduce,
   NDArray ufeat = (ufeat_vec.size() == 0) ? NullArray() : ufeat_vec[ufeat_eid[0]];
   const auto& bcast = CalcBcastOff(op, ufeat, efeat);
 
-  // TODO(Israt): Change it to ATEN_XPU_SWITCH_CUDA when cuda codes are modified
-  ATEN_XPU_SWITCH(graph->Context().device_type, XPU, "SpMM", {
+  ATEN_XPU_SWITCH_CUDA(graph->Context().device_type, XPU, "SpMM", {
     ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
       ATEN_FLOAT_BITS_SWITCH(out[out_eid[0]]->dtype, bits, "Feature data", {
         if (format == SparseFormat::kCSC) {
@@ -85,14 +84,10 @@ void SpMMHetero(const std::string& op, const std::string& reduce,
               op, reduce, bcast, vec_graph,
               ufeat_vec, efeat_vec, out, out_aux,
               ufeat_eid, out_eid);
-        // TODO(Israt): Enable it when COO support is added
-        // } else if (format == SparseFormat::kCOO) {
-        //   SpMMCoo<XPU, IdType, bits>(
-        //       op, reduce, bcast, graph->GetCOOMatrix(0),
-        //       ufeat, vec_efeat, out, out_aux);
-        // }
         } else {
-          LOG(FATAL) << "SpMM only supports CSC foramt for heterpgraph";
+          // TODO(Israt): Add support for COO format
+          LOG(FATAL) << "SpMM only supports CSC format for graphs with number "
+                     << "of relation types > 1";
         }
       });
     });
@@ -124,7 +119,7 @@ void SDDMM(const std::string& op,
               op, bcast, graph->GetCOOMatrix(0),
               lhs, rhs, out, lhs_target, rhs_target);
         } else {
-          LOG(FATAL) << "SDDMM only supports CSR and COO foramts";
+          LOG(FATAL) << "SDDMM only supports CSR and COO formats";
         }
       });
     });
@@ -154,8 +149,7 @@ void SDDMMHetero(const std::string& op,
   }
   const auto &bcast = CalcBcastOff(op, lhs[lhs_eid[0]], rhs[rhs_eid[0]]);
 
-  // TODO(Israt): change it to ATEN_XPU_SWITCH_CUDA when cuda codes are modified
-  ATEN_XPU_SWITCH(graph->Context().device_type, XPU, "SDDMM", {
+  ATEN_XPU_SWITCH_CUDA(graph->Context().device_type, XPU, "SDDMM", {
     ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
       ATEN_FLOAT_BITS_SWITCH(out[rhs_eid[0]]->dtype, bits, "Feature data", {
         if (format == SparseFormat::kCSR) {
@@ -163,13 +157,10 @@ void SDDMMHetero(const std::string& op,
               op, bcast, vec_csr,
               lhs, rhs, out, lhs_target, rhs_target,
               lhs_eid, rhs_eid);
-        // TODO(Israt): Enable it when COO support is added
-        // } else if (format == SparseFormat::kCOO) {
-        //   SDDMMCoo<XPU, IdType, bits>(
-        //       op, bcast, graph->GetCOOMatrix(0),
-        //       lhs, rhs, out, lhs_target, rhs_target);
         } else {
-          LOG(FATAL) << "SDDMM only supports CSR foramts";
+          // TODO(Israt): Add support for COO format
+          LOG(FATAL) << "SDDMM only supports CSC format for graphs with number "
+                     << "of relation types > 1";
         }
       });
     });

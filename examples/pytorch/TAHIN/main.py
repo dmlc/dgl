@@ -51,7 +51,7 @@ def main(args):
             tr_loss.backward()
             optimizer.step()
 
-        train_loss = np.sum(train_loss)
+        train_loss = torch.stack(train_loss).sum().cpu().item()
 
         model.eval()
         with torch.no_grad():
@@ -66,8 +66,8 @@ def main(args):
                 val_acc = evaluate_acc(logits.detach().cpu().numpy(), label.detach().cpu().numpy())
                 validate_loss.append(val_loss)
                 validate_acc.append(val_acc)
-        
-            validate_loss = np.sum(validate_loss)
+
+            validate_loss = torch.stack(validate_loss).sum().cpu().item()
             validate_acc = np.mean(validate_acc)
         
             #validate
@@ -111,8 +111,8 @@ def main(args):
             test_auc.append(auc)
             test_f1.append(f1)
             test_logloss.append(log_loss)
-        
-        test_loss = np.sum(test_loss)
+
+        test_loss = torch.stack(test_loss).sum().cpu().item()
         test_acc = np.mean(test_acc)
         test_auc = np.mean(test_auc)
         test_f1 = np.mean(test_f1)
