@@ -140,6 +140,24 @@ class DeviceAPI {
   DGL_DLL virtual void SyncStreamFromTo(DGLContext ctx,
                                         DGLStreamHandle event_src,
                                         DGLStreamHandle event_dst);
+
+  /*!
+   * \brief Pin host memory using cudaHostRegister().
+   *
+   * \param ctx The context of pinning and mapping.
+   * \param ptr The host memory pointer to be pinned.
+   * \param nbytes The size to be pinned.   
+   */  
+  DGL_DLL virtual void PinData(DGLContext ctx, void* ptr, size_t nbytes);
+
+  /*!
+   * \brief Unpin host memory ussing cudaHostUnregister().
+   *
+   * \param ctx The context to unmap and unpin.
+   * \param ptr The host memory pointer to be unpinned.   
+   */ 
+  DGL_DLL virtual void UnpinData(DGLContext ctx, void* ptr);
+
   /*!
    * \brief Allocate temporal workspace for backend execution.
    *
