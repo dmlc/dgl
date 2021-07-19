@@ -7,10 +7,9 @@ import dgl.function as fn
 
 from .. import utils
 
-
-@utils.skip_if_gpu()
 @utils.benchmark('time')
-@utils.parametrize('graph_name', ['livejournal', 'reddit'])
+@utils.parametrize_cpu('graph_name', ['livejournal', 'reddit'])
+@utils.parametrize_gpu('graph_name', ['ogbn-arxiv', 'reddit'])
 @utils.parametrize('format', ['coo', 'csc'])
 @utils.parametrize('seed_nodes_num', [200, 5000, 20000])
 @utils.parametrize('fanout', [5, 20, 40])

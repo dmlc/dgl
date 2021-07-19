@@ -5,29 +5,35 @@ import numpy as np
 import dgl
 
 def aug(graph, x, feat_drop_rate, edge_mask_rate):
-    ng = drop_edge(graph, edge_mask_rate)
-    feat = drop_feat(x, feat_drop_rate)
+    n_node = graph.num_nodes()
+
+    edge_mask = mask_edge(graph, edge_mask_rate)
+    feat = drop_feature(x, feat_drop_rate)
+
+    src = graph.edges()[0]
+    dst = graph.edges()[1]
+
+    nsrc = src[edge_mask]
+    ndst = dst[edge_mask]
+
+    ng = dgl.graph((nsrc, ndst), num_nodes=n_node)
     ng = ng.add_self_loop()
 
     return ng, feat
 
-def drop_edge(graph, drop_prob):
-    E = graph.num_edges()
-
-    mask_rates = th.FloatTensor(np.ones(E) * drop_prob)
-    masks = th.bernoulli(1 - mask_rates)
-    edge_idx = masks.nonzero().squeeze(1)
-
-    sg = dgl.edge_subgraph(graph, edge_idx, preserve_nodes=True)
-    
-    return sg
-
-def drop_feat(x, drop_prob):
-    D = x.shape[1]
-    mask_rates = th.FloatTensor(np.ones(D) * drop_prob)
-    masks = th.bernoulli(1 - mask_rates)
-
+def drop_feature(x, drop_prob):
+    drop_mask = th.empty((x.size(1),),
+                        dtype=th.float32,
+                        device=x.device).uniform_(0, 1) < drop_prob
     x = x.clone()
-    x[:, masks] = 0
+    x[:, drop_mask] = 0
 
     return x
+
+def mask_edge(graph, mask_prob):
+    E = graph.num_edges()
+
+    mask_rates = th.FloatTensor(np.ones(E) * mask_prob)
+    masks = th.bernoulli(1 - mask_rates)
+    mask_idx = masks.nonzero().squeeze(1)
+    return mask_idx

@@ -71,7 +71,7 @@ class OutputLayer(nn.Module):
         return self.fc(x_t2)
 
 class STGCN_WAVE(nn.Module):
-    def __init__(self, c, T, n, Lk, p, num_layers,control_str = 'TNTSTNTST'):
+    def __init__(self, c, T, n, Lk, p, num_layers, device, control_str = 'TNTSTNTST'):
         super(STGCN_WAVE, self).__init__()
         self.control_str = control_str # model structure controller
         self.num_layers = len(control_str)
@@ -90,7 +90,7 @@ class STGCN_WAVE(nn.Module):
                 self.layers.append(nn.LayerNorm([n,c[cnt]]))
         self.output = OutputLayer(c[cnt], T + 1 - 2**(diapower), n)
         for layer in self.layers:
-            layer = layer.cuda()
+            layer = layer.to(device)
     def forward(self, x):
         for i in range(self.num_layers):
             i_layer = self.control_str[i]

@@ -11,66 +11,64 @@ knowledge in GNNs for graph classification and we recommend you to check
 
 To use a single GPU in training a GNN, we need to put the model, graph(s), and other
 tensors (e.g. labels) on the same GPU:
-"""
 
-"""
-import torch
+.. code:: python
 
-# Use the first GPU
-device = torch.device("cuda:0")
-model = model.to(device)
-graph = graph.to(device)
-labels = labels.to(device)
-"""
+    import torch
 
-###############################################################################
-# The node and edge features in the graphs, if any, will also be on the GPU.
-# After that, the forward computation, backward computation and parameter
-# update will take place on the GPU. For graph classification, this repeats
-# for each minibatch gradient descent.
-#
-# Using multiple GPUs allows performing more computation per unit of time. It
-# is like having a team work together, where each GPU is a team member. We need
-# to distribute the computation workload across GPUs and let them synchronize
-# the efforts regularly. PyTorch provides convenient APIs for this task with
-# multiple processes, one per GPU, and we can use them in conjunction with DGL.
-#
-# Intuitively, we can distribute the workload along the dimension of data. This
-# allows multiple GPUs to perform the forward and backward computation of
-# multiple gradient descents in parallel. To distribute a dataset across
-# multiple GPUs, we need to partition it into multiple mutually exclusive
-# subsets of a similar size, one per GPU. We need to repeat the random
-# partition every epoch to guarantee randomness. We can use
-# :func:`~dgl.dataloading.pytorch.GraphDataLoader`, which wraps some PyTorch 
-# APIs and does the job for graph classification in data loading.
-#
-# Once all GPUs have finished the backward computation for its minibatch,
-# we need to synchronize the model parameter update across them. Specifically,
-# this involves collecting gradients from all GPUs, averaging them and updating
-# the model parameters on each GPU. We can wrap a PyTorch model with
-# :func:`~torch.nn.parallel.DistributedDataParallel` so that the model
-# parameter update will invoke gradient synchronization first under the hood.
-#
-# .. image:: https://data.dgl.ai/tutorial/mgpu_gc.png
-#   :width: 450px
-#   :align: center
-#
-# That’s the core behind this tutorial. We will explore it more in detail with
-# a complete example below.
-#
-# .. note::
-#
-#    See `this tutorial <https://pytorch.org/tutorials/intermediate/ddp_tutorial.html>`__
-#    from PyTorch for general multi-GPU training with ``DistributedDataParallel``.
-#
-# Distributed Process Group Initialization
-# ----------------------------------------
-#
-# For communication between multiple processes in multi-gpu training, we need
-# to start the distributed backend at the beginning of each process. We use
-# `world_size` to refer to the number of processes and `rank` to refer to the
-# process ID, which should be an integer from `0` to `world_size - 1`.
-# 
+    # Use the first GPU
+    device = torch.device("cuda:0")
+    model = model.to(device)
+    graph = graph.to(device)
+    labels = labels.to(device)
+
+The node and edge features in the graphs, if any, will also be on the GPU.
+After that, the forward computation, backward computation and parameter
+update will take place on the GPU. For graph classification, this repeats
+for each minibatch gradient descent.
+
+Using multiple GPUs allows performing more computation per unit of time. It
+is like having a team work together, where each GPU is a team member. We need
+to distribute the computation workload across GPUs and let them synchronize
+the efforts regularly. PyTorch provides convenient APIs for this task with
+multiple processes, one per GPU, and we can use them in conjunction with DGL.
+
+Intuitively, we can distribute the workload along the dimension of data. This
+allows multiple GPUs to perform the forward and backward computation of
+multiple gradient descents in parallel. To distribute a dataset across
+multiple GPUs, we need to partition it into multiple mutually exclusive
+subsets of a similar size, one per GPU. We need to repeat the random
+partition every epoch to guarantee randomness. We can use
+:func:`~dgl.dataloading.pytorch.GraphDataLoader`, which wraps some PyTorch 
+APIs and does the job for graph classification in data loading.
+
+Once all GPUs have finished the backward computation for its minibatch,
+we need to synchronize the model parameter update across them. Specifically,
+this involves collecting gradients from all GPUs, averaging them and updating
+the model parameters on each GPU. We can wrap a PyTorch model with
+:func:`~torch.nn.parallel.DistributedDataParallel` so that the model
+parameter update will invoke gradient synchronization first under the hood.
+
+.. image:: https://data.dgl.ai/tutorial/mgpu_gc.png
+  :width: 450px
+  :align: center
+
+That’s the core behind this tutorial. We will explore it more in detail with
+a complete example below.
+
+.. note::
+
+   See `this tutorial <https://pytorch.org/tutorials/intermediate/ddp_tutorial.html>`__
+   from PyTorch for general multi-GPU training with ``DistributedDataParallel``.
+
+Distributed Process Group Initialization
+----------------------------------------
+
+For communication between multiple processes in multi-gpu training, we need
+to start the distributed backend at the beginning of each process. We use
+`world_size` to refer to the number of processes and `rank` to refer to the
+process ID, which should be an integer from `0` to `world_size - 1`.
+""" 
 
 import torch.distributed as dist
 
@@ -193,9 +191,7 @@ def main(rank, world_size, dataset, seed=0):
     optimizer = Adam(model.parameters(), lr=0.01)
 
     train_loader, val_loader, test_loader = get_dataloaders(dataset,
-                                                            seed,
-                                                            world_size,
-                                                            rank)
+                                                            seed)
     for epoch in range(5):
         model.train()
         # The line below ensures all processes use a different
@@ -249,3 +245,6 @@ if __name__ == '__main__':
         procs.append(p)
     for p in procs:
         p.join()
+
+# Thumbnail credits: DGL
+# sphinx_gallery_thumbnail_path = '_static/blitz_5_graph_classification.png'

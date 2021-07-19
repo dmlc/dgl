@@ -12,6 +12,7 @@ Random walk
     :toctree: ../../generated/
 
     random_walk
+    node2vec_random_walk
     pack_traces
 
 Neighbor sampling
@@ -21,5 +22,6 @@ Neighbor sampling
     :toctree: ../../generated/
 
     sample_neighbors
+    sample_neighbors_biased
     select_topk
     PinSAGESampler
