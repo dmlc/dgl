@@ -190,6 +190,85 @@ HeteroSubgraph SampleNeighborsTopk(
   return ret;
 }
 
+HeteroSubgraph SampleNeighborsBiased(
+    const HeteroGraphPtr hg,
+    const IdArray& nodes,
+    const int64_t fanout,
+    const NDArray& bias,
+    const NDArray& tag_offset,
+    const EdgeDir dir,
+    const bool replace
+) {
+  CHECK_EQ(hg->NumEdgeTypes(), 1) << "Only homogeneous or bipartite graphs are supported";
+  auto pair = hg->meta_graph()->FindEdge(0);
+  const dgl_type_t src_vtype = pair.first;
+  const dgl_type_t dst_vtype = pair.second;
+  const dgl_type_t nodes_ntype = (dir == EdgeDir::kOut) ? src_vtype : dst_vtype;
+
+  // sanity check
+  CHECK_EQ(tag_offset->ndim, 2) << "The shape of tag_offset should be [num_nodes, num_tags + 1]";
+  CHECK_EQ(tag_offset->shape[0], hg->NumVertices(nodes_ntype))
+    << "The shape of tag_offset should be [num_nodes, num_tags + 1]";
+  CHECK_EQ(tag_offset->shape[1], bias->shape[0] + 1)
+    << "The sizes of tag_offset and bias are inconsistent";
+
+  const int64_t num_nodes = nodes->shape[0];
+  HeteroGraphPtr subrel;
+  IdArray induced_edges;
+  const dgl_type_t etype = 0;
+  if (num_nodes == 0 || fanout == 0) {
+      // Nothing to sample for this etype, create a placeholder relation graph
+      subrel = UnitGraph::Empty(
+        hg->GetRelationGraph(etype)->NumVertexTypes(),
+        hg->NumVertices(src_vtype),
+        hg->NumVertices(dst_vtype),
+        hg->DataType(), hg->Context());
+      induced_edges = aten::NullArray();
+    } else if (fanout == -1) {
+      const auto &earr = (dir == EdgeDir::kOut) ?
+        hg->OutEdges(etype, nodes_ntype) :
+        hg->InEdges(etype, nodes_ntype);
+      subrel = UnitGraph::CreateFromCOO(
+        hg->GetRelationGraph(etype)->NumVertexTypes(),
+        hg->NumVertices(src_vtype),
+        hg->NumVertices(dst_vtype),
+        earr.src,
+        earr.dst);
+      induced_edges = earr.id;
+    } else {
+      // sample from one relation graph
+      const auto req_fmt = (dir == EdgeDir::kOut)? CSR_CODE : CSC_CODE;
+      const auto created_fmt = hg->GetCreatedFormats();
+      COOMatrix sampled_coo;
+
+      switch (req_fmt) {
+        case CSR_CODE:
+          CHECK(created_fmt & CSR_CODE) << "A sorted CSR Matrix is required.";
+          sampled_coo = aten::CSRRowWiseSamplingBiased(
+            hg->GetCSRMatrix(etype), nodes, fanout, tag_offset, bias, replace);
+          break;
+        case CSC_CODE:
+          CHECK(created_fmt & CSC_CODE) << "A sorted CSC Matrix is required.";
+          sampled_coo = aten::CSRRowWiseSamplingBiased(
+            hg->GetCSCMatrix(etype), nodes, fanout, tag_offset, bias, replace);
+          sampled_coo = aten::COOTranspose(sampled_coo);
+          break;
+        default:
+          LOG(FATAL) << "Unsupported sparse format.";
+      }
+      subrel = UnitGraph::CreateFromCOO(
+        hg->GetRelationGraph(etype)->NumVertexTypes(), sampled_coo.num_rows, sampled_coo.num_cols,
+        sampled_coo.row, sampled_coo.col);
+      induced_edges = sampled_coo.data;
+    }
+
+  HeteroSubgraph ret;
+  ret.graph = CreateHeteroGraph(hg->meta_graph(), {subrel}, hg->NumVerticesPerType());
+  ret.induced_vertices.resize(hg->NumVertexTypes());
+  ret.induced_edges = {induced_edges};
+  return ret;
+}
+
 DGL_REGISTER_GLOBAL("sampling.neighbor._CAPI_DGLSampleNeighbors")
 .set_body([] (DGLArgs args, DGLRetValue *rv) {
     HeteroGraphRef hg = args[0];
@@ -228,6 +307,27 @@ DGL_REGISTER_GLOBAL("sampling.neighbor._CAPI_DGLSampleNeighborsTopk")
     std::shared_ptr<HeteroSubgraph> subg(new HeteroSubgraph);
     *subg = sampling::SampleNeighborsTopk(
         hg.sptr(), nodes, k, dir, weight, ascending);
+
+    *rv = HeteroGraphRef(subg);
+  });
+
+DGL_REGISTER_GLOBAL("sampling.neighbor._CAPI_DGLSampleNeighborsBiased")
+.set_body([] (DGLArgs args, DGLRetValue *rv) {
+    HeteroGraphRef hg = args[0];
+    const IdArray nodes = args[1];
+    const int64_t fanout = args[2];
+    const NDArray bias = args[3];
+    const NDArray tag_offset = args[4];
+    const std::string dir_str = args[5];
+    const bool replace = args[6];
+
+    CHECK(dir_str == "in" || dir_str == "out")
+      << "Invalid edge direction. Must be \"in\" or \"out\".";
+      EdgeDir dir = (dir_str == "in")? EdgeDir::kIn : EdgeDir::kOut;
+
+    std::shared_ptr<HeteroSubgraph> subg(new HeteroSubgraph);
+    *subg = sampling::SampleNeighborsBiased(
+        hg.sptr(), nodes, fanout, bias, tag_offset, dir, replace);
 
     *rv = HeteroGraphRef(subg);
   });

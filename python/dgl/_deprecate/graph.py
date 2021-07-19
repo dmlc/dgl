@@ -3563,7 +3563,7 @@ class DGLGraph(DGLBaseGraph):
         tensor([0, 1, 4])
         >>> SG.parent_eid
         tensor([0, 4])
-        >>> SG = G.edge_subgraph([0, 4], preserve_nodes=True)
+        >>> SG = G.edge_subgraph([0, 4], relabel_nodes=False)
         >>> SG.nodes()
         tensor([0, 1, 2, 3, 4])
         >>> SG.edges()

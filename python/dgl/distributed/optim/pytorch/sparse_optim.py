@@ -4,18 +4,18 @@ from abc import abstractmethod
 import torch as th
 
 from ...dist_tensor import DistTensor
-from ...nn.pytorch import NodeEmbedding
+from ...nn.pytorch import DistEmbedding
 from .utils import alltoallv_cpu, alltoall_cpu
 
 class DistSparseGradOptimizer(abc.ABC):
     r''' The abstract dist sparse optimizer.
 
-    Note: dgl dist sparse optimizer only work with dgl.distributed.nn.NodeEmbedding
+    Note: dgl dist sparse optimizer only work with dgl.distributed.DistEmbedding
 
     Parameters
     ----------
-    params : list of NodeEmbedding
-        The list of NodeEmbedding.
+    params : list of DistEmbedding
+        The list of DistEmbedding.
     lr : float
         The learning rate.
     '''
@@ -32,7 +32,8 @@ class DistSparseGradOptimizer(abc.ABC):
             self._rank = th.distributed.get_rank()
             self._world_size = th.distributed.get_world_size()
         else:
-            assert 'th.distributed shoud be initialized'
+            self._rank = 0
+            self._world_size = 1
 
     def step(self):
         ''' The step function.
@@ -145,7 +146,7 @@ class DistSparseGradOptimizer(abc.ABC):
             Index of the embeddings to be updated.
         grad : tensor
             Gradient of each embedding.
-        emb : dgl.distributed.nn.NodeEmbedding
+        emb : dgl.distributed.DistEmbedding
             Sparse node embedding to update.
         """
 
@@ -171,7 +172,7 @@ class SparseAdagrad(DistSparseGradOptimizer):
     r''' Distributed Node embedding optimizer using the Adagrad algorithm.
 
     This optimizer implements a distributed sparse version of Adagrad algorithm for
-    optimizing :class:`dgl.distributed.nn.NodeEmbedding`. Being sparse means it only updates
+    optimizing :class:`dgl.distributed.DistEmbedding`. Being sparse means it only updates
     the embeddings whose gradients have updates, which are usually a very
     small portion of the total embeddings.
 
@@ -183,8 +184,8 @@ class SparseAdagrad(DistSparseGradOptimizer):
 
     Parameters
     ----------
-    params : list[dgl.distributed.nn.NodeEmbedding]
-        The list of dgl.distributed.nn.NodeEmbedding.
+    params : list[dgl.distributed.DistEmbedding]
+        The list of dgl.distributed.DistEmbedding.
     lr : float
         The learning rate.
     eps : float, Optional
@@ -197,8 +198,8 @@ class SparseAdagrad(DistSparseGradOptimizer):
         # We need to register a state sum for each embedding in the kvstore.
         self._state = {}
         for emb in params:
-            assert isinstance(emb, NodeEmbedding), \
-                'SparseAdagrad only supports dgl.distributed.nn.NodeEmbedding'
+            assert isinstance(emb, DistEmbedding), \
+                'SparseAdagrad only supports dgl.distributed.DistEmbedding'
 
             name = emb.name + "_sum"
             state = DistTensor((emb.num_embeddings, emb.embedding_dim), th.float32, name,
@@ -218,7 +219,7 @@ class SparseAdagrad(DistSparseGradOptimizer):
             Index of the embeddings to be updated.
         grad : tensor
             Gradient of each embedding.
-        emb : dgl.distributed.nn.NodeEmbedding
+        emb : dgl.distributed.DistEmbedding
             Sparse embedding to update.
         """
         eps = self._eps
@@ -246,7 +247,7 @@ class SparseAdam(DistSparseGradOptimizer):
     r''' Distributed Node embedding optimizer using the Adam algorithm.
 
     This optimizer implements a distributed sparse version of Adam algorithm for
-    optimizing :class:`dgl.distributed.nn.NodeEmbedding`. Being sparse means it only updates
+    optimizing :class:`dgl.distributed.DistEmbedding`. Being sparse means it only updates
     the embeddings whose gradients have updates, which are usually a very
     small portion of the total embeddings.
 
@@ -262,8 +263,8 @@ class SparseAdam(DistSparseGradOptimizer):
 
     Parameters
     ----------
-    params : list[dgl.distributed.nn.NodeEmbedding]
-        The list of dgl.distributed.nn.NodeEmbedding.
+    params : list[dgl.distributed.DistEmbedding]
+        The list of dgl.distributed.DistEmbedding.
     lr : float
         The learning rate.
     betas : tuple[float, float], Optional
@@ -281,8 +282,8 @@ class SparseAdam(DistSparseGradOptimizer):
         self._beta2 = betas[1]
         self._state = {}
         for emb in params:
-            assert isinstance(emb, NodeEmbedding), \
-                'SparseAdam only supports dgl.distributed.nn.NodeEmbedding'
+            assert isinstance(emb, DistEmbedding), \
+                'SparseAdam only supports dgl.distributed.DistEmbedding'
 
             state_step = DistTensor((emb.num_embeddings,),
                                     th.float32, emb.name + "_step",
@@ -315,7 +316,7 @@ class SparseAdam(DistSparseGradOptimizer):
             Index of the embeddings to be updated.
         grad : tensor
             Gradient of each embedding.
-        emb : dgl.distributed.nn.NodeEmbedding
+        emb : dgl.distributed.DistEmbedding
             Sparse embedding to update.
         """
         beta1 = self._beta1

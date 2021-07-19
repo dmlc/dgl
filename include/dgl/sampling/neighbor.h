@@ -69,6 +69,15 @@ HeteroSubgraph SampleNeighborsTopk(
     const std::vector<FloatArray>& weight,
     bool ascending = false);
 
+HeteroSubgraph SampleNeighborsBiased(
+    const HeteroGraphPtr hg,
+    const IdArray& nodes,
+    const int64_t fanouts,
+    const NDArray& bias,
+    const NDArray& tag_offset,
+    const EdgeDir dir,
+    const bool replace
+);
 }  // namespace sampling
 }  // namespace dgl
 

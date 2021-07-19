@@ -153,7 +153,7 @@ of MFGs, we:
    training.
    
    If the features are stored in ``g.ndata``, then the labels
-   can be loaded by accessing the features in ``blocks[-1].srcdata``,
+   can be loaded by accessing the features in ``blocks[-1].dstdata``,
    the features of destination nodes of the last MFG, which is identical to
    the nodes we wish to compute the final representation.
 

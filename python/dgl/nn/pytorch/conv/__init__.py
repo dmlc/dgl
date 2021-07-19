@@ -21,7 +21,7 @@ from .densesageconv import DenseSAGEConv
 from .atomicconv import AtomicConv
 from .cfconv import CFConv
 from .dotgatconv import DotGatConv
-from .twirlsconv import TWIRLSConv, UnfoldingAndAttention as TWIRLSUnfoldingAndAttention
+from .twirlsconv import TWIRLSConv, TWIRLSUnfoldingAndAttention
 from .gcn2conv import GCN2Conv
 
 __all__ = ['GraphConv', 'EdgeWeightNorm', 'GATConv', 'TAGConv', 'RelGraphConv', 'SAGEConv',

@@ -99,7 +99,7 @@ def dgl_main():
 
     # create train graph
     train_edge_idx = torch.tensor(train_edge_idx).to(device)
-    train_graph = dgl.edge_subgraph(graph, train_edge_idx, preserve_nodes=True)
+    train_graph = dgl.edge_subgraph(graph, train_edge_idx, relabel_nodes=False)
     train_graph = train_graph.to(device)
     adj = train_graph.adjacency_matrix().to_dense().to(device)
 

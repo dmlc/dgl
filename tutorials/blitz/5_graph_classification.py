@@ -208,5 +208,5 @@ print('Test accuracy:', num_correct / num_tests)
 # 
 
 
-# Thumbnail Courtesy: DGL
+# Thumbnail credits: DGL
 # sphinx_gallery_thumbnail_path = '_static/blitz_5_graph_classification.png'
