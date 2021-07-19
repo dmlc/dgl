@@ -341,13 +341,13 @@ We are currently in Beta stage.  More features and improvements are coming.
 
 1. [**Extract the Knowledge of Graph Neural Networks and Go Beyond it: An Effective Knowledge Distillation Framework**](https://arxiv.org/pdf/2103.02885.pdf), WWW'21, *Cheng Yang, Jiawei Liu, Chuan Shi*
 
-2. [**VIKING: Adversarial Attack on Network Embeddings via Supervised Network Poisoning**](https://arxiv.org/pdf/2102.07164.pdf), PAKDD'21, *Viresh Gupta, Tanmoy Chakraborty*
+1. [**VIKING: Adversarial Attack on Network Embeddings via Supervised Network Poisoning**](https://arxiv.org/pdf/2102.07164.pdf), PAKDD'21, *Viresh Gupta, Tanmoy Chakraborty*
 
-3. [**Knowledge Graph Embedding using Graph Convolutional Networks with Relation-Aware Attention**](https://arxiv.org/pdf/2102.07200.pdf), *Nasrullah Sheikh, Xiao Qin, Berthold Reinwald, Christoph Miksovic, Thomas Gschwind, Paolo Scotton*
+1. [**Knowledge Graph Embedding using Graph Convolutional Networks with Relation-Aware Attention**](https://arxiv.org/pdf/2102.07200.pdf), *Nasrullah Sheikh, Xiao Qin, Berthold Reinwald, Christoph Miksovic, Thomas Gschwind, Paolo Scotton*
 
-4. [**SLAPS: Self-Supervision Improves Structure Learning for Graph Neural Networks**](https://arxiv.org/pdf/2102.05034.pdf), *Bahare Fatemi, Layla El Asri, Seyed Mehran Kazemi*
+1. [**SLAPS: Self-Supervision Improves Structure Learning for Graph Neural Networks**](https://arxiv.org/pdf/2102.05034.pdf), *Bahare Fatemi, Layla El Asri, Seyed Mehran Kazemi*
 
-5. [**Finding Needles in Heterogeneous Haystacks**](https://homepage.divms.uiowa.edu/~badhikari/assets/doc/papers/CONGCNIAAI2021.pdf), AAAI'21, *Bijaya Adhikari, Liangyue Li, Nikhil Rao, Karthik Subbian*
+1. [**Finding Needles in Heterogeneous Haystacks**](https://homepage.divms.uiowa.edu/~badhikari/assets/doc/papers/CONGCNIAAI2021.pdf), AAAI'21, *Bijaya Adhikari, Liangyue Li, Nikhil Rao, Karthik Subbian*
 
 1. [**Coreference-Aware Dialogue Summarization**](https://arxiv.org/abs/2106.08556), SIGDIAL'21, *Zhengyuan Liu, Ke Shi, Nancy F. Chen*
 
