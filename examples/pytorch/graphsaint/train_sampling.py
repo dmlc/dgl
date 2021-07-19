@@ -8,9 +8,14 @@ from sampler import SAINTNodeSampler, SAINTEdgeSampler, SAINTRandomWalkSampler
 from modules import GCNNet
 from utils import Logger, evaluate, save_log_dir, load_data
 
+import warnings
+
+# TODO: GCN layer propagation associating with alpha
+# TODO: loss computation assocating with lambda
+# TODO: details of samplers
 
 def main(args):
-
+    warnings.filterwarnings('ignore')
     multilabel_data = set(['ppi'])
     multilabel = args.dataset in multilabel_data
 
@@ -45,7 +50,7 @@ def main(args):
            n_val_samples,
            n_test_samples))
     # load sampler
-    if args.sampler == "node":
+    if args.sampler == "node": # NOTE: Here the jobs including graph sampling -jiahanli
         subg_iter = SAINTNodeSampler(args.node_budget, args.dataset, g,
                                      train_nid, args.num_repeat)
     elif args.sampler == "edge":
@@ -68,7 +73,7 @@ def main(args):
     print('labels shape:', g.ndata['label'].shape)
     print("features shape:", g.ndata['feat'].shape)
 
-    model = GCNNet( # TODO: Choose GCN as GNN layer on samplers?
+    model = GCNNet( # TODO: Choose GCN as GNN layer on samplers? -jiahanli
         in_dim=in_feats,
         hid_dim=args.n_hidden,
         out_dim=n_classes,
@@ -170,6 +175,7 @@ if __name__ == '__main__':
                         help="The length of random walk when using random walk sampler")
     parser.add_argument("--num-repeat", type=int, default=50,
                         help="Number of times of repeating sampling one node to estimate edge / node probability")
+    # TODO: num_repeat, interesting, how it works? -jiahanli
 
     # model params
     parser.add_argument("--n-hidden", type=int, default=512,

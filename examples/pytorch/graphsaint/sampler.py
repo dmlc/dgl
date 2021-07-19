@@ -39,23 +39,23 @@ class SAINTSampler(object):
             self.N, sampled_nodes = 0, 0
 
             t = time.perf_counter()
-            while sampled_nodes <= self.train_g.num_nodes() * num_repeat:
+            while sampled_nodes <= self.train_g.num_nodes() * num_repeat: # TODO: What's the meaning of num_repeat?
                 subgraph = self.__sample__()
-                self.subgraphs.append(subgraph)
+                self.subgraphs.append(subgraph)# NOTE: subgraph is essentially the sampled nids can be utilized to construct graph
                 sampled_nodes += subgraph.shape[0]
                 self.N += 1
             print(f'Sampling time: [{time.perf_counter() - t:.2f}s]')
-            np.save(graph_fn, self.subgraphs)
+            np.save(graph_fn, self.subgraphs) # NOTE: graph_fn, dir storing sampled subgraphs
 
             t = time.perf_counter()
             self.__counter__()
             aggr_norm, loss_norm = self.__compute_norm__()
             print(f'Normalization time: [{time.perf_counter() - t:.2f}s]')
-            np.save(norm_fn, (aggr_norm, loss_norm))
+            np.save(norm_fn, (aggr_norm, loss_norm)) # NOTE: aggr_norm is related to edges, while loss_norm is related to nodes.
 
         self.train_g.ndata['l_n'] = th.Tensor(loss_norm)
         self.train_g.edata['w'] = th.Tensor(aggr_norm)
-        self.__compute_degree_norm()
+        self.__compute_degree_norm() # TODO: train_D_norm and full_D_norm? what's this?
 
         self.num_batch = math.ceil(self.train_g.num_nodes() / node_budget)
         random.shuffle(self.subgraphs)
@@ -83,10 +83,11 @@ class SAINTSampler(object):
         raise NotImplementedError
 
     def __compute_norm__(self):
+        # TODO: this part is different from the paper, how about the original codes?
         self.node_counter[self.node_counter == 0] = 1
         self.edge_counter[self.edge_counter == 0] = 1
 
-        loss_norm = self.N / self.node_counter / self.train_g.num_nodes()
+        loss_norm = self.N / self.node_counter / self.train_g.num_nodes() # NOTE: different from paper, the formula in paper is wrong
 
         self.train_g.ndata['n_c'] = self.node_counter
         self.train_g.edata['e_c'] = self.edge_counter
@@ -137,9 +138,9 @@ class SAINTNodeSampler(SAINTSampler):
 
     def __sample__(self):
         if self.prob is None:
-            self.prob = self.train_g.in_degrees().float().clamp(min=1)
+            self.prob = self.train_g.in_degrees().float().clamp(min=1) # NOTE: clamp, clip a segment of data -jiahanli
 
-        sampled_nodes = th.multinomial(self.prob, num_samples=self.node_budget, replacement=True).unique()
+        sampled_nodes = th.multinomial(self.prob, num_samples=self.node_budget, replacement=True).unique() # TODO: weird? why replacement=True?
         return sampled_nodes.numpy()
 
 
