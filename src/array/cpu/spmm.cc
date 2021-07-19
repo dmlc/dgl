@@ -18,32 +18,21 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
              NDArray efeat,
              NDArray out,
              std::vector<NDArray> out_aux) {
-  const int64_t dim = bcast.out_len;
   if (reduce == "sum") {
     SWITCH_BITS(bits, DType, {
       SWITCH_OP(op, Op, {
-        DType *out_off = out.Ptr<DType>();
-        std::fill(out_off, out_off + csr.num_rows * dim, 0);
         cpu::SpMMSumCsr<IdType, DType, Op>(bcast, csr, ufeat, efeat, out);
       });
     });
   } else if (reduce == "max" || reduce == "min") {
     SWITCH_BITS(bits, DType, {
       SWITCH_OP(op, Op, {
-        DType *out_off = out.Ptr<DType>();
-        IdType* argX = Op::use_lhs ? static_cast<IdType*>(out_aux[0]->data) : nullptr;
-        IdType* argW = Op::use_rhs ? static_cast<IdType*>(out_aux[1]->data) : nullptr;
-        if (Op::use_lhs) std::fill(argX, argX + csr.num_rows * dim, 0);
-        if (Op::use_rhs) std::fill(argW, argW + csr.num_rows * dim, 0);
-        if (reduce == "max") {
-          std::fill(out_off, out_off + csr.num_rows * dim, cpu::op::Max<DType>::zero);
+        if (reduce == "max")
           cpu::SpMMCmpCsr<IdType, DType, Op, cpu::op::Max<DType>>(
               bcast, csr, ufeat, efeat, out, out_aux[0], out_aux[1]);
-        } else {
-          std::fill(out_off, out_off + csr.num_rows * dim, cpu::op::Min<DType>::zero);
+        else
           cpu::SpMMCmpCsr<IdType, DType, Op, cpu::op::Min<DType>>(
               bcast, csr, ufeat, efeat, out, out_aux[0], out_aux[1]);
-        }
       });
     });
   } else {
