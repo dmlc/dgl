@@ -15,4 +15,7 @@
 
     -   [ ] what gnn
 
+        -   [ ] GCN, which is weird in dgl
+
         
+

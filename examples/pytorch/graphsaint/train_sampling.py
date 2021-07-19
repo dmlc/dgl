@@ -68,7 +68,7 @@ def main(args):
     print('labels shape:', g.ndata['label'].shape)
     print("features shape:", g.ndata['feat'].shape)
 
-    model = GCNNet(
+    model = GCNNet( # TODO: Choose GCN as GNN layer on samplers?
         in_dim=in_feats,
         hid_dim=args.n_hidden,
         out_dim=n_classes,
