@@ -12,9 +12,9 @@ pip install pandas rdflib ogb
 
 # build
 if [[ $DEVICE == "cpu" ]]; then
-    CMAKE_VARS=""
+    CMAKE_VARS="-DUSE_LIBXSMM=OFF"
 else
-    CMAKE_VARS="-DUSE_CUDA=ON"
+    CMAKE_VARS="-DUSE_LIBXSMM=OFF -DUSE_CUDA=ON"
 fi
 mkdir -p build
 pushd build
