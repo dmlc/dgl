@@ -333,6 +333,10 @@ We are currently in Beta stage.  More features and improvements are coming.
 
 1. [**Enhancing Scientific Papers Summarization with Citation Graph**](https://arxiv.org/abs/2104.03057), AAAI'21, *Chenxin An, Ming Zhong, Yiran Chen, Danqing Wang, Xipeng Qiu, Xuanjing Huang*
 
+1. [**Graph Ensemble Learning over Multiple Dependency Trees for Aspect-level Sentiment Classification**](https://arxiv.org/abs/2103.11794), NAACL'21, *Xiaochen Hou, Peng Qi, Guangtao Wang, Rex Ying, Jing Huang, Xiaodong He, Bowen Zhou*
+
+1. [**Enhancing Scientific Papers Summarization with Citation Graph**](https://arxiv.org/abs/2104.03057), AAAI'21, *Chenxin An, Ming Zhong, Yiran Chen, Danqing Wang, Xipeng Qiu, Xuanjing Huang*
+
 1. [**Improving Graph Representation Learning by Contrastive Regularization**](https://arxiv.org/pdf/2101.11525.pdf), *Kaili Ma, Haochen Yang, Han Yang, Tatiana Jin, Pengfei Chen, Yongqiang Chen, Barakeel Fanseu Kamhoua, James Cheng*
 
 1. [**Extract the Knowledge of Graph Neural Networks and Go Beyond it: An Effective Knowledge Distillation Framework**](https://arxiv.org/pdf/2103.02885.pdf), WWW'21, *Cheng Yang, Jiawei Liu, Chuan Shi*
@@ -344,6 +348,16 @@ We are currently in Beta stage.  More features and improvements are coming.
 1. [**SLAPS: Self-Supervision Improves Structure Learning for Graph Neural Networks**](https://arxiv.org/pdf/2102.05034.pdf), *Bahare Fatemi, Layla El Asri, Seyed Mehran Kazemi*
 
 1. [**Finding Needles in Heterogeneous Haystacks**](https://homepage.divms.uiowa.edu/~badhikari/assets/doc/papers/CONGCNIAAI2021.pdf), AAAI'21, *Bijaya Adhikari, Liangyue Li, Nikhil Rao, Karthik Subbian*
+  
+1. [**RetCL: A Selection-based Approach for Retrosynthesis via Contrastive Learning**](https://arxiv.org/abs/2105.00795), IJCAI 2021, *Hankook Lee, Sungsoo Ahn, Seung-Woo Seo, You Young Song, Eunho Yang, Sung-Ju Hwang, Jinwoo Shin*
+  
+1. [**Accurate Prediction of Free Solvation Energy of Organic Molecules via Graph Attention Network and Message Passing Neural Network from Pairwise Atomistic Interactions**](https://arxiv.org/abs/2105.02048), *Ramin Ansari, Amirata Ghorbani*
+
+1. [**DIPS-Plus: The Enhanced Database of Interacting Protein Structures for Interface Prediction**](https://arxiv.org/abs/2106.04362), *Alex Morehead, Chen Chen, Ada Sedova, Jianlin Cheng*
+
+1. [**Coreference-Aware Dialogue Summarization**](https://arxiv.org/abs/2106.08556), SIGDIAL'21, *Zhengyuan Liu, Ke Shi, Nancy F. Chen*
+
+1. [**Document Structure aware Relational Graph Convolutional Networks for Ontology Population**](https://arxiv.org/abs/2104.12950), arXiv, *Abhay M Shalghar, Ayush Kumar, Balaji Ganesan, Aswin Kannan, Shobha G*
 
 </details>
 

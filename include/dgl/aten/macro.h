@@ -169,6 +169,35 @@
 } while (0)
 
 /*
+ * Dispatch data type only based on bit-width (8-bit, 16-bit, 32-bit, 64-bit):
+ *
+ * ATEN_DTYPE_BITS_ONLY_SWITCH(array->dtype, DType, {
+ *   // Now DType is the type which has the same bit-width with the
+ *   // data type in array.
+ *   // Do not use for computation, but only for read and write.
+ *   // For instance, one can do this for a CPU array:
+ *   DType *data = static_cast<DType *>(array->data);
+ * });
+ */
+#define ATEN_DTYPE_BITS_ONLY_SWITCH(val, DType, val_name, ...) do {       \
+  if ((val).bits == 8) {                                                  \
+    typedef int8_t DType;                                                 \
+    {__VA_ARGS__}                                                         \
+  } else if ((val).bits == 16) {                                          \
+    typedef int16_t DType;                                                \
+    {__VA_ARGS__}                                                         \
+  } else if ((val).bits == 32) {                                          \
+    typedef int32_t DType;                                                \
+    {__VA_ARGS__}                                                         \
+  } else if ((val).bits == 64) {                                          \
+    typedef int64_t DType;                                                \
+    {__VA_ARGS__}                                                         \
+  } else {                                                                \
+    LOG(FATAL) << (val_name) << " can only be 8-bit, 16-bit, 32-bit, or 64-bit"; \
+  }                                                                       \
+} while (0)
+
+/*
  * Dispatch according to integral type of CSR graphs.
  * Identical to ATEN_ID_TYPE_SWITCH except for a different error message.
  */

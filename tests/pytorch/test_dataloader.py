@@ -122,6 +122,12 @@ def test_neighbor_sampler_dataloader():
         modes.append('edge')
 
         collators.append(dgl.dataloading.EdgeCollator(
+            g, seeds, sampler, exclude='self'))
+        graphs.append(g)
+        nids.append({'follow': seeds})
+        modes.append('edge')
+
+        collators.append(dgl.dataloading.EdgeCollator(
             g, seeds, sampler, exclude='reverse_id', reverse_eids=reverse_eids))
         graphs.append(g)
         nids.append({'follow': seeds})
@@ -129,6 +135,12 @@ def test_neighbor_sampler_dataloader():
 
         collators.append(dgl.dataloading.EdgeCollator(
             g, seeds, sampler, negative_sampler=dgl.dataloading.negative_sampler.Uniform(2)))
+        graphs.append(g)
+        nids.append({'follow': seeds})
+        modes.append('link')
+
+        collators.append(dgl.dataloading.EdgeCollator(
+            g, seeds, sampler, exclude='self', negative_sampler=dgl.dataloading.negative_sampler.Uniform(2)))
         graphs.append(g)
         nids.append({'follow': seeds})
         modes.append('link')

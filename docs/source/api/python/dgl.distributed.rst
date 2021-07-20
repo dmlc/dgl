@@ -27,9 +27,9 @@ Distributed Tensor
 
 Distributed Node Embedding
 ---------------------
-.. currentmodule:: dgl.distributed.nn.pytorch
+.. currentmodule:: dgl.distributed
 
-.. autoclass:: NodeEmbedding
+.. autoclass:: DistEmbedding
 
 
 Distributed embedding optimizer
