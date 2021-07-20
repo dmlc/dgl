@@ -36,11 +36,11 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
         // if (Op::use_lhs) std::fill(argX, argX + csr.num_rows * dim, 0);
         // if (Op::use_rhs) std::fill(argW, argW + csr.num_rows * dim, 0);
         if (reduce == "max") {
-          // std::fill(out_off, out_off + csr.num_rows * dim, cpu::op::Max<DType>::zero);
+          std::fill(out_off, out_off + csr.num_rows * dim, cpu::op::Max<DType>::zero);
           cpu::SpMMCmpCsr<IdType, DType, Op, cpu::op::Max<DType>>(
               bcast, csr, ufeat, efeat, out, out_aux[0], out_aux[1]);
         } else {
-          // std::fill(out_off, out_off + csr.num_rows * dim, cpu::op::Min<DType>::zero);
+          std::fill(out_off, out_off + csr.num_rows * dim, cpu::op::Min<DType>::zero);
           cpu::SpMMCmpCsr<IdType, DType, Op, cpu::op::Min<DType>>(
               bcast, csr, ufeat, efeat, out, out_aux[0], out_aux[1]);
         }
