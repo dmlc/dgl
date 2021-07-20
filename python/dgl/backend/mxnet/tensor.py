@@ -356,9 +356,6 @@ def unique(input):
 def full_1d(length, fill_value, dtype, ctx):
     return nd.full((length,), fill_value, dtype=dtype, ctx=ctx)
 
-def full(shape, fill_value, dtype, ctx):
-    return nd.full(shape, fill_value, dtype=dtype, ctx=ctx)
-
 def nonzero_1d(input):
     # TODO: fallback to numpy is unfortunate
     tmp = input.asnumpy()

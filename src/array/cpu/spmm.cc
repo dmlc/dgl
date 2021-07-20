@@ -36,11 +36,11 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
         // if (Op::use_lhs) std::fill(argX, argX + csr.num_rows * dim, 0);
         // if (Op::use_rhs) std::fill(argW, argW + csr.num_rows * dim, 0);
         if (reduce == "max") {
-          // std::fill(out_off, out_off + csr.num_rows * dim, cpu::op::Max<DType>::zero);
+          std::fill(out_off, out_off + csr.num_rows * dim, cpu::op::Max<DType>::zero);
           cpu::SpMMCmpCsr<IdType, DType, Op, cpu::op::Max<DType>>(
               bcast, csr, ufeat, efeat, out, out_aux[0], out_aux[1]);
         } else {
-          // std::fill(out_off, out_off + csr.num_rows * dim, cpu::op::Min<DType>::zero);
+          std::fill(out_off, out_off + csr.num_rows * dim, cpu::op::Min<DType>::zero);
           cpu::SpMMCmpCsr<IdType, DType, Op, cpu::op::Min<DType>>(
               bcast, csr, ufeat, efeat, out, out_aux[0], out_aux[1]);
         }
@@ -69,7 +69,7 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
         // TODO(Israt): Ideally the for loop should go over num_ntypes
         for (dgl_type_t etype = 0; etype < ufeat_node_tids.size(); ++etype) {
           DType *out_off = vec_out[out_node_tids[etype]].Ptr<DType>();
-          // std::fill(out_off, out_off + vec_csr[etype].num_rows * dim, 0);
+          std::fill(out_off, out_off + vec_csr[etype].num_rows * dim, 0);
         }
         /* Call  SpMM for each relation type */
         for (dgl_type_t etype = 0; etype < ufeat_node_tids.size(); ++etype) {
@@ -90,8 +90,8 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
         for (dgl_type_t etype = 0; etype < ufeat_node_tids.size(); ++etype) {
           IdType* argX = Op::use_lhs ? static_cast<IdType*>(out_aux[0]->data) : nullptr;
           IdType* argW = Op::use_rhs ? static_cast<IdType*>(out_aux[1]->data) : nullptr;
-          // if (Op::use_lhs) std::fill(argX, argX + vec_csr[etype].num_rows * dim, 0);
-          // if (Op::use_rhs) std::fill(argW, argW + vec_csr[etype].num_rows * dim, 0);
+          if (Op::use_lhs) std::fill(argX, argX + vec_csr[etype].num_rows * dim, 0);
+          if (Op::use_rhs) std::fill(argW, argW + vec_csr[etype].num_rows * dim, 0);
         }
         /* Call  SpMM for each relation type */
         for (dgl_type_t etype = 0; etype < ufeat_node_tids.size(); ++etype) {
@@ -103,11 +103,11 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
           NDArray efeat = (vec_efeat.size() == 0) ? NullArray() : vec_efeat[etype];
           NDArray out = vec_out[dst_id];
           if (reduce == "max") {
-            // std::fill(out_off, out_off + csr.num_rows * dim, cpu::op::Max<DType>::zero);
+            std::fill(out_off, out_off + csr.num_rows * dim, cpu::op::Max<DType>::zero);
             cpu::SpMMCmpCsr<IdType, DType, Op, cpu::op::Max<DType>>(
                 bcast, csr, ufeat, efeat, out, out_aux[0], out_aux[1]);
           } else {
-            // std::fill(out_off, out_off + csr.num_rows * dim, cpu::op::Min<DType>::zero);
+            std::fill(out_off, out_off + csr.num_rows * dim, cpu::op::Min<DType>::zero);
             cpu::SpMMCmpCsr<IdType, DType, Op, cpu::op::Min<DType>>(
                 bcast, csr, ufeat, efeat, out, out_aux[0], out_aux[1]);
           }

@@ -419,13 +419,10 @@ def unique(input):
 
 def full_1d(length, fill_value, dtype, ctx):
     with tf.device(ctx):
-        t = tf.fill([length], value=tf.constant(fill_value, dtype=dtype))
+        t = tf.fill([length], value=fill_value)
+        t = tf.cast(t, dtype=dtype)
     return t
 
-def full(shape, fill_value, dtype, ctx):
-    with tf.device(ctx):
-        t = tf.fill(shape, value=tf.constant(fill_value, dtype=dtype))
-    return t
 
 def nonzero_1d(input):
     nonzero_bool = tf.cast(input, tf.bool)
