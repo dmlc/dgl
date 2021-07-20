@@ -146,11 +146,16 @@ def _gspmm(gidx, op, reduce_op, u, e):
     use_cmp = reduce_op in ['max', 'min']
     arg_u, arg_e = None, None
     idtype = getattr(F, gidx.dtype)
-    if use_cmp:
-        if use_u:
-            arg_u = F.zeros(v_shp, idtype, ctx)
-        if use_e:
-            arg_e = F.zeros(v_shp, idtype, ctx)
+    fill_value = 0
+    if reduce_op == 'max':
+        fill_value = float('-inf')
+    elif reduce_op == 'min':
+        fill_value = float('inf')
+    if use_u:
+        arg_u = F.full(v_shp, fill_value, idtype, ctx)
+    if use_e:
+        arg_e = F.full(v_shp, fill_value, idtype, ctx)
+
     arg_u_nd = to_dgl_nd_for_write(arg_u)
     arg_e_nd = to_dgl_nd_for_write(arg_e)
     if gidx.number_of_edges(0) > 0:
@@ -224,11 +229,14 @@ def _gspmm_hetero(g, op, reduce_op, u_and_e_tuple):
     use_cmp = reduce_op in ['max', 'min']
     arg_u, arg_e = None, None
     idtype = getattr(F, gidx.dtype)
-    if use_cmp:
-        if use_u:
-            arg_u = F.zeros(v_shp, idtype, ctx)
-        if use_e:
-            arg_e = F.zeros(v_shp, idtype, ctx)
+    if reduce_op == 'max':
+        fill_value = float('-inf')
+    elif reduce_op == 'min':
+        fill_value = float('inf')
+    if use_u:
+        arg_u = F.full(v_shp, fill_value, idtype, ctx)
+    if use_e:
+        arg_e = F.full(v_shp, fill_value, idtype, ctx)
     arg_u_nd = to_dgl_nd_for_write(arg_u)
     arg_e_nd = to_dgl_nd_for_write(arg_e)
     if gidx.number_of_edges(0) > 0:

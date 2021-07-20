@@ -940,6 +940,27 @@ def ones(shape, dtype, ctx):
     """
     pass
 
+def full(shape, fill_value, dtype, ctx):
+    """Create a tensor filled by fill_value.
+
+    Parameters
+    ----------
+    shape : tuple of int
+        The tensor shape.
+    fill_value: float
+        Value to be filled with 
+    dtype : data type
+        It should be one of the values in the data type dict.
+    ctx : context
+        The device of the result tensor.
+
+    Returns
+    -------
+    Tensor
+        The tensor filled with fill_value.
+    """
+    pass
+
 def uniform(shape, dtype, ctx, low, high):
     """Create a tensor with random value in a uniform
     distribution between low (inclusive) and high (exclusive).

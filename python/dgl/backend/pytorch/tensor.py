@@ -303,6 +303,9 @@ def unique(input):
 def full_1d(length, fill_value, dtype, ctx):
     return th.full((length,), fill_value, dtype=dtype, device=ctx)
 
+def full(shape, fill_value, dtype, ctx):
+    return th.full(shape, fill_value, dtype=dtype, device=ctx)
+
 def nonzero_1d(input):
     x = th.nonzero(input, as_tuple=False).squeeze()
     return x if x.dim() == 1 else x.view(-1)
@@ -348,6 +351,7 @@ def zerocopy_from_dgl_ndarray(data):
         # empty tensor. This is needed by the sparse optimizer when one of
         # processors may receive no gradients to update, but we want to keep
         # the dimension of the embedding.
+        print("Here is none")
         return th.empty(data.shape, dtype=getattr(th, data.dtype),
                         device=to_backend_ctx(data.ctx))
     else:
