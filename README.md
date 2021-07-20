@@ -305,19 +305,19 @@ We are currently in Beta stage.  More features and improvements are coming.
 
 1. [**Reinforcement Learning For Data Poisoning on Graph Neural Networks**](https://arxiv.org/abs/2102.06800), *Jacob Dineen, A S M Ahsan-Ul Haque, Matthew Bielskas*
 
-2. [**Generalising Recursive Neural Models by Tensor Decomposition**](https://github.com/danielecastellana22/tensor-tree-nn), IJCNN'20, *Daniele Castellana, Davide Bacciu*
+1. [**Generalising Recursive Neural Models by Tensor Decomposition**](https://github.com/danielecastellana22/tensor-tree-nn), IJCNN'20, *Daniele Castellana, Davide Bacciu*
 
-3. [**Tensor Decompositions in Recursive Neural Networks for Tree-Structured Data**](https://github.com/danielecastellana22/tensor-tree-nn), ESANN'20, *Daniele Castellana, Davide Bacciu*
+1. [**Tensor Decompositions in Recursive Neural Networks for Tree-Structured Data**](https://github.com/danielecastellana22/tensor-tree-nn), ESANN'20, *Daniele Castellana, Davide Bacciu*
 
-4. [**Combining Self-Organizing and Graph Neural Networks for Modeling Deformable Objects in Robotic Manipulation**](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7806087/), Frotiers in Robotics and AI, *Valencia, Angel J., and Pierre Payeur*
+1. [**Combining Self-Organizing and Graph Neural Networks for Modeling Deformable Objects in Robotic Manipulation**](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7806087/), Frotiers in Robotics and AI, *Valencia, Angel J., and Pierre Payeur*
 
-5. [**Joint stroke classification and text line grouping in online handwritten documents with edge pooling attention networks**](https://www.sciencedirect.com/science/article/abs/pii/S0031320321000467), Pattern Recognition, *Jun-Yu Ye, Yan-Ming Zhang, Qing Yang, Cheng-Lin Liu*
+1. [**Joint stroke classification and text line grouping in online handwritten documents with edge pooling attention networks**](https://www.sciencedirect.com/science/article/abs/pii/S0031320321000467), Pattern Recognition, *Jun-Yu Ye, Yan-Ming Zhang, Qing Yang, Cheng-Lin Liu*
 
-6. [**Toward Accurate Predictions of Atomic Properties via Quantum Mechanics Descriptors Augmented Graph Convolutional Neural Network: Application of This Novel Approach in NMR Chemical Shifts Predictions**](https://pubs.acs.org/doi/full/10.1021/acs.jpclett.0c02654), The Journal of Physical Chemistry Letters, *Peng Gao, Jie Zhang, Yuzhu Sun, and Jianguo Yu*
+1. [**Toward Accurate Predictions of Atomic Properties via Quantum Mechanics Descriptors Augmented Graph Convolutional Neural Network: Application of This Novel Approach in NMR Chemical Shifts Predictions**](https://pubs.acs.org/doi/full/10.1021/acs.jpclett.0c02654), The Journal of Physical Chemistry Letters, *Peng Gao, Jie Zhang, Yuzhu Sun, and Jianguo Yu*
 
-7. [**A Graph Neural Network to Model User Comfort in Robot Navigation**](https://arxiv.org/abs/2102.08863), *Pilar Bachiller, Daniel Rodriguez-Criado, Ronit R. Jorvekar, Pablo Bustos, Diego R. Faria, Luis J. Manso*
+1. [**A Graph Neural Network to Model User Comfort in Robot Navigation**](https://arxiv.org/abs/2102.08863), *Pilar Bachiller, Daniel Rodriguez-Criado, Ronit R. Jorvekar, Pablo Bustos, Diego R. Faria, Luis J. Manso*
 
-8. [**Medical Entity Disambiguation Using Graph Neural Networks**](https://arxiv.org/abs/2104.01488), *Alina Vretinaris, Chuan Lei, Vasilis Efthymiou, Xiao Qin, Fatma Özcan*
+1. [**Medical Entity Disambiguation Using Graph Neural Networks**](https://arxiv.org/abs/2104.01488), *Alina Vretinaris, Chuan Lei, Vasilis Efthymiou, Xiao Qin, Fatma Özcan*
 
 1. [**Chemistry-informed Macromolecule Graph Representation for Similarity Computation and Supervised Learning**](https://arxiv.org/abs/2103.02565), *Somesh Mohapatra, Joyce An, Rafael Gómez-Bombarelli*
 
