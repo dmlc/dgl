@@ -5,7 +5,7 @@ from . import ndarray as nd
 from ._ffi.function import _init_api
 from .base import DGLError
 from . import backend as F
-
+import numpy as np
 
 def infer_broadcast_shape(op, shp1, shp2):
     r"""Check the shape validity, and infer the output shape given input shape and operator.
@@ -142,19 +142,20 @@ def _gspmm(gidx, op, reduce_op, u, e):
     _, dsttype = gidx.metagraph.find_edge(0)
     v_shp = (gidx.number_of_nodes(dsttype), ) +\
         infer_broadcast_shape(op, u_shp[1:], e_shp[1:])
-    v = F.zeros(v_shp, dtype, ctx)
-    use_cmp = reduce_op in ['max', 'min']
-    arg_u, arg_e = None, None
-    idtype = getattr(F, gidx.dtype)
     fill_value = 0
     if reduce_op == 'max':
         fill_value = float('-inf')
     elif reduce_op == 'min':
         fill_value = float('inf')
-    if use_u:
-        arg_u = F.full(v_shp, fill_value, idtype, ctx)
-    if use_e:
-        arg_e = F.full(v_shp, fill_value, idtype, ctx)
+    v = F.full(v_shp, fill_value, dtype, ctx)
+    use_cmp = reduce_op in ['max', 'min']
+    arg_u, arg_e = None, None
+    idtype = getattr(F, gidx.dtype)
+    if use_cmp:
+        if use_u:
+            arg_u = F.zeros(v_shp, idtype, ctx)
+        if use_e:
+            arg_e = F.zeros(v_shp, idtype, ctx)
 
     arg_u_nd = to_dgl_nd_for_write(arg_u)
     arg_e_nd = to_dgl_nd_for_write(arg_e)
@@ -201,6 +202,12 @@ def _gspmm_hetero(g, op, reduce_op, u_and_e_tuple):
     list_v = [None] * gidx.number_of_ntypes()
     list_e = [None] * gidx.number_of_etypes()
 
+    fill_value = 0
+    if reduce_op == 'max':
+        fill_value = float('-inf')
+    elif reduce_op == 'min':
+        fill_value = float('inf')
+
     for rel in g.canonical_etypes:
         srctype, _, dsttype = rel
         etid = g.get_etype_id(rel)
@@ -224,19 +231,16 @@ def _gspmm_hetero(g, op, reduce_op, u_and_e_tuple):
         e_shp = F.shape(e) if use_e else (0,)
         v_shp = (gidx.number_of_nodes(dst_id), ) +\
             infer_broadcast_shape(op, u_shp[1:], e_shp[1:])
-        list_v[dst_id] = F.zeros(v_shp, dtype, ctx)
+        list_v[dst_id] = F.full(v_shp, fill_value, dtype, ctx)
 
     use_cmp = reduce_op in ['max', 'min']
     arg_u, arg_e = None, None
     idtype = getattr(F, gidx.dtype)
-    if reduce_op == 'max':
-        fill_value = float('-inf')
-    elif reduce_op == 'min':
-        fill_value = float('inf')
-    if use_u:
-        arg_u = F.full(v_shp, fill_value, idtype, ctx)
-    if use_e:
-        arg_e = F.full(v_shp, fill_value, idtype, ctx)
+    if use_cmp:
+        if use_u:
+            arg_u = F.zeros(v_shp, idtype, ctx)
+        if use_e:
+            arg_e = F.zeros(v_shp, idtype, ctx)
     arg_u_nd = to_dgl_nd_for_write(arg_u)
     arg_e_nd = to_dgl_nd_for_write(arg_e)
     if gidx.number_of_edges(0) > 0:
