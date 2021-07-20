@@ -16,7 +16,7 @@ from scipy import sparse as spsp
 from dgl.distributed import DistGraphServer, DistGraph
 
 
-def start_server(rank, tmpdir, disable_shared_mem, graph_name, graph_format='csc'):
+def start_server(rank, tmpdir, disable_shared_mem, graph_name, graph_format=['csc', 'coo']):
     g = DistGraphServer(rank, "rpc_ip_config.txt", 1, 1,
                         tmpdir / (graph_name + '.json'), disable_shared_mem=disable_shared_mem,
                         graph_format=graph_format)
@@ -284,7 +284,6 @@ def start_hetero_sample_client(rank, tmpdir, disable_shared_mem):
     try:
         nodes = {'n3': [0, 10, 99, 66, 124, 208]}
         sampled_graph = sample_neighbors(dist_graph, nodes, 3)
-        nodes = gpb.map_to_homo_nid(nodes['n3'], 'n3')
         block = dgl.to_block(sampled_graph, nodes)
         block.edata[dgl.EID] = sampled_graph.edata[dgl.EID]
     except Exception as e:
@@ -320,47 +319,36 @@ def check_rpc_hetero_sampling_shuffle(tmpdir, num_server):
     for p in pserver_list:
         p.join()
 
-    orig_nid_map = F.zeros((g.number_of_nodes(),), dtype=F.int64)
-    orig_eid_map = F.zeros((g.number_of_edges(),), dtype=F.int64)
+    orig_nid_map = {ntype: F.zeros((g.number_of_nodes(ntype),), dtype=F.int64) for ntype in g.ntypes}
+    orig_eid_map = {etype: F.zeros((g.number_of_edges(etype),), dtype=F.int64) for etype in g.etypes}
     for i in range(num_server):
         part, _, _, _, _, _, _ = load_partition(tmpdir / 'test_sampling.json', i)
-        F.scatter_row_inplace(orig_nid_map, part.ndata[dgl.NID], part.ndata['orig_id'])
-        F.scatter_row_inplace(orig_eid_map, part.edata[dgl.EID], part.edata['orig_id'])
+        ntype_ids, type_nids = gpb.map_to_per_ntype(part.ndata[dgl.NID])
+        for ntype_id, ntype in enumerate(g.ntypes):
+            idx = ntype_ids == ntype_id
+            F.scatter_row_inplace(orig_nid_map[ntype], F.boolean_mask(type_nids, idx),
+                                  F.boolean_mask(part.ndata['orig_id'], idx))
+        etype_ids, type_eids = gpb.map_to_per_etype(part.edata[dgl.EID])
+        for etype_id, etype in enumerate(g.etypes):
+            idx = etype_ids == etype_id
+            F.scatter_row_inplace(orig_eid_map[etype], F.boolean_mask(type_eids, idx),
+                                  F.boolean_mask(part.edata['orig_id'], idx))
 
-    src, dst = block.edges()
-    # These are global Ids after shuffling.
-    shuffled_src = F.gather_row(block.srcdata[dgl.NID], src)
-    shuffled_dst = F.gather_row(block.dstdata[dgl.NID], dst)
-    shuffled_eid = block.edata[dgl.EID]
-    # Get node/edge types.
-    etype, _ = gpb.map_to_per_etype(shuffled_eid)
-    src_type, _ = gpb.map_to_per_ntype(shuffled_src)
-    dst_type, _ = gpb.map_to_per_ntype(shuffled_dst)
-    etype = F.asnumpy(etype)
-    src_type = F.asnumpy(src_type)
-    dst_type = F.asnumpy(dst_type)
-    # These are global Ids in the original graph.
-    orig_src = F.asnumpy(F.gather_row(orig_nid_map, shuffled_src))
-    orig_dst = F.asnumpy(F.gather_row(orig_nid_map, shuffled_dst))
-    orig_eid = F.asnumpy(F.gather_row(orig_eid_map, shuffled_eid))
+    for src_type, etype, dst_type in block.canonical_etypes:
+        src, dst = block.edges(etype=etype)
+        # These are global Ids after shuffling.
+        shuffled_src = F.gather_row(block.srcnodes[src_type].data[dgl.NID], src)
+        shuffled_dst = F.gather_row(block.dstnodes[dst_type].data[dgl.NID], dst)
+        shuffled_eid = block.edges[etype].data[dgl.EID]
 
-    etype_map = {g.get_etype_id(etype):etype for etype in g.etypes}
-    etype_to_eptype = {g.get_etype_id(etype):(src_ntype, dst_ntype) for src_ntype, etype, dst_ntype in g.canonical_etypes}
-    for e in np.unique(etype):
-        src_t = src_type[etype == e]
-        dst_t = dst_type[etype == e]
-        assert np.all(src_t == src_t[0])
-        assert np.all(dst_t == dst_t[0])
+        orig_src = F.asnumpy(F.gather_row(orig_nid_map[src_type], shuffled_src))
+        orig_dst = F.asnumpy(F.gather_row(orig_nid_map[dst_type], shuffled_dst))
+        orig_eid = F.asnumpy(F.gather_row(orig_eid_map[etype], shuffled_eid))
 
         # Check the node Ids and edge Ids.
-        orig_src1, orig_dst1 = g.find_edges(orig_eid[etype == e], etype=etype_map[e])
-        assert np.all(F.asnumpy(orig_src1) == orig_src[etype == e])
-        assert np.all(F.asnumpy(orig_dst1) == orig_dst[etype == e])
-
-        # Check the node types.
-        src_ntype, dst_ntype = etype_to_eptype[e]
-        assert np.all(src_t == g.get_ntype_id(src_ntype))
-        assert np.all(dst_t == g.get_ntype_id(dst_ntype))
+        orig_src1, orig_dst1 = g.find_edges(orig_eid, etype=etype)
+        assert np.all(F.asnumpy(orig_src1) == orig_src)
+        assert np.all(F.asnumpy(orig_dst1) == orig_dst)
 
 # Wait non shared memory graph store
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
