@@ -105,11 +105,107 @@ class RemainderPartition : public NDArrayPartition {
   }
 };
 
+class RangePartition : public NDArrayPartition {
+ public:
+  RangePartition(
+      const int64_t array_size,
+      const int num_parts,
+      IdArray range) :
+    NDArrayPartition(array_size, num_parts),
+    range_(range) {
+    auto ctx = range->ctx;
+    if (ctx.device_type != kDLGPU) {
+        LOG(FATAL) << "The range for an NDArrayPartition is only supported "
+            " on GPUs. Transfer the range to the target device before "
+            "creating the partition.";
+    }
+  }
+
+  std::pair<IdArray, NDArray>
+  GeneratePermutation(
+      IdArray in_idx) const override {
+    auto ctx = in_idx->ctx;
+
+#ifdef DGL_USE_CUDA
+    if (ctx.device_type == kDLGPU) {
+      if (ctx == range_->ctx) {
+        LOG(FATAL) << "The range for the NDArrayPartition and the input "
+            "array must be on the same device.";
+      }
+      ATEN_ID_TYPE_SWITCH(in_idx->dtype, IdType, {
+        ATEN_ID_TYPE_SWITCH(range_->dtype, RangeType, {
+          return impl::GeneratePermutationFromRange<kDLGPU, IdType, RangeType>(
+              ArraySize(), NumParts(), range_, in_idx);
+        });
+      });
+    }
+#endif
+
+    LOG(FATAL) << "Remainder based partitioning for the CPU is not yet "
+        "implemented.";
+    // should be unreachable
+    return std::pair<IdArray, NDArray>{};
+  }
+
+  IdArray MapToLocal(
+      IdArray in_idx) const override {
+    auto ctx = in_idx->ctx;
+#ifdef DGL_USE_CUDA
+    if (ctx.device_type == kDLGPU) {
+      ATEN_ID_TYPE_SWITCH(in_idx->dtype, IdType, {
+        ATEN_ID_TYPE_SWITCH(range_->dtype, RangeType, {
+          return impl::MapToLocalFromRange<kDLGPU, IdType, RangeType>(
+              NumParts(), range_, in_idx);
+        });
+      });
+    }
+#endif
+
+    LOG(FATAL) << "Remainder based partitioning for the CPU is not yet "
+        "implemented.";
+    // should be unreachable
+    return IdArray{};
+  }
+
+  IdArray MapToGlobal(
+      IdArray in_idx,
+      const int part_id) const override {
+    auto ctx = in_idx->ctx;
+#ifdef DGL_USE_CUDA
+    if (ctx.device_type == kDLGPU) {
+      ATEN_ID_TYPE_SWITCH(in_idx->dtype, IdType, {
+        ATEN_ID_TYPE_SWITCH(range_->dtype, RangeType, {
+          return impl::MapToGlobalFromRange<kDLGPU, IdType, RangeType>(
+              NumParts(), range_, in_idx, part_id);
+        });
+      });
+    }
+#endif
+
+    LOG(FATAL) << "Remainder based partitioning for the CPU is not yet "
+        "implemented.";
+    // should be unreachable
+    return IdArray{};
+  }
+
+  int64_t PartSize(const int part_id) const override {
+    CHECK_LT(part_id, NumParts()) << "Invalid part ID (" << part_id << ") for "
+        "partition of size " << NumParts() << ".";
+    return ArraySize() / NumParts() + (part_id < ArraySize() % NumParts());
+  }
+}
+
 NDArrayPartitionRef CreatePartitionRemainderBased(
     const int64_t array_size,
     const int num_parts) {
   return NDArrayPartitionRef(std::make_shared<RemainderPartition>(
           array_size, num_parts));
+}
+
+NDArrayPartitionRef CreatePartitionRemainderBased(
+    IdArray range) {
+  return NDArrayPartitionRef(std::make_shared<RangePartition>(
+          range));
 }
 
 DGL_REGISTER_GLOBAL("partition._CAPI_DGLNDArrayPartitionCreateRemainderBased")
@@ -119,6 +215,15 @@ DGL_REGISTER_GLOBAL("partition._CAPI_DGLNDArrayPartitionCreateRemainderBased")
 
   *rv = CreatePartitionRemainderBased(array_size, num_parts);
 });
+
+DGL_REGISTER_GLOBAL("partition._CAPI_DGLNDArrayPartitionCreateRangeBased")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  IdArray range = args[0];
+
+  *rv = CreatePartitionRangeBased(range);
+});
+
+
 
 DGL_REGISTER_GLOBAL("partition._CAPI_DGLNDArrayPartitionGetPartSize")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
