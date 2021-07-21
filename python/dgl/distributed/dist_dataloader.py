@@ -53,6 +53,12 @@ def enable_mp_debug():
     logger.setLevel(logging.DEBUG)
 
 DATALOADER_ID = 0
+MP_MANAGER = None
+
+def init_mp_manager():
+    global MP_MANAGER
+    if MP_MANAGER is None:
+        MP_MANAGER = mp.Manager()
 
 class DistDataLoader:
     """DGL customized multiprocessing dataloader.
@@ -109,6 +115,7 @@ class DistDataLoader:
 
     def __init__(self, dataset, batch_size, shuffle=False, collate_fn=None, drop_last=False,
                  queue_size=None):
+        init_mp_manager()
         self.pool, self.num_workers = get_sampler_pool()
         if queue_size is None:
             queue_size = self.num_workers * 4 if self.num_workers > 0 else 4
@@ -117,10 +124,8 @@ class DistDataLoader:
         self.num_pending = 0
         self.collate_fn = collate_fn
         self.current_pos = 0
-        self.mp_manager = None
         if self.pool is not None:
-            self.mp_manager = mp.Manager()
-            self.queue = self.mp_manager.Queue(maxsize=queue_size)
+            self.queue = MP_MANAGER.Queue(maxsize=queue_size)
         else:
             self.queue = Queue(maxsize=queue_size)
         self.drop_last = drop_last
@@ -142,8 +147,8 @@ class DistDataLoader:
 
         if self.pool is not None:
             results = []
-            barrier = self.mp_manager.Barrier(self.num_workers)
-            barrier.reset()
+            barrier = MP_MANAGER.Barrier(self.num_workers)
+            # barrier.reset()
             for _ in range(self.num_workers):
                 results.append(self.pool.apply_async(
                     init_fn, args=(barrier, self.name, self.collate_fn, self.queue)))
@@ -157,11 +162,10 @@ class DistDataLoader:
         if self.pool is not None:
             results = []
             # Here we need to create the manager and barrier again.
-            with mp.Manager() as m:
-                barrier = m.Barrier(self.num_workers+1)
-                for _ in range(self.num_workers):
-                    results.append(self.pool.apply_async(cleanup_fn, args=(barrier, self.name,)))
-                barrier.wait()
+            barrier = MP_MANAGER.Barrier(self.num_workers)            
+            # barrier.reset()
+            for _ in range(self.num_workers):
+                results.append(self.pool.apply_async(cleanup_fn, args=(barrier, self.name,)))
             for res in results:
                 res.get()
 
