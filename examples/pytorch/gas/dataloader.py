@@ -116,7 +116,7 @@ class GASDataset(DGLBuiltinDataset):
 
         index = np.random.RandomState(seed).permutation(index)
         train_idx = index[:int(train_size * num_edges)]
-        val_idx = index[len(index) - int(val_size * num_edges):]
+        val_idx = index[num_edges - int(val_size * num_edges):]
         test_idx = index[int(train_size * num_edges):num_edges - int(val_size * num_edges)]
         train_mask = np.zeros(num_edges, dtype=np.bool)
         val_mask = np.zeros(num_edges, dtype=np.bool)

@@ -261,7 +261,7 @@ The folder contains example implementations of selected research papers related 
     - Tags:  Heterogeneous graph, Graph neural network, Graph structure
 - <a name='gas'></a> Li A, Qin Z, et al. Spam Review Detection with Graph Convolutional Networks. [Paper link](https://arxiv.org/abs/1908.10679).
     - Example code: [PyTorch](../examples/pytorch/gas)
-    - Tags:  Fraud detection, Heterogeneous graph, Edge classification
+    - Tags:  Fraud detection, Heterogeneous graph, Edge classification, Graph attention
 
 ## 2018
 

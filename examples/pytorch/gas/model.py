@@ -60,61 +60,62 @@ class GASConv(nn.Module):
         self.Vv = nn.Linear(v_in_dim, v_out_dim - nv_dim)
 
     def forward(self, g, e_feat, u_feat, v_feat):
-        g.nodes['u'].data['h'] = u_feat
-        g.nodes['v'].data['h'] = v_feat
-        g.edges['forward'].data['h'] = e_feat
-        g.edges['backward'].data['h'] = e_feat
+        with g.local_scope():
+            g.nodes['u'].data['h'] = u_feat
+            g.nodes['v'].data['h'] = v_feat
+            g.edges['forward'].data['h'] = e_feat
+            g.edges['backward'].data['h'] = e_feat
 
-        # formula 3 and 4 (optimized implementation to save memory)
-        g.nodes["u"].data.update({'he_u': self.u_linear(u_feat)})
-        g.nodes["v"].data.update({'he_v': self.v_linear(v_feat)})
-        g.edges["forward"].data.update({'he_e': self.e_linear(e_feat)})
-        g.apply_edges(lambda edges: {'he': edges.data['he_e'] + edges.src['he_u'] + edges.dst['he_v']}, etype='forward')
-        he = g.edges["forward"].data['he']
-        if self.activation is not None:
-            he = self.activation(he)
+            # formula 3 and 4 (optimized implementation to save memory)
+            g.nodes["u"].data.update({'he_u': self.u_linear(u_feat)})
+            g.nodes["v"].data.update({'he_v': self.v_linear(v_feat)})
+            g.edges["forward"].data.update({'he_e': self.e_linear(e_feat)})
+            g.apply_edges(lambda edges: {'he': edges.data['he_e'] + edges.src['he_u'] + edges.dst['he_v']}, etype='forward')
+            he = g.edges["forward"].data['he']
+            if self.activation is not None:
+                he = self.activation(he)
 
-        # formula 6
-        g.apply_edges(lambda edges: {'h_ve': th.cat([edges.src['h'], edges.data['h']], -1)}, etype='backward')
-        g.apply_edges(lambda edges: {'h_ue': th.cat([edges.src['h'], edges.data['h']], -1)}, etype='forward')
+            # formula 6
+            g.apply_edges(lambda edges: {'h_ve': th.cat([edges.src['h'], edges.data['h']], -1)}, etype='backward')
+            g.apply_edges(lambda edges: {'h_ue': th.cat([edges.src['h'], edges.data['h']], -1)}, etype='forward')
 
-        # formula 7, self-attention
-        g.nodes['u'].data['h_att_u'] = self.W_ATTN_u(u_feat)
-        g.nodes['v'].data['h_att_v'] = self.W_ATTN_v(v_feat)
+            # formula 7, self-attention
+            g.nodes['u'].data['h_att_u'] = self.W_ATTN_u(u_feat)
+            g.nodes['v'].data['h_att_v'] = self.W_ATTN_v(v_feat)
 
-        # Step 1: dot product
-        g.apply_edges(fn.e_dot_v('h_ve', 'h_att_u', 'edotv'), etype='backward')
-        g.apply_edges(fn.e_dot_v('h_ue', 'h_att_v', 'edotv'), etype='forward')
+            # Step 1: dot product
+            g.apply_edges(fn.e_dot_v('h_ve', 'h_att_u', 'edotv'), etype='backward')
+            g.apply_edges(fn.e_dot_v('h_ue', 'h_att_v', 'edotv'), etype='forward')
 
-        # Step 2. softmax
-        g.edges['backward'].data['sfm'] = edge_softmax(g['backward'], g.edges['backward'].data['edotv'])
-        g.edges['forward'].data['sfm'] = edge_softmax(g['forward'], g.edges['forward'].data['edotv'])
+            # Step 2. softmax
+            g.edges['backward'].data['sfm'] = edge_softmax(g['backward'], g.edges['backward'].data['edotv'])
+            g.edges['forward'].data['sfm'] = edge_softmax(g['forward'], g.edges['forward'].data['edotv'])
 
-        # Step 3. Broadcast softmax value to each edge, and then attention is done
-        g.apply_edges(lambda edges: {'attn': edges.data['h_ve'] * edges.data['sfm']}, etype='backward')
-        g.apply_edges(lambda edges: {'attn': edges.data['h_ue'] * edges.data['sfm']}, etype='forward')
+            # Step 3. Broadcast softmax value to each edge, and then attention is done
+            g.apply_edges(lambda edges: {'attn': edges.data['h_ve'] * edges.data['sfm']}, etype='backward')
+            g.apply_edges(lambda edges: {'attn': edges.data['h_ue'] * edges.data['sfm']}, etype='forward')
 
-        # Step 4. Aggregate attention to dst,user nodes, so formula 7 is done
-        g.update_all(fn.copy_e('attn', 'm'), fn.sum('m', 'agg_u'), etype='backward')
-        g.update_all(fn.copy_e('attn', 'm'), fn.sum('m', 'agg_v'), etype='forward')
+            # Step 4. Aggregate attention to dst,user nodes, so formula 7 is done
+            g.update_all(fn.copy_e('attn', 'm'), fn.sum('m', 'agg_u'), etype='backward')
+            g.update_all(fn.copy_e('attn', 'm'), fn.sum('m', 'agg_v'), etype='forward')
 
-        # formula 5
-        h_nu = self.W_u(g.nodes['u'].data['agg_u'])
-        h_nv = self.W_v(g.nodes['v'].data['agg_v'])
-        if self.activation is not None:
-            h_nu = self.activation(h_nu)
-            h_nv = self.activation(h_nv)
+            # formula 5
+            h_nu = self.W_u(g.nodes['u'].data['agg_u'])
+            h_nv = self.W_v(g.nodes['v'].data['agg_v'])
+            if self.activation is not None:
+                h_nu = self.activation(h_nu)
+                h_nv = self.activation(h_nv)
 
-        # Dropout
-        he = self.dropout(he)
-        h_nu = self.dropout(h_nu)
-        h_nv = self.dropout(h_nv)
+            # Dropout
+            he = self.dropout(he)
+            h_nu = self.dropout(h_nu)
+            h_nv = self.dropout(h_nv)
 
-        # formula 8
-        hu = th.cat([self.Vu(u_feat), h_nu], -1)
-        hv = th.cat([self.Vv(v_feat), h_nv], -1)
+            # formula 8
+            hu = th.cat([self.Vu(u_feat), h_nu], -1)
+            hv = th.cat([self.Vv(v_feat), h_nv], -1)
 
-        return he, hu, hv
+            return he, hu, hv
 
 
 class GAS(nn.Module):

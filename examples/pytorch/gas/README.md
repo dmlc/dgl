@@ -15,7 +15,11 @@ Dependencies
 
 Dataset
 ---------------------------------------
-The datasets used for edge classification are variants of DGL's built-in fake news datasets. **NOTE**: Same as the original fake news dataset, this variant is for academic use only as well, and commercial use is prohibited. The statistics are summarized as followings:
+The datasets used for edge classification are variants of DGL's built-in [fake news datasets](https://github.com/dmlc/dgl/blob/master/python/dgl/data/fakenews.py). The converting process from tree-structured graph to bipartite graph is shown in the figure. 
+
+![variant](variant.pdf)
+
+**NOTE**: Same as the original fake news dataset, this variant is for academic use only as well, and commercial use is prohibited. The statistics are summarized as followings:
 
 **Politifact**
 
@@ -60,7 +64,7 @@ python main_sampling.py --gpu 0
 
 Performance
 -------------------------
-|Dataset               | Xianyu (reported) | Fake News Politifact | Fake News Gossipcop |
+|Dataset               | Xianyu Graph (paper reported) | Fake News Politifact | Fake News Gossipcop |
 | -------------------- | ----------------- | -------------------- | ------------------- |
 | F1                   | 0.8143            | 0.9994               | 0.9942              |
 | AUC                  | 0.9860            | 1.0000               | 0.9991              |
