@@ -17,7 +17,7 @@ Dataset
 ---------------------------------------
 The datasets used for edge classification are variants of DGL's built-in [fake news datasets](https://github.com/dmlc/dgl/blob/master/python/dgl/data/fakenews.py). The converting process from tree-structured graph to bipartite graph is shown in the figure. 
 
-![variant](variant.pdf)
+![variant](variant.png)
 
 **NOTE**: Same as the original fake news dataset, this variant is for academic use only as well, and commercial use is prohibited. The statistics are summarized as followings:
 
