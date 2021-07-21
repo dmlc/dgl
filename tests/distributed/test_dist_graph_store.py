@@ -55,7 +55,8 @@ def create_random_graph(n):
 def run_server(graph_name, server_id, server_count, num_clients, shared_mem):
     g = DistGraphServer(server_id, "kv_ip_config.txt", server_count, num_clients,
                         '/tmp/dist_graph/{}.json'.format(graph_name),
-                        disable_shared_mem=not shared_mem)
+                        disable_shared_mem=not shared_mem,
+                        graph_format=['csc', 'coo'])
     print('start server', server_id)
     g.start()
 
@@ -469,6 +470,13 @@ def check_dist_graph_hetero(g, num_clients, num_nodes, num_edges):
     for etype in num_edges:
         assert etype in g.etypes
         assert num_edges[etype] == g.number_of_edges(etype)
+    etypes = [('n1', 'r1', 'n2'),
+              ('n1', 'r2', 'n3'),
+              ('n2', 'r3', 'n3')]
+    for i, etype in enumerate(g.canonical_etypes):
+        assert etype[0] == etypes[i][0]
+        assert etype[1] == etypes[i][1]
+        assert etype[2] == etypes[i][2]
     assert g.number_of_nodes() == sum([num_nodes[ntype] for ntype in num_nodes])
     assert g.number_of_edges() == sum([num_edges[etype] for etype in num_edges])
 
@@ -584,7 +592,6 @@ def test_server_client():
     check_server_client(True, 1, 1)
     check_server_client(False, 1, 1)
     check_server_client(True, 2, 2)
-    check_server_client(False, 2, 2)
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support distributed DistEmbedding")

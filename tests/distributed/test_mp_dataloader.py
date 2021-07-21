@@ -41,7 +41,8 @@ def start_server(rank, tmpdir, disable_shared_mem, num_clients):
     import dgl
     print('server: #clients=' + str(num_clients))
     g = DistGraphServer(rank, "mp_ip_config.txt", 1, num_clients,
-                        tmpdir / 'test_sampling.json', disable_shared_mem=disable_shared_mem)
+                        tmpdir / 'test_sampling.json', disable_shared_mem=disable_shared_mem,
+                        graph_format=['csc', 'coo'])
     g.start()
 
 

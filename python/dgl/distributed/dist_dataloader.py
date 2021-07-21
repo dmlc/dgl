@@ -64,7 +64,7 @@ class DistDataLoader:
     Parameters
     ----------
     dataset: a tensor
-        A tensor of node IDs or edge IDs.
+        Tensors of node IDs or edge IDs.
     batch_size: int
         The number of samples per batch to load.
     shuffle: bool, optional
@@ -127,7 +127,8 @@ class DistDataLoader:
         self.shuffle = shuffle
         self.is_closed = False
 
-        self.dataset = F.tensor(dataset)
+        self.dataset = dataset
+        self.data_idx = F.arange(0, len(dataset))
         self.expected_idxs = len(dataset) // self.batch_size
         if not self.drop_last and len(dataset) % self.batch_size != 0:
             self.expected_idxs += 1
@@ -176,7 +177,7 @@ class DistDataLoader:
 
     def __iter__(self):
         if self.shuffle:
-            self.dataset = F.rand_shuffle(self.dataset)
+            self.data_idx = F.rand_shuffle(self.data_idx)
         self.recv_idxs = 0
         self.current_pos = 0
         self.num_pending = 0
@@ -205,6 +206,7 @@ class DistDataLoader:
                 end_pos = len(self.dataset)
         else:
             end_pos = self.current_pos + self.batch_size
-        ret = self.dataset[self.current_pos:end_pos]
+        idx = self.data_idx[self.current_pos:end_pos].tolist()
+        ret = [self.dataset[i] for i in idx]
         self.current_pos = end_pos
         return ret
