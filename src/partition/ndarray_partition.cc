@@ -193,7 +193,10 @@ class RangePartition : public NDArrayPartition {
         "partition of size " << NumParts() << ".";
     return ArraySize() / NumParts() + (part_id < ArraySize() % NumParts());
   }
-}
+
+  private:
+    IdArray range_;
+};
 
 NDArrayPartitionRef CreatePartitionRemainderBased(
     const int64_t array_size,
@@ -202,10 +205,14 @@ NDArrayPartitionRef CreatePartitionRemainderBased(
           array_size, num_parts));
 }
 
-NDArrayPartitionRef CreatePartitionRemainderBased(
+NDArrayPartitionRef CreatePartitionRangeBased(
+    const int64_t array_size,
+    const int num_parts,
     IdArray range) {
   return NDArrayPartitionRef(std::make_shared<RangePartition>(
-          range));
+      array_size,
+      num_parts,
+      range));
 }
 
 DGL_REGISTER_GLOBAL("partition._CAPI_DGLNDArrayPartitionCreateRemainderBased")
@@ -218,9 +225,11 @@ DGL_REGISTER_GLOBAL("partition._CAPI_DGLNDArrayPartitionCreateRemainderBased")
 
 DGL_REGISTER_GLOBAL("partition._CAPI_DGLNDArrayPartitionCreateRangeBased")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-  IdArray range = args[0];
+  const int64_t array_size = args[0];
+  const int num_parts = args[1];
+  IdArray range = args[2];
 
-  *rv = CreatePartitionRangeBased(range);
+  *rv = CreatePartitionRangeBased(array_size, num_parts, range);
 });
 
 

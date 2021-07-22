@@ -101,7 +101,8 @@ __device__ RangeType _SearchRange(
   return cur;
 }
 
-template<typename IdType, typename RangeType> __global__ void _MapProcByRange(
+template<typename IdType, typename RangeType>
+__global__ void _MapProcByRangeKernel(
     const RangeType * const range,
     const IdType * const index,
     const int64_t num_index,
@@ -112,8 +113,10 @@ template<typename IdType, typename RangeType> __global__ void _MapProcByRange(
 
   // rely on caching to load the range into L1 cache
   if (idx < num_index) {
-    proc_id[idx] = static_cast<IdType>(
-        _SearchRange(range, num_proc, index[idx]));
+    proc_id[idx] = static_cast<IdType>(_SearchRange(
+        range,
+        static_cast<int>(num_proc),
+        static_cast<RangeType>(index[idx])));
   }
 }
 
@@ -129,7 +132,10 @@ __global__ void _MapLocalIndexByRange(
 
   // rely on caching to load the range into L1 cache
   if (idx < num_items) {
-    const int proc = _SearchRange(range, comm_size, in[idx]);
+    const int proc = _SearchRange(
+        range,
+        static_cast<int>(comm_size),
+        static_cast<RangeType>(in[idx]));
     out[idx] = in[idx] - range[proc];
   }
 }
@@ -428,7 +434,7 @@ GeneratePermutationFromRange(
     const dim3 block(256);
     const dim3 grid((num_in+block.x-1)/block.x);
 
-    CUDA_KERNEL_CALL(_MapProcByRange, grid, block, 0, stream,
+    CUDA_KERNEL_CALL(_MapProcByRangeKernel, grid, block, 0, stream,
         static_cast<const RangeType*>(range->data),
         static_cast<const IdType*>(in_idx->data),
         num_in,
@@ -526,7 +532,7 @@ GeneratePermutationFromRange<kDLGPU, int64_t, int64_t>(
         IdArray range,
         IdArray in_idx);
 
-template <DLDeviceType XPU, typename IdType>
+template <DLDeviceType XPU, typename IdType, typename RangeType>
 IdArray MapToLocalFromRange(
     const int num_parts,
     IdArray range,
@@ -582,9 +588,10 @@ MapToLocalFromRange<kDLGPU, int64_t, int64_t>(
         IdArray in_idx);
 
 
-template <DLDeviceType XPU, typename IdType>
+template <DLDeviceType XPU, typename IdType, typename RangeType>
 IdArray MapToGlobalFromRange(
     const int num_parts,
+    IdArray range,
     IdArray local_idx,
     const int part_id) {
   CHECK_LT(part_id, num_parts) << "Invalid partition id " << part_id <<
@@ -623,25 +630,25 @@ IdArray MapToGlobalFromRange(
 }
 
 template IdArray
-MapToGlobalFromRemainder<kDLGPU, int32_t, int32_t>(
+MapToGlobalFromRange<kDLGPU, int32_t, int32_t>(
         int num_parts,
         IdArray range,
         IdArray in_idx,
         int part_id);
 template IdArray
-MapToGlobalFromRemainder<kDLGPU, int64_t, int32_t>(
+MapToGlobalFromRange<kDLGPU, int64_t, int32_t>(
         int num_parts,
         IdArray range,
         IdArray in_idx,
         int part_id);
 template IdArray
-MapToGlobalFromRemainder<kDLGPU, int32_t, int64_t>(
+MapToGlobalFromRange<kDLGPU, int32_t, int64_t>(
         int num_parts,
         IdArray range,
         IdArray in_idx,
         int part_id);
 template IdArray
-MapToGlobalFromRemainder<kDLGPU, int64_t, int64_t>(
+MapToGlobalFromRange<kDLGPU, int64_t, int64_t>(
         int num_parts,
         IdArray range,
         IdArray in_idx,

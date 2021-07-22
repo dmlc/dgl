@@ -401,14 +401,15 @@ class NDArrayPartition(object):
         number of parts (e.g., i % num_parts).
         'range' assigns rows based on which part of the range 'part_ranges'
         they fall into.
-    part_ranges : List or Tensor, Optional
+    part_ranges : Tensor or dgl.NDArray, Optional
         Should only be specified when the mode is 'range'. Should be of the
         length `num_parts + 1`, and be the exclusive prefix-sum of the number
         of nodes in each partition. That is, for 3 partitions, we could have
         the list [0, a, b, 'array_size'], and all rows with index less
         than 'a' are assigned to partition 0, all rows with index greater than
         or equal to 'a' and less than 'b' are in partition 1, and all rows
-        with index greater or equal to 'b' are in partition 2. 
+        with index greater or equal to 'b' are in partition 2. Should have
+        the same context as the partitioned NDArray (i.e., be on the same GPU).
 
     Examples
     --------
@@ -444,13 +445,11 @@ class NDArrayPartition(object):
             assert part_ranges[0] == 0 and part_ranges[-1] == array_size, \
                 'part_ranges[0] must be 0, and part_ranges[-1] must be ' \
                 '"array_size".'
-            if isinstance(part_ranges, list):
-                part_ranges = nd.array(np.array(part_ranges))
-            elif F.is_tensor(part_ranges):
+            if F.is_tensor(part_ranges):
                 part_ranges = F.zerocopy_to_dgl_ndarray(part_ranges)
             else:
                 assert isinstance(part_ranges, NDArray), '"part_ranges" must ' \
-                    'be list, Tensor, or NDArray.'
+                    'be Tensor or dgl.NDArray.'
             self._partition = _CAPI_DGLNDArrayPartitionCreateRangeBased(
                 part_ranges)
         else:
