@@ -21,11 +21,11 @@ DGL is an easy-to-use, high performance and scalable Python package for deep lea
 </p>
 
 ## <img src="http://data.dgl.ai/asset/image/new.png" width="30">DGL News
+**07/22/2021**: The new **v0.7.0 release** includes a number of system optimizations, new models, new features and enhancements and bugfixes.  See our [release note](https://github.com/dmlc/dgl/releases/tag/v0.7.0) for more details.
+
 **02/26/2021**: The new **v0.6.0 release** includes distributed heterogeneous graph support, 13 more model examples, a Chinese translation of user guide thank to community support, and a new tutorial.  See our [release note](https://github.com/dmlc/dgl/releases/tag/v0.6.0) for more details.
 
 **09/05/2020**: We invite you to participate in the survey [here](https://forms.gle/Ej3jHCocACmb49Gp8) to make DGL better fit for your needs.  Thanks!
-
-**08/21/2020**: The new **v0.5.0 release** includes distributed GNN training, overhauled documentation and user guide, and several more features.  We have also submitted some models to the [OGB](https://ogb.stanford.edu) leaderboard.  See our [release note](https://github.com/dmlc/dgl/releases/tag/0.5.0) for more details.
 
 ## Using DGL
 
@@ -390,12 +390,12 @@ conda install -c dglteam dgl-cuda11.1  # CUDA 11.1
 
 |           | Latest Nightly Build Version  | Stable Version          |
 |-----------|-------------------------------|-------------------------|
-| CPU       | `pip install --pre dgl -f https://data.dgl.ai/wheels-test/repo.html`       | `pip install dgl`       |
-| CUDA 9.2  | `pip install --pre dgl-cu92 -f https://data.dgl.ai/wheels-test/repo.html`  | `pip install dgl-cu92`  |
-| CUDA 10.1 | `pip install --pre dgl-cu101 -f https://data.dgl.ai/wheels-test/repo.html` | `pip install dgl-cu101` |
-| CUDA 10.2 | `pip install --pre dgl-cu102 -f https://data.dgl.ai/wheels-test/repo.html` | `pip install dgl-cu102` |
-| CUDA 11.0 | `pip install --pre dgl-cu110 -f https://data.dgl.ai/wheels-test/repo.html` | `pip install dgl-cu110` |
-| CUDA 11.1 | `pip install --pre dgl-cu111 -f https://data.dgl.ai/wheels-test/repo.html` | `pip install dgl-cu111` |
+| CPU       | `pip install --pre dgl -f https://data.dgl.ai/wheels-test/repo.html`       | `pip install dgl -f https://data.dgl.ai/wheels-test/repo.html`       |
+| CUDA 9.2  | `pip install --pre dgl-cu92 -f https://data.dgl.ai/wheels-test/repo.html`  | `pip install dgl-cu92 -f https://data.dgl.ai/wheels-test/repo.html`  |
+| CUDA 10.1 | `pip install --pre dgl-cu101 -f https://data.dgl.ai/wheels-test/repo.html` | `pip install dgl-cu101 -f https://data.dgl.ai/wheels-test/repo.html` |
+| CUDA 10.2 | `pip install --pre dgl-cu102 -f https://data.dgl.ai/wheels-test/repo.html` | `pip install dgl-cu102 -f https://data.dgl.ai/wheels-test/repo.html` |
+| CUDA 11.0 | `pip install --pre dgl-cu110 -f https://data.dgl.ai/wheels-test/repo.html` | `pip install dgl-cu110 -f https://data.dgl.ai/wheels-test/repo.html` |
+| CUDA 11.1 | `pip install --pre dgl-cu111 -f https://data.dgl.ai/wheels-test/repo.html` | `pip install dgl-cu111 -f https://data.dgl.ai/wheels-test/repo.html` |
 
 ### Built from source code
 
