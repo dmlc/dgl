@@ -21,11 +21,11 @@ DGL is an easy-to-use, high performance and scalable Python package for deep lea
 </p>
 
 ## <img src="http://data.dgl.ai/asset/image/new.png" width="30">DGL News
+**07/22/2021**: The new **v0.7.0 release** includes a number of system optimizations, new models, new features and enhancements and bugfixes.  See our [release note](https://github.com/dmlc/dgl/releases/tag/v0.7.0) for more details.
+
 **02/26/2021**: The new **v0.6.0 release** includes distributed heterogeneous graph support, 13 more model examples, a Chinese translation of user guide thank to community support, and a new tutorial.  See our [release note](https://github.com/dmlc/dgl/releases/tag/v0.6.0) for more details.
 
 **09/05/2020**: We invite you to participate in the survey [here](https://forms.gle/Ej3jHCocACmb49Gp8) to make DGL better fit for your needs.  Thanks!
-
-**08/21/2020**: The new **v0.5.0 release** includes distributed GNN training, overhauled documentation and user guide, and several more features.  We have also submitted some models to the [OGB](https://ogb.stanford.edu) leaderboard.  See our [release note](https://github.com/dmlc/dgl/releases/tag/0.5.0) for more details.
 
 ## Using DGL
 
@@ -333,6 +333,10 @@ We are currently in Beta stage.  More features and improvements are coming.
 
 1. [**Enhancing Scientific Papers Summarization with Citation Graph**](https://arxiv.org/abs/2104.03057), AAAI'21, *Chenxin An, Ming Zhong, Yiran Chen, Danqing Wang, Xipeng Qiu, Xuanjing Huang*
 
+1. [**Graph Ensemble Learning over Multiple Dependency Trees for Aspect-level Sentiment Classification**](https://arxiv.org/abs/2103.11794), NAACL'21, *Xiaochen Hou, Peng Qi, Guangtao Wang, Rex Ying, Jing Huang, Xiaodong He, Bowen Zhou*
+
+1. [**Enhancing Scientific Papers Summarization with Citation Graph**](https://arxiv.org/abs/2104.03057), AAAI'21, *Chenxin An, Ming Zhong, Yiran Chen, Danqing Wang, Xipeng Qiu, Xuanjing Huang*
+
 1. [**Improving Graph Representation Learning by Contrastive Regularization**](https://arxiv.org/pdf/2101.11525.pdf), *Kaili Ma, Haochen Yang, Han Yang, Tatiana Jin, Pengfei Chen, Yongqiang Chen, Barakeel Fanseu Kamhoua, James Cheng*
 
 1. [**Extract the Knowledge of Graph Neural Networks and Go Beyond it: An Effective Knowledge Distillation Framework**](https://arxiv.org/pdf/2103.02885.pdf), WWW'21, *Cheng Yang, Jiawei Liu, Chuan Shi*
@@ -344,6 +348,16 @@ We are currently in Beta stage.  More features and improvements are coming.
 1. [**SLAPS: Self-Supervision Improves Structure Learning for Graph Neural Networks**](https://arxiv.org/pdf/2102.05034.pdf), *Bahare Fatemi, Layla El Asri, Seyed Mehran Kazemi*
 
 1. [**Finding Needles in Heterogeneous Haystacks**](https://homepage.divms.uiowa.edu/~badhikari/assets/doc/papers/CONGCNIAAI2021.pdf), AAAI'21, *Bijaya Adhikari, Liangyue Li, Nikhil Rao, Karthik Subbian*
+  
+1. [**RetCL: A Selection-based Approach for Retrosynthesis via Contrastive Learning**](https://arxiv.org/abs/2105.00795), IJCAI 2021, *Hankook Lee, Sungsoo Ahn, Seung-Woo Seo, You Young Song, Eunho Yang, Sung-Ju Hwang, Jinwoo Shin*
+  
+1. [**Accurate Prediction of Free Solvation Energy of Organic Molecules via Graph Attention Network and Message Passing Neural Network from Pairwise Atomistic Interactions**](https://arxiv.org/abs/2105.02048), *Ramin Ansari, Amirata Ghorbani*
+
+1. [**DIPS-Plus: The Enhanced Database of Interacting Protein Structures for Interface Prediction**](https://arxiv.org/abs/2106.04362), *Alex Morehead, Chen Chen, Ada Sedova, Jianlin Cheng*
+
+1. [**Coreference-Aware Dialogue Summarization**](https://arxiv.org/abs/2106.08556), SIGDIAL'21, *Zhengyuan Liu, Ke Shi, Nancy F. Chen*
+
+1. [**Document Structure aware Relational Graph Convolutional Networks for Ontology Population**](https://arxiv.org/abs/2104.12950), arXiv, *Abhay M Shalghar, Ayush Kumar, Balaji Ganesan, Aswin Kannan, Shobha G*
 
 </details>
 
@@ -376,12 +390,12 @@ conda install -c dglteam dgl-cuda11.1  # CUDA 11.1
 
 |           | Latest Nightly Build Version  | Stable Version          |
 |-----------|-------------------------------|-------------------------|
-| CPU       | `pip install --pre dgl -f https://data.dgl.ai/wheels-test/repo.html`       | `pip install dgl`       |
-| CUDA 9.2  | `pip install --pre dgl-cu92 -f https://data.dgl.ai/wheels-test/repo.html`  | `pip install dgl-cu92`  |
-| CUDA 10.1 | `pip install --pre dgl-cu101 -f https://data.dgl.ai/wheels-test/repo.html` | `pip install dgl-cu101` |
-| CUDA 10.2 | `pip install --pre dgl-cu102 -f https://data.dgl.ai/wheels-test/repo.html` | `pip install dgl-cu102` |
-| CUDA 11.0 | `pip install --pre dgl-cu110 -f https://data.dgl.ai/wheels-test/repo.html` | `pip install dgl-cu110` |
-| CUDA 11.1 | `pip install --pre dgl-cu111 -f https://data.dgl.ai/wheels-test/repo.html` | `pip install dgl-cu111` |
+| CPU       | `pip install --pre dgl -f https://data.dgl.ai/wheels-test/repo.html`       | `pip install dgl -f https://data.dgl.ai/wheels-test/repo.html`       |
+| CUDA 9.2  | `pip install --pre dgl-cu92 -f https://data.dgl.ai/wheels-test/repo.html`  | `pip install dgl-cu92 -f https://data.dgl.ai/wheels-test/repo.html`  |
+| CUDA 10.1 | `pip install --pre dgl-cu101 -f https://data.dgl.ai/wheels-test/repo.html` | `pip install dgl-cu101 -f https://data.dgl.ai/wheels-test/repo.html` |
+| CUDA 10.2 | `pip install --pre dgl-cu102 -f https://data.dgl.ai/wheels-test/repo.html` | `pip install dgl-cu102 -f https://data.dgl.ai/wheels-test/repo.html` |
+| CUDA 11.0 | `pip install --pre dgl-cu110 -f https://data.dgl.ai/wheels-test/repo.html` | `pip install dgl-cu110 -f https://data.dgl.ai/wheels-test/repo.html` |
+| CUDA 11.1 | `pip install --pre dgl-cu111 -f https://data.dgl.ai/wheels-test/repo.html` | `pip install dgl-cu111 -f https://data.dgl.ai/wheels-test/repo.html` |
 
 ### Built from source code
 
