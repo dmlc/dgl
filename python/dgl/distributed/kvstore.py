@@ -1056,7 +1056,7 @@ class KVClient(object):
         del self._push_handlers[name]
         self.barrier()
 
-    def map_shared_data(self, partition_book):
+    def map_shared_data(self, partition_book, sync=True):
         """Mapping shared-memory tensor from server to client.
 
         Parameters
@@ -1073,7 +1073,8 @@ class KVClient(object):
             self._all_possible_part_policy[policy.policy_str] = policy
 
         # Get shared data from server side
-        self.barrier()
+        if sync:
+            self.barrier()
         request = GetSharedDataRequest(GET_SHARED_MSG)
         rpc.send_request(self._main_server_id, request)
         response = rpc.recv_response()
@@ -1121,7 +1122,8 @@ class KVClient(object):
             # map_shared_data happens only at DistGraph initialization
             # TODO(xiangsx): We assume there is no non-graph data initialized at this time
             self._gdata_name_list.add(name)
-        self.barrier()
+        if sync:
+            self.barrier()
 
     def gdata_name_list(self):
         """Get all the graph data name"""

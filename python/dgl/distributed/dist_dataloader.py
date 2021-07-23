@@ -58,6 +58,7 @@ MP_MANAGER = None
 def init_mp_manager():
     global MP_MANAGER
     if MP_MANAGER is None:
+        print("Init MP Manager")
         MP_MANAGER = mp.Manager()
 
 class DistDataLoader:
