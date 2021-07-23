@@ -52,12 +52,13 @@ Welcome to Deep Graph Library Tutorials and Documentation
 
 .. toctree::
    :maxdepth: 1
-   :caption: Developer Notes
+   :caption: Notes
    :hidden:
    :glob:
 
    contribute
    developer/ffi
+   performance
 
 .. toctree::
    :maxdepth: 1
