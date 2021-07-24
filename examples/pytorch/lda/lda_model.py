@@ -29,7 +29,7 @@ def _lbeta(alpha, axis):
 
 # Taken from scikit-learn.  Worked better than uniform.
 # Perhaps this is due to concentration around one.
-_sklearn_random_init = torch.distributions.gamma.Gamma(100, 100)
+_sklearn_random_init = torch.distributions.gamma.Gamma(100, 100).sample
 
 
 def _edge_update(edges, step_size=1):
@@ -46,7 +46,7 @@ def _edge_update(edges, step_size=1):
     }
 
 
-def _weight_exp(z, ntype, prior):
+def _weight_fn(z, ntype, prior):
     """Node weight is approximately normalized for VB along the ntype
     direction.
     """
@@ -59,26 +59,24 @@ def _weight_exp(z, ntype, prior):
     return Elog.exp()
 
 
-def _node_update(nodes, prior):
-    return {
-        'z': nodes.data['z'],
-        'weight': _weight_exp(nodes.data['z'], nodes.ntype, prior)
-    }
-
-
-def _update_all(G, ntype, prior, step_size, return_obj=False):
+def _message_passing(G, dst_type, prior, step_size):
     """Follows Eq (5) of Hoffman et al., 2010.
     """
-    G_prop = G.reverse() if ntype == 'doc' else G # word
+    G = G.reverse() if dst_type == 'doc' else G # word
     msg_fn = lambda edges: _edge_update(edges, step_size)
-    node_fn = lambda nodes: _node_update(nodes, prior)
 
-    G_prop.update_all(msg_fn, fn.sum('z','z'), node_fn)
+    G.update_all(msg_fn, fn.sum('z','z'))
+    G.update_all(msg_fn, fn.sum('edge_elbo', 'edge_elbo'))
 
-    if return_obj:
-        G_prop.update_all(msg_fn, fn.sum('edge_elbo', 'edge_elbo'))
+    out = dict(G.nodes[dst_type].data)
+    out['weight'] = _weight_fn(out['z'], dst_type, prior)
+    return out
 
-    G.nodes[ntype].data.update(G_prop.nodes[ntype].data)
+
+def _load_z_update_weight(G, ntype, z, prior):
+    z = z.to(G.device)
+    G.nodes[ntype].data['z'] = z
+    G.nodes[ntype].data['weight'] = _weight_fn(z, ntype, prior)
     return dict(G.nodes[ntype].data)
 
 
@@ -96,7 +94,7 @@ class LatentDirichletAllocation:
     [2] Reactive LDA Library blogpost by Yingjie Miao for a similar Gibbs model
     """
     def __init__(
-        self, G, n_components,
+        self, n_words, n_components,
         prior=None,
         step_size={'doc': 1, 'word': 1}, # use larger value to get MAP
         word_rho=1, # use smaller value for online update
@@ -111,34 +109,22 @@ class LatentDirichletAllocation:
         self.step_size = step_size
 
         self.word_rho = word_rho
-        self.word_z = self._load_or_init(G, 'word')['z']
+        self.word_z = _sklearn_random_init((n_words, self.n_components))
         self.verbose = verbose
 
-    def _load_or_init(self, G, ntype, z=None):
-        if z is None:
-            z = _sklearn_random_init.sample(
-                (G.num_nodes(ntype), self.n_components)
-            ).to(G.device)
-
-        G.nodes[ntype].data['z'] = z
-        G.apply_nodes(
-            lambda nodes: _node_update(nodes, self.prior[ntype]),
-            ntype=ntype)
-        return dict(G.nodes[ntype].data)
-
-    def _e_step(self, G, reinit_doc=True, mean_change_tol=1e-3, max_iters=100):
+    def _e_step(self, G, mean_change_tol=1e-3, max_iters=100, word_ids=slice(None)):
         """_e_step implements doc data sampling until convergence or max_iters
         """
-        self._load_or_init(G, 'word', self.word_z)
-
-        if reinit_doc or ('weight' not in G.nodes['doc'].data):
-            self._load_or_init(G, 'doc')
+        _load_z_update_weight(G, 'word', self.word_z[word_ids], self.prior['word'])
+        doc_z = _sklearn_random_init((G.num_nodes('doc'), self.n_components)).to(G.device)
 
         for i in range(max_iters):
-            doc_z = dict(G.nodes['doc'].data)['z']
-            doc_data = _update_all(
+            _load_z_update_weight(G, 'doc', doc_z, self.prior['doc'])
+            doc_data = _message_passing(
                 G, 'doc', self.prior['doc'], self.step_size['doc'])
+
             mean_change = (doc_data['z'] - doc_z).abs().mean()
+            doc_z = doc_data['z']
             if mean_change < mean_change_tol:
                 break
         if self.verbose:
@@ -147,48 +133,40 @@ class LatentDirichletAllocation:
 
     transform = _e_step
 
-    def _m_step(self, G):
+    def partial_fit(self, G, word_ids=slice(None)):
         """_m_step implements word data sampling and stores word_z stats
         """
-        # assume G.nodes['doc'].data has been up to date
-        word_data = _update_all(
+        doc_data = self._e_step(G, word_ids=word_ids)
+        word_data = _message_passing(
             G, 'word', self.prior['word'], self.step_size['word'])
+        word_z = word_data['z'].to(self.word_z.device)
 
-        # online update
-        self.word_z = (
-            (1-self.word_rho) * self.word_z
-            +self.word_rho * word_data['z']
-        )
-        return word_data
+        self._last_mean_change = (word_z - self.word_z[word_ids]).abs().mean()
+        self.word_z[word_ids] *= (1 - self.word_rho)
+        self.word_z[word_ids] += self.word_rho * word_z
 
-    def partial_fit(self, G):
-        self._last_word_z = self.word_z
-        self._e_step(G)
-        self._m_step(G)
+        if self.verbose:
+            print(f'm-step mean_change: {self._last_mean_change:.4f}, '
+                  f'perplexity: {self.perplexity(G, doc_data)}')
         return self
 
-    def fit(self, G, mean_change_tol=1e-3, max_epochs=10):
+    def fit(self, G, mean_change_tol=1e-3, max_epochs=10, word_ids=slice(None)):
         for i in range(max_epochs):
-            self.partial_fit(G)
-            mean_change = (self.word_z - self._last_word_z).abs().mean()
             if self.verbose:
-                print(f'epoch {i+1}, '
-                      f'perplexity: {self.perplexity(G, False)}, '
-                      f'mean_change: {mean_change:.4f}')
-            if mean_change < mean_change_tol:
+                print(f'epoch {i+1}, ', end='')
+            self.partial_fit(G, word_ids=word_ids)
+            if self._last_mean_change < mean_change_tol:
                 break
         return self
 
-    def perplexity(self, G, reinit_doc=True):
+    def perplexity(self, G, doc_data=None, word_ids=slice(None)):
         """ppl = exp{-sum[log(p(w1,...,wn|d))] / n}
         Follows Eq (15) in Hoffman et al., 2010.
         """
-        word_data = self._load_or_init(G, 'word', self.word_z)
-        if reinit_doc or ('weight' not in G.nodes['doc'].data):
-            self._e_step(G, reinit_doc)
-        doc_data = _update_all(
-            G, 'doc', self.prior['doc'], self.step_size['doc'],
-            return_obj=True)
+        word_data = _load_z_update_weight(
+            G, 'word', self.word_z[word_ids], self.prior['word'])
+        if doc_data is None:
+            doc_data = self._e_step(G, word_ids=word_ids)
 
         # compute E[log p(docs | theta, beta)]
         edge_elbo = (
@@ -222,9 +200,16 @@ class LatentDirichletAllocation:
 
 if __name__ == '__main__':
     print('Testing LatentDirichletAllocation via task_example_test.sh ...')
-    tf_uv = np.array(np.nonzero(np.random.rand(20,10)<0.5)).T
-    G = dgl.heterograph({('doc','topic','word'): tf_uv.tolist()})
-    model = LatentDirichletAllocation(G, 5, verbose=False)
-    model.fit(G)
-    model.transform(G)
-    model.perplexity(G)
+    n_words = 100
+    G_train = dgl.heterograph(
+        {('doc','topic','word'): [(0, 0), (0, 3)]},
+        {'doc': 2, 'word': n_words}
+    )
+    G_test = dgl.heterograph(
+        {('doc', 'topic', 'word'): [(0, 1), (1, 2)]},
+        {'doc': 3, 'word': n_words}
+    )
+    model = LatentDirichletAllocation(n_words, 5, verbose=False)
+    model.fit(G_train)
+    model.transform(G_test)
+    model.perplexity(G_test)
