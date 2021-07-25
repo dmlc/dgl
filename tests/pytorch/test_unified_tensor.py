@@ -38,6 +38,7 @@ def test_unified_tensor():
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(F.ctx().type == 'cpu', reason='gpu only test')
+@pytest.mark.parametrize("num_workers", [1, 2])
 def test_multi_gpu_unified_tensor(num_workers):
     if F.ctx().type == 'cuda' and th.cuda.device_count() < num_workers:
         pytest.skip("Not enough number of GPUs to do this test, skip multi-gpu test.")
@@ -79,4 +80,5 @@ def test_multi_gpu_unified_tensor(num_workers):
 
 if __name__ == '__main__':
     test_unified_tensor()
+    test_multi_gpu_unified_tensor(1)
     test_multi_gpu_unified_tensor(2)
