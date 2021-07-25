@@ -6,12 +6,17 @@ import torch as th
 import dgl
 import backend as F
 
-def start_unified_tensor_worker(dev_id, input, seq_idx, rand_idx, output_seq, output_rand):
+def start_unified_tensor_worker(dev_id, input, seq_idx, rand_idx, output_seq_cpu, output_rand_cpu):
     device = th.device('cuda:'+str(dev_id))
     th.cuda.set_device(device)
     input_unified = dgl.contrib.UnifiedTensor(input, device=device)
-    output_seq.copy_(input_unified[seq_idx.to(device)].cpu())
-    output_rand.copy_(input_unified[rand_idx.to(device)].cpu())
+
+    seq_idx = seq_idx.to(device)
+    assert th.all(th.eq(output_seq_cpu, input_unified[seq_idx]))
+
+    rand_idx = rand_idx.to(device)
+    assert th.all(th.eq(output_rand_cpu, input_unified[rand_idx]))
+
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(F.ctx().type == 'cpu', reason='gpu only test')
@@ -50,8 +55,8 @@ def test_multi_gpu_unified_tensor():
     rand_test_size = 8192
 
     input = th.rand((test_row_size, test_col_size)).share_memory_()
-    seq_idx = th.arange(0, test_row_size).share_memory_()
-    rand_idx = th.randint(0, test_row_size, (rand_test_size,)).share_memory_()
+    seq_idx = th.arange(0, test_row_size)
+    rand_idx = th.randint(0, test_row_size, (rand_test_size,))
 
     output_seq = []
     output_rand = []
@@ -63,10 +68,8 @@ def test_multi_gpu_unified_tensor():
 
     ctx = mp.get_context('spawn')
     for i in range(num_workers):
-        output_seq.append(th.zeros((test_row_size, test_col_size)).share_memory_())
-        output_rand.append(th.zeros((rand_test_size, test_col_size)).share_memory_())
         p = ctx.Process(target=start_unified_tensor_worker,
-                        args=(i, input, seq_idx, rand_idx, output_seq[i], output_rand[i],))
+                        args=(i, input, seq_idx, rand_idx, output_seq_cpu, output_rand_cpu,))
         p.start()
         worker_list.append(p)
 
@@ -74,9 +77,6 @@ def test_multi_gpu_unified_tensor():
         p.join()
     for p in worker_list:
         assert p.exitcode == 0
-    for i in range(num_workers):
-        assert th.all(th.eq(output_seq_cpu, output_seq[i]))
-        assert th.all(th.eq(output_rand_cpu, output_rand[i]))
 
 
 if __name__ == '__main__':
