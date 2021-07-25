@@ -17,6 +17,12 @@ Key equations
  * All positions of the same topic have shared word distribution β_z~Dir(η)
  * The words in the same document / topic are correlated.
 
+|           | doc    | word   | topic   |
+|-----------|--------|--------|---------|
+| variable  | θ_d(z) | β_z(w) |         |
+| prior     | α      | η      |         |
+| posterior | γ_d(z) | λ_z(w) | ϕ_dw(z) |
+
 **MAP**
 
 A simplified MAP model is just a non-conjugate model with an inner summation to integrate out the latent topic variable:

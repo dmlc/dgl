@@ -29,7 +29,7 @@ def _lbeta(alpha, axis):
 
 # Taken from scikit-learn.  Worked better than uniform.
 # Perhaps this is due to concentration around one.
-_sklearn_random_init = torch.distributions.gamma.Gamma(100, 100).sample
+_init = torch.distributions.gamma.Gamma(100, 100).sample
 
 
 def _edge_update(edges, step_size=1):
@@ -59,31 +59,22 @@ def _weight_fn(z, ntype, prior):
     return Elog.exp()
 
 
-def _message_passing(G, dst_type, prior, step_size):
+def _message_passing(G, dst_type, step_size, doc_weight, word_weight, var_name):
     """Follows Eq (5) of Hoffman et al., 2010.
     """
     G = G.reverse() if dst_type == 'doc' else G # word
+
+    G.nodes['doc'].data['weight'] = doc_weight.to(G.device)
+    G.nodes['word'].data['weight'] = word_weight.to(G.device)
     msg_fn = lambda edges: _edge_update(edges, step_size)
 
-    G.update_all(msg_fn, fn.sum('z','z'))
-    G.update_all(msg_fn, fn.sum('edge_elbo', 'edge_elbo'))
-
-    out = dict(G.nodes[dst_type].data)
-    out['weight'] = _weight_fn(out['z'], dst_type, prior)
-    return out
-
-
-def _load_z_update_weight(G, ntype, z, prior):
-    z = z.to(G.device)
-    G.nodes[ntype].data['z'] = z
-    G.nodes[ntype].data['weight'] = _weight_fn(z, ntype, prior)
-    return dict(G.nodes[ntype].data)
+    G.update_all(msg_fn, fn.sum(var_name, var_name))
+    return G.nodes[dst_type].data[var_name]
 
 
 class LatentDirichletAllocation:
-    """LDA model that works with a HeteroGraph with doc/word node types.
-    The model alters the attributes of G arbitrarily,
-    but always load word_z if needed.
+    """LDA model that works with a HeteroGraph with doc->word meta paths.
+    The model alters the attributes of G arbitrarily, starting with word->weight.
     This is inspired by [1] and its corresponding scikit-learn implementation.
 
     References
@@ -99,6 +90,7 @@ class LatentDirichletAllocation:
         step_size={'doc': 1, 'word': 1}, # use larger value to get MAP
         word_rho=1, # use smaller value for online update
         verbose=True,
+        device='cpu', # use gpus for faster _word_weight update
         ):
         self.n_components = n_components
 
@@ -109,45 +101,57 @@ class LatentDirichletAllocation:
         self.step_size = step_size
 
         self.word_rho = word_rho
-        self.word_z = _sklearn_random_init((n_words, self.n_components))
+        self.word_z = _init((n_words, self.n_components)).to(device)
+        self._word_weight = _weight_fn(self.word_z, 'word', self.prior['word'])
         self.verbose = verbose
 
     def _e_step(self, G, mean_change_tol=1e-3, max_iters=100, word_ids=slice(None)):
         """_e_step implements doc data sampling until convergence or max_iters
         """
-        _load_z_update_weight(G, 'word', self.word_z[word_ids], self.prior['word'])
-        doc_z = _sklearn_random_init((G.num_nodes('doc'), self.n_components)).to(G.device)
+        word_weight = self._word_weight[word_ids].to(G.device)
+        doc_z = _init((G.num_nodes('doc'), self.n_components)).to(G.device)
 
         for i in range(max_iters):
-            _load_z_update_weight(G, 'doc', doc_z, self.prior['doc'])
-            doc_data = _message_passing(
-                G, 'doc', self.prior['doc'], self.step_size['doc'])
+            last_doc_z, doc_z = doc_z, _message_passing(
+                G, 'doc', self.step_size['doc'],
+                _weight_fn(doc_z, 'doc', self.prior['doc']),
+                word_weight, 'z'
+            )
 
-            mean_change = (doc_data['z'] - doc_z).abs().mean()
-            doc_z = doc_data['z']
+            mean_change = (doc_z - last_doc_z).abs().mean()
             if mean_change < mean_change_tol:
                 break
         if self.verbose:
             print(f'e-step num_iters={i+1} with mean_change={mean_change:.4f}')
-        return doc_data
+        return {'z': doc_z, 'weight': _weight_fn(doc_z, 'doc', self.prior['doc'])}
 
     transform = _e_step
 
-    def partial_fit(self, G, word_ids=slice(None)):
+    def _m_step(self, G, doc_data, word_ids=slice(None)):
         """_m_step implements word data sampling and stores word_z stats
         """
-        doc_data = self._e_step(G, word_ids=word_ids)
-        word_data = _message_passing(
-            G, 'word', self.prior['word'], self.step_size['word'])
-        word_z = word_data['z'].to(self.word_z.device)
+        word_z = _message_passing(
+            G, 'word', self.step_size['word'],
+            doc_data['weight'], self._word_weight[word_ids].to(G.device), 'z'
+        )
+        self.word_z[word_ids] = (
+            (1 - self.word_rho) * self.word_z[word_ids]
+            + self.word_rho * word_z.to(self.word_z.device)
+        )
+        # alone full word direction
+        self._word_weight = _weight_fn(self.word_z, 'word', self.prior['word'])
 
-        self._last_mean_change = (word_z - self.word_z[word_ids]).abs().mean()
-        self.word_z[word_ids] *= (1 - self.word_rho)
-        self.word_z[word_ids] += self.word_rho * word_z
+    def partial_fit(self, G, word_ids=slice(None)):
+        last_word_z = self.word_z[word_ids].clone()
+
+        doc_data = self._e_step(G, word_ids=word_ids)
+        self._m_step(G, doc_data, word_ids)
+
+        self._last_mean_change = (self.word_z[word_ids] - last_word_z).abs().mean()
 
         if self.verbose:
-            print(f'm-step mean_change: {self._last_mean_change:.4f}, '
-                  f'perplexity: {self.perplexity(G, doc_data)}')
+            print(f"m-step mean_change: {self._last_mean_change:.4f}, "
+                  f"perplexity: {self.perplexity(G, doc_data, word_ids=word_ids):.1f}")
         return self
 
     def fit(self, G, mean_change_tol=1e-3, max_epochs=10, word_ids=slice(None)):
@@ -163,15 +167,19 @@ class LatentDirichletAllocation:
         """ppl = exp{-sum[log(p(w1,...,wn|d))] / n}
         Follows Eq (15) in Hoffman et al., 2010.
         """
-        word_data = _load_z_update_weight(
-            G, 'word', self.word_z[word_ids], self.prior['word'])
         if doc_data is None:
             doc_data = self._e_step(G, word_ids=word_ids)
 
+        word_data = {'z': self.word_z, 'weight': self._word_weight}
+
+        edge_elbo = _message_passing(
+            G, 'doc', self.step_size['doc'],
+            doc_data['weight'], word_data['weight'][word_ids].to(G.device),
+            'edge_elbo'
+        )
+
         # compute E[log p(docs | theta, beta)]
-        edge_elbo = (
-            doc_data['edge_elbo'].sum() / doc_data['z'].sum()
-        ).cpu().numpy()
+        edge_elbo = (edge_elbo.sum() / doc_data['z'].sum()).cpu().numpy()
         if self.verbose:
             print(f'neg_elbo phi: {-edge_elbo:.3f}', end=' ')
 
@@ -199,17 +207,20 @@ class LatentDirichletAllocation:
 
 
 if __name__ == '__main__':
-    print('Testing LatentDirichletAllocation via task_example_test.sh ...')
-    n_words = 100
-    G_train = dgl.heterograph(
-        {('doc','topic','word'): [(0, 0), (0, 3)]},
-        {'doc': 2, 'word': n_words}
-    )
-    G_test = dgl.heterograph(
-        {('doc', 'topic', 'word'): [(0, 1), (1, 2)]},
-        {'doc': 3, 'word': n_words}
-    )
-    model = LatentDirichletAllocation(n_words, 5, verbose=False)
-    model.fit(G_train)
-    model.transform(G_test)
-    model.perplexity(G_test)
+    print('Testing LatentDirichletAllocation ...')
+    G = dgl.heterograph({('doc', '', 'word'): [(0, 0), (0, 3)]})
+    model = LatentDirichletAllocation(G.num_nodes('word'), 5, verbose=False)
+    model.fit(G)
+    model.transform(G)
+    model.perplexity(G)
+
+    dataloader = dgl.dataloading.NodeDataLoader(
+        G.reverse(),
+        {'doc': np.arange(G.num_nodes('doc'))},
+        dgl.dataloading.MultiLayerFullNeighborSampler(1))
+
+    for input_nodes, output_nodes, blocks in dataloader:
+        word2doc = blocks[0].adjacency_matrix()._indices().T.numpy().tolist()
+        G_batch = dgl.heterograph({('word', '', 'doc'): word2doc}).reverse()
+        model.partial_fit(G_batch, word_ids=input_nodes['word'])
+    print('Testing LatentDirichletAllocation passed!')
