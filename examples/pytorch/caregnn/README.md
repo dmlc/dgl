@@ -1,6 +1,6 @@
 # DGL Implementation of the CARE-GNN Paper
 
-This DGL example implements the CAmouflage-REsistant GNN (CARE-GNN) model proposed in the paper [Enhancing Graph Neural Network-based Fraud Detectors against Camouflaged Fraudsters](https://arxiv.org/abs/2008.08692).
+This DGL example implements the CAmouflage-REsistant GNN (CARE-GNN) model proposed in the paper [Enhancing Graph Neural Network-based Fraud Detectors against Camouflaged Fraudsters](https://arxiv.org/abs/2008.08692). The author's codes of implementation is [here](https://github.com/YingtongDou/CARE-GNN).
 
 **NOTE**: The sampling version of the model has been modified due to the nature of DGL node dataloader. In the formula 2 in the paper, instead of the embedding of the last layer, the embedding of current layer in last epoch is used to measure the similarity between center nodes and their neighbor.
 
