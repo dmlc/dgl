@@ -967,7 +967,7 @@ class DistGraph:
         '''
         return role.get_global_rank()
 
-    def find_edges(self, edges):
+    def find_edges(self, edges, etype=None):
         """ Given an edge ID array, return the source
         and destination node ID array ``s`` and ``d``.  ``s[i]`` and ``d[i]``
         are source and destination node ID for edge ``eid[i]``.
@@ -976,6 +976,18 @@ class DistGraph:
         ----------
         edges : tensor
             The edge ID array.
+        eid : Int Tensor
+            Each element is an ID. The tensor must have the same device type
+              and ID data type as the graph's.
+
+        etype : str or (str, str, str), optional
+            The type names of the edges. The allowed type name formats are:
+
+            * ``(str, str, str)`` for source node type, edge type and destination node type.
+            * or one ``str`` edge type name if the name can uniquely identify a
+              triplet format in the graph.
+
+            Can be omitted if the graph has only one type of edges.
 
         Returns
         -------
@@ -984,8 +996,17 @@ class DistGraph:
         tensor
             The destination node ID array.
         """
-        assert len(self.etypes) == 1, 'find_edges does not support heterogeneous graph for now.'
-        return dist_find_edges(self, edges)
+        if etype is None:
+            assert len(self.etypes) == 1, 'find_edges requires etype for heterogeneous graphs.'
+
+        gpb = self.get_partition_book()
+        if len(gpb.etypes) > 1:
+            edges = gpb.map_to_homo_eid(edges, etype)
+        src, dst = dist_find_edges(self, edges)
+        if len(gpb.ntypes) > 1:
+            _, src = gpb.map_to_per_ntype(src)
+            _, dst = gpb.map_to_per_ntype(dst)
+        return src, dst
 
     def get_partition_book(self):
         """Get the partition information.
