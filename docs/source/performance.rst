@@ -20,8 +20,11 @@ are available in `a standalone repository <https://github.com/dglai/dgl-0.5-benc
 v0.5 Benchmarks
 ---------------
 
-Here is a summary of the system evaluation results from our paper `Deep Graph Library: 
+Check out our paper `Deep Graph Library: 
 A Graph-Centric, Highly-Performant Package for Graph Neural Networks <https://arxiv.org/abs/1909.01315>`_.
+
+v0.4.3 Benchmarks
+------------------
 
 **Microbenchmark on speed and memory usage**:
 While leaving tensor and autograd functions to backend frameworks (e.g.
