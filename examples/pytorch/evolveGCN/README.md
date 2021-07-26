@@ -23,7 +23,7 @@ Using EvolveGCN-O can match the results of Fig.3 and Fig.4 in the paper.
 
 
 ## Attention:  
-* Currently only the Elliptic dataset data set is used.
+* Currently only the Elliptic dataset is used.
 * EvolveGCN-H is not solid in Elliptic dataset, the official code is the same.   
 
 Official code result when use EvolveGCN-H:  
