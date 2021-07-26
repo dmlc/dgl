@@ -27,30 +27,25 @@ from dgl import function as fn
 def _lbeta(alpha, axis):
     return torch.lgamma(alpha).sum(axis) - torch.lgamma(alpha.sum(axis))
 
-# Taken from scikit-learn.  Worked better than uniform.
-# Perhaps this is due to concentration around one.
-_init = torch.distributions.gamma.Gamma(100, 100).sample
 
-
-def _edge_update(edges, step_size=1):
+def _edge_update(edges):
     """ the Gibbs posterior distribution of z propto theta*beta.
-    As step_size -> infty, the result becomes MAP estimate on the dst nodes.
     """
     q = edges.src['weight'] * edges.dst['weight']
     marg = q.sum(axis=1, keepdims=True) + np.finfo(float).eps
     p = q / marg
 
     return {
-        'z': p * step_size,
-        'edge_elbo': marg.squeeze(1).log() * step_size,
+        'z': p,
+        'edge_elbo': marg.squeeze(1).log(),
     }
 
 
-def _weight_fn(z, ntype, prior):
-    """Node weight is approximately normalized for VB along the ntype
-    direction.
+def _bayesian_softmax(z, ntype, prior):
+    """The sum is less than or equal to one according to Jensen's inequality:
+    exp(E(log(x))) <= E(x) = 1. The bound is tight when z is large, e.g., due
+    to large lr_mult in the corresponding direction.
     """
-    prior = prior + z * 0 # convert numpy to torch
     gamma = prior + z
 
     axis = 1 if ntype == 'doc' else 0 # word
@@ -59,23 +54,18 @@ def _weight_fn(z, ntype, prior):
     return Elog.exp()
 
 
-def _message_passing(G, dst_type, step_size, doc_weight, word_weight, var_name):
-    """Follows Eq (5) of Hoffman et al., 2010.
-    """
-    G = G.reverse() if dst_type == 'doc' else G # word
-
-    G.nodes['doc'].data['weight'] = doc_weight.to(G.device)
-    G.nodes['word'].data['weight'] = word_weight.to(G.device)
-    msg_fn = lambda edges: _edge_update(edges, step_size)
-
-    G.update_all(msg_fn, fn.sum(var_name, var_name))
-    return G.nodes[dst_type].data[var_name]
-
-
 class LatentDirichletAllocation:
     """LDA model that works with a HeteroGraph with doc->word meta paths.
     The model alters the attributes of G arbitrarily, starting with word->weight.
     This is inspired by [1] and its corresponding scikit-learn implementation.
+
+    Hyperparameters
+    ---
+    * prior: parameters in the Dirichlet prior; default to 1/n_components
+    * lr: learning rate for online update; default to 1 for full gradient updates
+    * lr_mult: learning rate multiplier to quickly converge to MAP
+    * device: accelerate _bayesian_softmax on word_z parameters in m-step
+    * Tolerance / max_iters parameters are less often accessed; monkey-patch if needed
 
     References
     ---
@@ -87,10 +77,14 @@ class LatentDirichletAllocation:
     def __init__(
         self, n_words, n_components,
         prior=None,
-        step_size={'doc': 1, 'word': 1}, # use larger value to get MAP
-        word_rho=1, # use smaller value for online update
+        lr=1,
+        lr_mult={'doc': 1, 'word': 1},
+        device='cpu',
         verbose=True,
-        device='cpu', # use gpus for faster _word_weight update
+        _e_step_max_iters=100,
+        _e_step_mean_change_tol=1e-3,
+        _m_step_max_iters=10,
+        _m_step_mean_change_tol=1e-3,
         ):
         self.n_components = n_components
 
@@ -98,88 +92,138 @@ class LatentDirichletAllocation:
             prior = {'doc': 1./n_components, 'word': 1./n_components}
         self.prior = prior
 
-        self.step_size = step_size
-
-        self.word_rho = word_rho
-        self.word_z = _init((n_words, self.n_components)).to(device)
-        self._word_weight = _weight_fn(self.word_z, 'word', self.prior['word'])
+        self.lr = lr
+        self.lr_mult = lr_mult
+        self.device = device
         self.verbose = verbose
 
-    def _e_step(self, G, mean_change_tol=1e-3, max_iters=100, word_ids=slice(None)):
+        # Taken from scikit-learn.  Worked better than uniform.
+        # The sample points concentrate around 1.0
+        self._init = torch.distributions.gamma.Gamma(
+            torch.tensor(100.0, device=device),
+            torch.tensor(100.0, device=device),).sample
+
+        self.word_z = self._init((n_words, self.n_components))
+        self._word_weight = _bayesian_softmax(self.word_z, 'word', self.prior['word'])
+
+        self._e_step_max_iters=_e_step_max_iters
+        self._e_step_mean_change_tol=_e_step_mean_change_tol
+        self._m_step_max_iters=_m_step_max_iters
+        self._m_step_mean_change_tol=_m_step_mean_change_tol
+
+
+    def _prepare_graph(self, G, doc_data=None):
+        """ asssume full set of iid docs and allow subset of word_ids """
+        if doc_data is None:
+            z = self._init((G.num_nodes('doc'), self.n_components)).to(G.device)
+            weight = _bayesian_softmax(z, 'doc', self.prior['doc'])
+            doc_data = {'z': z, 'weight': weight}
+
+        G.nodes['doc'].data['z'] = doc_data['z']
+        G.nodes['doc'].data['weight'] = doc_data['weight']
+
+        # word_ids = G.in_degrees().nonzero(as_tuple=True)[0]
+
+        if 'word_ids' in G.nodes['word'].data:
+            word_ids = G.nodes['word'].data['word_ids'].to(self.device)
+        else:
+            word_ids = slice(None)
+
+        G.nodes['word'].data['z'] = self.word_z[word_ids].to(G.device)
+        G.nodes['word'].data['weight'] = self._word_weight[word_ids].to(G.device)
+
+        return word_ids
+
+
+    def _e_step(self, G, doc_data=None):
         """_e_step implements doc data sampling until convergence or max_iters
         """
-        word_weight = self._word_weight[word_ids].to(G.device)
-        doc_z = _init((G.num_nodes('doc'), self.n_components)).to(G.device)
+        G = G.reverse() # word -> doc
+        self._prepare_graph(G, doc_data)
 
-        for i in range(max_iters):
-            last_doc_z, doc_z = doc_z, _message_passing(
-                G, 'doc', self.step_size['doc'],
-                _weight_fn(doc_z, 'doc', self.prior['doc']),
-                word_weight, 'z'
+        for i in range(self._e_step_max_iters):
+            doc_z_old = G.nodes['doc'].data['z']
+
+            G.update_all(
+                _edge_update, fn.sum('z', 'z'), 
+                lambda x: {'z': x.data['z'] * self.lr_mult['doc']}
             )
+            G.nodes['doc'].data['weight'] = _bayesian_softmax(
+                G.nodes['doc'].data['z'], 'doc', self.prior['doc'])
 
-            mean_change = (doc_z - last_doc_z).abs().mean()
-            if mean_change < mean_change_tol:
+            mean_change = (G.nodes['doc'].data['z'] - doc_z_old).abs().mean()
+            if mean_change < self._e_step_mean_change_tol:
                 break
+
         if self.verbose:
             print(f'e-step num_iters={i+1} with mean_change={mean_change:.4f}')
-        return {'z': doc_z, 'weight': _weight_fn(doc_z, 'doc', self.prior['doc'])}
+
+        return dict(G.nodes['doc'].data)
+
 
     transform = _e_step
 
-    def _m_step(self, G, doc_data, word_ids=slice(None)):
+
+    def _m_step(self, G, doc_data):
         """_m_step implements word data sampling and stores word_z stats
         """
-        word_z = _message_passing(
-            G, 'word', self.step_size['word'],
-            doc_data['weight'], self._word_weight[word_ids].to(G.device), 'z'
+        word_ids = self._prepare_graph(G, doc_data)
+
+        G.update_all(
+            _edge_update, fn.sum('z', 'z'),
+            lambda x: {'z': x.data['z'] * self.lr_mult['word']}
         )
-        self.word_z[word_ids] = (
-            (1 - self.word_rho) * self.word_z[word_ids]
-            + self.word_rho * word_z.to(self.word_z.device)
-        )
-        # alone full word direction
-        self._word_weight = _weight_fn(self.word_z, 'word', self.prior['word'])
+        new = G.nodes['word'].data['z'].to(self.device)
+        word_z_diff = new - self.word_z[word_ids]
 
-    def partial_fit(self, G, word_ids=slice(None)):
-        last_word_z = self.word_z[word_ids].clone()
+        self.word_z = self.word_z * (1 - self.lr)
+        self.word_z[word_ids] += self.lr * new     # zero everywhere else
+        # softmax on the full word distribution
+        self._word_weight = _bayesian_softmax(self.word_z, 'word', self.prior['word'])
 
-        doc_data = self._e_step(G, word_ids=word_ids)
-        self._m_step(G, doc_data, word_ids)
+        return word_z_diff
 
-        self._last_mean_change = (self.word_z[word_ids] - last_word_z).abs().mean()
 
-        if self.verbose:
-            print(f"m-step mean_change: {self._last_mean_change:.4f}, "
-                  f"perplexity: {self.perplexity(G, doc_data, word_ids=word_ids):.1f}")
-        return self
+    def fit(self, G, batch_size=0):
+        if batch_size>0:
+            raise NotImplementedError("""
+                Use a custom loop to iterate between e and m steps;
+                set self.lr<1 and follow the example at the end of this file.""")
 
-    def fit(self, G, mean_change_tol=1e-3, max_epochs=10, word_ids=slice(None)):
-        for i in range(max_epochs):
+        for i in range(self._m_step_max_iters):
+            doc_data = self._e_step(G)
+            mean_change = self._m_step(G, doc_data).abs().mean()
+
             if self.verbose:
-                print(f'epoch {i+1}, ', end='')
-            self.partial_fit(G, word_ids=word_ids)
-            if self._last_mean_change < mean_change_tol:
+                print(f"iter {i+1}, m-step mean_change: {mean_change:.4f}, "
+                      f"perplexity: {self.perplexity(G, doc_data):.4f}")
+
+            if mean_change < self._m_step_mean_change_tol:
                 break
         return self
 
-    def perplexity(self, G, doc_data=None, word_ids=slice(None)):
+
+    def perplexity(self, G, doc_data=None):
         """ppl = exp{-sum[log(p(w1,...,wn|d))] / n}
         Follows Eq (15) in Hoffman et al., 2010.
         """
         if doc_data is None:
-            doc_data = self._e_step(G, word_ids=word_ids)
-
+            doc_data = self._e_step(G)
         word_data = {'z': self.word_z, 'weight': self._word_weight}
 
-        edge_elbo = _message_passing(
-            G, 'doc', self.step_size['doc'],
-            doc_data['weight'], word_data['weight'][word_ids].to(G.device),
-            'edge_elbo'
+        # augment doc_data with edge_elbo
+        G = G.reverse()
+        self._prepare_graph(G, doc_data)
+        G.update_all(
+            _edge_update, fn.sum('edge_elbo', 'edge_elbo'),
+            lambda x: {"edge_elbo": x.data['edge_elbo'] * self.lr_mult['doc']}
         )
+        doc_data = dict(G.nodes['doc'].data)
 
         # compute E[log p(docs | theta, beta)]
-        edge_elbo = (edge_elbo.sum() / doc_data['z'].sum()).cpu().numpy()
+        edge_elbo = (
+            doc_data['edge_elbo'].sum() / doc_data['z'].sum()
+        ).cpu().numpy()
         if self.verbose:
             print(f'neg_elbo phi: {-edge_elbo:.3f}', end=' ')
 
@@ -215,12 +259,17 @@ if __name__ == '__main__':
     model.perplexity(G)
 
     dataloader = dgl.dataloading.NodeDataLoader(
-        G.reverse(),
+        G.reverse(),         # sample by in-degree, to be reversed in blocks
         {'doc': np.arange(G.num_nodes('doc'))},
-        dgl.dataloading.MultiLayerFullNeighborSampler(1))
+        dgl.dataloading.MultiLayerFullNeighborSampler(1),
+    )
 
+    model = LatentDirichletAllocation(G.num_nodes('word'), 5, verbose=False, lr=0.1)
     for input_nodes, output_nodes, blocks in dataloader:
-        word2doc = blocks[0].adjacency_matrix()._indices().T.numpy().tolist()
-        G_batch = dgl.heterograph({('word', '', 'doc'): word2doc}).reverse()
-        model.partial_fit(G_batch, word_ids=input_nodes['word'])
+        word2doc = blocks[0].adjacency_matrix()._indices().T.tolist()
+        B = dgl.heterograph({('word', '', 'doc'): word2doc}).reverse()
+        B.nodes['word'].data['word_ids'] = input_nodes['word'].to(B.device)
+
+        model._m_step(B, model._e_step(B))
+
     print('Testing LatentDirichletAllocation passed!')
