@@ -7,6 +7,9 @@ import os
 import numpy as np
 
 from ..heterograph import DGLHeteroGraph
+from ..convert import heterograph as dgl_heterograph
+from ..convert import graph as dgl_graph
+from ..transform import compact_graphs
 from .. import heterograph_index
 from .. import backend as F
 from ..base import NID, EID, NTYPE, ETYPE, ALL, is_all
@@ -1007,6 +1010,56 @@ class DistGraph:
             _, src = gpb.map_to_per_ntype(src)
             _, dst = gpb.map_to_per_ntype(dst)
         return src, dst
+
+    def edge_subgraph(self, edges, relabel_nodes=True, store_ids=True):
+        """Return a subgraph induced on the given edges.
+
+        An edge-induced subgraph is equivalent to creating a new graph using the given
+        edges. In addition to extracting the subgraph, DGL also copies the features
+        of the extracted nodes and edges to the resulting graph. The copy is *lazy*
+        and incurs data movement only when needed.
+
+        If the graph is heterogeneous, DGL extracts a subgraph per relation and composes
+        them as the resulting graph. Thus, the resulting graph has the same set of relations
+        as the input one.
+
+        Parameters
+        ----------
+        edges : Int Tensor or dict[(str, str, str), Int Tensor]
+            The edges to form the subgraph. Each element is an edge ID. The tensor must have
+            the same device type and ID data type as the graph's.
+
+            If the graph is homogeneous, one can directly pass an Int Tensor.
+            Otherwise, the argument must be a dictionary with keys being edge types
+            and values being the edge IDs in the above formats.
+        relabel_nodes : bool, optional
+            If True, it will remove the isolated nodes and relabel the incident nodes in the
+            extracted subgraph.
+        store_ids : bool, optional
+            If True, it will store the raw IDs of the extracted edges in the ``edata`` of the
+            resulting graph under name ``dgl.EID``; if ``relabel_nodes`` is ``True``, it will
+            also store the raw IDs of the incident nodes in the ``ndata`` of the resulting
+            graph under name ``dgl.NID``.
+
+        Returns
+        -------
+        G : DGLGraph
+            The subgraph.
+        """
+        if isinstance(edges, dict):
+            # TODO(zhengda) we need to directly generate subgraph of all relations with
+            # one invocation.
+            subg = {etype: self.find_edges(edges[etype], etype) for etype in edges}
+            num_nodes = {ntype: self.number_of_nodes(ntype) for ntype in self.ntypes}
+            subg = dgl_heterograph(subg, num_nodes_dict=num_nodes)
+        else:
+            assert len(self.etypes) == 1
+            subg = self.find_edges(edges)
+            subg = dgl_graph(subg, num_nodes=self.number_of_nodes())
+
+        if relabel_nodes:
+            subg = compact_graphs(subg)
+        return subg
 
     def get_partition_book(self):
         """Get the partition information.
