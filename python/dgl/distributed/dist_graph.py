@@ -1059,6 +1059,7 @@ class DistGraph:
 
         if relabel_nodes:
             subg = compact_graphs(subg)
+        assert store_ids, 'edge_subgraph always stores original node/edge IDs.'
         return subg
 
     def get_partition_book(self):
