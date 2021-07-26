@@ -12,9 +12,9 @@ pip install pandas rdflib ogb
 
 # build
 if [[ $DEVICE == "cpu" ]]; then
-   pip install dgl==0.7.0rc2 -f https://data.dgl.ai/wheels/repo.html
+   pip install dgl==0.7.0 -f https://data.dgl.ai/wheels/repo.html
 else
-   pip install dgl-cu111==0.7.0rc2 -f https://data.dgl.ai/wheels/repo.html
+   pip install dgl-cu111==0.7.0 -f https://data.dgl.ai/wheels/repo.html
 fi
 # mkdir -p build
 # pushd build
