@@ -515,10 +515,10 @@ class DistGraph:
         self._client.map_shared_data(self._gpb)
 
     def __getstate__(self):
-        return self.graph_name, self._gpb
+        return self.graph_name, self._gpb, self._canonical_etypes
 
     def __setstate__(self, state):
-        self.graph_name, self._gpb_input = state
+        self.graph_name, self._gpb_input, self._canonical_etypes = state
         self._init()
 
         self._ndata_store = {}
@@ -977,9 +977,7 @@ class DistGraph:
 
         Parameters
         ----------
-        edges : tensor
-            The edge ID array.
-        eid : Int Tensor
+        edges : Int Tensor
             Each element is an ID. The tensor must have the same device type
               and ID data type as the graph's.
 
