@@ -23,7 +23,7 @@ This DGL example implements the EEG-GCNN model proposed in the paper [EEG-GCNN](
 First, download the precomputed data, labels, indices and put them in the repo. <br>
 Then run 
 ```python
-python train.py --num_feats --num_nodes --gpu_idx --num_epochs --exp_name --batch_size
+python main.py --num_feats --num_nodes --gpu_idx --num_epochs --exp_name --batch_size
 ```
 
 ## Performance
