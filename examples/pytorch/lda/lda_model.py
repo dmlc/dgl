@@ -65,7 +65,6 @@ class LatentDirichletAllocation:
     * lr: learning rate for online update; default to 1 for full gradient updates
     * lr_mult: learning rate multiplier to quickly converge to MAP
     * device: accelerate _bayesian_softmax on word_z parameters in m-step
-    * Tolerance / max_iters parameters are less often accessed; monkey-patch if needed
 
     References
     ---
@@ -81,10 +80,6 @@ class LatentDirichletAllocation:
         lr_mult={'doc': 1, 'word': 1},
         device='cpu',
         verbose=True,
-        _e_step_max_iters=100,
-        _e_step_mean_change_tol=1e-3,
-        _m_step_max_iters=10,
-        _m_step_mean_change_tol=1e-3,
         ):
         self.n_components = n_components
 
@@ -106,14 +101,9 @@ class LatentDirichletAllocation:
         self.word_z = self._init((n_words, self.n_components))
         self._word_weight = _bayesian_softmax(self.word_z, 'word', self.prior['word'])
 
-        self._e_step_max_iters=_e_step_max_iters
-        self._e_step_mean_change_tol=_e_step_mean_change_tol
-        self._m_step_max_iters=_m_step_max_iters
-        self._m_step_mean_change_tol=_m_step_mean_change_tol
-
 
     def _prepare_graph(self, G, doc_data=None):
-        """ asssume full set of iid docs and allow subset of word_ids """
+        """ load or init node data; rewrite G.ndata inplace """
         if doc_data is None:
             z = self._init((G.num_nodes('doc'), self.n_components)).to(G.device)
             weight = _bayesian_softmax(z, 'doc', self.prior['doc'])
@@ -122,26 +112,17 @@ class LatentDirichletAllocation:
         G.nodes['doc'].data['z'] = doc_data['z']
         G.nodes['doc'].data['weight'] = doc_data['weight']
 
-        # word_ids = G.in_degrees().nonzero(as_tuple=True)[0]
-
-        if 'word_ids' in G.nodes['word'].data:
-            word_ids = G.nodes['word'].data['word_ids'].to(self.device)
-        else:
-            word_ids = slice(None)
-
-        G.nodes['word'].data['z'] = self.word_z[word_ids].to(G.device)
-        G.nodes['word'].data['weight'] = self._word_weight[word_ids].to(G.device)
-
-        return word_ids
+        G.nodes['word'].data['z'] = self.word_z.to(G.device)
+        G.nodes['word'].data['weight'] = self._word_weight.to(G.device)
+        return G
 
 
-    def _e_step(self, G, doc_data=None):
+    def _e_step(self, G, doc_data=None, max_iters=100, mean_change_tol=1e-3):
         """_e_step implements doc data sampling until convergence or max_iters
         """
-        G = G.reverse() # word -> doc
-        self._prepare_graph(G, doc_data)
+        G = self._prepare_graph(G.reverse(), doc_data) # word -> doc
 
-        for i in range(self._e_step_max_iters):
+        for i in range(max_iters):
             doc_z_old = G.nodes['doc'].data['z']
 
             G.update_all(
@@ -152,7 +133,7 @@ class LatentDirichletAllocation:
                 G.nodes['doc'].data['z'], 'doc', self.prior['doc'])
 
             mean_change = (G.nodes['doc'].data['z'] - doc_z_old).abs().mean()
-            if mean_change < self._e_step_mean_change_tol:
+            if mean_change < mean_change_tol:
                 break
 
         if self.verbose:
@@ -167,38 +148,36 @@ class LatentDirichletAllocation:
     def _m_step(self, G, doc_data):
         """_m_step implements word data sampling and stores word_z stats
         """
-        word_ids = self._prepare_graph(G, doc_data)
+        G = self._prepare_graph(G.clone(), doc_data)
 
         G.update_all(
             _edge_update, fn.sum('z', 'z'),
             lambda x: {'z': x.data['z'] * self.lr_mult['word']}
         )
         new = G.nodes['word'].data['z'].to(self.device)
-        word_z_diff = new - self.word_z[word_ids]
+        mean_change = (new - self.word_z).abs().mean()
 
-        self.word_z = self.word_z * (1 - self.lr)
-        self.word_z[word_ids] += self.lr * new     # zero everywhere else
-        # softmax on the full word distribution
+        self.word_z = (1-self.lr) * self.word_z + self.lr * new
         self._word_weight = _bayesian_softmax(self.word_z, 'word', self.prior['word'])
 
-        return word_z_diff
+        return mean_change
 
 
-    def fit(self, G, batch_size=0):
+    def fit(self, G, batch_size=0, max_iters=10, mean_change_tol=1e-3):
         if batch_size>0:
             raise NotImplementedError("""
                 Use a custom loop to iterate between e and m steps;
                 set self.lr<1 and follow the example at the end of this file.""")
 
-        for i in range(self._m_step_max_iters):
+        for i in range(max_iters):
             doc_data = self._e_step(G)
-            mean_change = self._m_step(G, doc_data).abs().mean()
+            mean_change = self._m_step(G, doc_data)
 
             if self.verbose:
                 print(f"iter {i+1}, m-step mean_change: {mean_change:.4f}, "
                       f"perplexity: {self.perplexity(G, doc_data):.4f}")
 
-            if mean_change < self._m_step_mean_change_tol:
+            if mean_change < mean_change_tol:
                 break
         return self
 
@@ -212,8 +191,7 @@ class LatentDirichletAllocation:
         word_data = {'z': self.word_z, 'weight': self._word_weight}
 
         # augment doc_data with edge_elbo
-        G = G.reverse()
-        self._prepare_graph(G, doc_data)
+        G = self._prepare_graph(G.reverse(), doc_data) # word -> doc
         G.update_all(
             _edge_update, fn.sum('edge_elbo', 'edge_elbo'),
             lambda x: {"edge_elbo": x.data['edge_elbo'] * self.lr_mult['doc']}
@@ -257,19 +235,4 @@ if __name__ == '__main__':
     model.fit(G)
     model.transform(G)
     model.perplexity(G)
-
-    dataloader = dgl.dataloading.NodeDataLoader(
-        G.reverse(),         # sample by in-degree, to be reversed in blocks
-        {'doc': np.arange(G.num_nodes('doc'))},
-        dgl.dataloading.MultiLayerFullNeighborSampler(1),
-    )
-
-    model = LatentDirichletAllocation(G.num_nodes('word'), 5, verbose=False, lr=0.1)
-    for input_nodes, output_nodes, blocks in dataloader:
-        word2doc = blocks[0].adjacency_matrix()._indices().T.tolist()
-        B = dgl.heterograph({('word', '', 'doc'): word2doc}).reverse()
-        B.nodes['word'].data['word_ids'] = input_nodes['word'].to(B.device)
-
-        model._m_step(B, model._e_step(B))
-
     print('Testing LatentDirichletAllocation passed!')
