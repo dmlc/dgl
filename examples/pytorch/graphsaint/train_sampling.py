@@ -12,7 +12,8 @@ from modules import GCNNet
 from utils import Logger, evaluate, save_log_dir, load_data, calc_f1
 
 import warnings
-
+# TODO: sampling comsumes too much time because some [...] can use parallelism to speed up?
+# TODO: why author's method does not work here?
 def main(args):
     warnings.filterwarnings('ignore')
     multilabel_data = set(['ppi'])

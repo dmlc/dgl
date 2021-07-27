@@ -33,7 +33,9 @@ class SAINTSampler(Dataset):
         :param train: True if sampling subgraphs in training procedure
         :param online: True if resampling new subgraphs in training procedure; False if utilizing sampled subgraphs
                         (which are used when computing normalization coefficients) for training and sampling new
-                        subgraphs if the model need more. This param is valid only when 'train' is True.
+                        subgraphs if the model need more. If online == 'tot', employ totally offline sampling, which
+                        means all subgraphs originates from sampled subgraphs
+                        This param is valid only when 'train' is True.
         :param num_repeat: the expected number of sampled subgraphs in advance for computing normalization statistics,
                             which is actually the 'N' in the original paper. Note that this param is different from the
                             num_subg_norm.
@@ -90,14 +92,16 @@ class SAINTSampler(Dataset):
                 self.subgraphs.extend(subgraphs)
                 sampled_nodes += num_nodes
 
-                _subgraphs, _subg_counts = np.unique(np.concatenate(subgraphs), return_counts=True)
+                _subgraphs, _node_counts = np.unique(np.concatenate(subgraphs), return_counts=True)
                 sampled_nodes_idx = th.from_numpy(_subgraphs)
-                _subg_counts = th.from_numpy(_subg_counts)
-                self.node_counter[sampled_nodes_idx] += _subg_counts
+                _node_counts = th.from_numpy(_node_counts)
+                self.node_counter[sampled_nodes_idx] += _node_counts
 
-                subg = self.train_g.subgraph(sampled_nodes_idx)
-                sampled_edges_idx = subg.edata[dgl.EID]
-                self.edge_counter[sampled_edges_idx] += 1
+                subgs = [self.train_g.subgraph(subg) for subg in subgraphs] # TODO: consume too much time
+                sampled_edges_idx = [subg.edata[dgl.EID] for subg in subgs]
+                sampled_edges_idx, _edge_counts = th.unique(th.cat(sampled_edges_idx), return_counts=True)
+                self.edge_counter[sampled_edges_idx] += _edge_counts
+
                 self.N += len(subgraphs) # NOTE: number of subgraphs
                 if sampled_nodes > self.train_g.num_nodes() * num_repeat:
                     break
@@ -130,13 +134,17 @@ class SAINTSampler(Dataset):
         # Only when sampling subgraphs in training procedure and need to utilize sampled subgraphs and we still
         # have sampled subgraphs can we fetch a subgraph from sampled subgraphs
         if self.train:
-            if self.online:
+            if self.online is True:
                 subgraph = self.__sample__()
                 return dgl.node_subgraph(self.train_g, subgraph)
             else:
                 if self.cnt < len(self.subgraphs):
                     self.cnt += 1
-                    return dgl.node_subgraph(self.train_g, self.subgraphs[idx])
+                    return dgl.node_subgraph(self.train_g, self.subgraphs[self.cnt-1])
+                elif self.online == 'tot':
+                    random.shuffle(self.subgraphs)
+                    self.cnt = 1
+                    return dgl.node_subgraph(self.train_g, self.subgraphs[self.cnt-1])
                 else:
                     subgraph = self.__sample__()
                     return dgl.node_subgraph(self.train_g, subgraph)
