@@ -127,17 +127,11 @@ __global__ void _CSRRowWiseSampleKernel(
   assert(blockDim.x == WARP_SIZE);
   assert(blockDim.y == BLOCK_ROWS);
 
-  // we need one state per 256 threads
-  constexpr int NUM_RNG = ((WARP_SIZE*BLOCK_ROWS)+255)/256;
-  __shared__ curandState rng_array[NUM_RNG];
-  assert(blockDim.x >= NUM_RNG);
-  if (threadIdx.y == 0 && threadIdx.x < NUM_RNG) {
-    curand_init(rand_seed, 0, threadIdx.x, rng_array+threadIdx.x);
-  }
-  __syncthreads();
-  curandState * const rng = rng_array+((threadIdx.x+WARP_SIZE*threadIdx.y)/256);
-
   int64_t out_row = blockIdx.x*BLOCK_ROWS+threadIdx.y;
+
+  curandState rng;
+  curand_init(rand_seed, out_row, threadIdx.x, &rng);
+
   while (out_row < num_rows) {
     const int64_t row = in_rows[out_row];
 
@@ -162,7 +156,7 @@ __global__ void _CSRRowWiseSampleKernel(
       __syncwarp();
 
       for (int idx = num_picks+threadIdx.x; idx < deg; idx+=WARP_SIZE) {
-        const int num = curand(rng)%(idx+1);
+        const int num = curand(&rng)%(idx+1);
         if (num < num_picks) {
           // use max so as to achieve the replacement order the serial
           // algorithm would have
@@ -220,17 +214,9 @@ __global__ void _CSRRowWiseSampleReplaceKernel(
   // we assign one warp per row
   assert(blockDim.x == WARP_SIZE);
 
-  // we need one state per 256 threads
-  constexpr int NUM_RNG = ((WARP_SIZE*BLOCK_ROWS)+255)/256;
-  __shared__ curandState rng_array[NUM_RNG];
-  assert(blockDim.x >= NUM_RNG);
-  if (threadIdx.y == 0 && threadIdx.x < NUM_RNG) {
-    curand_init(rand_seed, 0, threadIdx.x, rng_array+threadIdx.x);
-  }
-  __syncthreads();
-  curandState * const rng = rng_array+((threadIdx.x+WARP_SIZE*threadIdx.y)/256);
-
   int64_t out_row = blockIdx.x*blockDim.y+threadIdx.y;
+  curandState rng;
+  curand_init(rand_seed, out_row, threadIdx.x, &rng);
   while (out_row < num_rows) {
     const int64_t row = in_rows[out_row];
 
@@ -239,13 +225,15 @@ __global__ void _CSRRowWiseSampleReplaceKernel(
 
     const int64_t deg = in_ptr[row+1] - in_row_start;
 
-    // each thread then blindly copies in rows
-    for (int idx = threadIdx.x; idx < num_picks; idx += blockDim.x) {
-      const int64_t edge = curand(rng) % deg;
-      const int64_t out_idx = out_row_start+idx;
-      out_rows[out_idx] = row;
-      out_cols[out_idx] = in_index[in_row_start+edge];
-      out_idxs[out_idx] = data ? data[in_row_start+edge] : in_row_start+edge;
+    if (deg > 0) {
+      // each thread then blindly copies in rows only if deg > 0.
+      for (int idx = threadIdx.x; idx < num_picks; idx += blockDim.x) {
+        const int64_t edge = curand(&rng) % deg;
+        const int64_t out_idx = out_row_start+idx;
+        out_rows[out_idx] = row;
+        out_cols[out_idx] = in_index[in_row_start+edge];
+        out_idxs[out_idx] = data ? data[in_row_start+edge] : in_row_start+edge;
+      }
     }
     out_row += gridDim.x*blockDim.y;
   }
