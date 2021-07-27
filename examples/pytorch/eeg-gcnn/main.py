@@ -64,7 +64,7 @@ if __name__ == "__main__":
     num_trainable_params = np.sum([np.prod(p.size()) if p.requires_grad else 0 for p in model.parameters()])
     model = model.to(_DEVICE).double()
 
-    # Dataloader========================================================================================================
+    # Dataloader=======================================================================================================
 
     # use WeightedRandomSampler to balance the training dataset
     NUM_WORKERS = 8
