@@ -176,6 +176,7 @@ COOMatrix CSRRowWisePerEtypePick(CSRMatrix mat, IdArray rows, IdArray etypes,
   std::vector<IdArray> picked_cols(rows->shape[0]);
   std::vector<IdArray> picked_idxs(rows->shape[0]);
 
+#pragma omp parallel for
   for (int64_t i = 0; i < num_rows; ++i) {
     const IdxType rid = rows_data[i];
     CHECK_LT(rid, mat.num_rows);

@@ -259,7 +259,7 @@ def check_rpc_sampling_shuffle(tmpdir, num_server):
     eids1 = orig_eid[sampled_graph.edata[dgl.EID]]
     assert np.array_equal(F.asnumpy(eids1), F.asnumpy(eids))
 
-def create_random_hetero():
+def create_random_hetero(dense=False):
     num_nodes = {'n1': 1010, 'n2': 1000, 'n3': 1020}
     etypes = [('n1', 'r1', 'n2'),
               ('n1', 'r2', 'n3'),
@@ -268,23 +268,8 @@ def create_random_hetero():
     random.seed(42)
     for etype in etypes:
         src_ntype, _, dst_ntype = etype
-        arr = spsp.random(num_nodes[src_ntype], num_nodes[dst_ntype], density=0.001, format='coo',
+        arr = spsp.random(num_nodes[src_ntype], num_nodes[dst_ntype], density=0.1 if dense else 0.001, format='coo',
                           random_state=100)
-        edges[etype] = (arr.row, arr.col)
-    g = dgl.heterograph(edges, num_nodes)
-    g.nodes['n1'].data['feat'] = F.ones((g.number_of_nodes('n1'), 10), F.float32, F.cpu())
-    return g
-
-def create_random_hetero_dense():
-    num_nodes = {'n1': 210, 'n2': 200, 'n3': 220}
-    etypes = [('n1', 'r1', 'n2'),
-              ('n1', 'r2', 'n3'),
-              ('n2', 'r3', 'n3')]
-    edges = {}
-    for etype in etypes:
-        src_ntype, _, dst_ntype = etype
-        arr = spsp.random(num_nodes[src_ntype], num_nodes[dst_ntype], density=0.1, format='coo',
-                          random_state=42)
         edges[etype] = (arr.row, arr.col)
     g = dgl.heterograph(edges, num_nodes)
     g.nodes['n1'].data['feat'] = F.ones((g.number_of_nodes('n1'), 10), F.float32, F.cpu())
@@ -397,7 +382,7 @@ def check_rpc_hetero_etype_sampling_shuffle(tmpdir, num_server):
     for _ in range(num_server):
         ip_config.write('{}\n'.format(get_local_usable_addr()))
     ip_config.close()
-    g = create_random_hetero_dense()
+    g = create_random_hetero(dense=True)
     num_parts = num_server
     num_hops = 1
 
