@@ -260,7 +260,8 @@ def check_rpc_sampling_shuffle(tmpdir, num_server):
     assert np.array_equal(F.asnumpy(eids1), F.asnumpy(eids))
 
 def create_random_hetero(dense=False):
-    num_nodes = {'n1': 1010, 'n2': 1000, 'n3': 1020}
+    num_nodes = {'n1': 210, 'n2': 200, 'n3': 220} if dense else \
+        {'n1': 1010, 'n2': 1000, 'n3': 1020}
     etypes = [('n1', 'r1', 'n2'),
               ('n1', 'r2', 'n3'),
               ('n2', 'r3', 'n3')]
