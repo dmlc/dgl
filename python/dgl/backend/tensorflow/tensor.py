@@ -188,7 +188,7 @@ def mean(input, dim):
 
 
 def reduce_mean(input):
-    return th.reduce_mean(input)
+    return tf.reduce_mean(input)
 
 
 def max(input, dim):
