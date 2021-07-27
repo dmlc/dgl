@@ -4,15 +4,14 @@ import time
 import numpy as np
 import torch
 import torch.nn.functional as F
-from sampler import SAINTNodeSampler, SAINTEdgeSampler, SAINTRandomWalkSampler
+from torch.utils.data import DataLoader
+# from sampler import SAINTNodeSampler, SAINTEdgeSampler, SAINTRandomWalkSampler
+from sampler_jiahanli import SAINTNodeSampler, SAINTEdgeSampler, SAINTRandomWalkSampler
+from config import CONFIG
 from modules import GCNNet
-from utils import Logger, evaluate, save_log_dir, load_data
+from utils import Logger, evaluate, save_log_dir, load_data, calc_f1
 
 import warnings
-
-# TODO: GCN layer propagation associating with alpha
-# TODO: loss computation assocating with lambda
-# TODO: details of samplers
 
 def main(args):
     warnings.filterwarnings('ignore')
@@ -50,15 +49,24 @@ def main(args):
            n_val_samples,
            n_test_samples))
     # load sampler
-    if args.sampler == "node": # NOTE: Here the jobs including graph sampling -jiahanli
-        subg_iter = SAINTNodeSampler(args.node_budget, args.dataset, g,
-                                     train_nid, args.num_repeat)
+
+    kwargs = {
+        'dn': args.dataset, 'g': g, 'train_nid': train_nid, 'num_workers': args.num_workers, 'train': False,
+        'num_subg_train': args.num_subg_train, 'num_subg_norm': args.num_subg_norm,
+        'batch_size_norm': args.batch_size_norm, 'online': args.online, 'num_repeat': args.num_repeat
+    }
+    if args.sampler == "node":
+        saint_sampler = SAINTNodeSampler(args.node_budget, **kwargs)
     elif args.sampler == "edge":
-        subg_iter = SAINTEdgeSampler(args.edge_budget, args.dataset, g,
-                                     train_nid, args.num_repeat)
+        saint_sampler = SAINTEdgeSampler(args.edge_budget, **kwargs)
     elif args.sampler == "rw":
-        subg_iter = SAINTRandomWalkSampler(args.num_roots, args.length, args.dataset, g,
-                                            train_nid, args.num_repeat)
+        saint_sampler = SAINTRandomWalkSampler(args.num_roots, args.length, **kwargs)
+    else:
+        raise NotImplementedError
+
+    saint_sampler.train = True
+    loader = DataLoader(saint_sampler, collate_fn=saint_sampler.__collate_fn__, batch_size=1,
+                        shuffle=True, num_workers=args.num_workers, drop_last=False)
 
     # set device for dataset tensors
     if args.gpu < 0:
@@ -104,7 +112,8 @@ def main(args):
     best_f1 = -1
 
     for epoch in range(args.n_epochs):
-        for j, subg in enumerate(subg_iter):
+        # for j, subg in enumerate(subg_iter):
+        for j, subg in enumerate(loader):
             # sync with upper level training graph
             if cuda:
                 subg = subg.to(torch.cuda.current_device())
@@ -124,11 +133,18 @@ def main(args):
             loss.backward()
             torch.nn.utils.clip_grad_norm(model.parameters(), 5)
             optimizer.step()
-            if j == len(subg_iter) - 1:
-                print(f"epoch:{epoch+1}/{args.n_epochs}, Iteration {j+1}/"
-                      f"{len(subg_iter)}:training loss", loss.item())
+
+            if j == len(loader) - 1:
+                model.eval()
+                with torch.no_grad():
+                    train_f1_mic, train_f1_mac = calc_f1(batch_labels.cpu().numpy(),
+                                                         pred.cpu().numpy(), multilabel)
+                    print(f"epoch:{epoch + 1}/{args.n_epochs}, Iteration {j + 1}/"
+                          f"{len(loader)}:training loss", loss.item())
+                    print("Train F1-mic {:.4f}, Train F1-mac {:.4f}".format(train_f1_mic, train_f1_mac))
 
         # evaluate
+        model.eval()
         if epoch % args.val_every == 0:
             val_f1_mic, val_f1_mac = evaluate(
                 model, g, labels, val_mask, multilabel)
@@ -153,57 +169,57 @@ def main(args):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='GraphSAINT')
-    # data source params
-    parser.add_argument("--dataset", type=str, choices=['ppi', 'flickr'], default='ppi',
-                        help="Name of dataset.")
-
-    # cuda params
-    parser.add_argument("--gpu", type=int, default=-1,
-                        help="GPU index. Default: -1, using CPU.")
-
-    # sampler params
-    parser.add_argument("--sampler", type=str, default="node", choices=['node', 'edge', 'rw'],
-                        help="Type of sampler")
-    parser.add_argument("--node-budget", type=int, default=6000,
-                        help="Expected number of sampled nodes when using node sampler")
-    parser.add_argument("--edge-budget", type=int, default=4000,
-                        help="Expected number of sampled edges when using edge sampler")
-    parser.add_argument("--num-roots", type=int, default=3000,
-                        help="Expected number of sampled root nodes when using random walk sampler")
-    parser.add_argument("--length", type=int, default=2,
-                        help="The length of random walk when using random walk sampler")
-    parser.add_argument("--num-repeat", type=int, default=50,
-                        help="Number of times of repeating sampling one node to estimate edge / node probability")
-    # TODO: num_repeat, interesting, how it works? -jiahanli
-
-    # model params
-    parser.add_argument("--n-hidden", type=int, default=512,
-                        help="Number of hidden gcn units")
-    parser.add_argument("--arch", type=str, default="1-0-1-0",
-                        help="Network architecture. 1 means an order-1 layer (self feature plus 1-hop neighbor "
-                             "feature), and 0 means an order-0 layer (self feature only)")
-    parser.add_argument("--dropout", type=float, default=0,
-                        help="Dropout rate")
-    parser.add_argument("--no-batch-norm", action='store_true',
-                        help="Whether to use batch norm")
-    parser.add_argument("--aggr", type=str, default="concat", choices=['mean', 'concat'],
-                        help="How to aggregate the self feature and neighbor features")
-
-    # training params
-    parser.add_argument("--n-epochs", type=int, default=100,
-                        help="Number of training epochs")
-    parser.add_argument("--lr", type=float, default=0.01,
-                        help="Learning rate")
-    parser.add_argument("--val-every", type=int, default=1,
-                        help="Frequency of evaluation on the validation set in number of epochs")
-    parser.add_argument("--use-val", action='store_true',
-                        help="whether to use validated best model to test")
-    parser.add_argument("--log-dir", type=str, default='none',
-                        help="Log file will be saved to log/{dataset}/{log_dir}")
-
-    args = parser.parse_args()
-
+    # parser = argparse.ArgumentParser(description='GraphSAINT')
+    # # data source params
+    # parser.add_argument("--dataset", type=str, choices=['ppi', 'flickr'], default='ppi',
+    #                     help="Name of dataset.")
+    #
+    # # cuda params
+    # parser.add_argument("--gpu", type=int, default=-1,
+    #                     help="GPU index. Default: -1, using CPU.")
+    #
+    # # sampler params
+    # parser.add_argument("--sampler", type=str, default="node", choices=['node', 'edge', 'rw'],
+    #                     help="Type of sampler")
+    # parser.add_argument("--node-budget", type=int, default=6000,
+    #                     help="Expected number of sampled nodes when using node sampler")
+    # parser.add_argument("--edge-budget", type=int, default=4000,
+    #                     help="Expected number of sampled edges when using edge sampler")
+    # parser.add_argument("--num-roots", type=int, default=3000,
+    #                     help="Expected number of sampled root nodes when using random walk sampler")
+    # parser.add_argument("--length", type=int, default=2,
+    #                     help="The length of random walk when using random walk sampler")
+    # parser.add_argument("--num-repeat", type=int, default=50,
+    #                     help="Number of times of repeating sampling one node to estimate edge / node probability")
+    #
+    # # model params
+    # parser.add_argument("--n-hidden", type=int, default=512,
+    #                     help="Number of hidden gcn units")
+    # parser.add_argument("--arch", type=str, default="1-0-1-0",
+    #                     help="Network architecture. 1 means an order-1 layer (self feature plus 1-hop neighbor "
+    #                          "feature), and 0 means an order-0 layer (self feature only)")
+    # parser.add_argument("--dropout", type=float, default=0,
+    #                     help="Dropout rate")
+    # parser.add_argument("--no-batch-norm", action='store_true',
+    #                     help="Whether to use batch norm")
+    # parser.add_argument("--aggr", type=str, default="concat", choices=['mean', 'concat'],
+    #                     help="How to aggregate the self feature and neighbor features")
+    #
+    # # training params
+    # parser.add_argument("--n-epochs", type=int, default=100,
+    #                     help="Number of training epochs")
+    # parser.add_argument("--lr", type=float, default=0.01,
+    #                     help="Learning rate")
+    # parser.add_argument("--val-every", type=int, default=1,
+    #                     help="Frequency of evaluation on the validation set in number of epochs")
+    # parser.add_argument("--use-val", action='store_true',
+    #                     help="whether to use validated best model to test")
+    # parser.add_argument("--log-dir", type=str, default='none',
+    #                     help="Log file will be saved to log/{dataset}/{log_dir}")
+    #
+    # args = parser.parse_args()
+    warnings.filterwarnings('ignore')
+    args = argparse.Namespace(**CONFIG)
     print(args)
 
     main(args)

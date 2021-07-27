@@ -11,6 +11,7 @@ from dgl.sampling import random_walk, pack_traces
 
 # The base class of sampler
 # (TODO): online sampling
+# NOTE: we have to do offline sampling for computing normalization coefficients
 class SAINTSampler(object):
     def __init__(self, dn, g, train_nid, node_budget, num_repeat=50):
         """
@@ -40,15 +41,15 @@ class SAINTSampler(object):
 
             t = time.perf_counter()
             while sampled_nodes <= self.train_g.num_nodes() * num_repeat: # TODO: What's the meaning of num_repeat?
-                subgraph = self.__sample__()
-                self.subgraphs.append(subgraph)# NOTE: subgraph is essentially the sampled nids can be utilized to construct graph
+                subgraph = self.__sample__() # NOTE: here do sampling subgraphs
+                self.subgraphs.append(subgraph)
                 sampled_nodes += subgraph.shape[0]
                 self.N += 1
             print(f'Sampling time: [{time.perf_counter() - t:.2f}s]')
             np.save(graph_fn, self.subgraphs) # NOTE: graph_fn, dir storing sampled subgraphs
 
             t = time.perf_counter()
-            self.__counter__()
+            self.__counter__() # TODO: try to shift this part into parallelism
             aggr_norm, loss_norm = self.__compute_norm__()
             print(f'Normalization time: [{time.perf_counter() - t:.2f}s]')
             np.save(norm_fn, (aggr_norm, loss_norm)) # NOTE: aggr_norm is related to edges, while loss_norm is related to nodes.
