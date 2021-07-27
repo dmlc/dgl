@@ -2,10 +2,10 @@
 This DGL example implements the EEG-GCNN model proposed in the paper [EEG-GCNN](https://arxiv.org/abs/2011.12107). The original code is [here](https://github.com/neerajwagh/eeg-gcnn).
 
 ## All References
-- Paper can also be found on PMLR: <http://proceedings.mlr.press/v136/wagh20a.html>
-- ML4H Poster can be helpful for understanding data preprocessing, model, and performance of the project: <https://drive.google.com/file/d/14nuAQKiIud3p6-c8r9WLV2tAvCyRwRev/view?usp=sharing>
-- The recording of presentation by the author Neeraj Wagh can be found here: <https://slideslive.com/38941020/eeggcnn-augmenting-electroencephalogrambased-neurological-disease-diagnosis-using-a-domainguided-graph-convolutional-neural-network?ref=account-folder-62123-folders>
-- The slides used during the presentation can be found here: <https://drive.google.com/file/d/1dXT4QAUXKauf7CAkhrVyhR2PFUsNh4b8/view?usp=sharing>
+- Paper can also be found on [PMLR](http://proceedings.mlr.press/v136/wagh20a.html).
+- [ML4H Poster](https://drive.google.com/file/d/14nuAQKiIud3p6-c8r9WLV2tAvCyRwRev/view?usp=sharing) can be helpful for understanding data preprocessing, model, and performance of the project. 
+- The recording of presentation by the author Neeraj Wagh can be found on [slideslive](https://slideslive.com/38941020/eeggcnn-augmenting-electroencephalogrambased-neurological-disease-diagnosis-using-a-domainguided-graph-convolutional-neural-network?ref=account-folder-62123-folders).
+- The slides used during the presentation can be found [here](https://drive.google.com/file/d/1dXT4QAUXKauf7CAkhrVyhR2PFUsNh4b8/view?usp=sharing).
 - Raw Data can be found in these two links: [MPI LEMON](http://fcon_1000.projects.nitrc.org/indi/retro/MPI_LEMON.html) (no registration needed), [TUH EEG Abnormal Corpus](https://www.isip.piconepress.com/projects/tuh_eeg/downloads/tuh_eeg_abnormal/) ([needs registration](https://www.isip.piconepress.com/projects/tuh_eeg/html/request_access.php))
 
 ## Dependencies
