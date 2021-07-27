@@ -18,7 +18,7 @@ This DGL example implements the EEG-GCNN model proposed in the paper [EEG-GCNN](
 
 ## Dataset
 - Final Models, Pre-computed Features, Training Metadata can be downloaded through [FigShare](https://figshare.com/articles/software/EEG-GCNN_Supporting_Resources_for_Reproducibility/13251452).
-- In EEGGraphDataset.py, we specify the channels and electrodes and use precomputed spectral coherence values to compute the edge weights. To use this example in your own advantage, please specify your channels, electrodes and generate your own spectral coherence values. All example datas can be downloaded from FigShare.
+- In EEGGraphDataset.py, we specify the channels and electrodes and use precomputed spectral coherence values to compute the edge weights. To use this example in your own advantage, please specify your channels, electrodes and generate your own spectral coherence values. All example datasets can be downloaded from FigShare.
 ## How to Run
 First, download the precomputed data, labels, indices and put them in the repo. <br>
 Then run 
