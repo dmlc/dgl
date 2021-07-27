@@ -104,7 +104,7 @@ HeteroSubgraph SampleNeighbors(
   return ret;
 }
 
-HeteroSubgraph SampleNeighborsHomogeneous(
+HeteroSubgraph SampleNeighborsEType(
     const HeteroGraphPtr hg,
     const IdArray nodes,
     const IdArray etypes,
@@ -114,9 +114,9 @@ HeteroSubgraph SampleNeighborsHomogeneous(
     bool replace) {
 
   CHECK_EQ(1, hg->NumVertexTypes())
-    << "SampleNeighborsHomogeneous only work with homogeneous graph";
+    << "SampleNeighborsEType only work with homogeneous graph";
   CHECK_EQ(1, hg->NumEdgeTypes())
-    << "SampleNeighborsHomogeneous only work with homogeneous graph";
+    << "SampleNeighborsEType only work with homogeneous graph";
 
   std::vector<HeteroGraphPtr> subrels(1);
   std::vector<IdArray> induced_edges(1);
@@ -351,7 +351,7 @@ HeteroSubgraph SampleNeighborsBiased(
   return ret;
 }
 
-DGL_REGISTER_GLOBAL("sampling.neighbor._CAPI_DGLSampleNeighborsHomogeneous")
+DGL_REGISTER_GLOBAL("sampling.neighbor._CAPI_DGLSampleNeighborsEType")
 .set_body([] (DGLArgs args, DGLRetValue *rv) {
     HeteroGraphRef hg = args[0];
     IdArray nodes = args[1];
@@ -366,7 +366,7 @@ DGL_REGISTER_GLOBAL("sampling.neighbor._CAPI_DGLSampleNeighborsHomogeneous")
     EdgeDir dir = (dir_str == "in")? EdgeDir::kIn : EdgeDir::kOut;
 
     std::shared_ptr<HeteroSubgraph> subg(new HeteroSubgraph);
-    *subg = sampling::SampleNeighborsHomogeneous(
+    *subg = sampling::SampleNeighborsEType(
         hg.sptr(), nodes, etypes, fanout, dir, prob, replace);
 
     *rv = HeteroSubgraphRef(subg);

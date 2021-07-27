@@ -610,6 +610,20 @@ def test_rpc_in_subgraph():
     with tempfile.TemporaryDirectory() as tmpdirname:
         check_rpc_in_subgraph_shuffle(Path(tmpdirname), 2)
 
+@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
+@unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Turn off Mxnet support")
+def test_standalone_etype_sampling():
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        os.environ['DGL_DIST_MODE'] = 'standalone'
+        check_standalone_etype_sampling_heterograph(Path(tmpdirname), True)
+
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        os.environ['DGL_DIST_MODE'] = 'standalone'
+        check_standalone_etype_sampling(Path(tmpdirname), True)
+        check_standalone_etype_sampling(Path(tmpdirname), False)
+
 if __name__ == "__main__":
     import tempfile
     with tempfile.TemporaryDirectory() as tmpdirname:

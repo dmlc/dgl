@@ -114,8 +114,8 @@ def sample_etype_neighbors(g, nodes, etype_field, fanout, edge_dir='in', prob=No
         else:
             prob_array = F.to_dgl_nd(F.tensor(prob, dtype=F.float32))
 
-    subgidx = _CAPI_DGLSampleNeighborsHomogeneous(g._graph, nodes, etypes, fanout,
-                                                  edge_dir, prob_array, replace)
+    subgidx = _CAPI_DGLSampleNeighborsEType(g._graph, nodes, etypes, fanout,
+                                            edge_dir, prob_array, replace)
     induced_edges = subgidx.induced_edges
     ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
 
