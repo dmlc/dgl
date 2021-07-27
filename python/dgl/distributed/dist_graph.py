@@ -503,6 +503,9 @@ class DistGraph:
             dst_tid = F.as_scalar(dst_tid)
             self._canonical_etypes.append((self.ntypes[src_tid], self.etypes[etype_id],
                                            self.ntypes[dst_tid]))
+        self._etype2canonical = {}
+        for src_type, etype, dst_type in self._canonical_etypes:
+            self._etype2canonical[etype] = (src_type, etype, dst_type)
 
     def _init(self):
         self._client = get_kvstore()
@@ -521,6 +524,9 @@ class DistGraph:
         self.graph_name, self._gpb_input, self._canonical_etypes = state
         self._init()
 
+        self._etype2canonical = {}
+        for src_type, etype, dst_type in self._canonical_etypes:
+            self._etype2canonical[etype] = (src_type, etype, dst_type)
         self._ndata_store = {}
         self._edata_store = {}
         self._ndata = NodeDataView(self)
@@ -1047,7 +1053,11 @@ class DistGraph:
         if isinstance(edges, dict):
             # TODO(zhengda) we need to directly generate subgraph of all relations with
             # one invocation.
-            subg = {etype: self.find_edges(edges[etype], etype) for etype in edges}
+            if isinstance(edges, tuple):
+                subg = {etype: self.find_edges(edges[etype], etype[1]) for etype in edges}
+            else:
+                subg = {self._etype2canonical[etype]: self.find_edges(edges[etype], etype) \
+                        for etype in edges}
             num_nodes = {ntype: self.number_of_nodes(ntype) for ntype in self.ntypes}
             subg = dgl_heterograph(subg, num_nodes_dict=num_nodes)
         else:
