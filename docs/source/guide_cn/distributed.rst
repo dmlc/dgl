@@ -28,7 +28,7 @@ DGL采用完全分布式的方法，可将数据和计算同时分布在一组�
 
     # 创建采样器
     sampler = NeighborSampler(g, [10,25],
-                              dgl.distributed.sample_neighbors, 
+                              dgl.distributed.sample_neighbors,
                               device)
 
     dataloader = DistDataLoader(

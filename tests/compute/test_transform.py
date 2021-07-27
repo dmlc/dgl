@@ -6,7 +6,6 @@ import dgl
 import dgl.function as fn
 import dgl.partition
 import backend as F
-from dgl.graph_index import from_scipy_sparse_matrix
 import unittest
 from utils import parametrize_dtype
 
@@ -504,11 +503,14 @@ def get_nodeflow(g, node_ids, num_layers):
 def test_partition_with_halo():
     g = create_large_graph(1000)
     node_part = np.random.choice(4, g.number_of_nodes())
-    subgs = dgl.transform.partition_graph_with_halo(g, node_part, 2, reshuffle=True)
+    subgs, _, _ = dgl.transform.partition_graph_with_halo(g, node_part, 2, reshuffle=True)
     for part_id, subg in subgs.items():
         node_ids = np.nonzero(node_part == part_id)[0]
         lnode_ids = np.nonzero(F.asnumpy(subg.ndata['inner_node']))[0]
-        assert np.all(np.sort(F.asnumpy(subg.ndata['orig_id'])[lnode_ids]) == node_ids)
+        orig_nids = F.asnumpy(subg.ndata['orig_id'])[lnode_ids]
+        assert np.all(np.sort(orig_nids) == node_ids)
+        assert np.all(F.asnumpy(subg.in_degrees(lnode_ids)) == F.asnumpy(g.in_degrees(orig_nids)))
+        assert np.all(F.asnumpy(subg.out_degrees(lnode_ids)) == F.asnumpy(g.out_degrees(orig_nids)))
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(F._default_context_str == 'gpu', reason="METIS doesn't support GPU")
@@ -1295,6 +1297,84 @@ def test_remove_edges(idtype):
     assert F.array_equal(g.nodes['game'].data['h'], F.tensor([2, 2], dtype=idtype))
     assert F.array_equal(g.nodes['developer'].data['h'], F.tensor([3, 3], dtype=idtype))
 
+    # batched graph
+    ctx = F.ctx()
+    g1 = dgl.graph(([0, 1], [1, 2]), num_nodes=5, idtype=idtype, device=ctx)
+    g2 = dgl.graph(([], []), idtype=idtype, device=ctx)
+    g3 = dgl.graph(([2, 3, 4], [3, 2, 1]), idtype=idtype, device=ctx)
+    bg = dgl.batch([g1, g2, g3])
+    bg_r = dgl.remove_edges(bg, 2)
+    assert bg.batch_size == bg_r.batch_size
+    assert F.array_equal(bg.batch_num_nodes(), bg_r.batch_num_nodes())
+    assert F.array_equal(bg_r.batch_num_edges(), F.tensor([2, 0, 2], dtype=F.int64))
+
+    bg_r = dgl.remove_edges(bg, [0, 2])
+    assert bg.batch_size == bg_r.batch_size
+    assert F.array_equal(bg.batch_num_nodes(), bg_r.batch_num_nodes())
+    assert F.array_equal(bg_r.batch_num_edges(), F.tensor([1, 0, 2], dtype=F.int64))
+
+    bg_r = dgl.remove_edges(bg, F.tensor([0, 2], dtype=idtype))
+    assert bg.batch_size == bg_r.batch_size
+    assert F.array_equal(bg.batch_num_nodes(), bg_r.batch_num_nodes())
+    assert F.array_equal(bg_r.batch_num_edges(), F.tensor([1, 0, 2], dtype=F.int64))
+
+    # batched heterogeneous graph
+    g1 = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 1], [1, 2]),
+        ('user', 'plays', 'game'): ([1, 3], [0, 1])
+    }, num_nodes_dict={'user': 4, 'game': 3}, idtype=idtype, device=ctx)
+    g2 = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 2], [3, 4]),
+        ('user', 'plays', 'game'): ([], [])
+    }, num_nodes_dict={'user': 6, 'game': 2}, idtype=idtype, device=ctx)
+    g3 = dgl.heterograph({
+        ('user', 'follows', 'user'): ([], []),
+        ('user', 'plays', 'game'): ([1, 2], [1, 2])
+    }, idtype=idtype, device=ctx)
+    bg = dgl.batch([g1, g2, g3])
+    bg_r = dgl.remove_edges(bg, 1, etype='follows')
+    assert bg.batch_size == bg_r.batch_size
+    ntypes = bg.ntypes
+    for nty in ntypes:
+        assert F.array_equal(bg.batch_num_nodes(nty), bg_r.batch_num_nodes(nty))
+    assert F.array_equal(bg_r.batch_num_edges('follows'), F.tensor([1, 2, 0], dtype=F.int64))
+    assert F.array_equal(bg_r.batch_num_edges('plays'), bg.batch_num_edges('plays'))
+
+    bg_r = dgl.remove_edges(bg, 2, etype='plays')
+    assert bg.batch_size == bg_r.batch_size
+    for nty in ntypes:
+        assert F.array_equal(bg.batch_num_nodes(nty), bg_r.batch_num_nodes(nty))
+    assert F.array_equal(bg.batch_num_edges('follows'), bg_r.batch_num_edges('follows'))
+    assert F.array_equal(bg_r.batch_num_edges('plays'), F.tensor([2, 0, 1], dtype=F.int64))
+
+    bg_r = dgl.remove_edges(bg, [0, 1, 3], etype='follows')
+    assert bg.batch_size == bg_r.batch_size
+    for nty in ntypes:
+        assert F.array_equal(bg.batch_num_nodes(nty), bg_r.batch_num_nodes(nty))
+    assert F.array_equal(bg_r.batch_num_edges('follows'), F.tensor([0, 1, 0], dtype=F.int64))
+    assert F.array_equal(bg.batch_num_edges('plays'), bg_r.batch_num_edges('plays'))
+
+    bg_r = dgl.remove_edges(bg, [1, 2], etype='plays')
+    assert bg.batch_size == bg_r.batch_size
+    for nty in ntypes:
+        assert F.array_equal(bg.batch_num_nodes(nty), bg_r.batch_num_nodes(nty))
+    assert F.array_equal(bg.batch_num_edges('follows'), bg_r.batch_num_edges('follows'))
+    assert F.array_equal(bg_r.batch_num_edges('plays'), F.tensor([1, 0, 1], dtype=F.int64))
+
+    bg_r = dgl.remove_edges(bg, F.tensor([0, 1, 3], dtype=idtype), etype='follows')
+    assert bg.batch_size == bg_r.batch_size
+    for nty in ntypes:
+        assert F.array_equal(bg.batch_num_nodes(nty), bg_r.batch_num_nodes(nty))
+    assert F.array_equal(bg_r.batch_num_edges('follows'), F.tensor([0, 1, 0], dtype=F.int64))
+    assert F.array_equal(bg.batch_num_edges('plays'), bg_r.batch_num_edges('plays'))
+
+    bg_r = dgl.remove_edges(bg, F.tensor([1, 2], dtype=idtype), etype='plays')
+    assert bg.batch_size == bg_r.batch_size
+    for nty in ntypes:
+        assert F.array_equal(bg.batch_num_nodes(nty), bg_r.batch_num_nodes(nty))
+    assert F.array_equal(bg.batch_num_edges('follows'), bg_r.batch_num_edges('follows'))
+    assert F.array_equal(bg_r.batch_num_edges('plays'), F.tensor([1, 0, 1], dtype=F.int64))
+
 @parametrize_dtype
 def test_remove_nodes(idtype):
     # homogeneous Graphs
@@ -1393,6 +1473,83 @@ def test_remove_nodes(idtype):
     assert F.array_equal(u, F.tensor([1], dtype=idtype))
     assert F.array_equal(v, F.tensor([0], dtype=idtype))
 
+    # batched graph
+    ctx = F.ctx()
+    g1 = dgl.graph(([0, 1], [1, 2]), num_nodes=5, idtype=idtype, device=ctx)
+    g2 = dgl.graph(([], []), idtype=idtype, device=ctx)
+    g3 = dgl.graph(([2, 3, 4], [3, 2, 1]), idtype=idtype, device=ctx)
+    bg = dgl.batch([g1, g2, g3])
+    bg_r = dgl.remove_nodes(bg, 1)
+    assert bg_r.batch_size == bg.batch_size
+    assert F.array_equal(bg_r.batch_num_nodes(), F.tensor([4, 0, 5], dtype=F.int64))
+    assert F.array_equal(bg_r.batch_num_edges(), F.tensor([0, 0, 3], dtype=F.int64))
+
+    bg_r = dgl.remove_nodes(bg, [1, 7])
+    assert bg_r.batch_size == bg.batch_size
+    assert F.array_equal(bg_r.batch_num_nodes(), F.tensor([4, 0, 4], dtype=F.int64))
+    assert F.array_equal(bg_r.batch_num_edges(), F.tensor([0, 0, 1], dtype=F.int64))
+
+    bg_r = dgl.remove_nodes(bg, F.tensor([1, 7], dtype=idtype))
+    assert bg_r.batch_size == bg.batch_size
+    assert F.array_equal(bg_r.batch_num_nodes(), F.tensor([4, 0, 4], dtype=F.int64))
+    assert F.array_equal(bg_r.batch_num_edges(), F.tensor([0, 0, 1], dtype=F.int64))
+
+    # batched heterogeneous graph
+    g1 = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 1], [1, 2]),
+        ('user', 'plays', 'game'): ([1, 3], [0, 1])
+    }, num_nodes_dict={'user': 4, 'game': 3}, idtype=idtype, device=ctx)
+    g2 = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 2], [3, 4]),
+        ('user', 'plays', 'game'): ([], [])
+    }, num_nodes_dict={'user': 6, 'game': 2}, idtype=idtype, device=ctx)
+    g3 = dgl.heterograph({
+        ('user', 'follows', 'user'): ([], []),
+        ('user', 'plays', 'game'): ([1, 2], [1, 2])
+    }, idtype=idtype, device=ctx)
+    bg = dgl.batch([g1, g2, g3])
+    bg_r = dgl.remove_nodes(bg, 1, ntype='user')
+    assert bg_r.batch_size == bg.batch_size
+    assert F.array_equal(bg_r.batch_num_nodes('user'), F.tensor([3, 6, 3], dtype=F.int64))
+    assert F.array_equal(bg.batch_num_nodes('game'), bg_r.batch_num_nodes('game'))
+    assert F.array_equal(bg_r.batch_num_edges('follows'), F.tensor([0, 2, 0], dtype=F.int64))
+    assert F.array_equal(bg_r.batch_num_edges('plays'), F.tensor([1, 0, 2], dtype=F.int64))
+
+    bg_r = dgl.remove_nodes(bg, 6, ntype='game')
+    assert bg_r.batch_size == bg.batch_size
+    assert F.array_equal(bg.batch_num_nodes('user'), bg_r.batch_num_nodes('user'))
+    assert F.array_equal(bg_r.batch_num_nodes('game'), F.tensor([3, 2, 2], dtype=F.int64))
+    assert F.array_equal(bg.batch_num_edges('follows'), bg_r.batch_num_edges('follows'))
+    assert F.array_equal(bg_r.batch_num_edges('plays'), F.tensor([2, 0, 1], dtype=F.int64))
+
+    bg_r = dgl.remove_nodes(bg, [1, 5, 6, 11], ntype='user')
+    assert bg_r.batch_size == bg.batch_size
+    assert F.array_equal(bg_r.batch_num_nodes('user'), F.tensor([3, 4, 2], dtype=F.int64))
+    assert F.array_equal(bg.batch_num_nodes('game'), bg_r.batch_num_nodes('game'))
+    assert F.array_equal(bg_r.batch_num_edges('follows'), F.tensor([0, 1, 0], dtype=F.int64))
+    assert F.array_equal(bg_r.batch_num_edges('plays'), F.tensor([1, 0, 1], dtype=F.int64))
+
+    bg_r = dgl.remove_nodes(bg, [0, 3, 4, 7], ntype='game')
+    assert bg_r.batch_size == bg.batch_size
+    assert F.array_equal(bg.batch_num_nodes('user'), bg_r.batch_num_nodes('user'))
+    assert F.array_equal(bg_r.batch_num_nodes('game'), F.tensor([2, 0, 2], dtype=F.int64))
+    assert F.array_equal(bg.batch_num_edges('follows'), bg_r.batch_num_edges('follows'))
+    assert F.array_equal(bg_r.batch_num_edges('plays'), F.tensor([1, 0, 1], dtype=F.int64))
+
+    bg_r = dgl.remove_nodes(bg, F.tensor([1, 5, 6, 11], dtype=idtype), ntype='user')
+    assert bg_r.batch_size == bg.batch_size
+    assert F.array_equal(bg_r.batch_num_nodes('user'), F.tensor([3, 4, 2], dtype=F.int64))
+    assert F.array_equal(bg.batch_num_nodes('game'), bg_r.batch_num_nodes('game'))
+    assert F.array_equal(bg_r.batch_num_edges('follows'), F.tensor([0, 1, 0], dtype=F.int64))
+    assert F.array_equal(bg_r.batch_num_edges('plays'), F.tensor([1, 0, 1], dtype=F.int64))
+
+    bg_r = dgl.remove_nodes(bg, F.tensor([0, 3, 4, 7], dtype=idtype), ntype='game')
+    assert bg_r.batch_size == bg.batch_size
+    assert F.array_equal(bg.batch_num_nodes('user'), bg_r.batch_num_nodes('user'))
+    assert F.array_equal(bg_r.batch_num_nodes('game'), F.tensor([2, 0, 2], dtype=F.int64))
+    assert F.array_equal(bg.batch_num_edges('follows'), bg_r.batch_num_edges('follows'))
+    assert F.array_equal(bg_r.batch_num_edges('plays'), F.tensor([1, 0, 1], dtype=F.int64))
+
 @parametrize_dtype
 def test_add_selfloop(idtype):
     # homogeneous graph
@@ -1477,5 +1634,112 @@ def test_remove_selfloop(idtype):
         raise_error = True
     assert raise_error
 
+
+@parametrize_dtype
+def test_reorder_graph(idtype):
+    g = dgl.graph(([0, 1, 2, 3, 4], [2, 2, 3, 2, 3]),
+                  idtype=idtype, device=F.ctx())
+    g.ndata['h'] = F.copy_to(F.randn((g.num_nodes(), 3)), ctx=F.ctx())
+    g.edata['w'] = F.copy_to(F.randn((g.num_edges(), 2)), ctx=F.ctx())
+
+    # call with default args: node_permute_algo='rcmk', edge_permute_algo='src', store_ids=True
+    rg = dgl.reorder_graph(g)
+    assert dgl.NID in rg.ndata.keys()
+    assert dgl.EID in rg.edata.keys()
+    src = F.asnumpy(rg.edges()[0])
+    assert np.array_equal(src, np.sort(src))
+
+    # call with 'dst' edge_permute_algo
+    rg = dgl.reorder_graph(g, edge_permute_algo='dst')
+    dst = F.asnumpy(rg.edges()[1])
+    assert np.array_equal(dst, np.sort(dst))
+
+    # call with unknown edge_permute_algo
+    raise_error = False
+    try:
+        dgl.reorder_graph(g, edge_permute_algo='none')
+    except:
+        raise_error = True
+    assert raise_error
+
+    # reorder back to original according to stored ids
+    rg = dgl.reorder_graph(g)
+    rg2 = dgl.reorder_graph(rg, 'custom', permute_config={
+        'nodes_perm': np.argsort(F.asnumpy(rg.ndata[dgl.NID]))})
+    assert F.array_equal(g.ndata['h'], rg2.ndata['h'])
+    assert F.array_equal(g.edata['w'], rg2.edata['w'])
+
+    # do not store ids
+    rg = dgl.reorder_graph(g, store_ids=False)
+    assert not dgl.NID in rg.ndata.keys()
+    assert not dgl.EID in rg.edata.keys()
+
+    # metis does not work on windows.
+    if os.name == 'nt':
+        pass
+    else:
+        # metis_partition may fail for small graph.
+        mg = create_large_graph(1000).to(F.ctx())
+
+        # call with metis strategy, but k is not specified
+        raise_error = False
+        try:
+            dgl.reorder_graph(mg, node_permute_algo='metis')
+        except:
+            raise_error = True
+        assert raise_error
+
+        # call with metis strategy, k is specified
+        raise_error = False
+        try:
+            dgl.reorder_graph(mg,
+                              node_permute_algo='metis', permute_config={'k': 2})
+        except:
+            raise_error = True
+        assert not raise_error
+
+    # call with qualified nodes_perm specified
+    nodes_perm = np.random.permutation(g.num_nodes())
+    raise_error = False
+    try:
+        dgl.reorder_graph(g, node_permute_algo='custom', permute_config={
+            'nodes_perm': nodes_perm})
+    except:
+        raise_error = True
+    assert not raise_error
+
+    # call with unqualified nodes_perm specified
+    raise_error = False
+    try:
+        dgl.reorder_graph(g, node_permute_algo='custom', permute_config={
+            'nodes_perm':  nodes_perm[:g.num_nodes() - 1]})
+    except:
+        raise_error = True
+    assert raise_error
+
+    # call with unsupported strategy
+    raise_error = False
+    try:
+        dgl.reorder_graph(g, node_permute_algo='cmk')
+    except:
+        raise_error = True
+    assert raise_error
+
+    # heterograph: not supported
+    raise_error = False
+    try:
+        hg = dgl.heterogrpah({('user', 'follow', 'user'): (
+            [0, 1], [1, 2])}, idtype=idtype, device=F.ctx())
+        dgl.reorder_graph(hg)
+    except:
+        raise_error = True
+    assert raise_error
+
+    # add 'csr' format if needed
+    fg = g.formats('csc')
+    assert 'csr' not in sum(fg.formats().values(), [])
+    rfg = dgl.reorder_graph(fg)
+    assert 'csr' in sum(rfg.formats().values(), [])
+
 if __name__ == '__main__':
-    pass
+    test_partition_with_halo()

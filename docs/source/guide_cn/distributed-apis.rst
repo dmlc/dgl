@@ -228,7 +228,7 @@ DGL提供了两个级别的API，用于对节点和边进行采样以生成小�
     dataloader = dgl.sampling.NodeDataLoader(g, train_nid, sampler,
                                              batch_size=batch_size, shuffle=True)
     for batch in dataloader:
-        ... 
+        ...
 
 
 分割数据集

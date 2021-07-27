@@ -17,7 +17,7 @@ Distributed Graph
 -----------------
 
 .. autoclass:: DistGraph
-    :members: ndata, edata, idtype, device, ntypes, etypes, number_of_nodes, number_of_edges, node_attr_schemes, edge_attr_schemes, rank, find_edges, get_partition_book, barrier, local_partition, num_nodes, num_edges, get_node_partition_policy, get_edge_partition_policy, get_etype_id, get_ntype_id, nodes, edges
+    :members: ndata, edata, idtype, device, ntypes, etypes, number_of_nodes, number_of_edges, node_attr_schemes, edge_attr_schemes, rank, find_edges, get_partition_book, barrier, local_partition, num_nodes, num_edges, get_node_partition_policy, get_edge_partition_policy, get_etype_id, get_ntype_id, nodes, edges, out_degrees, in_degrees
 
 Distributed Tensor
 ------------------
@@ -25,12 +25,21 @@ Distributed Tensor
 .. autoclass:: DistTensor
     :members: part_policy, shape, dtype, name
 
-Distributed Embedding
+Distributed Node Embedding
 ---------------------
+.. currentmodule:: dgl.distributed
 
 .. autoclass:: DistEmbedding
 
+
+Distributed embedding optimizer
+-------------------------
+.. currentmodule:: dgl.distributed.optim.pytorch
+
 .. autoclass:: SparseAdagrad
+    :members: step
+
+.. autoclass:: SparseAdam
     :members: step
 
 Distributed workload split

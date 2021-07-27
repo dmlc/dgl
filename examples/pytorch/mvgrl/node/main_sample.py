@@ -23,6 +23,7 @@ parser.add_argument('--wd1', type=float, default=0., help='Weight decay of mvgrl
 parser.add_argument('--wd2', type=float, default=0., help='Weight decay of linear evaluator.')
 parser.add_argument('--epsilon', type=float, default=0.01, help='Edge mask threshold of diffusion graph.')
 parser.add_argument("--hid_dim", type=int, default=512, help='Hidden layer dim.')
+parser.add_argument("--sample_size", type=int, default=2000, help='Subgraph size.')
 
 args = parser.parse_args()
 
@@ -54,7 +55,7 @@ if __name__ == '__main__':
 
     n_node = graph.number_of_nodes()
 
-    sample_size = 2000
+    sample_size = args.sample_size
 
     lbl1 = th.ones(sample_size * 2)
     lbl2 = th.zeros(sample_size * 2)

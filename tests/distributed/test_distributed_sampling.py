@@ -2,7 +2,7 @@ import dgl
 import unittest
 import os
 from dgl.data import CitationGraphDataset
-from dgl.distributed import sample_neighbors, find_edges
+from dgl.distributed import sample_neighbors
 from dgl.distributed import partition_graph, load_partition, load_partition_book
 import sys
 import multiprocessing as mp
@@ -16,9 +16,10 @@ from scipy import sparse as spsp
 from dgl.distributed import DistGraphServer, DistGraph
 
 
-def start_server(rank, tmpdir, disable_shared_mem, graph_name):
+def start_server(rank, tmpdir, disable_shared_mem, graph_name, graph_format=['csc', 'coo']):
     g = DistGraphServer(rank, "rpc_ip_config.txt", 1, 1,
-                        tmpdir / (graph_name + '.json'), disable_shared_mem=disable_shared_mem)
+                        tmpdir / (graph_name + '.json'), disable_shared_mem=disable_shared_mem,
+                        graph_format=graph_format)
     g.start()
 
 
@@ -43,12 +44,29 @@ def start_find_edges_client(rank, tmpdir, disable_shared_mem, eids):
     dgl.distributed.initialize("rpc_ip_config.txt")
     dist_graph = DistGraph("test_find_edges", gpb=gpb)
     try:
-        u, v = find_edges(dist_graph, eids)
+        u, v = dist_graph.find_edges(eids)
     except Exception as e:
         print(e)
         u, v = None, None
     dgl.distributed.exit_client()
     return u, v
+
+def start_get_degrees_client(rank, tmpdir, disable_shared_mem, nids=None):
+    gpb = None
+    if disable_shared_mem:
+        _, _, _, gpb, _, _, _ = load_partition(tmpdir / 'test_get_degrees.json', rank)
+    dgl.distributed.initialize("rpc_ip_config.txt", 1)
+    dist_graph = DistGraph("test_get_degrees", gpb=gpb)
+    try:
+        in_deg = dist_graph.in_degrees(nids)
+        all_in_deg = dist_graph.in_degrees()
+        out_deg = dist_graph.out_degrees(nids)
+        all_out_deg = dist_graph.out_degrees()
+    except Exception as e:
+        print(e)
+        in_deg, out_deg, all_in_deg, all_out_deg = None, None, None, None
+    dgl.distributed.exit_client()
+    return in_deg, out_deg, all_in_deg, all_out_deg
 
 def check_rpc_sampling(tmpdir, num_server):
     ip_config = open("rpc_ip_config.txt", "w")
@@ -102,13 +120,14 @@ def check_rpc_find_edges_shuffle(tmpdir, num_server):
     pserver_list = []
     ctx = mp.get_context('spawn')
     for i in range(num_server):
-        p = ctx.Process(target=start_server, args=(i, tmpdir, num_server > 1, 'test_find_edges'))
+        p = ctx.Process(target=start_server, args=(i, tmpdir, num_server > 1,
+                                                   'test_find_edges', ['csr', 'coo']))
         p.start()
         time.sleep(1)
         pserver_list.append(p)
 
-    orig_nid = F.zeros((g.number_of_nodes(),), dtype=F.int64)
-    orig_eid = F.zeros((g.number_of_edges(),), dtype=F.int64)
+    orig_nid = F.zeros((g.number_of_nodes(),), dtype=F.int64, ctx=F.cpu())
+    orig_eid = F.zeros((g.number_of_edges(),), dtype=F.int64, ctx=F.cpu())
     for i in range(num_server):
         part, _, _, _, _, _, _ = load_partition(tmpdir / 'test_find_edges.json', i)
         orig_nid[part.ndata[dgl.NID]] = part.ndata['orig_id']
@@ -122,6 +141,66 @@ def check_rpc_find_edges_shuffle(tmpdir, num_server):
     dv = orig_nid[dv]
     assert F.array_equal(u, du)
     assert F.array_equal(v, dv)
+
+# Wait non shared memory graph store
+@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
+@unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
+@pytest.mark.parametrize("num_server", [1, 2])
+def test_rpc_find_edges_shuffle(num_server):
+    import tempfile
+    os.environ['DGL_DIST_MODE'] = 'distributed'
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        check_rpc_find_edges_shuffle(Path(tmpdirname), num_server)
+
+def check_rpc_get_degree_shuffle(tmpdir, num_server):
+    ip_config = open("rpc_ip_config.txt", "w")
+    for _ in range(num_server):
+        ip_config.write('{}\n'.format(get_local_usable_addr()))
+    ip_config.close()
+
+    g = CitationGraphDataset("cora")[0]
+    g.readonly()
+    num_parts = num_server
+
+    partition_graph(g, 'test_get_degrees', num_parts, tmpdir,
+                    num_hops=1, part_method='metis', reshuffle=True)
+
+    pserver_list = []
+    ctx = mp.get_context('spawn')
+    for i in range(num_server):
+        p = ctx.Process(target=start_server, args=(i, tmpdir, num_server > 1, 'test_get_degrees'))
+        p.start()
+        time.sleep(1)
+        pserver_list.append(p)
+
+    orig_nid = F.zeros((g.number_of_nodes(),), dtype=F.int64, ctx=F.cpu())
+    for i in range(num_server):
+        part, _, _, _, _, _, _ = load_partition(tmpdir / 'test_get_degrees.json', i)
+        orig_nid[part.ndata[dgl.NID]] = part.ndata['orig_id']
+    time.sleep(3)
+
+    nids = F.tensor(np.random.randint(g.number_of_nodes(), size=100))
+    in_degs, out_degs, all_in_degs, all_out_degs = start_get_degrees_client(0, tmpdir, num_server > 1, nids)
+
+    print("Done get_degree")
+    for p in pserver_list:
+        p.join()
+
+    print('check results')
+    assert F.array_equal(g.in_degrees(orig_nid[nids]), in_degs)
+    assert F.array_equal(g.in_degrees(orig_nid), all_in_degs)
+    assert F.array_equal(g.out_degrees(orig_nid[nids]), out_degs)
+    assert F.array_equal(g.out_degrees(orig_nid), all_out_degs)
+
+# Wait non shared memory graph store
+@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
+@unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
+@pytest.mark.parametrize("num_server", [1, 2])
+def test_rpc_get_degree_shuffle(num_server):
+    import tempfile
+    os.environ['DGL_DIST_MODE'] = 'distributed'
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        check_rpc_get_degree_shuffle(Path(tmpdirname), num_server)
 
 #@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 #@unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
@@ -160,8 +239,8 @@ def check_rpc_sampling_shuffle(tmpdir, num_server):
     for p in pserver_list:
         p.join()
 
-    orig_nid = F.zeros((g.number_of_nodes(),), dtype=F.int64)
-    orig_eid = F.zeros((g.number_of_edges(),), dtype=F.int64)
+    orig_nid = F.zeros((g.number_of_nodes(),), dtype=F.int64, ctx=F.cpu())
+    orig_eid = F.zeros((g.number_of_edges(),), dtype=F.int64, ctx=F.cpu())
     for i in range(num_server):
         part, _, _, _, _, _, _ = load_partition(tmpdir / 'test_sampling.json', i)
         orig_nid[part.ndata[dgl.NID]] = part.ndata['orig_id']
@@ -205,7 +284,6 @@ def start_hetero_sample_client(rank, tmpdir, disable_shared_mem):
     try:
         nodes = {'n3': [0, 10, 99, 66, 124, 208]}
         sampled_graph = sample_neighbors(dist_graph, nodes, 3)
-        nodes = gpb.map_to_homo_nid(nodes['n3'], 'n3')
         block = dgl.to_block(sampled_graph, nodes)
         block.edata[dgl.EID] = sampled_graph.edata[dgl.EID]
     except Exception as e:
@@ -241,47 +319,36 @@ def check_rpc_hetero_sampling_shuffle(tmpdir, num_server):
     for p in pserver_list:
         p.join()
 
-    orig_nid_map = F.zeros((g.number_of_nodes(),), dtype=F.int64)
-    orig_eid_map = F.zeros((g.number_of_edges(),), dtype=F.int64)
+    orig_nid_map = {ntype: F.zeros((g.number_of_nodes(ntype),), dtype=F.int64) for ntype in g.ntypes}
+    orig_eid_map = {etype: F.zeros((g.number_of_edges(etype),), dtype=F.int64) for etype in g.etypes}
     for i in range(num_server):
         part, _, _, _, _, _, _ = load_partition(tmpdir / 'test_sampling.json', i)
-        F.scatter_row_inplace(orig_nid_map, part.ndata[dgl.NID], part.ndata['orig_id'])
-        F.scatter_row_inplace(orig_eid_map, part.edata[dgl.EID], part.edata['orig_id'])
+        ntype_ids, type_nids = gpb.map_to_per_ntype(part.ndata[dgl.NID])
+        for ntype_id, ntype in enumerate(g.ntypes):
+            idx = ntype_ids == ntype_id
+            F.scatter_row_inplace(orig_nid_map[ntype], F.boolean_mask(type_nids, idx),
+                                  F.boolean_mask(part.ndata['orig_id'], idx))
+        etype_ids, type_eids = gpb.map_to_per_etype(part.edata[dgl.EID])
+        for etype_id, etype in enumerate(g.etypes):
+            idx = etype_ids == etype_id
+            F.scatter_row_inplace(orig_eid_map[etype], F.boolean_mask(type_eids, idx),
+                                  F.boolean_mask(part.edata['orig_id'], idx))
 
-    src, dst = block.edges()
-    # These are global Ids after shuffling.
-    shuffled_src = F.gather_row(block.srcdata[dgl.NID], src)
-    shuffled_dst = F.gather_row(block.dstdata[dgl.NID], dst)
-    shuffled_eid = block.edata[dgl.EID]
-    # Get node/edge types.
-    etype, _ = gpb.map_to_per_etype(shuffled_eid)
-    src_type, _ = gpb.map_to_per_ntype(shuffled_src)
-    dst_type, _ = gpb.map_to_per_ntype(shuffled_dst)
-    etype = F.asnumpy(etype)
-    src_type = F.asnumpy(src_type)
-    dst_type = F.asnumpy(dst_type)
-    # These are global Ids in the original graph.
-    orig_src = F.asnumpy(F.gather_row(orig_nid_map, shuffled_src))
-    orig_dst = F.asnumpy(F.gather_row(orig_nid_map, shuffled_dst))
-    orig_eid = F.asnumpy(F.gather_row(orig_eid_map, shuffled_eid))
+    for src_type, etype, dst_type in block.canonical_etypes:
+        src, dst = block.edges(etype=etype)
+        # These are global Ids after shuffling.
+        shuffled_src = F.gather_row(block.srcnodes[src_type].data[dgl.NID], src)
+        shuffled_dst = F.gather_row(block.dstnodes[dst_type].data[dgl.NID], dst)
+        shuffled_eid = block.edges[etype].data[dgl.EID]
 
-    etype_map = {g.get_etype_id(etype):etype for etype in g.etypes}
-    etype_to_eptype = {g.get_etype_id(etype):(src_ntype, dst_ntype) for src_ntype, etype, dst_ntype in g.canonical_etypes}
-    for e in np.unique(etype):
-        src_t = src_type[etype == e]
-        dst_t = dst_type[etype == e]
-        assert np.all(src_t == src_t[0])
-        assert np.all(dst_t == dst_t[0])
+        orig_src = F.asnumpy(F.gather_row(orig_nid_map[src_type], shuffled_src))
+        orig_dst = F.asnumpy(F.gather_row(orig_nid_map[dst_type], shuffled_dst))
+        orig_eid = F.asnumpy(F.gather_row(orig_eid_map[etype], shuffled_eid))
 
         # Check the node Ids and edge Ids.
-        orig_src1, orig_dst1 = g.find_edges(orig_eid[etype == e], etype=etype_map[e])
-        assert np.all(F.asnumpy(orig_src1) == orig_src[etype == e])
-        assert np.all(F.asnumpy(orig_dst1) == orig_dst[etype == e])
-
-        # Check the node types.
-        src_ntype, dst_ntype = etype_to_eptype[e]
-        assert np.all(src_t == g.get_ntype_id(src_ntype))
-        assert np.all(dst_t == g.get_ntype_id(dst_ntype))
+        orig_src1, orig_dst1 = g.find_edges(orig_eid, etype=etype)
+        assert np.all(F.asnumpy(orig_src1) == orig_src)
+        assert np.all(F.asnumpy(orig_dst1) == orig_dst)
 
 # Wait non shared memory graph store
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
@@ -366,8 +433,8 @@ def check_rpc_in_subgraph_shuffle(tmpdir, num_server):
         p.join()
 
 
-    orig_nid = F.zeros((g.number_of_nodes(),), dtype=F.int64)
-    orig_eid = F.zeros((g.number_of_edges(),), dtype=F.int64)
+    orig_nid = F.zeros((g.number_of_nodes(),), dtype=F.int64, ctx=F.cpu())
+    orig_eid = F.zeros((g.number_of_edges(),), dtype=F.int64, ctx=F.cpu())
     for i in range(num_server):
         part, _, _, _, _, _, _ = load_partition(tmpdir / 'test_in_subgraph.json', i)
         orig_nid[part.ndata[dgl.NID]] = part.ndata['orig_id']
@@ -404,6 +471,8 @@ if __name__ == "__main__":
         os.environ['DGL_DIST_MODE'] = 'distributed'
         check_rpc_sampling(Path(tmpdirname), 2)
         check_rpc_sampling(Path(tmpdirname), 1)
+        check_rpc_get_degree_shuffle(Path(tmpdirname), 1)
+        check_rpc_get_degree_shuffle(Path(tmpdirname), 2)
         check_rpc_find_edges_shuffle(Path(tmpdirname), 2)
         check_rpc_find_edges_shuffle(Path(tmpdirname), 1)
         check_rpc_in_subgraph_shuffle(Path(tmpdirname), 2)

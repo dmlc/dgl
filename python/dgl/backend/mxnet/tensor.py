@@ -342,6 +342,11 @@ def clamp(data, min_val, max_val):
 def replace_inf_with_zero(x):
     return nd.where(nd.abs(x) == np.inf, nd.zeros_like(x), x)
 
+def count_nonzero(input):
+    # TODO: fallback to numpy is unfortunate
+    tmp = input.asnumpy()
+    return np.count_nonzero(tmp)
+
 def unique(input):
     # TODO: fallback to numpy is unfortunate
     tmp = input.asnumpy()
@@ -385,6 +390,7 @@ def zerocopy_to_numpy(arr):
     return arr.asnumpy()
 
 def zerocopy_from_numpy(np_data):
+    np_data = np.asarray(np_data, order='C')
     return mx.nd.from_numpy(np_data, zero_copy=True)
 
 def zerocopy_to_dgl_ndarray(arr):
@@ -520,10 +526,10 @@ class CopyReduce(mx.autograd.Function):
             in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
             degs_nd = zerocopy_to_dgl_ndarray(degs)
             K.copy_reduce(
-                'sum', self.graph, self.target, in_ones_nd, degs_nd, 
+                'sum', self.graph, self.target, in_ones_nd, degs_nd,
                 self.in_map[0], self.out_map[0])
             # reshape
-            degs = degs.reshape((out_data.shape[0],) + (1,) * (out_data.ndim - 1)).clip(1, float('inf')) 
+            degs = degs.reshape((out_data.shape[0],) + (1,) * (out_data.ndim - 1)).clip(1, float('inf'))
             out_data = out_data / degs
         else:
             degs = None

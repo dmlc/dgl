@@ -58,6 +58,10 @@ conducted in mini-batches.
 * :ref:`guide-minibatch-custom-gnn-module`
 * :ref:`guide-minibatch-inference`
 
+The following are performance tips for implementing and using neighborhood
+sampling:
+
+* :ref:`guide-minibatch-gpu-sampling`
 
 .. toctree::
     :maxdepth: 1
@@ -70,3 +74,4 @@ conducted in mini-batches.
     minibatch-custom-sampler
     minibatch-nn
     minibatch-inference
+    minibatch-gpu-sampling

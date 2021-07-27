@@ -11,6 +11,9 @@ include(CheckCXXCompilerFlag)
 check_cxx_compiler_flag("-std=c++14"   SUPPORT_CXX14)
 
 set(dgl_known_gpu_archs "35 50 60 70")
+if (CUDA_VERSION_MAJOR GREATER_EQUAL "11")
+  set(dgl_known_gpu_archs "${dgl_known_gpu_archs} 80")
+endif()
 
 ################################################################################################
 # A function for automatic detection of GPUs installed  (if autodetection is enabled)
@@ -84,7 +87,7 @@ endfunction()
 #   dgl_select_nvcc_arch_flags(out_variable)
 function(dgl_select_nvcc_arch_flags out_variable)
   # List of arch names
-  set(__archs_names "Fermi" "Kepler" "Maxwell" "Pascal" "Volta" "All" "Manual")
+  set(__archs_names "Fermi" "Kepler" "Maxwell" "Pascal" "Volta" "Ampere" "All" "Manual")
   set(__archs_name_default "All")
   if(NOT CMAKE_CROSSCOMPILING)
     list(APPEND __archs_names "Auto")
@@ -121,6 +124,8 @@ function(dgl_select_nvcc_arch_flags out_variable)
     set(__cuda_arch_bin "60 61")
   elseif(${CUDA_ARCH_NAME} STREQUAL "Volta")
     set(__cuda_arch_bin "70")
+  elseif(${CUDA_ARCH_NAME} STREQUAL "Ampere")
+    set(__cuda_arch_bin "80")
   elseif(${CUDA_ARCH_NAME} STREQUAL "All")
     set(__cuda_arch_bin ${dgl_known_gpu_archs})
   elseif(${CUDA_ARCH_NAME} STREQUAL "Auto")
@@ -233,8 +238,11 @@ macro(dgl_config_cuda out_variable)
   file(GLOB_RECURSE DGL_CUDA_SRC
     src/array/cuda/*.cc
     src/array/cuda/*.cu
+    src/array/cuda/uvm/*.cc
+    src/array/cuda/uvm/*.cu
     src/kernel/cuda/*.cc
     src/kernel/cuda/*.cu
+    src/partition/cuda/*.cu
     src/runtime/cuda/*.cc
     src/runtime/cuda/*.cu
     src/geometry/cuda/*.cu

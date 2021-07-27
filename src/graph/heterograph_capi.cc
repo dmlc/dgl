@@ -4,6 +4,7 @@
  * \brief Heterograph CAPI bindings.
  */
 #include <dgl/array.h>
+#include <dgl/aten/coo.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/immutable_graph.h>
 #include <dgl/runtime/container.h>
@@ -29,13 +30,16 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateUnitGraphFromCOO")
     IdArray row = args[3];
     IdArray col = args[4];
     List<Value> formats = args[5];
+    bool row_sorted = args[6];
+    bool col_sorted = args[7];
     std::vector<SparseFormat> formats_vec;
     for (Value val : formats) {
       std::string fmt = val->data;
       formats_vec.push_back(ParseSparseFormat(fmt));
     }
-    auto code = SparseFormatsToCode(formats_vec);
-    auto hgptr = CreateFromCOO(nvtypes, num_src, num_dst, row, col, code);
+    const auto code = SparseFormatsToCode(formats_vec);
+    auto hgptr = CreateFromCOO(nvtypes, num_src, num_dst, row, col,
+        row_sorted, col_sorted, code);
     *rv = HeteroGraphRef(hgptr);
   });
 
@@ -48,14 +52,20 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateUnitGraphFromCSR")
     IdArray indices = args[4];
     IdArray edge_ids = args[5];
     List<Value> formats = args[6];
+    bool transpose = args[7];
     std::vector<SparseFormat> formats_vec;
     for (Value val : formats) {
       std::string fmt = val->data;
       formats_vec.push_back(ParseSparseFormat(fmt));
     }
-    auto code = SparseFormatsToCode(formats_vec);
-    auto hgptr = CreateFromCSR(nvtypes, num_src, num_dst, indptr, indices, edge_ids, code);
-    *rv = HeteroGraphRef(hgptr);
+    const auto code = SparseFormatsToCode(formats_vec);
+    if (!transpose) {
+      auto hgptr = CreateFromCSR(nvtypes, num_src, num_dst, indptr, indices, edge_ids, code);
+      *rv = HeteroGraphRef(hgptr);
+    } else {
+      auto hgptr = CreateFromCSC(nvtypes, num_src, num_dst, indptr, indices, edge_ids, code);
+      *rv = HeteroGraphRef(hgptr);
+    }
   });
 
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateHeteroGraph")
@@ -375,6 +385,8 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroVertexSubgraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     List<Value> vids = args[1];
+    bool relabel_nodes = args[2];
+    CHECK(relabel_nodes) << "Node subgraph only supports relabel_nodes=True.";
     std::vector<IdArray> vid_vec;
     vid_vec.reserve(vids.size());
     for (Value val : vids) {
@@ -577,6 +589,18 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroDisjointPartitionBySizes")
     *rv = ret_list;
 });
 
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroSlice")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    const IdArray num_nodes_per_type = args[1];
+    const IdArray start_nid_per_type = args[2];
+    const IdArray num_edges_per_type = args[3];
+    const IdArray start_eid_per_type = args[4];
+    auto hgptr = SliceHeteroGraph(hg->meta_graph(), hg.sptr(), num_nodes_per_type,
+                                  start_nid_per_type, num_edges_per_type, start_eid_per_type);
+    *rv = HeteroGraphRef(hgptr);
+});
+
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetCreatedFormats")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
@@ -633,8 +657,9 @@ DGL_REGISTER_GLOBAL("subgraph._CAPI_DGLInSubgraph")
 .set_body([] (DGLArgs args, DGLRetValue *rv) {
     HeteroGraphRef hg = args[0];
     const auto& nodes = ListValueToVector<IdArray>(args[1]);
+    bool relabel_nodes = args[2];
     std::shared_ptr<HeteroSubgraph> ret(new HeteroSubgraph);
-    *ret = InEdgeGraph(hg.sptr(), nodes);
+    *ret = InEdgeGraph(hg.sptr(), nodes, relabel_nodes);
     *rv = HeteroGraphRef(ret);
   });
 
@@ -642,8 +667,9 @@ DGL_REGISTER_GLOBAL("subgraph._CAPI_DGLOutSubgraph")
 .set_body([] (DGLArgs args, DGLRetValue *rv) {
     HeteroGraphRef hg = args[0];
     const auto& nodes = ListValueToVector<IdArray>(args[1]);
+    bool relabel_nodes = args[2];
     std::shared_ptr<HeteroSubgraph> ret(new HeteroSubgraph);
-    *ret = OutEdgeGraph(hg.sptr(), nodes);
+    *ret = OutEdgeGraph(hg.sptr(), nodes, relabel_nodes);
     *rv = HeteroGraphRef(ret);
   });
 
@@ -651,6 +677,51 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLAsImmutableGraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     *rv = GraphRef(hg->AsImmutableGraph());
+  });
+
+DGL_REGISTER_GLOBAL("transform._CAPI_DGLHeteroSortOutEdges")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    NDArray tag = args[1];
+    int64_t num_tag = args[2];
+
+    CHECK_EQ(hg->Context().device_type, kDLCPU) << "Only support sorting by tag on cpu";
+    CHECK(aten::IsValidIdArray(tag));
+    CHECK_EQ(tag->ctx.device_type, kDLCPU) << "Only support sorting by tag on cpu";
+
+    const auto csr = hg->GetCSRMatrix(0);
+
+    NDArray tag_pos = aten::NullArray();
+    aten::CSRMatrix output;
+    std::tie(output, tag_pos) = aten::CSRSortByTag(csr, tag, num_tag);
+    HeteroGraphPtr output_hg = CreateFromCSR(hg->NumVertexTypes(), output, ALL_CODE);
+    List<ObjectRef> ret;
+    ret.push_back(HeteroGraphRef(output_hg));
+    ret.push_back(Value(MakeValue(tag_pos)));
+    *rv = ret;
+  });
+
+DGL_REGISTER_GLOBAL("transform._CAPI_DGLHeteroSortInEdges")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    NDArray tag = args[1];
+    int64_t num_tag = args[2];
+
+    CHECK_EQ(hg->Context().device_type, kDLCPU) << "Only support sorting by tag on cpu";
+    CHECK(aten::IsValidIdArray(tag));
+    CHECK_EQ(tag->ctx.device_type, kDLCPU) << "Only support sorting by tag on cpu";
+
+    const auto csc = hg->GetCSCMatrix(0);
+
+    NDArray tag_pos = aten::NullArray();
+    aten::CSRMatrix output;
+    std::tie(output, tag_pos) = aten::CSRSortByTag(csc, tag, num_tag);
+
+    HeteroGraphPtr output_hg = CreateFromCSC(hg->NumVertexTypes(), output, ALL_CODE);
+    List<ObjectRef> ret;
+    ret.push_back(HeteroGraphRef(output_hg));
+    ret.push_back(Value(MakeValue(tag_pos)));
+    *rv = ret;
   });
 
 DGL_REGISTER_GLOBAL("heterograph._CAPI_DGLFindSrcDstNtypes")

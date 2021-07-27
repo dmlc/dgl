@@ -14,16 +14,14 @@ import numpy as np
 import tqdm
 import torch as th
 import torch.nn as nn
-import torch.multiprocessing as mp
 from torch.utils.data import DataLoader
-from torch.multiprocessing import Queue
 from torch.nn.parallel import DistributedDataParallel
-from _thread import start_new_thread
-from functools import wraps
 from data import MovieLens
 from model import GCMCLayer, DenseBiDecoder, BiDecoder
 from utils import get_activation, get_optimizer, torch_total_param_num, torch_net_info, MetricLogger, to_etype_name
 import dgl
+import dgl.multiprocessing as mp
+from dgl.multiprocessing import Queue
 
 class Net(nn.Module):
     def __init__(self, args, dev_id):
@@ -136,33 +134,6 @@ def evaluate(args, dev_id, net, dataset, dataloader, segment='valid'):
     rmse = np.sqrt(rmse)
     return rmse
 
-# According to https://github.com/pytorch/pytorch/issues/17199, this decorator
-# is necessary to make fork() and openmp work together.
-def thread_wrapped_func(func):
-    """
-    Wraps a process entry point to make it work with OpenMP.
-    """
-    @wraps(func)
-    def decorated_function(*args, **kwargs):
-        queue = Queue()
-        def _queue_result():
-            exception, trace, res = None, None, None
-            try:
-                res = func(*args, **kwargs)
-            except Exception as e:
-                exception = e
-                trace = traceback.format_exc()
-            queue.put((res, exception, trace))
-
-        start_new_thread(_queue_result, ())
-        result, exception, trace = queue.get()
-        if exception is None:
-            return result
-        else:
-            assert isinstance(exception, Exception)
-            raise exception.__class__(trace)
-    return decorated_function
-
 def config():
     parser = argparse.ArgumentParser(description='GCMC')
     parser.add_argument('--seed', default=123, type=int)
@@ -211,6 +182,17 @@ def config():
 
 def run(proc_id, n_gpus, args, devices, dataset):
     dev_id = devices[proc_id]
+    if n_gpus > 1:
+        dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
+            master_ip='127.0.0.1', master_port='12345')
+        world_size = n_gpus
+        th.distributed.init_process_group(backend="nccl",
+                                          init_method=dist_init_method,
+                                          world_size=world_size,
+                                          rank=dev_id)
+    if n_gpus > 0:
+        th.cuda.set_device(dev_id)
+
     train_labels = dataset.train_labels
     train_truths = dataset.train_truths
     num_edges = train_truths.shape[0]
@@ -225,6 +207,7 @@ def run(proc_id, n_gpus, args, devices, dataset):
             dataset.train_enc_graph.number_of_edges(etype=to_etype_name(k)))
          for k in dataset.possible_rating_values},
         sampler,
+        use_ddp=n_gpus > 1,
         batch_size=args.minibatch_size,
         shuffle=True,
         drop_last=False)
@@ -246,17 +229,6 @@ def run(proc_id, n_gpus, args, devices, dataset):
             batch_size=args.minibatch_size,
             shuffle=False,
             drop_last=False)
-
-    if n_gpus > 1:
-        dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
-            master_ip='127.0.0.1', master_port='12345')
-        world_size = n_gpus
-        th.distributed.init_process_group(backend="nccl",
-                                          init_method=dist_init_method,
-                                          world_size=world_size,
-                                          rank=dev_id)
-    if n_gpus > 0:
-        th.cuda.set_device(dev_id)
 
     nd_possible_rating_values = \
         th.FloatTensor(dataset.possible_rating_values)
@@ -283,6 +255,8 @@ def run(proc_id, n_gpus, args, devices, dataset):
     iter_idx = 1
 
     for epoch in range(1, args.train_max_epoch):
+        if n_gpus > 1:
+            dataloader.set_epoch(epoch)
         if epoch > 1:
             t0 = time.time()
         net.train()
@@ -369,7 +343,8 @@ def run(proc_id, n_gpus, args, devices, dataset):
             if n_gpus > 1:
                 th.distributed.barrier()
 
-        print(logging_str)
+        if proc_id == 0:
+            print(logging_str)
     if proc_id == 0:
         print('Best epoch Idx={}, Best Valid RMSE={:.4f}, Best Test RMSE={:.4f}'.format(
               best_epoch, best_valid_rmse, best_test_rmse))
@@ -409,7 +384,7 @@ if __name__ == '__main__':
         dataset.train_dec_graph.create_formats_()
         procs = []
         for proc_id in range(n_gpus):
-            p = mp.Process(target=thread_wrapped_func(run), args=(proc_id, n_gpus, args, devices, dataset))
+            p = mp.Process(target=run, args=(proc_id, n_gpus, args, devices, dataset))
             p.start()
             procs.append(p)
         for p in procs:

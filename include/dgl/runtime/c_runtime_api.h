@@ -542,8 +542,19 @@ DGL_DLL int DGLStreamStreamSynchronize(int device_type,
 
 /*!
  * \brief Load tensor adapter.
+ * \return 0 when success, -1 when failure happens.
  */
-DGL_DLL void DGLLoadTensorAdapter(const char *path);
+DGL_DLL int DGLLoadTensorAdapter(const char *path);
+
+/*!
+ * \brief Pin host memory.
+ */
+int DGLArrayPinData(DGLArrayHandle handle, DLContext ctx);
+
+/*!
+ * \brief Unpin host memory.
+ */
+int DGLArrayUnpinData(DGLArrayHandle handle, DLContext ctx);
 
 /*!
  * \brief Bug report macro.
@@ -555,7 +566,7 @@ DGL_DLL void DGLLoadTensorAdapter(const char *path);
  *
  * Hints the user to file a bug report if the condition fails.
  */
-#define BUG_ON(cond) \
+#define BUG_IF_FAIL(cond) \
   CHECK(cond) << "A bug has been occurred.  " \
                  "Please file a bug report at https://github.com/dmlc/dgl/issues.  " \
                  "Message: "

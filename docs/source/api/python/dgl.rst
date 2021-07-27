@@ -74,6 +74,22 @@ Operators for generating new graphs by manipulating the structure of the existin
     line_graph
     khop_graph
     metapath_reachable_graph
+    adj_product_graph
+    adj_sum_graph
+    reorder_graph
+    sort_csr_by_tag
+    sort_csc_by_tag
+
+.. _api-partition:
+
+Graph Partition Utilities
+-------------------------
+.. autosummary::
+    :toctree: ../../generated/
+
+    metis_partition
+    metis_partition_assignment
+    partition_graph_with_halo
 
 .. _api-batch:
 
@@ -88,6 +104,7 @@ operators for computing graph-level representation for both single and batched g
 
     batch
     unbatch
+    slice_batch
     readout_nodes
     readout_edges
     sum_nodes

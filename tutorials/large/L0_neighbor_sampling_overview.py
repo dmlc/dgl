@@ -78,7 +78,7 @@ By the end of this tutorial, you will be able to
 #
 # Neighbor sampling addresses this issue by selecting a subset of the
 # neighbors to perform aggregation. For instance, to compute
-# :math:`\boldsymbol{h}_8^{(2)}`, you can choose two of the neighbors
+# :math:`\boldsymbol{h}_5^{(2)}`, you can choose two of the neighbors
 # instead of all of them to aggregate, as in the following animation:
 #
 # |image2|
@@ -115,5 +115,5 @@ By the end of this tutorial, you will be able to
 #
 
 
-# Thumbnail Courtesy: Understanding graph embedding methods and their applications, Mengjia Xu
+# Thumbnail credits: Understanding graph embedding methods and their applications, Mengjia Xu
 # sphinx_gallery_thumbnail_path = '_static/large_L0_neighbor_sampling_overview.png'

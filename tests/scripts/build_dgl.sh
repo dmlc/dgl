@@ -14,7 +14,7 @@ CMAKE_VARS="-DBUILD_CPP_TEST=ON -DUSE_OPENMP=ON -DBUILD_TORCH=ON"
 CMAKE_VARS="$CMAKE_VARS -DTORCH_PYTHON_INTERPS=/opt/conda/envs/pytorch-ci/bin/python"
 
 if [ "$1" == "gpu" ]; then
-    CMAKE_VARS="-DUSE_CUDA=ON $CMAKE_VARS"
+    CMAKE_VARS="-DUSE_CUDA=ON -DUSE_NCCL=ON $CMAKE_VARS"
 fi
 
 if [ -d build ]; then
@@ -26,7 +26,7 @@ rm -rf _download
 
 pushd build
 cmake $CMAKE_VARS ..
-make -j8
+make -j
 popd
 
 pushd python

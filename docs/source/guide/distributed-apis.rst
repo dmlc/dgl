@@ -125,7 +125,7 @@ in the cluster even if the :class:`~dgl.distributed.DistTensor` object disappear
     tensor = dgl.distributed.DistTensor((g.number_of_nodes(), 10), th.float32, name='test')
 
 **Note**: :class:`~dgl.distributed.DistTensor` creation is a synchronized operation. All trainers
-have to invoke the creation and the creation succeeds only when all trainers call it. 
+have to invoke the creation and the creation succeeds only when all trainers call it.
 
 A user can add a :class:`~dgl.distributed.DistTensor` to a :class:`~dgl.distributed.DistGraph`
 object as one of the node data or edge data.
@@ -153,7 +153,7 @@ computation operators, such as sum and mean.
 when a machine runs multiple servers. This may result in data corruption. One way to avoid concurrent
 writes to the same row of data is to run one server process on a machine.
 
-Distributed Embedding
+Distributed DistEmbedding
 ~~~~~~~~~~~~~~~~~~~~~
 
 DGL provides :class:`~dgl.distributed.DistEmbedding` to support transductive models that require
@@ -252,24 +252,28 @@ the same as single-process sampling.
     dataloader = dgl.sampling.NodeDataLoader(g, train_nid, sampler,
                                              batch_size=batch_size, shuffle=True)
     for batch in dataloader:
-        ... 
+        ...
 
 
 Split workloads
 ~~~~~~~~~~~~~~~
 
-Users need to split the training set so that each trainer works on its own subset. Similarly,
+To train a model, users first need to split the dataset into training, validation and test sets.
+For distributed training, this step is usually done before we invoke :func:`dgl.distributed.partition_graph`
+to partition a graph. We recommend to store the data split in boolean arrays as node data or edge data.
+For node classification tasks, the length of these boolean arrays is the number of nodes in a graph
+and each of their elements indicates the existence of a node in a training/validation/test set.
+Similar boolean arrays should be used for link prediction tasks.
+:func:`dgl.distributed.partition_graph` splits these boolean arrays (because they are stored as
+the node data or edge data of the graph) based on the graph partitioning
+result and store them with graph partitions.
+
+During distributed training, users need to assign training nodes/edges to each trainer. Similarly,
 we also need to split the validation and test set in the same way.
-
-For distributed training and evaluation, the recommended approach is to use boolean arrays to
-indicate the training/validation/test set. For node classification tasks, the length of these
-boolean arrays is the number of nodes in a graph and each of their elements indicates the existence
-of a node in a training/validation/test set. Similar boolean arrays should be used for
-link prediction tasks.
-
 DGL provides :func:`~dgl.distributed.node_split` and :func:`~dgl.distributed.edge_split` to
 split the training, validation and test set at runtime for distributed training. The two functions
-take the boolean arrays as input, split them and return a portion for the local trainer.
+take the boolean arrays constructed before graph partitioning as input, split them and
+return a portion for the local trainer.
 By default, they ensure that all portions have the same number of nodes/edges. This is
 important for synchronous SGD, which assumes each trainer has the same number of mini-batches.
 

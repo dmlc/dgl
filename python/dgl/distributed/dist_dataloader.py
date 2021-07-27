@@ -64,7 +64,7 @@ class DistDataLoader:
     Parameters
     ----------
     dataset: a tensor
-        A tensor of node IDs or edge IDs.
+        Tensors of node IDs or edge IDs.
     batch_size: int
         The number of samples per batch to load.
     shuffle: bool, optional
@@ -118,9 +118,8 @@ class DistDataLoader:
         self.collate_fn = collate_fn
         self.current_pos = 0
         if self.pool is not None:
-            self.m = mp.Manager()
-            self.barrier = self.m.Barrier(self.num_workers)
-            self.queue = self.m.Queue(maxsize=queue_size)
+            m = mp.Manager()
+            self.queue = m.Queue(maxsize=queue_size)
         else:
             self.queue = Queue(maxsize=queue_size)
         self.drop_last = drop_last
@@ -128,7 +127,8 @@ class DistDataLoader:
         self.shuffle = shuffle
         self.is_closed = False
 
-        self.dataset = F.tensor(dataset)
+        self.dataset = dataset
+        self.data_idx = F.arange(0, len(dataset))
         self.expected_idxs = len(dataset) // self.batch_size
         if not self.drop_last and len(dataset) % self.batch_size != 0:
             self.expected_idxs += 1
@@ -141,9 +141,10 @@ class DistDataLoader:
 
         if self.pool is not None:
             results = []
+            barrier = m.Barrier(self.num_workers)
             for _ in range(self.num_workers):
                 results.append(self.pool.apply_async(
-                    init_fn, args=(self.barrier, self.name, self.collate_fn, self.queue)))
+                    init_fn, args=(barrier, self.name, self.collate_fn, self.queue)))
             for res in results:
                 res.get()
 
@@ -153,8 +154,11 @@ class DistDataLoader:
         self.pool, self.num_workers = get_sampler_pool()
         if self.pool is not None:
             results = []
+            # Here we need to create the manager and barrier again.
+            m = mp.Manager()
+            barrier = m.Barrier(self.num_workers)
             for _ in range(self.num_workers):
-                results.append(self.pool.apply_async(cleanup_fn, args=(self.barrier, self.name,)))
+                results.append(self.pool.apply_async(cleanup_fn, args=(barrier, self.name,)))
             for res in results:
                 res.get()
 
@@ -173,7 +177,7 @@ class DistDataLoader:
 
     def __iter__(self):
         if self.shuffle:
-            self.dataset = F.rand_shuffle(self.dataset)
+            self.data_idx = F.rand_shuffle(self.data_idx)
         self.recv_idxs = 0
         self.current_pos = 0
         self.num_pending = 0
@@ -202,6 +206,7 @@ class DistDataLoader:
                 end_pos = len(self.dataset)
         else:
             end_pos = self.current_pos + self.batch_size
-        ret = self.dataset[self.current_pos:end_pos]
+        idx = self.data_idx[self.current_pos:end_pos].tolist()
+        ret = [self.dataset[i] for i in idx]
         self.current_pos = end_pos
         return ret
