@@ -97,7 +97,8 @@ __global__ void _CSRRowWiseSampleDegreeReplaceKernel(
 * without replacement.
 *
 * @tparam IdType The ID type used for matrices.
-* @tparam BLOCK_ROWS The number of rows covered by each threadblock.
+* @tparam BLOCK_WARPS The number of rows each thread block runs in parallel.
+* @tparam TILE_SIZE The number of rows covered by each threadblock.
 * @param rand_seed The random seed to use.
 * @param num_picks The number of non-zeros to pick per row.
 * @param num_rows The number of rows to pick.
@@ -110,7 +111,7 @@ __global__ void _CSRRowWiseSampleDegreeReplaceKernel(
 * @param out_cols The columns of the output COO (output).
 * @param out_idxs The data array of the output COO (output).
 */
-template<typename IdType, int BLOCK_ROWS, int TILE_SIZE>
+template<typename IdType, int BLOCK_WARPS, int TILE_SIZE>
 __global__ void _CSRRowWiseSampleKernel(
     const uint64_t rand_seed,
     const int64_t num_picks,
@@ -125,7 +126,7 @@ __global__ void _CSRRowWiseSampleKernel(
     IdType * const out_idxs) {
   // we assign one warp per row
   assert(blockDim.x == WARP_SIZE);
-  assert(blockDim.y == BLOCK_ROWS);
+  assert(blockDim.y == BLOCK_WARPS);
 
   int64_t out_row = blockIdx.x*TILE_SIZE+threadIdx.y;
   const int64_t last_row = min(static_cast<int64_t>(blockIdx.x+1)*TILE_SIZE, num_rows);
@@ -177,7 +178,7 @@ __global__ void _CSRRowWiseSampleKernel(
       }
     }
 
-    out_row += BLOCK_ROWS;
+    out_row += BLOCK_WARPS;
   }
 }
 
@@ -186,7 +187,8 @@ __global__ void _CSRRowWiseSampleKernel(
 * with replacement.
 *
 * @tparam IdType The ID type used for matrices.
-* @tparam BLOCK_ROWS The number of rows covered by each threadblock.
+* @tparam BLOCK_WARPS The number of rows each thread block runs in parallel.
+* @tparam TILE_SIZE The number of rows covered by each threadblock.
 * @param rand_seed The random seed to use.
 * @param num_picks The number of non-zeros to pick per row.
 * @param num_rows The number of rows to pick.
@@ -199,7 +201,7 @@ __global__ void _CSRRowWiseSampleKernel(
 * @param out_cols The columns of the output COO (output).
 * @param out_idxs The data array of the output COO (output).
 */
-template<typename IdType, int BLOCK_ROWS, int TILE_SIZE>
+template<typename IdType, int BLOCK_WARPS, int TILE_SIZE>
 __global__ void _CSRRowWiseSampleReplaceKernel(
     const uint64_t rand_seed,
     const int64_t num_picks,
@@ -239,7 +241,7 @@ __global__ void _CSRRowWiseSampleReplaceKernel(
         out_idxs[out_idx] = data ? data[in_row_start+edge] : in_row_start+edge;
       }
     }
-    out_row += BLOCK_ROWS;
+    out_row += BLOCK_WARPS;
   }
 }
 
@@ -325,11 +327,12 @@ COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat,
 
   // select edges
   if (replace) {
-    constexpr int BLOCK_ROWS = 128/WARP_SIZE;
-    constexpr int TILE_SIZE = BLOCK_ROWS*16;
-    const dim3 block(WARP_SIZE, BLOCK_ROWS);
+    constexpr int BLOCK_WARPS = 128/WARP_SIZE;
+    // the number of rows each thread block will cover
+    constexpr int TILE_SIZE = BLOCK_WARPS*16;
+    const dim3 block(WARP_SIZE, BLOCK_WARPS);
     const dim3 grid((num_rows+TILE_SIZE-1)/TILE_SIZE);
-    _CSRRowWiseSampleReplaceKernel<IdType, BLOCK_ROWS, TILE_SIZE><<<grid, block, 0, stream>>>(
+    _CSRRowWiseSampleReplaceKernel<IdType, BLOCK_WARPS, TILE_SIZE><<<grid, block, 0, stream>>>(
         random_seed,
         num_picks,
         num_rows,
@@ -342,11 +345,12 @@ COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat,
         out_cols,
         out_idxs);
   } else {
-    constexpr int BLOCK_ROWS = 128/WARP_SIZE;
-    constexpr int TILE_SIZE = BLOCK_ROWS*16;
-    const dim3 block(WARP_SIZE, BLOCK_ROWS);
+    constexpr int BLOCK_WARPS = 128/WARP_SIZE;
+    // the number of rows each thread block will cover
+    constexpr int TILE_SIZE = BLOCK_WARPS*16;
+    const dim3 block(WARP_SIZE, BLOCK_WARPS);
     const dim3 grid((num_rows+TILE_SIZE-1)/TILE_SIZE);
-    _CSRRowWiseSampleKernel<IdType, BLOCK_ROWS, TILE_SIZE><<<grid, block, 0, stream>>>(
+    _CSRRowWiseSampleKernel<IdType, BLOCK_WARPS, TILE_SIZE><<<grid, block, 0, stream>>>(
         random_seed,
         num_picks,
         num_rows,
