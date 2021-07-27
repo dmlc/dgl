@@ -13,5 +13,4 @@ API Reference
    nn
    dgl.ops
    dgl.sampling
-   dgl.contrib.UnifiedTensor   
    udf

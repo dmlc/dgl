@@ -7,10 +7,6 @@ from .. import utils
 class UnifiedTensor: #UnifiedTensor
     '''Class for storing unified tensor. Declaration of
     UnifiedTensor automatically pins the input tensor.
-    Upon a successful declaration of UnifiedTensor, the
-    target GPU device will have the address mapping of the
-    input CPU tensor for zero-copy (direct) access over
-    external interconnects (e.g., PCIe).
 
     Parameters
     ----------
@@ -18,49 +14,7 @@ class UnifiedTensor: #UnifiedTensor
         Tensor which we want to convert into the
         unified tensor.
     device : device
-        GPU to create the address mapping of the input CPU tensor.
-
-    Examples
-    --------
-    With a given CPU tensor ``feats``, a new UnifiedTensor targetting a default
-    GPU can be created as follows:
-
-    >>> feats = torch.rand((128,128))
-    >>> feats = dgl.contrib.UnifiedTensor(feats, device=torch.device('cuda'))
-
-    Now, the elements of the new tensor ``feats`` can be accessed with ``[]``
-    indexing. The context of the index tensor is a switch to trigger the
-    zero-copy access from GPU. For example, to use the ordinary CPU-based
-    data access, one can use the following method:
-
-    >>> idx = torch.Tensor([0,1,2])
-    >>> output = feats[idx]
-
-    Now, to use GPU to do a zero-copy access, do this:
-
-    >>> idx = torch.Tensor([0,1,2]).to('cuda')
-    >>> output = feats[idx]
-
-    For the multi-GPU operation, one can simply think UnifiedTensor like a GPU
-    tensor. For example, to copy a tensor ``feats`` to multiple GPUs, one
-    should do the following:
-
-    >>> feats = torch.rand((128,128))
-    >>> feats_gpu0 = feats.to('cuda:0')
-    >>> feats_gpu1 = feats.to('cuda:1')
-    >>> feats_gpu2 = feats.to('cuda:2')
-
-    Similar to that, to allow multiple GPUs to access the original CPU tensor
-    ``feats`` using UnifiedTensor, one can do the following:
-
-    >>> feats = torch.rand((128,128))
-    >>> feats_gpu0 = dgl.contrib.UnifiedTensor(feats, device=torch.device('cuda:0'))
-    >>> feats_gpu1 = dgl.contrib.UnifiedTensor(feats, device=torch.device('cuda:1'))
-    >>> feats_gpu2 = dgl.contrib.UnifiedTensor(feats, device=torch.device('cuda:2'))
-
-    Now, the ``cuda:0``, ``cuda:1``, and ``cuda:2`` devices will be able to access the
-    identical tensor located in the CPU memory using ``feats_gpu0``, ``feats_gpu1``, and
-    ``feats_gpu2`` tensors, respectively.
+        Device to create the mapping of the unified tensor.
     '''
 
     def __init__(self, input, device):
