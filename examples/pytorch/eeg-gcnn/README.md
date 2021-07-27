@@ -1,15 +1,12 @@
 # DGL Implementation of EEG-GCNN Paper
-This DGL example implements the EEG-GCNN model proposed in the paper [EEG-GCNN](https://arxiv.org/abs/2011.12107). The original code is in [here](https://github.com/neerajwagh/eeg-gcnn).
+This DGL example implements the EEG-GCNN model proposed in the paper [EEG-GCNN](https://arxiv.org/abs/2011.12107). The original code is [here](https://github.com/neerajwagh/eeg-gcnn).
 
 ## All References
-- ArXiv Pre-print: <https://arxiv.org/abs/2011.12107>
-- PMLR Paper: <http://proceedings.mlr.press/v136/wagh20a.html>
-- ML4H Poster: <https://drive.google.com/file/d/14nuAQKiIud3p6-c8r9WLV2tAvCyRwRev/view?usp=sharing>
-- ML4H 10-minute Video: <https://slideslive.com/38941020/eeggcnn-augmenting-electroencephalogrambased-neurological-disease-diagnosis-using-a-domainguided-graph-convolutional-neural-network?ref=account-folder-62123-folders>
-- ML4H Slides: <https://drive.google.com/file/d/1dXT4QAUXKauf7CAkhrVyhR2PFUsNh4b8/view?usp=sharing>
-- Code: [GitHub Repo](https://github.com/neerajwagh/eeg-gcnn)
-- Final Models, Pre-computed Features, Training Metadata: [FigShare .zip](https://figshare.com/articles/software/EEG-GCNN_Supporting_Resources_for_Reproducibility/13251452)
-- Raw Data: [MPI LEMON](http://fcon_1000.projects.nitrc.org/indi/retro/MPI_LEMON.html) (no registration needed), [TUH EEG Abnormal Corpus](https://www.isip.piconepress.com/projects/tuh_eeg/downloads/tuh_eeg_abnormal/) ([needs registration](https://www.isip.piconepress.com/projects/tuh_eeg/html/request_access.php))
+- Paper can also be found on PMLR: <http://proceedings.mlr.press/v136/wagh20a.html>
+- ML4H Poster can be helpful for understanding data preprocessing, model, and performance of the project: <https://drive.google.com/file/d/14nuAQKiIud3p6-c8r9WLV2tAvCyRwRev/view?usp=sharing>
+- The recording of presentation by the author Neeraj Wagh can be found here: <https://slideslive.com/38941020/eeggcnn-augmenting-electroencephalogrambased-neurological-disease-diagnosis-using-a-domainguided-graph-convolutional-neural-network?ref=account-folder-62123-folders>
+- The slides used during the presentation can be found here: <https://drive.google.com/file/d/1dXT4QAUXKauf7CAkhrVyhR2PFUsNh4b8/view?usp=sharing>
+- Raw Data can be found in these two links: [MPI LEMON](http://fcon_1000.projects.nitrc.org/indi/retro/MPI_LEMON.html) (no registration needed), [TUH EEG Abnormal Corpus](https://www.isip.piconepress.com/projects/tuh_eeg/downloads/tuh_eeg_abnormal/) ([needs registration](https://www.isip.piconepress.com/projects/tuh_eeg/html/request_access.php))
 
 ## Dependencies
 
@@ -20,8 +17,7 @@ This DGL example implements the EEG-GCNN model proposed in the paper [EEG-GCNN](
 - Sklearn 0.24.2
 
 ## Dataset
-- Raw Data: [MPI LEMON](http://fcon_1000.projects.nitrc.org/indi/retro/MPI_LEMON.html) (no registration needed), TUH EEG Abnormal Corpus (needs registration)
-- Precomputed data, labels, indices can be downloaded from [FigShare](https://figshare.com/articles/software/EEG-GCNN_Supporting_Resources_for_Reproducibility/13251452).
+- Final Models, Pre-computed Features, Training Metadata can be downloaded through [FigShare](https://figshare.com/articles/software/EEG-GCNN_Supporting_Resources_for_Reproducibility/13251452).
 - In EEGGraphDataset.py, we specify the channels and electrodes and use precomputed spectral coherence values to compute the edge weights. To use this example in your own advantage, please specify your channels, electrodes and generate your own spectral coherence values. All example datas can be downloaded from FigShare.
 ## How to Run
 First, download the precomputed data, labels, indices and put them in the repo. <br>
