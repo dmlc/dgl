@@ -545,7 +545,6 @@ def main(args):
         th.distributed.init_process_group(backend='gloo')
 
     g = dgl.distributed.DistGraph(args.graph_name, part_config=args.conf_path)
-    print(g)
     print('rank:', g.rank())
 
     pb = g.get_partition_book()
@@ -635,8 +634,6 @@ if __name__ == '__main__':
             help='Use layer norm')
     parser.add_argument('--local_rank', type=int, help='get rank of the process')
     parser.add_argument('--standalone', action='store_true', help='run in the standalone mode')
-    parser.add_argument('--per-etype-fanout', default=False, action='store_true',
-            help='Use per edge type neighbor sample instead of general neighbor sample.')
     args = parser.parse_args()
 
     # if validation_fanout is None, set it with args.fanout
