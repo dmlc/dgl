@@ -41,30 +41,33 @@ def _edge_update(edges):
     }
 
 
-def _bayesian_softmax(z, ntype, prior):
+def _bayesian_weight(z, ntype, prior, lr_mult):
     """The sum is less than or equal to one according to Jensen's inequality:
     exp(E(log(x))) <= E(x) = 1. The bound is tight when z is large, e.g., due
     to large lr_mult in the corresponding direction.
     """
-    gamma = prior + z
-
     axis = 1 if ntype == 'doc' else 0 # word
-    Elog = torch.digamma(gamma) - torch.digamma(gamma.sum(axis, keepdims=True))
 
-    return Elog.exp()
+    if lr_mult < float("inf"):
+        gamma = prior + z * lr_mult
+        sum = gamma.sum(axis, keepdims=True)
+        Elog = torch.digamma(gamma) - torch.digamma(sum)
+        return Elog.exp()
+    else: # avoid precision loss due to inf - inf
+        return z / z.sum(axis, keepdims=True)
 
 
 class LatentDirichletAllocation:
     """LDA model that works with a HeteroGraph with doc->word meta paths.
-    The model alters the attributes of G arbitrarily, starting with word->weight.
+    The model alters the attributes of G arbitrarily.
     This is inspired by [1] and its corresponding scikit-learn implementation.
 
     Hyperparameters
     ---
     * prior: parameters in the Dirichlet prior; default to 1/n_components
-    * lr: learning rate for online update; default to 1 for full gradient updates
-    * lr_mult: learning rate multiplier to quickly converge to MAP
-    * device: accelerate _bayesian_softmax on word_z parameters in m-step
+    * lr: new_z = (1-lr)*old_z + lr*z; default to 1 for full gradients.
+    * lr_mult: multiplier for z; use float("inf") to get max-a-posterior estimates.
+    * device: accelerate _bayesian_weight(word_z) during initialization.
 
     References
     ---
@@ -99,14 +102,18 @@ class LatentDirichletAllocation:
             torch.tensor(100.0, device=device),).sample
 
         self.word_z = self._init((n_words, self.n_components))
-        self._word_weight = _bayesian_softmax(self.word_z, 'word', self.prior['word'])
+        self._word_weight = self._bayesian_weight(self.word_z, 'word')
+
+
+    def _bayesian_weight(self, z, ntype):
+        return _bayesian_weight(z, ntype, self.prior[ntype], self.lr_mult[ntype])
 
 
     def _prepare_graph(self, G, doc_data=None):
         """ load or init node data; rewrite G.ndata inplace """
         if doc_data is None:
             z = self._init((G.num_nodes('doc'), self.n_components)).to(G.device)
-            weight = _bayesian_softmax(z, 'doc', self.prior['doc'])
+            weight = self._bayesian_weight(z, 'doc')
             doc_data = {'z': z, 'weight': weight}
 
         G.nodes['doc'].data['z'] = doc_data['z']
@@ -123,16 +130,15 @@ class LatentDirichletAllocation:
         G = self._prepare_graph(G.reverse(), doc_data) # word -> doc
 
         for i in range(max_iters):
-            doc_z_old = G.nodes['doc'].data['z']
+            old_z = G.nodes['doc'].data['z']
+            G.update_all(_edge_update, fn.sum('z', 'z'))
+            new_z = G.nodes['doc'].data['z']
 
-            G.update_all(
-                _edge_update, fn.sum('z', 'z'), 
-                lambda x: {'z': x.data['z'] * self.lr_mult['doc']}
-            )
-            G.nodes['doc'].data['weight'] = _bayesian_softmax(
-                G.nodes['doc'].data['z'], 'doc', self.prior['doc'])
+            mean_change = (new_z - old_z).abs().mean()
+            del old_z
 
-            mean_change = (G.nodes['doc'].data['z'] - doc_z_old).abs().mean()
+            G.nodes['doc'].data['weight'] = self._bayesian_weight(new_z, 'doc')
+
             if mean_change < mean_change_tol:
                 break
 
@@ -150,15 +156,15 @@ class LatentDirichletAllocation:
         """
         G = self._prepare_graph(G.clone(), doc_data)
 
-        G.update_all(
-            _edge_update, fn.sum('z', 'z'),
-            lambda x: {'z': x.data['z'] * self.lr_mult['word']}
-        )
-        new = G.nodes['word'].data['z'].to(self.device)
-        mean_change = (new - self.word_z).abs().mean()
+        old_z = G.nodes['word'].data['z']
+        G.update_all(_edge_update, fn.sum('z', 'z'))
+        new_z = (1-self.lr) * old_z + self.lr * G.nodes['word'].data['z']
 
-        self.word_z = (1-self.lr) * self.word_z + self.lr * new
-        self._word_weight = _bayesian_softmax(self.word_z, 'word', self.prior['word'])
+        mean_change = (new_z - old_z).abs().mean()
+        del old_z
+
+        self.word_z = new_z.to(self.device)
+        self._word_weight = self._bayesian_weight(new_z, 'word').to(self.device)
 
         return mean_change
 
@@ -182,6 +188,28 @@ class LatentDirichletAllocation:
         return self
 
 
+    def _edge_elbo(self, G, doc_data):
+        G = self._prepare_graph(G.reverse(), doc_data) # word -> doc
+        G.update_all(_edge_update, fn.sum('edge_elbo', 'edge_elbo'))
+        return (G.nodes['doc'].data['edge_elbo'].sum()
+                / G.nodes['doc'].data['z'].sum())
+
+
+    def _node_elbo(self, ndata, ntype):
+        if self.lr_mult[ntype] < float("inf"):
+            axis = 1 if ntype=='doc' else 0 # word
+            z = ndata['z'] * self.lr_mult[ntype]
+            weight = ndata['weight'] # already multiplied in _bayesian_weight
+
+            return (
+                (-z * weight.log()).sum(axis=axis)
+                -_lbeta(self.prior[ntype] + z * 0, axis=axis)
+                +_lbeta(self.prior[ntype] + z, axis=axis)
+            ).sum() / z.sum()
+        else: # inf / inf = 0
+            return torch.tensor(0.0)
+
+
     def perplexity(self, G, doc_data=None):
         """ppl = exp{-sum[log(p(w1,...,wn|d))] / n}
         Follows Eq (15) in Hoffman et al., 2010.
@@ -190,38 +218,20 @@ class LatentDirichletAllocation:
             doc_data = self._e_step(G)
         word_data = {'z': self.word_z, 'weight': self._word_weight}
 
-        # augment doc_data with edge_elbo
-        G = self._prepare_graph(G.reverse(), doc_data) # word -> doc
-        G.update_all(
-            _edge_update, fn.sum('edge_elbo', 'edge_elbo'),
-            lambda x: {"edge_elbo": x.data['edge_elbo'] * self.lr_mult['doc']}
-        )
-        doc_data = dict(G.nodes['doc'].data)
-
         # compute E[log p(docs | theta, beta)]
-        edge_elbo = (
-            doc_data['edge_elbo'].sum() / doc_data['z'].sum()
-        ).cpu().numpy()
+        edge_elbo = self._edge_elbo(G, doc_data).cpu().numpy()
         if self.verbose:
             print(f'neg_elbo phi: {-edge_elbo:.3f}', end=' ')
 
         # compute E[log p(theta | alpha) - log q(theta | gamma)]
-        doc_elbo = (
-            (-doc_data['z'] * doc_data['weight'].log()).sum(axis=1)
-            -_lbeta(self.prior['doc'] + doc_data['z'] * 0, axis=1)
-            +_lbeta(self.prior['doc'] + doc_data['z'], axis=1)
-        )
-        doc_elbo = (doc_elbo.sum() / doc_data['z'].sum()).cpu().numpy()
+        doc_elbo = self._node_elbo(doc_data, 'doc').cpu().numpy()
         if self.verbose:
             print(f'theta: {-doc_elbo:.3f}', end=' ')
 
         # compute E[log p(beta | eta) - log q (beta | lambda)]
-        word_elbo = (
-            (-word_data['z'] * word_data['weight'].log()).sum(axis=0)
-            -_lbeta(self.prior['word'] + word_data['z'] * 0, axis=0)
-            +_lbeta(self.prior['word'] + word_data['z'], axis=0)
-        )
-        word_elbo = (word_elbo.sum() / word_data['z'].sum()).cpu().numpy()
+        # The denominator z.sum() for extrapolation perplexity is undefined.
+        # We use the train set, whereas sklearn uses the test set - bug?
+        word_elbo = self._node_elbo(word_data, 'word').cpu().numpy()
         if self.verbose:
             print(f'beta: {-word_elbo:.3f}')
 
