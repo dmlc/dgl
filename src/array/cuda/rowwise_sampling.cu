@@ -110,7 +110,7 @@ __global__ void _CSRRowWiseSampleDegreeReplaceKernel(
 * @param out_cols The columns of the output COO (output).
 * @param out_idxs The data array of the output COO (output).
 */
-template<typename IdType, int BLOCK_ROWS>
+template<typename IdType, int BLOCK_ROWS, int TILE_SIZE>
 __global__ void _CSRRowWiseSampleKernel(
     const uint64_t rand_seed,
     const int64_t num_picks,
@@ -127,12 +127,13 @@ __global__ void _CSRRowWiseSampleKernel(
   assert(blockDim.x == WARP_SIZE);
   assert(blockDim.y == BLOCK_ROWS);
 
-  int64_t out_row = blockIdx.x*BLOCK_ROWS+threadIdx.y;
+  int64_t out_row = blockIdx.x*TILE_SIZE+threadIdx.y;
+  const int64_t last_row = min(static_cast<int64_t>(blockIdx.x+1)*TILE_SIZE, num_rows);
 
   curandState rng;
-  curand_init(rand_seed, out_row, threadIdx.x, &rng);
+  curand_init(rand_seed*gridDim.x+blockIdx.x, threadIdx.y*WARP_SIZE+threadIdx.x, 0, &rng);
 
-  while (out_row < num_rows) {
+  while (out_row < last_row) {
     const int64_t row = in_rows[out_row];
 
     const int64_t in_row_start = in_ptr[row];
@@ -176,7 +177,7 @@ __global__ void _CSRRowWiseSampleKernel(
       }
     }
 
-    out_row += gridDim.x*BLOCK_ROWS;
+    out_row += BLOCK_ROWS;
   }
 }
 
@@ -198,7 +199,7 @@ __global__ void _CSRRowWiseSampleKernel(
 * @param out_cols The columns of the output COO (output).
 * @param out_idxs The data array of the output COO (output).
 */
-template<typename IdType, int BLOCK_ROWS>
+template<typename IdType, int BLOCK_ROWS, int TILE_SIZE>
 __global__ void _CSRRowWiseSampleReplaceKernel(
     const uint64_t rand_seed,
     const int64_t num_picks,
@@ -214,10 +215,13 @@ __global__ void _CSRRowWiseSampleReplaceKernel(
   // we assign one warp per row
   assert(blockDim.x == WARP_SIZE);
 
-  int64_t out_row = blockIdx.x*blockDim.y+threadIdx.y;
+  int64_t out_row = blockIdx.x*TILE_SIZE+threadIdx.y;
+  const int64_t last_row = min(static_cast<int64_t>(blockIdx.x+1)*TILE_SIZE, num_rows);
+
   curandState rng;
-  curand_init(rand_seed, out_row, threadIdx.x, &rng);
-  while (out_row < num_rows) {
+  curand_init(rand_seed*gridDim.x+blockIdx.x, threadIdx.y*WARP_SIZE+threadIdx.x, 0, &rng);
+
+  while (out_row < last_row) {
     const int64_t row = in_rows[out_row];
 
     const int64_t in_row_start = in_ptr[row];
@@ -235,7 +239,7 @@ __global__ void _CSRRowWiseSampleReplaceKernel(
         out_idxs[out_idx] = data ? data[in_row_start+edge] : in_row_start+edge;
       }
     }
-    out_row += gridDim.x*blockDim.y;
+    out_row += BLOCK_ROWS;
   }
 }
 
@@ -322,9 +326,10 @@ COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat,
   // select edges
   if (replace) {
     constexpr int BLOCK_ROWS = 128/WARP_SIZE;
+    constexpr int TILE_SIZE = BLOCK_ROWS*16;
     const dim3 block(WARP_SIZE, BLOCK_ROWS);
-    const dim3 grid((num_rows+block.y-1)/block.y);
-    _CSRRowWiseSampleReplaceKernel<IdType, BLOCK_ROWS><<<grid, block, 0, stream>>>(
+    const dim3 grid((num_rows+TILE_SIZE-1)/TILE_SIZE);
+    _CSRRowWiseSampleReplaceKernel<IdType, BLOCK_ROWS, TILE_SIZE><<<grid, block, 0, stream>>>(
         random_seed,
         num_picks,
         num_rows,
@@ -338,9 +343,10 @@ COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat,
         out_idxs);
   } else {
     constexpr int BLOCK_ROWS = 128/WARP_SIZE;
+    constexpr int TILE_SIZE = BLOCK_ROWS*16;
     const dim3 block(WARP_SIZE, BLOCK_ROWS);
-    const dim3 grid((num_rows+block.y-1)/block.y);
-    _CSRRowWiseSampleKernel<IdType, BLOCK_ROWS><<<grid, block, 0, stream>>>(
+    const dim3 grid((num_rows+TILE_SIZE-1)/TILE_SIZE);
+    _CSRRowWiseSampleKernel<IdType, BLOCK_ROWS, TILE_SIZE><<<grid, block, 0, stream>>>(
         random_seed,
         num_picks,
         num_rows,
