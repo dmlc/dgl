@@ -66,9 +66,9 @@ bash scripts/test_inat.sh
 **Clustering with Seen Test Data Distribution Performance**
 |                    |              IMDB-Test-SameDist |                   iNat2018-Test |
 | ------------------ | ------------------------------: | ------------------------------: |
-|                 Fp |                           0.793 |                           0.330 |
-|                 Fb |                           0.795 |                           0.350 |
-|                NMI |                           0.947 |                           0.774 |
+|                 Fp |                           0.779 |                           0.330 |
+|                 Fb |                           0.819 |                           0.350 |
+|                NMI |                           0.949 |                           0.774 |
 * The results might fluctuate a little due to the randomness introduced by gpu knn building using faiss-gpu.
 
 
@@ -85,8 +85,8 @@ bash scripts/test_inat_train_on_resampled_1_in_6_per_class.sh
 **Clustering with Unseen Test Data Distribution Performance**
 |                    |                          Hannah |                            IMDB |                   iNat2018-Test |
 | ------------------ | ------------------------------: | ------------------------------: | ------------------------------: |
-|                 Fp |                           0.720 |                           0.765 |                           0.294 |
-|                 Fb |                           0.700 |                           0.796 |                           0.352 |
+|                 Fp |                           0.741 |                           0.717 |                           0.294 |
+|                 Fb |                           0.706 |                           0.810 |                           0.352 |
 |                NMI |                           0.810 |                           0.953 |                           0.764 |
 * The results might fluctuate a little due to the randomness introduced by gpu knn building using faiss-gpu.
 

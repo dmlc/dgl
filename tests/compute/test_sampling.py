@@ -156,7 +156,7 @@ def test_pinsage_sampling():
     _test_sampler(g, sampler, 'item')
     sampler = dgl.sampling.RandomWalkNeighborSampler(g, 4, 0.5, 3, 2, ['bought-by', 'bought'])
     _test_sampler(g, sampler, 'item')
-    sampler = dgl.sampling.RandomWalkNeighborSampler(g, 4, 0.5, 3, 2, 
+    sampler = dgl.sampling.RandomWalkNeighborSampler(g, 4, 0.5, 3, 2,
         [('item', 'bought-by', 'user'), ('user', 'bought', 'item')])
     _test_sampler(g, sampler, 'item')
     g = dgl.graph(([0, 0, 1, 1, 2, 2, 3, 3],
@@ -600,6 +600,34 @@ def create_test_graph(num_nodes, num_edges_per_node, bipartite=False):
         g = dgl.graph((src, dst))
     return g
 
+def create_etype_test_graph(num_nodes, num_edges_per_node, rare_cnt):
+    src = np.concatenate(
+        [np.random.choice(num_nodes, num_edges_per_node, replace=False) for i in range(num_nodes)]
+    )
+    dst = np.concatenate(
+        [np.array([i] * num_edges_per_node) for i in range(num_nodes)])
+
+    minor_src = np.concatenate(
+        [np.random.choice(num_nodes, 2, replace=False) for i in range(num_nodes)]
+    )
+    minor_dst = np.concatenate(
+        [np.array([i] * 2) for i in range(num_nodes)])
+
+    most_zero_src = np.concatenate(
+        [np.random.choice(num_nodes, num_edges_per_node, replace=False) for i in range(rare_cnt)]
+    )
+    most_zero_dst = np.concatenate(
+        [np.array([i] * num_edges_per_node) for i in range(rare_cnt)])
+
+
+    g = dgl.heterograph({("v", "e_major", "u") : (src, dst),
+                         ("u", "e_major_rev", "v") : (dst, src),
+                         ("v2", "e_minor", "u") : (minor_src, minor_dst),
+                         ("v2", "most_zero", "u") : (most_zero_src, most_zero_dst),
+                         ("u", "e_minor_rev", "v2") : (minor_dst, minor_src)})
+
+    return g
+
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
 def test_sample_neighbors_biased_homogeneous():
     g = create_test_graph(100, 30)
@@ -689,11 +717,114 @@ def test_sample_neighbors_biased_bipartite():
         subg = dgl.sampling.sample_neighbors_biased(g_sorted, g.srcnodes(), 5, bias, edge_dir='out', replace=True)
         check_num(subg.edges()[1], tag)
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
+def test_sample_neighbors_etype_homogeneous():
+    num_nodes = 100
+    rare_cnt = 4
+    g = create_etype_test_graph(100, 30, rare_cnt)
+    h_g = dgl.to_homogeneous(g)
+    seed_ntype = g.get_ntype_id("u")
+    seeds = F.nonzero_1d(h_g.ndata[dgl.NTYPE] == seed_ntype)
+
+    def check_num(nodes, replace):
+        nodes = F.asnumpy(nodes)
+        cnt = [sum(nodes == i) for i in range(num_nodes)]
+
+        for i in range(20):
+            if i < rare_cnt:
+                if replace is False:
+                    assert cnt[i] == 22
+                else:
+                    assert cnt[i] == 30
+            else:
+                if replace is False:
+                    assert cnt[i] == 12
+                else:
+                    assert cnt[i] == 20
+
+    # graph with coo format
+    coo_g = h_g.formats('coo')
+    for _ in range(5):
+        subg = dgl.sampling.sample_etype_neighbors(coo_g, seeds, dgl.ETYPE, 10, replace=False)
+        check_num(subg.edges()[1], False)
+
+    for _ in range(5):
+        subg = dgl.sampling.sample_etype_neighbors(coo_g, seeds, dgl.ETYPE, 10, replace=True)
+        check_num(subg.edges()[1], True)
+
+    # graph with csr format
+    csr_g = h_g.formats('csr')
+    csr_g = csr_g.formats(['csr','csc','coo'])
+    for _ in range(5):
+        subg = dgl.sampling.sample_etype_neighbors(csr_g, seeds, dgl.ETYPE, 10, replace=False)
+        check_num(subg.edges()[1], False)
+
+    for _ in range(5):
+        subg = dgl.sampling.sample_etype_neighbors(csr_g, seeds, dgl.ETYPE, 10, replace=True)
+        check_num(subg.edges()[1], True)
+
+    # graph with csc format
+    csc_g = h_g.formats('csc')
+    for _ in range(5):
+        subg = dgl.sampling.sample_etype_neighbors(csc_g, seeds, dgl.ETYPE, 10, replace=False)
+        check_num(subg.edges()[1], False)
+
+    for _ in range(5):
+        subg = dgl.sampling.sample_etype_neighbors(csc_g, seeds, dgl.ETYPE, 10, replace=True)
+        check_num(subg.edges()[1], True)
+
+    def check_num2(nodes, replace):
+        nodes = F.asnumpy(nodes)
+        cnt = [sum(nodes == i) for i in range(num_nodes)]
+
+        for i in range(20):
+            if replace is False:
+                assert cnt[i] == 7
+            else:
+                assert cnt[i] == 10
+
+    # edge dir out
+    # graph with coo format
+    coo_g = h_g.formats('coo')
+    for _ in range(5):
+        subg = dgl.sampling.sample_etype_neighbors(
+            coo_g, seeds, dgl.ETYPE, 5, edge_dir='out', replace=False)
+        check_num2(subg.edges()[0], False)
+    for _ in range(5):
+        subg = dgl.sampling.sample_etype_neighbors(
+            coo_g, seeds, dgl.ETYPE, 5, edge_dir='out', replace=True)
+        check_num2(subg.edges()[0], True)
+    # graph with csr format
+    csr_g = h_g.formats('csr')
+    for _ in range(5):
+        subg = dgl.sampling.sample_etype_neighbors(
+            csr_g, seeds, dgl.ETYPE, 5, edge_dir='out', replace=False)
+        check_num2(subg.edges()[0], False)
+
+    for _ in range(5):
+        subg = dgl.sampling.sample_etype_neighbors(
+            csr_g, seeds, dgl.ETYPE, 5, edge_dir='out', replace=True)
+        check_num2(subg.edges()[0], True)
+
+    # graph with csc format
+    csc_g = h_g.formats('csc')
+    csc_g = csc_g.formats(['csc','csr','coo'])
+    for _ in range(5):
+        subg = dgl.sampling.sample_etype_neighbors(
+            csc_g, seeds, dgl.ETYPE, 5, edge_dir='out', replace=False)
+        check_num2(subg.edges()[0], False)
+
+    for _ in range(5):
+        subg = dgl.sampling.sample_etype_neighbors(
+            csc_g, seeds, dgl.ETYPE, 5, edge_dir='out', replace=True)
+        check_num2(subg.edges()[0], True)
+
+
 if __name__ == '__main__':
+    test_sample_neighbors_etype_homogeneous()
     test_random_walk()
     test_pack_traces()
     test_pinsage_sampling()
-    # test_sample_neighbors()
     test_sample_neighbors_outedge()
     test_sample_neighbors_topk()
     test_sample_neighbors_topk_outedge()
