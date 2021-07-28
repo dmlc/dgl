@@ -147,6 +147,13 @@ class CustomPool:
             self.task_queues[i].put(
                 (MpCommand.DELETE_COLLATE_FN, (dataloader_name, )))
 
+    def call_barrier(self):
+        """Call barrier at all workers"""
+        for i in range(self.num_workers):
+            self.task_queues[i].put(
+                (MpCommand.CALL_BARRIER, tuple()))
+
+
     def close(self):
         """Close worker pool"""
         for i in range(self.num_workers):
