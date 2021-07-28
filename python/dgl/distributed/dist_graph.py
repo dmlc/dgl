@@ -505,7 +505,10 @@ class DistGraph:
                                            self.ntypes[dst_tid]))
         self._etype2canonical = {}
         for src_type, etype, dst_type in self._canonical_etypes:
-            self._etype2canonical[etype] = (src_type, etype, dst_type)
+            if etype in self._etype2canonical:
+                self._etype2canonical[etype] = ()
+            else:
+                self._etype2canonical[etype] = (src_type, etype, dst_type)
 
     def _init(self):
         self._client = get_kvstore()
@@ -526,7 +529,10 @@ class DistGraph:
 
         self._etype2canonical = {}
         for src_type, etype, dst_type in self._canonical_etypes:
-            self._etype2canonical[etype] = (src_type, etype, dst_type)
+            if etype in self._etype2canonical:
+                self._etype2canonical[etype] = ()
+            else:
+                self._etype2canonical[etype] = (src_type, etype, dst_type)
         self._ndata_store = {}
         self._edata_store = {}
         self._ndata = NodeDataView(self)
@@ -1056,8 +1062,11 @@ class DistGraph:
             if isinstance(edges, tuple):
                 subg = {etype: self.find_edges(edges[etype], etype[1]) for etype in edges}
             else:
-                subg = {self._etype2canonical[etype]: self.find_edges(edges[etype], etype) \
-                        for etype in edges}
+                subg = {}
+                for etype in edges:
+                    assert len(self._etype2canonical[etype]) == 3, \
+                            'the etype in input edges is ambiguous'
+                    subg[self._etype2canonical[etype]] = self.find_edges(edges[etype], etype)
             num_nodes = {ntype: self.number_of_nodes(ntype) for ntype in self.ntypes}
             subg = dgl_heterograph(subg, num_nodes_dict=num_nodes)
         else:
