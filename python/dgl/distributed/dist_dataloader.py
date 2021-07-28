@@ -115,11 +115,11 @@ class DistDataLoader:
             assert self.num_pending == 0
             raise StopIteration
 
-    def _get_data_from_result_queue(self, timeout=None):
+    def _get_data_from_result_queue(self, timeout=1800):
         if self.pool is None:
             ret = self.queue.pop(0)
         else:
-            ret = self.pool.get_result(self.name)
+            ret = self.pool.get_result(self.name, timeout=timeout)
         return ret
 
     def __iter__(self):

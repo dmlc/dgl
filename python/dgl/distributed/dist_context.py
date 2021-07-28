@@ -47,6 +47,7 @@ def _init_rpc(ip_config, num_servers, max_queue_size, net_type, role, num_thread
 
 
 class MpCommand(Enum):
+    """Enum class for multiprocessing command"""
     INIT_RPC = 0  # Not used in the task queue
     SET_COLLATE_FN = 1
     CALL_BARRIER = 2
@@ -57,6 +58,7 @@ class MpCommand(Enum):
 
 
 def init_process(_, rpc_config, mp_contexts):
+    """Work loop in the worker"""
     try:
         _init_rpc(*rpc_config)
         keep_polling = True
@@ -92,6 +94,9 @@ def init_process(_, rpc_config, mp_contexts):
 
 class CustomPool:
     def __init__(self, num_workers, rpc_config):
+        """
+        Customized worker pool
+        """
         ctx = mp.get_context("spawn")
         self.num_workers = num_workers
         self.queue_size = num_workers * 4
@@ -111,36 +116,43 @@ class CustomPool:
             self.process_list.append(proc)
 
     def set_collate_fn(self, func, dataloader_name):
+        """Set collate function in subprocess"""
         for i in range(self.num_workers):
             self.task_queues[i].put(
                 (MpCommand.SET_COLLATE_FN, (dataloader_name, func)))
 
     def submit_task(self, dataloader_name, args):
+        """Submit task to workers"""
         # Round robin
         self.task_queues[self.current_proc_id].put(
             (MpCommand.CALL_COLLATE_FN, (dataloader_name, args)))
         self.current_proc_id = (self.current_proc_id + 1) % self.num_workers
 
     def submit_task_to_all_workers(self, func, args):
+        """Submit task to all workers"""
         for i in range(self.num_workers):
             self.task_queues[i].put(
                 (MpCommand.CALL_FN_ALL_WORKERS, (func, args)))
 
-    def get_result(self, dataloader_name):
-        result_dataloader_name, result = self.result_queue.get(timeout=1800)
+    def get_result(self, dataloader_name, timeout=1800):
+        """Get result from result queue"""
+        result_dataloader_name, result = self.result_queue.get(timeout=timeout)
         assert result_dataloader_name == dataloader_name
         return result
 
     def delete_collate_fn(self, dataloader_name):
+        """Delete collate function"""
         for i in range(self.num_workers):
             self.task_queues[i].put(
                 (MpCommand.DELETE_COLLATE_FN, (dataloader_name, )))
 
     def close(self):
+        """Close worker pool"""
         for i in range(self.num_workers):
             self.task_queues[i].put((MpCommand.FINALIZE_POOL, tuple()))
 
     def join(self):
+        """Join the close process of worker pool"""
         for i in range(self.num_workers):
             self.process_list[i].join()
 
