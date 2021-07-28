@@ -2,7 +2,7 @@
   <img src="http://data.dgl.ai/asset/logo.jpg" height="200">
 </p>
 
-[![PyPi Latest Release](https://img.shields.io/pypi/v/dgl.svg)](https://pypi.org/project/dgl/)
+[![Latest Release](https://img.shields.io/github/v/release/dmlc/dgl)](https://github.com/dmlc/dgl/releases)
 [![Conda Latest Release](https://anaconda.org/dglteam/dgl/badges/version.svg)](https://anaconda.org/dglteam/dgl)
 [![Build Status](https://ci.dgl.ai/buildStatus/icon?job=DGL/master)](https://ci.dgl.ai/job/DGL/job/master/)
 [![Benchmark by ASV](http://img.shields.io/badge/benchmarked%20by-asv-green.svg?style=flat)](https://asv.dgl.ai/)
