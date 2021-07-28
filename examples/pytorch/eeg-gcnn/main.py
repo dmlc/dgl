@@ -14,7 +14,7 @@ from torch.utils.data import WeightedRandomSampler
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import balanced_accuracy_score
 from collections import Counter
-
+from sklearn import preprocessing
 
 if __name__ == "__main__":
     # argparse commandline args
@@ -42,10 +42,22 @@ if __name__ == "__main__":
     num_feats = args.num_feats
 
     # set up input and targets from files
-    memmap_x = f'norm_X'
+    memmap_x = f'psd_features_data_X'
     memmap_y = f'labels_y'
     x = load(memmap_x, mmap_mode='r')
     y = load(memmap_y, mmap_mode='r')
+
+    # normalize psd features data
+    normd_x = []
+    for i in range(len(y)):
+        arr = x[i, :]
+        arr = arr.reshape(1, -1)
+        arr2 = preprocessing.normalize(arr)
+        arr2 = arr2.reshape(48)
+        normd_x.append(arr2)
+
+    norm = np.array(normd_x)
+    x = norm.reshape(len(y), 48)
 
     # map 0/1 to diseased/healthy
     label_mapping, y = np.unique(y, return_inverse=True)
