@@ -1,13 +1,12 @@
 # pylint: disable=global-variable-undefined, invalid-name
 """Multiprocess dataloader for distributed training"""
-import time
-
-from .dist_context import get_sampler_pool, MpCommand, CustomPool
+from .dist_context import get_sampler_pool
 from .. import backend as F
 
 __all__ = ["DistDataLoader"]
 
 DATALOADER_ID = 0
+
 
 class DistDataLoader:
     """DGL customized multiprocessing dataloader.
@@ -67,7 +66,7 @@ class DistDataLoader:
         self.pool, self.num_workers = get_sampler_pool()
         if queue_size is None:
             queue_size = self.num_workers * 4 if self.num_workers > 0 else 4
-        self.queue_size = queue_size
+        self.queue_size = queue_size  # prefetch size
         self.batch_size = batch_size
         self.num_pending = 0
         self.collate_fn = collate_fn
@@ -103,8 +102,8 @@ class DistDataLoader:
     def __next__(self):
         if self.pool is None:
             num_reqs = 1
-        else: 
-            num_reqs = self.num_workers - self.num_pending
+        else:
+            num_reqs = self.queue_size - self.num_pending
         for _ in range(num_reqs):
             self._request_next_batch()
         if self.recv_idxs < self.expected_idxs:
@@ -118,7 +117,7 @@ class DistDataLoader:
 
     def _get_data_from_result_queue(self, timeout=None):
         if self.pool is None:
-            ret = self.queue.pop(0)            
+            ret = self.queue.pop(0)
         else:
             ret = self.pool.get_result(self.name)
         return ret
