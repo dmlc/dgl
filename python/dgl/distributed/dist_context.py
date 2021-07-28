@@ -56,7 +56,7 @@ class MpCommand(Enum):
     FINALIZE_POOL = 6
 
 
-def init_process(proc_id, rpc_config, mp_contexts):
+def init_process(_, rpc_config, mp_contexts):
     try:
         _init_rpc(*rpc_config)
         keep_polling = True
@@ -87,6 +87,7 @@ def init_process(proc_id, rpc_config, mp_contexts):
                 raise Exception("Unknown command")
     except Exception as e:
         traceback.print_exc()
+        raise e
 
 
 class CustomPool:
