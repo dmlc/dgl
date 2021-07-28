@@ -6,6 +6,7 @@ import atexit
 import time
 import os
 import sys
+from enum import Enum
 
 from . import rpc
 from .constants import MAX_QUEUE_SIZE
@@ -40,6 +41,96 @@ def _init_rpc(ip_config, num_servers, max_queue_size, net_type, role, num_thread
         print(e, flush=True)
         traceback.print_exc()
         raise e
+
+class MpCommand(Enum):
+    INIT_RPC = 0 # Not used in the task queue
+    SET_COLLATE_FN = 1
+    CALL_BARRIER = 2
+    DELETE_COLLATE_FN = 3
+    CALL_COLLATE_FN = 4
+    CALL_FN_ALL_WORKERS = 5
+    FINALIZE_POOL = 6
+
+
+def init_process(proc_id, rpc_config, mp_contexts):        
+    try:
+        _init_rpc(*rpc_config)
+        keep_polling = True
+        data_queue, task_queue, barrier = mp_contexts
+        collate_fn_dict = {}
+
+        while keep_polling:
+            command, args = task_queue.get(timeout=1800)
+            if command == MpCommand.SET_COLLATE_FN:
+                dataloader_name, func = args
+                collate_fn_dict[dataloader_name] = func
+            elif command == MpCommand.CALL_BARRIER:
+                barrier.wait()
+            elif command == MpCommand.DELETE_COLLATE_FN:
+                dataloader_name, = args
+                del collate_fn_dict[dataloader_name]
+            elif command == MpCommand.CALL_COLLATE_FN:
+                dataloader_name, collate_args = args
+                data_queue.put((dataloader_name, collate_fn_dict[dataloader_name](collate_args)))
+            elif command == MpCommand.CALL_FN_ALL_WORKERS:
+                func, func_args = args
+                func(func_args)
+            elif command == MpCommand.FINALIZE_POOL:
+                _exit()
+                keep_polling = False
+            else:
+                raise Exception("Unknown command")
+    except Exception as e:
+        traceback.print_exc()
+
+class CustomPool:
+    def __init__(self, num_workers, rpc_config):
+        ctx = mp.get_context("spawn")
+        self.num_workers = num_workers
+        self.queue_size = num_workers
+        self.result_queue = ctx.Queue(self.queue_size)
+        self.task_queues = []
+        self.process_list = []
+        self.current_proc_id = 0
+        self.cache_result_dict = {}
+        self.barrier = ctx.Barrier(num_workers)
+        for i in range(num_workers):
+            task_queue = ctx.Queue(self.queue_size)
+            self.task_queues.append(task_queue)
+            proc = ctx.Process(target=init_process, args=(i, rpc_config, (self.result_queue, task_queue, self.barrier)))
+            proc.daemon = True
+            proc.start()
+            self.process_list.append(proc)
+    
+    def set_collate_fn(self, func, dataloader_name):
+        for i in range(self.num_workers):
+            self.task_queues[i].put((MpCommand.SET_COLLATE_FN, (dataloader_name, func)))
+
+    def submit_task(self, dataloader_name, args):
+        # Round robin
+        self.task_queues[self.current_proc_id].put((MpCommand.CALL_COLLATE_FN, (dataloader_name, args)))
+        self.current_proc_id = (self.current_proc_id + 1) % self.num_workers
+
+    def submit_task_to_all_workers(self, func, args):
+        for i in range(self.num_workers):
+            self.task_queues[i].put((MpCommand.CALL_FN_ALL_WORKERS, (func, args)))
+
+    def get_result(self, dataloader_name):
+        result_dataloader_name, result = self.result_queue.get(timeout=1800)
+        assert result_dataloader_name == dataloader_name
+        return result
+    
+    def delete_collate_fn(self, dataloader_name):
+        for i in range(self.num_workers):
+            self.task_queues[i].put((MpCommand.DELETE_COLLATE_FN, (dataloader_name, )))
+
+    def close(self):
+        for i in range(self.num_workers):
+            self.task_queues[i].put((MpCommand.FINALIZE_POOL, tuple()))
+    
+    def join(self):
+        for i in range(self.num_workers):
+            self.process_list[i].join()
 
 def initialize(ip_config, num_servers=1, num_workers=0,
                max_queue_size=MAX_QUEUE_SIZE, net_type='socket',
@@ -114,13 +205,11 @@ def initialize(ip_config, num_servers=1, num_workers=0,
             num_servers = 1
 
         rpc.reset()
-        ctx = mp.get_context("spawn")
         global SAMPLER_POOL
         global NUM_SAMPLER_WORKERS
         is_standalone = os.environ.get('DGL_DIST_MODE', 'standalone') == 'standalone'
         if num_workers > 0 and not is_standalone:
-            SAMPLER_POOL = ctx.Pool(num_workers, initializer=_init_rpc,
-                                    initargs=(ip_config, num_servers, max_queue_size,
+            SAMPLER_POOL = CustomPool(num_workers, (ip_config, num_servers, max_queue_size,
                                               net_type, 'sampler', num_worker_threads))
         else:
             SAMPLER_POOL = None
@@ -149,9 +238,6 @@ def finalize_worker():
        Python's multiprocessing pool will not call atexit function when close
     """
     if SAMPLER_POOL is not None:
-        for _ in range(NUM_SAMPLER_WORKERS):
-            SAMPLER_POOL.apply_async(_exit)
-            time.sleep(0.1) # This is necessary but I don't know why
         SAMPLER_POOL.close()
 
 def join_finalize_worker():
