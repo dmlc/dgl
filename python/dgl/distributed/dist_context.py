@@ -93,9 +93,10 @@ def init_process(_, rpc_config, mp_contexts):
 
 
 class CustomPool:
+    """Customized worker pool"""
     def __init__(self, num_workers, rpc_config):
         """
-        Customized worker pool
+        Customized worker pool init function
         """
         ctx = mp.get_context("spawn")
         self.num_workers = num_workers
