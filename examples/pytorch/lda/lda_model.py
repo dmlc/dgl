@@ -43,17 +43,16 @@ def _edge_update(edges):
 
 def _bayesian_weight(z, ntype, prior, lr_mult):
     """The sum is less than or equal to one according to Jensen's inequality:
-    exp(E(log(x))) <= E(x) = 1. The bound is tight when z is large, e.g., due
-    to large lr_mult in the corresponding direction.
+    exp(E(log(x))) <= E(x) = 1. The bound is tight when z -> inf.
     """
     axis = 1 if ntype == 'doc' else 0 # word
+    K = z.shape[axis]
 
     if lr_mult < float("inf"):
-        gamma = prior + z * lr_mult
-        sum = gamma.sum(axis, keepdims=True)
-        Elog = torch.digamma(gamma) - torch.digamma(sum)
+        sum = K * prior + z.sum(axis, keepdims=True) * lr_mult
+        Elog = torch.digamma(prior + z * lr_mult) - torch.digamma(sum)
         return Elog.exp()
-    else: # avoid precision loss due to inf - inf
+    else:
         return z / z.sum(axis, keepdims=True)
 
 
@@ -66,7 +65,7 @@ class LatentDirichletAllocation:
     ---
     * prior: parameters in the Dirichlet prior; default to 1/n_components
     * lr: new_z = (1-lr)*old_z + lr*z; default to 1 for full gradients.
-    * lr_mult: multiplier for z; use float("inf") to get max-a-posterior estimates.
+    * lr_mult: multiplier for z-update; use float("inf") to wash out the prior.
     * device: accelerate _bayesian_weight(word_z) during initialization.
 
     References
@@ -134,11 +133,9 @@ class LatentDirichletAllocation:
             G.update_all(_edge_update, fn.sum('z', 'z'))
             new_z = G.nodes['doc'].data['z']
 
-            mean_change = (new_z - old_z).abs().mean()
-            del old_z
-
             G.nodes['doc'].data['weight'] = self._bayesian_weight(new_z, 'doc')
 
+            mean_change = (new_z - old_z).abs().mean()
             if mean_change < mean_change_tol:
                 break
 
@@ -156,16 +153,17 @@ class LatentDirichletAllocation:
         """
         G = self._prepare_graph(G.clone(), doc_data)
 
-        old_z = G.nodes['word'].data['z']
+        old_z = G.nodes['word'].data['z'].to(self.device)
         G.update_all(_edge_update, fn.sum('z', 'z'))
-        new_z = (1-self.lr) * old_z + self.lr * G.nodes['word'].data['z']
+        new_z = G.nodes['word'].data['z'].to(self.device)
 
         mean_change = (new_z - old_z).abs().mean()
         del old_z
 
-        self.word_z = new_z.to(self.device)
-        self._word_weight = self._bayesian_weight(new_z, 'word').to(self.device)
+        self.word_z = (1 - self.lr) * self.word_z + self.lr * new_z
+        del new_z
 
+        self._word_weight = self._bayesian_weight(self.word_z, 'word')
         return mean_change
 
 
@@ -180,8 +178,9 @@ class LatentDirichletAllocation:
             mean_change = self._m_step(G, doc_data)
 
             if self.verbose:
-                print(f"iter {i+1}, m-step mean_change: {mean_change:.4f}, "
-                      f"perplexity: {self.perplexity(G, doc_data):.4f}")
+                print(f"iter {i+1}, m-step mean_change={mean_change:.4f}, "
+                      f"digamma_gap={1 - self._word_weight.sum(axis=0).mean():.4f}, "
+                      f"perplexity={self.perplexity(G, doc_data):.4f}")
 
             if mean_change < mean_change_tol:
                 break
@@ -191,23 +190,29 @@ class LatentDirichletAllocation:
     def _edge_elbo(self, G, doc_data):
         G = self._prepare_graph(G.reverse(), doc_data) # word -> doc
         G.update_all(_edge_update, fn.sum('edge_elbo', 'edge_elbo'))
-        return (G.nodes['doc'].data['edge_elbo'].sum()
-                / G.nodes['doc'].data['z'].sum())
+        ndata = G.nodes['doc'].data
+        return (ndata['edge_elbo'].sum() / ndata['z'].sum())
 
 
     def _node_elbo(self, ndata, ntype):
-        if self.lr_mult[ntype] < float("inf"):
-            axis = 1 if ntype=='doc' else 0 # word
-            z = ndata['z'] * self.lr_mult[ntype]
-            weight = ndata['weight'] # already multiplied in _bayesian_weight
+        """ Eq (4) in Hoffman et al., 2010.
+        """
+        lr_mult = self.lr_mult[ntype]
+        z = ndata['z']
+        weight = ndata['weight']
+        prior = torch.tensor(self.prior[ntype], device=z.device)
 
+        axis = 1 if ntype=='doc' else 0 # word
+        K = z.shape[axis]
+
+        if lr_mult < float("inf"):
             return (
-                (-z * weight.log()).sum(axis=axis)
-                -_lbeta(self.prior[ntype] + z * 0, axis=axis)
-                +_lbeta(self.prior[ntype] + z, axis=axis)
-            ).sum() / z.sum()
-        else: # inf / inf = 0
-            return torch.tensor(0.0)
+                (-z * weight.log()).sum(axis) * lr_mult
+                - (K * torch.lgamma(prior) - torch.lgamma(K * prior)) # logB(a)
+                + _lbeta(prior + z * lr_mult, axis)               # logB(gamma)
+            ).sum() / z.sum() / lr_mult
+        else:
+            return torch.tensor(0.0, device=z.device)
 
 
     def perplexity(self, G, doc_data=None):
@@ -228,9 +233,9 @@ class LatentDirichletAllocation:
         if self.verbose:
             print(f'theta: {-doc_elbo:.3f}', end=' ')
 
-        # compute E[log p(beta | eta) - log q (beta | lambda)]
+        # compute E[log p(beta | eta) - log q(beta | lambda)]
         # The denominator z.sum() for extrapolation perplexity is undefined.
-        # We use the train set, whereas sklearn uses the test set - bug?
+        # We use the train set, whereas sklearn uses the test set.
         word_elbo = self._node_elbo(word_data, 'word').cpu().numpy()
         if self.verbose:
             print(f'beta: {-word_elbo:.3f}')

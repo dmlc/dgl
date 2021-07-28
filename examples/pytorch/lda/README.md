@@ -23,15 +23,15 @@ Key equations
 | prior     | α      | η      |         |
 | posterior | γ_d(z) | λ_z(w) | ϕ_dw(z) |
 
-**MAP**
+**Mixture-EM Model**
 
-A simplified MAP model is just a non-conjugate model with an inner summation to integrate out the latent topic variable:
-<img src="https://latex.codecogs.com/gif.latex?p(G)=\prod_{(d,w)}\left(\sum_z\theta_{dz}\beta_{zw}\right)" title="map" />
+A simplified case is just a mixture model with an inner summation to integrate out the latent topic variable:
+<img src="https://latex.codecogs.com/gif.latex?p(G)=\prod_{(d,w)}\left(\sum_z\theta_{dz}\beta_{zw}\right)" title="mixture" />
 
 The main complications are that θ_d / β_z are shared in the same document / topic and the variables reside in a probability simplex.
 One way to work around it is via expectation maximization
 
-<img src="https://latex.codecogs.com/gif.latex?\log&space;p(G)&space;=\sum_{(d,w)}\log\left(\sum_z\theta_{dz}\beta_{zw}\right)&space;\geq\sum_{(d,w)}\mathbb{E}_q\log\left(\frac{\theta_{dz}\beta_{zw}}{q(z;\phi_{dw})}\right)" title="map-em" />
+<img src="https://latex.codecogs.com/gif.latex?\log&space;p(G)&space;=\sum_{(d,w)}\log\left(\sum_z\theta_{dz}\beta_{zw}\right)&space;\geq\sum_{(d,w)}\mathbb{E}_q\log\left(\frac{\theta_{dz}\beta_{zw}}{q(z;\phi_{dw})}\right)" title="mixture-em" />
 
  * An explicit posterior is ϕ_dwz ∝ θ_dz * β_zw
  * E-step: find summary statistics with fractional membership
@@ -43,7 +43,7 @@ One way to work around it is via expectation maximization
 A Bayesian model adds Dirichlet priors to θ_d & β_z. This causes the posterior to be implicit and the bound to be loose. We will still use an independence assumption and cycle through the variational parameters similarly to coordinate ascent.
 
  * The evidence lower-bound is
- <img src="https://latex.codecogs.com/gif.latex?\log&space;p(G)=\sum_{(d,w)}\log\left(\int_{\theta_d}\iint_{\beta_{:}}\sum_z(\theta_{dz}\beta_{zw})p(\theta_d,\alpha)p(\beta_z;\eta)\right)&space;\\&space;\geq&space;\mathbb{E}_q\left[\sum_{(d,w)}\log\left(&space;\frac{\theta_{dz}\beta_{zw}}&space;{q(z;\phi_{dw})}&space;\right)&space;&plus;\sum_{d}&space;\log\left(&space;\frac{p(\theta_d;\alpha)}{q(\theta_d;\gamma_d)}&space;\right)&space;&plus;\sum_{z}&space;\log\left(&space;\frac{p(\beta_z;\eta)}{q(\beta_z;\lambda_z)}&space;\right)\right]" title="elbo" />
+ <img src="https://latex.codecogs.com/gif.latex?\log&space;p(G)=\sum_{(d,w)}\log\left(\int_{\theta_d}\sum_z\int_{\beta_z}(\theta_{dz}\beta_{zw}){\rm\,d}P(\beta_z;\eta){\rm\,d}P(\theta_d;\alpha)\right)&space;\\&space;\geq&space;\mathbb{E}_q\left[\sum_{(d,w)}\log\left(&space;\frac{\theta_{dz}\beta_{zw}}&space;{q(z;\phi_{dw})}&space;\right)&space;&plus;\sum_{d}&space;\log\left(&space;\frac{p(\theta_d;\alpha)}{q(\theta_d;\gamma_d)}&space;\right)&space;&plus;\sum_{z}&space;\log\left(&space;\frac{p(\beta_z;\eta)}{q(\beta_z;\lambda_z)}&space;\right)\right]" title="elbo" />
 
  * ELBO objective function factors as
  <img src="https://latex.codecogs.com/gif.latex?\sum_{(d,w)}&space;\phi_{dw}^{\top}\left(&space;\mathbb{E}_{\gamma_d}[\log\theta_d]&space;&plus;\mathbb{E}_{\lambda}[\log\beta_{:w}]&space;-\log\phi_{dw}&space;\right)&space;\\&space;&plus;&space;\sum_d&space;(\alpha-\gamma_d)^\top\mathbb{E}_{\gamma_d}[\log&space;\theta_d]-(\log&space;B(\alpha)-\log&space;B(\gamma_d))&space;\\&space;&plus;&space;\sum_z&space;(\eta-\lambda_z)^\top\mathbb{E}_{\lambda_z}[\log&space;\beta_z]-(\log&space;B(\eta)-\log&space;B(\lambda_z))" title="factors" />
@@ -56,8 +56,8 @@ The corpus is represented as a bipartite multi-graph G.
 We use DGL to propagate information through the edges and aggregate the distributions at doc/word nodes.
 For scalability, the phi variables are transient and updated during message passing.
 The gamma / lambda variables are updated after the nodes receive all edge messages.
-Following the conventions in [1], the gamma update is called E-step and the lambda update is called M-step, because the beta variable has smaller variance.
-The lambda variable is further recorded by the trainer and we may further approximate its MAP estimate by using a large step size for word nodes.
+Following the conventions in [1], the gamma update is called E-step and the lambda update is called M-step.
+The lambda variable is further recorded by the trainer and we may further disable (wash out) its prior by using a large step size for word nodes.
 A separate function is used to produce perplexity, which is based on the ELBO objective function divided by the total numbers of word/doc occurrences.
 
 Example
@@ -65,13 +65,13 @@ Example
 `%run example_20newsgroups.py`
  * Approximately matches scikit-learn training perplexity after 10 rounds of training.
  * Exactly matches scikit-learn training perplexity if word_z is set to lda.components_.T
- * To compute testing perplexity, we need to fix the word beta variables via MAP estimate. This step is not taken by sklearn and its beta part seems to contain another bug by dividing the training loss by the testing word counts. Nonetheless, I recommend setting `step_size["word"]` to a larger value to approximate the corresponding MAP estimate.
+ * There is a difference in how we compute testing perplexity. We weigh the beta contributions by the training word counts, whereas sklearn weighs them by test word counts.
  * The DGL-LDA model runs 50% faster on GPU devices compared with sklearn without joblib parallel.
 
 Advanced configurations
 ---
- * Set `step_size["word"]` to a large value obtain a MAP estimate for beta.
- * Set `0<word_rho<1` for online learning.
+ * Set `lr["word"] -> inf` to disable (wash out) prior on word variables.
+ * Set `0<lr<1` for online learning.
 
 References
 ---

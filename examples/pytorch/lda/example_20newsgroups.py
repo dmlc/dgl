@@ -96,8 +96,8 @@ print()
 
 print("Preparing dgl graphs...")
 t0 = time()
-G = dgl.heterograph({('doc', '', 'word'): tf_uv}, device=device)
-Gt = dgl.heterograph({('doc', '', 'word'): tt_uv}, device=device)
+G = dgl.heterograph({('doc','topic','word'): tf_uv}, device=device)
+Gt = dgl.heterograph({('doc','topic','word'): tt_uv}, device=device)
 print("done in %0.3fs." % (time() - t0))
 print()
 
