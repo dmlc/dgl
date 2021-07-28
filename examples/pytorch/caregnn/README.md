@@ -2,7 +2,7 @@
 
 This DGL example implements the CAmouflage-REsistant GNN (CARE-GNN) model proposed in the paper [Enhancing Graph Neural Network-based Fraud Detectors against Camouflaged Fraudsters](https://arxiv.org/abs/2008.08692). The author's codes of implementation is [here](https://github.com/YingtongDou/CARE-GNN).
 
-**NOTE**: The sampling version of the model has been modified due to the nature of DGL node dataloader. In the formula 2 in the paper, instead of the embedding of the last layer, the embedding of current layer in last epoch is used to measure the similarity between center nodes and their neighbor.
+**NOTE**: The sampling version of this model has been modified according to the feature of the DGL's NodeDataLoader. For the formula 2 in the paper, rather than using the embedding of the last layer, this version uses the embedding of the current layer in the previous epoch to measure the similarity between center nodes and their neighbors.
 
 Example implementor
 ----------------------
@@ -17,7 +17,7 @@ Dependencies
 
 Dataset
 ---------------------------------------
-The datasets used for node classification are variants of DGL's built-in Fake News datasets. The statistics are summarized as followings:
+The datasets used for node classification are DGL's built-in FraudDataset. The statistics are summarized as followings:
 
 **Amazon**
 
@@ -70,7 +70,7 @@ python main_sampling.py
 
 Performance
 -------------------------
-The result reported by the paper is the best validation results within 30 epochs, while ours are testing results.
+The result reported by the paper is the best validation results within 30 epochs, while ours are testing results after the max epoch specified in the table. Early stopping with patience value of 100 is applied.
 
 <table>
 	<tr>

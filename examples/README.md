@@ -77,7 +77,7 @@ To quickly locate the examples of your interest, search for the tagged keywords 
     - Tags: Heterogeneous graph, Graph neural network, Graph embedding, Network Schema
 - <a name="caregnn"></a> Dou Y, Liu Z, et al. Enhancing Graph Neural Network-based Fraud Detectors against Camouflaged Fraudsters. [Paper link](https://arxiv.org/abs/2008.08692).
     - Example code: [PyTorch](../examples/pytorch/caregnn)
-    - Tags: Multi-relational graph, Graph neural network, Fraud Detection, Reinforcement learning, Node classification
+    - Tags: Multi-relational graph, Graph neural network, Fraud detection, Reinforcement learning, Node classification
 
 ## 2019
 

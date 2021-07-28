@@ -75,9 +75,8 @@ class CAREConv(nn.Module):
                 hr[etype] = self.activation(hr[etype])
 
         # formula 9 using mean as inter-relation aggregator
-        h_homo = th.sum(th.stack(list(hr.values())) * th.Tensor(list(self.p.values())).view(-1, 1, 1).to(feat.device),
-                        dim=0)
-
+        p_tensor = th.Tensor(list(self.p.values())).view(-1, 1, 1).to(feat.device)
+        h_homo = th.sum(th.stack(list(hr.values())) * p_tensor, dim=0)
         h_homo += feat[:g.number_of_dst_nodes()]
         if self.activation is not None:
             h_homo = self.activation(h_homo)
@@ -153,14 +152,18 @@ class CAREGNN(nn.Module):
         for i, layer in enumerate(self.layers):
             for etype in self.edges:
                 if not layer.cvg:
+                    # formula 5
                     eid = graph.in_edges(idx, form='eid', etype=etype)
                     avg_dist = th.mean(dists[i][etype][eid])
+
+                    # formula 6
                     if layer.last_avg_dist[etype] < avg_dist:
                         layer.p[etype] -= self.step_size
                         layer.f.append(-1)
                     else:
                         layer.p[etype] += self.step_size
                         layer.f.append(+1)
+
                     # formula 7
                     if epoch >= 10 and sum(layer.f[-10:]) <= 2:
                         layer.cvg = True

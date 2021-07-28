@@ -86,13 +86,14 @@ def main(args):
         print("Epoch {}, Train: Recall: {:.4f} AUC: {:.4f} Loss: {:.4f} | Val: Recall: {:.4f} AUC: {:.4f} Loss: {:.4f}"
               .format(epoch, tr_recall, tr_auc, tr_loss.item(), val_recall, val_auc, val_loss.item()))
 
+        # Adjust p value with reinforcement learning module
         model.RLModule(graph, epoch, rl_idx)
 
         if args.early_stop:
             if stopper.step(val_auc, model):
                 break
 
-    # Test with mini batch after all epoch
+    # Test after all epoch
     model.eval()
     if args.early_stop:
         model.load_state_dict(th.load('es_checkpoint.pt'))

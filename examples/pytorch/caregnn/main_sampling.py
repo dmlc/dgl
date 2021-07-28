@@ -3,7 +3,7 @@ import argparse
 import torch as th
 import torch.optim as optim
 from utils import EarlyStopping
-from model import CAREGNN, CARESampler, _l1_dist
+from model_sampling import CAREGNN, CARESampler, _l1_dist
 from sklearn.metrics import roc_auc_score, recall_score
 
 

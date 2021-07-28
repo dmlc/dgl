@@ -66,9 +66,8 @@ class CAREConv(nn.Module):
                     hr[etype] = self.activation(hr[etype])
 
             # formula 9 using mean as inter-relation aggregator
-            h_homo = th.sum(th.stack(list(hr.values())) * th.Tensor(list(self.p.values())).view(-1, 1, 1).to(g.device),
-                            dim=0)
-
+            p_tensor = th.Tensor(list(self.p.values())).view(-1, 1, 1).to(g.device)
+            h_homo = th.sum(th.stack(list(hr.values())) * p_tensor, dim=0)
             h_homo += feat
             if self.activation is not None:
                 h_homo = self.activation(h_homo)
@@ -137,17 +136,20 @@ class CAREGNN(nn.Module):
         sim = th.tanh(self.layers[0].MLP(feat))
 
         # Forward of n layers of CARE-GNN
-        for i, layer in enumerate(self.layers):
+        for layer in self.layers:
             feat = layer(graph, feat)
 
         return feat, sim
 
     def RLModule(self, graph, epoch, idx):
-        for i, layer in enumerate(self.layers):
+        for layer in self.layers:
             for etype in self.edges:
                 if not layer.cvg[etype]:
+                    # formula 5
                     eid = graph.in_edges(idx, form='eid', etype=etype)
                     avg_dist = th.mean(layer.dist[etype][eid])
+
+                    # formula 6
                     if layer.last_avg_dist[etype] < avg_dist:
                         if layer.p[etype] - self.step_size > 0:
                             layer.p[etype] -= self.step_size
@@ -161,4 +163,3 @@ class CAREGNN(nn.Module):
                     # formula 7
                     if epoch >= 9 and abs(sum(layer.f[etype][-10:])) <= 2:
                         layer.cvg[etype] = True
-            # print(layer.p)
