@@ -7,6 +7,9 @@ import os
 import numpy as np
 
 from ..heterograph import DGLHeteroGraph
+from ..convert import heterograph as dgl_heterograph
+from ..convert import graph as dgl_graph
+from ..transform import compact_graphs
 from .. import heterograph_index
 from .. import backend as F
 from ..base import NID, EID, NTYPE, ETYPE, ALL, is_all
@@ -502,6 +505,12 @@ class DistGraph:
             dst_tid = F.as_scalar(dst_tid)
             self._canonical_etypes.append((self.ntypes[src_tid], self.etypes[etype_id],
                                            self.ntypes[dst_tid]))
+        self._etype2canonical = {}
+        for src_type, etype, dst_type in self._canonical_etypes:
+            if etype in self._etype2canonical:
+                self._etype2canonical[etype] = ()
+            else:
+                self._etype2canonical[etype] = (src_type, etype, dst_type)
 
     def _init(self):
         self._client = get_kvstore()
@@ -514,12 +523,18 @@ class DistGraph:
         self._client.map_shared_data(self._gpb)
 
     def __getstate__(self):
-        return self.graph_name, self._gpb
+        return self.graph_name, self._gpb, self._canonical_etypes
 
     def __setstate__(self, state):
-        self.graph_name, self._gpb_input = state
+        self.graph_name, self._gpb_input, self._canonical_etypes = state
         self._init()
 
+        self._etype2canonical = {}
+        for src_type, etype, dst_type in self._canonical_etypes:
+            if etype in self._etype2canonical:
+                self._etype2canonical[etype] = ()
+            else:
+                self._etype2canonical[etype] = (src_type, etype, dst_type)
         self._ndata_store = {}
         self._edata_store = {}
         self._ndata = NodeDataView(self)
@@ -969,15 +984,25 @@ class DistGraph:
         '''
         return role.get_global_rank()
 
-    def find_edges(self, edges):
+    def find_edges(self, edges, etype=None):
         """ Given an edge ID array, return the source
         and destination node ID array ``s`` and ``d``.  ``s[i]`` and ``d[i]``
         are source and destination node ID for edge ``eid[i]``.
 
         Parameters
         ----------
-        edges : tensor
-            The edge ID array.
+        edges : Int Tensor
+            Each element is an ID. The tensor must have the same device type
+              and ID data type as the graph's.
+
+        etype : str or (str, str, str), optional
+            The type names of the edges. The allowed type name formats are:
+
+            * ``(str, str, str)`` for source node type, edge type and destination node type.
+            * or one ``str`` edge type name if the name can uniquely identify a
+              triplet format in the graph.
+
+            Can be omitted if the graph has only one type of edges.
 
         Returns
         -------
@@ -986,8 +1011,75 @@ class DistGraph:
         tensor
             The destination node ID array.
         """
-        assert len(self.etypes) == 1, 'find_edges does not support heterogeneous graph for now.'
-        return dist_find_edges(self, edges)
+        if etype is None:
+            assert len(self.etypes) == 1, 'find_edges requires etype for heterogeneous graphs.'
+
+        gpb = self.get_partition_book()
+        if len(gpb.etypes) > 1:
+            edges = gpb.map_to_homo_eid(edges, etype)
+        src, dst = dist_find_edges(self, edges)
+        if len(gpb.ntypes) > 1:
+            _, src = gpb.map_to_per_ntype(src)
+            _, dst = gpb.map_to_per_ntype(dst)
+        return src, dst
+
+    def edge_subgraph(self, edges, relabel_nodes=True, store_ids=True):
+        """Return a subgraph induced on the given edges.
+
+        An edge-induced subgraph is equivalent to creating a new graph using the given
+        edges. In addition to extracting the subgraph, DGL also copies the features
+        of the extracted nodes and edges to the resulting graph. The copy is *lazy*
+        and incurs data movement only when needed.
+
+        If the graph is heterogeneous, DGL extracts a subgraph per relation and composes
+        them as the resulting graph. Thus, the resulting graph has the same set of relations
+        as the input one.
+
+        Parameters
+        ----------
+        edges : Int Tensor or dict[(str, str, str), Int Tensor]
+            The edges to form the subgraph. Each element is an edge ID. The tensor must have
+            the same device type and ID data type as the graph's.
+
+            If the graph is homogeneous, one can directly pass an Int Tensor.
+            Otherwise, the argument must be a dictionary with keys being edge types
+            and values being the edge IDs in the above formats.
+        relabel_nodes : bool, optional
+            If True, it will remove the isolated nodes and relabel the incident nodes in the
+            extracted subgraph.
+        store_ids : bool, optional
+            If True, it will store the raw IDs of the extracted edges in the ``edata`` of the
+            resulting graph under name ``dgl.EID``; if ``relabel_nodes`` is ``True``, it will
+            also store the raw IDs of the incident nodes in the ``ndata`` of the resulting
+            graph under name ``dgl.NID``.
+
+        Returns
+        -------
+        G : DGLGraph
+            The subgraph.
+        """
+        if isinstance(edges, dict):
+            # TODO(zhengda) we need to directly generate subgraph of all relations with
+            # one invocation.
+            if isinstance(edges, tuple):
+                subg = {etype: self.find_edges(edges[etype], etype[1]) for etype in edges}
+            else:
+                subg = {}
+                for etype in edges:
+                    assert len(self._etype2canonical[etype]) == 3, \
+                            'the etype in input edges is ambiguous'
+                    subg[self._etype2canonical[etype]] = self.find_edges(edges[etype], etype)
+            num_nodes = {ntype: self.number_of_nodes(ntype) for ntype in self.ntypes}
+            subg = dgl_heterograph(subg, num_nodes_dict=num_nodes)
+        else:
+            assert len(self.etypes) == 1
+            subg = self.find_edges(edges)
+            subg = dgl_graph(subg, num_nodes=self.number_of_nodes())
+
+        if relabel_nodes:
+            subg = compact_graphs(subg)
+        assert store_ids, 'edge_subgraph always stores original node/edge IDs.'
+        return subg
 
     def get_partition_book(self):
         """Get the partition information.

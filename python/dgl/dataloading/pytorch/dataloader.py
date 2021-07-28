@@ -776,35 +776,49 @@ class EdgeDataLoader:
             else:
                 dataloader_kwargs[k] = v
 
-        assert not isinstance(g, DistGraph), \
-                'EdgeDataLoader does not support DistGraph for now. ' \
-                + 'Please use DistDataLoader directly.'
+        if isinstance(g, DistGraph):
+            if device is None:
+                # for the distributed case default to the CPU
+                device = 'cpu'
+            assert device == 'cpu', 'Only cpu is supported in the case of a DistGraph.'
+            # Distributed DataLoader currently does not support heterogeneous graphs
+            # and does not copy features.  Fallback to normal solution
+            self.collator = EdgeCollator(g, eids, block_sampler, **collator_kwargs)
+            _remove_kwargs_dist(dataloader_kwargs)
+            self.dataloader = DistDataLoader(self.collator.dataset,
+                                             collate_fn=self.collator.collate,
+                                             **dataloader_kwargs)
+            self.is_distributed = True
+        else:
+            if device is None:
+                # default to the same device the graph is on
+                device = th.device(g.device)
 
-        if device is None:
-            # default to the same device the graph is on
-            device = th.device(g.device)
+            # if the sampler supports it, tell it to output to the
+            # specified device
+            num_workers = dataloader_kwargs.get('num_workers', 0)
+            if callable(getattr(block_sampler, "set_output_context", None)) and num_workers == 0:
+                block_sampler.set_output_context(to_dgl_context(device))
 
-        # if the sampler supports it, tell it to output to the
-        # specified device
-        num_workers = dataloader_kwargs.get('num_workers', 0)
-        if callable(getattr(block_sampler, "set_output_context", None)) and num_workers == 0:
-            block_sampler.set_output_context(to_dgl_context(device))
+            self.collator = _EdgeCollator(g, eids, block_sampler, **collator_kwargs)
+            self.use_scalar_batcher, self.scalar_batcher, self.dataloader, self.dist_sampler = \
+                    _init_dataloader(self.collator, device, dataloader_kwargs, use_ddp, ddp_seed)
+            self.use_ddp = use_ddp
+            self.is_distributed = False
 
-        self.collator = _EdgeCollator(g, eids, block_sampler, **collator_kwargs)
-        self.use_scalar_batcher, self.scalar_batcher, self.dataloader, self.dist_sampler = \
-            _init_dataloader(self.collator, device, dataloader_kwargs, use_ddp, ddp_seed)
-        self.use_ddp = use_ddp
+            # Precompute the CSR and CSC representations so each subprocess does not duplicate.
+            if num_workers > 0:
+                g.create_formats_()
 
         self.device = device
 
-        # Precompute the CSR and CSC representations so each subprocess does not
-        # duplicate.
-        if num_workers > 0:
-            g.create_formats_()
-
     def __iter__(self):
         """Return the iterator of the data loader."""
-        return _EdgeDataLoaderIter(self)
+        if self.is_distributed:
+            # Directly use the iterator of DistDataLoader, which doesn't copy features anyway.
+            return iter(self.dataloader)
+        else:
+            return _EdgeDataLoaderIter(self)
 
     def __len__(self):
         """Return the number of batches of the data loader."""
