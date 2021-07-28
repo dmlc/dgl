@@ -19,7 +19,7 @@ def evaluate(model, loss_fn, dataloader, device='cpu'):
         logits_gnn, logits_sim = model(blocks, feature)
 
         # compute loss
-        loss += loss_fn(logits_gnn, label) + args.sim_weight * loss_fn(logits_sim, label).item()
+        loss += loss_fn(logits_gnn, label).item() + args.sim_weight * loss_fn(logits_sim, label).item()
         recall += recall_score(label.cpu(), logits_gnn.argmax(dim=1).detach().cpu())
         auc += roc_auc_score(label.cpu(), logits_gnn[:, 1].detach().cpu())
         num_blocks += 1
