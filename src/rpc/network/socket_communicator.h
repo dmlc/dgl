@@ -202,6 +202,7 @@ class SocketReceiver : public Receiver {
    * \brief Message queue for each socket connection
    */ 
   std::unordered_map<int /* Sender (virtual) ID */, std::shared_ptr<MessageQueue>> msg_queue_;
+  std::unordered_map<int, std::shared_ptr<MessageQueue>>::iterator mq_iter_;
 
   /*!
    * \brief Independent thead for each socket connection

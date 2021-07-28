@@ -73,14 +73,15 @@ def _copy_graph_to_shared_mem(g, graph_name, graph_format):
     new_g.edata['inner_edge'] = _to_shared_mem(g.edata['inner_edge'],
                                                _get_edata_path(graph_name, 'inner_edge'))
     new_g.edata[EID] = _to_shared_mem(g.edata[EID], _get_edata_path(graph_name, EID))
+    new_g.edata[ETYPE] = _to_shared_mem(g.edata[ETYPE], _get_edata_path(graph_name, ETYPE))
     return new_g
 
 FIELD_DICT = {'inner_node': F.int32,    # A flag indicates whether the node is inside a partition.
               'inner_edge': F.int32,    # A flag indicates whether the edge is inside a partition.
               NID: F.int64,
               EID: F.int64,
-              NTYPE: F.int16,
-              ETYPE: F.int16}
+              NTYPE: F.int32,
+              ETYPE: F.int32}
 
 def _get_shared_mem_ndata(g, graph_name, name):
     ''' Get shared-memory node data from DistGraph server.
@@ -125,6 +126,7 @@ def _get_graph_from_shared_mem(graph_name):
 
     g.edata['inner_edge'] = _get_shared_mem_edata(g, graph_name, 'inner_edge')
     g.edata[EID] = _get_shared_mem_edata(g, graph_name, EID)
+    g.edata[ETYPE] = _get_shared_mem_edata(g, graph_name, ETYPE)
     return g
 
 NodeSpace = namedtuple('NodeSpace', ['data'])
