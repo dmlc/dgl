@@ -85,7 +85,7 @@ def main(args, print_fn=print):
                          subsample_ratio=args.subsample_ratio, use_coalesce=use_coalesce, prefix=args.dataset,
                          save_dir=args.save_dir, num_workers=args.num_workers, print_fn=print_fn)
     node_attribute = seal_data.ndata['feat']
-    edge_weight = seal_data.edata['edge_weight'].float()
+    edge_weight = seal_data.edata['weight'].float()
 
     train_data = seal_data('train')
     val_data = seal_data('valid')
