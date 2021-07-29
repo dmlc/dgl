@@ -245,4 +245,15 @@ if __name__ == '__main__':
     model.fit(G)
     model.transform(G)
     model.perplexity(G)
+
+    sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
+    dataloader = dgl.dataloading.NodeDataLoader(
+        G.reverse(), {'doc': np.arange(G.num_nodes('doc'))}, sampler,
+        batch_size=1024, shuffle=True, drop_last=False)
+    for input_nodes, _, blocks in dataloader:
+        B = dgl.heterograph(
+            {('word', '', 'doc'): blocks[0].adj()._indices().T.tolist()}
+        ).reverse()
+        B.nodes['word'].data['word_ids'] = input_nodes['word']
+        model.fit(B, max_iters=1)
     print('Testing LatentDirichletAllocation passed!')
