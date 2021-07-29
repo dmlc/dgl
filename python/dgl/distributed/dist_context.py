@@ -57,7 +57,7 @@ class MpCommand(Enum):
     FINALIZE_POOL = 6
 
 
-def init_process(_, rpc_config, mp_contexts):
+def init_process(rpc_config, mp_contexts):
     """Work loop in the worker"""
     try:
         _init_rpc(*rpc_config)
@@ -107,11 +107,11 @@ class CustomPool:
         self.current_proc_id = 0
         self.cache_result_dict = {}
         self.barrier = ctx.Barrier(num_workers)
-        for i in range(num_workers):
+        for _ in range(num_workers):
             task_queue = ctx.Queue(self.queue_size)
             self.task_queues.append(task_queue)
             proc = ctx.Process(target=init_process, args=(
-                i, rpc_config, (self.result_queue, task_queue, self.barrier)))
+                rpc_config, (self.result_queue, task_queue, self.barrier)))
             proc.daemon = True
             proc.start()
             self.process_list.append(proc)
