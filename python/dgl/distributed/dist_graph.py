@@ -512,7 +512,7 @@ class DistGraph:
             else:
                 self._etype2canonical[etype] = (src_type, etype, dst_type)
 
-    def _init(self, sync=True):
+    def _init(self):
         self._client = get_kvstore()
         assert self._client is not None, \
                 'Distributed module is not initialized. Please call dgl.distributed.initialize.'
@@ -520,14 +520,15 @@ class DistGraph:
         self._gpb = get_shared_mem_partition_book(self.graph_name, self._g)
         if self._gpb is None:
             self._gpb = self._gpb_input
-        self._client.map_shared_data(self._gpb, sync=sync)
+        self._client.map_shared_data(self._gpb)
 
     def __getstate__(self):
         return self.graph_name, self._gpb, self._canonical_etypes
 
     def __setstate__(self, state):
         self.graph_name, self._gpb_input, self._canonical_etypes = state
-        self._init(sync=False)
+        self._init()
+
         self._etype2canonical = {}
         for src_type, etype, dst_type in self._canonical_etypes:
             if etype in self._etype2canonical:
