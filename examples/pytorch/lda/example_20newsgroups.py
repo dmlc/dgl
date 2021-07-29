@@ -112,7 +112,7 @@ print(f"dgl-lda training perplexity {model.perplexity(G):.3f}")
 print(f"dgl-lda testing perplexity {model.perplexity(Gt):.3f}")
 
 plot_top_words(
-    type('dummy', (object,), {'components_': model.word_z.cpu().numpy().T}),
+    type('dummy', (object,), {'components_': model.word_z.cpu().numpy()}),
     tf_feature_names, n_top_words, 'Topics in LDA model')
 
 print("Training scikit-learn model...")
