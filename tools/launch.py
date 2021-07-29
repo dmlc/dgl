@@ -88,7 +88,7 @@ def execute_remote(
         port: Port number that the host is listening on.
         thread_list:
         username: Optional. If given, this will specify a username to use when issuing commands over SSH.
-            Useful when your infra does not allow ssh-ing as root.
+            Useful when your infra requires you to explicitly specify a username to avoid permission issues.
 
     Returns:
         thread: The Thread whose run() is to run the `cmd` on the remote host. Returns when the cmd completes
