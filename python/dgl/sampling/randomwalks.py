@@ -20,7 +20,7 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
     1. Start from the given node and set ``t`` to 0.
     2. Pick and traverse along edge type ``metapath[t]`` from the current node.
     3. If no edge can be found, halt.  Otherwise, increment ``t`` and go to step 2.
-    
+
     To generate multiple traces for a single node, you can specify the same node multiple
     times.
 
