@@ -112,7 +112,12 @@ class RangePartition : public NDArrayPartition {
       const int num_parts,
       IdArray range) :
     NDArrayPartition(array_size, num_parts),
-    range_(range) {
+    range_(range),
+    // We also need a copy of the range on the CPU, to compute partition
+    // sizes. We require the input range on the GPU, as if we have multiple
+    // GPUs, we can't know which is the proper one to copy the array to, but we
+    // have only one CPU context, and can safely copy the array to that.
+    range_cpu_(range.CopyTo(DGLContext{kDLCPU, 0})) {
     auto ctx = range->ctx;
     if (ctx.device_type != kDLGPU) {
         LOG(FATAL) << "The range for an NDArrayPartition is only supported "
@@ -128,9 +133,10 @@ class RangePartition : public NDArrayPartition {
 
 #ifdef DGL_USE_CUDA
     if (ctx.device_type == kDLGPU) {
-      if (ctx == range_->ctx) {
+      if (ctx.device_type != range_->ctx.device_type ||
+          ctx.device_id != range_->ctx.device_id) {
         LOG(FATAL) << "The range for the NDArrayPartition and the input "
-            "array must be on the same device.";
+            "array must be on the same device: " << ctx << " vs. " << range_->ctx;
       }
       ATEN_ID_TYPE_SWITCH(in_idx->dtype, IdType, {
         ATEN_ID_TYPE_SWITCH(range_->dtype, RangeType, {
@@ -191,11 +197,15 @@ class RangePartition : public NDArrayPartition {
   int64_t PartSize(const int part_id) const override {
     CHECK_LT(part_id, NumParts()) << "Invalid part ID (" << part_id << ") for "
         "partition of size " << NumParts() << ".";
-    return ArraySize() / NumParts() + (part_id < ArraySize() % NumParts());
+    ATEN_ID_TYPE_SWITCH(range_cpu_->dtype, RangeType, {
+      const RangeType * const ptr = static_cast<const RangeType*>(range_cpu_->data);
+      return ptr[part_id+1]-ptr[part_id];
+    });
   }
 
   private:
     IdArray range_;
+    IdArray range_cpu_;
 };
 
 NDArrayPartitionRef CreatePartitionRemainderBased(

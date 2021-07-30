@@ -127,6 +127,8 @@ NDArrayPartitionRef CreatePartitionRemainderBased(
  * @brief Create a new partition object, using the range (exclusive prefix-sum)
  * provided to identify which rows belong to which partitions.
  *
+ * @param array_size The size of the partitioned array.
+ * @param num_parts The number of parts the array is partitioned into.
  * @param range The exclusive prefix-sum of the number of rows owned by each
  * partition. The first value must be zero, and the last value must be the
  * total number of rows. It should be of length `num_parts+1`.
@@ -134,6 +136,8 @@ NDArrayPartitionRef CreatePartitionRemainderBased(
  * @return The partition object.
  */
 NDArrayPartitionRef CreatePartitionRangeBased(
+    int64_t array_size,
+    int num_parts,
     IdArray range);
 
 }  // namespace partition

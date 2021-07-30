@@ -83,15 +83,15 @@ __device__ RangeType _SearchRange(
     const RangeType target)
 {
   int start = 0;
-  int end = num_parts-1;
+  int end = num_parts;
   int cur = (end+start)/2;
 
   assert(range[0] == 0);
-  assert(range[num_parts] == target);
+  assert(target < range[num_parts]);
 
-  while (start < end) {
+  while (start+1 < end) {
     if (target < range[cur]) {
-      end = cur-1;
+      end = cur;
     } else {
       start = cur;
     }
