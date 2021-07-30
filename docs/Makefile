@@ -19,7 +19,7 @@ mxnet:
 	@echo "#                Step 1: Building MXNet tutorials                #"
 	@echo "#                                                                #"
 	@echo "##################################################################"
-	@DGLBACKEND=mxnet DGL_LOADALL=true $(SPHINXBUILD) -M html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
+	@DGLBACKEND=mxnet $(SPHINXBUILD) -M html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
 pytorch:
 	@echo "##################################################################"
@@ -27,7 +27,7 @@ pytorch:
 	@echo "#                Step 2: Building PyTorch tutorials              #"
 	@echo "#                                                                #"
 	@echo "##################################################################"
-	@DGLBACKEND=pytorch DGL_LOADALL=true $(SPHINXBUILD) -M html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O) 
+	@DGLBACKEND=pytorch $(SPHINXBUILD) -M html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O) 
 
 tensorflow:
 	@echo "##################################################################"
@@ -35,10 +35,10 @@ tensorflow:
 	@echo "#                Step 3: Building Tensorflow tutorials           #"
 	@echo "#                                                                #"
 	@echo "##################################################################"
-	@DGLBACKEND=tensorflow DGL_LOADALL=true $(SPHINXBUILD) -M html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O) 
+	@DGLBACKEND=tensorflow $(SPHINXBUILD) -M html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O) 
 
 html-noexec:
-	DGL_LOADALL=true $(SPHINXBUILD) -D plot_gallery=0 -b html "$(SOURCEDIR)" "$(BUILDDIR)/html" 
+	$(SPHINXBUILD) -D plot_gallery=0 -b html "$(SOURCEDIR)" "$(BUILDDIR)/html" 
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
 
