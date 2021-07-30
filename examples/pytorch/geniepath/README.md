@@ -15,24 +15,7 @@ Dependencies
 
 Dataset
 ---------------------------------------
-The datasets used for node classification are [Pubmed citation network dataset](https://docs.dgl.ai/api/python/dgl.data.html#dgl.data.PubmedGraphDataset) (tranductive) and [Protein-Protein Interaction dataset](https://docs.dgl.ai/api/python/dgl.data.html#dgl.data.PPIDataset) (inductive). The statistics are summarized as followings:
-
-**Pubmed**
-
-- Nodes: 19717
-- Edges: 88651
-- Number of Classes: 3
-- Label Split:
-
-    - Train: 60
-    - Valid: 500
-    - Test: 1000
-
-**PPI**
-
-- Train examples: 20
-- Valid examples: 2
-- Test examples: 2
+The datasets used for node classification are [Pubmed citation network dataset](https://docs.dgl.ai/api/python/dgl.data.html#dgl.data.PubmedGraphDataset) (tranductive) and [Protein-Protein Interaction dataset](https://docs.dgl.ai/api/python/dgl.data.html#dgl.data.PPIDataset) (inductive).
 
 How to run
 --------------------------------

@@ -81,7 +81,7 @@ def main(args):
         num_blocks = 0
         for subgraph in train_dataloader:
             subgraph = subgraph.to(device)
-            label = subgraph.ndata['label'].to(device)
+            label = subgraph.ndata['label']
             feat = subgraph.ndata['feat']
             logits = model(subgraph, feat)
 
