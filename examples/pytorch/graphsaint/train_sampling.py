@@ -12,7 +12,6 @@ from modules import GCNNet
 from utils import Logger, evaluate, save_log_dir, load_data, calc_f1
 
 import warnings
-# TODO: sampling comsumes too much time because some [...] can use parallelism to speed up?
 # TODO: why author's method does not work here?
 def main(args):
     warnings.filterwarnings('ignore')
@@ -68,9 +67,9 @@ def main(args):
     else:
         raise NotImplementedError
 
-    return # TODO: TEST
+    # return # TODO: TEST, this flag is set to measure pre-sampling time without time-consuming training
 
-    saint_sampler.train = Truesam
+    saint_sampler.train = True
     loader = DataLoader(saint_sampler, collate_fn=saint_sampler.__collate_fn__, batch_size=1,
                         shuffle=True, num_workers=0, drop_last=False)
 

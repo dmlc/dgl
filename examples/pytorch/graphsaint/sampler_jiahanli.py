@@ -66,7 +66,7 @@ class SAINTSampler(Dataset):
         self.train = train
         self.online = online
         self.cnt = 0 # count the times sampled subgraphs have been fetched.
-        test = True # TODO: TEST
+        test = True # TODO: TEST, this flag is set so that we can test sampling time every experiment
 
         assert self.num_subg_norm >= self.batch_size_norm, "num_sub_norm should be greater than batch_size_norm"
         if self.num_subg_train == 0:
@@ -114,12 +114,12 @@ class SAINTSampler(Dataset):
                     break
 
             print(f'Sampling time: [{time.perf_counter() - t:.2f}s]')
-            np.save(graph_fn, self.subgraphs) # NOTE: graph_fn, dir storing sampled subgraphs
+            np.save(graph_fn, self.subgraphs)
 
             t = time.perf_counter()
             aggr_norm, loss_norm = self.__compute_norm__()
             print(f'Normalization time: [{time.perf_counter() - t:.2f}s]')
-            np.save(norm_fn, (aggr_norm, loss_norm)) # NOTE: aggr_norm is related to edges, while loss_norm is related to nodes.
+            np.save(norm_fn, (aggr_norm, loss_norm))
 
         self.train_g.ndata['l_n'] = th.Tensor(loss_norm)
         self.train_g.edata['w'] = th.Tensor(aggr_norm)
