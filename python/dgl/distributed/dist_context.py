@@ -1,5 +1,5 @@
 """Initialize the distributed services"""
-# pylint: disable=lines-too-long
+# pylint: disable=line-too-long
 
 import multiprocessing as mp
 import traceback
