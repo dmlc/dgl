@@ -174,8 +174,6 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, queue=None):
                                           world_size=world_size,
                                           rank=proc_id)
 
-
-
     sampler = dgl.dataloading.MultiLayerNeighborSampler(fanouts)
     loader = dgl.dataloading.NodeDataLoader(
         g,
@@ -554,7 +552,7 @@ def main(args, devices):
                                               num_classes, num_rels, target_idx,
                                               inv_target, train_idx, val_idx,
                                               test_idx, labels),
-                                             queue))
+                                              queue))
             p.start()
             procs.append(p)
         for p in procs:

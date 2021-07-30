@@ -275,6 +275,13 @@ Sequential
     :members:
     :show-inheritance:
 
+WeightBasis
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.utils.WeightBasis
+    :members:
+    :show-inheritance:
+
 KNNGraph
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
