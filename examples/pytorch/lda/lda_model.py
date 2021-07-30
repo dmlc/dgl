@@ -137,7 +137,7 @@ class LatentDirichletAllocation:
     def _e_step(self, G, doc_data=None, mean_change_tol=1e-3, max_iters=100):
         """_e_step implements doc data sampling until convergence or max_iters
         """
-        G = self._prepare_graph(G.reverse(), doc_data) # word -> doc
+        G_d2w, G = G, self._prepare_graph(G.reverse(), doc_data) # word -> doc
         old_z = G.nodes['doc'].data['z']
 
         for i in range(max_iters):
@@ -153,7 +153,8 @@ class LatentDirichletAllocation:
             old_z = doc_data['z']
 
         if self.verbose:
-            print(f'e-step num_iters={i+1} with mean_change={mean_change:.4f}')
+            print(f"e-step num_iters={i+1} with mean_change={mean_change:.4f}, "
+                  f"perplexity={self.perplexity(G_d2w, doc_data):.4f}")
 
         return doc_data
 
@@ -165,7 +166,8 @@ class LatentDirichletAllocation:
 
 
     def _m_step(self, G, doc_data):
-        """_m_step implements word data sampling and stores word_z stats
+        """_m_step implements word data sampling and stores word_z stats.
+        mean_change is in the sense of full graph with lr=1.
         """
         G = self._prepare_graph(G.clone(), doc_data)
         word_ids = self._get_word_ids(G)
@@ -173,11 +175,19 @@ class LatentDirichletAllocation:
         G.update_all(_edge_update, fn.sum('z', 'z'))
         word_data = G.nodes['word'].data
 
+        self._last_mean_change = (
+            word_data['z'] - self.word_z[:, word_ids].to(G.device).T
+        ).abs().mean()
+
         self.word_z *= (1 - self.lr)
         self.word_z[:, word_ids] += self.lr * word_data['z'].T.to(self.device)
 
         self._word_weight = _bayesian_weight(
             self.word_z, self.prior['word'], self.lr_mult['word'])
+
+        if self.verbose:
+            print(f"m-step mean_change={self._last_mean_change:.4f}, "
+                  f"weight_gap={1 - self._word_weight.sum(axis=1).mean():.4f}")
         return word_data
 
 
@@ -188,22 +198,13 @@ class LatentDirichletAllocation:
 
 
     def fit(self, G, mean_change_tol=1e-3, max_epochs=10):
-        old_zT = self.word_z[:, self._get_word_ids(G)].T.to(G.device).clone()
-
         for i in range(max_epochs):
-            doc_data = self._e_step(G)
-            word_data = self._m_step(G, doc_data)
-
-            mean_change = (word_data['z'] - old_zT).abs().mean()
-
             if self.verbose:
-                print(f"iter {i+1}, m-step mean_change={mean_change:.4f}, "
-                      f"weight_gap={1 - self._word_weight.sum(axis=1).mean():.4f}, "
-                      f"perplexity={self.perplexity(G, doc_data):.4f}")
+                print(f"epoch {i+1}, ", end="")
+            self.partial_fit(G)
 
-            if mean_change < mean_change_tol:
+            if self._last_mean_change < mean_change_tol:
                 break
-            old_zT = word_data['z']
         return self
 
 
