@@ -75,6 +75,9 @@ To quickly locate the examples of your interest, search for the tagged keywords 
 - <a name="nshe"></a> Zhao J, Wang X, et al. Network Schema Preserving Heterogeneous Information Network Embedding. [Paper link](https://www.ijcai.org/Proceedings/2020/0190.pdf).
     - Example code: [OpenHGNN](https://github.com/BUPT-GAMMA/OpenHGNN/tree/main/openhgnn/output/NSHE)
     - Tags: Heterogeneous graph, Graph neural network, Graph embedding, Network Schema
+- <a name="caregnn"></a> Dou Y, Liu Z, et al. Enhancing Graph Neural Network-based Fraud Detectors against Camouflaged Fraudsters. [Paper link](https://arxiv.org/abs/2008.08692).
+    - Example code: [PyTorch](../examples/pytorch/caregnn)
+    - Tags: Multi-relational graph, Graph neural network, Fraud detection, Reinforcement learning, Node classification
 
 ## 2019
 
