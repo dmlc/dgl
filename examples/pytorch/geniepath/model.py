@@ -29,8 +29,8 @@ class GeniePath(nn.Module):
             self.layers.append(GeniePathConv(hid_dim, hid_dim, hid_dim, num_heads=num_heads, residual=residual))
 
     def forward(self, graph, x):
-        h = th.rand(1, x.shape[0], self.hid_dim).to(x.device)
-        c = th.rand(1, x.shape[0], self.hid_dim).to(x.device)
+        h = th.zeros(1, x.shape[0], self.hid_dim).to(x.device)
+        c = th.zeros(1, x.shape[0], self.hid_dim).to(x.device)
 
         x = self.linear1(x)
         for layer in self.layers:
