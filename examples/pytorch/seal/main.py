@@ -10,6 +10,8 @@ from utils import load_ogb_dataset, evaluate_hits
 from sampler import SEALData
 from model import GCN, DGCNN
 from logger import LightLogging
+import torch.multiprocessing
+torch.multiprocessing.set_sharing_strategy('file_system')
 
 '''
 Part of the code are adapted from
