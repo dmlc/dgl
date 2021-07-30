@@ -103,7 +103,7 @@ print()
 
 print("Training dgl-lda model...")
 t0 = time()
-model = LDAModel(G.num_nodes('word'), n_components)
+model = LDAModel(G, n_components)
 model.fit(G)
 print("done in %0.3fs." % (time() - t0))
 print()

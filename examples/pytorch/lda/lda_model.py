@@ -58,12 +58,20 @@ class LatentDirichletAllocation:
     The model alters the attributes of G arbitrarily.
     This is inspired by [1] and its corresponding scikit-learn implementation.
 
-    Hyperparameters
+    Inputs
     ---
+    * G: a template graph; optional if n_words is provided.
+    * n_components: latent feature dimension; automatically set priors if missing.
+    * n_words: ignore G and set n_words directly.
     * prior: parameters in the Dirichlet prior; default to 1/n_components
     * lr: new_z = (1-lr)*old_z + lr*z; default to 1 for full gradients.
-    * lr_mult: multiplier for z-update; use float("inf") to wash out the prior.
+    * lr_mult: multiplier for z-update; use float("inf") to remove the prior completely.
     * device: accelerate _bayesian_weight(word_z) during initialization.
+
+    Caveat
+    ---
+    * With a larger n_components, the prior can get too small and _bayesian_weight
+        outputs zeros. Suggest manually setting `prior={'doc': 0.1, 'word': 0.1}`.
 
     References
     ---
@@ -73,13 +81,16 @@ class LatentDirichletAllocation:
     [2] Reactive LDA Library blogpost by Yingjie Miao for a similar Gibbs model
     """
     def __init__(
-        self, n_words, n_components,
+        self, G, n_components,
+        n_words=None,
         prior=None,
         lr=1,
         lr_mult={'doc': 1, 'word': 1},
         device='cpu',
         verbose=True,
         ):
+        if n_words is None:
+            n_words = G.num_nodes('word')
         if prior is None:
             prior = {'doc': 1./n_components, 'word': 1./n_components}
         self.prior = prior
@@ -110,8 +121,8 @@ class LatentDirichletAllocation:
         G.nodes['doc'].data['z'] = doc_data['z']
         G.nodes['doc'].data['weight'] = doc_data['weight']
 
-        if 'word_ids' in G.nodes['word'].data:
-            word_ids = G.nodes['word'].data['word_ids'].to(self.device)
+        if '_ID' in G.nodes['word'].data:
+            word_ids = G.nodes['word'].data['_ID'].to(self.device)
         else:
             word_ids = slice(None)
 
@@ -120,7 +131,7 @@ class LatentDirichletAllocation:
         return G, word_ids
 
 
-    def _e_step(self, G, doc_data=None, max_iters=100, mean_change_tol=1e-3):
+    def _e_step(self, G, doc_data=None, mean_change_tol=1e-3, max_iters=100):
         """_e_step implements doc data sampling until convergence or max_iters
         """
         G, _ = self._prepare_graph(G.reverse(), doc_data) # word -> doc
@@ -142,7 +153,10 @@ class LatentDirichletAllocation:
         return dict(G.nodes['doc'].data)
 
 
-    transform = _e_step
+    def transform(self, G):
+        doc_data = self._e_step(G)
+        G, _ = self._prepare_graph(G.clone(), doc_data)
+        return doc_data['weight'] @ G.nodes['word'].data['weight'].T
 
 
     def _m_step(self, G, doc_data):
@@ -164,13 +178,13 @@ class LatentDirichletAllocation:
         return mean_change
 
 
-    def fit(self, G, batch_size=0, max_iters=10, mean_change_tol=1e-3):
+    def fit(self, G, mean_change_tol=1e-3, max_epochs=10, batch_size=0):
         if batch_size>0:
             raise NotImplementedError("""
                 Use a custom loop to iterate between e and m steps;
                 set self.lr<1 and follow the example at the end of this file.""")
 
-        for i in range(max_iters):
+        for i in range(max_epochs):
             doc_data = self._e_step(G)
             mean_change = self._m_step(G, doc_data)
 
@@ -197,7 +211,7 @@ class LatentDirichletAllocation:
         lr_mult = self.lr_mult[ntype]
         z = ndata['z']
         weight = ndata['weight']
-        prior = torch.tensor(self.prior[ntype], device=z.device)
+        prior = torch.tensor(self.prior[ntype], device=z.device, dtype=float)
         K = z.shape[1]
 
         if lr_mult < float("inf"):
@@ -235,13 +249,15 @@ class LatentDirichletAllocation:
         if self.verbose:
             print(f'beta: {-word_elbo:.3f}')
 
-        return np.exp(-edge_elbo - doc_elbo - word_elbo)
+        ppl = np.exp(-edge_elbo - doc_elbo - word_elbo)
+        assert not np.isnan(ppl), "numerical errors"
+        return ppl
 
 
 if __name__ == '__main__':
     print('Testing LatentDirichletAllocation ...')
     G = dgl.heterograph({('doc', '', 'word'): [(0, 0), (0, 3)]})
-    model = LatentDirichletAllocation(G.num_nodes('word'), 5, verbose=False)
+    model = LatentDirichletAllocation(G, 5, verbose=False)
     model.fit(G)
     model.transform(G)
     model.perplexity(G)
@@ -250,10 +266,10 @@ if __name__ == '__main__':
     dataloader = dgl.dataloading.NodeDataLoader(
         G.reverse(), {'doc': np.arange(G.num_nodes('doc'))}, sampler,
         batch_size=1024, shuffle=True, drop_last=False)
-    for input_nodes, _, blocks in dataloader:
-        B = dgl.heterograph(
-            {('word', '', 'doc'): blocks[0].adj()._indices().T.tolist()}
+    for input_nodes, _, (block,) in dataloader:
+        B = dgl.DGLHeteroGraph(
+            block._graph, ['_', 'word', 'doc', '_'], block.etypes
         ).reverse()
-        B.nodes['word'].data['word_ids'] = input_nodes['word']
-        model.fit(B, max_iters=1)
+        B.nodes['word'].data.update(block.nodes['word'].data)
+        model.fit(B, max_epochs=1)
     print('Testing LatentDirichletAllocation passed!')
