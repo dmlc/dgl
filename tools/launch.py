@@ -186,11 +186,11 @@ def construct_torch_dist_launcher_cmd(
                          "--master_addr={master_addr} " \
                          "--master_port={master_port}"
     return torch_cmd_template.format(
-        nproc_per_node=str(num_trainers),
-        nnodes=str(num_nodes),
-        node_rank=str(node_rank),
-        master_addr=str(master_addr),
-        master_port=str(master_port)
+        nproc_per_node=num_trainers,
+        nnodes=num_nodes,
+        node_rank=node_rank,
+        master_addr=master_addr,
+        master_port=master_port
     )
 
 
@@ -252,7 +252,7 @@ def wrap_udf_in_torch_dist_launcher(
             python_bin = candidate_python_bin
             break
 
-    # transforms the udf_command from (ignoring pre-commands):
+    # transforms the udf_command from:
     #     python path/to/dist_trainer.py arg0 arg1
     # to:
     #     python -m torch.distributed.launch [DIST TORCH ARGS] path/to/dist_trainer.py arg0 arg1
