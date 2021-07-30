@@ -16,7 +16,7 @@ import warnings
 # TODO: why author's method does not work here?
 def main(args):
     warnings.filterwarnings('ignore')
-    multilabel_data = set(['ppi'])
+    multilabel_data = {'ppi', 'yelp', 'amazon'}
     multilabel = args.dataset in multilabel_data
 
     # load and preprocess dataset
@@ -56,6 +56,9 @@ def main(args):
         'num_subg_train': args.num_subg_train, 'num_subg_norm': args.num_subg_norm,
         'batch_size_norm': args.batch_size_norm, 'online': args.online, 'num_repeat': args.num_repeat
     }
+
+
+    # for _ in range(args.test_repeat): # TODO: TEST
     if args.sampler == "node":
         saint_sampler = SAINTNodeSampler(args.node_budget, **kwargs)
     elif args.sampler == "edge":
@@ -65,9 +68,11 @@ def main(args):
     else:
         raise NotImplementedError
 
-    saint_sampler.train = True
+    return # TODO: TEST
+
+    saint_sampler.train = Truesam
     loader = DataLoader(saint_sampler, collate_fn=saint_sampler.__collate_fn__, batch_size=1,
-                        shuffle=True, num_workers=args.num_workers, drop_last=False)
+                        shuffle=True, num_workers=0, drop_last=False)
 
     # set device for dataset tensors
     if args.gpu < 0:
@@ -114,7 +119,9 @@ def main(args):
 
     for epoch in range(args.n_epochs):
         # for j, subg in enumerate(subg_iter):
+        # t = time.perf_counter()
         for j, subg in enumerate(loader):
+            # print("Sampling time per iter (one subgraph) in training: {}".format(time.perf_counter() - t))
             # sync with upper level training graph
             if cuda:
                 subg = subg.to(torch.cuda.current_device())
@@ -220,7 +227,12 @@ if __name__ == '__main__':
     #
     # args = parser.parse_args()
     warnings.filterwarnings('ignore')
-    args = argparse.Namespace(**CONFIG)
+
+    parser = argparse.ArgumentParser(description='GraphSAINT')
+    parser.add_argument("--task", type=str, default="ppi_n", help="type of tasks")
+    task = parser.parse_args().task
+    args = argparse.Namespace(**CONFIG[task])
     print(args)
+
 
     main(args)

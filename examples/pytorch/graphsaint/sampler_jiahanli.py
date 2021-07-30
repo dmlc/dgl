@@ -53,7 +53,7 @@ class SAINTSampler(Dataset):
         # NOTE: In author's codes, the number of sampled subgraphs in advance for computing normalization coefficients
         # is controlled by self.train_g.num_nodes() * num_repeat where num_repeat is the expected number of sampled
         # subgraphs.
-        self.g = g
+        self.g = g.cpu()
         self.train_g: dgl.graph = g.subgraph(train_nid)
         self.dn, self.num_repeat = dn, num_repeat
         self.node_counter = th.zeros((self.train_g.num_nodes(),))
@@ -66,9 +66,9 @@ class SAINTSampler(Dataset):
         self.train = train
         self.online = online
         self.cnt = 0 # count the times sampled subgraphs have been fetched.
-        test = True
+        test = True # TODO: TEST
 
-        assert self.num_subg_norm > self.batch_size_norm, "num_sub_norm should be greater than batch_size_norm"
+        assert self.num_subg_norm >= self.batch_size_norm, "num_sub_norm should be greater than batch_size_norm"
         if self.num_subg_train == 0:
             self.num_subg_train = math.ceil(self.train_g.num_nodes() / node_budget)  # TODO: weird!!!
         graph_fn, norm_fn = self.__generate_fn__() # NOTE: the file to store sampled graphs and computed norms
@@ -88,21 +88,28 @@ class SAINTSampler(Dataset):
                                 collate_fn=self.__collate_fn__, drop_last=False)
 
             t = time.perf_counter()
-            for num_nodes, subgraphs in loader:
-                self.subgraphs.extend(subgraphs)
+            for num_nodes, subgraphs_nids, subgraphs_eids in loader:
+                # t0 = time.perf_counter()
+                # print('Sampling time consumption: {}'.format(t0 - t))
+                self.subgraphs.extend(subgraphs_nids)
                 sampled_nodes += num_nodes
 
-                _subgraphs, _node_counts = np.unique(np.concatenate(subgraphs), return_counts=True)
+                _subgraphs, _node_counts = np.unique(np.concatenate(subgraphs_nids), return_counts=True)
                 sampled_nodes_idx = th.from_numpy(_subgraphs)
                 _node_counts = th.from_numpy(_node_counts)
                 self.node_counter[sampled_nodes_idx] += _node_counts
 
-                subgs = [self.train_g.subgraph(subg) for subg in subgraphs] # TODO: consume too much time
-                sampled_edges_idx = [subg.edata[dgl.EID] for subg in subgs]
-                sampled_edges_idx, _edge_counts = th.unique(th.cat(sampled_edges_idx), return_counts=True)
+                # t1 = time.perf_counter()
+                # print('Node counter time consumption: {}'.format(t1 - t0))
+
+                _subgraphs_eids, _edge_counts = np.unique(np.concatenate(subgraphs_eids), return_counts=True)
+                sampled_edges_idx = th.from_numpy(_subgraphs_eids)
+                _edge_counts = th.from_numpy(_edge_counts)
                 self.edge_counter[sampled_edges_idx] += _edge_counts
 
-                self.N += len(subgraphs) # NOTE: number of subgraphs
+                # t2 = time.perf_counter()
+                # print('Edge counter time consumption: {}'.format(t2 - t1))
+                self.N += len(subgraphs_nids) # NOTE: number of subgraphs
                 if sampled_nodes > self.train_g.num_nodes() * num_repeat:
                     break
 
@@ -149,26 +156,28 @@ class SAINTSampler(Dataset):
                     subgraph = self.__sample__()
                     return dgl.node_subgraph(self.train_g, subgraph)
         else:
-            subgraph = self.__sample__()
-            num_nodes = len(subgraph)
-            return num_nodes, subgraph
+            subgraph_nids = self.__sample__()
+            num_nodes = len(subgraph_nids)
+            subgraph_eids = dgl.node_subgraph(self.train_g, subgraph_nids).edata[dgl.EID]
+            return num_nodes, subgraph_nids, subgraph_eids
 
     def __collate_fn__(self, batch):
-        if not self.train:
-            sum_num_nodes = 0
-            subgraphs = []
-            for num_nodes, subgraph in batch:
-                sum_num_nodes += num_nodes
-                subgraphs.append(subgraph)
-            return sum_num_nodes, subgraphs
-        else:
+        if self.train:
             subgraphs = []
             for g in batch:
                 subgraphs.append(g)
             if len(subgraphs) == 1:
                 return subgraphs[0]
             return subgraphs
-
+        else:
+            sum_num_nodes = 0
+            subgraphs_nids_list = []
+            subgraphs_eids_list = []
+            for num_nodes, subgraph_nids, subgraph_eids in batch:
+                sum_num_nodes += num_nodes
+                subgraphs_nids_list.append(subgraph_nids)
+                subgraphs_eids_list.append(subgraph_eids)
+            return sum_num_nodes, subgraphs_nids_list, subgraphs_eids_list
     def __clear__(self):
         self.prob = None
         self.node_counter = None
@@ -179,11 +188,11 @@ class SAINTSampler(Dataset):
         raise NotImplementedError
 
     def __compute_norm__(self):
-        # TODO: this part is different from the paper, how about the original codes?
+
         self.node_counter[self.node_counter == 0] = 1
         self.edge_counter[self.edge_counter == 0] = 1
 
-        loss_norm = self.N / self.node_counter / self.train_g.num_nodes() # NOTE: different from paper, the formula in paper is wrong
+        loss_norm = self.N / self.node_counter / self.train_g.num_nodes()
 
         self.train_g.ndata['n_c'] = self.node_counter
         self.train_g.edata['e_c'] = self.edge_counter
