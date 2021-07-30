@@ -1,4 +1,5 @@
 """Initialize the distributed services"""
+# pylint: disable=lines-too-long
 
 import multiprocessing as mp
 import traceback
@@ -6,6 +7,7 @@ import atexit
 import time
 import os
 import sys
+import queue
 from enum import Enum
 
 from . import rpc
@@ -66,7 +68,11 @@ def init_process(rpc_config, mp_contexts):
         collate_fn_dict = {}
 
         while keep_polling:
-            command, args = task_queue.get(timeout=1800)
+            try:
+                # Follow https://github.com/pytorch/pytorch/blob/d57ce8cf8989c0b737e636d8d7abe16c1f08f70b/torch/utils/data/_utils/worker.py#L260
+                command, args = task_queue.get(timeout=5)
+            except queue.Empty:
+                continue
             if command == MpCommand.SET_COLLATE_FN:
                 dataloader_name, func = args
                 collate_fn_dict[dataloader_name] = func
@@ -157,7 +163,8 @@ class CustomPool:
     def close(self):
         """Close worker pool"""
         for i in range(self.num_workers):
-            self.task_queues[i].put((MpCommand.FINALIZE_POOL, tuple()))
+            self.task_queues[i].put((MpCommand.FINALIZE_POOL, tuple()), block=False)
+            time.sleep(0.5) # Fix for early python version
 
     def join(self):
         """Join the close process of worker pool"""
@@ -274,6 +281,7 @@ def finalize_worker():
     """Finalize workers
        Python's multiprocessing pool will not call atexit function when close
     """
+    global SAMPLER_POOL
     if SAMPLER_POOL is not None:
         SAMPLER_POOL.close()
 
