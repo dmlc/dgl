@@ -165,6 +165,9 @@ To quickly locate the examples of your interest, search for the tagged keywords 
 - <a name='gas'></a> Li A, Qin Z, et al. Spam Review Detection with Graph Convolutional Networks. [Paper link](https://arxiv.org/abs/1908.10679).
     - Example code: [PyTorch](../examples/pytorch/gas)
     - Tags:  Fraud detection, Heterogeneous graph, Edge classification, Graph attention
+- <a name='geniepath'></a> Liu Z, et al. Geniepath: Graph neural networks with adaptive receptive paths. [Paper link](https://arxiv.org/abs/1802.00910).
+    - Example code: [PyTorch](../examples/pytorch/geniepath)
+    - Tags:  Fraud detection, Node classification, Graph attention, LSTM, Adaptive receptive fields
 
 ## 2018
 
