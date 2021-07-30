@@ -369,6 +369,13 @@ def test_is_sorted():
    assert src_sorted == True
    assert dst_sorted == False
 
+
+def test_default_types():
+    dg = dgl.DGLGraph()
+    g = dgl.graph(([], []))
+    assert dg.ntypes == g.ntypes
+    assert dg.etypes == g.etypes
+
 if __name__ == '__main__':
     test_query()
     test_mutation()
@@ -377,3 +384,4 @@ if __name__ == '__main__':
     test_find_edges()
     test_hypersparse_query()
     test_is_sorted()
+    test_default_types()
