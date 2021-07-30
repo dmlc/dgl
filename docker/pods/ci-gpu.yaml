@@ -11,6 +11,13 @@ spec:
       resources:
         limits:
           nvidia.com/gpu: 1 # requesting 1 GPU
+      volumeMounts:
+        - name: dshm
+          mountPath: /dev/shm
+  volumes:
+  - name: dshm
+    emptyDir:
+      medium: Memory
   affinity:
     nodeAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
