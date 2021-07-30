@@ -566,6 +566,7 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
         etype_ids, idx = F.sort_1d(etype_ids)
         src, dst = F.gather_row(src, idx), F.gather_row(dst, idx)
         eid = F.gather_row(frontier.edata[EID], idx)
+        assert len(eid) > 0
         _, src = gpb.map_to_per_ntype(src)
         _, dst = gpb.map_to_per_ntype(dst)
 

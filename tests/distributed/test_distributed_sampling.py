@@ -39,14 +39,14 @@ def start_sample_client(rank, tmpdir, disable_shared_mem):
     dgl.distributed.exit_client()
     return sampled_graph
 
-def start_find_edges_client(rank, tmpdir, disable_shared_mem, eids):
+def start_find_edges_client(rank, tmpdir, disable_shared_mem, eids, etype=None):
     gpb = None
     if disable_shared_mem:
         _, _, _, gpb, _, _, _ = load_partition(tmpdir / 'test_find_edges.json', rank)
     dgl.distributed.initialize("rpc_ip_config.txt")
     dist_graph = DistGraph("test_find_edges", gpb=gpb)
     try:
-        u, v = dist_graph.find_edges(eids)
+        u, v = dist_graph.find_edges(eids, etype=etype)
     except Exception as e:
         print(e)
         u, v = None, None
@@ -116,8 +116,9 @@ def check_rpc_find_edges_shuffle(tmpdir, num_server):
     g.readonly()
     num_parts = num_server
 
-    partition_graph(g, 'test_find_edges', num_parts, tmpdir,
-                    num_hops=1, part_method='metis', reshuffle=True)
+    orig_nid, orig_eid = partition_graph(g, 'test_find_edges', num_parts, tmpdir,
+                                         num_hops=1, part_method='metis',
+                                         reshuffle=True, return_mapping=True)
 
     pserver_list = []
     ctx = mp.get_context('spawn')
@@ -128,19 +129,56 @@ def check_rpc_find_edges_shuffle(tmpdir, num_server):
         time.sleep(1)
         pserver_list.append(p)
 
-    orig_nid = F.zeros((g.number_of_nodes(),), dtype=F.int64, ctx=F.cpu())
-    orig_eid = F.zeros((g.number_of_edges(),), dtype=F.int64, ctx=F.cpu())
-    for i in range(num_server):
-        part, _, _, _, _, _, _ = load_partition(tmpdir / 'test_find_edges.json', i)
-        orig_nid[part.ndata[dgl.NID]] = part.ndata['orig_id']
-        orig_eid[part.edata[dgl.EID]] = part.edata['orig_id']
-
     time.sleep(3)
     eids = F.tensor(np.random.randint(g.number_of_edges(), size=100))
     u, v = g.find_edges(orig_eid[eids])
     du, dv = start_find_edges_client(0, tmpdir, num_server > 1, eids)
     du = orig_nid[du]
     dv = orig_nid[dv]
+    assert F.array_equal(u, du)
+    assert F.array_equal(v, dv)
+
+def create_random_hetero():
+    num_nodes = {'n1': 10000, 'n2': 10010, 'n3': 10020}
+    etypes = [('n1', 'r1', 'n2'),
+              ('n1', 'r2', 'n3'),
+              ('n2', 'r3', 'n3')]
+    edges = {}
+    for etype in etypes:
+        src_ntype, _, dst_ntype = etype
+        arr = spsp.random(num_nodes[src_ntype], num_nodes[dst_ntype], density=0.001, format='coo',
+                          random_state=100)
+        edges[etype] = (arr.row, arr.col)
+    return dgl.heterograph(edges, num_nodes)
+
+def check_rpc_hetero_find_edges_shuffle(tmpdir, num_server):
+    ip_config = open("rpc_ip_config.txt", "w")
+    for _ in range(num_server):
+        ip_config.write('{}\n'.format(get_local_usable_addr()))
+    ip_config.close()
+
+    g = create_random_hetero()
+    num_parts = num_server
+
+    orig_nid, orig_eid = partition_graph(g, 'test_find_edges', num_parts, tmpdir,
+                                         num_hops=1, part_method='metis',
+                                         reshuffle=True, return_mapping=True)
+
+    pserver_list = []
+    ctx = mp.get_context('spawn')
+    for i in range(num_server):
+        p = ctx.Process(target=start_server, args=(i, tmpdir, num_server > 1,
+                                                   'test_find_edges', ['csr', 'coo']))
+        p.start()
+        time.sleep(1)
+        pserver_list.append(p)
+
+    time.sleep(3)
+    eids = F.tensor(np.random.randint(g.number_of_edges('r1'), size=100))
+    u, v = g.find_edges(orig_eid['r1'][eids], etype='r1')
+    du, dv = start_find_edges_client(0, tmpdir, num_server > 1, eids, etype='r1')
+    du = orig_nid['n1'][du]
+    dv = orig_nid['n2'][dv]
     assert F.array_equal(u, du)
     assert F.array_equal(v, dv)
 
@@ -153,6 +191,7 @@ def test_rpc_find_edges_shuffle(num_server):
     import tempfile
     os.environ['DGL_DIST_MODE'] = 'distributed'
     with tempfile.TemporaryDirectory() as tmpdirname:
+        check_rpc_hetero_find_edges_shuffle(Path(tmpdirname), num_server)
         check_rpc_find_edges_shuffle(Path(tmpdirname), num_server)
 
 def check_rpc_get_degree_shuffle(tmpdir, num_server):
@@ -630,6 +669,8 @@ if __name__ == "__main__":
         check_rpc_get_degree_shuffle(Path(tmpdirname), 2)
         check_rpc_find_edges_shuffle(Path(tmpdirname), 2)
         check_rpc_find_edges_shuffle(Path(tmpdirname), 1)
+        check_rpc_hetero_find_edges_shuffle(Path(tmpdirname), 1)
+        check_rpc_hetero_find_edges_shuffle(Path(tmpdirname), 2)
         check_rpc_in_subgraph_shuffle(Path(tmpdirname), 2)
         check_rpc_sampling_shuffle(Path(tmpdirname), 1)
         check_rpc_sampling_shuffle(Path(tmpdirname), 2)
