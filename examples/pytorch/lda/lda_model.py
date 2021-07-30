@@ -111,6 +111,13 @@ class LatentDirichletAllocation:
             self.word_z, self.prior['word'], self.lr_mult['word'])
 
 
+    def _get_word_ids(self, G):
+        if '_ID' in G.nodes['word'].data:
+            return G.nodes['word'].data['_ID'].to(self.device)
+        else:
+            return slice(None)
+
+
     def _prepare_graph(self, G, doc_data=None):
         """ load or init node data; rewrite G.ndata inplace """
         if doc_data is None:
@@ -121,72 +128,73 @@ class LatentDirichletAllocation:
         G.nodes['doc'].data['z'] = doc_data['z']
         G.nodes['doc'].data['weight'] = doc_data['weight']
 
-        if '_ID' in G.nodes['word'].data:
-            word_ids = G.nodes['word'].data['_ID'].to(self.device)
-        else:
-            word_ids = slice(None)
-
+        word_ids = self._get_word_ids(G)
         G.nodes['word'].data['z'] = self.word_z[:, word_ids].to(G.device).T
         G.nodes['word'].data['weight'] = self._word_weight[:, word_ids].to(G.device).T
-        return G, word_ids
+        return G
 
 
     def _e_step(self, G, doc_data=None, mean_change_tol=1e-3, max_iters=100):
         """_e_step implements doc data sampling until convergence or max_iters
         """
-        G, _ = self._prepare_graph(G.reverse(), doc_data) # word -> doc
+        G = self._prepare_graph(G.reverse(), doc_data) # word -> doc
+        old_z = G.nodes['doc'].data['z']
 
         for i in range(max_iters):
-            old_z = G.nodes['doc'].data['z']
             G.update_all(_edge_update, fn.sum('z', 'z'))
+            doc_data = G.nodes['doc'].data
 
-            G.nodes['doc'].data['weight'] = _bayesian_weight(
-                G.nodes['doc'].data['z'], self.prior['doc'], self.lr_mult['doc'])
+            doc_data['weight'] = _bayesian_weight(
+                doc_data['z'], self.prior['doc'], self.lr_mult['doc'])
 
-            mean_change = (G.nodes['doc'].data['z'] - old_z).abs().mean()
+            mean_change = (doc_data['z'] - old_z).abs().mean()
             if mean_change < mean_change_tol:
                 break
+            old_z = doc_data['z']
 
         if self.verbose:
             print(f'e-step num_iters={i+1} with mean_change={mean_change:.4f}')
 
-        return dict(G.nodes['doc'].data)
+        return doc_data
 
 
     def transform(self, G):
         doc_data = self._e_step(G)
-        G, _ = self._prepare_graph(G.clone(), doc_data)
-        return doc_data['weight'] @ G.nodes['word'].data['weight'].T
+        word_ids = self._get_word_ids(G)
+        return doc_data['weight'] @ self._word_weight[:, word_ids].to(G.device)
 
 
     def _m_step(self, G, doc_data):
         """_m_step implements word data sampling and stores word_z stats
         """
-        G, word_ids = self._prepare_graph(G.clone(), doc_data)
+        G = self._prepare_graph(G.clone(), doc_data)
+        word_ids = self._get_word_ids(G)
 
-        old_z = G.nodes['word'].data['z']
         G.update_all(_edge_update, fn.sum('z', 'z'))
-        new_z = G.nodes['word'].data['z']
-
-        mean_change = (new_z - old_z).abs().mean()
+        word_data = G.nodes['word'].data
 
         self.word_z *= (1 - self.lr)
-        self.word_z[:, word_ids] += self.lr * new_z.T.to(self.device)
+        self.word_z[:, word_ids] += self.lr * word_data['z'].T.to(self.device)
 
         self._word_weight = _bayesian_weight(
             self.word_z, self.prior['word'], self.lr_mult['word'])
-        return mean_change
+        return word_data
 
 
-    def fit(self, G, mean_change_tol=1e-3, max_epochs=10, batch_size=0):
-        if batch_size>0:
-            raise NotImplementedError("""
-                Use a custom loop to iterate between e and m steps;
-                set self.lr<1 and follow the example at the end of this file.""")
+    def partial_fit(self, G):
+        doc_data = self._e_step(G)
+        self._m_step(G, doc_data)
+        return self
+
+
+    def fit(self, G, mean_change_tol=1e-3, max_epochs=10):
+        old_zT = self.word_z[:, self._get_word_ids(G)].T.to(G.device).clone()
 
         for i in range(max_epochs):
             doc_data = self._e_step(G)
-            mean_change = self._m_step(G, doc_data)
+            word_data = self._m_step(G, doc_data)
+
+            mean_change = (word_data['z'] - old_zT).abs().mean()
 
             if self.verbose:
                 print(f"iter {i+1}, m-step mean_change={mean_change:.4f}, "
@@ -195,11 +203,12 @@ class LatentDirichletAllocation:
 
             if mean_change < mean_change_tol:
                 break
+            old_zT = word_data['z']
         return self
 
 
     def _edge_elbo(self, G, doc_data):
-        G, _ = self._prepare_graph(G.reverse(), doc_data) # word -> doc
+        G = self._prepare_graph(G.reverse(), doc_data) # word -> doc
         G.update_all(_edge_update, fn.sum('edge_elbo', 'edge_elbo'))
         ndata = G.nodes['doc'].data
         return (ndata['edge_elbo'].sum() / ndata['z'].sum())
@@ -271,5 +280,5 @@ if __name__ == '__main__':
             block._graph, ['_', 'word', 'doc', '_'], block.etypes
         ).reverse()
         B.nodes['word'].data.update(block.nodes['word'].data)
-        model.fit(B, max_epochs=1)
+        model.partial_fit(B)
     print('Testing LatentDirichletAllocation passed!')
