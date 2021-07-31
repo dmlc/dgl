@@ -41,16 +41,16 @@ def _edge_update(edges):
     }
 
 
-def _bayesian_weight(z, prior, lr_mult):
+def _bayesian_weight(z, prior, lr_mult, axis=1):
     """The sum is less than or equal to one according to Jensen's inequality:
     exp(E(log(x))) <= E(x) = 1. The bound is tight when z -> inf.
     """
     if lr_mult < float("inf"):
-        sum = z.shape[1] * prior + z.sum(axis=1, keepdims=True) * lr_mult
+        sum = z.shape[axis] * prior + z.sum(axis, keepdims=True) * lr_mult
         Elog = torch.digamma(prior + z * lr_mult) - torch.digamma(sum)
         return Elog.exp()
     else:
-        return z / z.sum(axis=1, keepdims=True)
+        return z / z.sum(axis, keepdims=True)
 
 
 class LatentDirichletAllocation:
@@ -60,9 +60,8 @@ class LatentDirichletAllocation:
 
     Inputs
     ---
-    * G: a template graph; optional if n_words is provided.
+    * G: a template graph or an integer showing n_words
     * n_components: latent feature dimension; automatically set priors if missing.
-    * n_words: ignore G and set n_words directly.
     * prior: parameters in the Dirichlet prior; default to 1/n_components
     * lr: new_z = (1-lr)*old_z + lr*z; default to 1 for full gradients.
     * lr_mult: multiplier for z-update; use float("inf") to remove the prior completely.
@@ -82,15 +81,15 @@ class LatentDirichletAllocation:
     """
     def __init__(
         self, G, n_components,
-        n_words=None,
         prior=None,
         lr=1,
         lr_mult={'doc': 1, 'word': 1},
         device='cpu',
         verbose=True,
         ):
-        if n_words is None:
-            n_words = G.num_nodes('word')
+        self.n_words = G.num_nodes('word') if hasattr(G, 'num_nodes') else G
+        self.n_components = n_components
+
         if prior is None:
             prior = {'doc': 1./n_components, 'word': 1./n_components}
         self.prior = prior
@@ -106,9 +105,9 @@ class LatentDirichletAllocation:
             torch.tensor(100.0, device=device),
             torch.tensor(100.0, device=device),).sample
 
-        self.word_z = self._init((n_components, n_words))
+        self.word_z = self._init((self.n_words, n_components))
         self._word_weight = _bayesian_weight(
-            self.word_z, self.prior['word'], self.lr_mult['word'])
+            self.word_z, self.prior['word'], self.lr_mult['word'], axis=0)
 
 
     def _get_word_ids(self, G):
@@ -121,7 +120,7 @@ class LatentDirichletAllocation:
     def _prepare_graph(self, G, doc_data=None):
         """ load or init node data; rewrite G.ndata inplace """
         if doc_data is None:
-            z = self._init((G.num_nodes('doc'), self.word_z.shape[0])).to(G.device)
+            z = self._init((G.num_nodes('doc'), self.n_components)).to(G.device)
             weight = _bayesian_weight(z, self.prior['doc'], self.lr_mult['doc'])
             doc_data = {'z': z, 'weight': weight}
 
@@ -129,8 +128,8 @@ class LatentDirichletAllocation:
         G.nodes['doc'].data['weight'] = doc_data['weight']
 
         word_ids = self._get_word_ids(G)
-        G.nodes['word'].data['z'] = self.word_z[:, word_ids].to(G.device).T
-        G.nodes['word'].data['weight'] = self._word_weight[:, word_ids].to(G.device).T
+        G.nodes['word'].data['z'] = self.word_z[word_ids].to(G.device)
+        G.nodes['word'].data['weight'] = self._word_weight[word_ids].to(G.device)
         return G
 
 
@@ -162,7 +161,7 @@ class LatentDirichletAllocation:
     def transform(self, G):
         doc_data = self._e_step(G)
         word_ids = self._get_word_ids(G)
-        return doc_data['weight'] @ self._word_weight[:, word_ids].to(G.device)
+        return doc_data['weight'] @ self._word_weight[word_ids].T.to(G.device)
 
 
     def _m_step(self, G, doc_data):
@@ -171,23 +170,24 @@ class LatentDirichletAllocation:
         """
         G = self._prepare_graph(G.clone(), doc_data)
         word_ids = self._get_word_ids(G)
+        old_z = G.nodes['word'].data['z']
 
         G.update_all(_edge_update, fn.sum('z', 'z'))
         word_data = G.nodes['word'].data
 
-        self._last_mean_change = (
-            word_data['z'] - self.word_z[:, word_ids].to(G.device).T
-        ).abs().mean()
+        self._last_mean_change = (word_data['z'] - old_z).abs().mean()
+        del old_z
+        if self.verbose:
+            print(f"m-step mean_change={self._last_mean_change:.4f}, ", end="")
 
         self.word_z *= (1 - self.lr)
-        self.word_z[:, word_ids] += self.lr * word_data['z'].T.to(self.device)
+        self.word_z[word_ids] += (self.lr * word_data['z']).to(self.device)
 
         self._word_weight = _bayesian_weight(
-            self.word_z, self.prior['word'], self.lr_mult['word'])
+            self.word_z, self.prior['word'], self.lr_mult['word'], axis=0)
 
         if self.verbose:
-            print(f"m-step mean_change={self._last_mean_change:.4f}, "
-                  f"weight_gap={1 - self._word_weight.sum(axis=1).mean():.4f}")
+            print(f"weight_gap={1 - self._word_weight.sum(axis=0).mean():.4f}")
         return word_data
 
 
@@ -218,20 +218,20 @@ class LatentDirichletAllocation:
     def _node_elbo(self, ndata, ntype):
         """ Eq (4) in Hoffman et al., 2010.
         """
+        axis = 1 if ntype=='doc' else 0
         lr_mult = self.lr_mult[ntype]
         z = ndata['z']
         weight = ndata['weight']
-        prior = torch.tensor(self.prior[ntype], device=z.device, dtype=float)
-        K = z.shape[1]
+        prior = torch.tensor(self.prior[ntype], device=z.device, dtype=z.dtype)
+        K = z.shape[axis]
 
         if lr_mult < float("inf"):
-            return (
-                (-z * weight.log()).sum(axis=1) * lr_mult
-                - (K * torch.lgamma(prior) - torch.lgamma(K * prior)) # logB(a)
-                + _lbeta(prior + z * lr_mult, axis=1)               # logB(gamma)
-            ).sum() / z.sum() / lr_mult
+            log_evid = (z * weight.log()).sum(axis) * lr_mult
+            log_B_a = (K * torch.lgamma(prior) - torch.lgamma(K * prior))
+            log_B_g = _lbeta(prior + z * lr_mult, axis)
+            return (- log_evid - log_B_a + log_B_g).sum() / z.sum() / lr_mult
         else:
-            return torch.tensor(0.0, device=z.device)
+            return torch.tensor(0.0, device=z.device, dtype=z.dtype)
 
 
     def perplexity(self, G, doc_data=None):
@@ -260,7 +260,8 @@ class LatentDirichletAllocation:
             print(f'beta: {-word_elbo:.3f}')
 
         ppl = np.exp(-edge_elbo - doc_elbo - word_elbo)
-        assert not np.isnan(ppl), "numerical errors"
+        if G.num_edges()>0 and np.isnan(ppl):
+            warnings.warn("numerical issue in perplexity")
         return ppl
 
 
