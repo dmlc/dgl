@@ -339,6 +339,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCHandleSignal")
   sigemptyset(&sigHandler.sa_mask);
   sigHandler.sa_flags = 0;
   sigaction(SIGINT, &sigHandler, nullptr);
+  sigaction(SIGTERM, &sigHandler, nullptr);
 });
 #endif
 

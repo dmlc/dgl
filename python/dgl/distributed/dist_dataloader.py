@@ -71,7 +71,7 @@ class DistDataLoader:
         self.num_pending = 0
         self.collate_fn = collate_fn
         self.current_pos = 0
-        self.queue = []
+        self.queue = [] # Only used when pool is None
         self.drop_last = drop_last
         self.recv_idxs = 0
         self.shuffle = shuffle
