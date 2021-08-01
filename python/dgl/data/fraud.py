@@ -46,6 +46,8 @@ class FraudDataset(DGLBuiltinDataset):
         validation set size of the dataset, and the
         size of testing set is (1 - train_size - val_size)
         Default: 0.1
+    force_reload : bool
+        Whether to reload the dataset. Default: False
 
     Attributes
     ----------
@@ -85,7 +87,7 @@ class FraudDataset(DGLBuiltinDataset):
         'amazon': 'user'
     }
 
-    def __init__(self, name, raw_dir=None, random_seed=717, train_size=0.7, val_size=0.1):
+    def __init__(self, name, raw_dir=None, random_seed=717, train_size=0.7, val_size=0.1, force_reload=False):
         assert name in ['yelp', 'amazon'], "only supports 'yelp', or 'amazon'"
         url = _get_dgl_url(self.file_urls[name])
         self.seed = random_seed
@@ -93,7 +95,8 @@ class FraudDataset(DGLBuiltinDataset):
         self.val_size = val_size
         super(FraudDataset, self).__init__(name=name,
                                            url=url,
-                                           raw_dir=raw_dir)
+                                           raw_dir=raw_dir,
+                                           force_reload=force_reload)
 
     def process(self):
         """process raw data to graph, labels, splitting masks"""
@@ -243,6 +246,8 @@ class FraudYelpDataset(FraudDataset):
         validation set size of the dataset, and the
         size of testing set is (1 - train_size - val_size)
         Default: 0.1
+    force_reload : bool
+        Whether to reload the dataset. Default: False
 
     Examples
     --------
@@ -253,12 +258,13 @@ class FraudYelpDataset(FraudDataset):
     >>> label = graph.ndata['label']
     """
 
-    def __init__(self, raw_dir=None, random_seed=717, train_size=0.7, val_size=0.1):
+    def __init__(self, raw_dir=None, random_seed=717, train_size=0.7, val_size=0.1, force_reload=False):
         super(FraudYelpDataset, self).__init__(name='yelp',
                                                raw_dir=raw_dir,
                                                random_seed=random_seed,
                                                train_size=train_size,
-                                               val_size=val_size)
+                                               val_size=val_size,
+                                               force_reload=force_reload)
 
 
 class FraudAmazonDataset(FraudDataset):
@@ -312,6 +318,8 @@ class FraudAmazonDataset(FraudDataset):
         validation set size of the dataset, and the
         size of testing set is (1 - train_size - val_size)
         Default: 0.1
+    force_reload : bool
+        Whether to reload the dataset. Default: False
 
     Examples
     --------
@@ -322,9 +330,10 @@ class FraudAmazonDataset(FraudDataset):
     >>> label = graph.ndata['label']
     """
 
-    def __init__(self, raw_dir=None, random_seed=717, train_size=0.7, val_size=0.1):
+    def __init__(self, raw_dir=None, random_seed=717, train_size=0.7, val_size=0.1, force_reload=False):
         super(FraudAmazonDataset, self).__init__(name='amazon',
                                                  raw_dir=raw_dir,
                                                  random_seed=random_seed,
                                                  train_size=train_size,
-                                                 val_size=val_size)
+                                                 val_size=val_size,
+                                                 force_reload=force_reload)
