@@ -39,8 +39,8 @@ class DGLHeteroGraph(object):
     # pylint: disable=unused-argument, dangerous-default-value
     def __init__(self,
                  gidx=[],
-                 ntypes=['_U'],
-                 etypes=['_V'],
+                 ntypes=['_N'],
+                 etypes=['_E'],
                  node_frames=None,
                  edge_frames=None,
                  **deprecate_kwargs):
