@@ -120,7 +120,7 @@ __global__ void _MapProcByRangeKernel(
 }
 
 template<typename IdType, typename RangeType>
-__global__ void _MapLocalIndexByRange(
+__global__ void _MapLocalIndexByRangeKernel(
     const RangeType * const range,
     const IdType * const in,
     IdType * const out,
@@ -140,7 +140,7 @@ __global__ void _MapLocalIndexByRange(
 }
 
 template<typename IdType, typename RangeType>
-__global__ void _MapGlobalIndexByRange(
+__global__ void _MapGlobalIndexByRangeKernel(
     const RangeType * const range,
     const IdType * const in,
     IdType * const out,
@@ -547,7 +547,7 @@ IdArray MapToLocalFromRange(
     const dim3 grid((global_idx->shape[0] +block.x-1)/block.x);
 
     CUDA_KERNEL_CALL(
-        _MapLocalIndexByRange,
+        _MapLocalIndexByRangeKernel,
         grid,
         block,
         0,
@@ -609,7 +609,7 @@ IdArray MapToGlobalFromRange(
     const dim3 grid((local_idx->shape[0] +block.x-1)/block.x);
 
     CUDA_KERNEL_CALL(
-        _MapGlobalIndexByRange,
+        _MapGlobalIndexByRangeKernel,
         grid,
         block,
         0,
