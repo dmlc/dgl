@@ -41,16 +41,7 @@ class UnifiedTensor: #UnifiedTensor
     >>> idx = torch.Tensor([0,1,2]).to('cuda')
     >>> output = feats[idx]
 
-    For the multi-GPU operation, one can simply think UnifiedTensor like a GPU
-    tensor. For example, to copy a tensor ``feats`` to multiple GPUs, one
-    should do the following:
-
-    >>> feats = torch.rand((128,128))
-    >>> feats_gpu0 = feats.to('cuda:0')
-    >>> feats_gpu1 = feats.to('cuda:1')
-    >>> feats_gpu2 = feats.to('cuda:2')
-
-    Similar to that, to allow multiple GPUs to access the original CPU tensor
+    For the multi-GPU operation, to allow multiple GPUs to access the original CPU tensor
     ``feats`` using UnifiedTensor, one can do the following:
 
     >>> feats = torch.rand((128,128))
@@ -59,7 +50,18 @@ class UnifiedTensor: #UnifiedTensor
     >>> feats_gpu2 = dgl.contrib.UnifiedTensor(feats, device=torch.device('cuda:2'))
 
     Now, the ``cuda:0``, ``cuda:1``, and ``cuda:2`` devices will be able to access the
-    identical tensor located in the CPU memory using ``feats_gpu0``, ``feats_gpu1``, and
+    identical tensor located in the CPU memory using ``feats_gpu0``, ``feats_gpu1``, and ``feats_gpu2`` tensors, respectively.
+    
+    One can simply use following operations to slice the sub tensors into different GPU devices directly.
+
+    >>> feats_idx_gpu0 = torch.randint(128, 16, device='cuda:0')
+    >>> feats_idx_gpu1 = torch.randint(128, 16, device='cuda:1')
+    >>> feats_idx_gpu2 = torch.randint(128, 16, device='cuda:2')
+    
+    >>> sub_feat_gpu0 = feats_gpu0[feats_idx_gpu0]
+    >>> sub_feat_gpu1 = feats_gpu1[feats_idx_gpu1]
+    >>> sub_feat_gpu2 = feats_gpu2[feats_idx_gpu2]
+
     ``feats_gpu2`` tensors, respectively.
     '''
 
