@@ -1362,10 +1362,7 @@ class KVClient(object):
             if machine_id == self._machine_id:
                 local_id = F.tensor(np.arange(self._part_policy[name].get_part_size(),
                                               dtype=np.int64))
-                local_data = self._pull_handlers[name](self._data_store, name, local_id)
-                server_id = self._main_server_id
-                local_response = PullResponse(server_id, local_data)
-                total += F.count_nonzero(local_response.data_tensor)
+                total += F.count_nonzero(self._data_store[name][local_id])
             else:
                 request = CountLocalNonzeroRequest(name)
                 rpc.send_request_to_machine(machine_id, request)
