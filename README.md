@@ -287,6 +287,9 @@ Take the survey [here](https://forms.gle/Ej3jHCocACmb49Gp8) and leave any feedba
 
 1. [**A Classification Method for Academic Resources Based on a Graph Attention Network**](https://www.mdpi.com/1999-5903/13/3/64/htm), Future Internet'21, *Jie Yu, Yaliu Li, Chenle Pan and Junwei Wang*
 
+1. [**Large Graph Convolutional Network Training with GPU-Oriented Data Communication Architecture**](https://arxiv.org/abs/2103.03330), *Seung Won Min, Kun Wu, Sitao Huang, Mert Hidayetoğlu, Jinjun Xiong, Eiman Ebrahimi, Deming Chen, Wen-mei Hwu*
+
+
 </details>
 
 ## Contributing
