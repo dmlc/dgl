@@ -272,6 +272,8 @@ Take the survey [here](https://forms.gle/Ej3jHCocACmb49Gp8) and leave any feedba
 1. [**Coreference-Aware Dialogue Summarization**](https://arxiv.org/abs/2106.08556), SIGDIAL'21, *Zhengyuan Liu, Ke Shi, Nancy F. Chen*
 
 1. [**Document Structure aware Relational Graph Convolutional Networks for Ontology Population**](https://arxiv.org/abs/2104.12950), arXiv, *Abhay M Shalghar, Ayush Kumar, Balaji Ganesan, Aswin Kannan, Shobha G*
+  
+1. [**Covid-19 Detection from Chest X-ray and Patient Metadata using Graph Convolutional Neural Networks**](https://arxiv.org/abs/2105.09720), *Thosini Bamunu Mudiyanselage, Nipuna Senanayake, Chunyan Ji, Yi Pan, Yanqing Zhang*
 
 </details>
 
