@@ -51,7 +51,7 @@ For acquainted users who wish to learn more,
 * [Study classical papers](https://docs.dgl.ai/tutorials/models/index.html) on graph machine learning alongside DGL.
 * Search for the usage of a specific API in the [API reference manual](https://docs.dgl.ai/api/python/index.html), which organizes all DGL APIs by their namespace.
 
-All the learning materials are available at our [documentation site](https://docs.dgl.ai/). If you are new to deep learning in general, 
+All the learning materials are available at our [documentation site](https://docs.dgl.ai/). If you are new to deep learning in general,
 check out the open source book [Dive into Deep Learning](https://d2l.ai/).
 
 
@@ -262,9 +262,9 @@ Take the survey [here](https://forms.gle/Ej3jHCocACmb49Gp8) and leave any feedba
 1. [**SLAPS: Self-Supervision Improves Structure Learning for Graph Neural Networks**](https://arxiv.org/pdf/2102.05034.pdf), *Bahare Fatemi, Layla El Asri, Seyed Mehran Kazemi*
 
 1. [**Finding Needles in Heterogeneous Haystacks**](https://homepage.divms.uiowa.edu/~badhikari/assets/doc/papers/CONGCNIAAI2021.pdf), AAAI'21, *Bijaya Adhikari, Liangyue Li, Nikhil Rao, Karthik Subbian*
-  
+
 1. [**RetCL: A Selection-based Approach for Retrosynthesis via Contrastive Learning**](https://arxiv.org/abs/2105.00795), IJCAI 2021, *Hankook Lee, Sungsoo Ahn, Seung-Woo Seo, You Young Song, Eunho Yang, Sung-Ju Hwang, Jinwoo Shin*
-  
+
 1. [**Accurate Prediction of Free Solvation Energy of Organic Molecules via Graph Attention Network and Message Passing Neural Network from Pairwise Atomistic Interactions**](https://arxiv.org/abs/2105.02048), *Ramin Ansari, Amirata Ghorbani*
 
 1. [**DIPS-Plus: The Enhanced Database of Interacting Protein Structures for Interface Prediction**](https://arxiv.org/abs/2106.04362), *Alex Morehead, Chen Chen, Ada Sedova, Jianlin Cheng*
@@ -272,14 +272,23 @@ Take the survey [here](https://forms.gle/Ej3jHCocACmb49Gp8) and leave any feedba
 1. [**Coreference-Aware Dialogue Summarization**](https://arxiv.org/abs/2106.08556), SIGDIAL'21, *Zhengyuan Liu, Ke Shi, Nancy F. Chen*
 
 1. [**Document Structure aware Relational Graph Convolutional Networks for Ontology Population**](https://arxiv.org/abs/2104.12950), arXiv, *Abhay M Shalghar, Ayush Kumar, Balaji Ganesan, Aswin Kannan, Shobha G*
-  
+
 1. [**Covid-19 Detection from Chest X-ray and Patient Metadata using Graph Convolutional Neural Networks**](https://arxiv.org/abs/2105.09720), *Thosini Bamunu Mudiyanselage, Nipuna Senanayake, Chunyan Ji, Yi Pan, Yanqing Zhang*
 
 1. [**Graph neural networks and sequence embeddings enable the prediction and design of the cofactor specificity of Rossmann fold proteins**](https://www.biorxiv.org/content/10.1101/2021.05.05.440912v2), bioRxiv'21, *Kamil Kaminski, Jan Ludwiczak, Maciej Jasinski, Adriana Bukala, Rafal Madaj, Krzysztof Szczepaniak, Stanislaw Dunin-Horkawicz*
 
 1. [**LGESQL: Line Graph Enhanced Text-to-SQL Model with Mixed Local and Non-Local Relations**](https://arxiv.org/pdf/2106.01093.pdf), ACL'21, *Ruisheng Cao, Lu Chen, Zhi Chen, Yanbin Zhao, Su Zhu, Kai Yu*
 
+1. [**Enhancing Graph Neural Networks via auxiliary training for semi-supervised node classification**](https://www.sciencedirect.com/science/article/pii/S0950705121001477), Knowledge-Based System'21, *Yao Wu, Yu Song, Hong Huang, Fanghua Ye, Xing Xie, Hai Jin*
+
+1. [**Modeling Graph Node Correlations with Neighbor Mixture Models**](https://arxiv.org/pdf/2103.15966.pdf), *Linfeng Liu, Michael C. Hughes, Li-Ping Liu*
+
+1. [**COMBINING PHYSICS AND MACHINE LEARNING FOR NETWORK FLOW ESTIMATION**](https://openreview.net/pdf/9dc2744a465941220de07cf308acf822ec8aaa64.pdf), ICLR'21, *Arlei Silva, Furkan Kocayusufoglu, Saber Jafarpour, Francesco Bullo, Ananthram Swami, Ambuj Singh*
+
+1. [**A Classification Method for Academic Resources Based on a Graph Attention Network**](https://www.mdpi.com/1999-5903/13/3/64/htm), Future Internet'21, *Jie Yu, Yaliu Li, Chenle Pan and Junwei Wang*
+
 1. [**Large Graph Convolutional Network Training with GPU-Oriented Data Communication Architecture**](https://arxiv.org/abs/2103.03330), *Seung Won Min, Kun Wu, Sitao Huang, Mert Hidayetoğlu, Jinjun Xiong, Eiman Ebrahimi, Deming Chen, Wen-mei Hwu*
+
 
 </details>
 
