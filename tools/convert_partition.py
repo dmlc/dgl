@@ -54,11 +54,16 @@ if args.removed_edges is not None:
     # that were removed during ParMETIS gets retained back into the partioned file, so that
     # no edges were lost.
 
+    print('Adding removed edges back into the partitioned file, that way all edges that were removed during ParMETIS gets retained back into the partioned file')
+
     for part_id in range(num_parts):
         edge_file = '{}/p{:03}-{}_edges.txt'.format(input_dir, part_id, graph_name)
         part_df = pd.read_csv(edge_file, sep=" ", usecols=remove_column_index, names=remove_column_name)
         merge_df = pd.merge(part_df, removed_df, how='inner', on=["src_id", "dest_id"])
         merge_df.to_csv(edge_file, mode='a', header=False, index=False, sep=" ")
+
+    print('All dropped edges were retained back into the partitioned files. Now partitioned files has all edges in them')
+
 
 with open(args.schema) as json_file:
     schema = json.load(json_file)
