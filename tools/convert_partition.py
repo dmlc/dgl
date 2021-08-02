@@ -50,6 +50,10 @@ if args.removed_edges is not None:
     removed_df = pd.read_csv(removed_file, sep=" ", header=None)
     removed_df.rename(columns = {0: "src_id", 1: "dest_id"}, inplace=True)
 
+    # We are adding removed edges back into the partitioned file, so that all the edges
+    # that were removed during ParMETIS gets retained back into the partioned file, so that
+    # no edges were lost.
+
     for part_id in range(num_parts):
         edge_file = '{}/p{:03}-{}_edges.txt'.format(input_dir, part_id, graph_name)
         part_df = pd.read_csv(edge_file, sep=" ", usecols=remove_column_index, names=remove_column_name)
