@@ -203,9 +203,9 @@ class RangePartition : public NDArrayPartition {
     });
   }
 
-  private:
-    IdArray range_;
-    IdArray range_cpu_;
+ private:
+  IdArray range_;
+  IdArray range_cpu_;
 };
 
 NDArrayPartitionRef CreatePartitionRemainderBased(

@@ -80,8 +80,7 @@ template<typename RangeType>
 __device__ RangeType _SearchRange(
     const RangeType * const range,
     const int num_parts,
-    const RangeType target)
-{
+    const RangeType target) {
   int start = 0;
   int end = num_parts;
   int cur = (end+start)/2;

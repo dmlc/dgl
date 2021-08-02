@@ -425,7 +425,7 @@ class NDArrayPartition(object):
     range based partitioning (e.g. from a
     dgl.distributed.graph_partition_book.RangePartitionBook)
     'max_node_map', to an NDArrayPartition 'part'.
-    
+
     >>> part_range = [0]
     >>> for part in part_book.metadata():
     >>>     part_range.append(part_range[-1] + part['num_nodes'])
@@ -440,7 +440,7 @@ class NDArrayPartition(object):
             self._partition = _CAPI_DGLNDArrayPartitionCreateRemainderBased(
                 array_size, num_parts)
         elif mode == 'range':
-            assert part_ranges not is None, 'When using range-based ' \
+            assert part_ranges is not None, 'When using range-based ' \
                 'partitioning, "part_ranges" must not be None.'
             assert part_ranges[0] == 0 and part_ranges[-1] == array_size, \
                 'part_ranges[0] must be 0, and part_ranges[-1] must be ' \
