@@ -451,6 +451,8 @@ class NDArrayPartition(object):
                 assert isinstance(part_ranges, NDArray), '"part_ranges" must ' \
                     'be Tensor or dgl.NDArray.'
             self._partition = _CAPI_DGLNDArrayPartitionCreateRangeBased(
+                array_size,
+                num_parts,
                 part_ranges)
         else:
             assert False, 'Unknown partition mode "{}"'.format(mode)
