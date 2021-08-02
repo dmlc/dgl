@@ -1,6 +1,6 @@
-import math
 import torch
 import torch.nn as nn
+from torch.nn import init
 from dgl.nn.pytorch import GraphConv
 from torch.nn.parameter import Parameter
 
@@ -50,17 +50,14 @@ class MatGRUGate(torch.nn.Module):
         super().__init__()
         self.activation = activation
         self.W = Parameter(torch.Tensor(rows, rows))
-        self.reset_param(self.W)
-
         self.U = Parameter(torch.Tensor(rows, rows))
-        self.reset_param(self.U)
+        self.bias = Parameter(torch.Tensor(rows, cols))
+        self.reset_parameters()
 
-        self.bias = Parameter(torch.zeros(rows, cols))
-
-    def reset_param(self, t):
-        # Initialize based on the number of columns
-        stdv = 1. / math.sqrt(t.size(1))
-        t.data.uniform_(-stdv, stdv)
+    def reset_parameters(self):
+        init.xavier_uniform_(self.W)
+        init.xavier_uniform_(self.U)
+        init.zeros_(self.bias)
 
     def forward(self, x, hidden):
         out = self.activation(self.W.matmul(x) + \
@@ -80,19 +77,17 @@ class TopK(torch.nn.Module):
     def __init__(self, feats, k):
         super().__init__()
         self.scorer = Parameter(torch.Tensor(feats, 1))
-        self.reset_parameters(self.scorer)
+        self.reset_parameters()
 
         self.k = k
 
-    def reset_parameters(self, t):
-        stdv = 1. / math.sqrt(t.size(0))
-        t.data.uniform_(-stdv, stdv)
+    def reset_parameters(self):
+        init.xavier_uniform_(self.scorer)
 
     def forward(self, node_embs):
         scores = node_embs.matmul(self.scorer) / self.scorer.norm()
         vals, topk_indices = scores.view(-1).topk(self.k)
-        tanh = torch.nn.Tanh()
-        out = node_embs[topk_indices] * tanh(scores[topk_indices].view(-1, 1))
+        out = node_embs[topk_indices] * torch.tanh(scores[topk_indices].view(-1, 1))
         # we need to transpose the output
         return out.t()
 
@@ -123,12 +118,11 @@ class EvolveGCNH(nn.Module):
         self.mlp = nn.Sequential(nn.Linear(n_hidden, classifier_hidden),
                                  nn.ReLU(),
                                  nn.Linear(classifier_hidden, n_classes))
-        self.reset_params()
+        self.reset_parameters()
 
-    def reset_params(self):
-        for layer in self.gcn_weights_list:
-            stdv = 1. / math.sqrt(layer.size(1))
-            layer.data.uniform_(-stdv, stdv)
+    def reset_parameters(self):
+        for gcn_weight in self.gcn_weights_list:
+            init.xavier_uniform_(gcn_weight)
 
     def forward(self, g_list):
         feature_list = []
@@ -173,11 +167,11 @@ class EvolveGCNO(nn.Module):
         self.mlp = nn.Sequential(nn.Linear(n_hidden, classifier_hidden),
                                  nn.ReLU(),
                                  nn.Linear(classifier_hidden, n_classes))
-        self.reset_params()
+        self.reset_parameters()
 
-    def reset_params(self):
-        for layer in self.gcn_weights_list:
-            torch.nn.init.xavier_normal_(layer)
+    def reset_parameters(self):
+        for gcn_weight in self.gcn_weights_list:
+            init.xavier_uniform_(gcn_weight)
 
     def forward(self, g_list):
         feature_list = []
