@@ -220,7 +220,7 @@ COOMatrix COOTranspose(COOMatrix coo);
  * - The function first check whether the input COO matrix is sorted
  *   using a linear scan.
  * - If the COO matrix is row sorted, the conversion can be done very
- *   efficiently in a sequential scan. The result indices and data arrays 
+ *   efficiently in a sequential scan. The result indices and data arrays
  *   are directly equal to the column and data arrays from the input.
  * - If the COO matrix is further column sorted, the result CSR is
  *   also column sorted.
@@ -360,6 +360,54 @@ COOMatrix COORowWiseSampling(
     bool replace = true);
 
 /*!
+ * \brief Randomly select a fixed number of non-zero entries for each edge type
+ *        along each given row independently.
+ *
+ * The function performs random choices along each row independently.
+ * In each row, num_samples samples is picked for each edge type. (The edge
+ * type is stored in etypes)
+ * The picked indices are returned in the form of a COO matrix.
+ *
+ * If replace is false and a row has fewer non-zero values than num_samples,
+ * all the values are picked.
+ *
+ * Examples:
+ *
+ * // coo.num_rows = 4;
+ * // coo.num_cols = 4;
+ * // coo.rows = [0, 0, 0, 0, 3]
+ * // coo.cols = [0, 1, 3, 2, 3]
+ * // coo.data = [2, 3, 0, 1, 4]
+ * // etype = [0, 0, 0, 2, 1]
+ * COOMatrix coo = ...;
+ * IdArray rows = ... ; // [0, 3]
+ * COOMatrix sampled = COORowWisePerEtypeSampling(coo, rows, etype, 2, FloatArray(), false);
+ * // possible sampled coo matrix:
+ * // sampled.num_rows = 4
+ * // sampled.num_cols = 4
+ * // sampled.rows = [0, 0, 0, 3]
+ * // sampled.cols = [0, 3, 2, 3]
+ * // sampled.data = [2, 0, 1, 4]
+ *
+ * \param mat Input coo matrix.
+ * \param rows Rows to sample from.
+ * \param etypes Edge types of each edge.
+ * \param num_samples Number of samples
+ * \param prob Unnormalized probability array. Should be of the same length as the data array.
+ *             If an empty array is provided, assume uniform.
+ * \param replace True if sample with replacement
+ * \return A COOMatrix storing the picked row and col indices. Its data field stores the
+ *         the index of the picked elements in the value array.
+ */
+COOMatrix COORowWisePerEtypeSampling(
+    COOMatrix mat,
+    IdArray rows,
+    IdArray etypes,
+    int64_t num_samples,
+    FloatArray prob = FloatArray(),
+    bool replace = true);
+
+/*!
  * \brief Select K non-zero entries with the largest weights along each given row.
  *
  * The function performs top-k selection along each row independently.
@@ -405,7 +453,7 @@ COOMatrix COORowWiseTopk(
 
 /*!
  * \brief Union two COOMatrix into one COOMatrix.
- * 
+ *
  * Two Matrix must have the same shape.
  *
  * Example:
@@ -477,7 +525,7 @@ COOMatrix DisjointUnionCoo(
  *      [3, 0, 2],
  *      [1, 1, 0],
  *      [0, 0, 4]]
- * 
+ *
  * B, cnt, edge_map = COOToSimple(A)
  *
  * B = [[0, 0, 0],
@@ -588,7 +636,7 @@ COOMatrix COOSliceContiguousChunk(
 
 /*!
  * \brief Create a LineGraph of input coo
- * 
+ *
  * A = [[0, 0, 1],
  *      [1, 0, 1],
  *      [1, 1, 0]]
