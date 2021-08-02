@@ -29,7 +29,7 @@ parser.add_argument('--edge-attr-dtype', type=str, default=None,
                     help='The data type of the edge attributes')
 parser.add_argument('--output', required=True, type=str,
                     help='The output directory of the partitioned results')
-parser.add_argument('--removed', help='file where we have edges that were dropped', default=None, type=str)
+parser.add_argument('--removed-edges', help='file where we have edges that were dropped', default=None, type=str)
 
 args = parser.parse_args()
 
@@ -43,15 +43,15 @@ workspace_dir = args.workspace
 output_dir = args.output
 
 
-if args.removed is not None:
-    removed_file = '{}{}'.format(input_dir, args.removed)
+if args.removed_edges is not None:
+    removed_file = '{}/{}'.format(input_dir, args.removed_edges)
     remove_column_index = [0, 1, 2, 3]
     remove_column_name = ["distributed_src_id", "distributed_dest_id", "src_id", "dest_id"]
     removed_df = pd.read_csv(removed_file, sep=" ", header=None)
     removed_df.rename(columns = {0: "src_id", 1: "dest_id"}, inplace=True)
 
     for part_id in range(num_parts):
-        edge_file = '{}p{:03}-{}_edges.txt'.format(input_dir, part_id, graph_name)
+        edge_file = '{}/p{:03}-{}_edges.txt'.format(input_dir, part_id, graph_name)
         part_df = pd.read_csv(edge_file, sep=" ", usecols=remove_column_index, names=remove_column_name)
         merge_df = pd.merge(part_df, removed_df, how='inner', on=["src_id", "dest_id"])
         merge_df.to_csv(edge_file, mode='a', header=False, index=False, sep=" ")
