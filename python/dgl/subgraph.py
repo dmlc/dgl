@@ -119,9 +119,9 @@ def node_subgraph(graph, nodes, *, relabel_nodes=True, store_ids=True):
     >>> })
     >>> sub_g = dgl.node_subgraph(g, {'user': [1, 2]})
     >>> sub_g
-    Graph(num_nodes={'user': 2, 'game': 0},
-          num_edges={('user', 'plays', 'game'): 0, ('user', 'follows', 'user'): 2},
-          metagraph=[('user', 'game'), ('user', 'user')])
+    Graph(num_nodes={'game': 0, 'user': 2},
+          num_edges={('user', 'follows', 'user'): 2, ('user', 'plays', 'game'): 0},
+          metagraph=[('user', 'user', 'follows'), ('user', 'game', 'plays')])
 
     See Also
     --------
@@ -266,9 +266,9 @@ def edge_subgraph(graph, edges, *, relabel_nodes=True, store_ids=True, **depreca
     >>> sub_g = dgl.edge_subgraph(g, {('user', 'follows', 'user'): [1, 2],
     ...                               ('user', 'plays', 'game'): [2]})
     >>> print(sub_g)
-    Graph(num_nodes={'user': 2, 'game': 1},
-          num_edges={('user', 'plays', 'game'): 1, ('user', 'follows', 'user'): 2},
-          metagraph=[('user', 'game'), ('user', 'user')])
+    Graph(num_nodes={'game': 1, user': 2},
+          num_edges={('user', 'follows', 'user'): 2, ('user', 'plays', 'game'): 1},
+          metagraph=[('user', 'user', 'follows'), ('user', 'game', 'plays')])
 
     See Also
     --------

@@ -39,8 +39,8 @@ class DGLHeteroGraph(object):
     # pylint: disable=unused-argument, dangerous-default-value
     def __init__(self,
                  gidx=[],
-                 ntypes=['_U'],
-                 etypes=['_V'],
+                 ntypes=['_N'],
+                 etypes=['_E'],
                  node_frames=None,
                  edge_frames=None,
                  **deprecate_kwargs):
@@ -4951,6 +4951,18 @@ class DGLHeteroGraph(object):
         >>> g.nodes['user'].data['h']
         tensor([[0.],
                 [4.]])
+
+        User-defined cross reducer equivalent to "sum".
+
+        >>> def cross_sum(flist):
+        ...     return torch.sum(torch.stack(flist, dim=0), dim=0) if len(flist) > 1 else flist[0]
+
+        Use the user-defined cross reducer.
+
+        >>> g.multi_update_all(
+        ...     {'follows': (fn.copy_src('h', 'm'), fn.sum('m', 'h')),
+        ...      'attracts': (fn.copy_src('h', 'm'), fn.sum('m', 'h'))},
+        ... cross_sum)
         """
         all_out = defaultdict(list)
         merge_order = defaultdict(list)

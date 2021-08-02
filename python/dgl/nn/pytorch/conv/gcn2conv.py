@@ -20,7 +20,9 @@ class GCN2Conv(nn.Module):
     and Identity mapping (GCNII) was introduced in `"Simple and Deep Graph Convolutional
     Networks" <https://arxiv.org/abs/2007.02133>`_ paper.
     It is mathematically is defined as follows:
+
     .. math::
+
         \mathbf{h}^{(l+1)} =\left( (1 - \alpha)(\mathbf{D}^{-1/2} \mathbf{\hat{A}}
         \mathbf{D}^{-1/2})\mathbf{h}^{(l)} + \alpha {\mathbf{h}^{(0)}} \right)
         \left( (1 - \beta_l) \mathbf{I} + \beta_l \mathbf{W} \right)

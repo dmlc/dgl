@@ -68,11 +68,11 @@ bool has_edge_between(const CSRMatrix &csr, dgl_id_t u,
 template <DLDeviceType XPU, typename IdxType>
 std::tuple<dgl_id_t, dgl_id_t, bool> Node2vecRandomWalkStep(
     IdxType *data, dgl_id_t curr, dgl_id_t pre, const double p, const double q,
-    int64_t len, const CSRMatrix &csr, const FloatArray &probs,
+    int64_t len, const CSRMatrix &csr, bool csr_has_data, const FloatArray &probs,
     TerminatePredicate<IdxType> terminate) {
   const IdxType *offsets = csr.indptr.Ptr<IdxType>();
   const IdxType *all_succ = csr.indices.Ptr<IdxType>();
-  const IdxType *all_eids = CSRHasData(csr) ? csr.data.Ptr<IdxType>() : nullptr;
+  const IdxType *all_eids = csr_has_data ? csr.data.Ptr<IdxType>() : nullptr;
   const IdxType *succ = all_succ + offsets[curr];
   const IdxType *eids = all_eids ? (all_eids + offsets[curr]) : nullptr;
 
@@ -153,13 +153,14 @@ std::pair<IdArray, IdArray> Node2vecRandomWalk(
     const int64_t max_num_steps, const FloatArray &prob,
     TerminatePredicate<IdxType> terminate) {
   const CSRMatrix &edges = g->GetCSRMatrix(0);  // homogeneous graph.
+  bool csr_has_data = CSRHasData(edges);
 
   StepFunc<IdxType> step =
-    [&edges, &prob, p, q, terminate]
+    [&edges, csr_has_data, &prob, p, q, terminate]
     (IdxType *data, dgl_id_t curr, int64_t len) {
       dgl_id_t pre = (len != 0) ? data[len - 1] : curr;
       return Node2vecRandomWalkStep<XPU, IdxType>(data, curr, pre, p, q, len,
-                                                  edges, prob, terminate);
+                                                  edges, csr_has_data, prob, terminate);
     };
 
   return GenericRandomWalk<XPU, IdxType>(seeds, max_num_steps, step);

@@ -354,5 +354,5 @@ def mean_udf(nodes):
 # 
 
 
-# Thumbnail Courtesy: Representation Learning on Networks, Jure Leskovec, WWW 2018
+# Thumbnail credits: Representation Learning on Networks, Jure Leskovec, WWW 2018
 # sphinx_gallery_thumbnail_path = '_static/blitz_3_message_passing.png'

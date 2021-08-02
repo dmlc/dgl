@@ -223,5 +223,5 @@ graph, label = dataset[0]
 print(graph, label)
 
 
-# Thumbnail Courtesy: (Un)common Use Cases for Graph Databases, Michal Bachman
+# Thumbnail credits: (Un)common Use Cases for Graph Databases, Michal Bachman
 # sphinx_gallery_thumbnail_path = '_static/blitz_6_load_data.png'

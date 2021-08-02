@@ -152,7 +152,8 @@ class CoraFullDataset(GNNBenchmarkDataset):
     Statistics:
 
     - Nodes: 19,793
-    - Edges: 130,622
+    - Edges: 126,842 (note that the original dataset has 65,311 edges but DGL adds
+      the reverse edges and remove the duplicates, hence with a different number)
     - Number of Classes: 70
     - Node feature size: 8,710
 
@@ -218,7 +219,8 @@ class CoauthorCSDataset(GNNBenchmarkDataset):
     Statistics:
 
     - Nodes: 18,333
-    - Edges: 327,576
+    - Edges: 163,788 (note that the original dataset has 81,894 edges but DGL adds
+      the reverse edges and remove the duplicates, hence with a different number)
     - Number of classes: 15
     - Node feature size: 6,805
 
@@ -284,7 +286,8 @@ class CoauthorPhysicsDataset(GNNBenchmarkDataset):
     Statistics
 
     - Nodes: 34,493
-    - Edges: 991,848
+    - Edges: 495,924 (note that the original dataset has 247,962 edges but DGL adds
+      the reverse edges and remove the duplicates, hence with a different number)
     - Number of classes: 5
     - Node feature size: 8,415
 
@@ -349,7 +352,8 @@ class AmazonCoBuyComputerDataset(GNNBenchmarkDataset):
     Statistics:
 
     - Nodes: 13,752
-    - Edges: 574,418
+    - Edges: 491,722 (note that the original dataset has 245,778 edges but DGL adds
+      the reverse edges and remove the duplicates, hence with a different number)
     - Number of classes: 10
     - Node feature size: 767
 
@@ -414,7 +418,8 @@ class AmazonCoBuyPhotoDataset(GNNBenchmarkDataset):
     Statistics
 
     - Nodes: 7,650
-    - Edges: 287,326
+    - Edges: 238,163 (note that the original dataset has 119,043 edges but DGL adds
+      the reverse edges and remove the duplicates, hence with a different number)
     - Number of classes: 8
     - Node feature size: 745
 
