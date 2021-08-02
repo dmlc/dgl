@@ -15,11 +15,14 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
                 return_eids=False):
     """Generate random walk traces from an array of starting nodes based on the given metapath.
 
-    For a single starting node, ``num_traces`` traces would be generated.  A trace would
+    Each starting node will have one trace generated, which
 
     1. Start from the given node and set ``t`` to 0.
     2. Pick and traverse along edge type ``metapath[t]`` from the current node.
     3. If no edge can be found, halt.  Otherwise, increment ``t`` and go to step 2.
+
+    To generate multiple traces for a single node, you can specify the same node multiple
+    times.
 
     The returned traces all have length ``len(metapath) + 1``, where the first node
     is the starting node itself.
