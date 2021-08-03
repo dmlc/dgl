@@ -1071,10 +1071,13 @@ class DistGraph:
                     subg[self._etype2canonical[etype]] = self.find_edges(edges[etype], etype)
             num_nodes = {ntype: self.number_of_nodes(ntype) for ntype in self.ntypes}
             subg = dgl_heterograph(subg, num_nodes_dict=num_nodes)
+            for etype in edges:
+                subg.edges[etype][EID] = edges[etype]
         else:
             assert len(self.etypes) == 1
             subg = self.find_edges(edges)
             subg = dgl_graph(subg, num_nodes=self.number_of_nodes())
+            subg.edata[EID] = edges
 
         if relabel_nodes:
             subg = compact_graphs(subg)
