@@ -64,10 +64,14 @@ def thread_wrapped_func(func):
 
     return decorated_function
 
-def get_graph(name, format):
+def get_graph(name, format = None):
     # global GRAPH_CACHE
     # if name in GRAPH_CACHE:
     #     return GRAPH_CACHE[name].to(format)
+    if isinstance(format, str):
+        format = [format] # didn't specify format
+    if format is None:
+        format = ['csc', 'csr', 'coo']
     g = None
     if name == 'cora':
         g = dgl.data.CoraGraphDataset(verbose=False)[0]
@@ -79,7 +83,7 @@ def get_graph(name, format):
             g_list, _ = dgl.load_graphs(bin_path)
             g = g_list[0]
         else:
-            g = get_livejournal().formats([format])
+            g = get_livejournal().formats(format)
             dgl.save_graphs(bin_path, [g])
     elif name == "friendster":
         bin_path = "/tmp/dataset/friendster/friendster_{}.bin".format(format)
@@ -87,7 +91,7 @@ def get_graph(name, format):
             g_list, _ = dgl.load_graphs(bin_path)
             g = g_list[0]
         else:
-            g = get_friendster().formats([format])
+            g = get_friendster().formats(format)
             dgl.save_graphs(bin_path, [g])
     elif name == "reddit":
         bin_path = "/tmp/dataset/reddit/reddit_{}.bin".format(format)
@@ -95,14 +99,14 @@ def get_graph(name, format):
             g_list, _ = dgl.load_graphs(bin_path)
             g = g_list[0]
         else:
-            g = dgl.data.RedditDataset(self_loop=True)[0].formats([format])
+            g = dgl.data.RedditDataset(self_loop=True)[0].formats(format)
             dgl.save_graphs(bin_path, [g])
     elif name.startswith("ogb"):
         g = get_ogb_graph(name)
     else:
         raise Exception("Unknown dataset")
     # GRAPH_CACHE[name] = g
-    g = g.formats([format])
+    g = g.formats(format)
     return g
 
 

@@ -80,7 +80,7 @@ def _check_neighbor_sampling_dataloader(g, nids, dl, mode, collator):
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
 def test_neighbor_sampler_dataloader():
-    g = dgl.heterograph({('user', 'follow', 'user'): ([0, 0, 0, 1, 1], [1, 2, 3, 3, 4])}, 
+    g = dgl.heterograph({('user', 'follow', 'user'): ([0, 0, 0, 1, 1], [1, 2, 3, 3, 4])},
                         {'user': 6}).long()
     g = dgl.to_bidirected(g)
     g.ndata['feat'] = F.randn((6, 8))
@@ -122,6 +122,12 @@ def test_neighbor_sampler_dataloader():
         modes.append('edge')
 
         collators.append(dgl.dataloading.EdgeCollator(
+            g, seeds, sampler, exclude='self'))
+        graphs.append(g)
+        nids.append({'follow': seeds})
+        modes.append('edge')
+
+        collators.append(dgl.dataloading.EdgeCollator(
             g, seeds, sampler, exclude='reverse_id', reverse_eids=reverse_eids))
         graphs.append(g)
         nids.append({'follow': seeds})
@@ -129,6 +135,12 @@ def test_neighbor_sampler_dataloader():
 
         collators.append(dgl.dataloading.EdgeCollator(
             g, seeds, sampler, negative_sampler=dgl.dataloading.negative_sampler.Uniform(2)))
+        graphs.append(g)
+        nids.append({'follow': seeds})
+        modes.append('link')
+
+        collators.append(dgl.dataloading.EdgeCollator(
+            g, seeds, sampler, exclude='self', negative_sampler=dgl.dataloading.negative_sampler.Uniform(2)))
         graphs.append(g)
         nids.append({'follow': seeds})
         modes.append('link')
@@ -284,7 +296,7 @@ def test_edge_dataloader():
         g2, {ety: g2.edges(form='eid', etype=ety) for ety in g2.canonical_etypes},
         sampler, device=F.ctx(), negative_sampler=neg_sampler,
         batch_size=batch_size)
-    
+
     assert isinstance(iter(dataloader), Iterator)
     for input_nodes, pos_pair_graph, neg_pair_graph, blocks in dataloader:
         _check_device(input_nodes)

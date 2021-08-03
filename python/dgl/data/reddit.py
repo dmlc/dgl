@@ -9,6 +9,7 @@ from .dgl_dataset import DGLBuiltinDataset
 from .utils import _get_dgl_url, generate_mask_tensor, load_graphs, save_graphs, deprecate_property
 from .. import backend as F
 from ..convert import from_scipy
+from ..transform import reorder_graph
 
 
 class RedditDataset(DGLBuiltinDataset):
@@ -155,6 +156,9 @@ class RedditDataset(DGLBuiltinDataset):
         self._graph.ndata['test_mask'] = generate_mask_tensor(test_mask)
         self._graph.ndata['feat'] = F.tensor(features, dtype=F.data_type_dict['float32'])
         self._graph.ndata['label'] = F.tensor(labels, dtype=F.data_type_dict['int64'])
+        self._graph = reorder_graph(
+            self._graph, node_permute_algo='rcmk', edge_permute_algo='dst', store_ids=False)
+
         self._print_info()
 
     def has_cache(self):
