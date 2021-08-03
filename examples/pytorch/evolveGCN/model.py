@@ -85,7 +85,7 @@ class TopK(torch.nn.Module):
         init.xavier_uniform_(self.scorer)
 
     def forward(self, node_embs):
-        scores = node_embs.matmul(self.scorer) / self.scorer.norm()
+        scores = node_embs.matmul(self.scorer) / self.scorer.norm().clamp(min=1e-6)
         vals, topk_indices = scores.view(-1).topk(self.k)
         out = node_embs[topk_indices] * torch.tanh(scores[topk_indices].view(-1, 1))
         # we need to transpose the output
