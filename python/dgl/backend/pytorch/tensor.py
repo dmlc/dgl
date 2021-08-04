@@ -3,6 +3,7 @@ from __future__ import absolute_import
 from distutils.version import LooseVersion
 
 import scipy # Weird bug in new pytorch when import scipy after import torch
+import numpy as np
 import torch as th
 import builtins
 import numbers
@@ -289,6 +290,10 @@ def clamp(data, min_val, max_val):
 
 def replace_inf_with_zero(x):
     return th.masked_fill(x, th.isinf(x), 0)
+
+def count_nonzero(input):
+    # TODO: fallback to numpy for backward compatibility
+    return np.count_nonzero(input)
 
 def unique(input):
     if input.dtype == th.bool:

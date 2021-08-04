@@ -104,6 +104,88 @@ HeteroSubgraph SampleNeighbors(
   return ret;
 }
 
+HeteroSubgraph SampleNeighborsEType(
+    const HeteroGraphPtr hg,
+    const IdArray nodes,
+    const IdArray etypes,
+    const int64_t fanout,
+    EdgeDir dir,
+    const IdArray prob,
+    bool replace) {
+
+  CHECK_EQ(1, hg->NumVertexTypes())
+    << "SampleNeighborsEType only work with homogeneous graph";
+  CHECK_EQ(1, hg->NumEdgeTypes())
+    << "SampleNeighborsEType only work with homogeneous graph";
+
+  std::vector<HeteroGraphPtr> subrels(1);
+  std::vector<IdArray> induced_edges(1);
+  const int64_t num_nodes = nodes->shape[0];
+  dgl_type_t etype = 0;
+  const dgl_type_t src_vtype = 0;
+  const dgl_type_t dst_vtype = 0;
+  if (num_nodes == 0 || fanout == 0) {
+    subrels[etype] = UnitGraph::Empty(1,
+      hg->NumVertices(src_vtype),
+      hg->NumVertices(dst_vtype),
+      hg->DataType(), hg->Context());
+    induced_edges[etype] = aten::NullArray();
+  } else if (fanout == -1) {
+    const auto &earr = (dir == EdgeDir::kOut) ?
+      hg->OutEdges(etype, nodes) :
+      hg->InEdges(etype, nodes);
+    subrels[etype] = UnitGraph::CreateFromCOO(
+      1,
+      hg->NumVertices(src_vtype),
+      hg->NumVertices(dst_vtype),
+      earr.src,
+      earr.dst);
+      induced_edges[etype] = earr.id;
+  } else {
+    // sample from graph
+    // the edge type is stored in etypes
+    auto req_fmt = (dir == EdgeDir::kOut)? CSR_CODE : CSC_CODE;
+    auto avail_fmt = hg->SelectFormat(etype, req_fmt);
+    COOMatrix sampled_coo;
+    switch (avail_fmt) {
+      case SparseFormat::kCOO:
+        if (dir == EdgeDir::kIn) {
+          sampled_coo = aten::COOTranspose(aten::COORowWisePerEtypeSampling(
+            aten::COOTranspose(hg->GetCOOMatrix(etype)),
+            nodes, etypes, fanout, prob, replace));
+        } else {
+          sampled_coo = aten::COORowWisePerEtypeSampling(
+            hg->GetCOOMatrix(etype), nodes, etypes, fanout, prob, replace);
+        }
+        break;
+      case SparseFormat::kCSR:
+        CHECK(dir == EdgeDir::kOut) << "Cannot sample out edges on CSC matrix.";
+        sampled_coo = aten::CSRRowWisePerEtypeSampling(
+            hg->GetCSRMatrix(etype), nodes, etypes, fanout, prob, replace);
+          break;
+      case SparseFormat::kCSC:
+        CHECK(dir == EdgeDir::kIn) << "Cannot sample in edges on CSR matrix.";
+        sampled_coo = aten::CSRRowWisePerEtypeSampling(
+            hg->GetCSCMatrix(etype), nodes, etypes, fanout, prob, replace);
+        sampled_coo = aten::COOTranspose(sampled_coo);
+        break;
+      default:
+        LOG(FATAL) << "Unsupported sparse format.";
+    }
+
+    subrels[etype] = UnitGraph::CreateFromCOO(
+      1, sampled_coo.num_rows, sampled_coo.num_cols,
+      sampled_coo.row, sampled_coo.col);
+    induced_edges[etype] = sampled_coo.data;
+  }
+
+  HeteroSubgraph ret;
+  ret.graph = CreateHeteroGraph(hg->meta_graph(), subrels, hg->NumVerticesPerType());
+  ret.induced_vertices.resize(hg->NumVertexTypes());
+  ret.induced_edges = std::move(induced_edges);
+  return ret;
+}
+
 HeteroSubgraph SampleNeighborsTopk(
     const HeteroGraphPtr hg,
     const std::vector<IdArray>& nodes,
@@ -268,6 +350,27 @@ HeteroSubgraph SampleNeighborsBiased(
   ret.induced_edges = {induced_edges};
   return ret;
 }
+
+DGL_REGISTER_GLOBAL("sampling.neighbor._CAPI_DGLSampleNeighborsEType")
+.set_body([] (DGLArgs args, DGLRetValue *rv) {
+    HeteroGraphRef hg = args[0];
+    IdArray nodes = args[1];
+    IdArray etypes = args[2];
+    const int64_t fanout = args[3];
+    const std::string dir_str = args[4];
+    IdArray prob = args[5];
+    const bool replace = args[6];
+
+    CHECK(dir_str == "in" || dir_str == "out")
+      << "Invalid edge direction. Must be \"in\" or \"out\".";
+    EdgeDir dir = (dir_str == "in")? EdgeDir::kIn : EdgeDir::kOut;
+
+    std::shared_ptr<HeteroSubgraph> subg(new HeteroSubgraph);
+    *subg = sampling::SampleNeighborsEType(
+        hg.sptr(), nodes, etypes, fanout, dir, prob, replace);
+
+    *rv = HeteroSubgraphRef(subg);
+  });
 
 DGL_REGISTER_GLOBAL("sampling.neighbor._CAPI_DGLSampleNeighbors")
 .set_body([] (DGLArgs args, DGLRetValue *rv) {
