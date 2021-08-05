@@ -210,7 +210,7 @@ if __name__ == "__main__":
         
         
     print("Output is stored in ", resultdir, flush=True)
-    for num_community in [2, 4, 8] :#, 16, 32, 64]:
+    for num_community in [2, 4, 8, 32] :#, 16, 32, 64]:
         print("Executing parititons: ", num_community)
 
         try:

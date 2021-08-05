@@ -11,7 +11,8 @@ export OMP_NUM_THREADS=${NUM_THREADS}
 export KMP_AFFINITY=compact,1,granularity=fine,verbose
 export KMP_BLOCKTIME=1
 echo "CONDA_PREFIX: "$CONDA_PREFIX
-export LD_PRELOAD=${CONDA_PREFIX}/lib/libtcmalloc.so:${CONDA_PREFIX}/lib/libiomp5.so
+#export LD_PRELOAD=${CONDA_PREFIX}/lib/libtcmalloc.so:${CONDA_PREFIX}/lib/libiomp5.so
+export LD_PRELOAD=${CONDA_PREFIX}/lib/libiomp5.so
 cdir=`pwd`
 export PYTHONPATH=$PYTHONPATH:$cdir/sub407/dgl/examples/pytorch/graphsage/
 

@@ -29,4 +29,9 @@ export Torch_DIR=$(python -c "import torch; import os; print(os.path.dirname(tor
 echo "Install DGL..."
 ( git clone --recursive https://github.com/sanchit-misra/dgl.git -b xeon-optimizations && cd dgl && git checkout c4d98dd && rm -rf build && mkdir build && cd build && cmake ../ &&  make -j && cd ../python && python setup.py clean && CMAKE_C_COMPILER=gcc CMAKE_CXX_COMPILER=g++ python setup.py install ) 
 
+#echo "Installing few more packages.."
+#pip install psutil
+#pip install ogb
+#pip install rdflib
+
 echo "All installations done !!!"
