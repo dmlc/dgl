@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2021 by Contributors
- * \file array/filter.cc
+ * \file array/cuda/cuda_filter.cc
  * \brief Object for selecting items in a set, or selecting items not in a set.
  */
 
@@ -139,11 +139,11 @@ class CudaFilterSet : public Filter {
         cudaDefaultStream);
   }
 
-  IdArray include(IdArray test) override {
+  IdArray find_included_indices(IdArray test) override {
     return _PerformFilter<IdType, true>(table_, test);
   }
 
-  IdArray exclude(IdArray test) override {
+  IdArray find_excluded_indices(IdArray test) override {
     return _PerformFilter<IdType, false>(table_, test);
   }
 

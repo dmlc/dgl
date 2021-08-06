@@ -47,18 +47,18 @@ def test_array_filter(idtype):
     x = F.copy_to(F.tensor([0,3,9,11], dtype=idtype), F.ctx())
     y = F.copy_to(F.tensor([0,19,0,28,3,9,11,4,5], dtype=idtype), F.ctx())
 
-    xi_act = f.include(x)
-    xi_exp = F.copy_to(F.tensor([0,9], dtype=idtype), F.ctx())
+    xi_act = f.find_included_indices(x)
+    xi_exp = F.copy_to(F.tensor([0,2], dtype=idtype), F.ctx())
     assert F.array_equal(xi_act, xi_exp)
-    xe_act = f.exclude(x)
-    xe_exp = F.copy_to(F.tensor([3,11], dtype=idtype), F.ctx())
+    xe_act = f.find_excluded_indices(x)
+    xe_exp = F.copy_to(F.tensor([1,3], dtype=idtype), F.ctx())
     assert F.array_equal(xe_act, xe_exp)
 
-    yi_act = f.include(y)
-    yi_exp = F.copy_to(F.tensor([0,0,9,4,5], dtype=idtype), F.ctx())
+    yi_act = f.find_included_indices(y)
+    yi_exp = F.copy_to(F.tensor([0,2,5,7,8], dtype=idtype), F.ctx())
     assert F.array_equal(yi_act, yi_exp)
-    ye_act = f.exclude(y)
-    ye_exp = F.copy_to(F.tensor([19,28,3,11], dtype=idtype), F.ctx())
+    ye_act = f.find_excluded_indices(y)
+    ye_exp = F.copy_to(F.tensor([1,3,4,6], dtype=idtype), F.ctx())
     assert F.array_equal(ye_act, ye_exp)
 
 if __name__ == '__main__':

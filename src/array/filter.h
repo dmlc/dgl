@@ -20,26 +20,27 @@ class Filter : public runtime::Object {
   DGL_DECLARE_OBJECT_TYPE_INFO(Filter, Object);
 
   /**
-   * @brief From the test set of items, get those which are included by this
-   * filter.
+   * @brief From the test set of items, get the index of those which are
+   * included by this filter.
    *
    * @param test The set of items to check for.
    *
-   * @return The subset of items from `test` that are selected by this filter.
+   * @return The indices of the items from `test` that are selected by
+   * this filter.
    */
-  virtual IdArray include(
+  virtual IdArray find_included_indices(
       IdArray test) = 0;
 
   /**
-   * @brief From the test set of items, get those which are excluded by this
-   * filter.
+   * @brief From the test set of items, get the indices of those which are
+   * excluded by this filter.
    *
    * @param test The set of items to check for.
    *
-   * @return The subset of items from `test` that are not selected by this
+   * @return The indices of the items from `test` that are not selected by this
    * filter.
    */
-  virtual IdArray exclude(
+  virtual IdArray find_excluded_indices(
       IdArray test) = 0;
 };
 

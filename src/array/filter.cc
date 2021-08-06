@@ -36,18 +36,18 @@ DGL_REGISTER_GLOBAL("utils.filter._CAPI_DGLFilterCreateFromSet")
   }
 });
 
-DGL_REGISTER_GLOBAL("utils.filter._CAPI_DGLFilterInclude")
+DGL_REGISTER_GLOBAL("utils.filter._CAPI_DGLFilterFindIncludedIndices")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   FilterRef filter = args[0];
   IdArray array = args[1];
-  *rv = filter->include(array);
+  *rv = filter->find_included_indices(array);
 });
 
-DGL_REGISTER_GLOBAL("utils.filter._CAPI_DGLFilterExclude")
+DGL_REGISTER_GLOBAL("utils.filter._CAPI_DGLFilterFindExcludedIndices")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   FilterRef filter = args[0];
   IdArray array = args[1];
-  *rv = filter->exclude(array);
+  *rv = filter->find_excluded_indices(array);
 });
 
 }  // namespace array

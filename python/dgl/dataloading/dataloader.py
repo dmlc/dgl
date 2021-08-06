@@ -13,8 +13,6 @@ from ..convert import heterograph
 from ..heterograph import DGLHeteroGraph as DGLGraph
 from ..distributed.dist_graph import DistGraph
 
-from torch.cuda import nvtx
-
 # pylint: disable=unused-argument
 def assign_block_eids(block, frontier):
     """Assigns edge IDs from the original graph to the message flow graph (MFG).
@@ -63,25 +61,23 @@ class _EidExcluder():
             else:
                 self._filter = utils.Filter(exclude_eids)
 
-    def find_exclude(self, parent_eids):
+    def find_excluded_indices(self, parent_eids):
         if self._exclude_eids is not None:
             parent_eids_np = _tensor_or_dict_to_numpy(parent_eids)
             return _locate_eids_to_exclude(parent_eids_np, self._exclude_eids)
         else:
             assert self._filter is not None
             if isinstance(parent_eids, Mapping):
-                located_eids = {k: self._filter[k].exclude(parent_eids[k]) for k,v in parent_eids.items()}
+                located_eids = {k: self._filter[k].find_excluded_indices(parent_eids[k])
+                                   for k,v in parent_eids.items()}
             else:
-                located_eids = self._filter.exclude(parent_eids)
+                located_eids = self._filter.find_excluded_indices(parent_eids)
             return located_eids
 
     def __call__(self, frontier):
-        nvtx.range_push("find_exclude")
         parent_eids = frontier.edata[EID]
-        located_eids = self.find_exclude(parent_eids)
-        nvtx.range_pop()
+        located_eids = self.find_excluded_indices(parent_eids)
 
-        nvtx.range_push("perform_exclude")
         if not isinstance(located_eids, Mapping):
             # (BarclayII) If frontier already has a EID field and located_eids is empty,
             # the returned graph will keep EID intact.  Otherwise, EID will change
@@ -101,7 +97,6 @@ class _EidExcluder():
                         frontier, v, etype=k, store_ids=True)
                     new_eids[k] = F.gather_row(parent_eids[k], frontier.edges[k].data[EID])
             frontier.edata[EID] = new_eids
-        nvtx.range_pop()
 
 
 def _create_eid_excluder(exclude_eids, device):

@@ -12,9 +12,9 @@ class Filter(object):
     >>> import torch as th
     >>> from dgl.utils import Filter
     >>> f = Filter(th.tensor([3,2,9], device=th.device('cuda')))
-    >>> f.include(th.tensor([0,2,8,9], device=th.device('cuda')))
+    >>> f.find_included_indices(th.tensor([0,2,8,9], device=th.device('cuda')))
     tensor([1,3])
-    >>> f.exclude(th.tensor([0,2,8,9], device=th.device('cuda')))
+    >>> f.find_excluded_indices(th.tensor([0,2,8,9], device=th.device('cuda')))
     tensor([0,2], device='cuda')
     """
     def __init__(self, ids):
@@ -29,9 +29,8 @@ class Filter(object):
         self._filter = _CAPI_DGLFilterCreateFromSet(
             F.zerocopy_to_dgl_ndarray(ids)) 
 
-    def include(self, test):
-        """Filter a set of ids, keeping on those from which this filter was
-        created.
+    def find_included_indices(self, test):
+        """Find the index of the ids in `test` that are in this filter.
 
         Parameters
         ----------
@@ -41,14 +40,14 @@ class Filter(object):
         Returns
         -------
         IdArray
-            The subset of ids in `test` that are also in this filter.
+            The index of ids in `test` that are also in this filter.
         """
         return F.zerocopy_from_dgl_ndarray( \
-            _CAPI_DGLFilterInclude(self._filter, F.zerocopy_to_dgl_ndarray(test)))
+            _CAPI_DGLFilterFindIncludedIndices( \
+                self._filter, F.zerocopy_to_dgl_ndarray(test)))
 
-    def exclude(self, test):
-        """Filter a set of ids, keeping only those which were not used to
-        create this filter.
+    def find_excluded_indices(self, test):
+        """Find the index of the ids in `test` that are not in this filter.
 
         Parameters
         ----------
@@ -58,9 +57,10 @@ class Filter(object):
         Returns
         -------
         IdArray
-            The subset of ids in `test` that are not in this filter.
+            The index of ids in `test` that are not in this filter.
         """
         return F.zerocopy_from_dgl_ndarray( \
-            _CAPI_DGLFilterExclude(self._filter, F.zerocopy_to_dgl_ndarray(test)))
+            _CAPI_DGLFilterFindExcludedIndices( \
+                self._filter, F.zerocopy_to_dgl_ndarray(test)))
 
 _init_api("dgl.utils.filter")
