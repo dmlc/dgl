@@ -18,7 +18,7 @@ using namespace dgl::runtime;
 template<DLDeviceType XPU, typename IdType> 
 FilterRef CreateSetFilter(IdArray set);
 
-DGL_REGISTER_GLOBAL("filter._CAPI_DGLFilterCreateFromSet")
+DGL_REGISTER_GLOBAL("utils.filter._CAPI_DGLFilterCreateFromSet")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   IdArray array = args[0];
   auto ctx = array->ctx;
@@ -36,14 +36,14 @@ DGL_REGISTER_GLOBAL("filter._CAPI_DGLFilterCreateFromSet")
   }
 });
 
-DGL_REGISTER_GLOBAL("filter._CAPI_DGLFilterInclude")
+DGL_REGISTER_GLOBAL("utils.filter._CAPI_DGLFilterInclude")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   FilterRef filter = args[0];
   IdArray array = args[1];
   *rv = filter->include(array);
 });
 
-DGL_REGISTER_GLOBAL("filter._CAPI_DGLFilterExclude")
+DGL_REGISTER_GLOBAL("utils.filter._CAPI_DGLFilterExclude")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   FilterRef filter = args[0];
   IdArray array = args[1];

@@ -29,11 +29,11 @@ __global__ void _IsInKernel(
     IdType * const mark) {
   const int64_t idx = threadIdx.x + blockDim.x*blockIdx.x;
   if (idx < size) {
-    mark[idx] = table.Contains(array[idx]) ^ include;
+    mark[idx] = table.Contains(array[idx]) ^ (!include);
   }
 }
 
-template<typename IdType, bool include>
+template<typename IdType>
 __global__ void _InsertKernel(
     const IdType * const array,
     const int64_t size,
@@ -118,7 +118,7 @@ IdArray _PerformFilter(
     const dim3 block(256);
     const dim3 grid((size+block.x-1)/block.x);
 
-    _InsertKernel<IdType, include><<<grid, block, 0, stream>>>(
+    _InsertKernel<<<grid, block, 0, stream>>>(
         static_cast<const IdType*>(test->data),
         size,
         prefix,
