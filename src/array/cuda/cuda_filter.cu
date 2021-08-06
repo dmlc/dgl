@@ -131,7 +131,7 @@ IdArray _PerformFilter(
 template<typename IdType>
 class CudaFilterSet : public Filter {
  public:
-  CudaFilterSet(IdArray array) :
+  explicit CudaFilterSet(IdArray array) :
       table_(array->shape[0], array->ctx, cudaDefaultStream) {
     table_.FillWithUnique(
         static_cast<const IdType*>(array->data),
@@ -151,12 +151,11 @@ class CudaFilterSet : public Filter {
   OrderedHashTable<IdType> table_;
 };
 
-}
+}  // namespace
 
-template<DLDeviceType XPU, typename IdType> 
+template<DLDeviceType XPU, typename IdType>
 FilterRef CreateSetFilter(IdArray set) {
   return FilterRef(std::make_shared<CudaFilterSet<IdType>>(set));
-
 }
 
 template FilterRef CreateSetFilter<kDLGPU, int32_t>(IdArray set);

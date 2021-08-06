@@ -49,5 +49,5 @@ DGL_DEFINE_OBJECT_REF(FilterRef, Filter);
 }  // namespace array
 }  // namespace dgl
 
-#endif // DGL_ARRAY_FILTER_H_
+#endif  // DGL_ARRAY_FILTER_H_
 

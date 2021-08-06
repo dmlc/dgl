@@ -1,3 +1,6 @@
+
+"""Utilities for finding overlap or missing items in arrays."""
+
 from .._ffi.function import _init_api
 from .. import backend as F
 
@@ -27,7 +30,7 @@ class Filter(object):
             The unique set of ids to keep in the filter.
         """
         self._filter = _CAPI_DGLFilterCreateFromSet(
-            F.zerocopy_to_dgl_ndarray(ids)) 
+            F.zerocopy_to_dgl_ndarray(ids))
 
     def find_included_indices(self, test):
         """Find the index of the ids in `test` that are in this filter.
