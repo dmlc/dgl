@@ -707,6 +707,65 @@ class DistGraph:
         """
         return self._canonical_etypes
 
+    def to_canonical_etype(self, etype):
+        """Convert an edge type to the corresponding canonical edge type in the graph.
+
+        A canonical edge type is a string triplet ``(str, str, str)``
+        for source node type, edge type and destination node type.
+
+        The function expects the given edge type name can uniquely identify a canonical edge
+        type. DGL will raise error if this is not the case.
+
+        Parameters
+        ----------
+        etype : str or (str, str, str)
+            If :attr:`etype` is an edge type (str), it returns the corresponding canonical edge
+            type in the graph. If :attr:`etype` is already a canonical edge type,
+            it directly returns the input unchanged.
+
+        Returns
+        -------
+        (str, str, str)
+            The canonical edge type corresponding to the edge type.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        >>> g = DistGraph("test")
+        >>> g.canonical_etypes
+        [('user', 'follows', 'user'),
+         ('user', 'follows', 'game'),
+         ('user', 'plays', 'game')]
+
+        >>> g.to_canonical_etype('plays')
+        ('user', 'plays', 'game')
+        >>> g.to_canonical_etype(('user', 'plays', 'game'))
+        ('user', 'plays', 'game')
+
+        See Also
+        --------
+        canonical_etypes
+        """
+        if etype is None:
+            if len(self.etypes) != 1:
+                raise DGLError('Edge type name must be specified if there are more than one '
+                               'edge types.')
+            etype = self.etypes[0]
+        if isinstance(etype, tuple):
+            return etype
+        else:
+            ret = self._etype2canonical.get(etype, None)
+            if ret is None:
+                raise DGLError('Edge type "{}" does not exist.'.format(etype))
+            if len(ret) != 3:
+                raise DGLError('Edge type "{}" is ambiguous. Please use canonical edge type '
+                               'in the form of (srctype, etype, dsttype)'.format(etype))
+            return ret
+
     def get_ntype_id(self, ntype):
         """Return the ID of the given node type.
 
@@ -1016,6 +1075,9 @@ class DistGraph:
 
         gpb = self.get_partition_book()
         if len(gpb.etypes) > 1:
+            # if etype is a canonical edge type (str, str, str), extract the edge type
+            if len(etype) == 3:
+                etype = etype[1]
             edges = gpb.map_to_homo_eid(edges, etype)
         src, dst = dist_find_edges(self, edges)
         if len(gpb.ntypes) > 1:
@@ -1071,10 +1133,13 @@ class DistGraph:
                     subg[self._etype2canonical[etype]] = self.find_edges(edges[etype], etype)
             num_nodes = {ntype: self.number_of_nodes(ntype) for ntype in self.ntypes}
             subg = dgl_heterograph(subg, num_nodes_dict=num_nodes)
+            for etype in edges:
+                subg.edges[etype].data[EID] = edges[etype]
         else:
             assert len(self.etypes) == 1
             subg = self.find_edges(edges)
             subg = dgl_graph(subg, num_nodes=self.number_of_nodes())
+            subg.edata[EID] = edges
 
         if relabel_nodes:
             subg = compact_graphs(subg)
