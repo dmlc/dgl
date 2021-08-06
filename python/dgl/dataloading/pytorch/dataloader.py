@@ -353,7 +353,7 @@ def _init_dataloader(collator, device, dataloader_kwargs, use_ddp, ddp_seed):
     use_scalar_batcher = False
     scalar_batcher = None
 
-    if th.device(device) != th.device('cpu') and dataloader_kwargs.get('num_workers', 0) != 0:
+    if th.device(device) != th.device('cpu') and dataloader_kwargs.get('num_workers', 0) == 0:
         batch_size = dataloader_kwargs.get('batch_size', 1)
 
         if batch_size > 1:
