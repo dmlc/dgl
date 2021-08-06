@@ -28,7 +28,7 @@ file(GLOB TA_TORCH_SRC *.cpp)
 add_library(${TORCH_TARGET_NAME} SHARED "${TA_TORCH_SRC}")
 
 message(STATUS "tensoradapter found PyTorch includes: ${TORCH_INCLUDE_DIRS}")
-message(STATUS "tensoradapter found PyTorch lib: ${TORCH_LIBRARIES}")
+message(STATUS "tensoradapter found PyTorch lib: ${TORCH_LIBRARY}")
 
 target_include_directories(
   ${TORCH_TARGET_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../include")
@@ -36,6 +36,6 @@ target_include_directories(
   ${TORCH_TARGET_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/dlpack/include")
 target_include_directories(
   ${TORCH_TARGET_NAME} PRIVATE "${TORCH_INCLUDE_DIRS}")
-target_link_libraries(${TORCH_TARGET_NAME} PRIVATE "${TORCH_LIBRARIES}")
+target_link_libraries(${TORCH_TARGET_NAME} PRIVATE "${TORCH_LIBRARY}")
 set_property(TARGET ${TORCH_TARGET_NAME} PROPERTY CXX_STANDARD 14)
 message(STATUS "Configured target ${TORCH_TARGET_NAME}")
