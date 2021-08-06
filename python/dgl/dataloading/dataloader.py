@@ -13,6 +13,8 @@ from ..convert import heterograph
 from ..heterograph import DGLHeteroGraph as DGLGraph
 from ..distributed.dist_graph import DistGraph
 
+from torch.cuda import nvtx
+
 # pylint: disable=unused-argument
 def assign_block_eids(block, frontier):
     """Assigns edge IDs from the original graph to the message flow graph (MFG).
@@ -46,45 +48,40 @@ def _locate_eids_to_exclude(frontier_parent_eids, exclude_eids):
         result = np.isin(frontier_parent_eids, exclude_eids).nonzero()[0]
         return F.zerocopy_from_numpy(result)
 
-def _create_eid_excluder(exclude_eids, device):
-    def noop(frontier):
-        pass
+class _EidExcluder():
+    def __init__(self, exclude_eids):
+        device = F.context(exclude_eids)
+        self._exclude_eids = None
+        self._filter = None
 
-    if exclude_eids is not None:
-        return noop
-
-    exclude_fn = None
-    if device == F.cpu():
-        exclude_eids = (
-            _tensor_or_dict_to_numpy(exclude_eids) if exclude_eids is not None else None)
-        def fn(parent_eids):
-            parent_eids_np = _tensor_or_dict_to_numpy(parent_eids)
-            return _locate_eids_to_exclude(parent_eids_np, exclude_eids)
-        exlcude_fn = fn
-    else:
-        if isinstance(exclude_eids, Mapping):
-            exclude_eids = {k: F.copy_to(v, self.output_device) \
-                for k,v in exclude_eids.items()}
+        if device == F.cpu():
+            self._exclude_eids = (
+                _tensor_or_dict_to_numpy(exclude_eids) if exclude_eids is not None else None)
         else:
-            exclude_eids = F.copy_to(exclude_eids, self.output_device)
-
-        if isinstance(exclude_eids, Mapping):
-            eid_filter = {k: Filter(v) for k, v in exclude_eids.items()}
-        else:
-            eid_filter = Filter(exclude_eids)
-
-        def fn(parent_eids):
-            if isinstance(parent_eids, Mapping):
-                located_eids = {k: eid_filter[k].exclude(parent_eids[k]) for k,v in parent_eids.items()}
+            if isinstance(exclude_eids, Mapping):
+                self._filter = {k: utils.Filter(v) for k, v in exclude_eids.items()}
             else:
-                located_eids = eid_filter.exclude(parent_eids)
+                self._filter = utils.Filter(exclude_eids)
+
+    def find_exclude(self, parent_eids):
+        if self._exclude_eids is not None:
+            parent_eids_np = _tensor_or_dict_to_numpy(parent_eids)
+            return _locate_eids_to_exclude(parent_eids_np, self._exclude_eids)
+        else:
+            assert self._filter is not None
+            if isinstance(parent_eids, Mapping):
+                located_eids = {k: self._filter[k].exclude(parent_eids[k]) for k,v in parent_eids.items()}
+            else:
+                located_eids = self._filter.exclude(parent_eids)
             return located_eids
-        exlcude_fn = fn
 
-    def excluder(frontier):
+    def __call__(self, frontier):
+        nvtx.range_push("find_exclude")
         parent_eids = frontier.edata[EID]
-        located_eids = excluder_fn(parent_eids)
+        located_eids = self.find_exclude(parent_eids)
+        nvtx.range_pop()
 
+        nvtx.range_push("perform_exclude")
         if not isinstance(located_eids, Mapping):
             # (BarclayII) If frontier already has a EID field and located_eids is empty,
             # the returned graph will keep EID intact.  Otherwise, EID will change
@@ -104,7 +101,20 @@ def _create_eid_excluder(exclude_eids, device):
                         frontier, v, etype=k, store_ids=True)
                     new_eids[k] = F.gather_row(parent_eids[k], frontier.edges[k].data[EID])
             frontier.edata[EID] = new_eids
-        
+        nvtx.range_pop()
+
+
+def _create_eid_excluder(exclude_eids, device):
+    if exclude_eids is None:
+        return None
+
+    if isinstance(exclude_eids, Mapping):
+        exclude_eids = {k: F.copy_to(v, device) \
+            for k,v in exclude_eids.items()}
+    else:
+        exclude_eids = F.copy_to(exclude_eids, device)
+
+    return _EidExcluder(exclude_eids)
 
 def _find_exclude_eids_with_reverse_id(g, eids, reverse_eid_map):
     if isinstance(eids, Mapping):
@@ -321,8 +331,7 @@ class BlockSampler(object):
 
             # Removing edges from the frontier for link prediction training falls
             # into the category of frontier postprocessing
-            if exclude_eids is not None:
-                parent_eids = frontier.edata[EID]
+            if eid_excluder is not None:
                 eid_excluder(frontier)
 
             block = transform.to_block(frontier, seed_nodes_out)

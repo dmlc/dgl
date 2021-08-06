@@ -13,9 +13,9 @@ class Filter(object):
     >>> from dgl.utils import Filter
     >>> f = Filter(th.tensor([3,2,9], device=th.device('cuda')))
     >>> f.include(th.tensor([0,2,8,9], device=th.device('cuda')))
-    tensor([2,9])
+    tensor([1,3])
     >>> f.exclude(th.tensor([0,2,8,9], device=th.device('cuda')))
-    tensor([0,8], device='cuda')
+    tensor([0,2], device='cuda')
     """
     def __init__(self, ids):
         """Create a new filter from a given set of ids. This currently is only

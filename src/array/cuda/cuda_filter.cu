@@ -35,14 +35,13 @@ __global__ void _IsInKernel(
 
 template<typename IdType>
 __global__ void _InsertKernel(
-    const IdType * const array,
-    const int64_t size,
     const IdType * const prefix,
+    const int64_t size,
     IdType * const result) {
   const int64_t idx = threadIdx.x + blockDim.x*blockIdx.x;
   if (idx < size) {
     if (prefix[idx] != prefix[idx+1]) {
-      result[prefix[idx]] = array[idx];
+      result[prefix[idx]] = idx;
     }
   }
 }
@@ -119,9 +118,8 @@ IdArray _PerformFilter(
     const dim3 grid((size+block.x-1)/block.x);
 
     _InsertKernel<<<grid, block, 0, stream>>>(
-        static_cast<const IdType*>(test->data),
-        size,
         prefix,
+        size,
         static_cast<IdType*>(result->data));
     CUDA_CALL(cudaGetLastError());
   }
