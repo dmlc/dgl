@@ -1229,48 +1229,38 @@ def _split_even_to_part(partition_book, elements):
     # strategy.
     # TODO(zhengda) we need another way to divide the list for other partitioning strategy.
     if isinstance(elements, DistTensor):
-        # Here we need to fetch all elements from the kvstore server.
-        # I hope it's OK.
-        eles = F.nonzero_1d(elements[0:len(elements)])
-        # compute the offset of each split and ensure that the difference of each partition size
-        # is 1.
-        offsets = _even_offset(len(eles), partition_book.num_partitions())
-        assert offsets[-1] == len(eles)
-
-        # Get the elements that belong to the partition.
-        partid = partition_book.partid
-        part_eles = eles[offsets[partid] : offsets[partid + 1]]
+        nonzero_count = elements.count_nonzero()
     else:
         elements = F.tensor(elements)
         nonzero_count = F.count_nonzero(elements)
-        # compute the offset of each split and ensure that the difference of each partition size
-        # is 1.
-        offsets = _even_offset(nonzero_count, partition_book.num_partitions())
-        assert offsets[-1] == nonzero_count
+    # compute the offset of each split and ensure that the difference of each partition size
+    # is 1.
+    offsets = _even_offset(nonzero_count, partition_book.num_partitions())
+    assert offsets[-1] == nonzero_count
 
-        # Get the elements that belong to the partition.
-        partid = partition_book.partid
-        left, right = offsets[partid], offsets[partid + 1]
+    # Get the elements that belong to the partition.
+    partid = partition_book.partid
+    left, right = offsets[partid], offsets[partid + 1]
 
-        x = y = 0
-        num_elements = len(elements)
-        block_size = num_elements // partition_book.num_partitions()
-        part_eles = None
-        # compute the nonzero tensor of each partition instead of whole tensor to save memory
-        for idx in range(0, num_elements, block_size):
-            nonzero_block = F.nonzero_1d(elements[idx:min(idx+block_size, num_elements)])
-            x = y
-            y += len(nonzero_block)
-            if y > left and x < right:
-                start = max(x, left) - x
-                end = min(y, right) - x
-                tmp = nonzero_block[start:end] + idx
-                if part_eles is None:
-                    part_eles = tmp
-                else:
-                    part_eles = F.cat((part_eles, tmp), 0)
-            elif x >= right:
-                break
+    x = y = 0
+    num_elements = len(elements)
+    block_size = num_elements // partition_book.num_partitions()
+    part_eles = None
+    # compute the nonzero tensor of each partition instead of whole tensor to save memory
+    for idx in range(0, num_elements, block_size):
+        nonzero_block = F.nonzero_1d(elements[idx:min(idx+block_size, num_elements)])
+        x = y
+        y += len(nonzero_block)
+        if y > left and x < right:
+            start = max(x, left) - x
+            end = min(y, right) - x
+            tmp = nonzero_block[start:end] + idx
+            if part_eles is None:
+                part_eles = tmp
+            else:
+                part_eles = F.cat((part_eles, tmp), 0)
+        elif x >= right:
+            break
 
     return part_eles
 
