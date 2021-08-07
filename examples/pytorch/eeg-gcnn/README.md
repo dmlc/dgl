@@ -1,5 +1,5 @@
 # DGL Implementation of EEG-GCNN Paper
-This example is a simplified version that presents how to utilize the original EEG-GCNN model proposed in the paper [EEG-GCNN](https://arxiv.org/abs/2011.12107), implemented with DGL library. The original code is [here](https://github.com/neerajwagh/eeg-gcnn).
+This example is a simplified version that presents how to utilize the original EEG-GCNN model proposed in the paper [EEG-GCNN](http://proceedings.mlr.press/v136/wagh20a.html), implemented with DGL library. The original code is [here](https://github.com/neerajwagh/eeg-gcnn).
 
 ## All References
 - [ML4H Poster](https://drive.google.com/file/d/14nuAQKiIud3p6-c8r9WLV2tAvCyRwRev/view?usp=sharing) can be helpful for understanding data preprocessing, model, and performance of the project. 
