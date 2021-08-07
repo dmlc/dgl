@@ -70,7 +70,7 @@ class _EidExcluder():
         else:
             assert self._filter is not None
             if isinstance(parent_eids, Mapping):
-                located_eids = {k: self._filter[k].find_excluded_indices(parent_eids[k])
+                located_eids = {k: self._filter[k].find_included_indices(parent_eids[k])
                                 for k, v in parent_eids.items()}
             else:
                 located_eids = self._filter.find_included_indices(parent_eids)
