@@ -583,6 +583,7 @@ def check_server_client_hetero(shared_mem, num_servers, num_clients):
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support some of operations in DistGraph")
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Turn off Mxnet support")
 def test_server_client():
     os.environ['DGL_DIST_MODE'] = 'distributed'
     check_server_client_hierarchy(False, 1, 4)
@@ -603,6 +604,7 @@ def test_dist_emb_server_client():
     check_dist_emb_server_client(True, 2, 2)
 
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support some of operations in DistGraph")
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Turn off Mxnet support")
 def test_standalone():
     os.environ['DGL_DIST_MODE'] = 'standalone'
 
