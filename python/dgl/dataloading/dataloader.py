@@ -69,7 +69,7 @@ class _EidExcluder():
             assert self._filter is not None
             if isinstance(parent_eids, Mapping):
                 located_eids = {k: self._filter[k].find_excluded_indices(parent_eids[k])
-                                   for k,v in parent_eids.items()}
+                                for k, v in parent_eids.items()}
             else:
                 located_eids = self._filter.find_excluded_indices(parent_eids)
             return located_eids
@@ -105,7 +105,7 @@ def _create_eid_excluder(exclude_eids, device):
 
     if isinstance(exclude_eids, Mapping):
         exclude_eids = {k: F.copy_to(v, device) \
-            for k,v in exclude_eids.items()}
+            for k, v in exclude_eids.items()}
     else:
         exclude_eids = F.copy_to(exclude_eids, device)
 
