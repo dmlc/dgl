@@ -18,13 +18,14 @@ class EEGGraphDataset(DGLDataset):
         ------
         a complete 8-node DGLGraph with node features and edge weights
     """
-    def __init__(self, x, y, num_nodes, transform=None):
+    def __init__(self, x, y, num_nodes, indices, transform=None):
         # CAUTION - epochs and labels are memory-mapped, used as if they are in RAM.
         self.epochs = x
         self.labels = y
+        self.indices = indices
         self.transform = transform
         self.num_nodes = num_nodes
-
+        # num_sensors = num_nodes = N = 8
         # NOTE: this order decides the node index, keep consistent!
         self.ch_names = [
             "F7-F3",
@@ -64,7 +65,6 @@ class EEGGraphDataset(DGLDataset):
         self.distances = self.get_sensor_distances()
         a = np.array(self.distances)
         self.distances = (a - np.min(a)) / (np.max(a) - np.min(a))
-        # self.edge_weights = torch.tensor(self.distances, dtype=torch.long)
         self.spec_coh_values = np.load("spec_coh_values.npy", allow_pickle=True)
 
     # sensor distances don't depend on window ID
@@ -105,27 +105,35 @@ class EEGGraphDataset(DGLDataset):
 
     # returns size of dataset = number of epochs
     def __len__(self):
-        return len(self.labels)
+        return len(self.indices)
 
     # retrieve one sample from the dataset after applying all transforms
     def __getitem__(self, idx):
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
+
+        # map input idx (ranging from 0 to __len__() inside self.indices)
+        # to an idx in the whole dataset (inside self.epochs)
+        # assert idx < len(self.indices)
+        idx = self.indices[idx]
         node_features = self.epochs[idx]
         node_features = torch.from_numpy(node_features.reshape(8, 6))
 
         # spectral coherence between 2 montage channels!
         spec_coh_values = self.spec_coh_values[idx, :]
+
         # combine edge weights and spect coh values into one value/ one E x 1 tensor
-        edge_weights = spec_coh_values + self.distances
-        edge_weights = torch.tensor(edge_weights)
+        edge_weights = self.distances + spec_coh_values
+        edge_weights = torch.tensor(edge_weights)  # trucated to integer
 
         # create 8-node complete graph
-        src = [[0 for i in range(self.num_nodes)] for j in range(8)]
+        src = [[0 for i in range(self.num_nodes)] for j in range(self.num_nodes)]
         for i in range(len(src)):
             for j in range(len(src[i])):
                 src[i][j] = i
         src = np.array(src).flatten()
 
-        det = [[i for i in range(self.num_nodes)] for j in range(8)]
+        det = [[i for i in range(self.num_nodes)] for j in range(self.num_nodes)]
         det = np.array(det).flatten()
 
         u, v = (torch.tensor(src), torch.tensor(det))
