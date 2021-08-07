@@ -19,23 +19,26 @@ This example is a simplified version that presents how to utilize the original E
 - Final Models, Pre-computed Features, Training Metadata can be downloaded through [FigShare](https://figshare.com/articles/software/EEG-GCNN_Supporting_Resources_for_Reproducibility/13251452).
 - In EEGGraphDataset.py, we specify the channels and electrodes and use precomputed spectral coherence values to compute the edge weights. To use this example in your own advantage, please specify your channels, electrodes and generate your own spectral coherence values. All example datasets can be downloaded from FigShare.
 ## How to Run
-First, download the precomputed data, labels, indices and put them in the repo. <br>
+First, download psd_features_data_X, labels_y, spec_coh_values.npy, and standard_1010.tsv.txt. Put them in the repo. <br>
 Then run 
 ```python
 python main.py
 ```
 
 ## Performance
-|Pytorch_geometric | AUC          | Precision     | Recall       | F-1          | Bal. Accuracy |
-|------------------|--------------|---------------|--------------|--------------|---------------|
-| Shallow EEG-GCNN | 0.867(0.005) | 0.985(0.004)  | 0.680(0.023) | 0.804(0.015) | 0.802(0.006)  |
-| Deep EEG-GCNN    | 0.908(0.002) | 0.987(0.0001) | 0.753(0.007) | 0.855(0.005) | 0.842(0.004)  |
 
-|      DGL          | AUC         | Precision     | Recall       | F-1          | Bal. Accuracy |
-|-------------------|-------------|---------------|--------------|--------------|---------------|
-| Shallow EEG-GCNN  | 0.875(0.036)| 0.980(0.013)  | 0.735(0.055) | 0.839(0.035) | 0.811(0.035)  |
-| Deep EEG-GCNN     | 0.890(0.004)| 0.988(0.004)  | 0.723(0.035) | 0.834(0.022) | 0.829(0.005)  |
+|      DGL          | AUC         | Bal. Accuracy |
+|-------------------|-------------|---------------|
+| Shallow EEG-GCNN  | 0.83        | 0.75          |
+| Deep EEG-GCNN     | 0.83        | 0.74          |
 
+Shallow_EEGGraphConvNet            |  AUC | Bal.Accuracy |
+:-------------------------:|:-------------------------:|:---------------:|
+![shallow_loss](https://user-images.githubusercontent.com/53772888/128595442-d185bd74-5c5d-4118-a6b7-b89dd307d3aa.png)  |![shallow_auc](https://user-images.githubusercontent.com/53772888/128595453-2f3b181a-bcb7-4da4-becd-7a7aa62083bc.png)|![shallow_bacc](https://user-images.githubusercontent.com/53772888/128595456-b293c888-bf8c-4f37-bd58-d01885da3832.png)
+
+Deep_EEGGraphConvNet            |  AUC | Bal.Accuracy |
+:-------------------------:|:-------------------------:|:---------------:|
+![deep_loss](https://user-images.githubusercontent.com/53772888/128595458-e4a76591-11cf-405f-9c20-2d161e49c358.png)|![deep_auc](https://user-images.githubusercontent.com/53772888/128595462-7a7bfb67-4601-4e83-8764-d7c44bf979b5.png)|![deep_bacc](https://user-images.githubusercontent.com/53772888/128595467-1a0cd37d-0152-431b-a29b-a40bafb71be5.png)
 ### Contact
 
 - Email to John(_wei33@illinois.edu_)

@@ -4,15 +4,10 @@ from dgl.nn import GraphConv, SumPooling
 
 
 class EEGGraphConvNet(nn.Module):
-    """ EEGGraph Convolution Net
-        Parameters
-        ----------
-        num_features_per_node: the number of features per node. In our case, it is 6.
-    """
-    def __init__(self, num_features_per_node):
+    def __init__(self, num_feats):
         super(EEGGraphConvNet, self).__init__()
 
-        self.conv1 = GraphConv(num_features_per_node, 32)
+        self.conv1 = GraphConv(num_feats, 32)
         self.conv2 = GraphConv(32, 20)
         self.conv2_bn = nn.BatchNorm1d(20, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
         self.fc_block1 = nn.Linear(20, 10)
@@ -26,22 +21,19 @@ class EEGGraphConvNet(nn.Module):
         x = g.ndata['x']
         edge_weight = g.edata['edge_weights']
 
-        x = self.conv1(g, x, edge_weight=edge_weight)
-        x = self.conv2(g, x, edge_weight=edge_weight)
-        x = self.conv2_bn(x)
+        x = function.leaky_relu(self.conv1(g, x, edge_weight=edge_weight))
+        x = function.leaky_relu(self.conv2_bn(self.conv2(g, x, edge_weight=edge_weight)))
 
         # NOTE: this takes node-level features/"embeddings"
         # and aggregates to graph-level - use for graph-level classification
         sumpool = SumPooling()
         out = sumpool(g, x)
-
         if return_graph_embedding:
             return out
 
         out = function.dropout(out, p=0.2, training=self.training)
         out = self.fc_block1(out)
-        out = function.leaky_relu_(out)
-
+        out = function.leaky_relu(out)
         out = self.fc_block2(out)
 
         return out
