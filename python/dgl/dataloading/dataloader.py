@@ -61,7 +61,9 @@ class _EidExcluder():
             else:
                 self._filter = utils.Filter(exclude_eids)
 
-    def find_excluded_indices(self, parent_eids):
+    def _find_indices(self, parent_eids):
+        """ Find the set of edge indices to remove.
+        """
         if self._exclude_eids is not None:
             parent_eids_np = _tensor_or_dict_to_numpy(parent_eids)
             return _locate_eids_to_exclude(parent_eids_np, self._exclude_eids)
@@ -71,12 +73,12 @@ class _EidExcluder():
                 located_eids = {k: self._filter[k].find_excluded_indices(parent_eids[k])
                                 for k, v in parent_eids.items()}
             else:
-                located_eids = self._filter.find_excluded_indices(parent_eids)
+                located_eids = self._filter.find_included_indices(parent_eids)
             return located_eids
 
     def __call__(self, frontier):
         parent_eids = frontier.edata[EID]
-        located_eids = self.find_excluded_indices(parent_eids)
+        located_eids = self._find_indices(parent_eids)
 
         if not isinstance(located_eids, Mapping):
             # (BarclayII) If frontier already has a EID field and located_eids is empty,
