@@ -32,14 +32,17 @@ python main.py
 | Shallow EEG-GCNN  | 0.832       | 0.750         |
 | Deep EEG-GCNN     | 0.830       | 0.736         |
 
-Shallow_EEGGraphConvNet            |  AUC | Bal.Accuracy |
-:-------------------------:|:-------------------------:|:---------------:|
+Shallow_EEGGraphConvNet    |              AUC          |     Bal.Accuracy      |
+:-------------------------:|:-------------------------:|:---------------------:|
 ![shallow_loss](https://user-images.githubusercontent.com/53772888/128595442-d185bd74-5c5d-4118-a6b7-b89dd307d3aa.png)  |![shallow_auc](https://user-images.githubusercontent.com/53772888/128595453-2f3b181a-bcb7-4da4-becd-7a7aa62083bc.png)|![shallow_bacc](https://user-images.githubusercontent.com/53772888/128595456-b293c888-bf8c-4f37-bd58-d01885da3832.png)
 
 Deep_EEGGraphConvNet            |  AUC | Bal.Accuracy |
 :-------------------------:|:-------------------------:|:---------------:|
 ![deep_loss](https://user-images.githubusercontent.com/53772888/128595458-e4a76591-11cf-405f-9c20-2d161e49c358.png)|![deep_auc](https://user-images.githubusercontent.com/53772888/128595462-7a7bfb67-4601-4e83-8764-d7c44bf979b5.png)|![deep_bacc](https://user-images.githubusercontent.com/53772888/128595467-1a0cd37d-0152-431b-a29b-a40bafb71be5.png)
+
+<br>
 Note: This example removes cross validation and optimal decision boundary that are used in the original code. The performance stats are slightly different from what is present in the paper.  
+
 ### Contact
 
 - Email to John(_wei33@illinois.edu_)
