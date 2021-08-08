@@ -5,6 +5,11 @@ from torch.nn import BatchNorm1d
 
 
 class EEGGraphConvNet(nn.Module):
+    """ EEGGraph Convolution Net
+        Parameters
+        ----------
+        num_features_per_node: the number of features per node. In our case, it is 6.
+    """
     def __init__(self, num_feats):
         super(EEGGraphConvNet, self).__init__()
 
