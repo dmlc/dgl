@@ -39,8 +39,10 @@ bool TensorDispatcher::Load(const char *path) {
 #else   // !WIN32
   handle_ = dlopen(path, RTLD_LAZY);
 
-  if (!handle_)
+  if (!handle_) {
+    LOG(WARNING) << "TensorDispatcher: dlopen failed: " << dlerror();
     return false;
+  }
 
   for (int i = 0; i < num_entries_; ++i) {
     entrypoints_[i] = dlsym(handle_, names_[i]);
