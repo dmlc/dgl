@@ -48,7 +48,14 @@ def _locate_eids_to_exclude(frontier_parent_eids, exclude_eids):
 
 class _EidExcluder():
     def __init__(self, exclude_eids):
-        device = F.context(exclude_eids)
+        device = None
+        if isinstance(exclude_eids, Mapping):
+            for k, v in exclude_eids.items():
+                if device is None:
+                    device = F.context(v)
+                    break
+        else:
+            device = F.context(exclude_eids)
         self._exclude_eids = None
         self._filter = None
 
@@ -105,11 +112,12 @@ def _create_eid_excluder(exclude_eids, device):
     if exclude_eids is None:
         return None
 
-    if isinstance(exclude_eids, Mapping):
-        exclude_eids = {k: F.copy_to(v, device) \
-            for k, v in exclude_eids.items()}
-    else:
-        exclude_eids = F.copy_to(exclude_eids, device)
+    if device is not None:
+        if isinstance(exclude_eids, Mapping):
+            exclude_eids = {k: F.copy_to(v, device) \
+                for k, v in exclude_eids.items()}
+        else:
+            exclude_eids = F.copy_to(exclude_eids, device)
 
     return _EidExcluder(exclude_eids)
 

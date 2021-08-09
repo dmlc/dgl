@@ -123,6 +123,7 @@ IdArray _PerformFilter(
         static_cast<IdType*>(result->data));
     CUDA_CALL(cudaGetLastError());
   }
+  device->FreeWorkspace(ctx, prefix);
 
   return result.CreateView({num_unique}, result->dtype);
 }
