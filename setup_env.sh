@@ -27,7 +27,7 @@ export Torch_DIR=$(python -c "import torch; import os; print(os.path.dirname(tor
 ( git clone https://github.com/ddkalamk/torch-ccl.git && cd torch-ccl && git checkout working_1.7 && git submodule sync && git submodule update --init --recursive && CMAKE_C_COMPILER=gcc CMAKE_CXX_COMPILER=g++ python setup.py install )
 
 echo "Install DGL..."
-( git clone --recursive https://github.com/sanchit-misra/dgl.git -b xeon-optimizations && cd dgl && git checkout c4d98dd && rm -rf build && mkdir build && cd build && cmake ../ &&  make -j && cd ../python && python setup.py clean && CMAKE_C_COMPILER=gcc CMAKE_CXX_COMPILER=g++ python setup.py install ) 
+( git clone --recursive https://github.com/sanchit-misra/dgl.git -b xeon-optimizations && cd dgl && git checkout b8aa727 && rm -rf build && mkdir build && cd build && cmake ../ &&  make -j && cd ../python && python setup.py clean && CMAKE_C_COMPILER=gcc CMAKE_CXX_COMPILER=g++ python setup.py install ) 
 
 #echo "Installing few more packages.."
 #pip install psutil
