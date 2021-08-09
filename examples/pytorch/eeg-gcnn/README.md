@@ -1,11 +1,11 @@
 # DGL Implementation of EEG-GCNN Paper
-This example is a simplified version that presents how to utilize the original EEG-GCNN model proposed in the paper [EEG-GCNN](http://proceedings.mlr.press/v136/wagh20a.html), implemented with DGL library. The original code is [here](https://github.com/neerajwagh/eeg-gcnn).
+This example is a simplified version that presents how to utilize the original EEG-GCNN model proposed in the paper [EEG-GCNN](http://proceedings.mlr.press/v136/wagh20a.html), implemented with DGL library. The example removes cross validation and optimal decision boundary that are used in the original code. The performance stats are slightly different from what is present in the paper. The original code is [here](https://github.com/neerajwagh/eeg-gcnn).
 
 ## All References
 - [ML4H Poster](https://drive.google.com/file/d/14nuAQKiIud3p6-c8r9WLV2tAvCyRwRev/view?usp=sharing) can be helpful for understanding data preprocessing, model, and performance of the project. 
 - The recording of presentation by the author Neeraj Wagh can be found on [slideslive](https://slideslive.com/38941020/eeggcnn-augmenting-electroencephalogrambased-neurological-disease-diagnosis-using-a-domainguided-graph-convolutional-neural-network?ref=account-folder-62123-folders).
 - The slides used during the presentation can be found [here](https://drive.google.com/file/d/1dXT4QAUXKauf7CAkhrVyhR2PFUsNh4b8/view?usp=sharing).
-- Raw Data can be found in these two links: [MPI LEMON](http://fcon_1000.projects.nitrc.org/indi/retro/MPI_LEMON.html) (no registration needed), [TUH EEG Abnormal Corpus](https://www.isip.piconepress.com/projects/tuh_eeg/downloads/tuh_eeg_abnormal/) ([needs registration](https://www.isip.piconepress.com/projects/tuh_eeg/html/request_access.php))
+- Raw Data can be found with these two links: [MPI LEMON](http://fcon_1000.projects.nitrc.org/indi/retro/MPI_LEMON.html) (no registration needed), [TUH EEG Abnormal Corpus](https://www.isip.piconepress.com/projects/tuh_eeg/downloads/tuh_eeg_abnormal/) ([needs registration](https://www.isip.piconepress.com/projects/tuh_eeg/html/request_access.php))
 
 ## Dependencies
 
@@ -17,10 +17,15 @@ This example is a simplified version that presents how to utilize the original E
 
 ## Dataset
 - Final Models, Pre-computed Features, Training Metadata can be downloaded through [FigShare](https://figshare.com/articles/software/EEG-GCNN_Supporting_Resources_for_Reproducibility/13251452).
-- In EEGGraphDataset.py, we specify the channels and electrodes and use precomputed spectral coherence values to compute the edge weights. To use this example in your own advantage, please specify your channels, electrodes and generate your own spectral coherence values. All example datasets can be downloaded from FigShare.
+- In ```EEGGraphDataset.py```, we specify the channels and electrodes and use precomputed spectral coherence values to compute the edge weights. To use this example in your own advantage, please specify your channels and electrodes in ```__init__``` function of ```EEGGraphDataset.py```. Generate your own spectral coherence values.
 ## How to Run
-First, download psd_features_data_X, labels_y, spec_coh_values.npy, and standard_1010.tsv.txt. Put them in the repo. <br>
-Then run 
+- First, download ```figshare_upload/master_metadata_index.csv```, ```figshare_upload/psd_features_data_X```, ```figshare_upload/labels_y```, ```figshare_upload/psd_shallow_eeg-gcnn/spec_coh_values.npy```, and ```figshare_upload/psd_shallow_eeg-gcnn/standard_1010.tsv.txt```. Put them in the repo. <br>
+- You may download these files by running:
+```python
+wget https://ndownloader.figshare.com/files/25518170
+```
+- You will need to unzip the downloaded file.
+- Then run 
 ```python
 python main.py
 ```
@@ -39,7 +44,7 @@ Shallow_EEGGraphConvNet            |  AUC | Bal.Accuracy |
 Deep_EEGGraphConvNet            |  AUC | Bal.Accuracy |
 :-------------------------:|:-------------------------:|:---------------:|
 ![deep_loss](https://user-images.githubusercontent.com/53772888/128595458-e4a76591-11cf-405f-9c20-2d161e49c358.png)|![deep_auc](https://user-images.githubusercontent.com/53772888/128595462-7a7bfb67-4601-4e83-8764-d7c44bf979b5.png)|![deep_bacc](https://user-images.githubusercontent.com/53772888/128595467-1a0cd37d-0152-431b-a29b-a40bafb71be5.png)
-Note: This example removes cross validation and optimal decision boundary that are used in the original code. The performance stats are slightly different from what is present in the paper.  
+  
 ### Contact
 
 - Email to John(_wei33@illinois.edu_)
