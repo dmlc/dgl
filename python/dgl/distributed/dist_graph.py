@@ -77,7 +77,6 @@ def _copy_graph_to_shared_mem(g, graph_name, graph_format):
     new_g.edata['inner_edge'] = _to_shared_mem(g.edata['inner_edge'],
                                                _get_edata_path(graph_name, 'inner_edge'))
     new_g.edata[EID] = _to_shared_mem(g.edata[EID], _get_edata_path(graph_name, EID))
-
     # for heterogeneous graph, we need to put ETYPE into KVStore
     # for homogeneous graph, ETYPE does not exist
     if ETYPE in g.edata:
