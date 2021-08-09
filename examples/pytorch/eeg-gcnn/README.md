@@ -44,14 +44,7 @@ Shallow_EEGGraphConvNet    |              AUC          |     Bal.Accuracy      |
 Deep_EEGGraphConvNet            |  AUC | Bal.Accuracy |
 :-------------------------:|:-------------------------:|:---------------:|
 ![deep_loss](https://user-images.githubusercontent.com/53772888/128595458-e4a76591-11cf-405f-9c20-2d161e49c358.png)|![deep_auc](https://user-images.githubusercontent.com/53772888/128595462-7a7bfb67-4601-4e83-8764-d7c44bf979b5.png)|![deep_bacc](https://user-images.githubusercontent.com/53772888/128595467-1a0cd37d-0152-431b-a29b-a40bafb71be5.png)
-<<<<<<< HEAD
-  
-=======
 
-<br>
-Note: This example removes cross validation and optimal decision boundary that are used in the original code. The performance stats are slightly different from what is present in the paper.  
-
->>>>>>> 69999e0790052d5e9d33a9c901e5f9131a90e39f
 ### Contact
 
 - Email to John(_wei33@illinois.edu_)
