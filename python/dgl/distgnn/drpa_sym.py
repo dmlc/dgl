@@ -257,7 +257,7 @@ class drpa_master(DGLHeteroGraph):
         try:
             return self.r_in_degs
         except:
-            print("Passing only local node degrees.")
+            #print("Passing only local node degrees.")
             pass
     
         return DGLHeteroGraph.in_degrees(self)

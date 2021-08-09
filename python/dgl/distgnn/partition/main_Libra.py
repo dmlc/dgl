@@ -181,6 +181,7 @@ if __name__ == "__main__":
     prefix = ""
     dataset = sys.argv[1]
     print("dataset: ", dataset)
+    index = 0
     if dataset == 'cora':
         resultdir = os.path.join(prefix, 'Libra_result_cora')
     elif dataset == 'pubmed':
@@ -189,13 +190,17 @@ if __name__ == "__main__":
         resultdir = os.path.join(prefix, 'Libra_result_citeseer')
     elif dataset == 'reddit':          
         resultdir = os.path.join(prefix, 'Libra_result_reddit')
+        index = 0
     elif dataset == 'ogbn-products':   
         resultdir = os.path.join(prefix, 'Libra_result_ogbn-products')
+        index = 1
     elif dataset == 'ogbn-papers100M':
         no_papers = False
         resultdir = os.path.join(prefix, 'Libra_result_ogbn-papers100M')
+        index = 3
     elif dataset == 'proteins':        
         resultdir = os.path.join(prefix, 'Libra_result_proteins')
+        index = 2
     elif dataset == 'ogbn-arxiv':      
         resultdir = os.path.join(prefix, 'Libra_result_ogbn-arxiv')
     else:
@@ -208,11 +213,13 @@ if __name__ == "__main__":
     except:
         print("Error: Could not create directory: ", resultdir)
         
-        
+    l = [[2,4,8,16], [2,4,8,16,32,64],[2,4,8,16,32,64],[32,64,128]]    
     print("Output is stored in ", resultdir, flush=True)
-    for num_community in [2, 4, 8, 32] :#, 16, 32, 64]:
+    print("Partition range: ", l[index])
+    #for num_community in [2, 4, 8, 32] :#, 16, 32, 64]:
+    for num_community in l[index]:
         print("Executing parititons: ", num_community)
-
+        continue
         try:
             resultdir_ = os.path.join(resultdir, str(num_community) + "Communities")
             os.makedirs(resultdir_, mode=0o775, exist_ok=True)
