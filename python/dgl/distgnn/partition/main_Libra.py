@@ -219,7 +219,7 @@ if __name__ == "__main__":
     #for num_community in [2, 4, 8, 32] :#, 16, 32, 64]:
     for num_community in l[index]:
         print("Executing parititons: ", num_community)
-        continue
+        #continue
         try:
             resultdir_ = os.path.join(resultdir, str(num_community) + "Communities")
             os.makedirs(resultdir_, mode=0o775, exist_ok=True)
