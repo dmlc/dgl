@@ -529,6 +529,42 @@ class DeleteDataRequest(rpc.Request):
         res = DeleteDataResponse(DELETE_MSG)
         return res
 
+COUNT_LOCAL_NONZERO = 901241
+
+class CountLocalNonzeroResponse(rpc.Response):
+    """Send the number of nonzero value in local data
+    """
+    def __init__(self, num_local_nonzero):
+        self.num_local_nonzero = num_local_nonzero
+
+    def __getstate__(self):
+        return self.num_local_nonzero
+
+    def __setstate__(self, state):
+        self.num_local_nonzero = state
+
+class CountLocalNonzeroRequest(rpc.Request):
+    """Send data name to server to count local nonzero value
+    Parameters
+    ----------
+    name : str
+        data name
+    """
+    def __init__(self, name):
+        self.name = name
+
+    def __getstate__(self):
+        return self.name
+
+    def __setstate__(self, state):
+        self.name = state
+
+    def process_request(self, server_state):
+        kv_store = server_state.kv_store
+        num_local_nonzero = kv_store.count_local_nonzero(self.name)
+        res = CountLocalNonzeroResponse(num_local_nonzero)
+        return res
+
 ############################ KVServer ###############################
 
 def default_push_handler(target, name, id_tensor, data_tensor):
@@ -630,6 +666,9 @@ class KVServer(object):
         rpc.register_service(DELETE_DATA,
                              DeleteDataRequest,
                              DeleteDataResponse)
+        rpc.register_service(COUNT_LOCAL_NONZERO,
+                             CountLocalNonzeroRequest,
+                             CountLocalNonzeroResponse)
         # Store the tensor data with specified data name
         self._data_store = {}
         # Store the partition information with specified data name
@@ -758,6 +797,24 @@ class KVServer(object):
                 return policy
         raise RuntimeError("Cannot find policy_str: %s from kvserver." % policy_str)
 
+    def count_local_nonzero(self, name):
+        """Count nonzero in local data
+
+        Parameters
+        ----------
+        name : str
+            data name.
+
+        Returns
+        -------
+        int
+            the number of nonzero in local data.
+        """
+        assert len(name) > 0, 'name cannot be empty.'
+        if name not in self._data_store:
+            raise RuntimeError("Data %s has not be created!" % name)
+        return F.count_nonzero(self._data_store[name])
+
 ############################ KVClient ###############################
 
 class KVClient(object):
@@ -815,6 +872,9 @@ class KVClient(object):
         rpc.register_service(DELETE_DATA,
                              DeleteDataRequest,
                              DeleteDataResponse)
+        rpc.register_service(COUNT_LOCAL_NONZERO,
+                             CountLocalNonzeroRequest,
+                             CountLocalNonzeroResponse)
         # Store the tensor data with specified data name
         self._data_store = {}
         # Store the partition information with specified data name
@@ -1123,9 +1183,13 @@ class KVClient(object):
             self._gdata_name_list.add(name)
         self.barrier()
 
+    def gdata_name_list(self):
+        """Get all the graph data name"""
+        return list(self._gdata_name_list)
+
     def data_name_list(self):
         """Get all the data name"""
-        return list(self._gdata_name_list)
+        return list(self._data_name_list)
 
     def get_data_meta(self, name):
         """Get meta data (data_type, data_shape, partition_policy)
@@ -1278,6 +1342,35 @@ class KVClient(object):
         """Used by sort response list
         """
         return elem.server_id
+
+    def count_nonzero(self, name):
+        """Count nonzero value by pull request from KVServers.
+
+        Parameters
+        ----------
+        name : str
+            data name
+
+        Returns
+        -------
+        int
+            the number of nonzero in this data.
+        """
+        total = 0
+        pull_count = 0
+        for machine_id in range(self._machine_count):
+            if machine_id == self._machine_id:
+                local_id = F.tensor(np.arange(self._part_policy[name].get_part_size(),
+                                              dtype=np.int64))
+                total += F.count_nonzero(self._data_store[name][local_id])
+            else:
+                request = CountLocalNonzeroRequest(name)
+                rpc.send_request_to_machine(machine_id, request)
+                pull_count += 1
+        for _ in range(pull_count):
+            res = rpc.recv_response()
+            total += res.num_local_nonzero
+        return total
 
 KVCLIENT = None
 

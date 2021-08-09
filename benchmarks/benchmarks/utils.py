@@ -32,12 +32,46 @@ def _download(url, path, filename):
 
 
 # GRAPH_CACHE = {}
+import torch.multiprocessing as mp
+from _thread import start_new_thread
+import traceback
 
+def thread_wrapped_func(func):
+    """
+    Wraps a process entry point to make it work with OpenMP.
+    """
 
-def get_graph(name, format):
+    @wraps(func)
+    def decorated_function(*args, **kwargs):
+        queue = mp.Queue()
+
+        def _queue_result():
+            exception, trace, res = None, None, None
+            try:
+                res = func(*args, **kwargs)
+            except Exception as e:
+                exception = e
+                trace = traceback.format_exc()
+            queue.put((res, exception, trace))
+
+        start_new_thread(_queue_result, ())
+        result, exception, trace = queue.get()
+        if exception is None:
+            return result
+        else:
+            assert isinstance(exception, Exception)
+            raise exception.__class__(trace)
+
+    return decorated_function
+
+def get_graph(name, format = None):
     # global GRAPH_CACHE
     # if name in GRAPH_CACHE:
     #     return GRAPH_CACHE[name].to(format)
+    if isinstance(format, str):
+        format = [format] # didn't specify format
+    if format is None:
+        format = ['csc', 'csr', 'coo']
     g = None
     if name == 'cora':
         g = dgl.data.CoraGraphDataset(verbose=False)[0]
@@ -49,7 +83,7 @@ def get_graph(name, format):
             g_list, _ = dgl.load_graphs(bin_path)
             g = g_list[0]
         else:
-            g = get_livejournal().formats([format])
+            g = get_livejournal().formats(format)
             dgl.save_graphs(bin_path, [g])
     elif name == "friendster":
         bin_path = "/tmp/dataset/friendster/friendster_{}.bin".format(format)
@@ -57,7 +91,7 @@ def get_graph(name, format):
             g_list, _ = dgl.load_graphs(bin_path)
             g = g_list[0]
         else:
-            g = get_friendster().formats([format])
+            g = get_friendster().formats(format)
             dgl.save_graphs(bin_path, [g])
     elif name == "reddit":
         bin_path = "/tmp/dataset/reddit/reddit_{}.bin".format(format)
@@ -65,14 +99,14 @@ def get_graph(name, format):
             g_list, _ = dgl.load_graphs(bin_path)
             g = g_list[0]
         else:
-            g = dgl.data.RedditDataset(self_loop=True)[0].formats([format])
+            g = dgl.data.RedditDataset(self_loop=True)[0].formats(format)
             dgl.save_graphs(bin_path, [g])
     elif name.startswith("ogb"):
         g = get_ogb_graph(name)
     else:
         raise Exception("Unknown dataset")
     # GRAPH_CACHE[name] = g
-    g = g.formats([format])
+    g = g.formats(format)
     return g
 
 
@@ -451,6 +485,32 @@ def skip_if_gpu():
     def _wrapper(func):
         if device == "gpu":
             # skip if not enabled
+            func.benchmark_name = "skip_" + func.__name__
+        return func
+    return _wrapper
+
+def _cuda_device_count(q):
+    import torch
+    q.put(torch.cuda.device_count())
+
+def get_num_gpu():
+    import multiprocessing as mp
+    q = mp.Queue()
+    p = mp.Process(target=_cuda_device_count, args=(q, ))
+    p.start()
+    p.join()
+    return q.get(block=False)
+
+GPU_COUNT = get_num_gpu()
+
+def skip_if_not_4gpu():
+    """skip if DGL_BENCH_DEVICE is gpu
+    """
+
+    def _wrapper(func):
+        if GPU_COUNT != 4:
+            # skip if not enabled
+            print("Skip {}".format(func.__name__))
             func.benchmark_name = "skip_" + func.__name__
         return func
     return _wrapper

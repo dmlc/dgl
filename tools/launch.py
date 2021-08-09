@@ -12,6 +12,7 @@ import multiprocessing
 import re
 from functools import partial
 from threading import Thread
+from typing import Optional
 
 DEFAULT_PORT = 30050
 
@@ -73,17 +74,46 @@ def get_killed_pids(ip, port, killed_pids):
             pids.append(int(l[0]))
     return pids
 
-def execute_remote(cmd, ip, port, thread_list):
-    """execute command line on remote machine via ssh"""
-    cmd = 'ssh -o StrictHostKeyChecking=no -p ' + str(port) + ' ' + ip + ' \'' + cmd + '\''
-    # thread func to run the job
-    def run(cmd):
-        subprocess.check_call(cmd, shell = True)
+def execute_remote(
+    cmd: str,
+    ip: str,
+    port: int,
+    username: Optional[str] = ""
+) -> Thread:
+    """Execute command line on remote machine via ssh.
 
-    thread = Thread(target = run, args=(cmd,))
+    Args:
+        cmd: User-defined command (udf) to execute on the remote host.
+        ip: The ip-address of the host to run the command on.
+        port: Port number that the host is listening on.
+        thread_list:
+        username: Optional. If given, this will specify a username to use when issuing commands over SSH.
+            Useful when your infra requires you to explicitly specify a username to avoid permission issues.
+
+    Returns:
+        thread: The Thread whose run() is to run the `cmd` on the remote host. Returns when the cmd completes
+            on the remote host.
+    """
+    ip_prefix = ""
+    if username:
+        ip_prefix += "{username}@".format(username=username)
+
+    # Construct ssh command that executes `cmd` on the remote host
+    ssh_cmd = "ssh -o StrictHostKeyChecking=no -p {port} {ip_prefix}{ip} '{cmd}'".format(
+        port=str(port),
+        ip_prefix=ip_prefix,
+        ip=ip,
+        cmd=cmd,
+    )
+
+    # thread func to run the job
+    def run(ssh_cmd):
+        subprocess.check_call(ssh_cmd, shell=True)
+
+    thread = Thread(target=run, args=(ssh_cmd,))
     thread.setDaemon(True)
     thread.start()
-    thread_list.append(thread)
+    return thread
 
 def get_remote_pids(ip, port, cmd_regex):
     """Get the process IDs that run the command in the remote machine.
@@ -127,6 +157,111 @@ def get_all_remote_pids(hosts, ssh_port, udf_command):
         pids = get_remote_pids(ip, ssh_port, new_udf_command)
         remote_pids[(ip, ssh_port)] = pids
     return remote_pids
+
+
+def construct_torch_dist_launcher_cmd(
+    num_trainers: int,
+    num_nodes: int,
+    node_rank: int,
+    master_addr: str,
+    master_port: int
+) -> str:
+    """Constructs the torch distributed launcher command.
+    Helper function.
+
+    Args:
+        num_trainers:
+        num_nodes:
+        node_rank:
+        master_addr:
+        master_port:
+
+    Returns:
+        cmd_str.
+    """
+    torch_cmd_template = "-m torch.distributed.launch " \
+                         "--nproc_per_node={nproc_per_node} " \
+                         "--nnodes={nnodes} " \
+                         "--node_rank={node_rank} " \
+                         "--master_addr={master_addr} " \
+                         "--master_port={master_port}"
+    return torch_cmd_template.format(
+        nproc_per_node=num_trainers,
+        nnodes=num_nodes,
+        node_rank=node_rank,
+        master_addr=master_addr,
+        master_port=master_port
+    )
+
+
+def wrap_udf_in_torch_dist_launcher(
+    udf_command: str,
+    num_trainers: int,
+    num_nodes: int,
+    node_rank: int,
+    master_addr: str,
+    master_port: int,
+) -> str:
+    """Wraps the user-defined function (udf_command) with the torch.distributed.launch module.
+
+     Example: if udf_command is "python3 run/some/trainer.py arg1 arg2", then new_df_command becomes:
+         "python3 -m torch.distributed.launch <TORCH DIST ARGS> run/some/trainer.py arg1 arg2
+
+    udf_command is assumed to consist of pre-commands (optional) followed by the python launcher script (required):
+    Examples:
+        # simple
+        python3.7 path/to/some/trainer.py arg1 arg2
+
+        # multi-commands
+        (cd some/dir && python3.7 path/to/some/trainer.py arg1 arg2)
+
+    IMPORTANT: If udf_command consists of multiple python commands, then this will result in undefined behavior.
+
+    Args:
+        udf_command:
+        num_trainers:
+        num_nodes:
+        node_rank:
+        master_addr:
+        master_port:
+
+    Returns:
+
+    """
+    torch_dist_cmd = construct_torch_dist_launcher_cmd(
+        num_trainers=num_trainers,
+        num_nodes=num_nodes,
+        node_rank=node_rank,
+        master_addr=master_addr,
+        master_port=master_port
+    )
+    # Auto-detect the python binary that kicks off the distributed trainer code.
+    # Note: This allowlist order matters, this will match with the FIRST matching entry. Thus, please add names to this
+    #       from most-specific to least-specific order eg:
+    #           (python3.7, python3.8) -> (python3)
+    # The allowed python versions are from this: https://www.dgl.ai/pages/start.html
+    python_bin_allowlist = (
+        "python3.6", "python3.7", "python3.8", "python3.9", "python3",
+        # for backwards compatibility, accept python2 but technically DGL is a py3 library, so this is not recommended
+        "python2.7", "python2",
+    )
+    # If none of the candidate python bins match, then we go with the default `python`
+    python_bin = "python"
+    for candidate_python_bin in python_bin_allowlist:
+        if candidate_python_bin in udf_command:
+            python_bin = candidate_python_bin
+            break
+
+    # transforms the udf_command from:
+    #     python path/to/dist_trainer.py arg0 arg1
+    # to:
+    #     python -m torch.distributed.launch [DIST TORCH ARGS] path/to/dist_trainer.py arg0 arg1
+    # Note: if there are multiple python commands in `udf_command`, this may do the Wrong Thing, eg launch each
+    #       python command within the torch distributed launcher.
+    new_udf_command = udf_command.replace(python_bin, f"{python_bin} {torch_dist_cmd}")
+
+    return new_udf_command
+
 
 def submit_jobs(args, udf_command):
     """Submit distributed jobs (server and client processes) via ssh"""
@@ -173,7 +308,7 @@ def submit_jobs(args, udf_command):
         cmd = server_cmd + ' ' + 'DGL_SERVER_ID=' + str(i)
         cmd = cmd + ' ' + udf_command
         cmd = 'cd ' + str(args.workspace) + '; ' + cmd
-        execute_remote(cmd, ip, args.ssh_port, thread_list)
+        thread_list.append(execute_remote(cmd, ip, args.ssh_port, username=args.ssh_username))
 
     # launch client tasks
     client_cmd = 'DGL_DIST_MODE="distributed" DGL_ROLE=client DGL_NUM_SAMPLER=' + str(args.num_samplers)
@@ -189,24 +324,20 @@ def submit_jobs(args, udf_command):
         client_cmd = client_cmd + ' ' + 'PYTHONPATH=' + os.environ.get('PYTHONPATH')
     client_cmd = client_cmd + ' ' + 'DGL_GRAPH_FORMAT=' + str(args.graph_format)
 
-    torch_cmd = '-m torch.distributed.launch'
-    torch_cmd = torch_cmd + ' ' + '--nproc_per_node=' + str(args.num_trainers)
-    torch_cmd = torch_cmd + ' ' + '--nnodes=' + str(len(hosts))
-    torch_cmd = torch_cmd + ' ' + '--node_rank=' + str(0)
-    torch_cmd = torch_cmd + ' ' + '--master_addr=' + str(hosts[0][0])
-    torch_cmd = torch_cmd + ' ' + '--master_port=' + str(1234)
     for node_id, host in enumerate(hosts):
         ip, _ = host
-        new_torch_cmd = torch_cmd.replace('node_rank=0', 'node_rank='+str(node_id))
-        if 'python3' in udf_command:
-            new_udf_command = udf_command.replace('python3', 'python3 ' + new_torch_cmd)
-        elif 'python2' in udf_command:
-            new_udf_command = udf_command.replace('python2', 'python2 ' + new_torch_cmd)
-        else:
-            new_udf_command = udf_command.replace('python', 'python ' + new_torch_cmd)
-        cmd = client_cmd + ' ' + new_udf_command
+        # Transform udf_command to follow torch's dist launcher format: `PYTHON_BIN -m torch.distributed.launch ... UDF`
+        torch_dist_udf_command = wrap_udf_in_torch_dist_launcher(
+            udf_command=udf_command,
+            num_trainers=args.num_trainers,
+            num_nodes=len(hosts),
+            node_rank=node_id,
+            master_addr=hosts[0][0],
+            master_port=1234,
+        )
+        cmd = client_cmd + ' ' + torch_dist_udf_command
         cmd = 'cd ' + str(args.workspace) + '; ' + cmd
-        execute_remote(cmd, ip, args.ssh_port, thread_list)
+        thread_list.append(execute_remote(cmd, ip, args.ssh_port, username=args.ssh_username))
 
     # Start a cleanup process dedicated for cleaning up remote training jobs.
     conn1,conn2 = multiprocessing.Pipe()
@@ -231,6 +362,12 @@ def submit_jobs(args, udf_command):
 def main():
     parser = argparse.ArgumentParser(description='Launch a distributed job')
     parser.add_argument('--ssh_port', type=int, default=22, help='SSH Port.')
+    parser.add_argument(
+        "--ssh_username", default="",
+        help="Optional. When issuing commands (via ssh) to cluster, use the provided username in the ssh cmd. "
+             "Example: If you provide --ssh_username=bob, then the ssh command will be like: 'ssh bob@1.2.3.4 CMD' "
+             "instead of 'ssh 1.2.3.4 CMD'"
+    )
     parser.add_argument('--workspace', type=str,
                         help='Path of user directory of distributed tasks. \
                         This is used to specify a destination location where \

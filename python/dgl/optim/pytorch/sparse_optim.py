@@ -70,7 +70,10 @@ class SparseGradOptimizer(abc.ABC):
                     else:
                         assert not self._device, \
                             "All gradients must be on the same device"
-            if self._device:
+
+            # distributed backend use nccl
+            if self._device and \
+                (not th.distributed.is_initialized() or th.distributed.get_backend() == 'nccl'):
                 # device is only set if the grads are on a GPU
                 self._comm_setup()
             else:
@@ -284,9 +287,11 @@ class SparseGradOptimizer(abc.ABC):
                                 # The overall buffer cost will be smaller than three times
                                 # the maximum memory requirement for sharing gradients.
                                 buffer_size = 128 if idx_i.shape[0] < 128 else idx_i.shape[0] * 2
-                                idx_shmem = create_shared_mem_array(idx_shmem_name, \
+                                idx_shmem = create_shared_mem_array(
+                                    '{}_{}'.format(idx_shmem_name, buffer_size), \
                                     (buffer_size,), idx_dtype)
-                                grad_shmem = create_shared_mem_array(grad_shmem_name, \
+                                grad_shmem = create_shared_mem_array(
+                                    '{}_{}'.format(grad_shmem_name, buffer_size), \
                                     (buffer_size, grad_dim), grad_dtype)
                                 self._shared_cache[emb_name][idx_shmem_name] = idx_shmem
                                 self._shared_cache[emb_name][grad_shmem_name] = grad_shmem
@@ -321,9 +326,11 @@ class SparseGradOptimizer(abc.ABC):
                             if idx_shmem_name not in self._shared_cache[emb_name] or \
                                 self._shared_cache[emb_name][idx_shmem_name].shape[0] < size:
                                 buffer_size = 128 if size < 128 else size * 2
-                                idx_shmem = get_shared_mem_array(idx_shmem_name, \
+                                idx_shmem = get_shared_mem_array(
+                                    '{}_{}'.format(idx_shmem_name, buffer_size), \
                                     (buffer_size,), idx_dtype)
-                                grad_shmem = get_shared_mem_array(grad_shmem_name, \
+                                grad_shmem = get_shared_mem_array(
+                                    '{}_{}'.format(grad_shmem_name, buffer_size), \
                                     (buffer_size, grad_dim), grad_dtype)
                                 self._shared_cache[emb_name][idx_shmem_name] = idx_shmem
                                 self._shared_cache[emb_name][grad_shmem_name] = grad_shmem
@@ -424,10 +431,15 @@ class SparseAdagrad(SparseGradOptimizer):
             emb_name = emb.name
             if th.device(emb.emb_tensor.device) == th.device('cpu'):
                 # if our embedding is on the CPU, our state also has to be
-                if self._rank <= 0:
+                if self._rank < 0:
+                    state = th.empty(
+                        emb.weight.shape,
+                        dtype=th.float32,
+                        device=eth.device('cpu')).zero_()
+                elif self._rank == 0:
                     state = create_shared_mem_array(emb_name+'_state', \
                         emb.weight.shape, th.float32).zero_()
-                if self._rank == 0:
+
                     if self._world_size > 1:
                         emb.store.set(emb_name+'_opt', emb_name)
                 elif self._rank > 0:
@@ -538,14 +550,27 @@ class SparseAdam(SparseGradOptimizer):
             emb_name = emb.name
             if th.device(emb.emb_tensor.device) == th.device('cpu'):
                 # if our embedding is on the CPU, our state also has to be
-                if self._rank <= 0:
+                if self._rank < 0:
+                    state_step = th.empty(
+                        (emb.weight.shape[0],),
+                        dtype=th.float32,
+                        device=th.device('cpu')).zero_()
+                    state_mem = th.empty(
+                        emb.weight.shape,
+                        dtype=th.float32,
+                        device=th.device('cpu')).zero_()
+                    state_power = th.empty(
+                        emb.weight.shape,
+                        dtype=th.float32,
+                        device=th.device('cpu')).zero_()
+                elif self._rank == 0:
                     state_step = create_shared_mem_array(emb_name+'_step', \
                         (emb.weight.shape[0],), th.float32).zero_()
                     state_mem = create_shared_mem_array(emb_name+'_mem', \
                         emb.weight.shape, th.float32).zero_()
                     state_power = create_shared_mem_array(emb_name+'_power', \
                         emb.weight.shape, th.float32).zero_()
-                if self._rank == 0:
+
                     if self._world_size > 1:
                         emb.store.set(emb_name+'_opt', emb_name)
                 elif self._rank > 0:
@@ -601,8 +626,7 @@ class SparseAdam(SparseGradOptimizer):
             # only perform async copies cpu -> gpu, or gpu-> gpu, but block
             # when copying to the cpu, so as to ensure the copy is finished
             # before operating on the data on the cpu
-            state_nonblock = state_dev != th.device('cpu')
-            exec_nonblock = exec_dev != th.device('cpu')
+            state_block = state_dev == th.device('cpu') and exec_dev != state_dev
 
             # There can be duplicated indices due to sampling.
             # Thus unique them here and average the gradient here.
@@ -611,9 +635,9 @@ class SparseAdam(SparseGradOptimizer):
                                                    return_counts=True)
             state_idx = grad_indices.to(state_dev)
             state_step[state_idx] += 1
-            state_step = state_step[state_idx].to(exec_dev, non_blocking=exec_nonblock)
-            orig_mem = state_mem[state_idx].to(exec_dev, non_blocking=exec_nonblock)
-            orig_power = state_power[state_idx].to(exec_dev, non_blocking=exec_nonblock)
+            state_step = state_step[state_idx].to(exec_dev)
+            orig_mem = state_mem[state_idx].to(exec_dev)
+            orig_power = state_power[state_idx].to(exec_dev)
 
             grad_values = th.zeros((grad_indices.shape[0], grad.shape[1]), device=exec_dev)
             grad_values.index_add_(0, inverse, grad)
@@ -621,17 +645,34 @@ class SparseAdam(SparseGradOptimizer):
 
             grad_mem = grad_values
             grad_power = grad_values * grad_values
+
             update_mem = beta1 * orig_mem + (1.-beta1) * grad_mem
             update_power = beta2 * orig_power + (1.-beta2) * grad_power
-            state_mem[state_idx] = update_mem.to(state_dev,
-                                                 non_blocking=state_nonblock)
-            state_power[state_idx] = update_power.to(state_dev,
-                                                     non_blocking=state_nonblock)
+            update_mem_dst = update_mem.to(state_dev, non_blocking=True)
+            update_power_dst = update_power.to(state_dev, non_blocking=True)
+            if state_block:
+                # use events to try and overlap CPU and GPU as much as possible
+                update_event = th.cuda.Event()
+                update_event.record()
 
             update_mem_corr = update_mem / (1. - th.pow(th.tensor(beta1, device=exec_dev),
                                                         state_step)).unsqueeze(1)
             update_power_corr = update_power / (1. - th.pow(th.tensor(beta2, device=exec_dev),
                                                             state_step)).unsqueeze(1)
             std_values = clr * update_mem_corr / (th.sqrt(update_power_corr) + eps)
+            std_values_dst = std_values.to(state_dev, non_blocking=True)
 
-            emb.weight[state_idx] -= std_values.to(state_dev)
+            if state_block:
+                std_event = th.cuda.Event()
+                std_event.record()
+                # wait for our transfers from exec_dev to state_dev to finish
+                # before we can use them
+                update_event.wait()
+            state_mem[state_idx] = update_mem_dst
+            state_power[state_idx] = update_power_dst
+
+            if state_block:
+                # wait for the transfer of std_values to finish before we
+                # can use it
+                std_event.wait()
+            emb.weight[state_idx] -= std_values_dst

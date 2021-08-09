@@ -23,6 +23,10 @@ Install from Conda or Pip
 We recommend installing DGL by ``conda`` or ``pip``.
 Check out the instructions on the `Get Started page <https://www.dgl.ai/pages/start.html>`_.
 
+.. note::
+
+   For Windows users: you will need to install `Visual C++ 2015 Redistributable <https://www.microsoft.com/en-us/download/details.aspx?id=48145>`_.
+
 .. _install-from-source:
 
 Install from source

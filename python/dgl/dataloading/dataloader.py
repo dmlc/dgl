@@ -77,6 +77,9 @@ def _find_exclude_eids(g, exclude_mode, eids, **kwargs):
         None (default)
             Does not exclude any edge.
 
+        'self'
+            Exclude the given edges themselves but nothing else.
+
         'reverse_id'
             Exclude all edges specified in ``eids``, as well as their reverse edges
             of the same edge type.
@@ -105,6 +108,8 @@ def _find_exclude_eids(g, exclude_mode, eids, **kwargs):
     """
     if exclude_mode is None:
         return None
+    elif exclude_mode == 'self':
+        return eids
     elif exclude_mode == 'reverse_id':
         return _find_exclude_eids_with_reverse_id(g, eids, kwargs['reverse_eid_map'])
     elif exclude_mode == 'reverse_types':
@@ -356,7 +361,8 @@ class Collator(ABC):
 def _prepare_tensor_dict(g, data, name, is_distributed):
     if is_distributed:
         x = F.tensor(next(iter(data.values())))
-        return {k: F.copy_to(F.astype(v, F.dtype(x)), F.context(x)) for k, v in data.items()}
+        return {k: F.copy_to(F.astype(F.tensor(v), F.dtype(x)), F.context(x)) \
+                for k, v in data.items()}
     else:
         return utils.prepare_tensor_dict(g, data, name)
 
@@ -493,6 +499,8 @@ class EdgeCollator(Collator):
 
         * None, which excludes nothing.
 
+        * ``'self'``, which excludes the sampled edges themselves but nothing else.
+
         * ``'reverse_id'``, which excludes the reverse edges of the sampled edges.  The said
           reverse edges have the same edge type as the sampled edges.  Only works
           on edge types whose source node type is the same as its destination node type.
@@ -577,7 +585,7 @@ class EdgeCollator(Collator):
     >>> neg_sampler = dgl.dataloading.negative_sampler.Uniform(5)
     >>> collator = dgl.dataloading.EdgeCollator(
     ...     g, train_eid, sampler, exclude='reverse_id',
-    ...     reverse_eids=reverse_eids, negative_sampler=neg_sampler,
+    ...     reverse_eids=reverse_eids, negative_sampler=neg_sampler)
     >>> dataloader = torch.utils.data.DataLoader(
     ...     collator.dataset, collate_fn=collator.collate,
     ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
@@ -696,7 +704,7 @@ class EdgeCollator(Collator):
         else:
             items = _prepare_tensor(self.g_sampling, items, 'items', self._is_distributed)
 
-        pair_graph = self.g.edge_subgraph(items, preserve_nodes=True)
+        pair_graph = self.g.edge_subgraph(items, relabel_nodes=False)
         induced_edges = pair_graph.edata[EID]
 
         neg_srcdst = self.negative_sampler(self.g, items)

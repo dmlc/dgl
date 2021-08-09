@@ -150,8 +150,8 @@ class DistTensor:
         self._name = str(data_name)
         self._persistent = persistent
         if self._name not in exist_names:
-            self.kvstore.init_data(self._name, shape, dtype, part_policy, init_func, is_gdata)
             self._owner = True
+            self.kvstore.init_data(self._name, shape, dtype, part_policy, init_func, is_gdata)
         else:
             self._owner = False
             dtype1, shape1, _ = self.kvstore.get_data_meta(self._name)
@@ -232,3 +232,13 @@ class DistTensor:
             The name of the tensor.
         '''
         return self._tensor_name
+
+    def count_nonzero(self):
+        '''Count and return the number of nonzero value
+
+        Returns
+        -------
+        int
+            the number of nonzero value
+        '''
+        return self.kvstore.count_nonzero(name=self.name)

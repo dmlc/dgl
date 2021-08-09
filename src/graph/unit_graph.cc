@@ -456,6 +456,8 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     if (aten::IsValidIdArray(edge_ids))
       CHECK((indices->shape[0] == edge_ids->shape[0]) || aten::IsNullArray(edge_ids))
         << "edge id arrays should have the same length as indices if not empty";
+    CHECK_EQ(num_src, indptr->shape[0] - 1)
+      << "number of nodes do not match the length of indptr minus 1.";
 
     adj_ = aten::CSRMatrix{num_src, num_dst, indptr, indices, edge_ids};
   }
@@ -1070,10 +1072,10 @@ std::vector<IdArray> UnitGraph::GetAdj(
   //   to_scipy_sparse_matrix. With the upcoming custom kernel change, we should change the
   //   behavior and make row for src and col for dst.
   if (fmt == std::string("csr")) {
-    return transpose? GetOutCSR()->GetAdj(etype, false, "csr")
+    return !transpose ? GetOutCSR()->GetAdj(etype, false, "csr")
       : GetInCSR()->GetAdj(etype, false, "csr");
   } else if (fmt == std::string("coo")) {
-    return GetCOO()->GetAdj(etype, !transpose, fmt);
+    return GetCOO()->GetAdj(etype, transpose, fmt);
   } else {
     LOG(FATAL) << "unsupported adjacency matrix format: " << fmt;
     return {};

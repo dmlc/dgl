@@ -172,7 +172,7 @@ class GraphSAGE(nn.Module):
 # The *positive graph* and the *negative graph* will contain the same set
 # of nodes as the original graph.  This makes it easier to pass node
 # features among multiple graphs for computation.  As you will see later,
-# you can directly fed the node representations computed on the entire
+# you can directly feed the node representations computed on the entire
 # graph to the positive and the negative graphs for computing pair-wise
 # scores.
 #
@@ -340,5 +340,5 @@ with torch.no_grad():
     print('AUC', compute_auc(pos_score, neg_score))
 
 
-# Thumbnail Courtesy: Link Prediction with Neo4j, Mark Needham
+# Thumbnail credits: Link Prediction with Neo4j, Mark Needham
 # sphinx_gallery_thumbnail_path = '_static/blitz_4_link_predict.png'

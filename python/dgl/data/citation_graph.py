@@ -20,6 +20,7 @@ from .. import batch
 from .. import backend as F
 from ..convert import graph as dgl_graph
 from ..convert import from_networkx, to_networkx
+from ..transform import reorder_graph
 
 backend = os.environ.get('DGLBACKEND', 'pytorch')
 
@@ -71,7 +72,7 @@ class CitationGraphDataset(DGLBuiltinDataset):
                                                    verbose=verbose)
 
     def process(self):
-        """Loads input data from data directory
+        """Loads input data from data directory and reorder graph for better locality
 
         ind.name.x => the feature vectors of the training instances as scipy.sparse.csr.csr_matrix object;
         ind.name.tx => the feature vectors of the test instances as scipy.sparse.csr.csr_matrix object;
@@ -136,7 +137,8 @@ class CitationGraphDataset(DGLBuiltinDataset):
         g.ndata['feat'] = F.tensor(_preprocess_features(features), dtype=F.data_type_dict['float32'])
         self._num_classes = onehot_labels.shape[1]
         self._labels = labels
-        self._g = g
+        self._g = reorder_graph(
+            g, node_permute_algo='rcmk', edge_permute_algo='dst', store_ids=False)
 
         if self.verbose:
             print('Finished data loading and preprocessing.')
@@ -384,7 +386,7 @@ class CoraGraphDataset(CitationGraphDataset):
     --------
     >>> dataset = CoraGraphDataset()
     >>> g = dataset[0]
-    >>> num_class = g.num_classes
+    >>> num_class = dataset.num_classes
     >>>
     >>> # get node feature
     >>> feat = g.ndata['feat']
@@ -396,8 +398,6 @@ class CoraGraphDataset(CitationGraphDataset):
     >>>
     >>> # get labels
     >>> label = g.ndata['label']
-    >>>
-    >>> # Train, Validation and Test
 
     """
     def __init__(self, raw_dir=None, force_reload=False, verbose=True, reverse_edge=True):
@@ -529,7 +529,7 @@ class CiteseerGraphDataset(CitationGraphDataset):
     --------
     >>> dataset = CiteseerGraphDataset()
     >>> g = dataset[0]
-    >>> num_class = g.num_classes
+    >>> num_class = dataset.num_classes
     >>>
     >>> # get node feature
     >>> feat = g.ndata['feat']
@@ -541,8 +541,6 @@ class CiteseerGraphDataset(CitationGraphDataset):
     >>>
     >>> # get labels
     >>> label = g.ndata['label']
-    >>>
-    >>> # Train, Validation and Test
 
     """
     def __init__(self, raw_dir=None, force_reload=False, verbose=True, reverse_edge=True):
@@ -671,7 +669,7 @@ class PubmedGraphDataset(CitationGraphDataset):
     --------
     >>> dataset = PubmedGraphDataset()
     >>> g = dataset[0]
-    >>> num_class = g.num_of_class
+    >>> num_class = dataset.num_of_class
     >>>
     >>> # get node feature
     >>> feat = g.ndata['feat']
@@ -683,8 +681,6 @@ class PubmedGraphDataset(CitationGraphDataset):
     >>>
     >>> # get labels
     >>> label = g.ndata['label']
-    >>>
-    >>> # Train, Validation and Test
 
     """
     def __init__(self, raw_dir=None, force_reload=False, verbose=True, reverse_edge=True):

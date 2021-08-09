@@ -190,6 +190,7 @@ bool SocketReceiver::Wait(const char* addr, int num_sender) {
   for (int i = 0; i < num_sender_; ++i) {
     msg_queue_[i] = std::make_shared<MessageQueue>(queue_size_);
   }
+  mq_iter_ = msg_queue_.begin();
   // Initialize socket and socket-thread
   server_socket_ = new TCPSocket();
   // Bind socket
@@ -222,16 +223,18 @@ bool SocketReceiver::Wait(const char* addr, int num_sender) {
 STATUS SocketReceiver::Recv(Message* msg, int* send_id) {
   // loop until get a message
   for (;;) {
-    for (auto& mq : msg_queue_) {
-      *send_id = mq.first;
+    for (; mq_iter_ != msg_queue_.end(); ++mq_iter_) {
       // We use non-block remove here
-      STATUS code = msg_queue_[*send_id]->Remove(msg, false);
+      STATUS code = mq_iter_->second->Remove(msg, false);
       if (code == QUEUE_EMPTY) {
         continue;  // jump to the next queue
       } else {
+        *send_id = mq_iter_->first;
+        ++mq_iter_;
         return code;
       }
     }
+    mq_iter_ = msg_queue_.begin();
   }
 }
 

@@ -22,7 +22,7 @@ def _AXWb(A, X, W, b):
 def test_graph_conv(out_dim):
     g = dgl.DGLGraph(nx.path_graph(3)).to(F.ctx())
     ctx = F.ctx()
-    adj = tf.sparse.to_dense(tf.sparse.reorder(g.adjacency_matrix(transpose=False, ctx=ctx)))
+    adj = tf.sparse.to_dense(tf.sparse.reorder(g.adjacency_matrix(transpose=True, ctx=ctx)))
 
     conv = nn.GraphConv(5, out_dim, norm='none', bias=True)
     # conv = conv
@@ -74,7 +74,7 @@ def test_graph_conv(out_dim):
 
 @parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite'], exclude=['zero-degree', 'dglgraph']))
-@pytest.mark.parametrize('norm', ['none', 'both', 'right'])
+@pytest.mark.parametrize('norm', ['none', 'both', 'right', 'left'])
 @pytest.mark.parametrize('weight', [True, False])
 @pytest.mark.parametrize('bias', [True, False])
 @pytest.mark.parametrize('out_dim', [1, 2])
@@ -510,7 +510,7 @@ def test_dense_cheb_conv(out_dim):
         g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1, random_state=42))
         g = g.to(ctx)
 
-        adj = tf.sparse.to_dense(tf.sparse.reorder(g.adjacency_matrix(transpose=False, ctx=ctx)))
+        adj = tf.sparse.to_dense(tf.sparse.reorder(g.adjacency_matrix(transpose=True, ctx=ctx)))
         cheb = nn.ChebConv(5, out_dim, k, None, bias=True)
         dense_cheb = nn.DenseChebConv(5, out_dim, k, bias=True)
 

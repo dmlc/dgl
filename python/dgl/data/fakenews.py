@@ -1,13 +1,12 @@
-import torch
 import os
 import numpy as np
-import pandas as pd
 import scipy.sparse as sp
 
 from .dgl_dataset import DGLBuiltinDataset
 from .utils import save_graphs, load_graphs, _get_dgl_url
 from .utils import save_info, load_info
 from ..convert import graph
+from .. import backend as F
 
 
 class FakeNewsDataset(DGLBuiltinDataset):
@@ -20,15 +19,15 @@ class FakeNewsDataset(DGLBuiltinDataset):
     the root node represents the news, the leaf nodes are Twitter users
     who retweeted the root news. Besides, the node features are encoded
     user historical tweets using different pretrained language models:
-        bert: the 768-dimensional node feature composed of Twitter user
-              historical tweets encoded by the bert-as-service
-        content: the 310-dimensional node feature composed of a
-                 300-dimensional “spacy” vector plus a 10-dimensional
-                 “profile” vector
-        profile: the 10-dimensional node feature composed of ten Twitter
-                 user profile attributes.
-        spacy: the 300-dimensional node feature composed of Twitter user
-               historical tweets encoded by the spaCy word2vec encoder.
+
+    - bert: the 768-dimensional node feature composed of Twitter user historical tweets encoded by the bert-as-service
+    - content: the 310-dimensional node feature composed of a 300-dimensional “spacy” vector plus a 10-dimensional “profile” vector
+    - profile: the 10-dimensional node feature composed of ten Twitter user profile attributes.
+    - spacy: the 300-dimensional node feature composed of Twitter user historical tweets encoded by the spaCy word2vec encoder.
+
+    Reference: <https://github.com/safe-graph/GNN-FakeNews>
+
+    Note: this dataset is for academic use only, and commercial use is prohibited.
 
     Statistics:
 
@@ -38,27 +37,33 @@ class FakeNewsDataset(DGLBuiltinDataset):
         - Nodes: 41,054
         - Edges: 40,740
         - Classes:
-            Fake: 157
-            Real: 157
+
+            - Fake: 157
+            - Real: 157
+
         - Node feature size:
-            bert: 768
-            content: 310
-            profile: 10
-            spacy: 300
+
+            - bert: 768
+            - content: 310
+            - profile: 10
+            - spacy: 300
 
         Gossipcop:
 
-        - Graphs: 5464
+        - Graphs: 5,464
         - Nodes: 314,262
         - Edges: 308,798
         - Classes:
-            Fake: 2732
-            Real: 2732
+
+            - Fake: 2,732
+            - Real: 2,732
+
         - Node feature size:
-            bert: 768
-            content: 310
-            profile: 10
-            spacy: 300
+
+            - bert: 768
+            - content: 310
+            - profile: 10
+            - spacy: 300
 
     Parameters
     ----------
@@ -86,7 +91,7 @@ class FakeNewsDataset(DGLBuiltinDataset):
         Graph labels
     feature_name : str
         Name of the feature (bert, content, profile, or spacy)
-    feature : scipy.sparse.csr.csr_matrix
+    feature : Tensor
         Node features
     train_mask : Tensor
         Mask of training set
@@ -122,14 +127,13 @@ class FakeNewsDataset(DGLBuiltinDataset):
 
     def process(self):
         """process raw data to graph, labels and masks"""
-        self.labels = np.load(os.path.join(self.raw_path, 'graph_labels.npy'))
-        self.labels = torch.LongTensor(self.labels)
+        self.labels = F.tensor(np.load(os.path.join(self.raw_path, 'graph_labels.npy')))
         num_graphs = self.labels.shape[0]
 
         node_graph_id = np.load(os.path.join(self.raw_path, 'node_graph_id.npy'))
-        edges = pd.read_csv(os.path.join(self.raw_path, 'A.txt'), header=None)
-        src = edges[0].to_numpy()
-        dst = edges[1].to_numpy()
+        edges = np.genfromtxt(os.path.join(self.raw_path, 'A.txt'), delimiter=',', dtype=int)
+        src = edges[:, 0]
+        dst = edges[:, 1]
         g = graph((src, dst))
 
         node_idx_list = []
@@ -142,18 +146,18 @@ class FakeNewsDataset(DGLBuiltinDataset):
         train_idx = np.load(os.path.join(self.raw_path, 'train_idx.npy'))
         val_idx = np.load(os.path.join(self.raw_path, 'val_idx.npy'))
         test_idx = np.load(os.path.join(self.raw_path, 'test_idx.npy'))
-        train_mask = torch.zeros(num_graphs, dtype=torch.bool)
-        val_mask = torch.zeros(num_graphs, dtype=torch.bool)
-        test_mask = torch.zeros(num_graphs, dtype=torch.bool)
+        train_mask = np.zeros(num_graphs, dtype=np.bool)
+        val_mask = np.zeros(num_graphs, dtype=np.bool)
+        test_mask = np.zeros(num_graphs, dtype=np.bool)
         train_mask[train_idx] = True
         val_mask[val_idx] = True
         test_mask[test_idx] = True
-        self.train_mask = train_mask
-        self.val_mask = val_mask
-        self.test_mask = test_mask
+        self.train_mask = F.tensor(train_mask)
+        self.val_mask = F.tensor(val_mask)
+        self.test_mask = F.tensor(test_mask)
 
         feature_file = 'new_' + self.feature_name + '_feature.npz'
-        self.feature = sp.load_npz(os.path.join(self.raw_path, feature_file))
+        self.feature = F.tensor(sp.load_npz(os.path.join(self.raw_path, feature_file)).todense())
 
     def save(self):
         """save the graph list and the labels"""
