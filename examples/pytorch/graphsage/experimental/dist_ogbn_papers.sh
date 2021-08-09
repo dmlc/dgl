@@ -1,8 +1,8 @@
 #!/usr/bin/bash
 
 echo "Executing ogbn-papers dataset..."
-echo "Creating partitions, this might take a while as the code is sequential."
-python ../../../../python/dgl/distgnn/partition/main_Libra.py ogbn-papers100M
+#echo "Creating partitions, this might take a while as the code is sequential."
+#python ../../../../python/dgl/distgnn/partition/main_Libra.py ogbn-papers100M
 
 echo "Performing distributed runs:"
 for i in 32 64 128

@@ -1,8 +1,8 @@
 #!/usr/bin/bash
 
 echo "Processing reddit dataset"
-echo "Creating partitions, this might take a while as the code is sequential."
-python ../../../../python/dgl/distgnn/partition/main_Libra.py reddit
+#echo "Creating partitions, this might take a while as the code is sequential."
+#python ../../../../python/dgl/distgnn/partition/main_Libra.py reddit
 
 echo "Performing distributed runs:"
 for i in 2 4 8 16
