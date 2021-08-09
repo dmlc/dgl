@@ -50,7 +50,7 @@ class _EidExcluder():
     def __init__(self, exclude_eids):
         device = None
         if isinstance(exclude_eids, Mapping):
-            for k, v in exclude_eids.items():
+            for _, v in exclude_eids.items():
                 if device is None:
                     device = F.context(v)
                     break
