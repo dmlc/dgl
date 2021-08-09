@@ -15,6 +15,7 @@ from .. import backend as F
 from ..base import NID, EID, NTYPE, ETYPE, ALL, is_all
 from .kvstore import KVServer, get_kvstore
 from .._ffi.ndarray import empty_shared_mem
+from ..ndarray import exist_shared_mem_array
 from ..frame import infer_scheme
 from .partition import load_partition, load_partition_book
 from .graph_partition_book import PartitionPolicy, get_shared_mem_partition_book
@@ -116,6 +117,9 @@ def _get_shared_mem_edata(g, graph_name, name):
     dlpack = data.to_dlpack()
     return F.zerocopy_from_dlpack(dlpack)
 
+def _exist_shared_mem_array(graph_name, name):
+    return exist_shared_mem_array(_get_edata_path(graph_name, name))
+
 def _get_graph_from_shared_mem(graph_name):
     ''' Get the graph from the DistGraph server.
 
@@ -135,7 +139,7 @@ def _get_graph_from_shared_mem(graph_name):
     g.edata[EID] = _get_shared_mem_edata(g, graph_name, EID)
 
     # heterogeneous graph has ETYPE
-    if len(etypes) > 1 or len(ntypes) > 1:
+    if _exist_shared_mem_array(graph_name, ETYPE):
         g.edata[ETYPE] = _get_shared_mem_edata(g, graph_name, ETYPE)
     return g
 
