@@ -133,7 +133,10 @@ def _get_graph_from_shared_mem(graph_name):
 
     g.edata['inner_edge'] = _get_shared_mem_edata(g, graph_name, 'inner_edge')
     g.edata[EID] = _get_shared_mem_edata(g, graph_name, EID)
-    g.edata[ETYPE] = _get_shared_mem_edata(g, graph_name, ETYPE)
+
+    # heterogeneous graph has ETYPE
+    if len(etypes) > 1 or len(ntypes) > 1:
+        g.edata[ETYPE] = _get_shared_mem_edata(g, graph_name, ETYPE)
     return g
 
 NodeSpace = namedtuple('NodeSpace', ['data'])
