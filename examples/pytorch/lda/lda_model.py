@@ -62,7 +62,7 @@ class LatentDirichletAllocation:
     * prior: parameters in the Dirichlet prior; default to 1/n_components
     * lr: new_z = (1-lr)*old_z + lr*z; default to 1 for full gradients.
     * mult: multiplier for z-update; a large value effectively disables prior.
-    * device: accelerate _bayesian_weight(word_z) during initialization.
+    * device: accelerate word distribution updates.
 
     Caveat
     ---
@@ -104,6 +104,8 @@ class LatentDirichletAllocation:
 
         self.word_z = self._init((self.n_words, n_components))
         self._word_weight = _bayesian_weight(self.word_z, self.prior['word'], axis=0)
+        self._word_cT = (self.word_z + self.prior['word']).T.cumsum(1)
+        self._word_cT /= self._word_cT[:, -1:]
 
 
     def _get_word_ids(self, G):
@@ -146,6 +148,8 @@ class LatentDirichletAllocation:
                 break
             old_z = doc_data['z']
 
+        doc_data = dict(doc_data)
+        del G
         if self.verbose:
             print(f"e-step num_iters={i+1} with mean_change={mean_change:.4f}, "
                   f"perplexity={self.perplexity(G_d2w, doc_data):.4f}")
@@ -158,10 +162,10 @@ class LatentDirichletAllocation:
 
     def sample(self, doc_data, num_samples):
         doc_param = doc_data['z'] + self.prior['doc']
-        word_param = (self.word_z + self.prior['word']).to(doc_param.device)
-
         z = torch.multinomial(doc_param, num_samples, True)
-        w = torch.multinomial(word_param.T, num_samples, True)
+
+        u = torch.rand(self.n_components, num_samples, device=self.device)
+        w = torch.searchsorted(self._word_cT, u).to(z.device)
         return torch.gather(w, 0, z)
 
 
@@ -170,6 +174,8 @@ class LatentDirichletAllocation:
         mean_change is in the sense of full graph with lr=1.
         """
         G = self._prepare_graph(G.clone(), doc_data)
+        delattr(self, '_word_weight')
+        delattr(self, '_word_cT')
         word_ids = self._get_word_ids(G)
         old_z = G.nodes['word'].data['z'].to(self.device)
 
@@ -187,6 +193,8 @@ class LatentDirichletAllocation:
         del new_z
 
         self._word_weight = _bayesian_weight(self.word_z, self.prior['word'], axis=0)
+        self._word_cT = (self.word_z + self.prior['word']).T.cumsum(1)
+        self._word_cT /= self._word_cT[:, -1:]
 
         if self.verbose:
             print(f"weight_gap={1 - self._word_weight.sum(axis=0).mean():.4f}")
@@ -265,7 +273,7 @@ class LatentDirichletAllocation:
 
 if __name__ == '__main__':
     print('Testing LatentDirichletAllocation ...')
-    G = dgl.heterograph({('doc', '', 'word'): [(0, 0), (0, 3)]})
+    G = dgl.heterograph({('doc', '', 'word'): [(0, 0), (1, 3)]})
     model = LatentDirichletAllocation(G, 5, verbose=False)
     model.fit(G)
     model.transform(G)
@@ -275,11 +283,11 @@ if __name__ == '__main__':
     sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
     dataloader = dgl.dataloading.NodeDataLoader(
         G.reverse(), {'doc': np.arange(G.num_nodes('doc'))}, sampler,
-        batch_size=1024, shuffle=True, drop_last=False)
+        batch_size=1, shuffle=True, drop_last=False)
     for input_nodes, _, (block,) in dataloader:
         B = dgl.DGLHeteroGraph(
             block._graph, ['_', 'word', 'doc', '_'], block.etypes
         ).reverse()
-        B.nodes['word'].data.update(block.nodes['word'].data)
+        B.nodes['word'].data['_ID'] = block.nodes['word'].data['_ID']
         model.partial_fit(B)
     print('Testing LatentDirichletAllocation passed!')
