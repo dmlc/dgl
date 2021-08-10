@@ -24,30 +24,41 @@ import dgl
 from dgl import function as fn
 
 
-def _lbeta(alpha, axis):
-    return torch.lgamma(alpha).sum(axis) - torch.lgamma(alpha.sum(axis))
+def _logsumexp(log_q):
+    log_max = log_q.amax(1, keepdims=True) if len(log_q) else log_q
+    return (log_q - log_max).exp().sum(1, keepdims=True).log() + log_max
 
 
 def _edge_update(edges, mult=1):
     """ the Gibbs posterior distribution of z propto theta*beta.
     """
-    q = edges.src['weight'] * edges.dst['weight']
-    marg = q.sum(axis=1, keepdims=True) + np.finfo(float).eps
-    p = q / marg
+    log_q = edges.src['log_weight'] + edges.dst['log_weight']
+    log_marg = _logsumexp(log_q)
+    p = (log_q - log_marg).exp()
 
     return {
         'z': p * mult,
-        'edge_elbo': marg.squeeze(1).log() * mult,
+        'edge_elbo': log_marg.squeeze(1) * mult,
     }
 
 
-def _bayesian_weight(z, prior, axis=1):
-    """The sum is less than or equal to one according to Jensen's inequality:
-    exp(E(log(x))) <= E(x) = 1. The bound is tight when z -> inf.
+def _bayesian_log_softmax(gamma, axis=1):
+    """ Similar to log-softmax for node parameter normalization, but subject to
+    Jensen's inequality s.t. sum(exp(out)) <= 1. The bound is tight when z -> inf.
     """
-    sum = z.shape[axis] * prior + z.sum(axis, keepdims=True)
-    Elog = torch.digamma(prior + z) - torch.digamma(sum)
-    return Elog.exp()
+    return torch.digamma(gamma) - torch.digamma(gamma.sum(axis, keepdims=True))
+
+
+def _lbeta(alpha, axis):
+    """ related to node elbo based on Dirichlet distribution """
+    return torch.lgamma(alpha).sum(axis) - torch.lgamma(alpha.sum(axis))
+
+
+def _compute_word_cdf_transposed(word_lambda):
+    """ compute word_cdf_transposed (n_components, n_words) to sample words """
+    word_cdf_transposed = word_lambda.T.cumsum(1)
+    word_cdf_transposed /= word_cdf_transposed[:, -1:]
+    return word_cdf_transposed
 
 
 class LatentDirichletAllocation:
@@ -63,11 +74,6 @@ class LatentDirichletAllocation:
     * lr: new_z = (1-lr)*old_z + lr*z; default to 1 for full gradients.
     * mult: multiplier for z-update; a large value effectively disables prior.
     * device: accelerate word distribution updates.
-
-    Caveat
-    ---
-    * With a larger n_components, the prior can get too small and _bayesian_weight
-        outputs zeros. Suggest manually setting `prior={'doc': 0.1, 'word': 0.1}`.
 
     References
     ---
@@ -103,9 +109,10 @@ class LatentDirichletAllocation:
             torch.tensor(100.0, device=device),).sample
 
         self.word_z = self._init((self.n_words, n_components))
-        self._word_weight = _bayesian_weight(self.word_z, self.prior['word'], axis=0)
-        self._word_cT = (self.word_z + self.prior['word']).T.cumsum(1)
-        self._word_cT /= self._word_cT[:, -1:]
+
+        word_lambda = self.word_z + self.prior['word']
+        self._word_log_weight = _bayesian_log_softmax(word_lambda, axis=0)
+        self._word_cdf_transposed = _compute_word_cdf_transposed(word_lambda)
 
 
     def _get_word_ids(self, G):
@@ -119,15 +126,15 @@ class LatentDirichletAllocation:
         """ load or init node data; rewrite G.ndata inplace """
         if doc_data is None:
             z = self._init((G.num_nodes('doc'), self.n_components)).to(G.device)
-            weight = _bayesian_weight(z, self.prior['doc'])
-            doc_data = {'z': z, 'weight': weight}
+            log_weight = _bayesian_log_softmax(z + self.prior['doc'])
+            doc_data = {'z': z, 'log_weight': log_weight}
 
         G.nodes['doc'].data['z'] = doc_data['z']
-        G.nodes['doc'].data['weight'] = doc_data['weight']
+        G.nodes['doc'].data['log_weight'] = doc_data['log_weight']
 
         word_ids = self._get_word_ids(G)
         G.nodes['word'].data['z'] = self.word_z[word_ids].to(G.device)
-        G.nodes['word'].data['weight'] = self._word_weight[word_ids].to(G.device)
+        G.nodes['word'].data['log_weight'] = self._word_log_weight[word_ids].to(G.device)
         return G
 
 
@@ -141,7 +148,8 @@ class LatentDirichletAllocation:
         for i in range(max_iters):
             G.update_all(edge_fn, fn.sum('z', 'z'))
             doc_data = G.nodes['doc'].data
-            doc_data['weight'] = _bayesian_weight(doc_data['z'], self.prior['doc'])
+            doc_data['log_weight'] = _bayesian_log_softmax(
+                doc_data['z'] + self.prior['doc'])
 
             mean_change = (doc_data['z'] - old_z).abs().mean()
             if mean_change < mean_change_tol:
@@ -161,12 +169,13 @@ class LatentDirichletAllocation:
 
 
     def sample(self, doc_data, num_samples):
-        doc_param = doc_data['z'] + self.prior['doc']
-        z = torch.multinomial(doc_param, num_samples, True)
+        doc_device = doc_data['z'].device
+        doc_gamma = doc_data['z'] + self.prior['doc']
+        topic_ids = torch.multinomial(doc_gamma, num_samples, True)
 
         u = torch.rand(self.n_components, num_samples, device=self.device)
-        w = torch.searchsorted(self._word_cT, u).to(z.device)
-        return torch.gather(w, 0, z)
+        word_ids = torch.searchsorted(self._word_cdf_transposed, u).to(doc_device)
+        return torch.gather(word_ids, 0, topic_ids) # pick components by topic_ids
 
 
     def _m_step(self, G, doc_data):
@@ -174,8 +183,8 @@ class LatentDirichletAllocation:
         mean_change is in the sense of full graph with lr=1.
         """
         G = self._prepare_graph(G.clone(), doc_data)
-        delattr(self, '_word_weight')
-        delattr(self, '_word_cT')
+        delattr(self, '_word_log_weight')
+        delattr(self, '_word_cdf_transposed')
         word_ids = self._get_word_ids(G)
         old_z = G.nodes['word'].data['z'].to(self.device)
 
@@ -192,12 +201,12 @@ class LatentDirichletAllocation:
         self.word_z[word_ids] += self.lr * new_z.to(self.device)
         del new_z
 
-        self._word_weight = _bayesian_weight(self.word_z, self.prior['word'], axis=0)
-        self._word_cT = (self.word_z + self.prior['word']).T.cumsum(1)
-        self._word_cT /= self._word_cT[:, -1:]
-
+        word_lambda = self.word_z + self.prior['word']
+        self._word_log_weight = _bayesian_log_softmax(word_lambda, axis=0)
+        self._word_cdf_transposed = _compute_word_cdf_transposed(word_lambda)
+        del word_lambda
         if self.verbose:
-            print(f"weight_gap={1 - self._word_weight.sum(axis=0).mean():.4f}")
+            print(f"weight_gap={1 - self._word_log_weight.exp().sum(axis=0).mean():.4f}")
 
 
     def partial_fit(self, G):
@@ -230,11 +239,10 @@ class LatentDirichletAllocation:
         """
         axis = 1 if ntype=='doc' else 0
         z = ndata['z']
-        weight = ndata['weight']
-        prior = torch.tensor(self.prior[ntype], device=z.device, dtype=z.dtype)
+        prior = torch.ones_like(z[0, 0]) * self.prior[ntype]
         K = z.shape[axis]
 
-        log_evid = (z * weight.log()).sum(axis)
+        log_evid = (z * ndata['log_weight']).sum(axis)
         log_B_a = (K * torch.lgamma(prior) - torch.lgamma(K * prior))
         log_B_g = _lbeta(prior + z, axis)
         return (- log_evid - log_B_a + log_B_g).sum() / z.sum()
@@ -246,7 +254,7 @@ class LatentDirichletAllocation:
         """
         if doc_data is None:
             doc_data = self._e_step(G)
-        word_data = {'z': self.word_z, 'weight': self._word_weight}
+        word_data = {'z': self.word_z, 'log_weight': self._word_log_weight}
 
         # compute E[log p(docs | theta, beta)]
         edge_elbo = self._edge_elbo(G, doc_data).cpu().numpy()
