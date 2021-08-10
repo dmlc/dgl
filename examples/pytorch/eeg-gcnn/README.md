@@ -31,7 +31,7 @@ python main.py
 ```
 - The default model used is ```shallow_EEGGraphConvNet.py```. To use ```deep_EEGGraphConvNet.py```, run:
 ```python
-python main.py --model=deep
+python main.py --model deep
 ```
 - After the code executes, you will be able to see similar stats in performance section printed. The code will save the trained model from every epoch.
 ## Performance
