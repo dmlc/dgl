@@ -10,6 +10,8 @@ from utils import load_ogb_dataset, evaluate_hits
 from sampler import SEALData
 from model import GCN, DGCNN
 from logger import LightLogging
+import torch.multiprocessing
+torch.multiprocessing.set_sharing_strategy('file_system')
 
 '''
 Part of the code are adapted from
@@ -85,7 +87,7 @@ def main(args, print_fn=print):
                          subsample_ratio=args.subsample_ratio, use_coalesce=use_coalesce, prefix=args.dataset,
                          save_dir=args.save_dir, num_workers=args.num_workers, print_fn=print_fn)
     node_attribute = seal_data.ndata['feat']
-    edge_weight = seal_data.edata['edge_weight'].float()
+    edge_weight = seal_data.edata['weight'].float()
 
     train_data = seal_data('train')
     val_data = seal_data('valid')
