@@ -1,8 +1,10 @@
 import torch
 import numpy as np
 import math
-from dgl.data import DGLDataset
+import pandas as pd
 import dgl
+from dgl.data import DGLDataset
+from itertools import product
 
 
 class EEGGraphDataset(DGLDataset):
@@ -13,19 +15,19 @@ class EEGGraphDataset(DGLDataset):
             There are 1 x 64 edges
         y: labels (diseased/healthy)
         num_nodes: the number of nodes of the graph. In our case, it is 8.
+        indices: Patient level indices. They are used to generate edge weights.
 
         Output
         ------
         a complete 8-node DGLGraph with node features and edge weights
     """
-    def __init__(self, x, y, num_nodes, indices, transform=None):
-        # CAUTION - epochs and labels are memory-mapped, used as if they are in RAM.
-        self.epochs = x
+    def __init__(self, x, y, num_nodes, indices):
+        # CAUTION - x and labels are memory-mapped, used as if they are in RAM.
+        self.x = x
         self.labels = y
         self.indices = indices
-        self.transform = transform
         self.num_nodes = num_nodes
-        # num_sensors = num_nodes = N = 8
+
         # NOTE: this order decides the node index, keep consistent!
         self.ch_names = [
             "F7-F3",
@@ -39,6 +41,7 @@ class EEGGraphDataset(DGLDataset):
         ]
 
         # in the 10-10 system, in between the 2 10-20 electrodes in ch_names, used for calculating edge weights
+        # Note: "01" is for "P03", and "02" is for "P04."
         self.ref_names = [
             "F5",
             "F6",
@@ -46,9 +49,6 @@ class EEGGraphDataset(DGLDataset):
             "C6",
             "P5",
             "P6",
-            # CAUTION: mapping has exceptional case
-            # "PO3", # not available in standard_1010.csv, using O1
-            # "PO4"  # not available in standard_1010.csv, using O2
             "O1",
             "O2"
         ]
@@ -56,7 +56,6 @@ class EEGGraphDataset(DGLDataset):
         # edge indices source to target - 2 x E = 2 x 64
         # fully connected undirected graph so 8*8=64 edges
         self.node_ids = range(len(self.ch_names))
-        from itertools import product
         self.edge_index = torch.tensor([[a, b] for a, b in product(self.node_ids, self.node_ids)],
                                        dtype=torch.long).t().contiguous()
 
@@ -69,7 +68,6 @@ class EEGGraphDataset(DGLDataset):
 
     # sensor distances don't depend on window ID
     def get_sensor_distances(self):
-        import pandas as pd
         coords_1010 = pd.read_csv("standard_1010.tsv.txt", sep='\t')
         num_edges = self.edge_index.shape[1]
         distances = []
@@ -78,7 +76,6 @@ class EEGGraphDataset(DGLDataset):
             sensor2_idx = self.edge_index[1, edge_idx]
             dist = self.get_geodesic_distance(sensor1_idx, sensor2_idx, coords_1010)
             distances.append(dist)
-
         assert len(distances) == num_edges
         return distances
 
@@ -92,7 +89,6 @@ class EEGGraphDataset(DGLDataset):
         y1 = float(coords_1010[coords_1010.label == ref_sensor1]["y"])
         z1 = float(coords_1010[coords_1010.label == ref_sensor1]["z"])
 
-        # print(ref_sensor2, montage_sensor2_idx, coords_1010[coords_1010.label == ref_sensor2]["x"])
         x2 = float(coords_1010[coords_1010.label == ref_sensor2]["x"])
         y2 = float(coords_1010[coords_1010.label == ref_sensor2]["y"])
         z2 = float(coords_1010[coords_1010.label == ref_sensor2]["z"])
@@ -103,7 +99,7 @@ class EEGGraphDataset(DGLDataset):
         dist = r * math.acos(round(((x1 * x2) + (y1 * y2) + (z1 * z2)) / (r ** 2), 2))
         return dist
 
-    # returns size of dataset = number of epochs
+    # returns size of dataset = number of indices
     def __len__(self):
         return len(self.indices)
 
@@ -113,10 +109,10 @@ class EEGGraphDataset(DGLDataset):
             idx = idx.tolist()
 
         # map input idx (ranging from 0 to __len__() inside self.indices)
-        # to an idx in the whole dataset (inside self.epochs)
+        # to an idx in the whole dataset (inside self.x)
         # assert idx < len(self.indices)
         idx = self.indices[idx]
-        node_features = self.epochs[idx]
+        node_features = self.x[idx]
         node_features = torch.from_numpy(node_features.reshape(8, 6))
 
         # spectral coherence between 2 montage channels!

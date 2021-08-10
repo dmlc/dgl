@@ -14,7 +14,7 @@ This example is a simplified version that presents how to utilize the original E
 - DGL 0.6.1
 - numpy 1.20.2
 - Sklearn 0.24.2
-
+- pandas 1.2.4
 ## Dataset
 - Final Models, Pre-computed Features, Training Metadata can be downloaded through [FigShare](https://figshare.com/articles/software/EEG-GCNN_Supporting_Resources_for_Reproducibility/13251452).
 - In ```EEGGraphDataset.py```, we specify the channels and electrodes and use precomputed spectral coherence values to compute the edge weights. To use this example in your own advantage, please specify your channels and electrodes in ```__init__``` function of ```EEGGraphDataset.py```. Generate your own spectral coherence values.
@@ -25,11 +25,15 @@ This example is a simplified version that presents how to utilize the original E
 wget https://ndownloader.figshare.com/files/25518170
 ```
 - You will need to unzip the downloaded file.
-- Then run 
+- Then run: 
 ```python
 python main.py
 ```
-
+- The default model used is ```shallow_EEGGraphConvNet.py```. To use ```deep_EEGGraphConvNet.py```, run:
+```python
+python main.py --model=deep
+```
+- After the code executes, you will be able to see similar stats in performance section printed. The code will save the trained model from every epoch.
 ## Performance
 
 |      DGL          | AUC         | Bal. Accuracy |

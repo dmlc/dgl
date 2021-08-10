@@ -4,8 +4,7 @@ import pandas as pd
 import torch
 import torch.nn as nn
 from sklearn.model_selection import train_test_split
-from joblib import load, dump
-from deep_EEGGraphConvNet import EEGGraphConvNet
+from joblib import load
 from EEGGraphDataset import EEGGraphDataset
 from dgl.dataloading import GraphDataLoader
 from torch.utils.data import WeightedRandomSampler
@@ -24,7 +23,17 @@ if __name__ == "__main__":
     parser.add_argument('--num_epochs', type=int, default=40, help='Number of epochs used to train')
     parser.add_argument('--exp_name', type=str, default='default', help='Name for the test.')
     parser.add_argument('--batch_size', type=int, default=512, help='Batch Size. Default is 512.')
+    parser.add_argument('--model', type=str, default='shallow',
+                        help='type shallow to use shallow_EEGGraphDataset; '
+                             'type deep to use deep_EEGGraphDataset. Default is shallow')
     args = parser.parse_args()
+
+    # choose model
+    if args.model == 'shallow':
+        from shallow_EEGGraphConvNet import EEGGraphConvNet
+
+    if args.model == 'deep':
+        from deep_EEGGraphConvNet import EEGGraphConvNet
 
     # set the random seed so that we can reproduce the results
     np.random.seed(42)
@@ -81,7 +90,6 @@ if __name__ == "__main__":
     # define model, optimizer, scheduler
     model = EEGGraphConvNet(num_feats)
     loss_function = nn.CrossEntropyLoss()
-    # optimizer = torch.optim.Adam(model.parameters(), lr=0.05, betas=(0.9, 0.999), eps=1e-08, weight_decay=0.5)
     optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
     scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[i * 10 for i in range(1, 26)], gamma=0.1)
 

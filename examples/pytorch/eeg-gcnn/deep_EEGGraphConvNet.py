@@ -8,7 +8,7 @@ class EEGGraphConvNet(nn.Module):
     """ EEGGraph Convolution Net
         Parameters
         ----------
-        num_features_per_node: the number of features per node. In our case, it is 6.
+        num_feats: the number of features per node. In our case, it is 6.
     """
     def __init__(self, num_feats):
         super(EEGGraphConvNet, self).__init__()
@@ -24,33 +24,28 @@ class EEGGraphConvNet(nn.Module):
         self.fc_block3 = nn.Linear(10, 2)
 
         # Xavier initializations
-        self.fc_block1.apply(lambda x: nn.init.xavier_normal_(x.weight, gain=1) if type(x) == nn.Linear else None)
-        self.fc_block2.apply(lambda x: nn.init.xavier_normal_(x.weight, gain=1) if type(x) == nn.Linear else None)
-        self.fc_block3.apply(lambda x: nn.init.xavier_normal_(x.weight, gain=1) if type(x) == nn.Linear else None)
+        self.fc_block1.apply(lambda x: nn.init.xavier_normal_(x.weight, gain=1))
+        self.fc_block2.apply(lambda x: nn.init.xavier_normal_(x.weight, gain=1))
+        self.fc_block3.apply(lambda x: nn.init.xavier_normal_(x.weight, gain=1))
 
         self.sumpool = SumPooling()
 
     def forward(self, g, return_graph_embedding=False):
         x = g.ndata['x']
-        # edge_index = g.edata['edge_index']
         edge_weight = g.edata['edge_weights']
 
-        # x = function.leaky_relu(self.conv1(g, x, edge_weight=edge_weight), negative_slope=0.01)
         x = self.conv1(g, x, edge_weight=edge_weight)
         x = function.leaky_relu(x, negative_slope=0.01)
         x = function.dropout(x, p=0.2, training=self.training)
 
-        # x = function.leaky_relu(self.conv2(g, x, edge_weight=edge_weight))
         x = self.conv2(g, x, edge_weight=edge_weight)
         x = function.leaky_relu(x, negative_slope=0.01)
         x = function.dropout(x, p=0.2, training=self.training)
 
-        # x = function.leaky_relu(self.conv3(g, x, edge_weight=edge_weight))
         x = self.conv3(g, x, edge_weight=edge_weight)
         x = function.leaky_relu(x, negative_slope=0.01)
         x = function.dropout(x, p=0.2, training=self.training)
 
-        # x = function.leaky_relu(self.conv4_bn(self.conv4(g, x, edge_weight=edge_weight)))
         x = self.conv4(g, x, edge_weight=edge_weight)
         x = self.conv4_bn(x)
         x = function.leaky_relu(x, negative_slope=0.01)
