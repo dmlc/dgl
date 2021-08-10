@@ -403,8 +403,8 @@ def _frontier_to_heterogeneous_graph(g, frontier, gpb):
                     F.boolean_mask(dst, type_idx))
             edge_ids[etype] = F.boolean_mask(eid, type_idx)
     hg = heterograph(data_dict,
-                        {ntype: g.number_of_nodes(ntype) for ntype in g.ntypes},
-                        idtype=g.idtype)
+                     {ntype: g.number_of_nodes(ntype) for ntype in g.ntypes},
+                     idtype=g.idtype)
 
     for etype in edge_ids:
         hg.edges[etype].data[EID] = edge_ids[etype]
