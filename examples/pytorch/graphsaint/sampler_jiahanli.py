@@ -9,53 +9,85 @@ import dgl.function as fn
 import dgl
 from dgl.sampling import random_walk, pack_traces
 
-
 # The base class of sampler
-# (TODO): online sampling
-# NOTE: we have to do offline sampling for computing normalization coefficients
-class SAINTSampler(Dataset):
+class SAINTSampler:
+    """
+    Description
+    -----------
+    SAINTSampler implements the sampler described in GraphSAINT. This sampler implements offline sampling in
+    pre-sampling phase as well as fully offline sampling, fully online sampling and mixed (online and offline) sampling
+    in training phase according to the paper. Users can conveniently set params of the sampler to choose different
+    modes.
+
+    Parameters
+    ----------
+    dn : str
+        name of dataset
+    g : DGLGraph
+        the full graph
+    train_nid : list
+        ids of training nodes
+    node_budget : int
+        the expected number of nodes in each subgraph, which is specifically explained in the paper
+    num_workers : int
+        number of processes to sample subgraphs in pre-sampling procedure using torch.dataloader
+    train : bool
+        a flag specifying if the sampler is utilized in training procedure or not. Note that the sampling methods are
+        different in pre-sampling phase and training phase respectively. We have to assign this flag as False before
+        pre-sampling phase and True after pre-sampling before training.
+    num_subg_train : int, optional
+        the number of subgraphs used in training per epoch, which is equal to the number of
+        iterations in per epoch. This param can be specified by user as any number. If it's set
+        to 0 (by default), `num_subg_train = len(train_nid) / node_budget`,
+        which is how author computes num_subg_train. Defaults: 0
+    num_subg_norm : int, optional
+        the number of subgraphs sampled in pre-sampling phase for computing normalization coefficients at the beginning.
+        Actually this param is used as `__len__` of sampler in pre-sampling phase.
+        Please make sure that num_subg_norm is greater than batch_size_norm so that we can sample enough subgraphs.
+        Defaults: 10000
+    batch_size_norm : int, optional
+        the number of subgraphs sampled by each process concurrently in pre-sampling phase. This param is passed to
+        `torch.DataLoader` for utilizing parallelism to pre-sample subgraphs.
+        Defaults: 200
+    online : bool, optional
+        This param is valid only when `train` is True.
+        If `True`, we employ fully online sampling in training phase. If `False`, we firstly utilize the
+        sampled subgraphs for training then sample new subgraphs when we need more. If `tot`, we employ fully
+        offline sampling in training phase, that is, we shuffle the sampled subgraphs then extract a new one from them
+        if the sampled subgraphs are not enough for training.
+        Defaults: True
+    num_subg : int, optional
+        the expected number of sampled subgraphs in pre-sampling phase
+        It is actually the 'N' in the original paper. Note that this param is different from the num_subg_norm.
+        Defaults: 50
+
+    Notes
+    -----
+    `node_budget` is set as **the expected number of nodes in each subgraph** and `num_subg` is set as
+    **the expected number of sampled subgraphs in pre-sampling phase**. But actually, according to the codes of original
+    author of `GraphSAINT`, these two parameters do not follow the initial definitions in the paper.
+    For example, the author uses `math.ceil(self.train_g.num_nodes() / node_budget)` to limit the number of iterations
+    even if the number of nodes in each sampled subgraph is much less that `node_budget` and all nodes in the graph
+    are sampled with replacement. Moreover, the author employs `sampled_nodes < self.train_g.num_nodes() * num_subg`
+    to limit the number of sampled subgraphs in pre-sampling phase. Overall, we can treat `node_budget` and `num_subg`
+    as two parameters controling the number of subgraphs without giving them too much meaning.
+
+    For flexibility and usability, we set param `num_subg_train`. If anyone wants to change the number of sampled
+    subgraps used in training instead of being controled by `math.ceil(self.train_g.num_nodes() / node_budget)`, this
+    param can be reset.
+
+    For parallelism of pre-sampling, we utilize `torch.DataLoader` to concurrently speed up sampling.
+    The `num_subg_norm` is the return value of `__len__` in pre-sampling phase, which is used to control the number
+    of pre-sampled subgraphs together with other params. Moreover, the param `batch_size_norm` determine the batch_size
+    of `torch.DataLoader` in internal pre-sampling part. But note that if we wanna pass the SAINTSampler to
+    `torch.DataLoader` for concurrently sampling subgraphs in training phase, we need to specify `batch_size` of
+    `DataLoader`, that is, `batch_size_norm` is not related to how sampler works in training procedure.
+    """
     def __init__(self, dn, g, train_nid, node_budget, num_workers, train, num_subg_train=0, num_subg_norm=10000,
-                 batch_size_norm=200, online=False, num_repeat=50):
-        """
-        :param num_subg_train: the number of subgraphs used in training per epoch, which is equal to the number of
-                                iterations in per epoch. This param can be specified by user as any number. If it's set
-                                as 0 (by default), num_subg_train = len(train_nid) / node_budget,
-                                which is how author computes num_subg_train
-        :param num_subg_norm: the number of subgraphs sampled in advance for computing normalization coefficients.
-                                Please make sure that num_subg_norm is greater than batch_size_norm so that we can
-                                sample enough subgraphs.
-        :param dn: name of dataset
-        :param g: full graph
-        :param train_nid: ids of training nodes
-        :param node_budget: expected number of sampled nodes. Actually node_budget is the times of sampling nodes
-                            which doesn't mean we sample 6000 different nodes.
-        :param num_workers: number of processes to sample subgraphs using torch.dataloader
-        :param train: True if sampling subgraphs in training procedure
-        :param online: True if resampling new subgraphs in training procedure; False if utilizing sampled subgraphs
-                        (which are used when computing normalization coefficients) for training and sampling new
-                        subgraphs if the model need more. If online == 'tot', employ totally offline sampling, which
-                        means all subgraphs originates from sampled subgraphs
-                        This param is valid only when 'train' is True.
-        :param num_repeat: the expected number of sampled subgraphs in advance for computing normalization statistics,
-                            which is actually the 'N' in the original paper. Note that this param is different from the
-                            num_subg_norm.
-
-        The number of sampled subgraphs in advance for computing normalization statistics is actually limited by
-        len(train_nid) * num_repeat, that is, the total number of nodes in these subgraphs should be less than
-        len(train_nid) * num_repeat. However, for parallelism by torch.dataloader to speed up sampling these subgraphs,
-        we need to specify the property __len__, which actually is the maximum number of subgraphs we can sample
-        (ideally without the limit of len(train_nid) * num_repeat). So __len__ is specified as num_sub_norm when sampling
-        happens for computing normalization statistics while num_sub_train when training.
-
-        Moreover, num_subg_norm is not specified in paper and author's codes. It's introduced here for torch.dataloader.
-
-        """
-        # NOTE: In author's codes, the number of sampled subgraphs in advance for computing normalization coefficients
-        # is controlled by self.train_g.num_nodes() * num_repeat where num_repeat is the expected number of sampled
-        # subgraphs.
+                 batch_size_norm=200, online=True, num_subg=50):
         self.g = g.cpu()
         self.train_g: dgl.graph = g.subgraph(train_nid)
-        self.dn, self.num_repeat = dn, num_repeat
+        self.dn, self.num_subg = dn, num_subg
         self.node_counter = th.zeros((self.train_g.num_nodes(),))
         self.edge_counter = th.zeros((self.train_g.num_edges(),))
         self.prob = None
@@ -66,14 +98,13 @@ class SAINTSampler(Dataset):
         self.train = train
         self.online = online
         self.cnt = 0 # count the times sampled subgraphs have been fetched.
-        test = True # TODO: TEST, this flag is set so that we can test sampling time every experiment
 
         assert self.num_subg_norm >= self.batch_size_norm, "num_sub_norm should be greater than batch_size_norm"
         if self.num_subg_train == 0:
-            self.num_subg_train = math.ceil(self.train_g.num_nodes() / node_budget)  # TODO: weird!!!
-        graph_fn, norm_fn = self.__generate_fn__() # NOTE: the file to store sampled graphs and computed norms
+            self.num_subg_train = math.ceil(self.train_g.num_nodes() / node_budget)
+        graph_fn, norm_fn = self.__generate_fn__()
 
-        if os.path.exists(graph_fn) and test is False:
+        if os.path.exists(graph_fn):
             self.subgraphs = np.load(graph_fn, allow_pickle=True)
             aggr_norm, loss_norm = np.load(norm_fn, allow_pickle=True)
         else:
@@ -89,8 +120,7 @@ class SAINTSampler(Dataset):
 
             t = time.perf_counter()
             for num_nodes, subgraphs_nids, subgraphs_eids in loader:
-                # t0 = time.perf_counter()
-                # print('Sampling time consumption: {}'.format(t0 - t))
+
                 self.subgraphs.extend(subgraphs_nids)
                 sampled_nodes += num_nodes
 
@@ -99,18 +129,13 @@ class SAINTSampler(Dataset):
                 _node_counts = th.from_numpy(_node_counts)
                 self.node_counter[sampled_nodes_idx] += _node_counts
 
-                # t1 = time.perf_counter()
-                # print('Node counter time consumption: {}'.format(t1 - t0))
-
                 _subgraphs_eids, _edge_counts = np.unique(np.concatenate(subgraphs_eids), return_counts=True)
                 sampled_edges_idx = th.from_numpy(_subgraphs_eids)
                 _edge_counts = th.from_numpy(_edge_counts)
                 self.edge_counter[sampled_edges_idx] += _edge_counts
 
-                # t2 = time.perf_counter()
-                # print('Edge counter time consumption: {}'.format(t2 - t1))
-                self.N += len(subgraphs_nids) # NOTE: number of subgraphs
-                if sampled_nodes > self.train_g.num_nodes() * num_repeat:
+                self.N += len(subgraphs_nids) # number of subgraphs
+                if sampled_nodes > self.train_g.num_nodes() * num_subg:
                     break
 
             print(f'Sampling time: [{time.perf_counter() - t:.2f}s]')
@@ -123,13 +148,11 @@ class SAINTSampler(Dataset):
 
         self.train_g.ndata['l_n'] = th.Tensor(loss_norm)
         self.train_g.edata['w'] = th.Tensor(aggr_norm)
-        self.__compute_degree_norm() # NOTE: used for basically normalizing adjacent matrix
+        self.__compute_degree_norm() # basically normalizing adjacent matrix
 
         random.shuffle(self.subgraphs)
         self.__clear__()
-        # NOTE: statistics below are not accurate
         print("The number of subgraphs is: ", len(self.subgraphs))
-        print("The size of subgraphs is about: ", len(self.subgraphs[-1]))
 
     def __len__(self):
         if self.train is False:
@@ -220,16 +243,16 @@ class SAINTNodeSampler(SAINTSampler):
 
     def __generate_fn__(self):
         graph_fn = os.path.join('./subgraphs/{}_Node_{}_{}.npy'.format(self.dn, self.node_budget,
-                                                                       self.num_repeat))
+                                                                       self.num_subg))
         norm_fn = os.path.join('./subgraphs/{}_Node_{}_{}_norm.npy'.format(self.dn, self.node_budget,
-                                                                           self.num_repeat))
+                                                                           self.num_subg))
         return graph_fn, norm_fn
 
     def __sample__(self):
         if self.prob is None:
-            self.prob = self.train_g.in_degrees().float().clamp(min=1) # NOTE: clamp, clip a segment of data -jiahanli
+            self.prob = self.train_g.in_degrees().float().clamp(min=1)
 
-        sampled_nodes = th.multinomial(self.prob, num_samples=self.node_budget, replacement=True).unique() # TODO: weird? why replacement=True?
+        sampled_nodes = th.multinomial(self.prob, num_samples=self.node_budget, replacement=True).unique()
         return sampled_nodes.numpy()
 
 
@@ -240,9 +263,9 @@ class SAINTEdgeSampler(SAINTSampler):
 
     def __generate_fn__(self):
         graph_fn = os.path.join('./subgraphs/{}_Edge_{}_{}.npy'.format(self.dn, self.edge_budget,
-                                                                       self.num_repeat))
+                                                                       self.num_subg))
         norm_fn = os.path.join('./subgraphs/{}_Edge_{}_{}_norm.npy'.format(self.dn, self.edge_budget,
-                                                                           self.num_repeat))
+                                                                           self.num_subg))
         return graph_fn, norm_fn
 
     def __sample__(self):
@@ -266,9 +289,9 @@ class SAINTRandomWalkSampler(SAINTSampler):
 
     def __generate_fn__(self):
         graph_fn = os.path.join('./subgraphs/{}_RW_{}_{}_{}.npy'.format(self.dn, self.num_roots,
-                                                                        self.length, self.num_repeat))
+                                                                        self.length, self.num_subg))
         norm_fn = os.path.join('./subgraphs/{}_RW_{}_{}_{}_norm.npy'.format(self.dn, self.num_roots,
-                                                                            self.length, self.num_repeat))
+                                                                            self.length, self.num_subg))
         return graph_fn, norm_fn
 
     def __sample__(self):

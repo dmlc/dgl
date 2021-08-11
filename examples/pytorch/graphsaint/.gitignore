@@ -1,0 +1,7 @@
+data/*
+log/*
+logs/*
+subgraphs/*
+wandb/*
+*.out
+*.prof

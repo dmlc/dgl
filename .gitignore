@@ -162,10 +162,3 @@ config.cmake
 .ycm_extra_conf.py
 **.png
 
-# jiahanli
-examples/pytorch/graphsaint/data/*
-examples/pytorch/graphsaint/log/*
-examples/pytorch/graphsaint/subgraphs/*
-examples/pytorch/graphsaint/wandb/*
-*.out
-*.prof
