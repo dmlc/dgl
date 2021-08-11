@@ -247,6 +247,6 @@ def random_point_dropout(batch_pc, max_dropout_ratio=0.875):
         dropout_ratio =  np.random.random()*max_dropout_ratio # 0~0.875
         drop_idx = np.where(np.random.random((batch_pc.shape[1]))<=dropout_ratio)[0]
         if len(drop_idx)>0:
-            dropout_ratio =  np.random.random()*max_dropout_ratio # 0~0.875
+            dropout_ratio =  np.random.random()*max_dropout_ratio # 0~0.875 # not need
             batch_pc[b,drop_idx,:] = batch_pc[b,0,:] # set to the first point
     return batch_pc
