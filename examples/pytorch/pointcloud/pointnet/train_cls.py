@@ -18,6 +18,7 @@ import provider
 from ModelNetDataLoader import ModelNetDataLoader
 from pointnet_cls import PointNetCls
 from pointnet2 import PointNet2SSGCls, PointNet2MSGCls
+from point_transformer import PointTransformer
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--model', type=str, default='pointnet')
@@ -123,6 +124,8 @@ elif args.model == 'pointnet2_ssg':
     net = PointNet2SSGCls(40, batch_size, input_dims=6)
 elif args.model == 'pointnet2_msg':
     net = PointNet2MSGCls(40, batch_size, input_dims=6)
+elif args.model == "point_transformer":
+    net = PointTransformer()
 
 net = net.to(dev)
 if args.load_model_path:
