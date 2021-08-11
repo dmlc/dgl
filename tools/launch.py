@@ -444,13 +444,7 @@ def submit_jobs(args, udf_command):
     for i in range(len(hosts) * server_count_per_machine):
         ip, _ = hosts[int(i / server_count_per_machine)]
         server_env_vars_cur = f"{server_env_vars} DGL_SERVER_ID={i}"
-        # use `export` to persist env vars for entire cmd block. required if udf_command is a chain of commands
-        # also: wrap in parens to not pollute env:
-        #     https://stackoverflow.com/a/45993803
-        cmd = "(export {server_env_vars}; {udf_command})".format(
-            server_env_vars=server_env_vars_cur,
-            udf_command=udf_command,
-        )
+        cmd = wrap_cmd_with_local_envvars(udf_command, server_env_vars_cur)
         cmd = 'cd ' + str(args.workspace) + '; ' + cmd
         thread_list.append(execute_remote(cmd, ip, args.ssh_port, username=args.ssh_username))
 
@@ -477,13 +471,7 @@ def submit_jobs(args, udf_command):
             master_addr=hosts[0][0],
             master_port=1234,
         )
-        # use `export` to persist env vars for entire cmd block. required if udf_command is a chain of commands
-        # also: wrap in parens to not pollute env:
-        #     https://stackoverflow.com/a/45993803
-        cmd = "(export {client_env_vars}; {new_udf_command})".format(
-            client_env_vars=client_env_vars,
-            new_udf_command=torch_dist_udf_command,
-        )
+        cmd = wrap_cmd_with_local_envvars(torch_dist_udf_command, client_env_vars)
         cmd = 'cd ' + str(args.workspace) + '; ' + cmd
         thread_list.append(execute_remote(cmd, ip, args.ssh_port, username=args.ssh_username))
 
