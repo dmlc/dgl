@@ -17,7 +17,20 @@ This example is a simplified version that presents how to utilize the original E
 - pandas 1.2.4
 ## Dataset
 - Final Models, Pre-computed Features, Training Metadata can be downloaded through [FigShare](https://figshare.com/articles/software/EEG-GCNN_Supporting_Resources_for_Reproducibility/13251452).
-- In ```EEGGraphDataset.py```, we specify the channels and electrodes and use precomputed spectral coherence values to compute the edge weights. To use this example in your own advantage, please specify your channels and electrodes in ```__init__``` function of ```EEGGraphDataset.py```. Generate your own spectral coherence values.
+- In ```EEGGraphDataset.py```, we specify the channels and electrodes and use precomputed spectral coherence values to compute the edge weights. To use this example in your own advantage, please specify your channels and electrodes in ```__init__``` function of ```EEGGraphDataset.py```.
+- To generate spectral coherence values, please refer to [spectral_connectivity](https://mne.tools/stable/generated/mne.connectivity.spectral_connectivity.html) function in mne library. An example usage may take the following form:
+```python
+     # ....loop over all windows in dataset....
+
+        # window data is 10-second preprocessed multi-channel timeseries (shape: n_channels x n_timepoints) containing all channels in ch_names
+        window_data = np.expand_dims(window_data, axis=0)
+
+        # ch_names are listed in EEGGraphDataset.py
+        for ch_idx, ch in enumerate(ch_names):
+            # number of channels is is len(ch_names), which is 8 in our case.
+            spec_coh_values, _, _, _, _ = mne.connectivity.spectral_connectivity(data=window_data, method='coh', indices=([ch_idx]*8, range(8)), sfreq=SAMPLING_FREQ,
+                                              fmin=1.0, fmax=40.0, faverage=True, verbose=False)
+```
 ## How to Run
 - First, download ```figshare_upload/master_metadata_index.csv```, ```figshare_upload/psd_features_data_X```, ```figshare_upload/labels_y```, ```figshare_upload/psd_shallow_eeg-gcnn/spec_coh_values.npy```, and ```figshare_upload/psd_shallow_eeg-gcnn/standard_1010.tsv.txt```. Put them in the repo. <br>
 - You may download these files by running:
