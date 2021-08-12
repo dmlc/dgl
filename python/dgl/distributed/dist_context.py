@@ -204,7 +204,7 @@ def initialize(ip_config, num_servers=1, num_workers=0,
 
         Default: ``'socket'``
     num_worker_threads: int
-        The number of threads in a worker process.
+        The number of omp threads in server and worker processes.
 
     Note
     ----
@@ -226,6 +226,7 @@ def initialize(ip_config, num_servers=1, num_workers=0,
             'Please define DGL_CONF_PATH to run DistGraph server'
         formats = os.environ.get('DGL_GRAPH_FORMAT', 'csc').split(',')
         formats = [f.strip() for f in formats]
+        utils.set_num_threads(num_worker_threads)
         serv = DistGraphServer(int(os.environ.get('DGL_SERVER_ID')),
                                os.environ.get('DGL_IP_CONFIG'),
                                int(os.environ.get('DGL_NUM_SERVER')),
