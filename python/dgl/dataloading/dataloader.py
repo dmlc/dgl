@@ -60,6 +60,8 @@ class _EidExcluder():
         self._filter = None
 
         if device == F.cpu():
+            # TODO(nv-dlasalle): Once Filter is implemented for the CPU, we
+            # should just use that irregardless of the device.
             self._exclude_eids = (
                 _tensor_or_dict_to_numpy(exclude_eids) if exclude_eids is not None else None)
         else:
