@@ -55,12 +55,13 @@ def _convert_str_to_tuple_key(part_d):
                 sub_d = copy_d
                 for key in key_tuple:
                     sub_d = sub_d[key]
-                try:
-                    tuple_key = literal_eval(k)
-                    sub_d[tuple_key] = sub_d[k]
-                    sub_d.pop(k)
-                except ValueError:
-                    pass
+                if k.startswith("tuple"):
+                    try:
+                        tuple_key = literal_eval(k[5:])
+                        sub_d[tuple_key] = sub_d[k]
+                        sub_d.pop(k)
+                    except ValueError:
+                        print("Error parse: {}".format(k))
                 _recursive_convert_str_to_tuple_key(v, key_tuple+(k,))
         # return copy_d
     _recursive_convert_str_to_tuple_key(part_d)
@@ -78,7 +79,7 @@ def _convert_tuple_key_to_str(part_d):
                     sub_d = copy_d
                     for key in key_tuple:
                         sub_d = sub_d[key]
-                    sub_d[str(k)] = sub_d[k]
+                    sub_d["tuple{}".format(k)] = sub_d[k]
                     sub_d.pop(k)
                 _recursive_convert_tuple_key_to_str(v, key_tuple+(k,))
         # return copy_d

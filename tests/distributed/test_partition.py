@@ -414,5 +414,5 @@ def test_hetero_partition():
 
 if __name__ == '__main__':
     os.makedirs('/tmp/partition', exist_ok=True)
-    # test_partition()
+    test_partition()
     test_hetero_partition()
