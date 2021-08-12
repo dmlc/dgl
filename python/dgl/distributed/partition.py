@@ -49,9 +49,9 @@ def _convert_str_to_tuple_key(part_d):
     copy_d = copy.deepcopy(part_d)
     # Iterate over d, modify on copy_d
 
-    def _recursive_convert_str_to_tuple_key(d, key_tuple=tuple()):
-        if isinstance(d, dict):
-            for k, v in d.items():
+    def _recursive_convert_str_to_tuple_key(part_d, key_tuple=tuple()):
+        if isinstance(part_d, dict):
+            for k, v in part_d.items():
                 sub_d = copy_d
                 for key in key_tuple:
                     sub_d = sub_d[key]
@@ -59,7 +59,7 @@ def _convert_str_to_tuple_key(part_d):
                     tuple_key = literal_eval(k)
                     sub_d[tuple_key] = sub_d[k]
                     sub_d.pop(k)
-                except:
+                except ValueError:
                     pass
                 _recursive_convert_str_to_tuple_key(v, key_tuple+(k,))
         # return copy_d
@@ -67,13 +67,13 @@ def _convert_str_to_tuple_key(part_d):
     return copy_d
 
 
-def _convert_tuple_key_to_str(d):
-    copy_d = copy.deepcopy(d)
+def _convert_tuple_key_to_str(part_d):
+    copy_d = copy.deepcopy(part_d)
     # Iterate over d, modify on copy_d
 
-    def _recursive_convert_tuple_key_to_str(d, key_tuple=tuple()):
-        if isinstance(d, dict):
-            for k, v in d.items():
+    def _recursive_convert_tuple_key_to_str(part_d, key_tuple=tuple()):
+        if isinstance(part_d, dict):
+            for k, v in part_d.items():
                 if isinstance(k, tuple):
                     sub_d = copy_d
                     for key in key_tuple:
@@ -82,7 +82,7 @@ def _convert_tuple_key_to_str(d):
                     sub_d.pop(k)
                 _recursive_convert_tuple_key_to_str(v, key_tuple+(k,))
         # return copy_d
-    _recursive_convert_tuple_key_to_str(d)
+    _recursive_convert_tuple_key_to_str(part_d)
     return copy_d
 
 
