@@ -3,8 +3,10 @@
 import json
 import os
 import time
+import copy
 import numpy as np
 
+from ast import literal_eval
 from .. import backend as F
 from ..base import NID, EID, NTYPE, ETYPE, dgl_warning
 from ..convert import to_homogeneous
@@ -41,6 +43,45 @@ def _get_part_ranges(id_ranges):
                 start = end
         res[key] = np.concatenate([np.array(l) for l in id_ranges[key]]).reshape(-1, 2)
     return res
+
+def _convert_str_to_tuple_key(d):
+    copy_d = copy.deepcopy(d)
+    # Iterate over d, modify on copy_d
+
+    def _recursive_convert_str_to_tuple_key(d, key_tuple=tuple()):
+        if isinstance(d, dict):
+            for k, v in d.items():
+                sub_d = copy_d
+                for key in key_tuple:
+                    sub_d = sub_d[key]
+                try:
+                    tuple_key = literal_eval(k)
+                    sub_d[tuple_key] = sub_d[k]
+                    sub_d.pop(k)
+                except:
+                    pass
+                _recursive_convert_str_to_tuple_key(v, key_tuple+(k,))
+        # return copy_d
+    _recursive_convert_str_to_tuple_key(d)
+    return copy_d
+
+def _convert_tuple_key_to_str(d):
+    copy_d = copy.deepcopy(d)
+    # Iterate over d, modify on copy_d
+    def _recursive_convert_tuple_key_to_str(d, key_tuple=tuple()):
+        if isinstance(d, dict):
+            for k, v in d.items():
+                if isinstance(k, tuple):
+                    sub_d = copy_d
+                    for key in key_tuple:
+                        sub_d = sub_d[key]
+                    sub_d[str(k)] = sub_d[k]
+                    sub_d.pop(k)
+                _recursive_convert_tuple_key_to_str(v, key_tuple+(k,))
+        # return copy_d
+    _recursive_convert_tuple_key_to_str(d)
+    return copy_d
+
 
 def load_partition(part_config, part_id):
     ''' Load data of a partition from the data path.
@@ -83,7 +124,7 @@ def load_partition(part_config, part_id):
     relative_to_config = lambda path: os.path.join(config_path, path)
 
     with open(part_config) as conf_f:
-        part_metadata = json.load(conf_f)
+        part_metadata = _convert_str_to_tuple_key(json.load(conf_f))
     assert 'part-{}'.format(part_id) in part_metadata, "part-{} does not exist".format(part_id)
     part_files = part_metadata['part-{}'.format(part_id)]
     assert 'node_feats' in part_files, "the partition does not contain node features."
@@ -160,7 +201,7 @@ def load_partition_book(part_config, part_id, graph=None):
         The edge types
     '''
     with open(part_config) as conf_f:
-        part_metadata = json.load(conf_f)
+        part_metadata = _convert_str_to_tuple_key(json.load(conf_f))
     assert 'num_parts' in part_metadata, 'num_parts does not exist.'
     assert part_metadata['num_parts'] > part_id, \
             'part {} is out of range (#parts: {})'.format(part_id, part_metadata['num_parts'])
@@ -241,7 +282,7 @@ def _get_orig_ids(g, sim_g, reshuffle, orig_nids, orig_eids):
     -------
     tensor or dict of tensors, tensor or dict of tensors
     '''
-    is_hetero = len(g.etypes) > 1 or len(g.ntypes) > 1
+    is_hetero = len(g.canonical_etypes) > 1 or len(g.ntypes) > 1
     if reshuffle and is_hetero:
         # Get the type IDs
         orig_ntype = F.gather_row(sim_g.ndata[NTYPE], orig_nids)
@@ -252,13 +293,13 @@ def _get_orig_ids(g, sim_g, reshuffle, orig_nids, orig_eids):
         orig_nids = {ntype: F.boolean_mask(orig_nids, orig_ntype == g.get_ntype_id(ntype)) \
                 for ntype in g.ntypes}
         orig_eids = {etype: F.boolean_mask(orig_eids, orig_etype == g.get_etype_id(etype)) \
-                for etype in g.etypes}
+                for etype in g.canonical_etypes}
     elif not reshuffle and not is_hetero:
         orig_nids = F.arange(0, sim_g.number_of_nodes())
         orig_eids = F.arange(0, sim_g.number_of_edges())
     elif not reshuffle:
         orig_nids = {ntype: F.arange(0, g.number_of_nodes(ntype)) for ntype in g.ntypes}
-        orig_eids = {etype: F.arange(0, g.number_of_edges(etype)) for etype in g.etypes}
+        orig_eids = {etype: F.arange(0, g.number_of_edges(etype)) for etype in g.canonical_etypes}
     return orig_nids, orig_eids
 
 def _set_trainer_ids(g, sim_g, node_parts):
@@ -275,7 +316,7 @@ def _set_trainer_ids(g, sim_g, node_parts):
     node_parts : tensor
         The node partition ID for each node in `sim_g`.
     '''
-    if len(g.etypes) == 1:
+    if len(g.canonical_etypes) == 1:
         g.ndata['trainer_id'] = node_parts
         # An edge is assigned to a partition based on its destination node.
         g.edata['trainer_id'] = F.gather_row(node_parts, g.edges()[1])
@@ -286,10 +327,11 @@ def _set_trainer_ids(g, sim_g, node_parts):
             trainer_id = F.zeros((len(orig_nid),), F.dtype(node_parts), F.cpu())
             F.scatter_row_inplace(trainer_id, orig_nid, F.boolean_mask(node_parts, type_idx))
             g.nodes[ntype].data['trainer_id'] = trainer_id
-        for _, etype, dst_type in g.canonical_etypes:
+        for src_type, etype, dst_type in g.canonical_etypes:
             # An edge is assigned to a partition based on its destination node.
-            trainer_id = F.gather_row(g.nodes[dst_type].data['trainer_id'], g.edges(etype=etype)[1])
-            g.edges[etype].data['trainer_id'] = trainer_id
+            trainer_id = F.gather_row(g.nodes[dst_type].data['trainer_id'], g.edges(etype=(src_type, etype, dst_type))[1])
+            g.edges[(src_type, etype, dst_type)].data['trainer_id'] = trainer_id
+
 
 def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method="metis",
                     reshuffle=True, balance_ntypes=None, balance_edges=False, return_mapping=False,
@@ -497,7 +539,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     ...                                 'output/test.json', 0)
     '''
     def get_homogeneous(g, balance_ntypes):
-        if len(g.etypes) == 1:
+        if len(g.canonical_etypes) == 1:
             sim_g = to_homogeneous(g)
             if isinstance(balance_ntypes, dict):
                 assert len(balance_ntypes) == 1
@@ -597,7 +639,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     # NTYPE: the node type.
     # orig_id: the global node IDs in the homogeneous version of input graph.
     # NID: the global node IDs in the reshuffled homogeneous version of the input graph.
-    if len(g.etypes) > 1:
+    if len(g.canonical_etypes) > 1:
         if reshuffle:
             for name in parts:
                 orig_ids = parts[name].ndata['orig_id']
@@ -627,7 +669,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                                              parts[name].edata['inner_edge'] == 1)
                 inner_eids = F.boolean_mask(parts[name].edata[EID],
                                             parts[name].edata['inner_edge'] == 1)
-                for etype in g.etypes:
+                for etype in g.canonical_etypes:
                     inner_etype_mask = inner_etype == g.get_etype_id(etype)
                     typed_eids = np.sort(F.asnumpy(F.boolean_mask(inner_eids, inner_etype_mask)))
                     assert np.all(typed_eids == np.arange(int(typed_eids[0]),
@@ -677,7 +719,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                                                 int(F.as_scalar(inner_nids[-1])) + 1])
                 val = np.cumsum(val).tolist()
                 assert val[-1] == g.number_of_nodes(ntype)
-            for etype in g.etypes:
+            for etype in g.canonical_etypes:
                 etype_id = g.get_etype_id(etype)
                 val = []
                 edge_map_val[etype] = []
@@ -698,7 +740,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                 inner_nids = F.boolean_mask(parts[0].ndata[NID], inner_node_mask)
                 node_map_val[ntype] = [[int(F.as_scalar(inner_nids[0])),
                                         int(F.as_scalar(inner_nids[-1])) + 1]]
-            for etype in g.etypes:
+            for etype in g.canonical_etypes:
                 etype_id = g.get_etype_id(etype)
                 inner_edge_mask = _get_inner_edge_mask(parts[0], etype_id)
                 inner_eids = F.boolean_mask(parts[0].edata[EID], inner_edge_mask)
@@ -715,7 +757,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
 
     start = time.time()
     ntypes = {ntype:g.get_ntype_id(ntype) for ntype in g.ntypes}
-    etypes = {etype:g.get_etype_id(etype) for etype in g.etypes}
+    etypes = {etype: g.get_etype_id(etype) for etype in g.canonical_etypes}
     part_metadata = {'graph_name': graph_name,
                      'num_nodes': g.number_of_nodes(),
                      'num_edges': g.number_of_edges(),
@@ -757,13 +799,13 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                     node_feats[ntype + '/' + name] = F.gather_row(g.nodes[ntype].data[name],
                                                                   local_nodes)
 
-            for etype in g.etypes:
+            for etype in g.canonical_etypes:
                 etype_id = g.get_etype_id(etype)
                 edata_name = 'orig_id' if reshuffle else EID
                 inner_edge_mask = _get_inner_edge_mask(part, etype_id)
                 # This is global edge IDs.
                 local_edges = F.boolean_mask(part.edata[edata_name], inner_edge_mask)
-                if len(g.etypes) > 1:
+                if len(g.canonical_etypes) > 1:
                     local_edges = F.gather_row(sim_g.edata[EID], local_edges)
                     print('part {} has {} edges of type {} and {} are inside the partition'.format(
                         part_id, F.as_scalar(F.sum(part.edata[ETYPE] == etype_id, 0)),
@@ -776,7 +818,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                 for name in g.edges[etype].data:
                     if name in [EID, 'inner_edge']:
                         continue
-                    edge_feats[etype + '/' + name] = F.gather_row(g.edges[etype].data[name],
+                    edge_feats['{}/{}'.format(etype, name)] = F.gather_row(g.edges[etype].data[name],
                                                                   local_edges)
         else:
             for ntype in g.ntypes:
@@ -797,8 +839,8 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                                                                       local_nodes)
                     else:
                         node_feats[ntype + '/' + name] = g.nodes[ntype].data[name]
-            for etype in g.etypes:
-                if reshuffle and len(g.etypes) > 1:
+            for etype in g.canonical_etypes:
+                if reshuffle and len(g.canonical_etypes) > 1:
                     edata_name = 'orig_id'
                     etype_id = g.get_etype_id(etype)
                     inner_edge_mask = _get_inner_edge_mask(part, etype_id)
@@ -811,12 +853,12 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                     if name in [EID, 'inner_edge']:
                         continue
                     if reshuffle:
-                        edge_feats[etype + '/' + name] = F.gather_row(g.edges[etype].data[name],
+                        edge_feats['{}/{}'.format(etype, name)] = F.gather_row(g.edges[etype].data[name],
                                                                       local_edges)
                     else:
-                        edge_feats[etype + '/' + name] = g.edges[etype].data[name]
+                        edge_feats['{}/{}'.format(etype, name)] = g.edges[etype].data[name]
         # Some adjustment for heterogeneous graphs.
-        if len(g.etypes) > 1:
+        if len(g.canonical_etypes) > 1:
             part.ndata['orig_id'] = F.gather_row(sim_g.ndata[NID], part.ndata['orig_id'])
             part.edata['orig_id'] = F.gather_row(sim_g.edata[EID], part.edata['orig_id'])
 
@@ -835,7 +877,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         save_graphs(part_graph_file, [part])
 
     with open('{}/{}.json'.format(out_path, graph_name), 'w') as outfile:
-        json.dump(part_metadata, outfile, sort_keys=True, indent=4)
+        json.dump(_convert_tuple_key_to_str(part_metadata), outfile, sort_keys=True, indent=4)
     print('Save partitions: {:.3f} seconds'.format(time.time() - start))
 
     num_cuts = sim_g.number_of_edges() - tot_num_inner_edges

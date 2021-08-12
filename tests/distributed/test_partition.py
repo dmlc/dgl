@@ -51,18 +51,31 @@ def create_random_hetero():
         edges[etype] = (arr.row, arr.col)
     return dgl.heterograph(edges, num_nodes)
 
+def create_duplicate_etype_name_hetero():
+    num_nodes = {'n1': 1000, 'n2': 1010, 'n3': 1020}
+    etypes = [('n1', 'r1', 'n2'),
+              ('n1', 'r1', 'n3'),
+              ('n2', 'r3', 'n3')]
+    edges = {}
+    for etype in etypes:
+        src_ntype, _, dst_ntype = etype
+        arr = spsp.random(num_nodes[src_ntype], num_nodes[dst_ntype], density=0.001, format='coo',
+                          random_state=100)
+        edges[etype] = (arr.row, arr.col)
+    return dgl.heterograph(edges, num_nodes)
+
 def verify_hetero_graph(g, parts):
     num_nodes = {ntype:0 for ntype in g.ntypes}
-    num_edges = {etype:0 for etype in g.etypes}
+    num_edges = {etype:0 for etype in g.canonical_etypes}
     for part in parts:
         assert len(g.ntypes) == len(F.unique(part.ndata[dgl.NTYPE]))
-        assert len(g.etypes) == len(F.unique(part.edata[dgl.ETYPE]))
+        assert len(g.canonical_etypes) == len(F.unique(part.edata[dgl.ETYPE]))
         for ntype in g.ntypes:
             ntype_id = g.get_ntype_id(ntype)
             inner_node_mask = _get_inner_node_mask(part, ntype_id)
             num_inner_nodes = F.sum(F.astype(inner_node_mask, F.int64), 0)
             num_nodes[ntype] += num_inner_nodes
-        for etype in g.etypes:
+        for etype in g.canonical_etypes:
             etype_id = g.get_etype_id(etype)
             inner_edge_mask = _get_inner_edge_mask(part, etype_id)
             num_inner_edges = F.sum(F.astype(inner_edge_mask, F.int64), 0)
@@ -72,12 +85,12 @@ def verify_hetero_graph(g, parts):
         print('node {}: {}, {}'.format(ntype, g.number_of_nodes(ntype), num_nodes[ntype]))
         assert g.number_of_nodes(ntype) == num_nodes[ntype]
     # Verify the number of edges are correct.
-    for etype in g.etypes:
+    for etype in g.canonical_etypes:
         print('edge {}: {}, {}'.format(etype, g.number_of_edges(etype), num_edges[etype]))
         assert g.number_of_edges(etype) == num_edges[etype]
 
     nids = {ntype:[] for ntype in g.ntypes}
-    eids = {etype:[] for etype in g.etypes}
+    eids = {etype:[] for etype in g.canonical_etypes}
     for part in parts:
         src, dst, eid = part.edges(form='all')
         orig_src = F.gather_row(part.ndata['orig_id'], src)
@@ -85,7 +98,7 @@ def verify_hetero_graph(g, parts):
         orig_eid = F.gather_row(part.edata['orig_id'], eid)
         etype_arr = F.gather_row(part.edata[dgl.ETYPE], eid)
         eid_type = F.gather_row(part.edata[dgl.EID], eid)
-        for etype in g.etypes:
+        for etype in g.canonical_etypes:
             etype_id = g.get_etype_id(etype)
             src1 = F.boolean_mask(orig_src, etype_arr == etype_id)
             dst1 = F.boolean_mask(orig_dst, etype_arr == etype_id)
@@ -140,7 +153,7 @@ def verify_graph_feats(g, gpb, part, node_feats, edge_feats):
             ndata = F.gather_row(node_feats[ntype + '/' + name], local_nids)
             assert np.all(F.asnumpy(ndata == true_feats))
 
-    for etype in g.etypes:
+    for etype in g.canonical_etypes:
         etype_id = g.get_etype_id(etype)
         inner_edge_mask = _get_inner_edge_mask(part, etype_id)
         inner_eids = F.boolean_mask(part.edata[dgl.EID],inner_edge_mask)
@@ -156,24 +169,24 @@ def verify_graph_feats(g, gpb, part, node_feats, edge_feats):
             if name in [dgl.EID, 'inner_edge']:
                 continue
             true_feats = F.gather_row(g.edges[etype].data[name], orig_id)
-            edata = F.gather_row(edge_feats[etype + '/' + name], local_eids)
+            edata = F.gather_row(edge_feats['{}/{}'.format(etype, name)], local_eids)
             assert np.all(F.asnumpy(edata == true_feats))
 
 def check_hetero_partition(hg, part_method, num_parts=4, num_trainers_per_machine=1):
     hg.nodes['n1'].data['labels'] = F.arange(0, hg.number_of_nodes('n1'))
     hg.nodes['n1'].data['feats'] = F.tensor(np.random.randn(hg.number_of_nodes('n1'), 10), F.float32)
-    hg.edges['r1'].data['feats'] = F.tensor(np.random.randn(hg.number_of_edges('r1'), 10), F.float32)
-    hg.edges['r1'].data['labels'] = F.arange(0, hg.number_of_edges('r1'))
+    hg.edges[('n1', 'r1', 'n2')].data['feats'] = F.tensor(np.random.randn(hg.number_of_edges(('n1', 'r1', 'n2')), 10), F.float32)
+    hg.edges[('n1', 'r1', 'n2')].data['labels'] = F.arange(0, hg.number_of_edges(('n1', 'r1', 'n2')))
     num_hops = 1
 
     orig_nids, orig_eids = partition_graph(hg, 'test', num_parts, '/tmp/partition', num_hops=num_hops,
                                            part_method=part_method, reshuffle=True, return_mapping=True,
                                            num_trainers_per_machine=num_trainers_per_machine)
     assert len(orig_nids) == len(hg.ntypes)
-    assert len(orig_eids) == len(hg.etypes)
+    assert len(orig_eids) == len(hg.canonical_etypes)
     for ntype in hg.ntypes:
         assert len(orig_nids[ntype]) == hg.number_of_nodes(ntype)
-    for etype in hg.etypes:
+    for etype in hg.canonical_etypes:
         assert len(orig_eids[etype]) == hg.number_of_edges(etype)
     parts = []
     shuffled_labels = []
@@ -187,8 +200,8 @@ def check_hetero_partition(hg, part_method, num_parts=4, num_trainers_per_machin
                 part_ids = F.floor_div(node_feats[name], num_trainers_per_machine)
                 assert np.all(F.asnumpy(part_ids) == i)
 
-            for etype in hg.etypes:
-                name = etype + '/trainer_id'
+            for etype in hg.canonical_etypes:
+                name = str(etype) + '/trainer_id'
                 assert name in edge_feats
                 part_ids = F.floor_div(edge_feats[name], num_trainers_per_machine)
                 assert np.all(F.asnumpy(part_ids) == i)
@@ -204,7 +217,7 @@ def check_hetero_partition(hg, part_method, num_parts=4, num_trainers_per_machin
         dst_ntype_ids, part_dst_ids = gpb.map_to_per_ntype(part_dst_ids)
         etype_ids, part_eids = gpb.map_to_per_etype(part_eids)
         # These are original per-type IDs.
-        for etype_id, etype in enumerate(hg.etypes):
+        for etype_id, etype in enumerate(hg.canonical_etypes):
             part_src_ids1 = F.boolean_mask(part_src_ids, etype_ids == etype_id)
             src_ntype_ids1 = F.boolean_mask(src_ntype_ids, etype_ids == etype_id)
             part_dst_ids1 = F.boolean_mask(part_dst_ids, etype_ids == etype_id)
@@ -224,7 +237,7 @@ def check_hetero_partition(hg, part_method, num_parts=4, num_trainers_per_machin
         verify_graph_feats(hg, gpb, part_g, node_feats, edge_feats)
 
         shuffled_labels.append(node_feats['n1/labels'])
-        shuffled_elabels.append(edge_feats['r1/labels'])
+        shuffled_elabels.append(edge_feats["('n1', 'r1', 'n2')/labels"])
     verify_hetero_graph(hg, parts)
 
     shuffled_labels = F.asnumpy(F.cat(shuffled_labels, 0))
@@ -232,9 +245,9 @@ def check_hetero_partition(hg, part_method, num_parts=4, num_trainers_per_machin
     orig_labels = np.zeros(shuffled_labels.shape, dtype=shuffled_labels.dtype)
     orig_elabels = np.zeros(shuffled_elabels.shape, dtype=shuffled_elabels.dtype)
     orig_labels[F.asnumpy(orig_nids['n1'])] = shuffled_labels
-    orig_elabels[F.asnumpy(orig_eids['r1'])] = shuffled_elabels
+    orig_elabels[F.asnumpy(orig_eids[('n1', 'r1', 'n2')])] = shuffled_elabels
     assert np.all(orig_labels == F.asnumpy(hg.nodes['n1'].data['labels']))
-    assert np.all(orig_elabels == F.asnumpy(hg.edges['r1'].data['labels']))
+    assert np.all(orig_elabels == F.asnumpy(hg.edges[('n1', 'r1', 'n2')].data['labels']))
 
 def check_partition(g, part_method, reshuffle, num_parts=4, num_trainers_per_machine=1):
     g.ndata['labels'] = F.arange(0, g.number_of_nodes())
@@ -259,8 +272,8 @@ def check_partition(g, part_method, reshuffle, num_parts=4, num_trainers_per_mac
                 part_ids = F.floor_div(node_feats[name], num_trainers_per_machine)
                 assert np.all(F.asnumpy(part_ids) == i)
 
-            for etype in g.etypes:
-                name = etype + '/trainer_id'
+            for etype in g.canonical_etypes:
+                name = str(etype) + '/trainer_id'
                 assert name in edge_feats
                 part_ids = F.floor_div(edge_feats[name], num_trainers_per_machine)
                 assert np.all(F.asnumpy(part_ids) == i)
@@ -392,9 +405,14 @@ def test_hetero_partition():
     check_hetero_partition(hg, 'metis', 1, 8)
     check_hetero_partition(hg, 'metis', 4, 8)
     check_hetero_partition(hg, 'random')
+    hg = create_duplicate_etype_name_hetero()
+    check_hetero_partition(hg, 'metis')
+    check_hetero_partition(hg, 'metis', 1, 8)
+    check_hetero_partition(hg, 'metis', 4, 8)
+    check_hetero_partition(hg, 'random')
 
 
 if __name__ == '__main__':
     os.makedirs('/tmp/partition', exist_ok=True)
-    test_partition()
+    # test_partition()
     test_hetero_partition()
