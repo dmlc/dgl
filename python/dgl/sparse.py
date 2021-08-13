@@ -187,7 +187,6 @@ def _gspmm_hetero(g, op, reduce_op, u_and_e_tuple):
     gidx = g._graph
     use_u = op != 'copy_rhs'
     use_e = op != 'copy_lhs'
-
     # TODO (Israt): Add check - F.dtype(u) != F.dtype(e):
 
     # deal with scalar features.

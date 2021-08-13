@@ -242,6 +242,11 @@ def invoke_gsddmm(graph, func):
     else:
         x = alldata[func.target][func.in_field]
         op = getattr(ops, func.name)
+        if graph._graph.number_of_etypes() > 1:
+            # Convert to list as dict is unordered.
+            lhs_list = [None] * graph._graph.number_of_ntypes()
+            rhs_list = [None] * graph._graph.number_of_etypes()
+            x = data_dict_to_tuple(graph, x, func.name, lhs_list, rhs_list)
         z = op(graph, x)
     return {func.out_field : z}
 

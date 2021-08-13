@@ -149,6 +149,7 @@ class GSpMM_hetero(th.autograd.Function):
     @staticmethod
     @custom_fwd(cast_inputs=th.float16)
     def forward(ctx, g, op, reduce_op, *feats): # feats = lhs_data + rhs_data
+
         out, (argX, argY) = _gspmm_hetero(g, op, reduce_op, feats)
         ctx.backward_cache = g, op, reduce_op
         ctx.save_for_backward(*feats, argX, argY)
@@ -262,8 +263,41 @@ class GSDDMM_hetero(th.autograd.Function):
     @custom_bwd
     # TODO(Israt): Implement the backward operator
     def backward(ctx, *dZ):
-        raise NotImplementedError('Homogenized GSDDMM backward operation is not implemented.')
+        g, op, lhs_target, rhs_target = ctx.backward_cache
+        feats = ctx.saved_tensors[:-2]
+        num_ntypes = g._graph.number_of_ntypes()
+        X, Y = feats[:num_ntypes], feats[num_ntypes:]
 
+        if op != 'copy_rhs' and any([x is not None for x in X]):
+            if lhs_target in ['u', 'v']:
+                _g = g if lhs_target == 'v' else g.reverse()
+                if op in ['add', 'sub', 'copy_lhs']:
+                    dX = gspmm_hetero(_g, 'copy_rhs', 'sum', None, *dZ)
+            else:  # lhs_target == 'e'
+                if op in ['add', 'sub', 'copy_lhs']:
+                    dX = dZ
+            dX = tuple([_reduce_grad(dX[i], X[i].shape) if X[i] is not None else None
+                for i in range(len(X))])
+        else:
+            dX = tuple([None] * len(X))
+        if op != 'copy_lhs' and any([y is not None for y in Y]):
+            if rhs_target in ['u', 'v']:
+                _g = g if rhs_target == 'v' else g.reverse()
+                if op in ['add', 'sub', 'copy_rhs']:
+                    tmp_Z = tuple([_addsub(op, dZ[i]) if dZ[i] is not None else None
+                        for i in range(len(dZ))])
+                    tmp = tuple(tmp_Z)
+                    dY = gspmm_hetero(_g, 'copy_rhs', 'sum', None, *tmp_Z)
+            else:
+                if op in ['add', 'sub', 'copy_rhs']:
+                    dY = tuple([_addsub(op, dZ[i]) if dZ[i] is not None else None
+                        for i in range(len(dZ))])
+                    # dY = _addsub(op, dZ)
+            dY = tuple([_reduce_grad(dY[i], Y[i].shape) if Y[i] is not None else None
+                for i in range(len(Y))])
+        else:
+            dY = tuple([None] * len(Y))
+        return (None, None) + dX + dY + None, None
 
 class EdgeSoftmax(th.autograd.Function):
     @staticmethod
