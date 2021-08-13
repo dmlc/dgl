@@ -149,7 +149,6 @@ class GSpMM_hetero(th.autograd.Function):
     @staticmethod
     @custom_fwd(cast_inputs=th.float16)
     def forward(ctx, g, op, reduce_op, *feats): # feats = lhs_data + rhs_data
-
         out, (argX, argY) = _gspmm_hetero(g, op, reduce_op, feats)
         ctx.backward_cache = g, op, reduce_op
         ctx.save_for_backward(*feats, argX, argY)
@@ -261,10 +260,10 @@ class GSDDMM_hetero(th.autograd.Function):
 
     @staticmethod
     @custom_bwd
-    # TODO(Israt): Implement the backward operator
+    # TODO(Israt): Implement the complete backward operator
     def backward(ctx, *dZ):
         g, op, lhs_target, rhs_target = ctx.backward_cache
-        feats = ctx.saved_tensors[:-2]
+        feats = ctx.saved_tensors
         num_ntypes = g._graph.number_of_ntypes()
         X, Y = feats[:num_ntypes], feats[num_ntypes:]
 
@@ -272,7 +271,7 @@ class GSDDMM_hetero(th.autograd.Function):
             if lhs_target in ['u', 'v']:
                 _g = g if lhs_target == 'v' else g.reverse()
                 if op in ['add', 'sub', 'copy_lhs']:
-                    dX = gspmm_hetero(_g, 'copy_rhs', 'sum', None, *dZ)
+                    dX = gspmm_hetero(_g, 'copy_rhs', 'sum', *(tuple(X + dZ)))
             else:  # lhs_target == 'e'
                 if op in ['add', 'sub', 'copy_lhs']:
                     dX = dZ
@@ -297,7 +296,7 @@ class GSDDMM_hetero(th.autograd.Function):
                 for i in range(len(Y))])
         else:
             dY = tuple([None] * len(Y))
-        return (None, None) + dX + dY + None, None
+        return (None, None, None, None) + dX + dY
 
 class EdgeSoftmax(th.autograd.Function):
     @staticmethod

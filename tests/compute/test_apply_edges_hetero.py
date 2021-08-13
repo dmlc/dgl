@@ -62,7 +62,7 @@ def test_unary_copy_u(idtype):
             [g.apply_edges(fn.copy_u('h', 'm'), etype = rel)
                 for rel in g.canonical_etypes]
             r1 = g['plays'].edata['m']
-            F.backward(r1, F.randn(r1.shape))
+            F.backward(r1, F.ones(r1.shape))
             n_grad1 = F.grad(g.ndata['h']['user'])
         # TODO (Israt): clear not working
         g.edata['m'].clear()
@@ -73,9 +73,8 @@ def test_unary_copy_u(idtype):
 
         g.apply_edges(fn.copy_u('h', 'm'))
         r2 = g['plays'].edata['m']
-        # TODO: Fix backward
-        # F.backward(r2, F.randn(r2.shape))
-        # n_grad2 = F.grad(g.nodes['user'].data['h'])
+        F.backward(r2, F.ones(r2.shape))
+        n_grad2 = F.grad(g.nodes['user'].data['h'])
 
         # correctness check
         def _print_error(a, b):
@@ -86,10 +85,10 @@ def test_unary_copy_u(idtype):
         if not F.allclose(r1, r2):
             _print_error(r1, r2)
         assert F.allclose(r1, r2)
-        # if not F.allclose(n_grad1, n_grad2):
-        #     print('node grad')
-        #     _print_error(n_grad1, n_grad2)
-        # assert(F.allclose(n_grad1, n_grad2))
+        if not F.allclose(n_grad1, n_grad2):
+            print('node grad')
+            _print_error(n_grad1, n_grad2)
+        assert(F.allclose(n_grad1, n_grad2))
 
     _test(fn.copy_u, fn.sum)
     # TODO(Israt) :Add reduce func to suport the following reduce op
