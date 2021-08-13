@@ -48,8 +48,8 @@ def main(args):
     # load sampler
 
     kwargs = {
-        'dn': args.dataset, 'g': g, 'train_nid': train_nid, 'num_workers': args.num_workers, 'train': False,
-        'num_subg_train': args.num_subg_train, 'num_subg_norm': args.num_subg_norm,
+        'dn': args.dataset, 'g': g, 'train_nid': train_nid, 'num_workers_sampler': args.num_workers_sampler,
+        'train': False, 'num_subg_train': args.num_subg_train, 'num_subg_norm': args.num_subg_norm,
         'batch_size_norm': args.batch_size_norm, 'online': args.online, 'num_subg': args.num_subg
     }
 
@@ -64,7 +64,7 @@ def main(args):
 
     saint_sampler.train = True
     loader = DataLoader(saint_sampler, collate_fn=saint_sampler.__collate_fn__, batch_size=1,
-                        shuffle=True, num_workers=0, drop_last=False)
+                        shuffle=True, num_workers=args.num_workers, drop_last=False)
 
     # set device for dataset tensors
     if args.gpu < 0:

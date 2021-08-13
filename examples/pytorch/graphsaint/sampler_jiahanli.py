@@ -29,7 +29,7 @@ class SAINTSampler:
         ids of training nodes
     node_budget : int
         the expected number of nodes in each subgraph, which is specifically explained in the paper
-    num_workers : int
+    num_workers_sampler : int
         number of processes to sample subgraphs in pre-sampling procedure using torch.dataloader
     train : bool
         a flag specifying if the sampler is utilized in training procedure or not. Note that the sampling methods are
@@ -83,7 +83,7 @@ class SAINTSampler:
     `torch.DataLoader` for concurrently sampling subgraphs in training phase, we need to specify `batch_size` of
     `DataLoader`, that is, `batch_size_norm` is not related to how sampler works in training procedure.
     """
-    def __init__(self, dn, g, train_nid, node_budget, num_workers, train, num_subg_train=0, num_subg_norm=10000,
+    def __init__(self, dn, g, train_nid, node_budget, num_workers_sampler, train, num_subg_train=0, num_subg_norm=10000,
                  batch_size_norm=200, online=True, num_subg=50):
         self.g = g.cpu()
         self.train_g: dgl.graph = g.subgraph(train_nid)
@@ -94,7 +94,7 @@ class SAINTSampler:
         self.num_subg_train = num_subg_train
         self.num_subg_norm = num_subg_norm
         self.batch_size_norm = batch_size_norm
-        self.num_workers = num_workers
+        self.num_workers_sampler = num_workers_sampler
         self.train = train
         self.online = online
         self.cnt = 0 # count the times sampled subgraphs have been fetched.
@@ -115,8 +115,8 @@ class SAINTSampler:
             # N: the number of subgraphs sampled in __init__
 
             # Employ parallelism to speed up the sampling procedure
-            loader = DataLoader(self, batch_size=self.batch_size_norm, shuffle=True, num_workers=self.num_workers,
-                                collate_fn=self.__collate_fn__, drop_last=False)
+            loader = DataLoader(self, batch_size=self.batch_size_norm, shuffle=True,
+                                num_workers=self.num_workers_sampler, collate_fn=self.__collate_fn__, drop_last=False)
 
             t = time.perf_counter()
             for num_nodes, subgraphs_nids, subgraphs_eids in loader:
@@ -168,7 +168,8 @@ class SAINTSampler:
                 subgraph = self.__sample__()
                 return dgl.node_subgraph(self.train_g, subgraph)
             else:
-                if self.cnt < len(self.subgraphs):
+                # if self.cnt < len(self.subgraphs):
+                if self.cnt < self.__len__(): # NOTE: change here ppi_n2
                     self.cnt += 1
                     return dgl.node_subgraph(self.train_g, self.subgraphs[self.cnt-1])
                 elif self.online == 'tot':
