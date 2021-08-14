@@ -169,7 +169,7 @@ class SAINTSampler:
                 return dgl.node_subgraph(self.train_g, subgraph)
             else:
                 # if self.cnt < len(self.subgraphs):
-                if self.cnt < self.__len__(): # NOTE: change here ppi_n2
+                if self.cnt < self.__len__():
                     self.cnt += 1
                     return dgl.node_subgraph(self.train_g, self.subgraphs[self.cnt-1])
                 elif self.online == 'tot':
