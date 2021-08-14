@@ -401,8 +401,8 @@ class BinaryReduce(th.autograd.Function):
     def backward(ctx, grad_out):
         reducer, binary_op, graph, lhs, rhs, lhs_map, rhs_map, out_map, \
             feat_shape, degs = ctx.backward_cache
-        ctx.backward_cache = None
         lhs_data, rhs_data, out_data = ctx.saved_tensors
+        ctx.backward_cache, ctx.saved_tensors = None, None
         lhs_data_nd = zerocopy_to_dgl_ndarray(lhs_data)
         rhs_data_nd = zerocopy_to_dgl_ndarray(rhs_data)
         out_data_nd = zerocopy_to_dgl_ndarray(out_data)
@@ -479,8 +479,8 @@ class CopyReduce(th.autograd.Function):
     @staticmethod
     def backward(ctx, grad_out):
         reducer, graph, target, in_map, out_map, degs = ctx.backward_cache
-        ctx.backward_cache = None
         in_data, out_data = ctx.saved_tensors
+        ctx.backward_cache, ctx.saved_tensors = None, None
         in_data_nd = zerocopy_to_dgl_ndarray(in_data)
         out_data_nd = zerocopy_to_dgl_ndarray(out_data)
         grad_in = None
