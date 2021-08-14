@@ -119,7 +119,7 @@ def dtype(input):
 
 
 def ndim(input):
-    return input.ndim
+    return len(input.shape)
 
 
 def context(input):
