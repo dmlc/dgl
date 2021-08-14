@@ -96,8 +96,8 @@ class GSpMM(th.autograd.Function):
     @custom_bwd
     def backward(ctx, dZ):
         gidx, op, reduce_op = ctx.backward_cache
+        ctx.backward_cache = None
         X, Y, argX, argY = ctx.saved_tensors
-        ctx.backward_cache, ctx.saved_tensors = None, None
         if op != 'copy_rhs' and ctx.needs_input_grad[3]:
             g_rev = gidx.reverse()
             if reduce_op == 'sum':
@@ -159,10 +159,10 @@ class GSpMM_hetero(th.autograd.Function):
     @custom_bwd
     def backward(ctx, *dZ):
         g, op, reduce_op = ctx.backward_cache
+        ctx.backward_cache = None
         feats = ctx.saved_tensors[:-2]
         argX = ctx.saved_tensors[-2]
         argY = ctx.saved_tensors[-1]
-        ctx.backward_cache, ctx.saved_tensors = None, None
         num_ntypes = g._graph.number_of_ntypes()
         X, Y = feats[:num_ntypes], feats[num_ntypes:]
 
@@ -203,8 +203,8 @@ class GSDDMM(th.autograd.Function):
     @custom_bwd
     def backward(ctx, dZ):
         gidx, op, lhs_target, rhs_target = ctx.backward_cache
+        ctx.backward_cache = None
         X, Y = ctx.saved_tensors
-        ctx.backward_cache, ctx.saved_tensors = None, None
         if op != 'copy_rhs' and ctx.needs_input_grad[2]:
             if lhs_target in ['u', 'v']:
                 _gidx = gidx if lhs_target == 'v' else gidx.reverse()
@@ -317,8 +317,8 @@ class EdgeSoftmax(th.autograd.Function):
             return grad_score.data
         """
         gidx = ctx.backward_cache
+        ctx.backward_cache = None
         out, = ctx.saved_tensors
-        ctx.backward_cache, ctx.saved_tensors = None, None
         sds = out * grad_out
         accum = gspmm(gidx, 'copy_rhs', 'sum', None, sds)
         grad_score = sds - gsddmm(gidx, 'mul', out, accum, 'e', 'v')
@@ -338,8 +338,8 @@ class SegmentReduce(th.autograd.Function):
     @custom_bwd
     def backward(ctx, dy):
         op = ctx.backward_cache
+        ctx.backward_cache = None
         arg, offsets = ctx.saved_tensors
-        ctx.backward_cache, ctx.saved_tensors = None, None
         m = offsets[-1].item()
         if op == 'sum':
             offsets = offsets[1:]
@@ -367,7 +367,6 @@ class ScatterAdd(th.autograd.Function):
     @custom_bwd
     def backward(ctx, dy):
         idx = ctx.saved_tensors
-        ctx.saved_tensors = None
         return dy[idx], None, None
 
 
@@ -386,8 +385,8 @@ class CSRMM(th.autograd.Function):
     def backward(ctx, dnrows, dncols, dC_indptr, dC_indices, dC_eids, dC_weights):
         # Only the last argument is meaningful.
         gidxA, gidxB, gidxC = ctx.backward_cache
+        ctx.backward_cache = None
         A_weights, B_weights = ctx.saved_tensors
-        ctx.backward_cache, ctx.saved_tensors = None, None
         dgidxA, dA_weights = csrmm(
             gidxC, dC_weights, gidxB.reverse(), B_weights, gidxA.number_of_ntypes())
         dgidxB, dB_weights = csrmm(
