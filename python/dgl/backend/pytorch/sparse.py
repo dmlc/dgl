@@ -101,7 +101,7 @@ class GSpMM(th.autograd.Function):
     @custom_bwd
     def backward(ctx, dZ):
         gidx, op, reduce_op = ctx.backward_cache
-        ctx.backward_cache = None
+        del ctx.backward_cache
         if op == 'copy_lhs' and reduce_op == 'sum':
             x_shape, = ctx.saved_tensors
             x_shape = th.Size(x_shape)
@@ -172,7 +172,7 @@ class GSpMM_hetero(th.autograd.Function):
     @custom_bwd
     def backward(ctx, *dZ):
         g, op, reduce_op = ctx.backward_cache
-        ctx.backward_cache = None
+        del ctx.backward_cache
         feats = ctx.saved_tensors[:-2]
         argX = ctx.saved_tensors[-2]
         argY = ctx.saved_tensors[-1]
@@ -216,7 +216,7 @@ class GSDDMM(th.autograd.Function):
     @custom_bwd
     def backward(ctx, dZ):
         gidx, op, lhs_target, rhs_target = ctx.backward_cache
-        ctx.backward_cache = None
+        del ctx.backward_cache
         X, Y = ctx.saved_tensors
         if op != 'copy_rhs' and ctx.needs_input_grad[2]:
             if lhs_target in ['u', 'v']:
@@ -330,7 +330,7 @@ class EdgeSoftmax(th.autograd.Function):
             return grad_score.data
         """
         gidx = ctx.backward_cache
-        ctx.backward_cache = None
+        del ctx.backward_cache
         out, = ctx.saved_tensors
         sds = out * grad_out
         accum = gspmm(gidx, 'copy_rhs', 'sum', None, sds)
@@ -351,7 +351,7 @@ class SegmentReduce(th.autograd.Function):
     @custom_bwd
     def backward(ctx, dy):
         op = ctx.backward_cache
-        ctx.backward_cache = None
+        del ctx.backward_cache
         arg, offsets = ctx.saved_tensors
         m = offsets[-1].item()
         if op == 'sum':
@@ -398,7 +398,7 @@ class CSRMM(th.autograd.Function):
     def backward(ctx, dnrows, dncols, dC_indptr, dC_indices, dC_eids, dC_weights):
         # Only the last argument is meaningful.
         gidxA, gidxB, gidxC = ctx.backward_cache
-        ctx.backward_cache = None
+        del ctx.backward_cache
         A_weights, B_weights = ctx.saved_tensors
         dgidxA, dA_weights = csrmm(
             gidxC, dC_weights, gidxB.reverse(), B_weights, gidxA.number_of_ntypes())
@@ -425,7 +425,7 @@ class CSRSum(th.autograd.Function):
     def backward(ctx, dnrows, dncols, dC_indptr, dC_indices, dC_eids, dC_weights):
         # Only the last argument is meaningful.
         gidxs, gidxC = ctx.backward_cache
-        ctx.backward_cache = None
+        del ctx.backward_cache
         return (None,) + tuple(csrmask(gidxC, dC_weights, gidx) for gidx in gidxs)
 
 
@@ -438,7 +438,7 @@ class CSRMask(th.autograd.Function):
     @staticmethod
     def backward(ctx, dB_weights):
         gidxA, gidxB = ctx.backward_cache
-        ctx.backward_cache = None
+        del ctx.backward_cache
         return None, csrmask(gidxB, dB_weights, gidxA), None
 
 
