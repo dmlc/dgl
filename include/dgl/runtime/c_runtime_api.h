@@ -33,7 +33,7 @@
 #endif
 
 // DGL version
-#define DGL_VERSION "0.7"
+#define DGL_VERSION "0.8"
 
 
 // DGL Runtime is DLPack compatible.
@@ -545,6 +545,16 @@ DGL_DLL int DGLStreamStreamSynchronize(int device_type,
  * \return 0 when success, -1 when failure happens.
  */
 DGL_DLL int DGLLoadTensorAdapter(const char *path);
+
+/*!
+ * \brief Pin host memory.
+ */
+int DGLArrayPinData(DGLArrayHandle handle, DLContext ctx);
+
+/*!
+ * \brief Unpin host memory.
+ */
+int DGLArrayUnpinData(DGLArrayHandle handle, DLContext ctx);
 
 /*!
  * \brief Bug report macro.
