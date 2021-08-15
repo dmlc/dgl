@@ -52,8 +52,7 @@ NDArray IndexSelectCPUFromGPU(NDArray array, IdArray index) {
       if (num_feat * sizeof(DType) < 2 * CACHE_LINE_SIZE) {
         CUDA_KERNEL_CALL(IndexSelectMultiKernel, grid, block, 0,
             thr_entry->stream, array_data, num_feat, idx_data, len, ret_data);
-      }
-      else {
+      } else {
         CUDA_KERNEL_CALL(IndexSelectMultiKernelAligned, grid, block, 0,
             thr_entry->stream, array_data, num_feat, idx_data, len, ret_data);
       }
