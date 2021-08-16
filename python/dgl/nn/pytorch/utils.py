@@ -300,8 +300,8 @@ def _row_norm(g, edge_features: torch.Tensor, eps: float) -> torch.Tensor:
     return _column_norm(reversed_g, edge_features, eps)
 
 
-def _doubly_stochastic_norm_adj(g, edge_features, eps: float) -> torch.Tensor:
-    _, p = edge_features
+def _doubly_stochastic_norm_adj(g, edge_features: torch.Tensor, eps: float) -> torch.Tensor:
+    _, p = edge_features.shape
     num_nodes = g.num_nodes()
     with g.local_scope():
         g.edata["_row_norm_e"] = _row_norm(g, edge_features, eps)
