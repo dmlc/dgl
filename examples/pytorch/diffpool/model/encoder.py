@@ -214,6 +214,8 @@ class DiffPool(nn.Module):
         #softmax + CE
         criterion = nn.CrossEntropyLoss()
         loss = criterion(pred, label)
+        for key, value in self.first_diffpool_layer.loss_log.items():
+            loss += value
         for diffpool_layer in self.diffpool_layers:
             for key, value in diffpool_layer.loss_log.items():
                 loss += value
