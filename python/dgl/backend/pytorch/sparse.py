@@ -254,7 +254,7 @@ class GSDDMM(th.autograd.Function):
         out = _gsddmm(gidx, op, X, Y, lhs_target, rhs_target)
         X_shape = X.shape if X is not None else None
         Y_shape = Y.shape if Y is not None else None
-        ctx.backward_cache = gidx, op, lhs_target, rhs_target, X.shape, Y.shape
+        ctx.backward_cache = gidx, op, lhs_target, rhs_target, X_shape, Y_shape
         req_grad_X = X.requires_grad if X is not None else False
         req_grad_Y = Y.requires_grad if Y is not None else False
         if not sddmm_cache_X(op, req_grad_X, req_grad_Y):
