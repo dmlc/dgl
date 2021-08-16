@@ -66,6 +66,8 @@ def _need_reduce_last_dim(ufeat, efeat):
     """Indicates whether to reduce the last dimension on edges
     in the backward pass of spmm,
     if so, use dot instead of mul."""
+    if ufeat is None or efeat is None:
+        return False
     ushp = ufeat.shape
     eshp = efeat.shape
     return ushp[1:-1] == eshp[1:-1] and eshp[-1] == 1 and ushp[-1] > 1
@@ -90,7 +92,7 @@ def spmm_cache_Y(binary_op, reduce_op, req_grad_X, req_grad_Y):
     """Rules to identify whether to cache Y in SpMM forward stage."""
     if binary_op != 'copy_rhs' and req_grad_X:
         if reduce_op == 'sum':
-            if binary_op in ['mul', 'and']:
+            if binary_op in ['mul', 'add']:
                 return True
         else:
             if binary_op == 'mul':
@@ -120,7 +122,11 @@ class GSpMM(th.autograd.Function):
     def forward(ctx, gidx, op, reduce_op, X, Y):
         out, (argX, argY) = _gspmm(gidx, op, reduce_op, X, Y)
         reduce_last = _need_reduce_last_dim(X, Y)
-        ctx.backward_cache = gidx, op, reduce_op, X.shape, Y.shape, X.dtype, X.device, reduce_last
+        X_shape = X.shape if X is not None else None
+        Y_shape = Y.shape if Y is not None else None
+        dtype = X.dtype if X is not None else Y.dtype
+        device = X.device if X is not None else Y.device
+        ctx.backward_cache = gidx, op, reduce_op, X_shape, Y_shape, dtype, device, reduce_last
         req_grad_X = X.requires_grad if X is not None else False
         req_grad_Y = Y.requires_grad if Y is not None else False
         if not spmm_cache_X(op, reduce_op, req_grad_X, req_grad_Y):
@@ -246,6 +252,8 @@ class GSDDMM(th.autograd.Function):
     @custom_fwd(cast_inputs=th.float16)
     def forward(ctx, gidx, op, X, Y, lhs_target, rhs_target):
         out = _gsddmm(gidx, op, X, Y, lhs_target, rhs_target)
+        X_shape = X.shape if X is not None else None
+        Y_shape = Y.shape if Y is not None else None
         ctx.backward_cache = gidx, op, lhs_target, rhs_target, X.shape, Y.shape
         req_grad_X = X.requires_grad if X is not None else False
         req_grad_Y = Y.requires_grad if Y is not None else False
@@ -281,7 +289,7 @@ class GSDDMM(th.autograd.Function):
             dX = _reduce_grad(dX, X_shape)
         else:
             dX = None
-        if op != 'copy_lhs' and ctx.needs___nput_grad[3]:
+        if op != 'copy_lhs' and ctx.needs_input_grad[3]:
             if rhs_target in ['u', 'v']:
                 _gidx = gidx if rhs_target == 'v' else gidx.reverse()
                 if op in ['add', 'copy_rhs']:
