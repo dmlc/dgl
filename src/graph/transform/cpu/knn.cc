@@ -235,19 +235,21 @@ void KdTreeKNN(const NDArray& data_points, const IdArray& data_offsets,
     KDTreeNDArrayAdapter<FloatType, IdType> kdtree(feature_size, current_data_points);
 
     // query
-    parallel_for(0, q_length, [&](IdType q) {
-      std::vector<IdType> out_buffer(k);
-      std::vector<FloatType> out_dist_buffer(k);
+    parallel_for(0, q_length, [&](IdType b, IdType e) {
+      for (auto q = b; q < e; ++q) {
+        std::vector<IdType> out_buffer(k);
+        std::vector<FloatType> out_dist_buffer(k);
 
-      auto curr_out_offset = k * q + out_offset;
-      const FloatType* q_point = current_query_pts_data + q * feature_size;
-      size_t num_matches = kdtree.GetIndex()->knnSearch(
-        q_point, k, out_buffer.data(), out_dist_buffer.data());
+        auto curr_out_offset = k * q + out_offset;
+        const FloatType* q_point = current_query_pts_data + q * feature_size;
+        size_t num_matches = kdtree.GetIndex()->knnSearch(
+            q_point, k, out_buffer.data(), out_dist_buffer.data());
 
-      for (size_t i = 0; i < num_matches; ++i) {
-        query_out[curr_out_offset] = q + q_offset;
-        data_out[curr_out_offset] = out_buffer[i] + d_offset;
-        curr_out_offset++;
+        for (size_t i = 0; i < num_matches; ++i) {
+          query_out[curr_out_offset] = q + q_offset;
+          data_out[curr_out_offset] = out_buffer[i] + d_offset;
+          curr_out_offset++;
+        }
       }
     });
   }
@@ -272,28 +274,30 @@ void BruteForceKNN(const NDArray& data_points, const IdArray& data_offsets,
 
     std::vector<FloatType> dist_buffer(k);
 
-    parallel_for(q_start, q_end, [&](IdType q_idx) {
-      std::vector<FloatType> dist_buffer(k);
-      for (IdType k_idx = 0; k_idx < k; ++k_idx) {
-        query_out[q_idx * k + k_idx] = q_idx;
-        dist_buffer[k_idx] = std::numeric_limits<FloatType>::max();
-      }
-      FloatType worst_dist = std::numeric_limits<FloatType>::max();
-
-      for (IdType d_idx = d_start; d_idx < d_end; ++d_idx) {
-        FloatType tmp_dist = EuclideanDistWithCheck<FloatType, IdType>(
-          query_points_data + q_idx * feature_size,
-          data_points_data + d_idx * feature_size,
-          feature_size, worst_dist);
-
-        if (tmp_dist == std::numeric_limits<FloatType>::max()) {
-          continue;
+    parallel_for(q_start, q_end, [&](IdType b, IdType e) {
+      for (auto q_idx = b; q_idx < e; ++q_idx) {
+        std::vector<FloatType> dist_buffer(k);
+        for (IdType k_idx = 0; k_idx < k; ++k_idx) {
+          query_out[q_idx * k + k_idx] = q_idx;
+          dist_buffer[k_idx] = std::numeric_limits<FloatType>::max();
         }
+        FloatType worst_dist = std::numeric_limits<FloatType>::max();
 
-        IdType out_offset = q_idx * k;
-        HeapInsert<FloatType, IdType>(
-          data_out + out_offset, dist_buffer.data(), d_idx, tmp_dist, k);
-        worst_dist = dist_buffer[0];
+        for (IdType d_idx = d_start; d_idx < d_end; ++d_idx) {
+          FloatType tmp_dist = EuclideanDistWithCheck<FloatType, IdType>(
+            query_points_data + q_idx * feature_size,
+            data_points_data + d_idx * feature_size,
+            feature_size, worst_dist);
+
+          if (tmp_dist == std::numeric_limits<FloatType>::max()) {
+            continue;
+          }
+
+          IdType out_offset = q_idx * k;
+          HeapInsert<FloatType, IdType>(
+            data_out + out_offset, dist_buffer.data(), d_idx, tmp_dist, k);
+          worst_dist = dist_buffer[0];
+        }
       }
     });
   }
@@ -357,22 +361,24 @@ void NNDescent(const NDArray& points, const IdArray& offsets,
     IdType segment_size = point_idx_end - point_idx_start;
 
     // random initialization
-    runtime::parallel_for(point_idx_start, point_idx_end, [&](size_t i) {
-      IdType local_idx = i - point_idx_start;
+    runtime::parallel_for(point_idx_start, point_idx_end, [&](size_t b, size_t e) {
+      for (auto i = b; i < e; ++i) {
+        IdType local_idx = i - point_idx_start;
 
-      dgl::RandomEngine::ThreadLocal()->UniformChoice<IdType>(
-        k, segment_size, neighbors + i * k, false);
+        dgl::RandomEngine::ThreadLocal()->UniformChoice<IdType>(
+          k, segment_size, neighbors + i * k, false);
 
-      for (IdType n = 0; n < k; ++n) {
-        central_nodes[i * k + n] = i;
-        neighbors[i * k + n] += point_idx_start;
-        flags[local_idx * k + n] = true;
-        neighbors_dists[local_idx * k + n] = impl::EuclideanDist<FloatType, IdType>(
-          points_data + i * feature_size,
-          points_data + neighbors[i * k + n] * feature_size,
-          feature_size);
+        for (IdType n = 0; n < k; ++n) {
+          central_nodes[i * k + n] = i;
+          neighbors[i * k + n] += point_idx_start;
+          flags[local_idx * k + n] = true;
+          neighbors_dists[local_idx * k + n] = impl::EuclideanDist<FloatType, IdType>(
+            points_data + i * feature_size,
+            points_data + neighbors[i * k + n] * feature_size,
+            feature_size);
+        }
+        impl::BuildHeap<FloatType, IdType>(neighbors + i * k, neighbors_dists + local_idx * k, k);
       }
-      impl::BuildHeap<FloatType, IdType>(neighbors + i * k, neighbors_dists + local_idx * k, k);
     });
 
     size_t num_updates = 0;
@@ -380,54 +386,58 @@ void NNDescent(const NDArray& points, const IdArray& offsets,
       num_updates = 0;
 
       // initialize candidates array as empty value
-      runtime::parallel_for(point_idx_start, point_idx_end, [&](size_t i) {
-        IdType local_idx = i - point_idx_start;
-        for (IdType c = 0; c < num_candidates; ++c) {
-          new_candidates[local_idx * num_candidates + c] = num_nodes;
-          old_candidates[local_idx * num_candidates + c] = num_nodes;
-          new_candidates_dists[local_idx * num_candidates + c] =
-            std::numeric_limits<FloatType>::max();
-          old_candidates_dists[local_idx * num_candidates + c] =
-            std::numeric_limits<FloatType>::max();
+      runtime::parallel_for(point_idx_start, point_idx_end, [&](size_t b, size_t e) {
+        for (auto i = b; i < e; ++i) {
+          IdType local_idx = i - point_idx_start;
+          for (IdType c = 0; c < num_candidates; ++c) {
+            new_candidates[local_idx * num_candidates + c] = num_nodes;
+            old_candidates[local_idx * num_candidates + c] = num_nodes;
+            new_candidates_dists[local_idx * num_candidates + c] =
+              std::numeric_limits<FloatType>::max();
+            old_candidates_dists[local_idx * num_candidates + c] =
+              std::numeric_limits<FloatType>::max();
+          }
         }
       });
 
       // randomly select neighbors as candidates
       int num_threads = omp_get_max_threads();
-      runtime::parallel_for(0, num_threads, [&](size_t tid) {
-        for (IdType i = point_idx_start; i < point_idx_end; ++i) {
-          IdType local_idx = i - point_idx_start;
-          for (IdType n = 0; n < k; ++n) {
-            IdType neighbor_idx = neighbors[i * k + n];
-            bool is_new = flags[local_idx * k + n];
-            IdType local_neighbor_idx = neighbor_idx - point_idx_start;
-            FloatType random_dist = dgl::RandomEngine::ThreadLocal()->Uniform<FloatType>();
+      runtime::parallel_for(0, num_threads, [&](size_t b, size_t e) {
+        for (auto tid = b; tid < e; ++tid) {
+          for (IdType i = point_idx_start; i < point_idx_end; ++i) {
+            IdType local_idx = i - point_idx_start;
+            for (IdType n = 0; n < k; ++n) {
+              IdType neighbor_idx = neighbors[i * k + n];
+              bool is_new = flags[local_idx * k + n];
+              IdType local_neighbor_idx = neighbor_idx - point_idx_start;
+              FloatType random_dist = dgl::RandomEngine::ThreadLocal()->Uniform<FloatType>();
 
-            if (is_new) {
-              if (local_idx % num_threads == tid) {
-                impl::HeapInsert<FloatType, IdType>(
-                  new_candidates + local_idx * num_candidates,
-                  new_candidates_dists + local_idx * num_candidates,
-                  neighbor_idx, random_dist, num_candidates, true);
-              }
-              if (local_neighbor_idx % num_threads == tid) {
-                impl::HeapInsert<FloatType, IdType>(
-                  new_candidates + local_neighbor_idx * num_candidates,
-                  new_candidates_dists + local_neighbor_idx * num_candidates,
-                  i, random_dist, num_candidates, true);
-              }
-            } else {
-              if (local_idx % num_threads == tid) {
-                impl::HeapInsert<FloatType, IdType>(
-                  old_candidates + local_idx * num_candidates,
-                  old_candidates_dists + local_idx * num_candidates,
-                  neighbor_idx, random_dist, num_candidates, true);
-              }
-              if (local_neighbor_idx % num_threads == tid) {
-                impl::HeapInsert<FloatType, IdType>(
-                  old_candidates + local_neighbor_idx * num_candidates,
-                  old_candidates_dists + local_neighbor_idx * num_candidates,
-                  i, random_dist, num_candidates, true);
+              if (is_new) {
+                if (local_idx % num_threads == tid) {
+                  impl::HeapInsert<FloatType, IdType>(
+                    new_candidates + local_idx * num_candidates,
+                    new_candidates_dists + local_idx * num_candidates,
+                    neighbor_idx, random_dist, num_candidates, true);
+                }
+                if (local_neighbor_idx % num_threads == tid) {
+                  impl::HeapInsert<FloatType, IdType>(
+                    new_candidates + local_neighbor_idx * num_candidates,
+                    new_candidates_dists + local_neighbor_idx * num_candidates,
+                    i, random_dist, num_candidates, true);
+                }
+              } else {
+                if (local_idx % num_threads == tid) {
+                  impl::HeapInsert<FloatType, IdType>(
+                    old_candidates + local_idx * num_candidates,
+                    old_candidates_dists + local_idx * num_candidates,
+                    neighbor_idx, random_dist, num_candidates, true);
+                }
+                if (local_neighbor_idx % num_threads == tid) {
+                  impl::HeapInsert<FloatType, IdType>(
+                    old_candidates + local_neighbor_idx * num_candidates,
+                    old_candidates_dists + local_neighbor_idx * num_candidates,
+                    i, random_dist, num_candidates, true);
+                }
               }
             }
           }
@@ -435,15 +445,17 @@ void NNDescent(const NDArray& points, const IdArray& offsets,
       });
 
       // mark all elements in new_candidates as false
-      runtime::parallel_for(point_idx_start, point_idx_end, [&](size_t i) {
-        IdType local_idx = i - point_idx_start;
-        for (IdType n = 0; n < k; ++n) {
-          IdType n_idx = neighbors[i * k + n];
+      runtime::parallel_for(point_idx_start, point_idx_end, [&](size_t b, size_t e) {
+        for (auto i = b; i < e; ++i) {
+          IdType local_idx = i - point_idx_start;
+          for (IdType n = 0; n < k; ++n) {
+            IdType n_idx = neighbors[i * k + n];
 
-          for (IdType c = 0; c < num_candidates; ++c) {
-            if (new_candidates[local_idx * num_candidates + c] == n_idx) {
-              flags[local_idx * k + n] = false;
-              break;
+            for (IdType c = 0; c < num_candidates; ++c) {
+              if (new_candidates[local_idx * num_candidates + c] == n_idx) {
+                flags[local_idx * k + n] = false;
+                break;
+              }
             }
           }
         }
@@ -458,48 +470,51 @@ void NNDescent(const NDArray& points, const IdArray& offsets,
         nnd_updates_t updates(block_size);
 
         // generate updates
-        runtime::parallel_for(block_start, block_end, [&](size_t i) {
-          IdType local_idx = i - point_idx_start;
-          for (IdType c1 = 0; c1 < num_candidates; ++c1) {
-            IdType new_c1 = new_candidates[local_idx * num_candidates + c1];
-            if (new_c1 == num_nodes) continue;
-            IdType c1_local = new_c1 - point_idx_start;
+        runtime::parallel_for(block_start, block_end, [&](size_t b, size_t e) {
+          for (auto i = b; i < e; ++i) {
+            IdType local_idx = i - point_idx_start;
 
-            // new-new
-            for (IdType c2 = c1; c2 < num_candidates; ++c2) {
-              IdType new_c2 = new_candidates[local_idx * num_candidates + c2];
-              if (new_c2 == num_nodes) continue;
-              IdType c2_local = new_c2 - point_idx_start;
+            for (IdType c1 = 0; c1 < num_candidates; ++c1) {
+              IdType new_c1 = new_candidates[local_idx * num_candidates + c1];
+              if (new_c1 == num_nodes) continue;
+              IdType c1_local = new_c1 - point_idx_start;
 
-              FloatType worst_c1_dist = neighbors_dists[c1_local * k];
-              FloatType worst_c2_dist = neighbors_dists[c2_local * k];
-              FloatType new_dist = impl::EuclideanDistWithCheck<FloatType, IdType>(
-                points_data + new_c1 * feature_size,
-                points_data + new_c2 * feature_size,
-                feature_size,
-                std::max(worst_c1_dist, worst_c2_dist));
+              // new-new
+              for (IdType c2 = c1; c2 < num_candidates; ++c2) {
+                IdType new_c2 = new_candidates[local_idx * num_candidates + c2];
+                if (new_c2 == num_nodes) continue;
+                IdType c2_local = new_c2 - point_idx_start;
 
-              if (new_dist < worst_c1_dist || new_dist < worst_c2_dist) {
-                updates[i - block_start].push_back(std::make_tuple(new_c1, new_c2, new_dist));
+                FloatType worst_c1_dist = neighbors_dists[c1_local * k];
+                FloatType worst_c2_dist = neighbors_dists[c2_local * k];
+                FloatType new_dist = impl::EuclideanDistWithCheck<FloatType, IdType>(
+                  points_data + new_c1 * feature_size,
+                  points_data + new_c2 * feature_size,
+                  feature_size,
+                  std::max(worst_c1_dist, worst_c2_dist));
+
+                if (new_dist < worst_c1_dist || new_dist < worst_c2_dist) {
+                  updates[i - block_start].push_back(std::make_tuple(new_c1, new_c2, new_dist));
+                }
               }
-            }
 
-            // new-old
-            for (IdType c2 = 0; c2 < num_candidates; ++c2) {
-              IdType old_c2 = old_candidates[local_idx * num_candidates + c2];
-              if (old_c2 == num_nodes) continue;
-              IdType c2_local = old_c2 - point_idx_start;
+              // new-old
+              for (IdType c2 = 0; c2 < num_candidates; ++c2) {
+                IdType old_c2 = old_candidates[local_idx * num_candidates + c2];
+                if (old_c2 == num_nodes) continue;
+                IdType c2_local = old_c2 - point_idx_start;
 
-              FloatType worst_c1_dist = neighbors_dists[c1_local * k];
-              FloatType worst_c2_dist = neighbors_dists[c2_local * k];
-              FloatType new_dist = impl::EuclideanDistWithCheck<FloatType, IdType>(
-                points_data + new_c1 * feature_size,
-                points_data + old_c2 * feature_size,
-                feature_size,
-                std::max(worst_c1_dist, worst_c2_dist));
+                FloatType worst_c1_dist = neighbors_dists[c1_local * k];
+                FloatType worst_c2_dist = neighbors_dists[c2_local * k];
+                FloatType new_dist = impl::EuclideanDistWithCheck<FloatType, IdType>(
+                  points_data + new_c1 * feature_size,
+                  points_data + old_c2 * feature_size,
+                  feature_size,
+                  std::max(worst_c1_dist, worst_c2_dist));
 
-              if (new_dist < worst_c1_dist || new_dist < worst_c2_dist) {
-                updates[i - block_start].push_back(std::make_tuple(new_c1, old_c2, new_dist));
+                if (new_dist < worst_c1_dist || new_dist < worst_c2_dist) {
+                  updates[i - block_start].push_back(std::make_tuple(new_c1, old_c2, new_dist));
+                }
               }
             }
           }

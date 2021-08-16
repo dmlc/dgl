@@ -57,10 +57,12 @@ NDArray COOIsNonZero(COOMatrix coo, NDArray row, NDArray col) {
   const int64_t row_stride = (rowlen == 1 && collen != 1) ? 0 : 1;
   const int64_t col_stride = (collen == 1 && rowlen != 1) ? 0 : 1;
   const int64_t kmax = std::max(rowlen, collen);
-  parallel_for(0, kmax, [=](size_t k) {
-    int64_t i = row_stride * k;
-    int64_t j = col_stride * k;
-    rst_data[k] = COOIsNonZero<XPU, IdType>(coo, row_data[i], col_data[j])? 1 : 0;
+  parallel_for(0, kmax, [=](size_t b, size_t e) {
+    for (auto k = b; k < e; ++k) {
+      int64_t i = row_stride * k;
+      int64_t j = col_stride * k;
+      rst_data[k] = COOIsNonZero<XPU, IdType>(coo, row_data[i], col_data[j])? 1 : 0;
+    }
   });
   return rst;
 }
@@ -180,14 +182,16 @@ IdArray COOGetData(COOMatrix coo, IdArray rows, IdArray cols) {
   //   the choice.
 
   if (coo.row_sorted) {
-    parallel_for(0, retlen, [&](size_t p) {
-      const IdType row_id = row_data[p * row_stride], col_id = col_data[p * col_stride];
-      auto it = std::lower_bound(coo_row, coo_row + nnz, row_id);
-      for (; it < coo_row + nnz && *it == row_id; ++it) {
-        const auto idx = it - coo_row;
-        if (coo_col[idx] == col_id) {
-          ret_data[p] = data? data[idx] : idx;
-          break;
+    parallel_for(0, retlen, [&](size_t b, size_t e) {
+      for (auto p = b; p < e; ++p) {
+        const IdType row_id = row_data[p * row_stride], col_id = col_data[p * col_stride];
+        auto it = std::lower_bound(coo_row, coo_row + nnz, row_id);
+        for (; it < coo_row + nnz && *it == row_id; ++it) {
+          const auto idx = it - coo_row;
+          if (coo_col[idx] == col_id) {
+            ret_data[p] = data? data[idx] : idx;
+            break;
+          }
         }
       }
     });
@@ -330,60 +334,62 @@ CSRMatrix COOToCSR(COOMatrix coo) {
 
     if (NNZ > 0) {
       auto num_threads = omp_get_max_threads();
-      parallel_for(0, num_threads, [&](int thread_id) {
-        // We partition the set the of non-zeros among the threads
-        const int64_t nz_chunk = (NNZ+num_threads-1)/num_threads;
-        const int64_t nz_start = thread_id*nz_chunk;
-        const int64_t nz_end = std::min(NNZ, nz_start+nz_chunk);
+      parallel_for(0, num_threads, [&](int b, int e) {
+        for (auto thread_id = b; thread_id < e; ++thread_id) {
+          // We partition the set the of non-zeros among the threads
+          const int64_t nz_chunk = (NNZ+num_threads-1)/num_threads;
+          const int64_t nz_start = thread_id*nz_chunk;
+          const int64_t nz_end = std::min(NNZ, nz_start+nz_chunk);
 
-        // Each thread searchs the row array for a change, and marks it's
-        // location in Bp. Threads, other than the first, start at the last
-        // index covered by the previous, in order to detect changes in the row
-        // array between thread partitions. This means that each thread after
-        // the first, searches the range [nz_start-1, nz_end). That is,
-        // if we had 10 non-zeros, and 4 threads, the indexes searched by each
-        // thread would be:
-        // 0: [0, 1, 2]
-        // 1: [2, 3, 4, 5]
-        // 2: [5, 6, 7, 8]
-        // 3: [8, 9]
-        //
-        // That way, if the row array were [0, 0, 1, 2, 2, 2, 4, 5, 5, 6], each
-        // change in row would be captured by one thread:
-        //
-        // 0: [0, 0, 1] - row 0
-        // 1: [1, 2, 2, 2] - row 1
-        // 2: [2, 4, 5, 5] - rows 2, 3, and 4
-        // 3: [5, 6] - rows 5 and 6
-        //
-        int64_t row = 0;
-        if (nz_start < nz_end) {
-          row = nz_start == 0 ? 0 : row_data[nz_start-1];
-          for (int64_t i = nz_start; i < nz_end; ++i) {
-            while (row != row_data[i]) {
-              ++row;
-              Bp[row] = i;
+          // Each thread searchs the row array for a change, and marks it's
+          // location in Bp. Threads, other than the first, start at the last
+          // index covered by the previous, in order to detect changes in the row
+          // array between thread partitions. This means that each thread after
+          // the first, searches the range [nz_start-1, nz_end). That is,
+          // if we had 10 non-zeros, and 4 threads, the indexes searched by each
+          // thread would be:
+          // 0: [0, 1, 2]
+          // 1: [2, 3, 4, 5]
+          // 2: [5, 6, 7, 8]
+          // 3: [8, 9]
+          //
+          // That way, if the row array were [0, 0, 1, 2, 2, 2, 4, 5, 5, 6], each
+          // change in row would be captured by one thread:
+          //
+          // 0: [0, 0, 1] - row 0
+          // 1: [1, 2, 2, 2] - row 1
+          // 2: [2, 4, 5, 5] - rows 2, 3, and 4
+          // 3: [5, 6] - rows 5 and 6
+          //
+          int64_t row = 0;
+          if (nz_start < nz_end) {
+            row = nz_start == 0 ? 0 : row_data[nz_start-1];
+            for (int64_t i = nz_start; i < nz_end; ++i) {
+              while (row != row_data[i]) {
+                ++row;
+                Bp[row] = i;
+              }
             }
-          }
 
-          // We will not detect the row change for the last row, nor any empty
-          // rows at the end of the matrix, so the last active thread needs
-          // mark all remaining rows in Bp with NNZ.
-          if (nz_end == NNZ) {
-            while (row < N) {
-              ++row;
-              Bp[row] = NNZ;
+            // We will not detect the row change for the last row, nor any empty
+            // rows at the end of the matrix, so the last active thread needs
+            // mark all remaining rows in Bp with NNZ.
+            if (nz_end == NNZ) {
+              while (row < N) {
+                ++row;
+                Bp[row] = NNZ;
+              }
             }
-          }
 
-          if (fill_data) {
-            // TODO(minjie): Many of our current implementation assumes that CSR must have
-            //   a data array. This is a temporary workaround. Remove this after:
-            //   - The old immutable graph implementation is deprecated.
-            //   - The old binary reduce kernel is deprecated.
-            std::iota(fill_data+nz_start,
-                      fill_data+nz_end,
-                      nz_start);
+            if (fill_data) {
+              // TODO(minjie): Many of our current implementation assumes that CSR must have
+              //   a data array. This is a temporary workaround. Remove this after:
+              //   - The old immutable graph implementation is deprecated.
+              //   - The old binary reduce kernel is deprecated.
+              std::iota(fill_data+nz_start,
+                        fill_data+nz_end,
+                        nz_start);
+            }
           }
         }
       });
@@ -625,9 +631,11 @@ COOMatrix COOReorder(COOMatrix coo, runtime::NDArray new_row_id_arr,
   IdType *out_row = static_cast<IdType*>(out_row_arr->data);
   IdType *out_col = static_cast<IdType*>(out_col_arr->data);
 
-  parallel_for(0, nnz, [=](size_t i) {
-    out_row[i] = new_row_ids[in_rows[i]];
-    out_col[i] = new_col_ids[in_cols[i]];
+  parallel_for(0, nnz, [=](size_t b, size_t e) {
+    for (auto i = b; i < e; ++i) {
+      out_row[i] = new_row_ids[in_rows[i]];
+      out_col[i] = new_col_ids[in_cols[i]];
+    }
   });
   return COOMatrix(num_rows, num_cols, out_row_arr, out_col_arr, out_data_arr);
 }

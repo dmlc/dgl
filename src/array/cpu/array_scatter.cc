@@ -40,8 +40,10 @@ void Scatter_(IdArray index, NDArray value, NDArray out) {
   const IdType* idx = index.Ptr<IdType>();
   const DType* val = value.Ptr<DType>();
   DType* outd = out.Ptr<DType>();
-  runtime::parallel_for(0, len, [&](size_t i) {
-    outd[idx[i]] = val[i];
+  runtime::parallel_for(0, len, [&](size_t b, size_t e) {
+    for (auto i = b; i < e; ++i) {
+      outd[idx[i]] = val[i];
+    }
   });
 }
 

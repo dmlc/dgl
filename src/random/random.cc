@@ -23,8 +23,10 @@ DGL_REGISTER_GLOBAL("rng._CAPI_SetSeed")
 .set_body([] (DGLArgs args, DGLRetValue *rv) {
     const int seed = args[0];
 
-    runtime::parallel_for(0, omp_get_max_threads(), [&](size_t i) {
-      RandomEngine::ThreadLocal()->SetSeed(seed);
+    runtime::parallel_for(0, omp_get_max_threads(), [&](size_t b, size_t e) {
+      for (auto i = b; i < e; ++i) {
+        RandomEngine::ThreadLocal()->SetSeed(seed);
+      }
     });
 #ifdef DGL_USE_CUDA
     auto* thr_entry = CUDAThreadEntry::ThreadLocal();

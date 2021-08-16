@@ -455,13 +455,15 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
                                       DLContext{kDLCPU, 0});
   char* return_data = static_cast<char*>(res_tensor->data);
   // Copy local data
-  parallel_for(0, local_ids.size(), [&](size_t i) {
-    CHECK_GE(ID_size*row_size, local_ids_orginal[i]*row_size+row_size);
-    CHECK_GE(data_size, local_ids[i] * row_size + row_size);
-    CHECK_GE(local_ids[i], 0);
-    memcpy(return_data + local_ids_orginal[i] * row_size,
-           local_data_char + local_ids[i] * row_size,
-           row_size);
+  parallel_for(0, local_ids.size(), [&](size_t b, size_t e) {
+    for (auto i = b; i < e; ++i) {
+      CHECK_GE(ID_size*row_size, local_ids_orginal[i]*row_size+row_size);
+      CHECK_GE(data_size, local_ids[i] * row_size + row_size);
+      CHECK_GE(local_ids[i], 0);
+      memcpy(return_data + local_ids_orginal[i] * row_size,
+             local_data_char + local_ids[i] * row_size,
+             row_size);
+    }
   });
   // Recv remote message
   for (int i = 0; i < msg_count; ++i) {

@@ -253,13 +253,15 @@ DGL_REGISTER_GLOBAL("partition._CAPI_DGLPartitionWithHalo_Hetero")
     ugptr->GetOutCSR();
     std::vector<std::shared_ptr<HaloHeteroSubgraph>> subgs(max_part_id + 1);
     int num_partitions = part_nodes.size();
-    runtime::parallel_for(0, num_partitions, [&](size_t i) {
-      auto nodes = aten::VecToIdArray(part_nodes[i]);
-      HaloHeteroSubgraph subg = GetSubgraphWithHalo(hgptr, nodes, num_hops);
-      std::shared_ptr<HaloHeteroSubgraph> subg_ptr(
-        new HaloHeteroSubgraph(subg));
-      int part_id = part_ids[i];
-      subgs[part_id] = subg_ptr;
+    runtime::parallel_for(0, num_partitions, [&](int b, int e) {
+      for (auto i = b; i < e; i++) {
+        auto nodes = aten::VecToIdArray(part_nodes[i]);
+        HaloHeteroSubgraph subg = GetSubgraphWithHalo(hgptr, nodes, num_hops);
+        std::shared_ptr<HaloHeteroSubgraph> subg_ptr(
+          new HaloHeteroSubgraph(subg));
+        int part_id = part_ids[i];
+        subgs[part_id] = subg_ptr;
+      }
     });
     List<HeteroSubgraphRef> ret_list;
     for (size_t i = 0; i < subgs.size(); i++) {
