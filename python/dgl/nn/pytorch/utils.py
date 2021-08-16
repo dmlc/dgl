@@ -282,3 +282,70 @@ class WeightBasis(nn.Module):
         # generate all weights from bases
         weight = th.matmul(self.w_comp, self.weight.view(self.num_bases, -1))
         return weight.view(self.num_outputs, *self.shape)
+
+
+def _column_norm(g, edge_features: torch.Tensor, eps: float) -> torch.Tensor:
+    with g.local_scope():
+        g.edata["_e"] = edge_features
+        g.update_all(fn.copy_edge("_e", 'm'), fn.sum('m', '_in_weight'))
+        degs = g.dstdata['_in_weight'] + eps
+        norm = 1.0 / degs
+        g.dstdata['_dst_in_w'] = norm
+        g.apply_edges(lambda e: {"_norm_e": e.dst['_dst_in_w'] * e.data["_e"]})
+        return g.edata["_norm_e"]
+
+
+def _row_norm(g, edge_features: torch.Tensor, eps: float) -> torch.Tensor:
+    reversed_g = reverse(g)
+    return _column_norm(reversed_g, edge_features, eps)
+
+
+def _doubly_stochastic_norm_adj(g, edge_features, eps: float) -> torch.Tensor:
+    _, p = edge_features
+    num_nodes = g.num_nodes()
+    with g.local_scope():
+        g.edata["_row_norm_e"] = _row_norm(g, edge_features, eps)
+        g.edata["_col_norm_e"] = _column_norm(g, g.edata["_row_norm_e"], eps)
+
+        # adjacency matrix for features e_tilde
+        u, v = g.all_edges(order='eid')
+        row_norm_adj = torch.zeros((num_nodes, num_nodes, p))
+        row_norm_adj[u, v] = g.edata['_row_norm_e']
+
+        # transposed adjacency matrix for features e_dot
+        column_norm_adj = torch.zeros((num_nodes, num_nodes, p))
+        # transpose by switching node order
+        column_norm_adj[v, u] = g.edata['_col_norm_e']
+
+    # put matrices in format expected by torch.bmm
+    ds_adj_matrix = torch.bmm(
+        row_norm_adj.permute(2, 0, 1), column_norm_adj.permute(2, 0, 1)
+    ).permute(1, 2, 0)
+    return ds_adj_matrix
+
+
+class TensorEdgeWeightNorm(nn.Module):
+    """
+    Description
+    -----------
+    Parameters
+    ----------
+    norm: str, optional
+        f
+
+    eps: float, optional
+        f
+
+    Example
+    -------
+    """
+
+    def __init__(self, norm='both', eps=0.):
+        super(TensorEdgeWeightNorm, self).__init__()
+        self._norm = norm
+        self._eps = eps
+
+    def forward(self, graph, edge_feature):
+        with graph.local_scope():
+            doubly_stochastic_adj = _doubly_stochastic_norm_adj(g, edge_feature, self._eps)
+            # TODO: get graph from adj matrix
