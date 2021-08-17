@@ -18,64 +18,118 @@ namespace dgl {
 namespace partition {
 namespace impl {
 
-template<typename IdType> __global__ void _MapProcByRemainder(
-    const IdType * const index,
-    const int64_t num_index,
-    const int64_t num_proc,
-    IdType * const proc_id) {
-  assert(num_index <= gridDim.x*blockDim.x);
+namespace {
+
+/**
+* @brief Kernel to map global element IDs to partition IDs by remainder.
+*
+* @tparam IdType The type of ID.
+* @param global The global element IDs.
+* @param num_elements The number of element IDs.
+* @param num_parts The number of partitions.
+* @param part_id The mapped partition ID (outupt).
+*/
+template<typename IdType>
+__global__ void _MapProcByRemainderKernel(
+    const IdType * const global,
+    const int64_t num_elements,
+    const int64_t num_parts,
+    IdType * const part_id) {
+  assert(num_elements <= gridDim.x*blockDim.x);
   const int64_t idx = blockDim.x*static_cast<int64_t>(blockIdx.x)+threadIdx.x;
 
-  if (idx < num_index) {
-    proc_id[idx] = index[idx] % num_proc;
+  if (idx < num_elements) {
+    part_id[idx] = global[idx] % num_parts;
   }
 }
 
+/**
+* @brief Kernel to map global element IDs to partition IDs, using a bit-mask.
+* The number of partitions must be a power a two.
+*
+* @tparam IdType The type of ID.
+* @param global The global element IDs.
+* @param num_elements The number of element IDs.
+* @param mask The bit-mask with 1's for each bit to keep from the element ID to
+* extract the partition ID (e.g., an 8 partition mask would be 0x07).
+* @param part_id The mapped partition ID (outupt).
+*/
 template<typename IdType>
-__global__ void _MapProcByMaskRemainder(
-    const IdType * const index,
-    const int64_t num_index,
+__global__ void _MapProcByMaskRemainderKernel(
+    const IdType * const global,
+    const int64_t num_elements,
     const IdType mask,
-    IdType * const proc_id) {
-  assert(num_index <= gridDim.x*blockDim.x);
+    IdType * const part_id) {
+  assert(num_elements <= gridDim.x*blockDim.x);
   const int64_t idx = blockDim.x*static_cast<int64_t>(blockIdx.x)+threadIdx.x;
 
-  if (idx < num_index) {
-    proc_id[idx] = index[idx] & mask;
+  if (idx < num_elements) {
+    part_id[idx] = global[idx] & mask;
   }
 }
 
+/**
+* @brief Kernel to map global element IDs to local element IDs.
+*
+* @tparam IdType The type of ID.
+* @param global The global element IDs.
+* @param num_elements The number of IDs.
+* @param num_parts The number of partitions.
+* @param local The local element IDs (output).
+*/
 template<typename IdType>
-__global__ void _MapLocalIndexByRemainder(
-    const IdType * const in,
-    IdType * const out,
-    const int64_t num_items,
-    const int comm_size) {
-  assert(num_items <= gridDim.x*blockDim.x);
+__global__ void _MapLocalIndexByRemainderKernel(
+    const IdType * const global,
+    const int64_t num_elements,
+    const int num_parts,
+    IdType * const local) {
+  assert(num_elements <= gridDim.x*blockDim.x);
   const int64_t idx = threadIdx.x+blockDim.x*blockIdx.x;
 
-  if (idx < num_items) {
-    out[idx] = in[idx] / comm_size;
+  if (idx < num_elements) {
+    local[idx] = global[idx] / num_parts;
   }
 }
 
+/**
+* @brief Kernel to map local element IDs within a partition to their global 
+* IDs, using the remainder over the number of partitions.
+*
+* @tparam IdType The type of ID.
+* @param local The local element IDs.
+* @param part_id The partition to map local elements from.
+* @param num_elements The number of elements to map.
+* @param num_parts The number of partitions.
+* @param global The global element IDs (output).
+*/
 template<typename IdType>
-__global__ void _MapGlobalIndexByRemainder(
-    const IdType * const in,
-    IdType * const out,
+__global__ void _MapGlobalIndexByRemainderKernel(
+    const IdType * const local,
     const int part_id,
-    const int64_t num_items,
-    const int comm_size) {
-  assert(num_items <= gridDim.x*blockDim.x);
+    const int64_t num_elements,
+    const int num_parts,
+    IdType * const global) {
+  assert(num_elements <= gridDim.x*blockDim.x);
   const int64_t idx = threadIdx.x+blockDim.x*blockIdx.x;
 
-  assert(part_id < comm_size);
+  assert(part_id < num_parts);
 
-  if (idx < num_items) {
-    out[idx] = (in[idx] * comm_size) + part_id;
+  if (idx < num_elements) {
+    global[idx] = (local[idx] * num_parts) + part_id;
   }
 }
 
+/**
+* @brief Device function to perform a binary search to find to which partition a
+* given ID belongs.
+*
+* @tparam RangeType The type of range.
+* @param range The prefix-sum of IDs assigned to partitions.
+* @param num_parts The number of partitions.
+* @param target The element ID to find the partition of.
+*
+* @return The partition.
+*/
 template<typename RangeType>
 __device__ RangeType _SearchRange(
     const RangeType * const range,
@@ -100,63 +154,100 @@ __device__ RangeType _SearchRange(
   return cur;
 }
 
+/**
+* @brief Kernel to map element IDs to partition IDs.
+*
+* @tparam IdType The type of element ID.
+* @tparam RangeType The type of of the range.
+* @param range The prefix-sum of IDs assigned to partitions.
+* @param global The global element IDs.
+* @param num_elements The number of element IDs.
+* @param num_parts The number of partitions.
+* @param part_id The partition ID assigned to each element (output).
+*/
 template<typename IdType, typename RangeType>
 __global__ void _MapProcByRangeKernel(
     const RangeType * const range,
-    const IdType * const index,
-    const int64_t num_index,
-    const int64_t num_proc,
-    IdType * const proc_id) {
-  assert(num_index <= gridDim.x*blockDim.x);
+    const IdType * const global,
+    const int64_t num_elements,
+    const int64_t num_parts,
+    IdType * const part_id) {
+  assert(num_elements <= gridDim.x*blockDim.x);
   const int64_t idx = blockDim.x*static_cast<int64_t>(blockIdx.x)+threadIdx.x;
 
   // rely on caching to load the range into L1 cache
-  if (idx < num_index) {
-    proc_id[idx] = static_cast<IdType>(_SearchRange(
+  if (idx < num_elements) {
+    part_id[idx] = static_cast<IdType>(_SearchRange(
         range,
-        static_cast<int>(num_proc),
-        static_cast<RangeType>(index[idx])));
+        static_cast<int>(num_parts),
+        static_cast<RangeType>(global[idx])));
   }
 }
 
+/**
+* @brief Kernel to map global element IDs to their ID within their respective
+* partition.
+*
+* @tparam IdType The type of element ID.
+* @tparam RangeType The type of the range.
+* @param range The prefix-sum of IDs assigned to partitions.
+* @param global The global element IDs.
+* @param num_elements The number of elements.
+* @param num_parts The number of partitions.
+* @param local The local element IDs (output).
+*/
 template<typename IdType, typename RangeType>
 __global__ void _MapLocalIndexByRangeKernel(
     const RangeType * const range,
-    const IdType * const in,
-    IdType * const out,
-    const int64_t num_items,
-    const int comm_size) {
-  assert(num_items <= gridDim.x*blockDim.x);
+    const IdType * const global,
+    const int64_t num_elements,
+    const int num_parts,
+    IdType * const local) {
+  assert(num_elements <= gridDim.x*blockDim.x);
   const int64_t idx = threadIdx.x+blockDim.x*blockIdx.x;
 
   // rely on caching to load the range into L1 cache
-  if (idx < num_items) {
+  if (idx < num_elements) {
     const int proc = _SearchRange(
         range,
-        static_cast<int>(comm_size),
-        static_cast<RangeType>(in[idx]));
-    out[idx] = in[idx] - range[proc];
+        static_cast<int>(num_parts),
+        static_cast<RangeType>(global[idx]));
+    local[idx] = global[idx] - range[proc];
   }
 }
 
+/**
+* @brief Kernel to map local element IDs within a partition to their global 
+* IDs.
+*
+* @tparam IdType The type of ID.
+* @tparam RangeType The type of the range.
+* @param range The prefix-sum of IDs assigend to partitions.
+* @param local The local element IDs.
+* @param part_id The partition to map local elements from.
+* @param num_elements The number of elements to map.
+* @param num_parts The number of partitions.
+* @param global The global element IDs (output).
+*/
 template<typename IdType, typename RangeType>
 __global__ void _MapGlobalIndexByRangeKernel(
     const RangeType * const range,
-    const IdType * const in,
-    IdType * const out,
+    const IdType * const local,
     const int part_id,
-    const int64_t num_items,
-    const int comm_size) {
-  assert(num_items <= gridDim.x*blockDim.x);
+    const int64_t num_elements,
+    const int num_parts,
+    IdType * const global) {
+  assert(num_elements <= gridDim.x*blockDim.x);
   const int64_t idx = threadIdx.x+blockDim.x*blockIdx.x;
 
-  assert(part_id < comm_size);
+  assert(part_id < num_parts);
 
   // rely on caching to load the range into L1 cache
-  if (idx < num_items) {
-    out[idx] = in[idx] + range[part_id];
+  if (idx < num_elements) {
+    global[idx] = local[idx] + range[part_id];
   }
 }
+}  // namespace
 
 // Remainder Based Partition Operations
 
@@ -204,14 +295,14 @@ GeneratePermutationFromRemainder(
 
     if (num_parts < (1 << part_bits)) {
       // num_parts is not a power of 2
-      CUDA_KERNEL_CALL(_MapProcByRemainder, grid, block, 0, stream,
+      CUDA_KERNEL_CALL(_MapProcByRemainderKernel, grid, block, 0, stream,
           static_cast<const IdType*>(in_idx->data),
           num_in,
           num_parts,
           proc_id_in.get());
     } else {
       // num_parts is a power of 2
-      CUDA_KERNEL_CALL(_MapProcByMaskRemainder, grid, block, 0, stream,
+      CUDA_KERNEL_CALL(_MapProcByMaskRemainderKernel, grid, block, 0, stream,
           static_cast<const IdType*>(in_idx->data),
           num_in,
           static_cast<IdType>(num_parts-1),  // bit mask
@@ -311,15 +402,15 @@ IdArray MapToLocalFromRemainder(
     const dim3 grid((global_idx->shape[0] +block.x-1)/block.x);
 
     CUDA_KERNEL_CALL(
-        _MapLocalIndexByRemainder,
+        _MapLocalIndexByRemainderKernel,
         grid,
         block,
         0,
         stream,
         static_cast<const IdType*>(global_idx->data),
-        static_cast<IdType*>(local_idx->data),
         global_idx->shape[0],
-        num_parts);
+        num_parts,
+        static_cast<IdType*>(local_idx->data));
 
     return local_idx;
   } else {
@@ -358,16 +449,16 @@ IdArray MapToGlobalFromRemainder(
     const dim3 grid((local_idx->shape[0] +block.x-1)/block.x);
 
     CUDA_KERNEL_CALL(
-        _MapGlobalIndexByRemainder,
+        _MapGlobalIndexByRemainderKernel,
         grid,
         block,
         0,
         stream,
         static_cast<const IdType*>(local_idx->data),
-        static_cast<IdType*>(global_idx->data),
         part_id,
         global_idx->shape[0],
-        num_parts);
+        num_parts,
+        static_cast<IdType*>(global_idx->data));
 
     return global_idx;
   } else {
@@ -554,9 +645,9 @@ IdArray MapToLocalFromRange(
         stream,
         static_cast<const RangeType*>(range->data),
         static_cast<const IdType*>(global_idx->data),
-        static_cast<IdType*>(local_idx->data),
         global_idx->shape[0],
-        num_parts);
+        num_parts,
+        static_cast<IdType*>(local_idx->data));
 
     return local_idx;
   } else {
@@ -616,10 +707,10 @@ IdArray MapToGlobalFromRange(
         stream,
         static_cast<const IdType*>(range->data),
         static_cast<const IdType*>(local_idx->data),
-        static_cast<IdType*>(global_idx->data),
         part_id,
         global_idx->shape[0],
-        num_parts);
+        num_parts,
+        static_cast<IdType*>(global_idx->data));
 
     return global_idx;
   } else {
