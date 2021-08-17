@@ -1,4 +1,8 @@
 #!/bin/bash
 
-nohup python -u train_sampling.py --task ppi_n >logs/test_lt/ppi/ppi_n 2>&1 &
-#python -u train_sampling.py --task ppi_n
+_dataset='ppi'
+_sampler='n'
+_task="${_dataset}_${_sampler}"
+_log="n_on"
+nohup python -u train_sampling.py --task $_task >logs/final2/$_dataset/$_log 2>&1 &
+

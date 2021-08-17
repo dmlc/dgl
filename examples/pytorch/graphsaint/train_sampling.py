@@ -49,8 +49,8 @@ def main(args):
 
     kwargs = {
         'dn': args.dataset, 'g': g, 'train_nid': train_nid, 'num_workers_sampler': args.num_workers_sampler,
-        'train': False, 'num_subg_train': args.num_subg_train, 'num_subg_norm': args.num_subg_norm,
-        'batch_size_norm': args.batch_size_norm, 'online': args.online, 'num_subg': args.num_subg
+        'train': False, 'num_subg_norm': args.num_subg_norm, 'batch_size_norm': args.batch_size_norm,
+        'online': args.online, 'num_subg': args.num_subg
     }
 
     if args.sampler == "node":
