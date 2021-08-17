@@ -192,35 +192,92 @@ class TransitionDown(nn.Module):
         return pos_res, feat_res
 
 
-# class TransitionUp(nn.Module):
-#     def __init__(self, dim1, dim2, dim_out):
-#         class SwapAxes(nn.Module):
-#             def __init__(self):
-#                 super().__init__()
+class FeaturePropagation(nn.Module):
+    """
+    The FeaturePropagation Layer
+    """
 
-#             def forward(self, x):
-#                 return x.transpose(1, 2)
+    def __init__(self, input_dims, sizes):
+        super(FeaturePropagation, self).__init__()
+        self.convs = nn.ModuleList()
+        self.bns = nn.ModuleList()
 
-#         super().__init__()
-#         self.fc1 = nn.Sequential(
-#             nn.Linear(dim1, dim_out),
-#             SwapAxes(),
-#             nn.BatchNorm1d(dim_out),  # TODO
-#             SwapAxes(),
-#             nn.ReLU(),
-#         )
-#         self.fc2 = nn.Sequential(
-#             nn.Linear(dim2, dim_out),
-#             SwapAxes(),
-#             nn.BatchNorm1d(dim_out),  # TODO
-#             SwapAxes(),
-#             nn.ReLU(),
-#         )
-#         self.fp = KNNConv([], -1)
+        sizes = [input_dims] + sizes
+        for i in range(1, len(sizes)):
+            self.convs.append(nn.Conv1d(sizes[i-1], sizes[i], 1))
+            self.bns.append(nn.BatchNorm1d(sizes[i]))
 
-#     def forward(self, xyz1, points1, xyz2, points2):
-#         feats1 = self.fc1(points1)
-#         feats2 = self.fc2(points2)
-#         feats1 = self.fp(xyz2.transpose(1, 2), xyz1.transpose(
-#             1, 2), None, feats1.transpose(1, 2)).transpose(1, 2)
-#         return feats1 + feats2
+    def forward(self, x1, x2, feat1, feat2):
+        """
+        Adapted from https://github.com/yanx27/Pointnet_Pointnet2_pytorch
+            Input:
+                x1: input points position data, [B, N, C]
+                x2: sampled input points position data, [B, S, C]
+                feat1: input points data, [B, N, D]
+                feat2: input points data, [B, S, D]
+            Return:
+                new_feat: upsampled points data, [B, D', N]
+        """
+        B, N, C = x1.shape
+        _, S, _ = x2.shape
+
+        if S == 1:
+            interpolated_feat = feat2.repeat(1, N, 1)
+        else:
+            dists = square_distance(x1, x2)
+            dists, idx = dists.sort(dim=-1)
+            dists, idx = dists[:, :, :3], idx[:, :, :3]  # [B, N, 3]
+
+            dist_recip = 1.0 / (dists + 1e-8)
+            norm = torch.sum(dist_recip, dim=2, keepdim=True)
+            weight = dist_recip / norm
+            interpolated_feat = torch.sum(index_points(
+                feat2, idx) * weight.view(B, N, 3, 1), dim=2)
+
+        if feat1 is not None:
+            new_feat = torch.cat([feat1, interpolated_feat], dim=-1)
+        else:
+            new_feat = interpolated_feat
+
+        new_feat = new_feat.permute(0, 2, 1)  # [B, D, S]
+        for i, conv in enumerate(self.convs):
+            bn = self.bns[i]
+            new_feat = F.relu(bn(conv(new_feat)))
+        return new_feat
+
+
+class TransitionUp(nn.Module):
+    """
+    The Transition Up Module
+    """
+
+    def __init__(self, dim1, dim2, dim_out):
+        class SwapAxes(nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, x):
+                return x.transpose(1, 2)
+
+        super(TransitionUp, self).__init__()
+        self.fc1 = nn.Sequential(
+            nn.Linear(dim1, dim_out),
+            SwapAxes(),
+            nn.BatchNorm1d(dim_out),  # TODO
+            SwapAxes(),
+            nn.ReLU(),
+        )
+        self.fc2 = nn.Sequential(
+            nn.Linear(dim2, dim_out),
+            SwapAxes(),
+            nn.BatchNorm1d(dim_out),  # TODO
+            SwapAxes(),
+            nn.ReLU(),
+        )
+        self.fp = FeaturePropagation(-1, [])
+
+    def forward(self, pos1, feat1, pos2, feat2):
+        h1 = self.fc1(feat1)
+        h2 = self.fc2(feat2)
+        h1 = self.fp(pos2, pos1, None, h1).transpose(1, 2)
+        return h1 + h2
