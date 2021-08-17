@@ -95,11 +95,17 @@ class PointTransformerCLS(nn.Module):
         super(PointTransformerCLS, self).__init__()
         self.backbone = PointTransformer(
             1024, batch_size, feature_dim, n_blocks, downsampling_rate, hidden_dim, transformer_dim, n_neighbors)
-        self.out_layer = nn.Linear(hidden_dim * 2 ** (n_blocks), out_classes)
+        self.out = self.fc2 = nn.Sequential(
+            nn.Linear(hidden_dim * 2 ** (n_blocks), 256),
+            nn.ReLU(),
+            nn.Linear(256, 64),
+            nn.ReLU(),
+            nn.Linear(64, out_classes)
+        )
 
     def forward(self, x):
         h, _ = self.backbone(x)
-        out = self.out_layer(torch.mean(h, dim=1))
+        out = self.out(torch.mean(h, dim=1))
         return out
 
 
