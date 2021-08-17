@@ -37,8 +37,6 @@ def create_test_heterograph(idtype):
     assert g.device == F.ctx()
     return g
 
-# def init_features(idtype):
-
 
 @parametrize_dtype
 def test_unary_copy_u(idtype):
@@ -95,6 +93,67 @@ def test_unary_copy_u(idtype):
     # _test('copy_u', 'max')
     # _test('copy_u', 'min')
     # _test('copy_u', 'mean')
+
+
+@parametrize_dtype
+def test_unary_copy_e(idtype):
+    def _test(mfunc, rfunc):
+
+        g = create_test_heterograph(idtype)
+        feat_size = 2
+
+        x1 = F.randn((4,feat_size))
+        x2 = F.randn((4,feat_size))
+        x3 = F.randn((3,feat_size))
+        x4 = F.randn((3,feat_size))
+        F.attach_grad(x1)
+        F.attach_grad(x2)
+        F.attach_grad(x3)
+        F.attach_grad(x4)
+        g['plays'].edata['eid'] = x1
+        g['follows'].edata['eid'] = x2
+        g['develops'].edata['eid'] = x3
+        g['wishes'].edata['eid'] = x4
+
+        #################################################################
+        #  apply_edges() is called for each etype in a loop
+        #################################################################
+        with F.record_grad():
+            [g.apply_edges(fn.copy_e('eid', 'm'), etype = rel)
+                for rel in g.canonical_etypes]
+            r1 = g['develops'].edata['m']
+            F.backward(r1, F.ones(r1.shape))
+            e_grad1 = F.grad(g['develops'].edata['eid'])
+
+        #################################################################
+        #  apply_edges() is called for all etypes at the same time
+        #################################################################
+
+        g.apply_edges(fn.copy_e('eid', 'm'))
+        r2 = g['develops'].edata['m']
+        F.backward(r2, F.ones(r2.shape))
+        e_grad2 = F.grad(g['develops'].edata['eid'])
+
+        # # correctness check
+        def _print_error(a, b):
+            for i, (x, y) in enumerate(zip(F.asnumpy(a).flatten(), F.asnumpy(b).flatten())):
+                if not np.allclose(x, y):
+                   print('@{} {} v.s. {}'.format(i, x, y))
+
+        if not F.allclose(r1, r2):
+            _print_error(r1, r2)
+        assert F.allclose(r1, r2)
+        if not F.allclose(e_grad1, e_grad2):
+            print('edge grad')
+            _print_error(e_grad1, e_grad2)
+        assert(F.allclose(e_grad1, e_grad2))
+
+    _test(fn.copy_e, fn.sum)
+    # TODO(Israt) :Add reduce func to suport the following reduce op
+    # _test('copy_e', 'max')
+    # _test('copy_e', 'min')
+    # _test('copy_e', 'mean')
+
 
 if __name__ == '__main__':
     test_unary_copy_u()
