@@ -218,7 +218,7 @@ COOMatrix CSRRowWisePerEtypePick(CSRMatrix mat, IdArray rows, IdArray etypes,
       for (int64_t j = 0; j < len; ++j) {
         et[j] = data ? etype_data[data[off+j]] : etype_data[off+j];
       }
-      if (!etype_sorted) // the edge type is sorted, not need to sort it
+      if (!etype_sorted)  // the edge type is sorted, not need to sort it
         std::sort(et_idx.begin(), et_idx.end(),
                   [&et](IdxType i1, IdxType i2) {return et[i1] < et[i2];});
 
