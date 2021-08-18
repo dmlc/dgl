@@ -4,7 +4,7 @@ import time
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
-from sampler_jiahanli import SAINTNodeSampler, SAINTEdgeSampler, SAINTRandomWalkSampler
+from sampler import SAINTNodeSampler, SAINTEdgeSampler, SAINTRandomWalkSampler
 from config import CONFIG
 from modules import GCNNet
 from utils import Logger, evaluate, save_log_dir, load_data, calc_f1

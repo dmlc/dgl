@@ -5,4 +5,5 @@ subgraphs/*
 wandb/*
 *.out
 *.prof
+run*
 
