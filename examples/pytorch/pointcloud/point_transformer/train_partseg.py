@@ -51,7 +51,7 @@ def train(net, opt, scheduler, train_loader, dev):
     total_correct = 0
     count = 0
     start = time.time()
-    with tqdm.tqdm(train_loader, ascii=True) as tq:
+    with tqdm.tqdm(train_loader) as tq:
         for data, label, cat in tq:
             num_examples = data.shape[0]
             data = data.to(dev, dtype=torch.float)
@@ -84,6 +84,8 @@ def train(net, opt, scheduler, train_loader, dev):
                 'AvgAcc': '%.5f' % AvgAcc})
     scheduler.step()
     end = time.time()
+    print("[Train] AvgLoss: {:.5}, AvgAcc: {:.5}, Time: {:.5}s".format(total_loss /
+          num_batches, total_correct / count, end - start))
     return data, preds, AvgLoss, AvgAcc, end-start
 
 
@@ -130,8 +132,8 @@ def evaluate(net, test_loader, dev, per_cat_verbose=False):
                 cat_tensor = torch.tensor(eye_mat[cat_ind]).to(
                     dev, dtype=torch.float).repeat(1, 2048)
                 cat_tensor = cat_tensor.view(
-                    num_examples, -1, 16).permute(0, 2, 1)
-                logits = net(data, cat_tensor)
+                    num_examples, -1, 16)
+                logits = net(data, cat_tensor).permute(0, 2, 1)
                 _, preds = logits.max(1)
 
                 cat_miou = mIoU(preds.cpu().numpy(),
@@ -146,6 +148,7 @@ def evaluate(net, test_loader, dev, per_cat_verbose=False):
                 tq.set_postfix({
                     'mIoU': '%.5f' % (miou / count),
                     'per Category mIoU': '%.5f' % (miou / count)})
+
     if per_cat_verbose:
         print("Per-Category mIoU:")
         for k, v in cat_miou.items():

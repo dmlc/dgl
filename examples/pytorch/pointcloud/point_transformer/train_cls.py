@@ -58,7 +58,6 @@ def train(net, opt, scheduler, train_loader, dev):
     start_time = time.time()
     with tqdm.tqdm(train_loader) as tq:
         for data, label in tq:
-            # for data, label in train_loader:
             data = data.data.numpy()
             data = provider.random_point_dropout(data)
             data[:, :, 0:3] = provider.random_scale_point_cloud(
@@ -102,7 +101,6 @@ def evaluate(net, test_loader, dev):
     with torch.no_grad():
         with tqdm.tqdm(test_loader) as tq:
             for data, label in tq:
-                # for data, label in test_loader:
                 label = label[:, 0]
                 num_examples = label.shape[0]
                 data, label = data.to(dev), label.to(dev).squeeze().long()
@@ -135,9 +133,9 @@ scheduler = optim.lr_scheduler.MultiStepLR(
 train_dataset = ModelNetDataLoader(local_path, 1024, split='train')
 test_dataset = ModelNetDataLoader(local_path, 1024, split='test')
 train_loader = torch.utils.data.DataLoader(
-    train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, drop_last=True, pin_memory=True)
+    train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, drop_last=True)
 test_loader = torch.utils.data.DataLoader(
-    test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, drop_last=True, pin_memory=True)
+    test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, drop_last=True)
 
 best_test_acc = 0
 
