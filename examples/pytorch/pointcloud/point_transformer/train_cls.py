@@ -20,7 +20,7 @@ parser.add_argument('--load-model-path', type=str, default='')
 parser.add_argument('--save-model-path', type=str, default='')
 parser.add_argument('--num-epochs', type=int, default=200)
 parser.add_argument('--num-workers', type=int, default=8)
-parser.add_argument('--batch-size', type=int, default=16)
+parser.add_argument('--batch-size', type=int, default=240)
 args = parser.parse_args()
 
 num_workers = args.num_workers
@@ -55,41 +55,41 @@ def train(net, opt, scheduler, train_loader, dev):
     total_correct = 0
     count = 0
     loss_f = nn.CrossEntropyLoss()
-    # with tqdm.tqdm(train_loader, ascii=True) as tq:
-    # for data, label in tq:
     start_time = time.time()
-    for data, label in train_loader:
-        data = data.data.numpy()
-        data = provider.random_point_dropout(data)
-        data[:, :, 0:3] = provider.random_scale_point_cloud(
-            data[:, :, 0:3])
-        data[:, :, 0:3] = provider.jitter_point_cloud(data[:, :, 0:3])
-        data[:, :, 0:3] = provider.shift_point_cloud(data[:, :, 0:3])
-        data = torch.tensor(data)
-        label = label[:, 0]
+    with tqdm.tqdm(train_loader) as tq:
+        for data, label in tq:
+            # for data, label in train_loader:
+            data = data.data.numpy()
+            data = provider.random_point_dropout(data)
+            data[:, :, 0:3] = provider.random_scale_point_cloud(
+                data[:, :, 0:3])
+            data[:, :, 0:3] = provider.jitter_point_cloud(data[:, :, 0:3])
+            data[:, :, 0:3] = provider.shift_point_cloud(data[:, :, 0:3])
+            data = torch.tensor(data)
+            label = label[:, 0]
 
-        num_examples = label.shape[0]
-        data, label = data.to(dev), label.to(dev).squeeze().long()
-        opt.zero_grad()
-        logits = net(data)
-        loss = loss_f(logits, label)
-        loss.backward()
-        opt.step()
+            num_examples = label.shape[0]
+            data, label = data.to(dev), label.to(dev).squeeze().long()
+            opt.zero_grad()
+            logits = net(data)
+            loss = loss_f(logits, label)
+            loss.backward()
+            opt.step()
 
-        _, preds = logits.max(1)
+            _, preds = logits.max(1)
 
-        num_batches += 1
-        count += num_examples
-        loss = loss.item()
-        correct = (preds == label).sum().item()
-        total_loss += loss
-        total_correct += correct
+            num_batches += 1
+            count += num_examples
+            loss = loss.item()
+            correct = (preds == label).sum().item()
+            total_loss += loss
+            total_correct += correct
 
-        # tq.set_postfix({
-        #     'AvgLoss': '%.5f' % (total_loss / num_batches),
-        #     'AvgAcc': '%.5f' % (total_correct / count)})
+            tq.set_postfix({
+                'AvgLoss': '%.5f' % (total_loss / num_batches),
+                'AvgAcc': '%.5f' % (total_correct / count)})
     print("[Train] AvgLoss: {:.5}, AvgAcc: {:.5}, Time: {:.5}s".format(total_loss /
-          num_batches, total_correct / count, time.time() - start_time))
+                                                                       num_batches, total_correct / count, time.time() - start_time))
     scheduler.step()
 
 
@@ -100,21 +100,21 @@ def evaluate(net, test_loader, dev):
     count = 0
     start_time = time.time()
     with torch.no_grad():
-        # with tqdm.tqdm(test_loader, ascii=True) as tq:
-        #     for data, label in tq:
-        for data, label in test_loader:
-            label = label[:, 0]
-            num_examples = label.shape[0]
-            data, label = data.to(dev), label.to(dev).squeeze().long()
-            logits = net(data)
-            _, preds = logits.max(1)
+        with tqdm.tqdm(test_loader) as tq:
+            for data, label in tq:
+                # for data, label in test_loader:
+                label = label[:, 0]
+                num_examples = label.shape[0]
+                data, label = data.to(dev), label.to(dev).squeeze().long()
+                logits = net(data)
+                _, preds = logits.max(1)
 
-            correct = (preds == label).sum().item()
-            total_correct += correct
-            count += num_examples
+                correct = (preds == label).sum().item()
+                total_correct += correct
+                count += num_examples
 
-            # tq.set_postfix({
-            #     'AvgAcc': '%.5f' % (total_correct / count)})
+                tq.set_postfix({
+                    'AvgAcc': '%.5f' % (total_correct / count)})
     print("[Test]  AvgAcc: {:.5}, Time: {:.5}s".format(
         total_correct / count, time.time() - start_time))
     return total_correct / count
@@ -135,9 +135,9 @@ scheduler = optim.lr_scheduler.MultiStepLR(
 train_dataset = ModelNetDataLoader(local_path, 1024, split='train')
 test_dataset = ModelNetDataLoader(local_path, 1024, split='test')
 train_loader = torch.utils.data.DataLoader(
-    train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, drop_last=True)
+    train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, drop_last=True, pin_memory=True)
 test_loader = torch.utils.data.DataLoader(
-    test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, drop_last=True)
+    test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, drop_last=True, pin_memory=True)
 
 best_test_acc = 0
 
