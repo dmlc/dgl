@@ -630,7 +630,7 @@ IdArray MapToLocalFromRange(
   const auto& ctx = global_idx->ctx;
   cudaStream_t stream = CUDAThreadEntry::ThreadLocal()->stream;
 
-  if (num_parts > 1) {
+  if (num_parts > 1 && global_idx->shape[0] > 0) {
     IdArray local_idx = aten::NewIdArray(global_idx->shape[0], ctx,
         sizeof(IdType)*8);
 
@@ -692,7 +692,7 @@ IdArray MapToGlobalFromRange(
   const auto& ctx = local_idx->ctx;
   cudaStream_t stream = CUDAThreadEntry::ThreadLocal()->stream;
 
-  if (num_parts > 1) {
+  if (num_parts > 1 && local_idx->shape[0] > 0) {
     IdArray global_idx = aten::NewIdArray(local_idx->shape[0], ctx,
         sizeof(IdType)*8);
 
@@ -705,7 +705,7 @@ IdArray MapToGlobalFromRange(
         block,
         0,
         stream,
-        static_cast<const IdType*>(range->data),
+        static_cast<const RangeType*>(range->data),
         static_cast<const IdType*>(local_idx->data),
         part_id,
         global_idx->shape[0],

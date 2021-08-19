@@ -6,6 +6,7 @@ from ._ffi.function import _init_api
 from .heterograph import DGLHeteroGraph
 from . import backend as F
 from . import utils
+from .ndarray import NDArray
 from .base import EID, NID, NTYPE, ETYPE
 from .subgraph import edge_subgraph
 
@@ -447,9 +448,8 @@ class NDArrayPartition(object):
                 '"array_size".'
             if F.is_tensor(part_ranges):
                 part_ranges = F.zerocopy_to_dgl_ndarray(part_ranges)
-            else:
-                assert isinstance(part_ranges, NDArray), '"part_ranges" must ' \
-                    'be Tensor or dgl.NDArray.'
+            assert isinstance(part_ranges, NDArray), '"part_ranges" must ' \
+                'be Tensor or dgl.NDArray.'
             self._partition = _CAPI_DGLNDArrayPartitionCreateRangeBased(
                 array_size,
                 num_parts,
