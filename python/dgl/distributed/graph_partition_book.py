@@ -163,10 +163,13 @@ def get_node_partition_from_book(book, device):
     assert isinstance(book, RangePartitionBook), "Can only convert " \
         "RangePartitionBook to NDArrayPartition."
     # create prefix-sum array on host
-    cpu_range = F.cat([F.tensor([0]), F.zerocopy_from_numpy(book._max_node_ids)+1], dim=0)
+    max_node_ids = F.zerocopy_from_numpy(book._max_node_ids)
+    cpu_range = F.cat([F.tensor([0], dtype=F.dtype(max_node_ids)),
+                       max_node_ids+1], dim=0)
     gpu_range = F.copy_to(cpu_range, ctx=device)
 
-    array_size = F.as_scalar(cpu_range[-1])
+    # convert from numpy
+    array_size = int(F.as_scalar(cpu_range[-1]))
     num_parts = book.num_partitions()
 
     return NDArrayPartition(array_size,
