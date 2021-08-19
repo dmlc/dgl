@@ -18,7 +18,7 @@ CMAKE_FLAGS="-DCUDA_TOOLKIT_ROOT_DIR=$CUDA_TOOLKIT_ROOT_DIR -DTORCH_CUDA_ARCH_LI
 if [ $# -eq 0 ]; then
 	$CMAKE_COMMAND $CMAKE_FLAGS ..
 	make -j
-	cp -v *.so $BINDIR/tensoradapter/pytorch
+	cp -v $CPSOURCE $BINDIR/tensoradapter/pytorch
 else
 	for PYTHON_INTERP in $@; do
 		rm -rf *
