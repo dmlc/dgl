@@ -1522,6 +1522,18 @@ def test_level2(idtype):
     g.nodes['game'].data.clear()
 
 @parametrize_dtype
+@unittest.skipIf(F._default_context_str == 'cpu', reason="Need gpu for this test")
+def test_more_nnz(idtype):
+    g = dgl.graph(([0, 0, 0, 0, 0], [1, 1, 1, 1, 1]), idtype=idtype, device=F.ctx())
+    g.ndata['x'] = F.copy_to(F.ones((2, 5)), ctx=F.ctx())
+    g.update_all(fn.copy_u('x', 'm'), fn.sum('m', 'y'))
+    y = g.ndata['y']
+    ans = np.zeros((2, 5))
+    ans[1] = 5
+    ans = F.copy_to(F.tensor(ans, dtype=F.dtype(y)), ctx=F.ctx())
+    assert F.array_equal(y, ans)
+
+@parametrize_dtype
 def test_updates(idtype):
     def msg_func(edges):
         return {'m': edges.src['h']}

@@ -5,6 +5,7 @@
  */
 #include <dgl/array.h>
 #include "../../../runtime/cuda/cuda_common.h"
+#include "../array_index_select.cuh"
 #include "./array_index_select_uvm.cuh"
 #include "../utils.h"
 
@@ -48,8 +49,13 @@ NDArray IndexSelectCPUFromGPU(NDArray array, IdArray index) {
           block.y *= 2;
       }
       const dim3 grid((len+block.y-1)/block.y);
-      CUDA_KERNEL_CALL(IndexSelectMultiKernel, grid, block, 0, thr_entry->stream,
-          array_data, num_feat, idx_data, len, ret_data);
+      if (num_feat * sizeof(DType) < 2 * CACHE_LINE_SIZE) {
+        CUDA_KERNEL_CALL(IndexSelectMultiKernel, grid, block, 0,
+            thr_entry->stream, array_data, num_feat, idx_data, len, ret_data);
+      } else {
+        CUDA_KERNEL_CALL(IndexSelectMultiKernelAligned, grid, block, 0,
+            thr_entry->stream, array_data, num_feat, idx_data, len, ret_data);
+      }
   }
   return ret;
 }
