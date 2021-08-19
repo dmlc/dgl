@@ -16,7 +16,12 @@ namespace partition {
 namespace impl {
 
 /**
- * @brief Create a permutation that groups indices by the part id.
+ * @brief Create a permutation that groups indices by the part id when used for
+ * slicing, via the remainder. That is, for the input indices A, find I
+ * such that A[I] is grouped by part ID.
+ *
+ * For example, if we have the set of indices [3, 9, 2, 4, 1, 7] and two
+ * partitions, the permutation vector would be [2, 3, 0, 1, 4, 5].
  *
  * @tparam XPU The type of device to run on.
  * @tparam IdType The type of the index.
@@ -71,7 +76,12 @@ IdArray MapToGlobalFromRemainder(
     int part_id);
 
 /**
- * @brief Create a permutation that groups indices by the part id.
+ * @brief Create a permutation that groups indices by the part id when used for
+ * slicing. That is, for the input indices A, find I such that A[I] is grouped
+ * by part ID.
+ *
+ * For example, if we have a range of [0, 5, 10] and the set of indices
+ * [3, 9, 2, 4, 1, 7], the permutation vector would be [0, 2, 3, 4, 1, 5].
  *
  * @tparam XPU The type of device to run on.
  * @tparam IdType The type of the index.
