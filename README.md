@@ -37,6 +37,8 @@ DGL provides a plenty of learning materials for all kinds of users from ML resea
 
 It is convenient to train models using DGL on large-scale graphs across multiple GPUs or multiple machines. DGL extensively optimizes the whole stack to reduce the overhead in communication, memory consumption and synchronization. As a result, DGL can easily scale to billion-sized graphs. See the [system performance note](https://docs.dgl.ai/performance.html) for the comparison with the other tools.
 
+Now DistDGL ParMETIS implementation also provides support for hetero graph by adding back the dropped edges back into the partitioned graph thus handling parMetis hetero graph usecase.
+
 ## Get Started
 
 Users can install DGL from [pip and conda](https://www.dgl.ai/pages/start.html). Advanced users can follow the [instructions](https://docs.dgl.ai/install/index.html#install-from-source) to install from source.
