@@ -11,7 +11,7 @@ from ...distributed import DistGraph
 from ...distributed import DistDataLoader
 from ...ndarray import NDArray as DGLNDArray
 from ... import backend as F
-from ...base import DGLError
+from ...base import DGLError, EID
 from ...utils import to_dgl_context
 
 __all__ = ['NodeDataLoader', 'EdgeDataLoader', 'GraphDataLoader',
@@ -348,6 +348,44 @@ class _EdgeDataLoaderIter:
         result = [_to_device(data, self.device) for data in result_]
         return result
 
+class _DistDataLoaderWrapper:
+    """
+    A wrapper for DistDataLoader, copy features from the original DistGraph to blocks
+    """
+    def __init__(self, g, dataloader):
+        self.g = g
+        assert isinstance(g, DistGraph), "Input g must be a DistGraph."
+        self.dataloader = dataloader
+
+    def __iter__(self):
+        self.dataloader = iter(self.dataloader)
+        return self
+
+    def __next__(self):
+        try:
+            ret = list(next(self.dataloader))
+            blocks = []
+            for _, block in enumerate(ret[-1]):
+                # copy node and edge features
+                blocks.append(self._copy_features(block))
+            ret[-1] = blocks
+            return tuple(ret)
+        except StopIteration:
+            raise StopIteration
+
+    def _copy_features(self, block):
+        for ntype in block.ntypes:
+            nids = block.nodes(ntype)
+            names = self.g._get_ndata_names(ntype)
+            for name in names:
+                block.nodes[ntype].data[name.get_name()] = self.g.nodes[ntype].data[name.get_name()][nids]
+        for etype in block.etypes:
+            eids = block.edges[etype].data[EID]
+            names = self.g._get_edata_names(etype)
+            for name in names:
+                block.edges[etype].data[name.get_name()] = self.g.edges[etype].data[name.get_name()][eids]
+        return block
+
 def _init_dataloader(collator, device, dataloader_kwargs, use_ddp, ddp_seed):
     dataset = collator.dataset
     use_scalar_batcher = False
@@ -494,12 +532,12 @@ class NodeDataLoader:
                 device = 'cpu'
             assert device == 'cpu', 'Only cpu is supported in the case of a DistGraph.'
             # Distributed DataLoader currently does not support heterogeneous graphs
-            # and does not copy features.  Fallback to normal solution
+            # Add a wrapper to Distributed DataLoader to copy features
             self.collator = NodeCollator(g, nids, block_sampler, **collator_kwargs)
             _remove_kwargs_dist(dataloader_kwargs)
-            self.dataloader = DistDataLoader(self.collator.dataset,
-                                             collate_fn=self.collator.collate,
-                                             **dataloader_kwargs)
+            self.dataloader = _DistDataLoaderWrapper(g, DistDataLoader(self.collator.dataset,
+                                                                       collate_fn=self.collator.collate,
+                                                                       **dataloader_kwargs))
             self.is_distributed = True
         else:
             if device is None:
@@ -528,7 +566,8 @@ class NodeDataLoader:
     def __iter__(self):
         """Return the iterator of the data loader."""
         if self.is_distributed:
-            # Directly use the iterator of DistDataLoader, which doesn't copy features anyway.
+            # Directly use the iterator of DistDataLoader
+            # Wrapped DistDataLoader works like DistDataLoader and also copy features
             return iter(self.dataloader)
         else:
             return _NodeDataLoaderIter(self)
@@ -782,12 +821,12 @@ class EdgeDataLoader:
                 device = 'cpu'
             assert device == 'cpu', 'Only cpu is supported in the case of a DistGraph.'
             # Distributed DataLoader currently does not support heterogeneous graphs
-            # and does not copy features.  Fallback to normal solution
+            # Add a wrapper to Distributed DataLoader to copy features
             self.collator = EdgeCollator(g, eids, block_sampler, **collator_kwargs)
             _remove_kwargs_dist(dataloader_kwargs)
-            self.dataloader = DistDataLoader(self.collator.dataset,
-                                             collate_fn=self.collator.collate,
-                                             **dataloader_kwargs)
+            self.dataloader = _DistDataLoaderWrapper(g, DistDataLoader(self.collator.dataset,
+                                                                       collate_fn=self.collator.collate,
+                                                                       **dataloader_kwargs))
             self.is_distributed = True
         else:
             if device is None:
@@ -815,7 +854,8 @@ class EdgeDataLoader:
     def __iter__(self):
         """Return the iterator of the data loader."""
         if self.is_distributed:
-            # Directly use the iterator of DistDataLoader, which doesn't copy features anyway.
+            # Directly use the iterator of DistDataLoader
+            # Wrapped DistDataLoader works like DistDataLoader and also copy features
             return iter(self.dataloader)
         else:
             return _EdgeDataLoaderIter(self)
