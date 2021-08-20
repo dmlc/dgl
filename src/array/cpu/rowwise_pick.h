@@ -7,11 +7,12 @@
 #define DGL_ARRAY_CPU_ROWWISE_PICK_H_
 
 #include <dgl/array.h>
+#include <omp.h>
 #include <functional>
 #include <algorithm>
 #include <string>
 #include <vector>
-#include <omp.h>
+#include <memory>
 
 namespace dgl {
 namespace aten {
