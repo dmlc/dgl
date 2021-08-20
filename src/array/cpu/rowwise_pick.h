@@ -107,7 +107,6 @@ COOMatrix CSRRowWisePick(CSRMatrix mat, IdArray rows,
   IdxType* picked_cdata = static_cast<IdxType*>(picked_col->data);
   IdxType* picked_idata = static_cast<IdxType*>(picked_idx->data);
 
-  // build prefix-sum
   const int num_threads = omp_get_max_threads();
   std::vector<int64_t> global_prefix(num_threads+1, 0);
 
@@ -127,6 +126,7 @@ COOMatrix CSRRowWisePick(CSRMatrix mat, IdArray rows,
     std::unique_ptr<int64_t[]> local_prefix(new int64_t[num_local + 1]);
     local_prefix[0] = 0;
     for (int64_t i = start_i; i < end_i; ++i) {
+      // build prefix-sum
       const int64_t local_i = i-start_i;
       const IdxType rid = rows_data[i];
       const IdxType len = std::min(
