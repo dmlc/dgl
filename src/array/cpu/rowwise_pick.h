@@ -129,8 +129,13 @@ COOMatrix CSRRowWisePick(CSRMatrix mat, IdArray rows,
       // build prefix-sum
       const int64_t local_i = i-start_i;
       const IdxType rid = rows_data[i];
-      const IdxType len = std::min(
+      IdxType len;
+      if (replace) {
+        len = indptr[rid+1] == indptr[rid] ? 0 : num_picks;
+      } else {
+        len = std::min(
           static_cast<IdxType>(num_picks), indptr[rid + 1] - indptr[rid]);
+      }
       local_prefix[local_i + 1] = local_prefix[local_i] + len;
     }
     global_prefix[thread_id + 1] = local_prefix[num_local];
