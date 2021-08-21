@@ -537,10 +537,10 @@ class NodeDataLoader:
             # Add a wrapper to Distributed DataLoader to copy features
             self.collator = NodeCollator(g, nids, block_sampler, **collator_kwargs)
             _remove_kwargs_dist(dataloader_kwargs)
-            self.dataloader = _DistDataLoaderWrapper(g,
-                                                     DistDataLoader(self.collator.dataset,
-                                                                    collate_fn=self.collator.collate,
-                                                                    **dataloader_kwargs))
+            self.dataloader = \
+                _DistDataLoaderWrapper(g, DistDataLoader(self.collator.dataset,
+                                                         collate_fn=self.collator.collate,
+                                                         **dataloader_kwargs))
             self.is_distributed = True
         else:
             if device is None:
@@ -827,10 +827,10 @@ class EdgeDataLoader:
             # Add a wrapper to Distributed DataLoader to copy features
             self.collator = EdgeCollator(g, eids, block_sampler, **collator_kwargs)
             _remove_kwargs_dist(dataloader_kwargs)
-            self.dataloader = _DistDataLoaderWrapper(g,
-                                                     DistDataLoader(self.collator.dataset,
-                                                                    collate_fn=self.collator.collate,
-                                                                    **dataloader_kwargs))
+            self.dataloader = \
+                _DistDataLoaderWrapper(g, DistDataLoader(self.collator.dataset,
+                                                         collate_fn=self.collator.collate,
+                                                         **dataloader_kwargs))
             self.is_distributed = True
         else:
             if device is None:
