@@ -37,9 +37,6 @@ def create_test_heterograph(idtype):
     assert g.device == F.ctx()
     return g
 
-# def init_features(idtype):
-
-
 @parametrize_dtype
 def test_unary_copy_u(idtype):
     def _test(mfunc, rfunc):
@@ -167,8 +164,69 @@ def test_unary_copy_e(idtype):
     # _test('copy_e', 'mean')
 
 
+@parametrize_dtype
+def test_binary_u_op_v(idtype):
+    def _test(mfunc, rfunc):
+
+        g = create_test_heterograph(idtype)
+
+        x1 = F.randn((g.num_nodes('user'), feat_size))
+        x2 = F.randn((g.num_nodes('developer'), feat_size))
+        x3 = F.randn((g.num_nodes('game'), feat_size))
+
+        F.attach_grad(x1)
+        F.attach_grad(x2)
+        F.attach_grad(x3)
+        g.nodes['user'].data['h'] = x1
+        g.nodes['developer'].data['h'] = x2
+        g.nodes['game'].data['h'] = x3
+
+        #################################################################
+        #  multi_update_all(): call msg_passing separately for each etype
+        #################################################################
+
+        with F.record_grad():
+            g.multi_update_all(
+                {etype : (mfunc('h', 'h', 'm'), rfunc('m', 'y'))
+                    for etype in g.canonical_etypes},
+                'sum')
+            r1 = g.nodes['game'].data['y']
+            F.backward(r1, F.ones(r1.shape))
+            n_grad1 = F.grad(g.nodes['user'].data['h'])
+
+        #################################################################
+        #  update_all(): call msg_passing for all etypes
+        #################################################################
+
+        g.update_all(mfunc('h', 'h', 'm'), rfunc('m', 'y'))
+        r2 = g.nodes['game'].data['y']
+        F.backward(r2, F.ones(r2.shape))
+        n_grad2 = F.grad(g.nodes['user'].data['h'])
+
+        # correctness check
+        def _print_error(a, b):
+            for i, (x, y) in enumerate(zip(F.asnumpy(a).flatten(), F.asnumpy(b).flatten())):
+                if not np.allclose(x, y):
+                    print('@{} {} v.s. {}'.format(i, x, y))
+
+        if not F.allclose(r1, r2):
+            _print_error(r1, r2)
+        assert F.allclose(r1, r2)
+        # TODO (Israt): r1 and r2 have different frad func associated with
+        # if not F.allclose(n_grad1, n_grad2):
+        #     print('node grad')
+        #     _print_error(n_grad1, n_grad2)
+        # assert(F.allclose(n_grad1, n_grad2))
+
+    _test(fn.u_add_v, fn.sum)
+    # TODO(Israt) :Add reduce func to suport the following reduce op
+    # _test('copy_u', 'max')
+    # _test('copy_u', 'min')
+    # _test('copy_u', 'mean')
+
+
 if __name__ == '__main__':
     test_unary_copy_u()
     test_unary_copy_e()
-
+    test_binary_u_op_v()
 

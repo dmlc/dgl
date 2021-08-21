@@ -212,8 +212,13 @@ class GSpMM_hetero(th.autograd.Function):
             g_rev = g.reverse()
             # TODO(Israt): implement other combinations of message and reduce functions
             if reduce_op == 'sum':
-                if op == 'copy_lhs':
-                    dX = gspmm_hetero(g_rev, 'copy_lhs', 'sum', *dZ)
+                if op == 'mul':
+                    dX = gspmm_hetero(g_rev, 'mul', 'sum', *tuple(dZ + Y))
+                elif op == 'add':
+                    dX = gspmm_hetero(g_rev, 'copy_lhs', 'sum', *tuple(dZ + Y))
+                elif op == 'copy_lhs':
+                    tmp_Y = tuple([None] * len(Y))
+                    dX = gspmm_hetero(g_rev, 'copy_lhs', 'sum', *tuple(dZ + tmp_Y))
             dX = tuple([_reduce_grad(dX[i], X[i].shape) if X[i] is not None else None 
                 for i in range(len(X))])
         else:  # X has not gradient
@@ -221,10 +226,14 @@ class GSpMM_hetero(th.autograd.Function):
         if op != 'copy_lhs' and any([y is not None for y in Y]):
             # TODO(Israt): implement other combinations of message and reduce functions
             if reduce_op == 'sum':
-                if op in ['copy_rhs']:
-                    tmp_Z = tuple([dZ[i] if dZ[i] is not None else None
-                        for i in range(len(dZ))])
-                    tmp = tuple(X + tmp_Z)
+                tmp_Z = tuple([dZ[i] if dZ[i] is not None else None
+                    for i in range(len(dZ))])
+                tmp = tuple(X + tmp_Z)
+                if op == 'mul' and reduce_last:
+                    dY = gsddmm_hetero(g, 'dot', 'u', 'v', *tmp)
+                elif op == 'mul':
+                    dY = gsddmm_hetero(g, 'mul', 'u', 'v', *tmp)
+                elif op in ['add', 'copy_rhs']:
                     dY = gsddmm_hetero(g, 'copy_rhs', 'u', 'v', *tmp)
             dY = tuple([_reduce_grad(dY[i], Y[i].shape) if Y[i] is not None else None
                 for i in range(len(Y))])
@@ -323,10 +332,59 @@ class GSDDMM_hetero(th.autograd.Function):
 
     @staticmethod
     @custom_bwd
-    # TODO(Israt): Implement the backward operator
+    # TODO(Israt): Implement the complete backward operator
     def backward(ctx, *dZ):
-        raise NotImplementedError('Homogenized GSDDMM backward operation is not implemented.')
+        g, op, lhs_target, rhs_target = ctx.backward_cache
+        feats = ctx.saved_tensors
+        num_ntypes = g._graph.number_of_ntypes()
+        X, Y = feats[:num_ntypes], feats[num_ntypes:]
 
+        if op != 'copy_rhs' and any([x is not None for x in X]):
+            if lhs_target in ['u', 'v']:
+                _g = g if lhs_target == 'v' else g.reverse()
+                if op in ['add', 'copy_lhs']:
+                    tmp = tuple([None] * len(X))
+                    dX = gspmm_hetero(_g, 'copy_rhs', 'sum', *(tuple(tmp + dZ)))
+                else:  # mul, dot
+                    if rhs_target == lhs_target:
+                        dX = gspmm_hetero(_g, 'copy_rhs', 'sum', None, dZ) *  Y
+                    elif rhs_target == 'e':
+                        dX = gspmm_hetero(_g, 'copy_rhs', 'sum', None, dZ * Y)
+                    else:  # rhs_target = !lhs_target
+                        dX = gspmm_hetero(_g, 'mul', 'sum', *tuple(Y + dZ))
+            else:  # lhs_target == 'e'
+                if op in ['add', 'copy_lhs']:
+                    dX = dZ
+                else:  # mul, dot
+                    dX = gsddmm_hetero(g, 'mul', dZ, Y, 'e', rhs_target)
+            dX = tuple([_reduce_grad(dX[i], X[i].shape) if X[i] is not None else None
+                for i in range(len(X))])
+        else:
+            dX = tuple([None] * len(X))
+        if op != 'copy_lhs' and any([y is not None for y in Y]):
+            if rhs_target in ['u', 'v']:
+                _g = g if rhs_target == 'v' else g.reverse()
+                tmp_X = tuple([None] * len(X))
+                if op in ['add', 'copy_rhs']:
+                    dY = gspmm_hetero(_g, 'copy_rhs', 'sum', *(tuple(tmp_X + dZ)))
+                else:  # mul, dot
+                    if lhs_target == rhs_target:
+                        dY = gspmm_hetero(_g, 'copy_rhs', 'sum', *(tuple(tmp + dZ))) * X
+                    elif lhs_target == 'e':
+                        dY = gspmm_hetero(_g, 'copy_rhs', 'sum', None, dZ * X)
+                    else:  # rhs_target = !lhs_target
+                        dY = gspmm_hetero(_g, 'mul', 'sum', *tuple(X + dZ))
+            else:
+                if op in ['add', 'copy_rhs']:
+                    dY = tuple([dZ[i] if dZ[i] is not None else None
+                        for i in range(len(dZ))])
+                else:  # mul, dot
+                    dY = gsddmm_hetero(g, 'mul', dZ, X, 'e', lhs_target)
+            dY = tuple([_reduce_grad(dY[i], Y[i].shape) if Y[i] is not None else None
+                for i in range(len(Y))])
+        else:
+            dY = tuple([None] * len(Y))
+        return (None, None, None, None) + dX + dY
 
 class EdgeSoftmax(th.autograd.Function):
     @staticmethod

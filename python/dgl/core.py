@@ -260,8 +260,8 @@ def invoke_gsddmm(graph, func):
         op = getattr(ops, func.name)
         if graph._graph.number_of_etypes() > 1:
             lhs_target, _, rhs_target = func.name.split("_", 2)
-            x = data_dict_to_list(graph, x, func, lhs_target, None )
-            y = data_dict_to_list(graph, y, func, None, rhs_target )
+            x = data_dict_to_list(graph, x, func, lhs_target, None)
+            y = data_dict_to_list(graph, y, func, None, rhs_target)
         z = op(graph, x, y)
     else:
         x = alldata[func.target][func.in_field]
@@ -317,8 +317,8 @@ def invoke_gspmm(graph, mfunc, rfunc, *, srcdata=None, dstdata=None, edata=None)
         op = getattr(ops, '{}_{}'.format(mfunc.name, rfunc.name))
         if graph._graph.number_of_etypes() > 1:
             lhs_target, _, rhs_target = mfunc.name.split("_", 2)
-            x = data_dict_to_list(graph, x, mfunc, lhs_target, None )
-            y = data_dict_to_list(graph, y, mfunc, None, rhs_target )
+            x = data_dict_to_list(graph, x, mfunc, lhs_target, None)
+            y = data_dict_to_list(graph, y, mfunc, None, rhs_target)
         z = op(graph, x, y)
     else:
         x = alldata[mfunc.target][mfunc.in_field]
