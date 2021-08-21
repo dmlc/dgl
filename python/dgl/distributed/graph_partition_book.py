@@ -10,6 +10,7 @@ from .. import utils
 from .shared_mem_utils import _to_shared_mem, _get_ndata_path, _get_edata_path, DTYPE_DICT
 from .._ffi.ndarray import empty_shared_mem
 from ..ndarray import exist_shared_mem_array
+from ..partition import NDArrayPartition
 from .id_map import IdMap
 
 def _move_metadata_to_shared_mem(graph_name, num_nodes, num_edges, part_id,
@@ -143,6 +144,38 @@ def get_shared_mem_partition_book(graph_name, graph_part):
         return RangePartitionBook(part_id, num_parts, node_map, edge_map, ntypes, etypes)
     else:
         return BasicPartitionBook(part_id, num_parts, node_map_data, edge_map_data, graph_part)
+
+def get_node_partition_from_book(book, device):
+    """ Get an NDArrayPartition of the nodes from a RangePartitionBook.
+
+    Parameters
+    ----------
+    book : RangePartitionBook
+        The partition book to extract the node partition from.
+    device : Device context object.
+        The location to node partition is to be used.
+
+    Returns
+    -------
+    NDarrayPartition
+        The NDArrayPartition object for the nodes in the graph.
+    """
+    assert isinstance(book, RangePartitionBook), "Can only convert " \
+        "RangePartitionBook to NDArrayPartition."
+    # create prefix-sum array on host
+    max_node_ids = F.zerocopy_from_numpy(book._max_node_ids)
+    cpu_range = F.cat([F.tensor([0], dtype=F.dtype(max_node_ids)),
+                       max_node_ids+1], dim=0)
+    gpu_range = F.copy_to(cpu_range, ctx=device)
+
+    # convert from numpy
+    array_size = int(F.as_scalar(cpu_range[-1]))
+    num_parts = book.num_partitions()
+
+    return NDArrayPartition(array_size,
+                            num_parts,
+                            mode='range',
+                            part_ranges=gpu_range)
 
 class GraphPartitionBook(ABC):
     """ The base class of the graph partition book.
