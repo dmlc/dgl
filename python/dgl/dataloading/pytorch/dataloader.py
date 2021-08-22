@@ -356,6 +356,8 @@ class _DistDataLoaderWrapper:
         self.g = g
         assert isinstance(g, DistGraph), "Input g must be a DistGraph."
         self.dataloader = dataloader
+        self._ndata = {}
+        self._edata = {}
 
     def __iter__(self):
         self.dataloader = iter(self.dataloader)
@@ -373,19 +375,37 @@ class _DistDataLoaderWrapper:
         except StopIteration:
             raise StopIteration
 
+    def _get_ndata(self, ntype):
+        if ntype not in self._ndata:
+            names = self.g._get_ndata_names(ntype)
+            ntype_data = {}
+            nodes = self.g.nodes[ntype]
+            for name in names:
+                ntype_data[name.get_name()] = nodes.data[name.get_name()]
+            self._ndata[ntype] = ntype_data
+        return self._ndata[ntype]
+
+    def _get_edata(self, etype):
+        if etype not in self._edata:
+            names = self.g._get_edata_names(etype)
+            etype_data = {}
+            edges = self.g.edges[etype]
+            for name in names:
+                etype_data[name.get_name()] = edges.data[name.get_name()]
+            self._edata[etype] = etype_data
+        return self._edata[etype]
+
     def _copy_features(self, block):
         for ntype in block.ntypes:
             nids = block.nodes(ntype)
-            names = self.g._get_ndata_names(ntype)
-            for name in names:
-                block.nodes[ntype].data[name.get_name()] = \
-                    self.g.nodes[ntype].data[name.get_name()][nids]
+            nodes = block.nodes[ntype]
+            for name, ndata in self._get_ndata(ntype).items():
+                nodes.data[name] = ndata[nids]
         for etype in block.etypes:
             eids = block.edges[etype].data[EID]
-            names = self.g._get_edata_names(etype)
-            for name in names:
-                block.edges[etype].data[name.get_name()] = \
-                    self.g.edges[etype].data[name.get_name()][eids]
+            edges = block.edges[etype]
+            for name, edata in self._get_edata(etype).items():
+                edges.data[name] = edata[eids]
         return block
 
 def _init_dataloader(collator, device, dataloader_kwargs, use_ddp, ddp_seed):
