@@ -19,7 +19,9 @@ To quickly locate the examples of your interest, search for the tagged keywords 
     - Tags: efficiency, node classification, label propagation
 
 ## 2020
-
+- <a name="eeg-gcnn"></a> Wagh et al. EEG-GCNN: Augmenting Electroencephalogram-based Neurological Disease Diagnosis using a Domain-guided Graph Convolutional Neural Network. [Paper link](http://proceedings.mlr.press/v136/wagh20a.html). 
+    - Example code: [PyTorch](../examples/pytorch/eeg-gcnn)
+    - Tags: graph classification, eeg representation learning, brain activity, graph convolution,  neurological disease classification, large dataset, edge weights, node features, fully-connected graph, graph neural network
 - <a name="rect"></a> Wang et al. Network Embedding with Completely-imbalanced Labels. [Paper link](https://ieeexplore.ieee.org/document/8979355). 
     - Example code: [PyTorch](../examples/pytorch/rect)
     - Tags: node classification, network embedding, completely-imbalanced labels
