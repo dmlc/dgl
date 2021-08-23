@@ -207,10 +207,10 @@ best_test_miou = 0
 best_test_per_cat_miou = 0
 
 for epoch in range(args.num_epochs):
+    print("Epoch #{}: ".format(epoch))
     data, preds, AvgLoss, AvgAcc, training_time = train(
         net, opt, scheduler, train_loader, dev)
     if (epoch + 1) % 5 == 0:
-        print('Epoch #%d Testing' % epoch)
         test_miou, test_per_cat_miou = evaluate(
             net, test_loader, dev, (epoch + 1) % 5 == 0)
         if test_miou > best_test_miou:
@@ -218,7 +218,7 @@ for epoch in range(args.num_epochs):
             best_test_per_cat_miou = test_per_cat_miou
             if args.save_model_path:
                 torch.save(net.state_dict(), args.save_model_path)
-        print('Current test mIoU: %.5f (best: %.5f), per-Category mIoU: %.5f (best: %.5f)' % (
+        print('[Test]  Current test mIoU: %.5f (best: %.5f), per-Category mIoU: %.5f (best: %.5f)' % (
             test_miou, best_test_miou, test_per_cat_miou, best_test_per_cat_miou))
     # Tensorboard
     if args.tensorboard:
@@ -233,3 +233,4 @@ for epoch in range(args.num_epochs):
             writer.add_scalar('test mIoU', test_miou, global_step=epoch)
             writer.add_scalar('best test mIoU',
                               best_test_miou, global_step=epoch)
+    print()

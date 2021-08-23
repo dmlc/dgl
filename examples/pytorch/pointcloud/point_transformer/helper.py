@@ -83,7 +83,8 @@ class KNNGraphBuilder(nn.Module):
             center = torch.zeros((N)).to(dev)
             center[centroids[i]] = 1
             src = group_idx[i].contiguous().view(-1)
-            dst = centroids[i].view(-1, 1).repeat(1, self.n_neighbor).view(-1)
+            dst = centroids[i].view(-1, 1).repeat(1, min(self.n_neighbor,
+                                                         src.shape[0] // centroids.shape[1])).view(-1)
 
             unified = torch.cat([src, dst])
             uniq, inv_idx = torch.unique(unified, return_inverse=True)
@@ -246,18 +247,22 @@ class FeaturePropagation(nn.Module):
         return new_feat
 
 
+class SwapAxes(nn.Module):
+    def __init__(self, dim1=1, dim2=2):
+        super(SwapAxes, self).__init__()
+        self.dim1 = dim1
+        self.dim2 = dim2
+
+    def forward(self, x):
+        return x.transpose(self.dim1, self.dim2)
+
+
 class TransitionUp(nn.Module):
     """
     The Transition Up Module
     """
 
     def __init__(self, dim1, dim2, dim_out):
-        class SwapAxes(nn.Module):
-            def __init__(self):
-                super().__init__()
-
-            def forward(self, x):
-                return x.transpose(1, 2)
 
         super(TransitionUp, self).__init__()
         self.fc1 = nn.Sequential(

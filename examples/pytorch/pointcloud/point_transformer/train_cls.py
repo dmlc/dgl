@@ -20,7 +20,7 @@ parser.add_argument('--load-model-path', type=str, default='')
 parser.add_argument('--save-model-path', type=str, default='')
 parser.add_argument('--num-epochs', type=int, default=200)
 parser.add_argument('--num-workers', type=int, default=8)
-parser.add_argument('--batch-size', type=int, default=240)
+parser.add_argument('--batch-size', type=int, default=16)
 args = parser.parse_args()
 
 num_workers = args.num_workers
@@ -125,10 +125,18 @@ net = net.to(dev)
 if args.load_model_path:
     net.load_state_dict(torch.load(args.load_model_path, map_location=dev))
 
-opt = optim.SGD(net.parameters(), lr=0.05, momentum=0.9, weight_decay=1e-4)
+# opt = optim.SGD(net.parameters(), lr=0.01, momentum=0.9, weight_decay=1e-4)
+opt = torch.optim.Adam(
+    net.parameters(),
+    lr=1e-3,
+    betas=(0.9, 0.999),
+    eps=1e-08,
+    weight_decay=1e-4
+)
 
-scheduler = optim.lr_scheduler.MultiStepLR(
-    opt, milestones=[120, 160], gamma=0.1)
+# scheduler = optim.lr_scheduler.MultiStepLR(
+#     opt, milestones=[120, 160], gamma=0.1)
+scheduler = torch.optim.lr_scheduler.StepLR(opt, step_size=50, gamma=0.3)
 
 train_dataset = ModelNetDataLoader(local_path, 1024, split='train')
 test_dataset = ModelNetDataLoader(local_path, 1024, split='test')

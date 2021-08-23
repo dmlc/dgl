@@ -98,7 +98,6 @@ class PointTransformerCLS(nn.Module):
             nn.Linear(hidden_dim * 2 ** (n_blocks), 256),
             nn.ReLU(),
             nn.Linear(256, 64),
-            nn.BatchNorm1d(64),
             nn.ReLU(),
             nn.Linear(64, out_classes)
         )
