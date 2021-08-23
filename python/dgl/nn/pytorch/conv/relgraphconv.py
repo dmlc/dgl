@@ -218,8 +218,9 @@ class RelGraphConv(nn.Module):
             if isinstance(etypes, list):
                 etypes = th.repeat_interleave(th.arange(len(etypes), device=device),
                                               th.tensor(etypes, device=device))
+            idim = weight.shape[1]
             weight = weight.view(-1, weight.shape[2])
-            flatidx = etypes * weight.shape[1] + h
+            flatidx = etypes * idim + h
             msg = weight.index_select(0, flatidx)
         elif self.low_mem:
             # A more memory-friendly implementation.
