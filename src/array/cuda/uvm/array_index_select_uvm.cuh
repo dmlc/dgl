@@ -14,10 +14,27 @@ namespace aten {
 namespace impl {
 
 template <typename DType, typename IdType>
-__global__ void IndexSelectMultiKernelAligned(
-        const DType* const array,
+__global__ void IndexSelectSingleKernelUVM(const DType* array, 
+                                           const IdType* index,
+                                           int64_t length,
+                                           int64_t arr_len,
+                                           DType* out) {
+  int tx = blockIdx.x * blockDim.x + threadIdx.x;
+  int stride_x = gridDim.x * blockDim.x;
+  while (tx < length) {
+    IdType target_index = index[tx];
+    assert(target_index >= 0 && target_index < arr_len);
+    out[tx] = array[target_index];
+    tx += stride_x;
+  }
+}
+
+template <typename DType, typename IdType>
+__global__ void IndexSelectMultiKernelUVM(
+        const DType* const array, 
         const int64_t num_feat,
         const IdType* const index,
+        const int64_t arr_len,
         const int64_t length,
         DType* const out) {
   int64_t out_row = blockIdx.x*blockDim.y+threadIdx.y;
@@ -27,6 +44,31 @@ __global__ void IndexSelectMultiKernelAligned(
   while (out_row < length) {
     int64_t col = threadIdx.x;
     const int64_t in_row = index[out_row];
+    assert(in_row >= 0 && in_row < arr_len);
+    while (col < num_feat) {
+      out[out_row*num_feat+col] = array[in_row*num_feat+col];
+      col += blockDim.x;
+    }
+    out_row += stride;
+  }
+}
+
+template <typename DType, typename IdType>
+__global__ void IndexSelectMultiKernelUVMAligned(
+        const DType* const array,
+        const int64_t num_feat,
+        const IdType* const index,
+        const int64_t arr_len,
+        const int64_t length,
+        DType* const out) {
+  int64_t out_row = blockIdx.x*blockDim.y+threadIdx.y;
+
+  const int64_t stride = blockDim.y*gridDim.x;
+
+  while (out_row < length) {
+    int64_t col = threadIdx.x;
+    const int64_t in_row = index[out_row];
+    assert(in_row >= 0 && in_row < arr_len);
     const int64_t idx_offset =
       ((uint64_t)(&array[in_row*num_feat]) % CACHE_LINE_SIZE) / sizeof(DType);
     col = col - idx_offset;
