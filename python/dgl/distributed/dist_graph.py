@@ -177,21 +177,25 @@ class NodeDataView(MutableMapping):
         # When this is created, the server may already load node data. We need to
         # initialize the node data in advance.
         names = g._get_ndata_names(ntype)
+        is_empty = False
         if ntype is None:
             self._data = g._ndata_store
+            is_empty = len(self._data) == 0
         else:
             if ntype in g._ndata_store:
                 self._data = g._ndata_store[ntype]
             else:
                 self._data = {}
                 g._ndata_store[ntype] = self._data
-        for name in names:
-            assert name.is_node()
-            policy = PartitionPolicy(name.policy_str, g.get_partition_book())
-            dtype, shape, _ = g._client.get_data_meta(str(name))
-            # We create a wrapper on the existing tensor in the kvstore.
-            self._data[name.get_name()] = DistTensor(shape, dtype, name.get_name(),
-                                                     part_policy=policy)
+                is_empty = True
+        if is_empty:
+            for name in names:
+                assert name.is_node()
+                policy = PartitionPolicy(name.policy_str, g.get_partition_book())
+                dtype, shape, _ = g._client.get_data_meta(str(name))
+                # We create a wrapper on the existing tensor in the kvstore.
+                self._data[name.get_name()] = DistTensor(shape, dtype, name.get_name(),
+                                                         part_policy=policy)
 
     def _get_names(self):
         return list(self._data.keys())
@@ -231,21 +235,25 @@ class EdgeDataView(MutableMapping):
         # When this is created, the server may already load edge data. We need to
         # initialize the edge data in advance.
         names = g._get_edata_names(etype)
+        is_empty = False
         if etype is None:
             self._data = g._edata_store
+            is_empty = len(self._data)
         else:
             if etype in g._edata_store:
                 self._data = g._edata_store[etype]
             else:
                 self._data = {}
                 g._edata_store[etype] = self._data
-        for name in names:
-            assert name.is_edge()
-            policy = PartitionPolicy(name.policy_str, g.get_partition_book())
-            dtype, shape, _ = g._client.get_data_meta(str(name))
-            # We create a wrapper on the existing tensor in the kvstore.
-            self._data[name.get_name()] = DistTensor(shape, dtype, name.get_name(),
-                                                     part_policy=policy)
+                is_empty = True
+        if is_empty:
+            for name in names:
+                assert name.is_edge()
+                policy = PartitionPolicy(name.policy_str, g.get_partition_book())
+                dtype, shape, _ = g._client.get_data_meta(str(name))
+                # We create a wrapper on the existing tensor in the kvstore.
+                self._data[name.get_name()] = DistTensor(shape, dtype, name.get_name(),
+                                                         part_policy=policy)
 
     def _get_names(self):
         return list(self._data.keys())
