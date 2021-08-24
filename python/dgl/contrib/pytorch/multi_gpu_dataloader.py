@@ -1,6 +1,7 @@
 import dgl
 from ...dataloading import NodeDataLoader
 from ..multi_gpu_tensor import MultiGPUTensor
+from typing import Mapping
 
 def _load_tensor(tensor, device, comm, part):
     loaded_tensor = None
@@ -34,9 +35,10 @@ class _NodeDataIterator:
 
         # re-attach node features
         for block in blocks:
-            for ntype in block.ntypes:
-                for k, v in self._n_feat.items():
-                    block.ndata[k][ntype] = _gather_row(v, block.ndata[dgl.NID]['_N'])
+            for k, v in self._n_feat.items():
+                for ntype, data in v.items():
+                    index = block.ndata[dgl.NID][ntype]
+                    block.ndata[k][ntype] = _gather_row(data, index)
 
         result = [input_nodes, output_nodes, blocks]
         if self._node_feat is not None:
@@ -55,7 +57,15 @@ class MultiGPUNodeDataLoader(NodeDataLoader):
         assert comm is None or use_ddp, "'use_ddp' must be true when using NCCL."
 
         # we need to remove all of the features
-        n_feat = {k: g.ndata.pop(k) for k in list(g.ndata.keys())}
+        n_feat = {}
+        for feat_name in list(g.ndata.keys()):
+            if isinstance(g.ndata[feat_name], Mapping):
+                n_feat[feat_name] = {k: g.ndata[feat_name][k] for k in g.ntypes}
+            else:
+                # make homogenous graphs still be mapped by node type, in order
+                # to simplify the rest of the code using this structure
+                n_feat[feat_name] = {'_N': g.ndata[feat_name]}
+            g.ndata.pop(feat_name)
 
         super(MultiGPUNodeDataLoader, self).__init__(
             g=g, nids=nids, block_sampler=block_sampler, device=device,
@@ -64,7 +74,10 @@ class MultiGPUNodeDataLoader(NodeDataLoader):
         # move features to GPU 
         self._n_feat = {}
         for k, v in n_feat.items():
-            self._n_feat[k] = _load_tensor(v, device, comm, partition)
+            self._n_feat[k] = {}
+            for ntype in v.keys():
+                self._n_feat[k][ntype] = \
+                    _load_tensor(v[ntype], device, comm, partition)
 
         self._node_feat = None
         if node_feat is not None:
