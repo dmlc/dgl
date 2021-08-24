@@ -73,10 +73,10 @@ class PointTransformer(nn.Module):
     def forward(self, x):
         if x.shape[-1] > 3:
             pos = x[:, :, :3]
-            feat = x[:, :, 3:]
         else:
             pos = x
-            feat = x
+            
+        feat = x
         h = self.fc(feat)
         h, _ = self.ptb(h, pos)
 

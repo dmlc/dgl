@@ -51,16 +51,9 @@ class KNearNeighbors(nn.Module):
         '''
         Adapted from https://github.com/yanx27/Pointnet_Pointnet2_pytorch
         '''
-        device = pos.device
-        B, N, _ = pos.shape
         center_pos = index_points(pos, centroids)
-        _, S, _ = center_pos.shape
-        group_idx = torch.arange(N, dtype=torch.long).to(
-            device).view(1, 1, N).repeat([B, S, 1])
         sqrdists = square_distance(center_pos, pos)
-        group_idx = group_idx.sort(dim=-1)[0][:, :, :self.n_neighbor]
-        group_first = group_idx[:, :, 0].view(
-            B, S, 1).repeat([1, 1, self.n_neighbor])
+        group_idx = sqrdists.argsort(dim=-1)[:, :, :self.n_neighbor]
         return group_idx
 
 

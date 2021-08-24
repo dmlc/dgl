@@ -119,7 +119,7 @@ def evaluate(net, test_loader, dev):
 
 
 dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-net = PointTransformerCLS(40, batch_size)
+net = PointTransformerCLS(40, batch_size, feature_dim=6)
 
 net = net.to(dev)
 if args.load_model_path:

@@ -20,7 +20,7 @@ parser.add_argument('--load-model-path', type=str, default='')
 parser.add_argument('--save-model-path', type=str, default='')
 parser.add_argument('--num-epochs', type=int, default=250)
 parser.add_argument('--num-workers', type=int, default=8)
-parser.add_argument('--batch-size', type=int, default=4)
+parser.add_argument('--batch-size', type=int, default=16)
 parser.add_argument('--tensorboard', action='store_true')
 args = parser.parse_args()
 
@@ -148,14 +148,17 @@ def evaluate(net, test_loader, dev, per_cat_verbose=False):
                 tq.set_postfix({
                     'mIoU': '%.5f' % (miou / count),
                     'per Category mIoU': '%.5f' % (miou / count)})
-
+    print("[Test] mIoU: %.5f, per Category mIoU: %.5f" %
+          (miou / count, miou / count))
     if per_cat_verbose:
+        print("-" * 60)
         print("Per-Category mIoU:")
         for k, v in cat_miou.items():
             if v[1] > 0:
                 print("%s mIoU=%.5f" % (k, v[0] / v[1]))
             else:
                 print("%s mIoU=%.5f" % (k, 1))
+        print("-" * 60)
     return miou / count, per_cat_miou / per_cat_count
 
 
@@ -166,7 +169,7 @@ net = net.to(dev)
 if args.load_model_path:
     net.load_state_dict(torch.load(args.load_model_path, map_location=dev))
 
-opt = optim.Adam(net.parameters(), lr=0.001, weight_decay=1e-4)
+opt = optim.Adam(net.parameters(), lr=1e-3, weight_decay=1e-4)
 scheduler = optim.lr_scheduler.StepLR(opt, step_size=20, gamma=0.5)
 L = PartSegLoss()
 
@@ -210,7 +213,7 @@ for epoch in range(args.num_epochs):
     print("Epoch #{}: ".format(epoch))
     data, preds, AvgLoss, AvgAcc, training_time = train(
         net, opt, scheduler, train_loader, dev)
-    if (epoch + 1) % 5 == 0:
+    if (epoch + 1) % 5 == 0 or epoch == 0:
         test_miou, test_per_cat_miou = evaluate(
             net, test_loader, dev, (epoch + 1) % 5 == 0)
         if test_miou > best_test_miou:
@@ -218,7 +221,7 @@ for epoch in range(args.num_epochs):
             best_test_per_cat_miou = test_per_cat_miou
             if args.save_model_path:
                 torch.save(net.state_dict(), args.save_model_path)
-        print('[Test]  Current test mIoU: %.5f (best: %.5f), per-Category mIoU: %.5f (best: %.5f)' % (
+        print('Current test mIoU: %.5f (best: %.5f), per-Category mIoU: %.5f (best: %.5f)' % (
             test_miou, best_test_miou, test_per_cat_miou, best_test_per_cat_miou))
     # Tensorboard
     if args.tensorboard:
