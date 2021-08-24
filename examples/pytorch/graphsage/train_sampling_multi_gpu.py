@@ -6,8 +6,8 @@ import torch.nn.functional as F
 import torch.optim as optim
 import dgl.multiprocessing as mp
 import dgl.nn.pytorch as dglnn
-from dgl.contrib.multi_gpu_tensor import MultiGPUTensor
 from dgl.cuda import nccl
+from dgl.contrib import MultiGPUNodeDataLoader
 import time
 import math
 import argparse
@@ -38,28 +38,12 @@ def evaluate(model, g, nfeat, labels, val_nid, device):
     model.train()
     return compute_acc(pred[val_nid], labels[val_nid])
 
-def distribute_tensor(tensor, device, comm):
-    dist_tensor = MultiGPUTensor(tensor.shape, tensor.dtype, device,
-        comm)
-    dist_tensor.all_set_global(tensor)
-    return dist_tensor
-
 def load_subtensor(nfeat, labels, seeds, input_nodes, dev_id):
     """
     Extracts features and labels for a subset of nodes.
     """
-    if isinstance(nfeat, MultiGPUTensor):
-        input_nodes = input_nodes.to(nfeat.get_local().device)
-        batch_inputs = nfeat.all_gather_row(input_nodes).to(dev_id)
-    else:
-        batch_inputs = nfeat[input_nodes].to(dev_id)
-
-    if isinstance(labels, MultiGPUTensor):
-        seeds = seeds.to(labels.get_local().device)
-        batch_labels = labels.all_gather_row(seeds).to(dev_id)
-    else:
-        batch_labels = labels[seeds].to(dev_id)
-
+    batch_inputs = nfeat[input_nodes].to(dev_id)
+    batch_labels = labels[seeds].to(dev_id)
     return batch_inputs, batch_labels
 
 #### Entry point
@@ -93,17 +77,6 @@ def run(proc_id, n_gpus, args, devices, data, nccl_id=None):
 
     in_feats = train_nfeat.shape[1]
 
-    if not args.data_cpu:
-        if nccl_id:
-            nccl_comm = nccl.Communicator(n_gpus, proc_id, nccl_id)
-
-            # split features across GPUs
-            train_nfeat = distribute_tensor(train_nfeat, dev_id, nccl_comm)
-            train_labels = distribute_tensor(train_labels, dev_id, nccl_comm)
-        else:
-            train_nfeat = train_nfeat.to(dev_id)
-            train_labels = train_labels.to(dev_id)
-
     train_mask = train_g.ndata['train_mask']
     val_mask = val_g.ndata['val_mask']
     test_mask = ~(test_g.ndata['train_mask'] | test_g.ndata['val_mask'])
@@ -114,16 +87,36 @@ def run(proc_id, n_gpus, args, devices, data, nccl_id=None):
     # Create PyTorch DataLoader for constructing blocks
     sampler = dgl.dataloading.MultiLayerNeighborSampler(
         [int(fanout) for fanout in args.fan_out.split(',')])
-    dataloader = dgl.dataloading.NodeDataLoader(
-        train_g,
-        train_nid,
-        sampler,
-        use_ddp=n_gpus > 1,
-        device=dev_id if args.num_workers == 0 else None,
-        batch_size=args.batch_size,
-        shuffle=True,
-        drop_last=False,
-        num_workers=args.num_workers)
+
+    nccl_comm = None
+    if nccl_id:
+        nccl_comm = nccl.Communicator(n_gpus, proc_id, nccl_id)
+
+    if not args.data_cpu:
+        dataloader = MultiGPUNodeDataLoader(
+            train_g,
+            train_nid,
+            sampler,
+            device=dev_id,
+            comm=nccl_comm,
+            node_feat=train_nfeat,
+            node_label=train_labels,
+            use_ddp=n_gpus > 1,
+            batch_size=args.batch_size,
+            shuffle=True,
+            drop_last=False,
+            num_workers=args.num_workers)
+    else:
+        dataloader = dgl.dataloading.NodeDataLoader(
+            train_g,
+            train_nid,
+            sampler,
+            use_ddp=n_gpus > 1,
+            device=dev_id if args.num_workers == 0 else None,
+            batch_size=args.batch_size,
+            shuffle=True,
+            drop_last=False,
+            num_workers=args.num_workers)
 
     # Define model and optimizer
     model = SAGE(in_feats, args.num_hidden, n_classes, args.num_layers, F.relu, args.dropout)
@@ -143,13 +136,17 @@ def run(proc_id, n_gpus, args, devices, data, nccl_id=None):
 
         # Loop over the dataloader to sample the computation dependency graph as a list of
         # blocks.
-        for step, (input_nodes, seeds, blocks) in enumerate(dataloader):
+        for step, data in enumerate(dataloader):
             if proc_id == 0:
                 tic_step = time.time()
 
-            # Load the input features as well as output labels
-            batch_inputs, batch_labels = load_subtensor(train_nfeat, train_labels,
-                                                        seeds, input_nodes, dev_id)
+            if len(data) == 3:
+                input_nodes, seeds, blocks = data
+                batch_inputs, batch_labels = load_subtensor(train_nfeat, train_labels,
+                                                            seeds, input_nodes, dev_id)
+            else:
+                input_nodes, seeds, blocks, batch_inputs, batch_labels = data
+
             blocks = [block.int().to(dev_id) for block in blocks]
             # Compute loss and prediction
             batch_pred = model(blocks, batch_inputs)
