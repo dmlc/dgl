@@ -312,13 +312,10 @@ class RelGraphConv(nn.Module):
                 * An integer list. The i^th element is the number of edges of the i^th type.
                   This requires the input graph to store edges sorted by their type IDs.
                   Preferred format if ``lowmem == True``.
-        norm : None or torch.Tensor
+        norm : torch.Tensor, optional
             Edge normalizer. Could be either
 
-                * ``None``, default value. No normalization is applied. Equivalent to
-                  :math:`e_{j,i}` equals :math:`1`.
-                * An :math:`(|E|, 1)` tensor. Normalization is applied. :math:`e_{j,i}` is
-                  queried from specified tensor.
+                * An :math:`(|E|, 1)` tensor storing the normalizer on each edge.
 
         Returns
         -------
