@@ -15,17 +15,16 @@ class RelGraphConv(nn.Module):
 
     Relational graph convolution is introduced in "`Modeling Relational Data with Graph
     Convolutional Networks <https://arxiv.org/abs/1703.06103>`__"
-    and can be described as below:
+    and can be described in DGL as below:
 
     .. math::
 
        h_i^{(l+1)} = \sigma(\sum_{r\in\mathcal{R}}
-       \sum_{j\in\mathcal{N}^r(i)}\frac{1}{c_{i,r}}W_r^{(l)}h_j^{(l)}+W_0^{(l)}h_i^{(l)})
+       \sum_{j\in\mathcal{N}^r(i)}e_{j,i}W_r^{(l)}h_j^{(l)}+W_0^{(l)}h_i^{(l)})
 
     where :math:`\mathcal{N}^r(i)` is the neighbor set of node :math:`i` w.r.t. relation
-    :math:`r`. :math:`c_{i,r}` is the normalizer equal
-    to :math:`|\mathcal{N}^r(i)|`. :math:`\sigma` is an activation function. :math:`W_0`
-    is the self-loop weight.
+    :math:`r`. :math:`e_{j,i}` is the normalizer. :math:`\sigma` is an activation
+    function. :math:`W_0` is the self-loop weight.
 
     The basis regularization decomposes :math:`W_r` by:
 
@@ -314,8 +313,10 @@ class RelGraphConv(nn.Module):
                 * An integer list. The i^th element is the number of edges of the i^th type.
                   This requires the input graph to store edges sorted by their type IDs.
                   Preferred format if ``lowmem == True``.
-        norm : torch.Tensor
-            Optional edge normalizer tensor. Shape: :math:`(|E|, 1)`.
+        norm : torch.Tensor, optional
+            Edge normalizer. Could be either
+
+                * An :math:`(|E|, 1)` tensor storing the normalizer on each edge.
 
         Returns
         -------
