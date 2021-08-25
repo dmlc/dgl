@@ -10,10 +10,10 @@
 #include "../../runtime/cuda/cuda_hashtable.cuh"
 #include "./dgl_cub.cuh"
 
+using namespace dgl::runtime::cuda;
+
 namespace dgl {
 namespace array {
-
-using namespace dgl::runtime::cuda;
 
 namespace {
 
