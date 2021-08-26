@@ -3,9 +3,10 @@
 from .. import backend as F
 from ..partition import NDArrayPartition
 
-class MultiGPUTensor:
-    """ Class for storing a large tensor split across GPU memory. When reading
-    memory from otehr GPUs, the call must be from all GPUs storing the tensor.
+class MultiGPUDataStore:
+    """ Class for storing a large tensor split across GPU memory according to
+    nodes. When reading memory from oehr GPUs, the call must be from all
+    GPUs storing the data.
 
     Example:
     --------
@@ -13,18 +14,18 @@ class MultiGPUTensor:
     It can be created via the shape and data type information from the tensor
     to split across gpus `large_cpu_tensor` in the below code:
 
-    >>> split_tensor = MultiGPUTensor(large_cpu_tensor.shape,
-                                      large_cpu_tensor.dtype,
-                                      dev_id,
-                                      nccl_comm)
-    >>> split_tensor.set_global(large_cpu_tensor)
+    >>> split_data = MultiGPUTensor(large_cpu_tensor.shape,
+    ...                               large_cpu_tensor.dtype,
+    ...                               dev_id,
+    ...                               nccl_comm)
+    >>> split_data.set_global(large_cpu_tensor)
 
     Then, once it is stored across GPU memory, during training, feature for
     mini-batches can be fetched via the `get_global()` method. If we have the
     tensor of mini-batch nodes `input_nodes` we can use the following code to
     fetch the features for the mini-batch:
     ...
-    >>> batch_features = split_tensor.get_global(input_nodes)
+    >>> batch_features = split_data.all_gather_row(input_nodes)
     """
     def __init__(self, shape, dtype, device, comm, partition=None):
         """ Create a new Tensor stored across multiple GPUs according to
