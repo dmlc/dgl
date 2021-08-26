@@ -406,8 +406,8 @@ def submit_jobs(args, udf_command):
     server_count_per_machine = 0
 
     # Get the IP addresses of the cluster.
-    ip_config = os.path.join(args.workspace, args.ip_config)
-    with open(ip_config) as f:
+    ip_config_workspace = os.path.join(args.workspace, args.ip_config)
+    with open(ip_config_workspace) as f:
         for line in f:
             result = line.strip().split()
             if len(result) == 2:
@@ -419,11 +419,11 @@ def submit_jobs(args, udf_command):
                 port = DEFAULT_PORT
                 hosts.append((ip, port))
             else:
-                raise RuntimeError("Format error of ip_config.")
+                raise RuntimeError("Format error of ip_config_workspace.")
             server_count_per_machine = args.num_servers
     # Get partition info of the graph data
-    part_config = os.path.join(args.workspace, args.part_config)
-    with open(part_config) as conf_f:
+    part_config_workspace = os.path.join(args.workspace, args.part_config)
+    with open(part_config_workspace) as conf_f:
         part_metadata = json.load(conf_f)
     assert 'num_parts' in part_metadata, 'num_parts does not exist.'
     # The number of partitions must match the number of machines in the cluster.
@@ -436,8 +436,10 @@ def submit_jobs(args, udf_command):
         num_samplers=args.num_samplers,
         num_server_threads=args.num_server_threads,
         tot_num_clients=tot_num_clients,
-        part_config=part_config,
-        ip_config=ip_config,
+        # Take care to pass part_config, ip_config to DistDGL processes with the workspace_dir prefix, otherwise
+        # various DistDGL systems (eg KVStore) will error with: "Cannot open file: ip_config.txt"
+        part_config=part_config_workspace,
+        ip_config=ip_config_workspace,
         num_servers=args.num_servers,
         graph_format=args.graph_format,
     )
@@ -452,8 +454,10 @@ def submit_jobs(args, udf_command):
     client_env_vars = construct_dgl_client_env_vars(
         num_samplers=args.num_samplers,
         tot_num_clients=tot_num_clients,
-        part_config=part_config,
-        ip_config=ip_config,
+        # Take care to pass part_config, ip_config to DistDGL processes with the workspace_dir prefix, otherwise
+        # various DistDGL systems (eg KVStore) will error with: "Cannot open file: ip_config.txt"
+        part_config=part_config_workspace,
+        ip_config=ip_config_workspace,
         num_servers=args.num_servers,
         graph_format=args.graph_format,
         num_omp_threads=os.environ.get("OMP_NUM_THREADS", str(args.num_omp_threads)),
