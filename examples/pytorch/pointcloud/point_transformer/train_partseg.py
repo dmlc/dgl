@@ -1,6 +1,4 @@
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
 import numpy as np
@@ -22,6 +20,7 @@ parser.add_argument('--num-epochs', type=int, default=250)
 parser.add_argument('--num-workers', type=int, default=8)
 parser.add_argument('--batch-size', type=int, default=16)
 parser.add_argument('--tensorboard', action='store_true')
+parser.add_argument('--opt', type=str, default='adam')
 args = parser.parse_args()
 
 num_workers = args.num_workers
@@ -51,7 +50,7 @@ def train(net, opt, scheduler, train_loader, dev):
     total_correct = 0
     count = 0
     start = time.time()
-    with tqdm.tqdm(train_loader) as tq:
+    with tqdm.tqdm(train_loader, ascii=True) as tq:
         for data, label, cat in tq:
             num_examples = data.shape[0]
             data = data.to(dev, dtype=torch.float)
@@ -147,9 +146,9 @@ def evaluate(net, test_loader, dev, per_cat_verbose=False):
                         per_cat_count += 1
                 tq.set_postfix({
                     'mIoU': '%.5f' % (miou / count),
-                    'per Category mIoU': '%.5f' % (miou / count)})
+                    'per Category mIoU': '%.5f' % (per_cat_miou / per_cat_count)})
     print("[Test] mIoU: %.5f, per Category mIoU: %.5f" %
-          (miou / count, miou / count))
+          (miou / count, per_cat_miou / per_cat_count))
     if per_cat_verbose:
         print("-" * 60)
         print("Per-Category mIoU:")
@@ -169,8 +168,24 @@ net = net.to(dev)
 if args.load_model_path:
     net.load_state_dict(torch.load(args.load_model_path, map_location=dev))
 
-opt = optim.Adam(net.parameters(), lr=1e-3, weight_decay=1e-4)
-scheduler = optim.lr_scheduler.StepLR(opt, step_size=20, gamma=0.5)
+if args.opt == 'adam':
+    # The optimizer strategy described in paper:
+    opt = torch.optim.SGD(net.parameters(), lr=0.01,
+                          momentum=0.9, weight_decay=1e-4)
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(
+        opt, milestones=[120, 160], gamma=0.1)
+elif args.opt == 'sgd':
+    # The optimizer strategy proposed by
+    # https://github.com/qq456cvb/Point-Transformers:
+    opt = torch.optim.Adam(
+        net.parameters(),
+        lr=1e-3,
+        betas=(0.9, 0.999),
+        eps=1e-08,
+        weight_decay=1e-4
+    )
+    scheduler = torch.optim.lr_scheduler.StepLR(opt, step_size=50, gamma=0.3)
+
 L = PartSegLoss()
 
 shapenet = ShapeNet(2048, normal_channel=False)
@@ -215,7 +230,7 @@ for epoch in range(args.num_epochs):
         net, opt, scheduler, train_loader, dev)
     if (epoch + 1) % 5 == 0 or epoch == 0:
         test_miou, test_per_cat_miou = evaluate(
-            net, test_loader, dev, (epoch + 1) % 5 == 0)
+            net, test_loader, dev, True)
         if test_miou > best_test_miou:
             best_test_miou = test_miou
             best_test_per_cat_miou = test_per_cat_miou

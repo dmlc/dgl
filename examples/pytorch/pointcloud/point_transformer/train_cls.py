@@ -7,7 +7,6 @@ import tqdm
 from functools import partial
 from dgl.data.utils import download, get_download_dir
 from torch.utils.data import DataLoader
-import torch.optim as optim
 import torch.nn as nn
 import torch
 import time
@@ -21,6 +20,7 @@ parser.add_argument('--save-model-path', type=str, default='')
 parser.add_argument('--num-epochs', type=int, default=200)
 parser.add_argument('--num-workers', type=int, default=8)
 parser.add_argument('--batch-size', type=int, default=16)
+parser.add_argument('--opt', type=str, default='adam')
 args = parser.parse_args()
 
 num_workers = args.num_workers
@@ -56,7 +56,7 @@ def train(net, opt, scheduler, train_loader, dev):
     count = 0
     loss_f = nn.CrossEntropyLoss()
     start_time = time.time()
-    with tqdm.tqdm(train_loader) as tq:
+    with tqdm.tqdm(train_loader, ascii=True) as tq:
         for data, label in tq:
             data = data.data.numpy()
             data = provider.random_point_dropout(data)
@@ -99,7 +99,7 @@ def evaluate(net, test_loader, dev):
     count = 0
     start_time = time.time()
     with torch.no_grad():
-        with tqdm.tqdm(test_loader) as tq:
+        with tqdm.tqdm(test_loader, ascii=True) as tq:
             for data, label in tq:
                 label = label[:, 0]
                 num_examples = label.shape[0]
@@ -125,18 +125,23 @@ net = net.to(dev)
 if args.load_model_path:
     net.load_state_dict(torch.load(args.load_model_path, map_location=dev))
 
-# opt = optim.SGD(net.parameters(), lr=0.01, momentum=0.9, weight_decay=1e-4)
-opt = torch.optim.Adam(
-    net.parameters(),
-    lr=1e-3,
-    betas=(0.9, 0.999),
-    eps=1e-08,
-    weight_decay=1e-4
-)
-
-# scheduler = optim.lr_scheduler.MultiStepLR(
-#     opt, milestones=[120, 160], gamma=0.1)
-scheduler = torch.optim.lr_scheduler.StepLR(opt, step_size=50, gamma=0.3)
+if args.opt == 'adam':
+    # The optimizer strategy described in paper:
+    opt = torch.optim.SGD(net.parameters(), lr=0.01,
+                          momentum=0.9, weight_decay=1e-4)
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(
+        opt, milestones=[120, 160], gamma=0.1)
+elif args.opt == 'sgd':
+    # The optimizer strategy proposed by
+    # https://github.com/qq456cvb/Point-Transformers:
+    opt = torch.optim.Adam(
+        net.parameters(),
+        lr=1e-3,
+        betas=(0.9, 0.999),
+        eps=1e-08,
+        weight_decay=1e-4
+    )
+    scheduler = torch.optim.lr_scheduler.StepLR(opt, step_size=50, gamma=0.3)
 
 train_dataset = ModelNetDataLoader(local_path, 1024, split='train')
 test_dataset = ModelNetDataLoader(local_path, 1024, split='test')

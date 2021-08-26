@@ -4,23 +4,23 @@ Point Transformer
 This is a reproduction of the paper: [Point Transformer](http://arxiv.org/abs/2012.09164).
 
 # Performance
-| Task           | Dataset    | Metric   | Score - Paper  | Score - DGL | Time(s) - DGL |
-|-----------------|------------|----------|------------------|-------------|-------------------|
-| Classification        | ModelNet40 | Accuracy | 93.7   | 90.4        | 101.0          |
-<!-- | Part Segmentation        | ShapeNet   | mIoU     | 86.6            | 83.6        | 234.0         | -->
+| Task           | Dataset    | Metric   | Score - Paper  | Score - DGL (Adam) | Score - DGL (SGD) | Time(s) - DGL |
+|-----------------|------------|----------|------------------|-------------|-------------|-------------------|
+| Classification        | ModelNet40 | Accuracy | 93.7   | 92.0        |  91.5        | 117.0          |
+| Part Segmentation        | ShapeNet   | mIoU     | 86.6            | 84.3        |  85.1        | 260.0         |
 
-+ Time(s) are the average training time per epoch, measured on EC2 g4dn.4xlarge instance w/ Tesla T4 GPU.
++ Time(s) are the average training time per epoch, measured on EC2 p3.8xlarge instance w/ Tesla V100 GPU.
 
 # How to Run
 
 For point cloud classification, run with
 
 ```python
-python train_cls.py
+python train_cls.py --opt [sgd/adam]
 ```
 
-<!-- For point cloud part-segmentation, run with
+For point cloud part-segmentation, run with
 
 ```python
-python train_partseg.py
-``` -->
+python train_partseg.py --opt [sgd/adam]
+```

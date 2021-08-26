@@ -12,28 +12,30 @@ https://github.com/qq456cvb/Point-Transformers
 
 
 class PointTransformerBlock(nn.Module):
-    def __init__(self, input_dim, n_neighbors):
+    def __init__(self, input_dim, n_neighbors, transformer_dim=None):
         super(PointTransformerBlock, self).__init__()
-        self.fc1 = nn.Linear(input_dim, input_dim)
-        self.fc2 = nn.Linear(input_dim, input_dim)
+        if transformer_dim is None:
+            transformer_dim = input_dim
+        self.fc1 = nn.Linear(input_dim, transformer_dim)
+        self.fc2 = nn.Linear(transformer_dim, input_dim)
         self.fc_delta = nn.Sequential(
-            nn.Linear(3, input_dim),
+            nn.Linear(3, transformer_dim),
             nn.ReLU(),
-            nn.Linear(input_dim, input_dim)
+            nn.Linear(transformer_dim, transformer_dim)
         )
         self.fc_gamma = nn.Sequential(
-            nn.Linear(input_dim, input_dim),
+            nn.Linear(transformer_dim, transformer_dim),
             nn.ReLU(),
-            nn.Linear(input_dim, input_dim)
+            nn.Linear(transformer_dim, transformer_dim)
         )
-        self.w_qs = nn.Linear(input_dim, input_dim, bias=False)
-        self.w_ks = nn.Linear(input_dim, input_dim, bias=False)
-        self.w_vs = nn.Linear(input_dim, input_dim, bias=False)
-        self.k = n_neighbors
+        self.w_qs = nn.Linear(transformer_dim, transformer_dim, bias=False)
+        self.w_ks = nn.Linear(transformer_dim, transformer_dim, bias=False)
+        self.w_vs = nn.Linear(transformer_dim, transformer_dim, bias=False)
+        self.n_neighbors = n_neighbors
 
     def forward(self, x, pos):
         dists = square_distance(pos, pos)
-        knn_idx = dists.argsort()[:, :, :self.k]  # b x n x k
+        knn_idx = dists.argsort()[:, :, :self.n_neighbors]  # b x n x k
         knn_pos = index_points(pos, knn_idx)
 
         h = self.fc1(x)
@@ -52,14 +54,15 @@ class PointTransformerBlock(nn.Module):
 
 
 class PointTransformer(nn.Module):
-    def __init__(self, n_points, batch_size, feature_dim=3, n_blocks=4, downsampling_rate=4, hidden_dim=32, n_neighbors=16):
+    def __init__(self, n_points, batch_size, feature_dim=3, n_blocks=4, downsampling_rate=4, hidden_dim=32, transformer_dim=None, n_neighbors=16):
         super(PointTransformer, self).__init__()
         self.fc = nn.Sequential(
             nn.Linear(feature_dim, hidden_dim),
             nn.ReLU(),
             nn.Linear(hidden_dim, hidden_dim)
         )
-        self.ptb = PointTransformerBlock(hidden_dim, n_neighbors)
+        self.ptb = PointTransformerBlock(
+            hidden_dim, n_neighbors, transformer_dim)
         self.transition_downs = nn.ModuleList()
         self.transformers = nn.ModuleList()
         for i in range(n_blocks):
@@ -68,14 +71,14 @@ class PointTransformer(nn.Module):
             self.transition_downs.append(TransitionDown(block_n_points, batch_size, [
                                          block_hidden_dim // 2 + 3, block_hidden_dim, block_hidden_dim], n_neighbors=n_neighbors))
             self.transformers.append(
-                PointTransformerBlock(block_hidden_dim, n_neighbors))
+                PointTransformerBlock(block_hidden_dim, n_neighbors, transformer_dim))
 
     def forward(self, x):
         if x.shape[-1] > 3:
             pos = x[:, :, :3]
         else:
             pos = x
-            
+
         feat = x
         h = self.fc(feat)
         h, _ = self.ptb(h, pos)
@@ -90,10 +93,10 @@ class PointTransformer(nn.Module):
 
 
 class PointTransformerCLS(nn.Module):
-    def __init__(self, out_classes, batch_size, feature_dim=3, n_blocks=4, downsampling_rate=4, hidden_dim=32, n_neighbors=16):
+    def __init__(self, out_classes, batch_size, feature_dim=3, n_blocks=4, downsampling_rate=4, hidden_dim=32, transformer_dim=None, n_neighbors=16):
         super(PointTransformerCLS, self).__init__()
         self.backbone = PointTransformer(
-            1024, batch_size, feature_dim, n_blocks, downsampling_rate, hidden_dim, n_neighbors)
+            1024, batch_size, feature_dim, n_blocks, downsampling_rate, hidden_dim, transformer_dim, n_neighbors)
         self.out = self.fc2 = nn.Sequential(
             nn.Linear(hidden_dim * 2 ** (n_blocks), 256),
             nn.ReLU(),
@@ -109,10 +112,10 @@ class PointTransformerCLS(nn.Module):
 
 
 class PointTransformerSeg(nn.Module):
-    def __init__(self, out_classes, batch_size, feature_dim=3, n_blocks=4, downsampling_rate=4, hidden_dim=32, n_neighbors=16):
+    def __init__(self, out_classes, batch_size, feature_dim=3, n_blocks=4, downsampling_rate=4, hidden_dim=32, transformer_dim=None, n_neighbors=16):
         super().__init__()
         self.backbone = PointTransformer(
-            2048, batch_size, feature_dim, n_blocks, downsampling_rate, hidden_dim, n_neighbors)
+            2048, batch_size, feature_dim, n_blocks, downsampling_rate, hidden_dim, transformer_dim, n_neighbors)
 
         self.fc = nn.Sequential(
             nn.Linear(32 * 2 ** n_blocks, 512),
@@ -122,7 +125,7 @@ class PointTransformerSeg(nn.Module):
             nn.Linear(512, 32 * 2 ** n_blocks)
         )
         self.ptb = PointTransformerBlock(
-            32 * 2 ** n_blocks, n_neighbors)
+            32 * 2 ** n_blocks, n_neighbors, transformer_dim)
 
         self.n_blocks = n_blocks
         self.transition_ups = nn.ModuleList()
@@ -132,7 +135,7 @@ class PointTransformerSeg(nn.Module):
             self.transition_ups.append(
                 TransitionUp(block_hidden_dim * 2, block_hidden_dim, block_hidden_dim))
             self.transformers.append(PointTransformerBlock(
-                block_hidden_dim, n_neighbors))
+                block_hidden_dim, n_neighbors, transformer_dim))
 
         self.out = nn.Sequential(
             nn.Linear(32+16, 64),
