@@ -52,9 +52,73 @@ class _NodeDataIterator:
         return result
             
 class MultiGPUNodeDataLoader(NodeDataLoader):
-    def __init__(self, g, nids, block_sampler, device, comm, partition=None, use_ddp=True,
+    """PyTorch dataloader for batch-iterating over a set of nodes, generating the list
+    of message flow graphs (MFGs) as computation dependency of the said minibatch.
+    The feature data of the graph is stored partitioned in GPU memory.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The graph.
+    nids : Tensor or dict[ntype, Tensor]
+        The node set to compute outputs.
+    block_sampler : dgl.dataloading.BlockSampler
+        The neighborhood sampler.
+    device : device context
+        The device to store the node data on, and the device
+        of the generated MFGs in each iteration, which should be a
+        PyTorch device object (e.g., ``torch.device``) specifying a GPU.
+    comm : dgl.cuda.nccl.Communicator, optional
+        The communicator to use to exchange features for each mini-batch.
+        Must not be None when multiple GPUs are used.
+    partition : dgl.partition.NDArrayPartition, optional
+        The partition specifying to which device each node's data belongs.
+        Must not be None when multiple GPUs are used.
+    use_ddp : boolean, optional
+        If True, tells the DataLoader to split the training set for each
+        participating process appropriately using
+        :class:`torch.utils.data.distributed.DistributedSampler`.
+
+        Note that :func:`~dgl.dataloading.NodeDataLoader.set_epoch` must be called
+        at the beginning of every epoch if :attr:`use_ddp` is True.
+
+        Overrides the :attr:`sampler` argument of :class:`torch.utils.data.DataLoader`.
+    node_feat : Tensor or dict[ntype, Tensor], optional
+        The node features to distribute separate from the graph for each
+        mini-batch. If specified, the sliced tensor corresponding to the
+        input nodes of the minibatch will be returned as the 4th item from the
+        iterator.
+    node_label : Tensor or dict[ntype, Tensor], optional
+        The node labels to distribute for each
+        mini-batch. If specified, the sliced tensor corresponding to the
+        seeds of the minibatch will be returned as the last item from the
+        iterator.
+    kwargs : dict
+        Arguments being passed to :py:class:`dgl.dataloader.NodeDataLoader`.
+
+    Examples
+    --------
+    To train a 3-layer GNN for node classification on a set of nodes ``train_nid`` on
+    a homogeneous graph where each node takes messages from all neighbors (assume
+    the backend is PyTorch):
+
+    >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
+    >>> dataloader = dgl.contrib.MultiGPUNodeDataLoader(
+    ...     g, train_nid, sampler,
+    ...     device=dev_id, comm=nccl_comm, node_feat=nfeat,
+    ...     node_label=labels, batch_size=1024, shuffle=True,
+    ...     drop_last=False)
+    >>> for input_nodes, output_nodes, blocks, batch_feats, batch_labels in dataloader:
+    ...     train_on(input_nodes, output_nodes, blocks, batch_feats, batch_labels)
+
+    In this example, `nccl_comm` is a :py:class:`dgl.cuda.nccl.Communicator`
+    that has previously been setup, and `dev_id` is the GPU being used by the
+    local process.
+    """
+    def __init__(self, g, nids, block_sampler, device, comm=None, partition=None, use_ddp=True,
                  node_feat=None, node_label=None, **kwargs):
         assert comm is None or use_ddp, "'use_ddp' must be true when using NCCL."
+        assert device != torch.device("cpu"), "The device must be a GPU."
 
         # we need to remove all of the features
         n_feat = {}
@@ -88,6 +152,7 @@ class MultiGPUNodeDataLoader(NodeDataLoader):
             self._node_label = _load_tensor(node_label, device, comm, partition)
 
     def __iter__(self):
+        """Return the iterator of the data loader."""
         it = super(MultiGPUNodeDataLoader, self).__iter__()
         return _NodeDataIterator(it, self._n_feat, self._node_feat,
                                  self._node_label)
