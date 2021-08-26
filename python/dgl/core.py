@@ -184,7 +184,7 @@ def _bucketing(val):
         return bkts
     return unique_val, bucketor
 
-def data_dict_to_list(graph, data_dict, func, lhs_target=None, rhs_target=None):
+def data_dict_to_list(graph, data_dict, func, target):
     """Get node or edge feature data of the given name for all the types.
 
     Parameters
@@ -208,13 +208,13 @@ def data_dict_to_list(graph, data_dict, func, lhs_target=None, rhs_target=None):
         data of type ``types[i]``.
     """
     if isinstance(func, fn.BinaryMessageFunction):
-        if lhs_target in ['u', 'v'] or rhs_target in ['u', 'v']:
+        if target in ['u', 'v']:
             output_list = [None] * graph._graph.number_of_ntypes()
             for srctype, _, dsttype in graph.canonical_etypes:
-                if lhs_target is not None:
+                if target == 'u':
                     src_id = graph.get_ntype_id(srctype)
                     output_list[src_id] = data_dict[srctype]
-                else: # rhs
+                else:
                     dst_id = graph.get_ntype_id(dsttype)
                     output_list[dst_id] = data_dict[dsttype]
         else: # target == 'e'
@@ -224,7 +224,7 @@ def data_dict_to_list(graph, data_dict, func, lhs_target=None, rhs_target=None):
                 output_list[etid] = data_dict[rel]
         return output_list
     else:
-        if lhs_target == 'u':
+        if target == 'u':
             lhs_list = [None] * graph._graph.number_of_ntypes()
             for srctype, _, _ in graph.canonical_etypes:
                 src_id = graph.get_ntype_id(srctype)
@@ -236,7 +236,6 @@ def data_dict_to_list(graph, data_dict, func, lhs_target=None, rhs_target=None):
                 etid = graph.get_etype_id(rel)
                 rhs_list[etid] = data_dict[rel]
             return rhs_list
-    # return tuple(lhs_list + rhs_list)
 
 def invoke_gsddmm(graph, func):
     """Invoke g-SDDMM computation on the graph.
@@ -260,8 +259,8 @@ def invoke_gsddmm(graph, func):
         op = getattr(ops, func.name)
         if graph._graph.number_of_etypes() > 1:
             lhs_target, _, rhs_target = func.name.split("_", 2)
-            x = data_dict_to_list(graph, x, func, lhs_target, None)
-            y = data_dict_to_list(graph, y, func, None, rhs_target)
+            x = data_dict_to_list(graph, x, func, lhs_target)
+            y = data_dict_to_list(graph, y, func, rhs_target)
         z = op(graph, x, y)
     else:
         x = alldata[func.target][func.in_field]
@@ -317,17 +316,17 @@ def invoke_gspmm(graph, mfunc, rfunc, *, srcdata=None, dstdata=None, edata=None)
         op = getattr(ops, '{}_{}'.format(mfunc.name, rfunc.name))
         if graph._graph.number_of_etypes() > 1:
             lhs_target, _, rhs_target = mfunc.name.split("_", 2)
-            x = data_dict_to_list(graph, x, mfunc, lhs_target, None)
-            y = data_dict_to_list(graph, y, mfunc, None, rhs_target)
+            x = data_dict_to_list(graph, x, mfunc, lhs_target)
+            y = data_dict_to_list(graph, y, mfunc, rhs_target)
         z = op(graph, x, y)
     else:
         x = alldata[mfunc.target][mfunc.in_field]
         op = getattr(ops, '{}_{}'.format(mfunc.name, rfunc.name))
         if graph._graph.number_of_etypes() > 1 and not isinstance(x, tuple):
             if mfunc.name == "copy_u":
-                x = data_dict_to_list(graph, x, mfunc, 'u', None)
+                x = data_dict_to_list(graph, x, mfunc, 'u')
             else: # "copy_e"
-                x = data_dict_to_list(graph, x, mfunc, 'e', None)
+                x = data_dict_to_list(graph, x, mfunc, 'e')
         z = op(graph, x)
     return {rfunc.out_field : z}
 

@@ -74,8 +74,7 @@ def gsddmm(g, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
         return gsddmm_internal(
             g._graph, op, lhs_data, rhs_data, lhs_target, rhs_target)
     else:
-        lhs_data = [None] * g._graph.number_of_ntypes() if lhs_data is None else lhs_data # copy_e
-        rhs_data = [None] * g._graph.number_of_etypes() if rhs_data is None else rhs_data # copy_u
+        # TODO (Israt): Call reshape func
         lhs_and_rhs_tuple = tuple(list(lhs_data) + list(rhs_data))
         return gsddmm_internal_hetero(g, op, lhs_target, rhs_target, *lhs_and_rhs_tuple)
 

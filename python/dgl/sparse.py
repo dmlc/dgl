@@ -64,6 +64,17 @@ def to_dgl_nd_for_write(x):
     return nd.NULL['int64'] if x is None else F.zerocopy_to_dgl_ndarray_for_write(x)
 
 
+def get_hs_id(g, rel, target):
+    """Find the src/dst/etype id based on the target type."""
+    srctype, _, dsttype = rel
+    etid = g.get_etype_id(rel)
+    if target == 0: # u
+        return g.get_ntype_id(srctype)
+    if target == 2: # v
+        return g.get_ntype_id(dsttype)
+    return etid
+
+
 target_mapping = {
     'u': 0,
     'e': 1,
@@ -340,30 +351,32 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
 def _gsddmm_hetero(g, op, lhs_target='u', rhs_target='v', lhs_and_rhs_tuple=None):
     r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface.
     """
-    num_ntypes = g._graph.number_of_ntypes()
-    lhs_tuple, rhs_tuple = lhs_and_rhs_tuple[:num_ntypes], lhs_and_rhs_tuple[num_ntypes:]
     gidx = g._graph
+    num_ntype = g._graph.number_of_ntypes()
+    num_etype = g._graph.number_of_etypes()
+    lhs_len = num_ntype if lhs_target in ['u', 'v'] else num_etype
+    lhs_tuple, rhs_tuple = lhs_and_rhs_tuple[:lhs_len], lhs_and_rhs_tuple[lhs_len:]
+
     use_lhs = op != 'copy_rhs'
     use_rhs = op != 'copy_lhs'
 
     # TODO (Israt): Add check - F.dtype(u) != F.dtype(e):
     # deal with scalar features.
     expand_lhs, expand_rhs = False, False
+    lhs_list = [None] * num_ntype if lhs_target in ['u', 'v'] else [None] * num_etype
+    rhs_list = [None] * num_ntype if rhs_target in ['u', 'v'] else [None] * num_etype
+    out_list = [None] * gidx.number_of_etypes()
 
     lhs_target = target_mapping[lhs_target]
     rhs_target = target_mapping[rhs_target]
 
-    lhs_list = [None] * gidx.number_of_ntypes()
-    rhs_list = [None] * gidx.number_of_ntypes()
-    out_list = [None] * gidx.number_of_etypes()
-
     for rel in g.canonical_etypes:
         srctype, _, dsttype = rel
         etid = g.get_etype_id(rel)
-        src_id = g.get_ntype_id(srctype)
-        dst_id = g.get_ntype_id(dsttype)
-        lhs = lhs_tuple[src_id]
-        rhs = rhs_tuple[dst_id]
+        lhs_id = get_hs_id(g, rel, lhs_target)
+        rhs_id = get_hs_id(g, rel, rhs_target)
+        lhs = lhs_tuple[lhs_id]
+        rhs = rhs_tuple[rhs_id]
         if use_lhs:
             if lhs is not None and F.ndim(lhs) == 1:
                 lhs = F.unsqueeze(lhs, -1)
@@ -372,17 +385,15 @@ def _gsddmm_hetero(g, op, lhs_target='u', rhs_target='v', lhs_and_rhs_tuple=None
             if rhs is not None and F.ndim(rhs) == 1:
                 rhs = F.unsqueeze(lhs, -1)
                 expand_rhs = True
-
         ctx = F.context(lhs) if use_lhs else F.context(rhs)
         dtype = F.dtype(lhs) if use_lhs else F.dtype(rhs)
         lhs_shp = F.shape(lhs) if use_lhs else (0,)
         rhs_shp = F.shape(rhs) if use_rhs else (0,)
-        lhs_list[src_id] = lhs if use_lhs else None
-        rhs_list[dst_id] = rhs if use_rhs else None
+        lhs_list[lhs_id] = lhs if use_lhs else None
+        rhs_list[rhs_id] = rhs if use_rhs else None
         out_shp = (gidx.number_of_edges(etid), ) +\
             infer_broadcast_shape(op, lhs_shp[1:], rhs_shp[1:])
         out_list[etid] = F.zeros(out_shp, dtype, ctx)
-
     if gidx.number_of_edges(0) > 0:
         _CAPI_DGLKernelSDDMMHetero(gidx, op,
                                    [to_dgl_nd(lhs) for lhs in lhs_list],

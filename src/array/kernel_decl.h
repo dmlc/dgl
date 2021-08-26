@@ -97,6 +97,13 @@ void SDDMMCoo(const std::string& op,
               int rhs_target);
 
 /*!
+ * \brief Find the src/dst/etype id based on the target.
+ */
+int get_hs_id(HeteroGraphPtr graph,
+             int target,
+             dgl_type_t etype);
+
+/*!
  * \brief Segment reduce.
  */
 template <int XPU, typename IdType, int bits>

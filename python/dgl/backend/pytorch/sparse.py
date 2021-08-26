@@ -343,20 +343,20 @@ class GSDDMM_hetero(th.autograd.Function):
             if lhs_target in ['u', 'v']:
                 _g = g if lhs_target == 'v' else g.reverse()
                 if op in ['add', 'copy_lhs']:
-                    tmp = tuple([None] * len(X))
-                    dX = gspmm_hetero(_g, 'copy_rhs', 'sum', *(tuple(tmp + dZ)))
+                    tpl_of_None = tuple([None] * len(X))
+                    dX = gspmm_hetero(_g, 'copy_rhs', 'sum', *(tuple(tpl_of_None + dZ)))
                 else:  # mul, dot
                     if rhs_target == lhs_target:
-                        dX = gspmm_hetero(_g, 'copy_rhs', 'sum', None, dZ) *  Y
+                        dX = gspmm_hetero(_g, 'copy_rhs', 'sum',  *(tuple(tpl_of_None + dZ))) *  Y
                     elif rhs_target == 'e':
-                        dX = gspmm_hetero(_g, 'copy_rhs', 'sum', None, dZ * Y)
+                        dX = gspmm_hetero(_g, 'copy_rhs', 'sum',  *(tuple(tpl_of_None + dZ)) * Y)
                     else:  # rhs_target = !lhs_target
                         dX = gspmm_hetero(_g, 'mul', 'sum', *tuple(Y + dZ))
             else:  # lhs_target == 'e'
                 if op in ['add', 'copy_lhs']:
                     dX = dZ
                 else:  # mul, dot
-                    dX = gsddmm_hetero(g, 'mul', dZ, Y, 'e', rhs_target)
+                    dX = gsddmm_hetero(g, 'mul', 'e', rhs_target, *tuple(dZ + Y))
             dX = tuple([_reduce_grad(dX[i], X[i].shape) if X[i] is not None else None
                 for i in range(len(X))])
         else:
@@ -364,14 +364,14 @@ class GSDDMM_hetero(th.autograd.Function):
         if op != 'copy_lhs' and any([y is not None for y in Y]):
             if rhs_target in ['u', 'v']:
                 _g = g if rhs_target == 'v' else g.reverse()
-                tmp_X = tuple([None] * len(X))
+                tpl_of_None = tuple([None] * len(X))
                 if op in ['add', 'copy_rhs']:
-                    dY = gspmm_hetero(_g, 'copy_rhs', 'sum', *(tuple(tmp_X + dZ)))
+                    dY = gspmm_hetero(_g, 'copy_rhs', 'sum', *(tuple(tpl_of_None + dZ)))
                 else:  # mul, dot
                     if lhs_target == rhs_target:
-                        dY = gspmm_hetero(_g, 'copy_rhs', 'sum', *(tuple(tmp + dZ))) * X
+                        dY = gspmm_hetero(_g, 'copy_rhs', 'sum', *(tuple(tpl_of_None + dZ))) * X
                     elif lhs_target == 'e':
-                        dY = gspmm_hetero(_g, 'copy_rhs', 'sum', None, dZ * X)
+                        dY = gspmm_hetero(_g, 'copy_rhs', 'sum', *(tuple(tpl_of_None + dZ)) * X)
                     else:  # rhs_target = !lhs_target
                         dY = gspmm_hetero(_g, 'mul', 'sum', *tuple(X + dZ))
             else:
@@ -379,7 +379,7 @@ class GSDDMM_hetero(th.autograd.Function):
                     dY = tuple([dZ[i] if dZ[i] is not None else None
                         for i in range(len(dZ))])
                 else:  # mul, dot
-                    dY = gsddmm_hetero(g, 'mul', dZ, X, 'e', lhs_target)
+                    dY = gsddmm_hetero(g, 'mul', 'e', lhs_target, *tuple(dZ + X))
             dY = tuple([_reduce_grad(dY[i], Y[i].shape) if Y[i] is not None else None
                 for i in range(len(Y))])
         else:
