@@ -295,8 +295,8 @@ if __name__ == '__main__':
     register_data_args(parser)
     parser.add_argument('--graph_name', type=str, help='graph name')
     parser.add_argument('--id', type=int, help='the partition id')
-    parser.add_argument('--ip_config', type=str, help='The file for IP configuration')
-    parser.add_argument('--part_config', type=str, help='The path to the partition config file')
+    parser.add_argument('--ip_config', type=str, help='The file for IP configuration. absolute path.')
+    parser.add_argument('--part_config', type=str, help='The path to the partition config file. absolute path.')
     parser.add_argument('--num_clients', type=int, help='The number of clients')
     parser.add_argument('--n_classes', type=int, help='the number of classes')
     parser.add_argument('--num_gpus', type=int, default=-1,

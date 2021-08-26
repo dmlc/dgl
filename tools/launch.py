@@ -436,8 +436,8 @@ def submit_jobs(args, udf_command):
         num_samplers=args.num_samplers,
         num_server_threads=args.num_server_threads,
         tot_num_clients=tot_num_clients,
-        part_config=args.part_config,
-        ip_config=args.ip_config,
+        part_config=part_config,
+        ip_config=ip_config,
         num_servers=args.num_servers,
         graph_format=args.graph_format,
     )
@@ -452,8 +452,8 @@ def submit_jobs(args, udf_command):
     client_env_vars = construct_dgl_client_env_vars(
         num_samplers=args.num_samplers,
         tot_num_clients=tot_num_clients,
-        part_config=args.part_config,
-        ip_config=args.ip_config,
+        part_config=part_config,
+        ip_config=ip_config,
         num_servers=args.num_servers,
         graph_format=args.graph_format,
         num_omp_threads=os.environ.get("OMP_NUM_THREADS", str(args.num_omp_threads)),
