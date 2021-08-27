@@ -1,6 +1,9 @@
 Point Transformer
 ====
 
+> This model is implemented on August 27, 2021 when there is no official code released.    
+Thus we implemented this model based on the code from <https://github.com/qq456cvb/Point-Transformers>.
+
 This is a reproduction of the paper: [Point Transformer](http://arxiv.org/abs/2012.09164).
 
 # Performance

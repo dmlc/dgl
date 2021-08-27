@@ -93,10 +93,10 @@ class PointTransformer(nn.Module):
 
 
 class PointTransformerCLS(nn.Module):
-    def __init__(self, out_classes, batch_size, feature_dim=3, n_blocks=4, downsampling_rate=4, hidden_dim=32, transformer_dim=None, n_neighbors=16):
+    def __init__(self, out_classes, batch_size, n_points=1024, feature_dim=3, n_blocks=4, downsampling_rate=4, hidden_dim=32, transformer_dim=None, n_neighbors=16):
         super(PointTransformerCLS, self).__init__()
         self.backbone = PointTransformer(
-            1024, batch_size, feature_dim, n_blocks, downsampling_rate, hidden_dim, transformer_dim, n_neighbors)
+            n_points, batch_size, feature_dim, n_blocks, downsampling_rate, hidden_dim, transformer_dim, n_neighbors)
         self.out = self.fc2 = nn.Sequential(
             nn.Linear(hidden_dim * 2 ** (n_blocks), 256),
             nn.ReLU(),
@@ -112,10 +112,10 @@ class PointTransformerCLS(nn.Module):
 
 
 class PointTransformerSeg(nn.Module):
-    def __init__(self, out_classes, batch_size, feature_dim=3, n_blocks=4, downsampling_rate=4, hidden_dim=32, transformer_dim=None, n_neighbors=16):
+    def __init__(self, out_classes, batch_size, n_points=2048, feature_dim=3, n_blocks=4, downsampling_rate=4, hidden_dim=32, transformer_dim=None, n_neighbors=16):
         super().__init__()
         self.backbone = PointTransformer(
-            2048, batch_size, feature_dim, n_blocks, downsampling_rate, hidden_dim, transformer_dim, n_neighbors)
+            n_points, batch_size, feature_dim, n_blocks, downsampling_rate, hidden_dim, transformer_dim, n_neighbors)
 
         self.fc = nn.Sequential(
             nn.Linear(32 * 2 ** n_blocks, 512),
