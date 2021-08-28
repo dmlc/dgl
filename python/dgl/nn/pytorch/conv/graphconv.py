@@ -27,7 +27,7 @@ class EdgeWeightNorm(nn.Module):
     And, setting ``norm='right'`` yields the following normalization term:
 
     .. math::
-      c_{ji} = (\sum_{k\in\mathcal{N}(i)}}e_{ki})
+      c_{ji} = (\sum_{k\in\mathcal{N}(i)}e_{ki})
 
     where :math:`e_{ji}` is the scalar weight on the edge from node :math:`j` to node :math:`i`.
 
