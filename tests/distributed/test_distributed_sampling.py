@@ -138,7 +138,7 @@ def check_rpc_find_edges_shuffle(tmpdir, num_server):
     assert F.array_equal(u, du)
     assert F.array_equal(v, dv)
 
-def create_random_hetero(dense=False):
+def create_random_hetero(dense=False, empty=False):
     num_nodes = {'n1': 210, 'n2': 200, 'n3': 220} if dense else \
         {'n1': 1010, 'n2': 1000, 'n3': 1020}
     etypes = [('n1', 'r1', 'n2'),
@@ -148,8 +148,8 @@ def create_random_hetero(dense=False):
     random.seed(42)
     for etype in etypes:
         src_ntype, _, dst_ntype = etype
-        arr = spsp.random(num_nodes[src_ntype] - 10,
-                          num_nodes[dst_ntype] - 10,
+        arr = spsp.random(num_nodes[src_ntype] - 10 if empty else num_nodes[src_ntype],
+                          num_nodes[dst_ntype] - 10 if empty else num_nodes[dst_ntype],
                           density=0.1 if dense else 0.001,
                           format='coo', random_state=100)
         edges[etype] = (arr.row, arr.col)
@@ -406,18 +406,28 @@ def check_rpc_hetero_sampling_shuffle(tmpdir, num_server):
         assert np.all(F.asnumpy(orig_src1) == orig_src)
         assert np.all(F.asnumpy(orig_dst1) == orig_dst)
 
+def get_degrees(g, nids, ntype):
+    deg = F.zeros((len(nids),), dtype=F.int64)
+    for srctype, etype, dsttype in g.canonical_etypes:
+        if srctype == ntype:
+            deg += g.out_degrees(u=nids, etype=etype)
+        elif dsttype == ntype:
+            deg += g.in_degrees(v=nids, etype=etype)
+    return deg
+
 def check_rpc_hetero_sampling_empty_shuffle(tmpdir, num_server):
     ip_config = open("rpc_ip_config.txt", "w")
     for _ in range(num_server):
         ip_config.write('{}\n'.format(get_local_usable_addr()))
     ip_config.close()
 
-    g = create_random_hetero()
+    g = create_random_hetero(empty=True)
     num_parts = num_server
     num_hops = 1
 
-    partition_graph(g, 'test_sampling', num_parts, tmpdir,
-                    num_hops=num_hops, part_method='metis', reshuffle=True)
+    orig_nids, _ = partition_graph(g, 'test_sampling', num_parts, tmpdir,
+                                   num_hops=num_hops, part_method='metis',
+                                   reshuffle=True, return_mapping=True)
 
     pserver_list = []
     ctx = mp.get_context('spawn')
@@ -428,14 +438,14 @@ def check_rpc_hetero_sampling_empty_shuffle(tmpdir, num_server):
         pserver_list.append(p)
 
     time.sleep(3)
-    num_nodes = g.number_of_nodes('n3')
+    deg = get_degrees(g, orig_nids['n3'], 'n3')
+    empty_nids = F.nonzero_1d(deg == 0)
     block, gpb = start_hetero_sample_client(0, tmpdir, num_server > 1,
-                                            nodes = {'n3': [num_nodes - 5, num_nodes - 4, num_nodes - 3, num_nodes - 2]})
+                                            nodes = {'n3': empty_nids})
     print("Done sampling")
     for p in pserver_list:
         p.join()
 
-    print(block)
     assert block.number_of_edges() == 0
     assert len(block.etypes) == len(g.etypes)
 
@@ -508,12 +518,13 @@ def check_rpc_hetero_etype_sampling_empty_shuffle(tmpdir, num_server):
     for _ in range(num_server):
         ip_config.write('{}\n'.format(get_local_usable_addr()))
     ip_config.close()
-    g = create_random_hetero(dense=True)
+    g = create_random_hetero(dense=True, empty=True)
     num_parts = num_server
     num_hops = 1
 
-    partition_graph(g, 'test_sampling', num_parts, tmpdir,
-                    num_hops=num_hops, part_method='metis', reshuffle=True)
+    orig_nids, _ = partition_graph(g, 'test_sampling', num_parts, tmpdir,
+                                   num_hops=num_hops, part_method='metis',
+                                   reshuffle=True, return_mapping=True)
 
     pserver_list = []
     ctx = mp.get_context('spawn')
@@ -525,14 +536,14 @@ def check_rpc_hetero_etype_sampling_empty_shuffle(tmpdir, num_server):
 
     time.sleep(3)
     fanout = 3
-    num_nodes = g.number_of_nodes('n3')
+    deg = get_degrees(g, orig_nids['n3'], 'n3')
+    empty_nids = F.nonzero_1d(deg == 0)
     block, gpb = start_hetero_etype_sample_client(0, tmpdir, num_server > 1, fanout,
-                                                  nodes={'n3': [num_nodes - 5, num_nodes - 4, num_nodes - 3, num_nodes - 2]})
+                                                  nodes={'n3': empty_nids})
     print("Done sampling")
     for p in pserver_list:
         p.join()
 
-    print(block)
     assert block.number_of_edges() == 0
     assert len(block.etypes) == len(g.etypes)
 
@@ -712,8 +723,6 @@ if __name__ == "__main__":
         os.environ['DGL_DIST_MODE'] = 'standalone'
         check_standalone_etype_sampling_heterograph(Path(tmpdirname), True)
 
-    test_rpc_sampling_shuffle(1)
-    test_rpc_sampling_shuffle(2)
     with tempfile.TemporaryDirectory() as tmpdirname:
         os.environ['DGL_DIST_MODE'] = 'standalone'
         check_standalone_etype_sampling(Path(tmpdirname), True)
