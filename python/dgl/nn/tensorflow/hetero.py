@@ -91,7 +91,7 @@ class HeteroGraphConv(layers.Layer):
     .. note::
     HeteroGraphConv requires that there is a module for every ``'etype'`` in an input graph.
     If you want to apply HeteroGraphConv to a subset of a graph's ``'etypes'``, you must create a new graph using for
-    example: :func:`~dgl.edge_type_subgraph()`.
+    example :func:`~dgl.edge_type_subgraph()`.
 
     Parameters
     ----------
