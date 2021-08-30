@@ -7,23 +7,14 @@
 #ifndef DGL_ARRAY_CUDA_ARRAY_INDEX_SELECT_UVM_CUH_
 #define DGL_ARRAY_CUDA_ARRAY_INDEX_SELECT_UVM_CUH_
 
+#define CACHE_LINE_SIZE 128
+
 namespace dgl {
 namespace aten {
 namespace impl {
 
 template <typename DType, typename IdType>
-__global__ void IndexSelectSingleKernel(const DType* array, const IdType* index,
-                                   int64_t length, DType* out) {
-  int tx = blockIdx.x * blockDim.x + threadIdx.x;
-  int stride_x = gridDim.x * blockDim.x;
-  while (tx < length) {
-    out[tx] = array[index[tx]];
-    tx += stride_x;
-  }
-}
-
-template <typename DType, typename IdType>
-__global__ void IndexSelectMultiKernel(
+__global__ void IndexSelectMultiKernelAligned(
         const DType* const array,
         const int64_t num_feat,
         const IdType* const index,
@@ -36,8 +27,12 @@ __global__ void IndexSelectMultiKernel(
   while (out_row < length) {
     int64_t col = threadIdx.x;
     const int64_t in_row = index[out_row];
+    const int64_t idx_offset =
+      ((uint64_t)(&array[in_row*num_feat]) % CACHE_LINE_SIZE) / sizeof(DType);
+    col = col - idx_offset;
     while (col < num_feat) {
-      out[out_row*num_feat+col] = array[in_row*num_feat+col];
+      if (col >= 0)
+        out[out_row*num_feat+col] = array[in_row*num_feat+col];
       col += blockDim.x;
     }
     out_row += stride;

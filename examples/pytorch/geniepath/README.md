@@ -41,7 +41,14 @@ python ppi.py
 
 Performance
 -------------------------
-|Dataset | Pubmed (ACC)| PPI (micro-F1)|
-| ------ | ----------- | ------------- |
-| Paper  | 78.5%       | 0.952         |
-| DGL    | 73.0%       | 0.959         |
+Dataset: Pubmed (ACC)
+|Method | GeniePath|
+| ------ | ----------- |
+| Paper  | 78.5%       |
+| DGL    | 73.0%       |
+
+Dataset: PPI (micro-F1)
+|Method | GeniePath| GeniePath-lazy| GeniePath-lazy-residual|
+| ------ | ----------- | ------------- | ------------------ |
+| Paper  | 0.9520      | 0.9790        | 0.9850        |
+| DGL    | 0.9729      | 0.9802        | 0.9798        |

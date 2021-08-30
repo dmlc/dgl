@@ -138,7 +138,7 @@ def knn_graph(x, k, algorithm='bruteforce-blas', dist='euclidean'):
     Returns
     -------
     DGLGraph
-        The constructred graph. The node IDs are in the same order as :attr:`x`.
+        The constructed graph. The node IDs are in the same order as :attr:`x`.
 
     Examples
     --------

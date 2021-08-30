@@ -386,7 +386,7 @@ class CoraGraphDataset(CitationGraphDataset):
     --------
     >>> dataset = CoraGraphDataset()
     >>> g = dataset[0]
-    >>> num_class = g.num_classes
+    >>> num_class = dataset.num_classes
     >>>
     >>> # get node feature
     >>> feat = g.ndata['feat']
@@ -398,8 +398,6 @@ class CoraGraphDataset(CitationGraphDataset):
     >>>
     >>> # get labels
     >>> label = g.ndata['label']
-    >>>
-    >>> # Train, Validation and Test
 
     """
     def __init__(self, raw_dir=None, force_reload=False, verbose=True, reverse_edge=True):
@@ -531,7 +529,7 @@ class CiteseerGraphDataset(CitationGraphDataset):
     --------
     >>> dataset = CiteseerGraphDataset()
     >>> g = dataset[0]
-    >>> num_class = g.num_classes
+    >>> num_class = dataset.num_classes
     >>>
     >>> # get node feature
     >>> feat = g.ndata['feat']
@@ -543,8 +541,6 @@ class CiteseerGraphDataset(CitationGraphDataset):
     >>>
     >>> # get labels
     >>> label = g.ndata['label']
-    >>>
-    >>> # Train, Validation and Test
 
     """
     def __init__(self, raw_dir=None, force_reload=False, verbose=True, reverse_edge=True):
@@ -673,7 +669,7 @@ class PubmedGraphDataset(CitationGraphDataset):
     --------
     >>> dataset = PubmedGraphDataset()
     >>> g = dataset[0]
-    >>> num_class = g.num_of_class
+    >>> num_class = dataset.num_of_class
     >>>
     >>> # get node feature
     >>> feat = g.ndata['feat']
@@ -685,8 +681,6 @@ class PubmedGraphDataset(CitationGraphDataset):
     >>>
     >>> # get labels
     >>> label = g.ndata['label']
-    >>>
-    >>> # Train, Validation and Test
 
     """
     def __init__(self, raw_dir=None, force_reload=False, verbose=True, reverse_edge=True):
