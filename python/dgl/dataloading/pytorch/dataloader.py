@@ -1,6 +1,5 @@
 """DGL PyTorch DataLoaders"""
 from collections import namedtuple
-from collections.abc import MutableMapping
 import warnings
 import inspect
 import math
@@ -355,9 +354,11 @@ NodeSpace = namedtuple('NodeSpace', ['data'])
 EdgeSpace = namedtuple('EdgeSpace', ['data'])
 
 class _BlockNodeView(object):
-    __slots__ = ['_block']
-    def __init__(self, wrapper):
+    """A node view class for block wrapper"""
+    __slots__ = ['_wrapper', '_typeid_getter']
+    def __init__(self, wrapper, typeid_getter):
         self._wrapper = wrapper
+        self._typeid_getter = typeid_getter
 
     def __getitem__(self, key):
         assert isinstance(key, str)
@@ -366,13 +367,17 @@ class _BlockNodeView(object):
         return NodeSpace(data=NodeDataView(self._wrapper, key))
 
     def __call__(self, ntype=None):
-        ntid = self._wrapper.block_typeid_getter(ntype)
+        ntid = self._typeid_getter(ntype)
         ret = F.arange(0, self._wrapper.block._graph.number_of_nodes(ntid),
-                       dtype=self._wrapper.block.idtype, ctx=self._graph.device)
+                       dtype=self._wrapper.block.idtype, ctx=self._wrapper.block.device)
         return ret
 
-class NodeDataView(MutableMapping):
-    __slots__ = ['_data']
+class NodeDataView(object):
+    """
+    A data view class when block.ndata[ntype] is called
+    Only allow read and update node attributes
+    """
+    __slots__ = ['_data', '_nids', '_names', '_nodes']
     def __init__(self, wrapper, ntype):
         self._data = wrapper._ndata.get(ntype, {})
         if len(self._data) == 0:
@@ -380,7 +385,7 @@ class NodeDataView(MutableMapping):
         if ntype not in wrapper._nids:
             wrapper._nids[ntype] = wrapper.nodes(ntype)
         self._nids = wrapper._nids[ntype]
-        self._names = set([name.get_name() for name in wrapper.g._get_ndata_names(ntype)])
+        self._names = {name.get_name() for name in wrapper.g._get_ndata_names(ntype)}
         self._nodes = wrapper.g.nodes[ntype]
 
     def _get_names(self):
@@ -398,6 +403,7 @@ class NodeDataView(MutableMapping):
         self._data[key] = val
 
 class _BlockEdgeView(object):
+    """A edge view class for block wrapper"""
     __slots__ = ['_wrapper']
     def __init__(self, wrapper):
         self._wrapper = wrapper
@@ -411,8 +417,12 @@ class _BlockEdgeView(object):
     def __call__(self, *args, **kwargs):
         return self._wrapper.block.all_edges(*args, **kwargs)
 
-class EdgeDataView(MutableMapping):
-    __slots__ = ['_data']
+class EdgeDataView(object):
+    """
+    A data view class when block.edata[etype] is called
+    Only allow read and update edge attributes
+    """
+    __slots__ = ['_data', '_eids', '_names', '_edges']
     def __init__(self, wrapper, etype):
         self._data = wrapper._edata.get(etype, {})
         if len(self._data) == 0:
@@ -420,7 +430,7 @@ class EdgeDataView(MutableMapping):
         if etype not in wrapper._eids:
             wrapper._eids[etype] = wrapper.block.edges[etype].data[EID]
         self._eids = wrapper._eids[etype]
-        self._names = set([name.get_name() for name in wrapper.g._get_edata_names(etype)])
+        self._names = {name.get_name() for name in wrapper.g._get_edata_names(etype)}
         self._edges = wrapper.g.edges[etype]
 
     def _get_names(self):
@@ -440,6 +450,7 @@ class EdgeDataView(MutableMapping):
 class _BlockWrapper:
     """
     A wrapper class for blocks returned by DistDataLoader
+    Allow users to read, copy, and modify nodes' and edges' attributes with limited APIs
     """
     def __init__(self, g, block):
         self.g = g
@@ -451,6 +462,7 @@ class _BlockWrapper:
         self._copied = False
 
     def _copy_node_attr(self, ntype, attr):
+        """copy node attributes"""
         if ntype not in self._ndata:
             self._nids[ntype] = self.block.nodes(ntype)
             self._ndata[ntype] = {}
@@ -460,6 +472,7 @@ class _BlockWrapper:
         self.block.nodes[ntype][attr] = self._ndata[ntype][attr]
 
     def _copy_edge_attr(self, etype, attr):
+        """copy edge attributes"""
         if etype not in self._edata:
             self._eids[etype] = self.block.edges[etype].data[EID]
             self._edata[etype] = {}
@@ -469,9 +482,7 @@ class _BlockWrapper:
         self.block.edges[etype][attr] = self._edata[etype][attr]
 
     def copy_attr(self, nattr=None, eattr=None):
-        """
-        copy node and edge attributes from DistTensor to blocks
-        """
+        """copy node and edge attributes from DistTensor to blocks"""
         if nattr is None:
             nattr = {}
             for ntype in self.ntypes:
@@ -488,24 +499,32 @@ class _BlockWrapper:
                 self._copy_edge_attr(etype, attr)
 
     def to(self, device, nattr=None, eattr=None):
+        """copy graph attributes and then send DGLHeteroGraph to target device (for training)"""
         self.copy_attr(nattr, eattr)
         return self.block.to(device)
 
+    def get_original_block(self):
+        """return the original (DGLHeteroGraph) block"""
+        if not self._copied:
+            warnings.warn("return original block with no attributes other than id."
+                          "Use copy_attr() to copy attributes if needed.")
+        return self.block
+
     @property
     def nodes(self):
-        return _BlockNodeView(self)
+        return _BlockNodeView(self, self.block.get_ntype_id)
 
     @property
     def srcnodes(self):
         if not self._copied:
-            warnings.warn("property srcnodes return srcnodes with no attributes other than id."
+            warnings.warn("property srcnodes returns srcnodes with no attributes other than id."
                           "Use copy_attr() to copy attributes if needed.")
         return self.block.srcnodes
 
     @property
     def dstnodes(self):
         if not self._copied:
-            warnings.warn("property dstnodes return dstnodes with no attributes other than id."
+            warnings.warn("property dstnodes returns dstnodes with no attributes other than id."
                           "Use copy_attr() to copy attributes if needed.")
         return self.block.dstnodes
 
@@ -521,14 +540,14 @@ class _BlockWrapper:
     @property
     def srcdata(self):
         if not self._copied:
-            warnings.warn("property srcdata return srcdata with no attributes other than id."
+            warnings.warn("property srcdata returns srcdata with no attributes other than id."
                           "Use copy_attr() to copy attributes if needed.")
         return self.block.srcdata
 
     @property
     def dstdata(self):
         if not self._copied:
-            warnings.warn("property dstdata return dstdata with no attributes other than id."
+            warnings.warn("property dstdata returns dstdata with no attributes other than id."
                           "Use copy_attr() to copy attributes if needed.")
         return self.block.dstdata
 
@@ -556,27 +575,6 @@ class _BlockWrapper:
     @property
     def dsttypes(self):
         return self.block.dsttypes
-
-    def number_of_nodes(self, ntype=None):
-        return self.block.number_of_nodes(ntype)
-
-    def number_of_edges(self, etype=None):
-        return self.block.number_of_edges(etype)
-
-    def num_nodes(self, ntype=None):
-        return self.block.num_nodes(ntype)
-
-    def num_edges(self, etype=None):
-        return self.block.num_edges(etype)
-
-    def out_degrees(self, u=ALL):
-        return self.block.out_degress(u)
-
-    def in_degrees(self, v=ALL):
-        return self.block.in_degrees(v)
-
-    def find_edges(self, edges, etype=None):
-        return self.block.find_edges(edges, etype)
 
 class _DistDataLoaderWrapper:
     """
