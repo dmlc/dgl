@@ -12,7 +12,6 @@ from dgl import DGLError
 import test_utils
 from test_utils import parametrize_dtype, get_cases
 from scipy.sparse import rand
-import torch
 
 rfuncs = {'sum': fn.sum, 'max': fn.max, 'min': fn.min, 'mean': fn.mean}
 fill_value = {'sum': 0, 'max': float("-inf")}
