@@ -13,7 +13,7 @@ from ...distributed import DistGraph
 from ...distributed import DistDataLoader
 from ...ndarray import NDArray as DGLNDArray
 from ... import backend as F
-from ...base import DGLError, EID, ALL
+from ...base import DGLError, EID
 from ...utils import to_dgl_context
 
 __all__ = ['NodeDataLoader', 'EdgeDataLoader', 'GraphDataLoader',
@@ -24,6 +24,9 @@ __all__ = ['NodeDataLoader', 'EdgeDataLoader', 'GraphDataLoader',
 PYTORCH_VER = LooseVersion(th.__version__)
 PYTORCH_16 = PYTORCH_VER >= LooseVersion("1.6.0")
 PYTORCH_17 = PYTORCH_VER >= LooseVersion("1.7.0")
+
+NodeSpace = namedtuple('NodeSpace', ['data'])
+EdgeSpace = namedtuple('EdgeSpace', ['data'])
 
 def _create_dist_sampler(dataset, dataloader_kwargs, ddp_seed):
     # Note: will change the content of dataloader_kwargs
@@ -350,9 +353,6 @@ class _EdgeDataLoaderIter:
         result = [_to_device(data, self.device) for data in result_]
         return result
 
-NodeSpace = namedtuple('NodeSpace', ['data'])
-EdgeSpace = namedtuple('EdgeSpace', ['data'])
-
 class _BlockNodeView(object):
     """A node view class for block wrapper"""
     __slots__ = ['_wrapper', '_typeid_getter']
@@ -498,47 +498,53 @@ class _BlockWrapper:
             for attr in attrs:
                 self._copy_edge_attr(etype, attr)
 
-    def to(self, device, nattr=None, eattr=None):
-        """copy graph attributes and then send DGLHeteroGraph to target device (for training)"""
+    def to_device(self, device, nattr=None, eattr=None):
+        """copy graph attributes and then send the block to target device (for training)"""
         self.copy_attr(nattr, eattr)
         return self.block.to(device)
 
     def get_original_block(self):
         """return the original (DGLHeteroGraph) block"""
         if not self._copied:
-            warnings.warn("return original block with no attributes other than id."
+            warnings.warn("return original block with no attributes other than id. "
                           "Use copy_attr() to copy attributes if needed.")
         return self.block
 
     @property
     def nodes(self):
+        """returns a block node view, similar to DGLHeteroGraph.nodes"""
         return _BlockNodeView(self, self.block.get_ntype_id)
 
     @property
     def srcnodes(self):
+        """returns a block node view for source nodes, similar to DGLHeteroGraph.srcnodes"""
         if not self._copied:
-            warnings.warn("property srcnodes returns srcnodes with no attributes other than id."
+            warnings.warn("property srcnodes returns srcnodes with no attributes other than id. "
                           "Use copy_attr() to copy attributes if needed.")
         return self.block.srcnodes
 
     @property
     def dstnodes(self):
+        """returns a block node view for destination nodes, similar to DGLHeteroGraph.dstnodes"""
         if not self._copied:
-            warnings.warn("property dstnodes returns dstnodes with no attributes other than id."
+            warnings.warn("property dstnodes returns dstnodes with no attributes other than id. "
                           "Use copy_attr() to copy attributes if needed.")
         return self.block.dstnodes
 
     @property
     def edges(self):
+        """returns a block edge view, similar to DGLHeteroGraph.edges"""
         return _BlockEdgeView(self)
 
     @property
     def ndata(self):
+        """returns a block node data view, similar to DGLHeteroGraph.ndata"""
         assert len(self.ntypes) == 1, "ndata only works for a graph with one node type."
         return NodeDataView(self, self.ntypes[0])
 
     @property
     def srcdata(self):
+        """returns a block node data view for source nodes, similar to DGLHeteroGraph.srcdata"""
         if not self._copied:
             warnings.warn("property srcdata returns srcdata with no attributes other than id."
                           "Use copy_attr() to copy attributes if needed.")
@@ -546,6 +552,7 @@ class _BlockWrapper:
 
     @property
     def dstdata(self):
+        """returns a block node data view for destination data, similar to DGLHeteroGraph.dstdata"""
         if not self._copied:
             warnings.warn("property dstdata returns dstdata with no attributes other than id."
                           "Use copy_attr() to copy attributes if needed.")
@@ -553,27 +560,33 @@ class _BlockWrapper:
 
     @property
     def edata(self):
+        """returns a block edge data view, similar to DGLHeteroGraph.edata"""
         assert len(self.etypes) == 1, "edata only works for a graph with one edge type."
         return EdgeDataView(self, self.etypes[0])
 
     @property
     def ntypes(self):
+        """returns node types in the block, similar to DGLHeteroGraph.ntypes"""
         return self.block.ntypes
 
     @property
     def etypes(self):
+        """returns edge types in the block, similar to DGLHeteroGraph.etypes"""
         return self.block.etypes
 
     @property
     def canonical_etypes(self):
+        """returns canonical edge types in the block, similar to DGLHeteroGraph.canonical_etypes"""
         return self.block.canonical_etypes
 
     @property
     def srctypes(self):
+        """returns source node types in the block, similar to DGLHeteroGraph.dsttypes"""
         return self.block.srctypes
 
     @property
     def dsttypes(self):
+        """returns destination node types in the block, similar to DGLHeteroGraph.srctypes"""
         return self.block.dsttypes
 
 class _DistDataLoaderWrapper:
