@@ -268,9 +268,9 @@ def invoke_gsddmm(graph, func):
         if graph._graph.number_of_etypes() > 1:
             # Convert to list as dict is unordered.
             if func.name == "copy_u":
-                x = data_dict_to_list(graph, x, func, 'u', None)
+                x = data_dict_to_list(graph, x, func, 'u')
             else: # "copy_e"
-                x = data_dict_to_list(graph, x, func, 'e', None)
+                x = data_dict_to_list(graph, x, func, 'e')
         z = op(graph, x)
     return {func.out_field : z}
 

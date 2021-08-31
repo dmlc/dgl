@@ -68,9 +68,9 @@ def get_hs_id(g, rel, target):
     """Find the src/dst/etype id based on the target type."""
     srctype, _, dsttype = rel
     etid = g.get_etype_id(rel)
-    if target == 0 or target == 'u':
+    if target in [0, 'u']:
         return g.get_ntype_id(srctype)
-    if target == 2 or target == 'v':
+    if target in [2, 'v']:
         return g.get_ntype_id(dsttype)
     return etid
 
@@ -368,7 +368,6 @@ def _gsddmm_hetero(g, op, lhs_len, lhs_target='u', rhs_target='v', lhs_and_rhs_t
     rhs_target = target_mapping[rhs_target]
 
     for rel in g.canonical_etypes:
-        srctype, _, dsttype = rel
         etid = g.get_etype_id(rel)
         lhs_id = get_hs_id(g, rel, lhs_target)
         rhs_id = get_hs_id(g, rel, rhs_target)

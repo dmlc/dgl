@@ -77,7 +77,7 @@ def gsddmm(g, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
         # TODO (Israt): Call reshape func
         lhs_and_rhs_tuple = tuple(list(lhs_data) + list(rhs_data))
         return gsddmm_internal_hetero(g, op, len(lhs_data), lhs_target,
-            rhs_target, *lhs_and_rhs_tuple)
+                                      rhs_target, *lhs_and_rhs_tuple)
 
 def _gen_sddmm_func(lhs_target, rhs_target, binary_op):
     name = "{}_{}_{}".format(lhs_target, binary_op, rhs_target)
