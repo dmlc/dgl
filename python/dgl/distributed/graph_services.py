@@ -1,5 +1,6 @@
 """A set of graph services of getting subgraphs from DistGraph"""
 from collections import namedtuple
+import numpy as np
 
 from .rpc import Request, Response, send_requests_to_machine, recv_responses
 from ..sampling import sample_neighbors as local_sample_neighbors
@@ -383,12 +384,18 @@ def _distributed_access(g, nodes, issue_remote_req, local_access):
     return sampled_graph
 
 def _frontier_to_heterogeneous_graph(g, frontier, gpb):
+    # We need to handle empty frontiers correctly.
+    if frontier.number_of_edges() == 0:
+        data_dict = {etype: (np.zeros(0), np.zeros(0)) for etype in g.canonical_etypes}
+        return heterograph(data_dict,
+                           {ntype: g.number_of_nodes(ntype) for ntype in g.ntypes},
+                           idtype=g.idtype)
+
     etype_ids, frontier.edata[EID] = gpb.map_to_per_etype(frontier.edata[EID])
     src, dst = frontier.edges()
     etype_ids, idx = F.sort_1d(etype_ids)
     src, dst = F.gather_row(src, idx), F.gather_row(dst, idx)
     eid = F.gather_row(frontier.edata[EID], idx)
-    assert len(eid) > 0
     _, src = gpb.map_to_per_ntype(src)
     _, dst = gpb.map_to_per_ntype(dst)
 
