@@ -546,7 +546,7 @@ class _BlockWrapper:
     def srcdata(self):
         """returns a block node data view for source nodes, similar to DGLHeteroGraph.srcdata"""
         if not self._copied:
-            warnings.warn("property srcdata returns srcdata with no attributes other than id."
+            warnings.warn("property srcdata returns srcdata with no attributes other than id. "
                           "Use copy_attr() to copy attributes if needed.")
         return self.block.srcdata
 
