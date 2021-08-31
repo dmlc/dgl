@@ -8,6 +8,36 @@ from . import backend as F
 from .base import DGLError, dgl_warning
 from .init import zero_initializer
 
+class _LazyIndex(object):
+    def __init__(self, index):
+        if isinstance(index, list):
+            self._indices = index
+        else:
+            self._indices = [index]
+
+    def __len__(self):
+        return len(self._indices[-1])
+
+    def slice(self, index):
+        """ Create a new _LazyIndex object sliced by the given index tensor.
+        """
+        # if our indices are in the same context, lets just slice now and free
+        # memory, otherwise do nothing until we have to
+        if F.context(self._indices[-1]) == F.context(index):
+            return _LazyIndex(self._indices[:-1] + [F.gather_row(self._indices[-1], index)])
+        return _LazyIndex(self._indices + [index])
+
+    def flatten(self):
+        """ Evaluate the chain of indices, and return a single index tensor.
+        """
+        flat_index = self._indices[0]
+        # here we actually need to resolve it
+        for index in self._indices[1:]:
+            if F.context(index) != F.context(flat_index):
+                index = F.copy_to(index, F.context(flat_index))
+            flat_index = F.gather_row(flat_index, index)
+        return flat_index
+
 class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
     """The column scheme.
 
@@ -111,6 +141,8 @@ class Column(object):
     def data(self):
         """Return the feature data. Perform index selecting if needed."""
         if self.index is not None:
+            if isinstance(self.index, _LazyIndex):
+                self.index = self.index.flatten()
             # If index and storage is not in the same context,
             # copy index to the same context of storage.
             # Copy index is usually cheaper than copy data
@@ -237,9 +269,10 @@ class Column(object):
         """Return a subcolumn.
 
         The resulting column will share the same storage as this column so this operation
-        is quite efficient. If the current column is also a sub-column (i.e., the
-        index tensor is not None), it slices the index tensor with the given
-        rowids as the index tensor of the resulting column.
+        is quite efficient. If the current column is also a sub-column (i.e.,
+        the index tensor is not None), the current index tensor will be sliced
+        by 'rowids', if they are on the same context. Otherwise, both index
+        tensors are saved, and only applied when the data is accessed.
 
         Parameters
         ----------
@@ -254,13 +287,11 @@ class Column(object):
         if self.index is None:
             return Column(self.storage, self.scheme, rowids, self.device)
         else:
-            if F.context(self.index) != F.context(rowids):
-                # make sure index and row ids are on the same context
-                kwargs = {}
-                if self.device is not None:
-                    kwargs = self.device[1]
-                rowids = F.copy_to(rowids, F.context(self.index), **kwargs)
-            return Column(self.storage, self.scheme, F.gather_row(self.index, rowids), self.device)
+            index = self.index
+            if not isinstance(index, _LazyIndex):
+                index = _LazyIndex(self.index)
+            index = index.slice(rowids)
+            return Column(self.storage, self.scheme, index, self.device)
 
     @staticmethod
     def create(data):
