@@ -68,9 +68,9 @@ def get_hs_id(g, rel, target):
     """Find the src/dst/etype id based on the target type."""
     srctype, _, dsttype = rel
     etid = g.get_etype_id(rel)
-    if target == 0: # u
+    if target == 0 or target == 'u':
         return g.get_ntype_id(srctype)
-    if target == 2: # v
+    if target == 2 or target == 'v':
         return g.get_ntype_id(dsttype)
     return etid
 
@@ -190,15 +190,13 @@ def _gspmm(gidx, op, reduce_op, u, e):
     return v, (arg_u, arg_e)
 
 
-def _gspmm_hetero(g, op, reduce_op, u_and_e_tuple):
+def _gspmm_hetero(g, op, reduce_op, u_len, u_and_e_tuple):
     r""" Generalized Sparse Matrix Multiplication interface.
     """
-    num_ntypes = g._graph.number_of_ntypes()
-    u_tuple, e_tuple = u_and_e_tuple[:num_ntypes], u_and_e_tuple[num_ntypes:]
+    u_tuple, e_tuple = u_and_e_tuple[:u_len], u_and_e_tuple[u_len:]
     gidx = g._graph
     use_u = op != 'copy_rhs'
     use_e = op != 'copy_lhs'
-
     # TODO (Israt): Add check - F.dtype(u) != F.dtype(e):
 
     # deal with scalar features.
@@ -348,13 +346,10 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
     return out
 
 
-def _gsddmm_hetero(g, op, lhs_target='u', rhs_target='v', lhs_and_rhs_tuple=None):
+def _gsddmm_hetero(g, op, lhs_len, lhs_target='u', rhs_target='v', lhs_and_rhs_tuple=None):
     r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface.
     """
     gidx = g._graph
-    num_ntype = g._graph.number_of_ntypes()
-    num_etype = g._graph.number_of_etypes()
-    lhs_len = num_ntype if lhs_target in ['u', 'v'] else num_etype
     lhs_tuple, rhs_tuple = lhs_and_rhs_tuple[:lhs_len], lhs_and_rhs_tuple[lhs_len:]
 
     use_lhs = op != 'copy_rhs'
@@ -363,6 +358,8 @@ def _gsddmm_hetero(g, op, lhs_target='u', rhs_target='v', lhs_and_rhs_tuple=None
     # TODO (Israt): Add check - F.dtype(u) != F.dtype(e):
     # deal with scalar features.
     expand_lhs, expand_rhs = False, False
+    num_ntype = g._graph.number_of_ntypes()
+    num_etype = g._graph.number_of_etypes()
     lhs_list = [None] * num_ntype if lhs_target in ['u', 'v'] else [None] * num_etype
     rhs_list = [None] * num_ntype if rhs_target in ['u', 'v'] else [None] * num_etype
     out_list = [None] * gidx.number_of_etypes()

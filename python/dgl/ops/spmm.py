@@ -86,8 +86,7 @@ def gspmm(g, op, reduce_op, lhs_data, rhs_data):
         lhs_and_rhs_tuple = tuple(list(lhs_data) + list(rhs_data))
         ret = gspmm_internal_hetero(g, op,
                                     'sum' if reduce_op == 'mean' else reduce_op,
-                                    *lhs_and_rhs_tuple)
-
+                                    len(lhs_data), *lhs_and_rhs_tuple)
     # TODO (Israt): Add support for 'max', 'min', 'mean' in heterograph
     # divide in degrees for mean reducer.
     if reduce_op == 'mean':

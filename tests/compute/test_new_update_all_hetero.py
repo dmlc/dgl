@@ -4,6 +4,7 @@ from collections import Counter
 import numpy as np
 import scipy.sparse as ssp
 import itertools
+from itertools import product
 import backend as F
 import networkx as nx
 import unittest, pytest
@@ -11,12 +12,14 @@ from dgl import DGLError
 import test_utils
 from test_utils import parametrize_dtype, get_cases
 from scipy.sparse import rand
+import torch
 
 rfuncs = {'sum': fn.sum, 'max': fn.max, 'min': fn.min, 'mean': fn.mean}
 fill_value = {'sum': 0, 'max': float("-inf")}
 feat_size = 2
 
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
+@unittest.skipIf(F._default_context_str == 'gpu', reason="Need to resolve ctx issue.")
 
 def create_test_heterograph(idtype):
     # test heterograph from the docstring, plus a user -- wishes -- game relation
@@ -165,8 +168,8 @@ def test_unary_copy_e(idtype):
 
 
 @parametrize_dtype
-def test_binary_u_op_v(idtype):
-    def _test(mfunc, rfunc):
+def test_binary_op(idtype):
+    def _test(lhs, rhs, binary_op, reducer):
 
         g = create_test_heterograph(idtype)
 
@@ -181,28 +184,44 @@ def test_binary_u_op_v(idtype):
         g.nodes['developer'].data['h'] = x2
         g.nodes['game'].data['h'] = x3
 
+        x1 = F.randn((4,feat_size))
+        x2 = F.randn((4,feat_size))
+        x3 = F.randn((3,feat_size))
+        x4 = F.randn((3,feat_size))
+        F.attach_grad(x1)
+        F.attach_grad(x2)
+        F.attach_grad(x3)
+        F.attach_grad(x4)
+        g['plays'].edata['h'] = x1
+        g['follows'].edata['h'] = x2
+        g['develops'].edata['h'] = x3
+        g['wishes'].edata['h'] = x4
+
+        builtin_msg_name = "{}_{}_{}".format(lhs, binary_op, rhs)
+        builtin_msg = getattr(fn, builtin_msg_name)
+        builtin_red = getattr(fn, reducer)
+
         #################################################################
         #  multi_update_all(): call msg_passing separately for each etype
         #################################################################
 
         with F.record_grad():
             g.multi_update_all(
-                {etype : (mfunc('h', 'h', 'm'), rfunc('m', 'y'))
+                {etype : (builtin_msg('h', 'h', 'm'), builtin_red('m', 'y'))
                     for etype in g.canonical_etypes},
                 'sum')
             r1 = g.nodes['game'].data['y']
             F.backward(r1, F.ones(r1.shape))
-            n_grad1 = F.grad(g.nodes['user'].data['h'])
+            n_grad1 = F.grad(r1)
 
         #################################################################
         #  update_all(): call msg_passing for all etypes
         #################################################################
 
-        g.update_all(mfunc('h', 'h', 'm'), rfunc('m', 'y'))
+        g.update_all(builtin_msg('h', 'h', 'm'), builtin_red('m', 'y'))
         r2 = g.nodes['game'].data['y']
         F.backward(r2, F.ones(r2.shape))
-        n_grad2 = F.grad(g.nodes['user'].data['h'])
-
+        n_grad2 = F.grad(r2)
         # correctness check
         def _print_error(a, b):
             for i, (x, y) in enumerate(zip(F.asnumpy(a).flatten(), F.asnumpy(b).flatten())):
@@ -218,15 +237,19 @@ def test_binary_u_op_v(idtype):
         #     _print_error(n_grad1, n_grad2)
         # assert(F.allclose(n_grad1, n_grad2))
 
-    _test(fn.u_add_v, fn.sum)
-    # TODO(Israt) :Add reduce func to suport the following reduce op
-    # _test('copy_u', 'max')
-    # _test('copy_u', 'min')
-    # _test('copy_u', 'mean')
+    target = ["u", "v", "e"]
+    for lhs, rhs in product(target, target):
+        if lhs == rhs:
+            continue
+        for binary_op in ["add", "sub", "mul", "div"]:
+            # TODO(Israt) :Add support for reduce func "max", "min", "mean"
+            for reducer in ["sum"]:
+                print(lhs, rhs, binary_op, reducer)
+                _test(lhs, rhs, binary_op, reducer)
 
 
 if __name__ == '__main__':
     test_unary_copy_u()
     test_unary_copy_e()
-    test_binary_u_op_v()
+    test_binary_op()
 

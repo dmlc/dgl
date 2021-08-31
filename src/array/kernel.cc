@@ -166,11 +166,11 @@ void SDDMMHetero(const std::string& op,
   });
 }
 
-int get_hs_id(HeteroGraphPtr graph, int target, dgl_type_t etype){
+int get_hs_id(HeteroGraphPtr graph, int target, dgl_type_t etype) {
   auto pair = graph->meta_graph()->FindEdge(etype);
-  if(target == 0)
+  if (target == 0)
     return pair.first;
-  if(target == 2)
+  if (target == 2)
     return pair.second;
   return etype;
 }
