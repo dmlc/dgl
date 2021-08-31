@@ -1,4 +1,6 @@
 """DGL PyTorch DataLoaders"""
+from collections.abc import MutableMapping
+from collections import namedtuple
 import inspect
 import math
 from distutils.version import LooseVersion
@@ -11,7 +13,7 @@ from ...distributed import DistGraph
 from ...distributed import DistDataLoader
 from ...ndarray import NDArray as DGLNDArray
 from ... import backend as F
-from ...base import DGLError, EID
+from ...base import DGLError, EID, ALL
 from ...utils import to_dgl_context
 
 __all__ = ['NodeDataLoader', 'EdgeDataLoader', 'GraphDataLoader',
@@ -348,6 +350,188 @@ class _EdgeDataLoaderIter:
         result = [_to_device(data, self.device) for data in result_]
         return result
 
+NodeSpace = namedtuple('NodeSpace', ['data'])
+EdgeSpace = namedtuple('EdgeSpace', ['data'])
+
+class _BlockNodeView(object):
+
+    __slots__ = ['_block']
+
+    def __init__(self, block):
+        self._block = block
+
+    def __getitem__(self, key):
+        assert isinstance(key, str)
+        assert key in self._block.ntypes, \
+            "Node type {0} doesn't exist in this block".format(key)
+        return NodeSpace(data=NodeDataView(self._block, key))
+
+class NodeDataView(MutableMapping):
+
+    __slots__ = ['_wrapper', '_data']
+
+    def __init__(self, block, ntype):
+        self._data = block._ndata[ntype]
+        if ntype in block._nids:
+            block._nids[ntype] = block.nodes(ntype)
+        self._nids = block._nids[ntype]
+        self._names = set(name.get_name() for name in block.g._get_ndata_names(ntype))
+        self._nodes = block.g.nodes[ntype]
+
+    def _get_names(self):
+        return list(self._names)
+
+    def __getitem__(self, key):
+        assert isinstance(key, str), "Key must be a str."
+        assert key in self._names, "Node attr {0} doesn't exist.".format(key)
+        if key not in self._data:
+            self._data[key] = self._nodes.data[key][self._nids]
+        return self._data[key]
+
+    def __setitem__(self, key, val):
+        self._data[key] = val
+
+class _BlockEdgeView(object):
+
+    __slots__ = ['_block']
+
+    def __init__(self, block):
+        self._block = block
+
+    def __getitem__(self, key):
+        assert isinstance(key, str)
+        assert key in self._block.etypes, \
+            "Node type {0} doesn't exist in this block".format(key)
+        return EdgeSpace(data=EdgeDataView(self._block, key))
+
+class EdgeDataView(MutableMapping):
+
+    __slots__ = ['_data']
+
+    def __init__(self, block, etype):
+        self._data = block._edata[etype]
+        if etype in block._eids:
+            block._eids[etype] = block.edges[etype].data[EID]
+        self._eids = block._eids[etype]
+        self._names = set(name.get_name() for name in block.g._get_edata_names(etype))
+        self._edges = block.g.edges[etype]
+
+    def _get_names(self):
+        return list(self._names)
+
+    def __getitem__(self, key):
+        assert isinstance(key, str), "Key must be a str."
+        assert key in self._names, "Node attr {0} doesn't exist.".format(key)
+        if key not in self._data:
+            self._data[key] = self._edges.data[key][self._eids]
+        return self._data[key]
+
+    def __setitem__(self, key, val):
+        self._data[key] = val
+
+class _BlockWrapper:
+    """
+    A wrapper class for blocks returned by DistDataLoader
+    """
+    def __init__(self, g, block):
+        self.g = g
+        self.block = block
+        self._ndata = {}
+        self._nids = {}
+        self._edata = {}
+        self._eids = {}
+
+    def _copy_node_attr(self, ntype, attr):
+        if ntype not in self._ndata:
+            self._nids[ntype] = self.block.nodes(ntype)
+            self._ndata[ntype] = {}
+            self._ndata[ntype][attr] = self.g.nodes[ntype].data[attr][self._nids[ntype]]
+        elif attr not in self._ndata[ntype]:
+            self._ndata[ntype][attr] = self.g.nodes[ntype].data[attr][self._nids[ntype]]
+        self.block.nodes[ntype][attr] = self._ndata[ntype][attr]
+
+    def _copy_edge_attr(self, etype, attr):
+        if etype not in self._edata:
+            self._eids[etype] = self.block.edges[etype].data[EID]
+            self._edata[etype] = {}
+            self._edata[etype][attr] = self.g.edges[etype].data[attr][self._eids[etype]]
+        elif attr not in self._edata[etype]:
+            self._edata[etype][attr] = self.g.edges[etype].data[attr][self._eids[etype]]
+        self.block.edges[etype][attr] = self._edata[etype][attr]
+
+    def copy_attr(self, nattr=None, eattr=None):
+        """
+        copy node and edge attributes from DistTensor to blocks
+        """
+        if nattr is None:
+            for ntype in self.ntypes:
+                nattr[ntype] = [name.get_name() for name in self.g._get_ndata_names(ntype)]
+        if eattr is None:
+            for etype in self.etypes:
+                eattr[etype] = [name.get_name() for name in self.g._get_edata_names(etype)]
+
+        for ntype, attrs in nattr.items():
+            for attr in attrs:
+                self._copy_node_attr(ntype, attr)
+
+        for etype, attrs in eattr.items():
+            for attr in attrs:
+                self._copy_edge_attr(etype, attr)
+
+    def to(self, device):
+        return self.block.to(device)
+
+    @property
+    def nodes(self):
+        return _BlockNodeView(self)
+
+    @property
+    def edges(self):
+        return _BlockEdgeView(self)
+
+    @property
+    def ndata(self):
+        assert len(self.ntypes) == 1, "ndata only works for a graph with one node type."
+        return self._ndata
+
+    @property
+    def edata(self):
+        assert len(self.etypes) == 1, "edata only works for a graph with one edge type."
+        return self._edata
+
+    @property
+    def ntypes(self):
+        return self.block.ntypes
+
+    @property
+    def etypes(self):
+        return self.block.etypes
+
+    @property
+    def canonical_etypes(self):
+        return self.block.canonical_etypes
+
+    def number_of_nodes(self, ntype=None):
+        return self.block.number_of_nodes(ntype)
+
+    def number_of_edges(self, etype=None):
+        return self.block.number_of_edges(etype)
+
+    def num_nodes(self, ntype=None):
+        return self.block.num_nodes(ntype)
+
+    def num_edges(self, etype=None):
+        return self.block.num_edges(etype)
+
+    def out_degrees(self, u=ALL):
+        return self.block.out_degress(u)
+
+    def in_degrees(self, v=ALL):
+        return self.block.in_degrees(v)
+
+    def find_edges(self, edges, etype=None):
+        return self.block.find_edges(edges, etype)
+
 class _DistDataLoaderWrapper:
     """
     A wrapper for DistDataLoader, copy features from original DistGraph to blocks
@@ -356,8 +540,6 @@ class _DistDataLoaderWrapper:
         self.g = g
         assert isinstance(g, DistGraph), "Input g must be a DistGraph."
         self.dataloader = dataloader
-        self._ndata = {}
-        self._edata = {}
 
     def __iter__(self):
         self.dataloader = iter(self.dataloader)
@@ -369,44 +551,11 @@ class _DistDataLoaderWrapper:
             blocks = []
             for _, block in enumerate(ret[-1]):
                 # copy node and edge features
-                blocks.append(self._copy_features(block))
+                blocks.append(_BlockWrapper(self.g, block))
             ret[-1] = blocks
             return tuple(ret)
         except StopIteration:
             raise StopIteration
-
-    def _get_ndata(self, ntype):
-        if ntype not in self._ndata:
-            names = self.g._get_ndata_names(ntype)
-            ntype_data = {}
-            nodes = self.g.nodes[ntype]
-            for name in names:
-                ntype_data[name.get_name()] = nodes.data[name.get_name()]
-            self._ndata[ntype] = ntype_data
-        return self._ndata[ntype]
-
-    def _get_edata(self, etype):
-        if etype not in self._edata:
-            names = self.g._get_edata_names(etype)
-            etype_data = {}
-            edges = self.g.edges[etype]
-            for name in names:
-                etype_data[name.get_name()] = edges.data[name.get_name()]
-            self._edata[etype] = etype_data
-        return self._edata[etype]
-
-    def _copy_features(self, block):
-        for ntype in block.ntypes:
-            nids = block.nodes(ntype)
-            nodes = block.nodes[ntype]
-            for name, ndata in self._get_ndata(ntype).items():
-                nodes.data[name] = ndata[nids]
-        for etype in block.etypes:
-            eids = block.edges[etype].data[EID]
-            edges = block.edges[etype]
-            for name, edata in self._get_edata(etype).items():
-                edges.data[name] = edata[eids]
-        return block
 
 def _init_dataloader(collator, device, dataloader_kwargs, use_ddp, ddp_seed):
     dataset = collator.dataset
