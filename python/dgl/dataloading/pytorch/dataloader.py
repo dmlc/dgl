@@ -1,4 +1,6 @@
 """DGL PyTorch DataLoaders"""
+from collections.abc import MutableMapping
+from collections import namedtuple
 import inspect
 import math
 from distutils.version import LooseVersion
@@ -11,7 +13,7 @@ from ...distributed import DistGraph
 from ...distributed import DistDataLoader
 from ...ndarray import NDArray as DGLNDArray
 from ... import backend as F
-from ...base import DGLError
+from ...base import DGLError, EID, ALL
 from ...utils import to_dgl_context
 
 __all__ = ['NodeDataLoader', 'EdgeDataLoader', 'GraphDataLoader',
@@ -348,6 +350,213 @@ class _EdgeDataLoaderIter:
         result = [_to_device(data, self.device) for data in result_]
         return result
 
+NodeSpace = namedtuple('NodeSpace', ['data'])
+EdgeSpace = namedtuple('EdgeSpace', ['data'])
+
+class _BlockNodeView(object):
+
+    __slots__ = ['_block']
+
+    def __init__(self, block):
+        self._block = block
+
+    def __getitem__(self, key):
+        assert isinstance(key, str)
+        assert key in self._block.ntypes, \
+            "Node type {0} doesn't exist in this block".format(key)
+        return NodeSpace(data=NodeDataView(self._block, key))
+
+class NodeDataView(MutableMapping):
+
+    __slots__ = ['_wrapper', '_data']
+
+    def __init__(self, block, ntype):
+        self._data = block._ndata[ntype]
+        if ntype in block._nids:
+            block._nids[ntype] = block.nodes(ntype)
+        self._nids = block._nids[ntype]
+        self._names = set(name.get_name() for name in block.g._get_ndata_names(ntype))
+        self._nodes = block.g.nodes[ntype]
+
+    def _get_names(self):
+        return list(self._names)
+
+    def __getitem__(self, key):
+        assert isinstance(key, str), "Key must be a str."
+        assert key in self._names, "Node attr {0} doesn't exist.".format(key)
+        if key not in self._data:
+            self._data[key] = self._nodes.data[key][self._nids]
+        return self._data[key]
+
+    def __setitem__(self, key, val):
+        self._data[key] = val
+
+class _BlockEdgeView(object):
+
+    __slots__ = ['_block']
+
+    def __init__(self, block):
+        self._block = block
+
+    def __getitem__(self, key):
+        assert isinstance(key, str)
+        assert key in self._block.etypes, \
+            "Node type {0} doesn't exist in this block".format(key)
+        return EdgeSpace(data=EdgeDataView(self._block, key))
+
+class EdgeDataView(MutableMapping):
+
+    __slots__ = ['_data']
+
+    def __init__(self, block, etype):
+        self._data = block._edata[etype]
+        if etype in block._eids:
+            block._eids[etype] = block.edges[etype].data[EID]
+        self._eids = block._eids[etype]
+        self._names = set(name.get_name() for name in block.g._get_edata_names(etype))
+        self._edges = block.g.edges[etype]
+
+    def _get_names(self):
+        return list(self._names)
+
+    def __getitem__(self, key):
+        assert isinstance(key, str), "Key must be a str."
+        assert key in self._names, "Node attr {0} doesn't exist.".format(key)
+        if key not in self._data:
+            self._data[key] = self._edges.data[key][self._eids]
+        return self._data[key]
+
+    def __setitem__(self, key, val):
+        self._data[key] = val
+
+class _BlockWrapper:
+    """
+    A wrapper class for blocks returned by DistDataLoader
+    """
+    def __init__(self, g, block):
+        self.g = g
+        self.block = block
+        self._ndata = {}
+        self._nids = {}
+        self._edata = {}
+        self._eids = {}
+
+    def _copy_node_attr(self, ntype, attr):
+        if ntype not in self._ndata:
+            self._nids[ntype] = self.block.nodes(ntype)
+            self._ndata[ntype] = {}
+            self._ndata[ntype][attr] = self.g.nodes[ntype].data[attr][self._nids[ntype]]
+        elif attr not in self._ndata[ntype]:
+            self._ndata[ntype][attr] = self.g.nodes[ntype].data[attr][self._nids[ntype]]
+        self.block.nodes[ntype][attr] = self._ndata[ntype][attr]
+
+    def _copy_edge_attr(self, etype, attr):
+        if etype not in self._edata:
+            self._eids[etype] = self.block.edges[etype].data[EID]
+            self._edata[etype] = {}
+            self._edata[etype][attr] = self.g.edges[etype].data[attr][self._eids[etype]]
+        elif attr not in self._edata[etype]:
+            self._edata[etype][attr] = self.g.edges[etype].data[attr][self._eids[etype]]
+        self.block.edges[etype][attr] = self._edata[etype][attr]
+
+    def copy_attr(self, nattr=None, eattr=None):
+        """
+        copy node and edge attributes from DistTensor to blocks
+        """
+        if nattr is None:
+            for ntype in self.ntypes:
+                nattr[ntype] = [name.get_name() for name in self.g._get_ndata_names(ntype)]
+        if eattr is None:
+            for etype in self.etypes:
+                eattr[etype] = [name.get_name() for name in self.g._get_edata_names(etype)]
+
+        for ntype, attrs in nattr.items():
+            for attr in attrs:
+                self._copy_node_attr(ntype, attr)
+
+        for etype, attrs in eattr.items():
+            for attr in attrs:
+                self._copy_edge_attr(etype, attr)
+
+    def to(self, device):
+        return self.block.to(device)
+
+    @property
+    def nodes(self):
+        return _BlockNodeView(self)
+
+    @property
+    def edges(self):
+        return _BlockEdgeView(self)
+
+    @property
+    def ndata(self):
+        assert len(self.ntypes) == 1, "ndata only works for a graph with one node type."
+        return self._ndata
+
+    @property
+    def edata(self):
+        assert len(self.etypes) == 1, "edata only works for a graph with one edge type."
+        return self._edata
+
+    @property
+    def ntypes(self):
+        return self.block.ntypes
+
+    @property
+    def etypes(self):
+        return self.block.etypes
+
+    @property
+    def canonical_etypes(self):
+        return self.block.canonical_etypes
+
+    def number_of_nodes(self, ntype=None):
+        return self.block.number_of_nodes(ntype)
+
+    def number_of_edges(self, etype=None):
+        return self.block.number_of_edges(etype)
+
+    def num_nodes(self, ntype=None):
+        return self.block.num_nodes(ntype)
+
+    def num_edges(self, etype=None):
+        return self.block.num_edges(etype)
+
+    def out_degrees(self, u=ALL):
+        return self.block.out_degress(u)
+
+    def in_degrees(self, v=ALL):
+        return self.block.in_degrees(v)
+
+    def find_edges(self, edges, etype=None):
+        return self.block.find_edges(edges, etype)
+
+class _DistDataLoaderWrapper:
+    """
+    A wrapper for DistDataLoader, copy features from original DistGraph to blocks
+    """
+    def __init__(self, g, dataloader):
+        self.g = g
+        assert isinstance(g, DistGraph), "Input g must be a DistGraph."
+        self.dataloader = dataloader
+
+    def __iter__(self):
+        self.dataloader = iter(self.dataloader)
+        return self
+
+    def __next__(self):
+        try:
+            ret = list(next(self.dataloader))
+            blocks = []
+            for _, block in enumerate(ret[-1]):
+                # copy node and edge features
+                blocks.append(_BlockWrapper(self.g, block))
+            ret[-1] = blocks
+            return tuple(ret)
+        except StopIteration:
+            raise StopIteration
+
 def _init_dataloader(collator, device, dataloader_kwargs, use_ddp, ddp_seed):
     dataset = collator.dataset
     use_scalar_batcher = False
@@ -494,12 +703,13 @@ class NodeDataLoader:
                 device = 'cpu'
             assert device == 'cpu', 'Only cpu is supported in the case of a DistGraph.'
             # Distributed DataLoader currently does not support heterogeneous graphs
-            # and does not copy features.  Fallback to normal solution
+            # Add a wrapper to Distributed DataLoader to copy features
             self.collator = NodeCollator(g, nids, block_sampler, **collator_kwargs)
             _remove_kwargs_dist(dataloader_kwargs)
-            self.dataloader = DistDataLoader(self.collator.dataset,
-                                             collate_fn=self.collator.collate,
-                                             **dataloader_kwargs)
+            self.dataloader = \
+                _DistDataLoaderWrapper(g, DistDataLoader(self.collator.dataset,
+                                                         collate_fn=self.collator.collate,
+                                                         **dataloader_kwargs))
             self.is_distributed = True
         else:
             if device is None:
@@ -528,7 +738,8 @@ class NodeDataLoader:
     def __iter__(self):
         """Return the iterator of the data loader."""
         if self.is_distributed:
-            # Directly use the iterator of DistDataLoader, which doesn't copy features anyway.
+            # Directly use the iterator of DistDataLoader
+            # Wrapped DistDataLoader works like DistDataLoader and also copy features
             return iter(self.dataloader)
         else:
             return _NodeDataLoaderIter(self)
@@ -782,12 +993,13 @@ class EdgeDataLoader:
                 device = 'cpu'
             assert device == 'cpu', 'Only cpu is supported in the case of a DistGraph.'
             # Distributed DataLoader currently does not support heterogeneous graphs
-            # and does not copy features.  Fallback to normal solution
+            # Add a wrapper to Distributed DataLoader to copy features
             self.collator = EdgeCollator(g, eids, block_sampler, **collator_kwargs)
             _remove_kwargs_dist(dataloader_kwargs)
-            self.dataloader = DistDataLoader(self.collator.dataset,
-                                             collate_fn=self.collator.collate,
-                                             **dataloader_kwargs)
+            self.dataloader = \
+                _DistDataLoaderWrapper(g, DistDataLoader(self.collator.dataset,
+                                                         collate_fn=self.collator.collate,
+                                                         **dataloader_kwargs))
             self.is_distributed = True
         else:
             if device is None:
@@ -815,7 +1027,8 @@ class EdgeDataLoader:
     def __iter__(self):
         """Return the iterator of the data loader."""
         if self.is_distributed:
-            # Directly use the iterator of DistDataLoader, which doesn't copy features anyway.
+            # Directly use the iterator of DistDataLoader
+            # Wrapped DistDataLoader works like DistDataLoader and also copy features
             return iter(self.dataloader)
         else:
             return _EdgeDataLoaderIter(self)
