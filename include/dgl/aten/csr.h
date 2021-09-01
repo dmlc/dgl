@@ -423,6 +423,7 @@ COOMatrix CSRRowWiseSampling(
  * \param prob Unnormalized probability array. Should be of the same length as the data array.
  *             If an empty array is provided, assume uniform.
  * \param replace True if sample with replacement
+ * \param etype_sorted True if the edge types are already sorted
  * \return A COOMatrix storing the picked row, col and data indices.
  */
 COOMatrix CSRRowWisePerEtypeSampling(
@@ -431,7 +432,8 @@ COOMatrix CSRRowWisePerEtypeSampling(
     IdArray etypes,
     int64_t num_samples,
     FloatArray prob = FloatArray(),
-    bool replace = true);
+    bool replace = true,
+    bool etype_sorted = false);
 
 /*!
  * \brief Select K non-zero entries with the largest weights along each given row.
