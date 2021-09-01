@@ -81,6 +81,9 @@ def _sample_etype_neighbors(local_g, partition_book, seed_nodes, etype_field,
     local_ids = partition_book.nid2localnid(seed_nodes, partition_book.partid)
     local_ids = F.astype(local_ids, local_g.idtype)
     # local_ids = self.seed_nodes
+
+    # DistGraph's edges are sorted by default according to
+    # graph partition mechanism.
     sampled_graph = local_sample_etype_neighbors(
         local_g, local_ids, etype_field, fan_out, edge_dir, prob, replace,
         etype_sorted=True, _dist_training=True)
