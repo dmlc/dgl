@@ -195,7 +195,8 @@ COOMatrix CSRRowWisePick(CSRMatrix mat, IdArray rows,
 // OpenMP parallelization on rows because each row performs computation independently.
 template <typename IdxType>
 COOMatrix CSRRowWisePerEtypePick(CSRMatrix mat, IdArray rows, IdArray etypes,
-                                 int64_t num_picks, bool replace, RangePickFn<IdxType> pick_fn) {
+                                 int64_t num_picks, bool replace, bool etype_sorted,
+                                 RangePickFn<IdxType> pick_fn) {
   using namespace aten;
   const IdxType* indptr = static_cast<IdxType*>(mat.indptr->data);
   const IdxType* indices = static_cast<IdxType*>(mat.indices->data);
@@ -250,8 +251,9 @@ COOMatrix CSRRowWisePerEtypePick(CSRMatrix mat, IdArray rows, IdArray etypes,
       for (int64_t j = 0; j < len; ++j) {
         et[j] = data ? etype_data[data[off+j]] : etype_data[off+j];
       }
-      std::sort(et_idx.begin(), et_idx.end(),
-                [&et](IdxType i1, IdxType i2) {return et[i1] < et[i2];});
+      if (!etype_sorted)  // the edge type is sorted, not need to sort it
+        std::sort(et_idx.begin(), et_idx.end(),
+                  [&et](IdxType i1, IdxType i2) {return et[i1] < et[i2];});
 
       IdxType cur_et = et[et_idx[0]];
       int64_t et_offset = 0;
@@ -339,12 +341,13 @@ COOMatrix COORowWisePick(COOMatrix mat, IdArray rows,
 // row-wise pick on the CSR matrix and rectifies the returned results.
 template <typename IdxType>
 COOMatrix COORowWisePerEtypePick(COOMatrix mat, IdArray rows, IdArray etypes,
-                                 int64_t num_picks, bool replace, RangePickFn<IdxType> pick_fn) {
+                                 int64_t num_picks, bool replace, bool etype_sorted,
+                                 RangePickFn<IdxType> pick_fn) {
   using namespace aten;
   const auto& csr = COOToCSR(COOSliceRows(mat, rows));
   const IdArray new_rows = Range(0, rows->shape[0], rows->dtype.bits, rows->ctx);
   const auto& picked = CSRRowWisePerEtypePick<IdxType>(
-    csr, new_rows, etypes, num_picks, replace, pick_fn);
+    csr, new_rows, etypes, num_picks, replace, etype_sorted, pick_fn);
   return COOMatrix(mat.num_rows, mat.num_cols,
                    IndexSelect(rows, picked.row),  // map the row index to the correct one
                    picked.col,

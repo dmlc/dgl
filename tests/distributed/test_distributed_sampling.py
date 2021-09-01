@@ -335,6 +335,17 @@ def start_hetero_etype_sample_client(rank, tmpdir, disable_shared_mem, fanout=3,
     assert 'feat' in dist_graph.nodes['n1'].data
     assert 'feat' not in dist_graph.nodes['n2'].data
     assert 'feat' not in dist_graph.nodes['n3'].data
+
+    if dist_graph.local_partition is not None:
+        # Check whether etypes are sorted in dist_graph
+        local_g = dist_graph.local_partition
+        local_nids = np.arange(local_g.num_nodes())
+        for lnid in local_nids:
+            leids = local_g.in_edges(lnid, form='eid')
+            letids = F.asnumpy(local_g.edata[dgl.ETYPE][leids])
+            _, idices = np.unique(letids, return_index=True)
+            assert np.all(idices[:-1] <= idices[1:])
+
     if gpb is None:
         gpb = dist_graph.get_partition_book()
     try:

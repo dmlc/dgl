@@ -111,7 +111,8 @@ HeteroSubgraph SampleNeighborsEType(
     const int64_t fanout,
     EdgeDir dir,
     const IdArray prob,
-    bool replace) {
+    bool replace,
+    bool etype_sorted) {
 
   CHECK_EQ(1, hg->NumVertexTypes())
     << "SampleNeighborsEType only work with homogeneous graph";
@@ -155,18 +156,18 @@ HeteroSubgraph SampleNeighborsEType(
             nodes, etypes, fanout, prob, replace));
         } else {
           sampled_coo = aten::COORowWisePerEtypeSampling(
-            hg->GetCOOMatrix(etype), nodes, etypes, fanout, prob, replace);
+            hg->GetCOOMatrix(etype), nodes, etypes, fanout, prob, replace, etype_sorted);
         }
         break;
       case SparseFormat::kCSR:
         CHECK(dir == EdgeDir::kOut) << "Cannot sample out edges on CSC matrix.";
         sampled_coo = aten::CSRRowWisePerEtypeSampling(
-            hg->GetCSRMatrix(etype), nodes, etypes, fanout, prob, replace);
+            hg->GetCSRMatrix(etype), nodes, etypes, fanout, prob, replace, etype_sorted);
           break;
       case SparseFormat::kCSC:
         CHECK(dir == EdgeDir::kIn) << "Cannot sample in edges on CSR matrix.";
         sampled_coo = aten::CSRRowWisePerEtypeSampling(
-            hg->GetCSCMatrix(etype), nodes, etypes, fanout, prob, replace);
+            hg->GetCSCMatrix(etype), nodes, etypes, fanout, prob, replace, etype_sorted);
         sampled_coo = aten::COOTranspose(sampled_coo);
         break;
       default:
@@ -360,6 +361,7 @@ DGL_REGISTER_GLOBAL("sampling.neighbor._CAPI_DGLSampleNeighborsEType")
     const std::string dir_str = args[4];
     IdArray prob = args[5];
     const bool replace = args[6];
+    const bool etype_sorted = args[7];
 
     CHECK(dir_str == "in" || dir_str == "out")
       << "Invalid edge direction. Must be \"in\" or \"out\".";
@@ -367,7 +369,7 @@ DGL_REGISTER_GLOBAL("sampling.neighbor._CAPI_DGLSampleNeighborsEType")
 
     std::shared_ptr<HeteroSubgraph> subg(new HeteroSubgraph);
     *subg = sampling::SampleNeighborsEType(
-        hg.sptr(), nodes, etypes, fanout, dir, prob, replace);
+        hg.sptr(), nodes, etypes, fanout, dir, prob, replace, etype_sorted);
 
     *rv = HeteroSubgraphRef(subg);
   });
