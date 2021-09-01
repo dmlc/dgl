@@ -221,12 +221,13 @@ def test_node_dataloader():
     g1 = dgl.graph(([0, 0, 0, 1, 1], [1, 2, 3, 3, 4]))
     g1.ndata['feat'] = F.copy_to(F.randn((5, 8)), F.cpu())
 
-    dataloader = dgl.dataloading.NodeDataLoader(
-        g1, g1.nodes(), sampler, device=F.ctx(), batch_size=g1.num_nodes())
-    for input_nodes, output_nodes, blocks in dataloader:
-        _check_device(input_nodes)
-        _check_device(output_nodes)
-        _check_device(blocks)
+    for preload in [0, 5]:
+        dataloader = dgl.dataloading.NodeDataLoader(
+            g1, g1.nodes(), sampler, device=F.ctx(), preload=preload, batch_size=g1.num_nodes())
+        for input_nodes, output_nodes, blocks in dataloader:
+            _check_device(input_nodes)
+            _check_device(output_nodes)
+            _check_device(blocks)
 
     g2 = dgl.heterograph({
          ('user', 'follow', 'user'): ([0, 0, 0, 1, 1, 1, 2], [1, 2, 3, 0, 2, 3, 0]),
@@ -238,14 +239,15 @@ def test_node_dataloader():
         g2.nodes[ntype].data['feat'] = F.copy_to(F.randn((g2.num_nodes(ntype), 8)), F.cpu())
     batch_size = max(g2.num_nodes(nty) for nty in g2.ntypes)
 
-    dataloader = dgl.dataloading.NodeDataLoader(
-        g2, {nty: g2.nodes(nty) for nty in g2.ntypes},
-        sampler, device=F.ctx(), batch_size=batch_size)
-    assert isinstance(iter(dataloader), Iterator)
-    for input_nodes, output_nodes, blocks in dataloader:
-        _check_device(input_nodes)
-        _check_device(output_nodes)
-        _check_device(blocks)
+    for preload in [0, 5]:
+        dataloader = dgl.dataloading.NodeDataLoader(
+            g2, {nty: g2.nodes(nty) for nty in g2.ntypes},
+            sampler, device=F.ctx(), preload=preload, batch_size=batch_size)
+        assert isinstance(iter(dataloader), Iterator)
+        for input_nodes, output_nodes, blocks in dataloader:
+            _check_device(input_nodes)
+            _check_device(output_nodes)
+            _check_device(blocks)
 
 def test_edge_dataloader():
     sampler = dgl.dataloading.MultiLayerFullNeighborSampler(2)

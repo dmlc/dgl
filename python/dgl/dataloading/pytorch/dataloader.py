@@ -1,6 +1,8 @@
 """DGL PyTorch DataLoaders"""
 import inspect
 import math
+import threading
+import queue
 from distutils.version import LooseVersion
 import torch as th
 from torch.utils.data import DataLoader
@@ -307,23 +309,47 @@ def _to_device(data, device):
         data = data.to(device)
     return data
 
+
+def _next(dl_iter, graph, device):
+    # input_nodes, output_nodes, blocks
+    result_ = next(dl_iter)
+    _restore_blocks_storage(result_[-1], graph)
+    result = [_to_device(data, device) for data in result_]
+    return result
+
+
+def _background_node_dataloader(dl_iter, g, device, results):
+    try:
+        while True:
+            results.put(_next(dl_iter, g, device))
+    except StopIteration:
+        results.put(None)
+
+
 class _NodeDataLoaderIter:
     def __init__(self, node_dataloader):
         self.device = node_dataloader.device
         self.node_dataloader = node_dataloader
         self.iter_ = iter(node_dataloader.dataloader)
+        self.preload = node_dataloader.preload
+        if self.preload > 0:
+            self.results = queue.Queue(self.preload)
+            threading.Thread(target=_background_node_dataloader, args=(
+                self.iter_, self.node_dataloader.collator.g, self.device,
+                self.results), daemon=True).start()
 
     # Make this an iterator for PyTorch Lightning compatibility
     def __iter__(self):
         return self
 
     def __next__(self):
-        # input_nodes, output_nodes, blocks
-        result_ = next(self.iter_)
-        _restore_blocks_storage(result_[-1], self.node_dataloader.collator.g)
-
-        result = [_to_device(data, self.device) for data in result_]
-        return result
+        if self.preload > 0:
+            res = self.results.get()
+            if res is None:
+                raise StopIteration
+            return res
+        else:
+            return _next(self.iter_, self.node_dataloader.collator.g, self.device)
 
 class _EdgeDataLoaderIter:
     def __init__(self, edge_dataloader):
@@ -422,6 +448,11 @@ class NodeDataLoader:
         :class:`torch.utils.data.distributed.DistributedSampler`.
 
         Only effective when :attr:`use_ddp` is True.
+    preload : int, optional
+        If greater than 0, data is continuously preloaded in a background python
+        thread and put into a queue with size of ``preload``. In each iteration, data
+        will be popped from queue and returned in main thread. This feature will then
+        speed up the data loading. 0 is the default value which means no preload at all.
     kwargs : dict
         Arguments being passed to :py:class:`torch.utils.data.DataLoader`.
 
@@ -479,7 +510,8 @@ class NodeDataLoader:
     """
     collator_arglist = inspect.getfullargspec(NodeCollator).args
 
-    def __init__(self, g, nids, block_sampler, device=None, use_ddp=False, ddp_seed=0, **kwargs):
+    def __init__(self, g, nids, block_sampler, device=None, use_ddp=False, ddp_seed=0,
+                 preload=0, **kwargs):
         collator_kwargs = {}
         dataloader_kwargs = {}
         for k, v in kwargs.items():
@@ -487,7 +519,7 @@ class NodeDataLoader:
                 collator_kwargs[k] = v
             else:
                 dataloader_kwargs[k] = v
-
+        self.preload = preload
         if isinstance(g, DistGraph):
             if device is None:
                 # for the distributed case default to the CPU

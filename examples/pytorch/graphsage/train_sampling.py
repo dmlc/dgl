@@ -68,6 +68,7 @@ def run(args, device, data):
         train_nid,
         sampler,
         device=dataloader_device,
+        preload=args.preload,
         batch_size=args.batch_size,
         shuffle=True,
         drop_last=False,
@@ -146,6 +147,9 @@ if __name__ == '__main__':
                                 "on GPU when using it to save time for data copy. This may "
                                 "be undesired if they cannot fit in GPU memory at once. "
                                 "This flag disables that.")
+    argparser.add_argument('--preload', type=int, default=0,
+                           help="Number of preload number in NodeDataLoader. If > 0,"
+                           " preload is enabled in background thread.")
     args = argparser.parse_args()
 
     if args.gpu >= 0:
