@@ -5,7 +5,7 @@ from torch.autograd import Variable
 import numpy as np
 import dgl
 import dgl.function as fn
-from dgl.geometry.pytorch import farthest_point_sampler
+from dgl.geometry import farthest_point_sampler # dgl.geometry.pytorch -> dgl.geometry
 
 '''
 Part of the code are adapted from
