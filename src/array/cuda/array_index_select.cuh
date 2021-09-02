@@ -20,8 +20,7 @@ __global__ void IndexSelectSingleKernel(const DType* array,
   int tx = blockIdx.x * blockDim.x + threadIdx.x;
   int stride_x = gridDim.x * blockDim.x;
   while (tx < length) {
-    IdType target_index = index[tx];
-    assert(target_index >= 0 && target_index < arr_len);
+    assert(index[tx] >= 0 && index[tx] < arr_len);
     out[tx] = array[index[tx]];
     tx += stride_x;
   }
