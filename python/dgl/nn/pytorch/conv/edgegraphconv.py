@@ -10,7 +10,7 @@ from ....utils import expand_as_pair
 
 
 # pylint: disable=W0235
-class GraphConv(nn.Module):
+class EdgeGraphConv(nn.Module):
     r"""
 
     Description
@@ -97,49 +97,7 @@ class GraphConv(nn.Module):
 
     Examples
     --------
-    >>> import dgl
-    >>> import numpy as np
-    >>> import torch as th
-    >>> from dgl.nn import GraphConv
-
-    >>> # Case 1: Homogeneous graph
-    >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
-    >>> g = dgl.add_self_loop(g)
-    >>> feat = th.ones(6, 10)
-    >>> conv = GraphConv(10, 2, norm='both', weight=True, bias=True)
-    >>> res = conv(g, feat)
-    >>> print(res)
-    tensor([[ 1.3326, -0.2797],
-            [ 1.4673, -0.3080],
-            [ 1.3326, -0.2797],
-            [ 1.6871, -0.3541],
-            [ 1.7711, -0.3717],
-            [ 1.0375, -0.2178]], grad_fn=<AddBackward0>)
-    >>> # allow_zero_in_degree example
-    >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
-    >>> conv = GraphConv(10, 2, norm='both', weight=True, bias=True, allow_zero_in_degree=True)
-    >>> res = conv(g, feat)
-    >>> print(res)
-    tensor([[-0.2473, -0.4631],
-            [-0.3497, -0.6549],
-            [-0.3497, -0.6549],
-            [-0.4221, -0.7905],
-            [-0.3497, -0.6549],
-            [ 0.0000,  0.0000]], grad_fn=<AddBackward0>)
-
-    >>> # Case 2: Unidirectional bipartite graph
-    >>> u = [0, 1, 0, 0, 1]
-    >>> v = [0, 1, 2, 3, 2]
-    >>> g = dgl.heterograph({('_U', '_E', '_V') : (u, v)})
-    >>> u_fea = th.rand(2, 5)
-    >>> v_fea = th.rand(4, 5)
-    >>> conv = GraphConv(5, 2, norm='both', weight=True, bias=True)
-    >>> res = conv(g, (u_fea, v_fea))
-    >>> res
-    tensor([[-0.2994,  0.6106],
-            [-0.4482,  0.5540],
-            [-0.5287,  0.8235],
-            [-0.2994,  0.6106]], grad_fn=<AddBackward0>)
+    # TODO: add examples that use EdgeGraphConv
     """
 
     def __init__(self,
@@ -150,10 +108,7 @@ class GraphConv(nn.Module):
                  bias=True,
                  activation=None,
                  allow_zero_in_degree=False):
-        super(GraphConv, self).__init__()
-        if norm not in ('none', 'both', 'right', 'left'):
-            raise DGLError('Invalid norm value. Must be either "none", "both", "right" or "left".'
-                           ' But got "{}".'.format(norm))
+        super(EdgeGraphConv, self).__init__()
         self._in_feats = in_feats
         self._out_feats = out_feats
         self._norm = norm
@@ -268,11 +223,10 @@ class GraphConv(nn.Module):
                                    'the issue. Setting ``allow_zero_in_degree`` '
                                    'to be `True` when constructing this module will '
                                    'suppress the check and let the code run.')
-            aggregate_fn = fn.copy_src('h', 'm')
-            if edge_weight is not None:
-                assert edge_weight.shape[0] == graph.number_of_edges()
-                graph.edata['_edge_weight'] = edge_weight
-                aggregate_fn = fn.u_mul_e('h', '_edge_weight', 'm')
+            if edge_weight is None:
+                raise DGLError("Edge weight is required for this layer type (EdgeGraphConv)")
+            assert edge_weight.shape[0] == graph.number_of_edges()
+            aggregate_fn = fn.u_mul_e('h', '_edge_weight', 'm')
 
             # (BarclayII) For RGCN on heterogeneous graphs we need to support GCN on bipartite.
             feat_src, feat_dst = expand_as_pair(feat, graph)
@@ -294,20 +248,15 @@ class GraphConv(nn.Module):
             else:
                 weight = self.weight
 
-            if self._in_feats > self._out_feats:
-                # mult W first to reduce the feature size for aggregation.
+            single_channel_rsts = []
+            for i in range(edge_weight.shape[1]):
+                graph.edata['_edge_weight'] = edge_weight[:, i]
+                graph.update_all(aggregate_fn, fn.sum(msg='m', out='rst'))
+                single_channel_rst = graph.dstdata["rst"]
                 if weight is not None:
-                    feat_src = th.matmul(feat_src, weight)
-                graph.srcdata['h'] = feat_src
-                graph.update_all(aggregate_fn, fn.sum(msg='m', out='h'))
-                rst = graph.dstdata['h']
-            else:
-                # aggregate first then mult W
-                graph.srcdata['h'] = feat_src
-                graph.update_all(aggregate_fn, fn.sum(msg='m', out='h'))
-                rst = graph.dstdata['h']
-                if weight is not None:
-                    rst = th.matmul(rst, weight)
+                    single_channel_rst = th.matmul(single_channel_rst, weight)
+                single_channel_rsts.append(single_channel_rst)
+            rst = th.cat(single_channel_rsts, axis=1)
 
             if self._norm in ['right', 'both']:
                 degs = graph.in_degrees().float().clamp(min=1)
