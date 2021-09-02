@@ -276,7 +276,7 @@ def main(args):
     if args.num_gpus == -1:
         device = th.device('cpu')
     else:
-        device = th.device('cuda:'+str(g.rank() % args.num_gpus))
+        device = th.device('cuda:'+str(args.local_rank))
     labels = g.ndata['labels'][np.arange(g.number_of_nodes())]
     n_classes = len(th.unique(labels[th.logical_not(th.isnan(labels))]))
     print('#labels:', n_classes)
