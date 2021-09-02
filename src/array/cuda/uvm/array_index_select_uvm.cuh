@@ -14,7 +14,7 @@ namespace aten {
 namespace impl {
 
 template <typename DType, typename IdType>
-__global__ void IndexSelectMultiKernelUVMAligned(
+__global__ void IndexSelectMultiKernelAligned(
         const DType* const array,
         const int64_t num_feat,
         const IdType* const index,
