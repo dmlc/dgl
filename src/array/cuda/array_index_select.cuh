@@ -32,8 +32,8 @@ __global__ void IndexSelectMultiKernel(
         const DType* const array,
         const int64_t num_feat,
         const IdType* const index,
-        const int64_t arr_len,
         const int64_t length,
+        const int64_t arr_len,
         DType* const out) {
   int64_t out_row = blockIdx.x*blockDim.y+threadIdx.y;
 
