@@ -8,6 +8,7 @@
 #include <dgl/packed_func_ext.h>
 #include <dgl/immutable_graph.h>
 #include <dgl/runtime/container.h>
+#include <dgl/runtime/parallel_for.h>
 #include <set>
 
 #include "../c_api_common.h"
@@ -629,14 +630,19 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateFormat")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     dgl_format_code_t code = hg->GetRelationGraph(0)->GetAllowedFormats();
-#if !defined(DGL_USE_CUDA)
-#pragma omp parallel for
+    auto get_format_f = [&](size_t etype_b, size_t etype_e) {
+      for (auto etype = etype_b; etype < etype_e; ++etype) {
+        auto bg = std::dynamic_pointer_cast<UnitGraph>(hg->GetRelationGraph(etype));
+        for (auto format : CodeToSparseFormats(code))
+          bg->GetFormat(format);
+      }
+    };
+
+#if !(defined(DGL_USE_CUDA))
+  runtime::parallel_for(0, hg->NumEdgeTypes(), get_format_f);
+#else
+  get_format_f(0, hg->NumEdgeTypes());
 #endif
-    for (int64_t etype = 0; etype < hg->NumEdgeTypes(); ++etype) {
-      auto bg = std::dynamic_pointer_cast<UnitGraph>(hg->GetRelationGraph(etype));
-      for (auto format : CodeToSparseFormats(code))
-        bg->GetFormat(format);
-    }
 });
 
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetFormatGraph")

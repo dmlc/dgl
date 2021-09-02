@@ -147,6 +147,7 @@ COOMatrix CSRRowWisePick(CSRMatrix mat, IdArray rows,
         global_prefix[t+1] += global_prefix[t];
       }
     }
+
     #pragma omp barrier
     const IdxType thread_offset = global_prefix[thread_id];
 

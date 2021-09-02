@@ -74,14 +74,12 @@ void parallel_for(
     auto chunk_size = divup((end - begin), num_threads);
     auto begin_tid = begin + tid * chunk_size;
     if (begin_tid < end) {
-      for (auto i = begin_tid; i < std::min(end, chunk_size + begin_tid); i++) {
-        f(i);
-      }
+      auto end_tid = std::min(end, chunk_size + begin_tid);
+      f(begin_tid, end_tid);
     }
   }
 #else
-  for (auto i = begin; i < end; i++)
-    f(i);
+  f(begin, end);
 #endif
 }
 
@@ -98,7 +96,7 @@ void parallel_for(
     const size_t begin,
     const size_t end,
     F&& f) {
-  parallel_for(begin, end, default_grain_size(), f);
+  parallel_for(begin, end, default_grain_size(), std::forward<F>(f));
 }
 }  // namespace runtime
 }  // namespace dgl

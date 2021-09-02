@@ -9,6 +9,7 @@
 
 #include <dgl/base_heterograph.h>
 #include <dgl/array.h>
+#include <dgl/runtime/parallel_for.h>
 #include <tuple>
 #include <utility>
 #include "randomwalks_impl.h"
@@ -47,25 +48,26 @@ std::pair<IdArray, IdArray> GenericRandomWalk(
   IdxType *traces_data = traces.Ptr<IdxType>();
   IdxType *eids_data = eids.Ptr<IdxType>();
 
-#pragma omp parallel for
-  for (int64_t seed_id = 0; seed_id < num_seeds; ++seed_id) {
-    int64_t i;
-    dgl_id_t curr = seed_data[seed_id];
-    traces_data[seed_id * trace_length] = curr;
+  runtime::parallel_for(0, num_seeds, [&](size_t seed_begin, size_t seed_end) {
+    for (auto seed_id = seed_begin; seed_id < seed_end; seed_id++) {
+      int64_t i;
+      dgl_id_t curr = seed_data[seed_id];
+      traces_data[seed_id * trace_length] = curr;
 
-    for (i = 0; i < max_num_steps; ++i) {
-      const auto &succ = step(traces_data + seed_id * max_num_steps, curr, i);
-      traces_data[seed_id * trace_length + i + 1] = curr = std::get<0>(succ);
-      eids_data[seed_id * max_num_steps + i] = std::get<1>(succ);
-      if (std::get<2>(succ))
-        break;
-    }
+      for (i = 0; i < max_num_steps; ++i) {
+        const auto &succ = step(traces_data + seed_id * max_num_steps, curr, i);
+        traces_data[seed_id * trace_length + i + 1] = curr = std::get<0>(succ);
+        eids_data[seed_id * max_num_steps + i] = std::get<1>(succ);
+        if (std::get<2>(succ))
+          break;
+      }
 
-    for (; i < max_num_steps; ++i) {
-      traces_data[seed_id * trace_length + i + 1] = -1;
-      eids_data[seed_id * max_num_steps + i] = -1;
+      for (; i < max_num_steps; ++i) {
+        traces_data[seed_id * trace_length + i + 1] = -1;
+        eids_data[seed_id * max_num_steps + i] = -1;
+      }
     }
-  }
+  });
 
   return std::make_pair(traces, eids);
 }
