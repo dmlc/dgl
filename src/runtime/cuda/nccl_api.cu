@@ -338,6 +338,7 @@ NDArray SparsePull(
         static_cast<const IdType*>(req_idx->data),
         perm,
         num_in,
+        req_idx->shape[0],
         send_idx.get());
     CUDA_CALL(cudaGetLastError());
   }
@@ -445,6 +446,7 @@ NDArray SparsePull(
         num_feat,
         static_cast<IdType*>(recv_idx->data),
         response_prefix_host.back(),
+        local_tensor->shape[0],
         filled_response_value.get());
     CUDA_CALL(cudaGetLastError());
   }
