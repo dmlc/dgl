@@ -101,7 +101,7 @@ where :math:`h_g` is the representation of :math:`g`, :math:`\mathcal{V}` is
 the set of nodes in :math:`g`, :math:`h_v` is the feature of node :math:`v`.
 
 DGL provides built-in support for common readout operations. For example,
-:func:`dgl.readout_nodes` implements the above readout operation.
+:func:`dgl.mean_nodes` implements the above readout operation.
 
 Once :math:`h_g` is available, one can pass it through an MLP layer for
 classification output.
@@ -132,10 +132,10 @@ readout result will be :math:`(B, D)`.
     g1.ndata['h'] = torch.tensor([1., 2.])
     g2 = dgl.graph(([0, 1], [1, 2]))
     g2.ndata['h'] = torch.tensor([1., 2., 3.])
-    
+
     dgl.readout_nodes(g1, 'h')
     # tensor([3.])  # 1 + 2
-    
+
     bg = dgl.batch([g1, g2])
     dgl.readout_nodes(bg, 'h')
     # tensor([3., 6.])  # [1 + 2, 1 + 2 + 3]
@@ -164,7 +164,7 @@ Being aware of the above computation rules, one can define a model as follows.
             self.conv1 = dglnn.GraphConv(in_dim, hidden_dim)
             self.conv2 = dglnn.GraphConv(hidden_dim, hidden_dim)
             self.classify = nn.Linear(hidden_dim, n_classes)
-    
+
         def forward(self, g, h):
             # Apply graph convolution and activation.
             h = F.relu(self.conv1(g, h))
@@ -229,7 +229,7 @@ updating the model.
             opt.step()
 
 For an end-to-end example of graph classification, see
-`DGL's GIN example <https://github.com/dmlc/dgl/tree/master/examples/pytorch/gin>`__. 
+`DGL's GIN example <https://github.com/dmlc/dgl/tree/master/examples/pytorch/gin>`__.
 The training loop is inside the
 function ``train`` in
 `main.py <https://github.com/dmlc/dgl/blob/master/examples/pytorch/gin/main.py>`__.
@@ -255,28 +255,28 @@ representations for each node type.
     class RGCN(nn.Module):
         def __init__(self, in_feats, hid_feats, out_feats, rel_names):
             super().__init__()
-    
+
             self.conv1 = dglnn.HeteroGraphConv({
                 rel: dglnn.GraphConv(in_feats, hid_feats)
                 for rel in rel_names}, aggregate='sum')
             self.conv2 = dglnn.HeteroGraphConv({
                 rel: dglnn.GraphConv(hid_feats, out_feats)
                 for rel in rel_names}, aggregate='sum')
-    
+
         def forward(self, graph, inputs):
             # inputs is features of nodes
             h = self.conv1(graph, inputs)
             h = {k: F.relu(v) for k, v in h.items()}
             h = self.conv2(graph, h)
             return h
-    
+
     class HeteroClassifier(nn.Module):
         def __init__(self, in_dim, hidden_dim, n_classes, rel_names):
             super().__init__()
 
             self.rgcn = RGCN(in_dim, hidden_dim, hidden_dim, rel_names)
             self.classify = nn.Linear(hidden_dim, n_classes)
-    
+
         def forward(self, g):
             h = g.ndata['feat']
             h = self.rgcn(g, h)

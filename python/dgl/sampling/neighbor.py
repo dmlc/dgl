@@ -14,7 +14,8 @@ __all__ = [
     'select_topk']
 
 def sample_etype_neighbors(g, nodes, etype_field, fanout, edge_dir='in', prob=None,
-                           replace=False, copy_ndata=True, copy_edata=True, _dist_training=False):
+                           replace=False, copy_ndata=True, copy_edata=True, etype_sorted=False,
+                           _dist_training=False):
     """Sample neighboring edges of the given nodes and return the induced subgraph.
 
     For each node, a number of inbound (or outbound when ``edge_dir == 'out'``) edges
@@ -75,6 +76,10 @@ def sample_etype_neighbors(g, nodes, etype_field, fanout, edge_dir='in', prob=No
         Internal argument.  Do not use.
 
         (Default: False)
+    etype_sorted: bool, optional
+        A hint telling whether the etypes are already sorted.
+
+        (Default: False)
 
     Returns
     -------
@@ -115,7 +120,7 @@ def sample_etype_neighbors(g, nodes, etype_field, fanout, edge_dir='in', prob=No
             prob_array = F.to_dgl_nd(F.tensor(prob, dtype=F.float32))
 
     subgidx = _CAPI_DGLSampleNeighborsEType(g._graph, nodes, etypes, fanout,
-                                            edge_dir, prob_array, replace)
+                                            edge_dir, prob_array, replace, etype_sorted)
     induced_edges = subgidx.induced_edges
     ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
 

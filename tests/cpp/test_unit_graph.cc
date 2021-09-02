@@ -3,14 +3,15 @@
  * \file test_unit_graph.cc
  * \brief Test UnitGraph
  */
-#include <gtest/gtest.h>
+#include "../../src/graph/unit_graph.h"
+#include "./../src/graph/heterograph.h"
+#include "./common.h"
 #include <dgl/array.h>
+#include <dgl/immutable_graph.h>
+#include <dgl/runtime/device_api.h>
+#include <gtest/gtest.h>
 #include <memory>
 #include <vector>
-#include <dgl/immutable_graph.h>
-#include "./common.h"
-#include "./../src/graph/heterograph.h"
-#include "../../src/graph/unit_graph.h"
 
 using namespace dgl;
 using namespace dgl::runtime;
@@ -296,6 +297,47 @@ void _TestUnitGraph_Reserve(DLContext ctx) {
   r_g_in_csr = r_g->GetCSCMatrix(0);
   ASSERT_TRUE(g_out_csr.indptr->data == r_g_in_csr.indptr->data);
   ASSERT_TRUE(g_out_csr.indices->data == r_g_in_csr.indices->data);
+}
+
+template <typename IdType>
+void _TestUnitGraph_CopyTo(const DLContext &src_ctx,
+                           const DGLContext &dst_ctx) {
+  const aten::CSRMatrix &csr = CSR1<IdType>(src_ctx);
+  const aten::COOMatrix &coo = COO1<IdType>(src_ctx);
+
+  auto device = dgl::runtime::DeviceAPI::Get(dst_ctx);
+  auto stream = device->CreateStream(dst_ctx);
+
+  auto g = dgl::UnitGraph::CreateFromCSC(2, csr);
+  ASSERT_EQ(g->GetCreatedFormats(), 4);
+  auto cg = dgl::UnitGraph::CopyTo(g, dst_ctx, stream);
+  device->StreamSync(dst_ctx, stream);
+  ASSERT_EQ(cg->GetCreatedFormats(), 4);
+
+  g = dgl::UnitGraph::CreateFromCSR(2, csr);
+  ASSERT_EQ(g->GetCreatedFormats(), 2);
+  cg = dgl::UnitGraph::CopyTo(g, dst_ctx, stream);
+  device->StreamSync(dst_ctx, stream);
+  ASSERT_EQ(cg->GetCreatedFormats(), 2);
+
+  g = dgl::UnitGraph::CreateFromCOO(2, coo);
+  ASSERT_EQ(g->GetCreatedFormats(), 1);
+  cg = dgl::UnitGraph::CopyTo(g, dst_ctx, stream);
+  device->StreamSync(dst_ctx, stream);
+  ASSERT_EQ(cg->GetCreatedFormats(), 1);
+}
+
+TEST(UniGraphTest, TestUnitGraph_CopyTo) {
+  _TestUnitGraph_CopyTo<int32_t>(CPU, CPU);
+  _TestUnitGraph_CopyTo<int64_t>(CPU, CPU);
+#ifdef DGL_USE_CUDA
+  _TestUnitGraph_CopyTo<int32_t>(CPU, GPU);
+  _TestUnitGraph_CopyTo<int32_t>(GPU, GPU);
+  _TestUnitGraph_CopyTo<int32_t>(GPU, CPU);
+  _TestUnitGraph_CopyTo<int64_t>(CPU, GPU);
+  _TestUnitGraph_CopyTo<int64_t>(GPU, GPU);
+  _TestUnitGraph_CopyTo<int64_t>(GPU, CPU);
+#endif
 }
 
 TEST(UniGraphTest, TestUnitGraph_Create) {

@@ -35,7 +35,7 @@ The construction function performs the following steps:
 
 In construction function, one first needs to set the data dimensions. For
 general PyTorch module, the dimensions are usually input dimension,
-output dimension and hidden dimensions. For graph neural, the input
+output dimension and hidden dimensions. For graph neural networks, the input
 dimension can be split into source node dimension and destination node
 dimension.
 
