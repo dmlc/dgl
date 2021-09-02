@@ -161,6 +161,14 @@ class BlockSampler(object):
         a CUDA context if multiprocessing is not used in the dataloader (e.g.,
         num_workers is 0). If this is None, the sampled blocks will be stored
         on the same device as the input graph.
+    exclude_edges_in_frontier : bool, default False
+        If True, the :func:`sample_frontier` method will receive an argument
+        :attr:`exclude_eids` containing the edge IDs from the original graph to exclude.
+        The :func:`sample_frontier` method must return a graph that does not contain
+        the edges corresponding to the excluded edges.  No additional postprocessing
+        will be done.
+
+        Otherwise, the edges will be removed *after* :func:`sample_frontier` returns.
 
     Notes
     -----
@@ -168,10 +176,46 @@ class BlockSampler(object):
     :ref:`User Guide Section 6 <guide-minibatch>` and
     :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
     """
-    def __init__(self, num_layers, return_eids=False, output_ctx=None):
+    def __init__(self, num_layers, return_eids=False, output_ctx=None,
+                 exclude_edges_in_frontier=False):
         self.num_layers = num_layers
         self.return_eids = return_eids
         self.set_output_context(output_ctx)
+        self.exclude_edges_in_frontier = exclude_edges_in_frontier
+
+    def _sample_frontier(self, block_id, g, seed_nodes, exclude_eids):
+        if self.exclude_edges_in_frontier:
+            frontier = self.sample_frontier(block_id, g, seed_nodes_in, exclude_eids=exclude_eids)
+        else:
+            frontier = self.sample_frontier(block_id, g, seed_nodes_in)
+
+            # Removing edges from the frontier for link prediction training falls
+            # into the category of frontier postprocessing
+            if exclude_eids is not None:
+                parent_eids = frontier.edata[EID]
+                parent_eids_np = _tensor_or_dict_to_numpy(parent_eids)
+                located_eids = _locate_eids_to_exclude(parent_eids_np, exclude_eids)
+                if not isinstance(located_eids, Mapping):
+                    # (BarclayII) If frontier already has a EID field and located_eids is empty,
+                    # the returned graph will keep EID intact.  Otherwise, EID will change
+                    # to the mapping from the new graph to the old frontier.
+                    # So we need to test if located_eids is empty, and do the remapping ourselves.
+                    if len(located_eids) > 0:
+                        frontier = transform.remove_edges(
+                            frontier, located_eids, store_ids=True)
+                        frontier.edata[EID] = F.gather_row(parent_eids, frontier.edata[EID])
+                else:
+                    # (BarclayII) remove_edges only accepts removing one type of edges,
+                    # so I need to keep track of the edge IDs left one by one.
+                    new_eids = parent_eids.copy()
+                    for k, v in located_eids.items():
+                        if len(v) > 0:
+                            frontier = transform.remove_edges(
+                                frontier, v, etype=k, store_ids=True)
+                            new_eids[k] = F.gather_row(parent_eids[k], frontier.edges[k].data[EID])
+                    frontier.edata[EID] = new_eids
+
+        return frontier
 
     def sample_frontier(self, block_id, g, seed_nodes, exclude_eids=None):
         """Generate the frontier given the destination nodes.
@@ -254,7 +298,7 @@ class BlockSampler(object):
             else:
                 seed_nodes_in = seed_nodes_in.to(graph_device)
 
-            frontier = self.sample_frontier(block_id, g, seed_nodes_in, exclude_eids=exclude_eids)
+            frontier = self._sample_frontier(block_id, g, seed_nodes_in, exclude_eids)
 
             if self.output_device is not None:
                 frontier = frontier.to(self.output_device)
