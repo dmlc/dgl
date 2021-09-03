@@ -71,6 +71,10 @@ class MultiLayerNeighborSampler(BlockSampler):
         self.fanout_arrays = []
         self.prob_arrays = None
 
+    @classmethod
+    def exclude_edges_in_frontier(cls, g):
+        return not isinstance(g, distributed.DistGraph) and g.device == F.cpu()
+
     def sample_frontier(self, block_id, g, seed_nodes, exclude_eids=None):
         fanout = self.fanouts[block_id]
         if isinstance(g, distributed.DistGraph):

@@ -253,12 +253,40 @@ class BlockSampler(object):
     :ref:`User Guide Section 6 <guide-minibatch>` and
     :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
     """
-    def __init__(self, num_layers, return_eids=False, output_ctx=None,
-                 exclude_edges_in_frontier=False):
+    def __init__(self, num_layers, return_eids=False, output_ctx=None):
         self.num_layers = num_layers
         self.return_eids = return_eids
         self.set_output_context(output_ctx)
-        self.exclude_edges_in_frontier = exclude_edges_in_frontier
+
+    # This is really a hack working around the lack of GPU-based neighbor sampling
+    # with edge exclusion.
+    @classmethod
+    def exclude_edges_in_frontier(cls, g):
+        """Returns whether the sampler will exclude edges in :func:`sample_frontier`.
+
+        If this method returns True, the method :func:`sample_frontier` will receive an
+        argument :attr:`exclude_eids` from :func:`sample_blocks`.  :func:`sample_frontier`
+        is then responsible for removing those edges.
+
+        If this method returns False, :func:`sample_blocks` will be responsible for
+        removing the edges.
+
+        When subclassing :class:`BlockSampler`, this method should return True when you
+        would like to remove the excluded edges in your :func:`sample_frontier` method.
+
+        By default this method returns False.
+
+        Parameters
+        ----------
+        g : DGLGraph
+            The original graph
+
+        Returns
+        -------
+        bool
+            Whether :func:`sample_frontier` will receive an argument :attr:`exclude_eids`.
+        """
+        return False
 
     def sample_frontier(self, block_id, g, seed_nodes, exclude_eids=None):
         """Generate the frontier given the destination nodes.
@@ -344,7 +372,7 @@ class BlockSampler(object):
                     block_id, g, seed_nodes_in, exclude_eids=exclude_eids)
             else:
                 frontier = self.sample_frontier(block_id, g, seed_nodes_in)
-            
+
             if self.output_device is not None:
                 frontier = frontier.to(self.output_device)
                 if isinstance(seed_nodes, dict):
