@@ -6,7 +6,12 @@ Requirements
 * sphinx
 * sphinx-gallery
 * sphinx_rtd_theme
-* Both pytorch and mxnet installed.
+* sphinx_copybutton
+* torch
+* mxnet
+* pillow
+* matplotlib
+
 
 Build documents
 ---------------

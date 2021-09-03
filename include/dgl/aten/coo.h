@@ -120,12 +120,13 @@ struct COOMatrix {
   }
 
   /*! \brief Return a copy of this matrix on the give device context. */
-  inline COOMatrix CopyTo(const DLContext& ctx) const {
+  inline COOMatrix CopyTo(const DLContext &ctx,
+                          const DGLStreamHandle &stream = nullptr) const {
     if (ctx == row->ctx)
       return *this;
-    return COOMatrix(num_rows, num_cols,
-                     row.CopyTo(ctx), col.CopyTo(ctx),
-                     aten::IsNullArray(data)? data : data.CopyTo(ctx),
+    return COOMatrix(num_rows, num_cols, row.CopyTo(ctx, stream),
+                     col.CopyTo(ctx, stream),
+                     aten::IsNullArray(data) ? data : data.CopyTo(ctx, stream),
                      row_sorted, col_sorted);
   }
 };
@@ -396,6 +397,7 @@ COOMatrix COORowWiseSampling(
  * \param prob Unnormalized probability array. Should be of the same length as the data array.
  *             If an empty array is provided, assume uniform.
  * \param replace True if sample with replacement
+ * \param etype_sorted True if the edge types are already sorted
  * \return A COOMatrix storing the picked row and col indices. Its data field stores the
  *         the index of the picked elements in the value array.
  */
@@ -405,7 +407,8 @@ COOMatrix COORowWisePerEtypeSampling(
     IdArray etypes,
     int64_t num_samples,
     FloatArray prob = FloatArray(),
-    bool replace = true);
+    bool replace = true,
+    bool etype_sorted = false);
 
 /*!
  * \brief Select K non-zero entries with the largest weights along each given row.

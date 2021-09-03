@@ -1,32 +1,26 @@
-from pointnet2 import PointNet2SSGCls, PointNet2MSGCls
-from pointnet_cls import PointNetCls
+from point_transformer import PointTransformerCLS
 from ModelNetDataLoader import ModelNetDataLoader
 import provider
 import argparse
 import os
-import urllib
 import tqdm
 from functools import partial
 from dgl.data.utils import download, get_download_dir
-import dgl
 from torch.utils.data import DataLoader
-import torch.optim as optim
-import torch.nn.functional as F
 import torch.nn as nn
 import torch
+import time
+
 torch.backends.cudnn.enabled = False
 
-
-# from dataset import ModelNet
-
 parser = argparse.ArgumentParser()
-parser.add_argument('--model', type=str, default='pointnet')
 parser.add_argument('--dataset-path', type=str, default='')
 parser.add_argument('--load-model-path', type=str, default='')
 parser.add_argument('--save-model-path', type=str, default='')
 parser.add_argument('--num-epochs', type=int, default=200)
 parser.add_argument('--num-workers', type=int, default=8)
-parser.add_argument('--batch-size', type=int, default=32)
+parser.add_argument('--batch-size', type=int, default=16)
+parser.add_argument('--opt', type=str, default='adam')
 args = parser.parse_args()
 
 num_workers = args.num_workers
@@ -61,6 +55,7 @@ def train(net, opt, scheduler, train_loader, dev):
     total_correct = 0
     count = 0
     loss_f = nn.CrossEntropyLoss()
+    start_time = time.time()
     with tqdm.tqdm(train_loader, ascii=True) as tq:
         for data, label in tq:
             data = data.data.numpy()
@@ -92,6 +87,8 @@ def train(net, opt, scheduler, train_loader, dev):
             tq.set_postfix({
                 'AvgLoss': '%.5f' % (total_loss / num_batches),
                 'AvgAcc': '%.5f' % (total_correct / count)})
+    print("[Train] AvgLoss: {:.5}, AvgAcc: {:.5}, Time: {:.5}s".format(total_loss /
+                                                                       num_batches, total_correct / count, time.time() - start_time))
     scheduler.step()
 
 
@@ -100,7 +97,7 @@ def evaluate(net, test_loader, dev):
 
     total_correct = 0
     count = 0
-
+    start_time = time.time()
     with torch.no_grad():
         with tqdm.tqdm(test_loader, ascii=True) as tq:
             for data, label in tq:
@@ -116,26 +113,35 @@ def evaluate(net, test_loader, dev):
 
                 tq.set_postfix({
                     'AvgAcc': '%.5f' % (total_correct / count)})
-
+    print("[Test]  AvgAcc: {:.5}, Time: {:.5}s".format(
+        total_correct / count, time.time() - start_time))
     return total_correct / count
 
 
 dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-if args.model == 'pointnet':
-    net = PointNetCls(40, input_dims=6)
-elif args.model == 'pointnet2_ssg':
-    net = PointNet2SSGCls(40, batch_size, input_dims=6)
-elif args.model == 'pointnet2_msg':
-    net = PointNet2MSGCls(40, batch_size, input_dims=6)
+net = PointTransformerCLS(40, batch_size, feature_dim=6)
 
 net = net.to(dev)
 if args.load_model_path:
     net.load_state_dict(torch.load(args.load_model_path, map_location=dev))
 
-opt = optim.Adam(net.parameters(), lr=1e-3, weight_decay=1e-4)
-
-scheduler = optim.lr_scheduler.StepLR(opt, step_size=20, gamma=0.7)
+if args.opt == 'adam':
+    # The optimizer strategy described in paper:
+    opt = torch.optim.SGD(net.parameters(), lr=0.01,
+                          momentum=0.9, weight_decay=1e-4)
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(
+        opt, milestones=[120, 160], gamma=0.1)
+elif args.opt == 'sgd':
+    # The optimizer strategy proposed by
+    # https://github.com/qq456cvb/Point-Transformers:
+    opt = torch.optim.Adam(
+        net.parameters(),
+        lr=1e-3,
+        betas=(0.9, 0.999),
+        eps=1e-08,
+        weight_decay=1e-4
+    )
+    scheduler = torch.optim.lr_scheduler.StepLR(opt, step_size=50, gamma=0.3)
 
 train_dataset = ModelNetDataLoader(local_path, 1024, split='train')
 test_dataset = ModelNetDataLoader(local_path, 1024, split='test')
@@ -147,9 +153,9 @@ test_loader = torch.utils.data.DataLoader(
 best_test_acc = 0
 
 for epoch in range(args.num_epochs):
+    print("Epoch #{}: ".format(epoch))
     train(net, opt, scheduler, train_loader, dev)
     if (epoch + 1) % 1 == 0:
-        print('Epoch #%d Testing' % epoch)
         test_acc = evaluate(net, test_loader, dev)
         if test_acc > best_test_acc:
             best_test_acc = test_acc
@@ -157,3 +163,4 @@ for epoch in range(args.num_epochs):
                 torch.save(net.state_dict(), args.save_model_path)
         print('Current test acc: %.5f (best: %.5f)' % (
             test_acc, best_test_acc))
+    print()

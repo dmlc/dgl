@@ -291,6 +291,7 @@ Take the survey [here](https://forms.gle/Ej3jHCocACmb49Gp8) and leave any feedba
 
 1. [**Large Graph Convolutional Network Training with GPU-Oriented Data Communication Architecture**](https://arxiv.org/abs/2103.03330), *Seung Won Min, Kun Wu, Sitao Huang, Mert Hidayetoğlu, Jinjun Xiong, Eiman Ebrahimi, Deming Chen, Wen-mei Hwu*
 
+1. [**Graph Attention Multi-Layer Perception**](https://github.com/PKU-DAIR/GAMLP/blob/main/GAMLP.pdf), *Wentao Zhang, Ziqi Yin, Zeang Sheng, Wen Ouyang, Xiaosen Li, Yangyu Tao, Zhi Yang, Bin Cui*
 
 </details>
 
