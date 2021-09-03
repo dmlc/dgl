@@ -415,9 +415,16 @@ CSRMatrix COOToCSR(COOMatrix coo) {
     std::vector<std::vector<IdType>> local_ptrs;
     std::vector<int64_t> thread_prefixsum;
 
-#pragma omp parallel
+    // get the number of threads OpenMP would spawn
+    int max_threads = omp_get_max_threads();
+    if (max_threads * N > 2*NNZ) {
+      max_threads = std::max(1, static_cast<int>((2*NNZ) / N));
+    }
+
+    const int num_threads = max_threads;
+
+#pragma omp parallel num_threads(num_threads)
     {
-      const int num_threads = omp_get_num_threads();
       const int thread_id = omp_get_thread_num();
       CHECK_LT(thread_id, num_threads);
 
