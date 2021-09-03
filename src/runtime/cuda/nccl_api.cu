@@ -43,7 +43,6 @@
 
 namespace dgl {
 
-using namespace kernel::cuda;
 using namespace partition;
 
 namespace runtime {
