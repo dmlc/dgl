@@ -4,10 +4,10 @@ from __future__ import absolute_import
 from collections import namedtuple
 from collections.abc import MutableMapping
 
+from . import distributed
 from . import backend as F
 from .base import DGLError, dgl_warning
 from .init import zero_initializer
-from .distributed.dist_tensor import DistTensor
 
 class _LazyIndex(object):
     def __init__(self, index):
@@ -128,7 +128,7 @@ class Column(object):
         else:
             self.storage = storage
             self.index = index
-        self.scheme = scheme if scheme else infer_scheme(storage)
+        self.scheme = scheme if scheme else infer_scheme(self.storage)
         self.device = device
 
     def __len__(self):
@@ -140,7 +140,7 @@ class Column(object):
 
     def _copy_dist_tensor(self):
         """this method copies actual tensor from DistTensor"""
-        assert isinstance(self.storage, DistTensor)
+        assert isinstance(self.storage, distributed.dist_tensor.DistTensor)
         if isinstance(self.index, _LazyIndex):
             self.index = self.index.flatten()
         self.storage = self.storage[self.index]
@@ -154,7 +154,7 @@ class Column(object):
     @property
     def data(self):
         """Return the feature data. Perform index selecting if needed."""
-        if isinstance(self.storage, DistTensor):
+        if isinstance(self.storage, distributed.dist_tensor.DistTensor):
             """
             if self.storage is a DistTensor, query the actual tensor from remotes servers
             reset self.index to None
@@ -189,10 +189,12 @@ class Column(object):
         if isinstance(val, tuple):
             """
             This case is used to handle DistTensor returned by DistGraph. 
-            index is used to identify rows in DistTensor that are present in the current graph/block
+            index is used to identify rows in DistTensor 
+                                that are present in the current graph/block
             """
             data, index = val
-            assert isinstance(data, DistTensor), "Input data must be DistTensor when index is specified."
+            assert isinstance(data, distributed.dist_tensor.DistTensor), \
+                "Input data must be DistTensor when index is specified."
             self.index = index
             self.storage = data
         else:
@@ -214,7 +216,7 @@ class Column(object):
         Column
             A new column
         """
-        if isinstance(self.storage, DistTensor):
+        if isinstance(self.storage, distributed.dist_tensor.DistTensor):
             # copy actual tensor from DistTensor, if self.storage is a DistTensor
             self._copy_dist_tensor()
         col = self.clone()
@@ -564,7 +566,7 @@ class Frame(MutableMapping):
         """
         for key, val in data.items():
             # handle DistTensor feature
-            if isinstance(val, tuple) or isinstance(val, DistTensor):
+            if isinstance(val, tuple) or isinstance(val, distributed.dist_tensor.DistTensor):
                 raise DGLError("Cannot assign a slice of DistTensor to rows of a tensor. "
                                "Try to retrieve the actual tensor from DistTensor first, "
                                "then do the assignment")
