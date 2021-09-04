@@ -121,11 +121,15 @@ class Column(object):
         Index tensor
     """
     def __init__(self, storage, scheme=None, index=None, device=None):
-        self.storage = storage
+        if isinstance(storage, tuple):
+            # handle DistTensor and node/edge ids in subgraphs
+            self.storage = storage[0]
+            self.index = storage[1]
+        else:
+            self.storage = storage
+            self.index = index
         self.scheme = scheme if scheme else infer_scheme(storage)
-        self.index = index
         self.device = device
-        self.is_dist_tensor = isinstance(storage, DistTensor)
 
     def __len__(self):
         """The number of features (number of rows) in this column."""
@@ -141,7 +145,6 @@ class Column(object):
             self.index = self.index.flatten()
         self.storage = self.storage[self.index]
         self.index = None
-        self.is_dist_tensor = False
 
     @property
     def shape(self):
@@ -192,7 +195,6 @@ class Column(object):
             assert isinstance(data, DistTensor), "Input data must be DistTensor when index is specified."
             self.index = index
             self.storage = data
-            self.is_dist_tensor = True
         else:
             self.index = None
             self.storage = val
@@ -212,8 +214,8 @@ class Column(object):
         Column
             A new column
         """
-        if self.is_dist_tensor:
-            # cop actual tensor from DistTensor, if self.storage is a DistTensor
+        if isinstance(self.storage, DistTensor):
+            # copy actual tensor from DistTensor, if self.storage is a DistTensor
             self._copy_dist_tensor()
         col = self.clone()
         col.device = (device, kwargs)
@@ -561,6 +563,11 @@ class Frame(MutableMapping):
             Row data.
         """
         for key, val in data.items():
+            # handle DistTensor feature
+            if isinstance(val, tuple) or isinstance(val, DistTensor):
+                raise DGLError("Cannot assign a slice of DistTensor to rows of a tensor. "
+                               "Try to retrieve the actual tensor from DistTensor first, "
+                               "then do the assignment")
             if key not in self:
                 scheme = infer_scheme(val)
                 ctx = F.context(val)

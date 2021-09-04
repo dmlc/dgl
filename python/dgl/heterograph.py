@@ -18,6 +18,7 @@ from . import utils
 from . import backend as F
 from .frame import Frame
 from .view import HeteroNodeView, HeteroNodeDataView, HeteroEdgeView, HeteroEdgeDataView
+from .distributed.dist_tensor import DistTensor
 
 __all__ = ['DGLHeteroGraph', 'combine_names']
 
@@ -4105,10 +4106,14 @@ class DGLHeteroGraph(object):
             u = utils.prepare_tensor(self, u, 'u')
             num_nodes = len(u)
         for key, val in data.items():
-            nfeats = F.shape(val)[0]
+            # handle DistTensor feature
+            nfeats = F.shape(val)[0] if not isinstance(val, tuple) else len(val[1])
             if nfeats != num_nodes:
                 raise DGLError('Expect number of features to match number of nodes (len(u)).'
                                ' Got %d and %d instead.' % (nfeats, num_nodes))
+            # don't check device if the feature tensor is DistTensor
+            if isinstance(val, tuple) or isinstance(val, DistTensor):
+                continue
             if F.context(val) != self.device:
                 raise DGLError('Cannot assign node feature "{}" on device {} to a graph on'
                                ' device {}. Call DGLGraph.to() to copy the graph to the'
@@ -4197,10 +4202,13 @@ class DGLHeteroGraph(object):
         else:
             num_edges = len(eid)
         for key, val in data.items():
-            nfeats = F.shape(val)[0]
+            nfeats = F.shape(val)[0] if not isinstance(val, tuple) else len(val[1])
             if nfeats != num_edges:
                 raise DGLError('Expect number of features to match number of edges.'
                                ' Got %d and %d instead.' % (nfeats, num_edges))
+            # don't check device if the feature tensor is DistTensor
+            if isinstance(val, tuple) or isinstance(val, DistTensor):
+                continue
             if F.context(val) != self.device:
                 raise DGLError('Cannot assign edge feature "{}" on device {} to a graph on'
                                ' device {}. Call DGLGraph.to() to copy the graph to the'
