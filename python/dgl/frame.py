@@ -155,11 +155,9 @@ class Column(object):
     def data(self):
         """Return the feature data. Perform index selecting if needed."""
         if isinstance(self.storage, distributed.dist_tensor.DistTensor):
-            """
-            if self.storage is a DistTensor, query the actual tensor from remotes servers
-            reset self.index to None
-            After this method, self.storage becomes a tensor on CPU
-            """
+            # if self.storage is a DistTensor, query the actual tensor from remotes servers
+            # reset self.index to None
+            # After this method, self.storage becomes a tensor on CPU
             self._copy_dist_tensor()
 
         # handle chain of indices
@@ -187,14 +185,12 @@ class Column(object):
     def data(self, val):
         """Update the column data."""
         if isinstance(val, tuple):
-            """
-            This case is used to handle DistTensor returned by DistGraph. 
-            index is used to identify rows in DistTensor 
-                                that are present in the current graph/block
-            """
+            # This case is used to handle DistTensor returned by DistGraph.
+            # index is used to identify rows in DistTensor
+            # that are present in the current graph/block
             data, index = val
-            assert isinstance(data, distributed.dist_tensor.DistTensor), \
-                "Input data must be DistTensor when index is specified."
+            assert isinstance(data, distributed.dist_tensor.DistTensor)\
+                , "Input data must be DistTensor when index is specified."
             self.index = index
             self.storage = data
         else:
@@ -566,7 +562,7 @@ class Frame(MutableMapping):
         """
         for key, val in data.items():
             # handle DistTensor feature
-            if isinstance(val, tuple) or isinstance(val, distributed.dist_tensor.DistTensor):
+            if isinstance(val, (tuple, distributed.dist_tensor.DistTensor)):
                 raise DGLError("Cannot assign a slice of DistTensor to rows of a tensor. "
                                "Try to retrieve the actual tensor from DistTensor first, "
                                "then do the assignment")

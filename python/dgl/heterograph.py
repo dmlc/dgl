@@ -4113,7 +4113,7 @@ class DGLHeteroGraph(object):
                 raise DGLError('Expect number of features to match number of nodes (len(u)).'
                                ' Got %d and %d instead.' % (nfeats, num_nodes))
             # don't check device if the feature tensor is DistTensor
-            if isinstance(val, tuple) or isinstance(val, distributed.dist_tensor.DistTensor):
+            if isinstance(val, (tuple, distributed.dist_tensor.DistTensor)):
                 continue
             if F.context(val) != self.device:
                 raise DGLError('Cannot assign node feature "{}" on device {} to a graph on'
@@ -4208,7 +4208,7 @@ class DGLHeteroGraph(object):
                 raise DGLError('Expect number of features to match number of edges.'
                                ' Got %d and %d instead.' % (nfeats, num_edges))
             # don't check device if the feature tensor is DistTensor
-            if isinstance(val, tuple) or isinstance(val, distributed.dist_tensor.DistTensor):
+            if isinstance(val, (tuple, distributed.dist_tensor.DistTensor)):
                 continue
             if F.context(val) != self.device:
                 raise DGLError('Cannot assign edge feature "{}" on device {} to a graph on'
