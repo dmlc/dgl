@@ -11,7 +11,7 @@ from ...distributed import DistGraph
 from ...distributed import DistDataLoader
 from ...ndarray import NDArray as DGLNDArray
 from ... import backend as F
-from ...base import DGLError
+from ...base import DGLError, EID
 from ...utils import to_dgl_context
 
 __all__ = ['NodeDataLoader', 'EdgeDataLoader', 'GraphDataLoader',
@@ -324,6 +324,51 @@ class _NodeDataLoaderIter:
 
         result = [_to_device(data, self.device) for data in result_]
         return result
+
+class _DistDataLoaderWrapper:
+    """
+    A wrapper for DistDataLoader, copy features from original DistGraph to blocks
+    """
+    def __init__(self, g, dataloader):
+        self.g = g
+        assert isinstance(g, DistGraph), "Input g must be a DistGraph."
+        self.dataloader = dataloader
+
+    def __iter__(self):
+        self.dataloader = iter(self.dataloader)
+        return self
+
+    def __next__(self):
+        try:
+            ret = list(next(self.dataloader))
+            blocks = []
+            for _, block in enumerate(ret[-1]):
+                # copy node and edge features
+                blocks.append(self._copy_features(block))
+            ret[-1] = blocks
+            return tuple(ret)
+        except StopIteration:
+            raise StopIteration
+
+    def _copy_features(self, block):
+        """copy DistTensor reference to block features"""
+        # copy node feature DistTensor reference
+        for ntype in block.ntypes:
+            nids = block.nodes(ntype)
+            block_nodes = block.nodes[ntype]
+            g_nodes = self.g.nodes[ntype]
+            for name in self.g._get_ndata_names(ntype):
+                ndata_name = name.get_name()
+                block_nodes.data[ndata_name] = (g_nodes.data[ndata_name], nids)
+        # copy edge feature DistTensor reference
+        for etype in block.etypes:
+            eids = block.edges[etype].data[EID]
+            block_edges = block.edges[etype]
+            g_edges = self.g.edges[etype]
+            for name in self.g._get_edata_names(etype):
+                edata_name = name.get_name()
+                block_edges.data[edata_name] = (g_edges.data[edata_name], eids)
+        return block
 
 class _EdgeDataLoaderIter:
     def __init__(self, edge_dataloader):

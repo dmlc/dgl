@@ -7,6 +7,7 @@ from collections.abc import MutableMapping
 from . import backend as F
 from .base import DGLError, dgl_warning
 from .init import zero_initializer
+from .distributed.dist_tensor import DistTensor
 
 class _LazyIndex(object):
     def __init__(self, index):
@@ -124,6 +125,7 @@ class Column(object):
         self.scheme = scheme if scheme else infer_scheme(storage)
         self.index = index
         self.device = device
+        self.is_dist_tensor = isinstance(storage, DistTensor)
 
     def __len__(self):
         """The number of features (number of rows) in this column."""
@@ -131,6 +133,15 @@ class Column(object):
             return F.shape(self.storage)[0]
         else:
             return len(self.index)
+
+    def _copy_dist_tensor(self):
+        """this method copies actual tensor from DistTensor"""
+        assert isinstance(self.storage, DistTensor)
+        if isinstance(self.index, _LazyIndex):
+            self.index = self.index.flatten()
+        self.storage = self.storage[self.index]
+        self.index = None
+        self.is_dist_tensor = False
 
     @property
     def shape(self):
@@ -140,6 +151,15 @@ class Column(object):
     @property
     def data(self):
         """Return the feature data. Perform index selecting if needed."""
+        if isinstance(self.storage, DistTensor):
+            """
+            if self.storage is a DistTensor, query the actual tensor from remotes servers
+            reset self.index to None
+            After this method, self.storage becomes a tensor on CPU
+            """
+            self._copy_dist_tensor()
+
+        # handle chain of indices
         if self.index is not None:
             if isinstance(self.index, _LazyIndex):
                 self.index = self.index.flatten()
@@ -163,8 +183,19 @@ class Column(object):
     @data.setter
     def data(self, val):
         """Update the column data."""
-        self.index = None
-        self.storage = val
+        if isinstance(val, tuple):
+            """
+            This case is used to handle DistTensor returned by DistGraph. 
+            index is used to identify rows in DistTensor that are present in the current graph/block
+            """
+            data, index = val
+            assert isinstance(data, DistTensor), "Input data must be DistTensor when index is specified."
+            self.index = index
+            self.storage = data
+            self.is_dist_tensor = True
+        else:
+            self.index = None
+            self.storage = val
 
     def to(self, device, **kwargs): # pylint: disable=invalid-name
         """ Return a new column with columns copy to the targeted device (cpu/gpu).
@@ -181,6 +212,9 @@ class Column(object):
         Column
             A new column
         """
+        if self.is_dist_tensor:
+            # cop actual tensor from DistTensor, if self.storage is a DistTensor
+            self._copy_dist_tensor()
         col = self.clone()
         col.device = (device, kwargs)
         return col
