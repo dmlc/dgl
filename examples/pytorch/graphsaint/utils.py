@@ -52,8 +52,6 @@ def evaluate(model, g, labels, mask, multilabel=False):
         labels = labels[mask]
         f1_mic, f1_mac = calc_f1(labels.cpu().numpy(),
                                  logits.cpu().numpy(), multilabel)
-        del logits
-        torch.cuda.empty_cache()
         return f1_mic, f1_mac
 
 

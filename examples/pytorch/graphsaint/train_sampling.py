@@ -10,7 +10,7 @@ from modules import GCNNet
 from utils import Logger, evaluate, save_log_dir, load_data, calc_f1
 import warnings
 
-def main(args):
+def main(args, task):
     warnings.filterwarnings('ignore')
     multilabel_data = {'ppi', 'yelp', 'amazon'}
     multilabel = args.dataset in multilabel_data
@@ -74,7 +74,7 @@ def main(args):
         torch.cuda.set_device(args.gpu)
         val_mask = val_mask.cuda()
         test_mask = test_mask.cuda()
-        g = g.to(args.gpu)
+        # g = g.to(args.gpu)
 
     print('labels shape:', g.ndata['label'].shape)
     print("features shape:", g.ndata['feat'].shape)
@@ -138,10 +138,10 @@ def main(args):
                     print(f"epoch:{epoch + 1}/{args.n_epochs}, Iteration {j + 1}/"
                           f"{len(loader)}:training loss", loss.item())
                     print("Train F1-mic {:.4f}, Train F1-mac {:.4f}".format(train_f1_mic, train_f1_mac))
-
         # evaluate
         model.eval()
         if epoch % args.val_every == 0:
+            model = model.to('cpu')
             val_f1_mic, val_f1_mac = evaluate(
                 model, g, labels, val_mask, multilabel)
             print(
@@ -150,15 +150,18 @@ def main(args):
                 best_f1 = val_f1_mic
                 print('new best val f1:', best_f1)
                 torch.save(model.state_dict(), os.path.join(
-                    log_dir, 'best_model.pkl'))
+                    log_dir, 'best_model_{}.pkl'.format(task)))
+            if args.gpu >= 0:
+                model = model.to('cuda:0')
 
     end_time = time.time()
     print(f'training using time {end_time - start_time}')
 
     # test
+    model = model.to('cpu')
     if args.use_val:
         model.load_state_dict(torch.load(os.path.join(
-            log_dir, 'best_model.pkl')))
+            log_dir, 'best_model_{}.pkl'.format(task))))
     test_f1_mic, test_f1_mac = evaluate(
         model, g, labels, test_mask, multilabel)
     print("Test F1-mic {:.4f}, Test F1-mac {:.4f}".format(test_f1_mic, test_f1_mac))
@@ -173,4 +176,4 @@ if __name__ == '__main__':
     args = argparse.Namespace(**CONFIG[task])
     print(args)
 
-    main(args)
+    main(args, task=task)
