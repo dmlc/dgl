@@ -788,7 +788,7 @@ class EdgeCollator(Collator):
         seed_nodes = pair_graph.ndata[NID]
 
         exclude_eids = _find_exclude_eids(
-            self.g,
+            self.g_sampling,
             self.exclude,
             items,
             reverse_eid_map=self.reverse_eids,
@@ -831,7 +831,7 @@ class EdgeCollator(Collator):
         seed_nodes = pair_graph.ndata[NID]
 
         exclude_eids = _find_exclude_eids(
-            self.g,
+            self.g_sampling,
             self.exclude,
             items,
             reverse_eid_map=self.reverse_eids,
