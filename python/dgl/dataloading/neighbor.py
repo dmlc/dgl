@@ -61,7 +61,7 @@ class MultiLayerNeighborSampler(BlockSampler):
     :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
     """
     def __init__(self, fanouts, replace=False, return_eids=False):
-        super().__init__(len(fanouts), return_eids, exclude_edges_in_frontier=True)
+        super().__init__(len(fanouts), return_eids)
 
         self.fanouts = fanouts
         self.replace = replace
