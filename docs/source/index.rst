@@ -48,16 +48,18 @@ Welcome to Deep Graph Library Tutorials and Documentation
    api/python/dgl.optim
    api/python/dgl.sampling
    api/python/dgl.multiprocessing
+   api/python/dgl.contrib.UnifiedTensor
    api/python/udf
 
 .. toctree::
    :maxdepth: 1
-   :caption: Developer Notes
+   :caption: Notes
    :hidden:
    :glob:
 
    contribute
    developer/ffi
+   performance
 
 .. toctree::
    :maxdepth: 1

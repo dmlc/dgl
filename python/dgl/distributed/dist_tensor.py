@@ -232,3 +232,13 @@ class DistTensor:
             The name of the tensor.
         '''
         return self._tensor_name
+
+    def count_nonzero(self):
+        '''Count and return the number of nonzero value
+
+        Returns
+        -------
+        int
+            the number of nonzero value
+        '''
+        return self.kvstore.count_nonzero(name=self.name)

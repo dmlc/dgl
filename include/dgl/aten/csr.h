@@ -113,12 +113,13 @@ struct CSRMatrix {
   }
 
   /*! \brief Return a copy of this matrix on the give device context. */
-  inline CSRMatrix CopyTo(const DLContext& ctx) const {
+  inline CSRMatrix CopyTo(const DLContext &ctx,
+                          const DGLStreamHandle &stream = nullptr) const {
     if (ctx == indptr->ctx)
       return *this;
-    return CSRMatrix(num_rows, num_cols,
-                     indptr.CopyTo(ctx), indices.CopyTo(ctx),
-                     aten::IsNullArray(data)? data : data.CopyTo(ctx),
+    return CSRMatrix(num_rows, num_cols, indptr.CopyTo(ctx, stream),
+                     indices.CopyTo(ctx, stream),
+                     aten::IsNullArray(data) ? data : data.CopyTo(ctx, stream),
                      sorted);
   }
 };
@@ -385,6 +386,55 @@ COOMatrix CSRRowWiseSampling(
     int64_t num_samples,
     FloatArray prob = FloatArray(),
     bool replace = true);
+
+/*!
+ * \brief Randomly select a fixed number of non-zero entries for each edge type
+ *        along each given row independently.
+ *
+ * The function performs random choices along each row independently.
+ * In each row, num_samples samples is picked for each edge type. (The edge
+ * type is stored in etypes)
+ * The picked indices are returned in the form of a COO matrix.
+ *
+ * If replace is false and a row has fewer non-zero values than num_samples,
+ * all the values are picked.
+ *
+ * Examples: TODO
+ *
+ * // csr.num_rows = 4;
+ * // csr.num_cols = 4;
+ * // csr.indptr = [0, 4, 4, 4, 5]
+ * // csr.cols = [0, 1, 3, 2, 3]
+ * // csr.data = [2, 3, 0, 1, 4]
+ * // etype = [0, 0, 0, 2, 1]
+ * CSRMatrix csr = ...;
+ * IdArray rows = ... ; // [0, 3]
+ * COOMatrix sampled = CSRRowWisePerEtypeSampling(csr, rows, etype, 2, FloatArray(), false);
+ * // possible sampled coo matrix:
+ * // sampled.num_rows = 4
+ * // sampled.num_cols = 4
+ * // sampled.rows = [0, 0, 0, 3]
+ * // sampled.cols = [0, 3, 2, 3]
+ * // sampled.data = [2, 0, 1, 4]
+ *
+ * \param mat Input CSR matrix.
+ * \param rows Rows to sample from.
+ * \param etypes Edge types of each edge.
+ * \param num_samples Number of samples
+ * \param prob Unnormalized probability array. Should be of the same length as the data array.
+ *             If an empty array is provided, assume uniform.
+ * \param replace True if sample with replacement
+ * \param etype_sorted True if the edge types are already sorted
+ * \return A COOMatrix storing the picked row, col and data indices.
+ */
+COOMatrix CSRRowWisePerEtypeSampling(
+    CSRMatrix mat,
+    IdArray rows,
+    IdArray etypes,
+    int64_t num_samples,
+    FloatArray prob = FloatArray(),
+    bool replace = true,
+    bool etype_sorted = false);
 
 /*!
  * \brief Select K non-zero entries with the largest weights along each given row.
