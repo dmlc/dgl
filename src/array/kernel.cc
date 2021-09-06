@@ -143,8 +143,8 @@ void SDDMMHetero(const std::string& op,
   std::vector<dgl_type_t> rhs_eid;
   for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
     vec_csr.push_back(graph->GetCSRMatrix(etype));
-    lhs_eid.push_back(get_hs_id(graph, lhs_target, etype));
-    rhs_eid.push_back(get_hs_id(graph, rhs_target, etype));
+    lhs_eid.push_back(get_hs_tid(graph, lhs_target, etype));
+    rhs_eid.push_back(get_hs_tid(graph, rhs_target, etype));
   }
   const auto &bcast = CalcBcastOff(op, lhs[lhs_eid[0]], rhs[rhs_eid[0]]);
 
@@ -166,7 +166,9 @@ void SDDMMHetero(const std::string& op,
   });
 }
 
-int get_hs_id(HeteroGraphPtr graph, int target, dgl_type_t etype) {
+
+/*! \brief Find the src/dst/etype id based on the target 'u', 'v' or 'e'. */
+int get_hs_tid(HeteroGraphPtr graph, int target, dgl_type_t etype) {
   auto pair = graph->meta_graph()->FindEdge(etype);
   if (target == 0)
     return pair.first;

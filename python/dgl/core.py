@@ -196,10 +196,8 @@ def data_dict_to_list(graph, data_dict, func, target):
         is the node type name or edge type name.
     func : dgl.function.BaseMessageFunction
         Built-in message function.
-    lhs_target : 'u', 'v' or 'e'
-        Could be list of None if op is ``copy_rhs``.
-    rhs_targer : 'u', 'v' or 'e'
-        Could be list of None if op is ``copy_lhs``.
+    target : 'u', 'v' or 'e'
+        The target of the lhs or rhs data
 
     Returns
     --------
