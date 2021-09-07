@@ -64,7 +64,7 @@ def to_dgl_nd_for_write(x):
     return nd.NULL['int64'] if x is None else F.zerocopy_to_dgl_ndarray_for_write(x)
 
 
-def get_hs_tid(g, rel, target):
+def get_typeid_by_target(g, rel, target):
     """Find the src/dst/etype id based on the target 'u', 'v' or 'e'."""
     srctype, _, dsttype = rel
     etid = g.get_etype_id(rel)
@@ -369,8 +369,8 @@ def _gsddmm_hetero(g, op, lhs_len, lhs_target='u', rhs_target='v', lhs_and_rhs_t
 
     for rel in g.canonical_etypes:
         etid = g.get_etype_id(rel)
-        lhs_id = get_hs_tid(g, rel, lhs_target)
-        rhs_id = get_hs_tid(g, rel, rhs_target)
+        lhs_id = get_typeid_by_target(g, rel, lhs_target)
+        rhs_id = get_typeid_by_target(g, rel, rhs_target)
         lhs = lhs_tuple[lhs_id]
         rhs = rhs_tuple[rhs_id]
         if use_lhs:

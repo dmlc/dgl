@@ -2,7 +2,7 @@ import torch as th
 from distutils.version import LooseVersion
 from ...base import is_all, ALL
 from ...sparse import _gspmm, _gspmm_hetero, _gsddmm, _gsddmm_hetero, _segment_reduce, _bwd_segment_cmp, _scatter_add
-from ...sparse import _csrmm, _csrsum, _csrmask, get_hs_tid
+from ...sparse import _csrmm, _csrsum, _csrmask, get_typeid_by_target
 from ...heterograph_index import create_unitgraph_from_csr
 
 if LooseVersion(th.__version__) >= LooseVersion("1.6.0"):
@@ -357,8 +357,8 @@ class GSDDMM_hetero(th.autograd.Function):
             for i in range(len(X))])
         req_grad_Y = tuple([Y[i].requires_grad if Y[i] is not None else False
             for i in range(len(Y))])
-        lhs_id = get_hs_tid(g, g.canonical_etypes[0], lhs_target)
-        rhs_id = get_hs_tid(g, g.canonical_etypes[0], rhs_target)
+        lhs_id = get_typeid_by_target(g, g.canonical_etypes[0], lhs_target)
+        rhs_id = get_typeid_by_target(g, g.canonical_etypes[0], rhs_target)
         ctx.save_for_backward(*feats)
         return out
 

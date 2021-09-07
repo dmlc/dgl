@@ -97,17 +97,6 @@ void SDDMMCoo(const std::string& op,
               int rhs_target);
 
 /*!
- * \brief Find the src/dst/etype id based on the target 'u', 'v' or 'e'.
- *
- * \param graph The input graph.
- * \param target 'u', 'v' or 'e'. The target of the lhs or rhs data of an etype.
- * \param etype Relation type of the input graph.
- */
-int get_hs_tid(HeteroGraphPtr graph,
-             int target,
-             dgl_type_t etype);
-
-/*!
  * \brief Segment reduce.
  */
 template <int XPU, typename IdType, int bits>
