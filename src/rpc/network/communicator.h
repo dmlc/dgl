@@ -3,8 +3,8 @@
  * \file communicator.h
  * \brief Communicator for DGL distributed training.
  */
-#ifndef DGL_RPC_NETWORK_COMMUNICATOR_H_
-#define DGL_RPC_NETWORK_COMMUNICATOR_H_
+#ifndef SRC_RPC_NETWORK_COMMUNICATOR_H_
+#define SRC_RPC_NETWORK_COMMUNICATOR_H_
 
 #include <dmlc/logging.h>
 
@@ -170,4 +170,4 @@ class Receiver {
 }  // namespace network
 }  // namespace dgl
 
-#endif  // DGL_RPC_NETWORK_COMMUNICATOR_H_
+#endif // SRC_RPC_NETWORK_COMMUNICATOR_H_

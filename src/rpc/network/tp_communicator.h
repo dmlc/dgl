@@ -3,26 +3,28 @@
  * \file communicator.h
  * \brief SocketCommunicator for DGL distributed training.
  */
-#ifndef SRC_RPC_NETWORK_SOCKET_COMMUNICATOR_H_
-#define SRC_RPC_NETWORK_SOCKET_COMMUNICATOR_H_
+#ifndef SRC_RPC_NETWORK_TP_COMMUNICATOR_H_
+#define SRC_RPC_NETWORK_TP_COMMUNICATOR_H_
+
 
 #include <thread>
 #include <vector>
+#include <deque>
 #include <string>
 #include <unordered_map>
 #include <memory>
+#include <tensorpipe/tensorpipe.h>
+
+
 
 #include "communicator.h"
-#include "msg_queue.h"
-#include "tcp_socket.h"
+// #include "msg_queue.h"
+// #include "tcp_socket.h"
 #include "common.h"
 
+using namespace tensorpipe;
 namespace dgl {
 namespace network {
-
-static constexpr int kMaxTryCount = 1024;    // maximal connection: 1024
-static constexpr int kTimeOut = 10 * 60;     // 10 minutes (in seconds) for socket timeout
-static constexpr int kMaxConnection = 1024;  // maximal connection: 1024
 
 /*!
  * \breif Networking address
@@ -37,13 +39,15 @@ struct IPAddr {
  *
  * SocketSender is the communicator implemented by tcp socket.
  */
-class SocketSender : public Sender {
+class TPSender : public Sender {
  public:
   /*!
    * \brief Sender constructor
    * \param queue_size size of message queue 
    */
-  explicit SocketSender(int64_t queue_size) : Sender(queue_size) {}
+  explicit TPSender(int64_t queue_size) : Sender(queue_size) {
+    context = std::make_shared<Context>();
+  };
 
   /*!
    * \brief Add receiver's address and ID to the sender's namebook
@@ -87,28 +91,30 @@ class SocketSender : public Sender {
   /*!
    * \brief Communicator type: 'socket'
    */
-  inline std::string Type() const { return std::string("socket"); }
+  inline std::string Type() const { return std::string("tp"); }
 
  private:
+  std::shared_ptr<Context> context;
+
   /*!
    * \brief socket for each connection of receiver
    */ 
-  std::unordered_map<int /* receiver ID */, std::shared_ptr<TCPSocket>> sockets_;
+  std::unordered_map<int /* receiver ID */, std::shared_ptr<Pipe>> pipes_;
 
   /*!
    * \brief receivers' address
    */ 
-  std::unordered_map<int /* receiver ID */, IPAddr> receiver_addrs_;
+  std::unordered_map<int /* receiver ID */, std::string> receiver_addrs_;
 
   /*!
    * \brief message queue for each socket connection
    */ 
-  std::unordered_map<int /* receiver ID */, std::shared_ptr<MessageQueue>> msg_queue_;
+//   std::unordered_map<int /* receiver ID */, std::shared_ptr<MessageQueue>> msg_queue_;
 
   /*!
    * \brief Independent thread for each socket connection
    */ 
-  std::unordered_map<int /* receiver ID */, std::shared_ptr<std::thread>> threads_;
+//   std::unordered_map<int /* receiver ID */, std::shared_ptr<std::thread>> threads_;
 
   /*!
    * \brief Send-loop for each socket in per-thread
@@ -118,7 +124,7 @@ class SocketSender : public Sender {
    * Note that, the SendLoop will finish its loop-job and exit thread
    * when the main thread invokes Signal() API on the message queue.
    */
-  static void SendLoop(TCPSocket* socket, MessageQueue* queue);
+//   static void SendLoop(TCPSocket* socket, MessageQueue* queue);
 };
 
 /*!
@@ -126,13 +132,16 @@ class SocketSender : public Sender {
  *
  * SocketReceiver is the communicator implemented by tcp socket.
  */
-class SocketReceiver : public Receiver {
+class TPReceiver : public Receiver {
  public:
+ 
   /*!
    * \brief Receiver constructor
    * \param queue_size size of message queue.
    */
-  explicit SocketReceiver(int64_t queue_size) : Receiver(queue_size) {}
+  explicit TPReceiver(int64_t queue_size): Receiver(queue_size) {
+    context = std::make_shared<Context>();
+  };
 
   /*!
    * \brief Wait for all the Senders to connect
@@ -180,9 +189,10 @@ class SocketReceiver : public Receiver {
   /*!
    * \brief Communicator type: 'socket'
    */
-  inline std::string Type() const { return std::string("socket"); }
+  inline std::string Type() const { return std::string("tp"); }
 
  private:
+  void AddReceiveRequest(int send_id);
   /*!
    * \brief number of sender
    */
@@ -191,23 +201,25 @@ class SocketReceiver : public Receiver {
   /*!
    * \brief server socket for listening connections
    */ 
-  TCPSocket* server_socket_;
+  // TCPSocket* server_socket_;
 
+  std::shared_ptr<Context> context;
   /*!
    * \brief socket for each client connections
    */ 
-  std::unordered_map<int /* Sender (virutal) ID */, std::shared_ptr<TCPSocket>> sockets_;
+  std::unordered_map<int /* Sender (virutal) ID */, std::shared_ptr<Pipe>> pipes_;
 
   /*!
    * \brief Message queue for each socket connection
    */ 
   std::unordered_map<int /* Sender (virtual) ID */, std::shared_ptr<MessageQueue>> msg_queue_;
-  std::unordered_map<int, std::shared_ptr<MessageQueue>>::iterator mq_iter_;
+  std::unordered_map<int /* Sender (virtual) ID */, std::shared_ptr<MessageQueue>>::iterator mq_iter_;
+  // std::unordered_map<int, std::shared_ptr<MessageQueue>>::iterator mq_iter_;
 
   /*!
    * \brief Independent thead for each socket connection
    */ 
-  std::unordered_map<int /* Sender (virtual) ID */, std::shared_ptr<std::thread>> threads_;
+  // std::unordered_map<int /* Sender (virtual) ID */, std::shared_ptr<std::thread>> threads_;
 
   /*!
    * \brief Recv-loop for each socket in per-thread
@@ -217,10 +229,11 @@ class SocketReceiver : public Receiver {
    * Note that, the RecvLoop will finish its loop-job and exit thread
    * when the main thread invokes Signal() API on the message queue.
    */ 
-  static void RecvLoop(TCPSocket* socket, MessageQueue* queue);
+  // static void RecvLoop(TCPSocket* socket, MessageQueue* queue);
 };
 
 }  // namespace network
 }  // namespace dgl
 
-#endif // SRC_RPC_NETWORK_SOCKET_COMMUNICATOR_H_
+
+#endif // SRC_RPC_NETWORK_TP_COMMUNICATOR_H_
