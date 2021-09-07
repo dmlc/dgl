@@ -7,11 +7,15 @@ import os
 import numpy as np
 
 from ..heterograph import DGLHeteroGraph
+from ..convert import heterograph as dgl_heterograph
+from ..convert import graph as dgl_graph
+from ..transform import compact_graphs
 from .. import heterograph_index
 from .. import backend as F
 from ..base import NID, EID, NTYPE, ETYPE, ALL, is_all
 from .kvstore import KVServer, get_kvstore
 from .._ffi.ndarray import empty_shared_mem
+from ..ndarray import exist_shared_mem_array
 from ..frame import infer_scheme
 from .partition import load_partition, load_partition_book
 from .graph_partition_book import PartitionPolicy, get_shared_mem_partition_book
@@ -73,14 +77,18 @@ def _copy_graph_to_shared_mem(g, graph_name, graph_format):
     new_g.edata['inner_edge'] = _to_shared_mem(g.edata['inner_edge'],
                                                _get_edata_path(graph_name, 'inner_edge'))
     new_g.edata[EID] = _to_shared_mem(g.edata[EID], _get_edata_path(graph_name, EID))
+    # for heterogeneous graph, we need to put ETYPE into KVStore
+    # for homogeneous graph, ETYPE does not exist
+    if ETYPE in g.edata:
+        new_g.edata[ETYPE] = _to_shared_mem(g.edata[ETYPE], _get_edata_path(graph_name, ETYPE))
     return new_g
 
 FIELD_DICT = {'inner_node': F.int32,    # A flag indicates whether the node is inside a partition.
               'inner_edge': F.int32,    # A flag indicates whether the edge is inside a partition.
               NID: F.int64,
               EID: F.int64,
-              NTYPE: F.int16,
-              ETYPE: F.int16}
+              NTYPE: F.int32,
+              ETYPE: F.int32}
 
 def _get_shared_mem_ndata(g, graph_name, name):
     ''' Get shared-memory node data from DistGraph server.
@@ -108,6 +116,9 @@ def _get_shared_mem_edata(g, graph_name, name):
     dlpack = data.to_dlpack()
     return F.zerocopy_from_dlpack(dlpack)
 
+def _exist_shared_mem_array(graph_name, name):
+    return exist_shared_mem_array(_get_edata_path(graph_name, name))
+
 def _get_graph_from_shared_mem(graph_name):
     ''' Get the graph from the DistGraph server.
 
@@ -125,6 +136,10 @@ def _get_graph_from_shared_mem(graph_name):
 
     g.edata['inner_edge'] = _get_shared_mem_edata(g, graph_name, 'inner_edge')
     g.edata[EID] = _get_shared_mem_edata(g, graph_name, EID)
+
+    # heterogeneous graph has ETYPE
+    if _exist_shared_mem_array(graph_name, ETYPE):
+        g.edata[ETYPE] = _get_shared_mem_edata(g, graph_name, ETYPE)
     return g
 
 NodeSpace = namedtuple('NodeSpace', ['data'])
@@ -500,6 +515,12 @@ class DistGraph:
             dst_tid = F.as_scalar(dst_tid)
             self._canonical_etypes.append((self.ntypes[src_tid], self.etypes[etype_id],
                                            self.ntypes[dst_tid]))
+        self._etype2canonical = {}
+        for src_type, etype, dst_type in self._canonical_etypes:
+            if etype in self._etype2canonical:
+                self._etype2canonical[etype] = ()
+            else:
+                self._etype2canonical[etype] = (src_type, etype, dst_type)
 
     def _init(self):
         self._client = get_kvstore()
@@ -512,12 +533,18 @@ class DistGraph:
         self._client.map_shared_data(self._gpb)
 
     def __getstate__(self):
-        return self.graph_name, self._gpb
+        return self.graph_name, self._gpb, self._canonical_etypes
 
     def __setstate__(self, state):
-        self.graph_name, self._gpb_input = state
+        self.graph_name, self._gpb_input, self._canonical_etypes = state
         self._init()
 
+        self._etype2canonical = {}
+        for src_type, etype, dst_type in self._canonical_etypes:
+            if etype in self._etype2canonical:
+                self._etype2canonical[etype] = ()
+            else:
+                self._etype2canonical[etype] = (src_type, etype, dst_type)
         self._ndata_store = {}
         self._edata_store = {}
         self._ndata = NodeDataView(self)
@@ -689,6 +716,65 @@ class DistGraph:
          ('user', 'plays', 'game')]
         """
         return self._canonical_etypes
+
+    def to_canonical_etype(self, etype):
+        """Convert an edge type to the corresponding canonical edge type in the graph.
+
+        A canonical edge type is a string triplet ``(str, str, str)``
+        for source node type, edge type and destination node type.
+
+        The function expects the given edge type name can uniquely identify a canonical edge
+        type. DGL will raise error if this is not the case.
+
+        Parameters
+        ----------
+        etype : str or (str, str, str)
+            If :attr:`etype` is an edge type (str), it returns the corresponding canonical edge
+            type in the graph. If :attr:`etype` is already a canonical edge type,
+            it directly returns the input unchanged.
+
+        Returns
+        -------
+        (str, str, str)
+            The canonical edge type corresponding to the edge type.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        >>> g = DistGraph("test")
+        >>> g.canonical_etypes
+        [('user', 'follows', 'user'),
+         ('user', 'follows', 'game'),
+         ('user', 'plays', 'game')]
+
+        >>> g.to_canonical_etype('plays')
+        ('user', 'plays', 'game')
+        >>> g.to_canonical_etype(('user', 'plays', 'game'))
+        ('user', 'plays', 'game')
+
+        See Also
+        --------
+        canonical_etypes
+        """
+        if etype is None:
+            if len(self.etypes) != 1:
+                raise DGLError('Edge type name must be specified if there are more than one '
+                               'edge types.')
+            etype = self.etypes[0]
+        if isinstance(etype, tuple):
+            return etype
+        else:
+            ret = self._etype2canonical.get(etype, None)
+            if ret is None:
+                raise DGLError('Edge type "{}" does not exist.'.format(etype))
+            if len(ret) != 3:
+                raise DGLError('Edge type "{}" is ambiguous. Please use canonical edge type '
+                               'in the form of (srctype, etype, dsttype)'.format(etype))
+            return ret
 
     def get_ntype_id(self, ntype):
         """Return the ID of the given node type.
@@ -967,15 +1053,25 @@ class DistGraph:
         '''
         return role.get_global_rank()
 
-    def find_edges(self, edges):
+    def find_edges(self, edges, etype=None):
         """ Given an edge ID array, return the source
         and destination node ID array ``s`` and ``d``.  ``s[i]`` and ``d[i]``
         are source and destination node ID for edge ``eid[i]``.
 
         Parameters
         ----------
-        edges : tensor
-            The edge ID array.
+        edges : Int Tensor
+            Each element is an ID. The tensor must have the same device type
+              and ID data type as the graph's.
+
+        etype : str or (str, str, str), optional
+            The type names of the edges. The allowed type name formats are:
+
+            * ``(str, str, str)`` for source node type, edge type and destination node type.
+            * or one ``str`` edge type name if the name can uniquely identify a
+              triplet format in the graph.
+
+            Can be omitted if the graph has only one type of edges.
 
         Returns
         -------
@@ -984,8 +1080,81 @@ class DistGraph:
         tensor
             The destination node ID array.
         """
-        assert len(self.etypes) == 1, 'find_edges does not support heterogeneous graph for now.'
-        return dist_find_edges(self, edges)
+        if etype is None:
+            assert len(self.etypes) == 1, 'find_edges requires etype for heterogeneous graphs.'
+
+        gpb = self.get_partition_book()
+        if len(gpb.etypes) > 1:
+            # if etype is a canonical edge type (str, str, str), extract the edge type
+            if len(etype) == 3:
+                etype = etype[1]
+            edges = gpb.map_to_homo_eid(edges, etype)
+        src, dst = dist_find_edges(self, edges)
+        if len(gpb.ntypes) > 1:
+            _, src = gpb.map_to_per_ntype(src)
+            _, dst = gpb.map_to_per_ntype(dst)
+        return src, dst
+
+    def edge_subgraph(self, edges, relabel_nodes=True, store_ids=True):
+        """Return a subgraph induced on the given edges.
+
+        An edge-induced subgraph is equivalent to creating a new graph using the given
+        edges. In addition to extracting the subgraph, DGL also copies the features
+        of the extracted nodes and edges to the resulting graph. The copy is *lazy*
+        and incurs data movement only when needed.
+
+        If the graph is heterogeneous, DGL extracts a subgraph per relation and composes
+        them as the resulting graph. Thus, the resulting graph has the same set of relations
+        as the input one.
+
+        Parameters
+        ----------
+        edges : Int Tensor or dict[(str, str, str), Int Tensor]
+            The edges to form the subgraph. Each element is an edge ID. The tensor must have
+            the same device type and ID data type as the graph's.
+
+            If the graph is homogeneous, one can directly pass an Int Tensor.
+            Otherwise, the argument must be a dictionary with keys being edge types
+            and values being the edge IDs in the above formats.
+        relabel_nodes : bool, optional
+            If True, it will remove the isolated nodes and relabel the incident nodes in the
+            extracted subgraph.
+        store_ids : bool, optional
+            If True, it will store the raw IDs of the extracted edges in the ``edata`` of the
+            resulting graph under name ``dgl.EID``; if ``relabel_nodes`` is ``True``, it will
+            also store the raw IDs of the incident nodes in the ``ndata`` of the resulting
+            graph under name ``dgl.NID``.
+
+        Returns
+        -------
+        G : DGLGraph
+            The subgraph.
+        """
+        if isinstance(edges, dict):
+            # TODO(zhengda) we need to directly generate subgraph of all relations with
+            # one invocation.
+            if isinstance(edges, tuple):
+                subg = {etype: self.find_edges(edges[etype], etype[1]) for etype in edges}
+            else:
+                subg = {}
+                for etype in edges:
+                    assert len(self._etype2canonical[etype]) == 3, \
+                            'the etype in input edges is ambiguous'
+                    subg[self._etype2canonical[etype]] = self.find_edges(edges[etype], etype)
+            num_nodes = {ntype: self.number_of_nodes(ntype) for ntype in self.ntypes}
+            subg = dgl_heterograph(subg, num_nodes_dict=num_nodes)
+            for etype in edges:
+                subg.edges[etype].data[EID] = edges[etype]
+        else:
+            assert len(self.etypes) == 1
+            subg = self.find_edges(edges)
+            subg = dgl_graph(subg, num_nodes=self.number_of_nodes())
+            subg.edata[EID] = edges
+
+        if relabel_nodes:
+            subg = compact_graphs(subg)
+        assert store_ids, 'edge_subgraph always stores original node/edge IDs.'
+        return subg
 
     def get_partition_book(self):
         """Get the partition information.
@@ -1135,48 +1304,38 @@ def _split_even_to_part(partition_book, elements):
     # strategy.
     # TODO(zhengda) we need another way to divide the list for other partitioning strategy.
     if isinstance(elements, DistTensor):
-        # Here we need to fetch all elements from the kvstore server.
-        # I hope it's OK.
-        eles = F.nonzero_1d(elements[0:len(elements)])
-        # compute the offset of each split and ensure that the difference of each partition size
-        # is 1.
-        offsets = _even_offset(len(eles), partition_book.num_partitions())
-        assert offsets[-1] == len(eles)
-
-        # Get the elements that belong to the partition.
-        partid = partition_book.partid
-        part_eles = eles[offsets[partid] : offsets[partid + 1]]
+        nonzero_count = elements.count_nonzero()
     else:
         elements = F.tensor(elements)
         nonzero_count = F.count_nonzero(elements)
-        # compute the offset of each split and ensure that the difference of each partition size
-        # is 1.
-        offsets = _even_offset(nonzero_count, partition_book.num_partitions())
-        assert offsets[-1] == nonzero_count
+    # compute the offset of each split and ensure that the difference of each partition size
+    # is 1.
+    offsets = _even_offset(nonzero_count, partition_book.num_partitions())
+    assert offsets[-1] == nonzero_count
 
-        # Get the elements that belong to the partition.
-        partid = partition_book.partid
-        left, right = offsets[partid], offsets[partid + 1]
+    # Get the elements that belong to the partition.
+    partid = partition_book.partid
+    left, right = offsets[partid], offsets[partid + 1]
 
-        x = y = 0
-        num_elements = len(elements)
-        block_size = num_elements // partition_book.num_partitions()
-        part_eles = None
-        # compute the nonzero tensor of each partition instead of whole tensor to save memory
-        for idx in range(0, num_elements, block_size):
-            nonzero_block = F.nonzero_1d(elements[idx:min(idx+block_size, num_elements)])
-            x = y
-            y += len(nonzero_block)
-            if y > left and x < right:
-                start = max(x, left) - x
-                end = min(y, right) - x
-                tmp = nonzero_block[start:end] + idx
-                if part_eles is None:
-                    part_eles = tmp
-                else:
-                    part_eles = F.cat((part_eles, tmp), 0)
-            elif x >= right:
-                break
+    x = y = 0
+    num_elements = len(elements)
+    block_size = num_elements // partition_book.num_partitions()
+    part_eles = None
+    # compute the nonzero tensor of each partition instead of whole tensor to save memory
+    for idx in range(0, num_elements, block_size):
+        nonzero_block = F.nonzero_1d(elements[idx:min(idx+block_size, num_elements)])
+        x = y
+        y += len(nonzero_block)
+        if y > left and x < right:
+            start = max(x, left) - x
+            end = min(y, right) - x
+            tmp = nonzero_block[start:end] + idx
+            if part_eles is None:
+                part_eles = tmp
+            else:
+                part_eles = F.cat((part_eles, tmp), 0)
+        elif x >= right:
+            break
 
     return part_eles
 
