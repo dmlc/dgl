@@ -19,8 +19,7 @@ to handle different relationships between entities in a knowledge base. To
 learn more about the research behind R-GCN, see `Modeling Relational Data with Graph Convolutional
 Networks <https://arxiv.org/pdf/1703.06103.pdf>`_ 
 
-The straightforward graph convolutional network (GCN) and 
-`DGL tutorial <http://doc.dgl.ai/tutorials/index.html>`_) exploits
+The straightforward graph convolutional network (GCN) exploits
 structural information of a dataset (that is, the graph connectivity) in order to
 improve the extraction of node representations. Graph edges are left as
 untyped.
