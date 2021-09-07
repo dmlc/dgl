@@ -201,6 +201,8 @@ target_include_directories(dgl PRIVATE "tensoradapter/include")
 target_include_directories(dgl PRIVATE "third_party/nanoflann/include")
 target_include_directories(dgl PRIVATE "third_party/libxsmm/include")
 
+target_include_directories(dgl PRIVATE third_party/tensorpipe)
+
 # For serialization
 if (USE_HDFS)
   option(DMLC_HDFS_SHARED "dgl has to build with dynamic hdfs library" ON)
@@ -227,6 +229,12 @@ if((NOT MSVC) AND USE_LIBXSMM)
   add_dependencies(dgl libxsmm)
   list(APPEND DGL_LINKER_LIBS -L${CMAKE_SOURCE_DIR}/third_party/libxsmm/lib/ xsmm)
 endif((NOT MSVC) AND USE_LIBXSMM)
+
+# list(REMOVE_ITEM CMAKE_C_FLAGS -pedantic)
+string(REPLACE "-pedantic" "" CMAKE_C_FLAGS ${CMAKE_C_FLAGS})
+set(TP_BUILD_LIBUV ON)
+set(TP_STATIC_OR_SHARED STATIC)
+add_subdirectory(third_party/tensorpipe)
 
 # Compile TVM Runtime and Featgraph
 # (NOTE) We compile a dynamic library called featgraph_runtime, which the DGL library links to.
@@ -288,6 +296,8 @@ if(BUILD_TORCH)
   add_dependencies(dgl tensoradapter_pytorch)
 endif(BUILD_TORCH)
 
+message(STATUS "CXX F: ${CMAKE_CXX_FLAGS}")
+message(STATUS "C F: ${CMAKE_C_FLAGS}")
 # Installation rules
 install(TARGETS dgl DESTINATION lib${LIB_SUFFIX})
 
