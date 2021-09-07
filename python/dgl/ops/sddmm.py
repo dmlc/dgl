@@ -74,9 +74,17 @@ def gsddmm(g, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
         return gsddmm_internal(
             g._graph, op, lhs_data, rhs_data, lhs_target, rhs_target)
     else:
-        if op in ['copy_lhs', 'copy_rhs']:
-            lhs_and_rhs_tuple = lhs_data if rhs_data is None else rhs_data
-        return gsddmm_internal_hetero(g, op, lhs_target, rhs_target, *lhs_and_rhs_tuple)
+        if op == 'copy_lhs':
+            rhs_data = [None] * g._graph.number_of_etypes()
+        elif op == 'copy_rhs':
+            lhs_data = [None] * g._graph.number_of_ntypes()
+        # TODO (Israt): Call reshape_lhs_rhs() on lhs and rhs data to match their dimension
+        # and avoid broadcasting issue. Handle the case where different nodes have
+        # different dimensions, and different etypes may need different broadcasting
+        # dims for the same node.
+        lhs_and_rhs_tuple = tuple(list(lhs_data) + list(rhs_data))
+        return gsddmm_internal_hetero(g, op, len(lhs_data), lhs_target,
+                                      rhs_target, *lhs_and_rhs_tuple)
 
 def _gen_sddmm_func(lhs_target, rhs_target, binary_op):
     name = "{}_{}_{}".format(lhs_target, binary_op, rhs_target)
