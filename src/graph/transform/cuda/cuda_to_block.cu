@@ -367,12 +367,13 @@ MapEdges(
 // Since partial specialization is not allowed for functions, use this as an
 // intermediate for ToBlock where XPU = kDLGPU.
 template<typename IdType>
-std::tuple<HeteroGraphPtr, std::vector<IdArray>, std::vector<IdArray>>
+std::tuple<HeteroGraphPtr, std::vector<IdArray>>
 ToBlockGPU(
     HeteroGraphPtr graph,
     const std::vector<IdArray> &rhs_nodes,
     const bool include_rhs_in_lhs,
-    std::vector<IdArray> lhs_nodes) {
+    std::vector<IdArray>* const lhs_nodes_ptr) {
+  std::vector<IdArray>& lhs_nodes = *lhs_nodes_ptr;
   const bool generate_lhs_nodes = lhs_nodes.empty();
 
   cudaStream_t stream = 0;
@@ -586,28 +587,28 @@ ToBlockGPU(
       new_meta_graph, rel_graphs, num_nodes_per_type);
 
   // return the new graph, the new src nodes, and new edges
-  return std::make_tuple(new_graph, lhs_nodes, induced_edges);
+  return std::make_tuple(new_graph, induced_edges);
 }
 
 }  // namespace
 
 template<>
-std::tuple<HeteroGraphPtr, std::vector<IdArray>, std::vector<IdArray>>
+std::tuple<HeteroGraphPtr, std::vector<IdArray>>
 ToBlock<kDLGPU, int32_t>(
     HeteroGraphPtr graph,
     const std::vector<IdArray> &rhs_nodes,
     bool include_rhs_in_lhs,
-    std::vector<IdArray> lhs_nodes) {
+    std::vector<IdArray>* const lhs_nodes) {
   return ToBlockGPU<int32_t>(graph, rhs_nodes, include_rhs_in_lhs, lhs_nodes);
 }
 
 template<>
-std::tuple<HeteroGraphPtr, std::vector<IdArray>, std::vector<IdArray>>
+std::tuple<HeteroGraphPtr, std::vector<IdArray>>
 ToBlock<kDLGPU, int64_t>(
     HeteroGraphPtr graph,
     const std::vector<IdArray> &rhs_nodes,
     bool include_rhs_in_lhs,
-    std::vector<IdArray> lhs_nodes) {
+    std::vector<IdArray>* const lhs_nodes) {
   return ToBlockGPU<int64_t>(graph, rhs_nodes, include_rhs_in_lhs, lhs_nodes);
 }
 
