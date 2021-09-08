@@ -256,3 +256,5 @@ class DGLArray(ctypes.Structure):
                 ("byte_offset", ctypes.c_uint64)]
 
 DGLArrayHandle = ctypes.POINTER(DGLArray)
+
+DGLStreamHandle = ctypes.c_void_p
