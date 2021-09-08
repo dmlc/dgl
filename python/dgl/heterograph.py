@@ -4438,8 +4438,7 @@ class DGLHeteroGraph(object):
             edata_tensor = {}
             key = list(edata.keys())[0]
             out_tensor_tuples = edata[key]
-            for rel in g.canonical_etypes:
-                etid = g.get_etype_id(rel)
+            for etid, rel in enumerate(g.canonical_etypes):
                 # TODO (Israt): Check the logic why some output tensor is None
                 if out_tensor_tuples[etid] is not None:
                     edata_tensor[key] = out_tensor_tuples[etid]
