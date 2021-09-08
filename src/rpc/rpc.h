@@ -12,8 +12,10 @@
 #include <dmlc/thread_local.h>
 #include <cstdint>
 #include <memory>
+#include <deque>
 #include <vector>
 #include <string>
+#include "./tensorpipe/tp_communicator.h"
 #include "./network/communicator.h"
 #include "./network/socket_communicator.h"
 #include "./network/msg_queue.h"
@@ -74,12 +76,17 @@ struct RPCContext {
   /*!
    * \brief Sender communicator.
    */
-  std::shared_ptr<network::Sender> sender;
+  std::shared_ptr<TPSender> sender;
 
   /*!
    * \brief Receiver communicator.
    */
-  std::shared_ptr<network::Receiver> receiver;
+  std::shared_ptr<TPReceiver> receiver;
+
+  std::shared_ptr<tensorpipe::Context> ctx;
+  // std::shared_ptr<te>
+
+  // std::shared_ptr<std::shared_ptr<RPCMessage>>;
 
   /*!
    * \brief Server state data.
@@ -106,8 +113,8 @@ struct RPCContext {
     t->num_clients = 0;
     t->barrier_count = 0;
     t->num_servers_per_machine = 0;
-    t->sender = std::shared_ptr<network::Sender>();
-    t->receiver = std::shared_ptr<network::Receiver>();
+    t->sender = std::shared_ptr<TPSender>();
+    t->receiver = std::shared_ptr<TPReceiver>();
   }
 };
 

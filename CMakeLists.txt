@@ -235,6 +235,7 @@ string(REPLACE "-pedantic" "" CMAKE_C_FLAGS ${CMAKE_C_FLAGS})
 set(TP_BUILD_LIBUV ON)
 set(TP_STATIC_OR_SHARED STATIC)
 add_subdirectory(third_party/tensorpipe)
+list(APPEND DGL_LINKER_LIBS tensorpipe)
 
 # Compile TVM Runtime and Featgraph
 # (NOTE) We compile a dynamic library called featgraph_runtime, which the DGL library links to.
