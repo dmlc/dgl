@@ -9,5 +9,7 @@
 
 # checksum md5sum of the files
 mag240m_kddcup2021.zip     : ```bd61c9446f557fbe4430d9a7ce108b34```
-wikikg90m_kddcup2021.zip.  : ```73d4f5dde29d78669330b4db4c12fc9c``` 
+
+wikikg90m_kddcup2021.zip   : ```73d4f5dde29d78669330b4db4c12fc9c``` 
+
 pcqm4m_kddcup2021.zip.     : ```5144ebaa7c67d24da1a2acbe41f57f6a``` 
