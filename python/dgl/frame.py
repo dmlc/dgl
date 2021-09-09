@@ -121,13 +121,8 @@ class Column(object):
         Index tensor
     """
     def __init__(self, storage, scheme=None, index=None, device=None):
-        if isinstance(storage, tuple):
-            # handle DistTensor and node/edge ids in subgraphs
-            self.storage = storage[0]
-            self.index = storage[1]
-        else:
-            self.storage = storage
-            self.index = index
+        self.storage = storage
+        self.index = index
         self.scheme = scheme if scheme else infer_scheme(self.storage)
         self.device = device
 
@@ -157,7 +152,7 @@ class Column(object):
         if isinstance(self.storage, distributed.dist_tensor.DistTensor):
             # if self.storage is a DistTensor, query the actual tensor from remotes servers
             # reset self.index to None
-            # After this method, self.storage becomes a tensor on CPU
+            # After this operation, self.storage becomes a tensor on CPU
             self._copy_dist_tensor()
 
         # handle chain of indices
@@ -184,18 +179,8 @@ class Column(object):
     @data.setter
     def data(self, val):
         """Update the column data."""
-        if isinstance(val, tuple):
-            # This case is used to handle DistTensor returned by DistGraph.
-            # index is used to identify rows in DistTensor
-            # that are present in the current graph/block
-            data, index = val
-            assert isinstance(data, distributed.dist_tensor.DistTensor)\
-                , "Input data must be DistTensor when index is specified."
-            self.index = index
-            self.storage = data
-        else:
-            self.index = None
-            self.storage = val
+        self.index = None
+        self.storage = val
 
     def to(self, device, **kwargs): # pylint: disable=invalid-name
         """ Return a new column with columns copy to the targeted device (cpu/gpu).
@@ -539,7 +524,9 @@ class Frame(MutableMapping):
             The column data.
         """
         col = Column.create(data)
-        if len(col) != self.num_rows:
+        # handle DistTensor
+        if not isinstance(data, distributed.dist_tensor.DistTensor) \
+                and len(col) != self.num_rows:
             raise DGLError('Expected data to have %d rows, got %d.' %
                            (self.num_rows, len(col)))
         self._columns[name] = col
@@ -562,7 +549,7 @@ class Frame(MutableMapping):
         """
         for key, val in data.items():
             # handle DistTensor feature
-            if isinstance(val, (tuple, distributed.dist_tensor.DistTensor)):
+            if isinstance(val, distributed.dist_tensor.DistTensor):
                 raise DGLError("Cannot assign a slice of DistTensor to rows of a tensor. "
                                "Try to retrieve the actual tensor from DistTensor first, "
                                "then do the assignment")

@@ -11,8 +11,11 @@ from ...distributed import DistGraph
 from ...distributed import DistDataLoader
 from ...ndarray import NDArray as DGLNDArray
 from ... import backend as F
-from ...base import DGLError, EID
+from ...base import DGLError, NID, EID
 from ...utils import to_dgl_context
+from ...utils import extract_node_subframes_for_block, extract_edge_subframes
+from ...utils import set_new_frames
+
 
 __all__ = ['NodeDataLoader', 'EdgeDataLoader', 'GraphDataLoader',
            # Temporary exposure.
@@ -342,8 +345,7 @@ class _DistDataLoaderWrapper:
         try:
             ret = list(next(self.dataloader))
             blocks = []
-            for _, block in enumerate(ret[-1]):
-                # copy node and edge features
+            for block in ret[-1]:
                 blocks.append(self._copy_features(block))
             ret[-1] = blocks
             return tuple(ret)
@@ -352,22 +354,38 @@ class _DistDataLoaderWrapper:
 
     def _copy_features(self, block):
         """copy DistTensor reference to block features"""
-        # copy node feature DistTensor reference
-        for ntype in block.ntypes:
-            nids = block.nodes(ntype)
-            block_nodes = block.nodes[ntype]
+        # copy srcnode feature DistTensor reference
+        ind_srcnodes = []
+        for ntype in block.srctypes:
+            ind_srcnodes.append(block.srcnodes[ntype].data[NID])
+            block_srcnodes = block.srcnodes[ntype]
             g_nodes = self.g.nodes[ntype]
             for name in self.g._get_ndata_names(ntype):
                 ndata_name = name.get_name()
-                block_nodes.data[ndata_name] = (g_nodes.data[ndata_name], nids)
+                block_srcnodes.data[ndata_name] = g_nodes.data[ndata_name]
+        # copy dstnode feature DistTensor reference
+        ind_dstnodes = []
+        for ntype in block.dsttypes:
+            ind_dstnodes.append(block.dstnodes[ntype].data[NID])
+            block_dstnodes = block.dstnodes[ntype]
+            g_nodes = self.g.nodes[ntype]
+            for name in self.g._get_ndata_names(ntype):
+                ndata_name = name.get_name()
+                block_dstnodes.data[ndata_name] = g_nodes.data[ndata_name]
         # copy edge feature DistTensor reference
+        ind_edges = []
         for etype in block.etypes:
-            eids = block.edges[etype].data[EID]
+            ind_edges.append(block.edges[etype].data[EID])
             block_edges = block.edges[etype]
             g_edges = self.g.edges[etype]
             for name in self.g._get_edata_names(etype):
                 edata_name = name.get_name()
-                block_edges.data[edata_name] = (g_edges.data[edata_name], eids)
+                block_edges.data[edata_name] = g_edges.data[edata_name]
+        block_node_subframes \
+            = extract_node_subframes_for_block(block, ind_srcnodes, ind_dstnodes)
+        block_edge_subframes = extract_edge_subframes(block, ind_edges)
+        set_new_frames(graph=block, node_frames=block_node_subframes,
+                       edge_frames=block_edge_subframes)
         return block
 
 class _EdgeDataLoaderIter:
