@@ -5,8 +5,8 @@
  * This source code is licensed under the BSD-style license found in the
  * LICENSE file in the root directory of this source tree.
  */
-#ifndef SRC_RPC_TENSORPIPE_QUEUE_H_
-#define SRC_RPC_TENSORPIPE_QUEUE_H_
+#ifndef DGL_RPC_TENSORPIPE_QUEUE_H_
+#define DGL_RPC_TENSORPIPE_QUEUE_H_
 
 #include <condition_variable>
 #include <deque>
@@ -47,7 +47,7 @@ class Queue {
   const int capacity_;
   std::deque<T> items_;
 };
-}  // namespace network
+}  // namespace rpc
 }  // namespace dgl
 
-#endif  // SRC_RPC_TENSORPIPE_QUEUE_H_
+#endif  // DGL_RPC_TENSORPIPE_QUEUE_H_
