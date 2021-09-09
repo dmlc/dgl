@@ -3,8 +3,8 @@
  * \file tp_communicator.h
  * \brief Tensorpipe Communicator for DGL distributed training.
  */
-#ifndef SRC_RPC_TENSORPIPE_TP_COMMUNICATOR_H_
-#define SRC_RPC_TENSORPIPE_TP_COMMUNICATOR_H_
+#ifndef DGL_RPC_TENSORPIPE_TP_COMMUNICATOR_H_
+#define DGL_RPC_TENSORPIPE_TP_COMMUNICATOR_H_
 
 #include <dmlc/logging.h>
 #include <tensorpipe/tensorpipe.h>
@@ -124,7 +124,7 @@ class TPSender {
    * when the main thread invokes Signal() API on the message queue.
    */
   //   static void SendLoop(TCPSocket* socket, MessageQueue* queue);
-};
+}
 
 /*!
  * \brief SocketReceiver for DGL distributed training.
@@ -212,4 +212,4 @@ class TPReceiver {
 }  // namespace rpc
 }  // namespace dgl
 
-#endif // SRC_RPC_TENSORPIPE_TP_COMMUNICATOR_H_
+#endif // DGL_RPC_TENSORPIPE_TP_COMMUNICATOR_H_
