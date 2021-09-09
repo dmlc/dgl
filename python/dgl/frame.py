@@ -122,8 +122,8 @@ class Column(object):
     """
     def __init__(self, storage, scheme=None, index=None, device=None):
         self.storage = storage
-        self.index = index
         self.scheme = scheme if scheme else infer_scheme(self.storage)
+        self.index = index
         self.device = device
 
     def __len__(self):
