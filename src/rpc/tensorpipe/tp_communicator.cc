@@ -1,3 +1,9 @@
+/*!
+ *  Copyright (c) 2019 by Contributors
+ * \file tp_communicator.cc
+ * \brief Tensorpipe Communicator for DGL distributed training.
+ */
+
 #include "tp_communicator.h"
 
 #include <time.h>
@@ -8,14 +14,13 @@
 #include <utility>
 
 #include "../rpc.h"
-#include "tp_communicator.h"
 
 namespace dgl {
 namespace rpc {
 
 using namespace tensorpipe;
 
-void TPSender::AddReceiver(std::string& addr, int recv_id) {
+void TPSender::AddReceiver(const std::string& addr, int recv_id) {
   receiver_addrs_[recv_id] = addr;
 }
 
@@ -44,7 +49,7 @@ bool TPSender::Connect() {
     pipes_[kv.first] = pipe;
   }
   return true;
-};
+}
 
 void TPSender::Send(RPCMessage msg, int recv_id) {
   auto pipe = pipes_[recv_id];
@@ -73,12 +78,12 @@ void TPSender::Send(RPCMessage msg, int recv_id) {
       LOG(FATAL) << error.what();
     }
   });
-};
+}
 
-void TPSender::Finalize(){};
-void TPReceiver::Finalize(){};
+void TPSender::Finalize() {}
+void TPReceiver::Finalize() {}
 
-bool TPReceiver::Wait(std::string& addr, int num_sender) {
+bool TPReceiver::Wait(const std::string& addr, int num_sender) {
   std::string addr_str(addr);
   listener = context->listen({addr});
   for (int i = 0; i < num_sender; i++) {
@@ -91,11 +96,12 @@ bool TPReceiver::Wait(std::string& addr, int num_sender) {
     });
     std::shared_ptr<Pipe> pipe = pipeProm.get_future().get();
     std::promise<bool> checkConnect;
-    pipe->readDescriptor([pipe, &checkConnect](const Error& error, Descriptor descriptor) {
-      Allocation allocation;
-      checkConnect.set_value(descriptor.metadata == "dglconnect");
-      pipe->read(allocation, [](const Error& error) {});
-    });
+    pipe->readDescriptor(
+      [pipe, &checkConnect](const Error& error, Descriptor descriptor) {
+        Allocation allocation;
+        checkConnect.set_value(descriptor.metadata == "dglconnect");
+        pipe->read(allocation, [](const Error& error) {});
+      });
     CHECK(checkConnect.get_future().get()) << "Invalid connect message.";
     pipes_[i] = pipe;
     ReceiveFromPipe(pipe, queue_);
@@ -142,7 +148,7 @@ void TPReceiver::ReceiveFromPipe(std::shared_ptr<Pipe> pipe,
   });
 }
 
-void TPReceiver::Recv(RPCMessage* msg) { *msg = std::move(queue_->pop()); };
+void TPReceiver::Recv(RPCMessage* msg) { *msg = std::move(queue_->pop()); }
 
 }  // namespace rpc
 }  // namespace dgl

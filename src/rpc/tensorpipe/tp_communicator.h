@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file communicator.h
- * \brief SocketCommunicator for DGL distributed training.
+ * \file tp_communicator.h
+ * \brief Tensorpipe Communicator for DGL distributed training.
  */
 #ifndef SRC_RPC_TENSORPIPE_TP_COMMUNICATOR_H_
 #define SRC_RPC_TENSORPIPE_TP_COMMUNICATOR_H_
@@ -41,10 +41,10 @@ class TPSender {
    * \brief Sender constructor
    * \param queue_size size of message queue
    */
-  TPSender(std::shared_ptr<tensorpipe::Context> ctx) {
+  explicit TPSender(std::shared_ptr<tensorpipe::Context> ctx) {
     CHECK(ctx) << "Context is not initialized";
     this->context = ctx;
-  };
+  }
 
   /*!
    * \brief Add receiver's address and ID to the sender's namebook
@@ -53,7 +53,7 @@ class TPSender {
    *
    * AddReceiver() is not thread-safe and only one thread can invoke this API.
    */
-  void AddReceiver(std::string& addr, int recv_id);
+  void AddReceiver(const std::string& addr, int recv_id);
 
   /*!
    * \brief Connect with all the Receivers
@@ -137,11 +137,11 @@ class TPReceiver {
    * \brief Receiver constructor
    * \param queue_size size of message queue.
    */
-  TPReceiver(std::shared_ptr<tensorpipe::Context> ctx) {
+  explicit TPReceiver(std::shared_ptr<tensorpipe::Context> ctx) {
     CHECK(ctx) << "Context is not initialized";
     this->context = ctx;
     queue_ = std::make_shared<RPCMessageQueue>();
-  };
+  }
 
   /*!
    * \brief Wait for all the Senders to connect
@@ -151,7 +151,7 @@ class TPReceiver {
    *
    * Wait() is not thread-safe and only one thread can invoke this API.
    */
-  bool Wait(std::string& addr, int num_sender);
+  bool Wait(const std::string& addr, int num_sender);
 
   /*!
    * \brief Recv RPCMessage from Sender. Actually removing data from queue.
@@ -212,4 +212,4 @@ class TPReceiver {
 }  // namespace rpc
 }  // namespace dgl
 
-#endif  // SRC_RPC_TENSORPIPE_TP_COMMUNICATOR_H_
+#endif // SRC_RPC_TENSORPIPE_TP_COMMUNICATOR_H_
