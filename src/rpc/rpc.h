@@ -16,9 +16,9 @@
 #include <vector>
 #include <string>
 #include "./tensorpipe/tp_communicator.h"
-#include "./network/communicator.h"
-#include "./network/socket_communicator.h"
-#include "./network/msg_queue.h"
+// #include "./network/communicator.h"
+// #include "./network/socket_communicator.h"
+// #include "./network/msg_queue.h"
 #include "./network/common.h"
 #include "./server_state.h"
 

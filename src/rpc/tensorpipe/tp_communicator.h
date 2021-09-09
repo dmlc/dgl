@@ -6,6 +6,7 @@
 #ifndef SRC_RPC_TENSORPIPE_TP_COMMUNICATOR_H_
 #define SRC_RPC_TENSORPIPE_TP_COMMUNICATOR_H_
 
+#include <dmlc/logging.h>
 #include <tensorpipe/tensorpipe.h>
 
 #include <deque>
@@ -15,7 +16,6 @@
 #include <unordered_map>
 #include <vector>
 
-#include <dmlc/logging.h>
 #include "./queue.h"
 
 // #include "communicator.h"
@@ -207,10 +207,9 @@ class TPReceiver {
     pipes_;
 
   std::shared_ptr<RPCMessageQueue> queue_;
-
 };
 
 }  // namespace rpc
 }  // namespace dgl
 
-#endif // SRC_RPC_TENSORPIPE_TP_COMMUNICATOR_H_
+#endif  // SRC_RPC_TENSORPIPE_TP_COMMUNICATOR_H_

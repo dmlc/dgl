@@ -41,9 +41,7 @@ bool TPSender::Connect() {
         LOG(INFO) << "Cannot connect to remove server. Wait to retry";
       }
     }
-    // pipe->
     pipes_[kv.first] = pipe;
-    // pipe->write
   }
   return true;
 };
@@ -92,11 +90,13 @@ bool TPReceiver::Wait(std::string& addr, int num_sender) {
       pipeProm.set_value(std::move(pipe));
     });
     std::shared_ptr<Pipe> pipe = pipeProm.get_future().get();
-    pipe->readDescriptor([pipe](const Error& error, Descriptor descriptor) {
+    std::promise<bool> checkConnect;
+    pipe->readDescriptor([pipe, &checkConnect](const Error& error, Descriptor descriptor) {
       Allocation allocation;
-      CHECK_EQ(descriptor.metadata, "dglconnect");
+      checkConnect.set_value(descriptor.metadata == "dglconnect");
       pipe->read(allocation, [](const Error& error) {});
     });
+    CHECK(checkConnect.get_future().get()) << "Invalid connect message.";
     pipes_[i] = pipe;
     ReceiveFromPipe(pipe, queue_);
   }
@@ -108,7 +108,7 @@ void TPReceiver::ReceiveFromPipe(std::shared_ptr<Pipe> pipe,
   pipe->readDescriptor([pipe, queue = std::move(queue)](const Error& error,
                                                         Descriptor descriptor) {
     if (error) {
-      //   LOG(FATAL) << error.what();
+      // Error may happen when the pipe is closed
       return;
     }
     Allocation allocation;
@@ -122,8 +122,8 @@ void TPReceiver::ReceiveFromPipe(std::shared_ptr<Pipe> pipe,
     pipe->read(allocation, [allocation, descriptor, queue = std::move(queue),
                             pipe](const Error& error) {
       if (error) {
+        // Error may happen when the pipe is closed
         return;
-        // LOG(FATAL) << error.what();
       }
 
       char* meta_msg_begin = const_cast<char*>(&descriptor.metadata[0]);
