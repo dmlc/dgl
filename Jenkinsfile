@@ -179,7 +179,7 @@ pipeline {
             }
           }
           steps {
-            checkout scm // doesn't need to checkout submodule for linting
+            init_git()
             sh 'bash tests/scripts/task_lint.sh'
           }
           post {
