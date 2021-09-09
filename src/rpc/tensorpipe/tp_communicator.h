@@ -15,6 +15,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include <dmlc/logging.h>
 #include "./queue.h"
 
 // #include "communicator.h"
@@ -27,10 +28,12 @@ namespace rpc {
 
 class RPCMessage;
 
+typedef Queue<RPCMessage> RPCMessageQueue;
+
 /*!
- * \brief SocketSender for DGL distributed training.
+ * \brief TPSender for DGL distributed training.
  *
- * SocketSender is the communicator implemented by tcp socket.
+ * TPSender is the communicator implemented by tcp socket.
  */
 class TPSender {
  public:
@@ -39,20 +42,13 @@ class TPSender {
    * \param queue_size size of message queue
    */
   TPSender(std::shared_ptr<tensorpipe::Context> ctx) {
+    CHECK(ctx) << "Context is not initialized";
     this->context = ctx;
-    // auto context = RPCContext::ThreadLocal()->ctx;
-    // if (!context){
-    //     context = std::make_shared<tensorpipe::Context>();
-    //     RPCContext::ThreadLocal()->ctx = context;
-    // } else {
-    //     this->context = RPCContext::ThreadLocal()->ctx;
-    // }
-
   };
 
   /*!
    * \brief Add receiver's address and ID to the sender's namebook
-   * \param addr Networking address, e.g., 'socket://127.0.0.1:50091', 'mpi://0'
+   * \param addr Networking address, e.g., 'tcp://127.0.0.1:50091'
    * \param id receiver's ID
    *
    * AddReceiver() is not thread-safe and only one thread can invoke this API.
@@ -89,7 +85,7 @@ class TPSender {
   void Finalize();
 
   /*!
-   * \brief Communicator type: 'socket'
+   * \brief Communicator type: 'tp'
    */
   inline std::string Type() const { return std::string("tp"); }
 
@@ -142,25 +138,14 @@ class TPReceiver {
    * \param queue_size size of message queue.
    */
   TPReceiver(std::shared_ptr<tensorpipe::Context> ctx) {
+    CHECK(ctx) << "Context is not initialized";
     this->context = ctx;
-    queue_ = std::make_shared<Queue<RPCMessage>>(99999);
-    // if (!context){
-    //     context = std::make_shared<tensorpipe::Context>();
-    //     RPCContext::ThreadLocal()->ctx = context;
-    // } else {
-    //     this->context = RPCContext::ThreadLocal()->ctx;
-    // }
-
-    // auto transportContext = tensorpipe::transport::uv::create();
-    // context->registerTransport(0, "tcp", transportContext);
-    // auto registerChannel = tensorpipe::channel::basic::create();
-    // context->registerChannel(0, "basic", registerChannel);
-    // queue_ = std::make_shared<Queue<RPCMessage>>();
+    queue_ = std::make_shared<RPCMessageQueue>();
   };
 
   /*!
    * \brief Wait for all the Senders to connect
-   * \param addr Networking address, e.g., 'socket://127.0.0.1:50051', 'mpi://0'
+   * \param addr Networking address, e.g., 'tcp://127.0.0.1:50051'
    * \param num_sender total number of Senders
    * \return True for success and False for fail
    *
@@ -169,8 +154,8 @@ class TPReceiver {
   bool Wait(std::string& addr, int num_sender);
 
   /*!
-   * \brief Recv data from Sender. Actually removing data from msg_queue.
-   * \param msg pointer of data message
+   * \brief Recv RPCMessage from Sender. Actually removing data from queue.
+   * \param msg pointer of RPCmessage
    * \param send_id which sender current msg comes from
    * \return Status code
    *
@@ -190,13 +175,15 @@ class TPReceiver {
   void Finalize();
 
   /*!
-   * \brief Communicator type: 'socket'
+   * \brief Communicator type: 'tp' (tensorpipe)
    */
   inline std::string Type() const { return std::string("tp"); }
 
-  //   std::shared_ptr<Queue<RPCMessage>> queue_;
+  /*!
+   * \brief Issue a receive request on pipe, and push the result into queue
+   */
   static void ReceiveFromPipe(std::shared_ptr<tensorpipe::Pipe> pipe,
-                              std::shared_ptr<Queue<RPCMessage>> queue);
+                              std::shared_ptr<RPCMessageQueue> queue);
 
  private:
   /*!
@@ -219,32 +206,8 @@ class TPReceiver {
                      std::shared_ptr<tensorpipe::Pipe>>
     pipes_;
 
-  std::shared_ptr<Queue<RPCMessage>> queue_;
+  std::shared_ptr<RPCMessageQueue> queue_;
 
-  /*!
-   * \brief Message queue for each socket connection
-   */
-  //   std::unordered_map<int /* Sender (virtual) ID */,
-  //   std::shared_ptr<MessageQueue>> msg_queue_; std::unordered_map<int /*
-  //   Sender (virtual) ID */, std::shared_ptr<MessageQueue>>::iterator
-  //   mq_iter_;
-  // std::unordered_map<int, std::shared_ptr<MessageQueue>>::iterator mq_iter_;
-
-  /*!
-   * \brief Independent thead for each socket connection
-   */
-  // std::unordered_map<int /* Sender (virtual) ID */,
-  // std::shared_ptr<std::thread>> threads_;
-
-  /*!
-   * \brief Recv-loop for each socket in per-thread
-   * \param socket client socket
-   * \param queue message queue
-   *
-   * Note that, the RecvLoop will finish its loop-job and exit thread
-   * when the main thread invokes Signal() API on the message queue.
-   */
-  // static void RecvLoop(TCPSocket* socket, MessageQueue* queue);
 };
 
 }  // namespace rpc

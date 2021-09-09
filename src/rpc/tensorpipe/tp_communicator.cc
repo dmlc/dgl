@@ -16,7 +16,6 @@ namespace rpc {
 using namespace tensorpipe;
 
 void TPSender::AddReceiver(std::string& addr, int recv_id) {
-  //   auto pipe = context->connect(addr);
   receiver_addrs_[recv_id] = addr;
 }
 
@@ -61,8 +60,9 @@ void TPSender::Send(RPCMessage msg, int recv_id) {
   tp_msg.payloads.resize(nonempty_ndarray_count);
   auto ndarray_holder = std::make_shared<std::vector<NDArray>>();
   ndarray_holder->resize(nonempty_ndarray_count);
-  int i = 0;
-  for (auto ptr : zc_write_strm.buffer_list()) {
+  auto& buffer_list = zc_write_strm.buffer_list();
+  for (int i = 0; i < buffer_list.size(); i++) {
+    auto& ptr = buffer_list[i];
     (*ndarray_holder.get())[i] = ptr.tensor;
     tp_msg.payloads[i].data = ptr.data;
     tp_msg.payloads[i].length = ptr.size;
@@ -77,14 +77,8 @@ void TPSender::Send(RPCMessage msg, int recv_id) {
   });
 };
 
-void TPSender::Finalize(){
-  //   context->close();
-  //   context->join();
-};
-void TPReceiver::Finalize(){
-  //   context->close();
-  //   context->join();
-};
+void TPSender::Finalize(){};
+void TPReceiver::Finalize(){};
 
 bool TPReceiver::Wait(std::string& addr, int num_sender) {
   std::string addr_str(addr);
@@ -95,14 +89,13 @@ bool TPReceiver::Wait(std::string& addr, int num_sender) {
       if (error) {
         LOG(WARNING) << error.what();
       }
-        pipeProm.set_value(std::move(pipe));
+      pipeProm.set_value(std::move(pipe));
     });
     std::shared_ptr<Pipe> pipe = pipeProm.get_future().get();
-    pipe->readDescriptor(
-    [pipe](const Error& error, Descriptor descriptor) {
-        Allocation allocation;
-        CHECK_EQ(descriptor.metadata, "dglconnect");
-        pipe->read(allocation, [](const Error& error) {});
+    pipe->readDescriptor([pipe](const Error& error, Descriptor descriptor) {
+      Allocation allocation;
+      CHECK_EQ(descriptor.metadata, "dglconnect");
+      pipe->read(allocation, [](const Error& error) {});
     });
     pipes_[i] = pipe;
     ReceiveFromPipe(pipe, queue_);
@@ -111,7 +104,7 @@ bool TPReceiver::Wait(std::string& addr, int num_sender) {
 }
 
 void TPReceiver::ReceiveFromPipe(std::shared_ptr<Pipe> pipe,
-                                 std::shared_ptr<Queue<RPCMessage>> queue) {
+                                 std::shared_ptr<RPCMessageQueue> queue) {
   pipe->readDescriptor([pipe, queue = std::move(queue)](const Error& error,
                                                         Descriptor descriptor) {
     if (error) {

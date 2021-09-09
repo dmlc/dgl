@@ -113,8 +113,9 @@ struct RPCContext {
     t->num_clients = 0;
     t->barrier_count = 0;
     t->num_servers_per_machine = 0;
-    t->sender = std::shared_ptr<TPSender>();
-    t->receiver = std::shared_ptr<TPReceiver>();
+    t->sender.reset();
+    t->receiver.reset();
+    t->ctx.reset();
   }
 };
 
@@ -209,4 +210,4 @@ namespace dmlc {
 DMLC_DECLARE_TRAITS(has_saveload, dgl::rpc::RPCMessage, true);
 }  // namespace dmlc
 
-#endif  // DGL_RPC_RPC_H_
+#endif // DGL_RPC_RPC_H_

@@ -18,13 +18,14 @@ namespace rpc {
 template <typename T>
 class Queue {
  public:
+  // Capacity isn't used actually
   explicit Queue(int capacity = 1) : capacity_(capacity) {}
 
   void push(T t) {
     std::unique_lock<std::mutex> lock(mutex_);
-    while (items_.size() >= capacity_) {
-      cv_.wait(lock);
-    }
+    // while (items_.size() >= capacity_) {
+    //   cv_.wait(lock);
+    // }
     items_.push_back(std::move(t));
     cv_.notify_all();
   }
