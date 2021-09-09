@@ -212,4 +212,4 @@ class TPReceiver {
 }  // namespace rpc
 }  // namespace dgl
 
-#endif // DGL_RPC_TENSORPIPE_TP_COMMUNICATOR_H_
+#endif  // DGL_RPC_TENSORPIPE_TP_COMMUNICATOR_H_

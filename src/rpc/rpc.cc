@@ -52,16 +52,16 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateSender")
     int64_t msg_queue_size = args[0];
     std::string type = args[1];
 
-    if (!RPCContext::ThreadLocal()->ctx){
-                RPCContext::ThreadLocal()->ctx = std::make_shared<tensorpipe::Context>();
-        auto context = RPCContext::ThreadLocal()->ctx;
-        auto transportContext = tensorpipe::transport::uv::create();
-        context->registerTransport(0, "tcp", transportContext);
-        auto registerChannel = tensorpipe::channel::basic::create();
-        context->registerChannel(0, "basic", registerChannel);
+    if (!RPCContext::ThreadLocal()->ctx) {
+      RPCContext::ThreadLocal()->ctx = std::make_shared<tensorpipe::Context>();
+      auto context = RPCContext::ThreadLocal()->ctx;
+      auto transportContext = tensorpipe::transport::uv::create();
+      context->registerTransport(0, "tcp", transportContext);
+      auto registerChannel = tensorpipe::channel::basic::create();
+      context->registerChannel(0, "basic", registerChannel);
     }
-      RPCContext::ThreadLocal()->sender =
-        std::make_shared<TPSender>(RPCContext::ThreadLocal()->ctx);
+    RPCContext::ThreadLocal()->sender =
+      std::make_shared<TPSender>(RPCContext::ThreadLocal()->ctx);
     // if (type.compare("socket") == 0) {
     // } else {
     //   LOG(FATAL) << "Unknown communicator type for rpc receiver: " << type;
@@ -72,16 +72,16 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateReceiver")
   .set_body([](DGLArgs args, DGLRetValue* rv) {
     int64_t msg_queue_size = args[0];
     std::string type = args[1];
-    if (!RPCContext::ThreadLocal()->ctx){
-        RPCContext::ThreadLocal()->ctx = std::make_shared<tensorpipe::Context>();
-        auto context = RPCContext::ThreadLocal()->ctx;
-        auto transportContext = tensorpipe::transport::uv::create();
-        context->registerTransport(0, "tcp", transportContext);
-        auto registerChannel = tensorpipe::channel::basic::create();
-        context->registerChannel(0, "basic", registerChannel);
+    if (!RPCContext::ThreadLocal()->ctx) {
+      RPCContext::ThreadLocal()->ctx = std::make_shared<tensorpipe::Context>();
+      auto context = RPCContext::ThreadLocal()->ctx;
+      auto transportContext = tensorpipe::transport::uv::create();
+      context->registerTransport(0, "tcp", transportContext);
+      auto registerChannel = tensorpipe::channel::basic::create();
+      context->registerChannel(0, "basic", registerChannel);
     }
-      RPCContext::ThreadLocal()->receiver =
-        std::make_shared<TPReceiver>(RPCContext::ThreadLocal()->ctx);
+    RPCContext::ThreadLocal()->receiver =
+      std::make_shared<TPReceiver>(RPCContext::ThreadLocal()->ctx);
     // if (type.compare("socket") == 0) {
     // } else {
     //   LOG(FATAL) << "Unknown communicator type for rpc sender: " << type;
@@ -112,8 +112,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCReceiverWait")
     //   LOG(FATAL) << "Unknown communicator type: "
     //              << RPCContext::ThreadLocal()->receiver->Type();
     // }
-    if (RPCContext::ThreadLocal()->receiver->Wait(addr, num_sender) ==
-        false) {
+    if (RPCContext::ThreadLocal()->receiver->Wait(addr, num_sender) == false) {
       LOG(FATAL) << "Wait sender socket failed.";
     }
   });
@@ -124,7 +123,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCAddReceiver")
     int port = args[1];
     int recv_id = args[2];
     std::string addr;
-    // addr = 
+    // addr =
     addr = StringPrintf("tcp://%s:%d", ip.c_str(), port);
     // addr = StringPrintf("tcp://%s", ip.c_str());
     // if (RPCContext::ThreadLocal()->sender->Type() == "socket") {
