@@ -160,6 +160,11 @@ file(GLOB_RECURSE DGL_SRC_1
 
 list(APPEND DGL_SRC ${DGL_SRC_1})
 
+if (NOT MSVC)
+  file(GLOB_RECURSE DGL_RPC_SRC src/rpc/*.cc)
+  list(APPEND DGL_SRC ${DGL_RPC_SRC})
+endif()
+
 # Configure cuda
 if(USE_CUDA)
   dgl_config_cuda(DGL_CUDA_SRC)
@@ -235,8 +240,6 @@ if(NOT MSVC)
   set(TP_STATIC_OR_SHARED STATIC)
   add_subdirectory(third_party/tensorpipe)
   list(APPEND DGL_LINKER_LIBS tensorpipe)
-  file(GLOB_RECURSE DGL_RPC_SRC src/rpc/*.cc)
-  list(APPEND DGL_SRC ${DGL_RPC_SRC})
   target_include_directories(dgl PRIVATE third_party/tensorpipe)
 endif(NOT MSVC)
 
