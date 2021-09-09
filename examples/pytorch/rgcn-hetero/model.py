@@ -216,20 +216,18 @@ class RelGraphConvLayerHetero(nn.Module):
         else:
             inputs_src = inputs_dst = inputs
 
-        # Use one-level message passing using new heterograph API
-        # TODO(Israt): Add the following code to NN module
         for srctype,_,_ in g.canonical_etypes:
             g.nodes[srctype].data['h'] = inputs[srctype]
 
+        g.apply_edges(fn.copy_u('h', 'm')) # g is a heterograph
         for rel in g.canonical_etypes:
-            _,etype,_ = rel
+            _, etype, _ = rel
             if self.use_weight:
                 w = wdict[etype]['weight']
-                g.apply_edges(lambda edges: {'h*w_r' : th.matmul(edges.src['h'], w)}, etype=rel)
+                g.edges[rel].data['h*w_r'] = th.matmul(g.edges[rel].data['m'], w)
             else:
-                g.apply_edges(lambda edges: {'h*w_r' : edges.src['h']}, etype=rel)
-
-        g.update_all_new(fn.copy_e('h*w_r', 'm'), fn.sum('m', 'h'))  # g is a heterograph
+                g.edges[rel].data['h*w_r'] = g.edges[rel].data['m']
+        g.update_all(fn.copy_e('h*w_r', 'm'), fn.sum('m', 'h'))
 
         def _apply(ntype):
             h = g.nodes[ntype].data['h']
@@ -404,7 +402,6 @@ class EntityClassify_Hetero(nn.Module):
         self.layers.append(RelGraphConvLayerHetero(
             self.h_dim, self.h_dim, self.rel_names,
             self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
-            # TODO(Israt): Originally weight=True. Why?
             dropout=self.dropout, weight=False))
         # h2h
         for i in range(self.num_hidden_layers):

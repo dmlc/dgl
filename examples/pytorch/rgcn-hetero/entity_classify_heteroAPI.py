@@ -75,16 +75,14 @@ def main(args):
     model.train()
     for epoch in range(args.n_epochs):
         optimizer.zero_grad()
-        if epoch > 5:
-            t0 = time.time()
+        t0 = time.time()
         logits = model()[category]
         loss = F.cross_entropy(logits[train_idx], labels[train_idx])
         loss.backward()
         optimizer.step()
         t1 = time.time()
 
-        if epoch > 5:
-            dur.append(t1 - t0)
+        dur.append(t1 - t0)
         train_acc = th.sum(logits[train_idx].argmax(dim=1) == labels[train_idx]).item() / len(train_idx)
         val_loss = F.cross_entropy(logits[val_idx], labels[val_idx])
         val_acc = th.sum(logits[val_idx].argmax(dim=1) == labels[val_idx]).item() / len(val_idx)
