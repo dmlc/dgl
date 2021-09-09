@@ -162,8 +162,10 @@ list(APPEND DGL_SRC ${DGL_SRC_1})
 
 if (NOT MSVC)
   file(GLOB_RECURSE DGL_RPC_SRC src/rpc/*.cc)
-  list(APPEND DGL_SRC ${DGL_RPC_SRC})
+else()
+  file(GLOB_RECURSE DGL_RPC_SRC src/rpc/network/*.cc)
 endif()
+list(APPEND DGL_SRC ${DGL_RPC_SRC})
 
 # Configure cuda
 if(USE_CUDA)
