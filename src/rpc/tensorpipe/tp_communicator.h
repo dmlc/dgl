@@ -59,7 +59,7 @@ class TPSender {
   bool Connect();
 
   /*!
-   * \brief Send RPCMessage to specified Receiver. 
+   * \brief Send RPCMessage to specified Receiver.
    * \param msg data message \param recv_id receiver's ID
    */
   void Send(RPCMessage msg, int recv_id);
@@ -75,7 +75,6 @@ class TPSender {
   inline std::string Type() const { return std::string("tp"); }
 
  private:
-
   /*!
    * \brief global context of tensorpipe
    */
