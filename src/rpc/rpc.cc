@@ -3,12 +3,9 @@
  * \file rpc/rpc.cc
  * \brief Implementation of RPC utilities used by both server and client sides.
  */
+#if defined(__linux__)
 #include "./rpc.h"
 
-#include <csignal>
-#if defined(__linux__)
-#include <unistd.h>
-#endif
 #include <dgl/array.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/random.h>
@@ -16,7 +13,9 @@
 #include <dgl/runtime/parallel_for.h>
 #include <dgl/zerocopy_serializer.h>
 #include <tensorpipe/tensorpipe.h>
+#include <unistd.h>
 
+#include <csignal>
 #include <future>
 
 #include "../c_api_common.h"
@@ -472,3 +471,5 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
 
 }  // namespace rpc
 }  // namespace dgl
+
+#endif
