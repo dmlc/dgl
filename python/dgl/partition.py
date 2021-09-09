@@ -6,6 +6,7 @@ from ._ffi.function import _init_api
 from .heterograph import DGLHeteroGraph
 from . import backend as F
 from . import utils
+from .ndarray import NDArray
 from .base import EID, NID, NTYPE, ETYPE
 from .subgraph import edge_subgraph
 
@@ -395,11 +396,21 @@ class NDArrayPartition(object):
     num_parts : int
         The number of parts to divide the array into.
     mode : String
-        The type of partition. Currently, the only valid value is 'remainder',
-        which assigns rows based on remainder when dividing the row id by the
+        The type of partition. Currently, the only valid values are
+        'remainder' and 'range'.
+        'remainder' assigns rows based on remainder when dividing the row id by the
         number of parts (e.g., i % num_parts).
-    part_ranges : List
-        Currently unused.
+        'range' assigns rows based on which part of the range 'part_ranges'
+        they fall into.
+    part_ranges : Tensor or dgl.NDArray, Optional
+        Should only be specified when the mode is 'range'. Should be of the
+        length `num_parts + 1`, and be the exclusive prefix-sum of the number
+        of nodes in each partition. That is, for 3 partitions, we could have
+        the list [0, a, b, 'array_size'], and all rows with index less
+        than 'a' are assigned to partition 0, all rows with index greater than
+        or equal to 'a' and less than 'b' are in partition 1, and all rows
+        with index greater or equal to 'b' are in partition 2. Should have
+        the same context as the partitioned NDArray (i.e., be on the same GPU).
 
     Examples
     --------
@@ -409,14 +420,40 @@ class NDArrayPartition(object):
 
     >>> from dgl.partition import NDArrayPartition
     >>> part = NDArrayPartition(g.num_nodes(), num_parts, mode='remainder' )
+
+    A range based partition of a homogenous graph `g`'s nodes, where
+    the nodes are stored in contiguous memory. This converts an existing
+    range based partitioning (e.g. from a
+    dgl.distributed.graph_partition_book.RangePartitionBook)
+    'max_node_map', to an NDArrayPartition 'part'.
+
+    >>> part_range = [0]
+    >>> for part in part_book.metadata():
+    >>>     part_range.append(part_range[-1] + part['num_nodes'])
+    >>> part = NDArrayPartition(g.num_nodes(), num_parts, mode='range',
+    ...                         part_ranges=part_range)
     """
     def __init__(self, array_size, num_parts, mode='remainder', part_ranges=None):
         assert num_parts > 0, 'Invalid "num_parts", must be > 0.'
         if mode == 'remainder':
             assert part_ranges is None, 'When using remainder-based ' \
-                    'partitioning, "part_ranges" should not be specified.'
+                'partitioning, "part_ranges" should not be specified.'
             self._partition = _CAPI_DGLNDArrayPartitionCreateRemainderBased(
                 array_size, num_parts)
+        elif mode == 'range':
+            assert part_ranges is not None, 'When using range-based ' \
+                'partitioning, "part_ranges" must not be None.'
+            assert part_ranges[0] == 0 and part_ranges[-1] == array_size, \
+                'part_ranges[0] must be 0, and part_ranges[-1] must be ' \
+                '"array_size".'
+            if F.is_tensor(part_ranges):
+                part_ranges = F.zerocopy_to_dgl_ndarray(part_ranges)
+            assert isinstance(part_ranges, NDArray), '"part_ranges" must ' \
+                'be Tensor or dgl.NDArray.'
+            self._partition = _CAPI_DGLNDArrayPartitionCreateRangeBased(
+                array_size,
+                num_parts,
+                part_ranges)
         else:
             assert False, 'Unknown partition mode "{}"'.format(mode)
         self._array_size = array_size

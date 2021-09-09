@@ -205,7 +205,8 @@ class UnitGraph : public BaseHeteroGraph {
   static HeteroGraphPtr AsNumBits(HeteroGraphPtr g, uint8_t bits);
 
   /*! \brief Copy the data to another context */
-  static HeteroGraphPtr CopyTo(HeteroGraphPtr g, const DLContext& ctx);
+  static HeteroGraphPtr CopyTo(HeteroGraphPtr g, const DLContext &ctx,
+                               const DGLStreamHandle &stream = nullptr);
 
   /*! 
    * \brief Create in-edge CSR format of the unit graph.
