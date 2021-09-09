@@ -1,7 +1,23 @@
+##
+#   Copyright 2021 Contributors 
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+#
+
 import unittest
 import backend as F
 import dgl
-from dgl.contrib.multi_gpu_tensor import MultiGPUTensor
+from dgl.contrib.multi_gpu_datastore import MultiGPUDataStore
 
 
 class DummyCommunicator:
@@ -25,7 +41,7 @@ class DummyCommunicator:
 def test_get_global_1part():
     t = F.copy_to(F.tensor([[1,2,3],[4,5,6],[7,8,9],[10,11,12]]), F.ctx())
     comm = DummyCommunicator(0, 1)
-    mt = MultiGPUTensor(t.shape, t.dtype, F.ctx(), comm)
+    mt = MultiGPUDataStore(t.shape, t.dtype, F.ctx(), comm)
     mt.all_set_global(t)
 
     idxs = F.copy_to(F.tensor([1,3], dtype=F.int64), ctx=F.ctx())
@@ -39,7 +55,7 @@ def test_get_global_1part():
 def test_get_global_3part():
     t = F.copy_to(F.tensor([[1,2,3],[4,5,6],[7,8,9],[10,11,12]]), F.ctx())
     comm = DummyCommunicator(2, 3)
-    mt = MultiGPUTensor(t.shape, t.dtype, F.ctx(), comm)
+    mt = MultiGPUDataStore(t.shape, t.dtype, F.ctx(), comm)
     mt.all_set_global(t)
 
     idxs = F.copy_to(F.tensor([2], dtype=F.int64), ctx=F.ctx())
@@ -53,7 +69,7 @@ def test_get_global_3part():
 def test_get_local_1part():
     t = F.copy_to(F.tensor([[1,2,3],[4,5,6],[7,8,9],[10,11,12]]), F.ctx())
     comm = DummyCommunicator(0, 1)
-    mt = MultiGPUTensor(t.shape, t.dtype, F.ctx(), comm)
+    mt = MultiGPUDataStore(t.shape, t.dtype, F.ctx(), comm)
     mt.all_set_global(t)
 
     act = mt.get_local()
@@ -66,7 +82,7 @@ def test_get_local_1part():
 def test_get_local_3part():
     t = F.copy_to(F.tensor([[1,2,3],[4,5,6],[7,8,9],[10,11,12]]), F.ctx())
     comm = DummyCommunicator(2, 3)
-    mt = MultiGPUTensor(t.shape, t.dtype, F.ctx(), comm)
+    mt = MultiGPUDataStore(t.shape, t.dtype, F.ctx(), comm)
     mt.all_set_global(t)
 
     act = mt.get_local()
@@ -79,7 +95,7 @@ def test_get_local_3part():
 def test_set_local_1part():
     t = F.copy_to(F.tensor([[1,2,3],[4,5,6],[7,8,9],[10,11,12]]), F.ctx())
     comm = DummyCommunicator(0, 1)
-    mt = MultiGPUTensor(t.shape, t.dtype, F.ctx(), comm)
+    mt = MultiGPUDataStore(t.shape, t.dtype, F.ctx(), comm)
     t_local = t
     mt.set_local(t_local)
 
@@ -93,7 +109,7 @@ def test_set_local_1part():
 def test_set_local_3part():
     t = F.copy_to(F.tensor([[1,2,3],[4,5,6],[7,8,9],[10,11,12]]), F.ctx())
     comm = DummyCommunicator(2, 3)
-    mt = MultiGPUTensor(t.shape, t.dtype, F.ctx(), comm)
+    mt = MultiGPUDataStore(t.shape, t.dtype, F.ctx(), comm)
     t_local = F.gather_row(t, F.tensor([2], dtype=F.int64))
     mt.set_local(t_local)
 
@@ -107,7 +123,7 @@ def test_set_local_3part():
 def test_backend():
     t = F.copy_to(F.tensor([[1,2,3],[4,5,6],[7,8,9],[10,11,12]]), F.ctx())
     comm = DummyCommunicator(2, 3)
-    mt = MultiGPUTensor(t.shape, t.dtype, F.ctx(), comm)
+    mt = MultiGPUDataStore(t.shape, t.dtype, F.ctx(), comm)
     t_local = F.gather_row(t, F.tensor([2], dtype=F.int64))
     mt.set_local(t_local)
 
