@@ -411,8 +411,13 @@ CSRMatrix COOToCSR(COOMatrix coo) {
     IdType *const Bi = static_cast<IdType *>(ret_indices->data);
     IdType *const Bx = static_cast<IdType *>(ret_data->data);
 
-    // store sorted data and record row_idx counts.
-    std::vector<std::pair<IdType, IdType>> e_sorted(NNZ);
+    // store sorted data and original index.
+    NDArray sorted_data = NDArray::Empty({NNZ}, coo.row->dtype, coo.row->ctx);
+    NDArray sorted_data_pos = NDArray::Empty({NNZ}, coo.row->dtype, coo.row->ctx);
+    IdType *const Sx = static_cast<IdType *>(sorted_data->data);
+    IdType *const Si = static_cast<IdType *>(sorted_data_pos->data);
+
+    // record row_idx in each thread.
     std::vector<std::vector<int64_t>> p_sum;
 
 #pragma omp parallel
@@ -447,9 +452,9 @@ CSRMatrix COOToCSR(COOMatrix coo) {
         ++p_sum[thread_id][row_thread_id];
       }
 
-// accumulate row_idx.
 #pragma omp barrier
 #pragma omp master
+      // accumulate row_idx.
       {
         int64_t cum = 0;
         for (size_t j = 0; j < p_sum.size(); ++j) {
@@ -463,14 +468,14 @@ CSRMatrix COOToCSR(COOMatrix coo) {
       }
 #pragma omp barrier
 
-      // sort data by row_idx and place into e_sorted.
+      // sort data by row_idx and place into Sx/Si.
       std::vector<int64_t> data_pos(p_sum[thread_id]);
       for (auto i = nz_start; i < nz_end; ++i) {
         const int64_t row_idx = row_data[i];
         const int64_t row_thread_id = row_idx / n_chunk;
         const int64_t pos = data_pos[row_thread_id]++;
-        e_sorted[pos].first = data == nullptr ? i : data[i];
-        e_sorted[pos].second = i;
+        Sx[pos] = data == nullptr ? i : data[i];
+        Si[pos] = i;
       }
 
 #pragma omp barrier
@@ -481,7 +486,7 @@ CSRMatrix COOToCSR(COOMatrix coo) {
       const int64_t i_end =
           thread_id + 1 == num_threads ? NNZ : p_sum[0][thread_id + 1];
       for (auto i = i_start; i < i_end; ++i) {
-        const int64_t row_idx = row_data[e_sorted[i].second];
+        const int64_t row_idx = row_data[Si[i]];
         ++Bp[row_idx + 1];
       }
 
@@ -495,10 +500,10 @@ CSRMatrix COOToCSR(COOMatrix coo) {
 
       // update Bi/Bp/Bx
       for (auto i = i_start; i < i_end; ++i) {
-        const int64_t row_idx = row_data[e_sorted[i].second];
+        const int64_t row_idx = row_data[Si[i]];
         const int64_t dest = (Bp[row_idx + 1]++) + i_start;
-        Bi[dest] = col_data[e_sorted[i].second];
-        Bx[dest] = e_sorted[i].first;
+        Bi[dest] = col_data[Si[i]];
+        Bx[dest] = Sx[i];
       }
       for (auto i = n_start; i < n_end; ++i) {
         Bp[i + 1] += i_start;
