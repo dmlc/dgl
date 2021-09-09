@@ -4,7 +4,7 @@
  * \brief COO sorting
  */
 #include <dgl/array.h>
-
+#include <dgl/runtime/parallel_for.h>
 #include <numeric>
 #include <algorithm>
 #include <vector>
@@ -54,6 +54,7 @@ CSRMatrix UnionCsr(const std::vector<CSRMatrix>& csrs) {
     for (int64_t i = 1; i <= csrs[0].num_rows; ++i) {
       std::vector<int64_t> indices_off;
       res_indptr[i] = indptr_data[0][i];
+
       indices_off.push_back(indptr_data[0][i-1]);
       for (size_t j = 1; j < csrs.size(); ++j) {
         res_indptr[i] += indptr_data[j][i];
@@ -74,7 +75,6 @@ CSRMatrix UnionCsr(const std::vector<CSRMatrix>& csrs) {
             }
           }  // for check out of bound
         }  // for
-
         res_indices[off] = min;
         res_data[off] = data_data[min_idx][indices_off[min_idx]];
         indices_off[min_idx] += 1;

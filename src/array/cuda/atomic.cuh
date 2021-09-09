@@ -10,6 +10,9 @@
 #include <cassert>
 #include "fp16.cuh"
 
+#if __CUDA_ARCH__ >= 600
+#include <cuda_fp16.h>
+#endif
 
 namespace dgl {
 namespace aten {
@@ -132,6 +135,84 @@ DEFINE_ATOMIC_HALF(Min)
 #define OP(a, b) a + b
 DEFINE_ATOMIC(Add)
 #undef OP
+
+
+/**
+* \brief Performs an atomic compare-and-swap on 64 bit integers. That is,
+* it the word `old` at the memory location `address`, computes
+* `(old == compare ? val : old)` , and stores the result back to memory at
+* the same address.
+*
+* \param address The address to perform the atomic operation on.
+* \param compare The value to compare to.
+* \param val The new value to conditionally store.
+*
+* \return The old value at the address.
+*/
+inline __device__ int64_t AtomicCAS(
+    int64_t * const address,
+    const int64_t compare,
+    const int64_t val) {
+  // match the type of "::atomicCAS", so ignore lint warning
+  using Type = unsigned long long int; // NOLINT
+
+  static_assert(sizeof(Type) == sizeof(*address), "Type width must match");
+
+  return atomicCAS(reinterpret_cast<Type*>(address),
+                   static_cast<Type>(compare),
+                   static_cast<Type>(val));
+}
+
+/**
+* \brief Performs an atomic compare-and-swap on 32 bit integers. That is,
+* it the word `old` at the memory location `address`, computes
+* `(old == compare ? val : old)` , and stores the result back to memory at
+* the same address.
+*
+* \param address The address to perform the atomic operation on.
+* \param compare The value to compare to.
+* \param val The new value to conditionally store.
+*
+* \return The old value at the address.
+*/
+inline __device__ int32_t AtomicCAS(
+    int32_t * const address,
+    const int32_t compare,
+    const int32_t val) {
+  // match the type of "::atomicCAS", so ignore lint warning
+  using Type = int; // NOLINT
+
+  static_assert(sizeof(Type) == sizeof(*address), "Type width must match");
+
+  return atomicCAS(reinterpret_cast<Type*>(address),
+                   static_cast<Type>(compare),
+                   static_cast<Type>(val));
+}
+
+inline __device__ int64_t AtomicMax(
+    int64_t * const address,
+    const int64_t val) {
+  // match the type of "::atomicCAS", so ignore lint warning
+  using Type = unsigned long long int; // NOLINT
+
+  static_assert(sizeof(Type) == sizeof(*address), "Type width must match");
+
+  return atomicMax(reinterpret_cast<Type*>(address),
+                   static_cast<Type>(val));
+}
+
+inline __device__ int32_t AtomicMax(
+    int32_t * const address,
+    const int32_t val) {
+  // match the type of "::atomicCAS", so ignore lint warning
+  using Type = int; // NOLINT
+
+  static_assert(sizeof(Type) == sizeof(*address), "Type width must match");
+
+  return atomicMax(reinterpret_cast<Type*>(address),
+                   static_cast<Type>(val));
+}
+
 
 template <>
 __device__ __forceinline__ float AtomicAdd<float>(float* addr, float val) {

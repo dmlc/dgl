@@ -8,6 +8,7 @@
 
 #include <dgl/array.h>
 #include <dgl/bcast.h>
+#include <dgl/runtime/parallel_for.h>
 #include <algorithm>
 #include <limits>
 #include <memory>
@@ -46,16 +47,18 @@ void SpMMSumCsrXbyak(dgl::ElemWiseAddUpdate<Op>* cpu_spec, const BcastOff& bcast
   const IdType* indices = csr.indices.Ptr<IdType>();
   const IdType* edges = csr.data.Ptr<IdType>();
   int64_t dim = bcast.out_len, lhs_dim = bcast.lhs_len, rhs_dim = bcast.rhs_len;
-#pragma omp parallel for
-  for (IdType rid = 0; rid < csr.num_rows; ++rid) {
-    const IdType row_start = indptr[rid], row_end = indptr[rid + 1];
-    DType* out_off = O + rid * dim;
-    for (IdType j = row_start; j < row_end; ++j) {
-      const IdType cid = indices[j];
-      const IdType eid = has_idx ? edges[j] : j;
-      cpu_spec->run(out_off, X + cid * lhs_dim, W + eid * rhs_dim, dim);
+
+  runtime::parallel_for(0, csr.num_rows, [&](size_t b, size_t e) {
+    for (auto rid = b; rid < e; ++rid) {
+      const IdType row_start = indptr[rid], row_end = indptr[rid + 1];
+      DType* out_off = O + rid * dim;
+      for (IdType j = row_start; j < row_end; ++j) {
+        const IdType cid = indices[j];
+        const IdType eid = has_idx ? edges[j] : j;
+        cpu_spec->run(out_off, X + cid * lhs_dim, W + eid * rhs_dim, dim);
+      }
     }
-  }
+  });
 }
 #endif  // USE_AVX
 #endif  // _WIN32
@@ -79,24 +82,25 @@ void SpMMSumCsrNaive(const BcastOff& bcast, const CSRMatrix& csr, const DType* X
   const IdType* indices = csr.indices.Ptr<IdType>();
   const IdType* edges = csr.data.Ptr<IdType>();
   int64_t dim = bcast.out_len, lhs_dim = bcast.lhs_len, rhs_dim = bcast.rhs_len;
-#pragma omp parallel for
-  for (IdType rid = 0; rid < csr.num_rows; ++rid) {
-    const IdType row_start = indptr[rid], row_end = indptr[rid + 1];
-    DType* out_off = O + rid * dim;
-    for (IdType j = row_start; j < row_end; ++j) {
-      const IdType cid = indices[j];
-      const IdType eid = has_idx ? edges[j] : j;
-      for (int64_t k = 0; k < dim; ++k) {
-        const int64_t lhs_add = bcast.use_bcast ? bcast.lhs_offset[k] : k;
-        const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
-        const DType* lhs_off =
-          Op::use_lhs ? X + cid * lhs_dim + lhs_add : nullptr;
-        const DType* rhs_off =
-          Op::use_rhs ? W + eid * rhs_dim + rhs_add : nullptr;
-        out_off[k] += Op::Call(lhs_off, rhs_off);
+  runtime::parallel_for(0, csr.num_rows, [&](size_t b, size_t e) {
+    for (auto rid = b; rid < e; ++rid) {
+      const IdType row_start = indptr[rid], row_end = indptr[rid + 1];
+      DType* out_off = O + rid * dim;
+      for (IdType j = row_start; j < row_end; ++j) {
+        const IdType cid = indices[j];
+        const IdType eid = has_idx ? edges[j] : j;
+        for (int64_t k = 0; k < dim; ++k) {
+          const int64_t lhs_add = bcast.use_bcast ? bcast.lhs_offset[k] : k;
+          const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
+          const DType* lhs_off =
+            Op::use_lhs ? X + cid * lhs_dim + lhs_add : nullptr;
+          const DType* rhs_off =
+            Op::use_rhs ? W + eid * rhs_dim + rhs_add : nullptr;
+          out_off[k] += Op::Call(lhs_off, rhs_off);
+        }
       }
     }
-  }
+  });
 }
 
 /*!
@@ -270,31 +274,32 @@ void SpMMCmpCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
 #endif  // USE_AVX
 #endif  // _WIN32
 
-#pragma omp parallel for
-  for (IdType rid = 0; rid < csr.num_rows; ++rid) {
-    const IdType row_start = indptr[rid], row_end = indptr[rid + 1];
-    DType* out_off = O + rid * dim;
-    IdType* argx_off = argX + rid * dim;
-    IdType* argw_off = argW + rid * dim;
-    for (IdType j = row_start; j < row_end; ++j) {
-      const IdType cid = indices[j];
-      const IdType eid = has_idx ? edges[j] : j;
-      for (int64_t k = 0; k < dim; ++k) {
-        const int64_t lhs_add = bcast.use_bcast ? bcast.lhs_offset[k] : k;
-        const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
-        const DType* lhs_off =
-          Op::use_lhs ? X + cid * lhs_dim + lhs_add : nullptr;
-        const DType* rhs_off =
-          Op::use_rhs ? W + eid * rhs_dim + rhs_add : nullptr;
-        const DType val = Op::Call(lhs_off, rhs_off);
-        if (Cmp::Call(out_off[k], val)) {
-          out_off[k] = val;
-          if (Op::use_lhs) argx_off[k] = cid;
-          if (Op::use_rhs) argw_off[k] = eid;
+    runtime::parallel_for(0, csr.num_rows, [&](size_t b, size_t e) {
+      for (auto rid = b; rid < e; ++rid) {
+        const IdType row_start = indptr[rid], row_end = indptr[rid + 1];
+        DType* out_off = O + rid * dim;
+        IdType* argx_off = argX + rid * dim;
+        IdType* argw_off = argW + rid * dim;
+        for (IdType j = row_start; j < row_end; ++j) {
+          const IdType cid = indices[j];
+          const IdType eid = has_idx ? edges[j] : j;
+          for (int64_t k = 0; k < dim; ++k) {
+            const int64_t lhs_add = bcast.use_bcast ? bcast.lhs_offset[k] : k;
+            const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
+            const DType* lhs_off =
+              Op::use_lhs ? X + cid * lhs_dim + lhs_add : nullptr;
+            const DType* rhs_off =
+              Op::use_rhs ? W + eid * rhs_dim + rhs_add : nullptr;
+            const DType val = Op::Call(lhs_off, rhs_off);
+            if (Cmp::Call(out_off[k], val)) {
+              out_off[k] = val;
+              if (Op::use_lhs) argx_off[k] = cid;
+              if (Op::use_rhs) argw_off[k] = eid;
+            }
+          }
         }
       }
-    }
-  }
+    });
 #if !defined(_WIN32)
 #ifdef USE_AVX
 #ifdef USE_LIBXSMM
