@@ -3649,7 +3649,7 @@ class DGLHeteroGraph(object):
 
         >>> g.adj(scipy_fmt='coo', etype='develops')
         <2x3 sparse matrix of type '<class 'numpy.int64'>'
-	    with 2 stored elements in COOrdinate format>
+           with 2 stored elements in COOrdinate format>
         """
         etid = self.get_etype_id(etype)
         if scipy_fmt is None:
@@ -4860,10 +4860,6 @@ class DGLHeteroGraph(object):
             if reduce_func.name in ['mean']:
                 raise NotImplementedError("Cannot set both intra-type and inter-type reduce "
                                           "operators as 'mean' using update_all. Please use "
-                                          "multi_update_all instead.")
-            if message_func.name not in ['copy_u', 'copy_e']:
-                raise NotImplementedError("Op \'" + message_func.name + "\' is not yet supported"
-                                          "in update_all for heterogeneous graphs. Please use"
                                           "multi_update_all instead.")
             g = self
             all_out = core.message_passing(g, message_func, reduce_func, apply_node_func)
