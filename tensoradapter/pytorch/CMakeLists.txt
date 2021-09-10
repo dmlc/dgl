@@ -27,12 +27,8 @@ set(TORCH_TARGET_NAME "tensoradapter_pytorch_${TORCH_VER}")
 file(GLOB TA_TORCH_SRC *.cpp)
 add_library(${TORCH_TARGET_NAME} SHARED "${TA_TORCH_SRC}")
 
-if (MSVC)
-  # Linking on windows requires all libraries
-  set(TENSORADAPTER_TORCH_LIBS ${TORCH_LIBRARIES})
-else()
-  set(TENSORADAPTER_TORCH_LIBS ${TORCH_LIBRARY})
-endif(MSVC)
+# use the library name rather than the path
+set(TENSORADAPTER_TORCH_LIBS torch)
 
 message(STATUS "tensoradapter found PyTorch includes: ${TORCH_INCLUDE_DIRS}")
 message(STATUS "tensoradapter found PyTorch lib: ${TENSORADAPTER_TORCH_LIBS}")

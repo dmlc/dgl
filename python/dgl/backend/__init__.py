@@ -74,7 +74,12 @@ def load_backend(mod_name):
                 setattr(thismod, api, _gen_missing_api(api, mod_name))
 
 def get_preferred_backend():
-    config_path = os.path.join(os.path.expanduser('~'), '.dgl', 'config.json')
+    default_dir = None
+    if "DGLDEFAULTDIR" in os.environ:
+        default_dir = os.getenv('DGLDEFAULTDIR')
+    else:
+        default_dir = os.path.join(os.path.expanduser('~'), '.dgl')
+    config_path = os.path.join(default_dir, 'config.json')
     backend_name = None
     if "DGLBACKEND" in os.environ:
         backend_name = os.getenv('DGLBACKEND')
@@ -88,7 +93,7 @@ def get_preferred_backend():
     else:
         print("DGL backend not selected or invalid.  "
               "Assuming PyTorch for now.", file=sys.stderr)
-        set_default_backend('pytorch')
+        set_default_backend(default_dir, 'pytorch')
         return 'pytorch'
 
 

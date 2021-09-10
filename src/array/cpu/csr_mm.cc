@@ -5,6 +5,7 @@
  */
 
 #include <dgl/array.h>
+#include <dgl/runtime/parallel_for.h>
 #include <parallel_hashmap/phmap.h>
 #include <vector>
 #include "array_utils.h"
@@ -12,6 +13,7 @@
 namespace dgl {
 
 using dgl::runtime::NDArray;
+using dgl::runtime::parallel_for;
 
 namespace aten {
 
@@ -26,17 +28,17 @@ void CountNNZPerRow(
     const IdType* B_indices,
     IdType* C_indptr_data,
     int64_t M) {
-  phmap::flat_hash_set<IdType> set;
-#pragma omp parallel for firstprivate(set)
-  for (int64_t i = 0; i < M; ++i) {
-    set.clear();
-    for (IdType u = A_indptr[i]; u < A_indptr[i + 1]; ++u) {
-      IdType w = A_indices[u];
-      for (IdType v = B_indptr[w]; v < B_indptr[w + 1]; ++v)
-        set.insert(B_indices[v]);
+  parallel_for(0, M, [=](size_t b, size_t e) {
+    for (auto i = b; i < e; ++i) {
+      phmap::flat_hash_set<IdType> set;
+      for (IdType u = A_indptr[i]; u < A_indptr[i + 1]; ++u) {
+        IdType w = A_indices[u];
+        for (IdType v = B_indptr[w]; v < B_indptr[w + 1]; ++v)
+          set.insert(B_indices[v]);
+      }
+      C_indptr_data[i] = set.size();
     }
-    C_indptr_data[i] = set.size();
-  }
+  });
 }
 
 template <typename IdType>
@@ -66,27 +68,27 @@ void ComputeIndicesAndData(
     IdType* C_indices_data,
     DType* C_weights_data,
     int64_t M) {
-  phmap::flat_hash_map<IdType, DType> map;
-#pragma omp parallel for firstprivate(map)
-  for (int64_t i = 0; i < M; ++i) {
-    map.clear();
-    for (IdType u = A_indptr[i]; u < A_indptr[i + 1]; ++u) {
-      IdType w = A_indices[u];
-      DType vA = A_data[A_eids ? A_eids[u] : u];
-      for (IdType v = B_indptr[w]; v < B_indptr[w + 1]; ++v) {
-        IdType t = B_indices[v];
-        DType vB = B_data[B_eids ? B_eids[v] : v];
-        map[t] += vA * vB;
+  parallel_for(0, M, [=](size_t b, size_t e) {
+    for (auto i = b; i < e; ++i) {
+      phmap::flat_hash_map<IdType, DType> map;
+      for (IdType u = A_indptr[i]; u < A_indptr[i + 1]; ++u) {
+        IdType w = A_indices[u];
+        DType vA = A_data[A_eids ? A_eids[u] : u];
+        for (IdType v = B_indptr[w]; v < B_indptr[w + 1]; ++v) {
+          IdType t = B_indices[v];
+          DType vB = B_data[B_eids ? B_eids[v] : v];
+          map[t] += vA * vB;
+        }
+      }
+
+      IdType v = C_indptr_data[i];
+      for (auto it : map) {
+        C_indices_data[v] = it.first;
+        C_weights_data[v] = it.second;
+        ++v;
       }
     }
-
-    IdType v = C_indptr_data[i];
-    for (auto it : map) {
-      C_indices_data[v] = it.first;
-      C_weights_data[v] = it.second;
-      ++v;
-    }
-  }
+  });
 }
 
 };  // namespace
