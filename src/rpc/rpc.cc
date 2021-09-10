@@ -38,8 +38,27 @@ RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout) {
   // ignore timeout now
   CHECK_EQ(timeout, 0) << "rpc cannot support timeout now.";
   RPCContext::ThreadLocal()->receiver->Recv(msg);
-  // RPCContext::ThreadLocal()->receiver->AddReceiveRequest(msg->server_id);
   return kRPCSuccess;
+}
+
+void InitGlobalTpContext() {
+  if (!RPCContext::ThreadLocal()->ctx) {
+    RPCContext::ThreadLocal()->ctx = std::make_shared<tensorpipe::Context>();
+    auto context = RPCContext::ThreadLocal()->ctx;
+    auto transportContext = tensorpipe::transport::uv::create();
+    context->registerTransport(0, "tcp", transportContext);
+    auto registerChannel = tensorpipe::channel::basic::create();
+    context->registerChannel(0, "basic", registerChannel);
+    std::vector<std::shared_ptr<tensorpipe::transport::Context>> contexts = {
+      tensorpipe::transport::uv::create(), tensorpipe::transport::uv::create(),
+      tensorpipe::transport::uv::create()};
+    std::vector<std::shared_ptr<tensorpipe::transport::Listener>> listeners = {
+      contexts[0]->listen("127.0.0.1"), contexts[1]->listen("127.0.0.1"),
+      contexts[2]->listen("127.0.0.1")};
+    auto registerChannel = tensorpipe::channel::mpt::create(
+      std::move(contexts), std::move(listeners));
+    context->registerChannel(10, "mpt", registerChannel);
+  }
 }
 
 //////////////////////////// C APIs ////////////////////////////
@@ -50,41 +69,18 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateSender")
   .set_body([](DGLArgs args, DGLRetValue* rv) {
     int64_t msg_queue_size = args[0];
     std::string type = args[1];
-
-    if (!RPCContext::ThreadLocal()->ctx) {
-      RPCContext::ThreadLocal()->ctx = std::make_shared<tensorpipe::Context>();
-      auto context = RPCContext::ThreadLocal()->ctx;
-      auto transportContext = tensorpipe::transport::uv::create();
-      context->registerTransport(0, "tcp", transportContext);
-      auto registerChannel = tensorpipe::channel::basic::create();
-      context->registerChannel(0, "basic", registerChannel);
-    }
+    InitGlobalTpContext();
     RPCContext::ThreadLocal()->sender =
       std::make_shared<TPSender>(RPCContext::ThreadLocal()->ctx);
-    // if (type.compare("socket") == 0) {
-    // } else {
-    //   LOG(FATAL) << "Unknown communicator type for rpc receiver: " << type;
-    // }
   });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateReceiver")
   .set_body([](DGLArgs args, DGLRetValue* rv) {
     int64_t msg_queue_size = args[0];
     std::string type = args[1];
-    if (!RPCContext::ThreadLocal()->ctx) {
-      RPCContext::ThreadLocal()->ctx = std::make_shared<tensorpipe::Context>();
-      auto context = RPCContext::ThreadLocal()->ctx;
-      auto transportContext = tensorpipe::transport::uv::create();
-      context->registerTransport(0, "tcp", transportContext);
-      auto registerChannel = tensorpipe::channel::basic::create();
-      context->registerChannel(0, "basic", registerChannel);
-    }
+    InitGlobalTpContext();
     RPCContext::ThreadLocal()->receiver =
       std::make_shared<TPReceiver>(RPCContext::ThreadLocal()->ctx);
-    // if (type.compare("socket") == 0) {
-    // } else {
-    //   LOG(FATAL) << "Unknown communicator type for rpc sender: " << type;
-    // }
   });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFinalizeSender")
@@ -104,13 +100,6 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCReceiverWait")
     int num_sender = args[2];
     std::string addr;
     addr = StringPrintf("tcp://%s:%d", ip.c_str(), port);
-    // addr = StringPrintf("tcp://%s", ip.c_str());
-    // if (RPCContext::ThreadLocal()->receiver->Type() == "socket") {
-    //   addr = StringPrintf("socket://%s:%d", ip.c_str(), port);
-    // } else {
-    //   LOG(FATAL) << "Unknown communicator type: "
-    //              << RPCContext::ThreadLocal()->receiver->Type();
-    // }
     if (RPCContext::ThreadLocal()->receiver->Wait(addr, num_sender) == false) {
       LOG(FATAL) << "Wait sender socket failed.";
     }
@@ -122,15 +111,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCAddReceiver")
     int port = args[1];
     int recv_id = args[2];
     std::string addr;
-    // addr =
     addr = StringPrintf("tcp://%s:%d", ip.c_str(), port);
-    // addr = StringPrintf("tcp://%s", ip.c_str());
-    // if (RPCContext::ThreadLocal()->sender->Type() == "socket") {
-    //   addr = StringPrintf("socket://%s:%d", ip.c_str(), port);
-    // } else {
-    //   LOG(FATAL) << "Unknown communicator type: "
-    //              << RPCContext::ThreadLocal()->sender->Type();
-    // }
     RPCContext::ThreadLocal()->sender->AddReceiver(addr, recv_id);
   });
 
