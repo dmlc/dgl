@@ -36,7 +36,6 @@ class SparseGradOptimizer(abc.ABC):
         self.shmem_buffer_holder = []
 
         assert len(params) > 0, 'Empty parameters'
-        name = "opt"
         # if we are using shared memory for communication
         for emb in params:
             assert isinstance(emb, NodeEmbedding), \
@@ -50,9 +49,6 @@ class SparseGradOptimizer(abc.ABC):
                     'MultiGPU rank for each embedding should be same.'
                 assert self._world_size == emb.world_size, \
                     'MultiGPU world_size for each embedding should be same.'
-            name = "{}_{}".format(name, emb.name)
-        self._name = name
-        self._short_name = name[:len(name) if len(name) < 32 else 32]
         assert not self._rank is None
         assert not self._world_size is None
 
@@ -111,25 +107,19 @@ class SparseGradOptimizer(abc.ABC):
             if self._rank < 0:
                 self._comm = nccl.Communicator(1, 0, nccl.UniqueId())
             else:
-                nccl_root_key = 'nccl_root_id_{}'.format(self._short_name)
                 th.cuda.set_device(self._device)
                 if self._rank == 0:
                     # root process broadcasts nccl id
                     nccl_id = nccl.UniqueId()
                     uid = str(nccl_id)
-                    store.set(nccl_root_key, uid)
+                    store.set('nccl_root_id', uid)
                 else:
-                    uid = store.get(nccl_root_key)
+                    uid = store.get('nccl_root_id')
                     nccl_id = nccl.UniqueId(uid)
                 # needs to be set for nccl to work
                 self._comm = nccl.Communicator(self._world_size,
                                                self._rank,
                                                nccl_id)
-                if self._rank == 0:
-                    # clear the store entry for future communicators
-                    if hasattr(store, 'delete_key'):
-                        store.delete_key(nccl_root_key)
-                    # for pytorch 1.6 or lower, there is no delete_key func
                 th.distributed.barrier()
 
     def _shared_setup(self):
