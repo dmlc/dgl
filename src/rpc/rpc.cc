@@ -47,17 +47,17 @@ void InitGlobalTpContext() {
     auto context = RPCContext::ThreadLocal()->ctx;
     auto transportContext = tensorpipe::transport::uv::create();
     context->registerTransport(0, "tcp", transportContext);
-    auto registerChannel = tensorpipe::channel::basic::create();
-    context->registerChannel(0, "basic", registerChannel);
+    auto basicChannel = tensorpipe::channel::basic::create();
+    context->registerChannel(0, "basic", basicChannel);
     std::vector<std::shared_ptr<tensorpipe::transport::Context>> contexts = {
       tensorpipe::transport::uv::create(), tensorpipe::transport::uv::create(),
       tensorpipe::transport::uv::create()};
     std::vector<std::shared_ptr<tensorpipe::transport::Listener>> listeners = {
       contexts[0]->listen("127.0.0.1"), contexts[1]->listen("127.0.0.1"),
       contexts[2]->listen("127.0.0.1")};
-    auto registerChannel = tensorpipe::channel::mpt::create(
+    auto mptChannel = tensorpipe::channel::mpt::create(
       std::move(contexts), std::move(listeners));
-    context->registerChannel(10, "mpt", registerChannel);
+    context->registerChannel(10, "mpt", mptChannel);
   }
 }
 
@@ -304,27 +304,27 @@ void SigHandler(int s) {
 }
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCHandleSignal")
-  .set_body([](DGLArgs args, DGLRetValue* rv) {
-    // Ctrl+C handler
-    struct sigaction sigHandler;
-    sigHandler.sa_handler = SigHandler;
-    sigemptyset(&sigHandler.sa_mask);
-    sigHandler.sa_flags = 0;
-    sigaction(SIGINT, &sigHandler, nullptr);
-    sigaction(SIGTERM, &sigHandler, nullptr);
-  });
+.set_body([](DGLArgs args, DGLRetValue* rv) {
+  // Ctrl+C handler
+  struct sigaction sigHandler;
+  sigHandler.sa_handler = SigHandler;
+  sigemptyset(&sigHandler.sa_mask);
+  sigHandler.sa_flags = 0;
+  sigaction(SIGINT, &sigHandler, nullptr);
+  sigaction(SIGTERM, &sigHandler, nullptr);
+});
 #endif
 
 //////////////////////////// ServerState ////////////////////////////
 
 DGL_REGISTER_GLOBAL("distributed.server_state._CAPI_DGLRPCGetServerState")
-  .set_body([](DGLArgs args, DGLRetValue* rv) {
-    auto st = RPCContext::ThreadLocal()->server_state;
-    if (st.get() == nullptr) {
-      RPCContext::ThreadLocal()->server_state = std::make_shared<ServerState>();
-    }
-    *rv = st;
-  });
+.set_body([](DGLArgs args, DGLRetValue* rv) {
+  auto st = RPCContext::ThreadLocal()->server_state;
+  if (st.get() == nullptr) {
+    RPCContext::ThreadLocal()->server_state = std::make_shared<ServerState>();
+  }
+  *rv = st;
+});
 
 //////////////////////////// KVStore ////////////////////////////
 
