@@ -1481,7 +1481,7 @@ def node_split(nodes, partition_book=None, ntype='_N', rank=None, force_even=Tru
         local_nids = partition_book.partid2nids(partition_book.partid)
         return _split_local(partition_book, rank, nodes, local_nids)
 
-def edge_split(edges, partition_book=None, etype='_E', rank=None, force_even=True,
+def edge_split(edges, partition_book=None, etype=('_N', '_E', '_N'), rank=None, force_even=True,
                edge_trainer_ids=None):
     ''' Split edges and return a subset for the local rank.
 
