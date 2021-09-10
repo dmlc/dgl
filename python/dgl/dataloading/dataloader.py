@@ -46,6 +46,83 @@ def _locate_eids_to_exclude(frontier_parent_eids, exclude_eids):
         result = np.isin(frontier_parent_eids, exclude_eids).nonzero()[0]
         return F.zerocopy_from_numpy(result)
 
+class _EidExcluder():
+    def __init__(self, exclude_eids):
+        device = None
+        if isinstance(exclude_eids, Mapping):
+            for _, v in exclude_eids.items():
+                if device is None:
+                    device = F.context(v)
+                    break
+        else:
+            device = F.context(exclude_eids)
+        self._exclude_eids = None
+        self._filter = None
+
+        if device == F.cpu():
+            # TODO(nv-dlasalle): Once Filter is implemented for the CPU, we
+            # should just use that irregardless of the device.
+            self._exclude_eids = (
+                _tensor_or_dict_to_numpy(exclude_eids) if exclude_eids is not None else None)
+        else:
+            if isinstance(exclude_eids, Mapping):
+                self._filter = {k: utils.Filter(v) for k, v in exclude_eids.items()}
+            else:
+                self._filter = utils.Filter(exclude_eids)
+
+    def _find_indices(self, parent_eids):
+        """ Find the set of edge indices to remove.
+        """
+        if self._exclude_eids is not None:
+            parent_eids_np = _tensor_or_dict_to_numpy(parent_eids)
+            return _locate_eids_to_exclude(parent_eids_np, self._exclude_eids)
+        else:
+            assert self._filter is not None
+            if isinstance(parent_eids, Mapping):
+                located_eids = {k: self._filter[k].find_included_indices(parent_eids[k])
+                                for k, v in parent_eids.items()}
+            else:
+                located_eids = self._filter.find_included_indices(parent_eids)
+            return located_eids
+
+    def __call__(self, frontier):
+        parent_eids = frontier.edata[EID]
+        located_eids = self._find_indices(parent_eids)
+
+        if not isinstance(located_eids, Mapping):
+            # (BarclayII) If frontier already has a EID field and located_eids is empty,
+            # the returned graph will keep EID intact.  Otherwise, EID will change
+            # to the mapping from the new graph to the old frontier.
+            # So we need to test if located_eids is empty, and do the remapping ourselves.
+            if len(located_eids) > 0:
+                frontier = transform.remove_edges(
+                    frontier, located_eids, store_ids=True)
+                frontier.edata[EID] = F.gather_row(parent_eids, frontier.edata[EID])
+        else:
+            # (BarclayII) remove_edges only accepts removing one type of edges,
+            # so I need to keep track of the edge IDs left one by one.
+            new_eids = parent_eids.copy()
+            for k, v in located_eids.items():
+                if len(v) > 0:
+                    frontier = transform.remove_edges(
+                        frontier, v, etype=k, store_ids=True)
+                    new_eids[k] = F.gather_row(parent_eids[k], frontier.edges[k].data[EID])
+            frontier.edata[EID] = new_eids
+
+
+def _create_eid_excluder(exclude_eids, device):
+    if exclude_eids is None:
+        return None
+
+    if device is not None:
+        if isinstance(exclude_eids, Mapping):
+            exclude_eids = {k: F.copy_to(v, device) \
+                for k, v in exclude_eids.items()}
+        else:
+            exclude_eids = F.copy_to(exclude_eids, device)
+
+    return _EidExcluder(exclude_eids)
+
 def _find_exclude_eids_with_reverse_id(g, eids, reverse_eid_map):
     if isinstance(eids, Mapping):
         eids = {g.to_canonical_etype(k): v for k, v in eids.items()}
@@ -77,6 +154,9 @@ def _find_exclude_eids(g, exclude_mode, eids, **kwargs):
         None (default)
             Does not exclude any edge.
 
+        'self'
+            Exclude the given edges themselves but nothing else.
+
         'reverse_id'
             Exclude all edges specified in ``eids``, as well as their reverse edges
             of the same edge type.
@@ -105,6 +185,8 @@ def _find_exclude_eids(g, exclude_mode, eids, **kwargs):
     """
     if exclude_mode is None:
         return None
+    elif exclude_mode == 'self':
+        return eids
     elif exclude_mode == 'reverse_id':
         return _find_exclude_eids_with_reverse_id(g, eids, kwargs['reverse_eid_map'])
     elif exclude_mode == 'reverse_types':
@@ -151,6 +233,11 @@ class BlockSampler(object):
     return_eids : bool, default False
         Whether to return the edge IDs involved in message passing in the MFG.
         If True, the edge IDs will be stored as an edge feature named ``dgl.EID``.
+    output_ctx : DGLContext, default None
+        The context the sampled blocks will be stored on. This should only be
+        a CUDA context if multiprocessing is not used in the dataloader (e.g.,
+        num_workers is 0). If this is None, the sampled blocks will be stored
+        on the same device as the input graph.
 
     Notes
     -----
@@ -158,9 +245,10 @@ class BlockSampler(object):
     :ref:`User Guide Section 6 <guide-minibatch>` and
     :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
     """
-    def __init__(self, num_layers, return_eids=False):
+    def __init__(self, num_layers, return_eids=False, output_ctx=None):
         self.num_layers = num_layers
         self.return_eids = return_eids
+        self.set_output_context(output_ctx)
 
     def sample_frontier(self, block_id, g, seed_nodes):
         """Generate the frontier given the destination nodes.
@@ -219,46 +307,67 @@ class BlockSampler(object):
         :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
         """
         blocks = []
-        exclude_eids = (
-            _tensor_or_dict_to_numpy(exclude_eids) if exclude_eids is not None else None)
+        eid_excluder = _create_eid_excluder(exclude_eids, self.output_device)
+
+        if isinstance(g, DistGraph):
+            # TODO:(nv-dlasalle) dist graphs may not have an associated graph,
+            # causing an error when trying to fetch the device, so for now,
+            # always assume the distributed graph's device is CPU.
+            graph_device = F.cpu()
+        else:
+            graph_device = g.device
+
         for block_id in reversed(range(self.num_layers)):
-            frontier = self.sample_frontier(block_id, g, seed_nodes)
+            seed_nodes_in = seed_nodes
+            if isinstance(seed_nodes_in, dict):
+                seed_nodes_in = {ntype: nodes.to(graph_device) \
+                    for ntype, nodes in seed_nodes_in.items()}
+            else:
+                seed_nodes_in = seed_nodes_in.to(graph_device)
+            frontier = self.sample_frontier(block_id, g, seed_nodes_in)
+
+            if self.output_device is not None:
+                frontier = frontier.to(self.output_device)
+                if isinstance(seed_nodes, dict):
+                    seed_nodes_out = {ntype: nodes.to(self.output_device) \
+                        for ntype, nodes in seed_nodes.items()}
+                else:
+                    seed_nodes_out = seed_nodes.to(self.output_device)
+            else:
+                seed_nodes_out = seed_nodes
 
             # Removing edges from the frontier for link prediction training falls
             # into the category of frontier postprocessing
-            if exclude_eids is not None:
-                parent_eids = frontier.edata[EID]
-                parent_eids_np = _tensor_or_dict_to_numpy(parent_eids)
-                located_eids = _locate_eids_to_exclude(parent_eids_np, exclude_eids)
-                if not isinstance(located_eids, Mapping):
-                    # (BarclayII) If frontier already has a EID field and located_eids is empty,
-                    # the returned graph will keep EID intact.  Otherwise, EID will change
-                    # to the mapping from the new graph to the old frontier.
-                    # So we need to test if located_eids is empty, and do the remapping ourselves.
-                    if len(located_eids) > 0:
-                        frontier = transform.remove_edges(
-                            frontier, located_eids, store_ids=True)
-                        frontier.edata[EID] = F.gather_row(parent_eids, frontier.edata[EID])
-                else:
-                    # (BarclayII) remove_edges only accepts removing one type of edges,
-                    # so I need to keep track of the edge IDs left one by one.
-                    new_eids = parent_eids.copy()
-                    for k, v in located_eids.items():
-                        if len(v) > 0:
-                            frontier = transform.remove_edges(
-                                frontier, v, etype=k, store_ids=True)
-                            new_eids[k] = F.gather_row(parent_eids[k], frontier.edges[k].data[EID])
-                    frontier.edata[EID] = new_eids
+            if eid_excluder is not None:
+                eid_excluder(frontier)
 
-            block = transform.to_block(frontier, seed_nodes)
-
+            block = transform.to_block(frontier, seed_nodes_out)
             if self.return_eids:
                 assign_block_eids(block, frontier)
 
             seed_nodes = {ntype: block.srcnodes[ntype].data[NID] for ntype in block.srctypes}
-
             blocks.insert(0, block)
         return blocks
+
+    def set_output_context(self, ctx):
+        """Set the device the generated block will be output to. This should
+        only be set to a cuda device, when multi-processing is not used in
+        the dataloader (e.g., num_workers is 0).
+
+        Parameters
+        ----------
+        output_ctx : DGLContext, default None
+            The device context the sampled blocks will be stored on. This
+            should only be a CUDA context if multiprocessing is not used in
+            the dataloader (e.g., num_workers is 0). If this is None, the
+            sampled blocks will be stored on the same device as the input
+            graph.
+        """
+        if ctx is not None:
+            self.output_device = F.to_backend_ctx(ctx)
+        else:
+            self.output_device = None
+
 
 class Collator(ABC):
     """Abstract DGL collator for training GNNs on downstream tasks stochastically.
@@ -307,7 +416,8 @@ class Collator(ABC):
 def _prepare_tensor_dict(g, data, name, is_distributed):
     if is_distributed:
         x = F.tensor(next(iter(data.values())))
-        return {k: F.copy_to(F.astype(v, F.dtype(x)), F.context(x)) for k, v in data.items()}
+        return {k: F.copy_to(F.astype(F.tensor(v), F.dtype(x)), F.context(x)) \
+                for k, v in data.items()}
     else:
         return utils.prepare_tensor_dict(g, data, name)
 
@@ -444,6 +554,8 @@ class EdgeCollator(Collator):
 
         * None, which excludes nothing.
 
+        * ``'self'``, which excludes the sampled edges themselves but nothing else.
+
         * ``'reverse_id'``, which excludes the reverse edges of the sampled edges.  The said
           reverse edges have the same edge type as the sampled edges.  Only works
           on edge types whose source node type is the same as its destination node type.
@@ -528,7 +640,7 @@ class EdgeCollator(Collator):
     >>> neg_sampler = dgl.dataloading.negative_sampler.Uniform(5)
     >>> collator = dgl.dataloading.EdgeCollator(
     ...     g, train_eid, sampler, exclude='reverse_id',
-    ...     reverse_eids=reverse_eids, negative_sampler=neg_sampler,
+    ...     reverse_eids=reverse_eids, negative_sampler=neg_sampler)
     >>> dataloader = torch.utils.data.DataLoader(
     ...     collator.dataset, collate_fn=collator.collate,
     ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
@@ -627,7 +739,7 @@ class EdgeCollator(Collator):
         seed_nodes = pair_graph.ndata[NID]
 
         exclude_eids = _find_exclude_eids(
-            self.g,
+            self.g_sampling,
             self.exclude,
             items,
             reverse_eid_map=self.reverse_eids,
@@ -647,7 +759,7 @@ class EdgeCollator(Collator):
         else:
             items = _prepare_tensor(self.g_sampling, items, 'items', self._is_distributed)
 
-        pair_graph = self.g.edge_subgraph(items, preserve_nodes=True)
+        pair_graph = self.g.edge_subgraph(items, relabel_nodes=False)
         induced_edges = pair_graph.edata[EID]
 
         neg_srcdst = self.negative_sampler(self.g, items)
@@ -670,7 +782,7 @@ class EdgeCollator(Collator):
         seed_nodes = pair_graph.ndata[NID]
 
         exclude_eids = _find_exclude_eids(
-            self.g,
+            self.g_sampling,
             self.exclude,
             items,
             reverse_eid_map=self.reverse_eids,

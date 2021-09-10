@@ -146,6 +146,10 @@ CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray 
 template <DLDeviceType XPU, typename IdType>
 void CSRSort_(CSRMatrix* csr);
 
+template <DLDeviceType XPU, typename IdType, typename TagType>
+std::pair<CSRMatrix, NDArray> CSRSortByTag(
+    const CSRMatrix &csr, IdArray tag_array, int64_t num_tags);
+
 template <DLDeviceType XPU, typename IdType>
 CSRMatrix CSRReorder(CSRMatrix csr, runtime::NDArray new_row_ids, runtime::NDArray new_col_ids);
 
@@ -160,14 +164,35 @@ template <DLDeviceType XPU, typename IdType, typename FloatType>
 COOMatrix CSRRowWiseSampling(
     CSRMatrix mat, IdArray rows, int64_t num_samples, FloatArray prob, bool replace);
 
+// FloatType is the type of probability data.
+template <DLDeviceType XPU, typename IdType, typename FloatType>
+COOMatrix CSRRowWisePerEtypeSampling(
+    CSRMatrix mat, IdArray rows, IdArray etypes,
+    int64_t num_samples, FloatArray prob, bool replace, bool etype_sorted);
+
 template <DLDeviceType XPU, typename IdType>
 COOMatrix CSRRowWiseSamplingUniform(
     CSRMatrix mat, IdArray rows, int64_t num_samples, bool replace);
+
+template <DLDeviceType XPU, typename IdType>
+COOMatrix CSRRowWisePerEtypeSamplingUniform(
+    CSRMatrix mat, IdArray rows, IdArray etypes, int64_t num_samples,
+    bool replace, bool etype_sorted);
 
 // FloatType is the type of weight data.
 template <DLDeviceType XPU, typename IdType, typename DType>
 COOMatrix CSRRowWiseTopk(
     CSRMatrix mat, IdArray rows, int64_t k, NDArray weight, bool ascending);
+
+template <DLDeviceType XPU, typename IdType, typename FloatType>
+COOMatrix CSRRowWiseSamplingBiased(
+    CSRMatrix mat,
+    IdArray rows,
+    int64_t num_samples,
+    NDArray tag_offset,
+    FloatArray bias,
+    bool replace
+);
 
 // Union CSRMatrixes
 template <DLDeviceType XPU, typename IdType>
@@ -236,9 +261,20 @@ template <DLDeviceType XPU, typename IdType, typename FloatType>
 COOMatrix COORowWiseSampling(
     COOMatrix mat, IdArray rows, int64_t num_samples, FloatArray prob, bool replace);
 
+// FloatType is the type of probability data.
+template <DLDeviceType XPU, typename IdType, typename FloatType>
+COOMatrix COORowWisePerEtypeSampling(
+    COOMatrix mat, IdArray rows, IdArray etypes,
+    int64_t num_samples, FloatArray prob, bool replace, bool etype_sorted);
+
 template <DLDeviceType XPU, typename IdType>
 COOMatrix COORowWiseSamplingUniform(
     COOMatrix mat, IdArray rows, int64_t num_samples, bool replace);
+
+template <DLDeviceType XPU, typename IdType>
+COOMatrix COORowWisePerEtypeSamplingUniform(
+    COOMatrix mat, IdArray rows, IdArray etypes, int64_t num_samples,
+    bool replace, bool etype_sorted);
 
 // FloatType is the type of weight data.
 template <DLDeviceType XPU, typename IdType, typename FloatType>

@@ -6,6 +6,7 @@ from ._ffi.function import _init_api
 from .heterograph import DGLHeteroGraph
 from . import backend as F
 from . import utils
+from .ndarray import NDArray
 from .base import EID, NID, NTYPE, ETYPE
 from .subgraph import edge_subgraph
 
@@ -199,7 +200,7 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
             eid = F.astype(induced_edges[0], F.int64) + max_eid * F.astype(inner_edge == 0, F.int64)
 
             _, index = F.sort_1d(eid)
-            subg1 = edge_subgraph(subg1, index, preserve_nodes=True)
+            subg1 = edge_subgraph(subg1, index, relabel_nodes=False)
             subg1.ndata[NID] = induced_nodes[0]
             subg1.edata[EID] = F.gather_row(induced_edges[0], index)
         else:
@@ -230,7 +231,7 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
         return subg_dict, None, None
 
 
-def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False):
+def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False, mode="k-way"):
     ''' This assigns nodes to different partitions with Metis partitioning algorithm.
 
     When performing Metis partitioning, we can put some constraint on the partitioning.
@@ -255,12 +256,15 @@ def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False):
         Node type of each node
     balance_edges : bool
         Indicate whether to balance the edges.
+    mode : str, "k-way" or "recursive"
+        Whether use multilevel recursive bisection or multilevel k-way paritioning.
 
     Returns
     -------
     a 1-D tensor
         A vector with each element that indicates the partition ID of a vertex.
     '''
+    assert mode in ("k-way", "recursive"), "'mode' can only be 'k-way' or 'recursive'"
     # METIS works only on symmetric graphs.
     # The METIS runs on the symmetric graph to generate the node assignment to partitions.
     start = time.time()
@@ -312,7 +316,7 @@ def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False):
         vwgt = F.to_dgl_nd(vwgt)
 
     start = time.time()
-    node_part = _CAPI_DGLMetisPartition_Hetero(sym_g._graph, k, vwgt)
+    node_part = _CAPI_DGLMetisPartition_Hetero(sym_g._graph, k, vwgt, mode)
     print('Metis partitioning: {:.3f} seconds'.format(time.time() - start))
     if len(node_part) == 0:
         return None
@@ -322,7 +326,7 @@ def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False):
 
 
 def metis_partition(g, k, extra_cached_hops=0, reshuffle=False,
-                    balance_ntypes=None, balance_edges=False):
+                    balance_ntypes=None, balance_edges=False, mode="k-way"):
     ''' This is to partition a graph with Metis partitioning.
 
     Metis assigns vertices to partitions. This API constructs subgraphs with the vertices assigned
@@ -364,17 +368,134 @@ def metis_partition(g, k, extra_cached_hops=0, reshuffle=False,
         Node type of each node
     balance_edges : bool
         Indicate whether to balance the edges.
+    mode : str, "k-way" or "recursive"
+        Whether use multilevel recursive bisection or multilevel k-way paritioning.
 
     Returns
     --------
     a dict of DGLGraphs
         The key is the partition ID and the value is the DGLGraph of the partition.
     '''
-    node_part = metis_partition_assignment(g, k, balance_ntypes, balance_edges)
+    assert mode in ("k-way", "recursive"), "'mode' can only be 'k-way' or 'recursive'"
+    node_part = metis_partition_assignment(g, k, balance_ntypes, balance_edges, mode)
     if node_part is None:
         return None
 
     # Then we split the original graph into parts based on the METIS partitioning results.
     return partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle)[0]
+
+
+class NDArrayPartition(object):
+    """ Create a new partition of an NDArray. That is, an object which assigns
+    each row of an NDArray to a specific partition.
+
+    Parameters
+    ----------
+    array_size : int
+        The first dimension of the array being partitioned.
+    num_parts : int
+        The number of parts to divide the array into.
+    mode : String
+        The type of partition. Currently, the only valid values are
+        'remainder' and 'range'.
+        'remainder' assigns rows based on remainder when dividing the row id by the
+        number of parts (e.g., i % num_parts).
+        'range' assigns rows based on which part of the range 'part_ranges'
+        they fall into.
+    part_ranges : Tensor or dgl.NDArray, Optional
+        Should only be specified when the mode is 'range'. Should be of the
+        length `num_parts + 1`, and be the exclusive prefix-sum of the number
+        of nodes in each partition. That is, for 3 partitions, we could have
+        the list [0, a, b, 'array_size'], and all rows with index less
+        than 'a' are assigned to partition 0, all rows with index greater than
+        or equal to 'a' and less than 'b' are in partition 1, and all rows
+        with index greater or equal to 'b' are in partition 2. Should have
+        the same context as the partitioned NDArray (i.e., be on the same GPU).
+
+    Examples
+    --------
+
+    A partition of a homgeonous graph `g`, where the vertices are
+    striped across processes can be generated via:
+
+    >>> from dgl.partition import NDArrayPartition
+    >>> part = NDArrayPartition(g.num_nodes(), num_parts, mode='remainder' )
+
+    A range based partition of a homogenous graph `g`'s nodes, where
+    the nodes are stored in contiguous memory. This converts an existing
+    range based partitioning (e.g. from a
+    dgl.distributed.graph_partition_book.RangePartitionBook)
+    'max_node_map', to an NDArrayPartition 'part'.
+
+    >>> part_range = [0]
+    >>> for part in part_book.metadata():
+    >>>     part_range.append(part_range[-1] + part['num_nodes'])
+    >>> part = NDArrayPartition(g.num_nodes(), num_parts, mode='range',
+    ...                         part_ranges=part_range)
+    """
+    def __init__(self, array_size, num_parts, mode='remainder', part_ranges=None):
+        assert num_parts > 0, 'Invalid "num_parts", must be > 0.'
+        if mode == 'remainder':
+            assert part_ranges is None, 'When using remainder-based ' \
+                'partitioning, "part_ranges" should not be specified.'
+            self._partition = _CAPI_DGLNDArrayPartitionCreateRemainderBased(
+                array_size, num_parts)
+        elif mode == 'range':
+            assert part_ranges is not None, 'When using range-based ' \
+                'partitioning, "part_ranges" must not be None.'
+            assert part_ranges[0] == 0 and part_ranges[-1] == array_size, \
+                'part_ranges[0] must be 0, and part_ranges[-1] must be ' \
+                '"array_size".'
+            if F.is_tensor(part_ranges):
+                part_ranges = F.zerocopy_to_dgl_ndarray(part_ranges)
+            assert isinstance(part_ranges, NDArray), '"part_ranges" must ' \
+                'be Tensor or dgl.NDArray.'
+            self._partition = _CAPI_DGLNDArrayPartitionCreateRangeBased(
+                array_size,
+                num_parts,
+                part_ranges)
+        else:
+            assert False, 'Unknown partition mode "{}"'.format(mode)
+        self._array_size = array_size
+        self._num_parts = num_parts
+
+    def num_parts(self):
+        """ Get the number of partitions.
+        """
+        return self._num_parts
+
+    def array_size(self):
+        """ Get the total size of the first dimension of the partitioned array.
+        """
+        return self._array_size
+
+    def get(self):
+        """ Get the C-handle for this object.
+        """
+        return self._partition
+
+    def get_local_indices(self, part, ctx):
+        """ Get the set of global indices in this given partition.
+        """
+        return self.map_to_global(F.arange(0, self.local_size(part), ctx=ctx), part)
+
+    def local_size(self, part):
+        """ Get the number of rows/items assigned to the given part.
+        """
+        return _CAPI_DGLNDArrayPartitionGetPartSize(self._partition, part)
+
+    def map_to_local(self, idxs):
+        """ Convert the set of global indices to local indices
+        """
+        return F.zerocopy_from_dgl_ndarray(_CAPI_DGLNDArrayPartitionMapToLocal(
+            self._partition,
+            F.zerocopy_to_dgl_ndarray(idxs)))
+
+    def map_to_global(self, idxs, part_id):
+        """ Convert the set of local indices ot global indices
+        """
+        return F.zerocopy_from_dgl_ndarray(_CAPI_DGLNDArrayPartitionMapToGlobal(
+            self._partition, F.zerocopy_to_dgl_ndarray(idxs), part_id))
+
 
 _init_api("dgl.partition")

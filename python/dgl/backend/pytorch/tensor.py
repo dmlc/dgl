@@ -3,6 +3,7 @@ from __future__ import absolute_import
 from distutils.version import LooseVersion
 
 import scipy # Weird bug in new pytorch when import scipy after import torch
+import numpy as np
 import torch as th
 import builtins
 import numbers
@@ -290,6 +291,10 @@ def clamp(data, min_val, max_val):
 def replace_inf_with_zero(x):
     return th.masked_fill(x, th.isinf(x), 0)
 
+def count_nonzero(input):
+    # TODO: fallback to numpy for backward compatibility
+    return np.count_nonzero(input)
+
 def unique(input):
     if input.dtype == th.bool:
         input = input.type(th.int8)
@@ -338,6 +343,13 @@ def zerocopy_from_dgl_ndarray(data):
         #  The issue will be fixed in v1.6 and later.
         return th.tensor([], dtype=getattr(th, data.dtype),
                          device=to_backend_ctx(data.ctx))
+    elif len(data.shape) == 0 or builtins.min(data.shape) == 0:
+        # Workaround the same issue as above, but preserve the shape of the
+        # empty tensor. This is needed by the sparse optimizer when one of
+        # processors may receive no gradients to update, but we want to keep
+        # the dimension of the embedding.
+        return th.empty(data.shape, dtype=getattr(th, data.dtype),
+                        device=to_backend_ctx(data.ctx))
     else:
         return dlpack.from_dlpack(data.to_dlpack())
 

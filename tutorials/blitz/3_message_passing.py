@@ -279,9 +279,9 @@ class Model(nn.Module):
         self.conv2 = WeightedSAGEConv(h_feats, num_classes)
     
     def forward(self, g, in_feat):
-        h = self.conv1(g, in_feat, torch.ones(g.num_edges()).to(g.device))
+        h = self.conv1(g, in_feat, torch.ones(g.num_edges(), 1).to(g.device))
         h = F.relu(h)
-        h = self.conv2(g, h, torch.ones(g.num_edges()).to(g.device))
+        h = self.conv2(g, h, torch.ones(g.num_edges(), 1).to(g.device))
         return h
     
 model = Model(g.ndata['feat'].shape[1], 16, dataset.num_classes)
@@ -310,12 +310,12 @@ def u_mul_e_udf(edges):
 
 ######################################################################
 # You can also write your own reduce function. For example, the following
-# is equivalent to the builtin ``fn.sum('m', 'h')`` function that sums up
+# is equivalent to the builtin ``fn.mean('m', 'h_N')`` function that averages
 # the incoming messages:
 # 
 
-def sum_udf(nodes):
-    return {'h': nodes.mailbox['m'].sum(1)}
+def mean_udf(nodes):
+    return {'h_N': nodes.mailbox['m'].mean(1)}
 
 
 ######################################################################
@@ -354,5 +354,5 @@ def sum_udf(nodes):
 # 
 
 
-# Thumbnail Courtesy: Representation Learning on Networks, Jure Leskovec, WWW 2018
+# Thumbnail credits: Representation Learning on Networks, Jure Leskovec, WWW 2018
 # sphinx_gallery_thumbnail_path = '_static/blitz_3_message_passing.png'

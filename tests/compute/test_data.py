@@ -1,6 +1,7 @@
 import dgl.data as data
 import unittest
 import backend as F
+import numpy as np
 
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
@@ -25,6 +26,33 @@ def test_gin():
 
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
+def test_fraud():
+    g = data.FraudDataset('amazon')[0]
+    assert g.num_nodes() == 11944
+
+    g = data.FraudAmazonDataset()[0]
+    assert g.num_nodes() == 11944
+
+    g = data.FraudYelpDataset()[0]
+    assert g.num_nodes() == 45954
+
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
+def test_fakenews():
+    ds = data.FakeNewsDataset('politifact', 'bert')
+    assert len(ds) == 314
+
+    ds = data.FakeNewsDataset('gossipcop', 'profile')
+    assert len(ds) == 5464
+
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
+def test_tudataset_regression():    
+    ds = data.TUDataset('ZINC_test', force_reload=True)
+    assert len(ds) == 5000
+
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
 def test_data_hash():
     class HashTestDataset(data.DGLDataset):
         def __init__(self, hash_key=()):
@@ -38,7 +66,83 @@ def test_data_hash():
     assert a.hash == b.hash
     assert a.hash != c.hash
 
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
+def test_citation_graph():
+    # cora
+    g = data.CoraGraphDataset()[0]
+    assert g.num_nodes() == 2708
+    assert g.num_edges() == 10556
+    dst = F.asnumpy(g.edges()[1])
+    assert np.array_equal(dst, np.sort(dst))
+
+    # Citeseer
+    g = data.CiteseerGraphDataset()[0]
+    assert g.num_nodes() == 3327
+    assert g.num_edges() == 9228
+    dst = F.asnumpy(g.edges()[1])
+    assert np.array_equal(dst, np.sort(dst))
+
+    # Pubmed
+    g = data.PubmedGraphDataset()[0]
+    assert g.num_nodes() == 19717
+    assert g.num_edges() == 88651
+    dst = F.asnumpy(g.edges()[1])
+    assert np.array_equal(dst, np.sort(dst))
+
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
+def test_gnn_benchmark():
+    # AmazonCoBuyComputerDataset
+    g = data.AmazonCoBuyComputerDataset()[0]
+    assert g.num_nodes() == 13752
+    assert g.num_edges() == 491722
+    dst = F.asnumpy(g.edges()[1])
+    assert np.array_equal(dst, np.sort(dst))
+
+    # AmazonCoBuyPhotoDataset
+    g = data.AmazonCoBuyPhotoDataset()[0]
+    assert g.num_nodes() == 7650
+    assert g.num_edges() == 238163
+    dst = F.asnumpy(g.edges()[1])
+    assert np.array_equal(dst, np.sort(dst))
+
+    # CoauthorPhysicsDataset
+    g = data.CoauthorPhysicsDataset()[0]
+    assert g.num_nodes() == 34493
+    assert g.num_edges() == 495924
+    dst = F.asnumpy(g.edges()[1])
+    assert np.array_equal(dst, np.sort(dst))
+
+    # CoauthorCSDataset
+    g = data.CoauthorCSDataset()[0]
+    assert g.num_nodes() == 18333
+    assert g.num_edges() == 163788
+    dst = F.asnumpy(g.edges()[1])
+    assert np.array_equal(dst, np.sort(dst))
+
+    # CoraFullDataset
+    g = data.CoraFullDataset()[0]
+    assert g.num_nodes() == 19793
+    assert g.num_edges() == 126842
+    dst = F.asnumpy(g.edges()[1])
+    assert np.array_equal(dst, np.sort(dst))
+
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
+def test_reddit():
+    # RedditDataset
+    g = data.RedditDataset()[0]
+    assert g.num_nodes() == 232965
+    assert g.num_edges() == 114615892
+    dst = F.asnumpy(g.edges()[1])
+    assert np.array_equal(dst, np.sort(dst))
+
+
 if __name__ == '__main__':
     test_minigc()
     test_gin()
     test_data_hash()
+    test_tudataset_regression()
+    test_fraud()
+    test_fakenews()

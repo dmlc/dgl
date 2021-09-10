@@ -19,18 +19,18 @@ namespace runtime {
 
 constexpr const char *TensorDispatcher::names_[];
 
-void TensorDispatcher::Load(const char *path) {
+bool TensorDispatcher::Load(const char *path) {
   CHECK(!available_) << "The tensor adapter can only load once.";
 
   if (path == nullptr || strlen(path) == 0)
     // does not have dispatcher library; all operators fall back to DGL's implementation
-    return;
+    return false;
 
 #if defined(WIN32) || defined(_WIN32)
   handle_ = LoadLibrary(path);
 
   if (!handle_)
-    return;
+    return false;
 
   for (int i = 0; i < num_entries_; ++i) {
     entrypoints_[i] = reinterpret_cast<void*>(GetProcAddress(handle_, names_[i]));
@@ -39,8 +39,10 @@ void TensorDispatcher::Load(const char *path) {
 #else   // !WIN32
   handle_ = dlopen(path, RTLD_LAZY);
 
-  if (!handle_)
-    return;
+  if (!handle_) {
+    LOG(WARNING) << "TensorDispatcher: dlopen failed: " << dlerror();
+    return false;
+  }
 
   for (int i = 0; i < num_entries_; ++i) {
     entrypoints_[i] = dlsym(handle_, names_[i]);
@@ -49,6 +51,7 @@ void TensorDispatcher::Load(const char *path) {
 #endif  // WIN32
 
   available_ = true;
+  return true;
 }
 
 TensorDispatcher::~TensorDispatcher() {

@@ -1,24 +1,43 @@
 import argparse
-
 from model import Grace
 from aug import aug
 from dataset import load
 
+import numpy as np
 import torch as th
 import torch.nn as nn
-
-import yaml
-from yaml import SafeLoader
 
 from eval import label_classification
 import warnings
 
 warnings.filterwarnings('ignore')
 
+
+def count_parameters(model):
+    return sum([np.prod(p.size()) for p in model.parameters() if p.requires_grad])
+
+
 parser = argparse.ArgumentParser()
-parser.add_argument('--dataname', type=str, default='cora', choices = ['cora', 'citeseer', 'pubmed'])
+parser.add_argument('--dataname', type=str, default='cora')
 parser.add_argument('--gpu', type=int, default=0)
-parser.add_argument('--split', type=str, default='random', choices = ['random', 'public'])
+parser.add_argument('--split', type=str, default='random')
+
+parser.add_argument('--epochs', type=int, default=500, help='Number of training periods.')
+parser.add_argument('--lr', type=float, default=0.001, help='Learning rate.')
+parser.add_argument('--wd', type=float, default=1e-5, help='Weight decay.')
+parser.add_argument('--temp', type=float, default=1.0, help='Temperature.')
+
+parser.add_argument('--act_fn', type=str, default='relu')
+
+parser.add_argument("--hid_dim", type=int, default=256, help='Hidden layer dim.')
+parser.add_argument("--out_dim", type=int, default=256, help='Output layer dim.')
+
+parser.add_argument("--num_layers", type=int, default=2, help='Number of GNN layers.')
+parser.add_argument('--der1', type=float, default=0.2, help='Drop edge ratio of the 1st augmentation.')
+parser.add_argument('--der2', type=float, default=0.2, help='Drop edge ratio of the 2nd augmentation.')
+parser.add_argument('--dfr1', type=float, default=0.2, help='Drop feature ratio of the 1st augmentation.')
+parser.add_argument('--dfr2', type=float, default=0.2, help='Drop feature ratio of the 2nd augmentation.')
+
 args = parser.parse_args()
 
 if args.gpu != -1 and th.cuda.is_available():
@@ -26,40 +45,37 @@ if args.gpu != -1 and th.cuda.is_available():
 else:
     args.device = 'cpu'
 
-
 if __name__ == '__main__':
 
     # Step 1: Load hyperparameters =================================================================== #
-    config = 'config.yaml'
-    config = yaml.load(open(config), Loader=SafeLoader)[args.dataname]
-    lr = config['learning_rate']
-    hid_dim = config['num_hidden']
-    out_dim = config['num_proj_hidden']
+    lr = args.lr
+    hid_dim = args.hid_dim
+    out_dim = args.out_dim
 
-    num_layers = config['num_layers']
-    act_fn = ({'relu': nn.ReLU(), 'prelu': nn.PReLU()})[config['activation']]
+    num_layers = args.num_layers
+    act_fn = ({'relu': nn.ReLU(), 'prelu': nn.PReLU()})[args.act_fn]
 
-    drop_edge_rate_1 = config['drop_edge_rate_1']
-    drop_edge_rate_2 = config['drop_edge_rate_2']
-    drop_feature_rate_1 = config['drop_feature_rate_1']
-    drop_feature_rate_2 = config['drop_feature_rate_2']
+    drop_edge_rate_1 = args.der1
+    drop_edge_rate_2 = args.der2
+    drop_feature_rate_1 = args.dfr1
+    drop_feature_rate_2 = args.dfr2
 
-    temp = config['tau']
-    epochs = config['num_epochs']
-    wd = config['weight_decay']
+    temp = args.temp
+    epochs = args.epochs
+    wd = args.wd
 
     # Step 2: Prepare data =================================================================== #
     graph, feat, labels, train_mask, test_mask = load(args.dataname)
-
     in_dim = feat.shape[1]
 
     # Step 3: Create model =================================================================== #
     model = Grace(in_dim, hid_dim, out_dim, num_layers, act_fn, temp)
     model = model.to(args.device)
+    print(f'# params: {count_parameters(model)}')
 
     optimizer = th.optim.Adam(model.parameters(), lr=lr, weight_decay=wd)
 
-    # Step 4: Training ======================================================================= #
+    # Step 4: Training =======================================================================
     for epoch in range(epochs):
         model.train()
         optimizer.zero_grad()
@@ -79,11 +95,12 @@ if __name__ == '__main__':
         print(f'Epoch={epoch:03d}, loss={loss.item():.4f}')
 
     # Step 5: Linear evaluation ============================================================== #
-    print("=== Final Evaluation ===")
+    print("=== Final ===")
+
     graph = graph.add_self_loop()
     graph = graph.to(args.device)
     feat = feat.to(args.device)
     embeds = model.get_embedding(graph, feat)
 
     '''Evaluation Embeddings  '''
-    label_classification(embeds, labels, train_mask, test_mask, split=args.split, ratio=0.1)
+    label_classification(embeds, labels, train_mask, test_mask, split=args.split)

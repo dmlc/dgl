@@ -115,7 +115,7 @@ class GATConv(nn.Module):
     >>> # Case 2: Unidirectional bipartite graph
     >>> u = [0, 1, 0, 0, 1]
     >>> v = [0, 1, 2, 3, 2]
-    >>> g = dgl.bipartite((u, v))
+    >>> g = dgl.heterograph({('A', 'r', 'B'): (u, v)})
     >>> u_feat = th.tensor(np.random.rand(2, 5).astype(np.float32))
     >>> v_feat = th.tensor(np.random.rand(4, 10).astype(np.float32))
     >>> gatconv = GATConv((5,10), 2, 3)
@@ -287,6 +287,8 @@ class GATConv(nn.Module):
                     *src_prefix_shape, self._num_heads, self._out_feats)
                 if graph.is_block:
                     feat_dst = feat_src[:graph.number_of_dst_nodes()]
+                    h_dst = h_dst[:graph.number_of_dst_nodes()]
+                    dst_prefix_shape = (graph.number_of_dst_nodes(),) + dst_prefix_shape[1:]
             # NOTE: GAT paper uses "first concatenation then linear projection"
             # to compute attention scores, while ours is "first projection then
             # addition", the two approaches are mathematically equivalent:

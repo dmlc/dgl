@@ -3,6 +3,7 @@
 import os
 import socket
 import atexit
+import logging
 
 from . import rpc
 from .constants import MAX_QUEUE_SIZE
@@ -13,9 +14,14 @@ if os.name != 'nt':
 
 def local_ip4_addr_list():
     """Return a set of IPv4 address
+
+    You can use
+    `logging.getLogger("dgl-distributed-socket").setLevel(logging.WARNING+1)`
+    to disable the warning here
     """
     assert os.name != 'nt', 'Do not support Windows rpc yet.'
     nic = set()
+    logger = logging.getLogger("dgl-distributed-socket")
     for if_nidx in socket.if_nameindex():
         name = if_nidx[1]
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -25,10 +31,9 @@ def local_ip4_addr_list():
                                    struct.pack('256s', name[:15].encode("UTF-8")))
         except OSError as e:
             if e.errno == 99: # EADDRNOTAVAIL
-                print("Warning!",
-                      "Interface: {}".format(name),
-                      "IP address not available for interface.",
-                      sep='\n')
+                logger.warning(
+                    "Warning! Interface: %s \n"
+                    "IP address not available for interface.", name)
                 continue
             else:
                 raise e

@@ -365,5 +365,5 @@ for epoch in range(1):
 #
 
 
-# Thumbnail Courtesy: Link Prediction with Neo4j, Mark Needham
+# Thumbnail credits: Link Prediction with Neo4j, Mark Needham
 # sphinx_gallery_thumbnail_path = '_static/blitz_4_link_predict.png'

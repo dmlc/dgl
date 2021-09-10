@@ -21,13 +21,13 @@ class EdgeWeightNorm(nn.Module):
 
     Mathematically, setting ``norm='both'`` yields the following normalization term:
 
-    .. math:
+    .. math::
       c_{ji} = (\sqrt{\sum_{k\in\mathcal{N}(j)}e_{jk}}\sqrt{\sum_{k\in\mathcal{N}(i)}e_{ki}})
 
     And, setting ``norm='right'`` yields the following normalization term:
 
-    .. math:
-      c_{ji} = (\sum_{k\in\mathcal{N}(i)}}e_{ki})
+    .. math::
+      c_{ji} = (\sum_{k\in\mathcal{N}(i)}e_{ki})
 
     where :math:`e_{ji}` is the scalar weight on the edge from node :math:`j` to node :math:`i`.
 
@@ -173,10 +173,18 @@ class GraphConv(nn.Module):
     out_feats : int
         Output feature size; i.e., the number of dimensions of :math:`h_i^{(l+1)}`.
     norm : str, optional
-        How to apply the normalizer. If is `'right'`, divide the aggregated messages
-        by each node's in-degrees, which is equivalent to averaging the received messages.
-        If is `'none'`, no normalization is applied. Default is `'both'`,
-        where the :math:`c_{ji}` in the paper is applied.
+        How to apply the normalizer.  Can be one of the following values:
+
+        * ``right``, to divide the aggregated messages by each node's in-degrees,
+          which is equivalent to averaging the received messages.
+
+        * ``none``, where no normalization is applied.
+
+        * ``both`` (default), where the messages are scaled with :math:`1/c_{ji}` above, equivalent
+          to symmetric normalization.
+
+        * ``left``, to divide the messages sent out from each node by its out-degrees,
+          equivalent to random walk normalization.
     weight : bool, optional
         If True, apply a linear layer. Otherwise, aggregating the messages
         without a weight matrix.
@@ -270,8 +278,8 @@ class GraphConv(nn.Module):
                  activation=None,
                  allow_zero_in_degree=False):
         super(GraphConv, self).__init__()
-        if norm not in ('none', 'both', 'right'):
-            raise DGLError('Invalid norm value. Must be either "none", "both" or "right".'
+        if norm not in ('none', 'both', 'right', 'left'):
+            raise DGLError('Invalid norm value. Must be either "none", "both", "right" or "left".'
                            ' But got "{}".'.format(norm))
         self._in_feats = in_feats
         self._out_feats = out_feats
@@ -395,9 +403,12 @@ class GraphConv(nn.Module):
 
             # (BarclayII) For RGCN on heterogeneous graphs we need to support GCN on bipartite.
             feat_src, feat_dst = expand_as_pair(feat, graph)
-            if self._norm == 'both':
+            if self._norm in ['left', 'both']:
                 degs = graph.out_degrees().float().clamp(min=1)
-                norm = th.pow(degs, -0.5)
+                if self._norm == 'both':
+                    norm = th.pow(degs, -0.5)
+                else:
+                    norm = 1.0 / degs
                 shp = norm.shape + (1,) * (feat_src.dim() - 1)
                 norm = th.reshape(norm, shp)
                 feat_src = feat_src * norm
@@ -425,7 +436,7 @@ class GraphConv(nn.Module):
                 if weight is not None:
                     rst = th.matmul(rst, weight)
 
-            if self._norm != 'none':
+            if self._norm in ['right', 'both']:
                 degs = graph.in_degrees().float().clamp(min=1)
                 if self._norm == 'both':
                     norm = th.pow(degs, -0.5)

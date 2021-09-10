@@ -114,8 +114,6 @@ NDArray IndexSelect(NDArray array, IdArray index) {
   NDArray ret;
   CHECK_SAME_CONTEXT(array, index);
   CHECK_GE(array->ndim, 1) << "Only support array with at least 1 dimension";
-  CHECK_EQ(array->shape[0], array.NumElements()) << "Only support tensor"
-    << " whose first dimension equals number of elements, e.g. (5,), (5, 1)";
   CHECK_EQ(index->ndim, 1) << "Index array must be an 1D array.";
   ATEN_XPU_SWITCH_CUDA(array->ctx.device_type, XPU, "IndexSelect", {
     ATEN_DTYPE_SWITCH(array->dtype, DType, "values", {
@@ -521,6 +519,21 @@ void CSRSort_(CSRMatrix* csr) {
   });
 }
 
+std::pair<CSRMatrix, NDArray> CSRSortByTag(
+    const CSRMatrix &csr, IdArray tag, int64_t num_tags) {
+  CHECK_EQ(csr.num_cols, tag->shape[0])
+      << "The length of the tag array should be equal to the number of columns ";
+  CHECK_SAME_CONTEXT(csr.indices, tag);
+  CHECK_INT(tag, "tag");
+  std::pair<CSRMatrix, NDArray> ret;
+  ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRSortByTag", {
+    ATEN_ID_TYPE_SWITCH(tag->dtype, TagType, {
+      ret = impl::CSRSortByTag<XPU, IdType, TagType>(csr, tag, num_tags);
+    });
+  });
+  return ret;
+}
+
 CSRMatrix CSRReorder(CSRMatrix csr, runtime::NDArray new_row_ids, runtime::NDArray new_col_ids) {
   CSRMatrix ret;
   ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRReorder", {
@@ -555,6 +568,25 @@ COOMatrix CSRRowWiseSampling(
   return ret;
 }
 
+COOMatrix CSRRowWisePerEtypeSampling(
+    CSRMatrix mat, IdArray rows, IdArray etypes,
+    int64_t num_samples, FloatArray prob, bool replace, bool etype_sorted) {
+  COOMatrix ret;
+  ATEN_CSR_SWITCH(mat, XPU, IdType, "CSRRowWisePerEtypeSampling", {
+    if (IsNullArray(prob)) {
+      ret = impl::CSRRowWisePerEtypeSamplingUniform<XPU, IdType>(
+            mat, rows, etypes, num_samples, replace, etype_sorted);
+    } else {
+      ATEN_FLOAT_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
+        ret = impl::CSRRowWisePerEtypeSampling<XPU, IdType, FloatType>(
+            mat, rows, etypes, num_samples, prob, replace, etype_sorted);
+      });
+    }
+  });
+  return ret;
+}
+
+
 COOMatrix CSRRowWiseTopk(
     CSRMatrix mat, IdArray rows, int64_t k, NDArray weight, bool ascending) {
   COOMatrix ret;
@@ -562,6 +594,23 @@ COOMatrix CSRRowWiseTopk(
     ATEN_DTYPE_SWITCH(weight->dtype, DType, "weight", {
       ret = impl::CSRRowWiseTopk<XPU, IdType, DType>(
           mat, rows, k, weight, ascending);
+    });
+  });
+  return ret;
+}
+
+COOMatrix CSRRowWiseSamplingBiased(
+    CSRMatrix mat,
+    IdArray rows,
+    int64_t num_samples,
+    NDArray tag_offset,
+    FloatArray bias,
+    bool replace) {
+  COOMatrix ret;
+  ATEN_CSR_SWITCH(mat, XPU, IdType, "CSRRowWiseSamplingBiased", {
+    ATEN_FLOAT_TYPE_SWITCH(bias->dtype, FloatType, "bias", {
+        ret = impl::CSRRowWiseSamplingBiased<XPU, IdType, FloatType>(
+          mat, rows, num_samples, tag_offset, bias, replace);
     });
   });
   return ret;
@@ -750,6 +799,24 @@ COOMatrix COORowWiseSampling(
       ATEN_FLOAT_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
         ret = impl::COORowWiseSampling<XPU, IdType, FloatType>(
             mat, rows, num_samples, prob, replace);
+      });
+    }
+  });
+  return ret;
+}
+
+COOMatrix COORowWisePerEtypeSampling(
+    COOMatrix mat, IdArray rows, IdArray etypes,
+    int64_t num_samples, FloatArray prob, bool replace, bool etype_sorted) {
+  COOMatrix ret;
+  ATEN_COO_SWITCH(mat, XPU, IdType, "COORowWisePerEtypeSampling", {
+    if (IsNullArray(prob)) {
+      ret = impl::COORowWisePerEtypeSamplingUniform<XPU, IdType>(
+            mat, rows, etypes, num_samples, replace, etype_sorted);
+    } else {
+      ATEN_FLOAT_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
+        ret = impl::COORowWisePerEtypeSampling<XPU, IdType, FloatType>(
+            mat, rows, etypes, num_samples, prob, replace, etype_sorted);
       });
     }
   });

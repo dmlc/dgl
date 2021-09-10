@@ -8,8 +8,140 @@ from .. import ndarray as nd
 from .. import utils
 
 __all__ = [
+    'sample_etype_neighbors',
     'sample_neighbors',
+    'sample_neighbors_biased',
     'select_topk']
+
+def sample_etype_neighbors(g, nodes, etype_field, fanout, edge_dir='in', prob=None,
+                           replace=False, copy_ndata=True, copy_edata=True, etype_sorted=False,
+                           _dist_training=False):
+    """Sample neighboring edges of the given nodes and return the induced subgraph.
+
+    For each node, a number of inbound (or outbound when ``edge_dir == 'out'``) edges
+    will be randomly chosen.  The graph returned will then contain all the nodes in the
+    original graph, but only the sampled edges.
+
+    Node/edge features are not preserved. The original IDs of
+    the sampled edges are stored as the `dgl.EID` feature in the returned graph.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The graph.  Can only be in CPU. Should only have one node type and one edge type.
+    nodes : tensor or dict
+        Node IDs to sample neighbors from.
+
+        This argument can take a single ID tensor or a dictionary of node types and ID tensors.
+        If a single tensor is given, the graph must only have one type of nodes.
+    etype_field : string
+        The field in g.edata storing the edge type.
+    fanout : int
+        The number of edges to be sampled for each node on each edge type.
+
+        This argument can only take a single int. DGL will sample this number of edges for
+        each node for every edge type.
+
+        If -1 is given for a single edge type, all the neighboring edges with that edge
+        type will be selected.
+    edge_dir : str, optional
+        Determines whether to sample inbound or outbound edges.
+
+        Can take either ``in`` for inbound edges or ``out`` for outbound edges.
+    prob : str, optional
+        Feature name used as the (unnormalized) probabilities associated with each
+        neighboring edge of a node.  The feature must have only one element for each
+        edge.
+
+        The features must be non-negative floats, and the sum of the features of
+        inbound/outbound edges for every node must be positive (though they don't have
+        to sum up to one).  Otherwise, the result will be undefined.
+
+        If :attr:`prob` is not None, GPU sampling is not supported.
+    replace : bool, optional
+        If True, sample with replacement.
+    copy_ndata: bool, optional
+        If True, the node features of the new graph are copied from
+        the original graph. If False, the new graph will not have any
+        node features.
+
+        (Default: True)
+    copy_edata: bool, optional
+        If True, the edge features of the new graph are copied from
+        the original graph.  If False, the new graph will not have any
+        edge features.
+
+        (Default: True)
+    _dist_training : bool, optional
+        Internal argument.  Do not use.
+
+        (Default: False)
+    etype_sorted: bool, optional
+        A hint telling whether the etypes are already sorted.
+
+        (Default: False)
+
+    Returns
+    -------
+    DGLGraph
+        A sampled subgraph containing only the sampled neighboring edges, with the
+        same device as the input graph.
+
+    Notes
+    -----
+    If :attr:`copy_ndata` or :attr:`copy_edata` is True, same tensors are used as
+    the node or edge features of the original graph and the new graph.
+    As a result, users should avoid performing in-place operations
+    on the node features of the new graph to avoid feature corruption.
+    """
+    if g.device != F.cpu():
+        raise DGLError("The graph should be in cpu.")
+    if etype_field not in g.edata:
+        raise DGLError("The graph should have {} in the edge data" \
+                       "representing the edge type.".format(etype_field))
+    if isinstance(fanout, int) is False:
+        raise DGLError("The fanout should be an integer")
+    if isinstance(nodes, dict) is True:
+        assert len(nodes) == 1, "The input graph should not have node types"
+        nodes = list(nodes.values())[0]
+    nodes = F.to_dgl_nd(utils.prepare_tensor(g, nodes, 'nodes'))
+    # treat etypes as int32, it is much cheaper than int64
+    # TODO(xiangsx): int8 can be a better choice.
+    etypes = F.to_dgl_nd(F.astype(g.edata[etype_field], ty=F.int32))
+
+    if prob is None:
+        prob_array = nd.array([], ctx=nd.cpu())
+    elif isinstance(prob, nd.NDArray):
+        prob_array = prob
+    else:
+        if prob in g.edata:
+            prob_array = F.to_dgl_nd(g.edata[prob])
+        else:
+            prob_array = F.to_dgl_nd(F.tensor(prob, dtype=F.float32))
+
+    subgidx = _CAPI_DGLSampleNeighborsEType(g._graph, nodes, etypes, fanout,
+                                            edge_dir, prob_array, replace, etype_sorted)
+    induced_edges = subgidx.induced_edges
+    ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
+
+    # handle features
+    # (TODO) (BarclayII) DGL distributed fails with bus error, freezes, or other
+    # incomprehensible errors with lazy feature copy.
+    # So in distributed training context, we fall back to old behavior where we
+    # only set the edge IDs.
+    if not _dist_training:
+        if copy_ndata:
+            node_frames = utils.extract_node_subframes(g, None)
+            utils.set_new_frames(ret, node_frames=node_frames)
+
+        if copy_edata:
+            edge_frames = utils.extract_edge_subframes(g, induced_edges)
+            utils.set_new_frames(ret, edge_frames=edge_frames)
+    else:
+        for i, etype in enumerate(ret.canonical_etypes):
+            ret.edges[etype].data[EID] = induced_edges[i]
+
+    return ret
 
 def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
                      copy_ndata=True, copy_edata=True, _dist_training=False):
@@ -25,7 +157,7 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
     Parameters
     ----------
     g : DGLGraph
-        The graph.  Must be on CPU.
+        The graph.  Can be either on CPU or GPU.
     nodes : tensor or dict
         Node IDs to sample neighbors from.
 
@@ -52,6 +184,8 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
         The features must be non-negative floats, and the sum of the features of
         inbound/outbound edges for every node must be positive (though they don't have
         to sum up to one).  Otherwise, the result will be undefined.
+
+        If :attr:`prob` is not None, GPU sampling is not supported.
     replace : bool, optional
         If True, sample with replacement.
     copy_ndata: bool, optional
@@ -74,7 +208,8 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
     Returns
     -------
     DGLGraph
-        A sampled subgraph containing only the sampled neighboring edges.  It is on CPU.
+        A sampled subgraph containing only the sampled neighboring edges, with the
+        same device as the input graph.
 
     Notes
     -----
@@ -178,6 +313,175 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
             ret.edges[etype].data[EID] = induced_edges[i]
 
     return ret
+
+def sample_neighbors_biased(g, nodes, fanout, bias, edge_dir='in',
+                            tag_offset_name='_TAG_OFFSET', replace=False,
+                            copy_ndata=True, copy_edata=True):
+    r"""Sample neighboring edges of the given nodes and return the induced subgraph, where each
+    neighbor's probability to be picked is determined by its tag.
+
+    For each node, a number of inbound (or outbound when ``edge_dir == 'out'``) edges
+    will be randomly chosen.  The graph returned will then contain all the nodes in the
+    original graph, but only the sampled edges.
+
+    This version of neighbor sampling can support the scenario where adjacent nodes with different
+    types have different sampling probability. Each node is assigned an integer (called a *tag*)
+    which represents its type. Tag is an analogue of node type under the framework of homogeneous
+    graphs. Nodes with the same tag share the same probability.
+
+    For example, assume a node has :math:`N+M` neighbors, and :math:`N` of them
+    have tag 0 while :math:`M` of them have tag 1. Assume a node of tag 0 has
+    an unnormalized probability :math:`p` to be picked while a node of tag 1
+    has :math:`q`. This function first chooses a tag according to the
+    unnormalized probability distribution
+    :math:`\frac{P(tag=0)}{P(tag=1)}=\frac{Np}{Mq}`, and then run a uniform
+    sampling to get a node of the chosen tag.
+
+    In order to make sampling more efficient, the input graph must have its
+    CSC matrix (or CSR matrix if ``edge_dir='out'``) sorted according to the tag. The API
+    :func:`~dgl.sort_csc_by_tag` and
+    :func:`~dgl.sort_csr_by_tag` are designed for this purpose, which
+    will internally reorder the neighbors by tags so that neighbors of the same tags are
+    stored in a consecutive range. The two APIs will also store the offsets of these ranges
+    in a node feature with :attr:`tag_offset_name` as its name.
+
+    **Please make sure that the CSR (or CSC) matrix of the graph has been sorted before
+    calling this function.**  This function itself will not check whether the
+    input graph is sorted. Note that the input :attr:`tag_offset_name` should
+    be consistent with that in the sorting function.
+
+    Only homogeneous or bipartite graphs are supported. For bipartite graphs,
+    the tag offsets of the source nodes when ``edge_dir='in'`` (or the destination
+    nodes when ``edge_dir='out'``) will be used in sampling.
+
+    Node/edge features are not preserved. The original IDs of
+    the sampled edges are stored as the ``dgl.EID`` feature in the returned graph.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The graph. Must be homogeneous or bipartite (only one edge type). Must be on CPU.
+    nodes : tensor or list
+        Node IDs to sample neighbors from.
+    fanout : int
+        The number of edges to be sampled for each node on each edge type.
+
+        If -1 is given, all the neighboring edges will be selected.
+    bias : tensor or list
+        The (unnormalized) probabilities associated with each tag. Its length should be equal
+        to the number of tags.
+
+        Entries of this array must be non-negative floats, and the sum of the entries must be
+        positive (though they don't have to sum up to one). Otherwise, the result will be
+        undefined.
+    edge_dir : str, optional
+        Determines whether to sample inbound or outbound edges.
+
+        Can take either ``in`` for inbound edges or ``out`` for outbound edges.
+    tag_offset_name : str, optional
+        The name of the node feature storing tag offsets.
+
+        (Default: "_TAG_OFFSET")
+    replace : bool, optional
+        If True, sample with replacement.
+    copy_ndata: bool, optional
+        If True, the node features of the new graph are copied from
+        the original graph. If False, the new graph will not have any
+        node features.
+
+        (Default: True)
+    copy_edata: bool, optional
+        If True, the edge features of the new graph are copied from
+        the original graph.  If False, the new graph will not have any
+        edge features.
+
+        (Default: True)
+
+    Returns
+    -------
+    DGLGraph
+        A sampled subgraph containing only the sampled neighboring edges.  It is on CPU.
+
+    Notes
+    -----
+    If :attr:`copy_ndata` or :attr:`copy_edata` is True, same tensors are used as
+    the node or edge features of the original graph and the new graph.
+    As a result, users should avoid performing in-place operations
+    on the node features of the new graph to avoid feature corruption.
+
+    See Also
+    --------
+    dgl.sort_csc_by_tag
+    dgl.sort_csr_by_tag
+
+    Examples
+    --------
+    Assume that you have the following graph
+
+    >>> g = dgl.graph(([0, 0, 1, 1, 2, 2], [1, 2, 0, 1, 2, 0]))
+
+    And the tags
+
+    >>> tag = torch.IntTensor([0, 0, 1])
+
+    Sort the graph (necessary!)
+
+    >>> g_sorted = dgl.transform.sort_csr_by_tag(g, tag)
+    >>> g_sorted.ndata['_TAG_OFFSET']
+    tensor([[0, 1, 2],
+            [0, 2, 2],
+            [0, 1, 2]])
+
+    Set the probability of each tag:
+
+    >>> bias = torch.tensor([1.0, 0.001])
+    >>> # node 2 is almost impossible to be sampled because it has tag 1.
+
+    To sample one out bound edge for node 0 and node 2:
+
+    >>> sg = dgl.sampling.sample_neighbors_biased(g_sorted, [0, 2], 1, bias, edge_dir='out')
+    >>> sg.edges(order='eid')
+    (tensor([0, 2]), tensor([1, 0]))
+    >>> sg.edata[dgl.EID]
+    tensor([0, 5])
+
+    With ``fanout`` greater than the number of actual neighbors and without replacement,
+    DGL will take all neighbors instead:
+
+    >>> sg = dgl.sampling.sample_neighbors_biased(g_sorted, [0, 2], 3, bias, edge_dir='out')
+    >>> sg.edges(order='eid')
+    (tensor([0, 0, 2, 2]), tensor([1, 2, 0, 2]))
+    """
+    if isinstance(nodes, list):
+        nodes = F.tensor(nodes)
+    if isinstance(bias, list):
+        bias = F.tensor(bias)
+
+    nodes_array = F.to_dgl_nd(nodes)
+    bias_array = F.to_dgl_nd(bias)
+    if edge_dir == 'in':
+        tag_offset_array = F.to_dgl_nd(g.dstdata[tag_offset_name])
+    elif edge_dir == 'out':
+        tag_offset_array = F.to_dgl_nd(g.srcdata[tag_offset_name])
+    else:
+        raise DGLError("edge_dir can only be 'in' or 'out'")
+
+    subgidx = _CAPI_DGLSampleNeighborsBiased(g._graph, nodes_array, fanout, bias_array,
+                                             tag_offset_array, edge_dir, replace)
+    induced_edges = subgidx.induced_edges
+    ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
+
+    if copy_ndata:
+        node_frames = utils.extract_node_subframes(g, None)
+        utils.set_new_frames(ret, node_frames=node_frames)
+
+    if copy_edata:
+        edge_frames = utils.extract_edge_subframes(g, induced_edges)
+        utils.set_new_frames(ret, edge_frames=edge_frames)
+
+    ret.edata[EID] = induced_edges[0]
+    return ret
+
 
 def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False,
                 copy_ndata=True, copy_edata=True):
