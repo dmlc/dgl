@@ -146,6 +146,9 @@ bool Colorize(IdType * result_data, curandGenerator_t gen, int64_t num_nodes) {
 template <DLDeviceType XPU, typename FloatType, typename IdType>
 void WeightedNeighborMatching(const aten::CSRMatrix &csr, const NDArray weight, IdArray result) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  const auto& ctx = result->ctx;
+  auto device = runtime::DeviceAPI::Get(ctx);
+  device->SetDevice(ctx);
   if (!thr_entry->curand_gen) {
     uint64_t seed = dgl::RandomEngine::ThreadLocal()->RandInt(UINT64_MAX);
     CURAND_CALL(curandCreateGenerator(&thr_entry->curand_gen, CURAND_RNG_PSEUDO_DEFAULT));
@@ -154,7 +157,7 @@ void WeightedNeighborMatching(const aten::CSRMatrix &csr, const NDArray weight, 
 
   // create proposal tensor
   const int64_t num_nodes = result->shape[0];
-  IdArray proposal = aten::Full(-1, num_nodes, sizeof(IdType) * 8, result->ctx);
+  IdArray proposal = aten::Full(-1, num_nodes, sizeof(IdType) * 8, ctx);
 
   // get data ptrs
   IdType *indptr_data = static_cast<IdType*>(csr.indptr->data);
@@ -194,6 +197,9 @@ template void WeightedNeighborMatching<kDLGPU, double, int64_t>(
 template <DLDeviceType XPU, typename IdType>
 void NeighborMatching(const aten::CSRMatrix &csr, IdArray result) {
   const int64_t num_edges = csr.indices->shape[0];
+  const auto& ctx = result->ctx;
+  auto device = runtime::DeviceAPI::Get(ctx);
+  device->SetDevice(ctx);
 
   // generate random weights
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
@@ -203,7 +209,7 @@ void NeighborMatching(const aten::CSRMatrix &csr, IdArray result) {
     CURAND_CALL(curandSetPseudoRandomGeneratorSeed(thr_entry->curand_gen, seed));
   }
   NDArray weight = NDArray::Empty(
-    {num_edges}, DLDataType{kDLFloat, sizeof(float) * 8, 1}, result->ctx);
+    {num_edges}, DLDataType{kDLFloat, sizeof(float) * 8, 1}, ctx);
   float *weight_data = static_cast<float*>(weight->data);
   CURAND_CALL(curandGenerateUniform(thr_entry->curand_gen, weight_data, num_edges));
   cudaDeviceSynchronize();
