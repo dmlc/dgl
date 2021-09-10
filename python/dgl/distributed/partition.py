@@ -46,6 +46,8 @@ def _get_part_ranges(id_ranges):
 
 
 def _convert_str_to_tuple_key(part_d):
+    """Parse back the string key to tuple,
+     as a reverse function of _convert_tuple_key_to_str"""
     copy_d = copy.deepcopy(part_d)
     # Iterate over d, modify on copy_d
 
@@ -69,6 +71,10 @@ def _convert_str_to_tuple_key(part_d):
 
 
 def _convert_tuple_key_to_str(part_d):
+    """Json cannot take tuple as key. This function convert tuple to string,
+     and append tuple as prefix. For example ('_N', '_E', '_N') will be
+     turned into "tuple('_N', '_E', '_N')" in json file as key
+    """
     copy_d = copy.deepcopy(part_d)
     # Iterate over d, modify on copy_d
 

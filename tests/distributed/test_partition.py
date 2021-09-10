@@ -350,16 +350,16 @@ def check_partition(g, part_method, reshuffle, num_parts=4, num_trainers_per_mac
             ndata = F.gather_row(node_feats['_N/' + name], local_nid)
             assert np.all(F.asnumpy(true_feats) == F.asnumpy(ndata))
         for name in ['feats']:
-            assert '_E/' + name in edge_feats
-            assert edge_feats['_E/' + name].shape[0] == len(local_edges)
+            assert "('_N', '_E', '_N')/" + name in edge_feats
+            assert edge_feats["('_N', '_E', '_N')/" + name].shape[0] == len(local_edges)
             true_feats = F.gather_row(g.edata[name], local_edges)
-            edata = F.gather_row(edge_feats['_E/' + name], local_eid)
+            edata = F.gather_row(edge_feats["('_N', '_E', '_N')/" + name], local_eid)
             assert np.all(F.asnumpy(true_feats) == F.asnumpy(edata))
 
         # This only works if node/edge IDs are shuffled.
         if reshuffle:
             shuffled_labels.append(node_feats['_N/labels'])
-            shuffled_edata.append(edge_feats['_E/feats'])
+            shuffled_edata.append(edge_feats["('_N', '_E', '_N')/feats"])
 
     # Verify that we can reconstruct node/edge data for original IDs.
     if reshuffle:
@@ -415,4 +415,4 @@ def test_hetero_partition():
 if __name__ == '__main__':
     os.makedirs('/tmp/partition', exist_ok=True)
     test_partition()
-    test_hetero_partition()
+    # test_hetero_partition()
