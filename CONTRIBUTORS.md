@@ -22,9 +22,11 @@ Contributors
 * [Qipeng Guo](https://github.com/QipengGuo) from AWS
 * [Xiangkun Hu](https://github.com/HuXiangkun) from AWS
 * [Ying Rui](https://github.com/Rhett-Ying) from AWS
+* [Israt Nisa](https://github.com/isratnisa) from AWS
 * [Zheng Zhang](https://github.com/zzhang-cn) from AWS
 * [Zihao Ye](https://github.com/yzh119) from University of Washington
 * [Chao Ma](https://github.com/aksnzhy)
+* [Qidong](https://github.com/soodoshll)
 * [Lingfan Yu](https://github.com/lingfanyu) from New York University
 * [Yu Gai](https://github.com/GaiYu0) from University of California, Berkeyley
 * [Qi Huang]() from New York University
