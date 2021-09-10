@@ -519,7 +519,7 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
              const std::vector<NDArray>& out_aux,
              const std::vector<dgl_type_t>& ufeat_ntids,  // ufeat node type id
              const std::vector<dgl_type_t>& out_ntids) {  // output node type id
-  bool is_scalar_efeat = vec_efeat.size() != 0;
+  bool is_scalar_efeat = vec_efeat[0].NumElements() == vec_csr[0].indices->shape[0];
   bool use_efeat = op != "copy_lhs";
   // TODO(Israt): Resolve PR-https://github.com/dmlc/dgl/issues/2995 and use multistream
   auto device = runtime::DeviceAPI::Get(vec_csr[0].indptr->ctx);
@@ -589,8 +589,7 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
             cusparse_available<bits, IdType>(more_nnz)) {  // cusparse
           NDArray efeat = vec_efeat[etype];
           if (!IsNullArray(csr.data))
-            efeat = _IndexSelect<DType, IdType>(vec_efeat[etype], csr.data);
-
+            efeat = _IndexSelect<DType, IdType>(efeat, csr.data);
           cusparse::CusparseCsrmm2Hetero<DType, IdType>(
               csr.indptr->ctx, csr,
               static_cast<DType*>(vec_ufeat[src_id]->data),
