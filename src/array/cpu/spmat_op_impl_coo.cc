@@ -622,7 +622,10 @@ CSRMatrix COOToCSR(COOMatrix coo) {
     const int64_t num_threads = omp_get_num_threads();
     const int64_t num_nodes = coo.num_rows;
     const int64_t num_edges = coo.row->shape[0];
-    if (num_threads * num_nodes > 2 * num_edges) {
+    // Besides graph density, num_threads is also taken into account. Below
+    // criteria is set-up according to the time/space complexity difference
+    // between these 2 algorithms.
+    if (num_threads * num_nodes > 4 * num_edges) {
       return UnSortedSparseCOOToCSR<IdType>(coo);
     }
     return UnSortedDenseCOOToCSR<IdType>(coo);

@@ -143,6 +143,11 @@ struct SparseCOOCSR {
   }
 };
 
+bool isSparseCOO(const int64_t &num_threads, const int64_t &num_nodes,
+                 const int64_t &num_edges) {
+  // refer to COOToCSR<>() in ~dgl/src/array/cpu/spmat_op_impl_coo for details.
+  return num_threads * num_nodes > 4 * num_edges;
+}
 }  // namespace
 
 template <typename IDX>
@@ -151,7 +156,8 @@ void _TestCOOToCSR(DLContext ctx) {
   auto csr = CSR1<IDX>(ctx);
   auto tcsr = aten::COOToCSR(coo);
   ASSERT_FALSE(coo.row_sorted);
-  ASSERT_FALSE(omp_get_num_threads() * coo.num_rows > 2 * coo.row->shape[0]);
+  ASSERT_FALSE(
+      isSparseCOO(omp_get_num_threads(), coo.num_rows, coo.row->shape[0]));
   ASSERT_EQ(csr.num_rows, tcsr.num_rows);
   ASSERT_EQ(csr.num_cols, tcsr.num_cols);
   ASSERT_TRUE(ArrayEQ<IDX>(csr.indptr, tcsr.indptr));
@@ -213,7 +219,8 @@ void _TestCOOToCSR(DLContext ctx) {
   csr = SparseCOOCSR::CSRSparse<IDX>(ctx);
   tcsr = aten::COOToCSR(coo);
   ASSERT_FALSE(coo.row_sorted);
-  ASSERT_TRUE(omp_get_num_threads() * coo.num_rows > 2 * coo.row->shape[0]);
+  ASSERT_TRUE(
+      isSparseCOO(omp_get_num_threads(), coo.num_rows, coo.row->shape[0]));
   ASSERT_EQ(csr.num_rows, tcsr.num_rows);
   ASSERT_EQ(csr.num_cols, tcsr.num_cols);
   ASSERT_TRUE(ArrayEQ<IDX>(csr.indptr, tcsr.indptr));
