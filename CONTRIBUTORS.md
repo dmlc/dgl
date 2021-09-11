@@ -41,6 +41,7 @@ Contributors
 * [Kay Liu](https://github.com/kayzliu) from UIC
 * [Tianqi Zhang](https://github.com/lygztq) from SJTU
 * [Hengrui Zhang](https://github.com/hengruizhang98)
+* [Seung Won Min](https://github.com/davidmin7) from UIUC
 * [@hbsun2113](https://github.com/hbsun2113): GraphSAGE in PyTorch
 * [Tianyi Zhang](https://github.com/Tiiiger): SGC in PyTorch
 * [Jun Chen](https://github.com/kitaev-chen): GIN in PyTorch
