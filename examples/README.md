@@ -17,6 +17,10 @@ To quickly locate the examples of your interest, search for the tagged keywords 
 - <a name="correct_and_smooth"></a> Huang et al. Combining Label Propagation and Simple Models Out-performs Graph Neural Networks. [Paper link](https://arxiv.org/abs/2010.13993). 
     - Example code: [PyTorch](../examples/pytorch/correct_and_smooth)
     - Tags: efficiency, node classification, label propagation
+- <a name="point_transformer"></a> Zhao et al. Point Transformer. [Paper link](http://arxiv.org/abs/2012.09164).
+    - Example code: [PyTorch](../examples/pytorch/pointcloud/point_transformer)
+    - Tags: point cloud classification, point cloud part-segmentation
+
 
 ## 2020
 - <a name="eeg-gcnn"></a> Wagh et al. EEG-GCNN: Augmenting Electroencephalogram-based Neurological Disease Diagnosis using a Domain-guided Graph Convolutional Neural Network. [Paper link](http://proceedings.mlr.press/v136/wagh20a.html). 
