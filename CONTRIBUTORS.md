@@ -18,7 +18,7 @@ Contributors
 * [Xiang Song](https://github.com/classicsong) from AWS
 * [Tianjun Xiao](https://github.com/sneakerkg) from AWS
 * [Tong He](https://github.com/hetong007) from AWS
-* [Jian Zhang]() from AWS
+* [Jian Zhang](https://github.com/zhjwy9343) from AWS
 * [Qipeng Guo](https://github.com/QipengGuo) from AWS
 * [Xiangkun Hu](https://github.com/HuXiangkun) from AWS
 * [Ying Rui](https://github.com/Rhett-Ying) from AWS
@@ -42,7 +42,6 @@ Contributors
 * [Tianqi Zhang](https://github.com/lygztq) from SJTU
 * [Hengrui Zhang](https://github.com/hengruizhang98)
 * [@hbsun2113](https://github.com/hbsun2113): GraphSAGE in PyTorch
-* [@zhjwy9343](https://github.com/zhjwy9343)
 * [Tianyi Zhang](https://github.com/Tiiiger): SGC in PyTorch
 * [Jun Chen](https://github.com/kitaev-chen): GIN in PyTorch
 * [Aymen Waheb](https://github.com/aymenwah): APPNP in PyTorch
@@ -56,4 +55,4 @@ Contributors
 * [@giuseppefutia](https://github.com/giuseppefutia)
 * [@mori97](https://github.com/mori97)
 * [@xnuohz](https://github.com/xnuohz)
-* Hao Jin
+* [Hao Jin](https://github.com/haojin2) from Amazon
