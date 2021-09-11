@@ -74,6 +74,10 @@ def gsddmm(g, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
         return gsddmm_internal(
             g._graph, op, lhs_data, rhs_data, lhs_target, rhs_target)
     else:
+        if op == 'copy_lhs':
+            rhs_data = [None] * g._graph.number_of_etypes()
+        elif op == 'copy_rhs':
+            lhs_data = [None] * g._graph.number_of_ntypes()
         # TODO (Israt): Call reshape_lhs_rhs() on lhs and rhs data to match their dimension
         # and avoid broadcasting issue. Handle the case where different nodes have
         # different dimensions, and different etypes may need different broadcasting
