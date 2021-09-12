@@ -51,7 +51,7 @@ class SparseGradOptimizer(abc.ABC):
                     'MultiGPU world_size for each embedding should be same.'
         assert not self._rank is None
         assert not self._world_size is None
-        self._nccl_root_id = 'nccl_root_id''
+        self._nccl_root_id = 'SparseGradOptimizer.nccl_root_id''
 
     def step(self):
         ''' The step function.
