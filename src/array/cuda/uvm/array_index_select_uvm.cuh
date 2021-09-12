@@ -13,6 +13,10 @@ namespace dgl {
 namespace aten {
 namespace impl {
 
+/*  This is a cross-device access version of IndexSelectMultiKernel.
+*   Since the memory access over PCIe is more sensitive to the
+*   data access aligment (cacheline), we need a separate version here.
+*/
 template <typename DType, typename IdType>
 __global__ void IndexSelectMultiKernelAligned(
         const DType* const array,
