@@ -25,6 +25,18 @@ def test_fps():
     assert res.sum() > 0
 
 
+def test_fps_start_idx():
+    N = 1000
+    batch_size = 5
+    sample_points = 10
+    x = th.tensor(np.random.uniform(size=(batch_size, int(N/batch_size), 3)))
+    ctx = F.ctx()
+    if F.gpu_ctx():
+        x = x.to(ctx)
+    res = farthest_point_sampler(x, sample_points, start_idx=0)
+    assert th.any(res[:, 0] == 0)
+
+
 @pytest.mark.parametrize('algorithm', ['bruteforce-blas', 'bruteforce', 'kd-tree'])
 @pytest.mark.parametrize('dist', ['euclidean', 'cosine'])
 def test_knn_cpu(algorithm, dist):
@@ -208,4 +220,5 @@ def test_edge_coarsening(idtype, g, weight, relabel):
 
 if __name__ == '__main__':
     test_fps()
+    test_fps_start_idx()
     test_knn()
