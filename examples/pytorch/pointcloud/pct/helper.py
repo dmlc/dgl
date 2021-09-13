@@ -139,13 +139,13 @@ class KNNConv(nn.Module):
         return {'new_feat': h}
 
 
-class GraphOp(nn.Module):
+class TransitionDown(nn.Module):
     """
     The Transition Down Module
     """
 
     def __init__(self, in_channels, out_channels, n_neighbor=64):
-        super(GraphOp, self).__init__()
+        super(TransitionDown, self).__init__()
         self.frnn_graph = KNNGraphBuilder(n_neighbor)
         self.message = KNNMessage(n_neighbor)
         self.conv = KNNConv([in_channels, out_channels, out_channels])

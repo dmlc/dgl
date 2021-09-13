@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 
-from helper import GraphOp
+from helper import TransitionDown
 
 '''
 Part of the code are adapted from
@@ -98,8 +98,8 @@ class PointTransformerCLS(nn.Module):
         self.conv2 = nn.Conv1d(64, 64, kernel_size=1, bias=False)
         self.bn1 = nn.BatchNorm1d(64)
         self.bn2 = nn.BatchNorm1d(64)
-        self.g_op0 = GraphOp(in_channels=128, out_channels=128, n_neighbor=32)
-        self.g_op1 = GraphOp(in_channels=256, out_channels=256, n_neighbor=32)
+        self.g_op0 = TransitionDown(in_channels=128, out_channels=128, n_neighbor=32)
+        self.g_op1 = TransitionDown(in_channels=256, out_channels=256, n_neighbor=32)
 
         self.pt_last = PCTPositionEmbedding()
 

@@ -10,7 +10,9 @@ This is a reproduction of the paper: [PCT: Point cloud transformer](http://arxiv
 | Part Segmentation        | ShapeNet   | mIoU     | 86.4            | 85.6       | 390.0         |
 
 + Time(s) are the average training time per epoch, measured on EC2 g4dn.12xlarge instance w/ Tesla T4 GPU.
-+ We run the code with the preprocessing used in [PointNet++](../pointnet).
++ We run the code with the preprocessing used in [PointNet++](../pointnet). We can only get 84.5 for classification if we use the preprocessing described in the paper:
+    > During training, a random translation in [−0.2, 0.2], a random anisotropic scaling in [0.67, 1.5] and a random input dropout were applied to augment the input data.
+
 
 # How to Run
 
