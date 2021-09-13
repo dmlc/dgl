@@ -172,4 +172,4 @@ namespace dmlc {
 DMLC_DECLARE_TRAITS(has_saveload, dgl::rpc::RPCMessage, true);
 }  // namespace dmlc
 
-#endif // DGL_RPC_RPC_H_
+#endif  // DGL_RPC_RPC_H_

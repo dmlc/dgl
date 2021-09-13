@@ -1,7 +1,14 @@
+/*!
+ *  Copyright (c) 2020 by Contributors
+ * \file rpc/rpc_msg.h
+ * \brief Common headers for remote process call (RPC).
+ */
 #ifndef DGL_RPC_RPC_MSG_H_
 #define DGL_RPC_RPC_MSG_H_
 
 #include <dgl/runtime/object.h>
+#include <string> 
+#include <vector> 
 
 namespace dgl {
 namespace rpc {
@@ -57,4 +64,4 @@ DGL_DEFINE_OBJECT_REF(RPCMessageRef, RPCMessage);
 
 }  // namespace rpc
 }  // namespace dgl
-#endif // DGL_RPC_RPC_MSG_H_
+#endif  // DGL_RPC_RPC_MSG_H_
