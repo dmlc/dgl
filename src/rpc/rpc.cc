@@ -435,7 +435,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
       CHECK_GE(data_size, local_ids[i] * row_size + row_size);
       CHECK_GE(local_ids[i], 0);
       memcpy(return_data + local_ids_orginal[i] * row_size,
-              local_data_char + local_ids[i] * row_size, row_size);
+             local_data_char + local_ids[i] * row_size, row_size);
     }
   });
   // Recv remote message
