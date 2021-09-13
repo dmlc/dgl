@@ -83,10 +83,10 @@ struct RPCContext {
    */
   std::shared_ptr<TPReceiver> receiver;
 
+  /*!
+   * \brief Tensorpipe global context
+   */
   std::shared_ptr<tensorpipe::Context> ctx;
-  // std::shared_ptr<te>
-
-  // std::shared_ptr<std::shared_ptr<RPCMessage>>;
 
   /*!
    * \brief Server state data.
