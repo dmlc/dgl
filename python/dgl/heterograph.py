@@ -4410,9 +4410,17 @@ class DGLHeteroGraph(object):
         """
         if inplace:
             raise DGLError('The `inplace` option is removed in v0.5.')
-        etid = self.get_etype_id(etype)
-        etype = self.canonical_etypes[etid]
-        g = self if etype is None else self[etype]
+        # Graph with one relation type
+        if self._graph.number_of_etypes() == 1 or etype is not None:
+            etid = self.get_etype_id(etype)
+            etype = self.canonical_etypes[etid]
+            g = self if etype is None else self[etype]
+        else:   # heterogeneous graph with number of relation types > 1
+            if not core.is_builtin(func):
+                raise DGLError("User defined functions are not yet "
+                               "supported in apply_edges for heterogeneous graphs. "
+                               "Please use (apply_edges(func), etype = rel) instead.")
+            g = self
         if is_all(edges):
             eid = ALL
         else:
@@ -4423,7 +4431,18 @@ class DGLHeteroGraph(object):
             edata = core.invoke_gsddmm(g, func)
         else:
             edata = core.invoke_edge_udf(g, eid, etype, func)
-        self._set_e_repr(etid, eid, edata)
+
+        if self._graph.number_of_etypes() == 1 or etype is not None:
+            self._set_e_repr(etid, eid, edata)
+        else:
+            edata_tensor = {}
+            key = list(edata.keys())[0]
+            out_tensor_tuples = edata[key]
+            for etid in range(self._graph.number_of_etypes()):
+                # TODO (Israt): Check the logic why some output tensor is None
+                if out_tensor_tuples[etid] is not None:
+                    edata_tensor[key] = out_tensor_tuples[etid]
+                    self._set_e_repr(etid, eid, edata_tensor)
 
     def send_and_recv(self,
                       edges,
