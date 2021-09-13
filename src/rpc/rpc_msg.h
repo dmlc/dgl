@@ -7,8 +7,9 @@
 #define DGL_RPC_RPC_MSG_H_
 
 #include <dgl/runtime/object.h>
-#include <string> 
-#include <vector> 
+
+#include <string>
+#include <vector>
 
 namespace dgl {
 namespace rpc {
