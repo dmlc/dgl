@@ -29,7 +29,6 @@ namespace rpc {
 
 using namespace tensorpipe;
 
-std::once_flag RPCContext::singleton_flag;
 RPCContext* RPCContext::singletonInstance;
 
 RPCStatus SendRPCMessage(const RPCMessage& msg, const int32_t target_id) {

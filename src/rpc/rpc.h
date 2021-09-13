@@ -103,7 +103,12 @@ struct RPCContext {
 
   /*! \brief Get the RPC context singleton */
   static RPCContext* getInstance() {
-    std::call_once(singleton_flag, &RPCContext::initRpcSingleton);
+    /*! This is accessiable by multiple thread but not thread-safe.
+        However DGL will initialize the context at main thread first,
+        so no concurrency should happen here */
+    if (!singletonInstance) {
+      singletonInstance = new RPCContext;
+    }
     return singletonInstance;
   }
 
@@ -122,12 +127,7 @@ struct RPCContext {
   }
 
  private:
-  /*! \brief once flag for initialization */
-  static std::once_flag singleton_flag;
-
   static RPCContext* singletonInstance;
-
-  static void initRpcSingleton() { singletonInstance = new RPCContext(); }
 };
 
 /*! \brief RPC status flag */
