@@ -29,22 +29,25 @@ namespace rpc {
 
 using namespace tensorpipe;
 
+std::once_flag RPCContext::singleton_flag;
+RPCContext* RPCContext::singletonInstance;
+
 RPCStatus SendRPCMessage(const RPCMessage& msg, const int32_t target_id) {
-  RPCContext::ThreadLocal()->sender->Send(msg, target_id);
+  RPCContext::getInstance()->sender->Send(msg, target_id);
   return kRPCSuccess;
 }
 
 RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout) {
   // ignore timeout now
   CHECK_EQ(timeout, 0) << "rpc cannot support timeout now.";
-  RPCContext::ThreadLocal()->receiver->Recv(msg);
+  RPCContext::getInstance()->receiver->Recv(msg);
   return kRPCSuccess;
 }
 
 void InitGlobalTpContext() {
-  if (!RPCContext::ThreadLocal()->ctx) {
-    RPCContext::ThreadLocal()->ctx = std::make_shared<tensorpipe::Context>();
-    auto context = RPCContext::ThreadLocal()->ctx;
+  if (!RPCContext::getInstance()->ctx) {
+    RPCContext::getInstance()->ctx = std::make_shared<tensorpipe::Context>();
+    auto context = RPCContext::getInstance()->ctx;
     auto transportContext = tensorpipe::transport::uv::create();
     context->registerTransport(0, "tcp", transportContext);
     auto basicChannel = tensorpipe::channel::basic::create();
@@ -70,8 +73,8 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateSender")
   int64_t msg_queue_size = args[0];
   std::string type = args[1];
   InitGlobalTpContext();
-  RPCContext::ThreadLocal()->sender =
-    std::make_shared<TPSender>(RPCContext::ThreadLocal()->ctx);
+  RPCContext::getInstance()->sender =
+    std::make_shared<TPSender>(RPCContext::getInstance()->ctx);
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateReceiver")
@@ -79,18 +82,18 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateReceiver")
   int64_t msg_queue_size = args[0];
   std::string type = args[1];
   InitGlobalTpContext();
-  RPCContext::ThreadLocal()->receiver =
-    std::make_shared<TPReceiver>(RPCContext::ThreadLocal()->ctx);
+  RPCContext::getInstance()->receiver =
+    std::make_shared<TPReceiver>(RPCContext::getInstance()->ctx);
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFinalizeSender")
 .set_body([](DGLArgs args, DGLRetValue* rv) {
-  RPCContext::ThreadLocal()->sender->Finalize();
+  RPCContext::getInstance()->sender->Finalize();
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFinalizeReceiver")
 .set_body([](DGLArgs args, DGLRetValue* rv) {
-  RPCContext::ThreadLocal()->receiver->Finalize();
+  RPCContext::getInstance()->receiver->Finalize();
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCReceiverWait")
@@ -100,7 +103,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCReceiverWait")
   int num_sender = args[2];
   std::string addr;
   addr = StringPrintf("tcp://%s:%d", ip.c_str(), port);
-  if (RPCContext::ThreadLocal()->receiver->Wait(addr, num_sender) == false) {
+  if (RPCContext::getInstance()->receiver->Wait(addr, num_sender) == false) {
     LOG(FATAL) << "Wait sender socket failed.";
   }
 });
@@ -112,12 +115,12 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCAddReceiver")
   int recv_id = args[2];
   std::string addr;
   addr = StringPrintf("tcp://%s:%d", ip.c_str(), port);
-  RPCContext::ThreadLocal()->sender->AddReceiver(addr, recv_id);
+  RPCContext::getInstance()->sender->AddReceiver(addr, recv_id);
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSenderConnect")
 .set_body([](DGLArgs args, DGLRetValue* rv) {
-  if (RPCContext::ThreadLocal()->sender->Connect() == false) {
+  if (RPCContext::getInstance()->sender->Connect() == false) {
     LOG(FATAL) << "Sender connection failed.";
   }
 });
@@ -125,94 +128,94 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSenderConnect")
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSetRank")
 .set_body([](DGLArgs args, DGLRetValue* rv) {
   const int32_t rank = args[0];
-  RPCContext::ThreadLocal()->rank = rank;
+  RPCContext::getInstance()->rank = rank;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetRank")
 .set_body([](DGLArgs args, DGLRetValue* rv) {
-  *rv = RPCContext::ThreadLocal()->rank;
+  *rv = RPCContext::getInstance()->rank;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSetNumServer")
 .set_body([](DGLArgs args, DGLRetValue* rv) {
   const int32_t num_servers = args[0];
-  *rv = RPCContext::ThreadLocal()->num_servers = num_servers;
+  *rv = RPCContext::getInstance()->num_servers = num_servers;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetNumServer")
 .set_body([](DGLArgs args, DGLRetValue* rv) {
-  *rv = RPCContext::ThreadLocal()->num_servers;
+  *rv = RPCContext::getInstance()->num_servers;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSetNumClient")
 .set_body([](DGLArgs args, DGLRetValue* rv) {
   const int32_t num_clients = args[0];
-  *rv = RPCContext::ThreadLocal()->num_clients = num_clients;
+  *rv = RPCContext::getInstance()->num_clients = num_clients;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetNumClient")
 .set_body([](DGLArgs args, DGLRetValue* rv) {
-  *rv = RPCContext::ThreadLocal()->num_clients;
+  *rv = RPCContext::getInstance()->num_clients;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSetNumServerPerMachine")
 .set_body([](DGLArgs args, DGLRetValue* rv) {
   const int32_t num_servers = args[0];
-  *rv = RPCContext::ThreadLocal()->num_servers_per_machine = num_servers;
+  *rv = RPCContext::getInstance()->num_servers_per_machine = num_servers;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetNumServerPerMachine")
 .set_body([](DGLArgs args, DGLRetValue* rv) {
-  *rv = RPCContext::ThreadLocal()->num_servers_per_machine;
+  *rv = RPCContext::getInstance()->num_servers_per_machine;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCIncrMsgSeq")
 .set_body([](DGLArgs args, DGLRetValue* rv) {
-  *rv = (RPCContext::ThreadLocal()->msg_seq)++;
+  *rv = (RPCContext::getInstance()->msg_seq)++;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetMsgSeq")
 .set_body([](DGLArgs args, DGLRetValue* rv) {
-  *rv = RPCContext::ThreadLocal()->msg_seq;
+  *rv = RPCContext::getInstance()->msg_seq;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSetMsgSeq")
 .set_body([](DGLArgs args, DGLRetValue* rv) {
   const int64_t msg_seq = args[0];
-  RPCContext::ThreadLocal()->msg_seq = msg_seq;
+  RPCContext::getInstance()->msg_seq = msg_seq;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetBarrierCount")
 .set_body([](DGLArgs args, DGLRetValue* rv) {
-  *rv = RPCContext::ThreadLocal()->barrier_count;
+  *rv = RPCContext::getInstance()->barrier_count;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSetBarrierCount")
 .set_body([](DGLArgs args, DGLRetValue* rv) {
   const int32_t count = args[0];
-  RPCContext::ThreadLocal()->barrier_count = count;
+  RPCContext::getInstance()->barrier_count = count;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetMachineID")
 .set_body([](DGLArgs args, DGLRetValue* rv) {
-  *rv = RPCContext::ThreadLocal()->machine_id;
+  *rv = RPCContext::getInstance()->machine_id;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSetMachineID")
 .set_body([](DGLArgs args, DGLRetValue* rv) {
   const int32_t machine_id = args[0];
-  RPCContext::ThreadLocal()->machine_id = machine_id;
+  RPCContext::getInstance()->machine_id = machine_id;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetNumMachines")
 .set_body([](DGLArgs args, DGLRetValue* rv) {
-  *rv = RPCContext::ThreadLocal()->num_machines;
+  *rv = RPCContext::getInstance()->num_machines;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSetNumMachines")
 .set_body([](DGLArgs args, DGLRetValue* rv) {
   const int32_t num_machines = args[0];
-  RPCContext::ThreadLocal()->num_machines = num_machines;
+  RPCContext::getInstance()->num_machines = num_machines;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSendRPCMessage")
@@ -319,9 +322,9 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCHandleSignal")
 
 DGL_REGISTER_GLOBAL("distributed.server_state._CAPI_DGLRPCGetServerState")
 .set_body([](DGLArgs args, DGLRetValue* rv) {
-  auto st = RPCContext::ThreadLocal()->server_state;
+  auto st = RPCContext::getInstance()->server_state;
   if (st.get() == nullptr) {
-    RPCContext::ThreadLocal()->server_state = std::make_shared<ServerState>();
+    RPCContext::getInstance()->server_state = std::make_shared<ServerState>();
   }
   *rv = st;
 });

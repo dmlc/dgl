@@ -15,6 +15,8 @@
 #include <deque>
 #include <vector>
 #include <string>
+#include <mutex>
+
 #include "./rpc_msg.h"
 #include "./tensorpipe/tp_communicator.h"
 #include "./network/common.h"
@@ -22,6 +24,8 @@
 
 namespace dgl {
 namespace rpc {
+
+struct RPCContext;
 
 // Communicator handler type
 typedef void* CommunicatorHandle;
@@ -31,8 +35,8 @@ struct RPCContext {
   /*!
    * \brief Rank of this process.
    *
-   * If the process is a client, this is equal to client ID. Otherwise, the process
-   * is a server and this is equal to server ID.
+   * If the process is a client, this is equal to client ID. Otherwise, the
+   * process is a server and this is equal to server ID.
    */
   int32_t rank = -1;
 
@@ -97,14 +101,15 @@ struct RPCContext {
    */
   std::shared_ptr<ServerState> server_state;
 
-  /*! \brief Get the thread-local RPC context structure */
-  static RPCContext *ThreadLocal() {
-    return dmlc::ThreadLocalStore<RPCContext>::Get();
+  /*! \brief Get the RPC context singleton */
+  static RPCContext* getInstance() {
+    std::call_once(singleton_flag, &RPCContext::initRpcSingleton);
+    return singletonInstance;
   }
 
   /*! \brief Reset the RPC context */
   static void Reset() {
-    auto* t = ThreadLocal();
+    auto* t = getInstance();
     t->rank = -1;
     t->machine_id = -1;
     t->num_machines = 0;
@@ -115,8 +120,15 @@ struct RPCContext {
     t->receiver.reset();
     t->ctx.reset();
   }
-};
 
+ private:
+  /*! \brief once flag for initialization */
+  static std::once_flag singleton_flag;
+
+  static RPCContext* singletonInstance;
+
+  static void initRpcSingleton() { singletonInstance = new RPCContext(); }
+};
 
 /*! \brief RPC status flag */
 enum RPCStatus {
