@@ -25,7 +25,7 @@ void TPSender::AddReceiver(const std::string& addr, int recv_id) {
 }
 
 bool TPSender::Connect() {
-  for (auto kv : receiver_addrs_) {
+  for (const auto& kv : receiver_addrs_) {
     std::shared_ptr<Pipe> pipe;
     for (;;) {
       pipe = context->connect(kv.second);
@@ -51,7 +51,7 @@ bool TPSender::Connect() {
   return true;
 }
 
-void TPSender::Send(RPCMessage msg, int recv_id) {
+void TPSender::Send(const RPCMessage& msg, int recv_id) {
   auto pipe = pipes_[recv_id];
   tensorpipe::Message tp_msg;
   std::string* zerocopy_blob_ptr = &tp_msg.metadata;

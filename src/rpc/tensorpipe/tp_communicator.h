@@ -62,7 +62,7 @@ class TPSender {
    * \brief Send RPCMessage to specified Receiver.
    * \param msg data message \param recv_id receiver's ID
    */
-  void Send(RPCMessage msg, int recv_id);
+  void Send(const RPCMessage& msg, int recv_id);
 
   /*!
    * \brief Finalize TPSender
