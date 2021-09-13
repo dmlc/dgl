@@ -457,10 +457,11 @@ void SpMMRedopCsrOpt(
   const int total_nnz = indptr[M];
   if (M <= 0 || K <= 0 || N <= 0 || total_nnz <= 0) return;
 
-  const float avg_degree = total_nnz * 1.0 / M;
-  const float nnz_prob = avg_degree / K;
+  const double avg_degree = total_nnz * 1.0 / M;
+  const double nnz_prob = avg_degree / K;
 
-  IdType K_block_size = llc_size / (N * sizeof(DType) * nnz_prob * BLOCKING_HEURISTIC_PARAM);
+  IdType K_block_size = std::min((int64_t)K, (int64_t)(llc_size / (N * sizeof(DType) *
+                                                       nnz_prob * BLOCKING_HEURISTIC_PARAM)));
   IdType M_block_size = M / (nthreads * NUM_BLOCKS_PER_THREAD);
   if (M_block_size == 0) M_block_size = 1;
   if (K_block_size == 0) K_block_size = 1;
