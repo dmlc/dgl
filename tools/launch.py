@@ -271,6 +271,7 @@ def construct_dgl_server_env_vars(
     ip_config: str,
     num_servers: int,
     graph_format: str,
+    pythonpath: Optional[str] = "",
 ) -> str:
     """Constructs the DGL server-specific env vars string that are required for DGL code to behave in the correct
     server role.
@@ -286,6 +287,7 @@ def construct_dgl_server_env_vars(
             Relative path to workspace.
         num_servers:
         graph_format:
+        pythonpath: Optional. If given, this will pass this as PYTHONPATH.
 
     Returns:
         server_env_vars: The server-specific env-vars in a string format, friendly for CLI execution.
@@ -300,7 +302,11 @@ def construct_dgl_server_env_vars(
         "DGL_IP_CONFIG={DGL_IP_CONFIG} "
         "DGL_NUM_SERVER={DGL_NUM_SERVER} "
         "DGL_GRAPH_FORMAT={DGL_GRAPH_FORMAT} "
+        "{suffix_optional_envvars}"
     )
+    suffix_optional_envvars = ""
+    if pythonpath:
+        suffix_optional_envvars += f"PYTHONPATH={pythonpath} "
     return server_env_vars_template.format(
         DGL_ROLE="server",
         DGL_NUM_SAMPLER=num_samplers,
@@ -310,6 +316,7 @@ def construct_dgl_server_env_vars(
         DGL_IP_CONFIG=ip_config,
         DGL_NUM_SERVER=num_servers,
         DGL_GRAPH_FORMAT=graph_format,
+        suffix_optional_envvars=suffix_optional_envvars,
     )
 
 
@@ -440,7 +447,9 @@ def submit_jobs(args, udf_command):
         ip_config=args.ip_config,
         num_servers=args.num_servers,
         graph_format=args.graph_format,
+        pythonpath=os.environ.get("PYTHONPATH", ""),
     )
+    print(server_env_vars)
     for i in range(len(hosts) * server_count_per_machine):
         ip, _ = hosts[int(i / server_count_per_machine)]
         server_env_vars_cur = f"{server_env_vars} DGL_SERVER_ID={i}"
@@ -459,6 +468,7 @@ def submit_jobs(args, udf_command):
         num_omp_threads=os.environ.get("OMP_NUM_THREADS", str(args.num_omp_threads)),
         pythonpath=os.environ.get("PYTHONPATH", ""),
     )
+    print(client_env_vars)
 
     for node_id, host in enumerate(hosts):
         ip, _ = host
