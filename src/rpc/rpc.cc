@@ -294,24 +294,24 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCMessageGetTensors")
 
 #if defined(__linux__)
 /*!
-* \brief The signal handler.
-* \param s signal
-*/
+ * \brief The signal handler.
+ * \param s signal
+ */
 void SigHandler(int s) {
-LOG(INFO) << "\nUser pressed Ctrl+C, Exiting";
-CleanupResources();
-exit(1);
+  LOG(INFO) << "\nUser pressed Ctrl+C, Exiting";
+  CleanupResources();
+  exit(1);
 }
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCHandleSignal")
 .set_body([](DGLArgs args, DGLRetValue* rv) {
-// Ctrl+C handler
-struct sigaction sigHandler;
-sigHandler.sa_handler = SigHandler;
-sigemptyset(&sigHandler.sa_mask);
-sigHandler.sa_flags = 0;
-sigaction(SIGINT, &sigHandler, nullptr);
-sigaction(SIGTERM, &sigHandler, nullptr);
+  // Ctrl+C handler
+  struct sigaction sigHandler;
+  sigHandler.sa_handler = SigHandler;
+  sigemptyset(&sigHandler.sa_mask);
+  sigHandler.sa_flags = 0;
+  sigaction(SIGINT, &sigHandler, nullptr);
+  sigaction(SIGTERM, &sigHandler, nullptr);
 });
 #endif
 
@@ -319,11 +319,11 @@ sigaction(SIGTERM, &sigHandler, nullptr);
 
 DGL_REGISTER_GLOBAL("distributed.server_state._CAPI_DGLRPCGetServerState")
 .set_body([](DGLArgs args, DGLRetValue* rv) {
-auto st = RPCContext::ThreadLocal()->server_state;
-if (st.get() == nullptr) {
-  RPCContext::ThreadLocal()->server_state = std::make_shared<ServerState>();
-}
-*rv = st;
+  auto st = RPCContext::ThreadLocal()->server_state;
+  if (st.get() == nullptr) {
+    RPCContext::ThreadLocal()->server_state = std::make_shared<ServerState>();
+  }
+  *rv = st;
 });
 
 //////////////////////////// KVStore ////////////////////////////
@@ -421,8 +421,9 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
     }
   }
   local_data_shape[0] = ID_size;
-  NDArray res_tensor =
-    NDArray::Empty(local_data_shape, local_data->dtype, DLContext{kDLCPU, 0});
+  NDArray res_tensor = NDArray::Empty(local_data_shape,
+                                      local_data->dtype,
+                                      DLContext{kDLCPU, 0});
   char* return_data = static_cast<char*>(res_tensor->data);
   // Copy local data
   parallel_for(0, local_ids.size(), [&](size_t b, size_t e) {
@@ -444,7 +445,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
     dgl_id_t id_size = remote_ids[part_id].size();
     for (size_t n = 0; n < id_size; ++n) {
       memcpy(return_data + remote_ids_original[part_id][n] * row_size,
-              data_char + n * row_size, row_size);
+             data_char + n * row_size, row_size);
     }
   }
   *rv = res_tensor;
