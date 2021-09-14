@@ -16,6 +16,7 @@ def test_basics():
     assert s0.stream.value is not None
     stream.set_stream(s0)
     assert s0.stream.value == stream.current_stream(ctx).stream.value
+    del s0
 
     # create external stream and set it as current
     s1 = stream.ExternalStream(ctx, ctypes.c_void_p())
@@ -33,6 +34,7 @@ def test_basics():
     data_cpu2 = F.copy_to(data_gpu, F.cpu())
     stream.synchronize_stream(s2)
     assert F.array_equal(data_cpu, data_cpu2)
+    del s2
 
     # restore original stream
     stream.set_stream(prev_s)
