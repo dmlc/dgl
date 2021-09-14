@@ -449,7 +449,6 @@ def submit_jobs(args, udf_command):
         graph_format=args.graph_format,
         pythonpath=os.environ.get("PYTHONPATH", ""),
     )
-    print(server_env_vars)
     for i in range(len(hosts) * server_count_per_machine):
         ip, _ = hosts[int(i / server_count_per_machine)]
         server_env_vars_cur = f"{server_env_vars} DGL_SERVER_ID={i}"
@@ -468,7 +467,6 @@ def submit_jobs(args, udf_command):
         num_omp_threads=os.environ.get("OMP_NUM_THREADS", str(args.num_omp_threads)),
         pythonpath=os.environ.get("PYTHONPATH", ""),
     )
-    print(client_env_vars)
 
     for node_id, host in enumerate(hosts):
         ip, _ = host
