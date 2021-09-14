@@ -15,6 +15,7 @@
 #
 
 import dgl
+import torch as th
 from ...dataloading import NodeDataLoader
 from ..multi_gpu_datastore import MultiGPUDataStore
 from typing import Mapping
@@ -134,7 +135,7 @@ class MultiGPUNodeDataLoader(NodeDataLoader):
     def __init__(self, g, nids, block_sampler, device, comm=None, partition=None, use_ddp=True,
                  node_feat=None, node_label=None, **kwargs):
         assert comm is None or use_ddp, "'use_ddp' must be true when using NCCL."
-        assert device != torch.device("cpu"), "The device must be a GPU."
+        assert device != th.device("cpu"), "The device must be a GPU."
 
         # we need to remove all of the features
         n_feat = {}
