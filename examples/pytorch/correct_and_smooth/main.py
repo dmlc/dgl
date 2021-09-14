@@ -75,6 +75,7 @@ def main():
                               num_smoothing_layers=args.num_smoothing_layers,
                               smoothing_alpha=args.smoothing_alpha,
                               smoothing_adj=args.smoothing_adj,
+                              autoscale=args.autoscale,
                               scale=args.scale)
         
         mask_idx = torch.cat([train_idx, valid_idx])
@@ -162,6 +163,7 @@ if __name__ == '__main__':
     parser.add_argument('--num-smoothing-layers', type=int, default=50)
     parser.add_argument('--smoothing-alpha', type=float, default=0.756)
     parser.add_argument('--smoothing-adj', type=str, default='DAD')
+    parser.add_argument('--autoscale', action='store_true')
     parser.add_argument('--scale', type=float, default=20.)
 
     args = parser.parse_args()
