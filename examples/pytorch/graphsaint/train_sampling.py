@@ -15,6 +15,16 @@ def main(args, task):
     multilabel_data = {'ppi', 'yelp', 'amazon'}
     multilabel = args.dataset in multilabel_data
 
+    # This flag is excluded for too large dataset, like amazon, the graph of which is too large to be directly
+    # shifted to one gpu. So we need to
+    # 1. put the whole graph on cpu, and put the subgraphs on gpu in training phase
+    # 2. put the model on gpu in training phase, and put the model on cpu in validation/testing phase
+    # We need to judge cpu_flag and cuda (below) simultaneously when shift model between cpu and gpu
+    if args.dataset in ['amazon']:
+        cpu_flag = True
+    else:
+        cpu_flag = False
+
     # load and preprocess dataset
     data = load_data(args, multilabel)
     g = data.g
@@ -49,7 +59,7 @@ def main(args, task):
 
     kwargs = {
         'dn': args.dataset, 'g': g, 'train_nid': train_nid, 'num_workers_sampler': args.num_workers_sampler,
-        'train': False, 'num_subg_norm': args.num_subg_norm, 'batch_size_norm': args.batch_size_norm,
+        'num_subg_norm': args.num_subg_norm, 'batch_size_norm': args.batch_size_norm,
         'online': args.online, 'num_subg': args.num_subg
     }
 
@@ -62,7 +72,6 @@ def main(args, task):
     else:
         raise NotImplementedError
 
-    saint_sampler.train = True
     loader = DataLoader(saint_sampler, collate_fn=saint_sampler.__collate_fn__, batch_size=1,
                         shuffle=True, num_workers=args.num_workers, drop_last=False)
 
@@ -74,7 +83,8 @@ def main(args, task):
         torch.cuda.set_device(args.gpu)
         val_mask = val_mask.cuda()
         test_mask = test_mask.cuda()
-        # g = g.to(args.gpu)
+        if not cpu_flag:
+            g = g.to('cuda:{}'.format(args.gpu))
 
     print('labels shape:', g.ndata['label'].shape)
     print("features shape:", g.ndata['feat'].shape)
@@ -141,7 +151,8 @@ def main(args, task):
         # evaluate
         model.eval()
         if epoch % args.val_every == 0:
-            model = model.to('cpu')
+            if cpu_flag and cuda:  # Only when we have shifted model to gpu and we need to shift it back on cpu
+                model = model.to('cpu')
             val_f1_mic, val_f1_mac = evaluate(
                 model, g, labels, val_mask, multilabel)
             print(
@@ -151,21 +162,21 @@ def main(args, task):
                 print('new best val f1:', best_f1)
                 torch.save(model.state_dict(), os.path.join(
                     log_dir, 'best_model_{}.pkl'.format(task)))
-            if args.gpu >= 0:
-                model = model.to('cuda:0')
+            if cpu_flag and cuda:
+                model.cuda()
 
     end_time = time.time()
     print(f'training using time {end_time - start_time}')
 
     # test
-    model = model.to('cpu')
     if args.use_val:
         model.load_state_dict(torch.load(os.path.join(
             log_dir, 'best_model_{}.pkl'.format(task))))
+    if cpu_flag and cuda:
+        model = model.to('cpu')
     test_f1_mic, test_f1_mac = evaluate(
         model, g, labels, test_mask, multilabel)
     print("Test F1-mic {:.4f}, Test F1-mac {:.4f}".format(test_f1_mic, test_f1_mac))
-
 
 if __name__ == '__main__':
     warnings.filterwarnings('ignore')

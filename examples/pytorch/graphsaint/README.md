@@ -10,19 +10,22 @@ Contributor: Jiahang Li ([@ljh1064126026](https://github.com/ljh1064126026))  Ta
 
 ## Dependencies
 
-- Python 3.7.0
-- PyTorch 1.6.0
+- Python 3.7.10
+- PyTorch 1.8.1
 - NumPy 1.19.2
 - Scikit-learn 0.23.2
-- DGL 0.5.3
+- DGL 0.7.1
 
 ## Dataset
 
-All datasets used are provided by Author's [code](https://github.com/GraphSAINT/GraphSAINT). They are available in [Google Drive](https://drive.google.com/drive/folders/1zycmmDES39zVlbVCYs88JTJ1Wm5FbfLz) (alternatively, [Baidu Wangpan (code: f1ao)](https://pan.baidu.com/s/1SOb0SiSAXavwAcNqkttwcg#list/path=%2F)). Once you download the datasets, you need to rename graphsaintdata to data. Dataset summary("m" stands for multi-label classification, and "s" for single-label.):
-| Dataset | Nodes | Edges | Degree | Feature | Classes | Train/Val/Test |
-| :-: | :-: | :-: | :-: | :-: | :-: | :-: |
-| PPI | 14,755 | 225,270 | 15 | 50 | 121(m) | 0.66/0.12/0.22 |
-| Flickr | 89,250 | 899,756 | 10 | 500 | 7(s) | 0.50/0.25/0.25 |
+All datasets used are provided by Author's [code](https://github.com/GraphSAINT/GraphSAINT). They are available in [Google Drive](https://drive.google.com/drive/folders/1zycmmDES39zVlbVCYs88JTJ1Wm5FbfLz) (alternatively, [Baidu Wangpan (code: f1ao)](https://pan.baidu.com/s/1SOb0SiSAXavwAcNqkttwcg#list/path=%2F)). Dataset summary("m" stands for multi-label binary classification, and "s" for single-label.):
+| Dataset | Nodes | Edges | Degree | Feature | Classes |
+| :-: | :-: | :-: | :-: | :-: | :-: |
+| PPI | 14,755 | 225,270 | 15 | 50 | 121(m) |
+| Flickr | 89,250 | 899,756 | 10 | 500 | 7(s) |
+| Reddit | 232,965 | 11,606,919 | 50 | 602 | 41(s) |
+| Yelp | 716,847 | 6,977,410 | 10 | 300 | 100 (m) |
+| Amazon | 1,598,960 | 132,169,734 | 83 | 200 | 107 (m) |
 
 Note that the PPI dataset here is different from DGL's built-in variant.
 
@@ -41,15 +44,15 @@ python train_sampling.py --task $task
 
 - `$task` includes `ppi_n, ppi_e, ppi_rw, flickr_n, flickr_e, flickr_rw, reddit_n, reddit_e, reddit_rw, yelp_n, yelp_e, yelp_rw, amazon_n, amazon_e, amazon_rw`. For example, `ppi_n` represents running experiments on dataset `ppi` with `node sampler`
 
-## Comparison
+## Experiments
 
 * Paper: results from the paper
 * Running: results from experiments with the authors' code
-* DGL: results from experiments with the DGL example. The experiment config comes from `config.py`. You can modify parameters in `config.py` to see different performance of different setup. 
+* DGL: results from experiments with the DGL example. The experiment config comes from `config.py`. You can modify parameters in the `config.py` to see different performance of different setup. 
 
-> Note that we implement offline sampling and online sampling in training phase. Offline sampling means all subgraphs utilized in training phase come from pre-sampled subgraphs. Online sampling means we deprecate all pre-sampled subgraphs and re-sample new subgraphs in training phase.
+> Note that we implement offline sampling and online sampling in training phase. Offline sampling means all subgraphs utilized in training phase come from pre-sampled subgraphs. Online sampling means we discard all pre-sampled subgraphs and re-sample new subgraphs in training phase.
 
-> Note that the sampling method in pre-sampling phase must be offline sampling.
+> Note that the sampling method in the pre-sampling phase must be offline sampling.
 
 ### F1-micro
 
@@ -107,9 +110,9 @@ python train_sampling.py --task $task
 | DGL_offline | 3.10 | 2.18 | 10.57 | 21.52 | 153.93 |
 | DGL_online | 3.05 | 2.13 | 11.01 | 22.23 | 151.84 |
 
-## Test std of sampling time
+## Test std of sampling and normalization time
 
-- We've run experiments 10 times repeatedly to test average and standard deviation of sampling time. Here we just test sampling time without model performance. Moreover, for efficient testing, the hardware and config employed here are not the same as the experiments above, so the sampling time might be a bit different from that above. But we keep the environment consistent in all experiments below.
+- We've run experiments 10 times repeatedly to test average and standard deviation of sampling and normalization time. Here we just test time without training model to the end. Moreover, for efficient testing, the hardware and config employed here are not the same as the experiments above, so the sampling time might be a bit different from that above. But we keep the environment consistent in all experiments below.
 
 > The value is (average, std)
 

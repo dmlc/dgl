@@ -28,10 +28,6 @@ class SAINTSampler:
         ids of training nodes.
     num_workers_sampler : int
         number of processes to sample subgraphs in pre-sampling procedure using torch.dataloader.
-    train : bool
-        a flag specifying if the sampler is utilized in training procedure or not. Note that the sampling methods are
-        different in pre-sampling phase and training phase respectively. We have to assign this flag as False before
-        pre-sampling phase and True after pre-sampling before training.
     num_subg_norm : int, optional
         the max number of subgraphs sampled in pre-sampling phase for computing normalization coefficients in the beginning.
         Actually this param is used as `__len__` of sampler in pre-sampling phase.
@@ -41,8 +37,7 @@ class SAINTSampler:
         the number of subgraphs sampled by each process concurrently in pre-sampling phase.
         Defaults: 200
     online : bool, optional
-        This param is valid only when `train` is True.
-        If `True`, we employ fully online sampling in training phase. Otherwise employing fully offline sampling.
+        If `True`, we employ online sampling in training phase. Otherwise employing offline sampling.
         Defaults: True
     num_subg : int, optional
         the expected number of sampled subgraphs in pre-sampling phase.
@@ -53,17 +48,18 @@ class SAINTSampler:
     Notes
     -----
     Here our implementation is a little bit different from the codes of the author. For example, author has limited the
-    number of iterations in training phase to `math.ceil(self.train_g.num_nodes() / node_budget)`
-    which can not fully make use of all pre-sampled subgraphs. We've released this restriction.
+    number of iterations in training phase to `math.ceil(self.train_g.num_nodes() / node_budget)` ( please refer to
+    annotations of `SAINTNodeSampler` to check the explanation of `node_budget`),
+    which can not fully make use of all pre-sampled subgraphs. We've remove this restriction.
 
     For parallelism of pre-sampling, we utilize `torch.DataLoader` to concurrently speed up sampling.
     The `num_subg_norm` is the return value of `__len__` in pre-sampling phase. Moreover, the param `batch_size_norm`
-    determine the batch_size of `torch.DataLoader` in internal pre-sampling part. But note that if we wanna pass the
+    determines the batch_size of `torch.DataLoader` in internal pre-sampling part. But note that if we wanna pass the
     SAINTSampler to `torch.DataLoader` for concurrently sampling subgraphs in training phase, we need to specify
     `batch_size` of `DataLoader`, that is, `batch_size_norm` is not related to how sampler works in training procedure.
     """
 
-    def __init__(self, dn, g, train_nid, num_workers_sampler, train, num_subg_norm=10000,
+    def __init__(self, dn, g, train_nid, num_workers_sampler, num_subg_norm=10000,
                  batch_size_norm=200, online=True, num_subg=50):
         self.g = g.cpu()
         self.train_g: dgl.graph = g.subgraph(train_nid)
@@ -74,10 +70,10 @@ class SAINTSampler:
         self.num_subg_norm = num_subg_norm
         self.batch_size_norm = batch_size_norm
         self.num_workers_sampler = num_workers_sampler
-        self.train = train
+        self.train = False
         self.online = online
 
-        assert self.num_subg_norm >= self.batch_size_norm, "num_sub_norm should be greater than batch_size_norm"
+        assert self.num_subg_norm >= self.batch_size_norm, "num_subg_norm should be greater than batch_size_norm"
         graph_fn, norm_fn = self.__generate_fn__()
 
         if os.path.exists(graph_fn):
@@ -130,6 +126,8 @@ class SAINTSampler:
         self.__clear__()
         print("The number of subgraphs is: ", len(self.subgraphs))
 
+        self.train = True
+
     def __len__(self):
         if self.train is False:
             return self.num_subg_norm
@@ -138,7 +136,7 @@ class SAINTSampler:
 
     def __getitem__(self, idx):
         # Only when sampling subgraphs in training procedure and need to utilize sampled subgraphs and we still
-        # have sampled subgraphs can we fetch a subgraph from sampled subgraphs
+        # have sampled subgraphs we can fetch a subgraph from sampled subgraphs
         if self.train:
             if self.online:
                 subgraph = self.__sample__()
