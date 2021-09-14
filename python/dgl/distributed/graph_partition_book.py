@@ -3,6 +3,7 @@
 import pickle
 from abc import ABC
 import numpy as np
+from ast import literal_eval
 
 from .. import backend as F
 from ..base import NID, EID
@@ -12,6 +13,12 @@ from .._ffi.ndarray import empty_shared_mem
 from ..ndarray import exist_shared_mem_array
 from ..partition import NDArrayPartition
 from .id_map import IdMap
+
+def _str_to_tuple(tuple_like_str):
+    try:
+        return literal_eval(tuple_like_str)
+    except:
+        return tuple_like_str
 
 def _move_metadata_to_shared_mem(graph_name, num_nodes, num_edges, part_id,
                                  num_partitions, node_map, edge_map, is_range_part):
@@ -596,6 +603,7 @@ class BasicPartitionBook(GraphPartitionBook):
     def eid2localeid(self, eids, partid, etype=('_N', '_E', '_N')):
         """Get the local edge ids within the given partition.
         """
+        etype = _str_to_tuple(etype)
         assert etype == ('_N', '_E', '_N'), 'Base partition book only supports homogeneous graph.'
         if partid != self._part_id:
             raise RuntimeError('Now GraphPartitionBook does not support \
@@ -1025,7 +1033,7 @@ class PartitionPolicy(object):
             partition ID
         """
         if EDGE_PART_POLICY in self._policy_str:
-            return self._partition_book.eid2partid(id_tensor, self._policy_str[5:])
+            return self._partition_book.eid2partid(id_tensor, _str_to_tuple(self._policy_str[5:]))
         elif NODE_PART_POLICY in self._policy_str:
             return self._partition_book.nid2partid(id_tensor, self._policy_str[5:])
         else:
@@ -1040,7 +1048,7 @@ class PartitionPolicy(object):
             data size
         """
         if EDGE_PART_POLICY in self._policy_str:
-            return len(self._partition_book.partid2eids(self._part_id, self._policy_str[5:]))
+            return len(self._partition_book.partid2eids(self._part_id, _str_to_tuple(self._policy_str[5:])))
         elif NODE_PART_POLICY in self._policy_str:
             return len(self._partition_book.partid2nids(self._part_id, self._policy_str[5:]))
         else:
@@ -1055,7 +1063,7 @@ class PartitionPolicy(object):
             data size
         """
         if EDGE_PART_POLICY in self._policy_str:
-            return self._partition_book._num_edges(self._policy_str[5:])
+            return self._partition_book._num_edges(_str_to_tuple(self._policy_str[5:]))
         elif NODE_PART_POLICY in self._policy_str:
             return self._partition_book._num_nodes(self._policy_str[5:])
         else:
@@ -1065,13 +1073,13 @@ class NodePartitionPolicy(PartitionPolicy):
     '''Partition policy for nodes.
     '''
     def __init__(self, partition_book, ntype='_N'):
-        super(NodePartitionPolicy, self).__init__(NODE_PART_POLICY + ':' + ntype, partition_book)
+        super(NodePartitionPolicy, self).__init__("{}:{}".format(NODE_PART_POLICY, ntype), partition_book)
 
 class EdgePartitionPolicy(PartitionPolicy):
     '''Partition policy for edges.
     '''
     def __init__(self, partition_book, etype=('_N', '_E', '_N')):
-        super(EdgePartitionPolicy, self).__init__(EDGE_PART_POLICY + ':' + etype, partition_book)
+        super(EdgePartitionPolicy, self).__init__("{}:{}".format(EDGE_PART_POLICY, etype), partition_book)
 
 class HeteroDataName(object):
     ''' The data name in a heterogeneous graph.
@@ -1092,7 +1100,7 @@ class HeteroDataName(object):
     '''
     def __init__(self, is_node, entity_type, data_name):
         self.policy_str = NODE_PART_POLICY if is_node else EDGE_PART_POLICY
-        self.policy_str = self.policy_str + ':' + entity_type
+        self.policy_str = "{}:{}".format(self.policy_str, entity_type)
         self.data_name = data_name
 
     def is_node(self):

@@ -468,7 +468,7 @@ def check_dist_graph_hetero(g, num_clients, num_nodes, num_edges):
         assert ntype in g.ntypes
         assert num_nodes[ntype] == g.number_of_nodes(ntype)
     for etype in num_edges:
-        assert etype in g.etypes
+        assert etype in g.canonical_etypes
         assert num_edges[etype] == g.number_of_edges(etype)
     etypes = [('n1', 'r1', 'n2'),
               ('n1', 'r2', 'n3'),
@@ -565,7 +565,7 @@ def check_server_client_hetero(shared_mem, num_servers, num_clients):
 
     cli_ps = []
     num_nodes = {ntype: g.number_of_nodes(ntype) for ntype in g.ntypes}
-    num_edges = {etype: g.number_of_edges(etype) for etype in g.etypes}
+    num_edges = {etype: g.number_of_edges(etype) for etype in g.canonical_etypes}
     for cli_id in range(num_clients):
         print('start client', cli_id)
         p = ctx.Process(target=run_client_hetero, args=(graph_name, 0, num_servers, num_clients, num_nodes,
