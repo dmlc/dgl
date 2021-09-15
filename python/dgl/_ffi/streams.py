@@ -20,16 +20,16 @@ class StreamContext(object):
 
     """
 
-    def __init__(self, stream):
+    def __init__(self, cuda_stream):
         """ create stream context instance
 
         Parameters
         ----------
-        stream : torch.cuda.Stream
+        cuda_stream : torch.cuda.Stream
             target stream will be set.
         """
-        self.ctx = to_dgl_context(stream.device)
-        self.curr_cuda_stream = stream.cuda_stream
+        self.ctx = to_dgl_context(cuda_stream.device)
+        self.curr_cuda_stream = cuda_stream.cuda_stream
 
     def __enter__(self):
         """ get previous stream and set target stream as current.
@@ -47,7 +47,7 @@ class StreamContext(object):
             self.ctx.device_type, self.ctx.device_id, self.prev_cuda_stream))
 
 
-def stream(stream):
+def stream(cuda_stream):
     """ Wrapper of StreamContext
 
     Parameters
@@ -55,4 +55,4 @@ def stream(stream):
     stream : torch.cuda.Stream
         target stream will be set.
     """
-    return StreamContext(stream)
+    return StreamContext(cuda_stream)
