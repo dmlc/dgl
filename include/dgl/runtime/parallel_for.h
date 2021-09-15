@@ -69,6 +69,7 @@ void parallel_for(
 
 #ifdef _OPENMP
   auto num_threads = compute_num_threads(begin, end, grain_size);
+  // (BarclayII) the exception code is borrowed from PyTorch.
   std::atomic_flag err_flag = ATOMIC_FLAG_INIT;
   std::exception_ptr eptr;
 
