@@ -28,12 +28,12 @@ class SAINTSampler:
         ids of training nodes.
     num_workers_sampler : int
         number of processes to sample subgraphs in pre-sampling procedure using torch.dataloader.
-    num_subg_norm : int, optional
+    num_subg_sampler : int, optional
         the max number of subgraphs sampled in pre-sampling phase for computing normalization coefficients in the beginning.
         Actually this param is used as `__len__` of sampler in pre-sampling phase.
-        Please make sure that num_subg_norm is greater than batch_size_norm so that we can sample enough subgraphs.
+        Please make sure that num_subg_sampler is greater than batch_size_sampler so that we can sample enough subgraphs.
         Defaults: 10000
-    batch_size_norm : int, optional
+    batch_size_sampler : int, optional
         the number of subgraphs sampled by each process concurrently in pre-sampling phase.
         Defaults: 200
     online : bool, optional
@@ -41,7 +41,7 @@ class SAINTSampler:
         Defaults: True
     num_subg : int, optional
         the expected number of sampled subgraphs in pre-sampling phase.
-        It is actually the 'N' in the original paper. Note that this param is different from the num_subg_norm.
+        It is actually the 'N' in the original paper. Note that this param is different from the num_subg_sampler.
         This param is just used to control the number of pre-sampled subgraphs.
         Defaults: 50
 
@@ -53,27 +53,27 @@ class SAINTSampler:
     which can not fully make use of all pre-sampled subgraphs. We've remove this restriction.
 
     For parallelism of pre-sampling, we utilize `torch.DataLoader` to concurrently speed up sampling.
-    The `num_subg_norm` is the return value of `__len__` in pre-sampling phase. Moreover, the param `batch_size_norm`
+    The `num_subg_sampler` is the return value of `__len__` in pre-sampling phase. Moreover, the param `batch_size_sampler`
     determines the batch_size of `torch.DataLoader` in internal pre-sampling part. But note that if we wanna pass the
     SAINTSampler to `torch.DataLoader` for concurrently sampling subgraphs in training phase, we need to specify
-    `batch_size` of `DataLoader`, that is, `batch_size_norm` is not related to how sampler works in training procedure.
+    `batch_size` of `DataLoader`, that is, `batch_size_sampler` is not related to how sampler works in training procedure.
     """
 
-    def __init__(self, dn, g, train_nid, num_workers_sampler, num_subg_norm=10000,
-                 batch_size_norm=200, online=True, num_subg=50):
+    def __init__(self, dn, g, train_nid, num_workers_sampler, num_subg_sampler=10000,
+                 batch_size_sampler=200, online=True, num_subg=50):
         self.g = g.cpu()
         self.train_g: dgl.graph = g.subgraph(train_nid)
         self.dn, self.num_subg = dn, num_subg
         self.node_counter = th.zeros((self.train_g.num_nodes(),))
         self.edge_counter = th.zeros((self.train_g.num_edges(),))
         self.prob = None
-        self.num_subg_norm = num_subg_norm
-        self.batch_size_norm = batch_size_norm
+        self.num_subg_sampler = num_subg_sampler
+        self.batch_size_sampler = batch_size_sampler
         self.num_workers_sampler = num_workers_sampler
         self.train = False
         self.online = online
 
-        assert self.num_subg_norm >= self.batch_size_norm, "num_subg_norm should be greater than batch_size_norm"
+        assert self.num_subg_sampler >= self.batch_size_sampler, "num_subg_sampler should be greater than batch_size_sampler"
         graph_fn, norm_fn = self.__generate_fn__()
 
         if os.path.exists(graph_fn):
@@ -87,7 +87,7 @@ class SAINTSampler:
             # N: the number of pre-sampled subgraphs
 
             # Employ parallelism to speed up the sampling procedure
-            loader = DataLoader(self, batch_size=self.batch_size_norm, shuffle=True,
+            loader = DataLoader(self, batch_size=self.batch_size_sampler, shuffle=True,
                                 num_workers=self.num_workers_sampler, collate_fn=self.__collate_fn__, drop_last=False)
 
             t = time.perf_counter()
@@ -130,7 +130,7 @@ class SAINTSampler:
 
     def __len__(self):
         if self.train is False:
-            return self.num_subg_norm
+            return self.num_subg_sampler
         else:
             return len(self.subgraphs)
 

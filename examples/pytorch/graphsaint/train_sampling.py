@@ -59,7 +59,7 @@ def main(args, task):
 
     kwargs = {
         'dn': args.dataset, 'g': g, 'train_nid': train_nid, 'num_workers_sampler': args.num_workers_sampler,
-        'num_subg_norm': args.num_subg_norm, 'batch_size_norm': args.batch_size_norm,
+        'num_subg_sampler': args.num_subg_sampler, 'batch_size_sampler': args.batch_size_sampler,
         'online': args.online, 'num_subg': args.num_subg
     }
 
@@ -183,8 +183,10 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='GraphSAINT')
     parser.add_argument("--task", type=str, default="ppi_n", help="type of tasks")
+    parser.add_argument("--online", type=bool, default="False", help="sampling method in training phase")
     task = parser.parse_args().task
     args = argparse.Namespace(**CONFIG[task])
+    args.online = parser.parse_args().online
     print(args)
 
     main(args, task=task)

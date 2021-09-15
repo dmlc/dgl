@@ -34,15 +34,35 @@ Note that the PPI dataset here is different from DGL's built-in variant.
 - The config file is `config.py`, which contains best configs for experiments below.
 - Please refer to `sampler.py` to see explanations of some key parameters.
 
+### Parameters
+
+| **aggr**                                                     | **arch**                                                     | **dataset**                                                  | **dropout**                                                  |
+| ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| define how to aggregate embeddings of each node and its neighbors' embeddings ,which can be 'concat', 'mean'. The neighbors' embeddings are generated based on GCN | e.g. '1-1-0', means there're three layers, the first and the second layer employ message passing on the graph, then aggregate the embeddings of each node  and its neighbors. The last layer only updates each node's embedding. The message passing  mechanism comes from GCN | the name of dataset, which can be 'ppi', 'flickr', 'reddit', 'yelp', 'amazon' | the dropout of model used in train_sampling.py               |
+| **edge_budget**                                              | **gpu**                                                      | **length**                                                   | **log_dir**                                                  |
+| the expected number of edges in each subgraph, which is specified in the paper | -1 means cpu, otherwise 'cuda:gpu', e.g. if gpu=0, use 'cuda:0' | the length of each random walk                               | the directory storing logs                                   |
+| **lr**                                                       | **n_epochs**                                                 | **n_hidden**                                                 | **no_batch_norm**                                            |
+| learning rate                                                | training epochs                                              | hidden dimension                                             | True if do NOT employ batch normalization in each layer      |
+| **node_budget**                                              | **num_subg**                                                 | **num_roots**                                                | **sampler**                                                  |
+| the expected number of nodes in each subgraph, which is specified in the paper | the expected number of pre_sampled subgraphs                 | the number of roots to generate random walks                 | specify which sampler to use, which can be 'node', 'edge', 'rw', corresponding to node, edge, random walk sampler |
+| **use_val**                                                  | **val_every**                                                | **num_workers_sampler**                                      | **num_subg_sampler**                                            |
+| True if use best model to test, which is stored by earlystop mechanism | validate per 'val_every' epochs                              | number of workers (processes) specified for internal dataloader in SAINTSampler, which is to pre-sample subgraphs | the maximal number of pre-sampled subgraphs                  |
+| **batch_size_sampler**                                          | **num_workers**                                              |                                                              |                                                              |
+| batch size of internal dataloader in SAINTSampler            | number of workers (processes) specified for external dataloader in train_sampling.py, which is to sample subgraphs in training phase |                                                              |                                                              |
+
+
+
+
 ## Minibatch training
 
 Run with following:
 ```bash
-python train_sampling.py --task $task
-# e.g. python train_sampling.py --task ppi_n
+python train_sampling.py --task $task --online $online
+# e.g. python train_sampling.py --task ppi_n --online True
 ```
 
 - `$task` includes `ppi_n, ppi_e, ppi_rw, flickr_n, flickr_e, flickr_rw, reddit_n, reddit_e, reddit_rw, yelp_n, yelp_e, yelp_rw, amazon_n, amazon_e, amazon_rw`. For example, `ppi_n` represents running experiments on dataset `ppi` with `node sampler`
+- `$online` includes `True` or `False`. `True` means we sample subgraphs on-the-fly in training phase, while discarding pre-sampled subgraphs. `False` means we utilize pre-sampled subgraphs in training phase.
 
 ## Experiments
 
@@ -91,30 +111,29 @@ python train_sampling.py --task $task
 | Method      | PPI  | Flickr | Reddit | Yelp | Amazon |
 | --- | --- | --- | --- | --- | --- |
 | Running | 1.46 | 3.49 | 19 | 59.01 | 978.62 |
-| DGL_offline | 2.51 | 1.12 | 27.32 | 60.15 | 929.24 |
-| DGL_online | 3.17 | 1.11 | 27.82 | 59.42 | 991.68 |
+| DGL | 2.51 | 1.12 | 27.32 | 60.15 | 929.24 |
 
 #### Random edge sampler
 
 | Method      | PPI  | Flickr | Reddit | Yelp | Amazon |
 | --- | --- | --- | --- | --- | --- |
 | Running | 1.4 | 3.18 | 13.88 | 39.02 | 164.35 |
-| DGL_offline | 3.08 | 1.91 | 53.59 | 48.94 | 1469.52 |
-| DGL_online | 3.04 | 1.87 | 52.01 | 48.38 | 1432.79 |
+| DGL | 3.04 | 1.87 | 52.01 | 48.38 | 1432.79 |
 
 #### Random walk sampler
 
 | Method      | PPI  | Flickr | Reddit | Yelp | Amazon |
 | --- | --- | --- | --- | --- | --- |
 | Running | 1.7 | 3.82 | 16.97 | 43.25 | 355.68 |
-| DGL_offline | 3.10 | 2.18 | 10.57 | 21.52 | 153.93 |
-| DGL_online | 3.05 | 2.13 | 11.01 | 22.23 | 151.84 |
+| DGL | 3.05 | 2.13 | 11.01 | 22.23 | 151.84 |
 
 ## Test std of sampling and normalization time
 
 - We've run experiments 10 times repeatedly to test average and standard deviation of sampling and normalization time. Here we just test time without training model to the end. Moreover, for efficient testing, the hardware and config employed here are not the same as the experiments above, so the sampling time might be a bit different from that above. But we keep the environment consistent in all experiments below.
 
-> The value is (average, std)
+> The config here which is different with that in the section above is only `num_workers_sampler`, `batch_size_sampler` and `num_workers`, which are only correlated to the sampling speed. The number of subgraphs is kept consistent across two sections thus the model's performance is not affected. 
+
+> The value is (average, std).
 
 ### Random node sampler
 
