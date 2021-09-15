@@ -1,5 +1,5 @@
 from dgl import rand_graph
-import dgl._ffi.stream as FS
+import dgl._ffi.streams as FS
 import dgl.ops as OPS
 import unittest
 import backend as F
