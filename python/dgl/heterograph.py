@@ -4107,7 +4107,7 @@ class DGLHeteroGraph(object):
             num_nodes = len(u)
         for key, val in data.items():
             # don't check device or nfeats if the feature tensor is DistTensor
-            if isinstance(val, distributed.dist_tensor.DistTensor):
+            if isinstance(val, distributed.DistTensor):
                 continue
             nfeats = F.shape(val)[0]
             if nfeats != num_nodes:
@@ -4202,7 +4202,7 @@ class DGLHeteroGraph(object):
             num_edges = len(eid)
         for key, val in data.items():
             # don't check device or nfeats if the feature tensor is DistTensor
-            if isinstance(val, distributed.dist_tensor.DistTensor):
+            if isinstance(val, distributed.DistTensor):
                 continue
             nfeats = F.shape(val)[0]
             if nfeats != num_edges:
