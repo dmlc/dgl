@@ -816,21 +816,14 @@ def extract_node_subframes_for_block(graph, srcnodes, dstnodes):
         Extracted node frames.
     """
     node_frames = []
-    if len(graph._node_frames) == len(srcnodes) + len(dstnodes):
-        # extract features from a DGLBlock
-        for i, ind_nodes in enumerate(srcnodes + dstnodes):
-            subf = graph._node_frames[i].subframe(ind_nodes)
-            subf[NID] = ind_nodes
-            node_frames.append(subf)
-    else:
-        for i, ind_nodes in enumerate(srcnodes):
-            subf = graph._node_frames[i].subframe(ind_nodes)
-            subf[NID] = ind_nodes
-            node_frames.append(subf)
-        for i, ind_nodes in enumerate(dstnodes):
-            subf = graph._node_frames[i].subframe(ind_nodes)
-            subf[NID] = ind_nodes
-            node_frames.append(subf)
+    for i, ind_nodes in enumerate(srcnodes):
+        subf = graph._node_frames[i].subframe(ind_nodes)
+        subf[NID] = ind_nodes
+        node_frames.append(subf)
+    for i, ind_nodes in enumerate(dstnodes):
+        subf = graph._node_frames[i].subframe(ind_nodes)
+        subf[NID] = ind_nodes
+        node_frames.append(subf)
     return node_frames
 
 def extract_edge_subframes(graph, edges, store_ids=True):

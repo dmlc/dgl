@@ -13,9 +13,8 @@ from ...ndarray import NDArray as DGLNDArray
 from ... import backend as F
 from ...base import DGLError, NID, EID
 from ...utils import to_dgl_context
-from ...utils import extract_node_subframes_for_block, extract_edge_subframes
 from ...utils import set_new_frames
-
+from ...frame import Frame
 
 __all__ = ['NodeDataLoader', 'EdgeDataLoader', 'GraphDataLoader',
            # Temporary exposure.
@@ -328,66 +327,6 @@ class _NodeDataLoaderIter:
         result = [_to_device(data, self.device) for data in result_]
         return result
 
-class _DistDataLoaderWrapper:
-    """
-    A wrapper for DistDataLoader, copy features from original DistGraph to blocks
-    """
-    def __init__(self, g, dataloader):
-        self.g = g
-        assert isinstance(g, DistGraph), "Input g must be a DistGraph."
-        self.dataloader = dataloader
-
-    def __iter__(self):
-        self.dataloader = iter(self.dataloader)
-        return self
-
-    def __next__(self):
-        try:
-            ret = list(next(self.dataloader))
-            blocks = []
-            for block in ret[-1]:
-                blocks.append(self._copy_features(block))
-            ret[-1] = blocks
-            return tuple(ret)
-        except StopIteration:
-            raise StopIteration
-
-    def _copy_features(self, block):
-        """copy DistTensor reference to block features"""
-        # copy srcnode feature DistTensor reference
-        ind_srcnodes = []
-        for ntype in block.srctypes:
-            ind_srcnodes.append(block.srcnodes[ntype].data[NID])
-            block_srcnodes = block.srcnodes[ntype]
-            g_nodes = self.g.nodes[ntype]
-            for name in self.g._get_ndata_names(ntype):
-                ndata_name = name.get_name()
-                block_srcnodes.data[ndata_name] = g_nodes.data[ndata_name]
-        # copy dstnode feature DistTensor reference
-        ind_dstnodes = []
-        for ntype in block.dsttypes:
-            ind_dstnodes.append(block.dstnodes[ntype].data[NID])
-            block_dstnodes = block.dstnodes[ntype]
-            g_nodes = self.g.nodes[ntype]
-            for name in self.g._get_ndata_names(ntype):
-                ndata_name = name.get_name()
-                block_dstnodes.data[ndata_name] = g_nodes.data[ndata_name]
-        # copy edge feature DistTensor reference
-        ind_edges = []
-        for etype in block.etypes:
-            ind_edges.append(block.edges[etype].data[EID])
-            block_edges = block.edges[etype]
-            g_edges = self.g.edges[etype]
-            for name in self.g._get_edata_names(etype):
-                edata_name = name.get_name()
-                block_edges.data[edata_name] = g_edges.data[edata_name]
-        block_node_subframes \
-            = extract_node_subframes_for_block(block, ind_srcnodes, ind_dstnodes)
-        block_edge_subframes = extract_edge_subframes(block, ind_edges)
-        set_new_frames(graph=block, node_frames=block_node_subframes,
-                       edge_frames=block_edge_subframes)
-        return block
-
 class _EdgeDataLoaderIter:
     def __init__(self, edge_dataloader):
         self.device = edge_dataloader.device
@@ -410,6 +349,70 @@ class _EdgeDataLoaderIter:
 
         result = [_to_device(data, self.device) for data in result_]
         return result
+
+
+class _DistDataLoaderWrapper:
+    """
+    A wrapper for DistDataLoader, copy features from original DistGraph to blocks
+    """
+    def __init__(self, g, dataloader):
+        self.g = g
+        assert isinstance(g, DistGraph), "Input g must be a DistGraph."
+        self.dataloader = dataloader
+
+    def __iter__(self):
+        self.dataloader = iter(self.dataloader)
+        return self
+
+    def __next__(self):
+        try:
+            ret = list(next(self.dataloader))
+            ret[-1] = self._copy_dist_attributes(ret[-1])
+            return tuple(ret)
+        except StopIteration:
+            raise StopIteration
+
+    def _copy_dist_attributes(self, blocks):
+        """copy DistTensor reference to blocks"""
+        # _extract_node/edge_subframes in internal.py doesn't handle DistGraph
+        # to keep changes in files minimal, two _extract_x_frames() are created
+        # to handle DistGraph attributes. Similar to _restore_x() functions.
+        def _extract_node_frames(nodes):
+            node_frames = []
+            for i, ind_node in enumerate(nodes):
+                # obtain NodeDataView._data dict
+                nframe = Frame(self.g.nodes[self.g.ntypes[i]].data._data)
+                subf = nframe.subframe(ind_node)
+                subf[NID] = ind_node
+                node_frames.append(subf)
+            return node_frames
+
+        def _extract_edge_frames(edges):
+            edge_frames = []
+            for i, ind_edge in enumerate(edges):
+                # obtain EdgeDataView._data dict
+                eframe = Frame(self.g.edges[self.g.etypes[i]].data._data)
+                subf = eframe.subframe(ind_edge)
+                subf[EID] = ind_edge
+                edge_frames.append(subf)
+            return edge_frames
+
+        for block in blocks:
+            # get srcnode ids
+            ind_srcnodes = [block.srcnodes[ntype].data[NID]
+                            for ntype in block.srctypes]
+            # get dstnode ids
+            ind_dstnodes = [block.dstnodes[ntype].data[NID]
+                            for ntype in block.dsttypes]
+            # get edge ids
+            ind_edges = [block.edges[etype].data[EID]
+                         for etype in block.etypes]
+            set_new_frames(graph=block,
+                           node_frames=_extract_node_frames(ind_srcnodes) +
+                                       _extract_node_frames(ind_dstnodes),
+                           edge_frames=_extract_edge_frames(ind_edges))
+        return blocks
+
 
 def _init_dataloader(collator, device, dataloader_kwargs, use_ddp, ddp_seed):
     dataset = collator.dataset
