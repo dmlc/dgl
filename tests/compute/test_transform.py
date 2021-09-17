@@ -1,3 +1,19 @@
+##
+#   Copyright 2019-2021 Contributors
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+#
+
 from scipy import sparse as spsp
 import networkx as nx
 import numpy as np
@@ -934,6 +950,32 @@ def test_to_block(idtype):
     bg = dgl.to_block(g, dst_nodes=dst_nodes)
     checkall(g, bg, dst_nodes)
     check_features(g, bg)
+
+    # test specifying lhs_nodes with include_dst_in_src
+    src_nodes = {}
+    for ntype in dst_nodes.keys():
+        # use the previous run to get the list of source nodes
+        src_nodes[ntype] = bg.srcnodes[ntype].data[dgl.NID]
+    bg = dgl.to_block(g, dst_nodes=dst_nodes, src_nodes=src_nodes)
+    checkall(g, bg, dst_nodes)
+    check_features(g, bg)
+
+    # test without include_dst_in_src
+    dst_nodes = {'A': F.tensor([4, 3, 2, 1], dtype=idtype), 'B': F.tensor([3, 5, 6, 1], dtype=idtype)}
+    bg = dgl.to_block(g, dst_nodes=dst_nodes, include_dst_in_src=False)
+    checkall(g, bg, dst_nodes, False)
+    check_features(g, bg)
+
+    # test specifying lhs_nodes without include_dst_in_src
+    src_nodes = {}
+    for ntype in dst_nodes.keys():
+        # use the previous run to get the list of source nodes
+        src_nodes[ntype] = bg.srcnodes[ntype].data[dgl.NID]
+    bg = dgl.to_block(g, dst_nodes=dst_nodes, include_dst_in_src=False,
+        src_nodes=src_nodes)
+    checkall(g, bg, dst_nodes, False)
+    check_features(g, bg)
+
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @parametrize_dtype
