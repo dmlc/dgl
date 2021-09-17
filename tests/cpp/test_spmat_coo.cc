@@ -148,6 +148,39 @@ bool isSparseCOO(const int64_t &num_threads, const int64_t &num_nodes,
   // refer to COOToCSR<>() in ~dgl/src/array/cpu/spmat_op_impl_coo for details.
   return num_threads * num_nodes > 4 * num_edges;
 }
+
+template <typename IDX>
+aten::COOMatrix RowSorted_NullData_COO(DLContext ctx = CTX) {
+  // [[0, 1, 1, 0, 0],
+  //  [1, 0, 0, 0, 0],
+  //  [0, 0, 1, 1, 0],
+  //  [0, 0, 0, 0, 0]]
+  // row : [0, 0, 1, 2, 2]
+  // col : [1, 2, 0, 2, 3]
+  return aten::COOMatrix(4, 5,
+                         aten::VecToIdArray(std::vector<IDX>({0, 0, 1, 2, 2}),
+                                            sizeof(IDX) * 8, ctx),
+                         aten::VecToIdArray(std::vector<IDX>({1, 2, 0, 2, 3}),
+                                            sizeof(IDX) * 8, ctx),
+                         aten::NullArray(), true, false);
+}
+
+template <typename IDX>
+aten::CSRMatrix RowSorted_NullData_CSR(DLContext ctx = CTX) {
+  // [[0, 1, 1, 0, 0],
+  //  [1, 0, 0, 0, 0],
+  //  [0, 0, 1, 1, 0],
+  //  [0, 0, 0, 0, 0]]
+  // data: [0, 1, 2, 3, 4]
+  return aten::CSRMatrix(4, 5,
+                         aten::VecToIdArray(std::vector<IDX>({0, 2, 3, 5, 5}),
+                                            sizeof(IDX) * 8, ctx),
+                         aten::VecToIdArray(std::vector<IDX>({1, 2, 0, 2, 3}),
+                                            sizeof(IDX) * 8, ctx),
+                         aten::VecToIdArray(std::vector<IDX>({0, 1, 2, 3, 4}),
+                                            sizeof(IDX) * 8, ctx),
+                         false);
+}
 }  // namespace
 
 template <typename IDX>
@@ -191,6 +224,20 @@ void _TestCOOToCSR(DLContext ctx) {
   ASSERT_TRUE(ArrayEQ<IDX>(rs_csr.indptr, rs_tcsr.indptr));
   ASSERT_TRUE(ArrayEQ<IDX>(rs_tcsr.indices, rs_coo.col));
   ASSERT_TRUE(ArrayEQ<IDX>(rs_tcsr.data, rs_coo.data));
+
+  rs_coo = RowSorted_NullData_COO<IDX>(ctx);
+  ASSERT_TRUE(rs_coo.row_sorted);
+  rs_csr = RowSorted_NullData_CSR<IDX>(ctx);
+  rs_tcsr = aten::COOToCSR(rs_coo);
+  ASSERT_EQ(coo.num_rows, rs_tcsr.num_rows);
+  ASSERT_EQ(rs_csr.num_rows, rs_tcsr.num_rows);
+  ASSERT_EQ(coo.num_cols, rs_tcsr.num_cols);
+  ASSERT_EQ(rs_csr.num_cols, rs_tcsr.num_cols);
+  ASSERT_TRUE(ArrayEQ<IDX>(rs_csr.indptr, rs_tcsr.indptr));
+  ASSERT_TRUE(ArrayEQ<IDX>(rs_csr.indices, rs_tcsr.indices));
+  ASSERT_TRUE(ArrayEQ<IDX>(rs_csr.data, rs_tcsr.data));
+  ASSERT_TRUE(ArrayEQ<IDX>(rs_coo.col, rs_tcsr.indices));
+  ASSERT_FALSE(ArrayEQ<IDX>(rs_coo.data, rs_tcsr.data));
 
   // Convert from col sorted coo
   coo = COO1<IDX>(ctx);
