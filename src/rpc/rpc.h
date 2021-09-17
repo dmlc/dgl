@@ -120,7 +120,6 @@ struct RPCContext {
     t->receiver.reset();
     t->ctx.reset();
   }
-
 };
 
 /*! \brief RPC status flag */
