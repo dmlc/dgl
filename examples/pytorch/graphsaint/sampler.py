@@ -132,7 +132,8 @@ class SAINTSampler:
         if self.train is False:
             return self.num_subg_sampler
         else:
-            return len(self.subgraphs)
+            # return len(self.subgraphs)
+            return 10
 
     def __getitem__(self, idx):
         # Only when sampling subgraphs in training procedure and need to utilize sampled subgraphs and we still
