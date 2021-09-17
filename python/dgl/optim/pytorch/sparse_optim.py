@@ -35,6 +35,7 @@ class SparseGradOptimizer(abc.ABC):
         # otherwise it will crash the training
         self.shmem_buffer_holder = []
 
+        assert len(params) > 0, 'Empty parameters'
         # if we are using shared memory for communication
         for emb in params:
             assert isinstance(emb, NodeEmbedding), \
@@ -50,6 +51,7 @@ class SparseGradOptimizer(abc.ABC):
                     'MultiGPU world_size for each embedding should be same.'
         assert not self._rank is None
         assert not self._world_size is None
+        self._nccl_root_id = 'SparseGradOptimizer.nccl_root_id'
 
     def step(self):
         ''' The step function.
@@ -111,17 +113,14 @@ class SparseGradOptimizer(abc.ABC):
                     # root process broadcasts nccl id
                     nccl_id = nccl.UniqueId()
                     uid = str(nccl_id)
-                    store.set('nccl_root_id', uid)
+                    store.set(self._nccl_root_id, uid)
                 else:
-                    uid = store.get('nccl_root_id')
+                    uid = store.get(self._nccl_root_id)
                     nccl_id = nccl.UniqueId(uid)
                 # needs to be set for nccl to work
                 self._comm = nccl.Communicator(self._world_size,
                                                self._rank,
                                                nccl_id)
-                if self._rank == 0:
-                    # clear the store entry for future communicators
-                    store.delete_key('nccl_root_id')
                 th.distributed.barrier()
 
     def _shared_setup(self):

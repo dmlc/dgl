@@ -1,5 +1,18 @@
 /*!
- *  Copyright (c) 2020 by Contributors
+ *  Copyright 2020-2021 Contributors
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
  * \file graph/transform/cuda_to_block.cu
  * \brief Functions to convert a set of edges into a graph block with local
  * ids.
@@ -202,7 +215,8 @@ class DeviceNodeMapMaker {
 
   /**
   * \brief This function builds node maps for each node type, preserving the
-  * order of the input nodes.
+  * order of the input nodes. Here it is assumed the lhs_nodes are not unique,
+  * and thus a unique list is generated.
   *
   * \param lhs_nodes The set of source input nodes.
   * \param rhs_nodes The set of destination input nodes.
@@ -237,6 +251,49 @@ class DeviceNodeMapMaker {
             nodes->shape[0],
             (*lhs_device)[ntype].Ptr<IdType>(),
             count_lhs_device+ntype,
+            stream);
+      }
+    }
+
+    // unique rhs nodes
+    const int64_t rhs_num_ntypes = static_cast<int64_t>(rhs_nodes.size());
+    for (int64_t ntype = 0; ntype < rhs_num_ntypes; ++ntype) {
+      const IdArray& nodes = rhs_nodes[ntype];
+      if (nodes->shape[0] > 0) {
+        node_maps->RhsHashTable(ntype).FillWithUnique(
+            nodes.Ptr<IdType>(),
+            nodes->shape[0],
+            stream);
+      }
+    }
+  }
+
+  /**
+  * \brief This function builds node maps for each node type, preserving the
+  * order of the input nodes. Here it is assumed both lhs_nodes and rhs_nodes
+  * are unique.
+  *
+  * \param lhs_nodes The set of source input nodes.
+  * \param rhs_nodes The set of destination input nodes.
+  * \param node_maps The node maps to be constructed.
+  * \param stream The stream to operate on.
+  */
+  void Make(
+      const std::vector<IdArray>& lhs_nodes,
+      const std::vector<IdArray>& rhs_nodes,
+      DeviceNodeMap<IdType> * const node_maps,
+      cudaStream_t stream) {
+    const int64_t num_ntypes = lhs_nodes.size() + rhs_nodes.size();
+
+    // unique lhs nodes
+    const int64_t lhs_num_ntypes = static_cast<int64_t>(lhs_nodes.size());
+    for (int64_t ntype = 0; ntype < lhs_num_ntypes; ++ntype) {
+      const IdArray& nodes = lhs_nodes[ntype];
+      if (nodes->shape[0] > 0) {
+        CHECK_EQ(nodes->ctx.device_type, kDLGPU);
+        node_maps->LhsHashTable(ntype).FillWithUnique(
+            nodes.Ptr<IdType>(),
+            nodes->shape[0],
             stream);
       }
     }
@@ -323,11 +380,15 @@ MapEdges(
 // Since partial specialization is not allowed for functions, use this as an
 // intermediate for ToBlock where XPU = kDLGPU.
 template<typename IdType>
-std::tuple<HeteroGraphPtr, std::vector<IdArray>, std::vector<IdArray>>
+std::tuple<HeteroGraphPtr, std::vector<IdArray>>
 ToBlockGPU(
     HeteroGraphPtr graph,
     const std::vector<IdArray> &rhs_nodes,
-    const bool include_rhs_in_lhs) {
+    const bool include_rhs_in_lhs,
+    std::vector<IdArray>* const lhs_nodes_ptr) {
+  std::vector<IdArray>& lhs_nodes = *lhs_nodes_ptr;
+  const bool generate_lhs_nodes = lhs_nodes.empty();
+
   cudaStream_t stream = 0;
   const auto& ctx = graph->Context();
   auto device = runtime::DeviceAPI::Get(ctx);
@@ -363,80 +424,121 @@ ToBlockGPU(
   for (int64_t ntype = 0; ntype < num_ntypes; ++ntype) {
     maxNodesPerType[ntype+num_ntypes] += rhs_nodes[ntype]->shape[0];
 
-    if (include_rhs_in_lhs) {
-      maxNodesPerType[ntype] += rhs_nodes[ntype]->shape[0];
+    if (generate_lhs_nodes) {
+      if (include_rhs_in_lhs) {
+        maxNodesPerType[ntype] += rhs_nodes[ntype]->shape[0];
+      }
+    } else {
+      maxNodesPerType[ntype] += lhs_nodes[ntype]->shape[0];
     }
   }
-  for (int64_t etype = 0; etype < num_etypes; ++etype) {
-    const auto src_dst_types = graph->GetEndpointTypes(etype);
-    const dgl_type_t srctype = src_dst_types.first;
-    if (edge_arrays[etype].src.defined()) {
-      maxNodesPerType[srctype] += edge_arrays[etype].src->shape[0];
+  if (generate_lhs_nodes) {
+    // we don't have lhs_nodes, see we need to count inbound edges to get an
+    // upper bound
+    for (int64_t etype = 0; etype < num_etypes; ++etype) {
+      const auto src_dst_types = graph->GetEndpointTypes(etype);
+      const dgl_type_t srctype = src_dst_types.first;
+      if (edge_arrays[etype].src.defined()) {
+        maxNodesPerType[srctype] += edge_arrays[etype].src->shape[0];
+      }
     }
   }
 
   // gather lhs_nodes
-  std::vector<int64_t> src_node_offsets(num_ntypes, 0);
   std::vector<IdArray> src_nodes(num_ntypes);
-  for (int64_t ntype = 0; ntype < num_ntypes; ++ntype) {
-    src_nodes[ntype] = NewIdArray(maxNodesPerType[ntype], ctx,
-        sizeof(IdType)*8);
-    if (include_rhs_in_lhs) {
-      // place rhs nodes first
-      device->CopyDataFromTo(rhs_nodes[ntype].Ptr<IdType>(), 0,
-          src_nodes[ntype].Ptr<IdType>(), src_node_offsets[ntype],
-          sizeof(IdType)*rhs_nodes[ntype]->shape[0],
-          rhs_nodes[ntype]->ctx, src_nodes[ntype]->ctx,
-          rhs_nodes[ntype]->dtype,
-          stream);
-      src_node_offsets[ntype] += sizeof(IdType)*rhs_nodes[ntype]->shape[0];
+  if (generate_lhs_nodes) {
+    std::vector<int64_t> src_node_offsets(num_ntypes, 0);
+    for (int64_t ntype = 0; ntype < num_ntypes; ++ntype) {
+      src_nodes[ntype] = NewIdArray(maxNodesPerType[ntype], ctx,
+          sizeof(IdType)*8);
+      if (include_rhs_in_lhs) {
+        // place rhs nodes first
+        device->CopyDataFromTo(rhs_nodes[ntype].Ptr<IdType>(), 0,
+            src_nodes[ntype].Ptr<IdType>(), src_node_offsets[ntype],
+            sizeof(IdType)*rhs_nodes[ntype]->shape[0],
+            rhs_nodes[ntype]->ctx, src_nodes[ntype]->ctx,
+            rhs_nodes[ntype]->dtype,
+            stream);
+        src_node_offsets[ntype] += sizeof(IdType)*rhs_nodes[ntype]->shape[0];
+      }
     }
-  }
-  for (int64_t etype = 0; etype < num_etypes; ++etype) {
-    const auto src_dst_types = graph->GetEndpointTypes(etype);
-    const dgl_type_t srctype = src_dst_types.first;
-    if (edge_arrays[etype].src.defined()) {
-      device->CopyDataFromTo(
-          edge_arrays[etype].src.Ptr<IdType>(), 0,
-          src_nodes[srctype].Ptr<IdType>(),
-          src_node_offsets[srctype],
-          sizeof(IdType)*edge_arrays[etype].src->shape[0],
-          rhs_nodes[srctype]->ctx,
-          src_nodes[srctype]->ctx,
-          rhs_nodes[srctype]->dtype,
-          stream);
+    for (int64_t etype = 0; etype < num_etypes; ++etype) {
+      const auto src_dst_types = graph->GetEndpointTypes(etype);
+      const dgl_type_t srctype = src_dst_types.first;
+      if (edge_arrays[etype].src.defined()) {
+        device->CopyDataFromTo(
+            edge_arrays[etype].src.Ptr<IdType>(), 0,
+            src_nodes[srctype].Ptr<IdType>(),
+            src_node_offsets[srctype],
+            sizeof(IdType)*edge_arrays[etype].src->shape[0],
+            rhs_nodes[srctype]->ctx,
+            src_nodes[srctype]->ctx,
+            rhs_nodes[srctype]->dtype,
+            stream);
 
-      src_node_offsets[srctype] += sizeof(IdType)*edge_arrays[etype].src->shape[0];
+        src_node_offsets[srctype] += sizeof(IdType)*edge_arrays[etype].src->shape[0];
+      }
+    }
+  } else {
+    for (int64_t ntype = 0; ntype < num_ntypes; ++ntype) {
+      src_nodes[ntype] = lhs_nodes[ntype];
     }
   }
 
   // allocate space for map creation process
   DeviceNodeMapMaker<IdType> maker(maxNodesPerType);
-
   DeviceNodeMap<IdType> node_maps(maxNodesPerType, ctx, stream);
 
-  int64_t total_lhs = 0;
-  for (int64_t ntype = 0; ntype < num_ntypes; ++ntype) {
-    total_lhs += maxNodesPerType[ntype];
+  if (generate_lhs_nodes) {
+    lhs_nodes.reserve(num_ntypes);
+    for (int64_t ntype = 0; ntype < num_ntypes; ++ntype) {
+      lhs_nodes.emplace_back(NewIdArray(
+          maxNodesPerType[ntype], ctx, sizeof(IdType)*8));
+    }
   }
 
-  std::vector<IdArray> lhs_nodes;
-  lhs_nodes.reserve(num_ntypes);
+  std::vector<int64_t> num_nodes_per_type(num_ntypes*2);
+  // populate RHS nodes from what we already know
   for (int64_t ntype = 0; ntype < num_ntypes; ++ntype) {
-    lhs_nodes.emplace_back(NewIdArray(
-        maxNodesPerType[ntype], ctx, sizeof(IdType)*8));
+    num_nodes_per_type[num_ntypes+ntype] = rhs_nodes[ntype]->shape[0];
   }
 
   // populate the mappings
-  int64_t * count_lhs_device = static_cast<int64_t*>(
-      device->AllocWorkspace(ctx, sizeof(int64_t)*num_ntypes*2));
-  maker.Make(
-      src_nodes,
-      rhs_nodes,
-      &node_maps,
-      count_lhs_device,
-      &lhs_nodes,
-      stream);
+  if (generate_lhs_nodes) {
+    int64_t * count_lhs_device = static_cast<int64_t*>(
+        device->AllocWorkspace(ctx, sizeof(int64_t)*num_ntypes*2));
+
+    maker.Make(
+        src_nodes,
+        rhs_nodes,
+        &node_maps,
+        count_lhs_device,
+        &lhs_nodes,
+        stream);
+
+    device->CopyDataFromTo(
+        count_lhs_device, 0,
+        num_nodes_per_type.data(), 0,
+        sizeof(*num_nodes_per_type.data())*num_ntypes,
+        ctx,
+        DGLContext{kDLCPU, 0},
+        DGLType{kDLInt, 64, 1},
+        stream);
+    device->StreamSync(ctx, stream);
+
+    // wait for the node counts to finish transferring
+    device->FreeWorkspace(ctx, count_lhs_device);
+  } else {
+    maker.Make(
+        lhs_nodes,
+        rhs_nodes,
+        &node_maps,
+        stream);
+
+    for (int64_t ntype = 0; ntype < num_ntypes; ++ntype) {
+      num_nodes_per_type[ntype] = lhs_nodes[ntype]->shape[0];
+    }
+  }
 
   std::vector<IdArray> induced_edges;
   induced_edges.reserve(num_etypes);
@@ -460,32 +562,16 @@ ToBlockGPU(
   std::vector<HeteroGraphPtr> rel_graphs;
   rel_graphs.reserve(num_etypes);
 
-  std::vector<int64_t> num_nodes_per_type(num_ntypes*2);
-  // populate RHS nodes from what we already know
-  for (int64_t ntype = 0; ntype < num_ntypes; ++ntype) {
-    num_nodes_per_type[num_ntypes+ntype] = rhs_nodes[ntype]->shape[0];
-  }
-  device->CopyDataFromTo(
-      count_lhs_device, 0,
-      num_nodes_per_type.data(), 0,
-      sizeof(*num_nodes_per_type.data())*num_ntypes,
-      ctx,
-      DGLContext{kDLCPU, 0},
-      DGLType{kDLInt, 64, 1},
-      stream);
-  device->StreamSync(ctx, stream);
-
-  // wait for the node counts to finish transferring
-  device->FreeWorkspace(ctx, count_lhs_device);
-
   // map node numberings from global to local, and build pointer for CSR
   std::vector<IdArray> new_lhs;
   std::vector<IdArray> new_rhs;
   std::tie(new_lhs, new_rhs) = MapEdges(graph, edge_arrays, node_maps, stream);
 
   // resize lhs nodes
-  for (int64_t ntype = 0; ntype < num_ntypes; ++ntype) {
-    lhs_nodes[ntype]->shape[0] = num_nodes_per_type[ntype];
+  if (generate_lhs_nodes) {
+    for (int64_t ntype = 0; ntype < num_ntypes; ++ntype) {
+      lhs_nodes[ntype]->shape[0] = num_nodes_per_type[ntype];
+    }
   }
 
   // build the heterograph
@@ -514,27 +600,29 @@ ToBlockGPU(
       new_meta_graph, rel_graphs, num_nodes_per_type);
 
   // return the new graph, the new src nodes, and new edges
-  return std::make_tuple(new_graph, lhs_nodes, induced_edges);
+  return std::make_tuple(new_graph, induced_edges);
 }
 
 }  // namespace
 
 template<>
-std::tuple<HeteroGraphPtr, std::vector<IdArray>, std::vector<IdArray>>
+std::tuple<HeteroGraphPtr, std::vector<IdArray>>
 ToBlock<kDLGPU, int32_t>(
     HeteroGraphPtr graph,
     const std::vector<IdArray> &rhs_nodes,
-    bool include_rhs_in_lhs) {
-  return ToBlockGPU<int32_t>(graph, rhs_nodes, include_rhs_in_lhs);
+    bool include_rhs_in_lhs,
+    std::vector<IdArray>* const lhs_nodes) {
+  return ToBlockGPU<int32_t>(graph, rhs_nodes, include_rhs_in_lhs, lhs_nodes);
 }
 
 template<>
-std::tuple<HeteroGraphPtr, std::vector<IdArray>, std::vector<IdArray>>
+std::tuple<HeteroGraphPtr, std::vector<IdArray>>
 ToBlock<kDLGPU, int64_t>(
     HeteroGraphPtr graph,
     const std::vector<IdArray> &rhs_nodes,
-    bool include_rhs_in_lhs) {
-  return ToBlockGPU<int64_t>(graph, rhs_nodes, include_rhs_in_lhs);
+    bool include_rhs_in_lhs,
+    std::vector<IdArray>* const lhs_nodes) {
+  return ToBlockGPU<int64_t>(graph, rhs_nodes, include_rhs_in_lhs, lhs_nodes);
 }
 
 }  // namespace transform

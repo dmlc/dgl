@@ -107,6 +107,7 @@ void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_poin
 
   // sample for each cloud in the batch
   IdType* start_idx_data = static_cast<IdType*>(start_idx->data);
+  CUDA_CALL(cudaSetDevice(array->ctx.device_id));
 
   CUDA_KERNEL_CALL(fps_kernel,
       batch_size, THREADS, 0, thr_entry->stream,
