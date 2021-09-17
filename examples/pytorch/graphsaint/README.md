@@ -57,12 +57,13 @@ Note that the PPI dataset here is different from DGL's built-in variant.
 
 Run with following:
 ```bash
-python train_sampling.py --task $task --online $online
-# e.g. python train_sampling.py --task ppi_n --online True
+python train_sampling.py --task $task $online
+# online sampling: e.g. python train_sampling.py --task ppi_n --online
+# offline sampling: e.g. python train_sampling.py --task flickr_e
 ```
 
 - `$task` includes `ppi_n, ppi_e, ppi_rw, flickr_n, flickr_e, flickr_rw, reddit_n, reddit_e, reddit_rw, yelp_n, yelp_e, yelp_rw, amazon_n, amazon_e, amazon_rw`. For example, `ppi_n` represents running experiments on dataset `ppi` with `node sampler`
-- `$online` includes `True` or `False`. `True` means we sample subgraphs on-the-fly in training phase, while discarding pre-sampled subgraphs. `False` means we utilize pre-sampled subgraphs in training phase.
+- If `$online` is `--online`,  we sample subgraphs on-the-fly in the training phase, while discarding pre-sampled subgraphs. If `$online` is empty, we utilize pre-sampled subgraphs in the training phase.
 
 ## Experiments
 

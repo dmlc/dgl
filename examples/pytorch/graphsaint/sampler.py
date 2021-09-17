@@ -150,13 +150,8 @@ class SAINTSampler:
             return num_nodes, subgraph_nids, subgraph_eids
 
     def __collate_fn__(self, batch):
-        if self.train:
-            subgraphs = []
-            for g in batch:
-                subgraphs.append(g)
-            if len(subgraphs) == 1:
-                return subgraphs[0]
-            return subgraphs
+        if self.train:  # sample only one graph each epoch, batch_size in training phase in 1
+            return batch[0]
         else:
             sum_num_nodes = 0
             subgraphs_nids_list = []
