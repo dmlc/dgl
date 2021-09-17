@@ -847,6 +847,16 @@ def test_to_simple(idtype):
     assert 'h' not in sg.nodes['user'].data
     assert 'hh' not in sg.nodes['user'].data
 
+    # verify DGLGraph.edge_ids() after dgl.to_simple()
+    # in case ids are not initialized in underlying coo2csr()
+    u = F.tensor([0, 1, 2])
+    v = F.tensor([1, 2, 3])
+    eids = F.tensor([0, 1, 2])
+    g = dgl.graph((u, v))
+    assert F.array_equal(g.edge_ids(u, v), eids)
+    sg = dgl.to_simple(g)
+    assert F.array_equal(sg.edge_ids(u, v), eids)
+
 @parametrize_dtype
 def test_to_block(idtype):
     def check(g, bg, ntype, etype, dst_nodes, include_dst_in_src=True):
