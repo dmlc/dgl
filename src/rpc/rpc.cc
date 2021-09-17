@@ -31,15 +31,15 @@ using namespace tensorpipe;
 
 // Borrow from PyTorch
 
-const std::string kSocketIfnameEnvVar = "TP_SOCKET_IFNAME";
-const std::string kDefaultUvAddress = "127.0.0.1";
+const char kSocketIfnameEnvVar[] = "TP_SOCKET_IFNAME";
+const char kDefaultUvAddress[] = "127.0.0.1";
 constexpr static int kNumUvThreads = 16;
 
 const std::string& guessAddress() {
   static const std::string uvAddress = []() {
     tensorpipe::Error error;
     std::string result;
-    char* ifnameEnv = std::getenv(kSocketIfnameEnvVar.c_str());
+    char* ifnameEnv = std::getenv(kSocketIfnameEnvVar);
     if (ifnameEnv != nullptr) {
       std::tie(error, result) =
           tensorpipe::transport::uv::lookupAddrForIface(ifnameEnv);
@@ -47,7 +47,7 @@ const std::string& guessAddress() {
         LOG(WARNING) << "Failed to look up the IP address for interface "
                      << ifnameEnv << " (" << error.what() << "), defaulting to "
                      << kDefaultUvAddress;
-        return kDefaultUvAddress;
+        return std::string(kDefaultUvAddress);
       }
     } else {
       std::tie(error, result) =
@@ -56,7 +56,7 @@ const std::string& guessAddress() {
         LOG(WARNING) << "Failed to look up the IP address for the hostname ("
                      << error.what() << "), defaulting to "
                      << kDefaultUvAddress;
-        return kDefaultUvAddress;
+        return std::string(kDefaultUvAddress);
       }
     }
     return result;
