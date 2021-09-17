@@ -29,7 +29,40 @@ namespace rpc {
 
 using namespace tensorpipe;
 
-RPCContext* RPCContext::singletonInstance;
+// Borrow from PyTorch
+
+const std::string kSocketIfnameEnvVar = "TP_SOCKET_IFNAME";
+const std::string kDefaultUvAddress = "127.0.0.1";
+constexpr static int kNumUvThreads = 16;
+
+const std::string& guessAddress() {
+  static const std::string uvAddress = []() {
+    tensorpipe::Error error;
+    std::string result;
+    char* ifnameEnv = std::getenv(kSocketIfnameEnvVar.c_str());
+    if (ifnameEnv != nullptr) {
+      std::tie(error, result) =
+          tensorpipe::transport::uv::lookupAddrForIface(ifnameEnv);
+      if (error) {
+        LOG(WARNING) << "Failed to look up the IP address for interface "
+                     << ifnameEnv << " (" << error.what() << "), defaulting to "
+                     << kDefaultUvAddress;
+        return kDefaultUvAddress;
+      }
+    } else {
+      std::tie(error, result) =
+          tensorpipe::transport::uv::lookupAddrForHostname();
+      if (error) {
+        LOG(WARNING) << "Failed to look up the IP address for the hostname ("
+                     << error.what() << "), defaulting to "
+                     << kDefaultUvAddress;
+        return kDefaultUvAddress;
+      }
+    }
+    return result;
+  }();
+  return uvAddress;
+}
 
 RPCStatus SendRPCMessage(const RPCMessage& msg, const int32_t target_id) {
   RPCContext::getInstance()->sender->Send(msg, target_id);
@@ -49,16 +82,20 @@ void InitGlobalTpContext() {
     auto context = RPCContext::getInstance()->ctx;
     auto transportContext = tensorpipe::transport::uv::create();
     context->registerTransport(0, "tcp", transportContext);
+    // Register basic uv channel
     auto basicChannel = tensorpipe::channel::basic::create();
     context->registerChannel(0, "basic", basicChannel);
-    std::vector<std::shared_ptr<tensorpipe::transport::Context>> contexts = {
-      tensorpipe::transport::uv::create(), tensorpipe::transport::uv::create(),
-      tensorpipe::transport::uv::create()};
-    std::vector<std::shared_ptr<tensorpipe::transport::Listener>> listeners = {
-      contexts[0]->listen("127.0.0.1"), contexts[1]->listen("127.0.0.1"),
-      contexts[2]->listen("127.0.0.1")};
-    auto mptChannel = tensorpipe::channel::mpt::create(
-      std::move(contexts), std::move(listeners));
+    // Register multiplex uv channel
+    std::vector<std::shared_ptr<tensorpipe::transport::Context>> contexts;
+    std::vector<std::shared_ptr<tensorpipe::transport::Listener>> listeners;
+    for (int i = 0; i < kNumUvThreads; i++) {
+      auto context = tensorpipe::transport::uv::create();
+      std::string address = guessAddress();
+      contexts.push_back(std::move(context));
+      listeners.push_back(contexts.back()->listen(address));
+    }
+    auto mptChannel = tensorpipe::channel::mpt::create(std::move(contexts),
+                                                       std::move(listeners));
     context->registerChannel(10, "mpt", mptChannel);
   }
 }

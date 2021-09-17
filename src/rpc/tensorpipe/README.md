@@ -66,7 +66,7 @@ pipe->write(message, callback_fn)
 ```
 
 ## Register the underlying communication channel
-There are two concept, transport and channel. 
+There are two concept, transport and channel.
 Transport is the basic component for communication like sockets, which only supports cpu buffers.
 Channel is higher abstraction over transport, which can support gpu buffers, or utilize multiple transport method to acceelerate communication
 
@@ -94,3 +94,11 @@ context->registerChannel(10, "mpt", mptChannel);
 ```
 
 There are more channels supported by tensorpipe, such as CUDA IPC (for cuda communication on the same machine), CMA(using shared memory on the same machine), CUDA GDR(using infiniband with CUDA GPUDirect for gpu buffer), CUDA Basic(using socket+seperate thread to copy buffer to CUDA memory.
+
+Quote from tensorpipe:
+
+Backends come in two flavors:
+
+Transports are the connections used by the pipes to transfer control messages, and the (smallish) core payloads. They are meant to be lightweight and low-latency. The most basic transport is a simple TCP one, which should work in all scenarios. A more optimized one, for example, is based on a ring buffer allocated in shared memory, which two processes on the same machine can use to communicate by performing just a memory copy, without passing through the kernel.
+
+Channels are where the heavy lifting takes place, as they take care of copying the (larger) tensor data. High bandwidths are a requirement. Examples include multiplexing chunks of data across multiple TCP sockets and processes, so to saturate the NIC's bandwidth. Or using a CUDA memcpy call to transfer memory from one GPU to another using NVLink.

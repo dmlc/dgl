@@ -103,13 +103,8 @@ struct RPCContext {
 
   /*! \brief Get the RPC context singleton */
   static RPCContext* getInstance() {
-    /*! This is accessiable by multiple thread but not thread-safe.
-        However DGL will initialize the context at main thread first,
-        so no concurrency should happen here */
-    if (!singletonInstance) {
-      singletonInstance = new RPCContext;
-    }
-    return singletonInstance;
+    static RPCContext ctx;
+    return &ctx;
   }
 
   /*! \brief Reset the RPC context */
@@ -126,8 +121,6 @@ struct RPCContext {
     t->ctx.reset();
   }
 
- private:
-  static RPCContext* singletonInstance;
 };
 
 /*! \brief RPC status flag */

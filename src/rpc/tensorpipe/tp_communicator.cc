@@ -60,15 +60,18 @@ void TPSender::Send(const RPCMessage& msg, int recv_id) {
   int32_t nonempty_ndarray_count = zc_write_strm.buffer_list().size();
   zerocopy_blob_ptr->append(reinterpret_cast<char*>(&nonempty_ndarray_count),
                             sizeof(int32_t));
-  tp_msg.payloads.resize(nonempty_ndarray_count);
+  tp_msg.tensors.resize(nonempty_ndarray_count);
+  // Hold the NDArray that ensure it's valid until write operation completes
   auto ndarray_holder = std::make_shared<std::vector<NDArray>>();
   ndarray_holder->resize(nonempty_ndarray_count);
   auto& buffer_list = zc_write_strm.buffer_list();
   for (int i = 0; i < buffer_list.size(); i++) {
     auto& ptr = buffer_list[i];
     (*ndarray_holder.get())[i] = ptr.tensor;
-    tp_msg.payloads[i].data = ptr.data;
-    tp_msg.payloads[i].length = ptr.size;
+    tensorpipe::CpuBuffer cpu_buffer;
+    cpu_buffer.ptr = ptr.data;
+    tp_msg.tensors[i].buffer = cpu_buffer;
+    tp_msg.tensors[i].length = ptr.size;
     if (ptr.size == 0) {
       LOG(FATAL) << "Cannot send a empty NDArray.";
     }
@@ -118,33 +121,38 @@ void TPReceiver::ReceiveFromPipe(std::shared_ptr<Pipe> pipe,
       return;
     }
     Allocation allocation;
-    int payloadsize = descriptor.payloads.size();
-    if (descriptor.payloads.size() > 0) {
-      allocation.payloads.resize(payloadsize);
-      for (int i = 0; i < descriptor.payloads.size(); i++) {
-        allocation.payloads[i].data = new char[descriptor.payloads[i].length];
+    CHECK_EQ(descriptor.payloads.size(), 0) << "Invalid DGL RPC Message";
+
+    int tensorsize = descriptor.tensors.size();
+    if (tensorsize > 0) {
+      allocation.tensors.resize(tensorsize);
+      for (int i = 0; i < descriptor.tensors.size(); i++) {
+        tensorpipe::CpuBuffer cpu_buffer;
+        cpu_buffer.ptr = new char[descriptor.tensors[i].length];
+        allocation.tensors[i].buffer = cpu_buffer;
       }
     }
-    pipe->read(allocation, [allocation, descriptor, queue = std::move(queue),
-                            pipe](const Error& error) {
-      if (error) {
-        // Error may happen when the pipe is closed
-        return;
-      }
+    pipe->read(
+      allocation, [allocation, descriptor = std::move(descriptor),
+                   queue = std::move(queue), pipe](const Error& error) {
+        if (error) {
+          // Error may happen when the pipe is closed
+          return;
+        }
 
-      char* meta_msg_begin = const_cast<char*>(&descriptor.metadata[0]);
-      std::vector<void*> buffer_list(descriptor.payloads.size());
-      for (int i = 0; i < descriptor.payloads.size(); i++) {
-        buffer_list[i] = allocation.payloads[i].data;
-      }
-      StreamWithBuffer zc_read_strm(
-        meta_msg_begin, descriptor.metadata.size() - sizeof(int32_t),
-        buffer_list);
-      RPCMessage msg;
-      zc_read_strm.Read(&msg);
-      queue->push(msg);
-      TPReceiver::ReceiveFromPipe(pipe, queue);
-    });
+        char* meta_msg_begin = const_cast<char*>(&descriptor.metadata[0]);
+        std::vector<void*> buffer_list(descriptor.tensors.size());
+        for (int i = 0; i < descriptor.tensors.size(); i++) {
+          buffer_list[i] = allocation.tensors[i].buffer.unwrap<CpuBuffer>().ptr;
+        }
+        StreamWithBuffer zc_read_strm(
+          meta_msg_begin, descriptor.metadata.size() - sizeof(int32_t),
+          buffer_list);
+        RPCMessage msg;
+        zc_read_strm.Read(&msg);
+        queue->push(msg);
+        TPReceiver::ReceiveFromPipe(pipe, queue);
+      });
   });
 }
 
