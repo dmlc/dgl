@@ -81,7 +81,7 @@ def run(proc_id, n_gpus, args, devices, data):
 
     train_mask = train_g.ndata['train_mask']
     val_mask = val_g.ndata['val_mask']
-    test_mask = ~(test_g.ndata['train_mask'] | test_g.ndata['val_mask'])
+    test_mask = test_g.ndata['test_mask']
     train_nid = train_mask.nonzero().squeeze()
     val_nid = val_mask.nonzero().squeeze()
     test_nid = test_mask.nonzero().squeeze()
@@ -200,6 +200,13 @@ if __name__ == '__main__':
         g, n_classes = load_reddit()
     elif args.dataset == 'ogbn-products':
         g, n_classes = load_ogb('ogbn-products')
+    elif args.dataset == 'ogbn-papers100M':
+        g, n_classes = load_ogb('ogbn-papers100M')
+        # add reverse direction edges to make graph undirected
+        srcs, dsts = g.all_edges()
+        g.add_edges(dsts, srcs)
+        # convert labels to integer
+        g.ndata['labels'] = th.as_tensor(g.ndata['labels'], dtype=th.int64)
     else:
         raise Exception('unknown dataset')
 
