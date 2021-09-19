@@ -350,7 +350,6 @@ class _EdgeDataLoaderIter:
         result = [_to_device(data, self.device) for data in result_]
         return result
 
-
 class _DistDataLoaderWrapper:
     """
     A wrapper for DistDataLoader, copy features from original DistGraph to blocks
@@ -412,7 +411,6 @@ class _DistDataLoaderWrapper:
                                        _extract_node_frames(ind_dstnodes),
                            edge_frames=_extract_edge_frames(ind_edges))
         return blocks
-
 
 def _init_dataloader(collator, device, dataloader_kwargs, use_ddp, ddp_seed):
     dataset = collator.dataset
