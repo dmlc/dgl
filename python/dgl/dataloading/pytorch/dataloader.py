@@ -407,7 +407,7 @@ class _DistDataLoaderWrapper:
             ind_edges = [block.edges[etype].data[EID]
                          for etype in block.etypes]
             set_new_frames(graph=block,
-                           node_frames=_extract_node_frames(ind_srcnodes) +
+                           node_frames=_extract_node_frames(ind_srcnodes)+\
                                        _extract_node_frames(ind_dstnodes),
                            edge_frames=_extract_edge_frames(ind_edges))
         return blocks
