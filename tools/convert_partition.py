@@ -29,7 +29,8 @@ parser.add_argument('--edge-attr-dtype', type=str, default=None,
                     help='The data type of the edge attributes')
 parser.add_argument('--output', required=True, type=str,
                     help='The output directory of the partitioned results')
-parser.add_argument('--removed-edges', help='file where we have edges that were dropped', default=None, type=str)
+parser.add_argument('--removed-edges', help='a file that contains the removed self-loops and duplicated edges',
+                    default=None, type=str)
 
 args = parser.parse_args()
 
