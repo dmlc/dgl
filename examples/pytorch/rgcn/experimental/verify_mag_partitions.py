@@ -62,6 +62,7 @@ for key in edge_map:
 eid_map = dgl.distributed.id_map.IdMap(edge_map)
 
 # Load the graph partition structure.
+orig_edge_ids = {etype: [] for etype in hg.etypes}
 for partid in range(num_parts):
     print('test part', partid)
     part_file = 'outputs/part{}/graph.dgl'.format(partid)
@@ -101,9 +102,15 @@ for partid in range(num_parts):
         orig_type_eid = subg.edata['orig_id'][idx]
         # All edges should have the same edge type.
         assert np.all(etype_ids1.numpy() == int(etype_id))
+        orig_edge_ids[etype].append(orig_type_eid)
 
         # Check edge data.
         for name in hg.edges[etype].data:
             local_data = edge_feats[etype + '/' + name][type_eid]
             local_data1 = hg.edges[etype].data[name][orig_type_eid]
             assert np.all(local_data.numpy() == local_data1.numpy())
+
+for etype in orig_edge_ids:
+    eids = th.cat(orig_edge_ids[etype])
+    uniq_eids = th.unique(eids)
+    assert len(uniq_eids) == hg.number_of_edges(etype)
