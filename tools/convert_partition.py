@@ -42,28 +42,25 @@ edge_attr_dtype = args.edge_attr_dtype
 workspace_dir = args.workspace
 output_dir = args.output
 
-
+self_loop_edges = None
+duplicate_edges = None
 if args.removed_edges is not None:
     removed_file = '{}/{}'.format(input_dir, args.removed_edges)
-    remove_column_index = [0, 1, 2, 3]
-    remove_column_name = ["distributed_src_id", "distributed_dest_id", "src_id", "dest_id"]
-    removed_df = pd.read_csv(removed_file, sep=" ", header=None)
-    removed_df.rename(columns = {0: "src_id", 1: "dest_id"}, inplace=True)
-
-    # We are adding removed edges back into the partitioned file, so that all the edges
-    # that were removed during ParMETIS gets retained back into the partioned file, so that
-    # no edges were lost.
-
-    print('Adding removed edges back into the partitioned file, that way all edges that were removed during ParMETIS gets retained back into the partioned file')
-
-    for part_id in range(num_parts):
-        edge_file = '{}/p{:03}-{}_edges.txt'.format(input_dir, part_id, graph_name)
-        part_df = pd.read_csv(edge_file, sep=" ", usecols=remove_column_index, names=remove_column_name)
-        merge_df = pd.merge(part_df, removed_df, how='inner', on=["src_id", "dest_id"])
-        merge_df.to_csv(edge_file, mode='a', header=False, index=False, sep=" ")
-
-    print('All dropped edges were retained back into the partitioned files. Now partitioned files has all edges in them')
-
+    removed_df = csv.read_csv(removed_file, read_options=pyarrow.csv.ReadOptions(autogenerate_column_names=True),
+                         parse_options=pyarrow.csv.ParseOptions(delimiter=' '))
+    assert removed_df.num_columns == 4
+    src_id = removed_df['f0'].to_numpy()
+    dst_id = removed_df['f1'].to_numpy()
+    orig_id = removed_df['f2'].to_numpy()
+    etype = removed_df['f3'].to_numpy()
+    self_loop_idx = src_id == dst_id
+    not_self_loop_idx = src_id != dst_id
+    self_loop_edges = [src_id[self_loop_idx], dst_id[self_loop_idx],
+                       orig_id[self_loop_idx], etype[self_loop_idx]]
+    duplicate_edges = [src_id[not_self_loop_idx], dst_id[not_self_loop_idx],
+                       orig_id[not_self_loop_idx], etype[not_self_loop_idx]]
+    print('There are {} self-loops and {} duplicated edges in the removed edges'.format(len(self_loop_edges[0]),
+                                                                                        len(duplicate_edges[0])))
 
 with open(args.schema) as json_file:
     schema = json.load(json_file)
@@ -90,6 +87,7 @@ def read_feats(file_name):
     num_cols = len(attrs.columns)
     return np.stack([attrs.columns[i].to_numpy() for i in range(num_cols)], 1)
 
+max_nid = np.iinfo(np.int32).max
 num_edges = 0
 num_nodes = 0
 node_map_val = {ntype:[] for ntype in ntypes}
@@ -150,6 +148,49 @@ for part_id in range(num_parts):
                          parse_options=pyarrow.csv.ParseOptions(delimiter=' '))
     num_cols = len(edges.columns)
     src_id, dst_id, orig_src_id, orig_dst_id, orig_edge_id, etype_ids = [edges.columns[i].to_numpy() for i in range(num_cols)]
+
+    # Let's merge the self-loops and duplicated edges to the partition.
+    src_id_list, dst_id_list = [src_id], [dst_id]
+    orig_src_id_list, orig_dst_id_list = [orig_src_id], [orig_dst_id]
+    orig_edge_id_list, etype_id_list = [orig_edge_id], [etype_ids]
+    if self_loop_edges is not None and len(self_loop_edges[0]) > 0:
+        uniq_orig_nids, idx = np.unique(orig_dst_id, return_index=True)
+        common_nids, common_idx1, common_idx2 = np.intersect1d(uniq_orig_nids, self_loop_edges[0], return_indices=True)
+        idx = idx[common_idx1]
+        # the IDs after ID assignment
+        src_id_list.append(dst_id[idx])
+        dst_id_list.append(dst_id[idx])
+        # homogeneous IDs in the input graph.
+        orig_src_id_list.append(self_loop_edges[0][common_idx2])
+        orig_dst_id_list.append(self_loop_edges[0][common_idx2])
+        # edge IDs and edge type.
+        orig_edge_id_list.append(self_loop_edges[2][common_idx2])
+        etype_id_list.append(self_loop_edges[3][common_idx2])
+        print('Add {} self-loops in partition {}'.format(len(idx), part_id))
+    if duplicate_edges is not None and len(duplicate_edges[0]) > 0:
+        part_ids = orig_src_id.astype(np.int64) * max_nid + orig_dst_id.astype(np.int64)
+        uniq_orig_ids, idx = np.unique(part_ids, return_index=True)
+        duplicate_ids = duplicate_edges[0].astype(np.int64) * max_nid + duplicate_edges[1].astype(np.int64)
+        common_nids, common_idx1, common_idx2 = np.intersect1d(uniq_orig_ids, duplicate_ids, return_indices=True)
+        idx = idx[common_idx1]
+        # the IDs after ID assignment
+        src_id_list.append(src_id[idx])
+        dst_id_list.append(dst_id[idx])
+        # homogeneous IDs in the input graph.
+        orig_src_id_list.append(duplicate_edges[0][common_idx2])
+        orig_dst_id_list.append(duplicate_edges[1][common_idx2])
+        # edge IDs and edge type.
+        orig_edge_id_list.append(duplicate_edges[2][common_idx2])
+        etype_id_list.append(duplicate_edges[3][common_idx2])
+        print('Add {} duplicated edges in partition {}'.format(len(idx), part_id))
+    src_id = np.concatenate(src_id_list) if len(src_id_list) > 1 else src_id_list[0]
+    dst_id = np.concatenate(dst_id_list) if len(dst_id_list) > 1 else dst_id_list[0]
+    orig_src_id = np.concatenate(orig_src_id_list) if len(orig_src_id_list) > 1 else orig_src_id_list[0]
+    orig_dst_id = np.concatenate(orig_dst_id_list) if len(orig_dst_id_list) > 1 else orig_dst_id_list[0]
+    orig_edge_id = np.concatenate(orig_edge_id_list) if len(orig_edge_id_list) > 1 else orig_edge_id_list[0]
+    etype_ids = np.concatenate(etype_id_list) if len(etype_id_list) > 1 else etype_id_list[0]
+    print('There are {} edges in partition {}'.format(len(src_id), part_id))
+
     # It's not guaranteed that the edges are sorted based on edge type.
     # Let's sort edges and all attributes on the edges.
     sort_idx = np.argsort(etype_ids)
@@ -228,6 +269,7 @@ for part_id in range(num_parts):
     part_dir = output_dir + '/part' + str(part_id)
     os.makedirs(part_dir, exist_ok=True)
     dgl.save_graphs(part_dir + '/graph.dgl', [compact_g1])
+num_nodes < max_nid
 
 part_metadata = {'graph_name': graph_name,
                  'num_nodes': num_nodes,
