@@ -9,18 +9,18 @@ import tqdm
 import argparse
 import time
 
+import provider
 from ShapeNet import ShapeNet
-from point_transformer import PointTransformerSeg, PartSegLoss
+from pct import PointTransformerSeg, PartSegLoss
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset-path', type=str, default='')
 parser.add_argument('--load-model-path', type=str, default='')
 parser.add_argument('--save-model-path', type=str, default='')
-parser.add_argument('--num-epochs', type=int, default=250)
+parser.add_argument('--num-epochs', type=int, default=500)
 parser.add_argument('--num-workers', type=int, default=8)
 parser.add_argument('--batch-size', type=int, default=16)
 parser.add_argument('--tensorboard', action='store_true')
-parser.add_argument('--opt', type=str, default='adam')
 args = parser.parse_args()
 
 num_workers = args.num_workers
@@ -59,9 +59,9 @@ def train(net, opt, scheduler, train_loader, dev):
             cat_ind = [category_list.index(c) for c in cat]
             # An one-hot encoding for the object category
             cat_tensor = torch.tensor(eye_mat[cat_ind]).to(
-                dev, dtype=torch.float).repeat(1, 2048)
-            cat_tensor = cat_tensor.view(num_examples, -1, 16)
-            logits = net(data, cat_tensor).permute(0, 2, 1)
+                dev, dtype=torch.float)
+            cat_tensor = cat_tensor.view(num_examples, 16, 1)
+            logits = net(data, cat_tensor)
             loss = L(logits, label)
             loss.backward()
             opt.step()
@@ -129,10 +129,10 @@ def evaluate(net, test_loader, dev, per_cat_verbose=False):
                 label = label.to(dev, dtype=torch.long)
                 cat_ind = [category_list.index(c) for c in cat]
                 cat_tensor = torch.tensor(eye_mat[cat_ind]).to(
-                    dev, dtype=torch.float).repeat(1, 2048)
+                    dev, dtype=torch.float)
                 cat_tensor = cat_tensor.view(
-                    num_examples, -1, 16)
-                logits = net(data, cat_tensor).permute(0, 2, 1)
+                    num_examples, 16, 1)
+                logits = net(data, cat_tensor)
                 _, preds = logits.max(1)
 
                 cat_miou = mIoU(preds.cpu().numpy(),
@@ -162,29 +162,21 @@ def evaluate(net, test_loader, dev, per_cat_verbose=False):
 
 
 dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-net = PointTransformerSeg(50, batch_size)
+net = PointTransformerSeg()
 
 net = net.to(dev)
 if args.load_model_path:
     net.load_state_dict(torch.load(args.load_model_path, map_location=dev))
 
-if args.opt == 'sgd':
-    # The optimizer strategy described in paper:
-    opt = torch.optim.SGD(net.parameters(), lr=0.01,
-                          momentum=0.9, weight_decay=1e-4)
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(
-        opt, milestones=[120, 160], gamma=0.1)
-elif args.opt == 'adam':
-    # The optimizer strategy proposed by
-    # https://github.com/qq456cvb/Point-Transformers:
-    opt = torch.optim.Adam(
-        net.parameters(),
-        lr=1e-3,
-        betas=(0.9, 0.999),
-        eps=1e-08,
-        weight_decay=1e-4
-    )
-    scheduler = torch.optim.lr_scheduler.StepLR(opt, step_size=50, gamma=0.3)
+opt = torch.optim.SGD(
+    net.parameters(),
+    lr=0.01,
+    weight_decay=1e-4,
+    momentum=0.9
+)
+
+scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+    opt, T_max=args.num_epochs)
 
 L = PartSegLoss()
 
