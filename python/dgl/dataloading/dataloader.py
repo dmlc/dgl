@@ -238,6 +238,14 @@ class BlockSampler(object):
         a CUDA context if multiprocessing is not used in the dataloader (e.g.,
         num_workers is 0). If this is None, the sampled blocks will be stored
         on the same device as the input graph.
+    exclude_edges_in_frontier : bool, default False
+        If True, the :func:`sample_frontier` method will receive an argument
+        :attr:`exclude_eids` containing the edge IDs from the original graph to exclude.
+        The :func:`sample_frontier` method must return a graph that does not contain
+        the edges corresponding to the excluded edges.  No additional postprocessing
+        will be done.
+
+        Otherwise, the edges will be removed *after* :func:`sample_frontier` returns.
 
     Notes
     -----
@@ -250,7 +258,37 @@ class BlockSampler(object):
         self.return_eids = return_eids
         self.set_output_context(output_ctx)
 
-    def sample_frontier(self, block_id, g, seed_nodes):
+    # This is really a hack working around the lack of GPU-based neighbor sampling
+    # with edge exclusion.
+    @classmethod
+    def exclude_edges_in_frontier(cls, g):
+        """Returns whether the sampler will exclude edges in :func:`sample_frontier`.
+
+        If this method returns True, the method :func:`sample_frontier` will receive an
+        argument :attr:`exclude_eids` from :func:`sample_blocks`.  :func:`sample_frontier`
+        is then responsible for removing those edges.
+
+        If this method returns False, :func:`sample_blocks` will be responsible for
+        removing the edges.
+
+        When subclassing :class:`BlockSampler`, this method should return True when you
+        would like to remove the excluded edges in your :func:`sample_frontier` method.
+
+        By default this method returns False.
+
+        Parameters
+        ----------
+        g : DGLGraph
+            The original graph
+
+        Returns
+        -------
+        bool
+            Whether :func:`sample_frontier` will receive an argument :attr:`exclude_eids`.
+        """
+        return False
+
+    def sample_frontier(self, block_id, g, seed_nodes, exclude_eids=None):
         """Generate the frontier given the destination nodes.
 
         The subclasses should override this function.
@@ -266,6 +304,11 @@ class BlockSampler(object):
 
             If the graph only has one node type, one can just specify a single tensor
             of node IDs.
+        exclude_eids: Tensor or dict
+            Edge IDs to exclude during sampling neighbors for the seed nodes.
+
+            This argument can take a single ID tensor or a dictionary of edge types and ID tensors.
+            If a single tensor is given, the graph must only have one type of nodes.
 
         Returns
         -------
@@ -307,7 +350,6 @@ class BlockSampler(object):
         :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
         """
         blocks = []
-        eid_excluder = _create_eid_excluder(exclude_eids, self.output_device)
 
         if isinstance(g, DistGraph):
             # TODO:(nv-dlasalle) dist graphs may not have an associated graph,
@@ -324,7 +366,12 @@ class BlockSampler(object):
                     for ntype, nodes in seed_nodes_in.items()}
             else:
                 seed_nodes_in = seed_nodes_in.to(graph_device)
-            frontier = self.sample_frontier(block_id, g, seed_nodes_in)
+
+            if self.exclude_edges_in_frontier:
+                frontier = self.sample_frontier(
+                    block_id, g, seed_nodes_in, exclude_eids=exclude_eids)
+            else:
+                frontier = self.sample_frontier(block_id, g, seed_nodes_in)
 
             if self.output_device is not None:
                 frontier = frontier.to(self.output_device)
@@ -338,8 +385,10 @@ class BlockSampler(object):
 
             # Removing edges from the frontier for link prediction training falls
             # into the category of frontier postprocessing
-            if eid_excluder is not None:
-                eid_excluder(frontier)
+            if not self.exclude_edges_in_frontier:
+                eid_excluder = _create_eid_excluder(exclude_eids, self.output_device)
+                if eid_excluder is not None:
+                    eid_excluder(frontier)
 
             block = transform.to_block(frontier, seed_nodes_out)
             if self.return_eids:
