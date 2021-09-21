@@ -168,7 +168,7 @@ class FakeNewsDataset(DGLBuiltinDataset):
                               'feature': self.feature,
                               'train_mask': self.train_mask,
                               'val_mask': self.val_mask,
-                              'test_mask': self.train_mask})
+                              'test_mask': self.test_mask})
 
     def has_cache(self):
         """ check whether there are processed data in `self.save_path` """
