@@ -43,7 +43,8 @@ bool TPSender::Connect() {
         break;
       } else {
         sleep(5);
-        LOG(INFO) << "Cannot connect to remove server. Wait to retry";
+        LOG(INFO) << "Cannot connect to remove server " << kv.second
+                  << ". Wait to retry";
       }
     }
     pipes_[kv.first] = pipe;
