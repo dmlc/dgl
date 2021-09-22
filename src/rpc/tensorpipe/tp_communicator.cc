@@ -77,18 +77,19 @@ void TPSender::Send(const RPCMessage& msg, int recv_id) {
       LOG(FATAL) << "Cannot send a empty NDArray.";
     }
   }
-  pipe->write(tp_msg, [ndarray_holder](const tensorpipe::Error& error) {
-    if (error) {
-      LOG(FATAL) << error.what();
-    }
-  });
+  pipe->write(tp_msg,
+              [ndarray_holder, recv_id](const tensorpipe::Error& error) {
+                if (error) {
+                  LOG(FATAL) << "Failed to send message to " << recv_id
+                             << ". Details: " << error.what();
+                }
+              });
 }
 
 void TPSender::Finalize() {}
 void TPReceiver::Finalize() {}
 
 bool TPReceiver::Wait(const std::string& addr, int num_sender) {
-  std::string addr_str(addr);
   listener = context->listen({addr});
   for (int i = 0; i < num_sender; i++) {
     std::promise<std::shared_ptr<Pipe>> pipeProm;

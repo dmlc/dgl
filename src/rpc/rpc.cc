@@ -81,10 +81,10 @@ void InitGlobalTpContext() {
     RPCContext::getInstance()->ctx = std::make_shared<tensorpipe::Context>();
     auto context = RPCContext::getInstance()->ctx;
     auto transportContext = tensorpipe::transport::uv::create();
-    context->registerTransport(0, "tcp", transportContext);
+    context->registerTransport(0 /* priority */, "tcp", transportContext);
     // Register basic uv channel
     auto basicChannel = tensorpipe::channel::basic::create();
-    context->registerChannel(0, "basic", basicChannel);
+    context->registerChannel(0 /* low priority */, "basic", basicChannel);
     // Register multiplex uv channel
     std::vector<std::shared_ptr<tensorpipe::transport::Context>> contexts;
     std::vector<std::shared_ptr<tensorpipe::transport::Listener>> listeners;
@@ -96,7 +96,7 @@ void InitGlobalTpContext() {
     }
     auto mptChannel = tensorpipe::channel::mpt::create(std::move(contexts),
                                                        std::move(listeners));
-    context->registerChannel(10, "mpt", mptChannel);
+    context->registerChannel(10 /* high priority */, "mpt", mptChannel);
   }
 }
 

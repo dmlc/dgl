@@ -194,6 +194,8 @@ else(USE_CUDA)
   add_library(dgl SHARED ${DGL_SRC})
 endif(USE_CUDA)
 
+set_property(TARGET dgl PROPERTY CXX_STANDARD 14)
+
 # include directories
 target_include_directories(dgl PRIVATE "include")
 target_include_directories(dgl PRIVATE "third_party/dlpack/include")
@@ -305,8 +307,6 @@ if(BUILD_TORCH)
   add_dependencies(dgl tensoradapter_pytorch)
 endif(BUILD_TORCH)
 
-message(STATUS "CXX F: ${CMAKE_CXX_FLAGS}")
-message(STATUS "C F: ${CMAKE_C_FLAGS}")
 # Installation rules
 install(TARGETS dgl DESTINATION lib${LIB_SUFFIX})
 
