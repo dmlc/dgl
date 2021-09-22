@@ -10,6 +10,8 @@
 #include <algorithm>
 #include <string>
 #include <cstdlib>
+#include <exception>
+#include <atomic>
 
 namespace {
 int64_t divup(int64_t x, int64_t y) {
@@ -67,6 +69,9 @@ void parallel_for(
 
 #ifdef _OPENMP
   auto num_threads = compute_num_threads(begin, end, grain_size);
+  // (BarclayII) the exception code is borrowed from PyTorch.
+  std::atomic_flag err_flag = ATOMIC_FLAG_INIT;
+  std::exception_ptr eptr;
 
 #pragma omp parallel num_threads(num_threads)
   {
@@ -75,9 +80,16 @@ void parallel_for(
     auto begin_tid = begin + tid * chunk_size;
     if (begin_tid < end) {
       auto end_tid = std::min(end, chunk_size + begin_tid);
-      f(begin_tid, end_tid);
+      try {
+        f(begin_tid, end_tid);
+      } catch (...) {
+        if (!err_flag.test_and_set())
+          eptr = std::current_exception();
+      }
     }
   }
+  if (eptr)
+    std::rethrow_exception(eptr);
 #else
   f(begin, end);
 #endif
