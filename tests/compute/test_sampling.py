@@ -48,6 +48,12 @@ def test_random_walk():
 
     traces, eids, ntypes = dgl.sampling.random_walk(g1, [0, 1, 2, 0, 1, 2], length=4, return_eids=True)
     check_random_walk(g1, ['follow'] * 4, traces, ntypes, trace_eids=eids)
+    try:
+        dgl.sampling.random_walk(g1, [0, 1, 2, 10], length=4, return_eids=True)
+        fail = False        # shouldn't abort
+    except:
+        fail = True
+    assert fail
     traces, eids, ntypes = dgl.sampling.random_walk(g1, [0, 1, 2, 0, 1, 2], length=4, restart_prob=0., return_eids=True)
     check_random_walk(g1, ['follow'] * 4, traces, ntypes, trace_eids=eids)
     traces, ntypes = dgl.sampling.random_walk(
