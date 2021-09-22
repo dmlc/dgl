@@ -1230,6 +1230,8 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelDegDivBack")
 
 /**************************************************************************************/
 /* Libra partitioning codebase */
+
+/*! \brief Identifies the lead loaded partition/community for a given edge assignment.*/
 int32_t LeastLoad(int64_t* community_edges, int32_t nc) {
   // initialize random seed
   srand (time(NULL));    
@@ -1251,6 +1253,19 @@ int32_t LeastLoad(int64_t* community_edges, int32_t nc) {
   return loc[r];    
 }
 
+/*! \brief Libra - vertexcut based graph partitioning.
+  \param nc Number of partitions/communities
+  \param node_degree_a Per node degree
+  \param edgenum_unassigned_a intermediate memmory as tensor
+  \param community_weights_a weight of the created partitions
+  \param u_a src nodes
+  \param v_a dst nodes
+  \param w_a weight per edge
+  \param out_a partition assignment of the edges
+  \param N_n number of nodes in the input graph
+  \param N_e number of edges in the input graph
+  \param prefix output/partition storage location 
+*/
 template<typename IdType, typename IdType2, typename DType>
 int32_t LibraVertexCut(
   int32_t nc,
@@ -1299,7 +1314,6 @@ int32_t LibraVertexCut(
     if (node_assignments[u].size() == 0 && node_assignments[v].size() == 0) {
       int32_t c = LeastLoad(community_edges, nc);
       out[i] = c;
-      // assert(c < nc);
       CHECK_LT(c, nc);
         
       community_edges[c] ++;
@@ -1308,16 +1322,6 @@ int32_t LibraVertexCut(
       if (u != v)
         node_assignments[v].push_back(c);
 
-      #if DEBUG
-      if (node_assignments[u].size() > nc) {
-        LOG(FATAL) << "Error: generated splits are greater than nc!";        
-        for (int32_t k=0; k<node_assignments[u].size(); k++)
-          printf("%d ", node_assignments[u][k]);
-        printf("\n");
-      }
-      #endif            
-      // assert(node_assignments[u].size() <= nc);
-      // assert(node_assignments[v].size() <= nc);
       CHECK(node_assignments[u].size() <= nc) <<
         "Error: 1. generated splits (u) are greater than nc!";
       CHECK(node_assignments[v].size() <= nc) <<
@@ -1332,13 +1336,9 @@ int32_t LibraVertexCut(
       }
       int32_t cindex = LeastLoad(cache, node_assignments[u].size());
       int32_t c = node_assignments[u][cindex];
-      // assert(c < nc);
       out[i] = c;
       community_edges[c] ++;
       community_weights[c] = community_weights[c] + w;
-      //for (uint32_t j=0; j<node_assignments[v].size(); j++) {
-      //  assert(node_assignments[v][j] != c);
-      // }
             
       node_assignments[v].push_back(c);
       CHECK(node_assignments[v].size() <= nc) <<
@@ -1358,18 +1358,8 @@ int32_t LibraVertexCut(
 
       community_edges[c] ++;
       community_weights[c] = community_weights[c] + w;
-
-      // for (uint32_t j=0; j<node_assignments[u].size(); j++) {
-      //  assert(node_assignments[u][j] != c);
-      //}
             
       node_assignments[u].push_back(c);
-      // if (node_assignments[u].size() > nc) {
-      //   printf("Failed assert 2\n");
-      //   for (int32_t k=0; k<node_assignments[u].size(); k++)
-      //     printf("%d ", node_assignments[u][k]);
-      //   printf("\n");
-      // }
       CHECK(node_assignments[u].size() <= nc) <<
         "3. Error: generated splits (u) are greater than nc!";
       edgenum_unassigned[u] --;
@@ -1385,46 +1375,16 @@ int32_t LibraVertexCut(
       CHECK(node_assignments[v].size() <= nc) <<
         "4. Error: generated splits (v) are greater than nc!";
       for (int32_t j=0; j<node_assignments[v].size(); j++) {
-        // if(node_assignments[v][j] >= nc) {
-          // printf("Failed assert: %d %d\n", node_assignments[v][j], nc);
-          // for (int32_t l=0; l<node_assignments[v].size(); l++)
-          //  printf("%d ", node_assignments[v][l]);
-          //printf("\n");
-        // }
         CHECK(node_assignments[v][j] < nc) << "Error: 4. Part assigned (v) greater than nc!";
         setv[node_assignments[v][j]] ++;
       }
       
       for (int32_t j=0; j<node_assignments[u].size(); j++) {
-        // if(node_assignments[u][j] >= nc) {
-        //   printf("Failed assert %d %d\n", node_assignments[u][j], nc);
-        //   for (int32_t l=0; l<node_assignments[u].size(); l++)
-        //     printf("%d ", node_assignments[u][l]);
-        //   printf("\n");
-        // }                
-        // if (node_assignments[u].size() > nc) {
-        //   printf("Failed assert 3\n");
-        //   for (int32_t k=0; k<node_assignments[u].size(); k++)
-        //     printf("%d ", node_assignments[u][k]);
-        //   printf("\n");
-        // }                
         CHECK(node_assignments[u][j] < nc) << "Error: 4. Part assigned (u) greater than nc!";
         setv[node_assignments[u][j]] ++;
       }
             
-      for (int32_t j=0; j<nc; j++) {
-        #if DEBUG
-        if (setv[j] > 2) {
-          printf("Failed assert\n");
-          for (int32_t l=0; l<nc; l++) 
-            printf("%d ", setv[l]); printf("\n");
-          for (int32_t l=0; l<node_assignments[u].size(); l++)
-            printf("%d ", node_assignments[u][l]);    printf("\n");
-          for (int32_t l=0; l<node_assignments[v].size(); l++)
-            printf("%d ", node_assignments[v][l]);    printf("\n");
-        }
-        #endif
-        
+      for (int32_t j=0; j<nc; j++) {        
         CHECK(setv[j] <= 2) << "Error: 4. unexpected computed value !!!";
         if (setv[j] == 2) {
           interset++;
@@ -1489,12 +1449,6 @@ int32_t LibraVertexCut(
           if (u != v)
             node_assignments[u].push_back(c);
 
-          // if (node_assignments[u].size() > nc) {
-          //   printf("Failed assert 4\n");
-          //   for (int32_t k=0; k<node_assignments[u].size(); k++)
-          //     printf("%d ", node_assignments[u][k]);
-          //   printf("\n");
-          // }                    
           CHECK(node_assignments[u].size() <= nc) <<
             "Error: 6. generated splits (u) greater than nc!!";
           replication_list.push_back(u);
@@ -1512,7 +1466,6 @@ int32_t LibraVertexCut(
       std::to_string(c) +".txt";
         
     FILE *fp = fopen(str.c_str(), "w");
-    // assert(fp != NULL);
     CHECK_NOTNULL(fp);
         
     for (int64_t i=0; i<N_e; i++) {
@@ -1524,7 +1477,6 @@ int32_t LibraVertexCut(
 
   std::string str = lprefix + "/"  + std::to_string(nc) + "Communities/replicationlist.csv";
   FILE *fp = fopen(str.c_str(), "w");
-  // assert(fp != NULL);
   CHECK_NOTNULL(fp);
     
   std::string str_ = "# The Indices of Nodes that are replicated :: Header";
@@ -1584,7 +1536,24 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLLibraVertexCut")
 });
 
 
-
+/*! \brief Builds dictionaries for assigning local node IDs to nodes in the paritions
+  and prepares indices to gather the graph from input graph.
+  \param a_a local src node ID of an edge in a partition
+  \param b_a local dst node ID of an edge in a partition
+  \param indices_a keep track of global node ID to local node ID
+  \param ldt_key_a per partition dict for tacking gloal to local node IDs
+  \param gdt_key_a global dict for assigning consecutive node IDs to nodes across all the
+  partitions
+  \param gdt_value_a global dict for assigning consecutive node IDs to nodes across all the
+  partition
+  \param node_map_a keeps track of range of local node IDs (consecutive) given to the nodes in
+  the partitions
+  \param nc  number of partitions/communities
+  \param c current partition numbers
+  \param fsize size of pre-allocated memory tensor
+  \param hash_nodes_a returns the actual number of nodes and edges in the partition
+  \param prefix output file location
+ */
 void Libra2dglBuildDict(
   NDArray a_a,
   NDArray b_a,
@@ -1608,8 +1577,6 @@ void Libra2dglBuildDict(
   int32_t *offset     = offset_a.Ptr<int32_t>();
   int32_t *hash_nodes = hash_nodes_a.Ptr<int32_t>();    
   int32_t width = nc;
-  // int32_t c = c;
-  // int64_t fsize = fsize;
         
   int64_t *a = a_a.Ptr<int64_t>();
   int64_t *b = b_a.Ptr<int64_t>();
@@ -1627,7 +1594,6 @@ void Libra2dglBuildDict(
   std::string lprefix = prefix;
   std::string str = lprefix + "/community" + std::to_string(c) + ".txt";    
   FILE *fp = fopen(str.c_str(), "r");
-  // assert(fp != NULL);
   CHECK_NOTNULL(fp);
 
   while(!feof(fp) && edge < fsize) {
@@ -1637,13 +1603,11 @@ void Libra2dglBuildDict(
             
     if (indices[u] == -100) {
       ldt_key[pos] = u;
-      // ldt_value[pos] = pos;
       CHECK(pos < num_nodes);
       indices[u] = pos++;
     }
     if (indices[v] == -100) {
       ldt_key[pos] = v;
-      // ldt_value[pos] = pos;
       CHECK(pos < num_nodes);
       indices[v] = pos++;
     }
@@ -1691,6 +1655,16 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLLibra2dglBuildDict")
                      nc, c, fsize, hash_nodes, prefix);
 });
 
+
+/*! \brief sets up the 1-level tree aomng the clones of the split-nodes.
+  \param gdt_key_a global dict for assigning consecutive node IDs to nodes across all the
+  partitions
+  \param gdt_value_a global dict for assigning consecutive node IDs to nodes across all the
+  partition
+  \param lftensor_a keeps the root node ID of 1-level tree
+  \param nc number of partitions/communities
+  \param Nn number of nodes in the input graph
+ */
 void Libra2dglSetLF(
   NDArray gdt_key_a,
   NDArray gdt_value_a,
@@ -1713,8 +1687,6 @@ void Libra2dglSetLF(
     }
     else {
       int32_t val = rand() % gdt_key[i];
-      // assert(val >= 0 && val < gdt_key[i]);
-      //assert(gdt_key[i] <= nc);
       CHECK(val >= 0 && val < gdt_key[i]);
       CHECK(gdt_key[i] <= nc);
       
@@ -1740,7 +1712,37 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLLibra2dglSetLF")
 });
 
 
-
+/*!
+  \brief For each node in a partition, it creates a list of remote clone IDs;
+  also, for each node in a partition, it gathers the data (feats, label, trian, test)
+  from input graph.
+  \param feat_a node features in current partition c
+  \param gfeat_a input graph node features
+  \param adj_a list of node IDs of remote clones
+  \param inner_nodes_a marks whether a node is split or not
+  \param ldt_key_a per partition dict for tacking gloal to local node IDs
+  \param gdt_key_a global dict for assigning consecutive node IDs to nodes across all the
+  partitions
+  \param gdt_value_a global dict for assigning consecutive node IDs to nodes across all the
+  partition
+  \param node_map_a keeps track of range of local node IDs (consecutive) given to the nodes in
+  the partitions
+  \param lf_a 1-level tree marking for local split nodes
+  \param lftensor_a gloabl (all the partitions) 1-level tree 
+  \param num_nodes number of nodes in current partition
+  \param nc number of partitions/communities
+  \param c current partition/community
+  \param feat_size node feature vector size
+  \param labels_a local (for this partition) labels
+  \param trainm_a local (for this partition) training nodes
+  \param testm_a local (for this partition) testing nodes
+  \param valm_a local (for this partition) validation nodes
+  \param glabels_a gloabl (input graph) labels
+  \param gtrainm_a gloabl (input graph) training nodes
+  \param gtestm_a gloabl (input graph) testing nodes
+  \param gvalm_a gloabl (input graph) validation nodes
+  \param Nn number of nodes in the input graph
+ */
 template<typename IdType,typename DType>
 void Libra2dglBuildAdjlist(
   NDArray feat_a,
@@ -1765,10 +1767,8 @@ void Libra2dglBuildAdjlist(
   NDArray gtrainm_a,
   NDArray gtestm_a ,
   NDArray gvalm_a,
-  int64_t feat_shape) {
+  int64_t Nn) {
   
-  // float *feat = feat_.Ptr<float>();      // 2D tensor
-  // float *gfeat = gfeat_.Ptr<float>();      // 2D tensor
   DType   *feat       = feat_a.Ptr<DType>(); // 2D tensor
   DType   *gfeat      = gfeat_a.Ptr<DType>(); // 2D tensor
   int32_t *adj        = adj_a.Ptr<int32_t>(); // 2D tensor
@@ -1805,8 +1805,6 @@ void Libra2dglBuildAdjlist(
           adj_ptr[pos++] = ptr[j];
       }
       CHECK(flg == 1);
-      if(pos != ind - 1)
-        printf("Error: not equal, pos: %d, ind: %d\n", pos, ind-1);
       CHECK(pos == ind - 1);
       for (; pos < width; pos++) adj_ptr[pos] = -1;
       inner_node[i] = 0;
@@ -1817,8 +1815,6 @@ void Libra2dglBuildAdjlist(
   for (int64_t i=0; i<num_nodes; i++) {
     int64_t k = ldt_key[i];
     int64_t ind = i*feat_size;
-    // float *optr = gfeat + ind;
-    // float *iptr = feat + k*feat_size;
     DType *optr = gfeat + ind;
     DType *iptr = feat + k*feat_size;        
 
@@ -1826,11 +1822,8 @@ void Libra2dglBuildAdjlist(
       optr[j] = iptr[j];
   }
 
-  // float *labels = labels_.Ptr<float>();
-  // float *glabels = glabels_.Ptr<float>();
   IdType *labels = labels_a.Ptr<IdType>();
   IdType *glabels = glabels_a.Ptr<IdType>();
-  // printf("IdType: %ld\n", sizeof(IdType));
   bool *trainm = trainm_a.Ptr<bool>();
   bool *gtrainm = gtrainm_a.Ptr<bool>();
   bool *testm = testm_a.Ptr<bool>();
@@ -1840,8 +1833,7 @@ void Libra2dglBuildAdjlist(
   #pragma omp parallel for
   for (int64_t i=0; i<num_nodes; i++) {
     int64_t k = ldt_key[i];
-    // assert(k >=0 && k < feat_shape);
-    CHECK(k >=0 && k < feat_shape);
+    CHECK(k >=0 && k < Nn);
     glabels[i] = labels[k];
     gtrainm[i] = trainm[k];
     gtestm[i] = testm[k];
@@ -1874,7 +1866,7 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLLibra2dglBuildAdjlist")
   NDArray gtrainm    = args[19];
   NDArray gtestm     = args[20];
   NDArray gvalm      = args[21];
-  int64_t feat_shape = args[22];
+  int64_t Nn         = args[22];
 
   ATEN_FLOAT_TYPE_SWITCH(feat->dtype, DType, "Features", {
       ATEN_ID_BITS_SWITCH((glabels->dtype).bits, IdType, {
@@ -1889,7 +1881,7 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLLibra2dglBuildAdjlist")
                                                trainm, testm,
                                                valm, glabels,
                                                gtrainm, gtestm,
-                                               gvalm, feat_shape);
+                                               gvalm, Nn);
         });
     });
 });

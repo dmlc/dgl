@@ -1,4 +1,14 @@
-#/usr/bin/python
+"""
+ Copyright (c) 2021 Intel Corporation
+ \file distgnn/partition/libra2dgl.py
+ \brief Libra2dgl - Libra output to DGL/DistGNN graph format conversion
+ \author Vasimuddin Md <vasimuddin.md@intel.com>,
+         Guixiang Ma <guixiang.ma@intel.com>
+         Sanchit Misra <sanchit.misra@intel.com>,
+         Ramanarayan Mohanty <ramanarayan.mohanty@intel.com>,         
+         Sasikanth Avancha <sasikanth.avancha@intel.com>
+         Nesreen K. Ahmed <nesreen.k.ahmed@intel.com>
+"""
 
 import os
 import sys
@@ -12,7 +22,7 @@ from load_graph import load_reddit, load_ogb
 from dgl.sparse import libra2dgl_build_dict
 from dgl.sparse import libra2dgl_set_lf
 from dgl.sparse import libra2dgl_build_adjlist
-
+from dgl.base import DGLError
 
 ## replication per node
 def rep_per_node(prefix, nc):
@@ -22,7 +32,9 @@ def rep_per_node(prefix, nc):
 
     fline = f.readline()
     for line in f:
-        assert line[0] != '#', "Error: read hash !!"
+        if line[0] == '#':
+            raise DGLError("Error: Read hash in rep_per_node func.")
+    
         node = line.strip('\n')
         if r_dt.get(node, -100) == -100:
             r_dt[node] = 1
@@ -30,14 +42,15 @@ def rep_per_node(prefix, nc):
             r_dt[node] += 1
 
     f.close()
-
+    ## checks
     for v in r_dt.values():
-        assert v < nc, "Error: Assertion in replication !!"
+        if v >= nc:
+            raise DGLError("Error: Unexpected event in rep_per_node func.")
 
     return r_dt
 
 
-## Reports the partition for a given node
+## Reports the partition for a given node ID
 def find_partition(nid, node_map):
     if nid == -1:
         return 1000
@@ -47,8 +60,7 @@ def find_partition(nid, node_map):
         if nid < nnodes:
             return pos
         pos = pos +1
-    print("Error: Something is wrong in find_partition")
-    sys.exit(1)
+    raise DGLError("Error: Unexpected event in find_partition( func.")
 
 
 class Args:
@@ -58,28 +70,32 @@ class Args:
     
 ## libra2dgl conversion C/C++ code extension
 def main_libra2dgl(resultdir, dataset, nc):
+    """
+    Converts the output from Libra partitioning to DGL/DistGNN graph input.
+    It builds dictionaries to assign local IDs to nodes in the partitions as well
+    as it build a database to keep track of the location of clone nodes in the remote
+    partitions.
 
+    Parameters
+    ----------
+    resultdir : Location where partitions in dgl format are stored
+    dataset : Dataset name
+    nc : Number of partitions
+
+    Output
+    ------
+    Creates partX folder in resultdir location for each partition X
+
+    Notes
+    -----
+    This output is directly used as input to DistGNN
+    
+    """
     tedges = 1615685872   ## total edges
     max_c = 1024   ## max partitions supported    
     factor = 1.2
     
     ## for pre-allocated tensor size
-    hash_edges_ = [0, 0,
-                  int((tedges/2)*factor),
-                  0,
-                  int((tedges/4)*factor),
-                  0,0,0,
-                  int((tedges/8)*factor),
-                  0, 0, 0, 0, 0, 0, 0,
-                  int((tedges/16)*factor),
-                  0, 0, 0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0,
-                  int((tedges/32)*factor),
-                  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-                  int((tedges/64)*factor),
-                  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-                  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-                  int((tedges/128)*factor)]
-
     hash_edges = [int((tedges/i)*factor) for i in range(1, max_c + 1)]
     
     ## load graph for the feature gather
@@ -116,7 +132,8 @@ def main_libra2dgl(resultdir, dataset, nc):
     
     gg = [DGLGraph() for i in range(nc)]
     part_nodes = []
-    
+
+    ## Iterator over number of partitions
     for i in range(nc):
         g = gg[i]                
         fsize = hash_edges[nc]
@@ -128,6 +145,7 @@ def main_libra2dgl(resultdir, dataset, nc):
         ldt_ar.append(ldt_key)
 
         ## building node, parition dictionary
+        ## Assign local node ids and mapping to global node ids
         libra2dgl_build_dict(a, b, indices, ldt_key, gdt_key, gdt_value,
                              node_map, offset, nc, i, fsize, hash_nodes,
                              resultdir)
@@ -139,7 +157,7 @@ def main_libra2dgl(resultdir, dataset, nc):
         g.add_edges(a[0:num_edges], b[0:num_edges])
 
     ########################################################
-    ## fixing lf for the split-nodes
+    ## fixing lf - 1-level tree for the split-nodes
     libra2dgl_set_lf(gdt_key, gdt_value, lftensor, nc, N_n)
     ########################################################
     graph_name = dataset
@@ -173,16 +191,11 @@ def main_libra2dgl(resultdir, dataset, nc):
         except:
             feat = g_orig.ndata['features']
 
-        one = False
         try:
-            #g_orig.ndata['label'] = g_orig.ndata['label'].type(th.float)
             labels = g_orig.ndata['label']
-            one = True
         except:
-            #g_orig.ndata['labels'] = g_orig.ndata['labels'].type(th.float)
             labels = g_orig.ndata['labels']
             
-        #print("Labels: ", labels)
         trainm = g_orig.ndata['train_mask']
         testm = g_orig.ndata['test_mask']
         valm = g_orig.ndata['val_mask']
@@ -194,57 +207,25 @@ def main_libra2dgl(resultdir, dataset, nc):
         gtrainm = th.zeros(num_nodes, dtype=trainm.dtype);
         gtestm = th.zeros(num_nodes, dtype=testm.dtype);
         gvalm = th.zeros(num_nodes, dtype=valm.dtype);
-        
+
+        ## build remote node databse per local node
+        ## gather feats, train, test, val, and labels for each partition
         libra2dgl_build_adjlist(feat, gfeat, adj, inner_node, ldt, gdt_key,
                                 gdt_value, node_map, lf, lftensor, num_nodes,
                                 nc, i, feat_size, labels, trainm, testm, valm,
                                 glabels, gtrainm, gtestm, gvalm, feat.shape[0])
                                     
 
-        g.ndata['adj'] = adj
-        g.ndata['inner_node'] = inner_node
-        g.ndata['feat'] = gfeat
-        g.ndata['lf'] = lf 
+        g.ndata['adj'] = adj   ## databse of remote clones
+        g.ndata['inner_node'] = inner_node  ## split node '0' else '1'
+        g.ndata['feat'] = gfeat    ## gathered features
+        g.ndata['lf'] = lf  ## 1-level tree among split nodes
 
         g.ndata['label'] = glabels
         g.ndata['train_mask'] = gtrainm
         g.ndata['test_mask'] = gtestm
         g.ndata['val_mask'] = gvalm
 
-        ## debug
-        ##ldt_ = []
-        ##for l in range(num_nodes):
-        ##    if int(ldt[l]) >= g_orig.number_of_nodes() or int(ldt[l]) < 0:
-        ##           print("ldt error: {} {}".format(int(ldt[l]), g_orig.number_of_nodes()) )
-        ##    assert int(ldt[l]) < g_orig.number_of_nodes(), "Error in ldt"
-        ##    assert int(ldt[l]) >= 0, "Error in ldt"
-        ##    ldt_.append(int(ldt[l]))
-        ##    
-        ##ldt__ = th.tensor(ldt_)
-        ##try:
-        ##    #g.ndata['label'] = th.gather(g_orig.ndata['label'], 0, ldt__)
-        ##    lab = th.gather(g_orig.ndata['label'], 0, ldt__)
-        ##except:
-        ##    #g.ndata['label'] = th.gather(g_orig.ndata['labels'], 0, ldt__)
-        ##    lab = th.gather(g_orig.ndata['labels'], 0, ldt__)
-        ##
-        #### g.ndata['train_mask'] = th.gather(g_orig.ndata['train_mask'], 0, ldt__)
-        #### g.ndata['test_mask'] = th.gather(g_orig.ndata['test_mask'], 0, ldt__)
-        #### g.ndata['val_mask'] = th.gather(g_orig.ndata['val_mask'], 0, ldt__)
-        ##tr = th.gather(g_orig.ndata['train_mask'], 0, ldt__)
-        ##te = th.gather(g_orig.ndata['test_mask'], 0, ldt__)
-        ##va = th.gather(g_orig.ndata['val_mask'], 0, ldt__)
-        ##
-        #### small test
-        ##for k in range(g.ndata['label'].shape[0]):
-        ##    assert g.ndata['train_mask'][k] == tr[k]
-        ##    assert g.ndata['test_mask'][k] == te[k]
-        ##    if not th.isnan(g.ndata['label'][k]):
-        ##        assert g.ndata['label'][k] == lab[k]
-        #print("DType: ", g.ndata['label'].dtype, " ", lab.dtype, " ", g.ndata['label'].shape[0])
-        #print("Checks passed successfully!!")
-        ## debug ends
-            
         lf = g.ndata['lf']        
         print("Writing partition {} to file".format(i), flush=True)    
         
@@ -269,9 +250,7 @@ def main_libra2dgl(resultdir, dataset, nc):
     with open('{}/{}.json'.format(out_path, graph_name), 'w') as outfile:
         json.dump(part_metadata, outfile, sort_keys=True, indent=4)
         
-
     return gg, node_map
-
 
 
 def load_proteins(dataset):
@@ -279,11 +258,10 @@ def load_proteins(dataset):
     graph_file = os.path.join(part_dir + "/graph.dgl")
     graph = load_graphs(graph_file)[0][0]
     return graph
-    
 
 
-
-def run(dataset, resultdir, nc, no_papers):
+## Driver function for Libra output to DGL graph format conversion
+def run(dataset, resultdir, nc):
     th.set_printoptions(threshold=10)
         
     print("Dataset: ", dataset, flush=True)
@@ -291,5 +269,4 @@ def run(dataset, resultdir, nc, no_papers):
     print("number of parititons: ", nc)
 
     r_dt = rep_per_node(resultdir, nc)
-
     partition_ar, node_map =  main_libra2dgl(resultdir, dataset, nc)    

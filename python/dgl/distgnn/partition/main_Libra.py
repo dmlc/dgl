@@ -1,3 +1,15 @@
+"""
+Copyright (c) 2021 Intel Corporation
+ \file distgnn/partition/main_Libra.py
+ \brief Libra - Vertex-cut based graph partitioner for distirbuted training
+ \author Vasimuddin Md <vasimuddin.md@intel.com>,
+         Guixiang Ma <guixiang.ma@intel.com>
+         Sanchit Misra <sanchit.misra@intel.com>,
+         Ramanarayan Mohanty <ramanarayan.mohanty@intel.com>,         
+         Sasikanth Avancha <sasikanth.avancha@intel.com>
+         Nesreen K. Ahmed <nesreen.k.ahmed@intel.com>
+"""
+
 import os
 import sys
 import networkx as nx
@@ -14,6 +26,7 @@ from load_graph import load_reddit, load_ogb
 from dgl.sparse import libra_vertex_cut
 from dgl.data.utils import load_graphs, save_graphs, load_tensors, save_tensors
 from scipy.io import mmread
+from dgl.base import DGLError
 import libra2dgl
 import requests
 
@@ -26,7 +39,7 @@ def download_proteins():
     try:
         r = requests.get(url)
     except:
-        print("Error: can't download Proteins dataset!! Aborting..")
+        raise DGLError("Error: Failed to download Proteins dataset!! Aborting..")
         
     with open("proteins.mtx", "wb") as handle:
         handle.write(r.content)
@@ -75,7 +88,7 @@ def proteins_mtx2dgl():
     g.ndata['val_mask'] = val_mask
     g.ndata['label'] = label
 
-    print(g)
+    #print(g)
     return g
 
 
@@ -87,7 +100,7 @@ def save(g, dataset):
     os.makedirs(part_dir, mode=0o775, exist_ok=True)
     save_tensors(node_feat_file, g.ndata)
     save_graphs(part_graph_file, [g])
-    #print("Graph saved successfully !!")
+    print("Graph saved successfully !!")
     
 
 def load_proteins(dataset):    
@@ -115,6 +128,21 @@ def leastload(weights_array):
 
 
 def vertex_cut_partition(num_community, dataset, prefix):
+    """
+    Performs vertex-cut based grpah partitioning
+    Parameters
+    ----------
+    num_community : Number of partitions to create
+    dataset : Input graph name to partition
+    prefix : Output location
+
+    Output
+    ------
+    Creates X partition folder as XCommunities (say, X=2, so, 2Communities)
+    XCommunities contains communityZ.txt file per parition Z
+    Each such file contains list of edges assigned to that partition.
+
+    """
     args = Args(dataset)
     print("Input dataset: ", args.dataset)
     if args.dataset == 'ogbn-products':
@@ -127,18 +155,17 @@ def vertex_cut_partition(num_community, dataset, prefix):
         G = load_proteins('proteins')
     elif args.dataset == 'ogbn-arxiv':
         print("Loading ogbn-arxiv")
-        G, _ = load_ogb('ogbn-arxiv')                                
+        G, _ = load_ogb('ogbn-arxiv')
     else:
         try:
             G = load_data(args)[0]
         except:
-            print("Dataset {} not found !!!".format(dataset))
-            sys.exit(1)
+            raise DGLError("Error: Dataset {} not found !!!".format(dataset))
 
     print("Done loading the graph.", flush=True)
     
     N_n = G.number_of_nodes()  # number of nodes
-    N_c = num_community
+    N_c = num_community     ## number of partitions/communities
     N_e = G.number_of_edges()
     community_list = [[] for i in range(N_c)]
     
@@ -169,14 +196,14 @@ def vertex_cut_partition(num_community, dataset, prefix):
     return int(community_weights.max())
 
 
-if __name__ == "__main__":    
-    if len(sys.argv) != 2:
-        print("Error: Input dataset required !!")
-        sys.exit(1)
 
-    no_papers = True
+if __name__ == "__main__":    
+    if len(sys.argv) != 3:
+        raise DGLError("Error: exec <Input dataset> <#partitions>")
+
     prefix = ""
     dataset = sys.argv[1]
+    nc = int(sys.argv[2])
     print("dataset: ", dataset)
     index = 0
     if dataset == 'cora':
@@ -191,7 +218,6 @@ if __name__ == "__main__":
         resultdir = os.path.join(prefix, 'Libra_result_ogbn-products')
         index = 1
     elif dataset == 'ogbn-papers100M':
-        no_papers = False
         resultdir = os.path.join(prefix, 'Libra_result_ogbn-papers100M')
         index = 3
     elif dataset == 'proteins':        
@@ -200,23 +226,24 @@ if __name__ == "__main__":
     elif dataset == 'ogbn-arxiv':      
         resultdir = os.path.join(prefix, 'Libra_result_ogbn-arxiv')
     else:
-        print("Error: dataset not found !!")
-        sys.exit(1)
-
+        raise DGLError("Error: Input dataset not found !!")
+        
     ## create ouptut directory
     try:
         os.makedirs(resultdir, mode=0o775, exist_ok=True)
     except:
         print("Error: Could not create directory: ", resultdir)
-        
+
+    ## Partitions per dataset 
     l = [[2,4,8,16], [2,4,8,16,32,64],[2,4,8,16,32,64],[32,64,128]]    
     print("Output is stored in ", resultdir, flush=True)
-    #print("Partition range: ", l[index])
-    print("Generating ", l[index], " partitions...", flush=True)
-    #for num_community in [2, 4, 8, 32] :#, 16, 32, 64]:
+    #print("Generating ", l[index], " partitions...", flush=True)
+    print("Generating ", nc, " partitions...", flush=True)
 
     tic = time.time()
-    for num_community in l[index]:        
+    #for num_community in l[index]:
+    for i in range(1):
+        num_community = nc
         print("####################################################################")
         print("Executing parititons: ", num_community)
         ltic = time.time()
@@ -224,19 +251,19 @@ if __name__ == "__main__":
             resultdir_libra2dgl = os.path.join(resultdir, str(num_community) + "Communities")
             os.makedirs(resultdir_libra2dgl, mode=0o775, exist_ok=True)
         except:
-            print("Error: Could not create sub-directory: ", resultdir_libra2dgl)
-            sys.exit(1)
+            raise DGLError("Error: Could not create sub-directory: ", resultdir_libra2dgl)
 
         ## Libra partitioning
         max_weightsum  = vertex_cut_partition(num_community, sys.argv[1], resultdir)
                 
         print(" ** Converting libra partitions to dgl graphs **")
-        libra2dgl.run(dataset, resultdir_libra2dgl, num_community, no_papers)
+        libra2dgl.run(dataset, resultdir_libra2dgl, num_community)
         print("Conversion libra2dgl completed !!!")
         ltoc = time.time()
         print("Time taken by {} partitions {:0.4f} sec".format(num_community, ltoc - ltic))
         print()
 
     toc = time.time()
-    print("Generated ", l[index], " partitions in {:0.4f} sec".format(toc - tic), flush=True)
+    #print("Generated ", l[index], " partitions in {:0.4f} sec".format(toc - tic), flush=True)
+    print("Generated ", nc, " partitions in {:0.4f} sec".format(toc - tic), flush=True)
     print("Partitioning completed successfully !!!")
