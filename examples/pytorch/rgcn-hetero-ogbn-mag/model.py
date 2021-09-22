@@ -65,9 +65,6 @@ class RelGraphEmbedding(nn.Module):
             for ntype in self._hg.ntypes:
                 hg_nodes = self._hg.nodes(ntype)
 
-                # if device is not None:
-                #     hg_nodes = hg_nodes.to(device)
-
                 if self._node_feats[ntype] is None:
                     x[ntype] = self.node_embeddings[ntype](hg_nodes)
                 else:
