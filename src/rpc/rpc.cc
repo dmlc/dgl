@@ -33,7 +33,6 @@ using namespace tensorpipe;
 
 const char kSocketIfnameEnvVar[] = "TP_SOCKET_IFNAME";
 const char kDefaultUvAddress[] = "127.0.0.1";
-constexpr static int kNumUvThreads = 16;
 
 const std::string& guessAddress() {
   static const std::string uvAddress = []() {
@@ -85,18 +84,24 @@ void InitGlobalTpContext() {
     // Register basic uv channel
     auto basicChannel = tensorpipe::channel::basic::create();
     context->registerChannel(0 /* low priority */, "basic", basicChannel);
-    // Register multiplex uv channel
-    std::vector<std::shared_ptr<tensorpipe::transport::Context>> contexts;
-    std::vector<std::shared_ptr<tensorpipe::transport::Listener>> listeners;
-    for (int i = 0; i < kNumUvThreads; i++) {
-      auto context = tensorpipe::transport::uv::create();
-      std::string address = guessAddress();
-      contexts.push_back(std::move(context));
-      listeners.push_back(contexts.back()->listen(address));
+
+    char* numUvThreads_str = std::getenv("DGL_SOCKET_NTHREADS");
+    if (numUvThreads_str) {
+      int numUvThreads = std::atoi(numUvThreads_str);
+      CHECK(numUvThreads > 0) << "DGL_SOCKET_NTHREADS should be positive integer if set";
+      // Register multiplex uv channel
+      std::vector<std::shared_ptr<tensorpipe::transport::Context>> contexts;
+      std::vector<std::shared_ptr<tensorpipe::transport::Listener>> listeners;
+      for (int i = 0; i < numUvThreads; i++) {
+        auto context = tensorpipe::transport::uv::create();
+        std::string address = guessAddress();
+        contexts.push_back(std::move(context));
+        listeners.push_back(contexts.back()->listen(address));
+      }
+      auto mptChannel = tensorpipe::channel::mpt::create(std::move(contexts),
+                                                         std::move(listeners));
+      context->registerChannel(10 /* high priority */, "mpt", mptChannel);
     }
-    auto mptChannel = tensorpipe::channel::mpt::create(std::move(contexts),
-                                                       std::move(listeners));
-    context->registerChannel(10 /* high priority */, "mpt", mptChannel);
   }
 }
 
