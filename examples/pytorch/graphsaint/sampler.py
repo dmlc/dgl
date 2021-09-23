@@ -1,5 +1,6 @@
 import os
 import time
+import math
 import torch as th
 from torch.utils.data import DataLoader
 import random
@@ -20,6 +21,10 @@ class SAINTSampler:
 
     Parameters
     ----------
+    node_budget : int
+        the expected number of nodes in each subgraph, which is specifically explained in the paper. Actually this
+        param specifies the times of sampling nodes from the original graph with replacement. The meaning of edge_budget
+        is similar to the node_budget.
     dn : str
         name of dataset.
     g : DGLGraph
@@ -30,7 +35,7 @@ class SAINTSampler:
         number of processes to sample subgraphs in pre-sampling procedure using torch.dataloader.
     num_subg_sampler : int, optional
         the max number of subgraphs sampled in pre-sampling phase for computing normalization coefficients in the beginning.
-        Actually this param is used as `__len__` of sampler in pre-sampling phase.
+        Actually this param is used as ``__len__`` of sampler in pre-sampling phase.
         Please make sure that num_subg_sampler is greater than batch_size_sampler so that we can sample enough subgraphs.
         Defaults: 10000
     batch_size_sampler : int, optional
@@ -44,14 +49,16 @@ class SAINTSampler:
         It is actually the 'N' in the original paper. Note that this param is different from the num_subg_sampler.
         This param is just used to control the number of pre-sampled subgraphs.
         Defaults: 50
+    full : bool, optional
+        True if the number of subgraphs used in the training phase equals to that of pre-sampled subgraphs, or
+        ``math.ceil(self.train_g.num_nodes() / self.node_budget)``. This formula takes the result of A divided by B as
+        the number of subgraphs used in the training phase, where A is the number of training nodes in the original
+        graph, B is the expected number of nodes in each pre-sampled subgraph. Please refer to the paper to check the
+        details.
+        Defaults: True
 
     Notes
     -----
-    Here our implementation is a little bit different from the codes of the author. For example, author has limited the
-    number of iterations in training phase to `math.ceil(self.train_g.num_nodes() / node_budget)` ( please refer to
-    annotations of `SAINTNodeSampler` to check the explanation of `node_budget`),
-    which can not fully make use of all pre-sampled subgraphs. We've remove this restriction.
-
     For parallelism of pre-sampling, we utilize `torch.DataLoader` to concurrently speed up sampling.
     The `num_subg_sampler` is the return value of `__len__` in pre-sampling phase. Moreover, the param `batch_size_sampler`
     determines the batch_size of `torch.DataLoader` in internal pre-sampling part. But note that if we wanna pass the
@@ -59,9 +66,10 @@ class SAINTSampler:
     `batch_size` of `DataLoader`, that is, `batch_size_sampler` is not related to how sampler works in training procedure.
     """
 
-    def __init__(self, dn, g, train_nid, num_workers_sampler, num_subg_sampler=10000,
-                 batch_size_sampler=200, online=True, num_subg=50):
+    def __init__(self, node_budget, dn, g, train_nid, num_workers_sampler, num_subg_sampler=10000,
+                 batch_size_sampler=200, online=True, num_subg=50, full=True):
         self.g = g.cpu()
+        self.node_budget = node_budget
         self.train_g: dgl.graph = g.subgraph(train_nid)
         self.dn, self.num_subg = dn, num_subg
         self.node_counter = th.zeros((self.train_g.num_nodes(),))
@@ -72,6 +80,7 @@ class SAINTSampler:
         self.num_workers_sampler = num_workers_sampler
         self.train = False
         self.online = online
+        self.full = full
 
         assert self.num_subg_sampler >= self.batch_size_sampler, "num_subg_sampler should be greater than batch_size_sampler"
         graph_fn, norm_fn = self.__generate_fn__()
@@ -132,8 +141,10 @@ class SAINTSampler:
         if self.train is False:
             return self.num_subg_sampler
         else:
-            # return len(self.subgraphs)
-            return 10
+            if self.full:
+                return len(self.subgraphs)
+            else:
+                return math.ceil(self.train_g.num_nodes() / self.node_budget)
 
     def __getitem__(self, idx):
         # Only when sampling subgraphs in training procedure and need to utilize sampled subgraphs and we still
@@ -212,7 +223,7 @@ class SAINTNodeSampler(SAINTSampler):
 
     def __init__(self, node_budget, **kwargs):
         self.node_budget = node_budget
-        super(SAINTNodeSampler, self).__init__(**kwargs)
+        super(SAINTNodeSampler, self).__init__(node_budget=node_budget, **kwargs)
 
     def __generate_fn__(self):
         graph_fn = os.path.join('./subgraphs/{}_Node_{}_{}.npy'.format(self.dn, self.node_budget,
@@ -244,7 +255,7 @@ class SAINTEdgeSampler(SAINTSampler):
     def __init__(self, edge_budget, **kwargs):
         self.edge_budget = edge_budget
         self.rng = np.random.default_rng()
-        super(SAINTEdgeSampler, self).__init__(**kwargs)
+        super(SAINTEdgeSampler, self).__init__(node_budget=edge_budget*2, **kwargs)
 
     def __generate_fn__(self):
         graph_fn = os.path.join('./subgraphs/{}_Edge_{}_{}.npy'.format(self.dn, self.edge_budget,
@@ -292,7 +303,7 @@ class SAINTRandomWalkSampler(SAINTSampler):
 
     def __init__(self, num_roots, length, **kwargs):
         self.num_roots, self.length = num_roots, length
-        super(SAINTRandomWalkSampler, self).__init__(**kwargs)
+        super(SAINTRandomWalkSampler, self).__init__(node_budget=num_roots * length, **kwargs)
 
     def __generate_fn__(self):
         graph_fn = os.path.join('./subgraphs/{}_RW_{}_{}_{}.npy'.format(self.dn, self.num_roots,

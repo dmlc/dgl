@@ -60,7 +60,7 @@ def main(args, task):
     kwargs = {
         'dn': args.dataset, 'g': g, 'train_nid': train_nid, 'num_workers_sampler': args.num_workers_sampler,
         'num_subg_sampler': args.num_subg_sampler, 'batch_size_sampler': args.batch_size_sampler,
-        'online': args.online, 'num_subg': args.num_subg
+        'online': args.online, 'num_subg': args.num_subg, 'full': args.full
     }
 
     if args.sampler == "node":
@@ -71,7 +71,6 @@ def main(args, task):
         saint_sampler = SAINTRandomWalkSampler(args.num_roots, args.length, **kwargs)
     else:
         raise NotImplementedError
-
     loader = DataLoader(saint_sampler, collate_fn=saint_sampler.__collate_fn__, batch_size=1,
                         shuffle=True, num_workers=args.num_workers, drop_last=False)
 
