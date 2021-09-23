@@ -31,6 +31,7 @@ namespace {
  *        edge type in the metapath.
  * \param max_num_steps The maximum number of steps of a random walk path.
  * \param step The random walk step function with type \c StepFunc.
+ * \param max_nodes Throws an error if one of the values in \c seeds exceeds this argument.
  * \return A 2D array of shape (len(seeds), max_num_steps + 1) with node IDs.
  * \note The graph itself should be bounded in the closure of \c step.
  */
@@ -38,7 +39,8 @@ template<DLDeviceType XPU, typename IdxType>
 std::pair<IdArray, IdArray> GenericRandomWalk(
     const IdArray seeds,
     int64_t max_num_steps,
-    StepFunc<IdxType> step) {
+    StepFunc<IdxType> step,
+    int64_t max_nodes) {
   int64_t num_seeds = seeds->shape[0];
   int64_t trace_length = max_num_steps + 1;
   IdArray traces = IdArray::Empty({num_seeds, trace_length}, seeds->dtype, seeds->ctx);
@@ -53,6 +55,8 @@ std::pair<IdArray, IdArray> GenericRandomWalk(
       int64_t i;
       dgl_id_t curr = seed_data[seed_id];
       traces_data[seed_id * trace_length] = curr;
+
+      CHECK_LT(curr, max_nodes) << "Seed node ID exceeds the maximum number of nodes.";
 
       for (i = 0; i < max_num_steps; ++i) {
         const auto &succ = step(traces_data + seed_id * max_num_steps, curr, i);
