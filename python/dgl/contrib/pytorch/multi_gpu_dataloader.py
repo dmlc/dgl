@@ -15,6 +15,8 @@
 #
 
 import dgl
+from dgl import utils
+from dgl.frame import Frame
 import torch as th
 from ...dataloading import NodeDataLoader
 from ..multi_gpu_datastore import MultiGPUDataStore
@@ -37,9 +39,12 @@ def _gather_row(tensor, index):
         return tensor[index]
 
 class _NodeDataIterator:
-    def __init__(self, it, n_feat, node_feat, node_label):
+    def __init__(self, it, n_feat, e_feat, node_feat, node_label):
         self._it = it
+        # {ntype: {feature: tensor}}
         self._n_feat = n_feat
+        # {etype: {feature: tensor}}
+        self._e_feat = e_feat
         self._node_feat = node_feat
         self._node_label = node_label
 
@@ -52,10 +57,28 @@ class _NodeDataIterator:
 
         # re-attach node features
         for block in blocks:
-            for k, v in self._n_feat.items():
-                for ntype, data in v.items():
-                    index = block.ndata[dgl.NID][ntype]
-                    block.ndata[k][ntype] = _gather_row(data, index)
+            node_frames = []
+            for ntype in block.ntypes:
+                index = block.ndata[dgl.NID][ntype]
+                frame = Frame(num_rows=len(index))
+                for k, v in self._n_feat[ntype].items():
+                    data = _gather_row(v, index)
+                    frame.update_column(k, data)
+                node_frames.append(frame)
+
+            edge_frames = []
+            for etype in block.etypes:
+                index = block.edata[dgl.EID]
+                if isinstance(index, Mapping):
+                    index = index[etype]
+                frame = Frame(num_rows=len(index))
+                for k, v in self._e_feat[etype].items():
+                    data = _gather_row(v, index)
+                    frame.update_column(k, data)
+                edge_frames.append(frame)
+
+            utils.set_new_frames(block, node_frames=node_frames,
+                edge_frames=edge_frames)
 
         result = [input_nodes, output_nodes, blocks]
         if self._node_feat is not None:
@@ -137,28 +160,41 @@ class MultiGPUNodeDataLoader(NodeDataLoader):
         assert comm is None or use_ddp, "'use_ddp' must be true when using NCCL."
         assert device != th.device("cpu"), "The device must be a GPU."
 
-        # we need to remove all of the features
-        n_feat = {}
+        # save node all features to GPU
+        self._n_feat = {}
+        for ntype in g.ntypes:
+            feats = {}
+            for feat_name in list(g.ndata.keys()):
+                if isinstance(g.ndata[feat_name], Mapping):
+                    data = g.ndata[feat_name][ntype]
+                else:
+                    data = g.ndata[feat_name] 
+                feats[feat_name] = _load_tensor(data, device, comm, partition)
+            self._n_feat[ntype] = feats
+
+        # remove all node features
         for feat_name in list(g.ndata.keys()):
-            if isinstance(g.ndata[feat_name], Mapping):
-                n_feat[feat_name] = {k: g.ndata[feat_name][k] for k in g.ntypes}
-            else:
-                # make homogenous graphs still be mapped by node type, in order
-                # to simplify the rest of the code using this structure
-                n_feat[feat_name] = {'_N': g.ndata[feat_name]}
             g.ndata.pop(feat_name)
+
+        # save all edge features to GPU
+        self._e_feat = {}
+        for etype in g.etypes:
+            feats = {}
+#            for feat_name in list(g.edata.keys()):
+#                if isinstance(g.edata[feat_name], Mapping):
+#                    data = g.edata[feat_name][etype]
+#                else:
+#                    data = g.edata[feat_name] 
+#                feats[feat_name] = _load_tensor(data, device, comm, partition)
+            self._e_feat[etype] = feats
+
+        # remove all edge features
+        for feat_name in list(g.edata.keys()):
+            g.edata.pop(feat_name)
 
         super(MultiGPUNodeDataLoader, self).__init__(
             g=g, nids=nids, block_sampler=block_sampler, device=device,
             use_ddp=use_ddp, **kwargs)
-
-        # move features to GPU 
-        self._n_feat = {}
-        for k, v in n_feat.items():
-            self._n_feat[k] = {}
-            for ntype in v.keys():
-                self._n_feat[k][ntype] = \
-                    _load_tensor(v[ntype], device, comm, partition)
 
         self._node_feat = None
         if node_feat is not None:
@@ -171,6 +207,6 @@ class MultiGPUNodeDataLoader(NodeDataLoader):
     def __iter__(self):
         """Return the iterator of the data loader."""
         it = super(MultiGPUNodeDataLoader, self).__iter__()
-        return _NodeDataIterator(it, self._n_feat, self._node_feat,
-                                 self._node_label)
+        return _NodeDataIterator(it, self._n_feat, self._e_feat,
+                                 self._node_feat, self._node_label)
             
