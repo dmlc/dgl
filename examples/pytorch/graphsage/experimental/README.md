@@ -1,3 +1,5 @@
+## DistGNN
+
 ## Distributed training
 
 This is an example of training GraphSage in a distributed fashion. Before training, please install some python libs by pip:
