@@ -211,7 +211,7 @@ set(GOOGLE_TEST 0) # Turn off dmlc-core test
 
 # Compile METIS
 if(NOT MSVC)
-  set(GKLIB_PATH "${CMAKE_SOURCE_DIR}/third_party/METIS/GKlib")
+  set(GKLIB_PATH "${CMAKE_CURRENT_SOURCE_DIR}/third_party/METIS/GKlib")
   include(${GKLIB_PATH}/GKlibSystem.cmake)
   include_directories(${GKLIB_PATH})
   include_directories("third_party/METIS/include/")
