@@ -61,7 +61,9 @@ class _NodeDataIterator:
             for ntype in block.ntypes:
                 index = block.ndata[dgl.NID][ntype]
                 frame = Frame(num_rows=len(index))
+                print("ntype = {}, self._n_feat = {}".format(ntype, self._n_feat))
                 for k, v in self._n_feat[ntype].items():
+                    print("k = {}, v = {}".format(k,v))
                     data = _gather_row(v, index)
                     frame.update_column(k, data)
                 node_frames.append(frame)
@@ -70,19 +72,25 @@ class _NodeDataIterator:
             for etype in block.etypes:
                 index = block.edata[dgl.EID]
                 if isinstance(index, Mapping):
-                    index = index[etype]
+                    index = index[block.to_canonical_etype(etype)]
                 frame = Frame(num_rows=len(index))
                 for k, v in self._e_feat[etype].items():
                     data = _gather_row(v, index)
                     frame.update_column(k, data)
                 edge_frames.append(frame)
 
+            print("Setting node frames = {}".format(node_frames))
             utils.set_new_frames(block, node_frames=node_frames,
                 edge_frames=edge_frames)
 
         result = [input_nodes, output_nodes, blocks]
         if self._node_feat is not None:
-            input_feats = _gather_row(self._node_feat, input_nodes)
+            if isinstance(self._node_feat, Mapping):
+                input_feats = {}
+                for k,v in self._node_feat.items():
+                    input_feats[k] = _gather_row(v, input_nodes[k])
+            else:
+                input_feats = _gather_row(self._node_feat, input_nodes)
             result.append(input_feats)
 
         if self._node_label is not None:
@@ -162,35 +170,39 @@ class MultiGPUNodeDataLoader(NodeDataLoader):
 
         # save node all features to GPU
         self._n_feat = {}
-        for ntype in g.ntypes:
+        for i, ntype in enumerate(g.ntypes):
+            print("ntype == {}".format(ntype))
             feats = {}
-            for feat_name in list(g.ndata.keys()):
+            for feat_name in list(g._node_frames[i].keys()):
                 if isinstance(g.ndata[feat_name], Mapping):
                     data = g.ndata[feat_name][ntype]
                 else:
                     data = g.ndata[feat_name] 
                 feats[feat_name] = _load_tensor(data, device, comm, partition)
+                print("feat_name->'{}' = {}".format(feat_name, feats[feat_name]))
             self._n_feat[ntype] = feats
 
         # remove all node features
-        for feat_name in list(g.ndata.keys()):
-            g.ndata.pop(feat_name)
+        for i, ntype in enumerate(g.ntypes):
+            for feat_name in list(g._node_frames[i].keys()):
+                g._node_frames[i].pop(feat_name)
 
         # save all edge features to GPU
         self._e_feat = {}
-        for etype in g.etypes:
+        for i, etype in enumerate(g.etypes):
             feats = {}
-#            for feat_name in list(g.edata.keys()):
-#                if isinstance(g.edata[feat_name], Mapping):
-#                    data = g.edata[feat_name][etype]
-#                else:
-#                    data = g.edata[feat_name] 
-#                feats[feat_name] = _load_tensor(data, device, comm, partition)
+            for feat_name in list(g._edge_frames[i].keys()):
+                if isinstance(g.edata[feat_name], Mapping):
+                    data = g.edata[feat_name][etype]
+                else:
+                    data = g.edata[feat_name] 
+                feats[feat_name] = _load_tensor(data, device, comm, partition)
             self._e_feat[etype] = feats
 
         # remove all edge features
-        for feat_name in list(g.edata.keys()):
-            g.edata.pop(feat_name)
+        for i, etype in enumerate(g.etypes):
+            for feat_name in list(g._edge_frames[i].keys()):
+                g._edge_frames[i].pop(feat_name)
 
         super(MultiGPUNodeDataLoader, self).__init__(
             g=g, nids=nids, block_sampler=block_sampler, device=device,
@@ -198,10 +210,17 @@ class MultiGPUNodeDataLoader(NodeDataLoader):
 
         self._node_feat = None
         if node_feat is not None:
-            self._node_feat = _load_tensor(node_feat, device, comm, partition)
+            if isinstance(node_feat, Mapping):
+                self._node_feat = {}
+                for k,v in node_feat.items():
+                    self._node_feat[k] = _load_tensor(v, device, comm, partition)
+            else:
+                self._node_feat = _load_tensor(node_feat, device, comm, partition)
         
         self._node_label = None
         if node_label is not None:
+            assert not isinstance(node_label, Mapping), \
+                "Multiple label types is not supported."
             self._node_label = _load_tensor(node_label, device, comm, partition)
 
     def __iter__(self):
