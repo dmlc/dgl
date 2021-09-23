@@ -183,9 +183,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GraphSAINT')
     parser.add_argument("--task", type=str, default="ppi_n", help="type of tasks")
     parser.add_argument("--online", dest='online', action='store_true', help="sampling method in training phase")
+    parser.add_argument("--gpu", type=int, default=0, help="the gpu index")
     task = parser.parse_args().task
     args = argparse.Namespace(**CONFIG[task])
     args.online = parser.parse_args().online
+    args.gpu = parser.parse_args().gpu
     print(args)
 
     main(args, task=task)
