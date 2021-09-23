@@ -558,8 +558,8 @@ def main():
                         formats, separated by ",". For example, the graph format is "csr,csc".')
     parser.add_argument('--extra_envs', nargs='+', type=str, default=[],
                         help='Extra environment parameters need to be set. For example, \
-                        you can set the LD_LIBRARY_PATH and NCCL_DEBUG by adding:
-                        --extra_envs "LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH" "NCCL_DEBUG=INFO" ')
+                        you can set the LD_LIBRARY_PATH and NCCL_DEBUG by adding: \
+                        --extra_envs LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH NCCL_DEBUG=INFO ')
     args, udf_command = parser.parse_known_args()
     assert len(udf_command) == 1, 'Please provide user command line.'
     assert args.num_trainers is not None and args.num_trainers > 0, \
