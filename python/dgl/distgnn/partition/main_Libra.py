@@ -103,17 +103,17 @@ def save(g, dataset):
     print("Graph saved successfully !!")
     
 
-def load_proteins(dataset):    
+def load_proteins(dataset):
     part_dir = dataset
     graph_file = os.path.join(part_dir + "/graph.dgl")
 
     if not os.path.exists("proteins.mtx"):
         download_proteins()
-    if not os.path.exists(graph_file):        
+    if not os.path.exists(graph_file):
         g = proteins_mtx2dgl()
         save(g, dataset)
     
-    graph = load_graphs(graph_file)[0][0]    
+    graph = load_graphs(graph_file)[0][0]
     return graph
 
 
@@ -197,7 +197,7 @@ def vertex_cut_partition(num_community, dataset, prefix):
 
 
 
-if __name__ == "__main__":    
+if __name__ == "__main__":
     if len(sys.argv) != 3:
         raise DGLError("Error: exec <Input dataset> <#partitions>")
 
@@ -212,18 +212,18 @@ if __name__ == "__main__":
         resultdir = os.path.join(prefix, 'Libra_result_pubmed')
     elif dataset == 'citeseer':
         resultdir = os.path.join(prefix, 'Libra_result_citeseer')
-    elif dataset == 'reddit':          
+    elif dataset == 'reddit':
         resultdir = os.path.join(prefix, 'Libra_result_reddit')
-    elif dataset == 'ogbn-products':   
+    elif dataset == 'ogbn-products':
         resultdir = os.path.join(prefix, 'Libra_result_ogbn-products')
         index = 1
     elif dataset == 'ogbn-papers100M':
         resultdir = os.path.join(prefix, 'Libra_result_ogbn-papers100M')
         index = 3
-    elif dataset == 'proteins':        
+    elif dataset == 'proteins':
         resultdir = os.path.join(prefix, 'Libra_result_proteins')
         index = 2
-    elif dataset == 'ogbn-arxiv':      
+    elif dataset == 'ogbn-arxiv':
         resultdir = os.path.join(prefix, 'Libra_result_ogbn-arxiv')
     else:
         raise DGLError("Error: Input dataset not found !!")
@@ -235,7 +235,7 @@ if __name__ == "__main__":
         print("Error: Could not create directory: ", resultdir)
 
     ## Partitions per dataset 
-    l = [[2,4,8,16], [2,4,8,16,32,64],[2,4,8,16,32,64],[32,64,128]]    
+    l = [[2,4,8,16], [2,4,8,16,32,64],[2,4,8,16,32,64],[32,64,128]]
     print("Output is stored in ", resultdir, flush=True)
     #print("Generating ", l[index], " partitions...", flush=True)
     print("Generating ", nc, " partitions...", flush=True)
@@ -255,7 +255,7 @@ if __name__ == "__main__":
 
         ## Libra partitioning
         max_weightsum  = vertex_cut_partition(num_community, sys.argv[1], resultdir)
-                
+
         print(" ** Converting libra partitions to dgl graphs **")
         libra2dgl.run(dataset, resultdir_libra2dgl, num_community)
         print("Conversion libra2dgl completed !!!")

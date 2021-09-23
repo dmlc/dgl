@@ -92,7 +92,7 @@ def main_libra2dgl(resultdir, dataset, nc):
     
     """
     tedges = 1615685872   ## total edges
-    max_c = 1024   ## max partitions supported    
+    max_c = 1024   ## max partitions supported
     factor = 1.2
     
     ## for pre-allocated tensor size
@@ -101,7 +101,7 @@ def main_libra2dgl(resultdir, dataset, nc):
     ## load graph for the feature gather
     args = Args(dataset)
 
-    print("Loading data...", flush=True)                
+    print("Loading data...", flush=True)
     if args.dataset == 'ogbn-products':
         print("Loading ogbn-products")
         g_orig, _ = load_ogb('ogbn-products')
@@ -113,11 +113,11 @@ def main_libra2dgl(resultdir, dataset, nc):
         g_orig = load_proteins('proteins')
     elif args.dataset == 'ogbn-arxiv':
         print("Loading ogbn-arxiv")
-        g_orig, _ = load_ogb('ogbn-arxiv')                                        
+        g_orig, _ = load_ogb('ogbn-arxiv')
     else:
         g_orig = load_data(args)[0]
 
-    print("Done loading data.", flush=True)    
+    print("Done loading data.", flush=True)
     a,b = g_orig.edges()
 
     N_n = g_orig.number_of_nodes()
@@ -135,7 +135,7 @@ def main_libra2dgl(resultdir, dataset, nc):
 
     ## Iterator over number of partitions
     for i in range(nc):
-        g = gg[i]                
+        g = gg[i]
         fsize = hash_edges[nc]
 
         hash_nodes = th.zeros(2, dtype=th.int32)
@@ -177,13 +177,13 @@ def main_libra2dgl(resultdir, dataset, nc):
                      'node_map': node_map_val,
                      'edge_map': edge_map_val}
     ############################################################
-    
+
     for i in range(nc):
         g = gg[0]
         num_nodes = part_nodes[i]
-        adj        = th.zeros([num_nodes, nc - 1], dtype=th.int32);
-        inner_node = th.zeros(num_nodes, dtype=th.int32);
-        lf         = th.zeros(num_nodes, dtype=th.int32);
+        adj        = th.zeros([num_nodes, nc - 1], dtype=th.int32)
+        inner_node = th.zeros(num_nodes, dtype=th.int32)
+        lf         = th.zeros(num_nodes, dtype=th.int32)
         ldt = ldt_ar[0]
 
         try:
@@ -195,18 +195,18 @@ def main_libra2dgl(resultdir, dataset, nc):
             labels = g_orig.ndata['label']
         except:
             labels = g_orig.ndata['labels']
-            
+
         trainm = g_orig.ndata['train_mask']
         testm = g_orig.ndata['test_mask']
         valm = g_orig.ndata['val_mask']
-            
-        feat_size = feat.shape[1]
-        gfeat = th.zeros([num_nodes, feat_size], dtype=feat.dtype);
 
-        glabels = th.zeros(num_nodes, dtype=labels.dtype);
-        gtrainm = th.zeros(num_nodes, dtype=trainm.dtype);
-        gtestm = th.zeros(num_nodes, dtype=testm.dtype);
-        gvalm = th.zeros(num_nodes, dtype=valm.dtype);
+        feat_size = feat.shape[1]
+        gfeat = th.zeros([num_nodes, feat_size], dtype=feat.dtype)
+
+        glabels = th.zeros(num_nodes, dtype=labels.dtype)
+        gtrainm = th.zeros(num_nodes, dtype=trainm.dtype)
+        gtestm = th.zeros(num_nodes, dtype=testm.dtype)
+        gvalm = th.zeros(num_nodes, dtype=valm.dtype)
 
         ## build remote node databse per local node
         ## gather feats, train, test, val, and labels for each partition
@@ -214,7 +214,7 @@ def main_libra2dgl(resultdir, dataset, nc):
                                 gdt_value, node_map, lf, lftensor, num_nodes,
                                 nc, i, feat_size, labels, trainm, testm, valm,
                                 glabels, gtrainm, gtestm, gvalm, feat.shape[0])
-                                    
+        
 
         g.ndata['adj'] = adj   ## databse of remote clones
         g.ndata['inner_node'] = inner_node  ## split node '0' else '1'
@@ -226,8 +226,8 @@ def main_libra2dgl(resultdir, dataset, nc):
         g.ndata['test_mask'] = gtestm
         g.ndata['val_mask'] = gvalm
 
-        lf = g.ndata['lf']        
-        print("Writing partition {} to file".format(i), flush=True)    
+        lf = g.ndata['lf']
+        print("Writing partition {} to file".format(i), flush=True)
         
         part = g
         part_id = i
@@ -269,4 +269,4 @@ def run(dataset, resultdir, nc):
     print("number of parititons: ", nc)
 
     r_dt = rep_per_node(resultdir, nc)
-    partition_ar, node_map =  main_libra2dgl(resultdir, dataset, nc)    
+    partition_ar, node_map =  main_libra2dgl(resultdir, dataset, nc)
