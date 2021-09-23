@@ -562,8 +562,10 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_FG_SDDMMTreeReduction")
   });
 #endif  // USE_TVM
 
+
+
 /**************************************************************************************/
-/* DistGNN functions */
+/* Libra partitioning codebase */
 
 template<typename IdType>
 int32_t Ver2partition(IdType in_val, int32_t* node_map, int32_t num_parts) {
@@ -574,667 +576,12 @@ int32_t Ver2partition(IdType in_val, int32_t* node_map, int32_t num_parts) {
     pos = pos + 1;
   }
   LOG(FATAL) << "Error: Unexpected output in Ver2partition!";
-  //printf("Error: func Ver2partition\n");
-  // exit(EXIT_FAILURE);
 }
-
-
-int32_t Map2localIndex(int32_t otf, int32_t *node_map,
-                       int32_t num_parts, int32_t &pid,
-                       int32_t cur_part) {
-  int32_t last_p = 0;
-  if (cur_part != 0)
-    last_p = node_map[cur_part - 1];
-  for (int32_t i=cur_part; i<num_parts; i++) {
-    int32_t nnodes = node_map[i];
-    if (otf < nnodes) {
-      pid = i;
-      return otf - last_p;
-    }
-    last_p = nnodes;
-  }
-  LOG(FATAL) << "Error: Unexpected output in Map2localIndex!";
-  // printf("Error: func Map2localIndex\n");
-  // exit(EXIT_FAILURE);
-}
-
-
-template<typename IdType, typename DType>
-void FdrpaGatherEmbLR(
-  NDArray feat_a,
-  int64_t feat_shape,
-  NDArray adj_a,
-  NDArray send_feat_list_a,
-  int64_t offset,
-  NDArray send_node_list_a,
-  NDArray send_to_node_list_a,    
-  NDArray selected_nodes_a,
-  NDArray in_degs_a,
-  NDArray ver2part_a,
-  NDArray ver2part_index_a,
-  int32_t width,
-  int32_t feat_size,
-  int32_t cur_part,
-  int64_t soffset_base,
-  int64_t soffset_cur,
-  NDArray node_map_a,
-  int32_t num_parts) {
-  
-  if (soffset_cur == 0) return;
-        
-  DType*   feat              = feat_a.Ptr<DType>();
-  IdType*  adj               = adj_a.Ptr<IdType>();
-  DType*   send_feat_list    = send_feat_list_a.Ptr<DType>() + offset * (feat_size + 1);
-  int32_t* send_node_list    = send_node_list_a.Ptr<int32_t>();
-  int32_t* send_to_node_list = send_to_node_list_a.Ptr<int32_t>() + offset;
-  int32_t* selected_nodes    = selected_nodes_a.Ptr<int32_t>();
-  DType*   in_degs           = in_degs_a.Ptr<DType>();
-  int32_t* ver2part          = ver2part_a.Ptr<int32_t>();
-  int32_t* ver2part_index    = ver2part_index_a.Ptr<int32_t>();
-  int32_t* node_map          = node_map_a.Ptr<int32_t>();
-    
-  int32_t pos = 0, pos_out = 0;
-  int32_t len = selected_nodes_a.GetSize() >> 2;
-    
-  int32_t *gindex = (int32_t*)calloc(sizeof(int32_t), len);
-  int32_t lim = send_node_list_a.GetSize() >> 2;
-  int32_t counter = 0;
-  pos = 0;
-  
-  for (int32_t i=0; i<len; i++) {
-    if (ver2part[i] == cur_part) {
-      if (counter >= soffset_base && pos < soffset_cur) {
-        gindex[pos++] = i;
-      }
-      counter ++;
-    }
-  }    
-  CHECK(pos == soffset_cur);
-  
-  #pragma omp parallel for
-  for (int64_t i=0; i<pos; i++)
-  {
-    int32_t id = gindex[i];
-    int64_t index = selected_nodes[id];
-    
-    #if DEBUG  //checks
-    if (index >= feat_shape) {
-      printf("Error: at index: %d, feat_shape: %d\n", index, feat_shape);
-      fflush(0);
-      CHECK(index < feat_shape);
-    }       
-    CHECK(index >= 0);
-    #endif
-        
-    DType *iptr = feat + index * feat_size;        
-    send_node_list[i] = index;        
-    DType *optr = send_feat_list + i * (feat_size + 1);
-    optr[0] = in_degs[index];
-    send_to_node_list[i] = ver2part_index[id];
-    
-    #if DEBUG   // checks
-    int32_t  p = Ver2partition<int32_t>(ver2part_index[id], node_map, num_parts);
-    if (cur_part != p)
-      LOG(FATAL) << "Error: Cur_part not matching !";
-      // printf("Error: at not matching: %d %d\n", cur_part, p);
-    CHECK(cur_part == p);
-    #endif
-        
-    #pragma omp simd
-    for (int64_t k=0; k<feat_size; k++)
-      optr[1 + k] = iptr[k];
-  }
-  free(gindex);
-}
-
-
-DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelFdrpaGatherEmbLR")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-  NDArray feat              = args[0];
-  int64_t feat_shape        = args[1];
-  NDArray adj               = args[2];
-  NDArray send_feat_list    = args[3];
-  int64_t offset            = args[4];
-  NDArray send_node_list    = args[5];
-  NDArray send_to_node_list = args[6];
-  NDArray selected_nodes    = args[7];
-  NDArray in_degs           = args[8];
-  NDArray ver2part          = args[9];
-  NDArray ver2part_index    = args[10];
-  int32_t width             = args[11];
-  int32_t feat_size         = args[12];
-  int32_t cur_part          = args[13];
-  int64_t soffset_base      = args[14];
-  int64_t soffset_cur       = args[15];
-  NDArray node_map          = args[16];
-  int32_t num_parts         = args[17];
-
-  ATEN_ID_TYPE_SWITCH(adj->dtype, IdType, {
-      ATEN_FLOAT_TYPE_SWITCH(feat->dtype, DType, "Feature data", {
-          FdrpaGatherEmbLR<IdType, DType>(feat, feat_shape,
-                                          adj, send_feat_list,
-                                          offset, send_node_list,
-                                          send_to_node_list, selected_nodes,
-                                          in_degs, ver2part,
-                                          ver2part_index, width,
-                                          feat_size, cur_part,
-                                          soffset_base, soffset_cur,
-                                          node_map, num_parts);          
-        });
-    });
-});
-
-
-template<typename IdType, typename DType>
-void ScatterReduceLR(
-  NDArray otf_a,
-  int64_t offsetf,
-  NDArray otn_a,
-  int64_t offsetn,    
-  NDArray feat_a,    
-  NDArray in_degs_a,
-  NDArray node_map_a,
-  int64_t dim,
-  int64_t feat_size,
-  int64_t num_parts,
-  NDArray recv_list_nodes_a,
-  NDArray pos_a,
-  int64_t lim,
-  int32_t cur_part) {
-  
-  DType*   otf             = otf_a.Ptr<DType>() + offsetf;
-  int32_t* otn             = otn_a.Ptr<int32_t>() + offsetn;
-  DType*   feat            = feat_a.Ptr<DType>();
-  DType*  in_degs          = in_degs_a.Ptr<DType>();
-  int32_t* node_map        = node_map_a.Ptr<int32_t>();
-  int32_t* recv_list_nodes = recv_list_nodes_a.Ptr<int32_t>();
-  int64_t* pos             = pos_a.Ptr<int64_t>();
-
-  int64_t size = in_degs_a.GetSize() >> 2;
-  int64_t fsize = feat_a.GetSize() >> 2;
-
-  #pragma omp parallel for
-  for (int64_t i=0; i<lim; i++) {
-    DType *iptr = otf + i * (feat_size + 1);
-    CHECK(iptr[0] >= 0) << "Error: ScatterReduceLR, -ve index!"; 
-    // if(iptr[0] < 0) {
-    //   printf("Error: ScatterReduceLR, at -ve index, i: %d, iptr: %f\n", i, iptr[0]);
-    //   fflush(0);
-    //   exit(EXIT_FAILURE);
-    // }
-
-    int32_t pid = -1;
-    int64_t index = Map2localIndex(otn[i], node_map, num_parts, pid, cur_part);
-    CHECK(pid == cur_part);
-    CHECK(index < size && index >= 0) << "Error: ScatterReudce, index out of range!";
-    // if (index >= size || index < 0) {
-    //   printf("Error: ScatterReduceLR, at index out of range: %d\n", index);
-    //   fflush(0);
-    //   exit(EXIT_FAILURE);      
-    // }
-    
-    in_degs[index] += iptr[0];
-    recv_list_nodes[i] = index;
-    DType *optr = feat + index * feat_size;
-
-    CHECK((i+1)*(feat_size+1) <= dim) << "Error: ScatterReudce, feat_size out of range!";
-    // if ((i+1)*(feat_size+1) > dim) {
-    //   printf("Error: lim: %d %d\n", i+1+feat_size, dim);
-    //   fflush(0);exit(EXIT_FAILURE);
-    // }
-    CHECK((index+1)*feat_size <= fsize) << "Error: ScatterReudce, feat_size (fsize) out of range!";
-    // if( (index+1)*feat_size > fsize) {
-    //   printf("Error: fsize, %d %d %d\n", (index+1)*feat_size, fsize, feat_size);
-    //   fflush(0);exit(EXIT_FAILURE);
-    // }
-        
-    #pragma omp simd
-    for (int32_t j=0; j<feat_size; j++)
-      optr[j] += iptr[1 + j];
-  }
-  pos[0] += lim;
-}
-
-
-DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelScatterReduceLR")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-  NDArray otf             = args[0];
-  int64_t offsetf         = args[1];
-  NDArray otn             = args[2];
-  int64_t offsetn         = args[3];    
-  NDArray feat            = args[4];
-  NDArray in_degs         = args[5];
-  NDArray node_map        = args[6];
-  int64_t dim             = args[7];
-  int64_t feat_size       = args[8];
-  int64_t num_parts       = args[9];
-  NDArray recv_list_nodes = args[10];
-  NDArray pos             = args[11];
-  int64_t lim             = args[12];
-  int64_t cur_part        = args[13];
-
-  ATEN_FLOAT_TYPE_SWITCH(in_degs->dtype, IdType, "Id data", {
-      ATEN_FLOAT_TYPE_SWITCH(otf->dtype, DType, "Feature data", {
-          ScatterReduceLR<IdType, DType>(otf, offsetf, otn, offsetn,
-                                         feat, in_degs, node_map,
-                                         dim, feat_size, num_parts,
-                                         recv_list_nodes, pos, lim,
-                                         cur_part);
-        });
-    });
-});
-
-
-template<typename DType>
-void FdrpaGatherEmbRL(
-  NDArray feat_a,
-  int64_t feat_shape,
-  NDArray send_feat_list_a,
-  int64_t offset,
-  NDArray recv_list_nodes_a,
-  int64_t lim,
-  NDArray in_degs_a,
-  int32_t feat_size,
-  int32_t cur_part,
-  NDArray node_map_a,
-  int32_t num_parts) {
-  
-  DType*   feat            = feat_a.Ptr<DType>();
-  DType*   send_feat_list  = send_feat_list_a.Ptr<DType>() + offset;
-  int32_t* recv_list_nodes  = recv_list_nodes_a.Ptr<int32_t>();
-  int32_t* node_map        = node_map_a.Ptr<int32_t>();
-  DType*   in_degs         = in_degs_a.Ptr<DType>();
-    
-  int32_t pos = 0, pos_out = 0;
-
-  #pragma omp parallel for
-  for (int64_t i=0; i<lim; i++) {
-    int64_t index = recv_list_nodes[i];
-    CHECK(index < feat_shape) << "Error: FdrpaGartherRL, index of range of feat_shape!";
-    //if (index >= feat_shape) {
-    //  printf("Error:at index: %d, feat_shape: %d\n", index, feat_shape);
-    //  fflush(0);
-    //  exit(EXIT_FAILURE);
-    //}
-
-    DType *iptr = feat + index * feat_size;        
-    DType *optr = send_feat_list + i * (feat_size + 1);
-    optr[0] = in_degs[index];
-        
-    #pragma omp simd
-    for (int32_t k=0; k<feat_size; k++)
-      optr[1 + k] = iptr[k];
-  }
-}
-
-
-DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelFdrpaGatherEmbRL")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-  NDArray feat              = args[0];
-  int64_t feat_shape        = args[1];
-  NDArray send_feat_list    = args[2];
-  int64_t offset            = args[3];
-  NDArray recv_list_nodes   = args[4];
-  int64_t lim               = args[5];
-  NDArray in_degs           = args[6];
-  int32_t feat_size         = args[7];
-  int32_t cur_part          = args[8];
-  NDArray node_map          = args[9];
-  int32_t num_parts         = args[10];
-
-  ATEN_FLOAT_TYPE_SWITCH(feat->dtype, DType, "Feature data", {
-      FdrpaGatherEmbRL<DType>(feat,
-                              feat_shape,
-                              send_feat_list,
-                              offset,
-                              recv_list_nodes,
-                              lim,
-                              in_degs,
-                              feat_size,
-                              cur_part,
-                              node_map,
-                              num_parts);
-    });    
-});
-
-template<typename DType>
-void ScatterReduceRL(
-  NDArray otf_a,
-  int64_t offset,
-  NDArray stn_a,
-  int64_t lim,
-  NDArray in_degs_a,
-  NDArray feat_a,    
-  NDArray node_map_a,
-  int64_t dim,
-  int64_t feat_size,
-  int64_t num_parts,
-  int32_t cur_part) {
-  
-  DType*   otf             = otf_a.Ptr<DType>() + offset;
-  int32_t* stn             = stn_a.Ptr<int32_t>();
-  DType*   feat            = feat_a.Ptr<DType>();
-  int32_t* node_map        = node_map_a.Ptr<int32_t>();
-  DType*   in_degs         = in_degs_a.Ptr<DType>();
-
-  int64_t fsize = feat_a.GetSize() >> 2;
-
-  #pragma omp parallel for
-  for (int64_t i=0; i<lim; i++) {
-    DType   *iptr  = otf + i * (feat_size + 1); 
-    int64_t  index = stn[i];
-    DType   *optr  = feat + index * feat_size;
-    in_degs[index] = iptr[0];
-
-    CHECK((i+1)*(1+feat_size) <= dim) << "Error: ScatterReduceRL, index out of range!";
-    // if ((i+1)*(1+feat_size) > dim) {
-    //   printf("Error: at lim: %d %d\n", i+1+feat_size, dim);
-    //   fflush(0);exit(EXIT_FAILURE);
-    // }
-    CHECK((index+1)*feat_size <= fsize) << "Error: ScatterReduceRL, index (fsize) out of range!";
-    // if( (index+1)*feat_size > fsize) {
-    //   printf("Error: at fsize, %d %d %d\n", (index+1)*feat_size, fsize, feat_size);
-    //   fflush(0);exit(EXIT_FAILURE);
-    // }
-
-    #pragma simd
-    for (int32_t j=0; j<feat_size; j++)
-      optr[j] = iptr[1+j];    
-  }
-}
-
-
-DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelScatterReduceRL")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-  NDArray otf             = args[0];
-  int64_t offset          = args[1];
-  NDArray stn             = args[2];
-  int64_t lim             = args[3];
-  NDArray in_degs         = args[4];
-  NDArray feat            = args[5];
-  NDArray node_map        = args[6];
-  int64_t dim             = args[7];
-  int64_t feat_size       = args[8];
-  int64_t num_parts       = args[9];
-  int64_t cur_part        = args[10];
-
-  ATEN_FLOAT_TYPE_SWITCH(otf->dtype, DType, "Feature data", {
-      ScatterReduceRL<DType>(otf, offset, stn, lim,
-                             in_degs, feat, node_map,
-                             dim, feat_size, num_parts,
-                             cur_part);
-    });
-});
-
-template<typename IdType>
-void FdrpaCommBuckets(
-  NDArray adj_a,
-  NDArray selected_nodes_a,
-  NDArray ver2part_a,
-  NDArray ver2part_index_a,
-  NDArray node_map_a,
-  NDArray buckets_a,
-  NDArray lf_a,
-  int32_t width,
-  int32_t num_parts,
-  int32_t cur_part) {
-  
-  IdType*  adj             = adj_a.Ptr<IdType>();
-  int32_t* selected_nodes  = selected_nodes_a.Ptr<int32_t>();
-  int32_t* ver2part       = ver2part_a.Ptr<int32_t>();
-  int32_t* ver2part_index = ver2part_index_a.Ptr<int32_t>();
-  int32_t* node_map        = node_map_a.Ptr<int32_t>();
-  int32_t* buckets         = buckets_a.Ptr<int32_t>();
-  int32_t* lf              = lf_a.Ptr<int32_t>();
-    
-  int32_t nthreads = omp_get_max_threads();
-  int32_t *gbucket = (int32_t*) calloc (sizeof(int32_t), nthreads * num_parts);
-    
-  int32_t tnodes = 0;
-  int32_t len = selected_nodes_a.GetSize() >> 2;
-    
-  #pragma omp parallel
-  {
-    int32_t tid = omp_get_thread_num();
-    std::vector<std::pair<int32_t, int32_t> > cache(num_parts);
-    #pragma omp for
-    for(int64_t i=0; i<len; i++) {
-      int64_t index = selected_nodes[i];
-      int32_t lf_val = lf[index];
-      CHECK(lf_val != -200);
-      int32_t p = Ver2partition<IdType>(lf_val, node_map, num_parts);
-            
-      IdType *ptr = adj + width * index;
-      int32_t min_part = p;
-      int32_t min_index = lf_val;
-            
-      if (min_part != cur_part) {
-        // debug code
-        bool flg = 1;
-        for (int32_t j=0; j<width; j++) {
-          if (ptr[j] >= 0) {
-            if(ptr[j] == lf_val)
-              flg = 0;
-          }                
-          else                         
-            break;
-        }                
-        CHECK(flg == 0);
-        // debug code ends
-        gbucket[tid*num_parts + min_part] ++;
-        ver2part[i] = min_part;
-        ver2part_index[i] = min_index;
-      }
-      else {
-        ver2part[i] = -100;
-      }                
-    }
-  }
-  // aggregate
-  for (int32_t t=0; t<nthreads; t++) {
-    for (int32_t p=0; p<num_parts; p++)
-      buckets[p] += gbucket[t*num_parts + p];
-  }
-  for (int32_t p=0; p<num_parts; p++) tnodes += buckets[p];    
-
-  free(gbucket);
-}
-
-DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelFdrpaCommBuckets")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-  NDArray adj            = args[0];
-  NDArray selected_nodes = args[1];
-  NDArray ver2part       = args[2];
-  NDArray ver2part_index = args[3];
-  NDArray node_map       = args[4];
-  NDArray buckets        = args[5];
-  NDArray lf             = args[6];
-  int32_t width          = args[7];
-  int32_t num_parts      = args[8];
-  int32_t cur_part       = args[9];
-
-  ATEN_ID_TYPE_SWITCH(adj->dtype, IdType, {
-      FdrpaCommBuckets<IdType>(adj,
-                               selected_nodes,
-                               ver2part,
-                               ver2part_index,
-                               node_map,
-                               buckets,
-                               lf,
-                               width,
-                               num_parts,
-                               cur_part);
-    });
-});
-
-
-template<typename IdType>
-void FdrpaInitBuckets(
-  NDArray adj_a,
-  NDArray selected_nodes_a,
-  NDArray node_map_a,
-  NDArray buckets_a,
-  NDArray lf_a,
-  int32_t width,
-  int32_t num_parts,
-  int32_t cur_part) {
-  
-  IdType*  adj             = adj_a.Ptr<IdType>();
-  int32_t* selected_nodes  = selected_nodes_a.Ptr<int32_t>();
-  int32_t* node_map        = node_map_a.Ptr<int32_t>();
-  int32_t* buckets         = buckets_a.Ptr<int32_t>();
-  int32_t* lf              = lf_a.Ptr<int32_t>();
-    
-  int32_t nthreads = omp_get_max_threads();
-  int32_t *gbucket = (int32_t*) calloc (sizeof(int32_t), nthreads * num_parts);    
-  int32_t len = selected_nodes_a.GetSize() >> 2;
-    
-  #pragma omp parallel
-  {
-    int32_t tid = omp_get_thread_num();
-    #pragma omp for
-    for(int64_t i=0; i<len; i++) {
-      int64_t index = selected_nodes[i];
-      int32_t lf_val = lf[index];
-      CHECK(lf_val != -200);
-      int32_t p = Ver2partition<IdType>(lf_val, node_map, num_parts);
-            
-      IdType *ptr = adj + width * index;
-      int32_t min_part = p;
-      int32_t min_index = lf_val;
-            
-      if (min_part != cur_part) {
-        // check-debug code
-        bool flg = 1;
-        for (int32_t j=0; j<width; j++) {
-          if (ptr[j] >= 0) {
-            if(ptr[j] == lf_val)
-              flg = 0;
-          }                
-          else                         
-            break;
-        }                
-        CHECK(flg == 0);
-        // assert(flg == 0);
-        // check-debug code ends
-        gbucket[tid*num_parts + min_part] ++;
-      }
-    }
-  }
-
-  // aggregate
-  for (int32_t t=0; t<nthreads; t++) {
-    for (int32_t p=0; p<num_parts; p++)
-      buckets[p] += gbucket[t*num_parts + p];
-  }
-  free(gbucket);
-}
-
-DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelFdrpaInitBuckets")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-  NDArray adj            = args[0];
-  NDArray selected_nodes = args[1];
-  NDArray node_map       = args[2];
-  NDArray buckets        = args[3];
-  NDArray lf             = args[4];
-  int32_t width          = args[5];
-  int32_t num_parts      = args[6];
-  int32_t cur_part       = args[7];
-
-  ATEN_ID_TYPE_SWITCH(adj->dtype, IdType, {
-      FdrpaInitBuckets<IdType>(adj,
-                               selected_nodes,
-                               node_map,
-                               buckets,
-                               lf,
-                               width,
-                               num_parts,
-                               cur_part);
-    });
-});
-
-
-template<typename DType>
-void DegDiv(
-  NDArray neigh_,    
-  NDArray h_,        
-  int64_t feat_size,
-  NDArray in_degs_,  
-  int64_t lim) {
-  
-  DType*  neigh = neigh_.Ptr<DType>();
-  DType*  h     = h_.Ptr<DType>();
-  DType* degs  = in_degs_.Ptr<DType>();
-
-  #pragma omp parallel for
-  for (int32_t i=0; i<lim; i++) {
-    DType deg = degs[i];
-    DType *ptrn = neigh + i* feat_size;
-    DType *ptrh = h     + i* feat_size;
-    for (int32_t j=0; j<feat_size; j++) {
-
-      ptrn[j] = (ptrn[j] +  ptrh[j]) / (deg + 1);
-    }
-
-  }
-}
-    
-DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelDegDiv")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-  NDArray neigh_    = args[0];
-  NDArray h_        = args[1];
-  int64_t feat_size_= args[2];
-  NDArray in_degs_  = args[3];
-  int64_t lim_      = args[4];
-
-  ATEN_FLOAT_TYPE_SWITCH(neigh_->dtype, DType, "Feature data", {
-      DegDiv<DType>(neigh_, h_, feat_size_, in_degs_, lim_);
-    });
-});
-
-template<typename DType>
-void DegDivBack(
-  NDArray neigh_grad_,    
-  int64_t feat_size,
-  NDArray in_degs_,  
-  int64_t lim) {
-  
-  DType*  neigh_grad = neigh_grad_.Ptr<DType>();
-  DType* degs  = in_degs_.Ptr<DType>();
-
-  #pragma omp parallel for
-  for (int32_t i=0; i<lim; i++) {
-    DType deg = degs[i];
-    DType *ptrn = neigh_grad + i* feat_size;
-    for (int32_t j=0; j<feat_size; j++) {
-
-      ptrn[j] = ptrn[j]  / (deg + 1);
-    }
-  }
-}
-    
-DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelDegDivBack")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-  NDArray neigh_    = args[0];
-  int64_t feat_size_= args[1];
-  NDArray in_degs_  = args[2];
-  int64_t lim_      = args[3];
-
-  ATEN_FLOAT_TYPE_SWITCH(neigh_->dtype, DType, "Feature data", {
-      DegDivBack<DType>(neigh_, feat_size_, in_degs_, lim_);
-    });
-});
-
-
-
-
-/**************************************************************************************/
-/* Libra partitioning codebase */
 
 /*! \brief Identifies the lead loaded partition/community for a given edge assignment.*/
 int32_t LeastLoad(int64_t* community_edges, int32_t nc) {
   // initialize random seed
-  srand (time(NULL));    
+  srand (time(NULL));
   std::vector<int> score, loc;
   int32_t min = 1e9;
   for (int32_t i=0; i<nc; i++) {
@@ -1247,10 +594,9 @@ int32_t LeastLoad(int64_t* community_edges, int32_t nc) {
       loc.push_back(i);
     }
   }
-    
   int32_t r = rand() % loc.size();
   CHECK(loc[r] < nc);
-  return loc[r];    
+  return loc[r];
 }
 
 /*! \brief Libra - vertexcut based graph partitioning.
@@ -1264,7 +610,7 @@ int32_t LeastLoad(int64_t* community_edges, int32_t nc) {
   \param out_a partition assignment of the edges
   \param N_n number of nodes in the input graph
   \param N_e number of edges in the input graph
-  \param prefix output/partition storage location 
+  \param prefix output/partition storage location
 */
 template<typename IdType, typename IdType2, typename DType>
 int32_t LibraVertexCut(
@@ -1279,7 +625,7 @@ int32_t LibraVertexCut(
   int64_t N_n,
   int64_t N_e,
   std::string prefix) {
-  
+
   int32_t *out                = out_a.Ptr<int32_t>();
   IdType  *node_degree        = node_degree_a.Ptr<IdType>();
   IdType  *edgenum_unassigned = edgenum_unassigned_a.Ptr<IdType>();
@@ -1290,23 +636,23 @@ int32_t LibraVertexCut(
 
   std::vector<std::vector<int32_t> > node_assignments(N_n);
   std::vector<IdType2> replication_list;
-    
+
   // local allocations
   int64_t *community_edges = (int64_t*)calloc(sizeof(int64_t), nc);
   int64_t *cache = (int64_t*)calloc(sizeof(int64_t), nc);
-        
+
   CHECK ((out_a.GetSize() >> 2) == N_e);
   CHECK ((node_degree_a.GetSize() >> 3) == N_n);
   CHECK ((u_a.GetSize() >> 3) == N_e);
   CHECK ((w_a.GetSize() >> 2) == N_e);
-    
+
   for (int64_t i=0; i<N_e; i++) {
     IdType u = uptr[i];
     IdType v = vptr[i];
     float  w = wptr[i];
     CHECK (u < N_n);
     CHECK (v < N_n);
-        
+
     if (i%10000000 == 0) {
       printf("."); fflush(0);
     }
@@ -1315,7 +661,7 @@ int32_t LibraVertexCut(
       int32_t c = LeastLoad(community_edges, nc);
       out[i] = c;
       CHECK_LT(c, nc);
-        
+
       community_edges[c] ++;
       community_weights[c] = community_weights[c] + w;
       node_assignments[u].push_back(c);
@@ -1339,7 +685,7 @@ int32_t LibraVertexCut(
       out[i] = c;
       community_edges[c] ++;
       community_weights[c] = community_weights[c] + w;
-            
+
       node_assignments[v].push_back(c);
       CHECK(node_assignments[v].size() <= nc) <<
         "Error: 2. generated splits (v) are greater than nc!";
@@ -1358,7 +704,7 @@ int32_t LibraVertexCut(
 
       community_edges[c] ++;
       community_weights[c] = community_weights[c] + w;
-            
+
       node_assignments[u].push_back(c);
       CHECK(node_assignments[u].size() <= nc) <<
         "3. Error: generated splits (u) are greater than nc!";
@@ -1378,13 +724,13 @@ int32_t LibraVertexCut(
         CHECK(node_assignments[v][j] < nc) << "Error: 4. Part assigned (v) greater than nc!";
         setv[node_assignments[v][j]] ++;
       }
-      
+
       for (int32_t j=0; j<node_assignments[u].size(); j++) {
         CHECK(node_assignments[u][j] < nc) << "Error: 4. Part assigned (u) greater than nc!";
         setv[node_assignments[u][j]] ++;
       }
-            
-      for (int32_t j=0; j<nc; j++) {        
+
+      for (int32_t j=0; j<nc; j++) {
         CHECK(setv[j] <= 2) << "Error: 4. unexpected computed value !!!";
         if (setv[j] == 2) {
           interset++;
@@ -1394,7 +740,7 @@ int32_t LibraVertexCut(
       if (interset) {
         for (int32_t j=0; j<intersetv.size(); j++) {
           int32_t cind = intersetv[j];
-          cache[j] = community_edges[cind];                    
+          cache[j] = community_edges[cind];
         }
         int32_t cindex = LeastLoad(cache, intersetv.size());
         int32_t c = intersetv[cindex];
@@ -1404,7 +750,7 @@ int32_t LibraVertexCut(
         community_edges[c] ++;
         community_weights[c] = community_weights[c] + w;
         edgenum_unassigned[u] --;
-        edgenum_unassigned[v] --;                                
+        edgenum_unassigned[v] --;
       }
       else {
         if (node_degree[u] < node_degree[v]) {
@@ -1453,10 +799,10 @@ int32_t LibraVertexCut(
             "Error: 6. generated splits (u) greater than nc!!";
           replication_list.push_back(u);
           edgenum_unassigned[u] --;
-          edgenum_unassigned[v] --;                                                        
+          edgenum_unassigned[v] --;
         }
       }
-    }        
+    }
   }
   free(cache);
 
@@ -1464,12 +810,12 @@ int32_t LibraVertexCut(
   for (int64_t c=0; c < nc; c++) {
     std::string str = lprefix + "/" + std::to_string(nc) + "Communities/community" +
       std::to_string(c) +".txt";
-        
+
     FILE *fp = fopen(str.c_str(), "w");
     CHECK_NOTNULL(fp);
         
     for (int64_t i=0; i<N_e; i++) {
-      if (out[i] == c) 
+      if (out[i] == c)
         fprintf(fp, "%ld,%ld,%f\n", uptr[i], vptr[i], wptr[i]);
     }
     fclose(fp);
@@ -1478,7 +824,7 @@ int32_t LibraVertexCut(
   std::string str = lprefix + "/"  + std::to_string(nc) + "Communities/replicationlist.csv";
   FILE *fp = fopen(str.c_str(), "w");
   CHECK_NOTNULL(fp);
-    
+
   std::string str_ = "# The Indices of Nodes that are replicated :: Header";
   fprintf(fp, "## The Indices of Nodes that are replicated :: Header");
   printf("Total replication: %ld\n", replication_list.size());
@@ -1490,15 +836,15 @@ int32_t LibraVertexCut(
   for (int64_t c=0; c < nc; c++)
     printf("%f ", community_weights[c]);
   printf("\n");
-    
+
   printf("Community edges:\n");
   for (int64_t c=0; c < nc; c++)
     printf("%ld ", community_edges[c]);
   printf("\n");
 
-  free(community_edges);    
+  free(community_edges);
   fclose(fp);
-    
+
   return 0;
 }
 
@@ -1515,7 +861,7 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLLibraVertexCut")
   int64_t N                  = args[8];
   int64_t N_e                = args[9];
   std::string prefix        = args[10];
-  
+
   ATEN_ID_TYPE_SWITCH(node_degree->dtype, IdType2, {
       ATEN_ID_TYPE_SWITCH(u->dtype, IdType, {
           ATEN_FLOAT_TYPE_SWITCH(w->dtype, DType, "Feature data", {
@@ -1575,9 +921,9 @@ void Libra2dglBuildDict(
   int32_t *gdt_value  = gdt_value_a.Ptr<int32_t>(); // 2D tensor
   int32_t *node_map   = node_map_a.Ptr<int32_t>();
   int32_t *offset     = offset_a.Ptr<int32_t>();
-  int32_t *hash_nodes = hash_nodes_a.Ptr<int32_t>();    
+  int32_t *hash_nodes = hash_nodes_a.Ptr<int32_t>();
   int32_t width = nc;
-        
+
   int64_t *a = a_a.Ptr<int64_t>();
   int64_t *b = b_a.Ptr<int64_t>();
 
@@ -1588,11 +934,11 @@ void Libra2dglBuildDict(
   for (int32_t i=0; i<N_n; i++) {
     indices[i] = -100;
   }
-    
+
   int32_t pos = 0;
   int64_t edge = 0;
   std::string lprefix = prefix;
-  std::string str = lprefix + "/community" + std::to_string(c) + ".txt";    
+  std::string str = lprefix + "/community" + std::to_string(c) + ".txt";
   FILE *fp = fopen(str.c_str(), "r");
   CHECK_NOTNULL(fp);
 
@@ -1600,7 +946,7 @@ void Libra2dglBuildDict(
     int64_t u, v;
     float w;
     fscanf(fp, "%ld,%ld,%f\n", &u, &v, &w);
-            
+
     if (indices[u] == -100) {
       ldt_key[pos] = u;
       CHECK(pos < num_nodes);
@@ -1621,7 +967,7 @@ void Libra2dglBuildDict(
 
   for (int32_t i=0; i<pos; i++) {
     int64_t  u   = ldt_key[i];
-    int32_t  v   = indices[u];            
+    int32_t  v   = indices[u];
     int32_t *ind = &gdt_key[u];
     int32_t *ptr = gdt_value + u*width;
     ptr[*ind] = offset[0] + v;
@@ -1671,17 +1017,17 @@ void Libra2dglSetLF(
   NDArray lftensor_a,
   int32_t nc,
   int64_t Nn) {
-    
+
   srand (time(NULL));
   int32_t *gdt_key    = gdt_key_a.Ptr<int32_t>();
   int32_t *gdt_value  = gdt_value_a.Ptr<int32_t>(); // 2D tensor
   int32_t *lftensor   = lftensor_a.Ptr<int32_t>();
-    
+
   int32_t width = nc;
   int32_t cnt = 0;
   int32_t avg_split_copy = 0, scnt = 0;
-  
-  for (int64_t i=0; i<Nn; i++) {        
+
+  for (int64_t i=0; i<Nn; i++) {
     if (gdt_key[i] <= 0) {
       cnt ++;
     }
@@ -1689,7 +1035,7 @@ void Libra2dglSetLF(
       int32_t val = rand() % gdt_key[i];
       CHECK(val >= 0 && val < gdt_key[i]);
       CHECK(gdt_key[i] <= nc);
-      
+
       int32_t *ptr = gdt_value + i*width;
       lftensor[i] = ptr[val];
     }
@@ -1728,7 +1074,7 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLLibra2dglSetLF")
   \param node_map_a keeps track of range of local node IDs (consecutive) given to the nodes in
   the partitions
   \param lf_a 1-level tree marking for local split nodes
-  \param lftensor_a gloabl (all the partitions) 1-level tree 
+  \param lftensor_a gloabl (all the partitions) 1-level tree
   \param num_nodes number of nodes in current partition
   \param nc number of partitions/communities
   \param c current partition/community
@@ -1759,7 +1105,7 @@ void Libra2dglBuildAdjlist(
   int32_t nc,
   int32_t c,
   int32_t feat_size,
-  NDArray labels_a , 
+  NDArray labels_a ,
   NDArray trainm_a ,
   NDArray testm_a  ,
   NDArray valm_a   ,
@@ -1768,7 +1114,7 @@ void Libra2dglBuildAdjlist(
   NDArray gtestm_a ,
   NDArray gvalm_a,
   int64_t Nn) {
-  
+
   DType   *feat       = feat_a.Ptr<DType>(); // 2D tensor
   DType   *gfeat      = gfeat_a.Ptr<DType>(); // 2D tensor
   int32_t *adj        = adj_a.Ptr<int32_t>(); // 2D tensor
@@ -1786,7 +1132,7 @@ void Libra2dglBuildAdjlist(
     int64_t k = ldt_key[i];
     int64_t v = i;
     int32_t ind = gdt_key[k];
-        
+
     int32_t *adj_ptr = adj + v*width;
     if(ind == 1) {
       for (int32_t j=0; j<width; j++) adj_ptr[j] = -1;
@@ -1808,15 +1154,15 @@ void Libra2dglBuildAdjlist(
       CHECK(pos == ind - 1);
       for (; pos < width; pos++) adj_ptr[pos] = -1;
       inner_node[i] = 0;
-    }        
-  }    
-  // gathering 
+    }
+  }
+  // gathering
   #pragma omp parallel for
   for (int64_t i=0; i<num_nodes; i++) {
     int64_t k = ldt_key[i];
     int64_t ind = i*feat_size;
     DType *optr = gfeat + ind;
-    DType *iptr = feat + k*feat_size;        
+    DType *iptr = feat + k*feat_size;
 
     for (int32_t j=0; j<feat_size; j++)
       optr[j] = iptr[j];
@@ -1829,7 +1175,7 @@ void Libra2dglBuildAdjlist(
   bool *testm = testm_a.Ptr<bool>();
   bool *gtestm = gtestm_a.Ptr<bool>();
   bool *valm = valm_a.Ptr<bool>();
-  bool *gvalm = gvalm_a.Ptr<bool>();  
+  bool *gvalm = gvalm_a.Ptr<bool>();
   #pragma omp parallel for
   for (int64_t i=0; i<num_nodes; i++) {
     int64_t k = ldt_key[i];
@@ -1837,8 +1183,8 @@ void Libra2dglBuildAdjlist(
     glabels[i] = labels[k];
     gtrainm[i] = trainm[k];
     gtestm[i] = testm[k];
-    gvalm[i] = valm[k];        
-  }    
+    gvalm[i] = valm[k];
+  }
 }
 
 
