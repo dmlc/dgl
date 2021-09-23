@@ -405,6 +405,24 @@ def wrap_cmd_with_local_envvars(cmd: str, env_vars: str) -> str:
     #     https://stackoverflow.com/a/45993803
     return f"(export {env_vars}; {cmd})"
 
+def wrap_cmd_with_extra_envvars(cmd: str, env_vars: list) -> str:
+    """Wraps a CLI command with extra env vars
+
+    Example:
+        >>> cmd = "ls && pwd"
+        >>> env_vars = ["VAR1=value1", "VAR2=value2"]
+        >>> wrap_cmd_with_extra_envvars(cmd, env_vars)
+        "(export VAR1=value1 VAR2=value2; ls && pwd)"
+
+    Args:
+        cmd:
+        env_vars: A list of strings containing env vars, e.g., ["VAR1=value1", "VAR2=value2"]
+
+    Returns:
+        cmd_with_env_vars:
+    """
+    env_vars = " ".join(env_vars)
+    return wrap_cmd_with_local_envvars(cmd, env_vars)
 
 def submit_jobs(args, udf_command):
     """Submit distributed jobs (server and client processes) via ssh"""
@@ -453,6 +471,7 @@ def submit_jobs(args, udf_command):
         ip, _ = hosts[int(i / server_count_per_machine)]
         server_env_vars_cur = f"{server_env_vars} DGL_SERVER_ID={i}"
         cmd = wrap_cmd_with_local_envvars(udf_command, server_env_vars_cur)
+        cmd = wrap_cmd_with_extra_envvars(cmd, args.extra_envs) if len(args.extra_envs) > 0 else cmd
         cmd = 'cd ' + str(args.workspace) + '; ' + cmd
         thread_list.append(execute_remote(cmd, ip, args.ssh_port, username=args.ssh_username))
 
@@ -480,6 +499,7 @@ def submit_jobs(args, udf_command):
             master_port=1234,
         )
         cmd = wrap_cmd_with_local_envvars(torch_dist_udf_command, client_env_vars)
+        cmd = wrap_cmd_with_extra_envvars(cmd, args.extra_envs) if len(args.extra_envs) > 0 else cmd
         cmd = 'cd ' + str(args.workspace) + '; ' + cmd
         thread_list.append(execute_remote(cmd, ip, args.ssh_port, username=args.ssh_username))
 
@@ -536,6 +556,10 @@ def main():
                         help='The format of the graph structure of each partition. \
                         The allowed formats are csr, csc and coo. A user can specify multiple \
                         formats, separated by ",". For example, the graph format is "csr,csc".')
+    parser.add_argument('--extra_envs', nargs='+', type=str, default=[],
+                        help='Extra environment parameters need to be set. For example, \
+                        you can set the LD_LIBRARY_PATH and NCCL_DEBUG by adding: \
+                        --extra_envs LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH NCCL_DEBUG=INFO ')
     args, udf_command = parser.parse_known_args()
     assert len(udf_command) == 1, 'Please provide user command line.'
     assert args.num_trainers is not None and args.num_trainers > 0, \
