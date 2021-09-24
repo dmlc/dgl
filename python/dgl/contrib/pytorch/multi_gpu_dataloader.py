@@ -1,5 +1,5 @@
 ##
-#   Copyright 2021 Contributors 
+#   Copyright 2021 Contributors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -62,9 +62,7 @@ class _NodeDataIterator:
             for ntype in block.ntypes:
                 index = block.ndata[dgl.NID][ntype]
                 frame = Frame(num_rows=len(index))
-                print("ntype = {}, self._n_feat = {}".format(ntype, self._n_feat))
                 for k, v in self._n_feat[ntype].items():
-                    print("k = {}, v = {}".format(k,v))
                     data = _gather_row(v, index)
                     frame.update_column(k, data)
                 node_frames.append(frame)
@@ -80,7 +78,6 @@ class _NodeDataIterator:
                     frame.update_column(k, data)
                 edge_frames.append(frame)
 
-            print("Setting node frames = {}".format(node_frames))
             utils.set_new_frames(block, node_frames=node_frames,
                 edge_frames=edge_frames)
 
@@ -99,7 +96,7 @@ class _NodeDataIterator:
             result.append(output_labels)
 
         return result
-            
+
 class MultiGPUNodeDataLoader(NodeDataLoader):
     """PyTorch dataloader for batch-iterating over a set of nodes, generating the list
     of message flow graphs (MFGs) as computation dependency of the said minibatch.
@@ -181,15 +178,13 @@ class MultiGPUNodeDataLoader(NodeDataLoader):
         # save node all features to GPU
         self._n_feat = {}
         for i, ntype in enumerate(g.ntypes):
-            print("ntype == {}".format(ntype))
             feats = {}
             for feat_name in list(g._node_frames[i].keys()):
                 if isinstance(g.ndata[feat_name], Mapping):
                     data = g.ndata[feat_name][ntype]
                 else:
-                    data = g.ndata[feat_name] 
+                    data = g.ndata[feat_name]
                 feats[feat_name] = _load_tensor(data, device, comm, partition)
-                print("feat_name->'{}' = {}".format(feat_name, feats[feat_name]))
             self._n_feat[ntype] = feats
 
         # remove all node features
@@ -205,7 +200,7 @@ class MultiGPUNodeDataLoader(NodeDataLoader):
                 if isinstance(g.edata[feat_name], Mapping):
                     data = g.edata[feat_name][etype]
                 else:
-                    data = g.edata[feat_name] 
+                    data = g.edata[feat_name]
                 feats[feat_name] = _load_tensor(data, device, comm,
                                                 edge_partition)
             self._e_feat[etype] = feats
@@ -227,7 +222,7 @@ class MultiGPUNodeDataLoader(NodeDataLoader):
                     self._node_feat[k] = _load_tensor(v, device, comm, partition)
             else:
                 self._node_feat = _load_tensor(node_feat, device, comm, partition)
-        
+
         self._node_label = None
         if node_label is not None:
             assert not isinstance(node_label, Mapping), \
@@ -239,4 +234,4 @@ class MultiGPUNodeDataLoader(NodeDataLoader):
         it = super(MultiGPUNodeDataLoader, self).__iter__()
         return _NodeDataIterator(it, self._n_feat, self._e_feat,
                                  self._node_feat, self._node_label)
-            
+

@@ -1,5 +1,5 @@
 ##
-#   Copyright 2020-2021 Contributors 
+#   Copyright 2020-2021 Contributors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -516,6 +516,8 @@ class NDArrayPartition(object):
             self._partition, F.zerocopy_to_dgl_ndarray(idxs), part_id))
 
     def mode(self):
+        """ Get the type of partition.
+        """
         return self._mode
 
 def create_edge_partition_from_nodes(partition, graph):
