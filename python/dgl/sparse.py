@@ -669,7 +669,7 @@ def scatter_reduce_lr(otf, offsetf, otn, offsetn, neigh, degs, node_map,
 
     
 def fdrpa_gather_emb_rl(feat, feat_shape, send_feat_list, offset, recv_list_nodes,
-                        lim, in_degs, feat_size, cur_part, node_map, num_parts):
+                        lim, in_degs, feat_size, node_map, num_parts):
     node_map_a = to_dgl_nd(node_map)
     _CAPI_DGLKernelFdrpaGatherEmbRL(to_dgl_nd(feat),
                                     feat_shape,
@@ -678,14 +678,13 @@ def fdrpa_gather_emb_rl(feat, feat_shape, send_feat_list, offset, recv_list_node
                                     to_dgl_nd(recv_list_nodes),
                                     lim,
                                     to_dgl_nd(in_degs),
-                                    feat_size,
-                                    cur_part,
+                                    feat_size,                                    
                                     node_map_a,
                                     num_parts)
 
     
 def scatter_reduce_rl(otf, offset, stn, lim, in_degs, neigh, node_map, dim, feat_size,
-                      num_parts, cur_part):
+                      num_parts):
     node_map_a = to_dgl_nd(node_map)
     _CAPI_DGLKernelScatterReduceRL(to_dgl_nd(otf),
                                    offset,
@@ -696,8 +695,7 @@ def scatter_reduce_rl(otf, offset, stn, lim, in_degs, neigh, node_map, dim, feat
                                    node_map_a,
                                    dim,
                                    feat_size,
-                                   num_parts,
-                                   cur_part)
+                                   num_parts)
     
 
 def fdrpa_comm_buckets(adj, selected_nodes, ver2part, ver2part_index, node_map,

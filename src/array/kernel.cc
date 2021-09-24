@@ -599,15 +599,34 @@ int32_t Map2localIndex(int32_t otf, int32_t *node_map,
 }
 
 
+/*!
+  \brief Leaf nodes gather local node aggregates to send to remote clone root node.
+  \param feat_a node features in current partition
+  \param Nn number of nodes in the input graph
+  \param adj_a list of node IDs of remote clones
+  \param send_feat_list_a buffer for gathered aggregates
+  \param send_to_node_list_a remote node IDs storage for use during root to leaf comm
+  \param selected_nodes_a split nodes in current partition
+  \param in_degs_a node degree
+  \param ver2part_a remote clone node's partition
+  \param ver2part_index_a remote clone node's local ID
+  \param width total possible clone nodes per node
+  \param feat_size feature vector size
+  \param cur_part remote partition/rank for which this gather op is invoked
+  \param soffset_base used a offset due to split in communicaiton
+  \param soffset_cur used a offset due to split in communicaiton
+  \param node_map_a node ID range for all the partitions
+  \param num_parts number of mpi ranks or partitions
+*/
 template<typename IdType, typename DType>
 void FdrpaGatherEmbLR(
   NDArray feat_a,
-  int64_t feat_shape,
+  int64_t Nn,
   NDArray adj_a,
   NDArray send_feat_list_a,
   int64_t offset,
   NDArray send_node_list_a,
-  NDArray send_to_node_list_a,    
+  NDArray send_to_node_list_a,
   NDArray selected_nodes_a,
   NDArray in_degs_a,
   NDArray ver2part_a,
@@ -658,12 +677,7 @@ void FdrpaGatherEmbLR(
     int64_t index = selected_nodes[id];
     
     #if DEBUG  //checks
-    if (index >= feat_shape) {
-      printf("Error: at index: %d, feat_shape: %d\n", index, feat_shape);
-      fflush(0);
-      CHECK(index < feat_shape);
-    }       
-    CHECK(index >= 0);
+    CHECK(index >= 0 && index < Nn);
     #endif
         
     DType *iptr = feat + index * feat_size;        
@@ -676,7 +690,6 @@ void FdrpaGatherEmbLR(
     int32_t  p = Ver2partition<int32_t>(ver2part_index[id], node_map, num_parts);
     if (cur_part != p)
       LOG(FATAL) << "Error: Cur_part not matching !";
-      // printf("Error: at not matching: %d %d\n", cur_part, p);
     CHECK(cur_part == p);
     #endif
         
@@ -691,7 +704,7 @@ void FdrpaGatherEmbLR(
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelFdrpaGatherEmbLR")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   NDArray feat              = args[0];
-  int64_t feat_shape        = args[1];
+  int64_t Nn                = args[1];
   NDArray adj               = args[2];
   NDArray send_feat_list    = args[3];
   int64_t offset            = args[4];
@@ -711,7 +724,7 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelFdrpaGatherEmbLR")
 
   ATEN_ID_TYPE_SWITCH(adj->dtype, IdType, {
       ATEN_FLOAT_TYPE_SWITCH(feat->dtype, DType, "Feature data", {
-          FdrpaGatherEmbLR<IdType, DType>(feat, feat_shape,
+          FdrpaGatherEmbLR<IdType, DType>(feat, Nn,
                                           adj, send_feat_list,
                                           offset, send_node_list,
                                           send_to_node_list, selected_nodes,
@@ -725,6 +738,23 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelFdrpaGatherEmbLR")
 });
 
 
+/*!
+  \brief Root node scatter reduces the recvd partial aggregates to local partial aggregates.
+  \param otf_a recvd partial aggreagated from leafs
+  \param offsetf offset in otf_a
+  \param otn_a local node IDs for which partial aggregates are recvd
+  \param offsetn offset in otn_a
+  \param feat_a node features in current partition
+  \param in_degs_a node degree
+  \param node_map_a node ID range for all the partitions
+  \param dim recvd partial aggregate size
+  \param feat_size node feature vector size
+  \param num_parts number of mpi ranks or partitions
+  \param recv_list_nodes_a buffer to store recv nodes from individual partitions,used in next gather
+  \param pos debug variable
+  \param lim number of nodes recvd from a remote parition/mpi rank
+  \param cur_part my mpi rank
+*/
 template<typename IdType, typename DType>
 void ScatterReduceLR(
   NDArray otf_a,
@@ -825,17 +855,29 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelScatterReduceLR")
 });
 
 
+/*!
+  \brief Root node gathers partial aggregates to be sent to leaf nodes.
+  \param feat_a node features in current partition
+  \param Nn number of nodes in the input graph
+  \param send_feat_list_a buffer for gathered aggregates
+  \param offset offset in the send_feat_list_a
+  \param node IDs to be gathered
+  \param lim number of nodes to be gathered
+  \param in_degs_a node degree
+  \param feat_size node feature vector size
+  \param node_map_a node ID range for all the partitions
+  \param num_parts number of mpi ranks or partitions
+*/
 template<typename DType>
 void FdrpaGatherEmbRL(
   NDArray feat_a,
-  int64_t feat_shape,
+  int64_t Nn,
   NDArray send_feat_list_a,
   int64_t offset,
   NDArray recv_list_nodes_a,
   int64_t lim,
   NDArray in_degs_a,
   int32_t feat_size,
-  int32_t cur_part,
   NDArray node_map_a,
   int32_t num_parts) {
   
@@ -850,7 +892,7 @@ void FdrpaGatherEmbRL(
   #pragma omp parallel for
   for (int64_t i=0; i<lim; i++) {
     int64_t index = recv_list_nodes[i];
-    CHECK(index < feat_shape) << "Error: FdrpaGartherRL, index of range of feat_shape!";
+    CHECK(index < Nn) << "Error: FdrpaGartherRL, index of range of feat_shape!";
     //if (index >= feat_shape) {
     //  printf("Error:at index: %d, feat_shape: %d\n", index, feat_shape);
     //  fflush(0);
@@ -871,32 +913,44 @@ void FdrpaGatherEmbRL(
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelFdrpaGatherEmbRL")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   NDArray feat              = args[0];
-  int64_t feat_shape        = args[1];
+  int64_t Nn                = args[1];
   NDArray send_feat_list    = args[2];
   int64_t offset            = args[3];
   NDArray recv_list_nodes   = args[4];
   int64_t lim               = args[5];
   NDArray in_degs           = args[6];
   int32_t feat_size         = args[7];
-  int32_t cur_part          = args[8];
-  NDArray node_map          = args[9];
-  int32_t num_parts         = args[10];
+  NDArray node_map          = args[8];
+  int32_t num_parts         = args[9];
 
   ATEN_FLOAT_TYPE_SWITCH(feat->dtype, DType, "Feature data", {
       FdrpaGatherEmbRL<DType>(feat,
-                              feat_shape,
+                              Nn,
                               send_feat_list,
                               offset,
                               recv_list_nodes,
                               lim,
                               in_degs,
                               feat_size,
-                              cur_part,
                               node_map,
                               num_parts);
     });    
 });
 
+
+/*!
+  \brief Leaf nodes scatter reduce the recvd partial aggregates to local partial aggregates.
+  \param otf_a recvd partial aggreagated from leafs
+  \param offset offset in otf_a
+  \param stn_a buffered leaf local nodes whose partial aggregate were communicated
+  \param lim number of nodes recvd from a remote parition/mpi rank
+  \param in_degs_a node degree
+  \param feat_a node features in current partition
+  \param node_map_a node ID range for all the partitions
+  \param dim recvd partial aggregate size
+  \param feat_size node feature vector size
+  \param num_parts number of mpi ranks or partitions
+*/
 template<typename DType>
 void ScatterReduceRL(
   NDArray otf_a,
@@ -908,8 +962,7 @@ void ScatterReduceRL(
   NDArray node_map_a,
   int64_t dim,
   int64_t feat_size,
-  int64_t num_parts,
-  int32_t cur_part) {
+  int64_t num_parts) {
   
   DType*   otf             = otf_a.Ptr<DType>() + offset;
   int32_t* stn             = stn_a.Ptr<int32_t>();
@@ -956,13 +1009,11 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelScatterReduceRL")
   int64_t dim             = args[7];
   int64_t feat_size       = args[8];
   int64_t num_parts       = args[9];
-  int64_t cur_part        = args[10];
 
   ATEN_FLOAT_TYPE_SWITCH(otf->dtype, DType, "Feature data", {
       ScatterReduceRL<DType>(otf, offset, stn, lim,
                              in_degs, feat, node_map,
-                             dim, feat_size, num_parts,
-                             cur_part);
+                             dim, feat_size, num_parts);
     });
 });
 
