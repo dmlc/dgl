@@ -538,7 +538,7 @@ def create_edge_partition_from_nodes(partition, graph):
         # per-partition and use the prefix-sum of this for the range
         rng = [0]
         for part in range(graph.num_parts()):
-            idx = partition.get_local_indices(partition, ctx=F.cpu())
+            idx = partition.get_local_indices(part, ctx=F.cpu())
             rng.append(rng[-1] + \
                 F.as_scalar(F.sum(graph.out_degrees(u=idx), dim=0)))
         return NDArrayPartition(array_size=graph.number_of_edges(),
