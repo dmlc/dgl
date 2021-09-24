@@ -1,4 +1,28 @@
-## Distributed training
+## Distributed training using DistGNN
+Paper: https://arxiv.org/abs/2104.06700
+Distributed training for GraphSage.
+
+### Requirements:  
+Install OneCCL library from https://github.com/ddkalamk/torch-ccl/tree/working_1.7   
+Note: Ensure setting torch_ccl_path   
+
+### Runs:  
+Step 1: Graph partition: Vertex based graph partition using Libra (https://github.com/dmlc/dgl/pull/3376)  
+Step 2: Distributed training:  
+Reddit:  
+1. cd-0  
+sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_drpa.py --dataset reddit --n-epochs 200 --nr 1 --aggregator-type "gcn"    
+
+2. cd-5 (r=5)  
+sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_drpa.py --dataset reddit --n-epochs 200 --nr 5 --aggregator-type "gcn"  
+
+3. 0c  
+sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_drpa.py --dataset reddit --n-epochs 200 --nr -1 --aggregator-type "gcn"  
+
+
+Note: make sure graph partition is run from current directory to store paritions in current directory.  
+
+---------------------------------------------------------------------------------------------------------
 
 This is an example of training GraphSage in a distributed fashion. Before training, please install some python libs by pip:
 
