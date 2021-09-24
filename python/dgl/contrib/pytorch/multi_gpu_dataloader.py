@@ -19,6 +19,7 @@ from dgl import utils
 from dgl.frame import Frame
 import torch as th
 from ...dataloading import NodeDataLoader
+from ...partition import NDArrayPartition, create_edge_partition_from_nodes
 from ..multi_gpu_datastore import MultiGPUDataStore
 from typing import Mapping
 
@@ -121,7 +122,8 @@ class MultiGPUNodeDataLoader(NodeDataLoader):
         Must not be None when multiple GPUs are used.
     partition : dgl.partition.NDArrayPartition, optional
         The partition specifying to which device each node's data belongs.
-        Must not be None when multiple GPUs are used.
+        If not specified, the indices will be striped evenly across the
+        GPUs.
     use_ddp : boolean, optional
         If True, tells the DataLoader to split the training set for each
         participating process appropriately using
@@ -168,6 +170,14 @@ class MultiGPUNodeDataLoader(NodeDataLoader):
         assert comm is None or use_ddp, "'use_ddp' must be true when using NCCL."
         assert device != th.device("cpu"), "The device must be a GPU."
 
+        if partition is None:
+            partition = NDArrayPartition(
+                g.number_of_nodes(),
+                comm.size() if comm else 1,
+                mode='remainder')
+        edge_partition = create_edge_partition_from_nodes( \
+            partition, g)
+
         # save node all features to GPU
         self._n_feat = {}
         for i, ntype in enumerate(g.ntypes):
@@ -196,7 +206,8 @@ class MultiGPUNodeDataLoader(NodeDataLoader):
                     data = g.edata[feat_name][etype]
                 else:
                     data = g.edata[feat_name] 
-                feats[feat_name] = _load_tensor(data, device, comm, partition)
+                feats[feat_name] = _load_tensor(data, device, comm,
+                                                edge_partition)
             self._e_feat[etype] = feats
 
         # remove all edge features

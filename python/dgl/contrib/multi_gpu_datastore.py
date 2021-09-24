@@ -16,7 +16,6 @@
 """ The MultiGPUDataStore class. """
 
 from .. import backend as F
-from ..partition import NDArrayPartition
 
 class MultiGPUDataStore:
     """ Class for storing a large tensor split across GPU memory according to
@@ -42,7 +41,7 @@ class MultiGPUDataStore:
     ...
     >>> batch_features = split_data.all_gather_row(input_nodes)
     """
-    def __init__(self, shape, dtype, device, comm, partition=None):
+    def __init__(self, shape, dtype, device, comm, partition):
         """ Create a new Tensor stored across multiple GPUs according to
         `partition`. This funciton must be called by all processes.
 
@@ -58,16 +57,9 @@ class MultiGPUDataStore:
             The current backend device.
         comm : nccl.Communicator
             The NCCL communicator to use.
-        partition : NDArrayPartition, optional
+        partition : NDArrayPartition
             The partition describing how the tensor is split across the GPUs.
-            If not specified, the indices will be striped evenly across the
-            GPUs.
         """
-        if partition is None:
-            partition = NDArrayPartition(
-                shape[0],
-                comm.size(),
-                mode='remainder')
         assert partition.num_parts() == comm.size(), "The partition " \
             "must have the same number of parts as the communicator has ranks."
         assert partition.array_size() == shape[0], "The partition must be for " \
