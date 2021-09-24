@@ -95,7 +95,7 @@ def run(proc_id, n_gpus, args, devices, data, nccl_id=None):
 
     train_mask = train_g.ndata['train_mask']
     val_mask = val_g.ndata['val_mask']
-    test_mask = ~(test_g.ndata['train_mask'] | test_g.ndata['val_mask'])
+    test_mask = test_g.ndata['test_mask']
     train_nid = train_mask.nonzero().squeeze()
     val_nid = val_mask.nonzero().squeeze()
     test_nid = test_mask.nonzero().squeeze()
@@ -240,6 +240,7 @@ if __name__ == '__main__':
         g, n_classes = load_ogb('ogbn-products')
     elif args.dataset == 'ogbn-papers100M':
         g, n_classes = load_ogb('ogbn-papers100M')
+        g = dgl.add_reverse_edges(g)
         # convert labels to interger
         g.ndata['labels'] = th.as_tensor(g.ndata['labels'], dtype=th.int64)
     else:
