@@ -8,6 +8,7 @@ import numpy as np
 import dgl.function as fn
 import dgl
 from dgl.sampling import random_walk, pack_traces
+import scipy
 
 
 # The base class of sampler
@@ -255,6 +256,8 @@ class SAINTEdgeSampler(SAINTSampler):
     def __init__(self, edge_budget, **kwargs):
         self.edge_budget = edge_budget
         self.rng = np.random.default_rng()
+
+
         super(SAINTEdgeSampler, self).__init__(node_budget=edge_budget*2, **kwargs)
 
     def __generate_fn__(self):
@@ -264,26 +267,39 @@ class SAINTEdgeSampler(SAINTSampler):
                                                                            self.num_subg))
         return graph_fn, norm_fn
 
+    # TODO: only sample half edges, then add another half edges
+    # TODO: use numpy to implement cython sampling method
     def __sample__(self):
         if self.prob is None:
             src, dst = self.train_g.edges()
             src_degrees, dst_degrees = self.train_g.in_degrees(src).float().clamp(min=1), \
                                        self.train_g.in_degrees(dst).float().clamp(min=1)
-            self.prob = 1. / src_degrees + 1. / dst_degrees
+            prob_mat = 1. / src_degrees + 1. / dst_degrees
+            prob_mat = scipy.sparse.csr_matrix((prob_mat.numpy(), (src.numpy(), dst.numpy())))
+            # The edge probability here only contains that of edges in upper triangle adjacency matrix
+            # Because we assume the graph is undirected, that is, the adjacency matrix is symmetric. We only need
+            # to consider half of edges in the graph.
+            self.prob = th.tensor(scipy.sparse.triu(prob_mat).data)
+            self.prob /= self.prob.sum()
+            self.adj_nodes = np.stack(prob_mat.nonzero(), axis=1)
 
-        if len(self.prob) > 2 ^ 24:
-            prob = self.prob.numpy()
-            prob /= prob.sum()
-            sampled_edges = np.unique(
-                self.rng.choice(len(prob), size=self.edge_budget, p=prob, replace=True)
-            )
-            del prob
-        else:
-            sampled_edges = th.multinomial(self.prob, num_samples=self.edge_budget, replacement=True).unique()
-
-        sampled_src, sampled_dst = self.train_g.find_edges(sampled_edges)
-        sampled_nodes = th.cat([sampled_src, sampled_dst]).unique()
-        return sampled_nodes.numpy()
+        # if len(self.prob) > 2 ^ 24:
+        #     prob = self.prob.numpy()
+        #     prob /= prob.sum()
+        #     sampled_edges = np.unique(
+        #         self.rng.choice(len(prob), size=self.edge_budget, p=prob, replace=True)
+        #     )
+        #     del prob
+        # else:
+        # sampled_edges = th.multinomial(self.prob, num_samples=self.edge_budget, replacement=True).unique()
+        sampled_edges = np.unique(
+                    dgl.random.choice(len(self.prob), size=self.edge_budget, prob=self.prob, replace=False)
+                )
+        # sampled_src, sampled_dst = self.train_g.find_edges(sampled_edges)
+        sampled_nodes = np.unique(self.adj_nodes[sampled_edges].flatten()).astype('long')
+        # sampled_nodes = th.cat([sampled_src, sampled_dst]).unique()
+        # return sampled_nodes.numpy()
+        return sampled_nodes
 
 
 class SAINTRandomWalkSampler(SAINTSampler):
