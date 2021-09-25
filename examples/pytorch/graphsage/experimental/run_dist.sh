@@ -1,3 +1,7 @@
+## Copyright (c) 2021 Intel Corporation
+## \file run_dist.sh : Run script for distributed execution
+## \author Dhiraj D. Kalamkar <dhiraj.d.kalamkar@intel.com>
+
 #!/bin/bash
 
 function print_vars {

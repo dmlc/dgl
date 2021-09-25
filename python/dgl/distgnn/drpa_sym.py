@@ -417,7 +417,7 @@ class DRPACore(torch.autograd.Function):
         buffcomm_iter_lr.push(lim)
 
         #message(rank, "Max iters in MPI split comm: {}", (lim))
-        prof.append('Gather I: {:0.4f}'.format(time.time() - tic))
+        prof.append('Gather I: {:0.4f} s'.format(time.time() - tic))
         
         ## 3. Recv the remote partial aggreates by the root and update the aggregates
         recv_list_nodes = []
@@ -434,7 +434,7 @@ class DRPACore(torch.autograd.Function):
                 req = gfqueue_feats_lr.pop();  req.wait()
                 req = gfqueue_nodes_lr.pop(); req.wait()
             
-                prof.append('Async comm I: {:0.4f}'.format(time.time() - tic))
+                prof.append('Async comm I: {:0.4f} s'.format(time.time() - tic))
                     
                 otf = buffcomm_feats_lr.pop()
                 out_size = buffcomm_feats_size_lr.pop()
@@ -462,7 +462,7 @@ class DRPACore(torch.autograd.Function):
                 if ilen != pos[0]: raise DGLError("Error: Issue in scatter reduce.")
                 recv_list_nodes.append(recv_list_nodes_ar)
 
-            prof.append('Scatter I: {:0.4f}'.format(time.time() - ticg))
+            prof.append('Scatter I: {:0.4f} s'.format(time.time() - ticg))
 
             tic = time.time()
             for j in range(lim):               ### gather-scatter round II
@@ -500,7 +500,7 @@ class DRPACore(torch.autograd.Function):
                     
             buffcomm_iter_rl.push(lim)
 
-            prof.append('Gather II: {:0.4f}'.format(time.time() - tic))
+            prof.append('Gather II: {:0.4f} s'.format(time.time() - tic))
 
             ## 4. Recv remote partial aggreagted from the root and update local aggregates
             if epoch >= 2*nrounds_update or nrounds == 1:
@@ -511,7 +511,7 @@ class DRPACore(torch.autograd.Function):
                     tic = time.time()
                     
                     req = gfqueue_feats_rl.pop(); req.wait()
-                    prof.append('Async comms II: {:0.4f}'.format(time.time() - tic))
+                    prof.append('Async comms II: {:0.4f} s'.format(time.time() - tic))
                     
                     otf = buffcomm_feats_rl.pop()
                     out_size = buffcomm_feats_size_rl.pop()
@@ -526,7 +526,7 @@ class DRPACore(torch.autograd.Function):
             
                         offset += out_size[l]
 
-                prof.append('Scatter II: {:0.4f}'.format(time.time() - ticg))
+                prof.append('Scatter II: {:0.4f} s'.format(time.time() - ticg))
 
         if rank == 0:  ## Display runtime profile for major components
             print(prof, flush=True)

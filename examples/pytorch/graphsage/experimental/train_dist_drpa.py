@@ -246,8 +246,9 @@ if __name__ == '__main__':
                         help="dropout probability")
     parser.add_argument("--gpu", type=int, default=-1,
                         help="gpu")
+    ## nr=1 (cd-0), nr=5 (say, r=5), nr=-1 (0c)
     parser.add_argument("--nr", type=int, default=1,
-                        help="#delay in delayed updates")    
+                        help="#delay (r) in delayed updates")    
     parser.add_argument("--val", default=False,
                         action='store_true')
     parser.add_argument("--lr", type=float, default=0.032,
