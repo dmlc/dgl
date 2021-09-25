@@ -59,8 +59,16 @@ class _NodeDataIterator:
         # re-attach node features
         for block in blocks:
             node_frames = []
-            for ntype in block.ntypes:
-                index = block.ndata[dgl.NID][ntype]
+            # have to handle src and dst nodes separately in a block
+            for ntype in block.srctypes:
+                index = block.srcnodes[ntype].data[dgl.NID]
+                frame = Frame(num_rows=len(index))
+                for k, v in self._n_feat[ntype].items():
+                    data = _gather_row(v, index)
+                    frame.update_column(k, data)
+                node_frames.append(frame)
+            for ntype in block.dsttypes:
+                index = block.dstnodes[ntype].data[dgl.NID]
                 frame = Frame(num_rows=len(index))
                 for k, v in self._n_feat[ntype].items():
                     data = _gather_row(v, index)
@@ -69,7 +77,7 @@ class _NodeDataIterator:
 
             edge_frames = []
             for etype in block.etypes:
-                index = block.edata[dgl.EID]
+                index = block.edges[etype].data[dgl.EID]
                 if isinstance(index, Mapping):
                     index = index[block.to_canonical_etype(etype)]
                 frame = Frame(num_rows=len(index))
