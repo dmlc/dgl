@@ -1,3 +1,14 @@
+## Distributed training using DistGNN
+Added applications for OGBN big dataset (products, papers100M) and Proteins dataset.  
+Prequisite:  
+1. Libra vertex graph partitioning codebase
+2. DistGNN training codebase
+
+### Settings  
+Tested with: Cent OS 7.6, gcc v8.3.0, PyTorch 1.7.1, Python 3.7.10, slurm scheduler   
+Environment used: Anaconda  
+
+
 ## Distributed training
 
 This is an example of training GraphSage in a distributed fashion. Before training, please install some python libs by pip:
