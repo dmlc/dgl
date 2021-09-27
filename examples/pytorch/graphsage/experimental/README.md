@@ -1,6 +1,6 @@
 ## Distributed training using DistGNN
 Added applications for OGBN big dataset (products, papers100M) and Proteins dataset.  
-Prequisite:  
+Requirements:  
 1. Libra vertex graph partitioning codebase
 2. DistGNN training codebase
 
