@@ -19,7 +19,7 @@ from .. import backend as F
 
 class MultiGPUDataStore:
     """ Class for storing a large tensor split across GPU memory according to
-    nodes. When reading memory from oehr GPUs, the call must be from all
+    nodes. When reading memory from other GPUs, the call must be from all
     GPUs storing the data.
 
     Example:
@@ -34,7 +34,7 @@ class MultiGPUDataStore:
     ...                               nccl_comm)
     >>> split_data.set_global(large_cpu_tensor)
 
-    Then, once it is stored across GPU memory, during training, feature for
+    Then, once it is stored across GPU memory during training, features for
     mini-batches can be fetched via the `get_global()` method. If we have the
     tensor of mini-batch nodes `input_nodes` we can use the following code to
     fetch the features for the mini-batch:
@@ -43,7 +43,7 @@ class MultiGPUDataStore:
     """
     def __init__(self, shape, dtype, device, comm, partition):
         """ Create a new Tensor stored across multiple GPUs according to
-        `partition`. This funciton must be called by all processes.
+        `partition`. This function must be called by all processes.
 
         Parameters
         ----------
@@ -91,7 +91,7 @@ class MultiGPUDataStore:
             index, self._tensor, self._partition)
 
     def all_set_global(self, values):
-        """ Set this process's portition of the global tensor. It will use the
+        """ Set this process's portion of the global tensor. It will use the
         partition to select which rows of the global tensor should be stored in
         the current device.
 

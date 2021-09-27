@@ -107,7 +107,7 @@ class _NodeDataIterator:
 
 class MultiGPUNodeDataLoader(NodeDataLoader):
     """PyTorch dataloader for batch-iterating over a set of nodes, generating the list
-    of message flow graphs (MFGs) as computation dependency of the said minibatch.
+    of message flow graphs (MFGs) as computation dependency of the said mini-batch.
     The feature data of the graph is stored partitioned in GPU memory.
 
     Parameters
@@ -141,12 +141,12 @@ class MultiGPUNodeDataLoader(NodeDataLoader):
     node_feat : Tensor or dict[ntype, Tensor], optional
         The node features to distribute separate from the graph for each
         mini-batch. If specified, the sliced tensor corresponding to the
-        input nodes of the minibatch will be returned as the 4th item from the
+        input nodes of the mini-batch will be returned as the 4th item from the
         iterator.
     node_label : Tensor or dict[ntype, Tensor], optional
         The node labels to distribute for each
         mini-batch. If specified, the sliced tensor corresponding to the
-        seeds of the minibatch will be returned as the last item from the
+        seeds of the mini-batch will be returned as the last item from the
         iterator.
     kwargs : dict
         Arguments being passed to :py:class:`dgl.dataloader.NodeDataLoader`.
@@ -183,7 +183,7 @@ class MultiGPUNodeDataLoader(NodeDataLoader):
         edge_partition = create_edge_partition_from_nodes( \
             partition, g)
 
-        # save node all features to GPU
+        # save all node features to GPU
         self._n_feat = {}
         for i, ntype in enumerate(g.ntypes):
             feats = {}
