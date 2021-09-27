@@ -4,6 +4,7 @@
  * \brief CPU implementation of COO sparse matrix operators
  */
 #include <dmlc/omp.h>
+#include <dgl/runtime/parallel_for.h>
 #include <vector>
 #include <unordered_set>
 #include <unordered_map>
@@ -14,6 +15,7 @@
 namespace dgl {
 
 using runtime::NDArray;
+using runtime::parallel_for;
 
 namespace aten {
 namespace impl {
@@ -55,12 +57,13 @@ NDArray COOIsNonZero(COOMatrix coo, NDArray row, NDArray col) {
   const int64_t row_stride = (rowlen == 1 && collen != 1) ? 0 : 1;
   const int64_t col_stride = (collen == 1 && rowlen != 1) ? 0 : 1;
   const int64_t kmax = std::max(rowlen, collen);
-#pragma omp parallel for
-  for (int64_t k = 0; k < kmax; ++k) {
-    int64_t i = row_stride * k;
-    int64_t j = col_stride * k;
-    rst_data[k] = COOIsNonZero<XPU, IdType>(coo, row_data[i], col_data[j])? 1 : 0;
-  }
+  parallel_for(0, kmax, [=](size_t b, size_t e) {
+    for (auto k = b; k < e; ++k) {
+      int64_t i = row_stride * k;
+      int64_t j = col_stride * k;
+      rst_data[k] = COOIsNonZero<XPU, IdType>(coo, row_data[i], col_data[j])? 1 : 0;
+    }
+  });
   return rst;
 }
 
@@ -114,8 +117,9 @@ NDArray COOGetRowNNZ(COOMatrix coo, NDArray rows) {
   NDArray rst = NDArray::Empty({len}, rows->dtype, rows->ctx);
   IdType* rst_data = static_cast<IdType*>(rst->data);
 #pragma omp parallel for
-  for (int64_t i = 0; i < len; ++i)
+  for (int64_t i = 0; i < len; ++i) {
     rst_data[i] = COOGetRowNNZ<XPU, IdType>(coo, vid_data[i]);
+  }
   return rst;
 }
 
@@ -178,18 +182,19 @@ IdArray COOGetData(COOMatrix coo, IdArray rows, IdArray cols) {
   //   the choice.
 
   if (coo.row_sorted) {
-#pragma omp parallel for
-    for (int64_t p = 0; p < retlen; ++p) {
-      const IdType row_id = row_data[p * row_stride], col_id = col_data[p * col_stride];
-      auto it = std::lower_bound(coo_row, coo_row + nnz, row_id);
-      for (; it < coo_row + nnz && *it == row_id; ++it) {
-        const auto idx = it - coo_row;
-        if (coo_col[idx] == col_id) {
-          ret_data[p] = data? data[idx] : idx;
-          break;
+    parallel_for(0, retlen, [&](size_t b, size_t e) {
+      for (auto p = b; p < e; ++p) {
+        const IdType row_id = row_data[p * row_stride], col_id = col_data[p * col_stride];
+        auto it = std::lower_bound(coo_row, coo_row + nnz, row_id);
+        for (; it < coo_row + nnz && *it == row_id; ++it) {
+          const auto idx = it - coo_row;
+          if (coo_col[idx] == col_id) {
+            ret_data[p] = data? data[idx] : idx;
+            break;
+          }
         }
       }
-    }
+    });
   } else {
 #pragma omp parallel for
     for (int64_t p = 0; p < retlen; ++p) {
@@ -297,46 +302,37 @@ template COOMatrix COOTranspose<kDLCPU, int32_t>(COOMatrix coo);
 template COOMatrix COOTranspose<kDLCPU, int64_t>(COOMatrix coo);
 
 ///////////////////////////// COOToCSR /////////////////////////////
+namespace {
 
-// complexity: time O(NNZ), space O(1) if the coo is row sorted,
-// time O(NNZ/p + N), space O(NNZ + N*p) otherwise, where p is the number of
-// threads.
-template <DLDeviceType XPU, typename IdType>
-CSRMatrix COOToCSR(COOMatrix coo) {
+template <class IdType> CSRMatrix SortedCOOToCSR(const COOMatrix &coo) {
   const int64_t N = coo.num_rows;
   const int64_t NNZ = coo.row->shape[0];
-  const IdType* const row_data = static_cast<IdType*>(coo.row->data);
-  const IdType* const col_data = static_cast<IdType*>(coo.col->data);
-  const IdType* const data = COOHasData(coo)? static_cast<IdType*>(coo.data->data) : nullptr;
+  const IdType *const row_data = static_cast<IdType *>(coo.row->data);
+  const IdType *const col_data = static_cast<IdType *>(coo.col->data);
+  const IdType *const data =
+      COOHasData(coo) ? static_cast<IdType *>(coo.data->data) : nullptr;
 
   NDArray ret_indptr = NDArray::Empty({N + 1}, coo.row->dtype, coo.row->ctx);
-  NDArray ret_indices;
-  NDArray ret_data;
+  NDArray ret_indices = coo.col;
+  NDArray ret_data = data == nullptr
+                         ? NDArray::Empty({NNZ}, coo.row->dtype, coo.row->ctx)
+                         : coo.data;
 
-  const bool row_sorted = coo.row_sorted;
-  const bool col_sorted = coo.col_sorted;
+  // compute indptr
+  IdType *const Bp = static_cast<IdType *>(ret_indptr->data);
+  Bp[0] = 0;
 
-  if (row_sorted) {
-    // compute indptr
-    IdType* const Bp = static_cast<IdType*>(ret_indptr->data);
-    Bp[0] = 0;
+  IdType *const fill_data =
+      data ? nullptr : static_cast<IdType *>(ret_data->data);
 
-    if (!data) {
-      // Leave empty, and populate from inside of parallel block
-      coo.data = NDArray::Empty({NNZ}, coo.row->dtype, coo.row->ctx);
-    }
-    IdType * const fill_data = data ? nullptr : static_cast<IdType*>(coo.data->data);
-
-    if (NNZ > 0) {
-      #pragma omp parallel
-      {
-        const int num_threads = omp_get_num_threads();
-        const int thread_id = omp_get_thread_num();
-
+  if (NNZ > 0) {
+    auto num_threads = omp_get_max_threads();
+    parallel_for(0, num_threads, [&](int b, int e) {
+      for (auto thread_id = b; thread_id < e; ++thread_id) {
         // We partition the set the of non-zeros among the threads
-        const int64_t nz_chunk = (NNZ+num_threads-1)/num_threads;
-        const int64_t nz_start = thread_id*nz_chunk;
-        const int64_t nz_end = std::min(NNZ, nz_start+nz_chunk);
+        const int64_t nz_chunk = (NNZ + num_threads - 1) / num_threads;
+        const int64_t nz_start = thread_id * nz_chunk;
+        const int64_t nz_end = std::min(NNZ, nz_start + nz_chunk);
 
         // Each thread searchs the row array for a change, and marks it's
         // location in Bp. Threads, other than the first, start at the last
@@ -360,7 +356,7 @@ CSRMatrix COOToCSR(COOMatrix coo) {
         //
         int64_t row = 0;
         if (nz_start < nz_end) {
-          row = nz_start == 0 ? 0 : row_data[nz_start-1];
+          row = nz_start == 0 ? 0 : row_data[nz_start - 1];
           for (int64_t i = nz_start; i < nz_end; ++i) {
             while (row != row_data[i]) {
               ++row;
@@ -379,108 +375,262 @@ CSRMatrix COOToCSR(COOMatrix coo) {
           }
 
           if (fill_data) {
-            // TODO(minjie): Many of our current implementation assumes that CSR must have
-            //   a data array. This is a temporary workaround. Remove this after:
+            // TODO(minjie): Many of our current implementation assumes that CSR
+            // must have
+            //   a data array. This is a temporary workaround. Remove this
+            //   after:
             //   - The old immutable graph implementation is deprecated.
             //   - The old binary reduce kernel is deprecated.
-            std::iota(fill_data+nz_start,
-                      fill_data+nz_end,
-                      nz_start);
+            std::iota(fill_data + nz_start, fill_data + nz_end, nz_start);
           }
         }
       }
-    } else {
-      std::fill(Bp, Bp+N+1, 0);
-    }
-
-    // compute indices and data
-    ret_indices = coo.col;
-    ret_data = coo.data;
+    });
   } else {
-    // compute indptr
-    IdType* const Bp = static_cast<IdType*>(ret_indptr->data);
-    Bp[0] = 0;
-
-    // compute indices and data
-    ret_indices = NDArray::Empty({NNZ}, coo.row->dtype, coo.row->ctx);
-    ret_data = NDArray::Empty({NNZ}, coo.row->dtype, coo.row->ctx);
-    IdType* const Bi = static_cast<IdType*>(ret_indices->data);
-    IdType* const Bx = static_cast<IdType*>(ret_data->data);
-
-    // the offset within each row, that each thread will write to
-    std::vector<std::vector<IdType>> local_ptrs;
-    std::vector<int64_t> thread_prefixsum;
-
-#pragma omp parallel
-    {
-      const int num_threads = omp_get_num_threads();
-      const int thread_id = omp_get_thread_num();
-      CHECK_LT(thread_id, num_threads);
-
-      const int64_t nz_chunk = (NNZ+num_threads-1)/num_threads;
-      const int64_t nz_start = thread_id*nz_chunk;
-      const int64_t nz_end = std::min(NNZ, nz_start+nz_chunk);
-
-      const int64_t n_chunk = (N+num_threads-1)/num_threads;
-      const int64_t n_start = thread_id*n_chunk;
-      const int64_t n_end = std::min(N, n_start+n_chunk);
-
-#pragma omp master
-      {
-        local_ptrs.resize(num_threads);
-        thread_prefixsum.resize(num_threads+1);
-      }
-
-#pragma omp barrier
-      local_ptrs[thread_id].resize(N, 0);
-
-      for (int64_t i = nz_start; i < nz_end; ++i) {
-        ++local_ptrs[thread_id][row_data[i]];
-      }
-
-#pragma omp barrier
-      // compute prefixsum in parallel
-      int64_t sum = 0;
-      for (int64_t i = n_start; i < n_end; ++i) {
-        IdType tmp = 0;
-        for (int j = 0; j < num_threads; ++j) {
-          std::swap(tmp, local_ptrs[j][i]);
-          tmp += local_ptrs[j][i];
-        }
-        sum += tmp;
-        Bp[i+1] = sum;
-      }
-      thread_prefixsum[thread_id+1] = sum;
-
-#pragma omp barrier
-#pragma omp master
-      {
-        for (int64_t i = 0; i < num_threads; ++i) {
-          thread_prefixsum[i+1] += thread_prefixsum[i];
-        }
-        CHECK_EQ(thread_prefixsum[num_threads], NNZ);
-      }
-#pragma omp barrier
-
-      sum = thread_prefixsum[thread_id];
-      for (int64_t i = n_start; i < n_end; ++i) {
-        Bp[i+1] += sum;
-      }
-
-#pragma omp barrier
-      for (int64_t i = nz_start; i < nz_end; ++i) {
-        const IdType r = row_data[i];
-        const int64_t index = Bp[r] + local_ptrs[thread_id][r]++;
-        Bi[index] = col_data[i];
-        Bx[index] = data ? data[i] : i;
-      }
-    }
-    CHECK_EQ(Bp[N], NNZ);
+    std::fill(Bp, Bp + N + 1, 0);
   }
 
-  return CSRMatrix(coo.num_rows, coo.num_cols,
-                   ret_indptr, ret_indices, ret_data,
-                   col_sorted);
+  return CSRMatrix(coo.num_rows, coo.num_cols, ret_indptr, ret_indices,
+                   ret_data, coo.col_sorted);
+}
+
+template <class IdType> CSRMatrix UnSortedSparseCOOToCSR(const COOMatrix &coo) {
+  const int64_t N = coo.num_rows;
+  const int64_t NNZ = coo.row->shape[0];
+  const IdType *const row_data = static_cast<IdType *>(coo.row->data);
+  const IdType *const col_data = static_cast<IdType *>(coo.col->data);
+  const IdType *const data =
+      COOHasData(coo) ? static_cast<IdType *>(coo.data->data) : nullptr;
+
+  NDArray ret_indptr = NDArray::Empty({N + 1}, coo.row->dtype, coo.row->ctx);
+  NDArray ret_indices = NDArray::Empty({NNZ}, coo.row->dtype, coo.row->ctx);
+  NDArray ret_data = NDArray::Empty({NNZ}, coo.row->dtype, coo.row->ctx);
+  IdType *const Bp = static_cast<IdType *>(ret_indptr->data);
+  Bp[0] = 0;
+  IdType *const Bi = static_cast<IdType *>(ret_indices->data);
+  IdType *const Bx = static_cast<IdType *>(ret_data->data);
+
+  // store sorted data and original index.
+  NDArray sorted_data = NDArray::Empty({NNZ}, coo.row->dtype, coo.row->ctx);
+  NDArray sorted_data_pos = NDArray::Empty({NNZ}, coo.row->dtype, coo.row->ctx);
+  IdType *const Sx = static_cast<IdType *>(sorted_data->data);
+  IdType *const Si = static_cast<IdType *>(sorted_data_pos->data);
+
+  // record row_idx in each thread.
+  std::vector<std::vector<int64_t>> p_sum;
+
+#pragma omp parallel
+  {
+    const int num_threads = omp_get_num_threads();
+    const int thread_id = omp_get_thread_num();
+    CHECK_LT(thread_id, num_threads);
+
+    const int64_t nz_chunk = (NNZ + num_threads - 1) / num_threads;
+    const int64_t nz_start = thread_id * nz_chunk;
+    const int64_t nz_end = std::min(NNZ, nz_start + nz_chunk);
+
+    const int64_t n_chunk = (N + num_threads - 1) / num_threads;
+    const int64_t n_start = thread_id * n_chunk;
+    const int64_t n_end = std::min(N, n_start + n_chunk);
+
+    // init Bp as zero and one shift is always applied when accessing Bp as
+    // its length is N+1.
+    for (auto i = n_start; i < n_end; ++i) {
+      Bp[i + 1] = 0;
+    }
+
+#pragma omp master
+    { p_sum.resize(num_threads); }
+#pragma omp barrier
+
+    // iterate on NNZ data and count row_idx.
+    p_sum[thread_id].resize(num_threads, 0);
+    for (auto i = nz_start; i < nz_end; ++i) {
+      const int64_t row_idx = row_data[i];
+      const int64_t row_thread_id = row_idx / n_chunk;
+      ++p_sum[thread_id][row_thread_id];
+    }
+
+#pragma omp barrier
+#pragma omp master
+    // accumulate row_idx.
+    {
+      int64_t cum = 0;
+      for (size_t j = 0; j < p_sum.size(); ++j) {
+        for (size_t i = 0; i < p_sum.size(); ++i) {
+          auto tmp = p_sum[i][j];
+          p_sum[i][j] = cum;
+          cum += tmp;
+        }
+      }
+      CHECK_EQ(cum, NNZ);
+    }
+#pragma omp barrier
+
+    // sort data by row_idx and place into Sx/Si.
+    std::vector<int64_t> data_pos(p_sum[thread_id]);
+    for (auto i = nz_start; i < nz_end; ++i) {
+      const int64_t row_idx = row_data[i];
+      const int64_t row_thread_id = row_idx / n_chunk;
+      const int64_t pos = data_pos[row_thread_id]++;
+      Sx[pos] = data == nullptr ? i : data[i];
+      Si[pos] = i;
+    }
+
+#pragma omp barrier
+
+    // Now we're able to do coo2csr on sorted data in each thread in parallel.
+    // compute data number on each row_idx.
+    const int64_t i_start = p_sum[0][thread_id];
+    const int64_t i_end =
+        thread_id + 1 == num_threads ? NNZ : p_sum[0][thread_id + 1];
+    for (auto i = i_start; i < i_end; ++i) {
+      const int64_t row_idx = row_data[Si[i]];
+      ++Bp[row_idx + 1];
+    }
+
+    // accumulate on each row
+    IdType cumsum = 0;
+    for (auto i = n_start; i < n_end; ++i) {
+      const auto tmp = Bp[i + 1];
+      Bp[i + 1] = cumsum;
+      cumsum += tmp;
+    }
+
+    // update Bi/Bp/Bx
+    for (auto i = i_start; i < i_end; ++i) {
+      const int64_t row_idx = row_data[Si[i]];
+      const int64_t dest = (Bp[row_idx + 1]++) + i_start;
+      Bi[dest] = col_data[Si[i]];
+      Bx[dest] = Sx[i];
+    }
+    for (auto i = n_start; i < n_end; ++i) {
+      Bp[i + 1] += i_start;
+    }
+  }
+  return CSRMatrix(coo.num_rows, coo.num_cols, ret_indptr, ret_indices,
+                   ret_data, coo.col_sorted);
+}
+
+template <class IdType> CSRMatrix UnSortedDenseCOOToCSR(const COOMatrix &coo) {
+  const int64_t N = coo.num_rows;
+  const int64_t NNZ = coo.row->shape[0];
+  const IdType *const row_data = static_cast<IdType *>(coo.row->data);
+  const IdType *const col_data = static_cast<IdType *>(coo.col->data);
+  const IdType *const data =
+      COOHasData(coo) ? static_cast<IdType *>(coo.data->data) : nullptr;
+
+  NDArray ret_indptr = NDArray::Empty({N + 1}, coo.row->dtype, coo.row->ctx);
+  NDArray ret_indices = NDArray::Empty({NNZ}, coo.row->dtype, coo.row->ctx);
+  NDArray ret_data = NDArray::Empty({NNZ}, coo.row->dtype, coo.row->ctx);
+  IdType *const Bp = static_cast<IdType *>(ret_indptr->data);
+  Bp[0] = 0;
+  IdType *const Bi = static_cast<IdType *>(ret_indices->data);
+  IdType *const Bx = static_cast<IdType *>(ret_data->data);
+
+  // the offset within each row, that each thread will write to
+  std::vector<std::vector<IdType>> local_ptrs;
+  std::vector<int64_t> thread_prefixsum;
+
+#pragma omp parallel
+  {
+    const int num_threads = omp_get_num_threads();
+    const int thread_id = omp_get_thread_num();
+    CHECK_LT(thread_id, num_threads);
+
+    const int64_t nz_chunk = (NNZ + num_threads - 1) / num_threads;
+    const int64_t nz_start = thread_id * nz_chunk;
+    const int64_t nz_end = std::min(NNZ, nz_start + nz_chunk);
+
+    const int64_t n_chunk = (N + num_threads - 1) / num_threads;
+    const int64_t n_start = thread_id * n_chunk;
+    const int64_t n_end = std::min(N, n_start + n_chunk);
+
+#pragma omp master
+    {
+      local_ptrs.resize(num_threads);
+      thread_prefixsum.resize(num_threads + 1);
+    }
+
+#pragma omp barrier
+    local_ptrs[thread_id].resize(N, 0);
+
+    for (int64_t i = nz_start; i < nz_end; ++i) {
+      ++local_ptrs[thread_id][row_data[i]];
+    }
+
+#pragma omp barrier
+    // compute prefixsum in parallel
+    int64_t sum = 0;
+    for (int64_t i = n_start; i < n_end; ++i) {
+      IdType tmp = 0;
+      for (int j = 0; j < num_threads; ++j) {
+        std::swap(tmp, local_ptrs[j][i]);
+        tmp += local_ptrs[j][i];
+      }
+      sum += tmp;
+      Bp[i + 1] = sum;
+    }
+    thread_prefixsum[thread_id + 1] = sum;
+
+#pragma omp barrier
+#pragma omp master
+    {
+      for (int64_t i = 0; i < num_threads; ++i) {
+        thread_prefixsum[i + 1] += thread_prefixsum[i];
+      }
+      CHECK_EQ(thread_prefixsum[num_threads], NNZ);
+    }
+#pragma omp barrier
+
+    sum = thread_prefixsum[thread_id];
+    for (int64_t i = n_start; i < n_end; ++i) {
+      Bp[i + 1] += sum;
+    }
+
+#pragma omp barrier
+    for (int64_t i = nz_start; i < nz_end; ++i) {
+      const IdType r = row_data[i];
+      const int64_t index = Bp[r] + local_ptrs[thread_id][r]++;
+      Bi[index] = col_data[i];
+      Bx[index] = data ? data[i] : i;
+    }
+  }
+  CHECK_EQ(Bp[N], NNZ);
+
+  return CSRMatrix(coo.num_rows, coo.num_cols, ret_indptr, ret_indices,
+                   ret_data, coo.col_sorted);
+}
+
+}  // namespace
+
+/*
+Implementation and Complexity details. N: num_nodes, NNZ: num_edges, P:
+num_threads.
+  1. If row is sorted in COO, SortedCOOToCSR<> is applied. Time: O(NNZ/P).
+Space: O(1).
+  2. If row is NOT sorted in COO and graph is sparse (low average degree),
+UnSortedSparseCOOToCSR<> is applied. Time: O(NNZ/P + N/P + P^2), space O(NNZ +
+P^2).
+  3. If row is NOT sorted in COO and graph is dense (medium/high average
+degree), UnSortedDenseCOOToCSR<> is applied. Time: O(NNZ/P + N/P), space O(NNZ +
+N*P).
+*/
+template <DLDeviceType XPU, typename IdType>
+CSRMatrix COOToCSR(COOMatrix coo) {
+  if (!coo.row_sorted) {
+    const int64_t num_threads = omp_get_num_threads();
+    const int64_t num_nodes = coo.num_rows;
+    const int64_t num_edges = coo.row->shape[0];
+    // Besides graph density, num_threads is also taken into account. Below
+    // criteria is set-up according to the time/space complexity difference
+    // between these 2 algorithms.
+    if (num_threads * num_nodes > 4 * num_edges) {
+      return UnSortedSparseCOOToCSR<IdType>(coo);
+    }
+    return UnSortedDenseCOOToCSR<IdType>(coo);
+  }
+  return SortedCOOToCSR<IdType>(coo);
 }
 
 template CSRMatrix COOToCSR<kDLCPU, int32_t>(COOMatrix coo);
@@ -627,11 +777,12 @@ COOMatrix COOReorder(COOMatrix coo, runtime::NDArray new_row_id_arr,
   IdType *out_row = static_cast<IdType*>(out_row_arr->data);
   IdType *out_col = static_cast<IdType*>(out_col_arr->data);
 
-#pragma omp parallel for
-  for (int64_t i = 0; i < nnz; i++) {
-    out_row[i] = new_row_ids[in_rows[i]];
-    out_col[i] = new_col_ids[in_cols[i]];
-  }
+  parallel_for(0, nnz, [=](size_t b, size_t e) {
+    for (auto i = b; i < e; ++i) {
+      out_row[i] = new_row_ids[in_rows[i]];
+      out_col[i] = new_col_ids[in_cols[i]];
+    }
+  });
   return COOMatrix(num_rows, num_cols, out_row_arr, out_col_arr, out_data_arr);
 }
 

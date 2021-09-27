@@ -125,13 +125,13 @@ net = net.to(dev)
 if args.load_model_path:
     net.load_state_dict(torch.load(args.load_model_path, map_location=dev))
 
-if args.opt == 'adam':
+if args.opt == 'sgd':
     # The optimizer strategy described in paper:
     opt = torch.optim.SGD(net.parameters(), lr=0.01,
                           momentum=0.9, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.MultiStepLR(
         opt, milestones=[120, 160], gamma=0.1)
-elif args.opt == 'sgd':
+elif args.opt == 'adam':
     # The optimizer strategy proposed by
     # https://github.com/qq456cvb/Point-Transformers:
     opt = torch.optim.Adam(

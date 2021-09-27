@@ -58,8 +58,9 @@ class SAGE(nn.Module):
                 g,
                 th.arange(g.num_nodes()).to(g.device),
                 sampler,
+                device=device if num_workers == 0 else None,
                 batch_size=batch_size,
-                shuffle=True,
+                shuffle=False,
                 drop_last=False,
                 num_workers=num_workers)
 
