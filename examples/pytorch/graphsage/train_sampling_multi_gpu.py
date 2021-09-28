@@ -93,12 +93,18 @@ def run(proc_id, n_gpus, args, devices, data, nccl_id=None):
 
     in_feats = train_nfeat.shape[1]
 
-    train_mask = train_g.ndata['train_mask']
-    val_mask = val_g.ndata['val_mask']
-    test_mask = test_g.ndata['test_mask']
+    train_mask = train_g.ndata.pop('train_mask')
+    val_mask = val_g.ndata.pop('val_mask')
+    test_mask = test_g.ndata.pop('test_mask')
     train_nid = train_mask.nonzero().squeeze()
     val_nid = val_mask.nonzero().squeeze()
     test_nid = test_mask.nonzero().squeeze()
+
+    # remove uncessary edge and node data
+    for k in list(g.edata.keys()):
+        g.edata.pop(k)
+    for k in list(g.ndata.keys()):
+        g.ndata.pop(k)
 
     # Create PyTorch DataLoader for constructing blocks
     sampler = dgl.dataloading.MultiLayerNeighborSampler(
@@ -267,9 +273,11 @@ if __name__ == '__main__':
     else:
         nccl_id = nccl.UniqueId()
         procs = []
-        for proc_id in range(n_gpus):
+        for proc_id in range(1, n_gpus):
             p = mp.Process(target=run, args=(proc_id, n_gpus, args, devices, data, nccl_id))
             p.start()
             procs.append(p)
+        # original process runs on GPU 0
+        run(0, n_gpus, args, devices, data, nccl_id)
         for p in procs:
             p.join()

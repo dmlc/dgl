@@ -106,9 +106,9 @@ class _NodeDataIterator:
         return result
 
 class MultiGPUNodeDataLoader(NodeDataLoader):
-    """PyTorch dataloader for batch-iterating over a set of nodes, generating the list
-    of message flow graphs (MFGs) as computation dependency of the said mini-batch.
-    The feature data of the graph is stored partitioned in GPU memory.
+    """Specialized pytorch dataloader for iterating over a set of nodes,
+    generating the message flow graphs (MFGs) and collecting feature and label
+    data for the minibatch.
 
     Parameters
     ----------

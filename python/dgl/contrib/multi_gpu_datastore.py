@@ -1,5 +1,5 @@
 ##
-#   Copyright 2021 Contributors 
+#   Copyright 2021 Contributors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -28,11 +28,12 @@ class MultiGPUDataStore:
     It can be created via the shape and data type information from the tensor
     to split across gpus `large_cpu_tensor` in the below code:
 
-    >>> split_data = MultiGPUTensor(large_cpu_tensor.shape,
+    >>> partition = NDArrayPartition(len(large_cpu_tensor), nccl_comm)
+    >>> split_data = MultiGPUDataStore(large_cpu_tensor.shape,
     ...                               large_cpu_tensor.dtype,
     ...                               dev_id,
     ...                               nccl_comm)
-    >>> split_data.set_global(large_cpu_tensor)
+    >>> split_data.all_set_global(large_cpu_tensor)
 
     Then, once it is stored across GPU memory during training, features for
     mini-batches can be fetched via the `get_global()` method. If we have the
@@ -63,7 +64,7 @@ class MultiGPUDataStore:
         assert partition.num_parts() == comm.size(), "The partition " \
             "must have the same number of parts as the communicator has ranks."
         assert partition.array_size() == shape[0], "The partition must be for " \
-            "an array with the same number of rows as this MultiGPUTensor."
+            "an array with the same number of rows as this MultiGPUDataStore."
 
         self._comm = comm
         self._partition = partition
