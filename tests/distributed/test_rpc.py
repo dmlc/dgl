@@ -107,11 +107,13 @@ class HelloRequest(dgl.distributed.Request):
         res = HelloResponse(self.hello_str, self.integer, new_tensor)
         return res
 
-def start_server(num_clients, ip_config):
+def start_server(num_clients, ip_config, keep_alive=False):
     print("Sleep 5 seconds to test client re-connect.")
     time.sleep(5)
-    server_state = dgl.distributed.ServerState(None, local_g=None, partition_book=None)
-    dgl.distributed.register_service(HELLO_SERVICE_ID, HelloRequest, HelloResponse)
+    server_state = dgl.distributed.ServerState(
+        None, local_g=None, partition_book=None, keep_alive=keep_alive)
+    dgl.distributed.register_service(
+        HELLO_SERVICE_ID, HelloRequest, HelloResponse)
     dgl.distributed.start_server(server_id=0, 
                                  ip_config=ip_config, 
                                  num_servers=1,
@@ -223,6 +225,40 @@ def test_multi_client():
         pclient_list[i].join()
     pserver.join()
 
+@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
+def test_multi_client_group():
+    os.environ['DGL_DIST_MODE'] = 'distributed'
+    ip_config = open("rpc_ip_config_mul_client.txt", "w")
+    ip_addr = get_local_usable_addr()
+    ip_config.write('%s\n' % ip_addr)
+    ip_config.close()
+    ctx = mp.get_context('spawn')
+    pserver = ctx.Process(target=start_server, args=(10, "rpc_ip_config_mul_client.txt", True))
+
+    # 1st client group
+    pclient_list = []
+    for i in range(10):
+        pclient = ctx.Process(target=start_client, args=("rpc_ip_config_mul_client.txt",))
+        pclient_list.append(pclient)
+    pserver.start()
+    for i in range(10):
+        pclient_list[i].start()
+    for i in range(10):
+        pclient_list[i].join()
+    assert pserver.is_alive()
+
+    # 2nd client group
+    pclient_list = []
+    for i in range(10):
+        pclient = ctx.Process(target=start_client, args=("rpc_ip_config_mul_client.txt",))
+        pclient_list.append(pclient)
+    for i in range(10):
+        pclient_list[i].start()
+    for i in range(10):
+        pclient_list[i].join()
+    assert pserver.is_alive()
+
+    pserver.terminate()
 
 if __name__ == '__main__':
     test_serialize()

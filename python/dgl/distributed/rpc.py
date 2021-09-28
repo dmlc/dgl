@@ -10,6 +10,7 @@ from .._ffi.object import register_object, ObjectBase
 from .._ffi.function import _init_api
 from ..base import DGLError
 from .. import backend as F
+from .constants import *
 
 __all__ = ['set_rank', 'get_rank', 'Request', 'Response', 'register_service', \
 'create_sender', 'create_receiver', 'finalize_sender', 'finalize_receiver', \
@@ -933,6 +934,12 @@ def client_barrier():
     res = recv_response()
     assert res.msg == 'barrier'
 
+def init_server(max_queue_size, net_type):
+    """Init resources of current server"""
+    create_sender(max_queue_size, net_type)
+    create_receiver(max_queue_size, net_type)
+    print("Server (%d) get started." % get_rank())
+
 def finalize_server():
     """Finalize resources of current server
     """
@@ -1065,7 +1072,7 @@ class ShutDownRequest(Request):
     def process_request(self, server_state):
         assert self.client_id == 0
         finalize_server()
-        return 'exit'
+        return SERVER_KEEP_ALIVE if server_state.keep_alive else SERVER_EXIT
 
 GET_NUM_CLIENT = 22453
 

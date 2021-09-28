@@ -3,7 +3,7 @@
 import time
 
 from . import rpc
-from .constants import MAX_QUEUE_SIZE
+from .constants import *
 
 def start_server(server_id, ip_config, num_servers, num_clients, server_state, \
     max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
@@ -59,43 +59,48 @@ def start_server(server_id, ip_config, num_servers, num_clients, server_state, \
     rpc.set_machine_id(machine_id)
     ip_addr = server_namebook[server_id][1]
     port = server_namebook[server_id][2]
-    rpc.create_sender(max_queue_size, net_type)
-    rpc.create_receiver(max_queue_size, net_type)
-    # wait all the senders connect to server.
-    # Once all the senders connect to server, server will not
-    # accept new sender's connection
-    print("Wait connections ...")
-    rpc.receiver_wait(ip_addr, port, num_clients)
-    print("%d clients connected!" % num_clients)
-    rpc.set_num_client(num_clients)
-    # Recv all the client's IP and assign ID to clients
-    addr_list = []
-    client_namebook = {}
-    for _ in range(num_clients):
-        req, _ = rpc.recv_request()
-        addr_list.append(req.ip_addr)
-    addr_list.sort()
-    for client_id, addr in enumerate(addr_list):
-        client_namebook[client_id] = addr
-    for client_id, addr in client_namebook.items():
-        client_ip, client_port = addr.split(':')
-        rpc.add_receiver_addr(client_ip, client_port, client_id)
-    time.sleep(3) # wait client's socket ready. 3 sec is enough.
-    rpc.sender_connect()
-    if rpc.get_rank() == 0: # server_0 send all the IDs
-        for client_id, _ in client_namebook.items():
-            register_res = rpc.ClientRegisterResponse(client_id)
-            rpc.send_response(client_id, register_res)
-    # main service loop
+
     while True:
-        req, client_id = rpc.recv_request()
-        res = req.process_request(server_state)
-        if res is not None:
-            if isinstance(res, list):
-                for response in res:
-                    target_id, res_data = response
-                    rpc.send_response(target_id, res_data)
-            elif isinstance(res, str) and res == 'exit':
-                break # break the loop and exit server
-            else:
-                rpc.send_response(client_id, res)
+        rpc.init_server(max_queue_size, net_type)
+        # wait all the senders connect to server.
+        # Once all the senders connect to server, server will not
+        # accept new sender's connection
+        print("Wait connections ...")
+        rpc.receiver_wait(ip_addr, port, num_clients)
+        print("%d clients connected!" % num_clients)
+        rpc.set_num_client(num_clients)
+        # Recv all the client's IP and assign ID to clients
+        addr_list = []
+        client_namebook = {}
+        for _ in range(num_clients):
+            req, _ = rpc.recv_request()
+            addr_list.append(req.ip_addr)
+        addr_list.sort()
+        for client_id, addr in enumerate(addr_list):
+            client_namebook[client_id] = addr
+        for client_id, addr in client_namebook.items():
+            client_ip, client_port = addr.split(':')
+            rpc.add_receiver_addr(client_ip, client_port, client_id)
+        time.sleep(3)  # wait client's socket ready. 3 sec is enough.
+        rpc.sender_connect()
+        if rpc.get_rank() == 0:  # server_0 send all the IDs
+            for client_id, _ in client_namebook.items():
+                register_res = rpc.ClientRegisterResponse(client_id)
+                rpc.send_response(client_id, register_res)
+        # main service loop
+        while True:
+            req, client_id = rpc.recv_request()
+            res = req.process_request(server_state)
+            if res is not None:
+                if isinstance(res, list):
+                    for response in res:
+                        target_id, res_data = response
+                        rpc.send_response(target_id, res_data)
+                elif isinstance(res, str):
+                    if res == SERVER_EXIT:
+                        # exit process
+                        return
+                    # keep alive and start over to serve new clients
+                    break
+                else:
+                    rpc.send_response(client_id, res)
