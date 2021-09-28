@@ -28,11 +28,14 @@ class Sender {
   /*!
    * \brief Sender constructor
    * \param queue_size size (bytes) of message queue. 
+   * \param max_thread_count size of thread pool. 0 for no limit
    * Note that, the queue_size parameter is optional.
    */
-  explicit Sender(int64_t queue_size = 0) {
+  explicit Sender(int64_t queue_size = 0, int max_thread_count = 0) {
     CHECK_GE(queue_size, 0);
+    CHECK_GE(max_thread_count, 0);
     queue_size_ = queue_size;
+    max_thread_count_ = max_thread_count;
   }
 
   virtual ~Sender() {}
@@ -86,6 +89,10 @@ class Sender {
    * \brief Size of message queue
    */
   int64_t queue_size_;
+  /*!
+   * \brief Size of thread pool. 0 for no limit
+   */
+  int max_thread_count_;
 };
 
 /*!
@@ -101,13 +108,16 @@ class Receiver {
   /*!
    * \brief Receiver constructor
    * \param queue_size size of message queue.
+   * \param max_thread_count size of thread pool. 0 for no limit
    * Note that, the queue_size parameter is optional.
    */
-  explicit Receiver(int64_t queue_size = 0) {
+  explicit Receiver(int64_t queue_size = 0, int max_thread_count = 0) {
     if (queue_size < 0) {
       LOG(FATAL) << "queue_size cannot be a negative number.";
     }
+    CHECK_GE(max_thread_count, 0);
     queue_size_ = queue_size;
+    max_thread_count_ = max_thread_count;
   }
 
   virtual ~Receiver() {}
@@ -165,6 +175,10 @@ class Receiver {
    * \brief Size of message queue
    */
   int64_t queue_size_;
+  /*!
+   * \brief Size of thread pool. 0 for no limit
+   */
+  int max_thread_count_;
 };
 
 }  // namespace network
