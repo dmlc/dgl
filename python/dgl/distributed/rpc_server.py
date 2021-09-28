@@ -3,7 +3,7 @@
 import time
 
 from . import rpc
-from .constants import *
+from .constants import MAX_QUEUE_SIZE, SERVER_EXIT, SERVER_KEEP_ALIVE
 
 def start_server(server_id, ip_config, num_servers, num_clients, server_state, \
     max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
@@ -100,7 +100,11 @@ def start_server(server_id, ip_config, num_servers, num_clients, server_state, \
                     if res == SERVER_EXIT:
                         # exit process
                         return
-                    # keep alive and start over to serve new clients
-                    break
+                    elif res == SERVER_KEEP_ALIVE:
+                        # keep alive and start over to serve new clients
+                        break
+                    else:
+                        raise RuntimeError(
+                            "Unexpected return code: {}".format(res))
                 else:
                     rpc.send_response(client_id, res)

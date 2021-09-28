@@ -74,6 +74,7 @@ class ServerState:
 
     @property
     def keep_alive(self):
+        """Get keep alive flag"""
         return self._keep_alive
 
 
