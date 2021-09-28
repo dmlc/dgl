@@ -206,7 +206,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_DGLSenderCreate")
     int64_t msg_queue_size = args[1];
     network::Sender* sender = nullptr;
     if (type == "socket") {
-      sender = new network::SocketSender(msg_queue_size);
+      sender = new network::SocketSender(msg_queue_size, 0);
     } else {
       LOG(FATAL) << "Unknown communicator type: " << type;
     }
@@ -220,7 +220,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_DGLReceiverCreate")
     int64_t msg_queue_size = args[1];
     network::Receiver* receiver = nullptr;
     if (type == "socket") {
-      receiver = new network::SocketReceiver(msg_queue_size);
+      receiver = new network::SocketReceiver(msg_queue_size, 0);
     } else {
       LOG(FATAL) << "Unknown communicator type: " << type;
     }

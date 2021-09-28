@@ -12,6 +12,7 @@
 #include <unordered_map>
 #include <memory>
 
+#include "../../runtime/semaphore_wrapper.h"
 #include "communicator.h"
 #include "msg_queue.h"
 #include "tcp_socket.h"
@@ -42,8 +43,10 @@ class SocketSender : public Sender {
   /*!
    * \brief Sender constructor
    * \param queue_size size of message queue 
+   * \param max_thread_count size of thread pool. 0 for no limit
    */
-  explicit SocketSender(int64_t queue_size) : Sender(queue_size) {}
+  SocketSender(int64_t queue_size, int max_thread_count)
+    : Sender(queue_size, max_thread_count) {}
 
   /*!
    * \brief Add receiver's address and ID to the sender's namebook
@@ -93,7 +96,8 @@ class SocketSender : public Sender {
   /*!
    * \brief socket for each connection of receiver
    */ 
-  std::unordered_map<int /* receiver ID */, std::shared_ptr<TCPSocket>> sockets_;
+  std::vector<std::unordered_map<int /* receiver ID */,
+    std::shared_ptr<TCPSocket>>> sockets_;
 
   /*!
    * \brief receivers' address
@@ -101,24 +105,27 @@ class SocketSender : public Sender {
   std::unordered_map<int /* receiver ID */, IPAddr> receiver_addrs_;
 
   /*!
-   * \brief message queue for each socket connection
+   * \brief message queue for each thread
    */ 
-  std::unordered_map<int /* receiver ID */, std::shared_ptr<MessageQueue>> msg_queue_;
+  std::vector<std::shared_ptr<MessageQueue>> msg_queue_;
 
   /*!
-   * \brief Independent thread for each socket connection
+   * \brief Independent thread
    */ 
-  std::unordered_map<int /* receiver ID */, std::shared_ptr<std::thread>> threads_;
+  std::vector<std::shared_ptr<std::thread>> threads_;
 
   /*!
-   * \brief Send-loop for each socket in per-thread
-   * \param socket TCPSocket for current connection
-   * \param queue message_queue for current connection
+   * \brief Send-loop for each thread
+   * \param sockets TCPSockets for current thread
+   * \param queue message_queue for current thread
    * 
    * Note that, the SendLoop will finish its loop-job and exit thread
    * when the main thread invokes Signal() API on the message queue.
    */
-  static void SendLoop(TCPSocket* socket, MessageQueue* queue);
+  static void SendLoop(
+    std::unordered_map<int /* Receiver (virtual) ID */,
+      std::shared_ptr<TCPSocket>> sockets,
+    std::shared_ptr<MessageQueue> queue);
 };
 
 /*!
@@ -131,8 +138,10 @@ class SocketReceiver : public Receiver {
   /*!
    * \brief Receiver constructor
    * \param queue_size size of message queue.
+   * \param max_thread_count size of thread pool. 0 for no limit
    */
-  explicit SocketReceiver(int64_t queue_size) : Receiver(queue_size) {}
+  SocketReceiver(int64_t queue_size, int max_thread_count)
+    : Receiver(queue_size, max_thread_count) {}
 
   /*!
    * \brief Wait for all the Senders to connect
@@ -183,6 +192,11 @@ class SocketReceiver : public Receiver {
   inline std::string Type() const { return std::string("socket"); }
 
  private:
+  struct RecvContext {
+    int64_t data_size = -1;
+    int64_t received_bytes = 0;
+    char *buffer = nullptr;
+  };
   /*!
    * \brief number of sender
    */
@@ -196,28 +210,41 @@ class SocketReceiver : public Receiver {
   /*!
    * \brief socket for each client connections
    */ 
-  std::unordered_map<int /* Sender (virutal) ID */, std::shared_ptr<TCPSocket>> sockets_;
+  std::vector<std::unordered_map<int /* Sender (virutal) ID */,
+    std::shared_ptr<TCPSocket>>> sockets_;
 
   /*!
    * \brief Message queue for each socket connection
    */ 
-  std::unordered_map<int /* Sender (virtual) ID */, std::shared_ptr<MessageQueue>> msg_queue_;
+  std::unordered_map<int /* Sender (virtual) ID */,
+    std::shared_ptr<MessageQueue>> msg_queue_;
   std::unordered_map<int, std::shared_ptr<MessageQueue>>::iterator mq_iter_;
 
   /*!
-   * \brief Independent thead for each socket connection
+   * \brief Independent thead
    */ 
-  std::unordered_map<int /* Sender (virtual) ID */, std::shared_ptr<std::thread>> threads_;
+  std::vector<std::shared_ptr<std::thread>> threads_;
 
   /*!
-   * \brief Recv-loop for each socket in per-thread
-   * \param socket client socket
-   * \param queue message queue
+   * \brief queue_sem_ semphore to indicate number of messages in multiple
+   * message queues to prevent busy wait of Recv
+   */
+  runtime::Semaphore queue_sem_;
+
+  /*!
+   * \brief Recv-loop for each thread
+   * \param sockets client sockets of current thread
+   * \param queue message queues of current thread
    *
    * Note that, the RecvLoop will finish its loop-job and exit thread
    * when the main thread invokes Signal() API on the message queue.
    */ 
-  static void RecvLoop(TCPSocket* socket, MessageQueue* queue);
+  static void RecvLoop(
+    std::unordered_map<int /* Sender (virtual) ID */,
+      std::shared_ptr<TCPSocket>> sockets,
+    std::unordered_map<int /* Sender (virtual) ID */,
+      std::shared_ptr<MessageQueue>> queues,
+    runtime::Semaphore *queue_sem);
 };
 
 }  // namespace network
