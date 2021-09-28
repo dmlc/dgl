@@ -370,6 +370,7 @@ class GSDDMM_hetero(th.autograd.Function):
     # TODO(Israt): Implement the complete backward operator
     def backward(ctx, *dZ):
         g, op, lhs_target, rhs_target, X_shape, Y_shape, X_len = ctx.backward_cache
+        ctx.backward_cache = None
         feats = ctx.saved_tensors
         X, Y = feats[:X_len], feats[X_len:]
         if op != 'copy_rhs' and any([x is not None for x in X]):
