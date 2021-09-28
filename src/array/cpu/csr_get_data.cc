@@ -4,6 +4,7 @@
  * \brief Retrieve entries of a CSR matrix
  */
 #include <dgl/array.h>
+#include <dgl/runtime/parallel_for.h>
 #include <vector>
 #include <unordered_set>
 #include <numeric>
@@ -12,7 +13,7 @@
 namespace dgl {
 
 using runtime::NDArray;
-
+using runtime::parallel_for;
 namespace aten {
 namespace impl {
 
@@ -70,35 +71,37 @@ NDArray CSRGetData(
 
   if (csr.sorted) {
     // use binary search on each row
-#pragma omp parallel for
-    for (int64_t p = 0; p < retlen; ++p) {
-      const IdType row_id = row_data[p * row_stride], col_id = col_data[p * col_stride];
-      CHECK(row_id >= 0 && row_id < csr.num_rows) << "Invalid row index: " << row_id;
-      CHECK(col_id >= 0 && col_id < csr.num_cols) << "Invalid col index: " << col_id;
-      const IdType *start_ptr = indices_data + indptr_data[row_id];
-      const IdType *end_ptr = indices_data + indptr_data[row_id + 1];
-      auto it = std::lower_bound(start_ptr, end_ptr, col_id);
-      if (it != end_ptr && *it == col_id) {
-        const IdType idx = it - indices_data;
-        IdType eid = data ? data[idx] : idx;
-        ret_data[p] = return_eids ? eid : weight_data[eid];
-      }
-    }
-  } else {
-    // linear search on each row
-#pragma omp parallel for
-    for (int64_t p = 0; p < retlen; ++p) {
-      const IdType row_id = row_data[p * row_stride], col_id = col_data[p * col_stride];
-      CHECK(row_id >= 0 && row_id < csr.num_rows) << "Invalid row index: " << row_id;
-      CHECK(col_id >= 0 && col_id < csr.num_cols) << "Invalid col index: " << col_id;
-      for (IdType idx = indptr_data[row_id]; idx < indptr_data[row_id + 1]; ++idx) {
-        if (indices_data[idx] == col_id) {
+    parallel_for(0, retlen, [&](size_t b, size_t e) {
+      for (auto p = b; p < e; ++p) {
+        const IdType row_id = row_data[p * row_stride], col_id = col_data[p * col_stride];
+        CHECK(row_id >= 0 && row_id < csr.num_rows) << "Invalid row index: " << row_id;
+        CHECK(col_id >= 0 && col_id < csr.num_cols) << "Invalid col index: " << col_id;
+        const IdType *start_ptr = indices_data + indptr_data[row_id];
+        const IdType *end_ptr = indices_data + indptr_data[row_id + 1];
+        auto it = std::lower_bound(start_ptr, end_ptr, col_id);
+        if (it != end_ptr && *it == col_id) {
+          const IdType idx = it - indices_data;
           IdType eid = data ? data[idx] : idx;
           ret_data[p] = return_eids ? eid : weight_data[eid];
-          break;
         }
       }
-    }
+    });
+  } else {
+    // linear search on each row
+    parallel_for(0, retlen, [&](size_t b, size_t e) {
+      for (auto p = b; p < e; ++p) {
+        const IdType row_id = row_data[p * row_stride], col_id = col_data[p * col_stride];
+        CHECK(row_id >= 0 && row_id < csr.num_rows) << "Invalid row index: " << row_id;
+        CHECK(col_id >= 0 && col_id < csr.num_cols) << "Invalid col index: " << col_id;
+        for (IdType idx = indptr_data[row_id]; idx < indptr_data[row_id + 1]; ++idx) {
+          if (indices_data[idx] == col_id) {
+            IdType eid = data ? data[idx] : idx;
+            ret_data[p] = return_eids ? eid : weight_data[eid];
+            break;
+          }
+        }
+      }
+    });
   }
   return ret;
 }

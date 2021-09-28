@@ -1,5 +1,6 @@
 """RPC components. They are typically functions or utilities used by both
 server and clients."""
+import os
 import abc
 import pickle
 import random
@@ -111,7 +112,8 @@ def create_sender(max_queue_size, net_type):
     net_type : str
         Networking type. Current options are: 'socket'.
     """
-    _CAPI_DGLRPCCreateSender(int(max_queue_size), net_type)
+    max_thread_count = int(os.getenv('DGL_SOCKET_MAX_THREAD_COUNT', '0'))
+    _CAPI_DGLRPCCreateSender(int(max_queue_size), net_type, max_thread_count)
 
 def create_receiver(max_queue_size, net_type):
     """Create rpc receiver of this process.
@@ -123,7 +125,8 @@ def create_receiver(max_queue_size, net_type):
     net_type : str
         Networking type. Current options are: 'socket'.
     """
-    _CAPI_DGLRPCCreateReceiver(int(max_queue_size), net_type)
+    max_thread_count = int(os.getenv('DGL_SOCKET_MAX_THREAD_COUNT', '0'))
+    _CAPI_DGLRPCCreateReceiver(int(max_queue_size), net_type, max_thread_count)
 
 def finalize_sender():
     """Finalize rpc sender of this process.

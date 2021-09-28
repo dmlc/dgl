@@ -108,7 +108,7 @@ class Sequential(nn.Sequential):
 
     Description
     -----------
-    A squential container for stacking graph neural network modules.
+    A sequential container for stacking graph neural network modules.
 
     DGL supports two modes: sequentially apply GNN modules on 1) the same graph or
     2) a list of given graphs. In the second case, the number of graphs equals the

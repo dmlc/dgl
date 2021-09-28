@@ -435,7 +435,7 @@ def main(args):
     if args.num_gpus == -1:
         device = th.device('cpu')
     else:
-        device = th.device('cuda:'+str(g.rank() % args.num_gpus))
+        device = th.device('cuda:'+str(args.local_rank))
 
     # Pack data
     in_feats = g.ndata['features'].shape[1]

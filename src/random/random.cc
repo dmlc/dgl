@@ -7,6 +7,7 @@
 #include <dmlc/omp.h>
 #include <dgl/runtime/registry.h>
 #include <dgl/runtime/packed_func.h>
+#include <dgl/runtime/parallel_for.h>
 #include <dgl/random.h>
 #include <dgl/array.h>
 
@@ -21,10 +22,12 @@ namespace dgl {
 DGL_REGISTER_GLOBAL("rng._CAPI_SetSeed")
 .set_body([] (DGLArgs args, DGLRetValue *rv) {
     const int seed = args[0];
-#pragma omp parallel for
-    for (int i = 0; i < omp_get_max_threads(); ++i) {
-      RandomEngine::ThreadLocal()->SetSeed(seed);
-    }
+
+    runtime::parallel_for(0, omp_get_max_threads(), [&](size_t b, size_t e) {
+      for (auto i = b; i < e; ++i) {
+        RandomEngine::ThreadLocal()->SetSeed(seed);
+      }
+    });
 #ifdef DGL_USE_CUDA
     auto* thr_entry = CUDAThreadEntry::ThreadLocal();
     if (!thr_entry->curand_gen) {
