@@ -119,7 +119,7 @@ bool TCPSocket::Accept(TCPSocket * socket, std::string * ip, int * port) {
 }
 
 #ifdef _WIN32
-bool TCPSocket::SetBlocking(bool flag) {
+bool TCPSocket::SetNonBlocking(bool flag) {
   int result;
   u_long argp = flag ? 1 : 0;
 
@@ -134,7 +134,7 @@ bool TCPSocket::SetBlocking(bool flag) {
   return true;
 }
 #else   // !_WIN32
-bool TCPSocket::SetBlocking(bool flag) {
+bool TCPSocket::SetNonBlocking(bool flag) {
   int opts;
 
   if ((opts = fcntl(socket_, F_GETFL)) < 0) {
@@ -205,7 +205,7 @@ int64_t TCPSocket::Receive(char * buffer, int64_t size_buffer) {
   do {  // retry if EINTR failure appears
     number_recv = recv(socket_, buffer, size_buffer, 0);
   } while (number_recv == -1 && errno == EINTR);
-  if (number_recv == -1) {
+  if (number_recv == -1 && errno != EAGAIN && errno != EWOULDBLOCK) {
     LOG(ERROR) << "recv error: " << strerror(errno);
   }
 
