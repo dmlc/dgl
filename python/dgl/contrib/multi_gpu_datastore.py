@@ -43,7 +43,7 @@ class MultiGPUDataStore:
     """
     def __init__(self, shape, dtype, device, comm, partition):
         """ Create a new Tensor stored across multiple GPUs according to
-        `partition`. This function must be called by all processes.
+        `partition`. This function must be called by all processes at the same time.
 
         Parameters
         ----------
