@@ -3,6 +3,7 @@ from __future__ import absolute_import
 
 from collections import namedtuple
 from collections.abc import MutableMapping
+import functools
 
 from . import backend as F
 from .base import DGLError, dgl_warning
@@ -38,29 +39,31 @@ class _LazyIndex(object):
             flat_index = F.gather_row(flat_index, index)
         return flat_index
 
-class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
-    """The column scheme.
+Scheme = namedtuple('Scheme', ['shape', 'dtype'])
 
-    Parameters
-    ----------
-    shape : tuple of int
-        The feature shape.
-    dtype : backend-specific type object
-        The feature data type.
-    """
-    # Pickling torch dtypes could be problemetic; this is a workaround.
-    # I also have to create data_type_dict and reverse_data_type_dict
-    # attribute just for this bug.
-    # I raised an issue in PyTorch bug tracker:
-    # https://github.com/pytorch/pytorch/issues/14057
-    def __reduce__(self):
-        state = (self.shape, F.reverse_data_type_dict[self.dtype])
-        return self._reconstruct_scheme, state
+# class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
+#     """The column scheme.
 
-    @classmethod
-    def _reconstruct_scheme(cls, shape, dtype_str):
-        dtype = F.data_type_dict[dtype_str]
-        return cls(shape, dtype)
+#     Parameters
+#     ----------
+#     shape : tuple of int
+#         The feature shape.
+#     dtype : backend-specific type object
+#         The feature data type.
+#     """
+#     # Pickling torch dtypes could be problemetic; this is a workaround.
+#     # I also have to create data_type_dict and reverse_data_type_dict
+#     # attribute just for this bug.
+#     # I raised an issue in PyTorch bug tracker:
+#     # https://github.com/pytorch/pytorch/issues/14057
+#     def __reduce__(self):
+#         state = (self.shape, F.reverse_data_type_dict[self.dtype])
+#         return self._reconstruct_scheme, state
+
+#     @classmethod
+#     def _reconstruct_scheme(cls, shape, dtype_str):
+#         dtype = F.data_type_dict[dtype_str]
+#         return cls(shape, dtype)
 
 def infer_scheme(tensor):
     """Infer column scheme from the given tensor data.
@@ -75,7 +78,7 @@ def infer_scheme(tensor):
     Scheme
         The column scheme.
     """
-    return Scheme(tuple(F.shape(tensor)[1:]), F.dtype(tensor))
+    return Scheme(tuple(F.shape(tensor))[1:], F.dtype(tensor))
 
 class Column(object):
     """A column is a compact store of features of multiple nodes/edges.
@@ -121,9 +124,18 @@ class Column(object):
     """
     def __init__(self, storage, scheme=None, index=None, device=None):
         self.storage = storage
-        self.scheme = scheme if scheme else infer_scheme(storage)
+        self._scheme = scheme
         self.index = index
         self.device = device
+    
+    @property
+    def scheme(self):
+        if self._scheme:
+            return self._scheme
+        else:
+            self._scheme = infer_scheme(self.storage)
+            return self._scheme
+
 
     def __len__(self):
         """The number of features (number of rows) in this column."""
@@ -299,7 +311,8 @@ class Column(object):
         if isinstance(data, Column):
             return data.clone()
         else:
-            return Column(data)
+            # return Column(data)
+            return data
 
     def __repr__(self):
         return repr(self.data)
@@ -505,9 +518,9 @@ class Frame(MutableMapping):
             The column data.
         """
         col = Column.create(data)
-        if len(col) != self.num_rows:
-            raise DGLError('Expected data to have %d rows, got %d.' %
-                           (self.num_rows, len(col)))
+        # if len(col) != self.num_rows:
+        #     raise DGLError('Expected data to have %d rows, got %d.' %
+        #                    (self.num_rows, len(col)))
         self._columns[name] = col
 
     def update_row(self, rowids, data):
