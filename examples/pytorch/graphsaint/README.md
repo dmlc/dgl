@@ -118,8 +118,8 @@ python train_sampling.py --task $task $online
 
 | Method      | PPI  | Flickr | Reddit | Yelp | Amazon |
 | --- | --- | --- | --- | --- | --- |
-| Running | 1.4 | 3.18 | 13.88 | 39.02 | 164.35 |
-| DGL | 3.04 | 1.87 | 52.01 | 48.38 | 1432.79 |
+| Running | 1.4 | 3.18 | 13.88 | 39.02 |  |
+| DGL | 3.04 | 1.87 | 52.01 | 48.38 |  |
 
 #### Random walk sampler
 
