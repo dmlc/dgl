@@ -283,22 +283,10 @@ class SAINTEdgeSampler(SAINTSampler):
             self.prob /= self.prob.sum()
             self.adj_nodes = np.stack(prob_mat.nonzero(), axis=1)
 
-        # if len(self.prob) > 2 ^ 24:
-        #     prob = self.prob.numpy()
-        #     prob /= prob.sum()
-        #     sampled_edges = np.unique(
-        #         self.rng.choice(len(prob), size=self.edge_budget, p=prob, replace=True)
-        #     )
-        #     del prob
-        # else:
-        # sampled_edges = th.multinomial(self.prob, num_samples=self.edge_budget, replacement=True).unique()
         sampled_edges = np.unique(
                     dgl.random.choice(len(self.prob), size=self.edge_budget, prob=self.prob, replace=False)
                 )
-        # sampled_src, sampled_dst = self.train_g.find_edges(sampled_edges)
         sampled_nodes = np.unique(self.adj_nodes[sampled_edges].flatten()).astype('long')
-        # sampled_nodes = th.cat([sampled_src, sampled_dst]).unique()
-        # return sampled_nodes.numpy()
         return sampled_nodes
 
 
