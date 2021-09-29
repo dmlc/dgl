@@ -71,6 +71,7 @@ def main(args, task):
         saint_sampler = SAINTRandomWalkSampler(args.num_roots, args.length, **kwargs)
     else:
         raise NotImplementedError
+    return
     loader = DataLoader(saint_sampler, collate_fn=saint_sampler.__collate_fn__, batch_size=1,
                         shuffle=True, num_workers=args.num_workers, drop_last=False)
     # set device for dataset tensors

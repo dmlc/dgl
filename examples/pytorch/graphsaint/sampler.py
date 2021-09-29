@@ -9,8 +9,7 @@ import dgl.function as fn
 import dgl
 from dgl.sampling import random_walk, pack_traces
 import scipy
-import edge_sampler
-from edge_sampler import sample_edge
+
 
 # The base class of sampler
 class SAINTSampler:
@@ -280,9 +279,8 @@ class SAINTEdgeSampler(SAINTSampler):
             # The edge probability here only contains that of edges in upper triangle adjacency matrix
             # Because we assume the graph is undirected, that is, the adjacency matrix is symmetric. We only need
             # to consider half of edges in the graph.
-            self.prob = scipy.sparse.triu(prob_mat).data
+            self.prob = th.tensor(scipy.sparse.triu(prob_mat).data)
             self.prob /= self.prob.sum()
-            self.p_cumsum = np.cumsum(self.prob)
             self.adj_nodes = np.stack(prob_mat.nonzero(), axis=1)
 
         # if len(self.prob) > 2 ^ 24:
@@ -294,10 +292,9 @@ class SAINTEdgeSampler(SAINTSampler):
         #     del prob
         # else:
         # sampled_edges = th.multinomial(self.prob, num_samples=self.edge_budget, replacement=True).unique()
-        sampled_edges = sample_edge(self.edge_budget, self.p_cumsum)
-        # sampled_edges = np.unique(
-        #             dgl.random.choice(len(self.prob), size=self.edge_budget, prob=self.prob, replace=False)
-        #         )
+        sampled_edges = np.unique(
+                    dgl.random.choice(len(self.prob), size=self.edge_budget, prob=self.prob, replace=False)
+                )
         # sampled_src, sampled_dst = self.train_g.find_edges(sampled_edges)
         sampled_nodes = np.unique(self.adj_nodes[sampled_edges].flatten()).astype('long')
         # sampled_nodes = th.cat([sampled_src, sampled_dst]).unique()
