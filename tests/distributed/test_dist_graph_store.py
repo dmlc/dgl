@@ -52,13 +52,13 @@ def create_random_graph(n):
     arr = (spsp.random(n, n, density=0.001, format='coo', random_state=100) != 0).astype(np.int64)
     return dgl.from_scipy(arr)
 
-def run_server(graph_name, server_id, server_count, num_clients, shared_mem):
+def run_server(graph_name, server_id, server_count, num_clients, shared_mem, keep_alive=False):
     g = DistGraphServer(server_id, "kv_ip_config.txt", server_count, num_clients,
                         '/tmp/dist_graph/{}.json'.format(graph_name),
                         disable_shared_mem=not shared_mem,
                         graph_format=['csc', 'coo'])
     print('start server', server_id)
-    g.start()
+    g.start(keep_alive)
 
 def emb_init(shape, dtype):
     return F.zeros(shape, dtype, F.cpu())
@@ -304,7 +304,7 @@ def check_dist_graph(g, num_clients, num_nodes, num_edges):
 
     print('end')
 
-def check_dist_emb_server_client(shared_mem, num_servers, num_clients):
+def check_dist_emb_server_client(shared_mem, num_servers, num_clients, keep_alive=False):
     prepare_dist()
     g = create_random_graph(10000)
 
@@ -321,29 +321,38 @@ def check_dist_emb_server_client(shared_mem, num_servers, num_clients):
     ctx = mp.get_context('spawn')
     for serv_id in range(num_servers):
         p = ctx.Process(target=run_server, args=(graph_name, serv_id, num_servers,
-                                                 num_clients, shared_mem))
+                                                 num_clients, shared_mem, keep_alive))
         serv_ps.append(p)
         p.start()
 
-    cli_ps = []
-    for cli_id in range(num_clients):
-        print('start client', cli_id)
-        p = ctx.Process(target=run_emb_client, args=(graph_name, 0, num_servers, num_clients,
-                                                     g.number_of_nodes(),
-                                                     g.number_of_edges()))
-        p.start()
-        cli_ps.append(p)
+    def launch_clients():
+        cli_ps = []
+        for cli_id in range(num_clients):
+            print('start client', cli_id)
+            p = ctx.Process(target=run_emb_client, args=(graph_name, 0, num_servers, num_clients,
+                                                        g.number_of_nodes(),
+                                                        g.number_of_edges()))
+            p.start()
+            cli_ps.append(p)
 
-    for p in cli_ps:
-        p.join()
-        assert p.exitcode == 0
+        for p in cli_ps:
+            p.join()
 
-    for p in serv_ps:
-        p.join()
+    launch_clients()
+
+    if not keep_alive:
+        for p in serv_ps:
+            p.join()
+    else:
+        for p in serv_ps:
+            assert p.is_alive()
+        launch_clients()
+        for p in serv_ps:
+            p.terminate()
 
     print('clients have terminated')
 
-def check_server_client(shared_mem, num_servers, num_clients):
+def check_server_client(shared_mem, num_servers, num_clients, keep_alive=False):
     prepare_dist()
     g = create_random_graph(10000)
 
@@ -360,23 +369,33 @@ def check_server_client(shared_mem, num_servers, num_clients):
     ctx = mp.get_context('spawn')
     for serv_id in range(num_servers):
         p = ctx.Process(target=run_server, args=(graph_name, serv_id, num_servers,
-                                                 num_clients, shared_mem))
+                                                 num_clients, shared_mem, keep_alive))
         serv_ps.append(p)
         p.start()
 
-    cli_ps = []
-    for cli_id in range(num_clients):
-        print('start client', cli_id)
-        p = ctx.Process(target=run_client, args=(graph_name, 0, num_servers, num_clients, g.number_of_nodes(),
-                                                 g.number_of_edges()))
-        p.start()
-        cli_ps.append(p)
+    def launch_clients():
+        cli_ps = []
+        for cli_id in range(num_clients):
+            print('start client', cli_id)
+            p = ctx.Process(target=run_client, args=(graph_name, 0, num_servers, num_clients, g.number_of_nodes(),
+                                                     g.number_of_edges()))
+            p.start()
+            cli_ps.append(p)
 
-    for p in cli_ps:
-        p.join()
+        for p in cli_ps:
+            p.join()
 
-    for p in serv_ps:
-        p.join()
+    launch_clients()
+
+    if not keep_alive:
+        for p in serv_ps:
+            p.join()
+    else:
+        for p in serv_ps:
+            assert p.is_alive()
+        launch_clients()
+        for p in serv_ps:
+            p.terminate()
 
     print('clients have terminated')
 
@@ -593,6 +612,7 @@ def test_server_client():
     check_server_client(True, 1, 1)
     check_server_client(False, 1, 1)
     check_server_client(True, 2, 2)
+    check_server_client(True, 2, 2, keep_alive=True)
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support distributed DistEmbedding")
@@ -602,6 +622,7 @@ def test_dist_emb_server_client():
     check_dist_emb_server_client(True, 1, 1)
     check_dist_emb_server_client(False, 1, 1)
     check_dist_emb_server_client(True, 2, 2)
+    check_dist_emb_server_client(True, 2, 2, keep_alive=True)
 
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support some of operations in DistGraph")
 @unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Turn off Mxnet support")

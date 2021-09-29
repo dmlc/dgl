@@ -359,12 +359,14 @@ class DistGraphServer(KVServer):
                 self.init_data(name=str(data_name), policy_str=data_name.policy_str,
                                data_tensor=edge_feats[name])
 
-    def start(self):
+    def start(self, keep_alive=False):
         """ Start graph store server.
         """
         # start server
-        server_state = ServerState(kv_store=self, local_g=self.client_g, partition_book=self.gpb)
-        print('start graph service on server {} for part {}'.format(self.server_id, self.part_id))
+        server_state = ServerState(
+            kv_store=self, local_g=self.client_g, partition_book=self.gpb, keep_alive=keep_alive)
+        print('start graph service on server {} for part {}'.format(
+            self.server_id, self.part_id))
         start_server(server_id=self.server_id,
                      ip_config=self.ip_config,
                      num_servers=self.num_servers,
