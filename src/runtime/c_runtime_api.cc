@@ -356,6 +356,15 @@ int DGLSetStream(int device_type, int device_id, DGLStreamHandle stream) {
   API_END();
 }
 
+int DGLGetStream(int device_type, int device_id, DGLStreamHandle* stream) {
+  API_BEGIN();
+  DGLContext ctx;
+  ctx.device_type = static_cast<DLDeviceType>(device_type);
+  ctx.device_id = device_id;
+  *stream = DeviceAPIManager::Get(ctx)->GetStream();
+  API_END();
+}
+
 int DGLSynchronize(int device_type, int device_id, DGLStreamHandle stream) {
   API_BEGIN();
   DGLContext ctx;

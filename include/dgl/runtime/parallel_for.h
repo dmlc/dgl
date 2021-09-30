@@ -10,6 +10,8 @@
 #include <algorithm>
 #include <string>
 #include <cstdlib>
+#include <exception>
+#include <atomic>
 
 namespace {
 int64_t divup(int64_t x, int64_t y) {
@@ -67,6 +69,9 @@ void parallel_for(
 
 #ifdef _OPENMP
   auto num_threads = compute_num_threads(begin, end, grain_size);
+  // (BarclayII) the exception code is borrowed from PyTorch.
+  std::atomic_flag err_flag = ATOMIC_FLAG_INIT;
+  std::exception_ptr eptr;
 
 #pragma omp parallel num_threads(num_threads)
   {
@@ -74,14 +79,19 @@ void parallel_for(
     auto chunk_size = divup((end - begin), num_threads);
     auto begin_tid = begin + tid * chunk_size;
     if (begin_tid < end) {
-      for (auto i = begin_tid; i < std::min(end, chunk_size + begin_tid); i++) {
-        f(i);
+      auto end_tid = std::min(end, chunk_size + begin_tid);
+      try {
+        f(begin_tid, end_tid);
+      } catch (...) {
+        if (!err_flag.test_and_set())
+          eptr = std::current_exception();
       }
     }
   }
+  if (eptr)
+    std::rethrow_exception(eptr);
 #else
-  for (auto i = begin; i < end; i++)
-    f(i);
+  f(begin, end);
 #endif
 }
 
@@ -98,7 +108,7 @@ void parallel_for(
     const size_t begin,
     const size_t end,
     F&& f) {
-  parallel_for(begin, end, default_grain_size(), f);
+  parallel_for(begin, end, default_grain_size(), std::forward<F>(f));
 }
 }  // namespace runtime
 }  // namespace dgl

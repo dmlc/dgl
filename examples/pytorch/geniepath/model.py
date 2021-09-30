@@ -12,6 +12,7 @@ class GeniePathConv(nn.Module):
 
     def forward(self, graph, x, h, c):
         x = self.breadth_func(graph, x)
+        x = th.tanh(x)
         x = th.mean(x, dim=1)
         x, (h, c) = self.depth_func(x.unsqueeze(0), (h, c))
         x = x[0]
@@ -59,7 +60,7 @@ class GeniePathLazy(nn.Module):
         x = self.linear1(x)
         h_tmps = []
         for layer in self.breaths:
-            h_tmps.append(th.mean(layer(graph, x), dim=1))
+            h_tmps.append(th.mean(th.tanh(layer(graph, x)), dim=1))
         x = x.unsqueeze(0)
         for h_tmp, layer in zip(h_tmps, self.depths):
             in_cat = th.cat((h_tmp.unsqueeze(0), x), -1)
