@@ -172,8 +172,7 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLCompactGraphs")
     ATEN_XPU_SWITCH_CUDA(graphs[0]->Context().device_type, XPU, "CompactGraphs", {
       ATEN_ID_TYPE_SWITCH(graphs[0]->DataType(), IdType, {
         result_pair = CompactGraphs<XPU, IdType>(
-          graph_ref.sptr(), rhs_nodes, include_rhs_in_lhs,
-          &lhs_nodes);
+          graphs, always_preserve);
       });
     });
 
