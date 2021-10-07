@@ -94,10 +94,6 @@ class EdgeGraphConv(nn.Module):
     to ``True`` for those cases to unblock the code and handle zero-in-degree nodes manually.
     A common practise to handle this is to filter out the nodes with zero-in-degree when use
     after conv.
-
-    Examples
-    --------
-    # TODO: add examples that use EdgeGraphConv
     """
 
     def __init__(self,
@@ -264,7 +260,7 @@ class EdgeGraphConv(nn.Module):
                 if self.bias is not None:
                     single_channel_rst = single_channel_rst + self.bias
                 single_channel_rsts.append(single_channel_rst)
-                    
+
             rst = th.cat(single_channel_rsts, axis=1)
 
             if self._norm in ['right', 'both']:

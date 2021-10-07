@@ -1136,7 +1136,6 @@ def test_hetero_conv(agg, idtype):
     assert mod3.carg2 == 1
 
 
-
 if __name__ == '__main__':
     test_graph_conv()
     test_graph_conv_e_weight()
