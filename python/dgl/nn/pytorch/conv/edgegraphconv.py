@@ -183,7 +183,7 @@ class EdgeGraphConv(nn.Module):
             Optional external weight tensor.
         edge_weight : torch.Tensor, optional
             Optional tensor on the edge. If given, the convolution will weight
-            with regard to the message. This should of shape :math:`(E, P)` where E is the number 
+            with regard to the message. This should of shape :math:`(E, P)` where E is the number
             of edged and P is the dimension of the edge weight.
 
         Returns
@@ -207,8 +207,8 @@ class EdgeGraphConv(nn.Module):
         ----
         * Input shape: :math:`(N, *, \text{in_feats})` where * means any number of additional
           dimensions, :math:`N` is the number of nodes.
-        * Output shape: :math:`(N, *, \text{out_feats}) * \text{edge_weight_dimension}` where all but the last dimension are
-          the same shape as the input.
+        * Output shape: :math:`(N, *, \text{out_feats}) * \text{edge_weight_dimension}` where all
+          but the last dimension are the same shape as the input.
         * Weight shape: :math:`(\text{in_feats}, \text{out_feats})`.
         * Edge weight shape: :math:`(\text{num_edges}, \text{edge_weight_dimension})`.
         """
