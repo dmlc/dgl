@@ -109,6 +109,9 @@ class EdgeGraphConv(nn.Module):
                  activation=None,
                  allow_zero_in_degree=False):
         super(EdgeGraphConv, self).__init__()
+        if norm not in ('none', 'both', 'right', 'left'):
+            raise DGLError('Invalid norm value. Must be either "none", "both", "right" or "left".'
+                           ' But got "{}".'.format(norm))
         self._in_feats = in_feats
         self._out_feats = out_feats
         self._norm = norm
@@ -184,7 +187,8 @@ class EdgeGraphConv(nn.Module):
             Optional external weight tensor.
         edge_weight : torch.Tensor, optional
             Optional tensor on the edge. If given, the convolution will weight
-            with regard to the message.
+            with regard to the message. This should of shape :math:`(E, P)` where E is the number 
+            of edged and P is the dimension of the edge weight.
 
         Returns
         -------
@@ -207,9 +211,10 @@ class EdgeGraphConv(nn.Module):
         ----
         * Input shape: :math:`(N, *, \text{in_feats})` where * means any number of additional
           dimensions, :math:`N` is the number of nodes.
-        * Output shape: :math:`(N, *, \text{out_feats})` where all but the last dimension are
+        * Output shape: :math:`(N, *, \text{out_feats}) * \text{edge_weight_dimension}` where all but the last dimension are
           the same shape as the input.
         * Weight shape: :math:`(\text{in_feats}, \text{out_feats})`.
+        * Edge weight shape: :math:`(\text{num_edges}, \text{edge_weight_dimension})`.
         """
         with graph.local_scope():
             if not self._allow_zero_in_degree:
@@ -239,6 +244,7 @@ class EdgeGraphConv(nn.Module):
                 shp = norm.shape + (1,) * (feat_src.dim() - 1)
                 norm = th.reshape(norm, shp)
                 feat_src = feat_src * norm
+            graph.srcdata['h'] = feat_src
 
             if weight is not None:
                 if self.weight is not None:
@@ -255,7 +261,10 @@ class EdgeGraphConv(nn.Module):
                 single_channel_rst = graph.dstdata["rst"]
                 if weight is not None:
                     single_channel_rst = th.matmul(single_channel_rst, weight)
+                if self.bias is not None:
+                    single_channel_rst = single_channel_rst + self.bias
                 single_channel_rsts.append(single_channel_rst)
+                    
             rst = th.cat(single_channel_rsts, axis=1)
 
             if self._norm in ['right', 'both']:
@@ -267,9 +276,6 @@ class EdgeGraphConv(nn.Module):
                 shp = norm.shape + (1,) * (feat_dst.dim() - 1)
                 norm = th.reshape(norm, shp)
                 rst = rst * norm
-
-            if self.bias is not None:
-                rst = rst + self.bias
 
             if self._activation is not None:
                 rst = self._activation(rst)

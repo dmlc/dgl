@@ -1043,9 +1043,14 @@ def test_edgegraph_conv(g, idtype, norm, weight, bias, out_dim):
     nsrc = g.number_of_src_nodes()
     ndst = g.number_of_dst_nodes()
     h = F.randn((nsrc, 5)).to(F.ctx())
+    ext_w = F.randn((5, out_dim)).to(F.ctx())
 
-    h_out = conv(g, h, edge_weight)
+    if weight:
+        h_out = conv(g, h, edge_weight=edge_weight)
+    else:
+        h_out = conv(g, h, weight=ext_w, edge_weight=edge_weight)
     assert h_out.shape == (ndst, out_dim * 6)
+    
 
 @parametrize_dtype
 @pytest.mark.parametrize('agg', ['sum', 'max', 'min', 'mean', 'stack', myagg])
