@@ -32,7 +32,7 @@ class GCNLayer(nn.Module):
         for lin in self.lins:
             nn.init.xavier_normal_(lin.weight)
 
-    def feat_trans(self, features, idx):
+    def feat_trans(self, features, idx):  # linear transformation + activation + batch normalization
         h = self.lins[idx](features) + self.bias[idx]
 
         if self.act is not None:
@@ -51,7 +51,7 @@ class GCNLayer(nn.Module):
         h_hop = [h_in]
 
         D_norm = g.ndata['train_D_norm'] if 'train_D_norm' in g.ndata else g.ndata['full_D_norm']
-        for _ in range(self.order):
+        for _ in range(self.order):  # forward propagation
             g.ndata['h'] = h_hop[-1]
             if 'w' not in g.edata:
                 g.edata['w'] = th.ones((g.num_edges(), )).to(features.device)
