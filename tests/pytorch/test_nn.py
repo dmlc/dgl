@@ -1030,6 +1030,24 @@ def myagg(alist, dsttype):
     return rst
 
 @parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo', 'bipartite'], exclude=['zero-degree', 'dglgraph']))
+@pytest.mark.parametrize('norm', ['none', 'both', 'right', 'left'])
+@pytest.mark.parametrize('weight', [True, False])
+@pytest.mark.parametrize('bias', [True, False])
+@pytest.mark.parametrize('out_dim', [1, 2])
+def test_edgegraph_conv(g, idtype, norm, weight, bias, out_dim):
+    g = g.astype(idtype).to(F.ctx())
+    conv = nn.EdgeGraphConv(5, out_dim, norm=norm, weight=weight, bias=bias).to(F.ctx())
+
+    edge_weight = F.randn((g.number_of_edges(), 6)).to(F.ctx())
+    nsrc = g.number_of_src_nodes()
+    ndst = g.number_of_dst_nodes()
+    h = F.randn((nsrc, 5)).to(F.ctx())
+
+    h_out = conv(g, h, edge_weight)
+    assert h_out.shape == (ndst, out_dim)
+
+@parametrize_dtype
 @pytest.mark.parametrize('agg', ['sum', 'max', 'min', 'mean', 'stack', myagg])
 def test_hetero_conv(agg, idtype):
     g = dgl.heterograph({
@@ -1111,6 +1129,8 @@ def test_hetero_conv(agg, idtype):
     assert mod2.carg2 == 0
     assert mod3.carg1 == 0
     assert mod3.carg2 == 1
+
+
 
 if __name__ == '__main__':
     test_graph_conv()
