@@ -39,8 +39,8 @@ class DGLHeteroGraph(object):
     # pylint: disable=unused-argument, dangerous-default-value
     def __init__(self,
                  gidx=[],
-                 ntypes=['_U'],
-                 etypes=['_V'],
+                 ntypes=['_N'],
+                 etypes=['_E'],
                  node_frames=None,
                  edge_frames=None,
                  **deprecate_kwargs):
@@ -3649,7 +3649,7 @@ class DGLHeteroGraph(object):
 
         >>> g.adj(scipy_fmt='coo', etype='develops')
         <2x3 sparse matrix of type '<class 'numpy.int64'>'
-	    with 2 stored elements in COOrdinate format>
+           with 2 stored elements in COOrdinate format>
         """
         etid = self.get_etype_id(etype)
         if scipy_fmt is None:
@@ -4410,9 +4410,17 @@ class DGLHeteroGraph(object):
         """
         if inplace:
             raise DGLError('The `inplace` option is removed in v0.5.')
-        etid = self.get_etype_id(etype)
-        etype = self.canonical_etypes[etid]
-        g = self if etype is None else self[etype]
+        # Graph with one relation type
+        if self._graph.number_of_etypes() == 1 or etype is not None:
+            etid = self.get_etype_id(etype)
+            etype = self.canonical_etypes[etid]
+            g = self if etype is None else self[etype]
+        else:   # heterogeneous graph with number of relation types > 1
+            if not core.is_builtin(func):
+                raise DGLError("User defined functions are not yet "
+                               "supported in apply_edges for heterogeneous graphs. "
+                               "Please use (apply_edges(func), etype = rel) instead.")
+            g = self
         if is_all(edges):
             eid = ALL
         else:
@@ -4423,7 +4431,18 @@ class DGLHeteroGraph(object):
             edata = core.invoke_gsddmm(g, func)
         else:
             edata = core.invoke_edge_udf(g, eid, etype, func)
-        self._set_e_repr(etid, eid, edata)
+
+        if self._graph.number_of_etypes() == 1 or etype is not None:
+            self._set_e_repr(etid, eid, edata)
+        else:
+            edata_tensor = {}
+            key = list(edata.keys())[0]
+            out_tensor_tuples = edata[key]
+            for etid in range(self._graph.number_of_etypes()):
+                # TODO (Israt): Check the logic why some output tensor is None
+                if out_tensor_tuples[etid] is not None:
+                    edata_tensor[key] = out_tensor_tuples[etid]
+                    self._set_e_repr(etid, eid, edata_tensor)
 
     def send_and_recv(self,
                       edges,
@@ -4860,10 +4879,6 @@ class DGLHeteroGraph(object):
             if reduce_func.name in ['mean']:
                 raise NotImplementedError("Cannot set both intra-type and inter-type reduce "
                                           "operators as 'mean' using update_all. Please use "
-                                          "multi_update_all instead.")
-            if message_func.name not in ['copy_u', 'copy_e']:
-                raise NotImplementedError("Op \'" + message_func.name + "\' is not yet supported"
-                                          "in update_all for heterogeneous graphs. Please use"
                                           "multi_update_all instead.")
             g = self
             all_out = core.message_passing(g, message_func, reduce_func, apply_node_func)

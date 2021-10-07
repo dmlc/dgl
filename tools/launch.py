@@ -12,6 +12,7 @@ import multiprocessing
 import re
 from functools import partial
 from threading import Thread
+from typing import Optional
 
 DEFAULT_PORT = 30050
 
@@ -73,17 +74,46 @@ def get_killed_pids(ip, port, killed_pids):
             pids.append(int(l[0]))
     return pids
 
-def execute_remote(cmd, ip, port, thread_list):
-    """execute command line on remote machine via ssh"""
-    cmd = 'ssh -o StrictHostKeyChecking=no -p ' + str(port) + ' ' + ip + ' \'' + cmd + '\''
-    # thread func to run the job
-    def run(cmd):
-        subprocess.check_call(cmd, shell = True)
+def execute_remote(
+    cmd: str,
+    ip: str,
+    port: int,
+    username: Optional[str] = ""
+) -> Thread:
+    """Execute command line on remote machine via ssh.
 
-    thread = Thread(target = run, args=(cmd,))
+    Args:
+        cmd: User-defined command (udf) to execute on the remote host.
+        ip: The ip-address of the host to run the command on.
+        port: Port number that the host is listening on.
+        thread_list:
+        username: Optional. If given, this will specify a username to use when issuing commands over SSH.
+            Useful when your infra requires you to explicitly specify a username to avoid permission issues.
+
+    Returns:
+        thread: The Thread whose run() is to run the `cmd` on the remote host. Returns when the cmd completes
+            on the remote host.
+    """
+    ip_prefix = ""
+    if username:
+        ip_prefix += "{username}@".format(username=username)
+
+    # Construct ssh command that executes `cmd` on the remote host
+    ssh_cmd = "ssh -o StrictHostKeyChecking=no -p {port} {ip_prefix}{ip} '{cmd}'".format(
+        port=str(port),
+        ip_prefix=ip_prefix,
+        ip=ip,
+        cmd=cmd,
+    )
+
+    # thread func to run the job
+    def run(ssh_cmd):
+        subprocess.check_call(ssh_cmd, shell=True)
+
+    thread = Thread(target=run, args=(ssh_cmd,))
     thread.setDaemon(True)
     thread.start()
-    thread_list.append(thread)
+    return thread
 
 def get_remote_pids(ip, port, cmd_regex):
     """Get the process IDs that run the command in the remote machine.
@@ -128,6 +158,272 @@ def get_all_remote_pids(hosts, ssh_port, udf_command):
         remote_pids[(ip, ssh_port)] = pids
     return remote_pids
 
+
+def construct_torch_dist_launcher_cmd(
+    num_trainers: int,
+    num_nodes: int,
+    node_rank: int,
+    master_addr: str,
+    master_port: int
+) -> str:
+    """Constructs the torch distributed launcher command.
+    Helper function.
+
+    Args:
+        num_trainers:
+        num_nodes:
+        node_rank:
+        master_addr:
+        master_port:
+
+    Returns:
+        cmd_str.
+    """
+    torch_cmd_template = "-m torch.distributed.launch " \
+                         "--nproc_per_node={nproc_per_node} " \
+                         "--nnodes={nnodes} " \
+                         "--node_rank={node_rank} " \
+                         "--master_addr={master_addr} " \
+                         "--master_port={master_port}"
+    return torch_cmd_template.format(
+        nproc_per_node=num_trainers,
+        nnodes=num_nodes,
+        node_rank=node_rank,
+        master_addr=master_addr,
+        master_port=master_port
+    )
+
+
+def wrap_udf_in_torch_dist_launcher(
+    udf_command: str,
+    num_trainers: int,
+    num_nodes: int,
+    node_rank: int,
+    master_addr: str,
+    master_port: int,
+) -> str:
+    """Wraps the user-defined function (udf_command) with the torch.distributed.launch module.
+
+     Example: if udf_command is "python3 run/some/trainer.py arg1 arg2", then new_df_command becomes:
+         "python3 -m torch.distributed.launch <TORCH DIST ARGS> run/some/trainer.py arg1 arg2
+
+    udf_command is assumed to consist of pre-commands (optional) followed by the python launcher script (required):
+    Examples:
+        # simple
+        python3.7 path/to/some/trainer.py arg1 arg2
+
+        # multi-commands
+        (cd some/dir && python3.7 path/to/some/trainer.py arg1 arg2)
+
+    IMPORTANT: If udf_command consists of multiple python commands, then this will result in undefined behavior.
+
+    Args:
+        udf_command:
+        num_trainers:
+        num_nodes:
+        node_rank:
+        master_addr:
+        master_port:
+
+    Returns:
+
+    """
+    torch_dist_cmd = construct_torch_dist_launcher_cmd(
+        num_trainers=num_trainers,
+        num_nodes=num_nodes,
+        node_rank=node_rank,
+        master_addr=master_addr,
+        master_port=master_port
+    )
+    # Auto-detect the python binary that kicks off the distributed trainer code.
+    # Note: This allowlist order matters, this will match with the FIRST matching entry. Thus, please add names to this
+    #       from most-specific to least-specific order eg:
+    #           (python3.7, python3.8) -> (python3)
+    # The allowed python versions are from this: https://www.dgl.ai/pages/start.html
+    python_bin_allowlist = (
+        "python3.6", "python3.7", "python3.8", "python3.9", "python3",
+        # for backwards compatibility, accept python2 but technically DGL is a py3 library, so this is not recommended
+        "python2.7", "python2",
+    )
+    # If none of the candidate python bins match, then we go with the default `python`
+    python_bin = "python"
+    for candidate_python_bin in python_bin_allowlist:
+        if candidate_python_bin in udf_command:
+            python_bin = candidate_python_bin
+            break
+
+    # transforms the udf_command from:
+    #     python path/to/dist_trainer.py arg0 arg1
+    # to:
+    #     python -m torch.distributed.launch [DIST TORCH ARGS] path/to/dist_trainer.py arg0 arg1
+    # Note: if there are multiple python commands in `udf_command`, this may do the Wrong Thing, eg launch each
+    #       python command within the torch distributed launcher.
+    new_udf_command = udf_command.replace(python_bin, f"{python_bin} {torch_dist_cmd}")
+
+    return new_udf_command
+
+
+def construct_dgl_server_env_vars(
+    num_samplers: int,
+    num_server_threads: int,
+    tot_num_clients: int,
+    part_config: str,
+    ip_config: str,
+    num_servers: int,
+    graph_format: str,
+    pythonpath: Optional[str] = "",
+) -> str:
+    """Constructs the DGL server-specific env vars string that are required for DGL code to behave in the correct
+    server role.
+    Convenience function.
+
+    Args:
+        num_samplers:
+        num_server_threads:
+        tot_num_clients:
+        part_config: Partition config.
+            Relative path to workspace.
+        ip_config: IP config file containing IP addresses of cluster hosts.
+            Relative path to workspace.
+        num_servers:
+        graph_format:
+        pythonpath: Optional. If given, this will pass this as PYTHONPATH.
+
+    Returns:
+        server_env_vars: The server-specific env-vars in a string format, friendly for CLI execution.
+
+    """
+    server_env_vars_template = (
+        "DGL_ROLE={DGL_ROLE} "
+        "DGL_NUM_SAMPLER={DGL_NUM_SAMPLER} "
+        "OMP_NUM_THREADS={OMP_NUM_THREADS} "
+        "DGL_NUM_CLIENT={DGL_NUM_CLIENT} "
+        "DGL_CONF_PATH={DGL_CONF_PATH} "
+        "DGL_IP_CONFIG={DGL_IP_CONFIG} "
+        "DGL_NUM_SERVER={DGL_NUM_SERVER} "
+        "DGL_GRAPH_FORMAT={DGL_GRAPH_FORMAT} "
+        "{suffix_optional_envvars}"
+    )
+    suffix_optional_envvars = ""
+    if pythonpath:
+        suffix_optional_envvars += f"PYTHONPATH={pythonpath} "
+    return server_env_vars_template.format(
+        DGL_ROLE="server",
+        DGL_NUM_SAMPLER=num_samplers,
+        OMP_NUM_THREADS=num_server_threads,
+        DGL_NUM_CLIENT=tot_num_clients,
+        DGL_CONF_PATH=part_config,
+        DGL_IP_CONFIG=ip_config,
+        DGL_NUM_SERVER=num_servers,
+        DGL_GRAPH_FORMAT=graph_format,
+        suffix_optional_envvars=suffix_optional_envvars,
+    )
+
+
+def construct_dgl_client_env_vars(
+    num_samplers: int,
+    tot_num_clients: int,
+    part_config: str,
+    ip_config: str,
+    num_servers: int,
+    graph_format: str,
+    num_omp_threads: int,
+    pythonpath: Optional[str] = "",
+) -> str:
+    """Constructs the DGL client-specific env vars string that are required for DGL code to behave in the correct
+    client role.
+    Convenience function.
+
+    Args:
+        num_samplers:
+        tot_num_clients:
+        part_config: Partition config.
+            Relative path to workspace.
+        ip_config: IP config file containing IP addresses of cluster hosts.
+            Relative path to workspace.
+        num_servers:
+        graph_format:
+        num_omp_threads:
+        pythonpath: Optional. If given, this will pass this as PYTHONPATH.
+
+    Returns:
+        client_env_vars: The client-specific env-vars in a string format, friendly for CLI execution.
+
+    """
+    client_env_vars_template = (
+        "DGL_DIST_MODE={DGL_DIST_MODE} "
+        "DGL_ROLE={DGL_ROLE} "
+        "DGL_NUM_SAMPLER={DGL_NUM_SAMPLER} "
+        "DGL_NUM_CLIENT={DGL_NUM_CLIENT} "
+        "DGL_CONF_PATH={DGL_CONF_PATH} "
+        "DGL_IP_CONFIG={DGL_IP_CONFIG} "
+        "DGL_NUM_SERVER={DGL_NUM_SERVER} "
+        "DGL_GRAPH_FORMAT={DGL_GRAPH_FORMAT} "
+        "OMP_NUM_THREADS={OMP_NUM_THREADS} "
+        "{suffix_optional_envvars}"
+    )
+    # append optional additional env-vars
+    suffix_optional_envvars = ""
+    if pythonpath:
+        suffix_optional_envvars += f"PYTHONPATH={pythonpath} "
+    return client_env_vars_template.format(
+        DGL_DIST_MODE="distributed",
+        DGL_ROLE="client",
+        DGL_NUM_SAMPLER=num_samplers,
+        DGL_NUM_CLIENT=tot_num_clients,
+        DGL_CONF_PATH=part_config,
+        DGL_IP_CONFIG=ip_config,
+        DGL_NUM_SERVER=num_servers,
+        DGL_GRAPH_FORMAT=graph_format,
+        OMP_NUM_THREADS=num_omp_threads,
+        suffix_optional_envvars=suffix_optional_envvars,
+    )
+
+
+def wrap_cmd_with_local_envvars(cmd: str, env_vars: str) -> str:
+    """Wraps a CLI command with desired env vars with the following properties:
+    (1) env vars persist for the entire `cmd`, even if it consists of multiple "chained" commands like:
+        cmd = "ls && pwd && python run/something.py"
+    (2) env vars don't pollute the environment after `cmd` completes.
+
+    Example:
+        >>> cmd = "ls && pwd"
+        >>> env_vars = "VAR1=value1 VAR2=value2"
+        >>> wrap_cmd_with_local_envvars(cmd, env_vars)
+        "(export VAR1=value1 VAR2=value2; ls && pwd)"
+
+    Args:
+        cmd:
+        env_vars: A string containing env vars, eg "VAR1=val1 VAR2=val2"
+
+    Returns:
+        cmd_with_env_vars:
+
+    """
+    # use `export` to persist env vars for entire cmd block. required if udf_command is a chain of commands
+    # also: wrap in parens to not pollute env:
+    #     https://stackoverflow.com/a/45993803
+    return f"(export {env_vars}; {cmd})"
+
+def wrap_cmd_with_extra_envvars(cmd: str, env_vars: list) -> str:
+    """Wraps a CLI command with extra env vars
+
+    Example:
+        >>> cmd = "ls && pwd"
+        >>> env_vars = ["VAR1=value1", "VAR2=value2"]
+        >>> wrap_cmd_with_extra_envvars(cmd, env_vars)
+        "(export VAR1=value1 VAR2=value2; ls && pwd)"
+
+    Args:
+        cmd:
+        env_vars: A list of strings containing env vars, e.g., ["VAR1=value1", "VAR2=value2"]
+
+    Returns:
+        cmd_with_env_vars:
+    """
+    env_vars = " ".join(env_vars)
+    return wrap_cmd_with_local_envvars(cmd, env_vars)
+
 def submit_jobs(args, udf_command):
     """Submit distributed jobs (server and client processes) via ssh"""
     hosts = []
@@ -135,7 +431,7 @@ def submit_jobs(args, udf_command):
     server_count_per_machine = 0
 
     # Get the IP addresses of the cluster.
-    ip_config = args.workspace + '/' + args.ip_config
+    ip_config = os.path.join(args.workspace, args.ip_config)
     with open(ip_config) as f:
         for line in f:
             result = line.strip().split()
@@ -151,7 +447,7 @@ def submit_jobs(args, udf_command):
                 raise RuntimeError("Format error of ip_config.")
             server_count_per_machine = args.num_servers
     # Get partition info of the graph data
-    part_config = args.workspace + '/' + args.part_config
+    part_config = os.path.join(args.workspace, args.part_config)
     with open(part_config) as conf_f:
         part_metadata = json.load(conf_f)
     assert 'num_parts' in part_metadata, 'num_parts does not exist.'
@@ -161,52 +457,51 @@ def submit_jobs(args, udf_command):
 
     tot_num_clients = args.num_trainers * (1 + args.num_samplers) * len(hosts)
     # launch server tasks
-    server_cmd = 'DGL_ROLE=server DGL_NUM_SAMPLER=' + str(args.num_samplers)
-    server_cmd = server_cmd + ' ' + 'OMP_NUM_THREADS=' + str(args.num_server_threads)
-    server_cmd = server_cmd + ' ' + 'DGL_NUM_CLIENT=' + str(tot_num_clients)
-    server_cmd = server_cmd + ' ' + 'DGL_CONF_PATH=' + str(args.part_config)
-    server_cmd = server_cmd + ' ' + 'DGL_IP_CONFIG=' + str(args.ip_config)
-    server_cmd = server_cmd + ' ' + 'DGL_NUM_SERVER=' + str(args.num_servers)
-    server_cmd = server_cmd + ' ' + 'DGL_GRAPH_FORMAT=' + str(args.graph_format)
-    for i in range(len(hosts)*server_count_per_machine):
+    server_env_vars = construct_dgl_server_env_vars(
+        num_samplers=args.num_samplers,
+        num_server_threads=args.num_server_threads,
+        tot_num_clients=tot_num_clients,
+        part_config=args.part_config,
+        ip_config=args.ip_config,
+        num_servers=args.num_servers,
+        graph_format=args.graph_format,
+        pythonpath=os.environ.get("PYTHONPATH", ""),
+    )
+    for i in range(len(hosts) * server_count_per_machine):
         ip, _ = hosts[int(i / server_count_per_machine)]
-        cmd = server_cmd + ' ' + 'DGL_SERVER_ID=' + str(i)
-        cmd = cmd + ' ' + udf_command
+        server_env_vars_cur = f"{server_env_vars} DGL_SERVER_ID={i}"
+        cmd = wrap_cmd_with_local_envvars(udf_command, server_env_vars_cur)
+        cmd = wrap_cmd_with_extra_envvars(cmd, args.extra_envs) if len(args.extra_envs) > 0 else cmd
         cmd = 'cd ' + str(args.workspace) + '; ' + cmd
-        execute_remote(cmd, ip, args.ssh_port, thread_list)
+        thread_list.append(execute_remote(cmd, ip, args.ssh_port, username=args.ssh_username))
 
     # launch client tasks
-    client_cmd = 'DGL_DIST_MODE="distributed" DGL_ROLE=client DGL_NUM_SAMPLER=' + str(args.num_samplers)
-    client_cmd = client_cmd + ' ' + 'DGL_NUM_CLIENT=' + str(tot_num_clients)
-    client_cmd = client_cmd + ' ' + 'DGL_CONF_PATH=' + str(args.part_config)
-    client_cmd = client_cmd + ' ' + 'DGL_IP_CONFIG=' + str(args.ip_config)
-    client_cmd = client_cmd + ' ' + 'DGL_NUM_SERVER=' + str(args.num_servers)
-    if os.environ.get('OMP_NUM_THREADS') is not None:
-        client_cmd = client_cmd + ' ' + 'OMP_NUM_THREADS=' + os.environ.get('OMP_NUM_THREADS')
-    else:
-        client_cmd = client_cmd + ' ' + 'OMP_NUM_THREADS=' + str(args.num_omp_threads)
-    if os.environ.get('PYTHONPATH') is not None:
-        client_cmd = client_cmd + ' ' + 'PYTHONPATH=' + os.environ.get('PYTHONPATH')
-    client_cmd = client_cmd + ' ' + 'DGL_GRAPH_FORMAT=' + str(args.graph_format)
+    client_env_vars = construct_dgl_client_env_vars(
+        num_samplers=args.num_samplers,
+        tot_num_clients=tot_num_clients,
+        part_config=args.part_config,
+        ip_config=args.ip_config,
+        num_servers=args.num_servers,
+        graph_format=args.graph_format,
+        num_omp_threads=os.environ.get("OMP_NUM_THREADS", str(args.num_omp_threads)),
+        pythonpath=os.environ.get("PYTHONPATH", ""),
+    )
 
-    torch_cmd = '-m torch.distributed.launch'
-    torch_cmd = torch_cmd + ' ' + '--nproc_per_node=' + str(args.num_trainers)
-    torch_cmd = torch_cmd + ' ' + '--nnodes=' + str(len(hosts))
-    torch_cmd = torch_cmd + ' ' + '--node_rank=' + str(0)
-    torch_cmd = torch_cmd + ' ' + '--master_addr=' + str(hosts[0][0])
-    torch_cmd = torch_cmd + ' ' + '--master_port=' + str(1234)
     for node_id, host in enumerate(hosts):
         ip, _ = host
-        new_torch_cmd = torch_cmd.replace('node_rank=0', 'node_rank='+str(node_id))
-        if 'python3' in udf_command:
-            new_udf_command = udf_command.replace('python3', 'python3 ' + new_torch_cmd)
-        elif 'python2' in udf_command:
-            new_udf_command = udf_command.replace('python2', 'python2 ' + new_torch_cmd)
-        else:
-            new_udf_command = udf_command.replace('python', 'python ' + new_torch_cmd)
-        cmd = client_cmd + ' ' + new_udf_command
+        # Transform udf_command to follow torch's dist launcher format: `PYTHON_BIN -m torch.distributed.launch ... UDF`
+        torch_dist_udf_command = wrap_udf_in_torch_dist_launcher(
+            udf_command=udf_command,
+            num_trainers=args.num_trainers,
+            num_nodes=len(hosts),
+            node_rank=node_id,
+            master_addr=hosts[0][0],
+            master_port=1234,
+        )
+        cmd = wrap_cmd_with_local_envvars(torch_dist_udf_command, client_env_vars)
+        cmd = wrap_cmd_with_extra_envvars(cmd, args.extra_envs) if len(args.extra_envs) > 0 else cmd
         cmd = 'cd ' + str(args.workspace) + '; ' + cmd
-        execute_remote(cmd, ip, args.ssh_port, thread_list)
+        thread_list.append(execute_remote(cmd, ip, args.ssh_port, username=args.ssh_username))
 
     # Start a cleanup process dedicated for cleaning up remote training jobs.
     conn1,conn2 = multiprocessing.Pipe()
@@ -231,6 +526,12 @@ def submit_jobs(args, udf_command):
 def main():
     parser = argparse.ArgumentParser(description='Launch a distributed job')
     parser.add_argument('--ssh_port', type=int, default=22, help='SSH Port.')
+    parser.add_argument(
+        "--ssh_username", default="",
+        help="Optional. When issuing commands (via ssh) to cluster, use the provided username in the ssh cmd. "
+             "Example: If you provide --ssh_username=bob, then the ssh command will be like: 'ssh bob@1.2.3.4 CMD' "
+             "instead of 'ssh 1.2.3.4 CMD'"
+    )
     parser.add_argument('--workspace', type=str,
                         help='Path of user directory of distributed tasks. \
                         This is used to specify a destination location where \
@@ -255,6 +556,10 @@ def main():
                         help='The format of the graph structure of each partition. \
                         The allowed formats are csr, csc and coo. A user can specify multiple \
                         formats, separated by ",". For example, the graph format is "csr,csc".')
+    parser.add_argument('--extra_envs', nargs='+', type=str, default=[],
+                        help='Extra environment parameters need to be set. For example, \
+                        you can set the LD_LIBRARY_PATH and NCCL_DEBUG by adding: \
+                        --extra_envs LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH NCCL_DEBUG=INFO ')
     args, udf_command = parser.parse_known_args()
     assert len(udf_command) == 1, 'Please provide user command line.'
     assert args.num_trainers is not None and args.num_trainers > 0, \

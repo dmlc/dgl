@@ -33,7 +33,7 @@
 #endif
 
 // DGL version
-#define DGL_VERSION "0.7"
+#define DGL_VERSION "0.8"
 
 
 // DGL Runtime is DLPack compatible.
@@ -515,6 +515,16 @@ DGL_DLL int DGLStreamFree(int device_type, int device_id, DGLStreamHandle stream
  * \return 0 when success, -1 when failure happens
  */
 DGL_DLL int DGLSetStream(int device_type, int device_id, DGLStreamHandle handle);
+
+/*!
+ * \brief Get the runtime stream of current thread.
+ *
+ * \param device_type The device type of context
+ * \param device_id The device id of context.
+ * \param handle The stream handle.
+ * \return 0 when success, -1 when failure happens
+ */
+DGL_DLL int DGLGetStream(int device_type, int device_id, DGLStreamHandle* handle);
 
 /*!
  * \brief Wait until all computations on stream completes.

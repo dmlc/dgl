@@ -163,7 +163,7 @@ class CorrectAndSmooth(nn.Module):
                                       correction_adj)
         self.prop2 = LabelPropagation(num_smoothing_layers,
                                       smoothing_alpha,
-                                      correction_adj)
+                                      smoothing_adj)
 
     def correct(self, g, y_soft, y_true, mask):
         with g.local_scope():

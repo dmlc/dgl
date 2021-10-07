@@ -95,7 +95,7 @@ def tutorial_test_linux(backend) {
 }
 
 def is_authorized(name) {
-  def authorized_user = ['VoVAllen', 'BarclayII', 'jermainewang', 'zheng-da', 'mufeili']
+  def authorized_user = ['VoVAllen', 'BarclayII', 'jermainewang', 'zheng-da', 'mufeili', 'Rhett-Ying']
   return (name in authorized_user)
 }
 

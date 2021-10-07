@@ -12,9 +12,14 @@ spec:
       requests:
         cpu: 8
     volumeMounts:
-        - name: persistent-storage
-          mountPath: /tmp/dataset
+      - name: persistent-storage
+        mountPath: /tmp/dataset
+      - name: dshm
+        mountPath: /dev/shm    
   volumes:
   - name: persistent-storage
     persistentVolumeClaim:
       claimName: ogb-efs-claim
+  - name: dshm
+    emptyDir:
+      medium: Memory

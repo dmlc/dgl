@@ -25,6 +25,8 @@ class FakeNewsDataset(DGLBuiltinDataset):
     - profile: the 10-dimensional node feature composed of ten Twitter user profile attributes.
     - spacy: the 300-dimensional node feature composed of Twitter user historical tweets encoded by the spaCy word2vec encoder.
 
+    Reference: <https://github.com/safe-graph/GNN-FakeNews>
+
     Note: this dataset is for academic use only, and commercial use is prohibited.
 
     Statistics:
@@ -166,7 +168,7 @@ class FakeNewsDataset(DGLBuiltinDataset):
                               'feature': self.feature,
                               'train_mask': self.train_mask,
                               'val_mask': self.val_mask,
-                              'test_mask': self.train_mask})
+                              'test_mask': self.test_mask})
 
     def has_cache(self):
         """ check whether there are processed data in `self.save_path` """

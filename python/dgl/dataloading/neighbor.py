@@ -3,6 +3,7 @@ from .dataloader import BlockSampler
 from .. import sampling, subgraph, distributed
 from .. import ndarray as nd
 from .. import backend as F
+from ..base import ETYPE
 
 class MultiLayerNeighborSampler(BlockSampler):
     """Sampler that builds computational dependency of node representations via
@@ -70,7 +71,11 @@ class MultiLayerNeighborSampler(BlockSampler):
         self.fanout_arrays = []
         self.prob_arrays = None
 
-    def sample_frontier(self, block_id, g, seed_nodes):
+    @classmethod
+    def exclude_edges_in_frontier(cls, g):
+        return not isinstance(g, distributed.DistGraph) and g.device == F.cpu()
+
+    def sample_frontier(self, block_id, g, seed_nodes, exclude_eids=None):
         fanout = self.fanouts[block_id]
         if isinstance(g, distributed.DistGraph):
             if fanout is None:
@@ -78,7 +83,15 @@ class MultiLayerNeighborSampler(BlockSampler):
                 # let's use sample_neighbors to replace in_subgraph for now.
                 frontier = distributed.sample_neighbors(g, seed_nodes, -1, replace=False)
             else:
-                frontier = distributed.sample_neighbors(g, seed_nodes, fanout, replace=self.replace)
+                if len(g.etypes) > 1: # heterogeneous distributed graph
+                    # The edge type is stored in g.edata[dgl.ETYPE]
+                    assert isinstance(fanout, int), "For distributed training, " \
+                        "we can only sample same number of neighbors for each edge type"
+                    frontier = distributed.sample_etype_neighbors(
+                        g, seed_nodes, ETYPE, fanout, replace=self.replace)
+                else:
+                    frontier = distributed.sample_neighbors(
+                        g, seed_nodes, fanout, replace=self.replace)
         else:
             if fanout is None:
                 frontier = subgraph.in_subgraph(g, seed_nodes)
@@ -88,7 +101,7 @@ class MultiLayerNeighborSampler(BlockSampler):
 
                 frontier = sampling.sample_neighbors(
                     g, seed_nodes, self.fanout_arrays[block_id],
-                    replace=self.replace, prob=self.prob_arrays)
+                    replace=self.replace, prob=self.prob_arrays, exclude_edges=exclude_eids)
         return frontier
 
     def _build_prob_arrays(self, g):

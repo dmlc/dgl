@@ -4,11 +4,13 @@
  * \brief Array index select CPU implementation
  */
 #include <dgl/array.h>
+#include <dgl/runtime/parallel_for.h>
 #include <tuple>
 #include <utility>
 
 namespace dgl {
 using runtime::NDArray;
+using runtime::parallel_for;
 namespace aten {
 namespace impl {
 
@@ -29,11 +31,12 @@ std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths) {
   NDArray concat = NDArray::Empty({total_length}, array->dtype, array->ctx);
   DType *concat_data = static_cast<DType *>(concat->data);
 
-#pragma omp parallel for
-  for (int64_t i = 0; i < rows; ++i) {
-    for (int64_t j = 0; j < length_data[i]; ++j)
-      concat_data[offsets_data[i] + j] = array_data[i * stride + j];
-  }
+  parallel_for(0, rows, [=](size_t b, size_t e) {
+    for (auto i = b; i < e; ++i) {
+      for (int64_t j = 0; j < length_data[i]; ++j)
+        concat_data[offsets_data[i] + j] = array_data[i * stride + j];
+    }
+  });
 
   return std::make_pair(concat, offsets);
 }
@@ -56,16 +59,17 @@ std::tuple<NDArray, IdArray, IdArray> Pack(NDArray array, DType pad_value) {
 
   IdArray length = NewIdArray(rows, array->ctx);
   int64_t *length_data = static_cast<int64_t *>(length->data);
-#pragma omp parallel for
-  for (int64_t i = 0; i < rows; ++i) {
-    int64_t j;
-    for (j = 0; j < cols; ++j) {
-      const DType val = array_data[i * cols + j];
-      if (val == pad_value)
-        break;
+  parallel_for(0, rows, [=](size_t b, size_t e) {
+    for (auto i = b; i < e; ++i) {
+      int64_t j;
+      for (j = 0; j < cols; ++j) {
+        const DType val = array_data[i * cols + j];
+        if (val == pad_value)
+          break;
+      }
+      length_data[i] = j;
     }
-    length_data[i] = j;
-  }
+  });
 
   auto ret = ConcatSlices<XPU, DType, int64_t>(array, length);
   return std::make_tuple(ret.first, length, ret.second);
