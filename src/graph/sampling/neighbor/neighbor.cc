@@ -17,12 +17,57 @@ using namespace dgl::aten;
 namespace dgl {
 namespace sampling {
 
+HeteroSubgraph ExcludeCertainEdges(
+    const HeteroSubgraph& sg,
+    const std::vector<IdArray>& exclude_edges) {
+
+    HeteroGraphPtr hg_view = HeteroGraphRef(sg.graph).sptr();
+    std::vector<IdArray> remain_induced_edges(hg_view->NumEdgeTypes());
+    std::vector<IdArray> remain_edges(hg_view->NumEdgeTypes());
+
+    for (dgl_type_t etype = 0; etype < hg_view->NumEdgeTypes(); ++etype) {
+      IdArray edge_ids = Range(0,
+                               sg.induced_edges[etype]->shape[0],
+                               sg.induced_edges[etype]->dtype.bits,
+                               sg.induced_edges[etype]->ctx);
+      if (exclude_edges[etype].GetSize() == 0) {
+        remain_edges[etype] = edge_ids;
+        remain_induced_edges[etype] = sg.induced_edges[etype];
+        continue;
+      }
+      ATEN_ID_TYPE_SWITCH(hg_view->DataType(), IdType, {
+        IdType* idx_data = edge_ids.Ptr<IdType>();
+        IdType* induced_edges_data = sg.induced_edges[etype].Ptr<IdType>();
+        const IdType exclude_edges_len = exclude_edges[etype]->shape[0];
+        std::sort(exclude_edges[etype].Ptr<IdType>(),
+                  exclude_edges[etype].Ptr<IdType>() + exclude_edges_len);
+        const IdType* exclude_edges_data = exclude_edges[etype].Ptr<IdType>();
+        IdType outId = 0;
+        for (IdType i = 0; i != sg.induced_edges[etype]->shape[0]; ++i) {
+          if (!std::binary_search(exclude_edges_data,
+                                  exclude_edges_data + exclude_edges_len,
+                                  induced_edges_data[i])) {
+            induced_edges_data[outId] = induced_edges_data[i];
+            idx_data[outId] = idx_data[i];
+            ++outId;
+          }
+        }
+        remain_edges[etype] = aten::IndexSelect(edge_ids, 0, outId);
+        remain_induced_edges[etype] = aten::IndexSelect(sg.induced_edges[etype], 0, outId);
+      });
+    }
+    HeteroSubgraph subg = hg_view->EdgeSubgraph(remain_edges, true);
+    subg.induced_edges = std::move(remain_induced_edges);
+    return subg;
+}
+
 HeteroSubgraph SampleNeighbors(
     const HeteroGraphPtr hg,
     const std::vector<IdArray>& nodes,
     const std::vector<int64_t>& fanouts,
     EdgeDir dir,
     const std::vector<FloatArray>& prob,
+    const std::vector<IdArray>& exclude_edges,
     bool replace) {
 
   // sanity check
@@ -101,6 +146,9 @@ HeteroSubgraph SampleNeighbors(
   ret.graph = CreateHeteroGraph(hg->meta_graph(), subrels, hg->NumVerticesPerType());
   ret.induced_vertices.resize(hg->NumVertexTypes());
   ret.induced_edges = std::move(induced_edges);
+  if (!exclude_edges.empty()) {
+    return ExcludeCertainEdges(ret, exclude_edges);
+  }
   return ret;
 }
 
@@ -382,7 +430,8 @@ DGL_REGISTER_GLOBAL("sampling.neighbor._CAPI_DGLSampleNeighbors")
     const auto& fanouts = fanouts_array.ToVector<int64_t>();
     const std::string dir_str = args[3];
     const auto& prob = ListValueToVector<FloatArray>(args[4]);
-    const bool replace = args[5];
+    const auto& exclude_edges = ListValueToVector<IdArray>(args[5]);
+    const bool replace = args[6];
 
     CHECK(dir_str == "in" || dir_str == "out")
       << "Invalid edge direction. Must be \"in\" or \"out\".";
@@ -390,7 +439,7 @@ DGL_REGISTER_GLOBAL("sampling.neighbor._CAPI_DGLSampleNeighbors")
 
     std::shared_ptr<HeteroSubgraph> subg(new HeteroSubgraph);
     *subg = sampling::SampleNeighbors(
-        hg.sptr(), nodes, fanouts, dir, prob, replace);
+        hg.sptr(), nodes, fanouts, dir, prob, exclude_edges, replace);
 
     *rv = HeteroSubgraphRef(subg);
   });

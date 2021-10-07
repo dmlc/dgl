@@ -1,4 +1,4 @@
-from point_transformer import PointTransformerCLS
+from pct import PointTransformerCLS
 from ModelNetDataLoader import ModelNetDataLoader
 import provider
 import argparse
@@ -17,10 +17,9 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--dataset-path', type=str, default='')
 parser.add_argument('--load-model-path', type=str, default='')
 parser.add_argument('--save-model-path', type=str, default='')
-parser.add_argument('--num-epochs', type=int, default=200)
+parser.add_argument('--num-epochs', type=int, default=250)
 parser.add_argument('--num-workers', type=int, default=8)
-parser.add_argument('--batch-size', type=int, default=16)
-parser.add_argument('--opt', type=str, default='adam')
+parser.add_argument('--batch-size', type=int, default=32)
 args = parser.parse_args()
 
 num_workers = args.num_workers
@@ -119,29 +118,22 @@ def evaluate(net, test_loader, dev):
 
 
 dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-net = PointTransformerCLS(40, batch_size, feature_dim=6)
+net = PointTransformerCLS()
 
 net = net.to(dev)
 if args.load_model_path:
     net.load_state_dict(torch.load(args.load_model_path, map_location=dev))
 
-if args.opt == 'sgd':
-    # The optimizer strategy described in paper:
-    opt = torch.optim.SGD(net.parameters(), lr=0.01,
-                          momentum=0.9, weight_decay=1e-4)
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(
-        opt, milestones=[120, 160], gamma=0.1)
-elif args.opt == 'adam':
-    # The optimizer strategy proposed by
-    # https://github.com/qq456cvb/Point-Transformers:
-    opt = torch.optim.Adam(
-        net.parameters(),
-        lr=1e-3,
-        betas=(0.9, 0.999),
-        eps=1e-08,
-        weight_decay=1e-4
-    )
-    scheduler = torch.optim.lr_scheduler.StepLR(opt, step_size=50, gamma=0.3)
+
+opt = torch.optim.SGD(
+    net.parameters(),
+    lr=0.01,
+    weight_decay=1e-4,
+    momentum=0.9
+)
+
+scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+    opt, T_max=args.num_epochs)
 
 train_dataset = ModelNetDataLoader(local_path, 1024, split='train')
 test_dataset = ModelNetDataLoader(local_path, 1024, split='test')
