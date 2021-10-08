@@ -239,13 +239,10 @@ MapEdges(
 
   const auto& ctx = graph->Context();
 
-  // should map the edges of each graph in parallel or
-  // call this function multiple times
-
-  // std::vector<IdArray> new_lhs;
-  // new_lhs.reserve(edge_sets.size());
-  // std::vector<IdArray> new_rhs;
-  // new_rhs.reserve(edge_sets.size());
+  std::vector<IdArray> new_lhs;
+  new_lhs.reserve(edge_sets.size());
+  std::vector<IdArray> new_rhs;
+  new_rhs.reserve(edge_sets.size());
 
   // The next peformance optimization here, is to perform mapping of all edge
   // types in a single kernel launch.
@@ -255,8 +252,8 @@ MapEdges(
     if (edges.id.defined() && edges.src->shape[0] > 0) {
       const int64_t num_edges = edges.src->shape[0];
 
-      // new_lhs.emplace_back(NewIdArray(num_edges, ctx, sizeof(IdType)*8));
-      // new_rhs.emplace_back(NewIdArray(num_edges, ctx, sizeof(IdType)*8));
+      new_lhs.emplace_back(NewIdArray(num_edges, ctx, sizeof(IdType)*8));
+      new_rhs.emplace_back(NewIdArray(num_edges, ctx, sizeof(IdType)*8));
 
       const auto src_dst_types = graph->GetEndpointTypes(etype);
       const int src_type = src_dst_types.first;
@@ -276,8 +273,8 @@ MapEdges(
         edges.dst.Ptr<IdType>(),
         new_rhs.back().Ptr<IdType>(),
         num_edges,
-        node_map.LhsHashTable(src_type).DeviceHandle(),
-        node_map.RhsHashTable(dst_type).DeviceHandle());
+        node_map.HashTable(src_type).DeviceHandle(),
+        node_map.HashTable(dst_type).DeviceHandle());
       CUDA_CALL(cudaGetLastError());
     } else {
       new_lhs.emplace_back(
@@ -305,14 +302,159 @@ CompactGraphsGPU(
   CHECK_EQ(ctx.device_type, kDLGPU);
 
   // Step 1: Collect the nodes that has connections for each type.
+  const int64_t num_ntypes = graphs[0]->NumVertexTypes();
+  std::vector<std::vector<EdgeArray>> all_edges(graphs.size());   // all_edges[i][etype]
+
+  // count the number of nodes per type
+  std::vector<int64_t> max_vertex_cnt(num_ntypes, 0);
+  for (size_t i = 0; i < graphs.size(); ++i) {
+    const HeteroGraphPtr curr_graph = graphs[i];
+    const int64_t num_etypes = curr_graph->NumEdgeTypes();
+
+    for (IdType etype = 0; etype < num_etypes; ++etype) {
+      IdType srctype, dsttype;
+      std::tie(srctype, dsttype) = curr_graph->GetEndpointTypes(etype);
+
+      const int64_t n_edges = curr_graph->NumEdges(etype);
+      max_vertex_cnt[srctype] += n_edges;
+      max_vertex_cnt[dsttype] += n_edges;
+    }
+  }
+
+  for (size_t i = 0; i < always_preserve.size(); ++i) {
+    max_vertex_cnt[i] += always_preserve[i]->shape[0];
+  }
+
+  // gather all nodes
+  std::vector<IdArray> all_nodes(num_ntypes);
+  std::vector<int64_t> node_offsets(num_ntypes, 0);
+
+  for (int64_t ntype = 0; ntype < num_ntypes; ++ntype) {
+    all_nodes[ntype] = NewIdArray(max_vertex_cnt[ntype], ctx,
+      sizeof(IdType)*8);
+    // copy the nodes in always_preserve
+    if (ntype < always_preserve.size()) {
+      device->CopyDataFromTo(
+          always_preserve[ntype].Ptr<IdType>(), 0,
+          all_nodes[ntype].Ptr<IdType>(),
+          node_offsets[ntype],
+          sizeof(IdType)*always_preserve[ntype]->shape[0],
+          always_preserve[ntype]->ctx,
+          all_nodes[ntype]->ctx,
+          always_preserve[ntype]->dtype,
+          stream);
+      node_offsets[ntype] += sizeof(IdType)*always_preserve[ntype]->shape[0];
+    }
+  }
+
+  for (size_t i = 0; i < graphs.size(); ++i) {
+    const HeteroGraphPtr curr_graph = graphs[i];
+    const int64_t num_etypes = curr_graph->NumEdgeTypes();
+
+    all_edges[i].reserve(num_etypes);
+    for (IdType etype = 0; etype < num_etypes; ++etype) {
+      IdType srctype, dsttype;
+      std::tie(srctype, dsttype) = curr_graph->GetEndpointTypes(etype);
+
+      const EdgeArray edges = curr_graph->Edges(etype, "eid");
+
+      if (edges.src.defined()) {
+        device->CopyDataFromTo(
+            edges.src.Ptr<IdType>(), 0,
+            all_nodes[srctype].Ptr<IdType>(),
+            node_offsets[srctype],
+            sizeof(IdType)*edges.src->shape[0],
+            edges.src->ctx,
+            all_nodes[srctype]->ctx,
+            edges.src->dtype,
+            stream);
+        node_offsets[srctype] += sizeof(IdType)*edges.src->shape[0];
+      }
+      if (edges.dst.defined()) {
+        device->CopyDataFromTo(
+            edges.dst.Ptr<IdType>(), 0,
+            all_nodes[dsttype].Ptr<IdType>(),
+            node_offsets[dsttype],
+            sizeof(IdType)*edges.dst->shape[0],
+            edges.dst->ctx,
+            all_nodes[dsttype]->ctx,
+            edges.dst->dtype,
+            stream);
+        node_offsets[dsttype] += sizeof(IdType)*edges.dst->shape[0];
+      }
+      all_edges[i].push_back(edges);
+    }
+  }
 
   // Step 2: Relabel the nodes for each type to a smaller ID space
-  //         using BuildNodeMap
+  //         using BuildNodeMaps
+
+  // allocate space for map creation
+  // the hashmap on GPU
+  DeviceNodeMap<IdType> node_maps(max_vertex_cnt, ctx, stream);
+  // number of unique nodes per type on CPU
+  std::vector<int64_t> num_induced_nodes(num_ntypes);
+  // number of unique nodes per type on GPU
+  int64_t * count_unique_device = static_cast<int64_t*>(
+      device->AllocWorkspace(ctx, sizeof(int64_t)*num_ntypes));
+  // the set of unique nodes per type
+  std::vector<IdArray> induced_nodes(num_ntypes);
+  for (int64_t ntype = 0; ntype < num_ntypes; ++ntype) {
+    induced_nodes.emplace_back(NewIdArray(
+      max_vertex_cnt[ntype], ctx, sizeof(IdType)*8));
+  }
+
+  BuildNodeMaps(
+    all_nodes,
+    &node_maps,
+    count_unique_device,
+    &induced_nodes,
+    stream);
+
+  device->CopyDataFromTo(
+    count_unique_device, 0,
+    num_induced_nodes.data(), 0,
+    sizeof(*num_induced_nodes.data())*num_ntypes,
+    ctx,
+    DGLContext{kDLCPU, 0},
+    DGLType{kDLInt, 64, 1},
+    stream);
+  device->StreamSync(ctx, stream);
+
+  // wait for the node counts to finish transferring
+  device->FreeWorkspace(ctx, count_unique_device);
 
   // Step 3: Remap the edges of each graph using MapEdges
+  std::vector<HeteroGraphPtr> new_graphs;
+  for (size_t i = 0; i < graphs.size(); ++i) {
+    const HeteroGraphPtr curr_graph = graphs[i];
+    const auto meta_graph = curr_graph->meta_graph();
+    const int64_t num_etypes = curr_graph->NumEdgeTypes();
 
+    std::vector<HeteroGraphPtr> rel_graphs;
+    rel_graphs.reserve(num_etypes);
 
+    std::vector<IdArray> new_src;
+    std::vector<IdArray> new_dst;
+    std::tie(new_src, new_dst) = MapEdges(
+      curr_graph, all_edges[i], node_maps, stream);
 
+    for (IdType etype = 0; etype < num_etypes; ++etype) {
+      IdType srctype, dsttype;
+      std::tie(srctype, dsttype) = curr_graph->GetEndpointTypes(etype);
+
+      rel_graphs.push_back(UnitGraph::CreateFromCOO(
+          srctype == dsttype ? 1 : 2,
+          induced_nodes[srctype]->shape[0],
+          induced_nodes[dsttype]->shape[0],
+          new_src[etype],
+          new_dst[etype]));
+    }
+
+    new_graphs.push_back(CreateHeteroGraph(meta_graph, rel_graphs, num_induced_nodes));
+  }
+
+  return std::make_pair(new_graphs, induced_nodes);
 };
 
 }  // namespace
