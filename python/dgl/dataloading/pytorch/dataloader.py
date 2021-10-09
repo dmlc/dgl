@@ -369,7 +369,12 @@ def _next(dl_iter, graph, device, load_input, load_output, stream=None):
 def _background_node_dataloader(dl_iter, g, device, results, load_input, load_output):
     try:
         while True:
-            stream = th.cuda.Stream(device=device)
+            dev = None
+            if device.type == 'cuda':
+                dev = device
+            elif g.device.type == 'cuda':
+                dev = g.device
+            stream = th.cuda.Stream(device=dev)
             results.put(
                 (_next(dl_iter, g, device, load_input, load_output, stream), stream))
     except StopIteration:
