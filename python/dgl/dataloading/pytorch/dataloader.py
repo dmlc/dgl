@@ -386,7 +386,7 @@ class _NodeDataLoaderIter:
         self.device = node_dataloader.device
         self.node_dataloader = node_dataloader
         self.iter_ = iter(node_dataloader.dataloader)
-        self.async_load = node_dataloader.async_load
+        self.async_load = node_dataloader.async_load and th.cuda.is_available()
         if self.async_load:
             self.results = queue.Queue(1)
             threading.Thread(target=_background_node_dataloader, args=(
