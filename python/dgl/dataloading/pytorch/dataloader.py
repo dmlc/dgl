@@ -386,8 +386,8 @@ class _NodeDataLoaderIter:
             self.results = queue.Queue(1)
             threading.Thread(target=_background_node_dataloader, args=(
                 self.iter_, self.node_dataloader.collator.g, self.device,
-                self.results, node_dataloader.load_input, node_dataloader.load_output),
-                daemon=True).start()
+                self.results, node_dataloader.load_input, node_dataloader.load_output
+                ), daemon=True).start()
 
     # Make this an iterator for PyTorch Lightning compatibility
     def __iter__(self):
@@ -592,7 +592,7 @@ class NodeDataLoader:
     collator_arglist = inspect.getfullargspec(NodeCollator).args
 
     def __init__(self, g, nids, graph_sampler, device=None, use_ddp=False, ddp_seed=0,
-                 load_input={}, load_output={}, async_load=False, **kwargs):
+                 load_input=None, load_output=None, async_load=False, **kwargs):
         collator_kwargs = {}
         dataloader_kwargs = {}
         for k, v in kwargs.items():
@@ -603,8 +603,8 @@ class NodeDataLoader:
         if not g.is_homogeneous:
             if load_input or load_output:
                 raise DGLError('load_input/load_output not supported for heterograph yet.')
-        self.load_input = load_input
-        self.load_output = load_output
+        self.load_input = {} if load_input is None else load_input
+        self.load_output = {} if load_output is None else load_output
         self.async_load = async_load
         if isinstance(g, DistGraph):
             if device is None:

@@ -299,7 +299,7 @@ def test_node_dataloader(sampler_name):
         'shadow': dgl.dataloading.ShaDowKHopSampler([3, 3])}[sampler_name]
     g1.ndata['label'] = F.copy_to(F.randn((g1.num_nodes(),)), F.cpu())
 
-    for load_input, load_output in [({}, {}), ({'feat': g1.ndata['feat']}, {'label': g1.ndata['label']})]:
+    for load_input, load_output in [(None, None), ({'feat': g1.ndata['feat']}, {'label': g1.ndata['label']})]:
         for async_load in [False, True]:
             dataloader = dgl.dataloading.NodeDataLoader(
                 g1, g1.nodes(), sampler, device=F.ctx(),
