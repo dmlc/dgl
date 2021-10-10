@@ -70,12 +70,12 @@ class TCPSocket {
               int * port_client);
 
   /*!
-   * \brief SetBlocking() is needed refering to this example of epoll:
+   * \brief SetNonBlocking() is needed refering to this example of epoll:
    * http://www.kernel.org/doc/man-pages/online/pages/man4/epoll.4.html
-   * \param flag flag for blocking
+   * \param flag true for nonblocking, false for blocking
    * \return true for success and false for failure
    */
-  bool SetBlocking(bool flag);
+  bool SetNonBlocking(bool flag);
 
   /*!
    * \brief Set timeout for socket
