@@ -349,11 +349,11 @@ def _next(dl_iter, graph, device, load_input, load_output, stream=None):
     _restore_storages(blocks, graph)
     input_data = {}
     for tag, data in load_input.items():
-        sliced = _index_select(data, input_nodes, data.device == device)
+        sliced = _index_select(data, input_nodes, data.device != device)
         input_data[tag] = sliced
     output_data = {}
     for tag, data in load_output.items():
-        sliced = _index_select(data, output_nodes, data.device == device)
+        sliced = _index_select(data, output_nodes, data.device != device)
         output_data[tag] = sliced
     result_ = (input_nodes, output_nodes, blocks, input_data, output_data)
     if stream is not None:
