@@ -605,12 +605,7 @@ class NodeDataLoader:
                 collator_kwargs[k] = v
             else:
                 dataloader_kwargs[k] = v
-        if not g.is_homogeneous:
-            if load_input or load_output:
-                raise DGLError('load_input/load_output not supported for heterograph yet.')
-        self.load_input = {} if load_input is None else load_input
-        self.load_output = {} if load_output is None else load_output
-        self.async_load = async_load
+
         if isinstance(g, DistGraph):
             if device is None:
                 # for the distributed case default to the CPU
@@ -628,6 +623,13 @@ class NodeDataLoader:
             if device is None:
                 # default to the same device the graph is on
                 device = th.device(g.device)
+
+            if not g.is_homogeneous:
+                if load_input or load_output:
+                    raise DGLError('load_input/load_output not supported for heterograph yet.')
+            self.load_input = {} if load_input is None else load_input
+            self.load_output = {} if load_output is None else load_output
+            self.async_load = async_load
 
             # if the sampler supports it, tell it to output to the
             # specified device
