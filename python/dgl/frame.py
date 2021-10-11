@@ -131,7 +131,7 @@ class Column(object):
 
     @property
     def scheme(self):
-        """"""
+        """scheme"""
         if self._scheme:
             return self._scheme
         else:
@@ -408,7 +408,7 @@ class Frame:
             self._initializers[column] = initializer
 
     def update(self, other):
-        """"""
+        """update"""
         self._columns.update(other)
 
     @property
