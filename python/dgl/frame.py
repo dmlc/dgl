@@ -239,10 +239,10 @@ class Column(object):
         feats : Tensor
             New features.
         """
-        feat_scheme = infer_scheme(feats)
-        if feat_scheme != self.scheme:
-            raise DGLError("Cannot update column of scheme %s using feature of scheme %s."
-                           % (feat_scheme, self.scheme))
+        # feat_scheme = infer_scheme(feats)
+        # if feat_scheme != self.scheme:
+        #     raise DGLError("Cannot update column of scheme %s using feature of scheme %s."
+        #                    % (feat_scheme, self.scheme))
         self.data = F.scatter_row(self.data, rowids, feats)
 
     def extend(self, feats, feat_scheme=None):
@@ -311,8 +311,7 @@ class Column(object):
         if isinstance(data, Column):
             return data.clone()
         else:
-            # return Column(data)
-            return data
+            return Column(data)
 
     def __repr__(self):
         return repr(self.data)
@@ -325,7 +324,12 @@ class Column(object):
     def __copy__(self):
         return self.clone()
 
-class Frame(MutableMapping):
+# import sys
+# sys.path.append("/home/ubuntu/dev/csr/dgl/build")
+# import dglpybind
+# from dglpybind import Column
+
+class Frame:
     """The columnar storage for node/edge features.
 
     The frame is a dictionary from feature names to feature columns.
@@ -401,6 +405,9 @@ class Frame(MutableMapping):
             self._default_initializer = initializer
         else:
             self._initializers[column] = initializer
+
+    def update(self, other):
+        self._columns.update(other)
 
     @property
     def schemes(self):
