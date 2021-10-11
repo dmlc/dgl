@@ -5,9 +5,9 @@ from collections.abc import Mapping, Iterable
 from contextlib import contextmanager
 import copy
 import numbers
+import functools
 import networkx as nx
 import numpy as np
-import functools
 
 # import profile
 
@@ -2299,6 +2299,7 @@ class DGLHeteroGraph(object):
 
     @functools.lru_cache()
     def number_of_nodes_ntype_id(self, ntype_id):
+        """num nodes ntype id"""
         return self._graph.number_of_nodes(ntype_id)
 
     def num_nodes(self, ntype=None):

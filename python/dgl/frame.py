@@ -2,8 +2,8 @@
 from __future__ import absolute_import
 
 from collections import namedtuple
-from collections.abc import MutableMapping
-import functools
+# from collections.abc import MutableMapping
+# import functools
 
 from . import backend as F
 from .base import DGLError, dgl_warning
@@ -122,20 +122,21 @@ class Column(object):
     index : Tensor
         Index tensor
     """
+
     def __init__(self, storage, scheme=None, index=None, device=None):
         self.storage = storage
         self._scheme = scheme
         self.index = index
         self.device = device
-    
+
     @property
     def scheme(self):
+        """"""
         if self._scheme:
             return self._scheme
         else:
             self._scheme = infer_scheme(self.storage)
             return self._scheme
-
 
     def __len__(self):
         """The number of features (number of rows) in this column."""
@@ -407,6 +408,7 @@ class Frame:
             self._initializers[column] = initializer
 
     def update(self, other):
+        """"""
         self._columns.update(other)
 
     @property
