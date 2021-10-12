@@ -20,6 +20,7 @@ from dgl.frame import Frame
 import torch as th
 from ...dataloading import NodeDataLoader
 from ...partition import NDArrayPartition, create_edge_partition_from_nodes
+from ...cuda import nccl
 from ..multi_gpu_datastore import MultiGPUDataStore
 from typing import Mapping
 
@@ -182,7 +183,7 @@ class MultiGPUNodeDataLoader(NodeDataLoader):
             th.distributed.broadcast_object_list(objs)
             if rank != 0:
                 nccl_id = nccl.UniqueId(objs[0])
-            comm = nccl.Communicator(world_size, rank, ncc_id)
+            comm = nccl.Communicator(world_size, rank, nccl_id)
         assert comm is None or use_ddp, "'use_ddp' must be true when using NCCL."
 
         if partition is None:
