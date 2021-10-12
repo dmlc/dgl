@@ -23,6 +23,8 @@
 #include <dgl/transform.h>
 #include <dgl/array.h>
 #include <dgl/packed_func_ext.h>
+#include <dgl/runtime/registry.h>
+#include <dgl/runtime/container.h>
 #include <vector>
 #include <utility>
 #include "../../c_api_common.h"
@@ -138,7 +140,7 @@ CompactGraphsCPU(
 
 template<>
 std::pair<std::vector<HeteroGraphPtr>, std::vector<IdArray>>
-CompactGraphs<KDLCPU, int32_t>(
+CompactGraphs<kDLCPU, int32_t>(
     const std::vector<HeteroGraphPtr> &graphs,
     const std::vector<IdArray> &always_preserve) {
   return CompactGraphsCPU<int32_t>(graphs, always_preserve);
@@ -146,7 +148,7 @@ CompactGraphs<KDLCPU, int32_t>(
 
 template<>
 std::pair<std::vector<HeteroGraphPtr>, std::vector<IdArray>>
-CompactGraphs<KDLCPU, int64_t>(
+CompactGraphs<kDLCPU, int64_t>(
     const std::vector<HeteroGraphPtr> &graphs,
     const std::vector<IdArray> &always_preserve) {
   return CompactGraphsCPU<int64_t>(graphs, always_preserve);

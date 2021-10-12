@@ -77,6 +77,12 @@ def run(proc_id, n_gpus, args, devices, data):
     n_edges = g.num_edges()
     train_seeds = th.arange(n_edges)
 
+    dataloader_device = th.device('cpu')
+    if args.sample_gpu:
+        train_seeds = train_seeds.to(device)
+        g = g.to(device)
+        dataloader_device = device
+
     # Create sampler
     sampler = dgl.dataloading.MultiLayerNeighborSampler(
         [int(fanout) for fanout in args.fan_out.split(',')])
@@ -87,7 +93,7 @@ def run(proc_id, n_gpus, args, devices, data):
             th.arange(n_edges // 2, n_edges),
             th.arange(0, n_edges // 2)]).to(train_seeds),
         negative_sampler=NegativeSampler(g, args.num_negs, args.neg_share),
-        device=device,
+        device=dataloader_device,
         use_ddp=n_gpus > 1,
         batch_size=args.batch_size,
         shuffle=True,
@@ -213,6 +219,8 @@ if __name__ == '__main__':
     argparser.add_argument('--dropout', type=float, default=0.5)
     argparser.add_argument('--num-workers', type=int, default=0,
                            help="Number of sampling processes. Use 0 for no extra process.")
+    argparser.add_argument('--sample-gpu', action='store_true',
+                           help="Perform the sampling process on the GPU. Must have 0 workers.")
     args = argparser.parse_args()
 
     devices = list(map(int, args.gpu.split(',')))

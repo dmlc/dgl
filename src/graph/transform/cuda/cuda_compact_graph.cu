@@ -197,6 +197,7 @@ class DeviceNodeMap {
 * \param unique_nodes_device The unique nodes (on the GPU).
 * \param stream The stream to operate on.
 */
+template<typename IdType>
 void BuildNodeMaps(
     const std::vector<IdArray>& input_nodes,
     DeviceNodeMap<IdType> * const node_maps,
@@ -333,7 +334,7 @@ CompactGraphsGPU(
     all_nodes[ntype] = NewIdArray(max_vertex_cnt[ntype], ctx,
       sizeof(IdType)*8);
     // copy the nodes in always_preserve
-    if (ntype < always_preserve.size()) {
+    if (ntype < always_preserve.size() && always_preserve[ntype]->shape[0] > 0) {
       device->CopyDataFromTo(
           always_preserve[ntype].Ptr<IdType>(), 0,
           all_nodes[ntype].Ptr<IdType>(),
@@ -352,8 +353,8 @@ CompactGraphsGPU(
     const int64_t num_etypes = curr_graph->NumEdgeTypes();
 
     all_edges[i].reserve(num_etypes);
-    for (IdType etype = 0; etype < num_etypes; ++etype) {
-      IdType srctype, dsttype;
+    for (int64_t etype = 0; etype < num_etypes; ++etype) {
+      dgl_type_t srctype, dsttype;
       std::tie(srctype, dsttype) = curr_graph->GetEndpointTypes(etype);
 
       const EdgeArray edges = curr_graph->Edges(etype, "eid");
@@ -400,8 +401,8 @@ CompactGraphsGPU(
   // the set of unique nodes per type
   std::vector<IdArray> induced_nodes(num_ntypes);
   for (int64_t ntype = 0; ntype < num_ntypes; ++ntype) {
-    induced_nodes.emplace_back(NewIdArray(
-      max_vertex_cnt[ntype], ctx, sizeof(IdType)*8));
+    induced_nodes[ntype] = NewIdArray(max_vertex_cnt[ntype], ctx,
+      sizeof(IdType)*8);
   }
 
   BuildNodeMaps(
@@ -423,6 +424,11 @@ CompactGraphsGPU(
 
   // wait for the node counts to finish transferring
   device->FreeWorkspace(ctx, count_unique_device);
+
+  // resize induced nodes
+  for (int64_t ntype = 0; ntype < num_ntypes; ++ntype) {
+    induced_nodes[ntype]->shape[0] = num_induced_nodes[ntype];
+  }
 
   // Step 3: Remap the edges of each graph using MapEdges
   std::vector<HeteroGraphPtr> new_graphs;

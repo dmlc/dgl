@@ -2031,9 +2031,6 @@ def compact_graphs(graphs, always_preserve=None, copy_ndata=True, copy_edata=Tru
     # Process the dictionary or tensor of "always preserve" nodes
     if always_preserve is None:
         always_preserve = {}
-    elif device != F.cpu():
-        raise DGLError('Compacting graphs on GPU requires '
-                       '"always_preserve=None" for now.')
     elif not isinstance(always_preserve, Mapping):
         if len(ntypes) > 1:
             raise ValueError("Node type must be given if multiple node types exist.")
