@@ -22,7 +22,6 @@ import torch.nn.functional as F
 import torch.optim as optim
 import dgl.multiprocessing as mp
 import dgl.nn.pytorch as dglnn
-from dgl.cuda import nccl
 from dgl.contrib import MultiGPUNodeDataLoader
 import time
 import math
@@ -64,7 +63,7 @@ def load_subtensor(nfeat, labels, seeds, input_nodes, dev_id):
 
 #### Entry point
 
-def run(proc_id, n_gpus, args, devices, data, nccl_id=None):
+def run(proc_id, n_gpus, args, devices, data):
     # Start up distributed training, if enabled.
     dev_id = devices[proc_id]
     if n_gpus > 1:
@@ -110,17 +109,12 @@ def run(proc_id, n_gpus, args, devices, data, nccl_id=None):
     sampler = dgl.dataloading.MultiLayerNeighborSampler(
         [int(fanout) for fanout in args.fan_out.split(',')])
 
-    nccl_comm = None
-    if nccl_id:
-        nccl_comm = nccl.Communicator(n_gpus, proc_id, nccl_id)
-
     if not args.data_cpu:
         dataloader = MultiGPUNodeDataLoader(
             train_g,
             train_nid,
             sampler,
             device=dev_id,
-            comm=nccl_comm,
             node_feat=train_nfeat,
             node_label=train_labels,
             use_ddp=n_gpus > 1,
@@ -164,9 +158,12 @@ def run(proc_id, n_gpus, args, devices, data, nccl_id=None):
 
             if len(data) == 3:
                 input_nodes, seeds, blocks = data
+                # manually load inputs and labels for this mini-batch
                 batch_inputs, batch_labels = load_subtensor(train_nfeat, train_labels,
                                                             seeds, input_nodes, dev_id)
             else:
+                # the dataloader is configured to load the labels and features
+                # for this mini-batch
                 input_nodes, seeds, blocks, batch_inputs, batch_labels = data
 
             blocks = [block.int().to(dev_id) for block in blocks]
@@ -271,13 +268,10 @@ if __name__ == '__main__':
     if n_gpus == 1:
         run(0, n_gpus, args, devices, data)
     else:
-        nccl_id = nccl.UniqueId()
         procs = []
-        for proc_id in range(1, n_gpus):
-            p = mp.Process(target=run, args=(proc_id, n_gpus, args, devices, data, nccl_id))
+        for proc_id in range(0, n_gpus):
+            p = mp.Process(target=run, args=(proc_id, n_gpus, args, devices, data))
             p.start()
             procs.append(p)
-        # original process runs on GPU 0
-        run(0, n_gpus, args, devices, data, nccl_id)
         for p in procs:
             p.join()

@@ -122,9 +122,6 @@ class MultiGPUNodeDataLoader(NodeDataLoader):
         The device to store the node data on, and the device
         of the generated MFGs in each iteration, which should be a
         PyTorch device object (e.g., ``torch.device``) specifying a GPU.
-    comm : dgl.cuda.nccl.Communicator, optional
-        The communicator to use to exchange features for each mini-batch.
-        Must not be None when multiple GPUs are used.
     partition : dgl.partition.NDArrayPartition, optional
         The partition specifying to which device each node's data belongs.
         If not specified, the indices will be striped evenly across the
@@ -160,20 +157,33 @@ class MultiGPUNodeDataLoader(NodeDataLoader):
     >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
     >>> dataloader = dgl.contrib.MultiGPUNodeDataLoader(
     ...     g, train_nid, sampler,
-    ...     device=dev_id, comm=nccl_comm, node_feat=nfeat,
+    ...     device=dev_id, node_feat=nfeat,
     ...     node_label=labels, batch_size=1024, shuffle=True,
     ...     drop_last=False)
     >>> for input_nodes, output_nodes, blocks, batch_feats, batch_labels in dataloader:
     ...     train_on(input_nodes, output_nodes, blocks, batch_feats, batch_labels)
 
-    In this example, `nccl_comm` is a :py:class:`dgl.cuda.nccl.Communicator`
-    that has previously been setup, and `dev_id` is the GPU being used by the
-    local process.
     """
-    def __init__(self, g, nids, block_sampler, device, comm=None, partition=None, use_ddp=True,
+    def __init__(self, g, nids, block_sampler, device, partition=None, use_ddp=True,
                  node_feat=None, node_label=None, **kwargs):
-        assert comm is None or use_ddp, "'use_ddp' must be true when using NCCL."
         assert device != th.device("cpu"), "The device must be a GPU."
+
+        # create the nccl communicator (if we have multiple processes)
+        comm = None
+        if th.distributed.is_initialized():
+            rank = th.distributed.get_rank()
+            world_size = th.distributed.get_world_size()
+
+            objs = [None]
+            nccl_id = None
+            if rank == 0:
+                nccl_id = nccl.UniqueId()
+                objs[0] = str(nccl_id)
+            th.distributed.broadcast_object_list(objs)
+            if rank != 0:
+                nccl_id = nccl.UniqueId(objs[0])
+            comm = nccl.Communicator(world_size, rank, ncc_id)
+        assert comm is None or use_ddp, "'use_ddp' must be true when using NCCL."
 
         if partition is None:
             partition = NDArrayPartition(
