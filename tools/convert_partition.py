@@ -270,7 +270,6 @@ for part_id in range(num_parts):
     part_dir = output_dir + '/part' + str(part_id)
     os.makedirs(part_dir, exist_ok=True)
     dgl.save_graphs(part_dir + '/graph.dgl', [compact_g1])
-num_nodes < max_nid
 
 part_metadata = {'graph_name': graph_name,
                  'num_nodes': num_nodes,
