@@ -61,7 +61,13 @@ for key in edge_map:
     edge_map[key] = th.stack([th.tensor(row) for row in edge_map[key]], 0)
 eid_map = dgl.distributed.id_map.IdMap(edge_map)
 
+for ntype in node_map:
+    assert hg.number_of_nodes(ntype) == th.sum(node_map[ntype][:,1] - node_map[ntype][:,0])
+for etype in edge_map:
+    assert hg.number_of_edges(etype) == th.sum(edge_map[etype][:,1] - edge_map[etype][:,0])
+
 # Load the graph partition structure.
+orig_node_ids = {ntype: [] for ntype in hg.ntypes}
 orig_edge_ids = {etype: [] for etype in hg.etypes}
 for partid in range(num_parts):
     print('test part', partid)
@@ -79,8 +85,11 @@ for partid in range(num_parts):
         nid = subg.ndata[dgl.NID][idx]
         ntype_ids1, type_nid = nid_map(nid)
         orig_type_nid = subg.ndata['orig_id'][idx]
+        inner_node = subg.ndata['inner_node'][idx]
         # All nodes should have the same node type.
         assert np.all(ntype_ids1.numpy() == int(ntype_id))
+        assert np.all(nid[inner_node == 1].numpy() == np.arange(node_map[ntype][partid,0], node_map[ntype][partid,1]))
+        orig_node_ids[ntype].append(orig_type_nid[inner_node == 1])
 
         # Check node data.
         for name in hg.nodes[ntype].data:
@@ -100,9 +109,11 @@ for partid in range(num_parts):
         eid = subg.edata[dgl.EID][idx]
         etype_ids1, type_eid = eid_map(eid)
         orig_type_eid = subg.edata['orig_id'][idx]
+        inner_edge = subg.edata['inner_edge'][idx]
         # All edges should have the same edge type.
         assert np.all(etype_ids1.numpy() == int(etype_id))
-        orig_edge_ids[etype].append(orig_type_eid)
+        assert np.all(np.sort(eid[inner_edge == 1].numpy()) == np.arange(edge_map[etype][partid,0], edge_map[etype][partid,1]))
+        orig_edge_ids[etype].append(orig_type_eid[inner_edge == 1])
 
         # Check edge data.
         for name in hg.edges[etype].data:
@@ -110,7 +121,12 @@ for partid in range(num_parts):
             local_data1 = hg.edges[etype].data[name][orig_type_eid]
             assert np.all(local_data.numpy() == local_data1.numpy())
 
+for ntype in orig_node_ids:
+    nids = th.cat(orig_node_ids[ntype])
+    nids = th.sort(nids)[0]
+    assert np.all((nids == th.arange(hg.number_of_nodes(ntype))).numpy())
+
 for etype in orig_edge_ids:
     eids = th.cat(orig_edge_ids[etype])
-    uniq_eids = th.unique(eids)
-    assert len(uniq_eids) == hg.number_of_edges(etype)
+    eids = th.sort(eids)[0]
+    assert np.all((eids == th.arange(hg.number_of_edges(etype))).numpy())
