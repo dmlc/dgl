@@ -69,7 +69,7 @@ def load_backend(mod_name):
                     rev_data_type_dict[v] = k
             setattr(thismod,
                     'reverse_data_type_dict',
-                    rev_data_type_dict})
+                    rev_data_type_dict)
             # log backend name
             setattr(thismod, 'backend_name', mod_name)
         else:
