@@ -309,7 +309,7 @@ class Column(object):
     @staticmethod
     def create(data):
         """Create a new column using the given data."""
-        if isinstance(data, Column):
+        if type(data) == Column:
             return data.clone()
         else:
             return Column(data)
@@ -409,7 +409,12 @@ class Frame:
 
     def update(self, other):
         """update"""
-        self._columns.update(other)
+        for k, v in other.items():
+            self.update_column(k, v)    
+
+    def pop(self, key):
+        """update"""
+        self._columns.pop(key)
 
     @property
     def schemes(self):

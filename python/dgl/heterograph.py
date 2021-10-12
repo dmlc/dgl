@@ -1158,7 +1158,7 @@ class DGLHeteroGraph(object):
                                'in the form of (srctype, etype, dsttype)' % etype)
             return ret
 
-    @functools.lru_cache
+    @functools.lru_cache()
     def get_ntype_id(self, ntype):
         """Return the ID of the given node type.
 
