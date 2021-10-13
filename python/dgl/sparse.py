@@ -235,13 +235,13 @@ def _gspmm_hetero(gidx, op, reduce_op, u_len, u_and_e_tuple):
             arg_e = F.zeros(v_shp, idtype, ctx)
     arg_u_nd = to_dgl_nd_for_write(arg_u)
     arg_e_nd = to_dgl_nd_for_write(arg_e)
-    if gidx.number_of_edges(0) > 0:
-        _CAPI_DGLKernelSpMMHetero(gidx, op, reduce_op,
-                                  [to_dgl_nd(u_i) for u_i in list_u],
-                                  [to_dgl_nd(e_i) for e_i in list_e],
-                                  [to_dgl_nd_for_write(v_i) for v_i in list_v],
-                                  arg_u_nd,
-                                  arg_e_nd)
+    # if gidx.number_of_edges(0) > 0:
+    #     _CAPI_DGLKernelSpMMHetero(gidx, op, reduce_op,
+    #                               [to_dgl_nd(u_i) for u_i in list_u],
+    #                               [to_dgl_nd(e_i) for e_i in list_e],
+    #                               [to_dgl_nd_for_write(v_i) for v_i in list_v],
+    #                               arg_u_nd,
+    #                               arg_e_nd)
     arg_u = None if arg_u is None else F.zerocopy_from_dgl_ndarray(arg_u_nd)
     arg_e = None if arg_e is None else F.zerocopy_from_dgl_ndarray(arg_e_nd)
     # To deal with scalar node/edge features.
@@ -344,7 +344,7 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
 def _gsddmm_hetero(gidx, op, lhs_len, lhs_target='u', rhs_target='v', lhs_and_rhs_tuple=None):
     r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface.
     """
-    lhs_tuple, rhs_tuple = lhs_and_rhs_tuple[:lhs_len], lhs_and_rhs_tuple[lhs_len:]
+    lhs_tuple, rhs_tuple = list(lhs_and_rhs_tuple[:lhs_len]), list(lhs_and_rhs_tuple[lhs_len:])
 
     use_lhs = op != 'copy_rhs'
     use_rhs = op != 'copy_lhs'
@@ -354,8 +354,8 @@ def _gsddmm_hetero(gidx, op, lhs_len, lhs_target='u', rhs_target='v', lhs_and_rh
     expand_lhs, expand_rhs = False, False
     num_ntype = gidx.number_of_ntypes()
     num_etype = gidx.number_of_etypes()
-    lhs_list = [None] * num_ntype if lhs_target in ['u', 'v'] else [None] * num_etype
-    rhs_list = [None] * num_ntype if rhs_target in ['u', 'v'] else [None] * num_etype
+    lhs_list = lhs_tuple # [None] * num_ntype if lhs_target in ['u', 'v'] else [None] * num_etype
+    rhs_list = rhs_tuple # [None] * num_ntype if rhs_target in ['u', 'v'] else [None] * num_etype
     out_list = [None] * gidx.number_of_etypes()
 
     lhs_target = target_mapping[lhs_target]
@@ -382,15 +382,15 @@ def _gsddmm_hetero(gidx, op, lhs_len, lhs_target='u', rhs_target='v', lhs_and_rh
         rhs_list[rhs_id] = rhs if use_rhs else None
         out_shp = (gidx.number_of_edges(etid), ) +\
             infer_broadcast_shape(op, lhs_shp[1:], rhs_shp[1:])
-        out_list[etid] = F.zeros(out_shp, dtype, ctx)
+        out_list[etid] = F.tensor([]) #F.zeros(out_sh, dtype, ctx)
     if gidx.number_of_edges(0) > 0:
         _CAPI_DGLKernelSDDMMHetero(gidx, op,
                                    [to_dgl_nd(lhs) for lhs in lhs_list],
                                    [to_dgl_nd(rhs) for rhs in rhs_list],
                                    [to_dgl_nd_for_write(out) for out in out_list],
                                    lhs_target, rhs_target)
-
-    for l in range(gidx.number_of_ntypes()):
+    print("Output after CAPI_SDDMM: ", out_list)
+    for l in range(gidx.number_of_etypes()):
         # Replace None by empty tensor. Forward func doesn't accept None in tuple.
         e = out_list[l]
         e = F.tensor([]) if e is None else e

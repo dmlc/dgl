@@ -147,17 +147,18 @@ int get_typeid_by_target(HeteroGraphPtr graph, int target, dgl_type_t etype) {
 /*! \brief Generalized Sampled Dense-Dense Matrix Multiplication. */
 void SDDMMHetero(const std::string& op,
            HeteroGraphPtr graph,
-           std::vector<NDArray> lhs,
-           std::vector<NDArray> rhs,
-           std::vector<NDArray> out,
+           std::vector<NDArray>& lhs,
+           std::vector<NDArray>& rhs,
+           std::vector<NDArray>& out,
            int lhs_target,
            int rhs_target) {
   // TODO(Israt): change it to COO_CODE
   SparseFormat format = graph->SelectFormat(0, CSR_CODE);
-
+  // auto device = runtime::DeviceAPI::Get(out[0]->ctx);
   std::vector<CSRMatrix> vec_csr;
   std::vector<dgl_type_t> lhs_eid;
   std::vector<dgl_type_t> rhs_eid;
+
   for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
     vec_csr.push_back(graph->GetCSRMatrix(etype));
     lhs_eid.push_back(get_typeid_by_target(graph, lhs_target, etype));
@@ -165,9 +166,15 @@ void SDDMMHetero(const std::string& op,
   }
   const auto &bcast = CalcBcastOff(op, lhs[lhs_eid[0]], rhs[rhs_eid[0]]);
 
+  const auto& ctx = lhs[lhs_eid[0]]->ctx;
+  for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
+    NDArray ret = NDArray::Empty({vec_csr[etype].indices->shape[0] * bcast.lhs_len},
+      DLDataType{kDLFloat, sizeof(float) * 8, 1}, ctx);
+    out[etype] = ret;
+  }
   ATEN_XPU_SWITCH_CUDA(graph->Context().device_type, XPU, "SDDMM", {
     ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
-      ATEN_FLOAT_BITS_SWITCH(out[rhs_eid[0]]->dtype, bits, "Feature data", {
+      ATEN_FLOAT_BITS_SWITCH(out[0]->dtype, bits, "Feature data", {
         if (format == SparseFormat::kCSR) {
           SDDMMCsrHetero<XPU, IdType, bits>(
               op, bcast, vec_csr,
