@@ -817,6 +817,7 @@ class DGLHeteroGraph(object):
         """Some info like batch_num_nodes may be stale after mutation
         Clean these cached info
         """
+        self.clear_cache()
         self._batch_num_nodes = None
         self._batch_num_edges = None
 
@@ -842,6 +843,16 @@ class DGLHeteroGraph(object):
         the name with ``"SRC/"`` or ``"DST/"`` when specifying a node type.
         """
         return self._is_unibipartite
+    
+    def clear_cache(self):
+        """clear all cache"""
+        type(self).ntypes.fget.cache_clear()
+        self.get_ntype_id.cache_clear()
+        type(self).nodes.fget.cache_clear()
+        type(self).edges.fget.cache_clear()
+        self.number_of_nodes.cache_clear()
+        self.number_of_nodes_ntype_id.cache_clear()
+        type(self).device.fget.cache_clear()
 
     @property
     @functools.lru_cache()
