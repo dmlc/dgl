@@ -20,7 +20,7 @@ class DistEmbedding:
     optimizers in the future.
 
     Distributed embeddings are sharded and stored in a cluster of machines in the same way as
-    py:meth:`dgl.distributed.DistTensor`, except that distributed embeddings are trainable.
+    :py:meth:`~dgl.distributed.DistTensor`, except that distributed embeddings are trainable.
     Because distributed embeddings are sharded
     in the same way as nodes and edges of a distributed graph, it is usually much more
     efficient to access than the sparse embeddings provided by the deep learning frameworks.
