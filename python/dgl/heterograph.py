@@ -1,5 +1,5 @@
 """Classes for heterogeneous graphs."""
-#pylint: disable= too-many-lines
+#pylint: disable= too-many-lines, no-member
 from collections import defaultdict
 from collections.abc import Mapping, Iterable
 from contextlib import contextmanager
@@ -817,7 +817,7 @@ class DGLHeteroGraph(object):
         """Some info like batch_num_nodes may be stale after mutation
         Clean these cached info
         """
-        self.clear_cache()
+        self._clear_cache()
         self._batch_num_nodes = None
         self._batch_num_edges = None
 
@@ -843,8 +843,8 @@ class DGLHeteroGraph(object):
         the name with ``"SRC/"`` or ``"DST/"`` when specifying a node type.
         """
         return self._is_unibipartite
-    
-    def clear_cache(self):
+
+    def _clear_cache(self):
         """clear all cache"""
         type(self).ntypes.fget.cache_clear()
         self.get_ntype_id.cache_clear()
