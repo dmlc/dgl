@@ -179,7 +179,7 @@ class Column(object):
         """Update the column data."""
         self.index = None
         self.storage = val
-    
+
     def set_data(self, val):
         """Update the column data."""
         self.index = None
@@ -315,7 +315,7 @@ class Column(object):
     @staticmethod
     def create(data):
         """Create a new column using the given data."""
-        if type(data) == Column:
+        if isinstance(data, Column):
             return data.clone()
         else:
             return Column(data)
@@ -416,12 +416,12 @@ class Frame:
     def update(self, other):
         """update"""
         for k, v in other.items():
-            self.update_column(k, v)  
+            self.update_column(k, v)
 
-    def get(self, key, default = None):
+    def get(self, key, default=None):
         """get"""
         if key in self._columns:
-            return self._columns[key].data  
+            return self._columns[key].data
         else:
             return default
 
