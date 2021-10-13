@@ -87,7 +87,9 @@ def run(proc_id, n_gpus, args, devices, data):
     sampler = dgl.dataloading.MultiLayerNeighborSampler(
         [int(fanout) for fanout in args.fan_out.split(',')])
     dataloader = dgl.dataloading.EdgeDataLoader(
-        g, train_seeds, sampler, exclude='reverse_id',
+        g, train_seeds, sampler,
+        # Excluding edges doesn't support GPU for now
+        exclude=None if args.sample_gpu else 'reverse_id',
         # For each edge with ID e in Reddit dataset, the reverse edge is e ± |E|/2.
         reverse_eids=th.cat([
             th.arange(n_edges // 2, n_edges),
