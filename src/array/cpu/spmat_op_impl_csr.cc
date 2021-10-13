@@ -377,6 +377,7 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {
 
   std::vector<IdType> sums;
 
+  // Perform two-round parallel prefix sum using OpenMP
   #pragma omp parallel
   {
     int64_t tid = omp_get_thread_num();
@@ -389,6 +390,8 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {
     }
 
     int64_t sum = 0;
+
+    // First round of parallel prefix sum. All threads perform local prefix sums.
     #pragma omp for schedule(static) nowait
     for (int64_t i = 0; i < len; ++i) {
       int64_t rid = rows_data[i];
@@ -406,11 +409,14 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {
 
     int64_t offset = sums[tid];
 
+    // Second round of parallel prefix sum. Update the local prefix sums.
     #pragma omp for schedule(static)
     for (int64_t i = 0; i < len; ++i)
       ret_indptr_data[i + 1] += offset;
   }
 
+  // After the prefix sum, the last element of ret_indptr_data holds the
+  // sum of all elements
   nnz = ret_indptr_data[len];
 
   ret.indices = NDArray::Empty({nnz}, csr.indices->dtype, csr.indices->ctx);
@@ -420,19 +426,20 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {
   IdType* ret_indices_data = static_cast<IdType*>(ret.indices->data);
   IdType* ret_data = static_cast<IdType*>(ret.data->data);
 
-  #pragma omp parallel for
-  for (int64_t i = 0; i < len; ++i) {
-    const IdType rid = rows_data[i];
-    // note: zero is allowed
-    std::copy(indices_data + indptr_data[rid], indices_data + indptr_data[rid + 1],
-              ret_indices_data + ret_indptr_data[i]);
-    if (data)
-      std::copy(data + indptr_data[rid], data + indptr_data[rid + 1],
-                ret_data + ret_indptr_data[i]);
-    else
-      std::iota(ret_data + ret_indptr_data[i], ret_data + ret_indptr_data[i + 1],
-                indptr_data[rid]);
-  }
+  parallel_for(0, len, [=](int64_t b, int64_t e) {
+    for (auto i = b; i < e; ++i) {
+      const IdType rid = rows_data[i];
+      // note: zero is allowed
+      std::copy(indices_data + indptr_data[rid], indices_data + indptr_data[rid + 1],
+                ret_indices_data + ret_indptr_data[i]);
+      if (data)
+        std::copy(data + indptr_data[rid], data + indptr_data[rid + 1],
+                  ret_data + ret_indptr_data[i]);
+      else
+        std::iota(ret_data + ret_indptr_data[i], ret_data + ret_indptr_data[i + 1],
+                  indptr_data[rid]);
+    }
+  });
   return ret;
 }
 
