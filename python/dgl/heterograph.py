@@ -1606,6 +1606,7 @@ class DGLHeteroGraph(object):
     #################################################################
 
     @property
+    @functools.lru_cache()
     def nodes(self):
         """Return a node view
 
@@ -1985,6 +1986,7 @@ class DGLHeteroGraph(object):
             return HeteroNodeDataView(self, ntypes, ntids, ALL)
 
     @property
+    @functools.lru_cache()
     def edges(self):
         """Return an edge view
 

@@ -122,6 +122,7 @@ class Column(object):
     index : Tensor
         Index tensor
     """
+    __slots__ = ['storage', "_scheme", "index", "device"]
 
     def __init__(self, storage, scheme=None, index=None, device=None):
         self.storage = storage
@@ -175,6 +176,11 @@ class Column(object):
 
     @data.setter
     def data(self, val):
+        """Update the column data."""
+        self.index = None
+        self.storage = val
+    
+    def set_data(self, val):
         """Update the column data."""
         self.index = None
         self.storage = val
@@ -410,7 +416,14 @@ class Frame:
     def update(self, other):
         """update"""
         for k, v in other.items():
-            self.update_column(k, v)    
+            self.update_column(k, v)  
+
+    def get(self, key, default = None):
+        """get"""
+        if key in self._columns:
+            return self._columns[key].data  
+        else:
+            return default
 
     def pop(self, key):
         """update"""
@@ -531,11 +544,14 @@ class Frame:
         data : Column or data convertible to Column
             The column data.
         """
-        col = Column.create(data)
-        # if len(col) != self.num_rows:
-        #     raise DGLError('Expected data to have %d rows, got %d.' %
-        #                    (self.num_rows, len(col)))
-        self._columns[name] = col
+        if name in self._columns:
+            self._columns[name].set_data(data)
+        else:
+            col = Column.create(data)
+            # if len(col) != self.num_rows:
+            #     raise DGLError('Expected data to have %d rows, got %d.' %
+            #                    (self.num_rows, len(col)))
+            self._columns[name] = col
 
     def update_row(self, rowids, data):
         """Update the feature data of the given rows.

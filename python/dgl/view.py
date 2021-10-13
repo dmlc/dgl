@@ -1,6 +1,7 @@
 """Views of DGLGraph."""
 from __future__ import absolute_import
 
+import functools
 from collections import namedtuple, defaultdict
 from collections.abc import MutableMapping
 
@@ -18,6 +19,7 @@ class HeteroNodeView(object):
         self._graph = graph
         self._typeid_getter = typeid_getter
 
+    @functools.lru_cache()
     def __getitem__(self, key):
         if isinstance(key, slice):
             # slice
@@ -127,6 +129,7 @@ class HeteroEdgeView(object):
     def __init__(self, graph):
         self._graph = graph
 
+    @functools.lru_cache()
     def __getitem__(self, key):
         if isinstance(key, slice):
             # slice
