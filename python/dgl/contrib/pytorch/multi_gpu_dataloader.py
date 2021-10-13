@@ -148,6 +148,7 @@ class MultiGPUNodeDataLoader(NodeDataLoader):
         iterator.
     kwargs : dict
         Arguments being passed to :py:class:`dgl.dataloader.NodeDataLoader`.
+        If `num_workers` is specified, it must be 0.
 
     Examples
     --------
@@ -166,8 +167,10 @@ class MultiGPUNodeDataLoader(NodeDataLoader):
 
     """
     def __init__(self, g, nids, block_sampler, device, partition=None, use_ddp=True,
-                 node_feat=None, node_label=None, **kwargs):
+                 node_feat=None, node_label=None, num_workers=0, **kwargs):
         assert device != th.device("cpu"), "The device must be a GPU."
+        assert num_workers == 0, "MultiGPUNodeDataLoader only works with " \
+            "0 workers."
 
         # create the nccl communicator (if we have multiple processes)
         comm = None
@@ -231,7 +234,7 @@ class MultiGPUNodeDataLoader(NodeDataLoader):
 
         super(MultiGPUNodeDataLoader, self).__init__(
             g=g, nids=nids, block_sampler=block_sampler, device=device,
-            use_ddp=use_ddp, **kwargs)
+            use_ddp=use_ddp, num_workers=num_workers, **kwargs)
 
         self._node_feat = None
         if node_feat is not None:
