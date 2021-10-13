@@ -84,7 +84,7 @@ def gspmm(g, op, reduce_op, lhs_data, rhs_data):
         rhs_data = [None] * g._graph.number_of_etypes() if rhs_data is None else rhs_data
         # TODO (Israt): Call reshape func
         lhs_and_rhs_tuple = tuple(list(lhs_data) + list(rhs_data))
-        ret = gspmm_internal_hetero(g, op,
+        ret = gspmm_internal_hetero(g._graph, op,
                                     'sum' if reduce_op == 'mean' else reduce_op,
                                     len(lhs_data), *lhs_and_rhs_tuple)
     # TODO (Israt): Add support for 'max', 'min', 'mean' in heterograph
