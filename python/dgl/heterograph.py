@@ -5828,6 +5828,7 @@ class DGLHeteroGraph(object):
         for fmt in formats:
             assert fmt in ("coo", "csr", "csc"), '{} is not coo, csr or csc'.format(fmt)
         gidx = self._graph.shared_memory(name, self.ntypes, self.etypes, formats)
+        self._clear_cache()
         return DGLHeteroGraph(gidx, self.ntypes, self.etypes)
 
 
