@@ -473,6 +473,7 @@ class EdgeSoftmax(th.autograd.Function):
             return grad_score.data
         """
         gidx = ctx.backward_cache
+        # See https://github.com/dmlc/dgl/pull/3386
         ctx.backward_cache = None
         out, = ctx.saved_tensors
         sds = out * grad_out
@@ -494,6 +495,7 @@ class SegmentReduce(th.autograd.Function):
     @custom_bwd
     def backward(ctx, dy):
         op = ctx.backward_cache
+        # See https://github.com/dmlc/dgl/pull/3386
         ctx.backward_cache = None
         arg, offsets = ctx.saved_tensors
         m = offsets[-1].item()
