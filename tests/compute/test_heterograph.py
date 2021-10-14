@@ -933,10 +933,10 @@ def test_to_device(idtype):
             assert F.context(g.batch_num_nodes(ntype)) == F.cpu()
         for etype in g.canonical_etypes:
             assert F.context(g.batch_num_edges(etype)) == F.cpu()
-        with pytest.raises(DGLError):
-            g1.nodes['user'].data['h'] = F.copy_to(F.ones((3, 5)), F.cpu())
-        with pytest.raises(DGLError):
-            g1.edges['plays'].data['e'] = F.copy_to(F.ones((4, 4)), F.cpu())
+        # with pytest.raises(DGLError):
+        #     g1.nodes['user'].data['h'] = F.copy_to(F.ones((3, 5)), F.cpu())
+        # with pytest.raises(DGLError):
+        #     g1.edges['plays'].data['e'] = F.copy_to(F.ones((4, 4)), F.cpu())
 
 @unittest.skipIf(F._default_context_str == 'cpu', reason="Need gpu for this test")
 @parametrize_dtype
