@@ -5,7 +5,9 @@ import dgl
 import torch as th
 from ogb.nodeproppred import DglNodePropPredDataset
 
-with open('outputs/mag.json') as json_file:
+partitions_folder = 'outputs'
+graph_name = 'mag'
+with open('{}/{}.json'.format(partitions_folder, graph_name)) as json_file:
     metadata = json.load(json_file)
 num_parts = metadata['num_parts']
 
@@ -24,8 +26,8 @@ hg.nodes['paper'].data['feat'] = hg_orig.nodes['paper'].data['feat']
 node_feats = {}
 edge_feats = {}
 for partid in range(num_parts):
-    part_node_feats = dgl.data.utils.load_tensors('outputs/part{}/node_feat.dgl'.format(partid))
-    part_edge_feats = dgl.data.utils.load_tensors('outputs/part{}/edge_feat.dgl'.format(partid))
+    part_node_feats = dgl.data.utils.load_tensors('{}/part{}/node_feat.dgl'.format(partitions_folder, partid))
+    part_edge_feats = dgl.data.utils.load_tensors('{}/part{}/edge_feat.dgl'.format(partitions_folder, partid))
     for key in part_node_feats:
         if key in node_feats:
             node_feats[key].append(part_node_feats[key])
@@ -52,6 +54,8 @@ for key in etype_map:
     etype_id = etype_map[key]
     etypes[etype_id] = key
 
+etype2canonical = {etype: (srctype, etype, dsttype) for srctype, etype, dsttype in hg.canonical_etypes}
+
 node_map = metadata['node_map']
 for key in node_map:
     node_map[key] = th.stack([th.tensor(row) for row in node_map[key]], 0)
@@ -66,16 +70,46 @@ for ntype in node_map:
 for etype in edge_map:
     assert hg.number_of_edges(etype) == th.sum(edge_map[etype][:,1] - edge_map[etype][:,0])
 
+eid = []
+gpb = dgl.distributed.graph_partition_book.RangePartitionBook(0, 2, node_map, edge_map,
+        {ntype:i for i, ntype in enumerate(hg.ntypes)},
+        {etype:i for i, etype in enumerate(hg.etypes)})
+subg0 = dgl.load_graphs('{}/part0/graph.dgl'.format(partitions_folder))[0][0]
+for etype in hg.etypes:
+    type_eid = th.zeros((1,), dtype=th.int64)
+    eid.append(gpb.map_to_homo_eid(type_eid, etype))
+eid = th.cat(eid)
+part_id = gpb.eid2partid(eid)
+assert np.all(part_id.numpy() == 0)
+local_eid = gpb.eid2localeid(eid, 0)
+assert np.all(local_eid.numpy() == eid.numpy())
+assert np.all((subg0.edata[dgl.EID][local_eid] == eid).numpy())
+lsrc, ldst = subg0.find_edges(local_eid)
+gsrc, gdst = subg0.ndata[dgl.NID][lsrc], subg0.ndata[dgl.NID][ldst]
+assert np.all(gsrc.numpy() == lsrc.numpy())
+assert np.all(gdst.numpy() == ldst.numpy())
+etids, _ = gpb.map_to_per_etype(eid)
+src_tids, _ = gpb.map_to_per_ntype(gsrc)
+dst_tids, _ = gpb.map_to_per_ntype(gdst)
+canonical_etypes = []
+etype_ids = th.arange(0, len(etypes))
+for src_tid, etype_id, dst_tid in zip(src_tids, etype_ids, dst_tids):
+    canonical_etypes.append((ntypes[src_tid], etypes[etype_id], ntypes[dst_tid]))
+for etype in canonical_etypes:
+    assert etype in hg.canonical_etypes
+
 # Load the graph partition structure.
 orig_node_ids = {ntype: [] for ntype in hg.ntypes}
 orig_edge_ids = {etype: [] for etype in hg.etypes}
 for partid in range(num_parts):
     print('test part', partid)
-    part_file = 'outputs/part{}/graph.dgl'.format(partid)
+    part_file = '{}/part{}/graph.dgl'.format(partitions_folder, partid)
     subg = dgl.load_graphs(part_file)[0][0]
     subg_src_id, subg_dst_id = subg.edges()
-    subg_src_id = subg.ndata['orig_id'][subg_src_id]
-    subg_dst_id = subg.ndata['orig_id'][subg_dst_id]
+    orig_src_id = subg.ndata['orig_id'][subg_src_id]
+    orig_dst_id = subg.ndata['orig_id'][subg_dst_id]
+    global_src_id = subg.ndata[dgl.NID][subg_src_id]
+    global_dst_id = subg.ndata[dgl.NID][subg_dst_id]
     subg_ntype = subg.ndata[dgl.NTYPE]
     subg_etype = subg.edata[dgl.ETYPE]
     for ntype_id in th.unique(subg_ntype):
@@ -99,11 +133,19 @@ for partid in range(num_parts):
 
     for etype_id in th.unique(subg_etype):
         etype = etypes[etype_id]
+        srctype, _, dsttype = etype2canonical[etype]
         idx = subg_etype == etype_id
-        exist = hg[etype].has_edges_between(subg_src_id[idx], subg_dst_id[idx])
+        exist = hg[etype].has_edges_between(orig_src_id[idx], orig_dst_id[idx])
         assert np.all(exist.numpy())
-        eid = hg[etype].edge_ids(subg_src_id[idx], subg_dst_id[idx])
+        eid = hg[etype].edge_ids(orig_src_id[idx], orig_dst_id[idx])
         assert np.all(eid.numpy() == subg.edata['orig_id'][idx].numpy())
+
+        ntype_ids, type_nid = nid_map(global_src_id[idx])
+        assert len(th.unique(ntype_ids)) == 1
+        assert ntypes[ntype_ids[0]] == srctype
+        ntype_ids, type_nid = nid_map(global_dst_id[idx])
+        assert len(th.unique(ntype_ids)) == 1
+        assert ntypes[ntype_ids[0]] == dsttype
 
         # This is global IDs after reshuffle.
         eid = subg.edata[dgl.EID][idx]
