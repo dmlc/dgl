@@ -64,14 +64,13 @@ def to_dgl_nd_for_write(x):
     return nd.NULL['int64'] if x is None else F.zerocopy_to_dgl_ndarray_for_write(x)
 
 
-def get_typeid_by_target(g, rel, target):
+def get_typeid_by_target(gidx, etid, target):
     """Find the src/dst/etype id based on the target 'u', 'v' or 'e'."""
-    srctype, _, dsttype = rel
-    etid = g.get_etype_id(rel)
+    src_id, dst_id = gidx.metagraph.find_edge(etid)
     if target in [0, 'u']:
-        return g.get_ntype_id(srctype)
+        return src_id
     if target in [2, 'v']:
-        return g.get_ntype_id(dsttype)
+        return dst_id
     return etid
 
 
@@ -190,11 +189,10 @@ def _gspmm(gidx, op, reduce_op, u, e):
     return v, (arg_u, arg_e)
 
 
-def _gspmm_hetero(g, op, reduce_op, u_len, u_and_e_tuple):
+def _gspmm_hetero(gidx, op, reduce_op, u_len, u_and_e_tuple):
     r""" Generalized Sparse Matrix Multiplication interface.
     """
     u_tuple, e_tuple = u_and_e_tuple[:u_len], u_and_e_tuple[u_len:]
-    gidx = g._graph
     use_u = op != 'copy_rhs'
     use_e = op != 'copy_lhs'
     # TODO (Israt): Add check - F.dtype(u) != F.dtype(e):
@@ -205,11 +203,8 @@ def _gspmm_hetero(g, op, reduce_op, u_len, u_and_e_tuple):
     list_v = [None] * gidx.number_of_ntypes()
     list_e = [None] * gidx.number_of_etypes()
 
-    for rel in g.canonical_etypes:
-        srctype, _, dsttype = rel
-        etid = g.get_etype_id(rel)
-        src_id = g.get_ntype_id(srctype)
-        dst_id = g.get_ntype_id(dsttype)
+    for etid in range(gidx.number_of_etypes()):
+        src_id, dst_id = gidx.metagraph.find_edge(etid)
         u = u_tuple[src_id] if use_u else None
         e = e_tuple[etid] if use_e else None
         if use_u:
@@ -346,10 +341,9 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
     return out
 
 
-def _gsddmm_hetero(g, op, lhs_len, lhs_target='u', rhs_target='v', lhs_and_rhs_tuple=None):
+def _gsddmm_hetero(gidx, op, lhs_len, lhs_target='u', rhs_target='v', lhs_and_rhs_tuple=None):
     r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface.
     """
-    gidx = g._graph
     lhs_tuple, rhs_tuple = lhs_and_rhs_tuple[:lhs_len], lhs_and_rhs_tuple[lhs_len:]
 
     use_lhs = op != 'copy_rhs'
@@ -358,8 +352,8 @@ def _gsddmm_hetero(g, op, lhs_len, lhs_target='u', rhs_target='v', lhs_and_rhs_t
     # TODO (Israt): Add check - F.dtype(u) != F.dtype(e):
     # deal with scalar features.
     expand_lhs, expand_rhs = False, False
-    num_ntype = g._graph.number_of_ntypes()
-    num_etype = g._graph.number_of_etypes()
+    num_ntype = gidx.number_of_ntypes()
+    num_etype = gidx.number_of_etypes()
     lhs_list = [None] * num_ntype if lhs_target in ['u', 'v'] else [None] * num_etype
     rhs_list = [None] * num_ntype if rhs_target in ['u', 'v'] else [None] * num_etype
     out_list = [None] * gidx.number_of_etypes()
@@ -367,10 +361,9 @@ def _gsddmm_hetero(g, op, lhs_len, lhs_target='u', rhs_target='v', lhs_and_rhs_t
     lhs_target = target_mapping[lhs_target]
     rhs_target = target_mapping[rhs_target]
 
-    for rel in g.canonical_etypes:
-        etid = g.get_etype_id(rel)
-        lhs_id = get_typeid_by_target(g, rel, lhs_target)
-        rhs_id = get_typeid_by_target(g, rel, rhs_target)
+    for etid in range(gidx.number_of_etypes()):
+        lhs_id = get_typeid_by_target(gidx, etid, lhs_target)
+        rhs_id = get_typeid_by_target(gidx, etid, rhs_target)
         lhs = lhs_tuple[lhs_id]
         rhs = rhs_tuple[rhs_id]
         if use_lhs:
