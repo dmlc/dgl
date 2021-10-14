@@ -25,6 +25,7 @@
 #include <dgl/base_heterograph.h>
 
 #include <vector>
+#include <utility>
 
 namespace dgl {
 namespace transform {

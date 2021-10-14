@@ -253,7 +253,7 @@ CompactGraphsGPU(
   }
 
   return std::make_pair(new_graphs, induced_nodes);
-};
+}
 
 }  // namespace
 
