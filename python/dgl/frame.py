@@ -418,6 +418,11 @@ class Frame:
         for k, v in other.items():
             self.update_column(k, v)
 
+    def items(self):
+        """items"""
+        for key in self._columns.keys():
+            yield key, self._columns[key].data
+
     def get(self, key, default=None):
         """get"""
         if key in self._columns:

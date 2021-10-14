@@ -846,7 +846,7 @@ class DGLHeteroGraph(object):
 
     def _clear_cache(self):
         """clear all cache"""
-        type(self).ntypes.fget.cache_clear()
+        # type(self).ntypes.fget.cache_clear()
         self.get_ntype_id.cache_clear()
         type(self).nodes.fget.cache_clear()
         type(self).edges.fget.cache_clear()
@@ -855,7 +855,6 @@ class DGLHeteroGraph(object):
         type(self).device.fget.cache_clear()
 
     @property
-    @functools.lru_cache()
     def ntypes(self):
         """Return all the node type names in the graph.
 
