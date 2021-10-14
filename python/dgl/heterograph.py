@@ -654,7 +654,7 @@ class DGLHeteroGraph(object):
         self._graph = sub_g._graph
         self._node_frames = sub_g._node_frames
         self._edge_frames = sub_g._edge_frames
-        self._reset_cached_info()
+        self._clear_cache()
 
     def remove_nodes(self, nids, ntype=None, store_ids=False):
         r"""Remove multiple nodes with the specified node type
@@ -812,7 +812,7 @@ class DGLHeteroGraph(object):
                 self.nodes[c_ntype].data.pop(NID)
             for c_etype in self.canonical_etypes:
                 self.edges[c_etype].data.pop(EID)
-        self._reset_cached_info()
+        self._clear_cache()
 
     def _reset_cached_info(self):
         """Some info like batch_num_nodes may be stale after mutation
