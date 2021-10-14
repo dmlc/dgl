@@ -88,6 +88,13 @@ class HeteroGraphConv(layers.Layer):
     >>> print(y_dst.keys())
     dict_keys(['user', 'game'])
 
+    Notes
+    -----
+
+    HeteroGraphConv requires that there is a module for every ``'etype'`` in an input graph.
+    If you want to apply HeteroGraphConv to a subset of a graph's ``'etypes'``, you must
+    create a new graph using for example :func:`~dgl.edge_type_subgraph()`.
+
     Parameters
     ----------
     mods : dict[str, nn.Module]
@@ -162,8 +169,6 @@ class HeteroGraphConv(layers.Layer):
             src_inputs, dst_inputs = inputs
             for stype, etype, dtype in g.canonical_etypes:
                 rel_graph = g[stype, etype, dtype]
-                if rel_graph.number_of_edges() == 0:
-                    continue
                 if stype not in src_inputs or dtype not in dst_inputs:
                     continue
                 dstdata = self.mods[etype](
@@ -175,8 +180,6 @@ class HeteroGraphConv(layers.Layer):
         else:
             for stype, etype, dtype in g.canonical_etypes:
                 rel_graph = g[stype, etype, dtype]
-                if rel_graph.number_of_edges() == 0:
-                    continue
                 if stype not in inputs:
                     continue
                 dstdata = self.mods[etype](

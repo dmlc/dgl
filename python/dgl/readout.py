@@ -413,6 +413,8 @@ def broadcast_nodes(graph, graph_feat, *, ntype=None):
     --------
     broadcast_edges
     """
+    if len(F.shape(graph_feat)) == 1:
+        graph_feat = F.unsqueeze(graph_feat, dim=0)
     return F.repeat(graph_feat, graph.batch_num_nodes(ntype), dim=0)
 
 def broadcast_edges(graph, graph_feat, *, etype=None):
@@ -478,6 +480,8 @@ def broadcast_edges(graph, graph_feat, *, etype=None):
     --------
     broadcast_nodes
     """
+    if len(F.shape(graph_feat)) == 1:
+        graph_feat = F.unsqueeze(graph_feat, dim=0)
     return F.repeat(graph_feat, graph.batch_num_edges(etype), dim=0)
 
 READOUT_ON_ATTRS = {

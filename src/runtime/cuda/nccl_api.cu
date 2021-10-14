@@ -29,7 +29,6 @@
 #include "cuda_common.h"
 #include "../../runtime/workspace.h"
 #include "../../partition/ndarray_partition.h"
-#include "../../kernel/cuda/atomic.cuh"
 #include "../../array/cuda/dgl_cub.cuh"
 #include "../../array/cuda/array_index_select.cuh"
 
@@ -44,7 +43,6 @@
 
 namespace dgl {
 
-using namespace kernel::cuda;
 using namespace partition;
 
 namespace runtime {

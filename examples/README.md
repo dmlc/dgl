@@ -20,7 +20,9 @@ To quickly locate the examples of your interest, search for the tagged keywords 
 - <a name="point_transformer"></a> Zhao et al. Point Transformer. [Paper link](http://arxiv.org/abs/2012.09164).
     - Example code: [PyTorch](../examples/pytorch/pointcloud/point_transformer)
     - Tags: point cloud classification, point cloud part-segmentation
-
+- <a name="pct"></a> Guo et al. PCT: Point cloud transformer. [Paper link](http://arxiv.org/abs/2012.09688).
+    - Example code: [PyTorch](../examples/pytorch/pointcloud/pct)
+    - Tags: point cloud classification, point cloud part-segmentation
 
 ## 2020
 - <a name="eeg-gcnn"></a> Wagh et al. EEG-GCNN: Augmenting Electroencephalogram-based Neurological Disease Diagnosis using a Domain-guided Graph Convolutional Neural Network. [Paper link](http://proceedings.mlr.press/v136/wagh20a.html). 

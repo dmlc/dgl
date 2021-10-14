@@ -10,10 +10,10 @@
 #include <numeric>
 
 #include "./dgl_cub.cuh"
-#include "../../kernel/cuda/atomic.cuh"
+#include "../../array/cuda/atomic.cuh"
 #include "../../runtime/cuda/cuda_common.h"
 
-using namespace dgl::kernel::cuda;
+using namespace dgl::aten::cuda;
 
 namespace dgl {
 namespace aten {
