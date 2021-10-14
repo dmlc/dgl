@@ -12,19 +12,21 @@ NodeSpace = namedtuple('NodeSpace', ['data'])
 EdgeSpace = namedtuple('EdgeSpace', ['data'])
 
 
-def _ignore_unhashable(func): 
+def _ignore_unhashable(func):
     uncached = func.__wrapped__
     attributes = functools.WRAPPER_ASSIGNMENTS + ('cache_info', 'cache_clear')
-    @functools.wraps(func, assigned=attributes) 
-    def wrapper(*args, **kwargs): 
-        try: 
-            return func(*args, **kwargs) 
-        except TypeError as error: 
-            if 'unhashable type' in str(error): 
-                return uncached(*args, **kwargs) 
-            raise 
+
+    @functools.wraps(func, assigned=attributes)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except TypeError as error:
+            if 'unhashable type' in str(error):
+                return uncached(*args, **kwargs)
+            raise
     wrapper.__uncached__ = uncached
     return wrapper
+
 
 class HeteroNodeView(object):
     """A NodeView class to act as G.nodes for a DGLHeteroGraph."""
