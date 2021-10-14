@@ -24,7 +24,7 @@ def is_internal_column(name):
 
 def is_all(arg):
     """Return true if the argument is a special symbol for all nodes or edges."""
-    return arg == ALL
+    return ALL == arg
 
 # pylint: disable=invalid-name
 _default_formatwarning = warnings.formatwarning
