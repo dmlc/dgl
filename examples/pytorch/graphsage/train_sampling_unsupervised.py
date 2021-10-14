@@ -65,8 +65,8 @@ def run(proc_id, n_gpus, args, devices, data):
                                           world_size=world_size,
                                           rank=proc_id)
     train_mask, val_mask, test_mask, n_classes, g = data
-    nfeat = g.ndata.pop('feat')
-    labels = g.ndata.pop('label')
+    nfeat = g.ndata.pop('feat').to(device)
+    labels = g.ndata.pop('label').to(device)
     in_feats = nfeat.shape[1]
 
     train_nid = th.LongTensor(np.nonzero(train_mask)).squeeze()
@@ -77,11 +77,10 @@ def run(proc_id, n_gpus, args, devices, data):
     n_edges = g.num_edges()
     train_seeds = th.arange(n_edges)
 
-    dataloader_device = th.device('cpu')
     if args.sample_gpu:
+        assert n_gpus > 0, "Must have GPUs to enable GPU sampling"
         train_seeds = train_seeds.to(device)
         g = g.to(device)
-        dataloader_device = device
 
     # Create sampler
     sampler = dgl.dataloading.MultiLayerNeighborSampler(
@@ -95,7 +94,7 @@ def run(proc_id, n_gpus, args, devices, data):
             th.arange(n_edges // 2, n_edges),
             th.arange(0, n_edges // 2)]).to(train_seeds),
         negative_sampler=NegativeSampler(g, args.num_negs, args.neg_share),
-        device=dataloader_device,
+        device=device,
         use_ddp=n_gpus > 1,
         batch_size=args.batch_size,
         shuffle=True,
@@ -129,11 +128,11 @@ def run(proc_id, n_gpus, args, devices, data):
         tic_step = time.time()
         for step, (input_nodes, pos_graph, neg_graph, blocks) in enumerate(dataloader):
             batch_inputs = nfeat[input_nodes].to(device)
-            d_step = time.time()
-
             pos_graph = pos_graph.to(device)
             neg_graph = neg_graph.to(device)
             blocks = [block.int().to(device) for block in blocks]
+            d_step = time.time()
+
             # Compute loss and prediction
             batch_pred = model(blocks, batch_inputs)
             loss = loss_fcn(batch_pred, pos_graph, neg_graph)
