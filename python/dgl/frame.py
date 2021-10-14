@@ -122,7 +122,7 @@ class Column(object):
     index : Tensor
         Index tensor
     """
-    __slots__ = ['storage', "_scheme", "index", "device"]
+    # __slots__ = ['storage', "_scheme", "index", "device"]
 
     def __init__(self, storage, scheme=None, index=None, device=None):
         self.storage = storage
