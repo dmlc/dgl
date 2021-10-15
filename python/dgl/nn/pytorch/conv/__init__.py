@@ -6,6 +6,7 @@ from .appnpconv import APPNPConv
 from .chebconv import ChebConv
 from .edgeconv import EdgeConv
 from .gatconv import GATConv
+from .egatconv import EGATConv
 from .ginconv import GINConv
 from .gmmconv import GMMConv
 from .graphconv import GraphConv, EdgeWeightNorm

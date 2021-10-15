@@ -563,7 +563,30 @@ def test_gat_conv_bi(g, idtype, out_dim, num_heads):
     assert h.shape == (g.number_of_dst_nodes(), num_heads, out_dim)
     _, a = gat(g, feat, get_attention=True)
     assert a.shape == (g.number_of_edges(), num_heads, 1)
+    
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo']))
+@pytest.mark.parametrize('out_node_feats', [1, 5])
+@pytest.mark.parametrize('out_edge_feats', [1, 5])
+@pytest.mark.parametrize('num_heads', [1, 4])
+def test_egat_conv(g, idtype, out_node_feats, out_edge_feats, num_heads):
+    g = g.astype(idtype).to(F.ctx())
+    ctx = F.ctx() 
+    egat = nn.EGATConv(in_node_feats=10,
+                     in_edge_feats=5,
+                     out_node_feats=out_node_feats,
+                     out_edge_feats=out_edge_feats,
+                     num_heads=num_heads)
+    nfeat = F.randn((g.number_of_nodes(), 10))
+    efeat = F.randn((g.number_of_edges(), 5))
+    
+    egat = egat.to(ctx)
+    h, f = egat(g, nfeat, efeat)
 
+    # test pickle
+    th.save(egat, tmp_buffer)
+
+    
 @parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite']))
 @pytest.mark.parametrize('aggre_type', ['mean', 'pool', 'gcn', 'lstm'])
@@ -1112,19 +1135,6 @@ def test_hetero_conv(agg, idtype):
     assert mod3.carg1 == 0
     assert mod3.carg2 == 1
 
-    #conv on graph without any edges
-    for etype in g.etypes:
-        g = dgl.remove_edges(g, g.edges(form='eid', etype=etype), etype=etype)
-    assert g.num_edges() == 0
-    h = conv(g, {'user': uf, 'game': gf, 'store': sf})
-    assert set(h.keys()) == {'user', 'game'}
-
-    block = dgl.to_block(g.to(F.cpu()), {'user': [0, 1, 2, 3], 'game': [
-                         0, 1, 2, 3], 'store': []}).to(F.ctx())
-    h = conv(block, ({'user': uf, 'game': gf, 'store': sf},
-             {'user': uf, 'game': gf, 'store': sf[0:0]}))
-    assert set(h.keys()) == {'user', 'game'}
-
 if __name__ == '__main__':
     test_graph_conv()
     test_graph_conv_e_weight()
@@ -1137,6 +1147,7 @@ if __name__ == '__main__':
     test_rgcn_sorted()
     test_tagconv()
     test_gat_conv()
+    test_egat_conv()
     test_sage_conv()
     test_sgc_conv()
     test_appnp_conv()
@@ -1153,4 +1164,3 @@ if __name__ == '__main__':
     test_sequential()
     test_atomic_conv()
     test_cf_conv()
-    test_hetero_conv()
