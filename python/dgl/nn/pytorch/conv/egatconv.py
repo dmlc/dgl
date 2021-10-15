@@ -4,6 +4,7 @@ import torch as th
 from torch import nn
 from torch.nn import init
 
+
 # pylint: enable=W0235
 class EGATConv(nn.Module):
     r"""
@@ -15,17 +16,17 @@ class EGATConv(nn.Module):
     <https://pubmed.ncbi.nlm.nih.gov/34571541/>`__ (see supplementary data).
     The difference appears in the method how unnormalized attention scores :math:`e_{ij}`
     are obtain:
-        
+
     .. math::
         e_{ij} &= \vec{F} (f_{ij}^{\prime})
 
         f_{ij}^{\prim} &= \mathrm{LeakyReLU}\left(A [ h_{i} \| f_{ij} \| h_{j}]\right)
-        
+
     where :math:`f_{ij}^{\prim}` are edge features, :math:`\mathrm{A}` is weight matrix and
-    
+
     :math: `\vec{F}` is weight vector. After that resulting node features
     :math:`h_{i}^{\prim}` are updated in the same way as in regular GAT.
-    
+
     Parameters
     ----------
     in_node_feats : int
@@ -38,7 +39,7 @@ class EGATConv(nn.Module):
         Output edge feature size.
     num_heads : int
         Number of attention heads.
-        
+
     Examples
     ----------
     >>> import dgl
@@ -47,8 +48,8 @@ class EGATConv(nn.Module):
     >>>
     >>> num_nodes, num_edges = 8, 30
     >>>#define connections
-    >>> u, v = th.randint(num_nodes, num_edges), th.randint(num_nodes, num_edges) 
-    >>> graph = dgl.graph((u,v))    
+    >>> u, v = th.randint(num_nodes, num_edges), th.randint(num_nodes, num_edges)
+    >>> graph = dgl.graph((u,v))
 
     >>> node_feats = th.rand((num_nodes, 20))
     >>> edge_feats = th.rand((num_edges, 12))
@@ -57,26 +58,25 @@ class EGATConv(nn.Module):
                           out_node_feats=15,
                           out_edge_feats=10,
                           num_heads=3)
-    >>> #forward pass                    
+    >>> #forward pass
     >>> new_node_feats, new_edge_feats = egat(graph, node_feats, edge_feats)
     >>> new_node_feats.shape, new_edge_feats.shape
     ((8, 3, 12), (30, 3, 10))
     """
+
     def __init__(self,
                  in_node_feats,
                  in_edge_feats,
                  out_node_feats,
                  out_edge_feats,
-                 num_heads,
-                 **kw_args):
-        
+                 num_heads):
         super().__init__()
         self._num_heads = num_heads
         self._out_node_feats = out_node_feats
         self._out_edge_feats = out_edge_feats
-        self.fc_nodes = nn.Linear(in_node_feats, out_node_feats*num_heads, bias=True)
-        self.fc_edges = nn.Linear(in_edge_feats + 2*in_node_feats,
-                                  out_edge_feats*num_heads, bias=False)
+        self.fc_nodes = nn.Linear(in_node_feats, out_node_feats * num_heads, bias=True)
+        self.fc_edges = nn.Linear(in_edge_feats + 2 * in_node_feats,
+                                  out_edge_feats * num_heads, bias=False)
         self.fc_attn = nn.Linear(out_edge_feats, num_heads, bias=False)
         self.reset_parameters()
 
@@ -93,11 +93,11 @@ class EGATConv(nn.Module):
         r"""
         Calculate output edge features and corresponding attention scores
         """
-        #extract features
+        # extract features
         h_src = edges.src['h']
         h_dst = edges.dst['h']
         f = edges.data['f']
-        #stack h_i | f_ij | h_j
+        # stack h_i | f_ij | h_j
         stack = th.cat([h_src, f, h_dst], dim=-1)
         # apply FC and activation
         f_out = self.fc_edges(stack)
@@ -106,11 +106,11 @@ class EGATConv(nn.Module):
         # apply FC to reduce edge_feats to scalar
         a = self.fc_attn(f_out).sum(-1).unsqueeze(-1)
 
-        return {'a': a, 'f' : f_out}
+        return {'a': a, 'f': f_out}
 
     def message_func(self, edges):
         r"""
-        Node aggregation 
+        Node aggregation
         """
         return {'h': edges.src['h'], 'a': edges.data['a']}
 
@@ -140,13 +140,12 @@ class EGATConv(nn.Module):
              where:
                  :math:`F_{in}` is size of input node feauture,
                  :math:`*` is the number of edges.
-       
-            
+
         Returns
         -------
         pair of torch.Tensor
             node output features followed by edge output features
-            The node output feature of shape :math:`(*, H, D_{out})` 
+            The node output feature of shape :math:`(*, H, D_{out})`
             The edge output feature of shape :math:`(*, H, F_{out})`
             where:
                 :math:`H` is the number of heads,
@@ -166,5 +165,5 @@ class EGATConv(nn.Module):
             graph.ndata['h'] = nfeats_
             graph.update_all(message_func=self.message_func,
                              reduce_func=self.reduce_func)
-            
+
         return graph.ndata.pop('h'), graph.edata.pop('f')
