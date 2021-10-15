@@ -5,7 +5,7 @@ from . import ndarray as nd
 from ._ffi.function import _init_api
 from .base import DGLError
 from . import backend as F
-
+import time
 
 def infer_broadcast_shape(op, shp1, shp2):
     r"""Check the shape validity, and infer the output shape given input shape and operator.
@@ -235,13 +235,13 @@ def _gspmm_hetero(gidx, op, reduce_op, u_len, u_and_e_tuple):
             arg_e = F.zeros(v_shp, idtype, ctx)
     arg_u_nd = to_dgl_nd_for_write(arg_u)
     arg_e_nd = to_dgl_nd_for_write(arg_e)
-    # if gidx.number_of_edges(0) > 0:
-    #     _CAPI_DGLKernelSpMMHetero(gidx, op, reduce_op,
-    #                               [to_dgl_nd(u_i) for u_i in list_u],
-    #                               [to_dgl_nd(e_i) for e_i in list_e],
-    #                               [to_dgl_nd_for_write(v_i) for v_i in list_v],
-    #                               arg_u_nd,
-    #                               arg_e_nd)
+    if gidx.number_of_edges(0) > 0:
+        _CAPI_DGLKernelSpMMHetero(gidx, op, reduce_op,
+                                  [to_dgl_nd(u_i) for u_i in list_u],
+                                  [to_dgl_nd(e_i) for e_i in list_e],
+                                  [to_dgl_nd_for_write(v_i) for v_i in list_v],
+                                  arg_u_nd,
+                                  arg_e_nd)
     arg_u = None if arg_u is None else F.zerocopy_from_dgl_ndarray(arg_u_nd)
     arg_e = None if arg_e is None else F.zerocopy_from_dgl_ndarray(arg_e_nd)
     # To deal with scalar node/edge features.
@@ -344,7 +344,7 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
 def _gsddmm_hetero(gidx, op, lhs_len, lhs_target='u', rhs_target='v', lhs_and_rhs_tuple=None):
     r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface.
     """
-    lhs_tuple, rhs_tuple = list(lhs_and_rhs_tuple[:lhs_len]), list(lhs_and_rhs_tuple[lhs_len:])
+    lhs_list, rhs_list = list(lhs_and_rhs_tuple[:lhs_len]), list(lhs_and_rhs_tuple[lhs_len:])
 
     use_lhs = op != 'copy_rhs'
     use_rhs = op != 'copy_lhs'
@@ -352,44 +352,55 @@ def _gsddmm_hetero(gidx, op, lhs_len, lhs_target='u', rhs_target='v', lhs_and_rh
     # TODO (Israt): Add check - F.dtype(u) != F.dtype(e):
     # deal with scalar features.
     expand_lhs, expand_rhs = False, False
-    num_ntype = gidx.number_of_ntypes()
-    num_etype = gidx.number_of_etypes()
-    lhs_list = lhs_tuple # [None] * num_ntype if lhs_target in ['u', 'v'] else [None] * num_etype
-    rhs_list = rhs_tuple # [None] * num_ntype if rhs_target in ['u', 'v'] else [None] * num_etype
+
     out_list = [None] * gidx.number_of_etypes()
 
     lhs_target = target_mapping[lhs_target]
     rhs_target = target_mapping[rhs_target]
-
+    # lhs and rhs for the first etype
+    lhs = lhs_list[get_typeid_by_target(gidx, 0, lhs_target)]
+    rhs = rhs_list[get_typeid_by_target(gidx, 0, rhs_target)]
+    ctx = F.context(lhs) if use_lhs else F.context(rhs)
+    dtype = F.dtype(lhs) if use_lhs else F.dtype(rhs)
+    # # TODO(Israt): Find a better way
+    out_len = lhs.shape[1] if use_lhs else rhs.shape[1]
+    t0 = time.time()
     for etid in range(gidx.number_of_etypes()):
-        lhs_id = get_typeid_by_target(gidx, etid, lhs_target)
-        rhs_id = get_typeid_by_target(gidx, etid, rhs_target)
-        lhs = lhs_tuple[lhs_id]
-        rhs = rhs_tuple[rhs_id]
-        if use_lhs:
-            if lhs is not None and F.ndim(lhs) == 1:
-                lhs = F.unsqueeze(lhs, -1)
-                expand_lhs = True
-        if use_rhs:
-            if rhs is not None and F.ndim(rhs) == 1:
-                rhs = F.unsqueeze(lhs, -1)
-                expand_rhs = True
-        ctx = F.context(lhs) if use_lhs else F.context(rhs)
-        dtype = F.dtype(lhs) if use_lhs else F.dtype(rhs)
-        lhs_shp = F.shape(lhs) if use_lhs else (0,)
-        rhs_shp = F.shape(rhs) if use_rhs else (0,)
-        lhs_list[lhs_id] = lhs if use_lhs else None
-        rhs_list[rhs_id] = rhs if use_rhs else None
-        out_shp = (gidx.number_of_edges(etid), ) +\
-            infer_broadcast_shape(op, lhs_shp[1:], rhs_shp[1:])
-        out_list[etid] = F.tensor([]) #F.zeros(out_sh, dtype, ctx)
+        # lhs_id = get_typeid_by_target(gidx, etid, lhs_target)
+        # rhs_id = get_typeid_by_target(gidx, etid, rhs_target)
+        # lhs = lhs_tuple[lhs_id]
+        # rhs = rhs_tuple[rhs_id]
+        # if use_lhs:
+        #     if lhs is not None and F.ndim(lhs) == 1:
+        #         lhs = F.unsqueeze(lhs, -1)
+        #         expand_lhs = True
+        # if use_rhs:
+        #     if rhs is not None and F.ndim(rhs) == 1:
+        #         rhs = F.unsqueeze(lhs, -1)
+        #         expand_rhs = True
+        # lhs_shp = F.shape(lhs) if use_lhs else (0,)
+        # rhs_shp = F.shape(rhs) if use_rhs else (0,)
+        # lhs_list[lhs_id] = lhs if use_lhs else None
+        # rhs_list[rhs_id] = rhs if use_rhs else None
+        # out_shp = (gidx.number_of_edges(etid), ) +\
+        #     infer_broadcast_shape(op, lhs_shp[1:], rhs_shp[1:])
+        out_shp = 1;
+        # out_list[etid] = F.tensor([]) #F.zeros(out_shp, dtype, ctx)
+        out_list[etid] = F.zeros(out_shp, dtype, ctx)
+    print("SDDMM_CAPI preprocess time:", (time.time() - t0)*1000, "ms")
+    t1 = time.time()
     if gidx.number_of_edges(0) > 0:
-        _CAPI_DGLKernelSDDMMHetero(gidx, op,
+        tmp = _CAPI_DGLKernelSDDMMHetero(gidx, op,
                                    [to_dgl_nd(lhs) for lhs in lhs_list],
                                    [to_dgl_nd(rhs) for rhs in rhs_list],
                                    [to_dgl_nd_for_write(out) for out in out_list],
                                    lhs_target, rhs_target)
-    print("Output after CAPI_SDDMM: ", out_list)
+
+    print("SDDMM_CAPI time:", (time.time() - t1)*1000, "ms")
+    t2 = time.time()
+    for i, out_ndarray in enumerate(tmp):
+        out_list[i] = F.zerocopy_from_dgl_ndarray(out_ndarray).reshape(gidx.number_of_edges(i), out_len)
+    print("ndarray conversion time:", (time.time() - t2)*1000, "ms")
     for l in range(gidx.number_of_etypes()):
         # Replace None by empty tensor. Forward func doesn't accept None in tuple.
         e = out_list[l]

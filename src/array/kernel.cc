@@ -154,7 +154,6 @@ void SDDMMHetero(const std::string& op,
            int rhs_target) {
   // TODO(Israt): change it to COO_CODE
   SparseFormat format = graph->SelectFormat(0, CSR_CODE);
-  // auto device = runtime::DeviceAPI::Get(out[0]->ctx);
   std::vector<CSRMatrix> vec_csr;
   std::vector<dgl_type_t> lhs_eid;
   std::vector<dgl_type_t> rhs_eid;
@@ -165,11 +164,13 @@ void SDDMMHetero(const std::string& op,
     rhs_eid.push_back(get_typeid_by_target(graph, rhs_target, etype));
   }
   const auto &bcast = CalcBcastOff(op, lhs[lhs_eid[0]], rhs[rhs_eid[0]]);
-
-  const auto& ctx = lhs[lhs_eid[0]]->ctx;
+  // TODO(Israt): how to find bcast shape for output
+  const int max_ndim = std::max(bcast.lhs_len, bcast.rhs_len);
+  const auto& ctx = out[0]->ctx;
   for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
-    NDArray ret = NDArray::Empty({vec_csr[etype].indices->shape[0] * bcast.lhs_len},
+    NDArray ret = NDArray::Empty({vec_csr[etype].indices->shape[0] * max_ndim},
       DLDataType{kDLFloat, sizeof(float) * 8, 1}, ctx);
+    // TODO (Israt): add memset?
     out[etype] = ret;
   }
   ATEN_XPU_SWITCH_CUDA(graph->Context().device_type, XPU, "SDDMM", {
@@ -397,6 +398,7 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSDDMMHetero")
     List<Value> list_out = args[4];
     int lhs_target = args[5];
     int rhs_target = args[6];
+
     std::vector<NDArray> vec_lhs;
     std::vector<NDArray> vec_rhs;
     std::vector<NDArray> vec_out;
@@ -415,6 +417,10 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSDDMMHetero")
       vec_out.push_back(val->data);
     }
     SDDMMHetero(op, graph.sptr(), vec_lhs, vec_rhs, vec_out, lhs_target, rhs_target);
+    List<ObjectRef> tmp_list;
+    for (auto x: vec_out)
+       tmp_list.push_back(Value(MakeValue(x)));
+    *rv = tmp_list;
   });
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSegmentReduce")
