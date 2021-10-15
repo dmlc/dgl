@@ -1,18 +1,29 @@
 import argparse
 import os
 import time
-import numpy as np
 import torch
 import torch.nn.functional as F
+from torch.utils.data import DataLoader
 from sampler import SAINTNodeSampler, SAINTEdgeSampler, SAINTRandomWalkSampler
+from config import CONFIG
 from modules import GCNNet
-from utils import Logger, evaluate, save_log_dir, load_data
+from utils import Logger, evaluate, save_log_dir, load_data, calc_f1
+import warnings
 
-
-def main(args):
-
-    multilabel_data = set(['ppi'])
+def main(args, task):
+    warnings.filterwarnings('ignore')
+    multilabel_data = {'ppi', 'yelp', 'amazon'}
     multilabel = args.dataset in multilabel_data
+
+    # This flag is excluded for too large dataset, like amazon, the graph of which is too large to be directly
+    # shifted to one gpu. So we need to
+    # 1. put the whole graph on cpu, and put the subgraphs on gpu in training phase
+    # 2. put the model on gpu in training phase, and put the model on cpu in validation/testing phase
+    # We need to judge cpu_flag and cuda (below) simultaneously when shift model between cpu and gpu
+    if args.dataset in ['amazon']:
+        cpu_flag = True
+    else:
+        cpu_flag = False
 
     # load and preprocess dataset
     data = load_data(args, multilabel)
@@ -45,16 +56,23 @@ def main(args):
            n_val_samples,
            n_test_samples))
     # load sampler
-    if args.sampler == "node":
-        subg_iter = SAINTNodeSampler(args.node_budget, args.dataset, g,
-                                     train_nid, args.num_repeat)
-    elif args.sampler == "edge":
-        subg_iter = SAINTEdgeSampler(args.edge_budget, args.dataset, g,
-                                     train_nid, args.num_repeat)
-    elif args.sampler == "rw":
-        subg_iter = SAINTRandomWalkSampler(args.num_roots, args.length, args.dataset, g,
-                                            train_nid, args.num_repeat)
 
+    kwargs = {
+        'dn': args.dataset, 'g': g, 'train_nid': train_nid, 'num_workers_sampler': args.num_workers_sampler,
+        'num_subg_sampler': args.num_subg_sampler, 'batch_size_sampler': args.batch_size_sampler,
+        'online': args.online, 'num_subg': args.num_subg, 'full': args.full
+    }
+
+    if args.sampler == "node":
+        saint_sampler = SAINTNodeSampler(args.node_budget, **kwargs)
+    elif args.sampler == "edge":
+        saint_sampler = SAINTEdgeSampler(args.edge_budget, **kwargs)
+    elif args.sampler == "rw":
+        saint_sampler = SAINTRandomWalkSampler(args.num_roots, args.length, **kwargs)
+    else:
+        raise NotImplementedError
+    loader = DataLoader(saint_sampler, collate_fn=saint_sampler.__collate_fn__, batch_size=1,
+                        shuffle=True, num_workers=args.num_workers, drop_last=False)
     # set device for dataset tensors
     if args.gpu < 0:
         cuda = False
@@ -63,7 +81,8 @@ def main(args):
         torch.cuda.set_device(args.gpu)
         val_mask = val_mask.cuda()
         test_mask = test_mask.cuda()
-        g = g.to(args.gpu)
+        if not cpu_flag:
+            g = g.to('cuda:{}'.format(args.gpu))
 
     print('labels shape:', g.ndata['label'].shape)
     print("features shape:", g.ndata['feat'].shape)
@@ -99,8 +118,7 @@ def main(args):
     best_f1 = -1
 
     for epoch in range(args.n_epochs):
-        for j, subg in enumerate(subg_iter):
-            # sync with upper level training graph
+        for j, subg in enumerate(loader):
             if cuda:
                 subg = subg.to(torch.cuda.current_device())
             model.train()
@@ -119,12 +137,20 @@ def main(args):
             loss.backward()
             torch.nn.utils.clip_grad_norm(model.parameters(), 5)
             optimizer.step()
-            if j == len(subg_iter) - 1:
-                print(f"epoch:{epoch+1}/{args.n_epochs}, Iteration {j+1}/"
-                      f"{len(subg_iter)}:training loss", loss.item())
 
+            if j == len(loader) - 1:
+                model.eval()
+                with torch.no_grad():
+                    train_f1_mic, train_f1_mac = calc_f1(batch_labels.cpu().numpy(),
+                                                         pred.cpu().numpy(), multilabel)
+                    print(f"epoch:{epoch + 1}/{args.n_epochs}, Iteration {j + 1}/"
+                          f"{len(loader)}:training loss", loss.item())
+                    print("Train F1-mic {:.4f}, Train F1-mac {:.4f}".format(train_f1_mic, train_f1_mac))
         # evaluate
+        model.eval()
         if epoch % args.val_every == 0:
+            if cpu_flag and cuda:  # Only when we have shifted model to gpu and we need to shift it back on cpu
+                model = model.to('cpu')
             val_f1_mic, val_f1_mac = evaluate(
                 model, g, labels, val_mask, multilabel)
             print(
@@ -133,7 +159,9 @@ def main(args):
                 best_f1 = val_f1_mic
                 print('new best val f1:', best_f1)
                 torch.save(model.state_dict(), os.path.join(
-                    log_dir, 'best_model.pkl'))
+                    log_dir, 'best_model_{}.pkl'.format(task)))
+            if cpu_flag and cuda:
+                model.cuda()
 
     end_time = time.time()
     print(f'training using time {end_time - start_time}')
@@ -141,63 +169,24 @@ def main(args):
     # test
     if args.use_val:
         model.load_state_dict(torch.load(os.path.join(
-            log_dir, 'best_model.pkl')))
+            log_dir, 'best_model_{}.pkl'.format(task))))
+    if cpu_flag and cuda:
+        model = model.to('cpu')
     test_f1_mic, test_f1_mac = evaluate(
         model, g, labels, test_mask, multilabel)
     print("Test F1-mic {:.4f}, Test F1-mac {:.4f}".format(test_f1_mic, test_f1_mac))
 
-
 if __name__ == '__main__':
+    warnings.filterwarnings('ignore')
+
     parser = argparse.ArgumentParser(description='GraphSAINT')
-    # data source params
-    parser.add_argument("--dataset", type=str, choices=['ppi', 'flickr'], default='ppi',
-                        help="Name of dataset.")
-
-    # cuda params
-    parser.add_argument("--gpu", type=int, default=-1,
-                        help="GPU index. Default: -1, using CPU.")
-
-    # sampler params
-    parser.add_argument("--sampler", type=str, default="node", choices=['node', 'edge', 'rw'],
-                        help="Type of sampler")
-    parser.add_argument("--node-budget", type=int, default=6000,
-                        help="Expected number of sampled nodes when using node sampler")
-    parser.add_argument("--edge-budget", type=int, default=4000,
-                        help="Expected number of sampled edges when using edge sampler")
-    parser.add_argument("--num-roots", type=int, default=3000,
-                        help="Expected number of sampled root nodes when using random walk sampler")
-    parser.add_argument("--length", type=int, default=2,
-                        help="The length of random walk when using random walk sampler")
-    parser.add_argument("--num-repeat", type=int, default=50,
-                        help="Number of times of repeating sampling one node to estimate edge / node probability")
-
-    # model params
-    parser.add_argument("--n-hidden", type=int, default=512,
-                        help="Number of hidden gcn units")
-    parser.add_argument("--arch", type=str, default="1-0-1-0",
-                        help="Network architecture. 1 means an order-1 layer (self feature plus 1-hop neighbor "
-                             "feature), and 0 means an order-0 layer (self feature only)")
-    parser.add_argument("--dropout", type=float, default=0,
-                        help="Dropout rate")
-    parser.add_argument("--no-batch-norm", action='store_true',
-                        help="Whether to use batch norm")
-    parser.add_argument("--aggr", type=str, default="concat", choices=['mean', 'concat'],
-                        help="How to aggregate the self feature and neighbor features")
-
-    # training params
-    parser.add_argument("--n-epochs", type=int, default=100,
-                        help="Number of training epochs")
-    parser.add_argument("--lr", type=float, default=0.01,
-                        help="Learning rate")
-    parser.add_argument("--val-every", type=int, default=1,
-                        help="Frequency of evaluation on the validation set in number of epochs")
-    parser.add_argument("--use-val", action='store_true',
-                        help="whether to use validated best model to test")
-    parser.add_argument("--log-dir", type=str, default='none',
-                        help="Log file will be saved to log/{dataset}/{log_dir}")
-
-    args = parser.parse_args()
-
+    parser.add_argument("--task", type=str, default="ppi_n", help="type of tasks")
+    parser.add_argument("--online", dest='online', action='store_true', help="sampling method in training phase")
+    parser.add_argument("--gpu", type=int, default=0, help="the gpu index")
+    task = parser.parse_args().task
+    args = argparse.Namespace(**CONFIG[task])
+    args.online = parser.parse_args().online
+    args.gpu = parser.parse_args().gpu
     print(args)
 
-    main(args)
+    main(args, task=task)
