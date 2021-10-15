@@ -7,13 +7,11 @@ from torch.nn import init
 # pylint: enable=W0235
 class EGATConv(nn.Module):
     r"""
-    
     Description
     -----------
     Apply Graph Attention Layer over input graph. EGAT is an extension
     of regular `Graph Attention Network <https://arxiv.org/pdf/1710.10903.pdf>`__ 
-    handling edge features, detailed description is available in
-    `Rossmann-Toolbox <https://pubmed.ncbi.nlm.nih.gov/34571541/>`__ (see supplementary data).
+    handling edge features, detailed description is available in `Rossmann-Toolbox <https://pubmed.ncbi.nlm.nih.gov/34571541/>`__ (see supplementary data).
      The difference appears in the method how unnormalized attention scores :math:`e_{ij}`
      are obtain:
         
@@ -23,9 +21,9 @@ class EGATConv(nn.Module):
         f_{ij}^{\prim} &= \mathrm{LeakyReLU}\left(A [ h_{i} \| f_{ij} \| h_{j}]\right)
 
     where :math:`f_{ij}^{\prim}` are edge features, :math:`\mathrm{A}` is weight matrix and 
-    :math: `\vec{F}` is weight vector. After that resulting node features 
-    :math:`h_{i}^{\prim}` are updated in the same way as in regular GAT. 
-   
+    :math: `\vec{F}` is weight vector. After that resulting node features
+    :math:`h_{i}^{\prim}` are updated in the same way as in regular GAT.
+    
     Parameters
     ----------
     in_node_feats : int
@@ -50,7 +48,7 @@ class EGATConv(nn.Module):
     >>> u, v = th.randint(num_nodes, num_edges), th.randint(num_nodes, num_edges) 
     >>> graph = dgl.graph((u,v))    
 
-    >>> node_feats = th.rand((num_nodes, 20)) 
+    >>> node_feats = th.rand((num_nodes, 20))
     >>> edge_feats = th.rand((num_edges, 12))
     >>> egat = EGATConv(in_node_feats=20,
                           in_edge_feats=12,
@@ -89,6 +87,9 @@ class EGATConv(nn.Module):
         init.xavier_normal_(self.fc_attn.weight, gain=gain)
 
     def edge_attention(self, edges):
+        """
+        Calculate output edge features and corresponding attention scores
+        """
         #extract features
         h_src = edges.src['h']
         h_dst = edges.dst['h']
@@ -108,6 +109,9 @@ class EGATConv(nn.Module):
         return {'h': edges.src['h'], 'a': edges.data['a']}
 
     def reduce_func(self, nodes):
+        """
+        Calculate output node features as a weighted sum over is's edges
+        """
         alpha = nn.functional.softmax(nodes.mailbox['a'], dim=1)
         h = th.sum(alpha * nodes.mailbox['h'], dim=1)
         return {'h': h}
@@ -141,11 +145,10 @@ class EGATConv(nn.Module):
             where:
                 :math:`H` is the number of heads,
                 :math:`D_{out}` is size of output node feature,
-                :math:`F_{out}` is size of output edge feature.            
+                :math:`F_{out}` is size of output edge feature.
         """
-        
         with graph.local_scope():
-        ##TODO allow node src and dst feats
+            ##TODO allow node src and dst feats
             graph.edata['f'] = efeats
             graph.ndata['h'] = nfeats
 
@@ -156,7 +159,6 @@ class EGATConv(nn.Module):
 
             graph.ndata['h'] = nfeats_
             graph.update_all(message_func = self.message_func,
-                         reduce_func = self.reduce_func)
+                             reduce_func = self.reduce_func)
 
-            return graph.ndata.pop('h'), graph.edata.pop('f')
-    
+        return graph.ndata.pop('h'), graph.edata.pop('f')
