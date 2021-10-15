@@ -166,4 +166,4 @@ class EGATConv(nn.Module):
             graph.update_all(message_func=self.message_func,
                              reduce_func=self.reduce_func)
 
-        return graph.ndata.pop('h'), graph.edata.pop('f')
+            return graph.ndata.pop('h'), graph.edata.pop('f')
