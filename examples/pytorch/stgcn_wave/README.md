@@ -3,12 +3,12 @@ Spatio-Temporal Graph Convolutional Networks
 
 - Paper link: [arXiv](https://arxiv.org/pdf/1709.04875v4.pdf)
 - Author's code repo: https://github.com/VeritasYin/STGCN_IJCAI-18.
-Dependencies
-------------
-- PyTorch 1.1.0+
-- sklearn
-- dgl
-- tables
+- See [this blog](https://towardsdatascience.com/build-your-first-graph-neural-network-model-to-predict-traffic-speed-in-20-minutes-b593f8f838e5) for more details about running the code.
+- Dependencies
+  - PyTorch 1.1.0+
+  - sklearn
+  - dgl
+  - tables
 
 
 How to run
