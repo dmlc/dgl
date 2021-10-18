@@ -60,9 +60,16 @@ def load_backend(mod_name):
 
             # override data type dict function
             setattr(thismod, 'data_type_dict', data_type_dict)
+
+            # for data types with aliases, treat the first listed type as
+            # the true one
+            rev_data_type_dict = {}
+            for k, v in data_type_dict.items():
+                if not v in rev_data_type_dict.keys():
+                    rev_data_type_dict[v] = k
             setattr(thismod,
                     'reverse_data_type_dict',
-                    {v: k for k, v in data_type_dict.items()})
+                    rev_data_type_dict)
             # log backend name
             setattr(thismod, 'backend_name', mod_name)
         else:

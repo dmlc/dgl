@@ -27,7 +27,7 @@ def data_type_dict():
             'int16'   : th.int16,
             'int32'   : th.int32,
             'int64'   : th.int64,
-            'bool'    : th.bool}
+            'bool'    : th.uint8}
 
 def cpu():
     return th.device('cpu')

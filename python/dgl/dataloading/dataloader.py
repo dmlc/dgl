@@ -386,7 +386,7 @@ class BlockSampler(object):
 
             # Removing edges from the frontier for link prediction training falls
             # into the category of frontier postprocessing
-            if not self.exclude_edges_in_frontier:
+            if not self.exclude_edges_in_frontier(g):
                 eid_excluder = _create_eid_excluder(exclude_eids, self.output_device)
                 if eid_excluder is not None:
                     frontier = eid_excluder(frontier)
