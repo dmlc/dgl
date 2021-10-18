@@ -9,6 +9,7 @@
 #include <dgl/immutable_graph.h>
 #include <dgl/runtime/container.h>
 #include <dgl/runtime/parallel_for.h>
+#include <dgl/runtime/c_runtime_api.h>
 #include <set>
 
 #include "../c_api_common.h"
@@ -466,7 +467,9 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCopyTo")
     DLContext ctx;
     ctx.device_type = static_cast<DLDeviceType>(device_type);
     ctx.device_id = device_id;
-    HeteroGraphPtr hg_new = HeteroGraph::CopyTo(hg.sptr(), ctx);
+    DGLStreamHandle stream = nullptr;
+    DGLGetStream(device_type, device_id, &stream);
+    HeteroGraphPtr hg_new = HeteroGraph::CopyTo(hg.sptr(), ctx, stream);
     *rv = HeteroGraphRef(hg_new);
   });
 

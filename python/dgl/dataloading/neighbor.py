@@ -165,3 +165,7 @@ class MultiLayerFullNeighborSampler(MultiLayerNeighborSampler):
     """
     def __init__(self, n_layers, return_eids=False):
         super().__init__([None] * n_layers, return_eids=return_eids)
+
+    @classmethod
+    def exclude_edges_in_frontier(cls, g):
+        return False
