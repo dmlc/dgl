@@ -87,3 +87,18 @@ class KVClient(object):
 
     def map_shared_data(self, partition_book):
         '''Mapping shared-memory tensor from server to client.'''
+
+    def count_nonzero(self, name):
+        """Count nonzero value by pull request from KVServers.
+
+        Parameters
+        ----------
+        name : str
+            data name
+
+        Returns
+        -------
+        int
+            the number of nonzero in this data.
+        """
+        return F.count_nonzero(self._data[name])
