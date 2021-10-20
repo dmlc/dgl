@@ -192,40 +192,38 @@ def _gspmm(gidx, op, reduce_op, u, e):
 def _gspmm_hetero(gidx, op, reduce_op, u_len, u_and_e_tuple):
     r""" Generalized Sparse Matrix Multiplication interface.
     """
-    u_tuple, e_tuple = u_and_e_tuple[:u_len], u_and_e_tuple[u_len:]
+    list_u, list_e = list(u_and_e_tuple[:u_len]), list(u_and_e_tuple[u_len:])
     use_u = op != 'copy_rhs'
     use_e = op != 'copy_lhs'
     # TODO (Israt): Add check - F.dtype(u) != F.dtype(e):
 
     # deal with scalar features.
     expand_u, expand_e = False, False
-    list_u = [None] * gidx.number_of_ntypes()
     list_v = [None] * gidx.number_of_ntypes()
-    list_e = [None] * gidx.number_of_etypes()
-
+    # Check the first etype to check compatibilty check for all etypes
+    src_id, dst_id = gidx.metagraph.find_edge(0)
+    u = list_u[src_id] if use_u else None
+    e = list_e[0] if use_e else None
+    ctx = F.context(u) if use_u else F.context(e)
+    dtype = F.dtype(u) if use_u else F.dtype(e)
+    u_shp = F.shape(u) if use_u else (0,)
+    e_shp = F.shape(e) if use_e else (0,)
+    out_len = infer_broadcast_shape(op, u_shp[1:], e_shp[1:])
+    tot_dst_nodes = 0
+    src_list = []
+    dst_list = []
+    updated =  [False] * gidx.number_of_etypes()
     for etid in range(gidx.number_of_etypes()):
         src_id, dst_id = gidx.metagraph.find_edge(etid)
-        u = u_tuple[src_id] if use_u else None
-        e = e_tuple[etid] if use_e else None
-        if use_u:
-            if u is not None and F.ndim(u) == 1:
-                u = F.unsqueeze(u, -1)
-                expand_u = True
-            list_u[src_id] = u if use_u else None
-        if use_e:
-            if e is not None and F.ndim(e) == 1:
-                e = F.unsqueeze(e, -1)
-                expand_e = True
-            list_e[etid] = e if use_e else None
-        ctx = F.context(u) if use_u else F.context(e) # TODO(Israt): Put outside of loop
-        dtype = F.dtype(u) if use_u else F.dtype(e) # TODO(Israt): Put outside of loop
-        u_shp = F.shape(u) if use_u else (0,)
-        e_shp = F.shape(e) if use_e else (0,)
-        v_shp = (gidx.number_of_nodes(dst_id), ) +\
-            infer_broadcast_shape(op, u_shp[1:], e_shp[1:])
-        list_v[dst_id] = F.zeros(v_shp, dtype, ctx)
-
+        src_list.append(src_id)
+        dst_list.append(dst_id)
+        tot_dst_nodes += gidx.number_of_nodes(dst_id) if updated[dst_id] is False else 0
+        updated[dst_id] = True
+    out_merged = F.zeros((tot_dst_nodes,) + out_len, dtype, ctx)
     use_cmp = reduce_op in ['max', 'min']
+    # TODO(Israt): Fix arg_u, arg_e
+    v_shp = (gidx.number_of_nodes(dst_id), ) +\
+            infer_broadcast_shape(op, u_shp[1:], e_shp[1:])
     arg_u, arg_e = None, None
     idtype = getattr(F, gidx.dtype)
     if use_cmp:
@@ -235,6 +233,16 @@ def _gspmm_hetero(gidx, op, reduce_op, u_len, u_and_e_tuple):
             arg_e = F.zeros(v_shp, idtype, ctx)
     arg_u_nd = to_dgl_nd_for_write(arg_u)
     arg_e_nd = to_dgl_nd_for_write(arg_e)
+    loc = 0
+    new_loc = 0
+    updated =  [False] * gidx.number_of_etypes()
+    for etid in range(gidx.number_of_etypes()):
+        dst_id = dst_list[etid]
+        if updated[dst_id] is False:
+            new_loc += gidx.number_of_nodes(dst_id)
+            updated[dst_id] = True
+            list_v[dst_id] = (out_merged[loc:new_loc])
+            loc = new_loc
     if gidx.number_of_edges(0) > 0:
         _CAPI_DGLKernelSpMMHetero(gidx, op, reduce_op,
                                   [to_dgl_nd(u_i) for u_i in list_u],
@@ -352,7 +360,6 @@ def _gsddmm_hetero(gidx, op, lhs_len, lhs_target='u', rhs_target='v', lhs_and_rh
     # TODO (Israt): Add check - F.dtype(u) != F.dtype(e):
     # deal with scalar features.
     expand_lhs, expand_rhs = False, False
-
     out_list = [None] * gidx.number_of_etypes()
 
     lhs_target = target_mapping[lhs_target]
@@ -363,13 +370,12 @@ def _gsddmm_hetero(gidx, op, lhs_len, lhs_target='u', rhs_target='v', lhs_and_rh
     ctx = F.context(lhs) if use_lhs else F.context(rhs)
     dtype = F.dtype(lhs) if use_lhs else F.dtype(rhs)
     # # TODO(Israt): Find a better way
-    out_len = lhs.shape[1] if use_lhs else rhs.shape[1]
-    t0 = time.time()
+    lhs_shp = F.shape(lhs) if use_lhs else (0,)
+    rhs_shp = F.shape(rhs) if use_rhs else (0,)
+    out_len = infer_broadcast_shape(op, lhs_shp[1:], rhs_shp[1:])#lhs.shape[1] if use_lhs else rhs.shape[1]
+    tot_edges = 0
+
     for etid in range(gidx.number_of_etypes()):
-        # lhs_id = get_typeid_by_target(gidx, etid, lhs_target)
-        # rhs_id = get_typeid_by_target(gidx, etid, rhs_target)
-        # lhs = lhs_tuple[lhs_id]
-        # rhs = rhs_tuple[rhs_id]
         # if use_lhs:
         #     if lhs is not None and F.ndim(lhs) == 1:
         #         lhs = F.unsqueeze(lhs, -1)
@@ -378,29 +384,21 @@ def _gsddmm_hetero(gidx, op, lhs_len, lhs_target='u', rhs_target='v', lhs_and_rh
         #     if rhs is not None and F.ndim(rhs) == 1:
         #         rhs = F.unsqueeze(lhs, -1)
         #         expand_rhs = True
-        # lhs_shp = F.shape(lhs) if use_lhs else (0,)
-        # rhs_shp = F.shape(rhs) if use_rhs else (0,)
-        # lhs_list[lhs_id] = lhs if use_lhs else None
-        # rhs_list[rhs_id] = rhs if use_rhs else None
-        # out_shp = (gidx.number_of_edges(etid), ) +\
-        #     infer_broadcast_shape(op, lhs_shp[1:], rhs_shp[1:])
-        out_shp = 1;
-        # out_list[etid] = F.tensor([]) #F.zeros(out_shp, dtype, ctx)
-        out_list[etid] = F.zeros(out_shp, dtype, ctx)
-    print("SDDMM_CAPI preprocess time:", (time.time() - t0)*1000, "ms")
-    t1 = time.time()
+        tot_edges += gidx.number_of_edges(etid)
+    out_merged = F.zeros((tot_edges,) + out_len, dtype, ctx)
+    loc = 0
+    new_loc = 0
+    for etid in range(gidx.number_of_etypes()):
+        new_loc += gidx.number_of_edges(etid)
+        out_list[etid] = (out_merged[loc:new_loc])
+        loc = new_loc
+
     if gidx.number_of_edges(0) > 0:
-        tmp = _CAPI_DGLKernelSDDMMHetero(gidx, op,
+        _CAPI_DGLKernelSDDMMHetero(gidx, op,
                                    [to_dgl_nd(lhs) for lhs in lhs_list],
                                    [to_dgl_nd(rhs) for rhs in rhs_list],
                                    [to_dgl_nd_for_write(out) for out in out_list],
                                    lhs_target, rhs_target)
-
-    print("SDDMM_CAPI time:", (time.time() - t1)*1000, "ms")
-    t2 = time.time()
-    for i, out_ndarray in enumerate(tmp):
-        out_list[i] = F.zerocopy_from_dgl_ndarray(out_ndarray).reshape(gidx.number_of_edges(i), out_len)
-    print("ndarray conversion time:", (time.time() - t2)*1000, "ms")
     for l in range(gidx.number_of_etypes()):
         # Replace None by empty tensor. Forward func doesn't accept None in tuple.
         e = out_list[l]

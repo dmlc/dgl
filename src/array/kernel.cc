@@ -164,15 +164,7 @@ void SDDMMHetero(const std::string& op,
     rhs_eid.push_back(get_typeid_by_target(graph, rhs_target, etype));
   }
   const auto &bcast = CalcBcastOff(op, lhs[lhs_eid[0]], rhs[rhs_eid[0]]);
-  // TODO(Israt): how to find bcast shape for output
-  const int max_ndim = std::max(bcast.lhs_len, bcast.rhs_len);
-  const auto& ctx = out[0]->ctx;
-  for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
-    NDArray ret = NDArray::Empty({vec_csr[etype].indices->shape[0] * max_ndim},
-      DLDataType{kDLFloat, sizeof(float) * 8, 1}, ctx);
-    // TODO (Israt): add memset?
-    out[etype] = ret;
-  }
+
   ATEN_XPU_SWITCH_CUDA(graph->Context().device_type, XPU, "SDDMM", {
     ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
       ATEN_FLOAT_BITS_SWITCH(out[0]->dtype, bits, "Feature data", {
