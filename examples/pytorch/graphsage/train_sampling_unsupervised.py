@@ -65,8 +65,11 @@ def run(proc_id, n_gpus, args, devices, data):
                                           world_size=world_size,
                                           rank=proc_id)
     train_mask, val_mask, test_mask, n_classes, g = data
-    nfeat = g.ndata.pop('feat').to(device)
-    labels = g.ndata.pop('label').to(device)
+    nfeat = g.ndata.pop('feat')
+    labels = g.ndata.pop('label')
+    if not args.data_cpu:
+        nfeat = nfeat.to(device)
+        labels = labels.to(device)
     in_feats = nfeat.shape[1]
 
     train_nid = th.LongTensor(np.nonzero(train_mask)).squeeze()
@@ -220,6 +223,11 @@ if __name__ == '__main__':
                            help="Number of sampling processes. Use 0 for no extra process.")
     argparser.add_argument('--sample-gpu', action='store_true',
                            help="Perform the sampling process on the GPU. Must have 0 workers.")
+    argparser.add_argument('--data-cpu', action='store_true',
+                           help="By default the script puts all node features and labels "
+                                "on GPU when using it to save time for data copy. This may "
+                                "be undesired if they cannot fit in GPU memory at once. "
+                                "This flag disables that.")
     args = argparser.parse_args()
 
     devices = list(map(int, args.gpu.split(',')))
