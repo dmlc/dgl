@@ -26,14 +26,17 @@ We overload w with bold-symbol-w, which represents the entire observed document-
 **Multinomial PCA**
 
 Multinomial PCA is a "latent allocation" model without the "Dirichlet".
-Its data likelihood sums over the latent topic-index variable k:
+Its data likelihood sums over the latent topic-index variable k,
+<img src="https://latex.codecogs.com/svg.image?\inline&space;p(w_{di}|\theta_d,\beta)=\sum_k\theta_{dk}\beta_{kw}"/>,
+where θ_d and β_k are shared within the same document and topic, respectively.
 
-<img src="https://latex.codecogs.com/svg.image?p(w_{di}|\theta_d,\beta)=\sum_k\theta_{dk}\beta_{kw}"/>
-
-If we perform gradient descent, we may need additional steps to project the parameters to the probability simplices: `∑_k θ_dk = 1` and `∑_w β_kw = 1`.
+If we perform gradient descent, we may need additional steps to project the parameters to the probability simplices:
+<img src="https://latex.codecogs.com/svg.image?\inline&space;\sum_k\theta_{dk}=1"/>
+and
+<img src="https://latex.codecogs.com/svg.image?\inline&space;\sum_w\beta_{kw}=1"/>.
 Instead, a more efficient solution is to borrow ideas from evidence lower-bound (ELBO) decomposition:
 
-<!-- 
+<!--
 \log p(w) \geq \mathcal{L}(w,\phi)
 \stackrel{def}{=}
 \mathbb{E}_q [\log p(w,z;\theta,\beta) - \log q(z;\phi)]
@@ -45,19 +48,31 @@ Instead, a more efficient solution is to borrow ideas from evidence lower-bound 
 
 <img src="https://latex.codecogs.com/svg.image?\log&space;p(w)&space;\geq&space;\mathcal{L}(w,\phi)\stackrel{def}{=}\mathbb{E}_q&space;[\log&space;p(w,z;\theta,\beta)&space;-&space;\log&space;q(z;\phi)]\\=\mathbb{E}_q&space;[\log&space;p(w|z;\beta)&space;&plus;&space;\log&space;p(z;\theta)&space;-&space;\log&space;q(z;\phi)]\\=\sum_{dwk}n_{dw}\phi_{dwk}&space;[\log\beta_{kw}&space;&plus;&space;\log&space;\theta_{dk}&space;-&space;\log&space;\phi_{dwk}]"/>
 
-The solutions for `θ_dk ∝ ∑_w n_dw ϕ_dwk` and `β_kw ∝ ∑_d n_dw ϕ_dwk` follow from the maximization of cross-entropy loss.
-The solution for `ϕ_dwk ∝ θ_dk β_kw` follows from Kullback-Leibler divergence.
-After normalizing to `∑_k ϕ_dwk = 1`, the difference `log β_kw + log θ_dk - log ϕ_dwk` becomes constant in `k`,
+The solutions for
+<img src="https://latex.codecogs.com/svg.image?\inline&space;\theta_{dk}\propto\sum_wn_{dw}\phi_{dwk}"/>
+and
+<img src="https://latex.codecogs.com/svg.image?\inline&space;\beta_{kw}\propto\sum_dn_{dw}\phi_{dwk}"/>
+follow from the maximization of cross-entropy loss.
+The solution for
+<img src="https://latex.codecogs.com/svg.image?\inline&space;\phi_{dwk}\propto&space;\theta_{dk}\beta_{kw}"/>
+follows from Kullback-Leibler divergence.
+After normalizing to
+<img src="https://latex.codecogs.com/svg.image?\inline&space;\sum_k\phi_{dwk}=1"/>,
+the difference
+<img src="https://latex.codecogs.com/svg.image?\inline&space;\ell_{dw}=\log\beta_{kw}+\log\theta_{dk}-\log\phi_{dwk}"/>
+becomes constant in k,
 which is connected to the likelihood for the observed document-word pairs.
 
-Notice that after learning, the document vector θ_d considers the correlation between all words in d and similarly the topic distribution vector β_k considers the correlations in all observed documents.
+Note that after learning, the document vector θ_d considers the correlation between all words in d and similarly the topic distribution vector β_k considers the correlations in all observed documents.
 
 **Variational Bayes**
 
-A Bayesian model adds Dirichlet priors to θ_d and β_z, which leads to a similar ELBO if we assume independence `q(z,θ,β;ϕ,γ,λ) = q(z;ϕ)q(θ;γ)q(β;λ)`:
+A Bayesian model adds Dirichlet priors to θ_d and β_z, which leads to a similar ELBO if we assume independence
+<img src="https://latex.codecogs.com/svg.image?\inline&space;q(z,\theta,\beta;\phi,\gamma,\lambda)=q(z;\phi)q(\theta;\gamma)q(\beta;\lambda)"/>,
+i.e.:
 
 <!--
-\log p(w|\alpha,\eta) \geq \mathcal{L}(w,\phi,\gamma,\lambda)
+\log p(w;\alpha,\eta) \geq \mathcal{L}(w,\phi,\gamma,\lambda)
 \stackrel{def}{=}
 \mathbb{E}_q [\log p(w,z,\theta,\beta;\alpha,\eta) - \log q(z,\theta,\beta;\phi,\gamma,\lambda)]
 \\=
@@ -78,24 +93,28 @@ A Bayesian model adds Dirichlet priors to θ_d and β_z, which leads to a simila
 \right]
  -->
 
-<img src="https://latex.codecogs.com/svg.image?\log&space;p(w|\alpha,\eta)&space;\geq&space;\mathcal{L}(w,\phi,\gamma,\lambda)\stackrel{def}{=}\mathbb{E}_q&space;[\log&space;p(w,z,\theta,\beta;\alpha,\eta)&space;-&space;\log&space;q(z,\theta,\beta;\phi,\gamma,\lambda)]\\=\mathbb{E}_q&space;\left[\log&space;p(w|z,\beta)&space;&plus;&space;\log&space;p(z|\theta)&space;-&space;\log&space;q(z;\phi)&plus;\log&space;p(\theta;\alpha)&space;-&space;\log&space;q(\theta;\gamma)&plus;\log&space;p(\beta;\eta)&space;-&space;\log&space;q(\beta;\lambda)\right]\\=\sum_{dwk}n_{dw}\phi_{dwk}&space;(\mathbb{E}_{\lambda_k}[\log\beta_{kw}]&space;&plus;&space;\mathbb{E}_{\gamma_d}[\log&space;\theta_{dk}]&space;-&space;\log&space;\phi_{dwk})\\&plus;\sum_{d}\left[(\alpha-\gamma_d)^\top\mathbb{E}_{\gamma_d}[\log\theta_d]-(\log&space;B(\alpha&space;1_K)&space;-&space;\log&space;B(\gamma_d))\right]\\&plus;\sum_{k}\left[(\eta-\lambda_k)^\top\mathbb{E}_{\lambda_k}[\log\beta_k]-(\log&space;B(\eta&space;1_W)&space;-&space;\log&space;B(\lambda_k))\right]"/>
+<img src="https://latex.codecogs.com/svg.image?\log&space;p(w;\alpha,\eta)&space;\geq&space;\mathcal{L}(w,\phi,\gamma,\lambda)\stackrel{def}{=}\mathbb{E}_q&space;[\log&space;p(w,z,\theta,\beta;\alpha,\eta)&space;-&space;\log&space;q(z,\theta,\beta;\phi,\gamma,\lambda)]\\=\mathbb{E}_q&space;\left[\log&space;p(w|z,\beta)&space;&plus;&space;\log&space;p(z|\theta)&space;-&space;\log&space;q(z;\phi)&plus;\log&space;p(\theta;\alpha)&space;-&space;\log&space;q(\theta;\gamma)&plus;\log&space;p(\beta;\eta)&space;-&space;\log&space;q(\beta;\lambda)\right]\\=\sum_{dwk}n_{dw}\phi_{dwk}&space;(\mathbb{E}_{\lambda_k}[\log\beta_{kw}]&space;&plus;&space;\mathbb{E}_{\gamma_d}[\log&space;\theta_{dk}]&space;-&space;\log&space;\phi_{dwk})\\&plus;\sum_{d}\left[(\alpha-\gamma_d)^\top\mathbb{E}_{\gamma_d}[\log\theta_d]-(\log&space;B(\alpha&space;1_K)&space;-&space;\log&space;B(\gamma_d))\right]\\&plus;\sum_{k}\left[(\eta-\lambda_k)^\top\mathbb{E}_{\lambda_k}[\log\beta_k]-(\log&space;B(\eta&space;1_W)&space;-&space;\log&space;B(\lambda_k))\right]"/>
 
 
 **Solutions**
 
-The solutions to VB subsumes the solutions to multinomial PCA when `n_dw -> infty`.
-The solution for ϕ is `ϕ_dwk ∝ E_γ[log(θ_dk)] E_λ[log(β_kw)]`,
-where the additional expectation can be expressed via digamma functions.
-The solutions for `γ_dk = α + ∑_w n_dw ϕ_dwk` and `λ_kw = η + ∑_d n_dw ϕ_dwk` come from direct gradient calculation.
-After substituting the optimal solutions, we compute the marginal likelihood by adding the three terms, which are nonnegative because they come from Kullback-Leibler divergence.
-
-Code Organization
----
-
-TODO
+The solutions to VB subsumes the solutions to multinomial PCA when n goes to infinity.
+The solution for ϕ is
+<img src="https://latex.codecogs.com/svg.image?\inline&space;\log\phi_{dwk}=\mathbb{E}_{\gamma_d}[\log\theta_{dk}]+\mathbb{E}_{\lambda_k}[\log\beta_{kw}]-\ell_{dw}"/>,
+where the additional expectation can be expressed via digamma functions
+and
+<img src="https://latex.codecogs.com/svg.image?\inline&space;\ell_{dw}=\log\sum_k\exp(\mathbb{E}_{\gamma_d}[\log\theta_{dk}]+\mathbb{E}_{\lambda_k}[\log\beta_{kw}])"/>
+is the log-partition function.
+The solutions for
+<img src="https://latex.codecogs.com/svg.image?\inline&space;\gamma_{dk}=\alpha+\sum_wn_{dw}\phi_{dwk}"/>
+and
+<img src="https://latex.codecogs.com/svg.image?\inline&space;\lambda_{kw}=\eta+\sum_dn_{dw}\phi_{dwk}"/>
+come from direct gradient calculation.
+After substituting the optimal solutions, we compute the marginal likelihood by adding the three terms, which are all connected to (the negative of) Kullback-Leibler divergence.
 
 DGL usage
 ---
+
 The corpus is represented as a bipartite multi-graph G.
 We use DGL to propagate information through the edges and aggregate the distributions at doc/word nodes.
 For scalability, the phi variables are transient and updated during message passing.
