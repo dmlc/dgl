@@ -109,7 +109,10 @@ class LatentDirichletAllocation:
             torch.tensor(100.0, device=device),).sample
 
         self.word_z = self._init((self.n_words, n_components))
+        self._compute_word_stats()
 
+
+    def _compute_word_stats(self):
         word_lambda = self.word_z + self.prior['word']
         self._word_log_weight = _bayesian_log_softmax(word_lambda, axis=0)
         self._word_cdf_transposed = _compute_word_cdf_transposed(word_lambda)
@@ -201,10 +204,7 @@ class LatentDirichletAllocation:
         self.word_z[word_ids] += self.lr * new_z.to(self.device)
         del new_z
 
-        word_lambda = self.word_z + self.prior['word']
-        self._word_log_weight = _bayesian_log_softmax(word_lambda, axis=0)
-        self._word_cdf_transposed = _compute_word_cdf_transposed(word_lambda)
-        del word_lambda
+        self._compute_word_stats()
         if self.verbose:
             print(f"weight_gap={1 - self._word_log_weight.exp().sum(axis=0).mean():.4f}")
 

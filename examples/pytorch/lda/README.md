@@ -12,49 +12,87 @@ On the provided small-scale example on 20 news groups dataset, our DGL-LDA model
 Key equations
 ---
 
-The non-Bayesian form assumes document d -> topic z -> word w. The Bayesian form adds
-priors and variational posteriors to the learnable parameters. In both forms, q(z|d,w)
-is used as an auxiliary distribution to aid learning.
+<!-- https://editor.codecogs.com/ -->
 
-| Multinomial | p(z\|d)   | p(w\|z)  | q(z\|d,w) |
-|-------------|-----------|----------|-----------|
-| Parameter   | θ_d       | β_z      | ϕ_dw      |
-| Prior       | Dir(α)    | Dir(η)   |           |
-| Posterior   | Dir(γ_d)  | Dir(λ_z) |           |
+Let k be the topic index variable with one-hot encoded vector representation z. The rest of the variables are:
 
-**Non-Bayesian EM**
+|             | z_d\~p(θ_d) | w_k\~p(β_k) | z_dw\~q(ϕ_dw) |
+|-------------|-------------|-------------|---------------|
+| Prior       | Dir(α)      | Dir(η)      |     (n/a)     |
+| Posterior   | Dir(γ_d)    | Dir(λ_k)    |     (n/a)     |
 
-A simple form of topic modeling is to assume p(w|d) to be a latent-variable model, such that when the latent topic variable is unobserved, the marginal word probabilities become correlated inside the same document. Here is the marginal likelihood:
+We overload w with bold-symbol-w, which represents the entire observed document-world multi-graph. The difference is better shown in the original paper.
 
-<img src="https://latex.codecogs.com/gif.latex?p(w|d)=\sum_z\theta_{dz}\beta_{zw}\quad\Rightarrow\quad&space;\log&space;p(G)=\sum_{\mbox{edge}(d,w)}\log\left(\sum_z(\theta_{dz}\beta_{zw})\right)." title="marginal" />
+**Multinomial PCA**
 
-If we try to take a gradient against θ_d(z), we immediately realize the challenge that the denominator contains θ_d(z) in a summation term, which is nonconvex and computationally inefficient. Instead, we apply Jensen's inequality:
+Multinomial PCA is a "latent allocation" model without the "Dirichlet".
+Its data likelihood sums over the latent topic-index variable k:
 
-<img src="https://latex.codecogs.com/gif.latex?\log\left(\sum_z(\theta_{dz}\beta_{zw})\right)\geq\sum_z\phi_{dw}(z)\log\left(\frac{\theta_{dz}\beta_{zw}}{\phi_{dw}(z)}\right)=:\mbox{ELBO}(d,w)." title="elbo" />
+<img src="https://latex.codecogs.com/svg.image?p(w_{di}|\theta_d,\beta)=\sum_k\theta_{dk}\beta_{kw}"/>
 
-To show more details, we write out the proof:
+If we perform gradient descent, we may need additional steps to project the parameters to the probability simplices: `∑_k θ_dk = 1` and `∑_w β_kw = 1`.
+Instead, a more efficient solution is to borrow ideas from evidence lower-bound (ELBO) decomposition:
 
-<img src="https://latex.codecogs.com/gif.latex?\mbox{left}-\mbox{right}=\left(\sum_z\phi_{dw}(z)\right&space;)\log\left(\sum_z(\theta_{dz}\beta_{zw})\right)-\sum_z\phi_{dw}(z)\log\left(\frac{\theta_{dz}\beta_{zw}}{\phi_{dw}(z)}\right)&space;\\&space;=\sum_z\phi_{dw}(z)\log\left(\frac{\sum_{z'}(\theta_{dz'}\beta_{z'w})}{(\theta_{dz}\beta_{zw})/\phi_{dw}(z)}&space;\right&space;)&space;=\sum_z\phi_{dw}(z)\log\left(\frac{\phi_{dw}(z)}{(\theta_{dz}\beta_{zw})/\sum_{z'}(\theta_{dz'}\beta_{z'w})}&space;\right&space;)," title="proof" />
+<!-- 
+\log p(w) \geq \mathcal{L}(w,\phi)
+\stackrel{def}{=}
+\mathbb{E}_q [\log p(w,z;\theta,\beta) - \log q(z;\phi)]
+\\=
+\mathbb{E}_q [\log p(w|z;\beta) + \log p(z;\theta) - \log q(z;\phi)]
+\\=
+\sum_{dwk}n_{dw}\phi_{dwk} [\log\beta_{kw} + \log \theta_{dk} - \log \phi_{dwk}]
+-->
 
-where the last equation is nonnegative due to Kullback-Leibler divergence: KL(ϕ_dw\|\|p(z|d,w))>=0. The bound is tight when ϕ_dw is exactly the posterior distribution given the learned parameters. We thus alternate between (θ_d, β_z) and ϕ_dw. Specifically, ϕ_dw may be found via edge update and, with the ELBO, the node parameters assume cross-entropy likelihoods:
+<img src="https://latex.codecogs.com/svg.image?\log&space;p(w)&space;\geq&space;\mathcal{L}(w,\phi)\stackrel{def}{=}\mathbb{E}_q&space;[\log&space;p(w,z;\theta,\beta)&space;-&space;\log&space;q(z;\phi)]\\=\mathbb{E}_q&space;[\log&space;p(w|z;\beta)&space;&plus;&space;\log&space;p(z;\theta)&space;-&space;\log&space;q(z;\phi)]\\=\sum_{dwk}n_{dw}\phi_{dwk}&space;[\log\beta_{kw}&space;&plus;&space;\log&space;\theta_{dk}&space;-&space;\log&space;\phi_{dwk}]"/>
 
-<img src="https://latex.codecogs.com/gif.latex?\mbox{ELBO}=\sum_{d,z}\left(\sum_w\phi_{dw}(z)\right)\log(\theta_{dz})+\sum_{z,w}\left(\sum_d\phi_{dw}(z)\right)\log(\beta_{zw})-\mbox{Const.}" title="node" />
+The solutions for `θ_dk ∝ ∑_w n_dw ϕ_dwk` and `β_kw ∝ ∑_d n_dw ϕ_dwk` follow from the maximization of cross-entropy loss.
+The solution for `ϕ_dwk ∝ θ_dk β_kw` follows from Kullback-Leibler divergence.
+After normalizing to `∑_k ϕ_dwk = 1`, the difference `log β_kw + log θ_dk - log ϕ_dwk` becomes constant in `k`,
+which is connected to the likelihood for the observed document-word pairs.
 
-To update the nodes, we simplify normalize the fractional membership ϕ_dw to find the parameters of the generative multinomial distributions.
+Notice that after learning, the document vector θ_d considers the correlation between all words in d and similarly the topic distribution vector β_k considers the correlations in all observed documents.
 
 **Variational Bayes**
 
-A Bayesian model adds Dirichlet priors to θ_d & β_z. This causes the posterior to be implicit and the bound to be loose. We will still use an independence assumption and cycle through the variational parameters similarly to coordinate ascent.
+A Bayesian model adds Dirichlet priors to θ_d and β_z, which leads to a similar ELBO if we assume independence `q(z,θ,β;ϕ,γ,λ) = q(z;ϕ)q(θ;γ)q(β;λ)`:
 
- * The evidence lower-bound is
+<!--
+\log p(w|\alpha,\eta) \geq \mathcal{L}(w,\phi,\gamma,\lambda)
+\stackrel{def}{=}
+\mathbb{E}_q [\log p(w,z,\theta,\beta;\alpha,\eta) - \log q(z,\theta,\beta;\phi,\gamma,\lambda)]
+\\=
+\mathbb{E}_q \left[
+\log p(w|z,\beta) + \log p(z|\theta) - \log q(z;\phi)
++\log p(\theta;\alpha) - \log q(\theta;\gamma)
++\log p(\beta;\eta) - \log q(\beta;\lambda)
+\right]
+\\=
+\sum_{dwk}n_{dw}\phi_{dwk} (\mathbb{E}_{\lambda_k}[\log\beta_{kw}] + \mathbb{E}_{\gamma_d}[\log \theta_{dk}] - \log \phi_{dwk})
+\\+\sum_{d}\left[
+(\alpha-\gamma_d)^\top\mathbb{E}_{\gamma_d}[\log\theta_d]
+-(\log B(\alpha 1_K) - \log B(\gamma_d))
+\right]
+\\+\sum_{k}\left[
+(\eta-\lambda_k)^\top\mathbb{E}_{\lambda_k}[\log\beta_k]
+-(\log B(\eta 1_W) - \log B(\lambda_k))
+\right]
+ -->
 
- <img src="https://latex.codecogs.com/gif.latex?\log&space;p(G)=\sum_{(d,w)}\log\left(\int_{\theta_d}\sum_z\int_{\beta_z}(\theta_{dz}\beta_{zw}){\rm\,d}P(\beta_z;\eta){\rm\,d}P(\theta_d;\alpha)\right)&space;\\&space;\geq&space;\mathbb{E}_q\left[\sum_{(d,w)}\log\left(&space;\frac{\theta_{dz}\beta_{zw}}&space;{q(z;\phi_{dw})}&space;\right)&space;&plus;\sum_{d}&space;\log\left(&space;\frac{p(\theta_d;\alpha)}{q(\theta_d;\gamma_d)}&space;\right)&space;&plus;\sum_{z}&space;\log\left(&space;\frac{p(\beta_z;\eta)}{q(\beta_z;\lambda_z)}&space;\right)\right]" title="elbo2" />
+<img src="https://latex.codecogs.com/svg.image?\log&space;p(w|\alpha,\eta)&space;\geq&space;\mathcal{L}(w,\phi,\gamma,\lambda)\stackrel{def}{=}\mathbb{E}_q&space;[\log&space;p(w,z,\theta,\beta;\alpha,\eta)&space;-&space;\log&space;q(z,\theta,\beta;\phi,\gamma,\lambda)]\\=\mathbb{E}_q&space;\left[\log&space;p(w|z,\beta)&space;&plus;&space;\log&space;p(z|\theta)&space;-&space;\log&space;q(z;\phi)&plus;\log&space;p(\theta;\alpha)&space;-&space;\log&space;q(\theta;\gamma)&plus;\log&space;p(\beta;\eta)&space;-&space;\log&space;q(\beta;\lambda)\right]\\=\sum_{dwk}n_{dw}\phi_{dwk}&space;(\mathbb{E}_{\lambda_k}[\log\beta_{kw}]&space;&plus;&space;\mathbb{E}_{\gamma_d}[\log&space;\theta_{dk}]&space;-&space;\log&space;\phi_{dwk})\\&plus;\sum_{d}\left[(\alpha-\gamma_d)^\top\mathbb{E}_{\gamma_d}[\log\theta_d]-(\log&space;B(\alpha&space;1_K)&space;-&space;\log&space;B(\gamma_d))\right]\\&plus;\sum_{k}\left[(\eta-\lambda_k)^\top\mathbb{E}_{\lambda_k}[\log\beta_k]-(\log&space;B(\eta&space;1_W)&space;-&space;\log&space;B(\lambda_k))\right]"/>
 
- * ELBO objective function factors as
 
- <img src="https://latex.codecogs.com/gif.latex?\sum_{(d,w)}&space;\phi_{dw}^{\top}\left(&space;\mathbb{E}_{\gamma_d}[\log\theta_d]&space;&plus;\mathbb{E}_{\lambda}[\log\beta_{:w}]&space;-\log\phi_{dw}&space;\right)&space;\\&space;&plus;&space;\sum_d&space;(\alpha-\gamma_d)^\top\mathbb{E}_{\gamma_d}[\log&space;\theta_d]-(\log&space;B(\alpha)-\log&space;B(\gamma_d))&space;\\&space;&plus;&space;\sum_z&space;(\eta-\lambda_z)^\top\mathbb{E}_{\lambda_z}[\log&space;\beta_z]-(\log&space;B(\eta)-\log&space;B(\lambda_z))" title="factors" />
+**Solutions**
 
- * Similarly, optimization alternates between ϕ, γ, λ. Since θ, β are random, we use an explicit solution for E[log X] under Dirichlet distribution via digamma function.
+The solutions to VB subsumes the solutions to multinomial PCA when `n_dw -> infty`.
+The solution for ϕ is `ϕ_dwk ∝ E_γ[log(θ_dk)] E_λ[log(β_kw)]`,
+where the additional expectation can be expressed via digamma functions.
+The solutions for `γ_dk = α + ∑_w n_dw ϕ_dwk` and `λ_kw = η + ∑_d n_dw ϕ_dwk` come from direct gradient calculation.
+After substituting the optimal solutions, we compute the marginal likelihood by adding the three terms, which are nonnegative because they come from Kullback-Leibler divergence.
+
+Code Organization
+---
+
+TODO
 
 DGL usage
 ---
