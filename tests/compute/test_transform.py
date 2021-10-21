@@ -662,24 +662,23 @@ def test_reorder_nodes():
         old_neighs2 = g.predecessors(old_nid)
         assert np.all(np.sort(old_neighs1) == np.sort(F.asnumpy(old_neighs2)))
 
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU compaction not implemented")
 @parametrize_dtype
 def test_compact(idtype):
     g1 = dgl.heterograph({
         ('user', 'follow', 'user'): ([1, 3], [3, 5]),
         ('user', 'plays', 'game'): ([2, 3, 2], [4, 4, 5]),
         ('game', 'wished-by', 'user'): ([6, 5], [7, 7])},
-        {'user': 20, 'game': 10}, idtype=idtype)
+        {'user': 20, 'game': 10}, idtype=idtype, device=F.ctx())
 
     g2 = dgl.heterograph({
         ('game', 'clicked-by', 'user'): ([3], [1]),
         ('user', 'likes', 'user'): ([1, 8], [8, 9])},
-        {'user': 20, 'game': 10}, idtype=idtype)
+        {'user': 20, 'game': 10}, idtype=idtype, device=F.ctx())
 
     g3 = dgl.heterograph({('user', '_E', 'user'): ((0, 1), (1, 2))},
-                         {'user': 10}, idtype=idtype)
+                         {'user': 10}, idtype=idtype, device=F.ctx())
     g4 = dgl.heterograph({('user', '_E', 'user'): ((1, 3), (3, 5))},
-                         {'user': 10}, idtype=idtype)
+                         {'user': 10}, idtype=idtype, device=F.ctx())
 
     def _check(g, new_g, induced_nodes):
         assert g.ntypes == new_g.ntypes

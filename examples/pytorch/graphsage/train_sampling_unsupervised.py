@@ -67,6 +67,9 @@ def run(proc_id, n_gpus, args, devices, data):
     train_mask, val_mask, test_mask, n_classes, g = data
     nfeat = g.ndata.pop('feat')
     labels = g.ndata.pop('label')
+    if not args.data_cpu:
+        nfeat = nfeat.to(device)
+        labels = labels.to(device)
     in_feats = nfeat.shape[1]
 
     train_nid = th.LongTensor(np.nonzero(train_mask)).squeeze()
@@ -76,6 +79,11 @@ def run(proc_id, n_gpus, args, devices, data):
     # Create PyTorch DataLoader for constructing blocks
     n_edges = g.num_edges()
     train_seeds = th.arange(n_edges)
+
+    if args.sample_gpu:
+        assert n_gpus > 0, "Must have GPUs to enable GPU sampling"
+        train_seeds = train_seeds.to(device)
+        g = g.to(device)
 
     # Create sampler
     sampler = dgl.dataloading.MultiLayerNeighborSampler(
@@ -121,11 +129,11 @@ def run(proc_id, n_gpus, args, devices, data):
         tic_step = time.time()
         for step, (input_nodes, pos_graph, neg_graph, blocks) in enumerate(dataloader):
             batch_inputs = nfeat[input_nodes].to(device)
-            d_step = time.time()
-
             pos_graph = pos_graph.to(device)
             neg_graph = neg_graph.to(device)
             blocks = [block.int().to(device) for block in blocks]
+            d_step = time.time()
+
             # Compute loss and prediction
             batch_pred = model(blocks, batch_inputs)
             loss = loss_fcn(batch_pred, pos_graph, neg_graph)
@@ -213,6 +221,13 @@ if __name__ == '__main__':
     argparser.add_argument('--dropout', type=float, default=0.5)
     argparser.add_argument('--num-workers', type=int, default=0,
                            help="Number of sampling processes. Use 0 for no extra process.")
+    argparser.add_argument('--sample-gpu', action='store_true',
+                           help="Perform the sampling process on the GPU. Must have 0 workers.")
+    argparser.add_argument('--data-cpu', action='store_true',
+                           help="By default the script puts all node features and labels "
+                                "on GPU when using it to save time for data copy. This may "
+                                "be undesired if they cannot fit in GPU memory at once. "
+                                "This flag disables that.")
     args = argparser.parse_args()
 
     devices = list(map(int, args.gpu.split(',')))
