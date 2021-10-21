@@ -24,7 +24,11 @@ from dgl import function as fn
 try:
     from functools import cached_property
 except ImportError:
-    cached_property = property
+    try:
+        from backports.cached_property import cached_property
+    except ImportError:
+        warnings.warn("cached_property not found - using property instead")
+        cached_property = property
 
 
 class EdgeData:
@@ -94,7 +98,7 @@ class DocData(Dirichlet):
         return self.__class__(self.prior, out, self.mult)
 
 
-class Distributed:
+class Distributed(collections.UserList):
     """ split on dim=0 and store on multiple devices  """
     def __init__(self, prior, nphi, mult=1):
         self.prior = prior
@@ -103,7 +107,7 @@ class Distributed:
         self.clear_cache()
 
     def clear_cache(self, gc_collect=False):
-        self.parts = [Dirichlet(self.prior, nphi, self.mult) for nphi in self.nphi]
+        super().__init__([Dirichlet(self.prior, nphi, self.mult) for nphi in self.nphi])
         if gc_collect:
             gc.collect()
             for nphi in self.nphi:
@@ -117,9 +121,9 @@ class WordData(Distributed):
     def prepare_graph(self, G):
         if '_ID' in G.nodes['word'].data:
             _ID = G.nodes['word'].data['_ID']
-            out = [part.Elog[:, _ID.to(G.device)].to(_ID.device) for part in self.parts]
+            out = [part.Elog[:, _ID.to(G.device)].to(_ID.device) for part in self]
         else:
-            out = [part.Elog.to(G.device) for part in self.parts]
+            out = [part.Elog.to(G.device) for part in self]
 
         G.nodes['word'].data['Elog'] = torch.cat(out).T
 
@@ -264,17 +268,12 @@ class LatentDirichletAllocation:
 
 
     def sample(self, doc_data, num_samples):
-        u = torch.rand(doc_data.cdf.shape[0], num_samples, device=doc_data.nphi.device)
-        topic_ids = torch.searchsorted(doc_data.cdf, u)
+        def fn(cdf):
+            u = torch.rand(cdf.shape[0], num_samples, device=cdf.device)
+            return torch.searchsorted(cdf, u).to(doc_data.cdf.device)
 
-        def collapse_words(cdf):
-            v = torch.rand(cdf.shape[0], num_samples, device=cdf.device)
-            return torch.searchsorted(cdf, v)
-
-        word_ids = torch.cat([
-            collapse_words(part.cdf).to(doc_data.nphi.device)
-            for part in self.word_data.parts
-            ])
+        topic_ids = fn(doc_data.cdf)
+        word_ids = torch.cat([fn(part.cdf) for part in self.word_data])
         return torch.gather(word_ids, 0, topic_ids) # pick components by topic_ids
 
 
@@ -308,7 +307,7 @@ class LatentDirichletAllocation:
         if self.verbose:
             Bayesian_gap = np.mean([
                 part.Elog.exp().sum(1).mean().tolist()
-                for part in self.word_data.parts
+                for part in self.word_data
             ])
             print(f"Bayesian_gap={1 - Bayesian_gap:.4f}")
 
@@ -355,8 +354,8 @@ class LatentDirichletAllocation:
         # The denominator n for extrapolation perplexity is undefined.
         # We use the train set, whereas sklearn uses the test set.
         word_elbo = (
-            sum([part.loglike.sum().tolist() for part in self.word_data.parts])
-            / sum([part.n.tolist() for part in self.word_data.parts])
+            sum([part.loglike.sum().tolist() for part in self.word_data])
+            / sum([part.n.tolist() for part in self.word_data])
             )
         if self.verbose:
             print(f'beta: {-word_elbo:.3f}')
@@ -373,7 +372,8 @@ if __name__ == '__main__':
     model = LatentDirichletAllocation(n_words=5, n_components=10, verbose=False)
     model.fit(G)
     model.transform(G)
-    model.sample(model.transform(G), 2)
+    if hasattr(torch, "searchsorted"):
+        model.sample(model.transform(G), 2)
     model.perplexity(G)
 
     sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
