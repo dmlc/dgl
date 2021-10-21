@@ -1,8 +1,22 @@
 /*!
  *  Copyright (c) 2021 by Contributors
- * \file nccl_api.cc
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
+ * \file nccl_api.cu
  * \brief Implementation of wrapper around NCCL routines.
  */
+
 
 #ifdef DGL_USE_NCCL
 
@@ -29,7 +43,6 @@
 #include "cuda_common.h"
 #include "../../runtime/workspace.h"
 #include "../../partition/ndarray_partition.h"
-#include "../../kernel/cuda/atomic.cuh"
 #include "../../array/cuda/dgl_cub.cuh"
 #include "../../array/cuda/array_index_select.cuh"
 
@@ -44,7 +57,6 @@
 
 namespace dgl {
 
-using namespace kernel::cuda;
 using namespace partition;
 
 namespace runtime {
@@ -338,6 +350,7 @@ NDArray SparsePull(
         static_cast<const IdType*>(req_idx->data),
         perm,
         num_in,
+        req_idx->shape[0],
         send_idx.get());
     CUDA_CALL(cudaGetLastError());
   }
@@ -445,6 +458,7 @@ NDArray SparsePull(
         num_feat,
         static_cast<IdType*>(recv_idx->data),
         response_prefix_host.back(),
+        local_tensor->shape[0],
         filled_response_value.get());
     CUDA_CALL(cudaGetLastError());
   }
@@ -627,12 +641,12 @@ void NCCLCommunicator::AllToAll(
     cudaStream_t stream) {
   const ncclDataType_t type = NCCLType<IdType>();
 
-  ncclGroupStart();
+  NCCL_CALL(ncclGroupStart());
   for (int r = 0; r < size_; ++r) {
-    ncclSend(send+(r*count), count, type, r, comm_, stream);
-    ncclRecv(recv+(r*count), count, type, r, comm_, stream);
+    NCCL_CALL(ncclSend(send+(r*count), count, type, r, comm_, stream));
+    NCCL_CALL(ncclRecv(recv+(r*count), count, type, r, comm_, stream));
   }
-  ncclGroupEnd();
+  NCCL_CALL(ncclGroupEnd());
 }
 
 template
@@ -662,23 +676,26 @@ void NCCLCommunicator::SparseAllToAll(
   const ncclDataType_t idx_type = NCCLType<IdType>();
   const ncclDataType_t value_type = NCCLType<DType>();
 
-  ncclGroupStart();
+  // idxs
+  AllToAllV(send_idx, send_prefix, recv_idx, recv_prefix, stream);
+
+  // values
+  NCCL_CALL(ncclGroupStart());
   for (int r = 0; r < size_; ++r) {
     const int64_t send_size = send_prefix[r+1]-send_prefix[r];
     if (send_size > 0) {
-      ncclSend(send_idx+send_prefix[r], send_size, idx_type, r, comm_, stream);
-      ncclSend(send_value+send_prefix[r]*num_feat, send_size*num_feat,
-               value_type, r, comm_, stream);
+      NCCL_CALL(ncclSend(send_value+send_prefix[r]*num_feat, send_size*num_feat,
+                         value_type, r, comm_, stream));
     }
     const int64_t recv_size = recv_prefix[r+1]-recv_prefix[r];
     if (recv_size > 0) {
-      ncclRecv(recv_idx+recv_prefix[r], recv_size, idx_type, r, comm_, stream);
-      ncclRecv(recv_value+recv_prefix[r]*num_feat, recv_size*num_feat,
-               value_type, r, comm_, stream);
+      NCCL_CALL(ncclRecv(recv_value+recv_prefix[r]*num_feat, recv_size*num_feat,
+                         value_type, r, comm_, stream));
     }
   }
-  ncclGroupEnd();
+  NCCL_CALL(ncclGroupEnd());
 }
+
 
 template
 void NCCLCommunicator::SparseAllToAll<int32_t, __half>(

@@ -60,6 +60,8 @@ class CPUDeviceAPI final : public DeviceAPI {
            size);
   }
 
+  DGLStreamHandle CreateStream(DGLContext) final { return nullptr; }
+
   void StreamSync(DGLContext ctx, DGLStreamHandle stream) final {
   }
 

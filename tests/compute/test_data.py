@@ -2,6 +2,9 @@ import dgl.data as data
 import unittest
 import backend as F
 import numpy as np
+import gzip
+import tempfile
+import os
 
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
@@ -139,6 +142,20 @@ def test_reddit():
     assert np.array_equal(dst, np.sort(dst))
 
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
+def test_extract_archive():
+    # gzip
+    with tempfile.TemporaryDirectory() as src_dir:
+        gz_file = 'gz_archive'
+        gz_path = os.path.join(src_dir, gz_file + '.gz')
+        content = b"test extract archive gzip"
+        with gzip.open(gz_path, 'wb') as f:
+            f.write(content)
+        with tempfile.TemporaryDirectory() as dst_dir:
+            data.utils.extract_archive(gz_path, dst_dir, overwrite=True)
+            assert os.path.exists(os.path.join(dst_dir, gz_file))
+
+
 if __name__ == '__main__':
     test_minigc()
     test_gin()
@@ -146,3 +163,4 @@ if __name__ == '__main__':
     test_tudataset_regression()
     test_fraud()
     test_fakenews()
+    test_extract_archive()

@@ -1,5 +1,6 @@
 """A set of graph services of getting subgraphs from DistGraph"""
 from collections import namedtuple
+import numpy as np
 
 from .rpc import Request, Response, send_requests_to_machine, recv_responses
 from ..sampling import sample_neighbors as local_sample_neighbors
@@ -80,8 +81,12 @@ def _sample_etype_neighbors(local_g, partition_book, seed_nodes, etype_field,
     local_ids = partition_book.nid2localnid(seed_nodes, partition_book.partid)
     local_ids = F.astype(local_ids, local_g.idtype)
     # local_ids = self.seed_nodes
+
+    # DistGraph's edges are sorted by default according to
+    # graph partition mechanism.
     sampled_graph = local_sample_etype_neighbors(
-        local_g, local_ids, etype_field, fan_out, edge_dir, prob, replace, _dist_training=True)
+        local_g, local_ids, etype_field, fan_out, edge_dir, prob, replace,
+        etype_sorted=True, _dist_training=True)
     global_nid_mapping = local_g.ndata[NID]
     src, dst = sampled_graph.edges()
     global_src, global_dst = F.gather_row(global_nid_mapping, src), \
@@ -382,6 +387,40 @@ def _distributed_access(g, nodes, issue_remote_req, local_access):
     sampled_graph = merge_graphs(res_list, g.number_of_nodes())
     return sampled_graph
 
+def _frontier_to_heterogeneous_graph(g, frontier, gpb):
+    # We need to handle empty frontiers correctly.
+    if frontier.number_of_edges() == 0:
+        data_dict = {etype: (np.zeros(0), np.zeros(0)) for etype in g.canonical_etypes}
+        return heterograph(data_dict,
+                           {ntype: g.number_of_nodes(ntype) for ntype in g.ntypes},
+                           idtype=g.idtype)
+
+    etype_ids, frontier.edata[EID] = gpb.map_to_per_etype(frontier.edata[EID])
+    src, dst = frontier.edges()
+    etype_ids, idx = F.sort_1d(etype_ids)
+    src, dst = F.gather_row(src, idx), F.gather_row(dst, idx)
+    eid = F.gather_row(frontier.edata[EID], idx)
+    _, src = gpb.map_to_per_ntype(src)
+    _, dst = gpb.map_to_per_ntype(dst)
+
+    data_dict = dict()
+    edge_ids = {}
+    for etid in range(len(g.etypes)):
+        etype = g.etypes[etid]
+        canonical_etype = g.canonical_etypes[etid]
+        type_idx = etype_ids == etid
+        if F.sum(type_idx, 0) > 0:
+            data_dict[canonical_etype] = (F.boolean_mask(src, type_idx), \
+                    F.boolean_mask(dst, type_idx))
+            edge_ids[etype] = F.boolean_mask(eid, type_idx)
+    hg = heterograph(data_dict,
+                     {ntype: g.number_of_nodes(ntype) for ntype in g.ntypes},
+                     idtype=g.idtype)
+
+    for etype in edge_ids:
+        hg.edges[etype].data[EID] = edge_ids[etype]
+    return hg
+
 def sample_etype_neighbors(g, nodes, etype_field, fanout, edge_dir='in', prob=None, replace=False):
     """Sample from the neighbors of the given nodes from a distributed graph.
 
@@ -460,31 +499,7 @@ def sample_etype_neighbors(g, nodes, etype_field, fanout, edge_dir='in', prob=No
                                        etype_field, fanout, edge_dir, prob, replace)
     frontier = _distributed_access(g, nodes, issue_remote_req, local_access)
     if len(gpb.etypes) > 1:
-        etype_ids, frontier.edata[EID] = gpb.map_to_per_etype(frontier.edata[EID])
-        src, dst = frontier.edges()
-        etype_ids, idx = F.sort_1d(etype_ids)
-        src, dst = F.gather_row(src, idx), F.gather_row(dst, idx)
-        eid = F.gather_row(frontier.edata[EID], idx)
-        _, src = gpb.map_to_per_ntype(src)
-        _, dst = gpb.map_to_per_ntype(dst)
-
-        data_dict = dict()
-        edge_ids = {}
-        for etid in range(len(g.etypes)):
-            etype = g.etypes[etid]
-            canonical_etype = g.canonical_etypes[etid]
-            type_idx = etype_ids == etid
-            if F.sum(type_idx, 0) > 0:
-                data_dict[canonical_etype] = (F.boolean_mask(src, type_idx), \
-                        F.boolean_mask(dst, type_idx))
-                edge_ids[etype] = F.boolean_mask(eid, type_idx)
-        hg = heterograph(data_dict,
-                         {ntype: g.number_of_nodes(ntype) for ntype in g.ntypes},
-                         idtype=g.idtype)
-
-        for etype in edge_ids:
-            hg.edges[etype].data[EID] = edge_ids[etype]
-        return hg
+        return _frontier_to_heterogeneous_graph(g, frontier, gpb)
     else:
         return frontier
 
@@ -561,32 +576,7 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
                                  fanout, edge_dir, prob, replace)
     frontier = _distributed_access(g, nodes, issue_remote_req, local_access)
     if len(gpb.etypes) > 1:
-        etype_ids, frontier.edata[EID] = gpb.map_to_per_etype(frontier.edata[EID])
-        src, dst = frontier.edges()
-        etype_ids, idx = F.sort_1d(etype_ids)
-        src, dst = F.gather_row(src, idx), F.gather_row(dst, idx)
-        eid = F.gather_row(frontier.edata[EID], idx)
-        assert len(eid) > 0
-        _, src = gpb.map_to_per_ntype(src)
-        _, dst = gpb.map_to_per_ntype(dst)
-
-        data_dict = dict()
-        edge_ids = {}
-        for etid in range(len(g.etypes)):
-            etype = g.etypes[etid]
-            canonical_etype = g.canonical_etypes[etid]
-            type_idx = etype_ids == etid
-            if F.sum(type_idx, 0) > 0:
-                data_dict[canonical_etype] = (F.boolean_mask(src, type_idx), \
-                        F.boolean_mask(dst, type_idx))
-                edge_ids[etype] = F.boolean_mask(eid, type_idx)
-        hg = heterograph(data_dict,
-                         {ntype: g.number_of_nodes(ntype) for ntype in g.ntypes},
-                         idtype=g.idtype)
-
-        for etype in edge_ids:
-            hg.edges[etype].data[EID] = edge_ids[etype]
-        return hg
+        return _frontier_to_heterogeneous_graph(g, frontier, gpb)
     else:
         return frontier
 

@@ -169,8 +169,6 @@ class HeteroGraphConv(nn.Module):
 
             for stype, etype, dtype in g.canonical_etypes:
                 rel_graph = g[stype, etype, dtype]
-                if rel_graph.number_of_edges() == 0:
-                    continue
                 if stype not in src_inputs or dtype not in dst_inputs:
                     continue
                 dstdata = self.mods[etype](
@@ -182,8 +180,6 @@ class HeteroGraphConv(nn.Module):
         else:
             for stype, etype, dtype in g.canonical_etypes:
                 rel_graph = g[stype, etype, dtype]
-                if rel_graph.number_of_edges() == 0:
-                    continue
                 if stype not in inputs:
                     continue
                 dstdata = self.mods[etype](
