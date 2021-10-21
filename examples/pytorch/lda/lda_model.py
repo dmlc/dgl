@@ -24,7 +24,7 @@ from dgl import function as fn
 try:
     from functools import cached_property
 except ImportError:
-    from backports.cached_property import cached_property
+    cached_property = property
 
 
 class EdgeData:
@@ -246,13 +246,12 @@ class LatentDirichletAllocation:
                 lambda edges: {'phi': EdgeData(edges.src, edges.dst).phi},
                 fn.sum('phi', 'nphi')
             )
-            new_data = doc_data.extract_graph(G_rev)
+            old_nphi = doc_data.nphi
+            doc_data = doc_data.extract_graph(G_rev)
 
-            mean_change = (doc_data.nphi - new_data.nphi).abs().mean()
+            mean_change = (old_nphi - doc_data.nphi).abs().mean()
             if mean_change < mean_change_tol:
                 break
-            else:
-                doc_data = new_data
 
         if self.verbose:
             print(f"e-step num_iters={i+1} with mean_change={mean_change:.4f}, "
