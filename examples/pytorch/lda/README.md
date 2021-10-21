@@ -134,8 +134,8 @@ Example
 
 Advanced configurations
 ---
- * Set `0<lr<1` for online learning with partial_fit.
- * Set `lr["doc"]>=100` or `lr["word"]>=100` to disable the corresponding Bayesian priors.
+ * Set `0<rho<1` for online learning with partial_fit.
+ * Set `mult["doc"]=100` or `mult["word"]=100` or some large value to disable the corresponding Bayesian priors.
 
 References
 ---
