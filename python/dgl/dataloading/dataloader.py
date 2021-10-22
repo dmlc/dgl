@@ -368,7 +368,7 @@ class BlockSampler(object):
             else:
                 seed_nodes_in = seed_nodes_in.to(graph_device)
 
-            if self.exclude_edges_in_frontier:
+            if self.exclude_edges_in_frontier(g):
                 frontier = self.sample_frontier(
                     block_id, g, seed_nodes_in, exclude_eids=exclude_eids)
             else:
