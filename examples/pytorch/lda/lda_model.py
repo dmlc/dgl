@@ -62,7 +62,7 @@ class _Dirichlet:
         return torch.digamma(self.posterior) - \
                torch.digamma(self.posterior.sum(1, keepdims=True))
 
-    @property
+    @cached_property
     def loglike(self):
         neg_evid = -(self.nphi * self.Elog).sum(1)
 
@@ -75,13 +75,9 @@ class _Dirichlet:
 
         return neg_evid - log_B_prior + log_B_posterior
 
-    @property
+    @cached_property
     def n(self):
-        return self.nphi.sum()
-
-    @property
-    def weight(self):
-        return self.posterior / self.posterior.sum(1, keepdims=True)
+        return self.nphi.sum(1)
 
     @cached_property
     def cdf(self):
@@ -343,7 +339,7 @@ class LatentDirichletAllocation:
             print(f'neg_elbo phi: {-edge_elbo:.3f}', end=' ')
 
         # compute E[log p(theta | alpha) - log q(theta | gamma)]
-        doc_elbo = (doc_data.loglike.sum() / doc_data.n).tolist()
+        doc_elbo = (doc_data.loglike.sum() / doc_data.n.sum()).tolist()
         if self.verbose:
             print(f'theta: {-doc_elbo:.3f}', end=' ')
 
@@ -352,7 +348,7 @@ class LatentDirichletAllocation:
         # We use the train set, whereas sklearn uses the test set.
         word_elbo = (
             sum([part.loglike.sum().tolist() for part in self.word_data])
-            / sum([part.n.tolist() for part in self.word_data])
+            / sum([part.n.sum().tolist() for part in self.word_data])
             )
         if self.verbose:
             print(f'beta: {-word_elbo:.3f}')
