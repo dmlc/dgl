@@ -48,14 +48,13 @@ class EdgeData:
 
 
 class Dirichlet:
-    def __init__(self, prior, nphi, mult=1):
+    def __init__(self, prior, nphi):
         self.prior = prior
         self.nphi = nphi
-        self.mult = mult
 
     @cached_property
     def posterior(self):
-        return self.prior + self.nphi * self.mult
+        return self.prior + self.nphi
 
     @cached_property
     def Elog(self):
@@ -64,7 +63,7 @@ class Dirichlet:
 
     @cached_property
     def loglike(self):
-        neg_evid = -(self.nphi * self.mult * self.Elog).sum(1)
+        neg_evid = -(self.nphi * self.Elog).sum(1)
 
         prior = torch.as_tensor(self.prior).to(self.nphi)
         K = self.nphi.shape[1]
@@ -77,7 +76,7 @@ class Dirichlet:
 
     @cached_property
     def n(self):
-        return self.nphi.sum() * self.mult
+        return self.nphi.sum()
 
     @cached_property
     def weight(self):
@@ -93,21 +92,20 @@ class DocData(Dirichlet):
     def prepare_graph(self, G):
         G.nodes['doc'].data['Elog'] = self.Elog.to(G.device)
 
-    def extract_graph(self, G):
-        out = G.nodes['doc'].data['nphi'].to(self.nphi.device)
-        return self.__class__(self.prior, out, self.mult)
+    def extract_graph(self, G, mult):
+        out = G.nodes['doc'].data['nphi'] * mult
+        return self.__class__(self.prior, out.to(self.nphi.device))
 
 
 class Distributed(collections.UserList):
     """ split on dim=0 and store on multiple devices  """
-    def __init__(self, prior, nphi, mult=1):
+    def __init__(self, prior, nphi):
         self.prior = prior
         self.nphi = nphi
-        self.mult = mult
         self.clear_cache()
 
     def clear_cache(self, gc_collect=False):
-        super().__init__([Dirichlet(self.prior, nphi, self.mult) for nphi in self.nphi])
+        super().__init__([Dirichlet(self.prior, nphi) for nphi in self.nphi])
         if gc_collect:
             gc.collect()
             for nphi in self.nphi:
@@ -127,10 +125,11 @@ class WordData(Distributed):
 
         G.nodes['word'].data['Elog'] = torch.cat(out).T
 
-    def extract_graph(self, G):
-        split_sections = [x.shape[0] for x in self.nphi]
-        nphi = torch.split(G.nodes['word'].data['nphi'].T, split_sections)
-
+    def extract_graph(self, G, mult):
+        nphi = torch.split(
+            G.nodes['word'].data['nphi'].T * mult,
+            [x.shape[0] for x in self.nphi]
+        )
         if '_ID' in G.nodes['word'].data:
             _ID = G.nodes['word'].data['_ID']
 
@@ -140,7 +139,7 @@ class WordData(Distributed):
         else:
             out = [y.to(x.device) for x,y in zip(self.nphi, nphi)]
 
-        return self.__class__(self.prior, out, self.mult)
+        return self.__class__(self.prior, out)
 
 
 class GammaParams(collections.namedtuple('GammaParams', "concentration, rate")):
@@ -221,14 +220,14 @@ class LatentDirichletAllocation:
                 ).sample((s, self.n_words))
             for s, device in zip(split_sections, self.device_list)
         ]
-        self.word_data = WordData(self.prior['word'], word_nphi, self.mult['word'])
+        self.word_data = WordData(self.prior['word'], word_nphi)
 
 
     def _init_doc_data(self, n_docs, device):
         doc_nphi = torch.distributions.gamma.Gamma(
             *self._init_params.to(device)
             ).sample((n_docs, self.n_components))
-        return DocData(self.prior['doc'], doc_nphi, self.mult['doc'])
+        return DocData(self.prior['doc'], doc_nphi)
 
 
     def _prepare_graph(self, G, doc_data):
@@ -251,7 +250,7 @@ class LatentDirichletAllocation:
                 fn.sum('phi', 'nphi')
             )
             old_nphi = doc_data.nphi
-            doc_data = doc_data.extract_graph(G_rev)
+            doc_data = doc_data.extract_graph(G_rev, self.mult['doc'])
 
             mean_change = (old_nphi - doc_data.nphi).abs().mean()
             if mean_change < mean_change_tol:
@@ -288,7 +287,7 @@ class LatentDirichletAllocation:
             fn.sum('phi', 'nphi')
         )
         self.word_data.clear_cache(gc_collect=True)
-        word_data = self.word_data.extract_graph(G)
+        word_data = self.word_data.extract_graph(G, self.mult['word'])
 
         self._last_mean_change = np.mean([
             (old_nphi - nphi).abs().mean().tolist()
@@ -302,7 +301,7 @@ class LatentDirichletAllocation:
             for (old_nphi, nphi) in zip(self.word_data.nphi, word_data.nphi)
         ]
         del word_data
-        self.word_data = WordData(self.word_data.prior, new_nphi, self.word_data.mult)
+        self.word_data = WordData(self.word_data.prior, new_nphi)
 
         if self.verbose:
             Bayesian_gap = np.mean([
