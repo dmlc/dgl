@@ -17,7 +17,7 @@
 # limitations under the License.
 
 
-import os, functools, warnings, torch, typing, gc, collections
+import os, functools, warnings, torch, typing, collections
 import numpy as np, scipy as sp
 import dgl
 from dgl import function as fn
@@ -36,11 +36,11 @@ class EdgeData:
         self.src_data = src_data
         self.dst_data = dst_data
 
-    @cached_property
+    @property
     def loglike(self):
         return (self.src_data['Elog'] + self.dst_data['Elog']).logsumexp(1)
 
-    @cached_property
+    @property
     def phi(self):
         return (
             self.src_data['Elog'] + self.dst_data['Elog'] - self.loglike.unsqueeze(1)
@@ -57,12 +57,12 @@ class _Dirichlet:
     def posterior(self):
         return self.prior + self.nphi
 
-    @cached_property
+    @property
     def Elog(self):
         return torch.digamma(self.posterior) - \
                torch.digamma(self.posterior.sum(1, keepdims=True))
 
-    @cached_property
+    @property
     def loglike(self):
         neg_evid = -(self.nphi * self.Elog).sum(1)
 
@@ -75,11 +75,11 @@ class _Dirichlet:
 
         return neg_evid - log_B_prior + log_B_posterior
 
-    @cached_property
+    @property
     def n(self):
         return self.nphi.sum()
 
-    @cached_property
+    @property
     def weight(self):
         return self.posterior / self.posterior.sum(1, keepdims=True)
 
@@ -106,14 +106,9 @@ class _Distributed(collections.UserList):
         self.nphi = nphi
         self.clear_cache()
 
-    def clear_cache(self, gc_collect=False):
+    def clear_cache(self):
         super().__init__([_Dirichlet(self.prior, nphi) for nphi in self.nphi])
-        if gc_collect:
-            gc.collect()
-            for part in self:
-                if part.device.type == 'cuda':
-                    with torch.cuda.device(part.device):
-                        torch.cuda.empty_cache()
+        # TODO: gc may lead to dead lock; set PYTORCH_NO_CUDA_MEMORY_CACHING instead
 
     def split_device(self, other, dim=0):
         split_sections = [x.shape[0] for x in self.nphi]
@@ -291,21 +286,20 @@ class LatentDirichletAllocation:
             lambda edges: {'phi': EdgeData(edges.src, edges.dst).phi},
             fn.sum('phi', 'nphi')
         )
-        self.word_data.clear_cache(gc_collect=True)
-        word_data = self.word_data.extract_graph(G, self.mult['word'])
+        self.word_data.clear_cache()
+        new_nphi = self.word_data.extract_graph(G, self.mult['word']).nphi
 
         self._last_mean_change = np.mean([
-            (old_nphi - nphi).abs().mean().tolist()
-            for (old_nphi, nphi) in zip(self.word_data.nphi, word_data.nphi)
+            (old - new).abs().mean().tolist()
+            for (old, new) in zip(self.word_data.nphi, new_nphi)
             ])
         if self.verbose:
             print(f"m-step mean_change={self._last_mean_change:.4f}, ", end="")
 
-        new_nphi = [
-            old_nphi * (1 - self.rho) + nphi * self.rho
-            for (old_nphi, nphi) in zip(self.word_data.nphi, word_data.nphi)
-        ]
-        del word_data
+        # old * (1-rho) + new * rho
+        for old, new in zip(self.word_data.nphi, new_nphi):
+            new *= self.rho
+            new += old * (1 - self.rho)
         self.word_data = WordData(self.word_data.prior, new_nphi)
 
         if self.verbose:
