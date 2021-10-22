@@ -1,9 +1,12 @@
 """Torch modules for graph attention networks with fully valuable edges (EGAT)."""
 # pylint: disable= no-member, arguments-differ, invalid-name
+# pylint: disable= no-member, arguments-differ, invalid-name
 import torch as th
 from torch import nn
 from torch.nn import init
 
+from .... import function as fn
+from ...functional import edge_softmax
 
 # pylint: enable=W0235
 class EGATConv(nn.Module):
