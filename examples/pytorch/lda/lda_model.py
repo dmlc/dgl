@@ -47,7 +47,7 @@ class EdgeData:
         ).exp()
 
 
-class Dirichlet:
+class _Dirichlet:
     def __init__(self, prior, nphi):
         self.prior = prior
         self.nphi = nphi
@@ -84,10 +84,11 @@ class Dirichlet:
 
     @cached_property
     def cdf(self):
-        return self.posterior.cumsum(1) / self.posterior.sum(1, keepdims=True)
+        cdf = self.posterior.cumsum(1)
+        return cdf / cdf[:, -1:]
 
 
-class DocData(Dirichlet):
+class DocData(_Dirichlet):
     """ nphi (n_docs by n_topics) """
     def prepare_graph(self, G):
         G.nodes['doc'].data['Elog'] = self.Elog.to(G.device)
@@ -97,7 +98,7 @@ class DocData(Dirichlet):
         return self.__class__(self.prior, out.to(self.nphi.device))
 
 
-class Distributed(collections.UserList):
+class _Distributed(collections.UserList):
     """ split on dim=0 and store on multiple devices  """
     def __init__(self, prior, nphi):
         self.prior = prior
@@ -105,7 +106,7 @@ class Distributed(collections.UserList):
         self.clear_cache()
 
     def clear_cache(self, gc_collect=False):
-        super().__init__([Dirichlet(self.prior, nphi) for nphi in self.nphi])
+        super().__init__([_Dirichlet(self.prior, nphi) for nphi in self.nphi])
         if gc_collect:
             gc.collect()
             for nphi in self.nphi:
@@ -113,8 +114,13 @@ class Distributed(collections.UserList):
                     with torch.cuda.device(nphi.device):
                         torch.cuda.empty_cache()
 
+    def split_device(self, other, dim=0):
+        split_sections = [x.shape[0] for x in self.nphi]
+        out = torch.split(other, split_sections, dim)
+        return [y.to(x.device) for x,y in zip(self.nphi, out)]
 
-class WordData(Distributed):
+
+class WordData(_Distributed):
     """ distributed nphi (n_topics by n_words), transpose to/from graph nodes data """
     def prepare_graph(self, G):
         if '_ID' in G.nodes['word'].data:
@@ -126,18 +132,16 @@ class WordData(Distributed):
         G.nodes['word'].data['Elog'] = torch.cat(out).T
 
     def extract_graph(self, G, mult):
-        nphi = torch.split(
-            G.nodes['word'].data['nphi'].T * mult,
-            [x.shape[0] for x in self.nphi]
-        )
+        nphi = G.nodes['word'].data['nphi'].T * mult
+
         if '_ID' in G.nodes['word'].data:
             _ID = G.nodes['word'].data['_ID']
 
             out = [torch.zeros_like(x) for x in self.nphi]
-            for x, y in zip(out, nphi):
-                x[:, _ID.to(x.device)] = y.to(x.device)
+            for x, y in zip(out, self.split_device(nphi)):
+                x[:, _ID.to(x.device)] = y
         else:
-            out = [y.to(x.device) for x,y in zip(self.nphi, nphi)]
+            out = self.split_device(nphi)
 
         return self.__class__(self.prior, out)
 
@@ -168,7 +172,8 @@ class LatentDirichletAllocation:
     * prior: parameters in the Dirichlet prior; default to 1/n_components and 1/n_words
     * rho: new_nphi = (1-rho)*old_nphi + rho*nphi; default to 1 for full gradients.
     * mult: multiplier for nphi-update; a large value effectively disables prior.
-    * device: accelerate word distribution updates.
+    * init: sklearn initializers (100.0, 100.0); the sample points concentrate around 1.0
+    * device_list: accelerate word_data updates.
 
     Notes
     ---
@@ -187,6 +192,7 @@ class LatentDirichletAllocation:
         prior=None,
         rho=1,
         mult={'doc': 1, 'word': 1},
+        init={'doc': (100., 100.), 'word': (100., 100.)},
         device_list=['cpu'],
         verbose=True,
         ):
@@ -199,14 +205,12 @@ class LatentDirichletAllocation:
 
         self.rho = rho
         self.mult = mult
+        self.init = init
 
         assert not isinstance(device_list, str), "plz wrap devices in a list"
         self.device_list = device_list
         self.verbose = verbose
 
-        # Taken from scikit-learn.  Worked better than uniform.
-        # The sample points concentrate around 1.0
-        self._init_params = GammaParams(100.0, 100.0)
         self._init_word_data()
 
 
@@ -216,7 +220,7 @@ class LatentDirichletAllocation:
         )
         word_nphi = [
             torch.distributions.gamma.Gamma(
-                *self._init_params.to(device)
+                *GammaParams(*self.init['word']).to(device)
                 ).sample((s, self.n_words))
             for s, device in zip(split_sections, self.device_list)
         ]
@@ -225,7 +229,7 @@ class LatentDirichletAllocation:
 
     def _init_doc_data(self, n_docs, device):
         doc_nphi = torch.distributions.gamma.Gamma(
-            *self._init_params.to(device)
+            *GammaParams(*self.init['doc']).to(device)
             ).sample((n_docs, self.n_components))
         return DocData(self.prior['doc'], doc_nphi)
 
