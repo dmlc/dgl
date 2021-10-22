@@ -72,8 +72,7 @@ class EGATConv(nn.Module):
                  out_node_feats,
                  out_edge_feats,
                  num_heads,
-                 bias=True,
-                 **kw_args):
+                 bias=True):
 
         super().__init__()
         self._num_heads = num_heads
