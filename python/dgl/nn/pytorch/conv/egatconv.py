@@ -39,6 +39,8 @@ class EGATConv(nn.Module):
         Output edge feature size.
     num_heads : int
         Number of attention heads.
+    bias : bool, optional
+        If True, add bias term to :math `f_{ij}^{\prime}`. Defaults: ``True``.
 
     Examples
     ----------
@@ -47,7 +49,7 @@ class EGATConv(nn.Module):
     >>> from dgl.nn import EGATConv
     >>>
     >>> num_nodes, num_edges = 8, 30
-    >>>#define connections
+    >>> # define connections
     >>> u, v = th.randint(num_nodes, num_edges), th.randint(num_nodes, num_edges)
     >>> graph = dgl.graph((u,v))
 
@@ -69,60 +71,38 @@ class EGATConv(nn.Module):
                  in_edge_feats,
                  out_node_feats,
                  out_edge_feats,
-                 num_heads):
+                 num_heads,
+                 bias=True,
+                 **kw_args):
+
         super().__init__()
         self._num_heads = num_heads
         self._out_node_feats = out_node_feats
         self._out_edge_feats = out_edge_feats
-        self.fc_nodes = nn.Linear(in_node_feats, out_node_feats * num_heads, bias=True)
-        self.fc_edges = nn.Linear(in_edge_feats + 2 * in_node_feats,
-                                  out_edge_feats * num_heads, bias=False)
-        self.fc_attn = nn.Linear(out_edge_feats, num_heads, bias=False)
+        self.fc_node = nn.Linear(in_node_feats, out_node_feats*num_heads, bias=True)
+        self.fc_ni = nn.Linear(in_node_feats, out_edge_feats*num_heads, bias=False)
+        self.fc_fij = nn.Linear(in_edge_feats, out_edge_feats*num_heads, bias=False)
+        self.fc_nj = nn.Linear(in_node_feats, out_edge_feats*num_heads, bias=False)
+        self.attn = nn.Parameter(th.FloatTensor(size=(1, num_heads, out_edge_feats)))
+        if bias:
+            self.bias = nn.Parameter(th.FloatTensor(size=(num_heads * out_edge_feats,)))
+        else:
+            self.register_buffer('bias', None)
         self.reset_parameters()
 
     def reset_parameters(self):
-        r"""
+        """
         Reinitialize learnable parameters.
         """
         gain = init.calculate_gain('relu')
-        init.xavier_normal_(self.fc_nodes.weight, gain=gain)
-        init.xavier_normal_(self.fc_edges.weight, gain=gain)
-        init.xavier_normal_(self.fc_attn.weight, gain=gain)
+        init.xavier_normal_(self.fc_node.weight, gain=gain)
+        init.xavier_normal_(self.fc_ni.weight, gain=gain)
+        init.xavier_normal_(self.fc_fij.weight, gain=gain)
+        init.xavier_normal_(self.fc_nj.weight, gain=gain)
+        init.xavier_normal_(self.attn, gain=gain)
+        init.constant_(self.bias, 0)
 
-    def edge_attention(self, edges):
-        r"""
-        Calculate output edge features and corresponding attention scores
-        """
-        # extract features
-        h_src = edges.src['h']
-        h_dst = edges.dst['h']
-        f = edges.data['f']
-        # stack h_i | f_ij | h_j
-        stack = th.cat([h_src, f, h_dst], dim=-1)
-        # apply FC and activation
-        f_out = self.fc_edges(stack)
-        f_out = nn.functional.leaky_relu(f_out)
-        f_out = f_out.view(-1, self._num_heads, self._out_edge_feats)
-        # apply FC to reduce edge_feats to scalar
-        a = self.fc_attn(f_out).sum(-1).unsqueeze(-1)
-
-        return {'a': a, 'f': f_out}
-
-    def message_func(self, edges):
-        r"""
-        Node aggregation
-        """
-        return {'h': edges.src['h'], 'a': edges.data['a']}
-
-    def reduce_func(self, nodes):
-        r"""
-        Calculate output node features as a weighted sum over it's edges
-        """
-        alpha = nn.functional.softmax(nodes.mailbox['a'], dim=1)
-        h = th.sum(alpha * nodes.mailbox['h'], dim=1)
-        return {'h': h}
-
-    def forward(self, graph, nfeats, efeats):
+    def forward(self, graph, nfeats, efeats, get_attention=False):
         r"""
         Compute new node and edge features.
 
@@ -140,6 +120,8 @@ class EGATConv(nn.Module):
              where:
                  :math:`F_{in}` is size of input node feauture,
                  :math:`*` is the number of edges.
+        get_attention : bool, optional
+                Whether to return the attention values. Default to False.
 
         Returns
         -------
@@ -152,18 +134,38 @@ class EGATConv(nn.Module):
                 :math:`D_{out}` is size of output node feature,
                 :math:`F_{out}` is size of output edge feature.
         """
+
         with graph.local_scope():
-            ##TODO allow node src and dst feats
+            # TODO allow node src and dst feats
             graph.edata['f'] = efeats
             graph.ndata['h'] = nfeats
+            # calc edge attention
+            # same trick way as in dgl.nn.pytorch.GATConv, but also includes edge feats
+            # https://github.com/dmlc/dgl/blob/master/python/dgl/nn/pytorch/conv/gatconv.py#L297
+            f_ni = self.fc_ni(nfeats)
+            f_nj = self.fc_nj(nfeats)
+            f_fij = self.fc_fij(efeats)
+            graph.srcdata.update({'f_ni': f_ni})
+            graph.dstdata.update({'f_nj': f_nj})
+            # add ni, nj factors
+            graph.apply_edges(fn.u_add_v('f_ni', 'f_nj', 'f_tmp'))
+            # add fij to node factor
+            f_out = graph.edata.pop('f_tmp') + f_fij
+            if self.bias is not None:
+                f_out += self.bias
+            f_out = nn.functional.leaky_relu(f_out)
+            f_out = f_out.view(-1, self._num_heads, self._out_edge_feats)
+            # compute attention factor
+            e = (f_out * self.attn).sum(dim=-1).unsqueeze(-1)
+            graph.edata['a'] = edge_softmax(graph, e)
+            graph.ndata['h_out'] = self.fc_node(nfeats).view(-1, self._num_heads,
+                                                             self._out_node_feats)
+            # calc weighted sum
+            graph.update_all(fn.u_mul_e('h_out', 'a', 'm'),
+                             fn.sum('m', 'h_out'))
 
-            graph.apply_edges(self.edge_attention)
-
-            nfeats_ = self.fc_nodes(nfeats)
-            nfeats_ = nfeats_.view(-1, self._num_heads, self._out_node_feats)
-
-            graph.ndata['h'] = nfeats_
-            graph.update_all(message_func=self.message_func,
-                             reduce_func=self.reduce_func)
-
-            return graph.ndata.pop('h'), graph.edata.pop('f')
+            h_out = graph.ndata['h_out'].view(-1, self._num_heads, self._out_node_feats)
+            if get_attention:
+                return h_out, f_out, graph.edata.pop('a')
+            else:
+                return h_out, f_out
