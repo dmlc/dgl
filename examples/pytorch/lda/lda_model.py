@@ -344,8 +344,7 @@ class LatentDirichletAllocation:
         G = G.clone()
         self._prepare_graph(G, doc_data)
         G.apply_edges(lambda edges: {'loglike': EdgeData(edges.src, edges.dst).loglike})
-
-        edge_elbo = G.edata['loglike'].sum().tolist() / G.num_edges()
+        edge_elbo = (G.edata['loglike'].sum() / G.num_edges()).tolist()
         if self.verbose:
             print(f'neg_elbo phi: {-edge_elbo:.3f}', end=' ')
 
