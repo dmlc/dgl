@@ -51,6 +51,7 @@ class _Dirichlet:
     def __init__(self, prior, nphi):
         self.prior = prior
         self.nphi = nphi
+        self.device = nphi.device
 
     @cached_property
     def posterior(self):
@@ -95,7 +96,7 @@ class DocData(_Dirichlet):
 
     def extract_graph(self, G, mult):
         out = G.nodes['doc'].data['nphi'] * mult
-        return self.__class__(self.prior, out.to(self.nphi.device))
+        return self.__class__(self.prior, out.to(self.device))
 
 
 class _Distributed(collections.UserList):
@@ -109,9 +110,9 @@ class _Distributed(collections.UserList):
         super().__init__([_Dirichlet(self.prior, nphi) for nphi in self.nphi])
         if gc_collect:
             gc.collect()
-            for nphi in self.nphi:
-                if nphi.device.type == 'cuda':
-                    with torch.cuda.device(nphi.device):
+            for part in self:
+                if part.device.type == 'cuda':
+                    with torch.cuda.device(part.device):
                         torch.cuda.empty_cache()
 
     def split_device(self, other, dim=0):
@@ -125,7 +126,7 @@ class WordData(_Distributed):
     def prepare_graph(self, G):
         if '_ID' in G.nodes['word'].data:
             _ID = G.nodes['word'].data['_ID']
-            out = [part.Elog[:, _ID.to(G.device)].to(_ID.device) for part in self]
+            out = [part.Elog[:, _ID.to(part.device)].to(G.device) for part in self]
         else:
             out = [part.Elog.to(G.device) for part in self]
 
@@ -273,7 +274,7 @@ class LatentDirichletAllocation:
     def sample(self, doc_data, num_samples):
         def fn(cdf):
             u = torch.rand(cdf.shape[0], num_samples, device=cdf.device)
-            return torch.searchsorted(cdf, u).to(doc_data.cdf.device)
+            return torch.searchsorted(cdf, u).to(doc_data.device)
 
         topic_ids = fn(doc_data.cdf)
         word_ids = torch.cat([fn(part.cdf) for part in self.word_data])
