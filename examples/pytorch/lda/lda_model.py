@@ -369,6 +369,16 @@ class LatentDirichletAllocation:
         return ppl
 
 
+def doc_subgraph(G, doc_ids):
+    sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
+    block, *_ = sampler.sample_blocks(G.reverse(), {'doc': torch.as_tensor(doc_ids)})
+    B = dgl.DGLHeteroGraph(
+        block._graph, ['_', 'word', 'doc', '_'], block.etypes
+    ).reverse()
+    B.nodes['word'].data['_ID'] = block.nodes['word'].data['_ID']
+    return B
+
+
 if __name__ == '__main__':
     print('Testing LatentDirichletAllocation ...')
     G = dgl.heterograph({('doc', '', 'word'): [(0, 0), (1, 3)]}, {'doc': 2, 'word': 5})
@@ -379,14 +389,7 @@ if __name__ == '__main__':
         model.sample(model.transform(G), 2)
     model.perplexity(G)
 
-    sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
-    dataloader = dgl.dataloading.NodeDataLoader(
-        G.reverse(), {'doc': np.arange(G.num_nodes('doc'))}, sampler,
-        batch_size=1, shuffle=True, drop_last=False)
-    for input_nodes, _, (block,) in dataloader:
-        B = dgl.DGLHeteroGraph(
-            block._graph, ['_', 'word', 'doc', '_'], block.etypes
-        ).reverse()
-        B.nodes['word'].data['_ID'] = block.nodes['word'].data['_ID']
+    for doc_id in range(2):
+        B = doc_subgraph(G, [doc_id])
         model.partial_fit(B)
     print('Testing LatentDirichletAllocation passed!')
