@@ -21,6 +21,7 @@ import os, functools, warnings, torch, typing, collections
 import numpy as np, scipy as sp
 import dgl
 from dgl import function as fn
+
 try:
     from functools import cached_property
 except ImportError:
@@ -29,6 +30,12 @@ except ImportError:
     except ImportError:
         warnings.warn("cached_property not found - using property instead")
         cached_property = property
+
+if int(os.environ.get("LDA_NO_CACHED_2D_PROPERTY", 0)):
+    warnings.warn("trading cached 2d property speed for memory")
+    cached_2d_property = property
+else:
+    cached_2d_property = cached_property
 
 
 class EdgeData:
@@ -53,14 +60,18 @@ class _Dirichlet:
         self.nphi = nphi
         self.device = nphi.device
 
-    @cached_property
+    @cached_2d_property
     def posterior(self):
         return self.prior + self.nphi
+
+    @cached_property
+    def posterior_sum(self):
+        return self.nphi.sum(1) + self.prior * self.nphi.shape[1]
 
     @property
     def Elog(self):
         return torch.digamma(self.posterior) - \
-               torch.digamma(self.posterior.sum(1, keepdims=True))
+               torch.digamma(self.posterior_sum.unsqueeze(1))
 
     @cached_property
     def loglike(self):
@@ -71,7 +82,7 @@ class _Dirichlet:
         log_B_prior = torch.lgamma(prior) * K - torch.lgamma(prior * K)
 
         log_B_posterior = torch.lgamma(self.posterior).sum(1) - \
-                          torch.lgamma(self.posterior.sum(1))
+                          torch.lgamma(self.posterior_sum)
 
         return neg_evid - log_B_prior + log_B_posterior
 
@@ -79,7 +90,7 @@ class _Dirichlet:
     def n(self):
         return self.nphi.sum(1)
 
-    @cached_property
+    @cached_2d_property
     def cdf(self):
         cdf = self.posterior.cumsum(1)
         return cdf / cdf[:, -1:]
