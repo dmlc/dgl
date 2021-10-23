@@ -363,7 +363,7 @@ if __name__ == '__main__':
     argparser.add_argument('--no-gpu-inference', dest='gpu_inference',
                            action='store_false')
     argparser.set_defaults(gpu_inference=True)
-    argparser.add_argument('--inference-mode', default='neighbor-sampler', type=str,
+    argparser.add_argument('--inference-mode', default='neighbor_sampler', type=str,
                            choices=['neighbor_sampler', 'full_neighbor_sampler', 'full_graph'])
     argparser.add_argument('--dataset', default='ogbn-mag', type=str,
                            choices=['ogbn-mag'])
