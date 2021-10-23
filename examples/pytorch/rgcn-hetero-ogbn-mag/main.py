@@ -233,7 +233,7 @@ def run(args: argparse.ArgumentParser) -> None:
         args.num_bases,
         args.num_layers,
         norm=args.norm,
-        batch_norm=args.batch_norm,
+        layer_norm=args.layer_norm,
         input_dropout=args.input_dropout,
         dropout=args.dropout,
         activation=activations[args.activation],
@@ -381,11 +381,11 @@ if __name__ == '__main__':
     argparser.add_argument('--num-layers', default=2, type=int)
     argparser.add_argument('--norm', default='right',
                            type=str, choices=['both', 'none', 'right'])
-    argparser.add_argument('--batch-norm', dest='batch_norm',
+    argparser.add_argument('--layer-norm', dest='layer_norm',
                            action='store_true')
-    argparser.add_argument('--no-batch-norm', dest='batch_norm',
+    argparser.add_argument('--no-layer-norm', dest='layer_norm',
                            action='store_false')
-    argparser.set_defaults(batch_norm=False)
+    argparser.set_defaults(layer_norm=False)
     argparser.add_argument('--input-dropout', default=0.1, type=float)
     argparser.add_argument('--dropout', default=0.5, type=float)
     argparser.add_argument('--activation', default='relu', type=str,

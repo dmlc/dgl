@@ -188,7 +188,7 @@ class EntityClassify(nn.Module):
         num_bases: int,
         num_layers: int,
         norm: str = 'right',
-        batch_norm: bool = False,
+        layer_norm: bool = False,
         input_dropout: float = 0,
         dropout: float = 0,
         activation: Callable[[torch.Tensor], torch.Tensor] = None,
@@ -239,13 +239,13 @@ class EntityClassify(nn.Module):
             self_loop=self_loop,
         ))
 
-        if batch_norm:
-            self._batch_norms = nn.ModuleList()
+        if layer_norm:
+            self._layer_norms = nn.ModuleList()
 
             for _ in range(num_layers - 1):
-                self._batch_norms.append(nn.BatchNorm1d(hidden_feats))
+                self._layer_norms.append(nn.LayerNorm(hidden_feats))
         else:
-            self._batch_norms = None
+            self._layer_norms = None
 
     def _apply_layers(
         self,
@@ -255,8 +255,8 @@ class EntityClassify(nn.Module):
         x = inputs
 
         for ntype, h in x.items():
-            if self._batch_norms is not None:
-                h = self._batch_norms[layer_idx](h)
+            if self._layer_norms is not None:
+                h = self._layer_norms[layer_idx](h)
 
             if self._activation is not None:
                 h = self._activation(h)
