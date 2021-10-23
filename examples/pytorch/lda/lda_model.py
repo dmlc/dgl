@@ -31,8 +31,8 @@ except ImportError:
         warnings.warn("cached_property not found - using property instead")
         cached_property = property
 
-if int(os.environ.get("LDA_NO_CACHED_2D_PROPERTY", 0)):
-    warnings.warn("trading cached 2d property speed for memory")
+if int(os.environ.get("LDA_LOW_MEMORY_MODE", 0)):
+    warnings.warn("lda low memory mode disables cached_2d_property and m-step mean_change")
     cached_2d_property = property
 else:
     cached_2d_property = cached_property
@@ -296,17 +296,22 @@ class LatentDirichletAllocation:
         self.word_data.clear_cache()
         new_nphi = self.word_data.extract_graph(G, self.mult['word']).nphi
 
-        self._last_mean_change = np.mean([
-            (old - new).abs().mean().tolist()
-            for (old, new) in zip(self.word_data.nphi, new_nphi)
-            ])
+        if int(os.environ.get("LDA_LOW_MEMORY_MODE", 0)):
+            self._last_mean_change = float("inf")
+        else:
+            self._last_mean_change = np.mean([
+                (old - new).abs().mean().tolist()
+                for (old, new) in zip(self.word_data.nphi, new_nphi)
+                ])
         if self.verbose:
             print(f"m-step mean_change={self._last_mean_change:.4f}, ", end="")
 
         # old * (1-rho) + new * rho
         for old, new in zip(self.word_data.nphi, new_nphi):
             new *= self.rho
-            new += old * (1 - self.rho)
+            old *= 1 - self.rho
+            new += old
+        del old, new
         self.word_data = WordData(self.word_data.prior, new_nphi)
 
         if self.verbose:
