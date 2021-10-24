@@ -61,26 +61,26 @@ class _Dirichlet:
         self.device = nphi.device
         self._bsz = _bsz
 
-    def sparse_posterior(self, _ID):
+    def get_posterior(self, _ID=slice(None)):
         return self.prior + self.nphi[:, _ID]
 
     @cached_2d_property
     def posterior(self):
-        return self.sparse_posterior(slice(None))
+        return self.get_posterior()
 
     @cached_property
     def posterior_sum(self):
         return self.nphi.sum(1) + self.prior * self.nphi.shape[1]
 
-    def sparse_Elog(self, _ID):
-        return torch.digamma(self.sparse_posterior(_ID)) - \
+    def get_Elog(self, _ID=slice(None)):
+        return torch.digamma(self.get_posterior(_ID)) - \
                torch.digamma(self.posterior_sum.unsqueeze(1))
 
     @cached_2d_property
     def Elog(self):
-        return self.sparse_Elog(slice(None))
+        return self.get_Elog()
 
-    def sum_dim1(self, fn):
+    def _sum_by_parts(self, fn):
         return functools.reduce(torch.add, [
             fn(slice(i, min(i+self._bsz, self.nphi.shape[1]))).sum(1)
             for i in list(range(0, self.nphi.shape[1], self._bsz))
@@ -88,23 +88,23 @@ class _Dirichlet:
 
     @cached_property
     def loglike(self):
-        neg_evid = -self.sum_dim1(
-            lambda s: (self.nphi[:, s] * self.sparse_Elog(s))
+        neg_evid = -self._sum_by_parts(
+            lambda s: (self.nphi[:, s] * self.get_Elog(s))
             )
 
         prior = torch.as_tensor(self.prior).to(self.nphi)
         K = self.nphi.shape[1]
         log_B_prior = torch.lgamma(prior) * K - torch.lgamma(prior * K)
 
-        log_B_posterior = self.sum_dim1(
-            lambda s: torch.lgamma(self.sparse_posterior(s))
+        log_B_posterior = self._sum_by_parts(
+            lambda s: torch.lgamma(self.get_posterior(s))
             ) - torch.lgamma(self.posterior_sum)
 
         return neg_evid - log_B_prior + log_B_posterior
 
     @cached_property
     def Bayesian_gap(self):
-        return 1. - self.sum_dim1(lambda s: self.sparse_Elog(s).exp())
+        return 1. - self._sum_by_parts(lambda s: self.get_Elog(s).exp())
 
     @cached_property
     def n(self):
@@ -123,6 +123,15 @@ class _Dirichlet:
             except AttributeError:
                 pass
 
+    def update(self, new, _ID=slice(None), rho=1):
+        """ old * (1-rho) + new * rho """
+        self.clear_cache()
+        mean_change = (self.nphi[:, _ID] - new).abs().mean().tolist()
+
+        self.nphi *= (1 - rho)
+        self.nphi[:, _ID] += new * rho
+        return mean_change
+
 
 class DocData(_Dirichlet):
     """ nphi (n_docs by n_topics) """
@@ -130,11 +139,8 @@ class DocData(_Dirichlet):
         G.nodes['doc'].data['Elog'] = self.Elog.to(G.device)
 
     def update_from(self, G, mult):
-        self.clear_cache()
-        out = G.nodes['doc'].data['nphi'] * mult
-        mean_change = (self.nphi - out).abs().mean().tolist()
-        self.nphi = out.to(self.device)
-        return mean_change
+        new = G.nodes['doc'].data['nphi'] * mult
+        return self.update(new.to(self.device))
 
 
 class _Distributed(collections.UserList):
@@ -143,10 +149,6 @@ class _Distributed(collections.UserList):
         self.prior = prior
         self.nphi = nphi
         super().__init__([_Dirichlet(self.prior, nphi) for nphi in self.nphi])
-
-    def clear_cache(self):
-        for part in self:
-            part.clear_cache()
 
     def split_device(self, other, dim=0):
         split_sections = [x.shape[0] for x in self.nphi]
@@ -159,14 +161,13 @@ class WordData(_Distributed):
     def prepare_graph(self, G):
         if '_ID' in G.nodes['word'].data:
             _ID = G.nodes['word'].data['_ID']
-            out = [part.sparse_Elog(_ID).to(G.device) for part in self]
+            out = [part.get_Elog(_ID).to(G.device) for part in self]
         else:
             out = [part.Elog.to(G.device) for part in self]
 
         G.nodes['word'].data['Elog'] = torch.cat(out).T
 
     def update_from(self, G, mult, rho):
-        self.clear_cache()
         nphi = G.nodes['word'].data['nphi'].T * mult
 
         if '_ID' in G.nodes['word'].data:
@@ -174,16 +175,9 @@ class WordData(_Distributed):
         else:
             _ID = slice(None)
 
-        mean_change = np.mean([
-            (x[:, _ID] - y).abs().mean().tolist()
-            for x, y in zip(self.nphi, self.split_device(nphi))
-        ])
-
-        for x, y in zip(self.nphi, self.split_device(nphi)):
-            x *= (1 - rho)
-            x[:, _ID] += y * rho
-
-        return mean_change
+        mean_change = [x.update(y, _ID, rho)
+            for x, y in zip(self, self.split_device(nphi))]
+        return np.mean(mean_change)
 
 
 class GammaParams(collections.namedtuple('GammaParams', "concentration, rate")):
