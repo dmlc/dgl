@@ -32,7 +32,7 @@ except ImportError:
         cached_property = property
 
 if int(os.environ.get("LDA_LOW_MEMORY_MODE", 0)):
-    warnings.warn("lda low memory mode disables cached_2d_property and m-step mean_change")
+    warnings.warn("lda low memory mode disables cached_2d_property")
     cached_2d_property = property
 else:
     cached_2d_property = cached_property
@@ -55,36 +55,56 @@ class EdgeData:
 
 
 class _Dirichlet:
-    def __init__(self, prior, nphi):
+    def __init__(self, prior, nphi, _bsz=int(1e6)):
         self.prior = prior
         self.nphi = nphi
         self.device = nphi.device
+        self._bsz = _bsz
+
+    def sparse_posterior(self, _ID):
+        return self.prior + self.nphi[:, _ID]
 
     @cached_2d_property
     def posterior(self):
-        return self.prior + self.nphi
+        return self.sparse_posterior(slice(None))
 
     @cached_property
     def posterior_sum(self):
         return self.nphi.sum(1) + self.prior * self.nphi.shape[1]
 
-    @property
-    def Elog(self):
-        return torch.digamma(self.posterior) - \
+    def sparse_Elog(self, _ID):
+        return torch.digamma(self.sparse_posterior(_ID)) - \
                torch.digamma(self.posterior_sum.unsqueeze(1))
+
+    @cached_2d_property
+    def Elog(self):
+        return self.sparse_Elog(slice(None))
+
+    def sum_dim1(self, fn):
+        return functools.reduce(torch.add, [
+            fn(slice(i, min(i+self._bsz, self.nphi.shape[1]))).sum(1)
+            for i in list(range(0, self.nphi.shape[1], self._bsz))
+        ])
 
     @cached_property
     def loglike(self):
-        neg_evid = -(self.nphi * self.Elog).sum(1)
+        neg_evid = -self.sum_dim1(
+            lambda s: (self.nphi[:, s] * self.sparse_Elog(s))
+            )
 
         prior = torch.as_tensor(self.prior).to(self.nphi)
         K = self.nphi.shape[1]
         log_B_prior = torch.lgamma(prior) * K - torch.lgamma(prior * K)
 
-        log_B_posterior = torch.lgamma(self.posterior).sum(1) - \
-                          torch.lgamma(self.posterior_sum)
+        log_B_posterior = self.sum_dim1(
+            lambda s: torch.lgamma(self.sparse_posterior(s))
+            ) - torch.lgamma(self.posterior_sum)
 
         return neg_evid - log_B_prior + log_B_posterior
+
+    @cached_property
+    def Bayesian_gap(self):
+        return 1. - self.sum_dim1(lambda s: self.sparse_Elog(s).exp())
 
     @cached_property
     def n(self):
@@ -95,15 +115,26 @@ class _Dirichlet:
         cdf = self.posterior.cumsum(1)
         return cdf / cdf[:, -1:]
 
+    def clear_cache(self):
+        for name in ["posterior", "posterior_sum", "Elog", "loglike",
+                     "Bayesian_gap", "n", "cdf"]:
+            try:
+                delattr(self, name)
+            except AttributeError:
+                pass
+
 
 class DocData(_Dirichlet):
     """ nphi (n_docs by n_topics) """
     def prepare_graph(self, G):
         G.nodes['doc'].data['Elog'] = self.Elog.to(G.device)
 
-    def extract_graph(self, G, mult):
+    def update_from(self, G, mult):
+        self.clear_cache()
         out = G.nodes['doc'].data['nphi'] * mult
-        return self.__class__(self.prior, out.to(self.device))
+        mean_change = (self.nphi - out).abs().mean().tolist()
+        self.nphi = out.to(self.device)
+        return mean_change
 
 
 class _Distributed(collections.UserList):
@@ -111,11 +142,11 @@ class _Distributed(collections.UserList):
     def __init__(self, prior, nphi):
         self.prior = prior
         self.nphi = nphi
-        self.clear_cache()
+        super().__init__([_Dirichlet(self.prior, nphi) for nphi in self.nphi])
 
     def clear_cache(self):
-        super().__init__([_Dirichlet(self.prior, nphi) for nphi in self.nphi])
-        # TODO: gc may lead to dead lock; set PYTORCH_NO_CUDA_MEMORY_CACHING instead
+        for part in self:
+            part.clear_cache()
 
     def split_device(self, other, dim=0):
         split_sections = [x.shape[0] for x in self.nphi]
@@ -128,25 +159,31 @@ class WordData(_Distributed):
     def prepare_graph(self, G):
         if '_ID' in G.nodes['word'].data:
             _ID = G.nodes['word'].data['_ID']
-            out = [part.Elog[:, _ID.to(part.device)].to(G.device) for part in self]
+            out = [part.sparse_Elog(_ID).to(G.device) for part in self]
         else:
             out = [part.Elog.to(G.device) for part in self]
 
         G.nodes['word'].data['Elog'] = torch.cat(out).T
 
-    def extract_graph(self, G, mult):
+    def update_from(self, G, mult, rho):
+        self.clear_cache()
         nphi = G.nodes['word'].data['nphi'].T * mult
 
         if '_ID' in G.nodes['word'].data:
             _ID = G.nodes['word'].data['_ID']
-
-            out = [torch.zeros_like(x) for x in self.nphi]
-            for x, y in zip(out, self.split_device(nphi)):
-                x[:, _ID.to(x.device)] = y
         else:
-            out = self.split_device(nphi)
+            _ID = slice(None)
 
-        return self.__class__(self.prior, out)
+        mean_change = np.mean([
+            (x[:, _ID] - y).abs().mean().tolist()
+            for x, y in zip(self.nphi, self.split_device(nphi))
+        ])
+
+        for x, y in zip(self.nphi, self.split_device(nphi)):
+            x *= (1 - rho)
+            x[:, _ID] += y * rho
+
+        return mean_change
 
 
 class GammaParams(collections.namedtuple('GammaParams', "concentration, rate")):
@@ -256,10 +293,7 @@ class LatentDirichletAllocation:
                 lambda edges: {'phi': EdgeData(edges.src, edges.dst).phi},
                 fn.sum('phi', 'nphi')
             )
-            old_nphi = doc_data.nphi
-            doc_data = doc_data.extract_graph(G_rev, self.mult['doc'])
-
-            mean_change = (old_nphi - doc_data.nphi).abs().mean()
+            mean_change = doc_data.update_from(G_rev, self.mult['doc'])
             if mean_change < mean_change_tol:
                 break
 
@@ -293,33 +327,15 @@ class LatentDirichletAllocation:
             lambda edges: {'phi': EdgeData(edges.src, edges.dst).phi},
             fn.sum('phi', 'nphi')
         )
-        self.word_data.clear_cache()
-        new_nphi = self.word_data.extract_graph(G, self.mult['word']).nphi
+        self._last_mean_change = self.word_data.update_from(
+            G, self.mult['word'], self.rho)
 
-        if int(os.environ.get("LDA_LOW_MEMORY_MODE", 0)):
-            self._last_mean_change = float("inf")
-        else:
-            self._last_mean_change = np.mean([
-                (old - new).abs().mean().tolist()
-                for (old, new) in zip(self.word_data.nphi, new_nphi)
-                ])
         if self.verbose:
             print(f"m-step mean_change={self._last_mean_change:.4f}, ", end="")
-
-        # old * (1-rho) + new * rho
-        for old, new in zip(self.word_data.nphi, new_nphi):
-            new *= self.rho
-            old *= 1 - self.rho
-            new += old
-        del old, new
-        self.word_data = WordData(self.word_data.prior, new_nphi)
-
-        if self.verbose:
             Bayesian_gap = np.mean([
-                part.Elog.exp().sum(1).mean().tolist()
-                for part in self.word_data
+                part.Bayesian_gap.mean().tolist() for part in self.word_data
             ])
-            print(f"Bayesian_gap={1 - Bayesian_gap:.4f}")
+            print(f"Bayesian_gap={Bayesian_gap:.4f}")
 
 
     def partial_fit(self, G):
