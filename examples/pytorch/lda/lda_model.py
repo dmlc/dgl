@@ -17,10 +17,8 @@
 # limitations under the License.
 
 
-import os, functools, warnings, torch, typing, collections
+import os, functools, warnings, torch, typing, collections, dgl
 import numpy as np, scipy as sp
-import dgl
-from dgl import function as fn
 
 try:
     from functools import cached_property
@@ -298,7 +296,7 @@ class LatentDirichletAllocation:
             self._prepare_graph(G_rev, doc_data)
             G_rev.update_all(
                 lambda edges: {'phi': EdgeData(edges.src, edges.dst).phi},
-                fn.sum('phi', 'nphi')
+                dgl.function.sum('phi', 'nphi')
             )
             mean_change = doc_data.update_from(G_rev, self.mult['doc'])
             if mean_change < mean_change_tol:
@@ -345,7 +343,7 @@ class LatentDirichletAllocation:
         self._prepare_graph(G, doc_data)
         G.update_all(
             lambda edges: {'phi': EdgeData(edges.src, edges.dst).phi},
-            fn.sum('phi', 'nphi')
+            dgl.function.sum('phi', 'nphi')
         )
         self._last_mean_change = self.word_data.update_from(
             G, self.mult['word'], self.rho)
