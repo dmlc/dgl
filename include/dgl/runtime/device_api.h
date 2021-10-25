@@ -126,6 +126,10 @@ class DeviceAPI {
    */
   virtual void SetStream(DGLContext ctx, DGLStreamHandle stream) {}
   /*!
+   * \brief Get the stream
+   */
+  virtual DGLStreamHandle GetStream() const { return nullptr; }
+  /*!
    * \brief Synchronize 2 streams of execution.
    *
    * An event is created in event_src stream that the second then

@@ -108,6 +108,7 @@ class _EidExcluder():
                         frontier, v, etype=k, store_ids=True)
                     new_eids[k] = F.gather_row(parent_eids[k], frontier.edges[k].data[EID])
             frontier.edata[EID] = new_eids
+        return frontier
 
 
 def _create_eid_excluder(exclude_eids, device):
@@ -367,7 +368,7 @@ class BlockSampler(object):
             else:
                 seed_nodes_in = seed_nodes_in.to(graph_device)
 
-            if self.exclude_edges_in_frontier:
+            if self.exclude_edges_in_frontier(g):
                 frontier = self.sample_frontier(
                     block_id, g, seed_nodes_in, exclude_eids=exclude_eids)
             else:
@@ -385,10 +386,10 @@ class BlockSampler(object):
 
             # Removing edges from the frontier for link prediction training falls
             # into the category of frontier postprocessing
-            if not self.exclude_edges_in_frontier:
+            if not self.exclude_edges_in_frontier(g):
                 eid_excluder = _create_eid_excluder(exclude_eids, self.output_device)
                 if eid_excluder is not None:
-                    eid_excluder(frontier)
+                    frontier = eid_excluder(frontier)
 
             block = transform.to_block(frontier, seed_nodes_out)
             if self.return_eids:

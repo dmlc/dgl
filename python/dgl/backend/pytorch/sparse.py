@@ -2,7 +2,7 @@ import torch as th
 from distutils.version import LooseVersion
 from ...base import is_all, ALL
 from ...sparse import _gspmm, _gspmm_hetero, _gsddmm, _gsddmm_hetero, _segment_reduce, _bwd_segment_cmp, _scatter_add
-from ...sparse import _csrmm, _csrsum, _csrmask, get_typeid_by_target
+from ...sparse import _csrmm, _csrsum, _csrmask
 from ...heterograph_index import create_unitgraph_from_csr
 
 if LooseVersion(th.__version__) >= LooseVersion("1.6.0"):
@@ -144,6 +144,7 @@ class GSpMM(th.autograd.Function):
     @custom_bwd
     def backward(ctx, dZ):
         gidx, op, reduce_op, X_shape, Y_shape, dtype, device, reduce_last = ctx.backward_cache
+        ctx.backward_cache = None
         X, Y, argX, argY = ctx.saved_tensors
         if op != 'copy_rhs' and ctx.needs_input_grad[3]:
             g_rev = gidx.reverse()
@@ -192,12 +193,12 @@ class GSpMM(th.autograd.Function):
 class GSpMM_hetero(th.autograd.Function):
     @staticmethod
     @custom_fwd(cast_inputs=th.float16)
-    def forward(ctx, g, op, reduce_op, X_len, *feats): # feats = lhs_data + rhs_data
-        out, (argX, argY) = _gspmm_hetero(g, op, reduce_op, X_len, feats)
+    def forward(ctx, gidx, op, reduce_op, X_len, *feats): # feats = lhs_data + rhs_data
+        out, (argX, argY) = _gspmm_hetero(gidx, op, reduce_op, X_len, feats)
         X, Y = feats[:X_len], feats[X_len:]
         # TODO (Israt): check target to decide src_id/dst_id?
         # checking the first relation to decide for all the relations
-        src_id, dst_id = g._graph.metagraph.find_edge(0)
+        src_id, dst_id = gidx.metagraph.find_edge(0)
         reduce_last = _need_reduce_last_dim(X[src_id], Y[dst_id])
         X_shape = tuple([X[i].shape if X[i] is not None else None
             for i in range(X_len)])
@@ -205,7 +206,7 @@ class GSpMM_hetero(th.autograd.Function):
             for i in range(len(Y))])
         dtype = X[src_id].dtype if X[src_id] is not None else Y[dst_id].dtype
         device = X[src_id].device if X[src_id] is not None else Y[dst_id].device
-        ctx.backward_cache = g, op, reduce_op, X_shape, Y_shape, dtype, device, reduce_last, X_len
+        ctx.backward_cache = gidx, op, reduce_op, X_shape, Y_shape, dtype, device, reduce_last, X_len
         req_grad_X = tuple([X[i].requires_grad if X[i] is not None else False
             for i in range(X_len)])
         req_grad_Y = tuple([Y[i].requires_grad if Y[i] is not None else False
@@ -223,14 +224,15 @@ class GSpMM_hetero(th.autograd.Function):
     @staticmethod
     @custom_bwd
     def backward(ctx, *dZ):
-        g, op, reduce_op, X_shape, Y_shape, dtype, device, reduce_last, X_len = ctx.backward_cache
+        gidx, op, reduce_op, X_shape, Y_shape, dtype, device, reduce_last, X_len = ctx.backward_cache
+        ctx.backward_cache = None
         feats = ctx.saved_tensors[:-2]
         argX = ctx.saved_tensors[-2]
         argY = ctx.saved_tensors[-1]
         X, Y = feats[:X_len], feats[X_len:]
 
         if op != 'copy_rhs' and any([x is not None for x in X]):
-            g_rev = g.reverse()
+            g_rev = gidx.reverse()
             # TODO(Israt): implement other combinations of message and reduce functions
             if reduce_op == 'sum':
                 if op == 'mul':
@@ -251,11 +253,11 @@ class GSpMM_hetero(th.autograd.Function):
                     for i in range(len(dZ))])
                 tpl_X_dZ = tuple(X + tpl_dZ)
                 if op == 'mul' and reduce_last:
-                    dY = gsddmm_hetero(g, 'dot', X_len, 'u', 'v', *tpl_X_dZ)
+                    dY = gsddmm_hetero(gidx, 'dot', X_len, 'u', 'v', *tpl_X_dZ)
                 elif op == 'mul':
-                    dY = gsddmm_hetero(g, 'mul', X_len, 'u', 'v', *tpl_X_dZ)
+                    dY = gsddmm_hetero(gidx, 'mul', X_len, 'u', 'v', *tpl_X_dZ)
                 elif op in ['add', 'copy_rhs']:
-                    dY = gsddmm_hetero(g, 'copy_rhs', X_len, 'u', 'v', *tpl_X_dZ)
+                    dY = gsddmm_hetero(gidx, 'copy_rhs', X_len, 'u', 'v', *tpl_X_dZ)
             dY = tuple([_reduce_grad(dY[i], Y_shape[i]) if Y[i] is not None else None
                 for i in range(len(Y))])
         else:  # Y has no gradient
@@ -298,6 +300,7 @@ class GSDDMM(th.autograd.Function):
     @custom_bwd
     def backward(ctx, dZ):
         gidx, op, lhs_target, rhs_target, X_shape, Y_shape = ctx.backward_cache
+        ctx.backward_cache = None
         X, Y = ctx.saved_tensors
         if op != 'copy_rhs' and ctx.needs_input_grad[2]:
             if lhs_target in ['u', 'v']:
@@ -345,20 +348,18 @@ class GSDDMM(th.autograd.Function):
 class GSDDMM_hetero(th.autograd.Function):
     @staticmethod
     @custom_fwd(cast_inputs=th.float16)
-    def forward(ctx, g, op, X_len, lhs_target, rhs_target, *feats): # feats = X+Y
-        out = _gsddmm_hetero(g, op, X_len, lhs_target, rhs_target, feats)
+    def forward(ctx, gidx, op, X_len, lhs_target, rhs_target, *feats): # feats = X+Y
+        out = _gsddmm_hetero(gidx, op, X_len, lhs_target, rhs_target, feats)
         X, Y = feats[:X_len], feats[X_len:]
         X_shape = tuple([X[i].shape if X[i] is not None else None
                 for i in range(len(X))])
         Y_shape = tuple([Y[i].shape if Y[i] is not None else None
             for i in range(len(Y))])
-        ctx.backward_cache = g, op, lhs_target, rhs_target, X_shape, Y_shape, X_len
+        ctx.backward_cache = gidx, op, lhs_target, rhs_target, X_shape, Y_shape, X_len
         req_grad_X = tuple([X[i].requires_grad if X[i] is not None else False
             for i in range(len(X))])
         req_grad_Y = tuple([Y[i].requires_grad if Y[i] is not None else False
             for i in range(len(Y))])
-        lhs_id = get_typeid_by_target(g, g.canonical_etypes[0], lhs_target)
-        rhs_id = get_typeid_by_target(g, g.canonical_etypes[0], rhs_target)
         ctx.save_for_backward(*feats)
         return out
 
@@ -366,56 +367,57 @@ class GSDDMM_hetero(th.autograd.Function):
     @custom_bwd
     # TODO(Israt): Implement the complete backward operator
     def backward(ctx, *dZ):
-        g, op, lhs_target, rhs_target, X_shape, Y_shape, X_len = ctx.backward_cache
+        gidx, op, lhs_target, rhs_target, X_shape, Y_shape, X_len = ctx.backward_cache
+        ctx.backward_cache = None
         feats = ctx.saved_tensors
         X, Y = feats[:X_len], feats[X_len:]
         if op != 'copy_rhs' and any([x is not None for x in X]):
             if lhs_target in ['u', 'v']:
-                _g = g if lhs_target == 'v' else g.reverse()
+                _gidx = gidx if lhs_target == 'v' else gidx.reverse()
                 tpl_of_None = tuple([None] * len(X))
                 if op in ['add', 'copy_lhs']:
-                    dX = gspmm_hetero(_g, 'copy_rhs', 'sum', len(X), *(tuple(tpl_of_None + dZ)))
+                    dX = gspmm_hetero(_gidx, 'copy_rhs', 'sum', len(X), *(tuple(tpl_of_None + dZ)))
                 else:  # mul, dot
                     if rhs_target == lhs_target:
-                        dX = gspmm_hetero(_g, 'copy_rhs', 'sum', len(X), *(tuple(tpl_of_None + dZ))) *  Y
+                        dX = gspmm_hetero(_gidx, 'copy_rhs', 'sum', len(X), *(tuple(tpl_of_None + dZ))) *  Y
                     elif rhs_target == 'e':
                         dZ_mul_Y = tuple([dZ[i] * Y[i] if dZ[i] is not None else None
                             for i in range(len(Y))])
-                        dX = gspmm_hetero(_g, 'copy_rhs', 'sum', len(X), *(tuple(tpl_of_None + dZ_mul_Y)))
+                        dX = gspmm_hetero(_gidx, 'copy_rhs', 'sum', len(X), *(tuple(tpl_of_None + dZ_mul_Y)))
                     else:  # rhs_target = !lhs_target
-                        dX = gspmm_hetero(_g, 'mul', 'sum', len(X), *tuple(Y + dZ))
+                        dX = gspmm_hetero(_gidx, 'mul', 'sum', len(X), *tuple(Y + dZ))
             else:  # lhs_target == 'e'
                 if op in ['add', 'copy_lhs']:
                     dX = dZ
                 else:  # mul, dot
-                    num_etype = g._graph.number_of_etypes()
-                    dX = gsddmm_hetero(g, 'mul', num_etype, 'e', rhs_target, *tuple(dZ + Y))
+                    num_etype = gidx.number_of_etypes()
+                    dX = gsddmm_hetero(gidx, 'mul', num_etype, 'e', rhs_target, *tuple(dZ + Y))
             dX = tuple([_reduce_grad(dX[i], X_shape[i]) if X[i] is not None else None
                 for i in range(len(X))])
         else:
             dX = tuple([None] * len(X))
         if op != 'copy_lhs' and any([y is not None for y in Y]):
             if rhs_target in ['u', 'v']:
-                _g = g if rhs_target == 'v' else g.reverse()
+                _gidx = gidx if rhs_target == 'v' else gidx.reverse()
                 tpl_of_None = tuple([None] * len(X))
                 if op in ['add', 'copy_rhs']:
-                    dY = gspmm_hetero(_g, 'copy_rhs', 'sum', len(X), *(tuple(tpl_of_None + dZ)))
+                    dY = gspmm_hetero(_gidx, 'copy_rhs', 'sum', len(X), *(tuple(tpl_of_None + dZ)))
                 else:  # mul, dot
                     if lhs_target == rhs_target:
-                        dY = gspmm_hetero(_g, 'copy_rhs', 'sum', len(X), *(tuple(tpl_of_None + dZ))) * X
+                        dY = gspmm_hetero(_gidx, 'copy_rhs', 'sum', len(X), *(tuple(tpl_of_None + dZ))) * X
                     elif lhs_target == 'e':
                         dZ_mul_X = tuple([dZ[i] * X[i] if dZ[i] is not None else None
                             for i in range(len(X))])
-                        dY = gspmm_hetero(_g, 'copy_rhs', 'sum', len(X), *(tuple(tpl_of_None + dZ_mul_X)))
+                        dY = gspmm_hetero(_gidx, 'copy_rhs', 'sum', len(X), *(tuple(tpl_of_None + dZ_mul_X)))
                     else:  # rhs_target = !lhs_target
-                        dY = gspmm_hetero(_g, 'mul', 'sum', len(X), *tuple(X + dZ))
+                        dY = gspmm_hetero(_gidx, 'mul', 'sum', len(X), *tuple(X + dZ))
             else:
                 if op in ['add', 'copy_rhs']:
                     dY = tuple([dZ[i] if dZ[i] is not None else None
                         for i in range(len(dZ))])
                 else:  # mul, dot
-                    num_etype = g._graph.number_of_etypes()
-                    dY = gsddmm_hetero(g, 'mul', num_etype, 'e', lhs_target, *tuple(dZ + X))
+                    num_etype = gidx.number_of_etypes()
+                    dY = gsddmm_hetero(gidx, 'mul', num_etype, 'e', lhs_target, *tuple(dZ + X))
             dY = tuple([_reduce_grad(dY[i], Y_shape[i]) if Y[i] is not None else None
                 for i in range(len(Y))])
         else:
@@ -471,6 +473,8 @@ class EdgeSoftmax(th.autograd.Function):
             return grad_score.data
         """
         gidx = ctx.backward_cache
+        # See https://github.com/dmlc/dgl/pull/3386
+        ctx.backward_cache = None
         out, = ctx.saved_tensors
         sds = out * grad_out
         accum = gspmm(gidx, 'copy_rhs', 'sum', None, sds)
@@ -491,6 +495,8 @@ class SegmentReduce(th.autograd.Function):
     @custom_bwd
     def backward(ctx, dy):
         op = ctx.backward_cache
+        # See https://github.com/dmlc/dgl/pull/3386
+        ctx.backward_cache = None
         arg, offsets = ctx.saved_tensors
         m = offsets[-1].item()
         if op == 'sum':
@@ -537,6 +543,7 @@ class CSRMM(th.autograd.Function):
     def backward(ctx, dnrows, dncols, dC_indptr, dC_indices, dC_eids, dC_weights):
         # Only the last argument is meaningful.
         gidxA, gidxB, gidxC = ctx.backward_cache
+        ctx.backward_cache = None
         A_weights, B_weights = ctx.saved_tensors
         dgidxA, dA_weights = csrmm(
             gidxC, dC_weights, gidxB.reverse(), B_weights, gidxA.number_of_ntypes())
@@ -563,6 +570,7 @@ class CSRSum(th.autograd.Function):
     def backward(ctx, dnrows, dncols, dC_indptr, dC_indices, dC_eids, dC_weights):
         # Only the last argument is meaningful.
         gidxs, gidxC = ctx.backward_cache
+        ctx.backward_cache = None
         return (None,) + tuple(csrmask(gidxC, dC_weights, gidx) for gidx in gidxs)
 
 
@@ -575,6 +583,7 @@ class CSRMask(th.autograd.Function):
     @staticmethod
     def backward(ctx, dB_weights):
         gidxA, gidxB = ctx.backward_cache
+        ctx.backward_cache = None
         return None, csrmask(gidxB, dB_weights, gidxA), None
 
 

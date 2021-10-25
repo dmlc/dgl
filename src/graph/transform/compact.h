@@ -13,43 +13,41 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
- * \file graph/transform/to_bipartite.h
- * \brief Functions to convert a set of edges into a graph block with local
- * ids.
+ * \file graph/transform/compact.h
+ * \brief Functions to find and eliminate the common isolated nodes across
+ * all given graphs with the same set of nodes.
  */
 
-#ifndef DGL_GRAPH_TRANSFORM_TO_BIPARTITE_H_
-#define DGL_GRAPH_TRANSFORM_TO_BIPARTITE_H_
+#ifndef DGL_GRAPH_TRANSFORM_COMPACT_H_
+#define DGL_GRAPH_TRANSFORM_COMPACT_H_
 
 #include <dgl/array.h>
 #include <dgl/base_heterograph.h>
 
-#include <tuple>
 #include <vector>
+#include <utility>
 
 namespace dgl {
 namespace transform {
 
 /**
- * @brief Create a graph block from the set of
- * src and dst nodes (lhs and rhs respectively).
+ * @brief Given a list of graphs with the same set of nodes, find and eliminate
+ * the common isolated nodes across all graphs.
  *
  * @tparam XPU The type of device to operate on.
  * @tparam IdType The type to use as an index.
- * @param graph The graph from which to extract the block.
- * @param rhs_nodes The destination nodes of the block.
- * @param include_rhs_in_lhs Whether or not to include the
- * destination nodes of the block in the sources nodes.
- * @param [in/out] lhs_nodes The source nodes of the block.
+ * @param graphs The list of graphs to be compacted.
+ * @param always_preserve The vector of nodes to be preserved.
  *
- * @return The block and the induced edges.
+ * @return The vector of compacted graphs and the vector of induced nodes.
  */
 template<DLDeviceType XPU, typename IdType>
-std::tuple<HeteroGraphPtr, std::vector<IdArray>>
-ToBlock(HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes,
-        bool include_rhs_in_lhs, std::vector<IdArray>* lhs_nodes);
+std::pair<std::vector<HeteroGraphPtr>, std::vector<IdArray>>
+CompactGraphs(
+    const std::vector<HeteroGraphPtr> &graphs,
+    const std::vector<IdArray> &always_preserve);
 
 }  // namespace transform
 }  // namespace dgl
 
-#endif  // DGL_GRAPH_TRANSFORM_TO_BIPARTITE_H_
+#endif  // DGL_GRAPH_TRANSFORM_COMPACT_H_

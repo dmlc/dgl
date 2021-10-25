@@ -1,13 +1,30 @@
 /*!
- *  Copyright (c) 2019 by Contributors
+ *  Copyright 2019-2021 Contributors
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
  * \file graph/transform/compact.cc
  * \brief Compact graph implementation
  */
+
+#include "compact.h"
 
 #include <dgl/base_heterograph.h>
 #include <dgl/transform.h>
 #include <dgl/array.h>
 #include <dgl/packed_func_ext.h>
+#include <dgl/runtime/registry.h>
+#include <dgl/runtime/container.h>
 #include <vector>
 #include <utility>
 #include "../../c_api_common.h"
@@ -27,7 +44,7 @@ namespace {
 
 template<typename IdType>
 std::pair<std::vector<HeteroGraphPtr>, std::vector<IdArray>>
-CompactGraphs(
+CompactGraphsCPU(
     const std::vector<HeteroGraphPtr> &graphs,
     const std::vector<IdArray> &always_preserve) {
   // TODO(BarclayII): check whether the node space and metagraph of each graph is the same.
@@ -121,17 +138,20 @@ CompactGraphs(
 
 };  // namespace
 
+template<>
 std::pair<std::vector<HeteroGraphPtr>, std::vector<IdArray>>
-CompactGraphs(
+CompactGraphs<kDLCPU, int32_t>(
     const std::vector<HeteroGraphPtr> &graphs,
     const std::vector<IdArray> &always_preserve) {
-  std::pair<std::vector<HeteroGraphPtr>, std::vector<IdArray>> result;
-  // TODO(BarclayII): check for all IdArrays
-  CHECK(graphs[0]->DataType() == always_preserve[0]->dtype) << "data type mismatch.";
-  ATEN_ID_TYPE_SWITCH(graphs[0]->DataType(), IdType, {
-    result = CompactGraphs<IdType>(graphs, always_preserve);
-  });
-  return result;
+  return CompactGraphsCPU<int32_t>(graphs, always_preserve);
+}
+
+template<>
+std::pair<std::vector<HeteroGraphPtr>, std::vector<IdArray>>
+CompactGraphs<kDLCPU, int64_t>(
+    const std::vector<HeteroGraphPtr> &graphs,
+    const std::vector<IdArray> &always_preserve) {
+  return CompactGraphsCPU<int64_t>(graphs, always_preserve);
 }
 
 DGL_REGISTER_GLOBAL("transform._CAPI_DGLCompactGraphs")
@@ -146,7 +166,17 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLCompactGraphs")
     for (Value array : always_preserve_refs)
       always_preserve.push_back(array->data);
 
-    const auto &result_pair = CompactGraphs(graphs, always_preserve);
+    // TODO(BarclayII): check for all IdArrays
+    CHECK(graphs[0]->DataType() == always_preserve[0]->dtype) << "data type mismatch.";
+
+    std::pair<std::vector<HeteroGraphPtr>, std::vector<IdArray>> result_pair;
+
+    ATEN_XPU_SWITCH_CUDA(graphs[0]->Context().device_type, XPU, "CompactGraphs", {
+      ATEN_ID_TYPE_SWITCH(graphs[0]->DataType(), IdType, {
+        result_pair = CompactGraphs<XPU, IdType>(
+          graphs, always_preserve);
+      });
+    });
 
     List<HeteroGraphRef> compacted_graph_refs;
     List<Value> induced_nodes;

@@ -170,6 +170,10 @@ class CUDADeviceAPI final : public DeviceAPI {
         ->stream = static_cast<cudaStream_t>(stream);
   }
 
+  DGLStreamHandle GetStream() const final {
+    return static_cast<DGLStreamHandle>(CUDAThreadEntry::ThreadLocal()->stream);
+  }
+
   void PinData(DGLContext ctx, void* ptr, size_t nbytes) {
     CUDA_CALL(cudaSetDevice(ctx.device_id));
     CUDA_CALL(cudaHostRegister(ptr, nbytes, cudaHostRegisterDefault));
