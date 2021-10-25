@@ -47,7 +47,6 @@ class EdgeData:
 
     @property
     def expectation(self):
-        """ only makes sense on doc->word graph """
         return (self.src_data['expectation'] * self.dst_data['expectation']).sum(1)
 
 
