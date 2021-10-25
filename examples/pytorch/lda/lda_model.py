@@ -55,41 +55,39 @@ class EdgeData:
 
 
 class _Dirichlet:
-    def __init__(self, prior, nphi, _bsz=int(1e6)):
+    def __init__(self, prior, nphi, _chunksize=int(1e6)):
         self.prior = prior
         self.nphi = nphi
         self.device = nphi.device
-        self._bsz = _bsz
-
-    def get_posterior(self, _ID=slice(None)):
-        return self.prior + self.nphi[:, _ID]
+        self._sum_by_parts = lambda map_fn: functools.reduce(torch.add, [
+            map_fn(slice(i, min(i+_chunksize, nphi.shape[1]))).sum(1)
+            for i in list(range(0, nphi.shape[1], _chunksize))
+        ])
 
     @cached_2d_property
     def posterior(self):
-        return self.get_posterior()
+        return self.prior + self.nphi
 
     @cached_property
     def posterior_sum(self):
         return self.nphi.sum(1) + self.prior * self.nphi.shape[1]
 
-    def get_Elog(self, _ID=slice(None)):
-        return torch.digamma(self.get_posterior(_ID)) - \
-               torch.digamma(self.posterior_sum.unsqueeze(1))
-
     @cached_2d_property
     def Elog(self):
-        return self.get_Elog()
+        return torch.digamma(self.posterior) - \
+               torch.digamma(self.posterior_sum.unsqueeze(1))
 
-    def _sum_by_parts(self, fn):
-        return functools.reduce(torch.add, [
-            fn(slice(i, min(i+self._bsz, self.nphi.shape[1]))).sum(1)
-            for i in list(range(0, self.nphi.shape[1], self._bsz))
-        ])
+    def _posterior(self, _ID=slice(None)):
+        return self.prior + self.nphi[:, _ID]
+
+    def _Elog(self, _ID=slice(None)):
+        return torch.digamma(self._posterior(_ID)) - \
+               torch.digamma(self.posterior_sum.unsqueeze(1))
 
     @cached_property
     def loglike(self):
         neg_evid = -self._sum_by_parts(
-            lambda s: (self.nphi[:, s] * self.get_Elog(s))
+            lambda s: (self.nphi[:, s] * self._Elog(s))
             )
 
         prior = torch.as_tensor(self.prior).to(self.nphi)
@@ -97,14 +95,10 @@ class _Dirichlet:
         log_B_prior = torch.lgamma(prior) * K - torch.lgamma(prior * K)
 
         log_B_posterior = self._sum_by_parts(
-            lambda s: torch.lgamma(self.get_posterior(s))
+            lambda s: torch.lgamma(self._posterior(s))
             ) - torch.lgamma(self.posterior_sum)
 
         return neg_evid - log_B_prior + log_B_posterior
-
-    @cached_property
-    def Bayesian_gap(self):
-        return 1. - self._sum_by_parts(lambda s: self.get_Elog(s).exp())
 
     @cached_property
     def n(self):
@@ -112,25 +106,44 @@ class _Dirichlet:
 
     @cached_2d_property
     def cdf(self):
-        cdf = self.posterior.cumsum(1)
-        return cdf / cdf[:, -1:]
+        cdf = self._posterior()
+        torch.cumsum(cdf, 1, out=cdf)
+        cdf /= cdf[:, -1:]
+        return cdf
+
+    @cached_property
+    def Bayesian_gap(self):
+        return 1. - self._sum_by_parts(lambda s: self._Elog(s).exp())
+
+    _cached_properties = [
+        "posterior", "posterior_sum", "Elog", "loglike", "n",
+        "cdf", "Bayesian_gap"]
 
     def clear_cache(self):
-        for name in ["posterior", "posterior_sum", "Elog", "loglike",
-                     "Bayesian_gap", "n", "cdf"]:
+        for name in self._cached_properties:
             try:
                 delattr(self, name)
             except AttributeError:
                 pass
 
     def update(self, new, _ID=slice(None), rho=1):
-        """ old * (1-rho) + new * rho """
+        """ inplace: old * (1-rho) + new * rho """
         self.clear_cache()
         mean_change = (self.nphi[:, _ID] - new).abs().mean().tolist()
 
         self.nphi *= (1 - rho)
         self.nphi[:, _ID] += new * rho
         return mean_change
+
+    def __matmul__(self, other):
+        """ self.posterior @ other.posterior
+        = (self.nphi + 1 * self.prior * 1') @ (other.nphi + 1 * other.prior * 1')
+        """
+        out = self.nphi @ other.nphi
+        out += self.nphi.sum(1, keepdims=True) * other.prior
+        out += self.prior * other.nphi.sum(0, keepdims=True)
+        out += self.prior * other.prior * self.nphi.shape[1]
+        return out
 
 
 class DocData(_Dirichlet):
@@ -161,7 +174,7 @@ class WordData(_Distributed):
     def prepare_graph(self, G):
         if '_ID' in G.nodes['word'].data:
             _ID = G.nodes['word'].data['_ID']
-            out = [part.get_Elog(_ID).to(G.device) for part in self]
+            out = [part._Elog(_ID).to(G.device) for part in self]
         else:
             out = [part.Elog.to(G.device) for part in self]
 
@@ -180,7 +193,7 @@ class WordData(_Distributed):
         return np.mean(mean_change)
 
 
-class GammaParams(collections.namedtuple('GammaParams', "concentration, rate")):
+class Gamma(collections.namedtuple('Gamma', "concentration, rate")):
     """ articulate the difference between torch gamma and numpy gamma """
     @property
     def shape(self):
@@ -190,8 +203,11 @@ class GammaParams(collections.namedtuple('GammaParams', "concentration, rate")):
     def scale(self):
         return 1 / self.rate
 
-    def to(self, device):
-        return self.__class__(*[torch.as_tensor(v).to(device) for v in self])
+    def sample(self, shape, device):
+        return torch.distributions.gamma.Gamma(
+            torch.as_tensor(self.concentration, device=device),
+            torch.as_tensor(self.rate, device=device),
+        ).sample(shape)
 
 
 class LatentDirichletAllocation:
@@ -253,18 +269,15 @@ class LatentDirichletAllocation:
             np.linspace(0, self.n_components, len(self.device_list)+1).astype(int)
         )
         word_nphi = [
-            torch.distributions.gamma.Gamma(
-                *GammaParams(*self.init['word']).to(device)
-                ).sample((s, self.n_words))
+            Gamma(*self.init['word']).sample((s, self.n_words), device)
             for s, device in zip(split_sections, self.device_list)
         ]
         self.word_data = WordData(self.prior['word'], word_nphi)
 
 
     def _init_doc_data(self, n_docs, device):
-        doc_nphi = torch.distributions.gamma.Gamma(
-            *GammaParams(*self.init['doc']).to(device)
-            ).sample((n_docs, self.n_components))
+        doc_nphi = Gamma(*self.init['doc']).sample(
+            (n_docs, self.n_components), device)
         return DocData(self.prior['doc'], doc_nphi)
 
 
@@ -299,6 +312,19 @@ class LatentDirichletAllocation:
 
 
     transform = _e_step
+
+
+    def predict(self, doc_data):
+        pred_scores = [
+            DocData(doc_data.prior, doc_nphi) @ w for (doc_nphi, w) in zip(
+                self.word_data.split_device(doc_data.nphi, dim=1),
+                self.word_data)
+        ]
+        x = torch.zeros_like(pred_scores[0], device=doc_data.device)
+        for p in pred_scores:
+            x += p.to(x.device)
+        x /= x.sum(1, keepdims=True)
+        return x
 
 
     def sample(self, doc_data, num_samples):
@@ -401,6 +427,7 @@ if __name__ == '__main__':
     model = LatentDirichletAllocation(n_words=5, n_components=10, verbose=False)
     model.fit(G)
     model.transform(G)
+    model.predict(model.transform(G))
     if hasattr(torch, "searchsorted"):
         model.sample(model.transform(G), 2)
     model.perplexity(G)

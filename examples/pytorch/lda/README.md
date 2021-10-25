@@ -8,7 +8,9 @@ There is no back-propagation, because gradient descent is typically considered
 inefficient on probability simplex.
 On the provided small-scale example on 20 news groups dataset, our DGL-LDA model runs
 50% faster on GPU than sklearn model without joblib parallel.
-For larger graphs, we tested up to 30 million unique word nodes via mini-batch training and parameter distribution across multiple gpus in device_list.
+For larger graphs, thanks to subgraph sampling and low-memory implementation, we may fit 100 million unique words with 256 topic dimensions on a large multi-gpu machine.
+(The runtime memory is often less than 2x of parameter storage.)
+
 
 Key equations
 ---
