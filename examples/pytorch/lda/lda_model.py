@@ -29,12 +29,6 @@ except ImportError:
         warnings.warn("cached_property not found - using property instead")
         cached_property = property
 
-if int(os.environ.get("LDA_LOW_MEMORY_MODE", 0)):
-    warnings.warn("lda low memory mode disables cached_2d_property")
-    cached_2d_property = property
-else:
-    cached_2d_property = cached_property
-
 
 class EdgeData:
     def __init__(self, src_data, dst_data):
@@ -67,21 +61,12 @@ class _Dirichlet:
             for i in list(range(0, nphi.shape[1], _chunksize))
         ])
 
-    @cached_2d_property
-    def posterior(self):
-        return self.prior + self.nphi
+    def _posterior(self, _ID=slice(None)):
+        return self.prior + self.nphi[:, _ID]
 
     @cached_property
     def posterior_sum(self):
         return self.nphi.sum(1) + self.prior * self.nphi.shape[1]
-
-    @cached_2d_property
-    def Elog(self):
-        return torch.digamma(self.posterior) - \
-               torch.digamma(self.posterior_sum.unsqueeze(1))
-
-    def _posterior(self, _ID=slice(None)):
-        return self.prior + self.nphi[:, _ID]
 
     def _Elog(self, _ID=slice(None)):
         return torch.digamma(self._posterior(_ID)) - \
@@ -123,9 +108,7 @@ class _Dirichlet:
     def Bayesian_gap(self):
         return 1. - self._sum_by_parts(lambda s: self._Elog(s).exp())
 
-    _cached_properties = [
-        "posterior", "posterior_sum", "Elog", "loglike", "n",
-        "cdf", "Bayesian_gap"]
+    _cached_properties = ["posterior_sum", "loglike", "n", "cdf", "Bayesian_gap"]
 
     def clear_cache(self):
         for name in self._cached_properties:
@@ -158,7 +141,7 @@ class DocData(_Dirichlet):
     """ nphi (n_docs by n_topics) """
     def prepare_graph(self, G, key="Elog"):
         if key == "Elog":
-            G.nodes['doc'].data["Elog"] = self.Elog.to(G.device)
+            G.nodes['doc'].data["Elog"] = self._Elog().to(G.device)
         elif key == "expectation":
             G.nodes['doc'].data["expectation"] = self._expectation().to(G.device)
 
