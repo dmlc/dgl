@@ -10,11 +10,11 @@ Copyright (c) 2021 Intel Corporation
          Nesreen K. Ahmed <nesreen.k.ahmed@intel.com>
 */
 
+#include <stdint.h>
+#include <omp.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/base_heterograph.h>
 #include <vector>
-#include <stdint.h>
-#include <omp.h>
 
 #ifdef USE_TVM
 #include <featgraph.h>
@@ -32,12 +32,10 @@ namespace {
 
 }  // namespace
 
-/* Libra partitioning codebase */
-
 template<typename IdType>
 int32_t Ver2partition(IdType in_val, int32_t* node_map, int32_t num_parts) {
   int32_t pos = 0;
-  for (int32_t p=0; p<num_parts; p++) {
+  for (int32_t p=0; p < num_parts; p++) {
     if (in_val < node_map[p])
       return pos;
     pos = pos + 1;
@@ -48,20 +46,22 @@ int32_t Ver2partition(IdType in_val, int32_t* node_map, int32_t num_parts) {
 /*! \brief Identifies the lead loaded partition/community for a given edge assignment.*/
 int32_t LeastLoad(int64_t* community_edges, int32_t nc) {
   // initialize random seed
-  srand (time(NULL));
+  //srand(time(NULL));
   std::vector<int> score, loc;
   int32_t min = 1e9;
-  for (int32_t i=0; i<nc; i++) {
+  for (int32_t i=0; i < nc; i++) {
     if (community_edges[i] < min) {
       min = community_edges[i];
     }
   }
-  for (int32_t i=0; i<nc; i++) {
+  for (int32_t i=0; i < nc; i++) {
     if (community_edges[i] == min) {
       loc.push_back(i);
     }
   }
-  int32_t r = rand() % loc.size();
+  // int32_t r = rand() % loc.size();   // rand_r recommended
+  unsigned int seed = time(NULL);
+  int32_t r = rand_r(&seed) % loc.size();   // rand_r recommended
   CHECK(loc[r] < nc);
   return loc[r];
 }
@@ -92,7 +92,6 @@ int32_t LibraVertexCut(
   int64_t N_n,
   int64_t N_e,
   std::string prefix) {
-
   int32_t *out                = out_a.Ptr<int32_t>();
   IdType  *node_degree        = node_degree_a.Ptr<IdType>();
   IdType  *edgenum_unassigned = edgenum_unassigned_a.Ptr<IdType>();
@@ -104,20 +103,22 @@ int32_t LibraVertexCut(
   std::vector<std::vector<int32_t> > node_assignments(N_n);
   std::vector<IdType2> replication_list;
   // local allocations
-  int64_t *community_edges = (int64_t*)calloc(sizeof(int64_t), nc);
-  int64_t *cache = (int64_t*)calloc(sizeof(int64_t), nc);
+  // int64_t *community_edges = (int64_t*)calloc(sizeof(int64_t), nc);
+  // int64_t *cache = (int64_t*)calloc(sizeof(int64_t), nc);
+  int64_t *community_edges = reinterpret_cast<int64_t*>(calloc(sizeof(int64_t), nc));
+  int64_t *cache = reinterpret_cast<int64_t*>(calloc(sizeof(int64_t), nc));
 
-  CHECK ((out_a.GetSize() >> 2) == N_e);
-  CHECK ((node_degree_a.GetSize() >> 3) == N_n);
-  CHECK ((u_a.GetSize() >> 3) == N_e);
-  CHECK ((w_a.GetSize() >> 2) == N_e);
+  CHECK((out_a.GetSize() >> 2) == N_e);
+  CHECK((node_degree_a.GetSize() >> 3) == N_n);
+  CHECK((u_a.GetSize() >> 3) == N_e);
+  CHECK((w_a.GetSize() >> 2) == N_e);
 
-  for (int64_t i=0; i<N_e; i++) {
+  for (int64_t i=0; i < N_e; i++) {
     IdType u = uptr[i];
     IdType v = vptr[i];
     float  w = wptr[i];
-    CHECK (u < N_n);
-    CHECK (v < N_n);
+    CHECK(u < N_n);
+    CHECK(v < N_n);
 
     if (i%10000000 == 0) {
       printf("."); fflush(0);
@@ -128,7 +129,7 @@ int32_t LibraVertexCut(
       out[i] = c;
       CHECK_LT(c, nc);
 
-      community_edges[c] ++;
+      community_edges[c]++;
       community_weights[c] = community_weights[c] + w;
       node_assignments[u].push_back(c);
       if (u != v)
@@ -138,28 +139,26 @@ int32_t LibraVertexCut(
         "Error: 1. generated splits (u) are greater than nc!";
       CHECK(node_assignments[v].size() <= nc) <<
         "Error: 1. generated splits (v) are greater than nc!";
-      edgenum_unassigned[u] --;
-      edgenum_unassigned[v] --;
-    }
-    else if (node_assignments[u].size() != 0 && node_assignments[v].size() == 0) {
-      for (uint32_t j=0; j<node_assignments[u].size(); j++) {
+      edgenum_unassigned[u]--;
+      edgenum_unassigned[v]--;
+    } else if (node_assignments[u].size() != 0 && node_assignments[v].size() == 0) {
+      for (uint32_t j=0; j < node_assignments[u].size(); j++) {
         int32_t cind = node_assignments[u][j];
         cache[j] = community_edges[cind];
       }
       int32_t cindex = LeastLoad(cache, node_assignments[u].size());
       int32_t c = node_assignments[u][cindex];
       out[i] = c;
-      community_edges[c] ++;
+      community_edges[c]++;
       community_weights[c] = community_weights[c] + w;
 
       node_assignments[v].push_back(c);
       CHECK(node_assignments[v].size() <= nc) <<
         "Error: 2. generated splits (v) are greater than nc!";
-      edgenum_unassigned[u] --;
-      edgenum_unassigned[v] --;
-    }
-    else if (node_assignments[v].size() != 0 && node_assignments[u].size() == 0) {
-      for (uint32_t j=0; j<node_assignments[v].size(); j++) {
+      edgenum_unassigned[u]--;
+      edgenum_unassigned[v]--;
+    } else if (node_assignments[v].size() != 0 && node_assignments[u].size() == 0) {
+      for (uint32_t j=0; j < node_assignments[v].size(); j++) {
         int32_t cind = node_assignments[v][j];
         cache[j] = community_edges[cind];
       }
@@ -168,35 +167,34 @@ int32_t LibraVertexCut(
       CHECK(c < nc) << "Error: 2. partition greater than nc !!";
       out[i] = c;
 
-      community_edges[c] ++;
+      community_edges[c]++;
       community_weights[c] = community_weights[c] + w;
 
       node_assignments[u].push_back(c);
       CHECK(node_assignments[u].size() <= nc) <<
         "3. Error: generated splits (u) are greater than nc!";
-      edgenum_unassigned[u] --;
-      edgenum_unassigned[v] --;
-    }
-    else {
+      edgenum_unassigned[u]--;
+      edgenum_unassigned[v]--;
+    } else {
       std::vector<int> setv(nc), intersetv;
-      for (int32_t j=0; j<nc; j++) setv[j] = 0;
+      for (int32_t j=0; j < nc; j++) setv[j] = 0;
       int32_t interset = 0;
 
       CHECK(node_assignments[u].size() <= nc) <<
         "4. Error: generated splits (u) are greater than nc!";
       CHECK(node_assignments[v].size() <= nc) <<
         "4. Error: generated splits (v) are greater than nc!";
-      for (int32_t j=0; j<node_assignments[v].size(); j++) {
+      for (int32_t j=0; j < node_assignments[v].size(); j++) {
         CHECK(node_assignments[v][j] < nc) << "Error: 4. Part assigned (v) greater than nc!";
-        setv[node_assignments[v][j]] ++;
+        setv[node_assignments[v][j]]++;
       }
 
-      for (int32_t j=0; j<node_assignments[u].size(); j++) {
+      for (int32_t j=0; j < node_assignments[u].size(); j++) {
         CHECK(node_assignments[u][j] < nc) << "Error: 4. Part assigned (u) greater than nc!";
-        setv[node_assignments[u][j]] ++;
+        setv[node_assignments[u][j]]++;
       }
 
-      for (int32_t j=0; j<nc; j++) {
+      for (int32_t j=0; j < nc; j++) {
         CHECK(setv[j] <= 2) << "Error: 4. unexpected computed value !!!";
         if (setv[j] == 2) {
           interset++;
@@ -204,23 +202,21 @@ int32_t LibraVertexCut(
         }
       }
       if (interset) {
-        for (int32_t j=0; j<intersetv.size(); j++) {
+        for (int32_t j=0; j < intersetv.size(); j++) {
           int32_t cind = intersetv[j];
           cache[j] = community_edges[cind];
         }
         int32_t cindex = LeastLoad(cache, intersetv.size());
-        int32_t c = intersetv[cindex];
-        
+        int32_t c = intersetv[cindex];        
         CHECK(c < nc) << "Error: 4. partition greater than nc !!";
         out[i] = c;
-        community_edges[c] ++;
+        community_edges[c]++;
         community_weights[c] = community_weights[c] + w;
-        edgenum_unassigned[u] --;
-        edgenum_unassigned[v] --;
-      }
-      else {
+        edgenum_unassigned[u]--;
+        edgenum_unassigned[v]--;
+      } else {
         if (node_degree[u] < node_degree[v]) {
-          for (uint32_t j=0; j<node_assignments[u].size(); j++) {
+          for (uint32_t j=0; j < node_assignments[u].size(); j++) {
             int32_t cind = node_assignments[u][j];
             cache[j] = community_edges[cind];
           }
@@ -228,10 +224,10 @@ int32_t LibraVertexCut(
           int32_t c = node_assignments[u][cindex];
           CHECK(c < nc) << "Error: 5. partition greater than nc !!";
           out[i] = c;
-          community_edges[c] ++;
+          community_edges[c]++;
           community_weights[c] = community_weights[c] + w;
 
-          for (uint32_t j=0; j<node_assignments[v].size(); j++) {
+          for (uint32_t j=0; j < node_assignments[v].size(); j++) {
             CHECK(node_assignments[v][j] != c) <<
               "Error: 5. duplicate partition (v) assignment !!";
           }
@@ -240,11 +236,10 @@ int32_t LibraVertexCut(
           CHECK(node_assignments[v].size() <= nc) <<
             "Error: 5. generated splits (v) greater than nc!!";
           replication_list.push_back(v);
-          edgenum_unassigned[u] --;
-          edgenum_unassigned[v] --;
-        }
-        else {
-          for (uint32_t j=0; j<node_assignments[v].size(); j++) {
+          edgenum_unassigned[u]--;
+          edgenum_unassigned[v]--;
+        } else {
+          for (uint32_t j=0; j < node_assignments[v].size(); j++) {
             int32_t cind = node_assignments[v][j];
             cache[j] = community_edges[cind];
           }
@@ -252,9 +247,9 @@ int32_t LibraVertexCut(
           int32_t c = node_assignments[v][cindex];
           CHECK(c < nc)  << "Error: 6. partition greater than nc !!";
           out[i] = c;
-          community_edges[c] ++;
+          community_edges[c]++;
           community_weights[c] = community_weights[c] + w;
-          for (uint32_t j=0; j<node_assignments[u].size(); j++) {
+          for (uint32_t j=0; j < node_assignments[u].size(); j++) {
             CHECK(node_assignments[u][j] != c) <<
               "Error: 6. duplicate partition (u) assignment !!";
           }
@@ -264,8 +259,8 @@ int32_t LibraVertexCut(
           CHECK(node_assignments[u].size() <= nc) <<
             "Error: 6. generated splits (u) greater than nc!!";
           replication_list.push_back(u);
-          edgenum_unassigned[u] --;
-          edgenum_unassigned[v] --;
+          edgenum_unassigned[u]--;
+          edgenum_unassigned[v]--;
         }
       }
     }
@@ -279,8 +274,8 @@ int32_t LibraVertexCut(
 
     FILE *fp = fopen(str.c_str(), "w");
     CHECK_NOTNULL(fp);
-        
-    for (int64_t i=0; i<N_e; i++) {
+
+    for (int64_t i=0; i < N_e; i++) {
       if (out[i] == c)
         fprintf(fp, "%ld,%ld,%f\n", uptr[i], vptr[i], wptr[i]);
     }
@@ -295,7 +290,7 @@ int32_t LibraVertexCut(
   fprintf(fp, "## The Indices of Nodes that are replicated :: Header");
   printf("Total replication: %ld\n", replication_list.size());
 
-  for (uint64_t i=0; i<replication_list.size(); i++)
+  for (uint64_t i=0; i < replication_list.size(); i++)
     fprintf(fp, "%ld\n", replication_list[i]);
 
   printf("Community weights:\n");
@@ -380,11 +375,10 @@ void Libra2dglBuildDict(
   int64_t fsize,
   NDArray hash_nodes_a,
   std::string prefix) {
-
   int32_t *indices    = indices_a.Ptr<int32_t>();
   int64_t *ldt_key    = ldt_key_a.Ptr<int64_t>();
   int32_t *gdt_key    = gdt_key_a.Ptr<int32_t>();
-  int32_t *gdt_value  = gdt_value_a.Ptr<int32_t>(); // 2D tensor
+  int32_t *gdt_value  = gdt_value_a.Ptr<int32_t>();   // 2D tensor
   int32_t *node_map   = node_map_a.Ptr<int32_t>();
   int32_t *offset     = offset_a.Ptr<int32_t>();
   int32_t *hash_nodes = hash_nodes_a.Ptr<int32_t>();
@@ -397,7 +391,7 @@ void Libra2dglBuildDict(
   int32_t num_nodes = ldt_key_a.GetSize() >> 2;
 
   #pragma omp simd
-  for (int32_t i=0; i<N_n; i++) {
+  for (int32_t i=0; i < N_n; i++) {
     indices[i] = -100;
   }
 
@@ -408,7 +402,7 @@ void Libra2dglBuildDict(
   FILE *fp = fopen(str.c_str(), "r");
   CHECK_NOTNULL(fp);
 
-  while(!feof(fp) && edge < fsize) {
+  while (!feof(fp) && edge < fsize) {
     int64_t u, v;
     float w;
     fscanf(fp, "%ld,%ld,%f\n", &u, &v, &w);
@@ -431,14 +425,15 @@ void Libra2dglBuildDict(
   hash_nodes[0] = pos;
   hash_nodes[1] = edge;
 
-  for (int32_t i=0; i<pos; i++) {
+  for (int32_t i=0; i < pos; i++) {
     int64_t  u   = ldt_key[i];
     int32_t  v   = indices[u];
     int32_t *ind = &gdt_key[u];
     int32_t *ptr = gdt_value + u*width;
     ptr[*ind] = offset[0] + v;
     (*ind)++;
-    CHECK(v != -100);
+    // CHECK(v != -100);
+    CHECK_NE(v, -100);
     CHECK(*ind <= nc);
   }
   node_map[c] = offset[0] +  pos;
@@ -461,7 +456,6 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLLibra2dglBuildDict")
   int64_t     fsize      = args[10];
   NDArray     hash_nodes = args[11];
   std::string prefix     = args[12];
-  
   Libra2dglBuildDict(a, b, indices, ldt_key, gdt_key,
                      gdt_value, node_map, offset,
                      nc, c, fsize, hash_nodes, prefix);
@@ -483,22 +477,21 @@ void Libra2dglSetLF(
   NDArray lftensor_a,
   int32_t nc,
   int64_t Nn) {
-
-  srand (time(NULL));
+  srand(time(NULL));
   int32_t *gdt_key    = gdt_key_a.Ptr<int32_t>();
-  int32_t *gdt_value  = gdt_value_a.Ptr<int32_t>(); // 2D tensor
+  int32_t *gdt_value  = gdt_value_a.Ptr<int32_t>();   // 2D tensor
   int32_t *lftensor   = lftensor_a.Ptr<int32_t>();
 
   int32_t width = nc;
   int32_t cnt = 0;
   int32_t avg_split_copy = 0, scnt = 0;
 
-  for (int64_t i=0; i<Nn; i++) {
+  for (int64_t i=0; i < Nn; i++) {
     if (gdt_key[i] <= 0) {
-      cnt ++;
-    }
-    else {
-      int32_t val = rand() % gdt_key[i];
+      cnt++;
+    } else {
+      unsigned int seed = time(NULL);
+      int32_t val = rand_r(&seed) % gdt_key[i];  // consider using rand_r()
       CHECK(val >= 0 && val < gdt_key[i]);
       CHECK(gdt_key[i] <= nc);
 
@@ -507,7 +500,7 @@ void Libra2dglSetLF(
     }
     if (gdt_key[i] > 1) {
       avg_split_copy += gdt_key[i];
-      scnt ++;
+      scnt++;
     }
   }
 }
@@ -555,7 +548,7 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLLibra2dglSetLF")
   \param gvalm_a gloabl (input graph) validation nodes
   \param Nn number of nodes in the input graph
  */
-template<typename IdType,typename DType>
+template<typename IdType, typename DType>
 void Libra2dglBuildAdjlist(
   NDArray feat_a,
   NDArray gfeat_a,
@@ -580,43 +573,41 @@ void Libra2dglBuildAdjlist(
   NDArray gtestm_a ,
   NDArray gvalm_a,
   int64_t Nn) {
-
-  DType   *feat       = feat_a.Ptr<DType>(); // 2D tensor
-  DType   *gfeat      = gfeat_a.Ptr<DType>(); // 2D tensor
-  int32_t *adj        = adj_a.Ptr<int32_t>(); // 2D tensor
+  DType   *feat       = feat_a.Ptr<DType>();    // 2D tensor
+  DType   *gfeat      = gfeat_a.Ptr<DType>();   // 2D tensor
+  int32_t *adj        = adj_a.Ptr<int32_t>();   // 2D tensor
   int32_t *inner_node = inner_node_a.Ptr<int32_t>();
   int64_t *ldt_key    = ldt_key_a.Ptr<int64_t>();
   int32_t *gdt_key    = gdt_key_a.Ptr<int32_t>();
-  int32_t *gdt_value  = gdt_value_a.Ptr<int32_t>(); // 2D tensor
+  int32_t *gdt_value  = gdt_value_a.Ptr<int32_t>();   // 2D tensor
   int32_t *node_map   = node_map_a.Ptr<int32_t>();
   int32_t *lf         = lf_a.Ptr<int32_t>();
   int32_t *lftensor   = lftensor_a.Ptr<int32_t>();
   int32_t width = nc - 1;
 
   #pragma omp parallel for
-  for (int32_t i=0; i<num_nodes; i++) {
+  for (int32_t i=0; i < num_nodes; i++) {
     int64_t k = ldt_key[i];
     int64_t v = i;
     int32_t ind = gdt_key[k];
 
     int32_t *adj_ptr = adj + v*width;
-    if(ind == 1) {
-      for (int32_t j=0; j<width; j++) adj_ptr[j] = -1;
+    if (ind == 1) {
+      for (int32_t j=0; j < width; j++) adj_ptr[j] = -1;
       inner_node[i] = 1;
       lf[i] = -200;
-    }
-    else {
+    } else {
       lf[i] = lftensor[k];
       int32_t *ptr = gdt_value + k*nc;
       int32_t pos = 0;
       CHECK(ind <= nc);
       int32_t flg = 0;
-      for (int32_t j=0; j<ind; j++) {
+      for (int32_t j=0; j < ind; j++) {
         if (ptr[j] == lf[i]) flg = 1;
-        if(c != Ver2partition<int32_t>(ptr[j], node_map, nc) )
+        if (c != Ver2partition<int32_t>(ptr[j], node_map, nc) )
           adj_ptr[pos++] = ptr[j];
       }
-      CHECK(flg == 1);
+      CHECK_EQ(flg, 1);
       CHECK(pos == ind - 1);
       for (; pos < width; pos++) adj_ptr[pos] = -1;
       inner_node[i] = 0;
@@ -624,13 +615,13 @@ void Libra2dglBuildAdjlist(
   }
   // gathering
   #pragma omp parallel for
-  for (int64_t i=0; i<num_nodes; i++) {
+  for (int64_t i=0; i < num_nodes; i++) {
     int64_t k = ldt_key[i];
     int64_t ind = i*feat_size;
     DType *optr = gfeat + ind;
     DType *iptr = feat + k*feat_size;
 
-    for (int32_t j=0; j<feat_size; j++)
+    for (int32_t j=0; j < feat_size; j++)
       optr[j] = iptr[j];
   }
 
@@ -643,7 +634,7 @@ void Libra2dglBuildAdjlist(
   bool *valm = valm_a.Ptr<bool>();
   bool *gvalm = gvalm_a.Ptr<bool>();
   #pragma omp parallel for
-  for (int64_t i=0; i<num_nodes; i++) {
+  for (int64_t i=0; i < num_nodes; i++) {
     int64_t k = ldt_key[i];
     CHECK(k >=0 && k < Nn);
     glabels[i] = labels[k];
