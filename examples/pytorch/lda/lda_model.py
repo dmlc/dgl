@@ -17,7 +17,7 @@
 # limitations under the License.
 
 
-import os, functools, warnings, torch, typing, collections, dgl
+import os, functools, warnings, torch, collections, dgl
 import numpy as np, scipy as sp
 
 try:
@@ -50,6 +50,11 @@ class EdgeData:
         return (
             self.src_data['Elog'] + self.dst_data['Elog'] - self.loglike.unsqueeze(1)
         ).exp()
+
+    @property
+    def expectation(self):
+        """ only makes sense on doc->word graph """
+        return (self.src_data['expectation'] * self.dst_data['expectation']).sum(1)
 
 
 class _Dirichlet:
@@ -102,12 +107,17 @@ class _Dirichlet:
     def n(self):
         return self.nphi.sum(1)
 
-    @cached_2d_property
+    @cached_property
     def cdf(self):
         cdf = self._posterior()
         torch.cumsum(cdf, 1, out=cdf)
         cdf /= cdf[:, -1:]
         return cdf
+
+    def _expectation(self, _ID=slice(None)):
+        expectation = self._posterior(_ID)
+        expectation /= self.posterior_sum.unsqueeze(1)
+        return expectation
 
     @cached_property
     def Bayesian_gap(self):
@@ -146,8 +156,11 @@ class _Dirichlet:
 
 class DocData(_Dirichlet):
     """ nphi (n_docs by n_topics) """
-    def prepare_graph(self, G):
-        G.nodes['doc'].data['Elog'] = self.Elog.to(G.device)
+    def prepare_graph(self, G, key="Elog"):
+        if key == "Elog":
+            G.nodes['doc'].data["Elog"] = self.Elog.to(G.device)
+        elif key == "expectation":
+            G.nodes['doc'].data["expectation"] = self._expectation().to(G.device)
 
     def update_from(self, G, mult):
         new = G.nodes['doc'].data['nphi'] * mult
@@ -169,14 +182,20 @@ class _Distributed(collections.UserList):
 
 class WordData(_Distributed):
     """ distributed nphi (n_topics by n_words), transpose to/from graph nodes data """
-    def prepare_graph(self, G):
+    def prepare_graph(self, G, key="Elog"):
         if '_ID' in G.nodes['word'].data:
             _ID = G.nodes['word'].data['_ID']
-            out = [part._Elog(_ID).to(G.device) for part in self]
         else:
-            out = [part.Elog.to(G.device) for part in self]
+            _ID = slice(None)
 
-        G.nodes['word'].data['Elog'] = torch.cat(out).T
+        if key == "Elog":
+            Elog = [part._Elog(_ID).to(G.device) for part in self]
+            G.nodes['word'].data["Elog"] = torch.cat(Elog).T
+
+        elif key == "expectation":
+            expectation = [part._expectation(_ID).to(G.device) for part in self]
+            G.nodes['word'].data["expectation"] = torch.cat(expectation).T
+
 
     def update_from(self, G, mult, rho):
         nphi = G.nodes['word'].data['nphi'].T * mult
@@ -279,9 +298,9 @@ class LatentDirichletAllocation:
         return DocData(self.prior['doc'], doc_nphi)
 
 
-    def _prepare_graph(self, G, doc_data):
-        doc_data.prepare_graph(G)
-        self.word_data.prepare_graph(G)
+    def _prepare_graph(self, G, doc_data, key="Elog"):
+        doc_data.prepare_graph(G, key)
+        self.word_data.prepare_graph(G, key)
 
 
     def _e_step(self, G, doc_data=None, mean_change_tol=1e-3, max_iters=100):
@@ -291,9 +310,10 @@ class LatentDirichletAllocation:
             doc_data = self._init_doc_data(G.num_nodes('doc'), G.device)
 
         G_rev = G.reverse() # word -> doc
+        self.word_data.prepare_graph(G_rev)
 
         for i in range(max_iters):
-            self._prepare_graph(G_rev, doc_data)
+            doc_data.prepare_graph(G_rev)
             G_rev.update_all(
                 lambda edges: {'phi': EdgeData(edges.src, edges.dst).phi},
                 dgl.function.sum('phi', 'nphi')
@@ -326,13 +346,28 @@ class LatentDirichletAllocation:
 
 
     def sample(self, doc_data, num_samples):
+        """ sample and return normalized expected probabilities """
         def fn(cdf):
             u = torch.rand(cdf.shape[0], num_samples, device=cdf.device)
             return torch.searchsorted(cdf, u).to(doc_data.device)
 
         topic_ids = fn(doc_data.cdf)
         word_ids = torch.cat([fn(part.cdf) for part in self.word_data])
-        return torch.gather(word_ids, 0, topic_ids) # pick components by topic_ids
+        ids = torch.gather(word_ids, 0, topic_ids) # pick components by topic_ids
+
+        # compute expectation scores on sampled ids
+        src_ids = torch.arange(
+            ids.shape[0], dtype=ids.dtype, device=ids.device
+            ).reshape((-1, 1)).expand(ids.shape)
+        unique_ids, inverse_ids = torch.unique(ids, sorted=False, return_inverse=True)
+
+        G = dgl.heterograph({('doc','','word'): (src_ids.ravel(), inverse_ids.ravel())})
+        G.nodes['word'].data['_ID'] = unique_ids
+        self._prepare_graph(G, doc_data, "expectation")
+        G.apply_edges(lambda e: {'expectation': EdgeData(e.src, e.dst).expectation})
+        expectation = G.edata['expectation'].reshape(ids.shape)
+
+        return ids, expectation
 
 
     def _m_step(self, G, doc_data):
@@ -427,7 +462,7 @@ if __name__ == '__main__':
     model.transform(G)
     model.predict(model.transform(G))
     if hasattr(torch, "searchsorted"):
-        model.sample(model.transform(G), 2)
+        model.sample(model.transform(G), 3)
     model.perplexity(G)
 
     for doc_id in range(2):
