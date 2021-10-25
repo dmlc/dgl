@@ -21,10 +21,10 @@ def main(args):
         device = 'cpu'
 
     # retrieve labels of ground truth
-    labels = graph.ndata['label'].to(device).squeeze().long()
+    labels = graph.ndata['label'].to(device)
 
     # Extract node features
-    feat = graph.ndata['feature'].to(device).float()
+    feat = graph.ndata['feature'].to(device)
 
     # retrieve masks for train/validation/test
     train_mask = graph.ndata['train_mask']

@@ -14,8 +14,8 @@ def evaluate(model, loss_fn, dataloader, device='cpu'):
     num_blocks = 0
     for input_nodes, output_nodes, blocks in dataloader:
         blocks = [b.to(device) for b in blocks]
-        feature = blocks[0].srcdata['feature'].float()
-        label = blocks[-1].dstdata['label'].squeeze().long()
+        feature = blocks[0].srcdata['feature']
+        label = blocks[-1].dstdata['label']
         logits_gnn, logits_sim = model(blocks, feature)
 
         # compute loss
@@ -42,10 +42,10 @@ def main(args):
         device = 'cpu'
 
     # retrieve labels of ground truth
-    labels = graph.ndata['label'].to(device).bool()
+    labels = graph.ndata['label'].to(device)
 
     # Extract node features
-    feat = graph.ndata['feature'].to(device).float()
+    feat = graph.ndata['feature'].to(device)
     layers_feat = feat.expand(args.num_layers, -1, -1)
 
     # retrieve masks for train/validation/test
@@ -58,7 +58,7 @@ def main(args):
     test_idx = th.nonzero(test_mask, as_tuple=False).squeeze(1).to(device)
 
     # Reinforcement learning module only for positive training nodes
-    rl_idx = th.nonzero(train_mask.to(device) & labels, as_tuple=False).squeeze(1)
+    rl_idx = th.nonzero(train_mask.to(device) & labels.bool(), as_tuple=False).squeeze(1)
 
     graph = graph.to(device)
 
@@ -112,8 +112,8 @@ def main(args):
 
         for input_nodes, output_nodes, blocks in train_dataloader:
             blocks = [b.to(device) for b in blocks]
-            train_feature = blocks[0].srcdata['feature'].float()
-            train_label = blocks[-1].dstdata['label'].squeeze().long()
+            train_feature = blocks[0].srcdata['feature']
+            train_label = blocks[-1].dstdata['label']
             logits_gnn, logits_sim = model(blocks, train_feature)
 
             # compute loss
