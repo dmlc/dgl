@@ -33,8 +33,6 @@ from dgl.sparse import libra2dgl_build_adjlist
 from dgl.data.utils import load_graphs, save_graphs, load_tensors, save_tensors
 from scipy.io import mmread
 from dgl.base import DGLError
-
-#from dgl.distgnn.partition import libra2dgl
 import requests
 
 ## \brief This function reports replication per node
@@ -431,18 +429,12 @@ def vertex_cut_partition(num_community, dataset, prefix):
 
 
 if __name__ == "__main__":
-    #if len(sys.argv) != 3:
-    #    raise DGLError("Error: exec <Input dataset> <#partitions>")
     argparser = argparse.ArgumentParser()
     argparser.add_argument('--dataset', type=str, default='cora')
     argparser.add_argument('--num-parts', type=int, default=2)
     argparser.add_argument('--out-dir', type=str, default='\"\"')
     args = argparser.parse_args()
 
-
-    #prefix = ""
-    #dataset = sys.argv[1]
-    #nc = int(sys.argv[2])
     dataset = args.dataset
     nc = args.num_parts
     prefix = args.out_dir
@@ -517,7 +509,6 @@ if __name__ == "__main__":
 
 
 def partition_graph(dataset, nc, prefix):
-
     print("dataset: ", dataset)
     print("num partitions: ", nc)
     print("output location: ", prefix)

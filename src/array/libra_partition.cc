@@ -46,7 +46,6 @@ int32_t Ver2partition(IdType in_val, int32_t* node_map, int32_t num_parts) {
 /*! \brief Identifies the lead loaded partition/community for a given edge assignment.*/
 int32_t LeastLoad(int64_t* community_edges, int32_t nc) {
   // initialize random seed
-  //srand(time(NULL));
   std::vector<int> score, loc;
   int32_t min = 1e9;
   for (int32_t i=0; i < nc; i++) {
@@ -59,9 +58,9 @@ int32_t LeastLoad(int64_t* community_edges, int32_t nc) {
       loc.push_back(i);
     }
   }
-  // int32_t r = rand() % loc.size();   // rand_r recommended
+
   unsigned int seed = time(NULL);
-  int32_t r = rand_r(&seed) % loc.size();   // rand_r recommended
+  int32_t r = rand_r(&seed) % loc.size();
   CHECK(loc[r] < nc);
   return loc[r];
 }
@@ -103,8 +102,6 @@ int32_t LibraVertexCut(
   std::vector<std::vector<int32_t> > node_assignments(N_n);
   std::vector<IdType2> replication_list;
   // local allocations
-  // int64_t *community_edges = (int64_t*)calloc(sizeof(int64_t), nc);
-  // int64_t *cache = (int64_t*)calloc(sizeof(int64_t), nc);
   int64_t *community_edges = reinterpret_cast<int64_t*>(calloc(sizeof(int64_t), nc));
   int64_t *cache = reinterpret_cast<int64_t*>(calloc(sizeof(int64_t), nc));
 
@@ -207,7 +204,7 @@ int32_t LibraVertexCut(
           cache[j] = community_edges[cind];
         }
         int32_t cindex = LeastLoad(cache, intersetv.size());
-        int32_t c = intersetv[cindex];        
+        int32_t c = intersetv[cindex];
         CHECK(c < nc) << "Error: 4. partition greater than nc !!";
         out[i] = c;
         community_edges[c]++;
@@ -432,7 +429,6 @@ void Libra2dglBuildDict(
     int32_t *ptr = gdt_value + u*width;
     ptr[*ind] = offset[0] + v;
     (*ind)++;
-    // CHECK(v != -100);
     CHECK_NE(v, -100);
     CHECK(*ind <= nc);
   }
@@ -491,7 +487,7 @@ void Libra2dglSetLF(
       cnt++;
     } else {
       unsigned int seed = time(NULL);
-      int32_t val = rand_r(&seed) % gdt_key[i];  // consider using rand_r()
+      int32_t val = rand_r(&seed) % gdt_key[i];
       CHECK(val >= 0 && val < gdt_key[i]);
       CHECK(gdt_key[i] <= nc);
 
