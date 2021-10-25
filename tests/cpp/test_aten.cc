@@ -260,8 +260,8 @@ TEST(ArrayTest, TestRelabel_) {
   _TestRelabel_<int32_t>(CPU);
   _TestRelabel_<int64_t>(CPU);
 #ifdef DGL_USE_CUDA
-  _TestIndexSelect<int32_t>(GPU);
-  _TestIndexSelect<int64_t>(GPU);
+  _TestRelabel_<int32_t>(GPU);
+  _TestRelabel_<int64_t>(GPU);
 #endif
 }
 

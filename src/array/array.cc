@@ -205,7 +205,7 @@ NDArray Repeat(NDArray array, IdArray repeats) {
 
 IdArray Relabel_(const std::vector<IdArray>& arrays) {
   IdArray ret;
-  ATEN_XPU_SWITCH(arrays[0]->ctx.device_type, XPU, "Relabel_", {
+  ATEN_XPU_SWITCH_CUDA(arrays[0]->ctx.device_type, XPU, "Relabel_", {
     ATEN_ID_TYPE_SWITCH(arrays[0]->dtype, IdType, {
       ret = impl::Relabel_<XPU, IdType>(arrays);
     });

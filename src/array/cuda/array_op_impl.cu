@@ -263,65 +263,72 @@ template IdArray Range<kDLGPU, int64_t>(int64_t, int64_t, DLContext);
 
 ///////////////////////////// Relabel_ //////////////////////////////
 
+template <typename IdType>
+__global__ void _RelabelKernel(
+    IdType* out, int64_t length,
+    DeviceOrderedHashTable<IdType> table) {
+
+  int tx = blockIdx.x * blockDim.x + threadIdx.x;
+  int stride_x = gridDim.x * blockDim.x;
+
+  while (tx < length) {
+    out[tx] = table.Search(out[tx])->local;
+    tx += stride_x;
+  }
+}
+
 template <DLDeviceType XPU, typename IdType>
 IdArray Relabel_(const std::vector<IdArray>& arrays) {
-  cudaStream_t stream = 0;
   const auto& ctx = arrays[0]->ctx;
   auto device = runtime::DeviceAPI::Get(ctx);
+  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
 
-  int64_t max_vertex_cnt = 0;
-  for (IdArray arr: arrays) {
-    max_vertex_cnt += arr->shape[0];
-  }
+  IdArray all_nodes = Concat(arrays);
+  const int64_t total_length = all_nodes->shape[0];
 
-  // gather all the nodes
-  IdArray all_nodes = NewIdArray(max_vertex_cnt, ctx, sizeof(IdType)*8);
-  int64_t offset = 0;
-  for (IdArray arr: arrays) {
-    device->CopyDataFromTo(
-      arr.Ptr<IdType>(), 0,
-      all_nodes.Ptr<IdType>(), offset,
-      sizeof(IdType)*arr->shape[0],
-      arr->ctx,
-      all_nodes->ctx,
-      arr->dtype,
-      stream);
-    offset += sizeof(IdType)*arr->shape[0];
-  }
-
-  // build node maps and relabel
-  OrderedHashTable<IdType> node_map(max_vertex_cnt, ctx, stream);
-  int64_t num_induced_nodes = 0;
-  int64_t * count_unique_device = static_cast<int64_t*>(
+  // build node maps and get the induced nodes
+  OrderedHashTable<IdType> node_map(total_length, ctx, thr_entry->stream);
+  int64_t num_induced = 0;
+  int64_t * num_induced_device = static_cast<int64_t*>(
       device->AllocWorkspace(ctx, sizeof(int64_t)));
-  IdArray induced_nodes = NewIdArray(max_vertex_cnt, ctx, sizeof(IdType)*8);
+  IdArray induced_nodes = NewIdArray(total_length, ctx, sizeof(IdType)*8);
 
   CUDA_CALL(cudaMemsetAsync(
-    count_unique_device,
+    num_induced_device,
     0,
-    sizeof(*count_unique_device),
-    stream));
-  CHECK_EQ(all_nodes->ctx.device_type, kDLGPU);
+    sizeof(*num_induced_device),
+    thr_entry->stream));
+
   node_map.FillWithDuplicates(
     all_nodes.Ptr<IdType>(),
     all_nodes->shape[0],
     induced_nodes.Ptr<IdType>(),
-    count_unique_device,
-    stream);
+    num_induced_device,
+    thr_entry->stream);
 
   device->CopyDataFromTo(
-    count_unique_device, 0,
-    &num_induced_nodes, 0,
-    sizeof(num_induced_nodes),
+    num_induced_device, 0,
+    &num_induced, 0,
+    sizeof(num_induced),
     ctx,
     DGLContext{kDLCPU, 0},
     DGLType{kDLInt, 64, 1},
-    stream);
-  device->StreamSync(ctx, stream);
-  device->FreeWorkspace(ctx, count_unique_device);
+    thr_entry->stream);
+  device->StreamSync(ctx, thr_entry->stream);
+  device->FreeWorkspace(ctx, num_induced_device);
 
   // resize the induced nodes
-  induced_nodes->shape[0] = num_induced_nodes;
+  induced_nodes->shape[0] = num_induced;
+
+  // relabel
+  for (IdArray arr : arrays) {
+    const int64_t length = arr->shape[0];
+    int nt = cuda::FindNumThreads(length);
+    int nb = (length + nt - 1) / nt;
+    CUDA_KERNEL_CALL((_RelabelKernel<IdType>),
+      nb, nt, 0, thr_entry->stream,
+      arr.Ptr<IdType>(), length, node_map.DeviceHandle());
+  }
 
   return induced_nodes;
 }
