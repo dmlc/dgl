@@ -95,7 +95,7 @@ class _Dirichlet:
     def cdf(self):
         cdf = self._posterior()
         torch.cumsum(cdf, 1, out=cdf)
-        cdf /= cdf[:, -1:]
+        cdf /= cdf[:, -1:].clone()
         return cdf
 
     def _expectation(self, _ID=slice(None)):
@@ -257,7 +257,7 @@ class LatentDirichletAllocation:
         self.init = init
 
         assert not isinstance(device_list, str), "plz wrap devices in a list"
-        self.device_list = device_list
+        self.device_list = device_list[:n_components] # avoid edge cases
         self.verbose = verbose
 
         self._init_word_data()
@@ -347,7 +347,7 @@ class LatentDirichletAllocation:
         G.nodes['word'].data['_ID'] = unique_ids
         self._prepare_graph(G, doc_data, "expectation")
         G.apply_edges(lambda e: {'expectation': EdgeData(e.src, e.dst).expectation})
-        expectation = G.edata['expectation'].reshape(ids.shape)
+        expectation = G.edata.pop('expectation').reshape(ids.shape)
 
         return ids, expectation
 
