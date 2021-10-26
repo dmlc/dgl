@@ -56,6 +56,7 @@ class CAREConv(nn.Module):
         self.p = {}
         self.last_avg_dist = {}
         self.f = {}
+        # indicate whether the RL converges
         self.cvg = {}
         for etype in edges:
             self.p[etype] = 0.5
@@ -151,7 +152,7 @@ class CAREGNN(nn.Module):
     def RLModule(self, graph, epoch, idx, dists):
         for i, layer in enumerate(self.layers):
             for etype in self.edges:
-                if not layer.cvg:
+                if not layer.cvg[etype]:
                     # formula 5
                     eid = graph.in_edges(idx, form='eid', etype=etype)
                     avg_dist = th.mean(dists[i][etype][eid])
@@ -159,11 +160,17 @@ class CAREGNN(nn.Module):
                     # formula 6
                     if layer.last_avg_dist[etype] < avg_dist:
                         layer.p[etype] -= self.step_size
-                        layer.f.append(-1)
+                        layer.f[etype].append(-1)
+                        # avoid overflow, follow the author's implement
+                        if layer.p[etype] < 0:
+                            layer.p[etype] = 0.001
                     else:
                         layer.p[etype] += self.step_size
-                        layer.f.append(+1)
+                        layer.f[etype].append(+1)
+                        if layer.p[etype] > 1:
+                            layer.p[etype] = 0.999
+                    layer.last_avg_dist[etype] = avg_dist
 
                     # formula 7
-                    if epoch >= 10 and sum(layer.f[-10:]) <= 2:
-                        layer.cvg = True
+                    if epoch >= 9 and abs(sum(layer.f[etype][-10:])) <= 2:
+                        layer.cvg[etype] = True

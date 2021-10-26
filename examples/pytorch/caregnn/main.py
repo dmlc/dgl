@@ -3,8 +3,9 @@ import argparse
 import torch as th
 from model import CAREGNN
 import torch.optim as optim
-from utils import EarlyStopping
 from sklearn.metrics import recall_score, roc_auc_score
+
+from utils import EarlyStopping
 
 
 def main(args):
@@ -121,7 +122,7 @@ if __name__ == '__main__':
     parser.add_argument("--weight_decay", type=float, default=0.001, help="Weight decay. Default: 0.001")
     parser.add_argument("--step_size", type=float, default=0.02, help="RL action step size (lambda 2). Default: 0.02")
     parser.add_argument("--sim_weight", type=float, default=2, help="Similarity loss weight (lambda 1). Default: 2")
-    parser.add_argument('--early-stop', action='store_true', default=True, help="indicates whether to use early stop")
+    parser.add_argument('--early-stop', action='store_true', default=False, help="indicates whether to use early stop")
 
     args = parser.parse_args()
     print(args)
