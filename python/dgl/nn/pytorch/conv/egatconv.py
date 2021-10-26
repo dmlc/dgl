@@ -1,6 +1,5 @@
 """Torch modules for graph attention networks with fully valuable edges (EGAT)."""
 # pylint: disable= no-member, arguments-differ, invalid-name
-# pylint: disable= no-member, arguments-differ, invalid-name
 import torch as th
 from torch import nn
 from torch.nn import init
@@ -18,17 +17,17 @@ class EGATConv(nn.Module):
     handling edge features, detailed description is available in `Rossmann-Toolbox
     <https://pubmed.ncbi.nlm.nih.gov/34571541/>`__ (see supplementary data).
     The difference appears in the method how unnormalized attention scores :math:`e_{ij}`
-    are obtain:
+    are obtained:
 
     .. math::
         e_{ij} &= \vec{F} (f_{ij}^{\prime})
 
-        f_{ij}^{\prim} &= \mathrm{LeakyReLU}\left(A [ h_{i} \| f_{ij} \| h_{j}]\right)
+        f_{ij}^{\prime} &= \mathrm{LeakyReLU}\left(A [ h_{i} \| f_{ij} \| h_{j}]\right)
 
-    where :math:`f_{ij}^{\prim}` are edge features, :math:`\mathrm{A}` is weight matrix and
+    where :math:`f_{ij}^{\prime}` are edge features, :math:`\mathrm{A}` is weight matrix and
 
     :math: `\vec{F}` is weight vector. After that resulting node features
-    :math:`h_{i}^{\prim}` are updated in the same way as in regular GAT.
+    :math:`h_{i}^{\prime}` are updated in the same way as in regular GAT.
 
     Parameters
     ----------
@@ -37,32 +36,31 @@ class EGATConv(nn.Module):
     in_edge_feats : int
         Input edge feature size :math:`f_{ij}`.
     out_node_feats : int
-        Output nodes feature size.
+        Output node feature size.
     out_edge_feats : int
-        Output edge feature size.
+        Output edge feature size :math:`f_{ij}^{\prime}`.
     num_heads : int
         Number of attention heads.
     bias : bool, optional
-        If True, add bias term to :math `f_{ij}^{\prime}`. Defaults: ``True``.
+        If True, add bias term to :math: `f_{ij}^{\prime}`. Defaults: ``True``.
 
     Examples
     ----------
     >>> import dgl
     >>> import torch as th
     >>> from dgl.nn import EGATConv
-    >>>
+
     >>> num_nodes, num_edges = 8, 30
-    >>> # define connections
-    >>> u, v = th.randint(num_nodes, num_edges), th.randint(num_nodes, num_edges)
-    >>> graph = dgl.graph((u,v))
+    >>> # generate a graph
+    >>> graph = dgl.rand_graph((num_nodes,num_edges))
 
     >>> node_feats = th.rand((num_nodes, 20))
     >>> edge_feats = th.rand((num_edges, 12))
     >>> egat = EGATConv(in_node_feats=20,
-                          in_edge_feats=12,
-                          out_node_feats=15,
-                          out_edge_feats=10,
-                          num_heads=3)
+                        in_edge_feats=12,
+                        out_node_feats=15,
+                        out_edge_feats=10,
+                        num_heads=3)
     >>> #forward pass
     >>> new_node_feats, new_edge_feats = egat(graph, node_feats, edge_feats)
     >>> new_node_feats.shape, new_edge_feats.shape
@@ -113,15 +111,15 @@ class EGATConv(nn.Module):
         graph : DGLGraph
             The graph.
         nfeats : torch.Tensor
-            The input node feature of shape :math:`(*, D_{in})`
+            The input node feature of shape :math:`(N, D_{in})`
             where:
                 :math:`D_{in}` is size of input node feature,
-                :math:`*` is the number of nodes.
+                :math:`N` is the number of nodes.
         efeats: torch.Tensor
-             The input edge feature of shape :math:`(*, F_{in})`
+             The input edge feature of shape :math:`(E, F_{in})`
              where:
-                 :math:`F_{in}` is size of input node feauture,
-                 :math:`*` is the number of edges.
+                 :math:`F_{in}` is size of input node feature,
+                 :math:`E` is the number of edges.
         get_attention : bool, optional
                 Whether to return the attention values. Default to False.
 
@@ -129,21 +127,31 @@ class EGATConv(nn.Module):
         -------
         pair of torch.Tensor
             node output features followed by edge output features
-            The node output feature of shape :math:`(*, H, D_{out})`
-            The edge output feature of shape :math:`(*, H, F_{out})`
+            The node output feature of shape :math:`(N, H, D_{out})`
+            The edge output feature of shape :math:`(F, H, F_{out})`
             where:
                 :math:`H` is the number of heads,
                 :math:`D_{out}` is size of output node feature,
                 :math:`F_{out}` is size of output edge feature.
+        torch.Tensor, optional
+            The attention values of shape :math:`(E, H, 1)`.
+            This is returned only when :attr: `get_attention` is ``True``.
         """
 
         with graph.local_scope():
+            if (graph.in_degrees() == 0).any():
+                raise DGLError('There are 0-in-degree nodes in the graph, '
+                               'output for those nodes will be invalid. '
+                               'This is harmful for some applications, '
+                               'causing silent performance regression. '
+                               'Adding self-loop on the input graph by '
+                               'calling `g = dgl.add_self_loop(g)` will resolve '
+                               'the issue.')
+
             # TODO allow node src and dst feats
-            graph.edata['f'] = efeats
-            graph.ndata['h'] = nfeats
             # calc edge attention
             # same trick way as in dgl.nn.pytorch.GATConv, but also includes edge feats
-            # https://github.com/dmlc/dgl/blob/master/python/dgl/nn/pytorch/conv/gatconv.py#L297
+            # https://github.com/dmlc/dgl/blob/master/python/dgl/nn/pytorch/conv/gatconv.py
             f_ni = self.fc_ni(nfeats)
             f_nj = self.fc_nj(nfeats)
             f_fij = self.fc_fij(efeats)
@@ -154,7 +162,7 @@ class EGATConv(nn.Module):
             # add fij to node factor
             f_out = graph.edata.pop('f_tmp') + f_fij
             if self.bias is not None:
-                f_out += self.bias
+                f_out = f_out + self.bias
             f_out = nn.functional.leaky_relu(f_out)
             f_out = f_out.view(-1, self._num_heads, self._out_edge_feats)
             # compute attention factor

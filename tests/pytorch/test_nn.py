@@ -573,17 +573,17 @@ def test_egat_conv(g, idtype, out_node_feats, out_edge_feats, num_heads):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx() 
     egat = nn.EGATConv(in_node_feats=10,
-                     in_edge_feats=5,
-                     out_node_feats=out_node_feats,
-                     out_edge_feats=out_edge_feats,
-                     num_heads=num_heads)
+                       in_edge_feats=5,
+                       out_node_feats=out_node_feats,
+                       out_edge_feats=out_edge_feats,
+                       num_heads=num_heads)
     nfeat = F.randn((g.number_of_nodes(), 10))
     efeat = F.randn((g.number_of_edges(), 5))
     
     egat = egat.to(ctx)
     h, f = egat(g, nfeat, efeat)
+    h, f, attn = egat(g, nfeat, efeat, True)
 
-    # test pickle
     th.save(egat, tmp_buffer)    
 
 @parametrize_dtype
