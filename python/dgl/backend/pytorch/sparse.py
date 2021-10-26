@@ -102,7 +102,7 @@ def spmm_cache_Y(binary_op, reduce_op, req_grad_X, req_grad_Y):
 
 def spmm_cache_argX(binary_op, reduce_op, req_grad_X, req_grad_Y):
     """Rules to identify whether to cache argX in SpMM forward stage."""
-    if req_grad_X:
+    if req_grad_X or req_grad_Y:
         if reduce_op in ['min', 'max']:
             return True
     return False
@@ -110,7 +110,7 @@ def spmm_cache_argX(binary_op, reduce_op, req_grad_X, req_grad_Y):
 
 def spmm_cache_argY(binary_op, reduce_op, req_grad_X, req_grad_Y):
     """Rules to identify whether to cache argY in SpMM forward stage."""
-    if req_grad_Y:
+    if req_grad_X or req_grad_Y:
         if reduce_op in ['min', 'max']:
             return True
     return False
