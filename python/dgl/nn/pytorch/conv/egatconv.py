@@ -6,6 +6,7 @@ from torch.nn import init
 
 from .... import function as fn
 from ...functional import edge_softmax
+from ....base import DGLError
 
 # pylint: enable=W0235
 class EGATConv(nn.Module):
