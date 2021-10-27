@@ -125,16 +125,6 @@ class _Dirichlet:
         self.nphi[:, _ID] += new * rho
         return mean_change
 
-    def __matmul__(self, other):
-        """ self.posterior @ other.posterior
-        = (self.nphi + 1 * self.prior * 1') @ (other.nphi + 1 * other.prior * 1')
-        """
-        out = self.nphi @ other.nphi
-        out += self.nphi.sum(1, keepdims=True) * other.prior
-        out += self.prior * other.nphi.sum(0, keepdims=True)
-        out += self.prior * other.prior * self.nphi.shape[1]
-        return out
-
 
 class DocData(_Dirichlet):
     """ nphi (n_docs by n_topics) """
@@ -316,14 +306,16 @@ class LatentDirichletAllocation:
 
     def predict(self, doc_data):
         pred_scores = [
-            DocData(doc_data.prior, doc_nphi) @ w for (doc_nphi, w) in zip(
-                self.word_data.split_device(doc_data.nphi, dim=1),
+            # d_exp @ w._expectation()
+            (lambda x: x @ w.nphi + x.sum(1, keepdims=True) * w.prior)
+            (d_exp / w.posterior_sum.unsqueeze(0))
+            for (d_exp, w) in zip(
+                self.word_data.split_device(doc_data._expectation(), dim=1),
                 self.word_data)
         ]
         x = torch.zeros_like(pred_scores[0], device=doc_data.device)
         for p in pred_scores:
             x += p.to(x.device)
-        x /= x.sum(1, keepdims=True)
         return x
 
 
