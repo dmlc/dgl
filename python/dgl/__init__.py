@@ -27,6 +27,7 @@ from ._ffi.function import register_func, get_global_func, list_global_func_name
 from ._ffi.base import DGLError, __version__
 
 from .base import ALL, NTYPE, NID, ETYPE, EID
+from .edata_fixture import use_edata_for_update
 from .readout import *
 from .batch import *
 from .convert import *
