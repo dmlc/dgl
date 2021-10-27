@@ -16,7 +16,7 @@ def _edata_update_fixture(edata_name_fixture, verbose):
             message_func = src_mul_edge(
                 message_func.in_field, edata_name_fixture, message_func.out_field)
             if verbose:
-                dgl_warning("Patch update_all functions")
+                dgl_warning("Using edata {} for update_all computation".format(edata_name_fixture))
         return ORIGINAL_UPDATEALL(self, message_func, reduce_func, apply_node_func, etype)
     return new_update_all
 
