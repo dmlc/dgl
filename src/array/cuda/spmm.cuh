@@ -317,64 +317,6 @@ void SpMMCsr(
 }
 
 
-/*!
- * \brief CUDA implementation of g-SpMM on Csr format.
- * \param bcast Broadcast information.
- * \param csr The Csr matrix.
- * \param ufeat The feature on source nodes.
- * \param efeat The feature on edges.
- * \param out The result feature on destination nodes.
- * \param argu Arg-Min/Max on source nodes, which refers the source node indices
- *        correspond to the minimum/maximum values of reduction result on
- *        destination nodes. It's useful in computing gradients of Min/Max reducer.
- * \param arge Arg-Min/Max on edges. which refers the source node indices
- *        correspond to the minimum/maximum values of reduction result on
- *        destination nodes. It's useful in computing gradients of Min/Max reducer.
- * \param stream cudaStream id.
-
- */
-template <typename Idx, typename DType,
-          typename BinaryOp, typename ReduceOp>
-void SpMMCsrHetero(
-    const BcastOff& bcast,
-    const CSRMatrix& csr,
-    NDArray ufeat, NDArray efeat,
-    NDArray out, NDArray argu, NDArray arge,
-    cudaStream_t strm_id) {
-  const Idx *indptr = csr.indptr.Ptr<Idx>();
-  const Idx *indices = csr.indices.Ptr<Idx>();
-  const Idx *edge_map = csr.data.Ptr<Idx>();
-  const DType *ufeat_data = ufeat.Ptr<DType>();
-  const DType *efeat_data = efeat.Ptr<DType>();
-  DType *out_data = out.Ptr<DType>();
-  Idx* argu_data = argu.Ptr<Idx>();
-  Idx* arge_data = arge.Ptr<Idx>();
-
-  int64_t *ubcast_off = nullptr, *ebcast_off = nullptr;
-  int64_t len = bcast.out_len,
-          lhs_len = bcast.lhs_len,
-          rhs_len = bcast.rhs_len;
-  const int ntx = FindNumThreads(len);
-  const int nty = CUDA_MAX_NUM_THREADS / ntx;
-  const int nbx = (len + ntx - 1) / ntx;
-  const int nby = FindNumBlocks<'y'>((csr.num_rows + nty - 1) / nty);
-  //LOG(INFO) << "nblks=(" << nbx << ", " << nby << ") nthrs=(" << ntx << ", " << nty << ")";
-  const dim3 nblks(nbx, nby);
-  const dim3 nthrs(ntx, nty);
-  const bool use_idx = !IsNullArray(csr.data);
-
-  BCAST_IDX_CTX_SWITCH(bcast, use_idx, ufeat->ctx, ubcast_off, ebcast_off, {
-    CUDA_KERNEL_CALL((SpMMCsrKernel<Idx, DType, BinaryOp, ReduceOp, UseBcast, UseIdx>),
-        nblks, nthrs, 0, strm_id,
-        ufeat_data, efeat_data, out_data, argu_data, arge_data,
-        indptr, indices, edge_map,
-        csr.num_rows, csr.num_cols,
-        ubcast_off, ebcast_off,
-        lhs_len, rhs_len, len)
-  });
-}
-
-
 }  // namespace cuda
 }  // namespace aten
 }  // namespace dgl
