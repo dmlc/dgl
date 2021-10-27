@@ -565,7 +565,7 @@ def test_gat_conv_bi(g, idtype, out_dim, num_heads):
     assert a.shape == (g.number_of_edges(), num_heads, 1)
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['homo']))
+@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
 @pytest.mark.parametrize('out_node_feats', [1, 5])
 @pytest.mark.parametrize('out_edge_feats', [1, 5])
 @pytest.mark.parametrize('num_heads', [1, 4])
