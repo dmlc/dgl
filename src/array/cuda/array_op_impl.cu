@@ -1,10 +1,9 @@
 /*!
- *  Copyright (c) 2020 by Contributors
+ *  Copyright (c) 2020-2021 by Contributors
  * \file array/cuda/array_op_impl.cu
  * \brief Array operator GPU implementation
  */
 #include <dgl/array.h>
-#include <dgl/runtime/device_api.h>
 #include "../../runtime/cuda/cuda_common.h"
 #include "../../runtime/cuda/cuda_hashtable.cuh"
 #include "./utils.h"
@@ -265,8 +264,7 @@ template IdArray Range<kDLGPU, int64_t>(int64_t, int64_t, DLContext);
 
 template <typename IdType>
 __global__ void _RelabelKernel(
-    IdType* out, int64_t length,
-    DeviceOrderedHashTable<IdType> table) {
+    IdType* out, int64_t length, DeviceOrderedHashTable<IdType> table) {
 
   int tx = blockIdx.x * blockDim.x + threadIdx.x;
   int stride_x = gridDim.x * blockDim.x;
