@@ -129,10 +129,7 @@ class _Dirichlet:
 class DocData(_Dirichlet):
     """ nphi (n_docs by n_topics) """
     def prepare_graph(self, G, key="Elog"):
-        if key == "Elog":
-            G.nodes['doc'].data["Elog"] = self._Elog().to(G.device)
-        elif key == "expectation":
-            G.nodes['doc'].data["expectation"] = self._expectation().to(G.device)
+        G.nodes['doc'].data[key] = getattr(self, '_'+key)().to(G.device)
 
     def update_from(self, G, mult):
         new = G.nodes['doc'].data['nphi'] * mult
@@ -160,13 +157,8 @@ class WordData(_Distributed):
         else:
             _ID = slice(None)
 
-        if key == "Elog":
-            Elog = [part._Elog(_ID).to(G.device) for part in self]
-            G.nodes['word'].data["Elog"] = torch.cat(Elog).T
-
-        elif key == "expectation":
-            expectation = [part._expectation(_ID).to(G.device) for part in self]
-            G.nodes['word'].data["expectation"] = torch.cat(expectation).T
+        out = [getattr(part, '_'+key)(_ID).to(G.device) for part in self]
+        G.nodes['word'].data[key] = torch.cat(out).T
 
 
     def update_from(self, G, mult, rho):
