@@ -170,7 +170,7 @@ class GCN2Conv(nn.Module):
         """
         self._allow_zero_in_degree = set_value
 
-    def forward(self, graph, feat, feat_0):
+    def forward(self, graph, feat, feat_0, edge_weight=None):
         r"""
 
         Description
@@ -182,11 +182,13 @@ class GCN2Conv(nn.Module):
         graph : DGLGraph
             The graph.
         feat : torch.Tensor
-             The input feature of shape
+            The input feature of shape
             :math:`(N, D_{in})`
             where :math:`D_{in}` is the size of input feature and :math:`N` is the number of nodes.
         feat_0 : torch.Tensor
-                The initial feature of shape :math:`(N, D_{in})`
+            The initial feature of shape :math:`(N, D_{in})`
+        edge_weight: Optional[torch.Tensor]
+            edge_weight used in the message passing process.
 
         Returns
         -------
@@ -230,7 +232,11 @@ class GCN2Conv(nn.Module):
 
             feat = feat * norm
             graph.ndata["h"] = feat
-            graph.update_all(fn.copy_u("h", "m"), fn.sum("m", "h"))
+            msg_func = fn.copy_u("h", "m")
+            if edge_weight is not None:
+                graph.edata["_edge_weight"] = edge_weight
+                msg_func = fn.u_mul_e("h", "_edge_weight", "m")
+            graph.update_all(msg_func, fn.sum("m", "h"))
             feat = graph.ndata.pop("h")
             feat = feat * norm
             # scale

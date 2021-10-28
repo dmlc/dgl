@@ -59,6 +59,7 @@ class TAGConv(nn.Module):
             [ 0.5215, -1.6044],
             [ 0.3304, -1.9927]], grad_fn=<AddmmBackward>)
     """
+
     def __init__(self,
                  in_feats,
                  out_feats,
@@ -89,7 +90,7 @@ class TAGConv(nn.Module):
         gain = nn.init.calculate_gain('relu')
         nn.init.xavier_normal_(self.lin.weight, gain=gain)
 
-    def forward(self, graph, feat):
+    def forward(self, graph, feat, edge_weight=None):
         r"""
 
         Description
@@ -103,6 +104,8 @@ class TAGConv(nn.Module):
         feat : torch.Tensor
             The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`
             is size of input feature, :math:`N` is the number of nodes.
+        edge_weight: Optional[torch.Tensor]
+            edge_weight used in the message passing process.
 
         Returns
         -------
@@ -117,14 +120,18 @@ class TAGConv(nn.Module):
             shp = norm.shape + (1,) * (feat.dim() - 1)
             norm = th.reshape(norm, shp).to(feat.device)
 
-            #D-1/2 A D -1/2 X
+            msg_func = fn.copy_u("h", "m")
+            if edge_weight is not None:
+                graph.edata["_edge_weight"] = edge_weight
+                msg_func = fn.u_mul_e("h", "_edge_weight", "m")
+            # D-1/2 A D -1/2 X
             fstack = [feat]
             for _ in range(self._k):
 
                 rst = fstack[-1] * norm
                 graph.ndata['h'] = rst
 
-                graph.update_all(fn.copy_src(src='h', out='m'),
+                graph.update_all(msg_func,
                                  fn.sum(msg='m', out='h'))
                 rst = graph.ndata['h']
                 rst = rst * norm

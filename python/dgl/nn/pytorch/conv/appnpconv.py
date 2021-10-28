@@ -66,7 +66,7 @@ class APPNPConv(nn.Module):
         self._alpha = alpha
         self.edge_drop = nn.Dropout(edge_drop)
 
-    def forward(self, graph, feat):
+    def forward(self, graph, feat, edge_weight=None):
         r"""
 
         Description
@@ -80,6 +80,9 @@ class APPNPConv(nn.Module):
         feat : torch.Tensor
             The input feature of shape :math:`(N, *)`. :math:`N` is the
             number of nodes, and :math:`*` could be of any shape.
+        edge_weight: Optional[torch.Tensor]
+            edge_weight used in the message passing process. Default to th.ones
+            if not specified
 
         Returns
         -------
@@ -99,8 +102,10 @@ class APPNPConv(nn.Module):
                 # normalization by src node
                 feat = feat * src_norm
                 graph.ndata['h'] = feat
+                if edge_weight is None:
+                    edge_weight = th.ones(graph.number_of_edges(), 1)
                 graph.edata['w'] = self.edge_drop(
-                    th.ones(graph.number_of_edges(), 1).to(feat.device))
+                    edge_weight).to(feat.device)
                 graph.update_all(fn.u_mul_e('h', 'w', 'm'),
                                  fn.sum('m', 'h'))
                 feat = graph.ndata.pop('h')

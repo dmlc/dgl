@@ -130,7 +130,7 @@ class SGConv(nn.Module):
         """
         self._allow_zero_in_degree = set_value
 
-    def forward(self, graph, feat):
+    def forward(self, graph, feat, edge_weight=None):
         r"""
 
         Description
@@ -144,6 +144,8 @@ class SGConv(nn.Module):
         feat : torch.Tensor
             The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`
             is size of input feature, :math:`N` is the number of nodes.
+        edge_weight: Optional[torch.Tensor]
+            edge_weight used in the message passing process.
 
         Returns
         -------
@@ -176,6 +178,11 @@ class SGConv(nn.Module):
                                    'to be `True` when constructing this module will '
                                    'suppress the check and let the code run.')
 
+            msg_func = fn.copy_u("h", "m")
+            if edge_weight is not None:
+                graph.edata["_edge_weight"] = edge_weight
+                msg_func = fn.u_mul_e("h", "_edge_weight", "m")
+
             if self._cached_h is not None:
                 feat = self._cached_h
             else:
@@ -187,7 +194,7 @@ class SGConv(nn.Module):
                 for _ in range(self._k):
                     feat = feat * norm
                     graph.ndata['h'] = feat
-                    graph.update_all(fn.copy_u('h', 'm'),
+                    graph.update_all(msg_func,
                                      fn.sum('m', 'h'))
                     feat = graph.ndata.pop('h')
                     feat = feat * norm
