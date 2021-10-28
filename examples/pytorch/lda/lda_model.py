@@ -17,7 +17,7 @@
 # limitations under the License.
 
 
-import os, functools, warnings, torch, collections, dgl
+import os, functools, warnings, torch, collections, dgl, io
 import numpy as np, scipy as sp
 
 try:
@@ -262,6 +262,18 @@ class LatentDirichletAllocation:
         return DocData(self.prior['doc'], doc_nphi)
 
 
+    def save(self, f):
+        for w in self.word_data:
+            w.clear_cache()
+        torch.save({
+            'prior': self.prior,
+            'rho': self.rho,
+            'mult': self.mult,
+            'init': self.init,
+            'word_data': [part.nphi for part in self.word_data],
+        }, f)
+
+
     def _prepare_graph(self, G, doc_data, key="Elog"):
         doc_data.prepare_graph(G, key)
         self.word_data.prepare_graph(G, key)
@@ -312,7 +324,9 @@ class LatentDirichletAllocation:
 
 
     def sample(self, doc_data, num_samples):
-        """ sample and return normalized expected probabilities """
+        """ draw independent words and return the marginal probabilities,
+        i.e., the expectations in Dirichlet distributions.
+        """
         def fn(cdf):
             u = torch.rand(cdf.shape[0], num_samples, device=cdf.device)
             return torch.searchsorted(cdf, u).to(doc_data.device)
@@ -434,4 +448,10 @@ if __name__ == '__main__':
     for doc_id in range(2):
         B = doc_subgraph(G, [doc_id])
         model.partial_fit(B)
+
+    with io.BytesIO() as f:
+        model.save(f)
+        f.seek(0)
+        print(torch.load(f))
+
     print('Testing LatentDirichletAllocation passed!')
