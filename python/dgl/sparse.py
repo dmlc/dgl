@@ -215,7 +215,7 @@ def _gspmm_hetero(gidx, op, reduce_op, u_len, u_and_e_tuple):
     tot_dst_nodes = 0
     src_list = []
     dst_list = []
-    updated =  [False] * gidx.number_of_etypes()
+    updated = [False] * gidx.number_of_etypes()
     for etid in range(gidx.number_of_etypes()):
         src_id, dst_id = gidx.metagraph.find_edge(etid)
         src_list.append(src_id)
@@ -240,7 +240,7 @@ def _gspmm_hetero(gidx, op, reduce_op, u_len, u_and_e_tuple):
     arg_e_nd = to_dgl_nd_for_write(arg_e)
     loc = 0
     new_loc = 0
-    updated =  [False] * gidx.number_of_etypes()
+    updated = [False] * gidx.number_of_etypes()
     for etid in range(gidx.number_of_etypes()):
         dst_id = dst_list[etid]
         if updated[dst_id] is False:
