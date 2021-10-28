@@ -1,7 +1,7 @@
 # Cluster-SAGE on OGB Dataset
 
 Requires DGL 0.4.3post2 or later versions.
-We use builtin metris to do the graph partition.
+We use builtin metis to do the graph partition.
 
 ## OGB-Product
 
