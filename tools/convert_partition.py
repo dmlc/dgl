@@ -194,8 +194,6 @@ for part_id in range(num_parts):
     compact_g.edata['orig_id'] = th.as_tensor(orig_edge_id)
     compact_g.edata[dgl.ETYPE] = th.as_tensor(etype_ids)
     compact_g.edata['inner_edge'] = th.ones(compact_g.number_of_edges(), dtype=th.bool)
-    compact_g.edata[dgl.EID] = th.arange(num_edges, num_edges + compact_g.number_of_edges())
-    num_edges += compact_g.number_of_edges()
 
     # The original IDs are homogeneous IDs.
     # Similarly, we need to add the original homogeneous node IDs
@@ -223,11 +221,26 @@ for part_id in range(num_parts):
     compact_g1.edata['orig_id'] = compact_g.edata['orig_id'][compact_g1.edata[dgl.EID]]
     compact_g1.edata[dgl.ETYPE] = compact_g.edata[dgl.ETYPE][compact_g1.edata[dgl.EID]]
     compact_g1.edata['inner_edge'] = compact_g.edata['inner_edge'][compact_g1.edata[dgl.EID]]
-    compact_g1.edata[dgl.EID] = compact_g.edata[dgl.EID][compact_g1.edata[dgl.EID]]
+
+    # reshuffle edges on ETYPE as node_subgraph relabels edges
+    idx = th.argsort(compact_g1.edata[dgl.ETYPE])
+    u, v = compact_g1.edges()
+    u = u[idx]
+    v = v[idx]
+    compact_g2 = dgl.graph((u, v))
+    compact_g2.ndata['orig_id'] = compact_g1.ndata['orig_id']
+    compact_g2.ndata[dgl.NTYPE] = compact_g1.ndata[dgl.NTYPE]
+    compact_g2.ndata[dgl.NID] = compact_g1.ndata[dgl.NID]
+    compact_g2.ndata['inner_node'] = compact_g1.ndata['inner_node']
+    compact_g2.edata['orig_id'] = compact_g1.edata['orig_id'][idx]
+    compact_g2.edata[dgl.ETYPE] = compact_g1.edata[dgl.ETYPE][idx]
+    compact_g2.edata['inner_edge'] = compact_g1.edata['inner_edge'][idx]
+    compact_g2.edata[dgl.EID] = th.arange(num_edges, num_edges + compact_g2.number_of_edges())
+    num_edges += compact_g2.number_of_edges()
 
     part_dir = output_dir + '/part' + str(part_id)
     os.makedirs(part_dir, exist_ok=True)
-    dgl.save_graphs(part_dir + '/graph.dgl', [compact_g1])
+    dgl.save_graphs(part_dir + '/graph.dgl', [compact_g2])
 
 part_metadata = {'graph_name': graph_name,
                  'num_nodes': num_nodes,

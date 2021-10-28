@@ -2,6 +2,7 @@ import os
 import json
 import numpy as np
 import dgl
+import dgl.distributed.graph_partition_book as GPB
 import torch as th
 from ogb.nodeproppred import DglNodePropPredDataset
 
@@ -60,6 +61,43 @@ edge_map = metadata['edge_map']
 for key in edge_map:
     edge_map[key] = th.stack([th.tensor(row) for row in edge_map[key]], 0)
 eid_map = dgl.distributed.id_map.IdMap(edge_map)
+
+for ntype in node_map:
+    assert hg.number_of_nodes(ntype) == th.sum(
+        node_map[ntype][:, 1] - node_map[ntype][:, 0])
+for etype in edge_map:
+    assert hg.number_of_edges(etype) == th.sum(
+        edge_map[etype][:, 1] - edge_map[etype][:, 0])
+
+eid = []
+gpb = GPB.RangePartitionBook(0, 2, node_map, edge_map,
+                             {ntype: i for i, ntype in enumerate(
+                                 hg.ntypes)},
+                             {etype: i for i, etype in enumerate(hg.etypes)})
+subg0 = dgl.load_graphs('{}/part0/graph.dgl'.format("outputs"))[0][0]
+for etype in hg.etypes:
+    type_eid = th.zeros((1,), dtype=th.int64)
+    eid.append(gpb.map_to_homo_eid(type_eid, etype))
+eid = th.cat(eid)
+part_id = gpb.eid2partid(eid)
+assert np.all(part_id.numpy() == 0)
+local_eid = gpb.eid2localeid(eid, 0)
+assert np.all(local_eid.numpy() == eid.numpy())
+assert np.all((subg0.edata[dgl.EID][local_eid] == eid).numpy())
+lsrc, ldst = subg0.find_edges(local_eid)
+gsrc, gdst = subg0.ndata[dgl.NID][lsrc], subg0.ndata[dgl.NID][ldst]
+assert np.all(gsrc.numpy() == lsrc.numpy())
+assert np.all(gdst.numpy() == ldst.numpy())
+etids, _ = gpb.map_to_per_etype(eid)
+src_tids, _ = gpb.map_to_per_ntype(gsrc)
+dst_tids, _ = gpb.map_to_per_ntype(gdst)
+canonical_etypes = []
+etype_ids = th.arange(0, len(etypes))
+for src_tid, etype_id, dst_tid in zip(src_tids, etype_ids, dst_tids):
+    canonical_etypes.append(
+        (ntypes[src_tid], etypes[etype_id], ntypes[dst_tid]))
+for etype in canonical_etypes:
+    assert etype in hg.canonical_etypes
 
 # Load the graph partition structure.
 for partid in range(num_parts):
