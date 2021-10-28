@@ -4,8 +4,10 @@ from .. import backend as F
 from .._ffi.ndarray import empty_shared_mem
 from .. import ndarray as nd
 
-DTYPE_DICT = F.data_type_dict
-DTYPE_DICT = {DTYPE_DICT[key]:key for key in DTYPE_DICT}
+DTYPE_DICT = {}
+for k, v in F.data_type_dict.items():
+    if not v in DTYPE_DICT.keys():
+        DTYPE_DICT[v] = k
 
 def _get_ndata_path(graph_name, ndata_name):
     return "/" + graph_name + "_node_" + ndata_name

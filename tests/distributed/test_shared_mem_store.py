@@ -17,6 +17,7 @@ import unittest
 import dgl.function as fn
 import traceback
 from numpy.testing import assert_almost_equal
+from dgl.distributed.shared_mem_utils import _to_shared_mem, DTYPE_DICT
 
 
 num_nodes = 100
@@ -293,9 +294,21 @@ def test_copy_shared_mem():
     p1.join()
     p2.join()
 
-# Skip test this file
-#if __name__ == '__main__':
+
+@unittest.skipIf(dgl.backend.backend_name != "pytorch", reason="uint8 is used instead of bool in pytorch")
+def test_to_shared_mem():
+    assert F.bool == F.uint8
+    assert DTYPE_DICT[F.uint8] == 'uint8'
+    feat = F.tensor([1, 2, 3], dtype=F.uint8)
+    try:
+        _ = _to_shared_mem(feat, "test")
+    except ValueError:
+        assert False
+    pass
+
+if __name__ == '__main__':
 #    test_copy_shared_mem()
 #    test_init()
 #    test_sync_barrier()
 #    test_compute()
+    test_to_shared_mem
