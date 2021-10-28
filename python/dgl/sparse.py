@@ -5,7 +5,6 @@ from . import ndarray as nd
 from ._ffi.function import _init_api
 from .base import DGLError
 from . import backend as F
-import time
 
 def infer_broadcast_shape(op, shp1, shp2):
     r"""Check the shape validity, and infer the output shape given input shape and operator.
@@ -195,7 +194,6 @@ def _gspmm_hetero(gidx, op, reduce_op, u_len, u_and_e_tuple):
     list_u, list_e = list(u_and_e_tuple[:u_len]), list(u_and_e_tuple[u_len:])
     use_u = op != 'copy_rhs'
     use_e = op != 'copy_lhs'
-    # TODO (Israt): Add check - F.dtype(u) != F.dtype(e):
 
     # deal with scalar features.
     expand_u, expand_e = False, False
@@ -204,6 +202,11 @@ def _gspmm_hetero(gidx, op, reduce_op, u_len, u_and_e_tuple):
     src_id, dst_id = gidx.metagraph.find_edge(0)
     u = list_u[src_id] if use_u else None
     e = list_e[0] if use_e else None
+    if use_u and use_e:
+        if F.dtype(u) != F.dtype(e):
+            raise DGLError("The node features' data type {} doesn't match edge"
+                           " features' data type {}, please convert them to the"
+                           " same type.".format(F.dtype(u), F.dtype(e)))
     ctx = F.context(u) if use_u else F.context(e)
     dtype = F.dtype(u) if use_u else F.dtype(e)
     u_shp = F.shape(u) if use_u else (0,)
@@ -221,7 +224,9 @@ def _gspmm_hetero(gidx, op, reduce_op, u_len, u_and_e_tuple):
         updated[dst_id] = True
     out_merged = F.zeros((tot_dst_nodes,) + out_len, dtype, ctx)
     use_cmp = reduce_op in ['max', 'min']
-    # TODO(Israt): Fix arg_u, arg_e
+    # TODO(Israt): Fix arg_u, arg_e when add rfunc (max/min) support
+    # TODO(Israt): check for each etype whether F.ndim(u or e) == 1, and
+    # unsqueeze and expansion operations are required
     v_shp = (gidx.number_of_nodes(dst_id), ) +\
             infer_broadcast_shape(op, u_shp[1:], e_shp[1:])
     arg_u, arg_e = None, None
@@ -261,13 +266,12 @@ def _gspmm_hetero(gidx, op, reduce_op, u_len, u_and_e_tuple):
         if ((expand_u or not use_u) and (expand_e or not use_e)):
             v = F.squeeze(v, -1)  # To deal with scalar node/edge features.
         list_v[l] = v
-    out = tuple(list_v)
 
     if expand_u and use_cmp:
         arg_u = F.squeeze(arg_u, -1)
     if expand_e and use_cmp:
         arg_e = F.squeeze(arg_e, -1)
-    return out, (arg_u, arg_e)
+    return tuple(list_v), (arg_u, arg_e)
 
 
 def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
@@ -357,7 +361,6 @@ def _gsddmm_hetero(gidx, op, lhs_len, lhs_target='u', rhs_target='v', lhs_and_rh
     use_lhs = op != 'copy_rhs'
     use_rhs = op != 'copy_lhs'
 
-    # TODO (Israt): Add check - F.dtype(u) != F.dtype(e):
     # deal with scalar features.
     expand_lhs, expand_rhs = False, False
     out_list = [None] * gidx.number_of_etypes()
@@ -367,23 +370,19 @@ def _gsddmm_hetero(gidx, op, lhs_len, lhs_target='u', rhs_target='v', lhs_and_rh
     # lhs and rhs for the first etype
     lhs = lhs_list[get_typeid_by_target(gidx, 0, lhs_target)]
     rhs = rhs_list[get_typeid_by_target(gidx, 0, rhs_target)]
+    if use_lhs and use_rhs:
+        if F.dtype(lhs) != F.dtype(rhs):
+            raise DGLError("The operands data type don't match: {} and {}, please convert them"
+                           " to the same type.".format(F.dtype(lhs), F.dtype(rhs)))
     ctx = F.context(lhs) if use_lhs else F.context(rhs)
     dtype = F.dtype(lhs) if use_lhs else F.dtype(rhs)
-    # # TODO(Israt): Find a better way
     lhs_shp = F.shape(lhs) if use_lhs else (0,)
     rhs_shp = F.shape(rhs) if use_rhs else (0,)
-    out_len = infer_broadcast_shape(op, lhs_shp[1:], rhs_shp[1:])#lhs.shape[1] if use_lhs else rhs.shape[1]
+    out_len = infer_broadcast_shape(op, lhs_shp[1:], rhs_shp[1:])
+    # TODO(Israt): check for each etype whether F.ndim(lhs or rhs) == 1, and
+    # unsqueeze and expansion operations are required
     tot_edges = 0
-
     for etid in range(gidx.number_of_etypes()):
-        # if use_lhs:
-        #     if lhs is not None and F.ndim(lhs) == 1:
-        #         lhs = F.unsqueeze(lhs, -1)
-        #         expand_lhs = True
-        # if use_rhs:
-        #     if rhs is not None and F.ndim(rhs) == 1:
-        #         rhs = F.unsqueeze(lhs, -1)
-        #         expand_rhs = True
         tot_edges += gidx.number_of_edges(etid)
     out_merged = F.zeros((tot_edges,) + out_len, dtype, ctx)
     loc = 0
@@ -406,8 +405,7 @@ def _gsddmm_hetero(gidx, op, lhs_len, lhs_target='u', rhs_target='v', lhs_and_rh
         if (expand_lhs or not use_lhs) and (expand_rhs or not use_rhs):
             e = F.squeeze(v, -1)
         out_list[l] = e
-    out = tuple(out_list)
-    return out
+    return tuple(out_list)
 
 
 def _segment_reduce(op, feat, offsets):

@@ -147,17 +147,17 @@ int get_typeid_by_target(HeteroGraphPtr graph, int target, dgl_type_t etype) {
 /*! \brief Generalized Sampled Dense-Dense Matrix Multiplication. */
 void SDDMMHetero(const std::string& op,
            HeteroGraphPtr graph,
-           std::vector<NDArray>& lhs,
-           std::vector<NDArray>& rhs,
-           std::vector<NDArray>& out,
+           std::vector<NDArray> lhs,
+           std::vector<NDArray> rhs,
+           std::vector<NDArray> out,
            int lhs_target,
            int rhs_target) {
   // TODO(Israt): change it to COO_CODE
   SparseFormat format = graph->SelectFormat(0, CSR_CODE);
+
   std::vector<CSRMatrix> vec_csr;
   std::vector<dgl_type_t> lhs_eid;
   std::vector<dgl_type_t> rhs_eid;
-
   for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
     vec_csr.push_back(graph->GetCSRMatrix(etype));
     lhs_eid.push_back(get_typeid_by_target(graph, lhs_target, etype));
@@ -390,7 +390,6 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSDDMMHetero")
     List<Value> list_out = args[4];
     int lhs_target = args[5];
     int rhs_target = args[6];
-
     std::vector<NDArray> vec_lhs;
     std::vector<NDArray> vec_rhs;
     std::vector<NDArray> vec_out;
@@ -409,10 +408,6 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSDDMMHetero")
       vec_out.push_back(val->data);
     }
     SDDMMHetero(op, graph.sptr(), vec_lhs, vec_rhs, vec_out, lhs_target, rhs_target);
-    List<ObjectRef> tmp_list;
-    for (auto x: vec_out)
-       tmp_list.push_back(Value(MakeValue(x)));
-    *rv = tmp_list;
   });
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSegmentReduce")
