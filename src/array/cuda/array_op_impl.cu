@@ -277,12 +277,16 @@ __global__ void _RelabelKernel(
 
 template <DLDeviceType XPU, typename IdType>
 IdArray Relabel_(const std::vector<IdArray>& arrays) {
+  IdArray all_nodes = Concat(arrays);
+  const int64_t total_length = all_nodes->shape[0];
+
+  if (total_length == 0) {
+    return all_nodes;
+  }
+
   const auto& ctx = arrays[0]->ctx;
   auto device = runtime::DeviceAPI::Get(ctx);
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
-
-  IdArray all_nodes = Concat(arrays);
-  const int64_t total_length = all_nodes->shape[0];
 
   // build node maps and get the induced nodes
   OrderedHashTable<IdType> node_map(total_length, ctx, thr_entry->stream);
