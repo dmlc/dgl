@@ -633,7 +633,7 @@ def khop_in_subgraph(graph, node, k, *, ntype=None,
     ...     ('user', 'follows', 'user'): ([0, 1, 1], [1, 2, 2])})
     >>> sg = dgl.khop_in_subgraph(g, 0, k=2, ntype='game')
     >>> sg
-    Graph(num_nodes={'game': 3, 'user': 3},
+    Graph(num_nodes={'game': 1, 'user': 2},
           num_edges={('user', 'follows', 'user'): 1, ('user', 'plays', 'game'): 2},
           metagraph=[('user', 'user', 'follows'), ('user', 'game', 'plays')])
 
@@ -741,13 +741,13 @@ def khop_out_subgraph(graph, node, k, *, ntype=None,
           edata_schemes={'w': Scheme(shape=(2,), dtype=torch.int64), 
                          '_ID': Scheme(shape=(), dtype=torch.int64)})
     >>> sg.edges()
-    (tensor([0, 2, 0, 2]), tensor([1, 1, 2, 4]))
+    (tensor([0, 0, 2, 2]), tensor([1, 2, 1, 3]))
     >>> sg.edata[dgl.EID]  # original edge IDs
-    tensor([0, 1, 2, 4])
+    tensor([0, 2, 1, 4])
     >>> sg.edata['w']  # also extract the features
     tensor([[0, 1],
-            [2, 3],
             [4, 5],
+            [2, 3],
             [8, 9]])
             
     Extract a subgraph from a heterogeneous graph.

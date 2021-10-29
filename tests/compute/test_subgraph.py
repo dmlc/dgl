@@ -490,6 +490,8 @@ def test_khop_in_subgraph(idtype):
     }, idtype=idtype)
     sg = dgl.khop_in_subgraph(g, 0, k=2, ntype='game')
     assert sg.idtype == idtype
+    assert sg.num_nodes('game') == 1
+    assert sg.num_nodes('user') == 2
     assert len(sg.ntypes) == 2
     assert len(sg.etypes) == 2
     u, v = sg['follows'].edges()
@@ -513,12 +515,12 @@ def test_khop_out_subgraph(idtype):
     assert sg.idtype == g.idtype
     u, v = sg.edges()
     edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
-    assert edge_set == {(0,1), (2,1), (0,2), (2,4)}
-    assert F.array_equal(sg.edata[dgl.EID], F.tensor([0, 1, 2, 4], dtype=idtype))
+    assert edge_set == {(0,1), (2,1), (0,2), (2,3)}
+    assert F.array_equal(sg.edata[dgl.EID], F.tensor([0, 2, 1, 4], dtype=idtype))
     assert F.array_equal(sg.edata['w'], F.tensor([
         [0, 1],
-        [2, 3],
         [4, 5],
+        [2, 3],
         [8, 9]
     ]))
 
@@ -528,6 +530,8 @@ def test_khop_out_subgraph(idtype):
     }, idtype=idtype)
     sg = dgl.khop_out_subgraph(g, 0, k=2, ntype='user')
     assert sg.idtype == idtype
+    assert sg.num_nodes('game') == 2
+    assert sg.num_nodes('user') == 3
     assert len(sg.ntypes) == 2
     assert len(sg.etypes) == 2
     u, v = sg['follows'].edges()
