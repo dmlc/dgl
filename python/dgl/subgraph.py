@@ -645,7 +645,7 @@ def khop_in_subgraph(graph, node, k, *, ntype=None,
         raise DGLError('Extracting subgraph of a block graph is not allowed.')
 
     if ntype is None:
-        if graph.number_of_ntypes() != 1:
+        if graph._graph.number_of_ntypes() != 1:
             raise DGLError('Node type name must be specified if there are more than one' 
                            'node types.')
         ntype = graph.ntypes[0]
@@ -768,7 +768,7 @@ def khop_out_subgraph(graph, node, k, *, ntype=None,
         raise DGLError('Extracting subgraph of a block graph is not allowed.')
     
     if ntype is None:
-        if graph.number_of_ntypes() != 1:
+        if graph._graph.number_of_ntypes() != 1:
             raise DGLError('Node type name must be specified if there are more than one' 
                            'node types.')
         ntype = graph.ntypes[0]
