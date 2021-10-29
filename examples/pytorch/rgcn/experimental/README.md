@@ -162,20 +162,22 @@ python3 write_mag.py
 
 ### Step 2: partition the graph with ParMETIS
 Run the program called `pm_dglpart` in ParMETIS to read the node file and the edge file output in Step 1
-to partition the graph.
+to partition the graph. For large heterographs, it's likely to have duplicate edges when converted to
+homogenous graph in previous step. `pm_dglpart` will ignore those duplicate edges and print out for
+notification. We need to save those info to add duplicate edges back in next steps.
 
 ```bash
-pm_dglpart mag 2
+pm_dglpart mag 2 | tee dglpart.out
 ```
 This partitions the graph into two parts with a single process.
 
 ```
-mpirun -np 4 pm_dglpart mag 2
+mpirun -np 4 pm_dglpart mag 2 | tee dglpart.out
 ```
 This partitions the graph into eight parts with four processes.
 
 ```
-mpirun --hostfile hostfile -np 4 pm_dglpart mag 2
+mpirun --hostfile hostfile -np 4 pm_dglpart mag 2 | tee dglpart.out
 ```
 This partitions the graph into eight parts with four processes on multiple machines.
 `hostfile` specifies the IPs of the machines; one line for a machine. The input files
@@ -183,16 +185,27 @@ should reside in the machine where the command line runs. Each process will writ
 the partitions to files in the local machine. For simplicity, we recommend users to
 write the files on NFS.
 
-### Step 3: Convert the ParMETIS partitions into DGLGraph
+### Step 3: post-process ignored duplicate edges when calling `pm_dglpart`
+
+Duplicate edges are ignored when partition, we need to add them back for following
+conversion from partitions to DGLGraphs.
+
+```bash
+cat dglpart.out | grep "Duplicate edges with metadata" | awk -F'[][]' '{print $4}' > removed.csv
+```
+
+### Step 4: Convert the ParMETIS partitions into DGLGraph
 
 DGL provides a tool called `convert_partition.py` to load one partition at a time and convert it into a DGLGraph
 and save it into a file.
 
+Then we're ready to convert partitions into DGLGraphs.
+
 ```bash
-python3 ~/workspace/dgl/tools/convert_partition.py --input-dir . --graph-name mag --schema mag.json --num-parts 2 --num-node-weights 4 --output outputs
+python3 ~/workspace/dgl/tools/convert_partition.py --input-dir . --graph-name mag --schema mag.json --num-parts 2 --num-node-weights 4 --output outputs --removed-edges removed.csv
 ```
 
-### Step 4: Read node data and edge data for each partition
+### Step 5: Read node data and edge data for each partition
 
 This shows an example of reading node data and edge data of each partition and saving them into files located in the same directory as the DGLGraph file.
 
@@ -200,7 +213,7 @@ This shows an example of reading node data and edge data of each partition and s
 python3 get_mag_data.py
 ```
 
-### Step 5: Verify the partition result (Optional)
+### Step 6: Verify the partition result (Optional)
 
 ```bash
 python3 verify_mag_partitions.py
