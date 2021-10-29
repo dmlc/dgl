@@ -460,3 +460,79 @@ def test_subgraph_message_passing():
     g.ndata['x'] = F.copy_to(F.randn((5, 6)), F.cpu())
     sg = g.subgraph([1, 2, 3]).to(F.ctx())
     sg.update_all(lambda edges: {'x': edges.src['x']}, lambda nodes: {'y': F.sum(nodes.mailbox['x'], 1)})
+
+@parametrize_dtype
+def test_khop_in_subgraph(idtype):
+    g = dgl.graph(([1, 1, 2, 3, 4], [0, 2, 0, 4, 2]), idtype=idtype, device=F.ctx())
+    g.edata['w'] = F.tensor([
+        [0, 1],
+        [2, 3],
+        [4, 5],
+        [6, 7],
+        [8, 9]
+    ])
+    sg = dgl.khop_in_subgraph(g, 0, k=2)
+    assert sg.idtype == g.idtype
+    u, v = sg.edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert edge_set == {(1,0), (1,2), (2,0), (4,2)}
+    assert F.array_equal(sg.edata[dgl.EID], F.tensor([0, 1, 2, 4], dtype=idtype))
+    assert F.array_equal(sg.edata['w'], F.tensor([
+        [0, 1],
+        [2, 3],
+        [4, 5],
+        [8, 9]
+    ]))
+    
+    g = dgl.heterograph({
+        ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
+        ('user', 'follows', 'user'): ([0, 1, 1], [1, 2, 2]),
+    }, idtype=idtype)
+    sg = dgl.khop_in_subgraph(g, 0, k=2, ntype='game')
+    assert sg.idtype == idtype
+    assert len(sg.ntypes) == 2
+    assert len(sg.etypes) == 2
+    u, v = sg['follows'].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert edge_set == {(0, 0), (1, 0)}
+    u, v = sg['plays'].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert edge_set == {(0, 1)}
+
+@parametrize_dtype
+def test_khop_out_subgraph(idtype):
+    g = dgl.graph(([0, 2, 0, 4, 2], [1, 1, 2, 3, 4]), idtype=idtype, device=F.ctx())
+    g.edata['w'] = F.tensor([
+        [0, 1],
+        [2, 3],
+        [4, 5],
+        [6, 7],
+        [8, 9]
+    ])
+    sg = dgl.khop_out_subgraph(g, 0, k=2)
+    assert sg.idtype == g.idtype
+    u, v = sg.edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert edge_set == {(0,1), (2,1), (0,2), (2,4)}
+    assert F.array_equal(sg.edata[dgl.EID], F.tensor([0, 1, 2, 4], dtype=idtype))
+    assert F.array_equal(sg.edata['w'], F.tensor([
+        [0, 1],
+        [2, 3],
+        [4, 5],
+        [8, 9]
+    ]))
+
+    g = dgl.heterograph({
+        ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
+        ('user', 'follows', 'user'): ([0, 1], [1, 3]),
+    }, idtype=idtype)
+    sg = dgl.khop_out_subgraph(g, 0, k=2, ntype='user')
+    assert sg.idtype == idtype
+    assert len(sg.ntypes) == 2
+    assert len(sg.etypes) == 2
+    u, v = sg['follows'].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert edge_set == {(0, 1), (1, 2)}
+    u, v = sg['plays'].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert edge_set == {(0,0), (1,0), (1,1)}
