@@ -617,7 +617,7 @@ def khop_in_subgraph(graph, node, k, *, ntype=None,
           edata_schemes={'w': Scheme(shape=(2,), dtype=torch.int64), 
                          '_ID': Scheme(shape=(), dtype=torch.int64)})
     >>> sg.edges()
-    (tensor([1, 1, 2, 4]), tensor([0, 2, 0, 2]))
+    (tensor([1, 1, 2, 3]), tensor([0, 2, 0, 2]))
     >>> sg.edata[dgl.EID]  # original edge IDs
     tensor([0, 1, 2, 4])
     >>> sg.edata['w']  # also extract the features
@@ -660,6 +660,7 @@ def khop_in_subgraph(graph, node, k, *, ntype=None,
             current_hop_nodes[srctype].append(in_nbrs)
         for nty in graph.ntypes:
             if len(current_hop_nodes[nty]) == 0:
+                current_hop_nodes[nty] = F.tensor([], dtype=graph.idtype)
                 continue
             current_hop_nodes[nty] = F.unique(F.cat(current_hop_nodes[nty], dim=0))
         k_hop_nodes_.append(current_hop_nodes)
@@ -783,6 +784,7 @@ def khop_out_subgraph(graph, node, k, *, ntype=None,
             current_hop_nodes[dsttype].append(out_nbrs)
         for nty in graph.ntypes:
             if len(current_hop_nodes[nty]) == 0:
+                current_hop_nodes[nty] = F.tensor([], dtype=graph.idtype)
                 continue
             current_hop_nodes[nty] = F.unique(F.cat(current_hop_nodes[nty], dim=0))
         k_hop_nodes_.append(current_hop_nodes)

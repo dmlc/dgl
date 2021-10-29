@@ -475,7 +475,7 @@ def test_khop_in_subgraph(idtype):
     assert sg.idtype == g.idtype
     u, v = sg.edges()
     edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
-    assert edge_set == {(1,0), (1,2), (2,0), (4,2)}
+    assert edge_set == {(1,0), (1,2), (2,0), (3,2)}
     assert F.array_equal(sg.edata[dgl.EID], F.tensor([0, 1, 2, 4], dtype=idtype))
     assert F.array_equal(sg.edata['w'], F.tensor([
         [0, 1],
