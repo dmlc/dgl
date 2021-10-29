@@ -555,18 +555,18 @@ DGLHeteroGraph.out_subgraph = utils.alias_func(out_subgraph)
 def khop_in_subgraph(graph, node, k, *, ntype=None,
                      relabel_nodes=True, store_ids=True):
     """Return the k-hop subgraph of the specified node induced on the inbound edges.
-    
+
     We can expand a set of nodes by including the predecessors of them. From a
     specified node, a k-hop in subgraph is obtained by first repeating the node set
     expansion for k times and then creating a node induced subgraph. In addition to
     extracting the subgraph, DGL also copies the features of the extracted nodes and
     edges to the resulting graph. The copy is *lazy* and incurs data movement only
     when needed.
-    
+
     If the graph is heterogeneous, DGL extracts a subgraph per relation and composes
     them as the resulting graph. Thus the resulting graph has the same set of relations
     as the input one.
-    
+
     Parameters
     ----------
     graph : DGLGraph
@@ -586,28 +586,28 @@ def khop_in_subgraph(graph, node, k, *, ntype=None,
         resulting graph under name ``dgl.EID``; if ``relabel_nodes`` is ``True``, it will
         also store the raw IDs of the extracted nodes in the ``ndata`` of the resulting
         graph under name ``dgl.NID``.
-    
+
     Returns
     -------
     G : DGLGraph
         The subgraph.
-    
+
     Notes
     -----
-    
+
     When k is 1, the result subgraph is different from the one obtained by
     :func:`dgl.in_subgraph`. The 1-hop in subgraph also includes the edges
     among the neighborhood.
-    
+
     Examples
     --------
     The following example uses PyTorch backend.
 
     >>> import dgl
     >>> import torch
-    
+
     Extract a two-hop subgraph from a homogeneous graph.
-    
+
     >>> g = dgl.graph(([1, 1, 2, 3, 4], [0, 2, 0, 4, 2]))
     >>> g.edata['w'] = torch.arange(10).view(5, 2)
     >>> sg = dgl.khop_in_subgraph(g, 0, k=2)
@@ -625,7 +625,7 @@ def khop_in_subgraph(graph, node, k, *, ntype=None,
             [2, 3],
             [4, 5],
             [8, 9]])
-            
+
     Extract a subgraph from a heterogeneous graph.
 
     >>> g = dgl.heterograph({
@@ -686,7 +686,7 @@ def khop_out_subgraph(graph, node, k, *, ntype=None,
     extracting the subgraph, DGL also copies the features of the extracted nodes and
     edges to the resulting graph. The copy is *lazy* and incurs data movement only
     when needed.
-    
+
     If the graph is heterogeneous, DGL extracts a subgraph per relation and composes
     them as the resulting graph. Thus the resulting graph has the same set of relations
     as the input one.
@@ -710,28 +710,28 @@ def khop_out_subgraph(graph, node, k, *, ntype=None,
         resulting graph under name ``dgl.EID``; if ``relabel_nodes`` is ``True``, it will
         also store the raw IDs of the extracted nodes in the ``ndata`` of the resulting
         graph under name ``dgl.NID``.
-    
+
     Returns
     -------
     G : DGLGraph
         The subgraph.
-    
+
     Notes
     -----
-    
+
     When k is 1, the result subgraph is different from the one obtained by
     :func:`dgl.out_subgraph`. The 1-hop out subgraph also includes the edges
     among the neighborhood.
-    
+
     Examples
     --------
     The following example uses PyTorch backend.
 
     >>> import dgl
     >>> import torch
-    
+
     Extract a two-hop subgraph from a homogeneous graph.
-    
+
     >>> g = dgl.graph(([0, 2, 0, 4, 2], [1, 1, 2, 3, 4]))
     >>> g.edata['w'] = torch.arange(10).view(5, 2)
     >>> sg = dgl.khop_out_subgraph(g, 0, k=2)
@@ -749,9 +749,9 @@ def khop_out_subgraph(graph, node, k, *, ntype=None,
             [4, 5],
             [2, 3],
             [8, 9]])
-            
+
     Extract a subgraph from a heterogeneous graph.
-    
+
     >>> g = dgl.heterograph({
     ...     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
     ...     ('user', 'follows', 'user'): ([0, 1], [1, 3])})
@@ -767,7 +767,7 @@ def khop_out_subgraph(graph, node, k, *, ntype=None,
     """
     if graph.is_block:
         raise DGLError('Extracting subgraph of a block graph is not allowed.')
-    
+
     if ntype is None:
         if graph._graph.number_of_ntypes() != 1:
             raise DGLError('Node type name must be specified if there are more than one' 
