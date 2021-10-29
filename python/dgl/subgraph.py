@@ -614,7 +614,7 @@ def khop_in_subgraph(graph, node, k, *, ntype=None,
     >>> sg
     Graph(num_nodes=4, num_edges=4,
           ndata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64)}
-          edata_schemes={'w': Scheme(shape=(2,), dtype=torch.int64), 
+          edata_schemes={'w': Scheme(shape=(2,), dtype=torch.int64),
                          '_ID': Scheme(shape=(), dtype=torch.int64)})
     >>> sg.edges()
     (tensor([1, 1, 2, 3]), tensor([0, 2, 0, 2]))
@@ -646,7 +646,7 @@ def khop_in_subgraph(graph, node, k, *, ntype=None,
 
     if ntype is None:
         if graph._graph.number_of_ntypes() != 1:
-            raise DGLError('Node type name must be specified if there are more than one' 
+            raise DGLError('Node type name must be specified if there are more than one'
                            'node types.')
         ntype = graph.ntypes[0]
 
@@ -669,7 +669,7 @@ def khop_in_subgraph(graph, node, k, *, ntype=None,
     k_hop_nodes = dict()
     for nty in graph.ntypes:
         k_hop_nodes[nty] = F.unique(F.cat([
-            hop_nodes.get(nty, F.tensor([], dtype=graph.idtype)) 
+            hop_nodes.get(nty, F.tensor([], dtype=graph.idtype))
             for hop_nodes in k_hop_nodes_], dim=0))
 
     return node_subgraph(graph, k_hop_nodes, relabel_nodes=relabel_nodes, store_ids=store_ids)
@@ -738,7 +738,7 @@ def khop_out_subgraph(graph, node, k, *, ntype=None,
     >>> sg
     Graph(num_nodes=4, num_edges=4,
           ndata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64)}
-          edata_schemes={'w': Scheme(shape=(2,), dtype=torch.int64), 
+          edata_schemes={'w': Scheme(shape=(2,), dtype=torch.int64),
                          '_ID': Scheme(shape=(), dtype=torch.int64)})
     >>> sg.edges()
     (tensor([0, 0, 2, 2]), tensor([1, 2, 1, 3]))
@@ -770,7 +770,7 @@ def khop_out_subgraph(graph, node, k, *, ntype=None,
 
     if ntype is None:
         if graph._graph.number_of_ntypes() != 1:
-            raise DGLError('Node type name must be specified if there are more than one' 
+            raise DGLError('Node type name must be specified if there are more than one'
                            'node types.')
         ntype = graph.ntypes[0]
 
@@ -793,7 +793,7 @@ def khop_out_subgraph(graph, node, k, *, ntype=None,
     k_hop_nodes = dict()
     for nty in graph.ntypes:
         k_hop_nodes[nty] = F.unique(F.cat([
-            hop_nodes.get(nty, F.tensor([], dtype=graph.idtype)) 
+            hop_nodes.get(nty, F.tensor([], dtype=graph.idtype))
             for hop_nodes in k_hop_nodes_], dim=0))
 
     return node_subgraph(graph, k_hop_nodes, relabel_nodes=relabel_nodes, store_ids=store_ids)
