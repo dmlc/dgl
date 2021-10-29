@@ -55,7 +55,7 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
              const std::vector<NDArray>& vec_ufeat,
              const std::vector<NDArray>& vec_efeat,
              std::vector<NDArray> vec_out,
-             const std::vector<NDArray>& out_aux,
+             const std::vector<std::vector<NDArray>>& out_aux,
              const std::vector<dgl_type_t>& ufeat_node_tids,
              const std::vector<dgl_type_t>& out_node_tids) {
   const int64_t dim = bcast.out_len;
@@ -77,6 +77,13 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
   } else if (reduce == "max" || reduce == "min") {
     SWITCH_BITS(bits, DType, {
       SWITCH_OP(op, Op, {
+        for (dgl_type_t etype = 0; etype < ufeat_node_tids.size(); ++etype) {
+          DType *out_off = vec_out[out_node_tids[etype]].Ptr<DType>();
+          if (reduce == "max")
+            std::fill(out_off, out_off + vec_csr[etype].num_rows * dim, cpu::op::Max<DType>::zero);
+          else
+            std::fill(out_off, out_off + vec_csr[etype].num_rows * dim, cpu::op::Min<DType>::zero);
+        }
         /* Call  SpMM for each relation type */
         for (dgl_type_t etype = 0; etype < ufeat_node_tids.size(); ++etype) {
           const dgl_type_t src_id = ufeat_node_tids[etype];
@@ -87,13 +94,11 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
           NDArray efeat = (vec_efeat.size() == 0) ? NullArray() : vec_efeat[etype];
           NDArray out = vec_out[dst_id];
           if (reduce == "max") {
-            std::fill(out_off, out_off + csr.num_rows * dim, cpu::op::Max<DType>::zero);
             cpu::SpMMCmpCsr<IdType, DType, Op, cpu::op::Max<DType>>(
-                bcast, csr, ufeat, efeat, out, out_aux[0], out_aux[1]);
+                bcast, csr, ufeat, efeat, out, out_aux[0][src_id], out_aux[1][etype]);
           } else {
-            std::fill(out_off, out_off + csr.num_rows * dim, cpu::op::Min<DType>::zero);
             cpu::SpMMCmpCsr<IdType, DType, Op, cpu::op::Min<DType>>(
-                bcast, csr, ufeat, efeat, out, out_aux[0], out_aux[1]);
+                bcast, csr, ufeat, efeat, out, out_aux[0][src_id], out_aux[1][etype]);
           }
         }
       });
@@ -132,42 +137,42 @@ template void SpMMCsrHetero<kDLCPU, int32_t, 16>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const std::vector<CSRMatrix>& csr,
     const std::vector<NDArray>& ufeat, const std::vector<NDArray>& efeat,
-    std::vector<NDArray> out, const std::vector<NDArray>& out_aux,
+    std::vector<NDArray> out, const std::vector<std::vector<NDArray>>& out_aux,
     const std::vector<dgl_type_t>& ufeat_node_tids,
     const std::vector<dgl_type_t>& out_node_tids);
 template void SpMMCsrHetero<kDLCPU, int64_t, 16>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const std::vector<CSRMatrix>& csr,
     const std::vector<NDArray>& ufeat, const std::vector<NDArray>& efeat,
-    std::vector<NDArray> out, const std::vector<NDArray>& out_aux,
+    std::vector<NDArray> out, const std::vector<std::vector<NDArray>>& out_aux,
     const std::vector<dgl_type_t>& ufeat_node_tids,
     const std::vector<dgl_type_t>& out_node_tids);
 template void SpMMCsrHetero<kDLCPU, int32_t, 32>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const std::vector<CSRMatrix>& csr,
     const std::vector<NDArray>& ufeat, const std::vector<NDArray>& efeat,
-    std::vector<NDArray> out, const std::vector<NDArray>& out_aux,
+    std::vector<NDArray> out, const std::vector<std::vector<NDArray>>& out_aux,
     const std::vector<dgl_type_t>& ufeat_node_tids,
     const std::vector<dgl_type_t>& out_node_tids);
 template void SpMMCsrHetero<kDLCPU, int64_t, 32>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const std::vector<CSRMatrix>& csr,
     const std::vector<NDArray>& ufeat, const std::vector<NDArray>& efeat,
-    std::vector<NDArray> out, const std::vector<NDArray>& out_aux,
+    std::vector<NDArray> out, const std::vector<std::vector<NDArray>>& out_aux,
     const std::vector<dgl_type_t>& ufeat_node_tids,
     const std::vector<dgl_type_t>& out_node_tids);
 template void SpMMCsrHetero<kDLCPU, int32_t, 64>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const std::vector<CSRMatrix>& csr,
     const std::vector<NDArray>& ufeat, const std::vector<NDArray>& efeat,
-    std::vector<NDArray> out, const std::vector<NDArray>& out_aux,
+    std::vector<NDArray> out, const std::vector<std::vector<NDArray>>& out_aux,
     const std::vector<dgl_type_t>& ufeat_node_tids,
     const std::vector<dgl_type_t>& out_node_tids);
 template void SpMMCsrHetero<kDLCPU, int64_t, 64>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const std::vector<CSRMatrix>& csr,
     const std::vector<NDArray>& ufeat, const std::vector<NDArray>& efeat,
-    std::vector<NDArray> out, const std::vector<NDArray>& out_aux,
+    std::vector<NDArray> out, const std::vector<std::vector<NDArray>>& out_aux,
     const std::vector<dgl_type_t>& ufeat_node_tids,
     const std::vector<dgl_type_t>& out_node_tids);
 

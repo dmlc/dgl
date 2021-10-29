@@ -202,6 +202,13 @@ def _gspmm_hetero(gidx, op, reduce_op, u_len, u_and_e_tuple):
     list_u = [None] * gidx.number_of_ntypes()
     list_v = [None] * gidx.number_of_ntypes()
     list_e = [None] * gidx.number_of_etypes()
+    list_arg_u_nd = [None] * gidx.number_of_ntypes()
+    list_arg_u = [None] * gidx.number_of_ntypes()
+    # TODO(Israt): double check ntype or etype
+    list_arg_e_nd = [None] * gidx.number_of_etypes()
+    list_arg_e = [None] * gidx.number_of_etypes()
+    use_cmp = reduce_op in ['max', 'min']
+    idtype = getattr(F, gidx.dtype)
 
     for etid in range(gidx.number_of_etypes()):
         src_id, dst_id = gidx.metagraph.find_edge(etid)
@@ -224,28 +231,30 @@ def _gspmm_hetero(gidx, op, reduce_op, u_len, u_and_e_tuple):
         v_shp = (gidx.number_of_nodes(dst_id), ) +\
             infer_broadcast_shape(op, u_shp[1:], e_shp[1:])
         list_v[dst_id] = F.zeros(v_shp, dtype, ctx)
-
-    use_cmp = reduce_op in ['max', 'min']
-    arg_u, arg_e = None, None
-    idtype = getattr(F, gidx.dtype)
-    if use_cmp:
-        if use_u:
-            arg_u = F.zeros(v_shp, idtype, ctx)
-        if use_e:
-            arg_e = F.zeros(v_shp, idtype, ctx)
-    arg_u_nd = to_dgl_nd_for_write(arg_u)
-    arg_e_nd = to_dgl_nd_for_write(arg_e)
+        if use_cmp:
+            if use_u:
+                list_arg_u[src_id] = F.zeros(v_shp, idtype, ctx)
+            if use_e:
+                list_arg_e[etid] = F.zeros(v_shp, idtype, ctx)
+        list_arg_u_nd[src_id] = to_dgl_nd_for_write(list_arg_u[src_id])
+        list_arg_e_nd[etid] = to_dgl_nd_for_write(list_arg_e[etid])
     if gidx.number_of_edges(0) > 0:
         _CAPI_DGLKernelSpMMHetero(gidx, op, reduce_op,
                                   [to_dgl_nd(u_i) for u_i in list_u],
                                   [to_dgl_nd(e_i) for e_i in list_e],
                                   [to_dgl_nd_for_write(v_i) for v_i in list_v],
-                                  arg_u_nd,
-                                  arg_e_nd)
-    arg_u = None if arg_u is None else F.zerocopy_from_dgl_ndarray(arg_u_nd)
-    arg_e = None if arg_e is None else F.zerocopy_from_dgl_ndarray(arg_e_nd)
+                                  list_arg_u_nd,
+                                  list_arg_e_nd)
+    for l, arg_u_nd in enumerate(list_arg_u_nd):
+        # TODO(Israt): l or src_id as index of lhs
+        list_arg_u[l] = None if list_arg_u[l] is None else F.zerocopy_from_dgl_ndarray(arg_u_nd)
+        if expand_u and use_cmp:
+            list_arg_u[l] = F.squeeze(list_arg_u[l], -1)
+    for l, arg_e_nd in enumerate(list_arg_e_nd):
+        list_arg_e[l] = None if list_arg_e[l] is None else F.zerocopy_from_dgl_ndarray(arg_e_nd)
+        if expand_e and use_cmp:
+            list_arg_e[l] = F.squeeze(list_arg_e[l], -1)
     # To deal with scalar node/edge features.
-
     for l in range(gidx.number_of_ntypes()):
         # replace None by empty tensor. Forward func doesn't accept None in tuple.
         v = list_v[l]
@@ -254,12 +263,7 @@ def _gspmm_hetero(gidx, op, reduce_op, u_len, u_and_e_tuple):
             v = F.squeeze(v, -1)  # To deal with scalar node/edge features.
         list_v[l] = v
     out = tuple(list_v)
-
-    if expand_u and use_cmp:
-        arg_u = F.squeeze(arg_u, -1)
-    if expand_e and use_cmp:
-        arg_e = F.squeeze(arg_e, -1)
-    return out, (arg_u, arg_e)
+    return out, (list_arg_u, list_arg_e)
 
 
 def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):

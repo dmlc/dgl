@@ -214,11 +214,11 @@ class GSpMM_hetero(th.autograd.Function):
 
         # checking the first relation to decide for all the relations
         if not spmm_cache_argX(op, reduce_op, req_grad_X[src_id], req_grad_Y[dst_id]):
-            argX = None
+            argX = tuple([None] * len(X))
         if not spmm_cache_argY(op, reduce_op, req_grad_X[src_id], req_grad_Y[dst_id]):
-            argY = None
+            argY = tuple([None] * len(Y))
 
-        ctx.save_for_backward(*feats, argX, argY)
+        ctx.save_for_backward(*feats, *argX, *argY)
         return out
 
     @staticmethod
@@ -226,9 +226,9 @@ class GSpMM_hetero(th.autograd.Function):
     def backward(ctx, *dZ):
         gidx, op, reduce_op, X_shape, Y_shape, dtype, device, reduce_last, X_len = ctx.backward_cache
         ctx.backward_cache = None
-        feats = ctx.saved_tensors[:-2]
-        argX = ctx.saved_tensors[-2]
-        argY = ctx.saved_tensors[-1]
+        feats = ctx.saved_tensors[:-(len(X_shape) + len(Y_shape))]
+        argX = ctx.saved_tensors[-(len(X_shape) + len(Y_shape)):-len(Y_shape)]
+        argY = ctx.saved_tensors[-len(Y_shape):]
         X, Y = feats[:X_len], feats[X_len:]
 
         if op != 'copy_rhs' and any([x is not None for x in X]):
@@ -273,7 +273,7 @@ def sddmm_cache_X(op, req_grad_X, req_grad_Y):
 
 
 def sddmm_cache_Y(op, req_grad_X, req_grad_Y):
-    """Rules to identify whether to cache Y in SDDMM forward stage.""" 
+    """Rules to identify whether to cache Y in SDDMM forward stage."""
     if op in ['mul', 'dot'] and req_grad_X:
         return True
     return False
