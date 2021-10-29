@@ -565,6 +565,28 @@ def test_gat_conv_bi(g, idtype, out_dim, num_heads):
     assert a.shape == (g.number_of_edges(), num_heads, 1)
 
 @parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
+@pytest.mark.parametrize('out_node_feats', [1, 5])
+@pytest.mark.parametrize('out_edge_feats', [1, 5])
+@pytest.mark.parametrize('num_heads', [1, 4])
+def test_egat_conv(g, idtype, out_node_feats, out_edge_feats, num_heads):
+    g = g.astype(idtype).to(F.ctx())
+    ctx = F.ctx() 
+    egat = nn.EGATConv(in_node_feats=10,
+                       in_edge_feats=5,
+                       out_node_feats=out_node_feats,
+                       out_edge_feats=out_edge_feats,
+                       num_heads=num_heads)
+    nfeat = F.randn((g.number_of_nodes(), 10))
+    efeat = F.randn((g.number_of_edges(), 5))
+    
+    egat = egat.to(ctx)
+    h, f = egat(g, nfeat, efeat)
+    h, f, attn = egat(g, nfeat, efeat, True)
+
+    th.save(egat, tmp_buffer)    
+
+@parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite']))
 @pytest.mark.parametrize('aggre_type', ['mean', 'pool', 'gcn', 'lstm'])
 def test_sage_conv(idtype, g, aggre_type):
@@ -1137,6 +1159,7 @@ if __name__ == '__main__':
     test_rgcn_sorted()
     test_tagconv()
     test_gat_conv()
+    test_egat_conv()
     test_sage_conv()
     test_sgc_conv()
     test_appnp_conv()
