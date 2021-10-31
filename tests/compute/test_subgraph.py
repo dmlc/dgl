@@ -483,7 +483,7 @@ def test_khop_in_subgraph(idtype):
         [4, 5],
         [8, 9]
     ]))
-    
+
     g = dgl.heterograph({
         ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
         ('user', 'follows', 'user'): ([0, 1, 1], [1, 2, 2]),
@@ -496,10 +496,10 @@ def test_khop_in_subgraph(idtype):
     assert len(sg.etypes) == 2
     u, v = sg['follows'].edges()
     edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
-    assert edge_set == {(0, 0), (1, 0)}
+    assert edge_set == {(0, 1)}
     u, v = sg['plays'].edges()
     edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
-    assert edge_set == {(0, 1)}
+    assert edge_set == {(0, 0), (1, 0)}
 
 @parametrize_dtype
 def test_khop_out_subgraph(idtype):
