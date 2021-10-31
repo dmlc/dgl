@@ -652,15 +652,16 @@ def khop_in_subgraph(graph, node, k, *, ntype=None,
 
     last_hop_nodes = {ntype: F.tensor([node], dtype=graph.idtype)}
     k_hop_nodes_ = [last_hop_nodes]
+    place_holder = F.copy_to(F.tensor([], dtype=graph.idtype), graph.device)
     for _ in range(k):
         current_hop_nodes = {nty: [] for nty in graph.ntypes}
         for cetype in graph.canonical_etypes:
             srctype, _, dsttype = cetype
-            in_nbrs, _ = graph.in_edges(last_hop_nodes.get(dsttype, []), etype=cetype)
+            in_nbrs, _ = graph.in_edges(last_hop_nodes.get(dsttype, place_holder), etype=cetype)
             current_hop_nodes[srctype].append(in_nbrs)
         for nty in graph.ntypes:
             if len(current_hop_nodes[nty]) == 0:
-                current_hop_nodes[nty] = F.tensor([], dtype=graph.idtype)
+                current_hop_nodes[nty] = place_holder
                 continue
             current_hop_nodes[nty] = F.unique(F.cat(current_hop_nodes[nty], dim=0))
         k_hop_nodes_.append(current_hop_nodes)
@@ -669,7 +670,7 @@ def khop_in_subgraph(graph, node, k, *, ntype=None,
     k_hop_nodes = dict()
     for nty in graph.ntypes:
         k_hop_nodes[nty] = F.unique(F.cat([
-            hop_nodes.get(nty, F.tensor([], dtype=graph.idtype))
+            hop_nodes.get(nty, place_holder)
             for hop_nodes in k_hop_nodes_], dim=0))
 
     return node_subgraph(graph, k_hop_nodes, relabel_nodes=relabel_nodes, store_ids=store_ids)
@@ -774,17 +775,19 @@ def khop_out_subgraph(graph, node, k, *, ntype=None,
                            'node types.')
         ntype = graph.ntypes[0]
 
-    last_hop_nodes = {ntype: F.tensor([node], dtype=graph.idtype)}
+    last_hop_nodes = {ntype: F.copy_to(F.tensor([node], dtype=graph.idtype), graph.device)}
     k_hop_nodes_ = [last_hop_nodes]
+    place_holder = F.copy_to(F.tensor([], dtype=graph.idtype), graph.device)
     for _ in range(k):
         current_hop_nodes = {nty: [] for nty in graph.ntypes}
         for cetype in graph.canonical_etypes:
             srctype, _, dsttype = cetype
-            _, out_nbrs = graph.out_edges(last_hop_nodes.get(srctype, []), etype=cetype)
+            _, out_nbrs = graph.out_edges(last_hop_nodes.get(
+                srctype, place_holder), etype=cetype)
             current_hop_nodes[dsttype].append(out_nbrs)
         for nty in graph.ntypes:
             if len(current_hop_nodes[nty]) == 0:
-                current_hop_nodes[nty] = F.tensor([], dtype=graph.idtype)
+                current_hop_nodes[nty] = place_holder
                 continue
             current_hop_nodes[nty] = F.unique(F.cat(current_hop_nodes[nty], dim=0))
         k_hop_nodes_.append(current_hop_nodes)
@@ -793,7 +796,7 @@ def khop_out_subgraph(graph, node, k, *, ntype=None,
     k_hop_nodes = dict()
     for nty in graph.ntypes:
         k_hop_nodes[nty] = F.unique(F.cat([
-            hop_nodes.get(nty, F.tensor([], dtype=graph.idtype))
+            hop_nodes.get(nty, place_holder)
             for hop_nodes in k_hop_nodes_], dim=0))
 
     return node_subgraph(graph, k_hop_nodes, relabel_nodes=relabel_nodes, store_ids=store_ids)
