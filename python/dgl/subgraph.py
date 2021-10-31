@@ -650,7 +650,7 @@ def khop_in_subgraph(graph, node, k, *, ntype=None,
                            'node types.')
         ntype = graph.ntypes[0]
 
-    last_hop_nodes = {ntype: F.tensor([node], dtype=graph.idtype)}
+    last_hop_nodes = {ntype: F.copy_to(F.tensor([node], dtype=graph.idtype), graph.device)}
     k_hop_nodes_ = [last_hop_nodes]
     place_holder = F.copy_to(F.tensor([], dtype=graph.idtype), graph.device)
     for _ in range(k):
