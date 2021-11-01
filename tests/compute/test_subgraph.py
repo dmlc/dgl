@@ -487,7 +487,7 @@ def test_khop_in_subgraph(idtype):
     g = dgl.heterograph({
         ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
         ('user', 'follows', 'user'): ([0, 1, 1], [1, 2, 2]),
-    }, idtype=idtype)
+    }, idtype=idtype, device=F.ctx())
     sg = dgl.khop_in_subgraph(g, 0, k=2, ntype='game')
     assert sg.idtype == idtype
     assert sg.num_nodes('game') == 1
@@ -527,7 +527,7 @@ def test_khop_out_subgraph(idtype):
     g = dgl.heterograph({
         ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
         ('user', 'follows', 'user'): ([0, 1], [1, 3]),
-    }, idtype=idtype)
+    }, idtype=idtype, device=F.ctx())
     sg = dgl.khop_out_subgraph(g, 0, k=2, ntype='user')
     assert sg.idtype == idtype
     assert sg.num_nodes('game') == 2
