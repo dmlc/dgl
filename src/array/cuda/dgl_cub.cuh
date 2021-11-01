@@ -10,7 +10,9 @@
 // include cub in a safe manner
 #define CUB_NS_PREFIX namespace dgl {
 #define CUB_NS_POSTFIX }
+#define CUB_NS_QUALIFIER ::dgl::cub
 #include "cub/cub.cuh"
+#undef CUB_NS_QUALIFIER
 #undef CUB_NS_POSTFIX
 #undef CUB_NS_PREFIX
 
