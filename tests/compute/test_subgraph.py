@@ -303,7 +303,7 @@ def test_in_subgraph(idtype):
         ('user', 'play', 'game'): ([0, 0, 1, 3], [0, 1, 2, 2]),
         ('game', 'liked-by', 'user'): ([2, 2, 2, 1, 1, 0], [0, 1, 2, 0, 3, 0]),
         ('user', 'flips', 'coin'): ([0, 1, 2, 3], [0, 0, 0, 0])
-    }, idtype=idtype, num_nodes_dict={'user': 5, 'game': 10, 'coin': 8})
+    }, idtype=idtype, num_nodes_dict={'user': 5, 'game': 10, 'coin': 8}).to(F.ctx())
     subg = dgl.in_subgraph(hg, {'user' : [0,1], 'game' : 0})
     assert subg.idtype == idtype
     assert len(subg.ntypes) == 3
@@ -370,7 +370,7 @@ def test_out_subgraph(idtype):
         ('user', 'play', 'game'): ([0, 0, 1, 3], [0, 1, 2, 2]),
         ('game', 'liked-by', 'user'): ([2, 2, 2, 1, 1, 0], [0, 1, 2, 0, 3, 0]),
         ('user', 'flips', 'coin'): ([0, 1, 2, 3], [0, 0, 0, 0])
-    }, idtype=idtype)
+    }, idtype=idtype).to(F.ctx())
     subg = dgl.out_subgraph(hg, {'user' : [0,1], 'game' : 0})
     assert subg.idtype == idtype
     assert len(subg.ntypes) == 3
