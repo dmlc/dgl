@@ -429,7 +429,14 @@ test_dataloader = dgl.dataloading.EdgeDataLoader(
 ######################################################################
 # The rest is similar to training except that you no longer compute
 # the gradients, and you collect all the scores and ground truth
-# labels for final metric calculation:
+# labels for final metric calculation.
+#
+# .. note::
+#
+#    If the graph does not change, you can also precompute all the
+#    node representations beforehand with ``inference`` function.
+#    You can then feed the precomputed results directly into the
+#    predictor without passing the MFGs into the model.
 #
 test_preds = []
 test_labels = []
