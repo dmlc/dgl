@@ -484,6 +484,12 @@ def test_khop_in_subgraph(idtype):
         [8, 9]
     ]))
 
+    # Test isolated node
+    sg = dgl.khop_in_subgraph(g, 1, k=2)
+    assert sg.idtype == g.idtype
+    assert sg.num_nodes() == 1
+    assert sg.num_edges() == 0
+
     g = dgl.heterograph({
         ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
         ('user', 'follows', 'user'): ([0, 1, 1], [1, 2, 2]),
@@ -500,6 +506,14 @@ def test_khop_in_subgraph(idtype):
     u, v = sg['plays'].edges()
     edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
     assert edge_set == {(0, 0), (1, 0)}
+
+    # Test isolated node
+    sg = dgl.khop_in_subgraph(g, 0, k=2, ntype='user')
+    assert sg.idtype == idtype
+    assert sg.num_nodes('game') == 0
+    assert sg.num_nodes('user') == 1
+    assert sg.num_edges('follows') == 0
+    assert sg.num_edges('plays') == 0
 
 @parametrize_dtype
 def test_khop_out_subgraph(idtype):
@@ -524,6 +538,12 @@ def test_khop_out_subgraph(idtype):
         [8, 9]
     ]))
 
+    # Test isolated node
+    sg = dgl.khop_out_subgraph(g, 1, k=2)
+    assert sg.idtype == g.idtype
+    assert sg.num_nodes() == 1
+    assert sg.num_edges() == 0
+
     g = dgl.heterograph({
         ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
         ('user', 'follows', 'user'): ([0, 1], [1, 3]),
@@ -540,3 +560,11 @@ def test_khop_out_subgraph(idtype):
     u, v = sg['plays'].edges()
     edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
     assert edge_set == {(0,0), (1,0), (1,1)}
+
+    # Test isolated node
+    sg = dgl.khop_out_subgraph(g, 3, k=2, ntype='user')
+    assert sg.idtype == idtype
+    assert sg.num_nodes('game') == 0
+    assert sg.num_nodes('user') == 1
+    assert sg.num_edges('follows') == 0
+    assert sg.num_edges('plays') == 0
