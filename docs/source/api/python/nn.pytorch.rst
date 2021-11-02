@@ -44,6 +44,14 @@ GATConv
 .. autoclass:: dgl.nn.pytorch.conv.GATConv
     :members: forward
     :show-inheritance:
+    
+    
+EGATConv
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.conv.EGATConv
+    :members: forward
+    :show-inheritance:
 
 EdgeConv
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
