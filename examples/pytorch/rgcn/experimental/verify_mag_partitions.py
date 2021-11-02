@@ -76,7 +76,7 @@ for etype in edge_map:
         edge_map[etype][:, 1] - edge_map[etype][:, 0])
 
 eid = []
-gpb = dgl.distributed.graph_partition_book.RangePartitionBook(0, 2, node_map, edge_map,
+gpb = dgl.distributed.graph_partition_book.RangePartitionBook(0, num_parts, node_map, edge_map,
                                                               {ntype: i for i, ntype in enumerate(
                                                                   hg.ntypes)},
                                                               {etype: i for i, etype in enumerate(hg.etypes)})
