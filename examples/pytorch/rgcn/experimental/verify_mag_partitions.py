@@ -26,8 +26,10 @@ hg.nodes['paper'].data['feat'] = hg_orig.nodes['paper'].data['feat']
 node_feats = {}
 edge_feats = {}
 for partid in range(num_parts):
-    part_node_feats = dgl.data.utils.load_tensors('{}/part{}/node_feat.dgl'.format(partitions_folder, partid))
-    part_edge_feats = dgl.data.utils.load_tensors('{}/part{}/edge_feat.dgl'.format(partitions_folder, partid))
+    part_node_feats = dgl.data.utils.load_tensors(
+        '{}/part{}/node_feat.dgl'.format(partitions_folder, partid))
+    part_edge_feats = dgl.data.utils.load_tensors(
+        '{}/part{}/edge_feat.dgl'.format(partitions_folder, partid))
     for key in part_node_feats:
         if key in node_feats:
             node_feats[key].append(part_node_feats[key])
@@ -54,7 +56,8 @@ for key in etype_map:
     etype_id = etype_map[key]
     etypes[etype_id] = key
 
-etype2canonical = {etype: (srctype, etype, dsttype) for srctype, etype, dsttype in hg.canonical_etypes}
+etype2canonical = {etype: (srctype, etype, dsttype)
+                   for srctype, etype, dsttype in hg.canonical_etypes}
 
 node_map = metadata['node_map']
 for key in node_map:
@@ -66,14 +69,17 @@ for key in edge_map:
 eid_map = dgl.distributed.id_map.IdMap(edge_map)
 
 for ntype in node_map:
-    assert hg.number_of_nodes(ntype) == th.sum(node_map[ntype][:,1] - node_map[ntype][:,0])
+    assert hg.number_of_nodes(ntype) == th.sum(
+        node_map[ntype][:, 1] - node_map[ntype][:, 0])
 for etype in edge_map:
-    assert hg.number_of_edges(etype) == th.sum(edge_map[etype][:,1] - edge_map[etype][:,0])
+    assert hg.number_of_edges(etype) == th.sum(
+        edge_map[etype][:, 1] - edge_map[etype][:, 0])
 
 eid = []
 gpb = dgl.distributed.graph_partition_book.RangePartitionBook(0, 2, node_map, edge_map,
-        {ntype:i for i, ntype in enumerate(hg.ntypes)},
-        {etype:i for i, etype in enumerate(hg.etypes)})
+                                                              {ntype: i for i, ntype in enumerate(
+                                                                  hg.ntypes)},
+                                                              {etype: i for i, etype in enumerate(hg.etypes)})
 subg0 = dgl.load_graphs('{}/part0/graph.dgl'.format(partitions_folder))[0][0]
 for etype in hg.etypes:
     type_eid = th.zeros((1,), dtype=th.int64)
@@ -94,7 +100,8 @@ dst_tids, _ = gpb.map_to_per_ntype(gdst)
 canonical_etypes = []
 etype_ids = th.arange(0, len(etypes))
 for src_tid, etype_id, dst_tid in zip(src_tids, etype_ids, dst_tids):
-    canonical_etypes.append((ntypes[src_tid], etypes[etype_id], ntypes[dst_tid]))
+    canonical_etypes.append(
+        (ntypes[src_tid], etypes[etype_id], ntypes[dst_tid]))
 for etype in canonical_etypes:
     assert etype in hg.canonical_etypes
 
@@ -122,7 +129,8 @@ for partid in range(num_parts):
         inner_node = subg.ndata['inner_node'][idx]
         # All nodes should have the same node type.
         assert np.all(ntype_ids1.numpy() == int(ntype_id))
-        assert np.all(nid[inner_node == 1].numpy() == np.arange(node_map[ntype][partid,0], node_map[ntype][partid,1]))
+        assert np.all(nid[inner_node == 1].numpy() == np.arange(
+            node_map[ntype][partid, 0], node_map[ntype][partid, 1]))
         orig_node_ids[ntype].append(orig_type_nid[inner_node == 1])
 
         # Check node data.
@@ -154,7 +162,8 @@ for partid in range(num_parts):
         inner_edge = subg.edata['inner_edge'][idx]
         # All edges should have the same edge type.
         assert np.all(etype_ids1.numpy() == int(etype_id))
-        assert np.all(np.sort(eid[inner_edge == 1].numpy()) == np.arange(edge_map[etype][partid,0], edge_map[etype][partid,1]))
+        assert np.all(np.sort(eid[inner_edge == 1].numpy()) == np.arange(
+            edge_map[etype][partid, 0], edge_map[etype][partid, 1]))
         orig_edge_ids[etype].append(orig_type_eid[inner_edge == 1])
 
         # Check edge data.

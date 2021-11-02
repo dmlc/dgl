@@ -75,7 +75,8 @@ removed_edge_data = th.stack([th.cat([self_loop_src_id, duplicate_src_id]),
                               th.cat([self_loop_orig_id, duplicate_orig_id]),
                               th.cat([self_loop_etype, duplicate_etype])],
                              1)
-np.savetxt('mag_removed_edges.txt', removed_edge_data.numpy(), fmt='%d', delimiter=' ')
+np.savetxt('mag_removed_edges.txt',
+           removed_edge_data.numpy(), fmt='%d', delimiter=' ')
 print('There are {} edges, remove {} self-loops and {} duplicated edges'.format(g.number_of_edges(),
                                                                                 len(self_loop_src_id),
                                                                                 len(duplicate_src_id)))
@@ -90,7 +91,8 @@ dgl.data.utils.save_tensors("edge_feat.dgl", edge_feats)
 # Store the basic metadata of the graph.
 graph_stats = [g.number_of_nodes(), len(src_id), num_node_weights]
 with open('mag_stats.txt', 'w') as filehandle:
-    filehandle.writelines("{} {} {}".format(graph_stats[0], graph_stats[1], graph_stats[2]))
+    filehandle.writelines("{} {} {}".format(
+        graph_stats[0], graph_stats[1], graph_stats[2]))
 
 # Store the ID ranges of nodes and edges of the entire graph.
 nid_ranges = {}
