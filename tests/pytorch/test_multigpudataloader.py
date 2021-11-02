@@ -50,7 +50,7 @@ def test_node_dataloader():
     batch_size = 2
 
     dataloader = MultiGPUNodeDataLoader(
-        g1, g1.nodes(), sampler, device=F.ctx(), comm=None,
+        g1, g1.nodes(), sampler, device=F.ctx(),
         node_feat=node_feat,
         node_label=node_label,
         use_ddp=False,
