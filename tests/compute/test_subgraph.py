@@ -484,6 +484,17 @@ def test_khop_in_subgraph(idtype):
         [8, 9]
     ]))
 
+    # Test multiple nodes
+    sg = dgl.khop_in_subgraph(g, [0, 2], k=1)
+    u, v = sg.edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert edge_set == {(1,0), (1,2), (2,0), (3,2)}
+
+    sg = dgl.khop_in_subgraph(g, F.tensor([0, 2], idtype), k=1)
+    u, v = sg.edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert edge_set == {(1,0), (1,2), (2,0), (3,2)}
+
     # Test isolated node
     sg = dgl.khop_in_subgraph(g, 1, k=2)
     assert sg.idtype == g.idtype
@@ -494,7 +505,7 @@ def test_khop_in_subgraph(idtype):
         ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
         ('user', 'follows', 'user'): ([0, 1, 1], [1, 2, 2]),
     }, idtype=idtype, device=F.ctx())
-    sg = dgl.khop_in_subgraph(g, 0, k=2, ntype='game')
+    sg = dgl.khop_in_subgraph(g, {'game': 0}, k=2)
     assert sg.idtype == idtype
     assert sg.num_nodes('game') == 1
     assert sg.num_nodes('user') == 2
@@ -508,12 +519,21 @@ def test_khop_in_subgraph(idtype):
     assert edge_set == {(0, 0), (1, 0)}
 
     # Test isolated node
-    sg = dgl.khop_in_subgraph(g, 0, k=2, ntype='user')
+    sg = dgl.khop_in_subgraph(g, {'user': 0}, k=2)
     assert sg.idtype == idtype
     assert sg.num_nodes('game') == 0
     assert sg.num_nodes('user') == 1
     assert sg.num_edges('follows') == 0
     assert sg.num_edges('plays') == 0
+
+    # Test multiple nodes
+    sg = dgl.khop_in_subgraph(g, {'user': F.tensor([0, 1], idtype), 'game': 0}, k=1)
+    u, v = sg['follows'].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert edge_set == {(0, 1)}
+    u, v = sg['plays'].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert edge_set == {(0, 0), (1, 0)}
 
 @parametrize_dtype
 def test_khop_out_subgraph(idtype):
