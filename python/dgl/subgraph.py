@@ -684,8 +684,7 @@ def khop_in_subgraph(graph, nodes, k, *, relabel_nodes=True, store_ids=True):
 
 DGLHeteroGraph.khop_in_subgraph = utils.alias_func(khop_in_subgraph)
 
-def khop_out_subgraph(graph, node, k, *, ntype=None,
-                      relabel_nodes=True, store_ids=True):
+def khop_out_subgraph(graph, nodes, k, *, relabel_nodes=True, store_ids=True):
     """Return the subgraph induced by k-hop out-neighborhood of the specified node(s).
 
     We can expand a set of nodes by including the successors of them. From a
@@ -703,13 +702,19 @@ def khop_out_subgraph(graph, node, k, *, ntype=None,
     ----------
     graph : DGLGraph
         The input graph.
-    node : int
-        The ID of the central node.
+    nodes : nodes or dict[str, nodes]
+        The starting node(s) to expand. The allowed formats are:
+
+        * Int: ID of a single node.
+        * Int Tensor: Each element is a node ID. The tensor must have the same device
+          type and ID data type as the graph's.
+        * iterable[int]: Each element is a node ID.
+
+        If the graph is homogeneous, one can directly pass the above formats.
+        Otherwise, the argument must be a dictionary with keys being node types
+        and values being the node IDs in the above formats.
     k : int
         The number of hops.
-    ntype : str, optional
-        The type of the central node. It can be omitted if there is only one type of
-        nodes in the graph.
     relabel_nodes : bool, optional
         If True, it will remove the isolated nodes and relabel the rest nodes in the
         extracted subgraph.
@@ -763,7 +768,7 @@ def khop_out_subgraph(graph, node, k, *, ntype=None,
     >>> g = dgl.heterograph({
     ...     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
     ...     ('user', 'follows', 'user'): ([0, 1], [1, 3])})
-    >>> sg = dgl.khop_out_subgraph(g, 0, k=2, ntype='user')
+    >>> sg = dgl.khop_out_subgraph(g, {'user': 0}, k=2)
     >>> sg
     Graph(num_nodes={'game': 2, 'user': 3},
           num_edges={('user', 'follows', 'user'): 2, ('user', 'plays', 'game'): 2},
@@ -776,13 +781,15 @@ def khop_out_subgraph(graph, node, k, *, ntype=None,
     if graph.is_block:
         raise DGLError('Extracting subgraph of a block graph is not allowed.')
 
-    if ntype is None:
-        if graph._graph.number_of_ntypes() != 1:
-            raise DGLError('Node type name must be specified if there are more than one'
-                           'node types.')
-        ntype = graph.ntypes[0]
+    if not isinstance(nodes, Mapping):
+        assert len(graph.ntypes) == 1, \
+            'need a dict of node type and IDs for graph with multiple node types'
+        nodes = {graph.ntypes[0]: nodes}
 
-    last_hop_nodes = {ntype: F.copy_to(F.tensor([node], dtype=graph.idtype), graph.device)}
+    for nty, nty_nodes in nodes.items():
+        nodes[nty] = utils.prepare_tensor(graph, nty_nodes, 'nodes["{}"]'.format(nty))
+
+    last_hop_nodes = nodes
     k_hop_nodes_ = [last_hop_nodes]
     place_holder = F.copy_to(F.tensor([], dtype=graph.idtype), graph.device)
     for _ in range(k):
