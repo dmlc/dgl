@@ -602,9 +602,7 @@ def test_khop_out_subgraph(idtype):
 
     # Test multiple nodes
     sg = dgl.khop_out_subgraph(g, {'user': F.tensor([2], idtype), 'game': 0}, k=1)
-    u, v = sg['follows'].edges()
-    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
-    assert edge_set == {}
+    assert sg.num_edges('follows') == 0
     u, v = sg['plays'].edges()
     edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
     assert edge_set == {(2, 1)}
