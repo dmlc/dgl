@@ -323,9 +323,9 @@ IdArray Relabel_(const std::vector<IdArray>& arrays) {
   induced_nodes->shape[0] = num_induced;
 
   // relabel
+  const int nt = 128;
   for (IdArray arr : arrays) {
     const int64_t length = arr->shape[0];
-    int nt = cuda::FindNumThreads(length);
     int nb = (length + nt - 1) / nt;
     CUDA_KERNEL_CALL((_RelabelKernel<IdType>),
       nb, nt, 0, thr_entry->stream,
