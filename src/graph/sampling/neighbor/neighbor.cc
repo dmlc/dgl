@@ -1,5 +1,5 @@
 /*!
- *  Copyright (c) 2020 by Contributors
+ *  Copyright (c) 2020-2021 by Contributors
  * \file graph/sampling/neighbor.cc
  * \brief Definition of neighborhood-based sampler APIs.
  */
