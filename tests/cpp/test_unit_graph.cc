@@ -74,6 +74,12 @@ void _TestUnitGraph(DLContext ctx) {
 
   auto g = CreateFromCSC(2, csr);
   ASSERT_EQ(g->GetCreatedFormats(), 4);
+  ASSERT_EQ(g->NumEdgeTypes(), 1);
+  ASSERT_EQ(g->InDegree(0, 0), 1);
+  ASSERT_EQ(g->OutDegree(0, 0), 2);
+  ASSERT_EQ(g->GetCreatedFormats(), 6);
+  //auto&& nids = aten::VecToIdArray<IdType>({0, 1, 2, 3}, sizeof(IdType)*8);
+  //ASSERT_TRUE(ArrayEQ<IdType>(g->InDegrees(0, nids), aten::VecToIdArray<IdType>({0,1,2,3},sizeof(IdType)*8)));
 
   g = CreateFromCSR(2, csr);
   ASSERT_EQ(g->GetCreatedFormats(), 2);
