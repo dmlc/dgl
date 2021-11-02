@@ -45,37 +45,26 @@ class RelGraphEmbedding(nn.Module):
         device: torch.device = None,
     ) -> Dict[str, torch.Tensor]:
         if in_nodes is not None:
-            x = {}
-
-            for ntype, nid in in_nodes.items():
-                if self._node_feats[ntype] is None:
-                    x[ntype] = self.node_embeddings[ntype](nid)
-                else:
-                    if device is not None:
-                        self._node_feats[ntype] = self._node_feats[ntype].to(
-                            device)
-
-                    if self._node_feats_projection:
-                        x[ntype] = self._node_feats[ntype][nid] @ self.embeddings[ntype]
-                    else:
-                        x[ntype] = self._node_feats[ntype][nid]
+            ntypes = [ntype for ntype in in_nodes.keys()]
+            nids = [nid for nid in in_nodes.values()]
         else:
-            x = {}
+            ntypes = self._hg.ntypes
+            nids = [self._hg.nodes(ntype) for ntype in ntypes]
 
-            for ntype in self._hg.ntypes:
-                hg_nodes = self._hg.nodes(ntype)
+        x = {}
 
-                if self._node_feats[ntype] is None:
-                    x[ntype] = self.node_embeddings[ntype](hg_nodes)
+        for ntype, nid in zip(ntypes, nids):
+            if self._node_feats[ntype] is None:
+                x[ntype] = self.node_embeddings[ntype](nid)
+            else:
+                if device is not None:
+                    self._node_feats[ntype] = self._node_feats[ntype].to(
+                        device)
+
+                if self._node_feats_projection:
+                    x[ntype] = self._node_feats[ntype][nid] @ self.embeddings[ntype]
                 else:
-                    if device is not None:
-                        self._node_feats[ntype] = self._node_feats[ntype].to(
-                            device)
-
-                    if self._node_feats_projection:
-                        x[ntype] = self._node_feats[ntype] @ self.embeddings[ntype]
-                    else:
-                        x[ntype] = self._node_feats[ntype]
+                    x[ntype] = self._node_feats[ntype][nid]
 
         return x
 
