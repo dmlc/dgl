@@ -4,7 +4,7 @@ import torch as th
 from torch import nn
 
 from .... import function as fn
-from ...functional import edge_softmaxZ
+from ...functional import edge_softmax
 from ....base import DGLError
 from ..utils import Identity
 from ....utils import expand_as_pair
@@ -15,7 +15,7 @@ class GATv2Conv(nn.Module):
 
     Description
     -----------
-    Apply GATv2 from 
+    Apply GATv2 from
     `How Attentive are Graph Attention Networks?<https://arxiv.org/pdf/2105.14491.pdf>`__
     over an input signal.
 
