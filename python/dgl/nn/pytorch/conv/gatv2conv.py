@@ -1,9 +1,10 @@
-"""Torch modules for graph attention networks(GAT)."""
+"""Torch modules for graph attention networks v2 (GATv2)."""
+# pylint: disable= no-member, arguments-differ, invalid-name
 import torch as th
 from torch import nn
 
 from .... import function as fn
-from ...functional import edge_softmax
+from ...functional import edge_softmaxZ
 from ....base import DGLError
 from ..utils import Identity
 from ....utils import expand_as_pair
@@ -14,7 +15,8 @@ class GATv2Conv(nn.Module):
 
     Description
     -----------
-    Apply GATv2 from `How Attentive are Graph Attention Networks?<https://arxiv.org/pdf/2105.14491.pdf>`__
+    Apply GATv2 from 
+    `How Attentive are Graph Attention Networks?<https://arxiv.org/pdf/2105.14491.pdf>`__
     over an input signal.
 
     .. math::
@@ -141,8 +143,7 @@ class GATv2Conv(nn.Module):
                  activation=None,
                  allow_zero_in_degree=False,
                  bias=True,
-                 share_weights=False,
-                 **kwargs):
+                 share_weights=False):
         super(GATv2Conv, self).__init__()
         self._num_heads = num_heads
         self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
