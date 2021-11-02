@@ -27,7 +27,7 @@ def data_type_dict():
             'int16'   : th.int16,
             'int32'   : th.int32,
             'int64'   : th.int64,
-            'bool'    : th.uint8}
+            'bool'    : th.bool}
 
 def cpu():
     return th.device('cpu')
@@ -330,8 +330,14 @@ def zerocopy_to_numpy(input):
 def zerocopy_from_numpy(np_array):
     return th.as_tensor(np_array)
 
-def zerocopy_to_dgl_ndarray(data):
-    return nd.from_dlpack(dlpack.to_dlpack(data.contiguous()))
+if LooseVersion(th.__version__) >= LooseVersion("1.10.0"):
+    def zerocopy_to_dgl_ndarray(data):
+        if data.dtype == th.bool:
+            data = data.byte()
+        return nd.from_dlpack(dlpack.to_dlpack(data.contiguous()))
+else:
+    def zerocopy_to_dgl_ndarray(data):
+        return nd.from_dlpack(dlpack.to_dlpack(data.contiguous()))
 
 def zerocopy_to_dgl_ndarray_for_write(input):
     return zerocopy_to_dgl_ndarray(input)
