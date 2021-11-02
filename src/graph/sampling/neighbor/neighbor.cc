@@ -93,7 +93,7 @@ HeteroSubgraph SampleNeighbors(
         hg->NumVertices(src_vtype),
         hg->NumVertices(dst_vtype),
         hg->DataType(), hg->Context());
-      induced_edges[etype] = aten::NullArray();
+      induced_edges[etype] = aten::NullArray(hg->DataType(), hg->Context());
     } else if (fanouts[etype] == -1) {
       const auto &earr = (dir == EdgeDir::kOut) ?
         hg->OutEdges(etype, nodes_ntype) :
