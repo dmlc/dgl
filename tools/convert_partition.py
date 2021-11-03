@@ -98,6 +98,9 @@ num_nodes = 0
 node_map_val = {ntype: [] for ntype in ntypes}
 edge_map_val = {etype: [] for etype in etypes}
 for part_id in range(num_parts):
+    part_dir = output_dir + '/part' + str(part_id)
+    os.makedirs(part_dir, exist_ok=True)
+
     node_file = 'p{:03}-{}_nodes.txt'.format(part_id, graph_name)
     # The format of each line in the node file:
     # <node_id> <node_type> <weight1> ... <orig_type_node_id> <attributes>
@@ -308,8 +311,6 @@ for part_id in range(num_parts):
         num_edges, num_edges + compact_g2.number_of_edges())
     num_edges += compact_g2.number_of_edges()
 
-    part_dir = output_dir + '/part' + str(part_id)
-    os.makedirs(part_dir, exist_ok=True)
     dgl.save_graphs(part_dir + '/graph.dgl', [compact_g2])
 
 part_metadata = {'graph_name': graph_name,

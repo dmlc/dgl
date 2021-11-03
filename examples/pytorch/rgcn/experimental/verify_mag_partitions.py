@@ -75,6 +75,7 @@ for etype in edge_map:
     assert hg.number_of_edges(etype) == th.sum(
         edge_map[etype][:, 1] - edge_map[etype][:, 0])
 
+# verify part_0 with graph_partition_book
 eid = []
 gpb = dgl.distributed.graph_partition_book.RangePartitionBook(0, num_parts, node_map, edge_map,
                                                               {ntype: i for i, ntype in enumerate(
@@ -86,14 +87,16 @@ for etype in hg.etypes:
     eid.append(gpb.map_to_homo_eid(type_eid, etype))
 eid = th.cat(eid)
 part_id = gpb.eid2partid(eid)
-assert np.all(part_id.numpy() == 0)
+assert th.all(part_id == 0)
 local_eid = gpb.eid2localeid(eid, 0)
-assert np.all(local_eid.numpy() == eid.numpy())
-assert np.all((subg0.edata[dgl.EID][local_eid] == eid).numpy())
+assert th.all(local_eid == eid)
+assert th.all(subg0.edata[dgl.EID][local_eid] == eid)
 lsrc, ldst = subg0.find_edges(local_eid)
 gsrc, gdst = subg0.ndata[dgl.NID][lsrc], subg0.ndata[dgl.NID][ldst]
-assert np.all(gsrc.numpy() == lsrc.numpy())
-assert np.all(gdst.numpy() == ldst.numpy())
+assert th.all(gsrc == lsrc)
+# gdst which is not assigned into current partition is not required to equal ldst
+assert th.all(th.logical_or(
+    gdst == ldst, subg0.ndata['inner_node'][ldst] == 0))
 etids, _ = gpb.map_to_per_etype(eid)
 src_tids, _ = gpb.map_to_per_ntype(gsrc)
 dst_tids, _ = gpb.map_to_per_ntype(gdst)
