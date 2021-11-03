@@ -223,10 +223,11 @@ class DotPredictor(nn.Module):
 #
 # There are various ways to evaluate the performance of link prediction.
 # This tutorial follows the practice of `GraphSAGE
-# paper <https://cs.stanford.edu/people/jure/pubs/graphsage-nips17.pdf>`__,
-# where it treats the node embeddings learned by link prediction via
-# training and evaluating a linear classifier on top of the learned node
-# embeddings.
+# paper <https://cs.stanford.edu/people/jure/pubs/graphsage-nips17.pdf>`__.
+# Basically, it first trains a GNN via link prediction, and get an embedding
+# for each node.  Then it trains a downstream classifier on top of this
+# embedding and compute the accuracy as an assessment of the embedding
+# quality.
 #
 
 
@@ -361,7 +362,7 @@ for epoch in range(1):
 # ------------------------------------------------------
 #
 # In practice, it is more common to evaluate the link prediction
-# model to see whether it can predict new edges.  There are different
+# model to see whether it can predict new edges. There are different
 # evaluation metrics such as
 # `AUC <https://en.wikipedia.org/wiki/Receiver_operating_characteristic#Area_under_the_curve>`__
 # or `various metrics from information retrieval <https://en.wikipedia.org/wiki/Evaluation_measures_(information_retrieval)>`__.
@@ -390,10 +391,8 @@ test_neg_dst = torch.randint(0, graph.num_nodes(), (graph.num_edges(),))
 
 ######################################################################
 # First you need to construct a graph for ``dgl.dataloading.EdgeDataLoader``
-# to iterate on, which should have the same nodes as the original
-# ``graph``, but the testing node pairs as edges.  You also need to
-# label the edges with 1 if the corresponding node pair is positive,
-# and 0 if negative:
+# to iterate on, i.e. with the testing node pairs as edges.
+# You also need to label the edges, 1 if positive and 0 if negative.
 #
 
 test_src = torch.cat([test_pos_src, test_neg_src])
