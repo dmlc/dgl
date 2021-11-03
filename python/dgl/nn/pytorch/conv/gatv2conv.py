@@ -37,7 +37,7 @@ class GATv2Conv(nn.Module):
         Input feature size; i.e, the number of dimensions of :math:`h_i^{(l)}`.
         If the layer is to be applied to a unidirectional bipartite graph, `in_feats`
         specifies the input feature size on both the source and destination nodes.
-        If a scalar is given, the source and destination node feature size 
+        If a scalar is given, the source and destination node feature size
         would take the same value.
     out_feats : int
         Output feature size; i.e, the number of dimensions of :math:`h_i^{(l+1)}`.
@@ -200,7 +200,7 @@ class GATv2Conv(nn.Module):
         gain = nn.init.calculate_gain('relu')
         nn.init.xavier_normal_(self.fc_src.weight, gain=gain)
         if self.bias:
-             self.fc_src.bias.data.fill_(fill_value)
+            self.fc_src.bias.data.fill_(fill_value)
         if not self.share_weights:
             nn.init.xavier_normal_(self.fc_dst.weight, gain=gain)
             if self.bias:
