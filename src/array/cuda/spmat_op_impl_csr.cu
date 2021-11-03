@@ -230,7 +230,7 @@ __global__ void _SegmentCopyKernel(
     const IdType* indptr, const DType* data,
     const IdType* row, int64_t length, int64_t n_row,
     const IdType* out_indptr, DType* out_data) {
-  IdType tx = blockIdx.x * blockDim.x + threadIdx.x;
+  IdType tx = static_cast<IdType>(blockIdx.x) * blockDim.x + threadIdx.x;
   const int stride_x = gridDim.x * blockDim.x;
   while (tx < length) {
     // find upper bound for tx using binary search.
