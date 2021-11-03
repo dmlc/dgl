@@ -822,8 +822,8 @@ class EdgeCollator(Collator):
         dtype = F.dtype(list(neg_srcdst.values())[0][0])
         ctx = F.context(pair_graph)
         neg_edges = {
-            etype: neg_srcdst.get(etype,
-                (F.copy_to(F.tensor([], dtype), ctx), F.copy_to(F.tensor([], dtype), ctx)))
+            etype: neg_srcdst.get(etype, (F.copy_to(F.tensor([], dtype), ctx),
+                                          F.copy_to(F.tensor([], dtype), ctx)))
             for etype in self.g.canonical_etypes}
         neg_pair_graph = heterograph(
             neg_edges, {ntype: self.g.number_of_nodes(ntype) for ntype in self.g.ntypes})
