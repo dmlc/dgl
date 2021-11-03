@@ -16,11 +16,11 @@ class GATv2Conv(nn.Module):
     Description
     -----------
     Apply GATv2 from
-    `How Attentive are Graph Attention Networks?<https://arxiv.org/pdf/2105.14491.pdf>`__
+    `How Attentive are Graph Attention Networks? <https://arxiv.org/pdf/2105.14491.pdf>`__
     over an input signal.
 
     .. math::
-        h_i^{(l+1)} = \sum_{j\in \mathcal{N}(i)} \alpha_{i,j} W^{(l)} h_j^{(l)}
+        h_i^{(l+1)} = \sum_{j\in \mathcal{N}(i)} \alpha_{i,j} W^{(l)}_{right} h_j^{(l)}
 
     where :math:`\alpha_{ij}` is the attention score bewteen node :math:`i` and
     node :math:`j`:
@@ -28,12 +28,17 @@ class GATv2Conv(nn.Module):
     .. math::
         \alpha_{ij}^{l} &= \mathrm{softmax_i} (e_{ij}^{l})
 
-        e_{ij}^{l} &= \vec{a}^T\mathrm{LeakyReLU}\left(W[h_{i} \| h_{j}]\right)
+        e_{ij}^{l} &= \vec{a}^T\mathrm{LeakyReLU}\left(
+            W^{(l)}_{left} h_{i} + W^{(l)}_{right} h_{j}]\right)
 
     Parameters
     ----------
     in_feats : int, or pair of ints
         Input feature size; i.e, the number of dimensions of :math:`h_i^{(l)}`.
+        If the layer is to be applied to a unidirectional bipartite graph, `in_feats`
+        specifies the input feature size on both the source and destination nodes.
+        If a scalar is given, the source and destination node feature size 
+        would take the same value.
     out_feats : int
         Output feature size; i.e, the number of dimensions of :math:`h_i^{(l+1)}`.
     num_heads : int
@@ -55,16 +60,18 @@ class GATv2Conv(nn.Module):
         causing silent performance regression. This module will raise a DGLError if it detects
         0-in-degree nodes in input graph. By setting ``True``, it will suppress the check
         and let the users handle it by themselves. Defaults: ``False``.
-    bias (bool, optional): If set to :obj:`False`, the layer will not learn
+    bias : bool, optional
+        If set to :obj:`False`, the layer will not learn
         an additive bias. (default: :obj:`True`)
-    share_weights (bool, optional): If set to :obj:`True`, the same matrix
-        will be applied to the source and the target node of every edge.
+    share_weights : bool, optional
+        If set to :obj:`True`, the same matrix for :math:`W_{left}` and :math:`W_{right}` in
+        the above equations, will be applied to the source and the target node of every edge.
         (default: :obj:`False`)
 
     Note
     ----
     Zero in-degree nodes will lead to invalid output value. This is because no message
-    will be passed to those nodes, the aggregation function will be appied on empty input.
+    will be passed to those nodes, the aggregation function will be applied on empty input.
     A common practice to avoid this is to add a self-loop for each node in the graph if
     it is homogeneous, which can be achieved by:
 
@@ -174,34 +181,42 @@ class GATv2Conv(nn.Module):
                 self.res_fc = Identity()
         else:
             self.register_buffer('res_fc', None)
-        self.reset_parameters()
         self.activation = activation
+        self.share_weights = share_weights
+        self.bias = bias
+        self.reset_parameters()
 
     def reset_parameters(self):
         """
         Description
         -----------
         Reinitialize learnable parameters.
+
         Note
         ----
         The fc weights :math:`W^{(l)}` are initialized using Glorot uniform initialization.
         The attention weights are using xavier initialization method.
         """
         gain = nn.init.calculate_gain('relu')
-        if hasattr(self, 'fc'):
-            nn.init.xavier_normal_(self.fc.weight, gain=gain)
-        else:
-            nn.init.xavier_normal_(self.fc_src.weight, gain=gain)
+        nn.init.xavier_normal_(self.fc_src.weight, gain=gain)
+        if self.bias:
+             self.fc_src.bias.data.fill_(fill_value)
+        if not self.share_weights:
             nn.init.xavier_normal_(self.fc_dst.weight, gain=gain)
+            if self.bias:
+                self.fc_dst.bias.data.fill_(fill_value)
         nn.init.xavier_normal_(self.attn, gain=gain)
         if isinstance(self.res_fc, nn.Linear):
             nn.init.xavier_normal_(self.res_fc.weight, gain=gain)
+            if self.bias:
+                self.fc_dst.res_fc.data.fill_(fill_value)
 
     def set_allow_zero_in_degree(self, set_value):
         r"""
         Description
         -----------
         Set allow_zero_in_degree flag.
+
         Parameters
         ----------
         set_value : bool
@@ -214,6 +229,7 @@ class GATv2Conv(nn.Module):
         Description
         -----------
         Compute graph attention network layer.
+
         Parameters
         ----------
         graph : DGLGraph
@@ -225,6 +241,7 @@ class GATv2Conv(nn.Module):
             :math:`(N_{in}, D_{in_{src}})` and :math:`(N_{out}, D_{in_{dst}})`.
         get_attention : bool, optional
             Whether to return the attention values. Default to False.
+
         Returns
         -------
         torch.Tensor
@@ -233,6 +250,7 @@ class GATv2Conv(nn.Module):
         torch.Tensor, optional
             The attention values of shape :math:`(E, H, 1)`, where :math:`E` is the number of
             edges. This is returned only when :attr:`get_attention` is ``True``.
+
         Raises
         ------
         DGLError
@@ -262,8 +280,11 @@ class GATv2Conv(nn.Module):
                 h_src = h_dst = self.feat_drop(feat)
                 feat_src = self.fc_src(h_src).view(
                     -1, self._num_heads, self._out_feats)
-                feat_dst = self.fc_dst(h_src).view(
-                    -1, self._num_heads, self._out_feats)
+                if self.share_weights:
+                    feat_dst = feat_src
+                else:
+                    feat_dst = self.fc_dst(h_src).view(
+                        -1, self._num_heads, self._out_feats)
                 if graph.is_block:
                     feat_dst = feat_src[:graph.number_of_dst_nodes()]
             graph.srcdata.update({'el': feat_src})# (num_src_edge, num_heads, out_dim)

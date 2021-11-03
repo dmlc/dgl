@@ -2,20 +2,17 @@
 Graph Attention Networks in DGL using SPMV optimization.
 References
 ----------
-Paper: https://arxiv.org/abs/1710.10903
-Author's code: https://github.com/PetarV-/GAT
-Pytorch implementation: https://github.com/Diego999/pyGAT
+Paper: https://arxiv.org/pdf/2105.14491.pdf
+Author's code: https://github.com/tech-srl/how_attentive_are_gats
 """
 
 import torch
 import torch.nn as nn
-import dgl.function as fn
 from dgl.nn import GATv2Conv
-
+    
 
 class GATv2(nn.Module):
     def __init__(self,
-                 g,
                  num_layers,
                  in_dim,
                  num_hidden,
@@ -27,7 +24,6 @@ class GATv2(nn.Module):
                  negative_slope,
                  residual):
         super(GATv2, self).__init__()
-        self.g = g
         self.num_layers = num_layers
         self.gatv2_layers = nn.ModuleList()
         self.activation = activation
@@ -46,10 +42,10 @@ class GATv2(nn.Module):
             num_hidden * heads[-2], num_classes, heads[-1],
             feat_drop, attn_drop, negative_slope, residual, None, bias=False, share_weights=True))
 
-    def forward(self, inputs):
+    def forward(self, g, inputs):
         h = inputs
         for l in range(self.num_layers):
-            h = self.gatv2_layers[l](self.g, h).flatten(1)
+            h = self.gatv2_layers[l](h).flatten(1)
         # output projection
-        logits = self.gatv2_layers[-1](self.g, h).mean(1)
+        logits = self.gatv2_layers[-1](h).mean(1)
         return logits

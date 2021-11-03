@@ -5,7 +5,6 @@ Multiple heads are also batched together for faster training.
 
 import argparse
 import numpy as np
-import networkx as nx
 import time
 import torch
 import torch.nn.functional as F
@@ -49,10 +48,10 @@ def accuracy(logits, labels):
     return correct.item() * 1.0 / len(labels)
 
 
-def evaluate(model, features, labels, mask):
+def evaluate(model, g, features, labels, mask):
     model.eval()
     with torch.no_grad():
-        logits = model(features)
+        logits = model(g, features)
         logits = logits[mask]
         labels = labels[mask]
         return accuracy(logits, labels)
@@ -101,17 +100,16 @@ def main(args):
     n_edges = g.number_of_edges()
     # create model
     heads = ([args.num_heads] * args.num_layers) + [args.num_out_heads]
-    model = GATv2(g,
-                args.num_layers,
-                num_feats,
-                args.num_hidden,
-                n_classes,
-                heads,
-                F.elu,
-                args.in_drop,
-                args.attn_drop,
-                args.negative_slope,
-                args.residual)
+    model = GATv2(args.num_layers,
+                  num_feats,
+                  args.num_hidden,
+                  n_classes,
+                  heads,
+                  F.elu,
+                  args.in_drop,
+                  args.attn_drop,
+                  args.negative_slope,
+                  args.residual)
     print(model)
     if args.early_stop:
         stopper = EarlyStopping(patience=100)
@@ -130,7 +128,7 @@ def main(args):
         if epoch >= 3:
             t0 = time.time()
         # forward
-        logits = model(features)
+        logits = model(g, features)
         loss = loss_fcn(logits[train_mask], labels[train_mask])
 
         optimizer.zero_grad()
@@ -145,7 +143,7 @@ def main(args):
         if args.fastmode:
             val_acc = accuracy(logits[val_mask], labels[val_mask])
         else:
-            val_acc = evaluate(model, features, labels, val_mask)
+            val_acc = evaluate(g, model, features, labels, val_mask)
             if args.early_stop:
                 if stopper.step(val_acc, model):
                     break
