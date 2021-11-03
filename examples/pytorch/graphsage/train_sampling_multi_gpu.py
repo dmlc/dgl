@@ -38,9 +38,11 @@ def compute_acc(pred, labels):
     """
     return (th.argmax(pred, dim=1) == labels).float().sum() / len(pred)
 
-def evaluate(model, g, nfeat, labels, val_nid, device):
+def evaluate(args, model, g, nfeat, labels, val_nid, device):
     """
     Evaluate the model on the validation set specified by ``val_nid``.
+    args: The arguments to the training script.
+    model: The model to evaluate.
     g : The entire graph.
     inputs : The features of all the nodes.
     labels : The labels of all the nodes.
@@ -87,8 +89,8 @@ def run(proc_id, n_gpus, args, devices, data):
         val_labels = val_g.ndata.pop('labels')
         test_labels = test_g.ndata.pop('labels')
     else:
-        train_nfeat = val_nfeat = test_nfeat = g.ndata.pop('features')
-        train_labels = val_labels = test_labels = g.ndata.pop('labels')
+        train_nfeat = val_nfeat = test_nfeat = train_g.ndata.pop('features')
+        train_labels = val_labels = test_labels = train_g.ndata.pop('labels')
 
     in_feats = train_nfeat.shape[1]
 
@@ -100,10 +102,11 @@ def run(proc_id, n_gpus, args, devices, data):
     test_nid = test_mask.nonzero().squeeze()
 
     # remove uncessary edge and node data
-    for k in list(g.edata.keys()):
-        g.edata.pop(k)
-    for k in list(g.ndata.keys()):
-        g.ndata.pop(k)
+    for g in (train_g, val_g, test_g):
+        for k in list(g.edata.keys()):
+            g.edata.pop(k)
+        for k in list(g.ndata.keys()):
+            g.ndata.pop(k)
 
     # Create PyTorch DataLoader for constructing blocks
     sampler = dgl.dataloading.MultiLayerNeighborSampler(
@@ -192,14 +195,14 @@ def run(proc_id, n_gpus, args, devices, data):
             if epoch % args.eval_every == 0 and epoch != 0:
                 if n_gpus == 1:
                     eval_acc = evaluate(
-                        model, val_g, val_nfeat, val_labels, val_nid, devices[0])
+                        args, model, val_g, val_nfeat, val_labels, val_nid, devices[0])
                     test_acc = evaluate(
-                        model, test_g, test_nfeat, test_labels, test_nid, devices[0])
+                        args, model, test_g, test_nfeat, test_labels, test_nid, devices[0])
                 else:
                     eval_acc = evaluate(
-                        model.module, val_g, val_nfeat, val_labels, val_nid, devices[0])
+                        args, model.module, val_g, val_nfeat, val_labels, val_nid, devices[0])
                     test_acc = evaluate(
-                        model.module, test_g, test_nfeat, test_labels, test_nid, devices[0])
+                        args, model.module, test_g, test_nfeat, test_labels, test_nid, devices[0])
                 print('Eval Acc {:.4f}'.format(eval_acc))
                 print('Test Acc: {:.4f}'.format(test_acc))
 
@@ -209,7 +212,7 @@ def run(proc_id, n_gpus, args, devices, data):
     if proc_id == 0:
         print('Avg epoch time: {}'.format(avg / (epoch - 4)))
 
-if __name__ == '__main__':
+def main():
     argparser = argparse.ArgumentParser("multi-gpu training")
     argparser.add_argument('--gpu', type=str, default='0',
                            help="Comma separated list of GPU device IDs.")
@@ -275,3 +278,6 @@ if __name__ == '__main__':
             procs.append(p)
         for p in procs:
             p.join()
+
+if __name__ == '__main__':
+    main()
