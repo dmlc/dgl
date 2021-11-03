@@ -200,16 +200,16 @@ class GATv2Conv(nn.Module):
         gain = nn.init.calculate_gain('relu')
         nn.init.xavier_normal_(self.fc_src.weight, gain=gain)
         if self.bias:
-            self.fc_src.bias.data.fill_(fill_value)
+            nn.init.constant_(self.fc_src.bias, 0)
         if not self.share_weights:
             nn.init.xavier_normal_(self.fc_dst.weight, gain=gain)
             if self.bias:
-                self.fc_dst.bias.data.fill_(fill_value)
+                nn.init.constant_(self.fc_dst.bias, 0)
         nn.init.xavier_normal_(self.attn, gain=gain)
         if isinstance(self.res_fc, nn.Linear):
             nn.init.xavier_normal_(self.res_fc.weight, gain=gain)
             if self.bias:
-                self.fc_dst.res_fc.data.fill_(fill_value)
+                nn.init.constant_(self.res_fc.bias, 0)
 
     def set_allow_zero_in_degree(self, set_value):
         r"""
