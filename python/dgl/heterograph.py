@@ -1254,6 +1254,7 @@ class DGLHeteroGraph(object):
             raise DGLError('DST node type "{}" does not exist.'.format(ntype))
         return ntid
 
+    @functools.lru_cache()
     def get_etype_id(self, etype):
         """Return the id of the given edge type.
 
@@ -2086,6 +2087,7 @@ class DGLHeteroGraph(object):
         return HeteroEdgeView(self)
 
     @property
+    @functools.lru_cache()
     def edata(self):
         """Return an edge data view for setting/getting edge features.
 
@@ -4211,30 +4213,31 @@ class DGLHeteroGraph(object):
             Edge representation.
         """
         # parse argument
-        if not is_all(edges):
+        is_all_e = is_all(edges)
+        if not is_all_e:
             eid = utils.parse_edges_arg_to_eid(self, edges, etid, 'edges')
 
-        # sanity check
-        if not utils.is_dict_like(data):
-            raise DGLError('Expect dictionary type for feature data.'
-                           ' Got "%s" instead.' % type(data))
+        # # sanity check
+        # if not utils.is_dict_like(data):
+        #     raise DGLError('Expect dictionary type for feature data.'
+        #                    ' Got "%s" instead.' % type(data))
 
-        if is_all(edges):
-            num_edges = self._graph.number_of_edges(etid)
-        else:
-            num_edges = len(eid)
-        for key, val in data.items():
-            nfeats = F.shape(val)[0]
-            if nfeats != num_edges:
-                raise DGLError('Expect number of features to match number of edges.'
-                               ' Got %d and %d instead.' % (nfeats, num_edges))
-            if F.context(val) != self.device:
-                raise DGLError('Cannot assign edge feature "{}" on device {} to a graph on'
-                               ' device {}. Call DGLGraph.to() to copy the graph to the'
-                               ' same device.'.format(key, F.context(val), self.device))
+        # if is_all_e:
+        #     num_edges = self._graph.number_of_edges(etid)
+        # else:
+        #     num_edges = len(eid)
+        # for key, val in data.items():
+        #     nfeats = F.shape(val)[0]
+            # if nfeats != num_edges:
+            #     raise DGLError('Expect number of features to match number of edges.'
+            #                    ' Got %d and %d instead.' % (nfeats, num_edges))
+            # if F.context(val) != self.device:
+            #     raise DGLError('Cannot assign edge feature "{}" on device {} to a graph on'
+            #                    ' device {}. Call DGLGraph.to() to copy the graph to the'
+            #                    ' same device.'.format(key, F.context(val), self.device))
 
         # set
-        if is_all(edges):
+        if is_all_e:
             self._edge_frames[etid].update(data)
         else:
             self._edge_frames[etid].update_row(eid, data)

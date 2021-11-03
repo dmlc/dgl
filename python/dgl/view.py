@@ -204,17 +204,17 @@ class HeteroEdgeDataView(MutableMapping):
 
     def __setitem__(self, key, val):
         if isinstance(self._etype, list):
-            assert isinstance(val, dict), \
-                'Current HeteroEdgeDataView has multiple edge types, ' \
-                'please pass the edge type and the corresponding data through a dict.'
+            # assert isinstance(val, dict), \
+            #     'Current HeteroEdgeDataView has multiple edge types, ' \
+            #     'please pass the edge type and the corresponding data through a dict.'
 
             for (etype, data) in val.items():
                 etid = self._graph.get_etype_id(etype)
                 self._graph._set_e_repr(etid, self._edges, {key : data})
         else:
-            assert isinstance(val, dict) is False, \
-                'The HeteroEdgeDataView has only one edge type. ' \
-                'please pass a tensor directly'
+            # assert isinstance(val, dict) is False, \
+            #     'The HeteroEdgeDataView has only one edge type. ' \
+            #     'please pass a tensor directly'
             self._graph._set_e_repr(self._etid, self._edges, {key : val})
 
     def __delitem__(self, key):
