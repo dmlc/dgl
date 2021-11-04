@@ -18,7 +18,8 @@
 from collections.abc import Iterable, Mapping
 from collections import defaultdict
 import numpy as np
-from scipy import sparse
+import scipy.sparse as sparse
+import scipy.sparse.linalg
 
 from ._ffi.function import _init_api
 from .base import dgl_warning, DGLError

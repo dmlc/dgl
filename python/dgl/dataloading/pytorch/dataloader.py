@@ -3,10 +3,10 @@ import inspect
 import math
 from distutils.version import LooseVersion
 import torch as th
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, IterableDataset
 from torch.utils.data.distributed import DistributedSampler
 import torch.distributed as dist
-from ..dataloader import NodeCollator, EdgeCollator, GraphCollator
+from ..dataloader import NodeCollator, EdgeCollator, GraphCollator, SubgraphIterator
 from ...distributed import DistGraph
 from ...distributed import DistDataLoader
 from ...ndarray import NDArray as DGLNDArray
@@ -906,6 +906,17 @@ class GraphDataLoader:
             self.collate = GraphCollator(**collator_kwargs).collate
         else:
             self.collate = collate_fn
+
+        # If the dataset is an infinite SubgraphIterator (i.e. without __len__) over a
+        # larger graph, convert it to an IterableDataset.
+        if isinstance(dataset, SubgraphIterator) and not hasattr(dataset, '__len__'):
+            class _Dataset(IterableDataset):
+                def __init__(self, it):
+                    self._it = it
+
+                def __iter__(self):
+                    return iter(self._it)
+            dataset = _Dataset(dataset)
 
         self.use_ddp = use_ddp
         if use_ddp:

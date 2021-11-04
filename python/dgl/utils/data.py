@@ -326,3 +326,25 @@ def infer_num_nodes(data, bipartite=False):
     if not bipartite:
         nsrc = ndst = max(nsrc, ndst)
     return nsrc, ndst
+
+def to_device(data, device):
+    """Transfer the tensor or dictionary of tensors to the given device.
+
+    Nothing will happen if the device of the original tensor is the same as target device.
+
+    Parameters
+    ----------
+    data : Tensor or dict[str, Tensor]
+        The data.
+    device : device
+        The target device.
+
+    Returns
+    -------
+    Tensor or dict[str, Tensor]
+        The output data.
+    """
+    if isinstance(data, dict):
+        return {k: F.copy_to(v, device) for k, v in data.items()}
+    else:
+        return F.copy_to(data, device)
