@@ -157,8 +157,8 @@ The graph structure should be written as a node file and an edge file. The node 
 can be written as DGL tensors. `write_mag.py` shows an example of writing the OGB MAG graph into files.
 
 As `pm_dglpart` cannot handle self-loops and duplicate edges correctly, these edges are removed and stored
-into `mag_removed_edges.txt`. When converting ParMETIS outputs into DGLGraph in next steps, the file that
-contains self-loops and duplicate edges info should be passed in.
+into `mag_removed_edges.txt` when calling `write_mag.py`. When converting ParMETIS outputs into DGLGraph
+in next steps, `mag_removed_edges.txt` should be passed in. Refer to Step 3 for more details.
 
 ```bash
 python3 write_mag.py
