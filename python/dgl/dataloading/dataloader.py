@@ -80,7 +80,7 @@ class _EidExcluder():
             assert self._filter is not None
             if isinstance(parent_eids, Mapping):
                 located_eids = {k: self._filter[k].find_included_indices(parent_eids[k])
-                                for k, v in parent_eids.items()}
+                                for k, v in parent_eids.items() if k in self._filter}
             else:
                 located_eids = self._filter.find_included_indices(parent_eids)
             return located_eids
@@ -820,8 +820,10 @@ class EdgeCollator(Collator):
             neg_srcdst = {self.g.canonical_etypes[0]: neg_srcdst}
         # Get dtype from a tuple of tensors
         dtype = F.dtype(list(neg_srcdst.values())[0][0])
+        ctx = F.context(pair_graph)
         neg_edges = {
-            etype: neg_srcdst.get(etype, (F.tensor([], dtype), F.tensor([], dtype)))
+            etype: neg_srcdst.get(etype, (F.copy_to(F.tensor([], dtype), ctx),
+                                          F.copy_to(F.tensor([], dtype), ctx)))
             for etype in self.g.canonical_etypes}
         neg_pair_graph = heterograph(
             neg_edges, {ntype: self.g.number_of_nodes(ntype) for ntype in self.g.ntypes})
