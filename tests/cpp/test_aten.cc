@@ -242,14 +242,14 @@ TEST(ArrayTest, TestIndexSelect) {
 }
 
 template <typename IDX>
-void _TestRelabel_() {
-  IdArray a = aten::VecToIdArray(std::vector<IDX>({0, 20, 10}), sizeof(IDX)*8, CTX);
-  IdArray b = aten::VecToIdArray(std::vector<IDX>({20, 5, 6}), sizeof(IDX)*8, CTX);
+void _TestRelabel_(DLContext ctx) {
+  IdArray a = aten::VecToIdArray(std::vector<IDX>({0, 20, 10}), sizeof(IDX)*8, ctx);
+  IdArray b = aten::VecToIdArray(std::vector<IDX>({20, 5, 6}), sizeof(IDX)*8, ctx);
   IdArray c = aten::Relabel_({a, b});
 
-  IdArray ta = aten::VecToIdArray(std::vector<IDX>({0, 1, 2}), sizeof(IDX)*8, CTX);
-  IdArray tb = aten::VecToIdArray(std::vector<IDX>({1, 3, 4}), sizeof(IDX)*8, CTX);
-  IdArray tc = aten::VecToIdArray(std::vector<IDX>({0, 20, 10, 5, 6}), sizeof(IDX)*8, CTX);
+  IdArray ta = aten::VecToIdArray(std::vector<IDX>({0, 1, 2}), sizeof(IDX)*8, ctx);
+  IdArray tb = aten::VecToIdArray(std::vector<IDX>({1, 3, 4}), sizeof(IDX)*8, ctx);
+  IdArray tc = aten::VecToIdArray(std::vector<IDX>({0, 20, 10, 5, 6}), sizeof(IDX)*8, ctx);
 
   ASSERT_TRUE(ArrayEQ<IDX>(a, ta));
   ASSERT_TRUE(ArrayEQ<IDX>(b, tb));
@@ -257,8 +257,12 @@ void _TestRelabel_() {
 }
 
 TEST(ArrayTest, TestRelabel_) {
-  _TestRelabel_<int32_t>();
-  _TestRelabel_<int64_t>();
+  _TestRelabel_<int32_t>(CPU);
+  _TestRelabel_<int64_t>(CPU);
+#ifdef DGL_USE_CUDA
+  _TestRelabel_<int32_t>(GPU);
+  _TestRelabel_<int64_t>(GPU);
+#endif
 }
 
 template <typename IDX>
