@@ -48,8 +48,6 @@ HeteroSubgraph EdgeSubgraphNoPreserveNodes(
     const HeteroGraph* hg, const std::vector<IdArray>& eids) {
   // TODO(minjie): In general, all relabeling should be separated with subgraph
   //   operations.
-  CHECK(hg->Context().device_type != kDLGPU)
-    << "Edge subgraph with relabeling does not support GPU.";
   CHECK_EQ(eids.size(), hg->NumEdgeTypes())
     << "Invalid input: the input list size must be the same as the number of edge type.";
   HeteroSubgraph ret;
