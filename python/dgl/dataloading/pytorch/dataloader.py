@@ -359,8 +359,8 @@ def _next(dl_iter, graph, device, load_input, load_output, stream=None):
     if stream is not None:
         with th.cuda.stream(stream):
             with FS.stream(stream):
-                result = ([_to_device(data, device)
-                          for data in result_], result_, stream.record_event())
+                result = [_to_device(data, device)
+                          for data in result_], result_, stream.record_event()
     else:
         result = [_to_device(data, device) for data in result_]
     return result
@@ -375,8 +375,7 @@ def _background_node_dataloader(dl_iter, g, device, results, load_input, load_ou
     stream = th.cuda.Stream(device=dev)
     try:
         while True:
-            results.put(_next(dl_iter, g, device,
-                        load_input, load_output, stream))
+            results.put(_next(dl_iter, g, device, load_input, load_output, stream))
     except StopIteration:
         results.put((None, None, None))
 
