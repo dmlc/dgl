@@ -18,8 +18,9 @@ else
 fi
 mkdir -p build
 pushd build
-cmake -DCUDA_TOOLKIT_ROOT_DIR=/usr/local/cuda -DBUILD_TORCH=ON $CMAKE_VARS ..
-make -j
+# skip build since using pip install
+# cmake -DCUDA_TOOLKIT_ROOT_DIR=/usr/local/cuda -DBUILD_TORCH=ON $CMAKE_VARS ..
+# make -j
 popd
 
 # conda deactivate
