@@ -359,26 +359,26 @@ def _next(dl_iter, graph, device, load_input, load_output, stream=None):
     if stream is not None:
         with th.cuda.stream(stream):
             with FS.stream(stream):
-                result = [_to_device(data, device)
-                          for data in result_], result_
+                result = ([_to_device(data, device)
+                          for data in result_], result_, stream.record_event())
     else:
         result = [_to_device(data, device) for data in result_]
     return result
 
 
 def _background_node_dataloader(dl_iter, g, device, results, load_input, load_output):
+    dev = None
+    if device.type == 'cuda':
+        dev = device
+    elif g.device.type == 'cuda':
+        dev = g.device
+    stream = th.cuda.Stream(device=dev)
     try:
         while True:
-            dev = None
-            if device.type == 'cuda':
-                dev = device
-            elif g.device.type == 'cuda':
-                dev = g.device
-            stream = th.cuda.Stream(device=dev)
-            results.put(
-                (_next(dl_iter, g, device, load_input, load_output, stream), stream))
+            results.put(_next(dl_iter, g, device,
+                        load_input, load_output, stream))
     except StopIteration:
-        results.put(((None, None), None))
+        results.put((None, None, None))
 
 
 class _NodeDataLoaderIter:
@@ -401,10 +401,10 @@ class _NodeDataLoaderIter:
     def __next__(self):
         res = ()
         if self.async_load:
-            (res, _), stream = self.results.get()
+            res, _, event = self.results.get()
             if res is None:
                 raise StopIteration
-            stream.synchronize()
+            event.wait(th.cuda.default_stream())
         else:
             res = _next(self.iter_, self.node_dataloader.collator.g, self.device,
                         self.node_dataloader.load_input, self.node_dataloader.load_output)
