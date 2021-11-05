@@ -327,40 +327,35 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSpMMHetero")
     List<Value> list_V = args[5];
     List<Value> list_ArgU = args[6];
     List<Value> list_ArgE = args[7];
+    List<Value> list_ArgU_etype = args[8];
     std::vector<NDArray> U_vec;
     std::vector<NDArray> V_vec;
     std::vector<NDArray> E_vec;
     std::vector<std::vector<NDArray>> Arg_vec; // ArgU + ArgE
+    std::vector<NDArray> ArgU_etype;
     U_vec.reserve(list_U.size());
     V_vec.reserve(list_V.size());
     E_vec.reserve(list_E.size());
-    for (Value val : list_U) {
-      U_vec.push_back(val->data);
-    }
-    for (Value val : list_V) {
-      V_vec.push_back(val->data);
-    }
-    for (Value val : list_E) {
-      E_vec.push_back(val->data);
-    }
-    for (int i = 0; i < 2; ++i) { // ArgU and ArgE
+
+    for (Value val : list_U) U_vec.push_back(val->data);
+    for (Value val : list_V) V_vec.push_back(val->data);
+    for (Value val : list_E) E_vec.push_back(val->data);
+
+    for (int i = 0; i < 3; ++i) // ArgU + ArgE + ArgU_etype
       Arg_vec.push_back(std::vector<NDArray>());
-    }
-    for (Value val : list_ArgU) {
-      Arg_vec[0].push_back(val->data);
-    }
-    for (Value val : list_ArgE) {
-      Arg_vec[1].push_back(val->data);
-    }
+    for (Value val : list_ArgU) Arg_vec[0].push_back(val->data);
+    for (Value val : list_ArgE) Arg_vec[1].push_back(val->data);
+    for (Value val : list_ArgU_etype) Arg_vec[2].push_back(val->data);
+
     for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
       auto pair = graph->meta_graph()->FindEdge(etype);
       const dgl_id_t src_id = pair.first;
       const dgl_id_t dst_id = pair.second;
       NDArray U = (U_vec.size() == 0) ? NullArray() : U_vec[src_id];
       NDArray E = (E_vec.size() == 0) ? NullArray() : E_vec[etype];
-      CheckCtx(graph->Context(), {U, E, V_vec[dst_id], Arg_vec[0][src_id], Arg_vec[1][etype],},
+      CheckCtx(graph->Context(), {U, E, V_vec[dst_id], Arg_vec[0][dst_id], Arg_vec[1][etype],},
           {"U_data", "E_data", "out", "Arg_U", "Arg_E"});
-      CheckContiguous({U, E, V_vec[dst_id], Arg_vec[0][src_id], Arg_vec[1][etype]},
+      CheckContiguous({U, E, V_vec[dst_id], Arg_vec[0][dst_id], Arg_vec[1][etype]},
           {"U_data", "E_data", "out", "Arg_U", "Arg_E"});
     }
     SpMMHetero(op, reduce_op, graph.sptr(), U_vec, E_vec, V_vec, Arg_vec);

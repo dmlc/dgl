@@ -77,12 +77,20 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
   } else if (reduce == "max" || reduce == "min") {
     SWITCH_BITS(bits, DType, {
       SWITCH_OP(op, Op, {
+        std::vector<bool> updated(vec_out.size(), false);
+        //  TODO (Israt): use vector updated to fill(out...) too
         for (dgl_type_t etype = 0; etype < ufeat_node_tids.size(); ++etype) {
           DType *out_off = vec_out[out_node_tids[etype]].Ptr<DType>();
           if (reduce == "max")
             std::fill(out_off, out_off + vec_csr[etype].num_rows * dim, cpu::op::Max<DType>::zero);
           else
             std::fill(out_off, out_off + vec_csr[etype].num_rows * dim, cpu::op::Min<DType>::zero);
+          const dgl_type_t dst_id = out_node_tids[etype];
+          if(!updated[dst_id]) {
+            updated[dst_id] = true;
+            IdType *argu_etype = out_aux[2][dst_id].Ptr<IdType>();
+            std::fill(argu_etype, argu_etype + vec_csr[etype].num_rows * dim, etype);
+          }
         }
         /* Call  SpMM for each relation type */
         for (dgl_type_t etype = 0; etype < ufeat_node_tids.size(); ++etype) {
@@ -94,11 +102,13 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
           NDArray efeat = (vec_efeat.size() == 0) ? NullArray() : vec_efeat[etype];
           NDArray out = vec_out[dst_id];
           if (reduce == "max") {
-            cpu::SpMMCmpCsr<IdType, DType, Op, cpu::op::Max<DType>>(
-                bcast, csr, ufeat, efeat, out, out_aux[0][src_id], out_aux[1][etype]);
+            cpu::SpMMCmpCsrHetero<IdType, DType, Op, cpu::op::Max<DType>>(
+                bcast, csr, ufeat, efeat, out, out_aux[0][dst_id], out_aux[1][etype],
+                out_aux[2][dst_id], etype);
           } else {
-            cpu::SpMMCmpCsr<IdType, DType, Op, cpu::op::Min<DType>>(
-                bcast, csr, ufeat, efeat, out, out_aux[0][src_id], out_aux[1][etype]);
+            cpu::SpMMCmpCsrHetero<IdType, DType, Op, cpu::op::Min<DType>>(
+                bcast, csr, ufeat, efeat, out, out_aux[0][dst_id], out_aux[1][etype],
+                out_aux[2][dst_id], etype);
           }
         }
       });

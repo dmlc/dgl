@@ -204,6 +204,8 @@ def _gspmm_hetero(gidx, op, reduce_op, u_len, u_and_e_tuple):
     list_e = [None] * gidx.number_of_etypes()
     list_arg_u_nd = [None] * gidx.number_of_ntypes()
     list_arg_u = [None] * gidx.number_of_ntypes()
+    list_arg_u_etype_nd = [None] * gidx.number_of_ntypes()
+    list_arg_u_etype = [None] * gidx.number_of_ntypes()
     # TODO(Israt): double check ntype or etype
     list_arg_e_nd = [None] * gidx.number_of_etypes()
     list_arg_e = [None] * gidx.number_of_etypes()
@@ -233,18 +235,21 @@ def _gspmm_hetero(gidx, op, reduce_op, u_len, u_and_e_tuple):
         list_v[dst_id] = F.zeros(v_shp, dtype, ctx)
         if use_cmp:
             if use_u:
-                list_arg_u[src_id] = F.zeros(v_shp, idtype, ctx)
+                list_arg_u[dst_id] = F.zeros(v_shp, idtype, ctx)
+                list_arg_u_etype[dst_id] = F.zeros(v_shp, idtype, ctx)
             if use_e:
                 list_arg_e[etid] = F.zeros(v_shp, idtype, ctx)
-        list_arg_u_nd[src_id] = to_dgl_nd_for_write(list_arg_u[src_id])
+        list_arg_u_nd[dst_id] = to_dgl_nd_for_write(list_arg_u[dst_id])
+        list_arg_u_etype_nd[dst_id] = to_dgl_nd_for_write(list_arg_u_etype[dst_id])
         list_arg_e_nd[etid] = to_dgl_nd_for_write(list_arg_e[etid])
+
     if gidx.number_of_edges(0) > 0:
         _CAPI_DGLKernelSpMMHetero(gidx, op, reduce_op,
                                   [to_dgl_nd(u_i) for u_i in list_u],
                                   [to_dgl_nd(e_i) for e_i in list_e],
                                   [to_dgl_nd_for_write(v_i) for v_i in list_v],
-                                  list_arg_u_nd,
-                                  list_arg_e_nd)
+                                  list_arg_u_nd, list_arg_e_nd,
+                                  list_arg_u_etype_nd)
     for l, arg_u_nd in enumerate(list_arg_u_nd):
         # TODO(Israt): l or src_id as index of lhs
         list_arg_u[l] = None if list_arg_u[l] is None else F.zerocopy_from_dgl_ndarray(arg_u_nd)
