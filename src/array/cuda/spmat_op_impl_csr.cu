@@ -244,8 +244,6 @@ __global__ void _SegmentCopyKernel(
         r = m;
       }
     }
-    // final check for upper bound
-    if (l < n_row && out_indptr[l] <= tx) l++;
 
     IdType rpos = l-1;
     IdType rofs = tx - out_indptr[rpos];
