@@ -234,7 +234,7 @@ __global__ void _SegmentCopyKernel(
   const int stride_x = gridDim.x * blockDim.x;
   while (tx < length) {
     // find upper bound for tx using binary search.
-    // out_indptr has already a prefix sum
+    // out_indptr has already a prefix sum. n_row = size(out_indptr)-1
     IdType l = 0, r = n_row, m = 0;
     while (l < r) {
       m = l + (r-l)/2;
