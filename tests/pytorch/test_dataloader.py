@@ -78,11 +78,10 @@ def _check_neighbor_sampling_dataloader(g, nids, dl, mode, collator):
         v_set = set(F.asnumpy(v))
         assert v_set == seed_set
 
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
 def test_neighbor_sampler_dataloader():
     g = dgl.heterograph({('user', 'follow', 'user'): ([0, 0, 0, 1, 1], [1, 2, 3, 3, 4])},
                         {'user': 6}).long()
-    g = dgl.to_bidirected(g)
+    g = dgl.to_bidirected(g).to(F.ctx())
     g.ndata['feat'] = F.randn((6, 8))
     g.edata['feat'] = F.randn((10, 4))
     reverse_eids = F.tensor([5, 6, 7, 8, 9, 0, 1, 2, 3, 4], dtype=F.int64)
@@ -94,7 +93,7 @@ def test_neighbor_sampler_dataloader():
          ('user', 'followed-by', 'user'): ([1, 2, 3, 0, 2, 3, 0], [0, 0, 0, 1, 1, 1, 2]),
          ('user', 'play', 'game'): ([0, 1, 1, 3, 5], [0, 1, 2, 0, 2]),
          ('game', 'played-by', 'user'): ([0, 1, 2, 0, 2], [0, 1, 1, 3, 5])
-    }).long()
+    }).long().to(F.ctx())
     for ntype in hg.ntypes:
         hg.nodes[ntype].data['feat'] = F.randn((hg.number_of_nodes(ntype), 8))
     for etype in hg.canonical_etypes:

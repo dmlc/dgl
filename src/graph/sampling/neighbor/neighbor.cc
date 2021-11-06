@@ -1,5 +1,5 @@
 /*!
- *  Copyright (c) 2020 by Contributors
+ *  Copyright (c) 2020-2021 by Contributors
  * \file graph/sampling/neighbor.cc
  * \brief Definition of neighborhood-based sampler APIs.
  */
@@ -93,7 +93,7 @@ HeteroSubgraph SampleNeighbors(
         hg->NumVertices(src_vtype),
         hg->NumVertices(dst_vtype),
         hg->DataType(), hg->Context());
-      induced_edges[etype] = aten::NullArray();
+      induced_edges[etype] = aten::NullArray(hg->DataType(), hg->Context());
     } else if (fanouts[etype] == -1) {
       const auto &earr = (dir == EdgeDir::kOut) ?
         hg->OutEdges(etype, nodes_ntype) :
