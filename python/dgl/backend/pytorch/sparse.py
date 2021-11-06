@@ -242,6 +242,21 @@ class GSpMM_hetero(th.autograd.Function):
                 elif op == 'copy_lhs':
                     tpl_None = tuple([None] * len(Y))
                     dX = gspmm_hetero(g_rev, 'copy_lhs', 'sum', len(X), *tuple(dZ + tpl_None))
+            else:  # max/min
+                # TODO(Israt): dont just depend on the first etype
+                src_id, dst_id = gidx.metagraph.find_edge(0)
+                dX = tuple([th.zeros((X_shape[i][0],) + dZ[dst_id].shape[1:], dtype=dtype, device=device)
+                    if X[i] is not None else None for i in range(len(X))])
+                if op == 'mul':
+                    grad = _expand(Y, dZ.shape[1:]).gather(
+                        0, argY.long()) * dZ
+                    dX.scatter_add_(0, argX.long(), grad)
+                elif op in ['add', 'copy_lhs']:
+                    for etid in range(len(dX)):
+                        src_id, dst_id = gidx.metagraph.find_edge(etid)
+                        dX[src_id].scatter_add_(0, argX[dst_id].long(), dZ[dst_id])
+                    # [dX[i].scatter_add_(0, argX[i].long(), dZ[1]) if dX[i] is not None else None
+                    #     for i in range(len(dX))]
             dX = tuple([_reduce_grad(dX[i], X_shape[i]) if X[i] is not None else None
                 for i in range(len(X))])
         else:  # X has not gradient
