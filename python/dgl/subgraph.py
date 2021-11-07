@@ -594,7 +594,7 @@ def khop_in_subgraph(graph, nodes, k, *, relabel_nodes=True, store_ids=True):
 
     Returns
     -------
-    G : DGLGraph
+    DGLGraph
         The subgraph.
 
     Notes
@@ -726,7 +726,7 @@ def khop_out_subgraph(graph, nodes, k, *, relabel_nodes=True, store_ids=True):
 
     Returns
     -------
-    G : DGLGraph
+    DGLGraph
         The subgraph.
 
     Notes
