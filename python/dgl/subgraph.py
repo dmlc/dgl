@@ -687,8 +687,6 @@ def khop_in_subgraph(graph, nodes, k, *, relabel_nodes=True, store_ids=True):
 
     sg = node_subgraph(graph, k_hop_nodes, relabel_nodes=relabel_nodes, store_ids=store_ids)
     if relabel_nodes:
-        return sg
-    else:
         if is_mapping:
             seed_inverse_indices = dict()
             for nty in nodes:
@@ -698,6 +696,8 @@ def khop_in_subgraph(graph, nodes, k, *, relabel_nodes=True, store_ids=True):
             seed_inverse_indices = F.slice_axis(
                 inverse_indices[nty], axis=0, begin=0, end=len(nodes[nty]))
         return sg, seed_inverse_indices
+    else:
+        return sg
 
 DGLHeteroGraph.khop_in_subgraph = utils.alias_func(khop_in_subgraph)
 
