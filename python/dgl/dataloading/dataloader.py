@@ -1004,4 +1004,5 @@ class GraphCollator(object):
 class SubgraphIterator(object):
     """Abstract class representing an iterator that yields a subgraph given a graph.
     """
-    pass
+    def __init__(self, g):
+        self.g = g
