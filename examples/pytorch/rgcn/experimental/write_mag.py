@@ -15,10 +15,6 @@ for etype in hg_orig.canonical_etypes:
 hg = dgl.heterograph(subgs)
 hg.nodes['paper'].data['feat'] = hg_orig.nodes['paper'].data['feat']
 print(hg)
-#subg_nodes = {}
-#for ntype in hg.ntypes:
-#    subg_nodes[ntype] = np.random.choice(hg.number_of_nodes(ntype), int(hg.number_of_nodes(ntype) / 5), replace=False)
-#hg = dgl.compact_graphs(dgl.node_subgraph(hg, subg_nodes))
 
 # OGB-MAG is stored in heterogeneous format. We need to convert it into homogeneous format.
 g = dgl.to_homogeneous(hg)
@@ -46,11 +42,44 @@ for ntype in hg.ntypes:
 dgl.data.utils.save_tensors("node_feat.dgl", node_feats)
 
 # Store the metadata of edges.
+# ParMETIS cannot handle duplicated edges and self-loops. We should remove them
+# in the preprocessing.
 src_id, dst_id = g.edges()
-edge_data = th.stack([src_id, dst_id,
-                      g.edata['orig_id'],
-                      g.edata[dgl.ETYPE]], 1)
+# Remove self-loops
+self_loop_idx = src_id == dst_id
+not_self_loop_idx = src_id != dst_id
+self_loop_src_id = src_id[self_loop_idx]
+self_loop_dst_id = dst_id[self_loop_idx]
+self_loop_orig_id = g.edata['orig_id'][self_loop_idx]
+self_loop_etype = g.edata[dgl.ETYPE][self_loop_idx]
+src_id = src_id[not_self_loop_idx]
+dst_id = dst_id[not_self_loop_idx]
+orig_id = g.edata['orig_id'][not_self_loop_idx]
+etype = g.edata[dgl.ETYPE][not_self_loop_idx]
+# Remove duplicated edges.
+ids = (src_id * g.number_of_nodes() + dst_id).numpy()
+uniq_ids, idx = np.unique(ids, return_index=True)
+duplicate_idx = np.setdiff1d(np.arange(len(ids)), idx)
+duplicate_src_id = src_id[duplicate_idx]
+duplicate_dst_id = dst_id[duplicate_idx]
+duplicate_orig_id = orig_id[duplicate_idx]
+duplicate_etype = etype[duplicate_idx]
+src_id = src_id[idx]
+dst_id = dst_id[idx]
+orig_id = orig_id[idx]
+etype = etype[idx]
+edge_data = th.stack([src_id, dst_id, orig_id, etype], 1)
 np.savetxt('mag_edges.txt', edge_data.numpy(), fmt='%d', delimiter=' ')
+removed_edge_data = th.stack([th.cat([self_loop_src_id, duplicate_src_id]),
+                              th.cat([self_loop_dst_id, duplicate_dst_id]),
+                              th.cat([self_loop_orig_id, duplicate_orig_id]),
+                              th.cat([self_loop_etype, duplicate_etype])],
+                             1)
+np.savetxt('mag_removed_edges.txt',
+           removed_edge_data.numpy(), fmt='%d', delimiter=' ')
+print('There are {} edges, remove {} self-loops and {} duplicated edges'.format(g.number_of_edges(),
+                                                                                len(self_loop_src_id),
+                                                                                len(duplicate_src_id)))
 
 # Store the edge features
 edge_feats = {}
@@ -60,9 +89,10 @@ for etype in hg.etypes:
 dgl.data.utils.save_tensors("edge_feat.dgl", edge_feats)
 
 # Store the basic metadata of the graph.
-graph_stats = [g.number_of_nodes(), g.number_of_edges(), num_node_weights]
+graph_stats = [g.number_of_nodes(), len(src_id), num_node_weights]
 with open('mag_stats.txt', 'w') as filehandle:
-    filehandle.writelines("{} {} {}".format(graph_stats[0], graph_stats[1], graph_stats[2]))
+    filehandle.writelines("{} {} {}".format(
+        graph_stats[0], graph_stats[1], graph_stats[2]))
 
 # Store the ID ranges of nodes and edges of the entire graph.
 nid_ranges = {}
