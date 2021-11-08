@@ -5,6 +5,7 @@ from torch.utils.data import DataLoader
 from collections import defaultdict
 from collections.abc import Iterator
 from itertools import product
+import pytest
 
 def _check_neighbor_sampling_dataloader(g, nids, dl, mode, collator):
     seeds = defaultdict(list)
@@ -204,6 +205,28 @@ def test_graph_dataloader():
         assert isinstance(graph, dgl.DGLGraph)
         assert F.asnumpy(label).shape[0] == batch_size
 
+@pytest.mark.parametrize('num_workers', [0, 4])
+def test_cluster_gcn(num_workers):
+    dataset = dgl.data.CoraFullDataset()
+    g = dataset[0]
+    sgiter = dgl.dataloading.ClusterGCNSubgraphIterator(g, 100, '.', refresh=True)
+    dataloader = dgl.dataloading.GraphDataLoader(sgiter, batch_size=4, num_workers=num_workers)
+    for sg in dataloader:
+        assert sg.batch_size == 4
+
+    sgiter = dgl.dataloading.ClusterGCNSubgraphIterator(g, 100, '.', refresh=False) # use cache
+    dataloader = dgl.dataloading.GraphDataLoader(sgiter, batch_size=4, num_workers=num_workers)
+    for sg in dataloader:
+        assert sg.batch_size == 4
+
+def test_shadow():
+    g = dgl.graph(([0, 1, 2, 3], [1, 2, 3, 4]))
+    sampler = dgl.dataloading.ShaDowKHopSampler([1, 1])
+    input_nodes, output_nodes, (sg,) = sampler.sample(g, [4])
+    assert F.array_equal(input_nodes, F.tensor([4, 3, 2], dtype=F.int64))
+    assert F.array_equal(output_nodes, F.tensor([4], dtype=F.int64))
+
+
 def _check_device(data):
     if isinstance(data, dict):
         for k, v in data.items():
@@ -214,11 +237,14 @@ def _check_device(data):
     else:
         assert data.device == F.ctx()
 
-def test_node_dataloader():
-    sampler = dgl.dataloading.MultiLayerFullNeighborSampler(2)
-
+@pytest.mark.parametrize('sampler_name', ['full', 'neighbor', 'shadow'])
+def test_node_dataloader(sampler_name):
     g1 = dgl.graph(([0, 0, 0, 1, 1], [1, 2, 3, 3, 4]))
     g1.ndata['feat'] = F.copy_to(F.randn((5, 8)), F.cpu())
+    sampler = {
+        'full': dgl.dataloading.MultiLayerFullNeighborSampler(2),
+        'neighbor': dgl.dataloading.MultiLayerNeighborSampler([3, 3]),
+        'shadow': dgl.dataloading.ShaDowKHopSampler([3, 3])}[sampler_name]
 
     dataloader = dgl.dataloading.NodeDataLoader(
         g1, g1.nodes(), sampler, device=F.ctx(), batch_size=g1.num_nodes())
@@ -236,6 +262,10 @@ def test_node_dataloader():
     for ntype in g2.ntypes:
         g2.nodes[ntype].data['feat'] = F.copy_to(F.randn((g2.num_nodes(ntype), 8)), F.cpu())
     batch_size = max(g2.num_nodes(nty) for nty in g2.ntypes)
+    sampler = {
+        'full': dgl.dataloading.MultiLayerFullNeighborSampler(2),
+        'neighbor': dgl.dataloading.MultiLayerNeighborSampler([{etype: 3 for etype in g2.etypes}] * 2),
+        'shadow': dgl.dataloading.ShaDowKHopSampler([{etype: 3 for etype in g2.etypes}] * 2)}[sampler_name]
 
     dataloader = dgl.dataloading.NodeDataLoader(
         g2, {nty: g2.nodes(nty) for nty in g2.ntypes},
@@ -246,12 +276,18 @@ def test_node_dataloader():
         _check_device(output_nodes)
         _check_device(blocks)
 
-def test_edge_dataloader():
-    sampler = dgl.dataloading.MultiLayerFullNeighborSampler(2)
+
+@pytest.mark.parametrize('sampler_name', ['full', 'neighbor', 'shadow'])
+def test_edge_dataloader(sampler_name):
     neg_sampler = dgl.dataloading.negative_sampler.Uniform(2)
 
     g1 = dgl.graph(([0, 0, 0, 1, 1], [1, 2, 3, 3, 4]))
     g1.ndata['feat'] = F.copy_to(F.randn((5, 8)), F.cpu())
+
+    sampler = {
+        'full': dgl.dataloading.MultiLayerFullNeighborSampler(2),
+        'neighbor': dgl.dataloading.MultiLayerNeighborSampler([3, 3]),
+        'shadow': dgl.dataloading.ShaDowKHopSampler([3, 3])}[sampler_name]
 
     # no negative sampler
     dataloader = dgl.dataloading.EdgeDataLoader(
@@ -280,6 +316,10 @@ def test_edge_dataloader():
     for ntype in g2.ntypes:
         g2.nodes[ntype].data['feat'] = F.copy_to(F.randn((g2.num_nodes(ntype), 8)), F.cpu())
     batch_size = max(g2.num_edges(ety) for ety in g2.canonical_etypes)
+    sampler = {
+        'full': dgl.dataloading.MultiLayerFullNeighborSampler(2),
+        'neighbor': dgl.dataloading.MultiLayerNeighborSampler([{etype: 3 for etype in g2.etypes}] * 2),
+        'shadow': dgl.dataloading.ShaDowKHopSampler([{etype: 3 for etype in g2.etypes}] * 2)}[sampler_name]
 
     # no negative sampler
     dataloader = dgl.dataloading.EdgeDataLoader(
@@ -306,5 +346,7 @@ def test_edge_dataloader():
 if __name__ == '__main__':
     test_neighbor_sampler_dataloader()
     test_graph_dataloader()
-    test_node_dataloader()
-    test_edge_dataloader()
+    test_cluster_gcn(0)
+    for sampler in ['full', 'neighbor', 'shadow']:
+        test_node_dataloader(sampler)
+        test_edge_dataloader(sampler)

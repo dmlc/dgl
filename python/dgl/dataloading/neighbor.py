@@ -22,6 +22,11 @@ class NeighborSamplingMixin(object):
     - :attr:`fanout_arrays`: List of DGL NDArrays containing the fanouts for every edge
       type at every later.
     """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)       # forward to base classes
+        self.fanout_arrays = []
+        self.prob_arrays = None
+
     def _build_prob_arrays(self, g):
         if self.prob is not None:
             self.prob_arrays = [F.to_dgl_nd(g.edges[etype].data[self.prob]) for etype in g.etypes]
@@ -84,11 +89,10 @@ class MultiLayerNeighborSampler(NeighborSamplingMixin, BlockSampler):
     the first, second, and third layer respectively (assuming the backend is PyTorch):
 
     >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([5, 10, 15])
-    >>> collator = dgl.dataloading.NodeCollator(g, train_nid, sampler)
-    >>> dataloader = torch.utils.data.DataLoader(
-    ...     collator.dataset, collate_fn=collator.collate,
+    >>> dataloader = dgl.dataloading.NodeDataLoader(
+    ...     g, train_nid, sampler,
     ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
-    >>> for blocks in dataloader:
+    >>> for input_nodes, output_nodes, blocks in dataloader:
     ...     train_on(blocks)
 
     If training on a heterogeneous graph and you want different number of neighbors for each
@@ -114,8 +118,6 @@ class MultiLayerNeighborSampler(NeighborSamplingMixin, BlockSampler):
 
         # used to cache computations and memory allocations
         # list[dgl.nd.NDArray]; each array stores the fan-outs of all edge types
-        self.fanout_arrays = []
-        self.prob_arrays = None
         self.prob = prob
 
     @classmethod
@@ -173,11 +175,10 @@ class MultiLayerFullNeighborSampler(MultiLayerNeighborSampler):
     second, and third layer respectively (assuming the backend is PyTorch):
 
     >>> sampler = dgl.dataloading.MultiLayerFullNeighborSampler(3)
-    >>> collator = dgl.dataloading.NodeCollator(g, train_nid, sampler)
-    >>> dataloader = torch.utils.data.DataLoader(
-    ...     collator.dataset, collate_fn=collator.collate,
+    >>> dataloader = dgl.dataloading.NodeDataLoader(
+    ...     g, train_nid, sampler,
     ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
-    >>> for blocks in dataloader:
+    >>> for input_nodes, output_nodes, blocks in dataloader:
     ...     train_on(blocks)
 
     Notes

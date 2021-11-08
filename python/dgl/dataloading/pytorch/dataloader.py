@@ -259,7 +259,7 @@ def _restore_subgraph_storage(subg, g):
         frame = g._edge_frames[g.get_etype_id(etype)]
         _restore_subframe_storage(subframe, frame)
 
-def _restore_storages(block, g):
+def _restore_block_storage(block, g):
     for ntype in block.srctypes:
         if ntype not in g.ntypes:
             continue
@@ -438,7 +438,7 @@ class NodeDataLoader:
         The graph.
     nids : Tensor or dict[ntype, Tensor]
         The node set to compute outputs.
-    block_sampler : dgl.dataloading.BlockSampler
+    graph_sampler : dgl.dataloading.Sampler
         The neighborhood sampler.
     device : device context, optional
         The device of the generated MFGs in each iteration, which should be a
@@ -516,7 +516,7 @@ class NodeDataLoader:
     """
     collator_arglist = inspect.getfullargspec(NodeCollator).args
 
-    def __init__(self, g, nids, block_sampler, device=None, use_ddp=False, ddp_seed=0, **kwargs):
+    def __init__(self, g, nids, graph_sampler, device=None, use_ddp=False, ddp_seed=0, **kwargs):
         collator_kwargs = {}
         dataloader_kwargs = {}
         for k, v in kwargs.items():
@@ -532,7 +532,7 @@ class NodeDataLoader:
             assert device == 'cpu', 'Only cpu is supported in the case of a DistGraph.'
             # Distributed DataLoader currently does not support heterogeneous graphs
             # and does not copy features.  Fallback to normal solution
-            self.collator = NodeCollator(g, nids, block_sampler, **collator_kwargs)
+            self.collator = NodeCollator(g, nids, graph_sampler, **collator_kwargs)
             _remove_kwargs_dist(dataloader_kwargs)
             self.dataloader = DistDataLoader(self.collator.dataset,
                                              collate_fn=self.collator.collate,
@@ -546,10 +546,10 @@ class NodeDataLoader:
             # if the sampler supports it, tell it to output to the
             # specified device
             num_workers = dataloader_kwargs.get('num_workers', 0)
-            if callable(getattr(block_sampler, "set_output_context", None)) and num_workers == 0:
-                block_sampler.set_output_context(to_dgl_context(device))
+            if callable(getattr(graph_sampler, "set_output_context", None)) and num_workers == 0:
+                graph_sampler.set_output_context(to_dgl_context(device))
 
-            self.collator = _NodeCollator(g, nids, block_sampler, **collator_kwargs)
+            self.collator = _NodeCollator(g, nids, graph_sampler, **collator_kwargs)
             self.use_scalar_batcher, self.scalar_batcher, self.dataloader, self.dist_sampler = \
                 _init_dataloader(self.collator, device, dataloader_kwargs, use_ddp, ddp_seed)
 
@@ -623,7 +623,7 @@ class EdgeDataLoader:
         The graph.  Currently must be on CPU; GPU is not supported.
     eids : Tensor or dict[etype, Tensor]
         The edge set in graph :attr:`g` to compute outputs.
-    block_sampler : dgl.dataloading.BlockSampler
+    graph_sampler : dgl.dataloading.Sampler
         The neighborhood sampler.
     device : device context, optional
         The device of the generated MFGs and graphs in each iteration, which should be a
@@ -804,7 +804,7 @@ class EdgeDataLoader:
     """
     collator_arglist = inspect.getfullargspec(EdgeCollator).args
 
-    def __init__(self, g, eids, block_sampler, device='cpu', use_ddp=False, ddp_seed=0, **kwargs):
+    def __init__(self, g, eids, graph_sampler, device='cpu', use_ddp=False, ddp_seed=0, **kwargs):
         collator_kwargs = {}
         dataloader_kwargs = {}
         for k, v in kwargs.items():
@@ -820,7 +820,7 @@ class EdgeDataLoader:
             assert device == 'cpu', 'Only cpu is supported in the case of a DistGraph.'
             # Distributed DataLoader currently does not support heterogeneous graphs
             # and does not copy features.  Fallback to normal solution
-            self.collator = EdgeCollator(g, eids, block_sampler, **collator_kwargs)
+            self.collator = EdgeCollator(g, eids, graph_sampler, **collator_kwargs)
             _remove_kwargs_dist(dataloader_kwargs)
             self.dataloader = DistDataLoader(self.collator.dataset,
                                              collate_fn=self.collator.collate,
@@ -834,10 +834,10 @@ class EdgeDataLoader:
             # if the sampler supports it, tell it to output to the
             # specified device
             num_workers = dataloader_kwargs.get('num_workers', 0)
-            if callable(getattr(block_sampler, "set_output_context", None)) and num_workers == 0:
-                block_sampler.set_output_context(to_dgl_context(device))
+            if callable(getattr(graph_sampler, "set_output_context", None)) and num_workers == 0:
+                graph_sampler.set_output_context(to_dgl_context(device))
 
-            self.collator = _EdgeCollator(g, eids, block_sampler, **collator_kwargs)
+            self.collator = _EdgeCollator(g, eids, graph_sampler, **collator_kwargs)
             self.use_scalar_batcher, self.scalar_batcher, self.dataloader, self.dist_sampler = \
                     _init_dataloader(self.collator, device, dataloader_kwargs, use_ddp, ddp_seed)
             self.use_ddp = use_ddp
@@ -971,7 +971,7 @@ class GraphDataLoader:
 
     def __iter__(self):
         """Return the iterator of the data loader."""
-        return _GraphDataLoaderIter(self.dataloader)
+        return _GraphDataLoaderIter(self)
 
     def __len__(self):
         """Return the number of batches of the data loader."""
