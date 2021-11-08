@@ -67,7 +67,8 @@ class GNNExplainer(nn.Module):
 
         return feat_mask, edge_mask
 
-    def _loss(self, )
+    def _loss(self):
+        return NotImplementedError
 
     def explain_node(self, node_id, graph, feat, **kwargs):
         r"""Learns and returns a node feature mask and subgraph that play a
