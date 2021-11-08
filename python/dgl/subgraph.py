@@ -749,7 +749,7 @@ def khop_out_subgraph(graph, nodes, k, *, relabel_nodes=True, store_ids=True):
     -------
     DGLGraph
         The subgraph.
-    Tensor or dict[str, Tensor]
+    Tensor or dict[str, Tensor], optional
         The new IDs of the input :attr:`nodes` after node relabeling. This is returned
         only when :attr:`relabel_nodes` is True. It is in the same form as :attr:`nodes`.
 
