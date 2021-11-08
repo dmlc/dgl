@@ -10,6 +10,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import dgl
+import dgl.function as fn
 from dgl.data import register_data_args
 
 from modules import GraphSAGE
@@ -71,6 +72,11 @@ def main(args):
         print("adding self-loop edges")
     # metis only support int64 graph
     g = g.long()
+
+    if args.use_pp:
+        g.update_all(fn.copy_u('feat', 'm'), fn.sum('m', 'feat_agg'))
+        g.ndata['feat'] = torch.cat([g.ndata['feat'], g.ndata['feat_agg']], 1)
+        del g.ndata['feat_agg']
 
     cluster_iterator = dgl.dataloading.GraphDataLoader(
         dgl.dataloading.ClusterGCNSubgraphIterator(

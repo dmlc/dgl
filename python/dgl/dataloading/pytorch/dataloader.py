@@ -374,7 +374,7 @@ class _EdgeDataLoaderIter:
 class _GraphDataLoaderIter:
     def __init__(self, graph_dataloader):
         self.dataloader = graph_dataloader
-        self.iter_ = iter(graph_dataloader)
+        self.iter_ = iter(graph_dataloader.dataloader)
 
     def __iter__(self):
         return self
