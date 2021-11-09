@@ -635,7 +635,9 @@ class NodeDataLoader:
             # we'd like to avoid any graph/data transfer graphs across devices in
             # sampler. Such transfer will be handled in dataloader.
             num_workers = dataloader_kwargs.get('num_workers', 0)
-            if (not async_load) and callable(getattr(graph_sampler, "set_output_context", None)) and num_workers == 0:
+            if ((not async_load) and
+                    callable(getattr(graph_sampler, "set_output_context", None)) and
+                    num_workers == 0):
                 graph_sampler.set_output_context(to_dgl_context(device))
 
             self.collator = _NodeCollator(g, nids, graph_sampler, **collator_kwargs)
