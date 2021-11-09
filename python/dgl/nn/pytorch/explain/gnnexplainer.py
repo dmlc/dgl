@@ -264,7 +264,7 @@ class GNNExplainer(nn.Module):
 
         if self.log:
             pbar = tqdm(total=self.num_epochs)
-            pbar.set_description(f'Explain node {node_id}')
+            pbar.set_description('Explain node {node_id}')
 
         for _ in range(self.num_epochs):
             optimizer.zero_grad()
@@ -387,7 +387,7 @@ class GNNExplainer(nn.Module):
 
         if self.log:
             pbar = tqdm(total=self.num_epochs)
-            pbar.set_description(f'Explain graph')
+            pbar.set_description('Explain graph')
 
         for _ in range(self.num_epochs):
             optimizer.zero_grad()
