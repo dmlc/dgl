@@ -25,9 +25,12 @@ class CARESampler(dgl.dataloading.BlockSampler):
                 # extract each node from dict because of single node type
                 for node in seed_nodes:
                     edges = g.in_edges(node, form='eid', etype=etype)
-                    num_neigh = int(g.in_degrees(node, etype=etype) * self.p[block_id][etype])
+                    num_neigh = th.ceil(g.in_degrees(node, etype=etype) * self.p[block_id][etype]).int().item()
                     neigh_dist = self.dists[block_id][etype][edges]
-                    neigh_index = np.argpartition(neigh_dist.cpu().detach(), num_neigh)[:num_neigh]
+                    if neigh_dist.shape[0] > num_neigh:
+                        neigh_index = np.argpartition(neigh_dist.cpu().detach(), num_neigh)[:num_neigh]
+                    else:
+                        neigh_index = np.arange(num_neigh)
                     edge_mask[edges[neigh_index]] = 1
                 new_edges_masks[etype] = edge_mask.bool()
 

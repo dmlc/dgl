@@ -188,5 +188,6 @@ if __name__ == '__main__':
     parser.add_argument('--early-stop', action='store_true', default=False, help="indicates whether to use early stop")
 
     args = parser.parse_args()
+    th.manual_seed(717)
     print(args)
     main(args)

@@ -70,9 +70,7 @@ python main_sampling.py
 
 Performance
 -------------------------
-The result reported by the paper is the best validation results within 30 epochs, and the table below reports the average  value and standard deviation of 10 runs for val / test (same setting in the paper except for the random seed, here `seed=717`). Early stopping with patience value of 100 is applied.
-
-We try to  run the experiments under the same experimental setting in the paper, but the training process is affected by the random seed (especially the RL process). The mini-batch version is recommended since it is more similar to the author’implementation. 
+The result reported by the paper is the best validation results within 30 epochs, and the table below reports the val and test results (same setting in the paper except for the random seed, here `seed=717`). 
 
 <table>
 <thead>
@@ -90,38 +88,39 @@ We try to  run the experiments under the same experimental setting in the paper,
     <td>30 </td>
   </tr>
   <tr>
-    <td rowspan="3">AUC</td>
+    <td rowspan="3">AUC (val/test)</td>
     <td>paper reported</td>
     <td>0.8973 / -</td>
     <td>0.7570 / -</td>
   </tr>
   <tr>
     <td>DGL full graph</td>
-    <td>0.8799±0.0157 / 0.8740±0.0176</td>
-    <td>0.6781 / 0.6822</td>
+    <td>0.8849 / 0.8922</td>
+    <td>0.6856 / 0.6867</td>
   </tr>
   <tr>
     <td>DGL sampling</td>
-    <td>0.9271±0.0108 / 0.9142±0.0114</td>
-    <td>0.7588±0.0061 / 0.7627±0.0045</td>
+    <td>0.9350 / 0.9331</td>
+    <td>0.7857 / 0.7890</td>
   </tr>
   <tr>
-    <td rowspan="3">Recall</td>
+    <td rowspan="3">Recall (val/test)</td>
     <td>paper reported</td>
     <td>0.8848 / -</td>
     <td>0.7192 / -</td>
   </tr>
   <tr>
     <td>DGL full graph</td>
-    <td>0.8165±0.0349 / 0.7967±0.0406</td>
-    <td>0.6190 / 0.7977</td>
+    <td>0.8615 / 0.8544</td>
+    <td>0.6667/ 0.6619</td>
   </tr>
   <tr>
     <td>DGL sampling</td>
-    <td>0.8301±0.0275 / 0.8221±0.0258</td>
-    <td>0.7003±0.0258 / 0.6956±0.0225</td>
+    <td>0.9130 / 0.9045</td>
+    <td>0.7537 / 0.7540</td>
   </tr>
 </tbody>
 </table>
+
 
 
