@@ -1,8 +1,8 @@
 """Torch Module for GNNExplainer"""
 # pylint: disable= no-member, arguments-differ, invalid-name
+from math import sqrt
 import torch
 
-from math import sqrt
 from torch import nn
 from tqdm import tqdm
 
@@ -244,9 +244,9 @@ class GNNExplainer(nn.Module):
         feat = feat[sg_nodes]
         for key, item in kwargs.items():
             if torch.is_tensor(item) and item.size(0) == num_nodes:
-                item[sg_nodes]
+                item = item[sg_nodes]
             elif torch.is_tensor(item) and item.size(0) == num_edges:
-                item[sg_edges]
+                item = item[sg_edges]
             kwargs[key] = item
 
         # Get the initial prediction.
