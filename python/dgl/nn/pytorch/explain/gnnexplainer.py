@@ -198,25 +198,21 @@ class GNNExplainer(nn.Module):
 
         params = [feat_mask, edge_mask]
         optimizer = torch.optim.Adam(params, lr=self.lr)
-        # Hack
-        model_optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
 
         if self.log:
             pbar = tqdm(total=self.num_epochs)
             pbar.set_description(f'Explain node {node_id}')
 
-        model_optimizer.zero_grad()
         for _ in range(self.num_epochs):
-            feat = feat * feat_mask.sigmoid()
-            logits = self.model(graph=sg, feat=feat,
+            optimizer.zero_grad()
+            h = feat * feat_mask.sigmoid()
+            logits = self.model(graph=sg, feat=h,
                                 eweight=edge_mask.sigmoid())
             log_probs = logits.log_softmax(dim=-1)
             loss = -log_probs[inverse_indices, pred_label[inverse_indices]]
             loss = self._loss_regularize(loss, edge_mask, feat_mask)
             loss.backward()
             optimizer.step()
-            optimizer.zero_grad()
-            model_optimizer.zero_grad()
 
             if self.log:
                 pbar.update(1)
