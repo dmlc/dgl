@@ -630,10 +630,12 @@ class NodeDataLoader:
             self.load_output = {} if load_output is None else load_output
             self.async_load = async_load
 
-            # if the sampler supports it, tell it to output to the
-            # specified device
+            # if the sampler supports it, tell it to output to the specified device.
+            # But if async_load is enabled, set_output_context should be skipped as
+            # we'd like to avoid any graph/data transfer graphs across devices in
+            # sampler. Such transfer will be handled in dataloader.
             num_workers = dataloader_kwargs.get('num_workers', 0)
-            if callable(getattr(graph_sampler, "set_output_context", None)) and num_workers == 0:
+            if (not async_load) and callable(getattr(graph_sampler, "set_output_context", None)) and num_workers == 0:
                 graph_sampler.set_output_context(to_dgl_context(device))
 
             self.collator = _NodeCollator(g, nids, graph_sampler, **collator_kwargs)
