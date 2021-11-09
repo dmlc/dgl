@@ -689,7 +689,7 @@ def khop_in_subgraph(graph, nodes, k, *, relabel_nodes=True, store_ids=True):
             hop_nodes.get(nty, place_holder)
             for hop_nodes in k_hop_nodes_], dim=0), return_inverse=True)
 
-    sg = node_subgraph(graph, k_hop_nodes, relabel_nodes=relabel_nodes, store_ids=store_ids)
+    sub_g = node_subgraph(graph, k_hop_nodes, relabel_nodes=relabel_nodes, store_ids=store_ids)
     if relabel_nodes:
         if is_mapping:
             seed_inverse_indices = dict()
@@ -699,9 +699,9 @@ def khop_in_subgraph(graph, nodes, k, *, relabel_nodes=True, store_ids=True):
         else:
             seed_inverse_indices = F.slice_axis(
                 inverse_indices[nty], axis=0, begin=0, end=len(nodes[nty]))
-        return sg, seed_inverse_indices
+        return sub_g, seed_inverse_indices
     else:
-        return sg
+        return sub_g
 
 DGLHeteroGraph.khop_in_subgraph = utils.alias_func(khop_in_subgraph)
 
@@ -843,7 +843,7 @@ def khop_out_subgraph(graph, nodes, k, *, relabel_nodes=True, store_ids=True):
             hop_nodes.get(nty, place_holder)
             for hop_nodes in k_hop_nodes_], dim=0), return_inverse=True)
 
-    sg = node_subgraph(graph, k_hop_nodes, relabel_nodes=relabel_nodes, store_ids=store_ids)
+    sub_g = node_subgraph(graph, k_hop_nodes, relabel_nodes=relabel_nodes, store_ids=store_ids)
     if relabel_nodes:
         if is_mapping:
             seed_inverse_indices = dict()
@@ -853,9 +853,9 @@ def khop_out_subgraph(graph, nodes, k, *, relabel_nodes=True, store_ids=True):
         else:
             seed_inverse_indices = F.slice_axis(
                 inverse_indices[nty], axis=0, begin=0, end=len(nodes[nty]))
-        return sg, seed_inverse_indices
+        return sub_g, seed_inverse_indices
     else:
-        return sg
+        return sub_g
 
 DGLHeteroGraph.khop_out_subgraph = utils.alias_func(khop_out_subgraph)
 
