@@ -226,7 +226,6 @@ class GNNExplainer(nn.Module):
 
         feat_mask = feat_mask.detach().sigmoid().squeeze()
         edge_mask = edge_mask.detach().sigmoid()
-        self._restore_model_grad()
 
         return sg, feat_mask, edge_mask
 
