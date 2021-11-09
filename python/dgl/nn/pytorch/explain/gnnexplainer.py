@@ -164,10 +164,26 @@ class GNNExplainer(nn.Module):
         >>> # Explain the prediction for node 0
         >>> explainer = GNNExplainer(model, num_hops=1)
         >>> sg, feat_mask, edge_mask = explainer.explain_node(0, g, features)
+        >>> sg.num_edges()
+        26
+        >>> feat_mask
+        tensor([0.2638, 0.2738, 0.3039,  ..., 0.2794, 0.2643, 0.2733])
+        >>> edge_mask
+        tensor([0.8291, 0.2065, 0.1379, 0.2265, 0.8618, 0.7038, 0.2094, 0.8847, 0.2157,
+                0.6595, 0.1906, 0.8184, 0.2033, 0.7211, 0.1279, 0.1668, 0.1441, 0.8571,
+                0.1903, 0.1125, 0.8235, 0.1913, 0.5834, 0.2248, 0.8345, 0.9270])
 
         Returns
         -------
-        TODO
+        sg : DGLGraph
+            The subgraph induced on the k-hop in-neighborhood of :attr:`node_id`.
+        feat_mask : Tensor
+            Learned feature importance mask of shape (D,), where D is the feature
+            size. The values are within range (0, 1). The higher, the more important.
+        edge_mask : Tensor
+            Learned importance mask of the edges in the subgraph, which is a tensor
+            of shape (E,), where E is the number of edges in the subgraph. The values
+            are within range (0, 1). The higher, the more important.
         """
         self.model.eval()
         num_nodes = graph.num_nodes()
@@ -223,7 +239,7 @@ class GNNExplainer(nn.Module):
         feat_mask = feat_mask.detach().sigmoid().squeeze()
         edge_mask = edge_mask.detach().sigmoid()
 
-        return sg, feat_mask, edge_mask
+        return inverse_indices, sg, feat_mask, edge_mask
 
     def explain_graph(self):
         r"""TODO"""
