@@ -565,6 +565,45 @@ def test_gat_conv_bi(g, idtype, out_dim, num_heads):
     assert a.shape == (g.number_of_edges(), num_heads, 1)
 
 @parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite'], exclude=['zero-degree']))
+@pytest.mark.parametrize('out_dim', [1, 5])
+@pytest.mark.parametrize('num_heads', [1, 4])
+def test_gatv2_conv(g, idtype, out_dim, num_heads):
+    g = g.astype(idtype).to(F.ctx())
+    ctx = F.ctx()
+    gat = nn.GATv2Conv(5, out_dim, num_heads)
+    feat = F.randn((g.number_of_src_nodes(), 5))
+    gat = gat.to(ctx)
+    h = gat(g, feat)
+
+    # test pickle
+    th.save(gat, tmp_buffer)
+
+    assert h.shape == (g.number_of_dst_nodes(), num_heads, out_dim)
+    _, a = gat(g, feat, get_attention=True)
+    assert a.shape == (g.number_of_edges(), num_heads, 1)
+
+    # test residual connection
+    gat = nn.GATConv(5, out_dim, num_heads, residual=True)
+    gat = gat.to(ctx)
+    h = gat(g, feat)
+
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['bipartite'], exclude=['zero-degree']))
+@pytest.mark.parametrize('out_dim', [1, 2])
+@pytest.mark.parametrize('num_heads', [1, 4])
+def test_gatv2_conv_bi(g, idtype, out_dim, num_heads):
+    g = g.astype(idtype).to(F.ctx())
+    ctx = F.ctx()
+    gat = nn.GATv2Conv(5, out_dim, num_heads)
+    feat = (F.randn((g.number_of_src_nodes(), 5)), F.randn((g.number_of_dst_nodes(), 5)))
+    gat = gat.to(ctx)
+    h = gat(g, feat)
+    assert h.shape == (g.number_of_dst_nodes(), num_heads, out_dim)
+    _, a = gat(g, feat, get_attention=True)
+    assert a.shape == (g.number_of_edges(), num_heads, 1)
+
+@parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
 @pytest.mark.parametrize('out_node_feats', [1, 5])
 @pytest.mark.parametrize('out_edge_feats', [1, 5])
@@ -1159,6 +1198,7 @@ if __name__ == '__main__':
     test_rgcn_sorted()
     test_tagconv()
     test_gat_conv()
+    test_gatv2_conv()
     test_egat_conv()
     test_sage_conv()
     test_sgc_conv()
