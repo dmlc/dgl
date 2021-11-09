@@ -57,6 +57,10 @@ class GNNExplainer(nn.Module):
                  log=True):
         super(GNNExplainer, self).__init__()
         self.model = model
+        requires_grad = []
+        for param in self.model.parameters():
+            requires_grad.append(param.requires_grad)
+        self.requires_grad = requires_grad
         self.num_hops = num_hops
         self.lr = lr
         self.num_epochs = num_epochs
@@ -71,7 +75,7 @@ class GNNExplainer(nn.Module):
         feat_mask = nn.Parameter(torch.randn(1, feat_size) * std)
 
         std = nn.init.calculate_gain('relu') * sqrt(2.0 / (2 * num_nodes))
-        edge_mask = torch.nn.Parameter(torch.randn(num_edges) * std)
+        edge_mask = nn.Parameter(torch.randn(num_edges) * std)
 
         return feat_mask, edge_mask
 
@@ -97,6 +101,14 @@ class GNNExplainer(nn.Module):
         loss = loss + self.coeffs['node_feat_ent'] * ent.mean()
 
         return loss
+
+    def _disable_model_grad(self):
+        for param in self.model.parameters():
+            param.requires_grad = False
+
+    def _restore_model_grad(self):
+        for i, param in enumerate(self.model.parameters()):
+            param.requires_grad = self.requires_grad[i]
 
     def explain_node(self, node_id, graph, feat, **kwargs):
         r"""Learns and returns a node feature mask and subgraph that play a
@@ -170,6 +182,7 @@ class GNNExplainer(nn.Module):
         TODO
         """
         self.model.eval()
+        self._disable_model_grad()
         num_nodes = graph.num_nodes()
         num_edges = graph.num_edges()
 
@@ -222,6 +235,7 @@ class GNNExplainer(nn.Module):
 
         feat_mask = feat_mask.detach().sigmoid().squeeze()
         edge_mask = edge_mask.detach().sigmoid()
+        self._restore_model_grad()
 
         return sg, feat_mask, edge_mask
 
