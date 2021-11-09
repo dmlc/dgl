@@ -62,8 +62,25 @@ class GNNExplainer(nn.Module):
         self.num_epochs = num_epochs
         self.log = log
 
-    def _init_masks(self, feat, graph):
-        r"""TODO"""
+    def _init_masks(self, graph, feat):
+        r"""Initialize learnable feature and edge mask.
+
+        Parameters
+        ----------
+        graph : DGLGraph
+            Input graph.
+        feat : Tensor
+            Input node features.
+
+        Returns
+        -------
+        feat_mask : Tensor
+            Feature mask of shape :math:`(1, D)`, where :math:`D`
+            is the feature size.
+        edge_mask : Tensor
+            Edge mask of shape :math:`(E)`, where :math:`E` is the
+            number of edges.
+        """
         num_nodes, feat_size = feat.size()
         num_edges = graph.num_edges()
 
@@ -75,8 +92,25 @@ class GNNExplainer(nn.Module):
 
         return feat_mask, edge_mask
 
-    def _loss_regularize(self, loss, edge_mask, feat_mask):
-        r"""TODO"""
+    def _loss_regularize(self, loss, feat_mask, edge_mask):
+        r"""Add regularization terms to the loss.
+
+        Parameters
+        ----------
+        loss : Tensor
+            Loss value.
+        feat_mask : Tensor
+            Feature mask of shape :math:`(1, D)`, where :math:`D`
+            is the feature size.
+        edge_mask : Tensor
+            Edge mask of shape :math:`(E)`, where :math:`E`
+            is the number of edges.
+
+        Returns
+        -------
+        Tensor
+            Loss value with regularization terms added.
+        """
         # epsilon for numerical stability
         eps = 1e-15
 
@@ -99,7 +133,7 @@ class GNNExplainer(nn.Module):
         return loss
 
     def explain_node(self, node_id, graph, feat, **kwargs):
-        r"""Learns and returns a node feature mask and subgraph that play a
+        r"""Learn and return a node feature mask and subgraph that play a
         crucial role to explain the prediction made by the GNN for node
         :attr:`node_id`.
 
@@ -109,17 +143,34 @@ class GNNExplainer(nn.Module):
             The node to explain.
         graph : DGLGraph
             A homogeneous graph.
-        feat : torch.Tensor
-            The input feature of shape :math:`(N, *)`. :math:`N` is the
-            number of nodes, and :math:`*` could be of any shape.
+        feat : Tensor
+            The input feature of shape :math:`(N, D)`. :math:`N` is the
+            number of nodes, and :math:`D` is the feature size.
         kwargs : dict
             Additional arguments passed to the GNN model. Tensors whose
             first dimension is the number of nodes or edges will be
             assumed to be node/edge features.
 
+        Returns
+        -------
+        new_node_id : Tensor
+            The new ID of the input center node.
+        sg : DGLGraph
+            The subgraph induced on the k-hop in-neighborhood of :attr:`node_id`.
+        feat_mask : Tensor
+            Learned feature importance mask of shape :math:`(D)`, where :math:`D` is the
+            feature size. The values are within range :math:`(0, 1)`.
+            The higher, the more important.
+        edge_mask : Tensor
+            Learned importance mask of the edges in the subgraph, which is a tensor
+            of shape :math:`(E)`, where :math:`E` is the number of edges in the
+            subgraph. The values are within range :math:`(0, 1)`.
+            The higher, the more important.
+
         Examples
         --------
 
+        >>> import dgl
         >>> import dgl.function as fn
         >>> import torch
         >>> import torch.nn as nn
@@ -161,29 +212,25 @@ class GNNExplainer(nn.Module):
         >>>     loss.backward()
         >>>     optimizer.step()
 
-        >>> # Explain the prediction for node 0
+        >>> # Explain the prediction for node 10
         >>> explainer = GNNExplainer(model, num_hops=1)
-        >>> sg, feat_mask, edge_mask = explainer.explain_node(0, g, features)
+        >>> new_center, sg, feat_mask, edge_mask = explainer.explain_node(10, g, features)
+        >>> new_center
+        tensor([1])
         >>> sg.num_edges()
         26
+        >>> # Old IDs of the nodes in the subgraph
+        >>> sg.ndata[dgl.NID]
+        tensor([ 9, 10, 11, 12])
+        >>> # Old IDs of the edges in the subgraph
+        >>> sg.edata[dgl.EID]
+        tensor([51, 53, 56, 48, 52, 57, 47, 50, 55, 46, 49, 54])
         >>> feat_mask
         tensor([0.2638, 0.2738, 0.3039,  ..., 0.2794, 0.2643, 0.2733])
         >>> edge_mask
         tensor([0.8291, 0.2065, 0.1379, 0.2265, 0.8618, 0.7038, 0.2094, 0.8847, 0.2157,
                 0.6595, 0.1906, 0.8184, 0.2033, 0.7211, 0.1279, 0.1668, 0.1441, 0.8571,
                 0.1903, 0.1125, 0.8235, 0.1913, 0.5834, 0.2248, 0.8345, 0.9270])
-
-        Returns
-        -------
-        sg : DGLGraph
-            The subgraph induced on the k-hop in-neighborhood of :attr:`node_id`.
-        feat_mask : Tensor
-            Learned feature importance mask of shape (D,), where D is the feature
-            size. The values are within range (0, 1). The higher, the more important.
-        edge_mask : Tensor
-            Learned importance mask of the edges in the subgraph, which is a tensor
-            of shape (E,), where E is the number of edges in the subgraph. The values
-            are within range (0, 1). The higher, the more important.
         """
         self.model.eval()
         num_nodes = graph.num_nodes()
@@ -202,12 +249,12 @@ class GNNExplainer(nn.Module):
                 item[sg_edges]
             kwargs[key] = item
 
-        # Get the initial prediction
+        # Get the initial prediction.
         with torch.no_grad():
             logits = self.model(graph=sg, feat=feat, **kwargs)
             pred_label = logits.argmax(dim=-1)
 
-        feat_mask, edge_mask = self._init_masks(feat, sg)
+        feat_mask, edge_mask = self._init_masks(sg, feat)
         device = feat.device
         feat_mask = feat_mask.to(device)
         edge_mask = edge_mask.to(device)
@@ -223,10 +270,10 @@ class GNNExplainer(nn.Module):
             optimizer.zero_grad()
             h = feat * feat_mask.sigmoid()
             logits = self.model(graph=sg, feat=h,
-                                eweight=edge_mask.sigmoid())
+                                eweight=edge_mask.sigmoid(), **kwargs)
             log_probs = logits.log_softmax(dim=-1)
             loss = -log_probs[inverse_indices, pred_label[inverse_indices]]
-            loss = self._loss_regularize(loss, edge_mask, feat_mask)
+            loss = self._loss_regularize(loss, feat_mask, edge_mask)
             loss.backward()
             optimizer.step()
 
@@ -241,6 +288,75 @@ class GNNExplainer(nn.Module):
 
         return inverse_indices, sg, feat_mask, edge_mask
 
-    def explain_graph(self):
-        r"""TODO"""
+    def explain_graph(self, graph, feat, **kwargs):
+        r"""Learn and return a node feature mask and an edge mask that play a
+        crucial role to explain the prediction made by the GNN for a graph.
+
+        Parameters
+        ----------
+        graph : DGLGraph
+            A homogeneous graph.
+        feat : Tensor
+            The input feature of shape :math:`(N, D)`. :math:`N` is the
+            number of nodes, and :math:`D` is the feature size.
+        kwargs : dict
+            Additional arguments passed to the GNN model. Tensors whose
+            first dimension is the number of nodes or edges will be
+            assumed to be node/edge features.
+
+        Returns
+        -------
+        feat_mask : Tensor
+            Learned feature importance mask of shape :math:`(D)`, where :math:`D` is the
+            feature size. The values are within range :math:`(0, 1)`.
+            The higher, the more important.
+        edge_mask : Tensor
+            Learned importance mask of the edges in the graph, which is a tensor
+            of shape :math:`(E)`, where :math:`E` is the number of edges in the
+            graph. The values are within range :math:`(0, 1)`. The higher,
+            the more important.
+
+        Examples
+        --------
+        TODO
+        """
         self.model.eval()
+
+        # Get the initial prediction.
+        with torch.no_grad():
+            logits = self.model(graph=graph, feat=feat, **kwargs)
+            pred_label = logits.argmax(dim=-1)
+
+        feat_mask, edge_mask = self._init_masks(graph, feat)
+        device = feat.device
+        feat_mask = feat_mask.to(device)
+        edge_mask = edge_mask.to(device)
+
+        params = [feat_mask, edge_mask]
+        optimizer = torch.optim.Adam(params, lr=self.lr)
+
+        if self.log:
+            pbar = tqdm(total=self.num_epochs)
+            pbar.set_description(f'Explain graph')
+
+        for _ in range(self.num_epochs):
+            optimizer.zero_grad()
+            h = feat * feat_mask.sigmoid()
+            logits = self.model(graph=graph, feat=h,
+                                eweight=edge_mask.sigmoid(), **kwargs)
+            log_probs = logits.log_softmax(dim=-1)
+            loss = -log_probs[0, pred_label[0]]
+            loss = self._loss_regularize(loss, feat_mask, edge_mask)
+            loss.backward()
+            optimizer.step()
+
+            if self.log:
+                pbar.update(1)
+
+        if self.log:
+            pbar.close()
+
+        feat_mask = feat_mask.detach().sigmoid().squeeze()
+        edge_mask = edge_mask.detach().sigmoid()
+
+        return feat_mask, edge_mask
