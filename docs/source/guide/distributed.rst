@@ -16,7 +16,7 @@ For the training script, DGL provides distributed APIs that are similar to the o
 mini-batch training. This makes distributed training require only small code modifications
 from mini-batch training on a single machine. Below shows an example of training GraphSage
 in a distributed fashion. The only code modifications are located on line 4-7:
-1) initialize DGL's distributed module, 2) create a distributed graph object, and 
+1) initialize DGL's distributed module, 2) create a distributed graph object, and
 3) split the training set and calculate the nodes for the local process.
 The rest of the code, including sampler creation, model definition, training loops
 are the same as :ref:`mini-batch training <guide-minibatch>`.
@@ -35,7 +35,7 @@ are the same as :ref:`mini-batch training <guide-minibatch>`.
 
     # Create sampler
     sampler = NeighborSampler(g, [10,25],
-                              dgl.distributed.sample_neighbors, 
+                              dgl.distributed.sample_neighbors,
                               device)
 
     dataloader = DistDataLoader(
@@ -66,8 +66,6 @@ When running the training script in a cluster of machines, DGL provides tools to
 to the cluster's machines and launch the training job on all machines.
 
 **Note**: The current distributed training API only supports the Pytorch backend.
-
-**Note**: The current implementation only supports graphs with one node type and one edge type.
 
 DGL implements a few distributed components to support distributed training. The figure below
 shows the components and their interactions.

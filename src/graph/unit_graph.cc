@@ -61,12 +61,15 @@ inline GraphPtr CreateUnitGraphMetaGraph(int num_vtypes) {
 
 class UnitGraph::COO : public BaseHeteroGraph {
  public:
-  COO(GraphPtr metagraph, int64_t num_src, int64_t num_dst, IdArray src, IdArray dst)
+  COO(GraphPtr metagraph, int64_t num_src, int64_t num_dst, IdArray src,
+      IdArray dst, bool row_sorted = false, bool col_sorted = false)
     : BaseHeteroGraph(metagraph) {
     CHECK(aten::IsValidIdArray(src));
     CHECK(aten::IsValidIdArray(dst));
     CHECK_EQ(src->shape[0], dst->shape[0]) << "Input arrays should have the same length.";
-    adj_ = aten::COOMatrix{num_src, num_dst, src, dst};
+    adj_ = aten::COOMatrix{num_src, num_dst, src, dst,
+        NullArray(),
+        row_sorted, col_sorted};
   }
 
   COO(GraphPtr metagraph, const aten::COOMatrix& coo)
@@ -146,10 +149,11 @@ class UnitGraph::COO : public BaseHeteroGraph {
     return ret;
   }
 
-  COO CopyTo(const DLContext& ctx) const {
+  COO CopyTo(const DLContext &ctx,
+             const DGLStreamHandle &stream = nullptr) const {
     if (Context() == ctx)
       return *this;
-    return COO(meta_graph_, adj_.CopyTo(ctx));
+    return COO(meta_graph_, adj_.CopyTo(ctx, stream));
   }
 
   bool IsMultigraph() const override {
@@ -232,7 +236,7 @@ class UnitGraph::COO : public BaseHeteroGraph {
 
   EdgeArray FindEdges(dgl_type_t etype, IdArray eids) const override {
     CHECK(aten::IsValidIdArray(eids)) << "Invalid edge id array";
-    BUG_ON(aten::IsNullArray(adj_.data)) <<
+    BUG_IF_FAIL(aten::IsNullArray(adj_.data)) <<
       "FindEdges requires the internal COO matrix not having EIDs.";
     return EdgeArray{aten::IndexSelect(adj_.row, eids),
                      aten::IndexSelect(adj_.col, eids),
@@ -450,9 +454,11 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     : BaseHeteroGraph(metagraph) {
     CHECK(aten::IsValidIdArray(indptr));
     CHECK(aten::IsValidIdArray(indices));
-    CHECK(aten::IsValidIdArray(edge_ids));
-    CHECK_EQ(indices->shape[0], edge_ids->shape[0])
-      << "indices and edge id arrays should have the same length";
+    if (aten::IsValidIdArray(edge_ids))
+      CHECK((indices->shape[0] == edge_ids->shape[0]) || aten::IsNullArray(edge_ids))
+        << "edge id arrays should have the same length as indices if not empty";
+    CHECK_EQ(num_src, indptr->shape[0] - 1)
+      << "number of nodes do not match the length of indptr minus 1.";
 
     adj_ = aten::CSRMatrix{num_src, num_dst, indptr, indices, edge_ids};
   }
@@ -532,11 +538,12 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     }
   }
 
-  CSR CopyTo(const DLContext& ctx) const {
+  CSR CopyTo(const DLContext &ctx,
+             const DGLStreamHandle &stream = nullptr) const {
     if (Context() == ctx) {
       return *this;
     } else {
-      return CSR(meta_graph_, adj_.CopyTo(ctx));
+      return CSR(meta_graph_, adj_.CopyTo(ctx, stream));
     }
   }
 
@@ -1067,10 +1074,10 @@ std::vector<IdArray> UnitGraph::GetAdj(
   //   to_scipy_sparse_matrix. With the upcoming custom kernel change, we should change the
   //   behavior and make row for src and col for dst.
   if (fmt == std::string("csr")) {
-    return transpose? GetOutCSR()->GetAdj(etype, false, "csr")
+    return !transpose ? GetOutCSR()->GetAdj(etype, false, "csr")
       : GetInCSR()->GetAdj(etype, false, "csr");
   } else if (fmt == std::string("coo")) {
-    return GetCOO()->GetAdj(etype, !transpose, fmt);
+    return GetCOO()->GetAdj(etype, transpose, fmt);
   } else {
     LOG(FATAL) << "unsupported adjacency matrix format: " << fmt;
     return {};
@@ -1140,12 +1147,14 @@ HeteroSubgraph UnitGraph::EdgeSubgraph(
 HeteroGraphPtr UnitGraph::CreateFromCOO(
     int64_t num_vtypes, int64_t num_src, int64_t num_dst,
     IdArray row, IdArray col,
+    bool row_sorted, bool col_sorted,
     dgl_format_code_t formats) {
   CHECK(num_vtypes == 1 || num_vtypes == 2);
   if (num_vtypes == 1)
     CHECK_EQ(num_src, num_dst);
   auto mg = CreateUnitGraphMetaGraph(num_vtypes);
-  COOPtr coo(new COO(mg, num_src, num_dst, row, col));
+  COOPtr coo(new COO(mg, num_src, num_dst, row, col,
+      row_sorted, col_sorted));
 
   return HeteroGraphPtr(
       new UnitGraph(mg, nullptr, nullptr, coo, formats));
@@ -1225,18 +1234,22 @@ HeteroGraphPtr UnitGraph::AsNumBits(HeteroGraphPtr g, uint8_t bits) {
   }
 }
 
-HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DLContext& ctx) {
+HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DLContext &ctx,
+                                 const DGLStreamHandle &stream) {
   if (ctx == g->Context()) {
     return g;
   } else {
     auto bg = std::dynamic_pointer_cast<UnitGraph>(g);
     CHECK_NOTNULL(bg);
-    CSRPtr new_incsr =
-      (bg->in_csr_->defined())? CSRPtr(new CSR(bg->in_csr_->CopyTo(ctx))) : nullptr;
-    CSRPtr new_outcsr =
-      (bg->out_csr_->defined())? CSRPtr(new CSR(bg->out_csr_->CopyTo(ctx))) : nullptr;
-    COOPtr new_coo =
-      (bg->coo_->defined())? COOPtr(new COO(bg->coo_->CopyTo(ctx))) : nullptr;
+    CSRPtr new_incsr = (bg->in_csr_->defined())
+                           ? CSRPtr(new CSR(bg->in_csr_->CopyTo(ctx, stream)))
+                           : nullptr;
+    CSRPtr new_outcsr = (bg->out_csr_->defined())
+                            ? CSRPtr(new CSR(bg->out_csr_->CopyTo(ctx, stream)))
+                            : nullptr;
+    COOPtr new_coo = (bg->coo_->defined())
+                         ? COOPtr(new COO(bg->coo_->CopyTo(ctx, stream)))
+                         : nullptr;
     return HeteroGraphPtr(
         new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, new_coo, bg->formats_));
   }

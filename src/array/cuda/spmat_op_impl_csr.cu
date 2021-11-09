@@ -17,37 +17,6 @@ using runtime::NDArray;
 namespace aten {
 namespace impl {
 
-/*!
- * \brief Search adjacency list linearly for each (row, col) pair and
- * write the data under the matched position in the indices array to the output.
- *
- * If there is no match, -1 is written.
- * If there are multiple matches, only the first match is written.
- * If the given data array is null, write the matched position to the output.
- */
-template <typename IdType>
-__global__ void _LinearSearchKernel(
-    const IdType* indptr, const IdType* indices, const IdType* data,
-    const IdType* row, const IdType* col,
-    int64_t row_stride, int64_t col_stride,
-    int64_t length, IdType* out) {
-  int tx = blockIdx.x * blockDim.x + threadIdx.x;
-  const int stride_x = gridDim.x * blockDim.x;
-  while (tx < length) {
-    int rpos = tx * row_stride, cpos = tx * col_stride;
-    IdType v = -1;
-    const IdType r = row[rpos], c = col[cpos];
-    for (IdType i = indptr[r]; i < indptr[r + 1]; ++i) {
-      if (indices[i] == c) {
-        v = (data)? data[i] : i;
-        break;
-      }
-    }
-    out[tx] = v;
-    tx += stride_x;
-  }
-}
-
 ///////////////////////////// CSRIsNonZero /////////////////////////////
 
 template <DLDeviceType XPU, typename IdType>
@@ -61,12 +30,12 @@ bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col) {
   IdArray out = aten::NewIdArray(1, ctx, sizeof(IdType) * 8);
   const IdType* data = nullptr;
   // TODO(minjie): use binary search for sorted csr
-  CUDA_KERNEL_CALL(_LinearSearchKernel,
+  CUDA_KERNEL_CALL(cuda::_LinearSearchKernel,
       1, 1, 0, thr_entry->stream,
       csr.indptr.Ptr<IdType>(), csr.indices.Ptr<IdType>(), data,
       rows.Ptr<IdType>(), cols.Ptr<IdType>(),
       1, 1, 1,
-      out.Ptr<IdType>());
+      static_cast<IdType*>(nullptr), static_cast<IdType>(-1), out.Ptr<IdType>());
   out = out.CopyTo(DLContext{kDLCPU, 0});
   return *out.Ptr<IdType>() != -1;
 }
@@ -89,12 +58,12 @@ NDArray CSRIsNonZero(CSRMatrix csr, NDArray row, NDArray col) {
   const int nb = (rstlen + nt - 1) / nt;
   const IdType* data = nullptr;
   // TODO(minjie): use binary search for sorted csr
-  CUDA_KERNEL_CALL(_LinearSearchKernel,
+  CUDA_KERNEL_CALL(cuda::_LinearSearchKernel,
       nb, nt, 0, thr_entry->stream,
       csr.indptr.Ptr<IdType>(), csr.indices.Ptr<IdType>(), data,
       row.Ptr<IdType>(), col.Ptr<IdType>(),
       row_stride, col_stride, rstlen,
-      rst.Ptr<IdType>());
+      static_cast<IdType*>(nullptr), static_cast<IdType>(-1), rst.Ptr<IdType>());
   return rst != -1;
 }
 
@@ -259,17 +228,27 @@ template CSRMatrix CSRSliceRows<kDLGPU, int64_t>(CSRMatrix, int64_t, int64_t);
 template <typename IdType, typename DType>
 __global__ void _SegmentCopyKernel(
     const IdType* indptr, const DType* data,
-    const IdType* row, int64_t row_stride, int64_t length,
+    const IdType* row, int64_t length, int64_t n_row,
     const IdType* out_indptr, DType* out_data) {
-  int tx = blockIdx.x * blockDim.x + threadIdx.x;
+  IdType tx = static_cast<IdType>(blockIdx.x) * blockDim.x + threadIdx.x;
   const int stride_x = gridDim.x * blockDim.x;
   while (tx < length) {
-    int rpos = tx * row_stride;
-    const IdType r = row[rpos];
-    DType* out_buf = out_data + out_indptr[tx];
-    for (IdType i = indptr[r]; i < indptr[r + 1]; ++i) {
-      *(out_buf++) = data? data[i] : i;
+    // find upper bound for tx using binary search.
+    // out_indptr has already a prefix sum. n_row = size(out_indptr)-1
+    IdType l = 0, r = n_row, m = 0;
+    while (l < r) {
+      m = l + (r-l)/2;
+      if (tx >= out_indptr[m]) {
+        l = m+1;
+      } else {
+        r = m;
+      }
     }
+
+    IdType rpos = l-1;
+    IdType rofs = tx - out_indptr[rpos];
+    const IdType u = row[rpos];
+    out_data[tx] = data? data[indptr[u]+rofs] : indptr[u]+rofs;
     tx += stride_x;
   }
 }
@@ -281,21 +260,22 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {
   IdArray ret_indptr = aten::CumSum(aten::CSRGetRowNNZ(csr, rows), true);
   const int64_t nnz = aten::IndexSelect<IdType>(ret_indptr, len);
 
-  const int nt = cuda::FindNumThreads(len);
-  const int nb = (len + nt - 1) / nt;
+  const int nt = 256;  // for better GPU usage of small invocations
+  const int nb = (nnz + nt - 1) / nt;
+
   // Copy indices.
   IdArray ret_indices = NDArray::Empty({nnz}, csr.indptr->dtype, csr.indptr->ctx);
   CUDA_KERNEL_CALL(_SegmentCopyKernel,
       nb, nt, 0, thr_entry->stream,
       csr.indptr.Ptr<IdType>(), csr.indices.Ptr<IdType>(),
-      rows.Ptr<IdType>(), 1, len,
+      rows.Ptr<IdType>(), nnz, len,
       ret_indptr.Ptr<IdType>(), ret_indices.Ptr<IdType>());
   // Copy data.
   IdArray ret_data = NDArray::Empty({nnz}, csr.indptr->dtype, csr.indptr->ctx);
   CUDA_KERNEL_CALL(_SegmentCopyKernel,
       nb, nt, 0, thr_entry->stream,
       csr.indptr.Ptr<IdType>(), CSRHasData(csr)? csr.data.Ptr<IdType>() : nullptr,
-      rows.Ptr<IdType>(), 1, len,
+      rows.Ptr<IdType>(), nnz, len,
       ret_indptr.Ptr<IdType>(), ret_data.Ptr<IdType>());
   return CSRMatrix(len, csr.num_cols,
                    ret_indptr, ret_indices, ret_data,
@@ -304,41 +284,6 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {
 
 template CSRMatrix CSRSliceRows<kDLGPU, int32_t>(CSRMatrix , NDArray);
 template CSRMatrix CSRSliceRows<kDLGPU, int64_t>(CSRMatrix , NDArray);
-
-///////////////////////////// CSRGetData /////////////////////////////
-
-template <DLDeviceType XPU, typename IdType>
-IdArray CSRGetData(CSRMatrix csr, NDArray row, NDArray col) {
-  const int64_t rowlen = row->shape[0];
-  const int64_t collen = col->shape[0];
-
-  CHECK((rowlen == collen) || (rowlen == 1) || (collen == 1))
-    << "Invalid row and col id array.";
-
-  const int64_t row_stride = (rowlen == 1 && collen != 1) ? 0 : 1;
-  const int64_t col_stride = (collen == 1 && rowlen != 1) ? 0 : 1;
-
-  const int64_t rstlen = std::max(rowlen, collen);
-  IdArray rst = NDArray::Empty({rstlen}, row->dtype, row->ctx);
-  if (rstlen == 0)
-    return rst;
-
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
-  const int nt = cuda::FindNumThreads(rstlen);
-  const int nb = (rstlen + nt - 1) / nt;
-  // TODO(minjie): use binary search for sorted csr
-  CUDA_KERNEL_CALL(_LinearSearchKernel,
-      nb, nt, 0, thr_entry->stream,
-      csr.indptr.Ptr<IdType>(), csr.indices.Ptr<IdType>(),
-      CSRHasData(csr)? csr.data.Ptr<IdType>() : nullptr,
-      row.Ptr<IdType>(), col.Ptr<IdType>(),
-      row_stride, col_stride, rstlen,
-      rst.Ptr<IdType>());
-  return rst;
-}
-
-template NDArray CSRGetData<kDLGPU, int32_t>(CSRMatrix csr, NDArray rows, NDArray cols);
-template NDArray CSRGetData<kDLGPU, int64_t>(CSRMatrix csr, NDArray rows, NDArray cols);
 
 ///////////////////////////// CSRGetDataAndIndices /////////////////////////////
 

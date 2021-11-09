@@ -4,11 +4,14 @@
  * \brief Array operator CPU implementation
  */
 #include <dgl/array.h>
+#include <dgl/runtime/ndarray.h>
+#include <dgl/runtime/parallel_for.h>
 #include <numeric>
 #include "../arith.h"
 
 namespace dgl {
 using runtime::NDArray;
+using runtime::parallel_for;
 namespace aten {
 namespace impl {
 
@@ -50,8 +53,7 @@ IdArray BinaryElewise(IdArray lhs, IdArray rhs) {
   IdType* ret_data = static_cast<IdType*>(ret->data);
   // TODO(BarclayII): this usually incurs lots of overhead in thread spawning, scheduling,
   // etc., especially since the workload is very light.  Need to replace with parallel_for.
-// #pragma omp parallel for
-  for (int64_t i = 0; i < lhs->shape[0]; ++i) {
+  for (size_t i = 0; i < lhs->shape[0]; i++) {
     ret_data[i] = Op::Call(lhs_data[i], rhs_data[i]);
   }
   return ret;
@@ -87,8 +89,7 @@ IdArray BinaryElewise(IdArray lhs, IdType rhs) {
   IdType* ret_data = static_cast<IdType*>(ret->data);
   // TODO(BarclayII): this usually incurs lots of overhead in thread spawning, scheduling,
   // etc., especially since the workload is very light.  Need to replace with parallel_for.
-// #pragma omp parallel for
-  for (int64_t i = 0; i < lhs->shape[0]; ++i) {
+  for (size_t i = 0; i < lhs->shape[0]; i++) {
     ret_data[i] = Op::Call(lhs_data[i], rhs);
   }
   return ret;
@@ -124,8 +125,7 @@ IdArray BinaryElewise(IdType lhs, IdArray rhs) {
   IdType* ret_data = static_cast<IdType*>(ret->data);
   // TODO(BarclayII): this usually incurs lots of overhead in thread spawning, scheduling,
   // etc., especially since the workload is very light.  Need to replace with parallel_for.
-// #pragma omp parallel for
-  for (int64_t i = 0; i < rhs->shape[0]; ++i) {
+  for (size_t i = 0; i < rhs->shape[0]; i++) {
     ret_data[i] = Op::Call(lhs, rhs_data[i]);
   }
   return ret;
@@ -161,8 +161,7 @@ IdArray UnaryElewise(IdArray lhs) {
   IdType* ret_data = static_cast<IdType*>(ret->data);
   // TODO(BarclayII): this usually incurs lots of overhead in thread spawning, scheduling,
   // etc., especially since the workload is very light.  Need to replace with parallel_for.
-// #pragma omp parallel for
-  for (int64_t i = 0; i < lhs->shape[0]; ++i) {
+  for (size_t i = 0; i < lhs->shape[0]; i++) {
     ret_data[i] = Op::Call(lhs_data[i]);
   }
   return ret;
@@ -173,16 +172,18 @@ template IdArray UnaryElewise<kDLCPU, int64_t, arith::Neg>(IdArray lhs);
 
 ///////////////////////////// Full /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType>
-IdArray Full(IdType val, int64_t length, DLContext ctx) {
-  IdArray ret = NewIdArray(length, ctx, sizeof(IdType) * 8);
-  IdType* ret_data = static_cast<IdType*>(ret->data);
+template <DLDeviceType XPU, typename DType>
+NDArray Full(DType val, int64_t length, DLContext ctx) {
+  NDArray ret = NDArray::Empty({length}, DLDataTypeTraits<DType>::dtype, ctx);
+  DType* ret_data = static_cast<DType*>(ret->data);
   std::fill(ret_data, ret_data + length, val);
   return ret;
 }
 
-template IdArray Full<kDLCPU, int32_t>(int32_t val, int64_t length, DLContext ctx);
-template IdArray Full<kDLCPU, int64_t>(int64_t val, int64_t length, DLContext ctx);
+template NDArray Full<kDLCPU, int32_t>(int32_t val, int64_t length, DLContext ctx);
+template NDArray Full<kDLCPU, int64_t>(int64_t val, int64_t length, DLContext ctx);
+template NDArray Full<kDLCPU, float>(float val, int64_t length, DLContext ctx);
+template NDArray Full<kDLCPU, double>(double val, int64_t length, DLContext ctx);
 
 ///////////////////////////// Range /////////////////////////////
 

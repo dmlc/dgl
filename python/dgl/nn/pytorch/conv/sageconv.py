@@ -197,8 +197,9 @@ class SAGEConv(nn.Module):
         Returns
         -------
         torch.Tensor
-            The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
-            is size of output feature.
+            The output feature of shape :math:`(N_{dst}, D_{out})`
+            where :math:`N_{dst}` is the number of destination nodes in the input graph,
+            math:`D_{out}` is size of output feature.
         """
         self._compatibility_check()
         with graph.local_scope():
@@ -238,7 +239,10 @@ class SAGEConv(nn.Module):
                 if isinstance(feat, tuple):  # heterogeneous
                     graph.dstdata['h'] = self.fc_neigh(feat_dst) if lin_before_mp else feat_dst
                 else:
-                    graph.dstdata['h'] = graph.srcdata['h']
+                    if graph.is_block:
+                        graph.dstdata['h'] = graph.srcdata['h'][:graph.num_dst_nodes()]
+                    else:
+                        graph.dstdata['h'] = graph.srcdata['h']
                 graph.update_all(msg_fn, fn.sum('m', 'neigh'))
                 # divide in_degrees
                 degs = graph.in_degrees().to(feat_dst)

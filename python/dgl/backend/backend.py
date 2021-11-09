@@ -1125,6 +1125,21 @@ def replace_inf_with_zero(x):
     """
     pass
 
+def count_nonzero(input):
+    """Return the count of non-zero values in the tensor input.
+
+    Parameters
+    ----------
+    input : Tensor
+        The tensor to be counted
+
+    Returns
+    -------
+    Integer
+        The result
+    """
+    pass
+
 ###############################################################################
 # Tensor functions used *only* on index tensor
 # ----------------
@@ -1452,6 +1467,47 @@ def gspmm(gidx, op, reduce_op, lhs_data, rhs_data):
     """
     pass
 
+def gspmm_hetero(g, op, reduce_op, lhs_len, *lhs_and_rhs_tuple):
+    r""" Generalized Sparse Matrix Multiplication interface on heterogenenous graph.
+    All the relation types of the heterogeneous graph will be processed together.
+    It fuses two steps into one kernel.
+    (1) Computes messages by :attr:`op` source node and edge features.
+    (2) Aggregate the messages by :attr:`reduce_op` as the features on destination nodes.
+
+    .. math::
+        x_v = \psi_{(u, v, e)\in \mathcal{G}}(\rho(x_u, x_e))
+
+    where :math:`x_v` is the returned feature on destination nodes, and :math`x_u`,
+    :math:`x_e` refers to :attr:`u`, :attr:`e` respectively. :math:`\rho` means binary
+    operator :attr:`op` and :math:`\psi` means reduce operator :attr:`reduce_op`,
+    :math:`\mathcal{G}` is the graph we apply gspmm on: :attr:`g`.
+
+    Note that this function does not handle gradients.
+
+    Parameters
+    ----------
+    g : HeteroGraph
+        The input graph.
+    op : str
+        The binary op's name, could be ``add``, ``sub``, ``mul``, ``div``,
+        ``copy_lhs``, ``copy_rhs``.
+    reduce_op : str
+        Reduce operator, could be ``sum``, ``max``, ``min``.
+    lhs_len : int
+        Length of the lhs data
+    lhs_and_rhs_tuple : tuple of tensors
+        lhs_data and rhs_data are concatenated to one tuple. lhs_data is
+        also a tuple of tensors of size number of ntypes. Same is true for
+        rhs_data.
+        The tensor(s) in the tuple could be None
+
+    Returns
+    -------
+    tuple of tensor
+        The resulting tuple of tensor.
+    """
+    pass
+
 def gsddmm(gidx, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
     r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface.
     It computes edge features by :attr:`op` lhs features and rhs features.
@@ -1484,6 +1540,46 @@ def gsddmm(gidx, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
     -------
     tensor
         The result tensor.
+    """
+    pass
+
+def gsddmm_hetero(g, op, lhs_len, lhs_target='u', rhs_target='v', *lhs_and_rhs_tuple):
+    r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface on
+    heterogenenous graph. All the relation types of the heterogeneous graph
+    will be processed together.
+    It computes edge features by :attr:`op` lhs features and rhs features.
+
+    .. math::
+        x_{e} = \phi(x_{lhs}, x_{rhs}), \forall (u,e,v)\in \mathcal{G}
+
+    where :math:`x_{e}` is the returned feature on edges and :math:`x_u`,
+    :math:`x_v` refers to :attr:`u`, :attr:`v` respectively. :math:`\phi`
+    is the binary operator :attr:`op`, and :math:`\mathcal{G}` is the graph
+    we apply gsddmm on: :attr:`g`. $lhs$ and $rhs$ are one of $u,v,e$'s.
+
+    Parameters
+    ----------
+    gidx : HeteroGraphIndex
+        The input graph.
+    op : str
+        Binary operator, could be ``add``, ``sub``, ``mul``, ``div``, ``dot``,
+        ``copy_lhs``, ``copy_rhs``.
+    lhs_len : int
+        Length of the lhs data
+    lhs_target: str
+        Choice of `u`(source), `e`(edge) or `v`(destination) for left operand.
+    rhs_target: str
+        Choice of `u`(source), `e`(edge) or `v`(destination) for right operand.
+    lhs_and_rhs_tuple : tuple of tensors
+        lhs_data and rhs_data are concatenated to one tuple. lhs_data is
+        also a tuple of tensors of size number of ntypes. Same is true for
+        rhs_data.
+        The tensor(s) in the tuple could be None
+
+    Returns
+    -------
+    tuple of tensor
+        The resulting tuple of tensor.
     """
     pass
 
@@ -1566,7 +1662,92 @@ def scatter_add(x, idx, m):
         The indices array.
     m : int
         The length of output.
-    
+
+    Returns
+    -------
+    Tensor
+        The output tensor.
+    """
+    pass
+
+def csrmm(A, A_weights, B, B_weights, num_vtypes):
+    """Compute weighted adjacency matrix multiplication.
+
+    Notes
+    -----
+    Both A and B must allow creation of CSR representations, and must be simple graphs
+    (i.e. having at most one edge between two nodes).
+
+    The output unit graph has no format restriction.
+
+    Parameters
+    ----------
+    A : HeteroGraphIndex
+        The unit graph as left operand.
+    A_weights : Tensor
+        The edge weights of A.  Must be a 1D vector.
+    B : HeteroGraphIndex
+        The unit graph as right operand.
+    B_weights : Tensor
+        The edge weights of B.  Must be a 1D vector.
+    num_vtypes : int
+        The number of node types of the output graph.  Must be either 1 or 2.
+
+    Returns
+    -------
+    HeteroGraphIndex
+        The output unit graph.
+    Tensor
+        The output edge weights.
+    """
+    pass
+
+def csrsum(gidxs, weights):
+    """Compute weighted adjacency matrix summation.
+
+    Notes
+    -----
+    All unit graphs must allow creation of CSR representations, and must be simple graphs
+    (i.e. having at most one edge between two nodes).
+
+    The output unit graph has no format restriction.
+
+    Parameters
+    ----------
+    gidxs : list[HeteroGraphIndex]
+        The unit graphs.
+    weights : list[Tensor]
+        The edge weights of each graph.  Must be 1D vectors.
+
+    Returns
+    -------
+    HeteroGraphIndex
+        The output unit graph.
+    Tensor
+        The output edge weights.
+    """
+    pass
+
+def csrmask(A, A_weights, B):
+    """Retrieve the values in the weighted adjacency matrix of graph :attr:`A` at the
+    non-zero positions of graph :attr:`B`'s adjacency matrix.
+
+    In scipy, this is equivalent to ``A[B != 0]``.
+
+    Notes
+    -----
+    Both A and B must allow creation of CSR representations, and must be simple graphs
+    (i.e. having at most one edge between two nodes).
+
+    Parameters
+    ----------
+    A : HeteroGraphIndex
+        The unit graph as left operand.
+    A_weights : Tensor
+        The edge weights of A.  Must be a 1D vector.
+    B : HeteroGraphIndex
+        The unit graph as right operand.
+
     Returns
     -------
     Tensor

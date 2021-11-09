@@ -6,7 +6,12 @@ Requirements
 * sphinx
 * sphinx-gallery
 * sphinx_rtd_theme
-* Both pytorch and mxnet installed.
+* sphinx_copybutton
+* torch
+* mxnet
+* pillow
+* matplotlib
+
 
 Build documents
 ---------------
@@ -30,3 +35,7 @@ Render locally
 cd build/html
 python3 -m http.server 8000
 ```
+
+Add new folders
+---------------
+Add the path of the new folder in the two lists `examples_dirs` and `gallery_dirs` in docs/source/conf.py.

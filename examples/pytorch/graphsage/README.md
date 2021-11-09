@@ -9,9 +9,9 @@ Requirements
 ------------
 - requests
 
-``bash
+```bash
 pip install requests
-``
+```
 
 
 Results
@@ -34,10 +34,14 @@ Train w/ mini-batch sampling (on the Reddit dataset)
 ```bash
 python3 train_sampling.py --num-epochs 30       # neighbor sampling
 python3 train_sampling.py --num-epochs 30 --inductive  # inductive learning with neighbor sampling
-python3 train_sampling_multi_gpu.py --num-epochs 30    # neighbor sampling with multi GPU
-python3 train_sampling_multi_gpu.py --num-epochs 30 --inductive  # inductive learning with neighbor sampling, multi GPU
 python3 train_cv.py --num-epochs 30             # control variate sampling
-python3 train_cv_multi_gpu.py --num-epochs 30   # control variate sampling with multi GPU
+```
+
+For multi-gpu training
+```bash
+python3 train_sampling_multi_gpu.py --num-epochs 30 --gpu 0,1,...    # neighbor sampling
+python3 train_sampling_multi_gpu.py --num-epochs 30 --inductive --gpu 0,1,...  # inductive learning
+python3 train_cv_multi_gpu.py --num-epochs 30 --gpu 0,1,...   # control variate sampling
 ```
 
 Accuracy:
@@ -66,3 +70,14 @@ Notably,
   in the paper.
 
 Micro F1 score reaches 0.9212 on test set.
+
+### Training with PyTorch Lightning
+
+We also provide minibatch training scripts with PyTorch Lightning in `train_lightning.py` and `train_lightning_unsupervised.py`.
+
+Requires `pytorch_lightning` and `torchmetrics`.
+
+```bash
+python3 train_lightning.py
+python3 train_lightning_unsupervised.py
+```

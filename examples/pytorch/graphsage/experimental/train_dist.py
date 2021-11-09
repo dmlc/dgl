@@ -21,20 +21,21 @@ import torch.optim as optim
 import torch.multiprocessing as mp
 from torch.utils.data import DataLoader
 
-def load_subtensor(g, seeds, input_nodes, device):
+def load_subtensor(g, seeds, input_nodes, device, load_feat=True):
     """
     Copys features and labels of a set of nodes onto GPU.
     """
-    batch_inputs = g.ndata['features'][input_nodes].to(device)
+    batch_inputs = g.ndata['features'][input_nodes].to(device) if load_feat else None
     batch_labels = g.ndata['labels'][seeds].to(device)
     return batch_inputs, batch_labels
 
 class NeighborSampler(object):
-    def __init__(self, g, fanouts, sample_neighbors, device):
+    def __init__(self, g, fanouts, sample_neighbors, device, load_feat=True):
         self.g = g
         self.fanouts = fanouts
         self.sample_neighbors = sample_neighbors
         self.device = device
+        self.load_feat=load_feat
 
     def sample_blocks(self, seeds):
         seeds = th.LongTensor(np.asarray(seeds))
@@ -51,8 +52,9 @@ class NeighborSampler(object):
 
         input_nodes = blocks[0].srcdata[dgl.NID]
         seeds = blocks[-1].dstdata[dgl.NID]
-        batch_inputs, batch_labels = load_subtensor(self.g, seeds, input_nodes, "cpu")
-        blocks[0].srcdata['features'] = batch_inputs
+        batch_inputs, batch_labels = load_subtensor(self.g, seeds, input_nodes, "cpu", self.load_feat)
+        if self.load_feat:
+            blocks[0].srcdata['features'] = batch_inputs
         blocks[-1].dstdata['labels'] = batch_labels
         return blocks
 
@@ -258,9 +260,17 @@ def main(args):
     print('rank:', g.rank())
 
     pb = g.get_partition_book()
-    train_nid = dgl.distributed.node_split(g.ndata['train_mask'], pb, force_even=True)
-    val_nid = dgl.distributed.node_split(g.ndata['val_mask'], pb, force_even=True)
-    test_nid = dgl.distributed.node_split(g.ndata['test_mask'], pb, force_even=True)
+    if 'trainer_id' in g.ndata:
+        train_nid = dgl.distributed.node_split(g.ndata['train_mask'], pb, force_even=True,
+                                               node_trainer_ids=g.ndata['trainer_id'])
+        val_nid = dgl.distributed.node_split(g.ndata['val_mask'], pb, force_even=True,
+                                             node_trainer_ids=g.ndata['trainer_id'])
+        test_nid = dgl.distributed.node_split(g.ndata['test_mask'], pb, force_even=True,
+                                              node_trainer_ids=g.ndata['trainer_id'])
+    else:
+        train_nid = dgl.distributed.node_split(g.ndata['train_mask'], pb, force_even=True)
+        val_nid = dgl.distributed.node_split(g.ndata['val_mask'], pb, force_even=True)
+        test_nid = dgl.distributed.node_split(g.ndata['test_mask'], pb, force_even=True)
     local_nid = pb.partid2nids(pb.partid).detach().numpy()
     print('part {}, train: {} (local: {}), val: {} (local: {}), test: {} (local: {})'.format(
         g.rank(), len(train_nid), len(np.intersect1d(train_nid.numpy(), local_nid)),
@@ -269,7 +279,7 @@ def main(args):
     if args.num_gpus == -1:
         device = th.device('cpu')
     else:
-        device = th.device('cuda:'+str(g.rank() % args.num_gpus))
+        device = th.device('cuda:'+str(args.local_rank))
     labels = g.ndata['labels'][np.arange(g.number_of_nodes())]
     n_classes = len(th.unique(labels[th.logical_not(th.isnan(labels))]))
     print('#labels:', n_classes)
@@ -289,7 +299,7 @@ if __name__ == '__main__':
     parser.add_argument('--part_config', type=str, help='The path to the partition config file')
     parser.add_argument('--num_clients', type=int, help='The number of clients')
     parser.add_argument('--n_classes', type=int, help='the number of classes')
-    parser.add_argument('--num_gpus', type=int, default=-1, 
+    parser.add_argument('--num_gpus', type=int, default=-1,
                         help="the number of GPU device. Use -1 for CPU training")
     parser.add_argument('--num_epochs', type=int, default=20)
     parser.add_argument('--num_hidden', type=int, default=16)

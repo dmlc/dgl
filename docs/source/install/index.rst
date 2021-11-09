@@ -23,6 +23,10 @@ Install from Conda or Pip
 We recommend installing DGL by ``conda`` or ``pip``.
 Check out the instructions on the `Get Started page <https://www.dgl.ai/pages/start.html>`_.
 
+.. note::
+
+   For Windows users: you will need to install `Visual C++ 2015 Redistributable <https://www.microsoft.com/en-us/download/details.aspx?id=48145>`_.
+
 .. _install-from-source:
 
 Install from source
@@ -111,7 +115,7 @@ install the Python binding for DGL.
 
    mkdir build
    cd build
-   cmake -DUSE_OPENMP=off -DCMAKE_C_FLAGS='-DXBYAK_DONT_USE_MAP_JIT' -DCMAKE_CXX_FLAGS='-DXBYAK_DONT_USE_MAP_JIT' ..
+   cmake -DUSE_OPENMP=off -DCMAKE_C_FLAGS='-DXBYAK_DONT_USE_MAP_JIT' -DCMAKE_CXX_FLAGS='-DXBYAK_DONT_USE_MAP_JIT' -DUSE_AVX=OFF -DUSE_LIBXSMM=OFF ..
    make -j4
    cd ../python
    python setup.py install

@@ -10,35 +10,35 @@ pip3 install ogb pyarrow
 
 To train RGCN, it has four steps:
 
-### Step 0: Setup a Distributed File System 
-* You may skip this step if your cluster already has folder(s) synchronized across machines. 
+### Step 0: Setup a Distributed File System
+* You may skip this step if your cluster already has folder(s) synchronized across machines.
 
-To perform distributed training, files and codes need to be accessed across multiple machines. A distributed file system would perfectly handle the job (i.e., NFS, Ceph). 
+To perform distributed training, files and codes need to be accessed across multiple machines. A distributed file system would perfectly handle the job (i.e., NFS, Ceph).
 
-#### Server side setup 
+#### Server side setup
 Here is an example of how to setup NFS. First, install essential libs on the storage server
 ```bash
 sudo apt-get install nfs-kernel-server
-``` 
+```
 
 Below we assume the user account is `ubuntu` and we create a directory of `workspace` in the home directory.
 ```bash
 mkdir -p /home/ubuntu/workspace
 ```
 
-We assume that the all servers are under a subnet with ip range `192.168.0.0` to `192.168.255.255`. The exports configuration needs to be modifed to 
+We assume that the all servers are under a subnet with ip range `192.168.0.0` to `192.168.255.255`. The exports configuration needs to be modifed to
 
 ```bash
 sudo vim /etc/exports
-# add the following line 
+# add the following line
 /home/ubuntu/workspace  192.168.0.0/16(rw,sync,no_subtree_check)
 ```
 
 The server's internal ip can be checked  via `ifconfig` or `ip`. If the ip does not begin with `192.168`, then you may use
 ```bash
-# for ip range 10.0.0.0 – 10.255.255.255	
+# for ip range 10.0.0.0 – 10.255.255.255
 /home/ubuntu/workspace  10.0.0.0/8(rw,sync,no_subtree_check)
-# for ip range 172.16.0.0 – 172.31.255.255	
+# for ip range 172.16.0.0 – 172.31.255.255
 /home/ubuntu/workspace  172.16.0.0/12(rw,sync,no_subtree_check)
 ```
 
@@ -51,22 +51,22 @@ sudo systemctl restart nfs-kernel-server
 For configraution details, please refer to [NFS ArchWiki](https://wiki.archlinux.org/index.php/NFS).
 
 
-#### Client side setup 
+#### Client side setup
 
 To use NFS, clients also require to install essential packages
 
 ```
-sudo apt-get install nfs-common 
+sudo apt-get install nfs-common
 ```
 
-You can either mount the NFS manually 
+You can either mount the NFS manually
 
 ```
 mkdir -p /home/ubuntu/workspace
 sudo mount -t nfs <nfs-server-ip>:/home/ubuntu/workspace /home/ubuntu/workspace
 ```
-	
-or edit the fstab so the folder will be mounted automatically 
+
+or edit the fstab so the folder will be mounted automatically
 
 ```
 # vim /etc/fstab
@@ -74,7 +74,7 @@ or edit the fstab so the folder will be mounted automatically
 <nfs-server-ip>:/home/ubuntu/workspace   /home/ubuntu/workspace   nfs   defaults	0 0
 ```
 
-Then run `mount -a`. 
+Then run `mount -a`.
 
 Now go to `/home/ubuntu/workspace` and clone the DGL Github repository.
 
@@ -109,8 +109,6 @@ DGL provides a script to launch the training job in the cluster. `part_config` a
 specify relative paths to the path of the workspace.
 
 The command below launches one training process on each machine and each training process has 4 sampling processes.
-**Note**: There is a known bug in Python 3.8. The training process hangs when running multiple sampling processes for each training process.
-Please set the number of sampling processes to 0 if you are using Python 3.8.
 
 ```bash
 python3 ~/workspace/dgl/tools/launch.py \
@@ -128,6 +126,23 @@ We can get the performance score at the second epoch:
 Val Acc 0.4323, Test Acc 0.4255, time: 128.0379
 ```
 
+The command below launches the same distributed training job using dgl distributed DistEmbedding
+```bash
+python3 ~/workspace/dgl/tools/launch.py \
+--workspace ~/workspace/dgl/examples/pytorch/rgcn/experimental/ \
+--num_trainers 1 \
+--num_servers 1 \
+--num_samplers 4 \
+--part_config data/ogbn-mag.json \
+--ip_config ip_config.txt \
+"python3 entity_classify_dist.py --graph-name ogbn-mag --dataset ogbn-mag --fanout='25,25' --batch-size 1024  --n-hidden 64 --lr 0.01 --eval-batch-size 1024  --low-mem --dropout 0.5 --use-self-loop --n-bases 2 --n-epochs 3 --layer-norm --ip-config ip_config.txt  --sparse-embedding --sparse-lr 0.06 --num_gpus 1 --dgl-sparse"
+```
+
+We can get the performance score at the second epoch:
+```
+Val Acc 0.4410, Test Acc 0.4282, time: 32.5274
+```
+
 **Note:** if you are using conda or other virtual environments on the remote machines, you need to replace `python3` in the command string (i.e. the last argument) with the path to the Python interpreter in that environment.
 
 ## Partition a graph with ParMETIS
@@ -140,6 +155,10 @@ More details about the four steps are explained in our
 
 The graph structure should be written as a node file and an edge file. The node features and edge features
 can be written as DGL tensors. `write_mag.py` shows an example of writing the OGB MAG graph into files.
+
+As `pm_dglpart` cannot handle self-loops and duplicate edges correctly, these edges are removed and stored
+into `mag_removed_edges.txt` when calling `write_mag.py`. When converting ParMETIS outputs into DGLGraph
+in next steps, `mag_removed_edges.txt` should be passed in. Refer to Step 3 for more details.
 
 ```bash
 python3 write_mag.py
@@ -171,10 +190,11 @@ write the files on NFS.
 ### Step 3: Convert the ParMETIS partitions into DGLGraph
 
 DGL provides a tool called `convert_partition.py` to load one partition at a time and convert it into a DGLGraph
-and save it into a file.
+and save it into a file. As mentioned in Step 1, please pass `mag_removed_edges.txt` if any self-loops and
+duplicate edges are removed.
 
 ```bash
-python3 ~/workspace/dgl/tools/convert_partition.py --input-dir . --graph-name mag --schema mag.json --num-parts 2 --num-node-weights 4 --output outputs
+python3 ~/workspace/dgl/tools/convert_partition.py --input-dir . --graph-name mag --schema mag.json --num-parts 2 --num-node-weights 4 --output outputs --removed-edges mag_removed_edges.txt
 ```
 
 ### Step 4: Read node data and edge data for each partition
@@ -188,7 +208,7 @@ python3 get_mag_data.py
 ### Step 5: Verify the partition result (Optional)
 
 ```bash
-python3 verify_mag_partitions.py 
+python3 verify_mag_partitions.py
 ```
 
 ## Distributed code runs in the standalone mode
@@ -203,5 +223,5 @@ python3 partition_graph.py --dataset ogbn-mag --num_parts 1
 
 ### Step 2: run the training script
 ```bash
-python3 entity_classify_dist.py --graph-name ogbn-mag  --dataset ogbn-mag --fanout='25,25' --batch-size 512 --n-hidden 64 --lr 0.01 --eval-batch-size 128 --low-mem --dropout 0.5 --use-self-loop --n-bases 2 --n-epochs 3 --layer-norm --ip-config ip_config.txt --conf-path 'data/ogbn-mag.json' --standalone  --sparse-embedding  --sparse-lr 0.06 --node-feats
+DGL_DIST_MODE=standalone python3 entity_classify_dist.py --graph-name ogbn-mag  --dataset ogbn-mag --fanout='25,25' --batch-size 512 --n-hidden 64 --lr 0.01 --eval-batch-size 128 --low-mem --dropout 0.5 --use-self-loop --n-bases 2 --n-epochs 3 --layer-norm --ip-config ip_config.txt --conf-path 'data/ogbn-mag.json' --standalone  --sparse-embedding  --sparse-lr 0.06
 ```

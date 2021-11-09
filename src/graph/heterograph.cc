@@ -48,8 +48,6 @@ HeteroSubgraph EdgeSubgraphNoPreserveNodes(
     const HeteroGraph* hg, const std::vector<IdArray>& eids) {
   // TODO(minjie): In general, all relabeling should be separated with subgraph
   //   operations.
-  CHECK(hg->Context().device_type != kDLGPU)
-    << "Edge subgraph with relabeling does not support GPU.";
   CHECK_EQ(eids.size(), hg->NumEdgeTypes())
     << "Invalid input: the input list size must be the same as the number of edge type.";
   HeteroSubgraph ret;
@@ -254,7 +252,8 @@ HeteroGraphPtr HeteroGraph::AsNumBits(HeteroGraphPtr g, uint8_t bits) {
                                         hgindex->num_verts_per_type_));
 }
 
-HeteroGraphPtr HeteroGraph::CopyTo(HeteroGraphPtr g, const DLContext& ctx) {
+HeteroGraphPtr HeteroGraph::CopyTo(HeteroGraphPtr g, const DLContext &ctx,
+                                   const DGLStreamHandle &stream) {
   if (ctx == g->Context()) {
     return g;
   }
@@ -262,7 +261,7 @@ HeteroGraphPtr HeteroGraph::CopyTo(HeteroGraphPtr g, const DLContext& ctx) {
   CHECK_NOTNULL(hgindex);
   std::vector<HeteroGraphPtr> rel_graphs;
   for (auto g : hgindex->relation_graphs_) {
-    rel_graphs.push_back(UnitGraph::CopyTo(g, ctx));
+    rel_graphs.push_back(UnitGraph::CopyTo(g, ctx, stream));
   }
   return HeteroGraphPtr(new HeteroGraph(hgindex->meta_graph_, rel_graphs,
                                         hgindex->num_verts_per_type_));

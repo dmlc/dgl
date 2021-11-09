@@ -3,6 +3,7 @@ import backend as F
 import unittest
 from torch.utils.data import DataLoader
 from collections import defaultdict
+from collections.abc import Iterator
 from itertools import product
 
 def _check_neighbor_sampling_dataloader(g, nids, dl, mode, collator):
@@ -77,11 +78,10 @@ def _check_neighbor_sampling_dataloader(g, nids, dl, mode, collator):
         v_set = set(F.asnumpy(v))
         assert v_set == seed_set
 
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
 def test_neighbor_sampler_dataloader():
-    g = dgl.heterograph({('user', 'follow', 'user'): ([0, 0, 0, 1, 1], [1, 2, 3, 3, 4])}, 
+    g = dgl.heterograph({('user', 'follow', 'user'): ([0, 0, 0, 1, 1], [1, 2, 3, 3, 4])},
                         {'user': 6}).long()
-    g = dgl.to_bidirected(g)
+    g = dgl.to_bidirected(g).to(F.ctx())
     g.ndata['feat'] = F.randn((6, 8))
     g.edata['feat'] = F.randn((10, 4))
     reverse_eids = F.tensor([5, 6, 7, 8, 9, 0, 1, 2, 3, 4], dtype=F.int64)
@@ -93,7 +93,7 @@ def test_neighbor_sampler_dataloader():
          ('user', 'followed-by', 'user'): ([1, 2, 3, 0, 2, 3, 0], [0, 0, 0, 1, 1, 1, 2]),
          ('user', 'play', 'game'): ([0, 1, 1, 3, 5], [0, 1, 2, 0, 2]),
          ('game', 'played-by', 'user'): ([0, 1, 2, 0, 2], [0, 1, 1, 3, 5])
-    }).long()
+    }).long().to(F.ctx())
     for ntype in hg.ntypes:
         hg.nodes[ntype].data['feat'] = F.randn((hg.number_of_nodes(ntype), 8))
     for etype in hg.canonical_etypes:
@@ -121,6 +121,12 @@ def test_neighbor_sampler_dataloader():
         modes.append('edge')
 
         collators.append(dgl.dataloading.EdgeCollator(
+            g, seeds, sampler, exclude='self'))
+        graphs.append(g)
+        nids.append({'follow': seeds})
+        modes.append('edge')
+
+        collators.append(dgl.dataloading.EdgeCollator(
             g, seeds, sampler, exclude='reverse_id', reverse_eids=reverse_eids))
         graphs.append(g)
         nids.append({'follow': seeds})
@@ -128,6 +134,12 @@ def test_neighbor_sampler_dataloader():
 
         collators.append(dgl.dataloading.EdgeCollator(
             g, seeds, sampler, negative_sampler=dgl.dataloading.negative_sampler.Uniform(2)))
+        graphs.append(g)
+        nids.append({'follow': seeds})
+        modes.append('link')
+
+        collators.append(dgl.dataloading.EdgeCollator(
+            g, seeds, sampler, exclude='self', negative_sampler=dgl.dataloading.negative_sampler.Uniform(2)))
         graphs.append(g)
         nids.append({'follow': seeds})
         modes.append('link')
@@ -179,6 +191,7 @@ def test_neighbor_sampler_dataloader():
     for _g, nid, collator, mode in zip(graphs, nids, collators, modes):
         dl = DataLoader(
             collator.dataset, collate_fn=collator.collate, batch_size=2, shuffle=True, drop_last=False)
+        assert isinstance(iter(dl), Iterator)
         _check_neighbor_sampling_dataloader(_g, nid, dl, mode, collator)
 
 def test_graph_dataloader():
@@ -186,6 +199,7 @@ def test_graph_dataloader():
     num_batches = 2
     minigc_dataset = dgl.data.MiniGCDataset(batch_size * num_batches, 10, 20)
     data_loader = dgl.dataloading.GraphDataLoader(minigc_dataset, batch_size=batch_size, shuffle=True)
+    assert isinstance(iter(data_loader), Iterator)
     for graph, label in data_loader:
         assert isinstance(graph, dgl.DGLGraph)
         assert F.asnumpy(label).shape[0] == batch_size
@@ -226,6 +240,7 @@ def test_node_dataloader():
     dataloader = dgl.dataloading.NodeDataLoader(
         g2, {nty: g2.nodes(nty) for nty in g2.ntypes},
         sampler, device=F.ctx(), batch_size=batch_size)
+    assert isinstance(iter(dataloader), Iterator)
     for input_nodes, output_nodes, blocks in dataloader:
         _check_device(input_nodes)
         _check_device(output_nodes)
@@ -280,6 +295,8 @@ def test_edge_dataloader():
         g2, {ety: g2.edges(form='eid', etype=ety) for ety in g2.canonical_etypes},
         sampler, device=F.ctx(), negative_sampler=neg_sampler,
         batch_size=batch_size)
+
+    assert isinstance(iter(dataloader), Iterator)
     for input_nodes, pos_pair_graph, neg_pair_graph, blocks in dataloader:
         _check_device(input_nodes)
         _check_device(pos_pair_graph)

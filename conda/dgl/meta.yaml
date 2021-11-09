@@ -2,7 +2,8 @@
 {% set package_name = 'dgl' + environ.get('DGL_PACKAGE_SUFFIX', '') %}
 package:
   name: dgl{{ environ.get('DGL_PACKAGE_SUFFIX', '') }}
-  version: "0.6.1"
+  version: "0.8"
+
 
 source:
   git_rev: 0.6.x

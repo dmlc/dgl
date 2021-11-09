@@ -59,7 +59,6 @@ def test_query():
     def _test_one(g):
         assert g.number_of_nodes() == 10
         assert g.number_of_edges() == 20
-        assert len(g) == 10
 
         for i in range(10):
             assert g.has_node(i)
@@ -119,9 +118,9 @@ def test_query():
         assert F.allclose(g.out_degrees([8, 9]), F.tensor([0, 1]))
 
         assert np.array_equal(
-                F.sparse_to_numpy(g.adjacency_matrix(transpose=False)), scipy_coo_input().toarray().T)
+                F.sparse_to_numpy(g.adjacency_matrix(transpose=True)), scipy_coo_input().toarray().T)
         assert np.array_equal(
-                F.sparse_to_numpy(g.adjacency_matrix(transpose=True)), scipy_coo_input().toarray())
+                F.sparse_to_numpy(g.adjacency_matrix(transpose=False)), scipy_coo_input().toarray())
 
     def _test(g):
         # test twice to see whether the cached format works or not
@@ -131,7 +130,6 @@ def test_query():
     def _test_csr_one(g):
         assert g.number_of_nodes() == 10
         assert g.number_of_edges() == 20
-        assert len(g) == 10
 
         for i in range(10):
             assert g.has_node(i)
@@ -194,9 +192,9 @@ def test_query():
         assert F.allclose(g.out_degrees([8, 9]), F.tensor([0, 1]))
 
         assert np.array_equal(
-                F.sparse_to_numpy(g.adjacency_matrix(transpose=False)), scipy_coo_input().toarray().T)
+                F.sparse_to_numpy(g.adjacency_matrix(transpose=True)), scipy_coo_input().toarray().T)
         assert np.array_equal(
-                F.sparse_to_numpy(g.adjacency_matrix(transpose=True)), scipy_coo_input().toarray())
+                F.sparse_to_numpy(g.adjacency_matrix(transpose=False)), scipy_coo_input().toarray())
 
     def _test_csr(g):
         # test twice to see whether the cached format works or not
@@ -255,8 +253,8 @@ def test_scipy_adjmat():
     adj_1 = g.adj(scipy_fmt='coo')
     assert np.array_equal(adj_0.toarray(), adj_1.toarray())
 
-    adj_t0 = g.adj(transpose=True, scipy_fmt='csr')
-    adj_t_1 = g.adj(transpose=True, scipy_fmt='coo')
+    adj_t0 = g.adj(transpose=False, scipy_fmt='csr')
+    adj_t_1 = g.adj(transpose=False, scipy_fmt='coo')
     assert np.array_equal(adj_0.toarray(), adj_1.toarray())
 
 def test_incmat():
@@ -346,6 +344,38 @@ def test_empty_data_initialized():
     assert "ha" in g.ndata
     assert len(g.ndata["ha"]) == 1
 
+def test_is_sorted():
+   u_src, u_dst = edge_pair_input(False) 
+   s_src, s_dst = edge_pair_input(True) 
+
+   u_src = F.tensor(u_src, dtype=F.int32)
+   u_dst = F.tensor(u_dst, dtype=F.int32)
+   s_src = F.tensor(s_src, dtype=F.int32)
+   s_dst = F.tensor(s_dst, dtype=F.int32)
+
+   src_sorted, dst_sorted = dgl.utils.is_sorted_srcdst(u_src, u_dst)
+   assert src_sorted == False
+   assert dst_sorted == False
+
+   src_sorted, dst_sorted = dgl.utils.is_sorted_srcdst(s_src, s_dst)
+   assert src_sorted == True
+   assert dst_sorted == True
+
+   src_sorted, dst_sorted = dgl.utils.is_sorted_srcdst(u_src, u_dst)
+   assert src_sorted == False
+   assert dst_sorted == False
+
+   src_sorted, dst_sorted = dgl.utils.is_sorted_srcdst(s_src, u_dst)
+   assert src_sorted == True
+   assert dst_sorted == False
+
+
+def test_default_types():
+    dg = dgl.DGLGraph()
+    g = dgl.graph(([], []))
+    assert dg.ntypes == g.ntypes
+    assert dg.etypes == g.etypes
+
 if __name__ == '__main__':
     test_query()
     test_mutation()
@@ -353,3 +383,5 @@ if __name__ == '__main__':
     test_incmat()
     test_find_edges()
     test_hypersparse_query()
+    test_is_sorted()
+    test_default_types()

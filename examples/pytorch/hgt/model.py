@@ -173,5 +173,5 @@ class HeteroRGCN(nn.Module):
         h_dict = self.layer1(G, input_dict)
         h_dict = {k : F.leaky_relu(h) for k, h in h_dict.items()}
         h_dict = self.layer2(G, h_dict)
-        # get paper logits
+        # get appropriate logits
         return h_dict[out_key]

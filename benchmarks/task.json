@@ -1,7 +1,7 @@
 {
     "r5.16xlarge": {
         "tests": [
-            ""
+            "api.", "kernel.", "model_acc.", "model_speed."
         ],
         "env": {
             "DEVICE": "cpu"
@@ -9,7 +9,15 @@
     },
     "g4dn.2xlarge": {
         "tests": [
-            ""
+            "api.", "kernel.", "model_acc.", "model_speed."
+        ],
+        "env": {
+            "DEVICE": "gpu"
+        }
+    },
+    "g4dn.12xlarge": {
+        "tests": [
+            "multigpu."
         ],
         "env": {
             "DEVICE": "gpu"

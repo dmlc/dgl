@@ -22,7 +22,7 @@ def _AXWb(A, X, W, b):
 def test_graph_conv(out_dim):
     g = dgl.DGLGraph(nx.path_graph(3)).to(F.ctx())
     ctx = F.ctx()
-    adj = tf.sparse.to_dense(tf.sparse.reorder(g.adjacency_matrix(transpose=False, ctx=ctx)))
+    adj = tf.sparse.to_dense(tf.sparse.reorder(g.adjacency_matrix(transpose=True, ctx=ctx)))
 
     conv = nn.GraphConv(5, out_dim, norm='none', bias=True)
     # conv = conv
@@ -74,7 +74,7 @@ def test_graph_conv(out_dim):
 
 @parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite'], exclude=['zero-degree', 'dglgraph']))
-@pytest.mark.parametrize('norm', ['none', 'both', 'right'])
+@pytest.mark.parametrize('norm', ['none', 'both', 'right', 'left'])
 @pytest.mark.parametrize('weight', [True, False])
 @pytest.mark.parametrize('bias', [True, False])
 @pytest.mark.parametrize('out_dim', [1, 2])
@@ -270,11 +270,15 @@ def test_gat_conv(g, idtype, out_dim, num_heads):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
     gat = nn.GATConv(5, out_dim, num_heads)
-    feat = F.randn((g.number_of_nodes(), 5))
+    feat = F.randn((g.number_of_src_nodes(), 5))
     h = gat(g, feat)
-    assert h.shape == (g.number_of_nodes(), num_heads, out_dim)
+    assert h.shape == (g.number_of_dst_nodes(), num_heads, out_dim)
     _, a = gat(g, feat, get_attention=True)
     assert a.shape == (g.number_of_edges(), num_heads, 1)
+
+    # test residual connection
+    gat = nn.GATConv(5, out_dim, num_heads, residual=True)
+    h = gat(g, feat)
 
 @parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['bipartite'], exclude=['zero-degree']))
@@ -297,7 +301,7 @@ def test_gat_conv_bi(g, idtype, out_dim, num_heads):
 def test_sage_conv(idtype, g, aggre_type, out_dim):
     g = g.astype(idtype).to(F.ctx())
     sage = nn.SAGEConv(5, out_dim, aggre_type)
-    feat = F.randn((g.number_of_nodes(), 5))
+    feat = F.randn((g.number_of_src_nodes(), 5))
     h = sage(g, feat)
     assert h.shape[-1] == out_dim
 
@@ -374,9 +378,9 @@ def test_gin_conv(g, idtype, aggregator_type):
         tf.keras.layers.Dense(12),
         aggregator_type
     )
-    feat = F.randn((g.number_of_nodes(), 5))
+    feat = F.randn((g.number_of_src_nodes(), 5))
     h = gin(g, feat)
-    assert h.shape == (g.number_of_nodes(), 12)
+    assert h.shape == (g.number_of_dst_nodes(), 12)
 
 @parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['bipartite']))
@@ -398,9 +402,9 @@ def test_edge_conv(g, idtype, out_dim):
     g = g.astype(idtype).to(F.ctx())
     edge_conv = nn.EdgeConv(out_dim)
 
-    h0 = F.randn((g.number_of_nodes(), 5))
+    h0 = F.randn((g.number_of_src_nodes(), 5))
     h1 = edge_conv(g, h0)
-    assert h1.shape == (g.number_of_nodes(), out_dim)
+    assert h1.shape == (g.number_of_dst_nodes(), out_dim)
 
 @parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['bipartite'], exclude=['zero-degree']))
@@ -498,6 +502,19 @@ def test_hetero_conv(agg, idtype):
     assert mod3.carg1 == 0
     assert mod3.carg2 == 1
 
+    #conv on graph without any edges
+    for etype in g.etypes:
+        g = dgl.remove_edges(g, g.edges(form='eid', etype=etype), etype=etype)
+    assert g.num_edges() == 0
+    h = conv(g, {'user': uf, 'game': gf, 'store': sf})
+    assert set(h.keys()) == {'user', 'game'}
+
+    block = dgl.to_block(g.to(F.cpu()), {'user': [0, 1, 2, 3], 'game': [
+                         0, 1, 2, 3], 'store': []}).to(F.ctx())
+    h = conv(block, ({'user': uf, 'game': gf, 'store': sf},
+             {'user': uf, 'game': gf, 'store': sf[0:0]}))
+    assert set(h.keys()) == {'user', 'game'}
+
 
 @pytest.mark.parametrize('out_dim', [1, 2])
 def test_dense_cheb_conv(out_dim):
@@ -506,7 +523,7 @@ def test_dense_cheb_conv(out_dim):
         g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1, random_state=42))
         g = g.to(ctx)
 
-        adj = tf.sparse.to_dense(tf.sparse.reorder(g.adjacency_matrix(transpose=False, ctx=ctx)))
+        adj = tf.sparse.to_dense(tf.sparse.reorder(g.adjacency_matrix(transpose=True, ctx=ctx)))
         cheb = nn.ChebConv(5, out_dim, k, None, bias=True)
         dense_cheb = nn.DenseChebConv(5, out_dim, k, bias=True)
 
@@ -545,3 +562,4 @@ if __name__ == '__main__':
     # test_dense_sage_conv()
     test_dense_cheb_conv()
     # test_sequential()
+    test_hetero_conv()

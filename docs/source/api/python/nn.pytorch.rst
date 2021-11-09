@@ -44,6 +44,20 @@ GATConv
 .. autoclass:: dgl.nn.pytorch.conv.GATConv
     :members: forward
     :show-inheritance:
+    
+GATv2Conv
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.conv.GATv2Conv
+    :members: forward
+    :show-inheritance:
+
+EGATConv
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.conv.EGATConv
+    :members: forward
+    :show-inheritance:
 
 EdgeConv
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -133,6 +147,27 @@ DotGatConv
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: dgl.nn.pytorch.conv.DotGatConv
+    :members: forward
+    :show-inheritance:
+
+TWIRLSConv
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.conv.TWIRLSConv
+    :members: forward
+    :show-inheritance:
+
+TWIRLSUnfoldingAndAttention
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.conv.TWIRLSUnfoldingAndAttention
+    :members: forward
+    :show-inheritance:
+    
+GCN2Conv
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.conv.GCN2Conv
     :members: forward
     :show-inheritance:
 
@@ -251,6 +286,13 @@ Sequential
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: dgl.nn.pytorch.utils.Sequential
+    :members:
+    :show-inheritance:
+
+WeightBasis
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.utils.WeightBasis
     :members:
     :show-inheritance:
 

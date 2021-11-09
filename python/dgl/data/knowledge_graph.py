@@ -422,13 +422,13 @@ class FB15k237Dataset(KnowledgeGraphDataset):
     >>> # build train_g
     >>> train_edges = train_set
     >>> train_g = g.edge_subgraph(train_edges,
-                                  preserve_nodes=True)
+                                  relabel_nodes=False)
     >>> train_g.edata['e_type'] = e_type[train_edges];
     >>>
     >>> # build val_g
     >>> val_edges = th.cat([train_edges, val_edges])
     >>> val_g = g.edge_subgraph(val_edges,
-                                preserve_nodes=True)
+                                relabel_nodes=False)
     >>> val_g.edata['e_type'] = e_type[val_edges];
     >>>
     >>> # Train, Validation and Test
@@ -558,13 +558,13 @@ class FB15kDataset(KnowledgeGraphDataset):
     >>> # build train_g
     >>> train_edges = train_set
     >>> train_g = g.edge_subgraph(train_edges,
-                                  preserve_nodes=True)
+                                  relabel_nodes=False)
     >>> train_g.edata['e_type'] = e_type[train_edges];
     >>>
     >>> # build val_g
     >>> val_edges = th.cat([train_edges, val_edges])
     >>> val_g = g.edge_subgraph(val_edges,
-                                preserve_nodes=True)
+                                relabel_nodes=False)
     >>> val_g.edata['e_type'] = e_type[val_edges];
     >>>
     >>> # Train, Validation and Test
@@ -694,13 +694,13 @@ class WN18Dataset(KnowledgeGraphDataset):
     >>> # build train_g
     >>> train_edges = train_set
     >>> train_g = g.edge_subgraph(train_edges,
-                                  preserve_nodes=True)
+                                  relabel_nodes=False)
     >>> train_g.edata['e_type'] = e_type[train_edges];
     >>>
     >>> # build val_g
     >>> val_edges = th.cat([train_edges, val_edges])
     >>> val_g = g.edge_subgraph(val_edges,
-                                preserve_nodes=True)
+                                relabel_nodes=False)
     >>> val_g.edata['e_type'] = e_type[val_edges];
     >>>
     >>> # Train, Validation and Test

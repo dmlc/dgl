@@ -1,6 +1,9 @@
 """Data loading components for neighbor sampling"""
 from .dataloader import BlockSampler
 from .. import sampling, subgraph, distributed
+from .. import ndarray as nd
+from .. import backend as F
+from ..base import ETYPE
 
 class MultiLayerNeighborSampler(BlockSampler):
     """Sampler that builds computational dependency of node representations via
@@ -63,7 +66,16 @@ class MultiLayerNeighborSampler(BlockSampler):
         self.fanouts = fanouts
         self.replace = replace
 
-    def sample_frontier(self, block_id, g, seed_nodes):
+        # used to cache computations and memory allocations
+        # list[dgl.nd.NDArray]; each array stores the fan-outs of all edge types
+        self.fanout_arrays = []
+        self.prob_arrays = None
+
+    @classmethod
+    def exclude_edges_in_frontier(cls, g):
+        return not isinstance(g, distributed.DistGraph) and g.device == F.cpu()
+
+    def sample_frontier(self, block_id, g, seed_nodes, exclude_eids=None):
         fanout = self.fanouts[block_id]
         if isinstance(g, distributed.DistGraph):
             if fanout is None:
@@ -71,13 +83,51 @@ class MultiLayerNeighborSampler(BlockSampler):
                 # let's use sample_neighbors to replace in_subgraph for now.
                 frontier = distributed.sample_neighbors(g, seed_nodes, -1, replace=False)
             else:
-                frontier = distributed.sample_neighbors(g, seed_nodes, fanout, replace=self.replace)
+                if len(g.etypes) > 1: # heterogeneous distributed graph
+                    # The edge type is stored in g.edata[dgl.ETYPE]
+                    assert isinstance(fanout, int), "For distributed training, " \
+                        "we can only sample same number of neighbors for each edge type"
+                    frontier = distributed.sample_etype_neighbors(
+                        g, seed_nodes, ETYPE, fanout, replace=self.replace)
+                else:
+                    frontier = distributed.sample_neighbors(
+                        g, seed_nodes, fanout, replace=self.replace)
         else:
             if fanout is None:
                 frontier = subgraph.in_subgraph(g, seed_nodes)
             else:
-                frontier = sampling.sample_neighbors(g, seed_nodes, fanout, replace=self.replace)
+                self._build_fanout(block_id, g)
+                self._build_prob_arrays(g)
+
+                frontier = sampling.sample_neighbors(
+                    g, seed_nodes, self.fanout_arrays[block_id],
+                    replace=self.replace, prob=self.prob_arrays, exclude_edges=exclude_eids)
         return frontier
+
+    def _build_prob_arrays(self, g):
+        # build prob_arrays only once
+        if self.prob_arrays is None:
+            self.prob_arrays = [nd.array([], ctx=nd.cpu())] * len(g.etypes)
+
+    def _build_fanout(self, block_id, g):
+        assert not self.fanouts is None, \
+            "_build_fanout() should only be called when fanouts is not None"
+        # build fanout_arrays only once for each layer
+        while block_id >= len(self.fanout_arrays):
+            for i in range(len(self.fanouts)):
+                fanout = self.fanouts[i]
+                if not isinstance(fanout, dict):
+                    fanout_array = [int(fanout)] * len(g.etypes)
+                else:
+                    if len(fanout) != len(g.etypes):
+                        raise DGLError('Fan-out must be specified for each edge type '
+                                       'if a dict is provided.')
+                    fanout_array = [None] * len(g.etypes)
+                    for etype, value in fanout.items():
+                        fanout_array[g.get_etype_id(etype)] = value
+                self.fanout_arrays.append(
+                    F.to_dgl_nd(F.tensor(fanout_array, dtype=F.int64)))
+
 
 class MultiLayerFullNeighborSampler(MultiLayerNeighborSampler):
     """Sampler that builds computational dependency of node representations by taking messages
@@ -115,3 +165,7 @@ class MultiLayerFullNeighborSampler(MultiLayerNeighborSampler):
     """
     def __init__(self, n_layers, return_eids=False):
         super().__init__([None] * n_layers, return_eids=return_eids)
+
+    @classmethod
+    def exclude_edges_in_frontier(cls, g):
+        return False

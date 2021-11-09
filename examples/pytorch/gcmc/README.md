@@ -11,7 +11,7 @@ Credit: Jiani Zhang ([@jennyzhang0215](https://github.com/jennyzhang0215))
 ## Dependencies
 * PyTorch 1.2+
 * pandas
-* torchtext 0.4+ (if using user and item contents as node features)
+* torchtext 0.9+ (if using user and item contents as node features)
 * spacy (if using user and item contents as node features)
     - You will also need to run `python -m spacy download en_core_web_sm`
 
