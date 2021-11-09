@@ -771,7 +771,7 @@ def khop_out_subgraph(graph, nodes, k, *, relabel_nodes=True, store_ids=True):
 
     >>> g = dgl.graph(([0, 2, 0, 4, 2], [1, 1, 2, 3, 4]))
     >>> g.edata['w'] = torch.arange(10).view(5, 2)
-    >>> sg = dgl.khop_out_subgraph(g, 0, k=2)
+    >>> sg, inverse_indices = dgl.khop_out_subgraph(g, 0, k=2)
     >>> sg
     Graph(num_nodes=4, num_edges=4,
           ndata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64)}
@@ -786,17 +786,21 @@ def khop_out_subgraph(graph, nodes, k, *, relabel_nodes=True, store_ids=True):
             [4, 5],
             [2, 3],
             [8, 9]])
+    >>> inverse_indices
+    tensor([0])
 
     Extract a subgraph from a heterogeneous graph.
 
     >>> g = dgl.heterograph({
     ...     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
     ...     ('user', 'follows', 'user'): ([0, 1], [1, 3])})
-    >>> sg = dgl.khop_out_subgraph(g, {'user': 0}, k=2)
+    >>> sg, inverse_indices = dgl.khop_out_subgraph(g, {'user': 0}, k=2)
     >>> sg
     Graph(num_nodes={'game': 2, 'user': 3},
           num_edges={('user', 'follows', 'user'): 2, ('user', 'plays', 'game'): 2},
           metagraph=[('user', 'user', 'follows'), ('user', 'game', 'plays')])
+    >>> inverse_indices
+    {'user': tensor([0])}
 
     See also
     --------

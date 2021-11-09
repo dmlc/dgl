@@ -41,6 +41,14 @@ class GNNExplainer(nn.Module):
     log : bool, optional
         If True, it will log the computation process, default to True.
     """
+
+    coeffs = {
+        'edge_size': 0.005,
+        'edge_ent': 1.0,
+        'node_feat_size': 1.0,
+        'node_feat_ent': 0.1
+    }
+
     def __init__(self,
                  model,
                  num_hops,
@@ -67,8 +75,28 @@ class GNNExplainer(nn.Module):
 
         return feat_mask, edge_mask
 
-    def _loss(self):
-        return NotImplementedError
+    def _loss_regularize(self, loss, edge_mask, feat_mask):
+        r"""TODO"""
+        # epsilon for numerical stability
+        eps = 1e-15
+
+        edge_mask = edge_mask.sigmoid()
+        # Edge mask sparsity regularization
+        loss = loss + self.coeffs['edge_size'] * torch.sum(edge_mask)
+        # Edge mask entropy regularization
+        ent = - edge_mask * torch.log(edge_mask + eps) - \
+            (1 - edge_mask) * torch.log(1 - edge_mask + eps)
+        loss = loss + self.coeffs['edge_ent'] * ent.mean()
+
+        feat_mask = feat_mask.sigmoid()
+        # Feature mask sparsity regularization
+        loss = loss + self.coeffs['node_feat_size'] * torch.mean(feat_mask)
+        # Feature mask entropy regularization
+        ent = -feat_mask * torch.log(feat_mask + eps) - \
+            (1 - feat_mask) * torch.log(1 - feat_mask + eps)
+        loss = loss + self.coeffs['node_feat_ent'] * ent.mean()
+
+        return loss
 
     def explain_node(self, node_id, graph, feat, **kwargs):
         r"""Learns and returns a node feature mask and subgraph that play a
@@ -99,7 +127,7 @@ class GNNExplainer(nn.Module):
 
         # Extract node-centered k-hop subgraph and
         # its associated node and edge features.
-        sg = khop_in_subgraph(graph, node_id, self.num_hops)
+        sg, inverse_indices = khop_in_subgraph(graph, node_id, self.num_hops)
         sg_nodes = sg.ndata[NID]
         sg_edges = sg.edata[EID]
         feat = feat[sg_nodes]
@@ -113,8 +141,7 @@ class GNNExplainer(nn.Module):
         # Get the initial prediction
         with torch.no_grad():
             logits = self.model(graph=sg, feat=feat, **kwargs)
-            log_probs = logits.log_softmax(dim=-1)
-            pred_label = log_probs.argmax(dim=-1)
+            pred_label = logits.argmax(dim=-1)
 
         feat_mask, edge_mask = self._init_masks(feat, sg)
         device = feat.device
@@ -134,6 +161,21 @@ class GNNExplainer(nn.Module):
             logits = self.model(graph=sg, feat=feat,
                                 eweight=edge_mask.sigmoid())
             log_probs = logits.log_softmax(dim=-1)
+            loss = -log_probs[inverse_indices, pred_label[inverse_indices]]
+            loss = self._loss_regularize(loss, edge_mask, feat_mask)
+            loss.backward()
+            optimizer.step()
+
+            if self.log:
+                pbar.update(1)
+
+        if self.log:
+            pbar.close()
+
+        feat_mask = feat_mask.detach().sigmoid().squeeze()
+        edge_mask = edge_mask.detach().sigmoid()
+
+        return feat_mask, edge_mask
 
     def explain_graph(self):
         r"""TODO"""
