@@ -44,7 +44,7 @@ GATConv
 .. autoclass:: dgl.nn.pytorch.conv.GATConv
     :members: forward
     :show-inheritance:
-    
+
 GATv2Conv
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -163,7 +163,7 @@ TWIRLSUnfoldingAndAttention
 .. autoclass:: dgl.nn.pytorch.conv.TWIRLSUnfoldingAndAttention
     :members: forward
     :show-inheritance:
-    
+
 GCN2Conv
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -318,4 +318,16 @@ NodeEmbedding
 
 .. autoclass:: dgl.nn.pytorch.sparse_emb.NodeEmbedding
     :members:
+    :show-inheritance:
+
+Explainability Models
+----------------------------------------
+
+.. automodule:: dgl.nn.pytorch.explain
+
+GNNExplainer
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.explain.GNNExplainer
+    :members: explain_node, explain_graph
     :show-inheritance:

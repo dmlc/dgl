@@ -175,7 +175,7 @@ class GNNExplainer(nn.Module):
         feat_mask = feat_mask.detach().sigmoid().squeeze()
         edge_mask = edge_mask.detach().sigmoid()
 
-        return feat_mask, edge_mask
+        return sg, feat_mask, edge_mask
 
     def explain_graph(self):
         r"""TODO"""
