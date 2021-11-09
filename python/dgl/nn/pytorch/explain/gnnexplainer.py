@@ -57,10 +57,6 @@ class GNNExplainer(nn.Module):
                  log=True):
         super(GNNExplainer, self).__init__()
         self.model = model
-        requires_grad = []
-        for param in self.model.parameters():
-            requires_grad.append(param.requires_grad)
-        self.requires_grad = requires_grad
         self.num_hops = num_hops
         self.lr = lr
         self.num_epochs = num_epochs
@@ -101,14 +97,6 @@ class GNNExplainer(nn.Module):
         loss = loss + self.coeffs['node_feat_ent'] * ent.mean()
 
         return loss
-
-    def _disable_model_grad(self):
-        for param in self.model.parameters():
-            param.requires_grad = False
-
-    def _restore_model_grad(self):
-        for i, param in enumerate(self.model.parameters()):
-            param.requires_grad = self.requires_grad[i]
 
     def explain_node(self, node_id, graph, feat, **kwargs):
         r"""Learns and returns a node feature mask and subgraph that play a
@@ -182,7 +170,6 @@ class GNNExplainer(nn.Module):
         TODO
         """
         self.model.eval()
-        self._disable_model_grad()
         num_nodes = graph.num_nodes()
         num_edges = graph.num_edges()
 
@@ -211,13 +198,15 @@ class GNNExplainer(nn.Module):
 
         params = [feat_mask, edge_mask]
         optimizer = torch.optim.Adam(params, lr=self.lr)
+        # Hack
+        model_optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
 
         if self.log:
             pbar = tqdm(total=self.num_epochs)
             pbar.set_description(f'Explain node {node_id}')
 
+        model_optimizer.zero_grad()
         for _ in range(self.num_epochs):
-            optimizer.zero_grad()
             feat = feat * feat_mask.sigmoid()
             logits = self.model(graph=sg, feat=feat,
                                 eweight=edge_mask.sigmoid())
@@ -226,6 +215,8 @@ class GNNExplainer(nn.Module):
             loss = self._loss_regularize(loss, edge_mask, feat_mask)
             loss.backward()
             optimizer.step()
+            optimizer.zero_grad()
+            model_optimizer.zero_grad()
 
             if self.log:
                 pbar.update(1)
