@@ -50,6 +50,18 @@ void ScatterAdd(NDArray feat,
   });
 }
 
+/*! \brief Scatter Add on heterogeneous graph.*/
+template <int XPU, typename IdType, int bits>
+void ScatterAdd_hetero(HeteroGraphPtr g,
+                std::vector<NDArray> feat,
+                std::vector<NDArray> idx,
+                std::vector<NDArray> idx_etype,
+                std::vector<NDArray> out) {
+  SWITCH_BITS(bits, DType, {
+    cpu::ScatterAdd_hetero<IdType, DType>(g, feat, idx, idx_etype, out);
+  });
+}
+
 /*! \brief Backward function of segment cmp.*/
 template <int XPU, typename IdType, int bits>
 void BackwardSegmentCmp(
@@ -121,6 +133,26 @@ template void ScatterAdd<kDLCPU, int64_t, 64>(
     NDArray feat,
     NDArray arg,
     NDArray out);
+
+template void ScatterAdd_hetero<kDLCPU, int32_t, 16>(
+    HeteroGraphPtr g, std::vector<NDArray> feat, std::vector<NDArray> idx,
+    std::vector<NDArray> idx_etype, std::vector<NDArray> out);
+template void ScatterAdd_hetero<kDLCPU, int64_t, 16>(
+    HeteroGraphPtr g, std::vector<NDArray> feat, std::vector<NDArray> idx,
+    std::vector<NDArray> idx_etype, std::vector<NDArray> out);
+template void ScatterAdd_hetero<kDLCPU, int32_t, 32>(
+    HeteroGraphPtr g, std::vector<NDArray> feat, std::vector<NDArray> idx,
+    std::vector<NDArray> idx_etype, std::vector<NDArray> out);
+template void ScatterAdd_hetero<kDLCPU, int64_t, 32>(
+    HeteroGraphPtr g, std::vector<NDArray> feat, std::vector<NDArray> idx,
+    std::vector<NDArray> idx_etype, std::vector<NDArray> out);
+template void ScatterAdd_hetero<kDLCPU, int32_t, 64>(
+    HeteroGraphPtr g, std::vector<NDArray> feat, std::vector<NDArray> idx,
+    std::vector<NDArray> idx_etype, std::vector<NDArray> out);
+template void ScatterAdd_hetero<kDLCPU, int64_t, 64>(
+    HeteroGraphPtr g, std::vector<NDArray> feat, std::vector<NDArray> idx,
+    std::vector<NDArray> idx_etype, std::vector<NDArray> out);
+
 template void BackwardSegmentCmp<kDLCPU, int32_t, 16>(
     NDArray feat,
     NDArray arg,

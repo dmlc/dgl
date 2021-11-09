@@ -7,6 +7,7 @@
 #include "./segment_reduce.cuh"
 #include "./functor.cuh"
 #include "./utils.h"
+#include <dgl/base_heterograph.h>
 
 namespace dgl {
 
@@ -44,6 +45,18 @@ void ScatterAdd(NDArray feat,
                 NDArray out) {
   SWITCH_BITS(bits, DType, {
     cuda::ScatterAdd<IdType, DType>(feat, idx, out);
+  });
+}
+
+
+template <int XPU, typename IdType, int bits>
+void ScatterAdd_hetero(HeteroGraphPtr g,
+                       std::vector<NDArray> feat,
+                       std::vector<NDArray> idx,
+                       std::vector<NDArray> idx_etype,
+                       std::vector<NDArray> out) {
+  SWITCH_BITS(bits, DType, {
+    // cuda::ScatterAdd<IdType, DType>(feat, idx, out);
   });
 }
 
@@ -118,6 +131,26 @@ template void ScatterAdd<kDLGPU, int64_t, 64>(
     NDArray feat,
     NDArray idx,
     NDArray out);
+
+template void ScatterAdd_hetero<kDLGPU, int32_t, 16>(
+    HeteroGraphPtr g, std::vector<NDArray> feat, std::vector<NDArray> idx,
+    std::vector<NDArray> idx_etype, std::vector<NDArray> out);
+template void ScatterAdd_hetero<kDLGPU, int64_t, 16>(
+    HeteroGraphPtr g, std::vector<NDArray> feat, std::vector<NDArray> idx,
+    std::vector<NDArray> idx_etype, std::vector<NDArray> out);
+template void ScatterAdd_hetero<kDLGPU, int32_t, 32>(
+    HeteroGraphPtr g, std::vector<NDArray> feat, std::vector<NDArray> idx,
+    std::vector<NDArray> idx_etype, std::vector<NDArray> out);
+template void ScatterAdd_hetero<kDLGPU, int64_t, 32>(
+    HeteroGraphPtr g, std::vector<NDArray> feat, std::vector<NDArray> idx,
+    std::vector<NDArray> idx_etype, std::vector<NDArray> out);
+template void ScatterAdd_hetero<kDLGPU, int32_t, 64>(
+    HeteroGraphPtr g, std::vector<NDArray> feat, std::vector<NDArray> idx,
+    std::vector<NDArray> idx_etype, std::vector<NDArray> out);
+template void ScatterAdd_hetero<kDLGPU, int64_t, 64>(
+    HeteroGraphPtr g, std::vector<NDArray> feat, std::vector<NDArray> idx,
+    std::vector<NDArray> idx_etype, std::vector<NDArray> out);
+
 template void BackwardSegmentCmp<kDLGPU, int32_t, 16>(
     NDArray feat,
     NDArray arg,

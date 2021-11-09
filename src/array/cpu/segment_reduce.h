@@ -8,6 +8,7 @@
 
 #include <dgl/array.h>
 #include <dgl/runtime/parallel_for.h>
+#include <dgl/base_heterograph.h>
 
 namespace dgl {
 namespace aten {
@@ -97,6 +98,48 @@ void ScatterAdd(NDArray feat, NDArray idx, NDArray out) {
     for (int k = 0; k < dim; ++k) {
 #pragma omp atomic
       out_data[write_row * dim + k] += feat_data[i * dim + k];
+    }
+  }
+}
+
+/*!
+ * \brief CPU kernel of Scatter Add (on first dimension) operator for heterogeneous graph.
+ * \note math equation: out[idx[i], *] += feat[i, *]
+ * \param feat The input tensor.
+ * \param idx The indices tensor.
+ * \param out The output tensor.
+ */
+template <typename IdType, typename DType>
+void ScatterAdd_hetero(HeteroGraphPtr graph,
+                       std::vector<NDArray> list_feat,
+                       std::vector<NDArray> list_idx,
+                       std::vector<NDArray> list_idx_etypes,
+                       std::vector<NDArray> list_out) {
+
+// #pragma omp parallel for
+  for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
+    auto pair = graph->meta_graph()->FindEdge(etype);
+    const dgl_id_t src_id = pair.first; // graph is reveresed
+    const dgl_id_t dst_id = pair.second;
+    const DType* feat_data = list_feat[src_id].Ptr<DType>();
+    const IdType* idx_data = list_idx[src_id].Ptr<IdType>();
+    const IdType* idx_etype_data = list_idx_etypes[src_id].Ptr<IdType>();
+    DType* out_data = list_out[dst_id].Ptr<DType>();
+
+    int dim = 1;
+    for (int i = 1; i < list_out[dst_id]->ndim; ++i)
+      dim *= list_out[dst_id]->shape[i];
+    int n = list_feat[src_id]->shape[0];
+
+    for (int i = 0; i < n; ++i) {
+      if (etype == idx_etype_data[i]) {
+        const int write_row = idx_data[i];
+        for (int k = 0; k < dim; ++k) {
+        // #pragma omp atomic
+          out_data[write_row * dim + k] += feat_data[i * dim + k];
+          // out_data[etype/src_type][write_row * dim + k] += list_feat[dst_id][i * dim + k];
+        }
+      }
     }
   }
 }

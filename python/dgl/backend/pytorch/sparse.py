@@ -1,8 +1,8 @@
 import torch as th
 from distutils.version import LooseVersion
 from ...base import is_all, ALL
-from ...sparse import _gspmm, _gspmm_hetero, _gsddmm, _gsddmm_hetero, _segment_reduce, _bwd_segment_cmp, _scatter_add
-from ...sparse import _csrmm, _csrsum, _csrmask
+from ...sparse import _gspmm, _gspmm_hetero, _gsddmm, _gsddmm_hetero, _segment_reduce, _bwd_segment_cmp
+from ...sparse import _csrmm, _csrsum, _csrmask, _scatter_add, _scatter_add_hetero
 from ...heterograph_index import create_unitgraph_from_csr
 
 if LooseVersion(th.__version__) >= LooseVersion("1.6.0"):
@@ -163,7 +163,8 @@ class GSpMM(th.autograd.Function):
                         0, argY.long()) * dZ
                     dX.scatter_add_(0, argX.long(), grad)
                 elif op in ['add', 'copy_lhs']:
-                    dX.scatter_add_(0, argX.long(), dZ)
+                    dX = scatter_add(dZ, argX.long(), len(dX)) # DGL style
+                    # dX.scatter_add_(0, argX.long(), dZ) # PyTorch style
             dX = _reduce_grad(dX, X_shape)
         else:  # X has not gradient
             dX = None
@@ -194,7 +195,7 @@ class GSpMM_hetero(th.autograd.Function):
     @staticmethod
     @custom_fwd(cast_inputs=th.float16)
     def forward(ctx, gidx, op, reduce_op, X_len, *feats): # feats = lhs_data + rhs_data
-        out, (argX, argY) = _gspmm_hetero(gidx, op, reduce_op, X_len, feats)
+        out, (argX, argY, argX_etype) = _gspmm_hetero(gidx, op, reduce_op, X_len, feats)
         X, Y = feats[:X_len], feats[X_len:]
         # TODO (Israt): check target to decide src_id/dst_id?
         # checking the first relation to decide for all the relations
@@ -218,7 +219,7 @@ class GSpMM_hetero(th.autograd.Function):
         if not spmm_cache_argY(op, reduce_op, req_grad_X[src_id], req_grad_Y[dst_id]):
             argY = tuple([None] * len(Y))
 
-        ctx.save_for_backward(*feats, *argX, *argY)
+        ctx.save_for_backward(*feats, *argX, *argX_etype, *argY )
         return out
 
     @staticmethod
@@ -226,8 +227,9 @@ class GSpMM_hetero(th.autograd.Function):
     def backward(ctx, *dZ):
         gidx, op, reduce_op, X_shape, Y_shape, dtype, device, reduce_last, X_len = ctx.backward_cache
         ctx.backward_cache = None
-        feats = ctx.saved_tensors[:-(len(X_shape) + len(Y_shape))]
-        argX = ctx.saved_tensors[-(len(X_shape) + len(Y_shape)):-len(Y_shape)]
+        feats = ctx.saved_tensors[:-(2*len(X_shape) + len(Y_shape))]
+        argX = ctx.saved_tensors[-(2*len(X_shape) + len(Y_shape)):-(len(X_shape) + len(Y_shape))]
+        argX_etype = ctx.saved_tensors[-(len(X_shape) + len(Y_shape)):-len(Y_shape)]
         argY = ctx.saved_tensors[-len(Y_shape):]
         X, Y = feats[:X_len], feats[X_len:]
 
@@ -252,11 +254,8 @@ class GSpMM_hetero(th.autograd.Function):
                         0, argY.long()) * dZ
                     dX.scatter_add_(0, argX.long(), grad)
                 elif op in ['add', 'copy_lhs']:
-                    for etid in range(len(dX)):
-                        src_id, dst_id = gidx.metagraph.find_edge(etid)
-                        dX[src_id].scatter_add_(0, argX[dst_id].long(), dZ[dst_id])
-                    # [dX[i].scatter_add_(0, argX[i].long(), dZ[1]) if dX[i] is not None else None
-                    #     for i in range(len(dX))]
+                    # TODO(Israt): argX.long()
+                    dX = scatter_add_hetero(g_rev, dZ, argX, argX_etype, dX)
             dX = tuple([_reduce_grad(dX[i], X_shape[i]) if X[i] is not None else None
                 for i in range(len(X))])
         else:  # X has not gradient
@@ -439,6 +438,7 @@ class GSDDMM_hetero(th.autograd.Function):
             dY = tuple([None] * len(Y))
         return (None, None, None, None, None) + dX + dY
 
+
 class EdgeSoftmax(th.autograd.Function):
     @staticmethod
     @custom_fwd(cast_inputs=th.float16)
@@ -533,6 +533,21 @@ class ScatterAdd(th.autograd.Function):
     @custom_fwd(cast_inputs=th.float16)
     def forward(ctx, x, idx, m):
         y = _scatter_add(x, idx, m)
+        ctx.save_for_backward(idx)
+        return y
+
+    @staticmethod
+    @custom_bwd
+    def backward(ctx, dy):
+        idx = ctx.saved_tensors
+        return dy[idx], None, None
+
+
+class ScatterAdd_hetero(th.autograd.Function):
+    @staticmethod
+    @custom_fwd(cast_inputs=th.float16)
+    def forward(ctx, gidx, x, idx, idx_etype, m):
+        y = _scatter_add_hetero(gidx, x, idx, idx_etype, m)
         ctx.save_for_backward(idx)
         return y
 
@@ -656,6 +671,9 @@ def segment_reduce(op, x, offsets):
 
 def scatter_add(x, idx, m):
     return ScatterAdd.apply(x, idx, m)
+
+def scatter_add_hetero(gidx, x, idx, idx_etype, m):
+    return ScatterAdd_hetero.apply(gidx, x, idx, idx_etype, m)
 
 def csrmm(gidxA, A_weights, gidxB, B_weights, num_vtypes):
     nrows, ncols, C_indptr, C_indices, C_eids, C_weights = \

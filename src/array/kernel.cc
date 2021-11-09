@@ -218,6 +218,23 @@ void ScatterAddDispatch(NDArray feat, NDArray idx, NDArray out) {
   });
 }
 
+/*! \brief Scatter Add (on first dimension) dispatch function on heterogeneous graph. */
+void ScatterAddDispatchHetero(HeteroGraphPtr graph,
+                        std::vector<NDArray> feat,
+                        std::vector<NDArray> idx,
+                        std::vector<NDArray> idx_etype,
+                        std::vector<NDArray> out) {
+  auto pair = graph->meta_graph()->FindEdge(0); // checking the first etype
+  auto src_id = pair.first;
+  ATEN_XPU_SWITCH_CUDA(feat[src_id]->ctx.device_type, XPU, "ScatterAdd", {
+    ATEN_ID_TYPE_SWITCH(idx[src_id]->dtype, IdType, {
+      ATEN_FLOAT_BITS_SWITCH(feat[src_id]->dtype, bits, "Feature data", {
+        ScatterAdd_hetero<XPU, IdType, bits>(graph, feat, idx, idx_etype, out);
+      });
+    });
+  });
+}
+
 /*! \brief Backward segment cmp dispatch function.*/
 void BackwardSegmentCmpDispatch(NDArray feat, NDArray arg, NDArray out) {
   ATEN_XPU_SWITCH_CUDA(feat->ctx.device_type, XPU, "BackwardSegmentCmp", {
@@ -435,6 +452,32 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelScatterAdd")
     CheckCtx(feat->ctx, {feat, idx, out}, {"feat", "idx", "out"});
     CheckContiguous({feat, idx, out}, {"feat", "idx", "out"});
     ScatterAddDispatch(feat, idx, out);
+  });
+
+DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelScatterAddHetero")
+.set_body([](DGLArgs args, DGLRetValue *rv) {
+    HeteroGraphRef graph = args[0];
+    List<Value> list_feat = args[1];
+    List<Value> list_idx = args[2];
+    List<Value> list_idx_etype = args[3];
+    List<Value> list_out = args[4];
+    std::vector<NDArray> vec_feat;
+    std::vector<NDArray> vec_idx;
+    std::vector<NDArray> vec_idx_etype;
+    std::vector<NDArray> vec_out;
+
+    vec_feat.reserve(list_feat.size());
+    vec_idx.reserve(list_idx.size());
+    vec_idx_etype.reserve(list_idx_etype.size());
+    vec_out.reserve(list_out.size());
+
+    for (Value val : list_feat) vec_feat.push_back(val->data);
+    for (Value val : list_idx) vec_idx.push_back(val->data);
+    for (Value val : list_idx_etype) vec_idx_etype.push_back(val->data);
+    for (Value val : list_out) vec_out.push_back(val->data);
+    // CheckCtx(feat->ctx, {feat, idx, out}, {"feat", "idx", "out"});
+    // CheckContiguous({feat, idx, out}, {"feat", "idx", "out"});
+    ScatterAddDispatchHetero(graph.sptr(), vec_feat, vec_idx, vec_idx_etype, vec_out);
   });
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelBwdSegmentCmp")

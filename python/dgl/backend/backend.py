@@ -1670,6 +1670,33 @@ def scatter_add(x, idx, m):
     """
     pass
 
+def scatter_add_hetero(gidx, x, idx, idx_etype, dX):
+
+    """Scatter add (on first dimension) operator on heterogeneous graph.
+
+    Math: y[idx[i], *] += x[i, *]
+
+    Parameters
+    ----------
+    gidx : HeteroGraphIndex
+        The input graph.
+    x : Tuple of tensors
+        The input features.
+    idx : Tuple of tensors
+        The indices array.
+    idx_etype : Tuple of tensors
+        The etypes array for each indices in idx array.
+    dX : Tuple of tensors
+        To find the length of output.
+
+    Returns
+    -------
+    Tensor
+        The output tensor.
+    """
+    pass
+
+
 def csrmm(A, A_weights, B, B_weights, num_vtypes):
     """Compute weighted adjacency matrix multiplication.
 

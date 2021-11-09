@@ -115,6 +115,16 @@ void ScatterAdd(NDArray feat,
                 NDArray out);
 
 /*!
+ * \brief Scatter Add on first dimension.
+ */
+template <int XPU, typename IdType, int bits>
+void ScatterAdd_hetero(HeteroGraphPtr g,
+                std::vector<NDArray> feat,
+                std::vector<NDArray> idx,
+                std::vector<NDArray> idx_etype,
+                std::vector<NDArray> out);
+
+/*!
  * \brief Backward function of segment cmp.
  */
 template <int XPU, typename IdType, int bits>

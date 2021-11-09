@@ -259,6 +259,9 @@ def _gspmm_hetero(gidx, op, reduce_op, u_len, u_and_e_tuple):
         list_arg_e[l] = None if list_arg_e[l] is None else F.zerocopy_from_dgl_ndarray(arg_e_nd)
         if expand_e and use_cmp:
             list_arg_e[l] = F.squeeze(list_arg_e[l], -1)
+    for l, arg_u_etype_nd in enumerate(list_arg_u_etype_nd):
+        list_arg_u_etype[l] = None if arg_u_etype_nd is None else F.zerocopy_from_dgl_ndarray(arg_u_etype_nd)
+
     # To deal with scalar node/edge features.
     for l in range(gidx.number_of_ntypes()):
         # replace None by empty tensor. Forward func doesn't accept None in tuple.
@@ -268,7 +271,7 @@ def _gspmm_hetero(gidx, op, reduce_op, u_len, u_and_e_tuple):
             v = F.squeeze(v, -1)  # To deal with scalar node/edge features.
         list_v[l] = v
     out = tuple(list_v)
-    return out, (list_arg_u, list_arg_e)
+    return out, (list_arg_u, list_arg_e, list_arg_u_etype)
 
 
 def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
@@ -488,6 +491,43 @@ def _scatter_add(x, idx, m):
                               to_dgl_nd(idx),
                               to_dgl_nd_for_write(out))
     return out
+
+
+def _scatter_add_hetero(gidx, list_x, list_idx, list_idx_etype, list_dX):
+    r""" Scatter add operator (on first dimension) implementation.
+
+    Math: y[idx[i], *] += x[i, *]
+
+    Parameters
+    ----------
+    x : Tensor
+        The input feature.
+    idx : Tensor
+        The indices array.
+    m : int
+        The length of output.
+
+    Returns
+    -------
+    Tensor
+        The output tensor.
+    """
+    # dX = scatter_add_hetero(g_rev, dZ, argX, argX_etype, dX)
+    list_out = [None] * len(list_dX)
+    for etid in range(gidx.number_of_etypes()):
+        src_id, dst_id = gidx.metagraph.find_edge(etid) # gidx is reveresed
+        x = list_x[src_id]
+        out_shp = (len(list_dX[dst_id]),) + F.shape(x)[1:]
+        ctx = F.context(x)
+        dtype = F.dtype(x)
+        list_out[dst_id] = F.zeros(out_shp, dtype, ctx)
+    _CAPI_DGLKernelScatterAddHetero(gidx,
+                                    [to_dgl_nd(x) for x in list_x],
+                                    # TODO (Israt): change idx to idx.long()
+                                    [to_dgl_nd(idx) for idx in list_idx],
+                                    [to_dgl_nd(idx_etype) for idx_etype in list_idx_etype],
+                                    [to_dgl_nd_for_write(out) for out in list_out])
+    return tuple(list_out)
 
 
 def _bwd_segment_cmp(feat, arg, m):
