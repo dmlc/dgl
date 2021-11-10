@@ -110,6 +110,11 @@ def edge_softmax(graph, logits, eids=ALL, norm_by='dst'):
         return edge_softmax_internal(graph._graph, logits,
                                      eids=eids, norm_by=norm_by)
     else:
-        return edge_softmax_hetero_internal(graph._graph, logits,
+        list_logits = [None] * graph._graph.number_of_etypes()
+        for rel in graph.canonical_etypes:
+            etid = graph.get_etype_id(rel)
+            _, etype, _ = rel
+            list_logits[etid] = logits[etype]
+        return edge_softmax_hetero_internal(graph._graph, list_logits,
                                             eids=eids, norm_by=norm_by)
 
