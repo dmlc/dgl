@@ -83,12 +83,13 @@ class GNNExplainer(nn.Module):
         """
         num_nodes, feat_size = feat.size()
         num_edges = graph.num_edges()
+        device = feat.device
 
         std = 0.1
-        feat_mask = nn.Parameter(torch.randn(1, feat_size) * std)
+        feat_mask = nn.Parameter(torch.randn(1, feat_size, device=device) * std)
 
         std = nn.init.calculate_gain('relu') * sqrt(2.0 / (2 * num_nodes))
-        edge_mask = nn.Parameter(torch.randn(num_edges) * std)
+        edge_mask = nn.Parameter(torch.randn(num_edges, device=device) * std)
 
         return feat_mask, edge_mask
 
@@ -255,9 +256,6 @@ class GNNExplainer(nn.Module):
             pred_label = logits.argmax(dim=-1)
 
         feat_mask, edge_mask = self._init_masks(sg, feat)
-        device = feat.device
-        feat_mask = feat_mask.to(device)
-        edge_mask = edge_mask.to(device)
 
         params = [feat_mask, edge_mask]
         optimizer = torch.optim.Adam(params, lr=self.lr)
@@ -378,9 +376,6 @@ class GNNExplainer(nn.Module):
             pred_label = logits.argmax(dim=-1)
 
         feat_mask, edge_mask = self._init_masks(graph, feat)
-        device = feat.device
-        feat_mask = feat_mask.to(device)
-        edge_mask = edge_mask.to(device)
 
         params = [feat_mask, edge_mask]
         optimizer = torch.optim.Adam(params, lr=self.lr)
