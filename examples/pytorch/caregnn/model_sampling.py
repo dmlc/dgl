@@ -25,9 +25,12 @@ class CARESampler(dgl.dataloading.BlockSampler):
                 # extract each node from dict because of single node type
                 for node in seed_nodes:
                     edges = g.in_edges(node, form='eid', etype=etype)
-                    num_neigh = int(g.in_degrees(node, etype=etype) * self.p[block_id][etype])
+                    num_neigh = th.ceil(g.in_degrees(node, etype=etype) * self.p[block_id][etype]).int().item()
                     neigh_dist = self.dists[block_id][etype][edges]
-                    neigh_index = np.argpartition(neigh_dist.cpu().detach(), num_neigh)[:num_neigh]
+                    if neigh_dist.shape[0] > num_neigh:
+                        neigh_index = np.argpartition(neigh_dist.cpu().detach(), num_neigh)[:num_neigh]
+                    else:
+                        neigh_index = np.arange(num_neigh)
                     edge_mask[edges[neigh_index]] = 1
                 new_edges_masks[etype] = edge_mask.bool()
 
@@ -56,6 +59,7 @@ class CAREConv(nn.Module):
         self.p = {}
         self.last_avg_dist = {}
         self.f = {}
+        # indicate whether the RL converges
         self.cvg = {}
         for etype in edges:
             self.p[etype] = 0.5
@@ -151,7 +155,7 @@ class CAREGNN(nn.Module):
     def RLModule(self, graph, epoch, idx, dists):
         for i, layer in enumerate(self.layers):
             for etype in self.edges:
-                if not layer.cvg:
+                if not layer.cvg[etype]:
                     # formula 5
                     eid = graph.in_edges(idx, form='eid', etype=etype)
                     avg_dist = th.mean(dists[i][etype][eid])
@@ -159,11 +163,17 @@ class CAREGNN(nn.Module):
                     # formula 6
                     if layer.last_avg_dist[etype] < avg_dist:
                         layer.p[etype] -= self.step_size
-                        layer.f.append(-1)
+                        layer.f[etype].append(-1)
+                        # avoid overflow, follow the author's implement
+                        if layer.p[etype] < 0:
+                            layer.p[etype] = 0.001
                     else:
                         layer.p[etype] += self.step_size
-                        layer.f.append(+1)
+                        layer.f[etype].append(+1)
+                        if layer.p[etype] > 1:
+                            layer.p[etype] = 0.999
+                    layer.last_avg_dist[etype] = avg_dist
 
                     # formula 7
-                    if epoch >= 10 and sum(layer.f[-10:]) <= 2:
-                        layer.cvg = True
+                    if epoch >= 9 and abs(sum(layer.f[etype][-10:])) <= 2:
+                        layer.cvg[etype] = True
