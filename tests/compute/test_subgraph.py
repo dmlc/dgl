@@ -467,7 +467,7 @@ def test_khop_in_subgraph(idtype):
         [4, 5],
         [8, 9]
     ]))
-    assert F.array_equal(inv, F.tensor([0], dtype=idtype))
+    assert F.array_equal(inv, F.tensor([0]))
 
     # Test multiple nodes
     sg, inv = dgl.khop_in_subgraph(g, [0, 2], k=1)
@@ -561,7 +561,6 @@ def test_khop_out_subgraph(idtype):
     assert sg.idtype == g.idtype
     assert sg.num_nodes() == 1
     assert sg.num_edges() == 0
-    assert F.array_equal(inv, F.tensor([0, 2], dtype=idtype))
     assert F.array_equal(inv, F.tensor([0], dtype=idtype))
 
     g = dgl.heterograph({
