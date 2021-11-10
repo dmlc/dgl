@@ -472,18 +472,18 @@ def test_khop_in_subgraph(idtype):
     # Test multiple nodes
     sg, inv = dgl.khop_in_subgraph(g, [0, 2], k=1)
     assert sg.num_edges() == 4
-    assert F.array_equal(inv, F.tensor([0, 2], dtype=idtype))
+    assert F.array_equal(inv, F.tensor([0, 2]))
 
     sg, inv = dgl.khop_in_subgraph(g, F.tensor([0, 2], idtype), k=1)
     assert sg.num_edges() == 4
-    assert F.array_equal(inv, F.tensor([0, 2], dtype=idtype))
+    assert F.array_equal(inv, F.tensor([0, 2]))
 
     # Test isolated node
     sg, inv = dgl.khop_in_subgraph(g, 1, k=2)
     assert sg.idtype == g.idtype
     assert sg.num_nodes() == 1
     assert sg.num_edges() == 0
-    assert F.array_equal(inv, F.tensor([0], dtype=idtype))
+    assert F.array_equal(inv, F.tensor([0]))
 
     g = dgl.heterograph({
         ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
@@ -501,7 +501,7 @@ def test_khop_in_subgraph(idtype):
     u, v = sg['plays'].edges()
     edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
     assert edge_set == {(0, 0), (1, 0)}
-    assert F.array_equal(inv['game'], F.tensor([0], dtype=idtype))
+    assert F.array_equal(inv['game'], F.tensor([0]))
 
     # Test isolated node
     sg, inv = dgl.khop_in_subgraph(g, {'user': 0}, k=2)
@@ -510,7 +510,7 @@ def test_khop_in_subgraph(idtype):
     assert sg.num_nodes('user') == 1
     assert sg.num_edges('follows') == 0
     assert sg.num_edges('plays') == 0
-    assert F.array_equal(inv['user'], F.tensor([0], dtype=idtype))
+    assert F.array_equal(inv['user'], F.tensor([0]))
 
     # Test multiple nodes
     sg, inv = dgl.khop_in_subgraph(g, {'user': F.tensor([0, 1], idtype), 'game': 0}, k=1)
@@ -520,8 +520,8 @@ def test_khop_in_subgraph(idtype):
     u, v = sg['plays'].edges()
     edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
     assert edge_set == {(0, 0), (1, 0)}
-    assert F.array_equal(inv['user'], F.tensor([0, 1], dtype=idtype))
-    assert F.array_equal(inv['game'], F.tensor([0], dtype=idtype))
+    assert F.array_equal(inv['user'], F.tensor([0, 1]))
+    assert F.array_equal(inv['game'], F.tensor([0]))
 
 @parametrize_dtype
 def test_khop_out_subgraph(idtype):
@@ -545,23 +545,23 @@ def test_khop_out_subgraph(idtype):
         [2, 3],
         [8, 9]
     ]))
-    assert F.array_equal(inv, F.tensor([0], dtype=idtype))
+    assert F.array_equal(inv, F.tensor([0]))
 
     # Test multiple nodes
     sg, inv = dgl.khop_out_subgraph(g, [0, 2], k=1)
     assert sg.num_edges() == 4
-    assert F.array_equal(inv, F.tensor([0, 2], dtype=idtype))
+    assert F.array_equal(inv, F.tensor([0, 2]))
 
     sg, inv = dgl.khop_out_subgraph(g, F.tensor([0, 2], idtype), k=1)
     assert sg.num_edges() == 4
-    assert F.array_equal(inv, F.tensor([0, 2], dtype=idtype))
+    assert F.array_equal(inv, F.tensor([0, 2]))
 
     # Test isolated node
     sg, inv = dgl.khop_out_subgraph(g, 1, k=2)
     assert sg.idtype == g.idtype
     assert sg.num_nodes() == 1
     assert sg.num_edges() == 0
-    assert F.array_equal(inv, F.tensor([0], dtype=idtype))
+    assert F.array_equal(inv, F.tensor([0]))
 
     g = dgl.heterograph({
         ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
@@ -579,7 +579,7 @@ def test_khop_out_subgraph(idtype):
     u, v = sg['plays'].edges()
     edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
     assert edge_set == {(0,0), (1,0), (1,1)}
-    assert F.array_equal(inv['user'], F.tensor([0], dtype=idtype))
+    assert F.array_equal(inv['user'], F.tensor([0]))
 
     # Test isolated node
     sg, inv = dgl.khop_out_subgraph(g, {'user': 3}, k=2)
@@ -588,7 +588,7 @@ def test_khop_out_subgraph(idtype):
     assert sg.num_nodes('user') == 1
     assert sg.num_edges('follows') == 0
     assert sg.num_edges('plays') == 0
-    assert F.array_equal(inv['user'], F.tensor([0], dtype=idtype))
+    assert F.array_equal(inv['user'], F.tensor([0]))
 
     # Test multiple nodes
     sg, inv = dgl.khop_out_subgraph(g, {'user': F.tensor([2], idtype), 'game': 0}, k=1)
@@ -596,5 +596,5 @@ def test_khop_out_subgraph(idtype):
     u, v = sg['plays'].edges()
     edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
     assert edge_set == {(0, 1)}
-    assert F.array_equal(inv['user'], F.tensor([0], dtype=idtype))
-    assert F.array_equal(inv['game'], F.tensor([0], dtype=idtype))
+    assert F.array_equal(inv['user'], F.tensor([0]))
+    assert F.array_equal(inv['game'], F.tensor([0]))
