@@ -31,7 +31,7 @@ class GNNExplainer(nn.Module):
         * The output of its forward function is the logits for the predicted
           node/graph classes.
 
-        See also the example below.
+        See also the example in :func:`explain_node` and :func:`explain_graph`.
     num_hops : int
         The number of hops for GNN information aggregation.
     lr : float, optional

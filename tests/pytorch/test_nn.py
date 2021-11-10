@@ -1193,7 +1193,7 @@ def test_gnnexplainer(g, idtype, out_dim):
     g = g.astype(idtype).to(F.ctx())
     feat = F.randn((g.num_nodes(), 5))
 
-    class Model(nn.Module):
+    class Model(th.nn.Module):
         def __init__(self, in_feats, out_feats, graph=False):
             super(Model, self).__init__()
             self.linear = nn.Linear(in_feats, out_feats)
