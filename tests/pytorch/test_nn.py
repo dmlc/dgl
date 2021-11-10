@@ -1,5 +1,4 @@
 import io
-from python.dgl.nn.pytorch.explain.gnnexplainer import GNNExplainer
 import torch as th
 import networkx as nx
 import dgl
@@ -1220,12 +1219,12 @@ def test_gnnexplainer(g, idtype, out_dim):
 
     # Explain node prediction
     model = Model(5, out_dim)
-    explainer = GNNExplainer(model, num_hops=1)
+    explainer = nn.GNNExplainer(model, num_hops=1)
     new_center, sg, feat_mask, edge_mask = explainer.explain_node(10, g, feat)
 
     # Explain graph prediction
     model = Model(5, out_dim, graph=True)
-    explainer = GNNExplainer(model, num_hops=1)
+    explainer = nn.GNNExplainer(model, num_hops=1)
     feat_mask, edge_mask = explainer.explain_graph(g, feat)
 
 if __name__ == '__main__':
