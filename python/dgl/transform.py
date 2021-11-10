@@ -1304,8 +1304,8 @@ def laplacian_lambda_max(g):
         adj = g_i.adj(transpose=True, scipy_fmt=g_i.formats()['created'][0]).astype(float)
         norm = sparse.diags(F.asnumpy(g_i.in_degrees()).clip(1) ** -0.5, dtype=float)
         laplacian = sparse.eye(n) - norm * adj * norm
-        rst.append(sparse.linalg.eigs(laplacian, 1, which='LM',
-                                      return_eigenvectors=False)[0].real)
+        rst.append(scipy.sparse.linalg.eigs(
+            laplacian, 1, which='LM', return_eigenvectors=False)[0].real)
     return rst
 
 def metapath_reachable_graph(g, metapath):

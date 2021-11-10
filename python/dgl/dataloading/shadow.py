@@ -65,20 +65,20 @@ class ShaDowKHopSampler(NeighborSamplingMixin, Sampler):
         self.prob = prob
         self.set_output_context(output_ctx)
 
-    def sample(self, g, seed_nodes, exclude_eids=None):
+    def sample(self, g, seeds, exclude_eids=None):
         self._build_fanout(len(self.fanouts), g)
         self._build_prob_arrays(g)
-        seed_nodes = prepare_tensor_or_dict(g, seed_nodes, 'seed nodes')
-        output_nodes = seed_nodes
+        seeds = prepare_tensor_or_dict(g, seeds, 'seed nodes')
+        output_nodes = seeds
 
         for i in range(len(self.fanouts)):
             fanout = self.fanouts[i]
             frontier = sample_neighbors(
-                g, seed_nodes, fanout, replace=self.replace, prob=self.prob_arrays)
-            block = transform.to_block(frontier, seed_nodes)
-            seed_nodes = block.srcdata[NID]
+                g, seeds, fanout, replace=self.replace, prob=self.prob_arrays)
+            block = transform.to_block(frontier, seeds)
+            seeds = block.srcdata[NID]
 
-        sg = g.subgraph(seed_nodes, relabel_nodes=True)
+        sg = g.subgraph(seeds, relabel_nodes=True)
         sg = exclude_edges(sg, exclude_eids, self.output_device)
 
-        return seed_nodes, output_nodes, [sg]
+        return seeds, output_nodes, [sg]

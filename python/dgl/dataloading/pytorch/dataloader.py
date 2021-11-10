@@ -382,7 +382,7 @@ class _GraphDataLoaderIter:
     def __next__(self):
         result = next(self.iter_)
         if self.dataloader.is_subgraph_loader:
-            _restore_storages([result])
+            _restore_storages([result], g)
         return result
 
 def _init_dataloader(collator, device, dataloader_kwargs, use_ddp, ddp_seed):
@@ -943,8 +943,8 @@ class GraphDataLoader:
         # larger graph, convert it to an IterableDataset.
         if isinstance(dataset, SubgraphIterator) and not hasattr(dataset, '__len__'):
             class _Dataset(IterableDataset):
-                def __init__(self, it):
-                    self._it = it
+                def __init__(self, iter_):
+                    self._it = iter_
 
                 def __iter__(self):
                     return iter(self._it)
