@@ -1,9 +1,12 @@
+{% set use_cuda = environ.get('USE_CUDA', False) %}
+{% set package_name = 'dgl' + environ.get('DGL_PACKAGE_SUFFIX', '') %}
 package:
   name: dgl{{ environ.get('DGL_PACKAGE_SUFFIX', '') }}
   version: "0.8"
 
+
 source:
-  git_rev: 0.4.x
+  git_rev: 0.6.x
   git_url: https://github.com/dmlc/dgl.git
 
 requirements:
@@ -19,10 +22,13 @@ requirements:
     - scipy
     - networkx
     - requests
+    - vs2015_runtime # [win]
+    - cudatoolkit {{ CUDA_VER }} # [use_cuda]
 
 build:
   script_env:
     - USE_CUDA
+    - CUDA_VER
 
 about:
   home: https://github.com/dmlc/dgl.git
