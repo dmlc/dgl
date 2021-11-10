@@ -28,7 +28,7 @@ class GATv2Conv(nn.Module):
     .. math::
         \alpha_{ij}^{(l)} &= \mathrm{softmax_i} (e_{ij}^{(l)})
 
-        e_{ij}^{(l)} &= \vec{a}^T^{(l)}\mathrm{LeakyReLU}\left(
+        e_{ij}^{(l)} &= {\vec{a}^T}^{(l)}\mathrm{LeakyReLU}\left(
             W^{(l)}_{left} h_{i} + W^{(l)}_{right} h_{j}\right)
 
     Parameters
