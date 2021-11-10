@@ -239,8 +239,8 @@ class GNNExplainer(nn.Module):
         # Extract node-centered k-hop subgraph and
         # its associated node and edge features.
         sg, inverse_indices = khop_in_subgraph(graph, node_id, self.num_hops)
-        sg_nodes = sg.ndata[NID]
-        sg_edges = sg.edata[EID]
+        sg_nodes = sg.ndata[NID].long()
+        sg_edges = sg.edata[EID].long()
         feat = feat[sg_nodes]
         for key, item in kwargs.items():
             if torch.is_tensor(item) and item.size(0) == num_nodes:
