@@ -1196,7 +1196,7 @@ def test_gnnexplainer(g, idtype, out_dim):
     class Model(th.nn.Module):
         def __init__(self, in_feats, out_feats, graph=False):
             super(Model, self).__init__()
-            self.linear = nn.Linear(in_feats, out_feats)
+            self.linear = th.nn.Linear(in_feats, out_feats)
             if graph:
                 self.pool = nn.AvgPooling()
             else:
