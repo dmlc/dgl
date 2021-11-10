@@ -105,7 +105,7 @@ def test_node_dataloader_hg():
     sampler = dgl.dataloading.MultiLayerFullNeighborSampler(2)
     dataloader = MultiGPUNodeDataLoader(
         g1, {nty: g1.nodes(nty) for nty in g1.ntypes},
-        sampler, device=F.ctx(), comm=None,
+        sampler, device=F.ctx(),
         node_feat=node_feat,
         use_ddp=False,
         batch_size=batch_size,

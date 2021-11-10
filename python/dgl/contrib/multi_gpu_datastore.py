@@ -64,7 +64,9 @@ class MultiGPUDataStore:
         assert partition.num_parts() == comm.size(), "The partition " \
             "must have the same number of parts as the communicator has ranks."
         assert partition.array_size() == shape[0], "The partition must be for " \
-            "an array with the same number of rows as this MultiGPUDataStore."
+            "an array with the same number of rows as this MultiGPUDataStore: " \
+            "{} vs. {}".format(partition.array_size(), shape[0])
+
 
         self._comm = comm
         self._partition = partition

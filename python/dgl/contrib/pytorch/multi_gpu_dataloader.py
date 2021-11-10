@@ -25,20 +25,13 @@ from ..multi_gpu_datastore import MultiGPUDataStore
 from typing import Mapping
 
 def _load_tensor(tensor, device, comm, part):
-    loaded_tensor = None
-    if comm:
-        loaded_tensor = MultiGPUDataStore(shape=tensor.shape, dtype=tensor.dtype,
-            device=device, comm=comm, partition=part)
-        loaded_tensor.all_set_global(tensor)
-    else:
-        loaded_tensor = tensor.to(device)
+    loaded_tensor = MultiGPUDataStore(shape=tensor.shape, dtype=tensor.dtype,
+        device=device, comm=comm, partition=part)
+    loaded_tensor.all_set_global(tensor)
     return loaded_tensor
 
 def _gather_row(tensor, index):
-    if isinstance(tensor, MultiGPUDataStore):
-        return tensor.all_gather_row(index)
-    else:
-        return tensor[index]
+    return tensor.all_gather_row(index)
 
 class _NodeDataIterator:
     def __init__(self, it, n_feat, e_feat, node_feat, node_label):
@@ -123,7 +116,8 @@ class MultiGPUNodeDataLoader(NodeDataLoader):
         The device to store the node data on, and the device
         of the generated MFGs in each iteration, which should be a
         PyTorch device object (e.g., ``torch.device``) specifying a GPU.
-    partition : dgl.partition.NDArrayPartition, optional
+    partition : dgl.partition.NDArrayPartition or dict[ntype,
+            dgl.partition.NDArrayPartition], optional
         The partition specifying to which device each node's data belongs.
         If not specified, the indices will be striped evenly across the
         GPUs.
@@ -187,13 +181,29 @@ class MultiGPUNodeDataLoader(NodeDataLoader):
             if rank != 0:
                 nccl_id = nccl.UniqueId(objs[0])
             comm = nccl.Communicator(world_size, rank, nccl_id)
-        assert comm is None or use_ddp, "'use_ddp' must be true when using NCCL."
+            assert use_ddp, "'use_ddp' must be true when using NCCL."
+        else:
+            comm = nccl.Communicator(1, 0, nccl.UniqueId())
 
         if partition is None:
-            partition = NDArrayPartition(
-                g.number_of_nodes(),
-                comm.size() if comm else 1,
-                mode='remainder')
+            partition = {}
+            if len(g.ntypes) > 1:
+                for ntype in g.ntypes:
+                    partition[ntype] = NDArrayPartition(
+                        g.number_of_nodes(ntype),
+                        comm.size(),
+                        mode='remainder')
+            else:
+                # homogenous graph
+                partition[g.ntypes[0]] = NDArrayPartition(
+                    g.number_of_nodes(),
+                    comm.size(),
+                    mode='remainder')
+        elif not isinstance(partition, Mapping):
+            assert len(g.ntypes) == 1, "For multiple ntypes, `parition` must " \
+                "be a mapping of ntypes to NDArrayPartitions."
+            partition = {g.ntypes[0]: partition}
+
         edge_partition = create_edge_partition_from_nodes( \
             partition, g)
 
@@ -206,7 +216,8 @@ class MultiGPUNodeDataLoader(NodeDataLoader):
                     data = g.ndata[feat_name][ntype]
                 else:
                     data = g.ndata[feat_name]
-                feats[feat_name] = _load_tensor(data, device, comm, partition)
+                feats[feat_name] = _load_tensor(data, device, comm,
+                                                partition[ntype])
             self._n_feat[ntype] = feats
 
         # remove all node features
@@ -224,7 +235,7 @@ class MultiGPUNodeDataLoader(NodeDataLoader):
                 else:
                     data = g.edata[feat_name]
                 feats[feat_name] = _load_tensor(data, device, comm,
-                                                edge_partition)
+                                                edge_partition[etype])
             self._e_feat[etype] = feats
 
         # remove all edge features
@@ -241,15 +252,26 @@ class MultiGPUNodeDataLoader(NodeDataLoader):
             if isinstance(node_feat, Mapping):
                 self._node_feat = {}
                 for k,v in node_feat.items():
-                    self._node_feat[k] = _load_tensor(v, device, comm, partition)
+                    self._node_feat[k] = _load_tensor(v, device, comm,
+                                                      partition[k])
             else:
-                self._node_feat = _load_tensor(node_feat, device, comm, partition)
+                assert len(g.ntypes) == 1, "For multiple ntypes, `node_feat` " \
+                    "must be a mapping of ntypes to tensors."
+                self._node_feat = _load_tensor(node_feat, device, comm,
+                    partition[g.ntypes[0]])
 
         self._node_label = None
         if node_label is not None:
-            assert not isinstance(node_label, Mapping), \
-                "Multiple label types is not supported."
-            self._node_label = _load_tensor(node_label, device, comm, partition)
+            if isinstance(node_label, Mapping):
+                self._node_label = {}
+                for k,v in node_label.items():
+                    self._node_label[k] = _load_tensor(v, device, comm,
+                                                      partition[k])
+            else:
+                assert len(g.ntypes) == 1, "For multiple ntypes, `node_label` " \
+                    "must be a mapping of ntypes to tensors."
+                self._node_label = _load_tensor(node_label, device, comm,
+                    partition[g.ntypes[0]])
 
     def __iter__(self):
         """Return the iterator of the data loader."""
