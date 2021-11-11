@@ -15,7 +15,7 @@ from .. import utils
 
 def track_time( num_relations, format, feat_size, reduce_type):
     device = utils.get_bench_device()
-        dd = {}
+    dd = {}
     candidate_edges = [dgl.data.CoraGraphDataset(verbose=False)[0].edges(), dgl.data.PubmedGraphDataset(verbose=False)[
         0].edges(), dgl.data.CiteseerGraphDataset(verbose=False)[0].edges()]
     for i in range(num_relations):
