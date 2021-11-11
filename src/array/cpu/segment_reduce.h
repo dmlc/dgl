@@ -119,12 +119,14 @@ void ScatterAdd_hetero(HeteroGraphPtr graph,
 
 // #pragma omp parallel for
   std::vector<bool> updated(graph->NumVertexTypes(), false);
+
   for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
     auto pair = graph->meta_graph()->FindEdge(etype);
     const dgl_id_t src_id = pair.first; // graph is reveresed
     const dgl_id_t dst_id = pair.second;
-    // if(updated[src_id]) continue;
-    // updated[src_id] = true;
+    if( src_id == 2) continue; // TODO (Israt): delete hard code
+    if(updated[dst_id]) continue;
+    updated[dst_id] = true;
     const DType* feat_data = list_feat[src_id].Ptr<DType>();
     const IdType* idx_data = list_idx[src_id].Ptr<IdType>();
     const IdType* idx_ntype_data = list_idx_ntypes[src_id].Ptr<IdType>();
@@ -134,12 +136,13 @@ void ScatterAdd_hetero(HeteroGraphPtr graph,
     for (int i = 1; i < list_out[dst_id]->ndim; ++i)
       dim *= list_out[dst_id]->shape[i];
     int n = list_feat[src_id]->shape[0];
+
     for (int i = 0; i < n; ++i) {
-      for (int k = 0; k < dim; ++k) {
-          if (dst_id == idx_ntype_data[i * dim + k]) { // && i == idx_data[i * dim + k]) {
-            const int write_row = idx_data[i * dim + k];
+        const int write_row = idx_data[i];
+        for (int k = 0; k < dim; ++k) {
+          if (dst_id == idx_ntype_data[i * dim + k]) {
             // #pragma omp atomic
-            out_data[write_row * dim + k] += feat_data[i * dim + k];
+            out_data[write_row * dim + k] += feat_data[i * dim + k]; // feat = dZ
           }
       }
     }
