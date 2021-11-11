@@ -67,7 +67,7 @@ COOMatrix CSRToCOO<kDLGPU, int32_t>(CSRMatrix csr) {
  */
 template <typename DType, typename IdType>
 __global__ void _RepeatKernel(
-    const DType* val, const IdType* repeats, const IdType* pos,
+    const DType* val, const IdType* pos,
     DType* out, int64_t n_row, int64_t length) {
   int tx = blockIdx.x * blockDim.x + threadIdx.x;
   const int stride_x = gridDim.x * blockDim.x;
@@ -81,10 +81,7 @@ __global__ void _RepeatKernel(
         r = m;
       }
     }
-
-    IdType rpos = l-1;
-    IdType rofs = tx - pos[rpos];
-    out[tx] = val[rpos];
+    out[tx] = val[l-1];
     tx += stride_x;
   }
 }
@@ -104,7 +101,7 @@ COOMatrix CSRToCOO<kDLGPU, int64_t>(CSRMatrix csr) {
   auto start = high_resolution_clock::now();
   CUDA_KERNEL_CALL(_RepeatKernel,
       nb, nt, 0, thr_entry->stream,
-      rowids.Ptr<int64_t>(), row_nnz.Ptr<int64_t>(),
+      rowids.Ptr<int64_t>(),
       csr.indptr.Ptr<int64_t>(), ret_row.Ptr<int64_t>(),
       csr.num_rows, nnz);
   cudaDeviceSynchronize();
