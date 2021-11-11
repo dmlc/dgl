@@ -7,6 +7,9 @@
 #include "../../runtime/cuda/cuda_common.h"
 #include "./utils.h"
 
+#include <chrono>
+using namespace std::chrono;
+
 namespace dgl {
 
 using runtime::NDArray;
@@ -63,9 +66,26 @@ COOMatrix CSRToCOO<kDLGPU, int32_t>(CSRMatrix csr) {
  * out = [3, 1, 1]
  */
 template <typename DType, typename IdType>
-__global__ void _RepeatKernel(
+__global__ void _RepeatKernel1(
     const DType* val, const IdType* repeats, const IdType* pos,
     DType* out, int64_t length) {
+  int tx = blockIdx.x * blockDim.x + threadIdx.x;
+  const int stride_x = gridDim.x * blockDim.x;
+  while (tx < length) {
+    IdType off = pos[tx];
+    const IdType rep = repeats[tx];
+    const DType v = val[tx];
+    for (IdType i = 0; i < rep; ++i) {
+      out[off + i] = v;
+    }
+    tx += stride_x;
+  }
+}
+
+template <typename DType, typename IdType>
+__global__ void _RepeatKernel(
+    const DType* val, const IdType* repeats, const IdType* pos,
+    DType* out, int64_t n_row, int64_t length) {
   int tx = blockIdx.x * blockDim.x + threadIdx.x;
   const int stride_x = gridDim.x * blockDim.x;
   while (tx < length) {
@@ -89,14 +109,18 @@ COOMatrix CSRToCOO<kDLGPU, int64_t>(CSRMatrix csr) {
   IdArray row_nnz = CSRGetRowNNZ(csr, rowids);
   IdArray ret_row = NewIdArray(nnz, ctx, nbits);
 
-  const int nt = cuda::FindNumThreads(csr.num_rows);
-  const int nb = (csr.num_rows + nt - 1) / nt;
+  const int nt = 256;
+  const int nb = (nnz + nt - 1) / nt;
+  auto start = high_resolution_clock::now();
   CUDA_KERNEL_CALL(_RepeatKernel,
       nb, nt, 0, thr_entry->stream,
       rowids.Ptr<int64_t>(), row_nnz.Ptr<int64_t>(),
       csr.indptr.Ptr<int64_t>(), ret_row.Ptr<int64_t>(),
-      csr.num_rows);
-
+      csr.num_rows, nnz);
+  cudaDeviceSynchronize();
+  auto stop = high_resolution_clock::now();
+  auto duration = duration_cast<microseconds>(stop - start);
+  std::cout << "Repeat kernel execution time: " << (double) duration.count()/std::pow(10,6) << std::endl;
   return COOMatrix(csr.num_rows, csr.num_cols,
                    ret_row, csr.indices, csr.data,
                    true, csr.sorted);
