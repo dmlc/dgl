@@ -329,7 +329,7 @@ void SpMMCmpCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
 template <typename IdType, typename DType, typename Op, typename Cmp>
 void SpMMCmpCsrHetero(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
                 NDArray efeat, NDArray out, NDArray argu, NDArray arge,
-                NDArray argu_etype, const int etype) {
+                NDArray argu_ntype, const int ntype) {
   const bool has_idx = !IsNullArray(csr.data);
   const IdType* indptr = static_cast<IdType*>(csr.indptr->data);
   const IdType* indices = static_cast<IdType*>(csr.indices->data);
@@ -342,7 +342,7 @@ void SpMMCmpCsrHetero(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat
   DType* O = static_cast<DType*>(out->data);
   IdType* argX = Op::use_lhs ? static_cast<IdType*>(argu->data) : nullptr;
   IdType* argW = Op::use_rhs ? static_cast<IdType*>(arge->data) : nullptr;
-  IdType* argX_etype = Op::use_lhs ? static_cast<IdType*>(argu_etype->data) : nullptr;
+  IdType* argX_ntype = Op::use_lhs ? static_cast<IdType*>(argu_ntype->data) : nullptr;
   CHECK_NOTNULL(indptr);
   CHECK_NOTNULL(O);
   if (Op::use_lhs) {
@@ -376,7 +376,7 @@ void SpMMCmpCsrHetero(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat
         DType* out_off = O + rid * dim;
         IdType* argx_off = argX + rid * dim;
         IdType* argw_off = argW + rid * dim;
-        IdType* argx_etype = argX_etype + rid * dim;
+        IdType* argx_ntype = argX_ntype + rid * dim;
         for (IdType j = row_start; j < row_end; ++j) {
 
           const IdType cid = indices[j];
@@ -393,7 +393,7 @@ void SpMMCmpCsrHetero(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat
               out_off[k] = val;
               if (Op::use_lhs) {
                 argx_off[k] = cid;
-                argx_etype[k] = etype;
+                argx_ntype[k] = ntype;
               }
               if (Op::use_rhs) argw_off[k] = eid;
             }

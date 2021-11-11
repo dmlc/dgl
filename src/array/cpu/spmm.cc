@@ -88,8 +88,9 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
           const dgl_type_t dst_id = out_node_tids[etype];
           if(!updated[dst_id]) {
             updated[dst_id] = true;
-            IdType *argu_etype = out_aux[2][dst_id].Ptr<IdType>();
-            std::fill(argu_etype, argu_etype + vec_csr[etype].num_rows * dim, etype);
+            IdType *argu_ntype = out_aux[2][dst_id].Ptr<IdType>();
+            // TODO (Israt): what to fill with?
+            std::fill(argu_ntype, argu_ntype + vec_csr[etype].num_rows * dim, -1);
           }
         }
         /* Call  SpMM for each relation type */
@@ -104,11 +105,11 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
           if (reduce == "max") {
             cpu::SpMMCmpCsrHetero<IdType, DType, Op, cpu::op::Max<DType>>(
                 bcast, csr, ufeat, efeat, out, out_aux[0][dst_id], out_aux[1][etype],
-                out_aux[2][dst_id], etype);
+                out_aux[2][dst_id], src_id);
           } else {
             cpu::SpMMCmpCsrHetero<IdType, DType, Op, cpu::op::Min<DType>>(
                 bcast, csr, ufeat, efeat, out, out_aux[0][dst_id], out_aux[1][etype],
-                out_aux[2][dst_id], etype);
+                out_aux[2][dst_id], src_id);
           }
         }
       });
