@@ -93,7 +93,6 @@ COOMatrix CSRToCOO<kDLGPU, int64_t>(CSRMatrix csr) {
   const auto nbits = csr.indptr->dtype.bits;
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   IdArray rowids = Range(0, csr.num_rows, nbits, ctx);
-  IdArray row_nnz = CSRGetRowNNZ(csr, rowids);
   IdArray ret_row = NewIdArray(nnz, ctx, nbits);
 
   const int nt = 256;
