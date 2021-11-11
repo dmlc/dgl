@@ -99,13 +99,13 @@ class _EidExcluder():
         return frontier
 
 
-def exclude_edges(sg, exclude_eids, device):
+def exclude_edges(subg, exclude_eids, device):
     """Find and remove from the subgraph the edges whose IDs in the parent
     graph are given.
 
     Parameters
     ----------
-    sg : DGLGraph
+    subg : DGLGraph
         The subgraph. Must have ``dgl.EID`` field containing the original
         edge IDs in the parent graph.
     exclude_eids : Tensor or dict
@@ -120,7 +120,7 @@ def exclude_edges(sg, exclude_eids, device):
         the original edge IDs in the same parent graph.
     """
     if exclude_eids is None:
-        return sg
+        return subg
 
     if device is not None:
         if isinstance(exclude_eids, Mapping):
@@ -130,7 +130,7 @@ def exclude_edges(sg, exclude_eids, device):
             exclude_eids = F.copy_to(exclude_eids, device)
 
     excluder = _EidExcluder(exclude_eids)
-    return sg if excluder is None else excluder(sg)
+    return subg if excluder is None else excluder(subg)
 
 
 def _find_exclude_eids_with_reverse_id(g, eids, reverse_eid_map):
@@ -213,15 +213,15 @@ class Sampler(object):
     def __init__(self, output_ctx=None):
         self.set_output_context(output_ctx)
 
-    def sample(self, g, seeds, exclude_eids=None):
+    def sample(self, g, seed_nodes, exclude_eids=None):
         """Sample a structure from the graph.
 
         Parameters
         ----------
         g : DGLGraph
             The original graph.
-        seeds : Tensor or dict[str, Tensor]
-            The destination nodes or edges by type.
+        seed_nodes : Tensor or dict[ntype, Tensor]
+            The destination nodes by type.
 
             If the graph only has one node type, one can just specify a single tensor
             of node IDs.
@@ -232,7 +232,7 @@ class Sampler(object):
         -------
         Tensor or dict[ntype, Tensor]
             The nodes whose input features are required for computing the output
-            representation of :attr:`seeds`.
+            representation of :attr:`seed_nodes`.
         any
             Any data representing the structure.
         """
@@ -364,7 +364,7 @@ class BlockSampler(Sampler):
         """
         return False
 
-    def sample_frontier(self, block_id, g, seeds, exclude_eids=None):
+    def sample_frontier(self, block_id, g, seed_nodes, exclude_eids=None):
         """Generate the frontier given the destination nodes.
 
         The subclasses should override this function.
@@ -375,7 +375,7 @@ class BlockSampler(Sampler):
             Represents which GNN layer the frontier is generated for.
         g : DGLGraph
             The original graph.
-        seeds : Tensor or dict[ntype, Tensor]
+        seed_nodes : Tensor or dict[ntype, Tensor]
             The destination nodes by node type.
 
             If the graph only has one node type, one can just specify a single tensor
@@ -399,14 +399,14 @@ class BlockSampler(Sampler):
         """
         raise NotImplementedError
 
-    def sample(self, g, seeds, exclude_eids=None):
+    def sample(self, g, seed_nodes, exclude_eids=None):
         """Generate the a list of MFGs given the destination nodes.
 
         Parameters
         ----------
         g : DGLGraph
             The original graph.
-        seeds : Tensor or dict[ntype, Tensor]
+        seed_nodes : Tensor or dict[ntype, Tensor]
             The destination nodes by node type.
 
             If the graph only has one node type, one can just specify a single tensor
@@ -436,30 +436,30 @@ class BlockSampler(Sampler):
             graph_device = g.device
 
         for block_id in reversed(range(self.num_layers)):
-            seeds_in = to_device(seeds, graph_device)
+            seed_nodes_in = to_device(seed_nodes, graph_device)
 
             if self.exclude_edges_in_frontier(g):
                 frontier = self.sample_frontier(
-                    block_id, g, seeds_in, exclude_eids=exclude_eids)
+                    block_id, g, seed_nodes_in, exclude_eids=exclude_eids)
             else:
-                frontier = self.sample_frontier(block_id, g, seeds_in)
+                frontier = self.sample_frontier(block_id, g, seed_nodes_in)
 
             if self.output_device is not None:
                 frontier = frontier.to(self.output_device)
-                seeds_out = to_device(seeds, self.output_device)
+                seed_nodes_out = to_device(seed_nodes, self.output_device)
             else:
-                seeds_out = seeds
+                seed_nodes_out = seed_nodes
 
             # Removing edges from the frontier for link prediction training falls
             # into the category of frontier postprocessing
             if not self.exclude_edges_in_frontier(g):
                 frontier = exclude_edges(frontier, exclude_eids, self.output_device)
 
-            block = transform.to_block(frontier, seeds_out)
+            block = transform.to_block(frontier, seed_nodes_out)
             if self.return_eids:
                 self.assign_block_eids(block, frontier)
 
-            seeds = {ntype: block.srcnodes[ntype].data[NID] for ntype in block.srctypes}
+            seed_nodes = {ntype: block.srcnodes[ntype].data[NID] for ntype in block.srctypes}
             blocks.insert(0, block)
         return blocks[0].srcdata[NID], blocks[-1].dstdata[NID], blocks
 
@@ -794,7 +794,7 @@ class EdgeCollator(Collator):
         items = utils.prepare_tensor_or_dict(self.g_sampling, items, 'items')
 
         pair_graph = self.g.edge_subgraph(items)
-        seeds = pair_graph.ndata[NID]
+        seed_nodes = pair_graph.ndata[NID]
 
         exclude_eids = _find_exclude_eids(
             self.g_sampling,
@@ -804,7 +804,7 @@ class EdgeCollator(Collator):
             reverse_etype_map=self.reverse_etypes)
 
         input_nodes, _, blocks = self.graph_sampler.sample(
-            self.g_sampling, seeds, exclude_eids=exclude_eids)
+            self.g_sampling, seed_nodes, exclude_eids=exclude_eids)
 
         return input_nodes, pair_graph, blocks
 
@@ -836,7 +836,7 @@ class EdgeCollator(Collator):
         pair_graph, neg_pair_graph = transform.compact_graphs([pair_graph, neg_pair_graph])
         pair_graph.edata[EID] = induced_edges
 
-        seeds = pair_graph.ndata[NID]
+        seed_nodes = pair_graph.ndata[NID]
 
         exclude_eids = _find_exclude_eids(
             self.g_sampling,
@@ -846,7 +846,7 @@ class EdgeCollator(Collator):
             reverse_etype_map=self.reverse_etypes)
 
         input_nodes, _, blocks = self.graph_sampler.sample(
-            self.g_sampling, seeds, exclude_eids=exclude_eids)
+            self.g_sampling, seed_nodes, exclude_eids=exclude_eids)
 
         return input_nodes, pair_graph, neg_pair_graph, blocks
 
