@@ -70,7 +70,7 @@ class _NodeDataIterator:
                 node_frames.append(frame)
 
             edge_frames = []
-            for etype in block.etypes:
+            for etype in block.canonical_etypes:
                 index = block.edges[etype].data[dgl.EID]
                 if isinstance(index, Mapping):
                     index = index[block.to_canonical_etype(etype)]
@@ -227,7 +227,7 @@ class MultiGPUNodeDataLoader(NodeDataLoader):
 
         # save all edge features to GPU
         self._e_feat = {}
-        for i, etype in enumerate(g.etypes):
+        for i, etype in enumerate(g.canonical_etypes):
             feats = {}
             for feat_name in list(g._edge_frames[i].keys()):
                 if isinstance(g.edata[feat_name], Mapping):

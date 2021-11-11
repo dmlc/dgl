@@ -1,5 +1,5 @@
 ##
-#   Copyright 2021 Contributors 
+#   Copyright (c) 2021, NVIDIA CORPORATION.
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -90,11 +90,16 @@ def test_node_dataloader_hg():
          ('user', 'play', 'game'): ([0, 1, 1, 3, 5], [0, 1, 2, 0, 2]),
          ('game', 'played-by', 'user'): ([0, 1, 2, 0, 2], [0, 1, 1, 3, 5])
     })
-    graph_data_dim = {}
+    graph_ndata_dim = {}
+    graph_edata_dim = {}
     for ntype in g1.ntypes:
         g1.nodes[ntype].data['feat'] = F.copy_to(F.randn((g1.num_nodes(ntype), 8)), F.cpu())
 
-        graph_data_dim[ntype] = g1.nodes[ntype].data['feat'].shape[1]
+        graph_ndata_dim[ntype] = g1.nodes[ntype].data['feat'].shape[1]
+
+    for etype in g1.etypes:
+        g1.edges[etype].data['feat'] = F.copy_to(F.randn((g1.num_edges(etype), 10)), F.cpu())
+        graph_edata_dim[etype] = g1.edges[etype].data['feat'].shape[1]
 
     node_feat = {}
     for ntype in g1.ntypes:
@@ -112,6 +117,8 @@ def test_node_dataloader_hg():
         shuffle=True,
         drop_last=False)
 
+
+
     for input_nodes, output_nodes, blocks, block_feat in dataloader:
         # make sure everything is on the GPU
         for _, tensor in input_nodes.items():
@@ -126,10 +133,11 @@ def test_node_dataloader_hg():
         # make sure we have the same features
         for block in blocks:
             for ntype in block.ntypes:
-                print("block.ndata['feat'] = {}".format(block.ndata['feat']))
-                print("ntype = {}".format(ntype))
                 block_data_dim = block.ndata['feat'][ntype].shape[1]
-                assert block_data_dim == graph_data_dim[ntype]
+                assert block_data_dim == graph_ndata_dim[ntype]
+            for etype in block.canonical_etypes:
+                block_edata_dim = block.edata['feat'][etype].shape[1]
+                assert block_edata_dim == graph_edata_dim[etype[1]]
         for ntype in g1.ntypes:
             exp_feat = node_feat[ntype][input_nodes[ntype]]
             act_feat = F.copy_to(block_feat[ntype], F.cpu())

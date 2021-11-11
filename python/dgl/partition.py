@@ -16,8 +16,8 @@
 
 """Module for graph partition utilities."""
 import time
-import numpy as np
 from collections.abc import Mapping
+import numpy as np
 
 from ._ffi.function import _init_api
 from .heterograph import DGLHeteroGraph
@@ -528,15 +528,17 @@ def create_edge_partition_from_nodes(partition, graph):
     """
     if isinstance(partition, Mapping):
         edge_partition = {}
-        for srctype, etype, dsttype in graph.canonical_etypes:
+        for etype in graph.canonical_etypes:
+            srctype = etype[0]
             # assign edges based on their srctype
             npart = partition[srctype]
             if npart.mode() == 'remainder':
                 # This mode has no locality, so we don't bother to assign vertices to
                 # the same partition
-                return NDArrayPartition(array_size=graph.number_of_edges(etype),
-                                        num_parts=npart.num_parts(),
-                                        mode=npart._mode)
+                edge_partition[etype] = NDArrayPartition(
+                    array_size=graph.number_of_edges(etype),
+                    num_parts=npart.num_parts(),
+                    mode=npart._mode)
             else:
                 assert npart.mode() == 'range'
                 # This mode makes use of locality, so we want to preserve the same
@@ -548,10 +550,12 @@ def create_edge_partition_from_nodes(partition, graph):
                     rng.append(rng[-1] + \
                         F.as_scalar(F.sum(graph.out_degrees(u=idx, etype=etype),
                                           dim=0)))
-                return NDArrayPartition(array_size=graph.number_of_edges(),
-                                        num_parts=npart.num_parts(),
-                                        mode=npart.mode(),
-                                        part_ranges=rng)
+                edge_partition[etype] = NDArrayPartition(
+                    array_size=graph.number_of_edges(),
+                    num_parts=npart.num_parts(),
+                    mode=npart.mode(),
+                    part_ranges=rng)
+        return edge_partition
     else:
         if partition.mode() == 'remainder':
             # This mode has no locality, so we don't bother to assign vertices to
