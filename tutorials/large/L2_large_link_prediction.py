@@ -395,7 +395,7 @@ test_neg_dst = torch.randint(0, graph.num_nodes(), (graph.num_edges(),))
 # You also need to label the edges, 1 if positive and 0 if negative.
 #
 
-test_src = torch.cat([test_pos_src, test_neg_src])
+test_src = torch.cat([test_pos_src, test_pos_dst])
 test_dst = torch.cat([test_neg_src, test_neg_dst])
 test_graph = dgl.graph((test_src, test_dst), num_nodes=graph.num_nodes())
 test_graph.edata['label'] = torch.cat(
