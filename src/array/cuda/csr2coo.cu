@@ -66,35 +66,25 @@ COOMatrix CSRToCOO<kDLGPU, int32_t>(CSRMatrix csr) {
  * out = [3, 1, 1]
  */
 template <typename DType, typename IdType>
-__global__ void _RepeatKernel1(
-    const DType* val, const IdType* repeats, const IdType* pos,
-    DType* out, int64_t length) {
-  int tx = blockIdx.x * blockDim.x + threadIdx.x;
-  const int stride_x = gridDim.x * blockDim.x;
-  while (tx < length) {
-    IdType off = pos[tx];
-    const IdType rep = repeats[tx];
-    const DType v = val[tx];
-    for (IdType i = 0; i < rep; ++i) {
-      out[off + i] = v;
-    }
-    tx += stride_x;
-  }
-}
-
-template <typename DType, typename IdType>
 __global__ void _RepeatKernel(
     const DType* val, const IdType* repeats, const IdType* pos,
     DType* out, int64_t n_row, int64_t length) {
   int tx = blockIdx.x * blockDim.x + threadIdx.x;
   const int stride_x = gridDim.x * blockDim.x;
   while (tx < length) {
-    IdType off = pos[tx];
-    const IdType rep = repeats[tx];
-    const DType v = val[tx];
-    for (IdType i = 0; i < rep; ++i) {
-      out[off + i] = v;
+    IdType l = 0, r = n_row, m = 0;
+    while (l < r) {
+      m = l + (r-l)/2;
+      if (tx >= pos[m]) {
+        l = m+1;
+      } else {
+        r = m;
+      }
     }
+
+    IdType rpos = l-1;
+    IdType rofs = tx - pos[rpos];
+    out[tx] = val[rpos];
     tx += stride_x;
   }
 }
