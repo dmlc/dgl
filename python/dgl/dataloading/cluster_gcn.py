@@ -1,11 +1,10 @@
+"""Cluster-GCN subgraph iterators."""
 import os
-import glob
 import pickle
 import numpy as np
 
 from ..transform import metis_partition_assignment
 from .. import backend as F
-from ..subgraph import node_subgraph
 from .dataloader import SubgraphIterator
 
 class ClusterGCNSubgraphIterator(SubgraphIterator):
@@ -59,8 +58,9 @@ class ClusterGCNSubgraphIterator(SubgraphIterator):
         if not os.path.exists(path):
             return False
 
-        with open(path, 'rb') as f:
-            self.part_indptr, self.part_indices = pickle.load(f)
+        with open(path, 'rb') as file_:
+            self.part_indptr, self.part_indices = pickle.load(file_)
+        return True
 
     def _save_parts(self, assignment, cache_directory):
         os.makedirs(cache_directory, exist_ok=True)
