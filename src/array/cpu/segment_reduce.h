@@ -138,12 +138,12 @@ void ScatterAdd_hetero(HeteroGraphPtr graph,
     int n = list_feat[src_id]->shape[0];
 
     for (int i = 0; i < n; ++i) {
-        const int write_row = idx_data[i];
-        for (int k = 0; k < dim; ++k) {
-          if (dst_id == idx_ntype_data[i * dim + k]) {
-            // #pragma omp atomic
-            out_data[write_row * dim + k] += feat_data[i * dim + k]; // feat = dZ
-          }
+      for (int k = 0; k < dim; ++k) {
+        if (dst_id == idx_ntype_data[i * dim + k]) {
+          const int write_row = idx_data[i * dim + k];
+          // #pragma omp atomic
+          out_data[write_row * dim + k] += feat_data[i * dim + k]; // feat = dZ
+        }
       }
     }
   }
