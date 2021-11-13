@@ -69,8 +69,8 @@ class ClusterGCNSubgraphIterator(SubgraphIterator):
         num_nodes_per_part = np.bincount(assignment)
         self.part_indptr = np.insert(np.cumsum(num_nodes_per_part), 0, 0)
 
-        with open(self._cache_file_path(cache_directory), 'wb') as f:
-            pickle.dump((self.part_indptr, self.part_indices), f)
+        with open(self._cache_file_path(cache_directory), 'wb') as file_:
+            pickle.dump((self.part_indptr, self.part_indices), file_)
 
     def __len__(self):
         return self.part_indptr.shape[0] - 1
