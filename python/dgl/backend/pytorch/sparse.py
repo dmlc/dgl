@@ -275,7 +275,17 @@ class GSpMM_hetero(th.autograd.Function):
                     dY = gsddmm_hetero(gidx, 'mul', X_len, 'u', 'v', *tpl_X_dZ)
                 elif op in ['add', 'copy_rhs']:
                     dY = gsddmm_hetero(gidx, 'copy_rhs', X_len, 'u', 'v', *tpl_X_dZ)
-            dY = tuple([_reduce_grad(dY[i], Y_shape[i]) if Y[i] is not None else None
+            else:  # max/min
+                src_id, dst_id = gidx.metagraph.find_edge(0)
+                dY = tuple([th.zeros((Y_shape[i][0],) + dZ[dst_id].shape[1:], dtype=dtype, device=device)
+                    if Y[i] is not None else None for i in range(len(Y))])
+                if op == 'mul':
+                    grad = _expand(X, dZ.shape[1:]).gather(
+                        0, argX.long()) * dZ
+                    dY.scatter_add_(0, argY.long(), grad)
+                elif op in ['add', 'copy_rhs']:
+                    dY = scatter_add_hetero(gidx.reverse(), dZ, argY, argY_etype, dY)
+            dY = tuple([_reduce_grad(dY[i], Y_shape[i]) if dY[i] is not None else None
                 for i in range(len(Y))])
         else:  # Y has no gradient
             dY = tuple([None] * len(Y))
