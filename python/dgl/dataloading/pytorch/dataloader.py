@@ -692,7 +692,7 @@ class EdgeDataLoader:
     Examples
     --------
     The following example shows how to train a 3-layer GNN for edge classification on a
-    set of edges ``train_eid`` on a homogeneous undirected graph.  Each node takes
+    set of edges ``train_eid`` on a homogeneous undirected graph. Each node takes
     messages from all neighbors.
 
     Say that you have an array of source node IDs ``src`` and another array of destination

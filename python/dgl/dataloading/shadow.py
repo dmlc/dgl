@@ -1,30 +1,31 @@
 """ShaDow-GNN subgraph samplers."""
 from ..utils import prepare_tensor_or_dict
 from ..base import NID
+from .. import transform
 from ..sampling import sample_neighbors
 from .neighbor import NeighborSamplingMixin
 from .dataloader import exclude_edges, Sampler
 
 class ShaDowKHopSampler(NeighborSamplingMixin, Sampler):
     """K-hop subgraph sampler used by
-    `ShaDow-GNN <https://openreview.net/forum?id=GIeGTl8EYx>`__.
+    `ShaDow-GNN <https://arxiv.org/abs/2012.01380>`__.
 
     It performs node-wise neighbor sampling but instead of returning a list of
-    MFGs, it returns a single subgraph induced by all the sampled nodes.
+    MFGs, it returns a single subgraph induced by all the sampled nodes.  The
+    seed nodes from which the neighbors are sampled will appear the first in the
+    induced nodes of the subgraph.
 
     This is used in conjunction with :class:`dgl.dataloading.pytorch.NodeDataLoader`
     and :class:`dgl.dataloading.pytorch.EdgeDataLoader`.
 
     Parameters
     ----------
-    fanouts : list[int] or list[dict[etype, int] or None]
-        List of neighbors to sample per edge type for each GNN layer, starting from the
-        first layer.
+    fanouts : list[int] or list[dict[etype, int]]
+        List of neighbors to sample per edge type for each GNN layer, with the i-th
+        element being the fanout for the i-th GNN layer.
 
-        If the graph is homogeneous, only an integer is needed for each layer.
-
-        If None is provided for one layer, all neighbors will be included regardless of
-        edge types.
+        If only a single integer is provided, DGL assumes that every edge type
+        will have the same fanout.
 
         If -1 is provided for one edge type on one layer, then all inbound edges
         of that edge type will be included.
@@ -32,7 +33,8 @@ class ShaDowKHopSampler(NeighborSamplingMixin, Sampler):
         Whether to sample with replacement
     prob : str, optional
         If given, the probability of each neighbor being sampled is proportional
-        to the edge feature with the given name.
+        to the edge feature value with the given name.  The feature must be
+        a scalar on each edge.
 
     Examples
     --------
@@ -40,12 +42,21 @@ class ShaDowKHopSampler(NeighborSamplingMixin, Sampler):
     a homogeneous graph where each node takes messages from 5, 10, 15 neighbors for
     the first, second, and third layer respectively (assuming the backend is PyTorch):
 
+    >>> g = dgl.data.CoraFullDataset()[0]
     >>> sampler = dgl.dataloading.ShaDowKHopSampler([5, 10, 15])
     >>> dataloader = dgl.dataloading.NodeDataLoader(
-    ...     g, train_nid, sampler,
-    ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
+    ...     g, torch.arange(g.num_nodes()), sampler,
+    ...     batch_size=5, shuffle=True, drop_last=False, num_workers=4)
     >>> for input_nodes, output_nodes, (subgraph,) in dataloader:
-    ...     train_on(subgraph)
+    ...     print(subgraph)
+    ...     assert torch.equal(input_nodes, subgraph.ndata[dgl.NID])
+    ...     assert torch.equal(input_nodes[:output_nodes.shape[0]], output_nodes)
+    ...     break
+    Graph(num_nodes=529, num_edges=3796,
+          ndata_schemes={'label': Scheme(shape=(), dtype=torch.int64),
+                         'feat': Scheme(shape=(8710,), dtype=torch.float32),
+                         '_ID': Scheme(shape=(), dtype=torch.int64)}
+          edata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64)})
 
     If training on a heterogeneous graph and you want different number of neighbors for each
     edge type, one should instead provide a list of dicts.  Each dict would specify the

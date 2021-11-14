@@ -1,6 +1,7 @@
 import dgl
 import backend as F
 import unittest
+import torch
 from torch.utils.data import DataLoader
 from collections import defaultdict
 from collections.abc import Iterator
@@ -219,12 +220,35 @@ def test_cluster_gcn(num_workers):
     for sg in dataloader:
         assert sg.batch_size == 4
 
-def test_shadow():
-    g = dgl.graph(([0, 1, 2, 3], [1, 2, 3, 4]))
-    sampler = dgl.dataloading.ShaDowKHopSampler([1, 1])
-    input_nodes, output_nodes, (sg,) = sampler.sample(g, [4])
-    assert F.array_equal(input_nodes, F.tensor([4, 3, 2], dtype=F.int64))
-    assert F.array_equal(output_nodes, F.tensor([4], dtype=F.int64))
+@pytest.mark.parametrize('num_workers', [0, 4])
+def test_shadow(num_workers):
+    g = dgl.data.CoraFullDataset()[0]
+    sampler = dgl.dataloading.ShaDowKHopSampler([5, 10, 15])
+    dataloader = dgl.dataloading.NodeDataLoader(
+        g, torch.arange(g.num_nodes()), sampler,
+        batch_size=5, shuffle=True, drop_last=False, num_workers=num_workers)
+    for i, (input_nodes, output_nodes, (subgraph,)) in enumerate(dataloader):
+        assert torch.equal(input_nodes, subgraph.ndata[dgl.NID])
+        assert torch.equal(input_nodes[:output_nodes.shape[0]], output_nodes)
+        assert torch.equal(subgraph.ndata['label'], g.ndata['label'][input_nodes])
+        assert torch.equal(subgraph.ndata['feat'], g.ndata['feat'][input_nodes])
+        if i == 5:
+            break
+
+
+@pytest.mark.parametrize('num_workers', [0, 4])
+def test_neighbor_nonuniform(num_workers):
+    g = dgl.graph(([1, 2, 3, 4, 5, 6, 7, 8], [0, 0, 0, 0, 1, 1, 1, 1]))
+    g.edata['p'] = torch.FloatTensor([1, 1, 0, 0, 1, 1, 0, 0])
+    sampler = dgl.dataloading.MultiLayerNeighborSampler([2], prob='p')
+    dataloader = dgl.dataloading.NodeDataLoader(g, [0, 1], sampler, batch_size=1, device=F.ctx())
+    for input_nodes, output_nodes, blocks in dataloader:
+        seed = output_nodes.item()
+        neighbors = set(input_nodes[1:].cpu().numpy())
+        if seed == 1:
+            assert neighbors == {5, 6}
+        elif seed == 0:
+            assert neighbors == {1, 2}
 
 
 def _check_device(data):
@@ -237,13 +261,14 @@ def _check_device(data):
     else:
         assert data.device == F.ctx()
 
-@pytest.mark.parametrize('sampler_name', ['full', 'neighbor', 'shadow'])
+@pytest.mark.parametrize('sampler_name', ['full', 'neighbor', 'neighbor2', 'shadow'])
 def test_node_dataloader(sampler_name):
     g1 = dgl.graph(([0, 0, 0, 1, 1], [1, 2, 3, 3, 4]))
     g1.ndata['feat'] = F.copy_to(F.randn((5, 8)), F.cpu())
     sampler = {
         'full': dgl.dataloading.MultiLayerFullNeighborSampler(2),
         'neighbor': dgl.dataloading.MultiLayerNeighborSampler([3, 3]),
+        'neighbor2': dgl.dataloading.MultiLayerNeighborSampler([3, 3]),
         'shadow': dgl.dataloading.ShaDowKHopSampler([3, 3])}[sampler_name]
 
     dataloader = dgl.dataloading.NodeDataLoader(
@@ -265,6 +290,7 @@ def test_node_dataloader(sampler_name):
     sampler = {
         'full': dgl.dataloading.MultiLayerFullNeighborSampler(2),
         'neighbor': dgl.dataloading.MultiLayerNeighborSampler([{etype: 3 for etype in g2.etypes}] * 2),
+        'neighbor2': dgl.dataloading.MultiLayerNeighborSampler([3, 3]),
         'shadow': dgl.dataloading.ShaDowKHopSampler([{etype: 3 for etype in g2.etypes}] * 2)}[sampler_name]
 
     dataloader = dgl.dataloading.NodeDataLoader(

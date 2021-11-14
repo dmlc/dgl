@@ -206,9 +206,9 @@ def _find_exclude_eids(g, exclude_mode, eids, **kwargs):
 
 class Sampler(object):
     """An abstract class that takes in a graph and a set of seed nodes and returns a
-    structure representing a smaller portion of the graph for computation.  It can
+    structure representing a smaller portion of the graph for computation. It can
     be either a list of bipartite graphs (i.e. :class:`BlockSampler`), or a single
-    subgraph (i.e. :class:`SubgraphSampler`).
+    subgraph.
     """
     def __init__(self, output_ctx=None):
         self.set_output_context(output_ctx)
@@ -245,7 +245,7 @@ class Sampler(object):
 
         Parameters
         ----------
-        output_ctx : DGLContext, default None
+        ctx : DGLContext, default None
             The device context the sampled blocks will be stored on. This
             should only be a CUDA context if multiprocessing is not used in
             the dataloader (e.g., num_workers is 0). If this is None, the
@@ -667,7 +667,7 @@ class EdgeCollator(Collator):
     Examples
     --------
     The following example shows how to train a 3-layer GNN for edge classification on a
-    set of edges ``train_eid`` on a homogeneous undirected graph.  Each node takes
+    set of edges ``train_eid`` on a homogeneous undirected graph. Each node takes
     messages from all neighbors.
 
     Say that you have an array of source node IDs ``src`` and another array of destination

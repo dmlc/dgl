@@ -20,7 +20,7 @@ class NeighborSamplingMixin(object):
     - :attr:`prob_arrays`: List of DGL NDArrays containing the unnormalized probabilities
       for every edge type.
     - :attr:`fanout_arrays`: List of DGL NDArrays containing the fanouts for every edge
-      type at every later.
+      type at every layer.
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)       # forward to base classes
@@ -62,14 +62,12 @@ class MultiLayerNeighborSampler(NeighborSamplingMixin, BlockSampler):
 
     Parameters
     ----------
-    fanouts : list[int] or list[dict[etype, int] or None]
-        List of neighbors to sample per edge type for each GNN layer, starting from the
-        first layer.
+    fanouts : list[int] or list[dict[etype, int]]
+        List of neighbors to sample per edge type for each GNN layer, with the i-th
+        element being the fanout for the i-th GNN layer.
 
-        If the graph is homogeneous, only an integer is needed for each layer.
-
-        If None is provided for one layer, all neighbors will be included regardless of
-        edge types.
+        If only a single integer is provided, DGL assumes that every edge type
+        will have the same fanout.
 
         If -1 is provided for one edge type on one layer, then all inbound edges
         of that edge type will be included.
@@ -80,7 +78,8 @@ class MultiLayerNeighborSampler(NeighborSamplingMixin, BlockSampler):
         If True, the edge IDs will be stored as an edge feature named ``dgl.EID``.
     prob : str, optional
         If given, the probability of each neighbor being sampled is proportional
-        to the edge feature with the given name.
+        to the edge feature value with the given name.  The feature must be
+        a scalar on each edge.
 
     Examples
     --------
@@ -127,30 +126,22 @@ class MultiLayerNeighborSampler(NeighborSamplingMixin, BlockSampler):
     def sample_frontier(self, block_id, g, seed_nodes, exclude_eids=None):
         fanout = self.fanouts[block_id]
         if isinstance(g, distributed.DistGraph):
-            if fanout is None:
-                # TODO(zhengda) There is a bug in the distributed version of in_subgraph.
-                # let's use sample_neighbors to replace in_subgraph for now.
-                frontier = distributed.sample_neighbors(g, seed_nodes, -1, replace=False)
+            if len(g.etypes) > 1: # heterogeneous distributed graph
+                # The edge type is stored in g.edata[dgl.ETYPE]
+                assert isinstance(fanout, int), "For distributed training, " \
+                    "we can only sample same number of neighbors for each edge type"
+                frontier = distributed.sample_etype_neighbors(
+                    g, seed_nodes, ETYPE, fanout, replace=self.replace)
             else:
-                if len(g.etypes) > 1: # heterogeneous distributed graph
-                    # The edge type is stored in g.edata[dgl.ETYPE]
-                    assert isinstance(fanout, int), "For distributed training, " \
-                        "we can only sample same number of neighbors for each edge type"
-                    frontier = distributed.sample_etype_neighbors(
-                        g, seed_nodes, ETYPE, fanout, replace=self.replace)
-                else:
-                    frontier = distributed.sample_neighbors(
-                        g, seed_nodes, fanout, replace=self.replace)
+                frontier = distributed.sample_neighbors(
+                    g, seed_nodes, fanout, replace=self.replace)
         else:
-            if fanout is None:
-                frontier = subgraph.in_subgraph(g, seed_nodes)
-            else:
-                self._build_fanout(block_id, g)
-                self._build_prob_arrays(g)
+            self._build_fanout(block_id, g)
+            self._build_prob_arrays(g)
 
-                frontier = sampling.sample_neighbors(
-                    g, seed_nodes, self.fanout_arrays[block_id],
-                    replace=self.replace, prob=self.prob_arrays, exclude_edges=exclude_eids)
+            frontier = sampling.sample_neighbors(
+                g, seed_nodes, self.fanout_arrays[block_id],
+                replace=self.replace, prob=self.prob_arrays, exclude_edges=exclude_eids)
         return frontier
 
 
@@ -188,7 +179,7 @@ class MultiLayerFullNeighborSampler(MultiLayerNeighborSampler):
     :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
     """
     def __init__(self, n_layers, return_eids=False):
-        super().__init__([None] * n_layers, return_eids=return_eids)
+        super().__init__([-1] * n_layers, return_eids=return_eids)
 
     @classmethod
     def exclude_edges_in_frontier(cls, g):
