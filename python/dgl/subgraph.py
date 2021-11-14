@@ -594,8 +594,11 @@ def khop_in_subgraph(graph, nodes, k, *, relabel_nodes=True, store_ids=True):
 
     Returns
     -------
-    G : DGLGraph
+    DGLGraph
         The subgraph.
+    Tensor or dict[str, Tensor], optional
+        The new IDs of the input :attr:`nodes` after node relabeling. This is returned
+        only when :attr:`relabel_nodes` is True. It is in the same form as :attr:`nodes`.
 
     Notes
     -----
@@ -615,7 +618,7 @@ def khop_in_subgraph(graph, nodes, k, *, relabel_nodes=True, store_ids=True):
 
     >>> g = dgl.graph(([1, 1, 2, 3, 4], [0, 2, 0, 4, 2]))
     >>> g.edata['w'] = torch.arange(10).view(5, 2)
-    >>> sg = dgl.khop_in_subgraph(g, 0, k=2)
+    >>> sg, inverse_indices = dgl.khop_in_subgraph(g, 0, k=2)
     >>> sg
     Graph(num_nodes=4, num_edges=4,
           ndata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64)}
@@ -630,17 +633,21 @@ def khop_in_subgraph(graph, nodes, k, *, relabel_nodes=True, store_ids=True):
             [2, 3],
             [4, 5],
             [8, 9]])
+    >>> inverse_indices
+    tensor([0])
 
     Extract a subgraph from a heterogeneous graph.
 
     >>> g = dgl.heterograph({
     ...     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
     ...     ('user', 'follows', 'user'): ([0, 1, 1], [1, 2, 2])})
-    >>> sg = dgl.khop_in_subgraph(g, {'game': 0}, k=2)
+    >>> sg, inverse_indices = dgl.khop_in_subgraph(g, {'game': 0}, k=2)
     >>> sg
     Graph(num_nodes={'game': 1, 'user': 2},
           num_edges={('user', 'follows', 'user'): 1, ('user', 'plays', 'game'): 2},
           metagraph=[('user', 'user', 'follows'), ('user', 'game', 'plays')])
+    >>> inverse_indices
+    {'game': tensor([0])}
 
     See also
     --------
@@ -649,7 +656,8 @@ def khop_in_subgraph(graph, nodes, k, *, relabel_nodes=True, store_ids=True):
     if graph.is_block:
         raise DGLError('Extracting subgraph of a block graph is not allowed.')
 
-    if not isinstance(nodes, Mapping):
+    is_mapping = isinstance(nodes, Mapping)
+    if not is_mapping:
         assert len(graph.ntypes) == 1, \
             'need a dict of node type and IDs for graph with multiple node types'
         nodes = {graph.ntypes[0]: nodes}
@@ -675,12 +683,25 @@ def khop_in_subgraph(graph, nodes, k, *, relabel_nodes=True, store_ids=True):
         last_hop_nodes = current_hop_nodes
 
     k_hop_nodes = dict()
+    inverse_indices = dict()
     for nty in graph.ntypes:
-        k_hop_nodes[nty] = F.unique(F.cat([
+        k_hop_nodes[nty], inverse_indices[nty] = F.unique(F.cat([
             hop_nodes.get(nty, place_holder)
-            for hop_nodes in k_hop_nodes_], dim=0))
+            for hop_nodes in k_hop_nodes_], dim=0), return_inverse=True)
 
-    return node_subgraph(graph, k_hop_nodes, relabel_nodes=relabel_nodes, store_ids=store_ids)
+    sub_g = node_subgraph(graph, k_hop_nodes, relabel_nodes=relabel_nodes, store_ids=store_ids)
+    if relabel_nodes:
+        if is_mapping:
+            seed_inverse_indices = dict()
+            for nty in nodes:
+                seed_inverse_indices[nty] = F.slice_axis(
+                    inverse_indices[nty], axis=0, begin=0, end=len(nodes[nty]))
+        else:
+            seed_inverse_indices = F.slice_axis(
+                inverse_indices[nty], axis=0, begin=0, end=len(nodes[nty]))
+        return sub_g, seed_inverse_indices
+    else:
+        return sub_g
 
 DGLHeteroGraph.khop_in_subgraph = utils.alias_func(khop_in_subgraph)
 
@@ -726,8 +747,11 @@ def khop_out_subgraph(graph, nodes, k, *, relabel_nodes=True, store_ids=True):
 
     Returns
     -------
-    G : DGLGraph
+    DGLGraph
         The subgraph.
+    Tensor or dict[str, Tensor], optional
+        The new IDs of the input :attr:`nodes` after node relabeling. This is returned
+        only when :attr:`relabel_nodes` is True. It is in the same form as :attr:`nodes`.
 
     Notes
     -----
@@ -747,7 +771,7 @@ def khop_out_subgraph(graph, nodes, k, *, relabel_nodes=True, store_ids=True):
 
     >>> g = dgl.graph(([0, 2, 0, 4, 2], [1, 1, 2, 3, 4]))
     >>> g.edata['w'] = torch.arange(10).view(5, 2)
-    >>> sg = dgl.khop_out_subgraph(g, 0, k=2)
+    >>> sg, inverse_indices = dgl.khop_out_subgraph(g, 0, k=2)
     >>> sg
     Graph(num_nodes=4, num_edges=4,
           ndata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64)}
@@ -762,17 +786,21 @@ def khop_out_subgraph(graph, nodes, k, *, relabel_nodes=True, store_ids=True):
             [4, 5],
             [2, 3],
             [8, 9]])
+    >>> inverse_indices
+    tensor([0])
 
     Extract a subgraph from a heterogeneous graph.
 
     >>> g = dgl.heterograph({
     ...     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
     ...     ('user', 'follows', 'user'): ([0, 1], [1, 3])})
-    >>> sg = dgl.khop_out_subgraph(g, {'user': 0}, k=2)
+    >>> sg, inverse_indices = dgl.khop_out_subgraph(g, {'user': 0}, k=2)
     >>> sg
     Graph(num_nodes={'game': 2, 'user': 3},
           num_edges={('user', 'follows', 'user'): 2, ('user', 'plays', 'game'): 2},
           metagraph=[('user', 'user', 'follows'), ('user', 'game', 'plays')])
+    >>> inverse_indices
+    {'user': tensor([0])}
 
     See also
     --------
@@ -781,7 +809,8 @@ def khop_out_subgraph(graph, nodes, k, *, relabel_nodes=True, store_ids=True):
     if graph.is_block:
         raise DGLError('Extracting subgraph of a block graph is not allowed.')
 
-    if not isinstance(nodes, Mapping):
+    is_mapping = isinstance(nodes, Mapping)
+    if not is_mapping:
         assert len(graph.ntypes) == 1, \
             'need a dict of node type and IDs for graph with multiple node types'
         nodes = {graph.ntypes[0]: nodes}
@@ -808,12 +837,25 @@ def khop_out_subgraph(graph, nodes, k, *, relabel_nodes=True, store_ids=True):
         last_hop_nodes = current_hop_nodes
 
     k_hop_nodes = dict()
+    inverse_indices = dict()
     for nty in graph.ntypes:
-        k_hop_nodes[nty] = F.unique(F.cat([
+        k_hop_nodes[nty], inverse_indices[nty] = F.unique(F.cat([
             hop_nodes.get(nty, place_holder)
-            for hop_nodes in k_hop_nodes_], dim=0))
+            for hop_nodes in k_hop_nodes_], dim=0), return_inverse=True)
 
-    return node_subgraph(graph, k_hop_nodes, relabel_nodes=relabel_nodes, store_ids=store_ids)
+    sub_g = node_subgraph(graph, k_hop_nodes, relabel_nodes=relabel_nodes, store_ids=store_ids)
+    if relabel_nodes:
+        if is_mapping:
+            seed_inverse_indices = dict()
+            for nty in nodes:
+                seed_inverse_indices[nty] = F.slice_axis(
+                    inverse_indices[nty], axis=0, begin=0, end=len(nodes[nty]))
+        else:
+            seed_inverse_indices = F.slice_axis(
+                inverse_indices[nty], axis=0, begin=0, end=len(nodes[nty]))
+        return sub_g, seed_inverse_indices
+    else:
+        return sub_g
 
 DGLHeteroGraph.khop_out_subgraph = utils.alias_func(khop_out_subgraph)
 
