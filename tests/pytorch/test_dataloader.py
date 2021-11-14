@@ -206,6 +206,7 @@ def test_graph_dataloader():
         assert isinstance(graph, dgl.DGLGraph)
         assert F.asnumpy(label).shape[0] == batch_size
 
+@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @pytest.mark.parametrize('num_workers', [0, 4])
 def test_cluster_gcn(num_workers):
     dataset = dgl.data.CoraFullDataset()

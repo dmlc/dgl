@@ -463,6 +463,11 @@ class BlockSampler(Sampler):
             blocks.insert(0, block)
         return blocks[0].srcdata[NID], blocks[-1].dstdata[NID], blocks
 
+    def sample_blocks(self, g, seed_nodes, exclude_eids=None):
+        """Deprecated and identical to :meth:`sample`.
+        """
+        return self.sample(g, seed_nodes, exclude_eids)
+
 class Collator(ABC):
     """Abstract DGL collator for training GNNs on downstream tasks stochastically.
 

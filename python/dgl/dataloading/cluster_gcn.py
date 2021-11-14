@@ -40,6 +40,8 @@ class ClusterGCNSubgraphIterator(SubgraphIterator):
     ...     train_on(subgraph_batch)
     """
     def __init__(self, g, num_partitions, cache_directory, refresh=False):
+        if os.name == 'nt':
+            raise NotImplementedError("METIS partitioning is not supported on Windows yet.")
         super().__init__(g)
 
         # First see if the cache is already there.  If so, directly read from cache.
