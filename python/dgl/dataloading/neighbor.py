@@ -1,6 +1,6 @@
 """Data loading components for neighbor sampling"""
 from .dataloader import BlockSampler
-from .. import sampling, subgraph, distributed
+from .. import sampling, distributed
 from .. import ndarray as nd
 from .. import backend as F
 from ..base import ETYPE
