@@ -195,7 +195,7 @@ class GSpMM_hetero(th.autograd.Function):
     @staticmethod
     @custom_fwd(cast_inputs=th.float16)
     def forward(ctx, gidx, op, reduce_op, X_len, *feats): # feats = lhs_data + rhs_data
-        out, (argX, argY, argX_etype) = _gspmm_hetero(gidx, op, reduce_op, X_len, feats)
+        out, (argX, argY, argX_ntype, argY_etype) = _gspmm_hetero(gidx, op, reduce_op, X_len, feats)
         X, Y = feats[:X_len], feats[X_len:]
         # TODO (Israt): check target to decide src_id/dst_id?
         # checking the first relation to decide for all the relations
@@ -219,7 +219,7 @@ class GSpMM_hetero(th.autograd.Function):
         if not spmm_cache_argY(op, reduce_op, req_grad_X[src_id], req_grad_Y[dst_id]):
             argY = tuple([None] * len(Y))
 
-        ctx.save_for_backward(*feats, *argX, *argX_etype, *argY )
+        ctx.save_for_backward(*feats, *argX, *argX_ntype, *argY, *argY_etype )
         return out
 
     @staticmethod
@@ -227,10 +227,13 @@ class GSpMM_hetero(th.autograd.Function):
     def backward(ctx, *dZ):
         gidx, op, reduce_op, X_shape, Y_shape, dtype, device, reduce_last, X_len = ctx.backward_cache
         ctx.backward_cache = None
-        feats = ctx.saved_tensors[:-(2*len(X_shape) + len(Y_shape))]
-        argX = ctx.saved_tensors[-(2*len(X_shape) + len(Y_shape)):-(len(X_shape) + len(Y_shape))]
-        argX_etype = ctx.saved_tensors[-(len(X_shape) + len(Y_shape)):-len(Y_shape)]
-        argY = ctx.saved_tensors[-len(Y_shape):]
+        num_ntypes = gidx.number_of_ntypes()
+        feats = ctx.saved_tensors[:-(4 * num_ntypes)] # len(X_shape)
+        # feats = ctx.saved_tensors[:-(2*len(X_shape) + (2*len(Y_shape)))]
+        argX = ctx.saved_tensors[-(4 * num_ntypes):-(3 * num_ntypes)]
+        argX_ntype = ctx.saved_tensors[-(3 * num_ntypes):-(2 * num_ntypes)]
+        argY = ctx.saved_tensors[-(2 * num_ntypes):- num_ntypes]
+        argY_etype = ctx.saved_tensors[-num_ntypes:]
         X, Y = feats[:X_len], feats[X_len:]
 
         if op != 'copy_rhs' and any([x is not None for x in X]):
@@ -255,7 +258,7 @@ class GSpMM_hetero(th.autograd.Function):
                     dX.scatter_add_(0, argX.long(), grad)
                 elif op in ['add', 'copy_lhs']:
                     # TODO(Israt): argX.long()
-                    dX = scatter_add_hetero(g_rev, dZ, argX, argX_etype, dX)
+                    dX = scatter_add_hetero(g_rev, dZ, argX, argX_ntype, dX)
             dX = tuple([_reduce_grad(dX[i], X_shape[i]) if X[i] is not None else None
                 for i in range(len(X))])
         else:  # X has not gradient
