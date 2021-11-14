@@ -11,7 +11,7 @@ class ShaDowKHopSampler(NeighborSamplingMixin, Sampler):
     `ShaDow-GNN <https://arxiv.org/abs/2012.01380>`__.
 
     It performs node-wise neighbor sampling but instead of returning a list of
-    MFGs, it returns a single subgraph induced by all the sampled nodes.  The
+    MFGs, it returns a single subgraph induced by all the sampled nodes. The
     seed nodes from which the neighbors are sampled will appear the first in the
     induced nodes of the subgraph.
 
@@ -33,7 +33,7 @@ class ShaDowKHopSampler(NeighborSamplingMixin, Sampler):
         Whether to sample with replacement
     prob : str, optional
         If given, the probability of each neighbor being sampled is proportional
-        to the edge feature value with the given name.  The feature must be
+        to the edge feature value with the given name. The feature must be
         a scalar on each edge.
 
     Examples
@@ -59,7 +59,7 @@ class ShaDowKHopSampler(NeighborSamplingMixin, Sampler):
           edata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64)})
 
     If training on a heterogeneous graph and you want different number of neighbors for each
-    edge type, one should instead provide a list of dicts.  Each dict would specify the
+    edge type, one should instead provide a list of dicts. Each dict would specify the
     number of neighbors to pick per edge type.
 
     >>> sampler = dgl.dataloading.ShaDowKHopSampler([
