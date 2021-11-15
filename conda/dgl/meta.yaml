@@ -19,6 +19,7 @@ requirements:
     - scipy
     - networkx
     - requests
+    - tqdm
 
 build:
   script_env:
