@@ -133,7 +133,8 @@ class GCN2Conv(nn.Module):
         if self._project_initial_features:
             self.register_parameter("weight2", None)
         else:
-            self.weight2 = nn.Parameter(th.Tensor(self._in_feats, self._in_feats))
+            self.weight2 = nn.Parameter(
+                th.Tensor(self._in_feats, self._in_feats))
 
         if self._bias:
             self.bias = nn.Parameter(th.Tensor(self._in_feats))
@@ -188,8 +189,8 @@ class GCN2Conv(nn.Module):
         feat_0 : torch.Tensor
             The initial feature of shape :math:`(N, D_{in})`
         edge_weight: torch.Tensor, optional
-            edge_weight used in the message passing process.This is equivalent to use real-weighted adjacency in
-            the equation above
+            edge_weight used in the message passing process.This is equivalent to use real-weighted
+            adjacency in the equation above
 
         Returns
         -------
