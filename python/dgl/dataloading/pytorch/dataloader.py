@@ -385,7 +385,8 @@ class _NodeDataLoaderIter:
         self.device = node_dataloader.device
         self.node_dataloader = node_dataloader
         self.iter_ = iter(node_dataloader.dataloader)
-        self.async_load = node_dataloader.async_load and th.cuda.is_available()
+        self.async_load = node_dataloader.async_load and (
+            F.device_type(self.device) == 'cuda')
         if self.async_load:
             self.results = queue.Queue(1)
             threading.Thread(target=_background_node_dataloader, args=(
@@ -537,7 +538,9 @@ class NodeDataLoader:
         If True, data including graph, sliced tensors will be transferred
         between devices asynchronously.This is transparent to end users. This
         feature could speed up model train, especially when large data need
-        to be transferred.
+        to be transferred. As a disadvantage, underlying `to_block` on GPU
+        becomes disabled and could lead to decreased performance. This is a
+        trade-off which needs profiling to decide whether to enable it.
     kwargs : dict
         Arguments being passed to :py:class:`torch.utils.data.DataLoader`.
 
