@@ -144,7 +144,7 @@ class SGConv(nn.Module):
         feat : torch.Tensor
             The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`
             is size of input feature, :math:`N` is the number of nodes.
-        edge_weight: Optional[torch.Tensor]
+        edge_weight: torch.Tensor, optional
             edge_weight used in the message passing process.
 
         Returns

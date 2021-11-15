@@ -187,7 +187,7 @@ class GCN2Conv(nn.Module):
             where :math:`D_{in}` is the size of input feature and :math:`N` is the number of nodes.
         feat_0 : torch.Tensor
             The initial feature of shape :math:`(N, D_{in})`
-        edge_weight: Optional[torch.Tensor]
+        edge_weight: torch.Tensor, optional
             edge_weight used in the message passing process.
 
         Returns

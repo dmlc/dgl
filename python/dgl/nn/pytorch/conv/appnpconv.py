@@ -80,7 +80,7 @@ class APPNPConv(nn.Module):
         feat : torch.Tensor
             The input feature of shape :math:`(N, *)`. :math:`N` is the
             number of nodes, and :math:`*` could be of any shape.
-        edge_weight: Optional[torch.Tensor]
+        edge_weight: torch.Tensor, optional
             edge_weight used in the message passing process. Default to th.ones
             if not specified
 
