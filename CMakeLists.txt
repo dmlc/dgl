@@ -230,7 +230,7 @@ endif(NOT MSVC)
 
 # Compile LIBXSMM
 if((NOT MSVC) AND USE_LIBXSMM)
-  add_custom_target(libxsmm COMMAND make realclean COMMAND make -j BLAS=0
+  add_custom_target(libxsmm COMMAND make -j BLAS=0
                      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/third_party/libxsmm
                      )
   add_dependencies(dgl libxsmm)
