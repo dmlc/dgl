@@ -4,6 +4,7 @@ from __future__ import absolute_import
 from collections import namedtuple
 from collections.abc import MutableMapping
 
+from . import distributed
 from . import backend as F
 from .base import DGLError, dgl_warning
 from .init import zero_initializer
@@ -132,6 +133,14 @@ class Column(object):
         else:
             return len(self.index)
 
+    def _copy_dist_tensor(self):
+        """this method copies actual tensor from DistTensor"""
+        assert isinstance(self.storage, distributed.DistTensor)
+        if isinstance(self.index, _LazyIndex):
+            self.index = self.index.flatten()
+        self.storage = self.storage[self.index]
+        self.index = None
+
     @property
     def shape(self):
         """Return the scheme shape (feature shape) of this column."""
@@ -140,6 +149,13 @@ class Column(object):
     @property
     def data(self):
         """Return the feature data. Perform index selecting if needed."""
+        if isinstance(self.storage, distributed.DistTensor):
+            # if self.storage is a DistTensor, query the actual tensor from remotes servers
+            # reset self.index to None
+            # After this operation, self.storage becomes a tensor on CPU
+            self._copy_dist_tensor()
+
+        # handle chain of indices
         if self.index is not None:
             if isinstance(self.index, _LazyIndex):
                 self.index = self.index.flatten()
@@ -181,6 +197,9 @@ class Column(object):
         Column
             A new column
         """
+        if isinstance(self.storage, distributed.DistTensor):
+            # copy actual tensor from DistTensor, if self.storage is a DistTensor
+            self._copy_dist_tensor()
         col = self.clone()
         col.device = (device, kwargs)
         return col
@@ -505,7 +524,9 @@ class Frame(MutableMapping):
             The column data.
         """
         col = Column.create(data)
-        if len(col) != self.num_rows:
+        # handle DistTensor
+        if not isinstance(data, distributed.DistTensor) \
+                and len(col) != self.num_rows:
             raise DGLError('Expected data to have %d rows, got %d.' %
                            (self.num_rows, len(col)))
         self._columns[name] = col
@@ -527,6 +548,11 @@ class Frame(MutableMapping):
             Row data.
         """
         for key, val in data.items():
+            # handle DistTensor feature
+            if isinstance(val, distributed.DistTensor):
+                raise DGLError("Cannot assign a slice of DistTensor to rows of a tensor. "
+                               "Try to retrieve the actual tensor from DistTensor first, "
+                               "then do the assignment")
             if key not in self:
                 scheme = infer_scheme(val)
                 ctx = F.context(val)

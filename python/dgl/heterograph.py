@@ -15,6 +15,7 @@ from . import core
 from . import graph_index
 from . import heterograph_index
 from . import utils
+from . import distributed
 from . import backend as F
 from .frame import Frame
 from .view import HeteroNodeView, HeteroNodeDataView, HeteroEdgeView, HeteroEdgeDataView
@@ -4105,6 +4106,9 @@ class DGLHeteroGraph(object):
             u = utils.prepare_tensor(self, u, 'u')
             num_nodes = len(u)
         for key, val in data.items():
+            # don't check device or nfeats if the feature tensor is DistTensor
+            if isinstance(val, distributed.DistTensor):
+                continue
             nfeats = F.shape(val)[0]
             if nfeats != num_nodes:
                 raise DGLError('Expect number of features to match number of nodes (len(u)).'
@@ -4197,6 +4201,9 @@ class DGLHeteroGraph(object):
         else:
             num_edges = len(eid)
         for key, val in data.items():
+            # don't check device or nfeats if the feature tensor is DistTensor
+            if isinstance(val, distributed.DistTensor):
+                continue
             nfeats = F.shape(val)[0]
             if nfeats != num_edges:
                 raise DGLError('Expect number of features to match number of edges.'
