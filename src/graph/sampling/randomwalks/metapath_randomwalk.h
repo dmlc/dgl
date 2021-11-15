@@ -176,6 +176,8 @@ std::pair<IdArray, IdArray> MetapathBasedRandomWalk(
     TerminatePredicate<IdxType> terminate) {
   int64_t max_num_steps = metapath->shape[0];
   const IdxType *metapath_data = static_cast<IdxType *>(metapath->data);
+  const int64_t begin_ntype = hg->meta_graph()->FindEdge(metapath_data[0]).first;
+  const int64_t max_nodes = hg->NumVertices(begin_ntype);
 
   // Prefetch all edges.
   // This forces the heterograph to materialize all OutCSR's before the OpenMP loop;
@@ -206,7 +208,7 @@ std::pair<IdArray, IdArray> MetapathBasedRandomWalk(
         return MetapathRandomWalkStep<XPU, IdxType>(
             data, curr, len, edges_by_type, csr_has_data, metapath_data, prob, terminate);
       };
-    return GenericRandomWalk<XPU, IdxType>(seeds, max_num_steps, step);
+    return GenericRandomWalk<XPU, IdxType>(seeds, max_num_steps, step, max_nodes);
   } else {
     StepFunc<IdxType> step =
       [&edges_by_type, &csr_has_data, metapath_data, &prob, terminate]
@@ -214,7 +216,7 @@ std::pair<IdArray, IdArray> MetapathBasedRandomWalk(
         return MetapathRandomWalkStepUniform<XPU, IdxType>(
             data, curr, len, edges_by_type, csr_has_data, metapath_data, prob, terminate);
       };
-    return GenericRandomWalk<XPU, IdxType>(seeds, max_num_steps, step);
+    return GenericRandomWalk<XPU, IdxType>(seeds, max_num_steps, step, max_nodes);
   }
 }
 

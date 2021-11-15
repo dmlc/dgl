@@ -232,12 +232,12 @@ def compute_perm(parents):
             assert 0 <= len(indices_node) <= 2
 
             # Add a node to go with a singelton.
-            if len(indices_node) is 1:
+            if len(indices_node) == 1:
                 indices_node.append(pool_singeltons)
                 pool_singeltons += 1
 
             # Add two nodes as children of a singelton in the parent.
-            elif len(indices_node) is 0:
+            elif len(indices_node) == 0:
                 indices_node.append(pool_singeltons + 0)
                 indices_node.append(pool_singeltons + 1)
                 pool_singeltons += 2
