@@ -82,7 +82,8 @@ class APPNPConv(nn.Module):
             number of nodes, and :math:`*` could be of any shape.
         edge_weight: torch.Tensor, optional
             edge_weight used in the message passing process. Default to th.ones
-            if not specified
+            if not specified. This is equivalent to use real-weighted adjacency in
+            the equation above
 
         Returns
         -------

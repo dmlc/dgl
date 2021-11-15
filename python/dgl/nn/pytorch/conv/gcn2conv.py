@@ -34,7 +34,7 @@ class GCN2Conv(nn.Module):
     :math:`\alpha` is the fraction of initial node features, and
     :math:`\beta_l` is the hyperparameter to tune the strength of identity mapping.
     It is defined by :math:`\beta_l = \log(\frac{\lambda}{l}+1)\approx\frac{\lambda}{l}`,
-    where :math:`\lambda` is a hyperparameter. :math: `\beta` ensures that the decay of
+    where :math:`\lambda` is a hyperparameter. :math:`\beta` ensures that the decay of
     the weight matrix adaptively increases as we stack more layers.
 
     Parameters
@@ -188,7 +188,8 @@ class GCN2Conv(nn.Module):
         feat_0 : torch.Tensor
             The initial feature of shape :math:`(N, D_{in})`
         edge_weight: torch.Tensor, optional
-            edge_weight used in the message passing process.
+            edge_weight used in the message passing process.This is equivalent to use real-weighted adjacency in
+            the equation above
 
         Returns
         -------
