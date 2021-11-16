@@ -83,7 +83,7 @@ def gsddmm(g, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
         # different dimensions, and different etypes may need different broadcasting
         # dims for the same node.
         lhs_and_rhs_tuple = tuple(list(lhs_data) + list(rhs_data))
-        return gsddmm_internal_hetero(g, op, len(lhs_data), lhs_target,
+        return gsddmm_internal_hetero(g._graph, op, len(lhs_data), lhs_target,
                                       rhs_target, *lhs_and_rhs_tuple)
 
 def _gen_sddmm_func(lhs_target, rhs_target, binary_op):

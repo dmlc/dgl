@@ -86,6 +86,7 @@ void *SharedMemory::CreateNew(size_t sz) {
   return ptr_;
 #else
   LOG(FATAL) << "Shared memory is not supported on Windows.";
+  return nullptr;
 #endif  // _WIN32
 }
 
@@ -101,6 +102,7 @@ void *SharedMemory::Open(size_t sz) {
   return ptr_;
 #else
   LOG(FATAL) << "Shared memory is not supported on Windows.";
+  return nullptr;
 #endif  // _WIN32
 }
 
@@ -115,6 +117,7 @@ bool SharedMemory::Exist(const std::string &name) {
   }
 #else
   LOG(FATAL) << "Shared memory is not supported on Windows.";
+  return false;
 #endif  // _WIN32
 }
 

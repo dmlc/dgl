@@ -87,8 +87,10 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateSender")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   int64_t msg_queue_size = args[0];
   std::string type = args[1];
+  int max_thread_count = args[2];
   if (type.compare("socket") == 0) {
-    RPCContext::ThreadLocal()->sender = std::make_shared<network::SocketSender>(msg_queue_size);
+    RPCContext::ThreadLocal()->sender =
+      std::make_shared<network::SocketSender>(msg_queue_size, max_thread_count);
   } else {
     LOG(FATAL) << "Unknown communicator type for rpc receiver: " << type;
   }
@@ -98,8 +100,10 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateReceiver")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   int64_t msg_queue_size = args[0];
   std::string type = args[1];
+  int max_thread_count = args[2];
   if (type.compare("socket") == 0) {
-    RPCContext::ThreadLocal()->receiver = std::make_shared<network::SocketReceiver>(msg_queue_size);
+    RPCContext::ThreadLocal()->receiver =
+      std::make_shared<network::SocketReceiver>(msg_queue_size, max_thread_count);
   } else {
     LOG(FATAL) << "Unknown communicator type for rpc sender: " << type;
   }

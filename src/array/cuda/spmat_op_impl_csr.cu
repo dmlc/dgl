@@ -228,17 +228,27 @@ template CSRMatrix CSRSliceRows<kDLGPU, int64_t>(CSRMatrix, int64_t, int64_t);
 template <typename IdType, typename DType>
 __global__ void _SegmentCopyKernel(
     const IdType* indptr, const DType* data,
-    const IdType* row, int64_t row_stride, int64_t length,
+    const IdType* row, int64_t length, int64_t n_row,
     const IdType* out_indptr, DType* out_data) {
-  int tx = blockIdx.x * blockDim.x + threadIdx.x;
+  IdType tx = static_cast<IdType>(blockIdx.x) * blockDim.x + threadIdx.x;
   const int stride_x = gridDim.x * blockDim.x;
   while (tx < length) {
-    int rpos = tx * row_stride;
-    const IdType r = row[rpos];
-    DType* out_buf = out_data + out_indptr[tx];
-    for (IdType i = indptr[r]; i < indptr[r + 1]; ++i) {
-      *(out_buf++) = data? data[i] : i;
+    // find upper bound for tx using binary search.
+    // out_indptr has already a prefix sum. n_row = size(out_indptr)-1
+    IdType l = 0, r = n_row, m = 0;
+    while (l < r) {
+      m = l + (r-l)/2;
+      if (tx >= out_indptr[m]) {
+        l = m+1;
+      } else {
+        r = m;
+      }
     }
+
+    IdType rpos = l-1;
+    IdType rofs = tx - out_indptr[rpos];
+    const IdType u = row[rpos];
+    out_data[tx] = data? data[indptr[u]+rofs] : indptr[u]+rofs;
     tx += stride_x;
   }
 }
@@ -250,21 +260,22 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {
   IdArray ret_indptr = aten::CumSum(aten::CSRGetRowNNZ(csr, rows), true);
   const int64_t nnz = aten::IndexSelect<IdType>(ret_indptr, len);
 
-  const int nt = cuda::FindNumThreads(len);
-  const int nb = (len + nt - 1) / nt;
+  const int nt = 256;  // for better GPU usage of small invocations
+  const int nb = (nnz + nt - 1) / nt;
+
   // Copy indices.
   IdArray ret_indices = NDArray::Empty({nnz}, csr.indptr->dtype, csr.indptr->ctx);
   CUDA_KERNEL_CALL(_SegmentCopyKernel,
       nb, nt, 0, thr_entry->stream,
       csr.indptr.Ptr<IdType>(), csr.indices.Ptr<IdType>(),
-      rows.Ptr<IdType>(), 1, len,
+      rows.Ptr<IdType>(), nnz, len,
       ret_indptr.Ptr<IdType>(), ret_indices.Ptr<IdType>());
   // Copy data.
   IdArray ret_data = NDArray::Empty({nnz}, csr.indptr->dtype, csr.indptr->ctx);
   CUDA_KERNEL_CALL(_SegmentCopyKernel,
       nb, nt, 0, thr_entry->stream,
       csr.indptr.Ptr<IdType>(), CSRHasData(csr)? csr.data.Ptr<IdType>() : nullptr,
-      rows.Ptr<IdType>(), 1, len,
+      rows.Ptr<IdType>(), nnz, len,
       ret_indptr.Ptr<IdType>(), ret_data.Ptr<IdType>());
   return CSRMatrix(len, csr.num_cols,
                    ret_indptr, ret_indices, ret_data,

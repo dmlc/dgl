@@ -23,8 +23,10 @@ namespace dgl {
  */
 gk_csr_t *Convert2GKCsr(const aten::CSRMatrix mat, bool is_row) {
   // TODO(zhengda) The conversion will be zero-copy in the future.
-  const dgl_id_t *indptr = static_cast<dgl_id_t*>(mat.indptr->data);
-  const dgl_id_t *indices = static_cast<dgl_id_t*>(mat.indices->data);
+  CHECK_EQ(mat.indptr->dtype.bits, sizeof(dgl_id_t) * CHAR_BIT);
+  CHECK_EQ(mat.indices->dtype.bits, sizeof(dgl_id_t) * CHAR_BIT);
+  const dgl_id_t *indptr = static_cast<dgl_id_t *>(mat.indptr->data);
+  const dgl_id_t *indices = static_cast<dgl_id_t *>(mat.indices->data);
 
   gk_csr_t *gk_csr = gk_csr_Create();
   gk_csr->nrows = mat.num_rows;
