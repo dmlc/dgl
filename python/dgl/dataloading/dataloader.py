@@ -12,19 +12,7 @@ from ..batch import batch
 from ..convert import heterograph
 from ..heterograph import DGLHeteroGraph as DGLGraph
 from ..distributed.dist_graph import DistGraph
-
-# pylint: disable=unused-argument
-def assign_block_eids(block, frontier):
-    """Assigns edge IDs from the original graph to the message flow graph (MFG).
-
-    See also
-    --------
-    BlockSampler
-    """
-    for etype in block.canonical_etypes:
-        block.edges[etype].data[EID] = frontier.edges[etype].data[EID][
-            block.edges[etype].data[EID]]
-    return block
+from ..utils import to_device
 
 def _tensor_or_dict_to_numpy(ids):
     if isinstance(ids, Mapping):
@@ -111,9 +99,28 @@ class _EidExcluder():
         return frontier
 
 
-def _create_eid_excluder(exclude_eids, device):
+def exclude_edges(subg, exclude_eids, device):
+    """Find and remove from the subgraph the edges whose IDs in the parent
+    graph are given.
+
+    Parameters
+    ----------
+    subg : DGLGraph
+        The subgraph. Must have ``dgl.EID`` field containing the original
+        edge IDs in the parent graph.
+    exclude_eids : Tensor or dict
+        The edge IDs to exclude.
+    device : device
+        The output device of the graph.
+
+    Returns
+    -------
+    DGLGraph
+        The new subgraph with edges removed.  The ``dgl.EID`` field contains
+        the original edge IDs in the same parent graph.
+    """
     if exclude_eids is None:
-        return None
+        return subg
 
     if device is not None:
         if isinstance(exclude_eids, Mapping):
@@ -122,7 +129,9 @@ def _create_eid_excluder(exclude_eids, device):
         else:
             exclude_eids = F.copy_to(exclude_eids, device)
 
-    return _EidExcluder(exclude_eids)
+    excluder = _EidExcluder(exclude_eids)
+    return subg if excluder is None else excluder(subg)
+
 
 def _find_exclude_eids_with_reverse_id(g, eids, reverse_eid_map):
     if isinstance(eids, Mapping):
@@ -195,15 +204,67 @@ def _find_exclude_eids(g, exclude_mode, eids, **kwargs):
     else:
         raise ValueError('unsupported mode {}'.format(exclude_mode))
 
+class Sampler(object):
+    """An abstract class that takes in a graph and a set of seed nodes and returns a
+    structure representing a smaller portion of the graph for computation. It can
+    be either a list of bipartite graphs (i.e. :class:`BlockSampler`), or a single
+    subgraph.
+    """
+    def __init__(self, output_ctx=None):
+        self.set_output_context(output_ctx)
 
-class BlockSampler(object):
+    def sample(self, g, seed_nodes, exclude_eids=None):
+        """Sample a structure from the graph.
+
+        Parameters
+        ----------
+        g : DGLGraph
+            The original graph.
+        seed_nodes : Tensor or dict[ntype, Tensor]
+            The destination nodes by type.
+
+            If the graph only has one node type, one can just specify a single tensor
+            of node IDs.
+        exclude_eids : Tensor or dict[etype, Tensor]
+            The edges to exclude from computation dependency.
+
+        Returns
+        -------
+        Tensor or dict[ntype, Tensor]
+            The nodes whose input features are required for computing the output
+            representation of :attr:`seed_nodes`.
+        any
+            Any data representing the structure.
+        """
+        raise NotImplementedError
+
+    def set_output_context(self, ctx):
+        """Set the device the generated block or subgraph will be output to.
+        This should only be set to a cuda device, when multi-processing is not
+        used in the dataloader (e.g., num_workers is 0).
+
+        Parameters
+        ----------
+        ctx : DGLContext, default None
+            The device context the sampled blocks will be stored on. This
+            should only be a CUDA context if multiprocessing is not used in
+            the dataloader (e.g., num_workers is 0). If this is None, the
+            sampled blocks will be stored on the same device as the input
+            graph.
+        """
+        if ctx is not None:
+            self.output_device = F.to_backend_ctx(ctx)
+        else:
+            self.output_device = None
+
+class BlockSampler(Sampler):
     """Abstract class specifying the neighborhood sampling strategy for DGL data loaders.
 
-    The main method for BlockSampler is :meth:`sample_blocks`,
+    The main method for BlockSampler is :meth:`sample`,
     which generates a list of message flow graphs (MFGs) for a multi-layer GNN given a set of
     seed nodes to have their outputs computed.
 
-    The default implementation of :meth:`sample_blocks` is
+    The default implementation of :meth:`sample` is
     to repeat :attr:`num_layers` times the following procedure from the last layer to the first
     layer:
 
@@ -214,13 +275,13 @@ class BlockSampler(object):
     * Optionally, if the task is link prediction or edge classfication, remove edges
       connecting training node pairs.  If the graph is undirected, also remove the
       reverse edges.  This is controlled by the argument :attr:`exclude_eids` in
-      :meth:`sample_blocks` method.
+      :meth:`sample` method.
 
     * Convert the frontier into a MFG.
 
     * Optionally assign the IDs of the edges in the original graph selected in the first step
       to the MFG, controlled by the argument ``return_eids`` in
-      :meth:`sample_blocks` method.
+      :meth:`sample` method.
 
     * Prepend the MFG to the MFG list to be returned.
 
@@ -255,9 +316,23 @@ class BlockSampler(object):
     :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
     """
     def __init__(self, num_layers, return_eids=False, output_ctx=None):
+        super().__init__(output_ctx)
         self.num_layers = num_layers
         self.return_eids = return_eids
-        self.set_output_context(output_ctx)
+
+    # pylint: disable=unused-argument
+    @staticmethod
+    def assign_block_eids(block, frontier):
+        """Assigns edge IDs from the original graph to the message flow graph (MFG).
+
+        See also
+        --------
+        BlockSampler
+        """
+        for etype in block.canonical_etypes:
+            block.edges[etype].data[EID] = frontier.edges[etype].data[EID][
+                block.edges[etype].data[EID]]
+        return block
 
     # This is really a hack working around the lack of GPU-based neighbor sampling
     # with edge exclusion.
@@ -266,10 +341,10 @@ class BlockSampler(object):
         """Returns whether the sampler will exclude edges in :func:`sample_frontier`.
 
         If this method returns True, the method :func:`sample_frontier` will receive an
-        argument :attr:`exclude_eids` from :func:`sample_blocks`.  :func:`sample_frontier`
+        argument :attr:`exclude_eids` from :func:`sample`.  :func:`sample_frontier`
         is then responsible for removing those edges.
 
-        If this method returns False, :func:`sample_blocks` will be responsible for
+        If this method returns False, :func:`sample` will be responsible for
         removing the edges.
 
         When subclassing :class:`BlockSampler`, this method should return True when you
@@ -324,7 +399,7 @@ class BlockSampler(object):
         """
         raise NotImplementedError
 
-    def sample_blocks(self, g, seed_nodes, exclude_eids=None):
+    def sample(self, g, seed_nodes, exclude_eids=None):
         """Generate the a list of MFGs given the destination nodes.
 
         Parameters
@@ -361,12 +436,7 @@ class BlockSampler(object):
             graph_device = g.device
 
         for block_id in reversed(range(self.num_layers)):
-            seed_nodes_in = seed_nodes
-            if isinstance(seed_nodes_in, dict):
-                seed_nodes_in = {ntype: nodes.to(graph_device) \
-                    for ntype, nodes in seed_nodes_in.items()}
-            else:
-                seed_nodes_in = seed_nodes_in.to(graph_device)
+            seed_nodes_in = to_device(seed_nodes, graph_device)
 
             if self.exclude_edges_in_frontier(g):
                 frontier = self.sample_frontier(
@@ -376,48 +446,27 @@ class BlockSampler(object):
 
             if self.output_device is not None:
                 frontier = frontier.to(self.output_device)
-                if isinstance(seed_nodes, dict):
-                    seed_nodes_out = {ntype: nodes.to(self.output_device) \
-                        for ntype, nodes in seed_nodes.items()}
-                else:
-                    seed_nodes_out = seed_nodes.to(self.output_device)
+                seed_nodes_out = to_device(seed_nodes, self.output_device)
             else:
                 seed_nodes_out = seed_nodes
 
             # Removing edges from the frontier for link prediction training falls
             # into the category of frontier postprocessing
             if not self.exclude_edges_in_frontier(g):
-                eid_excluder = _create_eid_excluder(exclude_eids, self.output_device)
-                if eid_excluder is not None:
-                    frontier = eid_excluder(frontier)
+                frontier = exclude_edges(frontier, exclude_eids, self.output_device)
 
             block = transform.to_block(frontier, seed_nodes_out)
             if self.return_eids:
-                assign_block_eids(block, frontier)
+                self.assign_block_eids(block, frontier)
 
             seed_nodes = {ntype: block.srcnodes[ntype].data[NID] for ntype in block.srctypes}
             blocks.insert(0, block)
-        return blocks
+        return blocks[0].srcdata[NID], blocks[-1].dstdata[NID], blocks
 
-    def set_output_context(self, ctx):
-        """Set the device the generated block will be output to. This should
-        only be set to a cuda device, when multi-processing is not used in
-        the dataloader (e.g., num_workers is 0).
-
-        Parameters
-        ----------
-        output_ctx : DGLContext, default None
-            The device context the sampled blocks will be stored on. This
-            should only be a CUDA context if multiprocessing is not used in
-            the dataloader (e.g., num_workers is 0). If this is None, the
-            sampled blocks will be stored on the same device as the input
-            graph.
+    def sample_blocks(self, g, seed_nodes, exclude_eids=None):
+        """Deprecated and identical to :meth:`sample`.
         """
-        if ctx is not None:
-            self.output_device = F.to_backend_ctx(ctx)
-        else:
-            self.output_device = None
-
+        return self.sample(g, seed_nodes, exclude_eids)
 
 class Collator(ABC):
     """Abstract DGL collator for training GNNs on downstream tasks stochastically.
@@ -454,26 +503,6 @@ class Collator(ABC):
         """
         raise NotImplementedError
 
-# TODO(BarclayII): DistGraph.idtype and DistGraph.device are in the code, however
-# the underlying DGLGraph object could be None.  I was unable to figure out how
-# to properly implement those two properties so I'm working around that.  If the
-# graph is a DistGraph, I assume that the dtype and device of the data should
-# be the same as the graph already.
-#
-# After idtype and device get properly implemented, we should remove these two
-# _prepare_* functions.
-
-def _prepare_tensor_dict(g, data, name, is_distributed):
-    if is_distributed:
-        x = F.tensor(next(iter(data.values())))
-        return {k: F.copy_to(F.astype(F.tensor(v), F.dtype(x)), F.context(x)) \
-                for k, v in data.items()}
-    else:
-        return utils.prepare_tensor_dict(g, data, name)
-
-def _prepare_tensor(g, data, name, is_distributed):
-    return F.tensor(data) if is_distributed else utils.prepare_tensor(g, data, name)
-
 class NodeCollator(Collator):
     """DGL collator to combine nodes and their computation dependencies within a minibatch for
     training node classification or regression on a single graph with neighborhood sampling.
@@ -484,7 +513,7 @@ class NodeCollator(Collator):
         The graph.
     nids : Tensor or dict[ntype, Tensor]
         The node set to compute outputs.
-    block_sampler : dgl.dataloading.BlockSampler
+    graph_sampler : dgl.dataloading.BlockSampler
         The neighborhood sampler.
 
     Examples
@@ -507,20 +536,15 @@ class NodeCollator(Collator):
     :ref:`User Guide Section 6 <guide-minibatch>` and
     :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
     """
-    def __init__(self, g, nids, block_sampler):
+    def __init__(self, g, nids, graph_sampler):
         self.g = g
-        self._is_distributed = isinstance(g, DistGraph)
         if not isinstance(nids, Mapping):
             assert len(g.ntypes) == 1, \
                 "nids should be a dict of node type and ids for graph with multiple node types"
-        self.block_sampler = block_sampler
+        self.graph_sampler = graph_sampler
 
-        if isinstance(nids, Mapping):
-            self.nids = _prepare_tensor_dict(g, nids, 'nids', self._is_distributed)
-            self._dataset = utils.FlattenedDict(self.nids)
-        else:
-            self.nids = _prepare_tensor(g, nids, 'nids', self._is_distributed)
-            self._dataset = self.nids
+        self.nids = utils.prepare_tensor_or_dict(g, nids, 'nids')
+        self._dataset = utils.maybe_flatten_dict(self.nids)
 
     @property
     def dataset(self):
@@ -554,13 +578,9 @@ class NodeCollator(Collator):
         if isinstance(items[0], tuple):
             # returns a list of pairs: group them by node types into a dict
             items = utils.group_as_dict(items)
-            items = _prepare_tensor_dict(self.g, items, 'items', self._is_distributed)
-        else:
-            items = _prepare_tensor(self.g, items, 'items', self._is_distributed)
+        items = utils.prepare_tensor_or_dict(self.g, items, 'items')
 
-        blocks = self.block_sampler.sample_blocks(self.g, items)
-        output_nodes = blocks[-1].dstdata[NID]
-        input_nodes = blocks[0].srcdata[NID]
+        input_nodes, output_nodes, blocks = self.graph_sampler.sample(self.g, items)
 
         return input_nodes, output_nodes, blocks
 
@@ -590,7 +610,7 @@ class EdgeCollator(Collator):
         are generated.
     eids : Tensor or dict[etype, Tensor]
         The edge set in graph :attr:`g` to compute outputs.
-    block_sampler : dgl.dataloading.BlockSampler
+    graph_sampler : dgl.dataloading.BlockSampler
         The neighborhood sampler.
     g_sampling : DGLGraph, optional
         The graph where neighborhood sampling and message passing is performed.
@@ -652,7 +672,7 @@ class EdgeCollator(Collator):
     Examples
     --------
     The following example shows how to train a 3-layer GNN for edge classification on a
-    set of edges ``train_eid`` on a homogeneous undirected graph.  Each node takes
+    set of edges ``train_eid`` on a homogeneous undirected graph. Each node takes
     messages from all neighbors.
 
     Say that you have an array of source node IDs ``src`` and another array of destination
@@ -741,14 +761,13 @@ class EdgeCollator(Collator):
     :ref:`User Guide Section 6 <guide-minibatch>` and
     :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
     """
-    def __init__(self, g, eids, block_sampler, g_sampling=None, exclude=None,
+    def __init__(self, g, eids, graph_sampler, g_sampling=None, exclude=None,
                  reverse_eids=None, reverse_etypes=None, negative_sampler=None):
         self.g = g
-        self._is_distributed = isinstance(g, DistGraph)
         if not isinstance(eids, Mapping):
             assert len(g.etypes) == 1, \
                 "eids should be a dict of etype and ids for graph with multiple etypes"
-        self.block_sampler = block_sampler
+        self.graph_sampler = graph_sampler
 
         # One may wish to iterate over the edges in one graph while perform sampling in
         # another graph.  This may be the case for iterating over validation and test
@@ -766,12 +785,8 @@ class EdgeCollator(Collator):
         self.reverse_etypes = reverse_etypes
         self.negative_sampler = negative_sampler
 
-        if isinstance(eids, Mapping):
-            self.eids = _prepare_tensor_dict(g, eids, 'eids', self._is_distributed)
-            self._dataset = utils.FlattenedDict(self.eids)
-        else:
-            self.eids = _prepare_tensor(g, eids, 'eids', self._is_distributed)
-            self._dataset = self.eids
+        self.eids = utils.prepare_tensor_or_dict(g, eids, 'eids')
+        self._dataset = utils.maybe_flatten_dict(self.eids)
 
     @property
     def dataset(self):
@@ -781,9 +796,7 @@ class EdgeCollator(Collator):
         if isinstance(items[0], tuple):
             # returns a list of pairs: group them by node types into a dict
             items = utils.group_as_dict(items)
-            items = _prepare_tensor_dict(self.g_sampling, items, 'items', self._is_distributed)
-        else:
-            items = _prepare_tensor(self.g_sampling, items, 'items', self._is_distributed)
+        items = utils.prepare_tensor_or_dict(self.g_sampling, items, 'items')
 
         pair_graph = self.g.edge_subgraph(items)
         seed_nodes = pair_graph.ndata[NID]
@@ -795,9 +808,8 @@ class EdgeCollator(Collator):
             reverse_eid_map=self.reverse_eids,
             reverse_etype_map=self.reverse_etypes)
 
-        blocks = self.block_sampler.sample_blocks(
+        input_nodes, _, blocks = self.graph_sampler.sample(
             self.g_sampling, seed_nodes, exclude_eids=exclude_eids)
-        input_nodes = blocks[0].srcdata[NID]
 
         return input_nodes, pair_graph, blocks
 
@@ -805,9 +817,7 @@ class EdgeCollator(Collator):
         if isinstance(items[0], tuple):
             # returns a list of pairs: group them by node types into a dict
             items = utils.group_as_dict(items)
-            items = _prepare_tensor_dict(self.g_sampling, items, 'items', self._is_distributed)
-        else:
-            items = _prepare_tensor(self.g_sampling, items, 'items', self._is_distributed)
+        items = utils.prepare_tensor_or_dict(self.g_sampling, items, 'items')
 
         pair_graph = self.g.edge_subgraph(items, relabel_nodes=False)
         induced_edges = pair_graph.edata[EID]
@@ -840,9 +850,8 @@ class EdgeCollator(Collator):
             reverse_eid_map=self.reverse_eids,
             reverse_etype_map=self.reverse_etypes)
 
-        blocks = self.block_sampler.sample_blocks(
+        input_nodes, _, blocks = self.graph_sampler.sample(
             self.g_sampling, seed_nodes, exclude_eids=exclude_eids)
-        input_nodes = blocks[0].srcdata[NID]
 
         return input_nodes, pair_graph, neg_pair_graph, blocks
 
@@ -965,3 +974,9 @@ class GraphCollator(object):
             return [self.collate(samples) for samples in transposed]
 
         raise TypeError(self.graph_collate_err_msg_format.format(elem_type))
+
+class SubgraphIterator(object):
+    """Abstract class representing an iterator that yields a subgraph given a graph.
+    """
+    def __init__(self, g):
+        self.g = g

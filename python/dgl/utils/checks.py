@@ -1,6 +1,7 @@
 """Checking and logging utilities."""
 # pylint: disable=invalid-name
 from __future__ import absolute_import, division
+from collections.abc import Mapping
 
 from ..base import DGLError
 from .._ffi.function import _init_api
@@ -52,7 +53,7 @@ def prepare_tensor(g, data, name):
 def prepare_tensor_dict(g, data, name):
     """Convert a dictionary of data to a dictionary of ID tensors.
 
-    If calls ``prepare_tensor`` on each key-value pair.
+    Calls ``prepare_tensor`` on each key-value pair.
 
     Parameters
     ----------
@@ -69,6 +70,25 @@ def prepare_tensor_dict(g, data, name):
     """
     return {key : prepare_tensor(g, val, '{}["{}"]'.format(name, key))
             for key, val in data.items()}
+
+def prepare_tensor_or_dict(g, data, name):
+    """Convert data to either a tensor or a dictionary depending on input type.
+
+    Parameters
+    ----------
+    g : DGLHeteroGraph
+        Graph.
+    data : dict[str, (int, iterable of int, tensor)]
+        Data dict.
+    name : str
+        Name of the data.
+
+    Returns
+    -------
+    tensor or dict[str, tensor]
+    """
+    return prepare_tensor_dict(g, data, name) if isinstance(data, Mapping) \
+            else prepare_tensor(g, data, name)
 
 def parse_edges_arg_to_eid(g, edges, etid, argname='edges'):
     """Parse the :attr:`edges` argument and return an edge ID tensor.

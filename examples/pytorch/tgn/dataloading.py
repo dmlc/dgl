@@ -1,7 +1,7 @@
 import torch
 import dgl
 
-from dgl.dataloading.dataloader import EdgeCollator, assign_block_eids
+from dgl.dataloading.dataloader import EdgeCollator
 from dgl.dataloading import BlockSampler
 from dgl.dataloading.pytorch import _pop_subgraph_storage, _pop_blocks_storage
 from dgl.base import DGLError
@@ -91,7 +91,7 @@ class TemporalSampler(BlockSampler):
         #block = transform.to_block(frontier,seed_nodes)
         block = frontier
         if self.return_eids:
-            assign_block_eids(block, frontier)
+            self.assign_block_eids(block, frontier)
         blocks.append(block)
         return blocks
 
