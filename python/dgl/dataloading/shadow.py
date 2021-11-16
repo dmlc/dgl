@@ -33,7 +33,7 @@ class ShaDowKHopSampler(NeighborSamplingMixin, Sampler):
         Whether to sample with replacement
     prob : str, optional
         If given, the probability of each neighbor being sampled is proportional
-        to the edge feature value with the given name. The feature must be
+        to the edge feature value with the given name in ``g.edata``. The feature must be
         a scalar on each edge.
 
     Examples
@@ -66,6 +66,11 @@ class ShaDowKHopSampler(NeighborSamplingMixin, Sampler):
     ...     {('user', 'follows', 'user'): 5,
     ...      ('user', 'plays', 'game'): 4,
     ...      ('game', 'played-by', 'user'): 3}] * 3)
+
+    If you would like non-uniform neighbor sampling:
+
+    >>> g.edata['p'] = torch.rand(g.num_edges())   # any non-negative 1D vector works
+    >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([5, 10, 15], prob='p')
     """
     def __init__(self, fanouts, replace=False, prob=None, output_ctx=None):
         super().__init__(output_ctx)

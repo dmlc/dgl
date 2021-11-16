@@ -78,7 +78,7 @@ class MultiLayerNeighborSampler(NeighborSamplingMixin, BlockSampler):
         If True, the edge IDs will be stored as an edge feature named ``dgl.EID``.
     prob : str, optional
         If given, the probability of each neighbor being sampled is proportional
-        to the edge feature value with the given name.  The feature must be
+        to the edge feature value with the given name in ``g.edata``.  The feature must be
         a scalar on each edge.
 
     Examples
@@ -102,6 +102,11 @@ class MultiLayerNeighborSampler(NeighborSamplingMixin, BlockSampler):
     ...     {('user', 'follows', 'user'): 5,
     ...      ('user', 'plays', 'game'): 4,
     ...      ('game', 'played-by', 'user'): 3}] * 3)
+
+    If you would like non-uniform neighbor sampling:
+
+    >>> g.edata['p'] = torch.rand(g.num_edges())   # any non-negative 1D vector works
+    >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([5, 10, 15], prob='p')
 
     Notes
     -----
