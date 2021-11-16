@@ -8,6 +8,7 @@ from torch import nn
 
 from .... import function as fn
 from ....base import DGLError
+from . import EdgeWeightNorm
 
 
 class GCN2Conv(nn.Module):
@@ -190,7 +191,9 @@ class GCN2Conv(nn.Module):
             The initial feature of shape :math:`(N, D_{in})`
         edge_weight: torch.Tensor, optional
             edge_weight used in the message passing process.This is equivalent to use real-weighted
-            adjacency in the equation above
+            adjacency in the equation above, and the degree normalization uses edge weight also,
+            based on :ref:`EdgeWeightNorm`.
+
 
         Returns
         -------
@@ -228,9 +231,12 @@ class GCN2Conv(nn.Module):
                     )
 
             # normalize  to get smoothed representation
-            degs = graph.in_degrees().float().clamp(min=1)
-            norm = th.pow(degs, -0.5)
-            norm = norm.to(feat.device).unsqueeze(1)
+            if edge_weight is None:
+                degs = graph.in_degrees().float().clamp(min=1)
+                norm = th.pow(degs, -0.5)
+                norm = norm.to(feat.device).unsqueeze(1)
+            else:
+                norm = EdgeWeightNorm('both')(graph, edge_weight)
 
             feat = feat * norm
             graph.ndata["h"] = feat

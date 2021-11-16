@@ -4,6 +4,8 @@ import torch as th
 from torch import nn
 
 from .... import function as fn
+from . import EdgeWeightNorm
+
 
 class APPNPConv(nn.Module):
     r"""
@@ -57,6 +59,7 @@ class APPNPConv(nn.Module):
             [0.5000, 0.5000, 0.5000, 0.5000, 0.5000, 0.5000, 0.5000, 0.5000, 0.5000,
             0.5000]])
     """
+
     def __init__(self,
                  k,
                  alpha,
@@ -81,9 +84,9 @@ class APPNPConv(nn.Module):
             The input feature of shape :math:`(N, *)`. :math:`N` is the
             number of nodes, and :math:`*` could be of any shape.
         edge_weight: torch.Tensor, optional
-            edge_weight used in the message passing process. Default to th.ones
-            if not specified. This is equivalent to use real-weighted adjacency in
-            the equation above
+            edge_weight used in the message passing process.This is equivalent to use real-weighted
+            adjacency in the equation above, and the degree normalization uses edge weight also,
+            based on :ref:`EdgeWeightNorm`.
 
         Returns
         -------
@@ -92,12 +95,18 @@ class APPNPConv(nn.Module):
             should be the same as input shape.
         """
         with graph.local_scope():
-            src_norm = th.pow(graph.out_degrees().float().clamp(min=1), -0.5)
-            shp = src_norm.shape + (1,) * (feat.dim() - 1)
-            src_norm = th.reshape(src_norm, shp).to(feat.device)
-            dst_norm = th.pow(graph.in_degrees().float().clamp(min=1), -0.5)
-            shp = dst_norm.shape + (1,) * (feat.dim() - 1)
-            dst_norm = th.reshape(dst_norm, shp).to(feat.device)
+            if edge_weight is None:
+                src_norm = th.pow(
+                    graph.out_degrees().float().clamp(min=1), -0.5)
+                shp = src_norm.shape + (1,) * (feat.dim() - 1)
+                src_norm = th.reshape(src_norm, shp).to(feat.device)
+                dst_norm = th.pow(
+                    graph.in_degrees().float().clamp(min=1), -0.5)
+                shp = dst_norm.shape + (1,) * (feat.dim() - 1)
+                dst_norm = th.reshape(dst_norm, shp).to(feat.device)
+            else:
+                src_norm = dst_norm = EdgeWeightNorm(
+                    'both')(graph, edge_weight)
             feat_0 = feat
             for _ in range(self._k):
                 # normalization by src node
