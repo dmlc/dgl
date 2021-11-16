@@ -4,7 +4,7 @@ import torch as th
 from torch import nn
 
 from .... import function as fn
-from . import EdgeWeightNorm
+from .graphconv import EdgeWeightNorm
 
 
 class APPNPConv(nn.Module):
@@ -105,12 +105,13 @@ class APPNPConv(nn.Module):
                 shp = dst_norm.shape + (1,) * (feat.dim() - 1)
                 dst_norm = th.reshape(dst_norm, shp).to(feat.device)
             else:
-                src_norm = dst_norm = EdgeWeightNorm(
+                edge_weight = EdgeWeightNorm(
                     'both')(graph, edge_weight)
             feat_0 = feat
             for _ in range(self._k):
                 # normalization by src node
-                feat = feat * src_norm
+                if edge_weight is None:
+                    feat = feat * src_norm
                 graph.ndata['h'] = feat
                 if edge_weight is None:
                     edge_weight = th.ones(graph.number_of_edges(), 1)
@@ -120,6 +121,7 @@ class APPNPConv(nn.Module):
                                  fn.sum('m', 'h'))
                 feat = graph.ndata.pop('h')
                 # normalization by dst node
-                feat = feat * dst_norm
+                if edge_weight is None:
+                    feat = feat * dst_norm
                 feat = (1 - self._alpha) * feat + self._alpha * feat_0
             return feat

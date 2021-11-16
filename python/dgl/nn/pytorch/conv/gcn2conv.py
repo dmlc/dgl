@@ -8,7 +8,7 @@ from torch import nn
 
 from .... import function as fn
 from ....base import DGLError
-from . import EdgeWeightNorm
+from .graphconv import EdgeWeightNorm
 
 
 class GCN2Conv(nn.Module):
@@ -236,9 +236,10 @@ class GCN2Conv(nn.Module):
                 norm = th.pow(degs, -0.5)
                 norm = norm.to(feat.device).unsqueeze(1)
             else:
-                norm = EdgeWeightNorm('both')(graph, edge_weight)
+                edge_weight = EdgeWeightNorm('both')(graph, edge_weight)
 
-            feat = feat * norm
+            if edge_weight is None:
+                feat = feat * norm
             graph.ndata["h"] = feat
             msg_func = fn.copy_u("h", "m")
             if edge_weight is not None:
@@ -246,7 +247,8 @@ class GCN2Conv(nn.Module):
                 msg_func = fn.u_mul_e("h", "_edge_weight", "m")
             graph.update_all(msg_func, fn.sum("m", "h"))
             feat = graph.ndata.pop("h")
-            feat = feat * norm
+            if edge_weight is None:
+                feat = feat * norm
             # scale
             feat = feat * (1 - self.alpha)
 
