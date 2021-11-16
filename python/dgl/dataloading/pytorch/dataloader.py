@@ -3,10 +3,10 @@ import inspect
 import math
 from distutils.version import LooseVersion
 import torch as th
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, IterableDataset
 from torch.utils.data.distributed import DistributedSampler
 import torch.distributed as dist
-from ..dataloader import NodeCollator, EdgeCollator, GraphCollator
+from ..dataloader import NodeCollator, EdgeCollator, GraphCollator, SubgraphIterator
 from ...distributed import DistGraph
 from ...distributed import DistDataLoader
 from ...ndarray import NDArray as DGLNDArray
@@ -16,8 +16,8 @@ from ...utils import to_dgl_context
 
 __all__ = ['NodeDataLoader', 'EdgeDataLoader', 'GraphDataLoader',
            # Temporary exposure.
-           '_pop_subgraph_storage', '_pop_blocks_storage',
-           '_restore_subgraph_storage', '_restore_blocks_storage']
+           '_pop_subgraph_storage', '_pop_storages',
+           '_restore_subgraph_storage', '_restore_storages']
 
 PYTORCH_VER = LooseVersion(th.__version__)
 PYTORCH_16 = PYTORCH_VER >= LooseVersion("1.6.0")
@@ -213,26 +213,32 @@ def _pop_subgraph_storage(subg, g):
         frame = g._edge_frames[g.get_etype_id(etype)]
         _pop_subframe_storage(subframe, frame)
 
-def _pop_blocks_storage(blocks, g):
-    for block in blocks:
-        for ntype in block.srctypes:
-            if ntype not in g.ntypes:
-                continue
-            subframe = block._node_frames[block.get_ntype_id_from_src(ntype)]
-            frame = g._node_frames[g.get_ntype_id(ntype)]
-            _pop_subframe_storage(subframe, frame)
-        for ntype in block.dsttypes:
-            if ntype not in g.ntypes:
-                continue
-            subframe = block._node_frames[block.get_ntype_id_from_dst(ntype)]
-            frame = g._node_frames[g.get_ntype_id(ntype)]
-            _pop_subframe_storage(subframe, frame)
-        for etype in block.canonical_etypes:
-            if etype not in g.canonical_etypes:
-                continue
-            subframe = block._edge_frames[block.get_etype_id(etype)]
-            frame = g._edge_frames[g.get_etype_id(etype)]
-            _pop_subframe_storage(subframe, frame)
+def _pop_block_storage(block, g):
+    for ntype in block.srctypes:
+        if ntype not in g.ntypes:
+            continue
+        subframe = block._node_frames[block.get_ntype_id_from_src(ntype)]
+        frame = g._node_frames[g.get_ntype_id(ntype)]
+        _pop_subframe_storage(subframe, frame)
+    for ntype in block.dsttypes:
+        if ntype not in g.ntypes:
+            continue
+        subframe = block._node_frames[block.get_ntype_id_from_dst(ntype)]
+        frame = g._node_frames[g.get_ntype_id(ntype)]
+        _pop_subframe_storage(subframe, frame)
+    for etype in block.canonical_etypes:
+        if etype not in g.canonical_etypes:
+            continue
+        subframe = block._edge_frames[block.get_etype_id(etype)]
+        frame = g._edge_frames[g.get_etype_id(etype)]
+        _pop_subframe_storage(subframe, frame)
+
+def _pop_storages(subgs, g):
+    for subg in subgs:
+        if subg.is_block:
+            _pop_block_storage(subg, g)
+        else:
+            _pop_subgraph_storage(subg, g)
 
 def _restore_subframe_storage(subframe, frame):
     for key, col in subframe._columns.items():
@@ -253,32 +259,38 @@ def _restore_subgraph_storage(subg, g):
         frame = g._edge_frames[g.get_etype_id(etype)]
         _restore_subframe_storage(subframe, frame)
 
-def _restore_blocks_storage(blocks, g):
-    for block in blocks:
-        for ntype in block.srctypes:
-            if ntype not in g.ntypes:
-                continue
-            subframe = block._node_frames[block.get_ntype_id_from_src(ntype)]
-            frame = g._node_frames[g.get_ntype_id(ntype)]
-            _restore_subframe_storage(subframe, frame)
-        for ntype in block.dsttypes:
-            if ntype not in g.ntypes:
-                continue
-            subframe = block._node_frames[block.get_ntype_id_from_dst(ntype)]
-            frame = g._node_frames[g.get_ntype_id(ntype)]
-            _restore_subframe_storage(subframe, frame)
-        for etype in block.canonical_etypes:
-            if etype not in g.canonical_etypes:
-                continue
-            subframe = block._edge_frames[block.get_etype_id(etype)]
-            frame = g._edge_frames[g.get_etype_id(etype)]
-            _restore_subframe_storage(subframe, frame)
+def _restore_block_storage(block, g):
+    for ntype in block.srctypes:
+        if ntype not in g.ntypes:
+            continue
+        subframe = block._node_frames[block.get_ntype_id_from_src(ntype)]
+        frame = g._node_frames[g.get_ntype_id(ntype)]
+        _restore_subframe_storage(subframe, frame)
+    for ntype in block.dsttypes:
+        if ntype not in g.ntypes:
+            continue
+        subframe = block._node_frames[block.get_ntype_id_from_dst(ntype)]
+        frame = g._node_frames[g.get_ntype_id(ntype)]
+        _restore_subframe_storage(subframe, frame)
+    for etype in block.canonical_etypes:
+        if etype not in g.canonical_etypes:
+            continue
+        subframe = block._edge_frames[block.get_etype_id(etype)]
+        frame = g._edge_frames[g.get_etype_id(etype)]
+        _restore_subframe_storage(subframe, frame)
+
+def _restore_storages(subgs, g):
+    for subg in subgs:
+        if subg.is_block:
+            _restore_block_storage(subg, g)
+        else:
+            _restore_subgraph_storage(subg, g)
 
 class _NodeCollator(NodeCollator):
     def collate(self, items):
         # input_nodes, output_nodes, blocks
         result = super().collate(items)
-        _pop_blocks_storage(result[-1], self.g)
+        _pop_storages(result[-1], self.g)
         return result
 
 class _EdgeCollator(EdgeCollator):
@@ -287,15 +299,26 @@ class _EdgeCollator(EdgeCollator):
             # input_nodes, pair_graph, blocks
             result = super().collate(items)
             _pop_subgraph_storage(result[1], self.g)
-            _pop_blocks_storage(result[-1], self.g_sampling)
+            _pop_storages(result[-1], self.g_sampling)
             return result
         else:
             # input_nodes, pair_graph, neg_pair_graph, blocks
             result = super().collate(items)
             _pop_subgraph_storage(result[1], self.g)
             _pop_subgraph_storage(result[2], self.g)
-            _pop_blocks_storage(result[-1], self.g_sampling)
+            _pop_storages(result[-1], self.g_sampling)
             return result
+
+class _GraphCollator(GraphCollator):
+    def __init__(self, subgraph_iterator, **kwargs):
+        super().__init__(**kwargs)
+        self.subgraph_iterator = subgraph_iterator
+
+    def collate(self, items):
+        result = super().collate(items)
+        if self.subgraph_iterator is not None:
+            _pop_storages([result], self.subgraph_iterator.g)
+        return result
 
 def _to_device(data, device):
     if isinstance(data, dict):
@@ -320,7 +343,7 @@ class _NodeDataLoaderIter:
     def __next__(self):
         # input_nodes, output_nodes, blocks
         result_ = next(self.iter_)
-        _restore_blocks_storage(result_[-1], self.node_dataloader.collator.g)
+        _restore_storages(result_[-1], self.node_dataloader.collator.g)
 
         result = [_to_device(data, self.device) for data in result_]
         return result
@@ -343,9 +366,23 @@ class _EdgeDataLoaderIter:
             # Otherwise, input_nodes, pair_graph, blocks
             _restore_subgraph_storage(result_[2], self.edge_dataloader.collator.g)
         _restore_subgraph_storage(result_[1], self.edge_dataloader.collator.g)
-        _restore_blocks_storage(result_[-1], self.edge_dataloader.collator.g_sampling)
+        _restore_storages(result_[-1], self.edge_dataloader.collator.g_sampling)
 
         result = [_to_device(data, self.device) for data in result_]
+        return result
+
+class _GraphDataLoaderIter:
+    def __init__(self, graph_dataloader):
+        self.dataloader = graph_dataloader
+        self.iter_ = iter(graph_dataloader.dataloader)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        result = next(self.iter_)
+        if self.dataloader.is_subgraph_loader:
+            _restore_storages([result], g)
         return result
 
 def _init_dataloader(collator, device, dataloader_kwargs, use_ddp, ddp_seed):
@@ -401,7 +438,7 @@ class NodeDataLoader:
         The graph.
     nids : Tensor or dict[ntype, Tensor]
         The node set to compute outputs.
-    block_sampler : dgl.dataloading.BlockSampler
+    graph_sampler : dgl.dataloading.Sampler
         The neighborhood sampler.
     device : device context, optional
         The device of the generated MFGs in each iteration, which should be a
@@ -479,7 +516,7 @@ class NodeDataLoader:
     """
     collator_arglist = inspect.getfullargspec(NodeCollator).args
 
-    def __init__(self, g, nids, block_sampler, device=None, use_ddp=False, ddp_seed=0, **kwargs):
+    def __init__(self, g, nids, graph_sampler, device=None, use_ddp=False, ddp_seed=0, **kwargs):
         collator_kwargs = {}
         dataloader_kwargs = {}
         for k, v in kwargs.items():
@@ -495,7 +532,7 @@ class NodeDataLoader:
             assert device == 'cpu', 'Only cpu is supported in the case of a DistGraph.'
             # Distributed DataLoader currently does not support heterogeneous graphs
             # and does not copy features.  Fallback to normal solution
-            self.collator = NodeCollator(g, nids, block_sampler, **collator_kwargs)
+            self.collator = NodeCollator(g, nids, graph_sampler, **collator_kwargs)
             _remove_kwargs_dist(dataloader_kwargs)
             self.dataloader = DistDataLoader(self.collator.dataset,
                                              collate_fn=self.collator.collate,
@@ -509,10 +546,10 @@ class NodeDataLoader:
             # if the sampler supports it, tell it to output to the
             # specified device
             num_workers = dataloader_kwargs.get('num_workers', 0)
-            if callable(getattr(block_sampler, "set_output_context", None)) and num_workers == 0:
-                block_sampler.set_output_context(to_dgl_context(device))
+            if callable(getattr(graph_sampler, "set_output_context", None)) and num_workers == 0:
+                graph_sampler.set_output_context(to_dgl_context(device))
 
-            self.collator = _NodeCollator(g, nids, block_sampler, **collator_kwargs)
+            self.collator = _NodeCollator(g, nids, graph_sampler, **collator_kwargs)
             self.use_scalar_batcher, self.scalar_batcher, self.dataloader, self.dist_sampler = \
                 _init_dataloader(self.collator, device, dataloader_kwargs, use_ddp, ddp_seed)
 
@@ -586,7 +623,7 @@ class EdgeDataLoader:
         The graph.  Currently must be on CPU; GPU is not supported.
     eids : Tensor or dict[etype, Tensor]
         The edge set in graph :attr:`g` to compute outputs.
-    block_sampler : dgl.dataloading.BlockSampler
+    graph_sampler : dgl.dataloading.Sampler
         The neighborhood sampler.
     device : device context, optional
         The device of the generated MFGs and graphs in each iteration, which should be a
@@ -655,7 +692,7 @@ class EdgeDataLoader:
     Examples
     --------
     The following example shows how to train a 3-layer GNN for edge classification on a
-    set of edges ``train_eid`` on a homogeneous undirected graph.  Each node takes
+    set of edges ``train_eid`` on a homogeneous undirected graph. Each node takes
     messages from all neighbors.
 
     Say that you have an array of source node IDs ``src`` and another array of destination
@@ -767,7 +804,7 @@ class EdgeDataLoader:
     """
     collator_arglist = inspect.getfullargspec(EdgeCollator).args
 
-    def __init__(self, g, eids, block_sampler, device='cpu', use_ddp=False, ddp_seed=0, **kwargs):
+    def __init__(self, g, eids, graph_sampler, device='cpu', use_ddp=False, ddp_seed=0, **kwargs):
         collator_kwargs = {}
         dataloader_kwargs = {}
         for k, v in kwargs.items():
@@ -783,7 +820,7 @@ class EdgeDataLoader:
             assert device == 'cpu', 'Only cpu is supported in the case of a DistGraph.'
             # Distributed DataLoader currently does not support heterogeneous graphs
             # and does not copy features.  Fallback to normal solution
-            self.collator = EdgeCollator(g, eids, block_sampler, **collator_kwargs)
+            self.collator = EdgeCollator(g, eids, graph_sampler, **collator_kwargs)
             _remove_kwargs_dist(dataloader_kwargs)
             self.dataloader = DistDataLoader(self.collator.dataset,
                                              collate_fn=self.collator.collate,
@@ -797,10 +834,10 @@ class EdgeDataLoader:
             # if the sampler supports it, tell it to output to the
             # specified device
             num_workers = dataloader_kwargs.get('num_workers', 0)
-            if callable(getattr(block_sampler, "set_output_context", None)) and num_workers == 0:
-                block_sampler.set_output_context(to_dgl_context(device))
+            if callable(getattr(graph_sampler, "set_output_context", None)) and num_workers == 0:
+                graph_sampler.set_output_context(to_dgl_context(device))
 
-            self.collator = _EdgeCollator(g, eids, block_sampler, **collator_kwargs)
+            self.collator = _EdgeCollator(g, eids, graph_sampler, **collator_kwargs)
             self.use_scalar_batcher, self.scalar_batcher, self.dataloader, self.dist_sampler = \
                     _init_dataloader(self.collator, device, dataloader_kwargs, use_ddp, ddp_seed)
             self.use_ddp = use_ddp
@@ -902,8 +939,24 @@ class GraphDataLoader:
             else:
                 dataloader_kwargs[k] = v
 
+        # If the dataset is an infinite SubgraphIterator (i.e. without __len__) over a
+        # larger graph, convert it to an IterableDataset.
+        if isinstance(dataset, SubgraphIterator) and not hasattr(dataset, '__len__'):
+            class _Dataset(IterableDataset):
+                def __init__(self, iter_):
+                    self._it = iter_
+
+                def __iter__(self):
+                    return iter(self._it)
+            self.subgraph_iterator = dataset
+            dataset = _Dataset(dataset)
+            self.is_subgraph_loader = True
+        else:
+            self.is_subgraph_loader = False
+            self.subgraph_iterator = None
+
         if collate_fn is None:
-            self.collate = GraphCollator(**collator_kwargs).collate
+            self.collate = _GraphCollator(self.subgraph_iterator, **collator_kwargs).collate
         else:
             self.collate = collate_fn
 
@@ -918,7 +971,7 @@ class GraphDataLoader:
 
     def __iter__(self):
         """Return the iterator of the data loader."""
-        return iter(self.dataloader)
+        return _GraphDataLoaderIter(self)
 
     def __len__(self):
         """Return the number of batches of the data loader."""

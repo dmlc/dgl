@@ -16,6 +16,8 @@ Read the user guide :ref:`guide-minibatch`.
 """
 from .neighbor import *
 from .dataloader import *
+from .cluster_gcn import *
+from .shadow import *
 
 from . import negative_sampler
 from .async_transferer import AsyncTransferer
