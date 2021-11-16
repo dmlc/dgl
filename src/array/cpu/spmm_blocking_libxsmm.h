@@ -261,10 +261,7 @@ inline libxsmm_meltwfunction_opreduce_vecs_idx SpMMCreateLibxsmmKernel(
   if (std::is_same<DType, float>::value) {
     kernel = libxsmm_dispatch_meltw_opreduce_vecs_idx(
                N, &_ld, &_ld, LIBXSMM_DATATYPE_F32, LIBXSMM_DATATYPE_F32,
-               (sizeof(IdType) == 8) ? LIBXSMM_DATATYPE_I64 : LIBXSMM_DATATYPE_I32, opredop_flags);
-  }
-  if (kernel == nullptr) {
-    LOG(FATAL) << "Failed to generate libxsmm kernel for the SpMM operation!";
+               (sizeof(IdType) == 8) ? LIBXSMM_DATATYPE_I64 : LIBXSMM_DATATYPE_I32, opredop_flags, 0);
   }
   return kernel;
 }
@@ -423,7 +420,7 @@ inline void SpMMFreeBlocks(
  * \note it uses libxsmm, blocking and dynamic thread scheduling.
  */
 template <typename IdType, typename DType, typename Op, typename Redop>
-void SpMMRedopCsrOpt(
+int SpMMRedopCsrOpt(
     const BcastOff& bcast,
     const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat,
@@ -455,7 +452,7 @@ void SpMMRedopCsrOpt(
   const IdType* indptr = csr.indptr.Ptr<IdType>();
   CHECK_NOTNULL(indptr);
   const int total_nnz = indptr[M];
-  if (M <= 0 || K <= 0 || N <= 0 || total_nnz <= 0) return;
+  if (M <= 0 || K <= 0 || N <= 0 || total_nnz <= 0) return 0;
 
   const double avg_degree = total_nnz * 1.0 / M;
   const double nnz_prob = avg_degree / K;
@@ -517,6 +514,11 @@ void SpMMRedopCsrOpt(
                                                         LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_REDOP_SUM,
                                                         false);
   }
+  if (kernel == nullptr) {
+    LOG(INFO) << "Failed to generate libxsmm kernel for the SpMM operation!"
+              << "Reverting to naive implementation";
+    return 1;
+  }
 
 #ifdef DEBUG
   endTick = __rdtsc();
@@ -544,6 +546,7 @@ void SpMMRedopCsrOpt(
   endTick = __rdtsc();
   LOG(INFO) << "stage4 ticks = " << (endTick - startTick);
 #endif  // DEBUG
+  return 0;
 }
 
 /*!
@@ -556,10 +559,10 @@ void SpMMRedopCsrOpt(
  * \note it uses libxsmm, blocking and dynamic thread scheduling.
  */
 template <typename IdType, typename DType, typename Op>
-void SpMMSumCsrLibxsmm(const BcastOff& bcast, const CSRMatrix& csr,
+int SpMMSumCsrLibxsmm(const BcastOff& bcast, const CSRMatrix& csr,
                    NDArray ufeat, NDArray efeat, NDArray out) {
   NDArray dummy;
-  SpMMRedopCsrOpt<IdType, DType, Op, op::Add<DType>>(bcast, csr, ufeat, efeat, out, dummy, dummy);
+  return SpMMRedopCsrOpt<IdType, DType, Op, op::Add<DType>>(bcast, csr, ufeat, efeat, out, dummy, dummy);
 }
 
 /*!
@@ -574,9 +577,9 @@ void SpMMSumCsrLibxsmm(const BcastOff& bcast, const CSRMatrix& csr,
  * \note it uses libxsmm, blocking and dynamic thread scheduling.
  */
 template <typename IdType, typename DType, typename Op, typename Cmp>
-void SpMMCmpCsrLibxsmm(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
+int SpMMCmpCsrLibxsmm(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
                    NDArray efeat, NDArray out, NDArray argu, NDArray arge) {
-  SpMMRedopCsrOpt<IdType, DType, Op, Cmp>(bcast, csr, ufeat, efeat, out, argu, arge);
+  return SpMMRedopCsrOpt<IdType, DType, Op, Cmp>(bcast, csr, ufeat, efeat, out, argu, arge);
 }
 
 }  // namespace cpu
