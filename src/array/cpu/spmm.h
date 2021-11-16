@@ -142,7 +142,7 @@ void SpMMSumCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
        bcast.use_bcast || std::is_same<DType, double>::value;
   if (!no_libxsmm) {
     int ret = SpMMSumCsrLibxsmm<IdType, DType, Op>(bcast, csr, ufeat, efeat, out);
-    if(ret != 0)
+    if (ret != 0)
       SpMMSumCsrNaive<IdType, DType, Op>(bcast, csr, X, W, O);
   } else {
 #endif  // USE_LIBXSMM

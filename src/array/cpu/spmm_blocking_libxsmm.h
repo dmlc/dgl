@@ -261,7 +261,8 @@ inline libxsmm_meltwfunction_opreduce_vecs_idx SpMMCreateLibxsmmKernel(
   if (std::is_same<DType, float>::value) {
     kernel = libxsmm_dispatch_meltw_opreduce_vecs_idx(
                N, &_ld, &_ld, LIBXSMM_DATATYPE_F32, LIBXSMM_DATATYPE_F32,
-               (sizeof(IdType) == 8) ? LIBXSMM_DATATYPE_I64 : LIBXSMM_DATATYPE_I32, opredop_flags, 0);
+               (sizeof(IdType) == 8) ? LIBXSMM_DATATYPE_I64 : LIBXSMM_DATATYPE_I32,
+               opredop_flags, 0);
   }
   return kernel;
 }
@@ -562,7 +563,8 @@ template <typename IdType, typename DType, typename Op>
 int SpMMSumCsrLibxsmm(const BcastOff& bcast, const CSRMatrix& csr,
                    NDArray ufeat, NDArray efeat, NDArray out) {
   NDArray dummy;
-  return SpMMRedopCsrOpt<IdType, DType, Op, op::Add<DType>>(bcast, csr, ufeat, efeat, out, dummy, dummy);
+  return SpMMRedopCsrOpt<IdType, DType, Op, op::Add<DType>>(bcast, csr, ufeat, efeat, out,
+                                                            dummy, dummy);
 }
 
 /*!
