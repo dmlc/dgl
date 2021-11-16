@@ -116,35 +116,39 @@ void ScatterAdd_hetero(HeteroGraphPtr graph,
                        std::vector<NDArray> list_idx,
                        std::vector<NDArray> list_idx_ntypes,
                        std::vector<NDArray> list_out) {
-
-// #pragma omp parallel for
-  std::vector<bool> updated(graph->NumVertexTypes(), false);
-
+  std::vector<std::vector<dgl_id_t>> dst_src_ntids(graph->NumVertexTypes(), std::vector<dgl_id_t>());
   for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
     auto pair = graph->meta_graph()->FindEdge(etype);
-    const dgl_id_t src_id = pair.first; // graph is reveresed
-    const dgl_id_t dst_id = pair.second;
-    if( src_id == 2) continue; // TODO (Israt): delete hard code
-    if(updated[dst_id]) continue;
-    updated[dst_id] = true;
-    const DType* feat_data = list_feat[src_id].Ptr<DType>();
-    const IdType* idx_data = list_idx[src_id].Ptr<IdType>();
-    const IdType* idx_ntype_data = list_idx_ntypes[src_id].Ptr<IdType>();
-    DType* out_data = list_out[dst_id].Ptr<DType>();
+    const dgl_id_t dst_id = pair.first; // graph is reveresed
+    const dgl_id_t src_id = pair.second;
+    dst_src_ntids[dst_id].push_back(src_id); // can have duplicates. Use Hashtable to optimize.
+  }
+  std::vector<bool> updated(graph->NumVertexTypes(), false);
+  for (int dst_id = 0; dst_id < dst_src_ntids.size(); ++dst_id) {
+    updated[dst_id] = false;
+    for (int j = 0; j < dst_src_ntids[dst_id].size(); ++j) {
+      int src_id = dst_src_ntids[dst_id][j];
+      if(updated[src_id]) continue;
+      const DType* feat_data = list_feat[dst_id].Ptr<DType>();
+      const IdType* idx_data = list_idx[dst_id].Ptr<IdType>();
+      const IdType* idx_ntype_data = list_idx_ntypes[dst_id].Ptr<IdType>();
+      DType* out_data = list_out[src_id].Ptr<DType>();
 
-    int dim = 1;
-    for (int i = 1; i < list_out[dst_id]->ndim; ++i)
-      dim *= list_out[dst_id]->shape[i];
-    int n = list_feat[src_id]->shape[0];
-
-    for (int i = 0; i < n; ++i) {
-      for (int k = 0; k < dim; ++k) {
-        if (dst_id == idx_ntype_data[i * dim + k]) {
-          const int write_row = idx_data[i * dim + k];
-          // #pragma omp atomic
-          out_data[write_row * dim + k] += feat_data[i * dim + k]; // feat = dZ
+      int dim = 1;
+      for (int i = 1; i < list_out[src_id]->ndim; ++i)
+        dim *= list_out[src_id]->shape[i];
+      int n = list_feat[dst_id]->shape[0];
+  #pragma omp parallel for
+      for (int i = 0; i < n; ++i) {
+        for (int k = 0; k < dim; ++k) {
+          if (src_id == idx_ntype_data[i * dim + k]) {
+            const int write_row = idx_data[i * dim + k];
+  #pragma omp atomic
+            out_data[write_row * dim + k] += feat_data[i * dim + k]; // feat = dZ
+          }
         }
       }
+      updated[src_id] = true;
     }
   }
 }
