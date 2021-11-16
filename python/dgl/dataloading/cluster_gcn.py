@@ -34,7 +34,8 @@ class ClusterGCNSubgraphIterator(SubgraphIterator):
     --------
     Assuming that you have a graph ``g``:
 
-    >>> sgiter = dgl.dataloading.ClusterGCNSubgraphIterator(g, 100, '.', refresh=True)
+    >>> sgiter = dgl.dataloading.ClusterGCNSubgraphIterator(
+    ...     g, num_partitions=100, cache_directory='.', refresh=True)
     >>> dataloader = dgl.dataloading.GraphDataLoader(sgiter, batch_size=4, num_workers=0)
     >>> for subgraph_batch in dataloader:
     ...     train_on(subgraph_batch)

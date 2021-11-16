@@ -30,7 +30,7 @@ different neighbor sampling strategies by overriding the ``sample_frontier`` or
 the ``sample_blocks`` methods.
 
 .. autoclass:: BlockSampler
-    :members: sample_frontier, sample_blocks
+    :members: sample_frontier, sample_blocks, sample
 
 .. autoclass:: MultiLayerNeighborSampler
     :members: sample_frontier
@@ -46,7 +46,8 @@ iterators with ``GraphDataLoader`` like follows:
 
 .. code:: python
 
-   sgiter = dgl.dataloading.ClusterGCNSubgraphIterator(g, 100, '.', refresh=True)
+   sgiter = dgl.dataloading.ClusterGCNSubgraphIterator(
+       g, num_partitions=100, cache_directory='.', refresh=True)
    dataloader = dgl.dataloading.GraphDataLoader(sgiter, batch_size=4, num_workers=0)
    for subgraph_batch in dataloader:
        train_on(subgraph_batch)
