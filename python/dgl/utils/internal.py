@@ -691,6 +691,11 @@ class FlattenedDict(object):
         g = self._groups[k]
         return k, g[j]
 
+def maybe_flatten_dict(data):
+    """Return a FlattenedDict if the input is a Mapping, or the data itself otherwise.
+    """
+    return FlattenedDict(data) if isinstance(data, Mapping) else data
+
 def compensate(ids, origin_ids):
     """computing the compensate set of ids from origin_ids
 
