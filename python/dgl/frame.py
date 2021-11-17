@@ -2,7 +2,8 @@
 from __future__ import absolute_import
 
 from collections import namedtuple
-from collections.abc import MutableMapping
+# from collections.abc import MutableMapping
+# import functools
 
 from . import backend as F
 from .base import DGLError, dgl_warning
@@ -38,29 +39,31 @@ class _LazyIndex(object):
             flat_index = F.gather_row(flat_index, index)
         return flat_index
 
-class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
-    """The column scheme.
+Scheme = namedtuple('Scheme', ['shape', 'dtype'])
 
-    Parameters
-    ----------
-    shape : tuple of int
-        The feature shape.
-    dtype : backend-specific type object
-        The feature data type.
-    """
-    # Pickling torch dtypes could be problemetic; this is a workaround.
-    # I also have to create data_type_dict and reverse_data_type_dict
-    # attribute just for this bug.
-    # I raised an issue in PyTorch bug tracker:
-    # https://github.com/pytorch/pytorch/issues/14057
-    def __reduce__(self):
-        state = (self.shape, F.reverse_data_type_dict[self.dtype])
-        return self._reconstruct_scheme, state
+# class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
+#     """The column scheme.
 
-    @classmethod
-    def _reconstruct_scheme(cls, shape, dtype_str):
-        dtype = F.data_type_dict[dtype_str]
-        return cls(shape, dtype)
+#     Parameters
+#     ----------
+#     shape : tuple of int
+#         The feature shape.
+#     dtype : backend-specific type object
+#         The feature data type.
+#     """
+#     # Pickling torch dtypes could be problemetic; this is a workaround.
+#     # I also have to create data_type_dict and reverse_data_type_dict
+#     # attribute just for this bug.
+#     # I raised an issue in PyTorch bug tracker:
+#     # https://github.com/pytorch/pytorch/issues/14057
+#     def __reduce__(self):
+#         state = (self.shape, F.reverse_data_type_dict[self.dtype])
+#         return self._reconstruct_scheme, state
+
+#     @classmethod
+#     def _reconstruct_scheme(cls, shape, dtype_str):
+#         dtype = F.data_type_dict[dtype_str]
+#         return cls(shape, dtype)
 
 def infer_scheme(tensor):
     """Infer column scheme from the given tensor data.
@@ -75,7 +78,7 @@ def infer_scheme(tensor):
     Scheme
         The column scheme.
     """
-    return Scheme(tuple(F.shape(tensor)[1:]), F.dtype(tensor))
+    return Scheme(tuple(F.shape(tensor))[1:], F.dtype(tensor))
 
 class Column(object):
     """A column is a compact store of features of multiple nodes/edges.
@@ -119,11 +122,22 @@ class Column(object):
     index : Tensor
         Index tensor
     """
+    # __slots__ = ['storage', "_scheme", "index", "device"]
+
     def __init__(self, storage, scheme=None, index=None, device=None):
         self.storage = storage
-        self.scheme = scheme if scheme else infer_scheme(storage)
+        self._scheme = scheme
         self.index = index
         self.device = device
+
+    @property
+    def scheme(self):
+        """scheme"""
+        if self._scheme:
+            return self._scheme
+        else:
+            self._scheme = infer_scheme(self.storage)
+            return self._scheme
 
     def __len__(self):
         """The number of features (number of rows) in this column."""
@@ -162,6 +176,11 @@ class Column(object):
 
     @data.setter
     def data(self, val):
+        """Update the column data."""
+        self.index = None
+        self.storage = val
+
+    def set_data(self, val):
         """Update the column data."""
         self.index = None
         self.storage = val
@@ -227,10 +246,10 @@ class Column(object):
         feats : Tensor
             New features.
         """
-        feat_scheme = infer_scheme(feats)
-        if feat_scheme != self.scheme:
-            raise DGLError("Cannot update column of scheme %s using feature of scheme %s."
-                           % (feat_scheme, self.scheme))
+        # feat_scheme = infer_scheme(feats)
+        # if feat_scheme != self.scheme:
+        #     raise DGLError("Cannot update column of scheme %s using feature of scheme %s."
+        #                    % (feat_scheme, self.scheme))
         self.data = F.scatter_row(self.data, rowids, feats)
 
     def extend(self, feats, feat_scheme=None):
@@ -312,7 +331,12 @@ class Column(object):
     def __copy__(self):
         return self.clone()
 
-class Frame(MutableMapping):
+# import sys
+# sys.path.append("/home/ubuntu/dev/csr/dgl/build")
+# import dglpybind
+# from dglpybind import Column
+
+class Frame:
     """The columnar storage for node/edge features.
 
     The frame is a dictionary from feature names to feature columns.
@@ -388,6 +412,27 @@ class Frame(MutableMapping):
             self._default_initializer = initializer
         else:
             self._initializers[column] = initializer
+
+    def update(self, other):
+        """update"""
+        for k, v in other.items():
+            self.update_column(k, v)
+
+    def items(self):
+        """items"""
+        for key in self._columns.keys():
+            yield key, self._columns[key].data
+
+    def get(self, key, default=None):
+        """get"""
+        if key in self._columns:
+            return self._columns[key].data
+        else:
+            return default
+
+    def pop(self, key):
+        """update"""
+        self._columns.pop(key)
 
     @property
     def schemes(self):
@@ -504,11 +549,14 @@ class Frame(MutableMapping):
         data : Column or data convertible to Column
             The column data.
         """
-        col = Column.create(data)
-        if len(col) != self.num_rows:
-            raise DGLError('Expected data to have %d rows, got %d.' %
-                           (self.num_rows, len(col)))
-        self._columns[name] = col
+        if name in self._columns:
+            self._columns[name].set_data(data)
+        else:
+            col = Column.create(data)
+            # if len(col) != self.num_rows:
+            #     raise DGLError('Expected data to have %d rows, got %d.' %
+            #                    (self.num_rows, len(col)))
+            self._columns[name] = col
 
     def update_row(self, rowids, data):
         """Update the feature data of the given rows.

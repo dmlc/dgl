@@ -1,12 +1,15 @@
 """Classes for heterogeneous graphs."""
-#pylint: disable= too-many-lines
+#pylint: disable= too-many-lines, no-member
 from collections import defaultdict
 from collections.abc import Mapping, Iterable
 from contextlib import contextmanager
 import copy
 import numbers
+import functools
 import networkx as nx
 import numpy as np
+
+# import profile
 
 from ._ffi.function import _init_api
 from .ops import segment
@@ -20,7 +23,6 @@ from .frame import Frame
 from .view import HeteroNodeView, HeteroNodeDataView, HeteroEdgeView, HeteroEdgeDataView
 
 __all__ = ['DGLHeteroGraph', 'combine_names']
-
 class DGLHeteroGraph(object):
     """Class for storing graph structure and node/edge feature data.
 
@@ -652,6 +654,7 @@ class DGLHeteroGraph(object):
         self._graph = sub_g._graph
         self._node_frames = sub_g._node_frames
         self._edge_frames = sub_g._edge_frames
+        self._clear_cache()
 
     def remove_nodes(self, nids, ntype=None, store_ids=False):
         r"""Remove multiple nodes with the specified node type
@@ -809,11 +812,13 @@ class DGLHeteroGraph(object):
                 self.nodes[c_ntype].data.pop(NID)
             for c_etype in self.canonical_etypes:
                 self.edges[c_etype].data.pop(EID)
+        self._clear_cache()
 
     def _reset_cached_info(self):
         """Some info like batch_num_nodes may be stale after mutation
         Clean these cached info
         """
+        self._clear_cache()
         self._batch_num_nodes = None
         self._batch_num_edges = None
 
@@ -839,6 +844,16 @@ class DGLHeteroGraph(object):
         the name with ``"SRC/"`` or ``"DST/"`` when specifying a node type.
         """
         return self._is_unibipartite
+
+    def _clear_cache(self):
+        """clear all cache"""
+        # type(self).ntypes.fget.cache_clear()
+        self.get_ntype_id.cache_clear()
+        type(self).nodes.fget.cache_clear()
+        type(self).edges.fget.cache_clear()
+        self.number_of_nodes.cache_clear()
+        self.number_of_nodes_ntype_id.cache_clear()
+        type(self).device.fget.cache_clear()
 
     @property
     def ntypes(self):
@@ -1154,6 +1169,7 @@ class DGLHeteroGraph(object):
                                'in the form of (srctype, etype, dsttype)' % etype)
             return ret
 
+    @functools.lru_cache()
     def get_ntype_id(self, ntype):
         """Return the ID of the given node type.
 
@@ -1238,6 +1254,7 @@ class DGLHeteroGraph(object):
             raise DGLError('DST node type "{}" does not exist.'.format(ntype))
         return ntid
 
+    @functools.lru_cache()
     def get_etype_id(self, etype):
         """Return the id of the given edge type.
 
@@ -1601,6 +1618,7 @@ class DGLHeteroGraph(object):
     #################################################################
 
     @property
+    @functools.lru_cache()
     def nodes(self):
         """Return a node view
 
@@ -1980,6 +1998,7 @@ class DGLHeteroGraph(object):
             return HeteroNodeDataView(self, ntypes, ntids, ALL)
 
     @property
+    @functools.lru_cache()
     def edges(self):
         """Return an edge view
 
@@ -2068,6 +2087,7 @@ class DGLHeteroGraph(object):
         return HeteroEdgeView(self)
 
     @property
+    @functools.lru_cache()
     def edata(self):
         """Return an edge data view for setting/getting edge features.
 
@@ -2287,9 +2307,15 @@ class DGLHeteroGraph(object):
     # Graph query
     #################################################################
 
+    @functools.lru_cache()
     def number_of_nodes(self, ntype=None):
         """Alias of :meth:`num_nodes`"""
         return self.num_nodes(ntype)
+
+    @functools.lru_cache()
+    def number_of_nodes_ntype_id(self, ntype_id):
+        """num nodes ntype id"""
+        return self._graph.number_of_nodes(ntype_id)
 
     def num_nodes(self, ntype=None):
         """Return the number of nodes in the graph.
@@ -4080,6 +4106,7 @@ class DGLHeteroGraph(object):
         etid = self.get_etype_id(etype)
         self._edge_frames[etid].set_initializer(initializer, field)
 
+    # @profile
     def _set_n_repr(self, ntid, u, data):
         """Internal API to set node features.
 
@@ -4099,22 +4126,24 @@ class DGLHeteroGraph(object):
         data : dict of tensor
             Node representation.
         """
-        if is_all(u):
-            num_nodes = self._graph.number_of_nodes(ntid)
+        is_all_u = is_all(u)
+        if is_all_u:
+            pass
+            # num_nodes = self.number_of_nodes_ntype_id(ntid)
         else:
             u = utils.prepare_tensor(self, u, 'u')
-            num_nodes = len(u)
-        for key, val in data.items():
-            nfeats = F.shape(val)[0]
-            if nfeats != num_nodes:
-                raise DGLError('Expect number of features to match number of nodes (len(u)).'
-                               ' Got %d and %d instead.' % (nfeats, num_nodes))
-            if F.context(val) != self.device:
-                raise DGLError('Cannot assign node feature "{}" on device {} to a graph on'
-                               ' device {}. Call DGLGraph.to() to copy the graph to the'
-                               ' same device.'.format(key, F.context(val), self.device))
+            # num_nodes = len(u)
+        # for key, val in data.items():
+        #     nfeats = F.shape(val)[0]
+            # if nfeats != num_nodes:
+            #     raise DGLError('Expect number of features to match number of nodes (len(u)).'
+            #                    ' Got %d and %d instead.' % (nfeats, num_nodes))
+            # if F.context(val) != self.device:
+            #     raise DGLError('Cannot assign node feature "{}" on device {} to a graph on'
+            #                    ' device {}. Call DGLGraph.to() to copy the graph to the'
+            #                    ' same device.'.format(key, F.context(val), self.device))
 
-        if is_all(u):
+        if is_all_u:
             self._node_frames[ntid].update(data)
         else:
             self._node_frames[ntid].update_row(u, data)
@@ -4184,30 +4213,31 @@ class DGLHeteroGraph(object):
             Edge representation.
         """
         # parse argument
-        if not is_all(edges):
+        is_all_e = is_all(edges)
+        if not is_all_e:
             eid = utils.parse_edges_arg_to_eid(self, edges, etid, 'edges')
 
-        # sanity check
-        if not utils.is_dict_like(data):
-            raise DGLError('Expect dictionary type for feature data.'
-                           ' Got "%s" instead.' % type(data))
+        # # sanity check
+        # if not utils.is_dict_like(data):
+        #     raise DGLError('Expect dictionary type for feature data.'
+        #                    ' Got "%s" instead.' % type(data))
 
-        if is_all(edges):
-            num_edges = self._graph.number_of_edges(etid)
-        else:
-            num_edges = len(eid)
-        for key, val in data.items():
-            nfeats = F.shape(val)[0]
-            if nfeats != num_edges:
-                raise DGLError('Expect number of features to match number of edges.'
-                               ' Got %d and %d instead.' % (nfeats, num_edges))
-            if F.context(val) != self.device:
-                raise DGLError('Cannot assign edge feature "{}" on device {} to a graph on'
-                               ' device {}. Call DGLGraph.to() to copy the graph to the'
-                               ' same device.'.format(key, F.context(val), self.device))
+        # if is_all_e:
+        #     num_edges = self._graph.number_of_edges(etid)
+        # else:
+        #     num_edges = len(eid)
+        # for key, val in data.items():
+        #     nfeats = F.shape(val)[0]
+            # if nfeats != num_edges:
+            #     raise DGLError('Expect number of features to match number of edges.'
+            #                    ' Got %d and %d instead.' % (nfeats, num_edges))
+            # if F.context(val) != self.device:
+            #     raise DGLError('Cannot assign edge feature "{}" on device {} to a graph on'
+            #                    ' device {}. Call DGLGraph.to() to copy the graph to the'
+            #                    ' same device.'.format(key, F.context(val), self.device))
 
         # set
-        if is_all(edges):
+        if is_all_e:
             self._edge_frames[etid].update(data)
         else:
             self._edge_frames[etid].update_row(eid, data)
@@ -5331,6 +5361,7 @@ class DGLHeteroGraph(object):
                 return F.boolean_mask(e, F.gather_row(mask, e))
 
     @property
+    @functools.lru_cache()
     def device(self):
         """Get the device of the graph.
 
@@ -5800,6 +5831,7 @@ class DGLHeteroGraph(object):
         for fmt in formats:
             assert fmt in ("coo", "csr", "csc"), '{} is not coo, csr or csc'.format(fmt)
         gidx = self._graph.shared_memory(name, self.ntypes, self.etypes, formats)
+        self._clear_cache()
         return DGLHeteroGraph(gidx, self.ntypes, self.etypes)
 
 

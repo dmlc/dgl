@@ -1,6 +1,7 @@
 """Views of DGLGraph."""
 from __future__ import absolute_import
 
+import functools
 from collections import namedtuple, defaultdict
 from collections.abc import MutableMapping
 
@@ -10,6 +11,23 @@ from . import backend as F
 NodeSpace = namedtuple('NodeSpace', ['data'])
 EdgeSpace = namedtuple('EdgeSpace', ['data'])
 
+
+def _ignore_unhashable(func):
+    uncached = func.__wrapped__
+    attributes = functools.WRAPPER_ASSIGNMENTS + ('cache_info', 'cache_clear')
+
+    @functools.wraps(func, assigned=attributes)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except TypeError as error:
+            if 'unhashable type' in str(error):
+                return uncached(*args, **kwargs)
+            raise
+    wrapper.__uncached__ = uncached
+    return wrapper
+
+
 class HeteroNodeView(object):
     """A NodeView class to act as G.nodes for a DGLHeteroGraph."""
     __slots__ = ['_graph', '_typeid_getter']
@@ -18,6 +36,8 @@ class HeteroNodeView(object):
         self._graph = graph
         self._typeid_getter = typeid_getter
 
+    @_ignore_unhashable
+    @functools.lru_cache()
     def __getitem__(self, key):
         if isinstance(key, slice):
             # slice
@@ -127,6 +147,8 @@ class HeteroEdgeView(object):
     def __init__(self, graph):
         self._graph = graph
 
+    @_ignore_unhashable
+    @functools.lru_cache()
     def __getitem__(self, key):
         if isinstance(key, slice):
             # slice
@@ -182,17 +204,17 @@ class HeteroEdgeDataView(MutableMapping):
 
     def __setitem__(self, key, val):
         if isinstance(self._etype, list):
-            assert isinstance(val, dict), \
-                'Current HeteroEdgeDataView has multiple edge types, ' \
-                'please pass the edge type and the corresponding data through a dict.'
+            # assert isinstance(val, dict), \
+            #     'Current HeteroEdgeDataView has multiple edge types, ' \
+            #     'please pass the edge type and the corresponding data through a dict.'
 
             for (etype, data) in val.items():
                 etid = self._graph.get_etype_id(etype)
                 self._graph._set_e_repr(etid, self._edges, {key : data})
         else:
-            assert isinstance(val, dict) is False, \
-                'The HeteroEdgeDataView has only one edge type. ' \
-                'please pass a tensor directly'
+            # assert isinstance(val, dict) is False, \
+            #     'The HeteroEdgeDataView has only one edge type. ' \
+            #     'please pass a tensor directly'
             self._graph._set_e_repr(self._etid, self._edges, {key : val})
 
     def __delitem__(self, key):
