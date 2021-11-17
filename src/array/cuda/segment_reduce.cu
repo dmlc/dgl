@@ -50,7 +50,7 @@ void ScatterAdd(NDArray feat,
 
 
 template <int XPU, typename IdType, int bits>
-void ScatterAdd_hetero(HeteroGraphPtr g,
+void UpdateGradMinMax_hetero(HeteroGraphPtr g,
                        std::vector<NDArray> feat,
                        std::vector<NDArray> idx,
                        std::vector<NDArray> idx_etype,
@@ -132,22 +132,22 @@ template void ScatterAdd<kDLGPU, int64_t, 64>(
     NDArray idx,
     NDArray out);
 
-template void ScatterAdd_hetero<kDLGPU, int32_t, 16>(
+template void UpdateGradMinMax_hetero<kDLGPU, int32_t, 16>(
     HeteroGraphPtr g, std::vector<NDArray> feat, std::vector<NDArray> idx,
     std::vector<NDArray> idx_etype, std::vector<NDArray> out);
-template void ScatterAdd_hetero<kDLGPU, int64_t, 16>(
+template void UpdateGradMinMax_hetero<kDLGPU, int64_t, 16>(
     HeteroGraphPtr g, std::vector<NDArray> feat, std::vector<NDArray> idx,
     std::vector<NDArray> idx_etype, std::vector<NDArray> out);
-template void ScatterAdd_hetero<kDLGPU, int32_t, 32>(
+template void UpdateGradMinMax_hetero<kDLGPU, int32_t, 32>(
     HeteroGraphPtr g, std::vector<NDArray> feat, std::vector<NDArray> idx,
     std::vector<NDArray> idx_etype, std::vector<NDArray> out);
-template void ScatterAdd_hetero<kDLGPU, int64_t, 32>(
+template void UpdateGradMinMax_hetero<kDLGPU, int64_t, 32>(
     HeteroGraphPtr g, std::vector<NDArray> feat, std::vector<NDArray> idx,
     std::vector<NDArray> idx_etype, std::vector<NDArray> out);
-template void ScatterAdd_hetero<kDLGPU, int32_t, 64>(
+template void UpdateGradMinMax_hetero<kDLGPU, int32_t, 64>(
     HeteroGraphPtr g, std::vector<NDArray> feat, std::vector<NDArray> idx,
     std::vector<NDArray> idx_etype, std::vector<NDArray> out);
-template void ScatterAdd_hetero<kDLGPU, int64_t, 64>(
+template void UpdateGradMinMax_hetero<kDLGPU, int64_t, 64>(
     HeteroGraphPtr g, std::vector<NDArray> feat, std::vector<NDArray> idx,
     std::vector<NDArray> idx_etype, std::vector<NDArray> out);
 

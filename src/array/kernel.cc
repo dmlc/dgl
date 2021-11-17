@@ -229,7 +229,7 @@ void ScatterAddDispatchHetero(HeteroGraphPtr graph,
   ATEN_XPU_SWITCH_CUDA(feat[src_id]->ctx.device_type, XPU, "ScatterAdd", {
     ATEN_ID_TYPE_SWITCH(idx[src_id]->dtype, IdType, {
       ATEN_FLOAT_BITS_SWITCH(feat[src_id]->dtype, bits, "Feature data", {
-        ScatterAdd_hetero<XPU, IdType, bits>(graph, feat, idx, idx_etype, out);
+        UpdateGradMinMax_hetero<XPU, IdType, bits>(graph, feat, idx, idx_etype, out);
       });
     });
   });
@@ -455,7 +455,7 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelScatterAdd")
     ScatterAddDispatch(feat, idx, out);
   });
 
-DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelScatterAddHetero")
+DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelUpdateGradMinMaxHetero")
 .set_body([](DGLArgs args, DGLRetValue *rv) {
     HeteroGraphRef graph = args[0];
     List<Value> list_feat = args[1];

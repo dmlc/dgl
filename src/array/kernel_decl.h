@@ -118,7 +118,7 @@ void ScatterAdd(NDArray feat,
  * \brief Scatter Add on first dimension.
  */
 template <int XPU, typename IdType, int bits>
-void ScatterAdd_hetero(HeteroGraphPtr g,
+void UpdateGradMinMax_hetero(HeteroGraphPtr g,
                 std::vector<NDArray> feat,
                 std::vector<NDArray> idx,
                 std::vector<NDArray> idx_etype,

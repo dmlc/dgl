@@ -501,7 +501,7 @@ def _scatter_add(x, idx, m):
     return out
 
 
-def _scatter_add_hetero(gidx, list_x, list_idx, list_idx_etype, list_dX):
+def _update_grad_minmax_hetero(gidx, list_x, list_idx, list_idx_etype, list_dX):
     r""" Scatter add operator (on first dimension) implementation.
 
     Math: y[idx[i], *] += x[i, *]
@@ -529,7 +529,7 @@ def _scatter_add_hetero(gidx, list_x, list_idx, list_idx_etype, list_dX):
         ctx = F.context(x)
         dtype = F.dtype(x)
         list_out[dst_id] = F.zeros(out_shp, dtype, ctx)
-    _CAPI_DGLKernelScatterAddHetero(gidx,
+    _CAPI_DGLKernelUpdateGradMinMaxHetero(gidx,
                                     [to_dgl_nd(x) for x in list_x],
                                     # TODO (Israt): change idx to idx.long()
                                     [to_dgl_nd(idx) for idx in list_idx],

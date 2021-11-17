@@ -111,7 +111,7 @@ void ScatterAdd(NDArray feat, NDArray idx, NDArray out) {
  */
 
 template <typename IdType, typename DType>
-void ScatterAdd_hetero(HeteroGraphPtr graph,
+void UpdateGradMinMax_hetero(HeteroGraphPtr graph,
                        std::vector<NDArray> list_feat,
                        std::vector<NDArray> list_idx,
                        std::vector<NDArray> list_idx_ntypes,

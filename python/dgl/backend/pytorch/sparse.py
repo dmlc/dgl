@@ -2,7 +2,7 @@ import torch as th
 from distutils.version import LooseVersion
 from ...base import is_all, ALL
 from ...sparse import _gspmm, _gspmm_hetero, _gsddmm, _gsddmm_hetero, _segment_reduce, _bwd_segment_cmp
-from ...sparse import _csrmm, _csrsum, _csrmask, _scatter_add, _scatter_add_hetero
+from ...sparse import _csrmm, _csrsum, _csrmask, _scatter_add, _update_grad_minmax_hetero
 from ...heterograph_index import create_unitgraph_from_csr
 
 if LooseVersion(th.__version__) >= LooseVersion("1.6.0"):
@@ -238,7 +238,6 @@ class GSpMM_hetero(th.autograd.Function):
 
         if op != 'copy_rhs' and any([x is not None for x in X]):
             g_rev = gidx.reverse()
-            # TODO(Israt): implement other combinations of message and reduce functions
             if reduce_op == 'sum':
                 if op == 'mul':
                     dX = gspmm_hetero(g_rev, 'mul', 'sum', len(X), *tuple(dZ + Y))
@@ -258,7 +257,7 @@ class GSpMM_hetero(th.autograd.Function):
                     dX.scatter_add_(0, argX.long(), grad)
                 elif op in ['add', 'copy_lhs']:
                     # TODO(Israt): argX.long()
-                    dX = scatter_add_hetero(g_rev, dZ, argX, argX_ntype, dX)
+                    dX = update_grad_minmax_hetero(g_rev, dZ, argX, argX_ntype, dX)
             dX = tuple([_reduce_grad(dX[i], X_shape[i]) if X[i] is not None else None
                 for i in range(len(X))])
         else:  # X has not gradient
@@ -284,7 +283,7 @@ class GSpMM_hetero(th.autograd.Function):
                         0, argX.long()) * dZ
                     dY.scatter_add_(0, argY.long(), grad)
                 elif op in ['add', 'copy_rhs']:
-                    dY = scatter_add_hetero(gidx.reverse(), dZ, argY, argY_etype, dY)
+                    dY = update_grad_minmax_hetero(gidx.reverse(), dZ, argY, argY_etype, dY)
             dY = tuple([_reduce_grad(dY[i], Y_shape[i]) if dY[i] is not None else None
                 for i in range(len(dY))])
         else:  # Y has no gradient
@@ -556,11 +555,11 @@ class ScatterAdd(th.autograd.Function):
         return dy[idx], None, None
 
 
-class ScatterAdd_hetero(th.autograd.Function):
+class UpdateGradMinMaxHetero(th.autograd.Function):
     @staticmethod
     @custom_fwd(cast_inputs=th.float16)
     def forward(ctx, gidx, x, idx, idx_etype, m):
-        y = _scatter_add_hetero(gidx, x, idx, idx_etype, m)
+        y = _update_grad_minmax_hetero(gidx, x, idx, idx_etype, m)
         ctx.save_for_backward(idx)
         return y
 
@@ -685,8 +684,8 @@ def segment_reduce(op, x, offsets):
 def scatter_add(x, idx, m):
     return ScatterAdd.apply(x, idx, m)
 
-def scatter_add_hetero(gidx, x, idx, idx_etype, m):
-    return ScatterAdd_hetero.apply(gidx, x, idx, idx_etype, m)
+def update_grad_minmax_hetero(gidx, x, idx, idx_etype, m):
+    return UpdateGradMinMaxHetero.apply(gidx, x, idx, idx_etype, m)
 
 def csrmm(gidxA, A_weights, gidxB, B_weights, num_vtypes):
     nrows, ncols, C_indptr, C_indices, C_eids, C_weights = \
