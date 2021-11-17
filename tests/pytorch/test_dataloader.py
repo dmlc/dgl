@@ -319,7 +319,6 @@ def test_node_dataloader(sampler_name):
                     if load_output:
                         _check_device(blocks[-1].dstdata['label'])
                         OPS.copy_u_sum(blocks[-1], blocks[-1].dstdata['label'])
->>>>>>> 95cc5f20... enable graph copy on non-default stream
 
     g2 = dgl.heterograph({
          ('user', 'follow', 'user'): ([0, 0, 0, 1, 1, 1, 2], [1, 2, 3, 0, 2, 3, 0]),
