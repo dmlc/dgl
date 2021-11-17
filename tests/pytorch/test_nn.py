@@ -1237,15 +1237,15 @@ def test_jumping_knowledge():
 
     feat_list = [th.randn((num_nodes, num_feats)).to(ctx) for _ in range(num_layers)]
 
-    model = nn.JumpingKnowledge('cat')
+    model = nn.JumpingKnowledge('cat').to(ctx)
     model.reset_parameters()
     assert model(feat_list).shape == (num_nodes, num_layers * num_feats)
 
-    model = nn.JumpingKnowledge('max')
+    model = nn.JumpingKnowledge('max').to(ctx)
     model.reset_parameters()
     assert model(feat_list).shape == (num_nodes, num_feats)
 
-    model = nn.JumpingKnowledge('lstm', num_feats, num_layers)
+    model = nn.JumpingKnowledge('lstm', num_feats, num_layers).to(ctx)
     model.reset_parameters()
     assert model(feat_list).shape == (num_nodes, num_feats)
 
