@@ -244,7 +244,7 @@ class MultiGPUNodeDataLoader(NodeDataLoader):
                 g._edge_frames[i].pop(feat_name)
 
         super(MultiGPUNodeDataLoader, self).__init__(
-            g=g, nids=nids, block_sampler=block_sampler, device=device,
+            g=g, nids=nids, graph_sampler=block_sampler, device=device,
             use_ddp=use_ddp, num_workers=num_workers, **kwargs)
 
         self._node_feat = None
