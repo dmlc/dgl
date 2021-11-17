@@ -3,6 +3,8 @@
 5.5 Use of Edge Weights
 ----------------------------------
 
+:ref:`(中文版) <guide_cn-training-eweight>`
+
 In a weighted graph, each edge is associated with a semantically meaningful scalar weight. For
 example, the edge weights can be connectivity strengths or confidence scores. Naturally, one
 may want to utilize edge weights in model development.
@@ -12,10 +14,10 @@ Message Passing with Edge Weights
 
 Most graph neural networks (GNNs) integrate the graph topology information in forward computation
 by and only by the message passing mechanism. A message passing operation can be viewed as
-a function that takes in an adjacency matrix and additional input features. For an unweighted
-graph, the entries in the adjacency matrix can be zero or one, where a one-valued entry indicates
-an edge. If this graph is weighted, the non-zero entries can take arbitrary scalar values. This
-is equivalent to multiplying each message by its corresponding edge weight as in
+a function that takes an adjacency matrix and additional input features as input arguments. For an
+unweighted graph, the entries in the adjacency matrix can be zero or one, where a one-valued entry
+indicates an edge. If this graph is weighted, the non-zero entries can take arbitrary scalar
+values. This is equivalent to multiplying each message by its corresponding edge weight as in
 `GAT <https://arxiv.org/pdf/1710.10903.pdf>`__.
 
 With DGL, one can achieve this by:
