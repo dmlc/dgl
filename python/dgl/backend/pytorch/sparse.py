@@ -217,7 +217,7 @@ class GSpMM_hetero(th.autograd.Function):
         if not spmm_cache_argX(op, reduce_op, req_grad_X[src_id], req_grad_Y[dst_id]):
             argX = tuple([None] * len(X))
         if not spmm_cache_argY(op, reduce_op, req_grad_X[src_id], req_grad_Y[dst_id]):
-            argY = tuple([None] * len(Y))
+            argY = tuple([None] * len(X))
 
         ctx.save_for_backward(*feats, *argX, *argX_ntype, *argY, *argY_etype )
         return out
@@ -286,7 +286,7 @@ class GSpMM_hetero(th.autograd.Function):
                 elif op in ['add', 'copy_rhs']:
                     dY = scatter_add_hetero(gidx.reverse(), dZ, argY, argY_etype, dY)
             dY = tuple([_reduce_grad(dY[i], Y_shape[i]) if dY[i] is not None else None
-                for i in range(len(Y))])
+                for i in range(len(dY))])
         else:  # Y has no gradient
             dY = tuple([None] * len(Y))
         return (None, None, None, None) + dX + dY
