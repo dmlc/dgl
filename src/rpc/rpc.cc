@@ -104,7 +104,7 @@ void InitGlobalTpContext() {
       }
       auto mptChannel = tensorpipe::channel::mpt::create(std::move(contexts),
                                                          std::move(listeners));
-      context->registerChannel(10 /* high priority */, "mpt", mptChannel);
+      context->registerChannel(20 /* high priority */, "mpt", mptChannel);
     }
   }
 }
