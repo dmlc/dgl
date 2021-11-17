@@ -1,6 +1,8 @@
 """DGL PyTorch DataLoaders"""
 import inspect
 import math
+import threading
+import queue
 from distutils.version import LooseVersion
 import torch as th
 from torch.utils.data import DataLoader, IterableDataset
@@ -13,6 +15,7 @@ from ...ndarray import NDArray as DGLNDArray
 from ... import backend as F
 from ...base import DGLError
 from ...utils import to_dgl_context
+from ..._ffi import streams as FS
 
 __all__ = ['NodeDataLoader', 'EdgeDataLoader', 'GraphDataLoader',
            # Temporary exposure.
@@ -330,23 +333,89 @@ def _to_device(data, device):
         data = data.to(device)
     return data
 
+
+def _index_select(in_tensor, idx, pin_memory):
+    idx = idx.to(in_tensor.device)
+    shape = list(in_tensor.shape)
+    shape[0] = len(idx)
+    out_tensor = th.empty(*shape, dtype=in_tensor.dtype, pin_memory=pin_memory)
+    th.index_select(in_tensor, 0, idx, out=out_tensor)
+    return out_tensor
+
+
+def _next(dl_iter, graph, device, load_input, load_output, stream=None):
+    # input_nodes, ouput_nodes, blocks
+    input_nodes, output_nodes, blocks = next(dl_iter)
+    _restore_storages(blocks, graph)
+    input_data = {}
+    for tag, data in load_input.items():
+        sliced = _index_select(data, input_nodes, data.device != device)
+        input_data[tag] = sliced
+    output_data = {}
+    for tag, data in load_output.items():
+        sliced = _index_select(data, output_nodes, data.device != device)
+        output_data[tag] = sliced
+    result_ = (input_nodes, output_nodes, blocks, input_data, output_data)
+    if stream is not None:
+        with th.cuda.stream(stream):
+            with FS.stream(stream):
+                result = [_to_device(data, device)
+                          for data in result_], result_, stream.record_event()
+    else:
+        result = [_to_device(data, device) for data in result_]
+    return result
+
+
+def _background_node_dataloader(dl_iter, g, device, results, load_input, load_output):
+    dev = None
+    if device.type == 'cuda':
+        dev = device
+    elif g.device.type == 'cuda':
+        dev = g.device
+    stream = th.cuda.Stream(device=dev)
+    try:
+        while True:
+            results.put(_next(dl_iter, g, device, load_input, load_output, stream))
+    except StopIteration:
+        results.put((None, None, None))
+
+
 class _NodeDataLoaderIter:
     def __init__(self, node_dataloader):
         self.device = node_dataloader.device
         self.node_dataloader = node_dataloader
         self.iter_ = iter(node_dataloader.dataloader)
+        self.async_load = node_dataloader.async_load and (
+            F.device_type(self.device) == 'cuda')
+        if self.async_load:
+            self.results = queue.Queue(1)
+            threading.Thread(target=_background_node_dataloader, args=(
+                self.iter_, self.node_dataloader.collator.g, self.device,
+                self.results, node_dataloader.load_input, node_dataloader.load_output
+                ), daemon=True).start()
 
     # Make this an iterator for PyTorch Lightning compatibility
     def __iter__(self):
         return self
 
     def __next__(self):
-        # input_nodes, output_nodes, blocks
-        result_ = next(self.iter_)
-        _restore_storages(result_[-1], self.node_dataloader.collator.g)
-
-        result = [_to_device(data, self.device) for data in result_]
-        return result
+        res = ()
+        if self.async_load:
+            res, _, event = self.results.get()
+            if res is None:
+                raise StopIteration
+            event.wait(th.cuda.default_stream())
+        else:
+            res = _next(self.iter_, self.node_dataloader.collator.g, self.device,
+                        self.node_dataloader.load_input, self.node_dataloader.load_output)
+        input_nodes, output_nodes, blocks, input_data, output_data = res
+        if input_data:
+            for tag, data in input_data.items():
+                blocks[0].srcdata[tag] = data
+        if output_data:
+            for tag, data in output_data.items():
+                blocks[-1].dstdata[tag] = data
+        return input_nodes, output_nodes, blocks
 
 class _EdgeDataLoaderIter:
     def __init__(self, edge_dataloader):
@@ -459,6 +528,19 @@ class NodeDataLoader:
         :class:`torch.utils.data.distributed.DistributedSampler`.
 
         Only effective when :attr:`use_ddp` is True.
+    load_input : dict[tag, Tensor], optional
+        The tensors will be sliced according to ``blocks[0].srcdata[dgl.NID]``
+        and will be attached to ``blocks[0].srcdata``.
+    load_output : dict[tag, Tensor], optional
+        The tensors will be sliced according to ``blocks[-1].dstdata[dgl.NID]``
+        and will be attached to ``blocks[-1].dstdata``.
+    async_load : boolean, optional
+        If True, data including graph, sliced tensors will be transferred
+        between devices asynchronously.This is transparent to end users. This
+        feature could speed up model train, especially when large data need
+        to be transferred. As a disadvantage, underlying `to_block` on GPU
+        becomes disabled and could lead to decreased performance. This is a
+        trade-off which needs profiling to decide whether to enable it.
     kwargs : dict
         Arguments being passed to :py:class:`torch.utils.data.DataLoader`.
 
@@ -516,7 +598,8 @@ class NodeDataLoader:
     """
     collator_arglist = inspect.getfullargspec(NodeCollator).args
 
-    def __init__(self, g, nids, graph_sampler, device=None, use_ddp=False, ddp_seed=0, **kwargs):
+    def __init__(self, g, nids, graph_sampler, device=None, use_ddp=False, ddp_seed=0,
+                 load_input=None, load_output=None, async_load=False, **kwargs):
         collator_kwargs = {}
         dataloader_kwargs = {}
         for k, v in kwargs.items():
@@ -543,10 +626,21 @@ class NodeDataLoader:
                 # default to the same device the graph is on
                 device = th.device(g.device)
 
-            # if the sampler supports it, tell it to output to the
-            # specified device
+            if not g.is_homogeneous:
+                if load_input or load_output:
+                    raise DGLError('load_input/load_output not supported for heterograph yet.')
+            self.load_input = {} if load_input is None else load_input
+            self.load_output = {} if load_output is None else load_output
+            self.async_load = async_load
+
+            # if the sampler supports it, tell it to output to the specified device.
+            # But if async_load is enabled, set_output_context should be skipped as
+            # we'd like to avoid any graph/data transfer graphs across devices in
+            # sampler. Such transfer will be handled in dataloader.
             num_workers = dataloader_kwargs.get('num_workers', 0)
-            if callable(getattr(graph_sampler, "set_output_context", None)) and num_workers == 0:
+            if ((not async_load) and
+                    callable(getattr(graph_sampler, "set_output_context", None)) and
+                    num_workers == 0):
                 graph_sampler.set_output_context(to_dgl_context(device))
 
             self.collator = _NodeCollator(g, nids, graph_sampler, **collator_kwargs)
