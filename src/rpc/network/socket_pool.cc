@@ -5,32 +5,40 @@
  */
 #include "socket_pool.h"
 
-#include <dmlc/logging.h>
 #include "tcp_socket.h"
+#include <dmlc/logging.h>
 
-#ifdef USE_EPOLL
+#if defined(__linux__)
 #include <sys/epoll.h>
 #endif
 
 namespace dgl {
 namespace network {
 
+#if defined(__linux__)
+
 SocketPool::SocketPool() {
-#ifdef USE_EPOLL
   epfd_ = epoll_create1(0);
   if (epfd_ < 0) {
     LOG(FATAL) << "SocketPool cannot create epfd";
   }
-#endif
+}
+
+SocketPool::SocketPool(SocketPool &&) {
+  epfd_ = epoll_create1(0);
+  if (epfd_ < 0) {
+    LOG(FATAL) << "SocketPool cannot create epfd";
+  }
 }
 
 void SocketPool::AddSocket(std::shared_ptr<TCPSocket> socket, int socket_id,
-  int events) {
+                           int events) {
   int fd = socket->Socket();
+  std::unique_lock<std::mutex> lk(mtx_);
   tcp_sockets_[fd] = socket;
   socket_ids_[fd] = socket_id;
+  lk.unlock();
 
-#ifdef USE_EPOLL
   epoll_event e;
   e.data.fd = fd;
   if (events == READ) {
@@ -44,45 +52,37 @@ void SocketPool::AddSocket(std::shared_ptr<TCPSocket> socket, int socket_id,
     LOG(FATAL) << "SocketPool cannot add socket";
   }
   socket->SetNonBlocking(true);
-#else
-  if (tcp_sockets_.size() > 1) {
-    LOG(FATAL) << "SocketPool supports only one socket if not use epoll."
-      "Please turn on USE_EPOLL on building";
-  }
-#endif
 }
 
 size_t SocketPool::RemoveSocket(std::shared_ptr<TCPSocket> socket) {
   int fd = socket->Socket();
+  std::unique_lock<std::mutex> lk(mtx_);
   socket_ids_.erase(fd);
   tcp_sockets_.erase(fd);
-#ifdef USE_EPOLL
+  size_t ret = socket_ids_.size();
+  lk.unlock();
   epoll_ctl(epfd_, EPOLL_CTL_DEL, fd, NULL);
-#endif
-  return socket_ids_.size();
+  return ret;
 }
 
 SocketPool::~SocketPool() {
-#ifdef USE_EPOLL
-  for (auto& id : socket_ids_) {
+  std::lock_guard<std::mutex> lk(mtx_);
+  for (auto &id : socket_ids_) {
     int fd = id.first;
     epoll_ctl(epfd_, EPOLL_CTL_DEL, fd, NULL);
   }
-#endif
 }
 
-std::shared_ptr<TCPSocket> SocketPool::GetActiveSocket(int* socket_id) {
+std::shared_ptr<TCPSocket> SocketPool::GetActiveSocket(int *socket_id) {
   if (socket_ids_.empty()) {
     return nullptr;
   }
 
-  for (;;) {
-    while (pending_fds_.empty()) {
-      Wait();
-    }
+  Wait();
+  while (!pending_fds_.empty()) {
     int fd = pending_fds_.front();
     pending_fds_.pop();
-
+    std::lock_guard<std::mutex> lk(mtx_);
     // Check if this socket is not removed
     if (socket_ids_.find(fd) != socket_ids_.end()) {
       *socket_id = socket_ids_[fd];
@@ -94,17 +94,37 @@ std::shared_ptr<TCPSocket> SocketPool::GetActiveSocket(int* socket_id) {
 }
 
 void SocketPool::Wait() {
-#ifdef USE_EPOLL
   static const int MAX_EVENTS = 10;
   epoll_event events[MAX_EVENTS];
-  int nfd = epoll_wait(epfd_, events, MAX_EVENTS, -1 /*Timeout*/);
+  int nfd = epoll_wait(epfd_, events, MAX_EVENTS, 0 /*Timeout*/);
   for (int i = 0; i < nfd; ++i) {
     pending_fds_.push(events[i].data.fd);
   }
-#else
-  pending_fds_.push(tcp_sockets_.begin()->second->Socket());
-#endif
 }
 
-}  // namespace network
-}  // namespace dgl
+#else
+
+SocketPool::SocketPool() { LOG(FATAL) << "Not implemented..."; }
+
+void SocketPool::AddSocket(std::shared_ptr<TCPSocket> socket, int socket_id) {
+  LOG(FATAL) << "Not implemented...";
+}
+
+size_t SocketPool::RemoveSocket(std::shared_ptr<TCPSocket> socket) {
+  LOG(FATAL) << "Not implemented...";
+  return 0x0;
+}
+
+SocketPool::~SocketPool() {}
+
+std::shared_ptr<TCPSocket> SocketPool::GetActiveSocket(int *socket_id) {
+  LOG(FATAL) << "Not implemented...";
+  return nullptr;
+}
+
+void SocketPool::Wait() { LOG(FATAL) << "Not implemented..."; }
+
+#endif
+
+} // namespace network
+} // namespace dgl

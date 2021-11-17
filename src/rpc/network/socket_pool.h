@@ -9,6 +9,7 @@
 #include <unordered_map>
 #include <queue>
 #include <memory>
+#include <mutex>
 
 namespace dgl {
 namespace network {
@@ -35,6 +36,7 @@ class SocketPool {
    * \brief SocketPool constructor
    */
   SocketPool();
+  SocketPool(SocketPool&&);
 
   /*!
    * \brief Add a socket to SocketPool
@@ -89,6 +91,11 @@ class SocketPool {
    * \brief queue for current active fds
    */
   std::queue<int> pending_fds_;
+
+  /*!
+   * \brief mutex for safe access
+   */
+  std::mutex mtx_;
 };
 
 }  // namespace network

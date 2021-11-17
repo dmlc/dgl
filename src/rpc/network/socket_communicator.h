@@ -11,12 +11,16 @@
 #include <string>
 #include <unordered_map>
 #include <memory>
+#include <chrono>
+#include <atomic>
+#include <mutex>
 
 #include "../../runtime/semaphore_wrapper.h"
 #include "communicator.h"
 #include "msg_queue.h"
 #include "tcp_socket.h"
 #include "common.h"
+#include "socket_pool.h"
 
 namespace dgl {
 namespace network {
@@ -140,56 +144,58 @@ class SocketReceiver : public Receiver {
    * \param queue_size size of message queue.
    * \param max_thread_count size of thread pool. 0 for no limit
    */
-  SocketReceiver(int64_t queue_size, int max_thread_count)
-    : Receiver(queue_size, max_thread_count) {}
+   SocketReceiver(int64_t queue_size, int max_thread_count)
+       : Receiver(queue_size, max_thread_count), num_sender_(0), stop_(false) {}
 
-  /*!
-   * \brief Wait for all the Senders to connect
-   * \param addr Networking address, e.g., 'socket://127.0.0.1:50051', 'mpi://0'
-   * \param num_sender total number of Senders
-   * \return True for success and False for fail
-   *
-   * Wait() is not thread-safe and only one thread can invoke this API.
-   */
-  bool Wait(const char* addr, int num_sender);
+   /*!
+    * \brief Wait for all the Senders to connect
+    * \param addr Networking address, e.g., 'socket://127.0.0.1:50051', 'mpi://0'
+    * \param num_sender expected number of Senders but more than expected is supported
+    * \return True for success and False for fail
+    *
+    * Wait() is not thread-safe and only one thread can invoke this API. It's
+    * non-blocking and wait until Finalize() is called explicitly.
+    */
+   bool Wait(const char *addr, int num_sender) override;
 
-  /*!
-   * \brief Recv data from Sender. Actually removing data from msg_queue.
-   * \param msg pointer of data message
-   * \param send_id which sender current msg comes from
-   * \return Status code
-   *
-   * (1) The Recv() API is blocking, which will not 
-   *     return until getting data from message queue.
-   * (2) The Recv() API is thread-safe.
-   * (3) Memory allocated by communicator but will not own it after the function returns.
-   */
-  STATUS Recv(Message* msg, int* send_id);
+   /*!
+    * \brief Recv data from Sender. Actually removing data from msg_queue.
+    * \param msg pointer of data message
+    * \param send_id which sender current msg comes from
+    * \return Status code
+    *
+    * (1) The Recv() API is blocking, which will not
+    *     return until getting data from message queue.
+    * (2) The Recv() API is thread-safe.
+    * (3) Memory allocated by communicator but will not own it after the
+    * function returns.
+    */
+   STATUS Recv(Message *msg, int *send_id);
 
-  /*!
-   * \brief Recv data from a specified Sender. Actually removing data from msg_queue.
-   * \param msg pointer of data message
-   * \param send_id sender's ID
-   * \return Status code
-   *
-   * (1) The RecvFrom() API is blocking, which will not 
-   *     return until getting data from message queue.
-   * (2) The RecvFrom() API is thread-safe.
-   * (3) Memory allocated by communicator but will not own it after the function returns.
-   */
-  STATUS RecvFrom(Message* msg, int send_id);
+   /*!
+    * \brief Recv data from a specified Sender. Actually removing data from
+    * msg_queue. \param msg pointer of data message \param send_id sender's ID
+    * \return Status code
+    *
+    * (1) The RecvFrom() API is blocking, which will not
+    *     return until getting data from message queue.
+    * (2) The RecvFrom() API is thread-safe.
+    * (3) Memory allocated by communicator but will not own it after the
+    * function returns.
+    */
+   STATUS RecvFrom(Message *msg, int send_id);
 
-  /*!
-   * \brief Finalize SocketReceiver
-   *
-   * Finalize() is not thread-safe and only one thread can invoke this API.
-   */
-  void Finalize();
+   /*!
+    * \brief Finalize SocketReceiver
+    *
+    * Finalize() is not thread-safe and only one thread can invoke this API.
+    */
+   void Finalize();
 
-  /*!
-   * \brief Communicator type: 'socket'
-   */
-  inline std::string Type() const { return std::string("socket"); }
+   /*!
+    * \brief Communicator type: 'socket'
+    */
+   inline std::string Type() const { return std::string("socket"); }
 
  private:
   struct RecvContext {
@@ -204,32 +210,24 @@ class SocketReceiver : public Receiver {
 
   /*!
    * \brief server socket for listening connections
-   */ 
-  TCPSocket* server_socket_;
-
-  /*!
-   * \brief socket for each client connections
-   */ 
-  std::vector<std::unordered_map<int /* Sender (virutal) ID */,
-    std::shared_ptr<TCPSocket>>> sockets_;
+   */
+  std::shared_ptr<TCPSocket> server_socket_;
 
   /*!
    * \brief Message queue for each socket connection
-   */ 
+   */
   std::unordered_map<int /* Sender (virtual) ID */,
     std::shared_ptr<MessageQueue>> msg_queue_;
-  std::unordered_map<int, std::shared_ptr<MessageQueue>>::iterator mq_iter_;
+
+  /*!
+   * \brief Recv context for each socket connection
+   */
+  std::unordered_map<int, std::shared_ptr<RecvContext>> recv_contexts_;
 
   /*!
    * \brief Independent thead
    */ 
   std::vector<std::shared_ptr<std::thread>> threads_;
-
-  /*!
-   * \brief queue_sem_ semphore to indicate number of messages in multiple
-   * message queues to prevent busy wait of Recv
-   */
-  runtime::Semaphore queue_sem_;
 
   /*!
    * \brief Recv-loop for each thread
@@ -239,12 +237,22 @@ class SocketReceiver : public Receiver {
    * Note that, the RecvLoop will finish its loop-job and exit thread
    * when the main thread invokes Signal() API on the message queue.
    */ 
-  static void RecvLoop(
-    std::unordered_map<int /* Sender (virtual) ID */,
-      std::shared_ptr<TCPSocket>> sockets,
-    std::unordered_map<int /* Sender (virtual) ID */,
-      std::shared_ptr<MessageQueue>> queues,
-    runtime::Semaphore *queue_sem);
+  void RecvLoop(const int thread_id);
+
+  /*!
+   * \brief stop all spawned threads
+   */
+  std::atomic_bool stop_;
+
+  /*!
+   * \brief Socket pool for active sockets
+   */
+  std::vector<SocketPool> socket_pool_;
+
+  /*!
+   * \brief mutex to read/write safely
+   */
+  std::mutex mtx_;
 };
 
 }  // namespace network

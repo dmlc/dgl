@@ -73,6 +73,7 @@ def start_server(server_id, ip_config, num_servers, num_clients, server_state, \
     client_namebook = {}
     for _ in range(num_clients):
         req, _ = rpc.recv_request()
+        assert isinstance(req, rpc.ClientRegisterRequest)
         addr_list.append(req.ip_addr)
     addr_list.sort()
     for client_id, addr in enumerate(addr_list):

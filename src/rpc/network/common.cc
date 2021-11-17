@@ -125,5 +125,26 @@ void StringAppendF(string* dst, const char* format, ...) {
   va_end(ap);
 }
 
+std::pair<std::string, int> ParseAddress(const char *addr) {
+  std::vector<std::string> substring;
+  std::vector<std::string> ip_and_port;
+  SplitStringUsing(addr, "//", &substring);
+  // Check address format
+  if (substring[0] != "socket:" || substring.size() != 2) {
+    LOG(FATAL) << "Incorrect address format:" << addr
+               << " Please provide right address format, "
+               << "e.g, 'socket://127.0.0.1:50051'. ";
+  }
+  // Get IP and port
+  SplitStringUsing(substring[1], ":", &ip_and_port);
+  if (ip_and_port.size() != 2) {
+    LOG(FATAL) << "Incorrect address format:" << addr
+               << " Please provide right address format, "
+               << "e.g, 'socket://127.0.0.1:50051'. ";
+  }
+
+  return std::make_pair(ip_and_port[0], stoi(ip_and_port[1]));
+}
+
 }  // namespace network
 }  // namespace dgl

@@ -595,6 +595,10 @@ def test_server_client():
     check_server_client(True, 1, 1)
     check_server_client(False, 1, 1)
     check_server_client(True, 2, 2)
+    # handle many clients with a few working threads in receiver
+    os.environ['DGL_SOCKET_MAX_THREAD_COUNT'] = '2'
+    check_server_client(True, 2, os.cpu_count())
+    del(os.environ['DGL_SOCKET_MAX_THREAD_COUNT'])
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support distributed DistEmbedding")

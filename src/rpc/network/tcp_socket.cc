@@ -99,9 +99,11 @@ bool TCPSocket::Accept(TCPSocket * socket, std::string * ip, int * port) {
   } while (sock_client == -1 && errno == EINTR);
 
   if (sock_client < 0) {
-    LOG(ERROR) << "Failed accept connection on " << *ip << ":" << *port
-               << ", error: " << strerror(errno)
-               << (errno == EAGAIN ? " SO_RCVTIMEO timeout reached" : "");
+    // Let's suppress no connection present info for nonblocking socket.
+    if (errno != EAGAIN && errno != EWOULDBLOCK) {
+      LOG(ERROR) << "Failed accept connection on " << *ip << ":" << *port
+                 << ", error: " << strerror(errno);
+    }
     return false;
   }
 

@@ -126,6 +126,7 @@ void SplitStringToIteratorUsing(const StringType& full,
 std::string StringPrintf(const char* format, ...);
 void SStringPrintf(std::string* dst, const char* format, ...);
 void StringAppendF(std::string* dst, const char* format, ...);
+std::pair<std::string, int> ParseAddress(const char *addr);
 
 }  // namespace network
 }  // namespace dgl
