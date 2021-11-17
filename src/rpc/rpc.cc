@@ -80,10 +80,14 @@ void InitGlobalTpContext() {
     RPCContext::getInstance()->ctx = std::make_shared<tensorpipe::Context>();
     auto context = RPCContext::getInstance()->ctx;
     auto transportContext = tensorpipe::transport::uv::create();
+    auto shmtransport = tensorpipe::transport::shm::create();
     context->registerTransport(0 /* priority */, "tcp", transportContext);
+    context->registerTransport(10 /* priority */, "shm", shmtransport);
     // Register basic uv channel
     auto basicChannel = tensorpipe::channel::basic::create();
+    auto shmChannel = tensorpipe::channel::cma::create();
     context->registerChannel(0 /* low priority */, "basic", basicChannel);
+    context->registerChannel(10 /* low priority */, "cma", shmChannel);
 
     char* numUvThreads_str = std::getenv("DGL_SOCKET_NTHREADS");
     if (numUvThreads_str) {
@@ -280,6 +284,15 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateEmptyRPCMessage")
   std::shared_ptr<RPCMessage> rst(new RPCMessage);
   *rv = rst;
 });
+
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateEmptyRPCMessageWithSize")
+.set_body([](DGLArgs args, DGLRetValue* rv) {
+  int64_t message_size = args[0];
+
+  std::shared_ptr<RPCMessage> rst(new RPCMessage);
+  *rv = rst;
+});
+
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateRPCMessage")
 .set_body([](DGLArgs args, DGLRetValue* rv) {
