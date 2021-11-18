@@ -144,8 +144,8 @@ class SocketReceiver : public Receiver {
    * \param queue_size size of message queue.
    * \param max_thread_count size of thread pool. 0 for no limit
    */
-   SocketReceiver(int64_t queue_size, int max_thread_count)
-       : Receiver(queue_size, max_thread_count), num_sender_(0), stop_(false) {}
+    SocketReceiver(int64_t queue_size, int max_thread_count)
+     : Receiver(queue_size, max_thread_count), num_sender_(0), stop_(false) {}
 
    /*!
     * \brief Wait for all the Senders to connect
@@ -156,7 +156,7 @@ class SocketReceiver : public Receiver {
     * Wait() is not thread-safe and only one thread can invoke this API. It's
     * non-blocking and wait until Finalize() is called explicitly.
     */
-   bool Wait(const char *addr, int num_sender) override;
+    bool Wait(const char *addr, int num_sender) override;
 
    /*!
     * \brief Recv data from Sender. Actually removing data from msg_queue.
@@ -170,7 +170,7 @@ class SocketReceiver : public Receiver {
     * (3) Memory allocated by communicator but will not own it after the
     * function returns.
     */
-   STATUS Recv(Message *msg, int *send_id);
+    STATUS Recv(Message *msg, int *send_id);
 
    /*!
     * \brief Recv data from a specified Sender. Actually removing data from msg_queue.
@@ -184,19 +184,19 @@ class SocketReceiver : public Receiver {
     * (3) Memory allocated by communicator but will not own it after the
     * function returns.
     */
-   STATUS RecvFrom(Message *msg, int send_id);
+    STATUS RecvFrom(Message *msg, int send_id);
 
    /*!
     * \brief Finalize SocketReceiver
     *
     * Finalize() is not thread-safe and only one thread can invoke this API.
     */
-   void Finalize();
+    void Finalize();
 
    /*!
     * \brief Communicator type: 'socket'
     */
-   inline std::string Type() const { return std::string("socket"); }
+    inline std::string Type() const { return std::string("socket"); }
 
  private:
   struct RecvContext {

@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <memory>
+#include <algorithm>
 
 #include "socket_communicator.h"
 #include "../../c_api_common.h"
@@ -249,7 +250,7 @@ STATUS SocketReceiver::Recv(Message *msg, int *send_id) {
   bool fetched = false;
   while (!stop_) {
     lk.lock();
-    for (auto &&p : msg_queue_) { // TODO: more smart fetch is required.
+    for (auto &&p : msg_queue_) {
       code = p.second->Remove(msg, false);
       if (code == QUEUE_EMPTY) {
         continue;

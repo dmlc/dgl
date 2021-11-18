@@ -4,13 +4,11 @@
  * \brief Socket pool of nonblocking sockets for DGL distributed training.
  */
 #include "socket_pool.h"
-
-#include "tcp_socket.h"
 #include <dmlc/logging.h>
-
 #if defined(__linux__)
 #include <sys/epoll.h>
 #endif
+#include "tcp_socket.h"
 
 namespace dgl {
 namespace network {
@@ -126,5 +124,5 @@ void SocketPool::Wait() { LOG(FATAL) << "Not implemented..."; }
 
 #endif
 
-} // namespace network
-} // namespace dgl
+}  // namespace network
+}  // namespace dgl
