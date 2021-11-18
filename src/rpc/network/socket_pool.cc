@@ -104,6 +104,8 @@ void SocketPool::Wait() {
 
 SocketPool::SocketPool() { LOG(FATAL) << "Not implemented..."; }
 
+SocketPool::SocketPool(SocketPool&&) { LOG(FATAL) << "Not implemented..."; }
+
 void SocketPool::AddSocket(std::shared_ptr<TCPSocket> socket, int socket_id,
                            int events) {
   LOG(FATAL) << "Not implemented...";
