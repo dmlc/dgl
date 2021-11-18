@@ -13,20 +13,22 @@
 namespace dgl {
 namespace network {
 
-#if defined(__linux__)
-
 SocketPool::SocketPool() {
+#if defined(__linux__)
   epfd_ = epoll_create1(0);
   if (epfd_ < 0) {
     LOG(FATAL) << "SocketPool cannot create epfd";
   }
+#endif
 }
 
 SocketPool::SocketPool(SocketPool &&) {
+#if defined(__linux__)
   epfd_ = epoll_create1(0);
   if (epfd_ < 0) {
     LOG(FATAL) << "SocketPool cannot create epfd";
   }
+#endif
 }
 
 void SocketPool::AddSocket(std::shared_ptr<TCPSocket> socket, int socket_id,
@@ -37,6 +39,7 @@ void SocketPool::AddSocket(std::shared_ptr<TCPSocket> socket, int socket_id,
   socket_ids_[fd] = socket_id;
   lk.unlock();
 
+#if defined(__linux__)
   epoll_event e;
   e.data.fd = fd;
   if (events == READ) {
@@ -50,6 +53,11 @@ void SocketPool::AddSocket(std::shared_ptr<TCPSocket> socket, int socket_id,
     LOG(FATAL) << "SocketPool cannot add socket";
   }
   socket->SetNonBlocking(true);
+#else
+  if (tcp_sockets_.size() > 1) {
+    LOG(FATAL) << "SocketPool supports only one socket for non-linux platforms";
+  }
+#endif
 }
 
 size_t SocketPool::RemoveSocket(std::shared_ptr<TCPSocket> socket) {
@@ -59,16 +67,20 @@ size_t SocketPool::RemoveSocket(std::shared_ptr<TCPSocket> socket) {
   tcp_sockets_.erase(fd);
   size_t ret = socket_ids_.size();
   lk.unlock();
+#if defined(__linux__)
   epoll_ctl(epfd_, EPOLL_CTL_DEL, fd, NULL);
+#endif
   return ret;
 }
 
 SocketPool::~SocketPool() {
+#if defined(__linux__)
   std::lock_guard<std::mutex> lk(mtx_);
   for (auto &id : socket_ids_) {
     int fd = id.first;
     epoll_ctl(epfd_, EPOLL_CTL_DEL, fd, NULL);
   }
+#endif
 }
 
 std::shared_ptr<TCPSocket> SocketPool::GetActiveSocket(int *socket_id) {
@@ -92,40 +104,17 @@ std::shared_ptr<TCPSocket> SocketPool::GetActiveSocket(int *socket_id) {
 }
 
 void SocketPool::Wait() {
+#if defined(__linux__)
   static const int MAX_EVENTS = 10;
   epoll_event events[MAX_EVENTS];
   int nfd = epoll_wait(epfd_, events, MAX_EVENTS, 0 /*Timeout*/);
   for (int i = 0; i < nfd; ++i) {
     pending_fds_.push(events[i].data.fd);
   }
-}
-
 #else
-
-SocketPool::SocketPool() { LOG(FATAL) << "Not implemented..."; }
-
-SocketPool::SocketPool(SocketPool&&) { LOG(FATAL) << "Not implemented..."; }
-
-void SocketPool::AddSocket(std::shared_ptr<TCPSocket> socket, int socket_id,
-                           int events) {
-  LOG(FATAL) << "Not implemented...";
-}
-
-size_t SocketPool::RemoveSocket(std::shared_ptr<TCPSocket> socket) {
-  LOG(FATAL) << "Not implemented...";
-  return 0x0;
-}
-
-SocketPool::~SocketPool() {}
-
-std::shared_ptr<TCPSocket> SocketPool::GetActiveSocket(int *socket_id) {
-  LOG(FATAL) << "Not implemented...";
-  return nullptr;
-}
-
-void SocketPool::Wait() { LOG(FATAL) << "Not implemented..."; }
-
+  pending_fds_.push(tcp_sockets_.begin()->second->Socket());
 #endif
+}
 
-}  // namespace network
-}  // namespace dgl
+} // namespace network
+} // namespace dgl
