@@ -11,6 +11,7 @@
 #include <fstream>
 #include <streambuf>
 #include <chrono>
+#include <atomic>
 
 #include <stdlib.h>
 #include <time.h>
@@ -41,30 +42,37 @@ const char* ip_addr[] = {
 };
 
 static void start_client();
-static void start_server(int id, const bool);
-static void send_and_recv(const bool);
+static void start_server(int id);
+static void send_and_recv(const bool recv_blocking);
+
+std::atomic<int> g_sender_connected{0};
+std::atomic<int> g_receiver_waited{0};
+bool g_recv_blocking{false};
 
 TEST(SocketCommunicatorTest, SendAndRecv) {
   send_and_recv(true);
   send_and_recv(false);
 }
 
-void send_and_recv(const bool blocking) {
+void send_and_recv(const bool recv_blocking) {
+  g_sender_connected = 0;
+  g_receiver_waited = 0;
+  g_recv_blocking = recv_blocking;
   // start 10 client
-  std::vector<std::thread*> client_thread;
+  std::vector<std::thread> client_thread;
   for (int i = 0; i < kNumSender; ++i) {
-    client_thread.push_back(new std::thread(start_client));
+    client_thread.push_back(std::thread(start_client));
   }
   // start 10 server
-  std::vector<std::thread*> server_thread;
+  std::vector<std::thread> server_thread;
   for (int i = 0; i < kNumReceiver; ++i) {
-    server_thread.push_back(new std::thread(start_server, i, blocking));
+    server_thread.push_back(std::thread(start_server, i));
   }
   for (int i = 0; i < kNumSender; ++i) {
-    client_thread[i]->join();
+    client_thread[i].join();
   }
   for (int i = 0; i < kNumReceiver; ++i) {
-    server_thread[i]->join();
+    server_thread[i].join();
   }
 }
 
@@ -73,7 +81,10 @@ void start_client() {
   for (int i = 0; i < kNumReceiver; ++i) {
     sender.AddReceiver(ip_addr[i], i);
   }
-  sender.Connect();
+  while (!g_recv_blocking && (g_receiver_waited != kNumReceiver)) {
+  }
+  EXPECT_TRUE(sender.Connect());
+  ++g_sender_connected;
   for (int i = 0; i < kNumMessage; ++i) {
     for (int n = 0; n < kNumReceiver; ++n) {
       char* str_data = new char[9];
@@ -95,11 +106,19 @@ void start_client() {
   sender.Finalize();
 }
 
-void start_server(int id, const bool blocking = true) {
+void start_server(int id) {
   SocketReceiver receiver(kQueueSize, kThreadNum);
-  receiver.Wait(ip_addr[id], kNumSender, blocking);
-  // wait for senders connections and msgs
-  std::this_thread::sleep_for(std::chrono::seconds(5));
+  // for non-blocking wait, more than expected number of senders is supported.
+  int num_senders = g_recv_blocking ? kNumSender : kNumSender / 2;
+  receiver.Wait(ip_addr[id], num_senders, g_recv_blocking);
+  ++g_receiver_waited;
+  while (g_sender_connected != kNumSender) {
+  }
+  // As connectioin is acked immediately in underlying socket protocol and
+  // message resources could be a bit delayed in Receiver, we may fail to fetch
+  // the target msg with target sender_id immediately after connection is built.
+  // So we'd better sleep for a while.
+  std::this_thread::sleep_for(std::chrono::seconds(1));
   for (int i = 0; i < kNumMessage; ++i) {
     for (int n = 0; n < kNumSender; ++n) {
       Message msg;

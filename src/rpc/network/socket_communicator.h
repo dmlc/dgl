@@ -209,7 +209,7 @@ class SocketReceiver : public Receiver {
   /*!
    * \brief number of sender
    */
-  int num_sender_;
+  std::atomic<int> num_sender_;
 
   /*!
    * \brief server socket for listening connections

@@ -32,6 +32,7 @@ typedef int STATUS;
 #define  QUEUE_FULL      3404   // Cannot add message when queue is full
 #define  REMOVE_SUCCESS  3405   // Remove message successfully
 #define  QUEUE_EMPTY     3406   // Cannot remove when queue is empty
+#define  QUEUE_NOT_FOUND 3407   // Target queue is not found
 
 /*!
  * \brief Message used by network communicator and message queue.

@@ -220,9 +220,7 @@ bool SocketReceiver::Wait(const char *addr, const int num_sender, const bool blo
         &SocketReceiver::RecvLoop, this, thread_id));
   }
 
-  std::condition_variable cv;
-  std::mutex cv_mtx;
-  threads_.emplace_back(std::make_shared<std::thread>([this, &cv]() {
+  threads_.emplace_back(std::make_shared<std::thread>([this]() {
     server_socket_->SetNonBlocking(true);
     std::string accept_ip;
     int accept_port;
@@ -232,7 +230,7 @@ bool SocketReceiver::Wait(const char *addr, const int num_sender, const bool blo
                                   &accept_port)) {
         continue;
       }
-      int sender_id = num_sender_++;
+      int sender_id = num_sender_;
       int thread_id = sender_id % max_thread_count_;
       auto &&msg_queue = std::make_shared<MessageQueue>(queue_size_);
       auto &&recv_ctx = std::make_shared<RecvContext>();
@@ -240,14 +238,13 @@ bool SocketReceiver::Wait(const char *addr, const int num_sender, const bool blo
       msg_queue_[sender_id] = msg_queue;
       recv_contexts_[sender_id] = recv_ctx;
       socket_pool_[thread_id].AddSocket(accept_socket, sender_id);
-      lk.unlock();
-      cv.notify_all();
+      ++num_sender_;
     }
   }));
 
   // wait until expected number of senders connected if blocking wait
-  std::unique_lock<std::mutex> cv_lk(cv_mtx);
-  cv.wait(cv_lk, [this, &num_sender]() { return num_sender_ == num_sender; });
+  while (blocking && (num_sender_ != num_sender)) {
+  }
   return true;
 }
 
@@ -279,7 +276,10 @@ STATUS SocketReceiver::RecvFrom(Message *msg, int sender_id) {
   // Get message from specified message queue
   std::unique_lock<std::mutex> lk(mtx_);
   if (msg_queue_.count(sender_id) == 0) {
-    LOG(FATAL) << "No message queue for sender_id: " << sender_id;
+    LOG(WARNING) << "No message queue for sender_id: " << sender_id
+                 << ". Try again or check if sender_id is correct.";
+    lk.unlock();
+    return QUEUE_NOT_FOUND;
   }
   auto mq = msg_queue_[sender_id];
   lk.unlock();
@@ -315,6 +315,7 @@ int64_t RecvDataSize(TCPSocket *socket) {
 
 void RecvData(TCPSocket *socket, char *buffer, const int64_t &data_size,
               int64_t *received_bytes) {
+  //CHECK_GE(data_size, 0);
   while (*received_bytes < data_size) {
     int64_t max_len = data_size - *received_bytes;
     int64_t tmp = socket->Receive(buffer + *received_bytes, max_len);
@@ -362,8 +363,13 @@ void SocketReceiver::RecvLoop(const int thread_id) {
         buffer = new char[data_size];
         received_bytes = 0;
       } else if (data_size == 0) {
+        LOG(WARNING)<<"-------- data_size is zero, not expected.....";
         // Received stop signal
         socket_pool.RemoveSocket(socket);
+        //continue;
+      }
+      else{
+        LOG(WARNING)<<"------ data_size:"<<data_size<<", expected, should remove socket???";
       }
     }
 
