@@ -173,8 +173,9 @@ class SocketReceiver : public Receiver {
    STATUS Recv(Message *msg, int *send_id);
 
    /*!
-    * \brief Recv data from a specified Sender. Actually removing data from
-    * msg_queue. \param msg pointer of data message \param send_id sender's ID
+    * \brief Recv data from a specified Sender. Actually removing data from msg_queue.
+    * \param msg pointer of data message
+    * \param send_id sender's ID
     * \return Status code
     *
     * (1) The RecvFrom() API is blocking, which will not
