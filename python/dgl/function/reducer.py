@@ -77,7 +77,7 @@ def _gen_reduce_builtin(reducer):
 
     def func(msg, out):
         return SimpleReduceFunction(reducer, msg, out)
-    func.__name__ = reducer
+    func.__name__ = """{0}""".format(reducer)
     func.__doc__ = docstring
     return func
 
