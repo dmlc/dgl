@@ -1,5 +1,6 @@
 import os
 import dgl
+import dgl.ops as OPS
 import backend as F
 import unittest
 import torch
@@ -291,18 +292,33 @@ def _check_device(data):
 def test_node_dataloader(sampler_name):
     g1 = dgl.graph(([0, 0, 0, 1, 1], [1, 2, 3, 3, 4]))
     g1.ndata['feat'] = F.copy_to(F.randn((5, 8)), F.cpu())
-    sampler = {
-        'full': dgl.dataloading.MultiLayerFullNeighborSampler(2),
-        'neighbor': dgl.dataloading.MultiLayerNeighborSampler([3, 3]),
-        'neighbor2': dgl.dataloading.MultiLayerNeighborSampler([3, 3]),
-        'shadow': dgl.dataloading.ShaDowKHopSampler([3, 3])}[sampler_name]
+    g1.ndata['label'] = F.copy_to(F.randn((g1.num_nodes(),)), F.cpu())
 
-    dataloader = dgl.dataloading.NodeDataLoader(
-        g1, g1.nodes(), sampler, device=F.ctx(), batch_size=g1.num_nodes())
-    for input_nodes, output_nodes, blocks in dataloader:
-        _check_device(input_nodes)
-        _check_device(output_nodes)
-        _check_device(blocks)
+    for load_input, load_output in [(None, None), ({'feat': g1.ndata['feat']}, {'label': g1.ndata['label']})]:
+        for async_load in [False, True]:
+            for num_workers in [0, 1, 2]:
+                sampler = {
+                    'full': dgl.dataloading.MultiLayerFullNeighborSampler(2),
+                    'neighbor': dgl.dataloading.MultiLayerNeighborSampler([3, 3]),
+                    'neighbor2': dgl.dataloading.MultiLayerNeighborSampler([3, 3]),
+                    'shadow': dgl.dataloading.ShaDowKHopSampler([3, 3])}[sampler_name]
+                dataloader = dgl.dataloading.NodeDataLoader(
+                    g1, g1.nodes(), sampler, device=F.ctx(),
+                    load_input=load_input,
+                    load_output=load_output,
+                    async_load=async_load,
+                    batch_size=g1.num_nodes(),
+                    num_workers=num_workers)
+                for input_nodes, output_nodes, blocks in dataloader:
+                    _check_device(input_nodes)
+                    _check_device(output_nodes)
+                    _check_device(blocks)
+                    if load_input:
+                        _check_device(blocks[0].srcdata['feat'])
+                        OPS.copy_u_sum(blocks[0], blocks[0].srcdata['feat'])
+                    if load_output:
+                        _check_device(blocks[-1].dstdata['label'])
+                        OPS.copy_u_sum(blocks[-1], blocks[-1].dstdata['label'])
 
     g2 = dgl.heterograph({
          ('user', 'follow', 'user'): ([0, 0, 0, 1, 1, 1, 2], [1, 2, 3, 0, 2, 3, 0]),
@@ -319,14 +335,24 @@ def test_node_dataloader(sampler_name):
         'neighbor2': dgl.dataloading.MultiLayerNeighborSampler([3, 3]),
         'shadow': dgl.dataloading.ShaDowKHopSampler([{etype: 3 for etype in g2.etypes}] * 2)}[sampler_name]
 
-    dataloader = dgl.dataloading.NodeDataLoader(
-        g2, {nty: g2.nodes(nty) for nty in g2.ntypes},
-        sampler, device=F.ctx(), batch_size=batch_size)
-    assert isinstance(iter(dataloader), Iterator)
-    for input_nodes, output_nodes, blocks in dataloader:
-        _check_device(input_nodes)
-        _check_device(output_nodes)
-        _check_device(blocks)
+    for async_load in [False, True]:
+        dataloader = dgl.dataloading.NodeDataLoader(
+            g2, {nty: g2.nodes(nty) for nty in g2.ntypes},
+            sampler, device=F.ctx(), async_load=async_load, batch_size=batch_size)
+        assert isinstance(iter(dataloader), Iterator)
+        for input_nodes, output_nodes, blocks in dataloader:
+            _check_device(input_nodes)
+            _check_device(output_nodes)
+            _check_device(blocks)
+
+    status = False
+    try:
+        dgl.dataloading.NodeDataLoader(
+            g2, {nty: g2.nodes(nty) for nty in g2.ntypes},
+            sampler, device=F.ctx(), load_input={'feat': g1.ndata['feat']}, batch_size=batch_size)
+    except dgl.DGLError:
+        status = True
+    assert status
 
 
 @pytest.mark.parametrize('sampler_name', ['full', 'neighbor', 'shadow'])
