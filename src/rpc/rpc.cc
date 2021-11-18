@@ -124,13 +124,14 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCReceiverWait")
   std::string ip = args[0];
   int port = args[1];
   int num_sender = args[2];
+  bool blocking = args[3];
   std::string addr;
   if (RPCContext::ThreadLocal()->receiver->Type() == "socket") {
     addr = StringPrintf("socket://%s:%d", ip.c_str(), port);
   } else {
     LOG(FATAL) << "Unknown communicator type: " << RPCContext::ThreadLocal()->receiver->Type();
   }
-  if (RPCContext::ThreadLocal()->receiver->Wait(addr.c_str(), num_sender) == false) {
+  if (RPCContext::ThreadLocal()->receiver->Wait(addr.c_str(), num_sender, blocking) == false) {
     LOG(FATAL) << "Wait sender socket failed.";
   }
 });

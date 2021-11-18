@@ -151,25 +151,27 @@ class SocketReceiver : public Receiver {
     * \brief Wait for all the Senders to connect
     * \param addr Networking address, e.g., 'socket://127.0.0.1:50051', 'mpi://0'
     * \param num_sender expected number of Senders but more than expected is supported
+    * \param blocking if true, blocks until expected number of Senders connected
     * \return True for success and False for fail
     *
     * Wait() is not thread-safe and only one thread can invoke this API. It's
     * non-blocking and wait until Finalize() is called explicitly.
     */
-    bool Wait(const char *addr, int num_sender) override;
+    bool Wait(const char *addr, const int num_sender,
+              const bool blocking = true) override;
 
-   /*!
-    * \brief Recv data from Sender. Actually removing data from msg_queue.
-    * \param msg pointer of data message
-    * \param send_id which sender current msg comes from
-    * \return Status code
-    *
-    * (1) The Recv() API is blocking, which will not
-    *     return until getting data from message queue.
-    * (2) The Recv() API is thread-safe.
-    * (3) Memory allocated by communicator but will not own it after the
-    * function returns.
-    */
+    /*!
+     * \brief Recv data from Sender. Actually removing data from msg_queue.
+     * \param msg pointer of data message
+     * \param send_id which sender current msg comes from
+     * \return Status code
+     *
+     * (1) The Recv() API is blocking, which will not
+     *     return until getting data from message queue.
+     * (2) The Recv() API is thread-safe.
+     * (3) Memory allocated by communicator but will not own it after the
+     * function returns.
+     */
     STATUS Recv(Message *msg, int *send_id);
 
    /*!

@@ -126,11 +126,13 @@ class Receiver {
    * \brief Wait for all the Senders to connect
    * \param addr Networking address, e.g., 'socket://127.0.0.1:50051', 'mpi://0'
    * \param num_sender total number of Senders
+   * \param blocking if true, blocks until expected number of Senders connected
    * \return True for success and False for fail
    *
    * Wait() is not thread-safe and only one thread can invoke this API.
    */
-  virtual bool Wait(const char* addr, int num_sender) = 0;
+  virtual bool Wait(const char *addr, const int num_sender,
+                    const bool blocking = true) = 0;
 
   /*!
    * \brief Recv data from Sender

@@ -10,6 +10,7 @@
 #include <vector>
 #include <fstream>
 #include <streambuf>
+#include <chrono>
 
 #include <stdlib.h>
 #include <time.h>
@@ -40,9 +41,15 @@ const char* ip_addr[] = {
 };
 
 static void start_client();
-static void start_server(int id);
+static void start_server(int id, const bool);
+static void send_and_recv(const bool);
 
 TEST(SocketCommunicatorTest, SendAndRecv) {
+  send_and_recv(true);
+  send_and_recv(false);
+}
+
+void send_and_recv(const bool blocking) {
   // start 10 client
   std::vector<std::thread*> client_thread;
   for (int i = 0; i < kNumSender; ++i) {
@@ -51,7 +58,7 @@ TEST(SocketCommunicatorTest, SendAndRecv) {
   // start 10 server
   std::vector<std::thread*> server_thread;
   for (int i = 0; i < kNumReceiver; ++i) {
-    server_thread.push_back(new std::thread(start_server, i));
+    server_thread.push_back(new std::thread(start_server, i, blocking));
   }
   for (int i = 0; i < kNumSender; ++i) {
     client_thread[i]->join();
@@ -88,10 +95,11 @@ void start_client() {
   sender.Finalize();
 }
 
-void start_server(int id) {
-  sleep(5);
+void start_server(int id, const bool blocking = true) {
   SocketReceiver receiver(kQueueSize, kThreadNum);
-  receiver.Wait(ip_addr[id], kNumSender);
+  receiver.Wait(ip_addr[id], kNumSender, blocking);
+  // wait for senders connections and msgs
+  std::this_thread::sleep_for(std::chrono::seconds(5));
   for (int i = 0; i < kNumMessage; ++i) {
     for (int n = 0; n < kNumSender; ++n) {
       Message msg;

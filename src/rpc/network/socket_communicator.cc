@@ -10,6 +10,7 @@
 #include <time.h>
 #include <memory>
 #include <algorithm>
+#include <condition_variable>
 
 #include "socket_communicator.h"
 #include "../../c_api_common.h"
@@ -187,7 +188,7 @@ void SocketSender::SendLoop(
 
 /////////////////////////////////////// SocketReceiver ///////////////////////////////////////////
 
-bool SocketReceiver::Wait(const char *addr, int num_sender) {
+bool SocketReceiver::Wait(const char *addr, const int num_sender, const bool blocking) {
   CHECK_NOTNULL(addr);
   const auto &ip_port = ParseAddress(addr);
   const auto &ip = ip_port.first;
@@ -219,7 +220,9 @@ bool SocketReceiver::Wait(const char *addr, int num_sender) {
         &SocketReceiver::RecvLoop, this, thread_id));
   }
 
-  threads_.emplace_back(std::make_shared<std::thread>([this]() {
+  std::condition_variable cv;
+  std::mutex cv_mtx;
+  threads_.emplace_back(std::make_shared<std::thread>([this, &cv]() {
     server_socket_->SetNonBlocking(true);
     std::string accept_ip;
     int accept_port;
@@ -238,9 +241,13 @@ bool SocketReceiver::Wait(const char *addr, int num_sender) {
       recv_contexts_[sender_id] = recv_ctx;
       socket_pool_[thread_id].AddSocket(accept_socket, sender_id);
       lk.unlock();
+      cv.notify_all();
     }
   }));
 
+  // wait until expected number of senders connected if blocking wait
+  std::unique_lock<std::mutex> cv_lk(cv_mtx);
+  cv.wait(cv_lk, [this, &num_sender]() { return num_sender_ == num_sender; });
   return true;
 }
 
