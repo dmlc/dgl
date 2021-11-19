@@ -315,7 +315,7 @@ int64_t RecvDataSize(TCPSocket *socket) {
 
 void RecvData(TCPSocket *socket, char *buffer, const int64_t &data_size,
               int64_t *received_bytes) {
-  //CHECK_GE(data_size, 0);
+  CHECK_GT(data_size, 0);
   while (*received_bytes < data_size) {
     int64_t max_len = data_size - *received_bytes;
     int64_t tmp = socket->Receive(buffer + *received_bytes, max_len);
@@ -363,13 +363,12 @@ void SocketReceiver::RecvLoop(const int thread_id) {
         buffer = new char[data_size];
         received_bytes = 0;
       } else if (data_size == 0) {
-        LOG(WARNING)<<"-------- data_size is zero, not expected.....";
         // Received stop signal
         socket_pool.RemoveSocket(socket);
-        //continue;
-      }
-      else{
-        LOG(WARNING)<<"------ data_size:"<<data_size<<", expected, should remove socket???";
+        continue;
+      } else {
+        // already closed socket
+        continue;
       }
     }
 
