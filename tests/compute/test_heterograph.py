@@ -2751,8 +2751,12 @@ def test_heterograph_update(idtype):
     g1.update(g2)
 
     #Check g2's edges and nodes were added to g1's.
-    assert all(g1.edges()[0][g1_n_edges:] == g2.edges()[0])
-    assert all(g1.edges()[1][g1_n_edges:] == g2.edges()[1])
+    g1_us = F.asnumpy(g1.edges()[0][g1_n_edges:])
+    g2_us = F.asnumpy(g2.edges()[0])
+    assert all(g1_us == g2_us)
+    g1_vs = F.asnumpy(g1.edges()[1][g1_n_edges:])
+    g2_vs = F.asnumpy(g2.edges()[1])
+    assert all(g1_vs == g2_vs)
     for ntype in g1.ntypes:
         assert g1.num_nodes(ntype=ntype) == max(
             g1.num_nodes(ntype=ntype), g2.num_nodes(ntype=ntype)
