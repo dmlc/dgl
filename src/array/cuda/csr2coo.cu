@@ -7,9 +7,6 @@
 #include "../../runtime/cuda/cuda_common.h"
 #include "./utils.h"
 
-#include <chrono>
-using namespace std::chrono;
-
 namespace dgl {
 
 using runtime::NDArray;
