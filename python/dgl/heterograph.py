@@ -817,6 +817,73 @@ class DGLHeteroGraph(object):
         self._batch_num_nodes = None
         self._batch_num_edges = None
 
+    def update(self, other):
+        r"""Update the graph with other's nodes and edges.
+
+        Nodes and edges that exist in other but not in self will be
+        added to self along with their data. Nodes that exist in
+        both self and other will be updated with other's data if
+        necessary.
+
+        Parameters
+        ----------
+        other : DGLGraph
+
+        Notes
+        ----------
+        * Inplace update is applied to the current graph.
+        * Features that exist in other will be created in self
+          if they do not already exist.
+
+        Examples
+        ----------
+
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+        >>> g = dgl.graph((torch.tensor([0,1]), torch.tensor([2,3])))
+        >>> g.ndata["x"] = torch.zeros(4)
+        >>> h = dgl.graph((torch.tensor([1,2]), torch.tensor([0,4])))
+        >>> h.ndata["x"] = torch.ones(5)
+        >>> g.update(h)
+
+        ``g`` now contains edges and nodes from ``h``.
+        >>> g.edges()
+        (tensor([0, 1, 1, 2]), tensor([2, 3, 0, 4]))
+        >>> g.nodes()
+        tensor([0, 1, 2, 3, 4])
+
+        ``g``'s data has been updated with ``h``'s.
+        >>> g.ndata["x"]
+        tensor([1., 1., 1., 1., 1.])
+        
+        See Also
+        ----------
+        add_nodes
+        add_edges
+        """
+
+        #Add edges, edge data, and non-isolated nodes.
+        for etype in self.canonical_etypes:
+            other_etype_id = other.get_etype_id(etype)
+            other_edges = other.edges(etype = etype)
+            other_edge_data = other._edge_frames[other_etype_id]
+            self.add_edges(*other_edges, other_edge_data, etype)
+
+        #Add node data and isolated nodes.
+        for ntype in self.ntypes:
+            self_ntype_id = self.get_ntype_id(ntype)
+            other_ntype_id = other.get_ntype_id(ntype)
+            other_ndata = other._node_frames[other_ntype_id]
+            node_diff = (other.num_nodes(ntype = ntype) -
+                         self.num_nodes(ntype = ntype))
+            n_extra_nodes = max(0, node_diff)
+            self.add_nodes(n_extra_nodes, ntype = ntype)
+            other_nodes = F.arange(0, other.num_nodes(ntype = ntype))
+            self._node_frames[self_ntype_id].update_row(
+                other_nodes, other_ndata
+            )
 
     #################################################################
     # Metagraph query
