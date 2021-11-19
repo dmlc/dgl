@@ -1,9 +1,25 @@
+##
+#   Copyright 2019-2021 Contributors
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+#
 """Module for graph transformation utilities."""
 
 from collections.abc import Iterable, Mapping
 from collections import defaultdict
 import numpy as np
-from scipy import sparse
+import scipy.sparse as sparse
+import scipy.sparse.linalg
 
 from ._ffi.function import _init_api
 from .base import dgl_warning, DGLError
@@ -53,7 +69,7 @@ __all__ = [
     'as_heterograph',
     'adj_product_graph',
     'adj_sum_graph',
-    'reorder'
+    'reorder_graph'
     ]
 
 
@@ -122,7 +138,7 @@ def knn_graph(x, k, algorithm='bruteforce-blas', dist='euclidean'):
           This method is suitable for low-dimensional data (e.g. 3D
           point clouds)
 
-        * 'nn-descent' is a approximate approach from paper
+        * 'nn-descent' is an approximate approach from paper
           `Efficient k-nearest neighbor graph construction for generic similarity
           measures <https://www.cs.princeton.edu/cass/papers/www11.pdf>`_. This method
           will search for nearest neighbor candidates in "neighbors' neighbors".
@@ -138,7 +154,7 @@ def knn_graph(x, k, algorithm='bruteforce-blas', dist='euclidean'):
     Returns
     -------
     DGLGraph
-        The constructred graph. The node IDs are in the same order as :attr:`x`.
+        The constructed graph. The node IDs are in the same order as :attr:`x`.
 
     Examples
     --------
@@ -156,7 +172,7 @@ def knn_graph(x, k, algorithm='bruteforce-blas', dist='euclidean'):
     ...                   [0.3, 0.2, 0.4]])
     >>> knn_g = dgl.knn_graph(x, 2)  # Each node has two predecessors
     >>> knn_g.edges()
-    >>> (tensor([0, 1, 2, 2, 2, 3, 3, 3]), tensor([0, 1, 1, 2, 3, 0, 2, 3]))
+    (tensor([0, 1, 2, 2, 2, 3, 3, 3]), tensor([0, 1, 1, 2, 3, 0, 2, 3]))
 
     When :attr:`x` is a 3D tensor, DGL constructs multiple KNN graphs and
     and then composes them into a graph of multiple connected components.
@@ -297,7 +313,7 @@ def segmented_knn_graph(x, k, segs, algorithm='bruteforce-blas', dist='euclidean
           This method is suitable for low-dimensional data (e.g. 3D
           point clouds)
 
-        * 'nn-descent' is a approximate approach from paper
+        * 'nn-descent' is an approximate approach from paper
           `Efficient k-nearest neighbor graph construction for generic similarity
           measures <https://www.cs.princeton.edu/cass/papers/www11.pdf>`_. This method
           will search for nearest neighbor candidates in "neighbors' neighbors".
@@ -533,7 +549,7 @@ def knn(k, x, x_segs, y=None, y_segs=None, algorithm='bruteforce', dist='euclide
           This method is suitable for low-dimensional data (e.g. 3D
           point clouds)
 
-        * 'nn-descent' is a approximate approach from paper
+        * 'nn-descent' is an approximate approach from paper
           `Efficient k-nearest neighbor graph construction for generic similarity
           measures <https://www.cs.princeton.edu/cass/papers/www11.pdf>`_. This method
           will search for nearest neighbor candidates in "neighbors' neighbors".
@@ -1288,8 +1304,8 @@ def laplacian_lambda_max(g):
         adj = g_i.adj(transpose=True, scipy_fmt=g_i.formats()['created'][0]).astype(float)
         norm = sparse.diags(F.asnumpy(g_i.in_degrees()).clip(1) ** -0.5, dtype=float)
         laplacian = sparse.eye(n) - norm * adj * norm
-        rst.append(sparse.linalg.eigs(laplacian, 1, which='LM',
-                                      return_eigenvectors=False)[0].real)
+        rst.append(scipy.sparse.linalg.eigs(
+            laplacian, 1, which='LM', return_eigenvectors=False)[0].real)
     return rst
 
 def metapath_reachable_graph(g, metapath):
@@ -1627,7 +1643,7 @@ def remove_edges(g, eids, etype=None, store_ids=False):
     ...     })
     >>> g = dgl.remove_edges(g, torch.tensor([0, 1]), 'plays')
     >>> g.edges('all', etype='plays')
-    (tensor([0, 1]), tensor([0, 0]), tensor([0, 1]))
+    (tensor([1, 2]), tensor([1, 1]), tensor([0, 1]))
 
     See Also
     --------
@@ -1898,7 +1914,7 @@ def compact_graphs(graphs, always_preserve=None, copy_ndata=True, copy_edata=Tru
     graphs : DGLGraph or list[DGLGraph]
         The graph, or list of graphs.
 
-        All graphs must be on CPU.
+        All graphs must be on the same devices.
 
         All graphs must have the same set of nodes.
     always_preserve : Tensor or dict[str, Tensor], optional
@@ -1998,7 +2014,6 @@ def compact_graphs(graphs, always_preserve=None, copy_ndata=True, copy_edata=Tru
         return []
     if graphs[0].is_block:
         raise DGLError('Compacting a block graph is not allowed.')
-    assert all(g.device == F.cpu() for g in graphs), 'all the graphs must be on CPU'
 
     # Ensure the node types are ordered the same.
     # TODO(BarclayII): we ideally need to remove this constraint.
@@ -2011,8 +2026,8 @@ def compact_graphs(graphs, always_preserve=None, copy_ndata=True, copy_edata=Tru
              ntypes, g.ntypes)
         assert idtype == g.idtype, "Expect graph data type to be {}, but got {}".format(
             idtype, g.idtype)
-        assert device == g.device, "Expect graph device to be {}, but got {}".format(
-            device, g.device)
+        assert device == g.device, "All graphs must be on the same devices." \
+            "Expect graph device to be {}, but got {}".format(device, g.device)
 
     # Process the dictionary or tensor of "always preserve" nodes
     if always_preserve is None:
@@ -2053,7 +2068,7 @@ def compact_graphs(graphs, always_preserve=None, copy_ndata=True, copy_edata=Tru
 
     return new_graphs
 
-def to_block(g, dst_nodes=None, include_dst_in_src=True):
+def to_block(g, dst_nodes=None, include_dst_in_src=True, src_nodes=None):
     """Convert a graph into a bipartite-structured *block* for message passing.
 
     A block is a graph consisting of two sets of nodes: the
@@ -2088,6 +2103,12 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
         If False, do not include destination nodes in source nodes.
 
         (Default: True)
+
+    src_nodes : Tensor or disct[str, Tensor], optional
+        The list of source nodes (and prefixed by destination nodes if
+        `include_dst_in_src` is True).
+
+        If a tensor is given, the graph must have only one node type.
 
     Returns
     -------
@@ -2215,15 +2236,36 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True):
         if g._graph.ctx != d.ctx:
             raise ValueError('g and dst_nodes need to have the same context.')
 
-    new_graph_index, src_nodes_nd, induced_edges_nd = _CAPI_DGLToBlock(
-        g._graph, dst_node_ids_nd, include_dst_in_src)
+    src_node_ids = None
+    src_node_ids_nd = None
+    if src_nodes is not None and not isinstance(src_nodes, Mapping):
+        # src_nodes is a Tensor, check if the g has only one type.
+        if len(g.ntypes) > 1:
+            raise DGLError(
+                'Graph has more than one node type; please specify a dict for src_nodes.')
+        src_nodes = {g.ntypes[0]: src_nodes}
+        src_node_ids = [
+            F.copy_to(F.tensor(src_nodes.get(ntype, []), dtype=g._idtype_str), \
+                F.to_backend_ctx(g._graph.ctx)) \
+            for ntype in g.ntypes]
+        src_node_ids_nd = [F.to_dgl_nd(nodes) for nodes in src_node_ids]
+
+        for d in src_node_ids_nd:
+            if g._graph.ctx != d.ctx:
+                raise ValueError('g and src_nodes need to have the same context.')
+    else:
+        # use an empty list to signal we need to generate it
+        src_node_ids_nd = []
+
+    new_graph_index, src_nodes_ids_nd, induced_edges_nd = _CAPI_DGLToBlock(
+        g._graph, dst_node_ids_nd, include_dst_in_src, src_node_ids_nd)
 
     # The new graph duplicates the original node types to SRC and DST sets.
     new_ntypes = (g.ntypes, g.ntypes)
     new_graph = DGLBlock(new_graph_index, new_ntypes, g.etypes)
     assert new_graph.is_unibipartite  # sanity check
 
-    src_node_ids = [F.from_dgl_nd(src) for src in src_nodes_nd]
+    src_node_ids = [F.from_dgl_nd(src) for src in src_nodes_ids_nd]
     edge_ids = [F.from_dgl_nd(eid) for eid in induced_edges_nd]
 
     node_frames = utils.extract_node_subframes_for_block(g, src_node_ids, dst_node_ids)
@@ -2536,14 +2578,19 @@ def adj_product_graph(A, B, weight_name, etype='_E'):
     >>> B = dgl.heterograph({
     ...     ('B', 'BA', 'A'): ([0, 3, 2, 1, 3, 3], [1, 2, 0, 2, 1, 0])},
     ...     num_nodes_dict={'A': 3, 'B': 4})
-    >>> A.edata['w'] = torch.randn(6).requires_grad_()
-    >>> B.edata['w'] = torch.randn(6).requires_grad_()
 
     If your graph is a multigraph, you will need to call :func:`dgl.to_simple`
     to convert it into a simple graph first.
 
     >>> A = dgl.to_simple(A)
     >>> B = dgl.to_simple(B)
+
+    Initialize learnable edge weights.
+
+    >>> A.edata['w'] = torch.randn(6).requires_grad_()
+    >>> B.edata['w'] = torch.randn(6).requires_grad_()
+
+    Take the product.
 
     >>> C = dgl.adj_product_graph(A, B, 'w')
     >>> C.edges()
@@ -2660,11 +2707,18 @@ def adj_sum_graph(graphs, weight_name):
     >>> A.edata['w'] = torch.randn(6).requires_grad_()
     >>> B.edata['w'] = torch.randn(6).requires_grad_()
 
-    If your graph is a multigraph, you will need to call :func:`dgl.to_simple`
+    If your graph is a multigraph, call :func:`dgl.to_simple`
     to convert it into a simple graph first.
 
     >>> A = dgl.to_simple(A)
     >>> B = dgl.to_simple(B)
+
+    Initialize learnable edge weights.
+
+    >>> A.edata['w'] = torch.randn(6).requires_grad_()
+    >>> B.edata['w'] = torch.randn(6).requires_grad_()
+
+    Take the sum.
 
     >>> C = dgl.adj_sum_graph([A, B], 'w')
     >>> C.edges()
@@ -2902,52 +2956,59 @@ def sort_csc_by_tag(g, tag, tag_offset_name='_TAG_OFFSET'):
     return new_g
 
 
-def reorder(g, permute_algo='rcmk', store_ids=True, permute_config=None):
-    r"""Return a new graph which re-order and re-label the nodes
+def reorder_graph(g, node_permute_algo='rcmk', edge_permute_algo='src',
+                  store_ids=True, permute_config=None):
+    r"""Return a new graph with nodes and edges re-ordered/re-labeled
     according to the specified permute algorithm.
 
     Support homogeneous graph only for the moment.
 
-    This API is basically implemented by leveraging :func:`~dgl.node_subgraph`,
-    so the function signature is similar and raw IDs could be stored
-    in ``dgl.NID`` and ``dgl.EID``.
+    The re-ordering has two 2 steps: first re-order nodes and then re-order edges.
 
-    Please note that edges are re-ordered/re-labeled according to re-ordered
-    ``'src'`` nodes. This behavior is realized in :func:`dgl.node_subgraph`.
-    What's more, if user wants to re-order/re-label according to ``'dst'`` nodes
-    or any other algorithms, please use :func:`dgl.edge_subgraph` with new edge
-    permutation.
+    For node permutation, users can re-order by the :attr:`node_permute_algo`
+    argument. For edge permutation, user can re-arrange edges according to their
+    source nodes or destination nodes by the :attr:`edge_permute_algo` argument.
+    Some of the permutation algorithms are only implemented in CPU, so if the
+    input graph is on GPU, it will be copied to CPU first. The storage order of
+    the node and edge features in the graph are permuted accordingly.
 
     Parameters
     ----------
     g : DGLGraph
         The homogeneous graph.
-    permute_algo: str, optional
-        can be ``'rcmk'`` or ``'metis'`` or ``'custom'``. ``'rcmk'`` is the default value.
+    node_permute_algo: str, optional
+        The permutation algorithm to re-order nodes. Options are ``rcmk`` or
+        ``metis`` or ``custom``. ``rcmk`` is the default value.
 
-        * ``'rcmk'``: Call `Reverse Cuthill–McKee <https://docs.scipy.org/doc/scipy/reference/
+        * ``rcmk``: Use the `Reverse Cuthill–McKee <https://docs.scipy.org/doc/scipy/reference/
           generated/scipy.sparse.csgraph.reverse_cuthill_mckee.html#
-          scipy-sparse-csgraph-reverse-cuthill-mckee>`__ from ``'scipy'`` to generate nodes
-          permutation and pass it into :func:`~dgl.node_subgraph` to generate new graph.
-        * ``'metis'``: Call :func:`~dgl.partition.metis_partition_assignment` from ``'DGL'``
-          to generate nodes permutation and pass it into :func:`~dgl.node_subgraph` to generate
-          new graph.
-        * ``'custom'``: This enables user to pass in self-designed reorder algorithm.
-          User should pass in ``'nodes_perm'`` via another argument :attr:`permute_config` with
-          ``'custom'`` is specified here. By this way, can the graph be reordered according to
-          passed in nodes permutation.
-    store_ids: bool, optional
-        It is passed into :func:`~dgl.node_subgraph()`. If True, it will store
-        the raw IDs of the extracted nodes and edges in the ndata and edata of
-        the resulting graph under name ``'dgl.NID'`` and ``'dgl.EID'``, respectively.
-    permute_config: dict, optional
-        Additional config data for specified :attr:`permute_algo`.
+          scipy-sparse-csgraph-reverse-cuthill-mckee>`__ from ``scipy`` to generate nodes
+          permutation.
+        * ``metis``: Use the :func:`~dgl.metis_partition_assignment` function
+          to partition the input graph, which gives a cluster assignment of each node.
+          DGL then sorts the assignment array so the new node order will put nodes of
+          the same cluster together. Please note that the generated nodes permutation
+          of ``metis`` is non-deterministic due to algorithm's nature.
+        * ``custom``: Reorder the graph according to the user-provided node permutation
+          array (provided in :attr:`permute_config`).
+    edge_permute_algo: str, optional
+        The permutation algorithm to reorder edges. Options are ``src`` or ``dst``.
+        ``src`` is the default value.
 
-        * For ``'rcmk'``, this argument is not required.
-        * For ``'metis'``, partition part number ``'k'`` is required and specified in this
-          argument like this: {'k':10}.
-        * For ``'custom'``, ``'nodes_perm'`` should be specified in the format of
-          ``'Int Tensor'`` or ``'iterable[int]'`` like :attr:`nodes` in :func:`~dgl.node_subgraph`.
+        * ``src``: Edges are arranged according to their source nodes.
+        * ``dst``: Edges are arranged according to their destination nodes.
+    store_ids: bool, optional
+        If True, DGL will store the original node and edge IDs in the ndata and edata
+        of the resulting graph under name ``dgl.NID`` and ``dgl.EID``, respectively.
+    permute_config: dict, optional
+        Additional key-value config data for the specified permutation algorithm.
+
+        * For ``rcmk``, this argument is not required.
+        * For ``metis``, users should specify the number of partitions ``k`` (e.g.,
+          ``permute_config={'k':10}`` to partition the graph to 10 clusters).
+        * For ``custom``, users should provide a node permutation array ``nodes_perm``.
+          The array must be an integer list or a tensor with the same device of the
+          input graph.
 
     Returns
     -------
@@ -2976,7 +3037,7 @@ def reorder(g, permute_algo='rcmk', store_ids=True, permute_config=None):
 
     Reorder according to ``'rcmk'`` permute algorithm.
 
-    >>> rg = dgl.reorder(g)
+    >>> rg = dgl.reorder_graph(g)
     >>> rg.ndata
     {'h': tensor([[8, 9],
             [6, 7],
@@ -2990,9 +3051,9 @@ def reorder(g, permute_algo='rcmk', store_ids=True, permute_config=None):
             [2],
             [0]]), '_ID': tensor([4, 3, 1, 2, 0])}
 
-    Reorder with according to ``'metis'`` permute algorithm.
+    Reorder according to ``'metis'`` permute algorithm.
 
-    >>> rg = dgl.reorder(g, 'metis', permute_config={'k':2})
+    >>> rg = dgl.reorder_graph(g, 'metis', permute_config={'k':2})
     >>> rg.ndata
     {'h': tensor([[4, 5],
             [2, 3],
@@ -3011,7 +3072,7 @@ def reorder(g, permute_algo='rcmk', store_ids=True, permute_config=None):
     >>> nodes_perm = torch.randperm(g.num_nodes())
     >>> nodes_perm
     tensor([3, 2, 0, 4, 1])
-    >>> rg = dgl.reorder(g, 'custom', permute_config={'nodes_perm':nodes_perm})
+    >>> rg = dgl.reorder_graph(g, 'custom', permute_config={'nodes_perm':nodes_perm})
     >>> rg.ndata
     {'h': tensor([[6, 7],
             [4, 5],
@@ -3025,16 +3086,38 @@ def reorder(g, permute_algo='rcmk', store_ids=True, permute_config=None):
             [4],
             [1]]), '_ID': tensor([3, 2, 0, 4, 1])}
 
+    Reorder according to ``dst`` edge permute algorithm and refine further
+    according to self-generated edges permutation. Please assure to specify
+    ``relabel_nodes`` as ``False`` to keep the nodes order.
+
+    >>> rg = dgl.reorder_graph(g, edge_permute_algo='dst')
+    >>> rg.edges()
+    (tensor([0, 3, 1, 2, 4]), tensor([1, 1, 3, 3, 3]))
+    >>> eg = dgl.edge_subgraph(rg, [0, 2, 4, 1, 3], relabel_nodes=False)
+    >>> eg.edata
+    {'w': tensor([[4],
+            [3],
+            [0],
+            [2],
+            [1]]), '_ID': tensor([0, 2, 4, 1, 3])}
+
     """
+    # sanity checks
     if not g.is_homogeneous:
         raise DGLError("Homograph is supported only.")
-    expected_algo = ['rcmk', 'metis', 'custom']
-    if permute_algo not in expected_algo:
-        raise DGLError("Unexpected permute_algo is specified: {}. Expected algos: {}".format(
-            permute_algo, expected_algo))
-    if permute_algo == 'rcmk':
+    expected_node_algo = ['rcmk', 'metis', 'custom']
+    if node_permute_algo not in expected_node_algo:
+        raise DGLError("Unexpected node_permute_algo is specified: {}. Expected algos: {}".format(
+            node_permute_algo, expected_node_algo))
+    expected_edge_algo = ['src', 'dst']
+    if edge_permute_algo not in expected_edge_algo:
+        raise DGLError("Unexpected edge_permute_algo is specified: {}. Expected algos: {}".format(
+            edge_permute_algo, expected_edge_algo))
+
+    # generate nodes permutation
+    if node_permute_algo == 'rcmk':
         nodes_perm = rcmk_perm(g)
-    elif permute_algo == 'metis':
+    elif node_permute_algo == 'metis':
         if permute_config is None or 'k' not in permute_config:
             raise DGLError(
                 "Partition parts 'k' is required for metis. Please specify in permute_config.")
@@ -3048,10 +3131,24 @@ def reorder(g, permute_algo='rcmk', store_ids=True, permute_config=None):
         if len(nodes_perm) != g.num_nodes():
             raise DGLError("Length of passed in nodes_perm[{}] does not \
                     match graph num_nodes[{}].".format(len(nodes_perm), g.num_nodes()))
-    return subgraph.node_subgraph(g, nodes_perm, store_ids=store_ids)
+
+    # reorder nodes
+    rg = subgraph.node_subgraph(g, nodes_perm, store_ids=store_ids)
+
+    # reorder edges
+    if edge_permute_algo == 'src':
+        # the output graph of dgl.node_subgraph() is ordered/labeled
+        # according to src already. Nothing needs to do.
+        pass
+    elif edge_permute_algo == 'dst':
+        edges_perm = np.argsort(F.asnumpy(rg.edges()[1]))
+        rg = subgraph.edge_subgraph(
+            rg, edges_perm, relabel_nodes=False, store_ids=store_ids)
+
+    return rg
 
 
-DGLHeteroGraph.reorder = utils.alias_func(reorder)
+DGLHeteroGraph.reorder_graph = utils.alias_func(reorder_graph)
 
 
 def metis_perm(g, k):

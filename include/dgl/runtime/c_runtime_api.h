@@ -33,7 +33,7 @@
 #endif
 
 // DGL version
-#define DGL_VERSION "0.7"
+#define DGL_VERSION "0.8"
 
 
 // DGL Runtime is DLPack compatible.
@@ -517,6 +517,16 @@ DGL_DLL int DGLStreamFree(int device_type, int device_id, DGLStreamHandle stream
 DGL_DLL int DGLSetStream(int device_type, int device_id, DGLStreamHandle handle);
 
 /*!
+ * \brief Get the runtime stream of current thread.
+ *
+ * \param device_type The device type of context
+ * \param device_id The device id of context.
+ * \param handle The stream handle.
+ * \return 0 when success, -1 when failure happens
+ */
+DGL_DLL int DGLGetStream(int device_type, int device_id, DGLStreamHandle* handle);
+
+/*!
  * \brief Wait until all computations on stream completes.
  *
  * \param device_type The device type of context
@@ -545,6 +555,16 @@ DGL_DLL int DGLStreamStreamSynchronize(int device_type,
  * \return 0 when success, -1 when failure happens.
  */
 DGL_DLL int DGLLoadTensorAdapter(const char *path);
+
+/*!
+ * \brief Pin host memory.
+ */
+int DGLArrayPinData(DGLArrayHandle handle, DLContext ctx);
+
+/*!
+ * \brief Unpin host memory.
+ */
+int DGLArrayUnpinData(DGLArrayHandle handle, DLContext ctx);
 
 /*!
  * \brief Bug report macro.

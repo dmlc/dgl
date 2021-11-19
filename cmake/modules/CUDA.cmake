@@ -169,7 +169,7 @@ function(dgl_select_nvcc_arch_flags out_variable)
 endfunction()
 
 ################################################################################################
-# Short command for cuda comnpilation
+# Short command for cuda compilation
 # Usage:
 #   dgl_cuda_compile(<objlist_variable> <cuda_files>)
 macro(dgl_cuda_compile objlist_variable)
@@ -238,6 +238,8 @@ macro(dgl_config_cuda out_variable)
   file(GLOB_RECURSE DGL_CUDA_SRC
     src/array/cuda/*.cc
     src/array/cuda/*.cu
+    src/array/cuda/uvm/*.cc
+    src/array/cuda/uvm/*.cu
     src/kernel/cuda/*.cc
     src/kernel/cuda/*.cu
     src/partition/cuda/*.cu

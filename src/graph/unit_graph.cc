@@ -149,10 +149,11 @@ class UnitGraph::COO : public BaseHeteroGraph {
     return ret;
   }
 
-  COO CopyTo(const DLContext& ctx) const {
+  COO CopyTo(const DLContext &ctx,
+             const DGLStreamHandle &stream = nullptr) const {
     if (Context() == ctx)
       return *this;
-    return COO(meta_graph_, adj_.CopyTo(ctx));
+    return COO(meta_graph_, adj_.CopyTo(ctx, stream));
   }
 
   bool IsMultigraph() const override {
@@ -537,11 +538,12 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     }
   }
 
-  CSR CopyTo(const DLContext& ctx) const {
+  CSR CopyTo(const DLContext &ctx,
+             const DGLStreamHandle &stream = nullptr) const {
     if (Context() == ctx) {
       return *this;
     } else {
-      return CSR(meta_graph_, adj_.CopyTo(ctx));
+      return CSR(meta_graph_, adj_.CopyTo(ctx, stream));
     }
   }
 
@@ -998,30 +1000,38 @@ EdgeArray UnitGraph::Edges(dgl_type_t etype, const std::string &order) const {
 uint64_t UnitGraph::InDegree(dgl_type_t etype, dgl_id_t vid) const {
   SparseFormat fmt = SelectFormat(CSC_CODE);
   const auto ptr = GetFormat(fmt);
-  if (fmt == SparseFormat::kCSC)
-    return ptr->OutDegree(etype, vid);
-  else
-    return ptr->InDegree(etype, vid);
+  CHECK(fmt == SparseFormat::kCSC || fmt == SparseFormat::kCOO)
+      << "In degree cannot be computed as neither CSC nor COO format is "
+         "allowed for this graph. Please enable one of them at least.";
+  return fmt == SparseFormat::kCSC ? ptr->OutDegree(etype, vid)
+                                   : ptr->InDegree(etype, vid);
 }
 
 DegreeArray UnitGraph::InDegrees(dgl_type_t etype, IdArray vids) const {
   SparseFormat fmt = SelectFormat(CSC_CODE);
   const auto ptr = GetFormat(fmt);
-  if (fmt == SparseFormat::kCSC)
-    return ptr->OutDegrees(etype, vids);
-  else
-    return ptr->InDegrees(etype, vids);
+  CHECK(fmt == SparseFormat::kCSC || fmt == SparseFormat::kCOO)
+      << "In degree cannot be computed as neither CSC nor COO format is "
+         "allowed for this graph. Please enable one of them at least.";
+  return fmt == SparseFormat::kCSC ? ptr->OutDegrees(etype, vids)
+                                   : ptr->InDegrees(etype, vids);
 }
 
 uint64_t UnitGraph::OutDegree(dgl_type_t etype, dgl_id_t vid) const {
   SparseFormat fmt = SelectFormat(CSR_CODE);
   const auto ptr = GetFormat(fmt);
+  CHECK(fmt == SparseFormat::kCSR || fmt == SparseFormat::kCOO)
+      << "Out degree cannot be computed as neither CSR nor COO format is "
+         "allowed for this graph. Please enable one of them at least.";
   return ptr->OutDegree(etype, vid);
 }
 
 DegreeArray UnitGraph::OutDegrees(dgl_type_t etype, IdArray vids) const {
   SparseFormat fmt = SelectFormat(CSR_CODE);
   const auto ptr = GetFormat(fmt);
+  CHECK(fmt == SparseFormat::kCSR || fmt == SparseFormat::kCOO)
+      << "Out degree cannot be computed as neither CSR nor COO format is "
+         "allowed for this graph. Please enable one of them at least.";
   return ptr->OutDegrees(etype, vids);
 }
 
@@ -1232,18 +1242,22 @@ HeteroGraphPtr UnitGraph::AsNumBits(HeteroGraphPtr g, uint8_t bits) {
   }
 }
 
-HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DLContext& ctx) {
+HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DLContext &ctx,
+                                 const DGLStreamHandle &stream) {
   if (ctx == g->Context()) {
     return g;
   } else {
     auto bg = std::dynamic_pointer_cast<UnitGraph>(g);
     CHECK_NOTNULL(bg);
-    CSRPtr new_incsr =
-      (bg->in_csr_->defined())? CSRPtr(new CSR(bg->in_csr_->CopyTo(ctx))) : nullptr;
-    CSRPtr new_outcsr =
-      (bg->out_csr_->defined())? CSRPtr(new CSR(bg->out_csr_->CopyTo(ctx))) : nullptr;
-    COOPtr new_coo =
-      (bg->coo_->defined())? COOPtr(new COO(bg->coo_->CopyTo(ctx))) : nullptr;
+    CSRPtr new_incsr = (bg->in_csr_->defined())
+                           ? CSRPtr(new CSR(bg->in_csr_->CopyTo(ctx, stream)))
+                           : nullptr;
+    CSRPtr new_outcsr = (bg->out_csr_->defined())
+                            ? CSRPtr(new CSR(bg->out_csr_->CopyTo(ctx, stream)))
+                            : nullptr;
+    COOPtr new_coo = (bg->coo_->defined())
+                         ? COOPtr(new COO(bg->coo_->CopyTo(ctx, stream)))
+                         : nullptr;
     return HeteroGraphPtr(
         new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, new_coo, bg->formats_));
   }

@@ -4,6 +4,7 @@
  * \brief CSR sorting
  */
 #include <dgl/array.h>
+#include <dgl/runtime/parallel_for.h>
 #include <numeric>
 #include <algorithm>
 #include <vector>
@@ -48,16 +49,14 @@ void CSRSort_(CSRMatrix* csr) {
     csr->data = aten::Range(0, nnz, csr->indptr->dtype.bits, csr->indptr->ctx);
   }
   IdType* eid_data = static_cast<IdType*>(csr->data->data);
-#pragma omp parallel
-  {
-    std::vector<ShufflePair> reorder_vec;
-#pragma omp for
-    for (int64_t row = 0; row < num_rows; row++) {
+
+  runtime::parallel_for(0, num_rows, [=](size_t b, size_t e) {
+    for (auto row = b; row < e; ++row) {
       const int64_t num_cols = indptr_data[row + 1] - indptr_data[row];
+      std::vector<ShufflePair> reorder_vec(num_cols);
       IdType *col = indices_data + indptr_data[row];
       IdType *eid = eid_data + indptr_data[row];
 
-      reorder_vec.resize(num_cols);
       for (int64_t i = 0; i < num_cols; i++) {
         reorder_vec[i].first = col[i];
         reorder_vec[i].second = eid[i];
@@ -71,7 +70,8 @@ void CSRSort_(CSRMatrix* csr) {
         eid[i] = reorder_vec[i].second;
       }
     }
-  }
+  });
+
   csr->sorted = true;
 }
 
@@ -101,37 +101,38 @@ std::pair<CSRMatrix, NDArray> CSRSortByTag(
   auto out_indices_data = static_cast<IdType *>(output.indices->data);
   auto out_eid_data = static_cast<IdType *>(output.data->data);
 
-#pragma omp parallel for
-  for (IdType src = 0 ; src < num_rows ; ++src) {
-    const IdType start = indptr_data[src];
-    const IdType end = indptr_data[src + 1];
+  runtime::parallel_for(0, num_rows, [&](size_t b, size_t e) {
+    for (auto src = b; src < e; ++src) {
+      const IdType start = indptr_data[src];
+      const IdType end = indptr_data[src + 1];
 
-    auto tag_pos_row = tag_pos_data + src * (num_tags + 1);
-    std::vector<IdType> pointer(num_tags, 0);
+      auto tag_pos_row = tag_pos_data + src * (num_tags + 1);
+      std::vector<IdType> pointer(num_tags, 0);
 
-    for (IdType ptr = start ; ptr < end ; ++ptr) {
-      const IdType dst = indices_data[ptr];
-      const TagType tag = tag_data[dst];
-      CHECK_LT(tag, num_tags);
-      ++tag_pos_row[tag + 1];
-    }  // count
+      for (IdType ptr = start ; ptr < end ; ++ptr) {
+        const IdType dst = indices_data[ptr];
+        const TagType tag = tag_data[dst];
+        CHECK_LT(tag, num_tags);
+        ++tag_pos_row[tag + 1];
+      }  // count
 
-    for (TagType tag = 1 ; tag <= num_tags; ++tag) {
-      tag_pos_row[tag] += tag_pos_row[tag - 1];
-    }  // cumulate
+      for (TagType tag = 1 ; tag <= num_tags; ++tag) {
+        tag_pos_row[tag] += tag_pos_row[tag - 1];
+      }  // cumulate
 
-    for (IdType ptr = start ; ptr < end ; ++ptr) {
-      const IdType dst = indices_data[ptr];
-      const IdType eid = eid_data[ptr];
-      const TagType tag = tag_data[dst];
-      const IdType offset = tag_pos_row[tag] + pointer[tag];
-      CHECK_LT(offset, tag_pos_row[tag + 1]);
-      ++pointer[tag];
+      for (IdType ptr = start ; ptr < end ; ++ptr) {
+        const IdType dst = indices_data[ptr];
+        const IdType eid = eid_data[ptr];
+        const TagType tag = tag_data[dst];
+        const IdType offset = tag_pos_row[tag] + pointer[tag];
+        CHECK_LT(offset, tag_pos_row[tag + 1]);
+        ++pointer[tag];
 
-      out_indices_data[start + offset] = dst;
-      out_eid_data[start + offset] = eid;
+        out_indices_data[start + offset] = dst;
+        out_eid_data[start + offset] = eid;
+      }
     }
-  }
+  });
   output.sorted = false;
   return std::make_pair(output, tag_pos);
 }

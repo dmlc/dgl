@@ -1,6 +1,6 @@
 package:
   name: dgl{{ environ.get('DGL_PACKAGE_SUFFIX', '') }}
-  version: "0.7"
+  version: "0.8"
 
 source:
   git_rev: 0.4.x
@@ -19,6 +19,7 @@ requirements:
     - scipy
     - networkx
     - requests
+    - tqdm
 
 build:
   script_env:

@@ -36,7 +36,7 @@ NDArray IndexSelect(NDArray array, IdArray index) {
       const int nt = cuda::FindNumThreads(len);
       const int nb = (len + nt - 1) / nt;
       CUDA_KERNEL_CALL(IndexSelectSingleKernel, nb, nt, 0, thr_entry->stream,
-          array_data, idx_data, len, ret_data);
+          array_data, idx_data, len, arr_len, ret_data);
   } else {
       dim3 block(256, 1);
       while (static_cast<int64_t>(block.x) >= 2*num_feat) {
@@ -45,7 +45,7 @@ NDArray IndexSelect(NDArray array, IdArray index) {
       }
       const dim3 grid((len+block.y-1)/block.y);
       CUDA_KERNEL_CALL(IndexSelectMultiKernel, grid, block, 0, thr_entry->stream,
-          array_data, num_feat, idx_data, len, ret_data);
+          array_data, num_feat, idx_data, len, arr_len, ret_data);
   }
   return ret;
 }

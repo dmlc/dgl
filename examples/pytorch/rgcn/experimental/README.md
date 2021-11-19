@@ -126,7 +126,7 @@ We can get the performance score at the second epoch:
 Val Acc 0.4323, Test Acc 0.4255, time: 128.0379
 ```
 
-The command below launches the same distributed training job using dgl distributed NodeEmbedding
+The command below launches the same distributed training job using dgl distributed DistEmbedding
 ```bash
 python3 ~/workspace/dgl/tools/launch.py \
 --workspace ~/workspace/dgl/examples/pytorch/rgcn/experimental/ \
@@ -135,7 +135,7 @@ python3 ~/workspace/dgl/tools/launch.py \
 --num_samplers 4 \
 --part_config data/ogbn-mag.json \
 --ip_config ip_config.txt \
-"python3 entity_classify_dist.py --graph-name ogbn-mag --dataset ogbn-mag --fanout='25,25' --batch-size 1024  --n-hidden 64 --lr 0.01 --eval-batch-size 1024  --low-mem --dropout 0.5 --use-self-loop --n-bases 2 --n-epochs 3 --layer-norm --ip-config ip_config.txt  --sparse-embedding --sparse-lr 0.06 --num_gpus 1"
+"python3 entity_classify_dist.py --graph-name ogbn-mag --dataset ogbn-mag --fanout='25,25' --batch-size 1024  --n-hidden 64 --lr 0.01 --eval-batch-size 1024  --low-mem --dropout 0.5 --use-self-loop --n-bases 2 --n-epochs 3 --layer-norm --ip-config ip_config.txt  --sparse-embedding --sparse-lr 0.06 --num_gpus 1 --dgl-sparse"
 ```
 
 We can get the performance score at the second epoch:
@@ -155,6 +155,10 @@ More details about the four steps are explained in our
 
 The graph structure should be written as a node file and an edge file. The node features and edge features
 can be written as DGL tensors. `write_mag.py` shows an example of writing the OGB MAG graph into files.
+
+As `pm_dglpart` cannot handle self-loops and duplicate edges correctly, these edges are removed and stored
+into `mag_removed_edges.txt` when calling `write_mag.py`. When converting ParMETIS outputs into DGLGraph
+in next steps, `mag_removed_edges.txt` should be passed in. Refer to Step 3 for more details.
 
 ```bash
 python3 write_mag.py
@@ -186,10 +190,11 @@ write the files on NFS.
 ### Step 3: Convert the ParMETIS partitions into DGLGraph
 
 DGL provides a tool called `convert_partition.py` to load one partition at a time and convert it into a DGLGraph
-and save it into a file.
+and save it into a file. As mentioned in Step 1, please pass `mag_removed_edges.txt` if any self-loops and
+duplicate edges are removed.
 
 ```bash
-python3 ~/workspace/dgl/tools/convert_partition.py --input-dir . --graph-name mag --schema mag.json --num-parts 2 --num-node-weights 4 --output outputs
+python3 ~/workspace/dgl/tools/convert_partition.py --input-dir . --graph-name mag --schema mag.json --num-parts 2 --num-node-weights 4 --output outputs --removed-edges mag_removed_edges.txt
 ```
 
 ### Step 4: Read node data and edge data for each partition
@@ -218,5 +223,5 @@ python3 partition_graph.py --dataset ogbn-mag --num_parts 1
 
 ### Step 2: run the training script
 ```bash
-python3 entity_classify_dist.py --graph-name ogbn-mag  --dataset ogbn-mag --fanout='25,25' --batch-size 512 --n-hidden 64 --lr 0.01 --eval-batch-size 128 --low-mem --dropout 0.5 --use-self-loop --n-bases 2 --n-epochs 3 --layer-norm --ip-config ip_config.txt --conf-path 'data/ogbn-mag.json' --standalone  --sparse-embedding  --sparse-lr 0.06 --node-feats
+DGL_DIST_MODE=standalone python3 entity_classify_dist.py --graph-name ogbn-mag  --dataset ogbn-mag --fanout='25,25' --batch-size 512 --n-hidden 64 --lr 0.01 --eval-batch-size 128 --low-mem --dropout 0.5 --use-self-loop --n-bases 2 --n-epochs 3 --layer-norm --ip-config ip_config.txt --conf-path 'data/ogbn-mag.json' --standalone  --sparse-embedding  --sparse-lr 0.06
 ```

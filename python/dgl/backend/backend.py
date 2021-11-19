@@ -1125,6 +1125,21 @@ def replace_inf_with_zero(x):
     """
     pass
 
+def count_nonzero(input):
+    """Return the count of non-zero values in the tensor input.
+
+    Parameters
+    ----------
+    input : Tensor
+        The tensor to be counted
+
+    Returns
+    -------
+    Integer
+        The result
+    """
+    pass
+
 ###############################################################################
 # Tensor functions used *only* on index tensor
 # ----------------
@@ -1133,18 +1148,23 @@ def replace_inf_with_zero(x):
 # DGL should contain all the operations on index, so this set of operators
 # should be gradually removed.
 
-def unique(input):
+def unique(input, return_inverse=False):
     """Returns the unique scalar elements in a tensor.
 
     Parameters
     ----------
     input : Tensor
         Must be a 1-D tensor.
+    return_inverse : bool, optional
+        Whether to also return the indices for where elements in the original
+        input ended up in the returned unique list.
 
     Returns
     -------
     Tensor
         A 1-D tensor containing unique elements.
+    Tensor
+        A 1-D tensor containing the new positions of the elements in the input.
     """
     pass
 
@@ -1452,7 +1472,7 @@ def gspmm(gidx, op, reduce_op, lhs_data, rhs_data):
     """
     pass
 
-def gspmm_hetero(g, op, reduce_op, *lhs_and_rhs_tuple):
+def gspmm_hetero(g, op, reduce_op, lhs_len, *lhs_and_rhs_tuple):
     r""" Generalized Sparse Matrix Multiplication interface on heterogenenous graph.
     All the relation types of the heterogeneous graph will be processed together.
     It fuses two steps into one kernel.
@@ -1478,6 +1498,8 @@ def gspmm_hetero(g, op, reduce_op, *lhs_and_rhs_tuple):
         ``copy_lhs``, ``copy_rhs``.
     reduce_op : str
         Reduce operator, could be ``sum``, ``max``, ``min``.
+    lhs_len : int
+        Length of the lhs data
     lhs_and_rhs_tuple : tuple of tensors
         lhs_data and rhs_data are concatenated to one tuple. lhs_data is
         also a tuple of tensors of size number of ntypes. Same is true for
@@ -1526,7 +1548,7 @@ def gsddmm(gidx, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
     """
     pass
 
-def gsddmm_hetero(g, op, lhs_target='u', rhs_target='v', *lhs_and_rhs_tuple):
+def gsddmm_hetero(g, op, lhs_len, lhs_target='u', rhs_target='v', *lhs_and_rhs_tuple):
     r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface on
     heterogenenous graph. All the relation types of the heterogeneous graph
     will be processed together.
@@ -1547,6 +1569,8 @@ def gsddmm_hetero(g, op, lhs_target='u', rhs_target='v', *lhs_and_rhs_tuple):
     op : str
         Binary operator, could be ``add``, ``sub``, ``mul``, ``div``, ``dot``,
         ``copy_lhs``, ``copy_rhs``.
+    lhs_len : int
+        Length of the lhs data
     lhs_target: str
         Choice of `u`(source), `e`(edge) or `v`(destination) for left operand.
     rhs_target: str
@@ -1643,7 +1667,7 @@ def scatter_add(x, idx, m):
         The indices array.
     m : int
         The length of output.
-    
+
     Returns
     -------
     Tensor

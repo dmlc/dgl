@@ -126,6 +126,10 @@ class DeviceAPI {
    */
   virtual void SetStream(DGLContext ctx, DGLStreamHandle stream) {}
   /*!
+   * \brief Get the stream
+   */
+  virtual DGLStreamHandle GetStream() const { return nullptr; }
+  /*!
    * \brief Synchronize 2 streams of execution.
    *
    * An event is created in event_src stream that the second then
@@ -140,6 +144,24 @@ class DeviceAPI {
   DGL_DLL virtual void SyncStreamFromTo(DGLContext ctx,
                                         DGLStreamHandle event_src,
                                         DGLStreamHandle event_dst);
+
+  /*!
+   * \brief Pin host memory using cudaHostRegister().
+   *
+   * \param ctx The context of pinning and mapping.
+   * \param ptr The host memory pointer to be pinned.
+   * \param nbytes The size to be pinned.   
+   */  
+  DGL_DLL virtual void PinData(DGLContext ctx, void* ptr, size_t nbytes);
+
+  /*!
+   * \brief Unpin host memory ussing cudaHostUnregister().
+   *
+   * \param ctx The context to unmap and unpin.
+   * \param ptr The host memory pointer to be unpinned.   
+   */ 
+  DGL_DLL virtual void UnpinData(DGLContext ctx, void* ptr);
+
   /*!
    * \brief Allocate temporal workspace for backend execution.
    *

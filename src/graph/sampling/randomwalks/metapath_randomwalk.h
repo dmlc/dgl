@@ -57,6 +57,7 @@ std::tuple<dgl_id_t, dgl_id_t, bool> MetapathRandomWalkStep(
     dgl_id_t curr,
     int64_t len,
     const std::vector<CSRMatrix> &edges_by_type,
+    const std::vector<bool> &csr_has_data,
     const IdxType *metapath_data,
     const std::vector<FloatArray> &prob,
     TerminatePredicate<IdxType> terminate) {
@@ -70,7 +71,7 @@ std::tuple<dgl_id_t, dgl_id_t, bool> MetapathRandomWalkStep(
   const CSRMatrix &csr = edges_by_type[etype];
   const IdxType *offsets = csr.indptr.Ptr<IdxType>();
   const IdxType *all_succ = csr.indices.Ptr<IdxType>();
-  const IdxType *all_eids = CSRHasData(csr) ? csr.data.Ptr<IdxType>() : nullptr;
+  const IdxType *all_eids = csr_has_data[etype] ? csr.data.Ptr<IdxType>() : nullptr;
   const IdxType *succ = all_succ + offsets[curr];
   const IdxType *eids = all_eids ? (all_eids + offsets[curr]) : nullptr;
 
@@ -124,6 +125,7 @@ std::tuple<dgl_id_t, dgl_id_t, bool> MetapathRandomWalkStepUniform(
     dgl_id_t curr,
     int64_t len,
     const std::vector<CSRMatrix> &edges_by_type,
+    const std::vector<bool> &csr_has_data,
     const IdxType *metapath_data,
     const std::vector<FloatArray> &prob,
     TerminatePredicate<IdxType> terminate) {
@@ -137,7 +139,7 @@ std::tuple<dgl_id_t, dgl_id_t, bool> MetapathRandomWalkStepUniform(
   const CSRMatrix &csr = edges_by_type[etype];
   const IdxType *offsets = csr.indptr.Ptr<IdxType>();
   const IdxType *all_succ = csr.indices.Ptr<IdxType>();
-  const IdxType *all_eids = CSRHasData(csr) ? csr.data.Ptr<IdxType>() : nullptr;
+  const IdxType *all_eids = csr_has_data[etype] ? csr.data.Ptr<IdxType>() : nullptr;
   const IdxType *succ = all_succ + offsets[curr];
   const IdxType *eids = all_eids ? (all_eids + offsets[curr]) : nullptr;
 
@@ -174,14 +176,21 @@ std::pair<IdArray, IdArray> MetapathBasedRandomWalk(
     TerminatePredicate<IdxType> terminate) {
   int64_t max_num_steps = metapath->shape[0];
   const IdxType *metapath_data = static_cast<IdxType *>(metapath->data);
+  const int64_t begin_ntype = hg->meta_graph()->FindEdge(metapath_data[0]).first;
+  const int64_t max_nodes = hg->NumVertices(begin_ntype);
 
   // Prefetch all edges.
   // This forces the heterograph to materialize all OutCSR's before the OpenMP loop;
   // otherwise data races will happen.
   // TODO(BarclayII): should we later on materialize COO/CSR/CSC anyway unless told otherwise?
-  std::vector<CSRMatrix> edges_by_type;
-  for (dgl_type_t etype = 0; etype < hg->NumEdgeTypes(); ++etype)
-    edges_by_type.push_back(hg->GetCSRMatrix(etype));
+  int64_t num_etypes = hg->NumEdgeTypes();
+  std::vector<CSRMatrix> edges_by_type(num_etypes);
+  std::vector<bool> csr_has_data(num_etypes);
+  for (int64_t etype = 0; etype < num_etypes; ++etype) {
+    const CSRMatrix &csr = hg->GetCSRMatrix(etype);
+    edges_by_type[etype] = csr;
+    csr_has_data[etype] = CSRHasData(csr);
+  }
 
   // Hoist the check for Uniform vs Non uniform edge distribution
   // to avoid putting it on the hot path
@@ -194,20 +203,20 @@ std::pair<IdArray, IdArray> MetapathBasedRandomWalk(
   }
   if (!isUniform) {
     StepFunc<IdxType> step =
-      [&edges_by_type, metapath_data, &prob, terminate]
+      [&edges_by_type, &csr_has_data, metapath_data, &prob, terminate]
       (IdxType *data, dgl_id_t curr, int64_t len) {
         return MetapathRandomWalkStep<XPU, IdxType>(
-            data, curr, len, edges_by_type, metapath_data, prob, terminate);
+            data, curr, len, edges_by_type, csr_has_data, metapath_data, prob, terminate);
       };
-    return GenericRandomWalk<XPU, IdxType>(seeds, max_num_steps, step);
+    return GenericRandomWalk<XPU, IdxType>(seeds, max_num_steps, step, max_nodes);
   } else {
     StepFunc<IdxType> step =
-      [&edges_by_type, metapath_data, &prob, terminate]
+      [&edges_by_type, &csr_has_data, metapath_data, &prob, terminate]
       (IdxType *data, dgl_id_t curr, int64_t len) {
         return MetapathRandomWalkStepUniform<XPU, IdxType>(
-            data, curr, len, edges_by_type, metapath_data, prob, terminate);
+            data, curr, len, edges_by_type, csr_has_data, metapath_data, prob, terminate);
       };
-    return GenericRandomWalk<XPU, IdxType>(seeds, max_num_steps, step);
+    return GenericRandomWalk<XPU, IdxType>(seeds, max_num_steps, step, max_nodes);
   }
 }
 

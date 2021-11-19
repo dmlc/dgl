@@ -108,6 +108,28 @@ class DeviceOrderedHashTable {
       return &table_[pos];
     }
 
+    /**
+     * \brief Check whether a key exists within the hashtable.
+     *
+     * \param id The key to check for.
+     *
+     * \return True if the key exists in the hashtable.
+     */
+    inline __device__ bool Contains(
+        const IdType id) const {
+      IdType pos = Hash(id);
+
+      IdType delta = 1;
+      while (table_[pos].key != kEmptyKey) {
+        if (table_[pos].key == id) {
+          return true;
+        }
+        pos = Hash(pos+delta);
+        delta +=1;
+      }
+      return false;
+    }
+
   protected:
     // Must be uniform bytes for memset to work
     static constexpr IdType kEmptyKey = static_cast<IdType>(-1);

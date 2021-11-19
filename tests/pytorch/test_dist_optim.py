@@ -16,7 +16,7 @@ import backend as F
 import unittest
 import pickle
 import random
-from dgl.distributed.nn import NodeEmbedding
+from dgl.distributed import DistEmbedding
 from dgl.distributed.optim import SparseAdagrad, SparseAdam
 
 def create_random_graph(n):
@@ -78,8 +78,8 @@ def run_client(graph_name, cli_id, part_id, server_count):
     policy = dgl.distributed.PartitionPolicy('node', g.get_partition_book())
     num_nodes = g.number_of_nodes()
     emb_dim = 4
-    dgl_emb = NodeEmbedding(num_nodes, emb_dim, name='optim', init_func=initializer, part_policy=policy)
-    dgl_emb_zero = NodeEmbedding(num_nodes, emb_dim, name='optim-zero', init_func=initializer, part_policy=policy)
+    dgl_emb = DistEmbedding(num_nodes, emb_dim, name='optim', init_func=initializer, part_policy=policy)
+    dgl_emb_zero = DistEmbedding(num_nodes, emb_dim, name='optim-zero', init_func=initializer, part_policy=policy)
     dgl_adam = SparseAdam(params=[dgl_emb, dgl_emb_zero], lr=0.01)
     dgl_adam._world_size = 1
     dgl_adam._rank = 0

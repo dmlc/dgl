@@ -13,7 +13,7 @@ from dgl.data.utils import load_graphs
 import dgl.function as fn
 import dgl.nn.pytorch as dglnn
 from dgl.distributed import DistDataLoader
-from dgl.distributed.nn import NodeEmbedding
+from dgl.distributed import DistEmbedding
 
 import torch as th
 import torch.nn as nn
@@ -91,7 +91,7 @@ class DistEmb(nn.Module):
         self.emb_size = emb_size
         self.dgl_sparse_emb = dgl_sparse_emb
         if dgl_sparse_emb:
-            self.sparse_emb = NodeEmbedding(num_nodes, emb_size, name='sage', init_func=initializer)
+            self.sparse_emb = DistEmbedding(num_nodes, emb_size, name='sage', init_func=initializer)
         else:
             self.sparse_emb = th.nn.Embedding(num_nodes, emb_size, sparse=True)
             nn.init.uniform_(self.sparse_emb.weight, -1.0, 1.0)
@@ -276,7 +276,7 @@ def main(args):
     if args.num_gpus == -1:
         device = th.device('cpu')
     else:
-        device = th.device('cuda:'+str(g.rank() % args.num_gpus))
+        device = th.device('cuda:'+str(args.local_rank))
     labels = g.ndata['labels'][np.arange(g.number_of_nodes())]
     n_classes = len(th.unique(labels[th.logical_not(th.isnan(labels))]))
     print('#labels:', n_classes)

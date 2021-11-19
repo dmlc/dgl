@@ -9,6 +9,7 @@ import networkx as nx
 import numpy as np
 
 from ._ffi.function import _init_api
+from .ops import segment
 from .base import ALL, SLICE_FULL, NTYPE, NID, ETYPE, EID, is_all, DGLError, dgl_warning
 from . import core
 from . import graph_index
@@ -38,8 +39,8 @@ class DGLHeteroGraph(object):
     # pylint: disable=unused-argument, dangerous-default-value
     def __init__(self,
                  gidx=[],
-                 ntypes=['_U'],
-                 etypes=['_V'],
+                 ntypes=['_N'],
+                 etypes=['_E'],
                  node_frames=None,
                  edge_frames=None,
                  **deprecate_kwargs):
@@ -556,11 +557,7 @@ class DGLHeteroGraph(object):
 
         Notes
         -----
-
-        This function discards the batch information. Please use
-        :func:`dgl.DGLGraph.set_batch_num_nodes`
-        and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
-        to maintain the information.
+        This function preserves the batch information.
 
         Examples
         --------
@@ -581,6 +578,17 @@ class DGLHeteroGraph(object):
         (tensor([2]), tensor([2]), tensor([0]))
         >>> g.edata['he']
         tensor([[2.]])
+
+        Removing edges from a batched graph preserves batch information.
+
+        >>> g = dgl.graph((torch.tensor([0, 0, 2]), torch.tensor([0, 1, 2])))
+        >>> g2 = dgl.graph((torch.tensor([1, 2, 3]), torch.tensor([1, 3, 4])))
+        >>> bg = dgl.batch([g, g2])
+        >>> bg.batch_num_edges()
+        tensor([3, 3])
+        >>> bg.remove_edges([1, 4])
+        >>> bg.batch_num_edges()
+        tensor([2, 2])
 
         **Heterogeneous Graphs with Multiple Edge Types**
 
@@ -627,6 +635,19 @@ class DGLHeteroGraph(object):
             else:
                 edges[c_etype] = self.edges(form='eid', order='eid', etype=c_etype)
 
+        # If the graph is batched, update batch_num_edges
+        batched = self._batch_num_edges is not None
+        if batched:
+            c_etype = (u_type, e_type, v_type)
+            one_hot_removed_edges = F.zeros((self.num_edges(c_etype),), F.float32, self.device)
+            one_hot_removed_edges = F.scatter_row(one_hot_removed_edges, eids,
+                                                  F.full_1d(len(eids), 1., F.float32, self.device))
+            c_etype_batch_num_edges = self._batch_num_edges[c_etype]
+            batch_num_removed_edges = segment.segment_reduce(c_etype_batch_num_edges,
+                                                             one_hot_removed_edges, reducer='sum')
+            self._batch_num_edges[c_etype] = c_etype_batch_num_edges - \
+                                             F.astype(batch_num_removed_edges, F.int64)
+
         sub_g = self.edge_subgraph(edges, relabel_nodes=False, store_ids=store_ids)
         self._graph = sub_g._graph
         self._node_frames = sub_g._node_frames
@@ -655,11 +676,7 @@ class DGLHeteroGraph(object):
 
         Notes
         -----
-
-        This function discards the batch information. Please use
-        :func:`dgl.DGLGraph.set_batch_num_nodes`
-        and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
-        to maintain the information.
+        This function preserves the batch information.
 
         Examples
         --------
@@ -681,6 +698,19 @@ class DGLHeteroGraph(object):
         tensor([[2.]])
         >>> g.edata['he']
         tensor([[2.]])
+
+        Removing nodes from a batched graph preserves batch information.
+
+        >>> g = dgl.graph((torch.tensor([0, 0, 2]), torch.tensor([0, 1, 2])))
+        >>> g2 = dgl.graph((torch.tensor([1, 2, 3]), torch.tensor([1, 3, 4])))
+        >>> bg = dgl.batch([g, g2])
+        >>> bg.batch_num_nodes()
+        tensor([3, 5])
+        >>> bg.remove_nodes([1, 4])
+        >>> bg.batch_num_nodes()
+        tensor([2, 4])
+        >>> bg.batch_num_edges()
+        tensor([2, 2])
 
         **Heterogeneous Graphs with Multiple Node Types**
 
@@ -725,16 +755,60 @@ class DGLHeteroGraph(object):
         nodes = {}
         for c_ntype in self.ntypes:
             if self.get_ntype_id(c_ntype) == ntid:
+                target_ntype = c_ntype
                 original_nids = self.nodes(c_ntype)
                 nodes[c_ntype] = utils.compensate(nids, original_nids)
             else:
                 nodes[c_ntype] = self.nodes(c_ntype)
 
+        # If the graph is batched, update batch_num_nodes
+        batched = self._batch_num_nodes is not None
+        if batched:
+            one_hot_removed_nodes = F.zeros((self.num_nodes(target_ntype),),
+                                            F.float32, self.device)
+            one_hot_removed_nodes = F.scatter_row(one_hot_removed_nodes, nids,
+                                                  F.full_1d(len(nids), 1., F.float32, self.device))
+            c_ntype_batch_num_nodes = self._batch_num_nodes[target_ntype]
+            batch_num_removed_nodes = segment.segment_reduce(
+                c_ntype_batch_num_nodes, one_hot_removed_nodes, reducer='sum')
+            self._batch_num_nodes[target_ntype] = c_ntype_batch_num_nodes - \
+                                                  F.astype(batch_num_removed_nodes, F.int64)
+            # Record old num_edges to check later whether some edges were removed
+            old_num_edges = {c_etype: self._graph.number_of_edges(self.get_etype_id(c_etype))
+                             for c_etype in self.canonical_etypes}
+
         # node_subgraph
-        sub_g = self.subgraph(nodes, store_ids=store_ids)
+        # If batch_num_edges is to be updated, record the original edge IDs
+        sub_g = self.subgraph(nodes, store_ids=store_ids or batched)
         self._graph = sub_g._graph
         self._node_frames = sub_g._node_frames
         self._edge_frames = sub_g._edge_frames
+
+        # If the graph is batched, update batch_num_edges
+        if batched:
+            canonical_etypes = [
+                c_etype for c_etype in self.canonical_etypes if
+                self._graph.number_of_edges(self.get_etype_id(c_etype)) != old_num_edges[c_etype]]
+
+            for c_etype in canonical_etypes:
+                if self._graph.number_of_edges(self.get_etype_id(c_etype)) == 0:
+                    self._batch_num_edges[c_etype] = F.zeros(
+                        (self.batch_size,), F.int64, self.device)
+                    continue
+
+                one_hot_left_edges = F.zeros((old_num_edges[c_etype],), F.float32, self.device)
+                eids = self.edges[c_etype].data[EID]
+                one_hot_left_edges = F.scatter_row(one_hot_left_edges, eids,
+                                                   F.full_1d(len(eids), 1., F.float32, self.device))
+                batch_num_left_edges = segment.segment_reduce(
+                    self._batch_num_edges[c_etype], one_hot_left_edges, reducer='sum')
+                self._batch_num_edges[c_etype] = F.astype(batch_num_left_edges, F.int64)
+
+        if batched and not store_ids:
+            for c_ntype in self.ntypes:
+                self.nodes[c_ntype].data.pop(NID)
+            for c_etype in self.canonical_etypes:
+                self.edges[c_etype].data.pop(EID)
 
     def _reset_cached_info(self):
         """Some info like batch_num_nodes may be stale after mutation
@@ -3575,7 +3649,7 @@ class DGLHeteroGraph(object):
 
         >>> g.adj(scipy_fmt='coo', etype='develops')
         <2x3 sparse matrix of type '<class 'numpy.int64'>'
-	    with 2 stored elements in COOrdinate format>
+           with 2 stored elements in COOrdinate format>
         """
         etid = self.get_etype_id(etype)
         if scipy_fmt is None:
@@ -4336,9 +4410,17 @@ class DGLHeteroGraph(object):
         """
         if inplace:
             raise DGLError('The `inplace` option is removed in v0.5.')
-        etid = self.get_etype_id(etype)
-        etype = self.canonical_etypes[etid]
-        g = self if etype is None else self[etype]
+        # Graph with one relation type
+        if self._graph.number_of_etypes() == 1 or etype is not None:
+            etid = self.get_etype_id(etype)
+            etype = self.canonical_etypes[etid]
+            g = self if etype is None else self[etype]
+        else:   # heterogeneous graph with number of relation types > 1
+            if not core.is_builtin(func):
+                raise DGLError("User defined functions are not yet "
+                               "supported in apply_edges for heterogeneous graphs. "
+                               "Please use (apply_edges(func), etype = rel) instead.")
+            g = self
         if is_all(edges):
             eid = ALL
         else:
@@ -4349,7 +4431,18 @@ class DGLHeteroGraph(object):
             edata = core.invoke_gsddmm(g, func)
         else:
             edata = core.invoke_edge_udf(g, eid, etype, func)
-        self._set_e_repr(etid, eid, edata)
+
+        if self._graph.number_of_etypes() == 1 or etype is not None:
+            self._set_e_repr(etid, eid, edata)
+        else:
+            edata_tensor = {}
+            key = list(edata.keys())[0]
+            out_tensor_tuples = edata[key]
+            for etid in range(self._graph.number_of_etypes()):
+                # TODO (Israt): Check the logic why some output tensor is None
+                if out_tensor_tuples[etid] is not None:
+                    edata_tensor[key] = out_tensor_tuples[etid]
+                    self._set_e_repr(etid, eid, edata_tensor)
 
     def send_and_recv(self,
                       edges,
@@ -4787,10 +4880,6 @@ class DGLHeteroGraph(object):
                 raise NotImplementedError("Cannot set both intra-type and inter-type reduce "
                                           "operators as 'mean' using update_all. Please use "
                                           "multi_update_all instead.")
-            if message_func.name not in ['copy_u', 'copy_e']:
-                raise NotImplementedError("Op \'" + message_func.name + "\' is not yet supported"
-                                          "in update_all for heterogeneous graphs. Please use"
-                                          "multi_update_all instead.")
             g = self
             all_out = core.message_passing(g, message_func, reduce_func, apply_node_func)
             key = list(all_out.keys())[0]
@@ -4877,6 +4966,18 @@ class DGLHeteroGraph(object):
         >>> g.nodes['user'].data['h']
         tensor([[0.],
                 [4.]])
+
+        User-defined cross reducer equivalent to "sum".
+
+        >>> def cross_sum(flist):
+        ...     return torch.sum(torch.stack(flist, dim=0), dim=0) if len(flist) > 1 else flist[0]
+
+        Use the user-defined cross reducer.
+
+        >>> g.multi_update_all(
+        ...     {'follows': (fn.copy_src('h', 'm'), fn.sum('m', 'h')),
+        ...      'attracts': (fn.copy_src('h', 'm'), fn.sum('m', 'h'))},
+        ... cross_sum)
         """
         all_out = defaultdict(list)
         merge_order = defaultdict(list)
@@ -5377,6 +5478,10 @@ class DGLHeteroGraph(object):
         # Clone the frames
         ret._node_frames = [fr.clone() for fr in self._node_frames]
         ret._edge_frames = [fr.clone() for fr in self._edge_frames]
+
+        # Copy the batch information
+        ret._batch_num_nodes = copy.copy(self._batch_num_nodes)
+        ret._batch_num_edges = copy.copy(self._batch_num_edges)
 
         return ret
 

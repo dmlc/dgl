@@ -127,6 +127,23 @@ void SDDMM(const std::string& op,
 }
 
 
+/*!
+ * \brief Find the src/dst/etype id based on the target 'u', 'v' or 'e'.
+ *
+ * \param graph The input graph.
+ * \param target 'u', 'v' or 'e'. The target of the lhs or rhs data of an etype.
+ * \param etype Relation type of the input graph.
+ */
+int get_typeid_by_target(HeteroGraphPtr graph, int target, dgl_type_t etype) {
+  auto pair = graph->meta_graph()->FindEdge(etype);
+  if (target == 0)
+    return pair.first;
+  if (target == 2)
+    return pair.second;
+  return etype;
+}
+
+
 /*! \brief Generalized Sampled Dense-Dense Matrix Multiplication. */
 void SDDMMHetero(const std::string& op,
            HeteroGraphPtr graph,
@@ -135,17 +152,13 @@ void SDDMMHetero(const std::string& op,
            std::vector<NDArray> out,
            int lhs_target,
            int rhs_target) {
-  // TODO(Israt): change it to COO_CODE
-  SparseFormat format = graph->SelectFormat(0, CSR_CODE);
+  SparseFormat format = graph->SelectFormat(0, COO_CODE);
 
-  std::vector<CSRMatrix> vec_csr;
   std::vector<dgl_type_t> lhs_eid;
   std::vector<dgl_type_t> rhs_eid;
   for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
-    vec_csr.push_back(graph->GetCSRMatrix(etype));
-    auto pair = graph->meta_graph()->FindEdge(etype);
-    lhs_eid.push_back(pair.first);
-    rhs_eid.push_back(pair.second);
+    lhs_eid.push_back(get_typeid_by_target(graph, lhs_target, etype));
+    rhs_eid.push_back(get_typeid_by_target(graph, rhs_target, etype));
   }
   const auto &bcast = CalcBcastOff(op, lhs[lhs_eid[0]], rhs[rhs_eid[0]]);
 
@@ -153,14 +166,25 @@ void SDDMMHetero(const std::string& op,
     ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
       ATEN_FLOAT_BITS_SWITCH(out[rhs_eid[0]]->dtype, bits, "Feature data", {
         if (format == SparseFormat::kCSR) {
+          std::vector<CSRMatrix> vec_csr;
+          for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
+            vec_csr.push_back(graph->GetCSRMatrix(etype));
+          }
           SDDMMCsrHetero<XPU, IdType, bits>(
               op, bcast, vec_csr,
               lhs, rhs, out, lhs_target, rhs_target,
               lhs_eid, rhs_eid);
+        } else if (format == SparseFormat::kCOO) {
+          std::vector<COOMatrix> vec_coo;
+          for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
+            vec_coo.push_back(graph->GetCOOMatrix(etype));
+          }
+          SDDMMCooHetero<XPU, IdType, bits>(
+              op, bcast, vec_coo,
+              lhs, rhs, out, lhs_target, rhs_target,
+              lhs_eid, rhs_eid);
         } else {
-          // TODO(Israt): Add support for COO format
-          LOG(FATAL) << "SDDMM only supports CSC format for graphs with number "
-                     << "of relation types > 1";
+          LOG(FATAL) << "SDDMM only supports CSR and COO formats";
         }
       });
     });

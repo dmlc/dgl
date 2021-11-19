@@ -22,7 +22,6 @@ import torch.optim as optim
 import torch.multiprocessing as mp
 from dgl.distributed import DistDataLoader
 
-from dgl.distributed.optim import SparseAdagrad
 from train_dist_unsupervised import SAGE, NeighborSampler, PosNeighborSampler, CrossEntropyLoss, compute_acc
 from train_dist_transductive import DistEmb, load_embs
 
@@ -199,7 +198,7 @@ def main(args):
     if args.num_gpus == -1:
         device = th.device('cpu')
     else:
-        device = th.device('cuda:'+str(g.rank() % args.num_gpus))
+        device = th.device('cuda:'+str(args.local_rank))
 
     # Pack data
     global_train_nid = global_train_nid.squeeze()

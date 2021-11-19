@@ -29,7 +29,7 @@ One workaround is to simply average over all neighbor node features as described
 the research paper `GraphSAGE
 <https://www-cs-faculty.stanford.edu/people/jure/pubs/graphsage-nips17.pdf>`_.
 However, `Graph Attention Network <https://arxiv.org/abs/1710.10903>`_ proposes a
-different type of aggregation. GAN uses weighting neighbor features with feature dependent and
+different type of aggregation. GAT uses weighting neighbor features with feature dependent and
 structure-free normalization, in the style of attention.
 """
 ###############################################################

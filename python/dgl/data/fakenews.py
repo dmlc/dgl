@@ -20,18 +20,12 @@ class FakeNewsDataset(DGLBuiltinDataset):
     who retweeted the root news. Besides, the node features are encoded
     user historical tweets using different pretrained language models:
 
-    - bert: the 768-dimensional node feature composed of Twitter user
-    historical tweets encoded by the bert-as-service
+    - bert: the 768-dimensional node feature composed of Twitter user historical tweets encoded by the bert-as-service
+    - content: the 310-dimensional node feature composed of a 300-dimensional “spacy” vector plus a 10-dimensional “profile” vector
+    - profile: the 10-dimensional node feature composed of ten Twitter user profile attributes.
+    - spacy: the 300-dimensional node feature composed of Twitter user historical tweets encoded by the spaCy word2vec encoder.
 
-    - content: the 310-dimensional node feature composed of a
-    300-dimensional “spacy” vector plus a 10-dimensional
-    “profile” vector
-
-    - profile: the 10-dimensional node feature composed of ten Twitter
-    user profile attributes.
-
-    - spacy: the 300-dimensional node feature composed of Twitter user
-    historical tweets encoded by the spaCy word2vec encoder.
+    Reference: <https://github.com/safe-graph/GNN-FakeNews>
 
     Note: this dataset is for academic use only, and commercial use is prohibited.
 
@@ -174,7 +168,7 @@ class FakeNewsDataset(DGLBuiltinDataset):
                               'feature': self.feature,
                               'train_mask': self.train_mask,
                               'val_mask': self.val_mask,
-                              'test_mask': self.train_mask})
+                              'test_mask': self.test_mask})
 
     def has_cache(self):
         """ check whether there are processed data in `self.save_path` """

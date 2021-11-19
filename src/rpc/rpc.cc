@@ -11,6 +11,7 @@
 #endif
 
 #include <dgl/runtime/container.h>
+#include <dgl/runtime/parallel_for.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/array.h>
 #include <dgl/random.h>
@@ -86,8 +87,10 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateSender")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   int64_t msg_queue_size = args[0];
   std::string type = args[1];
+  int max_thread_count = args[2];
   if (type.compare("socket") == 0) {
-    RPCContext::ThreadLocal()->sender = std::make_shared<network::SocketSender>(msg_queue_size);
+    RPCContext::ThreadLocal()->sender =
+      std::make_shared<network::SocketSender>(msg_queue_size, max_thread_count);
   } else {
     LOG(FATAL) << "Unknown communicator type for rpc receiver: " << type;
   }
@@ -97,8 +100,10 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateReceiver")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   int64_t msg_queue_size = args[0];
   std::string type = args[1];
+  int max_thread_count = args[2];
   if (type.compare("socket") == 0) {
-    RPCContext::ThreadLocal()->receiver = std::make_shared<network::SocketReceiver>(msg_queue_size);
+    RPCContext::ThreadLocal()->receiver =
+      std::make_shared<network::SocketReceiver>(msg_queue_size, max_thread_count);
   } else {
     LOG(FATAL) << "Unknown communicator type for rpc sender: " << type;
   }
@@ -454,15 +459,16 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
                                       DLContext{kDLCPU, 0});
   char* return_data = static_cast<char*>(res_tensor->data);
   // Copy local data
-#pragma omp parallel for
-  for (int64_t i = 0; i < local_ids.size(); ++i) {
-    CHECK_GE(ID_size*row_size, local_ids_orginal[i]*row_size+row_size);
-    CHECK_GE(data_size, local_ids[i] * row_size + row_size);
-    CHECK_GE(local_ids[i], 0);
-    memcpy(return_data + local_ids_orginal[i] * row_size,
-           local_data_char + local_ids[i] * row_size,
-           row_size);
-  }
+  parallel_for(0, local_ids.size(), [&](size_t b, size_t e) {
+    for (auto i = b; i < e; ++i) {
+      CHECK_GE(ID_size*row_size, local_ids_orginal[i]*row_size+row_size);
+      CHECK_GE(data_size, local_ids[i] * row_size + row_size);
+      CHECK_GE(local_ids[i], 0);
+      memcpy(return_data + local_ids_orginal[i] * row_size,
+             local_data_char + local_ids[i] * row_size,
+             row_size);
+    }
+  });
   // Recv remote message
   for (int i = 0; i < msg_count; ++i) {
     RPCMessage msg;

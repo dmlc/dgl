@@ -75,7 +75,7 @@ class STGCN_WAVE(nn.Module):
         super(STGCN_WAVE, self).__init__()
         self.control_str = control_str # model structure controller
         self.num_layers = len(control_str)
-        self.layers = []
+        self.layers = nn.ModuleList([])
         cnt = 0
         diapower = 0
         for i in range(self.num_layers):

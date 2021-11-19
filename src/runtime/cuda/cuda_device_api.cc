@@ -170,6 +170,20 @@ class CUDADeviceAPI final : public DeviceAPI {
         ->stream = static_cast<cudaStream_t>(stream);
   }
 
+  DGLStreamHandle GetStream() const final {
+    return static_cast<DGLStreamHandle>(CUDAThreadEntry::ThreadLocal()->stream);
+  }
+
+  void PinData(DGLContext ctx, void* ptr, size_t nbytes) {
+    CUDA_CALL(cudaSetDevice(ctx.device_id));
+    CUDA_CALL(cudaHostRegister(ptr, nbytes, cudaHostRegisterDefault));
+  }
+
+  void UnpinData(DGLContext ctx, void* ptr) {
+    CUDA_CALL(cudaSetDevice(ctx.device_id));
+    CUDA_CALL(cudaHostUnregister(ptr));
+  }
+
   void* AllocWorkspace(DGLContext ctx, size_t size, DGLType type_hint) final {
     return CUDAThreadEntry::ThreadLocal()->pool.AllocWorkspace(ctx, size);
   }

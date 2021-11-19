@@ -49,7 +49,7 @@ the same as the other user guides and tutorials.
        
 GPU-based neighbor sampling also works for custom neighborhood samplers as long as
 (1) your sampler is subclassed from :class:`~dgl.dataloading.BlockSampler`, and (2)
-your code in the sampler entirely works on GPU.
+your sampler entirely works on GPU.
 
 .. note::
 

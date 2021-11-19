@@ -10,6 +10,7 @@ from .. import utils
 from .shared_mem_utils import _to_shared_mem, _get_ndata_path, _get_edata_path, DTYPE_DICT
 from .._ffi.ndarray import empty_shared_mem
 from ..ndarray import exist_shared_mem_array
+from ..partition import NDArrayPartition
 from .id_map import IdMap
 
 def _move_metadata_to_shared_mem(graph_name, num_nodes, num_edges, part_id,
@@ -143,6 +144,38 @@ def get_shared_mem_partition_book(graph_name, graph_part):
         return RangePartitionBook(part_id, num_parts, node_map, edge_map, ntypes, etypes)
     else:
         return BasicPartitionBook(part_id, num_parts, node_map_data, edge_map_data, graph_part)
+
+def get_node_partition_from_book(book, device):
+    """ Get an NDArrayPartition of the nodes from a RangePartitionBook.
+
+    Parameters
+    ----------
+    book : RangePartitionBook
+        The partition book to extract the node partition from.
+    device : Device context object.
+        The location to node partition is to be used.
+
+    Returns
+    -------
+    NDarrayPartition
+        The NDArrayPartition object for the nodes in the graph.
+    """
+    assert isinstance(book, RangePartitionBook), "Can only convert " \
+        "RangePartitionBook to NDArrayPartition."
+    # create prefix-sum array on host
+    max_node_ids = F.zerocopy_from_numpy(book._max_node_ids)
+    cpu_range = F.cat([F.tensor([0], dtype=F.dtype(max_node_ids)),
+                       max_node_ids+1], dim=0)
+    gpu_range = F.copy_to(cpu_range, ctx=device)
+
+    # convert from numpy
+    array_size = int(F.as_scalar(cpu_range[-1]))
+    num_parts = book.num_partitions()
+
+    return NDArrayPartition(array_size,
+                            num_parts,
+                            mode='range',
+                            part_ranges=gpu_range)
 
 class GraphPartitionBook(ABC):
     """ The base class of the graph partition book.
@@ -770,16 +803,20 @@ class RangePartitionBook(GraphPartitionBook):
         """
         ids = utils.toindex(ids).tousertensor()
         partids = self.nid2partid(ids, ntype)
-        end_diff = F.tensor(self._typed_max_node_ids[ntype])[partids] - ids
-        return F.tensor(self._typed_nid_range[ntype][:, 1])[partids] - end_diff
+        typed_max_nids = F.zerocopy_from_numpy(self._typed_max_node_ids[ntype])
+        end_diff = F.gather_row(typed_max_nids, partids) - ids
+        typed_nid_range = F.zerocopy_from_numpy(self._typed_nid_range[ntype][:, 1])
+        return F.gather_row(typed_nid_range, partids) - end_diff
 
     def map_to_homo_eid(self, ids, etype):
         """Map per-edge-type IDs to global edge IDs in the homoenegeous format.
         """
         ids = utils.toindex(ids).tousertensor()
         partids = self.eid2partid(ids, etype)
-        end_diff = F.tensor(self._typed_max_edge_ids[etype][partids]) - ids
-        return F.tensor(self._typed_eid_range[etype][:, 1])[partids] - end_diff
+        typed_max_eids = F.zerocopy_from_numpy(self._typed_max_edge_ids[etype])
+        end_diff = F.gather_row(typed_max_eids, partids) - ids
+        typed_eid_range = F.zerocopy_from_numpy(self._typed_eid_range[etype][:, 1])
+        return F.gather_row(typed_eid_range, partids) - end_diff
 
     def nid2partid(self, nids, ntype='_N'):
         """From global node IDs to partition IDs

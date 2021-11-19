@@ -99,7 +99,7 @@ neg_u, neg_v = np.where(adj_neg != 0)
 
 neg_eids = np.random.choice(len(neg_u), g.number_of_edges())
 test_neg_u, test_neg_v = neg_u[neg_eids[:test_size]], neg_v[neg_eids[:test_size]]
-train_neg_u, train_neg_v = neg_u[neg_eids[train_size:]], neg_v[neg_eids[train_size:]]
+train_neg_u, train_neg_v = neg_u[neg_eids[test_size:]], neg_v[neg_eids[test_size:]]
 
 
 ######################################################################
@@ -340,5 +340,5 @@ with torch.no_grad():
     print('AUC', compute_auc(pos_score, neg_score))
 
 
-# Thumbnail Courtesy: Link Prediction with Neo4j, Mark Needham
+# Thumbnail credits: Link Prediction with Neo4j, Mark Needham
 # sphinx_gallery_thumbnail_path = '_static/blitz_4_link_predict.png'

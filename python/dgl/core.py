@@ -184,7 +184,7 @@ def _bucketing(val):
         return bkts
     return unique_val, bucketor
 
-def data_dict_to_tuple(graph, data_dict, op, lhs_list=None, rhs_list=None):
+def data_dict_to_list(graph, data_dict, func, target):
     """Get node or edge feature data of the given name for all the types.
 
     Parameters
@@ -194,29 +194,50 @@ def data_dict_to_tuple(graph, data_dict, op, lhs_list=None, rhs_list=None):
     data_dict : dict[str, Tensor] or dict[(str, str, str), Tensor]]
         Node or edge data stored in DGLGraph. The key of the dictionary
         is the node type name or edge type name.
-    op : str
-        The binary op's name, could be ``add``, ``sub``, ``mul``, ``div``, ``dot``,
-        ``copy_lhs``, ``copy_rhs``.
-    lhs_list : list[tensor] or list[None]
-        The feature on source nodes, could be list of None if op is ``copy_rhs``.
-    rhs_list : list[tensor] or list[None]
-        The feature on edges, could be list of None if op is ``copy_lhs``.
+    func : dgl.function.BaseMessageFunction
+        Built-in message function.
+    target : 'u', 'v' or 'e'
+        The target of the lhs or rhs data
 
     Returns
     --------
-    data_tuple : tuple(Tensor)
-        Feature data stored in tuple of tensors. The i^th tensor stores the feature
+    data_list : list(Tensor)
+        Feature data stored in a list of tensors. The i^th tensor stores the feature
         data of type ``types[i]``.
     """
-    if op == "copy_u":
-        for srctype, _, _ in graph.canonical_etypes:
-            src_id = graph.get_ntype_id(srctype)
-            lhs_list[src_id] = data_dict[srctype]
-    elif op == "copy_e":
-        for rel in graph.canonical_etypes:
-            etid = graph.get_etype_id(rel)
-            rhs_list[etid] = data_dict[rel]
-    return tuple(lhs_list + rhs_list)
+    if isinstance(func, fn.BinaryMessageFunction):
+        if target in ['u', 'v']:
+            output_list = [None] * graph._graph.number_of_ntypes()
+            for srctype, _, dsttype in graph.canonical_etypes:
+                if target == 'u':
+                    src_id = graph.get_ntype_id(srctype)
+                    output_list[src_id] = data_dict[srctype]
+                else:
+                    dst_id = graph.get_ntype_id(dsttype)
+                    output_list[dst_id] = data_dict[dsttype]
+        else: # target == 'e'
+            output_list = [None] * graph._graph.number_of_etypes()
+            for rel in graph.canonical_etypes:
+                etid = graph.get_etype_id(rel)
+                output_list[etid] = data_dict[rel]
+        return output_list
+    else:
+        if target == 'u':
+            lhs_list = [None] * graph._graph.number_of_ntypes()
+            if not isinstance(data_dict, dict):
+                src_id, _ = graph._graph.metagraph.find_edge(0)
+                lhs_list[src_id] = data_dict
+            else:
+                for srctype, _, _ in graph.canonical_etypes:
+                    src_id = graph.get_ntype_id(srctype)
+                    lhs_list[src_id] = data_dict[srctype]
+            return lhs_list
+        else: # target == 'e':
+            rhs_list = [None] * graph._graph.number_of_etypes()
+            for rel in graph.canonical_etypes:
+                etid = graph.get_etype_id(rel)
+                rhs_list[etid] = data_dict[rel]
+            return rhs_list
 
 def invoke_gsddmm(graph, func):
     """Invoke g-SDDMM computation on the graph.
@@ -238,10 +259,20 @@ def invoke_gsddmm(graph, func):
         x = alldata[func.lhs][func.lhs_field]
         y = alldata[func.rhs][func.rhs_field]
         op = getattr(ops, func.name)
+        if graph._graph.number_of_etypes() > 1:
+            lhs_target, _, rhs_target = func.name.split("_", 2)
+            x = data_dict_to_list(graph, x, func, lhs_target)
+            y = data_dict_to_list(graph, y, func, rhs_target)
         z = op(graph, x, y)
     else:
         x = alldata[func.target][func.in_field]
         op = getattr(ops, func.name)
+        if graph._graph.number_of_etypes() > 1:
+            # Convert to list as dict is unordered.
+            if func.name == "copy_u":
+                x = data_dict_to_list(graph, x, func, 'u')
+            else: # "copy_e"
+                x = data_dict_to_list(graph, x, func, 'e')
         z = op(graph, x)
     return {func.out_field : z}
 
@@ -285,15 +316,19 @@ def invoke_gspmm(graph, mfunc, rfunc, *, srcdata=None, dstdata=None, edata=None)
         x = alldata[mfunc.lhs][mfunc.lhs_field]
         y = alldata[mfunc.rhs][mfunc.rhs_field]
         op = getattr(ops, '{}_{}'.format(mfunc.name, rfunc.name))
+        if graph._graph.number_of_etypes() > 1:
+            lhs_target, _, rhs_target = mfunc.name.split("_", 2)
+            x = data_dict_to_list(graph, x, mfunc, lhs_target)
+            y = data_dict_to_list(graph, y, mfunc, rhs_target)
         z = op(graph, x, y)
     else:
         x = alldata[mfunc.target][mfunc.in_field]
         op = getattr(ops, '{}_{}'.format(mfunc.name, rfunc.name))
-        if graph._graph.number_of_etypes() > 1:
-            # Convert to list as dict is unordered.
-            lhs_list = [None] * graph._graph.number_of_ntypes()
-            rhs_list = [None] * graph._graph.number_of_etypes()
-            x = data_dict_to_tuple(graph, x, mfunc.name, lhs_list, rhs_list)
+        if graph._graph.number_of_etypes() > 1 and not isinstance(x, tuple):
+            if mfunc.name == "copy_u":
+                x = data_dict_to_list(graph, x, mfunc, 'u')
+            else: # "copy_e"
+                x = data_dict_to_list(graph, x, mfunc, 'e')
         z = op(graph, x)
     return {rfunc.out_field : z}
 
