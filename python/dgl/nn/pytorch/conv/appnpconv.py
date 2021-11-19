@@ -1,5 +1,5 @@
 """Torch Module for APPNPConv"""
-# pylint: disable= no-member, arguments-differ, invalid-name
+# pylint: disable= no-member, arguments-differ, invalid-name, lines-too-long
 import torch as th
 from torch import nn
 
@@ -84,9 +84,10 @@ class APPNPConv(nn.Module):
             The input feature of shape :math:`(N, *)`. :math:`N` is the
             number of nodes, and :math:`*` could be of any shape.
         edge_weight: torch.Tensor, optional
-            edge_weight used in the message passing process.This is equivalent to use real-weighted
-            adjacency in the equation above, and the degree normalization uses edge weight also,
-            based on :ref:`EdgeWeightNorm`.
+            edge_weight to use in the message passing process.This is equivalent to use real-weighted
+            adjacency matrix in the equation above, and
+            :math:\tilde{D}^{-1/2}\tilde{A} \tilde{D}^{-1/2}
+            is based on :class:`dgl.nn.pytorch.graphconv.EdgeWeightNorm`.
 
         Returns
         -------

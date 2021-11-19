@@ -745,6 +745,31 @@ def test_gcn2conv_e_weight(g, idtype):
 
 
 @parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
+def test_sgconv_e_weight(g, idtype):
+    ctx = F.ctx()
+    g = g.astype(idtype).to(ctx)
+    sgconv = nn.SGConv(5, 5, 3)
+    feat = F.randn((g.number_of_nodes(), 5))
+    eweight = F.ones((g.num_edges(), ))
+    sgconv = sgconv.to(ctx)
+    h = sgconv(g, feat, edge_weight=eweight)
+    assert h.shape[-1] == 5
+
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
+def test_tagconv_e_weight(g, idtype):
+    ctx = F.ctx()
+    g = g.astype(idtype).to(ctx)
+    conv = nn.TAGConv(5, 5, bias=True)
+    conv = conv.to(ctx)
+    feat = F.randn((g.number_of_nodes(), 5))
+    eweight = F.ones((g.num_edges(), ))
+    conv = conv.to(ctx)
+    h = conv(g, feat, edge_weight=eweight)
+    assert h.shape[-1] == 5
+
+@parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite'], exclude=['zero-degree']))
 @pytest.mark.parametrize('aggregator_type', ['mean', 'max', 'sum'])
 def test_gin_conv(g, idtype, aggregator_type):
