@@ -2761,14 +2761,18 @@ def test_heterograph_update(idtype):
         #Check g1's node data was updated with g2's.
         for key in g1.nodes[ntype].data:
             g2_n_nodes = g2.num_nodes(ntype=ntype)
+            updated_g1_ndata = F.asnumpy(g1.nodes[ntype].data[key][:g2_n_nodes])
+            g2_ndata = F.asnumpy(g2.nodes[ntype].data[key])
             assert all(
-                (g1.nodes[ntype].data[key][:g2_n_nodes] == g2.nodes[ntype].data[key]).flatten()
+                (updated_g1_ndata == g2_ndata).flatten()
             )
 
     #Check g1's edge data was updated with g2's.
     for key in g1.edges["to"].data:
+        updated_g1_edata = F.asnumpy(g1.edges["to"].data[key][g1_n_edges:])
+        g2_edata = F.asnumpy(g2.edges["to"].data[key])
         assert all(
-            (g1.edges["to"].data[key][g1_n_edges:] == g2.edges["to"].data[key]).flatten()
+            (updated_g1_edata == g2_edata).flatten()
         )
 
 if __name__ == '__main__':
