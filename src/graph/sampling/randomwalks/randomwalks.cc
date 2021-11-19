@@ -114,7 +114,8 @@ std::tuple<IdArray, IdArray, IdArray> RandomWalkTopk(
           && (src->shape == dst->shape));
   std::tuple<IdArray, IdArray, IdArray> result;
 
-  ATEN_XPU_SWITCH_CUDA((src->ctx).device_type, XPU, "RandomWalkTopk", {
+  // TODO: support randomwalk_topk on GPU
+  ATEN_XPU_SWITCH((src->ctx).device_type, XPU, "RandomWalkTopk", {
     ATEN_ID_TYPE_SWITCH(src->dtype, IdxType, {
       result = impl::RandomWalkTopk<XPU, IdxType>(src, dst, num_samples_per_node, k);
     });
