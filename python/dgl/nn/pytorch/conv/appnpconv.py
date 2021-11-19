@@ -87,7 +87,7 @@ class APPNPConv(nn.Module):
             edge_weight to use in the message passing process.This is equivalent to
             use real-weighted adjacency matrix in the equation above, and
             :math:\tilde{D}^{-1/2}\tilde{A} \tilde{D}^{-1/2}
-            is based on :class:`dgl.nn.pytorch.graphconv.EdgeWeightNorm`.
+            is based on :class:`dgl.nn.pytorch.conv.graphconv.EdgeWeightNorm`.
 
         Returns
         -------
