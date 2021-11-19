@@ -116,5 +116,5 @@ void SocketPool::Wait() {
 #endif
 }
 
-} // namespace network
-} // namespace dgl
+}  // namespace network
+}  // namespace dgl
