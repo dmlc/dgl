@@ -1229,6 +1229,26 @@ def test_gnnexplainer(g, idtype, out_dim):
     explainer = nn.GNNExplainer(model, num_hops=1)
     feat_mask, edge_mask = explainer.explain_graph(g, feat)
 
+def test_jumping_knowledge():
+    ctx = F.ctx()
+    num_layers = 2
+    num_nodes = 3
+    num_feats = 4
+
+    feat_list = [th.randn((num_nodes, num_feats)).to(ctx) for _ in range(num_layers)]
+
+    model = nn.JumpingKnowledge('cat').to(ctx)
+    model.reset_parameters()
+    assert model(feat_list).shape == (num_nodes, num_layers * num_feats)
+
+    model = nn.JumpingKnowledge('max').to(ctx)
+    model.reset_parameters()
+    assert model(feat_list).shape == (num_nodes, num_feats)
+
+    model = nn.JumpingKnowledge('lstm', num_feats, num_layers).to(ctx)
+    model.reset_parameters()
+    assert model(feat_list).shape == (num_nodes, num_feats)
+
 if __name__ == '__main__':
     test_graph_conv()
     test_graph_conv_e_weight()
