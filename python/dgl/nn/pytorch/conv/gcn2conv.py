@@ -190,9 +190,10 @@ class GCN2Conv(nn.Module):
         feat_0 : torch.Tensor
             The initial feature of shape :math:`(N, D_{in})`
         edge_weight: torch.Tensor, optional
-            edge_weight used in the message passing process.This is equivalent to use real-weighted
-            adjacency in the equation above, and the degree normalization uses edge weight also,
-            based on :ref:`EdgeWeightNorm`.
+            edge_weight to use in the message passing process.This is equivalent to
+            use real-weighted adjacency matrix in the equation above, and
+            :math:\tilde{D}^{-1/2}\tilde{A} \tilde{D}^{-1/2}
+            is based on :class:`dgl.nn.pytorch.conv.graphconv.EdgeWeightNorm`.
 
 
         Returns
