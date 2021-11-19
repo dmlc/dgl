@@ -2736,7 +2736,7 @@ def test_adj_sparse(idtype, fmt):
 @parametrize_dtype
 def test_heterograph_update(idtype):
     g1 = dgl.heterograph({("a", "to", "b"): ([0,1], [1,0])}).astype(idtype).to(F.ctx())
-    g1_n_edges = g1.num_edges(etype = "to")
+    g1_n_edges = g1.num_edges(etype="to")
     g1.nodes["a"].data["nh"] = F.randn((2,3))
     g1.nodes["b"].data["nh"] = F.randn((2,3))
     g1.edges["to"].data["eh"] = F.randn((2,3))
@@ -2745,8 +2745,8 @@ def test_heterograph_update(idtype):
     g2.nodes["a"].data["nh"] = F.randn((4,3))
     g2.nodes["b"].data["nh"] = F.randn((6,3))
     g2.edges["to"].data["eh"] = F.randn((3,3))
-    g2.add_nodes(3, ntype = "a")
-    g2.add_nodes(3, ntype = "b")
+    g2.add_nodes(3, ntype="a")
+    g2.add_nodes(3, ntype="b")
 
     g1.update(g2)
 
@@ -2754,13 +2754,13 @@ def test_heterograph_update(idtype):
     assert all(g1.edges()[0][g1_n_edges:] == g2.edges()[0])
     assert all(g1.edges()[1][g1_n_edges:] == g2.edges()[1])
     for ntype in g1.ntypes:
-        assert g1.num_nodes(ntype = ntype) == max(
-            g1.num_nodes(ntype = ntype), g2.num_nodes(ntype = ntype)
+        assert g1.num_nodes(ntype=ntype) == max(
+            g1.num_nodes(ntype=ntype), g2.num_nodes(ntype=ntype)
         )
 
         #Check g1's node data was updated with g2's.
         for key in g1.nodes[ntype].data:
-            g2_n_nodes = g2.num_nodes(ntype = ntype)
+            g2_n_nodes = g2.num_nodes(ntype=ntype)
             assert all(
                 (g1.nodes[ntype].data[key][:g2_n_nodes] == g2.nodes[ntype].data[key]).flatten()
             )
