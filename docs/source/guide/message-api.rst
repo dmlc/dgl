@@ -82,7 +82,7 @@ example：
 
 .. code::
 
-    def updata_all_example(graph):
+    def update_all_example(graph):
         # store the result in graph.ndata['ft']
         graph.update_all(fn.u_mul_e('ft', 'a', 'm'),
                          fn.sum('m', 'ft'))

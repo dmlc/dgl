@@ -426,7 +426,7 @@ class LatentDirichletAllocation:
 
 def doc_subgraph(G, doc_ids):
     sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
-    block, *_ = sampler.sample_blocks(G.reverse(), {'doc': torch.as_tensor(doc_ids)})
+    _, _, (block,) = sampler.sample(G.reverse(), {'doc': torch.as_tensor(doc_ids)})
     B = dgl.DGLHeteroGraph(
         block._graph, ['_', 'word', 'doc', '_'], block.etypes
     ).reverse()
