@@ -96,7 +96,6 @@ COOMatrix CSRToCOO<kDLGPU, int64_t>(CSRMatrix csr) {
       rowids.Ptr<int64_t>(), row_nnz.Ptr<int64_t>(),
       csr.indptr.Ptr<int64_t>(), ret_row.Ptr<int64_t>(),
       csr.num_rows);
-  cudaDeviceSynchronize();
 
   return COOMatrix(csr.num_rows, csr.num_cols,
                    ret_row, csr.indices, csr.data,
