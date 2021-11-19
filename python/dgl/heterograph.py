@@ -880,7 +880,7 @@ class DGLHeteroGraph(object):
                          self.num_nodes(ntype=ntype))
             n_extra_nodes = max(0, node_diff)
             self.add_nodes(n_extra_nodes, ntype=ntype)
-            other_nodes = F.arange(0, other.num_nodes(ntype=ntype))
+            other_nodes = F.arange(0, other.num_nodes(ntype=ntype), self.idtype, self.device)
             self._node_frames[self_ntype_id].update_row(
                 other_nodes, other_ndata
             )
