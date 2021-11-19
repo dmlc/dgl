@@ -106,8 +106,8 @@ class TAGConv(nn.Module):
             The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`
             is size of input feature, :math:`N` is the number of nodes.
         edge_weight: torch.Tensor, optional
-            edge_weight to use in the message passing process.This is equivalent to
-            use real-weighted adjacency matrix in the equation above, and
+            edge_weight to use in the message passing process. This is equivalent to
+            using weighted adjacency matrix in the equation above, and
             :math:\tilde{D}^{-1/2}\tilde{A} \tilde{D}^{-1/2}
             is based on :class:`dgl.nn.pytorch.conv.graphconv.EdgeWeightNorm`.
 
