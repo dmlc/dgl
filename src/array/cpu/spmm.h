@@ -381,7 +381,6 @@ void SpMMCmpCsrHetero(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat
         IdType* argx_ntype = argX_ntype + rid * dim;
         IdType* argw_etype = argW_etype + rid * dim;
         for (IdType j = row_start; j < row_end; ++j) {
-
           const IdType cid = indices[j];
           const IdType eid = has_idx ? edges[j] : j;
           for (int64_t k = 0; k < dim; ++k) {

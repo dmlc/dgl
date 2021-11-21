@@ -9,6 +9,7 @@
 #include <dgl/array.h>
 #include <dgl/runtime/parallel_for.h>
 #include <dgl/base_heterograph.h>
+#include <vector>
 
 namespace dgl {
 namespace aten {
@@ -116,19 +117,20 @@ void UpdateGradMinMax_hetero(HeteroGraphPtr graph,
                        std::vector<NDArray> list_idx,
                        std::vector<NDArray> list_idx_ntypes,
                        std::vector<NDArray> list_out) {
-  std::vector<std::vector<dgl_id_t>> dst_src_ntids(graph->NumVertexTypes(), std::vector<dgl_id_t>());
+  std::vector<std::vector<dgl_id_t>> dst_src_ntids(graph->NumVertexTypes(),
+    std::vector<dgl_id_t>());
   for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
     auto pair = graph->meta_graph()->FindEdge(etype);
-    const dgl_id_t dst_id = pair.first; // graph is reveresed
+    const dgl_id_t dst_id = pair.first;  // graph is reveresed
     const dgl_id_t src_id = pair.second;
-    dst_src_ntids[dst_id].push_back(src_id); // can have duplicates. Use Hashtable to optimize.
+    dst_src_ntids[dst_id].push_back(src_id);  // can have duplicates. Use Hashtable to optimize.
   }
   std::vector<bool> updated(graph->NumVertexTypes(), false);
   for (int dst_id = 0; dst_id < dst_src_ntids.size(); ++dst_id) {
     updated[dst_id] = false;
     for (int j = 0; j < dst_src_ntids[dst_id].size(); ++j) {
       int src_id = dst_src_ntids[dst_id][j];
-      if(updated[src_id]) continue;
+      if (updated[src_id]) continue;
       const DType* feat_data = list_feat[dst_id].Ptr<DType>();
       const IdType* idx_data = list_idx[dst_id].Ptr<IdType>();
       const IdType* idx_ntype_data = list_idx_ntypes[dst_id].Ptr<IdType>();
@@ -144,7 +146,7 @@ void UpdateGradMinMax_hetero(HeteroGraphPtr graph,
           if (src_id == idx_ntype_data[i * dim + k]) {
             const int write_row = idx_data[i * dim + k];
   #pragma omp atomic
-            out_data[write_row * dim + k] += feat_data[i * dim + k]; // feat = dZ
+            out_data[write_row * dim + k] += feat_data[i * dim + k];  // feat = dZ
           }
         }
       }

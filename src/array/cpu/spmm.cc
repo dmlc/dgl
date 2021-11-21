@@ -78,7 +78,7 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
     SWITCH_BITS(bits, DType, {
       SWITCH_OP(op, Op, {
         std::vector<bool> updated(vec_out.size(), false);
-        //  TODO (Israt): use vector updated to fill(out...) too
+        // TODO(Israt): use vector updated to fill(out...) too
         for (dgl_type_t etype = 0; etype < ufeat_node_tids.size(); ++etype) {
           DType *out_off = vec_out[out_node_tids[etype]].Ptr<DType>();
           if (reduce == "max")
@@ -86,14 +86,14 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
           else
             std::fill(out_off, out_off + vec_csr[etype].num_rows * dim, cpu::op::Min<DType>::zero);
           const dgl_type_t dst_id = out_node_tids[etype];
-          if(!updated[dst_id]) {
+          if (!updated[dst_id]) {
             updated[dst_id] = true;
-            // TODO (Israt): what to fill with?
-            if(Op::use_lhs) {
+            // TODO(Israt): what to fill with?
+            if (Op::use_lhs) {
               IdType *argu_ntype = out_aux[2][dst_id].Ptr<IdType>();
               std::fill(argu_ntype, argu_ntype + vec_csr[etype].num_rows * dim, -1);
             }
-            if(Op::use_rhs) {
+            if (Op::use_rhs) {
               IdType *arge_etype = out_aux[3][dst_id].Ptr<IdType>();
               std::fill(arge_etype, arge_etype + vec_csr[etype].num_rows * dim, -1);
             }

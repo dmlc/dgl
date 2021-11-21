@@ -612,8 +612,8 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
                 NullArray() : vec_ufeat[src_id];
             NDArray efeat = (vec_efeat.size() == 0) ?
                 NullArray() : vec_efeat[etype];
-            cuda::SpMMCsr<IdType, DType, Op, cuda::reduce::Max<IdType, DType> >(
-                bcast, csr, ufeat, efeat, vec_out[dst_id], out_aux[0], out_aux[1]);
+            // cuda::SpMMCsr<IdType, DType, Op, cuda::reduce::Max<IdType, DType> >(
+            //     bcast, csr, ufeat, efeat, vec_out[dst_id], out_aux[0], out_aux[1]);
           });
       } else if (reduce == "min") {
           SWITCH_OP(op, Op, {
@@ -621,8 +621,8 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
                 NullArray() : vec_ufeat[src_id];
             NDArray efeat = (vec_efeat.size() == 0) ?
                 NullArray() : vec_efeat[etype];
-            cuda::SpMMCsr<IdType, DType, Op, cuda::reduce::Min<IdType, DType> >(
-                bcast, csr, ufeat, efeat, vec_out[dst_id], out_aux[0], out_aux[1]);
+            // cuda::SpMMCsr<IdType, DType, Op, cuda::reduce::Min<IdType, DType> >(
+            //     bcast, csr, ufeat, efeat, vec_out[dst_id], out_aux[0], out_aux[1]);
         });
       } else {
         LOG(FATAL) << "Not implemented";

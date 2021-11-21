@@ -4,10 +4,11 @@
  * \brief Segment reduce C APIs and definitions.
  */
 #include <dgl/array.h>
+#include <dgl/base_heterograph.h>
 #include "./segment_reduce.cuh"
 #include "./functor.cuh"
 #include "./utils.h"
-#include <dgl/base_heterograph.h>
+
 
 namespace dgl {
 

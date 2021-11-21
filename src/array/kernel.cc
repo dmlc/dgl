@@ -232,7 +232,7 @@ void ScatterAddDispatchHetero(HeteroGraphPtr graph,
                         std::vector<NDArray> idx,
                         std::vector<NDArray> idx_etype,
                         std::vector<NDArray> out) {
-  auto pair = graph->meta_graph()->FindEdge(0); // checking the first etype
+  auto pair = graph->meta_graph()->FindEdge(0);  // checking the first etype
   auto src_id = pair.first;
   ATEN_XPU_SWITCH_CUDA(feat[src_id]->ctx.device_type, XPU, "ScatterAdd", {
     ATEN_ID_TYPE_SWITCH(idx[src_id]->dtype, IdType, {
@@ -357,7 +357,7 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSpMMHetero")
     std::vector<NDArray> U_vec;
     std::vector<NDArray> V_vec;
     std::vector<NDArray> E_vec;
-    std::vector<std::vector<NDArray>> Arg_vec; // ArgU + ArgE
+    std::vector<std::vector<NDArray>> Arg_vec;  // ArgU + ArgE
     U_vec.reserve(list_U.size());
     V_vec.reserve(list_V.size());
     E_vec.reserve(list_E.size());
@@ -366,7 +366,7 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSpMMHetero")
     for (Value val : list_V) V_vec.push_back(val->data);
     for (Value val : list_E) E_vec.push_back(val->data);
 
-    for (int i = 0; i < 4; ++i) // ArgU + ArgE + ArgU_etype + ArgE_etype
+    for (int i = 0; i < 4; ++i)  // ArgU + ArgE + ArgU_etype + ArgE_etype
       Arg_vec.push_back(std::vector<NDArray>());
     for (Value val : list_ArgU) Arg_vec[0].push_back(val->data);
     for (Value val : list_ArgE) Arg_vec[1].push_back(val->data);
@@ -379,7 +379,7 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSpMMHetero")
       const dgl_id_t dst_id = pair.second;
       NDArray U = (U_vec.size() == 0) ? NullArray() : U_vec[src_id];
       NDArray E = (E_vec.size() == 0) ? NullArray() : E_vec[etype];
-      CheckCtx(graph->Context(), {U, E, V_vec[dst_id], Arg_vec[0][dst_id], Arg_vec[1][dst_id],},
+      CheckCtx(graph->Context(), {U, E, V_vec[dst_id], Arg_vec[0][dst_id], Arg_vec[1][dst_id]},
           {"U_data", "E_data", "out", "Arg_U", "Arg_E"});
       CheckContiguous({U, E, V_vec[dst_id], Arg_vec[0][dst_id], Arg_vec[1][dst_id]},
           {"U_data", "E_data", "out", "Arg_U", "Arg_E"});
