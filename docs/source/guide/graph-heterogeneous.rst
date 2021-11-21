@@ -251,7 +251,7 @@ The original node/edge types and type-specific IDs are stored in :py:attr:`~dgl.
     tensor([0, 0, 0, 1, 1, 1])
     >>> # Original type-specific node IDs
     >>> hg.ndata[dgl.NID]
-    >>> tensor([0, 1, 2, 0, 1, 2])
+    tensor([0, 1, 2, 0, 1, 2])
 
     >>> # Order of edge types in the heterograph
     >>> g.etypes

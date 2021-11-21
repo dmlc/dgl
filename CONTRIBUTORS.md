@@ -58,3 +58,5 @@ Contributors
 * [@xnuohz](https://github.com/xnuohz)
 * [Hao Jin](https://github.com/haojin2) from Amazon
 * [Xin Yao](https://github.com/yaox12) from Nvidia
+* [Abdurrahman Yasar](https://github.com/ayasar70) from Nvidia
+* [Shaked Brody](https://github.com/shakedbr) from Technion

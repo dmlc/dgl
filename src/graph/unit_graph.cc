@@ -1000,30 +1000,38 @@ EdgeArray UnitGraph::Edges(dgl_type_t etype, const std::string &order) const {
 uint64_t UnitGraph::InDegree(dgl_type_t etype, dgl_id_t vid) const {
   SparseFormat fmt = SelectFormat(CSC_CODE);
   const auto ptr = GetFormat(fmt);
-  if (fmt == SparseFormat::kCSC)
-    return ptr->OutDegree(etype, vid);
-  else
-    return ptr->InDegree(etype, vid);
+  CHECK(fmt == SparseFormat::kCSC || fmt == SparseFormat::kCOO)
+      << "In degree cannot be computed as neither CSC nor COO format is "
+         "allowed for this graph. Please enable one of them at least.";
+  return fmt == SparseFormat::kCSC ? ptr->OutDegree(etype, vid)
+                                   : ptr->InDegree(etype, vid);
 }
 
 DegreeArray UnitGraph::InDegrees(dgl_type_t etype, IdArray vids) const {
   SparseFormat fmt = SelectFormat(CSC_CODE);
   const auto ptr = GetFormat(fmt);
-  if (fmt == SparseFormat::kCSC)
-    return ptr->OutDegrees(etype, vids);
-  else
-    return ptr->InDegrees(etype, vids);
+  CHECK(fmt == SparseFormat::kCSC || fmt == SparseFormat::kCOO)
+      << "In degree cannot be computed as neither CSC nor COO format is "
+         "allowed for this graph. Please enable one of them at least.";
+  return fmt == SparseFormat::kCSC ? ptr->OutDegrees(etype, vids)
+                                   : ptr->InDegrees(etype, vids);
 }
 
 uint64_t UnitGraph::OutDegree(dgl_type_t etype, dgl_id_t vid) const {
   SparseFormat fmt = SelectFormat(CSR_CODE);
   const auto ptr = GetFormat(fmt);
+  CHECK(fmt == SparseFormat::kCSR || fmt == SparseFormat::kCOO)
+      << "Out degree cannot be computed as neither CSR nor COO format is "
+         "allowed for this graph. Please enable one of them at least.";
   return ptr->OutDegree(etype, vid);
 }
 
 DegreeArray UnitGraph::OutDegrees(dgl_type_t etype, IdArray vids) const {
   SparseFormat fmt = SelectFormat(CSR_CODE);
   const auto ptr = GetFormat(fmt);
+  CHECK(fmt == SparseFormat::kCSR || fmt == SparseFormat::kCOO)
+      << "Out degree cannot be computed as neither CSR nor COO format is "
+         "allowed for this graph. Please enable one of them at least.";
   return ptr->OutDegrees(etype, vids);
 }
 

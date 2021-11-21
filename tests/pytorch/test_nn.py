@@ -154,7 +154,7 @@ def test_graph_conv_bi(idtype, g, norm, weight, bias, out_dim):
     # Test a pair of tensor inputs
     g = g.astype(idtype).to(F.ctx())
     conv = nn.GraphConv(5, out_dim, norm=norm, weight=weight, bias=bias).to(F.ctx())
-    
+
     # test pickle
     th.save(conv, tmp_buffer)
 
@@ -192,7 +192,7 @@ def test_tagconv(out_dim):
     conv = nn.TAGConv(5, out_dim, bias=True)
     conv = conv.to(ctx)
     print(conv)
-    
+
     # test pickle
     th.save(conv, tmp_buffer)
 
@@ -565,13 +565,52 @@ def test_gat_conv_bi(g, idtype, out_dim, num_heads):
     assert a.shape == (g.number_of_edges(), num_heads, 1)
 
 @parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite'], exclude=['zero-degree']))
+@pytest.mark.parametrize('out_dim', [1, 5])
+@pytest.mark.parametrize('num_heads', [1, 4])
+def test_gatv2_conv(g, idtype, out_dim, num_heads):
+    g = g.astype(idtype).to(F.ctx())
+    ctx = F.ctx()
+    gat = nn.GATv2Conv(5, out_dim, num_heads)
+    feat = F.randn((g.number_of_src_nodes(), 5))
+    gat = gat.to(ctx)
+    h = gat(g, feat)
+
+    # test pickle
+    th.save(gat, tmp_buffer)
+
+    assert h.shape == (g.number_of_dst_nodes(), num_heads, out_dim)
+    _, a = gat(g, feat, get_attention=True)
+    assert a.shape == (g.number_of_edges(), num_heads, 1)
+
+    # test residual connection
+    gat = nn.GATConv(5, out_dim, num_heads, residual=True)
+    gat = gat.to(ctx)
+    h = gat(g, feat)
+
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['bipartite'], exclude=['zero-degree']))
+@pytest.mark.parametrize('out_dim', [1, 2])
+@pytest.mark.parametrize('num_heads', [1, 4])
+def test_gatv2_conv_bi(g, idtype, out_dim, num_heads):
+    g = g.astype(idtype).to(F.ctx())
+    ctx = F.ctx()
+    gat = nn.GATv2Conv(5, out_dim, num_heads)
+    feat = (F.randn((g.number_of_src_nodes(), 5)), F.randn((g.number_of_dst_nodes(), 5)))
+    gat = gat.to(ctx)
+    h = gat(g, feat)
+    assert h.shape == (g.number_of_dst_nodes(), num_heads, out_dim)
+    _, a = gat(g, feat, get_attention=True)
+    assert a.shape == (g.number_of_edges(), num_heads, 1)
+
+@parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
 @pytest.mark.parametrize('out_node_feats', [1, 5])
 @pytest.mark.parametrize('out_edge_feats', [1, 5])
 @pytest.mark.parametrize('num_heads', [1, 4])
 def test_egat_conv(g, idtype, out_node_feats, out_edge_feats, num_heads):
     g = g.astype(idtype).to(F.ctx())
-    ctx = F.ctx() 
+    ctx = F.ctx()
     egat = nn.EGATConv(in_node_feats=10,
                        in_edge_feats=5,
                        out_node_feats=out_node_feats,
@@ -579,12 +618,12 @@ def test_egat_conv(g, idtype, out_node_feats, out_edge_feats, num_heads):
                        num_heads=num_heads)
     nfeat = F.randn((g.number_of_nodes(), 10))
     efeat = F.randn((g.number_of_edges(), 5))
-    
+
     egat = egat.to(ctx)
     h, f = egat(g, nfeat, efeat)
     h, f, attn = egat(g, nfeat, efeat, True)
 
-    th.save(egat, tmp_buffer)    
+    th.save(egat, tmp_buffer)
 
 @parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite']))
@@ -669,11 +708,65 @@ def test_appnp_conv(g, idtype):
     appnp = nn.APPNPConv(10, 0.1)
     feat = F.randn((g.number_of_nodes(), 5))
     appnp = appnp.to(ctx)
-    
+
     # test pickle
     th.save(appnp, tmp_buffer)
 
     h = appnp(g, feat)
+    assert h.shape[-1] == 5
+
+
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
+def test_appnp_conv_e_weight(g, idtype):
+    ctx = F.ctx()
+    g = g.astype(idtype).to(ctx)
+    appnp = nn.APPNPConv(10, 0.1)
+    feat = F.randn((g.number_of_nodes(), 5))
+    eweight = F.ones((g.num_edges(), ))
+    appnp = appnp.to(ctx)
+
+    h = appnp(g, feat, edge_weight=eweight)
+    assert h.shape[-1] == 5
+
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
+def test_gcn2conv_e_weight(g, idtype):
+    ctx = F.ctx()
+    g = g.astype(idtype).to(ctx)
+    gcn2conv = nn.GCN2Conv(5, layer=2, alpha=0.5,
+                           project_initial_features=True)
+    feat = F.randn((g.number_of_nodes(), 5))
+    eweight = F.ones((g.num_edges(), ))
+    gcn2conv = gcn2conv.to(ctx)
+    res = feat
+    h = gcn2conv(g, res, feat, edge_weight=eweight)
+    assert h.shape[-1] == 5
+
+
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
+def test_sgconv_e_weight(g, idtype):
+    ctx = F.ctx()
+    g = g.astype(idtype).to(ctx)
+    sgconv = nn.SGConv(5, 5, 3)
+    feat = F.randn((g.number_of_nodes(), 5))
+    eweight = F.ones((g.num_edges(), ))
+    sgconv = sgconv.to(ctx)
+    h = sgconv(g, feat, edge_weight=eweight)
+    assert h.shape[-1] == 5
+
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
+def test_tagconv_e_weight(g, idtype):
+    ctx = F.ctx()
+    g = g.astype(idtype).to(ctx)
+    conv = nn.TAGConv(5, 5, bias=True)
+    conv = conv.to(ctx)
+    feat = F.randn((g.number_of_nodes(), 5))
+    eweight = F.ones((g.num_edges(), ))
+    conv = conv.to(ctx)
+    h = conv(g, feat, edge_weight=eweight)
     assert h.shape[-1] == 5
 
 @parametrize_dtype
@@ -692,7 +785,7 @@ def test_gin_conv(g, idtype, aggregator_type):
 
     # test pickle
     th.save(h, tmp_buffer)
-    
+
     assert h.shape == (g.number_of_dst_nodes(), 12)
 
 @parametrize_dtype
@@ -875,7 +968,7 @@ def test_edge_conv(g, idtype, out_dim):
 
     # test pickle
     th.save(edge_conv, tmp_buffer)
-    
+
     h0 = F.randn((g.number_of_src_nodes(), 5))
     h1 = edge_conv(g, h0)
     assert h1.shape == (g.number_of_dst_nodes(), out_dim)
@@ -892,7 +985,7 @@ def test_edge_conv_bi(g, idtype, out_dim):
     x0 = F.randn((g.number_of_dst_nodes(), 5))
     h1 = edge_conv(g, (h0, x0))
     assert h1.shape == (g.number_of_dst_nodes(), out_dim)
-    
+
 @parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite'], exclude=['zero-degree']))
 @pytest.mark.parametrize('out_dim', [1, 2])
@@ -903,10 +996,10 @@ def test_dotgat_conv(g, idtype, out_dim, num_heads):
     dotgat = nn.DotGatConv(5, out_dim, num_heads)
     feat = F.randn((g.number_of_src_nodes(), 5))
     dotgat = dotgat.to(ctx)
-    
+
     # test pickle
     th.save(dotgat, tmp_buffer)
-    
+
     h = dotgat(g, feat)
     assert h.shape == (g.number_of_dst_nodes(), num_heads, out_dim)
     _, a = dotgat(g, feat, get_attention=True)
@@ -1147,6 +1240,69 @@ def test_hetero_conv(agg, idtype):
              {'user': uf, 'game': gf, 'store': sf[0:0]}))
     assert set(h.keys()) == {'user', 'game'}
 
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
+@pytest.mark.parametrize('out_dim', [1, 2])
+def test_gnnexplainer(g, idtype, out_dim):
+    g = g.astype(idtype).to(F.ctx())
+    feat = F.randn((g.num_nodes(), 5))
+
+    class Model(th.nn.Module):
+        def __init__(self, in_feats, out_feats, graph=False):
+            super(Model, self).__init__()
+            self.linear = th.nn.Linear(in_feats, out_feats)
+            if graph:
+                self.pool = nn.AvgPooling()
+            else:
+                self.pool = None
+
+        def forward(self, graph, feat, eweight=None):
+            with graph.local_scope():
+                feat = self.linear(feat)
+                graph.ndata['h'] = feat
+                if eweight is None:
+                    graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
+                else:
+                    graph.edata['w'] = eweight
+                    graph.update_all(fn.u_mul_e('h', 'w', 'm'), fn.sum('m', 'h'))
+
+                if self.pool:
+                    return self.pool(graph, graph.ndata['h'])
+                else:
+                    return graph.ndata['h']
+
+    # Explain node prediction
+    model = Model(5, out_dim)
+    model = model.to(F.ctx())
+    explainer = nn.GNNExplainer(model, num_hops=1)
+    new_center, sg, feat_mask, edge_mask = explainer.explain_node(0, g, feat)
+
+    # Explain graph prediction
+    model = Model(5, out_dim, graph=True)
+    model = model.to(F.ctx())
+    explainer = nn.GNNExplainer(model, num_hops=1)
+    feat_mask, edge_mask = explainer.explain_graph(g, feat)
+
+def test_jumping_knowledge():
+    ctx = F.ctx()
+    num_layers = 2
+    num_nodes = 3
+    num_feats = 4
+
+    feat_list = [th.randn((num_nodes, num_feats)).to(ctx) for _ in range(num_layers)]
+
+    model = nn.JumpingKnowledge('cat').to(ctx)
+    model.reset_parameters()
+    assert model(feat_list).shape == (num_nodes, num_layers * num_feats)
+
+    model = nn.JumpingKnowledge('max').to(ctx)
+    model.reset_parameters()
+    assert model(feat_list).shape == (num_nodes, num_feats)
+
+    model = nn.JumpingKnowledge('lstm', num_feats, num_layers).to(ctx)
+    model.reset_parameters()
+    assert model(feat_list).shape == (num_nodes, num_feats)
+
 if __name__ == '__main__':
     test_graph_conv()
     test_graph_conv_e_weight()
@@ -1159,6 +1315,7 @@ if __name__ == '__main__':
     test_rgcn_sorted()
     test_tagconv()
     test_gat_conv()
+    test_gatv2_conv()
     test_egat_conv()
     test_sage_conv()
     test_sgc_conv()

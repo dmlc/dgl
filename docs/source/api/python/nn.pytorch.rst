@@ -44,8 +44,14 @@ GATConv
 .. autoclass:: dgl.nn.pytorch.conv.GATConv
     :members: forward
     :show-inheritance:
-    
-    
+
+GATv2Conv
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.conv.GATv2Conv
+    :members: forward
+    :show-inheritance:
+
 EGATConv
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -157,7 +163,7 @@ TWIRLSUnfoldingAndAttention
 .. autoclass:: dgl.nn.pytorch.conv.TWIRLSUnfoldingAndAttention
     :members: forward
     :show-inheritance:
-    
+
 GCN2Conv
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -304,6 +310,13 @@ SegmentedKNNGraph
     :members:
     :show-inheritance:
 
+JumpingKnowledge
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.utils.JumpingKnowledge
+    :members: forward, reset_parameters
+    :show-inheritance:
+
 NodeEmbedding Module
 ----------------------------------------
 
@@ -312,4 +325,16 @@ NodeEmbedding
 
 .. autoclass:: dgl.nn.pytorch.sparse_emb.NodeEmbedding
     :members:
+    :show-inheritance:
+
+Explainability Models
+----------------------------------------
+
+.. automodule:: dgl.nn.pytorch.explain
+
+GNNExplainer
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.explain.GNNExplainer
+    :members: explain_node, explain_graph
     :show-inheritance:
