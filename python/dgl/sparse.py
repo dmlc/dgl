@@ -267,9 +267,11 @@ def _gspmm_hetero(gidx, op, reduce_op, u_len, u_and_e_tuple):
         if expand_e and use_cmp:
             list_arg_e[l] = F.squeeze(list_arg_e[l], -1)
     for l, arg_u_ntype_nd in enumerate(list_arg_u_ntype_nd):
-        list_arg_u_ntype[l] = None if arg_u_ntype_nd is None else F.zerocopy_from_dgl_ndarray(arg_u_ntype_nd)
+        list_arg_u_ntype[l] = None if arg_u_ntype_nd is None \
+            else F.zerocopy_from_dgl_ndarray(arg_u_ntype_nd)
     for l, arg_e_etype_nd in enumerate(list_arg_e_etype_nd):
-        list_arg_e_etype[l] = None if arg_e_etype_nd is None else F.zerocopy_from_dgl_ndarray(arg_e_etype_nd)
+        list_arg_e_etype[l] = None if arg_e_etype_nd is None \
+            else F.zerocopy_from_dgl_ndarray(arg_e_etype_nd)
     # To deal with scalar node/edge features.
     for l in range(num_ntypes):
         # replace None by empty tensor. Forward func doesn't accept None in tuple.
@@ -530,11 +532,11 @@ def _update_grad_minmax_hetero(gidx, list_x, list_idx, list_idx_etype, list_dX):
         dtype = F.dtype(x)
         list_out[dst_id] = F.zeros(out_shp, dtype, ctx)
     _CAPI_DGLKernelUpdateGradMinMaxHetero(gidx,
-                                    [to_dgl_nd(x) for x in list_x],
-                                    # TODO (Israt): change idx to idx.long()
-                                    [to_dgl_nd(idx) for idx in list_idx],
-                                    [to_dgl_nd(idx_etype) for idx_etype in list_idx_etype],
-                                    [to_dgl_nd_for_write(out) for out in list_out])
+                                          [to_dgl_nd(x) for x in list_x],
+                                          # TODO (Israt): change idx to idx.long()
+                                          [to_dgl_nd(idx) for idx in list_idx],
+                                          [to_dgl_nd(idx_etype) for idx_etype in list_idx_etype],
+                                          [to_dgl_nd_for_write(out) for out in list_out])
     return tuple(list_out)
 
 
