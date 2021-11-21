@@ -16,7 +16,7 @@ from coarsening import coarsen
 from coordinate import get_coordinates, z2polar
 
 argparser = argparse.ArgumentParser("MNIST")
-argparser.add_argument("--gpu", type=int, default=-1,
+argparser.add_argument("--gpu", type=int, default=5,
                        help="gpu id, use cpu if set to -1")
 argparser.add_argument("--model", type=str, default="chebnet",
                        help="model to use, chebnet/monet")
