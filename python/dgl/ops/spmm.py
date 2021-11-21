@@ -89,7 +89,7 @@ def gspmm(g, op, reduce_op, lhs_data, rhs_data):
                                     len(lhs_data), *lhs_and_rhs_tuple)
         if reduce_op in ['min', 'max']:
             ret = tuple([F.replace_inf_with_zero(ret[i]) if ret[i] is not None else None
-                for i in range(len(ret))])
+                         for i in range(len(ret))])
     # TODO (Israt): Add support for 'mean' in heterograph
     # divide in degrees for mean reducer.
     if reduce_op == 'mean':
