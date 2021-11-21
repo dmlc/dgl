@@ -97,6 +97,22 @@ void SDDMMCoo(const std::string& op,
               int rhs_target);
 
 /*!
+ * \brief Generalized Sampled Dense-Dense Matrix Multiplication on Coo
+ format with heterograph support.
+  */
+template <int XPU, typename IdType, int bits>
+void SDDMMCooHetero(const std::string& op,
+              const BcastOff& bcast,
+              const std::vector<COOMatrix>& vec_coo,
+              const std::vector<NDArray>& vec_lhs,
+              const std::vector<NDArray>& vec_rhs,
+              std::vector<NDArray> vec_out,
+              int lhs_target,
+              int rhs_target,
+              const std::vector<dgl_type_t>& lhs_eid,
+              const std::vector<dgl_type_t>& rhs_eid);
+
+/*!
  * \brief Segment reduce.
  */
 template <int XPU, typename IdType, int bits>
