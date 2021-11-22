@@ -249,7 +249,7 @@ def randomwalk_topk(src, dst, num_samples_per_node, k):
     src = F.from_dgl_nd(src)
     dst = F.from_dgl_nd(dst)
     counts = F.from_dgl_nd(counts)
-    return (src,dst,counts)
+    return (src, dst, counts)
 
 def pack_traces(traces, types):
     """Pack the padded traces returned by ``random_walk()`` into a concatenated array.
