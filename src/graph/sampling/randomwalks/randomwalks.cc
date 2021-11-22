@@ -109,9 +109,9 @@ std::tuple<IdArray, IdArray, IdArray> RandomWalkTopk(
     const IdArray dst,
     const int64_t num_samples_per_node,
     const int64_t k) {
-  assert((src->shape.size() == 1)
+  assert((src->ndim == 1) && (dst->ndim == 1)
           && (src->shape[0] % num_samples_per_node == 0)
-          && (src->shape == dst->shape));
+          && (src->shape[0] == dst->shape[0]));
   std::tuple<IdArray, IdArray, IdArray> result;
 
   ATEN_XPU_SWITCH((src->ctx).device_type, XPU, "RandomWalkTopk", {
