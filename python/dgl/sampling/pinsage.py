@@ -4,13 +4,9 @@ import numpy as np
 
 from .. import backend as F
 from .. import convert
-from .. import transform
 from .randomwalks import random_walk
 from .randomwalks import randomwalk_topk
 from .neighbor import select_topk
-from ..base import EID
-from .. import utils
-
 
 class RandomWalkNeighborSampler(object):
     """PinSage-like neighbor sampler extended to any heterogeneous graphs.
@@ -110,7 +106,8 @@ class RandomWalkNeighborSampler(object):
         src = F.reshape(paths[:, self.metapath_hops::self.metapath_hops], (-1,))
         dst = F.repeat(paths[:, 0], self.num_traversals, 0)
 
-        src, dst, counts = randomwalk_topk(src, dst, (self.num_random_walks * self.num_traversals), self.num_neighbors)
+        src, dst, counts = randomwalk_topk(src, dst, (self.num_random_walks * self.num_traversals),
+                                           self.num_neighbors)
         neighbor_graph = convert.heterograph(
             {(self.ntype, '_E', self.ntype): (src, dst)},
             {self.ntype: self.G.number_of_nodes(self.ntype)}
