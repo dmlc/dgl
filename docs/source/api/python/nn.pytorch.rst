@@ -310,6 +310,13 @@ SegmentedKNNGraph
     :members:
     :show-inheritance:
 
+JumpingKnowledge
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.utils.JumpingKnowledge
+    :members: forward, reset_parameters
+    :show-inheritance:
+
 NodeEmbedding Module
 ----------------------------------------
 
