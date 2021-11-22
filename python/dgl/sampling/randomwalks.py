@@ -211,28 +211,45 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
     return (traces, eids, types) if return_eids else (traces, types)
 
 def randomwalk_topk(src, dst, num_samples_per_node, k):
-    """Select the top-k nodes in src for each node in dst(dedup).
+    """Select the top-k nodes in src for each node in dst.
+
+    Select k source nodes with the highest frequency in each partition of destination nodes.
+    The destination nodes should be the same in each partition, which partition size is
+    ``num_samples_per_node``.
+
+    This is fusing ``to_simple()``, ``select_topk()``, and counting the number of occurrences
+    together.
 
     Parameters
     ----------
     src                 : Tensor
+        The source nodes of edges.
     dst                 : Tensor
+        The destination nodes of edges.
     num_samples_per_node: int
-        The number of edges for each dst node
+        The number of edges for each destination node.
     k                   : int
         The k of top-k
 
     Returns
     -------
     src     : Tensor
+        The source nodes of edges.
     dst     : Tensor
+        The destination nodes of edges.
     counts  : Tensor
+        The count of each edge.
+
+    Notes
+    -------
+    The destination nodes should be the same in each partition, which partition size is
+    ``num_samples_per_node``.
 
     Examples
     --------
-    >>> src = torch.tensor([1,2,1,3,2,3,3,3])
-    >>> dst = torch.tensor([5,5,5,5,6,6,6,6])
-    >>> src,dst,counts = dgl.sampling.randomwalk_topk(src,dst,4,2)
+    >>> src = torch.tensor([1, 2, 1, 3, 2, 3, 3, 3])
+    >>> dst = torch.tensor([5, 5, 5, 5, 6, 6, 6, 6])
+    >>> src, dst, counts = dgl.sampling.randomwalk_topk(src, dst, 4, 2)
     >>> src
     tensor([1, 3, 3, 2])
     >>> dst
