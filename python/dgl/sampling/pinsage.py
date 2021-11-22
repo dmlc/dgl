@@ -7,6 +7,8 @@ from .. import convert
 from .randomwalks import random_walk
 from .randomwalks import randomwalk_topk
 from .neighbor import select_topk
+from .. import utils
+
 
 class RandomWalkNeighborSampler(object):
     """PinSage-like neighbor sampler extended to any heterogeneous graphs.
