@@ -6,7 +6,6 @@ from .. import backend as F
 from .. import convert
 from .randomwalks import random_walk
 from .randomwalks import randomwalk_topk
-from .neighbor import select_topk
 from .. import utils
 
 
