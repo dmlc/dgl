@@ -245,7 +245,7 @@ def randomwalk_topk(src, dst, num_samples_per_node, k):
     assert F.is_tensor(dst)
     src = F.to_dgl_nd(src)
     dst = F.to_dgl_nd(dst)
-    src,dst,counts = _CAPI_DGLSamplingRandomWalkTopk(src, dst, num_samples_per_node, k)
+    src, dst, counts = _CAPI_DGLSamplingRandomWalkTopk(src, dst, num_samples_per_node, k)
     src = F.from_dgl_nd(src)
     dst = F.from_dgl_nd(dst)
     counts = F.from_dgl_nd(counts)
