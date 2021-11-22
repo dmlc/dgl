@@ -715,6 +715,60 @@ def test_appnp_conv(g, idtype):
     h = appnp(g, feat)
     assert h.shape[-1] == 5
 
+
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
+def test_appnp_conv_e_weight(g, idtype):
+    ctx = F.ctx()
+    g = g.astype(idtype).to(ctx)
+    appnp = nn.APPNPConv(10, 0.1)
+    feat = F.randn((g.number_of_nodes(), 5))
+    eweight = F.ones((g.num_edges(), ))
+    appnp = appnp.to(ctx)
+
+    h = appnp(g, feat, edge_weight=eweight)
+    assert h.shape[-1] == 5
+
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
+def test_gcn2conv_e_weight(g, idtype):
+    ctx = F.ctx()
+    g = g.astype(idtype).to(ctx)
+    gcn2conv = nn.GCN2Conv(5, layer=2, alpha=0.5,
+                           project_initial_features=True)
+    feat = F.randn((g.number_of_nodes(), 5))
+    eweight = F.ones((g.num_edges(), ))
+    gcn2conv = gcn2conv.to(ctx)
+    res = feat
+    h = gcn2conv(g, res, feat, edge_weight=eweight)
+    assert h.shape[-1] == 5
+
+
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
+def test_sgconv_e_weight(g, idtype):
+    ctx = F.ctx()
+    g = g.astype(idtype).to(ctx)
+    sgconv = nn.SGConv(5, 5, 3)
+    feat = F.randn((g.number_of_nodes(), 5))
+    eweight = F.ones((g.num_edges(), ))
+    sgconv = sgconv.to(ctx)
+    h = sgconv(g, feat, edge_weight=eweight)
+    assert h.shape[-1] == 5
+
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
+def test_tagconv_e_weight(g, idtype):
+    ctx = F.ctx()
+    g = g.astype(idtype).to(ctx)
+    conv = nn.TAGConv(5, 5, bias=True)
+    conv = conv.to(ctx)
+    feat = F.randn((g.number_of_nodes(), 5))
+    eweight = F.ones((g.num_edges(), ))
+    conv = conv.to(ctx)
+    h = conv(g, feat, edge_weight=eweight)
+    assert h.shape[-1] == 5
+
 @parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite'], exclude=['zero-degree']))
 @pytest.mark.parametrize('aggregator_type', ['mean', 'max', 'sum'])
