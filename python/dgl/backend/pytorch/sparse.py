@@ -567,7 +567,7 @@ class UpdateGradMinMaxHetero(th.autograd.Function):
     @custom_bwd
     def backward(ctx, dy):
         idx = ctx.saved_tensors
-        return dy[idx], None, None
+        return dy[idx], None, None, None
 
 
 class CSRMM(th.autograd.Function):
