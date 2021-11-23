@@ -6,7 +6,6 @@ import dgl.nn.pytorch as nn
 import dgl.function as fn
 import backend as F
 import pytest
-from python.dgl.nn.pytorch.link import ElementwisePredictor
 from test_utils.graph_cases import get_cases, random_graph, random_bipartite, random_dglgraph
 from test_utils import parametrize_dtype
 from copy import deepcopy
