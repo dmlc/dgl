@@ -257,7 +257,7 @@ class GSpMM_hetero(th.autograd.Function):
                     dX.scatter_add_(0, argX.long(), grad)
                 elif op in ['add', 'copy_lhs']:
                     # TODO(Israt): argX.long()
-                    dX = update_grad_minmax_hetero(g_rev, dZ, argX, argX_ntype, dX)
+                    dX = _update_grad_minmax_hetero(g_rev, dZ, argX, argX_ntype, dX)
             dX = tuple([_reduce_grad(dX[i], X_shape[i]) if X[i] is not None else None
                 for i in range(len(X))])
         else:  # X has not gradient
@@ -283,7 +283,7 @@ class GSpMM_hetero(th.autograd.Function):
                         0, argX.long()) * dZ
                     dY.scatter_add_(0, argY.long(), grad)
                 elif op in ['add', 'copy_rhs']:
-                    dY = update_grad_minmax_hetero(gidx.reverse(), dZ, argY, argY_etype, dY)
+                    dY = _update_grad_minmax_hetero(gidx.reverse(), dZ, argY, argY_etype, dY)
             dY = tuple([_reduce_grad(dY[i], Y_shape[i]) if dY[i] is not None else None
                 for i in range(len(dY))])
         else:  # Y has no gradient
@@ -555,21 +555,6 @@ class ScatterAdd(th.autograd.Function):
         return dy[idx], None, None
 
 
-class UpdateGradMinMaxHetero(th.autograd.Function):
-    @staticmethod
-    @custom_fwd(cast_inputs=th.float16)
-    def forward(ctx, gidx, x, idx, idx_etype, m):
-        y = _update_grad_minmax_hetero(gidx, x, idx, idx_etype, m)
-        ctx.save_for_backward(idx)
-        return y
-
-    @staticmethod
-    @custom_bwd
-    def backward(ctx, dy):
-        idx = ctx.saved_tensors
-        return dy[idx], None, None, None
-
-
 class CSRMM(th.autograd.Function):
     @staticmethod
     def forward(ctx, gidxA, A_weights, gidxB, B_weights, num_vtypes):
@@ -683,9 +668,6 @@ def segment_reduce(op, x, offsets):
 
 def scatter_add(x, idx, m):
     return ScatterAdd.apply(x, idx, m)
-
-def update_grad_minmax_hetero(gidx, x, idx, idx_etype, m):
-    return UpdateGradMinMaxHetero.apply(gidx, x, idx, idx_etype, m)
 
 def csrmm(gidxA, A_weights, gidxB, B_weights, num_vtypes):
     nrows, ncols, C_indptr, C_indices, C_eids, C_weights = \
