@@ -5,6 +5,8 @@ from torch import nn
 
 from .... import function as fn
 from ....base import DGLError
+from .graphconv import EdgeWeightNorm
+
 
 class SGConv(nn.Module):
     r"""
@@ -83,6 +85,7 @@ class SGConv(nn.Module):
             [-1.9297, -0.9273],
             [-1.9441, -0.9343]], grad_fn=<AddmmBackward>)
     """
+
     def __init__(self,
                  in_feats,
                  out_feats,
@@ -130,7 +133,7 @@ class SGConv(nn.Module):
         """
         self._allow_zero_in_degree = set_value
 
-    def forward(self, graph, feat):
+    def forward(self, graph, feat, edge_weight=None):
         r"""
 
         Description
@@ -144,6 +147,11 @@ class SGConv(nn.Module):
         feat : torch.Tensor
             The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`
             is size of input feature, :math:`N` is the number of nodes.
+        edge_weight: torch.Tensor, optional
+            edge_weight to use in the message passing process. This is equivalent to
+            using weighted adjacency matrix in the equation above, and
+            :math:\tilde{D}^{-1/2}\tilde{A} \tilde{D}^{-1/2}
+            is based on :class:`dgl.nn.pytorch.conv.graphconv.EdgeWeightNorm`.
 
         Returns
         -------
@@ -176,21 +184,30 @@ class SGConv(nn.Module):
                                    'to be `True` when constructing this module will '
                                    'suppress the check and let the code run.')
 
+            msg_func = fn.copy_u("h", "m")
+            if edge_weight is not None:
+                graph.edata["_edge_weight"] = EdgeWeightNorm(
+                    'both')(graph, edge_weight)
+                msg_func = fn.u_mul_e("h", "_edge_weight", "m")
+
             if self._cached_h is not None:
                 feat = self._cached_h
             else:
-                # compute normalization
-                degs = graph.in_degrees().float().clamp(min=1)
-                norm = th.pow(degs, -0.5)
-                norm = norm.to(feat.device).unsqueeze(1)
+                if edge_weight is None:
+                    # compute normalization
+                    degs = graph.in_degrees().float().clamp(min=1)
+                    norm = th.pow(degs, -0.5)
+                    norm = norm.to(feat.device).unsqueeze(1)
                 # compute (D^-1 A^k D)^k X
                 for _ in range(self._k):
-                    feat = feat * norm
+                    if edge_weight is None:
+                        feat = feat * norm
                     graph.ndata['h'] = feat
-                    graph.update_all(fn.copy_u('h', 'm'),
+                    graph.update_all(msg_func,
                                      fn.sum('m', 'h'))
                     feat = graph.ndata.pop('h')
-                    feat = feat * norm
+                    if edge_weight is None:
+                        feat = feat * norm
 
                 if self.norm is not None:
                     feat = self.norm(feat)
