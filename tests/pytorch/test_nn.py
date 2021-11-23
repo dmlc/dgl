@@ -6,6 +6,7 @@ import dgl.nn.pytorch as nn
 import dgl.function as fn
 import backend as F
 import pytest
+from python.dgl.nn.pytorch.link import ElementwisePredictor
 from test_utils.graph_cases import get_cases, random_graph, random_bipartite, random_dglgraph
 from test_utils import parametrize_dtype
 from copy import deepcopy
@@ -1228,6 +1229,86 @@ def test_gnnexplainer(g, idtype, out_dim):
     model = model.to(F.ctx())
     explainer = nn.GNNExplainer(model, num_hops=1)
     feat_mask, edge_mask = explainer.explain_graph(g, feat)
+
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
+def test_elementwise_link(g, idtype):
+    g = g.astype(idtype).to(F.ctx())
+    in_feats = 5
+    feat = F.randn((g.num_nodes(), in_feats))
+
+    class MLP(th.nn.Module):
+        def __init__(self, in_feats, hidden_feats, out_feats):
+            super(MLP, self).__init__()
+            self.layer1 = th.nn.Linear(in_feats, hidden_feats)
+            self.layer2 = th.nn.Linear(hidden_feats, out_feats)
+
+        def reset_parameters(self):
+            self.layer1.reset_parameters()
+            self.layer2.reset_parameters()
+
+        def forward(self, h):
+            h = self.layer1(h)
+            return self.layer2(h)
+
+    # graph
+    link_pred = nn.ElementwisePredictor()
+    link_pred.reset_parameters()
+    assert link_pred(feat, g).shape == (g.num_edges(), in_feats)
+
+    # graph + MLP
+    out_feats = 1
+    mlp = MLP(in_feats, hidden_feats=3, out_feats=out_feats)
+    link_pred = nn.ElementwisePredictor(mlp)
+    link_pred.reset_parameters()
+    assert link_pred(feat, g).shape == (g.num_edges(), out_feats)
+
+    # arbitrary pairs of node representations
+    feats_i = F.randn((g.num_edges(), in_feats))
+    feats_j = F.randn((g.num_edges(), in_feats))
+    assert link_pred((feats_i, feats_j)).shape == (g.num_edges(), out_feats)
+
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
+def test_concat_link(g, idtype):
+    g = g.astype(idtype).to(F.ctx())
+
+    class MLP(th.nn.Module):
+        def __init__(self, in_feats, hidden_feats, out_feats):
+            super(MLP, self).__init__()
+            self.layer1 = th.nn.Linear(in_feats, hidden_feats)
+            self.layer2 = th.nn.Linear(hidden_feats, out_feats)
+
+        def reset_parameters(self):
+            self.layer1.reset_parameters()
+            self.layer2.reset_parameters()
+
+        def forward(self, h):
+            h = self.layer1(h)
+            return self.layer2(h)
+
+    # src, dst
+    src_feat_size = 2
+    dst_feat_size = 4
+    num_edges = 5
+    src_feats = F.randn((num_edges, src_feat_size))
+    dst_feats = F.randn((num_edges, dst_feat_size))
+    link_pred = nn.ConcatPredictor()
+    assert link_pred(src_feats, dst_feats).shape == (num_edges, src_feat_size + dst_feat_size)
+
+    # src, dst + MLP
+    out_feats = 1
+    mlp = MLP(in_feats=src_feat_size + dst_feat_size, hidden_feats=3, out_feats=out_feats)
+    link_pred = nn.ConcatPredictor(mlp)
+    assert link_pred(src_feats, dst_feats).shape == (num_edges, out_feats)
+
+    # src, dst, rel + MLP
+    rel_feat_size = 3
+    rel_feats = F.randn((num_edges, rel_feat_size))
+    in_feats = src_feat_size + dst_feat_size + rel_feat_size
+    mlp = MLP(in_feats=in_feats, hidden_feats=3, out_feats=out_feats)
+    link_pred = nn.ConcatPredictor(mlp)
+    assert link_pred(src_feats, dst_feats, rel_feats).shape == (num_edges, out_feats)
 
 if __name__ == '__main__':
     test_graph_conv()

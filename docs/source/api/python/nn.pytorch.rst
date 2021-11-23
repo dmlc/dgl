@@ -267,6 +267,27 @@ SetTransformerDecoder
     :members:
     :show-inheritance:
 
+.. _apinn-pytorch-link
+
+Predictor and Score Functions for Link Prediction
+-------------------------------------------------
+
+.. automodule:: dgl.nn.pytorch.link
+
+ElementwisePredictor
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.link.ElementwisePredictor
+    :members: forward, reset_parameters
+    :show-inheritance:
+
+ConcatPredictor
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.link.ConcatPredictor
+    :members: forward, reset_parameters
+    :show-inheritance:
+
 Heterogeneous Graph Convolution Module
 ----------------------------------------
 
