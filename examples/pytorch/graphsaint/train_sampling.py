@@ -9,6 +9,7 @@ from config import CONFIG
 from modules import GCNNet
 from utils import Logger, evaluate, save_log_dir, load_data, calc_f1
 import warnings
+from dgl.dataloading import GraphDataLoader
 
 def main(args, task):
     warnings.filterwarnings('ignore')
@@ -71,8 +72,8 @@ def main(args, task):
         saint_sampler = SAINTRandomWalkSampler(args.num_roots, args.length, **kwargs)
     else:
         raise NotImplementedError
-    loader = DataLoader(saint_sampler, collate_fn=saint_sampler.__collate_fn__, batch_size=1,
-                        shuffle=True, num_workers=args.num_workers, drop_last=False)
+    loader = GraphDataLoader(saint_sampler, batch_size=1,
+                             shuffle=True, num_workers=args.num_workers, drop_last=False)
     # set device for dataset tensors
     if args.gpu < 0:
         cuda = False

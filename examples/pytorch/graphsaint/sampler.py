@@ -9,10 +9,11 @@ import dgl.function as fn
 import dgl
 from dgl.sampling import random_walk, pack_traces
 import scipy
+from dgl.dataloading.dataloader import SubgraphIterator
 
 
 # The base class of sampler
-class SAINTSampler:
+class SAINTSampler(SubgraphIterator):
     """
     Description
     -----------
@@ -69,6 +70,8 @@ class SAINTSampler:
 
     def __init__(self, node_budget, dn, g, train_nid, num_workers_sampler, num_subg_sampler=10000,
                  batch_size_sampler=200, online=True, num_subg=50, full=True):
+        super().__init__(g)
+
         self.g = g.cpu()
         self.node_budget = node_budget
         self.train_g: dgl.graph = g.subgraph(train_nid)
