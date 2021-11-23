@@ -64,15 +64,27 @@ def merge(graphs):
     num_nodes_dict = {ntype: 0 for ntype in ntypes}
     merged = dgl.heterograph(data_dict, num_nodes_dict, ref.idtype, ref.device)
 
-    for next_graph in graphs:
-        # Add edges, edge data, and non-isolated nodes from next_graph to merged.
-        for etype in etypes:
-            next_etype_id = next_graph.get_etype_id(etype)
-            next_edges = next_graph.edges(etype=etype)
-            next_edge_data = next_graph._edge_frames[next_etype_id]
-            merged.add_edges(*next_edges, next_edge_data, etype)
+    # Merge edges and edge data.
+    for etype in etypes:
+        merged_us = F.zeros(0, ref.idtype, ref.device)
+        merged_vs = F.zeros(0, ref.idtype, ref.device)
+        edata_frames = []
+        for graph in graphs:
+            etype_id = graph.get_etype_id(etype)
+            us, vs = graph.edges(etype=etype)
+            merged_us = F.cat([merged_us, us], dim=0)
+            merged_vs = F.cat([merged_vs, vs], dim=0)
+            edge_data = graph._edge_frames[etype_id]
+            edata_frames.append(edge_data)
+        keys = ref.edges[etype].data.keys()
+        if len(keys) == 0:
+            edges_data = None
+        else:
+            edges_data = {k: F.cat([f[k] for f in edata_frames], dim=0) for k in keys}
+        merged.add_edges(merged_us, merged_vs, edges_data, etype)
 
-        # Add node data and isolated nodes from next_graph to merged.
+    # Add node data and isolated nodes from next_graph to merged.
+    for next_graph in graphs:
         for ntype in ntypes:
             merged_ntype_id = merged.get_ntype_id(ntype)
             next_ntype_id = next_graph.get_ntype_id(ntype)
