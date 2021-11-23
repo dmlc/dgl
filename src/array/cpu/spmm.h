@@ -358,61 +358,41 @@ void SpMMCmpCsrHetero(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat
     CHECK_NOTNULL(W);
     CHECK_NOTNULL(argW);
   }
-#if !defined(_WIN32)
-#ifdef USE_AVX
-#ifdef USE_LIBXSMM
-  std::cout << "Disable USE_LIBXSMM to use SpMMCmpCSR for heterogeneous graph" << std::endl;
-  const bool no_libxsmm =
-       bcast.use_bcast || std::is_same<DType, double>::value;
-  if (!no_libxsmm) {
-    SpMMCmpCsrLibxsmm<IdType, DType, Op, Cmp>(bcast, csr, ufeat, efeat, out, argu, arge);
-  } else {
-#endif  // USE_LIBXSMM
-#endif  // USE_AVX
-#endif  // _WIN32
-    // TODO(Israt): enable parallelism
-    // runtime::parallel_for(0, csr.num_rows, [&](size_t b, size_t e) {
-
-      for (auto rid = 0; rid < csr.num_rows; ++rid) {
-        const IdType row_start = indptr[rid], row_end = indptr[rid + 1];
-        DType* out_off = O + rid * dim;
-        IdType* argx_off = argX + rid * dim;
-        IdType* argw_off = argW + rid * dim;
-        IdType* argx_ntype = argX_ntype + rid * dim;
-        IdType* argw_etype = argW_etype + rid * dim;
-        for (IdType j = row_start; j < row_end; ++j) {
-          const IdType cid = indices[j];
-          const IdType eid = has_idx ? edges[j] : j;
-          for (int64_t k = 0; k < dim; ++k) {
-            const int64_t lhs_add = bcast.use_bcast ? bcast.lhs_offset[k] : k;
-            const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
-            const DType* lhs_off =
-              Op::use_lhs ? X + cid * lhs_dim + lhs_add : nullptr;
-            const DType* rhs_off =
-              Op::use_rhs ? W + eid * rhs_dim + rhs_add : nullptr;
-            const DType val = Op::Call(lhs_off, rhs_off);
-            if (Cmp::Call(out_off[k], val)) {
-              out_off[k] = val;
-              if (Op::use_lhs) {
-                argx_off[k] = cid;
-                argx_ntype[k] = ntype;
-              }
-              if (Op::use_rhs) {
-                argw_off[k] = eid;
-                argw_etype[k] = etype;
-              }
+  // TODO(Israt): Use LIBXSMM. Homogeneous graph uses LIBXMM when enabled.
+  runtime::parallel_for(0, csr.num_rows, [&](size_t b, size_t e) {
+    for (auto rid = b; rid < e; ++rid) {
+      const IdType row_start = indptr[rid], row_end = indptr[rid + 1];
+      DType* out_off = O + rid * dim;
+      IdType* argx_off = argX + rid * dim;
+      IdType* argw_off = argW + rid * dim;
+      IdType* argx_ntype = argX_ntype + rid * dim;
+      IdType* argw_etype = argW_etype + rid * dim;
+      for (IdType j = row_start; j < row_end; ++j) {
+        const IdType cid = indices[j];
+        const IdType eid = has_idx ? edges[j] : j;
+        for (int64_t k = 0; k < dim; ++k) {
+          const int64_t lhs_add = bcast.use_bcast ? bcast.lhs_offset[k] : k;
+          const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
+          const DType* lhs_off =
+            Op::use_lhs ? X + cid * lhs_dim + lhs_add : nullptr;
+          const DType* rhs_off =
+            Op::use_rhs ? W + eid * rhs_dim + rhs_add : nullptr;
+          const DType val = Op::Call(lhs_off, rhs_off);
+          if (Cmp::Call(out_off[k], val)) {
+            out_off[k] = val;
+            if (Op::use_lhs) {
+              argx_off[k] = cid;
+              argx_ntype[k] = ntype;
+            }
+            if (Op::use_rhs) {
+              argw_off[k] = eid;
+              argw_etype[k] = etype;
             }
           }
         }
       }
-    // });
-#if !defined(_WIN32)
-#ifdef USE_AVX
-#ifdef USE_LIBXSMM
-  }
-#endif  // USE_LIBXSMM
-#endif  // USE_AVX
-#endif  // _WIN32
+    }
+  });
 }
 
 
