@@ -163,7 +163,7 @@ std::pair<IdArray, IdArray> Node2vecRandomWalk(
                                                   edges, csr_has_data, prob, terminate);
     };
 
-  return GenericRandomWalk<XPU, IdxType>(seeds, max_num_steps, step);
+  return GenericRandomWalk<XPU, IdxType>(seeds, max_num_steps, step, g->NumVertices(0));
 }
 
 };  // namespace

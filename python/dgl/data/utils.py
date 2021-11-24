@@ -219,7 +219,8 @@ def extract_archive(file, target_dir, overwrite=False):
         import gzip
         import shutil
         with gzip.open(file, 'rb') as f_in:
-            with open(file[:-3], 'wb') as f_out:
+            target_file = os.path.join(target_dir, os.path.basename(file)[:-3])
+            with open(target_file, 'wb') as f_out:
                 shutil.copyfileobj(f_in, f_out)
     elif file.endswith('.zip'):
         import zipfile

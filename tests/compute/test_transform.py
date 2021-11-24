@@ -1,3 +1,19 @@
+##
+#   Copyright 2019-2021 Contributors
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+#
+
 from scipy import sparse as spsp
 import networkx as nx
 import numpy as np
@@ -482,13 +498,13 @@ def test_laplacian_lambda_max():
         assert l_max < 2 + eps
     '''
 
-def create_large_graph(num_nodes):
+def create_large_graph(num_nodes, idtype=F.int64):
     row = np.random.choice(num_nodes, num_nodes * 10)
     col = np.random.choice(num_nodes, num_nodes * 10)
     spm = spsp.coo_matrix((np.ones(len(row)), (row, col)))
     spm.sum_duplicates()
 
-    return dgl.from_scipy(spm)
+    return dgl.from_scipy(spm, idtype=idtype)
 
 def get_nodeflow(g, node_ids, num_layers):
     batch_size = len(node_ids)
@@ -514,14 +530,22 @@ def test_partition_with_halo():
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(F._default_context_str == 'gpu', reason="METIS doesn't support GPU")
-def test_metis_partition():
+@parametrize_dtype
+def test_metis_partition(idtype):
     # TODO(zhengda) Metis fails to partition a small graph.
-    g = create_large_graph(1000)
-    check_metis_partition(g, 0)
-    check_metis_partition(g, 1)
-    check_metis_partition(g, 2)
-    check_metis_partition_with_constraint(g)
-
+    g = create_large_graph(1000, idtype=idtype)
+    if idtype == F.int64:
+        check_metis_partition(g, 0)
+        check_metis_partition(g, 1)
+        check_metis_partition(g, 2)
+        check_metis_partition_with_constraint(g)
+    else:
+        assert_fail = False
+        try:
+            check_metis_partition(g, 1)
+        except:
+            assert_fail = True
+        assert assert_fail
 
 def check_metis_partition_with_constraint(g):
     ntypes = np.zeros((g.number_of_nodes(),), dtype=np.int32)
@@ -638,24 +662,23 @@ def test_reorder_nodes():
         old_neighs2 = g.predecessors(old_nid)
         assert np.all(np.sort(old_neighs1) == np.sort(F.asnumpy(old_neighs2)))
 
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU compaction not implemented")
 @parametrize_dtype
 def test_compact(idtype):
     g1 = dgl.heterograph({
         ('user', 'follow', 'user'): ([1, 3], [3, 5]),
         ('user', 'plays', 'game'): ([2, 3, 2], [4, 4, 5]),
         ('game', 'wished-by', 'user'): ([6, 5], [7, 7])},
-        {'user': 20, 'game': 10}, idtype=idtype)
+        {'user': 20, 'game': 10}, idtype=idtype, device=F.ctx())
 
     g2 = dgl.heterograph({
         ('game', 'clicked-by', 'user'): ([3], [1]),
         ('user', 'likes', 'user'): ([1, 8], [8, 9])},
-        {'user': 20, 'game': 10}, idtype=idtype)
+        {'user': 20, 'game': 10}, idtype=idtype, device=F.ctx())
 
     g3 = dgl.heterograph({('user', '_E', 'user'): ((0, 1), (1, 2))},
-                         {'user': 10}, idtype=idtype)
+                         {'user': 10}, idtype=idtype, device=F.ctx())
     g4 = dgl.heterograph({('user', '_E', 'user'): ((1, 3), (3, 5))},
-                         {'user': 10}, idtype=idtype)
+                         {'user': 10}, idtype=idtype, device=F.ctx())
 
     def _check(g, new_g, induced_nodes):
         assert g.ntypes == new_g.ntypes
@@ -831,6 +854,16 @@ def test_to_simple(idtype):
     assert 'h' not in sg.nodes['user'].data
     assert 'hh' not in sg.nodes['user'].data
 
+    # verify DGLGraph.edge_ids() after dgl.to_simple()
+    # in case ids are not initialized in underlying coo2csr()
+    u = F.tensor([0, 1, 2])
+    v = F.tensor([1, 2, 3])
+    eids = F.tensor([0, 1, 2])
+    g = dgl.graph((u, v))
+    assert F.array_equal(g.edge_ids(u, v), eids)
+    sg = dgl.to_simple(g)
+    assert F.array_equal(sg.edge_ids(u, v), eids)
+
 @parametrize_dtype
 def test_to_block(idtype):
     def check(g, bg, ntype, etype, dst_nodes, include_dst_in_src=True):
@@ -934,6 +967,32 @@ def test_to_block(idtype):
     bg = dgl.to_block(g, dst_nodes=dst_nodes)
     checkall(g, bg, dst_nodes)
     check_features(g, bg)
+
+    # test specifying lhs_nodes with include_dst_in_src
+    src_nodes = {}
+    for ntype in dst_nodes.keys():
+        # use the previous run to get the list of source nodes
+        src_nodes[ntype] = bg.srcnodes[ntype].data[dgl.NID]
+    bg = dgl.to_block(g, dst_nodes=dst_nodes, src_nodes=src_nodes)
+    checkall(g, bg, dst_nodes)
+    check_features(g, bg)
+
+    # test without include_dst_in_src
+    dst_nodes = {'A': F.tensor([4, 3, 2, 1], dtype=idtype), 'B': F.tensor([3, 5, 6, 1], dtype=idtype)}
+    bg = dgl.to_block(g, dst_nodes=dst_nodes, include_dst_in_src=False)
+    checkall(g, bg, dst_nodes, False)
+    check_features(g, bg)
+
+    # test specifying lhs_nodes without include_dst_in_src
+    src_nodes = {}
+    for ntype in dst_nodes.keys():
+        # use the previous run to get the list of source nodes
+        src_nodes[ntype] = bg.srcnodes[ntype].data[dgl.NID]
+    bg = dgl.to_block(g, dst_nodes=dst_nodes, include_dst_in_src=False,
+        src_nodes=src_nodes)
+    checkall(g, bg, dst_nodes, False)
+    check_features(g, bg)
+
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @parametrize_dtype

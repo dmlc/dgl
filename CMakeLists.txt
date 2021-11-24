@@ -34,6 +34,7 @@ dgl_option(BUILD_CPP_TEST "Build cpp unittest executables" OFF)
 dgl_option(LIBCXX_ENABLE_PARALLEL_ALGORITHMS "Enable the parallel algorithms library. This requires the PSTL to be available." OFF)
 dgl_option(USE_S3 "Build with S3 support" OFF)
 dgl_option(USE_HDFS "Build with HDFS support" OFF) # Set env HADOOP_HDFS_HOME if needed
+dgl_option(USE_EPOLL "Build with epoll for socket communicator" OFF)
 
 # Set debug compile option for gdb, only happens when -DCMAKE_BUILD_TYPE=DEBUG
 if (NOT MSVC)
@@ -119,6 +120,14 @@ if(USE_AVX)
     message(STATUS "Build with AVX optimization.")
   endif(USE_LIBXSMM)
 endif(USE_AVX)
+
+if (USE_EPOLL)
+  check_include_file("sys/epoll.h" USE_EPOLL)
+  if (USE_EPOLL)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DUSE_EPOLL")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_EPOLL")
+  endif()
+endif ()
 
 # Build with fp16 to support mixed precision training.
 if(USE_FP16)
@@ -211,7 +220,7 @@ set(GOOGLE_TEST 0) # Turn off dmlc-core test
 
 # Compile METIS
 if(NOT MSVC)
-  set(GKLIB_PATH "${CMAKE_SOURCE_DIR}/third_party/METIS/GKlib")
+  set(GKLIB_PATH "${CMAKE_CURRENT_SOURCE_DIR}/third_party/METIS/GKlib")
   include(${GKLIB_PATH}/GKlibSystem.cmake)
   include_directories(${GKLIB_PATH})
   include_directories("third_party/METIS/include/")
@@ -250,7 +259,7 @@ target_link_libraries(dgl ${DGL_LINKER_LIBS} ${DGL_RUNTIME_LINKER_LIBS})
 if(MSVC)
   add_custom_command(
     TARGET dgl POST_BUILD COMMAND
-    cmd.exe /c "COPY /Y Release\\dgl.dll .")
+    ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:dgl>" "$<TARGET_FILE_DIR:dgl>/..")
 endif(MSVC)
 
 # Tensor adapter libraries

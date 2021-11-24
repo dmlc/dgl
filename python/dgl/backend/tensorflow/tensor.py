@@ -413,8 +413,11 @@ def count_nonzero(input):
     return int(tf.math.count_nonzero(input))
 
 
-def unique(input):
-    return tf.unique(input).y
+def unique(input, return_inverse=False):
+    if return_inverse:
+        return tf.unique(input)
+    else:
+        return tf.unique(input).y
 
 
 def full_1d(length, fill_value, dtype, ctx):
