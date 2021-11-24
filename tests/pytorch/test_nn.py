@@ -1333,6 +1333,7 @@ def test_elementwise_link(g, idtype):
     # graph + MLP
     out_feats = 1
     mlp = MLP(in_feats, hidden_feats=3, out_feats=out_feats)
+    mlp = mlp.to(F.ctx())
     link_pred = nn.ElementwisePredictor(mlp)
     link_pred.reset_parameters()
     assert link_pred(feat, g).shape == (g.num_edges(), out_feats)
@@ -1373,6 +1374,7 @@ def test_concat_link(g, idtype):
     # src, dst + MLP
     out_feats = 1
     mlp = MLP(in_feats=src_feat_size + dst_feat_size, hidden_feats=3, out_feats=out_feats)
+    mlp = mlp.to(F.ctx())
     link_pred = nn.ConcatPredictor(mlp)
     assert link_pred(src_feats, dst_feats).shape == (num_edges, out_feats)
 
@@ -1381,6 +1383,7 @@ def test_concat_link(g, idtype):
     rel_feats = F.randn((num_edges, rel_feat_size))
     in_feats = src_feat_size + dst_feat_size + rel_feat_size
     mlp = MLP(in_feats=in_feats, hidden_feats=3, out_feats=out_feats)
+    mlp = mlp.to(F.ctx())
     link_pred = nn.ConcatPredictor(mlp)
     assert link_pred(src_feats, dst_feats, rel_feats).shape == (num_edges, out_feats)
 
