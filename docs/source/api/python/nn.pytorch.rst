@@ -171,6 +171,13 @@ GCN2Conv
     :members: forward
     :show-inheritance:
 
+SignConv
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.conv.SignConv
+    :members: forward
+    :show-inheritance:
+
 .. _apinn-pytorch-dense-conv:
 
 Dense Conv Layers

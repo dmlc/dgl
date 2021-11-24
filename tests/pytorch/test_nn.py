@@ -794,12 +794,7 @@ def test_sign_conv(g, idtype):
     feat = F.randn((g.number_of_src_nodes(), 5))
     signconvdeep = signconvdeep.to(ctx)
     edata = th.randn(g.num_edges()).to(ctx)
-    pos_eid = th.where(edata > 0)[0].to(idtype)
-    neg_eid = th.where(edata < 0)[0].to(idtype)
-    g.ndata["feat"] = feat
-    pos_graph = dgl.edge_subgraph(g, pos_eid, relabel_nodes=False, preserve_nodes=True)
-    neg_graph = dgl.edge_subgraph(g, neg_eid, relabel_noeds=False, preserve_nodes=True)
-    h = signconvdeep((pos_graph, neg_graph), (pos_graph.ndata['feat'], neg_graph.ndata['feat']))
+    h = signconvdeep(g, feat, edata)
     assert h.shape == (g.number_of_dst_nodes(), 12)
 
 
