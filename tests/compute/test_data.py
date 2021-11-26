@@ -156,6 +156,30 @@ def test_extract_archive():
             assert os.path.exists(os.path.join(dst_dir, gz_file))
 
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
+def test_csv_dataset():
+    for force_reload in [True, False]:
+        # single graph with multiple edges.csv and nodes.csv
+        csv_dataset = data.CSVDataset(os.path.join(
+            os.path.dirname(__file__), "data/single_graph/csv_meta.yml"), force_reload=force_reload)
+        assert len(csv_dataset) == 1
+        graph = csv_dataset[0]
+        assert ~graph.is_homogeneous
+        assert csv_dataset.has_cache()
+
+        # multiple graphs with single edges.csv and nodes.csv
+        csv_dataset = data.CSVDataset(os.path.join(
+            os.path.dirname(__file__), "data/multiple_graphs/csv_meta.yml"), force_reload=force_reload)
+        assert len(csv_dataset) > 1
+        graph, label = csv_dataset[0]
+        assert graph.is_homogeneous
+        assert 'train_mask' in csv_dataset.mask
+        assert 'val_mask' in csv_dataset.mask
+        assert 'test_mask' in csv_dataset.mask
+        assert len(csv_dataset) == csv_dataset.mask['train_mask'].shape[0]
+        assert csv_dataset.has_cache()
+
+
 if __name__ == '__main__':
     test_minigc()
     test_gin()
@@ -164,3 +188,4 @@ if __name__ == '__main__':
     test_fraud()
     test_fakenews()
     test_extract_archive()
+    test_csv_dataset()
