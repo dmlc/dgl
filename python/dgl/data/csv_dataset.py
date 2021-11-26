@@ -3,67 +3,97 @@ import yaml
 from yaml.loader import SafeLoader
 import pandas as pd
 import numpy as np
+from typing import List, Optional
+import pydantic as dt
 from .dgl_dataset import DGLDataset
 from ..convert import heterograph as dgl_heterograph
 from .. import backend as F
 from .utils import save_graphs, load_graphs, save_info, load_info
 
 
-def _yaml_sanity_check(meta_yaml):
-    #TODO: should be improved to check in an elegant way
-    with open(meta_yaml) as f:
-        meta = yaml.load(f, Loader=SafeLoader)
-        assert meta['version'] == '0.0.1'
-        assert meta['dataset_type'] in ['user_defined', 'dgl_data']
-        if meta['dataset_type'] == 'dgl_data':
-            assert 'dataset_name' in meta
-        has_multi_graphs = False
-        if 'graphs' in meta:
-            meta_graph = meta['graphs']
-            assert 'file_name' in meta_graph
-            assert 'separator' in meta_graph
-            assert 'graph_id_field' in meta_graph
-            assert 'labels' in meta_graph
-            meta_label = meta_graph['labels']
-            assert meta_label['type'] == 'classification'
-            assert 'field' in meta_label
-            assert 'num_classes' in meta_label
-            assert 'split_type_field' in meta_graph
-            has_multi_graphs = True
-        assert 'edges' in meta
-        for meta_edge in meta['edges']:
+class MetaLabel(dt.BaseModel):
+    type: str
+    field: str
+    num_classes: Optional[int] = None
+
+
+class MetaEdge(dt.BaseModel):
+    file_name: str
+    separator: str
+    etype: Optional[List[str]] = None
+    graph_id_field: Optional[str] = None
+    src_id_field: str
+    dst_id_field: str
+    feat_prefix_field: Optional[str] = None
+    labels: Optional[MetaLabel] = None
+    split_type_field: Optional[str] = None
+
+
+class MetaNode(dt.BaseModel):
+    file_name: str
+    separator: str
+    ntype: Optional[str] = None
+    graph_id_field: Optional[str] = None
+    node_id_field: str
+    feat_prefix_field: Optional[str] = None
+    labels: Optional[MetaLabel] = None
+    split_type_field: Optional[str] = None
+
+
+class MetaGraph(dt.BaseModel):
+    file_name: str
+    separator: str
+    graph_id_field: str
+    labels: MetaLabel
+    split_type_field: str
+
+
+class MetaYaml(dt.BaseModel):
+    version: str
+    dataset_type: str
+    dataset_name: Optional[str] = None
+    edges: List[MetaEdge]
+    nodes: List[MetaNode]
+    graphs: Optional[MetaGraph] = None
+
+
+def _yaml_sanity_check(yaml_file):
+    with open(yaml_file) as f:
+        yaml_data = yaml.load(f, Loader=SafeLoader)
+        meta_yaml = MetaYaml(**yaml_data)
+        assert meta_yaml.version == '0.0.1'
+        assert meta_yaml.dataset_type in ['user_defined', 'dgl_data']
+        if meta_yaml.dataset_type == 'dgl_data':
+            assert meta_yaml.dataset_name is not None
+        has_multi_graphs = meta_yaml.graphs is not None
+        if has_multi_graphs:
+            meta_graph = meta_yaml.graphs
+            meta_label = meta_graph.labels
+            assert meta_label.type == 'classification'
+            assert meta_label.num_classes is not None
+        for meta_edge in meta_yaml.edges:
             if meta_edge is None:
                 continue
-            assert 'file_name' in meta_edge
-            assert 'separator' in meta_edge
             if has_multi_graphs:
-                assert 'graph_id_field' in meta_edge
-            assert 'src_id_field' in meta_edge
-            assert 'dst_id_field' in meta_edge
-            if 'labels' in meta_edge:
-                meta_label = meta_edge['labels']
-                assert meta_label['type'] in ['classification', 'regression']
-                assert 'field' in meta_label
-                if meta_label['type'] == 'classification':
-                    assert 'num_classes' in meta_label
-                assert 'split_type_field' in meta_edge
-        assert 'nodes' in meta
-        for meta_node in meta['nodes']:
+                assert meta_edge.graph_id_field is not None
+            if meta_edge.labels is not None:
+                meta_label = meta_edge.labels
+                assert meta_label.type in ['classification', 'regression']
+                if meta_label.type == 'classification':
+                    assert meta_label.num_classes is not None
+                assert meta_edge.split_type_field is not None
+        for meta_node in meta_yaml.nodes:
             if meta_node is None:
                 continue
-            assert 'file_name' in meta_node
-            assert 'separator' in meta_node
             if has_multi_graphs:
-                assert 'graph_id_field' in meta_node
-            assert 'node_id_field' in meta_node
-            if 'labels' in meta_node:
-                meta_label = meta_node['labels']
-                assert meta_label['type'] in ['classification', 'regression']
-                assert 'field' in meta_label
-                if meta_label['type'] == 'classification':
-                    assert 'num_classes' in meta_label
-                assert 'split_type_field' in meta_node
-        return meta
+                assert meta_node.graph_id_field is not None
+            if meta_node.labels is not None:
+                meta_label = meta_node.labels
+                assert meta_label.type in ['classification', 'regression']
+                if meta_label.type == 'classification':
+                    assert meta_label.num_classes is not None
+                assert meta_node.split_type_field is not None
+        return meta_yaml
 
 
 class EdgeData:
@@ -84,28 +114,28 @@ class EdgeData:
     def _process(self, root_path, meta_edge):
         if meta_edge is None:
             return
-        file_path = os.path.join(root_path, meta_edge['file_name'])
-        separator = meta_edge['separator']
-        self.type = meta_edge['etype'] if 'etype' in meta_edge else [
+        file_path = os.path.join(root_path, meta_edge.file_name)
+        separator = meta_edge.separator
+        self.type = meta_edge.etype if meta_edge.etype is not None else [
             '_V', '_E', '_V']
-        if 'graph_id_field' in meta_edge:
+        if meta_edge.graph_id_field is not None:
             self.graph_id = F.tensor(pd.read_csv(file_path, sep=separator, usecols=[
-                meta_edge['graph_id_field']]).to_numpy().squeeze())
+                meta_edge.graph_id_field]).to_numpy().squeeze())
         self.src = F.tensor(pd.read_csv(file_path, sep=separator, usecols=[
-            meta_edge['src_id_field']]).to_numpy().squeeze())
+            meta_edge.src_id_field]).to_numpy().squeeze())
         self.dst = F.tensor(pd.read_csv(file_path, sep=separator, usecols=[
-            meta_edge['dst_id_field']]).to_numpy().squeeze())
-        if 'labels' in meta_edge:
-            meta_label = meta_edge['labels']
+            meta_edge.dst_id_field]).to_numpy().squeeze())
+        if meta_edge.labels is not None:
+            meta_label = meta_edge.labels
             self.label = F.tensor(pd.read_csv(file_path, sep=separator, usecols=[
-                meta_label['field']]).to_numpy().squeeze())
-            if meta_label['type'] == 'classification':
+                meta_label.field]).to_numpy().squeeze())
+            if meta_label.type == 'classification':
                 self.num_classes = F.tensor(
-                    np.full(self.label.shape, meta_label['num_classes']))
+                    np.full(self.label.shape, meta_label.num_classes))
             self.split_type = F.tensor(pd.read_csv(file_path, sep=separator, usecols=[
-                meta_edge['split_type_field']]).to_numpy().squeeze())
-        if 'feat_prefix_field' in meta_edge:
-            feat_prefix = meta_edge['feat_prefix_field']
+                meta_edge.split_type_field]).to_numpy().squeeze())
+        if meta_edge.feat_prefix_field is not None:
+            feat_prefix = meta_edge.feat_prefix_field
             feat_data = pd.read_csv(
                 file_path, sep=separator, usecols=lambda x: feat_prefix in x)
             self.feat = F.tensor(np.stack([feat_data[key].to_numpy()
@@ -129,25 +159,25 @@ class NodeData:
     def _process(self, root_path, meta_node):
         if meta_node is None:
             return
-        file_path = os.path.join(root_path, meta_node['file_name'])
-        separator = meta_node['separator']
-        if 'graph_id_field' in meta_node:
+        file_path = os.path.join(root_path, meta_node.file_name)
+        separator = meta_node.separator
+        if meta_node.graph_id_field is not None:
             self.graph_id = F.tensor(pd.read_csv(file_path, sep=separator, usecols=[
-                meta_node['graph_id_field']]).to_numpy().squeeze())
+                meta_node.graph_id_field]).to_numpy().squeeze())
         self.id = F.tensor(pd.read_csv(file_path, sep=separator, usecols=[
-            meta_node['node_id_field']]).to_numpy().squeeze())
-        self.type = meta_node['ntype'] if 'ntype' in meta_node else '_V'
-        if 'labels' in meta_node:
-            meta_label = meta_node['labels']
+            meta_node.node_id_field]).to_numpy().squeeze())
+        self.type = meta_node.ntype if meta_node.ntype is not None else '_V'
+        if meta_node.labels is not None:
+            meta_label = meta_node.labels
             self.label = F.tensor(pd.read_csv(file_path, sep=separator, usecols=[
-                meta_label['field']]).to_numpy().squeeze())
-            if meta_label['type'] == 'classification':
+                meta_label.field]).to_numpy().squeeze())
+            if meta_label.type == 'classification':
                 self.num_classes = F.tensor(
-                    np.full(self.label.shape, meta_label['num_classes']))
+                    np.full(self.label.shape, meta_label.num_classes))
             self.split_type = F.tensor(pd.read_csv(file_path, sep=separator, usecols=[
-                meta_node['split_type_field']]).to_numpy().squeeze())
-        if 'feat_prefix_field' in meta_node:
-            feat_prefix = meta_node['feat_prefix_field']
+                meta_node.split_type_field]).to_numpy().squeeze())
+        if meta_node.feat_prefix_field is not None:
+            feat_prefix = meta_node.feat_prefix_field
             feat_data = pd.read_csv(
                 file_path, sep=separator, usecols=lambda x: feat_prefix in x)
             self.feat = F.tensor(np.stack([feat_data[key].to_numpy()
@@ -168,16 +198,16 @@ class GraphData:
     def _process(self, root_path, meta_graph):
         if meta_graph is None:
             return
-        file_path = os.path.join(root_path, meta_graph['file_name'])
-        separator = meta_graph['separator']
+        file_path = os.path.join(root_path, meta_graph.file_name)
+        separator = meta_graph.separator
         self.graph_id = F.tensor(pd.read_csv(file_path, sep=separator, usecols=[
-            meta_graph['graph_id_field']]).to_numpy().squeeze())
-        meta_label = meta_graph['labels']
+            meta_graph.graph_id_field]).to_numpy().squeeze())
+        meta_label = meta_graph.labels
         self.label = F.tensor(pd.read_csv(file_path, sep=separator, usecols=[
-            meta_label['field']]).to_numpy().squeeze())
-        self.num_classes = meta_label['num_classes']
+            meta_label.field]).to_numpy().squeeze())
+        self.num_classes = meta_label.num_classes
         self.split_type = F.tensor(pd.read_csv(file_path, sep=separator, usecols=[
-            meta_graph['split_type_field']]).to_numpy().squeeze())
+            meta_graph.split_type_field]).to_numpy().squeeze())
 
 
 class CSVDataset(DGLDataset):
@@ -198,7 +228,7 @@ class CSVDataset(DGLDataset):
         self.graphs = None
         meta = _yaml_sanity_check(meta_yaml)
         self.meta = meta
-        ds_name = meta['dataset_name'] if 'dataset_name' in meta else 'csv_dataset'
+        ds_name = meta.dataset_name if meta.dataset_name is not None else 'csv_dataset'
         super().__init__(ds_name, raw_dir=os.path.dirname(
             meta_yaml), force_reload=force_reload, verbose=verbose)
 
@@ -208,17 +238,17 @@ class CSVDataset(DGLDataset):
         meta = self.meta
         root = self.raw_dir
         edge_data = []
-        for meta_edge in meta['edges']:
+        for meta_edge in meta.edges:
             edge_data.append(EdgeData(root, meta_edge))
 
         #parse NodeData
         node_data = []
-        for meta_node in meta['nodes']:
+        for meta_node in meta.nodes:
             node_data.append(NodeData(root, meta_node))
 
         #parse GraphData
         graph_data = GraphData(
-            root, meta['graphs']) if 'graphs' in meta else None
+            root, meta.graphs) if meta.graphs is not None else None
 
         #construct dgl.heterograph
         if graph_data is None:

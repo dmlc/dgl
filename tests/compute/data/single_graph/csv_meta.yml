@@ -1,6 +1,5 @@
 version: 0.0.1
 dataset_type: user_defined
-dataset_name: single_graph
 edges:
 - file_name: edges_0.csv
   separator: ','
