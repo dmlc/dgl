@@ -55,10 +55,10 @@ void SpMM(const std::string& op, const std::string& reduce,
 /*! \brief Generalized Sparse Matrix-Matrix Multiplication with hetero-graph support. */
 void SpMMHetero(const std::string& op, const std::string& reduce,
           HeteroGraphPtr graph,
-          std::vector<NDArray>& ufeat_vec,
-          std::vector<NDArray>& efeat_vec,
-          std::vector<NDArray>& out,
-          std::vector<std::vector<NDArray>>& out_aux) {
+          const std::vector<NDArray>& ufeat_vec,
+          const std::vector<NDArray>& efeat_vec,
+          std::vector<NDArray>* out,
+          std::vector<std::vector<NDArray>>* out_aux) {
   SparseFormat format = graph->SelectFormat(0, CSC_CODE);
 
   std::vector<CSRMatrix> vec_graph;
@@ -78,11 +78,11 @@ void SpMMHetero(const std::string& op, const std::string& reduce,
 
   ATEN_XPU_SWITCH_CUDA(graph->Context().device_type, XPU, "SpMM", {
     ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
-      ATEN_FLOAT_BITS_SWITCH(out[out_eid[0]]->dtype, bits, "Feature data", {
+      ATEN_FLOAT_BITS_SWITCH((*out)[out_eid[0]]->dtype, bits, "Feature data", {
         if (format == SparseFormat::kCSC) {
           SpMMCsrHetero<XPU, IdType, bits>(
               op, reduce, bcast, vec_graph,
-              ufeat_vec, efeat_vec, out, out_aux,
+              ufeat_vec, efeat_vec, *out, *out_aux,
               ufeat_eid, out_eid);
         } else {
           // TODO(Israt): Add support for COO format
@@ -227,17 +227,17 @@ void ScatterAddDispatch(NDArray feat, NDArray idx, NDArray out) {
 }
 
 /*! \brief Update gradients (reduce op max/min) dispatch function on heterogeneous graph. */
-void UpdateGradMinMaxDispatchHetero(HeteroGraphPtr graph,
-                        std::vector<NDArray>& feat,
-                        std::vector<NDArray>& idx,
-                        std::vector<NDArray>& idx_etype,
-                        std::vector<NDArray>& out) {
+void UpdateGradMinMaxDispatchHetero(const HeteroGraphPtr& graph,
+                        const std::vector<NDArray>& feat,
+                        const std::vector<NDArray>& idx,
+                        const std::vector<NDArray>& idx_etype,
+                        std::vector<NDArray>* out) {
   auto pair = graph->meta_graph()->FindEdge(0);  // checking the first etype
   auto src_id = pair.first;
   ATEN_XPU_SWITCH_CUDA(feat[src_id]->ctx.device_type, XPU, "ScatterAdd", {
     ATEN_ID_TYPE_SWITCH(idx[src_id]->dtype, IdType, {
       ATEN_FLOAT_BITS_SWITCH(feat[src_id]->dtype, bits, "Feature data", {
-        UpdateGradMinMax_hetero<XPU, IdType, bits>(graph, feat, idx, idx_etype, out);
+        UpdateGradMinMax_hetero<XPU, IdType, bits>(graph, feat, idx, idx_etype, *out);
       });
     });
   });
@@ -355,7 +355,7 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSpMMHetero")
     List<Value> list_ArgU_ntype = args[8];
     List<Value> list_ArgE_etype = args[9];
     std::vector<std::vector<NDArray>> Arg_vec;  // ArgU + ArgE
-    for (int i = 0; i < 4; ++i) { // ArgU + ArgE + ArgU_ntype + ArgE_etype
+    for (int i = 0; i < 4; ++i) {  // ArgU + ArgE + ArgU_ntype + ArgE_etype
       Arg_vec.push_back(std::vector<NDArray>());
     }
     std::vector<NDArray> U_vec = ListValueToVector<NDArray>(list_U);
@@ -376,7 +376,7 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSpMMHetero")
       CheckContiguous({U, E, V_vec[dst_id], Arg_vec[0][dst_id], Arg_vec[1][dst_id]},
           {"U_data", "E_data", "out", "Arg_U", "Arg_E"});
     }
-    SpMMHetero(op, reduce_op, graph.sptr(), U_vec, E_vec, V_vec, Arg_vec);
+    SpMMHetero(op, reduce_op, graph.sptr(), U_vec, E_vec, &V_vec, &Arg_vec);
   });
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSDDMM")
@@ -468,7 +468,7 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelUpdateGradMinMaxHetero")
     std::vector<NDArray> vec_out = ListValueToVector<NDArray>(list_out);
     // CheckCtx(feat->ctx, {feat, idx, out}, {"feat", "idx", "out"});
     // CheckContiguous({feat, idx, out}, {"feat", "idx", "out"});
-    UpdateGradMinMaxDispatchHetero(graph.sptr(), vec_feat, vec_idx, vec_idx_etype, vec_out);
+    UpdateGradMinMaxDispatchHetero(graph.sptr(), vec_feat, vec_idx, vec_idx_etype, &vec_out);
   });
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelBwdSegmentCmp")
