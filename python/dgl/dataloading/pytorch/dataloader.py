@@ -460,12 +460,18 @@ class NodeDataLoader:
         :class:`torch.utils.data.distributed.DistributedSampler`.
 
         Only effective when :attr:`use_ddp` is True.
-    load_input : dict[tag, Tensor], optional
+    load_input : dict[str, Tensor], optional
         The tensors will be sliced according to ``blocks[0].srcdata[dgl.NID]``
         and will be attached to ``blocks[0].srcdata``.
-    load_output : dict[tag, Tensor], optional
+    load_output : dict[str, Tensor], optional
         The tensors will be sliced according to ``blocks[-1].dstdata[dgl.NID]``
         and will be attached to ``blocks[-1].dstdata``.
+    load_ndata : dict[str, Tensor], optional
+        The tensors will be sliced and attached to **all** the blocks according to
+        ``srcdata[dgl.NID]`` and ``dstdata[dgl.NID]``.
+    load_edata : dict[str, Tensor], optional
+        The tensors will be sliced and attached to **all** the blocks according to
+        ``edata[dgl.NID]``
     async_load : boolean, optional
         If True, data including graph, sliced tensors will be transferred
         between devices asynchronously.This is transparent to end users. This
@@ -531,7 +537,8 @@ class NodeDataLoader:
     collator_arglist = inspect.getfullargspec(NodeCollator).args
 
     def __init__(self, g, nids, graph_sampler, device=None, use_ddp=False, ddp_seed=0,
-                 load_input=None, load_output=None, async_load=False, **kwargs):
+                 load_input=None, load_output=None, load_ndata=None, load_edata=None,
+                 async_load=False, **kwargs):
         collator_kwargs = {}
         dataloader_kwargs = {}
         for k, v in kwargs.items():
@@ -563,8 +570,8 @@ class NodeDataLoader:
                     raise DGLError('load_input/load_output not supported for heterograph yet.')
             self.load_input = {} if load_input is None else load_input
             self.load_output = {} if load_output is None else load_output
-            self.load_ndata = {}
-            self.load_edata = {}
+            self.load_ndata = {} if load_ndata is None else load_ndata
+            self.load_edata = {} if load_edata is None else load_edata
             self.async_load = async_load
 
             # if the sampler supports it, tell it to output to the specified device.
