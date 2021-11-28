@@ -7,6 +7,7 @@ import networkx as nx
 from ..base import DGLError
 from .. import backend as F
 from . import checks
+from .internal import recursive_apply
 
 def elist2tensor(elist, idtype):
     """Function to convert an edge list to edge tensors.
@@ -344,7 +345,4 @@ def to_device(data, device):
     Tensor or dict[str, Tensor]
         The output data.
     """
-    if isinstance(data, dict):
-        return {k: F.copy_to(v, device) for k, v in data.items()}
-    else:
-        return F.copy_to(data, device)
+    return recursive_apply(data, F.copy_to, device)

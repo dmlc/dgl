@@ -2127,6 +2127,203 @@ class DGLHeteroGraph(object):
         else:
             return HeteroEdgeDataView(self, self.canonical_etypes, ALL)
 
+    def _unpack(self, columns, types, dataview, view, force_heterogeneous, exclude_keys, name):
+        results = {}
+
+        if columns is None:
+            if len(types) == 1:
+                for k in list(dataview.keys()):
+                    if k in exclude_keys:
+                        continue
+                    results[k] = dataview.pop(k)
+                return results if not force_heterogeneous else {types[0]: results}
+            else:
+                for ntype in types:
+                    for k in list(view[ntype].data.keys()):
+                        if k in exclude_keys:
+                            continue
+                        results[ntype][k] = view[ntype].data.pop(k)
+                return results
+
+        if isinstance(columns, Mapping):
+            for k, v in columns.items():
+                results[k] = {}
+                for col in v:
+                    results[k][col] = view[k].data.pop(col)
+            return results
+        else:
+            assert len(types) == 1, \
+                "expect a dictionary for graphs with multiple %s types" % name
+            for k in columns:
+                results[k] = dataview.pop(k)
+            return results if not force_heterogeneous else {types[0]: results}
+
+    def unpack_ndata(self, ndata_columns=None, force_heterogeneous=False):
+        """Pops the node data from given feature names into a dictionary.  The graph
+        itself will no longer contain the said features.
+
+        Parameters
+        ----------
+        ndata_columns : list[str], or dict[str, list[str]], optional
+            List of columns to pop.  If not given, all features will be popped
+            except ``dgl.NID``.
+
+            If the graph has more than one node type, you must specify a dictionary
+            of node types and the feature names you want to pop.
+        force_heterogeneous : bool, optional
+            If True, forces the return to be a dictionary of dictionaries even
+            if the graph only has one node type.
+
+        Returns
+        -------
+        dict[str, Tensor] or dict[str, dict[str, Tensor]]
+            A dictionary of feature names and tensors, or a dictionary of node types
+            and such dictionaries if the graph has multiple node types.
+
+        Examples
+        --------
+        >>> g = dgl.graph(([0, 1, 2], [3, 4, 5]))
+        >>> g.ndata['x'] = torch.randn(6, 3)
+        >>> g.pop_ndata(['x'])
+        {'x': tensor([[ 0.2242,  0.0633,  0.2813],
+                [ 1.1587,  0.0329,  0.5426],
+                [ 0.6350, -0.8041,  0.0403],
+                [-1.2346, -1.5936,  0.9840],
+                [ 1.1959,  0.7292,  0.5716],
+                [-1.8317, -1.7814,  0.8339]])}
+        >>> g.ndata
+        {}
+
+        >>> g.ndata['x'] = torch.randn(6, 3)
+        >>> g.pop_ndata()
+        {'x': tensor([[-2.3537,  1.2567,  0.0811],
+                [ 0.1784,  1.4810, -0.3414],
+                [ 0.3078,  1.3162,  0.0369],
+                [ 0.0538,  0.8747, -0.7078],
+                [ 0.4278, -0.5260,  0.1715],
+                [ 1.4300, -0.7189, -0.1434]])}
+
+        For heterogeneous graphs:
+
+        >>> g = dgl.heterograph({('A', 'AB', 'B'): ([0,1,2],[0,1,2])})
+        >>> g.nodes['A'].data['x'] = torch.randn(3, 3)
+        >>> g.nodes['B'].data['y'] = torch.randn(3, 3)
+        >>> g2 = g.clone()
+
+        >>> g.pop_ndata({'A': ['x'], 'B': ['y']})
+        {'A': {'x': tensor([[-1.5939, -0.6028,  0.8368],
+                [ 0.2702, -0.7168, -0.9502],
+                [ 0.3448,  0.2063, -0.0140]])}, 'B': {'y': tensor([[-1.5570,  0.5947,  0.8873],
+                [ 0.5364, -0.2282,  2.4904],
+                [ 1.2022, -1.2771,  0.2304]])}}
+        >>> g.ndata
+        defaultdict(<class 'dict'>, {})
+
+        >>> g2.pop_ndata()
+        {'A': {'x': tensor([[-1.5939, -0.6028,  0.8368],
+                [ 0.2702, -0.7168, -0.9502],
+                [ 0.3448,  0.2063, -0.0140]])}, 'B': {'y': tensor([[-1.5570,  0.5947,  0.8873],
+                [ 0.5364, -0.2282,  2.4904],
+                [ 1.2022, -1.2771,  0.2304]])}}
+        >>> g2.ndata
+        defaultdict(<class 'dict'>, {})
+
+        You can also pop some of the node types:
+
+        >>> g3.pop_ndata({'A': ['x']})
+        {'A': {'x': tensor([[-1.5939, -0.6028,  0.8368],
+                [ 0.2702, -0.7168, -0.9502],
+                [ 0.3448,  0.2063, -0.0140]])}}
+        >>> g3.ndata
+        defaultdict(<class 'dict'>, {'B': {'y': tensor([[-1.5570,  0.5947,  0.8873],
+                [ 0.5364, -0.2282,  2.4904],
+                [ 1.2022, -1.2771,  0.2304]])}})
+        """
+        return self._unpack(ndata_columns, g.ntypes, g.ndata, g.nodes,
+                            force_heterogeneous, [NID, NTYPE], 'node')
+
+    def unpack_edata(self, edata_columns=None, force_heterogeneous=False):
+        """Pops the edge data from given feature names into a dictionary.  The graph
+        itself will no longer contain the said features.
+
+        Parameters
+        ----------
+        edata_columns : list[str], or dict[str, list[str]], optional
+            List of columns to pop.  If not given, all features will be popped
+            except ``dgl.EID``.
+
+            If the graph has more than one node type, you must specify a dictionary
+            of edge types and the feature names you want to pop.
+        force_heterogeneous : bool, optional
+            If True, forces the return to be a dictionary of dictionaries even
+            if the graph only has one edge type.
+
+        Returns
+        -------
+        dict[str, Tensor] or dict[str, dict[str, Tensor]]
+            A dictionary of feature names and tensors, or a dictionary of edge types
+            and such dictionaries if the graph has multiple edge types.
+
+        Examples
+        --------
+        >>> g = dgl.graph(([0, 1, 2], [3, 4, 5]))
+        >>> g.edata['x'] = torch.randn(3, 3)
+        >>> g.pop_edata(['x'])
+        {'x': tensor([[ 0.2242,  0.0633,  0.2813],
+                [ 1.1587,  0.0329,  0.5426],
+                [-1.8317, -1.7814,  0.8339]])}
+        >>> g.edata
+        {}
+
+        >>> g.edata['x'] = torch.randn(3, 3)
+        >>> g.pop_edata()
+        {'x': tensor([[-2.3537,  1.2567,  0.0811],
+                [ 0.4278, -0.5260,  0.1715],
+                [ 1.4300, -0.7189, -0.1434]])}
+
+        For heterogeneous graphs:
+
+        >>> g = dgl.heterograph(
+        ...         {('A', 'AB', 'B'): ([0, 1, 2], [0, 1, 2]),
+        ...          ('B', 'BA', 'A'): ([0, 1, 2], [0, 1, 2])})
+        >>> g.edges['AB'].data['x'] = torch.randn(3, 3)
+        >>> g.edges['BA'].data['y'] = torch.randn(3, 3)
+        >>> g2 = g.clone()
+
+        >>> g.pop_edata({'AB': ['x'], 'BA': ['y']})
+        {'AB': {'x': tensor([[-1.5939, -0.6028,  0.8368],
+                [ 0.2702, -0.7168, -0.9502],
+                [ 0.3448,  0.2063, -0.0140]])}, 'BA': {'y': tensor([[-1.5570,  0.5947,  0.8873],
+                [ 0.5364, -0.2282,  2.4904],
+                [ 1.2022, -1.2771,  0.2304]])}}
+        >>> g.edata
+        defaultdict(<class 'dict'>, {})
+
+        >>> g2.pop_edata()
+        {'AB': {'x': tensor([[-1.5939, -0.6028,  0.8368],
+                [ 0.2702, -0.7168, -0.9502],
+                [ 0.3448,  0.2063, -0.0140]])}, 'BA': {'y': tensor([[-1.5570,  0.5947,  0.8873],
+                [ 0.5364, -0.2282,  2.4904],
+                [ 1.2022, -1.2771,  0.2304]])}}
+        >>> g2.edata
+        defaultdict(<class 'dict'>, {})
+
+        You can also pop some of the node types:
+
+        >>> g3.pop_edata({'AB': ['x']})
+        {'AB': {'x': tensor([[-1.5939, -0.6028,  0.8368],
+                [ 0.2702, -0.7168, -0.9502],
+                [ 0.3448,  0.2063, -0.0140]])}}
+        >>> g3.ndata
+        defaultdict(<class 'dict'>, {'BA': {'y': tensor([[-1.5570,  0.5947,  0.8873],
+                [ 0.5364, -0.2282,  2.4904],
+                [ 1.2022, -1.2771,  0.2304]])}})
+        """
+        if isinstance(edata_columns, Mapping):
+            edata_columns = {self.to_canonical_etype(k): v for k, v in edata_columns.items()}
+        return self._unpack(edata_columns, g.canonical_etypes, g.edata, g.edges,
+                            force_heterogeneous, [EID, ETYPE], 'edge')
+
     def _find_etypes(self, key):
         etypes = [
             i for i, (srctype, etype, dsttype) in enumerate(self._canonical_etypes) if
