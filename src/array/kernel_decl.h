@@ -131,7 +131,7 @@ void ScatterAdd(NDArray feat,
                 NDArray out);
 
 /*!
- * \brief Scatter Add on first dimension.
+ * \brief Update gradients for reduce operator max and min on first dimension.
  */
 template <int XPU, typename IdType, int bits>
 void UpdateGradMinMax_hetero(HeteroGraphPtr g,

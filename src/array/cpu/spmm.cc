@@ -88,7 +88,6 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
           const dgl_type_t dst_id = out_node_tids[etype];
           if (!updated[dst_id]) {
             updated[dst_id] = true;
-            // TODO(Israt): what to fill with?
             if (Op::use_lhs) {
               IdType *argu_ntype = out_aux[2][dst_id].Ptr<IdType>();
               std::fill(argu_ntype, argu_ntype + vec_csr[etype].num_rows * dim, -1);
