@@ -59,7 +59,6 @@ def _slice(features, indices, pin_memory=True):
     """
     if torch.is_tensor(indices):
         return _slice_one_type(indices, features, pin_memory)
-    print(indices, features)
     return {k: _slice_one_type(indices[k], features[k], pin_memory)
             for k in indices.keys() if k in features.keys()}
 
