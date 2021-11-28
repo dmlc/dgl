@@ -190,7 +190,49 @@ def _gspmm(gidx, op, reduce_op, u, e):
 
 
 def _gspmm_hetero(gidx, op, reduce_op, u_len, u_and_e_tuple):
-    r""" Generalized Sparse Matrix Multiplication interface.
+    r""" Generalized Sparse Matrix Multiplication interface on heterogeneous graphs.
+    It handles multiple node and edge types of the graph. For each edge type, it takes
+    the result of :attr:`op` on source node feature and edge feature, and leads to a
+    message on edge. Then it aggregates the message by :attr:`reduce_op` on the destination
+    nodes of the etype.
+
+    .. math::
+        x_v = \psi_{(u, v, e)\in \mathcal{G}}(\rho(x_u, x_e))
+
+    where :math:`x_v` is the returned feature on destination nodes, and :math`x_u`,
+    :math:`x_e` refers to :attr:`u`, :attr:`e` respectively. :math:`\rho` means binary
+    operator :attr:`op` and :math:`\psi` means reduce operator :attr:`reduce_op`,
+    :math:`\mathcal{G}` is the graph we apply gspmm on: :attr:`g`.
+
+    Note that this function does not handle gradients.
+
+    Parameters
+    ----------
+    gidx : HeteroGraphIndex
+        The input graph index.
+    op : str
+        The binary op's name, could be ``add``, ``sub``, ``mul``, ``div``, ``copy_lhs``,
+        ``copy_rhs``.
+    reduce_op : str
+        Reduce operator, could be ``sum``, ``max``, ``min``.
+    u_len : int
+        The number of tensors in ``u`` (source node features)
+    u_and_e_tuple : Tuple of tensors
+        Tuple of source nodes' features and edges' features.
+        The feature on source nodes could be None if op is ``copy_rhs``.
+        The feature on edges, could also be None if op is ``copy_lhs``.
+
+    Returns
+    -------
+    tuple
+        The returned tuple is composed of two elements:
+        - The first element refers to the tuple of result tensors.
+        - The second element refers to a tuple composed of arg_u and arg_e
+          (which is useful when reducer is `min`/`max`).
+
+    Notes
+    -----
+    This function does not handle gradients.
     """
     u_tuple, e_tuple = u_and_e_tuple[:u_len], u_and_e_tuple[u_len:]
     use_u = op != 'copy_rhs'
@@ -504,25 +546,26 @@ def _scatter_add(x, idx, m):
 
 
 def _update_grad_minmax_hetero(gidx, list_x, list_idx, list_idx_etype, list_dX):
-    r""" Scatter add operator (on first dimension) implementation.
-
-    Math: y[idx[i], *] += x[i, *]
+    r""" Update gradients for reduce operator max and min (on first dimension) implementation.
 
     Parameters
     ----------
-    x : Tensor
-        The input feature.
-    idx : Tensor
-        The indices array.
-    m : int
-        The length of output.
+    gidx : HeteroGraphIndex
+        The input graph index.
+    list_x : List of tensors
+        List of the input features.
+    list_idx : List of tensors
+        List of the indices array.
+    list_idx_etype : List of tensors
+        List of the node- or edge-type array.
+    list_dX : List of tensors
+        List of gradients.
 
     Returns
     -------
     Tensor
         The output tensor.
     """
-    # dX = scatter_add_hetero(g_rev, dZ, argX, argX_etype, dX)
     list_out = [None] * len(list_dX)
     for etid in range(gidx.number_of_etypes()):
         src_id, dst_id = gidx.metagraph.find_edge(etid) # gidx is reveresed

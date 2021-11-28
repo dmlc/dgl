@@ -163,8 +163,7 @@ class GSpMM(th.autograd.Function):
                         0, argY.long()) * dZ
                     dX.scatter_add_(0, argX.long(), grad)
                 elif op in ['add', 'copy_lhs']:
-                    # dX = scatter_add(dZ, argX.long(), len(dX)) # DGL style
-                    dX.scatter_add_(0, argX.long(), dZ) # PyTorch style
+                    dX.scatter_add_(0, argX.long(), dZ)
             dX = _reduce_grad(dX, X_shape)
         else:  # X has not gradient
             dX = None
