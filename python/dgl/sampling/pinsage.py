@@ -5,7 +5,6 @@ import numpy as np
 from .. import backend as F
 from .. import convert
 from .randomwalks import random_walk
-from .randomwalks import randomwalk_topk
 from .. import utils
 
 def _select_pinsage_neighbors(src, dst, num_samples_per_node, k):
@@ -121,7 +120,7 @@ class RandomWalkNeighborSampler(object):
         dst = F.repeat(paths[:, 0], self.num_traversals, 0)
 
         src, dst, counts = _select_pinsage_neighbors(
-                src, dst, (self.num_random_walks * self.num_traversals), self.num_neighbors)
+            src, dst, (self.num_random_walks * self.num_traversals), self.num_neighbors)
         neighbor_graph = convert.heterograph(
             {(self.ntype, '_E', self.ntype): (src, dst)},
             {self.ntype: self.G.number_of_nodes(self.ntype)}
