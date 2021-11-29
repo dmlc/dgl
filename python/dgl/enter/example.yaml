@@ -1,0 +1,25 @@
+pipeline_name: nodepred
+device: 'cuda:0'
+# Data configurations
+data:
+    name: CoraGraphDataset
+node_embed_size: -1
+# Model configurations
+model:
+    name: GCN                      # Model name
+    num_layers: 2                  # number of layers
+    normalize: both                # normalization for adjacency matrix, can be none, symmetric, right
+    hidden_size: 16                # hidden layer size
+    activation: relu               # activation
+    dropout: 0.5                   # dropout
+    use_edge_weight: False         # use edge weight or not
+# Training configurations
+num_epochs: 200                    # Number of training epochs
+eval_period: 5                     # Number of epochs between two evaluations
+checkpoint_path: 'checkpoint.pt'   # Checkpoint path
+patience: 20                       # Early stop patience
+optimizer:
+    name: Adam                     # Optimizer name, can be Adam, ?
+    lr: 0.005                      # Learning rate
+    weight_decay: 0                # Weight decay
+loss: CrossEntropyLoss
