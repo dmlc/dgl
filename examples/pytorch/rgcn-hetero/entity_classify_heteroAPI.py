@@ -10,7 +10,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from dgl.data.rdf import AIFBDataset, MUTAGDataset, BGSDataset, AMDataset
-from model import EntityClassify_Hetero
+from model import EntityClassify_HeteroAPI
 
 def main(args):
     # load graph data
@@ -55,7 +55,7 @@ def main(args):
         test_idx = test_idx.cuda()
 
     # create model
-    model = EntityClassify_Hetero(g,
+    model = EntityClassify_HeteroAPI(g,
                            args.n_hidden,
                            num_classes,
                            num_bases=args.n_bases,

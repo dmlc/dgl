@@ -121,7 +121,7 @@ class RelGraphConvLayer(nn.Module):
             return self.dropout(h)
         return {ntype : _apply(ntype, h) for ntype, h in hs.items()}
 
-class RelGraphConvLayerHetero(nn.Module):
+class RelGraphConvLayerHeteroAPI(nn.Module):
     r"""Relational graph convolution layer.
 
     Parameters
@@ -156,7 +156,7 @@ class RelGraphConvLayerHetero(nn.Module):
                  activation=None,
                  self_loop=False,
                  dropout=0.0):
-        super(RelGraphConvLayerHetero, self).__init__()
+        super(RelGraphConvLayerHeteroAPI, self).__init__()
         self.in_feat = in_feat
         self.out_feat = out_feat
         self.rel_names = rel_names
@@ -371,7 +371,7 @@ class EntityClassify(nn.Module):
             x = y
         return y
 
-class EntityClassify_Hetero(nn.Module):
+class EntityClassify_HeteroAPI(nn.Module):
     def __init__(self,
                  g,
                  h_dim, out_dim,
@@ -379,7 +379,7 @@ class EntityClassify_Hetero(nn.Module):
                  num_hidden_layers=1,
                  dropout=0,
                  use_self_loop=False):
-        super(EntityClassify_Hetero, self).__init__()
+        super(EntityClassify_HeteroAPI, self).__init__()
         self.g = g
         self.h_dim = h_dim
         self.out_dim = out_dim
@@ -396,18 +396,18 @@ class EntityClassify_Hetero(nn.Module):
         self.embed_layer = RelGraphEmbed(g, self.h_dim)
         self.layers = nn.ModuleList()
         # i2h
-        self.layers.append(RelGraphConvLayerHetero(
+        self.layers.append(RelGraphConvLayerHeteroAPI(
             self.h_dim, self.h_dim, self.rel_names,
             self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
             dropout=self.dropout, weight=False))
         # h2h
         for i in range(self.num_hidden_layers):
-            self.layers.append(RelGraphConvLayerHetero(
+            self.layers.append(RelGraphConvLayerHeteroAPI(
                 self.h_dim, self.h_dim, self.rel_names,
                 self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
                 dropout=self.dropout))
         # h2o
-        self.layers.append(RelGraphConvLayerHetero(
+        self.layers.append(RelGraphConvLayerHeteroAPI(
             self.h_dim, self.out_dim, self.rel_names,
             self.num_bases, activation=None,
             self_loop=self.use_self_loop))
