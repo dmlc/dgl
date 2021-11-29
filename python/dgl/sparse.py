@@ -634,9 +634,10 @@ def libra2dgl_build_dict(a, b, indices, ldt_key, gdt_key, gdt_value, node_map,
                                 fsize,
                                 to_dgl_nd_for_write(hash_nodes),
                                 dataset)
+
     
 def libra2dgl_build_adjlist(feat, gfeat, adj, inner_node, ldt, gdt_key,
-                            gdt_value, node_map, lf, lftensor, num_nodes,
+                            gdt_value, node_map, lr, lrtensor, num_nodes,
                             nc, c, feat_size, labels, trainm, testm, valm,
                             glabels, gtrainm, gtestm, gvalm, feat_shape):
     _CAPI_DGLLibra2dglBuildAdjlist(to_dgl_nd(feat),
@@ -647,8 +648,8 @@ def libra2dgl_build_adjlist(feat, gfeat, adj, inner_node, ldt, gdt_key,
                                    to_dgl_nd(gdt_key),
                                    to_dgl_nd(gdt_value),
                                    to_dgl_nd(node_map),
-                                   to_dgl_nd_for_write(lf),
-                                   to_dgl_nd(lftensor),
+                                   to_dgl_nd_for_write(lr),
+                                   to_dgl_nd(lrtensor),
                                    num_nodes,
                                    nc,
                                    c,
@@ -665,10 +666,10 @@ def libra2dgl_build_adjlist(feat, gfeat, adj, inner_node, ldt, gdt_key,
     
 
     
-def libra2dgl_set_lf(gdt_key, gdt_value, lftensor, nc, Nn):
-    _CAPI_DGLLibra2dglSetLF(to_dgl_nd(gdt_key),
+def libra2dgl_set_lr(gdt_key, gdt_value, lrtensor, nc, Nn):
+    _CAPI_DGLLibra2dglSetLR(to_dgl_nd(gdt_key),
                             to_dgl_nd(gdt_value),
-                            to_dgl_nd_for_write(lftensor),
+                            to_dgl_nd_for_write(lrtensor),
                             nc,
                             Nn)
 
