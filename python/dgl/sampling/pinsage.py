@@ -1,6 +1,7 @@
 """PinSAGE sampler & related functions and classes"""
 
 import numpy as np
+from .._ffi.function import _init_api
 
 from .. import backend as F
 from .. import convert
