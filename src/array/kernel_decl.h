@@ -135,6 +135,7 @@ void ScatterAdd(NDArray feat,
  */
 template <int XPU, typename IdType, int bits>
 void UpdateGradMinMax_hetero(const HeteroGraphPtr& g,
+                const std::string& op,
                 const std::vector<NDArray>& feat,
                 const std::vector<NDArray>& idx,
                 const std::vector<NDArray>& idx_etype,

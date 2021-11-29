@@ -545,7 +545,7 @@ def _scatter_add(x, idx, m):
     return out
 
 
-def _update_grad_minmax_hetero(gidx, list_x, list_idx, list_idx_etype, list_dX):
+def _update_grad_minmax_hetero(gidx, op, list_x, list_idx, list_idx_etype, list_dX):
     r""" Update gradients for reduce operator max and min (on first dimension) implementation.
 
     Parameters
@@ -566,17 +566,23 @@ def _update_grad_minmax_hetero(gidx, list_x, list_idx, list_idx_etype, list_dX):
     Tensor
         The output tensor.
     """
+    use_u = op != 'copy_rhs'
+    use_e = op != 'copy_lhs'
     list_out = [None] * len(list_dX)
     for etid in range(gidx.number_of_etypes()):
         src_id, dst_id = gidx.metagraph.find_edge(etid) # gidx is reveresed
         x = list_x[src_id]
-        out_shp = (len(list_dX[dst_id]),) + F.shape(x)[1:]
         ctx = F.context(x)
         dtype = F.dtype(x)
-        list_out[dst_id] = F.zeros(out_shp, dtype, ctx)
-    _CAPI_DGLKernelUpdateGradMinMaxHetero(gidx,
+        if use_u:
+            out_shp = (len(list_dX[dst_id]),) + F.shape(x)[1:]
+            list_out[dst_id] = F.zeros(out_shp, dtype, ctx)
+        if use_e:
+            out_shp = (len(list_dX[etid]),) + F.shape(x)[1:]
+            list_out[etid] = F.zeros(out_shp, dtype, ctx)
+
+    _CAPI_DGLKernelUpdateGradMinMaxHetero(gidx, op,
                                           [to_dgl_nd(x) for x in list_x],
-                                          # TODO (Israt): change idx to idx.long()
                                           [to_dgl_nd(idx) for idx in list_idx],
                                           [to_dgl_nd(idx_etype) for idx_etype in list_idx_etype],
                                           [to_dgl_nd_for_write(out) for out in list_out])

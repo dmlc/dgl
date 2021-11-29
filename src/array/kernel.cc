@@ -228,6 +228,7 @@ void ScatterAddDispatch(NDArray feat, NDArray idx, NDArray out) {
 
 /*! \brief Update gradients (reduce op max/min) dispatch function on heterogeneous graph. */
 void UpdateGradMinMaxDispatchHetero(const HeteroGraphPtr& graph,
+                        const std::string& op,
                         const std::vector<NDArray>& feat,
                         const std::vector<NDArray>& idx,
                         const std::vector<NDArray>& idx_etype,
@@ -237,7 +238,7 @@ void UpdateGradMinMaxDispatchHetero(const HeteroGraphPtr& graph,
   ATEN_XPU_SWITCH_CUDA(feat[src_id]->ctx.device_type, XPU, "ScatterAdd", {
     ATEN_ID_TYPE_SWITCH(idx[src_id]->dtype, IdType, {
       ATEN_FLOAT_BITS_SWITCH(feat[src_id]->dtype, bits, "Feature data", {
-        UpdateGradMinMax_hetero<XPU, IdType, bits>(graph, feat, idx, idx_etype, out);
+        UpdateGradMinMax_hetero<XPU, IdType, bits>(graph, op, feat, idx, idx_etype, out);
       });
     });
   });
@@ -458,17 +459,18 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelScatterAdd")
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelUpdateGradMinMaxHetero")
 .set_body([](DGLArgs args, DGLRetValue *rv) {
     HeteroGraphRef graph = args[0];
-    List<Value> list_feat = args[1];
-    List<Value> list_idx = args[2];
-    List<Value> list_idx_etype = args[3];
-    List<Value> list_out = args[4];
+    const std::string op = args[1];
+    List<Value> list_feat = args[2];
+    List<Value> list_idx = args[3];
+    List<Value> list_idx_etype = args[4];
+    List<Value> list_out = args[5];
     std::vector<NDArray> vec_feat = ListValueToVector<NDArray>(list_feat);
     std::vector<NDArray> vec_idx = ListValueToVector<NDArray>(list_idx);
     std::vector<NDArray> vec_idx_etype = ListValueToVector<NDArray>(list_idx_etype);
     std::vector<NDArray> vec_out = ListValueToVector<NDArray>(list_out);
     // CheckCtx(feat->ctx, {feat, idx, out}, {"feat", "idx", "out"});
     // CheckContiguous({feat, idx, out}, {"feat", "idx", "out"});
-    UpdateGradMinMaxDispatchHetero(graph.sptr(), vec_feat, vec_idx, vec_idx_etype, &vec_out);
+    UpdateGradMinMaxDispatchHetero(graph.sptr(), op, vec_feat, vec_idx, vec_idx_etype, &vec_out);
   });
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelBwdSegmentCmp")

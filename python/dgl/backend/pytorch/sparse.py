@@ -255,8 +255,7 @@ class GSpMM_hetero(th.autograd.Function):
                         0, argY.long()) * dZ
                     dX.scatter_add_(0, argX.long(), grad)
                 elif op in ['add', 'copy_lhs']:
-                    # TODO(Israt): argX.long()
-                    dX = _update_grad_minmax_hetero(g_rev, dZ, argX, argX_ntype, dX)
+                    dX = _update_grad_minmax_hetero(g_rev, op, dZ, argX, argX_ntype, dX)
             dX = tuple([_reduce_grad(dX[i], X_shape[i]) if X[i] is not None else None
                 for i in range(len(X))])
         else:  # X has not gradient
@@ -282,7 +281,7 @@ class GSpMM_hetero(th.autograd.Function):
                         0, argX.long()) * dZ
                     dY.scatter_add_(0, argY.long(), grad)
                 elif op in ['add', 'copy_rhs']:
-                    dY = _update_grad_minmax_hetero(gidx.reverse(), dZ, argY, argY_etype, dY)
+                    dY = _update_grad_minmax_hetero(gidx.reverse(), op, dZ, argY, argY_etype, dY)
             dY = tuple([_reduce_grad(dY[i], Y_shape[i]) if dY[i] is not None else None
                 for i in range(len(dY))])
         else:  # Y has no gradient

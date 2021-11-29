@@ -104,7 +104,7 @@ void ScatterAdd(NDArray feat, NDArray idx, NDArray out) {
 }
 
 /*!
- * \brief CPU kernel of Scatter Add (on first dimension) operator for heterogeneous graph.
+ * \brief CPU kernel of updating gradients for reduce operator max and min on heterogeneous graph.
  * \note math equation: out[idx[i], *] += feat[i, *]
  * \param feat The input tensor.
  * \param idx The indices tensor.
@@ -113,45 +113,73 @@ void ScatterAdd(NDArray feat, NDArray idx, NDArray out) {
 
 template <typename IdType, typename DType>
 void UpdateGradMinMax_hetero(HeteroGraphPtr graph,
+                       const std::string& op,
                        std::vector<NDArray> list_feat,
                        std::vector<NDArray> list_idx,
                        std::vector<NDArray> list_idx_ntypes,
                        std::vector<NDArray> list_out) {
-  std::vector<std::vector<dgl_id_t>> dst_src_ntids(graph->NumVertexTypes(),
+  if (op == "copy_lhs") {
+    std::vector<std::vector<dgl_id_t>> dst_src_ntids(graph->NumVertexTypes(),
     std::vector<dgl_id_t>());
-  for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
-    auto pair = graph->meta_graph()->FindEdge(etype);
-    const dgl_id_t dst_id = pair.first;  // graph is reversed
-    const dgl_id_t src_id = pair.second;
-    dst_src_ntids[dst_id].push_back(src_id);  // can have duplicates. Use Hashtable to optimize.
-  }
-  std::vector<bool> updated(graph->NumVertexTypes(), false);
-  for (int dst_id = 0; dst_id < dst_src_ntids.size(); ++dst_id) {
-    updated[dst_id] = false;
-    for (int j = 0; j < dst_src_ntids[dst_id].size(); ++j) {
-      int src_id = dst_src_ntids[dst_id][j];
-      if (updated[src_id]) continue;
+    for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
+      auto pair = graph->meta_graph()->FindEdge(etype);
+      const dgl_id_t dst_id = pair.first;  // graph is reversed
+      const dgl_id_t src_id = pair.second;
+      dst_src_ntids[dst_id].push_back(src_id);  // can have duplicates. Use Hashtable to optimize.
+    }
+    std::vector<bool> updated(graph->NumVertexTypes(), false);
+    for (int dst_id = 0; dst_id < dst_src_ntids.size(); ++dst_id) {
+      updated[dst_id] = false;
+      for (int j = 0; j < dst_src_ntids[dst_id].size(); ++j) {
+        int src_id = dst_src_ntids[dst_id][j];
+        if (updated[src_id]) continue;
+        const DType* feat_data = list_feat[dst_id].Ptr<DType>();
+        const IdType* idx_data = list_idx[dst_id].Ptr<IdType>();
+        const IdType* idx_ntype_data = list_idx_ntypes[dst_id].Ptr<IdType>();
+        DType* out_data = list_out[src_id].Ptr<DType>();
+        int dim = 1;
+        for (int i = 1; i < list_out[src_id]->ndim; ++i)
+          dim *= list_out[src_id]->shape[i];
+        int n = list_feat[dst_id]->shape[0];
+    #pragma omp parallel for
+        for (int i = 0; i < n; ++i) {
+          for (int k = 0; k < dim; ++k) {
+            if (src_id == idx_ntype_data[i * dim + k]) {
+              const int write_row = idx_data[i * dim + k];
+    #pragma omp atomic
+              out_data[write_row * dim + k] += feat_data[i * dim + k];  // feat = dZ
+            }
+          }
+        }
+        updated[src_id] = true;
+      }
+    }
+  } else if (op == "copy_rhs") {
+    for (dgl_type_t etid = 0; etid < graph->NumEdgeTypes(); ++etid) {
+      auto pair = graph->meta_graph()->FindEdge(etid);
+      const dgl_id_t dst_id = pair.first;  // graph is reversed
+      const dgl_id_t src_id = pair.second;
       const DType* feat_data = list_feat[dst_id].Ptr<DType>();
       const IdType* idx_data = list_idx[dst_id].Ptr<IdType>();
       const IdType* idx_ntype_data = list_idx_ntypes[dst_id].Ptr<IdType>();
-      DType* out_data = list_out[src_id].Ptr<DType>();
-
+      DType* out_data = list_out[etid].Ptr<DType>();
       int dim = 1;
-      for (int i = 1; i < list_out[src_id]->ndim; ++i)
-        dim *= list_out[src_id]->shape[i];
+      for (int i = 1; i < list_out[etid]->ndim; ++i)
+        dim *= list_out[etid]->shape[i];
       int n = list_feat[dst_id]->shape[0];
-  #pragma omp parallel for
+      #pragma omp parallel for
       for (int i = 0; i < n; ++i) {
         for (int k = 0; k < dim; ++k) {
-          if (src_id == idx_ntype_data[i * dim + k]) {
+          if (etid == idx_ntype_data[i * dim + k]) {
             const int write_row = idx_data[i * dim + k];
-  #pragma omp atomic
+      #pragma omp atomic
             out_data[write_row * dim + k] += feat_data[i * dim + k];  // feat = dZ
           }
         }
       }
-      updated[src_id] = true;
     }
+  } else {
+    LOG(FATAL) << "Unsupported binary operator: " << op;
   }
 }
 

@@ -53,12 +53,13 @@ void ScatterAdd(NDArray feat,
 /*! \brief Update gradients for reduce operator max/min on heterogeneous graph.*/
 template <int XPU, typename IdType, int bits>
 void UpdateGradMinMax_hetero(const HeteroGraphPtr& g,
+                const std::string& op,
                 const std::vector<NDArray>& feat,
                 const std::vector<NDArray>& idx,
                 const std::vector<NDArray>& idx_etype,
                 std::vector<NDArray>* out) {
   SWITCH_BITS(bits, DType, {
-    cpu::UpdateGradMinMax_hetero<IdType, DType>(g, feat, idx, idx_etype, *out);
+    cpu::UpdateGradMinMax_hetero<IdType, DType>(g, op, feat, idx, idx_etype, *out);
   });
 }
 
@@ -135,29 +136,29 @@ template void ScatterAdd<kDLCPU, int64_t, 64>(
     NDArray out);
 
 template void UpdateGradMinMax_hetero<kDLCPU, int32_t, 16>(
-    const HeteroGraphPtr& g, const std::vector<NDArray>& feat,
-    const std::vector<NDArray>& idx, const std::vector<NDArray>& idx_etype,
-    std::vector<NDArray>* out);
+    const HeteroGraphPtr& g, const std::string& op,
+    const std::vector<NDArray>& feat, const std::vector<NDArray>& idx,
+    const std::vector<NDArray>& idx_etype, std::vector<NDArray>* out);
 template void UpdateGradMinMax_hetero<kDLCPU, int64_t, 16>(
-    const HeteroGraphPtr& g, const std::vector<NDArray>& feat,
-    const std::vector<NDArray>& idx, const std::vector<NDArray>& idx_etype,
-    std::vector<NDArray>* out);
+    const HeteroGraphPtr& g, const std::string& op,
+    const std::vector<NDArray>& feat, const std::vector<NDArray>& idx,
+    const std::vector<NDArray>& idx_etype, std::vector<NDArray>* out);
 template void UpdateGradMinMax_hetero<kDLCPU, int32_t, 32>(
-    const HeteroGraphPtr& g, const std::vector<NDArray>& feat,
-    const std::vector<NDArray>& idx, const std::vector<NDArray>& idx_etype,
-    std::vector<NDArray>* out);
+    const HeteroGraphPtr& g, const std::string& op,
+    const std::vector<NDArray>& feat, const std::vector<NDArray>& idx,
+    const std::vector<NDArray>& idx_etype, std::vector<NDArray>* out);
 template void UpdateGradMinMax_hetero<kDLCPU, int64_t, 32>(
-    const HeteroGraphPtr& g, const std::vector<NDArray>& feat,
-    const std::vector<NDArray>& idx, const std::vector<NDArray>& idx_etype,
-    std::vector<NDArray>* out);
+    const HeteroGraphPtr& g, const std::string& op,
+    const std::vector<NDArray>& feat, const std::vector<NDArray>& idx,
+    const std::vector<NDArray>& idx_etype, std::vector<NDArray>* out);
 template void UpdateGradMinMax_hetero<kDLCPU, int32_t, 64>(
-    const HeteroGraphPtr& g, const std::vector<NDArray>& feat,
-    const std::vector<NDArray>& idx, const std::vector<NDArray>& idx_etype,
-    std::vector<NDArray>* out);
+    const HeteroGraphPtr& g, const std::string& op,
+    const std::vector<NDArray>& feat, const std::vector<NDArray>& idx,
+    const std::vector<NDArray>& idx_etype, std::vector<NDArray>* out);
 template void UpdateGradMinMax_hetero<kDLCPU, int64_t, 64>(
-    const HeteroGraphPtr& g, const std::vector<NDArray>& feat,
-    const std::vector<NDArray>& idx, const std::vector<NDArray>& idx_etype,
-    std::vector<NDArray>* out);
+    const HeteroGraphPtr& g, const std::string& op,
+    const std::vector<NDArray>& feat, const std::vector<NDArray>& idx,
+    const std::vector<NDArray>& idx_etype, std::vector<NDArray>* out);
 
 template void BackwardSegmentCmp<kDLCPU, int32_t, 16>(
     NDArray feat,
