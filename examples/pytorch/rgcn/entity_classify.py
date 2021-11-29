@@ -30,17 +30,17 @@ class EntityClassify(BaseRGCN):
     def build_input_layer(self):
         return RelGraphConv(self.num_nodes, self.h_dim, self.num_rels, "basis",
                 self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
-                dropout=self.dropout, low_mem=self.low_mem)
+                dropout=self.dropout)
 
     def build_hidden_layer(self, idx):
         return RelGraphConv(self.h_dim, self.h_dim, self.num_rels, "basis",
                 self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
-                dropout=self.dropout, low_mem=self.low_mem)
+                dropout=self.dropout)
 
     def build_output_layer(self):
         return RelGraphConv(self.h_dim, self.out_dim, self.num_rels, "basis",
                 self.num_bases, activation=None,
-                self_loop=self.use_self_loop, low_mem=self.low_mem)
+                self_loop=self.use_self_loop)
 
 def main(args):
     # load graph data
@@ -121,7 +121,6 @@ def main(args):
                            num_hidden_layers=args.n_layers - 2,
                            dropout=args.dropout,
                            use_self_loop=args.use_self_loop,
-                           low_mem=args.low_mem,
                            use_cuda=use_cuda)
 
     if use_cuda:
@@ -195,8 +194,6 @@ if __name__ == '__main__':
     fp = parser.add_mutually_exclusive_group(required=False)
     fp.add_argument('--validation', dest='validation', action='store_true')
     fp.add_argument('--testing', dest='validation', action='store_false')
-    parser.add_argument("--low-mem", default=False, action='store_true',
-            help="Whether use low mem RelGraphCov")
     parser.set_defaults(validation=True)
 
     args = parser.parse_args()

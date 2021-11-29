@@ -210,23 +210,20 @@ class RelGraphConvLayerHetero(nn.Module):
         else:
             wdict = {}
 
-        if g.is_block:
-            inputs_src = inputs
-            inputs_dst = {k: v[:g.number_of_dst_nodes(k)] for k, v in inputs.items()}
-        else:
-            inputs_src = inputs_dst = inputs
+        inputs_src = inputs_dst = inputs
 
         for srctype,_,_ in g.canonical_etypes:
             g.nodes[srctype].data['h'] = inputs[srctype]
 
-        g.apply_edges(fn.copy_u('h', 'm')) # g is a heterograph
-        for rel in g.canonical_etypes:
-            _, etype, _ = rel
-            if self.use_weight:
-                w = wdict[etype]['weight']
-                g.edges[rel].data['h*w_r'] = th.matmul(g.edges[rel].data['m'], w)
-            else:
-                g.edges[rel].data['h*w_r'] = g.edges[rel].data['m']
+        if self.use_weight:
+            g.apply_edges(fn.copy_u('h', 'm'))
+            m = g.edata['m']
+            for rel in g.canonical_etypes:
+                _, etype, _ = rel
+                g.edges[rel].data['h*w_r'] =  th.matmul(m[rel], wdict[etype]['weight'])
+        else:
+            g.apply_edges(fn.copy_u('h', 'h*w_r'))
+
         g.update_all(fn.copy_e('h*w_r', 'm'), fn.sum('m', 'h'))
 
         def _apply(ntype):
