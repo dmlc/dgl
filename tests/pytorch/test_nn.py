@@ -779,12 +779,13 @@ def test_gin_conv(g, idtype, aggregator_type):
         th.nn.Linear(5, 12),
         aggregator_type
     )
+    th.save(gin, tmp_buffer)
     feat = F.randn((g.number_of_src_nodes(), 5))
     gin = gin.to(ctx)
     h = gin(g, feat)
 
     # test pickle
-    th.save(h, tmp_buffer)
+    th.save(gin, tmp_buffer)
 
     assert h.shape == (g.number_of_dst_nodes(), 12)
 
