@@ -237,7 +237,7 @@ void UpdateGradMinMaxDispatchHetero(const HeteroGraphPtr& graph,
   ATEN_XPU_SWITCH_CUDA(feat[src_id]->ctx.device_type, XPU, "ScatterAdd", {
     ATEN_ID_TYPE_SWITCH(idx[src_id]->dtype, IdType, {
       ATEN_FLOAT_BITS_SWITCH(feat[src_id]->dtype, bits, "Feature data", {
-        UpdateGradMinMax_hetero<XPU, IdType, bits>(graph, feat, idx, idx_etype, *out);
+        UpdateGradMinMax_hetero<XPU, IdType, bits>(graph, feat, idx, idx_etype, out);
       });
     });
   });

@@ -134,11 +134,11 @@ void ScatterAdd(NDArray feat,
  * \brief Update gradients for reduce operator max and min on first dimension.
  */
 template <int XPU, typename IdType, int bits>
-void UpdateGradMinMax_hetero(HeteroGraphPtr g,
-                std::vector<NDArray> feat,
-                std::vector<NDArray> idx,
-                std::vector<NDArray> idx_etype,
-                std::vector<NDArray> out);
+void UpdateGradMinMax_hetero(const HeteroGraphPtr& g,
+                const std::vector<NDArray>& feat,
+                const std::vector<NDArray>& idx,
+                const std::vector<NDArray>& idx_etype,
+                std::vector<NDArray>* out);
 
 /*!
  * \brief Backward function of segment cmp.

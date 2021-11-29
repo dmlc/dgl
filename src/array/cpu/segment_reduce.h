@@ -121,7 +121,7 @@ void UpdateGradMinMax_hetero(HeteroGraphPtr graph,
     std::vector<dgl_id_t>());
   for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
     auto pair = graph->meta_graph()->FindEdge(etype);
-    const dgl_id_t dst_id = pair.first;  // graph is reveresed
+    const dgl_id_t dst_id = pair.first;  // graph is reversed
     const dgl_id_t src_id = pair.second;
     dst_src_ntids[dst_id].push_back(src_id);  // can have duplicates. Use Hashtable to optimize.
   }
