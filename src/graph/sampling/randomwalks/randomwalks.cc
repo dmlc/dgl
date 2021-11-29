@@ -104,7 +104,7 @@ std::tuple<IdArray, IdArray, TypeArray> RandomWalkWithStepwiseRestart(
   return std::make_tuple(result.first, result.second, vtypes);
 }
 
-std::tuple<IdArray, IdArray, IdArray> RandomWalkTopk(
+std::tuple<IdArray, IdArray, IdArray> SelectPinSageNeighbors(
     const IdArray src,
     const IdArray dst,
     const int64_t num_samples_per_node,
@@ -114,9 +114,9 @@ std::tuple<IdArray, IdArray, IdArray> RandomWalkTopk(
           && (src->shape[0] == dst->shape[0]));
   std::tuple<IdArray, IdArray, IdArray> result;
 
-  ATEN_XPU_SWITCH((src->ctx).device_type, XPU, "RandomWalkTopk", {
+  ATEN_XPU_SWITCH((src->ctx).device_type, XPU, "SelectPinSageNeighbors", {
     ATEN_ID_TYPE_SWITCH(src->dtype, IdxType, {
-      result = impl::RandomWalkTopk<XPU, IdxType>(src, dst, num_samples_per_node, k);
+      result = impl::SelectPinSageNeighbors<XPU, IdxType>(src, dst, num_samples_per_node, k);
     });
   });
 
@@ -142,14 +142,14 @@ DGL_REGISTER_GLOBAL("sampling.randomwalks._CAPI_DGLSamplingRandomWalk")
     *rv = ret;
   });
 
-DGL_REGISTER_GLOBAL("sampling.randomwalks._CAPI_DGLSamplingRandomWalkTopk")
+DGL_REGISTER_GLOBAL("sampling.pinsage._CAPI_DGLSamplingSelectPinSageNeighbors")
 .set_body([] (DGLArgs args, DGLRetValue *rv) {
     IdArray src = args[0];
     IdArray dst = args[1];
     int64_t num_travelsals = static_cast<int64_t>(args[2]);
     int64_t k = static_cast<int64_t>(args[3]);
 
-    auto result = sampling::RandomWalkTopk(src, dst, num_travelsals, k);
+    auto result = sampling::SelectPinSageNeighbors(src, dst, num_travelsals, k);
 
     List<Value> ret;
     ret.push_back(Value(MakeValue(std::get<0>(result))));
