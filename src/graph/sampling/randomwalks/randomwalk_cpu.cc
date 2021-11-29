@@ -38,7 +38,7 @@ std::pair<IdArray, IdArray> RandomWalk(
 }
 
 template<DLDeviceType XPU, typename IdxType>
-std::tuple<IdArray, IdArray, IdArray> RandomWalkTopk(
+std::tuple<IdArray, IdArray, IdArray> SelectPinSageNeighbors(
     const IdArray src,
     const IdArray dst,
     const int64_t num_samples_per_node,
@@ -120,13 +120,13 @@ std::pair<IdArray, IdArray> RandomWalk<kDLCPU, int64_t>(
     const std::vector<FloatArray> &prob);
 
 template
-std::tuple<IdArray, IdArray, IdArray> RandomWalkTopk<kDLCPU, int32_t>(
+std::tuple<IdArray, IdArray, IdArray> SelectPinSageNeighbors<kDLCPU, int32_t>(
     const IdArray src,
     const IdArray dst,
     const int64_t num_samples_per_node,
     const int64_t k);
 template
-std::tuple<IdArray, IdArray, IdArray> RandomWalkTopk<kDLCPU, int64_t>(
+std::tuple<IdArray, IdArray, IdArray> SelectPinSageNeighbors<kDLCPU, int64_t>(
     const IdArray src,
     const IdArray dst,
     const int64_t num_samples_per_node,

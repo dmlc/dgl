@@ -116,7 +116,7 @@ std::pair<IdArray, IdArray> RandomWalkWithStepwiseRestart(
     FloatArray restart_prob);
 
 template<DLDeviceType XPU, typename IdxType>
-std::tuple<IdArray, IdArray, IdArray> RandomWalkTopk(
+std::tuple<IdArray, IdArray, IdArray> SelectPinSageNeighbors(
     const IdArray src,
     const IdArray dst,
     const int64_t num_samples_per_node,
