@@ -13,7 +13,6 @@ from ...ndarray import NDArray as DGLNDArray
 from ... import backend as F
 from ...base import DGLError
 from ...utils import to_dgl_context, recursive_apply
-from ..._ffi import streams as FS
 from .prefetcher import CUDAAsyncCopyNodeDataLoaderWrapper
 
 __all__ = ['NodeDataLoader', 'EdgeDataLoader', 'GraphDataLoader',

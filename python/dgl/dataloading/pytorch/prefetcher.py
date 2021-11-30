@@ -1,3 +1,4 @@
+"""Iterator wrappers for async feature prefetching from CPU to CUDA."""
 from queue import Queue
 import threading
 import torch
@@ -16,7 +17,7 @@ def _worker_entry(iter_, queue, device, get_features_func):
                     stream.record_event(),
                     None))
         queue.put((None, None, None))
-    except:
+    except:     # pylint: disable=bare-except
         queue.put((None, None, ExceptionWrapper(where='in CUDA async feature copy')))
 
 
@@ -72,8 +73,10 @@ class CUDAAsyncCopyWrapper(object):
       with some other information such as input/output node/edge IDs.
     * The wrapper's worker thread invokes :meth:`get_features` method, consuming
       the sampler's output and returning it together with the retrieved necessary features.
-    * The wrapper's worker thread puts the result into a queue.
-    * The main process retrieves the features and the sampled blocks/subgraphs from the queue.
+    * The wrapper's worker thread initiates CPU-to-GPU transfer and puts the results into
+      the queue together with a stream event.
+    * The main process retrieves the features and the sampled blocks/subgraphs from the queue,
+      then waits for the event to finish.
     * The main process assigns the features to the block/subgraphs with
       :meth:`assign_features` method and returns it.
     """
@@ -82,18 +85,28 @@ class CUDAAsyncCopyWrapper(object):
         # (1) The graph, with features sliced.
         self.queue = Queue(1)
         self.thread = threading.Thread(
-                target=_worker_entry,
-                args=(iter_, self.queue, device, self.get_features),
-                daemon=True)
+            target=_worker_entry,
+            args=(iter_, self.queue, device, self.get_features),
+            daemon=True)
         self.device = device
         self.iter_ = iter_
 
     def get_features(self, sample_result):
-        """Gets the feature from CPU.
+        """Gets the feature from CPU.  The result will be put into the queue.
+
+        Parameters
+        ----------
+        sample_result : any
+            Anything returned by the dataloader iterator :attr:`iter_`.
         """
         raise NotImplementedError
 
     def assign_features(self, queue_result):
+        """Assigns the prefetched features on GPU back into the sampling result.
+
+        It must have the same content and format as what is being returned from the dataloader
+        iterator :attr:`iter_`, except that everything is now on GPU.
+        """
         raise NotImplementedError
 
     def __next__(self):
@@ -102,8 +115,7 @@ class CUDAAsyncCopyWrapper(object):
             self.thread.join()
             if exception is None:
                 raise StopIteration
-            else:
-                exception.reraise()
+            exception.reraise()
         event.wait(torch.cuda.default_stream())
         return self.assign_features(result)
 
