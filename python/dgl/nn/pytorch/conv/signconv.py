@@ -24,7 +24,7 @@ class SignConv(nn.Module):
         \left[ \frac{1}{|\mathcal{N}^{-}(v)|} \sum_{w \in \mathcal{N}^{-}(v)}
         \mathbf{x}_w , \mathbf{x}_v \right]
 
-    if :obj:`first_aggr` is set to :obj:`True`, and
+    if `first_aggr` is set to `True`, then
 
     .. math::
         \mathbf{x}_v^{(\textrm{pos})} &= \mathbf{\Theta}^{(\textrm{pos})}
@@ -94,15 +94,23 @@ class SignConv(nn.Module):
                  bias=True):
         super(SignConv, self).__init__()
 
-        self.in_channels = in_feats
-        self.out_channels = out_feats
+        self.in_feats = in_feats
+        self.out_feats = out_feats
         self.first_aggr = first_aggr
         self.norm = norm
         self.norm_embed = norm_embed
+
+
         if first_aggr:
-            self.linear_layer = nn.Linear(in_feats * 2, out_feats, bias=bias)
+            self.lin_pos_l = nn.Linear(in_feats, out_feats, False)
+            self.lin_pos_r = nn.Linear(in_feats, out_feats, bias)
+            self.lin_neg_l = nn.Linear(in_feats, out_feats, False)
+            self.lin_neg_r = nn.Linear(in_feats, out_feats, bias)
         else:
-            self.linear_layer = nn.Linear(in_feats * 3, out_feats, bias=bias)
+            self.lin_pos_l = nn.Linear(2 * in_feats, out_feats, False)
+            self.lin_pos_r = nn.Linear(in_feats, out_feats, bias)
+            self.lin_neg_l = nn.Linear(2 * in_feats, out_feats, False)
+            self.lin_neg_r = nn.Linear(in_feats, out_feats, bias)
 
     def forward(self, graph, feature, edge_sign=None):
         r"""
@@ -130,6 +138,32 @@ class SignConv(nn.Module):
             The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
             is size of output feature.
         """
+        with graph.local_scope():
+            graph.ndata["feat"] = feature
+            graph.edata["pos_e"] = (edge_sign >= 0).float()
+            graph.edata["neg_e"] = (edge_sign < 0).float()
+            if self.norm:
+                reducer = fn.mean
+            else:
+                reducer = fn.sum
+            graph.update_all(fn.u_mul_e("feat", "pos_e", "m"),
+                             reducer("m", "pos_out"))
+            graph.update_all(fn.u_mul_e("feat", "neg_e", "m"),
+                             reducer("m", "neg_out"))
+
+            pos_out = graph.ndata["pos_out"]
+            neg_out = graph.ndata["neg_out"]
+
+        if self.first_aggr:
+            out = th.cat([pos_out, neg_out], 1)
+        else:
+            out = th.cat([pos_out, neg_out, feature], 1)
+        out = self.linear_layer(out)
+
+        if self.norm_embed:
+            out = F.normalize(out, p=2, dim=-1)
+
+        return out
         if self.first_aggr:
             assert edge_sign is None, "Cannot use edge_sign if first_aggr is set to True"
             return self.forward_base(graph, feature)
@@ -137,13 +171,20 @@ class SignConv(nn.Module):
             assert edge_sign is not None, "Need to provide edge_sign if first_aggr is set to False"
             return self.forward_deep(graph, feature, edge_sign)
 
-    def forward_base(self, graph, feature):
+    def forward_base(self, graph, feature, edge_sign):
+        """Forward function for first layer"""
         with graph.local_scope():
-            graph.ndata["feat"] = feature            
+            graph.ndata["feat"] = feature
+            graph.edata["pos_e"] = (edge_sign >= 0).float()
+            graph.edata["neg_e"] = (edge_sign < 0).float()
             if self.norm:
-                graph.update_all(fn.copy_u("feat", "m"), fn.mean("m", "out"))
+                reducer = fn.mean
             else:
-                graph.update_all(fn.copy_u("feat", "m"), fn.sum("m", "out"))
+                reducer = fn.sum
+            graph.update_all(fn.u_mul_e("feat", "pos_e", "m"),
+                             reducer("m", "pos_out"))
+            graph.update_all(fn.u_mul_e("feat", "neg_e", "m"),
+                             reducer("m", "neg_out"))
 
             out = th.cat([graph.ndata["out"], feature], 1)
             out = self.linear_layer(out)
@@ -154,6 +195,7 @@ class SignConv(nn.Module):
         return out
 
     def forward_deep(self, graph, feature, edge_sign):
+        """Forward function for non-first layer"""
         with graph.local_scope():
             graph.ndata["feat"] = feature
             graph.edata["pos_e"] = (edge_sign >= 0).float()
