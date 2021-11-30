@@ -8,14 +8,13 @@ from ...base import NID, EID
 def _worker_entry(iter_, queue, device, get_features_func):
     stream = torch.cuda.Stream(device=device)
     try:
-        while True:
-            result = get_features_func(next(iter_))
+        for batch in iter_:
+            result = get_features_func(batch)
             with torch.cuda.stream(stream), FS.stream(stream):
                 queue.put((
                     recursive_apply(result, lambda x: x.to(device)),
                     stream.record_event(),
                     None))
-    except StopIteration:
         queue.put((None, None, None))
     except:
         queue.put((None, None, ExceptionWrapper(where='in CUDA async feature copy')))
@@ -39,7 +38,8 @@ def _slice_one_type(indices, features, pin_memory):
     out_tensors = {}
     for k, v in features.items():
         out_tensor = torch.empty(
-            indices.shape[0], *v.shape[1:], dtype=v.dtype, pin_memory=pin_memory)
+            (indices.shape[0],) + tuple(v.shape[1:]),
+            dtype=v.dtype, pin_memory=pin_memory)
         torch.index_select(v, 0, indices, out=out_tensor)
         out_tensors[k] = out_tensor
     return out_tensors
@@ -86,7 +86,7 @@ class CUDAAsyncCopyWrapper(object):
                 args=(iter_, self.queue, device, self.get_features),
                 daemon=True)
         self.device = device
-        self.thread.start()
+        self.iter_ = iter_
 
     def get_features(self, sample_result):
         """Gets the feature from CPU.
@@ -99,6 +99,7 @@ class CUDAAsyncCopyWrapper(object):
     def __next__(self):
         result, event, exception = self.queue.get()
         if result is None:
+            self.thread.join()
             if exception is None:
                 raise StopIteration
             else:
@@ -146,7 +147,6 @@ class CUDAAsyncCopyNodeDataLoaderWrapper(CUDAAsyncCopyWrapper):
     def __init__(self, iter_, device, graph, input_features, output_labels, node_features,
                  edge_features, is_block_sampler):
         super().__init__(iter_, device)
-
         self.graph = graph
         self.input_features = input_features
         self.output_labels = output_labels
@@ -154,11 +154,13 @@ class CUDAAsyncCopyNodeDataLoaderWrapper(CUDAAsyncCopyWrapper):
         self.edge_features = edge_features
         self.is_block_sampler = is_block_sampler
 
+        self.thread.start()
+
     def get_features(self, sample_result):
         # Async copy assumes that the sampled subgraphs are either all subgraphs or
         # all blocks.  In both cases, we assume that the input data is put into the
         # first block/subgraph and the output data is put into the last block/subgraph.
-        # [TODO] If some of them are blocks and some of them are subgraphs,
+        # TODO(BarclayII): If some of them are blocks and some of them are subgraphs,
         # we don't know in which subgraph we should put input data and output data.
         # Should we return input data and output data in place of the input node IDs and
         # output node IDs?
@@ -175,10 +177,14 @@ class CUDAAsyncCopyNodeDataLoaderWrapper(CUDAAsyncCopyWrapper):
             assert subg.is_block == self.is_block_sampler, \
                 "Async copy assumes that the sampler returns either all blocks or " \
                 "all subgraphs."
+            # TODO(BarclayII): Prefetching relies on NID and EID, which may cause
+            # trouble with subgraph-of-subgraphs if NIDs and EIDs are not properly
+            # maintained.  This is especially the case when BlockSamplers do not
+            # return EIDs by default.
             if self.is_block_sampler:
                 block_srcdata = _slice(self.node_features, subg.srcdata[NID])
                 block_dstdata = _slice(self.node_features, subg.dstdata[NID])
-                block_edata = _slice(self.edge_features, subg.edata[EID], self.device)
+                block_edata = _slice(self.edge_features, subg.edata[EID])
                 subgs_data.append((block_srcdata, block_dstdata, block_edata))
             else:
                 subg_ndata = _slice(self.node_features, subg.ndata[NID])

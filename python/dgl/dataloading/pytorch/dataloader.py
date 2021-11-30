@@ -510,6 +510,26 @@ class NodeDataLoader:
     ...     for input_nodes, output_nodes, blocks in dataloader:
     ...         train_on(input_nodes, output_nodes, blocks)
 
+    **Asynchronous prefetching of features**
+
+    If you would like to fetch the features from CPU to GPU asynchronously, you will
+    need to supply :attr:`load_input`, :attr:`load_output`, :attr:`load_ndata` and
+    :attr:`load_edata`.  Say you would like to load input nodes' ``feature``,
+    output nodes' ``label``, and the edge weights named ``w``, you can write like
+
+    >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5], return_eids=True)
+    >>> features = g.unpack_ndata(['feature'])
+    >>> labels = g.unpack_ndata(['label'])
+    >>> edata = g.unpack_edata(['w'])
+    >>> dataloader = dgl.dataloading.NodeDataLoader(
+    ...     g, train_nid, sampler, use_ddp=True,
+    ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4,
+    ...     load_input=features, load_output=labels, load_edata=edata, async_load=True)
+    >>> for epoch in range(start_epoch, n_epochs):
+    ...     dataloader.set_epoch(epoch)
+    ...     for input_nodes, output_nodes, blocks in dataloader:
+    ...         train_on(input_nodes, output_nodes, blocks)
+
     Notes
     -----
     Please refer to
@@ -565,14 +585,20 @@ class NodeDataLoader:
                 # default to the same device the graph is on
                 device = th.device(g.device)
 
-            if not g.is_homogeneous:
-                if load_input or load_output:
-                    raise DGLError('load_input/load_output not supported for heterograph yet.')
+            self.async_load = async_load
             self.load_input = {} if load_input is None else load_input
             self.load_output = {} if load_output is None else load_output
             self.load_ndata = {} if load_ndata is None else load_ndata
+            # TODO(BarclayII): The samplers may not always return edge IDs due to
+            # efficiency concerns (see the comment in BlockSampler.__init__()).
+            # However, the async copy wrapper relies on EID in the returned subgraph
+            # to fetch edge features.  Therefore to make edge feature fetching work,
+            # return_eids must be True.  If we have a graph-level lazy index implemented
+            # we can potentially relax this constraint.
+            if (async_load and load_edata is not None and
+                    not getattr(graph_sampler, "return_eids", True)):
+                raise DGLError("sampler's return_eids must be True if load_edata is not None")
             self.load_edata = {} if load_edata is None else load_edata
-            self.async_load = async_load
 
             # if the sampler supports it, tell it to output to the specified device.
             # But if async_load is enabled, set_output_context should be skipped as
@@ -583,6 +609,8 @@ class NodeDataLoader:
                     callable(getattr(graph_sampler, "set_output_context", None)) and
                     num_workers == 0):
                 graph_sampler.set_output_context(to_dgl_context(device))
+            else:
+                graph_sampler.set_output_context(to_dgl_context(th.device('cpu')))
 
             self.collator = _NodeCollator(g, nids, graph_sampler, **collator_kwargs)
             self.use_scalar_batcher, self.scalar_batcher, self.dataloader, self.dist_sampler = \

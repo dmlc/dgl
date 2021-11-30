@@ -2139,6 +2139,7 @@ class DGLHeteroGraph(object):
                 return results if not force_heterogeneous else {types[0]: results}
             else:
                 for ntype in types:
+                    results[ntype] = {}
                     for k in list(view[ntype].data.keys()):
                         if k in exclude_keys:
                             continue
@@ -2239,7 +2240,7 @@ class DGLHeteroGraph(object):
                 [ 0.5364, -0.2282,  2.4904],
                 [ 1.2022, -1.2771,  0.2304]])}})
         """
-        return self._unpack(ndata_columns, g.ntypes, g.ndata, g.nodes,
+        return self._unpack(ndata_columns, self.ntypes, self.ndata, self.nodes,
                             force_heterogeneous, [NID, NTYPE], 'node')
 
     def unpack_edata(self, edata_columns=None, force_heterogeneous=False):
@@ -2321,7 +2322,7 @@ class DGLHeteroGraph(object):
         """
         if isinstance(edata_columns, Mapping):
             edata_columns = {self.to_canonical_etype(k): v for k, v in edata_columns.items()}
-        return self._unpack(edata_columns, g.canonical_etypes, g.edata, g.edges,
+        return self._unpack(edata_columns, self.canonical_etypes, self.edata, self.edges,
                             force_heterogeneous, [EID, ETYPE], 'edge')
 
     def _find_etypes(self, key):
@@ -4427,7 +4428,7 @@ class DGLHeteroGraph(object):
         """
         # parse argument
         if is_all(edges):
-            return dict(self._edge_frames[etid])
+            return self._edge_frames[etid]
         else:
             eid = utils.parse_edges_arg_to_eid(self, edges, etid, 'edges')
             return self._edge_frames[etid].subframe(eid)
