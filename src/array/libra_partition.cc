@@ -11,12 +11,12 @@ Copyright (c) 2021 Intel Corporation
 */
 
 #include <stdint.h>
+#include <dgl/runtime/parallel_for.h>
+#include <dgl/random.h>
 #include <dmlc/omp.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/base_heterograph.h>
 #include <vector>
-#include <dgl/runtime/parallel_for.h>
-#include <dgl/random.h>
 
 #ifdef USE_TVM
 #include <featgraph.h>
@@ -91,7 +91,7 @@ void LibraVertexCut(
   NDArray out,
   int64_t N_n,
   int64_t N_e,
-  std::string& prefix) {
+  const std::string& prefix) {
   int32_t *out_ptr                = out.Ptr<int32_t>();
   IdType  *node_degree_ptr        = node_degree.Ptr<IdType>();
   IdType  *edgenum_unassigned_ptr = edgenum_unassigned.Ptr<IdType>();
@@ -106,7 +106,7 @@ void LibraVertexCut(
   int64_t *community_edges = new int64_t[nc]();
   int64_t *cache = new int64_t[nc]();
 
-  int64_t meter = (int) (N_e/100);
+  int64_t meter = static_cast<int>(N_e/100);
   for (int64_t i=0; i < N_e; i++) {
     IdType u = u_ptr[i];    // edge end vertex 1
     IdType v = v_ptr[i];    // edge end vertex 2
@@ -349,10 +349,9 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLLibraVertexCut")
   \param[in] nc  number of partitions/communities
   \param[in] c current partition number
   \param[in] fsize size of pre-allocated memory tensor
-  \param[out] hash_nodes returns the actual number of nodes and edges in the partition
   \param[in] prefix input Libra partition file location
  */
-void Libra2dglBuildDict(
+List<Value> Libra2dglBuildDict(
   NDArray a,
   NDArray b,
   NDArray indices,
@@ -364,7 +363,6 @@ void Libra2dglBuildDict(
   int32_t nc,
   int32_t c,
   int64_t fsize,
-  NDArray hash_nodes,
   const std::string& prefix) {
   int64_t *indices_ptr    = indices.Ptr<int64_t>();   // 1D temp array
   int64_t *ldt_key_ptr    = ldt_key.Ptr<int64_t>();   // 1D local nodes <-> global nodes
@@ -372,7 +370,6 @@ void Libra2dglBuildDict(
   int64_t *gdt_value_ptr  = gdt_value.Ptr<int64_t>();   // 2D tensor
   int64_t *node_map_ptr   = node_map.Ptr<int64_t>();  // 1D tensor
   int64_t *offset_ptr     = offset.Ptr<int64_t>();    // 1D tensor
-  int64_t *hash_nodes_ptr = hash_nodes.Ptr<int64_t>();
   int32_t width = nc;
 
   int64_t *a_ptr = a.Ptr<int64_t>();    // stores local src and dst node ID,
@@ -401,7 +398,7 @@ void Libra2dglBuildDict(
       CHECK(pos < num_nodes);       // Sanity check
       indices_ptr[u] = pos++;       // consecutive local node ID for a given global node ID
     }
-    if (indices_ptr[v] == -100) {   //if already not assigned a local node ID
+    if (indices_ptr[v] == -100) {   // if already not assigned a local node ID
       ldt_key_ptr[pos] = v;
       CHECK(pos < num_nodes);       // Sanity check
       indices_ptr[v] = pos++;
@@ -411,12 +408,14 @@ void Libra2dglBuildDict(
   }
   CHECK(edge <= fsize) << "Pre-allocated memory, number of edges per partition is not enough.";
   fclose(fp);
-  hash_nodes_ptr[0] = pos;   // returns total number of nodes in this partition
-  hash_nodes_ptr[1] = edge;  // returns total number of edges in this partition
+
+  List<Value> ret;
+  ret.push_back(Value(MakeValue(pos)));  // returns total number of nodes in this partition
+  ret.push_back(Value(MakeValue(edge)));  // returns total number of edges in this partition
 
   for (int64_t i=0; i < pos; i++) {
     int64_t  u   = ldt_key_ptr[i];       // global node ID
-    //int64_t  v   = indices_ptr[u];
+    // int64_t  v   = indices_ptr[u];
     int64_t  v   = i;                   // local node ID
     int64_t *ind = &gdt_key_ptr[u];     // global dict, total number of local node IDs (an offset)
                                         // as of now for a given global node ID
@@ -429,6 +428,8 @@ void Libra2dglBuildDict(
   node_map_ptr[c] = offset_ptr[0] +  pos;   // since local node IDs for a partition are consecutive,
                                     // we maintain the range of local node IDs like this
   offset_ptr[0] += pos;
+
+  return ret;
 }
 
 
@@ -445,11 +446,11 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLLibra2dglBuildDict")
   int32_t     nc         = args[8];
   int32_t     c          = args[9];
   int64_t     fsize      = args[10];
-  NDArray     hash_nodes = args[11];
-  std::string prefix     = args[12];
-  Libra2dglBuildDict(a, b, indices, ldt_key, gdt_key,
+  std::string prefix     = args[11];
+  List<Value> ret = Libra2dglBuildDict(a, b, indices, ldt_key, gdt_key,
                      gdt_value, node_map, offset,
-                     nc, c, fsize, hash_nodes, prefix);
+                     nc, c, fsize, prefix);
+  *rv = ret;
 });
 
 
@@ -574,7 +575,7 @@ void Libra2dglBuildAdjlist(
   int64_t *lrtensor_ptr   = lrtensor.Ptr<int64_t>();
   int32_t width = nc - 1;
 
-  runtime::parallel_for (0, num_nodes, [&] (int64_t s, int64_t e) {
+  runtime::parallel_for(0, num_nodes, [&] (int64_t s, int64_t e) {
     for (int64_t i=s; i < e; i++) {
       int64_t k = ldt_key_ptr[i];
       int64_t v = i;
@@ -605,7 +606,7 @@ void Libra2dglBuildAdjlist(
   });
 
   // gather
-  runtime::parallel_for (0, num_nodes, [&] (int64_t s, int64_t e) {
+  runtime::parallel_for(0, num_nodes, [&] (int64_t s, int64_t e) {
     for (int64_t i=s; i < e; i++) {
       int64_t k = ldt_key_ptr[i];
       int64_t ind = i*feat_size;

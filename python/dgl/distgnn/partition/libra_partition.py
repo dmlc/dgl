@@ -130,7 +130,6 @@ def libra_partition(num_community, dataset, resultdir):
     for i in range(N_c):
         g = gg[i]
 
-        hash_nodes = th.zeros(2, dtype=th.int64)
         a = th.zeros(fsize, dtype=th.int64)
         b = th.zeros(fsize, dtype=th.int64)
         ldt_key = th.zeros(fsize, dtype=th.int64)
@@ -138,12 +137,12 @@ def libra_partition(num_community, dataset, resultdir):
 
         ## building node, parition dictionary
         ## Assign local node ids and mapping to global node ids
-        libra2dgl_build_dict(a, b, indices, ldt_key, gdt_key, gdt_value,
-                             node_map, offset, N_c, i, fsize, hash_nodes,
-                             resultdir)
+        ret = libra2dgl_build_dict(a, b, indices, ldt_key, gdt_key, gdt_value,
+                             node_map, offset, N_c, i, fsize, resultdir)
 
-        num_nodes = int(hash_nodes[0])
-        num_edges = int(hash_nodes[1])
+        num_nodes = int(ret[0])
+        num_edges = int(ret[1])
+        # print("ret values: {} {}".format(int(ret[0]), int(ret[1])))
         part_nodes.append(num_nodes)
 
         g.add_edges(a[0:num_edges], b[0:num_edges])

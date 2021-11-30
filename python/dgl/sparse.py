@@ -601,7 +601,7 @@ def _csrmask(A, A_weights, B):
     return F.from_dgl_nd(_CAPI_DGLCSRMask(A, F.to_dgl_nd(A_weights), B))
 
 
-    
+
 ###################################################################################################
 ## Libra Graph Partition
 def libra_vertex_cut(nc, node_degree, edgenum_unassigned,
@@ -620,8 +620,8 @@ def libra_vertex_cut(nc, node_degree, edgenum_unassigned,
 
 
 def libra2dgl_build_dict(a, b, indices, ldt_key, gdt_key, gdt_value, node_map,
-                         offset, nc, c, fsize, hash_nodes, dataset):
-    _CAPI_DGLLibra2dglBuildDict(to_dgl_nd_for_write(a),
+                         offset, nc, c, fsize, dataset):
+    ret = _CAPI_DGLLibra2dglBuildDict(to_dgl_nd_for_write(a),
                                 to_dgl_nd_for_write(b),
                                 to_dgl_nd_for_write(indices),
                                 to_dgl_nd_for_write(ldt_key),
@@ -632,10 +632,10 @@ def libra2dgl_build_dict(a, b, indices, ldt_key, gdt_key, gdt_value, node_map,
                                 nc,
                                 c,
                                 fsize,
-                                to_dgl_nd_for_write(hash_nodes),
                                 dataset)
+    return ret;
 
-    
+
 def libra2dgl_build_adjlist(feat, gfeat, adj, inner_node, ldt, gdt_key,
                             gdt_value, node_map, lr, lrtensor, num_nodes,
                             nc, c, feat_size, labels, trainm, testm, valm,
@@ -663,9 +663,9 @@ def libra2dgl_build_adjlist(feat, gfeat, adj, inner_node, ldt, gdt_key,
                                    to_dgl_nd_for_write(gtestm),
                                    to_dgl_nd_for_write(gvalm),
                                    feat_shape)
-    
 
-    
+
+
 def libra2dgl_set_lr(gdt_key, gdt_value, lrtensor, nc, Nn):
     _CAPI_DGLLibra2dglSetLR(to_dgl_nd(gdt_key),
                             to_dgl_nd(gdt_value),
