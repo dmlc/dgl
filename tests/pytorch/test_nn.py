@@ -1304,88 +1304,19 @@ def test_jumping_knowledge():
     model.reset_parameters()
     assert model(feat_list).shape == (num_nodes, num_feats)
 
-@parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
-def test_elementwise_link(g, idtype):
-    g = g.astype(idtype).to(F.ctx())
-    in_feats = 5
-    feat = F.randn((g.num_nodes(), in_feats))
+@pytest.mark.parametrize('op', ['dot', 'cos', 'ele', 'cat'])
+def test_edge_predictor(op):
+    ctx = F.ctx()
+    num_pairs = 3
+    in_feats = 4
+    out_feats = 5
+    h_src = th.randn((num_pairs, in_feats)).to(ctx)
+    h_dst = th.randn((num_pairs, in_feats)).to(ctx)
 
-    class MLP(th.nn.Module):
-        def __init__(self, in_feats, hidden_feats, out_feats):
-            super(MLP, self).__init__()
-            self.layer1 = th.nn.Linear(in_feats, hidden_feats)
-            self.layer2 = th.nn.Linear(hidden_feats, out_feats)
-
-        def reset_parameters(self):
-            self.layer1.reset_parameters()
-            self.layer2.reset_parameters()
-
-        def forward(self, h):
-            h = self.layer1(h)
-            return self.layer2(h)
-
-    # graph
-    link_pred = nn.ElementwisePredictor()
-    link_pred.reset_parameters()
-    assert link_pred(feat, g).shape == (g.num_edges(), in_feats)
-
-    # graph + MLP
-    out_feats = 1
-    mlp = MLP(in_feats, hidden_feats=3, out_feats=out_feats)
-    mlp = mlp.to(F.ctx())
-    link_pred = nn.ElementwisePredictor(mlp)
-    link_pred.reset_parameters()
-    assert link_pred(feat, g).shape == (g.num_edges(), out_feats)
-
-    # arbitrary pairs of node representations
-    feats_i = F.randn((g.num_edges(), in_feats))
-    feats_j = F.randn((g.num_edges(), in_feats))
-    assert link_pred((feats_i, feats_j)).shape == (g.num_edges(), out_feats)
-
-@parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
-def test_concat_link(g, idtype):
-    g = g.astype(idtype).to(F.ctx())
-
-    class MLP(th.nn.Module):
-        def __init__(self, in_feats, hidden_feats, out_feats):
-            super(MLP, self).__init__()
-            self.layer1 = th.nn.Linear(in_feats, hidden_feats)
-            self.layer2 = th.nn.Linear(hidden_feats, out_feats)
-
-        def reset_parameters(self):
-            self.layer1.reset_parameters()
-            self.layer2.reset_parameters()
-
-        def forward(self, h):
-            h = self.layer1(h)
-            return self.layer2(h)
-
-    # src, dst
-    src_feat_size = 2
-    dst_feat_size = 4
-    num_edges = 5
-    src_feats = F.randn((num_edges, src_feat_size))
-    dst_feats = F.randn((num_edges, dst_feat_size))
-    link_pred = nn.ConcatPredictor()
-    assert link_pred(src_feats, dst_feats).shape == (num_edges, src_feat_size + dst_feat_size)
-
-    # src, dst + MLP
-    out_feats = 1
-    mlp = MLP(in_feats=src_feat_size + dst_feat_size, hidden_feats=3, out_feats=out_feats)
-    mlp = mlp.to(F.ctx())
-    link_pred = nn.ConcatPredictor(mlp)
-    assert link_pred(src_feats, dst_feats).shape == (num_edges, out_feats)
-
-    # src, dst, rel + MLP
-    rel_feat_size = 3
-    rel_feats = F.randn((num_edges, rel_feat_size))
-    in_feats = src_feat_size + dst_feat_size + rel_feat_size
-    mlp = MLP(in_feats=in_feats, hidden_feats=3, out_feats=out_feats)
-    mlp = mlp.to(F.ctx())
-    link_pred = nn.ConcatPredictor(mlp)
-    assert link_pred(src_feats, dst_feats, rel_feats).shape == (num_edges, out_feats)
+    pred = nn.EdgePredictor(op)
+    assert pred(h_src, h_dst).shape == (num_pairs, 1)
+    pred = nn.EdgePredictor(op, in_feats, out_feats, bias=True).to(ctx)
+    assert pred(h_src, h_dst).shape == (num_pairs, out_feats)
 
 if __name__ == '__main__':
     test_graph_conv()

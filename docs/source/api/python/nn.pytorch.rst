@@ -274,17 +274,10 @@ Predictor and Score Functions for Link Prediction
 
 .. automodule:: dgl.nn.pytorch.link
 
-ElementwisePredictor
+EdgePredictor
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: dgl.nn.pytorch.link.ElementwisePredictor
-    :members: forward, reset_parameters
-    :show-inheritance:
-
-ConcatPredictor
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: dgl.nn.pytorch.link.ConcatPredictor
+.. autoclass:: dgl.nn.pytorch.link.EdgePredictor
     :members: forward, reset_parameters
     :show-inheritance:
 
