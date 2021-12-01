@@ -197,7 +197,6 @@ class GSpMM_hetero(th.autograd.Function):
         out, (argX, argY, argX_ntype, argY_etype) = _gspmm_hetero(gidx, op, reduce_op, X_len, feats)
         X, Y = feats[:X_len], feats[X_len:]
         # TODO (Israt): check target to decide src_id/dst_id?
-        # checking the first relation to decide for all the relations
         src_id, dst_id = gidx.metagraph.find_edge(0)
         reduce_last = _need_reduce_last_dim(X[src_id], Y[dst_id])
         X_shape = tuple([X[i].shape if X[i] is not None else None
@@ -227,8 +226,7 @@ class GSpMM_hetero(th.autograd.Function):
         gidx, op, reduce_op, X_shape, Y_shape, dtype, device, reduce_last, X_len = ctx.backward_cache
         ctx.backward_cache = None
         num_ntypes = gidx.number_of_ntypes()
-        feats = ctx.saved_tensors[:-(4 * num_ntypes)] # len(X_shape)
-        # feats = ctx.saved_tensors[:-(2*len(X_shape) + (2*len(Y_shape)))]
+        feats = ctx.saved_tensors[:-(4 * num_ntypes)]
         argX = ctx.saved_tensors[-(4 * num_ntypes):-(3 * num_ntypes)]
         argX_ntype = ctx.saved_tensors[-(3 * num_ntypes):-(2 * num_ntypes)]
         argY = ctx.saved_tensors[-(2 * num_ntypes):- num_ntypes]
@@ -246,7 +244,7 @@ class GSpMM_hetero(th.autograd.Function):
                     tpl_None = tuple([None] * len(Y))
                     dX = gspmm_hetero(g_rev, 'copy_lhs', 'sum', len(X), *tuple(dZ + tpl_None))
             else:  # max/min
-                # TODO(Israt): dont just depend on the first etype
+                # Assuming that the features are of the same dimension (enforced by the forward function)
                 src_id, dst_id = gidx.metagraph.find_edge(0)
                 dX = tuple([th.zeros((X_shape[i][0],) + dZ[dst_id].shape[1:], dtype=dtype, device=device)
                     if X[i] is not None else None for i in range(len(X))])

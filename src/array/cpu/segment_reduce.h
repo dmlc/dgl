@@ -128,8 +128,9 @@ void UpdateGradMinMax_hetero(HeteroGraphPtr graph,
       const dgl_id_t src_id = pair.second;
       dst_src_ntids[dst_id].push_back(src_id);  // can have duplicates. Use Hashtable to optimize.
     }
+    std::vector<bool> updated(graph->NumVertexTypes());
     for (int dst_id = 0; dst_id < dst_src_ntids.size(); ++dst_id) {
-      std::vector<bool> updated(graph->NumVertexTypes(), false);
+      std::fill(updated.begin(), updated.end(), false);
       for (int j = 0; j < dst_src_ntids[dst_id].size(); ++j) {
         int src_id = dst_src_ntids[dst_id][j];
         if (updated[src_id]) continue;

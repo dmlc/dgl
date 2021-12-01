@@ -65,16 +65,21 @@ void SpMMHetero(const std::string& op, const std::string& reduce,
   std::vector<dgl_type_t> ufeat_eid;
   std::vector<dgl_type_t> efeat_eid;
   std::vector<dgl_type_t> out_eid;
+  auto pair = graph->meta_graph()->FindEdge(0);  // first etype
+  NDArray ufeat_etype0 = (ufeat_vec.size() == 0) ? NullArray() : ufeat_vec[pair.first];
+  NDArray efeat_etype0 = (efeat_vec.size() == 0) ? NullArray() : efeat_vec[0];
   for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
     vec_graph.push_back(graph->GetCSCMatrix(etype));
     auto pair = graph->meta_graph()->FindEdge(etype);
     ufeat_eid.push_back(pair.first);
     efeat_eid.push_back(etype);
     out_eid.push_back(pair.second);
+    if (ufeat_etype0->shape[1] != ufeat_vec[pair.first]->shape[1])
+      LOG(FATAL) << "Column width of the input node features of all etypes must be same.";
+    if (efeat_etype0->shape[1] != efeat_vec[etype]->shape[1])
+      LOG(FATAL) << "Column width of the input edge features of all etypes must be same.";
   }
-  NDArray efeat = (efeat_vec.size() == 0) ? NullArray() : efeat_vec[efeat_eid[0]];
-  NDArray ufeat = (ufeat_vec.size() == 0) ? NullArray() : ufeat_vec[ufeat_eid[0]];
-  const auto& bcast = CalcBcastOff(op, ufeat, efeat);
+  const auto& bcast = CalcBcastOff(op, ufeat_etype0, efeat_etype0);
 
   ATEN_XPU_SWITCH_CUDA(graph->Context().device_type, XPU, "SpMM", {
     ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
