@@ -331,7 +331,6 @@ class _NodeDataLoaderIter:
         self.iter_ = iter(node_dataloader.dataloader)
         self.async_load = node_dataloader.async_load
         if self.async_load:
-        if self.async_load:
             if F.device_type(self.device) != 'cuda':
                 raise ValueError('Async feature loading requires setting device argument to cuda')
             self.iter_ = CUDAAsyncCopyNodeDataLoaderWrapper(
