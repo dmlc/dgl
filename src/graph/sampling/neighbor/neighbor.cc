@@ -7,6 +7,7 @@
 #include <dgl/runtime/container.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/array.h>
+#include <dgl/aten/macro.h>
 #include <dgl/sampling/neighbor.h>
 #include "../../../c_api_common.h"
 #include "../../unit_graph.h"
@@ -176,7 +177,7 @@ HeteroSubgraph SampleNeighborsEType(
 
   bool same_fanout = true;
   int64_t fanout_value = fanouts[0];
-  for (fanout : fanouts) {
+  for (auto fanout : fanouts) {
     if (fanout != fanout_value) {
       same_fanout = false;
       break;
@@ -424,8 +425,7 @@ DGL_REGISTER_GLOBAL("sampling.neighbor._CAPI_DGLSampleNeighborsEType")
     CHECK(dir_str == "in" || dir_str == "out")
       << "Invalid edge direction. Must be \"in\" or \"out\".";
     EdgeDir dir = (dir_str == "in")? EdgeDir::kIn : EdgeDir::kOut;
-    CHECK(fanout->dtype == DLDataType{kDLInt, 64, 1})
-      << "fFanout must be an int64 array";
+    CHECK_INT64(fanout, "fanout");
     std::vector<int64_t> fanout_vec = fanout.ToVector<int64_t>();
 
     std::shared_ptr<HeteroSubgraph> subg(new HeteroSubgraph);

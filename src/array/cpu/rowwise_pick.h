@@ -8,6 +8,7 @@
 
 #include <dgl/array.h>
 #include <dmlc/omp.h>
+#include <dgl/runtime/parallel_for.h>
 #include <functional>
 #include <algorithm>
 #include <string>
@@ -56,13 +57,14 @@ using PickFn = std::function<void(
 //
 // \param off Starting offset of this row.
 // \param et_offset Starting offset of this range.
+// \param cur_et The edge type.
 // \param et_len Length of the range.
 // \param et_idx A map from local idx to column id.
 // \param data Pointer of the data indices.
 // \param out_idx Picked indices in [et_offset, et_offset + et_len).
 template <typename IdxType>
 using RangePickFn = std::function<void(
-    IdxType off, IdxType et_offset, IdxType et_len,
+    IdxType off, IdxType et_offset, IdxType cur_et, IdxType et_len,
     const std::vector<IdxType> &et_idx, const IdxType* data,
     IdxType* out_idx)>;
 
@@ -240,7 +242,7 @@ COOMatrix CSRRowWisePerEtypePick(CSRMatrix mat, IdArray rows, IdArray etypes,
       }
 
       // fast path
-      if (same_num_pick && len <= num_picks_value && !replace) {
+      if (same_num_pick && len <= num_pick_value && !replace) {
         IdArray rows = Full(rid, len, sizeof(IdxType) * 8, ctx);
         IdArray cols = Full(-1, len, sizeof(IdxType) * 8, ctx);
         IdArray idx = Full(-1, len, sizeof(IdxType) * 8, ctx);
@@ -294,7 +296,7 @@ COOMatrix CSRRowWisePerEtypePick(CSRMatrix mat, IdArray rows, IdArray etypes,
               IdxType* picked_idata = static_cast<IdxType*>(picked_idx->data);
 
               // need call random pick
-              pick_fn(off, et_offset,
+              pick_fn(off, et_offset, cur_et,
                       et_len, et_idx,
                       data, picked_idata);
               for (int64_t k = 0; k < num_picks[cur_et]; ++k) {

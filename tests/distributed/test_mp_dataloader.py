@@ -279,7 +279,8 @@ def start_node_dataloader(rank, tmpdir, num_server, num_workers, orig_nid, orig_
 
     # Create sampler
     sampler = dgl.dataloading.MultiLayerNeighborSampler([
-        {etype: 5 for etype in g.etypes} if len(g.etypes) > 1 else 5,   # test dict for hetero
+        # test dict for hetero
+        {etype: 5 for etype in dist_graph.etypes} if len(dist_graph.etypes) > 1 else 5,
         10])        # test int for hetero
 
     # We need to test creating DistDataLoader multiple times.

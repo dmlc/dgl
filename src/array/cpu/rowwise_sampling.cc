@@ -46,9 +46,9 @@ inline PickFn<IdxType> GetSamplingPickFn(
 
 template <typename IdxType, typename FloatType>
 inline RangePickFn<IdxType> GetSamplingRangePickFn(
-    int64_t num_samples, FloatArray prob, bool replace) {
+    const std::vector<int64_t>& num_samples, FloatArray prob, bool replace) {
   RangePickFn<IdxType> pick_fn = [prob, num_samples, replace]
-    (IdxType off, IdxType et_offset, IdxType et_len,
+    (IdxType off, IdxType et_offset, IdxType cur_et, IdxType et_len,
     const std::vector<IdxType> &et_idx,
     const IdxType* data, IdxType* out_idx) {
       const FloatType* p_data = static_cast<FloatType*>(prob->data);
@@ -62,7 +62,7 @@ inline RangePickFn<IdxType> GetSamplingRangePickFn(
       }
 
       RandomEngine::ThreadLocal()->Choice<IdxType, FloatType>(
-          num_samples, probs, out_idx, replace);
+          num_samples[cur_et], probs, out_idx, replace);
     };
   return pick_fn;
 }
@@ -85,13 +85,13 @@ inline PickFn<IdxType> GetSamplingUniformPickFn(
 
 template <typename IdxType>
 inline RangePickFn<IdxType> GetSamplingUniformRangePickFn(
-    int64_t num_samples, bool replace) {
+    const std::vector<int64_t>& num_samples, bool replace) {
   RangePickFn<IdxType> pick_fn = [num_samples, replace]
-    (IdxType off, IdxType et_offset, IdxType et_len,
+    (IdxType off, IdxType et_offset, IdxType cur_et, IdxType et_len,
     const std::vector<IdxType> &et_idx,
     const IdxType* data, IdxType* out_idx) {
       RandomEngine::ThreadLocal()->UniformChoice<IdxType>(
-          num_samples, et_len, out_idx, replace);
+          num_samples[cur_et], et_len, out_idx, replace);
     };
   return pick_fn;
 }
