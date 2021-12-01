@@ -749,35 +749,37 @@ def test_sample_neighbors_etype_homogeneous():
                 else:
                     assert cnt[i] == 20
 
+    fanouts = F.full_1d(10, 5, F.int64, F.ctx())
+
     # graph with coo format
     coo_g = h_g.formats('coo')
     for _ in range(5):
-        subg = dgl.sampling.sample_etype_neighbors(coo_g, seeds, dgl.ETYPE, 10, replace=False)
+        subg = dgl.sampling.sample_etype_neighbors(coo_g, seeds, dgl.ETYPE, fanouts, replace=False)
         check_num(subg.edges()[1], False)
 
     for _ in range(5):
-        subg = dgl.sampling.sample_etype_neighbors(coo_g, seeds, dgl.ETYPE, 10, replace=True)
+        subg = dgl.sampling.sample_etype_neighbors(coo_g, seeds, dgl.ETYPE, fanouts, replace=True)
         check_num(subg.edges()[1], True)
 
     # graph with csr format
     csr_g = h_g.formats('csr')
     csr_g = csr_g.formats(['csr','csc','coo'])
     for _ in range(5):
-        subg = dgl.sampling.sample_etype_neighbors(csr_g, seeds, dgl.ETYPE, 10, replace=False)
+        subg = dgl.sampling.sample_etype_neighbors(csr_g, seeds, dgl.ETYPE, fanouts, replace=False)
         check_num(subg.edges()[1], False)
 
     for _ in range(5):
-        subg = dgl.sampling.sample_etype_neighbors(csr_g, seeds, dgl.ETYPE, 10, replace=True)
+        subg = dgl.sampling.sample_etype_neighbors(csr_g, seeds, dgl.ETYPE, fanouts, replace=True)
         check_num(subg.edges()[1], True)
 
     # graph with csc format
     csc_g = h_g.formats('csc')
     for _ in range(5):
-        subg = dgl.sampling.sample_etype_neighbors(csc_g, seeds, dgl.ETYPE, 10, replace=False)
+        subg = dgl.sampling.sample_etype_neighbors(csc_g, seeds, dgl.ETYPE, fanouts, replace=False)
         check_num(subg.edges()[1], False)
 
     for _ in range(5):
-        subg = dgl.sampling.sample_etype_neighbors(csc_g, seeds, dgl.ETYPE, 10, replace=True)
+        subg = dgl.sampling.sample_etype_neighbors(csc_g, seeds, dgl.ETYPE, fanouts, replace=True)
         check_num(subg.edges()[1], True)
 
     def check_num2(nodes, replace):
@@ -790,27 +792,28 @@ def test_sample_neighbors_etype_homogeneous():
             else:
                 assert cnt[i] == 10
 
+    fanouts = F.full_1d(5, 5, F.int64, F.ctx())
     # edge dir out
     # graph with coo format
     coo_g = h_g.formats('coo')
     for _ in range(5):
         subg = dgl.sampling.sample_etype_neighbors(
-            coo_g, seeds, dgl.ETYPE, 5, edge_dir='out', replace=False)
+            coo_g, seeds, dgl.ETYPE, fanouts, edge_dir='out', replace=False)
         check_num2(subg.edges()[0], False)
     for _ in range(5):
         subg = dgl.sampling.sample_etype_neighbors(
-            coo_g, seeds, dgl.ETYPE, 5, edge_dir='out', replace=True)
+            coo_g, seeds, dgl.ETYPE, fanouts, edge_dir='out', replace=True)
         check_num2(subg.edges()[0], True)
     # graph with csr format
     csr_g = h_g.formats('csr')
     for _ in range(5):
         subg = dgl.sampling.sample_etype_neighbors(
-            csr_g, seeds, dgl.ETYPE, 5, edge_dir='out', replace=False)
+            csr_g, seeds, dgl.ETYPE, fanouts, edge_dir='out', replace=False)
         check_num2(subg.edges()[0], False)
 
     for _ in range(5):
         subg = dgl.sampling.sample_etype_neighbors(
-            csr_g, seeds, dgl.ETYPE, 5, edge_dir='out', replace=True)
+            csr_g, seeds, dgl.ETYPE, fanouts, edge_dir='out', replace=True)
         check_num2(subg.edges()[0], True)
 
     # graph with csc format
@@ -818,12 +821,12 @@ def test_sample_neighbors_etype_homogeneous():
     csc_g = csc_g.formats(['csc','csr','coo'])
     for _ in range(5):
         subg = dgl.sampling.sample_etype_neighbors(
-            csc_g, seeds, dgl.ETYPE, 5, edge_dir='out', replace=False)
+            csc_g, seeds, dgl.ETYPE, fanouts, edge_dir='out', replace=False)
         check_num2(subg.edges()[0], False)
 
     for _ in range(5):
         subg = dgl.sampling.sample_etype_neighbors(
-            csc_g, seeds, dgl.ETYPE, 5, edge_dir='out', replace=True)
+            csc_g, seeds, dgl.ETYPE, fanouts, edge_dir='out', replace=True)
         check_num2(subg.edges()[0], True)
 
 @pytest.mark.parametrize('dtype', ['int32', 'int64'])
