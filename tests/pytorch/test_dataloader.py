@@ -288,7 +288,8 @@ def _check_device(data):
         assert data.device == F.ctx()
 
 @pytest.mark.parametrize('sampler_name', ['full', 'neighbor', 'neighbor2', 'shadow'])
-@pytest.mark.parametrize('async_load', ['off', 'no-feature', 'on'])
+# Do not test async_load for CPU
+@pytest.mark.parametrize('async_load', ['off', 'no-feature', 'on'] if F._default_context_str == 'gpu' else ['off'])
 @pytest.mark.parametrize('num_workers', [0, 1, 2])
 def test_node_dataloader(sampler_name, async_load, num_workers):
     load_features = (async_load == 'on')
@@ -463,9 +464,8 @@ if __name__ == '__main__':
     test_neighbor_nonuniform(0)
     for args in product(
             ['full', 'neighbor', 'shadow'],
-            ['off', 'no-feature', 'on'],
+            ['off', 'no-feature', 'on'] if F._default_context_str == 'gpu' else ['off'],
             [0, 1, 2]):
-        print(args)
         test_node_dataloader(*args)
     for args in product(['full', 'neighbor', 'shadow']):
         test_edge_dataloader(*args)
