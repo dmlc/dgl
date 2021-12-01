@@ -1314,7 +1314,12 @@ def test_edge_predictor(op):
     h_dst = th.randn((num_pairs, in_feats)).to(ctx)
 
     pred = nn.EdgePredictor(op)
-    assert pred(h_src, h_dst).shape == (num_pairs, 1)
+    if op in ['dot', 'cos']:
+        assert pred(h_src, h_dst).shape == (num_pairs, 1)
+    elif op == 'ele':
+        assert pred(h_src, h_dst).shape == (num_pairs, in_feats)
+    else:
+        assert pred(h_src, h_dst).shape == (num_pairs, 2 * in_feats)
     pred = nn.EdgePredictor(op, in_feats, out_feats, bias=True).to(ctx)
     assert pred(h_src, h_dst).shape == (num_pairs, out_feats)
 
