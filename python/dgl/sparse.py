@@ -218,9 +218,11 @@ def _gspmm_hetero(gidx, op, reduce_op, u_len, u_and_e_tuple):
     u_len : int
         The number of tensors in ``u`` (source node features)
     u_and_e_tuple : Tuple of tensors
-        Tuple of source nodes' features and edges' features.
-        The feature on source nodes could be None if op is ``copy_rhs``.
-        The feature on edges, could also be None if op is ``copy_lhs``.
+        Tuple of source nodes' features and edges' features. ``u_and_e_tuple[:u_len]``
+        stores the source nodes's features of all source node types. ``u_and_e_tuple[u_len:]``
+        stores the edges's features of all the edge types.
+        The source nodes' features of the soruce node types could be None if op is ``copy_rhs``.
+        The edges' features of the edge types could be None if op is ``copy_lhs``.
 
     Returns
     -------

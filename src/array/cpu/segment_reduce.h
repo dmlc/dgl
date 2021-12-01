@@ -115,10 +115,10 @@ void ScatterAdd(NDArray feat, NDArray idx, NDArray out) {
 template <typename IdType, typename DType>
 void UpdateGradMinMax_hetero(HeteroGraphPtr graph,
                        const std::string& op,
-                       std::vector<NDArray> list_feat,
-                       std::vector<NDArray> list_idx,
-                       std::vector<NDArray> list_idx_ntypes,
-                       std::vector<NDArray> list_out) {
+                       const std::vector<NDArray>& list_feat,
+                       const std::vector<NDArray>& list_idx,
+                       const std::vector<NDArray>& list_idx_ntypes,
+                       std::vector<NDArray>* list_out) {
   if (op == "copy_lhs") {
     std::vector<std::vector<dgl_id_t>> dst_src_ntids(graph->NumVertexTypes(),
     std::vector<dgl_id_t>());
@@ -137,10 +137,10 @@ void UpdateGradMinMax_hetero(HeteroGraphPtr graph,
         const DType* feat_data = list_feat[dst_id].Ptr<DType>();
         const IdType* idx_data = list_idx[dst_id].Ptr<IdType>();
         const IdType* idx_ntype_data = list_idx_ntypes[dst_id].Ptr<IdType>();
-        DType* out_data = list_out[src_id].Ptr<DType>();
+        DType* out_data = (*list_out)[src_id].Ptr<DType>();
         int dim = 1;
-        for (int i = 1; i < list_out[src_id]->ndim; ++i)
-          dim *= list_out[src_id]->shape[i];
+        for (int i = 1; i < (*list_out)[src_id]->ndim; ++i)
+          dim *= (*list_out)[src_id]->shape[i];
         int n = list_feat[dst_id]->shape[0];
 #pragma omp parallel for
         for (int i = 0; i < n; ++i) {
@@ -163,10 +163,10 @@ void UpdateGradMinMax_hetero(HeteroGraphPtr graph,
       const DType* feat_data = list_feat[dst_id].Ptr<DType>();
       const IdType* idx_data = list_idx[dst_id].Ptr<IdType>();
       const IdType* idx_ntype_data = list_idx_ntypes[dst_id].Ptr<IdType>();
-      DType* out_data = list_out[etid].Ptr<DType>();
+      DType* out_data = (*list_out)[etid].Ptr<DType>();
       int dim = 1;
-      for (int i = 1; i < list_out[etid]->ndim; ++i)
-        dim *= list_out[etid]->shape[i];
+      for (int i = 1; i < (*list_out)[etid]->ndim; ++i)
+        dim *= (*list_out)[etid]->shape[i];
       int n = list_feat[dst_id]->shape[0];
 #pragma omp parallel for
       for (int i = 0; i < n; ++i) {

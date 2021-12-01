@@ -39,8 +39,8 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
              const std::vector<CSRMatrix>& csr,
              const std::vector<NDArray>& ufeat,
              const std::vector<NDArray>& efeat,
-             std::vector<NDArray> out,
-             const std::vector<std::vector<NDArray>>& out_aux,
+             std::vector<NDArray>* out,
+             std::vector<std::vector<NDArray>>* out_aux,
              const std::vector<dgl_type_t>& ufeat_eid,
              const std::vector<dgl_type_t>& out_eid);
 /*!

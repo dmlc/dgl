@@ -87,7 +87,7 @@ void SpMMHetero(const std::string& op, const std::string& reduce,
         if (format == SparseFormat::kCSC) {
           SpMMCsrHetero<XPU, IdType, bits>(
               op, reduce, bcast, vec_graph,
-              ufeat_vec, efeat_vec, *out, *out_aux,
+              ufeat_vec, efeat_vec, out, out_aux,
               ufeat_eid, out_eid);
         } else {
           // TODO(Israt): Add support for COO format

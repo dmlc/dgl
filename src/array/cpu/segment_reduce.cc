@@ -59,7 +59,7 @@ void UpdateGradMinMax_hetero(const HeteroGraphPtr& g,
                 const std::vector<NDArray>& idx_etype,
                 std::vector<NDArray>* out) {
   SWITCH_BITS(bits, DType, {
-    cpu::UpdateGradMinMax_hetero<IdType, DType>(g, op, feat, idx, idx_etype, *out);
+    cpu::UpdateGradMinMax_hetero<IdType, DType>(g, op, feat, idx, idx_etype, out);
   });
 }
 
