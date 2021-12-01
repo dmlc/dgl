@@ -55,12 +55,17 @@ class EdgePredictor(nn.Module):
 
     Examples
     --------
+    >>> import dgl
     >>> import torch as th
     >>> from dgl.nn import EdgePredictor
-    >>> num_pairs = 3
+    >>> num_nodes = 2
+    >>> num_edges = 3
     >>> in_feats = 4
-    >>> h_src = th.randn(num_pairs, in_feats)
-    >>> h_dst = th.randn(num_pairs, in_feats)
+    >>> g = dgl.rand_graph(num_nodes=num_nodes, num_edges=num_edges)
+    >>> h = th.randn(num_nodes, in_feats)
+    >>> src, dst = g.edges()
+    >>> h_src = h[src]
+    >>> h_dst = h[dst]
 
     Case1: dot product
 
