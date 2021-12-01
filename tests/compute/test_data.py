@@ -5,6 +5,8 @@ import numpy as np
 import gzip
 import tempfile
 import os
+import pandas as pd
+import yaml
 
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
@@ -156,28 +158,148 @@ def test_extract_archive():
             assert os.path.exists(os.path.join(dst_dir, gz_file))
 
 
+class GenerateFilesForCSVDatasetSingle:
+    def __init__(self, test_dir):
+        self.test_dir = test_dir
+        self.meta_yaml = os.path.join(test_dir, "test_csv_meta.yml")
+        self.csv_files = []
+
+    def __enter__(self):
+        # single graph with multiple edges.csv and nodes.csv
+        meta_yaml_data = {'version': '0.0.1', 'dataset_type': 'user_defined', 'dataset_name': 'single_graph',
+                          'edges': [{'file_name': 'test_edges_0.csv', 'separator': ',',
+                                     'etype': ['user', 'like', 'item'], 'src_id_field': 'src', 'dst_id_field': 'dst',
+                                     'feat_prefix_field': 'feat_', 'labels': {'type': 'classification', 'field': 'label', 'num_classes': 10},
+                                     'split_type_field': 'split_type'},
+                                    {'file_name': 'test_edges_1.csv', 'separator': ',',
+                                     'etype': ['user', 'follow', 'user'], 'src_id_field': 'src', 'dst_id_field': 'dst',
+                                     'feat_prefix_field': 'feat_', 'labels': {'type': 'classification', 'field': 'label', 'num_classes': 10},
+                                     'split_type_field': 'split_type'}],
+                          'nodes': [{'file_name': 'test_nodes_0.csv', 'separator': ',', 'ntype': 'user',
+                                     'node_id_field': 'id', 'feat_prefix_field': 'feat_',
+                                     'labels': {'type': 'classification', 'field': 'label', 'num_classes': 2},
+                                     'split_type_field': 'split_type'},
+                                    {'file_name': 'test_nodes_1.csv', 'separator': ',', 'ntype': 'item',
+                                     'node_id_field': 'id', 'feat_prefix_field': 'feat_',
+                                     'labels': {'type': 'classification', 'field': 'label', 'num_classes': 2},
+                                     'split_type_field': 'split_type'}],
+                          }
+
+        meta_yaml = self.meta_yaml
+        with open(meta_yaml, 'w') as f:
+            yaml.dump(meta_yaml_data, f, sort_keys=False)
+        num_nodes = 100
+        num_edges = 500
+        for i in range(2):
+            edge_csv = os.path.join(
+                self.test_dir, "test_edges_{}.csv".format(i))
+            df = pd.DataFrame({'src': np.random.randint(num_nodes, size=num_edges),
+                               'dst': np.random.randint(num_nodes, size=num_edges),
+                               'label': np.random.randint(2, size=num_edges),
+                               'split_type': np.random.randint(3, size=num_edges),
+                               'feat_0': np.random.rand(num_edges),
+                               'feat_1': np.random.rand(num_edges)})
+            df.to_csv(edge_csv)
+            self.csv_files.append(edge_csv)
+            node_csv = os.path.join(
+                self.test_dir, "test_nodes_{}.csv".format(i))
+            df = pd.DataFrame({'id': np.arange(num_nodes),
+                               'label': np.random.randint(2, size=num_nodes),
+                               'split_type': np.random.randint(3, size=num_nodes),
+                               'feat_0': np.random.rand(num_nodes),
+                               'feat_1': np.random.rand(num_nodes),
+                               'feat_2': np.random.rand(num_nodes)})
+            df.to_csv(node_csv)
+            self.csv_files.append(node_csv)
+        return self
+
+    def __exit__(self, *args, **kwargs):
+        os.remove(self.meta_yaml)
+        [os.remove(csv_file) for csv_file in self.csv_files]
+
+
+class GenerateFilesForCSVDatasetMultiple():
+    def __init__(self, test_dir):
+        self.meta_yaml = os.path.join(test_dir, "test_csv_meta.yml")
+        self.edge_csv = os.path.join(test_dir, "test_edges.csv")
+        self.node_csv = os.path.join(test_dir, "test_nodes.csv")
+        self.graph_csv = os.path.join(test_dir, "test_graphs.csv")
+
+    def __enter__(self):
+        # multiple graphs with single edges.csv and nodes.csv
+        meta_yaml_data = {'version': '0.0.1', 'dataset_type': 'user_defined', 'dataset_name': 'multiple_graphs',
+                          'edges': [{'file_name': 'test_edges.csv', 'separator': ',',
+                                     'graph_id_field': 'graph_id', 'src_id_field': 'src', 'dst_id_field': 'dst',
+                                    'feat_prefix_field': 'feat_'}],
+                          'nodes': [{'file_name': 'test_nodes.csv', 'separator': ',', 'graph_id_field': 'graph_id',
+                                     'node_id_field': 'id', 'feat_prefix_field': 'feat_'}],
+                          'graphs': {'file_name': 'test_graphs.csv', 'separator': ',',
+                                     'graph_id_field': 'graph_id',
+                                     'labels': {'type': 'classification', 'field': 'label', 'num_classes': 2},
+                                     'split_type_field': 'split_type'},
+                          }
+
+        meta_yaml = self.meta_yaml
+        with open(meta_yaml, 'w') as f:
+            yaml.dump(meta_yaml_data, f, sort_keys=False)
+        num_nodes = 100
+        num_edges = 500
+        num_graphs = 20
+        df = pd.DataFrame({'graph_id': np.random.randint(num_graphs, size=num_edges*num_graphs),
+                           'src': np.random.randint(num_nodes, size=num_edges*num_graphs),
+                           'dst': np.random.randint(num_nodes, size=num_edges*num_graphs),
+                           'feat_0': np.random.rand(num_edges*num_graphs),
+                           'feat_1': np.random.rand(num_edges*num_graphs)})
+        df.to_csv(self.edge_csv)
+        graph_id = []
+        id = []
+        for i in range(num_graphs):
+            graph_id.extend(np.full(num_nodes, i))
+            id.extend(np.arange(num_nodes))
+        df = pd.DataFrame({'graph_id': graph_id,
+                           'id': id,
+                           'feat_0': np.random.rand(num_nodes*num_graphs),
+                           'feat_1': np.random.rand(num_nodes*num_graphs),
+                           'feat_2': np.random.rand(num_nodes*num_graphs)})
+        df.to_csv(self.node_csv)
+        df = pd.DataFrame({'graph_id': np.arange(num_graphs),
+                           'label': np.random.randint(2, size=num_graphs),
+                           'split_type': np.random.randint(3, size=num_graphs)})
+        df.to_csv(self.graph_csv)
+        return self
+
+    def __exit__(self, *args, **kwargs):
+        os.remove(self.meta_yaml)
+        os.remove(self.edge_csv)
+        os.remove(self.node_csv)
+        os.remove(self.graph_csv)
+
+
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
 def test_csv_dataset():
-    for force_reload in [True, False]:
-        # single graph with multiple edges.csv and nodes.csv
-        csv_dataset = data.CSVDataset(os.path.join(
-            os.path.dirname(__file__), "data/single_graph/csv_meta.yml"), force_reload=force_reload)
-        assert len(csv_dataset) == 1
-        graph = csv_dataset[0]
-        assert ~graph.is_homogeneous
-        assert csv_dataset.has_cache()
+    with tempfile.TemporaryDirectory() as test_dir:
+        for force_reload in [True, False]:
+            # single graph with multiple edges.csv and nodes.csv
+            with GenerateFilesForCSVDatasetSingle(test_dir) as f:
+                csv_dataset = data.CSVDataset(
+                    f.meta_yaml, force_reload=force_reload)
+                assert len(csv_dataset) == 1
+                graph = csv_dataset[0]
+                assert ~graph.is_homogeneous
+                assert csv_dataset.has_cache()
 
-        # multiple graphs with single edges.csv and nodes.csv
-        csv_dataset = data.CSVDataset(os.path.join(
-            os.path.dirname(__file__), "data/multiple_graphs/csv_meta.yml"), force_reload=force_reload)
-        assert len(csv_dataset) > 1
-        graph, label = csv_dataset[0]
-        assert graph.is_homogeneous
-        assert 'train_mask' in csv_dataset.mask
-        assert 'val_mask' in csv_dataset.mask
-        assert 'test_mask' in csv_dataset.mask
-        assert len(csv_dataset) == csv_dataset.mask['train_mask'].shape[0]
-        assert csv_dataset.has_cache()
+            # multiple graphs with single edges.csv and nodes.csv
+            with GenerateFilesForCSVDatasetMultiple(test_dir) as f:
+                csv_dataset = data.CSVDataset(
+                    f.meta_yaml, force_reload=force_reload)
+                assert len(csv_dataset) > 1
+                graph, label = csv_dataset[0]
+                assert graph.is_homogeneous
+                assert 'train_mask' in csv_dataset.mask
+                assert 'val_mask' in csv_dataset.mask
+                assert 'test_mask' in csv_dataset.mask
+                assert len(csv_dataset) == csv_dataset.mask['train_mask'].shape[0]
+                assert csv_dataset.has_cache()
 
 
 if __name__ == '__main__':
