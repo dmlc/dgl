@@ -70,8 +70,9 @@ def create_test_heterograph_large(idtype):
 @parametrize_dtype
 def test_unary_copy_u(idtype):
     def _test(mfunc, rfunc):
-
         g = create_test_heterograph_2(idtype)
+        g0 = create_test_heterograph(idtype)
+        g1 = create_test_heterograph_large(idtype)
         cross_reducer = rfunc.__name__
         x1 = F.randn((g.num_nodes('user'), feat_size))
         x2 = F.randn((g.num_nodes('developer'), feat_size))
@@ -136,6 +137,8 @@ def test_unary_copy_e(idtype):
     def _test(mfunc, rfunc):
 
         g = create_test_heterograph_large(idtype)
+        g0 = create_test_heterograph_2(idtype)
+        g1 = create_test_heterograph(idtype)
         cross_reducer = rfunc.__name__
         x1 = F.randn((g.num_edges('plays'),feat_size))
         x2 = F.randn((g.num_edges('follows'),feat_size))
