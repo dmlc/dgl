@@ -128,9 +128,8 @@ void UpdateGradMinMax_hetero(HeteroGraphPtr graph,
       const dgl_id_t src_id = pair.second;
       dst_src_ntids[dst_id].push_back(src_id);  // can have duplicates. Use Hashtable to optimize.
     }
-    std::vector<bool> updated(graph->NumVertexTypes(), false);
     for (int dst_id = 0; dst_id < dst_src_ntids.size(); ++dst_id) {
-      updated[dst_id] = false;
+      std::vector<bool> updated(graph->NumVertexTypes(), false);
       for (int j = 0; j < dst_src_ntids[dst_id].size(); ++j) {
         int src_id = dst_src_ntids[dst_id][j];
         if (updated[src_id]) continue;
@@ -142,12 +141,12 @@ void UpdateGradMinMax_hetero(HeteroGraphPtr graph,
         for (int i = 1; i < list_out[src_id]->ndim; ++i)
           dim *= list_out[src_id]->shape[i];
         int n = list_feat[dst_id]->shape[0];
-    #pragma omp parallel for
+#pragma omp parallel for
         for (int i = 0; i < n; ++i) {
           for (int k = 0; k < dim; ++k) {
             if (src_id == idx_ntype_data[i * dim + k]) {
               const int write_row = idx_data[i * dim + k];
-    #pragma omp atomic
+#pragma omp atomic
               out_data[write_row * dim + k] += feat_data[i * dim + k];  // feat = dZ
             }
           }
@@ -168,12 +167,12 @@ void UpdateGradMinMax_hetero(HeteroGraphPtr graph,
       for (int i = 1; i < list_out[etid]->ndim; ++i)
         dim *= list_out[etid]->shape[i];
       int n = list_feat[dst_id]->shape[0];
-      #pragma omp parallel for
+#pragma omp parallel for
       for (int i = 0; i < n; ++i) {
         for (int k = 0; k < dim; ++k) {
           if (etid == idx_ntype_data[i * dim + k]) {
             const int write_row = idx_data[i * dim + k];
-      #pragma omp atomic
+#pragma omp atomic
             out_data[write_row * dim + k] += feat_data[i * dim + k];  // feat = dZ
           }
         }
