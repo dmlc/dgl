@@ -2733,6 +2733,7 @@ def test_adj_sparse(idtype, fmt):
         indices_sorted_np[A_csc.data] = A_csc.indices
         assert np.array_equal(F.asnumpy(indices_sorted), indices_sorted_np)
 
+
 if __name__ == '__main__':
     # test_create()
     # test_query()

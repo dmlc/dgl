@@ -817,6 +817,7 @@ class DGLHeteroGraph(object):
         self._batch_num_nodes = None
         self._batch_num_edges = None
 
+
     #################################################################
     # Metagraph query
     #################################################################

@@ -60,7 +60,7 @@ def merge(graphs):
     ref = graphs[0]
     ntypes = ref.ntypes
     etypes = ref.canonical_etypes
-    data_dict = {etype: ([],[]) for etype in etypes}
+    data_dict = {etype: ([], []) for etype in etypes}
     num_nodes_dict = {ntype: 0 for ntype in ntypes}
     merged = dgl.heterograph(data_dict, num_nodes_dict, ref.idtype, ref.device)
 
