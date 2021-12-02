@@ -267,6 +267,20 @@ SetTransformerDecoder
     :members:
     :show-inheritance:
 
+.. _apinn-pytorch-link
+
+Predictor and Score Functions for Link Prediction
+-------------------------------------------------
+
+.. automodule:: dgl.nn.pytorch.link
+
+EdgePredictor
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.link.EdgePredictor
+    :members: forward, reset_parameters
+    :show-inheritance:
+
 Heterogeneous Graph Convolution Module
 ----------------------------------------
 
@@ -308,6 +322,13 @@ SegmentedKNNGraph
 
 .. autoclass:: dgl.nn.pytorch.factory.SegmentedKNNGraph
     :members:
+    :show-inheritance:
+
+JumpingKnowledge
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.utils.JumpingKnowledge
+    :members: forward, reset_parameters
     :show-inheritance:
 
 NodeEmbedding Module
