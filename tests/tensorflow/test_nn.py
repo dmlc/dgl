@@ -502,6 +502,19 @@ def test_hetero_conv(agg, idtype):
     assert mod3.carg1 == 0
     assert mod3.carg2 == 1
 
+    #conv on graph without any edges
+    for etype in g.etypes:
+        g = dgl.remove_edges(g, g.edges(form='eid', etype=etype), etype=etype)
+    assert g.num_edges() == 0
+    h = conv(g, {'user': uf, 'game': gf, 'store': sf})
+    assert set(h.keys()) == {'user', 'game'}
+
+    block = dgl.to_block(g.to(F.cpu()), {'user': [0, 1, 2, 3], 'game': [
+                         0, 1, 2, 3], 'store': []}).to(F.ctx())
+    h = conv(block, ({'user': uf, 'game': gf, 'store': sf},
+             {'user': uf, 'game': gf, 'store': sf[0:0]}))
+    assert set(h.keys()) == {'user', 'game'}
+
 
 @pytest.mark.parametrize('out_dim', [1, 2])
 def test_dense_cheb_conv(out_dim):
@@ -549,3 +562,4 @@ if __name__ == '__main__':
     # test_dense_sage_conv()
     test_dense_cheb_conv()
     # test_sequential()
+    test_hetero_conv()
