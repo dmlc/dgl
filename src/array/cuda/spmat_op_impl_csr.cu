@@ -230,11 +230,11 @@ __global__ void _SegmentCopyKernel(
     const IdType* indptr, const DType* data,
     const IdType* row, int64_t length, int64_t n_row,
     const IdType* out_indptr, DType* out_data) {
-  IdType tx = blockIdx.x * blockDim.x + threadIdx.x;
+  IdType tx = static_cast<IdType>(blockIdx.x) * blockDim.x + threadIdx.x;
   const int stride_x = gridDim.x * blockDim.x;
   while (tx < length) {
     // find upper bound for tx using binary search.
-    // out_indptr has already a prefix sum
+    // out_indptr has already a prefix sum. n_row = size(out_indptr)-1
     IdType l = 0, r = n_row, m = 0;
     while (l < r) {
       m = l + (r-l)/2;
@@ -244,8 +244,6 @@ __global__ void _SegmentCopyKernel(
         r = m;
       }
     }
-    // final check for upper bound
-    if (l < n_row && out_indptr[l] <= tx) l++;
 
     IdType rpos = l-1;
     IdType rofs = tx - out_indptr[rpos];

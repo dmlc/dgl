@@ -295,10 +295,10 @@ def count_nonzero(input):
     # TODO: fallback to numpy for backward compatibility
     return np.count_nonzero(input)
 
-def unique(input):
+def unique(input, return_inverse=False):
     if input.dtype == th.bool:
         input = input.type(th.int8)
-    return th.unique(input)
+    return th.unique(input, return_inverse=return_inverse)
 
 def full_1d(length, fill_value, dtype, ctx):
     return th.full((length,), fill_value, dtype=dtype, device=ctx)

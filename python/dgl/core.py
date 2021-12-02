@@ -224,9 +224,13 @@ def data_dict_to_list(graph, data_dict, func, target):
     else:
         if target == 'u':
             lhs_list = [None] * graph._graph.number_of_ntypes()
-            for srctype, _, _ in graph.canonical_etypes:
-                src_id = graph.get_ntype_id(srctype)
-                lhs_list[src_id] = data_dict[srctype]
+            if not isinstance(data_dict, dict):
+                src_id, _ = graph._graph.metagraph.find_edge(0)
+                lhs_list[src_id] = data_dict
+            else:
+                for srctype, _, _ in graph.canonical_etypes:
+                    src_id = graph.get_ntype_id(srctype)
+                    lhs_list[src_id] = data_dict[srctype]
             return lhs_list
         else: # target == 'e':
             rhs_list = [None] * graph._graph.number_of_etypes()

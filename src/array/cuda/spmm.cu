@@ -521,7 +521,6 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
              const std::vector<dgl_type_t>& out_ntids) {  // output node type id
   bool is_scalar_efeat = vec_efeat[0].NumElements() == vec_csr[0].indices->shape[0];
   bool use_efeat = op != "copy_lhs";
-  // TODO(Israt): Resolve PR-https://github.com/dmlc/dgl/issues/2995 and use multistream
   auto device = runtime::DeviceAPI::Get(vec_csr[0].indptr->ctx);
   SWITCH_BITS(bits, DType, {
     std::vector<DType*> trans_out(vec_out.size(), NULL);
@@ -603,34 +602,27 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
           NDArray efeat = (vec_efeat.size() == 0) ?
             NullArray() : vec_efeat[etype];
           SWITCH_OP(op, Op, {
-            cuda::SpMMCsrHetero<IdType, DType, Op, cuda::reduce::Sum<IdType, DType> >(
-                bcast, csr, ufeat, efeat, vec_out[dst_id],
-                NullArray(), NullArray(), thr_entry->stream);
+            cuda::SpMMCsr<IdType, DType, Op, cuda::reduce::Sum<IdType, DType> >(
+                bcast, csr, ufeat, efeat, vec_out[dst_id], NullArray(), NullArray());
           });
         }
       } else if (reduce == "max") {
-        // SWITCH_BITS(bits, DType, {
           SWITCH_OP(op, Op, {
             NDArray ufeat = (vec_ufeat.size() == 0) ?
                 NullArray() : vec_ufeat[src_id];
             NDArray efeat = (vec_efeat.size() == 0) ?
                 NullArray() : vec_efeat[etype];
-            cuda::SpMMCsrHetero<IdType, DType, Op, cuda::reduce::Max<IdType, DType> >(
-                bcast, csr, ufeat, efeat, vec_out[dst_id],
-                out_aux[0], out_aux[1], thr_entry->stream);
+            cuda::SpMMCsr<IdType, DType, Op, cuda::reduce::Max<IdType, DType> >(
+                bcast, csr, ufeat, efeat, vec_out[dst_id], out_aux[0], out_aux[1]);
           });
-        // });
       } else if (reduce == "min") {
-        // SWITCH_BITS(bits, DType, {
           SWITCH_OP(op, Op, {
             NDArray ufeat = (vec_ufeat.size() == 0) ?
                 NullArray() : vec_ufeat[src_id];
             NDArray efeat = (vec_efeat.size() == 0) ?
                 NullArray() : vec_efeat[etype];
-            cuda::SpMMCsrHetero<IdType, DType, Op, cuda::reduce::Min<IdType, DType> >(
-                bcast, csr, ufeat, efeat, vec_out[dst_id],
-                out_aux[0], out_aux[1], thr_entry->stream);
-          // });
+            cuda::SpMMCsr<IdType, DType, Op, cuda::reduce::Min<IdType, DType> >(
+                bcast, csr, ufeat, efeat, vec_out[dst_id], out_aux[0], out_aux[1]);
         });
       } else {
         LOG(FATAL) << "Not implemented";

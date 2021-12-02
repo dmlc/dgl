@@ -20,16 +20,16 @@ class GATv2Conv(nn.Module):
     over an input signal.
 
     .. math::
-        h_i^{(l+1)} = \sum_{j\in \mathcal{N}(i)} \alpha_{i,j} W^{(l)}_{right} h_j^{(l)}
+        h_i^{(l+1)} = \sum_{j\in \mathcal{N}(i)} \alpha_{ij}^{(l)} W^{(l)}_{right} h_j^{(l)}
 
     where :math:`\alpha_{ij}` is the attention score bewteen node :math:`i` and
     node :math:`j`:
 
     .. math::
-        \alpha_{ij}^{l} &= \mathrm{softmax_i} (e_{ij}^{l})
+        \alpha_{ij}^{(l)} &= \mathrm{softmax_i} (e_{ij}^{(l)})
 
-        e_{ij}^{l} &= \vec{a}^T\mathrm{LeakyReLU}\left(
-            W^{(l)}_{left} h_{i} + W^{(l)}_{right} h_{j}]\right)
+        e_{ij}^{(l)} &= {\vec{a}^T}^{(l)}\mathrm{LeakyReLU}\left(
+            W^{(l)}_{left} h_{i} + W^{(l)}_{right} h_{j}\right)
 
     Parameters
     ----------
@@ -287,6 +287,7 @@ class GATv2Conv(nn.Module):
                         -1, self._num_heads, self._out_feats)
                 if graph.is_block:
                     feat_dst = feat_src[:graph.number_of_dst_nodes()]
+                    h_dst = h_dst[:graph.number_of_dst_nodes()]
             graph.srcdata.update({'el': feat_src})# (num_src_edge, num_heads, out_dim)
             graph.dstdata.update({'er': feat_dst})
             graph.apply_edges(fn.u_add_v('el', 'er', 'e'))

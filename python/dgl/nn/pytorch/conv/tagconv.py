@@ -4,6 +4,7 @@ import torch as th
 from torch import nn
 
 from .... import function as fn
+from .graphconv import EdgeWeightNorm
 
 
 class TAGConv(nn.Module):
@@ -59,6 +60,7 @@ class TAGConv(nn.Module):
             [ 0.5215, -1.6044],
             [ 0.3304, -1.9927]], grad_fn=<AddmmBackward>)
     """
+
     def __init__(self,
                  in_feats,
                  out_feats,
@@ -89,7 +91,7 @@ class TAGConv(nn.Module):
         gain = nn.init.calculate_gain('relu')
         nn.init.xavier_normal_(self.lin.weight, gain=gain)
 
-    def forward(self, graph, feat):
+    def forward(self, graph, feat, edge_weight=None):
         r"""
 
         Description
@@ -103,6 +105,11 @@ class TAGConv(nn.Module):
         feat : torch.Tensor
             The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`
             is size of input feature, :math:`N` is the number of nodes.
+        edge_weight: torch.Tensor, optional
+            edge_weight to use in the message passing process. This is equivalent to
+            using weighted adjacency matrix in the equation above, and
+            :math:\tilde{D}^{-1/2}\tilde{A} \tilde{D}^{-1/2}
+            is based on :class:`dgl.nn.pytorch.conv.graphconv.EdgeWeightNorm`.
 
         Returns
         -------
@@ -112,22 +119,30 @@ class TAGConv(nn.Module):
         """
         with graph.local_scope():
             assert graph.is_homogeneous, 'Graph is not homogeneous'
+            if edge_weight is None:
+                norm = th.pow(graph.in_degrees().float().clamp(min=1), -0.5)
+                shp = norm.shape + (1,) * (feat.dim() - 1)
+                norm = th.reshape(norm, shp).to(feat.device)
 
-            norm = th.pow(graph.in_degrees().float().clamp(min=1), -0.5)
-            shp = norm.shape + (1,) * (feat.dim() - 1)
-            norm = th.reshape(norm, shp).to(feat.device)
-
-            #D-1/2 A D -1/2 X
+            msg_func = fn.copy_u("h", "m")
+            if edge_weight is not None:
+                graph.edata["_edge_weight"] = EdgeWeightNorm(
+                    'both')(graph, edge_weight)
+                msg_func = fn.u_mul_e("h", "_edge_weight", "m")
+            # D-1/2 A D -1/2 X
             fstack = [feat]
             for _ in range(self._k):
-
-                rst = fstack[-1] * norm
+                if edge_weight is None:
+                    rst = fstack[-1] * norm
+                else:
+                    rst = fstack[-1]
                 graph.ndata['h'] = rst
 
-                graph.update_all(fn.copy_src(src='h', out='m'),
+                graph.update_all(msg_func,
                                  fn.sum(msg='m', out='h'))
                 rst = graph.ndata['h']
-                rst = rst * norm
+                if edge_weight is None:
+                    rst = rst * norm
                 fstack.append(rst)
 
             rst = self.lin(th.cat(fstack, dim=-1))

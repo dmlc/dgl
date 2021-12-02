@@ -45,6 +45,8 @@ Operators for extracting and returning subgraphs.
     edge_type_subgraph
     in_subgraph
     out_subgraph
+    khop_in_subgraph
+    khop_out_subgraph
 
 .. _api-transform:
 
