@@ -64,8 +64,8 @@ int32_t LeastLoad(int64_t* community_edges, int32_t nc) {
 
 /*! \brief Libra - vertexcut based graph partitioning.
   It takes list of edges from input DGL graph and distributed them among nc partitions
-  During edge distribution, Libra assign a given edges based on the end vertices, in
-  doing so, it tries to minimized the splitting of the graph vertices. In case of conflict
+  During edge distribution, Libra assign a given edge to a partition based on the end vertices, 
+  in doing so, it tries to minimized the splitting of the graph vertices. In case of conflict
   Libra assigns an edge to the least loaded partition/community.
   \param[in] nc Number of partitions/communities
   \param[in] node_degree per node degree
@@ -93,12 +93,12 @@ void LibraVertexCut(
   int64_t N_e,
   const std::string& prefix) {
   int32_t *out_ptr                = out.Ptr<int32_t>();
-  IdType  *node_degree_ptr        = node_degree.Ptr<IdType>();
-  IdType  *edgenum_unassigned_ptr = edgenum_unassigned.Ptr<IdType>();
-  IdType2 *u_ptr                  = u.Ptr<IdType2>();
-  IdType2 *v_ptr                  = v.Ptr<IdType2>();
-  float   *w_ptr                  = w.Ptr<float>();
-  float   *community_weights_ptr  = community_weights.Ptr<float>();
+  IdType2 *node_degree_ptr        = node_degree.Ptr<IdType2>();
+  IdType2 *edgenum_unassigned_ptr = edgenum_unassigned.Ptr<IdType2>();
+  IdType  *u_ptr                  = u.Ptr<IdType>();
+  IdType  *v_ptr                  = v.Ptr<IdType>();
+  int64_t *w_ptr                  = w.Ptr<int64_t>();
+  int64_t *community_weights_ptr  = community_weights.Ptr<int64_t>();
 
   std::vector<std::vector<int32_t> > node_assignments(N_n);
   std::vector<IdType2> replication_list;
@@ -110,7 +110,8 @@ void LibraVertexCut(
   for (int64_t i=0; i < N_e; i++) {
     IdType u = u_ptr[i];    // edge end vertex 1
     IdType v = v_ptr[i];    // edge end vertex 2
-    float  w = w_ptr[i];    // edge weight
+    int64_t  w = w_ptr[i];    // edge weight
+
     CHECK(u < N_n);
     CHECK(v < N_n);
 
@@ -259,7 +260,7 @@ void LibraVertexCut(
       }
     }
   }
-  free(cache);
+  delete cache;
 
   for (int64_t c=0; c < nc; c++) {
     std::string path = prefix + "/community" + std::to_string(c) +".txt";
@@ -286,7 +287,7 @@ void LibraVertexCut(
 
   printf("Community weights:\n");
   for (int64_t c=0; c < nc; c++)
-    printf("%f ", community_weights_ptr[c]);
+    printf("%ld ", community_weights_ptr[c]);
   printf("\n");
 
   printf("Community edges:\n");
@@ -294,7 +295,7 @@ void LibraVertexCut(
     printf("%ld ", community_edges[c]);
   printf("\n");
 
-  free(community_edges);
+  delete community_edges;
   fclose(fp);
 }
 
@@ -406,7 +407,7 @@ List<Value> Libra2dglBuildDict(
     a_ptr[edge] = indices_ptr[u];     // new local ID for an edge
     b_ptr[edge++] = indices_ptr[v];   // new local ID for an edge
   }
-  CHECK(edge <= fsize) << "Pre-allocated memory, number of edges per partition is not enough.";
+  CHECK(edge <= fsize) << "[Bug] Pre-allocated memory, number of edges per partition is not enough.";
   fclose(fp);
 
   List<Value> ret;

@@ -12,31 +12,25 @@ Copyright (c) 2021 Intel Corporation
 """
 
 import os
-import sys
-import numpy as np
-import csv
-from statistics import mean
-import random
 import time
-
-import dgl
 import json
-from dgl import DGLGraph
 import torch as th
-from dgl.data import register_data_args, load_data
-from load_graph import load_reddit, load_ogb
+from load_graph import load_ogb
+from dgl import DGLGraph
+from dgl.data import load_data
 from dgl.sparse import libra_vertex_cut
 from dgl.sparse import libra2dgl_build_dict
 from dgl.sparse import libra2dgl_set_lr
 from dgl.sparse import libra2dgl_build_adjlist
-from dgl.data.utils import load_graphs, save_graphs, load_tensors, save_tensors
+from dgl.data.utils import save_graphs, save_tensors
 from dgl.distgnn.tools import load_proteins
-from scipy.io import mmread
 from dgl.base import DGLError
-import requests
 
 
 class Args:
+    """
+    Class to set the dataset name, for use in dgl dataset load functions
+    """
     def __init__(self, dataset):
         self.dataset = dataset
 
@@ -49,24 +43,27 @@ def libra_partition(num_community, dataset, resultdir):
     ----------
     num_community : Number of partitions to create
     dataset : Input graph name to partition
-    prefix : Output location
+    prefix : Output location for storing the partitioned graphs
 
     Output
     ------
     Creates X partition folder as XCommunities (say, X=2, so, 2Communities)
-    XCommunities contains communityZ.txt file per partition Z
-    Each such file contains a list of edges assigned to that partition.
-    The folder also contains partX folders containing DGL graphs for the partitions;
-    these graph files are used as input DistGNN.
+    XCommunities contains communityZ.txt file per partition Z (Z <- 0 .. X-1);
+    each such file contains a list of edges assigned to that partition.
+    These files constitute the output of Libra graph partition technique
+    (An intermediate result of this function).
+    The folder also contains partZ folders, each of these folders stores
+    DGL/DistGNN graphs for the Z partitions;
+    these graph files are used as input to DistGNN.
     """
     args = Args(dataset)
     print("Input dataset: ", args.dataset)
     if args.dataset == 'ogbn-products':
         print("Loading ogbn-products")
-        G,_ = load_ogb('ogbn-products')
+        G, _ = load_ogb('ogbn-products')
     elif args.dataset == 'ogbn-papers100M':
         print("Loading ogbn-papers100M")
-        G,_ = load_ogb('ogbn-papers100M')
+        G, _ = load_ogb('ogbn-papers100M')
     elif args.dataset == 'proteins':
         G = load_proteins('proteins')
     elif args.dataset == 'ogbn-arxiv':
@@ -80,80 +77,77 @@ def libra_partition(num_community, dataset, resultdir):
 
     print("Done loading the graph.", flush=True)
 
-    N_n = G.number_of_nodes()   # number of nodes
-    N_c = num_community      ## number of partitions/communities
-    N_e = G.number_of_edges()
-    community_list = [[] for i in range(N_c)]
-    print("Number of nodes in the graph: ", N_n)
-    print("Number of edges in the graph: ", N_e)
+    num_nodes = G.number_of_nodes()   # number of nodes
+    num_edges = G.number_of_edges()
+    print("Number of nodes in the graph: ", num_nodes)
+    print("Number of edges in the graph: ", num_edges)
 
     in_d = G.in_degrees()
     out_d = G.out_degrees()
     node_degree = in_d + out_d
     edgenum_unassigned = node_degree.clone()
-    replication_list = []
 
-    u_t,v_t = G.edges()
-    weight_ = th.ones(u_t.shape[0], dtype=th.float32)
-    community_weights = th.zeros(N_c, dtype=th.float32)
+    u_t, v_t = G.edges()
+    weight_ = th.ones(u_t.shape[0], dtype=th.int64)
+    community_weights = th.zeros(num_community, dtype=th.int64)
 
-    self_loop = 0
-    for i in range(len(u_t)):
-        if u_t[i] == v_t[i]:
-            self_loop += 1
-
-    print("#self loops in the dataset: ", self_loop)
-    #del G
+    # self_loop = 0
+    # for p, q in zip(u_t, v_t):
+    #     if p == q:
+    #         self_loop += 1
+    # print("#self loops in the dataset: ", self_loop)
+    
+    # del G
 
     ## call to C/C++ code
     out = th.zeros(u_t.shape[0], dtype=th.int32)
-    libra_vertex_cut(N_c, node_degree, edgenum_unassigned, community_weights,
-                     u_t, v_t, weight_, out, N_n, N_e, resultdir)
+    libra_vertex_cut(num_community, node_degree, edgenum_unassigned, community_weights,
+                     u_t, v_t, weight_, out, num_nodes, num_edges, resultdir)
 
     print("Max partition size: ", int(community_weights.max()))
     print(" ** Converting libra partitions to dgl graphs **")
     fsize = int(community_weights.max()) + 1024   ## max edges in partition
-    print("fsize: ", fsize)
+    print("fsize: ", fsize, flush=True)
 
-    node_map = th.zeros(N_c, dtype=th.int64)
-    indices = th.zeros(N_n, dtype=th.int64)
-    lrtensor = th.zeros(N_n, dtype=th.int64)
-    gdt_key = th.zeros(N_n, dtype=th.int64)
-    gdt_value = th.zeros([N_n, N_c], dtype=th.int64)
+    node_map = th.zeros(num_community, dtype=th.int64)
+    indices = th.zeros(num_nodes, dtype=th.int64)
+    lrtensor = th.zeros(num_nodes, dtype=th.int64)
+    gdt_key = th.zeros(num_nodes, dtype=th.int64)
+    gdt_value = th.zeros([num_nodes, num_community], dtype=th.int64)
     offset = th.zeros(1, dtype=th.int64)
     ldt_ar = []
 
-    gg = [DGLGraph() for i in range(N_c)]
+    gg_ar = [DGLGraph() for i in range(num_community)]
     part_nodes = []
 
+    print(">>> ", "num_nodes   ", " ", "num_edges")
     ## Iterator over number of partitions
-    for i in range(N_c):
-        g = gg[i]
+    for i in range(num_community):
+        g = gg_ar[i]
 
-        a = th.zeros(fsize, dtype=th.int64)
-        b = th.zeros(fsize, dtype=th.int64)
+        a_t = th.zeros(fsize, dtype=th.int64)
+        b_t = th.zeros(fsize, dtype=th.int64)
         ldt_key = th.zeros(fsize, dtype=th.int64)
         ldt_ar.append(ldt_key)
 
         ## building node, parition dictionary
         ## Assign local node ids and mapping to global node ids
-        ret = libra2dgl_build_dict(a, b, indices, ldt_key, gdt_key, gdt_value,
-                             node_map, offset, N_c, i, fsize, resultdir)
+        ret = libra2dgl_build_dict(a_t, b_t, indices, ldt_key, gdt_key, gdt_value,
+                                   node_map, offset, num_community, i, fsize, resultdir)
 
-        num_nodes = int(ret[0])
-        num_edges = int(ret[1])
-        # print("ret values: {} {}".format(int(ret[0]), int(ret[1])))
-        part_nodes.append(num_nodes)
-
-        g.add_edges(a[0:num_edges], b[0:num_edges])
-
+        num_nodes_partition = int(ret[0])
+        num_edges_partition = int(ret[1])
+        part_nodes.append(num_nodes_partition)
+        print(">>> ", num_nodes_partition, " ", num_edges_partition)
+        g.add_edges(a_t[0:num_edges_partition], b_t[0:num_edges_partition])
+        
     ########################################################
     ## fixing lr - 1-level tree for the split-nodes
-    libra2dgl_set_lr(gdt_key, gdt_value, lrtensor, N_c, N_n)
+    libra2dgl_set_lr(gdt_key, gdt_value, lrtensor, num_community, num_nodes)
     ########################################################
     graph_name = dataset
     part_method = 'Libra'
-    num_parts = N_c   ## number of paritions/communities
+    num_parts = num_community   ## number of paritions/communities
     num_hops = 0
     node_map_val = node_map.tolist()
     edge_map_val = 0
@@ -169,22 +163,22 @@ def libra_partition(num_community, dataset, resultdir):
                      'edge_map': edge_map_val}
     ############################################################
 
-    for i in range(N_c):
-        g = gg[0]
-        num_nodes = part_nodes[i]
-        adj        = th.zeros([num_nodes, N_c - 1], dtype=th.int64)
-        inner_node = th.zeros(num_nodes, dtype=th.int32)
-        lr         = th.zeros(num_nodes, dtype=th.int64)
+    for i in range(num_community):
+        g = gg_ar[0]
+        num_nodes_partition = part_nodes[i]
+        adj = th.zeros([num_nodes_partition, num_community - 1], dtype=th.int64)
+        inner_node = th.zeros(num_nodes_partition, dtype=th.int32)
+        lr_t = th.zeros(num_nodes_partition, dtype=th.int64)
         ldt = ldt_ar[0]
 
         try:
             feat = G.ndata['feat']
-        except:
+        except KeyError:
             feat = G.ndata['features']
 
         try:
             labels = G.ndata['label']
-        except:
+        except KeyError:
             labels = G.ndata['labels']
 
         trainm = G.ndata['train_mask'].int()
@@ -192,31 +186,40 @@ def libra_partition(num_community, dataset, resultdir):
         valm = G.ndata['val_mask'].int()
 
         feat_size = feat.shape[1]
-        gfeat = th.zeros([num_nodes, feat_size], dtype=feat.dtype)
+        gfeat = th.zeros([num_nodes_partition, feat_size], dtype=feat.dtype)
 
-        glabels = th.zeros(num_nodes, dtype=labels.dtype)
-        gtrainm = th.zeros(num_nodes, dtype=trainm.dtype)
-        gtestm = th.zeros(num_nodes, dtype=testm.dtype)
-        gvalm = th.zeros(num_nodes, dtype=valm.dtype)
+        glabels = th.zeros(num_nodes_partition, dtype=labels.dtype)
+        gtrainm = th.zeros(num_nodes_partition, dtype=trainm.dtype)
+        gtestm = th.zeros(num_nodes_partition, dtype=testm.dtype)
+        gvalm = th.zeros(num_nodes_partition, dtype=valm.dtype)
 
         ## build remote node databse per local node
         ## gather feats, train, test, val, and labels for each partition
         libra2dgl_build_adjlist(feat, gfeat, adj, inner_node, ldt, gdt_key,
-                                gdt_value, node_map, lr, lrtensor, num_nodes,
-                                N_c, i, feat_size, labels, trainm, testm, valm,
+                                gdt_value, node_map, lr_t, lrtensor, num_nodes_partition,
+                                num_community, i, feat_size, labels, trainm, testm, valm,
                                 glabels, gtrainm, gtestm, gvalm, feat.shape[0])
 
 
         g.ndata['adj'] = adj    ## database of remote clones
         g.ndata['inner_node'] = inner_node   ## split node '0' else '1'
         g.ndata['feat'] = gfeat    ## gathered features
-        g.ndata['lf'] = lr   ## 1-level tree among split nodes
+        g.ndata['lf'] = lr_t   ## 1-level tree among split nodes
 
         g.ndata['label'] = glabels
         g.ndata['train_mask'] = gtrainm
         g.ndata['test_mask'] = gtestm
         g.ndata['val_mask'] = gvalm
 
+        # Validation code, run only small graphs
+        # for l in range(num_nodes_partition):
+        #     index = int(ldt[l])
+        #     assert glabels[l] == labels[index]
+        #     assert gtrainm[l] == trainm[index]
+        #     assert gtestm[l] == testm[index]
+        #     for j in range(feat_size):
+        #         assert gfeat[l][j] == feat[index][j]
+            
         print("Writing partition {} to file".format(i), flush=True)
 
         part = g
@@ -233,7 +236,7 @@ def libra_partition(num_community, dataset, resultdir):
         save_graphs(part_graph_file, [part])
 
         del g
-        del gg[0]
+        del gg_ar[0]
         del ldt
         del ldt_ar[0]
 
@@ -243,9 +246,17 @@ def libra_partition(num_community, dataset, resultdir):
     print("Conversion libra2dgl completed !!!")
 
 
-def partition_graph(dataset, N_c, prefix):
+def partition_graph(dataset, num_community, prefix):
+    """
+    This is the function for end-users to invoke Libra based graph partitioning.
+    Parameters
+    ----------
+    dataset: Input dataset name.
+    num_community: Number of partitions or cummunities of the input graph.
+    prefix: Output location to store the partitioned graphs.
+    """
     print("dataset: ", dataset)
-    print("num partitions: ", N_c)
+    print("num partitions: ", num_community)
     print("output location: ", prefix)
 
     out_dir = 'Libra_result_' + dataset
@@ -259,27 +270,25 @@ def partition_graph(dataset, N_c, prefix):
 
     ## Partitions per dataset
     print("Output is stored in ", resultdir, flush=True)
-    print("Generating ", N_c, " partitions...", flush=True)
+    print("Generating ", num_community, " partitions...", flush=True)
 
     tic = time.time()
-    for i in range(1):
-        num_community = N_c    ## num communities or num partitions
-        print("####################################################################")
-        print("Executing parititons: ", num_community)
-        ltic = time.time()
-        try:
-            resultdir = os.path.join(resultdir, str(num_community) + "Communities")
-            os.makedirs(resultdir, mode=0o775, exist_ok=True)
-        except:
-            raise DGLError("Error: Could not create sub-directory: ", resultdir)
+    print("####################################################################")
+    print("Executing parititons: ", num_community)
+    ltic = time.time()
+    try:
+        resultdir = os.path.join(resultdir, str(num_community) + "Communities")
+        os.makedirs(resultdir, mode=0o775, exist_ok=True)
+    except:
+        raise DGLError("Error: Could not create sub-directory: ", resultdir)
 
-        ## Libra partitioning
-        libra_partition(num_community, dataset, resultdir)
+    ## Libra partitioning
+    libra_partition(num_community, dataset, resultdir)
 
-        ltoc = time.time()
-        print("Time taken by {} partitions {:0.4f} sec".format(num_community, ltoc - ltic))
-        print()
+    ltoc = time.time()
+    print("Time taken by {} partitions {:0.4f} sec".format(num_community, ltoc - ltic))
+    print()
 
     toc = time.time()
-    print("Generated ", N_c, " partitions in {:0.4f} sec".format(toc - tic), flush=True)
+    print("Generated ", num_community, " partitions in {:0.4f} sec".format(toc - tic), flush=True)
     print("Partitioning completed successfully !!!")

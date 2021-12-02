@@ -18,10 +18,10 @@ Note: Current Libra implementation is sequential. Extra overhead is paid due to 
 
 ### Expected partitioning timinigs  
 Cora, Pubmed, Citeseer: < 10 sec (<10GB)  
-Reddit: 1500 sec (~ 25GB)  
-OGBN-Products: ~2000 sec (~30GB)  
-Proteins: 18000 sec (Format conversion from public data takes time)  (~100GB)  
-OGBN-Paper100M: 25000 sec (~200GB)  
+Reddit: ~150 sec (~ 25GB)  
+OGBN-Products: ~200 sec (~30GB)  
+Proteins: 1800 sec (Format conversion from public data takes time)  (~100GB)  
+OGBN-Paper100M: 2500 sec (~200GB)  
 
 
 ### Settings

@@ -1,35 +1,38 @@
 r"""
 Copyright (c) 2021 Intel Corporation
  \file distgnn/tools/tools.py
- \brief Tools for use in DistGNN
+ \brief Tools for use in Libra graph partitioner.
  \author Vasimuddin Md <vasimuddin.md@intel.com>
 """
 
 import os
-import sys
-import csv
 import random
-import time
-
-import dgl
-import json
-from dgl import DGLGraph
-import torch as th
-from scipy.io import mmread
-from dgl.base import DGLError
 import requests
-from dgl.data.utils import load_graphs, save_graphs, load_tensors, save_tensors
+from scipy.io import mmread
+import torch as th
+import dgl
+from dgl.base import DGLError
+from dgl.data.utils import load_graphs, save_graphs, save_tensors
 
-## \brief This function reports replication per node
-def rep_per_node(prefix, nc):
+def rep_per_node(prefix, num_community):
+    """
+    Used on Libra partitioned data.
+    This function reports number of split-copes per node (replication) of
+    a partitioned graph
+    Parameters
+    ----------
+    prefix: Partition folder location (contains replicationlist.csv)
+    num_community: number of partitions or communities
+    """
     ifile = os.path.join(prefix, 'replicationlist.csv')
-    f = open(ifile, "r")
+    fhandle = open(ifile, "r")
     r_dt = {}
 
-    fline = f.readline()
-    for line in f:
+    fline = fhandle.readline()   ## reading first line, contains the comment.
+    print(fline)
+    for line in fhandle:
         if line[0] == '#':
-            raise DGLError("Error: Read hash in rep_per_node func.")
+            raise DGLError("[Bug] Read Hash char in rep_per_node func.")
 
         node = line.strip('\n')
         if r_dt.get(node, -100) == -100:
@@ -37,41 +40,46 @@ def rep_per_node(prefix, nc):
         else:
             r_dt[node] += 1
 
-    f.close()
-    ## checks
+    fhandle.close()
+    ## sanity checks
     for v in r_dt.values():
-        if v >= nc:
-            raise DGLError("Error: Unexpected event in rep_per_node func.")
+        if v >= num_community:
+            raise DGLError("[Bug] Unexpected event in rep_per_node() in tools.py.")
 
     return r_dt
 
 
-## \brief This function download Proteins dataset
 def download_proteins():
+    """
+    Downloads the proteins dataset
+    """
     print("Downloading dataset...")
     print("This might a take while..")
     url = "https://portal.nersc.gov/project/m1982/GNN/"
     file_name = "subgraph3_iso_vs_iso_30_70length_ALL.m100.propermm.mtx"
     url = url + file_name
     try:
-        r = requests.get(url)
+        req = requests.get(url)
     except:
         raise DGLError("Error: Failed to download Proteins dataset!! Aborting..")
 
     with open("proteins.mtx", "wb") as handle:
-        handle.write(r.content)
+        handle.write(req.content)
 
 
-## \brief This function converts Proteins dataset from mtx to dgl format
 def proteins_mtx2dgl():
+    """
+    This function converts Proteins dataset from mtx to dgl format.
+    """
     print("Converting mtx2dgl..")
     print("This might a take while..")
-    a = mmread('proteins.mtx')
-    coo = a.tocoo()
+    a_mtx = mmread('proteins.mtx')
+    coo = a_mtx.tocoo()
     u = th.tensor(coo.row, dtype=th.int64)
     v = th.tensor(coo.col, dtype=th.int64)
     g = dgl.DGLGraph()
-    g.add_edges(u,v)
+
+    g.add_edges(u, v)
 
     n = g.number_of_nodes()
     feat_size = 128         ## arbitrary number
@@ -84,9 +92,9 @@ def proteins_mtx2dgl():
     nlabels = 256
 
     train_mask = th.zeros(n, dtype=th.bool)
-    test_mask  = th.zeros(n, dtype=th.bool)
-    val_mask   = th.zeros(n, dtype=th.bool)
-    label      = th.zeros(n, dtype=th.int64)
+    test_mask = th.zeros(n, dtype=th.bool)
+    val_mask = th.zeros(n, dtype=th.bool)
+    label = th.zeros(n, dtype=th.int64)
 
     for i in range(train_size):
         train_mask[i] = True
@@ -108,8 +116,15 @@ def proteins_mtx2dgl():
 
     return g
 
-## \brief This function saves input dataset to dgl format
+
 def save(g, dataset):
+    """
+    This function saves input dataset to dgl format
+    Parameters
+    ----------
+    g : graph to be saved
+    dataset : output folder name
+    """
     print("Saving dataset..")
     part_dir = os.path.join("./" + dataset)
     node_feat_file = os.path.join(part_dir, "node_feat.dgl")
@@ -120,8 +135,13 @@ def save(g, dataset):
     print("Graph saved successfully !!")
 
 
-
 def load_proteins(dataset):
+    """
+    This function downloads, converts, and load Proteins graph dataset
+    Parameter
+    ---------
+    dataset: output folder name
+    """
     part_dir = dataset
     graph_file = os.path.join(part_dir + "/graph.dgl")
 
