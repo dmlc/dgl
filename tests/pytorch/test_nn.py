@@ -715,6 +715,60 @@ def test_appnp_conv(g, idtype):
     h = appnp(g, feat)
     assert h.shape[-1] == 5
 
+
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
+def test_appnp_conv_e_weight(g, idtype):
+    ctx = F.ctx()
+    g = g.astype(idtype).to(ctx)
+    appnp = nn.APPNPConv(10, 0.1)
+    feat = F.randn((g.number_of_nodes(), 5))
+    eweight = F.ones((g.num_edges(), ))
+    appnp = appnp.to(ctx)
+
+    h = appnp(g, feat, edge_weight=eweight)
+    assert h.shape[-1] == 5
+
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
+def test_gcn2conv_e_weight(g, idtype):
+    ctx = F.ctx()
+    g = g.astype(idtype).to(ctx)
+    gcn2conv = nn.GCN2Conv(5, layer=2, alpha=0.5,
+                           project_initial_features=True)
+    feat = F.randn((g.number_of_nodes(), 5))
+    eweight = F.ones((g.num_edges(), ))
+    gcn2conv = gcn2conv.to(ctx)
+    res = feat
+    h = gcn2conv(g, res, feat, edge_weight=eweight)
+    assert h.shape[-1] == 5
+
+
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
+def test_sgconv_e_weight(g, idtype):
+    ctx = F.ctx()
+    g = g.astype(idtype).to(ctx)
+    sgconv = nn.SGConv(5, 5, 3)
+    feat = F.randn((g.number_of_nodes(), 5))
+    eweight = F.ones((g.num_edges(), ))
+    sgconv = sgconv.to(ctx)
+    h = sgconv(g, feat, edge_weight=eweight)
+    assert h.shape[-1] == 5
+
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
+def test_tagconv_e_weight(g, idtype):
+    ctx = F.ctx()
+    g = g.astype(idtype).to(ctx)
+    conv = nn.TAGConv(5, 5, bias=True)
+    conv = conv.to(ctx)
+    feat = F.randn((g.number_of_nodes(), 5))
+    eweight = F.ones((g.num_edges(), ))
+    conv = conv.to(ctx)
+    h = conv(g, feat, edge_weight=eweight)
+    assert h.shape[-1] == 5
+
 @parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite'], exclude=['zero-degree']))
 @pytest.mark.parametrize('aggregator_type', ['mean', 'max', 'sum'])
@@ -725,12 +779,13 @@ def test_gin_conv(g, idtype, aggregator_type):
         th.nn.Linear(5, 12),
         aggregator_type
     )
+    th.save(gin, tmp_buffer)
     feat = F.randn((g.number_of_src_nodes(), 5))
     gin = gin.to(ctx)
     h = gin(g, feat)
 
     # test pickle
-    th.save(h, tmp_buffer)
+    th.save(gin, tmp_buffer)
 
     assert h.shape == (g.number_of_dst_nodes(), 12)
 
@@ -1228,6 +1283,26 @@ def test_gnnexplainer(g, idtype, out_dim):
     model = model.to(F.ctx())
     explainer = nn.GNNExplainer(model, num_hops=1)
     feat_mask, edge_mask = explainer.explain_graph(g, feat)
+
+def test_jumping_knowledge():
+    ctx = F.ctx()
+    num_layers = 2
+    num_nodes = 3
+    num_feats = 4
+
+    feat_list = [th.randn((num_nodes, num_feats)).to(ctx) for _ in range(num_layers)]
+
+    model = nn.JumpingKnowledge('cat').to(ctx)
+    model.reset_parameters()
+    assert model(feat_list).shape == (num_nodes, num_layers * num_feats)
+
+    model = nn.JumpingKnowledge('max').to(ctx)
+    model.reset_parameters()
+    assert model(feat_list).shape == (num_nodes, num_feats)
+
+    model = nn.JumpingKnowledge('lstm', num_feats, num_layers).to(ctx)
+    model.reset_parameters()
+    assert model(feat_list).shape == (num_nodes, num_feats)
 
 if __name__ == '__main__':
     test_graph_conv()
