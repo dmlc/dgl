@@ -779,12 +779,13 @@ def test_gin_conv(g, idtype, aggregator_type):
         th.nn.Linear(5, 12),
         aggregator_type
     )
+    th.save(gin, tmp_buffer)
     feat = F.randn((g.number_of_src_nodes(), 5))
     gin = gin.to(ctx)
     h = gin(g, feat)
 
     # test pickle
-    th.save(h, tmp_buffer)
+    th.save(gin, tmp_buffer)
 
     assert h.shape == (g.number_of_dst_nodes(), 12)
 
@@ -1302,6 +1303,25 @@ def test_jumping_knowledge():
     model = nn.JumpingKnowledge('lstm', num_feats, num_layers).to(ctx)
     model.reset_parameters()
     assert model(feat_list).shape == (num_nodes, num_feats)
+
+@pytest.mark.parametrize('op', ['dot', 'cos', 'ele', 'cat'])
+def test_edge_predictor(op):
+    ctx = F.ctx()
+    num_pairs = 3
+    in_feats = 4
+    out_feats = 5
+    h_src = th.randn((num_pairs, in_feats)).to(ctx)
+    h_dst = th.randn((num_pairs, in_feats)).to(ctx)
+
+    pred = nn.EdgePredictor(op)
+    if op in ['dot', 'cos']:
+        assert pred(h_src, h_dst).shape == (num_pairs, 1)
+    elif op == 'ele':
+        assert pred(h_src, h_dst).shape == (num_pairs, in_feats)
+    else:
+        assert pred(h_src, h_dst).shape == (num_pairs, 2 * in_feats)
+    pred = nn.EdgePredictor(op, in_feats, out_feats, bias=True).to(ctx)
+    assert pred(h_src, h_dst).shape == (num_pairs, out_feats)
 
 if __name__ == '__main__':
     test_graph_conv()
