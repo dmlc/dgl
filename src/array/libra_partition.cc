@@ -64,7 +64,7 @@ int32_t LeastLoad(int64_t* community_edges, int32_t nc) {
 
 /*! \brief Libra - vertexcut based graph partitioning.
   It takes list of edges from input DGL graph and distributed them among nc partitions
-  During edge distribution, Libra assign a given edge to a partition based on the end vertices, 
+  During edge distribution, Libra assign a given edge to a partition based on the end vertices,
   in doing so, it tries to minimized the splitting of the graph vertices. In case of conflict
   Libra assigns an edge to the least loaded partition/community.
   \param[in] nc Number of partitions/communities
@@ -407,7 +407,7 @@ List<Value> Libra2dglBuildDict(
     a_ptr[edge] = indices_ptr[u];     // new local ID for an edge
     b_ptr[edge++] = indices_ptr[v];   // new local ID for an edge
   }
-  CHECK(edge <= fsize) << "[Bug] Pre-allocated memory, number of edges per partition is not enough.";
+  CHECK(edge <= fsize) << "[Bug] memory allocated for #edges per partition is not enough.";
   fclose(fp);
 
   List<Value> ret;
