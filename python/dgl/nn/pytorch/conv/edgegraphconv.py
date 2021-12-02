@@ -227,7 +227,6 @@ class EdgeGraphConv(nn.Module):
             if edge_weight is None:
                 raise DGLError("Edge weight is required for this layer type (EdgeGraphConv)")
             assert edge_weight.shape[0] == graph.number_of_edges()
-            aggregate_fn = fn.u_mul_e('h', '_edge_weight', 'm')
 
             # (BarclayII) For RGCN on heterogeneous graphs we need to support GCN on bipartite.
             feat_src, feat_dst = expand_as_pair(feat, graph)
@@ -250,18 +249,17 @@ class EdgeGraphConv(nn.Module):
             else:
                 weight = self.weight
 
-            single_channel_rsts = []
-            for i in range(edge_weight.shape[1]):
-                graph.edata['_edge_weight'] = edge_weight[:, i]
-                graph.update_all(aggregate_fn, fn.sum(msg='m', out='rst'))
-                single_channel_rst = graph.dstdata["rst"]
-                if weight is not None:
-                    single_channel_rst = th.matmul(single_channel_rst, weight)
-                if self.bias is not None:
-                    single_channel_rst = single_channel_rst + self.bias
-                single_channel_rsts.append(single_channel_rst)
-
-            rst = th.cat(single_channel_rsts, axis=1)
+            # repeat the edge data _in_feats times so that dimensions match for aggregation
+            graph.edata["_edge_weight"] = th.stack([edge_weight] * self._in_feats, 2)
+            aggregate_fn = fn.u_mul_e('h', '_edge_weight', 'm')
+            graph.update_all(aggregate_fn, fn.sum(msg='m', out='rst'))
+            rst = graph.dstdata["rst"]
+            if weight is not None:
+                rst = th.matmul(rst, weight)
+            if self.bias is not None:
+                rst = rst + self.bias
+            # flatten the output
+            rst = rst.reshape(rst.shape[0], rst.shape[1]*rst.shape[2])
 
             if self._norm in ['right', 'both']:
                 degs = graph.in_degrees().float().clamp(min=1)
