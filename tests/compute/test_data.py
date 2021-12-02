@@ -166,23 +166,19 @@ class GenerateFilesForCSVDatasetSingle:
 
     def __enter__(self):
         # single graph with multiple edges.csv and nodes.csv
-        meta_yaml_data = {'version': '0.0.1', 'dataset_type': 'user_defined', 'dataset_name': 'single_graph',
-                          'edges': [{'file_name': 'test_edges_0.csv', 'separator': ',',
-                                     'etype': ['user', 'like', 'item'], 'src_id_field': 'src', 'dst_id_field': 'dst',
-                                     'feat_prefix_field': 'feat_', 'labels': {'type': 'classification', 'field': 'label', 'num_classes': 10},
-                                     'split_type_field': 'split_type'},
-                                    {'file_name': 'test_edges_1.csv', 'separator': ',',
-                                     'etype': ['user', 'follow', 'user'], 'src_id_field': 'src', 'dst_id_field': 'dst',
-                                     'feat_prefix_field': 'feat_', 'labels': {'type': 'classification', 'field': 'label', 'num_classes': 10},
-                                     'split_type_field': 'split_type'}],
-                          'nodes': [{'file_name': 'test_nodes_0.csv', 'separator': ',', 'ntype': 'user',
-                                     'node_id_field': 'id', 'feat_prefix_field': 'feat_',
-                                     'labels': {'type': 'classification', 'field': 'label', 'num_classes': 2},
-                                     'split_type_field': 'split_type'},
-                                    {'file_name': 'test_nodes_1.csv', 'separator': ',', 'ntype': 'item',
-                                     'node_id_field': 'id', 'feat_prefix_field': 'feat_',
-                                     'labels': {'type': 'classification', 'field': 'label', 'num_classes': 2},
-                                     'split_type_field': 'split_type'}],
+        meta_yaml_data = {'version': '0.0.1', 'dataset_type': 'user_defined',
+                          'edges': [{'file_name': 'test_edges_0.csv',
+                                     'etype': ['user', 'like', 'item'],
+                                     },
+                                    {'file_name': 'test_edges_1.csv',
+                                     'etype': ['user', 'follow', 'user'],
+                                     'labels': {'type': 'classification', 'num_classes': 3},
+                                     }],
+                          'nodes': [{'file_name': 'test_nodes_0.csv', 'ntype': 'user',
+                                     },
+                                    {'file_name': 'test_nodes_1.csv', 'ntype': 'item',
+                                     'labels': {'type': 'regression'},
+                                     }],
                           }
 
         meta_yaml = self.meta_yaml
@@ -248,8 +244,7 @@ class GenerateFilesForCSVDatasetMultiple():
         df = pd.DataFrame({'graph_id': np.random.randint(num_graphs, size=num_edges*num_graphs),
                            'src': np.random.randint(num_nodes, size=num_edges*num_graphs),
                            'dst': np.random.randint(num_nodes, size=num_edges*num_graphs),
-                           'feat_0': np.random.rand(num_edges*num_graphs),
-                           'feat_1': np.random.rand(num_edges*num_graphs)})
+                           })
         df.to_csv(self.edge_csv)
         graph_id = []
         id = []
