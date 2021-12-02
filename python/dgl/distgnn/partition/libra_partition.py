@@ -96,7 +96,7 @@ def libra_partition(num_community, dataset, resultdir):
     #     if p == q:
     #         self_loop += 1
     # print("#self loops in the dataset: ", self_loop)
-    
+
     # del G
 
     ## call to C/C++ code
@@ -140,7 +140,7 @@ def libra_partition(num_community, dataset, resultdir):
         part_nodes.append(num_nodes_partition)
         print(">>> ", num_nodes_partition, " ", num_edges_partition)
         g.add_edges(a_t[0:num_edges_partition], b_t[0:num_edges_partition])
-        
+
     ########################################################
     ## fixing lr - 1-level tree for the split-nodes
     libra2dgl_set_lr(gdt_key, gdt_value, lrtensor, num_community, num_nodes)
@@ -219,7 +219,7 @@ def libra_partition(num_community, dataset, resultdir):
         #     assert gtestm[l] == testm[index]
         #     for j in range(feat_size):
         #         assert gfeat[l][j] == feat[index][j]
-            
+
         print("Writing partition {} to file".format(i), flush=True)
 
         part = g
