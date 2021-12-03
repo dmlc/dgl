@@ -172,6 +172,7 @@ setup(
         'scipy>=1.1.0',
         'networkx>=2.1',
         'requests>=2.19.0',
+        'tqdm'
     ],
     url='https://github.com/dmlc/dgl',
     distclass=BinaryDistribution,

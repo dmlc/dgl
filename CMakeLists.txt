@@ -34,6 +34,7 @@ dgl_option(BUILD_CPP_TEST "Build cpp unittest executables" OFF)
 dgl_option(LIBCXX_ENABLE_PARALLEL_ALGORITHMS "Enable the parallel algorithms library. This requires the PSTL to be available." OFF)
 dgl_option(USE_S3 "Build with S3 support" OFF)
 dgl_option(USE_HDFS "Build with HDFS support" OFF) # Set env HADOOP_HDFS_HOME if needed
+dgl_option(REBUILD_LIBXSMM "Clean LIBXSMM build cache at every build" OFF) # Set env HADOOP_HDFS_HOME if needed
 dgl_option(USE_EPOLL "Build with epoll for socket communicator" OFF)
 
 # Set debug compile option for gdb, only happens when -DCMAKE_BUILD_TYPE=DEBUG
@@ -53,7 +54,6 @@ if(USE_CUDA)
     #   is fixed by https://github.com/NVIDIA/cub/commit/9143e47e048641aa0e6ddfd645bcd54ff1059939
     #   in 11.1.
     message(STATUS "Detected CUDA of version ${CUDA_VERSION}. Use external CUB/Thrust library.")
-    cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/thrust")
     cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/cub")
   endif()
 endif(USE_CUDA)
@@ -201,8 +201,6 @@ endif(USE_CUDA)
 target_include_directories(dgl PRIVATE "include")
 target_include_directories(dgl PRIVATE "third_party/dlpack/include")
 target_include_directories(dgl PRIVATE "third_party/dmlc-core/include")
-target_include_directories(dgl PRIVATE "third_party/minigun/minigun")
-target_include_directories(dgl PRIVATE "third_party/minigun/third_party/moderngpu/src")
 target_include_directories(dgl PRIVATE "third_party/phmap/")
 target_include_directories(dgl PRIVATE "third_party/xbyak/")
 target_include_directories(dgl PRIVATE "third_party/METIS/include/")
@@ -220,7 +218,7 @@ set(GOOGLE_TEST 0) # Turn off dmlc-core test
 
 # Compile METIS
 if(NOT MSVC)
-  set(GKLIB_PATH "${CMAKE_SOURCE_DIR}/third_party/METIS/GKlib")
+  set(GKLIB_PATH "${CMAKE_CURRENT_SOURCE_DIR}/third_party/METIS/GKlib")
   include(${GKLIB_PATH}/GKlibSystem.cmake)
   include_directories(${GKLIB_PATH})
   include_directories("third_party/METIS/include/")
@@ -230,9 +228,15 @@ endif(NOT MSVC)
 
 # Compile LIBXSMM
 if((NOT MSVC) AND USE_LIBXSMM)
-  add_custom_target(libxsmm COMMAND make realclean COMMAND make -j BLAS=0
-                     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/third_party/libxsmm
-                     )
+  if(REBUILD_LIBXSMM)
+    add_custom_target(libxsmm COMMAND make realclean COMMAND make -j BLAS=0
+                      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/third_party/libxsmm
+                      )
+  else(REBUILD_LIBXSMM)
+    add_custom_target(libxsmm COMMAND make -j BLAS=0
+                      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/third_party/libxsmm
+                      )
+  endif(REBUILD_LIBXSMM)
   add_dependencies(dgl libxsmm)
   list(APPEND DGL_LINKER_LIBS -L${CMAKE_SOURCE_DIR}/third_party/libxsmm/lib/ xsmm)
 endif((NOT MSVC) AND USE_LIBXSMM)
@@ -259,7 +263,7 @@ target_link_libraries(dgl ${DGL_LINKER_LIBS} ${DGL_RUNTIME_LINKER_LIBS})
 if(MSVC)
   add_custom_command(
     TARGET dgl POST_BUILD COMMAND
-    cmd.exe /c "COPY /Y Release\\dgl.dll .")
+    ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:dgl>" "$<TARGET_FILE_DIR:dgl>/..")
 endif(MSVC)
 
 # Tensor adapter libraries

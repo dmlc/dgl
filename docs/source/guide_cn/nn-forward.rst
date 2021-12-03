@@ -105,7 +105,7 @@ SAGEConv的数学公式如下：
                     # 除以入度
                     degs = graph.in_degrees().to(feat_dst)
                     h_neigh = (graph.dstdata['neigh'] + graph.dstdata['h']) / (degs.unsqueeze(-1) + 1)
-                elif self._aggre_type == 'max_pool':
+                elif self._aggre_type == 'pool':
                     graph.srcdata['h'] = F.relu(self.fc_pool(feat_src))
                     graph.update_all(fn.copy_u('h', 'm'), fn.max('m', 'neigh'))
                     h_neigh = graph.dstdata['neigh']
