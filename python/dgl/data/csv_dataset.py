@@ -118,28 +118,28 @@ class EdgeData:
         separator = meta_edge.separator
         self.type = meta_edge.etype
         if meta_edge.graph_id_field in csv_header:
-            self.graph_id = F.tensor(pd.read_csv(file_path, sep=separator, usecols=[
-                meta_edge.graph_id_field]).to_numpy().squeeze())
-        self.src = F.tensor(pd.read_csv(file_path, sep=separator, usecols=[
-            meta_edge.src_id_field]).to_numpy().squeeze())
-        self.dst = F.tensor(pd.read_csv(file_path, sep=separator, usecols=[
-            meta_edge.dst_id_field]).to_numpy().squeeze())
+            self.graph_id = pd.read_csv(file_path, sep=separator, usecols=[
+                meta_edge.graph_id_field]).to_numpy().squeeze()
+        self.src = pd.read_csv(file_path, sep=separator, usecols=[
+            meta_edge.src_id_field]).to_numpy().squeeze()
+        self.dst = pd.read_csv(file_path, sep=separator, usecols=[
+            meta_edge.dst_id_field]).to_numpy().squeeze()
         if meta_edge.labels is not None:
             meta_label = meta_edge.labels
-            self.label = F.tensor(pd.read_csv(file_path, sep=separator, usecols=[
-                meta_label.field]).to_numpy().squeeze())
+            self.label = pd.read_csv(file_path, sep=separator, usecols=[
+                meta_label.field]).to_numpy().squeeze()
             if meta_label.type == 'classification':
-                self.num_classes = F.tensor(
-                    np.full(self.label.shape, meta_label.num_classes))
+                self.num_classes = np.full(
+                    self.label.shape, meta_label.num_classes)
         if meta_edge.split_type_field in csv_header:
-            self.split_type = F.tensor(pd.read_csv(file_path, sep=separator, usecols=[
-                meta_edge.split_type_field]).to_numpy().squeeze())
+            self.split_type = pd.read_csv(file_path, sep=separator, usecols=[
+                meta_edge.split_type_field]).to_numpy().squeeze()
         feat_prefix = meta_edge.feat_field_prefix
         feat_data = pd.read_csv(
             file_path, sep=separator, usecols=lambda x: feat_prefix in x)
         if not feat_data.empty:
-            self.feat = F.tensor(np.stack([feat_data[key].to_numpy()
-                                 for key in feat_data], axis=1))
+            self.feat = np.stack([feat_data[key].to_numpy()
+                                 for key in feat_data], axis=1)
 
 
 class NodeData:
@@ -164,27 +164,27 @@ class NodeData:
             file_path, index_col=0, nrows=0).columns.tolist()
         separator = meta_node.separator
         if meta_node.graph_id_field in csv_header:
-            self.graph_id = F.tensor(pd.read_csv(file_path, sep=separator, usecols=[
-                meta_node.graph_id_field]).to_numpy().squeeze())
-        self.id = F.tensor(pd.read_csv(file_path, sep=separator, usecols=[
-            meta_node.node_id_field]).to_numpy().squeeze())
+            self.graph_id = pd.read_csv(file_path, sep=separator, usecols=[
+                meta_node.graph_id_field]).to_numpy().squeeze()
+        self.id = pd.read_csv(file_path, sep=separator, usecols=[
+            meta_node.node_id_field]).to_numpy().squeeze()
         self.type = meta_node.ntype
         if meta_node.labels is not None:
             meta_label = meta_node.labels
-            self.label = F.tensor(pd.read_csv(file_path, sep=separator, usecols=[
-                meta_label.field]).to_numpy().squeeze())
+            self.label = pd.read_csv(file_path, sep=separator, usecols=[
+                meta_label.field]).to_numpy().squeeze()
             if meta_label.type == 'classification':
-                self.num_classes = F.tensor(
-                    np.full(self.label.shape, meta_label.num_classes))
+                self.num_classes = np.full(
+                    self.label.shape, meta_label.num_classes)
         if meta_node.split_type_field in csv_header:
-            self.split_type = F.tensor(pd.read_csv(file_path, sep=separator, usecols=[
-                meta_node.split_type_field]).to_numpy().squeeze())
+            self.split_type = pd.read_csv(file_path, sep=separator, usecols=[
+                meta_node.split_type_field]).to_numpy().squeeze()
         feat_prefix = meta_node.feat_field_prefix
         feat_data = pd.read_csv(
             file_path, sep=separator, usecols=lambda x: feat_prefix in x)
         if not feat_data.empty:
-            self.feat = F.tensor(np.stack([feat_data[key].to_numpy()
-                                 for key in feat_data], axis=1))
+            self.feat = np.stack([feat_data[key].to_numpy()
+                                 for key in feat_data], axis=1)
 
 
 class GraphData:
@@ -206,21 +206,21 @@ class GraphData:
         csv_header = pd.read_csv(
             file_path, index_col=0, nrows=0).columns.tolist()
         separator = meta_graph.separator
-        self.graph_id = F.tensor(pd.read_csv(file_path, sep=separator, usecols=[
-            meta_graph.graph_id_field]).to_numpy().squeeze())
+        self.graph_id = pd.read_csv(file_path, sep=separator, usecols=[
+            meta_graph.graph_id_field]).to_numpy().squeeze()
         meta_label = meta_graph.labels
-        self.label = F.tensor(pd.read_csv(file_path, sep=separator, usecols=[
-            meta_label.field]).to_numpy().squeeze())
+        self.label = pd.read_csv(file_path, sep=separator, usecols=[
+            meta_label.field]).to_numpy().squeeze()
         self.num_classes = meta_label.num_classes
         if meta_graph.split_type_field in csv_header:
-            self.split_type = F.tensor(pd.read_csv(file_path, sep=separator, usecols=[
-                meta_graph.split_type_field]).to_numpy().squeeze())
+            self.split_type = pd.read_csv(file_path, sep=separator, usecols=[
+                meta_graph.split_type_field]).to_numpy().squeeze()
         feat_prefix = meta_graph.feat_field_prefix
         feat_data = pd.read_csv(
             file_path, sep=separator, usecols=lambda x: feat_prefix in x)
         if not feat_data.empty:
-            self.feat = F.tensor(np.stack([feat_data[key].to_numpy()
-                                 for key in feat_data], axis=1))
+            self.feat = np.stack([feat_data[key].to_numpy()
+                                 for key in feat_data], axis=1)
 
 
 class CSVDataset(DGLDataset):
@@ -269,7 +269,7 @@ class CSVDataset(DGLDataset):
             for e_data in edge_data:
                 assert len(e_data.type) == 3
                 edge_dict[(e_data.type[0], e_data.type[1], e_data.type[2])] = (
-                    e_data.src, e_data.dst)
+                    F.tensor(e_data.src), F.tensor(e_data.dst))
             node_dict = {}
             for n_data in node_data:
                 node_dict[n_data.type] = len(n_data.id)
@@ -279,15 +279,19 @@ class CSVDataset(DGLDataset):
                 type = (src_data.type[0], src_data.type[1], src_data.type[2]) if len(
                     src_data.type) == 3 else src_data.type
                 if src_data.feat is not None:
-                    dst_data[type].data['feat'] = src_data.feat
+                    dst_data[type].data['feat'] = F.tensor(src_data.feat)
                 if src_data.label is not None:
-                    dst_data[type].data['label'] = src_data.label
+                    dst_data[type].data['label'] = F.tensor(src_data.label)
                 if src_data.num_classes is not None:
-                    dst_data[type].data['num_classes'] = src_data.num_classes
+                    dst_data[type].data['num_classes'] = F.tensor(
+                        src_data.num_classes)
                 if src_data.split_type is not None:
-                    dst_data[type].data['train_mask'] = src_data.split_type == 0
-                    dst_data[type].data['val_mask'] = src_data.split_type == 1
-                    dst_data[type].data['test_mask'] = src_data.split_type == 2
+                    dst_data[type].data['train_mask'] = F.tensor(
+                        src_data.split_type == 0)
+                    dst_data[type].data['val_mask'] = F.tensor(
+                        src_data.split_type == 1)
+                    dst_data[type].data['test_mask'] = F.tensor(
+                        src_data.split_type == 2)
             for n_data in node_data:
                 assign_data(n_data, self.graph.nodes)
             for e_data in edge_data:
@@ -295,27 +299,29 @@ class CSVDataset(DGLDataset):
         else:
             edge_dict = {}
             for e_data in edge_data:
-                graph_id_arr = np.unique(F.asnumpy(e_data.graph_id))
+                graph_id_arr = np.unique(e_data.graph_id)
                 for g_id in graph_id_arr:
                     idx = e_data.graph_id == g_id
                     edge_dict[g_id] = {}
                     edge_dict[g_id]['edge'] = (
-                        e_data.src[idx], e_data.dst[idx])
+                        F.tensor(e_data.src[idx]), F.tensor(e_data.dst[idx]))
                     if e_data.feat is not None:
-                        edge_dict[g_id]['feat'] = e_data.feat[idx]
+                        edge_dict[g_id]['feat'] = F.tensor(e_data.feat[idx])
             node_dict = {}
             for n_data in node_data:
-                graph_id_arr = np.unique(F.asnumpy(n_data.graph_id))
+                graph_id_arr = np.unique(n_data.graph_id)
                 for g_id in graph_id_arr:
-                    idx = n_data.graph_id == g_id
                     node_dict[g_id] = {}
+                    idx = n_data.graph_id == g_id
                     node_dict[g_id]['node'] = len(n_data.id[idx])
                     if n_data.feat is not None:
-                        node_dict[g_id]['feat'] = n_data.feat[idx]
+                        node_dict[g_id]['feat'] = F.tensor(n_data.feat[idx])
             self.graphs = []
-            self.feat = graph_data.feat
-            self.labels = graph_data.label
-            for g_id in F.asnumpy(graph_data.graph_id):
+            self.feat = F.tensor(
+                graph_data.feat) if graph_data.feat is not None else None
+            self.labels = F.tensor(
+                graph_data.label) if graph_data.label is not None else None
+            for g_id in graph_data.graph_id:
                 if g_id not in node_dict:
                     raise RuntimeError(
                         "No node data is found for graph_id~{}.".format(g_id))
@@ -331,9 +337,9 @@ class CSVDataset(DGLDataset):
                 self.graphs.append(g)
             self.mask = {}
             if graph_data.split_type is not None:
-                self.mask['train_mask'] = graph_data.split_type == 0
-                self.mask['val_mask'] = graph_data.split_type == 1
-                self.mask['test_mask'] = graph_data.split_type == 2
+                self.mask['train_mask'] = F.tensor(graph_data.split_type == 0)
+                self.mask['val_mask'] = F.tensor(graph_data.split_type == 1)
+                self.mask['test_mask'] = F.tensor(graph_data.split_type == 2)
             self.num_classes = graph_data.num_classes
 
         self._sanity_check_after_process()
