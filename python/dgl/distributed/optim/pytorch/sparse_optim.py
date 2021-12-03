@@ -331,8 +331,9 @@ class SparseAdam(DistSparseGradOptimizer):
         grad_indices, inverse, cnt = th.unique(idx, return_inverse=True, return_counts=True)
         # update grad state
         state_idx = grad_indices.to(state_dev)
-        state_step[state_idx] += 1
-        state_step = state_step[state_idx].to(exec_dev, non_blocking=True)
+        state_val = state_step[state_idx] + 1
+        state_step[state_idx] = state_val
+        state_step = state_val.to(exec_dev, non_blocking=True)
         orig_mem = state_mem[state_idx].to(exec_dev, non_blocking=True)
         orig_power = state_power[state_idx].to(exec_dev, non_blocking=True)
 
