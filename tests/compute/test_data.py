@@ -7,6 +7,7 @@ import tempfile
 import os
 import pandas as pd
 import yaml
+import pytest
 
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
@@ -166,15 +167,15 @@ class GenerateFilesForCSVDatasetSingle:
 
     def __enter__(self):
         # single graph with multiple edges.csv and nodes.csv
-        meta_yaml_data = {'version': '0.0.1', 'dataset_type': 'user_defined',
-                          'edges': [{'file_name': 'test_edges_0.csv',
+        meta_yaml_data = {'version': '0.0.1', 'dataset_name': 'single_graph',
+                          'edge_data': [{'file_name': 'test_edges_0.csv',
                                      'etype': ['user', 'like', 'item'],
                                      },
                                     {'file_name': 'test_edges_1.csv',
                                      'etype': ['user', 'follow', 'user'],
                                      'labels': {'type': 'classification', 'num_classes': 3},
                                      }],
-                          'nodes': [{'file_name': 'test_nodes_0.csv', 'ntype': 'user',
+                          'node_data': [{'file_name': 'test_nodes_0.csv', 'ntype': 'user',
                                      },
                                     {'file_name': 'test_nodes_1.csv', 'ntype': 'item',
                                      'labels': {'type': 'regression'},
@@ -223,13 +224,13 @@ class GenerateFilesForCSVDatasetMultiple():
 
     def __enter__(self):
         # multiple graphs with single edges.csv and nodes.csv
-        meta_yaml_data = {'version': '0.0.1', 'dataset_type': 'user_defined', 'dataset_name': 'multiple_graphs',
-                          'edges': [{'file_name': 'test_edges.csv', 'separator': ',',
+        meta_yaml_data = {'version': '0.0.1', 'dataset_name': 'multiple_graphs',
+                          'edge_data': [{'file_name': 'test_edges.csv', 'separator': ',',
                                      'graph_id_field': 'graph_id', 'src_id_field': 'src', 'dst_id_field': 'dst',
-                                    'feat_prefix_field': 'feat_'}],
-                          'nodes': [{'file_name': 'test_nodes.csv', 'separator': ',', 'graph_id_field': 'graph_id',
-                                     'node_id_field': 'id', 'feat_prefix_field': 'feat_'}],
-                          'graphs': {'file_name': 'test_graphs.csv', 'separator': ',',
+                                    'feat_field_prefix': 'feat_'}],
+                          'node_data': [{'file_name': 'test_nodes.csv', 'separator': ',', 'graph_id_field': 'graph_id',
+                                     'node_id_field': 'id', 'feat_field_prefix': 'feat_'}],
+                          'graph_data': {'file_name': 'test_graphs.csv', 'separator': ',',
                                      'graph_id_field': 'graph_id',
                                      'labels': {'type': 'classification', 'field': 'label', 'num_classes': 2},
                                      'split_type_field': 'split_type'},
@@ -270,8 +271,416 @@ class GenerateFilesForCSVDatasetMultiple():
         os.remove(self.graph_csv)
 
 
+def _test_csvdt_simplex_homo(simplex_yaml):
+    with tempfile.TemporaryDirectory() as test_dir:
+        # generate YAML/CSVs
+        meta_yaml_path = os.path.join(test_dir, "test_csv_meta.yml")
+        edges_csv_path = os.path.join(test_dir, "test_edges.csv")
+        nodes_csv_path = os.path.join(test_dir, "test_nodes.csv")
+        if simplex_yaml:
+            meta_yaml_data = {'version': '0.0.1', 'dataset_name': 'default_name',
+                              'edge_data': [{'file_name': os.path.basename(edges_csv_path),
+                                             }],
+                              'node_data': [{'file_name': os.path.basename(nodes_csv_path),
+                                             }],
+                              }
+        else:
+            meta_yaml_data = {'version': '0.0.1', 'dataset_name': 'default_name',
+                              'edge_data': [{'file_name': os.path.basename(edges_csv_path),
+                                            'separator': ',', 'src_id_field': 'src', 'dst_id_field': 'dst',
+
+                                             }],
+                              'node_data': [{'file_name': os.path.basename(nodes_csv_path),
+                                             'separator': ',', 'node_id_field': 'id',
+                                             }],
+                              }
+
+        with open(meta_yaml_path, 'w') as f:
+            yaml.dump(meta_yaml_data, f, sort_keys=False)
+        num_nodes = 100
+        num_edges = 500
+        df = pd.DataFrame({'src': np.random.randint(num_nodes, size=num_edges),
+                           'dst': np.random.randint(num_nodes, size=num_edges),
+                           })
+        df.to_csv(edges_csv_path)
+        df = pd.DataFrame({'id': np.arange(num_nodes),
+                           })
+        df.to_csv(nodes_csv_path)
+
+        # load CSVDataset
+        csv_dataset = data.CSVDataset(meta_yaml_path)
+        assert len(csv_dataset) == 1
+        g = csv_dataset[0]
+        assert g.is_homogeneous
+        assert g.num_nodes() == num_nodes
+        assert g.num_edges() == num_edges
+
+        def _check(gdata):
+            assert 'feat' not in gdata
+            assert 'label' not in gdata
+            assert 'train_mask' not in gdata
+            assert 'val_mask' not in gdata
+            assert 'test_mask' not in gdata
+            assert 'num_classes' not in gdata
+        _check(g.ndata)
+        _check(g.edata)
+        assert len(g.ndata) == 0
+        assert len(g.edata) == 0
+
+
+def _test_csvdt_complex_homo(simplex_yaml):
+    with tempfile.TemporaryDirectory() as test_dir:
+        # generate YAML/CSVs
+        meta_yaml_path = os.path.join(test_dir, "test_csv_meta.yml")
+        edges_csv_path = os.path.join(test_dir, "test_edges.csv")
+        nodes_csv_path = os.path.join(test_dir, "test_nodes.csv")
+        if simplex_yaml:
+            meta_yaml_data = {'version': '0.0.1', 'dataset_name': 'default_name',
+                              'edge_data': [{'file_name': os.path.basename(edges_csv_path),
+                                             'labels': {'type': 'regression'},
+                                             }],
+                              'node_data': [{'file_name': os.path.basename(nodes_csv_path),
+                                             'labels': {'type': 'classification', 'num_classes': 3},
+                                             }],
+                              }
+        else:
+            meta_yaml_data = {'version': '0.0.1', 'dataset_name': 'default_name',
+                              'edge_data': [{'file_name': os.path.basename(edges_csv_path),
+                                             'labels': {'type': 'regression', 'field': 'label'},
+                                             'separator': ',',
+                                             'src_id_field': 'src', 'dst_id_field': 'dst',
+                                             'feat_field_prefix': 'feat_',
+                                             'split_type_field': 'split_type',
+                                             }],
+                              'node_data': [{'file_name': os.path.basename(nodes_csv_path),
+                                             'labels': {'type': 'classification', 'num_classes': 3, 'field': 'label'},
+                                             'separator': ',',
+                                             'node_id_field': 'id',
+                                             'feat_field_prefix': 'feat_', 'split_type_field': 'split_type',
+                                             }],
+                              }
+
+        with open(meta_yaml_path, 'w') as f:
+            yaml.dump(meta_yaml_data, f, sort_keys=False)
+        num_nodes = 100
+        num_edges = 500
+        df = pd.DataFrame({'src': np.random.randint(num_nodes, size=num_edges),
+                           'dst': np.random.randint(num_nodes, size=num_edges),
+                           'label': np.random.randint(2, size=num_edges),
+                           'split_type': np.random.randint(3, size=num_edges),
+                           'feat_0': np.random.rand(num_edges),
+                           'feat_1': np.random.rand(num_edges)
+                           })
+        df.to_csv(edges_csv_path)
+        df = pd.DataFrame({'id': np.arange(num_nodes),
+                           'label': np.random.randint(2, size=num_nodes),
+                           'split_type': np.random.randint(3, size=num_nodes),
+                           'feat_0': np.random.rand(num_nodes),
+                           'feat_1': np.random.rand(num_nodes),
+                           'feat_2': np.random.rand(num_nodes)
+                           })
+        df.to_csv(nodes_csv_path)
+
+        # load CSVDataset
+        csv_dataset = data.CSVDataset(meta_yaml_path)
+        assert len(csv_dataset) == 1
+        g = csv_dataset[0]
+        assert g.is_homogeneous
+        assert g.num_nodes() == num_nodes
+        assert g.num_edges() == num_edges
+
+        def _check(gdata):
+            assert 'feat' in gdata
+            assert 'label' in gdata
+            assert 'train_mask' in gdata
+            assert 'val_mask' in gdata
+            assert 'test_mask' in gdata
+        _check(g.ndata)
+        _check(g.edata)
+        assert 'num_classes' in g.ndata
+        assert 'num_classes' not in g.edata
+
+
+def _test_csvdt_simplex_hetero(simplex_yaml):
+    with tempfile.TemporaryDirectory() as test_dir:
+        # generate YAML/CSVs
+        meta_yaml_path = os.path.join(test_dir, "test_csv_meta.yml")
+        edges_csv_path_0 = os.path.join(test_dir, "test_edges_0.csv")
+        edges_csv_path_1 = os.path.join(test_dir, "test_edges_1.csv")
+        nodes_csv_path_0 = os.path.join(test_dir, "test_nodes_0.csv")
+        nodes_csv_path_1 = os.path.join(test_dir, "test_nodes_1.csv")
+        if simplex_yaml:
+            meta_yaml_data = {'version': '0.0.1', 'dataset_name': 'default_name',
+                              'edge_data': [{'file_name': os.path.basename(edges_csv_path_0),
+                                             'etype': ['user', 'follow', 'user'],
+                                             },
+                                            {'file_name': os.path.basename(edges_csv_path_1),
+                                             'etype': ['user', 'like', 'item'],
+                                             }],
+                              'node_data': [{'file_name': os.path.basename(nodes_csv_path_0),
+                                             'ntype': 'user',
+                                             },
+                                            {'file_name': os.path.basename(nodes_csv_path_1),
+                                             'ntype': 'item',
+                                             }],
+                              }
+        else:
+            meta_yaml_data = {'version': '0.0.1', 'dataset_name': 'default_name',
+                              'edge_data': [{'file_name': os.path.basename(edges_csv_path_0),
+                                             'etype': ['user', 'follow', 'user'],
+                                            'separator':',', 'src_id_field':'src', 'dst_id_field':'dst',
+
+                                             },
+                                            {'file_name': os.path.basename(edges_csv_path_1),
+                                             'etype': ['user', 'like', 'item'],
+                                            'separator':',', 'src_id_field':'src', 'dst_id_field':'dst',
+
+                                             }],
+                              'node_data': [{'file_name': os.path.basename(nodes_csv_path_0),
+                                             'ntype': 'user',
+                                             'separator': ',', 'node_id_field': 'id',
+                                             },
+                                            {'file_name': os.path.basename(nodes_csv_path_1),
+                                             'ntype': 'item',
+                                             'separator': ',', 'node_id_field': 'id',
+                                             }],
+                              }
+
+        with open(meta_yaml_path, 'w') as f:
+            yaml.dump(meta_yaml_data, f, sort_keys=False)
+        num_nodes = 100
+        num_edges = 500
+        df = pd.DataFrame({'src': np.random.randint(num_nodes, size=num_edges),
+                           'dst': np.random.randint(num_nodes, size=num_edges),
+                           })
+        df.to_csv(edges_csv_path_0)
+        df.to_csv(edges_csv_path_1)
+        df = pd.DataFrame({'id': np.arange(num_nodes),
+                           })
+        df.to_csv(nodes_csv_path_0)
+        df.to_csv(nodes_csv_path_1)
+
+        # load CSVDataset
+        csv_dataset = data.CSVDataset(meta_yaml_path)
+        assert len(csv_dataset) == 1
+        g = csv_dataset[0]
+        assert ~g.is_homogeneous
+
+        def _check(gdata):
+            assert 'feat' not in gdata
+            assert 'label' not in gdata
+            assert 'train_mask' not in gdata
+            assert 'val_mask' not in gdata
+            assert 'test_mask' not in gdata
+            assert 'num_classes' not in gdata
+        for ntype in g.ntypes:
+            assert g.num_nodes(ntype) == num_nodes
+            _check(g.nodes[ntype].data)
+        for etype in g.etypes:
+            assert g.num_edges(etype) == num_edges
+            _check(g.edges[etype].data)
+
+
+def _test_csvdt_complex_hetero(simplex_yaml):
+    with tempfile.TemporaryDirectory() as test_dir:
+        # generate YAML/CSVs
+        meta_yaml_path = os.path.join(test_dir, "test_csv_meta.yml")
+        edges_csv_path_0 = os.path.join(test_dir, "test_edges_0.csv")
+        edges_csv_path_1 = os.path.join(test_dir, "test_edges_1.csv")
+        nodes_csv_path_0 = os.path.join(test_dir, "test_nodes_0.csv")
+        nodes_csv_path_1 = os.path.join(test_dir, "test_nodes_1.csv")
+        if simplex_yaml:
+            meta_yaml_data = {'version': '0.0.1', 'dataset_name': 'default_name',
+                              'edge_data': [{'file_name': os.path.basename(edges_csv_path_0),
+                                             'etype': ['user', 'follow', 'user'],
+                                             'labels': {'type': 'regression'},
+                                             },
+                                            {'file_name': os.path.basename(edges_csv_path_1),
+                                             'etype': ['user', 'like', 'item'],
+                                             'labels': {'type': 'regression'},
+                                             }],
+                              'node_data': [{'file_name': os.path.basename(nodes_csv_path_0),
+                                             'ntype': 'user',
+                                             'labels': {'type': 'classification', 'num_classes': 3},
+                                             },
+                                            {'file_name': os.path.basename(nodes_csv_path_1),
+                                             'ntype': 'item',
+                                             'labels': {'type': 'classification', 'num_classes': 3},
+                                             }],
+                              }
+        else:
+            meta_yaml_data = {'version': '0.0.1', 'dataset_name': 'default_name',
+                              'edge_data': [{'file_name': os.path.basename(edges_csv_path_0),
+                                             'etype': ['user', 'follow', 'user'],
+                                             'labels': {'type': 'regression', 'field': 'label'},
+                                             'separator': ',',
+                                             'src_id_field': 'src', 'dst_id_field': 'dst',
+                                             'feat_field_prefix': 'feat_',
+                                             'split_type_field': 'split_type',
+                                             },
+                                            {'file_name': os.path.basename(edges_csv_path_1),
+                                             'etype': ['user', 'like', 'item'],
+                                             'labels': {'type': 'regression', 'field': 'label'},
+                                             'separator': ',',
+                                             'src_id_field': 'src', 'dst_id_field': 'dst',
+                                             'feat_field_prefix': 'feat_',
+                                             'split_type_field': 'split_type',
+                                             }],
+                              'node_data': [{'file_name': os.path.basename(nodes_csv_path_0),
+                                             'ntype': 'user',
+                                             'labels': {'type': 'classification', 'num_classes': 3, 'field': 'label'},
+                                             'separator': ',',
+                                             'node_id_field': 'id',
+                                             'feat_field_prefix': 'feat_', 'split_type_field': 'split_type',
+                                             },
+                                            {'file_name': os.path.basename(nodes_csv_path_1),
+                                             'ntype': 'item',
+                                             'labels': {'type': 'classification', 'num_classes': 3, 'field': 'label'},
+                                             'separator': ',',
+                                             'node_id_field': 'id',
+                                             'feat_field_prefix': 'feat_', 'split_type_field': 'split_type',
+                                             }],
+                              }
+
+        with open(meta_yaml_path, 'w') as f:
+            yaml.dump(meta_yaml_data, f, sort_keys=False)
+        num_nodes = 100
+        num_edges = 500
+        df = pd.DataFrame({'src': np.random.randint(num_nodes, size=num_edges),
+                           'dst': np.random.randint(num_nodes, size=num_edges),
+                           'label': np.random.randint(2, size=num_edges),
+                           'split_type': np.random.randint(3, size=num_edges),
+                           'feat_0': np.random.rand(num_edges),
+                           'feat_1': np.random.rand(num_edges)
+                           })
+        df.to_csv(edges_csv_path_0)
+        df.to_csv(edges_csv_path_1)
+        df = pd.DataFrame({'id': np.arange(num_nodes),
+                           'label': np.random.randint(2, size=num_nodes),
+                           'split_type': np.random.randint(3, size=num_nodes),
+                           'feat_0': np.random.rand(num_nodes),
+                           'feat_1': np.random.rand(num_nodes),
+                           'feat_2': np.random.rand(num_nodes)
+                           })
+        df.to_csv(nodes_csv_path_0)
+        df.to_csv(nodes_csv_path_1)
+
+        # load CSVDataset
+        csv_dataset = data.CSVDataset(meta_yaml_path)
+        assert len(csv_dataset) == 1
+        g = csv_dataset[0]
+        assert ~g.is_homogeneous
+
+        def _check(gdata):
+            assert 'feat' in gdata
+            assert 'label' in gdata
+            assert 'train_mask' in gdata
+            assert 'val_mask' in gdata
+            assert 'test_mask' in gdata
+        for ntype in g.ntypes:
+            assert g.num_nodes(ntype) == num_nodes
+            _check(g.nodes[ntype].data)
+            assert 'num_classes' in g.nodes[ntype].data
+        for etype in g.etypes:
+            assert g.num_edges(etype) == num_edges
+            _check(g.edges[etype].data)
+            assert 'num_classes' not in g.edges[etype].data
+
+
+def _test_csvdt_multiple_graphs(simplex_yaml):
+    with tempfile.TemporaryDirectory() as test_dir:
+        # generate YAML/CSVs
+        meta_yaml_path = os.path.join(test_dir, "test_csv_meta.yml")
+        edges_csv_path = os.path.join(test_dir, "test_edges.csv")
+        nodes_csv_path = os.path.join(test_dir, "test_nodes.csv")
+        graphs_csv_path = os.path.join(test_dir, "test_graphs.csv")
+        num_classes = 3
+        if simplex_yaml:
+            meta_yaml_data = {'version': '0.0.1', 'dataset_name': 'multiple_graphs',
+                              'edge_data': [{'file_name': os.path.basename(edges_csv_path),
+                                             },
+                                            ],
+                              'node_data': [{'file_name': os.path.basename(nodes_csv_path),
+                                             },
+                                            ],
+                              'graph_data': {'file_name': os.path.basename(graphs_csv_path),
+                                             'labels': {'type': 'classification', 'num_classes': num_classes},
+                                             }}
+        else:
+            meta_yaml_data = {'version': '0.0.1', 'dataset_name': 'multiple_graphs',
+                              'edge_data': [{'file_name': os.path.basename(edges_csv_path), 'separator': ',',
+                                             'graph_id_field': 'graph_id', 'src_id_field': 'src', 'dst_id_field': 'dst',
+                                             'feat_field_prefix': 'feat_',
+                                             },
+                                            ],
+                              'node_data': [{'file_name': os.path.basename(nodes_csv_path), 'separator': ',', 'graph_id_field': 'graph_id',
+                                             'node_id_field': 'id', 'feat_field_prefix': 'feat_',
+                                             },
+                                            ],
+                              'graph_data': {'file_name': os.path.basename(graphs_csv_path), 'separator': ',',
+                                             'graph_id_field': 'graph_id',
+                                             'labels': {'type': 'classification', 'field': 'label', 'num_classes': num_classes},
+                                             'split_type_field': 'split_type'}}
+
+        with open(meta_yaml_path, 'w') as f:
+            yaml.dump(meta_yaml_data, f, sort_keys=False)
+        num_nodes = 100
+        num_edges = 500
+        num_graphs = 20
+        graph_id = []
+        for i in range(num_graphs):
+            graph_id.extend(np.full(num_edges, i))
+        df = pd.DataFrame({'graph_id': graph_id,
+                           'src': np.random.randint(num_nodes, size=num_edges*num_graphs),
+                           'dst': np.random.randint(num_nodes, size=num_edges*num_graphs),
+                           'feat_0': np.random.rand(num_edges*num_graphs),
+                           'feat_1': np.random.rand(num_edges*num_graphs),
+                           })
+        df.to_csv(edges_csv_path)
+        graph_id = []
+        id = []
+        for i in range(num_graphs):
+            graph_id.extend(np.full(num_nodes, i))
+            id.extend(np.arange(num_nodes))
+        df = pd.DataFrame({'graph_id': graph_id,
+                           'id': id,
+                           'feat_0': np.random.rand(num_nodes*num_graphs),
+                           'feat_1': np.random.rand(num_nodes*num_graphs),
+                           'feat_2': np.random.rand(num_nodes*num_graphs)})
+        df.to_csv(nodes_csv_path)
+        df = pd.DataFrame({'graph_id': np.arange(num_graphs),
+                           'feat_0': np.random.rand(num_graphs),
+                           'feat_1': np.random.rand(num_graphs),
+                           'label': np.random.randint(num_classes, size=num_graphs),
+                           'split_type': np.random.randint(3, size=num_graphs)})
+        df.to_csv(graphs_csv_path)
+
+        # load CSVDataset
+        csv_dataset = data.CSVDataset(meta_yaml_path)
+        assert len(csv_dataset) == num_graphs
+        for g, label, feat in csv_dataset:
+            assert g.is_homogeneous
+            assert g.num_nodes() == num_nodes
+            assert 'feat' in g.ndata
+            assert g.num_edges() == num_edges
+            assert 'feat' in g.edata
+        assert 'train_mask' in csv_dataset.mask
+        assert 'val_mask' in csv_dataset.mask
+        assert 'test_mask' in csv_dataset.mask
+        assert len(csv_dataset) == csv_dataset.mask['train_mask'].shape[0]
+
+
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
-def test_csv_dataset():
+@pytest.mark.parametrize('simplex_yaml', [True, False])
+def test_csv_dataset(simplex_yaml):
+    # test various graphs with simplex or complex YAML/CSV
+    _test_csvdt_simplex_homo(simplex_yaml)
+    _test_csvdt_complex_homo(simplex_yaml)
+    _test_csvdt_simplex_hetero(simplex_yaml)
+    _test_csvdt_complex_hetero(simplex_yaml)
+    _test_csvdt_multiple_graphs(simplex_yaml)
+
+    # test dataset reload logic
     with tempfile.TemporaryDirectory() as test_dir:
         for force_reload in [True, False]:
             # single graph with multiple edges.csv and nodes.csv
@@ -293,7 +702,8 @@ def test_csv_dataset():
                 assert 'train_mask' in csv_dataset.mask
                 assert 'val_mask' in csv_dataset.mask
                 assert 'test_mask' in csv_dataset.mask
-                assert len(csv_dataset) == csv_dataset.mask['train_mask'].shape[0]
+                assert len(
+                    csv_dataset) == csv_dataset.mask['train_mask'].shape[0]
                 assert csv_dataset.has_cache()
 
 

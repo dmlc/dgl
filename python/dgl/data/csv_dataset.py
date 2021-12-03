@@ -25,7 +25,7 @@ class MetaEdge(dt.BaseModel):
     graph_id_field: Optional[str] = 'graph_id'
     src_id_field: Optional[str] = 'src'
     dst_id_field: Optional[str] = 'dst'
-    feat_prefix_field: Optional[str] = 'feat_'
+    feat_field_prefix: Optional[str] = 'feat_'
     labels: Optional[MetaLabel] = None
     split_type_field: Optional[str] = 'split_type'
 
@@ -36,7 +36,7 @@ class MetaNode(dt.BaseModel):
     ntype: Optional[str] = '_V'
     graph_id_field: Optional[str] = 'graph_id'
     node_id_field: Optional[str] = 'id'
-    feat_prefix_field: Optional[str] = 'feat_'
+    feat_field_prefix: Optional[str] = 'feat_'
     labels: Optional[MetaLabel] = None
     split_type_field: Optional[str] = 'split_type'
 
@@ -45,17 +45,17 @@ class MetaGraph(dt.BaseModel):
     file_name: str
     separator: Optional[str] = ','
     graph_id_field: Optional[str] = 'graph_id'
+    feat_field_prefix: Optional[str] = 'feat_'
     labels: MetaLabel
     split_type_field: Optional[str] = 'split_type'
 
 
 class MetaYaml(dt.BaseModel):
     version: str
-    dataset_type: str
-    dataset_name: Optional[str] = 'csvdataset_default'
-    edges: List[MetaEdge]
-    nodes: List[MetaNode]
-    graphs: Optional[MetaGraph] = None
+    dataset_name: str
+    edge_data: List[MetaEdge]
+    node_data: List[MetaNode]
+    graph_data: Optional[MetaGraph] = None
 
 
 def _yaml_sanity_check(yaml_file):
@@ -63,16 +63,13 @@ def _yaml_sanity_check(yaml_file):
         yaml_data = yaml.load(f, Loader=SafeLoader)
         meta_yaml = MetaYaml(**yaml_data)
         assert meta_yaml.version == '0.0.1'
-        assert meta_yaml.dataset_type in ['user_defined', 'dgl_data']
-        if meta_yaml.dataset_type == 'dgl_data':
-            assert meta_yaml.dataset_name is not None
-        has_multi_graphs = meta_yaml.graphs is not None
+        has_multi_graphs = meta_yaml.graph_data is not None
         if has_multi_graphs:
-            meta_graph = meta_yaml.graphs
+            meta_graph = meta_yaml.graph_data
             meta_label = meta_graph.labels
             assert meta_label.type == 'classification'
-            assert meta_label.num_classes is not None
-        for meta_edge in meta_yaml.edges:
+            assert meta_label.num_classes > 0
+        for meta_edge in meta_yaml.edge_data:
             if meta_edge is None:
                 continue
             if has_multi_graphs:
@@ -83,7 +80,7 @@ def _yaml_sanity_check(yaml_file):
                 if meta_label.type == 'classification':
                     assert meta_label.num_classes is not None
                 assert meta_edge.split_type_field is not None
-        for meta_node in meta_yaml.nodes:
+        for meta_node in meta_yaml.node_data:
             if meta_node is None:
                 continue
             if has_multi_graphs:
@@ -137,7 +134,7 @@ class EdgeData:
         if meta_edge.split_type_field in csv_header:
             self.split_type = F.tensor(pd.read_csv(file_path, sep=separator, usecols=[
                 meta_edge.split_type_field]).to_numpy().squeeze())
-        feat_prefix = meta_edge.feat_prefix_field
+        feat_prefix = meta_edge.feat_field_prefix
         feat_data = pd.read_csv(
             file_path, sep=separator, usecols=lambda x: feat_prefix in x)
         if not feat_data.empty:
@@ -182,7 +179,7 @@ class NodeData:
         if meta_node.split_type_field in csv_header:
             self.split_type = F.tensor(pd.read_csv(file_path, sep=separator, usecols=[
                 meta_node.split_type_field]).to_numpy().squeeze())
-        feat_prefix = meta_node.feat_prefix_field
+        feat_prefix = meta_node.feat_field_prefix
         feat_data = pd.read_csv(
             file_path, sep=separator, usecols=lambda x: feat_prefix in x)
         if not feat_data.empty:
@@ -196,6 +193,7 @@ class GraphData:
 
     def __init__(self, root_path, meta_graph):
         self.graph_id = None
+        self.feat = None
         self.label = None
         self.num_classes = None
         self.split_type = None
@@ -217,6 +215,12 @@ class GraphData:
         if meta_graph.split_type_field in csv_header:
             self.split_type = F.tensor(pd.read_csv(file_path, sep=separator, usecols=[
                 meta_graph.split_type_field]).to_numpy().squeeze())
+        feat_prefix = meta_graph.feat_field_prefix
+        feat_data = pd.read_csv(
+            file_path, sep=separator, usecols=lambda x: feat_prefix in x)
+        if not feat_data.empty:
+            self.feat = F.tensor(np.stack([feat_data[key].to_numpy()
+                                 for key in feat_data], axis=1))
 
 
 class CSVDataset(DGLDataset):
@@ -247,17 +251,17 @@ class CSVDataset(DGLDataset):
         meta = self.meta
         root = self.raw_dir
         edge_data = []
-        for meta_edge in meta.edges:
+        for meta_edge in meta.edge_data:
             edge_data.append(EdgeData(root, meta_edge))
 
         #parse NodeData
         node_data = []
-        for meta_node in meta.nodes:
+        for meta_node in meta.node_data:
             node_data.append(NodeData(root, meta_node))
 
         #parse GraphData
         graph_data = GraphData(
-            root, meta.graphs) if meta.graphs is not None else None
+            root, meta.graph_data) if meta.graph_data is not None else None
 
         #construct dgl.heterograph
         if graph_data is None:
@@ -309,6 +313,7 @@ class CSVDataset(DGLDataset):
                     if n_data.feat is not None:
                         node_dict[g_id]['feat'] = n_data.feat[idx]
             self.graphs = []
+            self.feat = graph_data.feat
             self.labels = graph_data.label
             for g_id in F.asnumpy(graph_data.graph_id):
                 if g_id not in node_dict:
@@ -316,6 +321,7 @@ class CSVDataset(DGLDataset):
                         "No node data is found for graph_id~{}.".format(g_id))
                 e_data = (F.tensor([]), F.tensor(
                     [])) if g_id not in edge_dict else edge_dict[g_id]['edge']
+                src_, dst_ = e_data
                 g = dgl_heterograph({('_V', '_E', '_V'): e_data}, num_nodes_dict={
                                     '_V': node_dict[g_id]['node']})
                 if 'feat' in node_dict[g_id]:
@@ -351,8 +357,11 @@ class CSVDataset(DGLDataset):
         if self.graph is not None:
             save_graphs(graph_path, self.graph)
         else:
+            labels_dict = {'labels': self.labels}
+            if self.feat is not None:
+                labels_dict['feat'] = self.feat
             save_graphs(graph_path, self.graphs,
-                        labels={'labels': self.labels})
+                        labels=labels_dict)
         info = {}
         info['is_graph_list'] = self.graphs is not None
         if info['is_graph_list']:
@@ -373,11 +382,17 @@ class CSVDataset(DGLDataset):
             self.mask = info['mask']
             self.num_classes = info['num_classes']
             self.labels = labels['labels']
+            self.feat = labels['feat'] if 'feat' in labels else None
         else:
             self.graph = graphs[0]
 
     def __getitem__(self, i):
-        return self.graph if self.graph is not None else (self.graphs[i], self.labels[i])
+        if self.graph is not None:
+            return self.graph
+        elif self.feat is None:
+            return (self.graphs[i], self.labels[i])
+        else:
+            return (self.graphs[i], self.labels[i], self.feat[i])
 
     def __len__(self):
         return 1 if self.graph is not None else len(self.graphs)
