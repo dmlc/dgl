@@ -1,8 +1,7 @@
-#>>> import
 import torch
 import torch.nn as nn
 from dgl.nn import GraphConv
-#<<< import
+import dgl
 
 class GCN(nn.Module):
     def __init__(self,
@@ -48,7 +47,7 @@ class GCN(nn.Module):
         self.dropout = nn.Dropout(p=dropout)
         self.act = getattr(torch, activation)
 
-    def forward(self, g, node_feat, edge_feat):
+    def forward(self, g, node_feat, edge_feat = None):
         h = node_feat
         edge_weight = edge_feat if self.use_edge_weight else None
         for layer in self.layers[:-1]:

@@ -6,13 +6,7 @@ data:
 node_embed_size: -1
 # Model configurations
 model:
-    name: GCN                      # Model name
-    num_layers: 2                  # number of layers
-    norm: both                # normalization for adjacency matrix, can be none, symmetric, right
-    hidden_size: 16                # hidden layer size
-    activation: relu               # activation
-    dropout: 0.5                   # dropout
-    use_edge_weight: False         # use edge weight or not
+    name: GAT                      # Model name
 # Training configurations
 early_stop: True
 num_epochs: 200                    # Number of training epochs
