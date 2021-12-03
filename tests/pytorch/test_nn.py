@@ -1304,6 +1304,25 @@ def test_jumping_knowledge():
     model.reset_parameters()
     assert model(feat_list).shape == (num_nodes, num_feats)
 
+@pytest.mark.parametrize('op', ['dot', 'cos', 'ele', 'cat'])
+def test_edge_predictor(op):
+    ctx = F.ctx()
+    num_pairs = 3
+    in_feats = 4
+    out_feats = 5
+    h_src = th.randn((num_pairs, in_feats)).to(ctx)
+    h_dst = th.randn((num_pairs, in_feats)).to(ctx)
+
+    pred = nn.EdgePredictor(op)
+    if op in ['dot', 'cos']:
+        assert pred(h_src, h_dst).shape == (num_pairs, 1)
+    elif op == 'ele':
+        assert pred(h_src, h_dst).shape == (num_pairs, in_feats)
+    else:
+        assert pred(h_src, h_dst).shape == (num_pairs, 2 * in_feats)
+    pred = nn.EdgePredictor(op, in_feats, out_feats, bias=True).to(ctx)
+    assert pred(h_src, h_dst).shape == (num_pairs, out_feats)
+
 if __name__ == '__main__':
     test_graph_conv()
     test_graph_conv_e_weight()
