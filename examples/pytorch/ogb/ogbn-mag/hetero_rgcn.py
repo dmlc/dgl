@@ -436,7 +436,6 @@ def test(g, model, node_embed, y_true, device, split_idx, args):
         pbar.update(batch_size)
     
     pbar.close()
-    print(f"Took {t_delta}s for full inference")
 
     y_pred = th.cat(y_hats, dim=0)
     y_true = th.unsqueeze(y_true, 1)
