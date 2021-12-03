@@ -105,13 +105,13 @@ void ScatterAdd(NDArray feat, NDArray idx, NDArray out) {
 }
 
 /*!
- * \brief CPU kernel of updating gradients for reduce operator max and min on heterogeneous graph.
- * \note math equation: out[idx[i], *] += feat[i, *]
- * \param feat The input tensor.
- * \param idx The indices tensor.
- * \param out The output tensor.
+ * \param graph The input heterogeneous graph.
+ * \param op The binary operator, could be `copy_u`, `copy_e'.
+ * \param list_feat List of the input tensors.
+ * \param list_idx  List of the indices tensors.
+ * \param list_idx_etype List of the node- or edge-type tensors.
+ * \param list_out List of the output tensors.
  */
-
 template <typename IdType, typename DType>
 void UpdateGradMinMax_hetero(HeteroGraphPtr graph,
                        const std::string& op,
