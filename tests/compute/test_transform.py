@@ -498,13 +498,13 @@ def test_laplacian_lambda_max():
         assert l_max < 2 + eps
     '''
 
-def create_large_graph(num_nodes):
+def create_large_graph(num_nodes, idtype=F.int64):
     row = np.random.choice(num_nodes, num_nodes * 10)
     col = np.random.choice(num_nodes, num_nodes * 10)
     spm = spsp.coo_matrix((np.ones(len(row)), (row, col)))
     spm.sum_duplicates()
 
-    return dgl.from_scipy(spm)
+    return dgl.from_scipy(spm, idtype=idtype)
 
 def get_nodeflow(g, node_ids, num_layers):
     batch_size = len(node_ids)
@@ -530,14 +530,22 @@ def test_partition_with_halo():
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(F._default_context_str == 'gpu', reason="METIS doesn't support GPU")
-def test_metis_partition():
+@parametrize_dtype
+def test_metis_partition(idtype):
     # TODO(zhengda) Metis fails to partition a small graph.
-    g = create_large_graph(1000)
-    check_metis_partition(g, 0)
-    check_metis_partition(g, 1)
-    check_metis_partition(g, 2)
-    check_metis_partition_with_constraint(g)
-
+    g = create_large_graph(1000, idtype=idtype)
+    if idtype == F.int64:
+        check_metis_partition(g, 0)
+        check_metis_partition(g, 1)
+        check_metis_partition(g, 2)
+        check_metis_partition_with_constraint(g)
+    else:
+        assert_fail = False
+        try:
+            check_metis_partition(g, 1)
+        except:
+            assert_fail = True
+        assert assert_fail
 
 def check_metis_partition_with_constraint(g):
     ntypes = np.zeros((g.number_of_nodes(),), dtype=np.int32)
@@ -654,24 +662,23 @@ def test_reorder_nodes():
         old_neighs2 = g.predecessors(old_nid)
         assert np.all(np.sort(old_neighs1) == np.sort(F.asnumpy(old_neighs2)))
 
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU compaction not implemented")
 @parametrize_dtype
 def test_compact(idtype):
     g1 = dgl.heterograph({
         ('user', 'follow', 'user'): ([1, 3], [3, 5]),
         ('user', 'plays', 'game'): ([2, 3, 2], [4, 4, 5]),
         ('game', 'wished-by', 'user'): ([6, 5], [7, 7])},
-        {'user': 20, 'game': 10}, idtype=idtype)
+        {'user': 20, 'game': 10}, idtype=idtype, device=F.ctx())
 
     g2 = dgl.heterograph({
         ('game', 'clicked-by', 'user'): ([3], [1]),
         ('user', 'likes', 'user'): ([1, 8], [8, 9])},
-        {'user': 20, 'game': 10}, idtype=idtype)
+        {'user': 20, 'game': 10}, idtype=idtype, device=F.ctx())
 
     g3 = dgl.heterograph({('user', '_E', 'user'): ((0, 1), (1, 2))},
-                         {'user': 10}, idtype=idtype)
+                         {'user': 10}, idtype=idtype, device=F.ctx())
     g4 = dgl.heterograph({('user', '_E', 'user'): ((1, 3), (3, 5))},
-                         {'user': 10}, idtype=idtype)
+                         {'user': 10}, idtype=idtype, device=F.ctx())
 
     def _check(g, new_g, induced_nodes):
         assert g.ntypes == new_g.ntypes
