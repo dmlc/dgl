@@ -235,14 +235,15 @@ class CSVDataset(DGLDataset):
     verbose: bool
         Whether to print out progress information. Default: True.
     """
+    META_YAML_NAME = 'meta.yaml'
 
     def __init__(self, data_path, force_reload=False, verbose=True):
         self.graph = None
         self.graphs = None
-        meta_yaml = os.path.join(data_path, 'meta.yaml')
+        meta_yaml = os.path.join(data_path, self.META_YAML_NAME)
         if not os.path.exists(meta_yaml):
             raise DGLError(
-                "'meta.yaml' cannot be found under {}.".format(data_path))
+                "'{}' cannot be found under {}.".format(self.META_YAML_NAME, data_path))
         meta = _yaml_sanity_check(meta_yaml)
         self.meta = meta
         ds_name = meta.dataset_name
