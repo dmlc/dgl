@@ -19,16 +19,22 @@ def extract_embed(node_embed, input_nodes):
     return emb
 
 class RelGraphEmbed(nn.Module):
-    r"""Embedding layer for featureless heterograph."""
-    def __init__(self, g, embed_size, exclude=list(), embed_name='embed',
-                 activation=None, dropout=0.0):
+    r"""Embedding layer for featureless heterograph.
+    
+    Parameters
+    ----------
+    g : DGLGraph
+        Input graph.
+    embed_size : int
+        The length of each embedding vector
+    exclude : list[str]
+        The list of node-types to exclude (e.g., because they have natural features)
+    """
+    def __init__(self, g, embed_size, exclude=list()):
         
         super(RelGraphEmbed, self).__init__()
         self.g = g
         self.embed_size = embed_size
-        self.embed_name = embed_name
-        self.activation = activation
-        self.dropout = nn.Dropout(dropout)
 
         # create weight embeddings for each node for each relation
         self.embeds = nn.ParameterDict()
@@ -57,10 +63,10 @@ class RelGraphConvLayer(nn.Module):
         Input feature size.
     out_feat : int
         Output feature size.
+    ntypes : list[str]
+        Node type names
     rel_names : list[str]
         Relation names.
-    num_bases : int, optional
-        Number of bases. If is none, use number of relations. Default: None.
     weight : bool, optional
         True if a linear layer is applied after message passing. Default: True
     bias : bool, optional
@@ -164,6 +170,26 @@ class RelGraphConvLayer(nn.Module):
 
 
 class EntityClassify(nn.Module):
+    r"""
+    R-GCN node classification model
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The heterogenous graph used for message passing
+    in_dim : int
+        Input feature size.
+    h_dim : int
+        Hidden dimension size.
+    out_dim : int
+        Output dimension size.
+    num_hidden_layers : int, optional
+        Number of RelGraphConvLayers. Default: 1
+    dropout : float, optional
+        Dropout rate. Default: 0.0
+    use_self_loop : bool, optional
+        True to include self loop message in RelGraphConvLayers. Default: True
+    """
     def __init__(self,
                  g, in_dim,
                  h_dim, out_dim,
@@ -210,12 +236,11 @@ class EntityClassify(nn.Module):
 
 
 class Logger(object):
-    """
+    r"""
     This class was taken directly from the PyG implementation and can be found
     here: https://github.com/snap-stanford/ogb/blob/master/examples/nodeproppred/mag/logger.py
 
     This was done to ensure that performance was measured in precisely the same way
-    
     """
     def __init__(self, runs, info=None):
         self.info = info
@@ -284,6 +309,16 @@ def prepare_data(args):
     labels = labels['paper'].flatten()
 
     def add_reverse_hetero(g, combine_like=True):
+        r"""
+        Parameters
+        ----------
+        g : DGLGraph
+            The heterogenous graph where reverse edges should be added
+        combine_like : bool, optional
+            Whether reverse-edges that have identical source/destination 
+            node types should be combined with the existing edge-type, 
+            rather than creating a new edge type.  Default: True.
+        """
         relations = {}
         num_nodes_dict = {ntype: g.num_nodes(ntype) for ntype in g.ntypes}
         for metapath in g.canonical_etypes:
