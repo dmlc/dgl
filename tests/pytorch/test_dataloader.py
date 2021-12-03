@@ -1,6 +1,5 @@
 import os
 import dgl
-import dgl.ops as OPS
 import backend as F
 import unittest
 import torch
@@ -281,44 +280,66 @@ def test_neighbor_nonuniform(num_workers):
 def _check_device(data):
     if isinstance(data, dict):
         for k, v in data.items():
-            assert v.device == F.ctx()
+            _check_device(v)
     elif isinstance(data, list):
         for v in data:
-            assert v.device == F.ctx()
+            _check_device(v)
     else:
         assert data.device == F.ctx()
 
 @pytest.mark.parametrize('sampler_name', ['full', 'neighbor', 'neighbor2', 'shadow'])
-def test_node_dataloader(sampler_name):
+# Do not test async_load for CPU
+@pytest.mark.parametrize('async_load', ['off', 'no-feature', 'on'] if F._default_context_str == 'gpu' else ['off'])
+@pytest.mark.parametrize('num_workers', [0, 1, 2])
+def test_node_dataloader(sampler_name, async_load, num_workers):
+    load_features = (async_load == 'on')
+    async_load = (async_load != 'off')
+
     g1 = dgl.graph(([0, 0, 0, 1, 1], [1, 2, 3, 3, 4]))
     g1.ndata['feat'] = F.copy_to(F.randn((5, 8)), F.cpu())
     g1.ndata['label'] = F.copy_to(F.randn((g1.num_nodes(),)), F.cpu())
+    g1.edata['w'] = F.copy_to(F.randn((g1.num_edges(),)), F.cpu())
 
-    for load_input, load_output in [(None, None), ({'feat': g1.ndata['feat']}, {'label': g1.ndata['label']})]:
-        for async_load in [False, True]:
-            for num_workers in [0, 1, 2]:
-                sampler = {
-                    'full': dgl.dataloading.MultiLayerFullNeighborSampler(2),
-                    'neighbor': dgl.dataloading.MultiLayerNeighborSampler([3, 3]),
-                    'neighbor2': dgl.dataloading.MultiLayerNeighborSampler([3, 3]),
-                    'shadow': dgl.dataloading.ShaDowKHopSampler([3, 3])}[sampler_name]
-                dataloader = dgl.dataloading.NodeDataLoader(
-                    g1, g1.nodes(), sampler, device=F.ctx(),
-                    load_input=load_input,
-                    load_output=load_output,
-                    async_load=async_load,
-                    batch_size=g1.num_nodes(),
-                    num_workers=num_workers)
-                for input_nodes, output_nodes, blocks in dataloader:
-                    _check_device(input_nodes)
-                    _check_device(output_nodes)
-                    _check_device(blocks)
-                    if load_input:
-                        _check_device(blocks[0].srcdata['feat'])
-                        OPS.copy_u_sum(blocks[0], blocks[0].srcdata['feat'])
-                    if load_output:
-                        _check_device(blocks[-1].dstdata['label'])
-                        OPS.copy_u_sum(blocks[-1], blocks[-1].dstdata['label'])
+    if load_features:
+        feat = g1.unpack_ndata(['feat'])
+        label = g1.unpack_ndata(['label'])
+        edata = g1.unpack_edata(['w'])
+        _feat = feat['feat']
+        _label = label['label']
+        _edata = edata['w']
+    else:
+        feat, label, edata = None, None, None
+        _feat = g1.ndata['feat']
+        _label = g1.ndata['label']
+        _edata = g1.edata['w']
+
+    sampler = {
+        'full': dgl.dataloading.MultiLayerFullNeighborSampler(2, return_eids=True),
+        'neighbor': dgl.dataloading.MultiLayerNeighborSampler([3, 3], return_eids=True),
+        'neighbor2': dgl.dataloading.MultiLayerNeighborSampler([3, 3], return_eids=True),
+        'shadow': dgl.dataloading.ShaDowKHopSampler([3, 3])}[sampler_name]
+    dataloader = dgl.dataloading.NodeDataLoader(
+        g1, g1.nodes(), sampler, device=F.ctx(),
+        load_input=feat,
+        load_output=label,
+        load_edata=edata,
+        async_load=async_load,
+        batch_size=2,
+        num_workers=num_workers)
+    for input_nodes, output_nodes, blocks in dataloader:
+        _check_device(input_nodes)
+        _check_device(output_nodes)
+        _check_device(blocks)
+        assert F.array_equal(
+            F.copy_to(blocks[0].srcdata['feat'], F.cpu()),
+            _feat[F.copy_to(blocks[0].srcdata[dgl.NID], F.cpu())])
+        assert F.array_equal(
+            F.copy_to(blocks[-1].dstdata['label'], F.cpu()),
+            _label[F.copy_to(blocks[-1].dstdata[dgl.NID], F.cpu())])
+        for block in blocks:
+            assert F.array_equal(
+                F.copy_to(block.edata['w'], F.cpu()),
+                _edata[F.copy_to(block.edata[dgl.EID], F.cpu())])
 
     g2 = dgl.heterograph({
          ('user', 'follow', 'user'): ([0, 0, 0, 1, 1, 1, 2], [1, 2, 3, 0, 2, 3, 0]),
@@ -328,31 +349,46 @@ def test_node_dataloader(sampler_name):
     })
     for ntype in g2.ntypes:
         g2.nodes[ntype].data['feat'] = F.copy_to(F.randn((g2.num_nodes(ntype), 8)), F.cpu())
+    for etype in g2.etypes:
+        g2.edges[etype].data['feat'] = F.copy_to(F.randn((g2.num_edges(etype), 6)), F.cpu())
     batch_size = max(g2.num_nodes(nty) for nty in g2.ntypes)
     sampler = {
-        'full': dgl.dataloading.MultiLayerFullNeighborSampler(2),
-        'neighbor': dgl.dataloading.MultiLayerNeighborSampler([{etype: 3 for etype in g2.etypes}] * 2),
-        'neighbor2': dgl.dataloading.MultiLayerNeighborSampler([3, 3]),
-        'shadow': dgl.dataloading.ShaDowKHopSampler([{etype: 3 for etype in g2.etypes}] * 2)}[sampler_name]
+        'full': dgl.dataloading.MultiLayerFullNeighborSampler(2, return_eids=True),
+        'neighbor': dgl.dataloading.MultiLayerNeighborSampler(
+            [{etype: 3 for etype in g2.etypes}] * 2, return_eids=True),
+        'neighbor2': dgl.dataloading.MultiLayerNeighborSampler([3, 3], return_eids=True),
+        'shadow': dgl.dataloading.ShaDowKHopSampler(
+            [{etype: 3 for etype in g2.etypes}] * 2)}[sampler_name]
 
-    for async_load in [False, True]:
-        dataloader = dgl.dataloading.NodeDataLoader(
-            g2, {nty: g2.nodes(nty) for nty in g2.ntypes},
-            sampler, device=F.ctx(), async_load=async_load, batch_size=batch_size)
-        assert isinstance(iter(dataloader), Iterator)
-        for input_nodes, output_nodes, blocks in dataloader:
-            _check_device(input_nodes)
-            _check_device(output_nodes)
-            _check_device(blocks)
+    if load_features:
+        _ndata = ndata = g2.unpack_ndata()
+        _edata = edata = g2.unpack_edata()
+        _edata = {k[1]: v for k, v in _edata.items()}   # canonical edge type to edge type
+    else:
+        ndata, edata = None, None
+        _ndata = {ntype: {'feat': g2.nodes[ntype].data['feat']} for ntype in g2.ntypes}
+        _edata = {etype: {'feat': g2.edges[etype].data['feat']} for etype in g2.etypes}
 
-    status = False
-    try:
-        dgl.dataloading.NodeDataLoader(
-            g2, {nty: g2.nodes(nty) for nty in g2.ntypes},
-            sampler, device=F.ctx(), load_input={'feat': g1.ndata['feat']}, batch_size=batch_size)
-    except dgl.DGLError:
-        status = True
-    assert status
+    dataloader = dgl.dataloading.NodeDataLoader(
+        g2, {nty: g2.nodes(nty) for nty in g2.ntypes},
+        sampler, device=F.ctx(), async_load=async_load, batch_size=batch_size,
+        load_ndata=ndata, load_edata=edata)
+    for input_nodes, output_nodes, blocks in dataloader:
+        _check_device(input_nodes)
+        _check_device(output_nodes)
+        _check_device(blocks)
+        for subg in blocks:
+            for ntype in g2.ntypes:
+                assert F.array_equal(
+                    subg.srcnodes[ntype].data['feat'],
+                    F.copy_to(_ndata[ntype]['feat'], F.ctx())[subg.srcnodes[ntype].data[dgl.NID]])
+                assert F.array_equal(
+                    subg.dstnodes[ntype].data['feat'],
+                    F.copy_to(_ndata[ntype]['feat'], F.ctx())[subg.dstnodes[ntype].data[dgl.NID]])
+            for etype in g2.etypes:
+                assert F.array_equal(
+                    subg.edges[etype].data['feat'],
+                    F.copy_to(_edata[etype]['feat'], F.ctx())[subg.edges[etype].data[dgl.EID]])
 
 
 @pytest.mark.parametrize('sampler_name', ['full', 'neighbor', 'shadow'])
@@ -426,6 +462,10 @@ if __name__ == '__main__':
     test_graph_dataloader()
     test_cluster_gcn(0)
     test_neighbor_nonuniform(0)
-    for sampler in ['full', 'neighbor', 'shadow']:
-        test_node_dataloader(sampler)
-        test_edge_dataloader(sampler)
+    for args in product(
+            ['full', 'neighbor', 'shadow'],
+            ['off', 'no-feature', 'on'] if F._default_context_str == 'gpu' else ['off'],
+            [0, 1, 2]):
+        test_node_dataloader(*args)
+    for args in product(['full', 'neighbor', 'shadow']):
+        test_edge_dataloader(*args)

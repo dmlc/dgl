@@ -1,21 +1,19 @@
 """DGL PyTorch DataLoaders"""
 import inspect
 import math
-import threading
-import queue
 from distutils.version import LooseVersion
 import torch as th
 from torch.utils.data import DataLoader, IterableDataset
 from torch.utils.data.distributed import DistributedSampler
 import torch.distributed as dist
-from ..dataloader import NodeCollator, EdgeCollator, GraphCollator, SubgraphIterator
+from ..dataloader import NodeCollator, EdgeCollator, GraphCollator, SubgraphIterator, BlockSampler
 from ...distributed import DistGraph
 from ...distributed import DistDataLoader
 from ...ndarray import NDArray as DGLNDArray
 from ... import backend as F
 from ...base import DGLError
-from ...utils import to_dgl_context
-from ..._ffi import streams as FS
+from ...utils import to_dgl_context, recursive_apply
+from .prefetcher import CUDAAsyncCopyNodeDataLoaderWrapper
 
 __all__ = ['NodeDataLoader', 'EdgeDataLoader', 'GraphDataLoader',
            # Temporary exposure.
@@ -324,98 +322,32 @@ class _GraphCollator(GraphCollator):
         return result
 
 def _to_device(data, device):
-    if isinstance(data, dict):
-        for k, v in data.items():
-            data[k] = v.to(device)
-    elif isinstance(data, list):
-        data = [item.to(device) for item in data]
-    else:
-        data = data.to(device)
-    return data
-
-
-def _index_select(in_tensor, idx, pin_memory):
-    idx = idx.to(in_tensor.device)
-    shape = list(in_tensor.shape)
-    shape[0] = len(idx)
-    out_tensor = th.empty(*shape, dtype=in_tensor.dtype, pin_memory=pin_memory)
-    th.index_select(in_tensor, 0, idx, out=out_tensor)
-    return out_tensor
-
-
-def _next(dl_iter, graph, device, load_input, load_output, stream=None):
-    # input_nodes, ouput_nodes, blocks
-    input_nodes, output_nodes, blocks = next(dl_iter)
-    _restore_storages(blocks, graph)
-    input_data = {}
-    for tag, data in load_input.items():
-        sliced = _index_select(data, input_nodes, data.device != device)
-        input_data[tag] = sliced
-    output_data = {}
-    for tag, data in load_output.items():
-        sliced = _index_select(data, output_nodes, data.device != device)
-        output_data[tag] = sliced
-    result_ = (input_nodes, output_nodes, blocks, input_data, output_data)
-    if stream is not None:
-        with th.cuda.stream(stream):
-            with FS.stream(stream):
-                result = [_to_device(data, device)
-                          for data in result_], result_, stream.record_event()
-    else:
-        result = [_to_device(data, device) for data in result_]
-    return result
-
-
-def _background_node_dataloader(dl_iter, g, device, results, load_input, load_output):
-    dev = None
-    if device.type == 'cuda':
-        dev = device
-    elif g.device.type == 'cuda':
-        dev = g.device
-    stream = th.cuda.Stream(device=dev)
-    try:
-        while True:
-            results.put(_next(dl_iter, g, device, load_input, load_output, stream))
-    except StopIteration:
-        results.put((None, None, None))
-
+    return recursive_apply(data, lambda x: x.to(device))
 
 class _NodeDataLoaderIter:
     def __init__(self, node_dataloader):
         self.device = node_dataloader.device
         self.node_dataloader = node_dataloader
         self.iter_ = iter(node_dataloader.dataloader)
-        self.async_load = node_dataloader.async_load and (
-            F.device_type(self.device) == 'cuda')
+        self.async_load = node_dataloader.async_load
         if self.async_load:
-            self.results = queue.Queue(1)
-            threading.Thread(target=_background_node_dataloader, args=(
-                self.iter_, self.node_dataloader.collator.g, self.device,
-                self.results, node_dataloader.load_input, node_dataloader.load_output
-                ), daemon=True).start()
+            if F.device_type(self.device) != 'cuda':
+                raise ValueError('Async feature loading requires setting device argument to cuda')
+            self.iter_ = CUDAAsyncCopyNodeDataLoaderWrapper(
+                self.iter_, self.device, self.node_dataloader.collator.g,
+                self.node_dataloader.load_input, self.node_dataloader.load_output,
+                self.node_dataloader.load_ndata, self.node_dataloader.load_edata,
+                isinstance(self.node_dataloader.collator.graph_sampler, BlockSampler))
 
     # Make this an iterator for PyTorch Lightning compatibility
     def __iter__(self):
         return self
 
     def __next__(self):
-        res = ()
-        if self.async_load:
-            res, _, event = self.results.get()
-            if res is None:
-                raise StopIteration
-            event.wait(th.cuda.default_stream())
-        else:
-            res = _next(self.iter_, self.node_dataloader.collator.g, self.device,
-                        self.node_dataloader.load_input, self.node_dataloader.load_output)
-        input_nodes, output_nodes, blocks, input_data, output_data = res
-        if input_data:
-            for tag, data in input_data.items():
-                blocks[0].srcdata[tag] = data
-        if output_data:
-            for tag, data in output_data.items():
-                blocks[-1].dstdata[tag] = data
-        return input_nodes, output_nodes, blocks
+        result = next(self.iter_)
+        _restore_storages(result[-1], self.node_dataloader.collator.g)
+        result = [_to_device(data, self.device) for data in result]
+        return result
 
 class _EdgeDataLoaderIter:
     def __init__(self, edge_dataloader):
@@ -428,16 +360,16 @@ class _EdgeDataLoaderIter:
         return self
 
     def __next__(self):
-        result_ = next(self.iter_)
+        result = next(self.iter_)
 
         if self.edge_dataloader.collator.negative_sampler is not None:
             # input_nodes, pair_graph, neg_pair_graph, blocks if None.
             # Otherwise, input_nodes, pair_graph, blocks
-            _restore_subgraph_storage(result_[2], self.edge_dataloader.collator.g)
-        _restore_subgraph_storage(result_[1], self.edge_dataloader.collator.g)
-        _restore_storages(result_[-1], self.edge_dataloader.collator.g_sampling)
+            _restore_subgraph_storage(result[2], self.edge_dataloader.collator.g)
+        _restore_subgraph_storage(result[1], self.edge_dataloader.collator.g)
+        _restore_storages(result[-1], self.edge_dataloader.collator.g_sampling)
 
-        result = [_to_device(data, self.device) for data in result_]
+        result = [_to_device(data, self.device) for data in result]
         return result
 
 class _GraphDataLoaderIter:
@@ -528,12 +460,18 @@ class NodeDataLoader:
         :class:`torch.utils.data.distributed.DistributedSampler`.
 
         Only effective when :attr:`use_ddp` is True.
-    load_input : dict[tag, Tensor], optional
+    load_input : dict[str, Tensor], optional
         The tensors will be sliced according to ``blocks[0].srcdata[dgl.NID]``
         and will be attached to ``blocks[0].srcdata``.
-    load_output : dict[tag, Tensor], optional
+    load_output : dict[str, Tensor], optional
         The tensors will be sliced according to ``blocks[-1].dstdata[dgl.NID]``
         and will be attached to ``blocks[-1].dstdata``.
+    load_ndata : dict[str, Tensor], optional
+        The tensors will be sliced and attached to **all** the blocks according to
+        ``srcdata[dgl.NID]`` and ``dstdata[dgl.NID]``.
+    load_edata : dict[str, Tensor], optional
+        The tensors will be sliced and attached to **all** the blocks according to
+        ``edata[dgl.NID]``
     async_load : boolean, optional
         If True, data including graph, sliced tensors will be transferred
         between devices asynchronously.This is transparent to end users. This
@@ -572,6 +510,26 @@ class NodeDataLoader:
     ...     for input_nodes, output_nodes, blocks in dataloader:
     ...         train_on(input_nodes, output_nodes, blocks)
 
+    **Asynchronous prefetching of features**
+
+    If you would like to fetch the features from CPU to GPU asynchronously, you will
+    need to supply :attr:`load_input`, :attr:`load_output`, :attr:`load_ndata` and
+    :attr:`load_edata`.  Say you would like to load input nodes' ``feature``,
+    output nodes' ``label``, and the edge weights named ``w``, you can write like
+
+    >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5], return_eids=True)
+    >>> features = g.unpack_ndata(['feature'])
+    >>> labels = g.unpack_ndata(['label'])
+    >>> edata = g.unpack_edata(['w'])
+    >>> dataloader = dgl.dataloading.NodeDataLoader(
+    ...     g, train_nid, sampler, use_ddp=True,
+    ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4,
+    ...     load_input=features, load_output=labels, load_edata=edata, async_load=True)
+    >>> for epoch in range(start_epoch, n_epochs):
+    ...     dataloader.set_epoch(epoch)
+    ...     for input_nodes, output_nodes, blocks in dataloader:
+    ...         train_on(input_nodes, output_nodes, blocks)
+
     Notes
     -----
     Please refer to
@@ -599,7 +557,8 @@ class NodeDataLoader:
     collator_arglist = inspect.getfullargspec(NodeCollator).args
 
     def __init__(self, g, nids, graph_sampler, device=None, use_ddp=False, ddp_seed=0,
-                 load_input=None, load_output=None, async_load=False, **kwargs):
+                 load_input=None, load_output=None, load_ndata=None, load_edata=None,
+                 async_load=False, **kwargs):
         collator_kwargs = {}
         dataloader_kwargs = {}
         for k, v in kwargs.items():
@@ -626,12 +585,20 @@ class NodeDataLoader:
                 # default to the same device the graph is on
                 device = th.device(g.device)
 
-            if not g.is_homogeneous:
-                if load_input or load_output:
-                    raise DGLError('load_input/load_output not supported for heterograph yet.')
+            self.async_load = async_load
             self.load_input = {} if load_input is None else load_input
             self.load_output = {} if load_output is None else load_output
-            self.async_load = async_load
+            self.load_ndata = {} if load_ndata is None else load_ndata
+            # TODO(BarclayII): The samplers may not always return edge IDs due to
+            # efficiency concerns (see the comment in BlockSampler.__init__()).
+            # However, the async copy wrapper relies on EID in the returned subgraph
+            # to fetch edge features.  Therefore to make edge feature fetching work,
+            # return_eids must be True.  If we have a graph-level lazy index implemented
+            # we can potentially relax this constraint.
+            if (async_load and load_edata is not None and
+                    not getattr(graph_sampler, "return_eids", True)):
+                raise DGLError("sampler's return_eids must be True if load_edata is not None")
+            self.load_edata = {} if load_edata is None else load_edata
 
             # if the sampler supports it, tell it to output to the specified device.
             # But if async_load is enabled, set_output_context should be skipped as
@@ -642,6 +609,8 @@ class NodeDataLoader:
                     callable(getattr(graph_sampler, "set_output_context", None)) and
                     num_workers == 0):
                 graph_sampler.set_output_context(to_dgl_context(device))
+            else:
+                graph_sampler.set_output_context(to_dgl_context(th.device('cpu')))
 
             self.collator = _NodeCollator(g, nids, graph_sampler, **collator_kwargs)
             self.use_scalar_batcher, self.scalar_batcher, self.dataloader, self.dist_sampler = \

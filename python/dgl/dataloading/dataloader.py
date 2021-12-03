@@ -318,6 +318,13 @@ class BlockSampler(Sampler):
     def __init__(self, num_layers, return_eids=False, output_ctx=None):
         super().__init__(output_ctx)
         self.num_layers = num_layers
+        # TODO(BarclayII): The return_eids flag is to avoid unnecessary index slicing when
+        # edge features are not needed in computation.  The "true" solution is really
+        # maintain some sort of "lazy index" in the subgraph themselves.  Currently we
+        # do have a _LazyIndex class in dgl.frame, but that's only for frames.  It's
+        # still yet to be seen on how to use it for subgraphing etc.
+        # See also the comment in NodeDataLoader.__init__() and the get_features()
+        # methods in the CUDAAsyncCopyWrapper subclasses.
         self.return_eids = return_eids
 
     # pylint: disable=unused-argument

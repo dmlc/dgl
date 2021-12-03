@@ -2733,6 +2733,69 @@ def test_adj_sparse(idtype, fmt):
         indices_sorted_np[A_csc.data] = A_csc.indices
         assert np.array_equal(F.asnumpy(indices_sorted), indices_sorted_np)
 
+def test_unpack():
+    g = dgl.graph(([0,1,2],[3,4,5])).to(F.ctx())
+    x1 = F.randn((6, 4))
+    x2 = F.randn((6, 5))
+    y1 = F.randn((3, 3))
+    y2 = F.randn((3, 6))
+    g.ndata['x1'] = x1
+    g.ndata['x2'] = x2
+    g.edata['y1'] = y1
+    g.edata['y2'] = y2
+    ndata = g.unpack_ndata(['x1'])
+    edata = g.unpack_edata(['y1'])
+    assert ndata['x1'] is x1
+    assert edata['y1'] is y1
+    assert set(g.ndata.keys()) == {'x2'}
+    assert set(g.edata.keys()) == {'y2'}
+
+    g.ndata['x1'] = x1
+    g.edata['y1'] = y1
+    ndata = g.unpack_ndata()
+    edata = g.unpack_edata()
+    assert ndata['x1'] is x1
+    assert ndata['x2'] is x2
+    assert edata['y1'] is y1
+    assert edata['y2'] is y2
+    assert len(g.ndata) == 0
+    assert len(g.edata) == 0
+
+    hg = create_test_heterograph(F.int64).to(F.ctx())
+    x1s = {}
+    x2s = {}
+    y1s = {}
+    y2s = {}
+    for ntype in hg.ntypes:
+        x1s[ntype] = hg.nodes[ntype].data['x1'] = F.randn((hg.num_nodes(ntype), 3))
+        x2s[ntype] = hg.nodes[ntype].data['x2'] = F.randn((hg.num_nodes(ntype), 4))
+    for etype in hg.etypes:
+        y1s[etype] = hg.edges[etype].data['y1'] = F.randn((hg.num_edges(etype), 5))
+        y2s[etype] = hg.edges[etype].data['y2'] = F.randn((hg.num_edges(etype), 6))
+    ndata = hg.unpack_ndata({ntype: ['x1'] for ntype in hg.ntypes})
+    edata = hg.unpack_edata({etype: ['y1'] for etype in hg.etypes})
+    for ntype in hg.ntypes:
+        assert ndata[ntype]['x1'] is x1s[ntype]
+        assert set(hg.nodes[ntype].data.keys()) == {'x2'}
+    for etype in hg.etypes:
+        assert edata[hg.to_canonical_etype(etype)]['y1'] is y1s[etype]
+        assert set(hg.edges[etype].data.keys()) == {'y2'}
+
+    for ntype in hg.ntypes:
+        hg.nodes[ntype].data['x1'] = x1s[ntype]
+    for etype in hg.etypes:
+        hg.edges[etype].data['y1'] = y1s[etype]
+    ndata = hg.unpack_ndata()
+    edata = hg.unpack_edata()
+    for ntype in hg.ntypes:
+        assert ndata[ntype]['x1'] is x1s[ntype]
+        assert ndata[ntype]['x2'] is x2s[ntype]
+        assert len(hg.nodes[ntype].data.keys()) == 0
+    for etype in hg.etypes:
+        assert edata[hg.to_canonical_etype(etype)]['y1'] is y1s[etype]
+        assert edata[hg.to_canonical_etype(etype)]['y2'] is y2s[etype]
+        assert len(hg.edges[etype].data.keys()) == 0
+
 
 if __name__ == '__main__':
     # test_create()

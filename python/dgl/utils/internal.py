@@ -1,7 +1,7 @@
 """Internal utilities."""
 from __future__ import absolute_import, division
 
-from collections.abc import Mapping, Iterable
+from collections.abc import Mapping, Iterable, Sequence
 from collections import defaultdict
 from functools import wraps
 import numpy as np
@@ -909,5 +909,15 @@ def alias_func(func):
         return func(*args, **kwargs)
     _fn.__doc__ = """Alias of :func:`dgl.{}`.""".format(func.__name__)
     return _fn
+
+def recursive_apply(data, fn, *args, **kwargs):
+    """Recursively apply a function to every element in a container.
+    """
+    if isinstance(data, Mapping):
+        return {k: recursive_apply(v, fn, *args, **kwargs) for k, v in data.items()}
+    elif isinstance(data, Sequence):
+        return [recursive_apply(v, fn, *args, **kwargs) for v in data]
+    else:
+        return fn(data, *args, **kwargs)
 
 _init_api("dgl.utils.internal")
