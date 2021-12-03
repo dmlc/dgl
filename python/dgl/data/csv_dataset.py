@@ -9,7 +9,7 @@ from .dgl_dataset import DGLDataset
 from ..convert import heterograph as dgl_heterograph
 from .. import backend as F
 from .utils import save_graphs, load_graphs, save_info, load_info
-from ..base import dgl_warning
+from ..base import dgl_warning, DGLError
 
 
 class MetaLabel(dt.BaseModel):
@@ -228,17 +228,21 @@ class CSVDataset(DGLDataset):
 
     Parameters
     -----------
-    meta_yaml: str
-        Absolute path of YAML config file.
+    data_path: str
+        Absolute path where YAML config file and related CSV files lie.
     force_reload : bool
         Whether to reload the dataset. Default: False
     verbose: bool
         Whether to print out progress information. Default: True.
     """
 
-    def __init__(self, meta_yaml, force_reload=False, verbose=True):
+    def __init__(self, data_path, force_reload=False, verbose=True):
         self.graph = None
         self.graphs = None
+        meta_yaml = os.path.join(data_path, 'meta.yaml')
+        if not os.path.exists(meta_yaml):
+            raise DGLError(
+                "'meta.yaml' cannot be found under {}.".format(data_path))
         meta = _yaml_sanity_check(meta_yaml)
         self.meta = meta
         ds_name = meta.dataset_name
@@ -323,7 +327,7 @@ class CSVDataset(DGLDataset):
                 graph_data.label) if graph_data.label is not None else None
             for g_id in graph_data.graph_id:
                 if g_id not in node_dict:
-                    raise RuntimeError(
+                    raise DGLError(
                         "No node data is found for graph_id~{}.".format(g_id))
                 e_data = (F.tensor([]), F.tensor(
                     [])) if g_id not in edge_dict else edge_dict[g_id]['edge']

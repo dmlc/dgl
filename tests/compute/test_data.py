@@ -162,7 +162,8 @@ def test_extract_archive():
 class GenerateFilesForCSVDatasetSingle:
     def __init__(self, test_dir):
         self.test_dir = test_dir
-        self.meta_yaml = os.path.join(test_dir, "test_csv_meta.yml")
+        self.data_path = test_dir
+        self.meta_yaml = os.path.join(test_dir, "meta.yaml")
         self.csv_files = []
 
     def __enter__(self):
@@ -217,7 +218,8 @@ class GenerateFilesForCSVDatasetSingle:
 
 class GenerateFilesForCSVDatasetMultiple():
     def __init__(self, test_dir):
-        self.meta_yaml = os.path.join(test_dir, "test_csv_meta.yml")
+        self.data_path = test_dir
+        self.meta_yaml = os.path.join(test_dir, "meta.yaml")
         self.edge_csv = os.path.join(test_dir, "test_edges.csv")
         self.node_csv = os.path.join(test_dir, "test_nodes.csv")
         self.graph_csv = os.path.join(test_dir, "test_graphs.csv")
@@ -274,7 +276,7 @@ class GenerateFilesForCSVDatasetMultiple():
 def _test_csvdt_simplex_homo(simplex_yaml):
     with tempfile.TemporaryDirectory() as test_dir:
         # generate YAML/CSVs
-        meta_yaml_path = os.path.join(test_dir, "test_csv_meta.yml")
+        meta_yaml_path = os.path.join(test_dir, "meta.yaml")
         edges_csv_path = os.path.join(test_dir, "test_edges.csv")
         nodes_csv_path = os.path.join(test_dir, "test_nodes.csv")
         if simplex_yaml:
@@ -308,7 +310,7 @@ def _test_csvdt_simplex_homo(simplex_yaml):
         df.to_csv(nodes_csv_path)
 
         # load CSVDataset
-        csv_dataset = data.CSVDataset(meta_yaml_path)
+        csv_dataset = data.CSVDataset(test_dir)
         assert len(csv_dataset) == 1
         g = csv_dataset[0]
         assert g.is_homogeneous
@@ -331,7 +333,7 @@ def _test_csvdt_simplex_homo(simplex_yaml):
 def _test_csvdt_complex_homo(simplex_yaml):
     with tempfile.TemporaryDirectory() as test_dir:
         # generate YAML/CSVs
-        meta_yaml_path = os.path.join(test_dir, "test_csv_meta.yml")
+        meta_yaml_path = os.path.join(test_dir, "meta.yaml")
         edges_csv_path = os.path.join(test_dir, "test_edges.csv")
         nodes_csv_path = os.path.join(test_dir, "test_nodes.csv")
         if simplex_yaml:
@@ -382,7 +384,7 @@ def _test_csvdt_complex_homo(simplex_yaml):
         df.to_csv(nodes_csv_path)
 
         # load CSVDataset
-        csv_dataset = data.CSVDataset(meta_yaml_path)
+        csv_dataset = data.CSVDataset(test_dir)
         assert len(csv_dataset) == 1
         g = csv_dataset[0]
         assert g.is_homogeneous
@@ -404,7 +406,7 @@ def _test_csvdt_complex_homo(simplex_yaml):
 def _test_csvdt_simplex_hetero(simplex_yaml):
     with tempfile.TemporaryDirectory() as test_dir:
         # generate YAML/CSVs
-        meta_yaml_path = os.path.join(test_dir, "test_csv_meta.yml")
+        meta_yaml_path = os.path.join(test_dir, "meta.yaml")
         edges_csv_path_0 = os.path.join(test_dir, "test_edges_0.csv")
         edges_csv_path_1 = os.path.join(test_dir, "test_edges_1.csv")
         nodes_csv_path_0 = os.path.join(test_dir, "test_nodes_0.csv")
@@ -461,7 +463,7 @@ def _test_csvdt_simplex_hetero(simplex_yaml):
         df.to_csv(nodes_csv_path_1)
 
         # load CSVDataset
-        csv_dataset = data.CSVDataset(meta_yaml_path)
+        csv_dataset = data.CSVDataset(test_dir)
         assert len(csv_dataset) == 1
         g = csv_dataset[0]
         assert ~g.is_homogeneous
@@ -484,7 +486,7 @@ def _test_csvdt_simplex_hetero(simplex_yaml):
 def _test_csvdt_complex_hetero(simplex_yaml):
     with tempfile.TemporaryDirectory() as test_dir:
         # generate YAML/CSVs
-        meta_yaml_path = os.path.join(test_dir, "test_csv_meta.yml")
+        meta_yaml_path = os.path.join(test_dir, "meta.yaml")
         edges_csv_path_0 = os.path.join(test_dir, "test_edges_0.csv")
         edges_csv_path_1 = os.path.join(test_dir, "test_edges_1.csv")
         nodes_csv_path_0 = os.path.join(test_dir, "test_nodes_0.csv")
@@ -566,7 +568,7 @@ def _test_csvdt_complex_hetero(simplex_yaml):
         df.to_csv(nodes_csv_path_1)
 
         # load CSVDataset
-        csv_dataset = data.CSVDataset(meta_yaml_path)
+        csv_dataset = data.CSVDataset(test_dir)
         assert len(csv_dataset) == 1
         g = csv_dataset[0]
         assert ~g.is_homogeneous
@@ -590,7 +592,7 @@ def _test_csvdt_complex_hetero(simplex_yaml):
 def _test_csvdt_multiple_graphs(simplex_yaml):
     with tempfile.TemporaryDirectory() as test_dir:
         # generate YAML/CSVs
-        meta_yaml_path = os.path.join(test_dir, "test_csv_meta.yml")
+        meta_yaml_path = os.path.join(test_dir, "meta.yaml")
         edges_csv_path = os.path.join(test_dir, "test_edges.csv")
         nodes_csv_path = os.path.join(test_dir, "test_nodes.csv")
         graphs_csv_path = os.path.join(test_dir, "test_graphs.csv")
@@ -656,7 +658,7 @@ def _test_csvdt_multiple_graphs(simplex_yaml):
         df.to_csv(graphs_csv_path)
 
         # load CSVDataset
-        csv_dataset = data.CSVDataset(meta_yaml_path)
+        csv_dataset = data.CSVDataset(test_dir)
         assert len(csv_dataset) == num_graphs
         for g, label, feat in csv_dataset:
             assert g.is_homogeneous
@@ -686,7 +688,7 @@ def test_csv_dataset(simplex_yaml):
             # single graph with multiple edges.csv and nodes.csv
             with GenerateFilesForCSVDatasetSingle(test_dir) as f:
                 csv_dataset = data.CSVDataset(
-                    f.meta_yaml, force_reload=force_reload)
+                    f.data_path, force_reload=force_reload)
                 assert len(csv_dataset) == 1
                 graph = csv_dataset[0]
                 assert ~graph.is_homogeneous
@@ -695,7 +697,7 @@ def test_csv_dataset(simplex_yaml):
             # multiple graphs with single edges.csv and nodes.csv
             with GenerateFilesForCSVDatasetMultiple(test_dir) as f:
                 csv_dataset = data.CSVDataset(
-                    f.meta_yaml, force_reload=force_reload)
+                    f.data_path, force_reload=force_reload)
                 assert len(csv_dataset) > 1
                 graph, label = csv_dataset[0]
                 assert graph.is_homogeneous
