@@ -126,33 +126,28 @@ void UpdateGradMinMax_hetero(HeteroGraphPtr graph,
       auto pair = graph->meta_graph()->FindEdge(etype);
       const dgl_id_t dst_id = pair.first;  // graph is reversed
       const dgl_id_t src_id = pair.second;
-      dst_src_ntids[dst_id].push_back(src_id);  // can have duplicates. Use Hashtable to optimize.
-    }
-    std::vector<bool> updated(graph->NumVertexTypes());
-    for (int dst_id = 0; dst_id < dst_src_ntids.size(); ++dst_id) {
-      std::fill(updated.begin(), updated.end(), false);
-      for (int j = 0; j < dst_src_ntids[dst_id].size(); ++j) {
-        int src_id = dst_src_ntids[dst_id][j];
-        if (updated[src_id]) continue;
-        const DType* feat_data = list_feat[dst_id].Ptr<DType>();
-        const IdType* idx_data = list_idx[dst_id].Ptr<IdType>();
-        const IdType* idx_ntype_data = list_idx_ntypes[dst_id].Ptr<IdType>();
-        DType* out_data = (*list_out)[src_id].Ptr<DType>();
-        int dim = 1;
-        for (int i = 1; i < (*list_out)[src_id]->ndim; ++i)
-          dim *= (*list_out)[src_id]->shape[i];
-        int n = list_feat[dst_id]->shape[0];
+      auto same_src_dst_id = std::find(begin(dst_src_ntids[dst_id]),
+        end(dst_src_ntids[dst_id]), src_id);
+      if (same_src_dst_id != std::end(dst_src_ntids[dst_id]))
+        continue;
+      dst_src_ntids[dst_id].push_back(src_id);
+      const DType* feat_data = list_feat[dst_id].Ptr<DType>();
+      const IdType* idx_data = list_idx[dst_id].Ptr<IdType>();
+      const IdType* idx_ntype_data = list_idx_ntypes[dst_id].Ptr<IdType>();
+      DType* out_data = (*list_out)[src_id].Ptr<DType>();
+      int dim = 1;
+      for (int i = 1; i < (*list_out)[src_id]->ndim; ++i)
+        dim *= (*list_out)[src_id]->shape[i];
+      int n = list_feat[dst_id]->shape[0];
 #pragma omp parallel for
-        for (int i = 0; i < n; ++i) {
-          for (int k = 0; k < dim; ++k) {
-            if (src_id == idx_ntype_data[i * dim + k]) {
-              const int write_row = idx_data[i * dim + k];
+      for (int i = 0; i < n; ++i) {
+        for (int k = 0; k < dim; ++k) {
+          if (src_id == idx_ntype_data[i * dim + k]) {
+            const int write_row = idx_data[i * dim + k];
 #pragma omp atomic
-              out_data[write_row * dim + k] += feat_data[i * dim + k];  // feat = dZ
-            }
+            out_data[write_row * dim + k] += feat_data[i * dim + k];  // feat = dZ
           }
         }
-        updated[src_id] = true;
       }
     }
   } else if (op == "copy_rhs") {
