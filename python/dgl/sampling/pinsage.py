@@ -92,7 +92,8 @@ class RandomWalkNeighborSampler(object):
         self.full_metapath = metapath * num_traversals
         restart_prob = np.zeros(self.metapath_hops * num_traversals)
         restart_prob[self.metapath_hops::self.metapath_hops] = termination_prob
-        self.restart_prob = F.tensor(restart_prob).to(self.G.device)
+        restart_prob = F.tensor(restart_prob, dtype=F.float32)
+        self.restart_prob = F.copy_to(restart_prob, G.device)
 
     # pylint: disable=no-member
     def __call__(self, seed_nodes):
