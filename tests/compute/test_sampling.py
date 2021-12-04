@@ -148,7 +148,8 @@ def test_pack_traces():
 
 def test_pinsage_sampling():
     def _test_sampler(g, sampler, ntype):
-        neighbor_g = sampler(F.tensor([0, 2], dtype=F.int64).to(F.ctx()))
+        seeds = F.copy_to(F.tensor([0, 2], dtype=F.int64), F.ctx())
+        neighbor_g = sampler(seeds)
         assert neighbor_g.ntypes == [ntype]
         u, v = neighbor_g.all_edges(form='uv', order='eid')
         uv = list(zip(F.asnumpy(u).tolist(), F.asnumpy(v).tolist()))
