@@ -565,6 +565,30 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
           x_length *= ufeat->shape[i];
       }
     }
+    // TODO (Israt): Can python do the following initializations while creating the tensors?
+    if (reduce == "max" ||  reduce == "min") {
+      const int64_t dim = bcast.out_len;
+      std::vector<bool> updated((*vec_out).size(), false);
+      for (dgl_type_t etype = 0; etype < ufeat_ntids.size(); ++etype) {
+        DType *out_off = (*vec_out)[out_ntids[etype]].Ptr<DType>();
+        if (reduce == "max")
+          _Fill(out_off, vec_csr[etype].num_rows * dim, cuda::reduce::Max<IdType, DType>::zero());
+        else // min
+          _Fill(out_off, vec_csr[etype].num_rows * dim, cuda::reduce::Min<IdType, DType>::zero());
+        const dgl_type_t dst_id = out_ntids[etype];
+        if (!updated[dst_id]) {
+          updated[dst_id] = true;
+          if (op == "copy_lhs") {
+            IdType *argu_ntype = (*out_aux)[2][dst_id].Ptr<IdType>();
+            _Fill(argu_ntype, vec_csr[etype].num_rows * dim, static_cast<IdType>(-1));
+          }
+          if (op == "copy_rhs") {
+            IdType *arge_etype = (*out_aux)[3][dst_id].Ptr<IdType>();
+            _Fill(arge_etype, vec_csr[etype].num_rows * dim, static_cast<IdType>(-1));
+          }
+        }
+      }
+    }
 
     auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
     for (dgl_type_t etype = 0; etype < ufeat_ntids.size(); ++etype) {
@@ -606,7 +630,28 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
                 bcast, csr, ufeat, efeat, (*vec_out)[dst_id], NullArray(), NullArray());
           });
         }
-      // TODO(Israt): Add support for max/min reducer
+      } else if (reduce == "max") {
+          SWITCH_OP(op, Op, {
+            NDArray ufeat = (vec_ufeat.size() == 0) ?
+                NullArray() : vec_ufeat[src_id];
+            NDArray efeat = (vec_efeat.size() == 0) ?
+                NullArray() : vec_efeat[etype];
+            cuda::SpMMCmpCsrHetero<IdType, DType, Op, cuda::reduce::Max<IdType, DType> >(
+                bcast, csr, ufeat, efeat, (*vec_out)[dst_id], (*out_aux)[0][dst_id],
+                (*out_aux)[1][dst_id], (*out_aux)[2][dst_id], (*out_aux)[3][dst_id],
+                src_id, etype);
+          });
+      } else if (reduce == "min") {
+          SWITCH_OP(op, Op, {
+            NDArray ufeat = (vec_ufeat.size() == 0) ?
+                NullArray() : vec_ufeat[src_id];
+            NDArray efeat = (vec_efeat.size() == 0) ?
+                NullArray() : vec_efeat[etype];
+            cuda::SpMMCmpCsrHetero<IdType, DType, Op, cuda::reduce::Min<IdType, DType> >(
+                bcast, csr, ufeat, efeat, (*vec_out)[dst_id], (*out_aux)[0][dst_id],
+                (*out_aux)[1][dst_id], (*out_aux)[2][dst_id], (*out_aux)[3][dst_id],
+                src_id, etype);
+        });
       } else {
         LOG(FATAL) << "Not implemented";
       }
