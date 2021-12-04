@@ -261,7 +261,6 @@ FrequencyHashmap<IdxType>::~FrequencyHashmap() {
   _edge_hashmap = nullptr;
 }
 
-// #define PERF_ANALYSIS
 
 template <typename IdxType>
 std::tuple<IdArray, IdArray, IdArray> FrequencyHashmap<IdxType>::Topk(
@@ -269,9 +268,6 @@ std::tuple<IdArray, IdArray, IdArray> FrequencyHashmap<IdxType>::Topk(
     const int64_t num_edges, const int64_t num_edges_per_node,
     const int64_t num_pick) {
 
-#ifdef PERF_ANALYSIS
-  auto t_start = std::chrono::high_resolution_clock::now();
-#endif
   using Idx64Type = int64_t;
   const int64_t num_dst_nodes = (num_edges / num_edges_per_node);
   constexpr int BLOCK_SIZE = 256;
@@ -283,9 +279,6 @@ std::tuple<IdArray, IdArray, IdArray> FrequencyHashmap<IdxType>::Topk(
   const IdxType num_edge_blocks = static_cast<IdxType>(edges_grid.x);
   IdxType num_unique_edges = 0;
 
-#ifdef PERF_ANALYSIS
-  auto t1 = std::chrono::high_resolution_clock::now();
-#endif
   // to mark if this position of edges is the first inserting position for _edge_hashmap
   bool *is_first_position = static_cast<bool*>(
       device->AllocWorkspace(_ctx, sizeof(bool) * (num_edges)));
@@ -301,29 +294,12 @@ std::tuple<IdArray, IdArray, IdArray> FrequencyHashmap<IdxType>::Topk(
   IdxType *num_unique_each_node = num_unique_each_node_data;
   IdxType *num_unique_each_node_alternate = (num_unique_each_node_data + (num_dst_nodes + 1));
   IdxType *unique_output_offsets = (num_unique_each_node_data + 2 * (num_dst_nodes + 1));
-#ifdef PERF_ANALYSIS
-  auto t2 = std::chrono::high_resolution_clock::now();
-  auto elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1);
-  std::cout << "data allocation time cost: " << elapsed.count() << std::endl;
-#endif
 
-#ifdef PERF_ANALYSIS
-  t1 = std::chrono::high_resolution_clock::now();
-#endif
   // 1. Scan the all edges and count the unique edges and unique edges for each dst node
   _count_frequency<IdxType, BLOCK_SIZE, TILE_SIZE><<<edges_grid, block, 0, _stream>>>(
       src_data, num_edges, num_edges_per_node,
       edge_blocks_prefix, is_first_position, *_device_edge_hashmap);
-#ifdef PERF_ANALYSIS
-  device->StreamSync(_ctx, _stream);
-  t2 = std::chrono::high_resolution_clock::now();
-  elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1);
-  std::cout << "step 1 time cost: " << elapsed.count() << std::endl;
-#endif
 
-#ifdef PERF_ANALYSIS
-  t1 = std::chrono::high_resolution_clock::now();
-#endif
   // 2. Compact the unique edges frequency
   // 2.1 ExclusiveSum the edge_blocks_prefix
   void *d_temp_storage = nullptr;
@@ -340,16 +316,8 @@ std::tuple<IdArray, IdArray, IdArray> FrequencyHashmap<IdxType>::Topk(
       _ctx, DGLContext{kDLCPU, 0},
       dtype, _stream);
   device->StreamSync(_ctx, _stream);
-#ifdef PERF_ANALYSIS
-  t2 = std::chrono::high_resolution_clock::now();
-  elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1);
-  std::cout << "step 2.1 time cost: " << elapsed.count() << std::endl;
-#endif
   // 2.2 Allocate the data of unique edges and frequency
   // double space to use SegmentedRadixSort
-#ifdef PERF_ANALYSIS
-  t1 = std::chrono::high_resolution_clock::now();
-#endif
   auto unique_src_edges_data = static_cast<IdxType*>(
       device->AllocWorkspace(_ctx, 2 * sizeof(IdxType) * (num_unique_edges)));
   IdxType *unique_src_edges = unique_src_edges_data;
@@ -359,30 +327,12 @@ std::tuple<IdArray, IdArray, IdArray> FrequencyHashmap<IdxType>::Topk(
       device->AllocWorkspace(_ctx, 2 * sizeof(Idx64Type) * (num_unique_edges)));
   Idx64Type *unique_frequency = unique_frequency_data;
   Idx64Type *unique_frequency_alternate = unique_frequency_data + num_unique_edges;
-#ifdef PERF_ANALYSIS
-  device->StreamSync(_ctx, _stream);
-  t2 = std::chrono::high_resolution_clock::now();
-  elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1);
-  std::cout << "step 2.2 allocate data time cost: " << elapsed.count() << std::endl;
-#endif
-#ifdef PERF_ANALYSIS
-  t1 = std::chrono::high_resolution_clock::now();
-#endif
   // 2.3 Compact the unique edges and their frequency
   _compact_frequency<IdxType, Idx64Type, BLOCK_SIZE, TILE_SIZE><<<edges_grid, block, 0, _stream>>>(
       src_data, dst_data, num_edges, num_edges_per_node,
       edge_blocks_prefix, is_first_position, num_unique_each_node,
       unique_src_edges, unique_frequency, *_device_edge_hashmap);
-#ifdef PERF_ANALYSIS
-  device->StreamSync(_ctx, _stream);
-  t2 = std::chrono::high_resolution_clock::now();
-  elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1);
-  std::cout << "step 2.3 time cost: " << elapsed.count() << std::endl;
-#endif
 
-#ifdef PERF_ANALYSIS
-  t1 = std::chrono::high_resolution_clock::now();
-#endif
   // 3. SegmentedRadixSort the unique edges and unique_frequency
   // 3.1 ExclusiveSum the num_unique_each_node
   d_temp_storage = nullptr;
@@ -393,24 +343,6 @@ std::tuple<IdArray, IdArray, IdArray> FrequencyHashmap<IdxType>::Topk(
   CUDA_CALL(cub::DeviceScan::ExclusiveSum(d_temp_storage, temp_storage_bytes,
             num_unique_each_node, num_unique_each_node_alternate, num_dst_nodes + 1));
   device->FreeWorkspace(_ctx, d_temp_storage);
-#ifdef PERF_ANALYSIS
-  // XXX: check, remove it
-  {
-    IdxType temp_num_unique_edges = 0;
-    device->CopyDataFromTo(&num_unique_each_node_alternate[num_dst_nodes], 0, &temp_num_unique_edges, 0,
-        sizeof(temp_num_unique_edges),
-        _ctx, DGLContext{kDLCPU, 0},
-        dtype, _stream);
-    device->StreamSync(_ctx, _stream);
-    assert(temp_num_unique_edges == num_unique_edges);
-  }
-  t2 = std::chrono::high_resolution_clock::now();
-  elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1);
-  std::cout << "step 3.1 time cost: " << elapsed.count() << std::endl;
-#endif
-#ifdef PERF_ANALYSIS
-  t1 = std::chrono::high_resolution_clock::now();
-#endif
   // 3.2 SegmentedRadixSort the unique_src_edges and unique_frequency
   // Create a set of DoubleBuffers to wrap pairs of device pointers
   cub::DoubleBuffer<Idx64Type> d_unique_frequency(unique_frequency, unique_frequency_alternate);
@@ -437,16 +369,7 @@ std::tuple<IdArray, IdArray, IdArray> FrequencyHashmap<IdxType>::Topk(
             num_unique_each_node_alternate, num_unique_each_node_alternate + 1));
   }
   device->FreeWorkspace(_ctx, d_temp_storage);
-#ifdef PERF_ANALYSIS
-  device->StreamSync(_ctx, _stream);
-  t2 = std::chrono::high_resolution_clock::now();
-  elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1);
-  std::cout << "step 3.2 time cost: " << elapsed.count() << std::endl;
-#endif
 
-#ifdef PERF_ANALYSIS
-  t1 = std::chrono::high_resolution_clock::now();
-#endif
   // 4. Get the final pick number for each dst node
   // 4.1 Reset the min(num_pick, num_unique_each_node) to num_unique_each_node
   constexpr int NODE_TILE_SIZE  = BLOCK_SIZE * 2;
@@ -463,12 +386,6 @@ std::tuple<IdArray, IdArray, IdArray> FrequencyHashmap<IdxType>::Topk(
   CUDA_CALL(cub::DeviceScan::ExclusiveSum(d_temp_storage, temp_storage_bytes,
             num_unique_each_node, unique_output_offsets, num_dst_nodes + 1));
   device->FreeWorkspace(_ctx, d_temp_storage);
-#ifdef PERF_ANALYSIS
-  device->StreamSync(_ctx, _stream);
-  t2 = std::chrono::high_resolution_clock::now();
-  elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1);
-  std::cout << "step 4 time cost: " << elapsed.count() << std::endl;
-#endif
 
   // 5. Pick the data to result
   IdxType num_output = 0;
@@ -484,19 +401,10 @@ std::tuple<IdArray, IdArray, IdArray> FrequencyHashmap<IdxType>::Topk(
       dtype, _ctx);
   IdArray res_cnt = IdArray::Empty({static_cast<int64_t>(num_output)},
       dtype, _ctx);
-#ifdef PERF_ANALYSIS
-  t1 = std::chrono::high_resolution_clock::now();
-#endif
   _pick_data<IdxType, Idx64Type, BLOCK_SIZE, NODE_TILE_SIZE><<<nodes_grid, block, 0, _stream>>>(
       d_unique_frequency.Current(), d_unique_src_edges.Current(), num_unique_each_node_alternate,
       dst_data, num_edges_per_node, num_dst_nodes, num_edges,
       unique_output_offsets, res_src.Ptr<IdxType>(), res_dst.Ptr<IdxType>(), res_cnt.Ptr<IdxType>());
-#ifdef PERF_ANALYSIS
-  device->StreamSync(_ctx, _stream);
-  t2 = std::chrono::high_resolution_clock::now();
-  elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1);
-  std::cout << "step 5 time cost: " << elapsed.count() << std::endl;
-#endif
 
   device->StreamSync(_ctx, _stream);
   device->FreeWorkspace(_ctx, is_first_position);
@@ -504,11 +412,6 @@ std::tuple<IdArray, IdArray, IdArray> FrequencyHashmap<IdxType>::Topk(
   device->FreeWorkspace(_ctx, num_unique_each_node_data);
   device->FreeWorkspace(_ctx, unique_src_edges_data);
   device->FreeWorkspace(_ctx, unique_frequency_data);
-#ifdef PERF_ANALYSIS
-  auto t_end = std::chrono::high_resolution_clock::now();
-  elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(t_end - t_start);
-  std::cout << "total time cost: " << elapsed.count() << std::endl;
-#endif
 
   return std::make_tuple(res_src, res_dst, res_cnt);
 }
