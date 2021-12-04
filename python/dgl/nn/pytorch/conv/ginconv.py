@@ -41,6 +41,9 @@ class GINConv(nn.Module):
         Initial :math:`\epsilon` value, default: ``0``.
     learn_eps : bool, optional
         If True, :math:`\epsilon` will be a learnable parameter. Default: ``False``.
+    activation : callable activation function/layer or None, optional
+        If not None, applies an activation function to the updated node features.
+        Default: ``None``.
 
     Example
     -------
@@ -72,10 +75,12 @@ class GINConv(nn.Module):
                  apply_func,
                  aggregator_type,
                  init_eps=0,
-                 learn_eps=False):
+                 learn_eps=False,
+                 activation=None):
         super(GINConv, self).__init__()
         self.apply_func = apply_func
         self._aggregator_type = aggregator_type
+        self.activation = activation
         if aggregator_type not in ('sum', 'max', 'mean'):
             raise KeyError(
                 'Aggregator type {} not recognized.'.format(aggregator_type))
@@ -129,4 +134,9 @@ class GINConv(nn.Module):
             rst = (1 + self.eps) * feat_dst + graph.dstdata['neigh']
             if self.apply_func is not None:
                 rst = self.apply_func(rst)
+            
+            # activation
+            if self.activation is not None:
+                rst = self.activation(rst)
+            
             return rst
