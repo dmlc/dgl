@@ -134,9 +134,7 @@ class GINConv(nn.Module):
             rst = (1 + self.eps) * feat_dst + graph.dstdata['neigh']
             if self.apply_func is not None:
                 rst = self.apply_func(rst)
-            
             # activation
             if self.activation is not None:
                 rst = self.activation(rst)
-            
             return rst
