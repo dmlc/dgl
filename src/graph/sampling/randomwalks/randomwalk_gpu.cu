@@ -34,8 +34,10 @@ struct GraphKernelData {
 };
 
 template<typename IdType, typename FloatType, int BLOCK_SIZE, int TILE_SIZE>
-__global__ void _RandomWalkKernel(const uint64_t rand_seed, const IdType *seed_data, const int64_t num_seeds,
-    const IdType* metapath_data, const uint64_t max_num_steps, const GraphKernelData<IdType>* graphs,
+__global__ void _RandomWalkKernel(
+    const uint64_t rand_seed, const IdType *seed_data, const int64_t num_seeds,
+    const IdType* metapath_data, const uint64_t max_num_steps,
+    const GraphKernelData<IdType>* graphs,
     const FloatType* restart_prob_data,
     IdType *out_traces_data,
     IdType *out_eids_data) {
@@ -43,9 +45,8 @@ __global__ void _RandomWalkKernel(const uint64_t rand_seed, const IdType *seed_d
   int64_t idx = blockIdx.x * TILE_SIZE + threadIdx.x;
   int64_t last_idx = min(static_cast<int64_t>(blockIdx.x + 1) * TILE_SIZE, num_seeds);
   int64_t trace_length = (max_num_steps + 1);
-
   curandState rng;
-  // reference: 
+  // reference:
   //     https://docs.nvidia.com/cuda/curand/device-api-overview.html#performance-notes
   curand_init(rand_seed + idx, 0, 0, &rng);
 
@@ -60,7 +61,7 @@ __global__ void _RandomWalkKernel(const uint64_t rand_seed, const IdType *seed_d
       const GraphKernelData<IdType> &graph = graphs[metapath_id];
       const int64_t in_row_start = graph.in_ptr[curr];
       const int64_t deg = graph.in_ptr[curr + 1] - graph.in_ptr[curr];
-      if (deg == 0) {// the degree is zero
+      if (deg == 0) {  // the degree is zero
         break;
       }
       const int64_t num = curand(&rng) % deg;
@@ -82,7 +83,7 @@ __global__ void _RandomWalkKernel(const uint64_t rand_seed, const IdType *seed_d
   }
 }
 
-} // namespace
+}  // namespace
 
 template<DLDeviceType XPU, typename IdType>
 std::pair<IdArray, IdArray> RandomWalkWithStepwiseRestart(
@@ -91,7 +92,6 @@ std::pair<IdArray, IdArray> RandomWalkWithStepwiseRestart(
     const TypeArray metapath,
     const std::vector<FloatArray> &prob,
     FloatArray restart_prob) {
-  
   const int64_t max_num_steps = metapath->shape[0];
   const IdType *metapath_data = static_cast<IdType *>(metapath->data);
   int64_t num_etypes = hg->NumEdgeTypes();
@@ -124,9 +124,9 @@ std::pair<IdArray, IdArray> RandomWalkWithStepwiseRestart(
       device->AllocWorkspace(ctx, (num_etypes) * sizeof(GraphKernelData<IdType>)));
   auto d_metapath_data = metapath_data;
   // copy graph metadata pointers to GPU
-  device->CopyDataFromTo(h_graphs, 0, d_graphs, 0, 
-      (num_etypes) * sizeof(GraphKernelData<IdType>), 
-      DGLContext{kDLCPU, 0}, 
+  device->CopyDataFromTo(h_graphs, 0, d_graphs, 0,
+      (num_etypes) * sizeof(GraphKernelData<IdType>),
+      DGLContext{kDLCPU, 0},
       ctx,
       hg->GetCSRMatrix(0).indptr->dtype,
       stream);
@@ -168,7 +168,7 @@ std::tuple<IdArray, IdArray, IdArray> SelectPinSageNeighbors(
     const IdArray dst,
     const int64_t num_samples_per_node,
     const int64_t k) {
-  CHECK(src->ctx.device_type == kDLGPU) << 
+  CHECK(src->ctx.device_type == kDLGPU) <<
     "IdArray needs be on GPU!";
   const IdxType* src_data = src.Ptr<IdxType>();
   const IdxType* dst_data = dst.Ptr<IdxType>();
@@ -176,9 +176,9 @@ std::tuple<IdArray, IdArray, IdArray> SelectPinSageNeighbors(
   auto ctx = src->ctx;
   // use default stream
   cudaStream_t stream = 0;
-  auto frequency_hashmap = FrequencyHashmap<IdxType>(num_dst_nodes, 
+  auto frequency_hashmap = FrequencyHashmap<IdxType>(num_dst_nodes,
       num_samples_per_node, ctx, stream);
-  auto ret = frequency_hashmap.Topk(src_data, dst_data, src->dtype, 
+  auto ret = frequency_hashmap.Topk(src_data, dst_data, src->dtype,
       src->shape[0], num_samples_per_node, k);
   return ret;
 }

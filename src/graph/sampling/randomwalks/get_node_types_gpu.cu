@@ -7,8 +7,8 @@
 #include <dgl/array.h>
 #include <dgl/base_heterograph.h>
 #include <dgl/runtime/device_api.h>
-#include <utility>
 #include <cuda_runtime.h>
+#include <utility>
 #include "randomwalks_impl.h"
 
 namespace dgl {
@@ -38,11 +38,12 @@ TypeArray GetNodeTypesFromMetapath(
   cudaStream_t stream = 0;
 
   auto h_metapath_data = static_cast<IdxType*>(
-                             cpu_device->AllocWorkspace(cpu_ctx, sizeof(IdxType) * (num_etypes)));
+      cpu_device->AllocWorkspace(cpu_ctx, sizeof(IdxType) * (num_etypes)));
   auto h_result_data = static_cast<IdxType*>(
-                             cpu_device->AllocWorkspace(cpu_ctx, sizeof(IdxType) * (num_etypes + 1)));
+      cpu_device->AllocWorkspace(cpu_ctx, sizeof(IdxType) * (num_etypes + 1)));
 
-  metapath_device->CopyDataFromTo(static_cast<const IdxType*>(metapath->data), 0, h_metapath_data, 0,
+  metapath_device->CopyDataFromTo(static_cast<const IdxType*>(metapath->data), 0,
+                                  h_metapath_data, 0,
                                   sizeof(IdxType) * (num_etypes),
                                   metapath_ctx, cpu_ctx,
                                   metapath->dtype, stream);

@@ -1,6 +1,5 @@
 """PinSAGE sampler & related functions and classes"""
 
-import numpy as np
 from .._ffi.function import _init_api
 
 from .. import backend as F
@@ -90,8 +89,7 @@ class RandomWalkNeighborSampler(object):
         self.metapath_hops = len(metapath)
         self.metapath = metapath
         self.full_metapath = metapath * num_traversals
-        restart_prob = F.zeros(self.metapath_hops * num_traversals,
-                F.float32, self.G.device)
+        restart_prob = F.zeros(self.metapath_hops * num_traversals, F.float32, self.G.device)
         restart_prob[self.metapath_hops::self.metapath_hops] = termination_prob
         self.restart_prob = F.copy_to(restart_prob, self.G.device)
 

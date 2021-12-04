@@ -5,10 +5,12 @@
  */
 
 #include <cub/cub.cuh>
+#include <algorithm>
+#include <tuple>
+#include <utility>
 #include "../../../runtime/cuda/cuda_common.h"
 #include "frequency_hashmap.cuh"
 #include "atomic.cuh"
-#include <chrono>
 
 namespace dgl {
 
@@ -48,7 +50,8 @@ __global__ void _init_edge_table(void *edge_hashmap, int64_t edges_len) {
 template<typename IdxType, int BLOCK_SIZE, int TILE_SIZE>
 __global__ void _count_frequency(const IdxType *src_data,
     const int64_t num_edges, const int64_t num_edges_per_node,
-    IdxType *edge_blocks_prefix, bool *is_first_position, DeviceEdgeHashmap<IdxType> device_edge_hashmap) {
+    IdxType *edge_blocks_prefix, bool *is_first_position,
+    DeviceEdgeHashmap<IdxType> device_edge_hashmap) {
   int64_t start_idx = (blockIdx.x * TILE_SIZE) + threadIdx.x;
   int64_t last_idx = start_idx + TILE_SIZE;
 
@@ -130,9 +133,11 @@ __global__ void _compact_frequency(const IdxType *src_data, const IdxType *dst_d
       if (is_first_position[idx] == true) {
         const IdxType pos = (block_offset + flag);
         unique_src_edges[pos] = src;
-        if (sizeof(IdxType) != sizeof(Idx64Type) && sizeof(IdxType) == 4) { // if IdxType is a 32-bit data
-          unique_frequency[pos] = ((static_cast<Idx64Type>(num_edges / num_edges_per_node - dst_idx) << 32)
-                                    | device_edge_hashmap.GetEdgeCount(src, dst_idx));
+        if (sizeof(IdxType) != sizeof(Idx64Type)
+            && sizeof(IdxType) == 4) {  // if IdxType is a 32-bit data
+          unique_frequency[pos] = (
+              (static_cast<Idx64Type>(num_edges / num_edges_per_node - dst_idx) << 32)
+              | device_edge_hashmap.GetEdgeCount(src, dst_idx));
         } else {
           unique_frequency[pos] = device_edge_hashmap.GetEdgeCount(src, dst_idx);
         }
@@ -180,14 +185,14 @@ __global__ void _pick_data(const Idx64Type *unique_frequency, const IdxType *uni
       }
     }
   }
-
 }
 
-} // namespace
+}  // namespace
 
 // return the old cnt of this edge
 template<typename IdxType>
-inline __device__ IdxType DeviceEdgeHashmap<IdxType>::InsertEdge(const IdxType &src, const IdxType &dst_idx) {
+inline __device__ IdxType DeviceEdgeHashmap<IdxType>::InsertEdge(
+    const IdxType &src, const IdxType &dst_idx) {
   IdxType start_off = dst_idx * _num_items_each_dst;
   IdxType pos = EdgeHash(src);
   IdxType delta = 1;
@@ -215,7 +220,8 @@ inline __device__ IdxType DeviceEdgeHashmap<IdxType>::GetDstCount(const IdxType 
 }
 
 template<typename IdxType>
-inline __device__ IdxType DeviceEdgeHashmap<IdxType>::GetEdgeCount(const IdxType &src, const IdxType &dst_idx) {
+inline __device__ IdxType DeviceEdgeHashmap<IdxType>::GetEdgeCount(
+    const IdxType &src, const IdxType &dst_idx) {
   IdxType start_off = dst_idx * _num_items_each_dst;
   IdxType pos = EdgeHash(src);
   IdxType delta = 1;
@@ -245,7 +251,8 @@ FrequencyHashmap<IdxType>::FrequencyHashmap(
   cudaMemset(dst_unique_edges, 0, (num_dst) * sizeof(IdxType));
   _init_edge_table<IdxType, BLOCK_SIZE, TILE_SIZE><<<grid, block, 0, _stream>>>(
       edge_hashmap, (num_dst * num_items_each_dst));
-  _device_edge_hashmap = new DeviceEdgeHashmap<IdxType>(num_dst, num_items_each_dst, dst_unique_edges, edge_hashmap);
+  _device_edge_hashmap = new DeviceEdgeHashmap<IdxType>(
+      num_dst, num_items_each_dst, dst_unique_edges, edge_hashmap);
   _dst_unique_edges = dst_unique_edges;
   _edge_hashmap = edge_hashmap;
 }
@@ -350,7 +357,8 @@ std::tuple<IdArray, IdArray, IdArray> FrequencyHashmap<IdxType>::Topk(
   // Determine temporary device storage requirements
   d_temp_storage = nullptr;
   temp_storage_bytes = 0;
-  // the DeviceRadixSort is faster than DeviceSegmentedRadixSort, especially when num_dst_nodes is large
+  // the DeviceRadixSort is faster than DeviceSegmentedRadixSort,
+  // especially when num_dst_nodes is large (about ~10000)
   if (dtype.bits == 32) {
     CUDA_CALL(cub::DeviceRadixSort::SortPairsDescending(d_temp_storage, temp_storage_bytes,
               d_unique_frequency, d_unique_src_edges, num_unique_edges));
@@ -404,7 +412,8 @@ std::tuple<IdArray, IdArray, IdArray> FrequencyHashmap<IdxType>::Topk(
   _pick_data<IdxType, Idx64Type, BLOCK_SIZE, NODE_TILE_SIZE><<<nodes_grid, block, 0, _stream>>>(
       d_unique_frequency.Current(), d_unique_src_edges.Current(), num_unique_each_node_alternate,
       dst_data, num_edges_per_node, num_dst_nodes, num_edges,
-      unique_output_offsets, res_src.Ptr<IdxType>(), res_dst.Ptr<IdxType>(), res_cnt.Ptr<IdxType>());
+      unique_output_offsets,
+      res_src.Ptr<IdxType>(), res_dst.Ptr<IdxType>(), res_cnt.Ptr<IdxType>());
 
   device->StreamSync(_ctx, _stream);
   device->FreeWorkspace(_ctx, is_first_position);
