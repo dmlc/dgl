@@ -515,15 +515,15 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
              const std::vector<CSRMatrix>& vec_csr,
              const std::vector<NDArray>& vec_ufeat,
              const std::vector<NDArray>& vec_efeat,
-             std::vector<NDArray> vec_out,
-             const std::vector<NDArray>& out_aux,
+             std::vector<NDArray>* vec_out,
+             std::vector<std::vector<NDArray>>* out_aux,
              const std::vector<dgl_type_t>& ufeat_ntids,  // ufeat node type id
              const std::vector<dgl_type_t>& out_ntids) {  // output node type id
   bool is_scalar_efeat = vec_efeat[0].NumElements() == vec_csr[0].indices->shape[0];
   bool use_efeat = op != "copy_lhs";
   auto device = runtime::DeviceAPI::Get(vec_csr[0].indptr->ctx);
   SWITCH_BITS(bits, DType, {
-    std::vector<DType*> trans_out(vec_out.size(), NULL);
+    std::vector<DType*> trans_out((*vec_out).size(), NULL);
 
     bool use_legacy_cusparsemm =
         (CUDART_VERSION < 11000) &&
@@ -532,9 +532,9 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
          (op == "mul" && is_scalar_efeat && cusparse_available<bits, IdType>(false)));
     // Create temporary output buffer to store non-transposed output
     if (use_legacy_cusparsemm) {
-      for (dgl_type_t ntype = 0; ntype < vec_out.size(); ++ntype) {
-        const int m = vec_out[ntype]->shape[0];
-        const int n = vec_out[ntype]->shape[1];
+      for (dgl_type_t ntype = 0; ntype < (*vec_out).size(); ++ntype) {
+        const int m = (*vec_out)[ntype]->shape[0];
+        const int n = (*vec_out)[ntype]->shape[1];
         if (m == 0) continue;
         DType *out = static_cast<DType*>(device->AllocWorkspace(vec_csr[0].indptr->ctx,
           m * n * sizeof(DType)));
@@ -577,7 +577,7 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
         if (op == "copy_lhs" && cusparse_available<bits, IdType>(more_nnz)) {  // cusparse
           /* If CUDA is less than 11.0, put the output in trans_out for later transposition */
           DType *out = (CUDART_VERSION < 11000) ? trans_out[dst_id] :
-            static_cast<DType*>(vec_out[dst_id]->data);
+            static_cast<DType*>((*vec_out)[dst_id]->data);
           cusparse::CusparseCsrmm2Hetero<DType, IdType>(
               csr.indptr->ctx, csr,
               static_cast<DType*>(vec_ufeat[src_id]->data),
@@ -593,8 +593,8 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
               csr.indptr->ctx, csr,
               static_cast<DType*>(vec_ufeat[src_id]->data),
               static_cast<DType*>(efeat->data),
-              // TODO(Israt): Change vec_out to trans_out to support CUDA version < 11
-              static_cast<DType*>(vec_out[dst_id]->data),
+              // TODO(Israt): Change (*vec_out) to trans_out to support CUDA version < 11
+              static_cast<DType*>((*vec_out)[dst_id]->data),
               x_length, thr_entry->stream);
         } else {  // general kernel
           NDArray ufeat = (vec_ufeat.size() == 0) ?
@@ -603,27 +603,10 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
             NullArray() : vec_efeat[etype];
           SWITCH_OP(op, Op, {
             cuda::SpMMCsr<IdType, DType, Op, cuda::reduce::Sum<IdType, DType> >(
-                bcast, csr, ufeat, efeat, vec_out[dst_id], NullArray(), NullArray());
+                bcast, csr, ufeat, efeat, (*vec_out)[dst_id], NullArray(), NullArray());
           });
         }
-      } else if (reduce == "max") {
-          SWITCH_OP(op, Op, {
-            NDArray ufeat = (vec_ufeat.size() == 0) ?
-                NullArray() : vec_ufeat[src_id];
-            NDArray efeat = (vec_efeat.size() == 0) ?
-                NullArray() : vec_efeat[etype];
-            cuda::SpMMCsr<IdType, DType, Op, cuda::reduce::Max<IdType, DType> >(
-                bcast, csr, ufeat, efeat, vec_out[dst_id], out_aux[0], out_aux[1]);
-          });
-      } else if (reduce == "min") {
-          SWITCH_OP(op, Op, {
-            NDArray ufeat = (vec_ufeat.size() == 0) ?
-                NullArray() : vec_ufeat[src_id];
-            NDArray efeat = (vec_efeat.size() == 0) ?
-                NullArray() : vec_efeat[etype];
-            cuda::SpMMCsr<IdType, DType, Op, cuda::reduce::Min<IdType, DType> >(
-                bcast, csr, ufeat, efeat, vec_out[dst_id], out_aux[0], out_aux[1]);
-        });
+      // TODO(Israt): Add support for max/min reducer
       } else {
         LOG(FATAL) << "Not implemented";
       }
@@ -631,11 +614,11 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
 
     if (use_legacy_cusparsemm) {
       // transpose output
-      for (dgl_type_t ntype = 0; ntype < vec_out.size(); ++ntype) {
-        const int m = vec_out[ntype]->shape[0];
-        const int n = vec_out[ntype]->shape[1];
+      for (dgl_type_t ntype = 0; ntype < (*vec_out).size(); ++ntype) {
+        const int m = (*vec_out)[ntype]->shape[0];
+        const int n = (*vec_out)[ntype]->shape[1];
         if (m == 0) continue;
-        DType *C_data = static_cast<DType*>(vec_out[ntype]->data);
+        DType *C_data = static_cast<DType*>((*vec_out)[ntype]->data);
         _Transpose(trans_out[ntype], C_data, n, m);
         device->FreeWorkspace(vec_csr[0].indptr->ctx, trans_out[ntype]);
       }
@@ -709,37 +692,37 @@ template void SpMMCsrHetero<kDLGPU, int32_t, 16>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const std::vector<CSRMatrix>& csr,
     const std::vector<NDArray>& ufeat, const std::vector<NDArray>& efeat,
-    std::vector<NDArray> out, const std::vector<NDArray>& out_aux,
+    std::vector<NDArray>* out, std::vector<std::vector<NDArray>>* out_aux,
     const std::vector<dgl_type_t>& ufeat_ntids, const std::vector<dgl_type_t>& out_ntids);
 template void SpMMCsrHetero<kDLGPU, int64_t, 16>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const std::vector<CSRMatrix>& csr,
     const std::vector<NDArray>& ufeat, const std::vector<NDArray>& efeat,
-    std::vector<NDArray> out, const std::vector<NDArray>& out_aux,
+    std::vector<NDArray>* out, std::vector<std::vector<NDArray>>* out_aux,
     const std::vector<dgl_type_t>& ufeat_ntids, const std::vector<dgl_type_t>& out_ntids);
 template void SpMMCsrHetero<kDLGPU, int32_t, 32>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const std::vector<CSRMatrix>& csr,
     const std::vector<NDArray>& ufeat, const std::vector<NDArray>& efeat,
-    std::vector<NDArray> out, const std::vector<NDArray>& out_aux,
+    std::vector<NDArray>* out, std::vector<std::vector<NDArray>>* out_aux,
     const std::vector<dgl_type_t>& ufeat_ntids, const std::vector<dgl_type_t>& out_ntids);
 template void SpMMCsrHetero<kDLGPU, int64_t, 32>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const std::vector<CSRMatrix>& csr,
     const std::vector<NDArray>& ufeat, const std::vector<NDArray>& efeat,
-    std::vector<NDArray> out, const std::vector<NDArray>& out_aux,
+    std::vector<NDArray>* out, std::vector<std::vector<NDArray>>* out_aux,
     const std::vector<dgl_type_t>& ufeat_ntids, const std::vector<dgl_type_t>& out_ntids);
 template void SpMMCsrHetero<kDLGPU, int32_t, 64>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const std::vector<CSRMatrix>& csr,
     const std::vector<NDArray>& ufeat, const std::vector<NDArray>& efeat,
-    std::vector<NDArray> out, const std::vector<NDArray>& out_aux,
+    std::vector<NDArray>* out, std::vector<std::vector<NDArray>>* out_aux,
     const std::vector<dgl_type_t>& ufeat_ntids, const std::vector<dgl_type_t>& out_ntids);
 template void SpMMCsrHetero<kDLGPU, int64_t, 64>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const std::vector<CSRMatrix>& csr,
     const std::vector<NDArray>& ufeat, const std::vector<NDArray>& efeat,
-    std::vector<NDArray> out, const std::vector<NDArray>& out_aux,
+    std::vector<NDArray>* out, std::vector<std::vector<NDArray>>* out_aux,
     const std::vector<dgl_type_t>& ufeat_ntids, const std::vector<dgl_type_t>& out_ntids);
 
 template void SpMMCoo<kDLGPU, int32_t, 16>(
