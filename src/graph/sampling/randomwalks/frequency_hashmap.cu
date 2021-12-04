@@ -38,6 +38,7 @@ __global__ void _init_edge_table(void *edge_hashmap, int64_t edges_len) {
   auto edge_hashmap_t = static_cast<EdgeItem*>(edge_hashmap);
   int64_t start_idx = (blockIdx.x * TILE_SIZE) + threadIdx.x;
   int64_t last_idx = start_idx + TILE_SIZE;
+#pragma unroll(4)
   for (int64_t idx = start_idx; idx < last_idx; idx += BLOCK_SIZE) {
     if (idx < edges_len) {
       EdgeItem *edge = (edge_hashmap_t + idx);
@@ -56,7 +57,6 @@ __global__ void _count_frequency(const IdxType *src_data,
   int64_t last_idx = start_idx + TILE_SIZE;
 
   IdxType count = 0;
-#pragma unroll(5)
   for (int64_t idx = start_idx; idx < last_idx; idx += BLOCK_SIZE) {
     if (idx < num_edges) {
       IdxType src = src_data[idx];
@@ -116,7 +116,6 @@ __global__ void _compact_frequency(const IdxType *src_data, const IdxType *dst_d
   __shared__ typename BlockScan::TempStorage temp_space;
   BlockPrefixCallbackOp<IdxType> prefix_op(0);
 
-#pragma unroll(5)
   for (int64_t idx = start_idx; idx < last_idx; idx += BLOCK_SIZE) {
     IdxType flag = 0;
     if (idx < num_edges) {
@@ -151,6 +150,7 @@ __global__ void _get_pick_num(IdxType *num_unique_each_node,
     const int64_t num_pick, const int64_t num_dst_nodes) {
   int64_t start_idx = (blockIdx.x * TILE_SIZE) + threadIdx.x;
   int64_t last_idx = start_idx + TILE_SIZE;
+#pragma unroll(4)
   for (int64_t idx = start_idx; idx < last_idx; idx += BLOCK_SIZE) {
     if (idx < num_dst_nodes) {
       IdxType &num_unique = num_unique_each_node[idx];
