@@ -117,56 +117,35 @@ void UpdateGradMinMax_hetero(HeteroGraphPtr graph,
                        const std::string& op,
                        const std::vector<NDArray>& list_feat,
                        const std::vector<NDArray>& list_idx,
-                       const std::vector<NDArray>& list_idx_ntypes,
+                       const std::vector<NDArray>& list_idx_types,
                        std::vector<NDArray>* list_out) {
-  if (op == "copy_lhs") {
+  if (op == "copy_lhs" || op == "copy_rhs") {
     std::vector<std::vector<dgl_id_t>> dst_src_ntids(graph->NumVertexTypes(),
     std::vector<dgl_id_t>());
+
     for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
       auto pair = graph->meta_graph()->FindEdge(etype);
-      const dgl_id_t dst_id = pair.first;  // graph is reversed
-      const dgl_id_t src_id = pair.second;
-      auto same_src_dst_id = std::find(begin(dst_src_ntids[dst_id]),
-        end(dst_src_ntids[dst_id]), src_id);
-      if (same_src_dst_id != std::end(dst_src_ntids[dst_id]))
+      const dgl_id_t dst_type = pair.first;  // graph is reversed
+      const dgl_id_t src_type = pair.second;
+      auto same_src_dst_ntype = std::find(begin(dst_src_ntids[dst_type]),
+        end(dst_src_ntids[dst_type]), src_type);
+      // if op is "copy_lhs", relation type with same src and dst node type will be updated once
+      if (op == "copy_lhs" && same_src_dst_ntype != std::end(dst_src_ntids[dst_type]))
         continue;
-      dst_src_ntids[dst_id].push_back(src_id);
-      const DType* feat_data = list_feat[dst_id].Ptr<DType>();
-      const IdType* idx_data = list_idx[dst_id].Ptr<IdType>();
-      const IdType* idx_ntype_data = list_idx_ntypes[dst_id].Ptr<IdType>();
-      DType* out_data = (*list_out)[src_id].Ptr<DType>();
+      dst_src_ntids[dst_type].push_back(src_type);
+      const DType* feat_data = list_feat[dst_type].Ptr<DType>();
+      const IdType* idx_data = list_idx[dst_type].Ptr<IdType>();
+      const IdType* idx_type_data = list_idx_types[dst_type].Ptr<IdType>();
+      int type = (op == "copy_lhs") ? src_type : etype;
+      DType* out_data = (*list_out)[type].Ptr<DType>();
       int dim = 1;
-      for (int i = 1; i < (*list_out)[src_id]->ndim; ++i)
-        dim *= (*list_out)[src_id]->shape[i];
-      int n = list_feat[dst_id]->shape[0];
+      for (int i = 1; i < (*list_out)[type]->ndim; ++i)
+        dim *= (*list_out)[type]->shape[i];
+      int n = list_feat[dst_type]->shape[0];
 #pragma omp parallel for
       for (int i = 0; i < n; ++i) {
         for (int k = 0; k < dim; ++k) {
-          if (src_id == idx_ntype_data[i * dim + k]) {
-            const int write_row = idx_data[i * dim + k];
-#pragma omp atomic
-            out_data[write_row * dim + k] += feat_data[i * dim + k];  // feat = dZ
-          }
-        }
-      }
-    }
-  } else if (op == "copy_rhs") {
-    for (dgl_type_t etid = 0; etid < graph->NumEdgeTypes(); ++etid) {
-      auto pair = graph->meta_graph()->FindEdge(etid);
-      const dgl_id_t dst_id = pair.first;  // graph is reversed
-      const dgl_id_t src_id = pair.second;
-      const DType* feat_data = list_feat[dst_id].Ptr<DType>();
-      const IdType* idx_data = list_idx[dst_id].Ptr<IdType>();
-      const IdType* idx_ntype_data = list_idx_ntypes[dst_id].Ptr<IdType>();
-      DType* out_data = (*list_out)[etid].Ptr<DType>();
-      int dim = 1;
-      for (int i = 1; i < (*list_out)[etid]->ndim; ++i)
-        dim *= (*list_out)[etid]->shape[i];
-      int n = list_feat[dst_id]->shape[0];
-#pragma omp parallel for
-      for (int i = 0; i < n; ++i) {
-        for (int k = 0; k < dim; ++k) {
-          if (etid == idx_ntype_data[i * dim + k]) {
+          if (type == idx_type_data[i * dim + k]) {
             const int write_row = idx_data[i * dim + k];
 #pragma omp atomic
             out_data[write_row * dim + k] += feat_data[i * dim + k];  // feat = dZ
