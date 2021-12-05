@@ -565,7 +565,7 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
           x_length *= ufeat->shape[i];
       }
     }
-    // TODO (Israt): Can python do the following initializations while creating the tensors?
+    // TODO(Israt): Can python do the following initializations while creating the tensors?
     if (reduce == "max" ||  reduce == "min") {
       const int64_t dim = bcast.out_len;
       std::vector<bool> updated((*vec_out).size(), false);
@@ -573,7 +573,7 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
         DType *out_off = (*vec_out)[out_ntids[etype]].Ptr<DType>();
         if (reduce == "max")
           _Fill(out_off, vec_csr[etype].num_rows * dim, cuda::reduce::Max<IdType, DType>::zero());
-        else // min
+        else  // min
           _Fill(out_off, vec_csr[etype].num_rows * dim, cuda::reduce::Min<IdType, DType>::zero());
         const dgl_type_t dst_id = out_ntids[etype];
         if (!updated[dst_id]) {
