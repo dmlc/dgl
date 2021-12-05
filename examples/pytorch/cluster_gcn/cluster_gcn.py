@@ -10,6 +10,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import dgl
+import dgl.function as fn
 from dgl.data import register_data_args
 
 from modules import GraphSAGE
@@ -72,8 +73,17 @@ def main(args):
     # metis only support int64 graph
     g = g.long()
 
-    cluster_iterator = ClusterIter(
-        args.dataset, g, args.psize, args.batch_size, train_nid, use_pp=args.use_pp)
+    if args.use_pp:
+        g.update_all(fn.copy_u('feat', 'm'), fn.sum('m', 'feat_agg'))
+        g.ndata['feat'] = torch.cat([g.ndata['feat'], g.ndata['feat_agg']], 1)
+        del g.ndata['feat_agg']
+
+    cluster_iterator = dgl.dataloading.GraphDataLoader(
+        dgl.dataloading.ClusterGCNSubgraphIterator(
+            dgl.node_subgraph(g, train_nid), args.psize, './cache'),
+        batch_size=args.batch_size, num_workers=4)
+    #cluster_iterator = ClusterIter(
+    #    args.dataset, g, args.psize, args.batch_size, train_nid, use_pp=args.use_pp)
 
     # set device for dataset tensors
     if args.gpu < 0:
@@ -132,9 +142,11 @@ def main(args):
                 cluster = cluster.to(torch.cuda.current_device())
             model.train()
             # forward
-            pred = model(cluster)
             batch_labels = cluster.ndata['label']
             batch_train_mask = cluster.ndata['train_mask']
+            if batch_train_mask.sum().item() == 0:
+                continue
+            pred = model(cluster)
             loss = loss_f(pred[batch_train_mask],
                           batch_labels[batch_train_mask])
 

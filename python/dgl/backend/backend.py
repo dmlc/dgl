@@ -1148,18 +1148,23 @@ def count_nonzero(input):
 # DGL should contain all the operations on index, so this set of operators
 # should be gradually removed.
 
-def unique(input):
+def unique(input, return_inverse=False):
     """Returns the unique scalar elements in a tensor.
 
     Parameters
     ----------
     input : Tensor
         Must be a 1-D tensor.
+    return_inverse : bool, optional
+        Whether to also return the indices for where elements in the original
+        input ended up in the returned unique list.
 
     Returns
     -------
     Tensor
         A 1-D tensor containing unique elements.
+    Tensor
+        A 1-D tensor containing the new positions of the elements in the input.
     """
     pass
 

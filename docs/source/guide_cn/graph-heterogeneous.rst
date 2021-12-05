@@ -235,7 +235,7 @@ DGL提供了 :func:`dgl.save_graphs` 和 :func:`dgl.load_graphs` 函数，分别
     tensor([0, 0, 0, 1, 1, 1])
     >>> # 原始的特定类型节点ID
     >>> hg.ndata[dgl.NID]
-    >>> tensor([0, 1, 2, 0, 1, 2])
+    tensor([0, 1, 2, 0, 1, 2])
 
     >>> # 异构图中边类型的顺序
     >>> g.etypes
