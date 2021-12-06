@@ -3,21 +3,23 @@
  * \file rpc/rpc.cc
  * \brief Implementation of RPC utilities used by both server and client sides.
  */
+#if defined(__linux__)
 #include "./rpc.h"
 
-#include <csignal>
-#if defined(__linux__)
-#include <unistd.h>
-#endif
-
+#include <dgl/array.h>
+#include <dgl/packed_func_ext.h>
+#include <dgl/random.h>
 #include <dgl/runtime/container.h>
 #include <dgl/runtime/parallel_for.h>
-#include <dgl/packed_func_ext.h>
-#include <dgl/array.h>
-#include <dgl/random.h>
 #include <dgl/zerocopy_serializer.h>
-#include "../runtime/resource_manager.h"
+#include <tensorpipe/tensorpipe.h>
+#include <unistd.h>
+
+#include <csignal>
+#include <future>
+
 #include "../c_api_common.h"
+#include "../runtime/resource_manager.h"
 
 using dgl::network::StringPrintf;
 using namespace dgl::runtime;
@@ -25,239 +27,248 @@ using namespace dgl::runtime;
 namespace dgl {
 namespace rpc {
 
-RPCStatus SendRPCMessage(const RPCMessage& msg, const int32_t target_id) {
-  std::shared_ptr<std::string> zerocopy_blob(new std::string());
-  StreamWithBuffer zc_write_strm(zerocopy_blob.get(), true);
-  zc_write_strm.Write(msg);
-  int32_t nonempty_ndarray_count = zc_write_strm.buffer_list().size();
-  zerocopy_blob->append(reinterpret_cast<char*>(&nonempty_ndarray_count),
-                        sizeof(int32_t));
-  network::Message rpc_meta_msg;
-  rpc_meta_msg.data = const_cast<char*>(zerocopy_blob->data());
-  rpc_meta_msg.size = zerocopy_blob->size();
-  rpc_meta_msg.deallocator = [zerocopy_blob](network::Message*) {};
-  CHECK_EQ(RPCContext::ThreadLocal()->sender->Send(
-    rpc_meta_msg, target_id), ADD_SUCCESS);
-  // send real ndarray data
-  for (auto ptr : zc_write_strm.buffer_list()) {
-    network::Message ndarray_data_msg;
-    ndarray_data_msg.data = reinterpret_cast<char*>(ptr.data);
-    if (ptr.size == 0) {
-      LOG(FATAL) << "Cannot send a empty NDArray.";
+using namespace tensorpipe;
+
+// Borrow from PyTorch
+
+const char kSocketIfnameEnvVar[] = "TP_SOCKET_IFNAME";
+const char kDefaultUvAddress[] = "127.0.0.1";
+
+const std::string& guessAddress() {
+  static const std::string uvAddress = []() {
+    tensorpipe::Error error;
+    std::string result;
+    char* ifnameEnv = std::getenv(kSocketIfnameEnvVar);
+    if (ifnameEnv != nullptr) {
+      std::tie(error, result) =
+          tensorpipe::transport::uv::lookupAddrForIface(ifnameEnv);
+      if (error) {
+        LOG(WARNING) << "Failed to look up the IP address for interface "
+                     << ifnameEnv << " (" << error.what() << "), defaulting to "
+                     << kDefaultUvAddress;
+        return std::string(kDefaultUvAddress);
+      }
+    } else {
+      std::tie(error, result) =
+          tensorpipe::transport::uv::lookupAddrForHostname();
+      if (error) {
+        LOG(WARNING) << "Failed to look up the IP address for the hostname ("
+                     << error.what() << "), defaulting to "
+                     << kDefaultUvAddress;
+        return std::string(kDefaultUvAddress);
+      }
     }
-    ndarray_data_msg.size = ptr.size;
-    NDArray tensor = ptr.tensor;
-    ndarray_data_msg.deallocator = [tensor](network::Message*) {};
-    CHECK_EQ(RPCContext::ThreadLocal()->sender->Send(
-      ndarray_data_msg, target_id), ADD_SUCCESS);
-  }
+    return result;
+  }();
+  return uvAddress;
+}
+
+RPCStatus SendRPCMessage(const RPCMessage& msg, const int32_t target_id) {
+  RPCContext::getInstance()->sender->Send(msg, target_id);
   return kRPCSuccess;
 }
 
 RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout) {
   // ignore timeout now
   CHECK_EQ(timeout, 0) << "rpc cannot support timeout now.";
-  network::Message rpc_meta_msg;
-  int send_id;
-  CHECK_EQ(RPCContext::ThreadLocal()->receiver->Recv(
-    &rpc_meta_msg, &send_id), REMOVE_SUCCESS);
-  char* count_ptr = rpc_meta_msg.data+rpc_meta_msg.size-sizeof(int32_t);
-  int32_t nonempty_ndarray_count = *(reinterpret_cast<int32_t*>(count_ptr));
-  // Recv real ndarray data
-  std::vector<void*> buffer_list(nonempty_ndarray_count);
-  for (int i = 0; i < nonempty_ndarray_count; ++i) {
-    network::Message ndarray_data_msg;
-    CHECK_EQ(RPCContext::ThreadLocal()->receiver->RecvFrom(
-        &ndarray_data_msg, send_id), REMOVE_SUCCESS);
-    buffer_list[i] = ndarray_data_msg.data;
-  }
-  StreamWithBuffer zc_read_strm(rpc_meta_msg.data, rpc_meta_msg.size-sizeof(int32_t), buffer_list);
-  zc_read_strm.Read(msg);
-  rpc_meta_msg.deallocator(&rpc_meta_msg);
+  RPCContext::getInstance()->receiver->Recv(msg);
   return kRPCSuccess;
+}
+
+void InitGlobalTpContext() {
+  if (!RPCContext::getInstance()->ctx) {
+    RPCContext::getInstance()->ctx = std::make_shared<tensorpipe::Context>();
+    auto context = RPCContext::getInstance()->ctx;
+    auto transportContext = tensorpipe::transport::uv::create();
+    auto shmtransport = tensorpipe::transport::shm::create();
+    context->registerTransport(0 /* priority */, "tcp", transportContext);
+    // Register basic uv channel
+    auto basicChannel = tensorpipe::channel::basic::create();
+    context->registerChannel(0 /* low priority */, "basic", basicChannel);
+
+    char* numUvThreads_str = std::getenv("DGL_SOCKET_NTHREADS");
+    if (numUvThreads_str) {
+      int numUvThreads = std::atoi(numUvThreads_str);
+      CHECK(numUvThreads > 0) << "DGL_SOCKET_NTHREADS should be positive integer if set";
+      // Register multiplex uv channel
+      std::vector<std::shared_ptr<tensorpipe::transport::Context>> contexts;
+      std::vector<std::shared_ptr<tensorpipe::transport::Listener>> listeners;
+      for (int i = 0; i < numUvThreads; i++) {
+        auto context = tensorpipe::transport::uv::create();
+        std::string address = guessAddress();
+        contexts.push_back(std::move(context));
+        listeners.push_back(contexts.back()->listen(address));
+      }
+      auto mptChannel = tensorpipe::channel::mpt::create(std::move(contexts),
+                                                         std::move(listeners));
+      context->registerChannel(20 /* high priority */, "mpt", mptChannel);
+    }
+  }
 }
 
 //////////////////////////// C APIs ////////////////////////////
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCReset")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-  RPCContext::Reset();
-});
+.set_body([](DGLArgs args, DGLRetValue* rv) { RPCContext::Reset(); });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateSender")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
+.set_body([](DGLArgs args, DGLRetValue* rv) {
   int64_t msg_queue_size = args[0];
   std::string type = args[1];
-  int max_thread_count = args[2];
-  if (type.compare("socket") == 0) {
-    RPCContext::ThreadLocal()->sender =
-      std::make_shared<network::SocketSender>(msg_queue_size, max_thread_count);
-  } else {
-    LOG(FATAL) << "Unknown communicator type for rpc receiver: " << type;
-  }
+  InitGlobalTpContext();
+  RPCContext::getInstance()->sender =
+    std::make_shared<TPSender>(RPCContext::getInstance()->ctx);
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateReceiver")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
+.set_body([](DGLArgs args, DGLRetValue* rv) {
   int64_t msg_queue_size = args[0];
   std::string type = args[1];
-  int max_thread_count = args[2];
-  if (type.compare("socket") == 0) {
-    RPCContext::ThreadLocal()->receiver =
-      std::make_shared<network::SocketReceiver>(msg_queue_size, max_thread_count);
-  } else {
-    LOG(FATAL) << "Unknown communicator type for rpc sender: " << type;
-  }
+  InitGlobalTpContext();
+  RPCContext::getInstance()->receiver =
+    std::make_shared<TPReceiver>(RPCContext::getInstance()->ctx);
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFinalizeSender")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-  RPCContext::ThreadLocal()->sender->Finalize();
+.set_body([](DGLArgs args, DGLRetValue* rv) {
+  RPCContext::getInstance()->sender->Finalize();
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFinalizeReceiver")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-  RPCContext::ThreadLocal()->receiver->Finalize();
+.set_body([](DGLArgs args, DGLRetValue* rv) {
+  RPCContext::getInstance()->receiver->Finalize();
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCReceiverWait")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
+.set_body([](DGLArgs args, DGLRetValue* rv) {
   std::string ip = args[0];
   int port = args[1];
   int num_sender = args[2];
   std::string addr;
-  if (RPCContext::ThreadLocal()->receiver->Type() == "socket") {
-    addr = StringPrintf("socket://%s:%d", ip.c_str(), port);
-  } else {
-    LOG(FATAL) << "Unknown communicator type: " << RPCContext::ThreadLocal()->receiver->Type();
-  }
-  if (RPCContext::ThreadLocal()->receiver->Wait(addr.c_str(), num_sender) == false) {
+  addr = StringPrintf("tcp://%s:%d", ip.c_str(), port);
+  if (RPCContext::getInstance()->receiver->Wait(addr, num_sender) == false) {
     LOG(FATAL) << "Wait sender socket failed.";
   }
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCAddReceiver")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
+.set_body([](DGLArgs args, DGLRetValue* rv) {
   std::string ip = args[0];
   int port = args[1];
   int recv_id = args[2];
   std::string addr;
-  if (RPCContext::ThreadLocal()->sender->Type() == "socket") {
-    addr = StringPrintf("socket://%s:%d", ip.c_str(), port);
-  } else {
-    LOG(FATAL) << "Unknown communicator type: " << RPCContext::ThreadLocal()->sender->Type();
-  }
-  RPCContext::ThreadLocal()->sender->AddReceiver(addr.c_str(), recv_id);
+  addr = StringPrintf("tcp://%s:%d", ip.c_str(), port);
+  RPCContext::getInstance()->sender->AddReceiver(addr, recv_id);
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSenderConnect")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-  if (RPCContext::ThreadLocal()->sender->Connect() == false) {
+.set_body([](DGLArgs args, DGLRetValue* rv) {
+  if (RPCContext::getInstance()->sender->Connect() == false) {
     LOG(FATAL) << "Sender connection failed.";
   }
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSetRank")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
+.set_body([](DGLArgs args, DGLRetValue* rv) {
   const int32_t rank = args[0];
-  RPCContext::ThreadLocal()->rank = rank;
+  RPCContext::getInstance()->rank = rank;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetRank")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-  *rv = RPCContext::ThreadLocal()->rank;
+.set_body([](DGLArgs args, DGLRetValue* rv) {
+  *rv = RPCContext::getInstance()->rank;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSetNumServer")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
+.set_body([](DGLArgs args, DGLRetValue* rv) {
   const int32_t num_servers = args[0];
-  *rv = RPCContext::ThreadLocal()->num_servers = num_servers;
+  *rv = RPCContext::getInstance()->num_servers = num_servers;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetNumServer")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-  *rv = RPCContext::ThreadLocal()->num_servers;
+.set_body([](DGLArgs args, DGLRetValue* rv) {
+  *rv = RPCContext::getInstance()->num_servers;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSetNumClient")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
+.set_body([](DGLArgs args, DGLRetValue* rv) {
   const int32_t num_clients = args[0];
-  *rv = RPCContext::ThreadLocal()->num_clients = num_clients;
+  *rv = RPCContext::getInstance()->num_clients = num_clients;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetNumClient")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-  *rv = RPCContext::ThreadLocal()->num_clients;
+.set_body([](DGLArgs args, DGLRetValue* rv) {
+  *rv = RPCContext::getInstance()->num_clients;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSetNumServerPerMachine")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
+.set_body([](DGLArgs args, DGLRetValue* rv) {
   const int32_t num_servers = args[0];
-  *rv = RPCContext::ThreadLocal()->num_servers_per_machine = num_servers;
+  *rv = RPCContext::getInstance()->num_servers_per_machine = num_servers;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetNumServerPerMachine")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-  *rv = RPCContext::ThreadLocal()->num_servers_per_machine;
+.set_body([](DGLArgs args, DGLRetValue* rv) {
+  *rv = RPCContext::getInstance()->num_servers_per_machine;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCIncrMsgSeq")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-  *rv = (RPCContext::ThreadLocal()->msg_seq)++;
+.set_body([](DGLArgs args, DGLRetValue* rv) {
+  *rv = (RPCContext::getInstance()->msg_seq)++;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetMsgSeq")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-  *rv = RPCContext::ThreadLocal()->msg_seq;
+.set_body([](DGLArgs args, DGLRetValue* rv) {
+  *rv = RPCContext::getInstance()->msg_seq;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSetMsgSeq")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
+.set_body([](DGLArgs args, DGLRetValue* rv) {
   const int64_t msg_seq = args[0];
-  RPCContext::ThreadLocal()->msg_seq = msg_seq;
+  RPCContext::getInstance()->msg_seq = msg_seq;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetBarrierCount")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-  *rv = RPCContext::ThreadLocal()->barrier_count;
+.set_body([](DGLArgs args, DGLRetValue* rv) {
+  *rv = RPCContext::getInstance()->barrier_count;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSetBarrierCount")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
+.set_body([](DGLArgs args, DGLRetValue* rv) {
   const int32_t count = args[0];
-  RPCContext::ThreadLocal()->barrier_count = count;
+  RPCContext::getInstance()->barrier_count = count;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetMachineID")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-  *rv = RPCContext::ThreadLocal()->machine_id;
+.set_body([](DGLArgs args, DGLRetValue* rv) {
+  *rv = RPCContext::getInstance()->machine_id;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSetMachineID")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
+.set_body([](DGLArgs args, DGLRetValue* rv) {
   const int32_t machine_id = args[0];
-  RPCContext::ThreadLocal()->machine_id = machine_id;
+  RPCContext::getInstance()->machine_id = machine_id;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetNumMachines")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-  *rv = RPCContext::ThreadLocal()->num_machines;
+.set_body([](DGLArgs args, DGLRetValue* rv) {
+  *rv = RPCContext::getInstance()->num_machines;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSetNumMachines")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
+.set_body([](DGLArgs args, DGLRetValue* rv) {
   const int32_t num_machines = args[0];
-  RPCContext::ThreadLocal()->num_machines = num_machines;
+  RPCContext::getInstance()->num_machines = num_machines;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSendRPCMessage")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
+.set_body([](DGLArgs args, DGLRetValue* rv) {
   RPCMessageRef msg = args[0];
   const int32_t target_id = args[1];
   *rv = SendRPCMessage(*(msg.sptr()), target_id);
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCRecvRPCMessage")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
+.set_body([](DGLArgs args, DGLRetValue* rv) {
   int32_t timeout = args[0];
   RPCMessageRef msg = args[1];
   *rv = RecvRPCMessage(msg.sptr().get(), timeout);
@@ -266,57 +277,67 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCRecvRPCMessage")
 //////////////////////////// RPCMessage ////////////////////////////
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateEmptyRPCMessage")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
+.set_body([](DGLArgs args, DGLRetValue* rv) {
   std::shared_ptr<RPCMessage> rst(new RPCMessage);
   *rv = rst;
 });
 
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateEmptyRPCMessageWithSize")
+.set_body([](DGLArgs args, DGLRetValue* rv) {
+  int64_t message_size = args[0];
+
+  std::shared_ptr<RPCMessage> rst(new RPCMessage);
+  *rv = rst;
+});
+
+
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateRPCMessage")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
+.set_body([](DGLArgs args, DGLRetValue* rv) {
   std::shared_ptr<RPCMessage> rst(new RPCMessage);
   rst->service_id = args[0];
   rst->msg_seq = args[1];
   rst->client_id = args[2];
   rst->server_id = args[3];
-  const std::string data = args[4];  // directly assigning string value raises errors :(
+  const std::string data =
+    args[4];  // directly assigning string value raises errors :(
   rst->data = data;
   rst->tensors = ListValueToVector<NDArray>(args[5]);
   *rv = rst;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCMessageGetServiceId")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
+.set_body([](DGLArgs args, DGLRetValue* rv) {
   const RPCMessageRef msg = args[0];
   *rv = msg->service_id;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCMessageGetMsgSeq")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
+.set_body([](DGLArgs args, DGLRetValue* rv) {
   const RPCMessageRef msg = args[0];
   *rv = msg->msg_seq;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCMessageGetClientId")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
+.set_body([](DGLArgs args, DGLRetValue* rv) {
   const RPCMessageRef msg = args[0];
   *rv = msg->client_id;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCMessageGetServerId")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
+.set_body([](DGLArgs args, DGLRetValue* rv) {
   const RPCMessageRef msg = args[0];
   *rv = msg->server_id;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCMessageGetData")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
+.set_body([](DGLArgs args, DGLRetValue* rv) {
   const RPCMessageRef msg = args[0];
   DGLByteArray barr{msg->data.c_str(), msg->data.size()};
   *rv = barr;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCMessageGetTensors")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
+.set_body([](DGLArgs args, DGLRetValue* rv) {
   const RPCMessageRef msg = args[0];
   List<Value> ret;
   for (size_t i = 0; i < msg->tensors.size(); ++i) {
@@ -337,7 +358,7 @@ void SigHandler(int s) {
 }
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCHandleSignal")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
+.set_body([](DGLArgs args, DGLRetValue* rv) {
   // Ctrl+C handler
   struct sigaction sigHandler;
   sigHandler.sa_handler = SigHandler;
@@ -351,10 +372,10 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCHandleSignal")
 //////////////////////////// ServerState ////////////////////////////
 
 DGL_REGISTER_GLOBAL("distributed.server_state._CAPI_DGLRPCGetServerState")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-  auto st = RPCContext::ThreadLocal()->server_state;
+.set_body([](DGLArgs args, DGLRetValue* rv) {
+  auto st = RPCContext::getInstance()->server_state;
   if (st.get() == nullptr) {
-    RPCContext::ThreadLocal()->server_state = std::make_shared<ServerState>();
+    RPCContext::getInstance()->server_state = std::make_shared<ServerState>();
   }
   *rv = st;
 });
@@ -362,7 +383,7 @@ DGL_REGISTER_GLOBAL("distributed.server_state._CAPI_DGLRPCGetServerState")
 //////////////////////////// KVStore ////////////////////////////
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetGlobalIDFromLocalPartition")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
+.set_body([](DGLArgs args, DGLRetValue* rv) {
   NDArray ID = args[0];
   NDArray part_id = args[1];
   int local_machine_id = args[2];
@@ -380,7 +401,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetGlobalIDFromLocalPartition")
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
+.set_body([](DGLArgs args, DGLRetValue* rv) {
   // Input
   std::string name = args[0];
   int local_machine_id = args[1];
@@ -403,8 +424,8 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
   std::vector<dgl_id_t> local_ids;
   std::vector<dgl_id_t> local_ids_orginal;
   std::vector<int64_t> local_data_shape;
-  std::vector<std::vector<dgl_id_t> > remote_ids(machine_count);
-  std::vector<std::vector<dgl_id_t> > remote_ids_original(machine_count);
+  std::vector<std::vector<dgl_id_t>> remote_ids(machine_count);
+  std::vector<std::vector<dgl_id_t>> remote_ids_original(machine_count);
   // Get row size (in bytes)
   int row_size = 1;
   for (int i = 0; i < local_data->ndim; ++i) {
@@ -443,8 +464,8 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
       msg.service_id = service_id;
       msg.msg_seq = msg_seq;
       msg.client_id = client_id;
-      int lower = i*group_count;
-      int upper = (i+1)*group_count;
+      int lower = i * group_count;
+      int upper = (i + 1) * group_count;
       msg.server_id = dgl::RandomEngine::ThreadLocal()->RandInt(lower, upper);
       msg.data = pickle_data;
       NDArray tensor = dgl::aten::VecToIdArray<dgl_id_t>(remote_ids[i]);
@@ -461,12 +482,12 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
   // Copy local data
   parallel_for(0, local_ids.size(), [&](size_t b, size_t e) {
     for (auto i = b; i < e; ++i) {
-      CHECK_GE(ID_size*row_size, local_ids_orginal[i]*row_size+row_size);
+      CHECK_GE(ID_size * row_size,
+                local_ids_orginal[i] * row_size + row_size);
       CHECK_GE(data_size, local_ids[i] * row_size + row_size);
       CHECK_GE(local_ids[i], 0);
       memcpy(return_data + local_ids_orginal[i] * row_size,
-             local_data_char + local_ids[i] * row_size,
-             row_size);
+             local_data_char + local_ids[i] * row_size, row_size);
     }
   });
   // Recv remote message
@@ -478,8 +499,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
     dgl_id_t id_size = remote_ids[part_id].size();
     for (size_t n = 0; n < id_size; ++n) {
       memcpy(return_data + remote_ids_original[part_id][n] * row_size,
-             data_char + n * row_size,
-             row_size);
+             data_char + n * row_size, row_size);
     }
   }
   *rv = res_tensor;
@@ -487,3 +507,5 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
 
 }  // namespace rpc
 }  // namespace dgl
+
+#endif
