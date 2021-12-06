@@ -95,7 +95,7 @@ def _yaml_sanity_check(yaml_file):
 
 
 class EdgeData:
-    """Parse edge data from edges_xxx.csv according to YAML::edges
+    """Parse edge data from edges_xxx.csv according to YAML::edge_data
     """
 
     def __init__(self, root_path, meta_edge):
@@ -143,7 +143,7 @@ class EdgeData:
 
 
 class NodeData:
-    """Parse node data from nodes_xxx.csv according to YAML::nodes
+    """Parse node data from nodes_xxx.csv according to YAML::node_data
     """
 
     def __init__(self, root_path, meta_node):
@@ -188,7 +188,7 @@ class NodeData:
 
 
 class GraphData:
-    """Parse graph data from graphs.csv according to YAML::graphs
+    """Parse graph data from graphs.csv according to YAML::graph_data
     """
 
     def __init__(self, root_path, meta_graph):
@@ -240,10 +240,10 @@ class CSVDataset(DGLDataset):
     def __init__(self, data_path, force_reload=False, verbose=True):
         self.graph = None
         self.graphs = None
-        meta_yaml = os.path.join(data_path, self.META_YAML_NAME)
+        meta_yaml = os.path.join(data_path, CSVDataset.META_YAML_NAME)
         if not os.path.exists(meta_yaml):
             raise DGLError(
-                "'{}' cannot be found under {}.".format(self.META_YAML_NAME, data_path))
+                "'{}' cannot be found under {}.".format(CSVDataset.META_YAML_NAME, data_path))
         meta = _yaml_sanity_check(meta_yaml)
         self.meta = meta
         ds_name = meta.dataset_name
@@ -283,13 +283,10 @@ class CSVDataset(DGLDataset):
             def assign_data(src_data, dst_data):
                 type = (src_data.type[0], src_data.type[1], src_data.type[2]) if len(
                     src_data.type) == 3 else src_data.type
-                if src_data.feat is not None:
-                    dst_data[type].data['feat'] = F.tensor(src_data.feat)
-                if src_data.label is not None:
-                    dst_data[type].data['label'] = F.tensor(src_data.label)
-                if src_data.num_classes is not None:
-                    dst_data[type].data['num_classes'] = F.tensor(
-                        src_data.num_classes)
+                for key in ['feat', 'label', 'num_classes']:
+                    if hasattr(src_data, key) and getattr(src_data, key) is not None:
+                        dst_data[type].data[key] = F.tensor(
+                            getattr(src_data, key))
                 if src_data.split_type is not None:
                     dst_data[type].data['train_mask'] = F.tensor(
                         src_data.split_type == 0)
