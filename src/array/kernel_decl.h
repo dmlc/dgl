@@ -39,8 +39,8 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
              const std::vector<CSRMatrix>& csr,
              const std::vector<NDArray>& ufeat,
              const std::vector<NDArray>& efeat,
-             std::vector<NDArray> out,
-             const std::vector<NDArray>& out_aux,
+             std::vector<NDArray>* out,
+             std::vector<std::vector<NDArray>>* out_aux,
              const std::vector<dgl_type_t>& ufeat_eid,
              const std::vector<dgl_type_t>& out_eid);
 /*!
@@ -129,6 +129,17 @@ template <int XPU, typename IdType, int bits>
 void ScatterAdd(NDArray feat,
                 NDArray idx,
                 NDArray out);
+
+/*!
+ * \brief Update gradients for reduce operator max and min on first dimension.
+ */
+template <int XPU, typename IdType, int bits>
+void UpdateGradMinMax_hetero(const HeteroGraphPtr& g,
+                const std::string& op,
+                const std::vector<NDArray>& feat,
+                const std::vector<NDArray>& idx,
+                const std::vector<NDArray>& idx_etype,
+                std::vector<NDArray>* out);
 
 /*!
  * \brief Backward function of segment cmp.
