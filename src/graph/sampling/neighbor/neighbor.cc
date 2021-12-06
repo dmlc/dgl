@@ -7,6 +7,7 @@
 #include <dgl/runtime/container.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/array.h>
+#include <dgl/aten/macro.h>
 #include <dgl/sampling/neighbor.h>
 #include "../../../c_api_common.h"
 #include "../../unit_graph.h"
@@ -156,7 +157,7 @@ HeteroSubgraph SampleNeighborsEType(
     const HeteroGraphPtr hg,
     const IdArray nodes,
     const IdArray etypes,
-    const int64_t fanout,
+    const std::vector<int64_t>& fanouts,
     EdgeDir dir,
     const IdArray prob,
     bool replace,
@@ -173,13 +174,23 @@ HeteroSubgraph SampleNeighborsEType(
   dgl_type_t etype = 0;
   const dgl_type_t src_vtype = 0;
   const dgl_type_t dst_vtype = 0;
-  if (num_nodes == 0 || fanout == 0) {
+
+  bool same_fanout = true;
+  int64_t fanout_value = fanouts[0];
+  for (auto fanout : fanouts) {
+    if (fanout != fanout_value) {
+      same_fanout = false;
+      break;
+    }
+  }
+
+  if (num_nodes == 0 || (same_fanout && fanout_value == 0)) {
     subrels[etype] = UnitGraph::Empty(1,
       hg->NumVertices(src_vtype),
       hg->NumVertices(dst_vtype),
       hg->DataType(), hg->Context());
     induced_edges[etype] = aten::NullArray();
-  } else if (fanout == -1) {
+  } else if (same_fanout && fanout_value == -1) {
     const auto &earr = (dir == EdgeDir::kOut) ?
       hg->OutEdges(etype, nodes) :
       hg->InEdges(etype, nodes);
@@ -201,21 +212,21 @@ HeteroSubgraph SampleNeighborsEType(
         if (dir == EdgeDir::kIn) {
           sampled_coo = aten::COOTranspose(aten::COORowWisePerEtypeSampling(
             aten::COOTranspose(hg->GetCOOMatrix(etype)),
-            nodes, etypes, fanout, prob, replace));
+            nodes, etypes, fanouts, prob, replace));
         } else {
           sampled_coo = aten::COORowWisePerEtypeSampling(
-            hg->GetCOOMatrix(etype), nodes, etypes, fanout, prob, replace, etype_sorted);
+            hg->GetCOOMatrix(etype), nodes, etypes, fanouts, prob, replace, etype_sorted);
         }
         break;
       case SparseFormat::kCSR:
         CHECK(dir == EdgeDir::kOut) << "Cannot sample out edges on CSC matrix.";
         sampled_coo = aten::CSRRowWisePerEtypeSampling(
-            hg->GetCSRMatrix(etype), nodes, etypes, fanout, prob, replace, etype_sorted);
+            hg->GetCSRMatrix(etype), nodes, etypes, fanouts, prob, replace, etype_sorted);
           break;
       case SparseFormat::kCSC:
         CHECK(dir == EdgeDir::kIn) << "Cannot sample in edges on CSR matrix.";
         sampled_coo = aten::CSRRowWisePerEtypeSampling(
-            hg->GetCSCMatrix(etype), nodes, etypes, fanout, prob, replace, etype_sorted);
+            hg->GetCSCMatrix(etype), nodes, etypes, fanouts, prob, replace, etype_sorted);
         sampled_coo = aten::COOTranspose(sampled_coo);
         break;
       default:
@@ -405,7 +416,7 @@ DGL_REGISTER_GLOBAL("sampling.neighbor._CAPI_DGLSampleNeighborsEType")
     HeteroGraphRef hg = args[0];
     IdArray nodes = args[1];
     IdArray etypes = args[2];
-    const int64_t fanout = args[3];
+    IdArray fanout = args[3];
     const std::string dir_str = args[4];
     IdArray prob = args[5];
     const bool replace = args[6];
@@ -414,10 +425,12 @@ DGL_REGISTER_GLOBAL("sampling.neighbor._CAPI_DGLSampleNeighborsEType")
     CHECK(dir_str == "in" || dir_str == "out")
       << "Invalid edge direction. Must be \"in\" or \"out\".";
     EdgeDir dir = (dir_str == "in")? EdgeDir::kIn : EdgeDir::kOut;
+    CHECK_INT64(fanout, "fanout");
+    std::vector<int64_t> fanout_vec = fanout.ToVector<int64_t>();
 
     std::shared_ptr<HeteroSubgraph> subg(new HeteroSubgraph);
     *subg = sampling::SampleNeighborsEType(
-        hg.sptr(), nodes, etypes, fanout, dir, prob, replace, etype_sorted);
+        hg.sptr(), nodes, etypes, fanout_vec, dir, prob, replace, etype_sorted);
 
     *rv = HeteroSubgraphRef(subg);
   });
