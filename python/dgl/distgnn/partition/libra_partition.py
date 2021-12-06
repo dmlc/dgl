@@ -15,70 +15,40 @@ import os
 import time
 import json
 import torch as th
-from load_graph import load_ogb
 from dgl import DGLGraph
-from dgl.data import load_data
 from dgl.sparse import libra_vertex_cut
 from dgl.sparse import libra2dgl_build_dict
 from dgl.sparse import libra2dgl_set_lr
 from dgl.sparse import libra2dgl_build_adjlist
 from dgl.data.utils import save_graphs, save_tensors
-from dgl.distgnn.tools import load_proteins
 from dgl.base import DGLError
 
 
-class Args:
-    """
-    Class to set the dataset name, for use in dgl dataset load functions
-    """
-    def __init__(self, dataset):
-        self.dataset = dataset
-
-
-def libra_partition(num_community, dataset, resultdir):
+def libra_partition(num_community, G, resultdir):
     """
     Performs vertex-cut based graph partitioning and converts the partitioning
     output to DGL input format
     Parameters
     ----------
     num_community : Number of partitions to create
-    dataset : Input graph name to partition
-    prefix : Output location for storing the partitioned graphs
+    G : Input graph to be partitioned
+    resultdir : Output location for storing the partitioned graphs
 
     Output
     ------
-    Creates X partition folder as XCommunities (say, X=2, so, 2Communities)
-    XCommunities contains communityZ.txt file per partition Z (Z <- 0 .. X-1);
+    1. Creates X partition folder as XCommunities (say, X=2, so, 2Communities)
+    XCommunities contains file name communityZ.txt per partition Z (Z <- 0 .. X-1);
     each such file contains a list of edges assigned to that partition.
-    These files constitute the output of Libra graph partition technique
+    These files constitute the output of Libra graph partitioner
     (An intermediate result of this function).
-    The folder also contains partZ folders, each of these folders stores
+    2. The folder also contains partZ folders, each of these folders stores
     DGL/DistGNN graphs for the Z partitions;
     these graph files are used as input to DistGNN.
+    3. The folder also contains a json file which contains partitions' information.
     """
-    args = Args(dataset)
-    print("Input dataset: ", args.dataset)
-    if args.dataset == 'ogbn-products':
-        print("Loading ogbn-products")
-        G, _ = load_ogb('ogbn-products')
-    elif args.dataset == 'ogbn-papers100M':
-        print("Loading ogbn-papers100M")
-        G, _ = load_ogb('ogbn-papers100M')
-    elif args.dataset == 'proteins':
-        G = load_proteins('proteins')
-    elif args.dataset == 'ogbn-arxiv':
-        print("Loading ogbn-arxiv")
-        G, _ = load_ogb('ogbn-arxiv')
-    else:
-        try:
-            G = load_data(args)[0]
-        except:
-            raise DGLError("Error: Dataset {} not found !!!".format(dataset))
-
-    print("Done loading the graph.", flush=True)
 
     num_nodes = G.number_of_nodes()   # number of nodes
-    num_edges = G.number_of_edges()
+    num_edges = G.number_of_edges()   # number of edges
     print("Number of nodes in the graph: ", num_nodes)
     print("Number of edges in the graph: ", num_edges)
 
@@ -107,7 +77,7 @@ def libra_partition(num_community, dataset, resultdir):
     print("Max partition size: ", int(community_weights.max()))
     print(" ** Converting libra partitions to dgl graphs **")
     fsize = int(community_weights.max()) + 1024   ## max edges in partition
-    print("fsize: ", fsize, flush=True)
+    # print("fsize: ", fsize, flush=True)
 
     node_map = th.zeros(num_community, dtype=th.int64)
     indices = th.zeros(num_nodes, dtype=th.int64)
@@ -145,7 +115,8 @@ def libra_partition(num_community, dataset, resultdir):
     ## fixing lr - 1-level tree for the split-nodes
     libra2dgl_set_lr(gdt_key, gdt_value, lrtensor, num_community, num_nodes)
     ########################################################
-    graph_name = dataset
+    #graph_name = dataset
+    graph_name = resultdir.split("_")[-1].split("/")[0]
     part_method = 'Libra'
     num_parts = num_community   ## number of paritions/communities
     num_hops = 0
@@ -246,31 +217,24 @@ def libra_partition(num_community, dataset, resultdir):
     print("Conversion libra2dgl completed !!!")
 
 
-def partition_graph(dataset, num_community, prefix):
+def partition_graph(num_community, G, resultdir):
     """
     This is the function for end-users to invoke Libra based graph partitioning.
     Parameters
     ----------
-    dataset: Input dataset name.
     num_community: Number of partitions or cummunities of the input graph.
-    prefix: Output location to store the partitioned graphs.
+    G: Input graph (DGLGraph).
+    resultdir: Output location to store the partitioned graphs.
     """
-    print("dataset: ", dataset)
-    print("num partitions: ", num_community)
-    print("output location: ", prefix)
 
-    out_dir = 'Libra_result_' + dataset
-    resultdir = os.path.join(prefix, out_dir)
+    print("num partitions: ", num_community)
+    print("output location: ", resultdir)
 
     ## create ouptut directory
     try:
         os.makedirs(resultdir, mode=0o775, exist_ok=True)
     except:
         raise DGLError("Error: Could not create directory: ", resultdir)
-
-    ## Partitions per dataset
-    print("Output is stored in ", resultdir, flush=True)
-    print("Generating ", num_community, " partitions...", flush=True)
 
     tic = time.time()
     print("####################################################################")
@@ -283,7 +247,7 @@ def partition_graph(dataset, num_community, prefix):
         raise DGLError("Error: Could not create sub-directory: ", resultdir)
 
     ## Libra partitioning
-    libra_partition(num_community, dataset, resultdir)
+    libra_partition(num_community, G, resultdir)
 
     ltoc = time.time()
     print("Time taken by {} partitions {:0.4f} sec".format(num_community, ltoc - ltic))
