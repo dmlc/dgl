@@ -82,12 +82,9 @@ void InitGlobalTpContext() {
     auto transportContext = tensorpipe::transport::uv::create();
     auto shmtransport = tensorpipe::transport::shm::create();
     context->registerTransport(0 /* priority */, "tcp", transportContext);
-    context->registerTransport(10 /* priority */, "shm", shmtransport);
     // Register basic uv channel
     auto basicChannel = tensorpipe::channel::basic::create();
-    auto shmChannel = tensorpipe::channel::cma::create();
     context->registerChannel(0 /* low priority */, "basic", basicChannel);
-    context->registerChannel(10 /* low priority */, "cma", shmChannel);
 
     char* numUvThreads_str = std::getenv("DGL_SOCKET_NTHREADS");
     if (numUvThreads_str) {

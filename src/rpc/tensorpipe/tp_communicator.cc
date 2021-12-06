@@ -138,7 +138,11 @@ void TPReceiver::ReceiveFromPipe(std::shared_ptr<Pipe> pipe,
       allocation, [allocation, descriptor = std::move(descriptor),
                    queue = std::move(queue), pipe](const Error& error) {
         if (error) {
-          // Error may happen when the pipe is closed
+          // Because we always have a read event posted to the epoll,
+          // Therefore when pipe is closed, error will be raised.
+          // But this error is expected.
+          // Other error is not expected. But we cannot identify the error with each
+          // Other for now. Thus here we skip handling for all errors
           return;
         }
 
