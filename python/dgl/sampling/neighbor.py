@@ -36,14 +36,11 @@ def sample_etype_neighbors(g, nodes, etype_field, fanout, edge_dir='in', prob=No
         If a single tensor is given, the graph must only have one type of nodes.
     etype_field : string
         The field in g.edata storing the edge type.
-    fanout : int
-        The number of edges to be sampled for each node on each edge type.
+    fanout : Tensor
+        The number of edges to be sampled for each node per edge type.  Must be a
+        1D tensor with the number of elements same as the number of edge types.
 
-        This argument can only take a single int. DGL will sample this number of edges for
-        each node for every edge type.
-
-        If -1 is given for a single edge type, all the neighboring edges with that edge
-        type will be selected.
+        If -1 is given, all of the neighbors will be selected.
     edge_dir : str, optional
         Determines whether to sample inbound or outbound edges.
 
@@ -99,15 +96,19 @@ def sample_etype_neighbors(g, nodes, etype_field, fanout, edge_dir='in', prob=No
     if etype_field not in g.edata:
         raise DGLError("The graph should have {} in the edge data" \
                        "representing the edge type.".format(etype_field))
-    if isinstance(fanout, int) is False:
-        raise DGLError("The fanout should be an integer")
-    if isinstance(nodes, dict) is True:
+    # (BarclayII) because the homogenized graph no longer contains the *name* of edge
+    # types, the fanout argument can no longer be a dict of etypes and ints, as opposed
+    # to sample_neighbors.
+    if not F.is_tensor(fanout):
+        raise DGLError("The fanout should be a tensor")
+    if isinstance(nodes, dict):
         assert len(nodes) == 1, "The input graph should not have node types"
         nodes = list(nodes.values())[0]
     nodes = F.to_dgl_nd(utils.prepare_tensor(g, nodes, 'nodes'))
     # treat etypes as int32, it is much cheaper than int64
     # TODO(xiangsx): int8 can be a better choice.
     etypes = F.to_dgl_nd(F.astype(g.edata[etype_field], ty=F.int32))
+    fanout = F.to_dgl_nd(fanout)
 
     if prob is None:
         prob_array = nd.array([], ctx=nd.cpu())

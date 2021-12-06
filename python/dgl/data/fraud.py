@@ -109,7 +109,8 @@ class FraudDataset(DGLBuiltinDataset):
         
         data = io.loadmat(file_path)
         node_features = data['features'].todense()
-        node_labels = data['label']
+        # remove additional dimension of length 1 in raw .mat file
+        node_labels = data['label'].squeeze()
         
         graph_data = {}
         for relation in self.relations[self.name]:
@@ -118,8 +119,8 @@ class FraudDataset(DGLBuiltinDataset):
             graph_data[(self.node_name[self.name], relation, self.node_name[self.name])] = (row, col)
         g = heterograph(graph_data)
         
-        g.ndata['feature'] = F.tensor(node_features)
-        g.ndata['label'] = F.tensor(node_labels.T)
+        g.ndata['feature'] = F.tensor(node_features, dtype=F.data_type_dict['float32'])
+        g.ndata['label'] = F.tensor(node_labels, dtype=F.data_type_dict['int64'])
         self.graph = g
         
         self._random_split(g.ndata['feature'], self.seed, self.train_size, self.val_size)

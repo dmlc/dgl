@@ -21,7 +21,7 @@ and an ``EdgeDataLoader`` for edge/link prediction task.
 .. _api-dataloading-neighbor-sampling:
 
 Neighbor Sampler
------------------------------
+----------------
 .. currentmodule:: dgl.dataloading.neighbor
 
 Neighbor samplers are classes that control the behavior of ``DataLoader`` s
@@ -30,7 +30,7 @@ different neighbor sampling strategies by overriding the ``sample_frontier`` or
 the ``sample_blocks`` methods.
 
 .. autoclass:: BlockSampler
-    :members: sample_frontier, sample_blocks
+    :members: sample_frontier, sample_blocks, sample
 
 .. autoclass:: MultiLayerNeighborSampler
     :members: sample_frontier
@@ -38,6 +38,29 @@ the ``sample_blocks`` methods.
 
 .. autoclass:: MultiLayerFullNeighborSampler
     :show-inheritance:
+
+Subgraph Iterators
+------------------
+Subgraph iterators iterate over the original graph in subgraphs. One should use subgraph
+iterators with ``GraphDataLoader`` like follows:
+
+.. code:: python
+
+   sgiter = dgl.dataloading.ClusterGCNSubgraphIterator(
+       g, num_partitions=100, cache_directory='.', refresh=True)
+   dataloader = dgl.dataloading.GraphDataLoader(sgiter, batch_size=4, num_workers=0)
+   for subgraph_batch in dataloader:
+       train_on(subgraph_batch)
+
+.. autoclass:: dgl.dataloading.dataloader.SubgraphIterator
+
+.. autoclass:: dgl.dataloading.cluster_gcn.ClusterGCNSubgraphIterator
+
+ShaDow-GNN Subgraph Sampler
+---------------------------
+.. currentmodule:: dgl.dataloading.shadow
+
+.. autoclass:: ShaDowKHopSampler
 
 .. _api-dataloading-collators:
 
