@@ -148,7 +148,7 @@ class TWIRLSConv(nn.Module):
         self.mlp_bef = MLP(self.input_d, self.hidden_d, self.size_bef_unf, self.num_mlp_before,
                            self.dropout, self.norm, init_activate=False)
 
-        self.unfolding = UnfoldingAndAttention(self.hidden_d, self.alp, self.lam, self.prop_step,
+        self.unfolding = TWIRLSUnfoldingAndAttention(self.hidden_d, self.alp, self.lam, self.prop_step,
                                                self.attn_aft, self.tau, self.T, self.p,
                                                self.use_eta, self.init_att, self.attn_dropout,
                                                self.precond)
