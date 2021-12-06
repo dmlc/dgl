@@ -12,13 +12,14 @@ from dgl import DGLError
 import test_utils
 from test_utils import parametrize_dtype, get_cases
 from scipy.sparse import rand
-import torch
+# import torch
 
 rfuncs = {'sum': fn.sum, 'max': fn.max, 'min': fn.min, 'mean': fn.mean}
 fill_value = {'sum': 0, 'max': float("-inf")}
 feat_size = 2
 
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
+
 
 def create_test_heterograph(idtype):
     # test heterograph from the docstring, plus a user -- wishes -- game relation
@@ -48,15 +49,15 @@ def test_edge_softmax(g, norm_by, idtype):
     print("params", norm_by, idtype)
 
     g = create_test_heterograph(idtype)
-    x1 = torch.full((g.num_edges('follows'), feat_size), 2.0)
-    x2 = torch.full((g.num_edges('plays'), feat_size), 3.0)
-    x3 = torch.full((g.num_edges('wishes'), feat_size), 4.0)
-    x4 = torch.full((g.num_edges('develops'), feat_size), 5.0)
+    # x1 = torch.full((g.num_edges('follows'), feat_size), 2.0)
+    # x2 = torch.full((g.num_edges('plays'), feat_size), 3.0)
+    # x3 = torch.full((g.num_edges('wishes'), feat_size), 4.0)
+    # x4 = torch.full((g.num_edges('develops'), feat_size), 5.0)
 
-    # x1 = F.randn((g.num_edges('follows'),feat_size))
-    # x2 = F.randn((g.num_edges('plays'),feat_size))
-    # x3 = F.randn((g.num_edges('wishess'),feat_size))
-    # x4 = F.randn((g.num_edges('develops'),feat_size))
+    x1 = F.randn((g.num_edges('follows'),feat_size))
+    x2 = F.randn((g.num_edges('plays'),feat_size))
+    x3 = F.randn((g.num_edges('wishes'),feat_size))
+    x4 = F.randn((g.num_edges('develops'),feat_size))
 
     e1 = F.attach_grad(F.clone(x1))
     e2 = F.attach_grad(F.clone(x2))
@@ -80,13 +81,20 @@ def test_edge_softmax(g, norm_by, idtype):
     #  edge_softmax() on heterogeneous graph
     #################################################################
 
-    e = {'follows':e1, 'plays':e2, 'wishes':e3, 'develops':e4}
+    e = {('user', 'follows', 'user'): e1,
+        ('user', 'plays', 'game'): e2,
+        ('user', 'wishes', 'game'): e3,
+        ('developer', 'develops', 'game'): e4}
+    # e['follows'] = F.attach_grad(F.clone(x1))
+    # e['plays'] = F.attach_grad(F.clone(x2))
+    # e['wishes'] = F.attach_grad(F.clone(x3))
+    # e['develops'] = F.attach_grad(F.clone(x4))
 
     with F.record_grad():
         score = edge_softmax(g, e, norm_by=norm_by)
-        # loss = e2.sum()
-        # F.backward(loss)
-        # grad_edata = F.grad(e1)
+        loss = score[0].sum()
+        F.backward(F.reduce_sum(score[0]))
+        grad_edata = F.grad(e1)
 
         # correctness check
         def _print_error(a, b):
