@@ -6,7 +6,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from .... import function as fn
 
-
 class TWIRLSConv(nn.Module):
     r"""
 
@@ -74,13 +73,8 @@ class TWIRLSConv(nn.Module):
     >>> feat = th.ones(6, 10)
     >>> conv = TWIRLSConv(10, 2, 128, prop_step = 64)
     >>> res = conv(g , feat)
-    >>> res
-    tensor([[ 0.4556, -2.6692],
-            [ 0.4556, -2.6692],
-            [ 0.4556, -2.6692],
-            [ 1.0112, -5.9241],
-            [ 0.8011, -4.6935],
-            [ 0.8844, -5.1814]], grad_fn=<AddmmBackward>)
+    >>> res.size()
+    torch.Size([6, 2])
     """
 
     def __init__(self,
