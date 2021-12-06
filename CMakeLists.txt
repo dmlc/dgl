@@ -34,6 +34,7 @@ dgl_option(BUILD_CPP_TEST "Build cpp unittest executables" OFF)
 dgl_option(LIBCXX_ENABLE_PARALLEL_ALGORITHMS "Enable the parallel algorithms library. This requires the PSTL to be available." OFF)
 dgl_option(USE_S3 "Build with S3 support" OFF)
 dgl_option(USE_HDFS "Build with HDFS support" OFF) # Set env HADOOP_HDFS_HOME if needed
+dgl_option(REBUILD_LIBXSMM "Clean LIBXSMM build cache at every build" OFF) # Set env HADOOP_HDFS_HOME if needed
 dgl_option(USE_EPOLL "Build with epoll for socket communicator" OFF)
 
 # Set debug compile option for gdb, only happens when -DCMAKE_BUILD_TYPE=DEBUG
@@ -209,8 +210,6 @@ set_property(TARGET dgl PROPERTY CXX_STANDARD 14)
 target_include_directories(dgl PRIVATE "include")
 target_include_directories(dgl PRIVATE "third_party/dlpack/include")
 target_include_directories(dgl PRIVATE "third_party/dmlc-core/include")
-target_include_directories(dgl PRIVATE "third_party/minigun/minigun")
-target_include_directories(dgl PRIVATE "third_party/minigun/third_party/moderngpu/src")
 target_include_directories(dgl PRIVATE "third_party/phmap/")
 target_include_directories(dgl PRIVATE "third_party/xbyak/")
 target_include_directories(dgl PRIVATE "third_party/METIS/include/")
@@ -239,9 +238,15 @@ endif(NOT MSVC)
 
 # Compile LIBXSMM
 if((NOT MSVC) AND USE_LIBXSMM)
-  add_custom_target(libxsmm COMMAND make realclean COMMAND make -j BLAS=0
-                     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/third_party/libxsmm
-                     )
+  if(REBUILD_LIBXSMM)
+    add_custom_target(libxsmm COMMAND make realclean COMMAND make -j BLAS=0
+                      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/third_party/libxsmm
+                      )
+  else(REBUILD_LIBXSMM)
+    add_custom_target(libxsmm COMMAND make -j BLAS=0
+                      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/third_party/libxsmm
+                      )
+  endif(REBUILD_LIBXSMM)
   add_dependencies(dgl libxsmm)
   list(APPEND DGL_LINKER_LIBS -L${CMAKE_SOURCE_DIR}/third_party/libxsmm/lib/ xsmm)
 endif((NOT MSVC) AND USE_LIBXSMM)
