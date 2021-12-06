@@ -95,9 +95,9 @@ class GINConv(nn.Module):
             self.eps = th.nn.Parameter(th.FloatTensor([init_eps]))
         else:
             self.register_buffer('eps', th.FloatTensor([init_eps]))
-        
+
         self.reset_parameters()
-        
+
     def reset_parameters(self):
         r"""
 
