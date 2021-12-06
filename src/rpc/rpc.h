@@ -12,16 +12,20 @@
 #include <dmlc/thread_local.h>
 #include <cstdint>
 #include <memory>
+#include <deque>
 #include <vector>
 #include <string>
-#include "./network/communicator.h"
-#include "./network/socket_communicator.h"
-#include "./network/msg_queue.h"
+#include <mutex>
+
+#include "./rpc_msg.h"
+#include "./tensorpipe/tp_communicator.h"
 #include "./network/common.h"
 #include "./server_state.h"
 
 namespace dgl {
 namespace rpc {
+
+struct RPCContext;
 
 // Communicator handler type
 typedef void* CommunicatorHandle;
@@ -31,8 +35,8 @@ struct RPCContext {
   /*!
    * \brief Rank of this process.
    *
-   * If the process is a client, this is equal to client ID. Otherwise, the process
-   * is a server and this is equal to server ID.
+   * If the process is a client, this is equal to client ID. Otherwise, the
+   * process is a server and this is equal to server ID.
    */
   int32_t rank = -1;
 
@@ -49,7 +53,7 @@ struct RPCContext {
   /*!
    * \brief Message sequence number.
    */
-  int64_t msg_seq = 0;
+  std::atomic<int64_t> msg_seq{0};
 
   /*!
    * \brief Total number of server.
@@ -74,12 +78,17 @@ struct RPCContext {
   /*!
    * \brief Sender communicator.
    */
-  std::shared_ptr<network::Sender> sender;
+  std::shared_ptr<TPSender> sender;
 
   /*!
    * \brief Receiver communicator.
    */
-  std::shared_ptr<network::Receiver> receiver;
+  std::shared_ptr<TPReceiver> receiver;
+
+  /*!
+   * \brief Tensorpipe global context
+   */
+  std::shared_ptr<tensorpipe::Context> ctx;
 
   /*!
    * \brief Server state data.
@@ -92,73 +101,26 @@ struct RPCContext {
    */
   std::shared_ptr<ServerState> server_state;
 
-  /*! \brief Get the thread-local RPC context structure */
-  static RPCContext *ThreadLocal() {
-    return dmlc::ThreadLocalStore<RPCContext>::Get();
+  /*! \brief Get the RPC context singleton */
+  static RPCContext* getInstance() {
+    static RPCContext ctx;
+    return &ctx;
   }
 
   /*! \brief Reset the RPC context */
   static void Reset() {
-    auto* t = ThreadLocal();
+    auto* t = getInstance();
     t->rank = -1;
     t->machine_id = -1;
     t->num_machines = 0;
     t->num_clients = 0;
     t->barrier_count = 0;
     t->num_servers_per_machine = 0;
-    t->sender = std::shared_ptr<network::Sender>();
-    t->receiver = std::shared_ptr<network::Receiver>();
+    t->sender.reset();
+    t->receiver.reset();
+    t->ctx.reset();
   }
 };
-
-/*! \brief RPC message data structure
- *
- * This structure is exposed to Python and can be used as argument or return value
- * in C API.
- */
-struct RPCMessage : public runtime::Object {
-  /*! \brief Service ID */
-  int32_t service_id;
-
-  /*! \brief Sequence number of this message. */
-  int64_t msg_seq;
-
-  /*! \brief Client ID. */
-  int32_t client_id;
-
-  /*! \brief Server ID. */
-  int32_t server_id;
-
-  /*! \brief Payload buffer carried by this request.*/
-  std::string data;
-
-  /*! \brief Extra payloads in the form of tensors.*/
-  std::vector<runtime::NDArray> tensors;
-
-  bool Load(dmlc::Stream* stream) {
-    stream->Read(&service_id);
-    stream->Read(&msg_seq);
-    stream->Read(&client_id);
-    stream->Read(&server_id);
-    stream->Read(&data);
-    stream->Read(&tensors);
-    return true;
-  }
-
-  void Save(dmlc::Stream* stream) const {
-    stream->Write(service_id);
-    stream->Write(msg_seq);
-    stream->Write(client_id);
-    stream->Write(server_id);
-    stream->Write(data);
-    stream->Write(tensors);
-  }
-
-  static constexpr const char* _type_key = "rpc.RPCMessage";
-  DGL_DECLARE_OBJECT_TYPE_INFO(RPCMessage, runtime::Object);
-};
-
-DGL_DEFINE_OBJECT_REF(RPCMessageRef, RPCMessage);
 
 /*! \brief RPC status flag */
 enum RPCStatus {
