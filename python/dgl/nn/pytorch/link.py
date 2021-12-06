@@ -370,7 +370,7 @@ class TransR(nn.Module):
         """
         h_rel = self.rel_emb(rels)
         proj_rel = self.rel_project(rels).reshape(-1, self.nfeats, self.rfeats)
-        h_head = torch.einsum('ab,abc->ac', h_head, proj_rel)
-        h_tail = torch.einsum('ab,abc->ac', h_tail, proj_rel)
+        h_head = (h_head.unsqueeze(1) @ proj_rel).squeeze(1)
+        h_tail = (h_tail.unsqueeze(1) @ proj_rel).squeeze(1)
 
         return - torch.norm(h_head + h_rel - h_tail, p=self.p, dim=-1)
