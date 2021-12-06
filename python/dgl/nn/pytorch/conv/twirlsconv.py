@@ -148,10 +148,10 @@ class TWIRLSConv(nn.Module):
         self.mlp_bef = MLP(self.input_d, self.hidden_d, self.size_bef_unf, self.num_mlp_before,
                            self.dropout, self.norm, init_activate=False)
 
-        self.unfolding = TWIRLSUnfoldingAndAttention(self.hidden_d, self.alp, self.lam, self.prop_step,
-                                               self.attn_aft, self.tau, self.T, self.p,
-                                               self.use_eta, self.init_att, self.attn_dropout,
-                                               self.precond)
+        self.unfolding = TWIRLSUnfoldingAndAttention(self.hidden_d, self.alp, self.lam,
+                                                     self.prop_step, self.attn_aft, self.tau,
+                                                     self.T, self.p, self.use_eta, self.init_att,
+                                                     self.attn_dropout, self.precond)
 
         # if there are really transformations before unfolding, then do init_activate in mlp_aft
         self.mlp_aft = MLP(self.size_aft_unf, self.hidden_d, self.output_d, self.num_mlp_after,
