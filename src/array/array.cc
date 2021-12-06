@@ -570,7 +570,8 @@ COOMatrix CSRRowWiseSampling(
 
 COOMatrix CSRRowWisePerEtypeSampling(
     CSRMatrix mat, IdArray rows, IdArray etypes,
-    int64_t num_samples, FloatArray prob, bool replace, bool etype_sorted) {
+    const std::vector<int64_t>& num_samples, FloatArray prob, bool replace,
+    bool etype_sorted) {
   COOMatrix ret;
   ATEN_CSR_SWITCH(mat, XPU, IdType, "CSRRowWisePerEtypeSampling", {
     if (IsNullArray(prob)) {
@@ -807,7 +808,8 @@ COOMatrix COORowWiseSampling(
 
 COOMatrix COORowWisePerEtypeSampling(
     COOMatrix mat, IdArray rows, IdArray etypes,
-    int64_t num_samples, FloatArray prob, bool replace, bool etype_sorted) {
+    const std::vector<int64_t>& num_samples, FloatArray prob, bool replace,
+    bool etype_sorted) {
   COOMatrix ret;
   ATEN_COO_SWITCH(mat, XPU, IdType, "COORowWisePerEtypeSampling", {
     if (IsNullArray(prob)) {
