@@ -1,8 +1,8 @@
 import torch as th
 from distutils.version import LooseVersion
 from ...base import is_all, ALL
-from ...sparse import _gspmm, _gspmm_hetero, _gsddmm, _gsddmm_hetero, _segment_reduce, _bwd_segment_cmp, _scatter_add
-from ...sparse import _csrmm, _csrsum, _csrmask
+from ...sparse import _gspmm, _gspmm_hetero, _gsddmm, _gsddmm_hetero, _segment_reduce, _bwd_segment_cmp
+from ...sparse import _csrmm, _csrsum, _csrmask, _scatter_add, _update_grad_minmax_hetero
 from ...heterograph_index import create_unitgraph_from_csr
 
 if LooseVersion(th.__version__) >= LooseVersion("1.6.0"):
@@ -194,10 +194,9 @@ class GSpMM_hetero(th.autograd.Function):
     @staticmethod
     @custom_fwd(cast_inputs=th.float16)
     def forward(ctx, gidx, op, reduce_op, X_len, *feats): # feats = lhs_data + rhs_data
-        out, (argX, argY) = _gspmm_hetero(gidx, op, reduce_op, X_len, feats)
+        out, (argX, argY, argX_ntype, argY_etype) = _gspmm_hetero(gidx, op, reduce_op, X_len, feats)
         X, Y = feats[:X_len], feats[X_len:]
         # TODO (Israt): check target to decide src_id/dst_id?
-        # checking the first relation to decide for all the relations
         src_id, dst_id = gidx.metagraph.find_edge(0)
         reduce_last = _need_reduce_last_dim(X[src_id], Y[dst_id])
         X_shape = tuple([X[i].shape if X[i] is not None else None
@@ -214,11 +213,11 @@ class GSpMM_hetero(th.autograd.Function):
 
         # checking the first relation to decide for all the relations
         if not spmm_cache_argX(op, reduce_op, req_grad_X[src_id], req_grad_Y[dst_id]):
-            argX = None
+            argX = tuple([None] * len(X))
         if not spmm_cache_argY(op, reduce_op, req_grad_X[src_id], req_grad_Y[dst_id]):
-            argY = None
+            argY = tuple([None] * len(X))
 
-        ctx.save_for_backward(*feats, argX, argY)
+        ctx.save_for_backward(*feats, *argX, *argX_ntype, *argY, *argY_etype )
         return out
 
     @staticmethod
@@ -226,14 +225,16 @@ class GSpMM_hetero(th.autograd.Function):
     def backward(ctx, *dZ):
         gidx, op, reduce_op, X_shape, Y_shape, dtype, device, reduce_last, X_len = ctx.backward_cache
         ctx.backward_cache = None
-        feats = ctx.saved_tensors[:-2]
-        argX = ctx.saved_tensors[-2]
-        argY = ctx.saved_tensors[-1]
+        num_ntypes = gidx.number_of_ntypes()
+        feats = ctx.saved_tensors[:-(4 * num_ntypes)]
+        argX = ctx.saved_tensors[-(4 * num_ntypes):-(3 * num_ntypes)]
+        argX_ntype = ctx.saved_tensors[-(3 * num_ntypes):-(2 * num_ntypes)]
+        argY = ctx.saved_tensors[-(2 * num_ntypes):- num_ntypes]
+        argY_etype = ctx.saved_tensors[-num_ntypes:]
         X, Y = feats[:X_len], feats[X_len:]
 
         if op != 'copy_rhs' and any([x is not None for x in X]):
             g_rev = gidx.reverse()
-            # TODO(Israt): implement other combinations of message and reduce functions
             if reduce_op == 'sum':
                 if op == 'mul':
                     dX = gspmm_hetero(g_rev, 'mul', 'sum', len(X), *tuple(dZ + Y))
@@ -242,6 +243,17 @@ class GSpMM_hetero(th.autograd.Function):
                 elif op == 'copy_lhs':
                     tpl_None = tuple([None] * len(Y))
                     dX = gspmm_hetero(g_rev, 'copy_lhs', 'sum', len(X), *tuple(dZ + tpl_None))
+            else:  # max/min
+                # Assuming that the features are of the same dimension (enforced by the forward function)
+                src_id, dst_id = gidx.metagraph.find_edge(0)
+                dX = tuple([th.zeros((X_shape[i][0],) + dZ[dst_id].shape[1:], dtype=dtype, device=device)
+                    if X[i] is not None else None for i in range(len(X))])
+                if op == 'mul':
+                    grad = _expand(Y, dZ.shape[1:]).gather(
+                        0, argY.long()) * dZ
+                    dX.scatter_add_(0, argX.long(), grad)
+                elif op in ['add', 'copy_lhs']:
+                    dX = _update_grad_minmax_hetero(g_rev, op, dZ, argX, argX_ntype, dX)
             dX = tuple([_reduce_grad(dX[i], X_shape[i]) if X[i] is not None else None
                 for i in range(len(X))])
         else:  # X has not gradient
@@ -258,8 +270,18 @@ class GSpMM_hetero(th.autograd.Function):
                     dY = gsddmm_hetero(gidx, 'mul', X_len, 'u', 'v', *tpl_X_dZ)
                 elif op in ['add', 'copy_rhs']:
                     dY = gsddmm_hetero(gidx, 'copy_rhs', X_len, 'u', 'v', *tpl_X_dZ)
-            dY = tuple([_reduce_grad(dY[i], Y_shape[i]) if Y[i] is not None else None
-                for i in range(len(Y))])
+            else:  # max/min
+                src_id, dst_id = gidx.metagraph.find_edge(0)
+                dY = tuple([th.zeros((Y_shape[i][0],) + dZ[dst_id].shape[1:], dtype=dtype, device=device)
+                    if Y[i] is not None else None for i in range(len(Y))])
+                if op == 'mul':
+                    grad = _expand(X, dZ.shape[1:]).gather(
+                        0, argX.long()) * dZ
+                    dY.scatter_add_(0, argY.long(), grad)
+                elif op in ['add', 'copy_rhs']:
+                    dY = _update_grad_minmax_hetero(gidx.reverse(), op, dZ, argY, argY_etype, dY)
+            dY = tuple([_reduce_grad(dY[i], Y_shape[i]) if dY[i] is not None else None
+                for i in range(len(dY))])
         else:  # Y has no gradient
             dY = tuple([None] * len(Y))
         return (None, None, None, None) + dX + dY
@@ -273,7 +295,7 @@ def sddmm_cache_X(op, req_grad_X, req_grad_Y):
 
 
 def sddmm_cache_Y(op, req_grad_X, req_grad_Y):
-    """Rules to identify whether to cache Y in SDDMM forward stage.""" 
+    """Rules to identify whether to cache Y in SDDMM forward stage."""
     if op in ['mul', 'dot'] and req_grad_X:
         return True
     return False
@@ -423,6 +445,7 @@ class GSDDMM_hetero(th.autograd.Function):
         else:
             dY = tuple([None] * len(Y))
         return (None, None, None, None, None) + dX + dY
+
 
 class EdgeSoftmax(th.autograd.Function):
     @staticmethod
