@@ -1323,6 +1323,15 @@ def test_edge_predictor(op):
     pred = nn.EdgePredictor(op, in_feats, out_feats, bias=True).to(ctx)
     assert pred(h_src, h_dst).shape == (num_pairs, out_feats)
 
+def test_twirls(): 
+    g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    feat = th.ones(6, 10)
+    conv = nn.TWIRLSConv(10, 2, 128, prop_step = 64)
+    res = conv(g , feat)
+    assert ( res.size() == (6,2) )
+    
+
+
 if __name__ == '__main__':
     test_graph_conv()
     test_graph_conv_e_weight()
@@ -1354,3 +1363,4 @@ if __name__ == '__main__':
     test_atomic_conv()
     test_cf_conv()
     test_hetero_conv()
+    test_twirls()
