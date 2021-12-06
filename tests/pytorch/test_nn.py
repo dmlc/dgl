@@ -776,7 +776,7 @@ def test_gin_conv(g, idtype, aggregator_type):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
     gin = nn.GINConv(
-        th.nn.Linear(5, 12),
+        5, 12,
         aggregator_type
     )
     th.save(gin, tmp_buffer)
@@ -796,7 +796,7 @@ def test_gin_conv_bi(g, idtype, aggregator_type):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
     gin = nn.GINConv(
-        th.nn.Linear(5, 12),
+        5, 12,
         aggregator_type
     )
     feat = (F.randn((g.number_of_src_nodes(), 5)), F.randn((g.number_of_dst_nodes(), 5)))
