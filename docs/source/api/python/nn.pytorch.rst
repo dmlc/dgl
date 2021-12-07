@@ -281,6 +281,20 @@ EdgePredictor
     :members: forward, reset_parameters
     :show-inheritance:
 
+TransE
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.link.TransE
+    :members: rel_emb, forward, reset_parameters
+    :show-inheritance:
+
+TransR
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.link.TransR
+    :members: rel_emb, rel_project, forward, reset_parameters
+    :show-inheritance:
+
 Heterogeneous Graph Convolution Module
 ----------------------------------------
 
