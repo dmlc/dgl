@@ -249,7 +249,7 @@ class EdgeGraphConv(nn.Module):
             else:
                 weight = self.weight
 
-            graph.edata["_edge_weight"] = th.unsqueeze(edge_weight)
+            graph.edata["_edge_weight"] = edge_weight.unsqueeze(-1)
             aggregate_fn = fn.u_mul_e('h', '_edge_weight', 'm')
             graph.update_all(aggregate_fn, fn.sum(msg='m', out='rst'))
             rst = graph.dstdata["rst"]
