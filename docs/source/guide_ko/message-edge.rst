@@ -5,8 +5,7 @@
 
 :ref:`(English Version) <guide-message-passing-edge>`
 
-`GAT <https://arxiv.org/pdf/1710.10903.pdf>`__ 또는 일부 `GCN
-변형 <https://arxiv.org/abs/2004.00445>`__ 에서 사용되는 것처럼 메시지 병합이전에 에지의 가중치를 적용하는 것은 GNN 모델링에서 흔하게 사용되는 기법이다. DGL은 이를 다음과 같은 밥벙으로 지원하고 있다.
+`GAT <https://arxiv.org/pdf/1710.10903.pdf>`__ 또는 일부 `GCN 변형 <https://arxiv.org/abs/2004.00445>`__ 에서 사용되는 것처럼 메시지 병합이전에 에지의 가중치를 적용하는 것은 GNN 모델링에서 흔하게 사용되는 기법이다. DGL은 이를 다음과 같은 밥벙으로 지원하고 있다.
 
 - 가중치를 에지 피쳐로 저장
 - 메시지 함수에서 에지 피쳐를 소스 노드의 피쳐와 곱하기
