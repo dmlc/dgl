@@ -138,7 +138,7 @@ def finalize_receiver():
     """
     _CAPI_DGLRPCFinalizeReceiver()
 
-def receiver_wait(ip_addr, port, num_senders):
+def receiver_wait(ip_addr, port, num_senders, blocking=True):
     """Wait all of the senders' connections.
 
     This api will be blocked until all the senders connect to the receiver.
@@ -151,8 +151,10 @@ def receiver_wait(ip_addr, port, num_senders):
         receiver's port
     num_senders : int
         total number of senders
+    blocking : bool
+        whether to wait blockingly
     """
-    _CAPI_DGLRPCReceiverWait(ip_addr, int(port), int(num_senders))
+    _CAPI_DGLRPCReceiverWait(ip_addr, int(port), int(num_senders), blocking)
 
 def add_receiver_addr(ip_addr, port, recv_id):
     """Add Receiver's IP address to sender's namebook.

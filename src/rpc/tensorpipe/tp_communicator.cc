@@ -42,9 +42,9 @@ bool TPSender::Connect() {
       if (done.get_future().get()) {
         break;
       } else {
-        sleep(5);
-        LOG(INFO) << "Cannot connect to remove server " << kv.second
-                  << ". Wait to retry";
+        LOG(INFO) << "Cannot connect to remote server " << kv.second
+                  << ". Retry in 2 seconds.";
+        std::this_thread::sleep_for(std::chrono::seconds(2));
       }
     }
     pipes_[kv.first] = pipe;
@@ -87,29 +87,56 @@ void TPSender::Send(const RPCMessage& msg, int recv_id) {
 }
 
 void TPSender::Finalize() {}
-void TPReceiver::Finalize() {}
 
-bool TPReceiver::Wait(const std::string& addr, int num_sender) {
-  listener = context->listen({addr});
-  for (int i = 0; i < num_sender; i++) {
-    std::promise<std::shared_ptr<Pipe>> pipeProm;
-    listener->accept([&](const Error& error, std::shared_ptr<Pipe> pipe) {
-      if (error) {
-        LOG(WARNING) << error.what();
-      }
-      pipeProm.set_value(std::move(pipe));
-    });
-    std::shared_ptr<Pipe> pipe = pipeProm.get_future().get();
-    std::promise<bool> checkConnect;
-    pipe->readDescriptor(
-      [pipe, &checkConnect](const Error& error, Descriptor descriptor) {
-        Allocation allocation;
-        checkConnect.set_value(descriptor.metadata == "dglconnect");
-        pipe->read(allocation, [](const Error& error) {});
+TPReceiver::~TPReceiver() { Finalize(); }
+
+void TPReceiver::Finalize() {
+  stop_wait_ = true;
+  if (wait_thread_.joinable()) {
+    wait_thread_.join();
+  }
+}
+
+bool TPReceiver::Wait(const std::string &addr, int num_sender, bool blocking) {
+  if (wait_thread_.joinable()) {
+    LOG(WARNING) << "TPReceiver::Wait() has been called already. Ignoring...";
+    return false;
+  }
+  wait_thread_ = std::thread([this, addr]() {
+    listener = context->listen({addr});
+    while (!stop_wait_) {
+      std::promise<std::shared_ptr<Pipe>> pipeProm;
+      listener->accept([&](const Error &error, std::shared_ptr<Pipe> pipe) {
+        if (error) {
+          LOG(WARNING) << error.what();
+        }
+        pipeProm.set_value(std::move(pipe));
       });
-    CHECK(checkConnect.get_future().get()) << "Invalid connect message.";
-    pipes_[i] = pipe;
-    ReceiveFromPipe(pipe, queue_);
+      auto &&fut = pipeProm.get_future();
+      std::future_status status;
+      do {
+        status = fut.wait_for(std::chrono::milliseconds(100));
+      } while (status != std::future_status::ready && !stop_wait_);
+      if (status != std::future_status::ready) {
+        // stop waiting
+        break;
+      }
+      std::shared_ptr<Pipe> pipe = fut.get();
+      std::promise<bool> checkConnect;
+      pipe->readDescriptor(
+          [pipe, &checkConnect](const Error &error, Descriptor descriptor) {
+            Allocation allocation;
+            checkConnect.set_value(descriptor.metadata == "dglconnect");
+            pipe->read(allocation, [](const Error &error) {});
+          });
+      CHECK(checkConnect.get_future().get()) << "Invalid connect message.";
+      ++num_connected_;
+      ReceiveFromPipe(pipe, queue_);
+    }
+    listener->close();
+    LOG(INFO) << "TPReceiver wait thread is exiting...";
+  });
+  while (blocking && (num_sender != num_connected_)) {
   }
   return true;
 }

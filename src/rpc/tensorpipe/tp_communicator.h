@@ -15,7 +15,7 @@
 #include <thread>
 #include <unordered_map>
 #include <vector>
-
+#include <atomic>
 #include "./queue.h"
 
 namespace dgl {
@@ -110,14 +110,20 @@ class TPReceiver {
   }
 
   /*!
+   * \brief Receiver destructor
+   */
+  ~TPReceiver();
+
+  /*!
    * \brief Wait for all the Senders to connect
    * \param addr Networking address, e.g., 'tcp://127.0.0.1:50051'
    * \param num_sender total number of Senders
+   * \param blocking whether to wait blockingly
    * \return True for success and False for fail
    *
    * Wait() is not thread-safe and only one thread can invoke this API.
    */
-  bool Wait(const std::string& addr, int num_sender);
+  bool Wait(const std::string &addr, int num_sender, bool blocking = true);
 
   /*!
    * \brief Recv RPCMessage from Sender. Actually removing data from queue.
@@ -178,6 +184,21 @@ class TPReceiver {
    * \brief RPCMessage queue
    */
   std::shared_ptr<RPCMessageQueue> queue_;
+
+  /*!
+   * \brief wait thread
+   */
+  std::thread wait_thread_;
+
+  /*!
+   * \brief number of accepted connections
+   */
+  std::atomic<uint32_t> num_connected_{0};
+
+  /*!
+   * \brief whether to stop waiting
+   */
+  std::atomic<bool> stop_wait_{false};
 };
 
 }  // namespace rpc
