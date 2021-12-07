@@ -95,6 +95,10 @@ void TPReceiver::Finalize() {
   if (wait_thread_.joinable()) {
     wait_thread_.join();
   }
+  for (auto &&p : pipes_) {
+    p.second->close();
+  }
+  pipes_.clear();
 }
 
 bool TPReceiver::Wait(const std::string &addr, int num_sender, bool blocking) {
@@ -130,8 +134,9 @@ bool TPReceiver::Wait(const std::string &addr, int num_sender, bool blocking) {
             pipe->read(allocation, [](const Error &error) {});
           });
       CHECK(checkConnect.get_future().get()) << "Invalid connect message.";
-      ++num_connected_;
+      pipes_[num_connected_] = pipe;
       ReceiveFromPipe(pipe, queue_);
+      ++num_connected_;
     }
     listener->close();
     LOG(INFO) << "TPReceiver wait thread is exiting...";
