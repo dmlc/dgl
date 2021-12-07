@@ -323,7 +323,7 @@ template <class IdType> CSRMatrix SortedCOOToCSR(const COOMatrix &coo) {
   Bp[0] = 0;
 
   IdType *const fill_data =
-      data ? nullptr : static_cast<IdType *>(coo.data->data);
+      data ? nullptr : static_cast<IdType *>(ret_data->data);
 
   if (NNZ > 0) {
     auto num_threads = omp_get_max_threads();

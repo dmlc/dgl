@@ -67,6 +67,52 @@ aten::COOMatrix COO1(DLContext ctx) {
 template aten::COOMatrix COO1<int32_t>(DLContext ctx);
 template aten::COOMatrix COO1<int64_t>(DLContext ctx);
 
+template <typename IdType> void _TestUnitGraph_InOutDegrees(DLContext ctx) {
+  /*
+  InDegree(s) is available only if COO or CSC formats permitted.
+  OutDegree(s) is available only if COO or CSR formats permitted.
+  */
+
+  // COO
+  {
+    const aten::COOMatrix &coo = COO1<IdType>(ctx);
+    auto &&g = CreateFromCOO(2, coo, COO_CODE);
+    ASSERT_EQ(g->InDegree(0, 0), 1);
+    auto &&nids = aten::Range(0, g->NumVertices(0), g->NumBits(), g->Context());
+    ASSERT_TRUE(ArrayEQ<IdType>(
+        g->InDegrees(0, nids),
+        aten::VecToIdArray<IdType>({1, 2}, g->NumBits(), g->Context())));
+    ASSERT_EQ(g->OutDegree(0, 0), 2);
+    ASSERT_TRUE(ArrayEQ<IdType>(
+        g->OutDegrees(0, nids),
+        aten::VecToIdArray<IdType>({2, 1}, g->NumBits(), g->Context())));
+  }
+  // CSC
+  {
+    const aten::CSRMatrix &csr = CSR1<IdType>(ctx);
+    auto &&g = CreateFromCSC(2, csr, CSC_CODE);
+    ASSERT_EQ(g->InDegree(0, 0), 1);
+    auto &&nids = aten::Range(0, g->NumVertices(0), g->NumBits(), g->Context());
+    ASSERT_TRUE(ArrayEQ<IdType>(
+        g->InDegrees(0, nids),
+        aten::VecToIdArray<IdType>({1, 2, 1}, g->NumBits(), g->Context())));
+    EXPECT_ANY_THROW(g->OutDegree(0, 0));
+    EXPECT_ANY_THROW(g->OutDegrees(0, nids));
+  }
+  // CSR
+  {
+    const aten::CSRMatrix &csr = CSR1<IdType>(ctx);
+    auto &&g = CreateFromCSR(2, csr, CSR_CODE);
+    ASSERT_EQ(g->OutDegree(0, 0), 1);
+    auto &&nids = aten::Range(0, g->NumVertices(0), g->NumBits(), g->Context());
+    ASSERT_TRUE(ArrayEQ<IdType>(
+        g->OutDegrees(0, nids),
+        aten::VecToIdArray<IdType>({1, 2, 1, 2}, g->NumBits(), g->Context())));
+    EXPECT_ANY_THROW(g->InDegree(0, 0));
+    EXPECT_ANY_THROW(g->InDegrees(0, nids));
+  }
+}
+
 template <typename IdType>
 void _TestUnitGraph(DLContext ctx) {
   const aten::CSRMatrix &csr = CSR1<IdType>(ctx);
@@ -337,6 +383,15 @@ TEST(UniGraphTest, TestUnitGraph_CopyTo) {
   _TestUnitGraph_CopyTo<int64_t>(CPU, GPU);
   _TestUnitGraph_CopyTo<int64_t>(GPU, GPU);
   _TestUnitGraph_CopyTo<int64_t>(GPU, CPU);
+#endif
+}
+
+TEST(UniGraphTest, TestUnitGraph_InOutDegrees) {
+  _TestUnitGraph_InOutDegrees<int32_t>(CPU);
+  _TestUnitGraph_InOutDegrees<int64_t>(CPU);
+#ifdef DGL_USE_CUDA
+  _TestUnitGraph_InOutDegrees<int32_t>(GPU);
+  _TestUnitGraph_InOutDegrees<int64_t>(GPU);
 #endif
 }
 

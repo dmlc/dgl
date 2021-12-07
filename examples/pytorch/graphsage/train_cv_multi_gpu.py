@@ -239,7 +239,7 @@ def run(proc_id, n_gpus, args, devices, data):
 
     # Create PyTorch DataLoader for constructing blocks
     if n_gpus > 1:
-        dist_sampler = torch.utils.data.distributed.DistributedSampler(train_nid.numpy(), shuffle=True, drop_last=False)
+        dist_sampler = th.utils.data.distributed.DistributedSampler(train_nid.numpy(), shuffle=True, drop_last=False)
         dataloader = DataLoader(
             dataset=train_nid.numpy(),
             batch_size=args.batch_size,

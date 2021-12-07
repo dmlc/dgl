@@ -144,7 +144,7 @@ def sample_etype_neighbors(g, nodes, etype_field, fanout, edge_dir='in', prob=No
     return ret
 
 def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
-                     copy_ndata=True, copy_edata=True, _dist_training=False):
+                     copy_ndata=True, copy_edata=True, _dist_training=False, exclude_edges=None):
     """Sample neighboring edges of the given nodes and return the induced subgraph.
 
     For each node, a number of inbound (or outbound when ``edge_dir == 'out'``) edges
@@ -186,6 +186,11 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
         to sum up to one).  Otherwise, the result will be undefined.
 
         If :attr:`prob` is not None, GPU sampling is not supported.
+    exclude_edges: tensor or dict
+        Edge IDs to exclude during sampling neighbors for the seed nodes.
+
+        This argument can take a single ID tensor or a dictionary of edge types and ID tensors.
+        If a single tensor is given, the graph must only have one type of nodes.
     replace : bool, optional
         If True, sample with replacement.
     copy_ndata: bool, optional
@@ -249,6 +254,30 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
     >>> sg = dgl.sampling.sample_neighbors(g, [0, 1], 3)
     >>> sg.edges(order='eid')
     (tensor([1, 2, 0, 1]), tensor([0, 0, 1, 1]))
+
+    To exclude certain EID's during sampling for the seed nodes:
+
+    >>> g = dgl.graph(([0, 0, 1, 1, 2, 2], [1, 2, 0, 1, 2, 0]))
+    >>> g_edges = g.all_edges(form='all')``
+    (tensor([0, 0, 1, 1, 2, 2]), tensor([1, 2, 0, 1, 2, 0]), tensor([0, 1, 2, 3, 4, 5]))
+    >>> sg = dgl.sampling.sample_neighbors(g, [0, 1], 3, exclude_edges=[0, 1, 2])
+    >>> sg.all_edges(form='all')
+    (tensor([2, 1]), tensor([0, 1]), tensor([0, 1]))
+    >>> sg.has_edges_between(g_edges[0][:3],g_edges[1][:3])
+    tensor([False, False, False])
+    >>> g = dgl.heterograph({
+    ...   ('drug', 'interacts', 'drug'): ([0, 0, 1, 1, 3, 2], [1, 2, 0, 1, 2, 0]),
+    ...   ('drug', 'interacts', 'gene'): ([0, 0, 1, 1, 2, 2], [1, 2, 0, 1, 2, 0]),
+    ...   ('drug', 'treats', 'disease'): ([0, 0, 1, 1, 2, 2], [1, 2, 0, 1, 2, 0])})
+    >>> g_edges = g.all_edges(form='all', etype=('drug', 'interacts', 'drug'))
+    (tensor([0, 0, 1, 1, 3, 2]), tensor([1, 2, 0, 1, 2, 0]), tensor([0, 1, 2, 3, 4, 5]))
+    >>> excluded_edges  = {('drug', 'interacts', 'drug'): g_edges[2][:3]}
+    >>> sg = dgl.sampling.sample_neighbors(g, {'drug':[0, 1]}, 3, exclude_edges=excluded_edges)
+    >>> sg.all_edges(form='all', etype=('drug', 'interacts', 'drug'))
+    (tensor([2, 1]), tensor([0, 1]), tensor([0, 1]))
+    >>> sg.has_edges_between(g_edges[0][:3],g_edges[1][:3],etype=('drug', 'interacts', 'drug'))
+    tensor([False, False, False])
+
     """
     if not isinstance(nodes, dict):
         if len(g.ntypes) > 1:
@@ -290,8 +319,21 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
             else:
                 prob_arrays.append(nd.array([], ctx=nd.cpu()))
 
+    excluded_edges_all_t = []
+    if exclude_edges is not None:
+        if not isinstance(exclude_edges, dict):
+            if len(g.etypes) > 1:
+                raise DGLError("Must specify etype type when the graph is not homogeneous.")
+            exclude_edges = {g.canonical_etypes[0] : exclude_edges}
+        exclude_edges = utils.prepare_tensor_dict(g, exclude_edges, 'edges')
+        for etype in g.canonical_etypes:
+            if etype in exclude_edges:
+                excluded_edges_all_t.append(F.to_dgl_nd(exclude_edges[etype]))
+            else:
+                excluded_edges_all_t.append(nd.array([], ctx=nd.cpu()))
+
     subgidx = _CAPI_DGLSampleNeighbors(g._graph, nodes_all_types, fanout_array,
-                                       edge_dir, prob_arrays, replace)
+                                       edge_dir, prob_arrays, excluded_edges_all_t, replace)
     induced_edges = subgidx.induced_edges
     ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
 

@@ -265,6 +265,7 @@ def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False, m
         A vector with each element that indicates the partition ID of a vertex.
     '''
     assert mode in ("k-way", "recursive"), "'mode' can only be 'k-way' or 'recursive'"
+    assert g.idtype == F.int64, "IdType of graph is required to be int64 for now."
     # METIS works only on symmetric graphs.
     # The METIS runs on the symmetric graph to generate the node assignment to partitions.
     start = time.time()

@@ -49,7 +49,7 @@ class Uniform(_BaseNegativeSampler):
     --------
     >>> g = dgl.graph(([0, 1, 2], [1, 2, 3]))
     >>> neg_sampler = dgl.dataloading.negative_sampler.Uniform(2)
-    >>> neg_sampler(g, [0, 1])
+    >>> neg_sampler(g, torch.tensor([0, 1]))
     (tensor([0, 0, 1, 1]), tensor([1, 0, 2, 3]))
     """
     def __init__(self, k):
