@@ -146,7 +146,10 @@ def node_subgraph(graph, nodes, *, relabel_nodes=True, store_ids=True):
         induced_nodes.append(_process_nodes(ntype, nids))
     sgi = graph._graph.node_subgraph(induced_nodes, relabel_nodes)
     induced_edges = sgi.induced_edges
-    induced_nodes = sgi.induced_nodes if relabel_nodes else None
+    # (BarclayII) should not write induced_nodes = sgi.induced_nodes due to the same
+    # bug in #1453.
+    if not relabel_nodes:
+        induced_nodes = None
     return _create_hetero_subgraph(graph, sgi, induced_nodes, induced_edges, store_ids=store_ids)
 
 DGLHeteroGraph.subgraph = utils.alias_func(node_subgraph)

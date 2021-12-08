@@ -33,7 +33,6 @@ The last section of it explains how to implement message passing on heterogeneou
 * :ref:`guide-message-passing-api`
 * :ref:`guide-message-passing-efficient`
 * :ref:`guide-message-passing-part`
-* :ref:`guide-message-passing-edge`
 * :ref:`guide-message-passing-heterograph`
 
 .. toctree::
@@ -44,5 +43,4 @@ The last section of it explains how to implement message passing on heterogeneou
     message-api
     message-efficient
     message-part
-    message-edge
     message-heterograph

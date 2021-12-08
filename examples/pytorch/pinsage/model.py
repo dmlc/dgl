@@ -52,13 +52,13 @@ def train(dataset, args):
     fields = {}
     examples = []
     for key, texts in item_texts.items():
-        fields[key] = torchtext.data.Field(include_lengths=True, lower=True, batch_first=True)
+        fields[key] = torchtext.legacy.data.Field(include_lengths=True, lower=True, batch_first=True)
     for i in range(g.number_of_nodes(item_ntype)):
-        example = torchtext.data.Example.fromlist(
+        example = torchtext.legacy.data.Example.fromlist(
             [item_texts[key][i] for key in item_texts.keys()],
             [(key, fields[key]) for key in item_texts.keys()])
         examples.append(example)
-    textset = torchtext.data.Dataset(examples, fields)
+    textset = torchtext.legacy.data.Dataset(examples, fields)
     for key, field in fields.items():
         field.build_vocab(getattr(textset, key))
         #field.build_vocab(getattr(textset, key), vectors='fasttext.simple.300d')
