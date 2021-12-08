@@ -32,24 +32,21 @@ class GINConv(nn.Module):
 
     Parameters
     ----------
-    in_feats : int
-        Input feature size; i.e, the number of dimensions of :math:`h_i^{(l)}`.
-    out_feats : int
-        Output feature size; i.e, the number of dimensions of :math:`h_i^{(l+1)}`.
+    apply_func : callable activation function/layer or None
+        If not None, apply this function to the updated node feature,
+        the :math:`f_\Theta` in the formula.
     aggregator_type : str
         Aggregator type to use (``sum``, ``max`` or ``mean``).
     init_eps : float, optional
         Initial :math:`\epsilon` value, default: ``0``.
     learn_eps : bool, optional
         If True, :math:`\epsilon` will be a learnable parameter. Default: ``False``.
-    bias : bool
-        If True, adds a learnable bias to the output. Default: ``True``.
     activation : callable activation function/layer or None, optional
         If not None, applies an activation function to the updated node features.
         Default: ``None``.
 
-    Example
-    -------
+    Examples
+    --------
     >>> import dgl
     >>> import numpy as np
     >>> import torch as th
@@ -57,36 +54,51 @@ class GINConv(nn.Module):
     >>>
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
     >>> feat = th.ones(6, 10)
-    >>> conv = GINConv(10, 10, 'max')
+    >>> lin = th.nn.Linear(10, 10)
+    >>> conv = GINConv(lin, 'max')
     >>> res = conv(g, feat)
     >>> res
-    tensor([[ 3.0337,  0.4225, -0.4726, -4.4781, -0.1171, -0.5454, -1.4001, -2.2853,
-              3.9959,  0.8057],
-            [ 3.0337,  0.4225, -0.4726, -4.4781, -0.1171, -0.5454, -1.4001, -2.2853,
-              3.9959,  0.8057],
-            [ 3.0337,  0.4225, -0.4726, -4.4781, -0.1171, -0.5454, -1.4001, -2.2853,
-              3.9959,  0.8057],
-            [ 3.0337,  0.4225, -0.4726, -4.4781, -0.1171, -0.5454, -1.4001, -2.2853,
-              3.9959,  0.8057],
-            [ 3.0337,  0.4225, -0.4726, -4.4781, -0.1171, -0.5454, -1.4001, -2.2853,
-              3.9959,  0.8057],
-            [ 1.3777,  0.2866, -0.1357, -2.1901, -0.0833, -0.2404, -0.6732, -1.0359,
-              2.0468,  0.4510]], grad_fn=<AddmmBackward>)
+    tensor([[-0.4821,  0.0207, -0.7665,  0.5721, -0.4682, -0.2134, -0.5236,  1.2855,
+            0.8843, -0.8764],
+            [-0.4821,  0.0207, -0.7665,  0.5721, -0.4682, -0.2134, -0.5236,  1.2855,
+            0.8843, -0.8764],
+            [-0.4821,  0.0207, -0.7665,  0.5721, -0.4682, -0.2134, -0.5236,  1.2855,
+            0.8843, -0.8764],
+            [-0.4821,  0.0207, -0.7665,  0.5721, -0.4682, -0.2134, -0.5236,  1.2855,
+            0.8843, -0.8764],
+            [-0.4821,  0.0207, -0.7665,  0.5721, -0.4682, -0.2134, -0.5236,  1.2855,
+            0.8843, -0.8764],
+            [-0.1804,  0.0758, -0.5159,  0.3569, -0.1408, -0.1395, -0.2387,  0.7773,
+            0.5266, -0.4465]], grad_fn=<AddmmBackward>)
+
+    >>> # With activation
+    >>> from torch.nn.functional import relu
+    >>> conv = GINConv(lin, 'max', activation=relu)
+    >>> res = conv(g, feat)
+    >>> res
+    tensor([[5.0118, 0.0000, 0.0000, 3.9091, 1.3371, 0.0000, 0.0000, 0.0000, 0.0000,
+             0.0000],
+            [5.0118, 0.0000, 0.0000, 3.9091, 1.3371, 0.0000, 0.0000, 0.0000, 0.0000,
+             0.0000],
+            [5.0118, 0.0000, 0.0000, 3.9091, 1.3371, 0.0000, 0.0000, 0.0000, 0.0000,
+             0.0000],
+            [5.0118, 0.0000, 0.0000, 3.9091, 1.3371, 0.0000, 0.0000, 0.0000, 0.0000,
+             0.0000],
+            [5.0118, 0.0000, 0.0000, 3.9091, 1.3371, 0.0000, 0.0000, 0.0000, 0.0000,
+             0.0000],
+            [2.5011, 0.0000, 0.0089, 2.0541, 0.8262, 0.0000, 0.0000, 0.1371, 0.0000,
+             0.0000]], grad_fn=<ReluBackward0>)
     """
     def __init__(self,
-                 in_feats,
-                 out_feats,
+                 apply_func,
                  aggregator_type,
                  init_eps=0,
                  learn_eps=False,
-                 bias=True,
                  activation=None):
         super(GINConv, self).__init__()
-        self._in_feats = in_feats
-        self._out_feats = out_feats
+        self.apply_func = apply_func
         self._aggregator_type = aggregator_type
         self.activation = activation
-        self.lin = nn.Linear(self._in_feats, self._out_feats, bias=bias)
         if aggregator_type not in ('sum', 'max', 'mean'):
             raise KeyError(
                 'Aggregator type {} not recognized.'.format(aggregator_type))
@@ -95,9 +107,9 @@ class GINConv(nn.Module):
             self.eps = th.nn.Parameter(th.FloatTensor([init_eps]))
         else:
             self.register_buffer('eps', th.FloatTensor([init_eps]))
-
+        
         self.reset_parameters()
-
+        
     def reset_parameters(self):
         r"""
 
@@ -110,7 +122,7 @@ class GINConv(nn.Module):
         The model parameters are initialized using Glorot uniform initialization.
         """
         gain = nn.init.calculate_gain('relu')
-        nn.init.xavier_normal_(self.lin.weight, gain=gain)
+        nn.init.xavier_normal_(self.apply_func.weight, gain=gain)
 
     def forward(self, graph, feat, edge_weight=None):
         r"""
@@ -128,6 +140,8 @@ class GINConv(nn.Module):
             :math:`D_{in}` is size of input feature, :math:`N` is the number of nodes.
             If a pair of torch.Tensor is given, the pair must contain two tensors of shape
             :math:`(N_{in}, D_{in})` and :math:`(N_{out}, D_{in})`.
+            If ``apply_func`` is not None, :math:`D_{in}` should
+            fit the input dimensionality requirement of ``apply_func``.
         edge_weight : torch.Tensor, optional
             Optional tensor on the edge. If given, the convolution will weight
             with regard to the message.
@@ -152,7 +166,8 @@ class GINConv(nn.Module):
             graph.srcdata['h'] = feat_src
             graph.update_all(aggregate_fn, _reducer('m', 'neigh'))
             rst = (1 + self.eps) * feat_dst + graph.dstdata['neigh']
-            rst = self.lin(rst)
+            if self.apply_func is not None:
+                rst = self.apply_func(rst)
             # activation
             if self.activation is not None:
                 rst = self.activation(rst)
