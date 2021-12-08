@@ -1,50 +1,35 @@
 import torch as th
 import torch.nn as nn
-
+import torch.nn.functional as F
 import dgl
 
-class BaseRGCN(nn.Module):
-    def __init__(self, num_nodes, h_dim, out_dim, num_rels, num_bases,
-                 num_hidden_layers=1, dropout=0,
-                 use_self_loop=False):
-        super(BaseRGCN, self).__init__()
-        self.num_nodes = num_nodes
-        self.h_dim = h_dim
-        self.out_dim = out_dim
-        self.num_rels = num_rels
-        self.num_bases = None if num_bases < 0 else num_bases
-        self.num_hidden_layers = num_hidden_layers
-        self.dropout = dropout
-        self.use_self_loop = use_self_loop
+from dgl.nn import RelGraphConv
 
-        # create rgcn layers
-        self.build_model()
+class RGCN(nn.Module):
+    def __init__(self, num_nodes, h_dim, out_dim, num_rels,
+                 regularizer="basis", num_bases=-1, dropout=0.,
+                 self_loop=False, link_pred=False):
+        super(RGCN, self).__init__()
 
-    def build_model(self):
         self.layers = nn.ModuleList()
-        # i2h
-        i2h = self.build_input_layer()
-        if i2h is not None:
-            self.layers.append(i2h)
-        # h2h
-        for idx in range(self.num_hidden_layers):
-            h2h = self.build_hidden_layer(idx)
-            self.layers.append(h2h)
-        # h2o
-        h2o = self.build_output_layer()
-        if h2o is not None:
-            self.layers.append(h2o)
+        if link_pred:
+            self.emb = nn.Embedding(num_nodes, h_dim)
+        else:
+            self.emb = None
+            self.layers.append(RelGraphConv(num_nodes, h_dim, num_rels, regularizer,
+                                            num_bases, activation=F.relu, self_loop=self_loop,
+                                            dropout=dropout))
 
-    def build_input_layer(self):
-        return None
-
-    def build_hidden_layer(self, idx):
-        raise NotImplementedError
-
-    def build_output_layer(self):
-        return None
+        # For entity classification, dropout should not be applied to the output layer
+        if not link_pred:
+            dropout = 0.
+        self.layers.append(RelGraphConv(h_dim, out_dim, num_rels, regularizer,
+                                        num_bases, self_loop=self_loop, dropout=dropout))
 
     def forward(self, g, h, r, norm):
+        if self.emb is not None:
+            h = self.emb(h.squeeze())
+
         for layer in self.layers:
             h = layer(g, h, r, norm)
         return h

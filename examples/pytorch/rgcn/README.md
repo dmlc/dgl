@@ -39,30 +39,30 @@ python entity_classify.py -d am --n-bases 40 --n-hidden 10
 ### Entity Classification with minibatch
 AIFB: accuracy avg(5 runs) 90.00%, best 94.44% (DGL)
 ```
-python3 entity_classify_mp.py -d aifb --testing --gpu 0 --fanout='20,20' --batch-size 128
+python entity_classify_mp.py -d aifb --testing --gpu 0 --fanout='20,20' --batch-size 128
 ```
 
 MUTAG: accuracy avg(10 runs) 62.94%, best 72.06% (DGL)
 ```
-python3 entity_classify_mp.py -d mutag --l2norm 5e-4 --n-bases 30 --testing --gpu 0 --batch-size 64 --fanout "-1, -1" --use-self-loop --dgl-sparse --n-epochs 20 --sparse-lr 0.01 --dropout 0.5
+python entity_classify_mp.py -d mutag --l2norm 5e-4 --n-bases 30 --testing --gpu 0 --batch-size 64 --fanout "-1, -1" --use-self-loop --dgl-sparse --n-epochs 20 --sparse-lr 0.01 --dropout 0.5
 ```
 
 BGS: accuracy avg(5 runs) 78.62%, best 86.21% (DGL)
 ```
-python3 entity_classify_mp.py -d bgs --l2norm 5e-4 --n-bases 40 --testing --gpu 0 --fanout "-1, -1"  --n-epochs=16 --batch-size=16 --dgl-sparse  --lr 0.01 --sparse-lr 0.05 --dropout 0.3
+python entity_classify_mp.py -d bgs --l2norm 5e-4 --n-bases 40 --testing --gpu 0 --fanout "-1, -1"  --n-epochs=16 --batch-size=16 --dgl-sparse  --lr 0.01 --sparse-lr 0.05 --dropout 0.3
 ```
 
 AM: accuracy avg(5 runs) 87.37%, best 89.9% (DGL)
 ```
-python3 entity_classify_mp.py -d am --l2norm 5e-4 --n-bases 40 --testing  --gpu 0 --fanout '35,35' --batch-size 64 --n-hidden 16 --use-self-loop --n-epochs=20 --dgl-sparse --lr 0.01  --sparse-lr 0.02 --dropout 0.7
+python entity_classify_mp.py -d am --l2norm 5e-4 --n-bases 40 --testing  --gpu 0 --fanout '35,35' --batch-size 64 --n-hidden 16 --use-self-loop --n-epochs=20 --dgl-sparse --lr 0.01  --sparse-lr 0.02 --dropout 0.7
 ```
 
 ### Link Prediction
 FB15k-237: MRR 0.151 (DGL), 0.158 (paper)
 ```
-python3 link_predict.py -d FB15k-237 --gpu 0 --eval-protocol raw
+python link_predict.py -d FB15k-237 --gpu 0 --eval-protocol raw
 ```
 FB15k-237: Filtered-MRR 0.2044
 ```
-python3 link_predict.py -d FB15k-237 --gpu 0 --eval-protocol filtered
+python link_predict.py -d FB15k-237 --gpu 0 --eval-protocol filtered
 ```

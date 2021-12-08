@@ -10,26 +10,9 @@ import time
 import torch
 import torch.nn.functional as F
 import dgl
-from dgl.nn.pytorch import RelGraphConv
 from dgl.data.rdf import AIFBDataset, MUTAGDataset, BGSDataset, AMDataset
 
-from model import BaseRGCN
-
-class EntityClassify(BaseRGCN):
-    def build_input_layer(self):
-        return RelGraphConv(self.num_nodes, self.h_dim, self.num_rels, "basis",
-                self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
-                dropout=self.dropout)
-
-    def build_hidden_layer(self, idx):
-        return RelGraphConv(self.h_dim, self.h_dim, self.num_rels, "basis",
-                self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
-                dropout=self.dropout)
-
-    def build_output_layer(self):
-        return RelGraphConv(self.h_dim, self.out_dim, self.num_rels, "basis",
-                self.num_bases, activation=None,
-                self_loop=self.use_self_loop)
+from model import RGCN
 
 def main(args):
     # load graph data
@@ -71,7 +54,7 @@ def main(args):
     category_id = hg.ntypes.index(category)
 
     g = dgl.to_homogeneous(hg, edata=['norm'])
-    num_nodes = g.number_of_nodes()
+    num_nodes = g.num_nodes()
     node_ids = torch.arange(num_nodes)
     edge_norm = g.edata['norm']
     edge_type = g.edata[dgl.ETYPE].long()
@@ -86,12 +69,11 @@ def main(args):
     feats = torch.arange(num_nodes)
 
     # create model
-    model = EntityClassify(num_nodes,
-                           args.n_hidden,
-                           num_classes,
-                           num_rels,
-                           num_bases=args.n_bases,
-                           num_hidden_layers=0)
+    model = RGCN(num_nodes,
+                 args.n_hidden,
+                 num_classes,
+                 num_rels,
+                 num_bases=args.n_bases)
 
     # check cuda
     use_cuda = args.gpu >= 0 and torch.cuda.is_available()

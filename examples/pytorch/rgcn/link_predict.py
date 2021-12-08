@@ -17,36 +17,16 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from dgl.data.knowledge_graph import load_data
-from dgl.nn.pytorch import RelGraphConv
 
-from model import BaseRGCN
+from model import RGCN
 
 import utils
 
-class EmbeddingLayer(nn.Module):
-    def __init__(self, num_nodes, h_dim):
-        super(EmbeddingLayer, self).__init__()
-        self.embedding = nn.Embedding(num_nodes, h_dim)
-
-    def forward(self, g, h, r, norm):
-        return self.embedding(h.squeeze())
-
-class RGCN(BaseRGCN):
-    def build_input_layer(self):
-        return EmbeddingLayer(self.num_nodes, self.h_dim)
-
-    def build_hidden_layer(self, idx):
-        act = F.relu if idx < self.num_hidden_layers - 1 else None
-        return RelGraphConv(self.h_dim, self.h_dim, self.num_rels, "bdd",
-                self.num_bases, activation=act, self_loop=True,
-                dropout=self.dropout)
-
 class LinkPredict(nn.Module):
-    def __init__(self, in_dim, h_dim, num_rels, num_bases=-1,
-                 num_hidden_layers=1, dropout=0, use_cuda=False, reg_param=0):
+    def __init__(self, in_dim, h_dim, num_rels, num_bases=-1, dropout=0, reg_param=0):
         super(LinkPredict, self).__init__()
-        self.rgcn = RGCN(in_dim, h_dim, h_dim, num_rels * 2, num_bases,
-                         num_hidden_layers, dropout, use_cuda)
+        self.rgcn = RGCN(in_dim, h_dim, h_dim, num_rels * 2, regularizer="bdd",
+                         num_bases=num_bases, dropout=dropout, self_loop=True, link_pred=True)
         self.reg_param = reg_param
         self.w_relation = nn.Parameter(torch.Tensor(num_rels, h_dim))
         nn.init.xavier_uniform_(self.w_relation,
@@ -100,9 +80,7 @@ def main(args):
                         args.n_hidden,
                         num_rels,
                         num_bases=args.n_bases,
-                        num_hidden_layers=args.n_layers,
                         dropout=args.dropout,
-                        use_cuda=use_cuda,
                         reg_param=args.regularization)
 
     # validation and testing triplets
