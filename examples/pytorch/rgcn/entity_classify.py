@@ -48,7 +48,7 @@ def main(args):
     else:
         dataset = AMDataset()
 
-    # Load from hetero-graph
+    # Load hetero-graph
     hg = dataset[0]
 
     num_rels = len(hg.canonical_etypes)
@@ -60,27 +60,21 @@ def main(args):
     test_idx = torch.nonzero(test_mask, as_tuple=False).squeeze()
     labels = hg.nodes[category].data.pop('labels')
 
-    # split dataset into train, validate, test
-    if args.validation:
-        val_idx = train_idx[:len(train_idx) // 5]
-        train_idx = train_idx[len(train_idx) // 5:]
-    else:
-        val_idx = train_idx
+    # As the datasets do not have a validation subset,
+    # use the training set for validation
+    val_idx = train_idx
 
-    # calculate norm for each edge type and store in edge
-    for canonical_etype in hg.canonical_etypes:
-        u, v, eid = hg.all_edges(form='all', etype=canonical_etype)
+    # Calculate normalization weight for each edge,
+    # 1. / d, d is the degree of the destination node
+    for cetype in hg.canonical_etypes:
+        _, v, eid = hg.edges(form='all', etype=cetype)
         _, inverse_index, count = torch.unique(v, return_inverse=True, return_counts=True)
         degrees = count[inverse_index]
         norm = torch.ones(eid.shape[0]).float() / degrees.float()
-        norm = norm.unsqueeze(1)
-        hg.edges[canonical_etype].data['norm'] = norm
+        hg.edges[cetype].data['norm'] = norm.unsqueeze(1)
 
     # get target category id
-    category_id = len(hg.ntypes)
-    for i, ntype in enumerate(hg.ntypes):
-        if ntype == category:
-            category_id = i
+    category_id = hg.ntypes.index(category)
 
     g = dgl.to_homogeneous(hg, edata=['norm'])
     num_nodes = g.number_of_nodes()
