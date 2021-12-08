@@ -703,4 +703,103 @@ def _csrmask(A, A_weights, B):
     """
     return F.from_dgl_nd(_CAPI_DGLCSRMask(A, F.to_dgl_nd(A_weights), B))
 
+
+##################################################
+## DistGNN functions
+def fdrpa_gather_emb_lr(feat, feat_shape, adj, send_feat_list, offset,
+                        send_node_list, send_to_node_list, selected_nodes,
+                        in_degs, ver2part, ver2part_index, width, feat_size,
+                        cur_part, soffset_base, soffset_cur, node_map, num_parts):
+    sfl_a            = to_dgl_nd_for_write(send_feat_list)
+    feat_a           = to_dgl_nd(feat)
+    adj_a            = to_dgl_nd(adj)
+    snl_a            = to_dgl_nd_for_write(send_node_list)
+    stnl_a           = to_dgl_nd_for_write(send_to_node_list)
+    selected_nodes_a = to_dgl_nd(selected_nodes)
+    node_map_a       = to_dgl_nd(node_map)
+    _CAPI_DGLKernelFdrpaGatherEmbLR(feat_a,
+                                    feat_shape,
+                                    adj_a,
+                                    sfl_a,
+                                    offset,
+                                    snl_a,
+                                    stnl_a,
+                                    selected_nodes_a,
+                                    to_dgl_nd(in_degs),
+                                    to_dgl_nd(ver2part),
+                                    to_dgl_nd(ver2part_index),
+                                    width,
+                                    feat_size,
+                                    cur_part,
+                                    soffset_base,
+                                    soffset_cur,
+                                    node_map_a,
+                                    num_parts)
+
+
+def scatter_reduce_lr(otf, offsetf, otn, offsetn, neigh, degs, node_map,
+                      dim, feat_size, num_parts, recv_list_nodes, pos,
+                      count, cur_part):
+    node_map_a = to_dgl_nd(node_map)
+    _CAPI_DGLKernelScatterReduceLR(to_dgl_nd(otf),
+                                   offsetf,
+                                   to_dgl_nd(otn),
+                                   offsetn,
+                                   to_dgl_nd_for_write(neigh),
+                                   to_dgl_nd_for_write(degs),
+                                   node_map_a,
+                                   dim,
+                                   feat_size,
+                                   num_parts,
+                                   to_dgl_nd_for_write(recv_list_nodes),
+                                   to_dgl_nd_for_write(pos),
+                                   count,
+                                   cur_part)
+
+
+def fdrpa_gather_emb_rl(feat, feat_shape, send_feat_list, offset, recv_list_nodes,
+                        lim, in_degs, feat_size, node_map, num_parts):
+    node_map_a = to_dgl_nd(node_map)
+    _CAPI_DGLKernelFdrpaGatherEmbRL(to_dgl_nd(feat),
+                                    feat_shape,
+                                    to_dgl_nd_for_write(send_feat_list),
+                                    offset,
+                                    to_dgl_nd(recv_list_nodes),
+                                    lim,
+                                    to_dgl_nd(in_degs),
+                                    feat_size,
+                                    node_map_a,
+                                    num_parts)
+
+
+def scatter_reduce_rl(otf, offset, stn, lim, in_degs, neigh, node_map, dim, feat_size,
+                      num_parts):
+    node_map_a = to_dgl_nd(node_map)
+    _CAPI_DGLKernelScatterReduceRL(to_dgl_nd(otf),
+                                   offset,
+                                   to_dgl_nd(stn),
+                                   lim,
+                                   to_dgl_nd_for_write(in_degs),
+                                   to_dgl_nd_for_write(neigh),
+                                   node_map_a,
+                                   dim,
+                                   feat_size,
+                                   num_parts)
+
+def fdrpa_comm_buckets(adj, selected_nodes, ver2part, ver2part_index, node_map,
+                       buckets, lf, width, num_parts, cur_part):
+    selected_nodes_a =  to_dgl_nd(selected_nodes)
+    node_map_a = to_dgl_nd(node_map)
+    _CAPI_DGLKernelFdrpaCommBuckets(to_dgl_nd(adj),
+                                    selected_nodes_a,
+                                    to_dgl_nd_for_write(ver2part),
+                                    to_dgl_nd_for_write(ver2part_index),
+                                    node_map_a,
+                                    to_dgl_nd_for_write(buckets),
+                                    to_dgl_nd(lf),
+                                    width,
+                                    num_parts,
+                                    cur_part)
+
+
 _init_api("dgl.sparse")

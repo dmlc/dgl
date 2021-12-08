@@ -1,4 +1,36 @@
-## Distributed training
+## Distributed training using DistGNN
+Paper: https://arxiv.org/abs/2104.06700
+Distributed training for GraphSage.
+
+### Requirements:  
+Install OneCCL library from https://github.com/ddkalamk/torch-ccl/tree/working_1.7 (commit: 633a77e)  
+Note: Ensure setting of 'torch_ccl_path'   
+
+### Runs:  
+Step 1: Graph partition: Vertex based graph partition using Libra (https://github.com/dmlc/dgl/pull/3376)  
+Step 2: Distributed training:  
+Reddit:  
+1. cd-0  
+sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_drpa.py --dataset reddit --n-epochs 200 --nr 1 --aggregator-type "gcn"    
+
+2. cd-5 (r=5)  
+sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_drpa.py --dataset reddit --n-epochs 200 --nr 5 --aggregator-type "gcn"  
+
+3. 0c  
+sh run_dist.sh -n <num_nodes> -ppn <ppn>  python train_dist_drpa.py --dataset reddit --n-epochs 200 --nr -1 --aggregator-type "gcn"  
+
+
+Note:
+I. num_nodes : sockets or compute node; ppn : MPI ranks per compute node e.g., ppn=2 for dual socket copmute node.  
+II. make sure graph partition (Libra) is run from current directory to store paritions in current directory.
+III. Please refer to the DistGNN for more details on cd-0, cd-r, and 0c algorithms  
+
+
+### Settings  
+Tested with: Cent OS 7.6, gcc v8.3.0, PyTorch 1.7.1, Python 3.7.10  
+Environment used: Anaconda  
+
+---------------------------------------------------------------------------------------------------------
 
 This is an example of training GraphSage in a distributed fashion. Before training, please install some python libs by pip:
 
