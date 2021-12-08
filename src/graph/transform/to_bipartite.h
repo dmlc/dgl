@@ -13,7 +13,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
- * \file graph/transform/cuda_to_block.cu
+ * \file graph/transform/to_bipartite.h
  * \brief Functions to convert a set of edges into a graph block with local
  * ids.
  */

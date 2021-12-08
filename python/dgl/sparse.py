@@ -64,14 +64,13 @@ def to_dgl_nd_for_write(x):
     return nd.NULL['int64'] if x is None else F.zerocopy_to_dgl_ndarray_for_write(x)
 
 
-def get_typeid_by_target(g, rel, target):
+def get_typeid_by_target(gidx, etid, target):
     """Find the src/dst/etype id based on the target 'u', 'v' or 'e'."""
-    srctype, _, dsttype = rel
-    etid = g.get_etype_id(rel)
+    src_id, dst_id = gidx.metagraph.find_edge(etid)
     if target in [0, 'u']:
-        return g.get_ntype_id(srctype)
+        return src_id
     if target in [2, 'v']:
-        return g.get_ntype_id(dsttype)
+        return dst_id
     return etid
 
 
@@ -190,26 +189,80 @@ def _gspmm(gidx, op, reduce_op, u, e):
     return v, (arg_u, arg_e)
 
 
-def _gspmm_hetero(g, op, reduce_op, u_len, u_and_e_tuple):
-    r""" Generalized Sparse Matrix Multiplication interface.
+def _gspmm_hetero(gidx, op, reduce_op, u_len, u_and_e_tuple):
+    r""" Generalized Sparse Matrix Multiplication interface on heterogeneous graphs.
+    It handles multiple node and edge types of the graph. For each edge type, it takes
+    the result of :attr:`op` on source node feature and edge feature, and leads to a
+    message on edge. Then it aggregates the message by :attr:`reduce_op` on the destination
+    nodes of the etype.
+
+    .. math::
+        x_v = \psi_{(u, v, e)\in \mathcal{G}}(\rho(x_u, x_e))
+
+    where :math:`x_v` is the returned feature on destination nodes, and :math`x_u`,
+    :math:`x_e` refers to :attr:`u`, :attr:`e` respectively. :math:`\rho` means binary
+    operator :attr:`op` and :math:`\psi` means reduce operator :attr:`reduce_op`,
+    :math:`\mathcal{G}` is the graph we apply gspmm on: :attr:`g`.
+
+    Note that this function does not handle gradients.
+
+    Parameters
+    ----------
+    gidx : HeteroGraphIndex
+        The input graph index.
+    op : str
+        The binary op's name, could be ``add``, ``sub``, ``mul``, ``div``, ``copy_lhs``,
+        ``copy_rhs``.
+    reduce_op : str
+        Reduce operator, could be ``sum``, ``max``, ``min``.
+    u_len : int
+        The number of tensors in ``u`` (source node features)
+    u_and_e_tuple : Tuple of tensors
+        Tuple of source nodes' features and edges' features. ``u_and_e_tuple[:u_len]``
+        stores the source nodes's features of all source node types. ``u_and_e_tuple[u_len:]``
+        stores the edges's features of all the edge types.
+        The source nodes' features of the soruce node types could be None if op is ``copy_rhs``.
+        The edges' features of the edge types could be None if op is ``copy_lhs``.
+
+    Returns
+    -------
+    tuple
+        The returned tuple is composed of two elements:
+        - The first element refers to the tuple of result tensors.
+        - The second element refers to a tuple composed of arg_u and arg_e
+          (which is useful when reducer is `min`/`max`).
+
+    Notes
+    -----
+    This function does not handle gradients.
     """
     u_tuple, e_tuple = u_and_e_tuple[:u_len], u_and_e_tuple[u_len:]
-    gidx = g._graph
     use_u = op != 'copy_rhs'
     use_e = op != 'copy_lhs'
     # TODO (Israt): Add check - F.dtype(u) != F.dtype(e):
 
     # deal with scalar features.
     expand_u, expand_e = False, False
-    list_u = [None] * gidx.number_of_ntypes()
-    list_v = [None] * gidx.number_of_ntypes()
-    list_e = [None] * gidx.number_of_etypes()
+    num_ntypes = gidx.number_of_ntypes()
+    num_etypes = gidx.number_of_etypes()
+    list_u = [None] * num_ntypes
+    list_v = [None] * num_ntypes
+    list_e = [None] * num_etypes
+    list_arg_u_nd = [None] * num_ntypes
+    list_arg_u = [None] * num_ntypes
+    list_arg_u_ntype_nd = [None] * num_ntypes
+    list_arg_u_ntype = [None] * num_ntypes
+    # TODO(Israt): double check ntype or etype
+    list_arg_e_nd = [None] * num_ntypes
+    list_arg_e = [None] * num_ntypes
+    list_arg_e_etype_nd = [None] * num_ntypes
+    list_arg_e_etype = [None] * num_ntypes
 
-    for rel in g.canonical_etypes:
-        srctype, _, dsttype = rel
-        etid = g.get_etype_id(rel)
-        src_id = g.get_ntype_id(srctype)
-        dst_id = g.get_ntype_id(dsttype)
+    use_cmp = reduce_op in ['max', 'min']
+    idtype = getattr(F, gidx.dtype)
+
+    for etid in range(num_etypes):
+        src_id, dst_id = gidx.metagraph.find_edge(etid)
         u = u_tuple[src_id] if use_u else None
         e = e_tuple[etid] if use_e else None
         if use_u:
@@ -229,29 +282,42 @@ def _gspmm_hetero(g, op, reduce_op, u_len, u_and_e_tuple):
         v_shp = (gidx.number_of_nodes(dst_id), ) +\
             infer_broadcast_shape(op, u_shp[1:], e_shp[1:])
         list_v[dst_id] = F.zeros(v_shp, dtype, ctx)
+        if use_cmp:
+            if use_u:
+                list_arg_u[dst_id] = F.zeros(v_shp, idtype, ctx)
+                list_arg_u_ntype[dst_id] = F.zeros(v_shp, idtype, ctx)
+            if use_e:
+                list_arg_e[dst_id] = F.zeros(v_shp, idtype, ctx)
+                list_arg_e_etype[dst_id] = F.zeros(v_shp, idtype, ctx)
+        list_arg_u_nd[dst_id] = to_dgl_nd_for_write(list_arg_u[dst_id])
+        list_arg_u_ntype_nd[dst_id] = to_dgl_nd_for_write(list_arg_u_ntype[dst_id])
+        list_arg_e_nd[dst_id] = to_dgl_nd_for_write(list_arg_e[dst_id])
+        list_arg_e_etype_nd[dst_id] = to_dgl_nd_for_write(list_arg_e_etype[dst_id])
 
-    use_cmp = reduce_op in ['max', 'min']
-    arg_u, arg_e = None, None
-    idtype = getattr(F, gidx.dtype)
-    if use_cmp:
-        if use_u:
-            arg_u = F.zeros(v_shp, idtype, ctx)
-        if use_e:
-            arg_e = F.zeros(v_shp, idtype, ctx)
-    arg_u_nd = to_dgl_nd_for_write(arg_u)
-    arg_e_nd = to_dgl_nd_for_write(arg_e)
     if gidx.number_of_edges(0) > 0:
         _CAPI_DGLKernelSpMMHetero(gidx, op, reduce_op,
                                   [to_dgl_nd(u_i) for u_i in list_u],
                                   [to_dgl_nd(e_i) for e_i in list_e],
                                   [to_dgl_nd_for_write(v_i) for v_i in list_v],
-                                  arg_u_nd,
-                                  arg_e_nd)
-    arg_u = None if arg_u is None else F.zerocopy_from_dgl_ndarray(arg_u_nd)
-    arg_e = None if arg_e is None else F.zerocopy_from_dgl_ndarray(arg_e_nd)
+                                  list_arg_u_nd, list_arg_e_nd,
+                                  list_arg_u_ntype_nd, list_arg_e_etype_nd)
+    for l, arg_u_nd in enumerate(list_arg_u_nd):
+        # TODO(Israt): l or src_id as index of lhs
+        list_arg_u[l] = None if list_arg_u[l] is None else F.zerocopy_from_dgl_ndarray(arg_u_nd)
+        if expand_u and use_cmp:
+            list_arg_u[l] = F.squeeze(list_arg_u[l], -1)
+    for l, arg_e_nd in enumerate(list_arg_e_nd):
+        list_arg_e[l] = None if list_arg_e[l] is None else F.zerocopy_from_dgl_ndarray(arg_e_nd)
+        if expand_e and use_cmp:
+            list_arg_e[l] = F.squeeze(list_arg_e[l], -1)
+    for l, arg_u_ntype_nd in enumerate(list_arg_u_ntype_nd):
+        list_arg_u_ntype[l] = None if arg_u_ntype_nd is None \
+            else F.zerocopy_from_dgl_ndarray(arg_u_ntype_nd)
+    for l, arg_e_etype_nd in enumerate(list_arg_e_etype_nd):
+        list_arg_e_etype[l] = None if arg_e_etype_nd is None \
+            else F.zerocopy_from_dgl_ndarray(arg_e_etype_nd)
     # To deal with scalar node/edge features.
-
-    for l in range(gidx.number_of_ntypes()):
+    for l in range(num_ntypes):
         # replace None by empty tensor. Forward func doesn't accept None in tuple.
         v = list_v[l]
         v = F.tensor([]) if v is None else v
@@ -259,12 +325,7 @@ def _gspmm_hetero(g, op, reduce_op, u_len, u_and_e_tuple):
             v = F.squeeze(v, -1)  # To deal with scalar node/edge features.
         list_v[l] = v
     out = tuple(list_v)
-
-    if expand_u and use_cmp:
-        arg_u = F.squeeze(arg_u, -1)
-    if expand_e and use_cmp:
-        arg_e = F.squeeze(arg_e, -1)
-    return out, (arg_u, arg_e)
+    return out, (list_arg_u, list_arg_e, list_arg_u_ntype, list_arg_e_etype)
 
 
 def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
@@ -346,10 +407,9 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
     return out
 
 
-def _gsddmm_hetero(g, op, lhs_len, lhs_target='u', rhs_target='v', lhs_and_rhs_tuple=None):
+def _gsddmm_hetero(gidx, op, lhs_len, lhs_target='u', rhs_target='v', lhs_and_rhs_tuple=None):
     r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface.
     """
-    gidx = g._graph
     lhs_tuple, rhs_tuple = lhs_and_rhs_tuple[:lhs_len], lhs_and_rhs_tuple[lhs_len:]
 
     use_lhs = op != 'copy_rhs'
@@ -358,8 +418,8 @@ def _gsddmm_hetero(g, op, lhs_len, lhs_target='u', rhs_target='v', lhs_and_rhs_t
     # TODO (Israt): Add check - F.dtype(u) != F.dtype(e):
     # deal with scalar features.
     expand_lhs, expand_rhs = False, False
-    num_ntype = g._graph.number_of_ntypes()
-    num_etype = g._graph.number_of_etypes()
+    num_ntype = gidx.number_of_ntypes()
+    num_etype = gidx.number_of_etypes()
     lhs_list = [None] * num_ntype if lhs_target in ['u', 'v'] else [None] * num_etype
     rhs_list = [None] * num_ntype if rhs_target in ['u', 'v'] else [None] * num_etype
     out_list = [None] * gidx.number_of_etypes()
@@ -367,10 +427,9 @@ def _gsddmm_hetero(g, op, lhs_len, lhs_target='u', rhs_target='v', lhs_and_rhs_t
     lhs_target = target_mapping[lhs_target]
     rhs_target = target_mapping[rhs_target]
 
-    for rel in g.canonical_etypes:
-        etid = g.get_etype_id(rel)
-        lhs_id = get_typeid_by_target(g, rel, lhs_target)
-        rhs_id = get_typeid_by_target(g, rel, rhs_target)
+    for etid in range(gidx.number_of_etypes()):
+        lhs_id = get_typeid_by_target(gidx, etid, lhs_target)
+        rhs_id = get_typeid_by_target(gidx, etid, rhs_target)
         lhs = lhs_tuple[lhs_id]
         rhs = rhs_tuple[rhs_id]
         if use_lhs:
@@ -486,6 +545,50 @@ def _scatter_add(x, idx, m):
                               to_dgl_nd(idx),
                               to_dgl_nd_for_write(out))
     return out
+
+
+def _update_grad_minmax_hetero(gidx, op, list_x, list_idx, list_idx_etype, list_dX):
+    r""" Update gradients for reduce operator max and min (on first dimension) implementation.
+
+    Parameters
+    ----------
+    gidx : HeteroGraphIndex
+        The input graph index.
+    list_x : List of tensors
+        List of the input features.
+    list_idx : List of tensors
+        List of the indices array.
+    list_idx_etype : List of tensors
+        List of the node- or edge-type array.
+    list_dX : List of tensors
+        List of gradients.
+
+    Returns
+    -------
+    Tensor
+        The output tensor.
+    """
+    use_u = op != 'copy_rhs'
+    use_e = op != 'copy_lhs'
+    list_out = [None] * len(list_dX)
+    for etid in range(gidx.number_of_etypes()):
+        src_id, dst_id = gidx.metagraph.find_edge(etid) # gidx is reveresed
+        x = list_x[src_id]
+        ctx = F.context(x)
+        dtype = F.dtype(x)
+        if use_u:
+            out_shp = (len(list_dX[dst_id]),) + F.shape(x)[1:]
+            list_out[dst_id] = F.zeros(out_shp, dtype, ctx)
+        if use_e:
+            out_shp = (len(list_dX[etid]),) + F.shape(x)[1:]
+            list_out[etid] = F.zeros(out_shp, dtype, ctx)
+
+    _CAPI_DGLKernelUpdateGradMinMaxHetero(gidx, op,
+                                          [to_dgl_nd(x) for x in list_x],
+                                          [to_dgl_nd(idx) for idx in list_idx],
+                                          [to_dgl_nd(idx_etype) for idx_etype in list_idx_etype],
+                                          [to_dgl_nd_for_write(out) for out in list_out])
+    return tuple(list_out)
 
 
 def _bwd_segment_cmp(feat, arg, m):

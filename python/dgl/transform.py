@@ -18,7 +18,8 @@
 from collections.abc import Iterable, Mapping
 from collections import defaultdict
 import numpy as np
-from scipy import sparse
+import scipy.sparse as sparse
+import scipy.sparse.linalg
 
 from ._ffi.function import _init_api
 from .base import dgl_warning, DGLError
@@ -1303,8 +1304,8 @@ def laplacian_lambda_max(g):
         adj = g_i.adj(transpose=True, scipy_fmt=g_i.formats()['created'][0]).astype(float)
         norm = sparse.diags(F.asnumpy(g_i.in_degrees()).clip(1) ** -0.5, dtype=float)
         laplacian = sparse.eye(n) - norm * adj * norm
-        rst.append(sparse.linalg.eigs(laplacian, 1, which='LM',
-                                      return_eigenvectors=False)[0].real)
+        rst.append(scipy.sparse.linalg.eigs(
+            laplacian, 1, which='LM', return_eigenvectors=False)[0].real)
     return rst
 
 def metapath_reachable_graph(g, metapath):
@@ -1913,7 +1914,7 @@ def compact_graphs(graphs, always_preserve=None, copy_ndata=True, copy_edata=Tru
     graphs : DGLGraph or list[DGLGraph]
         The graph, or list of graphs.
 
-        All graphs must be on CPU.
+        All graphs must be on the same devices.
 
         All graphs must have the same set of nodes.
     always_preserve : Tensor or dict[str, Tensor], optional
@@ -2013,7 +2014,6 @@ def compact_graphs(graphs, always_preserve=None, copy_ndata=True, copy_edata=Tru
         return []
     if graphs[0].is_block:
         raise DGLError('Compacting a block graph is not allowed.')
-    assert all(g.device == F.cpu() for g in graphs), 'all the graphs must be on CPU'
 
     # Ensure the node types are ordered the same.
     # TODO(BarclayII): we ideally need to remove this constraint.
@@ -2026,8 +2026,8 @@ def compact_graphs(graphs, always_preserve=None, copy_ndata=True, copy_edata=Tru
              ntypes, g.ntypes)
         assert idtype == g.idtype, "Expect graph data type to be {}, but got {}".format(
             idtype, g.idtype)
-        assert device == g.device, "Expect graph device to be {}, but got {}".format(
-            device, g.device)
+        assert device == g.device, "All graphs must be on the same devices." \
+            "Expect graph device to be {}, but got {}".format(device, g.device)
 
     # Process the dictionary or tensor of "always preserve" nodes
     if always_preserve is None:

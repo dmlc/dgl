@@ -3,6 +3,7 @@ import backend as F
 import numpy as np
 import unittest
 from collections import defaultdict
+import pytest
 
 def check_random_walk(g, metapath, traces, ntypes, prob=None, trace_eids=None):
     traces = F.asnumpy(traces)
@@ -47,6 +48,12 @@ def test_random_walk():
 
     traces, eids, ntypes = dgl.sampling.random_walk(g1, [0, 1, 2, 0, 1, 2], length=4, return_eids=True)
     check_random_walk(g1, ['follow'] * 4, traces, ntypes, trace_eids=eids)
+    try:
+        dgl.sampling.random_walk(g1, [0, 1, 2, 10], length=4, return_eids=True)
+        fail = False        # shouldn't abort
+    except:
+        fail = True
+    assert fail
     traces, eids, ntypes = dgl.sampling.random_walk(g1, [0, 1, 2, 0, 1, 2], length=4, restart_prob=0., return_eids=True)
     check_random_walk(g1, ['follow'] * 4, traces, ntypes, trace_eids=eids)
     traces, ntypes = dgl.sampling.random_walk(
@@ -718,110 +725,173 @@ def test_sample_neighbors_biased_bipartite():
         check_num(subg.edges()[1], tag)
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
-def test_sample_neighbors_etype_homogeneous():
+@pytest.mark.parametrize('format_', ['coo', 'csr', 'csc'])
+@pytest.mark.parametrize('direction', ['in', 'out'])
+@pytest.mark.parametrize('replace', [False, True])
+def test_sample_neighbors_etype_homogeneous(format_, direction, replace):
     num_nodes = 100
     rare_cnt = 4
     g = create_etype_test_graph(100, 30, rare_cnt)
     h_g = dgl.to_homogeneous(g)
     seed_ntype = g.get_ntype_id("u")
     seeds = F.nonzero_1d(h_g.ndata[dgl.NTYPE] == seed_ntype)
+    fanouts = F.tensor([6, 5, 4, 3, 2], dtype=F.int64)
 
-    def check_num(nodes, replace):
-        nodes = F.asnumpy(nodes)
-        cnt = [sum(nodes == i) for i in range(num_nodes)]
+    def check_num(h_g, all_src, all_dst, subg, replace, fanouts, direction):
+        src, dst = subg.edges()
+        num_etypes = F.asnumpy(h_g.edata[dgl.ETYPE]).max()
+        etype_array = F.asnumpy(subg.edata[dgl.ETYPE])
+        src = F.asnumpy(src)
+        dst = F.asnumpy(dst)
+        fanouts = F.asnumpy(fanouts)
 
-        for i in range(20):
-            if i < rare_cnt:
-                if replace is False:
-                    assert cnt[i] == 22
-                else:
-                    assert cnt[i] == 30
+        all_etype_array = F.asnumpy(h_g.edata[dgl.ETYPE])
+        all_src = F.asnumpy(all_src)
+        all_dst = F.asnumpy(all_dst)
+
+        src_per_etype = []
+        dst_per_etype = []
+        for etype in range(num_etypes):
+            src_per_etype.append(src[etype_array == etype])
+            dst_per_etype.append(dst[etype_array == etype])
+
+        if replace:
+            if direction == 'in':
+                in_degree_per_etype = [np.bincount(d) for d in dst_per_etype]
+                for in_degree, fanout in zip(in_degree_per_etype, fanouts):
+                    assert np.all(in_degree == fanout)
             else:
-                if replace is False:
-                    assert cnt[i] == 12
-                else:
-                    assert cnt[i] == 20
-
-    # graph with coo format
-    coo_g = h_g.formats('coo')
-    for _ in range(5):
-        subg = dgl.sampling.sample_etype_neighbors(coo_g, seeds, dgl.ETYPE, 10, replace=False)
-        check_num(subg.edges()[1], False)
-
-    for _ in range(5):
-        subg = dgl.sampling.sample_etype_neighbors(coo_g, seeds, dgl.ETYPE, 10, replace=True)
-        check_num(subg.edges()[1], True)
-
-    # graph with csr format
-    csr_g = h_g.formats('csr')
-    csr_g = csr_g.formats(['csr','csc','coo'])
-    for _ in range(5):
-        subg = dgl.sampling.sample_etype_neighbors(csr_g, seeds, dgl.ETYPE, 10, replace=False)
-        check_num(subg.edges()[1], False)
-
-    for _ in range(5):
-        subg = dgl.sampling.sample_etype_neighbors(csr_g, seeds, dgl.ETYPE, 10, replace=True)
-        check_num(subg.edges()[1], True)
-
-    # graph with csc format
-    csc_g = h_g.formats('csc')
-    for _ in range(5):
-        subg = dgl.sampling.sample_etype_neighbors(csc_g, seeds, dgl.ETYPE, 10, replace=False)
-        check_num(subg.edges()[1], False)
-
-    for _ in range(5):
-        subg = dgl.sampling.sample_etype_neighbors(csc_g, seeds, dgl.ETYPE, 10, replace=True)
-        check_num(subg.edges()[1], True)
-
-    def check_num2(nodes, replace):
-        nodes = F.asnumpy(nodes)
-        cnt = [sum(nodes == i) for i in range(num_nodes)]
-
-        for i in range(20):
-            if replace is False:
-                assert cnt[i] == 7
+                out_degree_per_etype = [np.bincount(s) for s in src_per_etype]
+                for out_degree, fanout in zip(out_degree_per_etype, fanouts):
+                    assert np.all(out_degree == fanout)
+        else:
+            if direction == 'in':
+                for v in set(dst):
+                    u = src[dst == v]
+                    et = etype_array[dst == v]
+                    all_u = all_src[all_dst == v]
+                    all_et = all_etype_array[all_dst == v]
+                    for etype in set(et):
+                        u_etype = set(u[et == etype])
+                        all_u_etype = set(all_u[all_et == etype])
+                        assert (len(u_etype) == fanouts[etype]) or (u_etype == all_u_etype)
             else:
-                assert cnt[i] == 10
+                for u in set(src):
+                    v = dst[src == u]
+                    et = etype_array[src == u]
+                    all_v = all_dst[all_src == u]
+                    all_et = all_etype_array[all_src == u]
+                    for etype in set(et):
+                        v_etype = set(v[et == etype])
+                        all_v_etype = set(all_v[all_et == etype])
+                        assert (len(v_etype) == fanouts[etype]) or (v_etype == all_v_etype)
 
-    # edge dir out
-    # graph with coo format
-    coo_g = h_g.formats('coo')
+    all_src, all_dst = h_g.edges()
+    h_g = h_g.formats(format_)
+    if (direction, format_) in [('in', 'csr'), ('out', 'csc')]:
+        h_g = h_g.formats(['csc', 'csr', 'coo'])
     for _ in range(5):
         subg = dgl.sampling.sample_etype_neighbors(
-            coo_g, seeds, dgl.ETYPE, 5, edge_dir='out', replace=False)
-        check_num2(subg.edges()[0], False)
-    for _ in range(5):
-        subg = dgl.sampling.sample_etype_neighbors(
-            coo_g, seeds, dgl.ETYPE, 5, edge_dir='out', replace=True)
-        check_num2(subg.edges()[0], True)
-    # graph with csr format
-    csr_g = h_g.formats('csr')
-    for _ in range(5):
-        subg = dgl.sampling.sample_etype_neighbors(
-            csr_g, seeds, dgl.ETYPE, 5, edge_dir='out', replace=False)
-        check_num2(subg.edges()[0], False)
+            h_g, seeds, dgl.ETYPE, fanouts, replace=replace, edge_dir=direction)
+        check_num(h_g, all_src, all_dst, subg, replace, fanouts, direction)
 
-    for _ in range(5):
-        subg = dgl.sampling.sample_etype_neighbors(
-            csr_g, seeds, dgl.ETYPE, 5, edge_dir='out', replace=True)
-        check_num2(subg.edges()[0], True)
+@pytest.mark.parametrize('dtype', ['int32', 'int64'])
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
+def test_sample_neighbors_exclude_edges_heteroG(dtype):
+    d_i_d_u_nodes = F.zerocopy_from_numpy(np.unique(np.random.randint(300, size=100, dtype=dtype)))
+    d_i_d_v_nodes = F.zerocopy_from_numpy(np.random.randint(25, size=d_i_d_u_nodes.shape, dtype=dtype))
+    d_i_g_u_nodes = F.zerocopy_from_numpy(np.unique(np.random.randint(300, size=100, dtype=dtype)))
+    d_i_g_v_nodes = F.zerocopy_from_numpy(np.random.randint(25, size=d_i_g_u_nodes.shape, dtype=dtype))
+    d_t_d_u_nodes = F.zerocopy_from_numpy(np.unique(np.random.randint(300, size=100, dtype=dtype)))
+    d_t_d_v_nodes = F.zerocopy_from_numpy(np.random.randint(25, size=d_t_d_u_nodes.shape, dtype=dtype))
 
-    # graph with csc format
-    csc_g = h_g.formats('csc')
-    csc_g = csc_g.formats(['csc','csr','coo'])
-    for _ in range(5):
-        subg = dgl.sampling.sample_etype_neighbors(
-            csc_g, seeds, dgl.ETYPE, 5, edge_dir='out', replace=False)
-        check_num2(subg.edges()[0], False)
+    g = dgl.heterograph({
+        ('drug', 'interacts', 'drug'): (d_i_d_u_nodes, d_i_d_v_nodes),
+        ('drug', 'interacts', 'gene'): (d_i_g_u_nodes, d_i_g_v_nodes),
+        ('drug', 'treats', 'disease'): (d_t_d_u_nodes, d_t_d_v_nodes)
+    })
 
-    for _ in range(5):
-        subg = dgl.sampling.sample_etype_neighbors(
-            csc_g, seeds, dgl.ETYPE, 5, edge_dir='out', replace=True)
-        check_num2(subg.edges()[0], True)
+    (U, V, EID) = (0, 1, 2)
+
+    nd_b_idx = np.random.randint(low=1, high=24, dtype=dtype)
+    nd_e_idx = np.random.randint(low=25, high=49, dtype=dtype)
+    did_b_idx = np.random.randint(low=1, high=24, dtype=dtype)
+    did_e_idx = np.random.randint(low=25, high=49, dtype=dtype)
+    sampled_amount = np.random.randint(low=1, high=10, dtype=dtype)
+
+    drug_i_drug_edges = g.all_edges(form='all', etype=('drug','interacts','drug'))
+    excluded_d_i_d_edges = drug_i_drug_edges[EID][did_b_idx:did_e_idx]
+    sampled_drug_node = drug_i_drug_edges[V][nd_b_idx:nd_e_idx]
+    did_excluded_nodes_U = drug_i_drug_edges[U][did_b_idx:did_e_idx]
+    did_excluded_nodes_V = drug_i_drug_edges[V][did_b_idx:did_e_idx]
+
+    nd_b_idx = np.random.randint(low=1, high=24, dtype=dtype)
+    nd_e_idx = np.random.randint(low=25, high=49, dtype=dtype)
+    dig_b_idx = np.random.randint(low=1, high=24, dtype=dtype)
+    dig_e_idx = np.random.randint(low=25, high=49, dtype=dtype)
+    drug_i_gene_edges = g.all_edges(form='all', etype=('drug','interacts','gene'))
+    excluded_d_i_g_edges = drug_i_gene_edges[EID][dig_b_idx:dig_e_idx]
+    dig_excluded_nodes_U = drug_i_gene_edges[U][dig_b_idx:dig_e_idx]
+    dig_excluded_nodes_V = drug_i_gene_edges[V][dig_b_idx:dig_e_idx]
+    sampled_gene_node = drug_i_gene_edges[V][nd_b_idx:nd_e_idx]
+
+    nd_b_idx = np.random.randint(low=1, high=24, dtype=dtype)
+    nd_e_idx = np.random.randint(low=25, high=49, dtype=dtype)
+    dtd_b_idx = np.random.randint(low=1, high=24, dtype=dtype)
+    dtd_e_idx = np.random.randint(low=25, high=49, dtype=dtype)
+    drug_t_dis_edges = g.all_edges(form='all', etype=('drug','treats','disease'))
+    excluded_d_t_d_edges = drug_t_dis_edges[EID][dtd_b_idx:dtd_e_idx]
+    dtd_excluded_nodes_U = drug_t_dis_edges[U][dtd_b_idx:dtd_e_idx]
+    dtd_excluded_nodes_V = drug_t_dis_edges[V][dtd_b_idx:dtd_e_idx]
+    sampled_disease_node = drug_t_dis_edges[V][nd_b_idx:nd_e_idx]
+    excluded_edges  = {('drug', 'interacts', 'drug'): excluded_d_i_d_edges,
+                       ('drug', 'interacts', 'gene'): excluded_d_i_g_edges,
+                       ('drug', 'treats', 'disease'): excluded_d_t_d_edges
+                      }
+
+    sg = dgl.sampling.sample_neighbors(g, {'drug': sampled_drug_node,
+                                           'gene': sampled_gene_node,
+                                           'disease': sampled_disease_node},
+                                       sampled_amount, exclude_edges=excluded_edges)
+
+    assert not np.any(F.asnumpy(sg.has_edges_between(did_excluded_nodes_U,did_excluded_nodes_V,
+                                                     etype=('drug','interacts','drug'))))
+    assert not np.any(F.asnumpy(sg.has_edges_between(dig_excluded_nodes_U,dig_excluded_nodes_V,
+                                                     etype=('drug','interacts','gene'))))
+    assert not np.any(F.asnumpy(sg.has_edges_between(dtd_excluded_nodes_U,dtd_excluded_nodes_V,
+                                                     etype=('drug','treats','disease'))))
+
+@pytest.mark.parametrize('dtype', ['int32', 'int64'])
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
+def test_sample_neighbors_exclude_edges_homoG(dtype):
+    u_nodes = F.zerocopy_from_numpy(np.unique(np.random.randint(300,size=100, dtype=dtype)))
+    v_nodes = F.zerocopy_from_numpy(np.random.randint(25, size=u_nodes.shape, dtype=dtype))
+    g = dgl.graph((u_nodes, v_nodes))
+
+    (U, V, EID) = (0, 1, 2)
+
+    nd_b_idx = np.random.randint(low=1,high=24, dtype=dtype)
+    nd_e_idx = np.random.randint(low=25,high=49, dtype=dtype)
+    b_idx = np.random.randint(low=1,high=24, dtype=dtype)
+    e_idx = np.random.randint(low=25,high=49, dtype=dtype)
+    sampled_amount = np.random.randint(low=1,high=10, dtype=dtype)
+
+    g_edges = g.all_edges(form='all')
+    excluded_edges = g_edges[EID][b_idx:e_idx]
+    sampled_node = g_edges[V][nd_b_idx:nd_e_idx]
+    excluded_nodes_U = g_edges[U][b_idx:e_idx]
+    excluded_nodes_V = g_edges[V][b_idx:e_idx]
+
+    sg = dgl.sampling.sample_neighbors(g, sampled_node,
+                                       sampled_amount, exclude_edges=excluded_edges)
+
+    assert not np.any(F.asnumpy(sg.has_edges_between(excluded_nodes_U,excluded_nodes_V)))
 
 
 if __name__ == '__main__':
-    test_sample_neighbors_etype_homogeneous()
+    from itertools import product
+    for args in product(['coo', 'csr', 'csc'], ['in', 'out'], [False, True]):
+        test_sample_neighbors_etype_homogeneous(*args)
     test_random_walk()
     test_pack_traces()
     test_pinsage_sampling()
@@ -831,3 +901,5 @@ if __name__ == '__main__':
     test_sample_neighbors_with_0deg()
     test_sample_neighbors_biased_homogeneous()
     test_sample_neighbors_biased_bipartite()
+    test_sample_neighbors_exclude_edges_heteroG('int32')
+    test_sample_neighbors_exclude_edges_homoG('int32')

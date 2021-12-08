@@ -116,7 +116,7 @@ for epoch in range(1, epochs + 1):
     print("epoch", epoch, ", train loss:", l_sum / n, ", validation loss:", val_loss)
 
     
-best_model = STGCN_WAVE(blocks, n_his, n_route, G, drop_prob, num_layers).to(device)
+best_model = STGCN_WAVE(blocks, n_his, n_route, G, drop_prob, num_layers, device, args.control_str).to(device)
 best_model.load_state_dict(torch.load(save_path))
 
 

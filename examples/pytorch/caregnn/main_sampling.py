@@ -2,9 +2,10 @@ import dgl
 import argparse
 import torch as th
 import torch.optim as optim
+from sklearn.metrics import roc_auc_score, recall_score
+
 from utils import EarlyStopping
 from model_sampling import CAREGNN, CARESampler, _l1_dist
-from sklearn.metrics import roc_auc_score, recall_score
 
 
 def evaluate(model, loss_fn, dataloader, device='cpu'):
@@ -14,8 +15,8 @@ def evaluate(model, loss_fn, dataloader, device='cpu'):
     num_blocks = 0
     for input_nodes, output_nodes, blocks in dataloader:
         blocks = [b.to(device) for b in blocks]
-        feature = blocks[0].srcdata['feature'].float()
-        label = blocks[-1].dstdata['label'].squeeze().long()
+        feature = blocks[0].srcdata['feature']
+        label = blocks[-1].dstdata['label']
         logits_gnn, logits_sim = model(blocks, feature)
 
         # compute loss
@@ -42,10 +43,10 @@ def main(args):
         device = 'cpu'
 
     # retrieve labels of ground truth
-    labels = graph.ndata['label'].to(device).bool()
+    labels = graph.ndata['label'].to(device)
 
     # Extract node features
-    feat = graph.ndata['feature'].to(device).float()
+    feat = graph.ndata['feature'].to(device)
     layers_feat = feat.expand(args.num_layers, -1, -1)
 
     # retrieve masks for train/validation/test
@@ -58,7 +59,7 @@ def main(args):
     test_idx = th.nonzero(test_mask, as_tuple=False).squeeze(1).to(device)
 
     # Reinforcement learning module only for positive training nodes
-    rl_idx = th.nonzero(train_mask.to(device) & labels, as_tuple=False).squeeze(1)
+    rl_idx = th.nonzero(train_mask.to(device) & labels.bool(), as_tuple=False).squeeze(1)
 
     graph = graph.to(device)
 
@@ -112,8 +113,8 @@ def main(args):
 
         for input_nodes, output_nodes, blocks in train_dataloader:
             blocks = [b.to(device) for b in blocks]
-            train_feature = blocks[0].srcdata['feature'].float()
-            train_label = blocks[-1].dstdata['label'].squeeze().long()
+            train_feature = blocks[0].srcdata['feature']
+            train_label = blocks[-1].dstdata['label']
             logits_gnn, logits_sim = model(blocks, train_feature)
 
             # compute loss
@@ -184,8 +185,9 @@ if __name__ == '__main__':
     parser.add_argument("--step_size", type=float, default=0.02, help="RL action step size (lambda 2). Default: 0.02")
     parser.add_argument("--sim_weight", type=float, default=2, help="Similarity loss weight (lambda 1). Default: 0.001")
     parser.add_argument("--num_workers", type=int, default=4, help="Number of node dataloader")
-    parser.add_argument('--early-stop', action='store_true', default=True, help="indicates whether to use early stop")
+    parser.add_argument('--early-stop', action='store_true', default=False, help="indicates whether to use early stop")
 
     args = parser.parse_args()
+    th.manual_seed(717)
     print(args)
     main(args)

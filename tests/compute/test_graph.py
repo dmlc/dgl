@@ -376,6 +376,40 @@ def test_default_types():
     assert dg.ntypes == g.ntypes
     assert dg.etypes == g.etypes
 
+
+def test_formats():
+    g = dgl.rand_graph(10, 20)
+    # in_degrees works if coo or csc available
+    # out_degrees works if coo or csr available
+    try:
+        g.in_degrees()
+        g.out_degrees()
+        g.formats('coo').in_degrees()
+        g.formats('coo').out_degrees()
+        g.formats('csc').in_degrees()
+        g.formats('csr').out_degrees()
+        fail = False
+    except DGLError:
+        fail = True
+    finally:
+        assert not fail
+    # in_degrees NOT works if csc available only
+    try:
+        g.formats('csc').out_degrees()
+        fail = True
+    except DGLError:
+        fail = False
+    finally:
+        assert not fail
+    # out_degrees NOT works if csr available only
+    try:
+        g.formats('csr').in_degrees()
+        fail = True
+    except DGLError:
+        fail = False
+    finally:
+        assert not fail
+    
 if __name__ == '__main__':
     test_query()
     test_mutation()
@@ -385,3 +419,4 @@ if __name__ == '__main__':
     test_hypersparse_query()
     test_is_sorted()
     test_default_types()
+    test_formats()

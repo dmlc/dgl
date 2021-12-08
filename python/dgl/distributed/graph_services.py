@@ -450,8 +450,9 @@ def sample_etype_neighbors(g, nodes, etype_field, fanout, edge_dir='in', prob=No
         one key-value pair to make this API consistent with dgl.sampling.sample_neighbors.
     etype_field : string
         The field in g.edata storing the edge type.
-    fanout : int
-        The number of edges to be sampled for each node per edge type.
+    fanout : int or dict[etype, int]
+        The number of edges to be sampled for each node per edge type.  If an integer
+        is given, DGL assumes that the same fanout is applied to every edge type.
 
         If -1 is given, all of the neighbors will be selected.
     edge_dir : str, optional
@@ -479,6 +480,11 @@ def sample_etype_neighbors(g, nodes, etype_field, fanout, edge_dir='in', prob=No
     DGLGraph
         A sampled subgraph containing only the sampled neighboring edges.  It is on CPU.
     """
+    if isinstance(fanout, int):
+        fanout = F.full_1d(len(g.etypes), fanout, F.int64, F.cpu())
+    else:
+        fanout = F.tensor([fanout[etype] for etype in g.etypes], dtype=F.int64)
+
     gpb = g.get_partition_book()
     if isinstance(nodes, dict):
         homo_nids = []
