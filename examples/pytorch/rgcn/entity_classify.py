@@ -16,12 +16,6 @@ from dgl.data.rdf import AIFBDataset, MUTAGDataset, BGSDataset, AMDataset
 from model import BaseRGCN
 
 class EntityClassify(BaseRGCN):
-    def create_features(self):
-        features = torch.arange(self.num_nodes)
-        if self.use_cuda:
-            features = features.cuda()
-        return features
-
     def build_input_layer(self):
         return RelGraphConv(self.num_nodes, self.h_dim, self.num_rels, "basis",
                 self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
@@ -87,8 +81,17 @@ def main(args):
     loc = (node_tids == category_id)
     target_idx = node_ids[loc]
 
-    # since the nodes are featureless, the input feature is then the node id.
+    # Since the nodes are featureless, learn node embeddings from scratch
+    # This requires passing the node IDs to the model.
     feats = torch.arange(num_nodes)
+
+    # create model
+    model = EntityClassify(num_nodes,
+                           args.n_hidden,
+                           num_classes,
+                           num_rels,
+                           num_bases=args.n_bases,
+                           num_hidden_layers=0)
 
     # check cuda
     use_cuda = args.gpu >= 0 and torch.cuda.is_available()
@@ -98,17 +101,6 @@ def main(args):
         edge_type = edge_type.cuda()
         edge_norm = edge_norm.cuda()
         labels = labels.cuda()
-
-    # create model
-    model = EntityClassify(num_nodes,
-                           args.n_hidden,
-                           num_classes,
-                           num_rels,
-                           num_bases=args.n_bases,
-                           num_hidden_layers=0,
-                           use_cuda=use_cuda)
-
-    if use_cuda:
         model.cuda()
         g = g.to('cuda:%d' % args.gpu)
 
