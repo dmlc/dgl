@@ -6,7 +6,6 @@ https://github.com/MichSchli/RelationPrediction
 """
 import numpy as np
 import torch
-from torch.multiprocessing import Queue
 import dgl
 
 #######################################################################

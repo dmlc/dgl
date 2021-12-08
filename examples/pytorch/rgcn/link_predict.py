@@ -16,7 +16,6 @@ import time
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import random
 from dgl.data.knowledge_graph import load_data
 from dgl.nn.pytorch import RelGraphConv
 
@@ -192,10 +191,10 @@ def main(args):
             if best_mrr < mrr:
                 best_mrr = mrr
                 torch.save({'state_dict': model.state_dict(), 'epoch': epoch}, model_state_file)
-            
+
             if epoch >= args.n_epochs:
                 break
-            
+
             if use_cuda:
                 model.cuda()
 

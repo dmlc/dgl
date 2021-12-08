@@ -5,13 +5,12 @@
 * Author's code for link prediction: [https://github.com/MichSchli/RelationPrediction](https://github.com/MichSchli/RelationPrediction)
 
 ### Dependencies
-* PyTorch 0.4.1+
-* requests
+* PyTorch 1.10
 * rdflib
 * pandas
 
 ```
-pip install requests torch rdflib pandas
+pip install rdflib pandas
 ```
 
 Example code was tested with rdflib 4.2.2 and pandas 0.23.4

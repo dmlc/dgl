@@ -15,7 +15,6 @@ import torch
 import torch.nn.functional as F
 import dgl
 from dgl.nn.pytorch import RelGraphConv
-from functools import partial
 from dgl.data.rdf import AIFBDataset, MUTAGDataset, BGSDataset, AMDataset
 
 from model import BaseRGCN
