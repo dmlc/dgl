@@ -135,7 +135,7 @@ def main(args):
     print()
 
     model.eval()
-    logits = model.forward(g, feats, edge_type, edge_norm)
+    logits = model(g, feats, edge_type, edge_norm)
     logits = logits[target_idx]
     test_loss = F.cross_entropy(logits[test_idx], labels[test_idx])
     test_acc = torch.sum(logits[test_idx].argmax(dim=1) == labels[test_idx]).item() / len(test_idx)
