@@ -95,9 +95,6 @@ void TPReceiver::Finalize() {
   if (wait_thread_.joinable()) {
     wait_thread_.join();
   }
-  for (auto &&p : pipes_) {
-    p.second->close();
-  }
   pipes_.clear();
 }
 
