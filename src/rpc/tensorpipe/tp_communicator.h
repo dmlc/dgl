@@ -193,7 +193,7 @@ class TPReceiver {
   /*!
    * \brief number of accepted connections
    */
-  std::atomic<uint32_t> num_connected_{0};
+  std::atomic<int32_t> num_connected_{0};
 
   /*!
    * \brief whether to stop waiting

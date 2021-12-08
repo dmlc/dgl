@@ -66,7 +66,7 @@ void TPSender::Send(const RPCMessage& msg, int recv_id) {
   auto ndarray_holder = std::make_shared<std::vector<NDArray>>();
   ndarray_holder->resize(nonempty_ndarray_count);
   auto& buffer_list = zc_write_strm.buffer_list();
-  for (int i = 0; i < buffer_list.size(); i++) {
+  for (size_t i = 0; i < buffer_list.size(); i++) {
     auto& ptr = buffer_list[i];
     (*ndarray_holder.get())[i] = ptr.tensor;
     tensorpipe::CpuBuffer cpu_buffer;
@@ -133,7 +133,15 @@ bool TPReceiver::Wait(const std::string &addr, int num_sender, bool blocking) {
             checkConnect.set_value(descriptor.metadata == "dglconnect");
             pipe->read(allocation, [](const Error &error) {});
           });
-      CHECK(checkConnect.get_future().get()) << "Invalid connect message.";
+      auto &&check_fut = checkConnect.get_future();
+      do {
+        status = check_fut.wait_for(std::chrono::milliseconds(100));
+      } while (status != std::future_status::ready && !stop_wait_);
+      if (status != std::future_status::ready) {
+        // stop waiting
+        break;
+      }
+      CHECK(check_fut.get()) << "Invalid connect message.";
       pipes_[num_connected_] = pipe;
       ReceiveFromPipe(pipe, queue_);
       ++num_connected_;
@@ -160,7 +168,7 @@ void TPReceiver::ReceiveFromPipe(std::shared_ptr<Pipe> pipe,
     int tensorsize = descriptor.tensors.size();
     if (tensorsize > 0) {
       allocation.tensors.resize(tensorsize);
-      for (int i = 0; i < descriptor.tensors.size(); i++) {
+      for (size_t i = 0; i < descriptor.tensors.size(); i++) {
         tensorpipe::CpuBuffer cpu_buffer;
         cpu_buffer.ptr = new char[descriptor.tensors[i].length];
         allocation.tensors[i].buffer = cpu_buffer;
@@ -180,7 +188,7 @@ void TPReceiver::ReceiveFromPipe(std::shared_ptr<Pipe> pipe,
 
         char* meta_msg_begin = const_cast<char*>(&descriptor.metadata[0]);
         std::vector<void*> buffer_list(descriptor.tensors.size());
-        for (int i = 0; i < descriptor.tensors.size(); i++) {
+        for (size_t i = 0; i < descriptor.tensors.size(); i++) {
           buffer_list[i] = allocation.tensors[i].buffer.unwrap<CpuBuffer>().ptr;
         }
         StreamWithBuffer zc_read_strm(
