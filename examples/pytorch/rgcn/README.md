@@ -57,21 +57,6 @@ AM: accuracy avg(5 runs) 87.37%, best 89.9% (DGL)
 python3 entity_classify_mp.py -d am --l2norm 5e-4 --n-bases 40 --testing  --gpu 0 --fanout '35,35' --batch-size 64 --n-hidden 16 --use-self-loop --n-epochs=20 --dgl-sparse --lr 0.01  --sparse-lr 0.02 --dropout 0.7
 ```
 
-### Entity Classification on OGBN-MAG
-Test-bd: P3-8xlarge
-
-OGBN-MAG accuracy 45.5 (3 runs)
-```
-python3 entity_classify_mp.py -d ogbn-mag --testing --fanout='30,30' --batch-size 1024 --n-hidden 128 --lr 0.01 --num-worker 4 --eval-batch-size 8 --low-mem --gpu 0,1,2,3 --dropout 0.7 --use-self-loop --n-bases 2 --n-epochs 3 --node-feats --dgl-sparse --sparse-lr 0.08
-```
-
-OGBN-MAG without node-feats 42.79
-```
-python3 entity_classify_mp.py -d ogbn-mag --testing --fanout='30,30' --batch-size 1024 --n-hidden 128 --lr 0.01 --num-worker 4 --eval-batch-size 8 --low-mem --gpu 0,1,2,3 --dropout 0.7 --use-self-loop --n-bases 2 --n-epochs 3 --dgl-sparse --sparse-lr 0.08
-```
-
-Test-bd: P2-8xlarge
-
 ### Link Prediction
 FB15k-237: MRR 0.151 (DGL), 0.158 (paper)
 ```

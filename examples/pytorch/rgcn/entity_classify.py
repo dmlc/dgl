@@ -45,10 +45,8 @@ def main(args):
         dataset = MUTAGDataset()
     elif args.dataset == 'bgs':
         dataset = BGSDataset()
-    elif args.dataset == 'am':
-        dataset = AMDataset()
     else:
-        raise ValueError()
+        dataset = AMDataset()
 
     # Load from hetero-graph
     hg = dataset[0]
@@ -171,6 +169,7 @@ if __name__ == '__main__':
     parser.add_argument("--n-bases", type=int, default=-1,
                         help="number of filter weight matrices, default: -1 [use all]")
     parser.add_argument("-d", "--dataset", type=str, required=True,
+                        choices=['aifb', 'mutag', 'bgs', 'am'],
                         help="dataset to use")
     parser.add_argument("--l2norm", type=float, default=5e-4,
                         help="l2 norm coef")

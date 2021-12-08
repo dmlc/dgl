@@ -13,19 +13,13 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 import dgl.multiprocessing as mp
-from dgl.multiprocessing import Queue
 from torch.nn.parallel import DistributedDataParallel
-from torch.utils.data import DataLoader
 import dgl
-from dgl import DGLGraph
-from functools import partial
 
 from dgl.data.rdf import AIFBDataset, MUTAGDataset, BGSDataset, AMDataset
 from model import RelGraphEmbedLayer
 from dgl.nn import RelGraphConv
 import tqdm
-
-from ogb.nodeproppred import DglNodePropPredDataset
 
 class EntityClassify(nn.Module):
     """ Entity classification class for RGCN
@@ -425,9 +419,6 @@ def main(args, devices):
         dataset = BGSDataset()
     elif args.dataset == 'am':
         dataset = AMDataset()
-    elif args.dataset == 'ogbn-mag':
-        dataset = DglNodePropPredDataset(name=args.dataset)
-        ogb_dataset = True
     else:
         raise ValueError()
 
@@ -449,8 +440,6 @@ def main(args, devices):
         num_rels = len(hg.canonical_etypes)
         num_of_ntype = len(hg.ntypes)
         num_classes = dataset.num_classes
-        if args.dataset == 'ogbn-mag':
-            category = 'paper'
         print('Number of relations: {}'.format(num_rels))
         print('Number of class: {}'.format(num_classes))
         print('Number of train: {}'.format(len(train_idx)))
