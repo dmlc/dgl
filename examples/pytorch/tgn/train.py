@@ -11,7 +11,8 @@ from tgn import TGN
 from data_preprocess import TemporalWikipediaDataset, TemporalRedditDataset, TemporalDataset
 from dataloading import (FastTemporalEdgeCollator, FastTemporalSampler,
                          SimpleTemporalEdgeCollator, SimpleTemporalSampler,
-                         TemporalEdgeDataLoader, TemporalSampler, TemporalEdgeCollator)
+                         TemporalSampler, TemporalEdgeCollator)
+from dgl.dataloading import EdgeDataLoader
 
 from sklearn.metrics import average_precision_score, roc_auc_score
 
@@ -197,49 +198,49 @@ if __name__ == "__main__":
         g_sampling.ndata[dgl.NID] = new_node_g_sampling.nodes()
 
     # we highly recommend that you always set the num_workers=0, otherwise the sampled subgraph may not be correct.
-    train_dataloader = TemporalEdgeDataLoader(graph_no_new_node,
-                                              train_seed,
-                                              sampler,
+    train_dataloader = EdgeDataLoader(graph_no_new_node,
+                                      train_seed,
+                                      sampler,
+                                      batch_size=args.batch_size,
+                                      negative_sampler=neg_sampler,
+                                      shuffle=False,
+                                      drop_last=False,
+                                      num_workers=0,
+                                      collator_cls=edge_collator,
+                                      g_sampling=g_sampling)
+
+    valid_dataloader = EdgeDataLoader(graph_no_new_node,
+                                      valid_seed,
+                                      sampler,
+                                      batch_size=args.batch_size,
+                                      negative_sampler=neg_sampler,
+                                      shuffle=False,
+                                      drop_last=False,
+                                      num_workers=0,
+                                      collator_cls=edge_collator,
+                                      g_sampling=g_sampling)
+
+    test_dataloader = EdgeDataLoader(graph_no_new_node,
+                                     test_seed,
+                                     sampler,
+                                     batch_size=args.batch_size,
+                                     negative_sampler=neg_sampler,
+                                     shuffle=False,
+                                     drop_last=False,
+                                     num_workers=0,
+                                     collator_cls=edge_collator,
+                                     g_sampling=g_sampling)
+
+    test_new_node_dataloader = EdgeDataLoader(graph_new_node,
+                                              test_new_node_seed,
+                                              new_node_sampler if args.fast_mode else sampler,
                                               batch_size=args.batch_size,
                                               negative_sampler=neg_sampler,
                                               shuffle=False,
                                               drop_last=False,
                                               num_workers=0,
-                                              collator=edge_collator,
-                                              g_sampling=g_sampling)
-
-    valid_dataloader = TemporalEdgeDataLoader(graph_no_new_node,
-                                              valid_seed,
-                                              sampler,
-                                              batch_size=args.batch_size,
-                                              negative_sampler=neg_sampler,
-                                              shuffle=False,
-                                              drop_last=False,
-                                              num_workers=0,
-                                              collator=edge_collator,
-                                              g_sampling=g_sampling)
-
-    test_dataloader = TemporalEdgeDataLoader(graph_no_new_node,
-                                             test_seed,
-                                             sampler,
-                                             batch_size=args.batch_size,
-                                             negative_sampler=neg_sampler,
-                                             shuffle=False,
-                                             drop_last=False,
-                                             num_workers=0,
-                                             collator=edge_collator,
-                                             g_sampling=g_sampling)
-
-    test_new_node_dataloader = TemporalEdgeDataLoader(graph_new_node,
-                                                      test_new_node_seed,
-                                                      new_node_sampler if args.fast_mode else sampler,
-                                                      batch_size=args.batch_size,
-                                                      negative_sampler=neg_sampler,
-                                                      shuffle=False,
-                                                      drop_last=False,
-                                                      num_workers=0,
-                                                      collator=edge_collator,
-                                                      g_sampling=new_node_g_sampling)
+                                              collator_cls=edge_collator,
+                                              g_sampling=new_node_g_sampling)
 
     edge_dim = data.edata['feats'].shape[1]
     num_node = data.num_nodes()
