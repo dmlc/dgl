@@ -9,9 +9,9 @@ DGL은 각 노드에 고유한 번호를 부여하는데 이를 노드 ID라고 
 
 여러 노드를 표현하기 위해서 DGL는 노드 ID로 1차원 정수 텐서를 사용한다. (PyTorch의 tensor, TensorFlow의 Tensor, 또는 MXNet의 ndarry) DGL은 이 포멧을 "노드-텐서"라고 부른다. DGL에서 에지들은 노드-텐서의 튜플 :math:`(U, V)` 로 표현된다. :math:`(U[i], V[i])`  는 :math:`U[i]` 에서 :math:`V[i]` 로의 에지이다. 
 
-:class:`~dgl.DGLGraph` 를 만드는 방법 중의 하나는 :func:`dgl.graph` 메소드를 사용하는 것이다. 이는 에지 집합을 입력으로 받는다. 또한 DGL은 다른 데이터 소스로부터 그래프들을 생성하는 것도 지원한다. :ref:`guide-graph-external` 참고하자.
+:class:`~dgl.DGLGraph` 를 만드는 방법 중의 하나는 :func:`dgl.graph` 메소드를 사용하는 것이다. 이는 에지 집합을 입력으로 받는다. 또한 DGL은 다른 데이터 소스로부터 그래프들을 생성하는 것도 지원한다. :ref:`guide_ko-graph-external` 참고하자.
 
-다음 코드는 아래와 같은 4개의 노드를 갖는 그래프를 :func:`dgl.graph`를 사용해서 :class:`~dgl.DGLGraph` 만들고, 그래프 구조를 쿼리하는 API들을 보여준다.
+다음 코드는 아래와 같은 4개의 노드를 갖는 그래프를 :func:`dgl.graph` 를 사용해서 :class:`~dgl.DGLGraph` 만들고, 그래프 구조를 쿼리하는 API들을 보여준다.
 
 .. figure:: https://data.dgl.ai/asset/image/user_guide_graphch_1.png
     :height: 200px
