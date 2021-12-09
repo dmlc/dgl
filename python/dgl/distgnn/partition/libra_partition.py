@@ -1,15 +1,22 @@
-r"""
-Copyright (c) 2021 Intel Corporation
- \file distgnn/partition/libra_partition.py
- \brief Libra - Vertex-cut based graph partitioner for distributed training
- \author Vasimuddin Md <vasimuddin.md@intel.com>,
-         Guixiang Ma <guixiang.ma@intel.com>
-         Sanchit Misra <sanchit.misra@intel.com>,
-         Ramanarayan Mohanty <ramanarayan.mohanty@intel.com>,
-         Sasikanth Avancha <sasikanth.avancha@intel.com>
-         Nesreen K. Ahmed <nesreen.k.ahmed@intel.com>
- \cite Distributed Power-law Graph Computing: Theoretical and Empirical Analysis
+r"""Libra partition functions.
+
+Libra partition is a vertex-cut based partitioning algorithm from
+`Distributed Power-law Graph Computing:
+Theoretical and Empirical Analysis
+<https://proceedings.neurips.cc/paper/2014/file/67d16d00201083a2b118dd5128dd6f59-Paper.pdf>`__
+from Xie et al.
 """
+
+# Copyright (c) 2021 Intel Corporation
+#  \file distgnn/partition/libra_partition.py
+#  \brief Libra - Vertex-cut based graph partitioner for distributed training
+#  \author Vasimuddin Md <vasimuddin.md@intel.com>,
+#          Guixiang Ma <guixiang.ma@intel.com>
+#          Sanchit Misra <sanchit.misra@intel.com>,
+#          Ramanarayan Mohanty <ramanarayan.mohanty@intel.com>,
+#          Sasikanth Avancha <sasikanth.avancha@intel.com>
+#          Nesreen K. Ahmed <nesreen.k.ahmed@intel.com>
+#  \cite Distributed Power-law Graph Computing: Theoretical and Empirical Analysis
 
 import os
 import time
@@ -27,7 +34,8 @@ from dgl.base import DGLError
 def libra_partition(num_community, G, resultdir):
     """
     Performs vertex-cut based graph partitioning and converts the partitioning
-    output to DGL input format
+    output to DGL input format.
+
     Parameters
     ----------
     num_community : Number of partitions to create
@@ -37,13 +45,13 @@ def libra_partition(num_community, G, resultdir):
     Output
     ------
     1. Creates X partition folder as XCommunities (say, X=2, so, 2Communities)
-    XCommunities contains file name communityZ.txt per partition Z (Z <- 0 .. X-1);
-    each such file contains a list of edges assigned to that partition.
-    These files constitute the output of Libra graph partitioner
-    (An intermediate result of this function).
+       XCommunities contains file name communityZ.txt per partition Z (Z <- 0 .. X-1);
+       each such file contains a list of edges assigned to that partition.
+       These files constitute the output of Libra graph partitioner
+       (An intermediate result of this function).
     2. The folder also contains partZ folders, each of these folders stores
-    DGL/DistGNN graphs for the Z partitions;
-    these graph files are used as input to DistGNN.
+       DGL/DistGNN graphs for the Z partitions;
+       these graph files are used as input to DistGNN.
     3. The folder also contains a json file which contains partitions' information.
     """
 
@@ -219,12 +227,37 @@ def libra_partition(num_community, G, resultdir):
 
 def partition_graph(num_community, G, resultdir):
     """
-    This is the function for end-users to invoke Libra based graph partitioning.
+    Performs vertex-cut based graph partitioning and converts the partitioning
+    output to DGL input format.
+
+    Given a graph, this function will create a folder named ``XCommunities`` where ``X``
+    stands for the number of communities.  It will contain ``X`` files named
+    ``communityZ.txt`` for each partition Z (from 0 to X-1);
+    each such file contains a list of edges assigned to that partition.
+    These files constitute the output of Libra graph partitioner.
+
+    The folder also contains X subfolders named ``partZ``, each of these folders stores
+    DGL/DistGNN graphs for partition Z; these graph files are used as input to
+    DistGNN.
+
+    The folder also contains a json file which contains partitions' information.
+
+    Currently we require the graph's node data to contain the following columns:
+
+    * ``features`` for node features.
+    * ``label`` for node labels.
+    * ``train_mask`` as a boolean mask of training node set.
+    * ``val_mask`` as a boolean mask of validation node set.
+    * ``test_mask`` as a boolean mask of test node set.
+
     Parameters
     ----------
-    num_community: Number of partitions or cummunities of the input graph.
-    G: Input graph (DGLGraph).
-    resultdir: Output location to store the partitioned graphs.
+    num_community : int
+        Number of partitions to create.
+    G : DGLGraph
+        Input graph to be partitioned.
+    resultdir : str
+        Output location for storing the partitioned graphs.
     """
 
     print("num partitions: ", num_community)
