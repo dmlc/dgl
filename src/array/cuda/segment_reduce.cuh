@@ -65,22 +65,29 @@ __global__ void ScatterAddKernel(
 
 /*!
  * \brief CUDA kernel to update gradients for reduce op max/min
- * \note each blockthread is responsible for adding a row in feature tensor
- *       to a target row in output tensor.
+ * \note each WARP (group of 32 threads) is responsible for adding a row in
+ * feature tensor to a target row in output tensor.
  */
+
 template <typename IdType, typename DType>
 __global__ void UpdateGradMinMaxHeteroKernel(
     const DType *feat, const IdType *idx, const IdType *idx_type, DType *out,
     int64_t n, int64_t dim, int type) {
-  for (int row = blockIdx.x; row < n; row += gridDim.x) {
-    int col = blockIdx.y * blockDim.x + threadIdx.x;
-    while (col < dim) {
+  unsigned int tId = threadIdx.x;
+  unsigned int laneId = tId & 31;
+  unsigned int gId = blockIdx.x * blockDim.x + threadIdx.x;
+  unsigned int warpId = gId >> 5;
+  unsigned int warp_size = 32;
+  unsigned int row = warpId;
+
+  while (row < n) {
+    for(unsigned int col = laneId; col < dim; col += warp_size) {
       if (type == idx_type[row * dim + col]) {
         const int write_row = idx[row * dim + col];
         cuda::AtomicAdd(out + write_row * dim + col, feat[row * dim + col]);
       }
-      col += gridDim.y * blockDim.x;
     }
+    row += blockDim.x * gridDim.x;
   }
 }
 
@@ -215,12 +222,11 @@ void UpdateGradMinMax_hetero(const HeteroGraphPtr& graph,
         dim *= (*list_out)[type]->shape[i];
       int n = list_feat[dst_ntype]->shape[0];
       auto *thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
-      const int nbx = FindNumBlocks<'x'>(n);
-      const int ntx = FindNumThreads(dim);
-      const int nby = FindNumBlocks<'y'>((dim + ntx - 1) / ntx);
-      const int nty = 1;
-      const dim3 nblks(nbx, nby);
-      const dim3 nthrs(ntx, nty);
+      const int th_per_row = 32;
+      const int ntx = 128;
+      const int nbx = FindNumBlocks<'x'>((n * th_per_row + ntx - 1) / ntx);
+      const dim3 nblks(nbx);
+      const dim3 nthrs(ntx);
       CUDA_KERNEL_CALL((UpdateGradMinMaxHeteroKernel<IdType, DType>),
                        nblks, nthrs, 0, thr_entry->stream,
                        feat_data, idx_data, idx_type_data,
