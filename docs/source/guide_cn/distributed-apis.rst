@@ -214,19 +214,19 @@ DGL提供了两个级别的API，用于对节点和边进行采样以生成小�
         for batch in dataloader:
             ...
 
-:class:`~dgl.DGLGraph` 和 :class:`~dgl.distributed.DistGraph` 都可以使用相同的高级采样API(
 :class:`~dgl.dataloading.pytorch.NodeDataloader`
 和
-:class:`~dgl.dataloading.pytorch.EdgeDataloader`)。使用
-:class:`~dgl.dataloading.pytorch.NodeDataloader`
+:class:`~dgl.dataloading.pytorch.EdgeDataloader` 有分布式的版本
+:class:`~dgl.dataloading.pytorch.DistNodeDataloader`
 和
-:class:`~dgl.dataloading.pytorch.EdgeDataloader` 时，分布式采样代码与单进程采样完全相同。
+:class:`~dgl.dataloading.pytorch.DistEdgeDataloader` 。使用
+时分布式采样代码与单进程采样几乎完全相同。
 
 .. code:: python
 
     sampler = dgl.sampling.MultiLayerNeighborSampler([10, 25])
-    dataloader = dgl.sampling.NodeDataLoader(g, train_nid, sampler,
-                                             batch_size=batch_size, shuffle=True)
+    dataloader = dgl.sampling.DistNodeDataLoader(g, train_nid, sampler,
+                                                 batch_size=batch_size, shuffle=True)
     for batch in dataloader:
         ...
 

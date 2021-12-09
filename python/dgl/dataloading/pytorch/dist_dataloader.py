@@ -35,8 +35,9 @@ class DistNodeDataLoader(DistDataLoader):
     def __init__(self, g, nids, graph_sampler, device=None, **kwargs):
         collator_kwargs = {}
         dataloader_kwargs = {}
+        _collator_arglist = inspect.getfullargspec(NodeCollator).args
         for k, v in kwargs.items():
-            if k in self.collator_arglist:
+            if k in _collator_arglist:
                 collator_kwargs[k] = v
             else:
                 dataloader_kwargs[k] = v
@@ -78,8 +79,9 @@ class DistEdgeDataLoader(DistDataLoader):
     def __init__(self, g, eids, graph_sampler, device=None, **kwargs):
         collator_kwargs = {}
         dataloader_kwargs = {}
+        _collator_arglist = inspect.getfullargspec(EdgeCollator).args
         for k, v in kwargs.items():
-            if k in self.collator_arglist:
+            if k in _collator_arglist:
                 collator_kwargs[k] = v
             else:
                 dataloader_kwargs[k] = v
@@ -92,8 +94,8 @@ class DistEdgeDataLoader(DistDataLoader):
         # and does not copy features.  Fallback to normal solution
         self.collator = EdgeCollator(g, eids, graph_sampler, **collator_kwargs)
         _remove_kwargs_dist(dataloader_kwargs)
-        self.dataloader = DistDataLoader(self.collator.dataset,
-                                         collate_fn=self.collator.collate,
-                                         **dataloader_kwargs)
+        super().__init__(self.collator.dataset,
+                         collate_fn=self.collator.collate,
+                         **dataloader_kwargs)
 
         self.device = device

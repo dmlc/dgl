@@ -164,8 +164,8 @@ Low-level API를 사용할 때, 샘플링 코드는 단일 프로세스 샘플�
 .. code:: python
 
     sampler = dgl.sampling.MultiLayerNeighborSampler([10, 25])
-    dataloader = dgl.sampling.NodeDataLoader(g, train_nid, sampler,
-                                             batch_size=batch_size, shuffle=True)
+    dataloader = dgl.sampling.DistNodeDataLoader(g, train_nid, sampler,
+                                                 batch_size=batch_size, shuffle=True)
     for batch in dataloader:
         ...
 
