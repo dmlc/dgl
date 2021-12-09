@@ -5,7 +5,7 @@
 
 :ref:`(English Version) <guide-minibatch>`
 
-만약 수백만, 수십억개의 노드들 또는 에지들을 갖는 큰 그래프인 경우에는 :ref:`guide-training` 에서 소개한 그래프 전체를 사용한 학습을 적용하기 어려울 것이다. Hidden state 크기가 :math:`H` 인 노드가 :math:`N` 개인 그래프에 :math:`L` -레이어의 graph convolutional network를 생각해보자. 중간 hidden 상태를 저장하는데 :math:`(NLH)` 메모리가 필요하고, :math:`N` 이 큰 경우 GPU 하나의 용량을 훨씬 넘을 것이다.
+만약 수백만, 수십억개의 노드들 또는 에지들을 갖는 큰 그래프인 경우에는 :ref:`guide_ko-training` 에서 소개한 그래프 전체를 사용한 학습을 적용하기 어려울 것이다. Hidden state 크기가 :math:`H` 인 노드가 :math:`N` 개인 그래프에 :math:`L` -레이어의 graph convolutional network를 생각해보자. 중간 hidden 상태를 저장하는데 :math:`(NLH)` 메모리가 필요하고, :math:`N` 이 큰 경우 GPU 하나의 용량을 훨씬 넘을 것이다.
 
 이 절에서 모든 노드들의 피쳐를 GPU에 올려야할 필요가 없는 stochastic 미니-배치 학습을 수행하는 법을 알아본다.
 
