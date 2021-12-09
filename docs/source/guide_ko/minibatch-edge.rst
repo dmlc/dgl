@@ -10,7 +10,7 @@
 이웃 샘플러 및 데이터 로더 정의하기
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-:ref:`노드 분류에서 사용한 것과 같은 이웃 샘플러<guide-minibatch-node-classification-sampler>` 를 사용할 수 있다.
+:ref:`노드 분류에서 사용한 것과 같은 이웃 샘플러<guide_ko-minibatch-node-classification-sampler>` 를 사용할 수 있다.
 
 .. code:: python
 
@@ -18,7 +18,7 @@
 
 에지 분류에 DGL이 제공하는 이웃 샘플러를 사용하려면, 미니-배치의 에지들의 집합을 iterate 하는 :class:`~dgl.dataloading.pytorch.EdgeDataLoader` 와 함께 사용해야한다. 이것은 아래 모듈에서 사용될 에지 미니-배치로부터 만들어질 서브 그래프와 *message flow graph* (MFG)들을 리턴한다.
 
-다음 코드 예제는 PyTorch DataLoader를 만든다. 이는 베치들에 있는 학습 에지 ID 배열 :math:`train_eids`들을 iterate 하고, 생성된 MFG들의 리스트를 GPU로 옮겨놓는다.
+다음 코드 예제는 PyTorch DataLoader를 만든다. 이는 베치들에 있는 학습 에지 ID 배열 :math:`train_eids` 들을 iterate 하고, 생성된 MFG들의 리스트를 GPU로 옮겨놓는다.
 
 .. code:: python
 
@@ -35,12 +35,12 @@
 
    빌트인으로 지원되는 샘플러들에 대한 전체 목록은 :ref:`neighborhood sampler API reference <api-dataloading-neighbor-sampling>` 에 있다.
 
-   :ref:`guide-minibatch-customizing-neighborhood-sampler` 에는 여러분만의 이웃 샘플러 만드는 방법과 MFG 개념에 대한 보다 상세한 설명을 담고 있다.
+   :ref:`guide_ko-minibatch-customizing-neighborhood-sampler` 에는 여러분만의 이웃 샘플러 만드는 방법과 MFG 개념에 대한 보다 상세한 설명을 담고 있다.
 
 이웃 샘플링을 위해서 원본 그래프에서 미니 배치의 에지들 제거하기
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-에지 분류 모델을 학습할 때, 때로는 computation dependency에서 학습 데이터에 있는 에지들을 존재하지 않았던 것처럼 만들기 위해 제거하는 것이 필요하다. 그렇지 않으면, 모델은 두 노드들 사이에 에지가 존재한다는 사실을 *인지*할 것이고, 이 정보를 학습에 잠재적으로 이용할 수 있기 때문이다.
+에지 분류 모델을 학습할 때, 때로는 computation dependency에서 학습 데이터에 있는 에지들을 존재하지 않았던 것처럼 만들기 위해 제거하는 것이 필요하다. 그렇지 않으면, 모델은 두 노드들 사이에 에지가 존재한다는 사실을 *인지* 할 것이고, 이 정보를 학습에 잠재적으로 이용할 수 있기 때문이다.
 
 따라서, 에지 분류의 경우 때로는 이웃 샘플링은 미니-배치안에 샘플된 에지들 및 undirected 그래프인 경우 샘플된 에지의 역방향 에지들도 원본 그래프에서 삭제하기도 한다. :class:`~dgl.dataloading.pytorch.EdgeDataLoader` 객체를 만들 때, ``exclude='reverse_id'`` 를 에지 ID와 그와 연관된 reverse 에지 ID들의 매핑 정보와 함께 지정할 수 있다.
 
@@ -70,7 +70,7 @@
 - 첫번째는 부속 노드(incident node)들의 representation을 얻는 부분
 - 두번째는 부속 노드의 representation들로부터 에지 점수를 계산하는 부분
 
-첫번째 부분은 :ref:`노드 분류<guide-minibatch-node-classification-model>` 와 완전히 동일하기에, 단순하게 이를 재사용할 수 있다. 입력 DGL에서 제공하는 데이터 로더가 만들어 낸 MFG들의 리스트와 입력 피쳐들이 된다.
+첫번째 부분은 :ref:`노드 분류<guide_ko-minibatch-node-classification-model>` 와 완전히 동일하기에, 단순하게 이를 재사용할 수 있다. 입력 DGL에서 제공하는 데이터 로더가 만들어 낸 MFG들의 리스트와 입력 피쳐들이 된다.
 
 .. code:: python
 
