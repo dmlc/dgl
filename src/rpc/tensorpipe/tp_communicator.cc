@@ -95,6 +95,9 @@ void TPReceiver::Finalize() {
   if (wait_thread_.joinable()) {
     wait_thread_.join();
   }
+  for (auto &&p : pipes_) {
+    p.second->close();
+  }
   pipes_.clear();
 }
 
@@ -106,14 +109,17 @@ bool TPReceiver::Wait(const std::string &addr, int num_sender, bool blocking) {
   wait_thread_ = std::thread([this, addr]() {
     listener = context->listen({addr});
     while (!stop_wait_) {
-      std::promise<std::shared_ptr<Pipe>> pipeProm;
-      listener->accept([&](const Error &error, std::shared_ptr<Pipe> pipe) {
-        if (error) {
-          LOG(WARNING) << error.what();
-        }
-        pipeProm.set_value(std::move(pipe));
-      });
-      auto &&fut = pipeProm.get_future();
+      auto pipe_prom = std::make_shared<std::promise<std::shared_ptr<Pipe>>>();
+      listener->accept(
+          [pipe_prom](const Error &error, std::shared_ptr<Pipe> pipe) {
+            if (error) {
+              LOG(WARNING) << error.what();
+              pipe_prom->set_value(nullptr);
+            } else {
+              pipe_prom->set_value(std::move(pipe));
+            }
+          });
+      auto &&fut = pipe_prom->get_future();
       std::future_status status;
       do {
         status = fut.wait_for(std::chrono::milliseconds(100));
@@ -123,6 +129,7 @@ bool TPReceiver::Wait(const std::string &addr, int num_sender, bool blocking) {
         break;
       }
       std::shared_ptr<Pipe> pipe = fut.get();
+      CHECK(pipe) << "Invalid pipe.";
       std::promise<bool> checkConnect;
       pipe->readDescriptor(
           [pipe, &checkConnect](const Error &error, Descriptor descriptor) {
