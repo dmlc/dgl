@@ -1323,6 +1323,26 @@ def test_edge_predictor(op):
     pred = nn.EdgePredictor(op, in_feats, out_feats, bias=True).to(ctx)
     assert pred(h_src, h_dst).shape == (num_pairs, out_feats)
 
+
+def test_ke_score_funcs():
+    ctx = F.ctx()
+    num_edges = 30
+    num_rels = 3
+    nfeats = 4
+
+    h_src = th.randn((num_edges, nfeats)).to(ctx)
+    h_dst = th.randn((num_edges, nfeats)).to(ctx)
+    rels = th.randint(low=0, high=num_rels, size=(num_edges,)).to(ctx)
+
+    score_func = nn.TransE(num_rels=num_rels, feats=nfeats).to(ctx)
+    score_func.reset_parameters()
+    score_func(h_src, h_dst, rels).shape == (num_edges)
+
+    score_func = nn.TransR(num_rels=num_rels, rfeats=nfeats - 1, nfeats=nfeats).to(ctx)
+    score_func.reset_parameters()
+    score_func(h_src, h_dst, rels).shape == (num_edges)
+
+
 def test_twirls(): 
     g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
     feat = th.ones(6, 10)
