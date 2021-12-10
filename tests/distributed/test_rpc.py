@@ -199,7 +199,6 @@ def test_rpc():
     pserver = ctx.Process(target=start_server, args=(1, "rpc_ip_config.txt"))
     pclient = ctx.Process(target=start_client, args=("rpc_ip_config.txt",))
     pserver.start()
-    time.sleep(1)
     pclient.start()
     pserver.join()
     pclient.join()
