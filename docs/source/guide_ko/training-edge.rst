@@ -106,7 +106,7 @@
         opt.step()
         print(loss.item())
 
-.. _guide-training-edge-classification-heterogeneous-graph:
+.. _guide_ko-training-edge-classification-heterogeneous-graph:
 
 Heterogeneous 그래프
 ~~~~~~~~~~~~~~~~~~
@@ -175,7 +175,7 @@ Heterogeneous 그래프들에 대한 에지 분류는 homogeneous 그래프와 �
     train_mask = hetero_graph.edges['click'].data['train_mask']
     node_features = {'user': user_feats, 'item': item_feats}
 
-학습 룹은 homogeneous 그래프의 것과 거의 유사하다. 예를 들어, 에지 타입 ``click``에 대한 에지 레이블을 예측하는 것은 다음과 같이 간단히 구현된다.
+학습 룹은 homogeneous 그래프의 것과 거의 유사하다. 예를 들어, 에지 타입 ``click`` 에 대한 에지 레이블을 예측하는 것은 다음과 같이 간단히 구현된다.
 
 .. code:: python
 
@@ -194,11 +194,11 @@ Heterogeneous 그래프의 에지들에 대한 에지 타입 예측하기
 
 주어진 에지의 타입을 예측하는 일도 종종 하게된다.
 
-:ref:`heterogeneous 그래프 예제 <guide-training-heterogeneous-graph-example>` 에서는 user와 item을 연결하는 에지가 주어졌을 때, user가 ``click`` 을 선택할지, ``dislike`` 를 선택할지를 예측하고 있다.
+:ref:`heterogeneous 그래프 예제 <guide_ko-training-heterogeneous-graph-example>` 에서는 user와 item을 연결하는 에지가 주어졌을 때, user가 ``click`` 을 선택할지, ``dislike`` 를 선택할지를 예측하고 있다.
 
 이는 추천에서 흔히 쓰이는 평가 예측의 간략한 버전이다.
 
-노드 representation을 얻기 위해서 heterogeneous graph convolution 네트워크를 사용할 수 있다. 이를 위해서 :ref:`이전에 정의한 RGCN <guide-training-rgcn-node-classification>` 를 사용하는 것도 가능하다.
+노드 representation을 얻기 위해서 heterogeneous graph convolution 네트워크를 사용할 수 있다. 이를 위해서 :ref:`이전에 정의한 RGCN <guide_ko-training-rgcn-node-classification>` 를 사용하는 것도 가능하다.
 
 에지 타입을 예측하기 위해서 ``HeteroDotProductPredictor`` 의 용도를 간단히 변경해서 예측할 모든 에지 타입을 “병합“하고 모든 에지들의 각 타입에 대한 점수를 내보내는 하나의 에지 타입만 있는 다른 그래프를 취하게하면 된다.
 
