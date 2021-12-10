@@ -233,6 +233,63 @@ class TemporalEdgeCollator(EdgeCollator):
         _pop_storages(result[-1], self.g_sampling)
         return result
 
+
+class TemporalEdgeDataLoader(dgl.dataloading.EdgeDataLoader):
+    """ TemporalEdgeDataLoader is an iteratable object to generate blocks for temporal embedding
+    as well as pos and neg pair graph for memory update.
+
+    The batch generated will follow temporal order
+
+    Parameters
+    ----------
+    g : dgl.Heterograph
+        graph for batching the temporal edge id as well as generate negative subgraph
+
+    eids : torch.tensor() or numpy array
+        eids range which to be batched, it is useful to split training validation test dataset
+
+    graph_sampler : dgl.dataloading.BlockSampler
+        temporal neighbor sampler which sample temporal and computationally depend blocks for computation
+
+    device : str
+        'cpu' means load dataset on cpu
+        'cuda' means load dataset on gpu
+
+    collator : dgl.dataloading.EdgeCollator
+        Merge input eid from pytorch dataloader to graph
+
+    Example
+    ----------
+    Please refers to examples/pytorch/tgn/train.py
+
+    """
+
+    def __init__(self, g, eids, graph_sampler, device='cpu', collator=TemporalEdgeCollator, **kwargs):
+        super().__init__(g, eids, graph_sampler, device, **kwargs)
+        collator_kwargs = {}
+        dataloader_kwargs = {}
+        for k, v in kwargs.items():
+            if k in self.collator_arglist:
+                collator_kwargs[k] = v
+            else:
+                dataloader_kwargs[k] = v
+        self.collator = collator(g, eids, graph_sampler, **collator_kwargs)
+
+        assert not isinstance(g, dgl.distributed.DistGraph), \
+            'EdgeDataLoader does not support DistGraph for now. ' \
+            + 'Please use DistDataLoader directly.'
+        self.dataloader = torch.utils.data.DataLoader(
+            self.collator.dataset, collate_fn=self.collator.collate, **dataloader_kwargs)
+        self.device = device
+
+        # Precompute the CSR and CSC representations so each subprocess does not
+        # duplicate.
+        if dataloader_kwargs.get('num_workers', 0) > 0:
+            g.create_formats_()
+
+    def __iter__(self):
+        return iter(self.dataloader)
+
 # ====== Fast Mode ======
 
 # Part of code in reservoir sampling comes from PyG library

@@ -282,32 +282,28 @@ def _restore_storages(subgs, g):
         else:
             _restore_subgraph_storage(subg, g)
 
-def _wrap_node_collator(cls):
-    class _NodeCollator(cls):
-        def collate(self, items): # pylint: disable=missing-docstring
-            # input_nodes, output_nodes, blocks
-            result = super().collate(items)
-            _pop_storages(result[-1], self.g)
-            return result
-    return _NodeCollator
+class _NodeCollator(NodeCollator):
+    def collate(self, items): # pylint: disable=missing-docstring
+        # input_nodes, output_nodes, blocks
+        result = super().collate(items)
+        _pop_storages(result[-1], self.g)
+        return result
 
-def _wrap_edge_collator(cls):
-    class _EdgeCollator(cls):
-        def collate(self, items): # pylint: disable=missing-docstring
-            if self.negative_sampler is None:
-                # input_nodes, pair_graph, blocks
-                result = super().collate(items)
-                _pop_subgraph_storage(result[1], self.g)
-                _pop_storages(result[-1], self.g_sampling)
-                return result
-            else:
-                # input_nodes, pair_graph, neg_pair_graph, blocks
-                result = super().collate(items)
-                _pop_subgraph_storage(result[1], self.g)
-                _pop_subgraph_storage(result[2], self.g)
-                _pop_storages(result[-1], self.g_sampling)
-                return result
-    return _EdgeCollator
+class _EdgeCollator(EdgeCollator):
+    def collate(self, items): # pylint: disable=missing-docstring
+        if self.negative_sampler is None:
+            # input_nodes, pair_graph, blocks
+            result = super().collate(items)
+            _pop_subgraph_storage(result[1], self.g)
+            _pop_storages(result[-1], self.g_sampling)
+            return result
+        else:
+            # input_nodes, pair_graph, neg_pair_graph, blocks
+            result = super().collate(items)
+            _pop_subgraph_storage(result[1], self.g)
+            _pop_subgraph_storage(result[2], self.g)
+            _pop_storages(result[-1], self.g_sampling)
+            return result
 
 class _GraphCollator(GraphCollator):
     def __init__(self, subgraph_iterator, **kwargs):
@@ -473,8 +469,6 @@ class NodeDataLoader(DataLoader):
         to be transferred. As a disadvantage, underlying `to_block` on GPU
         becomes disabled and could lead to decreased performance. This is a
         trade-off which needs profiling to decide whether to enable it.
-    collator_cls : dgl.dataloading.Collator, optional
-        The collator class.  Default is :class:`dgl.dataloading.NodeCollator`.
     kwargs : dict
         Arguments being passed to :py:class:`torch.utils.data.DataLoader`.
 
@@ -550,15 +544,15 @@ class NodeDataLoader(DataLoader):
         construction will take place on the CPU. This is the recommended setting when using a
         single-GPU and the whole graph does not fit in GPU memory.
     """
+    collator_arglist = inspect.getfullargspec(NodeCollator).args
     def __init__(self, g, nids, graph_sampler, device=None, use_ddp=False, ddp_seed=0,
                  load_input=None, load_output=None, load_ndata=None, load_edata=None,
-                 async_load=False, collator_cls=NodeCollator, **kwargs):
+                 async_load=False, **kwargs):
         _check_graph_type(g)
         collator_kwargs = {}
         dataloader_kwargs = {}
-        _collator_arglist = inspect.getfullargspec(collator_cls).args
         for k, v in kwargs.items():
-            if k in _collator_arglist:
+            if k in self.collator_arglist:
                 collator_kwargs[k] = v
             else:
                 dataloader_kwargs[k] = v
@@ -594,8 +588,7 @@ class NodeDataLoader(DataLoader):
         else:
             graph_sampler.set_output_context(to_dgl_context(th.device('cpu')))
 
-        self.collator = _wrap_node_collator(collator_cls)(
-            g, nids, graph_sampler, **collator_kwargs)
+        self.collator = _NodeCollator(g, nids, graph_sampler, **collator_kwargs)
         self.use_scalar_batcher, self.scalar_batcher, dataset, collator, self.dist_sampler = \
             _init_dataloader(self.collator, device, dataloader_kwargs, use_ddp, ddp_seed)
         super().__init__(dataset, collate_fn=collator.collate, **dataloader_kwargs)
@@ -725,8 +718,6 @@ class EdgeDataLoader(DataLoader):
         :class:`torch.utils.data.distributed.DistributedSampler`.
 
         Only effective when :attr:`use_ddp` is True.
-    collator_cls : dgl.dataloading.Collator, optional
-        The collator class.  Default is :class:`dgl.dataloading.EdgeCollator`.
     kwargs : dict
         Arguments being passed to :py:class:`torch.utils.data.DataLoader`.
 
@@ -843,15 +834,14 @@ class EdgeDataLoader(DataLoader):
 
     * Link prediction on heterogeneous graph: RGCN for link prediction.
     """
-
+    collator_arglist = inspect.getfullargspec(EdgeCollator).args
     def __init__(self, g, eids, graph_sampler, device='cpu', use_ddp=False, ddp_seed=0,
-                 collator_cls=EdgeCollator, **kwargs):
+                 **kwargs):
         _check_graph_type(g)
         collator_kwargs = {}
         dataloader_kwargs = {}
-        _collator_arglist = inspect.getfullargspec(collator_cls).args
         for k, v in kwargs.items():
-            if k in _collator_arglist:
+            if k in self.collator_arglist:
                 collator_kwargs[k] = v
             else:
                 dataloader_kwargs[k] = v
@@ -866,8 +856,7 @@ class EdgeDataLoader(DataLoader):
         if callable(getattr(graph_sampler, "set_output_context", None)) and num_workers == 0:
             graph_sampler.set_output_context(to_dgl_context(device))
 
-        self.collator = _wrap_edge_collator(collator_cls)(
-            g, eids, graph_sampler, **collator_kwargs)
+        self.collator = EdgeCollator(g, eids, graph_sampler, **collator_kwargs)
         self.use_scalar_batcher, self.scalar_batcher, dataset, collator, self.dist_sampler = \
                 _init_dataloader(self.collator, device, dataloader_kwargs, use_ddp, ddp_seed)
         self.use_ddp = use_ddp
@@ -949,12 +938,12 @@ class GraphDataLoader(DataLoader):
     ...     for batched_graph, labels in dataloader:
     ...         train_on(batched_graph, labels)
     """
+    collator_arglist = inspect.getfullargspec(GraphCollator).args
     def __init__(self, dataset, collate_fn=None, use_ddp=False, ddp_seed=0, **kwargs):
         collator_kwargs = {}
         dataloader_kwargs = {}
-        _collator_arglist = inspect.getfullargspec(GraphCollator).args
         for k, v in kwargs.items():
-            if k in _collator_arglist:
+            if k in self.collator_arglist:
                 collator_kwargs[k] = v
             else:
                 dataloader_kwargs[k] = v
