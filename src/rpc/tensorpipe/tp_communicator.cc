@@ -20,35 +20,29 @@ namespace rpc {
 
 using namespace tensorpipe;
 
-void TPSender::AddReceiver(const std::string& addr, int recv_id) {
-  receiver_addrs_[recv_id] = addr;
-}
-
-bool TPSender::Connect() {
-  for (const auto& kv : receiver_addrs_) {
-    std::shared_ptr<Pipe> pipe;
-    for (;;) {
-      pipe = context->connect(kv.second);
-      std::promise<bool> done;
-      tensorpipe::Message tpmsg;
-      tpmsg.metadata = "dglconnect";
-      pipe->write(tpmsg, [&done](const tensorpipe::Error& error) {
-        if (error) {
-          done.set_value(false);
-        } else {
-          done.set_value(true);
-        }
-      });
-      if (done.get_future().get()) {
-        break;
-      } else {
-        LOG(INFO) << "Cannot connect to remote server " << kv.second
-                  << ". Retry in 2 seconds.";
-        std::this_thread::sleep_for(std::chrono::seconds(2));
-      }
-    }
-    pipes_[kv.first] = pipe;
+bool TPSender::ConnectReceiver(const std::string &addr, int recv_id) {
+  if (pipes_.find(recv_id) != pipes_.end()) {
+    LOG(WARNING) << "Duplicate recv_id[" << recv_id << "]. Ignoring...";
+    return true;
   }
+  std::shared_ptr<Pipe> pipe;
+  pipe = context->connect(addr);
+  auto done = std::make_shared<std::promise<bool>>();
+  tensorpipe::Message tpmsg;
+  tpmsg.metadata = "dglconnect";
+  pipe->write(tpmsg, [done](const tensorpipe::Error &error) {
+    if (error) {
+      LOG(WARNING) << "Error occurred when write to pipe: " << error.what();
+      done->set_value(false);
+    } else {
+      done->set_value(true);
+    }
+  });
+  if (!done->get_future().get()) {
+    LOG(WARNING) << "Failed to connect to receiver[" << addr << "].";
+    return false;
+  }
+  pipes_[recv_id] = pipe;
   return true;
 }
 
@@ -86,9 +80,12 @@ void TPSender::Send(const RPCMessage& msg, int recv_id) {
               });
 }
 
-void TPSender::Finalize() {}
-
-TPReceiver::~TPReceiver() { Finalize(); }
+void TPSender::Finalize() {
+  for (auto &&p : pipes_) {
+    p.second->close();
+  }
+  pipes_.clear();
+}
 
 void TPReceiver::Finalize() {
   stop_wait_ = true;

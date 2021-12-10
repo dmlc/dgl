@@ -80,9 +80,7 @@ def start_server(server_id, ip_config, num_servers, num_clients, server_state, \
         client_namebook[client_id] = addr
     for client_id, addr in client_namebook.items():
         client_ip, client_port = addr.split(':')
-        rpc.add_receiver_addr(client_ip, client_port, client_id)
-    time.sleep(3) # wait client's socket ready. 3 sec is enough.
-    rpc.sender_connect()
+        assert rpc.connect_receiver(client_ip, client_port, client_id)
     if rpc.get_rank() == 0: # server_0 send all the IDs
         for client_id, _ in client_namebook.items():
             register_res = rpc.ClientRegisterResponse(client_id)

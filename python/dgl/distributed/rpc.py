@@ -13,7 +13,7 @@ from .. import backend as F
 
 __all__ = ['set_rank', 'get_rank', 'Request', 'Response', 'register_service', \
 'create_sender', 'create_receiver', 'finalize_sender', 'finalize_receiver', \
-'receiver_wait', 'add_receiver_addr', 'sender_connect', 'read_ip_config', \
+'receiver_wait', 'connect_receiver', 'read_ip_config', \
 'get_num_machines', 'set_num_machines', 'get_machine_id', 'set_machine_id', \
 'send_request', 'recv_request', 'send_response', 'recv_response', 'remote_call', \
 'send_request_to_machine', 'remote_call_to_machine', 'fast_pull', \
@@ -156,8 +156,8 @@ def receiver_wait(ip_addr, port, num_senders, blocking=True):
     """
     _CAPI_DGLRPCReceiverWait(ip_addr, int(port), int(num_senders), blocking)
 
-def add_receiver_addr(ip_addr, port, recv_id):
-    """Add Receiver's IP address to sender's namebook.
+def connect_receiver(ip_addr, port, recv_id):
+    """Connect to target receiver
 
     Parameters
     ----------
@@ -168,12 +168,7 @@ def add_receiver_addr(ip_addr, port, recv_id):
     recv_id : int
         receiver's ID
     """
-    _CAPI_DGLRPCAddReceiver(ip_addr, int(port), int(recv_id))
-
-def sender_connect():
-    """Connect to all the receivers.
-    """
-    _CAPI_DGLRPCSenderConnect()
+    return _CAPI_DGLRPCConnectReceiver(ip_addr, int(port), int(recv_id))
 
 def set_rank(rank):
     """Set the rank of this process.

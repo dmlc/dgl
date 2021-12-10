@@ -151,21 +151,14 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCReceiverWait")
   }
 });
 
-DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCAddReceiver")
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCConnectReceiver")
 .set_body([](DGLArgs args, DGLRetValue* rv) {
   std::string ip = args[0];
   int port = args[1];
   int recv_id = args[2];
   std::string addr;
   addr = StringPrintf("tcp://%s:%d", ip.c_str(), port);
-  RPCContext::getInstance()->sender->AddReceiver(addr, recv_id);
-});
-
-DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSenderConnect")
-.set_body([](DGLArgs args, DGLRetValue* rv) {
-  if (RPCContext::getInstance()->sender->Connect() == false) {
-    LOG(FATAL) << "Sender connection failed.";
-  }
+  *rv = RPCContext::getInstance()->sender->ConnectReceiver(addr, recv_id);
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSetRank")

@@ -42,21 +42,19 @@ class TPSender {
   }
 
   /*!
-   * \brief Add receiver's address and ID to the sender's namebook
-   * \param addr Networking address, e.g., 'tcp://127.0.0.1:50091'
-   * \param id receiver's ID
-   *
-   * AddReceiver() is not thread-safe and only one thread can invoke this API.
+   * \brief Sender destructor
    */
-  void AddReceiver(const std::string& addr, int recv_id);
+  ~TPSender() { Finalize(); }
 
   /*!
-   * \brief Connect with all the Receivers
+   * \brief Connect to receiver with address and ID
+   * \param addr Networking address, e.g., 'tcp://127.0.0.1:50091'
+   * \param recv_id receiver's ID
    * \return True for success and False for fail
    *
-   * Connect() is not thread-safe and only one thread can invoke this API.
+   * ConnectReceiver() is not thread-safe and only one thread can invoke this API.
    */
-  bool Connect();
+  bool ConnectReceiver(const std::string& addr, int recv_id);
 
   /*!
    * \brief Send RPCMessage to specified Receiver.
@@ -112,7 +110,7 @@ class TPReceiver {
   /*!
    * \brief Receiver destructor
    */
-  ~TPReceiver();
+  ~TPReceiver() { Finalize(); }
 
   /*!
    * \brief Wait for all the Senders to connect

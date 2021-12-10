@@ -108,8 +108,8 @@ class HelloRequest(dgl.distributed.Request):
         return res
 
 def start_server(num_clients, ip_config, server_id=0):
-    print("Sleep 5 seconds to test client re-connect.")
-    time.sleep(5)
+    print("Sleep 1 seconds to test client re-connect.")
+    time.sleep(1)
     server_state = dgl.distributed.ServerState(None, local_g=None, partition_book=None)
     dgl.distributed.register_service(HELLO_SERVICE_ID, HelloRequest, HelloResponse)
     print("Start server {}".format(server_id))
