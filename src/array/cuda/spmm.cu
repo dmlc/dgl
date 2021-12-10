@@ -542,7 +542,6 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
         trans_out[ntype] = out;
       }
     }
-
     // Check shape of ufeat for all relation type and compute feature size
     int64_t x_length = 1;
     for (dgl_type_t etype = 0; etype < (ufeat_ntids.size() - 1); ++etype) {
