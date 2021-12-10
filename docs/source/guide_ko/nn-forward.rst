@@ -1,6 +1,6 @@
 .. _guide_ko-nn-forward:
 
-3.2 DGL NN 모둘의 Forward 함수
+3.2 DGL NN 모듈의 Forward 함수
 ---------------------------
 
 :ref:`(English Versin) <guide-nn-forward>`
@@ -25,7 +25,7 @@ NN 모듈에서 ``forward()`` 함수는 실제 메시지 전달과 연산을 수
 
 ``forward()`` 는 계산 및 메시지 전달 과정에서 유효하지 않은 값을 만들 수 있는 여러 특별한 케이스들을 다룰 수 있어야 한다. :class:`~dgl.nn.pytorch.conv.GraphConv` 와 같은 그래프 conv 모듈에서 수행하는 가장 전형적인 점검은 입력 그래프가 in-degree가 0인 노드를 갖지 않는지 확인하는 것이다. in-degree가 0인 경우에, ``mailbox`` 에 아무것도 없게 되고, 축약 함수는 모두 0인 값을 만들어낼 것이다. 이는 잠재적인 모델 성능 문제를 일이킬 수도 있다. 하지만, :class:`~dgl.nn.pytorch.conv.SAGEConv` 모듈의 경우, aggregated representation은 원래의 노드 피쳐와 연결(concatenated)되기 때문에, ``forward()`` 의 결과는 항상 0이 아니기 때문에, 이런 체크가 필요 없다.
 
-DGL NN 모듈은 여러 종류의 그래프, 단종 그래프, 이종 그래프(:ref:`guide-graph-heterogeneous`), 서브그래프 블록(:ref:`guide-minibatch` ), 입력에 걸쳐서 재사용될 수 있다. 
+DGL NN 모듈은 여러 종류의 그래프, 단종 그래프, 이종 그래프(:ref:`guide_ko-graph-heterogeneous`), 서브그래프 블록(:ref:`guide_ko-minibatch` ), 입력에 걸쳐서 재사용될 수 있다. 
 
 SAGEConv의 수학 공식은 다음과 같다:
 
@@ -106,7 +106,7 @@ Heterogeneous 그래프의 경우, 그래프는 여러 이분 그래프로 나�
                 else:
                     rst = self.fc_self(h_self) + self.fc_neigh(h_neigh)
 
-이 코드는 실제로 메시지 전달과 축약 연산을 실행하고 있다. 이 부분의 코드는 모듈에 따라 다르게 구현된다. 이 코드의 모든 메시지 전달은 :meth:`~dgl.DGLGraph.update_all` API와 ``built-in``  메시지/축약 함수들로 구현되어 있는데, 이는 :ref:`guide-message-passing-efficient` 에서 설명된 DGL의 성능 최적화를 모두 활용하기 위해서이다.
+이 코드는 실제로 메시지 전달과 축약 연산을 실행하고 있다. 이 부분의 코드는 모듈에 따라 다르게 구현된다. 이 코드의 모든 메시지 전달은 :meth:`~dgl.DGLGraph.update_all` API와 ``built-in``  메시지/축약 함수들로 구현되어 있는데, 이는 :ref:`guide_ko-message-passing-efficient` 에서 설명된 DGL의 성능 최적화를 모두 활용하기 위해서이다.
 
 출력값을 위한 축약 후 피쳐 업데이트
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
