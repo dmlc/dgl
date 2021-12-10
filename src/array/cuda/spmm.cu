@@ -526,7 +526,7 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
     std::vector<DType*> trans_out((*vec_out).size(), NULL);
 
     bool use_legacy_cusparsemm =
-        (CUDART_VERSION < 11000) &&
+        (CUDART_VERSION < 11000) && (reduce == "sum") &&
         // legacy cuSPARSE does not care about NNZ, hence the argument "false".
         ((op == "copy_lhs" && cusparse_available<bits, IdType>(false)) ||
          (op == "mul" && is_scalar_efeat && cusparse_available<bits, IdType>(false)));
