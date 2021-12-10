@@ -56,3 +56,6 @@ class GCN(nn.Module):
             h = self.dropout(h)
         h = self.layers[-1](g, h, edge_weight=edge_weight)
         return h
+
+    def forward_block(self, blocks, node_feat, edge_feat):
+        pass
