@@ -1,7 +1,5 @@
 """Functions used by server."""
 
-import time
-
 from . import rpc
 from .constants import MAX_QUEUE_SIZE
 
