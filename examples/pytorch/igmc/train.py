@@ -7,7 +7,7 @@ import glob
 import random
 import argparse
 from shutil import copy
-from pyinstrument import Profiler
+# from pyinstrument import Profiler
 
 import numpy as np
 import torch as th
