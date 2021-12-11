@@ -1,5 +1,6 @@
 """Distributed dataloaders.
 """
+import inspect
 from ...distributed import DistDataLoader
 from ..dataloader import NodeCollator, EdgeCollator
 
