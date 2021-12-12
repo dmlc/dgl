@@ -26,27 +26,19 @@ TypeArray GetNodeTypesFromMetapath(
     const TypeArray metapath) {
 
   uint64_t num_etypes = metapath->shape[0];
-  TypeArray result = TypeArray::Empty(
-      {metapath->shape[0] + 1}, metapath->dtype, metapath->ctx);
-  IdxType *result_data = static_cast<IdxType *>(result->data);
 
-  auto metapath_ctx = metapath->ctx;
   auto cpu_ctx = DGLContext{kDLCPU, 0};
-  auto metapath_device = DeviceAPI::Get(metapath_ctx);
-  auto cpu_device = DeviceAPI::Get(cpu_ctx);
+  auto metapath_ctx = metapath->ctx;
   // use default stream
   cudaStream_t stream = 0;
 
-  auto h_metapath_data = static_cast<IdxType*>(
-      cpu_device->AllocWorkspace(cpu_ctx, sizeof(IdxType) * (num_etypes)));
-  auto h_result_data = static_cast<IdxType*>(
-      cpu_device->AllocWorkspace(cpu_ctx, sizeof(IdxType) * (num_etypes + 1)));
+  TypeArray h_result = TypeArray::Empty(
+      {metapath->shape[0] + 1}, metapath->dtype, cpu_ctx);
+  auto h_result_data = h_result.Ptr<IdxType>();
 
-  metapath_device->CopyDataFromTo(static_cast<const IdxType*>(metapath->data), 0,
-                                  h_metapath_data, 0,
-                                  sizeof(IdxType) * (num_etypes),
-                                  metapath_ctx, cpu_ctx,
-                                  metapath->dtype, stream);
+  auto h_metapath = metapath.CopyTo(cpu_ctx, stream);
+  DeviceAPI::Get(metapath_ctx)->StreamSync(metapath_ctx, stream);
+  const IdxType *h_metapath_data = h_metapath.Ptr<IdxType>();
 
   dgl_type_t curr_type = hg->GetEndpointTypes(h_metapath_data[0]).first;
   h_result_data[0] = curr_type;
@@ -63,14 +55,9 @@ TypeArray GetNodeTypesFromMetapath(
     curr_type = dsttype;
     h_result_data[i + 1] = dsttype;
   }
-  metapath_device->CopyDataFromTo(h_result_data, 0, result_data, 0,
-                                  sizeof(IdxType) * (num_etypes + 1),
-                                  cpu_ctx, metapath_ctx,
-                                  metapath->dtype, stream);
-  // release the data
-  metapath_device->StreamSync(metapath_ctx, stream);
-  cpu_device->FreeWorkspace(cpu_ctx, h_metapath_data);
-  cpu_device->FreeWorkspace(cpu_ctx, h_result_data);
+
+  auto result = h_result.CopyTo(metapath->ctx, stream);
+  DeviceAPI::Get(metapath_ctx)->StreamSync(metapath_ctx, stream);
   return result;
 }
 
