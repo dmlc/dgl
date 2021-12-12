@@ -157,7 +157,6 @@ std::pair<IdArray, IdArray> RandomWalkWithStepwiseRestart(
         eids_data);
   });
 
-  device->StreamSync(ctx, stream);
   device->FreeWorkspace(ctx, d_graphs);
   return std::make_pair(traces, eids);
 }

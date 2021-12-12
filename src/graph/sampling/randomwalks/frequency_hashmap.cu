@@ -417,7 +417,6 @@ std::tuple<IdArray, IdArray, IdArray> FrequencyHashmap<IdxType>::Topk(
       unique_output_offsets,
       res_src.Ptr<IdxType>(), res_dst.Ptr<IdxType>(), res_cnt.Ptr<IdxType>());
 
-  device->StreamSync(_ctx, _stream);
   device->FreeWorkspace(_ctx, is_first_position);
   device->FreeWorkspace(_ctx, edge_blocks_prefix_data);
   device->FreeWorkspace(_ctx, num_unique_each_node_data);
