@@ -198,10 +198,12 @@ inline __device__ IdxType DeviceEdgeHashmap<IdxType>::InsertEdge(
   IdxType delta = 1;
   IdxType old_cnt = static_cast<IdxType>(-1);
   while (true) {
-    IdxType old_src = dgl::aten::cuda::AtomicCAS(&_edge_hashmap[start_off + pos].src, static_cast<IdxType>(-1), src);
+    IdxType old_src = dgl::aten::cuda::AtomicCAS(
+        &_edge_hashmap[start_off + pos].src, static_cast<IdxType>(-1), src);
     if (old_src == static_cast<IdxType>(-1) || old_src == src) {
       // first insert
-      old_cnt = dgl::aten::cuda::AtomicAdd(&_edge_hashmap[start_off + pos].cnt, static_cast<IdxType>(1));
+      old_cnt = dgl::aten::cuda::AtomicAdd(
+          &_edge_hashmap[start_off + pos].cnt, static_cast<IdxType>(1));
       if (old_src == static_cast<IdxType>(-1)) {
         assert(dst_idx < _num_dst);
         dgl::aten::cuda::AtomicAdd(&_dst_unique_edges[dst_idx], static_cast<IdxType>(1));
