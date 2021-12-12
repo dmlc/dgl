@@ -4866,10 +4866,9 @@ class DGLHeteroGraph(object):
             _, dtid = self._graph.metagraph.find_edge(etid)
             g = self if etype is None else self[etype]
             ndata = core.message_passing(g, message_func, reduce_func, apply_node_func)
-            # Replace infinity with zero for isolated nodes when reducer is min/max
-            if reduce_func.name in ['min', 'max']:
-                key = list(ndata.keys())[0]
-                ndata[key] = F.replace_inf_with_zero(ndata[key])
+            key = list(ndata.keys())[0]
+            # Replace infinity with zero for isolated nodes
+            ndata[key] = F.replace_inf_with_zero(ndata[key])
             self._set_n_repr(dtid, ALL, ndata)
         else:   # heterogeneous graph with number of relation types > 1
             if not core.is_builtin(message_func) or not core.is_builtin(reduce_func):
