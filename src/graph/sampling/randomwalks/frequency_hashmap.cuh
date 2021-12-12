@@ -1,5 +1,5 @@
 /*!
- *  Copyright (c) 2018 by Contributors
+ *  Copyright (c) 2021 by Contributors
  * \file graph/sampling/frequency_hashmap.cuh
  * \brief frequency hashmap - used to select top-k frequency edges of each node
  */
