@@ -470,8 +470,7 @@ class EdgeSoftmax(th.autograd.Function):
             gidx = gidx.edge_subgraph([eids], True).graph
         if norm_by == 'src':
             gidx = gidx.reverse()
-        # TODO (Israt): convert to reducer 'max'. changed for debugging
-        score_max = _gspmm(gidx, 'copy_rhs', 'sum', None, score)[0]
+        score_max = _gspmm(gidx, 'copy_rhs', 'max', None, score)[0]
         score = th.exp(_gsddmm(gidx, 'sub', score, score_max, 'e', 'v'))
         score_sum = _gspmm(gidx, 'copy_rhs', 'sum', None, score)[0]
         out = _gsddmm(gidx, 'div', score, score_sum, 'e', 'v')
@@ -502,6 +501,7 @@ class EdgeSoftmax(th.autograd.Function):
         out, = ctx.saved_tensors
         sds = out * grad_out
         accum = gspmm(gidx, 'copy_rhs', 'sum', None, sds)
+
         grad_score = sds - gsddmm(gidx, 'mul', out, accum, 'e', 'v')
         return None, grad_score, None, None
 
@@ -534,7 +534,7 @@ class EdgeSoftmax_hetero(th.autograd.Function):
         e_len = gidx.number_of_etypes()
         lhs = [None] * u_len
         feats =  tuple(lhs + list(score))
-        score_max = _gspmm_hetero(gidx, 'copy_rhs', 'sum', u_len, feats)[0]
+        score_max = _gspmm_hetero(gidx, 'copy_rhs', 'max', u_len, feats)[0]
         out_tmp = _gsddmm_hetero(gidx, 'sub', e_len, 'e', 'v', tuple(list(score) + list(score_max)))
         score = tuple([th.exp(out_tmp[i]) if out_tmp[i] is not None else None
                 for i in range(len(out_tmp))])
