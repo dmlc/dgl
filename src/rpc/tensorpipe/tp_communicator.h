@@ -201,6 +201,11 @@ class TPReceiver {
    * \brief whether to stop waiting
    */
   std::atomic<bool> stop_wait_{false};
+
+  /*!
+   * \brief whether listen thread booted
+   */
+  std::atomic<bool> listen_booted_{false};
 };
 
 }  // namespace rpc

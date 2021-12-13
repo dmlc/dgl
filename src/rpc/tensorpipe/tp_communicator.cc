@@ -107,6 +107,7 @@ bool TPReceiver::Wait(const std::string &addr, int num_sender, bool blocking) {
   wait_thread_ = std::thread([this, addr]() {
     LOG(INFO) << "TPReceiver starts to wait on [" << addr << "].";
     listener = context->listen({addr});
+    listen_booted_ = true;
     while (!stop_wait_) {
       auto pipe_prom = std::make_shared<std::promise<std::shared_ptr<Pipe>>>();
       listener->accept(
@@ -152,6 +153,8 @@ bool TPReceiver::Wait(const std::string &addr, int num_sender, bool blocking) {
     listener->close();
     LOG(INFO) << "TPReceiver stops waiting on [" << addr << "].";
   });
+  while (!listen_booted_) {
+  }
   while (blocking && (num_sender != num_connected_)) {
   }
   return true;
