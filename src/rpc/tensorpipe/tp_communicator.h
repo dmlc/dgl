@@ -111,7 +111,10 @@ class TPReceiver {
   /*!
    * \brief Receiver destructor
    */
-  ~TPReceiver() { Finalize(); }
+  ~TPReceiver() {
+    LOG(INFO) << "~~~~~~~~TPReceiver::~TPReceiver()";
+    Finalize();
+  }
 
   /*!
    * \brief Wait for all the Senders to connect

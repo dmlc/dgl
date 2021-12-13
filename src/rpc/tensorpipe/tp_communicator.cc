@@ -103,6 +103,7 @@ bool TPReceiver::Wait(const std::string &addr, int num_sender, bool blocking) {
     LOG(WARNING) << "TPReceiver::Wait() has been called already. Ignoring...";
     return false;
   }
+  LOG(INFO) << "~~~~~~~~TPReceiver::Wait()";
   wait_thread_ = std::thread([this, addr]() {
     LOG(INFO) << "TPReceiver starts to wait on [" << addr << "].";
     listener = context->listen({addr});
