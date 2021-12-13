@@ -174,7 +174,7 @@ class GATv2Conv(nn.Module):
         self.attn_drop = nn.Dropout(attn_drop)
         self.leaky_relu = nn.LeakyReLU(negative_slope)
         if residual:
-            if self._in_dst_feats != out_feats:
+            if self._in_dst_feats != out_feats * num_heads:
                 self.res_fc = nn.Linear(
                     self._in_dst_feats, num_heads * out_feats, bias=bias)
             else:
