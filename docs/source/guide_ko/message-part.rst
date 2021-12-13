@@ -13,4 +13,4 @@
     sg = g.subgraph(nid)
     sg.update_all(message_func, reduce_func, apply_node_func)
 
-이는 미니-배치 학습에서 흔히 사용되는 방법이다. 자세한 사용법은 :ref:`guide-minibatch` 참고하자.
+이는 미니-배치 학습에서 흔히 사용되는 방법이다. 자세한 사용법은 :ref:`guide_ko-minibatch` 참고하자.
