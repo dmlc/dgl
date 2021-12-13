@@ -39,6 +39,7 @@ __global__ void _RandomWalkKernel(
     const IdType* metapath_data, const uint64_t max_num_steps,
     const GraphKernelData<IdType>* graphs,
     const FloatType* restart_prob_data,
+    const int64_t restart_prob_size,
     IdType *out_traces_data,
     IdType *out_eids_data) {
   assert(BLOCK_SIZE == blockDim.x);
@@ -69,7 +70,9 @@ __global__ void _RandomWalkKernel(
       IdType eid = (graph.data? graph.data[in_row_start + num] : in_row_start + num);
       *traces_data_ptr = pick;
       *eids_data_ptr = eid;
-      if (curand_uniform(&rng) < restart_prob_data[step_idx]) {
+      if ((restart_prob_size > 1) && (curand_uniform(&rng) < restart_prob_data[step_idx])) {
+        break;
+      } else if ((restart_prob_size == 1) && (curand_uniform(&rng) < restart_prob_data[0])) {
         break;
       }
       ++traces_data_ptr; ++eids_data_ptr;
@@ -85,12 +88,12 @@ __global__ void _RandomWalkKernel(
 
 }  // namespace
 
+// random walk for uniform choice
 template<DLDeviceType XPU, typename IdType>
-std::pair<IdArray, IdArray> RandomWalkWithStepwiseRestart(
+std::pair<IdArray, IdArray> RandomWalkUniform(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
-    const std::vector<FloatArray> &prob,
     FloatArray restart_prob) {
   const int64_t max_num_steps = metapath->shape[0];
   const IdType *metapath_data = static_cast<IdType *>(metapath->data);
@@ -131,20 +134,16 @@ std::pair<IdArray, IdArray> RandomWalkWithStepwiseRestart(
       hg->GetCSRMatrix(0).indptr->dtype,
       stream);
 
-  for (const auto &etype_prob : prob) {
-    if (!IsNullArray(etype_prob)) {
-      LOG(FATAL) << "Non-uniform Graph is not supported in GPU.";
-    }
-  }
-
   constexpr int BLOCK_SIZE = 256;
   constexpr int TILE_SIZE = BLOCK_SIZE * 4;
   dim3 block(256);
   dim3 grid((num_seeds + TILE_SIZE - 1) / TILE_SIZE);
   const uint64_t random_seed = RandomEngine::ThreadLocal()->RandInt(1000000000);
   ATEN_FLOAT_TYPE_SWITCH(restart_prob->dtype, FloatType, "random walk GPU kernel", {
-    auto restart_prob_data = static_cast<const FloatType*>(restart_prob->data);
     CHECK(restart_prob->ctx.device_type == kDLGPU) << "restart prob should be in GPU.";
+    CHECK(restart_prob->ndim == 1) << "restart prob dimension should be 1.";
+    const FloatType *restart_prob_data = restart_prob.Ptr<FloatType>();
+    const int64_t restart_prob_size = restart_prob->shape[0];
     _RandomWalkKernel<IdType, FloatType, BLOCK_SIZE, TILE_SIZE> <<<grid, block, 0, stream>>>(
         random_seed,
         seed_data,
@@ -153,12 +152,81 @@ std::pair<IdArray, IdArray> RandomWalkWithStepwiseRestart(
         max_num_steps,
         d_graphs,
         restart_prob_data,
+        restart_prob_size,
         traces_data,
         eids_data);
   });
 
   device->FreeWorkspace(ctx, d_graphs);
   return std::make_pair(traces, eids);
+}
+
+template<DLDeviceType XPU, typename IdType>
+std::pair<IdArray, IdArray> RandomWalk(
+    const HeteroGraphPtr hg,
+    const IdArray seeds,
+    const TypeArray metapath,
+    const std::vector<FloatArray> &prob) {
+
+  // not support no-uniform choice now
+  for (const auto &etype_prob : prob) {
+    if (!IsNullArray(etype_prob)) {
+      LOG(FATAL) << "Non-uniform choice is not supported in GPU.";
+    }
+  }
+
+  auto restart_prob = NDArray::Empty(
+      {0}, DLDataType{kDLFloat, 32, 1}, DGLContext{XPU, 0});
+  return RandomWalkUniform<XPU, IdType>(hg, seeds, metapath, restart_prob);
+}
+
+template<DLDeviceType XPU, typename IdType>
+std::pair<IdArray, IdArray> RandomWalkWithRestart(
+    const HeteroGraphPtr hg,
+    const IdArray seeds,
+    const TypeArray metapath,
+    const std::vector<FloatArray> &prob,
+    double restart_prob) {
+
+  // not support no-uniform choice now
+  for (const auto &etype_prob : prob) {
+    if (!IsNullArray(etype_prob)) {
+      LOG(FATAL) << "Non-uniform choice is not supported in GPU.";
+    }
+  }
+  auto restart_prob_array = NDArray::Empty(
+      {1}, DLDataType{kDLFloat, 64, 1}, seeds->ctx);
+  auto device_ctx = restart_prob_array->ctx;
+  auto device = dgl::runtime::DeviceAPI::Get(device_ctx);
+
+  // use default stream
+  cudaStream_t stream = 0;
+  device->CopyDataFromTo(
+      &restart_prob, 0, restart_prob_array.Ptr<double>(), 0,
+      sizeof(double),
+      DGLContext{kDLCPU, 0}, device_ctx,
+      restart_prob_array->dtype, stream);
+  device->StreamSync(device_ctx, stream);
+
+  return RandomWalkUniform<XPU, IdType>(hg, seeds, metapath, restart_prob_array);
+}
+
+template<DLDeviceType XPU, typename IdType>
+std::pair<IdArray, IdArray> RandomWalkWithStepwiseRestart(
+    const HeteroGraphPtr hg,
+    const IdArray seeds,
+    const TypeArray metapath,
+    const std::vector<FloatArray> &prob,
+    FloatArray restart_prob) {
+
+  // not support no-uniform choice now
+  for (const auto &etype_prob : prob) {
+    if (!IsNullArray(etype_prob)) {
+      LOG(FATAL) << "Non-uniform choice is not supported in GPU.";
+    }
+  }
+
+  return RandomWalkUniform<XPU, IdType>(hg, seeds, metapath, restart_prob);
 }
 
 template<DLDeviceType XPU, typename IdxType>
@@ -181,6 +249,34 @@ std::tuple<IdArray, IdArray, IdArray> SelectPinSageNeighbors(
       src->shape[0], num_samples_per_node, k);
   return ret;
 }
+
+template
+std::pair<IdArray, IdArray> RandomWalk<kDLGPU, int32_t>(
+    const HeteroGraphPtr hg,
+    const IdArray seeds,
+    const TypeArray metapath,
+    const std::vector<FloatArray> &prob);
+template
+std::pair<IdArray, IdArray> RandomWalk<kDLGPU, int64_t>(
+    const HeteroGraphPtr hg,
+    const IdArray seeds,
+    const TypeArray metapath,
+    const std::vector<FloatArray> &prob);
+
+template
+std::pair<IdArray, IdArray> RandomWalkWithRestart<kDLGPU, int32_t>(
+    const HeteroGraphPtr hg,
+    const IdArray seeds,
+    const TypeArray metapath,
+    const std::vector<FloatArray> &prob,
+    double restart_prob);
+template
+std::pair<IdArray, IdArray> RandomWalkWithRestart<kDLGPU, int64_t>(
+    const HeteroGraphPtr hg,
+    const IdArray seeds,
+    const TypeArray metapath,
+    const std::vector<FloatArray> &prob,
+    double restart_prob);
 
 template
 std::pair<IdArray, IdArray> RandomWalkWithStepwiseRestart<kDLGPU, int32_t>(
