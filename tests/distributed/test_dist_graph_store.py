@@ -96,6 +96,7 @@ def check_dist_graph_empty(g, num_clients, num_nodes, num_edges):
     print('end')
 
 def run_client_empty(graph_name, part_id, server_count, num_clients, num_nodes, num_edges):
+    time.sleep(5)
     os.environ['DGL_NUM_SERVER'] = str(server_count)
     dgl.distributed.initialize("kv_ip_config.txt")
     gpb, graph_name, _, _ = load_partition_book('/tmp/dist_graph/{}.json'.format(graph_name),
@@ -139,6 +140,7 @@ def check_server_client_empty(shared_mem, num_servers, num_clients):
     print('clients have terminated')
 
 def run_client(graph_name, part_id, server_count, num_clients, num_nodes, num_edges):
+    time.sleep(5)
     os.environ['DGL_NUM_SERVER'] = str(server_count)
     dgl.distributed.initialize("kv_ip_config.txt")
     gpb, graph_name, _, _ = load_partition_book('/tmp/dist_graph/{}.json'.format(graph_name),
@@ -147,6 +149,7 @@ def run_client(graph_name, part_id, server_count, num_clients, num_nodes, num_ed
     check_dist_graph(g, num_clients, num_nodes, num_edges)
 
 def run_emb_client(graph_name, part_id, server_count, num_clients, num_nodes, num_edges):
+    time.sleep(5)
     os.environ['DGL_NUM_SERVER'] = str(server_count)
     dgl.distributed.initialize("kv_ip_config.txt")
     gpb, graph_name, _, _ = load_partition_book('/tmp/dist_graph/{}.json'.format(graph_name),
@@ -155,6 +158,7 @@ def run_emb_client(graph_name, part_id, server_count, num_clients, num_nodes, nu
     check_dist_emb(g, num_clients, num_nodes, num_edges)
 
 def run_client_hierarchy(graph_name, part_id, server_count, node_mask, edge_mask, return_dict):
+    time.sleep(5)
     os.environ['DGL_NUM_SERVER'] = str(server_count)
     dgl.distributed.initialize("kv_ip_config.txt")
     gpb, graph_name, _, _ = load_partition_book('/tmp/dist_graph/{}.json'.format(graph_name),
@@ -436,6 +440,7 @@ def check_server_client_hierarchy(shared_mem, num_servers, num_clients):
 
 
 def run_client_hetero(graph_name, part_id, server_count, num_clients, num_nodes, num_edges):
+    time.sleep(5)
     os.environ['DGL_NUM_SERVER'] = str(server_count)
     dgl.distributed.initialize("kv_ip_config.txt")
     gpb, graph_name, _, _ = load_partition_book('/tmp/dist_graph/{}.json'.format(graph_name),
