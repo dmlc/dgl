@@ -102,6 +102,7 @@ class TPReceiver {
    * \param queue_size size of message queue.
    */
   explicit TPReceiver(std::shared_ptr<tensorpipe::Context> ctx) {
+    LOG(INFO) << "------ TPReceiver is contructing...";
     CHECK(ctx) << "Context is not initialized";
     this->context = ctx;
     queue_ = std::make_shared<RPCMessageQueue>();
