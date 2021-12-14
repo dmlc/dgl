@@ -42,7 +42,15 @@ def load_data(data_name, get_norm=False, inv_target=False):
     category_id = hg.ntypes.index(category)
 
     g = dgl.to_homogeneous(hg, edata=edata)
+    # TODO
+    g.ndata['ntype'] = g.ndata[dgl.NTYPE]
+    g.ndata['ntype'].share_memory_()
+    g.edata['etype'] = g.edata[dgl.ETYPE]
+    g.edata['etype'].share_memory_()
+    g.ndata['type_id'] = g.ndata[dgl.NID]
+    g.ndata['type_id'].share_memory_()
     node_ids = th.arange(g.num_nodes())
+
     # find out the target node ids in g
     loc = (g.ndata[dgl.NTYPE] == category_id)
     target_idx = node_ids[loc]

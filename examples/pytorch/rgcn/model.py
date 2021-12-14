@@ -103,7 +103,7 @@ class RelGraphEmbedLayer(nn.Module):
         else:
             return []
 
-    def forward(self, node_tids, type_ids):
+    def forward(self, node_ids, node_tids, type_ids):
         """Forward computation
 
         Parameters
@@ -118,7 +118,7 @@ class RelGraphEmbedLayer(nn.Module):
         tensor
             embeddings as the input of the next layer
         """
-        embeds = th.empty(node_tids.shape[0], self.embed_size, device=self.out_dev_id)
+        embeds = th.empty(node_ids.shape[0], self.embed_size, device=self.out_dev_id)
 
         type_ids = type_ids.to(self.storage_dev_id)
         node_tids = node_tids.to(self.storage_dev_id)
