@@ -13,7 +13,6 @@ import test_utils
 from test_utils import parametrize_dtype, get_cases
 from scipy.sparse import rand
 rfuncs = {'sum': fn.sum, 'max': fn.max, 'min': fn.min, 'mean': fn.mean}
-fill_value = {'sum': 0, 'max': float("-inf")}
 feat_size = 2
 
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
