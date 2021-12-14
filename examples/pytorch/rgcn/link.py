@@ -34,8 +34,8 @@ class LinkPredict(nn.Module):
         score = torch.sum(s * r * o, dim=1)
         return score
 
-    def forward(self, g, h, r, norm):
-        return self.rgcn(g, h, r, norm)
+    def forward(self, g, h):
+        return self.rgcn(g, h)
 
     def regularization_loss(self, embedding):
         return torch.mean(embedding.pow(2)) + torch.mean(self.w_relation.pow(2))
@@ -55,12 +55,19 @@ def node_norm_to_edge(g, node_norm):
     g.apply_edges(lambda edges : {'norm' : edges.dst['norm']})
     return g.edata['norm']
 
+def get_subset(g, mask):
+    idx = torch.nonzero(mask, as_tuple=False).squeeze()
+    src, dst = g.find_edges(idx)
+    rel = g.edata['etype'][idx]
+    return torch.stack([src, rel, dst], dim=1).numpy()
+
 def main(args):
     data = load_data('FB15k-237')
-    num_nodes = data.num_nodes
-    train_data = data.train
-    valid_data = data.valid
-    test_data = data.test
+    graph = data[0]
+    num_nodes = graph.num_nodes()
+    train_data = get_subset(graph, graph.edata['train_mask'])
+    valid_data = get_subset(graph, graph.edata['val_mask'])
+    test_data = get_subset(graph, graph.edata['test_mask'])
     num_rels = data.num_rels
 
     # create model
