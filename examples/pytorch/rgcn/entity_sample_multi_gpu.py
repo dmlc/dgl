@@ -99,9 +99,9 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, queue=None):
             print("Validation Accuracy: {:.4f} | Validation loss: {:.4f}".format(
                 val_acc, val_loss))
 
+    gc.collect()
     test_logits, test_seeds = evaluate(device, model, embed_layer, test_loader, inv_target)
     queue.put((test_logits, test_seeds))
-    th.distributed.barrier()
     if proc_id == 0:
         test_loss, test_acc = collect_eval()
         print("Final Test Accuracy: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss))
