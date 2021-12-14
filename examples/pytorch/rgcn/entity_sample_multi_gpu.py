@@ -85,7 +85,8 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, queue=None):
             eval_logits = th.cat(eval_logits)
             eval_seeds = th.cat(eval_seeds)
             eval_loss = F.cross_entropy(eval_logits, labels[eval_seeds].cpu()).item()
-            eval_acc = th.mean(eval_logits.argmax(dim=1) == labels[eval_seeds].cpu()).item()
+            eval_acc = th.mean(
+                (eval_logits.argmax(dim=1) == labels[eval_seeds].cpu()).float()).item()
 
             return eval_loss, eval_acc
 
