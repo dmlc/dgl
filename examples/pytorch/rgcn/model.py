@@ -103,7 +103,7 @@ class RelGraphEmbedLayer(nn.Module):
         else:
             return []
 
-    def forward(self, node_ids, node_tids, type_ids):
+    def forward(self, node_tids, type_ids):
         """Forward computation
 
         Parameters

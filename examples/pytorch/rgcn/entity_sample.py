@@ -92,8 +92,7 @@ def train(model, embed_layer, train_loader, inv_target,
         for blc in blocks:
             gen_norm(blc)
 
-        feats = embed_layer(blocks[0].srcdata[dgl.NID],
-                            blocks[0].srcdata['ntype'],
+        feats = embed_layer(blocks[0].srcdata['ntype'],
                             blocks[0].srcdata['type_id'])
         blocks = [blc.to(device) for blc in blocks]
         logits = model(blocks, feats)
@@ -124,8 +123,7 @@ def evaluate(device, model, embed_layer, eval_loader, inv_target):
             for blc in blocks:
                 gen_norm(blc)
 
-            feats = embed_layer(blocks[0].srcdata[dgl.NID],
-                                blocks[0].srcdata['ntype'],
+            feats = embed_layer(blocks[0].srcdata['ntype'],
                                 blocks[0].srcdata['type_id'])
             blocks = [blc.to(device) for blc in blocks]
             logits = model(blocks, feats)
