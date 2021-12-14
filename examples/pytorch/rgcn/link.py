@@ -9,6 +9,7 @@ import argparse
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import dgl
 
 from dgl.data.knowledge_graph import load_data
 
@@ -76,8 +77,8 @@ def main(args):
     test_graph, test_rel, test_norm = build_test_graph(
         num_nodes, num_rels, train_data)
     test_node_id = torch.arange(0, num_nodes).view(-1, 1)
-    test_rel = torch.from_numpy(test_rel)
-    test_norm = node_norm_to_edge(test_graph, test_norm)
+    test_graph.edata[dgl.ETYPE] = torch.from_numpy(test_rel)
+    test_graph.edata['norm'] = node_norm_to_edge(test_graph, test_norm)
 
     use_cuda = args.gpu >= 0 and torch.cuda.is_available()
     if use_cuda:
@@ -103,17 +104,16 @@ def main(args):
 
         # set node/edge feature
         node_id = torch.from_numpy(node_id).view(-1, 1).long()
-        edge_type = torch.from_numpy(edge_type)
-        edge_norm = node_norm_to_edge(g, node_norm)
+        g.edata[dgl.ETYPE] = torch.from_numpy(edge_type)
+        g.edata['norm'] = node_norm_to_edge(g, node_norm)
         data, labels = torch.from_numpy(data), torch.from_numpy(labels)
         deg = g.in_degrees(range(g.num_nodes())).float().view(-1, 1)
         if use_cuda:
             node_id, deg = node_id.cuda(), deg.cuda()
-            edge_type, edge_norm = edge_type.cuda(), edge_norm.cuda()
             data, labels = data.cuda(), labels.cuda()
             g = g.to(args.gpu)
 
-        embed = model(g, node_id, edge_type, edge_norm)
+        embed = model(g, node_id)
         loss = model.get_loss(embed, data, labels)
         optimizer.zero_grad()
         loss.backward()
@@ -128,7 +128,7 @@ def main(args):
             model = model.cpu()
             model.eval()
             print("start eval")
-            embed = model(test_graph, test_node_id, test_rel, test_norm)
+            embed = model(test_graph, test_node_id)
             mrr = calc_mrr(embed, model.w_relation, torch.LongTensor(train_data),
                            valid_data, test_data, eval_bz=500, eval_p=args.eval_protocol)
             # save best model
@@ -146,7 +146,7 @@ def main(args):
     model.eval()
     model.load_state_dict(checkpoint['state_dict'])
     print("Using best epoch: {}".format(checkpoint['epoch']))
-    embed = model(test_graph, test_node_id, test_rel, test_norm)
+    embed = model(test_graph, test_node_id)
     calc_mrr(embed, model.w_relation, torch.LongTensor(train_data), valid_data,
              test_data, hits=[1, 3, 10], batch_size=500, eval_p=args.eval_protocol)
 
