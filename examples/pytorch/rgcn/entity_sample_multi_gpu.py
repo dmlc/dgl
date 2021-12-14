@@ -44,7 +44,6 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, queue=None):
     model = DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id)
     if args.dgl_sparse:
         embed_layer.cuda(dev_id)
-        embed_layer = DistributedDataParallel(embed_layer, device_ids=[dev_id], output_device=dev_id)
     else:
         embed_layer = DistributedDataParallel(embed_layer, device_ids=None, output_device=None)
 
