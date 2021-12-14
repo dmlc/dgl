@@ -148,7 +148,7 @@ def main(args):
     print("Using best epoch: {}".format(checkpoint['epoch']))
     embed = model(test_graph, test_node_id, test_rel, test_norm)
     calc_mrr(embed, model.w_relation, torch.LongTensor(train_data), valid_data,
-             test_data, hits=[1, 3, 10], eval_bz=500, eval_p=args.eval_protocol)
+             test_data, hits=[1, 3, 10], batch_size=500, eval_p=args.eval_protocol)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='RGCN for link prediction')
