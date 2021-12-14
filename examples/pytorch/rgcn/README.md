@@ -49,14 +49,14 @@ MUTAG: accuracy avg(10 runs) 64.85%, best 72.06% (DGL)
 python entity_sample.py -d mutag --n-bases 30 --gpu 0 --batch-size 64 --fanout "-1, -1" --use-self-loop --dgl-sparse --n-epochs 20 --sparse-lr 0.01 --dropout 0.5
 ```
 
-BGS: accuracy avg(5 runs) 78.62%, best 86.21% (DGL)
+BGS: accuracy avg(5 runs) 76.55%, best 89.66% (DGL)
 ```
-python entity_sample.py -d bgs --n-bases 40 --gpu 0 --fanout "-1, -1"  --n-epochs=16 --batch-size=16 --dgl-sparse  --lr 0.01 --sparse-lr 0.05 --dropout 0.3
+python entity_sample.py -d bgs --n-bases 40 --gpu 0 --fanout "-1, -1"  --n-epochs=16 --batch-size=16 --dgl-sparse --sparse-lr 0.05 --dropout 0.3
 ```
 
-AM: accuracy avg(5 runs) 87.37%, best 89.9% (DGL)
+AM: accuracy avg(5 runs) 87.98%, best 88.9% (DGL)
 ```
-python entity_sample.py -d am --n-bases 40 --gpu 0 --fanout '35,35' --batch-size 64 --n-hidden 16 --use-self-loop --n-epochs=20 --dgl-sparse --lr 0.01  --sparse-lr 0.02 --dropout 0.7
+python entity_sample.py -d am --n-bases 40 --gpu 0 --fanout '35,35' --batch-size 64 --n-hidden 16 --use-self-loop --n-epochs=20 --dgl-sparse --sparse-lr 0.02 --dropout 0.7
 ```
 
 To use multiple GPUs, replace `entity_sample.py` with `entity_sample_multi_gpu.py` and specify
@@ -65,9 +65,9 @@ multiple GPU IDs separated by comma, e.g., `--gpu 0,1`.
 ### Link Prediction
 FB15k-237: MRR 0.151 (DGL), 0.158 (paper)
 ```
-python link.py -d FB15k-237 --gpu 0 --eval-protocol raw
+python link.py --gpu 0 --eval-protocol raw
 ```
 FB15k-237: Filtered-MRR 0.2044
 ```
-python link.py -d FB15k-237 --gpu 0 --eval-protocol filtered
+python link.py --gpu 0 --eval-protocol filtered
 ```
