@@ -137,7 +137,7 @@ def main(args):
             print("start eval")
             embed = model(test_graph, test_node_id)
             mrr = calc_mrr(embed, model.w_relation, torch.LongTensor(train_data),
-                           valid_data, test_data, eval_bz=500, eval_p=args.eval_protocol)
+                           valid_data, test_data, batch_size=500, eval_p=args.eval_protocol)
             # save best model
             if best_mrr < mrr:
                 best_mrr = mrr
