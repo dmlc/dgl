@@ -51,7 +51,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, queue=None):
     if args.dgl_sparse:
         all_params = list(model.parameters()) + list(embed_layer.parameters())
         optimizer = th.optim.Adam(all_params, lr=1e-2, weight_decay=args.l2norm)
-        emb_optimizer = dgl.optim.SparseAdam(params=embed_layer.module.dgl_emb,
+        emb_optimizer = dgl.optim.SparseAdam(params=embed_layer.dgl_emb,
                                              lr=args.sparse_lr, eps=1e-8)
     else:
         optimizer = th.optim.Adam(model.parameters(), lr=1e-2, weight_decay=args.l2norm)
