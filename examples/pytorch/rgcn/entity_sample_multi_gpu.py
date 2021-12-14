@@ -63,6 +63,21 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, queue=None):
         embs = list(embed_layer.module.node_embeds.parameters())
         emb_optimizer = th.optim.SparseAdam(embs, lr=args.sparse_lr)
 
+    def collect_eval():
+        eval_logits = []
+        eval_seeds = []
+        for _ in range(n_gpus):
+            eval_l, eval_s = queue.get()
+            eval_logits.append(eval_l)
+            eval_seeds.append(eval_s)
+        eval_logits = th.cat(eval_logits)
+        eval_seeds = th.cat(eval_seeds)
+        eval_loss = F.cross_entropy(eval_logits, labels[eval_seeds].cpu()).item()
+        eval_acc = th.mean(
+            (eval_logits.argmax(dim=1) == labels[eval_seeds].cpu()).float()).item()
+
+        return eval_loss, eval_acc
+
     th.set_num_threads(n_cpus)
     for epoch in range(args.n_epochs):
         train_loader.set_epoch(epoch)
@@ -75,21 +90,6 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, queue=None):
 
         gc.collect()
 
-        def collect_eval():
-            eval_logits = []
-            eval_seeds = []
-            for _ in range(n_gpus):
-                eval_l, eval_s = queue.get()
-                eval_logits.append(eval_l)
-                eval_seeds.append(eval_s)
-            eval_logits = th.cat(eval_logits)
-            eval_seeds = th.cat(eval_seeds)
-            eval_loss = F.cross_entropy(eval_logits, labels[eval_seeds].cpu()).item()
-            eval_acc = th.mean(
-                (eval_logits.argmax(dim=1) == labels[eval_seeds].cpu()).float()).item()
-
-            return eval_loss, eval_acc
-
         val_logits, val_seeds = evaluate(device, model, embed_layer, val_loader, inv_target)
         queue.put((val_logits, val_seeds))
 
@@ -99,7 +99,6 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, queue=None):
             print("Validation Accuracy: {:.4f} | Validation loss: {:.4f}".format(
                 val_acc, val_loss))
 
-    gc.collect()
     test_logits, test_seeds = evaluate(device, model, embed_layer, test_loader, inv_target)
     queue.put((test_logits, test_seeds))
     if proc_id == 0:
