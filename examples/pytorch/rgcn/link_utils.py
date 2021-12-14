@@ -27,7 +27,7 @@ def get_adj_and_degrees(num_nodes, triplets):
     return adj_list, degrees
 
 def sample_edge_neighborhood(adj_list, degrees, n_triplets, sample_size):
-    """Sample edges by neighborhool expansion.
+    """Sample edges by neighborhood expansion.
 
     This guarantees that the sampled edges form a connected graph, which
     may help deeper GNNs that require information from more than one hop.
@@ -40,6 +40,7 @@ def sample_edge_neighborhood(adj_list, degrees, n_triplets, sample_size):
     seen = np.array([False for _ in degrees])
 
     for i in range(0, sample_size):
+        # Sample nodes already visited if possible
         weights = sample_counts * seen
 
         if np.sum(weights) == 0:
@@ -49,13 +50,16 @@ def sample_edge_neighborhood(adj_list, degrees, n_triplets, sample_size):
         probabilities = (weights) / np.sum(weights)
         chosen_vertex = np.random.choice(np.arange(degrees.shape[0]),
                                          p=probabilities)
+        # Get adj_list of the sampled node
         chosen_adj_list = adj_list[chosen_vertex]
         seen[chosen_vertex] = True
 
+        # Sample an edge connected to the sampled node
         chosen_edge = np.random.choice(np.arange(chosen_adj_list.shape[0]))
         chosen_edge = chosen_adj_list[chosen_edge]
         edge_number = chosen_edge[0]
 
+        # Sample without replacement
         while picked[edge_number]:
             chosen_edge = np.random.choice(np.arange(chosen_adj_list.shape[0]))
             chosen_edge = chosen_adj_list[chosen_edge]
@@ -70,25 +74,23 @@ def sample_edge_neighborhood(adj_list, degrees, n_triplets, sample_size):
 
     return edges
 
-def sample_edge_uniform(adj_list, degrees, n_triplets, sample_size):
+def sample_edge_uniform(n_triplets, sample_size):
     """Sample edges uniformly from all the edges."""
     all_edges = np.arange(n_triplets)
     return np.random.choice(all_edges, sample_size, replace=False)
 
-def generate_sampled_graph_and_labels(triplets, sample_size, split_size,
-                                      num_rels, adj_list, degrees,
-                                      negative_rate, sampler="uniform"):
+def generate_sampled_graph_and_labels(triplets, num_rels, adj_list, degrees,
+                                      sampler, sample_size, split_size,
+                                      negative_rate):
     """Get training graph and signals
     First perform edge neighborhood sampling on graph, then perform negative
     sampling to generate negative samples
     """
     # perform edge neighbor sampling
     if sampler == "uniform":
-        edges = sample_edge_uniform(adj_list, degrees, len(triplets), sample_size)
+        edges = sample_edge_uniform(len(triplets), sample_size)
     elif sampler == "neighbor":
         edges = sample_edge_neighborhood(adj_list, degrees, len(triplets), sample_size)
-    else:
-        raise ValueError("Sampler type must be either 'uniform' or 'neighbor'.")
 
     # relabel nodes to have consecutive node ids
     edges = triplets[edges]
@@ -119,25 +121,23 @@ def generate_sampled_graph_and_labels(triplets, sample_size, split_size,
 
 def comp_deg_norm(g):
     g = g.local_var()
-    in_deg = g.in_degrees(range(g.number_of_nodes())).float().numpy()
+    in_deg = g.in_degrees(range(g.num_nodes())).float()
     norm = 1.0 / in_deg
-    norm[np.isinf(norm)] = 0
-    return norm
+    norm[torch.isinf(norm)] = 0
+    return norm.unsqueeze(-1)
 
 def build_graph_from_triplets(num_nodes, num_rels, triplets):
     """ Create a DGL graph. The graph is bidirectional because RGCN authors
         use reversed relations.
         This function also generates edge type and normalization factor
-        (reciprocal of node incoming degree)
+        (reciprocal of node in-degree)
     """
-    g = dgl.graph(([], []))
-    g.add_nodes(num_nodes)
     src, rel, dst = triplets
     src, dst = np.concatenate((src, dst)), np.concatenate((dst, src))
     rel = np.concatenate((rel, rel + num_rels))
     edges = sorted(zip(dst, src, rel))
     dst, src, rel = np.array(edges).transpose()
-    g.add_edges(src, dst)
+    g = dgl.graph((src, dst), num_nodes=num_nodes)
     norm = comp_deg_norm(g)
     print("# nodes: {}, # edges: {}".format(num_nodes, len(src)))
     return g, rel.astype('int64'), norm.astype('int64')
