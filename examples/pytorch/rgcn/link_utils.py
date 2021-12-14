@@ -241,7 +241,7 @@ def perturb_and_get_filtered_rank(emb, w, s, r, o, test_size, triplets_to_filter
         ranks.append(rank)
     return torch.LongTensor(ranks)
 
-def calc_mrr(emb, w, train_triplets, valid_triplets, test_triplets, batch_size, filter=False):
+def _calc_mrr(emb, w, train_triplets, valid_triplets, test_triplets, batch_size, filter=False):
     with torch.no_grad():
         s = test_triplets[:, 0]
         r = test_triplets[:, 1]
@@ -277,8 +277,8 @@ def calc_mrr(emb, w, train_triplets, valid_triplets, test_triplets, batch_size, 
 def calc_mrr(embedding, w, train_triplets, valid_triplets,
              test_triplets, batch_size=100, eval_p="filtered"):
     if eval_p == "filtered":
-        mrr = calc_mrr(embedding, w, train_triplets, valid_triplets,
-                       test_triplets, batch_size, filter=True)
+        mrr = _calc_mrr(embedding, w, train_triplets, valid_triplets,
+                        test_triplets, batch_size, filter=True)
     else:
-        mrr = calc_mrr(embedding, w, train_triplets, valid_triplets, test_triplets, batch_size)
+        mrr = _calc_mrr(embedding, w, train_triplets, valid_triplets, test_triplets, batch_size)
     return mrr
