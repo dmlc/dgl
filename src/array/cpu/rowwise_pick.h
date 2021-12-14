@@ -8,6 +8,7 @@
 
 #include <dgl/array.h>
 #include <dmlc/omp.h>
+#include <dgl/runtime/parallel_for.h>
 #include <functional>
 #include <algorithm>
 #include <string>
@@ -56,13 +57,14 @@ using PickFn = std::function<void(
 //
 // \param off Starting offset of this row.
 // \param et_offset Starting offset of this range.
+// \param cur_et The edge type.
 // \param et_len Length of the range.
 // \param et_idx A map from local idx to column id.
 // \param data Pointer of the data indices.
 // \param out_idx Picked indices in [et_offset, et_offset + et_len).
 template <typename IdxType>
 using RangePickFn = std::function<void(
-    IdxType off, IdxType et_offset, IdxType et_len,
+    IdxType off, IdxType et_offset, IdxType cur_et, IdxType et_len,
     const std::vector<IdxType> &et_idx, const IdxType* data,
     IdxType* out_idx)>;
 
@@ -196,123 +198,138 @@ COOMatrix CSRRowWisePick(CSRMatrix mat, IdArray rows,
 // OpenMP parallelization on rows because each row performs computation independently.
 template <typename IdxType>
 COOMatrix CSRRowWisePerEtypePick(CSRMatrix mat, IdArray rows, IdArray etypes,
-                                 int64_t num_picks, bool replace, bool etype_sorted,
-                                 RangePickFn<IdxType> pick_fn) {
+                                 const std::vector<int64_t>& num_picks, bool replace,
+                                 bool etype_sorted, RangePickFn<IdxType> pick_fn) {
   using namespace aten;
-  const IdxType* indptr = static_cast<IdxType*>(mat.indptr->data);
-  const IdxType* indices = static_cast<IdxType*>(mat.indices->data);
-  const IdxType* data = CSRHasData(mat)? static_cast<IdxType*>(mat.data->data) : nullptr;
-  const IdxType* rows_data = static_cast<IdxType*>(rows->data);
-  const int32_t* etype_data = static_cast<int32_t*>(etypes->data);
+  const IdxType* indptr = mat.indptr.Ptr<IdxType>();
+  const IdxType* indices = mat.indices.Ptr<IdxType>();
+  const IdxType* data = CSRHasData(mat)? mat.data.Ptr<IdxType>() : nullptr;
+  const IdxType* rows_data = rows.Ptr<IdxType>();
+  const int32_t* etype_data = etypes.Ptr<int32_t>();
   const int64_t num_rows = rows->shape[0];
   const auto& ctx = mat.indptr->ctx;
-  CHECK_EQ(etypes->dtype.bits / 8, sizeof(int32_t));
+  const int64_t num_etypes = num_picks.size();
+  CHECK_EQ(etypes->dtype.bits / 8, sizeof(int32_t)) << "etypes must be int32";
   std::vector<IdArray> picked_rows(rows->shape[0]);
   std::vector<IdArray> picked_cols(rows->shape[0]);
   std::vector<IdArray> picked_idxs(rows->shape[0]);
 
-#pragma omp parallel for
-  for (int64_t i = 0; i < num_rows; ++i) {
-    const IdxType rid = rows_data[i];
-    CHECK_LT(rid, mat.num_rows);
-    const IdxType off = indptr[rid];
-    const IdxType len = indptr[rid + 1] - off;
-
-    // do something here
-    if (len == 0) {
-      picked_rows[i] = NewIdArray(0, ctx, sizeof(IdxType) * 8);
-      picked_cols[i] = NewIdArray(0, ctx, sizeof(IdxType) * 8);
-      picked_idxs[i] = NewIdArray(0, ctx, sizeof(IdxType) * 8);
-      continue;
+  // Check if the number of picks have the same value.
+  // If so, we can potentially speed up if we have a node with total number of neighbors
+  // less than the given number of picks with replace=False.
+  bool same_num_pick = true;
+  int64_t num_pick_value = num_picks[0];
+  for (int64_t num_pick : num_picks) {
+    if (num_pick_value != num_pick) {
+      same_num_pick = false;
+      break;
     }
+  }
 
-    // fast path
-    if (len <= num_picks && !replace) {
-      IdArray rows = Full(rid, len, sizeof(IdxType) * 8, ctx);
-      IdArray cols = Full(-1, len, sizeof(IdxType) * 8, ctx);
-      IdArray idx = Full(-1, len, sizeof(IdxType) * 8, ctx);
-      IdxType* cdata = static_cast<IdxType*>(cols->data);
-      IdxType* idata = static_cast<IdxType*>(idx->data);
-      for (int64_t j = 0; j < len; ++j) {
-        cdata[j] = indices[off + j];
-        idata[j] = data ? data[off + j] : off + j;
+  runtime::parallel_for(0, num_rows, [&](size_t b, size_t e) {
+    for (int64_t i = b; i < e; ++i) {
+      const IdxType rid = rows_data[i];
+      CHECK_LT(rid, mat.num_rows);
+      const IdxType off = indptr[rid];
+      const IdxType len = indptr[rid + 1] - off;
+
+      // do something here
+      if (len == 0) {
+        picked_rows[i] = NewIdArray(0, ctx, sizeof(IdxType) * 8);
+        picked_cols[i] = NewIdArray(0, ctx, sizeof(IdxType) * 8);
+        picked_idxs[i] = NewIdArray(0, ctx, sizeof(IdxType) * 8);
+        continue;
       }
-      picked_rows[i] = rows;
-      picked_cols[i] = cols;
-      picked_idxs[i] = idx;
-    } else {
-      // need to do per edge type sample
-      std::vector<IdxType> rows;
-      std::vector<IdxType> cols;
-      std::vector<IdxType> idx;
 
-      std::vector<IdxType> et(len);
-      std::vector<IdxType> et_idx(len);
-      std::iota(et_idx.begin(), et_idx.end(), 0);
-      for (int64_t j = 0; j < len; ++j) {
-        et[j] = data ? etype_data[data[off+j]] : etype_data[off+j];
-      }
-      if (!etype_sorted)  // the edge type is sorted, not need to sort it
-        std::sort(et_idx.begin(), et_idx.end(),
-                  [&et](IdxType i1, IdxType i2) {return et[i1] < et[i2];});
-
-      IdxType cur_et = et[et_idx[0]];
-      int64_t et_offset = 0;
-      int64_t et_len = 1;
-      for (int64_t j = 0; j < len; ++j) {
-        if ((j+1 == len) || cur_et != et[et_idx[j+1]]) {
-          // 1 end of the current etype
-          // 2 end of the row
-          // random pick for current etype
-          if (et_len <= num_picks && !replace) {
-            // fast path, select all
-            for (int64_t k = 0; k < et_len; ++k) {
-              rows.push_back(rid);
-              cols.push_back(indices[off+et_idx[et_offset+k]]);
-              if (data)
-                idx.push_back(data[off+et_idx[et_offset+k]]);
-              else
-                idx.push_back(off+et_idx[et_offset+k]);
-            }
-          } else {
-            IdArray picked_idx = Full(-1, num_picks, sizeof(IdxType) * 8, ctx);
-            IdxType* picked_idata = static_cast<IdxType*>(picked_idx->data);
-
-            // need call random pick
-            pick_fn(off, et_offset,
-                    et_len, et_idx,
-                    data, picked_idata);
-            for (int64_t k = 0; k < num_picks; ++k) {
-              const IdxType picked = picked_idata[k];
-              rows.push_back(rid);
-              cols.push_back(indices[off+et_idx[et_offset+picked]]);
-              if (data)
-                idx.push_back(data[off+et_idx[et_offset+picked]]);
-              else
-                idx.push_back(off+et_idx[et_offset+picked]);
-            }
-          }
-
-          if (j+1 == len)
-            break;
-          // next etype
-          cur_et = et[et_idx[j+1]];
-          et_offset = j+1;
-          et_len = 1;
-        } else {
-          et_len++;
+      // fast path
+      if (same_num_pick && len <= num_pick_value && !replace) {
+        IdArray rows = Full(rid, len, sizeof(IdxType) * 8, ctx);
+        IdArray cols = Full(-1, len, sizeof(IdxType) * 8, ctx);
+        IdArray idx = Full(-1, len, sizeof(IdxType) * 8, ctx);
+        IdxType* cdata = cols.Ptr<IdxType>();
+        IdxType* idata = idx.Ptr<IdxType>();
+        for (int64_t j = 0; j < len; ++j) {
+          cdata[j] = indices[off + j];
+          idata[j] = data ? data[off + j] : off + j;
         }
-      }
+        picked_rows[i] = rows;
+        picked_cols[i] = cols;
+        picked_idxs[i] = idx;
+      } else {
+        // need to do per edge type sample
+        std::vector<IdxType> rows;
+        std::vector<IdxType> cols;
+        std::vector<IdxType> idx;
 
-      picked_rows[i] = VecToIdArray(rows, sizeof(IdxType) * 8, ctx);
-      picked_cols[i] = VecToIdArray(cols, sizeof(IdxType) * 8, ctx);
-      picked_idxs[i] = VecToIdArray(idx, sizeof(IdxType) * 8, ctx);
-    }  // end processing one row
+        std::vector<IdxType> et(len);
+        std::vector<IdxType> et_idx(len);
+        std::iota(et_idx.begin(), et_idx.end(), 0);
+        for (int64_t j = 0; j < len; ++j) {
+          et[j] = data ? etype_data[data[off+j]] : etype_data[off+j];
+        }
+        if (!etype_sorted)  // the edge type is sorted, not need to sort it
+          std::sort(et_idx.begin(), et_idx.end(),
+                    [&et](IdxType i1, IdxType i2) {return et[i1] < et[i2];});
+        CHECK(et[et_idx[len - 1]] < num_etypes) <<
+          "etype values exceed the number of fanouts";
 
-    CHECK_EQ(picked_rows[i]->shape[0], picked_cols[i]->shape[0]);
-    CHECK_EQ(picked_rows[i]->shape[0], picked_idxs[i]->shape[0]);
-  }  // end processing all rows
+        IdxType cur_et = et[et_idx[0]];
+        int64_t et_offset = 0;
+        int64_t et_len = 1;
+        for (int64_t j = 0; j < len; ++j) {
+          if ((j+1 == len) || cur_et != et[et_idx[j+1]]) {
+            // 1 end of the current etype
+            // 2 end of the row
+            // random pick for current etype
+            if (et_len <= num_picks[cur_et] && !replace) {
+              // fast path, select all
+              for (int64_t k = 0; k < et_len; ++k) {
+                rows.push_back(rid);
+                cols.push_back(indices[off+et_idx[et_offset+k]]);
+                if (data)
+                  idx.push_back(data[off+et_idx[et_offset+k]]);
+                else
+                  idx.push_back(off+et_idx[et_offset+k]);
+              }
+            } else {
+              IdArray picked_idx = Full(-1, num_picks[cur_et], sizeof(IdxType) * 8, ctx);
+              IdxType* picked_idata = static_cast<IdxType*>(picked_idx->data);
 
+              // need call random pick
+              pick_fn(off, et_offset, cur_et,
+                      et_len, et_idx,
+                      data, picked_idata);
+              for (int64_t k = 0; k < num_picks[cur_et]; ++k) {
+                const IdxType picked = picked_idata[k];
+                rows.push_back(rid);
+                cols.push_back(indices[off+et_idx[et_offset+picked]]);
+                if (data)
+                  idx.push_back(data[off+et_idx[et_offset+picked]]);
+                else
+                  idx.push_back(off+et_idx[et_offset+picked]);
+              }
+            }
+
+            if (j+1 == len)
+              break;
+            // next etype
+            cur_et = et[et_idx[j+1]];
+            et_offset = j+1;
+            et_len = 1;
+          } else {
+            et_len++;
+          }
+        }
+
+        picked_rows[i] = VecToIdArray(rows, sizeof(IdxType) * 8, ctx);
+        picked_cols[i] = VecToIdArray(cols, sizeof(IdxType) * 8, ctx);
+        picked_idxs[i] = VecToIdArray(idx, sizeof(IdxType) * 8, ctx);
+      }  // end processing one row
+
+      CHECK_EQ(picked_rows[i]->shape[0], picked_cols[i]->shape[0]);
+      CHECK_EQ(picked_rows[i]->shape[0], picked_idxs[i]->shape[0]);
+    }  // end processing all rows
+  });
 
   IdArray picked_row = Concat(picked_rows);
   IdArray picked_col = Concat(picked_cols);
@@ -342,8 +359,8 @@ COOMatrix COORowWisePick(COOMatrix mat, IdArray rows,
 // row-wise pick on the CSR matrix and rectifies the returned results.
 template <typename IdxType>
 COOMatrix COORowWisePerEtypePick(COOMatrix mat, IdArray rows, IdArray etypes,
-                                 int64_t num_picks, bool replace, bool etype_sorted,
-                                 RangePickFn<IdxType> pick_fn) {
+                                 const std::vector<int64_t>& num_picks, bool replace,
+                                 bool etype_sorted, RangePickFn<IdxType> pick_fn) {
   using namespace aten;
   const auto& csr = COOToCSR(COOSliceRows(mat, rows));
   const IdArray new_rows = Range(0, rows->shape[0], rows->dtype.bits, rows->ctx);

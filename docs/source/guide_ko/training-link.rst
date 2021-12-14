@@ -5,7 +5,7 @@
 
 :ref:`(English Version) <guide-training-link-prediction>`
 
-어떤 두 노드들 사이에 에지가 존재하는지 아닌지를 예측하고 싶은 경우가 있고, 이를 *링크 예측 과제*라고 한다.
+어떤 두 노드들 사이에 에지가 존재하는지 아닌지를 예측하고 싶은 경우가 있고, 이를 *링크 예측 과제* 라고 한다.
 
 개요
 ~~~~~~~~~
@@ -28,13 +28,11 @@ GNN 기반의 링크 예측 모델은 두 노드 :math:`u` 와 :math:`v` 간의 
 -  BPR loss:
    :math:`\mathcal{L} = \sum_{v_i \sim P_n(v), i=1,\dots,k} - \log \sigma (y_{u,v} - y_{u,v_i})`
 -  Margin loss:
-   :math:`\mathcal{L} = \sum_{v_i \sim P_n(v), i=1,\dots,k} \max(0, M - y_{u, v} + y_{u, v_i})`,
-   where :math:`M` is a constant hyperparameter.
-   여기서 :math:`M` 은 상수 하이퍼-파라메터이다.
+   :math:`\mathcal{L} = \sum_{v_i \sim P_n(v), i=1,\dots,k} \max(0, M - y_{u, v} + y_{u, v_i})`, 여기서 :math:`M` 은 상수 하이퍼-파라메터이다.
 
 `implicit feedback <https://arxiv.org/ftp/arxiv/papers/1205/1205.2618.pdf>`__ 이나 `noise-contrastive estimation <http://proceedings.mlr.press/v9/gutmann10a/gutmann10a.pdf>`__ 를 알고 있다면, 이 아이디어는 친숙할 것이다.
 
-:math:`u` 와 :math:`v` 사이의 점수를 계산하는 뉴럴 네트워크 모델은 :ref:`위에서 설명한 <guide-training-edge-classification>`  에지 리그레션 모델과 동일하다.
+:math:`u` 와 :math:`v` 사이의 점수를 계산하는 뉴럴 네트워크 모델은 :ref:`위에서 설명한 <guide_ko-training-edge-classification>`  에지 리그레션 모델과 동일하다.
 
 다음은 dot product를 사용해서 에지들의 점수를 계산하는 예제이다.
 
@@ -114,7 +112,7 @@ Heterogeneous 그래프들
 
 Heterogeneous 그래프에서의 링크 예측은 homogeneous 그래프에서의 링크 예측과 많이 다르지 않다. 다음 예제는 하나의 에지 타입에 대해서 예측을 수행한다고 가정하고 있는데, 이를 여러 에지 타입으로 확장하는 것은 쉽다.
 
-링크 예측을 위해서 :ref:`앞에서 <guide-training-edge-classification-heterogeneous-graph>` 의 ``HeteroDotProductPredictor`` 를 재활용해서 한 에지 타입에 대한 에지의 점수를 계산할 수 있다.
+링크 예측을 위해서 :ref:`앞에서 <guide_ko-training-edge-classification-heterogeneous-graph>` 의 ``HeteroDotProductPredictor`` 를 재활용해서 한 에지 타입에 대한 에지의 점수를 계산할 수 있다.
 
 .. code:: python
 

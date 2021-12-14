@@ -81,7 +81,7 @@
             pass
 
 :class:`~dgl.data.DGLDataset` 클래스에는 서브클래스에서 꼭 구현되어야 하는 함수들 ``process()`` ,
-``__getitem__(idx)`` 와 ``__len__()`` 이 있다. 또한 DGL은 저장과 로딩을 구현하는 것을 권장하는데, 그 이유는 큰 데이터셋 처리 시간을 많이 줄일 수 있고, 이를 쉽게 구현하는데 필요한 API들이 있기 때문이다. (:ref:`guide-data-pipeline-savenload` 참고)
+``__getitem__(idx)`` 와 ``__len__()`` 이 있다. 또한 DGL은 저장과 로딩을 구현하는 것을 권장하는데, 그 이유는 큰 데이터셋 처리 시간을 많이 줄일 수 있고, 이를 쉽게 구현하는데 필요한 API들이 있기 때문이다. (:ref:`guide_ko-data-pipeline-savenload` 참고)
 
 :class:`~dgl.data.DGLDataset` 의 목적은 그래프 데이터 로드에 필요한 편리하고 표준적인 방법을 제공하는 것이다. 그래프, 피쳐, 레이블, 그리고 데이터셋에 대한 기본적인 정보 (클래스 개수, 레이블 개수 등)을 저장할 수 있다. 샘플링, 파티셔닝 또는 파쳐 normalization과 같은 작업은 :class:`~dgl.data.DGLDataset` 의 서브클래스 밖에서 수행된다.
 
