@@ -102,7 +102,7 @@ DGL이 여러 이웃 샘플링 방법들을 제공하지만, 샘플링 방법을
 
 전체 구현은 :ref:`api-subgraph-extraction` 와 :ref:`api-sampling` 를 참고하자.
 
-기술적으로는 원본 그래프와 같은 노들들 집합을 잡는 어떤 그래프도 프로티어가 될 수 있다. 이는 :ref:`guide-minibatch-customizing-neighborhood-sampler-impl` 에 대한 기반이다.
+기술적으로는 원본 그래프와 같은 노들들 집합을 잡는 어떤 그래프도 프로티어가 될 수 있다. 이는 :ref:`guide_ko-minibatch-customizing-neighborhood-sampler-impl` 에 대한 기반이다.
 
 멀티-레이어 미니배치 메시지 전달을 위한 이분 구조(Bipartite Structure)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -213,7 +213,7 @@ MFG들은 heterogeneous 그래프에도 적용됩니다. 다음 프론티어를 
     print(hetero_block.dstnodes['user'].data[dgl.NID], hetero_block.dstnodes['game'].data[dgl.NID])
 
 
-.. _guide-minibatch-customizing-neighborhood-sampler-impl:
+.. _guide_ko-minibatch-customizing-neighborhood-sampler-impl:
 
 커스텀 이웃 샘플러 구현하기
 ~~~~~~~~~~~~~~~~~~~~
