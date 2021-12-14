@@ -12,7 +12,7 @@ import torch.nn.functional as F
 
 from dgl.data.knowledge_graph import load_data
 
-from link_utils import build_test_graph, get_adj_and_degrees, generate_sampled_graph_and_labels, calc_mrr
+from link_utils import build_test_graph, get_adj_and_degrees, sample_subgraph, calc_mrr
 from model import RGCN
 
 class LinkPredict(nn.Module):
@@ -34,12 +34,12 @@ class LinkPredict(nn.Module):
         return score
 
     def forward(self, g, h, r, norm):
-        return self.rgcn.forward(g, h, r, norm)
+        return self.rgcn(g, h, r, norm)
 
     def regularization_loss(self, embedding):
         return torch.mean(embedding.pow(2)) + torch.mean(self.w_relation.pow(2))
 
-    def get_loss(self, g, embed, triplets, labels):
+    def get_loss(self, embed, triplets, labels):
         # triplets is a list of data samples (positive and negative)
         # each row in the triplets is a 3-tuple of (source, relation, destination)
         score = self.calc_score(embed, triplets)
@@ -92,23 +92,21 @@ def main(args):
 
     model_state_file = 'model_state.pth'
 
-    epoch = 0
     best_mrr = 0
-    while True:
+    for epoch in range(6000):
         model.train()
-        epoch += 1
 
         # perform edge neighborhood sampling to generate training graph and data
-        g, node_id, edge_type, node_norm, data, labels = generate_sampled_graph_and_labels(
+        g, node_id, edge_type, node_norm, data, labels = sample_subgraph(
             train_data, num_rels, adj_list, degrees, args.edge_sampler,
             sample_size=30000, split_size=0.5, negative_rate=10)
 
         # set node/edge feature
         node_id = torch.from_numpy(node_id).view(-1, 1).long()
         edge_type = torch.from_numpy(edge_type)
-        edge_norm = node_norm_to_edge(g, torch.from_numpy(node_norm).view(-1, 1))
+        edge_norm = node_norm_to_edge(g, node_norm)
         data, labels = torch.from_numpy(data), torch.from_numpy(labels)
-        deg = g.in_degrees(range(g.number_of_nodes())).float().view(-1, 1)
+        deg = g.in_degrees(range(g.num_nodes())).float().view(-1, 1)
         if use_cuda:
             node_id, deg = node_id.cuda(), deg.cuda()
             edge_type, edge_norm = edge_type.cuda(), edge_norm.cuda()
@@ -116,44 +114,35 @@ def main(args):
             g = g.to(args.gpu)
 
         embed = model(g, node_id, edge_type, edge_norm)
-        loss = model.get_loss(g, embed, data, labels)
+        loss = model.get_loss(embed, data, labels)
+        optimizer.zero_grad()
         loss.backward()
         nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0) # clip gradients
         optimizer.step()
 
         print("Epoch {:04d} | Loss {:.4f} | Best MRR {:.4f}".format(epoch, loss.item(), best_mrr))
 
-        optimizer.zero_grad()
-
         # validation
         if epoch % 500 == 0:
             # perform validation on CPU because full graph is too large
-            if use_cuda:
-                model.cpu()
+            model = model.cpu()
             model.eval()
             print("start eval")
             embed = model(test_graph, test_node_id, test_rel, test_norm)
             mrr = calc_mrr(embed, model.w_relation, torch.LongTensor(train_data),
-                           valid_data, test_data, hits=[1, 3, 10], eval_bz=500,
-                           eval_p=args.eval_protocol)
+                           valid_data, test_data, eval_bz=500, eval_p=args.eval_protocol)
             # save best model
             if best_mrr < mrr:
                 best_mrr = mrr
                 torch.save({'state_dict': model.state_dict(), 'epoch': epoch}, model_state_file)
 
-            if epoch >= 6000:
-                break
-
             if use_cuda:
-                model.cuda()
+                model = model.cuda()
 
-    print("training done")
-
-    print("\nstart testing:")
+    print("Start testing:")
     # use best model checkpoint
     checkpoint = torch.load(model_state_file)
-    if use_cuda:
-        model.cpu() # test on CPU
+    model = model.cpu() # test on CPU
     model.eval()
     model.load_state_dict(checkpoint['state_dict'])
     print("Using best epoch: {}".format(checkpoint['epoch']))

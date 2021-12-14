@@ -79,9 +79,8 @@ def sample_edge_uniform(n_triplets, sample_size):
     all_edges = np.arange(n_triplets)
     return np.random.choice(all_edges, sample_size, replace=False)
 
-def generate_sampled_graph_and_labels(triplets, num_rels, adj_list, degrees,
-                                      sampler, sample_size, split_size,
-                                      negative_rate):
+def sample_subgraph(triplets, num_rels, adj_list, degrees,
+                    sampler, sample_size, split_size, negative_rate):
     """Get training graph and signals
     First perform edge neighborhood sampling on graph, then perform negative
     sampling to generate negative samples
@@ -95,6 +94,7 @@ def generate_sampled_graph_and_labels(triplets, num_rels, adj_list, degrees,
     # relabel nodes to have consecutive node ids
     edges = triplets[edges]
     src, rel, dst = edges.transpose()
+    # edges is the concatenation of src, dst with relabeled ID
     uniq_v, edges = np.unique((src, dst), return_inverse=True)
     src, dst = np.reshape(edges, (2, -1))
     relabeled_edges = np.stack((src, rel, dst)).transpose()
@@ -151,6 +151,7 @@ def negative_sampling(pos_samples, num_entity, negative_rate):
     size_of_batch = len(pos_samples)
     num_to_generate = size_of_batch * negative_rate
     neg_samples = np.tile(pos_samples, (negative_rate, 1))
+    # binary labels indicating positive and negative samples
     labels = np.zeros(size_of_batch * (negative_rate + 1), dtype=np.float32)
     labels[: size_of_batch] = 1
     values = np.random.randint(num_entity, size=num_to_generate)
@@ -197,7 +198,7 @@ def perturb_and_get_raw_rank(embedding, w, a, r, b, test_size, batch_size=100):
     return torch.cat(ranks)
 
 # return MRR (raw), and Hits @ (1, 3, 10)
-def calc_raw_mrr(embedding, w, test_triplets, hits=[], eval_bz=100):
+def calc_raw_mrr(embedding, w, test_triplets, eval_bz=100):
     with torch.no_grad():
         s = test_triplets[:, 0]
         r = test_triplets[:, 1]
@@ -215,9 +216,6 @@ def calc_raw_mrr(embedding, w, test_triplets, hits=[], eval_bz=100):
         mrr = torch.mean(1.0 / ranks.float())
         print("MRR (raw): {:.6f}".format(mrr.item()))
 
-        for hit in hits:
-            avg_count = torch.mean((ranks <= hit).float())
-            print("Hits (raw) @ {}: {:.6f}".format(hit, avg_count.item()))
     return mrr.item()
 
 #######################################################################
@@ -296,7 +294,7 @@ def perturb_s_and_get_filtered_rank(embedding, w, s, r, o, test_size, triplets_t
         ranks.append(rank)
     return torch.LongTensor(ranks)
 
-def calc_filtered_mrr(embedding, w, train_triplets, valid_triplets, test_triplets, hits=[]):
+def calc_filtered_mrr(embedding, w, train_triplets, valid_triplets, test_triplets):
     with torch.no_grad():
         s = test_triplets[:, 0]
         r = test_triplets[:, 1]
@@ -316,9 +314,6 @@ def calc_filtered_mrr(embedding, w, train_triplets, valid_triplets, test_triplet
         mrr = torch.mean(1.0 / ranks.float())
         print("MRR (filtered): {:.6f}".format(mrr.item()))
 
-        for hit in hits:
-            avg_count = torch.mean((ranks <= hit).float())
-            print("Hits (filtered) @ {}: {:.6f}".format(hit, avg_count.item()))
     return mrr.item()
 
 #######################################################################
@@ -327,9 +322,9 @@ def calc_filtered_mrr(embedding, w, train_triplets, valid_triplets, test_triplet
 #
 #######################################################################
 
-def calc_mrr(embedding, w, train_triplets, valid_triplets, test_triplets, hits=[], eval_bz=100, eval_p="filtered"):
+def calc_mrr(embedding, w, train_triplets, valid_triplets, test_triplets, eval_bz=100, eval_p="filtered"):
     if eval_p == "filtered":
-        mrr = calc_filtered_mrr(embedding, w, train_triplets, valid_triplets, test_triplets, hits)
+        mrr = calc_filtered_mrr(embedding, w, train_triplets, valid_triplets, test_triplets)
     else:
-        mrr = calc_raw_mrr(embedding, w, test_triplets, hits, eval_bz)
+        mrr = calc_raw_mrr(embedding, w, test_triplets, eval_bz)
     return mrr
