@@ -39,17 +39,14 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, queue=None):
         args, g, train_idx, test_idx, target_idx, dev_id, n_gpus)
     embed_layer, model = init_models(args, device, node_feats, num_classes, num_rels)
 
-    if n_gpus > 1:
-        labels = labels.to(device)
-        model = model.to(device)
-        model = DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id)
-        if args.dgl_sparse:
-            embed_layer.cuda(dev_id)
-            if len(list(embed_layer.parameters())) > 0:
-                embed_layer = DistributedDataParallel(embed_layer, device_ids=[dev_id], output_device=dev_id)
-        else:
-            if len(list(embed_layer.parameters())) > 0:
-                embed_layer = DistributedDataParallel(embed_layer, device_ids=None, output_device=None)
+    labels = labels.to(device)
+    model = model.to(device)
+    model = DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id)
+    if args.dgl_sparse:
+        embed_layer.cuda(dev_id)
+        embed_layer = DistributedDataParallel(embed_layer, device_ids=[dev_id], output_device=dev_id)
+    else:
+        embed_layer = DistributedDataParallel(embed_layer, device_ids=None, output_device=None)
 
     # optimizer
     if args.dgl_sparse:
@@ -58,8 +55,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, queue=None):
         emb_optimizer = dgl.optim.SparseAdam(params=embed_layer.module.dgl_emb,
                                              lr=args.sparse_lr, eps=1e-8)
     else:
-        dense_params = list(model.parameters())
-        optimizer = th.optim.Adam(dense_params, lr=1e-2, weight_decay=args.l2norm)
+        optimizer = th.optim.Adam(model.parameters(), lr=1e-2, weight_decay=args.l2norm)
         embs = list(embed_layer.module.node_embeds.parameters())
         emb_optimizer = th.optim.SparseAdam(embs, lr=args.sparse_lr)
 
