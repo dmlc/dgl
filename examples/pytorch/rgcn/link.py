@@ -11,7 +11,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import dgl
 
-from dgl.data.knowledge_graph import load_data
+from dgl.data.knowledge_graph import FB15k237Dataset
 
 from link_utils import build_test_graph, get_adj_and_degrees, sample_subgraph, calc_mrr
 from model import RGCN
@@ -62,7 +62,7 @@ def get_subset(g, mask):
     return torch.stack([src, rel, dst], dim=1).numpy()
 
 def main(args):
-    data = load_data('FB15k-237')
+    data = FB15k237Dataset(reverse=False)
     graph = data[0]
     num_nodes = graph.num_nodes()
     train_data = get_subset(graph, graph.edata['train_mask'])
@@ -155,7 +155,7 @@ def main(args):
     print("Using best epoch: {}".format(checkpoint['epoch']))
     embed = model(test_graph, test_node_id)
     calc_mrr(embed, model.w_relation, torch.LongTensor(train_data), valid_data,
-             test_data, hits=[1, 3, 10], batch_size=500, eval_p=args.eval_protocol)
+             test_data, batch_size=500, eval_p=args.eval_protocol)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='RGCN for link prediction')
