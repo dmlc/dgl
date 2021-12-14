@@ -36,7 +36,7 @@ class RelGraphEmbed(nn.Module):
         self.g = g
         self.embed_size = embed_size
 
-        # create weight embeddings for each node for each relation
+        # create learnable embeddings for all nodes, except those with a node-type in the "exclude" list
         self.embeds = nn.ParameterDict()
         for ntype in g.ntypes:
             if ntype in exclude:
@@ -332,7 +332,7 @@ def prepare_data(args):
                 # Original edges
                 relations[metapath] = (src, dst)
 
-                reverse_metapath = (metapath[2], 'rev-' + metapath[1], metapath[0])
+                reverse_metapath = (dst_ntype, 'rev-' + rel_type, src_ntype)
                 relations[reverse_metapath] = (dst, src)           # Reverse edges
 
         new_g = dgl.heterograph(relations, num_nodes_dict=num_nodes_dict)
@@ -355,7 +355,7 @@ def prepare_data(args):
     sampler = dgl.dataloading.MultiLayerNeighborSampler(args['fanout'])
     train_loader = dgl.dataloading.NodeDataLoader(
         g, split_idx['train'], sampler,
-        batch_size=args['batch_size'], shuffle=True, num_workers=32)
+        batch_size=args['batch_size'], shuffle=True, num_workers=0)
     
     return (g, labels, dataset.num_classes, split_idx,  
             logger, train_loader)
@@ -383,9 +383,6 @@ def train(g, model, node_embed, optimizer, train_loader, split_idx,
     # training loop
     print("start training...")
     category = 'paper'
-    
-    if th.cuda.is_available():
-        model.cuda()
 
     for epoch in range(args['n_epochs']):
         N_train= split_idx['train'][category].shape[0]
@@ -444,7 +441,7 @@ def test(g, model, node_embed, y_true, device, split_idx, args):
     sampler = dgl.dataloading.MultiLayerFullNeighborSampler(args['num_layers'])
     loader = dgl.dataloading.NodeDataLoader(
         g, {'paper': th.arange(g.num_nodes('paper'))}, sampler,
-        batch_size=16384, shuffle=False, num_workers=32)
+        batch_size=16384, shuffle=False, num_workers=0)
     
     N = y_true.size(0)
     pbar = tqdm(total=N)
@@ -493,8 +490,8 @@ def test(g, model, node_embed, y_true, device, split_idx, args):
 def main(args):
     # Static parameters
     hyperparameters = dict(
-        num_layers = 2,
-        fanout = [25, 20], 
+        num_layers=2,
+        fanout=[25, 20], 
         batch_size=1024,
     )
     hyperparameters.update(vars(args))
