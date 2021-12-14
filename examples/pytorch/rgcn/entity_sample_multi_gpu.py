@@ -109,9 +109,8 @@ def main(args, devices):
         args.dataset, inv_target=True)
     node_feats = [hg.num_nodes(ntype) for ntype in hg.ntypes]
 
-    g.ndata[dgl.NTYPE].share_memory_()
-    g.edata[dgl.ETYPE].share_memory_()
-    g.ndata[dgl.NID].share_memory_()
+    g.ndata['ntype'].share_memory_()
+    g.ndata['type_id'].share_memory_()
     target_idx.share_memory_()
     train_idx.share_memory_()
     test_idx.share_memory_()
