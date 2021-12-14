@@ -4866,9 +4866,10 @@ class DGLHeteroGraph(object):
             _, dtid = self._graph.metagraph.find_edge(etid)
             g = self if etype is None else self[etype]
             ndata = core.message_passing(g, message_func, reduce_func, apply_node_func)
-            key = list(ndata.keys())[0]
-            # Replace infinity with zero for isolated nodes
-            ndata[key] = F.replace_inf_with_zero(ndata[key])
+            if ndata:
+                # Replace infinity with zero for isolated nodes
+                key = list(ndata.keys())[0]
+                ndata[key] = F.replace_inf_with_zero(ndata[key])
             self._set_n_repr(dtid, ALL, ndata)
         else:   # heterogeneous graph with number of relation types > 1
             if not core.is_builtin(message_func) or not core.is_builtin(reduce_func):
@@ -4888,7 +4889,7 @@ class DGLHeteroGraph(object):
             for _, _, dsttype in g.canonical_etypes:
                 dtid = g.get_ntype_id(dsttype)
                 dst_tensor[key] = out_tensor_tuples[dtid]
-                if reduce_func.name in ['min', 'max']:
+                if core.is_builtin(reduce_func) and reduce_func.name in ['min', 'max']:
                     dst_tensor[key] = F.replace_inf_with_zero(dst_tensor[key])
                 self._node_frames[dtid].update(dst_tensor)
 
@@ -4998,7 +4999,7 @@ class DGLHeteroGraph(object):
             # merge by cross_reducer
             out = reduce_dict_data(frames, cross_reducer, merge_order[dtid])
             # Replace infinity with zero for isolated nodes when reducer is min/max
-            if rfunc.name in ['min', 'max']:
+            if  core.is_builtin(rfunc) and rfunc.name in ['min', 'max']:
                 key = list(out.keys())[0]
                 out[key] = F.replace_inf_with_zero(out[key]) if out[key] is not None else None
             self._node_frames[dtid].update(out)
