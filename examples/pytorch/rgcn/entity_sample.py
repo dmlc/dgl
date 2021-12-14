@@ -105,7 +105,7 @@ def train(model, embed_layer, train_loader, inv_target,
         emb_optimizer.step()
         optimizer.step()
 
-        train_acc = th.mean(logits.argmax(dim=1) == labels[seeds]).item()
+        train_acc = th.mean((logits.argmax(dim=1) == labels[seeds]).float()).item()
 
     return train_acc, loss
 
@@ -180,13 +180,13 @@ def main(args):
 
         val_logits, val_seeds = evaluate(device, model, embed_layer, val_loader, inv_target)
         val_loss, val_acc = F.cross_entropy(val_logits, labels[val_seeds].cpu()).item(), \
-            th.mean(val_logits.argmax(dim=1) == labels[val_seeds].cpu()).item()
+            th.mean((val_logits.argmax(dim=1) == labels[val_seeds].cpu()).float()).item()
         print("Validation Accuracy: {:.4f} | Validation loss: {:.4f}".format(val_acc, val_loss))
 
     test_logits, test_seeds = evaluate(device, model, embed_layer,
                                        test_loader, inv_target)
     test_loss, test_acc = F.cross_entropy(test_logits, labels[test_seeds].cpu()).item(), \
-        th.mean(test_logits.argmax(dim=1) == labels[test_seeds].cpu()).item()
+        th.mean((test_logits.argmax(dim=1) == labels[test_seeds].cpu()).float()).item()
     print("Final Test Accuracy: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss))
 
 if __name__ == '__main__':
