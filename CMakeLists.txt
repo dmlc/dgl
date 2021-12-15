@@ -166,10 +166,16 @@ file(GLOB_RECURSE DGL_SRC_1
   src/api/*.cc
   src/graph/*.cc
   src/scheduler/*.cc
-  src/rpc/*.cc
 )
 
 list(APPEND DGL_SRC ${DGL_SRC_1})
+
+if (NOT MSVC)
+  file(GLOB_RECURSE DGL_RPC_SRC src/rpc/*.cc)
+else()
+  file(GLOB_RECURSE DGL_RPC_SRC src/rpc/network/*.cc)
+endif()
+list(APPEND DGL_SRC ${DGL_RPC_SRC})
 
 # Configure cuda
 if(USE_CUDA)
@@ -198,18 +204,19 @@ else(USE_CUDA)
   add_library(dgl SHARED ${DGL_SRC})
 endif(USE_CUDA)
 
+set_property(TARGET dgl PROPERTY CXX_STANDARD 14)
+
 # include directories
 target_include_directories(dgl PRIVATE "include")
 target_include_directories(dgl PRIVATE "third_party/dlpack/include")
 target_include_directories(dgl PRIVATE "third_party/dmlc-core/include")
-target_include_directories(dgl PRIVATE "third_party/minigun/minigun")
-target_include_directories(dgl PRIVATE "third_party/minigun/third_party/moderngpu/src")
 target_include_directories(dgl PRIVATE "third_party/phmap/")
 target_include_directories(dgl PRIVATE "third_party/xbyak/")
 target_include_directories(dgl PRIVATE "third_party/METIS/include/")
 target_include_directories(dgl PRIVATE "tensoradapter/include")
 target_include_directories(dgl PRIVATE "third_party/nanoflann/include")
 target_include_directories(dgl PRIVATE "third_party/libxsmm/include")
+
 
 # For serialization
 if (USE_HDFS)
@@ -243,6 +250,16 @@ if((NOT MSVC) AND USE_LIBXSMM)
   add_dependencies(dgl libxsmm)
   list(APPEND DGL_LINKER_LIBS -L${CMAKE_SOURCE_DIR}/third_party/libxsmm/lib/ xsmm)
 endif((NOT MSVC) AND USE_LIBXSMM)
+
+if(NOT MSVC)
+  # Only build tensorpipe on linux
+  string(REPLACE "-pedantic" "" CMAKE_C_FLAGS ${CMAKE_C_FLAGS})
+  set(TP_BUILD_LIBUV ON)
+  set(TP_STATIC_OR_SHARED STATIC)
+  add_subdirectory(third_party/tensorpipe)
+  list(APPEND DGL_LINKER_LIBS tensorpipe)
+  target_include_directories(dgl PRIVATE third_party/tensorpipe)
+endif(NOT MSVC)
 
 # Compile TVM Runtime and Featgraph
 # (NOTE) We compile a dynamic library called featgraph_runtime, which the DGL library links to.

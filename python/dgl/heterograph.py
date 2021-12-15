@@ -4230,7 +4230,7 @@ class DGLHeteroGraph(object):
         """
         # parse argument
         if is_all(edges):
-            return dict(self._edge_frames[etid])
+            return self._edge_frames[etid]
         else:
             eid = utils.parse_edges_arg_to_eid(self, edges, etid, 'edges')
             return self._edge_frames[etid].subframe(eid)
@@ -4872,10 +4872,6 @@ class DGLHeteroGraph(object):
                 raise DGLError("User defined functions are not yet "
                                "supported in update_all for heterogeneous graphs. "
                                "Please use multi_update_all instead.")
-            if reduce_func.name in ['max', 'min']:
-                raise NotImplementedError("Reduce op \'" + reduce_func.name + "\' is not yet "
-                                          "supported in update_all for heterogeneous graphs. "
-                                          "Please use multi_update_all instead.")
             if reduce_func.name in ['mean']:
                 raise NotImplementedError("Cannot set both intra-type and inter-type reduce "
                                           "operators as 'mean' using update_all. Please use "

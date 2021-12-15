@@ -1,6 +1,7 @@
 """Package for pytorch-specific NN modules."""
 from .conv import *
 from .explain import *
+from .link import *
 from .glob import *
 from .softmax import *
 from .factory import *
