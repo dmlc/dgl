@@ -129,7 +129,7 @@ def main(args):
         print("Epoch {:04d} | Loss {:.4f} | Best MRR {:.4f}".format(epoch, loss.item(), best_mrr))
 
         # validation
-        if epoch % 500 == 0:
+        if (epoch + 1) % 500 == 0:
             # perform validation on CPU because full graph is too large
             model = model.cpu()
             model.eval()
