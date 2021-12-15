@@ -73,7 +73,6 @@ def main(args):
     # create model
     model = LinkPredict(num_nodes,
                         num_rels,
-                        num_bases=100,
                         reg_param=0.01)
 
     # validation and testing triplets

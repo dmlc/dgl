@@ -21,11 +21,12 @@ class RGCN(nn.Module):
         self.layers = nn.ModuleList()
         if link_pred:
             self.emb = nn.Embedding(in_dim, h_dim)
+            in_dim = h_dim
         else:
             self.emb = None
-            self.layers.append(RelGraphConv(in_dim, h_dim, num_rels, regularizer,
-                                            num_bases, activation=F.relu, self_loop=self_loop,
-                                            dropout=dropout))
+        self.layers.append(RelGraphConv(in_dim, h_dim, num_rels, regularizer,
+                                        num_bases, activation=F.relu, self_loop=self_loop,
+                                        dropout=dropout))
 
         # For entity classification, dropout should not be applied to the output layer
         if not link_pred:
