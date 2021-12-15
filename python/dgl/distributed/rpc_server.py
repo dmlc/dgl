@@ -35,8 +35,8 @@ def start_server(server_id, ip_config, num_servers, num_clients, server_state, \
     """
     assert server_id >= 0, 'server_id (%d) cannot be a negative number.' % server_id
     assert num_servers > 0, 'num_servers (%d) must be a positive number.' % num_servers
-    assert num_clients >= 0, 'num_client (%d) cannot be a negative number.' % num_client
-    assert max_queue_size > 0, 'queue_size (%d) cannot be a negative number.' % queue_size
+    assert num_clients >= 0, 'num_client (%d) cannot be a negative number.' % num_clients
+    assert max_queue_size > 0, 'queue_size (%d) cannot be a negative number.' % max_queue_size
     assert net_type in ('socket'), 'net_type (%s) can only be \'socket\'' % net_type
     # Register signal handler.
     rpc.register_sig_handler()
