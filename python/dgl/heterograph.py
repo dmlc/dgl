@@ -4866,7 +4866,7 @@ class DGLHeteroGraph(object):
             _, dtid = self._graph.metagraph.find_edge(etid)
             g = self if etype is None else self[etype]
             ndata = core.message_passing(g, message_func, reduce_func, apply_node_func)
-            if ndata:
+            if core.is_builtin(reduce_func) and reduce_func.name in ['min', 'max'] and ndata:
                 # Replace infinity with zero for isolated nodes
                 key = list(ndata.keys())[0]
                 ndata[key] = F.replace_inf_with_zero(ndata[key])
