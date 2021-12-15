@@ -206,8 +206,8 @@ void UpdateGradMinMax_hetero(const HeteroGraphPtr& graph,
       auto pair = graph->meta_graph()->FindEdge(etype);
       const dgl_id_t dst_ntype = pair.first;  // graph is reversed
       const dgl_id_t src_ntype = pair.second;
-      auto same_src_dst_ntype = std::find(begin(src_dst_ntypes[dst_ntype]),
-        end(src_dst_ntypes[dst_ntype]), src_ntype);
+      auto same_src_dst_ntype = std::find(std::begin(src_dst_ntypes[dst_ntype]),
+        std::end(src_dst_ntypes[dst_ntype]), src_ntype);
       // if op is "copy_lhs", relation type with same src and dst node type will be updated once
       if (op == "copy_lhs" && same_src_dst_ntype != std::end(src_dst_ntypes[dst_ntype]))
         continue;
