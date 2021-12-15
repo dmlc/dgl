@@ -33,11 +33,11 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
     Parameters
     ----------
     g : DGLGraph
-        The graph.  Must be on CPU.
+        The graph.
     nodes : Tensor
         Node ID tensor from which the random walk traces starts.
 
-        The tensor must be on CPU, and must have the same dtype as the ID type
+        The tensor must have the same dtype as the ID type
         of the graph.
     metapath : list[str or tuple of str], optional
         Metapath, specified as a list of edge types.
@@ -84,10 +84,6 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
         A 1-dimensional node type ID tensor with shape ``(len(metapath) + 1)`` or
         ``(length + 1)``.
         The type IDs match the ones in the original graph ``g``.
-
-    Notes
-    -----
-    The returned tensors are on CPU.
 
     Examples
     --------
@@ -160,7 +156,6 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
              [ 2,  0,  1,  1,  3,  2,  2],
              [ 0,  1,  1,  3,  0,  0,  0]]), tensor([0, 0, 1, 0, 0, 1, 0]))
     """
-    assert g.device == F.cpu(), "Graph must be on CPU."
     n_etypes = len(g.canonical_etypes)
     n_ntypes = len(g.ntypes)
 
