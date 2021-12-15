@@ -4230,7 +4230,7 @@ class DGLHeteroGraph(object):
         """
         # parse argument
         if is_all(edges):
-            return dict(self._edge_frames[etid])
+            return self._edge_frames[etid]
         else:
             eid = utils.parse_edges_arg_to_eid(self, edges, etid, 'edges')
             return self._edge_frames[etid].subframe(eid)
