@@ -9,12 +9,12 @@ import dgl.function as fn
 import dgl.nn.pytorch as dglnn
 import time
 import argparse
-from dgl.data import RedditDataset
 from torch.nn.parallel import DistributedDataParallel
 import tqdm
 
 from model import SAGE, compute_acc_unsupervised as compute_acc
 from negative_sampler import NegativeSampler
+from load_graph import load_reddit, load_ogb
 
 class CrossEntropyLoss(nn.Module):
     def forward(self, block_outputs, pos_graph, neg_graph):
@@ -56,6 +56,8 @@ def evaluate(model, g, nfeat, labels, train_nids, val_nids, test_nids, device):
 def run(proc_id, n_gpus, args, devices, data):
     # Unpack data
     device = devices[proc_id]
+    if n_gpus > 0:
+        th.cuda.set_device(device)
     if n_gpus > 1:
         dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
             master_ip='127.0.0.1', master_port='12345')
@@ -65,8 +67,8 @@ def run(proc_id, n_gpus, args, devices, data):
                                           world_size=world_size,
                                           rank=proc_id)
     train_mask, val_mask, test_mask, n_classes, g = data
-    nfeat = g.ndata.pop('feat')
-    labels = g.ndata.pop('label')
+    nfeat = g.ndata.pop('features')
+    labels = g.ndata.pop('labels')
     if not args.data_cpu:
         nfeat = nfeat.to(device)
         labels = labels.to(device)
@@ -148,7 +150,7 @@ def run(proc_id, n_gpus, args, devices, data):
             iter_neg.append(neg_edges / (t - tic_step))
             iter_d.append(d_step - tic_step)
             iter_t.append(t - d_step)
-            if step % args.log_every == 0:
+            if step % args.log_every == 0 and proc_id == 0:
                 gpu_mem_alloc = th.cuda.max_memory_allocated() / 1000000 if th.cuda.is_available() else 0
                 print('[{}]Epoch {:05d} | Step {:05d} | Loss {:.4f} | Speed (samples/sec) {:.4f}|{:.4f} | Load {:.4f}| train {:.4f} | GPU {:.1f} MB'.format(
                     proc_id, epoch, step, loss.item(), np.mean(iter_pos[3:]), np.mean(iter_neg[3:]), np.mean(iter_d[3:]), np.mean(iter_t[3:]), gpu_mem_alloc))
@@ -173,10 +175,14 @@ def run(proc_id, n_gpus, args, devices, data):
         print('Avg epoch time: {}'.format(avg / (epoch - 4)))
 
 def main(args, devices):
-    # load reddit data
-    data = RedditDataset(self_loop=False)
-    n_classes = data.num_classes
-    g = data[0]
+    # load dataset
+    if args.dataset == 'reddit':
+        g, n_classes = load_reddit(self_loop=False)
+    elif args.dataset == 'ogbn-products':
+        g, n_classes = load_ogb('ogbn-products')
+    else:
+        raise Exception('unknown dataset')
+
     train_mask = g.ndata['train_mask']
     val_mask = g.ndata['val_mask']
     test_mask = g.ndata['test_mask']
@@ -207,6 +213,8 @@ if __name__ == '__main__':
     argparser.add_argument("--gpu", type=str, default='0',
                            help="GPU, can be a list of gpus for multi-gpu training,"
                                 " e.g., 0,1,2,3; -1 for CPU")
+    argparser.add_argument('--dataset', type=str, default='reddit',
+                           choices=('reddit', 'ogbn-products'))
     argparser.add_argument('--num-epochs', type=int, default=20)
     argparser.add_argument('--num-hidden', type=int, default=16)
     argparser.add_argument('--num-layers', type=int, default=2)

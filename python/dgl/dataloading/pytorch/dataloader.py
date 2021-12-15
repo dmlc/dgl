@@ -16,6 +16,7 @@ from ... import backend as F
 from ...base import DGLError
 from ...utils import to_dgl_context
 from ..._ffi import streams as FS
+from ..._ffi.ndarray import empty_shared_mem
 
 __all__ = ['NodeDataLoader', 'EdgeDataLoader', 'GraphDataLoader',
            # Temporary exposure.
@@ -101,6 +102,27 @@ class _ScalarDataBatcher(th.utils.data.IterableDataset):
                 self.num_samples = math.ceil(len(self.dataset) / self.num_replicas)  # type: ignore
             self.total_size = self.num_samples * self.num_replicas
 
+            if self.rank == 0:
+                # pad the indices
+                indices = th.arange(len(self.dataset))
+                if not self.drop_last:
+                    # add extra samples to make it evenly divisible
+                    indices = th.cat([indices, indices[:(self.total_size - indices.shape[0])]])
+                else:
+                    # remove tail of data to make it evenly divisible.
+                    indices = indices[:self.total_size]
+                assert indices.shape[0] == self.total_size
+
+                # share indices among processes
+                indices = F.zerocopy_to_dgl_ndarray(indices).shared_memory('_shared_indices_for_ddp')
+            dist.barrier()
+            # reconstruct the shared ndarray
+            if self.rank != 0:
+                indices = empty_shared_mem('_shared_indices_for_ddp', False,
+                                           shape=(self.total_size,), dtype='int64')
+
+            self._shared_indices = F.zerocopy_from_dgl_ndarray(indices)
+ 
     def __iter__(self):
         if self.use_ddp:
             return self._iter_ddp()
@@ -132,26 +154,13 @@ class _ScalarDataBatcher(th.utils.data.IterableDataset):
         return _ScalarDataBatcherIter(dataset, self.batch_size, self.drop_last)
 
     def _iter_ddp(self):
-        # The following code (and the idea of cross-process shuffling with the same seed)
-        # comes from PyTorch.  See torch/utils/data/distributed.py for details.
         if self.shuffle:
-            # deterministically shuffle based on epoch and seed
-            g = th.Generator()
-            g.manual_seed(self.seed + self.epoch)
-            indices = th.randperm(len(self.dataset), generator=g)
-        else:
-            indices = th.arange(len(self.dataset))
-
-        if not self.drop_last:
-            # add extra samples to make it evenly divisible
-            indices = th.cat([indices, indices[:(self.total_size - indices.shape[0])]])
-        else:
-            # remove tail of data to make it evenly divisible.
-            indices = indices[:self.total_size]
-        assert indices.shape[0] == self.total_size
+            perm = (th.randperm(self.num_samples) + (self.rank * self.num_samples)) % self.dataset.shape[0]
+            self._shared_indices[self.num_samples * self.rank:self.num_samples * (self.rank + 1)] = perm
+        dist.barrier()
 
         # subsample
-        indices = indices[self.rank:self.total_size:self.num_replicas]
+        indices = self._shared_indices[self.rank:self.total_size:self.num_replicas]
         assert indices.shape[0] == self.num_samples
 
         # Dividing by worker is our own stuff.
