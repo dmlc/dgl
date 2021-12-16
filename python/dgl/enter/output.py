@@ -1,111 +1,76 @@
 import dgl
-import dgl.nn as dglnn
 import torch
-import torch as th
-import torch.functional as F
 import torch.nn as nn
-import torch.nn.functional as F
-import tqdm
 
 
 class GCN(nn.Module):
-    def __init__(self, in_size,
+    def __init__(self,
+                 in_size,
                  out_size,
                  hidden_size: int = 16,
-                 num_layers: int = 2,
-                 activation=F.relu,
-                 dropout: float = 0.5
-                 ):
-        super().__init__()
-        self.init(
-            in_size,
-            hidden_size,
-            out_size,
-            num_layers,
-            activation,
-            dropout)
+                 num_layers: int = 1,
+                 norm: str = "both",
+                 activation: str = "relu",
+                 dropout: float = 0.5,
+                 use_edge_weight: bool = False):
+        """Graph Convolutional Networks
 
-    def init(
-            self,
-            in_size,
-            hidden_size,
-            out_size,
-            num_layers,
-            activation,
-            dropout):
-        self.num_layers = num_layers
-        self.hidden_size = hidden_size
+        Parameters
+        ----------
+        in_size : int
+            Number of input features.
+        out_size : int
+            Output size.
+        hidden_size : int
+            Hidden size.
+        num_layers : int
+            Number of layers.
+        norm : str
+            GCN normalization type. Can be 'both', 'right', 'left', 'none'.
+        activation : str
+            Activation function.
+        dropout : float
+            Dropout rate.
+        use_edge_weight : bool
+            If true, scale the messages by edge weights.
+        """
+        super().__init__()
+        self.use_edge_weight = use_edge_weight
         self.out_size = out_size
         self.layers = nn.ModuleList()
-        if num_layers > 1:
-            self.layers.append(dglnn.SAGEConv(in_size, hidden_size, 'mean'))
-            for i in range(1, num_layers - 1):
-                self.layers.append(
-                    dglnn.SAGEConv(
-                        hidden_size,
-                        hidden_size,
-                        'mean'))
-            self.layers.append(dglnn.SAGEConv(hidden_size, out_size, 'mean'))
-        else:
-            self.layers.append(dglnn.SAGEConv(in_size, out_size, 'mean'))
-        self.dropout = nn.Dropout(dropout)
-        self.activation = activation
+        # input layer
+        self.layers.append(dgl.nn.GraphConv(in_size, hidden_size, norm=norm))
+        # hidden layers
+        for i in range(num_layers - 1):
+            self.layers.append(
+                dgl.nn.GraphConv(
+                    hidden_size,
+                    hidden_size,
+                    norm=norm))
+        # output layer
+        self.layers.append(dgl.nn.GraphConv(hidden_size, out_size, norm=norm))
+        self.dropout = nn.Dropout(p=dropout)
+        self.act = getattr(torch, activation)
 
-    def forward(self, blocks, x):
-        h = x
-        for l, (layer, block) in enumerate(zip(self.layers, blocks)):
-            h = layer(block, h)
+    def forward(self, g, node_feat, edge_feat=None):
+        h = node_feat
+        edge_weight = edge_feat if self.use_edge_weight else None
+        for l, layer in enumerate(self.layers):
+            h = layer(g, h, edge_weight=edge_weight)
             if l != len(self.layers) - 1:
-                h = self.activation(h)
+                h = self.act(h)
                 h = self.dropout(h)
         return h
 
-    def inference(self, g, x, device, batch_size, num_workers):
-        """
-        Inference with the GraphSAGE model on full neighbors (i.e. without neighbor sampling).
-        g : the entire graph.
-        x : the input of entire node set.
-
-        The inference code is written in a fashion that it could handle any number of nodes and
-        layers.
-        """
-        # During inference with sampling, multi-layer blocks are very inefficient because
-        # lots of computations in the first few layers are repeated.
-        # Therefore, we compute the representation of all nodes layer by layer.  The nodes
-        # on each layer are of course splitted in batches.
-        # TODO: can we standardize this?
-        for l, layer in enumerate(self.layers):
-            y = th.zeros(
-                g.num_nodes(),
-                self.hidden_size if l != len(
-                    self.layers) -
-                1 else self.out_size)
-
-            sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
-            dataloader = dgl.dataloading.NodeDataLoader(
-                g,
-                th.arange(g.num_nodes()).to(g.device),
-                sampler,
-                device=device if num_workers == 0 else None,
-                batch_size=batch_size,
-                shuffle=False,
-                drop_last=False,
-                num_workers=num_workers)
-
-            for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
-                block = blocks[0]
-
-                block = block.int().to(device)
-                h = x[input_nodes].to(device)
-                h = layer(block, h)
-                if l != len(self.layers) - 1:
-                    h = self.activation(h)
-                    h = self.dropout(h)
-
-                y[output_nodes] = h.cpu()
-
-            x = y
-        return y
+    def forward_block(self, blocks, node_feat, edge_feat=None):
+        h = node_feat
+        edge_weight = edge_feat if self.use_edge_weight else None
+        for l, (layer, block) in enumerate(zip(self.layers, blocks)):
+            h = layer(block, h, edge_weight=edge_weight)
+            if l != len(self.layers) - 1:
+                h = self.act(h)
+                h = self.dropout(h)
+        return h
 
 
 class EarlyStopping:
@@ -162,12 +127,27 @@ def evaluate(model, g, nfeat, labels, val_nid, device, cfg):
     device : The GPU device to evaluate on.
     """
     model.eval()
-    batch_size = 1
-    num_workers = 0
+    device = cfg.get("device", "cpu")
+    batch_size = cfg["sampler"].get("eval_batch_size")
+    num_workers = cfg["sampler"].get("eval_num_workers")
+    sampler = dgl.dataloading.MultiLayerFullNeighborSampler(len(model.layers))
+    dataloader = dgl.dataloading.NodeDataLoader(
+        g,
+        torch.arange(g.num_nodes()).to(g.device),
+        sampler,
+        device=device if num_workers == 0 else None,
+        batch_size=batch_size,
+        shuffle=False,
+        drop_last=False,
+        num_workers=num_workers)
     with torch.no_grad():
-        pred = model.inference(g, nfeat, device, batch_size, num_workers)
+        y = torch.zeros(g.num_nodes(), model.out_size)
+        for input_nodes, output_nodes, blocks in dataloader:
+            batch_inputs = nfeat[input_nodes].to(device)
+            h = model.forward_block(blocks, batch_inputs)
+            y[output_nodes] = h.cpu()
     model.train()
-    return accuracy(pred[val_nid], labels[val_nid].to(pred.device))
+    return accuracy(y[val_nid], labels[val_nid].to(y.device))
 
 
 def accuracy(logits, labels):
@@ -189,16 +169,16 @@ def train(cfg, device, data, model, optimizer, loss_fcn):
         ~(test_g.ndata['train_mask'] | test_g.ndata['val_mask']), as_tuple=True)[0]
 
     sampler = dgl.dataloading.MultiLayerNeighborSampler(
-        [int(fanout) for fanout in cfg["fan_out"].split(',')])
+        [int(fanout) for fanout in cfg["sampler"]["fan_out"]])
     dataloader = dgl.dataloading.NodeDataLoader(
         train_g,
         train_nid,
         sampler,
         device=device,
-        batch_size=cfg["batch_size"],
+        batch_size=cfg["sampler"]["batch_size"],
         shuffle=True,
         drop_last=False,
-        num_workers=cfg["num_workers"])
+        num_workers=cfg["sampler"]["num_workers"])
 
     stopper = EarlyStopping(cfg['patience'], cfg['checkpoint_path'])
 
@@ -210,20 +190,19 @@ def train(cfg, device, data, model, optimizer, loss_fcn):
             batch_inputs, batch_labels = load_subtensor(
                 train_nfeat, train_labels, seeds, input_nodes, device)
             blocks = [block.int().to(device) for block in blocks]
-            batch_pred = model(blocks, batch_inputs)
+            batch_pred = model.forward_block(blocks, batch_inputs)
             loss = loss_fcn(batch_pred, batch_labels)
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
-            if step != 0 and step % cfg['eval_period'] == 0:
-                train_acc = accuracy(batch_pred, batch_labels)
-                print("Epoch {:05d} | Loss {:.4f} | TrainAcc {:.4f}".
-                      format(epoch, loss.item(), train_acc))
+            train_acc = accuracy(batch_pred, batch_labels)
+            print("Epoch {:05d} | Loss {:.4f} | TrainAcc {:.4f}".
+                  format(epoch, loss.item(), train_acc))
 
-        if epoch % cfg["eval_every"] == 0 and epoch != 0:
-            eval_acc = evaluate(
+        if epoch % cfg["eval_period"] == 0 and epoch != 0:
+            val_acc = evaluate(
                 model,
                 val_g,
                 val_nfeat,
@@ -231,7 +210,7 @@ def train(cfg, device, data, model, optimizer, loss_fcn):
                 val_nid,
                 device,
                 cfg)
-            print('Eval Acc {:.4f}'.format(eval_acc))
+            print('Eval Acc {:.4f}'.format(val_acc))
 
         if stopper.step(val_acc, model):
             break
@@ -265,12 +244,18 @@ def main():
         'device': 'cpu',
         'node_embed_size': -1,
         'model': {},
-        'fan_out': '5,10',
-        'batch_size': 32,
-        'num_workers': 4,
+        'sampler': {
+            'name': None,
+            'fan_out': [
+                5,
+                10],
+            'batch_size': 1024,
+            'num_workers': 4,
+            'eval_batch_size': 32,
+            'eval_num_workers': 4},
         'early_stop': True,
         'num_epochs': 200,
-        'eval_period': 5,
+        'eval_period': 1,
         'checkpoint_path': 'checkpoint.pt',
         'patience': 20,
         'optimizer': {

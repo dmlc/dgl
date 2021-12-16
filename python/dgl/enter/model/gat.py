@@ -14,7 +14,7 @@ class GAT(nn.Module):
                  num_layers : int = 2,
                  num_hidden: int = 8,
                  heads = [8, 8],
-                 activation = F.elu,
+                 activation = "elu",
                  feat_drop : float = 0.6,
                  attn_drop: float = 0.6,
                  negative_slope: float = 0.2,
@@ -22,7 +22,7 @@ class GAT(nn.Module):
         super(GAT, self).__init__()
         self.num_layers = num_layers
         self.gat_layers = nn.ModuleList()
-        self.activation = activation
+        self.activation = getattr(torch.nn.functional, activation)
         # input projection (no residual)
         self.gat_layers.append(GATConv(
             in_size, num_hidden, heads[0],

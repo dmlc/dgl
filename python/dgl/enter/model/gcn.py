@@ -36,6 +36,7 @@ class GCN(nn.Module):
         """
         super().__init__()
         self.use_edge_weight = use_edge_weight
+        self.out_size = out_size
         self.layers = nn.ModuleList()
         # input layer
         self.layers.append(dgl.nn.GraphConv(in_size, hidden_size, norm=norm))
@@ -50,12 +51,19 @@ class GCN(nn.Module):
     def forward(self, g, node_feat, edge_feat = None):
         h = node_feat
         edge_weight = edge_feat if self.use_edge_weight else None
-        for layer in self.layers[:-1]:
+        for l, layer in enumerate(self.layers):
             h = layer(g, h, edge_weight=edge_weight)
-            h = self.act(h)
-            h = self.dropout(h)
-        h = self.layers[-1](g, h, edge_weight=edge_weight)
+            if l != len(self.layers) -1:
+                h = self.act(h)
+                h = self.dropout(h)
         return h
 
-    def forward_block(self, blocks, node_feat, edge_feat):
-        pass
+    def forward_block(self, blocks, node_feat, edge_feat = None):
+        h = node_feat
+        edge_weight = edge_feat if self.use_edge_weight else None
+        for l, (layer, block) in enumerate(zip(self.layers, blocks)):
+            h = layer(block, h, edge_weight=edge_weight)
+            if l != len(self.layers) - 1:
+                h = self.act(h)
+                h = self.dropout(h)
+        return h
