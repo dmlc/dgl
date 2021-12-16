@@ -58,7 +58,7 @@ void UpdateGradMinMax_hetero(const HeteroGraphPtr& g,
                 const std::vector<NDArray>& idx_etype,
                 std::vector<NDArray>* out) {
   SWITCH_BITS(bits, DType, {
-    LOG(FATAL) << "Not implemented. Please use CPU version.";
+    cuda::UpdateGradMinMax_hetero<IdType, DType>(g, op, feat, idx, idx_etype, out);
   });
 }
 
