@@ -13,11 +13,9 @@ import test_utils
 from test_utils import parametrize_dtype, get_cases
 from scipy.sparse import rand
 rfuncs = {'sum': fn.sum, 'max': fn.max, 'min': fn.min, 'mean': fn.mean}
-fill_value = {'sum': 0, 'max': float("-inf")}
 feat_size = 2
 
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
-@unittest.skipIf(F._default_context_str == 'gpu', reason="Max/min reducer not supported on GPU yet.")
 
 def create_test_heterograph(idtype):
     # test heterograph from the docstring, plus a user -- wishes -- game relation
