@@ -660,12 +660,13 @@ def _test_csvdt_multiple_graphs(simplex_yaml):
         # load CSVDataset
         csv_dataset = data.CSVDataset(test_dir)
         assert len(csv_dataset) == num_graphs
-        for g, label, feat in csv_dataset:
+        for g, label in csv_dataset:
             assert g.is_homogeneous
             assert g.num_nodes() == num_nodes
             assert 'feat' in g.ndata
             assert g.num_edges() == num_edges
             assert 'feat' in g.edata
+        assert hasattr(csv_dataset, 'feats')
         assert 'train_mask' in csv_dataset.mask
         assert 'val_mask' in csv_dataset.mask
         assert 'test_mask' in csv_dataset.mask
@@ -714,7 +715,7 @@ def _test_csvdt_mg_empty():
         # load CSVDataset
         csv_dataset = data.CSVDataset(test_dir)
         assert len(csv_dataset) == num_graphs
-        for i, (g, label, feat) in enumerate(csv_dataset):
+        for i, (g, label) in enumerate(csv_dataset):
             assert g.is_homogeneous
             if i == 0:
                 assert g.num_nodes() == num_nodes
@@ -724,6 +725,7 @@ def _test_csvdt_mg_empty():
             else:
                 assert g.num_nodes() == 0
                 assert g.num_edges() == 0
+        assert hasattr(csv_dataset, 'feats')
         assert 'train_mask' in csv_dataset.mask
         assert 'val_mask' in csv_dataset.mask
         assert 'test_mask' in csv_dataset.mask
