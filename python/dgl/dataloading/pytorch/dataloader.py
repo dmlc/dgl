@@ -16,7 +16,6 @@ from ... import backend as F
 from ...base import DGLError
 from ...utils import to_dgl_context
 from ..._ffi import streams as FS
-from ..._ffi.ndarray import empty_shared_mem
 
 __all__ = ['NodeDataLoader', 'EdgeDataLoader', 'GraphDataLoader',
            # Temporary exposure.
@@ -114,14 +113,19 @@ class _ScalarDataBatcher(th.utils.data.IterableDataset):
                 assert indices.shape[0] == self.total_size
 
                 # share indices among processes
-                indices = F.zerocopy_to_dgl_ndarray(indices).shared_memory('_shared_indices_for_ddp')
-            dist.barrier()
-            # reconstruct the shared ndarray
+                indices = indices.share_memory_()
+                _shared_filename = list(indices.storage()._share_filename_())
+            else:
+                _shared_filename = [None, None, None]
+            # Note: dist.broadcast_object_list() is a new feature introduced in PyTorch 1.7.0.
+            #       We may need a fallback for lower PyTorch versions.
+            dist.broadcast_object_list(_shared_filename, src=0)
+            # reconstruct the shared tensor
             if self.rank != 0:
-                indices = empty_shared_mem('_shared_indices_for_ddp', False,
-                                           shape=(self.total_size,), dtype='int64')
+                indices = th.LongTensor(th.LongStorage._new_shared_filename(*_shared_filename))
 
-            self._shared_indices = F.zerocopy_from_dgl_ndarray(indices)
+            self._shared_indices = indices
+            assert self._shared_indices.is_shared()
  
     def __iter__(self):
         if self.use_ddp:
