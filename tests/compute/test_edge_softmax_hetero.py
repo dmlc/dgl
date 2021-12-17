@@ -95,10 +95,10 @@ def test_edge_softmax(g, norm_by, idtype):
         ('developer', 'develops', 'game'): e3}
     with F.record_grad():
         score = edge_softmax(g, e, norm_by=norm_by)
-        r5 =  score[g.get_etype_id('plays')]
-        r6 =  score[g.get_etype_id('follows')]
-        r7 =  score[g.get_etype_id('develops')]
-        r8 =  score[g.get_etype_id('wishes')]
+        r5 =  score[('user', 'plays', 'game')]
+        r6 =  score[('user', 'follows', 'user')]
+        r7 =  score[('developer', 'develops', 'game')]
+        r8 =  score[('user', 'wishes', 'game')]
         F.backward(F.reduce_sum(r5) + F.reduce_sum(r6))
         grad_edata_ht = F.cat((F.grad(e3), F.grad(e2), F.grad(e1), F.grad(e4)), 0)
         # correctness check

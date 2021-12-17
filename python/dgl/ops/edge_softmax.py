@@ -123,10 +123,10 @@ def edge_softmax(graph, logits, eids=ALL, norm_by='dst'):
     Apply edge softmax over hg normalized by source nodes:
 
     >>> edge_softmax(hg, edata_dict, norm_by='src')
-        (tensor([[1.],
-        [1.]]), tensor([[0.5000],
+        {('developer', 'develops', 'game'): tensor([[1.],
+        [1.]]), ('user', 'follows', 'user'): tensor([[0.5000],
         [0.5000],
-        [1.0000]]))
+        [1.0000]])}
     """
     if not is_all(eids):
         eids = astype(eids, graph.idtype)
@@ -134,10 +134,15 @@ def edge_softmax(graph, logits, eids=ALL, norm_by='dst'):
         return edge_softmax_internal(graph._graph, logits,
                                      eids=eids, norm_by=norm_by)
     else:
-        list_logits = [None] * graph._graph.number_of_etypes()
+        logits_list = [None] * graph._graph.number_of_etypes()
         for rel in graph.canonical_etypes:
             etid = graph.get_etype_id(rel)
-            list_logits[etid] = logits[rel]
-        tuple_logits = tuple(list_logits)
-        return edge_softmax_hetero_internal(graph._graph,
-                                            eids, norm_by, *tuple_logits)
+            logits_list[etid] = logits[rel]
+        logits_tuple = tuple(logits_list)
+        score_tuple = edge_softmax_hetero_internal(graph._graph,
+                                            eids, norm_by, *logits_tuple)
+        score = {}
+        for rel in graph.canonical_etypes:
+            etid = graph.get_etype_id(rel)
+            score[rel] = score_tuple[etid]
+        return score
