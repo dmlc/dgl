@@ -1625,7 +1625,7 @@ def edge_softmax(gidx, logits, eids, norm_by):
     """
     pass
 
-def edge_softmax_hetero(gidx, logits, eids, norm_by):
+def edge_softmax_hetero(gidx, eids, norm_by, *logits):
     r"""Compute edge softmax.
 
     For a node :math:`i`, edge softmax is an operation of computing
@@ -1647,11 +1647,11 @@ def edge_softmax_hetero(gidx, logits, eids, norm_by):
     ----------
     gidx : HeteroGraphIndex
         The graph to perfor edge softmax on.
-    logits : torch.Tensor
-        The input edge feature
-    eids : torch.Tensor or ALL, optional
-        Edges on which to apply edge softmax. If ALL, apply edge
-        softmax on all edges in the graph. Default: ALL.
+    eids : dict of tensors
+        Each tensor has the edges on which to apply edge softmax for a
+        corresponsing relation type.
+    logits : tuple of tensors
+        The input edge features of different relation types.
     norm_by : str, could be `src` or `dst`
         Normalized by source nodes or destination nodes. Default: `dst`.
 

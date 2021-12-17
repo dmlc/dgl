@@ -529,7 +529,6 @@ class EdgeSoftmax_hetero(th.autograd.Function):
             gidx = gidx.edge_subgraph([eids], True).graph
         if norm_by == 'src':
             gidx = gidx.reverse()
-        # TODO (Israt): convert to reducer 'max'
         u_len = gidx.number_of_ntypes()
         e_len = gidx.number_of_etypes()
         lhs = [None] * u_len
@@ -561,15 +560,12 @@ class EdgeSoftmax_hetero(th.autograd.Function):
             grad_score = sds - out * sds_sum  # multiple expressions
             return grad_score.data
         """
-
-
         gidx = ctx.backward_cache
         # See https://github.com/dmlc/dgl/pull/3386
         ctx.backward_cache = None
         u_len = gidx.number_of_ntypes()
         e_len = gidx.number_of_etypes()
         lhs = [None] * u_len
-        # TODO(Israt): Why homogene has a comma after out?
         out = ctx.saved_tensors
         sds = tuple([out[i] * grad_out[i]
             for i in range(len(out))])
