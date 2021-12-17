@@ -92,8 +92,7 @@ def train(model, embed_layer, train_loader, inv_target,
         for blc in blocks:
             gen_norm(blc)
 
-        feats = embed_layer(blocks[0].srcdata['ntype'],
-                            blocks[0].srcdata['type_id'])
+        feats = embed_layer(blocks[0].srcdata[dgl.NID])
         blocks = [blc.to(device) for blc in blocks]
         logits = model(blocks, feats)
         loss = F.cross_entropy(logits, labels[seeds])
@@ -123,8 +122,7 @@ def evaluate(device, model, embed_layer, eval_loader, inv_target):
             for blc in blocks:
                 gen_norm(blc)
 
-            feats = embed_layer(blocks[0].srcdata['ntype'],
-                                blocks[0].srcdata['type_id'])
+            feats = embed_layer(blocks[0].srcdata[dgl.NID])
             blocks = [blc.to(device) for blc in blocks]
             logits = model(blocks, feats)
             eval_logits.append(logits.cpu().detach())
@@ -161,7 +159,7 @@ def main(args):
     if args.dgl_sparse:
         all_params = list(model.parameters()) + list(embed_layer.parameters())
         optimizer = th.optim.Adam(all_params, lr=1e-2, weight_decay=args.l2norm)
-        emb_optimizer = dgl.optim.SparseAdam(params=embed_layer.dgl_emb, lr=args.sparse_lr, eps=1e-8)
+        emb_optimizer = dgl.optim.SparseAdam(params=embed_layer.node_embed, lr=args.sparse_lr, eps=1e-8)
     else:
         dense_params = list(model.parameters())
         optimizer = th.optim.Adam(dense_params, lr=1e-2, weight_decay=args.l2norm)
