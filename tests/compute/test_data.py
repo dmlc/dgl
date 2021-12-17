@@ -660,17 +660,18 @@ def _test_csvdt_multiple_graphs(simplex_yaml):
         # load CSVDataset
         csv_dataset = data.CSVDataset(test_dir)
         assert len(csv_dataset) == num_graphs
-        for g, label in csv_dataset:
+        for g, label, feat in csv_dataset:
+            assert label is not None
+            assert feat is not None
             assert g.is_homogeneous
             assert g.num_nodes() == num_nodes
             assert 'feat' in g.ndata
             assert g.num_edges() == num_edges
             assert 'feat' in g.edata
-        assert hasattr(csv_dataset, 'feats')
-        assert 'train_mask' in csv_dataset.mask
-        assert 'val_mask' in csv_dataset.mask
-        assert 'test_mask' in csv_dataset.mask
-        assert len(csv_dataset) == csv_dataset.mask['train_mask'].shape[0]
+        assert csv_dataset.train_mask is not None
+        assert csv_dataset.val_mask is not None
+        assert csv_dataset.test_mask is not None
+        assert len(csv_dataset) == csv_dataset.train_mask.shape[0]
 
 
 def _test_csvdt_mg_empty():
@@ -715,7 +716,7 @@ def _test_csvdt_mg_empty():
         # load CSVDataset
         csv_dataset = data.CSVDataset(test_dir)
         assert len(csv_dataset) == num_graphs
-        for i, (g, label) in enumerate(csv_dataset):
+        for i, (g, label, feat) in enumerate(csv_dataset):
             assert g.is_homogeneous
             if i == 0:
                 assert g.num_nodes() == num_nodes
@@ -725,11 +726,73 @@ def _test_csvdt_mg_empty():
             else:
                 assert g.num_nodes() == 0
                 assert g.num_edges() == 0
-        assert hasattr(csv_dataset, 'feats')
-        assert 'train_mask' in csv_dataset.mask
-        assert 'val_mask' in csv_dataset.mask
-        assert 'test_mask' in csv_dataset.mask
-        assert len(csv_dataset) == csv_dataset.mask['train_mask'].shape[0]
+        assert csv_dataset.train_mask is not None
+        assert csv_dataset.val_mask is not None
+        assert csv_dataset.test_mask is not None
+        assert len(csv_dataset) == csv_dataset.train_mask.shape[0]
+
+
+def _test_csvdt_homo_graph_feat():
+    with tempfile.TemporaryDirectory() as test_dir:
+        # generate YAML/CSVs
+        meta_yaml_path = os.path.join(test_dir, "meta.yaml")
+        edges_csv_path = os.path.join(test_dir, "test_edges.csv")
+        nodes_csv_path = os.path.join(test_dir, "test_nodes.csv")
+        graphs_csv_path = os.path.join(test_dir, "test_graphs.csv")
+        meta_yaml_data = {'version': '1.0.0', 'dataset_name': 'default_name',
+                          'edge_data': [{'file_name': os.path.basename(edges_csv_path),
+                                         'labels': {'type': 'regression'},
+                                         'feats': {'separator': '|'}
+                                         }],
+                          'node_data': [{'file_name': os.path.basename(nodes_csv_path),
+                                         'labels': {'type': 'classification', 'num_classes': 3},
+                                         'feats': {'separator': '|'}
+                                         }],
+                          'graph_data': {'file_name': os.path.basename(graphs_csv_path), 'feats': {'separator': '|'}}
+                          }
+
+        with open(meta_yaml_path, 'w') as f:
+            yaml.dump(meta_yaml_data, f, sort_keys=False)
+        num_nodes = 100
+        num_edges = 500
+        num_graphs = 1
+        feat_dim = 3
+        df = pd.DataFrame({'src': np.random.randint(num_nodes, size=num_edges),
+                           'dst': np.random.randint(num_nodes, size=num_edges),
+                           'label': np.random.randint(2, size=num_edges),
+                           'split_type': np.random.randint(3, size=num_edges),
+                           'feat': np.array(["|".join(item) for item in np.random.rand(num_edges, feat_dim).astype(str)])
+                           })
+        df.to_csv(edges_csv_path, index=False)
+        df = pd.DataFrame({'id': np.arange(num_nodes),
+                           'label': np.random.randint(2, size=num_nodes),
+                           'split_type': np.random.randint(3, size=num_nodes),
+                           'feat': np.array(["|".join(item) for item in np.random.rand(num_nodes, feat_dim).astype(str)])
+                           })
+        df.to_csv(nodes_csv_path, index=False)
+        df = pd.DataFrame({'feat': np.array(
+            ["|".join(item) for item in np.random.rand(num_graphs, feat_dim).astype(str)])})
+        df.to_csv(graphs_csv_path, index=False)
+
+        # load CSVDataset
+        csv_dataset = data.CSVDataset(test_dir)
+        assert len(csv_dataset) == 1
+        g, feat = csv_dataset[0]
+        assert g.is_homogeneous
+        assert g.num_nodes() == num_nodes
+        assert g.num_edges() == num_edges
+        assert feat is not None
+
+        def _check(gdata):
+            assert 'feat' in gdata
+            assert 'label' in gdata
+            assert 'train_mask' in gdata
+            assert 'val_mask' in gdata
+            assert 'test_mask' in gdata
+        _check(g.ndata)
+        _check(g.edata)
+        assert 'num_classes' in g.ndata
+        assert 'num_classes' not in g.edata
 
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
@@ -744,6 +807,7 @@ def test_csv_dataset(simplex_yaml):
 
     # test more
     _test_csvdt_mg_empty()
+    _test_csvdt_homo_graph_feat()
 
     # test dataset reload logic
     with tempfile.TemporaryDirectory() as test_dir:
@@ -764,11 +828,10 @@ def test_csv_dataset(simplex_yaml):
                 assert len(csv_dataset) > 1
                 graph, label = csv_dataset[0]
                 assert graph.is_homogeneous
-                assert 'train_mask' in csv_dataset.mask
-                assert 'val_mask' in csv_dataset.mask
-                assert 'test_mask' in csv_dataset.mask
-                assert len(
-                    csv_dataset) == csv_dataset.mask['train_mask'].shape[0]
+                assert csv_dataset.train_mask is not None
+                assert csv_dataset.val_mask is not None
+                assert csv_dataset.test_mask is not None
+                assert len(csv_dataset) == csv_dataset.train_mask.shape[0]
                 assert csv_dataset.has_cache()
 
 

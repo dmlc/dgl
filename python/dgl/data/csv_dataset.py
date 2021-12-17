@@ -64,28 +64,35 @@ class MetaYaml(dt.BaseModel):
 
 
 def _yaml_sanity_check(yaml_file):
+    AVAILABLE_LABEL_TYPES = ['classification', 'regression']
     with open(yaml_file) as f:
         yaml_data = yaml.load(f, Loader=SafeLoader)
         meta_yaml = MetaYaml(**yaml_data)
-        assert meta_yaml.version == '1.0.0'
+        if meta_yaml.version != '1.0.0':
+            raise DGLError("Invalid version: {}. '1.0.0' is supported only for now.".format(
+                meta_yaml.version))
         for meta_edge in meta_yaml.edge_data:
             if meta_edge is None:
                 continue
             if meta_edge.labels is not None:
                 meta_label = meta_edge.labels
-                assert meta_label.type in ['classification', 'regression']
-                if meta_label.type == 'classification':
-                    assert meta_label.num_classes is not None
-                assert meta_edge.split_type_field is not None
+                if meta_label.type not in AVAILABLE_LABEL_TYPES:
+                    raise DGLError("Invalid type: {}. Only below ones are supported: {}".format(
+                        meta_label.type, AVAILABLE_LABEL_TYPES))
+                if meta_label.type == 'classification' and meta_label.num_classes is None:
+                    raise DGLError(
+                        "`num_classes` is required to be specified if type is classification.")
         for meta_node in meta_yaml.node_data:
             if meta_node is None:
                 continue
             if meta_node.labels is not None:
                 meta_label = meta_node.labels
-                assert meta_label.type in ['classification', 'regression']
-                if meta_label.type == 'classification':
-                    assert meta_label.num_classes is not None
-                assert meta_node.split_type_field is not None
+                if meta_label.type not in AVAILABLE_LABEL_TYPES:
+                    raise DGLError("Invalid type: {}. Only below ones are supported: {}".format(
+                        meta_label.type, AVAILABLE_LABEL_TYPES))
+                if meta_label.type == 'classification' and meta_label.num_classes is None:
+                    raise DGLError(
+                        "`num_classes` is required to be specified if type is classification.")
         return meta_yaml
 
 
@@ -217,6 +224,8 @@ class GraphData:
                     meta_label.field]).to_numpy().squeeze()
                 self.num_classes = np.full(
                     self.label.shape, meta_label.num_classes)
+        if self.num_classes is None:
+            self.num_classes = np.full(1, 1)
         if meta_graph.split_type_field in csv_header:
             self.split_type = pd.read_csv(file_path, sep=separator, usecols=[
                 meta_graph.split_type_field]).to_numpy().squeeze()
@@ -225,7 +234,7 @@ class GraphData:
             feat_data = pd.read_csv(
                 file_path, sep=separator, usecols=[meta_feat.field]).to_numpy().squeeze()
             self.feat = np.array([row.split(meta_feat.separator)
-                                 for row in feat_data]).astype(np.float)
+                                 for row in np.atleast_1d(feat_data)]).astype(np.float)
 
 
 class CSVDataset(DGLDataset):
@@ -246,7 +255,9 @@ class CSVDataset(DGLDataset):
         self.graphs = None
         self.labels = None
         self.feats = None
-        self.mask = None
+        self.train_mask = None
+        self.val_mask = None
+        self.test_mask = None
         self.num_classes = None
         meta_yaml = os.path.join(data_path, CSVDataset.META_YAML_NAME)
         if not os.path.exists(meta_yaml):
@@ -279,7 +290,6 @@ class CSVDataset(DGLDataset):
         #construct dgl.heterograph
         edge_dict = {}
         for e_data in edge_data:
-            assert len(e_data.type) == 3
             graph_ids = np.unique(e_data.graph_id)
             for graph_id in graph_ids:
                 idx = e_data.graph_id == graph_id
@@ -354,11 +364,10 @@ class CSVDataset(DGLDataset):
             if graph_data.label is not None:
                 self.labels = F.tensor(graph_data.label)
             if graph_data.split_type is not None:
-                self.mask = {}
-                self.mask['train_mask'] = F.tensor(graph_data.split_type == 0)
-                self.mask['val_mask'] = F.tensor(graph_data.split_type == 1)
-                self.mask['test_mask'] = F.tensor(graph_data.split_type == 2)
-            self.num_classes = graph_data.num_classes
+                self.train_mask = F.tensor(graph_data.split_type == 0)
+                self.val_mask = F.tensor(graph_data.split_type == 1)
+                self.test_mask = F.tensor(graph_data.split_type == 2)
+            self.num_classes = F.tensor(graph_data.num_classes)
         self.graphs = []
         for graph_id in sorted(graphs):
             self.graphs.append(graphs[graph_id])
@@ -367,50 +376,46 @@ class CSVDataset(DGLDataset):
     def has_cache(self):
         graph_path = os.path.join(self.save_path,
                                   self.name + '.bin')
-        info_path = os.path.join(self.save_path,
-                                 self.name + '.pkl')
-        if os.path.exists(graph_path) and os.path.exists(info_path):
+        if os.path.exists(graph_path):
             return True
 
         return False
 
     def save(self):
+        if self.graphs is None:
+            raise DGLError("No graphs available in dataset")
         graph_path = os.path.join(self.save_path,
                                   self.name + '.bin')
-        info_path = os.path.join(self.save_path,
-                                 self.name + '.pkl')
-        assert self.graphs is not None
-
-        save_graphs(graph_path, self.graphs,
-                    labels={'labels': self.labels} if self.labels is not None else None)
-        info = {}
-        for key in ['feats', 'mask', 'num_classes']:
+        data_dict = {}
+        for key in ['labels', 'feats', 'train_mask', 'val_mask', 'test_mask', 'num_classes']:
             if getattr(self, key) is not None:
-                info[key] = getattr(self, key)
-        save_info(info_path, info)
+                data_dict[key] = getattr(self, key)
+        save_graphs(graph_path, self.graphs,
+                    labels=data_dict)
 
     def load(self):
         graph_path = os.path.join(self.save_path,
                                   self.name + '.bin')
-        info_path = os.path.join(self.save_path,
-                                 self.name + '.pkl')
-        graphs, labels = load_graphs(graph_path)
+        graphs, data_dict = load_graphs(graph_path)
         self.graphs = graphs
-        if len(labels)>0:
-            self.labels = labels['labels']
-        info = load_info(info_path)
-        for k, v in info.items():
-            setattr(self, k, v)
+        for key in data_dict:
+            setattr(self, key, data_dict[key])
 
     def __getitem__(self, i):
-        if self.labels is None:
-            return self.graphs[i]
+        if len(self.graphs) == 1:
+            if self.feats is not None:
+                return (self.graphs[i], self.feats[i])
+            else:
+                return self.graphs[i]
         else:
-            return (self.graphs[i], self.labels[i])
+            if self.feats is not None:
+                return (self.graphs[i], self.labels[i], self.feats[i])
+            else:
+                return (self.graphs[i], self.labels[i])
 
     def __len__(self):
         return len(self.graphs)
 
     def _sanity_check_after_process(self):
-        #TODO:
-        pass
+        if self.graphs is None or len(self.graphs) == 0:
+            raise DGLError("No grahps are available in dataset.")
