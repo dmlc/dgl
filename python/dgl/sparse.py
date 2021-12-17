@@ -456,7 +456,7 @@ def _gsddmm_hetero(gidx, op, lhs_len, lhs_target='u', rhs_target='v', lhs_and_rh
                                    [to_dgl_nd_for_write(out) for out in out_list],
                                    lhs_target, rhs_target)
 
-    for l in range(gidx.number_of_ntypes()):
+    for l in range(gidx.number_of_etypes()):
         # Replace None by empty tensor. Forward func doesn't accept None in tuple.
         e = out_list[l]
         e = F.tensor([]) if e is None else e
