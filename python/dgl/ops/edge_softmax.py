@@ -140,7 +140,7 @@ def edge_softmax(graph, logits, eids=ALL, norm_by='dst'):
             logits_list[etid] = logits[rel]
         logits_tuple = tuple(logits_list)
         score_tuple = edge_softmax_hetero_internal(graph._graph,
-                                            eids, norm_by, *logits_tuple)
+                                                   eids, norm_by, *logits_tuple)
         score = {}
         for rel in graph.canonical_etypes:
             etid = graph.get_etype_id(rel)
