@@ -13,7 +13,7 @@ import dgl
 from torch.nn.parallel import DistributedDataParallel
 
 from entity_utils import load_data
-from entity_sample import gen_norm, init_dataloaders, init_models, train, evaluate
+from entity_sample import init_dataloaders, init_models, train, evaluate
 
 def run(proc_id, n_gpus, n_cpus, args, devices, dataset, queue=None):
     dev_id = devices[proc_id]
@@ -106,13 +106,6 @@ def main(args, devices):
     hg, g, num_rels, num_classes, labels, train_idx, test_idx, target_idx, inv_target = load_data(
         args.dataset, inv_target=True)
     node_feats = [hg.num_nodes(ntype) for ntype in hg.ntypes]
-
-    g.ndata['ntype'].share_memory_()
-    g.ndata['type_id'].share_memory_()
-    target_idx.share_memory_()
-    train_idx.share_memory_()
-    test_idx.share_memory_()
-    inv_target.share_memory_()
 
     # Create csr/coo/csc formats before launching training processes.
     # This avoids creating certain formats in each sub-process, which saves momory and CPU.
