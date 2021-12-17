@@ -75,9 +75,6 @@ def gspmm(g, op, reduce_op, lhs_data, rhs_data):
         ret = gspmm_internal(g._graph, op,
                              'sum' if reduce_op == 'mean' else reduce_op,
                              lhs_data, rhs_data)
-        # Replace infinity with zero for isolated nodes when reducer is min/max
-        if reduce_op in ['min', 'max']:
-            ret = F.replace_inf_with_zero(ret)
     else:
         # lhs_data or rhs_data is None only in unary functions like ``copy-u`` or ``copy_e``
         lhs_data = [None] * g._graph.number_of_ntypes() if lhs_data is None else lhs_data
@@ -87,13 +84,6 @@ def gspmm(g, op, reduce_op, lhs_data, rhs_data):
         ret = gspmm_internal_hetero(g._graph, op,
                                     'sum' if reduce_op == 'mean' else reduce_op,
                                     len(lhs_data), *lhs_and_rhs_tuple)
-        # `update_all` on heterogeneous graphs replaces the inf values with zeros on
-        # the final output (after processing all etypes). `multi_update_all` performs
-        # this operation after processing each etype. It computes the final output based
-        # on the output of each etype where inf is already replaced by zero.
-        if reduce_op in ['min', 'max']:
-            ret = tuple([F.replace_inf_with_zero(ret[i]) if ret[i] is not None else None
-                         for i in range(len(ret))])
     # TODO (Israt): Add support for 'mean' in heterograph
     # divide in degrees for mean reducer.
     if reduce_op == 'mean':

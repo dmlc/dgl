@@ -38,14 +38,18 @@ def create_test_heterograph(idtype):
 
 def create_test_heterograph_2(idtype):
 
-    src = np.random.randint(0, 5, 25)
-    dst = np.random.randint(0, 5, 25)
+    src = np.random.randint(0, 50, 25)
+    dst = np.random.randint(0, 50, 25)
+    src1 = np.random.randint(0, 25, 10)
+    dst1 = np.random.randint(0, 25, 10)
+    src2 = np.random.randint(0, 100, 1000)
+    dst2 = np.random.randint(0, 100, 1000)
     g = dgl.heterograph({
         ('user', 'becomes', 'player'):  (src, dst),
         ('user', 'follows', 'user'):  (src, dst),
         ('user', 'plays', 'game'): (src, dst),
-        ('user', 'wishes', 'game'): (src, dst),
-        ('developer', 'develops', 'game'): (src, dst),
+        ('user', 'wishes', 'game'): (src1, dst1),
+        ('developer', 'develops', 'game'): (src2, dst2),
     }, idtype=idtype, device=F.ctx())
     assert g.idtype == idtype
     assert g.device == F.ctx()
