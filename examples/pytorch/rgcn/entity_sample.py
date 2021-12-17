@@ -54,10 +54,10 @@ def init_dataloaders(args, g, train_idx, test_idx, target_idx, device, num_gpus=
 
     return train_loader, val_loader, test_loader
 
-def init_models(args, device, node_feats, num_classes, num_rels):
+def init_models(args, device, num_nodes, num_classes, num_rels):
     embed_layer = RelGraphEmbedLayer(device if not args.dgl_sparse else th.device('cpu'),
                                      device,
-                                     node_feats,
+                                     num_nodes,
                                      args.n_hidden,
                                      dgl_sparse=args.dgl_sparse)
 
@@ -136,7 +136,6 @@ def evaluate(device, model, embed_layer, eval_loader, inv_target):
 def main(args):
     hg, g, num_rels, num_classes, labels, train_idx, test_idx, target_idx, inv_target = load_data(
         args.dataset, inv_target=True)
-    node_feats = [hg.num_nodes(ntype) for ntype in hg.ntypes]
 
     # Create csr/coo/csc formats before launching training processes.
     # This avoids creating certain formats in each data loader process, which saves momory and CPU.
@@ -145,7 +144,7 @@ def main(args):
     device = th.device(args.gpu if args.gpu >= 0 else 'cpu')
     train_loader, val_loader, test_loader = init_dataloaders(
         args, g, train_idx, test_idx, target_idx, args.gpu)
-    embed_layer, model = init_models(args, device, node_feats, num_classes, num_rels)
+    embed_layer, model = init_models(args, device, g.num_nodes(), num_classes, num_rels)
 
     if args.gpu >= 0:
         th.cuda.set_device(device)
