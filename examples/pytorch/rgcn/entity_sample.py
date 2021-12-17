@@ -158,7 +158,8 @@ def main(args):
     if args.dgl_sparse:
         all_params = list(model.parameters()) + list(embed_layer.parameters())
         optimizer = th.optim.Adam(all_params, lr=1e-2, weight_decay=args.l2norm)
-        emb_optimizer = dgl.optim.SparseAdam(params=embed_layer.node_embed, lr=args.sparse_lr, eps=1e-8)
+        emb_optimizer = dgl.optim.SparseAdam(params=[embed_layer.node_embed],
+                                             lr=args.sparse_lr, eps=1e-8)
     else:
         dense_params = list(model.parameters())
         optimizer = th.optim.Adam(dense_params, lr=1e-2, weight_decay=args.l2norm)

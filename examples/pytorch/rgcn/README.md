@@ -39,7 +39,7 @@ python entity.py -d am --n-bases 40 --n-hidden 10
 
 ### Entity Classification with minibatch
 
-AIFB: accuracy avg(5 runs) 90.00%, best 94.44% (DGL)
+AIFB: accuracy avg(5 runs) 91.10%, best 97.22% (DGL)
 ```
 python entity_sample.py -d aifb --l2norm 0 --gpu 0 --fanout='20,20' --batch-size 128
 ```
