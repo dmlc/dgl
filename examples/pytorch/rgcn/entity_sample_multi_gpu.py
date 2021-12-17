@@ -55,7 +55,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, queue=None):
                                              lr=args.sparse_lr, eps=1e-8)
     else:
         optimizer = th.optim.Adam(model.parameters(), lr=1e-2, weight_decay=args.l2norm)
-        embs = list(embed_layer.module.node_embeds.parameters())
+        embs = list(embed_layer.module.parameters())
         emb_optimizer = th.optim.SparseAdam(embs, lr=args.sparse_lr)
 
     def collect_eval():

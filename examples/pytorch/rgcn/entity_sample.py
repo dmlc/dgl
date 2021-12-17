@@ -163,7 +163,7 @@ def main(args):
     else:
         dense_params = list(model.parameters())
         optimizer = th.optim.Adam(dense_params, lr=1e-2, weight_decay=args.l2norm)
-        embs = list(embed_layer.node_embeds.parameters())
+        embs = list(embed_layer.parameters())
         emb_optimizer = th.optim.SparseAdam(embs, lr=args.sparse_lr)
 
     for epoch in range(args.n_epochs):
