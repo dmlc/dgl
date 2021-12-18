@@ -626,7 +626,7 @@ std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling(
   CHECK_GT(num_trials, 0) << "Number of sampling trials must be positive";
   std::pair<IdArray, IdArray> result;
   ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRGlobalUniformNegativeSampling", {
-    result = impl::CSRGlobalUniformNegativeSampling(
+    result = impl::CSRGlobalUniformNegativeSampling<XPU, IdType>(
         csr, num_samples, num_trials, exclude_self_loops);
   });
   return result;

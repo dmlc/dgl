@@ -11,6 +11,7 @@
 #include <string>
 #include <cstdlib>
 #include <exception>
+#include <vector>
 #include <atomic>
 
 namespace {
@@ -54,8 +55,8 @@ static DefaultGrainSizeT default_grain_size;
  * \brief OpenMP-based parallel for loop.
  *
  * It requires each thread's workload to have at least \a grain_size elements.
- * The loop body will be a function that takes in a single argument \a i, which
- * stands for the index of the workload.
+ * The loop body will be a function that takes in two arguments \a begin and \a end, which
+ * stands for the starting and ending index of the workload.
  */
 template <typename F>
 void parallel_for(
@@ -111,6 +112,16 @@ void parallel_for(
   parallel_for(begin, end, default_grain_size(), std::forward<F>(f));
 }
 
+/*!
+ * \brief OpenMP-based two-stage parallel reduction.
+ *
+ * The first-stage reduction function \a f works in parallel.  Each thread's workload has
+ * at least \a grain_size elements.  The loop body will be a function that takes in
+ * the starting index, the ending index, and the reduction identity.
+ *
+ * The second-stage reduction function \a sf is a binary function working in the main
+ * thread. It aggregates the partially reduced result computed from each thread.
+ */
 template <typename DType, typename F, typename SF>
 DType parallel_reduce(
     const size_t begin,
@@ -151,7 +162,7 @@ DType parallel_reduce(
     std::rethrow_exception(eptr);
 
   DType out = ident;
-  for (int64_t i = 0; i < num_results; ++i)
+  for (int64_t i = 0; i < num_threads; ++i)
     out = sf(out, results_data[i]);
   return out;
 }

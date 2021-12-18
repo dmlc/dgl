@@ -18,7 +18,7 @@ template <DLDeviceType XPU, typename IdType>
 bool CSRIsSorted(CSRMatrix csr) {
   const IdType* indptr = csr.indptr.Ptr<IdType>();
   const IdType* indices = csr.indices.Ptr<IdType>();
-  return runtime::parallel_reduce(0, csr.num_rows, 1, true,
+  return runtime::parallel_reduce(0, csr.num_rows, 1, 1,
     [indptr, indices](size_t b, size_t e, bool ident) {
       for (size_t row = b; row < e; ++row) {
         for (IdType i = indptr[row] + 1; i < indptr[row + 1]; ++i) {

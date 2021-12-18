@@ -10,6 +10,7 @@
 #include <dgl/packed_func_ext.h>
 #include <dgl/runtime/container.h>
 #include <utility>
+#include "../../../c_api_common.h"
 
 using namespace dgl::runtime;
 using namespace dgl::aten;
@@ -25,24 +26,22 @@ std::pair<IdArray, IdArray> GlobalUniformNegativeSampling(
     bool exclude_self_loops) {
   dgl_format_code_t allowed = hg->GetAllowedFormats();
 
-  CHECK(FORMAT_HAS_CSR(allowed) || FORMAT_HAS_CSC(allowed)) <<
-    "Global uniform negative sampling requires either CSR or CSC format to work.";
-
-  switch (hg->SelectFormat(etype, CSC_CODE | CSR_CODE)) {
-   case SparseFormat::kCSC:
+  auto format = hg->SelectFormat(etype, CSC_CODE | CSR_CODE);
+  if (format == SparseFormat::kCSC) {
     CSRMatrix csc = hg->GetCSCMatrix(etype);
     CSRSort_(&csc);
     std::pair<IdArray, IdArray> result = CSRGlobalUniformNegativeSampling(
         csc, num_samples, num_trials, exclude_self_loops);
     // reverse the pair since it is CSC
-    return {pair.second, pair.first};
-   case SparseFormat::kCSR:
+    return {result.second, result.first};
+  } else if (format == SparseFormat::kCSR) {
     CSRMatrix csr = hg->GetCSRMatrix(etype);
     CSRSort_(&csr);
     return CSRGlobalUniformNegativeSampling(csr, num_samples, num_trials, exclude_self_loops);
+  } else {
+    LOG(FATAL) << "COO format is not supported in global uniform negative sampling";
+    return {IdArray(), IdArray()};
   }
-  // NOTREACHED
-  return {IdArray(), IdArray()};
 }
 
 DGL_REGISTER_GLOBAL("sampling.negative._CAPI_DGLGlobalUniformNegativeSampling")
@@ -55,7 +54,7 @@ DGL_REGISTER_GLOBAL("sampling.negative._CAPI_DGLGlobalUniformNegativeSampling")
     bool exclude_self_loops = args[4];
     List<Value> result;
     std::pair<IdArray, IdArray> ret = GlobalUniformNegativeSampling(
-        hg, etype, num_samples, num_trials, exclude_self_loops);
+        hg.sptr(), etype, num_samples, num_trials, exclude_self_loops);
     result.push_back(Value(MakeValue(ret.first)));
     result.push_back(Value(MakeValue(ret.second)));
     *rv = result;
