@@ -110,6 +110,52 @@ void parallel_for(
     F&& f) {
   parallel_for(begin, end, default_grain_size(), std::forward<F>(f));
 }
+
+template <typename DType, typename F, typename SF>
+DType parallel_reduce(
+    const size_t begin,
+    const size_t end,
+    const size_t grain_size,
+    const DType ident,
+    const F& f,
+    const SF& sf) {
+  if (begin >= end) {
+    return ident;
+  }
+
+  int num_threads = compute_num_threads(begin, end, grain_size);
+  if (num_threads == 1) {
+    return f(begin, end, ident);
+  }
+
+  std::vector<DType> results(num_threads, ident);
+  DType* results_data = results.data(); // reduce overhead from std vector for light workload
+  std::atomic_flag err_flag = ATOMIC_FLAG_INIT;
+  std::exception_ptr eptr;
+#pragma omp parallel num_threads(num_threads)
+  {
+    auto tid = omp_get_thread_num();
+    auto chunk_size = divup((end - begin), num_threads);
+    auto begin_tid = begin + tid * chunk_size;
+    if (begin_tid < end) {
+      auto end_tid = std::min(end, chunk_size + begin_tid);
+      try {
+        results_data[tid] = f(begin_tid, end_tid, ident);
+      } catch (...) {
+        if (!err_flag.test_and_set())
+          eptr = std::current_exception();
+      }
+    }
+  }
+  if (eptr)
+    std::rethrow_exception(eptr);
+
+  DType out = ident;
+  for (int64_t i = 0; i < num_results; ++i)
+    out = sf(out, results_data[i]);
+  return out;
+}
+
 }  // namespace runtime
 }  // namespace dgl
 

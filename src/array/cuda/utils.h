@@ -172,6 +172,24 @@ __global__ void _LinearSearchKernel(
   }
 }
 
+template <typename DType>
+inline DType GetCUDAScalar(
+    runtime::DeviceAPI* device_api,
+    DLContext ctx,
+    const DType* cuda_ptr,
+    cudaStream_t stream) {
+  DType result;
+  device_api->CopyDataFromTo(
+      cuda_ptr, 0,
+      &result, 0,
+      sizeof(result),
+      ctx,
+      DLContext{kDLCPU, 0},
+      DLDataTypeTraits<DType>::dtype,
+      stream);
+  return result;
+}
+
 }  // namespace cuda
 }  // namespace dgl
 

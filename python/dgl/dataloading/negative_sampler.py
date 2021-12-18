@@ -1,6 +1,7 @@
 """Negative samplers"""
 from collections.abc import Mapping
 from .. import backend as F
+from ..sampling import global_uniform_negative_sampling
 
 class _BaseNegativeSampler(object):
     def _generate(self, g, eids, canonical_etype):
@@ -31,7 +32,7 @@ class _BaseNegativeSampler(object):
 
         return neg_pair
 
-class Uniform(_BaseNegativeSampler):
+class PerSourceUniform(_BaseNegativeSampler):
     """Negative sampler that randomly chooses negative destination nodes
     for each source node according to a uniform distribution.
 
@@ -48,7 +49,7 @@ class Uniform(_BaseNegativeSampler):
     Examples
     --------
     >>> g = dgl.graph(([0, 1, 2], [1, 2, 3]))
-    >>> neg_sampler = dgl.dataloading.negative_sampler.Uniform(2)
+    >>> neg_sampler = dgl.dataloading.negative_sampler.PerSourceUniform(2)
     >>> neg_sampler(g, torch.tensor([0, 1]))
     (tensor([0, 0, 1, 1]), tensor([1, 0, 2, 3]))
     """
@@ -65,3 +66,48 @@ class Uniform(_BaseNegativeSampler):
         src = F.repeat(src, self.k, 0)
         dst = F.randint(shape, dtype, ctx, 0, g.number_of_nodes(vtype))
         return src, dst
+
+# Alias
+Uniform = PerSourceUniform
+
+class GlobalUniform(_BaseNegativeSampler):
+    """Negative sampler that randomly chooses negative source-destination pairs according
+    to a uniform distribution.
+
+    For each edge ``(u, v)`` of type ``(srctype, etype, dsttype)``, DGL generates
+    :attr:`k` pairs of negative edges ``(u', v')``, where ``u'`` is chosen uniformly from
+    all the nodes of type ``srctype`` and ``v'`` is chosen uniformly from all the nodes
+    of type ``dsttype``.  The resulting edges will also have type
+    ``(srctype, etype, dsttype)``.
+
+    Parameters
+    ----------
+    k : int
+        The number of negative examples to generate per minibatch.
+    exclude_self_loops : bool, optional
+        Whether to exclude self-loops from negative examples.  (Default: False)
+    num_trials : int, optional
+        The number of rejection sampling trials.  Increasing it will increase the
+        likelihood of getting :attr:`k` negative examples, but will also take more
+        time if the graph is dense.
+
+    Notes
+    -----
+    This negative sampler may not always return :attr:`k` negative samples.  Consider
+    increasing :attr:`num_trials` if you would like to always get :attr:`k` samples.
+
+    Examples
+    --------
+    >>> g = dgl.graph(([0, 1, 2], [1, 2, 3]))
+    >>> neg_sampler = dgl.dataloading.negative_sampler.GlobalUniform(4, True)
+    >>> neg_sampler(g)
+    (tensor([0, 1, 3, 2]), tensor([2, 0, 2, 1]))
+    """
+    def __init__(self, k, exclude_self_loops=False, num_trials=3):
+        self.k = k
+        self.exclude_self_loops = exclude_self_loops
+        self.num_trials = num_trials
+
+    def _generate(self, g, eids, canonical_etype):
+        return global_uniform_negative_sampling(
+                g, self.k, self.exclude_self_loops, self.canonical_etype, self.num_trials)

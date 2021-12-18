@@ -548,6 +548,25 @@ COOMatrix CSRRowWiseSamplingBiased(
 );
 
 /*!
+ * \brief Uniformly sample row-column pairs whose entries do not exist in the given
+ * sparse matrix using rejection sampling.
+ *
+ * \note The number of samples returned may not necessarily be the number of samples
+ * given.
+ *
+ * \param csr The CSR matrix.
+ * \param num_samples The number of samples.
+ * \param num_trials The number of trials.
+ * \param exclude_self_loops Do not include the examples where the row equals the column.
+ * \return A pair of row and column tensors.
+ */
+std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling(
+    const CSRMatrix& csr,
+    int64_t num_samples,
+    int num_trials,
+    bool exclude_self_loops);
+
+/*!
  * \brief Sort the column index according to the tag of each column.
  *
  * Example:

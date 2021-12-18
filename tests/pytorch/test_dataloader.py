@@ -356,9 +356,11 @@ def test_node_dataloader(sampler_name):
 
 
 @pytest.mark.parametrize('sampler_name', ['full', 'neighbor', 'shadow'])
-def test_edge_dataloader(sampler_name):
-    neg_sampler = dgl.dataloading.negative_sampler.Uniform(2)
-
+@pytest.mark.parametrize('neg_sampler', [
+    dgl.dataloading.negative_sampler.Uniform(2),
+    dgl.dataloading.negative_sampler.GlobalUniform(15, False, 3),
+    dgl.dataloading.negative_sampler.GlobalUniform(15, True, 3)])
+def test_edge_dataloader(sampler_name, neg_sampler):
     g1 = dgl.graph(([0, 0, 0, 1, 1], [1, 2, 3, 3, 4]))
     g1.ndata['feat'] = F.copy_to(F.randn((5, 8)), F.cpu())
 
