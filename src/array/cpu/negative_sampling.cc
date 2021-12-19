@@ -5,6 +5,7 @@
  */
 
 #include <dgl/array.h>
+#include <dgl/array_iterator.h>
 #include <dgl/runtime/parallel_for.h>
 #include <dgl/random.h>
 #include <utility>
@@ -21,14 +22,18 @@ std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling(
     const CSRMatrix &csr,
     int64_t num_samples,
     int num_trials,
-    bool exclude_self_loops) {
+    bool exclude_self_loops,
+    bool unique,
+    double redundancy) {
   const int64_t num_row = csr.num_rows;
   const int64_t num_col = csr.num_cols;
-  IdArray row = Full<IdType>(-1, num_samples, csr.indptr->ctx);
-  IdArray col = Full<IdType>(-1, num_samples, csr.indptr->ctx);
+  const int64_t num_actual_samples =
+    unique ? (int)(num_samples * redundancy) : num_samples;
+  IdArray row = Full<IdType>(-1, num_actual_samples, csr.indptr->ctx);
+  IdArray col = Full<IdType>(-1, num_actual_samples, csr.indptr->ctx);
   IdType* row_data = row.Ptr<IdType>();
   IdType* col_data = col.Ptr<IdType>();
-  parallel_for(0, num_samples, 1, [&](int64_t b, int64_t e) {
+  parallel_for(0, num_actual_samples, 1, [&](int64_t b, int64_t e) {
     for (int64_t i = b; i < e; ++i) {
       for (int trial = 0; trial < num_trials; ++trial) {
         IdType u = RandomEngine::ThreadLocal()->RandInt(num_row);
@@ -42,21 +47,24 @@ std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling(
     }
   });
 
-  IdType* row_data_end = std::remove_if(row_data, row_data + num_samples, [](IdType x) {
-    return x == -1;
-  });
-  IdType* col_data_end = std::remove_if(col_data, col_data + num_samples, [](IdType x) {
-    return x == -1;
-  });
-  IdArray row_filtered = row.CreateView({row_data_end - row_data}, row->dtype);
-  IdArray col_filtered = col.CreateView({col_data_end - col_data}, col->dtype);
-  return {row_filtered, col_filtered};
+  PairIterator<IdType> begin(row_data, col_data);
+  PairIterator<IdType> end = std::remove_if(begin, begin + num_samples,
+      [](const std::pair<IdType, IdType>& val) { return val.first == -1; });
+  if (unique) {
+    std::sort(begin, end,
+        [](const std::pair<IdType, IdType>& a, const std::pair<IdType, IdType>& b) {
+          return a.first < b.first || (a.first == b.first && a.second < b.second);
+        });;
+    end = std::unique(begin, end);
+  }
+  int64_t num_sampled = std::min(end - begin, num_samples);
+  return {row.CreateView({num_sampled}, row->dtype), col.CreateView({num_sampled}, col->dtype)};
 }
 
 template std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling<kDLCPU, int32_t>(
-    const CSRMatrix&, int64_t, int, bool);
+    const CSRMatrix&, int64_t, int, bool, bool, double);
 template std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling<kDLCPU, int64_t>(
-    const CSRMatrix&, int64_t, int, bool);
+    const CSRMatrix&, int64_t, int, bool, bool, double);
 
 };  // namespace impl
 };  // namespace aten

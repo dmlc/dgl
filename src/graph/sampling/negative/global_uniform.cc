@@ -23,7 +23,9 @@ std::pair<IdArray, IdArray> GlobalUniformNegativeSampling(
     dgl_type_t etype,
     int64_t num_samples,
     int num_trials,
-    bool exclude_self_loops) {
+    bool exclude_self_loops,
+    bool unique,
+    double redundancy) {
   dgl_format_code_t allowed = hg->GetAllowedFormats();
 
   auto format = hg->SelectFormat(etype, CSC_CODE | CSR_CODE);
@@ -31,13 +33,14 @@ std::pair<IdArray, IdArray> GlobalUniformNegativeSampling(
     CSRMatrix csc = hg->GetCSCMatrix(etype);
     CSRSort_(&csc);
     std::pair<IdArray, IdArray> result = CSRGlobalUniformNegativeSampling(
-        csc, num_samples, num_trials, exclude_self_loops);
+        csc, num_samples, num_trials, exclude_self_loops, unique, redundancy);
     // reverse the pair since it is CSC
     return {result.second, result.first};
   } else if (format == SparseFormat::kCSR) {
     CSRMatrix csr = hg->GetCSRMatrix(etype);
     CSRSort_(&csr);
-    return CSRGlobalUniformNegativeSampling(csr, num_samples, num_trials, exclude_self_loops);
+    return CSRGlobalUniformNegativeSampling(
+        csr, num_samples, num_trials, exclude_self_loops, unique, redundancy);
   } else {
     LOG(FATAL) << "COO format is not supported in global uniform negative sampling";
     return {IdArray(), IdArray()};
@@ -52,9 +55,11 @@ DGL_REGISTER_GLOBAL("sampling.negative._CAPI_DGLGlobalUniformNegativeSampling")
     int64_t num_samples = args[2];
     int num_trials = args[3];
     bool exclude_self_loops = args[4];
+    bool unique = args[5];
+    double redundancy = args[6];
     List<Value> result;
     std::pair<IdArray, IdArray> ret = GlobalUniformNegativeSampling(
-        hg.sptr(), etype, num_samples, num_trials, exclude_self_loops);
+        hg.sptr(), etype, num_samples, num_trials, exclude_self_loops, unique, redundancy);
     result.push_back(Value(MakeValue(ret.first)));
     result.push_back(Value(MakeValue(ret.second)));
     *rv = result;

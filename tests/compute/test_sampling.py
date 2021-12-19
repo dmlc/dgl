@@ -890,11 +890,26 @@ def test_sample_neighbors_exclude_edges_homoG(dtype):
 @pytest.mark.parametrize('dtype', ['int32', 'int64'])
 def test_global_uniform_negative_sampling(dtype):
     g = dgl.graph((np.random.randint(0, 20, (300,)), np.random.randint(0, 20, (300,)))).to(F.ctx())
-    src, dst = dgl.sampling.global_uniform_negative_sampling(g, 20, False)
+    src, dst = dgl.sampling.global_uniform_negative_sampling(g, 20, False, False)
     assert not F.asnumpy(g.has_edges_between(src, dst)).any()
 
+    src, dst = dgl.sampling.global_uniform_negative_sampling(g, 20, False, True)
+    assert not F.asnumpy(g.has_edges_between(src, dst)).any()
+    src = F.asnumpy(src)
+    dst = F.asnumpy(dst)
+    s = set(zip(src.tolist(), dst.tolist()))
+    assert len(s) == len(src)
+
     g = dgl.graph(([0], [1])).to(F.ctx())
-    src, dst = dgl.sampling.global_uniform_negative_sampling(g, 1, True, num_trials=5)
+    src, dst = dgl.sampling.global_uniform_negative_sampling(g, 20, True, False, num_trials=5)
+    src = F.asnumpy(src)
+    dst = F.asnumpy(dst)
+    # should have either no element or all (1, 0)
+    assert len(src) == 0 or (src[0] == 1).all()
+    assert len(dst) == 0 or (dst[0] == 0).all()
+
+    g = dgl.graph(([0], [1])).to(F.ctx())
+    src, dst = dgl.sampling.global_uniform_negative_sampling(g, 20, True, True, num_trials=5, redundancy=2)
     src = F.asnumpy(src)
     dst = F.asnumpy(dst)
     # should have either no element or (1, 0)
@@ -907,7 +922,7 @@ def test_global_uniform_negative_sampling(dtype):
     g = dgl.heterograph({
         ('A', 'AB', 'B'): (np.random.randint(0, 20, (300,)), np.random.randint(0, 40, (300,))),
         ('B', 'BA', 'A'): (np.random.randint(0, 40, (200,)), np.random.randint(0, 20, (200,)))}).to(F.ctx())
-    src, dst = dgl.sampling.global_uniform_negative_sampling(g, 20, False, 'AB')
+    src, dst = dgl.sampling.global_uniform_negative_sampling(g, 20, False, etype='AB')
     assert not F.asnumpy(g.has_edges_between(src, dst, etype='AB')).any()
 
 

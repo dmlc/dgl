@@ -28,6 +28,8 @@ namespace sampling {
  * \param num_trials The number of rejection sampling trials.
  * \param exclude_self_loops Do not include the examples where the source equals the
  *        destination.
+ * \param unique Whether to sample unique negative examples.
+ * \param redundancy How much redundant negative examples to take in case of duplicate examples.
  * \return The pair of source and destination tensors.
  */
 std::pair<IdArray, IdArray> GlobalUniformNegativeSampling(
@@ -35,7 +37,9 @@ std::pair<IdArray, IdArray> GlobalUniformNegativeSampling(
     dgl_type_t etype,
     int64_t num_samples,
     int num_trials,
-    bool exclude_self_loops);
+    bool exclude_self_loops,
+    bool unique,
+    double redundancy);
 
 };  // namespace sampling
 };  // namespace dgl

@@ -199,7 +199,9 @@ std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling(
     const CSRMatrix& csr,
     int64_t num_samples,
     int num_trials,
-    bool exclude_self_loops);
+    bool exclude_self_loops,
+    bool unique,
+    double redundancy);
 
 // Union CSRMatrixes
 template <DLDeviceType XPU, typename IdType>
