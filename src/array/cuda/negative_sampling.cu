@@ -36,7 +36,7 @@ __global__ void _GlobalUniformNegativeSamplingKernel(
   int64_t tx = blockIdx.x * blockDim.x + threadIdx.x;
   const int stride_x = gridDim.x * blockDim.x;
 
-  curandStatePhilox4_32_10_t rng; // this allows generating 4 32-bit ints at a time
+  curandStatePhilox4_32_10_t rng;   // this allows generating 4 32-bit ints at a time
   curand_init(random_seed * gridDim.x + blockIdx.x, threadIdx.x, 0, &rng);
 
   while (tx < num_samples) {

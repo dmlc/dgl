@@ -140,7 +140,6 @@ DType parallel_reduce(
   }
 
   std::vector<DType> results(num_threads, ident);
-  DType* results_data = results.data(); // reduce overhead from std vector for light workload
   std::atomic_flag err_flag = ATOMIC_FLAG_INIT;
   std::exception_ptr eptr;
 #pragma omp parallel num_threads(num_threads)
@@ -151,7 +150,7 @@ DType parallel_reduce(
     if (begin_tid < end) {
       auto end_tid = std::min(end, chunk_size + begin_tid);
       try {
-        results_data[tid] = f(begin_tid, end_tid, ident);
+        results[tid] = f(begin_tid, end_tid, ident);
       } catch (...) {
         if (!err_flag.test_and_set())
           eptr = std::current_exception();
@@ -163,7 +162,7 @@ DType parallel_reduce(
 
   DType out = ident;
   for (int64_t i = 0; i < num_threads; ++i)
-    out = sf(out, results_data[i]);
+    out = sf(out, results[i]);
   return out;
 }
 
