@@ -27,8 +27,7 @@ std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling(
     double redundancy) {
   const int64_t num_row = csr.num_rows;
   const int64_t num_col = csr.num_cols;
-  const int64_t num_actual_samples =
-    unique ? (int)(num_samples * redundancy) : num_samples;
+  const int64_t num_actual_samples = static_cast<int64_t>(num_samples * redundancy);
   IdArray row = Full<IdType>(-1, num_actual_samples, csr.indptr->ctx);
   IdArray col = Full<IdType>(-1, num_actual_samples, csr.indptr->ctx);
   IdType* row_data = row.Ptr<IdType>();
