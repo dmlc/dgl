@@ -189,10 +189,9 @@ def test_binary_op(idtype):
             [g.apply_edges(builtin_msg('h', 'h', 'm'), etype = rel)
                 for rel in g.canonical_etypes]
             r1 = g['plays'].edata['m']
-            loss = r1.sum() # + r5.sum() + r6.sum()
+            loss = F.sum(r1.view(-1), 0)
             F.backward(loss)
             n_grad1 = F.grad(g.nodes['game'].data['h'])
-            print("old", n_grad1)
 
         #################################################################
         #  apply_edges() is called on all relation types
@@ -216,10 +215,9 @@ def test_binary_op(idtype):
         with F.record_grad():
             g.apply_edges(builtin_msg('h', 'h', 'm'))
             r2 = g['plays'].edata['m']
-            loss = r2.sum() # + r5.sum() + r6.sum()
+            loss = F.sum(r2.view(-1), 0)
             F.backward(loss)
             n_grad2 = F.grad(g.nodes['game'].data['h'])
-            print("new", n_grad2)
         # correctness check
         def _print_error(a, b):
             for i, (x, y) in enumerate(zip(F.asnumpy(a).flatten(), F.asnumpy(b).flatten())):
@@ -247,5 +245,3 @@ def test_binary_op(idtype):
 if __name__ == '__main__':
     test_unary_copy_u()
     test_unary_copy_e()
-
-
