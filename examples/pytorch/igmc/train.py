@@ -7,7 +7,6 @@ import glob
 import random
 import argparse
 from shutil import copy
-# from pyinstrument import Profiler
 
 import numpy as np
 import torch as th
@@ -20,7 +19,6 @@ from data import MovieLens
 from dataset import MovieLensDataset, collate_movielens 
 from utils import MetricLogger
 
-os.environ['TZ'] = 'Asia/Shanghai'
 time.tzset()
 
 def evaluate(model, loader, device):
@@ -43,7 +41,6 @@ def adj_rating_reg(model):
         arr_loss += th.sum((weight[1:, :, :] - weight[:-1, :, :])**2)
     return arr_loss
 
-# @profile
 def train_epoch(model, loss_fn, optimizer, arr_lambda, loader, device, log_interval):
     model.train()
 
@@ -53,8 +50,6 @@ def train_epoch(model, loss_fn, optimizer, arr_lambda, loader, device, log_inter
     iter_cnt = 0
     iter_dur = []
 
-    # profiler = Profiler()
-    # profiler.start()
     for iter_idx, batch in enumerate(loader, start=1):
         t_start = time.time()
 
@@ -79,8 +74,6 @@ def train_epoch(model, loss_fn, optimizer, arr_lambda, loader, device, log_inter
             iter_loss = 0.
             iter_mse = 0.
             iter_cnt = 0
-    # profiler.stop()
-    # profiler.output_html()
     return epoch_loss / len(loader.dataset)
 
 def train(args):
@@ -111,9 +104,6 @@ def train(args):
                  num_bases=4, 
                  regression=True, 
                  edge_dropout=args.edge_dropout,
-                #  side_features=args.use_features,
-                #  n_side_features=n_features,
-                #  multiply_by=args.multiply_by
             ).to(args.device)
     loss_fn = nn.MSELoss().to(args.device)
     optimizer = optim.Adam(model.parameters(), lr=args.train_lr, weight_decay=0)
@@ -153,6 +143,7 @@ def train(args):
         f.write(eval_info)
 
 def config():
+    th.autograd.set_detect_anomaly(True)
     parser = argparse.ArgumentParser(description='IGMC')
     # general settings
     parser.add_argument('--testing', action='store_true', default=False,
@@ -168,8 +159,6 @@ def config():
     parser.add_argument('--data_test_ratio', type=float, default=0.1) # for ml-100k the test ration is 0.2
     parser.add_argument('--num_workers', type=int, default=8)
     parser.add_argument('--data_valid_ratio', type=float, default=0.2)
-    # parser.add_argument('--ensemble', action='store_true', default=False,
-    #                     help='if True, load a series of model checkpoints and ensemble the results')               
     parser.add_argument('--train_log_interval', type=int, default=100)
     parser.add_argument('--valid_log_interval', type=int, default=10)
     parser.add_argument('--save_appendix', type=str, default='debug', 
@@ -181,8 +170,6 @@ def config():
                         help='if < 1, subsample nodes per hop according to the ratio')
     parser.add_argument('--max_nodes_per_hop', type=int, default=200, 
                         help='if > 0, upper bound the # nodes per hop by another subsampling')
-    # parser.add_argument('--use_features', action='store_true', default=False,
-    #                     help='whether to use node features (side information)')
     # edge dropout settings
     parser.add_argument('--edge_dropout', type=float, default=0.2, 
                         help='if not 0, random drops edges from adjacency matrix with this prob')

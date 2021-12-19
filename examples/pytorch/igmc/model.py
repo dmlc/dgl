@@ -55,8 +55,7 @@ class IGMC(nn.Module):
         self.lin1.reset_parameters()
         self.lin2.reset_parameters()
 
-    # @profile
-    def forward(self, block):
+        def forward(self, block):
         block = edge_drop(block, self.edge_dropout, self.training)
 
         concat_states = []
