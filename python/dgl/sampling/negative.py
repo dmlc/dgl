@@ -65,7 +65,7 @@ def global_uniform_negative_sampling(
 
     etype_id = g.get_etype_id(etype)
     src, dst = _CAPI_DGLGlobalUniformNegativeSampling(
-            g._graph, etype_id, num_samples, num_trials, exclude_self_loops, unique, redundancy)
+        g._graph, etype_id, num_samples, num_trials, exclude_self_loops, unique, redundancy)
     return F.from_dgl_nd(src), F.from_dgl_nd(dst)
 
 _init_api('dgl.sampling.negative', __name__)

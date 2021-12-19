@@ -125,5 +125,5 @@ class GlobalUniform(_BaseNegativeSampler):
 
     def _generate(self, g, eids, canonical_etype):
         return global_uniform_negative_sampling(
-                g, self.k, self.exclude_self_loops, self.unique, canonical_etype, self.num_trials,
-                self.redundancy)
+            g, self.k, self.exclude_self_loops, self.unique, canonical_etype, self.num_trials,
+            self.redundancy)
