@@ -176,6 +176,12 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroContext")
     *rv = hg->Context();
   });
 
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroIsPinned")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    *rv = hg->IsPinned();
+  });
+
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroNumBits")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
@@ -471,6 +477,30 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCopyTo")
     DGLGetStream(device_type, device_id, &stream);
     HeteroGraphPtr hg_new = HeteroGraph::CopyTo(hg.sptr(), ctx, stream);
     *rv = HeteroGraphRef(hg_new);
+  });
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroPinMemory")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    int device_type = args[1];
+    int device_id = args[2];
+    DLContext ctx;
+    ctx.device_type = static_cast<DLDeviceType>(device_type);
+    ctx.device_id = device_id;
+    HeteroGraph::PinMemory(hg.sptr(), ctx);
+    *rv = hg;
+  });
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroUnpinMemory")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    int device_type = args[1];
+    int device_id = args[2];
+    DLContext ctx;
+    ctx.device_type = static_cast<DLDeviceType>(device_type);
+    ctx.device_id = device_id;
+    HeteroGraph::UnpinMemory(hg.sptr(), ctx);
+    *rv = hg;
   });
 
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCopyToSharedMem")

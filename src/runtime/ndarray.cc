@@ -255,6 +255,24 @@ void NDArray::CopyFromTo(DLTensor* from,
     from_size, from->ctx, to->ctx, from->dtype, stream);
 }
 
+void NDArray::PinData(DLTensor* tensor, DLContext ctx) {
+  // only need to call PinData once, since the pinned memory can be seen
+  // by all CUDA contexts, not just the one that performed the allocation
+  if (tensor->ctx.device_type == kDLCPUPinned) return;
+  CHECK_EQ(tensor->ctx.device_type, kDLCPU)
+    << "Only NDArray on CPU can be pinned";
+  CHECK_EQ(ctx.device_type, kDLGPU);
+  DeviceAPI::Get(ctx)->PinData(ctx, tensor->data, GetDataSize(*tensor));
+  tensor->ctx = DLContext{kDLCPUPinned, 0};
+}
+
+void NDArray::UnpinData(DLTensor* tensor, DLContext ctx) {
+  if (tensor->ctx.device_type != kDLCPUPinned) return;
+  CHECK_EQ(ctx.device_type, kDLGPU);
+  DeviceAPI::Get(ctx)->UnpinData(ctx, tensor->data);
+  tensor->ctx = DLContext{kDLCPU, 0};
+}
+
 template<typename T>
 NDArray NDArray::FromVector(const std::vector<T>& vec, DLContext ctx) {
   const DLDataType dtype = DLDataTypeTraits<T>::dtype;
@@ -514,16 +532,13 @@ int DGLArrayCopyToBytes(DGLArrayHandle handle,
 int DGLArrayPinData(DGLArrayHandle handle,
                     DLContext ctx) {
   API_BEGIN();
-  CHECK_EQ(ctx.device_type, kDLGPU);
-  DeviceAPI::Get(ctx)->PinData(ctx, handle->data,
-                                        GetDataSize(*handle));
+  NDArray::PinData(handle, ctx);
   API_END();
 }
 
 int DGLArrayUnpinData(DGLArrayHandle handle,
                       DLContext ctx) {
   API_BEGIN();
-  CHECK_EQ(ctx.device_type, kDLGPU);
-  DeviceAPI::Get(ctx)->UnpinData(ctx, handle->data);
+  NDArray::UnpinData(handle, ctx);
   API_END();
 }

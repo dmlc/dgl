@@ -129,6 +129,22 @@ struct COOMatrix {
                      aten::IsNullArray(data) ? data : data.CopyTo(ctx, stream),
                      row_sorted, col_sorted);
   }
+
+  inline void PinMemory(const DLContext &ctx) {
+    row.PinMemory(ctx);
+    col.PinMemory(ctx);
+    if (!aten::IsNullArray(data)) {
+      data.PinMemory(ctx);
+    }
+  }
+
+  inline void UnpinMemory(const DLContext &ctx) {
+    row.UnpinMemory(ctx);
+    col.UnpinMemory(ctx);
+    if (!aten::IsNullArray(data)) {
+      data.UnpinMemory(ctx);
+    }
+  }
 };
 
 ///////////////////////// COO routines //////////////////////////

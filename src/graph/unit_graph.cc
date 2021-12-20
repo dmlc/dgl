@@ -133,6 +133,10 @@ class UnitGraph::COO : public BaseHeteroGraph {
     return adj_.row->ctx;
   }
 
+  bool IsPinned() const override {
+    return adj_.row.IsPinned();
+  }
+
   uint8_t NumBits() const override {
     return adj_.row->dtype.bits;
   }
@@ -154,6 +158,14 @@ class UnitGraph::COO : public BaseHeteroGraph {
     if (Context() == ctx)
       return *this;
     return COO(meta_graph_, adj_.CopyTo(ctx, stream));
+  }
+
+  void PinMemory(const DLContext &ctx) {
+    adj_.PinMemory(ctx);
+  }
+
+  void UnpinMemory(const DLContext &ctx) {
+    adj_.UnpinMemory(ctx);
   }
 
   bool IsMultigraph() const override {
@@ -520,6 +532,10 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     return adj_.indices->ctx;
   }
 
+  bool IsPinned() const override {
+    return adj_.indices.IsPinned();
+  }
+
   uint8_t NumBits() const override {
     return adj_.indices->dtype.bits;
   }
@@ -545,6 +561,14 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     } else {
       return CSR(meta_graph_, adj_.CopyTo(ctx, stream));
     }
+  }
+
+  void PinMemory(const DLContext &ctx) {
+    adj_.PinMemory(ctx);
+  }
+
+  void UnpinMemory(const DLContext &ctx) {
+    adj_.UnpinMemory(ctx);
   }
 
   bool IsMultigraph() const override {
@@ -827,6 +851,10 @@ DLDataType UnitGraph::DataType() const {
 
 DLContext UnitGraph::Context() const {
   return GetAny()->Context();
+}
+
+bool UnitGraph::IsPinned() const {
+  return GetAny()->IsPinned();
 }
 
 uint8_t UnitGraph::NumBits() const {
@@ -1261,6 +1289,28 @@ HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DLContext &ctx,
     return HeteroGraphPtr(
         new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, new_coo, bg->formats_));
   }
+}
+
+void UnitGraph::PinMemory(HeteroGraphPtr g, const DLContext &ctx) {
+  auto bg = std::dynamic_pointer_cast<UnitGraph>(g);
+  CHECK_NOTNULL(bg);
+  if (bg->in_csr_->defined())
+    bg->in_csr_->PinMemory(ctx);
+  if (bg->out_csr_->defined())
+    bg->out_csr_->PinMemory(ctx);
+  if (bg->coo_->defined())
+    bg->coo_->PinMemory(ctx);
+}
+
+void UnitGraph::UnpinMemory(HeteroGraphPtr g, const DLContext &ctx) {
+  auto bg = std::dynamic_pointer_cast<UnitGraph>(g);
+  CHECK_NOTNULL(bg);
+  if (bg->in_csr_->defined())
+    bg->in_csr_->UnpinMemory(ctx);
+  if (bg->out_csr_->defined())
+    bg->out_csr_->UnpinMemory(ctx);
+  if (bg->coo_->defined())
+    bg->coo_->UnpinMemory(ctx);
 }
 
 void UnitGraph::InvalidateCSR() {

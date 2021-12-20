@@ -83,6 +83,8 @@ class UnitGraph : public BaseHeteroGraph {
 
   DLContext Context() const override;
 
+  bool IsPinned() const override;
+
   uint8_t NumBits() const override;
 
   bool IsMultigraph() const override;
@@ -207,6 +209,12 @@ class UnitGraph : public BaseHeteroGraph {
   /*! \brief Copy the data to another context */
   static HeteroGraphPtr CopyTo(HeteroGraphPtr g, const DLContext &ctx,
                                const DGLStreamHandle &stream = nullptr);
+
+  /*! \brief Pin the data */
+  static void PinMemory(HeteroGraphPtr g, const DLContext &ctx);
+
+  /*! \brief Pin the data */
+  static void UnpinMemory(HeteroGraphPtr g, const DLContext &ctx);
 
   /*! 
    * \brief Create in-edge CSR format of the unit graph.

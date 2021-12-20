@@ -58,6 +58,10 @@ class HeteroGraph : public BaseHeteroGraph {
     return relation_graphs_[0]->Context();
   }
 
+  bool IsPinned() const override {
+    return relation_graphs_[0]->IsPinned();
+  }
+
   uint8_t NumBits() const override {
     return relation_graphs_[0]->NumBits();
   }
@@ -227,6 +231,12 @@ class HeteroGraph : public BaseHeteroGraph {
   /*! \brief Copy the data to another context */
   static HeteroGraphPtr CopyTo(HeteroGraphPtr g, const DLContext &ctx,
                                const DGLStreamHandle &stream = nullptr);
+
+  /*! \brief Pin the data */
+  static void PinMemory(HeteroGraphPtr g, const DLContext &ctx);
+
+  /*! \brief Pin the data */
+  static void UnpinMemory(HeteroGraphPtr g, const DLContext &ctx);
 
   /*! \brief Copy the data to shared memory.
   *

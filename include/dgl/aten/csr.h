@@ -122,6 +122,22 @@ struct CSRMatrix {
                      aten::IsNullArray(data) ? data : data.CopyTo(ctx, stream),
                      sorted);
   }
+
+  inline void PinMemory(const DLContext &ctx) {
+    indptr.PinMemory(ctx);
+    indices.PinMemory(ctx);
+    if (!aten::IsNullArray(data)) {
+      data.PinMemory(ctx);
+    }
+  }
+
+  inline void UnpinMemory(const DLContext &ctx) {
+    indptr.UnpinMemory(ctx);
+    indices.UnpinMemory(ctx);
+    if (!aten::IsNullArray(data)) {
+      data.UnpinMemory(ctx);
+    }
+  }
 };
 
 ///////////////////////// CSR routines //////////////////////////

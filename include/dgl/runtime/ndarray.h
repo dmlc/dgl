@@ -170,6 +170,18 @@ class NDArray {
    */
   inline NDArray Clone(const DGLStreamHandle &stream = nullptr) const;
   /*!
+   * \brief Pin the data.
+   */
+  inline void PinMemory(const DLContext &ctx);
+  /*!
+   * \brief Unpin the data.
+   */
+  inline void UnpinMemory(const DLContext &ctx);
+  /*!
+   * \brief Check if the data is pinned.
+   */
+  inline bool IsPinned() const;
+  /*!
    * \brief Load NDArray from stream
    * \param stream The input data stream
    * \return Whether load is successful
@@ -271,6 +283,16 @@ class NDArray {
    */
   DGL_DLL static void CopyFromTo(
       DLTensor* from, DLTensor* to, DGLStreamHandle stream = nullptr);
+
+  /*!
+   * \brief Pin the data.
+   */
+  DGL_DLL static void PinData(DLTensor* tensor, DLContext ctx);
+
+  /*!
+   * \brief Unpin the data.
+   */
+  DGL_DLL static void UnpinData(DLTensor* tensor, DLContext ctx);
 
   // internal namespace
   struct Internal;
@@ -431,6 +453,24 @@ inline NDArray NDArray::Clone(const DGLStreamHandle &stream) const {
   CHECK(data_ != nullptr);
   const DLTensor* dptr = operator->();
   return this->CopyTo(dptr->ctx, stream);
+}
+
+inline void NDArray::PinMemory(const DLContext &ctx) {
+  CHECK(data_ != nullptr);
+  DLTensor* dptr = &(data_->dl_tensor);
+  PinData(dptr, ctx);
+}
+
+inline void NDArray::UnpinMemory(const DLContext &ctx) {
+  CHECK(data_ != nullptr);
+  DLTensor* dptr = &(data_->dl_tensor);
+  UnpinData(dptr, ctx);
+}
+
+inline bool NDArray::IsPinned() const {
+  CHECK(data_ != nullptr);
+  DLTensor* dptr = &(data_->dl_tensor);
+  return dptr->ctx.device_type == kDLCPUPinned;
 }
 
 inline int NDArray::use_count() const {

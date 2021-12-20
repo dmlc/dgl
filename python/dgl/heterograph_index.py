@@ -234,6 +234,50 @@ class HeteroGraphIndex(ObjectBase):
         """
         return _CAPI_DGLHeteroCopyTo(self, ctx.device_type, ctx.device_id)
 
+    def pin_memory(self, ctx):
+        """Pin this graph to the page-locked memory.
+
+        NOTE: this is an inplace method.
+
+        Parameters
+        ----------
+        ctx : DGLContext
+            The target device context.
+
+        Returns
+        -------
+        HeteroGraphIndex
+            The pinned graph index.
+        """
+        return _CAPI_DGLHeteroPinMemory(self, ctx.device_type, ctx.device_id)
+
+    def unpin_memory(self, ctx):
+        """Unpin this graph from the page-locked memory.
+
+        NOTE: this is an inplace method.
+
+        Parameters
+        ----------
+        ctx : DGLContext
+            The target device context.
+
+        Returns
+        -------
+        HeteroGraphIndex
+            The unpinned graph index.
+        """
+        return _CAPI_DGLHeteroUnpinMemory(self, ctx.device_type, ctx.device_id)
+
+    def is_pinned(self):
+        """Check if this graph is pinned to the page-locked memory.
+
+        Returns
+        -------
+        bool
+            True if the graph is pinned.
+        """
+        return bool(_CAPI_DGLHeteroIsPinned(self))
+
     def shared_memory(self, name, ntypes=None, etypes=None, formats=('coo', 'csr', 'csc')):
         """Return a copy of this graph in shared memory
 

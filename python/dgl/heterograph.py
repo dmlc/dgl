@@ -5446,6 +5446,52 @@ class DGLHeteroGraph(object):
         """
         return self.to(F.cpu())
 
+    def pin_memory(self, device):
+        """Pin the graph structure to the page-locked memory.
+
+        NOTE: this is an inplace method.
+
+        Parameters
+        ----------
+        device : Framework-specific device context object
+            The context to move data to (e.g., ``torch.device``).
+
+        Returns
+        -------
+        DGLGraph
+            The pinned graph.
+        """
+        self._graph.pin_memory(utils.to_dgl_context(device))
+        return self
+
+    def unpin_memory(self, device):
+        """Unpin the graph structure from the page-locked memory.
+
+        NOTE: this is an inplace method.
+
+        Parameters
+        ----------
+        device : Framework-specific device context object
+            The context to move data to (e.g., ``torch.device``).
+
+        Returns
+        -------
+        DGLGraph
+            The unpinned graph.
+        """
+        self._graph.unpin_memory(utils.to_dgl_context(device))
+        return self
+
+    def is_pinned(self):
+        """Check if the graph structure is pinned to the page-locked memory.
+
+        Returns
+        -------
+        bool
+            True if the graph structure is pinned.
+        """
+        return self._graph.is_pinned()
+
     def clone(self):
         """Return a heterograph object that is a clone of current graph.
 
