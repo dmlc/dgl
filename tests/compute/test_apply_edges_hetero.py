@@ -159,4 +159,3 @@ if __name__ == '__main__':
     test_unary_copy_u()
     test_unary_copy_e()
 
-
