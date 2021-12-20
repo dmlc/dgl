@@ -44,17 +44,17 @@ AIFB: accuracy avg(5 runs) 91.10%, best 97.22% (DGL)
 python entity_sample.py -d aifb --l2norm 0 --gpu 0 --fanout='20,20' --batch-size 128
 ```
 
-MUTAG: accuracy avg(10 runs) 64.85%, best 72.06% (DGL)
+MUTAG: accuracy avg(10 runs) 63.97%, best 72.06% (DGL)
 ```
 python entity_sample.py -d mutag --n-bases 30 --gpu 0 --batch-size 64 --fanout "-1, -1" --use-self-loop --dgl-sparse --n-epochs 20 --sparse-lr 0.01 --dropout 0.5
 ```
 
-BGS: accuracy avg(5 runs) 76.55%, best 89.66% (DGL)
+BGS: accuracy avg(5 runs) 79.31%, best 93.10% (DGL)
 ```
 python entity_sample.py -d bgs --n-bases 40 --gpu 0 --fanout "-1, -1"  --n-epochs=16 --batch-size=16 --dgl-sparse --sparse-lr 0.05 --dropout 0.3
 ```
 
-AM: accuracy avg(5 runs) 87.98%, best 88.9% (DGL)
+AM: accuracy avg(5 runs) 88.69%, best 90.91% (DGL)
 ```
 python entity_sample.py -d am --n-bases 40 --gpu 0 --fanout '35,35' --batch-size 64 --n-hidden 16 --use-self-loop --n-epochs=20 --dgl-sparse --sparse-lr 0.02 --dropout 0.7
 ```
