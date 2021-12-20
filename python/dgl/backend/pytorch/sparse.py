@@ -26,8 +26,8 @@ else:
             return bwd(*args, **kwargs)
         return decorate_bwd
 
-__all__ = ['gspmm', 'gsddmm', 'gspmm_hetero', 'gsddmm_hetero', 'edge_softmax', 'segment_reduce', 'scatter_add',
-           'csrmm', 'csrsum', 'csrmask']
+__all__ = ['gspmm', 'gsddmm', 'gspmm_hetero', 'gsddmm_hetero', 'edge_softmax', 'edge_softmax_hetero',
+           'segment_reduce', 'scatter_add', 'csrmm', 'csrsum', 'csrmask']
 
 
 def _reduce_grad(grad, shape):
@@ -501,8 +501,79 @@ class EdgeSoftmax(th.autograd.Function):
         out, = ctx.saved_tensors
         sds = out * grad_out
         accum = gspmm(gidx, 'copy_rhs', 'sum', None, sds)
+
         grad_score = sds - gsddmm(gidx, 'mul', out, accum, 'e', 'v')
         return None, grad_score, None, None
+
+
+class EdgeSoftmax_hetero(th.autograd.Function):
+    @staticmethod
+    @custom_fwd(cast_inputs=th.float16)
+    def forward(ctx, gidx, eids, norm_by, *score):
+        """Forward function.
+
+        Pseudo-code:
+
+        .. code:: python
+
+            score = dgl.EData(g, score)
+            score_max = score.dst_max()  # of type dgl.NData
+            score = score - score_max  # edge_sub_dst, ret dgl.EData
+            score_sum = score.dst_sum()  # of type dgl.NData
+            out = score / score_sum    # edge_div_dst, ret dgl.EData
+            return out.data
+        """
+        # remember to save the graph to backward cache before making it
+        # a local variable
+        if not is_all(eids):
+            gidx = gidx.edge_subgraph([eids], True).graph
+        if norm_by == 'src':
+            gidx = gidx.reverse()
+        u_len = gidx.number_of_ntypes()
+        e_len = gidx.number_of_etypes()
+        lhs = [None] * u_len
+        feats =  tuple(lhs + list(score))
+        score_max = _gspmm_hetero(gidx, 'copy_rhs', 'max', u_len, feats)[0]
+        out_tmp = _gsddmm_hetero(gidx, 'sub', e_len, 'e', 'v', tuple(list(score) + list(score_max)))
+        score = tuple([th.exp(out_tmp[i]) if out_tmp[i] is not None else None
+                for i in range(len(out_tmp))])
+        score_sum = _gspmm_hetero(gidx, 'copy_rhs', 'sum', u_len, tuple(lhs + list(score)))[0]
+        out = _gsddmm_hetero(gidx, 'div', e_len, 'e', 'v', tuple(list(score) + list(score_sum)))
+        ctx.backward_cache = gidx
+        ctx.save_for_backward(*out)
+        return out
+
+    @staticmethod
+    @custom_bwd
+    def backward(ctx, *grad_out):
+        """Backward function.
+
+        Pseudo-code:
+
+        .. code:: python
+
+            g, out = ctx.backward_cache
+            grad_out = dgl.EData(g, grad_out)
+            out = dgl.EData(g, out)
+            sds = out * grad_out  # type dgl.EData
+            sds_sum = sds.dst_sum()  # type dgl.NData
+            grad_score = sds - out * sds_sum  # multiple expressions
+            return grad_score.data
+        """
+        gidx = ctx.backward_cache
+        # See https://github.com/dmlc/dgl/pull/3386
+        ctx.backward_cache = None
+        u_len = gidx.number_of_ntypes()
+        e_len = gidx.number_of_etypes()
+        lhs = [None] * u_len
+        out = ctx.saved_tensors
+        sds = tuple([out[i] * grad_out[i]
+            for i in range(len(out))])
+        accum = _gspmm_hetero(gidx, 'copy_rhs', 'sum', u_len, tuple(lhs + list(sds)))[0]
+        out_sddmm = _gsddmm_hetero(gidx, 'mul', e_len, 'e', 'v', tuple(list(out) + list(accum)))
+        grad_score = tuple([sds[i] - out_sddmm[i]
+            for i in range(len(sds))])
+        return (None, None, None) + grad_score
 
 
 class SegmentReduce(th.autograd.Function):
@@ -658,6 +729,9 @@ def gsddmm_hetero(g, op, lhs_len, lhs_target='u', rhs_target='v', *lhs_and_rhs_t
 
 def edge_softmax(gidx, logits, eids=ALL, norm_by='dst'):
     return EdgeSoftmax.apply(gidx, logits, eids, norm_by)
+
+def edge_softmax_hetero(gidx, eids=ALL, norm_by='dst', *logits):
+    return EdgeSoftmax_hetero.apply(gidx, eids, norm_by, *logits)
 
 def segment_reduce(op, x, offsets):
     return SegmentReduce.apply(op, x, offsets)
