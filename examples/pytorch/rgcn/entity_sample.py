@@ -54,10 +54,10 @@ def init_dataloaders(args, g, train_idx, test_idx, target_idx, device, num_gpus=
 
     return train_loader, val_loader, test_loader
 
-def init_models(args, device, node_feats, num_classes, num_rels):
+def init_models(args, device, num_nodes, num_classes, num_rels):
     embed_layer = RelGraphEmbedLayer(device if not args.dgl_sparse else th.device('cpu'),
                                      device,
-                                     node_feats,
+                                     num_nodes,
                                      args.n_hidden,
                                      dgl_sparse=args.dgl_sparse)
 
@@ -92,8 +92,7 @@ def train(model, embed_layer, train_loader, inv_target,
         for blc in blocks:
             gen_norm(blc)
 
-        feats = embed_layer(blocks[0].srcdata['ntype'],
-                            blocks[0].srcdata['type_id'])
+        feats = embed_layer(blocks[0].srcdata[dgl.NID])
         blocks = [blc.to(device) for blc in blocks]
         logits = model(blocks, feats)
         loss = F.cross_entropy(logits, labels[seeds])
@@ -123,8 +122,7 @@ def evaluate(device, model, embed_layer, eval_loader, inv_target):
             for blc in blocks:
                 gen_norm(blc)
 
-            feats = embed_layer(blocks[0].srcdata['ntype'],
-                                blocks[0].srcdata['type_id'])
+            feats = embed_layer(blocks[0].srcdata[dgl.NID])
             blocks = [blc.to(device) for blc in blocks]
             logits = model(blocks, feats)
             eval_logits.append(logits.cpu().detach())
@@ -138,7 +136,6 @@ def evaluate(device, model, embed_layer, eval_loader, inv_target):
 def main(args):
     hg, g, num_rels, num_classes, labels, train_idx, test_idx, target_idx, inv_target = load_data(
         args.dataset, inv_target=True)
-    node_feats = [hg.num_nodes(ntype) for ntype in hg.ntypes]
 
     # Create csr/coo/csc formats before launching training processes.
     # This avoids creating certain formats in each data loader process, which saves momory and CPU.
@@ -147,7 +144,7 @@ def main(args):
     device = th.device(args.gpu if args.gpu >= 0 else 'cpu')
     train_loader, val_loader, test_loader = init_dataloaders(
         args, g, train_idx, test_idx, target_idx, args.gpu)
-    embed_layer, model = init_models(args, device, node_feats, num_classes, num_rels)
+    embed_layer, model = init_models(args, device, g.num_nodes(), num_classes, num_rels)
 
     if args.gpu >= 0:
         th.cuda.set_device(device)
@@ -161,11 +158,12 @@ def main(args):
     if args.dgl_sparse:
         all_params = list(model.parameters()) + list(embed_layer.parameters())
         optimizer = th.optim.Adam(all_params, lr=1e-2, weight_decay=args.l2norm)
-        emb_optimizer = dgl.optim.SparseAdam(params=embed_layer.dgl_emb, lr=args.sparse_lr, eps=1e-8)
+        emb_optimizer = dgl.optim.SparseAdam(params=[embed_layer.node_embed],
+                                             lr=args.sparse_lr, eps=1e-8)
     else:
         dense_params = list(model.parameters())
         optimizer = th.optim.Adam(dense_params, lr=1e-2, weight_decay=args.l2norm)
-        embs = list(embed_layer.node_embeds.parameters())
+        embs = list(embed_layer.parameters())
         emb_optimizer = th.optim.SparseAdam(embs, lr=args.sparse_lr)
 
     for epoch in range(args.n_epochs):

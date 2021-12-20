@@ -60,9 +60,8 @@ class RelGraphEmbedLayer(nn.Module):
         Device to store the weights of the layer
     out_dev
         Device to store the output embeddings
-    input_size : list of int
-        A list of input feature size for each node type. If None, we then
-        treat certain input feature as a one-hot encoding feature.
+    num_nodes : int
+        Number of nodes in the graph.
     embed_size : int
         Output embed size
     dgl_sparse : bool, optional
@@ -71,7 +70,7 @@ class RelGraphEmbedLayer(nn.Module):
     def __init__(self,
                  storage_dev,
                  out_dev,
-                 input_size,
+                 num_nodes,
                  embed_size,
                  dgl_sparse=False):
         super(RelGraphEmbedLayer, self).__init__()
@@ -81,58 +80,30 @@ class RelGraphEmbedLayer(nn.Module):
         self.dgl_sparse = dgl_sparse
 
         # create embeddings for all nodes
-        self.embeds = nn.ParameterDict()
-        self.node_embeds = {} if dgl_sparse else nn.ModuleDict()
-        num_of_ntype = len(input_size)
-        self.num_of_ntype = num_of_ntype
-
-        for ntype in range(num_of_ntype):
-            if dgl_sparse:
-                self.node_embeds[str(ntype)] = dgl.nn.NodeEmbedding(input_size[ntype], embed_size, name=str(ntype),
-                    init_func=initializer, device=self.storage_dev_id)
-            else:
-                sparse_emb = nn.Embedding(input_size[ntype], embed_size, sparse=True)
-                sparse_emb.cuda(self.storage_dev_id)
-                nn.init.uniform_(sparse_emb.weight, -1.0, 1.0)
-                self.node_embeds[str(ntype)] = sparse_emb
-
-    @property
-    def dgl_emb(self):
-        if self.dgl_sparse:
-            embs = [emb for emb in self.node_embeds.values()]
-            return embs
+        if dgl_sparse:
+            self.node_embed = dgl.nn.NodeEmbedding(num_nodes, embed_size, name='emb',
+                                                   init_func=initializer, device=self.storage_dev_id)
         else:
-            return []
+            self.node_embed = nn.Embedding(num_nodes, embed_size, sparse=True)
+            self.node_embed.cuda(self.storage_dev_id)
+            nn.init.uniform_(self.node_embed.weight, -1.0, 1.0)
 
-    def forward(self, node_tids, type_ids):
+    def forward(self, node_ids):
         """Forward computation
 
         Parameters
         ----------
-        node_tids : tensor
-            node type ids
-        type_ids : tensor
-            type-specific node ids
+        node_ids : tensor
+            Raw node IDs.
 
         Returns
         -------
         tensor
             embeddings as the input of the next layer
         """
-        embeds = th.empty(node_tids.shape[0], self.embed_size, device=self.out_dev_id)
-
-        type_ids = type_ids.to(self.storage_dev_id)
-        node_tids = node_tids.to(self.storage_dev_id)
-
-        # build locs first
-        locs = [None for _ in range(self.num_of_ntype)]
-        for ntype in range(self.num_of_ntype):
-            locs[ntype] = (node_tids == ntype).nonzero().squeeze(-1)
-        for ntype in range(self.num_of_ntype):
-            loc = locs[ntype]
-            if self.dgl_sparse:
-                embeds[loc] = self.node_embeds[str(ntype)](type_ids[loc], self.out_dev_id)
-            else:
-                embeds[loc] = self.node_embeds[str(ntype)](type_ids[loc]).to(self.out_dev_id)
+        if self.dgl_sparse:
+            embeds = self.node_embed(node_ids, self.out_dev_id)
+        else:
+            embeds = self.node_embed(node_ids).to(self.out_dev_id)
 
         return embeds

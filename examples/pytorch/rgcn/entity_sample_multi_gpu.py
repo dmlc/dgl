@@ -17,7 +17,7 @@ from entity_sample import init_dataloaders, init_models, train, evaluate
 
 def run(proc_id, n_gpus, n_cpus, args, devices, dataset, queue=None):
     dev_id = devices[proc_id]
-    g, node_feats, num_classes, num_rels, target_idx, inv_target, train_idx,\
+    g, num_classes, num_rels, target_idx, inv_target, train_idx,\
         test_idx, labels = dataset
 
     dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
@@ -37,7 +37,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, queue=None):
     device = th.device(dev_id)
     train_loader, val_loader, test_loader = init_dataloaders(
         args, g, train_idx, test_idx, target_idx, dev_id, n_gpus)
-    embed_layer, model = init_models(args, device, node_feats, num_classes, num_rels)
+    embed_layer, model = init_models(args, device, g.num_nodes(), num_classes, num_rels)
 
     labels = labels.to(device)
     model = model.to(device)
@@ -51,11 +51,11 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, queue=None):
     if args.dgl_sparse:
         all_params = list(model.parameters()) + list(embed_layer.parameters())
         optimizer = th.optim.Adam(all_params, lr=1e-2, weight_decay=args.l2norm)
-        emb_optimizer = dgl.optim.SparseAdam(params=embed_layer.dgl_emb,
+        emb_optimizer = dgl.optim.SparseAdam(params=[embed_layer.node_embed],
                                              lr=args.sparse_lr, eps=1e-8)
     else:
         optimizer = th.optim.Adam(model.parameters(), lr=1e-2, weight_decay=args.l2norm)
-        embs = list(embed_layer.module.node_embeds.parameters())
+        embs = list(embed_layer.module.parameters())
         emb_optimizer = th.optim.SparseAdam(embs, lr=args.sparse_lr)
 
     def collect_eval():
@@ -105,7 +105,6 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, queue=None):
 def main(args, devices):
     hg, g, num_rels, num_classes, labels, train_idx, test_idx, target_idx, inv_target = load_data(
         args.dataset, inv_target=True)
-    node_feats = [hg.num_nodes(ntype) for ntype in hg.ntypes]
 
     # Create csr/coo/csc formats before launching training processes.
     # This avoids creating certain formats in each sub-process, which saves momory and CPU.
@@ -118,7 +117,7 @@ def main(args, devices):
     for proc_id in range(n_gpus):
         # We use distributed data parallel dataloader to handle the data splitting
         p = mp.Process(target=run, args=(proc_id, n_gpus, n_cpus // n_gpus, args, devices,
-                                        (g, node_feats, num_classes, num_rels, target_idx,
+                                        (g, num_classes, num_rels, target_idx,
                                          inv_target, train_idx, test_idx, labels),
                                          queue))
         p.start()
