@@ -172,7 +172,7 @@ def pad_data(nids):
     if max_num_nodes > nids_length:
         pad_size = max_num_nodes % nids_length
         repeat_size = max_num_nodes // nids_length
-        new_nids = th.cat([nids for _ in repeat_size] + [nids[:pad_size]], axis=0)
+        new_nids = th.cat([nids for _ in range(repeat_size)] + [nids[:pad_size]], axis=0)
         print("Pad nids from {} to {}".format(nids_length, max_num_nodes))
     else:
         new_nids = nids
