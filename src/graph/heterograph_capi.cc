@@ -173,7 +173,10 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroDataType")
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroContext")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
-    *rv = hg->Context();
+    if (hg->Context().device_type == kDLCPUPinned)
+      *rv = DLContext{kDLCPU, 0};
+    else
+      *rv = hg->Context();
   });
 
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroIsPinned")

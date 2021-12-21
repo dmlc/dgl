@@ -952,6 +952,63 @@ def test_to_device2(g, idtype):
         assert g1.etypes == g.etypes
         assert g1.canonical_etypes == g.canonical_etypes
 
+@unittest.skipIf(F._default_context_str == 'cpu', reason="Need gpu for this test")
+@parametrize_dtype
+def test_pin_memory(idtype):
+    # TODO: rewrite this test case to accept different graphs so we
+    #  can test reverse graph and batched graph
+    g = create_test_heterograph(idtype)
+    g.nodes['user'].data['h'] = F.ones((3, 5))
+    g.nodes['game'].data['i'] = F.ones((2, 5))
+    g.edges['plays'].data['e'] = F.ones((4, 4))
+    g = g.to(F.cpu())
+    assert not g.is_pinned()
+
+    if F.is_cuda_available():
+        # unpin an unpinned CPU graph, directly return
+        g.unpin_memory(F.cuda())
+        assert not g.is_pinned()
+        assert g.device == F.cpu()
+
+        # pin a CPU graph
+        g.pin_memory(F.cuda())
+        assert g.is_pinned()
+        assert g.device == F.cpu()
+        assert F.context(g.nodes['user'].data['h']) == F.cpu()
+        assert F.context(g.nodes['game'].data['i']) == F.cpu()
+        assert F.context(g.edges['plays'].data['e']) == F.cpu()
+        for ntype in g.ntypes:
+            assert F.context(g.batch_num_nodes(ntype)) == F.cpu()
+        for etype in g.canonical_etypes:
+            assert F.context(g.batch_num_edges(etype)) == F.cpu()
+
+        # pin a pinned graph, direcly return
+        g.pin_memory(F.cuda())
+        assert g.is_pinned()
+        assert g.device == F.cpu()
+
+        # unpin a pinned graph
+        g.unpin_memory(F.cuda())
+        assert not g.is_pinned()
+        assert g.device == F.cpu()
+
+        # target device must be a CUDA device
+        with pytest.raises(DGLError):
+            g.pin_memory(F.cpu())
+        with pytest.raises(DGLError):
+            g.unpin_memory(F.cpu())
+
+        g1 = g.to(F.cuda())
+
+        # unpin an unpinned GPU graph, directly return
+        g1.unpin_memory(F.cuda())
+        assert not g1.is_pinned()
+        assert g1.device == F.cuda()
+
+        # error pinning a GPU graph
+        with pytest.raises(DGLError):
+            g1.pin_memory(F.cuda())
+
 @parametrize_dtype
 def test_convert_bound(idtype):
     def _test_bipartite_bound(data, card):
