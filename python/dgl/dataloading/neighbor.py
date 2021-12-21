@@ -71,7 +71,7 @@ class MultiLayerNeighborSampler(NeighborSamplingMixin, BlockSampler):
 
         If -1 is provided for one edge type on one layer, then all inbound edges
         of that edge type will be included.
-    replace : bool, default True
+    replace : bool, default False
         Whether to sample with replacement
     return_eids : bool, default False
         Whether to return the edge IDs involved in message passing in the MFG.
