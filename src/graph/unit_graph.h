@@ -213,7 +213,7 @@ class UnitGraph : public BaseHeteroGraph {
   /*! \brief Pin the data */
   static void PinMemory(HeteroGraphPtr g, const DLContext &ctx);
 
-  /*! \brief Pin the data */
+  /*! \brief Unpin the data */
   static void UnpinMemory(HeteroGraphPtr g, const DLContext &ctx);
 
   /*! 
