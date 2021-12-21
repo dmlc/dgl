@@ -7,7 +7,7 @@ __all__ = [
     'global_uniform_negative_sampling']
 
 def global_uniform_negative_sampling(
-        g, num_samples, exclude_self_loops=False, unique=True, etype=None, num_trials=3,
+        g, num_samples, exclude_self_loops=True, unique=True, etype=None, num_trials=3,
         redundancy=1.3):
     """Performs negative sampling, which generate source-destination pairs such that
     edges with the given type do not exist.
@@ -22,7 +22,8 @@ def global_uniform_negative_sampling(
     .. note::
 
        This function uses rejection sampling, and may not always return the same number
-       of negative examples as the given :attr:`num_samples`.
+       of negative examples as the given :attr:`num_samples`.  This is more likely to
+       happen when a graph is so small or dense that not many unique negative examples exist.
 
     Parameters
     ----------
@@ -34,7 +35,7 @@ def global_uniform_negative_sampling(
         Whether to exclude self-loops from the negative examples.  Only impacts the
         edge types whose source and destination node types are the same.
 
-        Default: False.
+        Default: True.
     unique : bool, optional
         Whether to sample unique negative examples.  Setting it to False will make things
         faster.  (Default: True)
@@ -46,10 +47,10 @@ def global_uniform_negative_sampling(
         Indicates how much more negative examples to actually generate during rejection sampling
         before finding the unique pairs.
 
-        Only effective if :attr:`unique` is True.
-
         Increasing it will increase the likelihood of getting :attr:`k` negative examples,
         but will also take more time and memory.
+
+        (Default: 1.3)
 
     Returns
     -------

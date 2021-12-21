@@ -85,7 +85,7 @@ class GlobalUniform(_BaseNegativeSampler):
     k : int
         The number of negative examples to generate per minibatch.
     exclude_self_loops : bool, optional
-        Whether to exclude self-loops from negative examples.  (Default: False)
+        Whether to exclude self-loops from negative examples.  (Default: True)
     unique : bool, optional
         Whether to sample unique negative examples.  Setting it to False will make things
         faster.  (Default: True)
@@ -98,16 +98,19 @@ class GlobalUniform(_BaseNegativeSampler):
         Indicates how much more negative examples to actually generate during rejection sampling
         before finding the unique pairs.
 
-        Only effective if :attr:`unique` is True.
-
         Increasing it will increase the likelihood of getting :attr:`k` negative examples,
         but will also take more time and memory.
 
+        (Default: 1.3)
+
     Notes
     -----
-    This negative sampler may not always return :attr:`k` negative samples.  Consider
-    increasing :attr:`num_trials` (and :attr:`redundancy` if :attr:`unique` is True) if you
-    would like to always get :attr:`k` samples.
+    This negative sampler may not always return :attr:`k` negative samples.  This is more
+    likely to happen if a graph is so small or dense that not many unique negative examples
+    exist.
+    
+    Consider increasing :attr:`num_trials` (and :attr:`redundancy` if :attr:`unique` is True) if
+    you would like to always get :attr:`k` samples.
 
     Examples
     --------
@@ -116,7 +119,7 @@ class GlobalUniform(_BaseNegativeSampler):
     >>> neg_sampler(g)
     (tensor([0, 1, 3, 2]), tensor([2, 0, 2, 1]))
     """
-    def __init__(self, k, exclude_self_loops=False, unique=True, num_trials=3, redundancy=1.3):
+    def __init__(self, k, exclude_self_loops=True, unique=True, num_trials=3, redundancy=1.3):
         self.k = k
         self.exclude_self_loops = exclude_self_loops
         self.unique = unique
