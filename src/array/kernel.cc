@@ -604,6 +604,5 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_FG_SDDMMTreeReduction")
   });
 #endif  // USE_TVM
 
-
 }  // namespace aten
 }  // namespace dgl
