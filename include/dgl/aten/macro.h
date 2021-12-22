@@ -46,6 +46,9 @@
   } else if ((val) == kDLGPU) {                                 \
     constexpr auto XPU = kDLGPU;                                \
     {__VA_ARGS__}                                               \
+  } else if ((val) == kDLCPUPinned) {                           \
+    constexpr auto XPU = kDLCPUPinned;                          \
+    {__VA_ARGS__}                                               \
   } else {                                                      \
     LOG(FATAL) << "Operator " << (op) << " does not support "   \
                << dgl::runtime::DeviceTypeCode2Str(val)         \
