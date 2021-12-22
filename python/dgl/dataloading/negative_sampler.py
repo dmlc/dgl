@@ -108,7 +108,7 @@ class GlobalUniform(_BaseNegativeSampler):
     This negative sampler may not always return :attr:`k` negative samples.  This is more
     likely to happen if a graph is so small or dense that not many unique negative examples
     exist.
-    
+
     Consider increasing :attr:`num_trials` (and :attr:`redundancy` if :attr:`unique` is True) if
     you would like to always get :attr:`k` samples.
 
