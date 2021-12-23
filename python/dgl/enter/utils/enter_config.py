@@ -4,37 +4,28 @@ import jinja2
 from jinja2 import Template
 from enum import Enum, IntEnum
 import copy
-from pydantic import BaseModel as PydanticBaseModel
-from .pipeline import nodepred, nodepred_sample
-from .utils.factory import PipelineFactory
+from pydantic import create_model, BaseModel as PydanticBaseModel, Field
+# from ..pipeline import nodepred, nodepred_sample
+from .factory import ModelFactory, PipelineFactory
+from .base_model import DGLBaseModel
+
 class DatasetEnum(str, Enum):
     RedditDataset = "RedditDataset"
     CoraGraphDataset = "CoraGraphDataset"
-
-
-class BaseModel(PydanticBaseModel):
-    class Config:
-        extra = "allow"
-        use_enum_values = True
-
 
 # class PipelineEnum(str, Enum):
 #     nodepred = "nodepred"
 #     nodepred_ns = 'nodepred_ns'
 # PipelineEnum = PipelineFactory.get_pipeline_enum()
 
-class DataConfig(BaseModel):
+class DataConfig(DGLBaseModel):
     name: DatasetEnum
-    class Config:
-        extra = "allow"
 
 output_file_path = None
 
-ModelConfig = dict
-
 SamplerConfig = dict
 
-class PipelineConfig(BaseModel):    
+class PipelineConfig(DGLBaseModel):    
     node_embed_size: Optional[int] = -1
     early_stop: Optional[dict]
     num_epochs: int = 200
@@ -42,11 +33,11 @@ class PipelineConfig(BaseModel):
     optimizer: dict = {"name": "Adam", "lr": 0.005}
     loss: str = "CrossEntropyLoss"
 
-class UserConfig(BaseModel):
+class UserConfig(DGLBaseModel):
     version: Optional[str] = "0.0.1"
     pipeline_name: PipelineFactory.get_pipeline_enum()
     device: str = "cpu"
     data: DataConfig
-    model: ModelConfig
+    model : ModelFactory.get_pydantic_model_config() = Field(..., discriminator="name")
     general_pipeline: PipelineConfig = PipelineConfig()
 

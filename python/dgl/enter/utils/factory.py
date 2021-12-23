@@ -1,11 +1,12 @@
 import enum
 import logging
-from typing import Callable, Dict, Literal
+from typing import Callable, Dict, Literal, Union
 from pathlib import Path
 from abc import ABC, abstractmethod, abstractstaticmethod
+from .base_model import DGLBaseModel
 import yaml
 import inspect
-from pydantic import create_model_from_typeddict, create_model
+from pydantic import create_model_from_typeddict, create_model, Field
 logger = logging.getLogger(__name__)
 
 
@@ -120,17 +121,29 @@ class ModelFactory:
 
     @classmethod
     def get_pydantic_constructor_arg_type(cls, model_name: str):
-        sigs = inspect.signature(cls.registry[model_name].__init__)
-        model_name_enum = enum.Enum('model_name', {"name": model_name})
-        type_annotation_dict = {
-            "name": 
-        }
+        model_enum = cls.get_model_enum()
+        arg_dict = cls.get_constructor_default_args(model_name)
+        type_annotation_dict = {}
+        # type_annotation_dict["name"] = Literal[""]     
         exempt_keys = ['self', 'in_size', 'out_size']
-        for k, param in dict(sigs.parameters).items():
+        for k, param in arg_dict.items():
             if k not in exempt_keys:
-                type_annotation_dict[k] = param.annotation
-        return create_model('ModelConfig', **type_annotation_dict)
-        # return type_annotation_dict
+                type_annotation_dict[k] = arg_dict[k]
+        class Base(DGLBaseModel):
+            name: Literal[model_name]
+        return create_model(f'{model_name.upper()}ModelConfig', **type_annotation_dict, __base__=Base)
+    
+    @classmethod
+    def get_pydantic_model_config(cls):
+        model_list = []
+        for k in cls.registry:
+            model_list.append(cls.get_pydantic_constructor_arg_type(k))
+        output = model_list[0]
+        for m in model_list[1:]:
+            output = Union[output, m]
+        return output
+
+
 
     @classmethod
     def get_model_class_name(cls, model_name):

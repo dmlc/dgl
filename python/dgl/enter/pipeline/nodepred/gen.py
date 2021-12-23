@@ -27,33 +27,21 @@ class NodepredPipeline(PipelineBase):
                 data: str = typer.Option(..., help="input data name"),
                 cfg: str = typer.Option("cfg.yml", help="output configuration path"),
                 model: ModelFactory.get_model_enum() = typer.Option(..., help="Model name"),):
-            from ...enter_config import UserConfig
-            self.default_cfg = NodepredPipelineCfg()
-            generated_cfg = {}
-            generated_cfg["pipeline_name"] = "nodepred"
-            generated_cfg["data"] = {"name": data}
-            model_config = ModelFactory.get_constructor_default_args(model.value)
-            model_config = ModelFactory.get_pydantic_constructor_arg_type(model.value)
-            import ipdb
-            ipdb.set_trace()
-            model_config.pop("self")
-            model_config.pop("in_size")
-            model_config.pop("out_size")
-            generated_cfg["model"] = {
-                "name": model.value,
-                **model_config
+            from ...utils.enter_config import UserConfig
+            generated_cfg = {
+                "pipeline_name": "nodepred",
+                "data": {"name": data},
+                "model": {"name": model.value},
+                "general_pipeline": NodepredPipelineCfg()
             }
-            generated_cfg["general_pipeline"] = NodepredPipelineCfg()
-            print(generated_cfg)
             output_cfg = UserConfig(**generated_cfg).dict()
-            print(output_cfg)
             yaml.safe_dump(output_cfg, Path(cfg).open("w"), sort_keys=False)
 
         return config
 
     @staticmethod
     def gen_script(user_cfg_dict):
-        from ...enter_config import UserConfig
+        from ...utils.enter_config import UserConfig
         user_cfg = UserConfig(**user_cfg_dict)
         # print(user_cfg)
         file_current_dir = Path(__file__).resolve().parent

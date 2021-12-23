@@ -1,13 +1,14 @@
 from enum import Enum
 from pathlib import Path
 from typing import Optional, List, Literal, Union
-from jinja2 import Template
+from jinja2 import Template, ext
 from pydantic import BaseModel, Field
 import copy
 import yaml
 
 import typer
 from ...utils.factory import PipelineFactory, ModelFactory, PipelineBase
+from ...utils.base_model import extract_name
 
 
 class MultiLayerSamplerConfig(BaseModel):
@@ -28,22 +29,18 @@ class OtherSamplerConfig(BaseModel):
         extra = 'forbid'
 
 
+SamplerConfig = Union[MultiLayerSamplerConfig,
+                   OtherSamplerConfig]
+
+SamplerChoice = extract_name(SamplerConfig)
 class NodepredNSPipelineCfg(BaseModel):
-    sampler: Union[MultiLayerSamplerConfig,
-                   OtherSamplerConfig] = Field(..., discriminator='name')
+    sampler: SamplerConfig = Field(..., discriminator='name')
     node_embed_size: Optional[int] = -1
     early_stop: Optional[dict]
     num_epochs: int = 200
     eval_period: int = 5
     optimizer: dict = {"name": "Adam", "lr": 0.005}
     loss: str = "CrossEntropyLoss"
-
-
-class SamplerChoice(str, Enum):
-    neighbor = "neighbor"
-    other = "other"
-
-
 
 @PipelineFactory.register("nodepred-ns")
 class NodepredNsPipeline(PipelineBase):
@@ -60,24 +57,13 @@ class NodepredNsPipeline(PipelineBase):
                 "neighbor", help="Specify sampler name"),
             model: ModelFactory.get_model_enum() = typer.Option(..., help="Model name"),
         ):
-            from ...enter_config import UserConfig
-            generated_cfg = {}
+            from ...utils.enter_config import UserConfig
             generated_cfg = {
                 "pipeline_name": "nodepred-ns",
                 "data": {"name": data},
                 "model": {"name": model.value},
+                "general_pipeline" : NodepredNSPipelineCfg(sampler={"name": sampler.value})
             }
-            pipeline_cfg = {"sampler": {"name": sampler}}
-            model_config = ModelFactory.get_constructor_default_args(
-                model.value)
-            model_config.pop("self")
-            model_config.pop("in_size")
-            model_config.pop("out_size")
-            generated_cfg["model"] = {
-                "name": model.value,
-                **model_config
-            }
-            generated_cfg["general_pipeline"] = NodepredNSPipelineCfg(**pipeline_cfg)
             output_cfg = UserConfig(**generated_cfg).dict()
             yaml.safe_dump(output_cfg, Path(cfg).open("w"), sort_keys=False)
 
