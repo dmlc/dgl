@@ -8,317 +8,235 @@ import pydantic as dt
 from .dgl_dataset import DGLDataset
 from ..convert import heterograph as dgl_heterograph
 from .. import backend as F
-from .utils import save_graphs, load_graphs, save_info, load_info
+from .utils import save_graphs, load_graphs
 from ..base import dgl_warning, DGLError
-
-
-class MetaLabel(dt.BaseModel):
-    type: str
-    field: Optional[str] = 'label'
-    num_classes: Optional[int] = 0
-
-
-class MetaFeat(dt.BaseModel):
-    field: Optional[str] = 'feat'
-    separator: Optional[str] = ','
-
-
-class MetaEdge(dt.BaseModel):
-    file_name: str
-    separator: Optional[str] = ','
-    etype: Optional[List[str]] = ['_V', '_E', '_V']
-    graph_id_field: Optional[str] = 'graph_id'
-    src_id_field: Optional[str] = 'src'
-    dst_id_field: Optional[str] = 'dst'
-    feats: Optional[MetaFeat] = None
-    labels: Optional[MetaLabel] = None
-    split_type_field: Optional[str] = 'split_type'
+import abc
+import ast
 
 
 class MetaNode(dt.BaseModel):
     file_name: str
-    separator: Optional[str] = ','
     ntype: Optional[str] = '_V'
     graph_id_field: Optional[str] = 'graph_id'
-    node_id_field: Optional[str] = 'id'
-    feats: Optional[MetaFeat] = None
-    labels: Optional[MetaLabel] = None
-    split_type_field: Optional[str] = 'split_type'
+    node_id_field: Optional[str] = 'node_id'
+
+
+class MetaEdge(dt.BaseModel):
+    file_name: str
+    etype: Optional[List[str]] = ['_V', '_E', '_V']
+    graph_id_field: Optional[str] = 'graph_id'
+    src_id_field: Optional[str] = 'src_id'
+    dst_id_field: Optional[str] = 'dst_id'
 
 
 class MetaGraph(dt.BaseModel):
     file_name: str
-    separator: Optional[str] = ','
     graph_id_field: Optional[str] = 'graph_id'
-    feats: Optional[MetaFeat] = None
-    labels: Optional[MetaLabel] = None
-    split_type_field: Optional[str] = 'split_type'
 
 
 class MetaYaml(dt.BaseModel):
     version: str
     dataset_name: str
-    edge_data: List[MetaEdge]
+    separator: Optional[str] = ','
     node_data: List[MetaNode]
+    edge_data: List[MetaEdge]
     graph_data: Optional[MetaGraph] = None
 
 
-def _yaml_sanity_check(yaml_file):
-    AVAILABLE_LABEL_TYPES = ['classification', 'regression']
+class NodeData:
+    def __init__(self, node_id, data, type=None, graph_id=None):
+        self.id = node_id
+        self.data = data
+        self.type = type if type is not None else '_V'
+        self.graph_id = graph_id if graph_id is not None else np.full(
+            len(node_id), 0)
+
+
+class EdgeData:
+    def __init__(self, src_id, dst_id, data, type=None, graph_id=None):
+        self.src = src_id
+        self.dst = dst_id
+        self.data = data
+        self.type = type if type is not None else ('_V', '_E', '_V')
+        self.graph_id = graph_id if graph_id is not None else np.full(
+            len(src_id), 0)
+
+
+class GraphData:
+    def __init__(self, graph_id, data):
+        self.graph_id = graph_id
+        self.data = data
+
+
+class DefaultDataParser:
+    def __init__(self, separator='|'):
+        self.separator = separator
+    def __call__(self, df):
+        data = {}
+        for header in df:
+            if 'Unnamed' in header:
+                dgl_warning("Unamed column is found. Ignored...")
+                continue
+            dt = df[header].to_numpy().squeeze()
+            if isinstance(dt[0], str):
+                #probably consists of list of numeric values
+                dt=np.array([ast.literal_eval(row) for row in dt])
+            data[header] = dt
+        return data
+
+
+def load_yaml_with_sanity_check(yaml_file):
     with open(yaml_file) as f:
         yaml_data = yaml.load(f, Loader=SafeLoader)
         meta_yaml = MetaYaml(**yaml_data)
         if meta_yaml.version != '1.0.0':
             raise DGLError("Invalid version: {}. '1.0.0' is supported only for now.".format(
                 meta_yaml.version))
-        for meta_edge in meta_yaml.edge_data:
-            if meta_edge is None:
-                continue
-            if meta_edge.labels is not None:
-                meta_label = meta_edge.labels
-                if meta_label.type not in AVAILABLE_LABEL_TYPES:
-                    raise DGLError("Invalid type: {}. Only below ones are supported: {}".format(
-                        meta_label.type, AVAILABLE_LABEL_TYPES))
-                if meta_label.type == 'classification' and meta_label.num_classes is None:
-                    raise DGLError(
-                        "`num_classes` is required to be specified if type is classification.")
-        for meta_node in meta_yaml.node_data:
-            if meta_node is None:
-                continue
-            if meta_node.labels is not None:
-                meta_label = meta_node.labels
-                if meta_label.type not in AVAILABLE_LABEL_TYPES:
-                    raise DGLError("Invalid type: {}. Only below ones are supported: {}".format(
-                        meta_label.type, AVAILABLE_LABEL_TYPES))
-                if meta_label.type == 'classification' and meta_label.num_classes is None:
-                    raise DGLError(
-                        "`num_classes` is required to be specified if type is classification.")
         return meta_yaml
 
 
-class EdgeData:
-    """Parse edge data from edges_xxx.csv according to YAML::edge_data
-    """
+class CSVDataLoader:
+    @staticmethod
+    def load_node_data_from_csv(meta_node, base_dir=None, separator=',', node_parser=DefaultDataParser()):
+        csv_path = meta_node.file_name
+        if base_dir is not None:
+            csv_path = os.path.join(base_dir,csv_path)
+        df = pd.read_csv(csv_path, sep=separator)
+        ntype = meta_node.ntype
+        ndata = node_parser(df)
+        if meta_node.node_id_field not in ndata:
+            raise DGLError(f"node_id_field[{meta_node.node_id_field}] does not exist in parsed node data dict.")
+        node_ids = ndata[meta_node.node_id_field]
+        ndata.pop(meta_node.node_id_field)
+        if meta_node.graph_id_field in ndata:
+            graph_ids = ndata[meta_node.graph_id_field]
+            ndata.pop(meta_node.graph_id_field)
+        else:
+            graph_ids = None
+        return NodeData(node_ids, ndata, type=ntype, graph_id=graph_ids)
 
-    def __init__(self, root_path, meta_edge):
-        self.type = None
-        self.graph_id = None
-        self.src = None
-        self.dst = None
-        self.label = None
-        self.num_classes = None
-        self.split_type = None
-        self.feat = None
-        self._process(root_path, meta_edge)
+    @staticmethod
+    def load_edge_data_from_csv(meta_edge, base_dir=None, separator=',', edge_parser=DefaultDataParser()):
+        csv_path = meta_edge.file_name
+        if base_dir is not None:
+            csv_path = os.path.join(base_dir,csv_path)
+        df = pd.read_csv(csv_path, sep=separator)
+        etype = tuple(meta_edge.etype)
+        edata = edge_parser(df)
+        if meta_edge.src_id_field not in edata:
+            raise DGLError(f"src_id_field[{meta_edge.src_id_field}] does not exist in parsed edge data dict.")
+        if meta_edge.dst_id_field not in edata:
+            raise DGLError(f"dst_id_field[{meta_edge.dst_id_field}] does not exist in parsed edge data dict.")
+        src_ids = edata[meta_edge.src_id_field]
+        dst_ids = edata[meta_edge.dst_id_field]
+        graph_ids = edata[meta_edge.graph_id_field] if meta_edge.graph_id_field in edata else None
+        for key in [meta_edge.src_id_field, meta_edge.dst_id_field, meta_edge.graph_id_field]:
+            if key in edata:
+                edata.pop(key)
+        return EdgeData(src_ids, dst_ids, edata, type=etype, graph_id=graph_ids)
 
-    def _process(self, root_path, meta_edge):
-        if meta_edge is None:
-            return
-        file_path = os.path.join(root_path, meta_edge.file_name)
-        csv_header = pd.read_csv(
-            file_path, nrows=0).columns.tolist()
-        separator = meta_edge.separator
-        self.type = meta_edge.etype
-        if meta_edge.graph_id_field in csv_header:
-            self.graph_id = pd.read_csv(file_path, sep=separator, usecols=[
-                meta_edge.graph_id_field]).to_numpy().squeeze()
-        self.src = pd.read_csv(file_path, sep=separator, usecols=[
-            meta_edge.src_id_field]).to_numpy().squeeze()
-        self.dst = pd.read_csv(file_path, sep=separator, usecols=[
-            meta_edge.dst_id_field]).to_numpy().squeeze()
-        if self.graph_id is None:
-            self.graph_id = np.full(len(self.src), 0)
-        if meta_edge.labels is not None:
-            meta_label = meta_edge.labels
-            self.label = pd.read_csv(file_path, sep=separator, usecols=[
-                meta_label.field]).to_numpy().squeeze()
-            if meta_label.type == 'classification':
-                self.num_classes = np.full(
-                    self.label.shape, meta_label.num_classes)
-        if meta_edge.split_type_field in csv_header:
-            self.split_type = pd.read_csv(file_path, sep=separator, usecols=[
-                meta_edge.split_type_field]).to_numpy().squeeze()
-        if meta_edge.feats is not None:
-            meta_feat = meta_edge.feats
-            feat_data = pd.read_csv(
-                file_path, sep=separator, usecols=[meta_feat.field]).to_numpy().squeeze()
-            self.feat = np.array([row.split(meta_feat.separator)
-                                 for row in feat_data]).astype(np.float)
-
-
-class NodeData:
-    """Parse node data from nodes_xxx.csv according to YAML::node_data
-    """
-
-    def __init__(self, root_path, meta_node):
-        self.graph_id = None
-        self.id = None
-        self.type = None
-        self.label = None
-        self.num_classes = None
-        self.split_type = None
-        self.feat = None
-        self._process(root_path, meta_node)
-
-    def _process(self, root_path, meta_node):
-        if meta_node is None:
-            return
-        file_path = os.path.join(root_path, meta_node.file_name)
-        csv_header = pd.read_csv(
-            file_path, nrows=0).columns.tolist()
-        separator = meta_node.separator
-        if meta_node.graph_id_field in csv_header:
-            self.graph_id = pd.read_csv(file_path, sep=separator, usecols=[
-                meta_node.graph_id_field]).to_numpy().squeeze()
-        self.id = pd.read_csv(file_path, sep=separator, usecols=[
-            meta_node.node_id_field]).to_numpy().squeeze()
-        if self.graph_id is None:
-            self.graph_id = np.full(len(self.id), 0)
-        self.type = meta_node.ntype
-        if meta_node.labels is not None:
-            meta_label = meta_node.labels
-            self.label = pd.read_csv(file_path, sep=separator, usecols=[
-                meta_label.field]).to_numpy().squeeze()
-            if meta_label.type == 'classification':
-                self.num_classes = np.full(
-                    self.label.shape, meta_label.num_classes)
-        if meta_node.split_type_field in csv_header:
-            self.split_type = pd.read_csv(file_path, sep=separator, usecols=[
-                meta_node.split_type_field]).to_numpy().squeeze()
-        if meta_node.feats is not None:
-            meta_feat = meta_node.feats
-            feat_data = pd.read_csv(
-                file_path, sep=separator, usecols=[meta_feat.field]).to_numpy().squeeze()
-            self.feat = np.array([row.split(meta_feat.separator)
-                                 for row in feat_data]).astype(np.float)
+    @staticmethod
+    def load_graph_data_from_csv(meta_graph, base_dir=None, separator=',', graph_parser=DefaultDataParser()):
+        csv_path = meta_graph.file_name
+        if base_dir is not None:
+            csv_path = os.path.join(base_dir,csv_path)
+        df = pd.read_csv(csv_path, sep=separator)
+        gdata = graph_parser(df)
+        if meta_graph.graph_id_field not in gdata:
+            raise DGLError(f"graph_id_field[{meta_graph.graph_id_field}] does not exist in parsed graph data dict.")
+        graph_ids = gdata[meta_graph.graph_id_field]
+        gdata.pop(meta_graph.graph_id_field)
+        return GraphData(graph_ids, gdata)
 
 
-class GraphData:
-    """Parse graph data from graphs.csv according to YAML::graph_data
-    """
+class DGLGraphConstructor:
+    @staticmethod
+    def construct_graphs(node_data, edge_data, graph_data=None):
+        if not isinstance(node_data, list):
+            node_data = [node_data]
+        if not isinstance(edge_data, list):
+            edge_data = [edge_data]
+        node_dict = DGLGraphConstructor._parse_node_data(node_data)
+        edge_dict = DGLGraphConstructor._parse_edge_data(edge_data, node_dict)
+        graph_dict = DGLGraphConstructor._construct_graphs(
+            node_dict, edge_dict)
+        if graph_data is None:
+            graph_data = GraphData(np.full(1, 0), {})
+        graphs, data = DGLGraphConstructor._parse_graph_data(
+            graph_data, graph_dict)
+        return graphs, data
 
-    def __init__(self, root_path, meta_graph):
-        self.graph_id = None
-        self.feat = None
-        self.label = None
-        self.num_classes = None
-        self.split_type = None
-        self._process(root_path, meta_graph)
-
-    def _process(self, root_path, meta_graph):
-        if meta_graph is None:
-            return
-        file_path = os.path.join(root_path, meta_graph.file_name)
-        csv_header = pd.read_csv(
-            file_path, nrows=0).columns.tolist()
-        separator = meta_graph.separator
-        if meta_graph.graph_id_field in csv_header:
-            self.graph_id = pd.read_csv(file_path, sep=separator, usecols=[
-                meta_graph.graph_id_field]).to_numpy().squeeze()
-        if self.graph_id is None:
-            self.graph_id = np.full(1, 0)
-        if meta_graph.labels is not None:
-            meta_label = meta_graph.labels
-            if meta_label.field in csv_header:
-                self.label = pd.read_csv(file_path, sep=separator, usecols=[
-                    meta_label.field]).to_numpy().squeeze()
-                self.num_classes = np.full(
-                    self.label.shape, meta_label.num_classes)
-        if self.num_classes is None:
-            self.num_classes = np.full(1, 1)
-        if meta_graph.split_type_field in csv_header:
-            self.split_type = pd.read_csv(file_path, sep=separator, usecols=[
-                meta_graph.split_type_field]).to_numpy().squeeze()
-        if meta_graph.feats is not None:
-            meta_feat = meta_graph.feats
-            feat_data = pd.read_csv(
-                file_path, sep=separator, usecols=[meta_feat.field]).to_numpy().squeeze()
-            self.feat = np.array([row.split(meta_feat.separator)
-                                 for row in np.atleast_1d(feat_data)]).astype(np.float)
-
-
-class CSVDataset(DGLDataset):
-    """The CSV graph dataset read data from CSV files according to passed in YAML config.
-
-    Parameters
-    -----------
-    data_path: str
-        Absolute path where YAML config file and related CSV files lie.
-    force_reload : bool
-        Whether to reload the dataset. Default: False
-    verbose: bool
-        Whether to print out progress information. Default: True.
-    """
-    META_YAML_NAME = 'meta.yaml'
-
-    def __init__(self, data_path, force_reload=False, verbose=True):
-        self.graphs = None
-        self.labels = None
-        self.feats = None
-        self.train_mask = None
-        self.val_mask = None
-        self.test_mask = None
-        self.num_classes = None
-        meta_yaml = os.path.join(data_path, CSVDataset.META_YAML_NAME)
-        if not os.path.exists(meta_yaml):
-            raise DGLError(
-                "'{}' cannot be found under {}.".format(CSVDataset.META_YAML_NAME, data_path))
-        meta = _yaml_sanity_check(meta_yaml)
-        self.meta = meta
-        ds_name = meta.dataset_name
-        super().__init__(ds_name, raw_dir=os.path.dirname(
-            meta_yaml), force_reload=force_reload, verbose=verbose)
-
-    def process(self):
-        """Parse node/edge data from CSV files and construct DGL.Graphs
-        """
-        meta = self.meta
-        root = self.raw_dir
-        edge_data = []
-        for meta_edge in meta.edge_data:
-            edge_data.append(EdgeData(root, meta_edge))
-
-        #parse NodeData
-        node_data = []
-        for meta_node in meta.node_data:
-            node_data.append(NodeData(root, meta_node))
-
-        #parse GraphData
-        graph_data = GraphData(
-            root, meta.graph_data) if meta.graph_data is not None else None
-
-        #construct dgl.heterograph
-        edge_dict = {}
-        for e_data in edge_data:
-            graph_ids = np.unique(e_data.graph_id)
-            for graph_id in graph_ids:
-                idx = e_data.graph_id == graph_id
-                edata = {}
-                edata['edges'] = (
-                    F.tensor(e_data.src[idx]), F.tensor(e_data.dst[idx]))
-                for key in ['feat', 'label', 'num_classes', 'split_type']:
-                    if getattr(e_data, key) is not None:
-                        edata[key] = F.tensor(
-                            getattr(e_data, key)[idx])
-                if graph_id not in edge_dict:
-                    edge_dict[graph_id] = {}
-                edge_dict[graph_id][(
-                    e_data.type[0], e_data.type[1], e_data.type[2])] = edata
+    @staticmethod
+    def _parse_node_data(node_data):
+        # node_ids could be arbitrary numeric values, namely non-sorted, duplicated, not labeled from 0 to num_nodes-1
         node_dict = {}
         for n_data in node_data:
             graph_ids = np.unique(n_data.graph_id)
             for graph_id in graph_ids:
+                if graph_id in node_dict and n_data.type in node_dict[graph_id]:
+                    raise DGLError(f"Duplicate node type[{n_data.type}] for same graph[{graph_id}], please place the same node_type for same graph into single NodeData.")
                 idx = n_data.graph_id == graph_id
+                ids = n_data.id[idx]
+                u_ids, u_indices = np.unique(ids, return_index=True)
+                if len(ids) > len(u_ids):
+                    dgl_warning(
+                        "There exist duplicated ids and only the first ones are kept.")
                 ndata = {}
-                ndata['num_nodes'] = len(n_data.id[idx])
-                for key in ['feat', 'label', 'num_classes', 'split_type']:
-                    if getattr(n_data, key) is not None:
-                        ndata[key] = F.tensor(
-                            getattr(n_data, key)[idx])
+                ndata['mapping'] = {index: i for i,
+                                    index in enumerate(ids[u_indices])}
+                data = {}
+                for key, value in n_data.data.items():
+                    data[key] = F.tensor(value[idx][u_indices])
+                ndata['data'] = data
                 if graph_id not in node_dict:
                     node_dict[graph_id] = {}
                 node_dict[graph_id][n_data.type] = ndata
-        graphs = {}
+        return node_dict
+
+    @staticmethod
+    def _parse_edge_data(edge_data, node_dict):
+        edge_dict = {}
+        for e_data in edge_data:
+            (src_type, e_type, dst_type) = e_data.type
+            graph_ids = np.unique(e_data.graph_id)
+            for graph_id in graph_ids:
+                if graph_id in edge_dict and e_data.type in edge_dict[graph_id]:
+                    raise DGLError(f"Duplicate edge type[{e_data.type}] for same graph[{graph_id}], please place the same edge_type for same graph into single EdgeData.")
+                idx = e_data.graph_id == graph_id
+                edata = {}
+                src_mapping = node_dict[graph_id][src_type]['mapping']
+                dst_mapping = node_dict[graph_id][dst_type]['mapping']
+                src_ids = [src_mapping[index] for index in e_data.src[idx]]
+                dst_ids = [dst_mapping[index] for index in e_data.dst[idx]]
+                edata['edges'] = (
+                    F.tensor(src_ids), F.tensor(dst_ids))
+                data = {}
+                for key, value in e_data.data.items():
+                    data[key] = F.tensor(value[idx])
+                edata['data'] = data
+                if graph_id not in edge_dict:
+                    edge_dict[graph_id] = {}
+                edge_dict[graph_id][e_data.type] = edata
+        return edge_dict
+
+    @staticmethod
+    def _parse_graph_data(graph_data, graphs_dict):
+        if len(graphs_dict) > len(graph_data.graph_id):
+            raise DGLError(
+                "More graph ids are found in node/edge data than graph data. Please specify all graph ids in graph data CSV.")
+        graph_ids = graph_data.graph_id
+        graphs = []
+        for graph_id in graph_ids:
+            if graph_id not in graphs_dict:
+                graphs_dict[graph_id] = dgl_heterograph(
+                    {('_V', '_E', '_V'): ([], [])})
+        for graph_id in graph_ids:
+            graphs.append(graphs_dict[graph_id])
+        return graphs, graph_data.data
+
+    @staticmethod
+    def _construct_graphs(node_dict, edge_dict):
+        graph_dict = {}
         for graph_id in node_dict:
             if graph_id not in edge_dict:
                 edata = {}
@@ -330,48 +248,78 @@ class CSVDataset(DGLDataset):
                 edges[etype] = edata['edges']
             nodes = {}
             for ntype, ndata in node_dict[graph_id].items():
-                nodes[ntype] = ndata['num_nodes']
+                nodes[ntype] = len(ndata['mapping'])
             graph = dgl_heterograph(
                 edges, num_nodes_dict=nodes)
 
             def assign_data(type, src_data, dst_data):
-                for key in ['feat', 'label', 'num_classes']:
-                    if key in src_data:
-                        dst_data[type].data[key] = src_data[key]
-                if 'split_type' in src_data:
-                    data = src_data['split_type']
-                    dst_data[type].data['train_mask'] = F.tensor(
-                        data == 0)
-                    dst_data[type].data['val_mask'] = F.tensor(
-                        data == 1)
-                    dst_data[type].data['test_mask'] = F.tensor(
-                        data == 2)
+                for key, value in src_data.items():
+                    dst_data[type].data[key] = value
             for type, data in node_dict[graph_id].items():
-                assign_data(type, data, graph.nodes)
+                assign_data(type, data['data'], graph.nodes)
             for (type), data in edge_dict[graph_id].items():
-                assign_data(type, data, graph.edges)
-            graphs[graph_id] = graph
-        if graph_data is not None:
-            if len(graphs) > len(graph_data.graph_id):
-                raise DGLError(
-                    "More graph ids are found in node/edge data than graph data. Please specify all graph ids in graph data CSV.")
-            for graph_id in graph_data.graph_id:
-                if graph_id not in graphs:
-                    graphs[graph_id] = dgl_heterograph(
-                        {('_V', '_E', '_V'): ([], [])})
-            if graph_data.feat is not None:
-                self.feats = F.tensor(graph_data.feat)
-            if graph_data.label is not None:
-                self.labels = F.tensor(graph_data.label)
-            if graph_data.split_type is not None:
-                self.train_mask = F.tensor(graph_data.split_type == 0)
-                self.val_mask = F.tensor(graph_data.split_type == 1)
-                self.test_mask = F.tensor(graph_data.split_type == 2)
-            self.num_classes = F.tensor(graph_data.num_classes)
-        self.graphs = []
-        for graph_id in sorted(graphs):
-            self.graphs.append(graphs[graph_id])
-        self._sanity_check_after_process()
+                assign_data(type, data['data'], graph.edges)
+            graph_dict[graph_id] = graph
+        return graph_dict
+
+
+class DGLCSVDataset(DGLDataset):
+    """
+    This class offers:
+    1. interface of load node/edge/graph data which should be overridden
+    2. construct graphs from node/edge/graph data
+    3. implement the interfaces of DGLDataset: behaves as a dataset
+    """
+    META_YAML_NAME = 'meta.yaml'
+
+    def __init__(self, data_path, force_reload=False, verbose=True, node_parsers=None, edge_parsers=None, graph_parser=None):
+        self.graphs = None
+        self.data = None
+        self.node_parsers = {}#node_parsers
+        self.edge_parsers = {}#edge_parsers
+        self.graph_parser = graph_parser
+        meta_yaml_path = os.path.join(data_path, DGLCSVDataset.META_YAML_NAME)
+        if not os.path.exists(meta_yaml_path):
+            raise DGLError(
+                "'{}' cannot be found under {}.".format(DGLCSVDataset.META_YAML_NAME, data_path))
+        self.meta_yaml = load_yaml_with_sanity_check(meta_yaml_path)
+        ds_name = self.meta_yaml.dataset_name
+        super().__init__(ds_name, raw_dir=os.path.dirname(
+            meta_yaml_path), force_reload=force_reload, verbose=verbose)
+
+    def process(self):
+        """Parse node/edge data from CSV files and construct DGL.Graphs
+        """
+        meta_yaml = self.meta_yaml
+        base_dir = self.raw_dir
+        node_data = []
+        for meta_node in meta_yaml.node_data:
+            if meta_node is None:
+                continue
+            ntype = meta_node.ntype
+            node_parser = DefaultDataParser() if ntype not in self.node_parsers else self.node_parsers[
+                ntype]
+            ndata = CSVDataLoader.load_node_data_from_csv(
+                meta_node, base_dir=base_dir, separator=meta_yaml.separator, node_parser=node_parser)
+            node_data.append(ndata)
+        edge_data = []
+        for meta_edge in meta_yaml.edge_data:
+            if meta_edge is None:
+                continue
+            etype = tuple(meta_edge.etype)
+            edge_parser = DefaultDataParser() if etype not in self.edge_parsers else self.edge_parsers[
+                etype]
+            edata = CSVDataLoader.load_edge_data_from_csv(
+                meta_edge, base_dir=base_dir, separator= meta_yaml.separator, edge_parser=edge_parser)
+            edge_data.append(edata)
+        graph_data = None
+        if meta_yaml.graph_data is not None:
+            meta_graph = meta_yaml.graph_data
+            graph_parser = DefaultDataParser() if self.graph_parser is None else self.graph_parser
+            graph_data = CSVDataLoader.load_graph_data_from_csv(
+                meta_graph, base_dir=base_dir, separator= meta_yaml.separator, graph_parser=graph_parser)
+        self.graphs, self.data = DGLGraphConstructor.construct_graphs(
+            node_data, edge_data, graph_data)
 
     def has_cache(self):
         graph_path = os.path.join(self.save_path,
@@ -386,36 +334,19 @@ class CSVDataset(DGLDataset):
             raise DGLError("No graphs available in dataset")
         graph_path = os.path.join(self.save_path,
                                   self.name + '.bin')
-        data_dict = {}
-        for key in ['labels', 'feats', 'train_mask', 'val_mask', 'test_mask', 'num_classes']:
-            if getattr(self, key) is not None:
-                data_dict[key] = getattr(self, key)
         save_graphs(graph_path, self.graphs,
-                    labels=data_dict)
+                    labels=self.data)
 
     def load(self):
         graph_path = os.path.join(self.save_path,
                                   self.name + '.bin')
-        graphs, data_dict = load_graphs(graph_path)
-        self.graphs = graphs
-        for key in data_dict:
-            setattr(self, key, data_dict[key])
+        self.graphs, self.data = load_graphs(graph_path)
 
     def __getitem__(self, i):
-        if len(self.graphs) == 1:
-            if self.feats is not None:
-                return (self.graphs[i], self.feats[i])
-            else:
-                return self.graphs[i]
+        if 'label' in self.data:
+            return (self.graphs[i], self.data['label'][i])
         else:
-            if self.feats is not None:
-                return (self.graphs[i], self.labels[i], self.feats[i])
-            else:
-                return (self.graphs[i], self.labels[i])
+            return self.graphs[i]
 
     def __len__(self):
         return len(self.graphs)
-
-    def _sanity_check_after_process(self):
-        if self.graphs is None or len(self.graphs) == 0:
-            raise DGLError("No grahps are available in dataset.")
