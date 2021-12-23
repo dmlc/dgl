@@ -4,7 +4,6 @@ device: 'cpu'
 data:
     name: PubmedGraphDataset
     data_dir: "/data/"
-node_embed_size: -1
 # Model configurations
 model:
     name: GCN                      # Model name
@@ -15,13 +14,15 @@ model:
     dropout: 0.5                   # dropout
     use_edge_weight: False         # use edge weight or not
 # Training configurations
-early_stop: True
-num_epochs: 200                    # Number of training epochs
-eval_period: 5                     # Number of epochs between two evaluations
-checkpoint_path: 'checkpoint.pt'   # Checkpoint path
-patience: 20                       # Early stop patience
-optimizer:
-    name: Adam                     # Optimizer name, can be Adam, ?
-    lr: 0.005                      # Learning rate
-    weight_decay: 0                # Weight decay
-loss: CrossEntropyLoss
+general_pipeline:
+    node_embed_size: -1
+    early_stop: 
+        checkpoint_path: 'checkpoint.pt'   # Checkpoint path
+        patience: 20                       # Early stop patience
+    num_epochs: 200                    # Number of training epochs
+    eval_period: 5                     # Number of epochs between two evaluations
+    optimizer:
+        name: Adam                     # Optimizer name, can be Adam, ?
+        lr: 0.005                      # Learning rate
+        weight_decay: 0                # Weight decay
+    loss: CrossEntropyLoss
