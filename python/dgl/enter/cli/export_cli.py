@@ -1,5 +1,6 @@
+from ..pipeline import *
 from ..utils.factory import ModelFactory, PipelineFactory
-from ..enter_config import PipelineEnum, UserConfig
+from ..enter_config import UserConfig
 import typer
 from enum import Enum
 import typing
@@ -16,7 +17,6 @@ def export(
 ):
     user_cfg = yaml.safe_load(Path(yaml_filename).open("r"))
     pipeline_name = user_cfg["pipeline_name"]
-    print(f"cfg: {user_cfg['data']}")
     output_file_content = PipelineFactory.call_generator(
         pipeline_name, user_cfg)
     with open(output, "w") as f:

@@ -103,7 +103,7 @@ def main():
     feat_size = data[0].ndata['feat'].shape[1]
     cfg["model"]["in_size"] = pipeline_cfg['node_embed_size'] if pipeline_cfg['node_embed_size'] > 0 else feat_size
     cfg["model"]["out_size"] = data.num_classes
-    model = {{ user_cfg.model.name | upper }}(**cfg["model"])
+    model = {{ model_class_name }}(**cfg["model"])
     if pipeline_cfg['node_embed_size'] > 0:
         model = GNNWithEmbedding(data[0].num_nodes(), pipeline_cfg['node_embed_size'], model)
     model = model.to(device)

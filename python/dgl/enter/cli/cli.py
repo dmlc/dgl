@@ -1,10 +1,12 @@
 import typer
-from .config_cli import config
+from ..pipeline import *
+from ..model import *
+from .config_cli import config_app
 from .train_cli import train
-from .export_cli import export
 
 app = typer.Typer()
-app.command()(config)
+# app.command()(config)
+app.add_typer(config_app, name="config")
 app.command()(train)
 # app.command()(export)
 

@@ -86,7 +86,7 @@ def accuracy(logits, labels):
     correct = torch.sum(indices == labels)
     return correct.item() * 1.0 / len(labels)
 
-def train(cfg, device, data, model, optimizer, loss_fcn):
+def train(cfg, pipeline_cfg, device, data, model, optimizer, loss_fcn):
     g = data[0]  # Only train on the first graph
     g = g.to(device)
     train_g = val_g = test_g = g
@@ -104,16 +104,16 @@ def train(cfg, device, data, model, optimizer, loss_fcn):
         train_nid,
         sampler,
         device=device,
-        batch_size=cfg["sampler"]["batch_size"],
+        batch_size=pipeline_cfg["sampler"]["batch_size"],
         shuffle=True,
         drop_last=False,
-        num_workers=cfg["sampler"]["num_workers"])
+        num_workers=pipeline_cfg["sampler"]["num_workers"])
 
     {% if user_cfg.early_stop %}
-    stopper = EarlyStopping(cfg['patience'], cfg['checkpoint_path'])    
+    stopper = EarlyStopping(pipeline_cfg['patience'], pipeline_cfg['checkpoint_path'])    
     {% endif %}
     val_acc = 0.
-    for epoch in range(cfg['num_epochs']):
+    for epoch in range(pipeline_cfg['num_epochs']):
         model.train()
         for step, (input_nodes, seeds, blocks) in enumerate(dataloader):
             # Load the input features as well as output labels
@@ -127,12 +127,11 @@ def train(cfg, device, data, model, optimizer, loss_fcn):
             loss.backward()
             optimizer.step()
             
-            {# if step != 0 and step % cfg['eval_period'] == 0: #}
             train_acc = accuracy(batch_pred, batch_labels)                
             print("Epoch {:05d} | Loss {:.4f} | TrainAcc {:.4f}".                
                 format(epoch, loss.item(), train_acc))
 
-        if epoch % cfg["eval_period"] == 0 and epoch != 0:
+        if epoch % pipeline_cfg["eval_period"] == 0 and epoch != 0:
             val_acc = evaluate(model, val_g, val_nfeat, val_labels, val_nid, device, cfg)
             print('Eval Acc {:.4f}'.format(val_acc))
         {% if user_cfg.early_stop %}
@@ -169,16 +168,17 @@ def main():
     data = dgl.data.{{ user_cfg.data.name }}()
     g = data[0]
     feat_size = g.ndata['feat'].shape[1]
-    cfg["model"]["in_size"] = cfg['node_embed_size'] if cfg['node_embed_size'] > 0 else feat_size
+    pipeline_cfg = cfg["general_pipeline"]
+    cfg["model"]["in_size"] = pipeline_cfg['node_embed_size'] if pipeline_cfg['node_embed_size'] > 0 else feat_size
     cfg["model"]["out_size"] = data.num_classes
-    model = {{ user_cfg.model.name }}(**cfg["model"])
+    model = {{ model_class_name }}(**cfg["model"])
     if cfg['node_embed_size'] > 0:
-        model = GNNWithEmbedding(data[0].num_nodes(), cfg['node_embed_size'], model)
+        model = GNNWithEmbedding(data[0].num_nodes(), pipeline_cfg['node_embed_size'], model)
     model = model.to(device)
     params = model.parameters()
     loss = torch.nn.{{ user_cfg.loss }}()
-    optimizer = torch.optim.Adam(params, **cfg["optimizer"])
-    train(cfg, device, data, model, optimizer, loss)
+    optimizer = torch.optim.Adam(params, **pipeline_cfg["optimizer"])
+    train(cfg, pipeline_cfg, device, data, model, optimizer, loss)
 
 if __name__ == '__main__':
     main()

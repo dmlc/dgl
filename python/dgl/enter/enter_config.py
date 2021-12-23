@@ -4,31 +4,36 @@ import jinja2
 from jinja2 import Template
 from enum import Enum, IntEnum
 import copy
-from pydantic import BaseModel, ValidationError
-
+from pydantic import BaseModel as PydanticBaseModel
+from .pipeline import nodepred, nodepred_sample
+from .utils.factory import PipelineFactory
 class DatasetEnum(str, Enum):
     RedditDataset = "RedditDataset"
     CoraGraphDataset = "CoraGraphDataset"
 
-class PipelineEnum(str, Enum):
-    nodepred = "nodepred"
-    nodepred_ns = 'nodepred_ns'
+
+class BaseModel(PydanticBaseModel):
+    class Config:
+        extra = "allow"
+        use_enum_values = True
+
+
+# class PipelineEnum(str, Enum):
+#     nodepred = "nodepred"
+#     nodepred_ns = 'nodepred_ns'
+# PipelineEnum = PipelineFactory.get_pipeline_enum()
 
 class DataConfig(BaseModel):
     name: DatasetEnum
     class Config:
         extra = "allow"
 
+output_file_path = None
 
 ModelConfig = dict
-# TrainConfig = dict
-def enum_representer(dumper: yaml.Dumper, data):
-    return dumper.represent_scalar(u'tag:yaml.org,2002:str', data.value)
 
-yaml.SafeDumper.add_representer(PipelineEnum, enum_representer)
-yaml.SafeDumper.add_representer(DatasetEnum, enum_representer)
-print("register")
-# yaml.add_multi_representer
+SamplerConfig = dict
+
 class PipelineConfig(BaseModel):    
     node_embed_size: Optional[int] = -1
     early_stop: Optional[dict]
@@ -37,15 +42,9 @@ class PipelineConfig(BaseModel):
     optimizer: dict = {"name": "Adam", "lr": 0.005}
     loss: str = "CrossEntropyLoss"
 
-# class TrainConfig(BaseModel):
-#     sampler: Optional[dict]
-#     # optimizer: dict
-#     early_stop: dict
-#     loss: str
-
 class UserConfig(BaseModel):
     version: Optional[str] = "0.0.1"
-    pipeline_name: PipelineEnum
+    pipeline_name: PipelineFactory.get_pipeline_enum()
     device: str = "cpu"
     data: DataConfig
     model: ModelConfig

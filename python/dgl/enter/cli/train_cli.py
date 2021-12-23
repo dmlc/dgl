@@ -1,15 +1,5 @@
-from ..utils.factory import ModelFactory
-from ..enter_config import PipelineEnum, UserConfig
-import typer
-from enum import Enum
-import typing
-import yaml
-from pathlib import Path
-
-
-# @config_app.command()
 from ..utils.factory import ModelFactory, PipelineFactory
-from ..enter_config import PipelineEnum, UserConfig
+from ..enter_config import UserConfig
 import typer
 from enum import Enum
 import typing
@@ -28,9 +18,7 @@ def train(
 ):
     user_cfg = yaml.safe_load(Path(cfg).open("r"))
     pipeline_name = user_cfg["pipeline_name"]
-    print(f"cfg: {user_cfg['data']}")
-    output_file_content = PipelineFactory.call_generator(
-        pipeline_name, user_cfg)
+    output_file_content = PipelineFactory.registry[pipeline_name].gen_script(user_cfg)
 
     f_code = autopep8.fix_code(output_file_content, options={'aggressive': 1})
     f_code = isort.code(f_code)
@@ -45,18 +33,3 @@ if __name__ == "__main__":
     train_app = typer.Typer()
     train_app.command()(train)
     train_app()
-
-# def train(
-#     code_file: str = typer.Argument("output.py", help="output config name"),
-# ):  
-#     import importlib.util
-#     spec = importlib.util.spec_from_file_location("main", code_file)
-#     main_module = importlib.util.module_from_spec(spec)
-#     spec.loader.exec_module(main_module)
-#     main_module.main()
-
-
-# if __name__ == "__main__":
-#     train_app = typer.Typer()
-#     train_app.command()(train)
-#     train_app()
