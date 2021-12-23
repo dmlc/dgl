@@ -1,4 +1,4 @@
-# Inductive Graph-based Matrix Completion
+# Inductive Graph-based Matrix Completion(IGMC)
 
 Paper link: [https://arxiv.org/abs/1904.12058](https://arxiv.org/abs/1904.12058)
 Author's code: [https://github.com/muhanzhang/IGMC](https://github.com/muhanzhang/IGMC)
@@ -7,30 +7,39 @@ Credit: Junfeng Zhou ([@zhoujf620](https://github.com/zhoujf620)), Jiahang Li ([
 
 ## Dependencies
 
-* PyTorch 1.9.1+
-* DGL 
+* PyTorch 1.10.1+
+* DGL 0.7.1+
 
-## Data
+## Datasets
 
 Supported datasets: ml-100k, ml-1m
+
+|              | ml-100k       | ml-1m         |
+| ------------ | ------------- | ------------- |
+| Users        | 943           | 6,040         |
+| Items        | 1,682         | 3,706         |
+| Ratings      | 100,000       | 1,000,209     |
+| Density      | 0.0630        | 0.0447        |
+| Rating types | 1, 2, 3, 4, 5 | 1, 2, 3, 4, 5 |
+
+
 
 ## How to run
 
 - ml-100k
+  - run on one GPU
+
 
 ```shell
-python3 train.py --data_name ml-100k --testing \
-                 --batch_size 128 --edge_dropout 0.2 --max_nodes_per_hop 200 --train_epochs 80 \
-                 --device 0
+python3 train.py --data_name ml-100k --testing
 ```
 
 - ml-1m
+  - distributed training on multiple GPUs
+
 
 ```shell
-python3 train_multi_gpu.py --data_name ml-1m --testing \
-                --batch_size 128 --edge_dropout 0. --max_nodes_per_hop 100 --train_epochs 40 \
-                --train_log_interval 100 --valid_log_interval 5 --train_lr_decay_step 20 \
-                --gpu 0,1,2,3
+python3 train_multi_gpu.py --data_name ml-1m --testing --gpu 0,1,2,3
 ```
 
 ## Results

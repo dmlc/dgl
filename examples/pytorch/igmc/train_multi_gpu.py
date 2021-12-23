@@ -162,16 +162,13 @@ def train(proc_id, n_gpus, args, devices, movielens):
         test_loader = th.utils.data.DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, 
                                 num_workers=args.num_workers, collate_fn=collate_movielens)
 
-    in_feats = (args.hop+1)*2 # + movielens.train_graph.ndata['refex'].shape[1]
+    in_feats = (args.hop+1)*2
     model = IGMC(in_feats=in_feats, 
                  latent_dim=[32, 32, 32, 32],
-                 num_relations=5, #dataset_base.num_rating, 
+                 num_relations=5,
                  num_bases=4, 
                  regression=True, 
                  edge_dropout=args.edge_dropout,
-                #  side_features=args.use_features,
-                #  n_side_features=n_features,
-                #  multiply_by=args.multiply_by
             ).to(dev_id)
     if n_gpus > 1:
         model = DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id)
@@ -240,7 +237,7 @@ def config():
     parser.add_argument('--num_workers', type=int, default=8)
     parser.add_argument('--data_valid_ratio', type=float, default=0.2)
     parser.add_argument('--train_log_interval', type=int, default=100)
-    parser.add_argument('--valid_log_interval', type=int, default=10)
+    parser.add_argument('--valid_log_interval', type=int, default=5)
     parser.add_argument('--save_appendix', type=str, default='debug', 
                         help='what to append to save-names when saving results')
 
@@ -249,11 +246,11 @@ def config():
                         help='enclosing subgraph hop number')
     parser.add_argument('--sample_ratio', type=float, default=1.0, 
                         help='if < 1, subsample nodes per hop according to the ratio')
-    parser.add_argument('--max_nodes_per_hop', type=int, default=200, 
+    parser.add_argument('--max_nodes_per_hop', type=int, default=100,
                         help='if > 0, upper bound the # nodes per hop by another subsampling')
 
     # edge dropout settings
-    parser.add_argument('--edge_dropout', type=float, default=0.2, 
+    parser.add_argument('--edge_dropout', type=float, default=0.0,
                         help='if not 0, random drops edges from adjacency matrix with this prob')
     parser.add_argument('--force_undirected', action='store_true', default=False, 
                         help='in edge dropout, force (x, y) and (y, x) to be dropped together')
@@ -262,8 +259,8 @@ def config():
     parser.add_argument('--train_lr', type=float, default=1e-3)
     parser.add_argument('--train_min_lr', type=float, default=1e-6)
     parser.add_argument('--train_lr_decay_factor', type=float, default=0.1)
-    parser.add_argument('--train_lr_decay_step', type=int, default=50)
-    parser.add_argument('--train_epochs', type=int, default=80)
+    parser.add_argument('--train_lr_decay_step', type=int, default=20)
+    parser.add_argument('--train_epochs', type=int, default=40)
     parser.add_argument('--batch_size', type=int, default=128)
     parser.add_argument('--arr_lambda', type=float, default=0.001)
     parser.add_argument('--num_rgcn_bases', type=int, default=4)
