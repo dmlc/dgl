@@ -436,7 +436,8 @@ class BlockSampler(Sampler):
             graph_device = g.device
 
         for block_id in reversed(range(self.num_layers)):
-            seed_nodes_in = to_device(seed_nodes, graph_device)
+            # seed_nodes_in = to_device(seed_nodes, graph_device)
+            seed_nodes_in = seed_nodes
 
             if self.exclude_edges_in_frontier(g):
                 frontier = self.sample_frontier(

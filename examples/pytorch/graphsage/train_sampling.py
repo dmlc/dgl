@@ -52,13 +52,17 @@ def run(args, device, data):
     val_nid = th.nonzero(val_g.ndata['val_mask'], as_tuple=True)[0]
     test_nid = th.nonzero(~(test_g.ndata['train_mask'] | test_g.ndata['val_mask']), as_tuple=True)[0]
 
-    dataloader_device = th.device('cpu')
     if args.sample_gpu:
         train_nid = train_nid.to(device)
         # copy only the csc to the GPU
         train_g = train_g.formats(['csc'])
         train_g = train_g.to(device)
-        dataloader_device = device
+        args.num_workers = 0
+    elif args.sample_uva:
+        train_nid = train_nid.to(device)
+        train_g = train_g.formats(['csc'])
+        train_g.pin_memory(device)
+        args.num_workers = 0
 
     # Create PyTorch DataLoader for constructing blocks
     sampler = dgl.dataloading.MultiLayerNeighborSampler(
@@ -67,7 +71,7 @@ def run(args, device, data):
         train_g,
         train_nid,
         sampler,
-        device=dataloader_device,
+        device=device,
         batch_size=args.batch_size,
         shuffle=True,
         drop_last=False,
@@ -137,6 +141,9 @@ if __name__ == '__main__':
     argparser.add_argument('--dropout', type=float, default=0.5)
     argparser.add_argument('--num-workers', type=int, default=4,
                            help="Number of sampling processes. Use 0 for no extra process.")
+    argparser.add_argument('--sample-uva', action='store_true',
+                           help="Perform sampling from GPU on the pinned graph. "
+                                "Must have 0 workers.")
     argparser.add_argument('--sample-gpu', action='store_true',
                            help="Perform the sampling process on the GPU. Must have 0 workers.")
     argparser.add_argument('--inductive', action='store_true',

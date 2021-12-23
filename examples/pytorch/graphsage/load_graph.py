@@ -11,11 +11,11 @@ def load_reddit():
     g.ndata['labels'] = g.ndata['label']
     return g, data.num_classes
 
-def load_ogb(name):
+def load_ogb(name, root='dataset'):
     from ogb.nodeproppred import DglNodePropPredDataset
 
     print('load', name)
-    data = DglNodePropPredDataset(name=name)
+    data = DglNodePropPredDataset(name=name, root=root)
     print('finish loading', name)
     splitted_idx = data.get_idx_split()
     graph, labels = data[0]

@@ -40,6 +40,20 @@
  */
 #ifdef DGL_USE_CUDA
 #define ATEN_XPU_SWITCH_CUDA(val, XPU, op, ...) do {            \
+  if ((val) == kDLCPU || (val) == kDLCPUPinned) {                                        \
+    constexpr auto XPU = kDLCPU;                                \
+    {__VA_ARGS__}                                               \
+  } else if ((val) == kDLGPU) {                                 \
+    constexpr auto XPU = kDLGPU;                                \
+    {__VA_ARGS__}                                               \
+  } else {                                                      \
+    LOG(FATAL) << "Operator " << (op) << " does not support "   \
+               << dgl::runtime::DeviceTypeCode2Str(val)         \
+               << " device.";                                   \
+  }                                                             \
+} while (0)
+
+#define ATEN_XPU_SWITCH_CUDA_UVA(val, XPU, op, ...) do {            \
   if ((val) == kDLCPU) {                                        \
     constexpr auto XPU = kDLCPU;                                \
     {__VA_ARGS__}                                               \
@@ -57,6 +71,7 @@
 } while (0)
 #else  // DGL_USE_CUDA
 #define ATEN_XPU_SWITCH_CUDA ATEN_XPU_SWITCH
+#define ATEN_XPU_SWITCH_CUDA_UVA ATEN_XPU_SWITCH
 #endif  // DGL_USE_CUDA
 
 /*
@@ -236,6 +251,13 @@
 #ifdef DGL_USE_CUDA
 #define ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, op, ...)            \
   ATEN_XPU_SWITCH_CUDA((csr).indptr->ctx.device_type, XPU, op, {   \
+    ATEN_ID_TYPE_SWITCH((csr).indptr->dtype, IdType, {             \
+      {__VA_ARGS__}                                                \
+    });                                                            \
+  });
+
+#define ATEN_CSR_SWITCH_CUDA_UVA(csr, XPU, IdType, op, ...)            \
+  ATEN_XPU_SWITCH_CUDA_UVA((csr).indptr->ctx.device_type, XPU, op, {   \
     ATEN_ID_TYPE_SWITCH((csr).indptr->dtype, IdType, {             \
       {__VA_ARGS__}                                                \
     });                                                            \
