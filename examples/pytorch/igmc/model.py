@@ -53,7 +53,7 @@ class IGMC(nn.Module):
         block = edge_drop(block, self.edge_dropout, self.training)
 
         concat_states = []
-        x = block.ndata['nlabel'] # th.cat([subgraph.ndata['nlabel'], subgraph.ndata['refex']], dim=1)
+        x = block.ndata['nlabel']
         for conv in self.convs:
             # edge mask zero denotes the edge dropped
             x = th.tanh(conv(block, x, block.edata['etype'], 
@@ -82,7 +82,7 @@ def uniform(size, tensor):
         tensor.data.uniform_(-bound, bound)
 
 def edge_drop(graph, edge_dropout=0.2, training=True):
-    assert edge_dropout >= 0.0 and edge_dropout <= 1.0, 'Invalid dropout rate.'
+    assert (edge_dropout >= 0.0) and (edge_dropout <= 1.0), 'Invalid dropout rate.'
 
     if not training:
         return graph

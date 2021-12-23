@@ -95,10 +95,10 @@ def train(args):
     test_loader = th.utils.data.DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, 
                             num_workers=args.num_workers, collate_fn=collate_movielens)
 
-    in_feats = (args.hop+1)*2 # + movielens.train_graph.ndata['refex'].shape[1]
+    in_feats = (args.hop+1)*2
     model = IGMC(in_feats=in_feats, 
                  latent_dim=[32, 32, 32, 32],
-                 num_relations=5, # movielens.num_rating, 
+                 num_relations=5,
                  num_bases=4, 
                  regression=True, 
                  edge_dropout=args.edge_dropout,
