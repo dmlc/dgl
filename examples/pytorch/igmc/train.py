@@ -19,8 +19,6 @@ from data import MovieLens
 from dataset import MovieLensDataset, collate_movielens 
 from utils import MetricLogger
 
-time.tzset()
-
 def evaluate(model, loader, device):
     # Evaluate RMSE
     model.eval()
@@ -163,6 +161,7 @@ def config():
     parser.add_argument('--valid_log_interval', type=int, default=10)
     parser.add_argument('--save_appendix', type=str, default='debug', 
                         help='what to append to save-names when saving results')
+
     # subgraph extraction settings
     parser.add_argument('--hop', default=1, metavar='S', 
                         help='enclosing subgraph hop number')
@@ -170,11 +169,13 @@ def config():
                         help='if < 1, subsample nodes per hop according to the ratio')
     parser.add_argument('--max_nodes_per_hop', type=int, default=200, 
                         help='if > 0, upper bound the # nodes per hop by another subsampling')
+
     # edge dropout settings
     parser.add_argument('--edge_dropout', type=float, default=0.2, 
                         help='if not 0, random drops edges from adjacency matrix with this prob')
     parser.add_argument('--force_undirected', action='store_true', default=False, 
                         help='in edge dropout, force (x, y) and (y, x) to be dropped together')
+
     # optimization settings
     parser.add_argument('--train_lr', type=float, default=1e-3)
     parser.add_argument('--train_min_lr', type=float, default=1e-6)

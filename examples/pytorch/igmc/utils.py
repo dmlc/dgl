@@ -17,16 +17,6 @@ class MetricLogger(object):
         with open(os.path.join(self.save_dir, 'log.txt'), 'a') as f:
             f.write('Epoch {}, train loss {:.4f}, test rmse {:.6f}\n'.format(
                 epoch, train_loss, test_rmse))
-        # if type(epoch) == int and epoch % self.log_interval == 0:
-        #     print('Saving model states...')
-        #     model_name = os.path.join(self.save_dir, 'model_checkpoint{}.pth'.format(epoch))
-        #     optimizer_name = os.path.join(
-        #         self.save_dir, 'optimizer_checkpoint{}.pth'.format(epoch)
-        #     )
-        #     if model is not None:
-        #         th.save(model.state_dict(), model_name)
-        #     if optimizer is not None:
-        #         th.save(optimizer.state_dict(), optimizer_name)
 
 def torch_total_param_num(net):
     return sum([np.prod(p.shape) for p in net.parameters()])
@@ -49,7 +39,7 @@ def one_hot(idx, length):
 
 def cal_dist(csr_graph, node_to_remove):
     # cal dist to node 0, with target edge nodes 0/1 removed
-    nodes = list(set(range(csr_graph.shape[1])) - set([node_to_remove]))
+    nodes = list(set(range(csr_graph.shape[1])) - {node_to_remove})
     csr_graph = csr_graph[nodes, :][:, nodes]
     dists = np.clip(sp.csgraph.dijkstra(
                         csr_graph, indices=0, directed=False, unweighted=True, limit=1e6
@@ -325,18 +315,3 @@ def grail_subgraph_extraction_labeling(graph, edge, h=1, sample_ratio=1.0, max_n
     subgraph.ndata['nlabel'] = node_labels
 
     return subgraph
-
-if __name__ == "__main__":
-    import time
-    from data import MovieLens
-    movielens = MovieLens("ml-100k", testing=True)
-
-    train_edges = movielens.train_rating_pairs
-    train_graph = movielens.train_graph
-
-    idx = 0
-    u, v = train_edges[0][idx], train_edges[1][idx]
-    subgraph = subgraph_extraction_labeling(
-                    (u, v), train_graph, 
-                    hop=1, sample_ratio=1.0, max_nodes_per_hop=200)
-    pass

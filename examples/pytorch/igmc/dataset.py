@@ -1,7 +1,3 @@
-import random
-from collections import namedtuple
-
-import numpy as np
 import torch as th
 import dgl
 
@@ -45,29 +41,3 @@ def collate_movielens(data):
     g = dgl.batch(g_list)
     g_label = th.stack(label_list)
     return g, g_label
-
-if __name__ == "__main__":
-    import time
-    from data import MovieLens
-    movielens = MovieLens("ml-100k", testing=True)
-
-    train_dataset = MovieLensDataset(
-        movielens.train_rating_pairs, movielens.train_rating_values, movielens.train_graph, 
-        hop=1, sample_ratio=1.0, max_nodes_per_hop=200)
-
-    train_loader = th.utils.data.DataLoader(train_dataset, batch_size=32, shuffle=True, 
-                            num_workers=8, collate_fn=collate_movielens)
-    # batch = next(iter(train_loader))
-
-    iter_dur = []
-    t_epoch = time.time()
-    for iter_idx, batch in enumerate(train_loader, start=1):
-        t_iter = time.time()
-        inputs = batch[0] # .to(th.device('cuda:0'))
-
-        iter_dur.append(time.time() - t_iter)
-        if iter_idx % 100 == 0:
-            print("Iter={}, time={:.4f}".format(
-                iter_idx, np.average(iter_dur)))
-            iter_dur = []
-    print("Epoch time={:.2f}".format(time.time()-t_epoch))

@@ -1,15 +1,12 @@
 """MovieLens dataset"""
 
 import os
-import scipy.sparse as sp
-
 import numpy as np
 import pandas as pd
 import torch as th
 
 import dgl 
 from dgl.data.utils import download, extract_archive, get_download_dir
-from refex import extract_refex_feature
 
 _urls = {
     'ml-100k' : 'http://files.grouplens.org/datasets/movielens/ml-100k.zip',
@@ -62,7 +59,6 @@ class MovieLens(object):
         self._rating = np.sort(np.unique(all_rating_data["rating"].values))
         
         print("All rating pairs : {}".format(all_rating_data.shape[0]))
-        # print("\tAll train rating pairs : {}".format(self.all_train_rating_data.shape[0]))
         print("\tTrain rating pairs : {}".format(train_rating_data.shape[0]))
         print("\tValid rating pairs : {}".format(valid_rating_data.shape[0]))
         print("\tTest rating pairs  : {}".format(test_rating_data.shape[0]))
@@ -91,7 +87,6 @@ class MovieLens(object):
         self._num_movie = len(self._global_movie_id_map)
 
         # pair value is idx rather than id, and rating value starts from 1.0
-        # self.all_train_rating_pairs, self.all_train_rating_values = self._generate_pair_value(self.all_train_rating_data)
         train_u_indices, train_v_indices, train_labels = self._generate_pair_value(train_rating_data)
         val_u_indices, val_v_indices, val_labels = self._generate_pair_value(valid_rating_data)
         test_u_indices, test_v_indices, test_labels = self._generate_pair_value(test_rating_data)
@@ -112,18 +107,6 @@ class MovieLens(object):
         self.train_graph = dgl.graph((th.cat([self.train_rating_pairs[0], self.train_rating_pairs[1]]), 
                                       th.cat([self.train_rating_pairs[1], self.train_rating_pairs[0]])))
         self.train_graph.edata['etype'] = th.cat([self.train_rating_values, self.train_rating_values]).to(th.long)
-
-        # add refex feature
-        # refex_feature = extract_refex_feature(self.train_graph)
-        # print("refex feature shape: {}".format(refex_feature.numpy().shape))
-        # self.train_graph.ndata['refex'] = refex_feature
-
-        # # add gdv feature
-        # gdv_feature = np.loadtxt('./{}.gdv'.format(data_name), dtype=np.float32)
-        # print("gdv feature shape: {}".format(gdv_feature.shape))
-        # gdv_feature = utils.MinMaxScaling(gdv_feature, axis=0)
-        # self.train_graph.ndata['gdv'] = th.from_numpy(gdv_feature)
-
     @property
     def num_rating(self):
         return self._rating.size
@@ -261,6 +244,3 @@ class MovieLens(object):
         # label ranges from 0. to 4.
         rating_values = rating_data["rating"].values.astype(np.float32) - 1.
         return rating_pairs[0], rating_pairs[1], rating_values
-
-if __name__ == '__main__':
-    dataset = MovieLens("ml-1m", testing=True)

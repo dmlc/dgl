@@ -25,9 +25,6 @@ from data import MovieLens
 from dataset import MovieLensDataset, collate_movielens 
 from utils import MetricLogger
 
-os.environ['TZ'] = 'Asia/Shanghai'
-time.tzset()
-
 # According to https://github.com/pytorch/pytorch/issues/17199, this decorator
 # is necessary to make fork() and openmp work together.
 def thread_wrapped_func(func):
@@ -242,12 +239,11 @@ def config():
     parser.add_argument('--data_test_ratio', type=float, default=0.1) # for ml-100k the test ration is 0.2
     parser.add_argument('--num_workers', type=int, default=8)
     parser.add_argument('--data_valid_ratio', type=float, default=0.2)
-    # parser.add_argument('--ensemble', action='store_true', default=False,
-    #                     help='if True, load a series of model checkpoints and ensemble the results')               
     parser.add_argument('--train_log_interval', type=int, default=100)
     parser.add_argument('--valid_log_interval', type=int, default=10)
     parser.add_argument('--save_appendix', type=str, default='debug', 
                         help='what to append to save-names when saving results')
+
     # subgraph extraction settings
     parser.add_argument('--hop', default=1, metavar='S', 
                         help='enclosing subgraph hop number')
@@ -255,13 +251,13 @@ def config():
                         help='if < 1, subsample nodes per hop according to the ratio')
     parser.add_argument('--max_nodes_per_hop', type=int, default=200, 
                         help='if > 0, upper bound the # nodes per hop by another subsampling')
-    # parser.add_argument('--use_features', action='store_true', default=False,
-    #                     help='whether to use node features (side information)')
+
     # edge dropout settings
     parser.add_argument('--edge_dropout', type=float, default=0.2, 
                         help='if not 0, random drops edges from adjacency matrix with this prob')
     parser.add_argument('--force_undirected', action='store_true', default=False, 
                         help='in edge dropout, force (x, y) and (y, x) to be dropped together')
+
     # optimization settings
     parser.add_argument('--train_lr', type=float, default=1e-3)
     parser.add_argument('--train_min_lr', type=float, default=1e-6)

@@ -3,12 +3,12 @@
 Paper link: [https://arxiv.org/abs/1904.12058](https://arxiv.org/abs/1904.12058)
 Author's code: [https://github.com/muhanzhang/IGMC](https://github.com/muhanzhang/IGMC)
 
-Credit: Junfeng Zhou ([@zhoujf620](https://github.com/zhoujf620))
+Credit: Junfeng Zhou ([@zhoujf620](https://github.com/zhoujf620)), Jiahang Li ([@LspongebobJH](https://github.com/LspongebobJH))
 
 ## Dependencies
 
-* PyTorch 1.2+
-* DGL 0.5 (nightly version)
+* PyTorch 1.9.1+
+* DGL 
 
 ## Data
 
