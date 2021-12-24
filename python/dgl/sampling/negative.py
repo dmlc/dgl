@@ -43,12 +43,15 @@ def global_uniform_negative_sampling(
         The edge type.  Can be omitted if the graph only has one edge type.
     num_trials : int, optional
         The number of rejection sampling trials.
+
+        Increasing it will increase the likelihood of getting :attr:`num_samples` negative
+        examples, but will also take more time.
     redundancy : float, optional
         Indicates how much more negative examples to actually generate during rejection sampling
         before finding the unique pairs.
 
-        Increasing it will increase the likelihood of getting :attr:`k` negative examples,
-        but will also take more time and memory.
+        Increasing it will increase the likelihood of getting :attr:`num_samples` negative
+        examples, but will also take more time and memory.
 
         (Default: 1.3)
 
