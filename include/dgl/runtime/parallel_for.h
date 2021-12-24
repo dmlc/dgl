@@ -56,7 +56,7 @@ static DefaultGrainSizeT default_grain_size;
  *
  * It requires each thread's workload to have at least \a grain_size elements.
  * The loop body will be a function that takes in two arguments \a begin and \a end, which
- * stands for the starting and ending index of the workload.
+ * stands for the starting (inclusive) and ending index (exclusive) of the workload.
  */
 template <typename F>
 void parallel_for(
@@ -117,10 +117,27 @@ void parallel_for(
  *
  * The first-stage reduction function \a f works in parallel.  Each thread's workload has
  * at least \a grain_size elements.  The loop body will be a function that takes in
- * the starting index, the ending index, and the reduction identity.
+ * the starting index (inclusive), the ending index (exclusive), and the reduction identity.
  *
  * The second-stage reduction function \a sf is a binary function working in the main
  * thread. It aggregates the partially reduced result computed from each thread.
+ *
+ * Example to compute a parallelized max reduction of an array \c a:
+ *
+ *     parallel_reduce(
+ *       0,        // starting index
+ *       100,      // ending index
+ *       1,        // grain size
+ *       -std::numeric_limits<float>::infinity,     // identity
+ *       [&a] (int begin, int end, float ident) {   // first-stage partial reducer
+ *         float result = ident;
+ *         for (int i = begin; i < end; ++i)
+ *           result = std::max(result, a[i]);
+ *         return result;
+ *       },
+ *       [] (float result, float partial_result) {
+ *         return std::max(result, partial_result);
+ *       });
  */
 template <typename DType, typename F, typename SF>
 DType parallel_reduce(
