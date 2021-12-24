@@ -326,7 +326,7 @@ if __name__ == '__main__':
     parser.add_argument('--part_config', type=str, help='The path to the partition config file')
     parser.add_argument('--num_clients', type=int, help='The number of clients')
     parser.add_argument('--n_classes', type=int, help='the number of classes')
-    parser.add_argument('--backend', type=str, default='nccl', help='pytorch distributed backend')
+    parser.add_argument('--backend', type=str, default='gloo', help='pytorch distributed backend')
     parser.add_argument('--num_gpus', type=int, default=-1,
                         help="the number of GPU device. Use -1 for CPU training")
     parser.add_argument('--num_epochs', type=int, default=20)
