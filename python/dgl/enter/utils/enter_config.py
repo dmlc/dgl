@@ -6,7 +6,7 @@ from enum import Enum, IntEnum
 import copy
 from pydantic import create_model, BaseModel as PydanticBaseModel, Field
 # from ..pipeline import nodepred, nodepred_sample
-from .factory import ModelFactory, PipelineFactory
+from .factory import ModelFactory, PipelineFactory, DataFactory
 from .base_model import DGLBaseModel
 
 class DatasetEnum(str, Enum):
@@ -37,7 +37,7 @@ class UserConfig(DGLBaseModel):
     version: Optional[str] = "0.0.1"
     pipeline_name: PipelineFactory.get_pipeline_enum()
     device: str = "cpu"
-    data: DataConfig
+    data: DataFactory.get_pydantic_config() = Field(..., discriminator="name")
     model : ModelFactory.get_pydantic_model_config() = Field(..., discriminator="name")
     general_pipeline: PipelineConfig = PipelineConfig()
 

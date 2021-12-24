@@ -20,7 +20,9 @@ class GAT(nn.Module):
                  negative_slope: float = 0.2,
                  residual: bool = False):
         super(GAT, self).__init__()
-        self.num_layers = num_layers
+        self.in_size = in_size
+        self.out_size = out_size
+        self.num_layers = num_layers-1
         self.gat_layers = nn.ModuleList()
         self.activation = getattr(torch.nn.functional, activation)
         # input projection (no residual)
@@ -28,7 +30,7 @@ class GAT(nn.Module):
             in_size, num_hidden, heads[0],
             feat_drop, attn_drop, negative_slope, False, self.activation))
         # hidden layers
-        for l in range(1, num_layers):
+        for l in range(1, self.num_layers):
             # due to multi-head, the in_size = num_hidden * num_heads
             self.gat_layers.append(GATConv(
                 num_hidden * heads[l-1], num_hidden, heads[l],
@@ -44,4 +46,11 @@ class GAT(nn.Module):
             h = self.gat_layers[l](graph, h).flatten(1)
         # output projection
         logits = self.gat_layers[-1](graph, h).mean(1)
+        return logits
+
+    def forward_block(self,  blocks, node_feat, edge_feat = None):
+        h = node_feat
+        for l in range(self.num_layers):
+            h = self.gat_layers[l](blocks[l], h).flatten(1)        
+        logits = self.gat_layers[-1](blocks[-1], h).mean(1)
         return logits

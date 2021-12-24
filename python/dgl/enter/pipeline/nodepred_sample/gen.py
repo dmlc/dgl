@@ -7,8 +7,8 @@ import copy
 import yaml
 
 import typer
-from ...utils.factory import PipelineFactory, ModelFactory, PipelineBase
-from ...utils.base_model import extract_name
+from ...utils.factory import PipelineFactory, ModelFactory, PipelineBase, DataFactory
+from ...utils.base_model import extract_name, EarlyStopConfig
 
 
 class MultiLayerSamplerConfig(BaseModel):
@@ -36,7 +36,7 @@ SamplerChoice = extract_name(SamplerConfig)
 class NodepredNSPipelineCfg(BaseModel):
     sampler: SamplerConfig = Field(..., discriminator='name')
     node_embed_size: Optional[int] = -1
-    early_stop: Optional[dict]
+    early_stop: Optional[EarlyStopConfig] = EarlyStopConfig()
     num_epochs: int = 200
     eval_period: int = 5
     optimizer: dict = {"name": "Adam", "lr": 0.005}
@@ -50,17 +50,19 @@ class NodepredNsPipeline(PipelineBase):
 
     def get_cfg_func(self):
         def config(
-            data: str = typer.Option(..., help="input data name"),
+            data: DataFactory.get_dataset_enum() = typer.Option(..., help="input data name"),
             cfg: str = typer.Option(
                 "cfg.yml", help="output configuration path"),
             sampler: SamplerChoice = typer.Option(
                 "neighbor", help="Specify sampler name"),
             model: ModelFactory.get_model_enum() = typer.Option(..., help="Model name"),
+            device: str = typer.Option("cpu", help="Device, cpu or cuda"),
         ):
             from ...utils.enter_config import UserConfig
             generated_cfg = {
                 "pipeline_name": "nodepred-ns",
-                "data": {"name": data},
+                "device": device,
+                "data": {"name": data.name},
                 "model": {"name": model.value},
                 "general_pipeline" : NodepredNSPipelineCfg(sampler={"name": sampler.value})
             }

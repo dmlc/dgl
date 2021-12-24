@@ -9,7 +9,6 @@ from pathlib import Path
 import isort
 import autopep8
 
-# @config_app.command()
 def train(
     cfg: str = typer.Option(..., help="yaml file name"),
     export: bool = typer.Option(False, "--export"),

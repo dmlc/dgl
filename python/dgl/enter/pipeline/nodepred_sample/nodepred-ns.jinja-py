@@ -60,9 +60,9 @@ def evaluate(model, g, nfeat, labels, val_nid, device, cfg):
     """
     model.eval()
     device = cfg.get("device", "cpu")
-    batch_size = cfg["sampler"].get("eval_batch_size")
-    num_workers = cfg["sampler"].get("eval_num_workers")
-    sampler = dgl.dataloading.MultiLayerFullNeighborSampler(len(model.layers))
+    batch_size = cfg["general_pipeline"]["sampler"]["eval_batch_size"]
+    num_workers = cfg["general_pipeline"]["sampler"]["eval_num_workers"]
+    sampler = dgl.dataloading.MultiLayerFullNeighborSampler(len(cfg["general_pipeline"]["sampler"]["fan_out"]))
     dataloader = dgl.dataloading.NodeDataLoader(
         g,
         torch.arange(g.num_nodes()).to(g.device),
@@ -76,6 +76,7 @@ def evaluate(model, g, nfeat, labels, val_nid, device, cfg):
         y = torch.zeros(g.num_nodes(), model.out_size)
         for input_nodes, output_nodes, blocks in dataloader:
             batch_inputs = nfeat[input_nodes].to(device)
+            blocks = [block.int().to(device) for block in blocks]
             h = model.forward_block(blocks, batch_inputs)
             y[output_nodes] = h.cpu()
     model.train()
@@ -88,7 +89,6 @@ def accuracy(logits, labels):
 
 def train(cfg, pipeline_cfg, device, data, model, optimizer, loss_fcn):
     g = data[0]  # Only train on the first graph
-    g = g.to(device)
     train_g = val_g = test_g = g
     train_nfeat = val_nfeat = test_nfeat = train_g.ndata['feat']
     train_labels = val_labels = test_labels = train_g.ndata['label']
@@ -98,7 +98,7 @@ def train(cfg, pipeline_cfg, device, data, model, optimizer, loss_fcn):
     test_nid = torch.nonzero(~(test_g.ndata['train_mask'] | test_g.ndata['val_mask']), as_tuple=True)[0]
 
     sampler = dgl.dataloading.MultiLayerNeighborSampler(
-        [int(fanout) for fanout in cfg["sampler"]["fan_out"]])
+        [int(fanout) for fanout in pipeline_cfg["sampler"]["fan_out"]])
     dataloader = dgl.dataloading.NodeDataLoader(
         train_g,
         train_nid,
@@ -172,11 +172,11 @@ def main():
     cfg["model"]["in_size"] = pipeline_cfg['node_embed_size'] if pipeline_cfg['node_embed_size'] > 0 else feat_size
     cfg["model"]["out_size"] = data.num_classes
     model = {{ model_class_name }}(**cfg["model"])
-    if cfg['node_embed_size'] > 0:
+    if pipeline_cfg['node_embed_size'] > 0:
         model = GNNWithEmbedding(data[0].num_nodes(), pipeline_cfg['node_embed_size'], model)
     model = model.to(device)
     params = model.parameters()
-    loss = torch.nn.{{ user_cfg.loss }}()
+    loss = torch.nn.{{ user_cfg.general_pipeline.loss }}()
     optimizer = torch.optim.Adam(params, **pipeline_cfg["optimizer"])
     train(cfg, pipeline_cfg, device, data, model, optimizer, loss)
 

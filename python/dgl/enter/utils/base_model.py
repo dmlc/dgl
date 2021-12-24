@@ -17,3 +17,7 @@ def extract_name(union_type):
         name =  t.__fields__['name'].type_.__args__[0]
         name_dict[name] = name
     return enum.Enum("Choice", name_dict)
+
+class EarlyStopConfig(DGLBaseModel):
+    patience: int = 20
+    checkpoint_path: str = "checkpoint.pth"

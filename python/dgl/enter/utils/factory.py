@@ -7,6 +7,8 @@ from .base_model import DGLBaseModel
 import yaml
 import inspect
 from pydantic import create_model_from_typeddict, create_model, Field
+from ...data import CoraGraphDataset, CiteseerGraphDataset, RedditDataset
+
 logger = logging.getLogger(__name__)
 
 
@@ -28,6 +30,51 @@ class PipelineBase(ABC):
     def get_description() -> str:
         pass
 
+
+class DataFactory:
+    registry = {}
+
+    @classmethod
+    def register(cls, name: str) -> Callable:
+
+        def inner_wrapper(wrapped_class) -> Callable:
+            if name in cls.registry:
+                logger.warning(
+                    'Executor %s already exists. Will replace it', name)
+            cls.registry[name] = wrapped_class
+            return wrapped_class
+
+        return inner_wrapper
+    
+    @classmethod
+    def get_dataset_enum(cls):
+        enum_class = enum.Enum(
+            "DatasetName", {v.__name__: k for k, v in cls.registry.items()})
+        return enum_class
+    
+    @classmethod
+    def get_dataset_classname(cls, name):
+        return cls.registry[name].__name__
+    
+    @classmethod
+    def get_pydantic_config(cls):
+        type_annotation_dict = {}
+        dataset_list = []
+        for k, v in cls.registry.items():
+            dataset_name = v.__name__
+            class Base(DGLBaseModel):
+                name: Literal[dataset_name]
+            
+            dataset_list.append(create_model(f'{dataset_name}Config', **type_annotation_dict, __base__=Base))
+        
+        output = dataset_list[0]
+        for d in dataset_list[1:]:
+            output = Union[output, d]
+        return output
+
+DataFactory.register("cora")(CoraGraphDataset)
+DataFactory.register("citeseer")(CiteseerGraphDataset)
+DataFactory.register("reddit")(RedditDataset)
 
 class PipelineFactory:
     """ The factory class for creating executors"""
