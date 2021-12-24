@@ -165,6 +165,7 @@ def pad_data(nids, device):
     the maximum size among all workers.
     """
     import torch.distributed as dist
+    # NCCL backend only supports GPU tensors, thus here we need to allocate it to gpu
     num_nodes = th.tensor(nids.numel()).to(device)
     dist.all_reduce(num_nodes, dist.ReduceOp.MAX)
     max_num_nodes = int(num_nodes)
