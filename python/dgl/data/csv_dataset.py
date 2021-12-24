@@ -71,6 +71,7 @@ class GraphData:
 class DefaultDataParser:
     def __init__(self, separator='|'):
         self.separator = separator
+
     def __call__(self, df):
         data = {}
         for header in df:
@@ -80,7 +81,7 @@ class DefaultDataParser:
             dt = df[header].to_numpy().squeeze()
             if isinstance(dt[0], str):
                 #probably consists of list of numeric values
-                dt=np.array([ast.literal_eval(row) for row in dt])
+                dt = np.array([ast.literal_eval(row) for row in dt])
             data[header] = dt
         return data
 
@@ -97,13 +98,17 @@ def load_yaml_with_sanity_check(yaml_file):
 
 class CSVDataLoader:
     @staticmethod
-    def load_node_data_from_csv(meta_node, base_dir=None, separator=',', node_parser=DefaultDataParser()):
-        csv_path = meta_node.file_name
+    def read_csv(file_name, base_dir, separator):
+        csv_path = file_name
         if base_dir is not None:
-            csv_path = os.path.join(base_dir,csv_path)
-        df = pd.read_csv(csv_path, sep=separator)
+            csv_path = os.path.join(base_dir, csv_path)
+        return pd.read_csv(csv_path, sep=separator)
+
+    @staticmethod
+    def load_node_data_from_csv(meta_node, base_dir=None, separator=',', data_parser=DefaultDataParser()):
+        df = CSVDataLoader.read_csv(meta_node.file_name, base_dir, separator)
         ntype = meta_node.ntype
-        ndata = node_parser(df)
+        ndata = data_parser(df)
         if meta_node.node_id_field not in ndata:
             raise DGLError(f"node_id_field[{meta_node.node_id_field}] does not exist in parsed node data dict.")
         node_ids = ndata[meta_node.node_id_field]
@@ -116,13 +121,10 @@ class CSVDataLoader:
         return NodeData(node_ids, ndata, type=ntype, graph_id=graph_ids)
 
     @staticmethod
-    def load_edge_data_from_csv(meta_edge, base_dir=None, separator=',', edge_parser=DefaultDataParser()):
-        csv_path = meta_edge.file_name
-        if base_dir is not None:
-            csv_path = os.path.join(base_dir,csv_path)
-        df = pd.read_csv(csv_path, sep=separator)
+    def load_edge_data_from_csv(meta_edge, base_dir=None, separator=',', data_parser=DefaultDataParser()):
+        df = CSVDataLoader.read_csv(meta_edge.file_name, base_dir, separator)
         etype = tuple(meta_edge.etype)
-        edata = edge_parser(df)
+        edata = data_parser(df)
         if meta_edge.src_id_field not in edata:
             raise DGLError(f"src_id_field[{meta_edge.src_id_field}] does not exist in parsed edge data dict.")
         if meta_edge.dst_id_field not in edata:
@@ -136,12 +138,9 @@ class CSVDataLoader:
         return EdgeData(src_ids, dst_ids, edata, type=etype, graph_id=graph_ids)
 
     @staticmethod
-    def load_graph_data_from_csv(meta_graph, base_dir=None, separator=',', graph_parser=DefaultDataParser()):
-        csv_path = meta_graph.file_name
-        if base_dir is not None:
-            csv_path = os.path.join(base_dir,csv_path)
-        df = pd.read_csv(csv_path, sep=separator)
-        gdata = graph_parser(df)
+    def load_graph_data_from_csv(meta_graph, base_dir=None, separator=',', data_parser=DefaultDataParser()):
+        df = CSVDataLoader.read_csv(meta_graph.file_name, base_dir, separator)
+        gdata = data_parser(df)
         if meta_graph.graph_id_field not in gdata:
             raise DGLError(f"graph_id_field[{meta_graph.graph_id_field}] does not exist in parsed graph data dict.")
         graph_ids = gdata[meta_graph.graph_id_field]
@@ -266,18 +265,23 @@ class DGLGraphConstructor:
 class DGLCSVDataset(DGLDataset):
     """
     This class offers:
-    1. interface of load node/edge/graph data which should be overridden
+    1. support user-defined node/edge/graph data parser
     2. construct graphs from node/edge/graph data
     3. implement the interfaces of DGLDataset: behaves as a dataset
     """
     META_YAML_NAME = 'meta.yaml'
 
-    def __init__(self, data_path, force_reload=False, verbose=True, node_parsers=None, edge_parsers=None, graph_parser=None):
+    def __init__(self, data_path, force_reload=False, verbose=True, data_parser=None):
+        """
+        data_parser : dict
+            {'user' : NodeDataParser,
+             ('user', 'like', 'item') : EdgeDataParser,
+             '_GRAPH_' : GraphDataParser,
+            }
+        """
         self.graphs = None
         self.data = None
-        self.node_parsers = {}#node_parsers
-        self.edge_parsers = {}#edge_parsers
-        self.graph_parser = graph_parser
+        self.data_parser = {} if data_parser is None else data_parser
         meta_yaml_path = os.path.join(data_path, DGLCSVDataset.META_YAML_NAME)
         if not os.path.exists(meta_yaml_path):
             raise DGLError(
@@ -297,27 +301,29 @@ class DGLCSVDataset(DGLDataset):
             if meta_node is None:
                 continue
             ntype = meta_node.ntype
-            node_parser = DefaultDataParser() if ntype not in self.node_parsers else self.node_parsers[
+            data_parser = DefaultDataParser() if ntype not in self.data_parser else self.data_parser[
                 ntype]
             ndata = CSVDataLoader.load_node_data_from_csv(
-                meta_node, base_dir=base_dir, separator=meta_yaml.separator, node_parser=node_parser)
+                meta_node, base_dir=base_dir, separator=meta_yaml.separator, data_parser=data_parser)
             node_data.append(ndata)
         edge_data = []
         for meta_edge in meta_yaml.edge_data:
             if meta_edge is None:
                 continue
             etype = tuple(meta_edge.etype)
-            edge_parser = DefaultDataParser() if etype not in self.edge_parsers else self.edge_parsers[
+            data_parser = DefaultDataParser() if etype not in self.data_parser else self.data_parser[
                 etype]
             edata = CSVDataLoader.load_edge_data_from_csv(
-                meta_edge, base_dir=base_dir, separator= meta_yaml.separator, edge_parser=edge_parser)
+                meta_edge, base_dir=base_dir, separator=meta_yaml.separator, data_parser=data_parser)
             edge_data.append(edata)
         graph_data = None
         if meta_yaml.graph_data is not None:
             meta_graph = meta_yaml.graph_data
-            graph_parser = DefaultDataParser() if self.graph_parser is None else self.graph_parser
+            data_parser = DefaultDataParser(
+            ) if '_GRAPH_' not in self.data_parser else self.data_parser['_GRAPH_']
             graph_data = CSVDataLoader.load_graph_data_from_csv(
-                meta_graph, base_dir=base_dir, separator= meta_yaml.separator, graph_parser=graph_parser)
+                meta_graph, base_dir=base_dir, separator=meta_yaml.separator, data_parser=data_parser)
+        # construct graphs
         self.graphs, self.data = DGLGraphConstructor.construct_graphs(
             node_data, edge_data, graph_data)
 

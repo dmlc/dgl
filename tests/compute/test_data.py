@@ -1,5 +1,3 @@
-import dgl.data as data
-from dgl import DGLError
 import unittest
 import backend as F
 import numpy as np
@@ -9,6 +7,9 @@ import os
 import pandas as pd
 import yaml
 import pytest
+import dgl.data as data
+import dgl.data.csv_dataset as csv_ds
+from dgl import DGLError
 
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
@@ -178,13 +179,13 @@ def _test_construct_graphs_homo():
     _, u_indices = np.unique(node_ids, return_index=True)
     ndata = {'feat': t_ndata['feat'][u_indices],
              'label': t_ndata['label'][u_indices]}
-    node_data = data.NodeData(node_ids, t_ndata)
+    node_data = csv_ds.NodeData(node_ids, t_ndata)
     src_ids = np.random.choice(node_ids, size=num_edges)
     dst_ids = np.random.choice(node_ids, size=num_edges)
     edata = {'feat': np.random.rand(
         num_edges, num_dims), 'label': np.random.randint(2, size=num_edges)}
-    edge_data = data.EdgeData(src_ids, dst_ids, edata)
-    graphs, data_dict = data.DGLGraphConstructor.construct_graphs(
+    edge_data = csv_ds.EdgeData(src_ids, dst_ids, edata)
+    graphs, data_dict = csv_ds.DGLGraphConstructor.construct_graphs(
         node_data, edge_data)
     assert len(graphs) == 1
     assert len(data_dict) == 0
@@ -222,7 +223,7 @@ def _test_construct_graphs_hetero():
         _, u_indices = np.unique(node_ids, return_index=True)
         ndata = {'feat': t_ndata['feat'][u_indices],
                  'label': t_ndata['label'][u_indices]}
-        node_data.append(data.NodeData(node_ids, t_ndata, type=ntype))
+        node_data.append(csv_ds.NodeData(node_ids, t_ndata, type=ntype))
         node_ids_dict[ntype] = node_ids
         ndata_dict[ntype] = ndata
     etypes = [('user', 'follow', 'user'), ('user', 'like', 'item')]
@@ -233,10 +234,10 @@ def _test_construct_graphs_hetero():
         dst_ids = np.random.choice(node_ids_dict[dst_type], size=num_edges)
         edata = {'feat': np.random.rand(
             num_edges, num_dims), 'label': np.random.randint(2, size=num_edges)}
-        edge_data.append(data.EdgeData(src_ids, dst_ids, edata,
+        edge_data.append(csv_ds.EdgeData(src_ids, dst_ids, edata,
                          type=(src_type, e_type, dst_type)))
         edata_dict[(src_type, e_type, dst_type)] = edata
-    graphs, data_dict = data.DGLGraphConstructor.construct_graphs(
+    graphs, data_dict = csv_ds.DGLGraphConstructor.construct_graphs(
         node_data, edge_data)
     assert len(graphs) == 1
     assert len(data_dict) == 0
@@ -271,7 +272,7 @@ def _test_DefaultDataParser():
                            'feat': [line.tolist() for line in feat],
                            })
         df.to_csv(csv_path, index=False)
-        dp = data.DefaultDataParser()
+        dp = csv_ds.DefaultDataParser()
         df = pd.read_csv(csv_path)
         dt = dp(df)
         assert np.array_equal(node_id, dt['node_id'])
@@ -283,7 +284,7 @@ def _test_DefaultDataParser():
         df = pd.DataFrame({'label': ['a', 'b', 'c'],
                            })
         df.to_csv(csv_path, index=False)
-        dp = data.DefaultDataParser()
+        dp = csv_ds.DefaultDataParser()
         df = pd.read_csv(csv_path)
         expect_except = False
         try:
@@ -297,7 +298,7 @@ def _test_DefaultDataParser():
         df = pd.DataFrame({'label': [1, 2, 3],
                            })
         df.to_csv(csv_path)
-        dp = data.DefaultDataParser()
+        dp = csv_ds.DefaultDataParser()
         df = pd.read_csv(csv_path)
         dt = dp(df)
         assert len(dt) == 1
@@ -312,7 +313,7 @@ def _test_load_yaml_with_sanity_check():
                      }
         with open(yaml_path, 'w') as f:
             yaml.dump(yaml_data, f, sort_keys=False)
-        meta = data.load_yaml_with_sanity_check(yaml_path)
+        meta = csv_ds.load_yaml_with_sanity_check(yaml_path)
         assert meta.version == '1.0.0'
         assert meta.dataset_name == 'default'
         assert meta.separator == ','
@@ -325,7 +326,7 @@ def _test_load_yaml_with_sanity_check():
                      }
         with open(yaml_path, 'w') as f:
             yaml.dump(yaml_data, f, sort_keys=False)
-        meta = data.load_yaml_with_sanity_check(yaml_path)
+        meta = csv_ds.load_yaml_with_sanity_check(yaml_path)
         for ndata in meta.node_data:
             assert ndata.file_name == 'nodes.csv'
             assert ndata.ntype == '_V'
@@ -346,7 +347,7 @@ def _test_load_yaml_with_sanity_check():
                      }
         with open(yaml_path, 'w') as f:
             yaml.dump(yaml_data, f, sort_keys=False)
-        meta = data.load_yaml_with_sanity_check(yaml_path)
+        meta = csv_ds.load_yaml_with_sanity_check(yaml_path)
         assert len(meta.node_data) == 1
         ndata = meta.node_data[0]
         assert ndata.ntype == 'user'
@@ -372,7 +373,7 @@ def _test_load_yaml_with_sanity_check():
                 yaml.dump(ydata, f, sort_keys=False)
             expect_except = False
             try:
-                meta = data.load_yaml_with_sanity_check(yaml_path)
+                meta = csv_ds.load_yaml_with_sanity_check(yaml_path)
             except:
                 expect_except = True
             assert expect_except
@@ -384,7 +385,7 @@ def _test_load_yaml_with_sanity_check():
             yaml.dump(yaml_data, f, sort_keys=False)
         expect_except = False
         try:
-            meta = data.load_yaml_with_sanity_check(yaml_path)
+            meta = csv_ds.load_yaml_with_sanity_check(yaml_path)
         except DGLError:
             expect_except = True
         assert expect_except
@@ -397,8 +398,8 @@ def _test_load_node_data_from_csv():
         df = pd.DataFrame({'node_id': np.arange(num_nodes)})
         csv_path = os.path.join(test_dir, 'nodes.csv')
         df.to_csv(csv_path, index=False)
-        meta_node = data.MetaNode(file_name=csv_path)
-        node_data = data.CSVDataLoader.load_node_data_from_csv(meta_node)
+        meta_node = csv_ds.MetaNode(file_name=csv_path)
+        node_data = csv_ds.CSVDataLoader.load_node_data_from_csv(meta_node)
         assert np.array_equal(df['node_id'], node_data.id)
         assert len(node_data.data) == 0
 
@@ -407,8 +408,8 @@ def _test_load_node_data_from_csv():
                           'label': np.random.randint(3, size=num_nodes)})
         csv_path = os.path.join(test_dir, 'nodes.csv')
         df.to_csv(csv_path, index=False)
-        meta_node = data.MetaNode(file_name=csv_path)
-        node_data = data.CSVDataLoader.load_node_data_from_csv(meta_node)
+        meta_node = csv_ds.MetaNode(file_name=csv_path)
+        node_data = csv_ds.CSVDataLoader.load_node_data_from_csv(meta_node)
         assert np.array_equal(df['node_id'], node_data.id)
         assert len(node_data.data) == 1
         assert np.array_equal(df['label'], node_data.data['label'])
@@ -420,8 +421,8 @@ def _test_load_node_data_from_csv():
             3, size=num_nodes), 'graph_id': np.full(num_nodes, 1)})
         csv_path = os.path.join(test_dir, 'nodes.csv')
         df.to_csv(csv_path, index=False)
-        meta_node = data.MetaNode(file_name=csv_path)
-        node_data = data.CSVDataLoader.load_node_data_from_csv(meta_node)
+        meta_node = csv_ds.MetaNode(file_name=csv_path)
+        node_data = csv_ds.CSVDataLoader.load_node_data_from_csv(meta_node)
         assert np.array_equal(df['node_id'], node_data.id)
         assert len(node_data.data) == 1
         assert np.array_equal(df['label'], node_data.data['label'])
@@ -432,10 +433,10 @@ def _test_load_node_data_from_csv():
         df = pd.DataFrame({'label': np.random.randint(3, size=num_nodes)})
         csv_path = os.path.join(test_dir, 'nodes.csv')
         df.to_csv(csv_path, index=False)
-        meta_node = data.MetaNode(file_name=csv_path)
+        meta_node = csv_ds.MetaNode(file_name=csv_path)
         expect_except = False
         try:
-            data.CSVDataLoader.load_node_data_from_csv(meta_node)
+            csv_ds.CSVDataLoader.load_node_data_from_csv(meta_node)
         except:
             expect_except = True
         assert expect_except
@@ -451,8 +452,8 @@ def _test_load_edge_data_from_csv():
                            })
         csv_path = os.path.join(test_dir, 'edges.csv')
         df.to_csv(csv_path, index=False)
-        meta_edge = data.MetaEdge(file_name=csv_path)
-        edge_data = data.CSVDataLoader.load_edge_data_from_csv(meta_edge)
+        meta_edge = csv_ds.MetaEdge(file_name=csv_path)
+        edge_data = csv_ds.CSVDataLoader.load_edge_data_from_csv(meta_edge)
         assert np.array_equal(df['src_id'], edge_data.src)
         assert np.array_equal(df['dst_id'], edge_data.dst)
         assert len(edge_data.data) == 0
@@ -463,8 +464,8 @@ def _test_load_edge_data_from_csv():
                            'label': np.random.randint(3, size=num_edges)})
         csv_path = os.path.join(test_dir, 'edges.csv')
         df.to_csv(csv_path, index=False)
-        meta_edge = data.MetaEdge(file_name=csv_path)
-        edge_data = data.CSVDataLoader.load_edge_data_from_csv(meta_edge)
+        meta_edge = csv_ds.MetaEdge(file_name=csv_path)
+        edge_data = csv_ds.CSVDataLoader.load_edge_data_from_csv(meta_edge)
         assert np.array_equal(df['src_id'], edge_data.src)
         assert np.array_equal(df['dst_id'], edge_data.dst)
         assert len(edge_data.data) == 1
@@ -480,8 +481,8 @@ def _test_load_edge_data_from_csv():
                            'label': np.random.randint(3, size=num_edges)})
         csv_path = os.path.join(test_dir, 'edges.csv')
         df.to_csv(csv_path, index=False)
-        meta_edge = data.MetaEdge(file_name=csv_path)
-        edge_data = data.CSVDataLoader.load_edge_data_from_csv(meta_edge)
+        meta_edge = csv_ds.MetaEdge(file_name=csv_path)
+        edge_data = csv_ds.CSVDataLoader.load_edge_data_from_csv(meta_edge)
         assert np.array_equal(df['src_id'], edge_data.src)
         assert np.array_equal(df['dst_id'], edge_data.dst)
         assert len(edge_data.data) == 2
@@ -495,10 +496,10 @@ def _test_load_edge_data_from_csv():
                            })
         csv_path = os.path.join(test_dir, 'edges.csv')
         df.to_csv(csv_path, index=False)
-        meta_edge = data.MetaEdge(file_name=csv_path)
+        meta_edge = csv_ds.MetaEdge(file_name=csv_path)
         expect_except = False
         try:
-            data.CSVDataLoader.load_edge_data_from_csv(meta_edge)
+            csv_ds.CSVDataLoader.load_edge_data_from_csv(meta_edge)
         except DGLError:
             expect_except = True
         assert expect_except
@@ -506,10 +507,10 @@ def _test_load_edge_data_from_csv():
                            })
         csv_path = os.path.join(test_dir, 'edges.csv')
         df.to_csv(csv_path, index=False)
-        meta_edge = data.MetaEdge(file_name=csv_path)
+        meta_edge = csv_ds.MetaEdge(file_name=csv_path)
         expect_except = False
         try:
-            data.CSVDataLoader.load_edge_data_from_csv(meta_edge)
+            csv_ds.CSVDataLoader.load_edge_data_from_csv(meta_edge)
         except DGLError:
             expect_except = True
         assert expect_except
@@ -522,8 +523,8 @@ def _test_load_graph_data_from_csv():
         df = pd.DataFrame({'graph_id': np.arange(num_graphs)})
         csv_path = os.path.join(test_dir, 'graph.csv')
         df.to_csv(csv_path, index=False)
-        meta_graph = data.MetaGraph(file_name=csv_path)
-        graph_data = data.CSVDataLoader.load_graph_data_from_csv(meta_graph)
+        meta_graph = csv_ds.MetaGraph(file_name=csv_path)
+        graph_data = csv_ds.CSVDataLoader.load_graph_data_from_csv(meta_graph)
         assert np.array_equal(df['graph_id'], graph_data.graph_id)
         assert len(graph_data.data) == 0
 
@@ -532,8 +533,8 @@ def _test_load_graph_data_from_csv():
                           'label': np.random.randint(3, size=num_graphs)})
         csv_path = os.path.join(test_dir, 'graph.csv')
         df.to_csv(csv_path, index=False)
-        meta_graph = data.MetaGraph(file_name=csv_path)
-        graph_data = data.CSVDataLoader.load_graph_data_from_csv(meta_graph)
+        meta_graph = csv_ds.MetaGraph(file_name=csv_path)
+        graph_data = csv_ds.CSVDataLoader.load_graph_data_from_csv(meta_graph)
         assert np.array_equal(df['graph_id'], graph_data.graph_id)
         assert len(graph_data.data) == 1
         assert np.array_equal(df['label'], graph_data.data['label'])
@@ -544,8 +545,8 @@ def _test_load_graph_data_from_csv():
                            'label': np.random.randint(3, size=num_graphs)})
         csv_path = os.path.join(test_dir, 'graph.csv')
         df.to_csv(csv_path, index=False)
-        meta_graph = data.MetaGraph(file_name=csv_path)
-        graph_data = data.CSVDataLoader.load_graph_data_from_csv(meta_graph)
+        meta_graph = csv_ds.MetaGraph(file_name=csv_path)
+        graph_data = csv_ds.CSVDataLoader.load_graph_data_from_csv(meta_graph)
         assert np.array_equal(df['graph_id'], graph_data.graph_id)
         assert len(graph_data.data) == 2
         assert np.array_equal(df['feat'], graph_data.data['feat'])
@@ -555,13 +556,14 @@ def _test_load_graph_data_from_csv():
         df = pd.DataFrame({'label': np.random.randint(3, size=num_graphs)})
         csv_path = os.path.join(test_dir, 'graph.csv')
         df.to_csv(csv_path, index=False)
-        meta_graph = data.MetaGraph(file_name=csv_path)
+        meta_graph = csv_ds.MetaGraph(file_name=csv_path)
         expect_except = False
         try:
-            data.CSVDataLoader.load_graph_data_from_csv(meta_graph)
+            csv_ds.CSVDataLoader.load_graph_data_from_csv(meta_graph)
         except DGLError:
             expect_except = True
         assert expect_except
+
 
 def _test_DGLCSVDataset():
     with tempfile.TemporaryDirectory() as test_dir:
@@ -573,52 +575,66 @@ def _test_DGLCSVDataset():
         nodes_csv_path_1 = os.path.join(test_dir, "test_nodes_1.csv")
         meta_yaml_data = {'version': '1.0.0', 'dataset_name': 'default_name',
                           'node_data': [{'file_name': os.path.basename(nodes_csv_path_0),
-                                            'ntype': 'user',
-                                            },
+                                         'ntype': 'user',
+                                         },
                                         {'file_name': os.path.basename(nodes_csv_path_1),
                                             'ntype': 'item',
-                                            }],
-                            'edge_data': [{'file_name': os.path.basename(edges_csv_path_0),
-                                            'etype': ['user', 'follow', 'user'],
-                                            },
+                                         }],
+                          'edge_data': [{'file_name': os.path.basename(edges_csv_path_0),
+                                         'etype': ['user', 'follow', 'user'],
+                                         },
                                         {'file_name': os.path.basename(edges_csv_path_1),
-                                            'etype': ['user', 'like', 'item'],
-                                            }],
-                            }
+                                         'etype': ['user', 'like', 'item'],
+                                         }],
+                          }
         with open(meta_yaml_path, 'w') as f:
             yaml.dump(meta_yaml_data, f, sort_keys=False)
         num_nodes = 100
         num_edges = 500
         num_dims = 3
         feat_ndata = np.random.rand(num_nodes, num_dims)
+        label_ndata = np.random.randint(2, size=num_nodes)
         df = pd.DataFrame({'node_id': np.arange(num_nodes),
-                           'label': np.random.randint(2, size=num_nodes),
+                           'label': label_ndata,
                            'feat': [line.tolist() for line in feat_ndata],
                            })
         df.to_csv(nodes_csv_path_0, index=False)
         df.to_csv(nodes_csv_path_1, index=False)
         feat_edata = np.random.rand(num_edges, num_dims)
+        label_edata = np.random.randint(2, size=num_edges)
         df = pd.DataFrame({'src_id': np.random.randint(num_nodes, size=num_edges),
                            'dst_id': np.random.randint(num_nodes, size=num_edges),
-                           'label': np.random.randint(2, size=num_edges),
+                           'label': label_edata,
                            'feat': [line.tolist() for line in feat_edata],
-                            })
+                           })
         df.to_csv(edges_csv_path_0, index=False)
         df.to_csv(edges_csv_path_1, index=False)
-       
 
         # load CSVDataset
-        csv_dataset = data.DGLCSVDataset(test_dir)
-        assert len(csv_dataset) == 1
-        g = csv_dataset[0]
-        assert ~g.is_homogeneous
+        for force_reload in [True, False]:
+            if not force_reload:
+                # remove original node data file to verify reload from cached files
+                os.remove(nodes_csv_path_0)
+                assert not os.path.exists(nodes_csv_path_0)
+            csv_dataset = data.DGLCSVDataset(
+                test_dir, force_reload=force_reload)
+            assert len(csv_dataset) == 1
+            g = csv_dataset[0]
+            assert not g.is_homogeneous
+            assert csv_dataset.has_cache()
+            for ntype in g.ntypes:
+                assert g.num_nodes(ntype) == num_nodes
+                assert F.array_equal(F.tensor(feat_ndata),
+                                     g.nodes[ntype].data['feat'])
+                assert F.array_equal(F.tensor(label_ndata),
+                                     g.nodes[ntype].data['label'])
+            for etype in g.etypes:
+                assert g.num_edges(etype) == num_edges
+                assert F.array_equal(F.tensor(feat_edata),
+                                     g.edges[etype].data['feat'])
+                assert F.array_equal(F.tensor(label_edata),
+                                     g.edges[etype].data['label'])
 
-        for ntype in g.ntypes:
-            assert g.num_nodes(ntype) == num_nodes
-            assert F.array_equal(F.tensor(feat_ndata),g.nodes[ntype].data['feat'])
-        for etype in g.etypes:
-            assert g.num_edges(etype) == num_edges
-            assert F.array_equal(F.tensor(feat_edata),g.edges[etype].data['feat'])
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
 def test_csvdataset():
