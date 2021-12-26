@@ -66,14 +66,14 @@ def merge(graphs):
 
     # Merge edges and edge data.
     for etype in etypes:
-        merged_us = F.zeros(0, ref.idtype, ref.device)
-        merged_vs = F.zeros(0, ref.idtype, ref.device)
+        unmerged_us = []
+        unmerged_vs = []
         edata_frames = []
         for graph in graphs:
             etype_id = graph.get_etype_id(etype)
             us, vs = graph.edges(etype=etype)
-            merged_us = F.cat([merged_us, us], dim=0)
-            merged_vs = F.cat([merged_vs, vs], dim=0)
+            unmerged_us.append(us)
+            unmerged_vs.append(vs)
             edge_data = graph._edge_frames[etype_id]
             edata_frames.append(edge_data)
         keys = ref.edges[etype].data.keys()
@@ -81,6 +81,8 @@ def merge(graphs):
             edges_data = None
         else:
             edges_data = {k: F.cat([f[k] for f in edata_frames], dim=0) for k in keys}
+        merged_us = F.copy_to(F.astype(F.cat(unmerged_us, dim=0), ref.idtype), ref.device)
+        merged_vs = F.copy_to(F.astype(F.cat(unmerged_vs, dim=0), ref.idtype), ref.device)
         merged.add_edges(merged_us, merged_vs, edges_data, etype)
 
     # Add node data and isolated nodes from next_graph to merged.
