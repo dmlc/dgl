@@ -765,7 +765,7 @@ def _test_DGLCSVDataset_multiple():
                                  csv_dataset.data['feat'])
             for i, (g, label) in enumerate(csv_dataset):
                 assert not g.is_homogeneous
-                assert label == label_gdata[i]
+                assert F.asnumpy(label) == label_gdata[i]
                 for ntype in g.ntypes:
                     assert g.num_nodes(ntype) == num_nodes
                     assert F.array_equal(F.tensor(feat_ndata[i*num_nodes:(i+1)*num_nodes]),
