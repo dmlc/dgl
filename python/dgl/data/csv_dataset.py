@@ -45,27 +45,36 @@ class MetaYaml(dt.BaseModel):
 
 class NodeData:
     def __init__(self, node_id, data, type=None, graph_id=None):
-        self.id = node_id
+        self.id = np.array(node_id, dtype=np.int)
         self.data = data
         self.type = type if type is not None else '_V'
-        self.graph_id = graph_id if graph_id is not None else np.full(
+        self.graph_id = np.array(graph_id, dtype=np.int) if graph_id is not None else np.full(
             len(node_id), 0)
+        assert len(self.id) == len(self.graph_id)
+        for k, v in self.data.items():
+            assert len(self.id) == len(v)
 
 
 class EdgeData:
     def __init__(self, src_id, dst_id, data, type=None, graph_id=None):
-        self.src = src_id
-        self.dst = dst_id
+        self.src = np.array(src_id, dtype=np.int)
+        self.dst = np.array(dst_id, dtype=np.int)
         self.data = data
         self.type = type if type is not None else ('_V', '_E', '_V')
-        self.graph_id = graph_id if graph_id is not None else np.full(
+        self.graph_id = np.array(graph_id, dtype=np.int) if graph_id is not None else np.full(
             len(src_id), 0)
+        assert len(self.src) == len(self.dst)
+        assert len(self.src) == len(self.graph_id)
+        for k, v in self.data.items():
+            assert len(self.src) == len(v)
 
 
 class GraphData:
     def __init__(self, graph_id, data):
-        self.graph_id = graph_id
+        self.graph_id = np.array(graph_id, dtype=np.int)
         self.data = data
+        for k, v in self.data.items():
+            assert len(self.graph_id) == len(v)
 
 
 class DefaultDataParser:
@@ -231,7 +240,10 @@ class DGLGraphConstructor:
                     {('_V', '_E', '_V'): ([], [])})
         for graph_id in graph_ids:
             graphs.append(graphs_dict[graph_id])
-        return graphs, graph_data.data
+        data = {}
+        for k, v in graph_data.data.items():
+            data[k] = F.tensor(v)
+        return graphs, data
 
     @staticmethod
     def _construct_graphs(node_dict, edge_dict):
@@ -350,7 +362,7 @@ class DGLCSVDataset(DGLDataset):
 
     def __getitem__(self, i):
         if 'label' in self.data:
-            return (self.graphs[i], self.data['label'][i])
+            return self.graphs[i], self.data['label'][i]
         else:
             return self.graphs[i]
 

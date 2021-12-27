@@ -258,6 +258,61 @@ def _test_construct_graphs_hetero():
         assert_data(edata_dict[etype], g.edges[etype].data)
 
 
+def _test_construct_graphs_multiple():
+    num_nodes = 100
+    num_edges = 1000
+    num_graphs = 10
+    num_dims = 3
+    node_ids = np.array([], dtype=np.int)
+    src_ids = np.array([], dtype=np.int)
+    dst_ids = np.array([], dtype=np.int)
+    ngraph_ids = np.array([], dtype=np.int)
+    egraph_ids = np.array([], dtype=np.int)
+    u_indices = np.array([], dtype=np.int)
+    for i in range(num_graphs):
+        l_node_ids = np.random.choice(
+            np.arange(num_nodes*2), size=num_nodes, replace=False)
+        node_ids = np.append(node_ids, l_node_ids)
+        _, l_u_indices = np.unique(l_node_ids, return_index=True)
+        u_indices = np.append(u_indices, l_u_indices)
+        ngraph_ids = np.append(ngraph_ids, np.full(num_nodes, i))
+        src_ids = np.append(src_ids, np.random.choice(
+            l_node_ids, size=num_edges))
+        dst_ids = np.append(dst_ids, np.random.choice(
+            l_node_ids, size=num_edges))
+        egraph_ids = np.append(egraph_ids, np.full(num_edges, i))
+    ndata = {'feat': np.random.rand(num_nodes*num_graphs, num_dims),
+             'label': np.random.randint(2, size=num_nodes*num_graphs)}
+    node_data = csv_ds.NodeData(node_ids, ndata, graph_id=ngraph_ids)
+    edata = {'feat': np.random.rand(
+        num_edges*num_graphs, num_dims), 'label': np.random.randint(2, size=num_edges*num_graphs)}
+    edge_data = csv_ds.EdgeData(src_ids, dst_ids, edata, graph_id=egraph_ids)
+    gdata = {'feat': np.random.rand(num_graphs, num_dims),
+             'label': np.random.randint(2, size=num_graphs)}
+    graph_data = csv_ds.GraphData(np.arange(num_graphs), gdata)
+    graphs, data_dict = csv_ds.DGLGraphConstructor.construct_graphs(
+        node_data, edge_data, graph_data)
+    assert len(graphs) == num_graphs
+    assert len(data_dict) == len(gdata)
+    for k, v in data_dict.items():
+        assert F.array_equal(F.tensor(gdata[k]), v)
+    for i, g in enumerate(graphs):
+        assert g.is_homogeneous
+        assert g.num_nodes() == num_nodes
+        assert g.num_edges() == num_edges
+
+        def assert_data(lhs, rhs, size, node=False):
+            for key, value in lhs.items():
+                assert key in rhs
+                value = value[i*size:(i+1)*size]
+                if node:
+                    indices = u_indices[i*size:(i+1)*size]
+                    value = value[indices]
+                assert F.array_equal(F.tensor(value), rhs[key])
+        assert_data(ndata, g.ndata, num_nodes, node=True)
+        assert_data(edata, g.edata, num_edges)
+
+
 def _test_DefaultDataParser():
     # common csv
     with tempfile.TemporaryDirectory() as test_dir:
@@ -565,7 +620,7 @@ def _test_load_graph_data_from_csv():
         assert expect_except
 
 
-def _test_DGLCSVDataset():
+def _test_DGLCSVDataset_single():
     with tempfile.TemporaryDirectory() as test_dir:
         # generate YAML/CSVs
         meta_yaml_path = os.path.join(test_dir, "meta.yaml")
@@ -626,26 +681,117 @@ def _test_DGLCSVDataset():
                 assert g.num_nodes(ntype) == num_nodes
                 assert F.array_equal(F.tensor(feat_ndata),
                                      g.nodes[ntype].data['feat'])
-                assert F.array_equal(F.tensor(label_ndata),
-                                     g.nodes[ntype].data['label'])
+                assert np.array_equal(label_ndata,
+                                      F.asnumpy(g.nodes[ntype].data['label']))
             for etype in g.etypes:
                 assert g.num_edges(etype) == num_edges
                 assert F.array_equal(F.tensor(feat_edata),
                                      g.edges[etype].data['feat'])
-                assert F.array_equal(F.tensor(label_edata),
-                                     g.edges[etype].data['label'])
+                assert np.array_equal(label_edata,
+                                      F.asnumpy(g.edges[etype].data['label']))
+
+
+def _test_DGLCSVDataset_multiple():
+    with tempfile.TemporaryDirectory() as test_dir:
+        # generate YAML/CSVs
+        meta_yaml_path = os.path.join(test_dir, "meta.yaml")
+        edges_csv_path_0 = os.path.join(test_dir, "test_edges_0.csv")
+        edges_csv_path_1 = os.path.join(test_dir, "test_edges_1.csv")
+        nodes_csv_path_0 = os.path.join(test_dir, "test_nodes_0.csv")
+        nodes_csv_path_1 = os.path.join(test_dir, "test_nodes_1.csv")
+        graph_csv_path = os.path.join(test_dir, "test_graph.csv")
+        meta_yaml_data = {'version': '1.0.0', 'dataset_name': 'default_name',
+                          'node_data': [{'file_name': os.path.basename(nodes_csv_path_0),
+                                         'ntype': 'user',
+                                         },
+                                        {'file_name': os.path.basename(nodes_csv_path_1),
+                                            'ntype': 'item',
+                                         }],
+                          'edge_data': [{'file_name': os.path.basename(edges_csv_path_0),
+                                         'etype': ['user', 'follow', 'user'],
+                                         },
+                                        {'file_name': os.path.basename(edges_csv_path_1),
+                                         'etype': ['user', 'like', 'item'],
+                                         }],
+                          'graph_data': {'file_name': os.path.basename(graph_csv_path)}
+                          }
+        with open(meta_yaml_path, 'w') as f:
+            yaml.dump(meta_yaml_data, f, sort_keys=False)
+        num_nodes = 100
+        num_edges = 500
+        num_graphs = 10
+        num_dims = 3
+        feat_ndata = np.random.rand(num_nodes*num_graphs, num_dims)
+        label_ndata = np.random.randint(2, size=num_nodes*num_graphs)
+        df = pd.DataFrame({'node_id': np.hstack([np.arange(num_nodes) for _ in range(num_graphs)]),
+                           'label': label_ndata,
+                           'feat': [line.tolist() for line in feat_ndata],
+                           'graph_id': np.hstack([np.full(num_nodes, i) for i in range(num_graphs)])
+                           })
+        df.to_csv(nodes_csv_path_0, index=False)
+        df.to_csv(nodes_csv_path_1, index=False)
+        feat_edata = np.random.rand(num_edges*num_graphs, num_dims)
+        label_edata = np.random.randint(2, size=num_edges*num_graphs)
+        df = pd.DataFrame({'src_id': np.hstack([np.random.randint(num_nodes, size=num_edges) for _ in range(num_graphs)]),
+                           'dst_id': np.hstack([np.random.randint(num_nodes, size=num_edges) for _ in range(num_graphs)]),
+                           'label': label_edata,
+                           'feat': [line.tolist() for line in feat_edata],
+                           'graph_id': np.hstack([np.full(num_edges, i) for i in range(num_graphs)])
+                           })
+        df.to_csv(edges_csv_path_0, index=False)
+        df.to_csv(edges_csv_path_1, index=False)
+        feat_gdata = np.random.rand(num_graphs, num_dims)
+        label_gdata = np.random.randint(2, size=num_graphs)
+        df = pd.DataFrame({'label': label_gdata,
+                           'feat': [line.tolist() for line in feat_gdata],
+                           'graph_id': np.arange(num_graphs)
+                           })
+        df.to_csv(graph_csv_path, index=False)
+
+        # load CSVDataset
+        for force_reload in [True, False]:
+            if not force_reload:
+                # remove original node data file to verify reload from cached files
+                os.remove(nodes_csv_path_0)
+                assert not os.path.exists(nodes_csv_path_0)
+            csv_dataset = data.DGLCSVDataset(
+                test_dir, force_reload=force_reload)
+            assert len(csv_dataset) == num_graphs
+            assert csv_dataset.has_cache()
+            assert len(csv_dataset.data) == 2
+            assert 'feat' in csv_dataset.data
+            assert 'label' in csv_dataset.data
+            assert F.array_equal(F.tensor(feat_gdata),
+                                 csv_dataset.data['feat'])
+            for i, (g, label) in enumerate(csv_dataset):
+                assert not g.is_homogeneous
+                assert label == label_gdata[i]
+                for ntype in g.ntypes:
+                    assert g.num_nodes(ntype) == num_nodes
+                    assert F.array_equal(F.tensor(feat_ndata[i*num_nodes:(i+1)*num_nodes]),
+                                         g.nodes[ntype].data['feat'])
+                    assert np.array_equal(label_ndata[i*num_nodes:(i+1)*num_nodes],
+                                          F.asnumpy(g.nodes[ntype].data['label']))
+                for etype in g.etypes:
+                    assert g.num_edges(etype) == num_edges
+                    assert F.array_equal(F.tensor(feat_edata[i*num_edges:(i+1)*num_edges]),
+                                         g.edges[etype].data['feat'])
+                    assert np.array_equal(label_edata[i*num_edges:(i+1)*num_edges],
+                                          F.asnumpy(g.edges[etype].data['label']))
 
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
 def test_csvdataset():
     _test_construct_graphs_homo()
     _test_construct_graphs_hetero()
+    _test_construct_graphs_multiple()
     _test_DefaultDataParser()
     _test_load_yaml_with_sanity_check()
     _test_load_node_data_from_csv()
     _test_load_edge_data_from_csv()
     _test_load_graph_data_from_csv()
-    _test_DGLCSVDataset()
+    _test_DGLCSVDataset_single()
+    _test_DGLCSVDataset_multiple()
 
 
 if __name__ == '__main__':
