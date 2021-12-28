@@ -108,8 +108,8 @@ class HelloRequest(dgl.distributed.Request):
         return res
 
 def start_server(num_clients, ip_config, server_id=0):
-    print("Sleep 5 seconds to test client re-connect.")
-    time.sleep(5)
+    print("Sleep 2 seconds to test client re-connect.")
+    time.sleep(2)
     server_state = dgl.distributed.ServerState(None, local_g=None, partition_book=None)
     dgl.distributed.register_service(HELLO_SERVICE_ID, HelloRequest, HelloResponse)
     print("Start server {}".format(server_id))
@@ -199,7 +199,6 @@ def test_rpc():
     pserver = ctx.Process(target=start_server, args=(1, "rpc_ip_config.txt"))
     pclient = ctx.Process(target=start_client, args=("rpc_ip_config.txt",))
     pserver.start()
-    time.sleep(1)
     pclient.start()
     pserver.join()
     pclient.join()
