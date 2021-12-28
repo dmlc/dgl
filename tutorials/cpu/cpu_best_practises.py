@@ -1,5 +1,5 @@
 """
-CPU Best Pratices
+CPU Best Practices
 =====================================================
 
 This chapter focus on providing best practises for environment setup
