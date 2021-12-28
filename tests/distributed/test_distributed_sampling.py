@@ -90,8 +90,10 @@ def check_rpc_sampling(tmpdir, num_server):
     for i in range(num_server):
         p = ctx.Process(target=start_server, args=(i, tmpdir, num_server > 1, 'test_sampling'))
         p.start()
+        time.sleep(1)
         pserver_list.append(p)
 
+    time.sleep(3)
     sampled_graph = start_sample_client(0, tmpdir, num_server > 1)
     print("Done sampling")
     for p in pserver_list:
@@ -124,8 +126,10 @@ def check_rpc_find_edges_shuffle(tmpdir, num_server):
         p = ctx.Process(target=start_server, args=(i, tmpdir, num_server > 1,
                                                    'test_find_edges', ['csr', 'coo']))
         p.start()
+        time.sleep(1)
         pserver_list.append(p)
 
+    time.sleep(3)
     eids = F.tensor(np.random.randint(g.number_of_edges(), size=100))
     u, v = g.find_edges(orig_eid[eids])
     du, dv = start_find_edges_client(0, tmpdir, num_server > 1, eids)
@@ -133,9 +137,6 @@ def check_rpc_find_edges_shuffle(tmpdir, num_server):
     dv = orig_nid[dv]
     assert F.array_equal(u, du)
     assert F.array_equal(v, dv)
-
-    for p in pserver_list:
-        p.join()
 
 def create_random_hetero(dense=False, empty=False):
     num_nodes = {'n1': 210, 'n2': 200, 'n3': 220} if dense else \
@@ -175,8 +176,10 @@ def check_rpc_hetero_find_edges_shuffle(tmpdir, num_server):
         p = ctx.Process(target=start_server, args=(i, tmpdir, num_server > 1,
                                                    'test_find_edges', ['csr', 'coo']))
         p.start()
+        time.sleep(1)
         pserver_list.append(p)
 
+    time.sleep(3)
     eids = F.tensor(np.random.randint(g.number_of_edges('r1'), size=100))
     u, v = g.find_edges(orig_eid['r1'][eids], etype='r1')
     du, dv = start_find_edges_client(0, tmpdir, num_server > 1, eids, etype='r1')
@@ -184,9 +187,6 @@ def check_rpc_hetero_find_edges_shuffle(tmpdir, num_server):
     dv = orig_nid['n2'][dv]
     assert F.array_equal(u, du)
     assert F.array_equal(v, dv)
-
-    for p in pserver_list:
-        p.join()
 
 # Wait non shared memory graph store
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
@@ -218,12 +218,14 @@ def check_rpc_get_degree_shuffle(tmpdir, num_server):
     for i in range(num_server):
         p = ctx.Process(target=start_server, args=(i, tmpdir, num_server > 1, 'test_get_degrees'))
         p.start()
+        time.sleep(1)
         pserver_list.append(p)
 
     orig_nid = F.zeros((g.number_of_nodes(),), dtype=F.int64, ctx=F.cpu())
     for i in range(num_server):
         part, _, _, _, _, _, _ = load_partition(tmpdir / 'test_get_degrees.json', i)
         orig_nid[part.ndata[dgl.NID]] = part.ndata['orig_id']
+    time.sleep(3)
 
     nids = F.tensor(np.random.randint(g.number_of_nodes(), size=100))
     in_degs, out_degs, all_in_degs, all_out_degs = start_get_degrees_client(0, tmpdir, num_server > 1, nids)
@@ -277,8 +279,10 @@ def check_rpc_sampling_shuffle(tmpdir, num_server):
     for i in range(num_server):
         p = ctx.Process(target=start_server, args=(i, tmpdir, num_server > 1, 'test_sampling'))
         p.start()
+        time.sleep(1)
         pserver_list.append(p)
 
+    time.sleep(3)
     sampled_graph = start_sample_client(0, tmpdir, num_server > 1)
     print("Done sampling")
     for p in pserver_list:
@@ -372,8 +376,10 @@ def check_rpc_hetero_sampling_shuffle(tmpdir, num_server):
     for i in range(num_server):
         p = ctx.Process(target=start_server, args=(i, tmpdir, num_server > 1, 'test_sampling'))
         p.start()
+        time.sleep(1)
         pserver_list.append(p)
 
+    time.sleep(3)
     block, gpb = start_hetero_sample_client(0, tmpdir, num_server > 1,
                                             nodes = {'n3': [0, 10, 99, 66, 124, 208]})
     print("Done sampling")
@@ -439,8 +445,10 @@ def check_rpc_hetero_sampling_empty_shuffle(tmpdir, num_server):
     for i in range(num_server):
         p = ctx.Process(target=start_server, args=(i, tmpdir, num_server > 1, 'test_sampling'))
         p.start()
+        time.sleep(1)
         pserver_list.append(p)
 
+    time.sleep(3)
     deg = get_degrees(g, orig_nids['n3'], 'n3')
     empty_nids = F.nonzero_1d(deg == 0)
     block, gpb = start_hetero_sample_client(0, tmpdir, num_server > 1,
@@ -469,8 +477,10 @@ def check_rpc_hetero_etype_sampling_shuffle(tmpdir, num_server):
     for i in range(num_server):
         p = ctx.Process(target=start_server, args=(i, tmpdir, num_server > 1, 'test_sampling'))
         p.start()
+        time.sleep(1)
         pserver_list.append(p)
 
+    time.sleep(3)
     fanout = 3
     block, gpb = start_hetero_etype_sample_client(0, tmpdir, num_server > 1, fanout,
                                                   nodes={'n3': [0, 10, 99, 66, 124, 208]})
@@ -532,8 +542,10 @@ def check_rpc_hetero_etype_sampling_empty_shuffle(tmpdir, num_server):
     for i in range(num_server):
         p = ctx.Process(target=start_server, args=(i, tmpdir, num_server > 1, 'test_sampling'))
         p.start()
+        time.sleep(1)
         pserver_list.append(p)
 
+    time.sleep(3)
     fanout = 3
     deg = get_degrees(g, orig_nids['n3'], 'n3')
     empty_nids = F.nonzero_1d(deg == 0)
@@ -664,9 +676,11 @@ def check_rpc_in_subgraph_shuffle(tmpdir, num_server):
     for i in range(num_server):
         p = ctx.Process(target=start_server, args=(i, tmpdir, num_server > 1, 'test_in_subgraph'))
         p.start()
+        time.sleep(1)
         pserver_list.append(p)
 
     nodes = [0, 10, 99, 66, 1024, 2008]
+    time.sleep(3)
     sampled_graph = start_in_subgraph_client(0, tmpdir, num_server > 1, nodes)
     for p in pserver_list:
         p.join()

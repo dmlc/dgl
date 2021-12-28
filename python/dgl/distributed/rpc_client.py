@@ -163,7 +163,7 @@ def connect_to_server(ip_config, num_servers, max_queue_size=MAX_QUEUE_SIZE, net
         server_ip = addr[1]
         server_port = addr[2]
         while not rpc.connect_receiver(server_ip, server_port, server_id):
-            time.sleep(3)
+            time.sleep(1)
     # Get local usable IP address and port
     ip_addr = get_local_usable_addr(server_ip)
     client_ip, client_port = ip_addr.split(':')
