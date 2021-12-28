@@ -23,4 +23,5 @@ def get_local_usable_addr():
     sock.listen(1)
     port = sock.getsockname()[1]
     sock.close()
+
     return ip_addr + ' ' + str(port)
