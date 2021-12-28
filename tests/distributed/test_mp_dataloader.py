@@ -196,7 +196,9 @@ def check_neg_dataloader(g, tmpdir, num_server, num_workers):
         p = ctx.Process(target=start_server, args=(
             i, tmpdir, num_server > 1, num_workers+1))
         p.start()
+        time.sleep(1)
         pserver_list.append(p)
+    time.sleep(3)
     os.environ['DGL_DIST_MODE'] = 'distributed'
     os.environ['DGL_NUM_SAMPLER'] = str(num_workers)
     ptrainer_list = []
@@ -204,6 +206,7 @@ def check_neg_dataloader(g, tmpdir, num_server, num_workers):
     p = ctx.Process(target=start_dist_neg_dataloader, args=(
             0, tmpdir, num_server, num_workers, orig_nid, g))
     p.start()
+    time.sleep(1)
     ptrainer_list.append(p)
 
     for p in pserver_list:
@@ -238,13 +241,16 @@ def test_dist_dataloader(tmpdir, num_server, num_workers, drop_last, reshuffle):
         p = ctx.Process(target=start_server, args=(
             i, tmpdir, num_server > 1, num_workers+1))
         p.start()
+        time.sleep(1)
         pserver_list.append(p)
 
+    time.sleep(3)
     os.environ['DGL_DIST_MODE'] = 'distributed'
     os.environ['DGL_NUM_SAMPLER'] = str(num_workers)
     ptrainer = ctx.Process(target=start_dist_dataloader, args=(
         0, tmpdir, num_server, drop_last, orig_nid, orig_eid))
     ptrainer.start()
+    time.sleep(1)
 
     for p in pserver_list:
         p.join()
@@ -378,8 +384,10 @@ def check_dataloader(g, tmpdir, num_server, num_workers, dataloader_type):
         p = ctx.Process(target=start_server, args=(
             i, tmpdir, num_server > 1, num_workers+1))
         p.start()
+        time.sleep(1)
         pserver_list.append(p)
 
+    time.sleep(3)
     os.environ['DGL_DIST_MODE'] = 'distributed'
     os.environ['DGL_NUM_SAMPLER'] = str(num_workers)
     ptrainer_list = []
@@ -387,11 +395,13 @@ def check_dataloader(g, tmpdir, num_server, num_workers, dataloader_type):
         p = ctx.Process(target=start_node_dataloader, args=(
             0, tmpdir, num_server, num_workers, orig_nid, orig_eid, g))
         p.start()
+        time.sleep(1)
         ptrainer_list.append(p)
     elif dataloader_type == 'edge':
         p = ctx.Process(target=start_edge_dataloader, args=(
             0, tmpdir, num_server, num_workers, orig_nid, orig_eid, g))
         p.start()
+        time.sleep(1)
         ptrainer_list.append(p)
     for p in pserver_list:
         p.join()
@@ -440,6 +450,10 @@ if __name__ == "__main__":
     import tempfile
     with tempfile.TemporaryDirectory() as tmpdirname:
         test_standalone(Path(tmpdirname))
-        test_dataloader(Path(tmpdirname))
-        test_neg_dataloader(Path(tmpdirname))
-        test_dist_dataloader(Path(tmpdirname))
+        test_dataloader(Path(tmpdirname), 3, 4, 'node')
+        test_dataloader(Path(tmpdirname), 3, 4, 'edge')
+        test_neg_dataloader(Path(tmpdirname), 3, 4)
+        test_dist_dataloader(Path(tmpdirname), 3, 0, True, True)
+        test_dist_dataloader(Path(tmpdirname), 3, 4, True, True)
+        test_dist_dataloader(Path(tmpdirname), 3, 0, True, False)
+        test_dist_dataloader(Path(tmpdirname), 3, 4, True, False)
