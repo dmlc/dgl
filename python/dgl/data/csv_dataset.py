@@ -15,6 +15,7 @@ import ast
 
 
 class MetaNode(dt.BaseModel):
+    """ Class of node_data in YAML. Internal use only. """
     file_name: str
     ntype: Optional[str] = '_V'
     graph_id_field: Optional[str] = 'graph_id'
@@ -22,6 +23,7 @@ class MetaNode(dt.BaseModel):
 
 
 class MetaEdge(dt.BaseModel):
+    """ Class of edge_data in YAML. Internal use only. """
     file_name: str
     etype: Optional[List[str]] = ['_V', '_E', '_V']
     graph_id_field: Optional[str] = 'graph_id'
@@ -30,11 +32,13 @@ class MetaEdge(dt.BaseModel):
 
 
 class MetaGraph(dt.BaseModel):
+    """ Class of graph_data in YAML. Internal use only. """
     file_name: str
     graph_id_field: Optional[str] = 'graph_id'
 
 
 class MetaYaml(dt.BaseModel):
+    """ Class of YAML. Internal use only. """
     version: str
     dataset_name: str
     separator: Optional[str] = ','
@@ -43,7 +47,20 @@ class MetaYaml(dt.BaseModel):
     graph_data: Optional[MetaGraph] = None
 
 
+def load_yaml_with_sanity_check(yaml_file):
+    """ Load yaml and do sanity check. Internal use only. """
+    with open(yaml_file) as f:
+        yaml_data = yaml.load(f, Loader=SafeLoader)
+        meta_yaml = MetaYaml(**yaml_data)
+        if meta_yaml.version != '1.0.0':
+            raise DGLError("Invalid version: {}. '1.0.0' is supported only for now.".format(
+                meta_yaml.version))
+        return meta_yaml
+
+
 class NodeData:
+    """ Class of node data which is used for DGLGraph construction. Internal use only. """
+
     def __init__(self, node_id, data, type=None, graph_id=None):
         self.id = np.array(node_id, dtype=np.int)
         self.data = data
@@ -56,6 +73,8 @@ class NodeData:
 
 
 class EdgeData:
+    """ Class of edge data which is used for DGLGraph construction. Internal use only. """
+
     def __init__(self, src_id, dst_id, data, type=None, graph_id=None):
         self.src = np.array(src_id, dtype=np.int)
         self.dst = np.array(dst_id, dtype=np.int)
@@ -70,6 +89,8 @@ class EdgeData:
 
 
 class GraphData:
+    """ Class of graph data which is used for DGLGraph construction. Internal use only. """
+
     def __init__(self, graph_id, data):
         self.graph_id = np.array(graph_id, dtype=np.int)
         self.data = data
@@ -77,35 +98,8 @@ class GraphData:
             assert len(self.graph_id) == len(v)
 
 
-class DefaultDataParser:
-    def __init__(self, separator='|'):
-        self.separator = separator
-
-    def __call__(self, df):
-        data = {}
-        for header in df:
-            if 'Unnamed' in header:
-                dgl_warning("Unamed column is found. Ignored...")
-                continue
-            dt = df[header].to_numpy().squeeze()
-            if isinstance(dt[0], str):
-                #probably consists of list of numeric values
-                dt = np.array([ast.literal_eval(row) for row in dt])
-            data[header] = dt
-        return data
-
-
-def load_yaml_with_sanity_check(yaml_file):
-    with open(yaml_file) as f:
-        yaml_data = yaml.load(f, Loader=SafeLoader)
-        meta_yaml = MetaYaml(**yaml_data)
-        if meta_yaml.version != '1.0.0':
-            raise DGLError("Invalid version: {}. '1.0.0' is supported only for now.".format(
-                meta_yaml.version))
-        return meta_yaml
-
-
 class CSVDataLoader:
+    """ Class for loading data from csv. Internal use only. """
     @staticmethod
     def read_csv(file_name, base_dir, separator):
         csv_path = file_name
@@ -114,7 +108,7 @@ class CSVDataLoader:
         return pd.read_csv(csv_path, sep=separator)
 
     @staticmethod
-    def load_node_data_from_csv(meta_node, base_dir=None, separator=',', data_parser=DefaultDataParser()):
+    def load_node_data_from_csv(meta_node, data_parser, base_dir=None, separator=','):
         df = CSVDataLoader.read_csv(meta_node.file_name, base_dir, separator)
         ntype = meta_node.ntype
         ndata = data_parser(df)
@@ -130,7 +124,7 @@ class CSVDataLoader:
         return NodeData(node_ids, ndata, type=ntype, graph_id=graph_ids)
 
     @staticmethod
-    def load_edge_data_from_csv(meta_edge, base_dir=None, separator=',', data_parser=DefaultDataParser()):
+    def load_edge_data_from_csv(meta_edge, data_parser, base_dir=None, separator=','):
         df = CSVDataLoader.read_csv(meta_edge.file_name, base_dir, separator)
         etype = tuple(meta_edge.etype)
         edata = data_parser(df)
@@ -147,7 +141,7 @@ class CSVDataLoader:
         return EdgeData(src_ids, dst_ids, edata, type=etype, graph_id=graph_ids)
 
     @staticmethod
-    def load_graph_data_from_csv(meta_graph, base_dir=None, separator=',', data_parser=DefaultDataParser()):
+    def load_graph_data_from_csv(meta_graph, data_parser, base_dir=None, separator=','):
         df = CSVDataLoader.read_csv(meta_graph.file_name, base_dir, separator)
         gdata = data_parser(df)
         if meta_graph.graph_id_field not in gdata:
@@ -158,6 +152,7 @@ class CSVDataLoader:
 
 
 class DGLGraphConstructor:
+    """ Class for constructing DGLGraph from Node/Edge/Graph data. Internal use only. """
     @staticmethod
     def construct_graphs(node_data, edge_data, graph_data=None):
         if not isinstance(node_data, list):
@@ -274,12 +269,67 @@ class DGLGraphConstructor:
         return graph_dict
 
 
-class DGLCSVDataset(DGLDataset):
+class DefaultDataParser:
+    """ Default data parser for DGLCSVDataset. It
+        1. ignores any columns which does not have a header.
+        2. tries to convert to list of numeric values if cell data is a str.
+        3. read data and infer data type directly, otherwise.
     """
-    This class offers:
-    1. support user-defined node/edge/graph data parser
-    2. construct graphs from node/edge/graph data
-    3. implement the interfaces of DGLDataset: behaves as a dataset
+
+    def __init__(self, separator='|'):
+        self.separator = separator
+
+    def __call__(self, df):
+        data = {}
+        for header in df:
+            if 'Unnamed' in header:
+                dgl_warning("Unamed column is found. Ignored...")
+                continue
+            dt = df[header].to_numpy().squeeze()
+            if isinstance(dt[0], str):
+                #probably consists of list of numeric values
+                dt = np.array([ast.literal_eval(row) for row in dt])
+            data[header] = dt
+        return data
+
+
+class DGLCSVDataset(DGLDataset):
+    """ This class aims to parse data from CSV files, construct DGLGraph
+        and behaves as a DGLDataset.
+
+    Parameters
+    ----------
+    data_path : str
+        Directory which contains 'meta.yaml' and CSV files
+    force_reload : bool
+        Whether to reload the dataset. Default: False
+    verbose: bool
+        Whether to print out progress information. Default: True.
+    data_parser : dict
+        A dictionary used for data parsing when loading data from CSV files.
+        The key is node/edge/graph type which specifies the header in CSV file
+        and the value is a callable object which is used to parse corresponding
+        column data. Especially, the graph level data parser is required
+        to be placed under key '_GRAPH_'. Default: None. If None, a default
+        data parser is applied which load data directly and tries to convert
+        list into array.
+
+    Attributes
+    ----------
+    graphs : :class:`dgl.DGLGraph`
+        Graphs of the dataset
+    data : dict
+        any available graph-level data such as graph-level feature, labels.
+
+    Examples
+    --------
+    Single heterograph dataset
+    >>> csv_dataset = data.DGLCSVDataset(test_dir)
+    >>> g = csv_dataset[0]
+
+    Multiple graphs dataset
+    >>> csv_dataset = data.DGLCSVDataset(test_dir)
+    >>> g, label = csv_dataset[0]
     """
     META_YAML_NAME = 'meta.yaml'
 

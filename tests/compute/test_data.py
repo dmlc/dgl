@@ -454,7 +454,8 @@ def _test_load_node_data_from_csv():
         csv_path = os.path.join(test_dir, 'nodes.csv')
         df.to_csv(csv_path, index=False)
         meta_node = csv_ds.MetaNode(file_name=csv_path)
-        node_data = csv_ds.CSVDataLoader.load_node_data_from_csv(meta_node)
+        node_data = csv_ds.CSVDataLoader.load_node_data_from_csv(
+            meta_node, csv_ds.DefaultDataParser())
         assert np.array_equal(df['node_id'], node_data.id)
         assert len(node_data.data) == 0
 
@@ -464,7 +465,8 @@ def _test_load_node_data_from_csv():
         csv_path = os.path.join(test_dir, 'nodes.csv')
         df.to_csv(csv_path, index=False)
         meta_node = csv_ds.MetaNode(file_name=csv_path)
-        node_data = csv_ds.CSVDataLoader.load_node_data_from_csv(meta_node)
+        node_data = csv_ds.CSVDataLoader.load_node_data_from_csv(
+            meta_node, csv_ds.DefaultDataParser())
         assert np.array_equal(df['node_id'], node_data.id)
         assert len(node_data.data) == 1
         assert np.array_equal(df['label'], node_data.data['label'])
@@ -477,7 +479,8 @@ def _test_load_node_data_from_csv():
         csv_path = os.path.join(test_dir, 'nodes.csv')
         df.to_csv(csv_path, index=False)
         meta_node = csv_ds.MetaNode(file_name=csv_path)
-        node_data = csv_ds.CSVDataLoader.load_node_data_from_csv(meta_node)
+        node_data = csv_ds.CSVDataLoader.load_node_data_from_csv(
+            meta_node, csv_ds.DefaultDataParser())
         assert np.array_equal(df['node_id'], node_data.id)
         assert len(node_data.data) == 1
         assert np.array_equal(df['label'], node_data.data['label'])
@@ -491,7 +494,8 @@ def _test_load_node_data_from_csv():
         meta_node = csv_ds.MetaNode(file_name=csv_path)
         expect_except = False
         try:
-            csv_ds.CSVDataLoader.load_node_data_from_csv(meta_node)
+            csv_ds.CSVDataLoader.load_node_data_from_csv(
+                meta_node, csv_ds.DefaultDataParser())
         except:
             expect_except = True
         assert expect_except
@@ -508,7 +512,8 @@ def _test_load_edge_data_from_csv():
         csv_path = os.path.join(test_dir, 'edges.csv')
         df.to_csv(csv_path, index=False)
         meta_edge = csv_ds.MetaEdge(file_name=csv_path)
-        edge_data = csv_ds.CSVDataLoader.load_edge_data_from_csv(meta_edge)
+        edge_data = csv_ds.CSVDataLoader.load_edge_data_from_csv(
+            meta_edge, csv_ds.DefaultDataParser())
         assert np.array_equal(df['src_id'], edge_data.src)
         assert np.array_equal(df['dst_id'], edge_data.dst)
         assert len(edge_data.data) == 0
@@ -520,7 +525,8 @@ def _test_load_edge_data_from_csv():
         csv_path = os.path.join(test_dir, 'edges.csv')
         df.to_csv(csv_path, index=False)
         meta_edge = csv_ds.MetaEdge(file_name=csv_path)
-        edge_data = csv_ds.CSVDataLoader.load_edge_data_from_csv(meta_edge)
+        edge_data = csv_ds.CSVDataLoader.load_edge_data_from_csv(
+            meta_edge, csv_ds.DefaultDataParser())
         assert np.array_equal(df['src_id'], edge_data.src)
         assert np.array_equal(df['dst_id'], edge_data.dst)
         assert len(edge_data.data) == 1
@@ -537,7 +543,8 @@ def _test_load_edge_data_from_csv():
         csv_path = os.path.join(test_dir, 'edges.csv')
         df.to_csv(csv_path, index=False)
         meta_edge = csv_ds.MetaEdge(file_name=csv_path)
-        edge_data = csv_ds.CSVDataLoader.load_edge_data_from_csv(meta_edge)
+        edge_data = csv_ds.CSVDataLoader.load_edge_data_from_csv(
+            meta_edge, csv_ds.DefaultDataParser())
         assert np.array_equal(df['src_id'], edge_data.src)
         assert np.array_equal(df['dst_id'], edge_data.dst)
         assert len(edge_data.data) == 2
@@ -554,7 +561,8 @@ def _test_load_edge_data_from_csv():
         meta_edge = csv_ds.MetaEdge(file_name=csv_path)
         expect_except = False
         try:
-            csv_ds.CSVDataLoader.load_edge_data_from_csv(meta_edge)
+            csv_ds.CSVDataLoader.load_edge_data_from_csv(
+                meta_edge, csv_ds.DefaultDataParser())
         except DGLError:
             expect_except = True
         assert expect_except
@@ -565,7 +573,8 @@ def _test_load_edge_data_from_csv():
         meta_edge = csv_ds.MetaEdge(file_name=csv_path)
         expect_except = False
         try:
-            csv_ds.CSVDataLoader.load_edge_data_from_csv(meta_edge)
+            csv_ds.CSVDataLoader.load_edge_data_from_csv(
+                meta_edge, csv_ds.DefaultDataParser())
         except DGLError:
             expect_except = True
         assert expect_except
@@ -579,7 +588,8 @@ def _test_load_graph_data_from_csv():
         csv_path = os.path.join(test_dir, 'graph.csv')
         df.to_csv(csv_path, index=False)
         meta_graph = csv_ds.MetaGraph(file_name=csv_path)
-        graph_data = csv_ds.CSVDataLoader.load_graph_data_from_csv(meta_graph)
+        graph_data = csv_ds.CSVDataLoader.load_graph_data_from_csv(
+            meta_graph, csv_ds.DefaultDataParser())
         assert np.array_equal(df['graph_id'], graph_data.graph_id)
         assert len(graph_data.data) == 0
 
@@ -589,7 +599,8 @@ def _test_load_graph_data_from_csv():
         csv_path = os.path.join(test_dir, 'graph.csv')
         df.to_csv(csv_path, index=False)
         meta_graph = csv_ds.MetaGraph(file_name=csv_path)
-        graph_data = csv_ds.CSVDataLoader.load_graph_data_from_csv(meta_graph)
+        graph_data = csv_ds.CSVDataLoader.load_graph_data_from_csv(
+            meta_graph, csv_ds.DefaultDataParser())
         assert np.array_equal(df['graph_id'], graph_data.graph_id)
         assert len(graph_data.data) == 1
         assert np.array_equal(df['label'], graph_data.data['label'])
@@ -601,7 +612,8 @@ def _test_load_graph_data_from_csv():
         csv_path = os.path.join(test_dir, 'graph.csv')
         df.to_csv(csv_path, index=False)
         meta_graph = csv_ds.MetaGraph(file_name=csv_path)
-        graph_data = csv_ds.CSVDataLoader.load_graph_data_from_csv(meta_graph)
+        graph_data = csv_ds.CSVDataLoader.load_graph_data_from_csv(
+            meta_graph, csv_ds.DefaultDataParser())
         assert np.array_equal(df['graph_id'], graph_data.graph_id)
         assert len(graph_data.data) == 2
         assert np.array_equal(df['feat'], graph_data.data['feat'])
@@ -614,7 +626,8 @@ def _test_load_graph_data_from_csv():
         meta_graph = csv_ds.MetaGraph(file_name=csv_path)
         expect_except = False
         try:
-            csv_ds.CSVDataLoader.load_graph_data_from_csv(meta_graph)
+            csv_ds.CSVDataLoader.load_graph_data_from_csv(
+                meta_graph, csv_ds.DefaultDataParser())
         except DGLError:
             expect_except = True
         assert expect_except
