@@ -233,7 +233,6 @@ def initialize(ip_config, num_servers=1, num_workers=0,
                                os.environ.get('DGL_CONF_PATH'),
                                graph_format=formats)
         serv.start()
-        rpc.reset()
         sys.exit()
     else:
         if os.environ.get('DGL_NUM_SAMPLER') is not None:
@@ -275,6 +274,7 @@ def finalize_client():
 
 def _exit():
     exit_client()
+    time.sleep(1)
 
 
 def finalize_worker():
@@ -319,4 +319,3 @@ def exit_client():
     join_finalize_worker()
     close_kvstore()
     atexit.unregister(exit_client)
-    rpc.reset()

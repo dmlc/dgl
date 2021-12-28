@@ -138,9 +138,6 @@ def check_rpc_find_edges_shuffle(tmpdir, num_server):
     assert F.array_equal(u, du)
     assert F.array_equal(v, dv)
 
-    for p in pserver_list:
-        p.join()
-
 def create_random_hetero(dense=False, empty=False):
     num_nodes = {'n1': 210, 'n2': 200, 'n3': 220} if dense else \
         {'n1': 1010, 'n2': 1000, 'n3': 1020}
@@ -190,9 +187,6 @@ def check_rpc_hetero_find_edges_shuffle(tmpdir, num_server):
     dv = orig_nid['n2'][dv]
     assert F.array_equal(u, du)
     assert F.array_equal(v, dv)
-
-    for p in pserver_list:
-        p.join()
 
 # Wait non shared memory graph store
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
