@@ -61,7 +61,7 @@ def run(args, device, data):
     elif args.sample_uva:
         train_nid = train_nid.to(device)
         train_g = train_g.formats(['csc'])
-        train_g.pin_memory(device)
+        train_g.pin_memory_()
         args.num_workers = 0
 
     # Create PyTorch DataLoader for constructing blocks
