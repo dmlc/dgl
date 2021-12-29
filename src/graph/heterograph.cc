@@ -267,14 +267,14 @@ HeteroGraphPtr HeteroGraph::CopyTo(HeteroGraphPtr g, const DLContext &ctx,
                                         hgindex->num_verts_per_type_));
 }
 
-void HeteroGraph::PinMemory(HeteroGraphPtr g){
+void HeteroGraph::PinMemory(HeteroGraphPtr g) {
   auto hgindex = std::dynamic_pointer_cast<HeteroGraph>(g);
   CHECK_NOTNULL(hgindex);
   for (auto g : hgindex->relation_graphs_)
     UnitGraph::PinMemory(g);
 }
 
-void HeteroGraph::UnpinMemory(HeteroGraphPtr g){
+void HeteroGraph::UnpinMemory(HeteroGraphPtr g) {
   auto hgindex = std::dynamic_pointer_cast<HeteroGraph>(g);
   CHECK_NOTNULL(hgindex);
   for (auto g : hgindex->relation_graphs_)
