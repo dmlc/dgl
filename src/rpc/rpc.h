@@ -114,7 +114,7 @@ struct RPCContext {
     t->machine_id = -1;
     t->num_machines = 0;
     t->msg_seq = 0;
-    t->num_servers=0;
+    t->num_servers = 0;
     t->num_clients = 0;
     t->barrier_count = 0;
     t->num_servers_per_machine = 0;
