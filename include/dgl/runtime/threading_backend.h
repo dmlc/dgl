@@ -70,7 +70,9 @@ class ThreadGroup {
 /*!
  * \brief Platform-agnostic no-op.
  */
-void Yield();
+// This used to be Yield(), renaming to YieldThread() because windows.h defined it as a
+// macro in later SDKs.
+void YieldThread();
 
 /*!
  * \return the maximum number of effective workers for this system.
