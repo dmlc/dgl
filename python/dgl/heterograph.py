@@ -5458,54 +5458,40 @@ class DGLHeteroGraph(object):
         """
         return self.to(F.cpu())
 
-    def pin_memory(self, device):
+    def pin_memory_(self):
         """Pin the graph structure to the page-locked memory.
 
         NOTE: This is an inplace method.
               The graph structure must be on CPU to be pinned.
               If the graph struture is already pinned, the function directly returns it.
 
-        Parameters
-        ----------
-        device : Framework-specific device context object (e.g., ``torch.device``).
-            Must be a GPU device to call ``pin_memory()`` from.
-
         Returns
         -------
         DGLGraph
             The pinned graph.
         """
-        if F.device_type(device) != 'cuda':
-            raise DGLError("Target device must be a cuda device.")
         if self._graph.is_pinned():
             return self
         if F.device_type(self.device) != 'cpu':
             raise DGLError("The graph structure must be on CPU to be pinned.")
-        self._graph.pin_memory(utils.to_dgl_context(device))
+        self._graph.pin_memory_()
         return self
 
-    def unpin_memory(self, device):
+    def unpin_memory_(self):
         """Unpin the graph structure from the page-locked memory.
 
         NOTE: This is an inplace method.
               If the graph struture is not pinned, e.g., on CPU or GPU,
               the function directly returns it.
 
-        Parameters
-        ----------
-        device : Framework-specific device context object (e.g., ``torch.device``).
-            Must be a GPU device to call ``unpin_memory()`` from.
-
         Returns
         -------
         DGLGraph
             The unpinned graph.
         """
-        if F.device_type(device) != 'cuda':
-            raise DGLError("Target device must be a cuda device.")
         if not self._graph.is_pinned():
             return self
-        self._graph.unpin_memory(utils.to_dgl_context(device))
+        self._graph.unpin_memory_()
         return self
 
     def is_pinned(self):

@@ -63,6 +63,10 @@ struct NDArray::Internal {
       ptr->mem = nullptr;
 #endif  // _WIN32
     } else if (ptr->dl_tensor.data != nullptr) {
+      // if the array is still pinned before freeing, unpin it.
+      if (ptr->dl_tensor.ctx.device_type == kDLCPUPinned) {
+        UnpinData(&(ptr->dl_tensor));
+      }
       dgl::runtime::DeviceAPI::Get(ptr->dl_tensor.ctx)->FreeDataSpace(
           ptr->dl_tensor.ctx, ptr->dl_tensor.data);
     }
@@ -255,21 +259,19 @@ void NDArray::CopyFromTo(DLTensor* from,
     from_size, from->ctx, to->ctx, from->dtype, stream);
 }
 
-void NDArray::PinData(DLTensor* tensor, DLContext ctx) {
-  // only need to call PinData once, since the pinned memory can be seen
+void NDArray::PinData(DLTensor* tensor) {
+  // Only need to call PinData once, since the pinned memory can be seen
   // by all CUDA contexts, not just the one that performed the allocation
   if (tensor->ctx.device_type == kDLCPUPinned) return;
   CHECK_EQ(tensor->ctx.device_type, kDLCPU)
     << "Only NDArray on CPU can be pinned";
-  CHECK_EQ(ctx.device_type, kDLGPU);
-  DeviceAPI::Get(ctx)->PinData(ctx, tensor->data, GetDataSize(*tensor));
+  DeviceAPI::Get(kDLGPU)->PinData(tensor->data, GetDataSize(*tensor));
   tensor->ctx = DLContext{kDLCPUPinned, 0};
 }
 
-void NDArray::UnpinData(DLTensor* tensor, DLContext ctx) {
+void NDArray::UnpinData(DLTensor* tensor) {
   if (tensor->ctx.device_type != kDLCPUPinned) return;
-  CHECK_EQ(ctx.device_type, kDLGPU);
-  DeviceAPI::Get(ctx)->UnpinData(ctx, tensor->data);
+  DeviceAPI::Get(kDLGPU)->UnpinData(tensor->data);
   tensor->ctx = DLContext{kDLCPU, 0};
 }
 
@@ -532,13 +534,13 @@ int DGLArrayCopyToBytes(DGLArrayHandle handle,
 int DGLArrayPinData(DGLArrayHandle handle,
                     DLContext ctx) {
   API_BEGIN();
-  NDArray::PinData(handle, ctx);
+  NDArray::PinData(handle);
   API_END();
 }
 
 int DGLArrayUnpinData(DGLArrayHandle handle,
                       DLContext ctx) {
   API_BEGIN();
-  NDArray::UnpinData(handle, ctx);
+  NDArray::UnpinData(handle);
   API_END();
 }

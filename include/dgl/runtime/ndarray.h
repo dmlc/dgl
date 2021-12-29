@@ -170,13 +170,20 @@ class NDArray {
    */
   inline NDArray Clone(const DGLStreamHandle &stream = nullptr) const;
   /*!
-   * \brief Pin the data.
+   * \brief Pin data of the current array.
+   * \note This is an in-place method. Behavior depends on the current context,
+   *       kDLCPU: will be pinned;
+   *       kDLCPUPinned: directly return;
+   *       kDLGPU: invalid, will throw an error.
    */
-  inline void PinMemory(const DLContext &ctx);
+  inline void PinMemory_();
   /*!
-   * \brief Unpin the data.
+   * \brief Unpin data of the current array.
+   * \note This is an in-place method. Behavior depends on the current context,
+   *       kDLCPUPinned: will be unpinned;
+   *       others: directly return.
    */
-  inline void UnpinMemory(const DLContext &ctx);
+  inline void UnpinMemory_();
   /*!
    * \brief Check if the data is pinned.
    */
@@ -285,14 +292,25 @@ class NDArray {
       DLTensor* from, DLTensor* to, DGLStreamHandle stream = nullptr);
 
   /*!
-   * \brief Pin the data.
+   * \brief Function to pin the data.
+   * \param tensor The array to be pinned.
+   * \note Data of the given array will be pinned inplace.
+   *       Behavior depends on the current context,
+   *       kDLCPU: will be pinned;
+   *       kDLCPUPinned: directly return;
+   *       kDLGPU: invalid, will throw an error.
    */
-  DGL_DLL static void PinData(DLTensor* tensor, DLContext ctx);
+  DGL_DLL static void PinData(DLTensor* tensor);
 
   /*!
-   * \brief Unpin the data.
+   * \brief Function to unpin the data.
+   * \param tensor The array to be unpinned.
+   * \note Data of the given array will be unpinned inplace.
+   *       Behavior depends on the current context,
+   *       kDLCPUPinned: will be unpinned;
+   *       others: directly return.
    */
-  DGL_DLL static void UnpinData(DLTensor* tensor, DLContext ctx);
+  DGL_DLL static void UnpinData(DLTensor* tensor);
 
   // internal namespace
   struct Internal;
@@ -455,22 +473,19 @@ inline NDArray NDArray::Clone(const DGLStreamHandle &stream) const {
   return this->CopyTo(dptr->ctx, stream);
 }
 
-inline void NDArray::PinMemory(const DLContext &ctx) {
+inline void NDArray::PinMemory_() {
   CHECK(data_ != nullptr);
-  DLTensor* dptr = &(data_->dl_tensor);
-  PinData(dptr, ctx);
+  PinData(&(data_->dl_tensor));
 }
 
-inline void NDArray::UnpinMemory(const DLContext &ctx) {
+inline void NDArray::UnpinMemory_() {
   CHECK(data_ != nullptr);
-  DLTensor* dptr = &(data_->dl_tensor);
-  UnpinData(dptr, ctx);
+  UnpinData(&(data_->dl_tensor));
 }
 
 inline bool NDArray::IsPinned() const {
   CHECK(data_ != nullptr);
-  DLTensor* dptr = &(data_->dl_tensor);
-  return dptr->ctx.device_type == kDLCPUPinned;
+  return data_->dl_tensor.ctx.device_type == kDLCPUPinned;
 }
 
 inline int NDArray::use_count() const {

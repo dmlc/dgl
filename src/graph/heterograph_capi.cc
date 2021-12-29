@@ -173,6 +173,9 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroDataType")
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroContext")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
+    // The Python side only recognizes CPU and GPU device type.
+    // Use is_pinned() to checked whether the object is
+    // on page-locked memory
     if (hg->Context().device_type == kDLCPUPinned)
       *rv = DLContext{kDLCPU, 0};
     else
@@ -485,24 +488,14 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCopyTo")
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroPinMemory")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
-    int device_type = args[1];
-    int device_id = args[2];
-    DLContext ctx;
-    ctx.device_type = static_cast<DLDeviceType>(device_type);
-    ctx.device_id = device_id;
-    HeteroGraph::PinMemory(hg.sptr(), ctx);
+    HeteroGraph::PinMemory(hg.sptr());
     *rv = hg;
   });
 
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroUnpinMemory")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
-    int device_type = args[1];
-    int device_id = args[2];
-    DLContext ctx;
-    ctx.device_type = static_cast<DLDeviceType>(device_type);
-    ctx.device_id = device_id;
-    HeteroGraph::UnpinMemory(hg.sptr(), ctx);
+    HeteroGraph::UnpinMemory(hg.sptr());
     *rv = hg;
   });
 
