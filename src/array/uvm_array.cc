@@ -18,7 +18,7 @@ NDArray IndexSelectCPUFromGPU(NDArray array, IdArray index) {
   CHECK_EQ(array->ctx.device_type, kDLCPUPinned)
     << "Only the CPUPinned device type input array is supported";
   CHECK_EQ(index->ctx.device_type, kDLGPU)
-    << "Only the GPU device type input index supported";
+    << "Only the GPU device type input index is supported";
 
   CHECK_GE(array->ndim, 1) << "Only support array with at least 1 dimension";
   CHECK_EQ(index->ndim, 1) << "Index array must be an 1D array.";
