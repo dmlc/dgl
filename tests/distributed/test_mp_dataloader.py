@@ -176,7 +176,6 @@ def start_dist_neg_dataloader(rank, tmpdir, num_server, num_workers, orig_nid, g
     dgl.distributed.exit_client() # this is needed since there's two test here in one process
 
 def check_neg_dataloader(g, tmpdir, num_server, num_workers):
-    reset_envs()
     ip_config = open("mp_ip_config.txt", "w")
     for _ in range(num_server):
         ip_config.write('{}\n'.format(get_local_usable_addr()))
@@ -360,7 +359,6 @@ def start_edge_dataloader(rank, tmpdir, num_server, num_workers, orig_nid, orig_
     dgl.distributed.exit_client() # this is needed since there's two test here in one process
 
 def check_dataloader(g, tmpdir, num_server, num_workers, dataloader_type):
-    reset_envs()
     ip_config = open("mp_ip_config.txt", "w")
     for _ in range(num_server):
         ip_config.write('{}\n'.format(get_local_usable_addr()))
@@ -424,6 +422,7 @@ def create_random_hetero():
 @pytest.mark.parametrize("num_workers", [0, 4])
 @pytest.mark.parametrize("dataloader_type", ["node", "edge"])
 def test_dataloader(tmpdir, num_server, num_workers, dataloader_type):
+    reset_envs()
     g = CitationGraphDataset("cora")[0]
     check_dataloader(g, tmpdir, num_server, num_workers, dataloader_type)
     g = create_random_hetero()
@@ -435,6 +434,7 @@ def test_dataloader(tmpdir, num_server, num_workers, dataloader_type):
 @pytest.mark.parametrize("num_server", [3])
 @pytest.mark.parametrize("num_workers", [0, 4])
 def test_neg_dataloader(tmpdir, num_server, num_workers):
+    reset_envs()
     g = CitationGraphDataset("cora")[0]
     check_neg_dataloader(g, tmpdir, num_server, num_workers)
     g = create_random_hetero()

@@ -71,7 +71,6 @@ def start_get_degrees_client(rank, tmpdir, disable_shared_mem, nids=None):
     return in_deg, out_deg, all_in_deg, all_out_deg
 
 def check_rpc_sampling(tmpdir, num_server):
-    reset_envs()
     ip_config = open("rpc_ip_config.txt", "w")
     for _ in range(num_server):
         ip_config.write('{}\n'.format(get_local_usable_addr()))
@@ -106,7 +105,6 @@ def check_rpc_sampling(tmpdir, num_server):
         F.asnumpy(sampled_graph.edata[dgl.EID]), F.asnumpy(eids))
 
 def check_rpc_find_edges_shuffle(tmpdir, num_server):
-    reset_envs()
     ip_config = open("rpc_ip_config.txt", "w")
     for _ in range(num_server):
         ip_config.write('{}\n'.format(get_local_usable_addr()))
@@ -156,7 +154,6 @@ def create_random_hetero(dense=False, empty=False):
     return g
 
 def check_rpc_hetero_find_edges_shuffle(tmpdir, num_server):
-    reset_envs()
     ip_config = open("rpc_ip_config.txt", "w")
     for _ in range(num_server):
         ip_config.write('{}\n'.format(get_local_usable_addr()))
@@ -191,6 +188,7 @@ def check_rpc_hetero_find_edges_shuffle(tmpdir, num_server):
 @unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Turn off Mxnet support")
 @pytest.mark.parametrize("num_server", [1, 2])
 def test_rpc_find_edges_shuffle(num_server):
+    reset_envs()
     import tempfile
     os.environ['DGL_DIST_MODE'] = 'distributed'
     with tempfile.TemporaryDirectory() as tmpdirname:
@@ -198,7 +196,6 @@ def test_rpc_find_edges_shuffle(num_server):
         check_rpc_find_edges_shuffle(Path(tmpdirname), num_server)
 
 def check_rpc_get_degree_shuffle(tmpdir, num_server):
-    reset_envs()
     ip_config = open("rpc_ip_config.txt", "w")
     for _ in range(num_server):
         ip_config.write('{}\n'.format(get_local_usable_addr()))
@@ -242,6 +239,7 @@ def check_rpc_get_degree_shuffle(tmpdir, num_server):
 @unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Turn off Mxnet support")
 @pytest.mark.parametrize("num_server", [1, 2])
 def test_rpc_get_degree_shuffle(num_server):
+    reset_envs()
     import tempfile
     os.environ['DGL_DIST_MODE'] = 'distributed'
     with tempfile.TemporaryDirectory() as tmpdirname:
@@ -251,13 +249,13 @@ def test_rpc_get_degree_shuffle(num_server):
 #@unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
 @unittest.skip('Only support partition with shuffle')
 def test_rpc_sampling():
+    reset_envs()
     import tempfile
     os.environ['DGL_DIST_MODE'] = 'distributed'
     with tempfile.TemporaryDirectory() as tmpdirname:
         check_rpc_sampling(Path(tmpdirname), 2)
 
 def check_rpc_sampling_shuffle(tmpdir, num_server):
-    reset_envs()
     ip_config = open("rpc_ip_config.txt", "w")
     for _ in range(num_server):
         ip_config.write('{}\n'.format(get_local_usable_addr()))
@@ -354,7 +352,6 @@ def start_hetero_etype_sample_client(rank, tmpdir, disable_shared_mem, fanout=3,
     return block, gpb
 
 def check_rpc_hetero_sampling_shuffle(tmpdir, num_server):
-    reset_envs()
     ip_config = open("rpc_ip_config.txt", "w")
     for _ in range(num_server):
         ip_config.write('{}\n'.format(get_local_usable_addr()))
@@ -421,7 +418,6 @@ def get_degrees(g, nids, ntype):
     return deg
 
 def check_rpc_hetero_sampling_empty_shuffle(tmpdir, num_server):
-    reset_envs()
     ip_config = open("rpc_ip_config.txt", "w")
     for _ in range(num_server):
         ip_config.write('{}\n'.format(get_local_usable_addr()))
@@ -454,7 +450,6 @@ def check_rpc_hetero_sampling_empty_shuffle(tmpdir, num_server):
     assert len(block.etypes) == len(g.etypes)
 
 def check_rpc_hetero_etype_sampling_shuffle(tmpdir, num_server):
-    reset_envs()
     ip_config = open("rpc_ip_config.txt", "w")
     for _ in range(num_server):
         ip_config.write('{}\n'.format(get_local_usable_addr()))
@@ -517,7 +512,6 @@ def check_rpc_hetero_etype_sampling_shuffle(tmpdir, num_server):
         assert np.all(F.asnumpy(orig_dst1) == orig_dst)
 
 def check_rpc_hetero_etype_sampling_empty_shuffle(tmpdir, num_server):
-    reset_envs()
     ip_config = open("rpc_ip_config.txt", "w")
     for _ in range(num_server):
         ip_config.write('{}\n'.format(get_local_usable_addr()))
@@ -555,6 +549,7 @@ def check_rpc_hetero_etype_sampling_empty_shuffle(tmpdir, num_server):
 @unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Turn off Mxnet support")
 @pytest.mark.parametrize("num_server", [1, 2])
 def test_rpc_sampling_shuffle(num_server):
+    reset_envs()
     import tempfile
     os.environ['DGL_DIST_MODE'] = 'distributed'
     with tempfile.TemporaryDirectory() as tmpdirname:
@@ -628,6 +623,7 @@ def check_standalone_etype_sampling_heterograph(tmpdir, reshuffle):
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
 def test_standalone_sampling():
+    reset_envs()
     import tempfile
     os.environ['DGL_DIST_MODE'] = 'standalone'
     with tempfile.TemporaryDirectory() as tmpdirname:
@@ -650,7 +646,6 @@ def start_in_subgraph_client(rank, tmpdir, disable_shared_mem, nodes):
 
 
 def check_rpc_in_subgraph_shuffle(tmpdir, num_server):
-    reset_envs()
     ip_config = open("rpc_ip_config.txt", "w")
     for _ in range(num_server):
         ip_config.write('{}\n'.format(get_local_usable_addr()))
@@ -700,6 +695,7 @@ def check_rpc_in_subgraph_shuffle(tmpdir, num_server):
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
 def test_rpc_in_subgraph():
+    reset_envs()
     import tempfile
     os.environ['DGL_DIST_MODE'] = 'distributed'
     with tempfile.TemporaryDirectory() as tmpdirname:
@@ -709,6 +705,7 @@ def test_rpc_in_subgraph():
 @unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
 @unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Turn off Mxnet support")
 def test_standalone_etype_sampling():
+    reset_envs()
     import tempfile
     with tempfile.TemporaryDirectory() as tmpdirname:
         os.environ['DGL_DIST_MODE'] = 'standalone'

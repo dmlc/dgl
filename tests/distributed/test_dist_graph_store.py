@@ -105,7 +105,6 @@ def run_client_empty(graph_name, part_id, server_count, num_clients, num_nodes, 
     check_dist_graph_empty(g, num_clients, num_nodes, num_edges)
 
 def check_server_client_empty(shared_mem, num_servers, num_clients):
-    reset_envs()
     prepare_dist()
     g = create_random_graph(10000)
 
@@ -305,7 +304,6 @@ def check_dist_graph(g, num_clients, num_nodes, num_edges):
     print('end')
 
 def check_dist_emb_server_client(shared_mem, num_servers, num_clients):
-    reset_envs()
     prepare_dist()
     g = create_random_graph(10000)
 
@@ -345,7 +343,6 @@ def check_dist_emb_server_client(shared_mem, num_servers, num_clients):
     print('clients have terminated')
 
 def check_server_client(shared_mem, num_servers, num_clients):
-    reset_envs()
     prepare_dist()
     g = create_random_graph(10000)
 
@@ -383,7 +380,6 @@ def check_server_client(shared_mem, num_servers, num_clients):
     print('clients have terminated')
 
 def check_server_client_hierarchy(shared_mem, num_servers, num_clients):
-    reset_envs()
     prepare_dist()
     g = create_random_graph(10000)
 
@@ -547,7 +543,6 @@ def check_dist_graph_hetero(g, num_clients, num_nodes, num_edges):
     print('end')
 
 def check_server_client_hetero(shared_mem, num_servers, num_clients):
-    reset_envs()
     prepare_dist()
     g = create_random_hetero()
 
@@ -588,6 +583,7 @@ def check_server_client_hetero(shared_mem, num_servers, num_clients):
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support some of operations in DistGraph")
 @unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Turn off Mxnet support")
 def test_server_client():
+    reset_envs()
     os.environ['DGL_DIST_MODE'] = 'distributed'
     check_server_client_hierarchy(False, 1, 4)
     check_server_client_empty(True, 1, 1)
@@ -601,6 +597,7 @@ def test_server_client():
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support distributed DistEmbedding")
 @unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Mxnet doesn't support distributed DistEmbedding")
 def test_dist_emb_server_client():
+    reset_envs()
     os.environ['DGL_DIST_MODE'] = 'distributed'
     check_dist_emb_server_client(True, 1, 1)
     check_dist_emb_server_client(False, 1, 1)
@@ -609,6 +606,7 @@ def test_dist_emb_server_client():
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support some of operations in DistGraph")
 @unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Turn off Mxnet support")
 def test_standalone():
+    reset_envs()
     os.environ['DGL_DIST_MODE'] = 'standalone'
 
     g = create_random_graph(10000)
@@ -627,6 +625,7 @@ def test_standalone():
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support distributed DistEmbedding")
 @unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Mxnet doesn't support distributed DistEmbedding")
 def test_standalone_node_emb():
+    reset_envs()
     os.environ['DGL_DIST_MODE'] = 'standalone'
 
     g = create_random_graph(10000)
@@ -644,7 +643,6 @@ def test_standalone_node_emb():
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 def test_split():
-    reset_envs()
     #prepare_dist()
     g = create_random_graph(10000)
     num_parts = 4
@@ -700,7 +698,6 @@ def test_split():
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 def test_split_even():
-    reset_envs()
     #prepare_dist(1)
     g = create_random_graph(10000)
     num_parts = 4

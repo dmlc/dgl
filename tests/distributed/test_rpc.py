@@ -156,6 +156,7 @@ def start_client(ip_config):
         assert_array_equal(F.asnumpy(res.tensor), F.asnumpy(TENSOR))
 
 def test_serialize():
+    reset_envs()
     os.environ['DGL_DIST_MODE'] = 'distributed'
     from dgl.distributed.rpc import serialize_to_payload, deserialize_from_payload
     SERVICE_ID = 12345
@@ -174,6 +175,7 @@ def test_serialize():
     assert res.x == res1.x
 
 def test_rpc_msg():
+    reset_envs()
     os.environ['DGL_DIST_MODE'] = 'distributed'
     from dgl.distributed.rpc import serialize_to_payload, deserialize_from_payload, RPCMessage
     SERVICE_ID = 32452
