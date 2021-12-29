@@ -160,12 +160,15 @@ class UnitGraph::COO : public BaseHeteroGraph {
     return COO(meta_graph_, adj_.CopyTo(ctx, stream));
   }
 
-  void PinMemory(const DLContext &ctx) {
-    adj_.PinMemory(ctx);
+
+  /*! \brief Pin the adj_: COOMatrix of the COO graph. */
+  void PinMemory_() {
+    adj_.PinMemory_();
   }
 
-  void UnpinMemory(const DLContext &ctx) {
-    adj_.UnpinMemory(ctx);
+  /*! \brief Unpin the adj_: COOMatrix of the COO graph. */
+  void UnpinMemory_() {
+    adj_.UnpinMemory_();
   }
 
   bool IsMultigraph() const override {
@@ -563,12 +566,14 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     }
   }
 
-  void PinMemory(const DLContext &ctx) {
-    adj_.PinMemory(ctx);
+  /*! \brief Pin the adj_: CSRMatrix of the CSR graph. */
+  void PinMemory_() {
+    adj_.PinMemory_();
   }
 
-  void UnpinMemory(const DLContext &ctx) {
-    adj_.UnpinMemory(ctx);
+  /*! \brief Unpin the adj_: CSRMatrix of the CSR graph. */
+  void UnpinMemory_() {
+    adj_.UnpinMemory_();
   }
 
   bool IsMultigraph() const override {
@@ -1291,26 +1296,26 @@ HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DLContext &ctx,
   }
 }
 
-void UnitGraph::PinMemory(HeteroGraphPtr g, const DLContext &ctx) {
+void UnitGraph::PinMemory(HeteroGraphPtr g) {
   auto bg = std::dynamic_pointer_cast<UnitGraph>(g);
   CHECK_NOTNULL(bg);
   if (bg->in_csr_->defined())
-    bg->in_csr_->PinMemory(ctx);
+    bg->in_csr_->PinMemory_();
   if (bg->out_csr_->defined())
-    bg->out_csr_->PinMemory(ctx);
+    bg->out_csr_->PinMemory_();
   if (bg->coo_->defined())
-    bg->coo_->PinMemory(ctx);
+    bg->coo_->PinMemory_();
 }
 
-void UnitGraph::UnpinMemory(HeteroGraphPtr g, const DLContext &ctx) {
+void UnitGraph::UnpinMemory(HeteroGraphPtr g) {
   auto bg = std::dynamic_pointer_cast<UnitGraph>(g);
   CHECK_NOTNULL(bg);
   if (bg->in_csr_->defined())
-    bg->in_csr_->UnpinMemory(ctx);
+    bg->in_csr_->UnpinMemory_();
   if (bg->out_csr_->defined())
-    bg->out_csr_->UnpinMemory(ctx);
+    bg->out_csr_->UnpinMemory_();
   if (bg->coo_->defined())
-    bg->coo_->UnpinMemory(ctx);
+    bg->coo_->UnpinMemory_();
 }
 
 void UnitGraph::InvalidateCSR() {

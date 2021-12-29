@@ -210,11 +210,24 @@ class UnitGraph : public BaseHeteroGraph {
   static HeteroGraphPtr CopyTo(HeteroGraphPtr g, const DLContext &ctx,
                                const DGLStreamHandle &stream = nullptr);
 
-  /*! \brief Pin the data */
-  static void PinMemory(HeteroGraphPtr g, const DLContext &ctx);
+  /*!
+  * \brief Pin the in_csr_, out_scr_ and coo_ of the given graph g.
+  * \note The graph g is pinned inplace. Behavior depends on the current context,
+  *       kDLCPU: will be pinned;
+  *       kDLCPUPinned: directly return;
+  *       kDLGPU: invalid, will throw an error.
+  *       The context check is deferred to pinning the NDArray.
+  */
+  static void PinMemory(HeteroGraphPtr g);
 
-  /*! \brief Unpin the data */
-  static void UnpinMemory(HeteroGraphPtr g, const DLContext &ctx);
+  /*!
+  * \brief Unpin the in_csr_, out_scr_ and coo_ of the given graph g.
+  * \note The graph g is unpinned inplace. Behavior depends on the current context,
+  *       kDLCPUPinned: will be unpinned;
+  *       others: directly return.
+  *       The context check is deferred to unpinning the NDArray.
+  */
+  static void UnpinMemory(HeteroGraphPtr g);
 
   /*! 
    * \brief Create in-edge CSR format of the unit graph.

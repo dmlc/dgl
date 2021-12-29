@@ -954,7 +954,7 @@ def test_to_device2(g, idtype):
 
 @unittest.skipIf(F._default_context_str == 'cpu', reason="Need gpu for this test")
 @parametrize_dtype
-def test_pin_memory(idtype):
+def test_pin_memory_(idtype):
     # TODO: rewrite this test case to accept different graphs so we
     #  can test reverse graph and batched graph
     g = create_test_heterograph(idtype)
@@ -966,12 +966,12 @@ def test_pin_memory(idtype):
 
     if F.is_cuda_available():
         # unpin an unpinned CPU graph, directly return
-        g.unpin_memory(F.cuda())
+        g.unpin_memory_()
         assert not g.is_pinned()
         assert g.device == F.cpu()
 
         # pin a CPU graph
-        g.pin_memory(F.cuda())
+        g.pin_memory_()
         assert g.is_pinned()
         assert g.device == F.cpu()
         assert F.context(g.nodes['user'].data['h']) == F.cpu()
@@ -983,31 +983,25 @@ def test_pin_memory(idtype):
             assert F.context(g.batch_num_edges(etype)) == F.cpu()
 
         # pin a pinned graph, direcly return
-        g.pin_memory(F.cuda())
+        g.pin_memory_()
         assert g.is_pinned()
         assert g.device == F.cpu()
 
         # unpin a pinned graph
-        g.unpin_memory(F.cuda())
+        g.unpin_memory_()
         assert not g.is_pinned()
         assert g.device == F.cpu()
-
-        # target device must be a CUDA device
-        with pytest.raises(DGLError):
-            g.pin_memory(F.cpu())
-        with pytest.raises(DGLError):
-            g.unpin_memory(F.cpu())
 
         g1 = g.to(F.cuda())
 
         # unpin an unpinned GPU graph, directly return
-        g1.unpin_memory(F.cuda())
+        g1.unpin_memory_()
         assert not g1.is_pinned()
         assert g1.device == F.cuda()
 
         # error pinning a GPU graph
         with pytest.raises(DGLError):
-            g1.pin_memory(F.cuda())
+            g1.pin_memory_()
 
 @parametrize_dtype
 def test_convert_bound(idtype):

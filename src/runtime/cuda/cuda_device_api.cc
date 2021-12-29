@@ -174,13 +174,16 @@ class CUDADeviceAPI final : public DeviceAPI {
     return static_cast<DGLStreamHandle>(CUDAThreadEntry::ThreadLocal()->stream);
   }
 
-  void PinData(DGLContext ctx, void* ptr, size_t nbytes) {
-    CUDA_CALL(cudaSetDevice(ctx.device_id));
+  /*! NOTE: cudaHostRegister can be called from an arbitrary GPU device,
+   *        so we don't need to specify a ctx.
+   *        The pinned memory can be seen by all CUDA contexts,
+   *        not just the one that performed the allocation
+   */
+  void PinData(void* ptr, size_t nbytes) {
     CUDA_CALL(cudaHostRegister(ptr, nbytes, cudaHostRegisterDefault));
   }
 
-  void UnpinData(DGLContext ctx, void* ptr) {
-    CUDA_CALL(cudaSetDevice(ctx.device_id));
+  void UnpinData(void* ptr) {
     CUDA_CALL(cudaHostUnregister(ptr));
   }
 

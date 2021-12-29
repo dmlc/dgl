@@ -123,19 +123,34 @@ struct CSRMatrix {
                      sorted);
   }
 
-  inline void PinMemory(const DLContext &ctx) {
-    indptr.PinMemory(ctx);
-    indices.PinMemory(ctx);
+  /*!
+  * \brief Pin the indptr, indices and data (if not Null) of the matrix.
+  * \note This is an in-place method. Behavior depends on the current context,
+  *       kDLCPU: will be pinned;
+  *       kDLCPUPinned: directly return;
+  *       kDLGPU: invalid, will throw an error.
+  *       The context check is deferred to pinning the NDArray.
+  */
+  inline void PinMemory_() {
+    indptr.PinMemory_();
+    indices.PinMemory_();
     if (!aten::IsNullArray(data)) {
-      data.PinMemory(ctx);
+      data.PinMemory_();
     }
   }
 
-  inline void UnpinMemory(const DLContext &ctx) {
-    indptr.UnpinMemory(ctx);
-    indices.UnpinMemory(ctx);
+  /*!
+  * \brief Unpin the indptr, indices and data (if not Null) of the matrix.
+  * \note This is an in-place method. Behavior depends on the current context,
+  *       kDLCPUPinned: will be unpinned;
+  *       others: directly return.
+  *       The context check is deferred to unpinning the NDArray.
+  */
+  inline void UnpinMemory_() {
+    indptr.UnpinMemory_();
+    indices.UnpinMemory_();
     if (!aten::IsNullArray(data)) {
-      data.UnpinMemory(ctx);
+      data.UnpinMemory_();
     }
   }
 };
