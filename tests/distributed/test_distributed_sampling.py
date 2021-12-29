@@ -10,7 +10,7 @@ import multiprocessing as mp
 import numpy as np
 import backend as F
 import time
-from utils import get_local_usable_addr
+from utils import get_local_usable_addr, reset_envs
 from pathlib import Path
 import pytest
 from scipy import sparse as spsp
@@ -71,6 +71,7 @@ def start_get_degrees_client(rank, tmpdir, disable_shared_mem, nids=None):
     return in_deg, out_deg, all_in_deg, all_out_deg
 
 def check_rpc_sampling(tmpdir, num_server):
+    reset_envs()
     ip_config = open("rpc_ip_config.txt", "w")
     for _ in range(num_server):
         ip_config.write('{}\n'.format(get_local_usable_addr()))
@@ -105,6 +106,7 @@ def check_rpc_sampling(tmpdir, num_server):
         F.asnumpy(sampled_graph.edata[dgl.EID]), F.asnumpy(eids))
 
 def check_rpc_find_edges_shuffle(tmpdir, num_server):
+    reset_envs()
     ip_config = open("rpc_ip_config.txt", "w")
     for _ in range(num_server):
         ip_config.write('{}\n'.format(get_local_usable_addr()))
@@ -154,6 +156,7 @@ def create_random_hetero(dense=False, empty=False):
     return g
 
 def check_rpc_hetero_find_edges_shuffle(tmpdir, num_server):
+    reset_envs()
     ip_config = open("rpc_ip_config.txt", "w")
     for _ in range(num_server):
         ip_config.write('{}\n'.format(get_local_usable_addr()))
@@ -195,6 +198,7 @@ def test_rpc_find_edges_shuffle(num_server):
         check_rpc_find_edges_shuffle(Path(tmpdirname), num_server)
 
 def check_rpc_get_degree_shuffle(tmpdir, num_server):
+    reset_envs()
     ip_config = open("rpc_ip_config.txt", "w")
     for _ in range(num_server):
         ip_config.write('{}\n'.format(get_local_usable_addr()))
@@ -253,6 +257,7 @@ def test_rpc_sampling():
         check_rpc_sampling(Path(tmpdirname), 2)
 
 def check_rpc_sampling_shuffle(tmpdir, num_server):
+    reset_envs()
     ip_config = open("rpc_ip_config.txt", "w")
     for _ in range(num_server):
         ip_config.write('{}\n'.format(get_local_usable_addr()))
@@ -349,6 +354,7 @@ def start_hetero_etype_sample_client(rank, tmpdir, disable_shared_mem, fanout=3,
     return block, gpb
 
 def check_rpc_hetero_sampling_shuffle(tmpdir, num_server):
+    reset_envs()
     ip_config = open("rpc_ip_config.txt", "w")
     for _ in range(num_server):
         ip_config.write('{}\n'.format(get_local_usable_addr()))
@@ -415,6 +421,7 @@ def get_degrees(g, nids, ntype):
     return deg
 
 def check_rpc_hetero_sampling_empty_shuffle(tmpdir, num_server):
+    reset_envs()
     ip_config = open("rpc_ip_config.txt", "w")
     for _ in range(num_server):
         ip_config.write('{}\n'.format(get_local_usable_addr()))
@@ -447,6 +454,7 @@ def check_rpc_hetero_sampling_empty_shuffle(tmpdir, num_server):
     assert len(block.etypes) == len(g.etypes)
 
 def check_rpc_hetero_etype_sampling_shuffle(tmpdir, num_server):
+    reset_envs()
     ip_config = open("rpc_ip_config.txt", "w")
     for _ in range(num_server):
         ip_config.write('{}\n'.format(get_local_usable_addr()))
@@ -509,6 +517,7 @@ def check_rpc_hetero_etype_sampling_shuffle(tmpdir, num_server):
         assert np.all(F.asnumpy(orig_dst1) == orig_dst)
 
 def check_rpc_hetero_etype_sampling_empty_shuffle(tmpdir, num_server):
+    reset_envs()
     ip_config = open("rpc_ip_config.txt", "w")
     for _ in range(num_server):
         ip_config.write('{}\n'.format(get_local_usable_addr()))
@@ -641,6 +650,7 @@ def start_in_subgraph_client(rank, tmpdir, disable_shared_mem, nodes):
 
 
 def check_rpc_in_subgraph_shuffle(tmpdir, num_server):
+    reset_envs()
     ip_config = open("rpc_ip_config.txt", "w")
     for _ in range(num_server):
         ip_config.write('{}\n'.format(get_local_usable_addr()))

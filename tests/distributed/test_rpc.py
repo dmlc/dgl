@@ -7,6 +7,7 @@ import backend as F
 import unittest, pytest
 import multiprocessing as mp
 from numpy.testing import assert_array_equal
+from utils import reset_envs
 
 if os.name != 'nt':
     import fcntl
@@ -190,6 +191,7 @@ def test_rpc_msg():
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 def test_rpc():
+    reset_envs()
     os.environ['DGL_DIST_MODE'] = 'distributed'
     ip_config = open("rpc_ip_config.txt", "w")
     ip_addr = get_local_usable_addr()
@@ -205,6 +207,7 @@ def test_rpc():
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 def test_multi_client():
+    reset_envs()
     os.environ['DGL_DIST_MODE'] = 'distributed'
     ip_config = open("rpc_ip_config_mul_client.txt", "w")
     ip_addr = get_local_usable_addr()
@@ -226,6 +229,7 @@ def test_multi_client():
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 def test_multi_thread_rpc():
+    reset_envs()
     os.environ['DGL_DIST_MODE'] = 'distributed'
     ip_config = open("rpc_ip_config_multithread.txt", "w")
     num_servers = 2

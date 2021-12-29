@@ -18,6 +18,7 @@ import backend as F
 import math
 import unittest
 import pickle
+from utils import reset_envs
 
 if os.name != 'nt':
     import fcntl
@@ -104,6 +105,7 @@ def run_client_empty(graph_name, part_id, server_count, num_clients, num_nodes, 
     check_dist_graph_empty(g, num_clients, num_nodes, num_edges)
 
 def check_server_client_empty(shared_mem, num_servers, num_clients):
+    reset_envs()
     prepare_dist()
     g = create_random_graph(10000)
 
@@ -303,6 +305,7 @@ def check_dist_graph(g, num_clients, num_nodes, num_edges):
     print('end')
 
 def check_dist_emb_server_client(shared_mem, num_servers, num_clients):
+    reset_envs()
     prepare_dist()
     g = create_random_graph(10000)
 
@@ -342,6 +345,7 @@ def check_dist_emb_server_client(shared_mem, num_servers, num_clients):
     print('clients have terminated')
 
 def check_server_client(shared_mem, num_servers, num_clients):
+    reset_envs()
     prepare_dist()
     g = create_random_graph(10000)
 
@@ -379,6 +383,7 @@ def check_server_client(shared_mem, num_servers, num_clients):
     print('clients have terminated')
 
 def check_server_client_hierarchy(shared_mem, num_servers, num_clients):
+    reset_envs()
     prepare_dist()
     g = create_random_graph(10000)
 
@@ -542,6 +547,7 @@ def check_dist_graph_hetero(g, num_clients, num_nodes, num_edges):
     print('end')
 
 def check_server_client_hetero(shared_mem, num_servers, num_clients):
+    reset_envs()
     prepare_dist()
     g = create_random_hetero()
 
@@ -638,6 +644,7 @@ def test_standalone_node_emb():
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 def test_split():
+    reset_envs()
     #prepare_dist()
     g = create_random_graph(10000)
     num_parts = 4
@@ -693,6 +700,7 @@ def test_split():
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 def test_split_even():
+    reset_envs()
     #prepare_dist(1)
     g = create_random_graph(10000)
     num_parts = 4
