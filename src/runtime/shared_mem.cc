@@ -137,7 +137,7 @@ bool SharedMemory::Exist(const std::string &name) {
 #ifndef _WIN32
   int fd = shm_open(name.c_str(), O_RDONLY, S_IRUSR | S_IWUSR);
   if (fd >= 0) {
-    close(fd_);
+    close(fd);
     return true;
   } else {
     return false;
