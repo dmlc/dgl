@@ -8,7 +8,7 @@
 메지시 전달 패러다임(Message Passing Paradigm)
 -----------------------------------------
 
-:math:`x_v\in\mathbb{R}^{d_1}` 이 노드 :math:`v` 의 피처이고, :math:`w_{e}\in\mathbb{R}^{d_2}` 가 에지 :math:`({u}, {v})` 의 피처라고 하자. **메시지 전달 패러다임**은 :math:`t+1` 단계에서 노드별(node-wise) 그리고 에지별(edge-wise)의 연산을 다음과 같이 정의한다:
+:math:`x_v\in\mathbb{R}^{d_1}` 이 노드 :math:`v` 의 피처이고, :math:`w_{e}\in\mathbb{R}^{d_2}` 가 에지 :math:`({u}, {v})` 의 피처라고 하자. **메시지 전달 패러다임** 은 :math:`t+1` 단계에서 노드별(node-wise) 그리고 에지별(edge-wise)의 연산을 다음과 같이 정의한다:
 
 .. math::  \text{에지별: } m_{e}^{(t+1)} = \phi \left( x_v^{(t)}, x_u^{(t)}, w_{e}^{(t)} \right) , ({u}, {v},{e}) \in \mathcal{E}.
 

@@ -1,10 +1,8 @@
-"""Torch modules for link prediction."""
+"""Predictor for edges in homogeneous graphs."""
 # pylint: disable= no-member, arguments-differ, invalid-name, W0235
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-__all__ = ['EdgePredictor']
 
 class EdgePredictor(nn.Module):
     r"""

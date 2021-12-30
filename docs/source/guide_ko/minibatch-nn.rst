@@ -153,6 +153,6 @@ DGL의 모든 메시지 전달 모듈들은 homogeneous 그래프, 단방향 이
             return F.relu(
                 self.W(torch.cat([g.dstdata['h'], g.dstdata['h_neigh']], 1)))
 
-:ref:`guide-nn` 은 단방향 이분 그래프, homogeneous 그래프와 MFG에 적용되는 :class:`dgl.nn.pytorch.SAGEConv` 를 자세히 다루고 있다.
+:ref:`guide_ko-nn` 은 단방향 이분 그래프, homogeneous 그래프와 MFG에 적용되는 :class:`dgl.nn.pytorch.SAGEConv` 를 자세히 다루고 있다.
 
 

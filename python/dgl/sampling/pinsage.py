@@ -41,7 +41,7 @@ class RandomWalkNeighborSampler(object):
     Parameters
     ----------
     G : DGLGraph
-        The graph.  It must be on CPU.
+        The graph.
     num_traversals : int
         The maximum number of metapath-based traversals for a single random walk.
 
@@ -71,7 +71,6 @@ class RandomWalkNeighborSampler(object):
     """
     def __init__(self, G, num_traversals, termination_prob,
                  num_random_walks, num_neighbors, metapath=None, weight_column='weights'):
-        assert G.device == F.cpu(), "Graph must be on CPU."
         self.G = G
         self.weight_column = weight_column
         self.num_random_walks = num_random_walks
@@ -93,7 +92,8 @@ class RandomWalkNeighborSampler(object):
         self.full_metapath = metapath * num_traversals
         restart_prob = np.zeros(self.metapath_hops * num_traversals)
         restart_prob[self.metapath_hops::self.metapath_hops] = termination_prob
-        self.restart_prob = F.zerocopy_from_numpy(restart_prob)
+        restart_prob = F.tensor(restart_prob, dtype=F.float32)
+        self.restart_prob = F.copy_to(restart_prob, G.device)
 
     # pylint: disable=no-member
     def __call__(self, seed_nodes):

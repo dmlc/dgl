@@ -40,7 +40,7 @@ DGL의 샘플러를 사용하기 위해서는 이를 미니배치에 있는 노�
         drop_last=False,
         num_workers=4)
 
-DataLoader를 iterate 하면서 각 레이어에 대한 computation dependency들을 대표하도록 특별하게 생성된 그래프들의 리스트를 얻을 수 있다. DGL에서 이것들을 *message flow graph*(MFG)라고 부른다.
+DataLoader를 iterate 하면서 각 레이어에 대한 computation dependency들을 대표하도록 특별하게 생성된 그래프들의 리스트를 얻을 수 있다. DGL에서 이것들을 *message flow graph* (MFG) 라고 부른다.
 
 .. code:: python
 
@@ -55,10 +55,10 @@ Iterator는 매번 세개의 아이템을 생성한다. ``input_nodes`` 는 ``ou
 
    지원되는 빌드인 샘플러들의 전체 목록은 :ref:`neighborhood sampler API reference <api-dataloading-neighbor-sampling>` 에서 찾아볼 수 있다.
 
-   :ref:`guide-minibatch-customizing-neighborhood-sampler` 에는 여러분만의 이웃 샘플러 만드는 방법과 MFG 개념에 대한 보다 상세한 설명을 담고 있다.
+   :ref:`guide_ko-minibatch-customizing-neighborhood-sampler` 에는 여러분만의 이웃 샘플러 만드는 방법과 MFG 개념에 대한 보다 상세한 설명을 담고 있다.
 
 
-.. _guide-minibatch-node-classification-model:
+.. _guide_ko-minibatch-node-classification-model:
 
 모델을 미니-배치 학습에 맞게 만들기
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -97,7 +97,7 @@ Iterator는 매번 세개의 아이템을 생성한다. ``input_nodes`` 는 ``ou
 
 :ref:`The API reference of each NN module <apinn>` 는 모듈이 MFG를 argument로 받을 수 있는지 없는지를 알려주고 있다.
 
-만약 여러분 자신의 메시지 전달 모듈을 사용하고 싶다면, :ref:`guide-minibatch-custom-gnn-module` 를 참고하자.
+만약 여러분 자신의 메시지 전달 모듈을 사용하고 싶다면, :ref:`guide_ko-minibatch-custom-gnn-module` 를 참고하자.
 
 학습 룹
 ~~~~~
@@ -142,7 +142,7 @@ Heterogeneous 그래프의 경우
 
 Heterogeneous 그래프에 대한 노드 분류 그래프 뉴럴 네트워크를 학습하는 것은 간단하다.
 
-:ref:`how to train a 2-layer RGCN on full graph <guide-training-rgcn-node-classification>` 를 예로 들어보자. 미니-배치 학습을 하는 RGCN 구현 코드는 이 예제와 매우 비슷하다. (간단하게 하기 위해서 self-loop, non-linearity와 기본적인 decomposition은 제거했다.)
+:ref:`how to train a 2-layer RGCN on full graph <guide_ko-training-rgcn-node-classification>` 를 예로 들어보자. 미니-배치 학습을 하는 RGCN 구현 코드는 이 예제와 매우 비슷하다. (간단하게 하기 위해서 self-loop, non-linearity와 기본적인 decomposition은 제거했다.)
 
 .. code:: python
 

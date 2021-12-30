@@ -7,7 +7,7 @@
 
 데이터 프로세싱 코드를 ``process()`` 함수에 구현할 수 있으며, 이때 처리되지 않은 데이터는 ``self.raw_dir`` 디렉토리에 있어야 한다. 그래프 머신러닝에는 일반적으로 3가지 종류의 일이 있다: 그래프 분류, 노드 분류, 그리고 링크 예측. 이 절에서는 이 일들에 관련된 데이터셋 처리 방법을 설명한다.
 
-이 절에서 그래프들, 피쳐들, 그리고 마스크들을 처리하는 표준 방법에 집중해서 알아본다. 빌트인 데이터셋을 예제로 사용할 것이고, 파일로 부터 그래프를 만드는 방법은 생략한다. 하지만, 이와 관련된 구현에 대한 링크를 제공할 것이다. 외부 소스들로 부터 그래프를 만드는 방법에 대한 완벽한 가이드는 :ref:`guide-graph-external` 를 참고하자. 
+이 절에서 그래프들, 피쳐들, 그리고 마스크들을 처리하는 표준 방법에 집중해서 알아본다. 빌트인 데이터셋을 예제로 사용할 것이고, 파일로 부터 그래프를 만드는 방법은 생략한다. 하지만, 이와 관련된 구현에 대한 링크를 제공할 것이다. 외부 소스들로 부터 그래프를 만드는 방법에 대한 완벽한 가이드는 :ref:`guide_ko-graph-external` 를 참고하자. 
 
 그래프 분류 데이터셋 프로세싱
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -55,7 +55,7 @@
             """Number of graphs in the dataset"""
             return len(self.graphs)
 
-``process()`` 함수에서 처리되지 않은 데이터는 그래프들의 리스트와 레이블들의 리스트로 변환된다. Iteration을 위해서 ``__getitem__(idx)``와 ``__len__()`` 를 구현해야 한다. 위의 예제에서와 같이, DGL에서는 ``__getitem__(idx)`` 가 ``(graph, label)`` tuple을 리턴하도록 권장한다. ``self._load_graph()`` 와 ``__getitem__`` 함수의 구체적인 구현은 `QM7bDataset source
+``process()`` 함수에서 처리되지 않은 데이터는 그래프들의 리스트와 레이블들의 리스트로 변환된다. Iteration을 위해서 ``__getitem__(idx)`` 와 ``__len__()`` 를 구현해야 한다. 위의 예제에서와 같이, DGL에서는 ``__getitem__(idx)`` 가 ``(graph, label)`` tuple을 리턴하도록 권장한다. ``self._load_graph()`` 와 ``__getitem__`` 함수의 구체적인 구현은 `QM7bDataset source
 code <https://docs.dgl.ai/en/0.5.x/_modules/dgl/data/qm7b.html#QM7bDataset>`__ 를 확인하자.
 
 데이터셋의 유용한 정보들을 지정하기 위해서 클래스에 프로퍼티들을 추가하는 것이 가능하다. :class:`~dgl.data.QM7bDataset` 에 이 멀티 테스크 데이터셋의 예측 테스트의 총 개숫를 지정하기 위해 ``num_labels`` 라는 프로퍼티를 추가할 수 있다.
@@ -89,7 +89,7 @@ code <https://docs.dgl.ai/en/0.5.x/_modules/dgl/data/qm7b.html#QM7bDataset>`__ �
             # your training code here
             pass
 
-그래프 분류 모델 학습에 대한 전체 가이드는 :ref:`guide-training-graph-classification` 를 참고하자.
+그래프 분류 모델 학습에 대한 전체 가이드는 :ref:`guide_ko-training-graph-classification` 를 참고하자.
 
 DGL의 빌트인 그래프 분류 데이터셋을 참고하면 그래프 분류 데이터셋의 더 많은 예들을 확인할 수 있다.
 
@@ -178,7 +178,7 @@ DGL의 빌트인 그래프 분류 데이터셋을 참고하면 그래프 분류 
     # get labels
     labels = graph.ndata['label']
 
-노드 분류 모델에 대한 전체 가이드는 :ref:`guide-training-node-classification` 를 참고하자.
+노드 분류 모델에 대한 전체 가이드는 :ref:`guide_ko-training-node-classification` 를 참고하자.
 
 DGL의 빌트인 데이터셋들은 노드 분류 데이터셋의 여러 예제들을 포함하고 있다.
 
@@ -262,7 +262,7 @@ DGL의 빌트인 데이터셋들은 노드 분류 데이터셋의 여러 예제�
     # get edge types in training set
     rel = graph.edata['etype'][train_idx]
 
-링크 예측 모델에 대한 전체 가이드는 :ref:`guide-training-link-prediction` 에 있다.
+링크 예측 모델에 대한 전체 가이드는 :ref:`guide_ko-training-link-prediction` 에 있다.
 
 DGL의 빌트인 데이터셋들은 링크 예측 데이터셋의 여러 예제들을 포함하고 있다.
 
