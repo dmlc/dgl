@@ -23,6 +23,7 @@ def start_server(rank, tmpdir, disable_shared_mem, graph_name, graph_format=['cs
                         tmpdir / (graph_name + '.json'), disable_shared_mem=disable_shared_mem,
                         graph_format=graph_format)
     g.start()
+    time.sleep(1)
 
 
 def start_sample_client(rank, tmpdir, disable_shared_mem):
