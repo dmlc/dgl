@@ -432,6 +432,6 @@ if __name__ == '__main__':
         test_node_dataloader(sampler)
         for neg_sampler in [
                 dgl.dataloading.negative_sampler.Uniform(2),
-                dgl.dataloading.negative_sampler.GlobalUniform(15, False, 3),
-                dgl.dataloading.negative_sampler.GlobalUniform(15, True, 3)]:
+                dgl.dataloading.negative_sampler.GlobalUniform(2, False),
+                dgl.dataloading.negative_sampler.GlobalUniform(2, True)]:
             test_edge_dataloader(sampler, neg_sampler)

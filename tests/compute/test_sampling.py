@@ -901,15 +901,7 @@ def test_global_uniform_negative_sampling(dtype):
     assert len(s) == len(src)
 
     g = dgl.graph(([0], [1])).to(F.ctx())
-    src, dst = dgl.sampling.global_uniform_negative_sampling(g, 20, True, False, num_trials=5)
-    src = F.asnumpy(src)
-    dst = F.asnumpy(dst)
-    # should have either no element or all (1, 0)
-    assert len(src) == 0 or (src[0] == 1).all()
-    assert len(dst) == 0 or (dst[0] == 0).all()
-
-    g = dgl.graph(([0], [1])).to(F.ctx())
-    src, dst = dgl.sampling.global_uniform_negative_sampling(g, 20, True, True, num_trials=5, redundancy=2)
+    src, dst = dgl.sampling.global_uniform_negative_sampling(g, 20, True, True, redundancy=10)
     src = F.asnumpy(src)
     dst = F.asnumpy(dst)
     # should have either no element or (1, 0)

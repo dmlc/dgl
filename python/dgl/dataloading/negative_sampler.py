@@ -8,7 +8,7 @@ class _BaseNegativeSampler(object):
         raise NotImplementedError
 
     def __call__(self, g, eids):
-        """Returns negative examples.
+        """Returns negative samples.
 
         Parameters
         ----------
@@ -20,7 +20,7 @@ class _BaseNegativeSampler(object):
         Returns
         -------
         tuple[Tensor, Tensor] or dict[etype, tuple[Tensor, Tensor]]
-            The returned source-destination pairs as negative examples.
+            The returned source-destination pairs as negative samples.
         """
         if isinstance(eids, Mapping):
             eids = {g.to_canonical_etype(k): v for k, v in eids.items()}
@@ -44,7 +44,7 @@ class PerSourceUniform(_BaseNegativeSampler):
     Parameters
     ----------
     k : int
-        The number of negative examples per edge.
+        The number of negative samples per edge.
 
     Examples
     --------
@@ -70,47 +70,62 @@ class PerSourceUniform(_BaseNegativeSampler):
 # Alias
 Uniform = PerSourceUniform
 
+def calc_draw(k_hat, num_edges, num_nodes, r=3):
+    # Calculates the number of samples required based on a lower-bound
+    # of the expected number of negative samples, based on N draws from 
+    # a binomial distribution.  Solves the following equation for N:
+    # 
+    # k_hat = N*p_k - r * np.sqrt(N*p_k*(1-p_k))
+    #     
+    # where p_k is the probability that a node pairing is a negative edge 
+    # and r is the number of standard deviations to construct the lower bound
+    p_m = num_edges / (num_nodes*(num_nodes-1))
+    p_k = 1 - p_m
+    
+    a = p_k ** 2
+    b = -p_k * (2 * k_hat + r ** 2 * p_m)
+    c = k_hat ** 2
+    
+    poly = polynomial.Polynomial([c, b, a])
+    N = poly.roots()[-1]
+    redundancy = N / k_hat - 1.
+    return redundancy
+
 class GlobalUniform(_BaseNegativeSampler):
     """Negative sampler that randomly chooses negative source-destination pairs according
     to a uniform distribution.
 
-    For each edge ``(u, v)`` of type ``(srctype, etype, dsttype)``, DGL generates
+    For each edge ``(u, v)`` of type ``(srctype, etype, dsttype)``, DGL generates at most
     :attr:`k` pairs of negative edges ``(u', v')``, where ``u'`` is chosen uniformly from
     all the nodes of type ``srctype`` and ``v'`` is chosen uniformly from all the nodes
     of type ``dsttype``.  The resulting edges will also have type
-    ``(srctype, etype, dsttype)``.
+    ``(srctype, etype, dsttype)``.  DGL guarantees that the sampled pairs will not have
+    edges in between.
 
     Parameters
     ----------
     k : int
-        The number of negative examples to generate per minibatch.
+        The desired number of negative samples to generate per edge.
     exclude_self_loops : bool, optional
-        Whether to exclude self-loops from negative examples.  (Default: True)
+        Whether to exclude self-loops from negative samples.  (Default: True)
     unique : bool, optional
-        Whether to sample unique negative examples.  Setting it to False will make things
+        Whether to sample unique negative samples.  Setting it to False will make things
         faster.  (Default: True)
-    num_trials : int, optional
-        The number of rejection sampling trials.
-
-        Increasing it will increase the likelihood of getting :attr:`k` negative examples,
-        but will also take more time if the graph is dense.
     redundancy : float, optional
-        Indicates how much more negative examples to actually generate during rejection sampling
+        Indicates how much more negative samples to actually generate during rejection sampling
         before finding the unique pairs.
 
-        Increasing it will increase the likelihood of getting :attr:`k` negative examples,
-        but will also take more time and memory.
+        Increasing it will increase the likelihood of getting :attr:`k` negative samples
+        per edge, but will also take more time and memory.
 
-        (Default: 1.3)
+        (Default: automatically determined by the density of graph)
 
     Notes
     -----
-    This negative sampler may not always return :attr:`k` negative samples.  This is more
-    likely to happen if a graph is so small or dense that not many unique negative examples
-    exist.
-
-    Consider increasing :attr:`num_trials` (and :attr:`redundancy` if :attr:`unique` is True) if
-    you would like to always get :attr:`k` samples.
+    This negative sampler will try to generate as many negative samples as possible, but
+    it may rarely return less than :attr:`k` negative samples per edge.
+    This is more likely to happen if a graph is so small or dense that not many unique
+    negative samples exist.
 
     Examples
     --------
@@ -119,14 +134,14 @@ class GlobalUniform(_BaseNegativeSampler):
     >>> neg_sampler(g)
     (tensor([0, 1, 3, 2]), tensor([2, 0, 2, 1]))
     """
-    def __init__(self, k, exclude_self_loops=True, unique=True, num_trials=3, redundancy=1.3):
+    def __init__(self, k, exclude_self_loops=True, unique=True, redundancy=None):
         self.k = k
         self.exclude_self_loops = exclude_self_loops
         self.unique = unique
         self.num_trials = num_trials
-        self.redundancy = redundancy
+        self.redundancy = None
 
     def _generate(self, g, eids, canonical_etype):
         return global_uniform_negative_sampling(
-            g, self.k, self.exclude_self_loops, self.unique, canonical_etype, self.num_trials,
-            self.redundancy)
+            g, len(eids) * self.k, self.exclude_self_loops, self.unique,
+            canonical_etype, self.redundancy)
