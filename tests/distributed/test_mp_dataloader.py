@@ -197,6 +197,7 @@ def check_neg_dataloader(g, tmpdir, num_server, num_workers):
         p = ctx.Process(target=start_server, args=(
             i, tmpdir, num_server > 1, num_workers+1))
         p.start()
+        time.sleep(1)
         pserver_list.append(p)
     os.environ['DGL_DIST_MODE'] = 'distributed'
     os.environ['DGL_NUM_SAMPLER'] = str(num_workers)
@@ -240,6 +241,7 @@ def test_dist_dataloader(tmpdir, num_server, num_workers, drop_last, reshuffle):
         p = ctx.Process(target=start_server, args=(
             i, tmpdir, num_server > 1, num_workers+1))
         p.start()
+        time.sleep(1)
         pserver_list.append(p)
 
     os.environ['DGL_DIST_MODE'] = 'distributed'
@@ -380,6 +382,7 @@ def check_dataloader(g, tmpdir, num_server, num_workers, dataloader_type):
         p = ctx.Process(target=start_server, args=(
             i, tmpdir, num_server > 1, num_workers+1))
         p.start()
+        time.sleep(1)
         pserver_list.append(p)
 
     os.environ['DGL_DIST_MODE'] = 'distributed'
