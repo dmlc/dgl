@@ -70,27 +70,6 @@ class PerSourceUniform(_BaseNegativeSampler):
 # Alias
 Uniform = PerSourceUniform
 
-def calc_draw(k_hat, num_edges, num_nodes, r=3):
-    # Calculates the number of samples required based on a lower-bound
-    # of the expected number of negative samples, based on N draws from 
-    # a binomial distribution.  Solves the following equation for N:
-    # 
-    # k_hat = N*p_k - r * np.sqrt(N*p_k*(1-p_k))
-    #     
-    # where p_k is the probability that a node pairing is a negative edge 
-    # and r is the number of standard deviations to construct the lower bound
-    p_m = num_edges / (num_nodes*(num_nodes-1))
-    p_k = 1 - p_m
-    
-    a = p_k ** 2
-    b = -p_k * (2 * k_hat + r ** 2 * p_m)
-    c = k_hat ** 2
-    
-    poly = polynomial.Polynomial([c, b, a])
-    N = poly.roots()[-1]
-    redundancy = N / k_hat - 1.
-    return redundancy
-
 class GlobalUniform(_BaseNegativeSampler):
     """Negative sampler that randomly chooses negative source-destination pairs according
     to a uniform distribution.
@@ -139,7 +118,7 @@ class GlobalUniform(_BaseNegativeSampler):
         self.exclude_self_loops = exclude_self_loops
         self.unique = unique
         self.num_trials = num_trials
-        self.redundancy = None
+        self.redundancy = redundancy
 
     def _generate(self, g, eids, canonical_etype):
         return global_uniform_negative_sampling(

@@ -1,6 +1,5 @@
 """Negative sampling APIs"""
 
-import numpy as np
 from numpy.polynomial import polynomial
 from .._ffi.function import _init_api
 from .. import backend as F
@@ -8,24 +7,24 @@ from .. import backend as F
 __all__ = [
     'global_uniform_negative_sampling']
 
-def _calc_redundancy(k_hat, num_edges, num_pairs, r=3):
+def _calc_redundancy(k_hat, num_edges, num_pairs, r=3): # pylint: disable=invalid-name
     # Calculates the number of samples required based on a lower-bound
-    # of the expected number of negative samples, based on N draws from 
+    # of the expected number of negative samples, based on N draws from
     # a binomial distribution.  Solves the following equation for N:
-    # 
+    #
     # k_hat = N*p_k - r * np.sqrt(N*p_k*(1-p_k))
-    #     
-    # where p_k is the probability that a node pairing is a negative edge 
+    #
+    # where p_k is the probability that a node pairing is a negative edge
     # and r is the number of standard deviations to construct the lower bound
     #
     # Credits to @zjost
     p_m = num_edges / num_pairs
     p_k = 1 - p_m
-    
+
     a = p_k ** 2
     b = -p_k * (2 * k_hat + r ** 2 * p_m)
     c = k_hat ** 2
-    
+
     poly = polynomial.Polynomial([c, b, a])
     N = poly.roots()[-1]
     redundancy = N / k_hat - 1.
