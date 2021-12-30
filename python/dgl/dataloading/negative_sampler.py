@@ -87,8 +87,8 @@ class GlobalUniform(_BaseNegativeSampler):
         The desired number of negative samples to generate per edge.
     exclude_self_loops : bool, optional
         Whether to exclude self-loops from negative samples.  (Default: True)
-    unique : bool, optional
-        Whether to sample unique negative samples.  Setting it to False will make things
+    replace : bool, optional
+        Whether to sample with replacement.  Setting it to True will make things
         faster.  (Default: True)
     redundancy : float, optional
         Indicates how much more negative samples to actually generate during rejection sampling
@@ -113,14 +113,13 @@ class GlobalUniform(_BaseNegativeSampler):
     >>> neg_sampler(g)
     (tensor([0, 1, 3, 2]), tensor([2, 0, 2, 1]))
     """
-    def __init__(self, k, exclude_self_loops=True, unique=True, redundancy=None):
+    def __init__(self, k, exclude_self_loops=True, replace=False, redundancy=None):
         self.k = k
         self.exclude_self_loops = exclude_self_loops
-        self.unique = unique
-        self.num_trials = num_trials
+        self.replace = replace
         self.redundancy = redundancy
 
     def _generate(self, g, eids, canonical_etype):
         return global_uniform_negative_sampling(
-            g, len(eids) * self.k, self.exclude_self_loops, self.unique,
+            g, len(eids) * self.k, self.exclude_self_loops, self.replace,
             canonical_etype, self.redundancy)

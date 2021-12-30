@@ -558,7 +558,7 @@ COOMatrix CSRRowWiseSamplingBiased(
  * \param num_samples The number of samples.
  * \param num_trials The number of trials.
  * \param exclude_self_loops Do not include the examples where the row equals the column.
- * \param unique Whether to sample unique negative examples.
+ * \param replace Whether to sample with replacement.
  * \param redundancy How much redundant negative examples to take in case of duplicate examples.
  * \return A pair of row and column tensors.
  */
@@ -567,7 +567,7 @@ std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling(
     int64_t num_samples,
     int num_trials,
     bool exclude_self_loops,
-    bool unique,
+    bool replace,
     double redundancy);
 
 /*!

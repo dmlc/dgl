@@ -890,10 +890,10 @@ def test_sample_neighbors_exclude_edges_homoG(dtype):
 @pytest.mark.parametrize('dtype', ['int32', 'int64'])
 def test_global_uniform_negative_sampling(dtype):
     g = dgl.graph((np.random.randint(0, 20, (300,)), np.random.randint(0, 20, (300,)))).to(F.ctx())
-    src, dst = dgl.sampling.global_uniform_negative_sampling(g, 20, False, False)
+    src, dst = dgl.sampling.global_uniform_negative_sampling(g, 20, False, True)
     assert not F.asnumpy(g.has_edges_between(src, dst)).any()
 
-    src, dst = dgl.sampling.global_uniform_negative_sampling(g, 20, False, True)
+    src, dst = dgl.sampling.global_uniform_negative_sampling(g, 20, False, False)
     assert not F.asnumpy(g.has_edges_between(src, dst)).any()
     src = F.asnumpy(src)
     dst = F.asnumpy(dst)
@@ -901,7 +901,7 @@ def test_global_uniform_negative_sampling(dtype):
     assert len(s) == len(src)
 
     g = dgl.graph(([0], [1])).to(F.ctx())
-    src, dst = dgl.sampling.global_uniform_negative_sampling(g, 20, True, True, redundancy=10)
+    src, dst = dgl.sampling.global_uniform_negative_sampling(g, 20, True, False, redundancy=10)
     src = F.asnumpy(src)
     dst = F.asnumpy(dst)
     # should have either no element or (1, 0)

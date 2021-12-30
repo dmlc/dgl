@@ -23,7 +23,7 @@ std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling(
     int64_t num_samples,
     int num_trials,
     bool exclude_self_loops,
-    bool unique,
+    bool replace,
     double redundancy) {
   const int64_t num_row = csr.num_rows;
   const int64_t num_col = csr.num_cols;
@@ -50,7 +50,7 @@ std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling(
   PairIterator<IdType> begin(row_data, col_data);
   PairIterator<IdType> end = std::remove_if(begin, begin + num_actual_samples,
       [](const std::pair<IdType, IdType>& val) { return val.first == -1; });
-  if (unique) {
+  if (!replace) {
     std::sort(begin, end,
         [](const std::pair<IdType, IdType>& a, const std::pair<IdType, IdType>& b) {
           return a.first < b.first || (a.first == b.first && a.second < b.second);

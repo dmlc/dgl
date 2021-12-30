@@ -31,7 +31,7 @@ def _calc_redundancy(k_hat, num_edges, num_pairs, r=3): # pylint: disable=invali
     return redundancy
 
 def global_uniform_negative_sampling(
-        g, num_samples, exclude_self_loops=True, unique=True, etype=None,
+        g, num_samples, exclude_self_loops=True, replace=False, etype=None,
         redundancy=None):
     """Performs negative sampling, which generate source-destination pairs such that
     edges with the given type do not exist.
@@ -61,9 +61,9 @@ def global_uniform_negative_sampling(
         edge types whose source and destination node types are the same.
 
         Default: True.
-    unique : bool, optional
-        Whether to sample unique negative samples.  Setting it to False will make things
-        faster.  (Default: True)
+    replace : bool, optional
+        Whether to sample with replacement.  Setting it to True will make things
+        faster.  (Default: False)
     etype : str or tuple of str, optional
         The edge type.  Can be omitted if the graph only has one edge type.
     redundancy : float, optional
@@ -96,7 +96,7 @@ def global_uniform_negative_sampling(
 
     etype_id = g.get_etype_id(etype)
     src, dst = _CAPI_DGLGlobalUniformNegativeSampling(
-        g._graph, etype_id, num_samples, 3, exclude_self_loops, unique, redundancy)
+        g._graph, etype_id, num_samples, 3, exclude_self_loops, replace, redundancy)
     return F.from_dgl_nd(src), F.from_dgl_nd(dst)
 
 _init_api('dgl.sampling.negative', __name__)

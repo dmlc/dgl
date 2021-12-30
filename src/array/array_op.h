@@ -200,7 +200,7 @@ std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling(
     int64_t num_samples,
     int num_trials,
     bool exclude_self_loops,
-    bool unique,
+    bool replace,
     double redundancy);
 
 // Union CSRMatrixes

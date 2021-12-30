@@ -129,7 +129,7 @@ std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling(
     int64_t num_samples,
     int num_trials,
     bool exclude_self_loops,
-    bool unique,
+    bool replace,
     double redundancy) {
   auto ctx = csr.indptr->ctx;
   auto dtype = csr.indptr->dtype;
@@ -171,7 +171,7 @@ std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling(
         thr_entry->stream));
   num_out = cuda::GetCUDAScalar(device, ctx, num_out_cuda, static_cast<cudaStream_t>(0));
 
-  if (unique) {
+  if (!replace) {
     IdArray unique_row = IdArray::Empty({num_out}, dtype, ctx);
     IdArray unique_col = IdArray::Empty({num_out}, dtype, ctx);
     IdType* unique_row_data = unique_row.Ptr<IdType>();
