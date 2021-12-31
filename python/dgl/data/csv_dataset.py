@@ -39,7 +39,7 @@ class MetaGraph(dt.BaseModel):
 
 class MetaYaml(dt.BaseModel):
     """ Class of YAML. Internal use only. """
-    version: str
+    version: Optional[str] = '1.0.0'
     dataset_name: str
     separator: Optional[str] = ','
     node_data: List[MetaNode]
@@ -53,7 +53,7 @@ def load_yaml_with_sanity_check(yaml_file):
         yaml_data = yaml.load(f, Loader=SafeLoader)
         meta_yaml = MetaYaml(**yaml_data)
         if meta_yaml.version != '1.0.0':
-            raise DGLError("Invalid version: {}. '1.0.0' is supported only for now.".format(
+            raise DGLError("Invalid CSVDataset version {}. Supported versions: '1.0.0'".format(
                 meta_yaml.version))
         return meta_yaml
 

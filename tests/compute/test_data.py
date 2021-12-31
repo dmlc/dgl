@@ -363,9 +363,8 @@ def _test_load_yaml_with_sanity_check():
     with tempfile.TemporaryDirectory() as test_dir:
         yaml_path = os.path.join(test_dir, 'meta.yaml')
         # workable but meaningless usually
-        yaml_data = {'version': '1.0.0', 'dataset_name': 'default', 'node_data': [],
-                     'edge_data': [],
-                     }
+        yaml_data = {'dataset_name': 'default',
+                     'node_data': [], 'edge_data': []}
         with open(yaml_path, 'w') as f:
             yaml.dump(yaml_data, f, sort_keys=False)
         meta = csv_ds.load_yaml_with_sanity_check(yaml_path)
@@ -418,11 +417,10 @@ def _test_load_yaml_with_sanity_check():
         assert meta.graph_data.file_name == 'graph.csv'
         assert meta.graph_data.graph_id_field == 'xxx'
     # some required fields are missing
-        yaml_data = {'version': '0.0.0', 'dataset_name': 'default', 'node_data': [],
-                     'edge_data': [],
-                     }
-        for field in ['version', 'dataset_name', 'node_data', 'edge_data']:
-            ydata = yaml_data
+        yaml_data = {'dataset_name': 'default',
+                     'node_data': [], 'edge_data': []}
+        for field in yaml_data.keys():
+            ydata = {k: v for k, v in yaml_data.items()}
             ydata.pop(field)
             with open(yaml_path, 'w') as f:
                 yaml.dump(ydata, f, sort_keys=False)
