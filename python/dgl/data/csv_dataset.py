@@ -184,12 +184,10 @@ class DGLGraphConstructor:
                 if len(ids) > len(u_ids):
                     dgl_warning(
                         "There exist duplicated ids and only the first ones are kept.")
-                ndata = {}
-                ndata['mapping'] = {index: i for i,
-                                    index in enumerate(ids[u_indices])}
-                data = {}
-                for key, value in n_data.data.items():
-                    data[key] = F.tensor(value[idx][u_indices])
+                ndata = {'mapping': {index: i for i,
+                                     index in enumerate(ids[u_indices])}}
+                data = {k: F.tensor(v[idx][u_indices])
+                        for k, v in n_data.data.items()}
                 ndata['data'] = data
                 if graph_id not in node_dict:
                     node_dict[graph_id] = {}
@@ -206,17 +204,13 @@ class DGLGraphConstructor:
                 if graph_id in edge_dict and e_data.type in edge_dict[graph_id]:
                     raise DGLError(f"Duplicate edge type[{e_data.type}] for same graph[{graph_id}], please place the same edge_type for same graph into single EdgeData.")
                 idx = e_data.graph_id == graph_id
-                edata = {}
                 src_mapping = node_dict[graph_id][src_type]['mapping']
                 dst_mapping = node_dict[graph_id][dst_type]['mapping']
                 src_ids = [src_mapping[index] for index in e_data.src[idx]]
                 dst_ids = [dst_mapping[index] for index in e_data.dst[idx]]
-                edata['edges'] = (
-                    F.tensor(src_ids), F.tensor(dst_ids))
-                data = {}
-                for key, value in e_data.data.items():
-                    data[key] = F.tensor(value[idx])
-                edata['data'] = data
+                edata = {'edges': (F.tensor(src_ids), F.tensor(dst_ids))}
+                edata['data'] = {k: F.tensor(v[idx])
+                                 for k, v in e_data.data.items()}
                 if graph_id not in edge_dict:
                     edge_dict[graph_id] = {}
                 edge_dict[graph_id][e_data.type] = edata
@@ -235,9 +229,7 @@ class DGLGraphConstructor:
                     {('_V', '_E', '_V'): ([], [])})
         for graph_id in graph_ids:
             graphs.append(graphs_dict[graph_id])
-        data = {}
-        for k, v in graph_data.data.items():
-            data[k] = F.tensor(v)
+        data = {k: F.tensor(v) for k, v in graph_data.data.items()}
         return graphs, data
 
     @staticmethod
@@ -245,16 +237,12 @@ class DGLGraphConstructor:
         graph_dict = {}
         for graph_id in node_dict:
             if graph_id not in edge_dict:
-                edata = {}
-                edata['edges'] = ([], [])
-                edge_dict[graph_id][('_V', '_E', '_V')] = edata
+                edge_dict[graph_id][('_V', '_E', '_V')] = {'edges': ([], [])}
 
-            edges = {}
-            for etype, edata in edge_dict[graph_id].items():
-                edges[etype] = edata['edges']
-            nodes = {}
-            for ntype, ndata in node_dict[graph_id].items():
-                nodes[ntype] = len(ndata['mapping'])
+            edges = {etype: edata['edges']
+                     for etype, edata in edge_dict[graph_id].items()}
+            nodes = {ntype: len(ndata['mapping'])
+                     for ntype, ndata in node_dict[graph_id].items()}
             graph = dgl_heterograph(
                 edges, num_nodes_dict=nodes)
 
