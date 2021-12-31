@@ -86,6 +86,16 @@ def run(proc_id, n_gpus, args, devices, data):
     val_nid = val_mask.nonzero().squeeze()
     test_nid = test_mask.nonzero().squeeze()
 
+    if args.sample_gpu:
+        train_nid = train_nid.to(dev_id)
+        train_g = train_g.formats(['csc'])
+        train_g = train_g.to(dev_id)
+        args.num_workers = 0
+    elif args.sample_uva:
+        train_nid = train_nid.to(dev_id)
+        train_g.pin_memory_()
+        args.num_workers = 0
+
     # Create PyTorch DataLoader for constructing blocks
     sampler = dgl.dataloading.MultiLayerNeighborSampler(
         [int(fanout) for fanout in args.fan_out.split(',')])
@@ -186,6 +196,11 @@ if __name__ == '__main__':
                            help="Number of sampling processes. Use 0 for no extra process.")
     argparser.add_argument('--inductive', action='store_true',
                            help="Inductive learning setting")
+    argparser.add_argument('--sample-gpu', action='store_true',
+                           help="Perform the sampling process on the GPU. Must have 0 workers.")
+    argparser.add_argument('--sample-uva', action='store_true',
+                           help="Perform sampling from GPU on the pinned graph. "
+                                "Must have 0 workers.")
     argparser.add_argument('--data-cpu', action='store_true',
                            help="By default the script puts all node features and labels "
                                 "on GPU when using it to save time for data copy. This may "
@@ -202,9 +217,6 @@ if __name__ == '__main__':
         g, n_classes = load_ogb('ogbn-products')
     else:
         raise Exception('unknown dataset')
-
-    # Construct graph
-    g = dgl.as_heterograph(g)
 
     if args.inductive:
         train_g, val_g, test_g = inductive_split(g)

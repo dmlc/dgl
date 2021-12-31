@@ -1,11 +1,11 @@
 import dgl
 import torch as th
 
-def load_reddit():
+def load_reddit(self_loop=True):
     from dgl.data import RedditDataset
 
     # load reddit data
-    data = RedditDataset(self_loop=True)
+    data = RedditDataset(self_loop=self_loop)
     g = data[0]
     g.ndata['features'] = g.ndata['feat']
     g.ndata['labels'] = g.ndata['label']
