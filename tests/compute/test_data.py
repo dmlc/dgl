@@ -312,6 +312,16 @@ def _test_construct_graphs_multiple():
         assert_data(ndata, g.ndata, num_nodes, node=True)
         assert_data(edata, g.edata, num_edges)
 
+    # Graph IDs found in node/edge CSV but not in graph CSV
+    graph_data = csv_ds.GraphData(np.arange(num_graphs-2), {})
+    expect_except = False
+    try:
+        _, _ = csv_ds.DGLGraphConstructor.construct_graphs(
+            node_data, edge_data, graph_data)
+    except:
+        expect_except = True
+    assert expect_except
+
 
 def _test_DefaultDataParser():
     # common csv

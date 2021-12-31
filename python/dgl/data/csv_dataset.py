@@ -209,9 +209,11 @@ class DGLGraphConstructor:
 
     @staticmethod
     def _parse_graph_data(graph_data, graphs_dict):
-        if len(graphs_dict) > len(graph_data.graph_id):
+        missing_ids = np.setdiff1d(
+            np.array(list(graphs_dict.keys())), graph_data.graph_id)
+        if len(missing_ids) > 0:
             raise DGLError(
-                "More graph ids are found in node/edge data than graph data. Please specify all graph ids in graph data CSV.")
+                "Found following graph ids in node/edge CSVs but not in graph CSV: {}.".format(missing_ids))
         graph_ids = graph_data.graph_id
         graphs = []
         for graph_id in graph_ids:
