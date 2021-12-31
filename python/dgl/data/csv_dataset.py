@@ -117,13 +117,8 @@ class CSVDataLoader:
         ndata = data_parser(df)
         if meta_node.node_id_field not in ndata:
             raise DGLError(f"node_id_field[{meta_node.node_id_field}] does not exist in parsed node data dict.")
-        node_ids = ndata[meta_node.node_id_field]
-        ndata.pop(meta_node.node_id_field)
-        if meta_node.graph_id_field in ndata:
-            graph_ids = ndata[meta_node.graph_id_field]
-            ndata.pop(meta_node.graph_id_field)
-        else:
-            graph_ids = None
+        node_ids = ndata.pop(meta_node.node_id_field)
+        graph_ids = ndata.pop(meta_node.graph_id_field, None)
         return NodeData(node_ids, ndata, type=ntype, graph_id=graph_ids)
 
     @staticmethod
@@ -135,12 +130,9 @@ class CSVDataLoader:
             raise DGLError(f"src_id_field[{meta_edge.src_id_field}] does not exist in parsed edge data dict.")
         if meta_edge.dst_id_field not in edata:
             raise DGLError(f"dst_id_field[{meta_edge.dst_id_field}] does not exist in parsed edge data dict.")
-        src_ids = edata[meta_edge.src_id_field]
-        dst_ids = edata[meta_edge.dst_id_field]
-        graph_ids = edata[meta_edge.graph_id_field] if meta_edge.graph_id_field in edata else None
-        for key in [meta_edge.src_id_field, meta_edge.dst_id_field, meta_edge.graph_id_field]:
-            if key in edata:
-                edata.pop(key)
+        src_ids = edata.pop(meta_edge.src_id_field)
+        dst_ids = edata.pop(meta_edge.dst_id_field)
+        graph_ids = edata.pop(meta_edge.graph_id_field, None)
         return EdgeData(src_ids, dst_ids, edata, type=etype, graph_id=graph_ids)
 
     @staticmethod
@@ -149,8 +141,7 @@ class CSVDataLoader:
         gdata = data_parser(df)
         if meta_graph.graph_id_field not in gdata:
             raise DGLError(f"graph_id_field[{meta_graph.graph_id_field}] does not exist in parsed graph data dict.")
-        graph_ids = gdata[meta_graph.graph_id_field]
-        gdata.pop(meta_graph.graph_id_field)
+        graph_ids = gdata.pop(meta_graph.graph_id_field)
         return GraphData(graph_ids, gdata)
 
 
