@@ -178,14 +178,12 @@ class DGLGraphConstructor:
                 if len(ids) > len(u_ids):
                     dgl_warning(
                         "There exist duplicated ids and only the first ones are kept.")
-                ndata = {'mapping': {index: i for i,
-                                     index in enumerate(ids[u_indices])}}
-                data = {k: F.tensor(v[idx][u_indices])
-                        for k, v in n_data.data.items()}
-                ndata['data'] = data
                 if graph_id not in node_dict:
                     node_dict[graph_id] = {}
-                node_dict[graph_id][n_data.type] = ndata
+                node_dict[graph_id][n_data.type] = {'mapping': {index: i for i,
+                                                                index in enumerate(ids[u_indices])},
+                                                    'data': {k: F.tensor(v[idx][u_indices])
+                                                             for k, v in n_data.data.items()}}
         return node_dict
 
     @staticmethod
@@ -202,12 +200,11 @@ class DGLGraphConstructor:
                 dst_mapping = node_dict[graph_id][dst_type]['mapping']
                 src_ids = [src_mapping[index] for index in e_data.src[idx]]
                 dst_ids = [dst_mapping[index] for index in e_data.dst[idx]]
-                edata = {'edges': (F.tensor(src_ids), F.tensor(dst_ids))}
-                edata['data'] = {k: F.tensor(v[idx])
-                                 for k, v in e_data.data.items()}
                 if graph_id not in edge_dict:
                     edge_dict[graph_id] = {}
-                edge_dict[graph_id][e_data.type] = edata
+                edge_dict[graph_id][e_data.type] = {'edges': (F.tensor(src_ids), F.tensor(dst_ids)),
+                                                    'data': {k: F.tensor(v[idx])
+                                                             for k, v in e_data.data.items()}}
         return edge_dict
 
     @staticmethod
