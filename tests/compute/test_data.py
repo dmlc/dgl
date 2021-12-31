@@ -791,8 +791,94 @@ def _test_DGLCSVDataset_multiple():
                                           F.asnumpy(g.edges[etype].data['label']))
 
 
+def _test_NodeEdgeGraphData():
+    # NodeData basics
+    num_nodes = 100
+    node_ids = np.arange(num_nodes, dtype=np.float)
+    ndata = csv_ds.NodeData(node_ids, {})
+    assert ndata.id.dtype == np.int64
+    assert np.array_equal(ndata.id, node_ids.astype(np.int64))
+    assert len(ndata.data) == 0
+    assert ndata.type == '_V'
+    assert np.array_equal(ndata.graph_id, np.full(num_nodes, 0))
+    # NodeData more
+    data = {'feat': np.random.rand(num_nodes, 3)}
+    graph_id = np.arange(num_nodes)
+    ndata = csv_ds.NodeData(node_ids, data, type='user', graph_id=graph_id)
+    assert ndata.type == 'user'
+    assert np.array_equal(ndata.graph_id, graph_id)
+    assert len(ndata.data) == len(data)
+    for k, v in data.items():
+        assert k in ndata.data
+        assert np.array_equal(ndata.data[k], v)
+    # NodeData except
+    expect_except = False
+    try:
+        csv_ds.NodeData(np.arange(num_nodes), {'feat': np.random.rand(
+            num_nodes+1, 3)}, graph_id=np.arange(num_nodes-1))
+    except:
+        expect_except = True
+    assert expect_except
+
+    # EdgeData basics
+    num_nodes = 100
+    num_edges = 1000
+    src_ids = np.random.randint(num_nodes, size=num_edges)
+    dst_ids = np.random.randint(num_nodes, size=num_edges)
+    edata = csv_ds.EdgeData(src_ids, dst_ids, {})
+    assert np.array_equal(edata.src, src_ids)
+    assert np.array_equal(edata.dst, dst_ids)
+    assert edata.type == ('_V', '_E', '_V')
+    assert len(edata.data) == 0
+    assert np.array_equal(edata.graph_id, np.full(num_edges, 0))
+    # EdageData more
+    src_ids = np.random.randint(num_nodes, size=num_edges).astype(np.float)
+    dst_ids = np.random.randint(num_nodes, size=num_edges).astype(np.float)
+    data = {'feat': np.random.rand(num_edges, 3)}
+    etype = ('user', 'like', 'item')
+    graph_ids = np.arange(num_edges)
+    edata = csv_ds.EdgeData(src_ids, dst_ids, data,
+                            type=etype, graph_id=graph_ids)
+    assert edata.src.dtype == np.int64
+    assert edata.dst.dtype == np.int64
+    assert np.array_equal(edata.src, src_ids)
+    assert np.array_equal(edata.dst, dst_ids)
+    assert edata.type == etype
+    assert len(edata.data) == len(data)
+    for k, v in data.items():
+        assert k in edata.data
+        assert np.array_equal(edata.data[k], v)
+    assert np.array_equal(edata.graph_id, graph_ids)
+    # EdgeData except
+    expect_except = False
+    try:
+        csv_ds.EdgeData(np.arange(num_edges), np.arange(
+            num_edges+1), {'feat': np.random.rand(num_edges-1, 3)}, graph_id=np.arange(num_edges+2))
+    except:
+        expect_except = True
+    assert expect_except
+
+    # GraphData basics
+    num_graphs = 10
+    graph_ids = np.arange(num_graphs)
+    gdata = csv_ds.GraphData(graph_ids, {})
+    assert np.array_equal(gdata.graph_id, graph_ids)
+    assert len(gdata.data) == 0
+    # GraphData more
+    graph_ids = np.arange(num_graphs).astype(np.float)
+    data = {'feat': np.random.rand(num_graphs, 3)}
+    gdata = csv_ds.GraphData(graph_ids, data)
+    assert gdata.graph_id.dtype == np.int64
+    assert np.array_equal(gdata.graph_id, graph_ids)
+    assert len(gdata.data) == len(data)
+    for k, v in data.items():
+        assert k in gdata.data
+        assert np.array_equal(gdata.data[k], v)
+
+
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
 def test_csvdataset():
+    _test_NodeEdgeGraphData()
     _test_construct_graphs_homo()
     _test_construct_graphs_hetero()
     _test_construct_graphs_multiple()

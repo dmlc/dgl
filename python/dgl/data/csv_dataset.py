@@ -58,44 +58,47 @@ def load_yaml_with_sanity_check(yaml_file):
         return meta_yaml
 
 
+def _validate_data_length(data_dict):
+    len_dict = {k: len(v) for k, v in data_dict.items()}
+    lst = list(len_dict.values())
+    res = lst.count(lst[0]) == len(lst)
+    if not res:
+        raise DGLError(
+            "All data are required to have same length while some of them does not. Length of data={}".format(str(len_dict)))
+
+
 class NodeData:
     """ Class of node data which is used for DGLGraph construction. Internal use only. """
 
     def __init__(self, node_id, data, type=None, graph_id=None):
-        self.id = np.array(node_id, dtype=np.int)
+        self.id = np.array(node_id, dtype=np.int64)
         self.data = data
         self.type = type if type is not None else '_V'
         self.graph_id = np.array(graph_id, dtype=np.int) if graph_id is not None else np.full(
             len(node_id), 0)
-        assert len(self.id) == len(self.graph_id)
-        for k, v in self.data.items():
-            assert len(self.id) == len(v)
+        _validate_data_length({**{'id': self.id, 'graph_id': self.graph_id}, **self.data})
 
 
 class EdgeData:
     """ Class of edge data which is used for DGLGraph construction. Internal use only. """
 
     def __init__(self, src_id, dst_id, data, type=None, graph_id=None):
-        self.src = np.array(src_id, dtype=np.int)
-        self.dst = np.array(dst_id, dtype=np.int)
+        self.src = np.array(src_id, dtype=np.int64)
+        self.dst = np.array(dst_id, dtype=np.int64)
         self.data = data
         self.type = type if type is not None else ('_V', '_E', '_V')
         self.graph_id = np.array(graph_id, dtype=np.int) if graph_id is not None else np.full(
             len(src_id), 0)
-        assert len(self.src) == len(self.dst)
-        assert len(self.src) == len(self.graph_id)
-        for k, v in self.data.items():
-            assert len(self.src) == len(v)
+        _validate_data_length({**{'src': self.src, 'dst': self.dst, 'graph_id': self.graph_id}, **self.data})
 
 
 class GraphData:
     """ Class of graph data which is used for DGLGraph construction. Internal use only. """
 
     def __init__(self, graph_id, data):
-        self.graph_id = np.array(graph_id, dtype=np.int)
+        self.graph_id = np.array(graph_id, dtype=np.int64)
         self.data = data
-        for k, v in self.data.items():
-            assert len(self.graph_id) == len(v)
+        _validate_data_length({**{'graph_id': self.graph_id}, **self.data})
 
 
 class CSVDataLoader:
