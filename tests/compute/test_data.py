@@ -769,7 +769,7 @@ def _test_DGLCSVDataset_multiple():
                            })
         df.to_csv(graph_csv_path, index=False)
 
-        # load CSVDataset
+        # load CSVDataset with default node/edge/graph_data_parser
         for force_reload in [True, False]:
             if not force_reload:
                 # remove original node data file to verify reload from cached files
@@ -799,6 +799,86 @@ def _test_DGLCSVDataset_multiple():
                                          g.edges[etype].data['feat'])
                     assert np.array_equal(label_edata[i*num_edges:(i+1)*num_edges],
                                           F.asnumpy(g.edges[etype].data['label']))
+
+
+def _test_DGLCSVDataset_customized_data_parser():
+    with tempfile.TemporaryDirectory() as test_dir:
+        # generate YAML/CSVs
+        meta_yaml_path = os.path.join(test_dir, "meta.yaml")
+        edges_csv_path_0 = os.path.join(test_dir, "test_edges_0.csv")
+        edges_csv_path_1 = os.path.join(test_dir, "test_edges_1.csv")
+        nodes_csv_path_0 = os.path.join(test_dir, "test_nodes_0.csv")
+        nodes_csv_path_1 = os.path.join(test_dir, "test_nodes_1.csv")
+        graph_csv_path = os.path.join(test_dir, "test_graph.csv")
+        meta_yaml_data = {'dataset_name': 'default_name',
+                          'node_data': [{'file_name': os.path.basename(nodes_csv_path_0),
+                                         'ntype': 'user',
+                                         },
+                                        {'file_name': os.path.basename(nodes_csv_path_1),
+                                            'ntype': 'item',
+                                         }],
+                          'edge_data': [{'file_name': os.path.basename(edges_csv_path_0),
+                                         'etype': ['user', 'follow', 'user'],
+                                         },
+                                        {'file_name': os.path.basename(edges_csv_path_1),
+                                         'etype': ['user', 'like', 'item'],
+                                         }],
+                          'graph_data': {'file_name': os.path.basename(graph_csv_path)}
+                          }
+        with open(meta_yaml_path, 'w') as f:
+            yaml.dump(meta_yaml_data, f, sort_keys=False)
+        num_nodes = 100
+        num_edges = 500
+        num_graphs = 10
+        label_ndata = np.random.randint(2, size=num_nodes*num_graphs)
+        df = pd.DataFrame({'node_id': np.hstack([np.arange(num_nodes) for _ in range(num_graphs)]),
+                           'label': label_ndata,
+                           'graph_id': np.hstack([np.full(num_nodes, i) for i in range(num_graphs)])
+                           })
+        df.to_csv(nodes_csv_path_0, index=False)
+        df.to_csv(nodes_csv_path_1, index=False)
+        label_edata = np.random.randint(2, size=num_edges*num_graphs)
+        df = pd.DataFrame({'src_id': np.hstack([np.random.randint(num_nodes, size=num_edges) for _ in range(num_graphs)]),
+                           'dst_id': np.hstack([np.random.randint(num_nodes, size=num_edges) for _ in range(num_graphs)]),
+                           'label': label_edata,
+                           'graph_id': np.hstack([np.full(num_edges, i) for i in range(num_graphs)])
+                           })
+        df.to_csv(edges_csv_path_0, index=False)
+        df.to_csv(edges_csv_path_1, index=False)
+        label_gdata = np.random.randint(2, size=num_graphs)
+        df = pd.DataFrame({'label': label_gdata,
+                           'graph_id': np.arange(num_graphs)
+                           })
+        df.to_csv(graph_csv_path, index=False)
+
+        class CustDataParser:
+            def __call__(self, df):
+                data = {}
+                for header in df:
+                    dt = df[header].to_numpy().squeeze()
+                    if header == 'label':
+                        dt += 2
+                    data[header] = dt
+                return data
+        # load CSVDataset with customized node/edge/graph_data_parser
+        csv_dataset = data.DGLCSVDataset(
+            test_dir, node_data_parser={'user': CustDataParser()}, edge_data_parser={('user', 'like', 'item'): CustDataParser()}, graph_data_parser=CustDataParser())
+        assert len(csv_dataset) == num_graphs
+        assert len(csv_dataset.data) == 1
+        assert 'label' in csv_dataset.data
+        for i, (g, label) in enumerate(csv_dataset):
+            assert not g.is_homogeneous
+            assert F.asnumpy(label) == label_gdata[i] + 2
+            for ntype in g.ntypes:
+                assert g.num_nodes(ntype) == num_nodes
+                offset = 2 if ntype == 'user' else 0
+                assert np.array_equal(label_ndata[i*num_nodes:(i+1)*num_nodes]+offset,
+                                      F.asnumpy(g.nodes[ntype].data['label']))
+            for etype in g.etypes:
+                assert g.num_edges(etype) == num_edges
+                offset = 2 if etype == 'like' else 0
+                assert np.array_equal(label_edata[i*num_edges:(i+1)*num_edges]+offset,
+                                      F.asnumpy(g.edges[etype].data['label']))
 
 
 def _test_NodeEdgeGraphData():
@@ -899,6 +979,7 @@ def test_csvdataset():
     _test_load_graph_data_from_csv()
     _test_DGLCSVDataset_single()
     _test_DGLCSVDataset_multiple()
+    _test_DGLCSVDataset_customized_data_parser()
 
 
 if __name__ == '__main__':

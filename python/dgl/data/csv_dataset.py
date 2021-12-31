@@ -283,14 +283,22 @@ class DGLCSVDataset(DGLDataset):
         Whether to reload the dataset. Default: False
     verbose: bool
         Whether to print out progress information. Default: True.
-    data_parser : dict
-        A dictionary used for data parsing when loading data from CSV files.
-        The key is node/edge/graph type which specifies the header in CSV file
-        and the value is a callable object which is used to parse corresponding
-        column data. Especially, the graph level data parser is required
-        to be placed under key '_GRAPH_'. Default: None. If None, a default
-        data parser is applied which load data directly and tries to convert
-        list into array.
+    node_data_parser : dict
+        A dictionary used for node data parsing when loading from CSV files.
+        The key is node type which specifies the header in CSV file and the
+        value is a callable object which is used to parse corresponding
+        column data. Default: None. If None, a default data parser is applied
+        which load data directly and tries to convert list into array.
+    edge_data_parser : dict
+        A dictionary used for edge data parsing when loading from CSV files.
+        The key is edge type which specifies the header in CSV file and the
+        value is a callable object which is used to parse corresponding
+        column data. Default: None. If None, a default data parser is applied
+        which load data directly and tries to convert list into array.
+    node_data_parser : callable
+        A callable object which is used to parse corresponding column graph
+        data. Default: None. If None, a default data parser is applied
+        which load data directly and tries to convert list into array.
 
     Attributes
     ----------
@@ -311,17 +319,13 @@ class DGLCSVDataset(DGLDataset):
     """
     META_YAML_NAME = 'meta.yaml'
 
-    def __init__(self, data_path, force_reload=False, verbose=True, data_parser=None):
-        """
-        data_parser : dict
-            {'user' : NodeDataParser,
-             ('user', 'like', 'item') : EdgeDataParser,
-             '_GRAPH_' : GraphDataParser,
-            }
-        """
+    def __init__(self, data_path, force_reload=False, verbose=True, node_data_parser=None, edge_data_parser=None, graph_data_parser=None):
         self.graphs = None
         self.data = None
-        self.data_parser = {} if data_parser is None else data_parser
+        self.node_data_parser = {} if node_data_parser is None else node_data_parser
+        self.edge_data_parser = {} if edge_data_parser is None else edge_data_parser
+        self.graph_data_parser = graph_data_parser
+        self.default_data_parser = DefaultDataParser()
         meta_yaml_path = os.path.join(data_path, DGLCSVDataset.META_YAML_NAME)
         if not os.path.exists(meta_yaml_path):
             raise DGLError(
@@ -341,7 +345,7 @@ class DGLCSVDataset(DGLDataset):
             if meta_node is None:
                 continue
             ntype = meta_node.ntype
-            data_parser = DefaultDataParser() if ntype not in self.data_parser else self.data_parser[
+            data_parser = self.default_data_parser if ntype not in self.node_data_parser else self.node_data_parser[
                 ntype]
             ndata = CSVDataLoader.load_node_data_from_csv(
                 meta_node, base_dir=base_dir, separator=meta_yaml.separator, data_parser=data_parser)
@@ -351,7 +355,7 @@ class DGLCSVDataset(DGLDataset):
             if meta_edge is None:
                 continue
             etype = tuple(meta_edge.etype)
-            data_parser = DefaultDataParser() if etype not in self.data_parser else self.data_parser[
+            data_parser = self.default_data_parser if etype not in self.edge_data_parser else self.edge_data_parser[
                 etype]
             edata = CSVDataLoader.load_edge_data_from_csv(
                 meta_edge, base_dir=base_dir, separator=meta_yaml.separator, data_parser=data_parser)
@@ -359,8 +363,7 @@ class DGLCSVDataset(DGLDataset):
         graph_data = None
         if meta_yaml.graph_data is not None:
             meta_graph = meta_yaml.graph_data
-            data_parser = DefaultDataParser(
-            ) if '_GRAPH_' not in self.data_parser else self.data_parser['_GRAPH_']
+            data_parser = self.default_data_parser if self.graph_data_parser is None else self.graph_data_parser
             graph_data = CSVDataLoader.load_graph_data_from_csv(
                 meta_graph, base_dir=base_dir, separator=meta_yaml.separator, data_parser=data_parser)
         # construct graphs
