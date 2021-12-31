@@ -21,22 +21,22 @@ import numpy as np
 import scipy.sparse as sparse
 import scipy.sparse.linalg
 
-from ._ffi.function import _init_api
-from .base import dgl_warning, DGLError
-from . import convert
-from .heterograph import DGLHeteroGraph, DGLBlock
-from .heterograph_index import create_metagraph_index, create_heterograph_from_relations
-from .frame import Frame
-from . import ndarray as nd
-from . import backend as F
-from . import utils, batch
-from .partition import metis_partition_assignment
-from .partition import partition_graph_with_halo
-from .partition import metis_partition
-from . import subgraph
+from .._ffi.function import _init_api
+from ..base import dgl_warning, DGLError
+from .. import convert
+from ..heterograph import DGLHeteroGraph, DGLBlock
+from ..heterograph_index import create_metagraph_index, create_heterograph_from_relations
+from ..frame import Frame
+from .. import ndarray as nd
+from .. import backend as F
+from .. import utils, batch
+from ..partition import metis_partition_assignment
+from ..partition import partition_graph_with_halo
+from ..partition import metis_partition
+from .. import subgraph
 
 # TO BE DEPRECATED
-from ._deprecate.graph import DGLGraph as DGLGraphStale
+from .._deprecate.graph import DGLGraph as DGLGraphStale
 
 __all__ = [
     'line_graph',
