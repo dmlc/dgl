@@ -231,13 +231,10 @@ class DGLGraphConstructor:
         for graph_id in node_dict:
             if graph_id not in edge_dict:
                 edge_dict[graph_id][('_V', '_E', '_V')] = {'edges': ([], [])}
-
-            edges = {etype: edata['edges']
-                     for etype, edata in edge_dict[graph_id].items()}
-            nodes = {ntype: len(ndata['mapping'])
-                     for ntype, ndata in node_dict[graph_id].items()}
-            graph = dgl_heterograph(
-                edges, num_nodes_dict=nodes)
+            graph = dgl_heterograph({etype: edata['edges']
+                                     for etype, edata in edge_dict[graph_id].items()},
+                                    num_nodes_dict={ntype: len(ndata['mapping'])
+                                                    for ntype, ndata in node_dict[graph_id].items()})
 
             def assign_data(type, src_data, dst_data):
                 for key, value in src_data.items():
