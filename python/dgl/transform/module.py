@@ -53,6 +53,18 @@ class AddSelfLoop(BaseTransform):
         If True, it will first remove self-loops to prevent duplicate self-loops.
     add_self_etypes : bool, optional
         If True, it will add an edge type 'self' per node type, which holds self-loops.
+
+    Example
+    -------
+
+    >>> import dgl
+    >>> from dgl import AddSelfLoop
+
+    Case1: Add self-loops for a homogeneous graph
+
+    >>> transform = AddSelfLoop()
+    >>> g = dgl.graph(([1, 1], [1, 2]))
+    >>>
     """
     def __init__(self, remove_first=False, self_etypes=False):
         self.remove_first = remove_first
@@ -64,8 +76,8 @@ class AddSelfLoop(BaseTransform):
             if utype != vtype:
                 continue
             if self.remove_first:
-                functional.remove_self_loop(g, etype=c_etype)
-            functional.add_self_loop(g, etype=c_etype)
+                g = functional.remove_self_loop(g, etype=c_etype)
+            g = functional.add_self_loop(g, etype=c_etype)
 
         if self.self_etypes:
             device = g.device
