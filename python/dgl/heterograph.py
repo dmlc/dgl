@@ -153,6 +153,8 @@ class DGLHeteroGraph(object):
                        for i, frame in enumerate(edge_frames)]
         self._edge_frames = edge_frames
 
+        self._is_pinned = False
+
     def __setstate__(self, state):
         # Compatibility check
         # TODO: version the storage
@@ -5554,6 +5556,28 @@ class DGLHeteroGraph(object):
         The case of heterogeneous graphs is the same.
         """
         return F.to_backend_ctx(self._graph.ctx)
+
+    def pin_memory(self):
+        """Returns a copy of the graph that has its features pinned if the graph
+        is not already pinned and on CPU.  Otherwise returns itself.
+
+        Depends on PR #3616 to pin the graphs' sparse matrix representations.
+        """
+        if self.device == F.cpu() and not self.is_pinned():
+            new_graph = self.clone()
+            for ntype in new_graph.ntypes:
+                for k, v in new_graph.nodes[ntype].data.items():
+                    new_graph.nodes[ntype].data[k] = F.pin_memory(v)
+            for etype in new_graph.canonical_etypes:
+                for k, v in new_graph.edges[etype].data.items():
+                    new_graph.edges[etype].data[k] = F.pin_memory(v)
+            new_graph._is_pinned = True
+            return new_graph
+        else:
+            return self
+
+    def is_pinned(self):
+        return self._is_pinned
 
     def to(self, device, **kwargs):  # pylint: disable=invalid-name
         """Move ndata, edata and graph structure to the targeted device (cpu/gpu).
