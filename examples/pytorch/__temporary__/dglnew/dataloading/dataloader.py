@@ -1,7 +1,8 @@
-from collections.abc import Mapping
+from collections.abc import Mapping, Awaitable
 from functools import partial
 from queue import Queue
 import threading
+import asyncio
 import torch
 from dgl._ffi import streams as FS
 from dgl.utils import recursive_apply, ExceptionWrapper
@@ -83,6 +84,7 @@ class TensorizedDataset(torch.utils.data.IterableDataset):
         self._device = indices.device
 
     def shuffle(self):
+        # TODO: may need an in-place shuffle kernel
         perm = torch.randperm(self._tensor_dataset.shape[0], device=self._device)
         self._tensor_dataset[:] = self._tensor_dataset[perm]
 
@@ -104,7 +106,44 @@ class TensorizedDataset(torch.utils.data.IterableDataset):
             dataset, self.batch_size, self.drop_last, self._mapping_keys)
 
 
-def _prefetcher_entry(dataloader_it, dataloader, queue):
+def _prefetch(batch, device, stream, pin_memory, sampler, use_asyncio):
+    sampler_cls = sampler.__class__
+    # The futures and the retrieved features will be indexed as:
+    #
+    #     feats[storage_key, target_idx, feat_key]
+    feats = {}
+
+    # Copy the sampled subgraphs to GPU first since setting GPU features require
+    # having the graph on GPU first.
+    with torch.cuda.stream(stream):
+        for storage_key, storage_dict in sampler._storages.items():
+            targets = getattr(
+                sampler,
+                f'__{storage_key}_storages__')(batch)
+            for i, target in enumerate(targets):
+                indices = target['_ID']     # depends on dgl.NID and dgl.EID being the same
+
+                for feat_key, storage in storage_dict.items():
+                    if use_asyncio and hasattr(storage, 'async_fetch'):
+                        future = asyncio.create_task(
+                            storage.async_fetch(indices, device, pin_memory=pin_memory))
+                        feats[storage_key, i, feat_key] = future
+                    else:
+                        feats[storage_key, i, feat_key] = storage.fetch(
+                            indices, device, pin_memory=pin_memory)
+        return feats
+
+
+async def _async_prefetch(batch, device, stream, pin_memory, sampler):
+    with torch.cuda.stream(stream):
+        feats = _prefetch(batch, device, stream, pin_memory, sampler, True)
+        for k, v in feats.items():
+            if isinstance(v, Awaitable):
+                feats[k] = await v
+    return feats
+
+
+def _prefetcher_entry(dataloader_it, dataloader, queue, use_asyncio):
     device = dataloader.device
     stream = torch.cuda.Stream(device=device)
     pin_memory = dataloader.pin_memory
@@ -113,39 +152,18 @@ def _prefetcher_entry(dataloader_it, dataloader, queue):
 
     try:
         for batch in dataloader_it:
-            # The futures and the retrieved features will be indexed as:
-            #
-            #     foo[storage_key][target_idx][feat_key]
-            future_or_values = defaultdict(list)
+            if use_asyncio:
+                feats = asyncio.run(_async_prefetch(batch, device, stream, pin_memory, sampler))
+            else:
+                feats = _prefetch(batch, device, stream, pin_memory, sampler, False)
 
-            # Copy the sampled subgraphs to GPU first since setting GPU features require
-            # having the graph on GPU first.
-            with torch.cuda.stream(stream):
-                for storage_key, storage_dict in sampler._storages.items():
-                    targets = getattr(
-                        sampler,
-                        f'__{storage_key}_storages__')(batch)
-                    for target in targets:
-                        indices = target['_ID']     # depends on dgl.NID and dgl.EID being the same
-                        target_future_or_value = {}
-
-                        for feat_key, storage in storage_dict.items():
-                            if dataloader.prefetch == 'async' and hasattr(storage, 'async_fetch'):
-                                future = storage.async_fetch(
-                                    indices, device, pin_memory=pin_memory)
-                                target_future_or_value[feat_key] = future
-                            else:
-                                target_future_or_value[feat_key] = storage.fetch(
-                                    indices, device, pin_memory=pin_memory)
-
-                        future_or_values[storage_key].append(target_future_or_value)
-                queue.put((
-                    # batch will be already in pinned memory as per the behavior of
-                    # PyTorch DataLoader.
-                    recursive_apply(batch, lambda x: x.to(device, non_blocking=True)),
-                    future_or_values,
-                    stream.record_event(),
-                    None))
+            queue.put((
+                # batch will be already in pinned memory as per the behavior of
+                # PyTorch DataLoader.
+                recursive_apply(batch, lambda x: x.to(device, non_blocking=True)),
+                feats,
+                stream.record_event(),
+                None))
         queue.put((None, None, None, None))
     except:     # pylint: disable=bare-except
         queue.put((None, None, None, ExceptionWrapper(where='in prefetcher')))
@@ -156,74 +174,74 @@ def _prefetcher_entry(dataloader_it, dataloader, queue):
 class _PrefetchingIter(object):
     def __init__(self, dataloader, dataloader_it):
         self.queue = Queue(1)
-        self.thread = threading.Thread(
-            target=_prefetcher_entry,
-            args=(dataloader_it, dataloader, self.queue),
-            daemon=True)
+        self.dataloader_it = dataloader_it
+        self.dataloader = dataloader
+        self.graph_sampler = self.dataloader.graph_sampler
+        self.pin_memory = self.dataloader.pin_memory
+        self.use_asyncio = self.dataloader.use_asyncio
 
-        self.thread.start()
+        #thread = threading.Thread(
+        #    target=_prefetcher_entry,
+        #    args=(dataloader_it, dataloader, self.queue, self.use_asyncio),
+        #    daemon=True)
+        #thread.start()
+        #self.thread = thread
 
     def __iter__(self):
         return self
 
     def __next__(self):
-        batch, future_or_values, stream_event, exception = self.queue.get()
-        if result is None:
-            self.thread.join()
-            if exception is None:
-                raise StopIteration
-            exception.reraise()
+        #batch, feats, stream_event, exception = self.queue.get()
+        #if result is None:
+        #    self.thread.join()
+        #    if exception is None:
+        #        raise StopIteration
+        #    exception.reraise()
+        batch = next(self.dataloader_it)
+        device = self.dataloader.device
+        stream = torch.cuda.Stream(device=device)
+        if self.use_asyncio:
+            feats = asyncio.run(_async_prefetch(
+                batch, device, stream, self.pin_memory, self.graph_sampler))
+        else:
+            feats = _prefetch(
+                batch, device, stream, self.pin_memory, self.graph_sampler, False)
+        batch = recursive_apply(batch, lambda x: x.to(device, non_blocking=True))
+        stream_event = stream.record_event()
 
-        # If there are remaining futures, wait for them and put them back in result
-        for storage_key, future_or_value_list in future_or_values.items():
-            targets = getattr(
-                sampler,
+        # Assign the prefetched features back to batch
+        target_dict = {}
+        for storage_key, storage_dict in self.graph_sampler._storages.items():
+            target_dict[storage_key] = getattr(
+                self.graph_sampler,
                 f'__{storage_key}_storages__')(batch)
-            for target, target_futures in zip(targets, future_or_value_list):
-                for feat_key, future_or_value in target_futures.items():
-                    target[feat_key] = (
-                        (await future_or_value) if isinstance(future_or_value, Awaitable)
-                        else future_or_value)
+        for (storage_key, i, feat_key), feat in feats.items():
+            target = target_dict[storage_key][i]
+            target[feat_key] = feat
 
         stream_event.wait()
         return batch
 
 
 class NodeDataLoader(torch.utils.data.DataLoader):
-    """
-    Parameters
-    ----------
-    prefetch : None, ``"sync"`` or ``"async"``
-        If None, go without feature prefetching.  Otherwise, a Python thread will spawn
-        to 
-    """
     def __init__(self, graph, train_idx, graph_sampler, device='cpu', use_ddp=False,
                  ddp_seed=0, batch_size=1, drop_last=False, shuffle=False,
-                 prefetch=None, **kwargs):
+                 use_asyncio=False, **kwargs):
         self.dataset = TensorizedDataset(train_idx, graph.ntypes, batch_size, drop_last)
         self.use_ddp = use_ddp
         self.ddp_seed = ddp_seed
         self._shuffle_dataset = shuffle
         self.graph_sampler = graph_sampler
-        self.prefetch = prefetch
+        self.use_asyncio = use_asyncio
         self.device = torch.device(device)
 
         super().__init__(
             self.dataset,
             collate_fn=graph_sampler.sample,
+            batch_size=None,
             **kwargs)
-
-    def __setattr__(self, name, val):
-        if name == 'shuffle':
-            # redirect to _shuffle_dataset
-            self._shuffle_dataset = val
-        else:
-            super().__setattr__(name, val)
 
     def __iter__(self):
         if self._shuffle_dataset:
             self.dataset.shuffle()
-        if self.prefetch:
-            return _PrefetchingIter(self, super().__iter__())
-        else:
-            return super().__iter__()
+        return _PrefetchingIter(self, super().__iter__())

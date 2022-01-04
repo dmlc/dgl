@@ -120,6 +120,9 @@ def copy_to(input, ctx, **kwargs):
     else:
         raise RuntimeError('Invalid context', ctx)
 
+def pin_memory(input):
+    return input.pin_memory()
+
 def sum(input, dim, keepdims=False):
     return th.sum(input, dim=dim, keepdim=keepdims)
 

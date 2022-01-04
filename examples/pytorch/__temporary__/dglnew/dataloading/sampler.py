@@ -2,6 +2,8 @@ import re
 from collections import defaultdict
 import torch
 
+from ..storages import TensorStorage
+
 _storage_pattern = re.compile('__(.*)_storages__')
 
 class SamplerMeta(type):
@@ -27,12 +29,12 @@ class SamplerMeta(type):
                 continue
 
             storage_key = match.group(1)
-            def _add_func(self, name, storage):
+            def _add_func(self, name, storage, _storage_key=storage_key):
                 # _storages is initialized in Sampler class.
-                if torch.is_tensor(storage)
-                    self._storages[storage_key][name] = TensorStorage(storage)
+                if torch.is_tensor(storage):
+                    self._storages[_storage_key][name] = TensorStorage(storage)
                 else:
-                    self._storages[storage_key][name] = storage
+                    self._storages[_storage_key][name] = storage
 
             new_func_name = f'add_{storage_key}'
             _add_func.__doc__ = \

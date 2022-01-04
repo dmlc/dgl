@@ -1,3 +1,3 @@
-from . import dataloader
-from . import sampler
-from . import neighbor_sampler
+from .dataloader import *
+from .neighbor_sampler import *
+from .sampler import *

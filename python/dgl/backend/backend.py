@@ -330,6 +330,9 @@ def copy_to(input, ctx, **kwargs):
     """
     pass
 
+def pin_memory(input):
+    pass
+
 ###############################################################################
 # Tensor functions on feature data
 # --------------------------------

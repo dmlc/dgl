@@ -2187,7 +2187,7 @@ class DGLHeteroGraph(object):
         --------
         >>> g = dgl.graph(([0, 1, 2], [3, 4, 5]))
         >>> g.ndata['x'] = torch.randn(6, 3)
-        >>> g.pop_ndata(['x'])
+        >>> g.unpack_ndata(['x'])
         {'x': tensor([[ 0.2242,  0.0633,  0.2813],
                 [ 1.1587,  0.0329,  0.5426],
                 [ 0.6350, -0.8041,  0.0403],
@@ -2198,7 +2198,7 @@ class DGLHeteroGraph(object):
         {}
 
         >>> g.ndata['x'] = torch.randn(6, 3)
-        >>> g.pop_ndata()
+        >>> g.unpack_ndata()
         {'x': tensor([[-2.3537,  1.2567,  0.0811],
                 [ 0.1784,  1.4810, -0.3414],
                 [ 0.3078,  1.3162,  0.0369],
@@ -2213,7 +2213,7 @@ class DGLHeteroGraph(object):
         >>> g.nodes['B'].data['y'] = torch.randn(3, 3)
         >>> g2 = g.clone()
 
-        >>> g.pop_ndata({'A': ['x'], 'B': ['y']})
+        >>> g.unpack_ndata({'A': ['x'], 'B': ['y']})
         {'A': {'x': tensor([[-1.5939, -0.6028,  0.8368],
                 [ 0.2702, -0.7168, -0.9502],
                 [ 0.3448,  0.2063, -0.0140]])}, 'B': {'y': tensor([[-1.5570,  0.5947,  0.8873],
@@ -2222,7 +2222,7 @@ class DGLHeteroGraph(object):
         >>> g.ndata
         defaultdict(<class 'dict'>, {})
 
-        >>> g2.pop_ndata()
+        >>> g2.unpack_ndata()
         {'A': {'x': tensor([[-1.5939, -0.6028,  0.8368],
                 [ 0.2702, -0.7168, -0.9502],
                 [ 0.3448,  0.2063, -0.0140]])}, 'B': {'y': tensor([[-1.5570,  0.5947,  0.8873],
@@ -2233,7 +2233,7 @@ class DGLHeteroGraph(object):
 
         You can also pop some of the node types:
 
-        >>> g3.pop_ndata({'A': ['x']})
+        >>> g3.unpack_ndata({'A': ['x']})
         {'A': {'x': tensor([[-1.5939, -0.6028,  0.8368],
                 [ 0.2702, -0.7168, -0.9502],
                 [ 0.3448,  0.2063, -0.0140]])}}
@@ -2271,7 +2271,7 @@ class DGLHeteroGraph(object):
         --------
         >>> g = dgl.graph(([0, 1, 2], [3, 4, 5]))
         >>> g.edata['x'] = torch.randn(3, 3)
-        >>> g.pop_edata(['x'])
+        >>> g.unpack_edata(['x'])
         {'x': tensor([[ 0.2242,  0.0633,  0.2813],
                 [ 1.1587,  0.0329,  0.5426],
                 [-1.8317, -1.7814,  0.8339]])}
@@ -2279,7 +2279,7 @@ class DGLHeteroGraph(object):
         {}
 
         >>> g.edata['x'] = torch.randn(3, 3)
-        >>> g.pop_edata()
+        >>> g.unpack_edata()
         {'x': tensor([[-2.3537,  1.2567,  0.0811],
                 [ 0.4278, -0.5260,  0.1715],
                 [ 1.4300, -0.7189, -0.1434]])}
@@ -2293,7 +2293,7 @@ class DGLHeteroGraph(object):
         >>> g.edges['BA'].data['y'] = torch.randn(3, 3)
         >>> g2 = g.clone()
 
-        >>> g.pop_edata({'AB': ['x'], 'BA': ['y']})
+        >>> g.unpack_edata({'AB': ['x'], 'BA': ['y']})
         {'AB': {'x': tensor([[-1.5939, -0.6028,  0.8368],
                 [ 0.2702, -0.7168, -0.9502],
                 [ 0.3448,  0.2063, -0.0140]])}, 'BA': {'y': tensor([[-1.5570,  0.5947,  0.8873],
@@ -2302,7 +2302,7 @@ class DGLHeteroGraph(object):
         >>> g.edata
         defaultdict(<class 'dict'>, {})
 
-        >>> g2.pop_edata()
+        >>> g2.unpack_edata()
         {'AB': {'x': tensor([[-1.5939, -0.6028,  0.8368],
                 [ 0.2702, -0.7168, -0.9502],
                 [ 0.3448,  0.2063, -0.0140]])}, 'BA': {'y': tensor([[-1.5570,  0.5947,  0.8873],
@@ -2311,13 +2311,13 @@ class DGLHeteroGraph(object):
         >>> g2.edata
         defaultdict(<class 'dict'>, {})
 
-        You can also pop some of the node types:
+        You can also pop some of the edge types:
 
-        >>> g3.pop_edata({'AB': ['x']})
+        >>> g3.unpack_edata({'AB': ['x']})
         {'AB': {'x': tensor([[-1.5939, -0.6028,  0.8368],
                 [ 0.2702, -0.7168, -0.9502],
                 [ 0.3448,  0.2063, -0.0140]])}}
-        >>> g3.ndata
+        >>> g3.edata
         defaultdict(<class 'dict'>, {'BA': {'y': tensor([[-1.5570,  0.5947,  0.8873],
                 [ 0.5364, -0.2282,  2.4904],
                 [ 1.2022, -1.2771,  0.2304]])}})
@@ -5687,13 +5687,15 @@ class DGLHeteroGraph(object):
         # Clone the graph structure
         meta_edges = []
         for s_ntype, _, d_ntype in self.canonical_etypes:
-            meta_edges.append((self.get_ntype_id(s_ntype), self.get_ntype_id(d_ntype)))
+            meta_edges.append((
+                self.get_ntype_id_from_src(s_ntype), self.get_ntype_id_from_dst(d_ntype)))
 
         metagraph = graph_index.from_edge_list(meta_edges, True)
         # rebuild graph idx
-        num_nodes_per_type = [self.number_of_nodes(c_ntype) for c_ntype in self.ntypes]
-        relation_graphs = [self._graph.get_relation_graph(self.get_etype_id(c_etype))
-                           for c_etype in self.canonical_etypes]
+        num_nodes_per_type = [
+            self._graph.number_of_nodes(i) for i in range(self._graph.number_of_ntypes())]
+        relation_graphs = [self._graph.get_relation_graph(i)
+                           for i in range(self._graph.number_of_etypes())]
         ret._graph = heterograph_index.create_heterograph_from_relations(
             metagraph, relation_graphs, utils.toindex(num_nodes_per_type, "int64"))
 

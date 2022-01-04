@@ -1,3 +1,4 @@
+import torch
 
 class TensorStorage(object):
     def __init__(self, tensor):
@@ -11,7 +12,8 @@ class TensorStorage(object):
         if not self.is_cuda:
             # CPU to CPU or CUDA - use pin_memory and async transfer if possible
             result = torch.empty(
-                indices.shape[0], *self.feature_shape, pin_memory=pin_memory)
+                indices.shape[0], *self.feature_shape, dtype=self.tensor.dtype,
+                pin_memory=pin_memory)
             torch.index_select(self.tensor, 0, indices, out=result)
             if device.type == 'cuda':
                 result = result.to(device, non_blocking=True)

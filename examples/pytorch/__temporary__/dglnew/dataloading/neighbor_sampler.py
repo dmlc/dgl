@@ -73,7 +73,9 @@ def _find_exclude_eids(g, exclude_mode, eids, **kwargs):
         raise ValueError('unsupported mode {}'.format(exclude_mode))
 
 class NeighborSampler(Sampler):
-    def __init__(self, fanouts, edge_dir='in', prob=None, replace=False, output_device=None, **kwargs):
+    def __init__(self, g, fanouts, edge_dir='in', prob=None, replace=False, output_device=None, **kwargs):
+        super().__init__()
+        self.g = g
         self.fanouts = fanouts
         self.edge_dir = edge_dir
         self.prob = prob
@@ -83,7 +85,7 @@ class NeighborSampler(Sampler):
     def sample_blocks_from_nodes(self, g, seed_nodes, exclude_edges=None):
         output_nodes = seed_nodes
         blocks = []
-        for i, fanout in reversed(enumerate(self.fanouts)):
+        for fanout in reversed(self.fanouts):
             frontier = g.sample_neighbors(
                 seed_nodes, fanout, edge_dir=self.edge_dir, prob=self.prob,
                 replace=self.replace, output_device=self.output_device,
@@ -109,7 +111,7 @@ class NeighborSampler(Sampler):
         return [block.edata for block in result]
 
     def sample(self, seed_nodes):
-        return self.sample_blocks_from_nodes(seed_nodes)
+        return self.sample_blocks_from_nodes(self.g, seed_nodes)
 
 def find_exclude_eids(seed_edges, exclude, g_sampling, reverse_eids=None,
                       reverse_etypes=None, output_device=None):

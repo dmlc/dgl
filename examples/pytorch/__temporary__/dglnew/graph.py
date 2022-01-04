@@ -96,11 +96,11 @@ class DGLGraphStorage(GraphStorage):
     def sample_neighbors(self, seed_nodes, fanout, edge_dir='in', prob=None, replace=False,
                          exclude_edges=None, output_device=None):
         if self.g.device == 'cpu':
-            frontier = dgl.sample_neighbors(
+            frontier = dgl.sampling.sample_neighbors(
                 self.g, seed_nodes, fanout, edge_dir=edge_dir, prob=prob, replace=replace,
                 exclude_edges=exclude_edges)
         else:
-            frontier = dgl.sample_neighbors(
+            frontier = dgl.sampling.sample_neighbors(
                 self.g, seed_nodes, fanout, edge_dir=edge_dir, prob=prob, replace=replace)
             if exclude_edges is not None:
                 eid_excluder = _EidExcluder(exclude_edges)
