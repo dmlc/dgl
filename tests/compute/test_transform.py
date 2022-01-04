@@ -1800,5 +1800,75 @@ def test_reorder_graph(idtype):
     rfg = dgl.reorder_graph(fg)
     assert 'csr' in sum(rfg.formats().values(), [])
 
+@parametrize_dtype
+def test_module_add_self_loop(idtype):
+    g = dgl.graph(([1, 1], [1, 2]), idtype=idtype, device=F.ctx())
+    g.ndata['h'] = F.randn((g.num_nodes(), 2))
+    g.edata['w'] = F.randn((g.num_edges(), 3))
+
+    # Case1: add self-loops with the default setting
+    transform = dgl.AddSelfLoop()
+    new_g = transform(g)
+    assert new_g.num_nodes() == g.num_nodes()
+    assert new_g.num_edges() == 5
+    src, dst = new_g.edges()
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 0), (1, 1), (1, 2), (2, 2)}
+    assert 'h' in new_g.ndata
+    assert 'w' in new_g.edata
+
+    # Case2: Remove self-loops first to avoid duplicate ones
+    transform = dgl.AddSelfLoop(remove_first=True)
+    new_g = transform(g)
+    assert new_g.num_nodes() == g.num_nodes()
+    assert new_g.num_edges() == 4
+    src, dst = new_g.edges()
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 0), (1, 1), (1, 2), (2, 2)}
+    assert 'h' in new_g.ndata
+    assert 'w' in new_g.edata
+
+    # Create a heterogeneous graph
+    g = dgl.heterograph({
+        ('user', 'plays', 'game'): ([0], [1]),
+        ('user', 'follows', 'user'): ([1], [3])
+    }, idtype=idtype, device=F.ctx())
+    g.nodes['user'].data['h1'] = F.randn((4, 2))
+    g.edges['plays'].data['w1'] = F.randn((1, 3))
+    g.nodes['game'].data['h2'] = F.randn((2, 4))
+    g.edges['follows'].data['w2'] = F.randn((1, 5))
+
+    # Case3: add self-loops for a heterogeneous graph
+    new_g = transform(g)
+    assert new_g.ntypes == g.ntypes
+    assert new_g.canonical_etypes == g.canonical_etypes
+    for nty in new_g.ntypes:
+        assert new_g.num_nodes(nty) == g.num_nodes(nty)
+    assert new_g.num_edges('plays') == 1
+    assert new_g.num_edges('follows') == 5
+    assert 'h1' in new_g.nodes['user'].data
+    assert 'h2' in new_g.nodes['game'].data
+    assert 'w1' in new_g.edges['plays'].data
+    assert 'w2' in new_g.edges['follows'].data
+
+    # Case4: add self-etypes for a heterogeneous graph
+    transform = dgl.AddSelfLoop(self_etypes=True)
+    new_g = transform(g)
+    assert new_g.ntypes == g.ntypes
+    assert new_g.canonical_etypes == {
+        ('user', 'plays', 'game'), ('user', 'follows', 'user'),
+        ('user', 'self', 'user'), ('game', 'self', 'game')
+    }
+    for nty in new_g.ntypes:
+        assert new_g.num_nodes(nty) == g.num_nodes(nty)
+    assert new_g.num_edges('plays') == 1
+    assert new_g.num_edges('follows') == 5
+    assert new_g.num_edges(('user', 'self', 'user')) == 4
+    assert new_g.num_edges(('game', 'self', 'game')) == 2
+    assert 'h1' in new_g.nodes['user'].data
+    assert 'h2' in new_g.nodes['game'].data
+    assert 'w1' in new_g.edges['plays'].data
+    assert 'w2' in new_g.edges['follows'].data
+
 if __name__ == '__main__':
     test_partition_with_halo()

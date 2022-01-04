@@ -64,7 +64,37 @@ class AddSelfLoop(BaseTransform):
 
     >>> transform = AddSelfLoop()
     >>> g = dgl.graph(([1, 1], [1, 2]))
-    >>>
+    >>> new_g = transform(g)
+    >>> print(new_g.edges())
+    (tensor([1, 1, 0, 1, 2]), tensor([1, 2, 0, 1, 2]))
+
+    Case2: Remove self-loops first to avoid duplicate self-loops
+
+    >>> transform = AddSelfLoop(remove_first=True)
+    >>> new_g = transform(g)
+    >>> print(new_g.edges())
+    (tensor([1, 0, 1, 2]), tensor([2, 0, 1, 2]))
+
+    Case3: Add self-loops for a heterogeneous graph
+
+    >>> g = dgl.heterograph({
+    ...     ('user', 'plays', 'game'): ([0], [1]),
+    ...     ('user', 'follows', 'user'): ([1], [2])
+    ... })
+    >>> new_g = transform(g)
+    >>> print(new_g.edges(etype='plays'))
+    (tensor([0]), tensor([1]))
+    >>> print(new_g.edges(etype='follows'))
+    (tensor([1, 0, 1, 2]), tensor([2, 0, 1, 2]))
+
+    Case4: Add self-etypes for a heterogeneous graph
+
+    >>> transform = AddSelfLoop(self_etypes=True)
+    >>> new_g = transform(g)
+    >>> print(new_g.edges(etype='follows'))
+    (tensor([1, 0, 1, 2]), tensor([2, 0, 1, 2]))
+    >>> print(new_g.edges(etype=('game', 'self', 'game')))
+    (tensor([0, 1]), tensor([0, 1]))
     """
     def __init__(self, remove_first=False, self_etypes=False):
         self.remove_first = remove_first
@@ -107,4 +137,25 @@ class AddSelfLoop(BaseTransform):
                 for key, feat in g.edges[c_etype].data.items():
                     new_g.edges[c_etype].data[key] = feat
             g = new_g
+        return g
+
+class RemoveSelfLoop(BaseTransform):
+    r"""
+
+    Description
+    -----------
+    Remove self-loops for each node in the graph and return a new graph.
+
+    For heterogeneous graphs, this operation only applies to edge types with same
+    source and destination node types.
+
+    Example
+    -------
+    """
+    def __call__(self, g):
+        for c_etype in g.canonical_etypes:
+            utype, _, vtype = c_etype
+            if utype != vtype:
+                continue
+            g = functional.remove_self_loop(g, etype=c_etype)
         return g
