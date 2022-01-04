@@ -259,9 +259,7 @@ class NDArray {
   template<typename T>
   std::vector<T> ToVector() const;
 
-#ifndef _WIN32
   std::shared_ptr<SharedMemory> GetSharedMem() const;
-#endif  // _WIN32
 
   /*!
    * \brief Function to copy data from one array to another.
@@ -313,9 +311,7 @@ struct NDArray::Container {
    */
   DLTensor dl_tensor;
 
-#ifndef _WIN32
   std::shared_ptr<SharedMemory> mem;
-#endif  // _WIN32
   /*!
    * \brief addtional context, reserved for recycling
    * \note We can attach additional content here
