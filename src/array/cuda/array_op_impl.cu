@@ -1,15 +1,17 @@
 /*!
- *  Copyright (c) 2020 by Contributors
+ *  Copyright (c) 2020-2021 by Contributors
  * \file array/cuda/array_op_impl.cu
  * \brief Array operator GPU implementation
  */
 #include <dgl/array.h>
 #include "../../runtime/cuda/cuda_common.h"
+#include "../../runtime/cuda/cuda_hashtable.cuh"
 #include "./utils.h"
 #include "../arith.h"
 
 namespace dgl {
 using runtime::NDArray;
+using namespace runtime::cuda;
 namespace aten {
 namespace impl {
 
@@ -36,7 +38,8 @@ IdArray BinaryElewise(IdArray lhs, IdArray rhs) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   int nt = cuda::FindNumThreads(len);
   int nb = (len + nt - 1) / nt;
-  _BinaryElewiseKernel<IdType, Op><<<nb, nt, 0, thr_entry->stream>>>(
+  CUDA_KERNEL_CALL((_BinaryElewiseKernel<IdType, Op>),
+      nb, nt, 0, thr_entry->stream,
       lhs_data, rhs_data, ret_data, len);
   return ret;
 }
@@ -85,7 +88,8 @@ IdArray BinaryElewise(IdArray lhs, IdType rhs) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   int nt = cuda::FindNumThreads(len);
   int nb = (len + nt - 1) / nt;
-  _BinaryElewiseKernel<IdType, Op><<<nb, nt, 0, thr_entry->stream>>>(
+  CUDA_KERNEL_CALL((_BinaryElewiseKernel<IdType, Op>),
+      nb, nt, 0, thr_entry->stream,
       lhs_data, rhs, ret_data, len);
   return ret;
 }
@@ -135,7 +139,8 @@ IdArray BinaryElewise(IdType lhs, IdArray rhs) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   int nt = cuda::FindNumThreads(len);
   int nb = (len + nt - 1) / nt;
-  _BinaryElewiseKernel<IdType, Op><<<nb, nt, 0, thr_entry->stream>>>(
+  CUDA_KERNEL_CALL((_BinaryElewiseKernel<IdType, Op>),
+      nb, nt, 0, thr_entry->stream,
       lhs, rhs_data, ret_data, len);
   return ret;
 }
@@ -183,7 +188,8 @@ IdArray UnaryElewise(IdArray lhs) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   int nt = cuda::FindNumThreads(len);
   int nb = (len + nt - 1) / nt;
-  _UnaryElewiseKernel<IdType, Op><<<nb, nt, 0, thr_entry->stream>>>(
+  CUDA_KERNEL_CALL((_UnaryElewiseKernel<IdType, Op>),
+      nb, nt, 0, thr_entry->stream,
       lhs_data, ret_data, len);
   return ret;
 }
@@ -193,9 +199,9 @@ template IdArray UnaryElewise<kDLGPU, int64_t, arith::Neg>(IdArray lhs);
 
 ///////////////////////////// Full /////////////////////////////
 
-template <typename IdType>
+template <typename DType>
 __global__ void _FullKernel(
-    IdType* out, int64_t length, IdType val) {
+    DType* out, int64_t length, DType val) {
   int tx = blockIdx.x * blockDim.x + threadIdx.x;
   int stride_x = gridDim.x * blockDim.x;
   while (tx < length) {
@@ -204,19 +210,22 @@ __global__ void _FullKernel(
   }
 }
 
-template <DLDeviceType XPU, typename IdType>
-IdArray Full(IdType val, int64_t length, DLContext ctx) {
-  IdArray ret = NewIdArray(length, ctx, sizeof(IdType) * 8);
-  IdType* ret_data = static_cast<IdType*>(ret->data);
+template <DLDeviceType XPU, typename DType>
+NDArray Full(DType val, int64_t length, DLContext ctx) {
+  NDArray ret = NDArray::Empty({length}, DLDataTypeTraits<DType>::dtype, ctx);
+  DType* ret_data = static_cast<DType*>(ret->data);
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   int nt = cuda::FindNumThreads(length);
   int nb = (length + nt - 1) / nt;
-  _FullKernel<IdType><<<nb, nt, 0, thr_entry->stream>>>(ret_data, length, val);
+  CUDA_KERNEL_CALL((_FullKernel<DType>), nb, nt, 0, thr_entry->stream,
+      ret_data, length, val);
   return ret;
 }
 
 template IdArray Full<kDLGPU, int32_t>(int32_t val, int64_t length, DLContext ctx);
 template IdArray Full<kDLGPU, int64_t>(int64_t val, int64_t length, DLContext ctx);
+template IdArray Full<kDLGPU, float>(float val, int64_t length, DLContext ctx);
+template IdArray Full<kDLGPU, double>(double val, int64_t length, DLContext ctx);
 
 
 ///////////////////////////// Range /////////////////////////////
@@ -242,12 +251,92 @@ IdArray Range(IdType low, IdType high, DLContext ctx) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   int nt = cuda::FindNumThreads(length);
   int nb = (length + nt - 1) / nt;
-  _RangeKernel<IdType><<<nb, nt, 0, thr_entry->stream>>>(ret_data, low, length);
+  CUDA_KERNEL_CALL((_RangeKernel<IdType>),
+      nb, nt, 0, thr_entry->stream,
+      ret_data, low, length);
   return ret;
 }
 
 template IdArray Range<kDLGPU, int32_t>(int32_t, int32_t, DLContext);
 template IdArray Range<kDLGPU, int64_t>(int64_t, int64_t, DLContext);
+
+///////////////////////////// Relabel_ //////////////////////////////
+
+template <typename IdType>
+__global__ void _RelabelKernel(
+    IdType* out, int64_t length, DeviceOrderedHashTable<IdType> table) {
+
+  int tx = blockIdx.x * blockDim.x + threadIdx.x;
+  int stride_x = gridDim.x * blockDim.x;
+
+  while (tx < length) {
+    out[tx] = table.Search(out[tx])->local;
+    tx += stride_x;
+  }
+}
+
+template <DLDeviceType XPU, typename IdType>
+IdArray Relabel_(const std::vector<IdArray>& arrays) {
+  IdArray all_nodes = Concat(arrays);
+  const int64_t total_length = all_nodes->shape[0];
+
+  if (total_length == 0) {
+    return all_nodes;
+  }
+
+  const auto& ctx = arrays[0]->ctx;
+  auto device = runtime::DeviceAPI::Get(ctx);
+  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+
+  // build node maps and get the induced nodes
+  OrderedHashTable<IdType> node_map(total_length, ctx, thr_entry->stream);
+  int64_t num_induced = 0;
+  int64_t * num_induced_device = static_cast<int64_t*>(
+      device->AllocWorkspace(ctx, sizeof(int64_t)));
+  IdArray induced_nodes = NewIdArray(total_length, ctx, sizeof(IdType)*8);
+
+  CUDA_CALL(cudaMemsetAsync(
+    num_induced_device,
+    0,
+    sizeof(*num_induced_device),
+    thr_entry->stream));
+
+  node_map.FillWithDuplicates(
+    all_nodes.Ptr<IdType>(),
+    all_nodes->shape[0],
+    induced_nodes.Ptr<IdType>(),
+    num_induced_device,
+    thr_entry->stream);
+
+  device->CopyDataFromTo(
+    num_induced_device, 0,
+    &num_induced, 0,
+    sizeof(num_induced),
+    ctx,
+    DGLContext{kDLCPU, 0},
+    DGLType{kDLInt, 64, 1},
+    thr_entry->stream);
+  device->StreamSync(ctx, thr_entry->stream);
+  device->FreeWorkspace(ctx, num_induced_device);
+
+  // resize the induced nodes
+  induced_nodes->shape[0] = num_induced;
+
+  // relabel
+  const int nt = 128;
+  for (IdArray arr : arrays) {
+    const int64_t length = arr->shape[0];
+    int nb = (length + nt - 1) / nt;
+    CUDA_KERNEL_CALL((_RelabelKernel<IdType>),
+      nb, nt, 0, thr_entry->stream,
+      arr.Ptr<IdType>(), length, node_map.DeviceHandle());
+  }
+
+  return induced_nodes;
+}
+
+template IdArray Relabel_<kDLGPU, int32_t>(const std::vector<IdArray>& arrays);
+template IdArray Relabel_<kDLGPU, int64_t>(const std::vector<IdArray>& arrays);
 
 ///////////////////////////// AsNumBits /////////////////////////////
 
@@ -270,10 +359,12 @@ IdArray AsNumBits(IdArray arr, uint8_t bits) {
   int nt = cuda::FindNumThreads(length);
   int nb = (length + nt - 1) / nt;
   if (bits == 32) {
-    _CastKernel<IdType, int32_t><<<nb, nt, 0, thr_entry->stream>>>(
+    CUDA_KERNEL_CALL((_CastKernel<IdType, int32_t>),
+        nb, nt, 0, thr_entry->stream,
         static_cast<IdType*>(arr->data), static_cast<int32_t*>(ret->data), length);
   } else {
-    _CastKernel<IdType, int64_t><<<nb, nt, 0, thr_entry->stream>>>(
+    CUDA_KERNEL_CALL((_CastKernel<IdType, int64_t>),
+        nb, nt, 0, thr_entry->stream,
         static_cast<IdType*>(arr->data), static_cast<int64_t*>(ret->data), length);
   }
   return ret;

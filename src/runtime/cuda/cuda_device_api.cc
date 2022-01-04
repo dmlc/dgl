@@ -138,7 +138,8 @@ class CUDADeviceAPI final : public DeviceAPI {
   DGLStreamHandle CreateStream(DGLContext ctx) {
     CUDA_CALL(cudaSetDevice(ctx.device_id));
     cudaStream_t retval;
-    CUDA_CALL(cudaStreamCreate(&retval));
+    // make sure the legacy default stream won't block on this stream
+    CUDA_CALL(cudaStreamCreateWithFlags(&retval, cudaStreamNonBlocking));
     return static_cast<DGLStreamHandle>(retval);
   }
 
@@ -169,6 +170,20 @@ class CUDADeviceAPI final : public DeviceAPI {
         ->stream = static_cast<cudaStream_t>(stream);
   }
 
+  DGLStreamHandle GetStream() const final {
+    return static_cast<DGLStreamHandle>(CUDAThreadEntry::ThreadLocal()->stream);
+  }
+
+  void PinData(DGLContext ctx, void* ptr, size_t nbytes) {
+    CUDA_CALL(cudaSetDevice(ctx.device_id));
+    CUDA_CALL(cudaHostRegister(ptr, nbytes, cudaHostRegisterDefault));
+  }
+
+  void UnpinData(DGLContext ctx, void* ptr) {
+    CUDA_CALL(cudaSetDevice(ctx.device_id));
+    CUDA_CALL(cudaHostUnregister(ptr));
+  }
+
   void* AllocWorkspace(DGLContext ctx, size_t size, DGLType type_hint) final {
     return CUDAThreadEntry::ThreadLocal()->pool.AllocWorkspace(ctx, size);
   }
@@ -189,10 +204,10 @@ class CUDADeviceAPI final : public DeviceAPI {
                       size_t size,
                       cudaMemcpyKind kind,
                       cudaStream_t stream) {
-    if (stream != 0) {
-      CUDA_CALL(cudaMemcpyAsync(to, from, size, kind, stream));
-    } else {
-      CUDA_CALL(cudaMemcpy(to, from, size, kind));
+    CUDA_CALL(cudaMemcpyAsync(to, from, size, kind, stream));
+    if (stream == 0 && kind == cudaMemcpyDeviceToHost) {
+      // only wait for the copy, when it's on the default stream, and it's to host memory
+      CUDA_CALL(cudaStreamSynchronize(stream));
     }
   }
 };

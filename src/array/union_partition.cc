@@ -10,8 +10,6 @@ namespace dgl {
 namespace aten {
 ///////////////////////// COO Based Operations/////////////////////////
 COOMatrix DisjointUnionCoo(const std::vector<COOMatrix>& coos) {
-  CHECK(coos.size() > 1) <<
-    "The length of input COOMatrix vector should be larger than 1";
   uint64_t src_offset = 0, dst_offset = 0;
   int64_t edge_data_offset = 0;
   bool has_data = false;
@@ -112,10 +110,45 @@ std::vector<COOMatrix> DisjointPartitionCooBySizes(
   return ret;
 }
 
+COOMatrix COOSliceContiguousChunk(
+  const COOMatrix &coo,
+  const std::vector<uint64_t> &edge_range,
+  const std::vector<uint64_t> &src_vertex_range,
+  const std::vector<uint64_t> &dst_vertex_range) {
+  IdArray result_src = NullArray(coo.row->dtype, coo.row->ctx);
+  IdArray result_dst = NullArray(coo.row->dtype, coo.row->ctx);
+  if (edge_range[1] != edge_range[0]) {
+    // The chunk has edges
+    result_src = IndexSelect(coo.row,
+                             edge_range[0],
+                             edge_range[1]) - src_vertex_range[0];
+    result_dst = IndexSelect(coo.col,
+                             edge_range[0],
+                             edge_range[1]) - dst_vertex_range[0];
+  }
+
+  IdArray result_data = NullArray();
+  // has data index array
+  if (COOHasData(coo)) {
+    result_data = IndexSelect(coo.data,
+                              edge_range[0],
+                              edge_range[1]) - edge_range[0];
+  }
+
+  COOMatrix sub_coo = COOMatrix(
+    src_vertex_range[1]-src_vertex_range[0],
+    dst_vertex_range[1]-dst_vertex_range[0],
+    result_src,
+    result_dst,
+    result_data,
+    coo.row_sorted,
+    coo.col_sorted);
+
+  return sub_coo;
+}
+
 ///////////////////////// CSR Based Operations/////////////////////////
 CSRMatrix DisjointUnionCsr(const std::vector<CSRMatrix>& csrs) {
-  CHECK(csrs.size() > 1) <<
-    "The length of input CSRMatrix vector should be larger than 1";
   uint64_t src_offset = 0, dst_offset = 0;
   int64_t indices_offset = 0;
   bool has_data = false;
@@ -224,6 +257,41 @@ std::vector<CSRMatrix> DisjointPartitionCsrBySizes(
   }
 
   return ret;
+}
+
+CSRMatrix CSRSliceContiguousChunk(
+  const CSRMatrix &csr,
+  const std::vector<uint64_t> &edge_range,
+  const std::vector<uint64_t> &src_vertex_range,
+  const std::vector<uint64_t> &dst_vertex_range) {
+  int64_t indptr_len = src_vertex_range[1] - src_vertex_range[0] + 1;
+  IdArray result_indptr = Full(0, indptr_len, csr.indptr->dtype.bits, csr.indptr->ctx);
+  IdArray result_indices = NullArray(csr.indptr->dtype, csr.indptr->ctx);
+  IdArray result_data = NullArray();
+  if (edge_range[1] != edge_range[0]) {
+    // The chunk has edges
+    result_indptr = IndexSelect(csr.indptr,
+                                src_vertex_range[0],
+                                src_vertex_range[1] + 1) - edge_range[0];
+    result_indices = IndexSelect(csr.indices,
+                                 edge_range[0],
+                                 edge_range[1]) - dst_vertex_range[0];
+    if (CSRHasData(csr)) {
+      result_data = IndexSelect(csr.data,
+                                edge_range[0],
+                                edge_range[1]) - edge_range[0];
+    }
+  }
+
+  CSRMatrix sub_csr = CSRMatrix(
+    src_vertex_range[1]-src_vertex_range[0],
+    dst_vertex_range[1]-dst_vertex_range[0],
+    result_indptr,
+    result_indices,
+    result_data,
+    csr.sorted);
+
+  return sub_csr;
 }
 
 }  // namespace aten

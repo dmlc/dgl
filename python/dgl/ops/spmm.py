@@ -1,12 +1,36 @@
 """dgl spmm operator module."""
 import sys
 
-from ..base import dgl_warning
 from ..backend import gspmm as gspmm_internal
+from ..backend import gspmm_hetero as gspmm_internal_hetero
 from .. import backend as F
 
 __all__ = ['gspmm']
 
+def reshape_lhs_rhs(lhs_data, rhs_data):
+    r""" Expand dims so that there will be no broadcasting issues with different
+    number of dimensions. For example, given two shapes (N, 3, 1), (E, 5, 3, 4)
+    that are valid broadcastable shapes, change them to (N, 1, 3, 1) and
+    (E, 5, 3, 4)
+
+    Parameters
+    ----------
+    lhs_data : tensor or None
+        The left operand, could be None if it's not required by op.
+    rhs_data : tensor or None
+        The right operand, could be None if it's not required by op.
+    """
+    lhs_shape = F.shape(lhs_data)
+    rhs_shape = F.shape(rhs_data)
+    if len(lhs_shape) != len(rhs_shape):
+        max_ndims = max(len(lhs_shape), len(rhs_shape))
+        lhs_pad_ndims = max_ndims - len(lhs_shape)
+        rhs_pad_ndims = max_ndims - len(rhs_shape)
+        new_lhs_shape = (lhs_shape[0],) + (1,) * lhs_pad_ndims + lhs_shape[1:]
+        new_rhs_shape = (rhs_shape[0],) + (1,) * rhs_pad_ndims + rhs_shape[1:]
+        lhs_data = F.reshape(lhs_data, new_lhs_shape)
+        rhs_data = F.reshape(rhs_data, new_rhs_shape)
+    return lhs_data, rhs_data
 
 def gspmm(g, op, reduce_op, lhs_data, rhs_data):
     r""" Generalized Sparse Matrix Multiplication interface.
@@ -44,32 +68,45 @@ def gspmm(g, op, reduce_op, lhs_data, rhs_data):
     tensor
         The result tensor.
     """
-    if op not in ['copy_lhs', 'copy_rhs']:
-        # Expand dims so that there will be no broadcasting issues with different
-        # number of dimensions. For example, given two shapes (N, 3, 1), (E, 5, 3, 4)
-        # that are valid broadcastable shapes, change them to (N, 1, 3, 1) and
-        # (E, 5, 3, 4)
-        lhs_shape = F.shape(lhs_data)
-        rhs_shape = F.shape(rhs_data)
-        if len(lhs_shape) != len(rhs_shape):
-            max_ndims = max(len(lhs_shape), len(rhs_shape))
-            lhs_pad_ndims = max_ndims - len(lhs_shape)
-            rhs_pad_ndims = max_ndims - len(rhs_shape)
-            new_lhs_shape = (lhs_shape[0],) + (1,) * lhs_pad_ndims + lhs_shape[1:]
-            new_rhs_shape = (rhs_shape[0],) + (1,) * rhs_pad_ndims + rhs_shape[1:]
-            lhs_data = F.reshape(lhs_data, new_lhs_shape)
-            rhs_data = F.reshape(rhs_data, new_rhs_shape)
+    if g._graph.number_of_etypes() == 1:
+        if op not in ['copy_lhs', 'copy_rhs']:
+            lhs_data, rhs_data = reshape_lhs_rhs(lhs_data, rhs_data)
+        # With max and min reducers infinity will be returned for zero degree nodes
+        ret = gspmm_internal(g._graph, op,
+                             'sum' if reduce_op == 'mean' else reduce_op,
+                             lhs_data, rhs_data)
+    else:
+        # lhs_data or rhs_data is None only in unary functions like ``copy-u`` or ``copy_e``
+        lhs_data = [None] * g._graph.number_of_ntypes() if lhs_data is None else lhs_data
+        rhs_data = [None] * g._graph.number_of_etypes() if rhs_data is None else rhs_data
+        # TODO (Israt): Call reshape func
+        lhs_and_rhs_tuple = tuple(list(lhs_data) + list(rhs_data))
+        ret = gspmm_internal_hetero(g._graph, op,
+                                    'sum' if reduce_op == 'mean' else reduce_op,
+                                    len(lhs_data), *lhs_and_rhs_tuple)
+    # TODO (Israt): Add support for 'mean' in heterograph
+    # divide in degrees for mean reducer.
     if reduce_op == 'mean':
-        ret = gspmm_internal(g._graph, op, 'sum', lhs_data, rhs_data)
         ret_shape = F.shape(ret)
         deg = g.in_degrees()
-        if F.as_scalar(F.min(deg, dim=0)) == 0:
-            dgl_warning('Zero-degree nodes encountered in mean reducer. Setting the mean to 0.')
-        deg = F.astype(F.clamp(deg, 1, g.number_of_edges()), F.dtype(ret))
+        deg = F.astype(F.clamp(deg, 1, max(g.number_of_edges(), 1)), F.dtype(ret))
         deg_shape = (ret_shape[0],) + (1,) * (len(ret_shape) - 1)
         return ret / F.reshape(deg, deg_shape)
     else:
-        return gspmm_internal(g._graph, op, reduce_op, lhs_data, rhs_data)
+        return ret
+
+
+def _attach_zerodeg_note(docstring, reducer):
+    note1 = """
+    The {} function will return zero for nodes with no incoming messages.""".format(reducer)
+    note2 = """
+    This is implemented by replacing all {} values to zero.
+    """.format("infinity" if reducer == "min" else "negative infinity")
+
+    docstring = docstring + note1
+    if reducer in ('min', 'max'):
+        docstring = docstring + note2
+    return docstring
 
 
 def _gen_spmm_func(binary_op, reduce_op):
@@ -104,6 +141,7 @@ def _gen_spmm_func(binary_op, reduce_op):
     https://docs.scipy.org/doc/numpy/user/basics.broadcasting.html
     for more details about the NumPy broadcasting semantics.
     """.format(binary_op, reduce_op)
+    docstring = _attach_zerodeg_note(docstring, reduce_op)
 
     def func(g, x, y):
         return gspmm(g, binary_op, reduce_op, x, y)
@@ -123,7 +161,7 @@ def _gen_copy_reduce_func(binary_op, reduce_op):
         "copy_u": "source node",
         "copy_e": "edge"
     }
-    docstring = lambda binary_op: """Generalized SpMM function. {}
+    docstring = lambda binary_op: _attach_zerodeg_note("""Generalized SpMM function. {}
     Then aggregates the message by {} on destination nodes.
 
     Parameters
@@ -144,7 +182,7 @@ def _gen_copy_reduce_func(binary_op, reduce_op):
     """.format(
         binary_str[binary_op],
         reduce_op,
-        x_str[binary_op])
+        x_str[binary_op]), reduce_op)
 
     def func(g, x):
         if binary_op == 'copy_u':

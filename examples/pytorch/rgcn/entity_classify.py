@@ -59,13 +59,12 @@ def main(args):
     hg = dataset[0]
 
     num_rels = len(hg.canonical_etypes)
-    num_of_ntype = len(hg.ntypes)
     category = dataset.predict_category
     num_classes = dataset.num_classes
     train_mask = hg.nodes[category].data.pop('train_mask')
     test_mask = hg.nodes[category].data.pop('test_mask')
-    train_idx = torch.nonzero(train_mask).squeeze()
-    test_idx = torch.nonzero(test_mask).squeeze()
+    train_idx = torch.nonzero(train_mask, as_tuple=False).squeeze()
+    test_idx = torch.nonzero(test_mask, as_tuple=False).squeeze()
     labels = hg.nodes[category].data.pop('labels')
 
     # split dataset into train, validate, test
@@ -90,7 +89,7 @@ def main(args):
         if ntype == category:
             category_id = i
 
-    g = dgl.to_homo(hg)
+    g = dgl.to_homogeneous(hg, edata=['norm'])
     num_nodes = g.number_of_nodes()
     node_ids = torch.arange(num_nodes)
     edge_norm = g.edata['norm']

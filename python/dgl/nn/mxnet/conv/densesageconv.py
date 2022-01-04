@@ -8,18 +8,22 @@ from ....utils import check_eq_shape
 
 
 class DenseSAGEConv(nn.Block):
-    """GraphSAGE layer where the graph structure is given by an
+    """
+
+    Description
+    -----------
+    GraphSAGE layer where the graph structure is given by an
     adjacency matrix.
-    We recommend to use this module when applying GraphSAGE on dense graphs.
+    We recommend to use this module when appying GraphSAGE on dense graphs.
 
     Note that we only support gcn aggregator in DenseSAGEConv.
 
     Parameters
     ----------
     in_feats : int
-        Input feature size.
+        Input feature size; i.e, the number of dimensions of :math:`h_i^{(l)}`.
     out_feats : int
-        Output feature size.
+        Output feature size; i.e, the number of dimensions of :math:`h_i^{(l+1)}`.
     feat_drop : float, optional
         Dropout rate on features. Default: 0.
     bias : bool
@@ -32,7 +36,7 @@ class DenseSAGEConv(nn.Block):
 
     See also
     --------
-    SAGEConv
+    `SAGEConv <https://docs.dgl.ai/api/python/nn.pytorch.html#sageconv>`__
     """
     def __init__(self,
                  in_feats,
@@ -52,7 +56,11 @@ class DenseSAGEConv(nn.Block):
                                weight_initializer=mx.init.Xavier(magnitude=math.sqrt(2.0)))
 
     def forward(self, adj, feat):
-        r"""Compute (Dense) Graph SAGE layer.
+        r"""
+
+        Description
+        -----------
+        Compute (Dense) Graph SAGE layer.
 
         Parameters
         ----------
@@ -64,11 +72,10 @@ class DenseSAGEConv(nn.Block):
             a row represents a destination node while a column represents a source
             node.
         feat : mxnet.NDArray or a pair of mxnet.NDArray
-            If a mxnet.NDArray is given, the input feature of shape :math:`(N, D_{in})`
-            where :math:`D_{in}` is size of input feature, :math:`N` is the number of
-            nodes.
-            If a pair of torch.Tensor is given, the pair must contain two tensors of
-            shape :math:`(N_{in}, D_{in})` and :math:`(N_{out}, D_{in})`.
+            If a mxnet.NDArray is given, the input feature of shape :math:`(N, D_{in})` where
+            :math:`D_{in}` is size of input feature, :math:`N` is the number of nodes.
+            If a pair of mxnet.NDArray is given, the pair must contain two tensors of shape
+            :math:`(N_{in}, D_{in})` and :math:`(N_{out}, D_{in})`.
 
         Returns
         -------

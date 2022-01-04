@@ -4,14 +4,12 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import torch.multiprocessing as mp
+import dgl.multiprocessing as mp
 import dgl.function as fn
 import dgl.nn.pytorch as dglnn
 import time
 import argparse
 import tqdm
-from _thread import start_new_thread
-from functools import wraps
 from dgl.data import RedditDataset
 from torch.utils.data import DataLoader
 from torch.nn.parallel import DistributedDataParallel
@@ -109,7 +107,7 @@ class SAGE(nn.Module):
                 end = start + batch_size
                 batch_nodes = nodes[start:end]
                 block = dgl.to_block(dgl.in_subgraph(g, batch_nodes), batch_nodes)
-                block = block.to(device)
+                block = block.int().to(device)
                 induced_nodes = block.srcdata[dgl.NID]
 
                 h = x[induced_nodes].to(device)
@@ -188,7 +186,7 @@ def load_subtensor(g, labels, blocks, hist_blocks, dev_id, aggregation_on_device
             hist_block = hist_block.to(dev_id)
         hist_block.update_all(fn.copy_u('hist', 'm'), fn.mean('m', 'agg_hist'))
 
-        block = block.to(dev_id)
+        block = block.int().to(dev_id)
         if not aggregation_on_device:
             hist_block = hist_block.to(dev_id)
         block.dstdata['agg_hist'] = hist_block.dstdata['agg_hist']
@@ -220,8 +218,8 @@ def run(args, dev_id, data):
 
     # Unpack data
     train_mask, val_mask, in_feats, labels, n_classes, g = data
-    train_nid = train_mask.nonzero()[:, 0]
-    val_nid = val_mask.nonzero()[:, 0]
+    train_nid = train_mask.nonzero().squeeze()
+    val_nid = val_mask.nonzero().squeeze()
 
     # Create sampler
     sampler = NeighborSampler(g, [int(_) for _ in args.fan_out.split(',')])
@@ -317,7 +315,7 @@ if __name__ == '__main__':
     train_mask = g.ndata['train_mask']
     val_mask = g.ndata['val_mask']
     g.ndata['features'] = features
-    g.create_format_()
+    g.create_formats_()
     # Pack data
     data = train_mask, val_mask, in_feats, labels, n_classes, g
 

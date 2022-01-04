@@ -18,11 +18,7 @@ import argparse
 from sklearn.metrics import f1_score
 from gat import GAT
 from dgl.data.ppi import PPIDataset
-from torch.utils.data import DataLoader
-
-def collate(graphs):
-    graph = dgl.batch(graphs)
-    return graph
+from dgl.dataloading import GraphDataLoader
 
 def evaluate(feats, model, subgraph, labels, loss_fcn):
     with torch.no_grad():
@@ -54,13 +50,13 @@ def main(args):
     train_dataset = PPIDataset(mode='train')
     valid_dataset = PPIDataset(mode='valid')
     test_dataset = PPIDataset(mode='test')
-    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, collate_fn=collate)
-    valid_dataloader = DataLoader(valid_dataset, batch_size=batch_size, collate_fn=collate)
-    test_dataloader = DataLoader(test_dataset, batch_size=batch_size, collate_fn=collate)
+    train_dataloader = GraphDataLoader(train_dataset, batch_size=batch_size)
+    valid_dataloader = GraphDataLoader(valid_dataset, batch_size=batch_size)
+    test_dataloader = GraphDataLoader(test_dataset, batch_size=batch_size)
     g = train_dataset[0]
     n_classes = train_dataset.num_labels
     num_feats = g.ndata['feat'].shape[1]
-    g = g.to(device)
+    g = g.int().to(device)
     heads = ([args.num_heads] * args.num_layers) + [args.num_out_heads]
     # define the model
     model = GAT(g,
@@ -96,12 +92,9 @@ def main(args):
         if epoch % 5 == 0:
             score_list = []
             val_loss_list = []
-            for batch, valid_data in enumerate(valid_dataloader):
-                subgraph, feats, labels = valid_data
+            for batch, subgraph in enumerate(valid_dataloader):
                 subgraph = subgraph.to(device)
-                feats = feats.to(device)
-                labels = labels.to(device)
-                score, val_loss = evaluate(feats.float(), model, subgraph, labels.float(), loss_fcn)
+                score, val_loss = evaluate(subgraph.ndata['feat'], model, subgraph, subgraph.ndata['label'], loss_fcn)
                 score_list.append(score)
                 val_loss_list.append(val_loss)
             mean_score = np.array(score_list).mean()
@@ -120,12 +113,10 @@ def main(args):
                 if cur_step == patience:
                     break
     test_score_list = []
-    for batch, test_data in enumerate(test_dataloader):
-        subgraph, feats, labels = test_data
+    for batch, subgraph in enumerate(test_dataloader):
         subgraph = subgraph.to(device)
-        feats = feats.to(device)
-        labels = labels.to(device)
-        test_score_list.append(evaluate(feats, model, subgraph, labels.float(), loss_fcn)[0])
+        score, test_loss = evaluate(subgraph.ndata['feat'], model, subgraph, subgraph.ndata['label'], loss_fcn)
+        test_score_list.append(score)
     print("Test F1-Score: {:.4f}".format(np.array(test_score_list).mean()))
 
 if __name__ == '__main__':

@@ -13,7 +13,9 @@ using namespace dgl::runtime;
 
 namespace dgl {
 
-IdArray GraphOp::MetisPartition(GraphPtr g, int k, NDArray vwgt_arr) {
+#if !defined(_WIN32)
+
+IdArray MetisPartition(GraphPtr g, int k, NDArray vwgt_arr) {
   // The index type of Metis needs to be compatible with DGL index type.
   CHECK_EQ(sizeof(idx_t), sizeof(dgl_id_t));
   ImmutableGraphPtr ig = std::dynamic_pointer_cast<ImmutableGraph>(g);
@@ -44,6 +46,9 @@ IdArray GraphOp::MetisPartition(GraphPtr g, int k, NDArray vwgt_arr) {
   idx_t options[METIS_NOPTIONS];
   METIS_SetDefaultOptions(options);
   options[METIS_OPTION_ONDISK] = 1;
+  options[METIS_OPTION_NITER] = 1;
+  options[METIS_OPTION_NIPARTS] = 1;
+  options[METIS_OPTION_DROPEDGES] = 1;
 
   int ret = METIS_PartGraphKway(&nvtxs,      // The number of vertices
                                 &ncon,       // The number of balancing constraints.
@@ -78,12 +83,18 @@ IdArray GraphOp::MetisPartition(GraphPtr g, int k, NDArray vwgt_arr) {
   return aten::NullArray();
 }
 
+#endif  // !defined(_WIN32)
+
 DGL_REGISTER_GLOBAL("transform._CAPI_DGLMetisPartition")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphRef g = args[0];
     int k = args[1];
     NDArray vwgt = args[2];
-    *rv = GraphOp::MetisPartition(g.sptr(), k, vwgt);
+#if !defined(_WIN32)
+    *rv = MetisPartition(g.sptr(), k, vwgt);
+#else
+    LOG(FATAL) << "Metis partition does not support Windows.";
+#endif  // !defined(_WIN32)
   });
 
 }   // namespace dgl

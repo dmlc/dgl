@@ -604,12 +604,17 @@ HeteroGraphPtr CreateHeteroGraph(
  * \param num_dst Number of nodes in the destination type.
  * \param row Src node ids of the edges.
  * \param col Dst node ids of the edges.
+ * \param row_sorted Whether the `row` array is in sorted ascending order.
+ * \param col_sorted When `row_sorted` is true, whether the columns within each
+ * row are also sorted. When `row_sorted` is false, this flag must also be
+ * false.
  * \param formats Sparse formats used for storing this graph.
  * \return A heterograph pointer.
  */
 HeteroGraphPtr CreateFromCOO(
     int64_t num_vtypes, int64_t num_src, int64_t num_dst,
-    IdArray row, IdArray col, dgl_format_code_t formats = all_code);
+    IdArray row, IdArray col, bool row_sorted = false, bool col_sorted = false,
+    dgl_format_code_t formats = ALL_CODE);
 
 /*!
  * \brief Create a heterograph from COO input.
@@ -620,7 +625,7 @@ HeteroGraphPtr CreateFromCOO(
  */
 HeteroGraphPtr CreateFromCOO(
     int64_t num_vtypes, const aten::COOMatrix& mat,
-    dgl_format_code_t formats = all_code);
+    dgl_format_code_t formats = ALL_CODE);
 
 /*!
  * \brief Create a heterograph from CSR input.
@@ -636,7 +641,7 @@ HeteroGraphPtr CreateFromCOO(
 HeteroGraphPtr CreateFromCSR(
     int64_t num_vtypes, int64_t num_src, int64_t num_dst,
     IdArray indptr, IdArray indices, IdArray edge_ids,
-    dgl_format_code_t formats = all_code);
+    dgl_format_code_t formats = ALL_CODE);
 
 /*!
  * \brief Create a heterograph from CSR input.
@@ -647,7 +652,7 @@ HeteroGraphPtr CreateFromCSR(
  */
 HeteroGraphPtr CreateFromCSR(
     int64_t num_vtypes, const aten::CSRMatrix& mat,
-    dgl_format_code_t formats = all_code);
+    dgl_format_code_t formats = ALL_CODE);
 
 /*!
  * \brief Create a heterograph from CSC input.
@@ -663,7 +668,7 @@ HeteroGraphPtr CreateFromCSR(
 HeteroGraphPtr CreateFromCSC(
     int64_t num_vtypes, int64_t num_src, int64_t num_dst,
     IdArray indptr, IdArray indices, IdArray edge_ids,
-    dgl_format_code_t formats = all_code);
+    dgl_format_code_t formats = ALL_CODE);
 
 /*!
  * \brief Create a heterograph from CSC input.
@@ -674,25 +679,29 @@ HeteroGraphPtr CreateFromCSC(
  */
 HeteroGraphPtr CreateFromCSC(
     int64_t num_vtypes, const aten::CSRMatrix& mat,
-    dgl_format_code_t formats = all_code);
+    dgl_format_code_t formats = ALL_CODE);
 
 /*!
  * \brief Extract the subgraph of the in edges of the given nodes.
  * \param graph Graph
  * \param nodes Node IDs of each type
+ * \param relabel_nodes Whether to remove isolated nodes and relabel the rest ones
  * \return Subgraph containing only the in edges. The returned graph has the same
  *         schema as the original one.
  */
-HeteroSubgraph InEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArray>& nodes);
+HeteroSubgraph InEdgeGraph(
+    const HeteroGraphPtr graph, const std::vector<IdArray>& nodes, bool relabel_nodes = false);
 
 /*!
  * \brief Extract the subgraph of the out edges of the given nodes.
  * \param graph Graph
  * \param nodes Node IDs of each type
+ * \param relabel_nodes Whether to remove isolated nodes and relabel the rest ones
  * \return Subgraph containing only the out edges. The returned graph has the same
  *         schema as the original one.
  */
-HeteroSubgraph OutEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArray>& nodes);
+HeteroSubgraph OutEdgeGraph(
+    const HeteroGraphPtr graph, const std::vector<IdArray>& nodes, bool relabel_nodes = false);
 
 /*!
  * \brief Joint union multiple graphs into one graph.
@@ -726,6 +735,27 @@ HeteroGraphPtr DisjointUnionHeteroGraph(
 
 HeteroGraphPtr DisjointUnionHeteroGraph2(
     GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& component_graphs);
+
+/*!
+ * \brief Slice a contiguous subgraph, e.g. retrieve a component graph from a batched graph.
+ *
+ * TODO(mufei): remove the meta_graph argument
+ *
+ * \param meta_graph Metagraph of the input and result.
+ * \param batched_graph Input graph.
+ * \param num_nodes_per_type Number of vertices of each type in the result.
+ * \param start_nid_per_type Start vertex ID of each type to slice.
+ * \param num_edges_per_type Number of edges of each type in the result.
+ * \param start_eid_per_type Start edge ID of each type to slice.
+ * \return Sliced graph
+ */
+HeteroGraphPtr SliceHeteroGraph(
+    GraphPtr meta_graph,
+    HeteroGraphPtr batched_graph,
+    IdArray num_nodes_per_type,
+    IdArray start_nid_per_type,
+    IdArray num_edges_per_type,
+    IdArray start_eid_per_type);
 
 /*!
  * \brief Split a graph into multiple disjoin components.
@@ -830,13 +860,13 @@ HeteroPickleStates HeteroPickle(HeteroGraphPtr graph);
 HeteroGraphPtr HeteroUnpickleOld(const HeteroPickleStates& states);
 
 #define FORMAT_HAS_CSC(format) \
-  ((format) & csc_code)
+  ((format) & CSC_CODE)
 
 #define FORMAT_HAS_CSR(format) \
-  ((format) & csr_code)
+  ((format) & CSR_CODE)
 
 #define FORMAT_HAS_COO(format) \
-  ((format) & coo_code)
+  ((format) & COO_CODE)
 
 }  // namespace dgl
 

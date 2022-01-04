@@ -44,6 +44,12 @@ class ServerState:
         self._kv_store = kv_store
         self._graph = local_g
         self.partition_book = partition_book
+        self._roles = {}
+
+    @property
+    def roles(self):
+        """Roles of the client processes"""
+        return self._roles
 
     @property
     def kv_store(self):

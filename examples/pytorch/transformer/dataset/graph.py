@@ -19,7 +19,7 @@ class GraphPool:
         print('start creating graph pool...')
         tic = time.time()
         self.n, self.m = n, m
-        g_pool = [[dgl.graph([]) for _ in range(m)] for _ in range(n)]
+        g_pool = [[dgl.graph(([], [])) for _ in range(m)] for _ in range(n)]
         num_edges = {
             'ee': np.zeros((n, n)).astype(int),
             'ed': np.zeros((n, m)).astype(int),

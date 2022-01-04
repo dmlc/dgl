@@ -1,14 +1,26 @@
 """PinSAGE sampler & related functions and classes"""
 
 import numpy as np
+from .._ffi.function import _init_api
 
 from .. import backend as F
 from .. import convert
-from .. import transform
 from .randomwalks import random_walk
-from .neighbor import select_topk
-from ..base import EID
+from .. import utils
 
+def _select_pinsage_neighbors(src, dst, num_samples_per_node, k):
+    """Determine the neighbors for PinSAGE algorithm from the given random walk traces.
+
+    This is fusing ``to_simple()``, ``select_topk()``, and counting the number of occurrences
+    together.
+    """
+    src = F.to_dgl_nd(src)
+    dst = F.to_dgl_nd(dst)
+    src, dst, counts = _CAPI_DGLSamplingSelectPinSageNeighbors(src, dst, num_samples_per_node, k)
+    src = F.from_dgl_nd(src)
+    dst = F.from_dgl_nd(dst)
+    counts = F.from_dgl_nd(counts)
+    return (src, dst, counts)
 
 class RandomWalkNeighborSampler(object):
     """PinSage-like neighbor sampler extended to any heterogeneous graphs.
@@ -53,18 +65,6 @@ class RandomWalkNeighborSampler(object):
         The name of the edge feature to be stored on the returned graph with the number of
         visits.
 
-    Inputs
-    ------
-    seed_nodes : Tensor
-        A tensor of given node IDs of node type ``ntype`` to generate neighbors from.  The
-        node type ``ntype`` is the beginning and ending node type of the given metapath.
-
-    Outputs
-    -------
-    g : DGLGraph
-        A homogeneous graph constructed by selecting neighbors for each given node according
-        to the algorithm above.
-
     Examples
     --------
     See examples in :any:`PinSAGESampler`.
@@ -92,28 +92,41 @@ class RandomWalkNeighborSampler(object):
         self.full_metapath = metapath * num_traversals
         restart_prob = np.zeros(self.metapath_hops * num_traversals)
         restart_prob[self.metapath_hops::self.metapath_hops] = termination_prob
-        self.restart_prob = F.zerocopy_from_numpy(restart_prob)
+        restart_prob = F.tensor(restart_prob, dtype=F.float32)
+        self.restart_prob = F.copy_to(restart_prob, G.device)
 
     # pylint: disable=no-member
     def __call__(self, seed_nodes):
+        """
+        Parameters
+        ----------
+        seed_nodes : Tensor
+            A tensor of given node IDs of node type ``ntype`` to generate neighbors from.  The
+            node type ``ntype`` is the beginning and ending node type of the given metapath.
+
+            It must be on CPU and have the same dtype as the ID type of the graph.
+
+        Returns
+        -------
+        g : DGLGraph
+            A homogeneous graph constructed by selecting neighbors for each given node according
+            to the algorithm above.  The returned graph is on CPU.
+        """
+        seed_nodes = utils.prepare_tensor(self.G, seed_nodes, 'seed_nodes')
+
         seed_nodes = F.repeat(seed_nodes, self.num_random_walks, 0)
         paths, _ = random_walk(
             self.G, seed_nodes, metapath=self.full_metapath, restart_prob=self.restart_prob)
         src = F.reshape(paths[:, self.metapath_hops::self.metapath_hops], (-1,))
         dst = F.repeat(paths[:, 0], self.num_traversals, 0)
 
-        src_mask = (src != -1)
-        src = F.boolean_mask(src, src_mask)
-        dst = F.boolean_mask(dst, src_mask)
-
-        # count the number of visits and pick the K-most frequent neighbors for each node
-        neighbor_graph = convert.graph(
-            (src, dst), num_nodes=self.G.number_of_nodes(self.ntype), ntype=self.ntype)
-        neighbor_graph = transform.to_simple(neighbor_graph, return_counts=self.weight_column)
-        counts = neighbor_graph.edata[self.weight_column]
-        neighbor_graph = select_topk(neighbor_graph, self.num_neighbors, self.weight_column)
-        selected_counts = F.gather_row(counts, neighbor_graph.edata[EID])
-        neighbor_graph.edata[self.weight_column] = selected_counts
+        src, dst, counts = _select_pinsage_neighbors(
+            src, dst, (self.num_random_walks * self.num_traversals), self.num_neighbors)
+        neighbor_graph = convert.heterograph(
+            {(self.ntype, '_E', self.ntype): (src, dst)},
+            {self.ntype: self.G.number_of_nodes(self.ntype)}
+        )
+        neighbor_graph.edata[self.weight_column] = counts
 
         return neighbor_graph
 
@@ -163,25 +176,14 @@ class PinSAGESampler(RandomWalkNeighborSampler):
         The name of the edge feature to be stored on the returned graph with the number of
         visits.
 
-    Inputs
-    ------
-    seed_nodes : Tensor
-        A tensor of given node IDs of node type ``ntype`` to generate neighbors from.
-
-    Outputs
-    -------
-    g : DGLHeteroGraph
-        A homogeneous graph constructed by selecting neighbors for each given node according
-        to PinSage algorithm.
-
     Examples
     --------
     Generate a random bidirectional bipartite graph with 3000 "A" nodes and 5000 "B" nodes.
 
     >>> g = scipy.sparse.random(3000, 5000, 0.003)
     >>> G = dgl.heterograph({
-    ...     ('A', 'AB', 'B'): g,
-    ...     ('B', 'BA', 'A'): g.T})
+    ...     ('A', 'AB', 'B'): g.nonzero(),
+    ...     ('B', 'BA', 'A'): g.T.nonzero()})
 
     Then we create a PinSage neighbor sampler that samples a graph of node type "A".  Each
     node would have (a maximum of) 10 neighbors.
@@ -217,3 +219,5 @@ class PinSAGESampler(RandomWalkNeighborSampler):
         super().__init__(G, num_traversals,
                          termination_prob, num_random_walks, num_neighbors,
                          metapath=[fw_etype, bw_etype], weight_column=weight_column)
+
+_init_api('dgl.sampling.pinsage', __name__)

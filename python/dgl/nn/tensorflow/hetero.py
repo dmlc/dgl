@@ -11,8 +11,25 @@ class HeteroGraphConv(layers.Layer):
     relation graphs, which reads the features from source nodes and writes the
     updated ones to destination nodes. If multiple relations have the same
     destination node types, their results are aggregated by the specified method.
-
     If the relation graph has no edge, the corresponding module will not be called.
+
+    Pseudo-code:
+
+    .. code::
+
+        outputs = {nty : [] for nty in g.dsttypes}
+        # Apply sub-modules on their associating relation graphs in parallel
+        for relation in g.canonical_etypes:
+            stype, etype, dtype = relation
+            dstdata = relation_submodule(g[relation], ...)
+            outputs[dtype].append(dstdata)
+
+        # Aggregate the results for each destination node type
+        rsts = {}
+        for ntype, ntype_outputs in outputs.items():
+            if len(ntype_outputs) != 0:
+                rsts[ntype] = aggregate(ntype_outputs)
+        return rsts
 
     Examples
     --------
@@ -71,6 +88,13 @@ class HeteroGraphConv(layers.Layer):
     >>> print(y_dst.keys())
     dict_keys(['user', 'game'])
 
+    Notes
+    -----
+
+    HeteroGraphConv requires that there is a module for every ``'etype'`` in an input graph.
+    If you want to apply HeteroGraphConv to a subset of a graph's ``'etypes'``, you must
+    create a new graph using for example :func:`~dgl.edge_type_subgraph()`.
+
     Parameters
     ----------
     mods : dict[str, nn.Module]
@@ -104,6 +128,12 @@ class HeteroGraphConv(layers.Layer):
     def __init__(self, mods, aggregate='sum'):
         super(HeteroGraphConv, self).__init__()
         self.mods = mods
+        # Do not break if graph has 0-in-degree nodes.
+        # Because there is no general rule to add self-loop for heterograph.
+        for _, v in self.mods.items():
+            set_allow_zero_in_degree_fn = getattr(v, 'set_allow_zero_in_degree', None)
+            if callable(set_allow_zero_in_degree_fn):
+                set_allow_zero_in_degree_fn(True)
         if isinstance(aggregate, str):
             self.agg_fn = get_aggregate_fn(aggregate)
         else:
@@ -139,8 +169,6 @@ class HeteroGraphConv(layers.Layer):
             src_inputs, dst_inputs = inputs
             for stype, etype, dtype in g.canonical_etypes:
                 rel_graph = g[stype, etype, dtype]
-                if rel_graph.number_of_edges() == 0:
-                    continue
                 if stype not in src_inputs or dtype not in dst_inputs:
                     continue
                 dstdata = self.mods[etype](
@@ -152,13 +180,11 @@ class HeteroGraphConv(layers.Layer):
         else:
             for stype, etype, dtype in g.canonical_etypes:
                 rel_graph = g[stype, etype, dtype]
-                if rel_graph.number_of_edges() == 0:
-                    continue
                 if stype not in inputs:
                     continue
                 dstdata = self.mods[etype](
                     rel_graph,
-                    inputs[stype],
+                    (inputs[stype], inputs[dtype]),
                     *mod_args.get(etype, ()),
                     **mod_kwargs.get(etype, {}))
                 outputs[dtype].append(dstdata)

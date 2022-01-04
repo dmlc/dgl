@@ -19,7 +19,8 @@ from .. import convert
 from .. import batch
 from .. import backend as F
 from ..convert import graph as dgl_graph
-from ..convert import to_networkx
+from ..convert import from_networkx, to_networkx
+from ..transform import reorder_graph
 
 backend = os.environ.get('DGLBACKEND', 'pytorch')
 
@@ -43,7 +44,9 @@ class CitationGraphDataset(DGLBuiltinDataset):
     force_reload : bool
         Whether to reload the dataset. Default: False
     verbose: bool
-      Whether to print out progress information. Default: True.
+        Whether to print out progress information. Default: True.
+    reverse_edge: bool
+        Whether to add reverse edges in graph. Default: True.
     """
     _urls = {
         'cora_v2' : 'dataset/cora_v2.zip',
@@ -51,7 +54,7 @@ class CitationGraphDataset(DGLBuiltinDataset):
         'pubmed' : 'dataset/pubmed.zip',
     }
 
-    def __init__(self, name, raw_dir=None, force_reload=False, verbose=True):
+    def __init__(self, name, raw_dir=None, force_reload=False, verbose=True, reverse_edge=True):
         assert name.lower() in ['cora', 'citeseer', 'pubmed']
 
         # Previously we use the pre-processing in pygcn (https://github.com/tkipf/pygcn)
@@ -60,6 +63,8 @@ class CitationGraphDataset(DGLBuiltinDataset):
             name = 'cora_v2'
 
         url = _get_dgl_url(self._urls[name])
+        self._reverse_edge = reverse_edge
+
         super(CitationGraphDataset, self).__init__(name,
                                                    url=url,
                                                    raw_dir=raw_dir,
@@ -67,7 +72,7 @@ class CitationGraphDataset(DGLBuiltinDataset):
                                                    verbose=verbose)
 
     def process(self):
-        """Loads input data from data directory
+        """Loads input data from data directory and reorder graph for better locality
 
         ind.name.x => the feature vectors of the training instances as scipy.sparse.csr.csr_matrix object;
         ind.name.tx => the feature vectors of the test instances as scipy.sparse.csr.csr_matrix object;
@@ -104,7 +109,11 @@ class CitationGraphDataset(DGLBuiltinDataset):
 
         features = sp.vstack((allx, tx)).tolil()
         features[test_idx_reorder, :] = features[test_idx_range, :]
-        graph = nx.DiGraph(nx.from_dict_of_lists(graph))
+
+        if self.reverse_edge:
+            graph = nx.DiGraph(nx.from_dict_of_lists(graph))
+        else:
+            graph = nx.Graph(nx.from_dict_of_lists(graph))
 
         onehot_labels = np.vstack((ally, ty))
         onehot_labels[test_idx_reorder, :] = onehot_labels[test_idx_range, :]
@@ -114,28 +123,29 @@ class CitationGraphDataset(DGLBuiltinDataset):
         idx_train = range(len(y))
         idx_val = range(len(y), len(y)+500)
 
-        train_mask = _sample_mask(idx_train, labels.shape[0])
-        val_mask = _sample_mask(idx_val, labels.shape[0])
-        test_mask = _sample_mask(idx_test, labels.shape[0])
+        train_mask = generate_mask_tensor(_sample_mask(idx_train, labels.shape[0]))
+        val_mask = generate_mask_tensor(_sample_mask(idx_val, labels.shape[0]))
+        test_mask = generate_mask_tensor(_sample_mask(idx_test, labels.shape[0]))
 
         self._graph = graph
-        g = dgl_graph(graph)
+        g = from_networkx(graph)
 
-        g.ndata['train_mask'] = generate_mask_tensor(train_mask)
-        g.ndata['val_mask'] = generate_mask_tensor(val_mask)
-        g.ndata['test_mask'] = generate_mask_tensor(test_mask)
+        g.ndata['train_mask'] = train_mask
+        g.ndata['val_mask'] = val_mask
+        g.ndata['test_mask'] = test_mask
         g.ndata['label'] = F.tensor(labels)
         g.ndata['feat'] = F.tensor(_preprocess_features(features), dtype=F.data_type_dict['float32'])
-        self._num_labels = onehot_labels.shape[1]
+        self._num_classes = onehot_labels.shape[1]
         self._labels = labels
-        self._g = g
+        self._g = reorder_graph(
+            g, node_permute_algo='rcmk', edge_permute_algo='dst', store_ids=False)
 
         if self.verbose:
             print('Finished data loading and preprocessing.')
             print('  NumNodes: {}'.format(self._g.number_of_nodes()))
             print('  NumEdges: {}'.format(self._g.number_of_edges()))
             print('  NumFeats: {}'.format(self._g.ndata['feat'].shape[1]))
-            print('  NumClasses: {}'.format(self.num_labels))
+            print('  NumClasses: {}'.format(self.num_classes))
             print('  NumTrainingSamples: {}'.format(
                 F.nonzero_1d(self._g.ndata['train_mask']).shape[0]))
             print('  NumValidationSamples: {}'.format(
@@ -161,7 +171,7 @@ class CitationGraphDataset(DGLBuiltinDataset):
         info_path = os.path.join(self.save_path,
                                  self.save_name + '.pkl')
         save_graphs(str(graph_path), self._g)
-        save_info(str(info_path), {'num_labels': self.num_labels})
+        save_info(str(info_path), {'num_classes': self.num_classes})
 
     def load(self):
         graph_path = os.path.join(self.save_path,
@@ -171,27 +181,29 @@ class CitationGraphDataset(DGLBuiltinDataset):
         graphs, _ = load_graphs(str(graph_path))
 
         info = load_info(str(info_path))
-        self._g = graphs[0]
+        graph = graphs[0]
+        self._g = graph
+        # for compatability
         graph = graph.clone()
-        graph.pop('train_mask')
-        graph.pop('val_mask')
-        graph.pop('test_mask')
-        graph.pop('feat')
-        graph.pop('label')
+        graph.ndata.pop('train_mask')
+        graph.ndata.pop('val_mask')
+        graph.ndata.pop('test_mask')
+        graph.ndata.pop('feat')
+        graph.ndata.pop('label')
         graph = to_networkx(graph)
         self._graph = nx.DiGraph(graph)
 
-        self._num_labels = info['num_labels']
-        self._g.ndata['train_mask'] = generate_mask_tensor(self._g.ndata['train_mask'].numpy())
-        self._g.ndata['val_mask'] = generate_mask_tensor(self._g.ndata['val_mask'].numpy())
-        self._g.ndata['test_mask'] = generate_mask_tensor(self._g.ndata['test_mask'].numpy())
+        self._num_classes = info['num_classes']
+        self._g.ndata['train_mask'] = generate_mask_tensor(F.asnumpy(self._g.ndata['train_mask']))
+        self._g.ndata['val_mask'] = generate_mask_tensor(F.asnumpy(self._g.ndata['val_mask']))
+        self._g.ndata['test_mask'] = generate_mask_tensor(F.asnumpy(self._g.ndata['test_mask']))
         # hack for mxnet compatability
 
         if self.verbose:
             print('  NumNodes: {}'.format(self._g.number_of_nodes()))
             print('  NumEdges: {}'.format(self._g.number_of_edges()))
             print('  NumFeats: {}'.format(self._g.ndata['feat'].shape[1]))
-            print('  NumClasses: {}'.format(self.num_labels))
+            print('  NumClasses: {}'.format(self.num_classes))
             print('  NumTrainingSamples: {}'.format(
                 F.nonzero_1d(self._g.ndata['train_mask']).shape[0]))
             print('  NumValidationSamples: {}'.format(
@@ -212,14 +224,19 @@ class CitationGraphDataset(DGLBuiltinDataset):
 
     @property
     def num_labels(self):
-        return self._num_labels
+        deprecate_property('dataset.num_labels', 'dataset.num_classes')
+        return self.num_classes
+
+    @property
+    def num_classes(self):
+        return self._num_classes
 
     """ Citation graph is used in many examples
         We preserve these properties for compatability.
     """
     @property
     def graph(self):
-        deprecate_property('dataset.graph', 'dataset.g')
+        deprecate_property('dataset.graph', 'dataset[0]')
         return self._graph
 
     @property
@@ -246,6 +263,11 @@ class CitationGraphDataset(DGLBuiltinDataset):
     def features(self):
         deprecate_property('dataset.feat', 'g.ndata[\'feat\']')
         return self._g.ndata['feat']
+
+    @property
+    def reverse_edge(self):
+        return self._reverse_edge
+    
 
 def _preprocess_features(features):
     """Row-normalize feature matrix and convert to tuple representation"""
@@ -323,7 +345,7 @@ class CoraGraphDataset(CitationGraphDataset):
     - Number of Classes: 7
     - Label split:
 
-        - Train: 140 
+        - Train: 140
         - Valid: 500
         - Test: 1000
 
@@ -336,10 +358,12 @@ class CoraGraphDataset(CitationGraphDataset):
         Whether to reload the dataset. Default: False
     verbose: bool
         Whether to print out progress information. Default: True.
+    reverse_edge: bool
+        Whether to add reverse edges in graph. Default: True.
 
     Attributes
     ----------
-    num_labels: int
+    num_classes: int
         Number of label classes
     graph: networkx.DiGraph
         Graph structure
@@ -362,7 +386,7 @@ class CoraGraphDataset(CitationGraphDataset):
     --------
     >>> dataset = CoraGraphDataset()
     >>> g = dataset[0]
-    >>> num_class = g.num_labels
+    >>> num_class = dataset.num_classes
     >>>
     >>> # get node feature
     >>> feat = g.ndata['feat']
@@ -374,14 +398,12 @@ class CoraGraphDataset(CitationGraphDataset):
     >>>
     >>> # get labels
     >>> label = g.ndata['label']
-    >>>
-    >>> # Train, Validation and Test
 
     """
-    def __init__(self, raw_dir=None, force_reload=False, verbose=True):
+    def __init__(self, raw_dir=None, force_reload=False, verbose=True, reverse_edge=True):
         name = 'cora'
 
-        super(CoraGraphDataset, self).__init__(name, raw_dir, force_reload, verbose)
+        super(CoraGraphDataset, self).__init__(name, raw_dir, force_reload, verbose, reverse_edge)
 
     def __getitem__(self, idx):
         r"""Gets the graph object
@@ -476,10 +498,12 @@ class CiteseerGraphDataset(CitationGraphDataset):
         Whether to reload the dataset. Default: False
     verbose: bool
         Whether to print out progress information. Default: True.
+    reverse_edge: bool
+        Whether to add reverse edges in graph. Default: True.
 
     Attributes
     ----------
-    num_labels: int
+    num_classes: int
         Number of label classes
     graph: networkx.DiGraph
         Graph structure
@@ -505,7 +529,7 @@ class CiteseerGraphDataset(CitationGraphDataset):
     --------
     >>> dataset = CiteseerGraphDataset()
     >>> g = dataset[0]
-    >>> num_class = g.num_labels
+    >>> num_class = dataset.num_classes
     >>>
     >>> # get node feature
     >>> feat = g.ndata['feat']
@@ -517,14 +541,12 @@ class CiteseerGraphDataset(CitationGraphDataset):
     >>>
     >>> # get labels
     >>> label = g.ndata['label']
-    >>>
-    >>> # Train, Validation and Test
 
     """
-    def __init__(self, raw_dir=None, force_reload=False, verbose=True):
+    def __init__(self, raw_dir=None, force_reload=False, verbose=True, reverse_edge=True):
         name = 'citeseer'
 
-        super(CiteseerGraphDataset, self).__init__(name, raw_dir, force_reload, verbose)
+        super(CiteseerGraphDataset, self).__init__(name, raw_dir, force_reload, verbose, reverse_edge)
 
     def __getitem__(self, idx):
         r"""Gets the graph object
@@ -619,10 +641,12 @@ class PubmedGraphDataset(CitationGraphDataset):
         Whether to reload the dataset. Default: False
     verbose: bool
         Whether to print out progress information. Default: True.
+    reverse_edge: bool
+        Whether to add reverse edges in graph. Default: True.
 
     Attributes
     ----------
-    num_labels: int
+    num_classes: int
         Number of label classes
     graph: networkx.DiGraph
         Graph structure
@@ -645,7 +669,7 @@ class PubmedGraphDataset(CitationGraphDataset):
     --------
     >>> dataset = PubmedGraphDataset()
     >>> g = dataset[0]
-    >>> num_class = g.num_of_class
+    >>> num_class = dataset.num_of_class
     >>>
     >>> # get node feature
     >>> feat = g.ndata['feat']
@@ -657,14 +681,12 @@ class PubmedGraphDataset(CitationGraphDataset):
     >>>
     >>> # get labels
     >>> label = g.ndata['label']
-    >>>
-    >>> # Train, Validation and Test
 
     """
-    def __init__(self, raw_dir=None, force_reload=False, verbose=True):
+    def __init__(self, raw_dir=None, force_reload=False, verbose=True, reverse_edge=True):
         name = 'pubmed'
 
-        super(PubmedGraphDataset, self).__init__(name, raw_dir, force_reload, verbose)
+        super(PubmedGraphDataset, self).__init__(name, raw_dir, force_reload, verbose, reverse_edge)
 
     def __getitem__(self, idx):
         r"""Gets the graph object
@@ -692,7 +714,7 @@ class PubmedGraphDataset(CitationGraphDataset):
         r"""The number of graphs in the dataset."""
         return super(PubmedGraphDataset, self).__len__()
 
-def load_cora(raw_dir=None, force_reload=False, verbose=True):
+def load_cora(raw_dir=None, force_reload=False, verbose=True, reverse_edge=True):
     """Get CoraGraphDataset
 
     Parameters
@@ -704,15 +726,17 @@ def load_cora(raw_dir=None, force_reload=False, verbose=True):
         Whether to reload the dataset. Default: False
     verbose: bool
     Whether to print out progress information. Default: True.
+    reverse_edge: bool
+        Whether to add reverse edges in graph. Default: True.
 
     Return
     -------
     CoraGraphDataset
     """
-    data = CoraGraphDataset(raw_dir, force_reload, verbose)
+    data = CoraGraphDataset(raw_dir, force_reload, verbose, reverse_edge)
     return data
 
-def load_citeseer(raw_dir=None, force_reload=False, verbose=True):
+def load_citeseer(raw_dir=None, force_reload=False, verbose=True, reverse_edge=True):
     """Get CiteseerGraphDataset
 
     Parameters
@@ -724,15 +748,17 @@ def load_citeseer(raw_dir=None, force_reload=False, verbose=True):
         Whether to reload the dataset. Default: False
     verbose: bool
     Whether to print out progress information. Default: True.
+    reverse_edge: bool
+        Whether to add reverse edges in graph. Default: True.
 
     Return
     -------
     CiteseerGraphDataset
     """
-    data = CiteseerGraphDataset(raw_dir, force_reload, verbose)
+    data = CiteseerGraphDataset(raw_dir, force_reload, verbose, reverse_edge)
     return data
 
-def load_pubmed(raw_dir=None, force_reload=False, verbose=True):
+def load_pubmed(raw_dir=None, force_reload=False, verbose=True, reverse_edge=True):
     """Get PubmedGraphDataset
 
     Parameters
@@ -744,12 +770,14 @@ def load_pubmed(raw_dir=None, force_reload=False, verbose=True):
             Whether to reload the dataset. Default: False
         verbose: bool
         Whether to print out progress information. Default: True.
+    reverse_edge: bool
+        Whether to add reverse edges in graph. Default: True.
 
     Return
     -------
     PubmedGraphDataset
     """
-    data = PubmedGraphDataset(raw_dir, force_reload, verbose)
+    data = PubmedGraphDataset(raw_dir, force_reload, verbose, reverse_edge)
     return data
 
 class CoraBinary(DGLBuiltinDataset):
@@ -789,13 +817,13 @@ class CoraBinary(DGLBuiltinDataset):
             for line in f.readlines():
                 if line.startswith('graph'):
                     if len(elist) != 0:
-                        self.graphs.append(dgl_graph(elist))
+                        self.graphs.append(dgl_graph(tuple(zip(*elist))))
                     elist = []
                 else:
                     u, v = line.strip().split(' ')
                     elist.append((int(u), int(v)))
             if len(elist) != 0:
-                self.graphs.append(dgl_graph(elist))
+                self.graphs.append(dgl_graph(tuple(zip(*elist))))
         with open("{}/pmpds.pkl".format(root), 'rb') as f:
             self.pmpds = _pickle_load(f)
         self.labels = []
@@ -839,8 +867,8 @@ class CoraBinary(DGLBuiltinDataset):
         self.graphs, labels = load_graphs(str(graph_path))
 
         self.labels = []
-        for i in range(len(lables)):
-            self.labels.append(labels['{}'.format(i)].asnumpy())
+        for i in range(len(labels)):
+            self.labels.append(F.asnumpy(labels['{}'.format(i)]))
         # load pmpds under self.raw_path
         with open("{}/pmpds.pkl".format(self.raw_path), 'rb') as f:
             self.pmpds = _pickle_load(f)

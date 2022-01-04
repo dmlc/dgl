@@ -104,20 +104,25 @@ class Identity(nn.Module):
         return x
 
 class Sequential(nn.Sequential):
-    r"""A squential container for stacking graph neural network modules.
+    r"""
 
-    We support two modes: sequentially apply GNN modules on the same graph or
-    a list of given graphs. In the second case, the number of graphs equals the
+    Description
+    -----------
+    A sequential container for stacking graph neural network modules.
+
+    DGL supports two modes: sequentially apply GNN modules on 1) the same graph or
+    2) a list of given graphs. In the second case, the number of graphs equals the
     number of modules inside this container.
 
     Parameters
     ----------
     *args :
-        Sub-modules of type torch.nn.Module, will be added to the container in
-        the order they are passed in the constructor.
+        Sub-modules of torch.nn.Module that will be added to the container in
+        the order by which they are passed in the constructor.
 
     Examples
     --------
+    The following example uses PyTorch backend.
 
     Mode 1: sequentially apply GNN modules on the same graph
 
@@ -146,16 +151,17 @@ class Sequential(nn.Sequential):
     >>> e_feat = torch.rand(9, 4)
     >>> net(g, n_feat, e_feat)
     (tensor([[39.8597, 45.4542, 25.1877, 30.8086],
-        [40.7095, 45.3985, 25.4590, 30.0134],
-        [40.7894, 45.2556, 25.5221, 30.4220]]), tensor([[80.3772, 89.7752, 50.7762, 60.5520],
-        [80.5671, 89.3736, 50.6558, 60.6418],
-        [80.4620, 89.5142, 50.3643, 60.3126],
-        [80.4817, 89.8549, 50.9430, 59.9108],
-        [80.2284, 89.6954, 50.0448, 60.1139],
-        [79.7846, 89.6882, 50.5097, 60.6213],
-        [80.2654, 90.2330, 50.2787, 60.6937],
-        [80.3468, 90.0341, 50.2062, 60.2659],
-        [80.0556, 90.2789, 50.2882, 60.5845]]))
+             [40.7095, 45.3985, 25.4590, 30.0134],
+             [40.7894, 45.2556, 25.5221, 30.4220]]),
+     tensor([[80.3772, 89.7752, 50.7762, 60.5520],
+             [80.5671, 89.3736, 50.6558, 60.6418],
+             [80.4620, 89.5142, 50.3643, 60.3126],
+             [80.4817, 89.8549, 50.9430, 59.9108],
+             [80.2284, 89.6954, 50.0448, 60.1139],
+             [79.7846, 89.6882, 50.5097, 60.6213],
+             [80.2654, 90.2330, 50.2787, 60.6937],
+             [80.3468, 90.0341, 50.2062, 60.2659],
+             [80.0556, 90.2789, 50.2882, 60.5845]]))
 
     Mode 2: sequentially apply GNN modules on different graphs
 
@@ -186,11 +192,14 @@ class Sequential(nn.Sequential):
             [220.4007, 239.7365, 213.8648, 234.9637],
             [196.4630, 207.6319, 184.2927, 208.7465]])
     """
+
     def __init__(self, *args):
         super(Sequential, self).__init__(*args)
 
     def forward(self, graph, *feats):
-        r"""Sequentially apply modules to the input.
+        r"""
+
+        Sequentially apply modules to the input.
 
         Parameters
         ----------
@@ -199,8 +208,8 @@ class Sequential(nn.Sequential):
 
         *feats :
             Input features.
-            The output of :math:`i`-th block should match that of the input
-            of :math:`(i+1)`-th block.
+            The output of the :math:`i`-th module should match the input
+            of the :math:`(i+1)`-th module in the sequential.
         """
         if isinstance(graph, list):
             for graph_i, module in zip(graph, self):
@@ -273,3 +282,124 @@ class WeightBasis(nn.Module):
         # generate all weights from bases
         weight = th.matmul(self.w_comp, self.weight.view(self.num_bases, -1))
         return weight.view(self.num_outputs, *self.shape)
+
+class JumpingKnowledge(nn.Module):
+    r"""
+
+    Description
+    -----------
+    The Jumping Knowledge aggregation module introduced in `Representation Learning on
+    Graphs with Jumping Knowledge Networks <https://arxiv.org/abs/1806.03536>`__. It
+    aggregates the output representations of multiple GNN layers with
+
+    **concatenation**
+
+    .. math::
+
+        h_i^{(1)} \, \Vert \, \ldots \, \Vert \, h_i^{(T)}
+
+    or **max pooling**
+
+    .. math::
+
+        \max \left( h_i^{(1)}, \ldots, h_i^{(T)} \right)
+
+    or **LSTM**
+
+    .. math::
+
+        \sum_{t=1}^T \alpha_i^{(t)} h_i^{(t)}
+
+    with attention scores :math:`\alpha_i^{(t)}` obtained from a BiLSTM
+
+    Parameters
+    ----------
+    mode : str
+        The aggregation to apply. It can be 'cat', 'max', or 'lstm',
+        corresponding to the equations above in order.
+    in_feats : int, optional
+        This argument is only required if :attr:`mode` is ``'lstm'``.
+        The output representation size of a single GNN layer. Note that
+        all GNN layers need to have the same output representation size.
+    num_layers : int, optional
+        This argument is only required if :attr:`mode` is ``'lstm'``.
+        The number of GNN layers for output aggregation.
+
+    Examples
+    --------
+    >>> import dgl
+    >>> import torch as th
+    >>> from dgl.nn import JumpingKnowledge
+
+    >>> # Output representations of two GNN layers
+    >>> num_nodes = 3
+    >>> in_feats = 4
+    >>> feat_list = [th.zeros(num_nodes, in_feats), th.ones(num_nodes, in_feats)]
+
+    >>> # Case1
+    >>> model = JumpingKnowledge()
+    >>> model(feat_list).shape
+    torch.Size([3, 8])
+
+    >>> # Case2
+    >>> model = JumpingKnowledge(mode='max')
+    >>> model(feat_list).shape
+    torch.Size([3, 4])
+
+    >>> # Case3
+    >>> model = JumpingKnowledge(mode='max', in_feats=in_feats, num_layers=len(feat_list))
+    >>> model(feat_list).shape
+    torch.Size([3, 4])
+    """
+    def __init__(self, mode='cat', in_feats=None, num_layers=None):
+        super(JumpingKnowledge, self).__init__()
+        assert mode in ['cat', 'max', 'lstm'], \
+            "Expect mode to be 'cat', or 'max' or 'lstm', got {}".format(mode)
+        self.mode = mode
+
+        if mode == 'lstm':
+            assert in_feats is not None, 'in_feats is required for lstm mode'
+            assert num_layers is not None, 'num_layers is required for lstm mode'
+            hidden_size = (num_layers * in_feats) // 2
+            self.lstm = nn.LSTM(in_feats, hidden_size, bidirectional=True, batch_first=True)
+            self.att = nn.Linear(2 * hidden_size, 1)
+
+    def reset_parameters(self):
+        r"""
+
+        Description
+        -----------
+        Reinitialize learnable parameters. This comes into effect only for the lstm mode.
+        """
+        if self.mode == 'lstm':
+            self.lstm.reset_parameters()
+            self.att.reset_parameters()
+
+    def forward(self, feat_list):
+        r"""
+
+        Description
+        -----------
+        Aggregate output representations across multiple GNN layers.
+
+        Parameters
+        ----------
+        feat_list : list[Tensor]
+            feat_list[i] is the output representations of a GNN layer.
+
+        Returns
+        -------
+        Tensor
+            The aggregated representations.
+        """
+        if self.mode == 'cat':
+            return th.cat(feat_list, dim=-1)
+        elif self.mode == 'max':
+            return th.stack(feat_list, dim=-1).max(dim=-1)[0]
+        else:
+            # LSTM
+            stacked_feat_list = th.stack(feat_list, dim=1) # (N, num_layers, in_feats)
+            alpha, _ = self.lstm(stacked_feat_list)
+            alpha = self.att(alpha).squeeze(-1)            # (N, num_layers)
+            alpha = th.softmax(alpha, dim=-1)
+            return (stacked_feat_list * alpha.unsqueeze(-1)).sum(dim=1)

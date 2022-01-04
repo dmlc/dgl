@@ -11,46 +11,7 @@ import io
 import unittest, pytest
 import test_utils
 from test_utils import parametrize_dtype, get_cases
-
-def _assert_is_identical(g, g2):
-    assert g.is_readonly == g2.is_readonly
-    assert g.number_of_nodes() == g2.number_of_nodes()
-    src, dst = g.all_edges(order='eid')
-    src2, dst2 = g2.all_edges(order='eid')
-    assert F.array_equal(src, src2)
-    assert F.array_equal(dst, dst2)
-
-    assert len(g.ndata) == len(g2.ndata)
-    assert len(g.edata) == len(g2.edata)
-    for k in g.ndata:
-        assert F.allclose(g.ndata[k], g2.ndata[k])
-    for k in g.edata:
-        assert F.allclose(g.edata[k], g2.edata[k])
-
-def _assert_is_identical_hetero(g, g2):
-    assert g.is_readonly == g2.is_readonly
-    assert g.ntypes == g2.ntypes
-    assert g.canonical_etypes == g2.canonical_etypes
-
-    # check if two metagraphs are identical
-    for edges, features in g.metagraph().edges(keys=True).items():
-        assert g2.metagraph().edges(keys=True)[edges] == features
-
-    # check if node ID spaces and feature spaces are equal
-    for ntype in g.ntypes:
-        assert g.number_of_nodes(ntype) == g2.number_of_nodes(ntype)
-        assert len(g.nodes[ntype].data) == len(g2.nodes[ntype].data)
-        for k in g.nodes[ntype].data:
-            assert F.allclose(g.nodes[ntype].data[k], g2.nodes[ntype].data[k])
-
-    # check if edge ID spaces and feature spaces are equal
-    for etype in g.canonical_etypes:
-        src, dst = g.all_edges(etype=etype, order='eid')
-        src2, dst2 = g2.all_edges(etype=etype, order='eid')
-        assert F.array_equal(src, src2)
-        assert F.array_equal(dst, dst2)
-        for k in g.edges[etype].data:
-            assert F.allclose(g.edges[etype].data[k], g2.edges[etype].data[k])
+from utils import assert_is_identical, assert_is_identical_hetero
 
 def _assert_is_identical_nodeflow(nf1, nf2):
     assert nf1.is_readonly == nf2.is_readonly
@@ -74,13 +35,13 @@ def _assert_is_identical_nodeflow(nf1, nf2):
             assert F.allclose(nf1.blocks[i].data[k], nf2.blocks[i].data[k])
 
 def _assert_is_identical_batchedgraph(bg1, bg2):
-    _assert_is_identical(bg1, bg2)
+    assert_is_identical(bg1, bg2)
     assert bg1.batch_size == bg2.batch_size
     assert bg1.batch_num_nodes == bg2.batch_num_nodes
     assert bg1.batch_num_edges == bg2.batch_num_edges
 
 def _assert_is_identical_batchedhetero(bg1, bg2):
-    _assert_is_identical_hetero(bg1, bg2)
+    assert_is_identical_hetero(bg1, bg2)
     for ntype in bg1.ntypes:
         assert bg1.batch_num_nodes(ntype) == bg2.batch_num_nodes(ntype)
     for canonical_etype in bg1.canonical_etypes:
@@ -132,7 +93,7 @@ def _global_message_func(nodes):
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(exclude=['dglgraph']))
+@pytest.mark.parametrize('g', get_cases(exclude=['dglgraph', 'two_hetero_batch']))
 def test_pickling_graph(g, idtype):
     g = g.astype(idtype)
     new_g = _reconstruct_pickle(g)
@@ -141,19 +102,18 @@ def test_pickling_graph(g, idtype):
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 def test_pickling_batched_heterograph():
     # copied from test_heterograph.create_test_heterograph()
-    plays_spmat = ssp.coo_matrix(([1, 1, 1, 1], ([0, 1, 2, 1], [0, 0, 1, 1])))
-    wishes_nx = nx.DiGraph()
-    wishes_nx.add_nodes_from(['u0', 'u1', 'u2'], bipartite=0)
-    wishes_nx.add_nodes_from(['g0', 'g1'], bipartite=1)
-    wishes_nx.add_edge('u0', 'g1', id=0)
-    wishes_nx.add_edge('u2', 'g0', id=1)
-
-    follows_g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows')
-    plays_g = dgl.bipartite(plays_spmat, 'user', 'plays', 'game')
-    wishes_g = dgl.bipartite(wishes_nx, 'user', 'wishes', 'game')
-    develops_g = dgl.bipartite([(0, 0), (1, 1)], 'developer', 'develops', 'game')
-    g = dgl.hetero_from_relations([follows_g, plays_g, wishes_g, develops_g])
-    g2 = dgl.hetero_from_relations([follows_g, plays_g, wishes_g, develops_g])
+    g = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 1], [1, 2]),
+        ('user', 'plays', 'game'): ([0, 1, 2, 1], [0, 0, 1, 1]),
+        ('user', 'wishes', 'game'): ([0, 2], [1, 0]),
+        ('developer', 'develops', 'game'): ([0, 1], [0, 1])
+    })
+    g2 = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 1], [1, 2]),
+        ('user', 'plays', 'game'): ([0, 1, 2, 1], [0, 0, 1, 1]),
+        ('user', 'wishes', 'game'): ([0, 2], [1, 0]),
+        ('developer', 'develops', 'game'): ([0, 1], [0, 1])
+    })
 
     g.nodes['user'].data['u_h'] = F.randn((3, 4))
     g.nodes['game'].data['g_h'] = F.randn((2, 5))
@@ -166,27 +126,42 @@ def test_pickling_batched_heterograph():
     new_bg = _reconstruct_pickle(bg)
     test_utils.check_graph_equal(bg, new_bg)
 
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
-@unittest.skipIf(dgl.backend.backend_name != "pytorch", reason="Only test for pytorch format file")
-def test_pickling_heterograph_index_compatibility():
-    plays_spmat = ssp.coo_matrix(([1, 1, 1, 1], ([0, 1, 2, 1], [0, 0, 1, 1])))
-    wishes_nx = nx.DiGraph()
-    wishes_nx.add_nodes_from(['u0', 'u1', 'u2'], bipartite=0)
-    wishes_nx.add_nodes_from(['g0', 'g1'], bipartite=1)
-    wishes_nx.add_edge('u0', 'g1', id=0)
-    wishes_nx.add_edge('u2', 'g0', id=1)
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU edge_subgraph w/ relabeling not implemented")
+def test_pickling_subgraph():
+    f1 = io.BytesIO()
+    f2 = io.BytesIO()
+    g = dgl.rand_graph(10000, 100000)
+    g.ndata['x'] = F.randn((10000, 4))
+    g.edata['x'] = F.randn((100000, 5))
+    pickle.dump(g, f1)
+    sg = g.subgraph([0, 1])
+    sgx = sg.ndata['x'] # materialize
+    pickle.dump(sg, f2)
+    # TODO(BarclayII): How should I test that the size of the subgraph pickle file should not
+    # be as large as the size of the original pickle file?
+    assert f1.tell() > f2.tell() * 50
 
-    follows_g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows')
-    plays_g = dgl.bipartite(plays_spmat, 'user', 'plays', 'game')
-    wishes_g = dgl.bipartite(wishes_nx, 'user', 'wishes', 'game')
-    develops_g = dgl.bipartite([(0, 0), (1, 1)], 'developer', 'develops', 'game')
-    g = dgl.hetero_from_relations([follows_g, plays_g, wishes_g, develops_g])
+    f2.seek(0)
+    f2.truncate()
+    sgx = sg.edata['x'] # materialize
+    pickle.dump(sg, f2)
+    assert f1.tell() > f2.tell() * 50
 
-    with open("tests/compute/hetero_pickle_old.pkl", "rb") as f:
-        gi = pickle.load(f)
-        f.close()
-    new_g = dgl.DGLHeteroGraph(gi, g.ntypes, g.etypes)
-    _assert_is_identical_hetero(g, new_g)
+    f2.seek(0)
+    f2.truncate()
+    sg = g.edge_subgraph([0])
+    sgx = sg.edata['x'] # materialize
+    pickle.dump(sg, f2)
+    assert f1.tell() > f2.tell() * 50
+
+    f2.seek(0)
+    f2.truncate()
+    sgx = sg.ndata['x'] # materialize
+    pickle.dump(sg, f2)
+    assert f1.tell() > f2.tell() * 50
+
+    f1.close()
+    f2.close()
 
 if __name__ == '__main__':
     test_pickling_index()

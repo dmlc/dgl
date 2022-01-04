@@ -14,18 +14,12 @@ import multiprocessing as mp
 import os
 
 def create_test_graph(idtype):
-    plays_spmat = ssp.coo_matrix(([1, 1, 1, 1], ([0, 1, 2, 1], [0, 0, 1, 1])))
-    wishes_nx = nx.DiGraph()
-    wishes_nx.add_nodes_from(['u0', 'u1', 'u2'], bipartite=0)
-    wishes_nx.add_nodes_from(['g0', 'g1'], bipartite=1)
-    wishes_nx.add_edge('u0', 'g1', id=0)
-    wishes_nx.add_edge('u2', 'g0', id=1)
-
-    follows_g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows', idtype=idtype)
-    plays_g = dgl.bipartite(plays_spmat, 'user', 'plays', 'game', idtype=idtype)
-    wishes_g = dgl.bipartite(wishes_nx, 'user', 'wishes', 'game', idtype=idtype)
-    develops_g = dgl.bipartite([(0, 0), (1, 1)], 'developer', 'develops', 'game', idtype=idtype)
-    g = dgl.hetero_from_relations([follows_g, plays_g, wishes_g, develops_g])
+    g = dgl.heterograph(({
+        ('user', 'follows', 'user'): ([0, 1], [1, 2]),
+        ('user', 'plays', 'game'): ([0, 1, 2, 1], [0, 0, 1, 1]),
+        ('user', 'wishes', 'game'): ([0, 2], [1, 0]),
+        ('developer', 'develops', 'game'): ([0, 1], [0, 1])
+    }), idtype=idtype)
     return g
 
 def _assert_is_identical_hetero(g, g2):
@@ -49,6 +43,7 @@ def _assert_is_identical_hetero(g, g2):
         assert F.array_equal(dst, dst2)
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
+@unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
 @parametrize_dtype
 def test_single_process(idtype):
     hg = create_test_graph(idtype=idtype)
@@ -66,6 +61,7 @@ def sub_proc(hg_origin, name):
     _assert_is_identical_hetero(hg_origin, hg_save_again)
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
+@unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
 @parametrize_dtype
 def test_multi_process(idtype):
     hg = create_test_graph(idtype=idtype)
@@ -76,6 +72,7 @@ def test_multi_process(idtype):
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(F._default_context_str == 'cpu', reason="Need gpu for this test")
+@unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
 def test_copy_from_gpu():
     hg = create_test_graph(idtype=F.int32)
     hg_gpu = hg.to(F.cuda())

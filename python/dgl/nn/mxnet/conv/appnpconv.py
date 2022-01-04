@@ -7,25 +7,58 @@ from mxnet.gluon import nn
 from .... import function as fn
 
 class APPNPConv(nn.Block):
-    r"""Approximate Personalized Propagation of Neural Predictions
+    r"""
+
+    Description
+    -----------
+    Approximate Personalized Propagation of Neural Predictions
     layer from paper `Predict then Propagate: Graph Neural Networks
     meet Personalized PageRank <https://arxiv.org/pdf/1810.05997.pdf>`__.
 
     .. math::
-        H^{0} & = X
+        H^{0} &= X
 
-        H^{t+1} & = (1-\alpha)\left(\hat{D}^{-1/2}
-        \hat{A} \hat{D}^{-1/2} H^{t}\right) + \alpha H^{0}
+        H^{l+1} &= (1-\alpha)\left(\tilde{D}^{-1/2}
+        \tilde{A} \tilde{D}^{-1/2} H^{l}\right) + \alpha H^{0}
+
+    where :math:`\tilde{A}` is :math:`A` + :math:`I`.
 
     Parameters
     ----------
     k : int
-        Number of iterations :math:`K`.
+        The number of iterations :math:`K`.
     alpha : float
         The teleport probability :math:`\alpha`.
     edge_drop : float, optional
-        Dropout rate on edges that controls the
+        The dropout rate on edges that controls the
         messages received by each node. Default: ``0``.
+
+    Example
+    -------
+    >>> import dgl
+    >>> import numpy as np
+    >>> import mxnet as mx
+    >>> from dgl.nn import APPNPConv
+    >>>
+    >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    >>> feat = mx.nd.ones((6, 10))
+    >>> conv = APPNPConv(k=3, alpha=0.5)
+    >>> conv.initialize(ctx=mx.cpu(0))
+    >>> res = conv(g, feat)
+    >>> res
+    [[1.         1.         1.         1.         1.         1.
+    1.         1.         1.         1.        ]
+    [1.         1.         1.         1.         1.         1.
+    1.         1.         1.         1.        ]
+    [1.         1.         1.         1.         1.         1.
+    1.         1.         1.         1.        ]
+    [1.0303301  1.0303301  1.0303301  1.0303301  1.0303301  1.0303301
+    1.0303301  1.0303301  1.0303301  1.0303301 ]
+    [0.86427665 0.86427665 0.86427665 0.86427665 0.86427665 0.86427665
+    0.86427665 0.86427665 0.86427665 0.86427665]
+    [0.5        0.5        0.5        0.5        0.5        0.5
+    0.5        0.5        0.5        0.5       ]]
+    <NDArray 6x10 @cpu(0)>
     """
     def __init__(self,
                  k,
@@ -38,14 +71,18 @@ class APPNPConv(nn.Block):
             self.edge_drop = nn.Dropout(edge_drop)
 
     def forward(self, graph, feat):
-        r"""Compute APPNP layer.
+        r"""
+
+        Description
+        -----------
+        Compute APPNP layer.
 
         Parameters
         ----------
         graph : DGLGraph
             The graph.
         feat : mx.NDArray
-            The input feature of shape :math:`(N, *)` :math:`N` is the
+            The input feature of shape :math:`(N, *)`. :math:`N` is the
             number of nodes, and :math:`*` could be of any shape.
 
         Returns

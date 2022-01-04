@@ -6,7 +6,11 @@ from torch.nn import init
 
 
 class DenseChebConv(nn.Module):
-    r"""Chebyshev Spectral Graph Convolution layer from paper `Convolutional
+    r"""
+
+    Description
+    -----------
+    Chebyshev Spectral Graph Convolution layer from paper `Convolutional
     Neural Networks on Graphs with Fast Localized Spectral Filtering
     <https://arxiv.org/pdf/1606.09375.pdf>`__.
 
@@ -15,17 +19,43 @@ class DenseChebConv(nn.Module):
     Parameters
     ----------
     in_feats: int
-        Number of input features.
+        Dimension of input features :math:`h_i^{(l)}`.
     out_feats: int
-        Number of output features.
+        Dimension of output features :math:`h_i^{(l+1)}`.
     k : int
         Chebyshev filter size.
+    activation : function, optional
+        Activation function, default is ReLu.
     bias : bool, optional
         If True, adds a learnable bias to the output. Default: ``True``.
 
+    Example
+    -------
+    >>> import dgl
+    >>> import numpy as np
+    >>> import torch as th
+    >>> from dgl.nn import DenseChebConv
+    >>>
+    >>> feat = th.ones(6, 10)
+    >>> adj = th.tensor([[0., 0., 1., 0., 0., 0.],
+    ...         [1., 0., 0., 0., 0., 0.],
+    ...         [0., 1., 0., 0., 0., 0.],
+    ...         [0., 0., 1., 0., 0., 1.],
+    ...         [0., 0., 0., 1., 0., 0.],
+    ...         [0., 0., 0., 0., 0., 0.]])
+    >>> conv = DenseChebConv(10, 2, 2)
+    >>> res = conv(adj, feat)
+    >>> res
+    tensor([[-3.3516, -2.4797],
+            [-3.3516, -2.4797],
+            [-3.3516, -2.4797],
+            [-4.5192, -3.0835],
+            [-2.5259, -2.0527],
+            [-0.5327, -1.0219]], grad_fn=<AddBackward0>)
+
     See also
     --------
-    ChebConv
+    `ChebConv <https://docs.dgl.ai/api/python/nn.pytorch.html#chebconv>`__
     """
     def __init__(self,
                  in_feats,
@@ -51,7 +81,11 @@ class DenseChebConv(nn.Module):
             init.xavier_normal_(self.W[i], init.calculate_gain('relu'))
 
     def forward(self, adj, feat, lambda_max=None):
-        r"""Compute (Dense) Chebyshev Spectral Graph Convolution layer.
+        r"""
+
+        Description
+        -----------
+        Compute (Dense) Chebyshev Spectral Graph Convolution layer.
 
         Parameters
         ----------

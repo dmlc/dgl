@@ -3563,7 +3563,7 @@ class DGLGraph(DGLBaseGraph):
         tensor([0, 1, 4])
         >>> SG.parent_eid
         tensor([0, 4])
-        >>> SG = G.edge_subgraph([0, 4], preserve_nodes=True)
+        >>> SG = G.edge_subgraph([0, 4], relabel_nodes=False)
         >>> SG.nodes()
         tensor([0, 1, 2, 3, 4])
         >>> SG.edges()
@@ -4038,6 +4038,7 @@ class DGLGraph(DGLBaseGraph):
         self._node_frame = old_nframe
         self._edge_frame = old_eframe
 
+    @property
     def is_homogeneous(self):
         """Return if the graph is homogeneous."""
         return True

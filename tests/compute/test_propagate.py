@@ -5,6 +5,10 @@ import unittest
 import utils as U
 from utils import parametrize_dtype
 
+def create_graph(idtype):
+    g = dgl.from_networkx(nx.path_graph(5), idtype=idtype, device=F.ctx())
+    return g
+
 def mfunc(edges):
     return {'m' : edges.src['x']}
 
@@ -15,7 +19,7 @@ def rfunc(nodes):
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @parametrize_dtype
 def test_prop_nodes_bfs(idtype):
-    g = dgl.graph(nx.path_graph(5), idtype=idtype, device=F.ctx())
+    g = create_graph(idtype)
     g.ndata['x'] = F.ones((5, 2))
     dgl.prop_nodes_bfs(g, 0, message_func=mfunc, reduce_func=rfunc, apply_node_func=None)
     # pull nodes using bfs order will result in a cumsum[i] + data[i] + data[i+1]
@@ -25,7 +29,7 @@ def test_prop_nodes_bfs(idtype):
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @parametrize_dtype
 def test_prop_edges_dfs(idtype):
-    g = dgl.graph(nx.path_graph(5), idtype=idtype, device=F.ctx())
+    g = create_graph(idtype)
     g.ndata['x'] = F.ones((5, 2))
     dgl.prop_edges_dfs(g, 0, message_func=mfunc, reduce_func=rfunc, apply_node_func=None)
     # snr using dfs results in a cumsum
@@ -48,7 +52,7 @@ def test_prop_edges_dfs(idtype):
 @parametrize_dtype
 def test_prop_nodes_topo(idtype):
     # bi-directional chain
-    g = dgl.graph(nx.path_graph(5), idtype=idtype, device=F.ctx())
+    g = create_graph(idtype)
     assert U.check_fail(dgl.prop_nodes_topo, g)  # has loop
 
     # tree

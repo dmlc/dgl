@@ -47,6 +47,7 @@ extensions = [
     'sphinx.ext.intersphinx',
     'sphinx.ext.graphviz',
     'sphinx_gallery.gen_gallery',
+    'sphinx_copybutton',
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -182,6 +183,7 @@ epub_exclude_files = ['search.html']
 
 # -- Extension configuration -------------------------------------------------
 autosummary_generate = True
+autodoc_member_order = 'alphabetical'
 
 intersphinx_mapping = {
     'python': ('https://docs.python.org/{.major}'.format(sys.version_info), None),
@@ -194,9 +196,18 @@ intersphinx_mapping = {
 # sphinx gallery configurations
 from sphinx_gallery.sorting import FileNameSortKey
 
-examples_dirs = ['../../tutorials/basics',
-                 '../../tutorials/models']  # path to find sources
-gallery_dirs = ['tutorials/basics', 'tutorials/models']  # path to generate docs
+examples_dirs = ['../../tutorials/blitz',
+                 '../../tutorials/large',
+                 '../../tutorials/dist',
+                 '../../tutorials/models',
+                 '../../tutorials/multi',
+                 '../../tutorials/cpu']  # path to find sources
+gallery_dirs = ['tutorials/blitz/',
+                'tutorials/large/',
+                'tutorials/dist/',
+                'tutorials/models/',
+                'tutorials/multi/',
+                'tutorials/cpu']  # path to generate docs
 reference_url = {
     'dgl' : None,
     'numpy': 'http://docs.scipy.org/doc/numpy/',
@@ -221,3 +232,7 @@ if dglbackend == 'mxnet':
     sphinx_gallery_conf['filename_pattern'] = "/*(?<=mx)\.py"
 if dglbackend == 'pytorch':
     sphinx_gallery_conf['filename_pattern'] = "/*(?<!mx)\.py"
+
+# sphinx-copybutton tool
+copybutton_prompt_text = r'>>> |\.\.\. '
+copybutton_prompt_is_regexp = True

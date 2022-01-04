@@ -48,8 +48,6 @@ HeteroSubgraph EdgeSubgraphNoPreserveNodes(
     const HeteroGraph* hg, const std::vector<IdArray>& eids) {
   // TODO(minjie): In general, all relabeling should be separated with subgraph
   //   operations.
-  CHECK(hg->Context().device_type != kDLGPU)
-    << "Edge subgraph with relabeling does not support GPU.";
   CHECK_EQ(eids.size(), hg->NumEdgeTypes())
     << "Invalid input: the input list size must be the same as the number of edge type.";
   HeteroSubgraph ret;
@@ -123,6 +121,10 @@ void HeteroGraphSanityCheck(GraphPtr meta_graph, const std::vector<HeteroGraphPt
   // all relation graphs must have only one edge type
   for (const auto &rg : rel_graphs) {
     CHECK_EQ(rg->NumEdgeTypes(), 1) << "Each relation graph must have only one edge type.";
+  }
+  auto ctx = rel_graphs[0]->Context();
+  for (const auto &rg : rel_graphs) {
+    CHECK_EQ(rg->Context(), ctx) << "Each relation graph must have the same context.";
   }
 }
 
@@ -250,7 +252,8 @@ HeteroGraphPtr HeteroGraph::AsNumBits(HeteroGraphPtr g, uint8_t bits) {
                                         hgindex->num_verts_per_type_));
 }
 
-HeteroGraphPtr HeteroGraph::CopyTo(HeteroGraphPtr g, const DLContext& ctx) {
+HeteroGraphPtr HeteroGraph::CopyTo(HeteroGraphPtr g, const DLContext &ctx,
+                                   const DGLStreamHandle &stream) {
   if (ctx == g->Context()) {
     return g;
   }
@@ -258,7 +261,7 @@ HeteroGraphPtr HeteroGraph::CopyTo(HeteroGraphPtr g, const DLContext& ctx) {
   CHECK_NOTNULL(hgindex);
   std::vector<HeteroGraphPtr> rel_graphs;
   for (auto g : hgindex->relation_graphs_) {
-    rel_graphs.push_back(UnitGraph::CopyTo(g, ctx));
+    rel_graphs.push_back(UnitGraph::CopyTo(g, ctx, stream));
   }
   return HeteroGraphPtr(new HeteroGraph(hgindex->meta_graph_, rel_graphs,
                                         hgindex->num_verts_per_type_));
@@ -420,7 +423,7 @@ FlattenedHeteroGraphPtr HeteroGraph::FlattenImpl(const std::vector<dgl_type_t>& 
       dsttype_set.push_back(dsttype);
     }
   }
-  // Sort the node types so that we can compare the sets and decide whether a homograph
+  // Sort the node types so that we can compare the sets and decide whether a homogeneous graph
   // should be returned.
   std::sort(srctype_set.begin(), srctype_set.end());
   std::sort(dsttype_set.begin(), dsttype_set.end());
@@ -484,7 +487,7 @@ FlattenedHeteroGraphPtr HeteroGraph::FlattenImpl(const std::vector<dgl_type_t>& 
   CHECK_EQ(gptr->NumBits(), NumBits());
 
   FlattenedHeteroGraph* result = new FlattenedHeteroGraph;
-  result->graph = HeteroGraphRef(gptr);
+  result->graph = HeteroGraphRef(HeteroGraphPtr(new HeteroGraph(gptr->meta_graph(), {gptr})));
   result->induced_srctype = aten::VecToIdArray(induced_srctype).CopyTo(Context());
   result->induced_srctype_set = aten::VecToIdArray(srctype_set).CopyTo(Context());
   result->induced_srcid = aten::VecToIdArray(induced_srcid).CopyTo(Context());

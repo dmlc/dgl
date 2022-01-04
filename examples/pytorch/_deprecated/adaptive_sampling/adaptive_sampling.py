@@ -76,8 +76,9 @@ class NodeSampler(object):
                 yield self.seeds[batches[i]], batches[i]
 
 
-def create_nodeflow(layer_mappings, block_mappings, block_aux_data, rel_graphs, seed_map):
-    hg = dgl.hetero_from_relations(rel_graphs)
+def create_nodeflow(layer_mappings, block_mappings, block_aux_data,
+                    data_dict, num_nodes_dict, seed_map):
+    hg = dgl.heterograph(data_dict, num_nodes_dict=num_nodes_dict)
     hg.layer_mappings = layer_mappings
     hg.block_mappings = block_mappings
     hg.block_aux_data = block_aux_data
@@ -105,7 +106,7 @@ class AdaptGenerator(object):
     def __init__(self, graph, num_blocks, node_feature=None, sampler=None, num_workers=0, coalesce=False,
                  sampler_weights=None, layer_nodes=None):
         self.node_feature = node_feature
-        adj = graph.adjacency_matrix_scipy()
+        adj = graph.adjacency_matrix_scipy(transpose=False)
         adj.data = np.ones(adj.nnz)
         self.norm_adj = normalize_adj(adj).tocsr()
         self.layer_nodes = layer_nodes
@@ -135,7 +136,8 @@ class AdaptGenerator(object):
         layer_mappings = []  # Mapping from layer node ID to parent node ID
         block_mappings = []  # Mapping from block edge ID to parent edge ID, or -1 if nonexistent
         block_aux_data = []
-        rel_graphs = []
+        data_dict = dict()
+        num_nodes_dict = dict()
 
         if self.coalesce:
             curr_frontier = torch.LongTensor(np.unique(seeds.numpy()))
@@ -163,11 +165,13 @@ class AdaptGenerator(object):
             aux_result = aux_result[[nodes_idx_map[i] for i in prev_frontier]]
             block_dsts = np.arange(len(curr_frontier)).repeat(num_neighbors)
 
-            rel_graphs.insert(0, dgl.bipartite(
-                (block_srcs, block_dsts),
-                'layer%d' % i, 'block%d' % i, 'layer%d' % (i + 1),
-                (len(prev_frontier), len(curr_frontier))
-            ))
+            data_dict.update({
+                ('layer%d' % i, 'block%d' % i, 'layer%d' % (i + 1)): (block_srcs, block_dsts)
+            })
+            num_nodes_dict.update({
+                'layer%d' % i: len(prev_frontier),
+                'layer%d' % (i + 1): len(curr_frontier)
+            })
 
             layer_mappings.insert(0, prev_frontier)
             block_mappings.insert(0, prev_frontier_edges)
@@ -179,7 +183,8 @@ class AdaptGenerator(object):
             layer_mappings=layer_mappings,
             block_mappings=block_mappings,
             block_aux_data=block_aux_data,
-            rel_graphs=rel_graphs,
+            data_dict=data_dict,
+            num_nodes_dict=num_nodes_dict,
             seed_map=seed_map)
 
     def stepback(self, curr_frontier, layer_index, *auxiliary):
@@ -365,7 +370,7 @@ class AdaptGraphSAGENet(nn.Module):
         ])
         self.sample_weights = sample_weights
         self.node_feature = node_feature
-        self.norm_adj = normalize_adj(trainG.adjacency_matrix_scipy())
+        self.norm_adj = normalize_adj(trainG.adjacency_matrix_scipy(transpose=False))
 
     def forward(self, nf, h, is_test=False):
         for i, layer in enumerate(self.layers):

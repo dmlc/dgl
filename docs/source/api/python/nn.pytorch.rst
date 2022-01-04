@@ -3,16 +3,9 @@
 NN Modules (PyTorch)
 ====================
 
-.. contents:: Contents
-    :local:
+.. _apinn-pytorch-conv:
 
-We welcome your contribution! If you want a model to be implemented in DGL as a NN module,
-please `create an issue <https://github.com/dmlc/dgl/issues>`_ started with "[Feature Request] NN Module XXXModel".
-
-If you want to contribute a NN module, please `create a pull request <https://github.com/dmlc/dgl/pulls>`_ started
-with "[NN] XXXModel in PyTorch NN Modules" and our team member would review this PR.
-
-Conv Layers 
+Conv Layers
 ----------------------------------------
 
 .. automodule:: dgl.nn.pytorch.conv
@@ -23,91 +16,112 @@ GraphConv
 .. autoclass:: dgl.nn.pytorch.conv.GraphConv
     :members: weight, bias, forward, reset_parameters
     :show-inheritance:
-    
+
+EdgeWeightNorm
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.conv.EdgeWeightNorm
+    :members: forward
+    :show-inheritance:
+
 RelGraphConv
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: dgl.nn.pytorch.conv.RelGraphConv
     :members: forward
     :show-inheritance:
-    
+
 TAGConv
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: dgl.nn.pytorch.conv.TAGConv
     :members: forward
     :show-inheritance:
-    
+
 GATConv
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: dgl.nn.pytorch.conv.GATConv
     :members: forward
     :show-inheritance:
-    
+
+GATv2Conv
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.conv.GATv2Conv
+    :members: forward
+    :show-inheritance:
+
+EGATConv
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.conv.EGATConv
+    :members: forward
+    :show-inheritance:
+
 EdgeConv
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: dgl.nn.pytorch.conv.EdgeConv
     :members: forward
     :show-inheritance:
-    
+
 SAGEConv
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: dgl.nn.pytorch.conv.SAGEConv
     :members: forward
     :show-inheritance:
-    
+
 SGConv
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: dgl.nn.pytorch.conv.SGConv
     :members: forward
     :show-inheritance:
-    
+
 APPNPConv
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: dgl.nn.pytorch.conv.APPNPConv
     :members: forward
     :show-inheritance:
-    
+
 GINConv
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: dgl.nn.pytorch.conv.GINConv
     :members: forward
     :show-inheritance:
-    
+
 GatedGraphConv
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: dgl.nn.pytorch.conv.GatedGraphConv
     :members: forward
     :show-inheritance:
-    
+
 GMMConv
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: dgl.nn.pytorch.conv.GMMConv
     :members: forward
     :show-inheritance:
-    
+
 ChebConv
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: dgl.nn.pytorch.conv.ChebConv
     :members: forward
     :show-inheritance:
-    
+
 AGNNConv
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: dgl.nn.pytorch.conv.AGNNConv
     :members: forward
     :show-inheritance:
-    
+
 NNConv
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -121,7 +135,44 @@ AtomicConv
 .. autoclass:: dgl.nn.pytorch.conv.AtomicConv
     :members: forward
     :show-inheritance:
-    
+
+CFConv
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.conv.CFConv
+    :members: forward
+    :show-inheritance:
+
+DotGatConv
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.conv.DotGatConv
+    :members: forward
+    :show-inheritance:
+
+TWIRLSConv
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.conv.TWIRLSConv
+    :members: forward
+    :show-inheritance:
+
+TWIRLSUnfoldingAndAttention
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.conv.TWIRLSUnfoldingAndAttention
+    :members: forward
+    :show-inheritance:
+
+GCN2Conv
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.conv.GCN2Conv
+    :members: forward
+    :show-inheritance:
+
+.. _apinn-pytorch-dense-conv:
+
 Dense Conv Layers
 ----------------------------------------
 
@@ -131,22 +182,24 @@ DenseGraphConv
 .. autoclass:: dgl.nn.pytorch.conv.DenseGraphConv
     :members: forward
     :show-inheritance:
-    
+
 DenseSAGEConv
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: dgl.nn.pytorch.conv.DenseSAGEConv
     :members: forward
     :show-inheritance:
-    
+
 DenseChebConv
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: dgl.nn.pytorch.conv.DenseChebConv
     :members: forward
     :show-inheritance:
-    
-Global Pooling Layers 
+
+.. _apinn-pytorch-pooling:
+
+Global Pooling Layers
 ----------------------------------------
 
 .. automodule:: dgl.nn.pytorch.glob
@@ -157,56 +210,103 @@ SumPooling
 .. autoclass:: dgl.nn.pytorch.glob.SumPooling
     :members:
     :show-inheritance:
-    
+
 AvgPooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: dgl.nn.pytorch.glob.AvgPooling
     :members:
     :show-inheritance:
-    
+
 MaxPooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: dgl.nn.pytorch.glob.MaxPooling
     :members:
     :show-inheritance:
-    
+
 SortPooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: dgl.nn.pytorch.glob.SortPooling
     :members:
     :show-inheritance:
-    
+
+WeightAndSum
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.glob.WeightAndSum
+    :members:
+    :show-inheritance:
+
 GlobalAttentionPooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: dgl.nn.pytorch.glob.GlobalAttentionPooling
     :members:
     :show-inheritance:
-    
+
 Set2Set
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: dgl.nn.pytorch.glob.Set2Set
     :members: forward
     :show-inheritance:
-    
+
 SetTransformerEncoder
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: dgl.nn.pytorch.glob.SetTransformerEncoder
     :members:
     :show-inheritance:
-    
+
 SetTransformerDecoder
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: dgl.nn.pytorch.glob.SetTransformerDecoder
     :members:
     :show-inheritance:
-    
+
+.. _apinn-pytorch-link
+
+Predictor and Score Functions for Link Prediction
+-------------------------------------------------
+
+.. automodule:: dgl.nn.pytorch.link
+
+EdgePredictor
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.link.EdgePredictor
+    :members: forward, reset_parameters
+    :show-inheritance:
+
+TransE
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.link.TransE
+    :members: rel_emb, forward, reset_parameters
+    :show-inheritance:
+
+TransR
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.link.TransR
+    :members: rel_emb, rel_project, forward, reset_parameters
+    :show-inheritance:
+
+Heterogeneous Graph Convolution Module
+----------------------------------------
+
+HeteroGraphConv
+~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.HeteroGraphConv
+   :members:
+   :show-inheritance:
+
+.. _apinn-pytorch-util:
+
 Utility Modules
 ----------------------------------------
 
@@ -217,22 +317,52 @@ Sequential
     :members:
     :show-inheritance:
 
+WeightBasis
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.utils.WeightBasis
+    :members:
+    :show-inheritance:
+
 KNNGraph
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: dgl.nn.pytorch.factory.KNNGraph
     :members:
     :show-inheritance:
-    
+
 SegmentedKNNGraph
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: dgl.nn.pytorch.factory.SegmentedKNNGraph
     :members:
     :show-inheritance:
-    
-Edge Softmax
+
+JumpingKnowledge
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. automodule:: dgl.nn.pytorch.softmax
-    :members: edge_softmax
+.. autoclass:: dgl.nn.pytorch.utils.JumpingKnowledge
+    :members: forward, reset_parameters
+    :show-inheritance:
+
+NodeEmbedding Module
+----------------------------------------
+
+NodeEmbedding
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.sparse_emb.NodeEmbedding
+    :members:
+    :show-inheritance:
+
+Explainability Models
+----------------------------------------
+
+.. automodule:: dgl.nn.pytorch.explain
+
+GNNExplainer
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.explain.GNNExplainer
+    :members: explain_node, explain_graph
+    :show-inheritance:

@@ -32,7 +32,7 @@ A = grid_graph(28, 8, metric)
 
 coarsening_levels = 4
 L, perm = coarsen(A, coarsening_levels)
-g_arr = [dgl.graph(csr) for csr in L]
+g_arr = [dgl.from_scipy(csr) for csr in L]
 
 coordinate_arr = get_coordinates(g_arr, grid_side, coarsening_levels, perm)
 for g, coordinate_arr in zip(g_arr, coordinate_arr):
@@ -177,6 +177,7 @@ for epoch in range(10):
     for g, x, y in test_loader:
         x = x.to(device)
         y = y.to(device)
+        g = [g_i.to(device) for g_i in g]
         out = model(g, x)
         hit += (out.max(-1)[1] == y).sum().item()
         tot += len(y)

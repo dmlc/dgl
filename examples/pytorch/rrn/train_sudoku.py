@@ -13,11 +13,12 @@ def main(args):
     else:
         device = torch.device('cuda', args.gpu)
 
+    model = SudokuNN(num_steps=args.steps, edge_drop=args.edge_drop)
+
     if args.do_train:
         if not os.path.exists(args.output_dir):
             os.mkdir(args.output_dir)
-
-        model = SudokuNN(num_steps=args.steps, edge_drop=args.edge_drop).to(device)
+        model.to(device)
         train_dataloader = sudoku_dataloader(args.batch_size, segment='train')
         dev_dataloader = sudoku_dataloader(args.batch_size, segment='valid')
 
@@ -57,18 +58,20 @@ def main(args):
             dev_acc = sum(dev_res) / len(dev_res)
             print(f"Dev loss {np.mean(dev_loss)}, accuracy {dev_acc}")
             if dev_acc >= best_dev_acc:
-                torch.save(model, os.path.join(args.output_dir, 'model_best.bin'))
+                torch.save(model.state_dict(), os.path.join(args.output_dir, 'model_best.bin'))
                 best_dev_acc = dev_acc
             print(f"Best dev accuracy {best_dev_acc}\n")
 
-        torch.save(model, os.path.join(args.output_dir, 'model_final.bin'))
+        torch.save(model.state_dict(), os.path.join(args.output_dir, 'model_final.bin'))
 
     if args.do_eval:
         model_path = os.path.join(args.output_dir, 'model_best.bin')
         if not os.path.exists(model_path):
             raise FileNotFoundError("Saved model not Found!")
 
-        model = torch.load(model_path).to(device)
+        model.load_state_dict(torch.load(model_path))
+        model.to(device)
+        
         test_dataloader = sudoku_dataloader(args.batch_size, segment='test')
 
         print("\n=========Test step========")

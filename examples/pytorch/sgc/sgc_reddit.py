@@ -36,7 +36,7 @@ def main(args):
         cuda = False
     else:
         cuda = True
-        g = g.to(args.gpu)
+        g = g.int().to(args.gpu)
 
     features = g.ndata['feat']
     labels = g.ndata['label']

@@ -2,14 +2,18 @@
 from collections.abc import Mapping
 
 from . import backend as F
-from .base import ALL, is_all, DGLError, dgl_warning
+from .base import ALL, is_all, DGLError, dgl_warning, NID, EID
+from .heterograph_index import disjoint_union, slice_gidx
+from .heterograph import DGLHeteroGraph
 from . import convert
 from . import utils
 
-__all__ = ['batch', 'unbatch', 'batch_hetero', 'unbatch_hetero']
 
-def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
-    r"""Batch a collection of ``DGLGraph``s into one graph for more efficient
+__all__ = ['batch', 'unbatch', 'slice_batch', 'batch_hetero', 'unbatch_hetero']
+
+def batch(graphs, ndata=ALL, edata=ALL, *,
+          node_attrs=None, edge_attrs=None):
+    r"""Batch a collection of :class:`DGLGraph` s into one graph for more efficient
     graph computation.
 
     Each input graph becomes one disjoint component of the batched graph. The nodes
@@ -34,8 +38,8 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
 
     The numbers of nodes and edges of the input graphs are accessible via the
     :func:`DGLGraph.batch_num_nodes` and :func:`DGLGraph.batch_num_edges` attributes
-    of the result graph. For homographs, they are 1D integer tensors, with each element
-    being the number of nodes/edges of the corresponding input graph. For
+    of the resulting graph. For homogeneous graphs, they are 1D integer tensors,
+    with each element being the number of nodes/edges of the corresponding input graph. For
     heterographs, they are dictionaries of 1D integer tensors, with node
     type or edge type as the keys.
 
@@ -45,7 +49,7 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
     By default, node/edge features are batched by concatenating the feature tensors
     of all input graphs. This thus requires features of the same name to have
     the same data type and feature size. One can pass ``None`` to the ``ndata``
-    or ``edata`` argument to prevent feature batching, or pass a list of string
+    or ``edata`` argument to prevent feature batching, or pass a list of strings
     to specify which features to batch.
 
     To unbatch the graph back to a list, use the :func:`dgl.unbatch` function.
@@ -67,7 +71,7 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
     Examples
     --------
 
-    Batch homographs
+    Batch homogeneous graphs
 
     >>> import dgl
     >>> import torch as th
@@ -155,71 +159,69 @@ def batch(graphs, ndata=ALL, edata=ALL, *, node_attrs=None, edge_attrs=None):
         dgl_warning('Arguments edge_attrs has been deprecated. Please use'
                     ' edata instead.')
         edata = edge_attrs
-    if not (is_all(ndata) or isinstance(ndata, list)):
+    if not (is_all(ndata) or isinstance(ndata, list) or ndata is None):
         raise DGLError('Invalid argument ndata: must be a string list but got {}.'.format(
             type(ndata)))
-    if not (is_all(edata) or isinstance(edata, list)):
+    if not (is_all(edata) or isinstance(edata, list) or edata is None):
         raise DGLError('Invalid argument edata: must be a string list but got {}.'.format(
             type(edata)))
+    if any(g.is_block for g in graphs):
+        raise DGLError("Batching a MFG is not supported.")
 
-    utils.check_all_same_device(graphs, 'graphs')
-    utils.check_all_same_idtype(graphs, 'graphs')
-    relations = graphs[0].canonical_etypes
-    idtype = graphs[0].idtype
-    device = graphs[0].device
+    relations = list(graphs[0].canonical_etypes)
+    relation_ids = [graphs[0].get_etype_id(r) for r in relations]
+    ntypes = list(graphs[0].ntypes)
+    ntype_ids = [graphs[0].get_ntype_id(n) for n in ntypes]
+    etypes = [etype for _, etype, _ in relations]
 
-    # Batch graph structure for each relation graph
-    edge_dict = {}
-    num_nodes_dict = {}
-    for rel in relations:
-        srctype, etype, dsttype = rel
-        srcnid_off = dstnid_off = 0
-        src, dst = [], []
-        for g in graphs:
-            u, v = g.edges(order='eid', etype=rel)
-            src.append(u + srcnid_off)
-            dst.append(v + dstnid_off)
-            srcnid_off += g.number_of_nodes(srctype)
-            dstnid_off += g.number_of_nodes(dsttype)
-        edge_dict[rel] = (F.cat(src, 0), F.cat(dst, 0))
-        num_nodes_dict.update({srctype : srcnid_off, dsttype : dstnid_off})
-    retg = convert.heterograph(edge_dict, num_nodes_dict, idtype=idtype, device=device)
+    gidx = disjoint_union(graphs[0]._graph.metagraph, [g._graph for g in graphs])
+    retg = DGLHeteroGraph(gidx, ntypes, etypes)
 
     # Compute batch num nodes
     bnn = {}
-    for ntype in graphs[0].ntypes:
+    for ntype in ntypes:
         bnn[ntype] = F.cat([g.batch_num_nodes(ntype) for g in graphs], 0)
     retg.set_batch_num_nodes(bnn)
 
     # Compute batch num edges
     bne = {}
-    for etype in graphs[0].canonical_etypes:
+    for etype in relations:
         bne[etype] = F.cat([g.batch_num_edges(etype) for g in graphs], 0)
     retg.set_batch_num_edges(bne)
 
     # Batch node feature
     if ndata is not None:
-        for ntype in graphs[0].ntypes:
-            feat_dicts = [g.nodes[ntype].data for g in graphs if g.number_of_nodes(ntype) > 0]
-            ret_feat = _batch_feat_dicts(feat_dicts, ndata, 'nodes["{}"].data'.format(ntype))
+        for ntype_id, ntype in zip(ntype_ids, ntypes):
+            all_empty = all(g._graph.number_of_nodes(ntype_id) == 0 for g in graphs)
+            frames = [
+                g._node_frames[ntype_id] for g in graphs
+                if g._graph.number_of_nodes(ntype_id) > 0 or all_empty]
+            # TODO: do we require graphs with no nodes/edges to have the same schema?  Currently
+            # we allow empty graphs to have no features during batching.
+            ret_feat = _batch_feat_dicts(frames, ndata, 'nodes["{}"].data'.format(ntype))
             retg.nodes[ntype].data.update(ret_feat)
 
     # Batch edge feature
     if edata is not None:
-        for etype in graphs[0].canonical_etypes:
-            feat_dicts = [g.edges[etype].data for g in graphs if g.number_of_edges(etype) > 0]
-            ret_feat = _batch_feat_dicts(feat_dicts, edata, 'edges[{}].data'.format(etype))
+        for etype_id, etype in zip(relation_ids, relations):
+            all_empty = all(g._graph.number_of_edges(etype_id) == 0 for g in graphs)
+            frames = [
+                g._edge_frames[etype_id] for g in graphs
+                if g._graph.number_of_edges(etype_id) > 0 or all_empty]
+            # TODO: do we require graphs with no nodes/edges to have the same schema?  Currently
+            # we allow empty graphs to have no features during batching.
+            ret_feat = _batch_feat_dicts(frames, edata, 'edges[{}].data'.format(etype))
             retg.edges[etype].data.update(ret_feat)
 
     return retg
 
-def _batch_feat_dicts(feat_dicts, keys, feat_dict_name):
+def _batch_feat_dicts(frames, keys, feat_dict_name):
     """Internal function to batch feature dictionaries.
 
     Parameters
     ----------
-    feat_dicts : list[dict[str, Tensor]]
-        Feature dictionary list.
+    frames : list[Frame]
+        List of frames
     keys : list[str]
         Feature keys. Can be '__ALL__', meaning batching all features.
     feat_dict_name : str
@@ -230,30 +232,30 @@ def _batch_feat_dicts(feat_dicts, keys, feat_dict_name):
     dict[str, Tensor]
         New feature dict.
     """
-    if len(feat_dicts) == 0:
+    if len(frames) == 0:
         return {}
+    schemas = [frame.schemes for frame in frames]
     # sanity checks
     if is_all(keys):
-        utils.check_all_same_keys(feat_dicts, feat_dict_name)
-        keys = feat_dicts[0].keys()
+        utils.check_all_same_schema(schemas, feat_dict_name)
+        keys = schemas[0].keys()
     else:
-        utils.check_all_have_keys(feat_dicts, keys, feat_dict_name)
-    utils.check_all_same_schema(feat_dicts, keys, feat_dict_name)
+        utils.check_all_same_schema_for_keys(schemas, keys, feat_dict_name)
     # concat features
-    ret_feat = {k : F.cat([fd[k] for fd in feat_dicts], 0) for k in keys}
+    ret_feat = {k : F.cat([fd[k] for fd in frames], 0) for k in keys}
     return ret_feat
 
 def unbatch(g, node_split=None, edge_split=None):
     """Revert the batch operation by split the given graph into a list of small ones.
 
     This is the reverse operation of :func:``dgl.batch``. If the ``node_split``
-    or the ``edge_split`` is not given, it uses the :func:`DGLGraph.batch_num_nodes`
-    and :func:`DGLGraph.batch_num_edges` of the input graph.
+    or the ``edge_split`` is not given, it calls :func:`DGLGraph.batch_num_nodes`
+    and :func:`DGLGraph.batch_num_edges` of the input graph to get the information.
 
     If the ``node_split`` or the ``edge_split`` arguments are given,
     it will partition the graph according to the given segments. One must assure
     that the partition is valid -- edges of the i^th graph only connect nodes
-    belong to the i^th graph. Otherwise, an error will be thrown.
+    belong to the i^th graph. Otherwise, DGL will throw an error.
 
     The function supports heterograph input, in which case the two split
     section arguments shall be of dictionary type -- similar to the
@@ -395,7 +397,7 @@ def unbatch(g, node_split=None, edge_split=None):
                           for i in range(num_split)]
 
     # Create graphs
-    gs = [convert.heterograph(edge_dict, num_nodes_dict, validate=True, idtype=g.idtype)
+    gs = [convert.heterograph(edge_dict, num_nodes_dict, idtype=g.idtype)
           for edge_dict, num_nodes_dict in zip(edge_dict_per, num_nodes_dict_per)]
 
     # Unbatch node features
@@ -414,6 +416,94 @@ def unbatch(g, node_split=None, edge_split=None):
 
     return gs
 
+def slice_batch(g, gid, store_ids=False):
+    """Get a particular graph from a batch of graphs.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        Input batched graph.
+    gid : int
+        The ID of the graph to retrieve.
+    store_ids : bool
+        If True, it will store the raw IDs of the extracted nodes and edges in the ``ndata`` and
+        ``edata`` of the resulting graph under name ``dgl.NID`` and ``dgl.EID``, respectively.
+
+    Returns
+    -------
+    DGLGraph
+        Retrieved graph.
+
+    Examples
+    --------
+
+    The following example uses PyTorch backend.
+
+    >>> import dgl
+    >>> import torch
+
+    Create a batched graph.
+
+    >>> g1 = dgl.graph(([0, 1], [2, 3]))
+    >>> g2 = dgl.graph(([1], [2]))
+    >>> bg = dgl.batch([g1, g2])
+
+    Get the second component graph.
+
+    >>> g = dgl.slice_batch(bg, 1)
+    >>> print(g)
+    Graph(num_nodes=3, num_edges=1,
+          ndata_schemes={}
+          edata_schemes={})
+    """
+    start_nid = []
+    num_nodes = []
+    for ntype in g.ntypes:
+        batch_num_nodes = g.batch_num_nodes(ntype)
+        num_nodes.append(F.as_scalar(batch_num_nodes[gid]))
+        if gid == 0:
+            start_nid.append(0)
+        else:
+            start_nid.append(F.as_scalar(F.sum(F.slice_axis(batch_num_nodes, 0, 0, gid), 0)))
+
+    start_eid = []
+    num_edges = []
+    for etype in g.canonical_etypes:
+        batch_num_edges = g.batch_num_edges(etype)
+        num_edges.append(F.as_scalar(batch_num_edges[gid]))
+        if gid == 0:
+            start_eid.append(0)
+        else:
+            start_eid.append(F.as_scalar(F.sum(F.slice_axis(batch_num_edges, 0, 0, gid), 0)))
+
+    # Slice graph structure
+    gidx = slice_gidx(g._graph, utils.toindex(num_nodes), utils.toindex(start_nid),
+                      utils.toindex(num_edges), utils.toindex(start_eid))
+    retg = DGLHeteroGraph(gidx, g.ntypes, g.etypes)
+
+    # Slice node features
+    for ntid, ntype in enumerate(g.ntypes):
+        stnid = start_nid[ntid]
+        for key, feat in g.nodes[ntype].data.items():
+            subfeats = F.slice_axis(feat, 0, stnid, stnid+num_nodes[ntid])
+            retg.nodes[ntype].data[key] = subfeats
+
+        if store_ids:
+            retg.nodes[ntype].data[NID] = F.arange(stnid, stnid+num_nodes[ntid],
+                                                   retg.idtype, retg.device)
+
+    # Slice edge features
+    for etid, etype in enumerate(g.canonical_etypes):
+        steid = start_eid[etid]
+        for key, feat in g.edges[etype].data.items():
+            subfeats = F.slice_axis(feat, 0, steid, steid+num_edges[etid])
+            retg.edges[etype].data[key] = subfeats
+
+        if store_ids:
+            retg.edges[etype].data[EID] = F.arange(steid, steid+num_edges[etid],
+                                                   retg.idtype, retg.device)
+
+    return retg
 
 #### DEPRECATED APIS ####
 def batch_hetero(*args, **kwargs):
@@ -426,4 +516,4 @@ def unbatch_hetero(*args, **kwargs):
     """DEPREACTED: please use dgl.unbatch """
     dgl_warning('From v0.5, DGLHeteroGraph is merged into DGLGraph. You can safely'
                 ' replace dgl.unbatch_hetero with dgl.unbatch')
-    return batch(*args, **kwargs)
+    return unbatch(*args, **kwargs)

@@ -145,7 +145,8 @@ def to_backend_ctx(dglctx):
 
 
 def astype(input, ty):
-    return tf.cast(input, dtype=ty)
+    with tf.device(input.device):
+        return tf.cast(input, dtype=ty)
 
 
 def asnumpy(input):
@@ -167,6 +168,8 @@ def sum(input, dim, keepdims=False):
         input = tf.cast(input, tf.int32)
     return tf.reduce_sum(input, axis=dim, keepdims=keepdims)
 
+def floor_div(in1, in2):
+    return astype(in1 / in2, dtype(in1))
 
 def reduce_sum(input):
     if input.dtype == tf.bool:
@@ -174,12 +177,18 @@ def reduce_sum(input):
     return tf.reduce_sum(input)
 
 
+def cumsum(input, dim):
+    if input.dtype == tf.bool:
+        input = tf.cast(input, tf.int32)
+    return tf.cumsum(input, axis=dim)
+
+
 def mean(input, dim):
     return tf.reduce_mean(input, axis=dim)
 
 
 def reduce_mean(input):
-    return th.reduce_mean(input)
+    return tf.reduce_mean(input)
 
 
 def max(input, dim):
@@ -252,7 +261,7 @@ def stack(seq, dim):
 
 
 def split(input, sizes_or_sections, dim):
-    return tf.split(input, sizes_or_sections, axis=dim)
+    return [copy_to(_, input.device) for _ in tf.split(input, sizes_or_sections, axis=dim)]
 
 
 def repeat(input, repeats, dim):
@@ -336,6 +345,12 @@ def uniform(shape, dtype, ctx, low, high):
     return t
 
 
+def randint(shape, dtype, ctx, low, high):
+    with tf.device(ctx):
+        t = tf.random.uniform(shape, dtype=dtype, minval=low, maxval=high)
+    return t
+
+
 def pad_packed_tensor(input, lengths, value, l_min=None):
     old_shape = input.shape
     if isinstance(lengths, tf.Tensor):
@@ -391,8 +406,18 @@ def clone(input):
 def clamp(data, min_val, max_val):
     return tf.clip_by_value(data, min_val, max_val)
 
-def unique(input):
-    return tf.unique(input).y
+def replace_inf_with_zero(x):
+    return tf.where(tf.abs(x) == np.inf, 0, x)
+
+def count_nonzero(input):
+    return int(tf.math.count_nonzero(input))
+
+
+def unique(input, return_inverse=False):
+    if return_inverse:
+        return tf.unique(input)
+    else:
+        return tf.unique(input).y
 
 
 def full_1d(length, fill_value, dtype, ctx):
@@ -411,8 +436,10 @@ def sort_1d(input):
     return tf.sort(input), tf.cast(tf.argsort(input), dtype=tf.int64)
 
 
-def arange(start, stop, dtype=tf.int64):
-    with tf.device("/cpu:0"):
+def arange(start, stop, dtype=tf.int64, ctx=None):
+    if not ctx:
+        ctx = "/cpu:0"
+    with tf.device(ctx):
         t = tf.range(start, stop, dtype=dtype)
     return t
 
@@ -434,10 +461,13 @@ def zerocopy_from_numpy(np_array):
 
 
 def zerocopy_to_dgl_ndarray(data):
-    if data.dtype == tf.int32 and device_type(data.device) == 'gpu':
-        # NOTE: TF doesn't keep int32 tensors on GPU due to legacy issues with
-        #   shape inference. Convert it to uint32 and cast it back afterwards.
-        data = tf.cast(data, tf.uint32)
+    if device_type(data.device) == 'gpu' and data.dtype in (tf.int32, tf.int64):
+        # NOTE: TF doesn't keep signed tensors on GPU due to legacy issues with
+        #   shape inference. Convert it to unsigned and cast it back afterwards.
+        if data.dtype == tf.int32:
+            data = tf.cast(data, tf.uint32)
+        elif data.dtype == tf.int64:
+            data = tf.cast(data, tf.uint64)
         return nd.cast_to_signed(nd.from_dlpack(zerocopy_to_dlpack(data)))
     else:
         return nd.from_dlpack(zerocopy_to_dlpack(data))

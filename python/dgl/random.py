@@ -5,15 +5,15 @@ from ._ffi.function import _init_api
 from . import backend as F
 from . import ndarray as nd
 
-def seed(val):
-    """Set the seed of randomized methods in DGL.
+__all__ = ['seed']
 
-    The randomized methods include various samplers and random walk routines.
+def seed(val):
+    """Set the random seed of DGL.
 
     Parameters
     ----------
     val : int
-        The seed
+        The seed.
     """
     _CAPI_SetSeed(val)
 
@@ -39,8 +39,6 @@ def choice(a, size, replace=True, prob=None):  # pylint: disable=invalid-name
 
     It out-performs numpy for non-uniform sampling in general cases.
 
-    TODO(minjie): support RNG as one of the arguments.
-
     Parameters
     ----------
     a : 1-D tensor or int
@@ -59,6 +57,7 @@ def choice(a, size, replace=True, prob=None):  # pylint: disable=invalid-name
     samples : 1-D tensor
         The generated random samples
     """
+    #TODO(minjie): support RNG as one of the arguments.
     if isinstance(size, tuple):
         num = np.prod(size)
     else:

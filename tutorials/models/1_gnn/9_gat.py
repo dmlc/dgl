@@ -1,13 +1,20 @@
 """
 .. _model-gat:
 
-Graph attention network
-==================================
+Understand Graph Attention Network
+=======================================
 
 **Authors:** `Hao Zhang <https://github.com/sufeidechabei/>`_, `Mufei Li
 <https://github.com/mufeili>`_, `Minjie Wang
 <https://jermainewang.github.io/>`_  `Zheng Zhang
 <https://shanghai.nyu.edu/academics/faculty/directory/zheng-zhang>`_
+
+.. warning::
+
+    The tutorial aims at gaining insights into the paper, with code as a mean
+    of explanation. The implementation thus is NOT optimized for running
+    efficiency. For recommended implementation, please refer to the `official
+    examples <https://github.com/dmlc/dgl/tree/master/examples>`_.
 
 In this tutorial, you learn about a graph attention network (GAT) and how it can be 
 implemented in PyTorch. You can also learn to visualize and understand what the attention 
@@ -22,7 +29,7 @@ One workaround is to simply average over all neighbor node features as described
 the research paper `GraphSAGE
 <https://www-cs-faculty.stanford.edu/people/jure/pubs/graphsage-nips17.pdf>`_.
 However, `Graph Attention Network <https://arxiv.org/abs/1710.10903>`_ proposes a
-different type of aggregation. GAN uses weighting neighbor features with feature dependent and
+different type of aggregation. GAT uses weighting neighbor features with feature dependent and
 structure-free normalization, in the style of attention.
 """
 ###############################################################
@@ -106,6 +113,12 @@ from dgl.nn.pytorch import GATConv
 # To begin, you can get an overall impression about how a ``GATLayer`` module is
 # implemented in DGL. In this section, the four equations above are broken down 
 # one at a time.
+#
+# .. note::
+#
+#    This is showing how to implement a GAT from scratch.  DGL provides a more
+#    efficient :class:`builtin GAT layer module <dgl.nn.pytorch.conv.GATConv>`.
+#
 
 import torch
 import torch.nn as nn

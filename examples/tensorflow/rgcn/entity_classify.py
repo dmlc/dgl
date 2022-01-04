@@ -66,7 +66,6 @@ def main(args):
         hg = dataset[0]
 
         num_rels = len(hg.canonical_etypes)
-        num_of_ntype = len(hg.ntypes)
         category = dataset.predict_category
         num_classes = dataset.num_classes
         train_mask = hg.nodes[category].data.pop('train_mask')
@@ -98,7 +97,7 @@ def main(args):
                 category_id = i
 
         # edge type and normalization factor
-        g = dgl.to_homo(hg)
+        g = dgl.to_homogeneous(hg, edata=['norm'])
 
     # check cuda
     if args.gpu < 0:

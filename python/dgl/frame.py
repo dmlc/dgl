@@ -8,6 +8,36 @@ from . import backend as F
 from .base import DGLError, dgl_warning
 from .init import zero_initializer
 
+class _LazyIndex(object):
+    def __init__(self, index):
+        if isinstance(index, list):
+            self._indices = index
+        else:
+            self._indices = [index]
+
+    def __len__(self):
+        return len(self._indices[-1])
+
+    def slice(self, index):
+        """ Create a new _LazyIndex object sliced by the given index tensor.
+        """
+        # if our indices are in the same context, lets just slice now and free
+        # memory, otherwise do nothing until we have to
+        if F.context(self._indices[-1]) == F.context(index):
+            return _LazyIndex(self._indices[:-1] + [F.gather_row(self._indices[-1], index)])
+        return _LazyIndex(self._indices + [index])
+
+    def flatten(self):
+        """ Evaluate the chain of indices, and return a single index tensor.
+        """
+        flat_index = self._indices[0]
+        # here we actually need to resolve it
+        for index in self._indices[1:]:
+            if F.context(index) != F.context(flat_index):
+                index = F.copy_to(index, F.context(flat_index))
+            flat_index = F.gather_row(flat_index, index)
+        return flat_index
+
 class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
     """The column scheme.
 
@@ -77,6 +107,11 @@ class Column(object):
         tensor of this column when the index tensor is not None.
         This typically happens when the column is extracted from another
         column using the `subcolumn` method.
+
+        It can also be None, which may only happen when transmitting a
+        not-yet-materialized subcolumn from a subprocess to the main process.
+        In this case, the main process should already maintain the content of
+        the storage, and is responsible for restoring the subcolumn's storage pointer.
     data : Tensor
         The actual data tensor of this column.
     scheme : Scheme
@@ -84,10 +119,11 @@ class Column(object):
     index : Tensor
         Index tensor
     """
-    def __init__(self, storage, scheme=None, index=None):
+    def __init__(self, storage, scheme=None, index=None, device=None):
         self.storage = storage
         self.scheme = scheme if scheme else infer_scheme(storage)
         self.index = index
+        self.device = device
 
     def __len__(self):
         """The number of features (number of rows) in this column."""
@@ -105,8 +141,23 @@ class Column(object):
     def data(self):
         """Return the feature data. Perform index selecting if needed."""
         if self.index is not None:
+            if isinstance(self.index, _LazyIndex):
+                self.index = self.index.flatten()
+            # If index and storage is not in the same context,
+            # copy index to the same context of storage.
+            # Copy index is usually cheaper than copy data
+            if F.context(self.storage) != F.context(self.index):
+                kwargs = {}
+                if self.device is not None:
+                    kwargs = self.device[1]
+                self.index = F.copy_to(self.index, F.context(self.storage), **kwargs)
             self.storage = F.gather_row(self.storage, self.index)
             self.index = None
+
+        # move data to the right device
+        if self.device is not None:
+            self.storage = F.copy_to(self.storage, self.device[0], **self.device[1])
+            self.device = None
         return self.storage
 
     @data.setter
@@ -114,6 +165,25 @@ class Column(object):
         """Update the column data."""
         self.index = None
         self.storage = val
+
+    def to(self, device, **kwargs): # pylint: disable=invalid-name
+        """ Return a new column with columns copy to the targeted device (cpu/gpu).
+
+        Parameters
+        ----------
+        device : Framework-specific device context object
+            The context to move data to.
+        kwargs : Key-word arguments.
+            Key-word arguments fed to the framework copy function.
+
+        Returns
+        -------
+        Column
+            A new column
+        """
+        col = self.clone()
+        col.device = (device, kwargs)
+        return col
 
     def __getitem__(self, rowids):
         """Return the feature data given the rowids.
@@ -130,7 +200,7 @@ class Column(object):
         Tensor
             The feature data
         """
-        return F.gather_row(self.data, rwoids)
+        return F.gather_row(self.data, rowids)
 
     def __setitem__(self, rowids, feats):
         """Update the feature data given the index.
@@ -145,7 +215,7 @@ class Column(object):
         feats : Tensor
             New features.
         """
-        self.update(idx, feats)
+        self.update(rowids, feats)
 
     def update(self, rowids, feats):
         """Update the feature data given the index.
@@ -186,22 +256,23 @@ class Column(object):
 
     def clone(self):
         """Return a shallow copy of this column."""
-        return Column(self.storage, self.scheme, self.index)
+        return Column(self.storage, self.scheme, self.index, self.device)
 
     def deepclone(self):
         """Return a deepcopy of this column.
 
         The operation triggers index selection.
         """
-        return Column(F.clone(self.data), self.scheme)
+        return Column(F.clone(self.data), copy.deepcopy(self.scheme))
 
     def subcolumn(self, rowids):
         """Return a subcolumn.
 
         The resulting column will share the same storage as this column so this operation
-        is quite efficient. If the current column is also a sub-column (i.e., the
-        index tensor is not None), it slices the index tensor with the given
-        rowids as the index tensor of the resulting column.
+        is quite efficient. If the current column is also a sub-column (i.e.,
+        the index tensor is not None), the current index tensor will be sliced
+        by 'rowids', if they are on the same context. Otherwise, both index
+        tensors are saved, and only applied when the data is accessed.
 
         Parameters
         ----------
@@ -214,9 +285,13 @@ class Column(object):
             Sub-column
         """
         if self.index is None:
-            return Column(self.storage, self.scheme, rowids)
+            return Column(self.storage, self.scheme, rowids, self.device)
         else:
-            return Column(self.storage, self.scheme, F.gather_row(self.index, rowids))
+            index = self.index
+            if not isinstance(index, _LazyIndex):
+                index = _LazyIndex(self.index)
+            index = index.slice(rowids)
+            return Column(self.storage, self.scheme, index, self.device)
 
     @staticmethod
     def create(data):
@@ -228,6 +303,14 @@ class Column(object):
 
     def __repr__(self):
         return repr(self.data)
+
+    def __getstate__(self):
+        if self.storage is not None:
+            _ = self.data               # evaluate feature slicing
+        return self.__dict__
+
+    def __copy__(self):
+        return self.clone()
 
 class Frame(MutableMapping):
     """The columnar storage for node/edge features.
@@ -453,31 +536,25 @@ class Frame(MutableMapping):
 
     def _append(self, other):
         """Append ``other`` frame to ``self`` frame."""
-        # NOTE: `other` can be empty.
-        if self.num_rows == 0:
-            # if no rows in current frame; append is equivalent to
-            # directly updating columns.
-            self._columns = {key: Column.create(data) for key, data in other.items()}
-        else:
-            # pad columns that are not provided in the other frame with initial values
-            for key, col in self._columns.items():
-                if key in other:
-                    continue
-                scheme = col.scheme
-                ctx = F.context(col.data)
-                if self.get_initializer(key) is None:
-                    self._set_zero_default_initializer()
-                initializer = self.get_initializer(key)
-                new_data = initializer((other.num_rows,) + scheme.shape,
-                                       scheme.dtype, ctx,
-                                       slice(self._num_rows, self._num_rows + other.num_rows))
-                other[key] = new_data
-            # append other to self
-            for key, col in other._columns.items():
-                if key not in self._columns:
-                    # the column does not exist; init a new column
-                    self.add_column(key, col.scheme, F.context(col.data))
-                self._columns[key].extend(col.data, col.scheme)
+        # pad columns that are not provided in the other frame with initial values
+        for key, col in self._columns.items():
+            if key in other:
+                continue
+            scheme = col.scheme
+            ctx = F.context(col.data)
+            if self.get_initializer(key) is None:
+                self._set_zero_default_initializer()
+            initializer = self.get_initializer(key)
+            new_data = initializer((other.num_rows,) + scheme.shape,
+                                   scheme.dtype, ctx,
+                                   slice(self._num_rows, self._num_rows + other.num_rows))
+            other[key] = new_data
+        # append other to self
+        for key, col in other._columns.items():
+            if key not in self._columns:
+                # the column does not exist; init a new column
+                self.add_column(key, col.scheme, F.context(col.data))
+            self._columns[key].extend(col.data, col.scheme)
 
     def append(self, other):
         """Append another frame's data into this frame.
@@ -577,6 +654,26 @@ class Frame(MutableMapping):
         subf._initializers = self._initializers
         subf._default_initializer = self._default_initializer
         return subf
+
+    def to(self, device, **kwargs): # pylint: disable=invalid-name
+        """ Return a new frame with columns copy to the targeted device (cpu/gpu).
+
+        Parameters
+        ----------
+        device : Framework-specific device context object
+            The context to move data to.
+        kwargs : Key-word arguments.
+            Key-word arguments fed to the framework copy function.
+
+        Returns
+        -------
+        Frame
+            A new frame
+        """
+        newframe = self.clone()
+        new_columns = {key : col.to(device, **kwargs) for key, col in newframe._columns.items()}
+        newframe._columns = new_columns
+        return newframe
 
     def __repr__(self):
         return repr(dict(self))

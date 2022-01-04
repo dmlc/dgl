@@ -106,7 +106,7 @@ class PandasGraphBuilder(object):
         dsttype = self.entity_pk_to_name[destination_key]
         etype = (srctype, name, dsttype)
         self.relation_name_to_etype[name] = etype
-        self.edges_per_relation[etype] = (src.cat.codes.values, dst.cat.codes.values)
+        self.edges_per_relation[etype] = (src.cat.codes.values.astype('int64'), dst.cat.codes.values.astype('int64'))
         self.relation_tables[name] = relation_table
         self.relation_src_key[name] = source_key
         self.relation_dst_key[name] = destination_key

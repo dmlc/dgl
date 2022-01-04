@@ -4,9 +4,12 @@
  * \brief Heterograph CAPI bindings.
  */
 #include <dgl/array.h>
+#include <dgl/aten/coo.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/immutable_graph.h>
 #include <dgl/runtime/container.h>
+#include <dgl/runtime/parallel_for.h>
+#include <dgl/runtime/c_runtime_api.h>
 #include <set>
 
 #include "../c_api_common.h"
@@ -29,13 +32,16 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateUnitGraphFromCOO")
     IdArray row = args[3];
     IdArray col = args[4];
     List<Value> formats = args[5];
+    bool row_sorted = args[6];
+    bool col_sorted = args[7];
     std::vector<SparseFormat> formats_vec;
     for (Value val : formats) {
       std::string fmt = val->data;
       formats_vec.push_back(ParseSparseFormat(fmt));
     }
-    auto code = SparseFormatsToCode(formats_vec);
-    auto hgptr = CreateFromCOO(nvtypes, num_src, num_dst, row, col, code);
+    const auto code = SparseFormatsToCode(formats_vec);
+    auto hgptr = CreateFromCOO(nvtypes, num_src, num_dst, row, col,
+        row_sorted, col_sorted, code);
     *rv = HeteroGraphRef(hgptr);
   });
 
@@ -48,14 +54,20 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateUnitGraphFromCSR")
     IdArray indices = args[4];
     IdArray edge_ids = args[5];
     List<Value> formats = args[6];
+    bool transpose = args[7];
     std::vector<SparseFormat> formats_vec;
     for (Value val : formats) {
       std::string fmt = val->data;
       formats_vec.push_back(ParseSparseFormat(fmt));
     }
-    auto code = SparseFormatsToCode(formats_vec);
-    auto hgptr = CreateFromCSR(nvtypes, num_src, num_dst, indptr, indices, edge_ids, code);
-    *rv = HeteroGraphRef(hgptr);
+    const auto code = SparseFormatsToCode(formats_vec);
+    if (!transpose) {
+      auto hgptr = CreateFromCSR(nvtypes, num_src, num_dst, indptr, indices, edge_ids, code);
+      *rv = HeteroGraphRef(hgptr);
+    } else {
+      auto hgptr = CreateFromCSC(nvtypes, num_src, num_dst, indptr, indices, edge_ids, code);
+      *rv = HeteroGraphRef(hgptr);
+    }
   });
 
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateHeteroGraph")
@@ -375,6 +387,8 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroVertexSubgraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     List<Value> vids = args[1];
+    bool relabel_nodes = args[2];
+    CHECK(relabel_nodes) << "Node subgraph only supports relabel_nodes=True.";
     std::vector<IdArray> vid_vec;
     vid_vec.reserve(vids.size());
     for (Value val : vids) {
@@ -453,7 +467,9 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCopyTo")
     DLContext ctx;
     ctx.device_type = static_cast<DLDeviceType>(device_type);
     ctx.device_id = device_id;
-    HeteroGraphPtr hg_new = HeteroGraph::CopyTo(hg.sptr(), ctx);
+    DGLStreamHandle stream = nullptr;
+    DGLGetStream(device_type, device_id, &stream);
+    HeteroGraphPtr hg_new = HeteroGraph::CopyTo(hg.sptr(), ctx, stream);
     *rv = HeteroGraphRef(hg_new);
   });
 
@@ -559,28 +575,6 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroDisjointPartitionBySizes_v
     *rv = ret_list;
 });
 
-DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroDisjointUnion")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphRef meta_graph = args[0];
-    List<HeteroGraphRef> component_graphs = args[1];
-    CHECK(component_graphs.size() > 0)
-      << "Expect graph list has at least one graph";
-    std::vector<HeteroGraphPtr> component_ptrs;
-    component_ptrs.reserve(component_graphs.size());
-    const int64_t bits = component_graphs[0]->NumBits();
-    for (const auto& component : component_graphs) {
-      component_ptrs.push_back(component.sptr());
-      CHECK_EQ(component->NumBits(), bits)
-        << "Expect graphs to batch have the same index dtype(int" << bits
-        << "), but got int" << component->NumBits();
-    }
-    ATEN_ID_BITS_SWITCH(bits, IdType, {
-      auto hgptr =
-        DisjointUnionHeteroGraph<IdType>(meta_graph.sptr(), component_ptrs);
-      *rv = HeteroGraphRef(hgptr);
-    });
-});
-
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroDisjointPartitionBySizes")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
@@ -597,6 +591,18 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroDisjointPartitionBySizes")
       ret_list.push_back(HeteroGraphRef(hgptr));
     }
     *rv = ret_list;
+});
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroSlice")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    const IdArray num_nodes_per_type = args[1];
+    const IdArray start_nid_per_type = args[2];
+    const IdArray num_edges_per_type = args[3];
+    const IdArray start_eid_per_type = args[4];
+    auto hgptr = SliceHeteroGraph(hg->meta_graph(), hg.sptr(), num_nodes_per_type,
+                                  start_nid_per_type, num_edges_per_type, start_eid_per_type);
+    *rv = HeteroGraphRef(hgptr);
 });
 
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetCreatedFormats")
@@ -627,11 +633,19 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateFormat")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     dgl_format_code_t code = hg->GetRelationGraph(0)->GetAllowedFormats();
-    for (dgl_type_t etype = 0; etype < hg->NumEdgeTypes(); ++etype) {
-      auto bg = std::dynamic_pointer_cast<UnitGraph>(hg->GetRelationGraph(etype));
-      for (auto format : CodeToSparseFormats(code))
-        bg->GetFormat(format);
-    }
+    auto get_format_f = [&](size_t etype_b, size_t etype_e) {
+      for (auto etype = etype_b; etype < etype_e; ++etype) {
+        auto bg = std::dynamic_pointer_cast<UnitGraph>(hg->GetRelationGraph(etype));
+        for (auto format : CodeToSparseFormats(code))
+          bg->GetFormat(format);
+      }
+    };
+
+#if !(defined(DGL_USE_CUDA))
+  runtime::parallel_for(0, hg->NumEdgeTypes(), get_format_f);
+#else
+  get_format_f(0, hg->NumEdgeTypes());
+#endif
 });
 
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetFormatGraph")
@@ -652,8 +666,9 @@ DGL_REGISTER_GLOBAL("subgraph._CAPI_DGLInSubgraph")
 .set_body([] (DGLArgs args, DGLRetValue *rv) {
     HeteroGraphRef hg = args[0];
     const auto& nodes = ListValueToVector<IdArray>(args[1]);
+    bool relabel_nodes = args[2];
     std::shared_ptr<HeteroSubgraph> ret(new HeteroSubgraph);
-    *ret = InEdgeGraph(hg.sptr(), nodes);
+    *ret = InEdgeGraph(hg.sptr(), nodes, relabel_nodes);
     *rv = HeteroGraphRef(ret);
   });
 
@@ -661,8 +676,9 @@ DGL_REGISTER_GLOBAL("subgraph._CAPI_DGLOutSubgraph")
 .set_body([] (DGLArgs args, DGLRetValue *rv) {
     HeteroGraphRef hg = args[0];
     const auto& nodes = ListValueToVector<IdArray>(args[1]);
+    bool relabel_nodes = args[2];
     std::shared_ptr<HeteroSubgraph> ret(new HeteroSubgraph);
-    *ret = OutEdgeGraph(hg.sptr(), nodes);
+    *ret = OutEdgeGraph(hg.sptr(), nodes, relabel_nodes);
     *rv = HeteroGraphRef(ret);
   });
 
@@ -672,28 +688,78 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLAsImmutableGraph")
     *rv = GraphRef(hg->AsImmutableGraph());
   });
 
+DGL_REGISTER_GLOBAL("transform._CAPI_DGLHeteroSortOutEdges")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    NDArray tag = args[1];
+    int64_t num_tag = args[2];
+
+    CHECK_EQ(hg->Context().device_type, kDLCPU) << "Only support sorting by tag on cpu";
+    CHECK(aten::IsValidIdArray(tag));
+    CHECK_EQ(tag->ctx.device_type, kDLCPU) << "Only support sorting by tag on cpu";
+
+    const auto csr = hg->GetCSRMatrix(0);
+
+    NDArray tag_pos = aten::NullArray();
+    aten::CSRMatrix output;
+    std::tie(output, tag_pos) = aten::CSRSortByTag(csr, tag, num_tag);
+    HeteroGraphPtr output_hg = CreateFromCSR(hg->NumVertexTypes(), output, ALL_CODE);
+    List<ObjectRef> ret;
+    ret.push_back(HeteroGraphRef(output_hg));
+    ret.push_back(Value(MakeValue(tag_pos)));
+    *rv = ret;
+  });
+
+DGL_REGISTER_GLOBAL("transform._CAPI_DGLHeteroSortInEdges")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    NDArray tag = args[1];
+    int64_t num_tag = args[2];
+
+    CHECK_EQ(hg->Context().device_type, kDLCPU) << "Only support sorting by tag on cpu";
+    CHECK(aten::IsValidIdArray(tag));
+    CHECK_EQ(tag->ctx.device_type, kDLCPU) << "Only support sorting by tag on cpu";
+
+    const auto csc = hg->GetCSCMatrix(0);
+
+    NDArray tag_pos = aten::NullArray();
+    aten::CSRMatrix output;
+    std::tie(output, tag_pos) = aten::CSRSortByTag(csc, tag, num_tag);
+
+    HeteroGraphPtr output_hg = CreateFromCSC(hg->NumVertexTypes(), output, ALL_CODE);
+    List<ObjectRef> ret;
+    ret.push_back(HeteroGraphRef(output_hg));
+    ret.push_back(Value(MakeValue(tag_pos)));
+    *rv = ret;
+  });
+
 DGL_REGISTER_GLOBAL("heterograph._CAPI_DGLFindSrcDstNtypes")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphRef metagraph = args[0];
-    std::set<int64_t> dst_set;
-    std::set<int64_t> src_set;
+    std::unordered_set<int64_t> dst_set;
+    std::unordered_set<int64_t> src_set;
 
     for (int64_t eid = 0; eid < metagraph->NumEdges(); ++eid) {
       auto edge = metagraph->FindEdge(eid);
       auto src = edge.first;
       auto dst = edge.second;
       dst_set.insert(dst);
-      if (dst_set.count(src))
-        return;
+      src_set.insert(src);
     }
 
     List<Value> srclist, dstlist;
     List<List<Value>> ret_list;
-    for (auto dst : dst_set)
-      dstlist.push_back(Value(MakeValue(dst)));
-    for (int64_t nid = 0 ; nid < metagraph->NumVertices(); ++nid)
-      if (!dst_set.count(nid))
+    for (int64_t nid = 0; nid < metagraph->NumVertices(); ++nid) {
+      auto is_dst = dst_set.count(nid);
+      auto is_src = src_set.count(nid);
+      if (is_dst && is_src)
+        return;
+      else if (is_dst)
+        dstlist.push_back(Value(MakeValue(nid)));
+      else
+        // If a node type is isolated, put it in srctype as defined in the Python docstring.
         srclist.push_back(Value(MakeValue(nid)));
+    }
     ret_list.push_back(srclist);
     ret_list.push_back(dstlist);
     *rv = ret_list;

@@ -3,14 +3,15 @@
  * \file test_unit_graph.cc
  * \brief Test UnitGraph
  */
-#include <gtest/gtest.h>
+#include "../../src/graph/unit_graph.h"
+#include "./../src/graph/heterograph.h"
+#include "./common.h"
 #include <dgl/array.h>
+#include <dgl/immutable_graph.h>
+#include <dgl/runtime/device_api.h>
+#include <gtest/gtest.h>
 #include <memory>
 #include <vector>
-#include <dgl/immutable_graph.h>
-#include "./common.h"
-#include "./../src/graph/heterograph.h"
-#include "../../src/graph/unit_graph.h"
 
 using namespace dgl;
 using namespace dgl::runtime;
@@ -66,6 +67,52 @@ aten::COOMatrix COO1(DLContext ctx) {
 template aten::COOMatrix COO1<int32_t>(DLContext ctx);
 template aten::COOMatrix COO1<int64_t>(DLContext ctx);
 
+template <typename IdType> void _TestUnitGraph_InOutDegrees(DLContext ctx) {
+  /*
+  InDegree(s) is available only if COO or CSC formats permitted.
+  OutDegree(s) is available only if COO or CSR formats permitted.
+  */
+
+  // COO
+  {
+    const aten::COOMatrix &coo = COO1<IdType>(ctx);
+    auto &&g = CreateFromCOO(2, coo, COO_CODE);
+    ASSERT_EQ(g->InDegree(0, 0), 1);
+    auto &&nids = aten::Range(0, g->NumVertices(0), g->NumBits(), g->Context());
+    ASSERT_TRUE(ArrayEQ<IdType>(
+        g->InDegrees(0, nids),
+        aten::VecToIdArray<IdType>({1, 2}, g->NumBits(), g->Context())));
+    ASSERT_EQ(g->OutDegree(0, 0), 2);
+    ASSERT_TRUE(ArrayEQ<IdType>(
+        g->OutDegrees(0, nids),
+        aten::VecToIdArray<IdType>({2, 1}, g->NumBits(), g->Context())));
+  }
+  // CSC
+  {
+    const aten::CSRMatrix &csr = CSR1<IdType>(ctx);
+    auto &&g = CreateFromCSC(2, csr, CSC_CODE);
+    ASSERT_EQ(g->InDegree(0, 0), 1);
+    auto &&nids = aten::Range(0, g->NumVertices(0), g->NumBits(), g->Context());
+    ASSERT_TRUE(ArrayEQ<IdType>(
+        g->InDegrees(0, nids),
+        aten::VecToIdArray<IdType>({1, 2, 1}, g->NumBits(), g->Context())));
+    EXPECT_ANY_THROW(g->OutDegree(0, 0));
+    EXPECT_ANY_THROW(g->OutDegrees(0, nids));
+  }
+  // CSR
+  {
+    const aten::CSRMatrix &csr = CSR1<IdType>(ctx);
+    auto &&g = CreateFromCSR(2, csr, CSR_CODE);
+    ASSERT_EQ(g->OutDegree(0, 0), 1);
+    auto &&nids = aten::Range(0, g->NumVertices(0), g->NumBits(), g->Context());
+    ASSERT_TRUE(ArrayEQ<IdType>(
+        g->OutDegrees(0, nids),
+        aten::VecToIdArray<IdType>({1, 2, 1, 2}, g->NumBits(), g->Context())));
+    EXPECT_ANY_THROW(g->InDegree(0, 0));
+    EXPECT_ANY_THROW(g->InDegrees(0, nids));
+  }
+}
+
 template <typename IdType>
 void _TestUnitGraph(DLContext ctx) {
   const aten::CSRMatrix &csr = CSR1<IdType>(ctx);
@@ -82,19 +129,19 @@ void _TestUnitGraph(DLContext ctx) {
 
   auto src = aten::VecToIdArray<int64_t>({1, 2, 5, 3});
   auto dst = aten::VecToIdArray<int64_t>({1, 6, 2, 6});
-  auto mg = dgl::UnitGraph::CreateFromCOO(2, 9, 8, src, dst, coo_code);
+  auto mg = dgl::UnitGraph::CreateFromCOO(2, 9, 8, src, dst, COO_CODE);
   ASSERT_EQ(mg->GetCreatedFormats(), 1);
-  auto hmg = dgl::UnitGraph::CreateFromCOO(1, 8, 8, src, dst, coo_code);
+  auto hmg = dgl::UnitGraph::CreateFromCOO(1, 8, 8, src, dst, COO_CODE);
   auto img = std::dynamic_pointer_cast<ImmutableGraph>(hmg->AsImmutableGraph());
   ASSERT_TRUE(img != nullptr);
-  mg = dgl::UnitGraph::CreateFromCOO(2, 9, 8, src, dst, csr_code | coo_code);
+  mg = dgl::UnitGraph::CreateFromCOO(2, 9, 8, src, dst, CSR_CODE | COO_CODE);
   ASSERT_EQ(mg->GetCreatedFormats(), 1);
-  hmg = dgl::UnitGraph::CreateFromCOO(1, 8, 8, src, dst, csr_code | coo_code);
+  hmg = dgl::UnitGraph::CreateFromCOO(1, 8, 8, src, dst, CSR_CODE | COO_CODE);
   img = std::dynamic_pointer_cast<ImmutableGraph>(hmg->AsImmutableGraph());
   ASSERT_TRUE(img != nullptr);
-  mg = dgl::UnitGraph::CreateFromCOO(2, 9, 8, src, dst, csc_code | coo_code);
+  mg = dgl::UnitGraph::CreateFromCOO(2, 9, 8, src, dst, CSC_CODE | COO_CODE);
   ASSERT_EQ(mg->GetCreatedFormats(), 1);
-  hmg = dgl::UnitGraph::CreateFromCOO(1, 8, 8, src, dst, csc_code | coo_code);
+  hmg = dgl::UnitGraph::CreateFromCOO(1, 8, 8, src, dst, CSC_CODE | COO_CODE);
   img = std::dynamic_pointer_cast<ImmutableGraph>(hmg->AsImmutableGraph());
   ASSERT_TRUE(img != nullptr);
 
@@ -121,7 +168,7 @@ void _TestUnitGraph_GetInCSR(DLContext ctx) {
 
   // test out csr
   g = CreateFromCSR(2, csr);
-  auto g_ptr = g->GetGraphInFormat(csc_code);
+  auto g_ptr = g->GetGraphInFormat(CSC_CODE);
   in_csr_matrix = g_ptr->GetCSCMatrix(0);
   ASSERT_EQ(in_csr_matrix.num_cols, csr.num_rows);
   ASSERT_EQ(in_csr_matrix.num_rows, csr.num_cols);
@@ -133,7 +180,7 @@ void _TestUnitGraph_GetInCSR(DLContext ctx) {
 
   // test out coo
   g = CreateFromCOO(2, coo);
-  g_ptr = g->GetGraphInFormat(csc_code);
+  g_ptr = g->GetGraphInFormat(CSC_CODE);
   in_csr_matrix = g_ptr->GetCSCMatrix(0);
   ASSERT_EQ(in_csr_matrix.num_cols, coo.num_rows);
   ASSERT_EQ(in_csr_matrix.num_rows, coo.num_cols);
@@ -151,7 +198,7 @@ void _TestUnitGraph_GetOutCSR(DLContext ctx) {
   const aten::COOMatrix &coo = COO1<IdType>(ctx);
 
   auto g = CreateFromCSC(2, csr);
-  auto g_ptr = g->GetGraphInFormat(csr_code);
+  auto g_ptr = g->GetGraphInFormat(CSR_CODE);
   auto out_csr_matrix = g_ptr->GetCSRMatrix(0);
   ASSERT_EQ(out_csr_matrix.num_cols, csr.num_rows);
   ASSERT_EQ(out_csr_matrix.num_rows, csr.num_cols);
@@ -170,7 +217,7 @@ void _TestUnitGraph_GetOutCSR(DLContext ctx) {
 
   // test out coo
   g = CreateFromCOO(2, coo);
-  g_ptr = g->GetGraphInFormat(csr_code);
+  g_ptr = g->GetGraphInFormat(CSR_CODE);
   out_csr_matrix = g_ptr->GetCSRMatrix(0);
   ASSERT_EQ(out_csr_matrix.num_rows, coo.num_rows);
   ASSERT_EQ(out_csr_matrix.num_cols, coo.num_cols);
@@ -188,7 +235,7 @@ void _TestUnitGraph_GetCOO(DLContext ctx) {
   const aten::COOMatrix &coo = COO1<IdType>(ctx);
 
   auto g = CreateFromCSC(2, csr);
-  auto g_ptr = g->GetGraphInFormat(coo_code);
+  auto g_ptr = g->GetGraphInFormat(COO_CODE);
   auto out_coo_matrix = g_ptr->GetCOOMatrix(0);
   ASSERT_EQ(out_coo_matrix.num_cols, csr.num_rows);
   ASSERT_EQ(out_coo_matrix.num_rows, csr.num_cols);
@@ -200,7 +247,7 @@ void _TestUnitGraph_GetCOO(DLContext ctx) {
 
   // test out csr
   g = CreateFromCSR(2, csr);
-  g_ptr = g->GetGraphInFormat(coo_code);
+  g_ptr = g->GetGraphInFormat(COO_CODE);
   out_coo_matrix = g_ptr->GetCOOMatrix(0);
   ASSERT_EQ(out_coo_matrix.num_rows, csr.num_rows);
   ASSERT_EQ(out_coo_matrix.num_cols, csr.num_cols);
@@ -296,6 +343,56 @@ void _TestUnitGraph_Reserve(DLContext ctx) {
   r_g_in_csr = r_g->GetCSCMatrix(0);
   ASSERT_TRUE(g_out_csr.indptr->data == r_g_in_csr.indptr->data);
   ASSERT_TRUE(g_out_csr.indices->data == r_g_in_csr.indices->data);
+}
+
+template <typename IdType>
+void _TestUnitGraph_CopyTo(const DLContext &src_ctx,
+                           const DGLContext &dst_ctx) {
+  const aten::CSRMatrix &csr = CSR1<IdType>(src_ctx);
+  const aten::COOMatrix &coo = COO1<IdType>(src_ctx);
+
+  auto device = dgl::runtime::DeviceAPI::Get(dst_ctx);
+  auto stream = device->CreateStream(dst_ctx);
+
+  auto g = dgl::UnitGraph::CreateFromCSC(2, csr);
+  ASSERT_EQ(g->GetCreatedFormats(), 4);
+  auto cg = dgl::UnitGraph::CopyTo(g, dst_ctx, stream);
+  device->StreamSync(dst_ctx, stream);
+  ASSERT_EQ(cg->GetCreatedFormats(), 4);
+
+  g = dgl::UnitGraph::CreateFromCSR(2, csr);
+  ASSERT_EQ(g->GetCreatedFormats(), 2);
+  cg = dgl::UnitGraph::CopyTo(g, dst_ctx, stream);
+  device->StreamSync(dst_ctx, stream);
+  ASSERT_EQ(cg->GetCreatedFormats(), 2);
+
+  g = dgl::UnitGraph::CreateFromCOO(2, coo);
+  ASSERT_EQ(g->GetCreatedFormats(), 1);
+  cg = dgl::UnitGraph::CopyTo(g, dst_ctx, stream);
+  device->StreamSync(dst_ctx, stream);
+  ASSERT_EQ(cg->GetCreatedFormats(), 1);
+}
+
+TEST(UniGraphTest, TestUnitGraph_CopyTo) {
+  _TestUnitGraph_CopyTo<int32_t>(CPU, CPU);
+  _TestUnitGraph_CopyTo<int64_t>(CPU, CPU);
+#ifdef DGL_USE_CUDA
+  _TestUnitGraph_CopyTo<int32_t>(CPU, GPU);
+  _TestUnitGraph_CopyTo<int32_t>(GPU, GPU);
+  _TestUnitGraph_CopyTo<int32_t>(GPU, CPU);
+  _TestUnitGraph_CopyTo<int64_t>(CPU, GPU);
+  _TestUnitGraph_CopyTo<int64_t>(GPU, GPU);
+  _TestUnitGraph_CopyTo<int64_t>(GPU, CPU);
+#endif
+}
+
+TEST(UniGraphTest, TestUnitGraph_InOutDegrees) {
+  _TestUnitGraph_InOutDegrees<int32_t>(CPU);
+  _TestUnitGraph_InOutDegrees<int64_t>(CPU);
+#ifdef DGL_USE_CUDA
+  _TestUnitGraph_InOutDegrees<int32_t>(GPU);
+  _TestUnitGraph_InOutDegrees<int64_t>(GPU);
+#endif
 }
 
 TEST(UniGraphTest, TestUnitGraph_Create) {

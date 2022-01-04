@@ -17,14 +17,15 @@ class BatchedGraphSAGE(nn.Module):
             gain=nn.init.calculate_gain('relu'))
 
     def forward(self, x, adj):
+        num_node_per_graph = adj.size(1)
         if self.use_bn and not hasattr(self, 'bn'):
-            self.bn = nn.BatchNorm1d(adj.size(1)).to(adj.device)
+            self.bn = nn.BatchNorm1d(num_node_per_graph).to(adj.device)
 
         if self.add_self:
-            adj = adj + torch.eye(adj.size(0)).to(adj.device)
+            adj = adj + torch.eye(num_node_per_graph).to(adj.device)
 
         if self.mean:
-            adj = adj / adj.sum(1, keepdim=True)
+            adj = adj / adj.sum(-1, keepdim=True)
 
         h_k_N = torch.matmul(adj, x)
         h_k = self.W(h_k_N)

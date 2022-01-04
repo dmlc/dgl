@@ -1,7 +1,7 @@
 import torch
 import math
 import dgl.function as fn
-from dgl.nn.pytorch import edge_softmax
+from dgl.nn.functional import edge_softmax
 from utlis import *
 from torch import nn
 import torch.nn.functional as F
@@ -121,8 +121,8 @@ class GAT(nn.Module):
         # compute edge attention
         graph.apply_edges(fn.u_dot_v('el', 'er', 'e'))
         e =  graph.edata.pop('e') / math.sqrt(self._out_feats * self._num_heads)
-        graph.edata['a'] = edge_softmax(graph, e).unsqueeze(-1)
-       # message passing
+        graph.edata['a'] = edge_softmax(graph, e)
+        # message passing
         graph.update_all(fn.u_mul_e('ft', 'a', 'm'),
                          fn.sum('m', 'ft2'))
         rst = graph.ndata['ft2']

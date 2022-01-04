@@ -10,7 +10,7 @@ import unittest
 from dgl import DGLGraph
 import dgl
 import dgl.ndarray as nd
-from dgl.data.utils import save_graphs, load_graphs, load_labels, save_tensors, load_tensors
+from dgl.data.utils import load_labels, save_tensors, load_tensors
 
 np.random.seed(44)
 
@@ -19,7 +19,7 @@ def generate_rand_graph(n, is_hetero):
     arr = (sp.sparse.random(n, n, density=0.1,
                             format='coo') != 0).astype(np.int64)
     if is_hetero:
-        return dgl.graph(arr)
+        return dgl.from_scipy(arr)
     else:
         return DGLGraph(arr, readonly=True)
 
@@ -51,11 +51,11 @@ def test_graph_serialize_with_feature(is_hetero):
     path = f.name
     f.close()
 
-    save_graphs(path, g_list)
+    dgl.save_graphs(path, g_list)
 
     t2 = time.time()
     idx_list = np.random.permutation(np.arange(num_graphs)).tolist()
-    loadg_list, _ = load_graphs(path, idx_list)
+    loadg_list, _ = dgl.load_graphs(path, idx_list)
 
     t3 = time.time()
     idx = idx_list[0]
@@ -88,10 +88,10 @@ def test_graph_serialize_without_feature(is_hetero):
     path = f.name
     f.close()
 
-    save_graphs(path, g_list)
+    dgl.save_graphs(path, g_list)
 
     idx_list = np.random.permutation(np.arange(num_graphs)).tolist()
-    loadg_list, _ = load_graphs(path, idx_list)
+    loadg_list, _ = dgl.load_graphs(path, idx_list)
 
     idx = idx_list[0]
     load_g = loadg_list[0]
@@ -117,10 +117,10 @@ def test_graph_serialize_with_labels(is_hetero):
     path = f.name
     f.close()
 
-    save_graphs(path, g_list, labels)
+    dgl.save_graphs(path, g_list, labels)
 
     idx_list = np.random.permutation(np.arange(num_graphs)).tolist()
-    loadg_list, l_labels0 = load_graphs(path, idx_list)
+    loadg_list, l_labels0 = dgl.load_graphs(path, idx_list)
     l_labels = load_labels(path)
     assert F.allclose(l_labels['label'], labels['label'])
     assert F.allclose(l_labels0['label'], labels['label'])
@@ -185,7 +185,7 @@ def test_serialize_empty_dict():
 
 
 def test_load_old_files1():
-    loadg_list, _ = load_graphs(os.path.join(
+    loadg_list, _ = dgl.load_graphs(os.path.join(
         os.path.dirname(__file__), "data/1.bin"))
     idx, num_nodes, edge0, edge1, edata_e1, edata_e2, ndata_n1 = np.load(
         os.path.join(os.path.dirname(__file__), "data/1.npy"), allow_pickle=True)
@@ -201,7 +201,7 @@ def test_load_old_files1():
 
 
 def test_load_old_files2():
-    loadg_list, labels0 = load_graphs(os.path.join(
+    loadg_list, labels0 = dgl.load_graphs(os.path.join(
         os.path.dirname(__file__), "data/2.bin"))
     labels1 = load_labels(os.path.join(
         os.path.dirname(__file__), "data/2.bin"))
@@ -211,38 +211,57 @@ def test_load_old_files2():
     assert np.allclose(F.asnumpy(labels1['label']), np_labels)
 
     load_g = loadg_list[idx]
+    print(load_g)
     load_edges = load_g.all_edges('uv', 'eid')
     assert np.allclose(F.asnumpy(load_edges[0]), edges0)
     assert np.allclose(F.asnumpy(load_edges[1]), edges1)
 
 
 def create_heterographs(idtype):
-    g_x = dgl.graph(([0, 1, 2], [1, 2, 3]), 'user',
-                    'follows', idtype=idtype)
-    g_y = dgl.graph(([0, 2], [2, 3]), 'user', 'knows', idtype=idtype).formats('csr')
-    g_x.nodes['user'].data['h'] = F.randn((4, 3))
-    g_x.edges['follows'].data['w'] = F.randn((3, 2))
-    g_y.nodes['user'].data['hh'] = F.ones((4, 5))
-    g_y.edges['knows'].data['ww'] = F.randn((2, 10))
-    g = dgl.hetero_from_relations([g_x, g_y])
+    g_x = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 1, 2], [1, 2, 3])}, idtype=idtype)
+    g_y = dgl.heterograph({
+        ('user', 'knows', 'user'): ([0, 2], [2, 3])}, idtype=idtype).formats('csr')
+    g_x.ndata['h'] = F.randn((4, 3))
+    g_x.edata['w'] = F.randn((3, 2))
+    g_y.ndata['hh'] = F.ones((4, 5))
+    g_y.edata['ww'] = F.randn((2, 10))
+    g = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 1, 2], [1, 2, 3]),
+        ('user', 'knows', 'user'): ([0, 2], [2, 3])
+    }, idtype=idtype)
+    g.nodes['user'].data['h'] = g_x.ndata['h']
+    g.nodes['user'].data['hh'] = g_y.ndata['hh']
+    g.edges['follows'].data['w'] = g_x.edata['w']
+    g.edges['knows'].data['ww'] = g_y.edata['ww']
     return [g, g_x, g_y]
 
 def create_heterographs2(idtype):
-    g_x = dgl.graph(([0, 1, 2], [1, 2, 3]), 'user',
-                    'follows', idtype=idtype)
-    g_y = dgl.graph(([0, 2], [2, 3]), 'user', 'knows', idtype=idtype).formats('csr')
-    g_z = dgl.bipartite(([0, 1, 3], [2, 3, 4]), 'user', 'knows', 'knowledge', idtype=idtype)
-    g_x.nodes['user'].data['h'] = F.randn((4, 3))
-    g_x.edges['follows'].data['w'] = F.randn((3, 2))
-    g_y.nodes['user'].data['hh'] = F.ones((4, 5))
-    g_y.edges['knows'].data['ww'] = F.randn((2, 10))
-    g = dgl.hetero_from_relations([g_x, g_y, g_z])
+    g_x = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 1, 2], [1, 2, 3])}, idtype=idtype)
+    g_y = dgl.heterograph({
+        ('user', 'knows', 'user'): ([0, 2], [2, 3])}, idtype=idtype).formats('csr')
+    g_z = dgl.heterograph(
+        {('user', 'knows', 'knowledge'): ([0, 1, 3], [2, 3, 4])}, idtype=idtype)
+    g_x.ndata['h'] = F.randn((4, 3))
+    g_x.edata['w'] = F.randn((3, 2))
+    g_y.ndata['hh'] = F.ones((4, 5))
+    g_y.edata['ww'] = F.randn((2, 10))
+    g = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 1, 2], [1, 2, 3]),
+        ('user', 'knows', 'user'): ([0, 2], [2, 3]),
+        ('user', 'knows', 'knowledge'): ([0, 1, 3], [2, 3, 4])
+    }, idtype=idtype)
+    g.nodes['user'].data['h'] = g_x.ndata['h']
+    g.edges['follows'].data['w'] = g_x.edata['w']
+    g.nodes['user'].data['hh'] = g_y.ndata['hh']
+    g.edges[('user', 'knows', 'user')].data['ww'] = g_y.edata['ww']
     return [g, g_x, g_y, g_z]
 
 def test_deserialize_old_heterograph_file():
     path = os.path.join(
         os.path.dirname(__file__), "data/hetero1.bin")
-    g_list, label_dict = load_graphs(path)
+    g_list, label_dict = dgl.load_graphs(path)
     assert g_list[0].idtype == F.int64
     assert g_list[3].idtype == F.int32
     assert np.allclose(
@@ -259,7 +278,7 @@ def create_old_heterograph_files():
         os.path.dirname(__file__), "data/hetero1.bin")
     g_list0 = create_heterographs(F.int64) + create_heterographs(F.int32)
     labels_dict = {"graph_label": F.ones(54)}
-    save_graphs(path, g_list0, labels_dict)
+    dgl.save_graphs(path, g_list0, labels_dict)
 
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
@@ -268,9 +287,9 @@ def test_serialize_heterograph():
     path = f.name
     f.close()
     g_list0 = create_heterographs2(F.int64) + create_heterographs2(F.int32)
-    save_graphs(path, g_list0)
+    dgl.save_graphs(path, g_list0)
 
-    g_list, _ = load_graphs(path)
+    g_list, _ = dgl.load_graphs(path)
     assert g_list[0].idtype == F.int64
     assert len(g_list[0].canonical_etypes) == 3
     for i in range(len(g_list0)):
@@ -302,9 +321,9 @@ def test_serialize_heterograph():
 def test_serialize_heterograph_s3():
     path = "s3://dglci-data-test/graph2.bin"
     g_list0 = create_heterographs(F.int64) + create_heterographs(F.int32)
-    save_graphs(path, g_list0)
+    dgl.save_graphs(path, g_list0)
 
-    g_list = load_graphs(path, [0, 2, 5])
+    g_list = dgl.load_graphs(path, [0, 2, 5])
     assert g_list[0].idtype == F.int64
     #assert g_list[1].restrict_format() == 'csr'
     assert np.allclose(
@@ -327,8 +346,8 @@ if __name__ == "__main__":
     #test_graph_serialize_with_labels(False)
     #test_serialize_tensors()
     #test_serialize_empty_dict()
-    #test_load_old_files1()
-    #test_load_old_files2()
+    # test_load_old_files1()
+    test_load_old_files2()
     #test_serialize_heterograph()
     #test_serialize_heterograph_s3()
     #test_deserialize_old_heterograph_file()

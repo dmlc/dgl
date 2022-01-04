@@ -7,7 +7,11 @@ from mxnet.gluon import nn
 
 
 class DenseGraphConv(nn.Block):
-    """Graph Convolutional Network layer where the graph structure
+    """
+
+    Description
+    -----------
+    Graph Convolutional Network layer where the graph structure
     is given by an adjacency matrix.
     We recommend user to use this module when applying graph convolution on
     dense graphs.
@@ -15,23 +19,29 @@ class DenseGraphConv(nn.Block):
     Parameters
     ----------
     in_feats : int
-        Input feature size.
+        Input feature size; i.e, the number of dimensions of :math:`h_j^{(l)}`.
     out_feats : int
-        Output feature size.
+        Output feature size; i.e., the number of dimensions of :math:`h_i^{(l+1)}`.
     norm : str, optional
         How to apply the normalizer. If is `'right'`, divide the aggregated messages
         by each node's in-degrees, which is equivalent to averaging the received messages.
         If is `'none'`, no normalization is applied. Default is `'both'`,
         where the :math:`c_{ij}` in the paper is applied.
-    bias : bool
+    bias : bool, optional
         If True, adds a learnable bias to the output. Default: ``True``.
     activation : callable activation function/layer or None, optional
         If not None, applies an activation function to the updated node features.
         Default: ``None``.
 
+    Notes
+    -----
+    Zero in-degree nodes will lead to all-zero output. A common practice
+    to avoid this is to add a self-loop for each node in the graph,
+    which can be achieved by setting the diagonal of the adjacency matrix to be 1.
+
     See also
     --------
-    GraphConv
+    `GraphConv <https://docs.dgl.ai/api/python/nn.pytorch.html#graphconv>`__
     """
     def __init__(self,
                  in_feats,
@@ -54,7 +64,11 @@ class DenseGraphConv(nn.Block):
             self._activation = activation
 
     def forward(self, adj, feat):
-        r"""Compute (Dense) Graph Convolution layer.
+        r"""
+
+        Description
+        -----------
+        Compute (Dense) Graph Convolution layer.
 
         Parameters
         ----------
@@ -65,7 +79,7 @@ class DenseGraphConv(nn.Block):
             graph, ``adj`` should be of shape :math:`(N, N)`. In both cases,
             a row represents a destination node while a column represents a source
             node.
-        feat : torch.Tensor
+        feat : mxnet.NDArray
             The input feature.
 
         Returns

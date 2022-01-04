@@ -28,9 +28,9 @@ def readout_nodes(graph, feat, weight=None, *, op='sum', ntype=None):
     feat : str
         Node feature name.
     weight : str, optional
-        Node weight name. If None, no weighting will be performed,
-        otherwise, weight each node feature with field :attr:`feat`.
-        for aggregation. The weight feature shape must be compatible with
+        Node weight name. None means aggregating without weights.
+        Otherwise, multiply each node feature by node feature :attr:`weight`
+        before aggregation. The weight feature shape must be compatible with
         an element-wise multiplication with the feature tensor.
     op : str, optional
         Readout operator. Can be 'sum', 'max', 'min', 'mean'.
@@ -39,7 +39,7 @@ def readout_nodes(graph, feat, weight=None, *, op='sum', ntype=None):
 
     Returns
     -------
-    tensor
+    Tensor
         Result tensor.
 
     Examples
@@ -101,22 +101,28 @@ def readout_edges(graph, feat, weight=None, *, op='sum', etype=None):
     Parameters
     ----------
     graph : DGLGraph.
-        Input graph.
+        The input graph.
     feat : str
-        Edge feature name.
+        The edge feature name.
     weight : str, optional
-        Edge weight name. If None, no weighting will be performed,
+        The edge weight feature name. If None, no weighting will be performed,
         otherwise, weight each edge feature with field :attr:`feat`.
         for summation. The weight feature shape must be compatible with
         an element-wise multiplication with the feature tensor.
     op : str, optional
         Readout operator. Can be 'sum', 'max', 'min', 'mean'.
-    etype : str, tuple of str, optional
-        Edge type. Can be omitted if there is only one edge type in the graph.
+    etype : str or (str, str, str), optional
+        The type names of the edges. The allowed type name formats are:
+
+        * ``(str, str, str)`` for source node type, edge type and destination node type.
+        * or one ``str`` edge type name if the name can uniquely identify a
+          triplet format in the graph.
+
+        Can be omitted if the graph has only one type of edges.
 
     Returns
     -------
-    tensor
+    Tensor
         Result tensor.
 
     Examples
@@ -166,31 +172,55 @@ def readout_edges(graph, feat, weight=None, *, op='sum', etype=None):
 
 def sum_nodes(graph, feat, weight=None, *, ntype=None):
     """Syntax sugar for ``dgl.readout_nodes(graph, feat, weight, ntype=ntype, op='sum')``.
+
+    See Also
+    --------
+    readout_nodes
     """
     return readout_nodes(graph, feat, weight, ntype=ntype, op='sum')
 
 def sum_edges(graph, feat, weight=None, *, etype=None):
     """Syntax sugar for ``dgl.readout_edges(graph, feat, weight, etype=etype, op='sum')``.
+
+    See Also
+    --------
+    readout_edges
     """
     return readout_edges(graph, feat, weight, etype=etype, op='sum')
 
 def mean_nodes(graph, feat, weight=None, *, ntype=None):
     """Syntax sugar for ``dgl.readout_nodes(graph, feat, weight, ntype=ntype, op='mean')``.
+
+    See Also
+    --------
+    readout_nodes
     """
     return readout_nodes(graph, feat, weight, ntype=ntype, op='mean')
 
 def mean_edges(graph, feat, weight=None, *, etype=None):
     """Syntax sugar for ``dgl.readout_edges(graph, feat, weight, etype=etype, op='mean')``.
+
+    See Also
+    --------
+    readout_edges
     """
     return readout_edges(graph, feat, weight, etype=etype, op='mean')
 
 def max_nodes(graph, feat, weight=None, *, ntype=None):
     """Syntax sugar for ``dgl.readout_nodes(graph, feat, weight, ntype=ntype, op='max')``.
+
+    See Also
+    --------
+    readout_nodes
     """
     return readout_nodes(graph, feat, weight, ntype=ntype, op='max')
 
 def max_edges(graph, feat, weight=None, *, etype=None):
     """Syntax sugar for ``dgl.readout_edges(graph, feat, weight, etype=etype, op='max')``.
+
+    See Also
+    --------
+    readout_edges
     """
     return readout_edges(graph, feat, weight, etype=etype, op='max')
 
@@ -210,15 +240,15 @@ def softmax_nodes(graph, feat, *, ntype=None):
     Parameters
     ----------
     graph : DGLGraph.
-        Input graph.
+        The input graph.
     feat : str
-        Node feature name.
+        The node feature name.
     ntype : str, optional
-        Node type. Can be omitted if there is only one node type in the graph.
+        The node type name. Can be omitted if there is only one node type in the graph.
 
     Returns
     -------
-    tensor
+    Tensor
         Result tensor.
 
     Examples
@@ -269,15 +299,21 @@ def softmax_edges(graph, feat, *, etype=None):
     Parameters
     ----------
     graph : DGLGraph.
-        Input graph.
+        The input graph.
     feat : str
-        Edge feature name.
-    etype : str, typle of str, optional
-        Edge type. Can be omitted if there is only one edge type in the graph.
+        The edge feature name.
+    etype : str or (str, str, str), optional
+        The type names of the edges. The allowed type name formats are:
+
+        * ``(str, str, str)`` for source node type, edge type and destination node type.
+        * or one ``str`` edge type name if the name can uniquely identify a
+          triplet format in the graph.
+
+        Can be omitted if the graph has only one type of edges.
 
     Returns
     -------
-    tensor
+    Tensor
         Result tensor.
 
     Examples
@@ -377,6 +413,8 @@ def broadcast_nodes(graph, graph_feat, *, ntype=None):
     --------
     broadcast_edges
     """
+    if len(F.shape(graph_feat)) == 1:
+        graph_feat = F.unsqueeze(graph_feat, dim=0)
     return F.repeat(graph_feat, graph.batch_num_nodes(ntype), dim=0)
 
 def broadcast_edges(graph, graph_feat, *, etype=None):
@@ -442,12 +480,46 @@ def broadcast_edges(graph, graph_feat, *, etype=None):
     --------
     broadcast_nodes
     """
+    if len(F.shape(graph_feat)) == 1:
+        graph_feat = F.unsqueeze(graph_feat, dim=0)
     return F.repeat(graph_feat, graph.batch_num_edges(etype), dim=0)
 
 READOUT_ON_ATTRS = {
     'nodes': ('ndata', 'batch_num_nodes', 'number_of_nodes'),
     'edges': ('edata', 'batch_num_edges', 'number_of_edges'),
 }
+
+def _topk_torch(keys, k, descending, x):
+    """Internal function to take graph-wise top-k node/edge features according to
+    the rank given by keys, this function is PyTorch only.
+
+    Parameters
+    ----------
+    keys : Tensor
+        The key for ranking.
+    k : int
+        The :math:`k` in "top-:math:`k`".
+    descending : bool
+        Indicates whether to return the feature corresponding to largest or
+        smallest elements.
+    x : Tensor
+        The padded feature with shape (batch, max_len, *)
+
+    Returns
+    -------
+    sorted_feat : Tensor
+        A tensor with shape :math:`(batch, k, *)`.
+    sorted_idx : Tensor
+        A tensor with shape :math:`(batch, k)`.
+    """
+    import torch as th
+    batch_size, max_len = x.shape[0], x.shape[1]
+    topk_indices = keys.topk(k, -1, largest=descending)[1]  # (batch_size, k)
+    x = x.view((batch_size * max_len), -1)
+    shift = th.arange(0, batch_size, device=x.device).view(batch_size, 1) * max_len
+    topk_indices_ = topk_indices + shift
+    x = x[topk_indices_].view(batch_size, k, -1)
+    return th.masked_fill(x, th.isinf(x), 0), topk_indices
 
 def _topk_on(graph, typestr, feat, k, descending, sortby, ntype_or_etype):
     """Internal function to take graph-wise top-k node/edge features of
@@ -498,46 +570,47 @@ def _topk_on(graph, typestr, feat, k, descending, sortby, ntype_or_etype):
     if F.ndim(data[feat]) > 2:
         raise DGLError('Only support {} feature `{}` with dimension less than or'
                        ' equal to 2'.format(typestr, feat))
-
     feat = data[feat]
     hidden_size = F.shape(feat)[-1]
     batch_num_objs = getattr(graph, batch_num_objs_attr)(ntype_or_etype)
     batch_size = len(batch_num_objs)
-
     length = max(max(F.asnumpy(batch_num_objs)), k)
     fill_val = -float('inf') if descending else float('inf')
-    feat_ = F.pad_packed_tensor(feat, batch_num_objs, fill_val, l_min=k)
+    feat_ = F.pad_packed_tensor(feat, batch_num_objs, fill_val, l_min=k)  # (batch_size, l, d)
 
-    if sortby is not None:
-        keys = F.squeeze(F.slice_axis(feat_, -1, sortby, sortby+1), -1)
-        order = F.argsort(keys, -1, descending=descending)
+    if F.backend_name == 'pytorch' and sortby is not None:
+        # PyTorch's implementation of top-K
+        keys = feat_[..., sortby]  # (batch_size, l)
+        return _topk_torch(keys, k, descending, feat_)
     else:
-        order = F.argsort(feat_, 1, descending=descending)
+        # Fallback to framework-agnostic implementation of top-K
+        if sortby is not None:
+            keys = F.squeeze(F.slice_axis(feat_, -1, sortby, sortby+1), -1)
+            order = F.argsort(keys, -1, descending=descending)
+        else:
+            order = F.argsort(feat_, 1, descending=descending)
+        topk_indices = F.slice_axis(order, 1, 0, k)
 
-    topk_indices = F.slice_axis(order, 1, 0, k)
-
-    # zero padding
-    feat_ = F.pad_packed_tensor(feat, batch_num_objs, 0, l_min=k)
-
-    if sortby is not None:
-        feat_ = F.reshape(feat_, (batch_size * length, -1))
-        shift = F.repeat(F.arange(0, batch_size) * length, k, -1)
-        shift = F.copy_to(shift, F.context(feat))
-        topk_indices_ = F.reshape(topk_indices, (-1,)) + shift
-    else:
-        feat_ = F.reshape(feat_, (-1,))
-        shift = F.repeat(F.arange(0, batch_size), k * hidden_size, -1) * length * hidden_size +\
-                F.cat([F.arange(0, hidden_size)] * batch_size * k, -1)
-        shift = F.copy_to(shift, F.context(feat))
-        topk_indices_ = F.reshape(topk_indices, (-1,)) * hidden_size + shift
-
-    return F.reshape(F.gather_row(feat_, topk_indices_), (batch_size, k, -1)),\
-           topk_indices
+        if sortby is not None:
+            feat_ = F.reshape(feat_, (batch_size * length, -1))
+            shift = F.repeat(F.arange(0, batch_size) * length, k, -1)
+            shift = F.copy_to(shift, F.context(feat))
+            topk_indices_ = F.reshape(topk_indices, (-1,)) + shift
+        else:
+            feat_ = F.reshape(feat_, (-1,))
+            shift = F.repeat(F.arange(0, batch_size), k * hidden_size, -1) * length * hidden_size +\
+                    F.cat([F.arange(0, hidden_size)] * batch_size * k, -1)
+            shift = F.copy_to(shift, F.context(feat))
+            topk_indices_ = F.reshape(topk_indices, (-1,)) * hidden_size + shift
+        out = F.reshape(F.gather_row(feat_, topk_indices_), (batch_size, k, -1))
+        out = F.replace_inf_with_zero(out)
+        return out, topk_indices
 
 def topk_nodes(graph, feat, k, *, descending=True, sortby=None, ntype=None):
-    """Perform a graph-wise top-k on node features :attr:`feat` in
-    :attr:`graph` by feature at index :attr:`sortby`. If :attr:
-    `descending` is set to False, return the k smallest elements instead.
+    """Return a graph-level representation by a graph-wise top-k on
+    node features :attr:`feat` in :attr:`graph` by feature at index :attr:`sortby`.
+
+    If :attr:`descending` is set to False, return the k smallest elements instead.
 
     If :attr:`sortby` is set to None, the function would perform top-k on
     all dimensions independently, equivalent to calling
@@ -568,6 +641,11 @@ def topk_nodes(graph, feat, k, *, descending=True, sortby=None, ntype=None):
         is set to None), where
         :math:`B` is the batch size of the input graph, :math:`D`
         is the feature size.
+
+    Notes
+    -----
+    If an example has :math:`n` nodes and :math:`n<k`, the ``sorted_feat``
+    tensor will pad the :math:`n+1` to :math:`k` th rows with zero;
 
     Examples
     --------
@@ -631,20 +709,16 @@ def topk_nodes(graph, feat, k, *, descending=True, sortby=None, ntype=None):
               [0.0880, 0.6379, 0.4451, 0.6893, 0.5197]]]), tensor([[[1, 0, 1, 3, 1],
               [3, 2, 0, 2, 2],
               [2, 3, 2, 1, 3]]]))
-
-    Notes
-    -----
-    If an example has :math:`n` nodes and :math:`n<k`, the ``sorted_feat``
-    tensor will pad the :math:`n+1` to :math:`k`th rows with zero;
     """
     return _topk_on(graph, 'nodes', feat, k,
                     descending=descending, sortby=sortby,
                     ntype_or_etype=ntype)
 
 def topk_edges(graph, feat, k, *, descending=True, sortby=None, etype=None):
-    """Perform a graph-wise top-k on node features :attr:`feat` in
-    :attr:`graph` by feature at index :attr:`sortby`. If :attr:
-    `descending` is set to False, return the k smallest elements instead.
+    """Return a graph-level representation by a graph-wise top-k
+    on edge features :attr:`feat` in :attr:`graph` by feature at index :attr:`sortby`.
+
+    If :attr:`descending` is set to False, return the k smallest elements instead.
 
     If :attr:`sortby` is set to None, the function would perform top-k on
     all dimensions independently, equivalent to calling
@@ -676,6 +750,11 @@ def topk_edges(graph, feat, k, *, descending=True, sortby=None, etype=None):
         :math:`B` is the batch size of the input graph, :math:`D`
         is the feature size.
 
+
+    Notes
+    -----
+    If an example has :math:`n` nodes and :math:`n<k`, the ``sorted_feat``
+    tensor will pad the :math:`n+1` to :math:`k` th rows with zero;
     Examples
     --------
 
@@ -738,11 +817,6 @@ def topk_edges(graph, feat, k, *, descending=True, sortby=None, etype=None):
               [0.0880, 0.6379, 0.4451, 0.6893, 0.5197]]]), tensor([[[1, 0, 1, 3, 1],
               [3, 2, 0, 2, 2],
               [2, 3, 2, 1, 3]]]))
-
-    Notes
-    -----
-    If an example has :math:`n` nodes and :math:`n<k`, the ``sorted_feat``
-    tensor will pad the :math:`n+1` to :math:`k`th rows with zero;
     """
     return _topk_on(graph, 'edges', feat, k,
                     descending=descending, sortby=sortby,

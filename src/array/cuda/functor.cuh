@@ -6,6 +6,10 @@
 #ifndef DGL_ARRAY_CUDA_FUNCTOR_CUH_
 #define DGL_ARRAY_CUDA_FUNCTOR_CUH_
 
+#include "./atomic.cuh"
+#include "./fp16.cuh"
+#include <cmath>
+
 namespace dgl {
 namespace aten {
 namespace cuda {
@@ -120,9 +124,11 @@ template <typename DType> constexpr bool Dot<DType>::reduce_last_dim;
 namespace reduce {
 template <typename Idx,
           typename DType,
-          bool atomic=false>
-struct Sum {
-  static constexpr DType zero = 0;
+          bool atomic>
+struct _Sum {
+  static constexpr __host__ __device__ __forceinline__ DType zero() {
+    return 0.;
+  };
   static constexpr bool require_arg = false;
   static __device__ __forceinline__ void Call(
     DType *out_buf, Idx *arg_u_buf, Idx *arg_e_buf,
@@ -133,20 +139,41 @@ struct Sum {
       cuda::AtomicAdd(out_buf, val);
     }
   }
+  static __device__ __forceinline__ void Call(
+      DType *out_buf, Idx *arg_buf,
+      DType val, Idx id) {
+    if (!atomic) {
+      *out_buf += val;
+    } else {
+      cuda::AtomicAdd(out_buf, val);
+    }
+  }
   static __device__ __forceinline__ void CallArg(Idx fid,
     Idx *arg_u_buf, Idx *arg_e_buf,
     DType val, DType val_ref, Idx uid, Idx eid) {}
 };
-template <typename Idx, typename DType, bool atomic>
-constexpr DType Sum<Idx, DType, atomic>::zero;
-template <typename Idx, typename DType, bool atomic>
-constexpr bool Sum<Idx, DType, atomic>::require_arg;
 
 template <typename Idx,
           typename DType,
           bool atomic=false>
-struct Max {
-  static constexpr DType zero = std::numeric_limits<DType>::lowest();
+struct Sum: _Sum<Idx, DType, atomic> { };
+
+#ifdef USE_FP16
+template <typename Idx, bool atomic>
+struct Sum<Idx, half, atomic>: _Sum<Idx, half, atomic> {
+  static constexpr __host__ __device__ __forceinline__ half zero() {
+    return __float2half_rn(0.);
+  };
+};
+#endif  // USE_FP16
+
+template <typename Idx,
+          typename DType,
+          bool atomic>
+struct _Max {
+  static constexpr __host__ __device__ __forceinline__ DType zero() {
+    return -std::numeric_limits<DType>::infinity();
+  };
   static constexpr bool require_arg = true;
   static __device__ __forceinline__ void Call(
     DType *out_buf, Idx *arg_u_buf, Idx *arg_e_buf,
@@ -156,6 +183,18 @@ struct Max {
         *out_buf = val;
         *arg_u_buf = uid;
         *arg_e_buf = eid;
+      }
+    } else {
+      cuda::AtomicMax(out_buf, val);
+    }
+  }
+  static __device__ __forceinline__ void Call(
+      DType *out_buf, Idx *arg_buf,
+      DType val, Idx id) {
+    if (!atomic) {
+      if (*out_buf < val) {
+        *out_buf = val;
+        *arg_buf = id;
       }
     } else {
       cuda::AtomicMax(out_buf, val);
@@ -174,16 +213,29 @@ struct Max {
     }
   }
 };
-template <typename Idx, typename DType, bool atomic>
-constexpr DType Max<Idx, DType, atomic>::zero;
-template <typename Idx, typename DType, bool atomic>
-constexpr bool Max<Idx, DType, atomic>::require_arg;
 
 template <typename Idx,
           typename DType,
           bool atomic=false>
-struct Min {
-  static constexpr DType zero = std::numeric_limits<DType>::max();
+struct Max : _Max<Idx, DType, atomic> { };
+
+#ifdef USE_FP16
+template <typename Idx,
+          bool atomic>
+struct Max<Idx, half, atomic> : _Max<Idx, half, atomic> {
+  static constexpr __host__ __device__ __forceinline__ half zero() {
+    return __float2half_rn(-6.550400e+04f);
+  };
+};
+#endif
+
+template <typename Idx,
+          typename DType,
+          bool atomic>
+struct _Min {
+  static constexpr __host__ __device__ __forceinline__ DType zero() {
+    return std::numeric_limits<DType>::infinity();
+  };
   static constexpr bool require_arg = true;
   static __device__ __forceinline__ void Call(
     DType *out_buf, Idx *arg_u_buf, Idx *arg_e_buf,
@@ -193,6 +245,18 @@ struct Min {
         *out_buf = val;
         *arg_u_buf = uid;
         *arg_e_buf = eid;
+      }
+    } else {
+      cuda::AtomicMin(out_buf, val);
+    }
+  }
+  static __device__ __forceinline__ void Call(
+      DType *out_buf, Idx *arg_buf,
+      DType val, Idx id) {
+    if (!atomic) {
+      if (*out_buf > val) {
+        *out_buf = val;
+        *arg_buf = id;
       }
     } else {
       cuda::AtomicMin(out_buf, val);
@@ -211,10 +275,21 @@ struct Min {
     }
   }
 };
-template <typename Idx, typename DType, bool atomic>
-constexpr DType Min<Idx, DType, atomic>::zero;
-template <typename Idx, typename DType, bool atomic>
-constexpr bool Min<Idx, DType, atomic>::require_arg;
+
+template <typename Idx,
+          typename DType,
+          bool atomic=false>
+struct Min : _Min<Idx, DType, atomic> { };
+
+#ifdef USE_FP16
+template <typename Idx,
+          bool atomic>
+struct Min<Idx, half, atomic> : _Min<Idx, half, atomic> {
+  static constexpr __host__ __device__ __forceinline__ half zero() {
+    return __float2half_rn(6.550400e+04f);
+  };
+};
+#endif  // USE_FP16
 
 }  // namespace reduce
 

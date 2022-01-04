@@ -36,11 +36,11 @@ class Metapath2VecTrainer:
 
     def train(self):
 
+        optimizer = optim.SparseAdam(list(self.skip_gram_model.parameters()), lr=self.initial_lr)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, len(self.dataloader))
+
         for iteration in range(self.iterations):
             print("\n\n\nIteration: " + str(iteration + 1))
-            optimizer = optim.SparseAdam(self.skip_gram_model.parameters(), lr=self.initial_lr)
-            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, len(self.dataloader))
-
             running_loss = 0.0
             for i, sample_batched in enumerate(tqdm(self.dataloader)):
 
@@ -59,7 +59,7 @@ class Metapath2VecTrainer:
                     if i > 0 and i % 500 == 0:
                         print(" Loss: " + str(running_loss))
 
-            self.skip_gram_model.save_embedding(self.data.id2word, self.output_file_name)
+        self.skip_gram_model.save_embedding(self.data.id2word, self.output_file_name)
 
 
 if __name__ == '__main__':

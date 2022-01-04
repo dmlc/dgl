@@ -10,8 +10,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import dgl
+import dgl.function as fn
 from dgl.data import register_data_args
-from torch.utils.tensorboard import SummaryWriter
 
 from modules import GraphSAGE
 from sampler import ClusterIter
@@ -73,8 +73,17 @@ def main(args):
     # metis only support int64 graph
     g = g.long()
 
-    cluster_iterator = ClusterIter(
-        args.dataset, g, args.psize, args.batch_size, train_nid, use_pp=args.use_pp)
+    if args.use_pp:
+        g.update_all(fn.copy_u('feat', 'm'), fn.sum('m', 'feat_agg'))
+        g.ndata['feat'] = torch.cat([g.ndata['feat'], g.ndata['feat_agg']], 1)
+        del g.ndata['feat_agg']
+
+    cluster_iterator = dgl.dataloading.GraphDataLoader(
+        dgl.dataloading.ClusterGCNSubgraphIterator(
+            dgl.node_subgraph(g, train_nid), args.psize, './cache'),
+        batch_size=args.batch_size, num_workers=4)
+    #cluster_iterator = ClusterIter(
+    #    args.dataset, g, args.psize, args.batch_size, train_nid, use_pp=args.use_pp)
 
     # set device for dataset tensors
     if args.gpu < 0:
@@ -84,7 +93,7 @@ def main(args):
         torch.cuda.set_device(args.gpu)
         val_mask = val_mask.cuda()
         test_mask = test_mask.cuda()
-        g = g.to(args.gpu)
+        g = g.int().to(args.gpu)
 
     print('labels shape:', g.ndata['label'].shape)
     print("features shape, ", g.ndata['feat'].shape)
@@ -102,7 +111,6 @@ def main(args):
 
     # logger and so on
     log_dir = save_log_dir(args)
-    writer = SummaryWriter(log_dir)
     logger = Logger(os.path.join(log_dir, 'loggings'))
     logger.write(args)
 
@@ -134,9 +142,11 @@ def main(args):
                 cluster = cluster.to(torch.cuda.current_device())
             model.train()
             # forward
-            pred = model(cluster)
             batch_labels = cluster.ndata['label']
             batch_train_mask = cluster.ndata['train_mask']
+            if batch_train_mask.sum().item() == 0:
+                continue
+            pred = model(cluster)
             loss = loss_f(pred[batch_train_mask],
                           batch_labels[batch_train_mask])
 
@@ -148,8 +158,6 @@ def main(args):
             if j % args.log_every == 0:
                 print(f"epoch:{epoch}/{args.n_epochs}, Iteration {j}/"
                       f"{len(cluster_iterator)}:training loss", loss.item())
-                writer.add_scalar('train/loss', loss.item(),
-                                  global_step=j + epoch * len(cluster_iterator))
         print("current memory:",
               torch.cuda.memory_allocated(device=pred.device) / 1024 / 1024)
 
@@ -164,8 +172,6 @@ def main(args):
                 print('new best val f1:', best_f1)
                 torch.save(model.state_dict(), os.path.join(
                     log_dir, 'best_model.pkl'))
-            writer.add_scalar('val/f1-mic', val_f1_mic, global_step=epoch)
-            writer.add_scalar('val/f1-mac', val_f1_mac, global_step=epoch)
 
     end_time = time.time()
     print(f'training using time {start_time-end_time}')
@@ -177,8 +183,6 @@ def main(args):
     test_f1_mic, test_f1_mac = evaluate(
         model, g, labels, test_mask, multitask)
     print("Test F1-mic{:.4f}, Test F1-mac{:.4f}". format(test_f1_mic, test_f1_mac))
-    writer.add_scalar('test/f1-mic', test_f1_mic)
-    writer.add_scalar('test/f1-mac', test_f1_mac)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GCN')
@@ -192,7 +196,7 @@ if __name__ == '__main__':
     parser.add_argument("--n-epochs", type=int, default=200,
                         help="number of training epochs")
     parser.add_argument("--log-every", type=int, default=100,
-                        help="number of training epochs")
+                        help="the frequency to save model")
     parser.add_argument("--batch-size", type=int, default=20,
                         help="batch size")
     parser.add_argument("--psize", type=int, default=1500,
@@ -210,7 +214,7 @@ if __name__ == '__main__':
     parser.add_argument("--self-loop", action='store_true',
                         help="graph self-loop (default=False)")
     parser.add_argument("--use-pp", action='store_true',
-                        help="whether to use percomputation")
+                        help="whether to use precomputation")
     parser.add_argument("--normalize", action='store_true',
                         help="whether to use normalized feature")
     parser.add_argument("--use-val", action='store_true',

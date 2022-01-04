@@ -144,6 +144,11 @@ struct PairIterator : public std::iterator<std::random_access_iterator_tag,
     return PairRef<V1, V2>(row, col);
   }
 
+  // required for random access iterators in VS2019
+  PairRef<V1, V2> operator[](size_t offset) const {
+    return PairRef<V1, V2>(row + offset, col + offset);
+  }
+
   V1 *row;
   V2 *col;
 };
@@ -156,7 +161,7 @@ namespace aten {
 namespace impl {
 
 template <DLDeviceType XPU, typename IdType>
-std::pair<IdArray, IdArray> Sort(IdArray array) {
+std::pair<IdArray, IdArray> Sort(IdArray array, int /* num_bits */) {
   const int64_t nitem = array->shape[0];
   IdArray val = array.Clone();
   IdArray idx = aten::Range(0, nitem, 64, array->ctx);
@@ -176,8 +181,8 @@ std::pair<IdArray, IdArray> Sort(IdArray array) {
   return std::make_pair(val, idx);
 }
 
-template std::pair<IdArray, IdArray> Sort<kDLCPU, int32_t>(IdArray);
-template std::pair<IdArray, IdArray> Sort<kDLCPU, int64_t>(IdArray);
+template std::pair<IdArray, IdArray> Sort<kDLCPU, int32_t>(IdArray, int num_bits);
+template std::pair<IdArray, IdArray> Sort<kDLCPU, int64_t>(IdArray, int num_bits);
 
 }  // namespace impl
 }  // namespace aten

@@ -8,7 +8,8 @@ import os
 from .dgl_dataset import DGLBuiltinDataset
 from .utils import _get_dgl_url, generate_mask_tensor, load_graphs, save_graphs, deprecate_property
 from .. import backend as F
-from ..convert import graph as dgl_graph
+from ..convert import from_scipy
+from ..transform import reorder_graph
 
 
 class RedditDataset(DGLBuiltinDataset):
@@ -140,7 +141,7 @@ class RedditDataset(DGLBuiltinDataset):
         # graph
         coo_adj = sp.load_npz(os.path.join(
             self.raw_path, "reddit{}_graph.npz".format(self._self_loop_str)))
-        self._graph = dgl_graph(coo_adj)
+        self._graph = from_scipy(coo_adj)
         # features and labels
         reddit_data = np.load(os.path.join(self.raw_path, "reddit_data.npz"))
         features = reddit_data["feature"]
@@ -155,6 +156,9 @@ class RedditDataset(DGLBuiltinDataset):
         self._graph.ndata['test_mask'] = generate_mask_tensor(test_mask)
         self._graph.ndata['feat'] = F.tensor(features, dtype=F.data_type_dict['float32'])
         self._graph.ndata['label'] = F.tensor(labels, dtype=F.data_type_dict['int64'])
+        self._graph = reorder_graph(
+            self._graph, node_permute_algo='rcmk', edge_permute_algo='dst', store_ids=False)
+
         self._print_info()
 
     def has_cache(self):
@@ -171,6 +175,9 @@ class RedditDataset(DGLBuiltinDataset):
         graph_path = os.path.join(self.save_path, 'dgl_graph.bin')
         graphs, _ = load_graphs(graph_path)
         self._graph = graphs[0]
+        self._graph.ndata['train_mask'] = generate_mask_tensor(self._graph.ndata['train_mask'].numpy())
+        self._graph.ndata['val_mask'] = generate_mask_tensor(self._graph.ndata['val_mask'].numpy())
+        self._graph.ndata['test_mask'] = generate_mask_tensor(self._graph.ndata['test_mask'].numpy())
         self._print_info()
 
     def _print_info(self):

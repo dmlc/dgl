@@ -76,3 +76,7 @@ def get_optimizer(opt):
         return optim.Adam
     else:
         raise NotImplementedError
+
+
+def to_etype_name(rating):
+    return str(rating).replace('.', '_')

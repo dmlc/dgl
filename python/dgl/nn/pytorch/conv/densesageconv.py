@@ -5,7 +5,11 @@ from ....utils import check_eq_shape
 
 
 class DenseSAGEConv(nn.Module):
-    """GraphSAGE layer where the graph structure is given by an
+    """
+
+    Description
+    -----------
+    GraphSAGE layer where the graph structure is given by an
     adjacency matrix.
     We recommend to use this module when appying GraphSAGE on dense graphs.
 
@@ -14,9 +18,9 @@ class DenseSAGEConv(nn.Module):
     Parameters
     ----------
     in_feats : int
-        Input feature size.
+        Input feature size; i.e, the number of dimensions of :math:`h_i^{(l)}`.
     out_feats : int
-        Output feature size.
+        Output feature size; i.e, the number of dimensions of :math:`h_i^{(l+1)}`.
     feat_drop : float, optional
         Dropout rate on features. Default: 0.
     bias : bool
@@ -27,9 +31,33 @@ class DenseSAGEConv(nn.Module):
         If not None, applies an activation function to the updated node features.
         Default: ``None``.
 
+    Example
+    -------
+    >>> import dgl
+    >>> import numpy as np
+    >>> import torch as th
+    >>> from dgl.nn import DenseSAGEConv
+    >>>
+    >>> feat = th.ones(6, 10)
+    >>> adj = th.tensor([[0., 0., 1., 0., 0., 0.],
+    ...         [1., 0., 0., 0., 0., 0.],
+    ...         [0., 1., 0., 0., 0., 0.],
+    ...         [0., 0., 1., 0., 0., 1.],
+    ...         [0., 0., 0., 1., 0., 0.],
+    ...         [0., 0., 0., 0., 0., 0.]])
+    >>> conv = DenseSAGEConv(10, 2)
+    >>> res = conv(adj, feat)
+    >>> res
+    tensor([[1.0401, 2.1008],
+            [1.0401, 2.1008],
+            [1.0401, 2.1008],
+            [1.0401, 2.1008],
+            [1.0401, 2.1008],
+            [1.0401, 2.1008]], grad_fn=<AddmmBackward>)
+
     See also
     --------
-    SAGEConv
+    `SAGEConv <https://docs.dgl.ai/api/python/nn.pytorch.html#sageconv>`__
     """
     def __init__(self,
                  in_feats,
@@ -48,12 +76,25 @@ class DenseSAGEConv(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        """Reinitialize learnable parameters."""
+        r"""
+
+        Description
+        -----------
+        Reinitialize learnable parameters.
+
+        Notes
+        -----
+        The linear weights :math:`W^{(l)}` are initialized using Glorot uniform initialization.
+        """
         gain = nn.init.calculate_gain('relu')
         nn.init.xavier_uniform_(self.fc.weight, gain=gain)
 
     def forward(self, adj, feat):
-        r"""Compute (Dense) Graph SAGE layer.
+        r"""
+
+        Description
+        -----------
+        Compute (Dense) Graph SAGE layer.
 
         Parameters
         ----------

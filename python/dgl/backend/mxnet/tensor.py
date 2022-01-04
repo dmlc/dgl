@@ -49,11 +49,17 @@ def tensor(data, dtype=None):
         if dtype is None:
             if isinstance(data, np.ndarray):
                 dtype = np.int32 if data.dtype == np.bool else data.dtype
+            elif len(data) == 0:
+                dtype = np.int64
             else:
                 dtype = np.int64 if isinstance(data[0], numbers.Integral) else np.float32
         return nd.array(data, dtype=dtype)
 
 def as_scalar(data):
+    if data.size != 1:
+        raise ValueError("The current array is not a scalar")
+    if data.shape != (1,):
+        data = data.expand_dims(axis=0)
     return data.asscalar()
 
 def get_preferred_sparse_format():
@@ -139,10 +145,18 @@ def copy_to(input, ctx, **kwargs):
     return input.as_in_context(ctx)
 
 def sum(input, dim, keepdims=False):
+    if len(input) == 0:
+        return nd.array([0.], dtype=input.dtype, ctx=input.context)
     return nd.sum(input, axis=dim, keepdims=keepdims)
+
+def floor_div(in1, in2):
+    return in1 / in2
 
 def reduce_sum(input):
     return input.sum()
+
+def cumsum(input, dim):
+    return nd.cumsum(input, axis=dim)
 
 def mean(input, dim):
     return nd.mean(input, axis=dim)
@@ -276,6 +290,9 @@ def ones(shape, dtype, ctx):
 def uniform(shape, dtype, ctx, low, high):
     return nd.random.uniform(low, high, ctx=ctx, dtype=dtype, shape=shape)
 
+def randint(shape, dtype, ctx, low, high):
+    return nd.random.randint(low, high, ctx=ctx, dtype=dtype, shape=shape)
+
 def pad_packed_tensor(input, lengths, value, l_min=None):
     old_shape = input.shape
     if isinstance(lengths, nd.NDArray):
@@ -322,11 +339,25 @@ def clone(input):
 def clamp(data, min_val, max_val):
     return nd.clip(data, min_val, max_val)
 
-def unique(input):
+def replace_inf_with_zero(x):
+    return nd.where(nd.abs(x) == np.inf, nd.zeros_like(x), x)
+
+def count_nonzero(input):
     # TODO: fallback to numpy is unfortunate
     tmp = input.asnumpy()
-    tmp = np.unique(tmp)
-    return nd.array(tmp, ctx=input.context, dtype=input.dtype)
+    return np.count_nonzero(tmp)
+
+def unique(input, return_inverse=False):
+    # TODO: fallback to numpy is unfortunate
+    tmp = input.asnumpy()
+    if return_inverse:
+        tmp, inv = np.unique(tmp, return_inverse=True)
+        tmp = nd.array(tmp, ctx=input.context, dtype=input.dtype)
+        inv = nd.array(inv, ctx=input.context)
+        return tmp, inv
+    else:
+        tmp = np.unique(tmp)
+        return nd.array(tmp, ctx=input.context, dtype=input.dtype)
 
 def full_1d(length, fill_value, dtype, ctx):
     return nd.full((length,), fill_value, dtype=dtype, ctx=ctx)
@@ -345,11 +376,11 @@ def sort_1d(input):
     idx = nd.cast(idx, dtype='int64')
     return val, idx
 
-def arange(start, stop, dtype=np.int64):
+def arange(start, stop, dtype=np.int64, ctx=None):
     if start >= stop:
-        return nd.array([], dtype=dtype)
+        return nd.array([], dtype=dtype, ctx=ctx)
     else:
-        return nd.arange(start, stop, dtype=dtype)
+        return nd.arange(start, stop, dtype=dtype, ctx=ctx)
 
 def rand_shuffle(arr):
     return mx.nd.random.shuffle(arr)
@@ -365,6 +396,7 @@ def zerocopy_to_numpy(arr):
     return arr.asnumpy()
 
 def zerocopy_from_numpy(np_data):
+    np_data = np.asarray(np_data, order='C')
     return mx.nd.from_numpy(np_data, zero_copy=True)
 
 def zerocopy_to_dgl_ndarray(arr):
@@ -500,10 +532,10 @@ class CopyReduce(mx.autograd.Function):
             in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
             degs_nd = zerocopy_to_dgl_ndarray(degs)
             K.copy_reduce(
-                'sum', self.graph, self.target, in_ones_nd, degs_nd, 
+                'sum', self.graph, self.target, in_ones_nd, degs_nd,
                 self.in_map[0], self.out_map[0])
             # reshape
-            degs = degs.reshape((out_data.shape[0],) + (1,) * (out_data.ndim - 1)).clip(1, float('inf')) 
+            degs = degs.reshape((out_data.shape[0],) + (1,) * (out_data.ndim - 1)).clip(1, float('inf'))
             out_data = out_data / degs
         else:
             degs = None

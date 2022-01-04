@@ -37,7 +37,7 @@ class GraphSAGELayer(nn.Module):
 
     def forward(self, g, h):
         g = g.local_var()
-        if not self.use_pp or not self.training:
+        if not self.use_pp:
             norm = self.get_norm(g)
             g.ndata['h'] = h
             g.update_all(fn.copy_src(src='h', out='m'),

@@ -27,3 +27,6 @@ DGLBACKEND=mxnet python3 train.py --gpu 0
 ## Speed Test
 
 See https://docs.google.com/spreadsheets/d/1eCQrVn7g0uWriz63EbEDdes2ksMdKdlbWMyT8PSU4rc .
+
+## Note
+The code can work with MXNet 1.5.1
