@@ -347,11 +347,17 @@ def count_nonzero(input):
     tmp = input.asnumpy()
     return np.count_nonzero(tmp)
 
-def unique(input):
+def unique(input, return_inverse=False):
     # TODO: fallback to numpy is unfortunate
     tmp = input.asnumpy()
-    tmp = np.unique(tmp)
-    return nd.array(tmp, ctx=input.context, dtype=input.dtype)
+    if return_inverse:
+        tmp, inv = np.unique(tmp, return_inverse=True)
+        tmp = nd.array(tmp, ctx=input.context, dtype=input.dtype)
+        inv = nd.array(inv, ctx=input.context)
+        return tmp, inv
+    else:
+        tmp = np.unique(tmp)
+        return nd.array(tmp, ctx=input.context, dtype=input.dtype)
 
 def full_1d(length, fill_value, dtype, ctx):
     return nd.full((length,), fill_value, dtype=dtype, ctx=ctx)

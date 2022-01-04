@@ -171,7 +171,7 @@ class ItemToItemScorer(nn.Module):
         super().__init__()
 
         n_nodes = full_graph.number_of_nodes(ntype)
-        self.bias = nn.Parameter(torch.zeros(n_nodes))
+        self.bias = nn.Parameter(torch.zeros(n_nodes, 1))
 
     def _add_bias(self, edges):
         bias_src = self.bias[edges.src[dgl.NID]]
