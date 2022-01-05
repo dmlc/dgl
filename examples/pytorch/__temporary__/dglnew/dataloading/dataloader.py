@@ -6,6 +6,7 @@ import asyncio
 import torch
 from dgl._ffi import streams as FS
 from dgl.utils import recursive_apply, ExceptionWrapper
+from .asyncio_wrapper import AsyncIO
 
 class _TensorizedDatasetIter(object):
     def __init__(self, dataset, batch_size, drop_last, mapping_keys):
@@ -124,7 +125,7 @@ def _prefetch(batch, device, stream, pin_memory, sampler, use_asyncio):
                 indices = target['_ID']     # depends on dgl.NID and dgl.EID being the same
 
                 for feat_key, storage in storage_dict.items():
-                    if use_asyncio and hasattr(storage, 'async_fetch'):
+                    if use_asyncio:
                         future = asyncio.create_task(
                             storage.async_fetch(indices, device, pin_memory=pin_memory))
                         feats[storage_key, i, feat_key] = future
@@ -143,7 +144,10 @@ async def _async_prefetch(batch, device, stream, pin_memory, sampler):
     return feats
 
 
+# Using Python thread makes one epoch 19s instead of 7.1s.
 def _prefetcher_entry(dataloader_it, dataloader, queue, use_asyncio):
+    # TODO: figure out why PyTorch sets the number of threads to 1
+    torch.set_num_threads(16)
     device = dataloader.device
     stream = torch.cuda.Stream(device=device)
     pin_memory = dataloader.pin_memory
@@ -153,7 +157,7 @@ def _prefetcher_entry(dataloader_it, dataloader, queue, use_asyncio):
     try:
         for batch in dataloader_it:
             if use_asyncio:
-                feats = asyncio.run(_async_prefetch(batch, device, stream, pin_memory, sampler))
+                feats = AsyncIO().run(_async_prefetch(batch, device, stream, pin_memory, sampler))
             else:
                 feats = _prefetch(batch, device, stream, pin_memory, sampler, False)
 
@@ -169,8 +173,6 @@ def _prefetcher_entry(dataloader_it, dataloader, queue, use_asyncio):
         queue.put((None, None, None, ExceptionWrapper(where='in prefetcher')))
 
 
-# Prefetcher thread is responsible for issuing the requests to the storages to fetch
-# features from the given indices.
 class _PrefetchingIter(object):
     def __init__(self, dataloader, dataloader_it):
         self.queue = Queue(1)
@@ -180,34 +182,34 @@ class _PrefetchingIter(object):
         self.pin_memory = self.dataloader.pin_memory
         self.use_asyncio = self.dataloader.use_asyncio
 
-        #thread = threading.Thread(
-        #    target=_prefetcher_entry,
-        #    args=(dataloader_it, dataloader, self.queue, self.use_asyncio),
-        #    daemon=True)
-        #thread.start()
-        #self.thread = thread
+        thread = threading.Thread(
+            target=_prefetcher_entry,
+            args=(dataloader_it, dataloader, self.queue, self.use_asyncio),
+            daemon=True)
+        thread.start()
+        self.thread = thread
 
     def __iter__(self):
         return self
 
     def __next__(self):
-        #batch, feats, stream_event, exception = self.queue.get()
-        #if result is None:
-        #    self.thread.join()
-        #    if exception is None:
-        #        raise StopIteration
-        #    exception.reraise()
-        batch = next(self.dataloader_it)
-        device = self.dataloader.device
-        stream = torch.cuda.Stream(device=device)
-        if self.use_asyncio:
-            feats = asyncio.run(_async_prefetch(
-                batch, device, stream, self.pin_memory, self.graph_sampler))
-        else:
-            feats = _prefetch(
-                batch, device, stream, self.pin_memory, self.graph_sampler, False)
-        batch = recursive_apply(batch, lambda x: x.to(device, non_blocking=True))
-        stream_event = stream.record_event()
+        batch, feats, stream_event, exception = self.queue.get()
+        if batch is None:
+            self.thread.join()
+            if exception is None:
+                raise StopIteration
+            exception.reraise()
+        #batch = next(self.dataloader_it)
+        #device = self.dataloader.device
+        #stream = torch.cuda.Stream(device=device)
+        #if self.use_asyncio:
+        #    feats = AsyncIO().run(_async_prefetch(
+        #        batch, device, stream, self.pin_memory, self.graph_sampler))
+        #else:
+        #    feats = _prefetch(
+        #        batch, device, stream, self.pin_memory, self.graph_sampler, False)
+        #batch = recursive_apply(batch, lambda x: x.to(device, non_blocking=True))
+        #stream_event = stream.record_event()
 
         # Assign the prefetched features back to batch
         target_dict = {}

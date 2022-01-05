@@ -57,7 +57,7 @@ model = SAGE(feats.shape[1], 256, dataset.num_classes).cuda()
 opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
 
 durations = []
-for _ in range(10):
+for _ in range(1):
     t0 = time.time()
     for it, blocks in enumerate(dataloader):
         x = blocks[0].srcdata['feat']
@@ -72,5 +72,6 @@ for _ in range(10):
             mem = torch.cuda.max_memory_allocated() / 1000000
             print('Loss', loss.item(), 'Acc', acc.item(), 'GPU Mem', mem, 'MB')
     tt = time.time()
+    print(tt - t0)
     durations.append(tt - t0)
-print(np.mean(durations[4:]), np.std(durations[4:]))
+#print(np.mean(durations[4:]), np.std(durations[4:]))
