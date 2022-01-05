@@ -268,7 +268,7 @@ class DefaultDataParser:
                 dgl_warning("Unamed column is found. Ignored...")
                 continue
             dt = df[header].to_numpy().squeeze()
-            if isinstance(dt[0], str):
+            if len(dt) > 0 and isinstance(dt[0], str):
                 #probably consists of list of numeric values
                 dt = np.array([ast.literal_eval(row) for row in dt])
             data[header] = dt
