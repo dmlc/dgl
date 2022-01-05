@@ -17,3 +17,15 @@ AddSelfLoop
 
 .. autoclass:: dgl.transform.module.BaseTransform
     :show-inheritance:
+
+RemoveSelfLoop
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.transform.module.RemoveSelfLoop
+    :show-inheritance:
+
+AddReverse
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.transform.module.AddReverse
+    :show-inheritance:

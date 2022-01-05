@@ -717,7 +717,7 @@ def to_bidirected(g, copy_ndata=False, readonly=None):
 
 def add_reverse_edges(g, readonly=None, copy_ndata=True,
                       copy_edata=False, ignore_bipartite=False):
-    r"""Add an reversed edge for each edge in the input graph and return a new graph.
+    r"""Add a reversed edge for each edge in the input graph and return a new graph.
 
     For a graph with edges :math:`(i_1, j_1), \cdots, (i_n, j_n)`, this
     function creates a new graph with edges
@@ -742,7 +742,7 @@ def add_reverse_edges(g, readonly=None, copy_ndata=True,
         (Default: True)
     copy_edata: bool, optional
         If True, the features of the reversed edges will be identical to
-        the original ones."
+        the original ones.
 
         If False, the new graph will not have any edge features.
 
