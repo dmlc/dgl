@@ -417,6 +417,7 @@ class ToSimple(BaseTransform):
     >>> transform = ToSimple()
     >>> g = dgl.graph(([0, 1, 1], [1, 2, 2]))
     >>> g.edata['w'] = torch.tensor([[0.1], [0.2], [0.3]])
+    >>> sg = transform(g)
     """
     def __init__(self, return_counts='count', writeback_mapping=False, aggregator='arbitrary'):
         self.return_counts = return_counts
@@ -430,6 +431,7 @@ class ToSimple(BaseTransform):
                                     copy_edata=True,
                                     aggregator=self.aggregator)
 
+"""
 class LineGraph(BaseTransform):
     raise NotImplementedError
 
@@ -453,3 +455,4 @@ class PPR(BaseTransform):
 
 class MDK(BaseTransform):
     raise NotImplementedError
+"""
