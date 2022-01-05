@@ -12,6 +12,7 @@ from .utils import save_graphs, load_graphs
 from ..base import dgl_warning, DGLError
 import abc
 import ast
+from typing import Callable
 
 
 class MetaNode(dt.BaseModel):
@@ -73,7 +74,17 @@ def _validate_data_length(data_dict):
             "All data are required to have same length while some of them does not. Length of data={}".format(str(len_dict)))
 
 
-class NodeData:
+class BaseData:
+    """ Class of base data which is inherited by Node/Edge/GraphData. Internal use only. """
+    @staticmethod
+    def read_csv(file_name, base_dir, separator):
+        csv_path = file_name
+        if base_dir is not None:
+            csv_path = os.path.join(base_dir, csv_path)
+        return pd.read_csv(csv_path, sep=separator)
+
+
+class NodeData(BaseData):
     """ Class of node data which is used for DGLGraph construction. Internal use only. """
 
     def __init__(self, node_id, data, type=None, graph_id=None):
@@ -84,8 +95,19 @@ class NodeData:
             len(node_id), 0)
         _validate_data_length({**{'id': self.id, 'graph_id': self.graph_id}, **self.data})
 
+    @staticmethod
+    def load_from_csv(meta: MetaNode, data_parser: Callable, base_dir=None, separator=','):
+        df = BaseData.read_csv(meta.file_name, base_dir, separator)
+        ntype = meta.ntype
+        ndata = data_parser(df)
+        if meta.node_id_field not in ndata:
+            raise DGLError(f"node_id_field[{meta.node_id_field}] does not exist in parsed node data dict.")
+        node_ids = ndata.pop(meta.node_id_field)
+        graph_ids = ndata.pop(meta.graph_id_field, None)
+        return NodeData(node_ids, ndata, type=ntype, graph_id=graph_ids)
 
-class EdgeData:
+
+class EdgeData(BaseData):
     """ Class of edge data which is used for DGLGraph construction. Internal use only. """
 
     def __init__(self, src_id, dst_id, data, type=None, graph_id=None):
@@ -97,8 +119,22 @@ class EdgeData:
             len(src_id), 0)
         _validate_data_length({**{'src': self.src, 'dst': self.dst, 'graph_id': self.graph_id}, **self.data})
 
+    @staticmethod
+    def load_from_csv(meta: MetaEdge, data_parser: Callable, base_dir=None, separator=','):
+        df = BaseData.read_csv(meta.file_name, base_dir, separator)
+        etype = tuple(meta.etype)
+        edata = data_parser(df)
+        if meta.src_id_field not in edata:
+            raise DGLError(f"src_id_field[{meta.src_id_field}] does not exist in parsed edge data dict.")
+        if meta.dst_id_field not in edata:
+            raise DGLError(f"dst_id_field[{meta.dst_id_field}] does not exist in parsed edge data dict.")
+        src_ids = edata.pop(meta.src_id_field)
+        dst_ids = edata.pop(meta.dst_id_field)
+        graph_ids = edata.pop(meta.graph_id_field, None)
+        return EdgeData(src_ids, dst_ids, edata, type=etype, graph_id=graph_ids)
 
-class GraphData:
+
+class GraphData(BaseData):
     """ Class of graph data which is used for DGLGraph construction. Internal use only. """
 
     def __init__(self, graph_id, data):
@@ -106,48 +142,13 @@ class GraphData:
         self.data = data
         _validate_data_length({**{'graph_id': self.graph_id}, **self.data})
 
-
-class CSVDataLoader:
-    """ Class for loading data from csv. Internal use only. """
     @staticmethod
-    def read_csv(file_name, base_dir, separator):
-        csv_path = file_name
-        if base_dir is not None:
-            csv_path = os.path.join(base_dir, csv_path)
-        return pd.read_csv(csv_path, sep=separator)
-
-    @staticmethod
-    def load_node_data_from_csv(meta_node, data_parser, base_dir=None, separator=','):
-        df = CSVDataLoader.read_csv(meta_node.file_name, base_dir, separator)
-        ntype = meta_node.ntype
-        ndata = data_parser(df)
-        if meta_node.node_id_field not in ndata:
-            raise DGLError(f"node_id_field[{meta_node.node_id_field}] does not exist in parsed node data dict.")
-        node_ids = ndata.pop(meta_node.node_id_field)
-        graph_ids = ndata.pop(meta_node.graph_id_field, None)
-        return NodeData(node_ids, ndata, type=ntype, graph_id=graph_ids)
-
-    @staticmethod
-    def load_edge_data_from_csv(meta_edge, data_parser, base_dir=None, separator=','):
-        df = CSVDataLoader.read_csv(meta_edge.file_name, base_dir, separator)
-        etype = tuple(meta_edge.etype)
-        edata = data_parser(df)
-        if meta_edge.src_id_field not in edata:
-            raise DGLError(f"src_id_field[{meta_edge.src_id_field}] does not exist in parsed edge data dict.")
-        if meta_edge.dst_id_field not in edata:
-            raise DGLError(f"dst_id_field[{meta_edge.dst_id_field}] does not exist in parsed edge data dict.")
-        src_ids = edata.pop(meta_edge.src_id_field)
-        dst_ids = edata.pop(meta_edge.dst_id_field)
-        graph_ids = edata.pop(meta_edge.graph_id_field, None)
-        return EdgeData(src_ids, dst_ids, edata, type=etype, graph_id=graph_ids)
-
-    @staticmethod
-    def load_graph_data_from_csv(meta_graph, data_parser, base_dir=None, separator=','):
-        df = CSVDataLoader.read_csv(meta_graph.file_name, base_dir, separator)
+    def load_from_csv(meta: MetaGraph, data_parser: Callable, base_dir=None, separator=','):
+        df = BaseData.read_csv(meta.file_name, base_dir, separator)
         gdata = data_parser(df)
-        if meta_graph.graph_id_field not in gdata:
-            raise DGLError(f"graph_id_field[{meta_graph.graph_id_field}] does not exist in parsed graph data dict.")
-        graph_ids = gdata.pop(meta_graph.graph_id_field)
+        if meta.graph_id_field not in gdata:
+            raise DGLError(f"graph_id_field[{meta.graph_id_field}] does not exist in parsed graph data dict.")
+        graph_ids = gdata.pop(meta.graph_id_field)
         return GraphData(graph_ids, gdata)
 
 
@@ -351,7 +352,7 @@ class DGLCSVDataset(DGLDataset):
             ntype = meta_node.ntype
             data_parser = self.node_data_parser.get(
                 ntype, self.default_data_parser)
-            ndata = CSVDataLoader.load_node_data_from_csv(
+            ndata = NodeData.load_from_csv(
                 meta_node, base_dir=base_dir, separator=meta_yaml.separator, data_parser=data_parser)
             node_data.append(ndata)
         edge_data = []
@@ -361,14 +362,14 @@ class DGLCSVDataset(DGLDataset):
             etype = tuple(meta_edge.etype)
             data_parser = self.edge_data_parser.get(
                 etype, self.default_data_parser)
-            edata = CSVDataLoader.load_edge_data_from_csv(
+            edata = EdgeData.load_from_csv(
                 meta_edge, base_dir=base_dir, separator=meta_yaml.separator, data_parser=data_parser)
             edge_data.append(edata)
         graph_data = None
         if meta_yaml.graph_data is not None:
             meta_graph = meta_yaml.graph_data
             data_parser = self.default_data_parser if self.graph_data_parser is None else self.graph_data_parser
-            graph_data = CSVDataLoader.load_graph_data_from_csv(
+            graph_data = GraphData.load_from_csv(
                 meta_graph, base_dir=base_dir, separator=meta_yaml.separator, data_parser=data_parser)
         # construct graphs
         self.graphs, self.data = DGLGraphConstructor.construct_graphs(
