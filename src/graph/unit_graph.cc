@@ -1389,6 +1389,10 @@ UnitGraph::CSRPtr UnitGraph::GetInCSR(bool inplace) const {
   // Prefers converting from COO since it is parallelized.
   // TODO(BarclayII): need benchmarking.
   if (!in_csr_->defined()) {
+    // inplace new formats materialization is not allowed for pinned graphs
+    if (inplace && IsPinned())
+      LOG(FATAL) << "Cannot create new formats for pinned graphs, " <<
+        "please create the CSC format before pinning.";
     if (coo_->defined()) {
       const auto& newadj = aten::COOToCSR(
             aten::COOTranspose(coo_->adj()));
@@ -1420,6 +1424,10 @@ UnitGraph::CSRPtr UnitGraph::GetOutCSR(bool inplace) const {
   // Prefers converting from COO since it is parallelized.
   // TODO(BarclayII): need benchmarking.
   if (!out_csr_->defined()) {
+    // inplace new formats materialization is not allowed for pinned graphs
+    if (inplace && IsPinned())
+      LOG(FATAL) << "Cannot create new formats for pinned graphs, " <<
+        "please create the CSR format before pinning.";
     if (coo_->defined()) {
       const auto& newadj = aten::COOToCSR(coo_->adj());
 
@@ -1448,6 +1456,10 @@ UnitGraph::COOPtr UnitGraph::GetCOO(bool inplace) const {
         CodeToStr(formats_) << ", cannot create COO matrix.";
   COOPtr ret = coo_;
   if (!coo_->defined()) {
+    // inplace new formats materialization is not allowed for pinned graphs
+    if (inplace && IsPinned())
+      LOG(FATAL) << "Cannot create new formats for pinned graphs, " <<
+        "please create the COO format before pinning.";
     if (in_csr_->defined()) {
       const auto& newadj = aten::COOTranspose(aten::CSRToCOO(in_csr_->adj(), true));
 

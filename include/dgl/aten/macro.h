@@ -37,10 +37,13 @@
  *   // Now XPU is a placeholder for array->ctx.device_type
  *   DeviceSpecificImplementation<XPU>(...);
  * });
+ * 
+ * We treat pinned memory as normal host memory if we don't want
+ * to enable CUDA UVA access for this operator
  */
 #ifdef DGL_USE_CUDA
 #define ATEN_XPU_SWITCH_CUDA(val, XPU, op, ...) do {            \
-  if ((val) == kDLCPU || (val) == kDLCPUPinned) {                                        \
+  if ((val) == kDLCPU || (val) == kDLCPUPinned) {               \
     constexpr auto XPU = kDLCPU;                                \
     {__VA_ARGS__}                                               \
   } else if ((val) == kDLGPU) {                                 \
@@ -53,7 +56,13 @@
   }                                                             \
 } while (0)
 
-#define ATEN_XPU_SWITCH_CUDA_UVA(val, XPU, op, ...) do {            \
+/*
+ * Dispatch according to device:
+ *
+ * Xin(yaox12): temporary macro that allows CUDA UVA operator
+ *
+ */
+#define ATEN_XPU_SWITCH_CUDA_UVA(val, XPU, op, ...) do {        \
   if ((val) == kDLCPU) {                                        \
     constexpr auto XPU = kDLCPU;                                \
     {__VA_ARGS__}                                               \

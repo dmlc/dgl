@@ -982,6 +982,14 @@ def test_pin_memory_(idtype):
         for etype in g.canonical_etypes:
             assert F.context(g.batch_num_edges(etype)) == F.cpu()
 
+        # not allowed to create new formats for the pinned graph
+        with pytest.raises(DGLError):
+            g.create_formats_()
+        # it's fine to clone with new formats, but new graphs are not pinned
+        for fmt in ['csc', 'csr', 'coo']:
+            g2 = g.formats(fmt)
+            assert not g2.is_pinned()
+
         # pin a pinned graph, direcly return
         g.pin_memory_()
         assert g.is_pinned()
