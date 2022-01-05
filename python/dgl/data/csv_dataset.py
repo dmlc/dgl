@@ -299,7 +299,7 @@ class DGLCSVDataset(DGLDataset):
         value is a callable object which is used to parse corresponding
         column data. Default: None. If None, a default data parser is applied
         which load data directly and tries to convert list into array.
-    node_data_parser : callable
+    graph_data_parser : callable
         A callable object which is used to parse corresponding column graph
         data. Default: None. If None, a default data parser is applied
         which load data directly and tries to convert list into array.
@@ -349,8 +349,8 @@ class DGLCSVDataset(DGLDataset):
             if meta_node is None:
                 continue
             ntype = meta_node.ntype
-            data_parser = self.default_data_parser if ntype not in self.node_data_parser else self.node_data_parser[
-                ntype]
+            data_parser = self.node_data_parser.get(
+                ntype, self.default_data_parser)
             ndata = CSVDataLoader.load_node_data_from_csv(
                 meta_node, base_dir=base_dir, separator=meta_yaml.separator, data_parser=data_parser)
             node_data.append(ndata)
@@ -359,8 +359,8 @@ class DGLCSVDataset(DGLDataset):
             if meta_edge is None:
                 continue
             etype = tuple(meta_edge.etype)
-            data_parser = self.default_data_parser if etype not in self.edge_data_parser else self.edge_data_parser[
-                etype]
+            data_parser = self.edge_data_parser.get(
+                etype, self.default_data_parser)
             edata = CSVDataLoader.load_edge_data_from_csv(
                 meta_edge, base_dir=base_dir, separator=meta_yaml.separator, data_parser=data_parser)
             edge_data.append(edata)
