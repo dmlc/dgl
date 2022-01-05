@@ -106,6 +106,29 @@ class NodeData(BaseData):
         graph_ids = ndata.pop(meta.graph_id_field, None)
         return NodeData(node_ids, ndata, type=ntype, graph_id=graph_ids)
 
+    @staticmethod
+    def to_dict(node_data: List['NodeData']) -> dict:
+        # node_ids could be arbitrary numeric values, namely non-sorted, duplicated, not labeled from 0 to num_nodes-1
+        node_dict = {}
+        for n_data in node_data:
+            graph_ids = np.unique(n_data.graph_id)
+            for graph_id in graph_ids:
+                if graph_id in node_dict and n_data.type in node_dict[graph_id]:
+                    raise DGLError(f"Duplicate node type[{n_data.type}] for same graph[{graph_id}], please place the same node_type for same graph into single NodeData.")
+                idx = n_data.graph_id == graph_id
+                ids = n_data.id[idx]
+                u_ids, u_indices = np.unique(ids, return_index=True)
+                if len(ids) > len(u_ids):
+                    dgl_warning(
+                        "There exist duplicated ids and only the first ones are kept.")
+                if graph_id not in node_dict:
+                    node_dict[graph_id] = {}
+                node_dict[graph_id][n_data.type] = {'mapping': {index: i for i,
+                                                                index in enumerate(ids[u_indices])},
+                                                    'data': {k: F.tensor(v[idx][u_indices])
+                                                             for k, v in n_data.data.items()}}
+        return node_dict
+
 
 class EdgeData(BaseData):
     """ Class of edge data which is used for DGLGraph construction. Internal use only. """
@@ -133,68 +156,8 @@ class EdgeData(BaseData):
         graph_ids = edata.pop(meta.graph_id_field, None)
         return EdgeData(src_ids, dst_ids, edata, type=etype, graph_id=graph_ids)
 
-
-class GraphData(BaseData):
-    """ Class of graph data which is used for DGLGraph construction. Internal use only. """
-
-    def __init__(self, graph_id, data):
-        self.graph_id = np.array(graph_id, dtype=np.int64)
-        self.data = data
-        _validate_data_length({**{'graph_id': self.graph_id}, **self.data})
-
     @staticmethod
-    def load_from_csv(meta: MetaGraph, data_parser: Callable, base_dir=None, separator=','):
-        df = BaseData.read_csv(meta.file_name, base_dir, separator)
-        gdata = data_parser(df)
-        if meta.graph_id_field not in gdata:
-            raise DGLError(f"graph_id_field[{meta.graph_id_field}] does not exist in parsed graph data dict.")
-        graph_ids = gdata.pop(meta.graph_id_field)
-        return GraphData(graph_ids, gdata)
-
-
-class DGLGraphConstructor:
-    """ Class for constructing DGLGraph from Node/Edge/Graph data. Internal use only. """
-    @staticmethod
-    def construct_graphs(node_data, edge_data, graph_data=None):
-        if not isinstance(node_data, list):
-            node_data = [node_data]
-        if not isinstance(edge_data, list):
-            edge_data = [edge_data]
-        node_dict = DGLGraphConstructor._parse_node_data(node_data)
-        edge_dict = DGLGraphConstructor._parse_edge_data(edge_data, node_dict)
-        graph_dict = DGLGraphConstructor._construct_graphs(
-            node_dict, edge_dict)
-        if graph_data is None:
-            graph_data = GraphData(np.full(1, 0), {})
-        graphs, data = DGLGraphConstructor._parse_graph_data(
-            graph_data, graph_dict)
-        return graphs, data
-
-    @staticmethod
-    def _parse_node_data(node_data):
-        # node_ids could be arbitrary numeric values, namely non-sorted, duplicated, not labeled from 0 to num_nodes-1
-        node_dict = {}
-        for n_data in node_data:
-            graph_ids = np.unique(n_data.graph_id)
-            for graph_id in graph_ids:
-                if graph_id in node_dict and n_data.type in node_dict[graph_id]:
-                    raise DGLError(f"Duplicate node type[{n_data.type}] for same graph[{graph_id}], please place the same node_type for same graph into single NodeData.")
-                idx = n_data.graph_id == graph_id
-                ids = n_data.id[idx]
-                u_ids, u_indices = np.unique(ids, return_index=True)
-                if len(ids) > len(u_ids):
-                    dgl_warning(
-                        "There exist duplicated ids and only the first ones are kept.")
-                if graph_id not in node_dict:
-                    node_dict[graph_id] = {}
-                node_dict[graph_id][n_data.type] = {'mapping': {index: i for i,
-                                                                index in enumerate(ids[u_indices])},
-                                                    'data': {k: F.tensor(v[idx][u_indices])
-                                                             for k, v in n_data.data.items()}}
-        return node_dict
-
-    @staticmethod
-    def _parse_edge_data(edge_data, node_dict):
+    def to_dict(edge_data: List['EdgeData'], node_dict: dict) -> dict:
         edge_dict = {}
         for e_data in edge_data:
             (src_type, e_type, dst_type) = e_data.type
@@ -214,8 +177,26 @@ class DGLGraphConstructor:
                                                              for k, v in e_data.data.items()}}
         return edge_dict
 
+
+class GraphData(BaseData):
+    """ Class of graph data which is used for DGLGraph construction. Internal use only. """
+
+    def __init__(self, graph_id, data):
+        self.graph_id = np.array(graph_id, dtype=np.int64)
+        self.data = data
+        _validate_data_length({**{'graph_id': self.graph_id}, **self.data})
+
     @staticmethod
-    def _parse_graph_data(graph_data, graphs_dict):
+    def load_from_csv(meta: MetaGraph, data_parser: Callable, base_dir=None, separator=','):
+        df = BaseData.read_csv(meta.file_name, base_dir, separator)
+        gdata = data_parser(df)
+        if meta.graph_id_field not in gdata:
+            raise DGLError(f"graph_id_field[{meta.graph_id_field}] does not exist in parsed graph data dict.")
+        graph_ids = gdata.pop(meta.graph_id_field)
+        return GraphData(graph_ids, gdata)
+
+    @staticmethod
+    def to_dict(graph_data: 'GraphData', graphs_dict: dict) -> dict:
         missing_ids = np.setdiff1d(
             np.array(list(graphs_dict.keys())), graph_data.graph_id)
         if len(missing_ids) > 0:
@@ -230,6 +211,25 @@ class DGLGraphConstructor:
         for graph_id in graph_ids:
             graphs.append(graphs_dict[graph_id])
         data = {k: F.tensor(v) for k, v in graph_data.data.items()}
+        return graphs, data
+
+
+class DGLGraphConstructor:
+    """ Class for constructing DGLGraph from Node/Edge/Graph data. Internal use only. """
+    @staticmethod
+    def construct_graphs(node_data, edge_data, graph_data=None):
+        if not isinstance(node_data, list):
+            node_data = [node_data]
+        if not isinstance(edge_data, list):
+            edge_data = [edge_data]
+        node_dict = NodeData.to_dict(node_data)
+        edge_dict = EdgeData.to_dict(edge_data, node_dict)
+        graph_dict = DGLGraphConstructor._construct_graphs(
+            node_dict, edge_dict)
+        if graph_data is None:
+            graph_data = GraphData(np.full(1, 0), {})
+        graphs, data = GraphData.to_dict(
+            graph_data, graph_dict)
         return graphs, data
 
     @staticmethod
