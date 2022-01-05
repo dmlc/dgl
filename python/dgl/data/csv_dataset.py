@@ -51,7 +51,13 @@ def load_yaml_with_sanity_check(yaml_file):
     """ Load yaml and do sanity check. Internal use only. """
     with open(yaml_file) as f:
         yaml_data = yaml.load(f, Loader=SafeLoader)
-        meta_yaml = MetaYaml(**yaml_data)
+        try:
+            meta_yaml = MetaYaml(**yaml_data)
+        except dt.ValidationError as e:
+            print(
+                "Details of pydantic.ValidationError:\n{}".format(e.json()))
+            raise DGLError(
+                "Validation Error for YAML fields. Details are shown above.")
         if meta_yaml.version != '1.0.0':
             raise DGLError("Invalid CSVDataset version {}. Supported versions: '1.0.0'".format(
                 meta_yaml.version))
