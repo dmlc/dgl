@@ -1909,5 +1909,83 @@ def test_module_remove_self_loop(idtype):
     assert 'w1' in new_g.edges['plays'].data
     assert 'w2' in new_g.edges['follows'].data
 
+@parametrize_dtype
+def test_module_add_reverse(idtype):
+    transform = dgl.AddReverse()
+
+    # Case1: Add reverse edges for a homogeneous graph
+    g = dgl.graph(([0], [1]), idtype=idtype, device=F.ctx())
+    g.ndata['h'] = F.randn((g.num_nodes(), 3))
+    g.edata['w'] = F.randn((g.num_edges(), 2))
+    new_g = transform(g)
+    assert g.num_nodes() == new_g.num_nodes()
+    src, dst = new_g.edges()
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 1), (1, 0)}
+    assert F.allclose(g.ndata['h'], new_g.ndata['h'])
+    assert F.allclose(g.edata['w'], F.narrow_row(new_g.edata['w'], 0, 1))
+    assert F.allclose(F.narrow_row(new_g.edata['w'], 1, 2), F.zeros((1, 2), F.float32, F.ctx()))
+
+    # Case2: Add reverse edges for a homogeneous graph and copy edata
+    transform = dgl.AddReverse(copy_edata=True)
+    new_g = transform(g)
+    assert g.num_nodes() == new_g.num_nodes()
+    src, dst = new_g.edges()
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 1), (1, 0)}
+    assert F.allclose(g.ndata['h'], new_g.ndata['h'])
+    assert F.allclose(g.edata['w'], F.narrow_row(new_g.edata['w'], 0, 1))
+    assert F.allclose(g.edata['w'], F.narrow_row(new_g.edata['w'], 1, 2))
+
+    # Case3: Add reverse edges for a heterogeneous graph
+    g = dgl.heterograph({
+        ('user', 'plays', 'game'): ([0, 1], [1, 1]),
+        ('user', 'follows', 'user'): ([1, 2], [2, 2])
+    })
+    new_g = transform(g)
+    assert g.ntypes == new_g.ntypes
+    assert set(new_g.canonical_etypes) == {
+        ('user', 'plays', 'game'), ('user', 'follows', 'user'), ('game', 'rev_plays', 'user')}
+    for nty in g.ntypes:
+        assert g.num_nodes(nty) == new_g.num_nodes(nty)
+
+    src, dst = new_g.edges(etype='plays')
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 1), (1, 1)}
+
+    src, dst = new_g.edges(etype='follows')
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(1, 2), (2, 2), (2, 1)}
+
+    src, dst = new_g.edges(etype='rev_plays')
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(1, 1), (1, 0)}
+
+    # Case4: Disable combine_like
+    transform = dgl.AddReverse(combine_like=False)
+    new_g = transform(g)
+    assert g.ntypes == new_g.ntypes
+    assert set(new_g.canonical_etypes) == {
+        ('user', 'plays', 'game'), ('user', 'follows', 'user'),
+        ('game', 'rev_plays', 'user'), ('user', 'rev_follows', 'user')}
+    for nty in g.ntypes:
+        assert g.num_nodes(nty) == new_g.num_nodes(nty)
+
+    src, dst = new_g.edges(etype='plays')
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 1), (1, 1)}
+
+    src, dst = new_g.edges(etype='follows')
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(1, 2), (2, 2)}
+
+    src, dst = new_g.edges(etype='rev_plays')
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(1, 1), (1, 0)}
+
+    src, dst = new_g.edges(etype='rev_follows')
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(2, 1), (2, 2)}
+
 if __name__ == '__main__':
     test_partition_with_halo()

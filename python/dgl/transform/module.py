@@ -296,6 +296,40 @@ class AddReverse(BaseTransform):
     >>> import dgl
     >>> import torch
     >>> from dgl import AddReverse
+
+    Case1: Add reverse edges for a homogeneous graph
+
+    >>> transform = AddReverse()
+    >>> g = dgl.graph(([0], [1]))
+    >>> g.edata['w'] = torch.ones(1, 2)
+    >>> new_g = transform(g)
+    >>> print(new_g.edges())
+    (tensor([0, 1]), tensor([1, 0]))
+    >>> print(new_g.edata['w'])
+    tensor([[1., 1.],
+            [0., 0.]])
+
+    Case2: Add reverse edges for a homogeneous graph and copy edata
+
+    >>> transform = AddReverse(copy_edata=True)
+    >>> new_g = transform(g)
+    >>> print(new_g.edata['w'])
+    tensor([[1., 1.],
+            [1., 1.]])
+
+    Case3: Add reverse edges for a heterogeneous graph
+
+    >>> g = dgl.heterograph({
+    ...     ('user', 'plays', 'game'): ([0, 1], [1, 1]),
+    ...     ('user', 'follows', 'user'): ([1, 2], [2, 2])
+    ... })
+    >>> new_g = transform(g)
+    >>> print(new_g.canonical_etypes)
+    [('game', 'rev_plays', 'user'), ('user', 'follows', 'user'), ('user', 'plays', 'game')]
+    >>> print(new_g.edges(etype='rev_plays'))
+    (tensor([1, 1]), tensor([0, 1]))
+    >>> print(new_g.edges(etype='follows'))
+    (tensor([1, 2, 2, 2]), tensor([2, 2, 1, 2]))
     """
     def __init__(self, copy_edata=False, combine_like=True):
         self.copy_edata = copy_edata
@@ -341,3 +375,30 @@ class AddReverse(BaseTransform):
                         new_g.edges[rev_c_etype].data[key] = feat
 
         return new_g
+
+class ToSimple(BaseTransform):
+    raise NotImplementedError
+
+class LineGraph(BaseTransform):
+    raise NotImplementedError
+
+class KHopGraph(BaseTransform):
+    raise NotImplementedError
+
+class MetapathGraph(BaseTransform):
+    raise NotImplementedError
+
+class KNNGraph(BaseTransform):
+    raise NotImplementedError
+
+class Compose(BaseTransform):
+    raise NotImplementedError
+
+class GDC(BaseTransform):
+    raise NotImplementedError
+
+class PPR(BaseTransform):
+    raise NotImplementedError
+
+class MDK(BaseTransform):
+    raise NotImplementedError

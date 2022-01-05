@@ -749,7 +749,7 @@ def add_reverse_edges(g, readonly=None, copy_ndata=True,
         (Default: False)
     ignore_bipartite: bool, optional
         If True, unidirectional bipartite graphs are ignored and
-        no error is raised. If False, an error  will be raised if
+        no error is raised. If False, an error will be raised if
         an edge type of the input heterogeneous graph is for a unidirectional
         bipartite graph.
 
