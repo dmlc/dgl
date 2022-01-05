@@ -2352,7 +2352,7 @@ def to_simple(g,
         (Default: "count")
     writeback_mapping: bool, optional
         If True, return an extra write-back mapping for each edge
-        type.  The write-back mapping is a tensor recording
+        type. The write-back mapping is a tensor recording
         the mapping from the edge IDs in the input graph to
         the edge IDs in the result graph. If the graph is
         heterogeneous, DGL returns a dictionary of edge types and such

@@ -23,7 +23,8 @@ __all__ = [
     'BaseTransform',
     'AddSelfLoop',
     'RemoveSelfLoop',
-    'AddReverse'
+    'AddReverse',
+    'ToSimple'
 ]
 
 class BaseTransform:
@@ -377,7 +378,57 @@ class AddReverse(BaseTransform):
         return new_g
 
 class ToSimple(BaseTransform):
-    raise NotImplementedError
+    r"""
+
+    Description
+    -----------
+    Convert a graph to a simple graph without parallel edges and return a new graph.
+
+    Parameters
+    ----------
+    return_counts : str, optional
+        The edge feature name to hold the edge count in the original graph.
+    writeback_mapping : bool, optional
+        If True, it returns an extra write-back mapping for each edge type.
+
+        * If the input graph has a single edge type, the mapping is a tensor
+          recording the mapping from the edge IDs in the input graph to the edge
+          IDs in the returned graph.
+        * If the input graph has multiple edge types, it returns a dictionary
+          mapping edge types to tensors in the above format.
+    aggregator : str, optional
+        The way to coalesce features of duplicate edges.
+
+        * ``'arbitrary'``: select arbitrarily from one of the duplicate edges
+        * ``'sum'``: take the sum over the duplicate edges
+        * ``'mean'``: take the mean over the duplicate edges
+
+    Example
+    -------
+
+    The following example uses PyTorch backend.
+
+    >>> import dgl
+    >>> import torch
+    >>> from dgl import ToSimple
+
+    Case1: Convert a homogeneous graph to a simple graph
+
+    >>> transform = ToSimple()
+    >>> g = dgl.graph(([0, 1, 1], [1, 2, 2]))
+    >>> g.edata['w'] = torch.tensor([[0.1], [0.2], [0.3]])
+    """
+    def __init__(self, return_counts='count', writeback_mapping=False, aggregator='arbitrary'):
+        self.return_counts = return_counts
+        self.writeback_mapping = writeback_mapping
+        self.aggregator = aggregator
+
+    def __call__(self, g):
+        return functional.to_simple(g,
+                                    return_counts=self.return_counts,
+                                    writeback_mapping=self.writeback_mapping,
+                                    copy_edata=True,
+                                    aggregator=self.aggregator)
 
 class LineGraph(BaseTransform):
     raise NotImplementedError
