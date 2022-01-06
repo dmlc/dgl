@@ -6,6 +6,7 @@ import asyncio
 import torch
 from dgl._ffi import streams as FS
 from dgl.utils import recursive_apply, ExceptionWrapper
+from dgl.frame import Column
 from .asyncio_wrapper import AsyncIO
 
 class _TensorizedDatasetIter(object):
@@ -106,6 +107,22 @@ class TensorizedDataset(torch.utils.data.IterableDataset):
         return _TensorizedDatasetIter(
             dataset, self.batch_size, self.drop_last, self._mapping_keys)
 
+
+def _prefetch_body(item, device, stream, dataloader):
+    if isinstance(item, dgl.DGLGraph):
+        g = dataloader.graph
+
+        for ntid, frame in enumerate(item._node_frames):
+            ntype = item.ntypes[ntid]
+            parent_ntid = dataloader.graph.get_ntype_id(ntype)
+            default_id = frame[dgl.NID]
+            for key in frame.keys():
+                column = frame[key]
+                if isinstance(column, Marker):
+                    name = column.name or key
+                    id_ = column.id_ or default_id
+                    if dataloader.use_asyncio:
+                        pass
 
 def _prefetch(batch, device, stream, pin_memory, sampler, use_asyncio):
     sampler_cls = sampler.__class__
@@ -225,6 +242,25 @@ class _PrefetchingIter(object):
         return batch
 
 
+def _remove_parent_storage_columns(item):
+    if isinstance(item, dgl.DGLGraph):
+        for frame in itertools.chain(item._node_frames, item._edge_frames):
+            for key in list(frame.keys()):
+                col = frame[key]
+                if isinstance(col, Column) and col.index is not None:
+                    del frame[col]
+
+def collate_wrapper(sample_func, g):
+    def _sample(items):
+        batch = sample_func(g, items)
+
+        # Remove all the columns whose storages are parent storages (i.e. index is not
+        # None)
+        batch = recursive_apply(_remove_parent_storage_columns, batch)
+        return batch
+    return _sample
+
+
 class NodeDataLoader(torch.utils.data.DataLoader):
     def __init__(self, graph, train_idx, graph_sampler, device='cpu', use_ddp=False,
                  ddp_seed=0, batch_size=1, drop_last=False, shuffle=False,
@@ -239,7 +275,7 @@ class NodeDataLoader(torch.utils.data.DataLoader):
 
         super().__init__(
             self.dataset,
-            collate_fn=graph_sampler.sample,
+            collate_fn=collate_wrapper(graph_sampler.sample, graph),
             batch_size=None,
             **kwargs)
 

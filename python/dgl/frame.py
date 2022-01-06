@@ -38,6 +38,9 @@ class _LazyIndex(object):
             flat_index = F.gather_row(flat_index, index)
         return flat_index
 
+class Marker(namedtuple('Marker', ['name', 'id_'])):
+    pass
+
 class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
     """The column scheme.
 
@@ -352,6 +355,8 @@ class Frame(MutableMapping):
         self._initializers = {}  # per-column initializers
         self._default_initializer = None
 
+        self._attached_columns = None
+
     def _set_zero_default_initializer(self):
         """Set the default initializer to be zero initializer."""
         self._default_initializer = zero_initializer
@@ -504,6 +509,10 @@ class Frame(MutableMapping):
         data : Column or data convertible to Column
             The column data.
         """
+        if isinstance(data, Marker):
+            self._columns[name] = data
+            return
+
         col = Column.create(data)
         if len(col) != self.num_rows:
             raise DGLError('Expected data to have %d rows, got %d.' %

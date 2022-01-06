@@ -6,6 +6,7 @@ from collections.abc import MutableMapping
 
 from .base import ALL, DGLError
 from . import backend as F
+from .frame import Marker
 
 NodeSpace = namedtuple('NodeSpace', ['data'])
 EdgeSpace = namedtuple('EdgeSpace', ['data'])
@@ -66,7 +67,13 @@ class HeteroNodeDataView(MutableMapping):
             return self._graph._get_n_repr(self._ntid, self._nodes)[key]
 
     def __setitem__(self, key, val):
-        if isinstance(self._ntype, list):
+        if isinstance(val, Marker):
+            if isinstance(self._ntid, list):
+                for ntid in self._ntid:
+                    self._graph._node_frames[ntid][key] = val
+            else:
+                self._graph._node_frames[ntid][key] = val
+        elif isinstance(self._ntype, list):
             assert isinstance(val, dict), \
                 'Current HeteroNodeDataView has multiple node types, ' \
                 'please passing the node type and the corresponding data through a dict.'
@@ -75,7 +82,7 @@ class HeteroNodeDataView(MutableMapping):
                 ntid = self._graph.get_ntype_id(ntype)
                 self._graph._set_n_repr(ntid, self._nodes, {key : data})
         else:
-            assert isinstance(val, dict) is False, \
+            assert not isinstance(val, dict), \
                 'The HeteroNodeDataView has only one node type. ' \
                 'please pass a tensor directly'
             self._graph._set_n_repr(self._ntid, self._nodes, {key : val})
@@ -119,6 +126,11 @@ class HeteroNodeDataView(MutableMapping):
             data = self._graph._get_n_repr(self._ntid, self._nodes)
             return repr({key : data[key]
                          for key in self._graph._node_frames[self._ntid]})
+
+    def mark(self, names, id_=None):
+        for ntid in self._ntid:
+            for name in names:
+                self._graph._node_frames[self._ntid][name] = Marker(name, id_)
 
 class HeteroEdgeView(object):
     """A EdgeView class to act as G.edges for a DGLHeteroGraph."""
@@ -181,7 +193,13 @@ class HeteroEdgeDataView(MutableMapping):
             return self._graph._get_e_repr(self._etid, self._edges)[key]
 
     def __setitem__(self, key, val):
-        if isinstance(self._etype, list):
+        if isinstance(val, Marker):
+            if isinstance(self._etid, list):
+                for etid in self._etid:
+                    self._graph._edge_frames[etid][key] = val
+            else:
+                self._graph._edge_frames[etid][key] = val
+        elif isinstance(self._etype, list):
             assert isinstance(val, dict), \
                 'Current HeteroEdgeDataView has multiple edge types, ' \
                 'please pass the edge type and the corresponding data through a dict.'
@@ -234,3 +252,8 @@ class HeteroEdgeDataView(MutableMapping):
             data = self._graph._get_e_repr(self._etid, self._edges)
             return repr({key : data[key]
                          for key in self._graph._edge_frames[self._etid]})
+
+    def mark(self, names, id_=None):
+        for ntid in self._ntid:
+            for name in names:
+                self._graph._edge_frames[self._ntid][name] = Marker(name, id_)
