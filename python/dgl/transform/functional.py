@@ -3197,4 +3197,4 @@ def rcmk_perm(g):
     perm = sparse.csgraph.reverse_cuthill_mckee(csr_adj)
     return perm.copy()
 
-_init_api("dgl.transform.functional")
+_init_api("dgl.transform", __name__)
