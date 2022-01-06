@@ -192,5 +192,5 @@ void TPReceiver::ReceiveFromPipe(std::shared_ptr<Pipe> pipe,
 
 void TPReceiver::Recv(RPCMessage *msg) { *msg = std::move(queue_->pop()); }
 
-} // namespace rpc
-} // namespace dgl
+}  // namespace rpc
+}  // namespace dgl
