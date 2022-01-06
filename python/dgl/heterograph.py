@@ -5465,10 +5465,32 @@ class DGLHeteroGraph(object):
               The graph structure must be on CPU to be pinned.
               If the graph struture is already pinned, the function directly returns it.
 
+        Materialization of new sparse formats for pinned graphs is not allowed.
+        But cloning and materialization is fine. See the examples below.
+
         Returns
         -------
         DGLGraph
             The pinned graph.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        >>> g = dgl.graph((torch.tensor([1, 0]), torch.tensor([1, 2])))
+        >>> g.pin_memory_()
+
+        Materialization of new sparse formats is not allowed for pinned graphs.
+
+        >>> g.create_formats_()  # This would raise an error! You should do this before pinning.
+
+        Cloning and materializing new formats is allowed. The returned graph is **not** pinned.
+
+        >>> g1 = g.formats(['csc'])
+        >>> assert not g1.is_pinned()
         """
         if self._graph.is_pinned():
             return self

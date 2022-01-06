@@ -986,9 +986,12 @@ def test_pin_memory_(idtype):
         with pytest.raises(DGLError):
             g.create_formats_()
         # it's fine to clone with new formats, but new graphs are not pinned
-        for fmt in ['csc', 'csr', 'coo']:
-            g2 = g.formats(fmt)
-            assert not g2.is_pinned()
+        # >>> g.formats()
+        # {'created': ['coo'], 'not created': ['csr', 'csc']}
+        assert not g.formats('csc').is_pinned()
+        assert not g.formats('csr').is_pinned()
+        # 'coo' formats is already created and thus not cloned
+        assert g.formats('coo').is_pinned()
 
         # pin a pinned graph, direcly return
         g.pin_memory_()

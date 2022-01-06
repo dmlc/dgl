@@ -204,6 +204,21 @@ NDArray NDArray::EmptyShared(const std::string &name,
   return ret;
 }
 
+inline DLContext GetDevice(DLContext ctx) {
+  switch (ctx.device_type) {
+    case kDLCPU:
+      return ctx;
+      break;
+    case kDLGPU:
+      return ctx;
+      break;
+    default:
+      // fallback to CPU
+      return DLContext{kDLCPU, 0};
+      break;
+  }
+}
+
 NDArray NDArray::Empty(std::vector<int64_t> shape,
                        DLDataType dtype,
                        DLContext ctx) {
@@ -211,7 +226,7 @@ NDArray NDArray::Empty(std::vector<int64_t> shape,
   if (td->IsAvailable())
     return td->Empty(shape, dtype, ctx);
 
-  NDArray ret = Internal::Create(shape, dtype, ctx);
+  NDArray ret = Internal::Create(shape, dtype, GetDevice(ctx));
   // setup memory content
   size_t size = GetDataSize(ret.data_->dl_tensor);
   size_t alignment = GetDataAlignment(ret.data_->dl_tensor);
