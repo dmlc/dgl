@@ -913,9 +913,11 @@ def alias_func(func):
 def recursive_apply(data, fn, *args, **kwargs):
     """Recursively apply a function to every element in a container.
     """
-    if isinstance(data, Mapping):
+    if F.is_tensor(data):
+        return fn(data, *args, **kwargs)
+    elif isinstance(data, Mapping):
         return {k: recursive_apply(v, fn, *args, **kwargs) for k, v in data.items()}
-    elif isinstance(data, Sequence):
+    elif isinstance(data, (Sequence, zip)):
         return [recursive_apply(v, fn, *args, **kwargs) for v in data]
     else:
         return fn(data, *args, **kwargs)

@@ -108,68 +108,90 @@ class TensorizedDataset(torch.utils.data.IterableDataset):
             dataset, self.batch_size, self.drop_last, self._mapping_keys)
 
 
-def _prefetch_body(item, device, stream, dataloader):
+def _prefetch_for_column(name, id_, use_asyncio, storage, device, pin_memory):
+    if use_asyncio:
+        return asyncio.create_task(storage.async_fetch(id_, device, pin_memory=pin_memory))
+    else:
+        return storage.fetch(id_, device, pin_memory=pin_memory)
+
+
+def _prefetch_update_feats(
+        feats, frames, types, get_type_id_func, storages, id_name, use_asyncio, device,
+        pin_memory):
+    for tid, frame in enumerate(frames):
+        type_ = types[tid]
+        parent_tid = get_type_id_func(type_)
+        default_id = frame[id_name]
+        for key in frame.keys():
+            column = frame[key]
+            if isinstance(column, Marker):
+                feats[tid, key] = _prefetch_for_column(
+                    column.name or key, column.id_ or default_id, use_asyncio,
+                    storages[type_, name], device, pin_memory)
+
+
+# This class exists to avoid recursion into the feature dictionary returned by the
+# prefetcher when calling recursive_apply().
+class _PrefetchedGraphFeatures(object):
+    __slots__ = ['node_feats', 'edge_feats']
+    def __init__(self, node_feats, edge_feats):
+        self.node_feats = node_feats
+        self.edge_feats = edge_feats
+
+    def topair(self):
+        return self.node_feats, self.edge_feats
+
+
+def _prefetch_for_subgraph(subg, dataloader):
+    g = dataloader.graph
+
+    node_feats, edge_feats = {}, {}
+    _prefetch_update_feats(
+        feats, subg._node_frames, subg.ntypes, dataloader.graph.get_ntype_id,
+        dataloader.node_data, dgl.NID, dataloader.use_asyncio, dataloader.device,
+        dataloader.pin_memory)
+    _prefetch_update_feats(
+        feats, subg._edge_frames, subg.canonical_etypes, dataloader.graph.get_etype_id,
+        dataloader.edge_data, dgl.EID, dataloader.use_asyncio, dataloader.device,
+        dataloader.pin_memory)
+    return _PrefetchedGraphFeatures(node_feats, edge_feats)
+
+
+def _prefetch_for(item, dataloader):
     if isinstance(item, dgl.DGLGraph):
-        g = dataloader.graph
+        return _prefetch_for_subgraph(item, dataloader)
+    elif isinstance(item, Marker):
+        return _prefetch_for_column(
+            item.name, item.id_, dataloader.use_asyncio, dataloader.other_data[item.name],
+            dataloader.device, dataloader.pin_memory)
+    else:
+        return None
 
-        for ntid, frame in enumerate(item._node_frames):
-            ntype = item.ntypes[ntid]
-            parent_ntid = dataloader.graph.get_ntype_id(ntype)
-            default_id = frame[dgl.NID]
-            for key in frame.keys():
-                column = frame[key]
-                if isinstance(column, Marker):
-                    name = column.name or key
-                    id_ = column.id_ or default_id
-                    if dataloader.use_asyncio:
-                        pass
 
-def _prefetch(batch, device, stream, pin_memory, sampler, use_asyncio):
-    sampler_cls = sampler.__class__
-    # The futures and the retrieved features will be indexed as:
-    #
-    #     feats[storage_key, target_idx, feat_key]
-    feats = {}
-
-    # Copy the sampled subgraphs to GPU first since setting GPU features require
-    # having the graph on GPU first.
+def _prefetch(batch, dataloader, stream):
+    # feats has the same nested structure of batch, except that
+    # (1) each subgraph is replaced with a pair of node features and edge features, both
+    #     being dictionaries whose keys are (type_id, column_name) and values are either
+    #     tensors or futures.
+    # (2) each Marker object is replaced with a tensor or future.
+    # (3) everything else are replaced with None.
     with torch.cuda.stream(stream):
-        for storage_key, storage_dict in sampler._storages.items():
-            targets = getattr(
-                sampler,
-                f'__{storage_key}_storages__')(batch)
-            for i, target in enumerate(targets):
-                indices = target['_ID']     # depends on dgl.NID and dgl.EID being the same
-
-                for feat_key, storage in storage_dict.items():
-                    if use_asyncio:
-                        future = asyncio.create_task(
-                            storage.async_fetch(indices, device, pin_memory=pin_memory))
-                        feats[storage_key, i, feat_key] = future
-                    else:
-                        feats[storage_key, i, feat_key] = storage.fetch(
-                            indices, device, pin_memory=pin_memory)
-        return feats
+        feats = recursive_apply(_prefetch_for, batch)
+    return feats
 
 
 async def _async_prefetch(batch, device, stream, pin_memory, sampler):
     with torch.cuda.stream(stream):
         feats = _prefetch(batch, device, stream, pin_memory, sampler, True)
-        for k, v in feats.items():
-            if isinstance(v, Awaitable):
-                feats[k] = await v
+        feats = recursive_apply(lambda x: await x if isinstance(x, Awaitable) else x, feats)
     return feats
 
 
 # Using Python thread makes one epoch 19s instead of 7.1s.
-def _prefetcher_entry(dataloader_it, dataloader, queue, use_asyncio):
+def _prefetcher_entry(dataloader_it, dataloader, queue):
     # TODO: figure out why PyTorch sets the number of threads to 1
+    use_asyncio = dataloader.use_asyncio
     torch.set_num_threads(16)
-    device = dataloader.device
-    stream = torch.cuda.Stream(device=device)
-    pin_memory = dataloader.pin_memory
-    sampler = dataloader.graph_sampler
-    sampler_cls = sampler.__class__
 
     try:
         for batch in dataloader_it:
@@ -181,6 +203,7 @@ def _prefetcher_entry(dataloader_it, dataloader, queue, use_asyncio):
             queue.put((
                 # batch will be already in pinned memory as per the behavior of
                 # PyTorch DataLoader.
+                ### TODO: recursive apply to() for _PrefetchedGraphFeatures
                 recursive_apply(batch, lambda x: x.to(device, non_blocking=True)),
                 feats,
                 stream.record_event(),
@@ -197,11 +220,10 @@ class _PrefetchingIter(object):
         self.dataloader = dataloader
         self.graph_sampler = self.dataloader.graph_sampler
         self.pin_memory = self.dataloader.pin_memory
-        self.use_asyncio = self.dataloader.use_asyncio
 
         thread = threading.Thread(
             target=_prefetcher_entry,
-            args=(dataloader_it, dataloader, self.queue, self.use_asyncio),
+            args=(dataloader_it, dataloader, self.queue),
             daemon=True)
         thread.start()
         self.thread = thread
