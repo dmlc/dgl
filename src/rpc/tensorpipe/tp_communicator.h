@@ -157,6 +157,12 @@ class TPReceiver {
 
  private:
   /*!
+   * \brief Callback for new connection is accepted.
+   */
+  void OnAccepted(const tensorpipe::Error&, std::shared_ptr<tensorpipe::Pipe>);
+
+ private:
+  /*!
    * \brief number of sender
    */
   int num_sender_;
@@ -184,19 +190,14 @@ class TPReceiver {
   std::shared_ptr<RPCMessageQueue> queue_;
 
   /*!
-   * \brief wait thread
-   */
-  std::thread wait_thread_;
-
-  /*!
    * \brief number of accepted connections
    */
   std::atomic<int32_t> num_connected_{0};
 
   /*!
-   * \brief whether to stop waiting
+   * \brief listner
    */
-  std::atomic<bool> stop_wait_{false};
+  std::shared_ptr<tensorpipe::Listener> listener_{nullptr};
 };
 
 }  // namespace rpc
