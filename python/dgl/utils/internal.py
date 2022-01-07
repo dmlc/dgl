@@ -913,13 +913,41 @@ def alias_func(func):
 def recursive_apply(data, fn, *args, **kwargs):
     """Recursively apply a function to every element in a container.
     """
-    if F.is_tensor(data):
+    if isinstance(data, str):   # str is a Sequence
         return fn(data, *args, **kwargs)
     elif isinstance(data, Mapping):
         return {k: recursive_apply(v, fn, *args, **kwargs) for k, v in data.items()}
-    elif isinstance(data, (Sequence, zip)):
+    elif isinstance(data, Sequence):
         return [recursive_apply(v, fn, *args, **kwargs) for v in data]
     else:
         return fn(data, *args, **kwargs)
+
+async def async_recursive_apply(data, fn, *args, **kwargs):
+    """Recursively apply an async function to every element in a container asynchronously
+    if the container has awaitables.
+    """
+    if isinstance(data, str):
+        return await fn(data, *args, **kwargs)
+    elif isinstance(data, Mapping):
+        return {k: await async_recursive_apply(v, fn, *args, **kwargs) for k, v in data.items()}
+    elif isinstance(data, Sequence):
+        return [await async_recursive_apply(v, fn, *args, **kwargs) for v in data]
+    else:
+        return await fn(data, *args, **kwargs)
+
+def recursive_apply_pair(data1, data2, fn, *args, **kwargs):
+    """Recursively apply a function to every pair of elements in two containers with the
+    same nested structure.
+    """
+    if isinstance(data1, str) or isinstance(data2, str):
+        return fn(data1, data2, *args, **kwargs)
+    elif isinstance(data1, Mapping) and isinstance(data2, Mapping):
+        return {
+            k: recursive_apply_pair(data1[k], data2[k], fn, *args, **kwargs)
+            for k in data1.keys()}
+    elif isinstance(data1, Sequence) and isinstance(data2, Sequence):
+        return [recursive_apply_pair(x, y, fn, *args, **kwargs) for x, y in zip(data1, data2)]
+    else:
+        return fn(data1, data2, *args, **kwargs)
 
 _init_api("dgl.utils.internal")

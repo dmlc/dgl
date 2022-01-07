@@ -72,7 +72,7 @@ class HeteroNodeDataView(MutableMapping):
                 for ntid in self._ntid:
                     self._graph._node_frames[ntid][key] = val
             else:
-                self._graph._node_frames[ntid][key] = val
+                self._graph._node_frames[self._ntid][key] = val
         elif isinstance(self._ntype, list):
             assert isinstance(val, dict), \
                 'Current HeteroNodeDataView has multiple node types, ' \
@@ -128,9 +128,13 @@ class HeteroNodeDataView(MutableMapping):
                          for key in self._graph._node_frames[self._ntid]})
 
     def mark(self, names, id_=None):
-        for ntid in self._ntid:
+        if not isinstance(self._ntid, list):
             for name in names:
                 self._graph._node_frames[self._ntid][name] = Marker(name, id_)
+        else:
+            for ntid in self._ntid:
+                for name in names:
+                    self._graph._node_frames[ntid][name] = Marker(name, id_)
 
 class HeteroEdgeView(object):
     """A EdgeView class to act as G.edges for a DGLHeteroGraph."""
@@ -198,7 +202,7 @@ class HeteroEdgeDataView(MutableMapping):
                 for etid in self._etid:
                     self._graph._edge_frames[etid][key] = val
             else:
-                self._graph._edge_frames[etid][key] = val
+                self._graph._edge_frames[self._etid][key] = val
         elif isinstance(self._etype, list):
             assert isinstance(val, dict), \
                 'Current HeteroEdgeDataView has multiple edge types, ' \
@@ -254,6 +258,10 @@ class HeteroEdgeDataView(MutableMapping):
                          for key in self._graph._edge_frames[self._etid]})
 
     def mark(self, names, id_=None):
-        for ntid in self._ntid:
+        if not isinstance(self._etid, list):
             for name in names:
-                self._graph._edge_frames[self._ntid][name] = Marker(name, id_)
+                self._graph._edge_frames[self._etid][name] = Marker(name, id_)
+        else:
+            for etid in self._etid:
+                for name in names:
+                    self._graph._edge_frames[etid][name] = Marker(name, id_)

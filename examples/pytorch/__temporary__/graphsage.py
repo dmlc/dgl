@@ -32,13 +32,15 @@ class SAGE(nn.Module):
 
 dataset = DglNodePropPredDataset('ogbn-products')
 graph, labels = dataset[0]
+graph.ndata['label'] = labels
 split_idx = dataset.get_idx_split()
 train_idx, valid_idx, test_idx = split_idx['train'], split_idx['valid'], split_idx['test']
 
 graph.create_formats_()
-feats = graph.unpack_ndata()['feat']
+# We actually won't have this statement in formal examples - this is just to ensure that
+# my code doesn't depend on DGLGraph's internal interfaces that did not appear in the RFC.
 graph = dglnew.graph.DGLGraphStorage(graph)
-sampler = dglnew.dataloading.NeighborSampler(graph, [5, 5, 5], output_device='cpu')
+sampler = dglnew.dataloading.NeighborSampler([5, 5, 5], output_device='cpu')
 dataloader = dglnew.dataloading.NodeDataLoader(
         graph,
         train_idx,
@@ -49,15 +51,16 @@ dataloader = dglnew.dataloading.NodeDataLoader(
         drop_last=False,
         pin_memory=True,
         num_workers=4,
-        use_asyncio=False)
-sampler.add_input('feat', feats)
-sampler.add_output('label', labels)
+        use_asyncio=False,
+        use_prefetch_thread=True)       # TBD: could probably remove this argument
+sampler.add_input('feat')
+sampler.add_output('label')
 
-model = SAGE(feats.shape[1], 256, dataset.num_classes).cuda()
+model = SAGE(graph.ndata['feat'].shape[1], 256, dataset.num_classes).cuda()
 opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
 
 durations = []
-for _ in range(1):
+for _ in range(10):
     t0 = time.time()
     for it, blocks in enumerate(dataloader):
         x = blocks[0].srcdata['feat']
@@ -74,4 +77,4 @@ for _ in range(1):
     tt = time.time()
     print(tt - t0)
     durations.append(tt - t0)
-#print(np.mean(durations[4:]), np.std(durations[4:]))
+print(np.mean(durations[4:]), np.std(durations[4:]))

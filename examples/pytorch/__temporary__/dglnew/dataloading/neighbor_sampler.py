@@ -1,4 +1,5 @@
 import dgl
+from dgl.frame import Marker
 from .sampler import Sampler
 
 def _find_exclude_eids_with_reverse_id(g, eids, reverse_eid_map):
@@ -100,10 +101,43 @@ class NeighborSampler(object):
             blocks.insert(0, block)
 
         blocks[0].srcdata.mark(self.inputs)
+        # Or equivalently
+        #
+        #     for name in self.inputs:
+        #         blocks[0].srcdata[name] = Marker()
+        #
+        # Marker's signature is
+        #
+        #     Marker(name: str, id_: tensor)
+        #
+        # Both arguments can be None.  In this case, the name and ID will be inferred
+        # from where it is assigned to.  E.g.
+        #
+        #     blocks[0].srcdata[name] = Marker()
+        #
+        # is equivalent to
+        #
+        #     blocks[0].srcdata[name] = Marker(name, blocks[0].srcdata[dgl.NID])
         blocks[-1].dstdata.mark(self.outputs)
         for block in blocks:
             block.edata.mark(self.edata)
-
+        # If you want to prefetch things other than ndata and edata, you can also
+        # return a Marker(name, id_).  If a Marker is returned in places other than
+        # in a graph's ndata/edata/srcdata/dstdata, the DataLoader will prefetch it
+        # from its dictionary ``other_data``.
+        # For instance, you can run
+        #
+        #     return blocks, Marker('other_feat', id_)
+        #
+        # To make it work with the sampler returning the stuff above, your dataloader
+        # needs to have the following
+        #
+        #     dataloader.attach_data('other_feat', tensor)
+        #
+        # Then you can run
+        #
+        #     for blocks, other_feat in dataloader:
+        #         train_on(blocks, other_feat)
         return blocks
 
     def add_input(self, name):

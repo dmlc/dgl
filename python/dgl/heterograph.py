@@ -5567,9 +5567,13 @@ class DGLHeteroGraph(object):
             new_graph = self.clone()
             for ntype in new_graph.ntypes:
                 for k, v in new_graph.nodes[ntype].data.items():
+                    if not F.is_tensor(v):  # may be a Marker
+                        continue
                     new_graph.nodes[ntype].data[k] = F.pin_memory(v)
             for etype in new_graph.canonical_etypes:
                 for k, v in new_graph.edges[etype].data.items():
+                    if not F.is_tensor(v):  # may be a Marker
+                        continue
                     new_graph.edges[etype].data[k] = F.pin_memory(v)
             new_graph._is_pinned = True
             return new_graph

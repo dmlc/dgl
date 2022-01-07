@@ -1,21 +1,5 @@
 import dgl
 
-class GraphStorage(object):
-    @property
-    def ndata(self):
-        pass
-
-    @property
-    def ntypes(self):
-        pass
-
-    def sample_neighbors(self, seed_nodes, fanout, edge_dir='in', prob=None, replace=False,
-                         output_device=None):
-        pass
-
-    def edge_subgraph(self, edges):
-        pass
-
 class _EidExcluder():
     def __init__(self, exclude_eids):
         device = None
@@ -80,7 +64,7 @@ class _EidExcluder():
             frontier.edata[EID] = new_eids
         return frontier
 
-class DGLGraphStorage(GraphStorage):
+class DGLGraphStorage(object):
     # A thin wrapper of DGLGraph that makes it a GraphStorage
     def __init__(self, g):
         self.g = g
@@ -92,6 +76,14 @@ class DGLGraphStorage(GraphStorage):
     @property
     def ndata(self):
         return self.g.ndata
+
+    @property
+    def canonical_etypes(self):
+        return self.g.canonical_etypes
+
+    @property
+    def edata(self):
+        return self.g.edata
 
     def sample_neighbors(self, seed_nodes, fanout, edge_dir='in', prob=None, replace=False,
                          exclude_edges=None, output_device=None):

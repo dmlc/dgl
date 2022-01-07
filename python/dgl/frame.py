@@ -38,8 +38,18 @@ class _LazyIndex(object):
             flat_index = F.gather_row(flat_index, index)
         return flat_index
 
-class Marker(namedtuple('Marker', ['name', 'id_'])):
-    pass
+class Marker:
+    __slots__ = ['name', 'id_']
+    def __init__(self, name=None, id_=None):
+        self.name = name
+        self.id_ = id_
+
+    def to(self, *args, **kwargs):
+        return self
+
+    @property
+    def data(self):
+        return self
 
 class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
     """The column scheme.
@@ -339,10 +349,13 @@ class Frame(MutableMapping):
             assert not isinstance(data, Frame)  # sanity check for code refactor
             # Note that we always create a new column for the given data.
             # This avoids two frames accidentally sharing the same column.
-            self._columns = {k : Column.create(v) for k, v in data.items()}
+            self._columns = {k : v if isinstance(v, Marker) else Column.create(v)
+                             for k, v in data.items()}
             self._num_rows = num_rows
             # infer num_rows & sanity check
             for name, col in self._columns.items():
+                if isinstance(col, Marker):
+                    continue
                 if self._num_rows is None:
                     self._num_rows = len(col)
                 elif len(col) != self._num_rows:
