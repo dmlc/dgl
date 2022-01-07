@@ -62,6 +62,14 @@ def load_yaml_with_sanity_check(yaml_file):
         if meta_yaml.version != '1.0.0':
             raise DGLError("Invalid CSVDataset version {}. Supported versions: '1.0.0'".format(
                 meta_yaml.version))
+        ntypes = [meta.ntype for meta in meta_yaml.node_data]
+        if len(ntypes) > len(set(ntypes)):
+            raise DGLError(
+                "Duplicate node types for different CSV files which is required to have unique node type. ntypes: {}.".format(ntypes))
+        etypes = [tuple(meta.etype) for meta in meta_yaml.edge_data]
+        if len(etypes) > len(set(etypes)):
+            raise DGLError(
+                "Duplicate edge types for different CSV files which is required to have unique edge type. etypes: {}.".format(etypes))
         return meta_yaml
 
 

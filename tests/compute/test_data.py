@@ -384,9 +384,9 @@ def _test_load_yaml_with_sanity_check():
         assert len(meta.node_data) == 0
         assert len(meta.edge_data) == 0
         assert meta.graph_data is None
-    # minimum with required fields only
-        yaml_data = {'version': '1.0.0', 'dataset_name': 'default', 'node_data': [{'file_name': 'nodes.csv'}, {'file_name': 'nodes.csv'}],
-                     'edge_data': [{'file_name': 'edges.csv'}, {'file_name': 'edges.csv'}],
+        # minimum with required fields only
+        yaml_data = {'version': '1.0.0', 'dataset_name': 'default', 'node_data': [{'file_name': 'nodes.csv'}],
+                     'edge_data': [{'file_name': 'edges.csv'}],
                      }
         with open(yaml_path, 'w') as f:
             yaml.dump(yaml_data, f, sort_keys=False)
@@ -402,7 +402,7 @@ def _test_load_yaml_with_sanity_check():
             assert edata.graph_id_field == 'graph_id'
             assert edata.src_id_field == 'src_id'
             assert edata.dst_id_field == 'dst_id'
-    # optional fields are specified
+        # optional fields are specified
         yaml_data = {'version': '1.0.0', 'dataset_name': 'default',
                      'separator': '|',
                      'node_data': [{'file_name': 'nodes.csv', 'ntype': 'user', 'graph_id_field': 'xxx', 'node_id_field': 'xxx'}],
@@ -426,7 +426,7 @@ def _test_load_yaml_with_sanity_check():
         assert meta.graph_data is not None
         assert meta.graph_data.file_name == 'graph.csv'
         assert meta.graph_data.graph_id_field == 'xxx'
-    # some required fields are missing
+        # some required fields are missing
         yaml_data = {'dataset_name': 'default',
                      'node_data': [], 'edge_data': []}
         for field in yaml_data.keys():
@@ -440,9 +440,33 @@ def _test_load_yaml_with_sanity_check():
             except:
                 expect_except = True
             assert expect_except
-    # inapplicable version
+        # inapplicable version
         yaml_data = {'version': '0.0.0', 'dataset_name': 'default', 'node_data': [{'file_name': 'nodes_0.csv'}],
                      'edge_data': [{'file_name': 'edges_0.csv'}],
+                     }
+        with open(yaml_path, 'w') as f:
+            yaml.dump(yaml_data, f, sort_keys=False)
+        expect_except = False
+        try:
+            meta = csv_ds.load_yaml_with_sanity_check(yaml_path)
+        except DGLError:
+            expect_except = True
+        assert expect_except
+        # duplicate node types
+        yaml_data = {'version': '1.0.0', 'dataset_name': 'default', 'node_data': [{'file_name': 'nodes.csv'}, {'file_name': 'nodes.csv'}],
+                     'edge_data': [{'file_name': 'edges.csv'}],
+                     }
+        with open(yaml_path, 'w') as f:
+            yaml.dump(yaml_data, f, sort_keys=False)
+        expect_except = False
+        try:
+            meta = csv_ds.load_yaml_with_sanity_check(yaml_path)
+        except DGLError:
+            expect_except = True
+        assert expect_except
+        # duplicate edge types
+        yaml_data = {'version': '1.0.0', 'dataset_name': 'default', 'node_data': [{'file_name': 'nodes.csv'}],
+                     'edge_data': [{'file_name': 'edges.csv'}, {'file_name': 'edges.csv'}],
                      }
         with open(yaml_path, 'w') as f:
             yaml.dump(yaml_data, f, sort_keys=False)
