@@ -83,6 +83,15 @@ class BaseData:
             csv_path = os.path.join(base_dir, csv_path)
         return pd.read_csv(csv_path, sep=separator)
 
+    @staticmethod
+    def pop_from_dataframe(df: pd.DataFrame, item: str):
+        ret = None
+        try:
+            ret = df.pop(item).to_numpy().squeeze()
+        except KeyError:
+            pass
+        return ret
+
 
 class NodeData(BaseData):
     """ Class of node data which is used for DGLGraph construction. Internal use only. """
@@ -98,12 +107,13 @@ class NodeData(BaseData):
     @staticmethod
     def load_from_csv(meta: MetaNode, data_parser: Callable, base_dir=None, separator=','):
         df = BaseData.read_csv(meta.file_name, base_dir, separator)
+        node_ids = BaseData.pop_from_dataframe(df, meta.node_id_field)
+        graph_ids = BaseData.pop_from_dataframe(df, meta.graph_id_field)
+        if node_ids is None:
+            raise DGLError("Missing node id field [{}] in file [{}].".format(
+                meta.node_id_field, meta.file_name))
         ntype = meta.ntype
         ndata = data_parser(df)
-        if meta.node_id_field not in ndata:
-            raise DGLError(f"node_id_field[{meta.node_id_field}] does not exist in parsed node data dict.")
-        node_ids = ndata.pop(meta.node_id_field)
-        graph_ids = ndata.pop(meta.graph_id_field, None)
         return NodeData(node_ids, ndata, type=ntype, graph_id=graph_ids)
 
     @staticmethod
@@ -145,15 +155,17 @@ class EdgeData(BaseData):
     @staticmethod
     def load_from_csv(meta: MetaEdge, data_parser: Callable, base_dir=None, separator=','):
         df = BaseData.read_csv(meta.file_name, base_dir, separator)
+        src_ids = BaseData.pop_from_dataframe(df, meta.src_id_field)
+        if src_ids is None:
+            raise DGLError("Missing src id field [{}] in file [{}].".format(
+                meta.src_id_field, meta.file_name))
+        dst_ids = BaseData.pop_from_dataframe(df, meta.dst_id_field)
+        if dst_ids is None:
+            raise DGLError("Missing dst id field [{}] in file [{}].".format(
+                meta.dst_id_field, meta.file_name))
+        graph_ids = BaseData.pop_from_dataframe(df, meta.graph_id_field)
         etype = tuple(meta.etype)
         edata = data_parser(df)
-        if meta.src_id_field not in edata:
-            raise DGLError(f"src_id_field[{meta.src_id_field}] does not exist in parsed edge data dict.")
-        if meta.dst_id_field not in edata:
-            raise DGLError(f"dst_id_field[{meta.dst_id_field}] does not exist in parsed edge data dict.")
-        src_ids = edata.pop(meta.src_id_field)
-        dst_ids = edata.pop(meta.dst_id_field)
-        graph_ids = edata.pop(meta.graph_id_field, None)
         return EdgeData(src_ids, dst_ids, edata, type=etype, graph_id=graph_ids)
 
     @staticmethod
@@ -189,10 +201,11 @@ class GraphData(BaseData):
     @staticmethod
     def load_from_csv(meta: MetaGraph, data_parser: Callable, base_dir=None, separator=','):
         df = BaseData.read_csv(meta.file_name, base_dir, separator)
+        graph_ids = BaseData.pop_from_dataframe(df, meta.graph_id_field)
+        if graph_ids is None:
+            raise DGLError("Missing graph id field [{}] in file [{}].".format(
+                meta.graph_id_field, meta.file_name))
         gdata = data_parser(df)
-        if meta.graph_id_field not in gdata:
-            raise DGLError(f"graph_id_field[{meta.graph_id_field}] does not exist in parsed graph data dict.")
-        graph_ids = gdata.pop(meta.graph_id_field)
         return GraphData(graph_ids, gdata)
 
     @staticmethod
@@ -262,7 +275,7 @@ class DefaultDataParser:
         3. read data and infer data type directly, otherwise.
     """
 
-    def __call__(self, df):
+    def __call__(self, df: pd.DataFrame):
         data = {}
         for header in df:
             if 'Unnamed' in header:
