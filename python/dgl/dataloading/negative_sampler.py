@@ -109,8 +109,8 @@ class GlobalUniform(_BaseNegativeSampler):
     Examples
     --------
     >>> g = dgl.graph(([0, 1, 2], [1, 2, 3]))
-    >>> neg_sampler = dgl.dataloading.negative_sampler.GlobalUniform(4, True)
-    >>> neg_sampler(g)
+    >>> neg_sampler = dgl.dataloading.negative_sampler.GlobalUniform(2, True)
+    >>> neg_sampler(g, torch.LongTensor([0, 1]))
     (tensor([0, 1, 3, 2]), tensor([2, 0, 2, 1]))
     """
     def __init__(self, k, exclude_self_loops=True, replace=False, redundancy=None):
