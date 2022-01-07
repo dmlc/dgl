@@ -7,8 +7,8 @@ import copy
 import yaml
 
 import typer
-from ...utils.factory import PipelineFactory, ModelFactory, PipelineBase, DataFactory
-from ...utils.base_model import extract_name, EarlyStopConfig
+from ...utils.factory import PipelineFactory, NodeModelFactory, PipelineBase, DataFactory
+from ...utils.base_model import extract_name, EarlyStopConfig, DeviceEnum
 
 
 class MultiLayerSamplerConfig(BaseModel):
@@ -55,8 +55,8 @@ class NodepredNsPipeline(PipelineBase):
                 "cfg.yml", help="output configuration path"),
             sampler: SamplerChoice = typer.Option(
                 "neighbor", help="Specify sampler name"),
-            model: ModelFactory.get_model_enum() = typer.Option(..., help="Model name"),
-            device: str = typer.Option("cpu", help="Device, cpu or cuda"),
+            model: NodeModelFactory.get_model_enum() = typer.Option(..., help="Model name"),
+            device: DeviceEnum = typer.Option("cpu", help="Device, cpu or cuda"),
         ):
             from ...utils.enter_config import UserConfig
             generated_cfg = {
@@ -84,10 +84,10 @@ class NodepredNsPipeline(PipelineBase):
         pipeline_cfg = NodepredNSPipelineCfg(**user_cfg_dict["general_pipeline"])
 
         render_cfg = copy.deepcopy(user_cfg_dict)
-        model_code = ModelFactory.get_source_code(
+        model_code = NodeModelFactory.get_source_code(
             user_cfg_dict["model"]["name"])
         render_cfg["model_code"] = model_code
-        render_cfg["model_class_name"] = ModelFactory.get_model_class_name(
+        render_cfg["model_class_name"] = NodeModelFactory.get_model_class_name(
             user_cfg_dict["model"]["name"])
 
         generated_user_cfg = copy.deepcopy(user_cfg_dict)

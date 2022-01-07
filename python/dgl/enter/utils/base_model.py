@@ -1,5 +1,14 @@
-from pydantic import BaseModel as PydanticBaseModel, create_model
 import enum
+from typing import Optional
+from jinja2 import Template
+from enum import Enum, IntEnum
+import copy
+from pydantic import create_model, BaseModel as PydanticBaseModel, Field, create_model
+
+
+class DeviceEnum(str, Enum):
+    cpu = "cpu"
+    cuda = "cuda"
 
 class DGLBaseModel(PydanticBaseModel):
     class Config:
