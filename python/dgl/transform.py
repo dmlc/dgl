@@ -634,8 +634,8 @@ def to_bidirected(g, copy_ndata=False, readonly=None):
     r"""Convert the graph to a bi-directional simple graph and return.
 
     For an input graph :math:`G`, return a new graph :math:`G'` such that an edge
-    :math:`(u, v)\in G'` if and only if there exists an edge :math:`(u, v)\in G` or
-    an edge :math:`(v, u)\in G`. The resulting graph :math:`G'` is a simple graph,
+    :math:`(u, v)\in G'` exists if and only if there exists an edge
+    :math:`(v, u)\in G`. The resulting graph :math:`G'` is a simple graph,
     meaning there is no parallel edge.
 
     The operation only works for edges whose two endpoints belong to the same node type.
