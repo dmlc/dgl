@@ -18,7 +18,6 @@
 namespace dgl {
 namespace runtime {
 
-#ifndef _WIN32
 /*
  * Shared memory is a resource that cannot be cleaned up if the process doesn't
  * exit normally. We'll manage the resource with ResourceManager.
@@ -33,21 +32,25 @@ class SharedMemoryResource: public Resource {
 
   void Destroy() {
     // LOG(INFO) << "remove " << name << " for shared memory";
+#ifndef _WIN32
     shm_unlink(name.c_str());
+#else   // _WIN32
+    // NOTHING; Windows automatically removes the shared memory object once all handles
+    // are unmapped.
+#endif
   }
 };
-#endif  // _WIN32
 
 SharedMemory::SharedMemory(const std::string &name) {
-#ifndef _WIN32
   this->name = name;
   this->own_ = false;
+#ifndef _WIN32
   this->fd_ = -1;
+#else
+  this->handle_ = nullptr;
+#endif
   this->ptr_ = nullptr;
   this->size_ = 0;
-#else
-  LOG(FATAL) << "Shared memory is not supported on Windows.";
-#endif  // _WIN32
 }
 
 SharedMemory::~SharedMemory() {
@@ -61,7 +64,9 @@ SharedMemory::~SharedMemory() {
     DeleteResource(name);
   }
 #else
-  LOG(FATAL) << "Shared memory is not supported on Windows.";
+  CHECK(UnmapViewOfFile(ptr_)) << "Win32 Error: " << GetLastError();
+  CloseHandle(handle_);
+  // Windows do not need a separate shm_unlink step.
 #endif  // _WIN32
 }
 
@@ -74,7 +79,7 @@ void *SharedMemory::CreateNew(size_t sz) {
   int flag = O_RDWR|O_CREAT;
   fd_ = shm_open(name.c_str(), flag, S_IRUSR | S_IWUSR);
   CHECK_NE(fd_, -1) << "fail to open " << name << ": " << strerror(errno);
-  // Shared memory cannot be deleted if the process exits abnormally.
+  // Shared memory cannot be deleted if the process exits abnormally in Linux.
   AddResource(name, std::shared_ptr<Resource>(new SharedMemoryResource(name)));
   auto res = ftruncate(fd_, sz);
   CHECK_NE(res, -1)
@@ -85,8 +90,22 @@ void *SharedMemory::CreateNew(size_t sz) {
   this->size_ = sz;
   return ptr_;
 #else
-  LOG(FATAL) << "Shared memory is not supported on Windows.";
-  return nullptr;
+  handle_ = CreateFileMapping(
+      INVALID_HANDLE_VALUE,
+      nullptr,
+      PAGE_READWRITE,
+      static_cast<DWORD>(sz >> 32),
+      static_cast<DWORD>(sz & 0xFFFFFFFF),
+      name.c_str());
+  CHECK(handle_ != nullptr) << "fail to open " << name << ", Win32 error: " << GetLastError();
+  ptr_ = MapViewOfFile(handle_, FILE_MAP_ALL_ACCESS, 0, 0, sz);
+  if (ptr_ == nullptr) {
+    LOG(FATAL) << "Memory mapping failed, Win32 error: " << GetLastError();
+    CloseHandle(handle_);
+    return nullptr;
+  }
+  this->size_ = sz;
+  return ptr_;
 #endif  // _WIN32
 }
 
@@ -101,23 +120,36 @@ void *SharedMemory::Open(size_t sz) {
   this->size_ = sz;
   return ptr_;
 #else
-  LOG(FATAL) << "Shared memory is not supported on Windows.";
-  return nullptr;
+  handle_ = OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, name.c_str());
+  CHECK(handle_ != nullptr) << "fail to open " << name << ", Win32 Error: " << GetLastError();
+  ptr_ = MapViewOfFile(handle_, FILE_MAP_ALL_ACCESS, 0, 0, sz);
+  if (ptr_ == nullptr) {
+    LOG(FATAL) << "Memory mapping failed, Win32 error: " << GetLastError();
+    CloseHandle(handle_);
+    return nullptr;
+  }
+  this->size_ = sz;
+  return ptr_;
 #endif  // _WIN32
 }
 
 bool SharedMemory::Exist(const std::string &name) {
 #ifndef _WIN32
-  int fd_ = shm_open(name.c_str(), O_RDONLY, S_IRUSR | S_IWUSR);
-  if (fd_ >= 0) {
-    close(fd_);
+  int fd = shm_open(name.c_str(), O_RDONLY, S_IRUSR | S_IWUSR);
+  if (fd >= 0) {
+    close(fd);
     return true;
   } else {
     return false;
   }
 #else
-  LOG(FATAL) << "Shared memory is not supported on Windows.";
-  return false;
+  HANDLE handle = OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, name.c_str());
+  if (handle != nullptr) {
+    CloseHandle(handle);
+    return true;
+  } else {
+    return false;
+  }
 #endif  // _WIN32
 }
 
