@@ -185,13 +185,14 @@ class NodeDataView(MutableMapping):
             else:
                 self._data = {}
                 g._ndata_store[ntype] = self._data
-        for name in names:
-            assert name.is_node()
-            policy = PartitionPolicy(name.policy_str, g.get_partition_book())
-            dtype, shape, _ = g._client.get_data_meta(str(name))
-            # We create a wrapper on the existing tensor in the kvstore.
-            self._data[name.get_name()] = DistTensor(shape, dtype, name.get_name(),
-                                                     part_policy=policy)
+        if len(self._data) == 0:
+            for name in names:
+                assert name.is_node()
+                policy = PartitionPolicy(name.policy_str, g.get_partition_book())
+                dtype, shape, _ = g._client.get_data_meta(str(name))
+                # We create a wrapper on the existing tensor in the kvstore.
+                self._data[name.get_name()] = DistTensor(shape, dtype, name.get_name(),
+                                                         part_policy=policy)
 
     def _get_names(self):
         return list(self._data.keys())
@@ -239,13 +240,14 @@ class EdgeDataView(MutableMapping):
             else:
                 self._data = {}
                 g._edata_store[etype] = self._data
-        for name in names:
-            assert name.is_edge()
-            policy = PartitionPolicy(name.policy_str, g.get_partition_book())
-            dtype, shape, _ = g._client.get_data_meta(str(name))
-            # We create a wrapper on the existing tensor in the kvstore.
-            self._data[name.get_name()] = DistTensor(shape, dtype, name.get_name(),
-                                                     part_policy=policy)
+        if len(self._data) == 0:
+            for name in names:
+                assert name.is_edge()
+                policy = PartitionPolicy(name.policy_str, g.get_partition_book())
+                dtype, shape, _ = g._client.get_data_meta(str(name))
+                # We create a wrapper on the existing tensor in the kvstore.
+                self._data[name.get_name()] = DistTensor(shape, dtype, name.get_name(),
+                                                         part_policy=policy)
 
     def _get_names(self):
         return list(self._data.keys())
