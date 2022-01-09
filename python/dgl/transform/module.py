@@ -24,7 +24,10 @@ __all__ = [
     'AddSelfLoop',
     'RemoveSelfLoop',
     'AddReverse',
-    'ToSimple'
+    'ToSimple',
+    'LineGraph',
+    'KHopGraph',
+    'AddMetaPaths'
 ]
 
 class BaseTransform:
@@ -274,7 +277,8 @@ class AddReverse(BaseTransform):
 
     Description
     -----------
-    Add a reverse edge for each edge in the input graph and return a new graph.
+    Add a reverse edge :math:`(i,j)` for each edge :math:`(j,i)` in the input graph and
+    return a new graph.
 
     For a heterogeneous graph, it adds a "reverse" edge type for each edge type
     to hold the reverse edges. For example, for a canonical edge type ('A', 'r', 'B'),
@@ -418,6 +422,33 @@ class ToSimple(BaseTransform):
     >>> g = dgl.graph(([0, 1, 1], [1, 2, 2]))
     >>> g.edata['w'] = torch.tensor([[0.1], [0.2], [0.3]])
     >>> sg = transform(g)
+    >>> print(sg.edges())
+    (tensor([0, 1]), tensor([1, 2]))
+    >>> print(sg.edata['count'])
+    tensor([1, 2])
+    >>> print(sg.edata['w'])
+    tensor([[0.1000], [0.2000]])
+
+    Case2: Convert a homogeneous graph to a simple graph with writeback mapping
+
+    >>> transform = ToSimple(writeback_mapping=True)
+    >>> sg, wm = transform(g)
+    >>> print(wm)
+    tensor([0, 1, 1])
+
+    Case3: Convert a heterogeneous graph to a simple graph
+
+    >>> g = dgl.heterograph({
+    ...     ('user', 'follows', 'user'): ([0, 1, 1], [1, 2, 2]),
+    ...     ('user', 'plays', 'game'): ([0, 1, 0], [1, 1, 1])
+    ... })
+    >>> sg, wm = transform(g)
+    >>> print(sg.edges(etype='follows'))
+    (tensor([0, 1]), tensor([1, 2]))
+    >>> print(sg.edges(etype='plays'))
+    (tensor([0, 1]), tensor([1, 1]))
+    >>> print(wm)
+    {('user', 'follows', 'user'): tensor([0, 1, 1]), ('user', 'plays', 'game'): tensor([0, 1, 0])}
     """
     def __init__(self, return_counts='count', writeback_mapping=False, aggregator='arbitrary'):
         self.return_counts = return_counts
@@ -431,16 +462,151 @@ class ToSimple(BaseTransform):
                                     copy_edata=True,
                                     aggregator=self.aggregator)
 
-"""
 class LineGraph(BaseTransform):
-    raise NotImplementedError
+    r"""
+
+    Description
+    -----------
+    Return the line graph of the input graph.
+
+    The line graph :math:`L(G)` of a given graph :math:`G` is a graph where
+    the nodes in :math:`L(G)` correspond to the edges in :math:`G`. For a pair
+    of edges :math:`(u, v)` and :math:`(v, w)` in :math:`G`, there will be an
+    edge from the node corresponding to :math:`(u, v)` to the node corresponding to
+    :math:`(v, w)` in :math:`L(G)`.
+
+    This module only works for homogeneous graphs.
+
+    Parameters
+    ----------
+    backtracking : bool, optional
+        If True, the line graph node corresponding to :math:`(u, v)` will not have an
+        edge connecting to the line graph node corresponding to :math:`(v, u)`.
+
+    Example
+    -------
+
+    The following example uses PyTorch backend.
+
+    >>> import dgl
+    >>> import torch
+    >>> from dgl import LineGraph
+
+    Case1: Backtracking is True
+
+    >>> transform = LineGraph()
+    >>> g = dgl.graph(([0, 1, 1], [1, 0, 2]))
+    >>> g.ndata['h'] = torch.tensor([[0.], [1.], [2.]])
+    >>> g.edata['w'] = torch.tensor([[0.], [0.1], [0.2]])
+    >>> new_g = transform(g)
+    >>> print(new_g)
+    Graph(num_nodes=3, num_edges=3,
+          ndata_schemes={'w': Scheme(shape=(1,), dtype=torch.float32)}
+          edata_schemes={})
+    >>> print(new_g.edges())
+    (tensor([0, 0, 1]), tensor([1, 2, 0]))
+
+    Case2: Backtracking is False
+
+    >>> transform = LineGraph(backtracking=False)
+    >>> new_g = transform(g)
+    >>> print(new_g.edges())
+    (tensor([0]), tensor([2]))
+    """
+    def __init__(self, backtracking=True):
+        self.backtracking = backtracking
+
+    def __call__(self, g):
+        return functional.line_graph(g, backtracking=self.backtracking, shared=True)
 
 class KHopGraph(BaseTransform):
-    raise NotImplementedError
+    r"""
 
-class MetapathGraph(BaseTransform):
-    raise NotImplementedError
+    Description
+    -----------
+    Return the graph whose edges connect the :math:`k`-hop neighbors of the original graph.
 
+    This module only works for homogeneous graphs.
+
+    Parameters
+    ----------
+    k : int
+        The number of hops.
+
+    Example
+    -------
+
+    >>> import dgl
+    >>> from dgl import KHopGraph
+
+    >>> transform = KHopGraph(2)
+    >>> g = dgl.graph(([0, 1], [1, 2]))
+    >>> new_g = transform(g)
+    >>> print(new_g.edges())
+    (tensor([0]), tensor([2]))
+    """
+    def __init__(self, k):
+        self.k = k
+
+    def __call__(self, g):
+        return functional.khop_graph(g, self.k)
+
+class AddMetaPaths(BaseTransform):
+    r"""
+
+    Description
+    -----------
+    Add canonical edge types to an input graph based on given metapaths, as described in
+    `Heterogeneous Graph Attention Network <https://arxiv.org/abs/1903.07293>`__. Formally,
+    a metapath is a path of the form
+
+    .. math::
+
+        \mathcal{V}_1 \xrightarrow{R_1} \mathcal{V}_2 \xrightarrow{R_2} \ldots
+        \xrightarrow{R_{\ell-1}} \mathcal{V}_{\ell}
+
+    in which :math:`\mathcal{V}_i` represents a node type and :math:`\xrightarrow{R_j}`
+    represents a relation type connecting its two adjacent node types. The adjacency matrix
+    corresponding to the metapath is obtained by sequential multiplication of adjacency matrices
+    along the metapath.
+
+    Parameters
+    ----------
+    metapaths : dict[str, list]
+        The metapaths to add, mapping a metapath name to a metapath. For example,
+        :attr:`{'co-author': [('person', 'author', 'paper'), ('paper', 'authored by', 'person')]}`
+    keep_orig_edges : bool, optional
+        If True, it will keep the edges of the original graph. Otherwise, it will drop them.
+
+    Example
+    -------
+
+    >>> import dgl
+    >>> from dgl import AddMetaPaths
+    """
+    def __init__(self, metapaths, keep_orig_edges=True):
+        self.metapaths = metapaths
+        self.keep_orig_edges = keep_orig_edges
+
+    def __call__(self, g):
+        data_dict = dict()
+
+        for meta_etype, metapath in self.metapaths.items():
+            meta_g = functional.metapath_reachable_graph(g, metapath)
+            u_type = metapath[0][0]
+            v_type = metapath[-1][-1]
+            data_dict[(u_type, meta_etype, v_type)] = meta_g.edges()
+
+        if self.keep_orig_edges:
+            for c_etype in g.canonical_etypes:
+                data_dict[c_etype] = g.edges(etype=c_etype)
+            new_g = self.update_graph_structure(g, data_dict, copy_edata=True)
+        else:
+            new_g = self.update_graph_structure(g, data_dict, copy_edata=False)
+
+        return new_g
+
+"""
 class KNNGraph(BaseTransform):
     raise NotImplementedError
 

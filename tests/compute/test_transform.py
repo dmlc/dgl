@@ -1809,6 +1809,8 @@ def test_module_add_self_loop(idtype):
     # Case1: add self-loops with the default setting
     transform = dgl.AddSelfLoop()
     new_g = transform(g)
+    assert new_g.device == g.device
+    assert new_g.idtype == g.idtype
     assert new_g.num_nodes() == g.num_nodes()
     assert new_g.num_edges() == 5
     src, dst = new_g.edges()
@@ -1820,6 +1822,8 @@ def test_module_add_self_loop(idtype):
     # Case2: Remove self-loops first to avoid duplicate ones
     transform = dgl.AddSelfLoop(remove_first=True)
     new_g = transform(g)
+    assert new_g.device == g.device
+    assert new_g.idtype == g.idtype
     assert new_g.num_nodes() == g.num_nodes()
     assert new_g.num_edges() == 4
     src, dst = new_g.edges()
@@ -1840,6 +1844,8 @@ def test_module_add_self_loop(idtype):
 
     # Case3: add self-loops for a heterogeneous graph
     new_g = transform(g)
+    assert new_g.device == g.device
+    assert new_g.idtype == g.idtype
     assert new_g.ntypes == g.ntypes
     assert new_g.canonical_etypes == g.canonical_etypes
     for nty in new_g.ntypes:
@@ -1854,6 +1860,8 @@ def test_module_add_self_loop(idtype):
     # Case4: add self-etypes for a heterogeneous graph
     transform = dgl.AddSelfLoop(self_etypes=True)
     new_g = transform(g)
+    assert new_g.device == g.device
+    assert new_g.idtype == g.idtype
     assert new_g.ntypes == g.ntypes
     assert new_g.canonical_etypes == {
         ('user', 'plays', 'game'), ('user', 'follows', 'user'),
@@ -1879,6 +1887,8 @@ def test_module_remove_self_loop(idtype):
     g.ndata['h'] = F.randn((g.num_nodes(), 2))
     g.edata['w'] = F.randn((g.num_edges(), 3))
     new_g = transform(g)
+    assert new_g.device == g.device
+    assert new_g.idtype == g.idtype
     assert new_g.num_nodes() == g.num_nodes()
     assert new_g.num_edges() == 1
     src, dst = new_g.edges()
@@ -1898,6 +1908,8 @@ def test_module_remove_self_loop(idtype):
     g.edges['follows'].data['w2'] = F.randn((2, 5))
 
     new_g = transform(g)
+    assert new_g.device == g.device
+    assert new_g.idtype == g.idtype
     assert new_g.ntypes == g.ntypes
     assert new_g.canonical_etypes == g.canonical_etypes
     for nty in new_g.ntypes:
@@ -1918,6 +1930,8 @@ def test_module_add_reverse(idtype):
     g.ndata['h'] = F.randn((g.num_nodes(), 3))
     g.edata['w'] = F.randn((g.num_edges(), 2))
     new_g = transform(g)
+    assert new_g.device == g.device
+    assert new_g.idtype == g.idtype
     assert g.num_nodes() == new_g.num_nodes()
     src, dst = new_g.edges()
     eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
@@ -1929,6 +1943,8 @@ def test_module_add_reverse(idtype):
     # Case2: Add reverse edges for a homogeneous graph and copy edata
     transform = dgl.AddReverse(copy_edata=True)
     new_g = transform(g)
+    assert new_g.device == g.device
+    assert new_g.idtype == g.idtype
     assert g.num_nodes() == new_g.num_nodes()
     src, dst = new_g.edges()
     eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
@@ -1943,6 +1959,8 @@ def test_module_add_reverse(idtype):
         ('user', 'follows', 'user'): ([1, 2], [2, 2])
     })
     new_g = transform(g)
+    assert new_g.device == g.device
+    assert new_g.idtype == g.idtype
     assert g.ntypes == new_g.ntypes
     assert set(new_g.canonical_etypes) == {
         ('user', 'plays', 'game'), ('user', 'follows', 'user'), ('game', 'rev_plays', 'user')}
@@ -1964,6 +1982,8 @@ def test_module_add_reverse(idtype):
     # Case4: Disable combine_like
     transform = dgl.AddReverse(combine_like=False)
     new_g = transform(g)
+    assert new_g.device == g.device
+    assert new_g.idtype == g.idtype
     assert g.ntypes == new_g.ntypes
     assert set(new_g.canonical_etypes) == {
         ('user', 'plays', 'game'), ('user', 'follows', 'user'),
@@ -1986,6 +2006,82 @@ def test_module_add_reverse(idtype):
     src, dst = new_g.edges(etype='rev_follows')
     eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
     assert eset == {(2, 1), (2, 2)}
+
+@parametrize_dtype
+def test_module_to_simple(idtype):
+    transform = dgl.ToSimple()
+    g = dgl.graph(([0, 1, 1], [1, 2, 2]), idtype=idtype, device=F.ctx())
+    g.ndata['h'] = F.randn((g.num_nodes(), 2))
+    g.edata['w'] = F.tensor([[0.1], [0.2], [0.3]])
+    sg = transform(g)
+    assert sg.device == g.device
+    assert sg.idtype == g.idtype
+    assert sg.num_nodes() == g.num_nodes()
+    assert sg.num_edges() == 2
+    src, dst = sg.edges()
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 1), (1, 2)}
+    assert F.allclose(sg.edata['count'], F.tensor([1, 2]))
+    assert F.allclose(sg.ndata['h'], g.ndata['h'])
+
+    g = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 1, 1], [1, 2, 2]),
+        ('user', 'plays', 'game'): ([0, 1, 0], [1, 1, 1])
+    })
+    sg = transform(g)
+    assert sg.device == g.device
+    assert sg.idtype == g.idtype
+    assert sg.ntypes == g.ntypes
+    assert sg.canonical_etypes == g.canonical_etypes
+    for nty in sg.ntypes:
+        assert sg.num_nodes(nty) == g.num_nodes(nty)
+    for ety in sg.canonical_etypes:
+        assert sg.num_edges(ety) == 2
+
+    src, dst = sg.edges(etype='follows')
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 1), (1, 2)}
+
+    src, dst = sg.edges(etype='plays')
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 1), (1, 1)}
+
+@parametrize_dtype
+def test_module_line_graph(idtype):
+    transform = dgl.LineGraph()
+    g = dgl.graph(([0, 1, 1], [1, 0, 2]), idtype=idtype, device=F.ctx())
+    g.ndata['h'] = F.tensor([[0.], [1.], [2.]])
+    g.edata['w'] = F.tensor([[0.], [0.1], [0.2]])
+    new_g = transform(g)
+    assert new_g.device == g.device
+    assert new_g.idtype == g.idtype
+    assert new_g.num_nodes() == g.num_edges()
+    src, dst = new_g.edges()
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 1), (0, 2), (1, 0)}
+
+    transform = dgl.LineGraph(backtracking=False)
+    new_g = transform(g)
+    assert new_g.device == g.device
+    assert new_g.idtype == g.idtype
+    assert new_g.num_nodes() == g.num_edges()
+    src, dst = new_g.edges()
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 2)}
+
+@parametrize_dtype
+def test_module_khop_graph(idtype):
+    transform = dgl.KHopGraph(2)
+    g = dgl.graph(([0, 1], [1, 2]), idtype=idtype, device=F.ctx())
+    g.ndata['h'] = F.randn((g.num_nodes(), 2))
+    new_g = transform(g)
+    assert new_g.device == g.device
+    assert new_g.idtype == g.idtype
+    assert new_g.num_nodes() == g.num_nodes()
+    assert F.allclose(g.ndata['h'], new_g.ndata['h'])
+    src, dst = new_g.edges()
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 2)}
 
 if __name__ == '__main__':
     test_partition_with_halo()

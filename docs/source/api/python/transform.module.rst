@@ -29,3 +29,27 @@ AddReverse
 
 .. autoclass:: dgl.transform.module.AddReverse
     :show-inheritance:
+
+ToSimple
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.transform.module.ToSimple
+    :show-inheritance:
+
+LineGraph
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.transform.module.LineGraph
+    :show-inheritance:
+
+KHopGraph
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.transform.module.KHopGraph
+    :show-inheritance:
+
+AddMetaPaths
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.transform.module.AddMetaPaths
+    :show-inheritance:

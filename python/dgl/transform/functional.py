@@ -867,7 +867,7 @@ def line_graph(g, backtracking=True, shared=False):
     """Return the line graph of this graph.
 
     The line graph ``L(G)`` of a given graph ``G`` is defined as another graph where
-    the nodes in ``L(G)`` maps to the edges in ``G``.  For any pair of edges ``(u, v)``
+    the nodes in ``L(G)`` correspond to the edges in ``G``.  For any pair of edges ``(u, v)``
     and ``(v, w)`` in ``G``, the corresponding node of edge ``(u, v)`` in ``L(G)`` will
     have an edge connecting to the corresponding node of edge ``(v, w)``.
 
