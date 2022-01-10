@@ -328,6 +328,20 @@ def _gspmm_hetero(gidx, op, reduce_op, u_len, u_and_e_tuple):
     return out, (list_arg_u, list_arg_e, list_arg_u_ntype, list_arg_e_etype)
 
 
+def _matmul_homogenized(gidx, u, list_w):
+    print("from sparse.py")
+    ctx = F.context(u)
+    dtype = F.dtype(u)
+    u_shp = F.shape(u)
+    out_shp = (gidx.number_of_edges(0), ) + u_shp[1:]
+    out = F.zeros(out_shp, dtype, ctx)
+    # _CAPI_DGLKernelGATHERMM(gidx,
+    #                         to_dgl_nd(u),
+    #                         [to_dgl_nd(w_i) for w_i in list_w],
+    #                         to_dgl_nd_for_write(out))
+    return out
+
+
 def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
     r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface. It
     takes the result of :attr:`op` on source node feature and destination node
