@@ -29,6 +29,7 @@ from .knowledge_graph import FB15k237Dataset, FB15kDataset, WN18Dataset
 from .rdf import AIFBDataset, MUTAGDataset, BGSDataset, AMDataset
 from .fraud import FraudDataset, FraudYelpDataset, FraudAmazonDataset
 from .fakenews import FakeNewsDataset
+from .csv_dataset import DGLCSVDataset
 
 
 def register_data_args(parser):
