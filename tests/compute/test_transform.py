@@ -2151,5 +2151,18 @@ def test_module_knn_graph(idtype):
     assert new_g.num_edges() == g.num_edges()
     assert F.allclose(g.ndata['h'], new_g.ndata['h'])
 
+@parametrize_dtype
+def test_module_compose(idtype):
+    g = dgl.graph(([0, 0], [1, 1]), idtype=idtype, device=F.ctx())
+    transform = dgl.Compose([dgl.ToSimple(), dgl.AddReverse()])
+    new_g = transform(g)
+    assert new_g.device == g.device
+    assert new_g.idtype == g.idtype
+    assert new_g.num_edges() == 2
+
+    src, dst = new_g.edges()
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 1), (1, 0)}
+
 if __name__ == '__main__':
     test_partition_with_halo()

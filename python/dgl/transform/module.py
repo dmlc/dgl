@@ -734,6 +734,8 @@ class Compose(BaseTransform):
     >>> g = dgl.graph(([0, 0], [1, 1]))
     >>> transform = T.Compose([T.ToSimple(), T.AddReverse()])
     >>> new_g = transform(g)
+    >>> print(new_g.edges())
+    (tensor([0, 1]), tensor([1, 0]))
     """
     def __init__(self, transforms):
         self.transforms = transforms
