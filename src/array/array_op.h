@@ -192,8 +192,16 @@ COOMatrix CSRRowWiseSamplingBiased(
     int64_t num_samples,
     NDArray tag_offset,
     FloatArray bias,
-    bool replace
-);
+    bool replace);
+
+template <DLDeviceType XPU, typename IdType>
+std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling(
+    const CSRMatrix& csr,
+    int64_t num_samples,
+    int num_trials,
+    bool exclude_self_loops,
+    bool replace,
+    double redundancy);
 
 // Union CSRMatrixes
 template <DLDeviceType XPU, typename IdType>
