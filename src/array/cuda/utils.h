@@ -7,6 +7,8 @@
 #define DGL_ARRAY_CUDA_UTILS_H_
 
 #include <dmlc/logging.h>
+#include <dgl/runtime/device_api.h>
+#include <dgl/runtime/ndarray.h>
 #include <dlpack/dlpack.h>
 #include "../../runtime/cuda/cuda_common.h"
 
@@ -170,6 +172,24 @@ __global__ void _LinearSearchKernel(
       out[tx] = weights ? weights[v] : v;
     tx += stride_x;
   }
+}
+
+template <typename DType>
+inline DType GetCUDAScalar(
+    runtime::DeviceAPI* device_api,
+    DLContext ctx,
+    const DType* cuda_ptr,
+    cudaStream_t stream) {
+  DType result;
+  device_api->CopyDataFromTo(
+      cuda_ptr, 0,
+      &result, 0,
+      sizeof(result),
+      ctx,
+      DLContext{kDLCPU, 0},
+      DLDataTypeTraits<DType>::dtype,
+      stream);
+  return result;
 }
 
 }  // namespace cuda
