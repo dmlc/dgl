@@ -65,11 +65,11 @@ def load_yaml_with_sanity_check(yaml_file):
         ntypes = [meta.ntype for meta in meta_yaml.node_data]
         if len(ntypes) > len(set(ntypes)):
             raise DGLError(
-                "Duplicate node types for different CSV files which is required to have unique node type. ntypes: {}.".format(ntypes))
+                "Each node CSV file must have a unique node type name, but found duplicate node type: {}.".format(ntypes))
         etypes = [tuple(meta.etype) for meta in meta_yaml.edge_data]
         if len(etypes) > len(set(etypes)):
             raise DGLError(
-                "Duplicate edge types for different CSV files which is required to have unique edge type. etypes: {}.".format(etypes))
+                "Each edge CSV file must have a unique edge type name, but found duplicate edge type: {}.".format(etypes))
         return meta_yaml
 
 
@@ -131,8 +131,6 @@ class NodeData(BaseData):
         for n_data in node_data:
             graph_ids = np.unique(n_data.graph_id)
             for graph_id in graph_ids:
-                if graph_id in node_dict and n_data.type in node_dict[graph_id]:
-                    raise DGLError(f"Duplicate node type[{n_data.type}] for same graph[{graph_id}], please place the same node_type for same graph into single NodeData.")
                 idx = n_data.graph_id == graph_id
                 ids = n_data.id[idx]
                 u_ids, u_indices = np.unique(ids, return_index=True)
@@ -305,23 +303,23 @@ class DGLCSVDataset(DGLDataset):
     ----------
     data_path : str
         Directory which contains 'meta.yaml' and CSV files
-    force_reload : bool
+    force_reload : bool, optional
         Whether to reload the dataset. Default: False
-    verbose: bool
+    verbose: bool, optional
         Whether to print out progress information. Default: True.
-    node_data_parser : dict
+    node_data_parser : dict[str, callable], optional
         A dictionary used for node data parsing when loading from CSV files.
         The key is node type which specifies the header in CSV file and the
         value is a callable object which is used to parse corresponding
         column data. Default: None. If None, a default data parser is applied
         which load data directly and tries to convert list into array.
-    edge_data_parser : dict
+    edge_data_parser : dict[(str, str, str), callable], optional
         A dictionary used for edge data parsing when loading from CSV files.
         The key is edge type which specifies the header in CSV file and the
         value is a callable object which is used to parse corresponding
         column data. Default: None. If None, a default data parser is applied
         which load data directly and tries to convert list into array.
-    graph_data_parser : callable
+    graph_data_parser : callable, optional
         A callable object which is used to parse corresponding column graph
         data. Default: None. If None, a default data parser is applied
         which load data directly and tries to convert list into array.
@@ -334,14 +332,7 @@ class DGLCSVDataset(DGLDataset):
         any available graph-level data such as graph-level feature, labels.
 
     Examples
-    --------
-    Single heterograph dataset
-    >>> csv_dataset = data.DGLCSVDataset(test_dir)
-    >>> g = csv_dataset[0]
-
-    Multiple graphs dataset
-    >>> csv_dataset = data.DGLCSVDataset(test_dir)
-    >>> g, label = csv_dataset[0]
+    [TODO]: link to a detailed web page.
     """
     META_YAML_NAME = 'meta.yaml'
 
