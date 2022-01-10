@@ -890,6 +890,36 @@ def test_sample_neighbors_exclude_edges_homoG(dtype):
 
     assert not np.any(F.asnumpy(sg.has_edges_between(excluded_nodes_U,excluded_nodes_V)))
 
+@pytest.mark.parametrize('dtype', ['int32', 'int64'])
+def test_global_uniform_negative_sampling(dtype):
+    g = dgl.graph((np.random.randint(0, 20, (300,)), np.random.randint(0, 20, (300,)))).to(F.ctx())
+    src, dst = dgl.sampling.global_uniform_negative_sampling(g, 20, False, True)
+    assert not F.asnumpy(g.has_edges_between(src, dst)).any()
+
+    src, dst = dgl.sampling.global_uniform_negative_sampling(g, 20, False, False)
+    assert not F.asnumpy(g.has_edges_between(src, dst)).any()
+    src = F.asnumpy(src)
+    dst = F.asnumpy(dst)
+    s = set(zip(src.tolist(), dst.tolist()))
+    assert len(s) == len(src)
+
+    g = dgl.graph(([0], [1])).to(F.ctx())
+    src, dst = dgl.sampling.global_uniform_negative_sampling(g, 20, True, False, redundancy=10)
+    src = F.asnumpy(src)
+    dst = F.asnumpy(dst)
+    # should have either no element or (1, 0)
+    assert len(src) < 2
+    assert len(dst) < 2
+    if len(src) == 1:
+        assert src[0] == 1
+        assert dst[0] == 0
+
+    g = dgl.heterograph({
+        ('A', 'AB', 'B'): (np.random.randint(0, 20, (300,)), np.random.randint(0, 40, (300,))),
+        ('B', 'BA', 'A'): (np.random.randint(0, 40, (200,)), np.random.randint(0, 20, (200,)))}).to(F.ctx())
+    src, dst = dgl.sampling.global_uniform_negative_sampling(g, 20, False, etype='AB')
+    assert not F.asnumpy(g.has_edges_between(src, dst, etype='AB')).any()
+
 
 if __name__ == '__main__':
     from itertools import product
@@ -906,3 +936,5 @@ if __name__ == '__main__':
     test_sample_neighbors_biased_bipartite()
     test_sample_neighbors_exclude_edges_heteroG('int32')
     test_sample_neighbors_exclude_edges_homoG('int32')
+    test_global_uniform_negative_sampling('int32')
+    test_global_uniform_negative_sampling('int64')

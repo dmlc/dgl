@@ -254,7 +254,7 @@ def _knn_graph_blas(x, k, dist='euclidean'):
 
     ctx = F.context(x)
     dist = pairwise_squared_distance(x)
-    k_indices = F.argtopk(dist, k, 2, descending=False)
+    k_indices = F.astype(F.argtopk(dist, k, 2, descending=False), F.int64)
     # index offset for each sample
     offset = F.arange(0, n_samples, ctx=ctx) * n_points
     offset = F.unsqueeze(offset, 1)
