@@ -27,7 +27,9 @@ __all__ = [
     'ToSimple',
     'LineGraph',
     'KHopGraph',
-    'AddMetaPaths'
+    'AddMetaPaths',
+    'KNNGraph',
+    'Compose'
 ]
 
 class BaseTransform:
@@ -583,6 +585,21 @@ class AddMetaPaths(BaseTransform):
 
     >>> import dgl
     >>> from dgl import AddMetaPaths
+
+    >>> transform = AddMetaPaths({
+    ...     'accepted': [('person', 'author', 'paper'), ('paper', 'accepted', 'venue')],
+    ...     'rejected': [('person', 'author', 'paper'), ('paper', 'rejected', 'venue')]
+    ... })
+    >>> g = dgl.heterograph({
+    ...     ('person', 'author', 'paper'): ([0, 0, 1], [1, 2, 2]),
+    ...     ('paper', 'accepted', 'venue'): ([1], [0]),
+    ...     ('paper', 'rejected', 'venue'): ([2], [1])
+    ... })
+    >>> new_g = transform(g)
+    >>> print(new_g.edges(etype=('person', 'accepted', 'venue')))
+    (tensor([0]), tensor([0]))
+    >>> print(new_g.edges(etype=('person', 'rejected', 'venue')))
+    (tensor([0, 1]), tensor([1, 1]))
     """
     def __init__(self, metapaths, keep_orig_edges=True):
         self.metapaths = metapaths
@@ -606,19 +623,126 @@ class AddMetaPaths(BaseTransform):
 
         return new_g
 
-"""
 class KNNGraph(BaseTransform):
-    raise NotImplementedError
+    r"""
+
+    Description
+    -----------
+    Construct a graph from a set of points according to k-nearest-neighbor (KNN)
+    and return.
+
+    The function transforms the coordinates/features of a point set
+    into a directed homogeneous graph. The coordinates of the point
+    set is specified as a matrix whose rows correspond to points and
+    columns correspond to coordinate/feature dimensions.
+
+    The nodes of the returned graph correspond to the points, where the predecessors
+    of each point are its k-nearest neighbors measured by the chosen distance.
+
+    Parameters
+    ----------
+    ndata_name : str
+        The ndata name to store the node features for KNN computation.
+    k : int
+        The number of nearest neighbors per node.
+    algorithm : str, optional
+        Algorithm used to compute the k-nearest neighbors.
+
+        * 'bruteforce-blas' will first compute the distance matrix
+          using BLAS matrix multiplication operation provided by
+          backend frameworks. Then use topk algorithm to get
+          k-nearest neighbors. This method is fast when the point
+          set is small but has :math:`O(N^2)` memory complexity where
+          :math:`N` is the number of points.
+
+        * 'bruteforce' will compute distances pair by pair and
+          directly select the k-nearest neighbors during distance
+          computation. This method is slower than 'bruteforce-blas'
+          but has less memory overhead (i.e., :math:`O(Nk)` where :math:`N`
+          is the number of points, :math:`k` is the number of nearest
+          neighbors per node) since we do not need to store all distances.
+
+        * 'bruteforce-sharemem' (CUDA only) is similar to 'bruteforce'
+          but use shared memory in CUDA devices for buffer. This method is
+          faster than 'bruteforce' when the dimension of input points
+          is not large. This method is only available on CUDA device.
+
+        * 'kd-tree' will use the kd-tree algorithm (CPU only).
+          This method is suitable for low-dimensional data (e.g. 3D
+          point clouds)
+
+        * 'nn-descent' is an approximate approach from paper
+          `Efficient k-nearest neighbor graph construction for generic similarity
+          measures <https://www.cs.princeton.edu/cass/papers/www11.pdf>`_. This method
+          will search for nearest neighbor candidates in "neighbors' neighbors".
+
+        (default: 'bruteforce-blas')
+    dist : str, optional
+        The distance metric used to compute distance between points. It can be the following
+        metrics:
+        * 'euclidean': Use Euclidean distance (L2 norm) :math:`\sqrt{\sum_{i} (x_{i} - y_{i})^{2}}`.
+        * 'cosine': Use cosine distance.
+        (default: 'euclidean')
+
+    Example
+    -------
+
+    The following examples use PyTorch backend.
+
+    >>> import dgl
+    >>> import torch
+    >>> from dgl import KNNGraph
+
+    >>> g = dgl.rand_graph(5, 20)
+    >>> g.ndata['h'] = torch.randn(g.num_nodes(), 3)
+    >>> transform = KNNGraph(ndata_name='h', k=3)
+    >>> new_g = transform(g)
+    """
+    def __init__(self, ndata_name, k, algorithm='bruteforce-blas', dist='euclidean'):
+        self.ndata_name = ndata_name
+        self.k = k
+        self.algorithm = algorithm
+        self.dist = dist
+
+    def __call__(self, g):
+        knn_g = functional.knn_graph(g.ndata[self.ndata_name],
+                                     self.k, self.algorithm, self.dist)
+        for key, feat in g.ndata.items():
+            knn_g.ndata[key] = feat
+
+        return knn_g
 
 class Compose(BaseTransform):
-    raise NotImplementedError
+    r"""
 
-class GDC(BaseTransform):
-    raise NotImplementedError
+    Description
+    -----------
+    Create a transform composed of multiple transforms in sequence.
 
-class PPR(BaseTransform):
-    raise NotImplementedError
+    Parameters
+    ----------
+    transforms : list of Callable
+        A list of transform objects to apply in order. A transform object should inherit
+        :class:`~dgl.BaseTransform` and implement :func:`~dgl.BaseTransform.__call__`.
 
-class MDK(BaseTransform):
-    raise NotImplementedError
-"""
+    Example
+    -------
+
+    >>> import dgl
+    >>> from dgl import transform as T
+
+    >>> g = dgl.graph(([0, 0], [1, 1]))
+    >>> transform = T.Compose([T.ToSimple(), T.AddReverse()])
+    >>> new_g = transform(g)
+    """
+    def __init__(self, transforms):
+        self.transforms = transforms
+
+    def __call__(self, g):
+        for transform in self.transforms:
+            g = transform(g)
+        return g
+
+    def __repr__(self):
+        args = [f'  {transform}' for transform in self.transforms]
+        return '{}([\n{}\n])'.format(self.__class__.__name__, ',\n'.join(args))

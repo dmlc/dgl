@@ -2083,5 +2083,73 @@ def test_module_khop_graph(idtype):
     eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
     assert eset == {(0, 2)}
 
+@parametrize_dtype
+def test_module_add_metapaths(idtype):
+    g = dgl.heterograph({
+        ('person', 'author', 'paper'): ([0, 0, 1], [1, 2, 2]),
+        ('paper', 'accepted', 'venue'): ([1], [0]),
+        ('paper', 'rejected', 'venue'): ([2], [1])
+    }, idtype=idtype, device=F.ctx())
+    g.nodes['venue'].data['h'] = F.randn((g.num_nodes('venue'), 2))
+    g.edges['author'].data['h'] = F.randn((g.num_edges('author'), 3))
+
+    # Case1: keep_orig_edges is True
+    metapaths = {
+        'accepted': [('person', 'author', 'paper'), ('paper', 'accepted', 'venue')],
+        'rejected': [('person', 'author', 'paper'), ('paper', 'rejected', 'venue')]
+    }
+    transform = dgl.AddMetaPaths(metapaths)
+    new_g = transform(g)
+    assert new_g.device == g.device
+    assert new_g.idtype == g.idtype
+    assert new_g.ntypes == g.ntypes
+    assert new_g.canonical_etypes == g.canonical_etypes
+    for nty in new_g.ntypes:
+        assert new_g.num_nodes(nty) == g.num_nodes(nty)
+    for ety in new_g.canonical_etypes:
+        assert new_g.num_edges(ety) == g.num_edges(ety)
+    assert F.allclose(g.nodes['venue'].data['h'], new_g.nodes['venue'].data['h'])
+    assert F.allclose(g.edges['author'].data['h'], new_g.edges['author'].data['h'])
+
+    src, dst = new_g.edges(etype=('person', 'accepted', 'paper'))
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 0)}
+
+    src, dst = new_g.edges(etype=('person', 'rejected', 'paper'))
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 1), (1, 1)}
+
+    # Case2: keep_orig_edges is False
+    transform = dgl.AddMetaPaths(metapaths, keep_orig_edges=False)
+    new_g = transform(g)
+    assert new_g.device == g.device
+    assert new_g.idtype == g.idtype
+    assert new_g.ntypes == g.ntypes
+    for nty in new_g.ntypes:
+        assert new_g.num_nodes(nty) == g.num_nodes(nty)
+    assert F.allclose(g.nodes['venue'].data['h'], new_g.nodes['venue'].data['h'])
+
+    src, dst = new_g.edges(etype=('person', 'accepted', 'paper'))
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 0)}
+
+    src, dst = new_g.edges(etype=('person', 'rejected', 'paper'))
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 1), (1, 1)}
+
+@parametrize_dtype
+def test_module_knn_graph(idtype):
+    g = dgl.graph(([], []), num_nodes=5, idtype=idtype, device=F.ctx())
+    g.ndata['h'] = F.randn((g.num_nodes(), 3))
+    transform = dgl.KNNGraph(ndata_name='h', k=3)
+    new_g = transform(g)
+    assert new_g.device == g.device
+    assert new_g.idtype == g.idtype
+    assert new_g.ntypes == g.ntypes
+    assert new_g.canonical_etypes == g.canonical_etypes
+    assert new_g.num_nodes() == g.num_nodes()
+    assert new_g.num_edges() == g.num_edges()
+    assert F.allclose(g.ndata['h'], new_g.ndata['h'])
+
 if __name__ == '__main__':
     test_partition_with_halo()

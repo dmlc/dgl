@@ -93,7 +93,7 @@ def knn_graph(x, k, algorithm='bruteforce-blas', dist='euclidean'):
     columns correspond to coordinate/feature dimensions.
 
     The nodes of the returned graph correspond to the points, where the predecessors
-    of each point are its k-nearest neighbors measured by the Euclidean distance.
+    of each point are its k-nearest neighbors measured by the chosen distance.
 
     If :attr:`x` is a 3D tensor, then each submatrix will be transformed
     into a separate graph. DGL then composes the graphs into a large

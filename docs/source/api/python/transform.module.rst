@@ -53,3 +53,9 @@ AddMetaPaths
 
 .. autoclass:: dgl.transform.module.AddMetaPaths
     :show-inheritance:
+
+KNNGraph
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.transform.module.KNNGraph
+    :show-inheritance:
