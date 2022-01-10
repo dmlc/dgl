@@ -113,6 +113,14 @@ void SDDMMCooHetero(const std::string& op,
               const std::vector<dgl_type_t>& rhs_eid);
 
 /*!
+ * \brief gather mm.
+ */
+template <int XPU, int bits>
+void gatherMM(NDArray H,
+          const std::vector<NDArray>& W_vec,
+          NDArray out);
+
+/*!
  * \brief Segment reduce.
  */
 template <int XPU, typename IdType, int bits>

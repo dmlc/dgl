@@ -51,4 +51,4 @@ with F.record_grad():
 	# g.apply_edges(edge_udf, etype=('user', 'plays', 'game'))
 
 
-print(g.edges[('user', 'plays', 'game')].data['h'])
+# print(g.edges[('user', 'plays', 'game')].data['h'])

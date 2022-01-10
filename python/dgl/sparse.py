@@ -335,10 +335,9 @@ def _matmul_homogenized(gidx, u, list_w):
     u_shp = F.shape(u)
     out_shp = (gidx.number_of_edges(0), ) + u_shp[1:]
     out = F.zeros(out_shp, dtype, ctx)
-    # _CAPI_DGLKernelGATHERMM(gidx,
-    #                         to_dgl_nd(u),
-    #                         [to_dgl_nd(w_i) for w_i in list_w],
-    #                         to_dgl_nd_for_write(out))
+    _CAPI_DGLKernelGATHERMM(to_dgl_nd(u),
+                            [to_dgl_nd(w_i) for w_i in list_w],
+                            to_dgl_nd_for_write(out))
     return out
 
 
