@@ -112,10 +112,10 @@ IdArray HStack(IdArray lhs, IdArray rhs) {
 
 NDArray IndexSelect(NDArray array, IdArray index) {
   NDArray ret;
-  CHECK_SAME_CONTEXT(array, index);
+  CHECK_VALID_CONTEXT(array, index);
   CHECK_GE(array->ndim, 1) << "Only support array with at least 1 dimension";
   CHECK_EQ(index->ndim, 1) << "Index array must be an 1D array.";
-  ATEN_XPU_SWITCH_CUDA(array->ctx.device_type, XPU, "IndexSelect", {
+  ATEN_XPU_SWITCH_CUDA(index->ctx.device_type, XPU, "IndexSelect", {
     ATEN_DTYPE_SWITCH(array->dtype, DType, "values", {
       ATEN_ID_TYPE_SWITCH(index->dtype, IdType, {
         ret = impl::IndexSelect<XPU, DType, IdType>(array, index);
@@ -371,9 +371,11 @@ int64_t CSRGetRowNNZ(CSRMatrix csr, int64_t row) {
 NDArray CSRGetRowNNZ(CSRMatrix csr, NDArray row) {
   NDArray ret;
   CHECK_SAME_DTYPE(csr.indices, row);
-  CHECK_SAME_CONTEXT(csr.indices, row);
-  ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRGetRowNNZ", {
-    ret = impl::CSRGetRowNNZ<XPU, IdType>(csr, row);
+  CHECK_VALID_CONTEXT(csr.indices, row);
+  ATEN_XPU_SWITCH_CUDA(row->ctx.device_type, XPU, "CSRGetRowNNZ", {
+    ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {
+      ret = impl::CSRGetRowNNZ<XPU, IdType>(csr, row);
+    });
   });
   return ret;
 }
@@ -553,9 +555,12 @@ CSRMatrix CSRRemove(CSRMatrix csr, IdArray entries) {
 COOMatrix CSRRowWiseSampling(
     CSRMatrix mat, IdArray rows, int64_t num_samples, FloatArray prob, bool replace) {
   COOMatrix ret;
+  CHECK_VALID_CONTEXT(mat.indptr, rows);
   if (IsNullArray(prob)) {
-    ATEN_CSR_SWITCH_CUDA_UVA(mat, XPU, IdType, "CSRRowWiseSampling", {
-      ret = impl::CSRRowWiseSamplingUniform<XPU, IdType>(mat, rows, num_samples, replace);
+    ATEN_XPU_SWITCH_CUDA(rows->ctx.device_type, XPU, "CSRRowWiseSampling", {
+      ATEN_ID_TYPE_SWITCH(mat.indptr->dtype, IdType, {
+        ret = impl::CSRRowWiseSamplingUniform<XPU, IdType>(mat, rows, num_samples, replace);
+      });
     });
   } else {
     ATEN_CSR_SWITCH(mat, XPU, IdType, "CSRRowWiseSampling", {

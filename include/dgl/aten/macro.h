@@ -265,13 +265,6 @@
     });                                                            \
   });
 
-#define ATEN_CSR_SWITCH_CUDA_UVA(csr, XPU, IdType, op, ...)            \
-  ATEN_XPU_SWITCH_CUDA_UVA((csr).indptr->ctx.device_type, XPU, op, {   \
-    ATEN_ID_TYPE_SWITCH((csr).indptr->dtype, IdType, {             \
-      {__VA_ARGS__}                                                \
-    });                                                            \
-  });
-
 // Macro to dispatch according to device context and index type.
 #define ATEN_COO_SWITCH_CUDA(coo, XPU, IdType, op, ...)               \
   ATEN_XPU_SWITCH_CUDA((coo).row->ctx.device_type, XPU, op, {    \
@@ -325,6 +318,12 @@
     << "Expected " << (#VAR2) << " to have the same device context as " << (#VAR1) << "("   \
     << (VAR1)->ctx << ")"                                                                   \
     << ". But got " << (VAR2)->ctx << ".";
+
+#define CHECK_VALID_CONTEXT(VAR1, VAR2)                                                     \
+  CHECK(((VAR1)->ctx == (VAR2)->ctx) || ((VAR1)->ctx.device_type == kDLCPUPinned))          \
+    << "Expected " << (#VAR2) << "(" << (VAR2)->ctx << ")" << " to have the same device "   \
+    << "context as " << (#VAR1) << "(" << (VAR1)->ctx << "). "                              \
+    << "Or " << (#VAR1) << "(" << (VAR1)->ctx << ")" << " is pinned";
 
 #define CHECK_NO_OVERFLOW(dtype, val)                                                  \
   do {                                                                                 \

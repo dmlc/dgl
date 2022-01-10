@@ -254,8 +254,9 @@ COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat,
                                     IdArray rows,
                                     const int64_t num_picks,
                                     const bool replace) {
+  if(mat.indptr->ctx.device_type != kDLGPU && mat.indptr->ctx.device_type != kDLCPUPinned)
+    LOG(FATAL) << "Graph must be on the GPU or pinned memory to enable GPU sampling.";
   const auto& ctx = rows->ctx;
-  CHECK_EQ(ctx.device_type, kDLGPU);
   auto device = runtime::DeviceAPI::Get(ctx);
 
   // TODO(dlasalle): Once the device api supports getting the stream from the
@@ -381,10 +382,6 @@ COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat,
 template COOMatrix CSRRowWiseSamplingUniform<kDLGPU, int32_t>(
     CSRMatrix, IdArray, int64_t, bool);
 template COOMatrix CSRRowWiseSamplingUniform<kDLGPU, int64_t>(
-    CSRMatrix, IdArray, int64_t, bool);
-template COOMatrix CSRRowWiseSamplingUniform<kDLCPUPinned, int32_t>(
-    CSRMatrix, IdArray, int64_t, bool);
-template COOMatrix CSRRowWiseSamplingUniform<kDLCPUPinned, int64_t>(
     CSRMatrix, IdArray, int64_t, bool);
 
 }  // namespace impl
