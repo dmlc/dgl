@@ -98,7 +98,7 @@ void TPReceiver::Finalize() {
 bool TPReceiver::Wait(const std::string &addr, int num_sender, bool blocking) {
   if (listener_) {
     LOG(WARNING) << "TPReceiver::Wait() has been called already. Ignoring...";
-    return false;
+    return true;
   }
   LOG(INFO) << "TPReceiver starts to wait on [" << addr << "].";
   listener_ = context->listen({addr});
@@ -115,8 +115,7 @@ void TPReceiver::OnAccepted(const Error &error, std::shared_ptr<Pipe> pipe) {
     if (error.isOfType<ListenerClosedError>()) {
       // Expected.
     } else {
-      LOG(WARNING) << "Unexpected error captured in TPReceiver::OnAccepted(): "
-                   << error.what();
+      LOG(WARNING) << "Unexpected error when accepting incoming pipe: " << error.what();
     }
     return;
   }
@@ -126,16 +125,15 @@ void TPReceiver::OnAccepted(const Error &error, std::shared_ptr<Pipe> pipe) {
     OnAccepted(error, pipe);
   });
 
+  // read the handshake message: "dglconnect"
   pipe->readDescriptor([pipe, this](const Error &error, Descriptor descriptor) {
     if (error) {
-      // expected, could happen if
-      LOG(WARNING)
-          << "Unexpected error captured when calling Pipe::readDescriptor(): "
-          << error.what();
+      LOG(WARNING) << "Unexpected error when reading from accepted pipe: " << error.what();
       return;
     }
     Allocation allocation;
     pipe->read(allocation, [](const Error &error) {});
+    CHECK(descriptor.metadata == "dglconnect") << "Invalid connect message.";
     pipes_[num_connected_] = pipe;
     ReceiveFromPipe(pipe, queue_);
     ++num_connected_;
