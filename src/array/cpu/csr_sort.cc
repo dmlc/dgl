@@ -18,19 +18,17 @@ template <DLDeviceType XPU, typename IdType>
 bool CSRIsSorted(CSRMatrix csr) {
   const IdType* indptr = csr.indptr.Ptr<IdType>();
   const IdType* indices = csr.indices.Ptr<IdType>();
-  bool ret = true;
-
-  for (int64_t row = 0; row < csr.num_rows; ++row) {
-    if (!ret)
-      continue;
-    for (IdType i = indptr[row] + 1; i < indptr[row + 1]; ++i) {
-      if (indices[i - 1] > indices[i]) {
-        ret = false;
-        break;
+  return runtime::parallel_reduce(0, csr.num_rows, 1, 1,
+    [indptr, indices](size_t b, size_t e, bool ident) {
+      for (size_t row = b; row < e; ++row) {
+        for (IdType i = indptr[row] + 1; i < indptr[row + 1]; ++i) {
+          if (indices[i - 1] > indices[i])
+            return false;
+        }
       }
-    }
-  }
-  return ret;
+      return ident;
+    },
+    [](bool a, bool b) { return a && b; });
 }
 
 template bool CSRIsSorted<kDLCPU, int64_t>(CSRMatrix csr);
@@ -45,6 +43,12 @@ void CSRSort_(CSRMatrix* csr) {
   const int64_t nnz = csr->indices->shape[0];
   const IdType* indptr_data = static_cast<IdType*>(csr->indptr->data);
   IdType* indices_data = static_cast<IdType*>(csr->indices->data);
+
+  if (CSRIsSorted(*csr)) {
+    csr->sorted = true;
+    return;
+  }
+
   if (!CSRHasData(*csr)) {
     csr->data = aten::Range(0, nnz, csr->indptr->dtype.bits, csr->indptr->ctx);
   }
