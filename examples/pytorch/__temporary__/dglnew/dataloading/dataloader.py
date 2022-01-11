@@ -12,6 +12,7 @@ from dgl.utils import (
 from dgl.frame import Column, Marker
 from .asyncio_wrapper import AsyncIO
 from ..storages import TensorStorage, FeatureStorage
+from .base import BlockSampler, EdgeWrapper, LinkWrapper
 
 class _TensorizedDatasetIter(object):
     def __init__(self, dataset, batch_size, drop_last, mapping_keys):

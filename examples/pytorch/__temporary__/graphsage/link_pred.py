@@ -39,6 +39,8 @@ graph, labels = dataset[0]
 graph.ndata['label'] = labels
 split_idx = dataset.get_idx_split()
 train_idx, valid_idx, test_idx = split_idx['train'], split_idx['valid'], split_idx['test']
+num_edges = graph.num_edges()
+train_eids = torch.arange(num_edges)
 
 graph.create_formats_()
 # We actually won't have this statement in formal examples - this is just to ensure that
@@ -50,20 +52,20 @@ sampler.add_input('feat')
 sampler.add_output('label')
 dataloader = dglnew.dataloading.EdgeDataLoader(
         graph,
-        torch.arange(graph.num_edges()),
+        train_eids,
         sampler,
         device='cuda',
         batch_size=1000,
         shuffle=True,
         drop_last=False,
         pin_memory=True,
-        num_workers=4,
+        num_workers=0,
         use_asyncio=False,
-        persistent_workers=True,
+        #persistent_workers=True,
         use_prefetch_thread=True,       # TBD: could probably remove this argument
         exclude='reverse_id',
-        reverse_eids=torch.arange(graph.num_edges()) ^ 1,
-        negative_sampler=dgl.dataloading.negative_sampler.GlobalUniform(5))
+        reverse_eids=torch.arange(num_edges) ^ 1,
+        negative_sampler=dgl.dataloading.negative_sampler.Uniform(5))
 
 model = SAGE(graph.ndata['feat'].shape[1], 256, dataset.num_classes).cuda()
 opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)

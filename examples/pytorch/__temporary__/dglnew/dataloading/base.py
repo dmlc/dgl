@@ -63,19 +63,19 @@ class BlockSampler(object):
 
     def add_input(self, name):
         assert not self._frozen, \
-            "Cannot call this method after the dataloader has been created.  "
+            "Cannot call this method after the dataloader has been created.  " \
             "Please call this method before the creation of dataloader."
         self.inputs.append(name)
 
     def add_output(self, name):
         assert not self._frozen, \
-            "Cannot call this method after the dataloader has been created.  "
+            "Cannot call this method after the dataloader has been created.  " \
             "Please call this method before the creation of dataloader."
         self.outputs.append(name)
 
     def add_edata(self, edata):
         assert not self._frozen, \
-            "Cannot call this method after the dataloader has been created.  "
+            "Cannot call this method after the dataloader has been created.  " \
             "Please call this method before the creation of dataloader."
         self.edata.append(name)
 
@@ -221,22 +221,23 @@ class EdgeWrapper(object):
 
     def _freeze(self):
         self._frozen = True
+        self.neighbor_sampler._freeze()
 
     def add_input(self, name):
         assert not self._frozen, \
-            "Cannot call this method after the dataloader has been created.  "
+            "Cannot call this method after the dataloader has been created.  " \
             "Please call this method before the creation of dataloader."
         self.inputs.append(name)
 
     def add_output(self, name):
         assert not self._frozen, \
-            "Cannot call this method after the dataloader has been created.  "
+            "Cannot call this method after the dataloader has been created.  " \
             "Please call this method before the creation of dataloader."
         self.outputs.append(name)
 
     def add_edata(self, edata):
         assert not self._frozen, \
-            "Cannot call this method after the dataloader has been created.  "
+            "Cannot call this method after the dataloader has been created.  " \
             "Please call this method before the creation of dataloader."
         self.edata.append(name)
 
@@ -310,15 +311,16 @@ class LinkWrapper(object):
 
     def _freeze(self):
         self._frozen = True
+        self.neighbor_sampler._freeze()
 
     def add_input(self, name):
         assert not self._frozen, \
-            "Cannot call this method after the dataloader has been created.  "
+            "Cannot call this method after the dataloader has been created.  " \
             "Please call this method before the creation of dataloader."
         self.inputs.append(name)
 
     def add_edata(self, edata):
         assert not self._frozen, \
-            "Cannot call this method after the dataloader has been created.  "
+            "Cannot call this method after the dataloader has been created.  " \
             "Please call this method before the creation of dataloader."
         self.edata.append(name)
