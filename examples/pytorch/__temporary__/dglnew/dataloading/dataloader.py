@@ -364,7 +364,7 @@ class NodeDataLoader(torch.utils.data.DataLoader):
 
         super().__init__(
             self.dataset,
-            collate_fn=collate_wrapper(graph_sampler.sample, graph),
+            collate_fn=collate_wrapper(self.graph_sampler.sample, graph),
             batch_size=None,
             worker_init_fn=worker_init_fn,
             **kwargs)
@@ -417,7 +417,7 @@ class EdgeDataLoader(torch.utils.data.DataLoader):
 
         super().__init__(
             self.dataset,
-            collate_fn=collate_wrapper(graph_sampler.sample, graph),
+            collate_fn=collate_wrapper(self.graph_sampler.sample, graph),
             batch_size=None,
             worker_init_fn=worker_init_fn,
             **kwargs)
