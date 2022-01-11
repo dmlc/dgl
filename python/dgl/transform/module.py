@@ -32,6 +32,49 @@ __all__ = [
     'Compose'
 ]
 
+def update_graph_structure(g, data_dict, copy_edata=True):
+    r"""
+
+    Description
+    -----------
+    Update the structure of a graph.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The graph to update.
+    data_dict : graph data
+        The dictionary data for constructing a heterogeneous graph.
+    copy_edata : bool
+        If True, it will copy the edge features to the updated graph.
+
+    Returns
+    -------
+    DGLGraph
+        The updated graph.
+    """
+    device = g.device
+    idtype = g.idtype
+    num_nodes_dict = dict()
+
+    for ntype in g.ntypes:
+        num_nodes_dict[ntype] = g.num_nodes(ntype)
+
+    new_g = convert.heterograph(data_dict, num_nodes_dict=num_nodes_dict,
+                                idtype=idtype, device=device)
+
+    # Copy features
+    for ntype in g.ntypes:
+        for key, feat in g.nodes[ntype].data.items():
+            new_g.nodes[ntype].data[key] = feat
+
+    if copy_edata:
+        for c_etype in g.canonical_etypes:
+            for key, feat in g.edges[c_etype].data.items():
+                new_g.edges[c_etype].data[key] = feat
+
+    return new_g
+
 class BaseTransform:
     r"""
 
@@ -39,100 +82,11 @@ class BaseTransform:
     -----------
     An abstract class for writing transforms.
     """
-    def transform_symmetric_etype(self, c_etype, *args):
-        r"""
-
-        Description
-        -----------
-        Transform a relation graph whose source and destination node types are identical.
-
-        Parameters
-        ----------
-        c_etype : 3-tuple of str
-            A canonical edge type.
-        """
-        raise NotImplementedError
-
-    def transform_asymmetric_etype(self, c_etype, *args):
-        r"""
-
-        Description
-        -----------
-        Transform a relation graph whose source and destination node types are distinct.
-
-        Parameters
-        ----------
-        c_etype : 3-tuple of str
-            A canonical edge type.
-        """
-        raise NotImplementedError
-
-    def transform_etype(self, c_etype, *args):
-        r"""
-
-        Description
-        -----------
-        Transform a relation graph.
-
-        Parameters
-        ----------
-        c_etype : 3-tuple of str
-            A canonical edge type.
-        """
-        utype, _, vtype = c_etype
-        if utype == vtype:
-            return self.transform_symmetric_etype(c_etype, *args)
-        else:
-            return self.transform_asymmetric_etype(c_etype, *args)
-
-    def update_graph_structure(self, g, data_dict, copy_edata=True):
-        r"""
-
-        Description
-        -----------
-        Update the structure of a graph.
-
-        Parameters
-        ----------
-        g : DGLGraph
-            The graph to update.
-        data_dict : graph data
-            The dictionary data for constructing a heterogeneous graph.
-        copy_edata : bool
-            If True, it will copy the edge features to the updated graph.
-
-        Returns
-        -------
-        DGLGraph
-            The updated graph.
-        """
-        device = g.device
-        idtype = g.idtype
-        num_nodes_dict = dict()
-
-        for ntype in g.ntypes:
-            num_nodes_dict[ntype] = g.num_nodes(ntype)
-
-        new_g = convert.heterograph(data_dict, num_nodes_dict=num_nodes_dict,
-                                    idtype=idtype, device=device)
-
-        # Copy features
-        for ntype in g.ntypes:
-            for key, feat in g.nodes[ntype].data.items():
-                new_g.nodes[ntype].data[key] = feat
-
-        if copy_edata:
-            for c_etype in g.canonical_etypes:
-                for key, feat in g.edges[c_etype].data.items():
-                    new_g.edges[c_etype].data[key] = feat
-
-        return new_g
-
     def __call__(self, g):
         raise NotImplementedError
 
     def __repr__(self):
-        return '{}()'.format(self.__class__.__name__)
+        return self.__class__.__name__ + '()'
 
 class AddSelfLoop(BaseTransform):
     r"""
@@ -197,14 +151,14 @@ class AddSelfLoop(BaseTransform):
         self.remove_first = remove_first
         self.self_etypes = self_etypes
 
-    def transform_symmetric_etype(self, c_etype, g):
+    def transform_etype(self, c_etype, g):
+        utype, _, vtype = c_etype
+        if utype != vtype:
+            return g
+
         if self.remove_first:
             g = functional.remove_self_loop(g, etype=c_etype)
-        g = functional.add_self_loop(g, etype=c_etype)
-        return g
-
-    def transform_asymmetric_etype(self, c_etype, g):
-        return g
+        return functional.add_self_loop(g, etype=c_etype)
 
     def __call__(self, g):
         for c_etype in g.canonical_etypes:
@@ -224,7 +178,7 @@ class AddSelfLoop(BaseTransform):
             for c_etype in g.canonical_etypes:
                 data_dict[c_etype] = g.edges(etype=c_etype)
 
-            g = self.update_graph_structure(g, data_dict)
+            g = update_graph_structure(g, data_dict)
         return g
 
 class RemoveSelfLoop(BaseTransform):
@@ -263,10 +217,10 @@ class RemoveSelfLoop(BaseTransform):
     >>> print(new_g.edges(etype='follows'))
     (tensor([1]), tensor([2]))
     """
-    def transform_symmetric_etype(self, c_etype, g):
-        return functional.remove_self_loop(g, etype=c_etype)
-
-    def transform_asymmetric_etype(self, c_etype, g):
+    def transform_etype(self, c_etype, g):
+        utype, _, vtype = c_etype
+        if utype == vtype:
+            g = functional.remove_self_loop(g, etype=c_etype)
         return g
 
     def __call__(self, g):
@@ -347,9 +301,8 @@ class AddReverse(BaseTransform):
             src, dst = g.edges(etype=c_etype)
             src, dst = F.cat([src, dst], dim=0), F.cat([dst, src], dim=0)
             data_dict[c_etype] = (src, dst)
-            return data_dict
         else:
-            return self.transform_asymmetric_etype(c_etype, g, data_dict)
+            self.transform_asymmetric_etype(c_etype, g, data_dict)
 
     def transform_asymmetric_etype(self, c_etype, g, data_dict):
         utype, etype, vtype = c_etype
@@ -358,13 +311,19 @@ class AddReverse(BaseTransform):
             c_etype: (src, dst),
             (vtype, 'rev_{}'.format(etype), utype): (dst, src)
         })
-        return data_dict
+
+    def transform_etype(self, c_etype, g, data_dict):
+        utype, _, vtype = c_etype
+        if utype == vtype:
+            self.transform_symmetric_etype(c_etype, g, data_dict)
+        else:
+            self.transform_asymmetric_etype(c_etype, g, data_dict)
 
     def __call__(self, g):
         data_dict = dict()
         for c_etype in g.canonical_etypes:
-            data_dict = self.transform_etype(c_etype, g, data_dict)
-        new_g = self.update_graph_structure(g, data_dict, copy_edata=False)
+            self.transform_etype(c_etype, g, data_dict)
+        new_g = update_graph_structure(g, data_dict, copy_edata=False)
 
         # Copy and expand edata
         for c_etype in g.canonical_etypes:
@@ -617,9 +576,9 @@ class AddMetaPaths(BaseTransform):
         if self.keep_orig_edges:
             for c_etype in g.canonical_etypes:
                 data_dict[c_etype] = g.edges(etype=c_etype)
-            new_g = self.update_graph_structure(g, data_dict, copy_edata=True)
+            new_g = update_graph_structure(g, data_dict, copy_edata=True)
         else:
-            new_g = self.update_graph_structure(g, data_dict, copy_edata=False)
+            new_g = update_graph_structure(g, data_dict, copy_edata=False)
 
         return new_g
 
@@ -746,5 +705,5 @@ class Compose(BaseTransform):
         return g
 
     def __repr__(self):
-        args = [f'  {transform}' for transform in self.transforms]
-        return '{}([\n{}\n])'.format(self.__class__.__name__, ',\n'.join(args))
+        args = ['  ' + str(transform) for transform in self.transforms]
+        return self.__class__.__name__ + '([\n' + ',\n'.join(args) + '\n])'
