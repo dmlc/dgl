@@ -63,7 +63,7 @@ DGL의 :class:`~dgl.dataloading.pytorch.EdgeDataLoader` 는 링크 예측를 위
 모델을 미니-배치 학습에 맞게 만들기
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-:ref:`guide-training-link-prediction` 에서 설명한 것처럼, 링크 예측은 (postive 예제인) 에지의 점수와 존재하지 않는 에지(즉, negative 예제)의 점수를 비교하는 것을 통해서 학습될 수 있다. 에지들의 점수를 계산하기 위해서, 에지 분류/리그레션에서 사용했던 노드 representation 계산 모델을 재사용한다.
+:ref:`guide_ko-training-link-prediction` 에서 설명한 것처럼, 링크 예측은 (positive 예제인) 에지의 점수와 존재하지 않는 에지(즉, negative 예제)의 점수를 비교하는 것을 통해서 학습될 수 있다. 에지들의 점수를 계산하기 위해서, 에지 분류/리그레션에서 사용했던 노드 representation 계산 모델을 재사용한다.
 
 .. code:: python
 

@@ -17,7 +17,7 @@ GPU를 사용해서 GNN을 학습하는데 메모리와 걸리는 시간을 줄�
 오프라인 추론 구현하기
 ~~~~~~~~~~~~~~~~
 
-6.1 :ref:`guide-minibatch-node-classification-model` 에서 다룬 2-레이어 GCN을 생각해 보자. 오프라인 추론을 구현하는 방법은 여전히 :class:`~dgl.dataloading.neighbor.MultiLayerFullNeighborSampler` 를 사용하지만, 한번에 하나의 레이어에 대한 샘플링을 수행한다. 하나의 레이어에 대한 계산은 메시지들어 어떻게 aggregate되고 합쳐지는지에 의존하기 때문에 오프라인 추론은 GNN 모듈의 메소드로 구현된다는 점을 주목하자.
+6.1 :ref:`guide_ko-minibatch-node-classification-model` 에서 다룬 2-레이어 GCN을 생각해 보자. 오프라인 추론을 구현하는 방법은 여전히 :class:`~dgl.dataloading.neighbor.MultiLayerFullNeighborSampler` 를 사용하지만, 한번에 하나의 레이어에 대한 샘플링을 수행한다. 하나의 레이어에 대한 계산은 메시지들어 어떻게 aggregate되고 합쳐지는지에 의존하기 때문에 오프라인 추론은 GNN 모듈의 메소드로 구현된다는 점을 주목하자.
 
 .. code:: python
 
