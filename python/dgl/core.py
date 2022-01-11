@@ -1,8 +1,9 @@
 """Implementation for core graph computation."""
 # pylint: disable=not-callable
 import numpy as np
+import torch as th
 
-from .base import DGLError, is_all, NID, EID, ALL, dgl_warning
+from .base import DGLError, is_all, NID, EID, ALL, dgl_warning, ETYPE
 from . import backend as F
 from . import function as fn
 from .frame import Frame
@@ -84,15 +85,12 @@ def invoke_gather_mm(graph, eid, etype, func, wdict, *, orig_eid=None):
     ebatch = EdgeBatch(graph, eid if orig_eid is None else orig_eid,
                        etype, srcdata, edata, dstdata)
     h = ebatch.src['h']
-    w_list = wdict
+    w = wdict.reshape(wdict.shape[0] * wdict.shape[1], wdict.shape[2])
+    _, E_etypes = th.unique(graph.edata[ETYPE], return_counts=True)
 
-    # w_list = [None] * graph._graph.number_of_etypes()
-    # for etype in graph.canonical_etypes:
-    #     etid = graph.get_etype_id(etype)
-    #     w_list[etid] = wdict[etype]
-    _matmul_homogenized(graph._graph, h, w_list)
+    output = _matmul_homogenized(graph._graph, E_etypes, h, w)
 
-    return func(ebatch)
+    return output
 
 def invoke_edge_udf(graph, eid, etype, func, *, orig_eid=None):
     """Invoke user-defined edge function on the given edges.

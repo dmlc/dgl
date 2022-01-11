@@ -115,9 +115,10 @@ void SDDMMCooHetero(const std::string& op,
 /*!
  * \brief gather mm.
  */
-template <int XPU, int bits>
-void gatherMM(NDArray H,
-          const std::vector<NDArray>& W_vec,
+template <int XPU, typename IdType, int bits>
+void gatherMM(const NDArray E_etype,
+          const NDArray H,
+          const NDArray W,
           NDArray out);
 
 /*!

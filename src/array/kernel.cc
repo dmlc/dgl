@@ -54,17 +54,19 @@ void SpMM(const std::string& op, const std::string& reduce,
 
 
 /*! \brief Generalized Sparse Matrix-Matrix Multiplication. */
-void GatherMM(NDArray H,
-          const std::vector<NDArray>& W_vec,
+void GatherMM(const NDArray E_etype,
+          const NDArray H,
+          const NDArray W,
           NDArray out) {
+  // const auto& bcast = CalcBcastOff("mul", H, W);
 
   ATEN_XPU_SWITCH_CUDA(H->ctx.device_type, XPU, "GatherMM", {
-    // ATEN_ID_TYPE_SWITCH(H->dtype, IdType, {
-      ATEN_FLOAT_BITS_SWITCH(out->dtype, bits, "Feature data", {
-        gatherMM<XPU, bits>(H, W_vec, out);
+    ATEN_ID_TYPE_SWITCH(E_etype->dtype, IdType, {
+      ATEN_FLOAT_BITS_SWITCH(H->dtype, bits, "Feature data", {
+        gatherMM<XPU, IdType, bits>(E_etype, H, W, out);
       });
     });
-  // });
+  });
 }
 
 /*! \brief Generalized Sparse Matrix-Matrix Multiplication with hetero-graph support. */
@@ -365,10 +367,10 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSpMM")
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelGATHERMM")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    NDArray H = args[0];
-    List<Value> list_W = args[1];
-    NDArray O = args[2];
-    printf("Calling _CAPI_DGLKernelGATHERMM\n");
+    NDArray E_etype = args[0];
+    NDArray H = args[1];
+    NDArray W = args[2];
+    NDArray O = args[3];
     // CheckCtx(graph->Context(), {U, E, V, ArgU, ArgE},
     //     {"U_data", "E_data", "out", "Arg_U", "Arg_E"});
     // CheckContiguous({U, E, V, ArgU, ArgE},
@@ -382,8 +384,7 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelGATHERMM")
     //     {0, 1, 2, 2, 2},
     //     {U, E, V, ArgU, ArgE},
     //     {"U_data", "E_data", "out", "Arg_U", "Arg_E"});
-    std::vector<NDArray> W_vec = ListValueToVector<NDArray>(list_W);
-    GatherMM(H, W_vec, O);
+    GatherMM(E_etype, H, W, O);
   });
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSpMMHetero")
