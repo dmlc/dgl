@@ -32,6 +32,7 @@ __all__ = [
     'Compose'
 ]
 
+# pylint: disable=E0001
 class BaseTransform:
     r"""
 
