@@ -6,12 +6,12 @@ import threading
 import asyncio
 import torch
 from dgl import DGLGraph, NID, EID
-from dgl._ffi import streams as FS
 from dgl.utils import (
-    recursive_apply, ExceptionWrapper, async_recursive_apply, recursive_apply_pair)
+    recursive_apply, ExceptionWrapper, async_recursive_apply, recursive_apply_pair,
+    set_num_threads)
 from dgl.frame import Column, Marker
 from .asyncio_wrapper import AsyncIO
-from ..storages import TensorStorage
+from ..storages import TensorStorage, FeatureStorage
 
 class _TensorizedDatasetIter(object):
     def __init__(self, dataset, batch_size, drop_last, mapping_keys):
@@ -179,13 +179,20 @@ def _prefetch(batch, dataloader, stream):
 
 
 async def _await_or_return(x):
-    return await x if isinstance(x, Awaitable) else x
+    if isinstance(x, Awaitable):
+        return await x
+    elif isinstance(x, _PrefetchedGraphFeatures):
+        node_feats = await async_recursive_apply(x.node_feats, _await_or_return)
+        edge_feats = await async_recursive_apply(x.edge_feats, _await_or_return)
+        return _PrefetchedGraphFeatures(node_feats, edge_feats)
+    else:
+        return x
 
 
 async def _async_prefetch(batch, dataloader, stream):
     with torch.cuda.stream(stream):
         feats = _prefetch(batch, dataloader, stream)
-        feats = await recursive_apply(feats, _await_or_return)
+        feats = await async_recursive_apply(feats, _await_or_return)
     return feats
 
 
@@ -205,10 +212,10 @@ def _assign_for(item, feat):
         return item
 
 
-def _prefetcher_entry(dataloader_it, dataloader, queue):
-    # TODO: figure out why PyTorch sets the number of threads to 1
+def _prefetcher_entry(dataloader_it, dataloader, queue, num_threads):
     use_asyncio = dataloader.use_asyncio
-    torch.set_num_threads(16)
+    if num_threads is not None:
+        torch.set_num_threads(num_threads)
     stream = (
             torch.cuda.Stream(device=dataloader.device)
             if dataloader.device.type == 'cuda' else None)
@@ -233,18 +240,19 @@ def _prefetcher_entry(dataloader_it, dataloader, queue):
 
 
 class _PrefetchingIter(object):
-    def __init__(self, dataloader, dataloader_it, use_thread=False):
+    def __init__(self, dataloader, dataloader_it, use_thread=False, num_threads=None):
         self.queue = Queue(1)
         self.dataloader_it = dataloader_it
         self.dataloader = dataloader
         self.graph_sampler = self.dataloader.graph_sampler
         self.pin_memory = self.dataloader.pin_memory
+        self.num_threads = num_threads
 
         self.use_thread = use_thread
         if use_thread:
             thread = threading.Thread(
                 target=_prefetcher_entry,
-                args=(dataloader_it, dataloader, self.queue),
+                args=(dataloader_it, dataloader, self.queue, num_threads),
                 daemon=True)
             thread.start()
             self.thread = thread
@@ -303,6 +311,14 @@ def collate_wrapper(sample_func, g):
     return _sample
 
 
+def _wrap_worker_init_fn(func):
+    def _func(worker_id):
+        set_num_threads(1)
+        if func is not None:
+            func(worker_id)
+    return _func
+
+
 def _wrap_storage(storage):
     if torch.is_tensor(storage):
         return TensorStorage(storage)
@@ -339,6 +355,7 @@ class NodeDataLoader(torch.utils.data.DataLoader):
         self.use_asyncio = use_asyncio
         self.device = torch.device(device)
         self.use_prefetch_thread = use_prefetch_thread
+        worker_init_fn = _wrap_worker_init_fn(kwargs.get('worker_init_fn', None))
 
         self.node_data = _prepare_storages_from_graph(graph, 'ndata', graph.ntypes)
         self.edge_data = _prepare_storages_from_graph(graph, 'edata', graph.canonical_etypes)
@@ -348,12 +365,71 @@ class NodeDataLoader(torch.utils.data.DataLoader):
             self.dataset,
             collate_fn=collate_wrapper(graph_sampler.sample, graph),
             batch_size=None,
+            worker_init_fn=worker_init_fn,
             **kwargs)
 
     def __iter__(self):
         if self._shuffle_dataset:
             self.dataset.shuffle()
-        return _PrefetchingIter(self, super().__iter__(), use_thread=self.use_prefetch_thread)
+        # When using multiprocessing PyTorch sometimes set the number of PyTorch threads to 1
+        # when spawning new Python threads.  This drastically slows down pinning features.
+        num_threads = torch.get_num_threads() if self.num_workers > 0 else None
+        return _PrefetchingIter(
+            self, super().__iter__(), use_thread=self.use_prefetch_thread,
+            num_threads=num_threads)
+
+    # To allow data other than node/edge data to be prefetched.
+    def attach_data(self, name, storage):
+        self.other_data[name] = _wrap_storage(storage)
+
+
+class EdgeDataLoader(torch.utils.data.DataLoader):
+    def __init__(self, graph, train_idx, graph_sampler, device='cpu', use_ddp=False,
+                 ddp_seed=0, batch_size=1, drop_last=False, shuffle=False,
+                 use_asyncio=False, use_prefetch_thread=False, exclude=None,
+                 reverse_eids=None, reverse_etypes=None, negative_sampler=None, **kwargs):
+        self.graph = graph
+        self.dataset = TensorizedDataset(train_idx, graph.ntypes, batch_size, drop_last)
+        self.use_ddp = use_ddp
+        self.ddp_seed = ddp_seed
+        self._shuffle_dataset = shuffle
+        self.graph_sampler = graph_sampler
+        self.use_asyncio = use_asyncio
+        self.device = torch.device(device)
+        self.use_prefetch_thread = use_prefetch_thread
+        worker_init_fn = _wrap_worker_init_fn(kwargs.get('worker_init_fn', None))
+
+        self.node_data = _prepare_storages_from_graph(graph, 'ndata', graph.ntypes)
+        self.edge_data = _prepare_storages_from_graph(graph, 'edata', graph.canonical_etypes)
+        self.other_data = {}
+
+        if isinstance(self.graph_sampler, BlockSampler):
+            if negative_sampler is not None:
+                self.graph_sampler = LinkWrapper(
+                    self.graph_sampler, exclude=exclude, reverse_eids=reverse_eids,
+                    reverse_etypes=reverse_etypes, negative_sampler=negative_sampler)
+            else:
+                self.graph_sampler = EdgeWrapper(
+                    self.graph_sampler, exclude=exclude, reverse_eids=reverse_eids,
+                    reverse_etypes=reverse_etypes)
+            self.graph_sampler._freeze()
+
+        super().__init__(
+            self.dataset,
+            collate_fn=collate_wrapper(graph_sampler.sample, graph),
+            batch_size=None,
+            worker_init_fn=worker_init_fn,
+            **kwargs)
+
+    def __iter__(self):
+        if self._shuffle_dataset:
+            self.dataset.shuffle()
+        # When using multiprocessing PyTorch sometimes set the number of PyTorch threads to 1
+        # when spawning new Python threads.  This drastically slows down pinning features.
+        num_threads = torch.get_num_threads() if self.num_workers > 0 else None
+        return _PrefetchingIter(
+            self, super().__iter__(), use_thread=self.use_prefetch_thread,
+            num_threads=num_threads)
 
     # To allow data other than node/edge data to be prefetched.
     def attach_data(self, name, storage):

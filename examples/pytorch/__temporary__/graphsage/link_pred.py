@@ -21,14 +21,18 @@ class SAGE(nn.Module):
         self.layers.append(dglnn.SAGEConv(n_hidden, n_classes, 'mean'))
         self.dropout = nn.Dropout(0.5)
 
-    def forward(self, blocks, x):
+    def forward(self, pair_graph, neg_pair_graph, blocks, x):
         h = x
         for l, (layer, block) in enumerate(zip(self.layers, blocks)):
             h = layer(block, h)
             if l != len(self.layers) - 1:
                 h = F.relu(h)
                 h = self.dropout(h)
-        return h
+        with pair_graph.local_scope(), neg_pair_graph.local_scope():
+            pair_graph.ndata['h'] = neg_pair_graph.ndata['h']
+            pair_graph.apply_edges(dgl.function.u_dot_v('h', 'h', 's'))
+            neg_pair_graph.apply_edges(dgl.function.u_dot_v('h', 'h', 's'))
+            return pair_graph.edata['s'], neg_pair_graph.edata['s']
 
 dataset = DglNodePropPredDataset('ogbn-products')
 graph, labels = dataset[0]
@@ -40,10 +44,13 @@ graph.create_formats_()
 # We actually won't have this statement in formal examples - this is just to ensure that
 # my code doesn't depend on DGLGraph's internal interfaces that did not appear in the RFC.
 graph = dglnew.graph.DGLGraphStorage(graph)
+
 sampler = dglnew.dataloading.NeighborSampler([5, 5, 5], output_device='cpu')
-dataloader = dglnew.dataloading.NodeDataLoader(
+sampler.add_input('feat')
+sampler.add_output('label')
+dataloader = dglnew.dataloading.EdgeDataLoader(
         graph,
-        train_idx,
+        torch.arange(graph.num_edges()),
         sampler,
         device='cuda',
         batch_size=1000,
@@ -52,9 +59,11 @@ dataloader = dglnew.dataloading.NodeDataLoader(
         pin_memory=True,
         num_workers=4,
         use_asyncio=False,
-        use_prefetch_thread=True)       # TBD: could probably remove this argument
-sampler.add_input('feat')
-sampler.add_output('label')
+        persistent_workers=True,
+        use_prefetch_thread=True,       # TBD: could probably remove this argument
+        exclude='reverse_id',
+        reverse_eids=torch.arange(graph.num_edges()) ^ 1,
+        negative_sampler=dgl.dataloading.negative_sampler.GlobalUniform(5))
 
 model = SAGE(graph.ndata['feat'].shape[1], 256, dataset.num_classes).cuda()
 opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
@@ -62,16 +71,19 @@ opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
 durations = []
 for _ in range(10):
     t0 = time.time()
-    for it, blocks in enumerate(dataloader):
+    for it, (pair_graph, neg_pair_graph, blocks) in enumerate(dataloader):
         x = blocks[0].srcdata['feat']
-        y = blocks[-1].dstdata['label'][:, 0]
-        y_hat = model(blocks, x)
-        loss = F.cross_entropy(y_hat, y)
+        pos_score, neg_score = model(pair_graph, neg_pair_graph, blocks, x)
+        pos_label = torch.ones_like(pos_score)
+        neg_label = torch.zeros_like(neg_score)
+        score = torch.cat([pos_score, neg_score])
+        labels = torch.cat([pos_label, neg_label])
+        loss = F.binary_cross_entropy_with_logits(score, labels)
         opt.zero_grad()
         loss.backward()
         opt.step()
         if it % 20 == 0:
-            acc = MF.accuracy(y_hat, y)
+            acc = MF.auc(score, labels)
             mem = torch.cuda.max_memory_allocated() / 1000000
             print('Loss', loss.item(), 'Acc', acc.item(), 'GPU Mem', mem, 'MB')
     tt = time.time()
