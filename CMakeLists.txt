@@ -36,6 +36,7 @@ dgl_option(USE_S3 "Build with S3 support" OFF)
 dgl_option(USE_HDFS "Build with HDFS support" OFF) # Set env HADOOP_HDFS_HOME if needed
 dgl_option(REBUILD_LIBXSMM "Clean LIBXSMM build cache at every build" OFF) # Set env HADOOP_HDFS_HOME if needed
 dgl_option(USE_EPOLL "Build with epoll for socket communicator" OFF)
+dgl_option(TP_BUILD_LIBUV "Build libuv together with tensorpipe (only impacts Linux)" ON)
 
 # Set debug compile option for gdb, only happens when -DCMAKE_BUILD_TYPE=DEBUG
 if (NOT MSVC)
@@ -254,7 +255,6 @@ endif((NOT MSVC) AND USE_LIBXSMM)
 if(NOT MSVC)
   # Only build tensorpipe on linux
   string(REPLACE "-pedantic" "" CMAKE_C_FLAGS ${CMAKE_C_FLAGS})
-  set(TP_BUILD_LIBUV ON)
   set(TP_STATIC_OR_SHARED STATIC)
   add_subdirectory(third_party/tensorpipe)
   list(APPEND DGL_LINKER_LIBS tensorpipe)

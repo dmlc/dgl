@@ -57,7 +57,7 @@ std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling(
         });;
     end = std::unique(begin, end);
   }
-  int64_t num_sampled = std::min(end - begin, num_samples);
+  int64_t num_sampled = std::min(static_cast<int64_t>(end - begin), num_samples);
   return {row.CreateView({num_sampled}, row->dtype), col.CreateView({num_sampled}, col->dtype)};
 }
 
