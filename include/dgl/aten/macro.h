@@ -55,32 +55,8 @@
                << " device.";                                   \
   }                                                             \
 } while (0)
-
-/*
- * Dispatch according to device:
- *
- * Xin(yaox12): temporary macro that allows CUDA UVA operator
- *
- */
-#define ATEN_XPU_SWITCH_CUDA_UVA(val, XPU, op, ...) do {        \
-  if ((val) == kDLCPU) {                                        \
-    constexpr auto XPU = kDLCPU;                                \
-    {__VA_ARGS__}                                               \
-  } else if ((val) == kDLGPU) {                                 \
-    constexpr auto XPU = kDLGPU;                                \
-    {__VA_ARGS__}                                               \
-  } else if ((val) == kDLCPUPinned) {                           \
-    constexpr auto XPU = kDLCPUPinned;                          \
-    {__VA_ARGS__}                                               \
-  } else {                                                      \
-    LOG(FATAL) << "Operator " << (op) << " does not support "   \
-               << dgl::runtime::DeviceTypeCode2Str(val)         \
-               << " device.";                                   \
-  }                                                             \
-} while (0)
 #else  // DGL_USE_CUDA
 #define ATEN_XPU_SWITCH_CUDA ATEN_XPU_SWITCH
-#define ATEN_XPU_SWITCH_CUDA_UVA ATEN_XPU_SWITCH
 #endif  // DGL_USE_CUDA
 
 /*
@@ -271,6 +247,14 @@
     ATEN_ID_TYPE_SWITCH((coo).row->dtype, IdType, {              \
       {__VA_ARGS__}                                              \
     });                                                          \
+  });
+
+// Dispatching according to the context of array to enable CUDA UVA
+#define ATEN_CSR_SWITCH_CUDA_UVA(csr, array, XPU, IdType, op, ...) \
+  ATEN_XPU_SWITCH_CUDA(array->ctx.device_type, XPU, op, {          \
+    ATEN_ID_TYPE_SWITCH((csr).indptr->dtype, IdType, {             \
+      {__VA_ARGS__}                                                \
+    });                                                            \
   });
 #else  // DGL_USE_CUDA
 #define ATEN_CSR_SWITCH_CUDA ATEN_CSR_SWITCH

@@ -115,6 +115,8 @@ NDArray IndexSelect(NDArray array, IdArray index) {
   CHECK_VALID_CONTEXT(array, index);
   CHECK_GE(array->ndim, 1) << "Only support array with at least 1 dimension";
   CHECK_EQ(index->ndim, 1) << "Index array must be an 1D array.";
+  // if array is not pinned, index has the same context as array
+  // if array is pinned, op dispatching depends on the context of index
   ATEN_XPU_SWITCH_CUDA(index->ctx.device_type, XPU, "IndexSelect", {
     ATEN_DTYPE_SWITCH(array->dtype, DType, "values", {
       ATEN_ID_TYPE_SWITCH(index->dtype, IdType, {
@@ -343,9 +345,9 @@ NDArray CSRIsNonZero(CSRMatrix csr, NDArray row, NDArray col) {
   NDArray ret;
   CHECK_SAME_DTYPE(csr.indices, row);
   CHECK_SAME_DTYPE(csr.indices, col);
-  CHECK_SAME_CONTEXT(csr.indices, row);
-  CHECK_SAME_CONTEXT(csr.indices, col);
-  ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRIsNonZero", {
+  CHECK_SAME_CONTEXT(row, col);
+  CHECK_VALID_CONTEXT(csr.indices, row);
+  ATEN_CSR_SWITCH_CUDA_UVA(csr, row, XPU, IdType, "CSRIsNonZero", {
     ret = impl::CSRIsNonZero<XPU, IdType>(csr, row, col);
   });
   return ret;
@@ -372,10 +374,8 @@ NDArray CSRGetRowNNZ(CSRMatrix csr, NDArray row) {
   NDArray ret;
   CHECK_SAME_DTYPE(csr.indices, row);
   CHECK_VALID_CONTEXT(csr.indices, row);
-  ATEN_XPU_SWITCH_CUDA(row->ctx.device_type, XPU, "CSRGetRowNNZ", {
-    ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {
-      ret = impl::CSRGetRowNNZ<XPU, IdType>(csr, row);
-    });
+  ATEN_CSR_SWITCH_CUDA_UVA(csr, row, XPU, IdType, "CSRGetRowNNZ", {
+    ret = impl::CSRGetRowNNZ<XPU, IdType>(csr, row);
   });
   return ret;
 }
@@ -412,9 +412,9 @@ NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols) {
   NDArray ret;
   CHECK_SAME_DTYPE(csr.indices, rows);
   CHECK_SAME_DTYPE(csr.indices, cols);
-  CHECK_SAME_CONTEXT(csr.indices, rows);
-  CHECK_SAME_CONTEXT(csr.indices, cols);
-  ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRGetData", {
+  CHECK_SAME_CONTEXT(rows, cols);
+  CHECK_VALID_CONTEXT(csr.indices, rows);
+  ATEN_CSR_SWITCH_CUDA_UVA(csr, rows, XPU, IdType, "CSRGetData", {
     ret = impl::CSRGetData<XPU, IdType>(csr, rows, cols);
   });
   return ret;
@@ -425,10 +425,10 @@ NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols, NDArray weights, D
   NDArray ret;
   CHECK_SAME_DTYPE(csr.indices, rows);
   CHECK_SAME_DTYPE(csr.indices, cols);
-  CHECK_SAME_CONTEXT(csr.indices, rows);
-  CHECK_SAME_CONTEXT(csr.indices, cols);
-  CHECK_SAME_CONTEXT(csr.indices, weights);
-  ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRGetData", {
+  CHECK_SAME_CONTEXT(rows, cols);
+  CHECK_SAME_CONTEXT(rows, weights);
+  CHECK_VALID_CONTEXT(csr.indices, rows);
+  ATEN_CSR_SWITCH_CUDA_UVA(csr, rows, XPU, IdType, "CSRGetData", {
     ret = impl::CSRGetData<XPU, IdType, DType>(csr, rows, cols, weights, filler);
   });
   return ret;
@@ -443,10 +443,10 @@ std::vector<NDArray> CSRGetDataAndIndices(
     CSRMatrix csr, NDArray rows, NDArray cols) {
   CHECK_SAME_DTYPE(csr.indices, rows);
   CHECK_SAME_DTYPE(csr.indices, cols);
-  CHECK_SAME_CONTEXT(csr.indices, rows);
-  CHECK_SAME_CONTEXT(csr.indices, cols);
+  CHECK_SAME_CONTEXT(rows, cols);
+  CHECK_VALID_CONTEXT(csr.indices, rows);
   std::vector<NDArray> ret;
-  ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRGetDataAndIndices", {
+  ATEN_CSR_SWITCH_CUDA_UVA(csr, rows, XPU, IdType, "CSRGetDataAndIndices", {
     ret = impl::CSRGetDataAndIndices<XPU, IdType>(csr, rows, cols);
   });
   return ret;
@@ -493,9 +493,9 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, int64_t start, int64_t end) {
 
 CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {
   CHECK_SAME_DTYPE(csr.indices, rows);
-  CHECK_SAME_CONTEXT(csr.indices, rows);
+  CHECK_VALID_CONTEXT(csr.indices, rows);
   CSRMatrix ret;
-  ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRSliceRows", {
+  ATEN_CSR_SWITCH_CUDA_UVA(csr, rows, XPU, IdType, "CSRSliceRows", {
     ret = impl::CSRSliceRows<XPU, IdType>(csr, rows);
   });
   return ret;
@@ -504,10 +504,10 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {
 CSRMatrix CSRSliceMatrix(CSRMatrix csr, NDArray rows, NDArray cols) {
   CHECK_SAME_DTYPE(csr.indices, rows);
   CHECK_SAME_DTYPE(csr.indices, cols);
-  CHECK_SAME_CONTEXT(csr.indices, rows);
-  CHECK_SAME_CONTEXT(csr.indices, cols);
+  CHECK_SAME_CONTEXT(rows, cols);
+  CHECK_VALID_CONTEXT(csr.indices, rows);
   CSRMatrix ret;
-  ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRSliceMatrix", {
+  ATEN_CSR_SWITCH_CUDA_UVA(csr, rows, XPU, IdType, "CSRSliceMatrix", {
     ret = impl::CSRSliceMatrix<XPU, IdType>(csr, rows, cols);
   });
   return ret;
@@ -557,10 +557,8 @@ COOMatrix CSRRowWiseSampling(
   COOMatrix ret;
   CHECK_VALID_CONTEXT(mat.indptr, rows);
   if (IsNullArray(prob)) {
-    ATEN_XPU_SWITCH_CUDA(rows->ctx.device_type, XPU, "CSRRowWiseSampling", {
-      ATEN_ID_TYPE_SWITCH(mat.indptr->dtype, IdType, {
-        ret = impl::CSRRowWiseSamplingUniform<XPU, IdType>(mat, rows, num_samples, replace);
-      });
+    ATEN_CSR_SWITCH_CUDA_UVA(mat, rows, XPU, IdType, "CSRRowWiseSampling", {
+      ret = impl::CSRRowWiseSamplingUniform<XPU, IdType>(mat, rows, num_samples, replace);
     });
   } else {
     ATEN_CSR_SWITCH(mat, XPU, IdType, "CSRRowWiseSampling", {
