@@ -32,7 +32,6 @@ __all__ = [
     'Compose'
 ]
 
-# pylint: disable=E0001
 class BaseTransform:
     r"""
 
@@ -132,6 +131,7 @@ class BaseTransform:
     def __call__(self, g):
         raise NotImplementedError
 
+    # pylint: disable=E0001
     def __repr__(self):
         return f'{self.__class__.__name__}()'
 
