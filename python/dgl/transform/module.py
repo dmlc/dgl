@@ -152,6 +152,24 @@ class AddSelfLoop(BaseTransform):
         self.self_etypes = self_etypes
 
     def transform_etype(self, c_etype, g):
+        r"""
+
+        Description
+        -----------
+        Transform the graph corresponding to a canonical edge type.
+
+        Parameters
+        ----------
+        c_etype : tuple of str
+            A canonical edge type.
+        g : DGLGraph
+            The graph.
+
+        Returns
+        -------
+        DGLGraph
+            The transformed graph.
+        """
         utype, _, vtype = c_etype
         if utype != vtype:
             return g
@@ -218,6 +236,24 @@ class RemoveSelfLoop(BaseTransform):
     (tensor([1]), tensor([2]))
     """
     def transform_etype(self, c_etype, g):
+        r"""
+
+        Description
+        -----------
+        Transform the graph corresponding to a canonical edge type.
+
+        Parameters
+        ----------
+        c_etype : tuple of str
+            A canonical edge type.
+        g : DGLGraph
+            The graph.
+
+        Returns
+        -------
+        DGLGraph
+            The transformed graph.
+        """
         utype, _, vtype = c_etype
         if utype == vtype:
             g = functional.remove_self_loop(g, etype=c_etype)
@@ -297,6 +333,21 @@ class AddReverse(BaseTransform):
         self.combine_like = combine_like
 
     def transform_symmetric_etype(self, c_etype, g, data_dict):
+        r"""
+
+        Description
+        -----------
+        Transform the graph corresponding to a symmetric canonical edge type.
+
+        Parameters
+        ----------
+        c_etype : tuple of str
+            A canonical edge type.
+        g : DGLGraph
+            The graph.
+        data_dict : dict
+            The edge data to update.
+        """
         if self.combine_like:
             src, dst = g.edges(etype=c_etype)
             src, dst = F.cat([src, dst], dim=0), F.cat([dst, src], dim=0)
@@ -305,6 +356,21 @@ class AddReverse(BaseTransform):
             self.transform_asymmetric_etype(c_etype, g, data_dict)
 
     def transform_asymmetric_etype(self, c_etype, g, data_dict):
+        r"""
+
+        Description
+        -----------
+        Transform the graph corresponding to an asymmetric canonical edge type.
+
+        Parameters
+        ----------
+        c_etype : tuple of str
+            A canonical edge type.
+        g : DGLGraph
+            The graph.
+        data_dict : dict
+            The edge data to update.
+        """
         utype, etype, vtype = c_etype
         src, dst = g.edges(etype=c_etype)
         data_dict.update({
@@ -313,6 +379,21 @@ class AddReverse(BaseTransform):
         })
 
     def transform_etype(self, c_etype, g, data_dict):
+        r"""
+
+        Description
+        -----------
+        Transform the graph corresponding to a canonical edge type.
+
+        Parameters
+        ----------
+        c_etype : tuple of str
+            A canonical edge type.
+        g : DGLGraph
+            The graph.
+        data_dict : dict
+            The edge data to update.
+        """
         utype, _, vtype = c_etype
         if utype == vtype:
             self.transform_symmetric_etype(c_etype, g, data_dict)
