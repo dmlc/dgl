@@ -165,7 +165,7 @@ DType parallel_reduce(
     auto chunk_size = divup((end - begin), num_threads);
     auto begin_tid = begin + tid * chunk_size;
     if (begin_tid < end) {
-      auto end_tid = std::min(end, chunk_size + begin_tid);
+      auto end_tid = std::min(end, static_cast<size_t>(chunk_size + begin_tid));
       try {
         results[tid] = f(begin_tid, end_tid, ident);
       } catch (...) {
