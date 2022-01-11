@@ -131,9 +131,8 @@ class BaseTransform:
     def __call__(self, g):
         raise NotImplementedError
 
-    # pylint: disable=E0001
     def __repr__(self):
-        return f'{self.__class__.__name__}()'
+        return '{}()'.format(self.__class__.__name__)
 
 class AddSelfLoop(BaseTransform):
     r"""
