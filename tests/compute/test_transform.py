@@ -2110,7 +2110,7 @@ def test_module_add_metapaths(idtype):
     }
     for nty in new_g.ntypes:
         assert new_g.num_nodes(nty) == g.num_nodes(nty)
-    for ety in new_g.canonical_etypes:
+    for ety in g.canonical_etypes:
         assert new_g.num_edges(ety) == g.num_edges(ety)
     assert F.allclose(g.nodes['venue'].data['h'], new_g.nodes['venue'].data['h'])
     assert F.allclose(g.edges['author'].data['h'], new_g.edges['author'].data['h'])
@@ -2153,7 +2153,6 @@ def test_module_knn_graph(idtype):
     assert new_g.ntypes == g.ntypes
     assert new_g.canonical_etypes == g.canonical_etypes
     assert new_g.num_nodes() == g.num_nodes()
-    assert new_g.num_edges() == g.num_edges()
     assert F.allclose(g.ndata['h'], new_g.ndata['h'])
 
 @parametrize_dtype
