@@ -1863,7 +1863,7 @@ def test_module_add_self_loop(idtype):
     assert new_g.device == g.device
     assert new_g.idtype == g.idtype
     assert new_g.ntypes == g.ntypes
-    assert new_g.canonical_etypes == {
+    assert set(new_g.canonical_etypes) == {
         ('user', 'plays', 'game'), ('user', 'follows', 'user'),
         ('user', 'self', 'user'), ('game', 'self', 'game')
     }
@@ -2103,7 +2103,11 @@ def test_module_add_metapaths(idtype):
     assert new_g.device == g.device
     assert new_g.idtype == g.idtype
     assert new_g.ntypes == g.ntypes
-    assert new_g.canonical_etypes == g.canonical_etypes
+    assert set(new_g.canonical_etypes) == {
+        ('person', 'author', 'paper'), ('paper', 'accepted', 'venue'),
+        ('paper', 'rejected', 'venue'), ('person', 'accepted', 'venue'),
+        ('person', 'rejected', 'venue')
+    }
     for nty in new_g.ntypes:
         assert new_g.num_nodes(nty) == g.num_nodes(nty)
     for ety in new_g.canonical_etypes:
@@ -2125,6 +2129,7 @@ def test_module_add_metapaths(idtype):
     assert new_g.device == g.device
     assert new_g.idtype == g.idtype
     assert new_g.ntypes == g.ntypes
+    assert len(new_g.canonical_etypes) == 2
     for nty in new_g.ntypes:
         assert new_g.num_nodes(nty) == g.num_nodes(nty)
     assert F.allclose(g.nodes['venue'].data['h'], new_g.nodes['venue'].data['h'])
