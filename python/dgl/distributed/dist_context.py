@@ -13,7 +13,7 @@ from enum import Enum
 from . import rpc
 from .constants import MAX_QUEUE_SIZE
 from .kvstore import init_kvstore, close_kvstore
-from .rpc_client import connect_to_server, shutdown_servers
+from .rpc_client import connect_to_server
 from .role import init_role
 from .. import utils
 
@@ -313,7 +313,11 @@ def exit_client():
     finalize_worker()  # finalize workers should be earilier than barrier, and non-blocking
     if os.environ.get('DGL_DIST_MODE', 'standalone') != 'standalone':
         rpc.client_barrier()
-        shutdown_servers()
+        # send ShutDownRequest to servers
+        if rpc.get_rank() == 0:  # Only client_0 issue this command
+            req = rpc.ShutDownRequest(rpc.get_rank())
+            for server_id in range(rpc.get_num_server()):
+                rpc.send_request(server_id, req)
     finalize_client()
     join_finalize_worker()
     close_kvstore()
