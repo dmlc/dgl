@@ -2142,6 +2142,7 @@ def test_module_add_metapaths(idtype):
     eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
     assert eset == {(0, 1), (1, 1)}
 
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="MXNet doesn't support @ operation")
 @parametrize_dtype
 def test_module_knn_graph(idtype):
     g = dgl.graph(([], []), num_nodes=5, idtype=idtype, device=F.ctx())
