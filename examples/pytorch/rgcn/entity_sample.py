@@ -40,7 +40,8 @@ def init_dataloaders(args, g, train_idx, test_idx, target_idx, device, use_ddp=F
         shuffle=False,
         drop_last=False)
 
-    test_sampler = MultiLayerNeighborSampler([None] * len(fanouts))
+    # -1 for sampling all neighbors
+    test_sampler = MultiLayerNeighborSampler([-1] * len(fanouts))
     test_loader = NodeDataLoader(
         g,
         target_idx[test_idx],
