@@ -7,12 +7,6 @@ import dgl
 from dgl.nn.pytorch import RelGraphConv
 
 class RGCN(nn.Module):
-    """
-    Parameters
-    ----------
-    in_dim : int
-        Input feature size or number of nodes
-    """
     def __init__(self, in_dim, h_dim, out_dim, num_rels,
                  regularizer="basis", num_bases=-1, dropout=0.,
                  self_loop=False, link_pred=False):
