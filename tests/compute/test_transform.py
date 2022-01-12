@@ -2134,11 +2134,11 @@ def test_module_add_metapaths(idtype):
         assert new_g.num_nodes(nty) == g.num_nodes(nty)
     assert F.allclose(g.nodes['venue'].data['h'], new_g.nodes['venue'].data['h'])
 
-    src, dst = new_g.edges(etype=('person', 'accepted', 'paper'))
+    src, dst = new_g.edges(etype=('person', 'accepted', 'venue'))
     eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
     assert eset == {(0, 0)}
 
-    src, dst = new_g.edges(etype=('person', 'rejected', 'paper'))
+    src, dst = new_g.edges(etype=('person', 'rejected', 'venue'))
     eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
     assert eset == {(0, 1), (1, 1)}
 
