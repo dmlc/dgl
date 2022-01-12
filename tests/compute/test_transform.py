@@ -1957,7 +1957,7 @@ def test_module_add_reverse(idtype):
     g = dgl.heterograph({
         ('user', 'plays', 'game'): ([0, 1], [1, 1]),
         ('user', 'follows', 'user'): ([1, 2], [2, 2])
-    })
+    }, device=F.ctx())
     new_g = transform(g)
     assert new_g.device == g.device
     assert new_g.idtype == g.idtype
