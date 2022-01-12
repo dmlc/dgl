@@ -63,6 +63,13 @@ class RandomEngine {
   }
 
   /*!
+   * \brief Generate an arbitrary random 32-bit integer.
+   */
+  int32_t RandInt32() {
+    return static_cast<int32_t>(rng_());
+  }
+
+  /*!
    * \brief Generate a uniform random integer in [0, upper)
    */
   template<typename T>

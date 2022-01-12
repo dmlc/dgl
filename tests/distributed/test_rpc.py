@@ -7,6 +7,7 @@ import backend as F
 import unittest, pytest
 import multiprocessing as mp
 from numpy.testing import assert_array_equal
+from utils import reset_envs
 
 if os.name != 'nt':
     import fcntl
@@ -108,8 +109,8 @@ class HelloRequest(dgl.distributed.Request):
         return res
 
 def start_server(num_clients, ip_config, server_id=0):
-    print("Sleep 5 seconds to test client re-connect.")
-    time.sleep(5)
+    print("Sleep 2 seconds to test client re-connect.")
+    time.sleep(2)
     server_state = dgl.distributed.ServerState(None, local_g=None, partition_book=None)
     dgl.distributed.register_service(HELLO_SERVICE_ID, HelloRequest, HelloResponse)
     print("Start server {}".format(server_id))
@@ -155,6 +156,7 @@ def start_client(ip_config):
         assert_array_equal(F.asnumpy(res.tensor), F.asnumpy(TENSOR))
 
 def test_serialize():
+    reset_envs()
     os.environ['DGL_DIST_MODE'] = 'distributed'
     from dgl.distributed.rpc import serialize_to_payload, deserialize_from_payload
     SERVICE_ID = 12345
@@ -173,6 +175,7 @@ def test_serialize():
     assert res.x == res1.x
 
 def test_rpc_msg():
+    reset_envs()
     os.environ['DGL_DIST_MODE'] = 'distributed'
     from dgl.distributed.rpc import serialize_to_payload, deserialize_from_payload, RPCMessage
     SERVICE_ID = 32452
@@ -190,6 +193,7 @@ def test_rpc_msg():
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 def test_rpc():
+    reset_envs()
     os.environ['DGL_DIST_MODE'] = 'distributed'
     ip_config = open("rpc_ip_config.txt", "w")
     ip_addr = get_local_usable_addr()
@@ -199,13 +203,13 @@ def test_rpc():
     pserver = ctx.Process(target=start_server, args=(1, "rpc_ip_config.txt"))
     pclient = ctx.Process(target=start_client, args=("rpc_ip_config.txt",))
     pserver.start()
-    time.sleep(1)
     pclient.start()
     pserver.join()
     pclient.join()
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 def test_multi_client():
+    reset_envs()
     os.environ['DGL_DIST_MODE'] = 'distributed'
     ip_config = open("rpc_ip_config_mul_client.txt", "w")
     ip_addr = get_local_usable_addr()
@@ -227,6 +231,7 @@ def test_multi_client():
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 def test_multi_thread_rpc():
+    reset_envs()
     os.environ['DGL_DIST_MODE'] = 'distributed'
     ip_config = open("rpc_ip_config_multithread.txt", "w")
     num_servers = 2

@@ -13,11 +13,9 @@ import test_utils
 from test_utils import parametrize_dtype, get_cases
 from scipy.sparse import rand
 rfuncs = {'sum': fn.sum, 'max': fn.max, 'min': fn.min, 'mean': fn.mean}
-fill_value = {'sum': 0, 'max': float("-inf")}
 feat_size = 2
 
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
-@unittest.skipIf(F._default_context_str == 'gpu', reason="Max/min reducer not supported on GPU yet.")
 
 def create_test_heterograph(idtype):
     # test heterograph from the docstring, plus a user -- wishes -- game relation
@@ -40,14 +38,18 @@ def create_test_heterograph(idtype):
 
 def create_test_heterograph_2(idtype):
 
-    src = np.random.randint(0, 5, 25)
-    dst = np.random.randint(0, 5, 25)
+    src = np.random.randint(0, 50, 25)
+    dst = np.random.randint(0, 50, 25)
+    src1 = np.random.randint(0, 25, 10)
+    dst1 = np.random.randint(0, 25, 10)
+    src2 = np.random.randint(0, 100, 1000)
+    dst2 = np.random.randint(0, 100, 1000)
     g = dgl.heterograph({
         ('user', 'becomes', 'player'):  (src, dst),
         ('user', 'follows', 'user'):  (src, dst),
         ('user', 'plays', 'game'): (src, dst),
-        ('user', 'wishes', 'game'): (src, dst),
-        ('developer', 'develops', 'game'): (src, dst),
+        ('user', 'wishes', 'game'): (src1, dst1),
+        ('developer', 'develops', 'game'): (src2, dst2),
     }, idtype=idtype, device=F.ctx())
     assert g.idtype == idtype
     assert g.device == F.ctx()
