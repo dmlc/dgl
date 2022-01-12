@@ -69,7 +69,8 @@ __all__ = [
     'as_heterograph',
     'adj_product_graph',
     'adj_sum_graph',
-    'reorder_graph'
+    'reorder_graph',
+    'norm_by_dst'
     ]
 
 
@@ -3196,5 +3197,11 @@ def rcmk_perm(g):
     csr_adj = g.adj(scipy_fmt=fmat)
     perm = sparse.csgraph.reverse_cuthill_mckee(csr_adj)
     return perm.copy()
+
+def norm_by_dst(g, etype=None):
+    _, v, _ = g.edges(form='all', etype=etype)
+    _, inv_index, count = F.unique(v, return_inverse=True, return_counts=True)
+    deg = count[inv_index]
+    return 1. / deg
 
 _init_api("dgl.transform")

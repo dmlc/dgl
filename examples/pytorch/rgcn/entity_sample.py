@@ -76,11 +76,7 @@ def process_batch(inv_target, batch):
     seeds = inv_target[seeds]
 
     for blc in blocks:
-        _, v, eid = blc.edges(form='all')
-        _, inverse_index, count = th.unique(v, return_inverse=True, return_counts=True)
-        degrees = count[inverse_index]
-        norm = th.ones(eid.shape[0]).to(degrees.device) / degrees
-        blc.edata['norm'] = norm.unsqueeze(1)
+        blc.edata['norm'] = dgl.norm_by_dst(blc).unsqueeze(1)
 
     return seeds, blocks
 

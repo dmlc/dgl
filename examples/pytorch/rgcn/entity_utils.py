@@ -29,11 +29,7 @@ def load_data(data_name, get_norm=False, inv_target=False):
         # Calculate normalization weight for each edge,
         # 1. / d, d is the degree of the destination node
         for cetype in hg.canonical_etypes:
-            _, v, eid = hg.edges(form='all', etype=cetype)
-            _, inverse_index, count = th.unique(v, return_inverse=True, return_counts=True)
-            degrees = count[inverse_index]
-            norm = th.ones(eid.shape[0]).float() / degrees.float()
-            hg.edges[cetype].data['norm'] = norm.unsqueeze(1)
+            hg.edges[cetype].data['norm'] = dgl.norm_by_dst(hg, cetype).unsqueeze(1)
         edata = ['norm']
     else:
         edata = None
