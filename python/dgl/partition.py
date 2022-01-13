@@ -242,8 +242,7 @@ def get_peak_mem():
     '''
     if not os.path.exists('/proc/self/status'):
         return 0.0
-    f = open('/proc/self/status', 'r')
-    for line in f:
+    for line in open('/proc/self/status', 'r'):
         if 'VmPeak' in line:
             mem = re.findall(r'\d+', line)[0]
             return int(mem) / 1024 / 1024
