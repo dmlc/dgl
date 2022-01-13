@@ -10,7 +10,7 @@ import multiprocessing as mp
 import numpy as np
 import backend as F
 import time
-from utils import get_local_usable_addr
+from utils import get_local_usable_addr, reset_envs
 from pathlib import Path
 import pytest
 from scipy import sparse as spsp
@@ -93,7 +93,6 @@ def check_rpc_sampling(tmpdir, num_server):
         time.sleep(1)
         pserver_list.append(p)
 
-    time.sleep(3)
     sampled_graph = start_sample_client(0, tmpdir, num_server > 1)
     print("Done sampling")
     for p in pserver_list:
@@ -129,7 +128,6 @@ def check_rpc_find_edges_shuffle(tmpdir, num_server):
         time.sleep(1)
         pserver_list.append(p)
 
-    time.sleep(3)
     eids = F.tensor(np.random.randint(g.number_of_edges(), size=100))
     u, v = g.find_edges(orig_eid[eids])
     du, dv = start_find_edges_client(0, tmpdir, num_server > 1, eids)
@@ -179,7 +177,6 @@ def check_rpc_hetero_find_edges_shuffle(tmpdir, num_server):
         time.sleep(1)
         pserver_list.append(p)
 
-    time.sleep(3)
     eids = F.tensor(np.random.randint(g.number_of_edges('r1'), size=100))
     u, v = g.find_edges(orig_eid['r1'][eids], etype='r1')
     du, dv = start_find_edges_client(0, tmpdir, num_server > 1, eids, etype='r1')
@@ -194,6 +191,7 @@ def check_rpc_hetero_find_edges_shuffle(tmpdir, num_server):
 @unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Turn off Mxnet support")
 @pytest.mark.parametrize("num_server", [1, 2])
 def test_rpc_find_edges_shuffle(num_server):
+    reset_envs()
     import tempfile
     os.environ['DGL_DIST_MODE'] = 'distributed'
     with tempfile.TemporaryDirectory() as tmpdirname:
@@ -225,7 +223,6 @@ def check_rpc_get_degree_shuffle(tmpdir, num_server):
     for i in range(num_server):
         part, _, _, _, _, _, _ = load_partition(tmpdir / 'test_get_degrees.json', i)
         orig_nid[part.ndata[dgl.NID]] = part.ndata['orig_id']
-    time.sleep(3)
 
     nids = F.tensor(np.random.randint(g.number_of_nodes(), size=100))
     in_degs, out_degs, all_in_degs, all_out_degs = start_get_degrees_client(0, tmpdir, num_server > 1, nids)
@@ -246,6 +243,7 @@ def check_rpc_get_degree_shuffle(tmpdir, num_server):
 @unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Turn off Mxnet support")
 @pytest.mark.parametrize("num_server", [1, 2])
 def test_rpc_get_degree_shuffle(num_server):
+    reset_envs()
     import tempfile
     os.environ['DGL_DIST_MODE'] = 'distributed'
     with tempfile.TemporaryDirectory() as tmpdirname:
@@ -255,6 +253,7 @@ def test_rpc_get_degree_shuffle(num_server):
 #@unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
 @unittest.skip('Only support partition with shuffle')
 def test_rpc_sampling():
+    reset_envs()
     import tempfile
     os.environ['DGL_DIST_MODE'] = 'distributed'
     with tempfile.TemporaryDirectory() as tmpdirname:
@@ -282,7 +281,6 @@ def check_rpc_sampling_shuffle(tmpdir, num_server):
         time.sleep(1)
         pserver_list.append(p)
 
-    time.sleep(3)
     sampled_graph = start_sample_client(0, tmpdir, num_server > 1)
     print("Done sampling")
     for p in pserver_list:
@@ -379,7 +377,6 @@ def check_rpc_hetero_sampling_shuffle(tmpdir, num_server):
         time.sleep(1)
         pserver_list.append(p)
 
-    time.sleep(3)
     block, gpb = start_hetero_sample_client(0, tmpdir, num_server > 1,
                                             nodes = {'n3': [0, 10, 99, 66, 124, 208]})
     print("Done sampling")
@@ -448,7 +445,6 @@ def check_rpc_hetero_sampling_empty_shuffle(tmpdir, num_server):
         time.sleep(1)
         pserver_list.append(p)
 
-    time.sleep(3)
     deg = get_degrees(g, orig_nids['n3'], 'n3')
     empty_nids = F.nonzero_1d(deg == 0)
     block, gpb = start_hetero_sample_client(0, tmpdir, num_server > 1,
@@ -480,7 +476,6 @@ def check_rpc_hetero_etype_sampling_shuffle(tmpdir, num_server):
         time.sleep(1)
         pserver_list.append(p)
 
-    time.sleep(3)
     fanout = 3
     block, gpb = start_hetero_etype_sample_client(0, tmpdir, num_server > 1, fanout,
                                                   nodes={'n3': [0, 10, 99, 66, 124, 208]})
@@ -545,7 +540,6 @@ def check_rpc_hetero_etype_sampling_empty_shuffle(tmpdir, num_server):
         time.sleep(1)
         pserver_list.append(p)
 
-    time.sleep(3)
     fanout = 3
     deg = get_degrees(g, orig_nids['n3'], 'n3')
     empty_nids = F.nonzero_1d(deg == 0)
@@ -564,6 +558,7 @@ def check_rpc_hetero_etype_sampling_empty_shuffle(tmpdir, num_server):
 @unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Turn off Mxnet support")
 @pytest.mark.parametrize("num_server", [1, 2])
 def test_rpc_sampling_shuffle(num_server):
+    reset_envs()
     import tempfile
     os.environ['DGL_DIST_MODE'] = 'distributed'
     with tempfile.TemporaryDirectory() as tmpdirname:
@@ -637,6 +632,7 @@ def check_standalone_etype_sampling_heterograph(tmpdir, reshuffle):
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
 def test_standalone_sampling():
+    reset_envs()
     import tempfile
     os.environ['DGL_DIST_MODE'] = 'standalone'
     with tempfile.TemporaryDirectory() as tmpdirname:
@@ -680,7 +676,6 @@ def check_rpc_in_subgraph_shuffle(tmpdir, num_server):
         pserver_list.append(p)
 
     nodes = [0, 10, 99, 66, 1024, 2008]
-    time.sleep(3)
     sampled_graph = start_in_subgraph_client(0, tmpdir, num_server > 1, nodes)
     for p in pserver_list:
         p.join()
@@ -710,6 +705,7 @@ def check_rpc_in_subgraph_shuffle(tmpdir, num_server):
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
 def test_rpc_in_subgraph():
+    reset_envs()
     import tempfile
     os.environ['DGL_DIST_MODE'] = 'distributed'
     with tempfile.TemporaryDirectory() as tmpdirname:
@@ -719,6 +715,7 @@ def test_rpc_in_subgraph():
 @unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
 @unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Turn off Mxnet support")
 def test_standalone_etype_sampling():
+    reset_envs()
     import tempfile
     with tempfile.TemporaryDirectory() as tmpdirname:
         os.environ['DGL_DIST_MODE'] = 'standalone'
