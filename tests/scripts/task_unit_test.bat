@@ -14,7 +14,7 @@ SET DGLBACKEND=!BACKEND!
 SET DGL_LIBRARY_PATH=!CD!\build
 SET DGL_DOWNLOAD_DIR=!CD!
 
-python -m pip install pytest || EXIT /B 1
+python -m pip install pytest pyyaml pandas pydantic || EXIT /B 1
 python -m pytest -v --junitxml=pytest_backend.xml tests\!DGLBACKEND! || EXIT /B 1
 python -m pytest -v --junitxml=pytest_compute.xml tests\compute || EXIT /B 1
 ENDLOCAL

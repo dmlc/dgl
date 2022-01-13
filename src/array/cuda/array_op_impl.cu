@@ -1,15 +1,17 @@
 /*!
- *  Copyright (c) 2020 by Contributors
+ *  Copyright (c) 2020-2021 by Contributors
  * \file array/cuda/array_op_impl.cu
  * \brief Array operator GPU implementation
  */
 #include <dgl/array.h>
 #include "../../runtime/cuda/cuda_common.h"
+#include "../../runtime/cuda/cuda_hashtable.cuh"
 #include "./utils.h"
 #include "../arith.h"
 
 namespace dgl {
 using runtime::NDArray;
+using namespace runtime::cuda;
 namespace aten {
 namespace impl {
 
@@ -257,6 +259,84 @@ IdArray Range(IdType low, IdType high, DLContext ctx) {
 
 template IdArray Range<kDLGPU, int32_t>(int32_t, int32_t, DLContext);
 template IdArray Range<kDLGPU, int64_t>(int64_t, int64_t, DLContext);
+
+///////////////////////////// Relabel_ //////////////////////////////
+
+template <typename IdType>
+__global__ void _RelabelKernel(
+    IdType* out, int64_t length, DeviceOrderedHashTable<IdType> table) {
+
+  int tx = blockIdx.x * blockDim.x + threadIdx.x;
+  int stride_x = gridDim.x * blockDim.x;
+
+  while (tx < length) {
+    out[tx] = table.Search(out[tx])->local;
+    tx += stride_x;
+  }
+}
+
+template <DLDeviceType XPU, typename IdType>
+IdArray Relabel_(const std::vector<IdArray>& arrays) {
+  IdArray all_nodes = Concat(arrays);
+  const int64_t total_length = all_nodes->shape[0];
+
+  if (total_length == 0) {
+    return all_nodes;
+  }
+
+  const auto& ctx = arrays[0]->ctx;
+  auto device = runtime::DeviceAPI::Get(ctx);
+  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+
+  // build node maps and get the induced nodes
+  OrderedHashTable<IdType> node_map(total_length, ctx, thr_entry->stream);
+  int64_t num_induced = 0;
+  int64_t * num_induced_device = static_cast<int64_t*>(
+      device->AllocWorkspace(ctx, sizeof(int64_t)));
+  IdArray induced_nodes = NewIdArray(total_length, ctx, sizeof(IdType)*8);
+
+  CUDA_CALL(cudaMemsetAsync(
+    num_induced_device,
+    0,
+    sizeof(*num_induced_device),
+    thr_entry->stream));
+
+  node_map.FillWithDuplicates(
+    all_nodes.Ptr<IdType>(),
+    all_nodes->shape[0],
+    induced_nodes.Ptr<IdType>(),
+    num_induced_device,
+    thr_entry->stream);
+
+  device->CopyDataFromTo(
+    num_induced_device, 0,
+    &num_induced, 0,
+    sizeof(num_induced),
+    ctx,
+    DGLContext{kDLCPU, 0},
+    DGLType{kDLInt, 64, 1},
+    thr_entry->stream);
+  device->StreamSync(ctx, thr_entry->stream);
+  device->FreeWorkspace(ctx, num_induced_device);
+
+  // resize the induced nodes
+  induced_nodes->shape[0] = num_induced;
+
+  // relabel
+  const int nt = 128;
+  for (IdArray arr : arrays) {
+    const int64_t length = arr->shape[0];
+    int nb = (length + nt - 1) / nt;
+    CUDA_KERNEL_CALL((_RelabelKernel<IdType>),
+      nb, nt, 0, thr_entry->stream,
+      arr.Ptr<IdType>(), length, node_map.DeviceHandle());
+  }
+
+  return induced_nodes;
+}
+
+template IdArray Relabel_<kDLGPU, int32_t>(const std::vector<IdArray>& arrays);
+template IdArray Relabel_<kDLGPU, int64_t>(const std::vector<IdArray>& arrays);
 
 ///////////////////////////// AsNumBits /////////////////////////////
 

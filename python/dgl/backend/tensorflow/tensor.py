@@ -320,7 +320,10 @@ def reshape(input, shape):
 
 
 def swapaxes(input, axis1, axis2):
-    return tf.transpose(input, perm=[axis1, axis2])
+    ndim = input.ndim
+    t = list(range(ndim))
+    t[axis1], t[axis2] = axis2 % ndim, axis1 % ndim
+    return tf.transpose(input, perm=t)
 
 
 def zeros(shape, dtype, ctx):
@@ -413,8 +416,11 @@ def count_nonzero(input):
     return int(tf.math.count_nonzero(input))
 
 
-def unique(input):
-    return tf.unique(input).y
+def unique(input, return_inverse=False):
+    if return_inverse:
+        return tf.unique(input)
+    else:
+        return tf.unique(input).y
 
 
 def full_1d(length, fill_value, dtype, ctx):

@@ -62,7 +62,7 @@ DGL支持内置的聚合函数 ``sum``、 ``max``、 ``min`` 和 ``mean`` 操作
 
 .. code::
 
-    def updata_all_example(graph):
+    def update_all_example(graph):
         # 在graph.ndata['ft']中存储结果
         graph.update_all(fn.u_mul_e('ft', 'a', 'm'),
                          fn.sum('m', 'ft'))
