@@ -28,7 +28,6 @@ __all__ = [
     'LineGraph',
     'KHopGraph',
     'AddMetaPaths',
-    'KNNGraph',
     'Compose'
 ]
 
@@ -100,9 +99,9 @@ class AddSelfLoop(BaseTransform):
 
     Parameters
     ----------
-    remove_first : bool, optional
-        If True, it will first remove self-loops to prevent duplicate self-loops.
-    add_self_etypes : bool, optional
+    allow_duplicate : bool, optional
+        If False, it will first remove self-loops to prevent duplicate self-loops.
+    new_etypes : bool, optional
         If True, it will add an edge type 'self' per node type, which holds self-loops.
 
     Example
@@ -117,16 +116,9 @@ class AddSelfLoop(BaseTransform):
     >>> g = dgl.graph(([1, 1], [1, 2]))
     >>> new_g = transform(g)
     >>> print(new_g.edges())
-    (tensor([1, 1, 0, 1, 2]), tensor([1, 2, 0, 1, 2]))
-
-    Case2: Remove self-loops first to avoid duplicate self-loops
-
-    >>> transform = AddSelfLoop(remove_first=True)
-    >>> new_g = transform(g)
-    >>> print(new_g.edges())
     (tensor([1, 0, 1, 2]), tensor([2, 0, 1, 2]))
 
-    Case3: Add self-loops for a heterogeneous graph
+    Case2: Add self-loops for a heterogeneous graph
 
     >>> g = dgl.heterograph({
     ...     ('user', 'plays', 'game'): ([0], [1]),
@@ -138,18 +130,18 @@ class AddSelfLoop(BaseTransform):
     >>> print(new_g.edges(etype='follows'))
     (tensor([1, 0, 1, 2]), tensor([2, 0, 1, 2]))
 
-    Case4: Add self-etypes for a heterogeneous graph
+    Case3: Add self-etypes for a heterogeneous graph
 
-    >>> transform = AddSelfLoop(self_etypes=True)
+    >>> transform = AddSelfLoop(new_etypes=True)
     >>> new_g = transform(g)
     >>> print(new_g.edges(etype='follows'))
     (tensor([1, 0, 1, 2]), tensor([2, 0, 1, 2]))
     >>> print(new_g.edges(etype=('game', 'self', 'game')))
     (tensor([0, 1]), tensor([0, 1]))
     """
-    def __init__(self, remove_first=False, self_etypes=False):
-        self.remove_first = remove_first
-        self.self_etypes = self_etypes
+    def __init__(self, allow_duplicate=False, new_etypes=False):
+        self.allow_duplicate = allow_duplicate
+        self.new_etypes = new_etypes
 
     def transform_etype(self, c_etype, g):
         r"""
@@ -174,7 +166,7 @@ class AddSelfLoop(BaseTransform):
         if utype != vtype:
             return g
 
-        if self.remove_first:
+        if not self.allow_duplicate:
             g = functional.remove_self_loop(g, etype=c_etype)
         return functional.add_self_loop(g, etype=c_etype)
 
@@ -182,7 +174,7 @@ class AddSelfLoop(BaseTransform):
         for c_etype in g.canonical_etypes:
             g = self.transform_etype(c_etype, g)
 
-        if self.self_etypes:
+        if self.new_etypes:
             device = g.device
             idtype = g.idtype
             data_dict = dict()
@@ -280,8 +272,8 @@ class AddReverse(BaseTransform):
     ----------
     copy_edata : bool, optional
         If True, the features of the reverse edges will be identical to the original ones.
-    combine_like : bool, optional
-        If True, it will not add a reverse edge type if the source and destination node type
+    sym_new_etype : bool, optional
+        If False, it will not add a reverse edge type if the source and destination node type
         in a canonical edge type are identical. Instead, it will directly add edges to the
         original edge type.
 
@@ -328,9 +320,9 @@ class AddReverse(BaseTransform):
     >>> print(new_g.edges(etype='follows'))
     (tensor([1, 2, 2, 2]), tensor([2, 2, 1, 2]))
     """
-    def __init__(self, copy_edata=False, combine_like=True):
+    def __init__(self, copy_edata=False, sym_new_etype=False):
         self.copy_edata = copy_edata
-        self.combine_like = combine_like
+        self.sym_new_etype = sym_new_etype
 
     def transform_symmetric_etype(self, c_etype, g, data_dict):
         r"""
@@ -348,12 +340,12 @@ class AddReverse(BaseTransform):
         data_dict : dict
             The edge data to update.
         """
-        if self.combine_like:
+        if self.sym_new_etype:
+            self.transform_asymmetric_etype(c_etype, g, data_dict)
+        else:
             src, dst = g.edges(etype=c_etype)
             src, dst = F.cat([src, dst], dim=0), F.cat([dst, src], dim=0)
             data_dict[c_etype] = (src, dst)
-        else:
-            self.transform_asymmetric_etype(c_etype, g, data_dict)
 
     def transform_asymmetric_etype(self, c_etype, g, data_dict):
         r"""
@@ -409,17 +401,17 @@ class AddReverse(BaseTransform):
         # Copy and expand edata
         for c_etype in g.canonical_etypes:
             utype, etype, vtype = c_etype
-            if utype == vtype and self.combine_like:
-                for key, feat in g.edges[c_etype].data.items():
-                    new_feat = feat if self.copy_edata else F.zeros(
-                        F.shape(feat), F.dtype(feat), F.context(feat))
-                    new_g.edges[c_etype].data[key] = F.cat([feat, new_feat], dim=0)
-            else:
+            if utype != vtype or self.sym_new_etype:
                 rev_c_etype = (vtype, 'rev_{}'.format(etype), utype)
                 for key, feat in g.edges[c_etype].data.items():
                     new_g.edges[c_etype].data[key] = feat
                     if self.copy_edata:
                         new_g.edges[rev_c_etype].data[key] = feat
+            else:
+                for key, feat in g.edges[c_etype].data.items():
+                    new_feat = feat if self.copy_edata else F.zeros(
+                        F.shape(feat), F.dtype(feat), F.context(feat))
+                    new_g.edges[c_etype].data[key] = F.cat([feat, new_feat], dim=0)
 
         return new_g
 
@@ -434,14 +426,6 @@ class ToSimple(BaseTransform):
     ----------
     return_counts : str, optional
         The edge feature name to hold the edge count in the original graph.
-    writeback_mapping : bool, optional
-        If True, it returns an extra write-back mapping for each edge type.
-
-        * If the input graph has a single edge type, the mapping is a tensor
-          recording the mapping from the edge IDs in the input graph to the edge
-          IDs in the returned graph.
-        * If the input graph has multiple edge types, it returns a dictionary
-          mapping edge types to tensors in the above format.
     aggregator : str, optional
         The way to coalesce features of duplicate edges.
 
@@ -471,36 +455,25 @@ class ToSimple(BaseTransform):
     >>> print(sg.edata['w'])
     tensor([[0.1000], [0.2000]])
 
-    Case2: Convert a homogeneous graph to a simple graph with writeback mapping
-
-    >>> transform = ToSimple(writeback_mapping=True)
-    >>> sg, wm = transform(g)
-    >>> print(wm)
-    tensor([0, 1, 1])
-
-    Case3: Convert a heterogeneous graph to a simple graph
+    Case2: Convert a heterogeneous graph to a simple graph
 
     >>> g = dgl.heterograph({
     ...     ('user', 'follows', 'user'): ([0, 1, 1], [1, 2, 2]),
     ...     ('user', 'plays', 'game'): ([0, 1, 0], [1, 1, 1])
     ... })
-    >>> sg, wm = transform(g)
+    >>> sg = transform(g)
     >>> print(sg.edges(etype='follows'))
     (tensor([0, 1]), tensor([1, 2]))
     >>> print(sg.edges(etype='plays'))
     (tensor([0, 1]), tensor([1, 1]))
-    >>> print(wm)
-    {('user', 'follows', 'user'): tensor([0, 1, 1]), ('user', 'plays', 'game'): tensor([0, 1, 0])}
     """
-    def __init__(self, return_counts='count', writeback_mapping=False, aggregator='arbitrary'):
+    def __init__(self, return_counts='count', aggregator='arbitrary'):
         self.return_counts = return_counts
-        self.writeback_mapping = writeback_mapping
         self.aggregator = aggregator
 
     def __call__(self, g):
         return functional.to_simple(g,
                                     return_counts=self.return_counts,
-                                    writeback_mapping=self.writeback_mapping,
                                     copy_edata=True,
                                     aggregator=self.aggregator)
 
@@ -522,8 +495,8 @@ class LineGraph(BaseTransform):
     Parameters
     ----------
     backtracking : bool, optional
-        If True, the line graph node corresponding to :math:`(u, v)` will not have an
-        edge connecting to the line graph node corresponding to :math:`(v, u)`.
+        If False, there will be an edge from the line graph node corresponding to
+        :math:`(u, v)` to the line graph node corresponding to :math:`(v, u)`.
 
     Example
     -------
@@ -598,7 +571,7 @@ class AddMetaPaths(BaseTransform):
 
     Description
     -----------
-    Add canonical edge types to an input graph based on given metapaths, as described in
+    Add new edges to an input graph based on given metapaths, as described in
     `Heterogeneous Graph Attention Network <https://arxiv.org/abs/1903.07293>`__. Formally,
     a metapath is a path of the form
 
@@ -662,95 +635,6 @@ class AddMetaPaths(BaseTransform):
             new_g = update_graph_structure(g, data_dict, copy_edata=False)
 
         return new_g
-
-class KNNGraph(BaseTransform):
-    r"""
-
-    Description
-    -----------
-    Construct a graph from a set of points according to k-nearest-neighbor (KNN)
-    and return.
-
-    The function transforms the coordinates/features of a point set
-    into a directed homogeneous graph. The coordinates of the point
-    set is specified as a matrix whose rows correspond to points and
-    columns correspond to coordinate/feature dimensions.
-
-    The nodes of the returned graph correspond to the points, where the predecessors
-    of each point are its k-nearest neighbors measured by the chosen distance.
-
-    Parameters
-    ----------
-    ndata_name : str
-        The ndata name to store the node features for KNN computation.
-    k : int
-        The number of nearest neighbors per node.
-    algorithm : str, optional
-        Algorithm used to compute the k-nearest neighbors.
-
-        * 'bruteforce-blas' will first compute the distance matrix
-          using BLAS matrix multiplication operation provided by
-          backend frameworks. Then use topk algorithm to get
-          k-nearest neighbors. This method is fast when the point
-          set is small but has :math:`O(N^2)` memory complexity where
-          :math:`N` is the number of points.
-
-        * 'bruteforce' will compute distances pair by pair and
-          directly select the k-nearest neighbors during distance
-          computation. This method is slower than 'bruteforce-blas'
-          but has less memory overhead (i.e., :math:`O(Nk)` where :math:`N`
-          is the number of points, :math:`k` is the number of nearest
-          neighbors per node) since we do not need to store all distances.
-
-        * 'bruteforce-sharemem' (CUDA only) is similar to 'bruteforce'
-          but use shared memory in CUDA devices for buffer. This method is
-          faster than 'bruteforce' when the dimension of input points
-          is not large. This method is only available on CUDA device.
-
-        * 'kd-tree' will use the kd-tree algorithm (CPU only).
-          This method is suitable for low-dimensional data (e.g. 3D
-          point clouds)
-
-        * 'nn-descent' is an approximate approach from paper
-          `Efficient k-nearest neighbor graph construction for generic similarity
-          measures <https://www.cs.princeton.edu/cass/papers/www11.pdf>`_. This method
-          will search for nearest neighbor candidates in "neighbors' neighbors".
-
-        (default: 'bruteforce-blas')
-    dist : str, optional
-        The distance metric used to compute distance between points. It can be the following
-        metrics:
-        * 'euclidean': Use Euclidean distance (L2 norm) :math:`\sqrt{\sum_{i} (x_{i} - y_{i})^{2}}`.
-        * 'cosine': Use cosine distance.
-        (default: 'euclidean')
-
-    Example
-    -------
-
-    The following examples use PyTorch backend.
-
-    >>> import dgl
-    >>> import torch
-    >>> from dgl import KNNGraph
-
-    >>> g = dgl.rand_graph(5, 20)
-    >>> g.ndata['h'] = torch.randn(g.num_nodes(), 3)
-    >>> transform = KNNGraph(ndata_name='h', k=3)
-    >>> new_g = transform(g)
-    """
-    def __init__(self, ndata_name, k, algorithm='bruteforce-blas', dist='euclidean'):
-        self.ndata_name = ndata_name
-        self.k = k
-        self.algorithm = algorithm
-        self.dist = dist
-
-    def __call__(self, g):
-        knn_g = functional.knn_graph(g.ndata[self.ndata_name],
-                                     self.k, self.algorithm, self.dist)
-        for key, feat in g.ndata.items():
-            knn_g.ndata[key] = feat
-
-        return knn_g
 
 class Compose(BaseTransform):
     r"""

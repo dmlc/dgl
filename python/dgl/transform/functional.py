@@ -13,7 +13,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 #
-"""Functional interface for"""
+"""Functional interface for transform"""
 
 from collections.abc import Iterable, Mapping
 from collections import defaultdict
@@ -1052,7 +1052,7 @@ def khop_graph(g, k, copy_ndata=True):
     col = np.repeat(adj_k.col, multiplicity)
     # TODO(zihao): we should support creating multi-graph from scipy sparse matrix
     # in the future.
-    new_g = convert.graph((row, col), num_nodes=n)
+    new_g = convert.graph((row, col), num_nodes=n, idtype=g.idtype, device=g.device)
 
     # handle ndata
     if copy_ndata:

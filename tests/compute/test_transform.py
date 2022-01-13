@@ -1812,7 +1812,7 @@ def test_module_add_self_loop(idtype):
     assert new_g.device == g.device
     assert new_g.idtype == g.idtype
     assert new_g.num_nodes() == g.num_nodes()
-    assert new_g.num_edges() == 5
+    assert new_g.num_edges() == 4
     src, dst = new_g.edges()
     eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
     assert eset == {(0, 0), (1, 1), (1, 2), (2, 2)}
@@ -1820,12 +1820,12 @@ def test_module_add_self_loop(idtype):
     assert 'w' in new_g.edata
 
     # Case2: Remove self-loops first to avoid duplicate ones
-    transform = dgl.AddSelfLoop(remove_first=True)
+    transform = dgl.AddSelfLoop(allow_duplicate=True)
     new_g = transform(g)
     assert new_g.device == g.device
     assert new_g.idtype == g.idtype
     assert new_g.num_nodes() == g.num_nodes()
-    assert new_g.num_edges() == 4
+    assert new_g.num_edges() == 5
     src, dst = new_g.edges()
     eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
     assert eset == {(0, 0), (1, 1), (1, 2), (2, 2)}
@@ -1858,7 +1858,7 @@ def test_module_add_self_loop(idtype):
     assert 'w2' in new_g.edges['follows'].data
 
     # Case4: add self-etypes for a heterogeneous graph
-    transform = dgl.AddSelfLoop(self_etypes=True)
+    transform = dgl.AddSelfLoop(new_etypes=True)
     new_g = transform(g)
     assert new_g.device == g.device
     assert new_g.idtype == g.idtype
@@ -1979,8 +1979,8 @@ def test_module_add_reverse(idtype):
     eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
     assert eset == {(1, 1), (1, 0)}
 
-    # Case4: Disable combine_like
-    transform = dgl.AddReverse(combine_like=False)
+    # Case4: Enforce reverse edge types for symmetric canonical edge types
+    transform = dgl.AddReverse(sym_new_etype=True)
     new_g = transform(g)
     assert new_g.device == g.device
     assert new_g.idtype == g.idtype
@@ -2007,6 +2007,7 @@ def test_module_add_reverse(idtype):
     eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
     assert eset == {(2, 1), (2, 2)}
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not supported for to_simple")
 @parametrize_dtype
 def test_module_to_simple(idtype):
     transform = dgl.ToSimple()
@@ -2141,20 +2142,6 @@ def test_module_add_metapaths(idtype):
     src, dst = new_g.edges(etype=('person', 'rejected', 'venue'))
     eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
     assert eset == {(0, 1), (1, 1)}
-
-@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="MXNet doesn't support @ operation")
-@parametrize_dtype
-def test_module_knn_graph(idtype):
-    g = dgl.graph(([], []), num_nodes=5, idtype=idtype, device=F.ctx())
-    g.ndata['h'] = F.randn((g.num_nodes(), 3))
-    transform = dgl.KNNGraph(ndata_name='h', k=3)
-    new_g = transform(g)
-    assert new_g.device == g.device
-    assert new_g.idtype == g.idtype
-    assert new_g.ntypes == g.ntypes
-    assert new_g.canonical_etypes == g.canonical_etypes
-    assert new_g.num_nodes() == g.num_nodes()
-    assert F.allclose(g.ndata['h'], new_g.ndata['h'])
 
 @parametrize_dtype
 def test_module_compose(idtype):
