@@ -113,12 +113,15 @@ struct RPCContext {
     t->rank = -1;
     t->machine_id = -1;
     t->num_machines = 0;
+    t->msg_seq = 0;
+    t->num_servers = 0;
     t->num_clients = 0;
     t->barrier_count = 0;
     t->num_servers_per_machine = 0;
     t->sender.reset();
     t->receiver.reset();
     t->ctx.reset();
+    t->server_state.reset();
   }
 };
 
