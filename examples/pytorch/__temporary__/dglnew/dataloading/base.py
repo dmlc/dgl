@@ -1,3 +1,8 @@
+import dgl
+from dgl import heterograph
+import dgl.backend as F
+from dgl.frame import Marker
+
 class BlockSampler(object):
     """BlockSampler is an abstract class assuming to take in a set of nodes whose
     outputs are to compute, and return a list of blocks.
@@ -6,42 +11,15 @@ class BlockSampler(object):
     ``srcdata``, the output node labels will be put in the last block's ``dstdata``, and
     the edge data will be put in all the blocks' ``edata``.
     """
-    def __init__(self):
-        self.inputs = []
-        self.outputs = []
-        self.edata = []
-        self._frozen = False
-
-    def _freeze(self):
-        self._frozen = True
+    def __init__(self, prefetch_node_feats=None, prefetch_labels=None, prefetch_edge_feats=None):
+        self.prefetch_node_feats = prefetch_node_feats or []
+        self.prefetch_labels = prefetch_labels or []
+        self.prefetch_edge_feats = prefetch_edge_feats or []
 
     def sample_blocks(self, g, seed_nodes, exclude_edges=None):
         raise NotImplementedError
 
-    def sample(self, g, seed_nodes):
-        blocks = self.sample_blocks(g, seed_nodes)
-
-        blocks[0].srcdata.mark(self.inputs)
-        # Or equivalently
-        #
-        #     for name in self.inputs:
-        #         blocks[0].srcdata[name] = Marker()
-        #
-        # Marker's signature is
-        #
-        #     Marker(name: str, id_: tensor)
-        #
-        # Both arguments can be None.  In this case, the name and ID will be inferred
-        # from where it is assigned to.  E.g.
-        #
-        #     blocks[0].srcdata[name] = Marker()
-        #
-        # is equivalent to
-        #
-        #     blocks[0].srcdata[name] = Marker(name, blocks[0].srcdata[dgl.NID])
-        blocks[-1].dstdata.mark(self.outputs)
-        for block in blocks:
-            block.edata.mark(self.edata)
+    def assign_lazy_features(self, result):
         # If you want to prefetch things other than ndata and edata, you can also
         # return a Marker(name, id_).  If a Marker is returned in places other than
         # in a graph's ndata/edata/srcdata/dstdata, the DataLoader will prefetch it
@@ -59,25 +37,16 @@ class BlockSampler(object):
         #
         #     for blocks, other_feat in dataloader:
         #         train_on(blocks, other_feat)
-        return blocks
+        input_nodes, output_nodes, blocks = result
+        blocks[0].srcdata.update({k: Marker(k) for k in self.prefetch_node_feats})
+        blocks[-1].dstdata.update({k: Marker(k) for k in self.prefetch_labels})
+        for block in blocks:
+            block.edata.update({k: Marker(k) for k in self.prefetch_edge_feats})
+        return input_nodes, output_nodes, blocks
 
-    def add_input(self, name):
-        assert not self._frozen, \
-            "Cannot call this method after the dataloader has been created.  " \
-            "Please call this method before the creation of dataloader."
-        self.inputs.append(name)
-
-    def add_output(self, name):
-        assert not self._frozen, \
-            "Cannot call this method after the dataloader has been created.  " \
-            "Please call this method before the creation of dataloader."
-        self.outputs.append(name)
-
-    def add_edata(self, edata):
-        assert not self._frozen, \
-            "Cannot call this method after the dataloader has been created.  " \
-            "Please call this method before the creation of dataloader."
-        self.edata.append(name)
+    def sample(self, g, seed_nodes):
+        result = self.sample_blocks(g, seed_nodes)
+        return self.assign_lazy_features(result)
 
 
 def _find_exclude_eids_with_reverse_id(g, eids, reverse_eid_map):
@@ -156,12 +125,12 @@ def _find_exclude_eids(g, exclude_mode, eids, **kwargs):
     else:
         raise ValueError('unsupported mode {}'.format(exclude_mode))
 
-def find_exclude_eids(seed_edges, exclude, g_sampling, reverse_eids=None,
-                      reverse_etypes=None, output_device=None):
+def find_exclude_eids(g, seed_edges, exclude, reverse_eids=None, reverse_etypes=None,
+                      output_device=None):
     # find the edges to exclude
     if exclude is not None:
         exclude_eids = _find_exclude_eids(
-            g_sampling,
+            g,
             exclude,
             seed_edges,
             reverse_eid_map=reverse_eids,
@@ -172,103 +141,18 @@ def find_exclude_eids(seed_edges, exclude, g_sampling, reverse_eids=None,
     return exclude_eids
 
 
-class EdgeWrapper(object):
-    """EdgeWrapper adapts a node-wise BlockSampler for edge classification.
-
-    It assumes that the neighbor sampler will return a list of blocks, and it will return
-
-    * A subgraph that contains only the edges in the minibatch and their incident nodes.
-      Note that the graph has an identical metagraph with the original graph.
-
-    * The list of blocks returned by the neighbor sampler.
-
-    It assumes that the input node features will be put in the first block's
-    ``srcdata``, the output edge labels will be put in the last block's ``dstdata``, and
-    the edge data will be put in all the blocks' ``edata``.
-    """
+class EdgeBlockSampler(object):
     def __init__(self, neighbor_sampler, exclude=None, reverse_eids=None,
-                 reverse_etypes=None):
+                 reverse_etypes=None, negative_sampler=None, prefetch_node_feats=None,
+                 prefetch_labels=None, prefetch_edge_feats=None):
         self.reverse_eids = reverse_eids
         self.reverse_etypes = reverse_etypes
         self.exclude = exclude
         self.neighbor_sampler = neighbor_sampler
-
-        self.inputs = neighbor_sampler.inputs
-        self.outputs = neighbor_sampler.outputs
-        self.edata = neighbor_sampler.edata
-        self._frozen = False
-
-    def sample(self, g, seed_edges, g_sampling=None):
-        exclude = self.exclude if g_sampling is None else None
-        g_sampling = g_sampling or g
-        pair_graph = g.edge_subgraph(seed_edges, self.output_device)
-        eids = pair_graph.edata[dgl.EID]
-        pair_graph = dgl.compact_graphs(pair_graph)
-        pair_graph.edata[dgl.EID] = eids
-        seed_nodes = pair_graph.ndata[dgl.NID]
-
-        exclude_eids = find_exclude_eids(
-            g, seed_edges, g_sampling, self.reverse_eids, self.reverse_etypes,
-            self.output_device)
-
-        blocks = self.neighbor_sampler.sample_blocks(g_sampling, seed_nodes, exclude_eids)
-
-        blocks[0].srcdata.mark(self.inputs)
-        pair_graph.edata.mark(self.outputs)
-        for block in blocks:
-            block.edata.mark(self.edata)
-        return pair_graph, blocks
-
-    def _freeze(self):
-        self._frozen = True
-        self.neighbor_sampler._freeze()
-
-    def add_input(self, name):
-        assert not self._frozen, \
-            "Cannot call this method after the dataloader has been created.  " \
-            "Please call this method before the creation of dataloader."
-        self.inputs.append(name)
-
-    def add_output(self, name):
-        assert not self._frozen, \
-            "Cannot call this method after the dataloader has been created.  " \
-            "Please call this method before the creation of dataloader."
-        self.outputs.append(name)
-
-    def add_edata(self, edata):
-        assert not self._frozen, \
-            "Cannot call this method after the dataloader has been created.  " \
-            "Please call this method before the creation of dataloader."
-        self.edata.append(name)
-
-
-class LinkWrapper(object):
-    """LinkWrapper adapts a node-wise BlockSampler for link prediction.
-
-    It assumes that the neighbor sampler will return a list of blocks, and it will return
-
-    * A subgraph that contains only the edges in the minibatch and their incident nodes.
-      Note that the graph has an identical metagraph with the original graph.
-
-    * Another graph that contains the "negative edges", connecting the source and
-      destination nodes yielded from the given negative sampler.
-
-    * The list of blocks returned by the neighbor sampler.
-
-    It assumes that the input node features will be put in the first block's
-    ``srcdata``, and the edge data will be put in all the blocks' ``edata``.
-    """
-    def __init__(self, neighbor_sampler, exclude=None, reverse_eids=None,
-                 reverse_etypes=None, negative_sampler=None):
-        self.reverse_eids = reverse_eids
-        self.reverse_etypes = reverse_etypes
-        self.exclude = exclude
         self.negative_sampler = negative_sampler
-        self.neighbor_sampler = neighbor_sampler
-
-        self.inputs = neighbor_sampler.inputs
-        self.edata = neighbor_sampler.edata
-        self._frozen = True
+        self.prefetch_node_feats = prefetch_node_feats or []
+        self.prefetch_labels = prefetch_labels or []
+        self.prefetch_edge_feats = prefetch_edge_feats or []
 
     def _build_neg_graph(self, g, seed_edges):
         neg_srcdst = self.negative_sampler(g, seed_edges)
@@ -286,41 +170,35 @@ class LinkWrapper(object):
             neg_edges, {ntype: g.number_of_nodes(ntype) for ntype in g.ntypes})
         return neg_pair_graph
 
-    def sample(self, g, seed_edges, g_sampling=None):
-        exclude = self.exclude if g_sampling is None else None
-        g_sampling = g_sampling or g
+    def assign_lazy_features(self, result):
+        pair_graph = result[1]
+        blocks = result[-1]
+        blocks[0].srcdata.update({k: Marker(k) for k in self.prefetch_node_feats})
+        pair_graph.edata.update({k: Marker(k) for k in self.prefetch_labels})
+        for block in blocks:
+            block.edata.update({k: Marker(k) for k in self.prefetch_edge_feats})
+
+    def sample(self, g, seed_edges):
+        exclude = self.exclude
         pair_graph = g.edge_subgraph(seed_edges, self.output_device)
         eids = pair_graph.edata[dgl.EID]
+        pair_graph = dgl.compact_graphs(pair_graph)
 
-        neg_graph = self._build_neg_graph(g, seed_edges)
+        if self.negative_sampler is not None:
+            neg_graph = self._build_neg_graph(g, seed_edges)
+            pair_graph, neg_graph = dgl.compact_graphs([pair_graph, neg_graph])
 
-        pair_graph, neg_graph = dgl.compact_graphs([pair_graph, neg_graph])
         pair_graph.edata[dgl.EID] = eids
         seed_nodes = pair_graph.ndata[dgl.NID]
 
         exclude_eids = find_exclude_eids(
-            g, seed_edges, g_sampling, self.reverse_eids, self.reverse_etypes,
+            g, seed_edges, exclude, self.reverse_eids, self.reverse_etypes,
             self.output_device)
 
-        blocks = self.neighbor_sampler.sample_blocks(g_sampling, seed_nodes, exclude_eids)
+        input_nodes, _, blocks = self.neighbor_sampler.sample_blocks(
+            g, seed_nodes, exclude_eids)
 
-        blocks[0].srcdata.mark(self.inputs)
-        for block in blocks:
-            block.edata.mark(self.edata)
-        return pair_graph, neg_graph, blocks
-
-    def _freeze(self):
-        self._frozen = True
-        self.neighbor_sampler._freeze()
-
-    def add_input(self, name):
-        assert not self._frozen, \
-            "Cannot call this method after the dataloader has been created.  " \
-            "Please call this method before the creation of dataloader."
-        self.inputs.append(name)
-
-    def add_edata(self, edata):
-        assert not self._frozen, \
-            "Cannot call this method after the dataloader has been created.  " \
-            "Please call this method before the creation of dataloader."
-        self.edata.append(name)
+        if self.negative_sampler is None:
+            return self.assign_lazy_features((input_nodes, pair_graph, blocks))
+        else:
+            return self.assign_lazy_features((input_nodes, pair_graph, neg_graph, blocks))

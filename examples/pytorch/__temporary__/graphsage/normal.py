@@ -6,8 +6,6 @@ import dgl
 import dgl.nn as dglnn
 import time
 import numpy as np
-# OGB must follow DGL if both DGL and PyG are installed. Otherwise DataLoader will hang.
-# (This is a long-standing issue)
 from ogb.nodeproppred import DglNodePropPredDataset
 
 import dglnew
@@ -36,13 +34,14 @@ graph.ndata['label'] = labels
 split_idx = dataset.get_idx_split()
 train_idx, valid_idx, test_idx = split_idx['train'], split_idx['valid'], split_idx['test']
 
-graph.create_formats_()
 # We actually won't have this statement in formal examples - this is just to ensure that
 # my code doesn't depend on DGLGraph's internal interfaces that did not appear in the RFC.
+graph.create_formats_()
 graph = dglnew.graph.DGLGraphStorage(graph)
-sampler = dglnew.dataloading.NeighborSampler([5, 5, 5], output_device='cpu')
-sampler.add_input('feat')
-sampler.add_output('label')
+
+sampler = dglnew.dataloading.NeighborSampler(
+        [5, 5, 5], output_device='cpu', prefetch_node_feats=['feat'],
+        prefetch_labels=['label'])
 dataloader = dglnew.dataloading.NodeDataLoader(
         graph,
         train_idx,

@@ -240,6 +240,44 @@ def _prefetcher_entry(dataloader_it, dataloader, queue, num_threads):
         queue.put((None, None, None, ExceptionWrapper(where='in prefetcher')))
 
 
+def remove_parent_storage_columns(item, g):
+    if not isinstance(item, DGLGraph):
+        return item
+
+    for subframe, frame in zip(
+            itertools.chain(item._node_frames, item._edge_frames),
+            itertools.chain(g._node_frames, g._edge_frames)):
+        for key in subframe.keys():
+            subcol = subframe._columns[key]   # directly get the column object
+            if isinstance(subcol, Marker):
+                continue
+            col = frame._columns.get(key, None)
+            if col is None:
+                continue
+            if col.storage is subcol.storage:
+                subcol.storage = None
+    return item
+
+
+def restore_parent_storage_columns(item, g):
+    if not isinstance(item, DGLGraph):
+        return item
+
+    for subframe, frame in zip(
+            itertools.chain(item._node_frames, item._edge_frames),
+            itertools.chain(g._node_frames, g._edge_frames)):
+        for key in subframe.keys():
+            subcol = subframe._columns[key]
+            if isinstance(subcol, Marker):
+                continue
+            col = frame._columns.get(key, None)
+            if col is None:
+                continue
+            if subcol.storage is None:
+                subcol.storage = col.storage
+    return item
+
+
 class _PrefetchingIter(object):
     def __init__(self, dataloader, dataloader_it, use_thread=False, num_threads=None):
         self.queue = Queue(1)
@@ -286,19 +324,10 @@ class _PrefetchingIter(object):
         batch, feats, stream_event = \
             self._next_non_threaded() if not self.use_thread else self._next_threaded()
         batch = recursive_apply_pair(batch, feats, _assign_for)
+        batch = recursive_apply(batch, restore_parent_storage_columns, self.dataloader.graph)
         if stream_event is not None:
             stream_event.wait()
         return batch
-
-
-def _remove_parent_storage_columns(item):
-    if isinstance(item, DGLGraph):
-        for frame in itertools.chain(item._node_frames, item._edge_frames):
-            for key in list(frame.keys()):
-                col = frame._columns[key]   # directly get the column object
-                if isinstance(col, Column) and col.index is not None:
-                    del frame[key]
-    return item
 
 
 def collate_wrapper(sample_func, g):
@@ -307,7 +336,7 @@ def collate_wrapper(sample_func, g):
 
         # Remove all the columns whose storages are parent storages (i.e. index is not
         # None)
-        batch = recursive_apply(batch, _remove_parent_storage_columns)
+        batch = recursive_apply(batch, remove_parent_storage_columns, g)
         return batch
     return _sample
 
@@ -358,6 +387,10 @@ class NodeDataLoader(torch.utils.data.DataLoader):
         self.use_prefetch_thread = use_prefetch_thread
         worker_init_fn = _wrap_worker_init_fn(kwargs.get('worker_init_fn', None))
 
+        # Instantiate all the formats if the number of workers is greater than 0.
+        if kwargs.get('num_workers', 0) > 0 and hasattr(self.graph, 'create_formats_'):
+            self.graph.create_formats_()
+
         self.node_data = _prepare_storages_from_graph(graph, 'ndata', graph.ntypes)
         self.edge_data = _prepare_storages_from_graph(graph, 'edata', graph.canonical_etypes)
         self.other_data = {}
@@ -403,6 +436,10 @@ class EdgeDataLoader(torch.utils.data.DataLoader):
         self.node_data = _prepare_storages_from_graph(graph, 'ndata', graph.ntypes)
         self.edge_data = _prepare_storages_from_graph(graph, 'edata', graph.canonical_etypes)
         self.other_data = {}
+
+        # Instantiate all the formats if the number of workers is greater than 0.
+        if kwargs.get('num_workers', 0) > 0 and hasattr(self.graph, 'create_formats_'):
+            self.graph.create_formats_()
 
         if isinstance(self.graph_sampler, BlockSampler):
             if negative_sampler is not None:

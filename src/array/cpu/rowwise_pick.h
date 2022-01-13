@@ -112,78 +112,91 @@ COOMatrix CSRRowWisePick(CSRMatrix mat, IdArray rows,
   const int num_threads = omp_get_max_threads();
   std::vector<int64_t> global_prefix(num_threads+1, 0);
 
+  // copied from parallel_for
+  std::atomic_flag err_flag = ATOMIC_FLAG_INIT;
+  std::exception_ptr eptr;
+
 #pragma omp parallel num_threads(num_threads)
   {
-    const int thread_id = omp_get_thread_num();
+    try {
+      const int thread_id = omp_get_thread_num();
 
-    const int64_t start_i = thread_id * (num_rows/num_threads) +
-        std::min(static_cast<int64_t>(thread_id), num_rows % num_threads);
-    const int64_t end_i = (thread_id + 1) * (num_rows/num_threads) +
-        std::min(static_cast<int64_t>(thread_id + 1), num_rows % num_threads);
-    assert(thread_id + 1 < num_threads || end_i == num_rows);
+      const int64_t start_i = thread_id * (num_rows/num_threads) +
+          std::min(static_cast<int64_t>(thread_id), num_rows % num_threads);
+      const int64_t end_i = (thread_id + 1) * (num_rows/num_threads) +
+          std::min(static_cast<int64_t>(thread_id + 1), num_rows % num_threads);
+      CHECK(thread_id + 1 < num_threads || end_i == num_rows);
 
-    const int64_t num_local = end_i - start_i;
+      const int64_t num_local = end_i - start_i;
 
-    // make sure we don't have to pay initialization cost
-    std::unique_ptr<int64_t[]> local_prefix(new int64_t[num_local + 1]);
-    local_prefix[0] = 0;
-    for (int64_t i = start_i; i < end_i; ++i) {
-      // build prefix-sum
-      const int64_t local_i = i-start_i;
-      const IdxType rid = rows_data[i];
-      IdxType len;
-      if (replace) {
-        len = indptr[rid+1] == indptr[rid] ? 0 : num_picks;
-      } else {
-        len = std::min(
-          static_cast<IdxType>(num_picks), indptr[rid + 1] - indptr[rid]);
-      }
-      local_prefix[local_i + 1] = local_prefix[local_i] + len;
-    }
-    global_prefix[thread_id + 1] = local_prefix[num_local];
-
-    #pragma omp barrier
-    #pragma omp master
-    {
-      for (int t = 0; t < num_threads; ++t) {
-        global_prefix[t+1] += global_prefix[t];
-      }
-    }
-
-    #pragma omp barrier
-    const IdxType thread_offset = global_prefix[thread_id];
-
-    for (int64_t i = start_i; i < end_i; ++i) {
-      const IdxType rid = rows_data[i];
-
-      const IdxType off = indptr[rid];
-      const IdxType len = indptr[rid + 1] - off;
-      if (len == 0)
-        continue;
-
-      const int64_t local_i = i - start_i;
-      const int64_t row_offset = thread_offset + local_prefix[local_i];
-
-      if (len <= num_picks && !replace) {
-        // nnz <= num_picks and w/o replacement, take all nnz
-        for (int64_t j = 0; j < len; ++j) {
-          picked_rdata[row_offset + j] = rid;
-          picked_cdata[row_offset + j] = indices[off + j];
-          picked_idata[row_offset + j] = data? data[off + j] : off + j;
+      // make sure we don't have to pay initialization cost
+      std::unique_ptr<int64_t[]> local_prefix(new int64_t[num_local + 1]);
+      local_prefix[0] = 0;
+      for (int64_t i = start_i; i < end_i; ++i) {
+        // build prefix-sum
+        const int64_t local_i = i-start_i;
+        const IdxType rid = rows_data[i];
+        CHECK_LE(rid, mat.num_rows);
+        IdxType len;
+        if (replace) {
+          len = indptr[rid+1] == indptr[rid] ? 0 : num_picks;
+        } else {
+          len = std::min(
+            static_cast<IdxType>(num_picks), indptr[rid + 1] - indptr[rid]);
         }
-      } else {
-        pick_fn(rid, off, len,
-                indices, data,
-                picked_idata + row_offset);
-        for (int64_t j = 0; j < num_picks; ++j) {
-          const IdxType picked = picked_idata[row_offset + j];
-          picked_rdata[row_offset + j] = rid;
-          picked_cdata[row_offset + j] = indices[picked];
-          picked_idata[row_offset + j] = data? data[picked] : picked;
+        local_prefix[local_i + 1] = local_prefix[local_i] + len;
+      }
+      global_prefix[thread_id + 1] = local_prefix[num_local];
+
+      #pragma omp barrier
+      #pragma omp master
+      {
+        for (int t = 0; t < num_threads; ++t) {
+          global_prefix[t+1] += global_prefix[t];
         }
       }
+
+      #pragma omp barrier
+      const IdxType thread_offset = global_prefix[thread_id];
+
+      for (int64_t i = start_i; i < end_i; ++i) {
+        const IdxType rid = rows_data[i];
+        CHECK_LE(rid, mat.num_rows);
+
+        const IdxType off = indptr[rid];
+        const IdxType len = indptr[rid + 1] - off;
+        if (len == 0)
+          continue;
+
+        const int64_t local_i = i - start_i;
+        const int64_t row_offset = thread_offset + local_prefix[local_i];
+
+        if (len <= num_picks && !replace) {
+          // nnz <= num_picks and w/o replacement, take all nnz
+          for (int64_t j = 0; j < len; ++j) {
+            picked_rdata[row_offset + j] = rid;
+            picked_cdata[row_offset + j] = indices[off + j];
+            picked_idata[row_offset + j] = data? data[off + j] : off + j;
+          }
+        } else {
+          pick_fn(rid, off, len,
+                  indices, data,
+                  picked_idata + row_offset);
+          for (int64_t j = 0; j < num_picks; ++j) {
+            const IdxType picked = picked_idata[row_offset + j];
+            picked_rdata[row_offset + j] = rid;
+            picked_cdata[row_offset + j] = indices[picked];
+            picked_idata[row_offset + j] = data? data[picked] : picked;
+          }
+        }
+      }
+    } catch (...) {
+      if (!err_flag.test_and_set())
+        eptr = std::current_exception();
     }
   }
+  if (eptr)
+    std::rethrow_exception(eptr);
 
   const int64_t new_len = global_prefix.back();
   picked_row = picked_row.CreateView({new_len}, picked_row->dtype);
