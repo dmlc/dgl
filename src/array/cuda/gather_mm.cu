@@ -54,26 +54,29 @@ void gatherMM(const NDArray E_etype,
               const NDArray w,
               NDArray out) {
   SWITCH_BITS(bits, DType, {
+
     int64_t num_rel = E_etype.NumElements();
     int n = w->shape[1]; // cols of B
     int k = h->shape[1]; // cols of A
     const DType *h_data = h.Ptr<DType>();
     const DType *w_data = w.Ptr<DType>();
     DType *out_data = out.Ptr<DType>();
-    // TODO(Israt): put on CPU
-    NDArray E_etype_cpu = E_etype.CopyTo(DLContext{kDLCPU, 0});
-    IdType* E_etype_data = static_cast<IdType*>(E_etype_cpu->data);
-
+    IdType* E_etype_data = static_cast<IdType*>(E_etype->data);
     int64_t h_offset = 0;
     int64_t w_offset = 0;
     int64_t out_offset = 0;
-    cublasHandle_t handle;
-    CUBLAS_CALL(cublasCreate(&handle));
     DType alpha = 1., beta = 0.;
+
+    auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+    if (!thr_entry->cublas_handle)
+        CUBLAS_CALL(cublasCreate(&(thr_entry->cublas_handle)));
+    CUBLAS_CALL(cublasSetStream(thr_entry->cublas_handle,
+        thr_entry->stream));
+
     for (int etype = 0; etype < num_rel; ++etype) {
         int m = E_etype_data[etype]; // rows of A
         CUBLAS_CALL(cublasGemm<DType>(
-          handle,
+          thr_entry->cublas_handle,
           CUBLAS_OP_N,
           CUBLAS_OP_N,
           m, n, k,
