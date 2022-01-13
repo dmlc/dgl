@@ -2145,16 +2145,16 @@ def test_module_add_metapaths(idtype):
 
 @parametrize_dtype
 def test_module_compose(idtype):
-    g = dgl.graph(([0, 0], [1, 1]), idtype=idtype, device=F.ctx())
-    transform = dgl.Compose([dgl.ToSimple(), dgl.AddReverse()])
+    g = dgl.graph(([0, 1], [1, 2]), idtype=idtype, device=F.ctx())
+    transform = dgl.Compose([dgl.AddReverse(), dgl.AddSelfLoop()])
     new_g = transform(g)
     assert new_g.device == g.device
     assert new_g.idtype == g.idtype
-    assert new_g.num_edges() == 2
+    assert new_g.num_edges() == 7
 
     src, dst = new_g.edges()
     eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
-    assert eset == {(0, 1), (1, 0)}
+    assert eset == {(0, 1), (1, 2), (1, 0), (2, 1), (0, 0), (1, 1), (2, 2)}
 
 if __name__ == '__main__':
     test_partition_with_halo()
