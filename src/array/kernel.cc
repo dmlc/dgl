@@ -13,6 +13,7 @@
 #include "kernel_decl.h"
 #include "../c_api_common.h"
 #include "./check.h"
+#include<math.h>
 
 using namespace dgl::runtime;
 
@@ -47,6 +48,44 @@ void SpMM(const std::string& op, const std::string& reduce,
         } else {
           LOG(FATAL) << "SpMM only supports CSC and COO formats";
         }
+      });
+    });
+  });
+}
+
+/*! \brief Generalized Sparse Matrix-Matrix Multiplication. */
+void Edge_softmax(const std::string& op,
+          HeteroGraphPtr graph,
+          NDArray ufeat,
+          NDArray efeat,
+          NDArray out) {
+  // TODO(zihao): format tuning
+  SparseFormat format = graph->SelectFormat(0, CSC_CODE);
+  const auto& bcast = CalcBcastOff(op, ufeat, efeat);
+
+  ATEN_XPU_SWITCH_CUDA(graph->Context().device_type, XPU, "edge_soft", {
+    ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
+      ATEN_FLOAT_BITS_SWITCH(out->dtype, bits, "edge_soft out data", {
+            Edge_softmax_csr<XPU, IdType, bits>(op,bcast,graph->GetCSCMatrix(0),ufeat, efeat, out);
+      });
+    });
+  });
+}
+
+void Edge_softmax_back(const std::string& op,
+          HeteroGraphPtr graph,
+          NDArray out,
+          NDArray sds,
+          NDArray back_out,
+          NDArray ufeat) {
+  // TODO(zihao): format tuning
+  SparseFormat format = graph->SelectFormat(0, CSC_CODE);
+  const auto& bcast = CalcBcastOff(op, ufeat, sds);
+
+  ATEN_XPU_SWITCH_CUDA(graph->Context().device_type, XPU, "edge_soft_back", {
+    ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
+      ATEN_FLOAT_BITS_SWITCH(out->dtype, bits, "edge_soft out data_back", {
+            Edge_softmax_csr_back<XPU, IdType, bits>(op,bcast,graph->GetCSCMatrix(0),out, sds, back_out);
       });
     });
   });
@@ -111,15 +150,18 @@ void SDDMM(const std::string& op,
   // TODO(zihao): format tuning
   SparseFormat format = graph->SelectFormat(0, COO_CODE);
   const auto &bcast = CalcBcastOff(op, lhs, rhs);
+  // std::cout<<"dim is:"<<bcast.out_len<<std::endl;
 
   ATEN_XPU_SWITCH_CUDA(graph->Context().device_type, XPU, "SDDMM", {
     ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
       ATEN_FLOAT_BITS_SWITCH(out->dtype, bits, "Feature data", {
         if (format == SparseFormat::kCSR) {
+          // std::cout<<"csr"<<std::endl;
           SDDMMCsr<XPU, IdType, bits>(
               op, bcast, graph->GetCSRMatrix(0),
               lhs, rhs, out, lhs_target, rhs_target);
         } else if (format == SparseFormat::kCOO) {
+          // std::cout<<"coo"<<std::endl;
           SDDMMCoo<XPU, IdType, bits>(
               op, bcast, graph->GetCOOMatrix(0),
               lhs, rhs, out, lhs_target, rhs_target);
@@ -332,6 +374,7 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSpMM")
     NDArray V = args[5];
     NDArray ArgU = args[6];
     NDArray ArgE = args[7];
+    
     CheckCtx(graph->Context(), {U, E, V, ArgU, ArgE},
         {"U_data", "E_data", "out", "Arg_U", "Arg_E"});
     CheckContiguous({U, E, V, ArgU, ArgE},
@@ -345,8 +388,35 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSpMM")
         {0, 1, 2, 2, 2},
         {U, E, V, ArgU, ArgE},
         {"U_data", "E_data", "out", "Arg_U", "Arg_E"});
+
     SpMM(op, reduce_op, graph.sptr(), U, E, V, {ArgU, ArgE});
+
   });
+
+
+DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKerneltest_softmax")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef graph = args[0];
+    const std::string op = args[1];
+    NDArray U = args[2];
+    NDArray E = args[3];
+    NDArray V = args[4];
+    
+    Edge_softmax(op, graph.sptr(), U, E, V);
+});
+
+DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKerneltest_back_softmax")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef graph = args[0];
+    const std::string op = args[1];
+    NDArray out = args[2];
+    NDArray sds = args[3];
+    NDArray back_out = args[4];
+    NDArray ufeat = args[5];
+    Edge_softmax_back(op, graph.sptr(), out, sds, back_out, ufeat);
+});
+
+
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSpMMHetero")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
@@ -394,6 +464,8 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSDDMM")
     NDArray out = args[4];
     int lhs_target = args[5];
     int rhs_target = args[6];
+
+
     CheckCtx(graph->Context(), {lhs, rhs, out}, {"lhs", "rhs", "out"});
     CheckContiguous({lhs, rhs, out}, {"lhs", "rhs", "out"});
     CHECK_EQ(graph->NumEdgeTypes(), 1);
@@ -406,8 +478,14 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSDDMM")
         {lhs_target, rhs_target, 1},
         {lhs, rhs, out},
         {"U_data", "E_data", "V_data"});
+
     SDDMM(op, graph.sptr(), lhs, rhs, out, lhs_target, rhs_target);
+
   });
+
+
+
+
 
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSDDMMHetero")

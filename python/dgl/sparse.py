@@ -83,6 +83,29 @@ target_mapping = {
     'dst': 2
 }
 
+def _softmax_back_test(gidx,out,sds):
+    op = 'copy_rhs'
+    back_out = F.zeros_like(out)
+    _CAPI_DGLKerneltest_back_softmax(gidx,op,
+                                to_dgl_nd(out),
+                                to_dgl_nd(sds),
+                                to_dgl_nd_for_write(back_out),
+                                to_dgl_nd(None))
+    return back_out
+
+def _softmax_test(gidx,e,op):
+    if(F.ndim(e) == 1):
+        e = F.unsqueeze(e, -1)
+        expand = True
+    else:
+        expand = False
+    myout = F.zeros_like(e)
+    _CAPI_DGLKerneltest_softmax(gidx,op,
+                                to_dgl_nd(None),
+                                to_dgl_nd(e),
+                                to_dgl_nd_for_write(myout))
+    myout = F.squeeze(myout, -1) if expand else myout
+    return myout
 
 def _gspmm(gidx, op, reduce_op, u, e):
     r""" Generalized Sparse Matrix Multiplication interface. It takes the result of
