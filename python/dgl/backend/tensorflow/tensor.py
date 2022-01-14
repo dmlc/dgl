@@ -320,7 +320,10 @@ def reshape(input, shape):
 
 
 def swapaxes(input, axis1, axis2):
-    return tf.transpose(input, perm=[axis1, axis2])
+    ndim = input.ndim
+    t = list(range(ndim))
+    t[axis1], t[axis2] = axis2 % ndim, axis1 % ndim
+    return tf.transpose(input, perm=t)
 
 
 def zeros(shape, dtype, ctx):
