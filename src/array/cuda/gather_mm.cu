@@ -96,19 +96,16 @@ void gatherMM_UnsortedEtype(const NDArray h,
     int64_t num_rel = E_per_rel.NumElements();
     int n = w->shape[1]; // cols of B
     int k = h->shape[1]; // cols of A
-    NDArray E_etype_cpu = E_per_rel.CopyTo(DLContext{kDLCPU, 0});
-    IdType* E_etype_data = static_cast<IdType*>(E_etype_cpu->data);
-
+    const IdType* E_per_rel_data = E_per_rel.Ptr<IdType>();
     IdType tot_num_rows = 0;
     for (int i = 0; i < num_rel; ++i)
-        tot_num_rows += E_etype_data[i];
+        tot_num_rows += E_per_rel_data[i];
 
     const int ntx = 128;
     const int warp_size = 32;
     const int nbx =  ((tot_num_rows * warp_size + ntx - 1) / ntx);
     const dim3 nblks(nbx);
     const dim3 nthrs(ntx);
-
     CUDA_KERNEL_CALL((gatherMMUnsortedEKernel<IdType, DType>),
         nblks, nthrs, 0, thr_entry->stream,
         static_cast<DType*>(h->data),
@@ -120,6 +117,8 @@ void gatherMM_UnsortedEtype(const NDArray h,
     });
 }
 
+// TODO(Israt): cublas treats input as col-major, pytorch stores input as
+// row-major. Fix it.
 template <int XPU, typename IdType, int bits>
 void gatherMM_SortedEtype(const NDArray h,
               const NDArray w,
@@ -133,9 +132,9 @@ void gatherMM_SortedEtype(const NDArray h,
         int k = h->shape[1]; // cols of A
         const DType *h_data = h.Ptr<DType>();
         const DType *w_data = w.Ptr<DType>();
+        const IdType* E_per_rel_data = E_per_rel.Ptr<IdType>();
         DType *out_data = out.Ptr<DType>();
-        NDArray E_per_rel_cpu = E_per_rel.CopyTo(DLContext{kDLCPU, 0});
-        IdType* E_per_rel_data = static_cast<IdType*>(E_per_rel_cpu->data);
+
         int64_t h_offset = 0;
         int64_t w_offset = 0;
         int64_t out_offset = 0;

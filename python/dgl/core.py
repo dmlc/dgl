@@ -1,14 +1,12 @@
 """Implementation for core graph computation."""
 # pylint: disable=not-callable
 import numpy as np
-import torch as th
 
-from .base import DGLError, is_all, NID, EID, ALL, dgl_warning, ETYPE
+from .base import DGLError, is_all, NID, EID, ALL, dgl_warning
 from . import backend as F
 from . import function as fn
 from .frame import Frame
 from .udf import NodeBatch, EdgeBatch
-from .sparse import _matmul_homogenized
 from . import ops
 
 def is_builtin(func):
@@ -47,50 +45,6 @@ def invoke_node_udf(graph, nid, ntype, func, *, ndata=None, orig_nid=None):
             ndata = graph._node_frames[ntid].subframe(nid)
     nbatch = NodeBatch(graph, nid if orig_nid is None else orig_nid, ntype, ndata)
     return func(nbatch)
-
-def invoke_gather_mm(graph, eid, etype, func, wdict, *, orig_eid=None):
-    """Invoke user-defined edge function on the given edges.
-
-    Parameters
-    ----------
-    graph : DGLGraph
-        The input graph.
-    eid : Tensor
-        The IDs of the edges to invoke UDF on.
-    etype : (str, str, str)
-        Edge type.
-    func : callable
-        The user-defined function.
-    orig_eid : Tensor, optional
-        Original edge IDs. Useful if the input graph is an extracted subgraph.
-
-    Returns
-    -------
-    dict[str, Tensor]
-        Results from running the UDF.
-    """
-    etid = graph.get_etype_id(etype)
-    stid, dtid = graph._graph.metagraph.find_edge(etid)
-    if is_all(eid):
-        u, v, eid = graph.edges(form='all')
-        edata = graph._edge_frames[etid]
-    else:
-        u, v = graph.find_edges(eid)
-        edata = graph._edge_frames[etid].subframe(eid)
-    if len(u) == 0:
-        dgl_warning('The input graph for the user-defined edge function ' \
-                    'does not contain valid edges')
-    srcdata = graph._node_frames[stid].subframe(u)
-    dstdata = graph._node_frames[dtid].subframe(v)
-    ebatch = EdgeBatch(graph, eid if orig_eid is None else orig_eid,
-                       etype, srcdata, edata, dstdata)
-    h = ebatch.src['h']
-    w = wdict.reshape(wdict.shape[0] * wdict.shape[1], wdict.shape[2])
-    _, E_etypes = th.unique(graph.edata[ETYPE], return_counts=True)
-
-    output = _matmul_homogenized(graph._graph, E_etypes, h, w)
-
-    return output
 
 def invoke_edge_udf(graph, eid, etype, func, *, orig_eid=None):
     """Invoke user-defined edge function on the given edges.
