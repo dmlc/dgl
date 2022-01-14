@@ -16,6 +16,19 @@ from torch.nn.parallel import DistributedDataParallel
 from entity_utils import load_data
 from entity_sample import init_dataloaders, init_models, train, evaluate
 
+def collect_eval(n_gpus, queue, labels):
+    eval_logits = []
+    eval_seeds = []
+    for _ in range(n_gpus):
+        eval_l, eval_s = queue.get()
+        eval_logits.append(eval_l)
+        eval_seeds.append(eval_s)
+    eval_logits = th.cat(eval_logits)
+    eval_seeds = th.cat(eval_seeds)
+    eval_acc = accuracy(eval_logits.argmax(dim=1), labels[eval_seeds].cpu()).item()
+
+    return eval_acc
+
 def run(proc_id, n_gpus, n_cpus, args, devices, dataset, queue=None):
     dev_id = devices[proc_id]
     g, num_classes, num_rels, target_idx, inv_target, train_idx,\
@@ -23,10 +36,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, queue=None):
 
     dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
         master_ip='127.0.0.1', master_port='12345')
-    backend = 'nccl'
-
-    if not args.dgl_sparse:
-        backend = 'gloo'
+    backend = 'nccl' if args.dgl_sparse else 'gloo'
     if proc_id == 0:
         print("backend using {}".format(backend))
     th.distributed.init_process_group(backend=backend,
@@ -53,19 +63,6 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, queue=None):
         emb_optimizer = th.optim.SparseAdam(embed_layer.module.parameters(), lr=args.sparse_lr)
     optimizer = th.optim.Adam(model.parameters(), lr=1e-2, weight_decay=args.l2norm)
 
-    def collect_eval():
-        eval_logits = []
-        eval_seeds = []
-        for _ in range(n_gpus):
-            eval_l, eval_s = queue.get()
-            eval_logits.append(eval_l)
-            eval_seeds.append(eval_s)
-        eval_logits = th.cat(eval_logits)
-        eval_seeds = th.cat(eval_seeds)
-        eval_acc = accuracy(eval_logits.argmax(dim=1), labels[eval_seeds].cpu()).item()
-
-        return eval_acc
-
     th.set_num_threads(n_cpus)
     for epoch in range(args.n_epochs):
         train_loader.set_epoch(epoch)
@@ -83,14 +80,14 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, queue=None):
 
         # gather evaluation result from multiple processes
         if proc_id == 0:
-            val_acc = collect_eval()
+            val_acc = collect_eval(n_gpus, queue, labels)
             print("Validation Accuracy: {:.4f}".format(val_acc))
 
     gc.collect()
     test_logits, test_seeds = evaluate(model, embed_layer, test_loader, inv_target)
     queue.put((test_logits, test_seeds))
     if proc_id == 0:
-        test_acc = collect_eval()
+        test_acc = collect_eval(n_gpus, queue, labels)
         print("Final Test Accuracy: {:.4f}".format(test_acc))
     th.distributed.barrier()
 

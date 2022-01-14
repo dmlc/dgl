@@ -125,10 +125,6 @@ def main(args):
     g, num_rels, num_classes, labels, train_idx, test_idx, target_idx, inv_target = load_data(
         args.dataset, inv_target=True)
 
-    # Create csr/coo/csc formats before launching training processes.
-    # This avoids creating certain formats in each data loader process, which saves momory and CPU.
-    g.create_formats_()
-
     if args.gpu >= 0 and th.cuda.is_available():
         device = th.device(args.gpu)
     else:
