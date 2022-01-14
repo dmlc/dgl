@@ -3228,6 +3228,9 @@ def norm_by_dst(g, etype=None):
     _, v, _ = g.edges(form='all', etype=etype)
     _, inv_index, count = F.unique(v, return_inverse=True, return_counts=True)
     deg = count[inv_index]
-    return 1. / deg
+    norm = 1. / deg
+    norm = F.replace_inf_with_zero(norm)
+
+    return norm
 
 _init_api("dgl.transform")

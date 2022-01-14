@@ -10,14 +10,6 @@ import dgl
 
 # Utility function for building training and testing graphs
 
-def comp_deg_norm(g):
-    in_deg = g.in_degrees(range(g.num_nodes())).float()
-    norm = 1.0 / in_deg
-    norm[th.isinf(norm)] = 0
-    # convert to edge norm
-    g.ndata['norm'] = norm.unsqueeze(-1).long()
-    g.apply_edges(lambda edges : {'norm' : edges.dst['norm']})
-
 def get_subset_g(g, mask, num_rels, bidirected=False):
     src, dst = g.edges()
     sub_src = src[mask]
@@ -39,7 +31,7 @@ def preprocess(g, num_rels):
 
     # Get test graph
     test_g = get_subset_g(g, g.edata['test_mask'], num_rels, bidirected=True)
-    comp_deg_norm(test_g)
+    test_g.edata['norm'] = dgl.norm_by_dst(test_g).unsqueeze(-1).long()
 
     return train_g, test_g
 
@@ -165,7 +157,7 @@ class SubgraphIterator:
         rel = np.concatenate((rel, rel + self.num_rels))
         sub_g = dgl.graph((src, dst), num_nodes=num_nodes)
         sub_g.edata[dgl.ETYPE] = th.from_numpy(rel)
-        comp_deg_norm(sub_g)
+        sub_g.edata['norm'] = dgl.norm_by_dst(sub_g).unsqueeze(-1).long()
         uniq_v = th.from_numpy(uniq_v).view(-1, 1).long()
 
         return sub_g, uniq_v, samples, labels
