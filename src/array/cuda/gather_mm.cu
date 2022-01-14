@@ -71,14 +71,27 @@ __global__ void gatherMMUnsortedEKernel(
     unsigned int warpId = gId >> 5;
     unsigned int row = warpId;
     if (row < num_rows) {
+        unsigned int local_row = row & 3; //hardcoded for TB size 128 (4 warps)
+        //  TODO(Israt): __shared__ does not take typename. Make compatible with double
+        extern __shared__ float sh_out[];
+        // global to shared
+        for (unsigned int k = laneId; k < out_len; k += 32)
+            sh_out[local_row * out_len + k] = 0;
+        __syncthreads();
+
         int w_offset = etype[row] * in_len * out_len; // assume all weights are of same dim
         /* iterate over elements of a row of H */
         for (unsigned int i = 0; i < in_len; i++) {
             DType h_val =  H[row * in_len + i];
             /* iterate over elements of a row of W in parallel */
             for (unsigned int k = laneId; k < out_len; k += 32) {
-                out[row * out_len + k] += h_val * W[w_offset + (i * out_len + k)];
+                sh_out[local_row * out_len + k] += h_val * W[w_offset + (i * out_len + k)];
+                // out[row * out_len + k] += h_val * W[w_offset + (i * out_len + k)];
             }
+        }
+        __syncthreads();
+        for (unsigned int k = laneId; k < out_len; k += 32) {
+            out[row * out_len + k] = sh_out[local_row * out_len + k];
         }
     }
 }
@@ -105,8 +118,11 @@ void gatherMM_UnsortedEtype(const NDArray h,
     const int nbx =  ((tot_num_rows * warp_size + ntx - 1) / ntx);
     const dim3 nblks(nbx);
     const dim3 nthrs(ntx);
+
+    const int warp_per_block = 4; //ntx / warp_size;
+    const int sh_mem_size = warp_per_block * n * sizeof(DType);
     CUDA_KERNEL_CALL((gatherMMUnsortedEKernel<IdType, DType>),
-        nblks, nthrs, 0, thr_entry->stream,
+        nblks, nthrs, sh_mem_size, thr_entry->stream,
         static_cast<DType*>(h->data),
         static_cast<DType*>(w->data),
         static_cast<DType*>(out->data),
