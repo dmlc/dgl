@@ -52,13 +52,13 @@ def run(args, device, data):
     val_nid = th.nonzero(val_g.ndata['val_mask'], as_tuple=True)[0]
     test_nid = th.nonzero(~(test_g.ndata['train_mask'] | test_g.ndata['val_mask']), as_tuple=True)[0]
 
-    if args.sample_gpu:
+    if args.sample_device == 'gpu':
         train_nid = train_nid.to(device)
         # copy only the csc to the GPU
         train_g = train_g.formats(['csc'])
         train_g = train_g.to(device)
         args.num_workers = 0
-    elif args.sample_uva:
+    elif args.sample_device == 'uva':
         train_nid = train_nid.to(device)
         train_g = train_g.formats(['csc'])
         train_g.pin_memory_()
@@ -141,18 +141,18 @@ if __name__ == '__main__':
     argparser.add_argument('--dropout', type=float, default=0.5)
     argparser.add_argument('--num-workers', type=int, default=4,
                            help="Number of sampling processes. Use 0 for no extra process.")
-    argparser.add_argument('--sample-uva', action='store_true',
-                           help="Perform sampling from GPU on the pinned graph. "
-                                "Must have 0 workers.")
-    argparser.add_argument('--sample-gpu', action='store_true',
-                           help="Perform the sampling process on the GPU. Must have 0 workers.")
     argparser.add_argument('--inductive', action='store_true',
                            help="Inductive learning setting")
-    argparser.add_argument('--data-cpu', action='store_true',
+    argparser.add_argument('--sample-device', choices=('cpu', 'gpu', 'uva'), default='cpu',
+                           help="Device to perform the sampling. "
+                                "Must have 0 workers for 'gpu' and 'uva'")
+    argparser.add_argument('--data-device', choices=('cpu', 'gpu', 'uva'), default='gpu',
                            help="By default the script puts all node features and labels "
                                 "on GPU when using it to save time for data copy. This may "
                                 "be undesired if they cannot fit in GPU memory at once. "
-                                "This flag disables that.")
+                                "Use 'cpu' to keep the features on host memory and "
+                                "'uva' to enable UnifiedTensor (GPU zero-copy access on "
+                                "pinned host memory).")
     args = argparser.parse_args()
 
     if args.gpu >= 0:
@@ -180,9 +180,12 @@ if __name__ == '__main__':
         train_nfeat = val_nfeat = test_nfeat = g.ndata.pop('features')
         train_labels = val_labels = test_labels = g.ndata.pop('labels')
 
-    if not args.data_cpu:
+    if args.data_device == 'gpu':
         train_nfeat = train_nfeat.to(device)
         train_labels = train_labels.to(device)
+    elif args.data_device == 'uva':
+        train_nfeat = dgl.contrib.UnifiedTensor(train_nfeat, device=device)
+        train_labels = dgl.contrib.UnifiedTensor(train_labels, device=device)
 
     # Pack data
     data = n_classes, train_g, val_g, test_g, train_nfeat, train_labels, \
