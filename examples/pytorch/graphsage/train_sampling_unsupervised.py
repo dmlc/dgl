@@ -55,7 +55,7 @@ def evaluate(model, g, nfeat, labels, train_nids, val_nids, test_nids, device):
 #### Entry point
 def run(proc_id, n_gpus, args, devices, data):
     # Unpack data
-    device = devices[proc_id]
+    device = th.device(devices[proc_id])
     if n_gpus > 0:
         th.cuda.set_device(device)
     if n_gpus > 1:
@@ -69,9 +69,12 @@ def run(proc_id, n_gpus, args, devices, data):
     train_mask, val_mask, test_mask, n_classes, g = data
     nfeat = g.ndata.pop('features')
     labels = g.ndata.pop('labels')
-    if not args.data_cpu:
+    if args.data_device == 'gpu':
         nfeat = nfeat.to(device)
         labels = labels.to(device)
+    elif args.data_device == 'uva':
+        nfeat = dgl.contrib.UnifiedTensor(nfeat, device=device)
+        labels = dgl.contrib.UnifiedTensor(labels, device=device)
     in_feats = nfeat.shape[1]
 
     train_nid = th.LongTensor(np.nonzero(train_mask)).squeeze()
@@ -82,12 +85,12 @@ def run(proc_id, n_gpus, args, devices, data):
     n_edges = g.num_edges()
     train_seeds = th.arange(n_edges)
 
-    if args.sample_gpu:
+    if args.sample_device == 'gpu':
         assert n_gpus > 0, "Must have GPUs to enable GPU sampling"
         train_seeds = train_seeds.to(device)
         g = g.to(device)
         args.num_workers = 0
-    elif args.sample_uva:
+    elif args.sample_device == 'uva':
         train_seeds = train_seeds.to(device)
         g.pin_memory_()
         args.num_workers = 0
@@ -101,7 +104,8 @@ def run(proc_id, n_gpus, args, devices, data):
         reverse_eids=th.cat([
             th.arange(n_edges // 2, n_edges),
             th.arange(0, n_edges // 2)]).to(train_seeds),
-        negative_sampler=NegativeSampler(g, args.num_negs, args.neg_share, device if args.sample_uva else None),
+        negative_sampler=NegativeSampler(g, args.num_negs, args.neg_share,
+                                         device if args.sample_device == 'uva' else None),
         device=device,
         use_ddp=n_gpus > 1,
         batch_size=args.batch_size,
@@ -236,16 +240,16 @@ if __name__ == '__main__':
     argparser.add_argument('--dropout', type=float, default=0.5)
     argparser.add_argument('--num-workers', type=int, default=0,
                            help="Number of sampling processes. Use 0 for no extra process.")
-    argparser.add_argument('--sample-uva', action='store_true',
-                           help="Perform sampling from GPU on the pinned graph. "
-                                "Must have 0 workers.")
-    argparser.add_argument('--sample-gpu', action='store_true',
-                           help="Perform the sampling process on the GPU. Must have 0 workers.")
-    argparser.add_argument('--data-cpu', action='store_true',
+    argparser.add_argument('--sample-device', choices=('cpu', 'gpu', 'uva'), default='cpu',
+                           help="Device to perform the sampling. "
+                                "Must have 0 workers for 'gpu' and 'uva'")
+    argparser.add_argument('--data-device', choices=('cpu', 'gpu', 'uva'), default='gpu',
                            help="By default the script puts all node features and labels "
                                 "on GPU when using it to save time for data copy. This may "
                                 "be undesired if they cannot fit in GPU memory at once. "
-                                "This flag disables that.")
+                                "Use 'cpu' to keep the features on host memory and "
+                                "'uva' to enable UnifiedTensor (GPU zero-copy access on "
+                                "pinned host memory).")
     args = argparser.parse_args()
 
     devices = list(map(int, args.gpu.split(',')))

@@ -49,6 +49,8 @@ def load_subtensor(nfeat, labels, seeds, input_nodes, device):
 def run(proc_id, n_gpus, args, devices, data):
     # Start up distributed training, if enabled.
     device = th.device(devices[proc_id])
+    if n_gpus > 0:
+        th.cuda.set_device(device)
     if n_gpus > 1:
         dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
             master_ip='127.0.0.1', master_port='12345')
@@ -57,7 +59,6 @@ def run(proc_id, n_gpus, args, devices, data):
                                           init_method=dist_init_method,
                                           world_size=world_size,
                                           rank=proc_id)
-    th.cuda.set_device(device)
 
     # Unpack data
     n_classes, train_g, val_g, test_g = data
@@ -161,20 +162,19 @@ def run(proc_id, n_gpus, args, devices, data):
             print('Epoch Time(s): {:.4f}'.format(toc - tic))
             if epoch >= 5:
                 avg += toc - tic
-            # if epoch % args.eval_every == 0 and epoch != 0:
-            #     if n_gpus == 1:
-            #         eval_acc = evaluate(
-            #             model, val_g, val_nfeat, val_labels, val_nid, devices[0])
-            #         test_acc = evaluate(
-            #             model, test_g, test_nfeat, test_labels, test_nid, devices[0])
-            #     else:
-            #         eval_acc = evaluate(
-            #             model.module, val_g, val_nfeat, val_labels, val_nid, devices[0])
-            #         test_acc = evaluate(
-            #             model.module, test_g, test_nfeat, test_labels, test_nid, devices[0])
-            #     print('Eval Acc {:.4f}'.format(eval_acc))
-            #     print('Test Acc: {:.4f}'.format(test_acc))
-
+            if epoch % args.eval_every == 0 and epoch != 0:
+                if n_gpus == 1:
+                    eval_acc = evaluate(
+                        model, val_g, val_nfeat, val_labels, val_nid, devices[0])
+                    test_acc = evaluate(
+                        model, test_g, test_nfeat, test_labels, test_nid, devices[0])
+                else:
+                    eval_acc = evaluate(
+                        model.module, val_g, val_nfeat, val_labels, val_nid, devices[0])
+                    test_acc = evaluate(
+                        model.module, test_g, test_nfeat, test_labels, test_nid, devices[0])
+                print('Eval Acc {:.4f}'.format(eval_acc))
+                print('Test Acc: {:.4f}'.format(test_acc))
 
     if n_gpus > 1:
         th.distributed.barrier()
@@ -217,7 +217,7 @@ if __name__ == '__main__':
     if args.dataset == 'reddit':
         g, n_classes = load_reddit()
     elif args.dataset == 'ogbn-products':
-        g, n_classes = load_ogb('ogbn-products', root='../../../.vscode')
+        g, n_classes = load_ogb('ogbn-products')
     else:
         raise Exception('unknown dataset')
 
