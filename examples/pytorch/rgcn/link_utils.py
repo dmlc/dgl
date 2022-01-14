@@ -31,7 +31,7 @@ def preprocess(g, num_rels):
 
     # Get test graph
     test_g = get_subset_g(g, g.edata['test_mask'], num_rels, bidirected=True)
-    test_g.edata['norm'] = dgl.norm_by_dst(test_g).unsqueeze(-1).long()
+    test_g.edata['norm'] = dgl.norm_by_dst(test_g).unsqueeze(-1)
 
     return train_g, test_g
 
@@ -157,7 +157,7 @@ class SubgraphIterator:
         rel = np.concatenate((rel, rel + self.num_rels))
         sub_g = dgl.graph((src, dst), num_nodes=num_nodes)
         sub_g.edata[dgl.ETYPE] = th.from_numpy(rel)
-        sub_g.edata['norm'] = dgl.norm_by_dst(sub_g).unsqueeze(-1).long()
+        sub_g.edata['norm'] = dgl.norm_by_dst(sub_g).unsqueeze(-1)
         uniq_v = th.from_numpy(uniq_v).view(-1, 1).long()
 
         return sub_g, uniq_v, samples, labels

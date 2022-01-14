@@ -73,6 +73,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, queue=None):
             print("Epoch {:05d}/{:05d} | Train Accuracy: {:.4f} | Train Loss: {:.4f}".format(
                 epoch, args.n_epochs, train_acc, loss))
 
+        # garbage collection that empties the queue
         gc.collect()
 
         val_logits, val_seeds = evaluate(model, embed_layer, val_loader, inv_target)
@@ -83,6 +84,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, queue=None):
             val_acc = collect_eval(n_gpus, queue, labels)
             print("Validation Accuracy: {:.4f}".format(val_acc))
 
+    # garbage collection that empties the queue
     gc.collect()
     test_logits, test_seeds = evaluate(model, embed_layer, test_loader, inv_target)
     queue.put((test_logits, test_seeds))
