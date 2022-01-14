@@ -3227,7 +3227,7 @@ def norm_by_dst(g, etype=None):
     """
     _, v, _ = g.edges(form='all', etype=etype)
     _, inv_index, count = F.unique(v, return_inverse=True, return_counts=True)
-    deg = count[inv_index]
+    deg = F.astype(count[inv_index], F.float32)
     norm = 1. / deg
     norm = F.replace_inf_with_zero(norm)
 
