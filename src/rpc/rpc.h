@@ -69,7 +69,7 @@ struct RPCContext {
   /*!
    * \brief Current barrier count
    */
-  int32_t barrier_count = 0;
+  std::unordered_map<int32_t, int32_t> barrier_count;
 
   /*!
    * \brief Total number of server per machine.
@@ -124,7 +124,7 @@ struct RPCContext {
     t->msg_seq = 0;
     t->num_servers = 0;
     t->num_clients = 0;
-    t->barrier_count = 0;
+    t->barrier_count.clear();
     t->num_servers_per_machine = 0;
     t->sender.reset();
     t->receiver.reset();

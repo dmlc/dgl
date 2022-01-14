@@ -87,7 +87,7 @@ def start_server(server_id, ip_config, num_servers, num_clients, server_state, \
                 # TODO[Rhett]: server should not be blocked endlessly.
                 while not rpc.connect_receiver(client_ip, client_port, client_id, group_id):
                     time.sleep(1)
-            if rpc.get_rank() == 0: # server_0 send all the IDs
+            if rpc.get_rank() == 0:  # server_0 send all the IDs
                 for client_id, _ in client_namebook.items():
                     register_res = rpc.ClientRegisterResponse(client_id)
                     rpc.send_response(client_id, register_res, group_id)

@@ -1157,17 +1157,18 @@ class ClientBarrierRequest(Request):
     """
     def __init__(self, msg='barrier'):
         self.msg = msg
+        self.group_id = get_group_id()
 
     def __getstate__(self):
-        return self.msg
+        return self.msg, self.group_id
 
     def __setstate__(self, state):
-        self.msg = state
+        self.msg, self.group_id = state
 
     def process_request(self, server_state):
-        _CAPI_DGLRPCSetBarrierCount(_CAPI_DGLRPCGetBarrierCount()+1)
-        if _CAPI_DGLRPCGetBarrierCount() == get_num_client():
-            _CAPI_DGLRPCSetBarrierCount(0)
+        _CAPI_DGLRPCSetBarrierCount(_CAPI_DGLRPCGetBarrierCount(self.group_id)+1, self.group_id)
+        if _CAPI_DGLRPCGetBarrierCount(self.group_id) == get_num_client():
+            _CAPI_DGLRPCSetBarrierCount(0, self.group_id)
             res_list = []
             for target_id in range(get_num_client()):
                 res_list.append((target_id, ClientBarrierResponse()))

@@ -170,11 +170,14 @@ def connect_to_server(ip_config, num_servers, max_queue_size=MAX_QUEUE_SIZE,
         server_port = addr[2]
         while not rpc.connect_receiver(server_ip, server_port, server_id):
             time.sleep(3)
+        print("Client[{}] conneccted to server[id:{}, ip:{}, port:{}]."
+              .format(os.getpid(), server_id, server_ip, server_port))
     # Get local usable IP address and port
     ip_addr = get_local_usable_addr(server_ip)
     client_ip, client_port = ip_addr.split(':')
     # wait server connect back
     rpc.receiver_wait(client_ip, client_port, num_servers, blocking=False)
+    print("Clien [{}] waits on {}:{}".format(os.getpid(), client_ip, client_port))
     # Register client on server
     register_req = rpc.ClientRegisterRequest(ip_addr)
     for server_id in range(num_servers):

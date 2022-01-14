@@ -251,8 +251,9 @@ def test_multi_client_groups():
     with open(ip_config, "w") as f:
         for _ in range(num_machines):
             f.write('%s\n' % get_local_usable_addr())
-    num_clients = 5
-    num_groups = 5
+    # presssue test
+    num_clients = 15
+    num_groups = 15
     ctx = mp.get_context('spawn')
     pserver_list = []
     for i in range(num_servers*num_machines):
