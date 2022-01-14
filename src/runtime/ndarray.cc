@@ -18,6 +18,8 @@ extern "C" void NDArrayDLPackDeleter(DLManagedTensor* tensor);
 
 namespace dgl {
 
+constexpr DLDataType DLDataTypeTraits<int8_t>::dtype;
+constexpr DLDataType DLDataTypeTraits<int16_t>::dtype;
 constexpr DLDataType DLDataTypeTraits<int32_t>::dtype;
 constexpr DLDataType DLDataTypeTraits<int64_t>::dtype;
 constexpr DLDataType DLDataTypeTraits<uint32_t>::dtype;
@@ -58,10 +60,8 @@ struct NDArray::Internal {
     using dgl::runtime::NDArray;
     if (ptr->manager_ctx != nullptr) {
       static_cast<NDArray::Container*>(ptr->manager_ctx)->DecRef();
-#ifndef _WIN32
     } else if (ptr->mem) {
       ptr->mem = nullptr;
-#endif  // _WIN32
     } else if (ptr->dl_tensor.data != nullptr) {
       dgl::runtime::DeviceAPI::Get(ptr->dl_tensor.ctx)->FreeDataSpace(
           ptr->dl_tensor.ctx, ptr->dl_tensor.data);
@@ -191,7 +191,6 @@ NDArray NDArray::EmptyShared(const std::string &name,
   NDArray ret = Internal::Create(shape, dtype, ctx);
   // setup memory content
   size_t size = GetDataSize(ret.data_->dl_tensor);
-#ifndef _WIN32
   auto mem = std::make_shared<SharedMemory>(name);
   if (is_create) {
     ret.data_->dl_tensor.data = mem->CreateNew(size);
@@ -200,9 +199,6 @@ NDArray NDArray::EmptyShared(const std::string &name,
   }
 
   ret.data_->mem = mem;
-#else
-  LOG(FATAL) << "Windows doesn't support NDArray with shared memory";
-#endif  // _WIN32
   return ret;
 }
 
@@ -310,11 +306,9 @@ template std::vector<uint64_t> NDArray::ToVector<uint64_t>() const;
 template std::vector<float> NDArray::ToVector<float>() const;
 template std::vector<double> NDArray::ToVector<double>() const;
 
-#ifndef _WIN32
 std::shared_ptr<SharedMemory> NDArray::GetSharedMem() const {
   return this->data_->mem;
 }
-#endif  // _WIN32
 
 
 void NDArray::Save(dmlc::Stream* strm) const {

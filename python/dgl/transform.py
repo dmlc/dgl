@@ -255,7 +255,7 @@ def _knn_graph_blas(x, k, dist='euclidean'):
 
     ctx = F.context(x)
     dist = pairwise_squared_distance(x)
-    k_indices = F.argtopk(dist, k, 2, descending=False)
+    k_indices = F.astype(F.argtopk(dist, k, 2, descending=False), F.int64)
     # index offset for each sample
     offset = F.arange(0, n_samples, ctx=ctx) * n_points
     offset = F.unsqueeze(offset, 1)
@@ -635,8 +635,8 @@ def to_bidirected(g, copy_ndata=False, readonly=None):
     r"""Convert the graph to a bi-directional simple graph and return.
 
     For an input graph :math:`G`, return a new graph :math:`G'` such that an edge
-    :math:`(u, v)\in G'` if and only if there exists an edge :math:`(u, v)\in G` or
-    an edge :math:`(v, u)\in G`. The resulting graph :math:`G'` is a simple graph,
+    :math:`(u, v)\in G'` exists if and only if there exists an edge
+    :math:`(v, u)\in G`. The resulting graph :math:`G'` is a simple graph,
     meaning there is no parallel edge.
 
     The operation only works for edges whose two endpoints belong to the same node type.
@@ -709,8 +709,6 @@ def to_bidirected(g, copy_ndata=False, readonly=None):
             assert False, "to_bidirected is not well defined for " \
                 "unidirectional bipartite graphs" \
                 ", but {} is unidirectional bipartite".format(c_etype)
-
-    assert g.is_multigraph is False, "to_bidirected only support simple graph"
 
     g = add_reverse_edges(g, copy_ndata=copy_ndata, copy_edata=False)
     g = to_simple(g, return_counts=None, copy_ndata=copy_ndata, copy_edata=False)

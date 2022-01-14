@@ -617,6 +617,23 @@ COOMatrix CSRRowWiseSamplingBiased(
   return ret;
 }
 
+std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling(
+    const CSRMatrix& csr,
+    int64_t num_samples,
+    int num_trials,
+    bool exclude_self_loops,
+    bool replace,
+    double redundancy) {
+  CHECK_GT(num_samples, 0) << "Number of samples must be positive";
+  CHECK_GT(num_trials, 0) << "Number of sampling trials must be positive";
+  std::pair<IdArray, IdArray> result;
+  ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRGlobalUniformNegativeSampling", {
+    result = impl::CSRGlobalUniformNegativeSampling<XPU, IdType>(
+        csr, num_samples, num_trials, exclude_self_loops, replace, redundancy);
+  });
+  return result;
+}
+
 
 CSRMatrix UnionCsr(const std::vector<CSRMatrix>& csrs) {
   CSRMatrix ret;
