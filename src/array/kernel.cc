@@ -54,16 +54,16 @@ void SpMM(const std::string& op, const std::string& reduce,
 
 
 /*! \brief Generalized Sparse Matrix-Matrix Multiplication. */
-void GatherMM(const NDArray E_etype,
-          const NDArray H,
+void GatherMM(const NDArray H,
           const NDArray W,
-          NDArray out) {
-  // const auto& bcast = CalcBcastOff("mul", H, W);
-
+          NDArray out,
+          const NDArray E_per_rel,
+          const NDArray etypes,
+          bool sortedE) {
   ATEN_XPU_SWITCH_CUDA(H->ctx.device_type, XPU, "GatherMM", {
-    ATEN_ID_TYPE_SWITCH(E_etype->dtype, IdType, {
+    ATEN_ID_TYPE_SWITCH(etypes->dtype, IdType, {
       ATEN_FLOAT_BITS_SWITCH(H->dtype, bits, "Feature data", {
-        gatherMM<XPU, IdType, bits>(E_etype, H, W, out);
+        gatherMM<XPU, IdType, bits>(H, W, out, E_per_rel, etypes, sortedE);
       });
     });
   });
@@ -367,24 +367,13 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSpMM")
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelGATHERMM")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    NDArray E_etype = args[0];
-    NDArray H = args[1];
-    NDArray W = args[2];
-    NDArray O = args[3];
-    // CheckCtx(graph->Context(), {U, E, V, ArgU, ArgE},
-    //     {"U_data", "E_data", "out", "Arg_U", "Arg_E"});
-    // CheckContiguous({U, E, V, ArgU, ArgE},
-    //     {"U_data", "E_data", "out", "Arg_U", "Arg_E"});
-    // CHECK_EQ(graph->NumEdgeTypes(), 1);
-    // auto pair = graph->meta_graph()->FindEdge(0);  // only one etype in the graph.
-    // const dgl_type_t src_vtype = pair.first;
-    // const dgl_type_t dst_vtype = pair.second;
-    // CheckShape(
-    //     {graph->NumVertices(src_vtype), graph->NumEdges(0), graph->NumVertices(dst_vtype)},
-    //     {0, 1, 2, 2, 2},
-    //     {U, E, V, ArgU, ArgE},
-    //     {"U_data", "E_data", "out", "Arg_U", "Arg_E"});
-    GatherMM(E_etype, H, W, O);
+    NDArray H = args[0];
+    NDArray W = args[1];
+    NDArray O = args[2];
+    NDArray E_per_rel = args[3];
+    NDArray etypes = args[4];
+    bool sortedE = args[5];
+    GatherMM(H, W, O, E_per_rel, etypes, sortedE);
   });
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSpMMHetero")

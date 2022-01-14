@@ -65,14 +65,28 @@ th.cuda.synchronize()
 print("high-mem matmul:", np.average(high_mem_time)*1000, "ms")
 
 # g.gather_mm(edge_udf, weight)
+# **** Sorted Gather mm ******
 th.cuda.synchronize()
+E_per_rel = E_etype.to("cuda:0")
 _gather_mm_time = []
 for i in range(iters):
         tic = time.time()
-        dgl.sparse._gather_mm(E_etype, H, W, Out)
+        dgl.sparse._gather_mm(H, W, Out, E_per_rel, etypes, sortedE=True)
         if i > 5:
                _gather_mm_time.append(time.time() - tic)
 th.cuda.synchronize()
-print("gather matmul:", np.average(_gather_mm_time)*1000, "ms")
+print("gather matmul Sorted:", np.average(_gather_mm_time)*1000, "ms")
+
+# **** Unsorted Gather mm ******
+th.cuda.synchronize()
+E_per_rel = E_etype.to("cuda:0")
+_gather_mm_time = []
+for i in range(iters):
+        tic = time.time()
+        dgl.sparse._gather_mm(H, W, Out, E_per_rel, etypes, sortedE=False)
+        if i > 5:
+               _gather_mm_time.append(time.time() - tic)
+th.cuda.synchronize()
+print("gather matmul Unsorted:", np.average(_gather_mm_time)*1000, "ms")
 
 

@@ -12,33 +12,35 @@ namespace aten {
 
 /*! \brief Generalized SDDMM on Coo format. */
 template <int XPU, typename IdType, int bits>
-void gatherMM(const NDArray E_etype,
-              const NDArray h,
-              const NDArray w,
-              NDArray out) {
+void gatherMM(const NDArray H,
+          const NDArray W,
+          NDArray out,
+          const NDArray E_per_rel,
+          const NDArray etype,
+          bool sortedE) {
   // SWITCH_BITS(bits, DType, {
   //   // cpu::gatherMM<IdType, DType>(lhs, rhs, out);
   // });
 }
 
 template void gatherMM<kDLCPU, int32_t, 16>(
-    const NDArray E_etype, const NDArray h,
-    const NDArray w, NDArray out);
+    const NDArray h, const NDArray w, NDArray out,
+    const NDArray E_per_rel, const NDArray etype, bool sortedE);
 template void gatherMM<kDLCPU, int64_t, 16>(
-    const NDArray E_etype, const NDArray h,
-    const NDArray w, NDArray out);
+    const NDArray h, const NDArray w, NDArray out,
+    const NDArray E_per_rel, const NDArray etype, bool sortedE);
 template void gatherMM<kDLCPU, int32_t, 32>(
-    const NDArray E_etype, const NDArray h,
-    const NDArray w, NDArray out);
+    const NDArray h, const NDArray w, NDArray out,
+    const NDArray E_per_rel, const NDArray etype, bool sortedE);
 template void gatherMM<kDLCPU, int64_t, 32>(
-    const NDArray E_etype, const NDArray h,
-    const NDArray w, NDArray out);
+    const NDArray h, const NDArray w, NDArray out,
+    const NDArray E_per_rel, const NDArray etype, bool sortedE);
 template void gatherMM<kDLCPU, int32_t, 64>(
-    const NDArray E_etype, const NDArray h,
-    const NDArray w, NDArray out);
+    const NDArray h, const NDArray w, NDArray out,
+    const NDArray E_per_rel, const NDArray etype, bool sortedE);
 template void gatherMM<kDLCPU, int64_t, 64>(
-    const NDArray E_etype, const NDArray h,
-    const NDArray w, NDArray out);
+    const NDArray h, const NDArray w, NDArray out,
+    const NDArray E_per_rel, const NDArray etype, bool sortedE);
 
 }  // namespace aten
 }  // namespace dgl

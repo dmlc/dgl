@@ -116,10 +116,12 @@ void SDDMMCooHetero(const std::string& op,
  * \brief gather mm.
  */
 template <int XPU, typename IdType, int bits>
-void gatherMM(const NDArray E_etype,
-          const NDArray H,
+void gatherMM(const NDArray H,
           const NDArray W,
-          NDArray out);
+          NDArray out,
+          const NDArray E_per_rel,
+          const NDArray etypes,
+          bool sortedE);
 
 /*!
  * \brief Segment reduce.
