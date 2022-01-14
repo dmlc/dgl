@@ -83,7 +83,6 @@ __global__ void gatherMMUnsortedEKernel(
     }
 }
 
-
 template <int XPU, typename IdType, int bits>
 void gatherMM_UnsortedEtype(const NDArray h,
               const NDArray w,
@@ -117,8 +116,6 @@ void gatherMM_UnsortedEtype(const NDArray h,
     });
 }
 
-// TODO(Israt): cublas treats input as col-major, pytorch stores input as
-// row-major. Fix it.
 template <int XPU, typename IdType, int bits>
 void gatherMM_SortedEtype(const NDArray h,
               const NDArray w,
@@ -129,7 +126,7 @@ void gatherMM_SortedEtype(const NDArray h,
 
         int64_t num_rel = E_per_rel.NumElements();
         int n = w->shape[1]; // cols of B
-        int k = h->shape[1]; // cols of A
+        int k = h->shape[1]; // cols of A = rows of B
         const DType *h_data = h.Ptr<DType>();
         const DType *w_data = w.Ptr<DType>();
         const IdType* E_per_rel_data = E_per_rel.Ptr<IdType>();
@@ -145,19 +142,21 @@ void gatherMM_SortedEtype(const NDArray h,
             CUBLAS_CALL(cublasCreate(&(thr_entry->cublas_handle)));
         CUBLAS_CALL(cublasSetStream(thr_entry->cublas_handle,
             thr_entry->stream));
-
+        int ldb = n,
+            lda = k,
+            ldc = n;
         for (int etype = 0; etype < num_rel; ++etype) {
             int m = E_per_rel_data[etype]; // rows of A
             CUBLAS_CALL(cublasGemm<DType>(
               thr_entry->cublas_handle,
               CUBLAS_OP_N,
               CUBLAS_OP_N,
-              m, n, k,
+              n, m, k,
               &alpha,
-              h_data + h_offset, m, //m x k
-              w_data + w_offset, k, // k x n
+              w_data + w_offset, ldb,
+              h_data + h_offset, lda,
               &beta,
-              out_data + out_offset, m));
+              out_data + out_offset, ldc));
             h_offset += m * k;
             w_offset += k * n;
             out_offset += m * n;
