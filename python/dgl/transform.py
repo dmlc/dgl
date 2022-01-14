@@ -3199,6 +3199,34 @@ def rcmk_perm(g):
     return perm.copy()
 
 def norm_by_dst(g, etype=None):
+    r"""Calculate normalization coefficient per edge based on destination node degree.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The input graph.
+    etype : str or (str, str, str), optional
+        The type of the edges to calculate. The allowed edge type formats are:
+
+        * ``(str, str, str)`` for source node type, edge type and destination node type.
+        * or one ``str`` edge type name if the name can uniquely identify a
+          triplet format in the graph.
+
+        It can be omitted if the graph has a single edge type.
+
+    Returns
+    -------
+    1D Tensor
+        The normalization coefficient of the edges.
+
+    Examples
+    --------
+
+    >>> import dgl
+    >>> g = dgl.graph(([0, 1, 1], [1, 1, 2]))
+    >>> print(dgl.norm_by_dst(g))
+    tensor([0.5000, 0.5000, 1.0000])
+    """
     _, v, _ = g.edges(form='all', etype=etype)
     _, inv_index, count = F.unique(v, return_inverse=True, return_counts=True)
     deg = count[inv_index]
