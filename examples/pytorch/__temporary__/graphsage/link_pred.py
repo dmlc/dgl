@@ -59,7 +59,7 @@ dataloader = dglnew.dataloading.EdgeDataLoader(
         shuffle=True,
         drop_last=False,
         pin_memory=True,
-        num_workers=16,
+        num_workers=8,
         use_asyncio=False,
         persistent_workers=True,
         use_prefetch_thread=True,       # TBD: could probably remove this argument
@@ -88,7 +88,8 @@ for _ in range(10):
             acc = MF.auroc(score, labels.long())
             mem = torch.cuda.max_memory_allocated() / 1000000
             print('Loss', loss.item(), 'Acc', acc.item(), 'GPU Mem', mem, 'MB')
-    tt = time.time()
-    print(tt - t0)
+            tt = time.time()
+            print(tt - t0)
+            t0 = time.time()
     durations.append(tt - t0)
 print(np.mean(durations[4:]), np.std(durations[4:]))
