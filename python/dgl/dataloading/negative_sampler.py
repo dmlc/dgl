@@ -64,7 +64,7 @@ class PerSourceUniform(_BaseNegativeSampler):
         shape = (shape[0] * self.k,)
         src, _ = g.find_edges(eids, etype=canonical_etype)
         src = F.repeat(src, self.k, 0)
-        dst = F.randint(shape, dtype, ctx, 0, g.number_of_nodes(vtype))
+        dst = F.randint(shape, dtype, ctx, 0, g.num_nodes(vtype))
         return src, dst
 
 # Alias

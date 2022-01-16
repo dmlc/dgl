@@ -38,6 +38,19 @@ class _LazyIndex(object):
             flat_index = F.gather_row(flat_index, index)
         return flat_index
 
+class LazyFeature(object):
+    __slots__ = ['name', 'id_']
+    def __init__(self, name=None, id_=None):
+        self.name = name
+        self.id_ = id_
+
+    def to(self, *args, **kwargs):
+        return self
+
+    @property
+    def data(self):
+        return self
+
 class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
     """The column scheme.
 
@@ -336,10 +349,13 @@ class Frame(MutableMapping):
             assert not isinstance(data, Frame)  # sanity check for code refactor
             # Note that we always create a new column for the given data.
             # This avoids two frames accidentally sharing the same column.
-            self._columns = {k : Column.create(v) for k, v in data.items()}
+            self._columns = {k : v if isinstance(v, LazyFeature) else Column.create(v)
+                             for k, v in data.items()}
             self._num_rows = num_rows
             # infer num_rows & sanity check
             for name, col in self._columns.items():
+                if isinstance(col, LazyFeature):
+                    continue
                 if self._num_rows is None:
                     self._num_rows = len(col)
                 elif len(col) != self._num_rows:
@@ -504,6 +520,10 @@ class Frame(MutableMapping):
         data : Column or data convertible to Column
             The column data.
         """
+        if isinstance(data, LazyFeature):
+            self._columns[name] = data
+            return
+
         col = Column.create(data)
         if len(col) != self.num_rows:
             raise DGLError('Expected data to have %d rows, got %d.' %

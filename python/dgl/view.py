@@ -6,6 +6,7 @@ from collections.abc import MutableMapping
 
 from .base import ALL, DGLError
 from . import backend as F
+from .frame import LazyFeature
 
 NodeSpace = namedtuple('NodeSpace', ['data'])
 EdgeSpace = namedtuple('EdgeSpace', ['data'])
@@ -66,7 +67,13 @@ class HeteroNodeDataView(MutableMapping):
             return self._graph._get_n_repr(self._ntid, self._nodes)[key]
 
     def __setitem__(self, key, val):
-        if isinstance(self._ntype, list):
+        if isinstance(val, LazyFeature):
+            if isinstance(self._ntid, list):
+                for ntid in self._ntid:
+                    self._graph._node_frames[ntid][key] = val
+            else:
+                self._graph._node_frames[self._ntid][key] = val
+        elif isinstance(self._ntype, list):
             assert isinstance(val, dict), \
                 'Current HeteroNodeDataView has multiple node types, ' \
                 'please passing the node type and the corresponding data through a dict.'
@@ -181,6 +188,12 @@ class HeteroEdgeDataView(MutableMapping):
             return self._graph._get_e_repr(self._etid, self._edges)[key]
 
     def __setitem__(self, key, val):
+        if isinstance(val, LazyFeature):
+            if isinstance(self._etid, list):
+                for etid in self._etid:
+                    self._graph._edge_frames[etid][key] = val
+            else:
+                self._graph._edge_frames[self._etid][key] = val
         if isinstance(self._etype, list):
             assert isinstance(val, dict), \
                 'Current HeteroEdgeDataView has multiple edge types, ' \

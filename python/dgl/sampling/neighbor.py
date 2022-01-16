@@ -15,7 +15,7 @@ __all__ = [
 
 def sample_etype_neighbors(g, nodes, etype_field, fanout, edge_dir='in', prob=None,
                            replace=False, copy_ndata=True, copy_edata=True, etype_sorted=False,
-                           _dist_training=False):
+                           _dist_training=False, output_device=None):
     """Sample neighboring edges of the given nodes and return the induced subgraph.
 
     For each node, a number of inbound (or outbound when ``edge_dir == 'out'``) edges
@@ -77,6 +77,8 @@ def sample_etype_neighbors(g, nodes, etype_field, fanout, edge_dir='in', prob=No
         A hint telling whether the etypes are already sorted.
 
         (Default: False)
+    output_device : Framework-specific device context object, optional
+        The output device.  Default is the same as the input graph.
 
     Returns
     -------
@@ -142,10 +144,13 @@ def sample_etype_neighbors(g, nodes, etype_field, fanout, edge_dir='in', prob=No
         for i, etype in enumerate(ret.canonical_etypes):
             ret.edges[etype].data[EID] = induced_edges[i]
 
-    return ret
+    return ret if output_device is None else ret.to(output_device)
+
+DGLHeteroGraph.sample_etype_neighbors = utils.alias_func(sample_etype_neighbors)
 
 def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
-                     copy_ndata=True, copy_edata=True, _dist_training=False, exclude_edges=None):
+                     copy_ndata=True, copy_edata=True, _dist_training=False,
+                     exclude_edges=None, output_device=None):
     """Sample neighboring edges of the given nodes and return the induced subgraph.
 
     For each node, a number of inbound (or outbound when ``edge_dir == 'out'``) edges
@@ -210,6 +215,8 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
         Internal argument.  Do not use.
 
         (Default: False)
+    output_device : Framework-specific device context object, optional
+        The output device.  Default is the same as the input graph.
 
     Returns
     -------
@@ -355,11 +362,13 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
         for i, etype in enumerate(ret.canonical_etypes):
             ret.edges[etype].data[EID] = induced_edges[i]
 
-    return ret
+    return ret if output_device is None else ret.to(output_device)
+
+DGLHeteroGraph.sample_neighbors = utils.alias_func(sample_neighbors)
 
 def sample_neighbors_biased(g, nodes, fanout, bias, edge_dir='in',
                             tag_offset_name='_TAG_OFFSET', replace=False,
-                            copy_ndata=True, copy_edata=True):
+                            copy_ndata=True, copy_edata=True, output_device=None):
     r"""Sample neighboring edges of the given nodes and return the induced subgraph, where each
     neighbor's probability to be picked is determined by its tag.
 
@@ -439,6 +448,8 @@ def sample_neighbors_biased(g, nodes, fanout, bias, edge_dir='in',
         edge features.
 
         (Default: True)
+    output_device : Framework-specific device context object, optional
+        The output device.  Default is the same as the input graph.
 
     Returns
     -------
@@ -523,11 +534,12 @@ def sample_neighbors_biased(g, nodes, fanout, bias, edge_dir='in',
         utils.set_new_frames(ret, edge_frames=edge_frames)
 
     ret.edata[EID] = induced_edges[0]
-    return ret
+    return ret if output_device is None else ret.to(output_device)
 
+DGLHeteroGraph.sample_neighbors_biased = utils.alias_func(sample_neighbors_biased)
 
 def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False,
-                copy_ndata=True, copy_edata=True):
+                copy_ndata=True, copy_edata=True, output_device=None):
     """Select the neighboring edges with k-largest (or k-smallest) weights of the given
     nodes and return the induced subgraph.
 
@@ -581,6 +593,8 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False,
         edge features.
 
         (Default: True)
+    output_device : Framework-specific device context object, optional
+        The output device.  Default is the same as the input graph.
 
     Returns
     -------
@@ -655,6 +669,8 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False,
     if copy_edata:
         edge_frames = utils.extract_edge_subframes(g, induced_edges)
         utils.set_new_frames(ret, edge_frames=edge_frames)
-    return ret
+    return ret if output_device is None else ret.to(output_device)
+
+DGLHeteroGraph.select_topk = utils.alias_func(select_topk)
 
 _init_api('dgl.sampling.neighbor', __name__)
