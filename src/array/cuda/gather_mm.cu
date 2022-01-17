@@ -43,7 +43,7 @@ cublasStatus_t cublasGemm<double>(cublasHandle_t handle, cublasOperation_t trans
   return cublasDgemm(handle, transa, transb, m, n, k, alpha, A, lda,
       B, ldb, beta, C, ldc);
 }
-}
+}  //namespace
 
 /* Idea 1: tranpose W and compute dot product of each row vector of H
    and column vector of W. Reuse in H.
@@ -71,15 +71,15 @@ __global__ void gatherMMUnsortedEKernel(
     unsigned int warpId = gId >> 5;
     unsigned int row = warpId;
     if (row < num_rows) {
-        unsigned int local_row = row & 3; //hardcoded for TB size 128 (4 warps)
-        //  TODO(Israt): __shared__ does not take typename. Make compatible with double
+        unsigned int local_row = row & 3;  //hardcoded for TB size 128 (4 warps)
+        // TODO(Israt): __shared__ does not take typename. Make compatible with double
         extern __shared__ float sh_out[];
         // global to shared
         for (unsigned int k = laneId; k < out_len; k += 32)
             sh_out[local_row * out_len + k] = 0;
         __syncthreads();
 
-        int w_offset = etype[row] * in_len * out_len; // assume all weights are of same dim
+        int w_offset = etype[row] * in_len * out_len;  // assume all weights are of same dim
         /* iterate over elements of a row of H */
         for (unsigned int i = 0; i < in_len; i++) {
             DType h_val =  H[row * in_len + i];
@@ -103,11 +103,10 @@ void gatherMM_UnsortedEtype(const NDArray h,
               const NDArray E_per_rel,
               const NDArray etype) {
   SWITCH_BITS(bits, DType, {
-
     auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
     int64_t num_rel = E_per_rel.NumElements();
-    int n = w->shape[1]; // cols of B
-    int k = h->shape[1]; // cols of A
+    int n = w->shape[1];  //cols of B
+    int k = h->shape[1];  //cols of A
     const IdType* E_per_rel_data = E_per_rel.Ptr<IdType>();
     IdType tot_num_rows = 0;
     for (int i = 0; i < num_rel; ++i)
@@ -119,7 +118,7 @@ void gatherMM_UnsortedEtype(const NDArray h,
     const dim3 nblks(nbx);
     const dim3 nthrs(ntx);
 
-    const int warp_per_block = 4; //ntx / warp_size;
+    const int warp_per_block = 4;  //ntx / warp_size;
     const int sh_mem_size = warp_per_block * n * sizeof(DType);
     CUDA_KERNEL_CALL((gatherMMUnsortedEKernel<IdType, DType>),
         nblks, nthrs, sh_mem_size, thr_entry->stream,

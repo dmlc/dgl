@@ -1,10 +1,8 @@
- 
-/*!
+ /*!
  *  Copyright (c) 2020 by Contributors
  * \file aten/cpu/gaher_mm.cc
  * \brief GatherMM C APIs and definitions.
  */
-#include "./sddmm.h"
 #include <dgl/array.h>
 
 namespace dgl {

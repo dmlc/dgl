@@ -9,6 +9,7 @@ from dgl.data.rdf import AIFBDataset, MUTAGDataset, BGSDataset, AMDataset
 import torch.nn as nn
 import time
 import numpy as np
+import argparse
 
 #####################################
 # Timer code from benchmarks folder
@@ -162,99 +163,110 @@ class RGCNHetero(nn.Module):
         return {'m' : edges.src['h'] @ weight}
 
 
-iters = 20
-feat_scale = 1
+def main(args):
+    iters = 20
 
-in_feat = 16 * feat_scale
-out_feat = 16 * feat_scale
-dev = "cuda:0"
-torch.cuda.set_device(dev)
+    in_feat = 16 * args.in_feat_scale
+    out_feat = 16 * args.out_feat_scale
 
-name, dataset = 'aifb', AIFBDataset()
-#name, dataset = 'mutag', MUTAGDataset()
-#name, dataset = 'bgs', BGSDataset()
-#name, dataset = 'am', AMDataset()
+    dev = "cuda:0"
+    torch.cuda.set_device(dev)
 
-g = dgl.to_homogeneous(dataset[0]).to(dev)
-etypes = g.edata[dgl.ETYPE].long().to(dev)
-num_rels = len(dataset[0].etypes)
-E_per_rel = torch.histogram(etypes.float().cpu(), bins=num_rels).hist.long()
+    name, dataset = 'aifb', AIFBDataset()
+    # name, dataset = 'mutag', MUTAGDataset()
+    #name, dataset = 'bgs', BGSDataset()
+    #name, dataset = 'am', AMDataset()
 
-print(f"""Dataset: {name}
-num_nodes: {g.num_nodes()}
-num_edges: {g.num_edges()}
-num_rels: {num_rels}
-in_feat: {in_feat}
-out_feat: {out_feat}
-E_per_rel: {E_per_rel}
-""")
+    g = dgl.to_homogeneous(dataset[0]).to(dev)
+    etypes = g.edata[dgl.ETYPE].long().to(dev)
+    num_rels = len(dataset[0].etypes)
+    E_per_rel = torch.histogram(etypes.float().cpu(), bins=num_rels).hist.long()
 
-feat = torch.randn(g.num_nodes(), in_feat).to(dev)
-weight = torch.randn(num_rels, in_feat, out_feat).to(dev)
+    print(f"""Dataset: {name}
+    num_nodes: {g.num_nodes()}
+    num_edges: {g.num_edges()}
+    num_rels: {num_rels}
+    in_feat: {in_feat}
+    out_feat: {out_feat}
+    E_per_rel: {E_per_rel}
+    """)
 
-# **** low-mem ******
-conv = RGCNLowMem(weight).to(dev)
-# dry run
-for i in range(3):
-    h = conv(g, feat, etypes)
-torch.cuda.synchronize()
-# test
-with Timer(dev) as t:
-    for i in range(iters):
-        h_lowmem = conv(g, feat, etypes)
-print("low-mem rgcn:", t.elapsed_secs / iters * 1000, "ms")
+    feat = torch.randn(g.num_nodes(), in_feat).to(dev)
+    weight = torch.randn(num_rels, in_feat, out_feat).to(dev)
 
-# **** high-mem ******
-conv = RGCNHighMem(weight).to(dev)
-# dry run
-for i in range(3):
-    h = conv(g, feat, etypes)
-torch.cuda.synchronize()
-# test
-with Timer(dev) as t:
-    for i in range(iters):
-        h_highmem = conv(g, feat, etypes)
-print("high-mem rgcn:", t.elapsed_secs / iters * 1000, "ms")
+    # **** low-mem ******
+    conv = RGCNLowMem(weight).to(dev)
+    # dry run
+    for i in range(3):
+        h = conv(g, feat, etypes)
+    torch.cuda.synchronize()
+    # test
+    with Timer(dev) as t:
+        for i in range(iters):
+            h_lowmem = conv(g, feat, etypes)
+    print("low-mem rgcn:", t.elapsed_secs / iters * 1000, "ms")
 
-# **** hetero ****
-hg = dataset[0].to(dev)
-conv = RGCNHetero(weight, hg.etypes).to(dev)
-feat_dict = {ntype : torch.randn(hg.num_nodes(ntype), in_feat).to(dev) for ntype in hg.ntypes}
-# dry run
-for i in range(3):
-    h_dict = conv(hg, feat_dict)
-torch.cuda.synchronize()
-# test
-with Timer(dev) as t:
-    for i in range(iters):
+    # **** high-mem ******
+    conv = RGCNHighMem(weight).to(dev)
+    # dry run
+    for i in range(3):
+        h = conv(g, feat, etypes)
+    torch.cuda.synchronize()
+    # test
+    with Timer(dev) as t:
+        for i in range(iters):
+            h_highmem = conv(g, feat, etypes)
+    print("high-mem rgcn:", t.elapsed_secs / iters * 1000, "ms")
+
+    # **** hetero ****
+    hg = dataset[0].to(dev)
+    conv = RGCNHetero(weight, hg.etypes).to(dev)
+    feat_dict = {ntype : torch.randn(hg.num_nodes(ntype), in_feat).to(dev) for ntype in hg.ntypes}
+    # dry run
+    for i in range(3):
         h_dict = conv(hg, feat_dict)
-print("hetero rgcn:", t.elapsed_secs / iters * 1000, "ms")
+    torch.cuda.synchronize()
+    # test
+    with Timer(dev) as t:
+        for i in range(iters):
+            h_dict = conv(hg, feat_dict)
+    print("hetero rgcn:", t.elapsed_secs / iters * 1000, "ms")
 
-# **** gather_mm sorted ****
-conv = RGCNGatherMMSorted(weight).to(dev)
-# dry run
-for i in range(3):
-    h = conv(g, feat, etypes, E_per_rel)
-torch.cuda.synchronize()
-# test
-with Timer(dev) as t:
-    for i in range(iters):
-        h_gmm_sorted = conv(g, feat, etypes, E_per_rel)
-print("gather_mm_sorted rgcn:", t.elapsed_secs / iters * 1000, "ms")
+    # **** gather_mm sorted ****
+    conv = RGCNGatherMMSorted(weight).to(dev)
+    # dry run
+    for i in range(3):
+        h = conv(g, feat, etypes, E_per_rel)
+    torch.cuda.synchronize()
+    # test
+    with Timer(dev) as t:
+        for i in range(iters):
+            h_gmm_sorted = conv(g, feat, etypes, E_per_rel)
+    print("gather_mm_sorted rgcn:", t.elapsed_secs / iters * 1000, "ms")
 
-# **** gather_mm unsorted ****
-conv = RGCNGatherMMUnsorted(weight).to(dev)
-# dry run
-for i in range(3):
-    h = conv(g, feat, etypes, E_per_rel)
-torch.cuda.synchronize()
-# test
-with Timer(dev) as t:
-    for i in range(iters):
-        h_gmm_unsorted = conv(g, feat, etypes, E_per_rel)
-print("gather_mm_unsorted rgcn:", t.elapsed_secs / iters * 1000, "ms")
+    # **** gather_mm unsorted ****
+    conv = RGCNGatherMMUnsorted(weight).to(dev)
+    # dry run
+    for i in range(3):
+        h = conv(g, feat, etypes, E_per_rel)
+    torch.cuda.synchronize()
+    # test
+    with Timer(dev) as t:
+        for i in range(iters):
+            h_gmm_unsorted = conv(g, feat, etypes, E_per_rel)
+    print("gather_mm_unsorted rgcn:", t.elapsed_secs / iters * 1000, "ms")
 
-# **** correctness ****
-assert torch.allclose(h_lowmem, h_highmem, atol=1e-3, rtol=1e-3)
-assert torch.allclose(h_lowmem, h_gmm_unsorted, atol=1e-3, rtol=1e-3)
- 
+    # **** correctness ****
+    # assert torch.allclose(h_lowmem, h_highmem, atol=1e-3, rtol=1e-3)
+    # assert torch.allclose(h_lowmem, h_gmm_unsorted, atol=1e-3, rtol=1e-3)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='e2e')
+    parser.add_argument("-i", "--in_feat_scale", type=int, default=1,
+            help="scale input feature length")
+    parser.add_argument("-o", "--out_feat_scale", type=int, default=1,
+            help="scale output feature length")
+    args = parser.parse_args()
+    print(args)
+    main(args)
