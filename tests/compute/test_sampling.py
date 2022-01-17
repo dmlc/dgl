@@ -892,7 +892,7 @@ def test_sample_neighbors_exclude_edges_homoG(dtype):
 
 @pytest.mark.parametrize('dtype', ['int32', 'int64'])
 def test_global_uniform_negative_sampling(dtype):
-    g = dgl.graph((np.random.randint(0, 20, (10,)), np.random.randint(0, 20, (10,)))).to(F.ctx())
+    g = dgl.graph((np.random.randint(0, 2000, (10,)), np.random.randint(0, 2000, (10,)))).to(F.ctx())
     src, dst = dgl.sampling.global_uniform_negative_sampling(g, 20, False, True)
     assert len(src) > 0
     assert len(dst) > 0
