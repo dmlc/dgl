@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.5)
 # Borrowed and adapted from TVM project
 ########################################
 project(dgl C CXX)
+set( CMAKE_CXX_FLAGS "-std=c++14" )
 message(STATUS "Start configuring project ${PROJECT_NAME}")
 
 # cmake utils

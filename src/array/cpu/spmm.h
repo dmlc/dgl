@@ -496,6 +496,7 @@ void Edge_softmax_csr_forward(const BcastOff& bcast, const CSRMatrix& csr, NDArr
             num[j-row_start] = eid*rhs_dim+rhs_add;
             max_v = std::max<DType>(max_v,(*rhs_off));
         }
+
         DType exp_sum = 0;
         for(auto& element : data_e){
             element -= max_v;
@@ -526,25 +527,25 @@ void Edge_softmax_csr_backward(const BcastOff& bcast, const CSRMatrix& csr, NDAr
   runtime::parallel_for(0, csr.num_rows, [&](size_t b, size_t e) {
     for (auto rid = b; rid < e; ++rid) {
       const IdType row_start = indptr[rid], row_end = indptr[rid + 1];
-      std::vector<DType> data_out(row_end-row_start,0);
-      std::vector<DType> data_sds(row_end-row_start,0);  
-      std::vector<IdType> num(row_end-row_start,0);
       for (int64_t k = 0; k < dim; ++k) {
+
         DType sum_sds = 0;
         for (IdType j = row_start; j < row_end; ++j) {
           const IdType eid = has_idx ? edges[j] : j;
             const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
-            const DType* rhs_off_out =
-              Op::use_rhs ? W_out + eid * rhs_dim + rhs_add : nullptr;
             const DType* rhs_off_sds =
               Op::use_rhs ? W_sds + eid * rhs_dim + rhs_add : nullptr;
-            data_out[j-row_start] = *rhs_off_out;
-            data_sds[j-row_start] = *rhs_off_sds;
             sum_sds += (*rhs_off_sds);
-            num[j-row_start] = eid*rhs_dim+rhs_add;
         }
-        for(int i=0;i<row_end-row_start;i++){
-            back_out.Ptr<DType>()[num[i]] = data_sds[i] - sum_sds*data_out[i];
+
+        for(IdType j = row_start; j< row_end; ++j){
+          const IdType eid = has_idx ? edges[j] : j;
+            const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
+              const DType* rhs_off_out =
+                Op::use_rhs ? W_out + eid * rhs_dim + rhs_add : nullptr;
+              const DType* rhs_off_sds =
+                Op::use_rhs ? W_sds + eid * rhs_dim + rhs_add : nullptr;
+          back_out.Ptr<DType>()[eid*rhs_dim+rhs_add] =  (*rhs_off_sds) - sum_sds*(*rhs_off_out);
         }
       }
       
