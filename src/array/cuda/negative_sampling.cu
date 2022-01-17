@@ -42,8 +42,13 @@ __global__ void _GlobalUniformNegativeSamplingKernel(
   while (tx < num_samples) {
     for (int i = 0; i < num_trials; ++i) {
       uint4 result = curand4(&rng);
-      IdType u = ((result.x << 32) | result.y) % num_row;
-      IdType v = ((result.z << 32) | result.w) % num_col;
+      // Turns out that result.x is always 0 with the above RNG.
+      uint64_t y_hi = result.y >> 16;
+      uint64_t y_lo = result.y & 0xFFFF;
+      uint64_t z = static_cast<uint64_t>(result.z);
+      uint64_t w = static_cast<uint64_t>(result.w);
+      int64_t u = static_cast<int64_t>(((y_lo << 32L) | z) % num_row);
+      int64_t v = static_cast<int64_t>(((y_hi << 32L) | w) % num_col);
 
       if (exclude_self_loops && (u == v))
         continue;
