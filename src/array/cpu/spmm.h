@@ -528,7 +528,7 @@ void Edge_softmax_csr_backward(const BcastOff& bcast, const CSRMatrix& csr, NDAr
     for (auto rid = b; rid < e; ++rid) {
       const IdType row_start = indptr[rid], row_end = indptr[rid + 1];
       for (int64_t k = 0; k < dim; ++k) {
-
+        
         DType sum_sds = 0;
         for (IdType j = row_start; j < row_end; ++j) {
           const IdType eid = has_idx ? edges[j] : j;
@@ -537,7 +537,6 @@ void Edge_softmax_csr_backward(const BcastOff& bcast, const CSRMatrix& csr, NDAr
               Op::use_rhs ? W_sds + eid * rhs_dim + rhs_add : nullptr;
             sum_sds += (*rhs_off_sds);
         }
-
         for(IdType j = row_start; j< row_end; ++j){
           const IdType eid = has_idx ? edges[j] : j;
             const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
