@@ -13,7 +13,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 #
-"""Module for graph transformation utilities."""
+"""Functional interface for transform"""
 
 from collections.abc import Iterable, Mapping
 from collections import defaultdict
@@ -21,22 +21,22 @@ import numpy as np
 import scipy.sparse as sparse
 import scipy.sparse.linalg
 
-from ._ffi.function import _init_api
-from .base import dgl_warning, DGLError
-from . import convert
-from .heterograph import DGLHeteroGraph, DGLBlock
-from .heterograph_index import create_metagraph_index, create_heterograph_from_relations
-from .frame import Frame
-from . import ndarray as nd
-from . import backend as F
-from . import utils, batch
-from .partition import metis_partition_assignment
-from .partition import partition_graph_with_halo
-from .partition import metis_partition
-from . import subgraph
+from .._ffi.function import _init_api
+from ..base import dgl_warning, DGLError
+from .. import convert
+from ..heterograph import DGLHeteroGraph, DGLBlock
+from ..heterograph_index import create_metagraph_index, create_heterograph_from_relations
+from ..frame import Frame
+from .. import ndarray as nd
+from .. import backend as F
+from .. import utils, batch
+from ..partition import metis_partition_assignment
+from ..partition import partition_graph_with_halo
+from ..partition import metis_partition
+from .. import subgraph
 
 # TO BE DEPRECATED
-from ._deprecate.graph import DGLGraph as DGLGraphStale
+from .._deprecate.graph import DGLGraph as DGLGraphStale
 
 __all__ = [
     'line_graph',
@@ -93,7 +93,7 @@ def knn_graph(x, k, algorithm='bruteforce-blas', dist='euclidean'):
     columns correspond to coordinate/feature dimensions.
 
     The nodes of the returned graph correspond to the points, where the predecessors
-    of each point are its k-nearest neighbors measured by the Euclidean distance.
+    of each point are its k-nearest neighbors measured by the chosen distance.
 
     If :attr:`x` is a 3D tensor, then each submatrix will be transformed
     into a separate graph. DGL then composes the graphs into a large
@@ -715,7 +715,7 @@ def to_bidirected(g, copy_ndata=False, readonly=None):
 
 def add_reverse_edges(g, readonly=None, copy_ndata=True,
                       copy_edata=False, ignore_bipartite=False):
-    r"""Add an reversed edge for each edge in the input graph and return a new graph.
+    r"""Add a reversed edge for each edge in the input graph and return a new graph.
 
     For a graph with edges :math:`(i_1, j_1), \cdots, (i_n, j_n)`, this
     function creates a new graph with edges
@@ -740,14 +740,14 @@ def add_reverse_edges(g, readonly=None, copy_ndata=True,
         (Default: True)
     copy_edata: bool, optional
         If True, the features of the reversed edges will be identical to
-        the original ones."
+        the original ones.
 
         If False, the new graph will not have any edge features.
 
         (Default: False)
     ignore_bipartite: bool, optional
         If True, unidirectional bipartite graphs are ignored and
-        no error is raised. If False, an error  will be raised if
+        no error is raised. If False, an error will be raised if
         an edge type of the input heterogeneous graph is for a unidirectional
         bipartite graph.
 
@@ -865,7 +865,7 @@ def line_graph(g, backtracking=True, shared=False):
     """Return the line graph of this graph.
 
     The line graph ``L(G)`` of a given graph ``G`` is defined as another graph where
-    the nodes in ``L(G)`` maps to the edges in ``G``.  For any pair of edges ``(u, v)``
+    the nodes in ``L(G)`` correspond to the edges in ``G``.  For any pair of edges ``(u, v)``
     and ``(v, w)`` in ``G``, the corresponding node of edge ``(u, v)`` in ``L(G)`` will
     have an edge connecting to the corresponding node of edge ``(v, w)``.
 
@@ -1050,7 +1050,7 @@ def khop_graph(g, k, copy_ndata=True):
     col = np.repeat(adj_k.col, multiplicity)
     # TODO(zihao): we should support creating multi-graph from scipy sparse matrix
     # in the future.
-    new_g = convert.graph((row, col), num_nodes=n)
+    new_g = convert.graph((row, col), num_nodes=n, idtype=g.idtype, device=g.device)
 
     # handle ndata
     if copy_ndata:
@@ -2350,7 +2350,7 @@ def to_simple(g,
         (Default: "count")
     writeback_mapping: bool, optional
         If True, return an extra write-back mapping for each edge
-        type.  The write-back mapping is a tensor recording
+        type. The write-back mapping is a tensor recording
         the mapping from the edge IDs in the input graph to
         the edge IDs in the result graph. If the graph is
         heterogeneous, DGL returns a dictionary of edge types and such
@@ -3195,4 +3195,4 @@ def rcmk_perm(g):
     perm = sparse.csgraph.reverse_cuthill_mckee(csr_adj)
     return perm.copy()
 
-_init_api("dgl.transform")
+_init_api("dgl.transform", __name__)
