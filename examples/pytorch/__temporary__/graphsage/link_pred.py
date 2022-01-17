@@ -70,11 +70,14 @@ dataloader = dglnew.dataloading.EdgeDataLoader(
 model = SAGE(graph.ndata['feat'].shape[1], 256, dataset.num_classes).cuda()
 opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
 
+def f(blocks):
+    return blocks[0].srcdata['feat']
+
 durations = []
 for _ in range(10):
     t0 = time.time()
     for it, (input_nodes, pair_graph, neg_pair_graph, blocks) in enumerate(dataloader):
-        x = blocks[0].srcdata['feat']
+        x = f(blocks)
         pos_score, neg_score = model(pair_graph, neg_pair_graph, blocks, x)
         pos_label = torch.ones_like(pos_score)
         neg_label = torch.zeros_like(neg_score)

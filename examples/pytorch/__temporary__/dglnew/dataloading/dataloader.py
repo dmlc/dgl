@@ -4,11 +4,14 @@ from queue import Queue
 import itertools
 import threading
 import asyncio
+import random
 import torch
+import torch.distributed as dist
 from dgl import DGLGraph, NID, EID
+from dgl import ndarray as nd
 from dgl.utils import (
     recursive_apply, ExceptionWrapper, async_recursive_apply, recursive_apply_pair,
-    set_num_threads)
+    set_num_threads, create_shared_mem_array, get_shared_mem_array)
 from dgl.frame import Column, LazyFeature
 from .asyncio_wrapper import AsyncIO
 from ..storages import TensorStorage, FeatureStorage
@@ -111,6 +114,63 @@ class TensorizedDataset(torch.utils.data.IterableDataset):
         dataset = self._divide_by_worker(self._tensor_dataset)
         return _TensorizedDatasetIter(
             dataset, self.batch_size, self.drop_last, self._mapping_keys)
+
+def _get_shared_mem_name(id_):
+    return f'ddp_{id_}'
+
+def _generate_shared_mem_name_id():
+    for _ in range(3):     # 3 trials
+        id_ = random.getrandbits(32)
+        name = _get_shared_mem_name(id_)
+        if not nd.exist_shared_mem_array(name):
+            return id_, name
+    raise DGLError('Unable to generate a shared memory array')
+
+class DDPTensorizedDataset(torch.utils.data.IterableDataset):
+    def __init__(self, indices, keys, batch_size, drop_last, ddp_seed):
+        self.rank = dist.get_rank()
+        self.num_replicas = dist.get_world_size()
+        self.seed = ddp_seed
+
+        if isinstance(indices, Mapping):
+            self._init_with_mapping(indices, keys)
+            self._mapping_keys = keys
+        else:
+            self._init_with_tensor(indices)
+            self._mapping_keys = None
+        self.batch_size = batch_size
+        self.drop_last = drop_last
+
+    def _init_with_mapping(self, indices, keys):
+        # TODO
+
+    def _init_with_tensor(self, indices):
+        # Rank 0 prepares the indices array in shared memory and broadcast the name
+        # to other ranks.
+        if self.rank == 0:
+            name, id_ = _generate_shared_mem_name_id()
+            num_samples = indices.shape[0]
+            indices_shared = create_shared_mem_array(name, (num_samples,), torch.int64)
+            indices_shared[:] = indices
+            self._tensor_dataset = indices_shared
+            self._device = indices_shared.device
+            id_tensor = torch.tensor([id_, num_samples], dtype=torch.int64)
+        else:
+            id_tensor = torch.tensor([0, 0], dtype=torch.int64)
+        dist.broadcast(id_tensor, src=0)
+        if self.rank != 0:
+            id_, num_samples = id_tensor.tolist()
+            name = _get_shared_mem_name(id_)
+            indices_shared = get_shared_mem_array(name, (num_samples,), torch.int64)
+            self._tensor_dataset = indices_shared
+            self._device = indices_shared.device
+
+    def shuffle(self):
+        if self.rank == 0:
+            num_samples = self._tensor_dataset.shape[0]
+            self._tensor_dataset[:] = self._tensor_dataset[
+                torch.randperm(num_samples, device=self._device)]
+        dist.barrier()
 
 
 def _prefetch_for_column(id_, use_asyncio, storage, device, pin_memory):
