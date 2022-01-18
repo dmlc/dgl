@@ -16,7 +16,6 @@ from ... import backend as F
 from ...base import DGLError
 from ...utils import to_dgl_context
 from ..._ffi import streams as FS
-import time
 
 __all__ = ['NodeDataLoader', 'EdgeDataLoader', 'GraphDataLoader',
            # Temporary exposure.
