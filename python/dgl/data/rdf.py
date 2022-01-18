@@ -8,10 +8,6 @@ from collections import OrderedDict
 import itertools
 import abc
 import re
-try:
-    import rdflib as rdf
-except ImportError:
-    pass
 
 import networkx as nx
 import numpy as np
@@ -115,7 +111,6 @@ class RDFGraphDataset(DGLBuiltinDataset):
                  raw_dir=None,
                  force_reload=False,
                  verbose=True):
-        import rdflib as rdf
         self._insert_reverse = insert_reverse
         self._print_every = print_every
         self._predict_category = predict_category
@@ -141,6 +136,7 @@ class RDFGraphDataset(DGLBuiltinDataset):
         -------
             Loaded rdf data
         """
+        import rdflib as rdf
         raw_rdf_graphs = []
         for _, filename in enumerate(os.listdir(root_path)):
             fmt = None
@@ -674,6 +670,7 @@ class AIFBDataset(RDFGraphDataset):
         return super(AIFBDataset, self).__len__()
 
     def parse_entity(self, term):
+        import rdflib as rdf
         if isinstance(term, rdf.Literal):
             return Entity(e_id=str(term), cls="_Literal")
         if isinstance(term, rdf.BNode):
@@ -855,6 +852,7 @@ class MUTAGDataset(RDFGraphDataset):
         return super(MUTAGDataset, self).__len__()
 
     def parse_entity(self, term):
+        import rdflib as rdf
         if isinstance(term, rdf.Literal):
             return Entity(e_id=str(term), cls="_Literal")
         elif isinstance(term, rdf.BNode):
@@ -1052,6 +1050,7 @@ class BGSDataset(RDFGraphDataset):
         return super(BGSDataset, self).__len__()
 
     def parse_entity(self, term):
+        import rdflib as rdf
         if isinstance(term, rdf.Literal):
             return None
         elif isinstance(term, rdf.BNode):
@@ -1247,6 +1246,7 @@ class AMDataset(RDFGraphDataset):
         return super(AMDataset, self).__len__()
 
     def parse_entity(self, term):
+        import rdflib as rdf
         if isinstance(term, rdf.Literal):
             return None
         elif isinstance(term, rdf.BNode):
