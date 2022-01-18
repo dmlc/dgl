@@ -140,7 +140,7 @@ std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling(
   auto dtype = csr.indptr->dtype;
   const int64_t num_row = csr.num_rows;
   const int64_t num_col = csr.num_cols;
-  const int64_t num_actual_samples = static_cast<int64_t>(num_samples * redundancy);
+  const int64_t num_actual_samples = static_cast<int64_t>(num_samples * (1 + redundancy));
   IdArray row = Full<IdType>(-1, num_actual_samples, ctx);
   IdArray col = Full<IdType>(-1, num_actual_samples, ctx);
   IdArray out_row = IdArray::Empty({num_actual_samples}, dtype, ctx);
