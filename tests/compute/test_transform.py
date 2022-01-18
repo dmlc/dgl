@@ -1800,5 +1800,361 @@ def test_reorder_graph(idtype):
     rfg = dgl.reorder_graph(fg)
     assert 'csr' in sum(rfg.formats().values(), [])
 
+@parametrize_dtype
+def test_module_add_self_loop(idtype):
+    g = dgl.graph(([1, 1], [1, 2]), idtype=idtype, device=F.ctx())
+    g.ndata['h'] = F.randn((g.num_nodes(), 2))
+    g.edata['w'] = F.randn((g.num_edges(), 3))
+
+    # Case1: add self-loops with the default setting
+    transform = dgl.AddSelfLoop()
+    new_g = transform(g)
+    assert new_g.device == g.device
+    assert new_g.idtype == g.idtype
+    assert new_g.num_nodes() == g.num_nodes()
+    assert new_g.num_edges() == 4
+    src, dst = new_g.edges()
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 0), (1, 1), (1, 2), (2, 2)}
+    assert 'h' in new_g.ndata
+    assert 'w' in new_g.edata
+
+    # Case2: Remove self-loops first to avoid duplicate ones
+    transform = dgl.AddSelfLoop(allow_duplicate=True)
+    new_g = transform(g)
+    assert new_g.device == g.device
+    assert new_g.idtype == g.idtype
+    assert new_g.num_nodes() == g.num_nodes()
+    assert new_g.num_edges() == 5
+    src, dst = new_g.edges()
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 0), (1, 1), (1, 2), (2, 2)}
+    assert 'h' in new_g.ndata
+    assert 'w' in new_g.edata
+
+    # Create a heterogeneous graph
+    g = dgl.heterograph({
+        ('user', 'plays', 'game'): ([0], [1]),
+        ('user', 'follows', 'user'): ([1], [3])
+    }, idtype=idtype, device=F.ctx())
+    g.nodes['user'].data['h1'] = F.randn((4, 2))
+    g.edges['plays'].data['w1'] = F.randn((1, 3))
+    g.nodes['game'].data['h2'] = F.randn((2, 4))
+    g.edges['follows'].data['w2'] = F.randn((1, 5))
+
+    # Case3: add self-loops for a heterogeneous graph
+    new_g = transform(g)
+    assert new_g.device == g.device
+    assert new_g.idtype == g.idtype
+    assert new_g.ntypes == g.ntypes
+    assert new_g.canonical_etypes == g.canonical_etypes
+    for nty in new_g.ntypes:
+        assert new_g.num_nodes(nty) == g.num_nodes(nty)
+    assert new_g.num_edges('plays') == 1
+    assert new_g.num_edges('follows') == 5
+    assert 'h1' in new_g.nodes['user'].data
+    assert 'h2' in new_g.nodes['game'].data
+    assert 'w1' in new_g.edges['plays'].data
+    assert 'w2' in new_g.edges['follows'].data
+
+    # Case4: add self-etypes for a heterogeneous graph
+    transform = dgl.AddSelfLoop(new_etypes=True)
+    new_g = transform(g)
+    assert new_g.device == g.device
+    assert new_g.idtype == g.idtype
+    assert new_g.ntypes == g.ntypes
+    assert set(new_g.canonical_etypes) == {
+        ('user', 'plays', 'game'), ('user', 'follows', 'user'),
+        ('user', 'self', 'user'), ('game', 'self', 'game')
+    }
+    for nty in new_g.ntypes:
+        assert new_g.num_nodes(nty) == g.num_nodes(nty)
+    assert new_g.num_edges('plays') == 1
+    assert new_g.num_edges('follows') == 5
+    assert new_g.num_edges(('user', 'self', 'user')) == 4
+    assert new_g.num_edges(('game', 'self', 'game')) == 2
+    assert 'h1' in new_g.nodes['user'].data
+    assert 'h2' in new_g.nodes['game'].data
+    assert 'w1' in new_g.edges['plays'].data
+    assert 'w2' in new_g.edges['follows'].data
+
+@parametrize_dtype
+def test_module_remove_self_loop(idtype):
+    transform = dgl.RemoveSelfLoop()
+
+    # Case1: homogeneous graph
+    g = dgl.graph(([1, 1], [1, 2]), idtype=idtype, device=F.ctx())
+    g.ndata['h'] = F.randn((g.num_nodes(), 2))
+    g.edata['w'] = F.randn((g.num_edges(), 3))
+    new_g = transform(g)
+    assert new_g.device == g.device
+    assert new_g.idtype == g.idtype
+    assert new_g.num_nodes() == g.num_nodes()
+    assert new_g.num_edges() == 1
+    src, dst = new_g.edges()
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(1, 2)}
+    assert 'h' in new_g.ndata
+    assert 'w' in new_g.edata
+
+    # Case2: heterogeneous graph
+    g = dgl.heterograph({
+        ('user', 'plays', 'game'): ([0, 1], [1, 1]),
+        ('user', 'follows', 'user'): ([1, 2], [2, 2])
+    }, idtype=idtype, device=F.ctx())
+    g.nodes['user'].data['h1'] = F.randn((3, 2))
+    g.edges['plays'].data['w1'] = F.randn((2, 3))
+    g.nodes['game'].data['h2'] = F.randn((2, 4))
+    g.edges['follows'].data['w2'] = F.randn((2, 5))
+
+    new_g = transform(g)
+    assert new_g.device == g.device
+    assert new_g.idtype == g.idtype
+    assert new_g.ntypes == g.ntypes
+    assert new_g.canonical_etypes == g.canonical_etypes
+    for nty in new_g.ntypes:
+        assert new_g.num_nodes(nty) == g.num_nodes(nty)
+    assert new_g.num_edges('plays') == 2
+    assert new_g.num_edges('follows') == 1
+    assert 'h1' in new_g.nodes['user'].data
+    assert 'h2' in new_g.nodes['game'].data
+    assert 'w1' in new_g.edges['plays'].data
+    assert 'w2' in new_g.edges['follows'].data
+
+@parametrize_dtype
+def test_module_add_reverse(idtype):
+    transform = dgl.AddReverse()
+
+    # Case1: Add reverse edges for a homogeneous graph
+    g = dgl.graph(([0], [1]), idtype=idtype, device=F.ctx())
+    g.ndata['h'] = F.randn((g.num_nodes(), 3))
+    g.edata['w'] = F.randn((g.num_edges(), 2))
+    new_g = transform(g)
+    assert new_g.device == g.device
+    assert new_g.idtype == g.idtype
+    assert g.num_nodes() == new_g.num_nodes()
+    src, dst = new_g.edges()
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 1), (1, 0)}
+    assert F.allclose(g.ndata['h'], new_g.ndata['h'])
+    assert F.allclose(g.edata['w'], F.narrow_row(new_g.edata['w'], 0, 1))
+    assert F.allclose(F.narrow_row(new_g.edata['w'], 1, 2), F.zeros((1, 2), F.float32, F.ctx()))
+
+    # Case2: Add reverse edges for a homogeneous graph and copy edata
+    transform = dgl.AddReverse(copy_edata=True)
+    new_g = transform(g)
+    assert new_g.device == g.device
+    assert new_g.idtype == g.idtype
+    assert g.num_nodes() == new_g.num_nodes()
+    src, dst = new_g.edges()
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 1), (1, 0)}
+    assert F.allclose(g.ndata['h'], new_g.ndata['h'])
+    assert F.allclose(g.edata['w'], F.narrow_row(new_g.edata['w'], 0, 1))
+    assert F.allclose(g.edata['w'], F.narrow_row(new_g.edata['w'], 1, 2))
+
+    # Case3: Add reverse edges for a heterogeneous graph
+    g = dgl.heterograph({
+        ('user', 'plays', 'game'): ([0, 1], [1, 1]),
+        ('user', 'follows', 'user'): ([1, 2], [2, 2])
+    }, device=F.ctx())
+    new_g = transform(g)
+    assert new_g.device == g.device
+    assert new_g.idtype == g.idtype
+    assert g.ntypes == new_g.ntypes
+    assert set(new_g.canonical_etypes) == {
+        ('user', 'plays', 'game'), ('user', 'follows', 'user'), ('game', 'rev_plays', 'user')}
+    for nty in g.ntypes:
+        assert g.num_nodes(nty) == new_g.num_nodes(nty)
+
+    src, dst = new_g.edges(etype='plays')
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 1), (1, 1)}
+
+    src, dst = new_g.edges(etype='follows')
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(1, 2), (2, 2), (2, 1)}
+
+    src, dst = new_g.edges(etype='rev_plays')
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(1, 1), (1, 0)}
+
+    # Case4: Enforce reverse edge types for symmetric canonical edge types
+    transform = dgl.AddReverse(sym_new_etype=True)
+    new_g = transform(g)
+    assert new_g.device == g.device
+    assert new_g.idtype == g.idtype
+    assert g.ntypes == new_g.ntypes
+    assert set(new_g.canonical_etypes) == {
+        ('user', 'plays', 'game'), ('user', 'follows', 'user'),
+        ('game', 'rev_plays', 'user'), ('user', 'rev_follows', 'user')}
+    for nty in g.ntypes:
+        assert g.num_nodes(nty) == new_g.num_nodes(nty)
+
+    src, dst = new_g.edges(etype='plays')
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 1), (1, 1)}
+
+    src, dst = new_g.edges(etype='follows')
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(1, 2), (2, 2)}
+
+    src, dst = new_g.edges(etype='rev_plays')
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(1, 1), (1, 0)}
+
+    src, dst = new_g.edges(etype='rev_follows')
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(2, 1), (2, 2)}
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not supported for to_simple")
+@parametrize_dtype
+def test_module_to_simple(idtype):
+    transform = dgl.ToSimple()
+    g = dgl.graph(([0, 1, 1], [1, 2, 2]), idtype=idtype, device=F.ctx())
+    g.ndata['h'] = F.randn((g.num_nodes(), 2))
+    g.edata['w'] = F.tensor([[0.1], [0.2], [0.3]])
+    sg = transform(g)
+    assert sg.device == g.device
+    assert sg.idtype == g.idtype
+    assert sg.num_nodes() == g.num_nodes()
+    assert sg.num_edges() == 2
+    src, dst = sg.edges()
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 1), (1, 2)}
+    assert F.allclose(sg.edata['count'], F.tensor([1, 2]))
+    assert F.allclose(sg.ndata['h'], g.ndata['h'])
+
+    g = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 1, 1], [1, 2, 2]),
+        ('user', 'plays', 'game'): ([0, 1, 0], [1, 1, 1])
+    })
+    sg = transform(g)
+    assert sg.device == g.device
+    assert sg.idtype == g.idtype
+    assert sg.ntypes == g.ntypes
+    assert sg.canonical_etypes == g.canonical_etypes
+    for nty in sg.ntypes:
+        assert sg.num_nodes(nty) == g.num_nodes(nty)
+    for ety in sg.canonical_etypes:
+        assert sg.num_edges(ety) == 2
+
+    src, dst = sg.edges(etype='follows')
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 1), (1, 2)}
+
+    src, dst = sg.edges(etype='plays')
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 1), (1, 1)}
+
+@parametrize_dtype
+def test_module_line_graph(idtype):
+    transform = dgl.LineGraph()
+    g = dgl.graph(([0, 1, 1], [1, 0, 2]), idtype=idtype, device=F.ctx())
+    g.ndata['h'] = F.tensor([[0.], [1.], [2.]])
+    g.edata['w'] = F.tensor([[0.], [0.1], [0.2]])
+    new_g = transform(g)
+    assert new_g.device == g.device
+    assert new_g.idtype == g.idtype
+    assert new_g.num_nodes() == g.num_edges()
+    src, dst = new_g.edges()
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 1), (0, 2), (1, 0)}
+
+    transform = dgl.LineGraph(backtracking=False)
+    new_g = transform(g)
+    assert new_g.device == g.device
+    assert new_g.idtype == g.idtype
+    assert new_g.num_nodes() == g.num_edges()
+    src, dst = new_g.edges()
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 2)}
+
+@parametrize_dtype
+def test_module_khop_graph(idtype):
+    transform = dgl.KHopGraph(2)
+    g = dgl.graph(([0, 1], [1, 2]), idtype=idtype, device=F.ctx())
+    g.ndata['h'] = F.randn((g.num_nodes(), 2))
+    new_g = transform(g)
+    assert new_g.device == g.device
+    assert new_g.idtype == g.idtype
+    assert new_g.num_nodes() == g.num_nodes()
+    assert F.allclose(g.ndata['h'], new_g.ndata['h'])
+    src, dst = new_g.edges()
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 2)}
+
+@parametrize_dtype
+def test_module_add_metapaths(idtype):
+    g = dgl.heterograph({
+        ('person', 'author', 'paper'): ([0, 0, 1], [1, 2, 2]),
+        ('paper', 'accepted', 'venue'): ([1], [0]),
+        ('paper', 'rejected', 'venue'): ([2], [1])
+    }, idtype=idtype, device=F.ctx())
+    g.nodes['venue'].data['h'] = F.randn((g.num_nodes('venue'), 2))
+    g.edges['author'].data['h'] = F.randn((g.num_edges('author'), 3))
+
+    # Case1: keep_orig_edges is True
+    metapaths = {
+        'accepted': [('person', 'author', 'paper'), ('paper', 'accepted', 'venue')],
+        'rejected': [('person', 'author', 'paper'), ('paper', 'rejected', 'venue')]
+    }
+    transform = dgl.AddMetaPaths(metapaths)
+    new_g = transform(g)
+    assert new_g.device == g.device
+    assert new_g.idtype == g.idtype
+    assert new_g.ntypes == g.ntypes
+    assert set(new_g.canonical_etypes) == {
+        ('person', 'author', 'paper'), ('paper', 'accepted', 'venue'),
+        ('paper', 'rejected', 'venue'), ('person', 'accepted', 'venue'),
+        ('person', 'rejected', 'venue')
+    }
+    for nty in new_g.ntypes:
+        assert new_g.num_nodes(nty) == g.num_nodes(nty)
+    for ety in g.canonical_etypes:
+        assert new_g.num_edges(ety) == g.num_edges(ety)
+    assert F.allclose(g.nodes['venue'].data['h'], new_g.nodes['venue'].data['h'])
+    assert F.allclose(g.edges['author'].data['h'], new_g.edges['author'].data['h'])
+
+    src, dst = new_g.edges(etype=('person', 'accepted', 'venue'))
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 0)}
+
+    src, dst = new_g.edges(etype=('person', 'rejected', 'venue'))
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 1), (1, 1)}
+
+    # Case2: keep_orig_edges is False
+    transform = dgl.AddMetaPaths(metapaths, keep_orig_edges=False)
+    new_g = transform(g)
+    assert new_g.device == g.device
+    assert new_g.idtype == g.idtype
+    assert new_g.ntypes == g.ntypes
+    assert len(new_g.canonical_etypes) == 2
+    for nty in new_g.ntypes:
+        assert new_g.num_nodes(nty) == g.num_nodes(nty)
+    assert F.allclose(g.nodes['venue'].data['h'], new_g.nodes['venue'].data['h'])
+
+    src, dst = new_g.edges(etype=('person', 'accepted', 'venue'))
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 0)}
+
+    src, dst = new_g.edges(etype=('person', 'rejected', 'venue'))
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 1), (1, 1)}
+
+@parametrize_dtype
+def test_module_compose(idtype):
+    g = dgl.graph(([0, 1], [1, 2]), idtype=idtype, device=F.ctx())
+    transform = dgl.Compose([dgl.AddReverse(), dgl.AddSelfLoop()])
+    new_g = transform(g)
+    assert new_g.device == g.device
+    assert new_g.idtype == g.idtype
+    assert new_g.num_edges() == 7
+
+    src, dst = new_g.edges()
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 1), (1, 2), (1, 0), (2, 1), (0, 0), (1, 1), (2, 2)}
+
 if __name__ == '__main__':
     test_partition_with_halo()

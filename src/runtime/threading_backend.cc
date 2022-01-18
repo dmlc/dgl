@@ -191,7 +191,7 @@ int ThreadGroup::Configure(AffinityMode mode, int nthreads, bool exclude_worker0
   return impl_->Configure(mode, nthreads, exclude_worker0);
 }
 
-void Yield() {
+void YieldThread() {
   std::this_thread::yield();
 }
 
