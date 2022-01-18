@@ -172,23 +172,29 @@ def main(args):
     dev = "cuda:0"
     torch.cuda.set_device(dev)
 
-    name, dataset = 'aifb', AIFBDataset()
-    # name, dataset = 'mutag', MUTAGDataset()
-    #name, dataset = 'bgs', BGSDataset()
-    #name, dataset = 'am', AMDataset()
+    # load graph data
+    if args.dataset == 'aifb':
+        dataset = AIFBDataset()
+    elif args.dataset == 'mutag':
+        dataset = MUTAGDataset()
+    elif args.dataset == 'bgs':
+        dataset = BGSDataset()
+    elif args.dataset == 'am':
+        dataset = AMDataset()
+    else:
+        raise ValueError()
 
     g = dgl.to_homogeneous(dataset[0]).to(dev)
     etypes = g.edata[dgl.ETYPE].long().to(dev)
     num_rels = len(dataset[0].etypes)
     E_per_rel = torch.histogram(etypes.float().cpu(), bins=num_rels).hist.long()
 
-    print(f"""Dataset: {name}
+    print(f"""Dataset: {args.dataset}
     num_nodes: {g.num_nodes()}
     num_edges: {g.num_edges()}
     num_rels: {num_rels}
     in_feat: {in_feat}
     out_feat: {out_feat}
-    E_per_rel: {E_per_rel}
     """)
 
     feat = torch.randn(g.num_nodes(), in_feat).to(dev)
@@ -258,7 +264,8 @@ def main(args):
 
     # **** correctness ****
     # assert torch.allclose(h_lowmem, h_highmem, atol=1e-3, rtol=1e-3)
-    # assert torch.allclose(h_lowmem, h_gmm_unsorted, atol=1e-3, rtol=1e-3)
+    assert torch.allclose(h_lowmem, h_gmm_sorted, atol=1e-3, rtol=1e-3)
+    assert torch.allclose(h_lowmem, h_gmm_unsorted, atol=1e-3, rtol=1e-3)
 
 
 if __name__ == "__main__":
@@ -267,6 +274,8 @@ if __name__ == "__main__":
             help="scale input feature length")
     parser.add_argument("-o", "--out_feat_scale", type=int, default=1,
             help="scale output feature length")
+    parser.add_argument("-d", "--dataset", type=str, required=True,
+            help="dataset to use")
     args = parser.parse_args()
     print(args)
     main(args)
