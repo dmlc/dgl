@@ -5466,6 +5466,8 @@ class DGLHeteroGraph(object):
               If the graph struture is already pinned, the function directly returns it.
 
         Materialization of new sparse formats for pinned graphs is not allowed.
+        To avoid implicit formats materialization during training,
+        you should create all the needed formats before pinnning.
         But cloning and materialization is fine. See the examples below.
 
         Returns

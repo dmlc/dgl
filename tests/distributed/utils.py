@@ -1,5 +1,6 @@
 
 import socket
+import os
 
 def get_local_usable_addr():
     """Get local usable IP and port
@@ -25,3 +26,10 @@ def get_local_usable_addr():
     sock.close()
 
     return ip_addr + ' ' + str(port)
+
+
+def reset_envs():
+    """Reset common environment variable which are set in tests. """
+    for key in ['DGL_ROLE', 'DGL_NUM_SAMPLER', 'DGL_NUM_SERVER', 'DGL_DIST_MODE', 'DGL_NUM_CLIENT']:
+        if key in os.environ:
+            os.environ.pop(key)
