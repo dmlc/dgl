@@ -16,6 +16,7 @@ from ... import backend as F
 from ...base import DGLError
 from ...utils import to_dgl_context
 from ..._ffi import streams as FS
+import time
 
 __all__ = ['NodeDataLoader', 'EdgeDataLoader', 'GraphDataLoader',
            # Temporary exposure.
@@ -101,31 +102,8 @@ class _ScalarDataBatcher(th.utils.data.IterableDataset):
                 self.num_samples = math.ceil(len(self.dataset) / self.num_replicas)  # type: ignore
             self.total_size = self.num_samples * self.num_replicas
 
-            if self.rank == 0:
-                # pad the indices
-                indices = th.arange(len(self.dataset))
-                if not self.drop_last:
-                    # add extra samples to make it evenly divisible
-                    indices = th.cat([indices, indices[:(self.total_size - indices.shape[0])]])
-                else:
-                    # remove tail of data to make it evenly divisible.
-                    indices = indices[:self.total_size]
-                assert indices.shape[0] == self.total_size
-
-                # share indices among processes
-                indices = indices.share_memory_()
-                _shared_filename = list(indices.storage()._share_filename_())
-            else:
-                _shared_filename = [None, None, None]
-            # Note: dist.broadcast_object_list() is a new feature introduced in PyTorch 1.7.0.
-            #       We may need a fallback for lower PyTorch versions.
-            dist.broadcast_object_list(_shared_filename, src=0)
-            # reconstruct the shared tensor
-            if self.rank != 0:
-                indices = th.LongTensor(th.LongStorage._new_shared_filename(*_shared_filename))
-
-            self._shared_indices = indices
-            assert self._shared_indices.is_shared()
+            self._indices = (th.arange(self.num_samples) + \
+                             self.rank * self.num_samples) % len(self.dataset)
  
     def __iter__(self):
         if self.use_ddp:
@@ -159,16 +137,11 @@ class _ScalarDataBatcher(th.utils.data.IterableDataset):
 
     def _iter_ddp(self):
         if self.shuffle:
-            perm = (th.randperm(self.num_samples) + (self.rank * self.num_samples)) % self.dataset.shape[0]
-            self._shared_indices[self.num_samples * self.rank:self.num_samples * (self.rank + 1)] = perm
-        dist.barrier()
-
-        # subsample
-        indices = self._shared_indices[self.rank:self.total_size:self.num_replicas]
-        assert indices.shape[0] == self.num_samples
+            self._indices = (th.randperm(self.num_samples) + \
+                             self.rank * self.num_samples) % len(self.dataset)
 
         # Dividing by worker is our own stuff.
-        dataset = self._divide_by_worker(self.dataset[indices])
+        dataset = self._divide_by_worker(self.dataset[self._indices])
         return _ScalarDataBatcherIter(dataset, self.batch_size, self.drop_last)
 
     def __len__(self):
