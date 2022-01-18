@@ -5,6 +5,7 @@ import itertools
 import threading
 import asyncio
 import random
+import math
 import torch
 import torch.distributed as dist
 from dgl import DGLGraph, NID, EID
@@ -64,6 +65,26 @@ class _TensorizedDatasetIter(object):
         return id_dict
 
 
+def _get_id_tensor_from_mapping(indices, device):
+    lengths = torch.LongTensor([indices[k].shape[0] for k in keys], device=device)
+    type_ids = torch.arange(len(keys), device=device).repeat_interleave(lengths)
+    all_indices = torch.cat([indices[k] for k in keys])
+    return torch.stack([type_ids, all_indices], 1)
+
+
+def _divide_by_worker(dataset):
+    num_samples = dataset.shape[0]
+    worker_info = torch.utils.data.get_worker_info()
+    if worker_info:
+        chunk_size = num_samples // worker_info.num_workers
+        left_over = num_samples % worker_info.num_workers
+        start = (chunk_size * worker_info.id) + min(left_over, worker_info.id)
+        end = start + chunk_size + (worker_info.id < left_over)
+        assert worker_info.id < worker_info.num_workers - 1 or end == num_samples
+        dataset = dataset[start:end]
+    return dataset
+
+
 class TensorizedDataset(torch.utils.data.IterableDataset):
     """Custom Dataset wrapper that returns a minibatch as tensors or dicts of tensors.
     When the dataset is on the GPU, this significantly reduces the overhead.
@@ -73,45 +94,23 @@ class TensorizedDataset(torch.utils.data.IterableDataset):
     """
     def __init__(self, indices, keys, batch_size, drop_last):
         if isinstance(indices, Mapping):
-            self._init_with_mapping(indices, keys)
+            self._device = next(iter(indices.values())).device
+            self._tensor_dataset = _get_id_tensor_from_mapping(indices, self.device)
             self._mapping_keys = keys
         else:
-            self._init_with_tensor(indices)
+            self._tensor_dataset = indices
+            self._device = indices.device
             self._mapping_keys = None
         self.batch_size = batch_size
         self.drop_last = drop_last
-
-    def _init_with_mapping(self, indices, keys):
-        device = next(iter(indices.values())).device
-        self._device = device
-        lengths = torch.LongTensor([indices[k].shape[0] for k in keys], device=device)
-        type_ids = torch.arange(len(keys), device=device).repeat_interleave(lengths)
-        all_indices = torch.cat([indices[k] for k in keys])
-        self._tensor_dataset = torch.stack([type_ids, all_indices], 1)
-
-    def _init_with_tensor(self, indices):
-        self._tensor_dataset = indices
-        self._device = indices.device
 
     def shuffle(self):
         # TODO: may need an in-place shuffle kernel
         perm = torch.randperm(self._tensor_dataset.shape[0], device=self._device)
         self._tensor_dataset[:] = self._tensor_dataset[perm]
 
-    def _divide_by_worker(self, dataset):
-        num_samples = dataset.shape[0]
-        worker_info = torch.utils.data.get_worker_info()
-        if worker_info:
-            chunk_size = num_samples // worker_info.num_workers
-            left_over = num_samples % worker_info.num_workers
-            start = (chunk_size * worker_info.id) + min(left_over, worker_info.id)
-            end = start + chunk_size + (worker_info.id < left_over)
-            assert worker_info.id < worker_info.num_workers - 1 or end == num_samples
-            dataset = dataset[start:end]
-        return dataset
-
     def __iter__(self):
-        dataset = self._divide_by_worker(self._tensor_dataset)
+        dataset = _divide_by_worker(self._tensor_dataset)
         return _TensorizedDatasetIter(
             dataset, self.batch_size, self.drop_last, self._mapping_keys)
 
@@ -123,7 +122,7 @@ def _generate_shared_mem_name_id():
         id_ = random.getrandbits(32)
         name = _get_shared_mem_name(id_)
         if not nd.exist_shared_mem_array(name):
-            return id_, name
+            return name, id_
     raise DGLError('Unable to generate a shared memory array')
 
 class DDPTensorizedDataset(torch.utils.data.IterableDataset):
@@ -131,46 +130,77 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
         self.rank = dist.get_rank()
         self.num_replicas = dist.get_world_size()
         self.seed = ddp_seed
-
-        if isinstance(indices, Mapping):
-            self._init_with_mapping(indices, keys)
-            self._mapping_keys = keys
-        else:
-            self._init_with_tensor(indices)
-            self._mapping_keys = None
+        self.epoch = 0
         self.batch_size = batch_size
         self.drop_last = drop_last
 
-    def _init_with_mapping(self, indices, keys):
-        # TODO
+        if self.drop_last and len(indices) % self.num_replicas != 0:
+            self.num_samples = math.ceil((len(indices) - self.num_replicas) / self.num_replicas)
+        else:
+            self.num_samples = math.ceil(len(indices) / self.num_replicas)
+        self.total_size = self.num_samples * self.num_replicas
+        # If drop_last is True, we create a shared memory array larger than the number
+        # of indices since we will need to pad it after shuffling to make it evenly
+        # divisible before every epoch.  If drop_last is False, we create an array
+        # with the same size as the indices so we can trim it later.
+        self.shared_mem_size = self.total_size if self.drop_last else len(indices)
+        self.num_indices = len(indices)
 
-    def _init_with_tensor(self, indices):
-        # Rank 0 prepares the indices array in shared memory and broadcast the name
-        # to other ranks.
         if self.rank == 0:
             name, id_ = _generate_shared_mem_name_id()
-            num_samples = indices.shape[0]
-            indices_shared = create_shared_mem_array(name, (num_samples,), torch.int64)
-            indices_shared[:] = indices
-            self._tensor_dataset = indices_shared
-            self._device = indices_shared.device
-            id_tensor = torch.tensor([id_, num_samples], dtype=torch.int64)
+            if isinstance(indices, Mapping):
+                device = next(iter(indices.values())).device
+                id_tensor = _get_id_tensor_from_mapping(indices, device)
+                self._tensor_dataset = create_shared_mem_array(
+                    name, (self.shared_mem_size, 2), torch.int64)
+                self._tensor_dataset[:id_tensor.shape[0], :] = id_tensor
+            else:
+                self._tensor_dataset = create_shared_mem_array(
+                    name, (self.shared_mem_size,), torch.int64)
+                self._tensor_dataset[:len(indices)] = indices
+            self._device = self._tensor_dataset.device
+            meta_info = torch.LongTensor([id_, self._tensor_dataset.shape[0]])
         else:
-            id_tensor = torch.tensor([0, 0], dtype=torch.int64)
-        dist.broadcast(id_tensor, src=0)
+            meta_info = torch.LongTensor([0, 0])
+
+        if dist.get_backend() == 'nccl':
+            # Use default CUDA device; PyTorch DDP required the users to set the CUDA
+            # device for each process themselves so calling .cuda() should be safe.
+            meta_info = meta_info.cuda()
+        dist.broadcast(meta_info, src=0)
+
         if self.rank != 0:
-            id_, num_samples = id_tensor.tolist()
+            id_, num_samples = meta_info.tolist()
             name = _get_shared_mem_name(id_)
-            indices_shared = get_shared_mem_array(name, (num_samples,), torch.int64)
+            if isinstance(indices, Mapping):
+                indices_shared = get_shared_mem_array(name, (num_samples, 2), torch.int64)
+            else:
+                indices_shared = get_shared_mem_array(name, (num_samples,), torch.int64)
             self._tensor_dataset = indices_shared
             self._device = indices_shared.device
 
+        if isinstance(indices, Mapping):
+            self._mapping_keys = keys
+        else:
+            self._mapping_keys = None
+
     def shuffle(self):
+        # Only rank 0 does the actual shuffling.  The other ranks wait for it.
         if self.rank == 0:
-            num_samples = self._tensor_dataset.shape[0]
-            self._tensor_dataset[:] = self._tensor_dataset[
-                torch.randperm(num_samples, device=self._device)]
+            self._tensor_dataset[:self.num_indices] = self._tensor_dataset[
+                torch.randperm(self.num_indices, device=self._device)]
+            if not self.drop_last:
+                # pad extra
+                self._tensor_dataset[self.num_indices:] = \
+                    self._tensor_dataset[:self.total_size - self.num_indices]
         dist.barrier()
+
+    def __iter__(self):
+        start = self.num_samples * self.rank
+        end = self.num_samples * (self.rank + 1)
+        dataset = _divide_by_worker(self._tensor_dataset[start:end])
+        return _TensorizedDatasetIter(
+            dataset, self.batch_size, self.drop_last, self._mapping_keys)
 
 
 def _prefetch_for_column(id_, use_asyncio, storage, device, pin_memory):
@@ -279,6 +309,8 @@ def _assign_for(item, feat):
 
 def _prefetcher_entry(dataloader_it, dataloader, queue, num_threads):
     use_asyncio = dataloader.use_asyncio
+    # PyTorch will set the number of threads to 1 which slows down pin_memory() calls
+    # in main process if a prefetching thread is created.
     if num_threads is not None:
         torch.set_num_threads(num_threads)
     stream = (
@@ -302,7 +334,7 @@ def _prefetcher_entry(dataloader_it, dataloader, queue, num_threads):
                 None))
         queue.put((None, None, None, None))
     except:     # pylint: disable=bare-except
-        queue.put((None, None, None, ExceptionWrapper(where='in prefetcher')))
+        queue.put((None, None, None, ExceptionWrapper(exc_info=exc_info, where='in prefetcher')))
 
 
 # DGLGraphs have the semantics of lazy feature slicing with subgraphs.  Such behavior depends
@@ -400,23 +432,25 @@ class _PrefetchingIter(object):
         return batch
 
 
-def collate_wrapper(sample_func, g):
-    def _sample(items):
-        batch = sample_func(g, items)
+# Make them classes to work with pickling in mp.spawn
+class CollateWrapper(object):
+    def __init__(self, sample_func, g):
+        self.sample_func = sample_func
+        self.g = g
 
-        # Remove all the columns whose storages are parent storages (i.e. index is not
-        # None)
-        batch = recursive_apply(batch, remove_parent_storage_columns, g)
-        return batch
-    return _sample
+    def __call__(self, items):
+        batch = self.sample_func(self.g, items)
+        return recursive_apply(batch, remove_parent_storage_columns, self.g)
 
 
-def _wrap_worker_init_fn(func):
-    def _func(worker_id):
+class WorkerInitWrapper(object):
+    def __init__(self, func):
+        self.func = func
+
+    def __call__(self, worker_id):
         set_num_threads(1)
-        if func is not None:
-            func(worker_id)
-    return _func
+        if self.func is not None:
+            self.func(worker_id)
 
 
 def _wrap_storage(storage):
@@ -442,20 +476,29 @@ def _prepare_storages_from_graph(graph, attr, types):
     return storages
 
 
+def create_tensorized_dataset(indices, keys, batch_size, drop_last, use_ddp, ddp_seed):
+    if use_ddp:
+        return DDPTensorizedDataset(indices, keys, batch_size, drop_last, ddp_seed)
+    else:
+        return TensorizedDataset(indices, keys, batch_size, drop_last)
+
+
 class NodeDataLoader(torch.utils.data.DataLoader):
     def __init__(self, graph, train_idx, graph_sampler, device='cpu', use_ddp=False,
                  ddp_seed=0, batch_size=1, drop_last=False, shuffle=False,
                  use_asyncio=False, use_prefetch_thread=False, **kwargs):
         self.graph = graph
-        self.dataset = TensorizedDataset(train_idx, graph.ntypes, batch_size, drop_last)
-        self.use_ddp = use_ddp
+        self.dataset = create_tensorized_dataset(
+            train_idx, graph.ntypes, batch_size, drop_last, use_ddp, ddp_seed)
         self.ddp_seed = ddp_seed
         self._shuffle_dataset = shuffle
         self.graph_sampler = graph_sampler
         self.use_asyncio = use_asyncio
         self.device = torch.device(device)
+        if self.device.type == 'cuda' and self.device.index is None:
+            self.device = torch.device('cuda', torch.cuda.current_device())
         self.use_prefetch_thread = use_prefetch_thread
-        worker_init_fn = _wrap_worker_init_fn(kwargs.get('worker_init_fn', None))
+        worker_init_fn = WorkerInitWrapper(kwargs.get('worker_init_fn', None))
 
         # Instantiate all the formats if the number of workers is greater than 0.
         if kwargs.get('num_workers', 0) > 0 and hasattr(self.graph, 'create_formats_'):
@@ -467,7 +510,7 @@ class NodeDataLoader(torch.utils.data.DataLoader):
 
         super().__init__(
             self.dataset,
-            collate_fn=collate_wrapper(self.graph_sampler.sample, graph),
+            collate_fn=CollateWrapper(self.graph_sampler.sample, graph),
             batch_size=None,
             worker_init_fn=worker_init_fn,
             **kwargs)
@@ -493,15 +536,16 @@ class EdgeDataLoader(torch.utils.data.DataLoader):
                  use_asyncio=False, use_prefetch_thread=False, exclude=None,
                  reverse_eids=None, reverse_etypes=None, negative_sampler=None, **kwargs):
         self.graph = graph
-        self.dataset = TensorizedDataset(train_idx, graph.ntypes, batch_size, drop_last)
-        self.use_ddp = use_ddp
-        self.ddp_seed = ddp_seed
+        self.dataset = create_tensorized_dataset(
+            train_idx, graph.canonical_etypes, batch_size, drop_last, use_ddp, ddp_seed)
         self._shuffle_dataset = shuffle
         self.graph_sampler = graph_sampler
         self.use_asyncio = use_asyncio
         self.device = torch.device(device)
+        if self.device.type == 'cuda' and self.device.index is None:
+            self.device = torch.device('cuda', torch.cuda.current_device())
         self.use_prefetch_thread = use_prefetch_thread
-        worker_init_fn = _wrap_worker_init_fn(kwargs.get('worker_init_fn', None))
+        worker_init_fn = WorkerInitWrapper(kwargs.get('worker_init_fn', None))
 
         self.node_data = _prepare_storages_from_graph(graph, 'ndata', graph.ntypes)
         self.edge_data = _prepare_storages_from_graph(graph, 'edata', graph.canonical_etypes)
@@ -518,7 +562,7 @@ class EdgeDataLoader(torch.utils.data.DataLoader):
 
         super().__init__(
             self.dataset,
-            collate_fn=collate_wrapper(self.graph_sampler.sample, graph),
+            collate_fn=CollateWrapper(self.graph_sampler.sample, graph),
             batch_size=None,
             worker_init_fn=worker_init_fn,
             **kwargs)
