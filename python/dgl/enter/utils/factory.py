@@ -8,6 +8,7 @@ import yaml
 import inspect
 from pydantic import create_model_from_typeddict, create_model, Field
 from ...data import CoraGraphDataset, CiteseerGraphDataset, RedditDataset
+from ...dataloading.negative_sampler import GlobalUniform, PerSourceUniform
 import inspect
 logger = logging.getLogger(__name__)
 
@@ -33,15 +34,17 @@ class PipelineBase(ABC):
 
 class DataFactory:
     registry = {}
+    import_code_registry = {}
 
     @classmethod
-    def register(cls, name: str) -> Callable:
+    def register(cls, name: str, args=(), import_code="import dgl") -> Callable:
 
         def inner_wrapper(wrapped_class) -> Callable:
             if name in cls.registry:
                 logger.warning(
                     'Executor %s already exists. Will replace it', name)
             cls.registry[name] = wrapped_class
+            cls.import_code_registry[name] = import_code
             return wrapped_class
 
         return inner_wrapper
@@ -75,8 +78,9 @@ class DataFactory:
         return output
 
 
-DataFactory.register("cora")(CoraGraphDataset)
-DataFactory.register("citeseer")(CiteseerGraphDataset)
+DataFactory.register("cora", import_code="from dgl.data import CoraGraphDataset")(CoraGraphDataset)
+DataFactory.register("citeseer", import_code="from dgl.data import CiteseerGraphDataset")(CiteseerGraphDataset)
+DataFactory.register("ogbl-collab", import_code="from ogb.linkproppred import DglLinkPropPredDataset")("DglLinkPropPredDataset('ogbl-collab')")
 DataFactory.register("reddit")(RedditDataset)
 
 
@@ -199,6 +203,78 @@ class ModelFactory:
             type_annotation_dict[k] = param.annotation
         return type_annotation_dict
 
+
+
+class SamplerFactory:
+    """ The factory class for creating executors"""
+
+    def __init__(self):
+        self.registry = {}
+
+    def get_model_enum(self):
+        enum_class = enum.Enum(
+            "NegativeSamplerName", {k: k for k, v in self.registry.items()})
+        return enum_class
+
+    def register(self, sampler_name: str) -> Callable:
+
+        def inner_wrapper(wrapped_class) -> Callable:
+            if sampler_name in self.registry:
+                logger.warning(
+                    'Sampler %s already exists. Will replace it', sampler_name)
+            self.registry[sampler_name] = wrapped_class
+            return wrapped_class
+
+        return inner_wrapper
+
+    def get_constructor_default_args(self, sampler_name):
+        sigs = inspect.signature(self.registry[sampler_name].__init__)
+        default_map = {}
+        for k, param in dict(sigs.parameters).items():
+            default_map[k] = param.default
+        return default_map
+
+    def get_pydantic_constructor_arg_type(self, sampler_name: str):
+        model_enum = self.get_model_enum()
+        arg_dict = self.get_constructor_default_args(sampler_name)
+        type_annotation_dict = {}
+        # type_annotation_dict["name"] = Literal[""]
+        exempt_keys = ['self', 'in_size', 'out_size', 'redundancy']
+        for k, param in arg_dict.items():
+            if k not in exempt_keys or param is None:
+                if k == 'k' or k == 'redundancy':
+                    type_annotation_dict[k] = 3
+                else:
+                    type_annotation_dict[k] = arg_dict[k]
+
+        class Base(DGLBaseModel):
+            name: Literal[sampler_name]
+        return create_model(f'{sampler_name.upper()}SamplerConfig', **type_annotation_dict, __base__=Base)
+
+    def get_pydantic_model_config(self):
+        model_list = []
+        for k in self.registry:
+            model_list.append(self.get_pydantic_constructor_arg_type(k))
+        output = model_list[0]
+        for m in model_list[1:]:
+            output = Union[output, m]
+        return output
+
+    def get_model_class_name(self, model_name):
+        return self.registry[model_name].__name__
+
+    def get_constructor_arg_type(self, model_name):
+        sigs = inspect.signature(self.registry[model_name].__init__)
+        type_annotation_dict = {}
+        for k, param in dict(sigs.parameters).items():
+            type_annotation_dict[k] = param.annotation
+        return type_annotation_dict
+
+
+
+NegativeSamplerFactory = SamplerFactory()
+NegativeSamplerFactory.register("uniform")(GlobalUniform)
+NegativeSamplerFactory.register("persource")(PerSourceUniform)
 
 NodeModelFactory = ModelFactory()
 EdgeModelFactory = ModelFactory()

@@ -1,6 +1,8 @@
 from ...utils.factory import EdgeModelFactory
-from .edgepred import EdgePredictor
+from .ele import ElementWiseProductPredictor
+from .bilinear import BilinearPredictor
 from .transe import TransE
 
-EdgeModelFactory.register("edgepred")(EdgePredictor)
-EdgeModelFactory.register("transe")(TransE)
+EdgeModelFactory.register("ele")(ElementWiseProductPredictor)
+EdgeModelFactory.register("bilinear")(BilinearPredictor)
+# EdgeModelFactory.register("transe")(TransE)
