@@ -8,6 +8,7 @@ import time
 
 from . import rpc
 from .constants import MAX_QUEUE_SIZE
+from .dist_context import exit_client, set_initialized
 
 if os.name != 'nt':
     import fcntl
@@ -183,9 +184,8 @@ def connect_to_server(ip_config, num_servers, max_queue_size=MAX_QUEUE_SIZE, net
     rpc.send_request(0, get_client_num_req)
     res = rpc.recv_response()
     rpc.set_num_client(res.num_client)
-    from .dist_context import exit_client, set_initialized
     atexit.register(exit_client)
-    set_initialized()
+    set_initialized(True)
 
 def shutdown_servers():
     """Issue commands to remote servers to shut them down.
@@ -194,6 +194,7 @@ def shutdown_servers():
     ------
     ConnectionError : If anything wrong with the connection.
     """
+    set_initialized(False)
     if rpc.get_rank() == 0:  # Only client_0 issue this command
         req = rpc.ShutDownRequest(rpc.get_rank())
         for server_id in range(rpc.get_num_server()):
