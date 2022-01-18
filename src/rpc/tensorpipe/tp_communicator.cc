@@ -34,7 +34,7 @@ bool TPSender::ConnectReceiver(const std::string &addr, int recv_id) {
     done->set_value(!error);
   });
   if (!done->get_future().get()) {
-    LOG(WARNING) << "Failed to connect to receiver[" << addr << "].";
+    DLOG(WARNING) << "Failed to connect to receiver[" << addr << "].";
     return false;
   }
   pipes_[recv_id] = pipe;
