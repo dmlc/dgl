@@ -38,6 +38,8 @@ struct DLDataTypeTraits {
   struct DLDataTypeTraits<T> { \
     static constexpr DLDataType dtype{code, bits, 1}; \
   }
+GEN_DLDATATYPETRAITS_FOR(int8_t, kDLInt, 8);
+GEN_DLDATATYPETRAITS_FOR(int16_t, kDLInt, 16);
 GEN_DLDATATYPETRAITS_FOR(int32_t, kDLInt, 32);
 GEN_DLDATATYPETRAITS_FOR(int64_t, kDLInt, 64);
 // XXX(BarclayII) most DL frameworks do not support unsigned int and long arrays, so I'm just

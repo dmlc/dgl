@@ -4,6 +4,7 @@ import os
 import socket
 import atexit
 import logging
+import time
 
 from . import rpc
 from .constants import MAX_QUEUE_SIZE
@@ -161,17 +162,17 @@ def connect_to_server(ip_config, num_servers, max_queue_size=MAX_QUEUE_SIZE, net
     for server_id, addr in server_namebook.items():
         server_ip = addr[1]
         server_port = addr[2]
-        rpc.add_receiver_addr(server_ip, server_port, server_id)
-    rpc.sender_connect()
+        while not rpc.connect_receiver(server_ip, server_port, server_id):
+            time.sleep(1)
     # Get local usable IP address and port
     ip_addr = get_local_usable_addr(server_ip)
     client_ip, client_port = ip_addr.split(':')
+    # wait server connect back
+    rpc.receiver_wait(client_ip, client_port, num_servers, blocking=False)
     # Register client on server
     register_req = rpc.ClientRegisterRequest(ip_addr)
     for server_id in range(num_servers):
         rpc.send_request(server_id, register_req)
-    # wait server connect back
-    rpc.receiver_wait(client_ip, client_port, num_servers)
     # recv client ID from server
     res = rpc.recv_response()
     rpc.set_rank(res.client_id)
