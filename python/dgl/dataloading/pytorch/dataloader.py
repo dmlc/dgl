@@ -103,7 +103,7 @@ class _ScalarDataBatcher(th.utils.data.IterableDataset):
 
             self._indices = (th.arange(self.num_samples) + \
                              self.rank * self.num_samples) % len(self.dataset)
- 
+
     def __iter__(self):
         if self.use_ddp:
             return self._iter_ddp()
