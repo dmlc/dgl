@@ -188,7 +188,7 @@ class DeviceAPI {
   DGL_DLL virtual void FreeWorkspace(DGLContext ctx, void* ptr);
 
   /*!
-   * \brief Get device API base don context.
+   * \brief Get device API based on context.
    * \param ctx The context
    * \param allow_missing Whether allow missing
    * \return The corresponding device API.
@@ -197,12 +197,12 @@ class DeviceAPI {
 
 
   /*!
-   * \brief Get device API base don context.
+   * \brief Get device API based on context.
    * \param dev_type The device type
    * \param allow_missing Whether allow missing
    * \return The corresponding device API.
    */
-  DGL_DLL static DeviceAPI* Get(int dev_type, bool allow_missing = false);
+  DGL_DLL static DeviceAPI* Get(DLDeviceType dev_type, bool allow_missing = false);
 };
 
 /*! \brief The device type bigger than this is RPC device */

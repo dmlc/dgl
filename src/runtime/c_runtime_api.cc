@@ -99,8 +99,8 @@ DeviceAPI* DeviceAPI::Get(DGLContext ctx, bool allow_missing) {
       static_cast<int>(ctx.device_type), allow_missing);
 }
 
-DeviceAPI* DeviceAPI::Get(int dev_type, bool allow_missing) {
-  return DeviceAPIManager::Get(dev_type, allow_missing);
+DeviceAPI* DeviceAPI::Get(DLDeviceType dev_type, bool allow_missing) {
+  return DeviceAPIManager::Get(static_cast<int>(dev_type), allow_missing);
 }
 
 void* DeviceAPI::AllocWorkspace(DGLContext ctx,
