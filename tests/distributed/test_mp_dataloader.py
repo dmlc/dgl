@@ -9,7 +9,7 @@ import sys
 import multiprocessing as mp
 import numpy as np
 import time
-from utils import get_local_usable_addr, reset_envs
+from utils import generate_ip_config, reset_envs
 from pathlib import Path
 from dgl.distributed import DistGraphServer, DistGraph, DistDataLoader
 import pytest
@@ -104,10 +104,7 @@ def start_dist_dataloader(rank, tmpdir, num_server, drop_last, orig_nid, orig_ei
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
 def test_standalone(tmpdir):
     reset_envs()
-    ip_config = open("mp_ip_config.txt", "w")
-    for _ in range(1):
-        ip_config.write('{}\n'.format(get_local_usable_addr()))
-    ip_config.close()
+    generate_ip_config("mp_ip_config.txt", 1, 1)
 
     g = CitationGraphDataset("cora")[0]
     print(g.idtype)
@@ -176,10 +173,7 @@ def start_dist_neg_dataloader(rank, tmpdir, num_server, num_workers, orig_nid, g
     dgl.distributed.exit_client() # this is needed since there's two test here in one process
 
 def check_neg_dataloader(g, tmpdir, num_server, num_workers):
-    ip_config = open("mp_ip_config.txt", "w")
-    for _ in range(num_server):
-        ip_config.write('{}\n'.format(get_local_usable_addr()))
-    ip_config.close()
+    generate_ip_config("mp_ip_config.txt", num_server, num_server)
 
     num_parts = num_server
     num_hops = 1
@@ -221,10 +215,7 @@ def check_neg_dataloader(g, tmpdir, num_server, num_workers):
 @pytest.mark.parametrize("reshuffle", [True, False])
 def test_dist_dataloader(tmpdir, num_server, num_workers, drop_last, reshuffle):
     reset_envs()
-    ip_config = open("mp_ip_config.txt", "w")
-    for _ in range(num_server):
-        ip_config.write('{}\n'.format(get_local_usable_addr()))
-    ip_config.close()
+    generate_ip_config("mp_ip_config.txt", num_server, num_server)
 
     g = CitationGraphDataset("cora")[0]
     print(g.idtype)
@@ -361,10 +352,7 @@ def start_edge_dataloader(rank, tmpdir, num_server, num_workers, orig_nid, orig_
     dgl.distributed.exit_client() # this is needed since there's two test here in one process
 
 def check_dataloader(g, tmpdir, num_server, num_workers, dataloader_type):
-    ip_config = open("mp_ip_config.txt", "w")
-    for _ in range(num_server):
-        ip_config.write('{}\n'.format(get_local_usable_addr()))
-    ip_config.close()
+    generate_ip_config("mp_ip_config.txt", num_server, num_server)
 
     num_parts = num_server
     num_hops = 1
