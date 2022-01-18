@@ -117,9 +117,9 @@ __global__ void gatherMMUnsortedEKernel_outInReg(
         int w_offset = etype[row] * in_len * out_len;  // assume all weights are of same dim
         /* iterate over elements of a row of H */
         for (unsigned int k_outloop = 0; k_outloop < out_len; k_outloop +=32) {
-            float out_reg = 0;  //thread private
+            float out_reg = 0;  // thread private
             unsigned int k = laneId;
-            if(k < out_len) {
+            if (k < out_len) {
                 for (unsigned int i = 0; i < in_len; i++) {
                     DType h_val =  H[row * in_len + i];
                     /* iterate over elements of a row of W in parallel */
@@ -156,7 +156,7 @@ __global__ void gatherMMUnsortedEKernel_optimal(
         // TODO(Israt): Fix for inlen < 64.
         __shared__ float sh_H[4 * sh_h_tile];
         int h_tile = sh_h_tile;
-        if(in_len < h_tile) h_tile = in_len;
+        if (in_len < h_tile) h_tile = in_len;
         /* Load H in shared mem in a coalesced way */
         for (int h_outloop = 0; h_outloop < in_len; h_outloop += h_tile) {
             for (unsigned int l = laneId; l < h_tile; l += 32)
@@ -168,9 +168,9 @@ __global__ void gatherMMUnsortedEKernel_optimal(
             for (unsigned int k_outloop = 0; k_outloop < out_len; k_outloop +=32) {
                 float out_reg = 0;  // thread private
                 unsigned int k = laneId;
-                if(k < out_len) {
+                if (k < out_len) {
                     for (unsigned int i = 0; i < h_tile; i++) {
-                        DType h_val =  sh_H[local_row * h_tile + i]; //
+                        DType h_val =  sh_H[local_row * h_tile + i];
                         /* iterate over elements of a row of W in parallel */
                         out_reg += h_val * W[w_offset + (i * out_len + (k_outloop + k))];
                     }
@@ -233,8 +233,8 @@ void gatherMM_SortedEtype(const NDArray h,
               const NDArray h_etype) {
     SWITCH_BITS(bits, DType, {
         int64_t num_rel = E_per_rel.NumElements();
-        int n = w->shape[1]; // cols of B
-        int k = h->shape[1]; // cols of A = rows of B
+        int n = w->shape[1];  // cols of B
+        int k = h->shape[1];  // cols of A = rows of B
         const DType *h_data = h.Ptr<DType>();
         const DType *w_data = w.Ptr<DType>();
         const IdType* E_per_rel_data = E_per_rel.Ptr<IdType>();
@@ -254,7 +254,7 @@ void gatherMM_SortedEtype(const NDArray h,
             lda = k,
             ldc = n;
         for (int etype = 0; etype < num_rel; ++etype) {
-            int m = E_per_rel_data[etype]; // rows of A
+            int m = E_per_rel_data[etype];  // rows of A
             CUBLAS_CALL(cublasGemm<DType>(
               thr_entry->cublas_handle,
               CUBLAS_OP_N,
