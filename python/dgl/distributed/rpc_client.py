@@ -8,7 +8,6 @@ import time
 
 from . import rpc
 from .constants import MAX_QUEUE_SIZE
-from .dist_context import exit_client, set_initialized
 
 if os.name != 'nt':
     import fcntl
@@ -184,6 +183,7 @@ def connect_to_server(ip_config, num_servers, max_queue_size=MAX_QUEUE_SIZE, net
     rpc.send_request(0, get_client_num_req)
     res = rpc.recv_response()
     rpc.set_num_client(res.num_client)
+    from .dist_context import exit_client, set_initialized
     atexit.register(exit_client)
     set_initialized(True)
 
@@ -194,6 +194,7 @@ def shutdown_servers():
     ------
     ConnectionError : If anything wrong with the connection.
     """
+    from .dist_context import set_initialized
     set_initialized(False)
     if rpc.get_rank() == 0:  # Only client_0 issue this command
         req = rpc.ShutDownRequest(rpc.get_rank())
