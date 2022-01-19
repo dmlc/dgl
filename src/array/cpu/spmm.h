@@ -250,7 +250,6 @@ void SpMMCmpCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
   DType* O = static_cast<DType*>(out->data);
   IdType* argX = Op::use_lhs ? static_cast<IdType*>(argu->data) : nullptr;
   IdType* argW = Op::use_rhs ? static_cast<IdType*>(arge->data) : nullptr;
-  
   CHECK_NOTNULL(indptr);
   CHECK_NOTNULL(O);
   if (Op::use_lhs) {

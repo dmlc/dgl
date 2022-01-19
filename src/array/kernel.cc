@@ -374,7 +374,6 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSpMM")
     NDArray V = args[5];
     NDArray ArgU = args[6];
     NDArray ArgE = args[7];
-    
     CheckCtx(graph->Context(), {U, E, V, ArgU, ArgE},
         {"U_data", "E_data", "out", "Arg_U", "Arg_E"});
     CheckContiguous({U, E, V, ArgU, ArgE},
