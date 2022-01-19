@@ -147,7 +147,7 @@ This script generates partitioned graphs and store them in the directory called 
 DGL provides a script to launch the training job in the cluster. `part_config` and `ip_config`
 specify relative paths to the path of the workspace.
 
-The command below launches one training process on each machine and each training process has 4 sampling processes.
+The command below launches one training process on each machine and each training process has 0 sampling processes.
 
 ```bash
 python3 ~/workspace/dgl/tools/launch.py \
