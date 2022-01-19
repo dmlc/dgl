@@ -278,7 +278,7 @@ void gatherMM(const NDArray h,
           NDArray out,
           const NDArray E_per_rel,
           const NDArray etype,
-          bool sortedE) {
+          bool sortedE, bool H_trans, bool w_trans) {
     if (sortedE)  // similar to low-mem matmul
         gatherMM_SortedEtype<XPU, IdType, bits>(h, w, out, E_per_rel, etype);
     else  // similar to bmm without copying w to edges
@@ -287,22 +287,28 @@ void gatherMM(const NDArray h,
 
 template void gatherMM<kDLGPU, int32_t, 16>(
     const NDArray h, const NDArray w, NDArray out,
-    const NDArray E_per_rel, const NDArray etype, bool sortedE);
+    const NDArray E_per_rel, const NDArray etype,
+    bool sortedE, bool H_trans,  bool W_trans);
 template void gatherMM<kDLGPU, int64_t, 16>(
     const NDArray h, const NDArray w, NDArray out,
-    const NDArray E_per_rel, const NDArray etype, bool sortedE);
+    const NDArray E_per_rel, const NDArray etype,
+    bool sortedE, bool H_trans,  bool W_trans);
 template void gatherMM<kDLGPU, int32_t, 32>(
     const NDArray h, const NDArray w, NDArray out,
-    const NDArray E_per_rel, const NDArray etype, bool sortedE);
+    const NDArray E_per_rel, const NDArray etype,
+    bool sortedE, bool H_trans,  bool W_trans);
 template void gatherMM<kDLGPU, int64_t, 32>(
     const NDArray h, const NDArray w, NDArray out,
-    const NDArray E_per_rel, const NDArray etype, bool sortedE);
+    const NDArray E_per_rel, const NDArray etype,
+    bool sortedE, bool H_trans,  bool W_trans);
 template void gatherMM<kDLGPU, int32_t, 64>(
     const NDArray h, const NDArray w, NDArray out,
-    const NDArray E_per_rel, const NDArray etype, bool sortedE);
+    const NDArray E_per_rel, const NDArray etype,
+    bool sortedE, bool H_trans,  bool W_trans);
 template void gatherMM<kDLGPU, int64_t, 64>(
     const NDArray h, const NDArray w, NDArray out,
-    const NDArray E_per_rel, const NDArray etype, bool sortedE);
+    const NDArray E_per_rel, const NDArray etype,
+    bool sortedE, bool H_trans,  bool W_trans);
 
 }  // namespace aten
 }  // namespace dgl

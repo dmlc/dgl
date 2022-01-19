@@ -121,7 +121,7 @@ void gatherMM(const NDArray H,
           NDArray out,
           const NDArray E_per_rel,
           const NDArray etypes,
-          bool sortedE);
+          bool sortedE, bool H_trans, bool W_trans);
 
 /*!
  * \brief Segment reduce.

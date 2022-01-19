@@ -59,11 +59,12 @@ void GatherMM(const NDArray H,
           NDArray out,
           const NDArray E_per_rel,
           const NDArray etypes,
-          bool sortedE) {
+          bool sortedE, bool H_trans, bool W_trans) {
   ATEN_XPU_SWITCH_CUDA(H->ctx.device_type, XPU, "GatherMM", {
     ATEN_ID_TYPE_SWITCH(etypes->dtype, IdType, {
       ATEN_FLOAT_BITS_SWITCH(H->dtype, bits, "Feature data", {
-        gatherMM<XPU, IdType, bits>(H, W, out, E_per_rel, etypes, sortedE);
+        gatherMM<XPU, IdType, bits>(H, W, out, E_per_rel, etypes, sortedE,
+          H_trans, W_trans);
       });
     });
   });
@@ -373,7 +374,9 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelGATHERMM")
     NDArray E_per_rel = args[3];
     NDArray etypes = args[4];
     bool sortedE = args[5];
-    GatherMM(H, W, O, E_per_rel, etypes, sortedE);
+    bool H_trans = args[6];
+    bool W_trans = args[7];
+    GatherMM(H, W, O, E_per_rel, etypes, sortedE, H_trans, W_trans);
   });
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSpMMHetero")

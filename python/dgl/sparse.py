@@ -334,8 +334,19 @@ def _gather_mm(h, w, out, E_per_rel, etypes, sortedE):
                             to_dgl_nd_for_write(out),
                             to_dgl_nd(E_per_rel),
                             to_dgl_nd(etypes),
-                            sortedE)
+                            sortedE, False, False)
     return out
+
+
+def _gather_mm_scatter(h, w, out, E_per_rel, etypes, sortedE, h_trans, w_trans):
+    _CAPI_DGLKernelGATHERMM(to_dgl_nd(h),
+                            to_dgl_nd(w),
+                            to_dgl_nd_for_write(out),
+                            to_dgl_nd(E_per_rel),
+                            to_dgl_nd(etypes),
+                            sortedE, h_trans, w_trans)
+    return out
+
 
 
 def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):

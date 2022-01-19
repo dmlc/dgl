@@ -4324,22 +4324,6 @@ class DGLHeteroGraph(object):
         ndata = core.invoke_node_udf(self, v_id, ntype, func, orig_nid=v_id)
         self._set_n_repr(ntid, v, ndata)
 
-    def gather_mm(self, func, wdict, edges=ALL, etype=None):
-        # Graph with one relation type
-        if self._graph.number_of_etypes() == 1 or etype is not None:
-            etid = self.get_etype_id(etype)
-            etype = self.canonical_etypes[etid]
-            g = self if etype is None else self[etype]
-        else:   # heterogeneous graph with number of relation types > 1
-            g = self
-        if is_all(edges):
-            eid = ALL
-        else:
-            eid = utils.parse_edges_arg_to_eid(self, edges, etid, 'edges')
-
-        edata = core.invoke_gather_mm(g, eid, etype, func, wdict)
-
-
     def apply_edges(self, func, edges=ALL, etype=None, inplace=False):
         """Update the features of the specified edges by the provided function.
 
