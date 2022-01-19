@@ -174,6 +174,11 @@ setup(
         'requests>=2.19.0',
         'tqdm'
     ],
+    entry_points = {
+        'console_scripts': [
+            "dgl-enter = dgl.enter.cli.cli:main"
+        ]
+    },
     url='https://github.com/dmlc/dgl',
     distclass=BinaryDistribution,
     ext_modules=config_cython(),

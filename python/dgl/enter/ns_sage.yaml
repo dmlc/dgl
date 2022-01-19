@@ -1,0 +1,30 @@
+pipeline_name: nodepred-neighbor-sampling
+device: 'cpu'
+# Data configurations
+data:
+    name: RedditDataset
+    data_dir: "/data/"
+node_embed_size: -1
+# Model configurations
+model:
+    name: GCN                      # Model name
+# Training configurations
+# fan_out: "5,10"
+sampler:
+    name: 
+    fan_out: [5, 10]
+    batch_size: 1024
+    num_workers: 4
+    eval_batch_size: 32
+    eval_num_workers: 4
+early_stop: True
+num_epochs: 200                    # Number of training epochs
+eval_period: 1                     # Number of epochs between two evaluations
+checkpoint_path: 'checkpoint.pt'   # Checkpoint path
+patience: 20                       # Early stop patience
+optimizer:
+    name: Adam                     # Optimizer name, can be Adam, ?
+    lr: 0.005  
+    beta1:                     # Learning rate
+    weight_decay: 0                # Weight decay
+loss: CrossEntropyLoss

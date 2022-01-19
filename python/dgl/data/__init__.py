@@ -30,6 +30,7 @@ from .rdf import AIFBDataset, MUTAGDataset, BGSDataset, AMDataset
 from .fraud import FraudDataset, FraudYelpDataset, FraudAmazonDataset
 from .fakenews import FakeNewsDataset
 from .csv_dataset import DGLCSVDataset
+from .linkpred_dataset import LinkPredDataset
 
 def register_data_args(parser):
     parser.add_argument(

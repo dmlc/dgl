@@ -1,0 +1,20 @@
+pipeline_name: nodepred
+device: 'cpu'
+# Data configurations
+data:
+    name: PubmedGraphDataset
+node_embed_size: -1
+# Model configurations
+model:
+    name: GAT                      # Model name
+# Training configurations
+early_stop: True
+num_epochs: 200                    # Number of training epochs
+eval_period: 5                     # Number of epochs between two evaluations
+checkpoint_path: 'checkpoint.pt'   # Checkpoint path
+patience: 20                       # Early stop patience
+optimizer:
+    name: Adam                     # Optimizer name, can be Adam, ?
+    lr: 0.005                      # Learning rate
+    weight_decay: 0                # Weight decay
+loss: CrossEntropyLoss
