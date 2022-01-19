@@ -17,24 +17,9 @@
 namespace dgl {
 namespace aten {
 
-template <int XPU, typename IdType, int bits>
-void Edge_softmax_csr_back(const std::string& op,
-             const BcastOff& bcast,
-             const aten::CSRMatrix& csr,
-             NDArray ufeat,
-             NDArray efeat,
-             NDArray out);
-
-
-template <int XPU, typename IdType, int bits>
-void Edge_softmax_csr(const std::string& op,
-             const BcastOff& bcast,
-             const aten::CSRMatrix& csr,
-             NDArray ufeat,
-             NDArray efeat,
-             NDArray out);
-
-
+/*!
+ * \brief Generalized Sparse Matrix Dense Matrix Multiplication on Csr format.
+ */
 template <int XPU, typename IdType, int bits>
 void SpMMCsr(const std::string& op, const std::string& reduce,
              const BcastOff& bcast,
@@ -198,6 +183,26 @@ std::pair<CSRMatrix, NDArray> CSRSum(
     const std::vector<CSRMatrix>& A,
     const std::vector<NDArray>& A_weights);
 
+/*!
+ * \brief Edge_softmax_csr forward function on Csr format.
+ */
+template <int XPU, typename IdType, int bits>
+void Edge_softmax_csr(const std::string& op,
+             const BcastOff& bcast,
+             const aten::CSRMatrix& csr,
+             NDArray ufeat,
+             NDArray efeat,
+             NDArray out);
+             template <int XPU, typename IdType, int bits>
+/*!
+ * \brief Edge_softmax_csr backward function on Csr format.
+ */
+void Edge_softmax_csr_back(const std::string& op,
+             const BcastOff& bcast,
+             const aten::CSRMatrix& csr,
+             NDArray ufeat,
+             NDArray efeat,
+             NDArray out);
 }  // namespace aten
 }  // namespace dgl
 

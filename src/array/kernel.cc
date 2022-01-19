@@ -13,7 +13,6 @@
 #include "kernel_decl.h"
 #include "../c_api_common.h"
 #include "./check.h"
-#include<math.h>
 
 using namespace dgl::runtime;
 
@@ -53,43 +52,6 @@ void SpMM(const std::string& op, const std::string& reduce,
   });
 }
 
-/*! \brief Generalized Sparse Matrix-Matrix Multiplication. */
-void Edge_softmax(const std::string& op,
-          HeteroGraphPtr graph,
-          NDArray ufeat,
-          NDArray efeat,
-          NDArray out) {
-  // TODO(zihao): format tuning
-  SparseFormat format = graph->SelectFormat(0, CSC_CODE);
-  const auto& bcast = CalcBcastOff(op, ufeat, efeat);
-
-  ATEN_XPU_SWITCH_CUDA(graph->Context().device_type, XPU, "edge_soft", {
-    ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
-      ATEN_FLOAT_BITS_SWITCH(out->dtype, bits, "edge_soft out data", {
-            Edge_softmax_csr<XPU, IdType, bits>(op,bcast,graph->GetCSCMatrix(0),ufeat, efeat, out);
-      });
-    });
-  });
-}
-
-void Edge_softmax_back(const std::string& op,
-          HeteroGraphPtr graph,
-          NDArray out,
-          NDArray sds,
-          NDArray back_out,
-          NDArray ufeat) {
-  // TODO(zihao): format tuning
-  SparseFormat format = graph->SelectFormat(0, CSC_CODE);
-  const auto& bcast = CalcBcastOff(op, ufeat, sds);
-
-  ATEN_XPU_SWITCH_CUDA(graph->Context().device_type, XPU, "edge_soft_back", {
-    ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
-      ATEN_FLOAT_BITS_SWITCH(out->dtype, bits, "edge_soft out data_back", {
-            Edge_softmax_csr_back<XPU, IdType, bits>(op,bcast,graph->GetCSCMatrix(0),out, sds, back_out);
-      });
-    });
-  });
-}
 
 /*! \brief Generalized Sparse Matrix-Matrix Multiplication with hetero-graph support. */
 void SpMMHetero(const std::string& op, const std::string& reduce,
@@ -237,6 +199,48 @@ void SDDMMHetero(const std::string& op,
     });
   });
 }
+
+
+/*! \brief Generalized Edge_softmax op for forward */
+void Edge_softmax(const std::string& op,
+          HeteroGraphPtr graph,
+          NDArray ufeat,
+          NDArray efeat,
+          NDArray out) {
+  // TODO(zhejiang): add gpu op for edge_softmax
+  SparseFormat format = graph->SelectFormat(0, CSC_CODE);
+  const auto& bcast = CalcBcastOff(op, ufeat, efeat);
+
+  ATEN_XPU_SWITCH(graph->Context().device_type, XPU, "edge_softmax", {
+    ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
+      ATEN_FLOAT_BITS_SWITCH(out->dtype, bits, "edge_softmax out data", {
+            Edge_softmax_csr<XPU, IdType, bits>(op,bcast,graph->GetCSCMatrix(0),ufeat, efeat, out);
+      });
+    });
+  });
+}
+
+
+/*! \brief Generalized Edge_softmax op for backward */
+void Edge_softmax_back(const std::string& op,
+          HeteroGraphPtr graph,
+          NDArray out,
+          NDArray sds,
+          NDArray back_out,
+          NDArray ufeat) {
+  // TODO(zhejiang): add gpu op for edge_softmax
+  SparseFormat format = graph->SelectFormat(0, CSC_CODE);
+  const auto& bcast = CalcBcastOff(op, ufeat, sds);
+
+  ATEN_XPU_SWITCH(graph->Context().device_type, XPU, "edge_softmax_back", {
+    ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
+      ATEN_FLOAT_BITS_SWITCH(out->dtype, bits, "edge_softmax out data_back", {
+            Edge_softmax_csr_back<XPU, IdType, bits>(op,bcast,graph->GetCSCMatrix(0),out, sds, back_out);
+      });
+    });
+  });
+}
+
 
 NDArray GetEdgeMapping(HeteroGraphRef graph) {
   SparseFormat format = graph->SelectFormat(0, CSC_CODE);
@@ -404,6 +408,7 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelEdge_softmax_forward")
     
     Edge_softmax(op, graph.sptr(), U, E, V);
 });
+
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelEdge_softmax_backward")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {

@@ -4,7 +4,6 @@ from ...base import is_all, ALL
 from ...sparse import _gspmm, _gspmm_hetero, _gsddmm, _gsddmm_hetero, _segment_reduce, _bwd_segment_cmp, _edge_softmax_forward,_edge_softmax_backward
 from ...sparse import _csrmm, _csrsum, _csrmask, _scatter_add, _update_grad_minmax_hetero
 from ...heterograph_index import create_unitgraph_from_csr
-import time
 if LooseVersion(th.__version__) >= LooseVersion("1.6.0"):
     from torch.cuda.amp import custom_fwd, custom_bwd
 else:
@@ -470,9 +469,13 @@ class EdgeSoftmax(th.autograd.Function):
             gidx = gidx.edge_subgraph([eids], True).graph
         if norm_by == 'src':
             gidx = gidx.reverse()
-    
-        out = _edge_softmax_forward(gidx,score,'copy_rhs') 
-
+        if(score.is_cuda):
+            score_max = _gspmm(gidx, 'copy_rhs', 'max', None, score)[0]
+            score = th.exp(_gsddmm(gidx, 'sub', score, score_max, 'e', 'v'))
+            score_sum = _gspmm(gidx, 'copy_rhs', 'sum', None, score)[0]
+            out = _gsddmm(gidx, 'div', score, score_sum, 'e', 'v')
+        else:
+            out = _edge_softmax_forward(gidx,score,'copy_rhs')
         ctx.backward_cache = gidx
         ctx.save_for_backward(out)
         return out
@@ -499,9 +502,12 @@ class EdgeSoftmax(th.autograd.Function):
         ctx.backward_cache = None
         out, = ctx.saved_tensors
         sds = out * grad_out
-  
-        grad_score = _edge_softmax_backward(gidx,out,sds) 
+        if(out.is_cuda):
+            accum = gspmm(gidx, 'copy_rhs', 'sum', None, sds)
 
+            grad_score = sds - gsddmm(gidx, 'mul', out, accum, 'e', 'v')
+        else:
+            grad_score = _edge_softmax_backward(gidx,out,sds)
         return None, grad_score, None, None
 
 

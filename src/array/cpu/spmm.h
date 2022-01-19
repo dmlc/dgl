@@ -5,7 +5,6 @@
  */
 #ifndef DGL_ARRAY_CPU_SPMM_H_
 #define DGL_ARRAY_CPU_SPMM_H_
-#include <dmlc/logging.h>
 #include <dgl/array.h>
 #include <dgl/bcast.h>
 #include <dgl/runtime/parallel_for.h>
@@ -14,7 +13,6 @@
 #include <memory>
 #include <algorithm>
 #include<math.h>
-#include<numeric>
 #include "spmm_binary_ops.h"
 #if !defined(_WIN32)
 #ifdef USE_AVX
@@ -470,6 +468,15 @@ void SpMMCmpCoo(const BcastOff& bcast, const COOMatrix& coo, NDArray ufeat,
   }
 }
 
+
+/*!
+ * \brief CPU kernel of Edge_softmax_csr_forward on Csr format.
+ * \param bcast Broadcast information.
+ * \param csr The Csr matrix.
+ * \param ufeat The feature on source nodes.
+ * \param efeat The feature on edges.
+ * \param out The result of edge_softmax_forward.
+ */
 template <typename IdType, typename DType, typename Op>
 void Edge_softmax_csr_forward(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
                 NDArray efeat, NDArray out) {
@@ -484,7 +491,6 @@ void Edge_softmax_csr_forward(const BcastOff& bcast, const CSRMatrix& csr, NDArr
       const IdType row_start = indptr[rid], row_end = indptr[rid + 1];
       std::vector<DType> data_e(row_end-row_start,0); 
       std::vector<IdType> num(row_end-row_start,0);
-
       for (int64_t k = 0; k < dim; ++k) {
         DType max_v = -std::numeric_limits<DType>::infinity();
         for (IdType j = row_start; j < row_end; ++j) {
@@ -496,14 +502,12 @@ void Edge_softmax_csr_forward(const BcastOff& bcast, const CSRMatrix& csr, NDArr
             num[j-row_start] = eid*rhs_dim+rhs_add;
             max_v = std::max<DType>(max_v,(*rhs_off));
         }
-
         DType exp_sum = 0;
         for(auto& element : data_e){
             element -= max_v;
             element = std::exp(element);
             exp_sum += element;
         }
-
         for(int i=0;i<row_end-row_start;i++){
             out.Ptr<DType>()[num[i]] = data_e[i]/exp_sum;
         }
@@ -513,7 +517,14 @@ void Edge_softmax_csr_forward(const BcastOff& bcast, const CSRMatrix& csr, NDArr
 }
 
 
-
+/*!
+ * \brief CPU kernel of Edge_softmax_csr_backward on Csr format.
+ * \param bcast Broadcast information.
+ * \param csr The Csr matrix.
+ * \param out The result of forward.
+ * \param sds The result of gradiet * out.
+ * \param back_out The result of edge_softmax_backward.
+ */
 template <typename IdType, typename DType, typename Op>
 void Edge_softmax_csr_backward(const BcastOff& bcast, const CSRMatrix& csr, NDArray out,
                 NDArray sds, NDArray back_out) {
@@ -528,7 +539,6 @@ void Edge_softmax_csr_backward(const BcastOff& bcast, const CSRMatrix& csr, NDAr
     for (auto rid = b; rid < e; ++rid) {
       const IdType row_start = indptr[rid], row_end = indptr[rid + 1];
       for (int64_t k = 0; k < dim; ++k) {
-        
         DType sum_sds = 0;
         for (IdType j = row_start; j < row_end; ++j) {
           const IdType eid = has_idx ? edges[j] : j;
