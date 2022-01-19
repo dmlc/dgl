@@ -36,12 +36,12 @@ def evaluate(model, g, nfeat, labels, val_nid, device):
     model.train()
     return compute_acc(pred[val_nid], labels[val_nid])
 
-def load_subtensor(nfeat, labels, seeds, input_nodes, device):
+def load_subtensor(nfeat, labels, seeds, input_nodes, dev_id):
     """
     Extracts features and labels for a subset of nodes.
     """
-    batch_inputs = nfeat[input_nodes].to(device)
-    batch_labels = labels[seeds].to(device)
+    batch_inputs = nfeat[input_nodes].to(dev_id)
+    batch_labels = labels[seeds].to(dev_id)
     return batch_inputs, batch_labels
 
 #### Entry point
@@ -235,6 +235,10 @@ if __name__ == '__main__':
     data = n_classes, train_g, val_g, test_g
 
     if devices[0] == -1:
+        assert args.sample_device == 'cpu', \
+               f"Must have GPUs to enable {args.sample_device} sampling."
+        assert args.data_device == 'cpu', \
+               f"Must have GPUs to enable {args.data_device} feature storage."
         run(0, 0, args, ['cpu'], data)
     elif n_gpus == 1:
         run(0, n_gpus, args, devices, data)

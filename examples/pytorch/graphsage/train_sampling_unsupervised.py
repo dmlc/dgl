@@ -86,7 +86,6 @@ def run(proc_id, n_gpus, args, devices, data):
     train_seeds = th.arange(n_edges)
 
     if args.sample_device == 'gpu':
-        assert n_gpus > 0, "Must have GPUs to enable GPU sampling"
         train_seeds = train_seeds.to(device)
         g = g.to(device)
         args.num_workers = 0
@@ -137,7 +136,6 @@ def run(proc_id, n_gpus, args, devices, data):
         # Loop over the dataloader to sample the computation dependency graph as a list of
         # blocks.
 
-        step_time = 0
         tic_step = time.time()
         for step, (input_nodes, pos_graph, neg_graph, blocks) in enumerate(dataloader):
             batch_inputs = nfeat[input_nodes].to(device)
@@ -160,11 +158,10 @@ def run(proc_id, n_gpus, args, devices, data):
             iter_neg.append(neg_edges / (t - tic_step))
             iter_d.append(d_step - tic_step)
             iter_t.append(t - d_step)
-            step_time += t - tic_step
             if step % args.log_every == 0 and proc_id == 0:
                 gpu_mem_alloc = th.cuda.max_memory_allocated() / 1000000 if th.cuda.is_available() else 0
-                print('[{}]Epoch {:05d} | Step {:05d} | Loss {:.4f} | Speed (samples/sec) {:.4f}|{:.4f} | Load {:.4f}| train {:.4f} | GPU {:.1f} MB | Avg. Time {:.4f}'.format(
-                    proc_id, epoch, step, loss.item(), np.mean(iter_pos[3:]), np.mean(iter_neg[3:]), np.mean(iter_d[3:]), np.mean(iter_t[3:]), gpu_mem_alloc, step_time / (step + 1)))
+                print('[{}]Epoch {:05d} | Step {:05d} | Loss {:.4f} | Speed (samples/sec) {:.4f}|{:.4f} | Load {:.4f}| train {:.4f} | GPU {:.1f} MB'.format(
+                    proc_id, epoch, step, loss.item(), np.mean(iter_pos[3:]), np.mean(iter_neg[3:]), np.mean(iter_d[3:]), np.mean(iter_t[3:]), gpu_mem_alloc))
             tic_step = time.time()
 
             if step % args.eval_every == 0 and proc_id == 0:
@@ -206,6 +203,10 @@ def main(args, devices):
 
     n_gpus = len(devices)
     if devices[0] == -1:
+        assert args.sample_device == 'cpu', \
+               f"Must have GPUs to enable {args.sample_device} sampling."
+        assert args.data_device == 'cpu', \
+               f"Must have GPUs to enable {args.data_device} feature storage."
         run(0, 0, args, ['cpu'], data)
     elif n_gpus == 1:
         run(0, n_gpus, args, devices, data)
