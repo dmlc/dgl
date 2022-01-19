@@ -114,14 +114,17 @@ def check_server_client_empty(shared_mem, num_servers, num_clients):
 
     print('clients have terminated')
 
-def run_client(graph_name, part_id, server_count, num_clients, num_nodes, num_edges, group_id=0):
+def run_client(graph_name, part_id, server_count, num_clients, num_nodes, num_edges, group_id, multi_groups):
     os.environ['DGL_NUM_SERVER'] = str(server_count)
     os.environ['DGL_GROUP_ID'] = str(group_id)
     dgl.distributed.initialize("kv_ip_config.txt")
     gpb, graph_name, _, _ = load_partition_book('/tmp/dist_graph/{}.json'.format(graph_name),
                                                 part_id, None)
     g = DistGraph(graph_name, gpb=gpb)
-    check_dist_graph(g, num_clients, num_nodes, num_edges)
+    if multi_groups:
+        # sync with all clients as no graph-data init is allowed when init DistGraph
+        time.sleep(5)
+    check_dist_graph(g, num_clients, num_nodes, num_edges, multi_groups)
 
 def run_emb_client(graph_name, part_id, server_count, num_clients, num_nodes, num_edges):
     os.environ['DGL_NUM_SERVER'] = str(server_count)
@@ -200,7 +203,11 @@ def check_dist_emb(g, num_clients, num_nodes, num_edges):
         print(e)
         sys.exit(-1)
 
-def check_dist_graph(g, num_clients, num_nodes, num_edges):
+def check_dist_graph(g, num_clients, num_nodes, num_edges, multi_groups=False):
+    """DistGraph/DistTensor are shared across all clients and all groups. For those
+    have same name, read simultaneously is ok while write simultaneously is undefined
+    behavior
+    """
     # Test API
     assert g.number_of_nodes() == num_nodes
     assert g.number_of_edges() == num_edges
@@ -217,47 +224,54 @@ def check_dist_graph(g, num_clients, num_nodes, num_edges):
     feats = F.squeeze(feats1, 1)
     assert np.all(F.asnumpy(feats == eids))
 
+    group_id = os.environ.get('DGL_GROUP_ID', 0)
     # Test init node data
     new_shape = (g.number_of_nodes(), 2)
-    test1 = dgl.distributed.DistTensor(new_shape, F.int32)
-    g.ndata['test1'] = test1
-    feats = g.ndata['test1'][nids]
+    # has to be globally unique
+    test1_name = f'test1_{group_id}'
+    test1 = dgl.distributed.DistTensor(new_shape, F.int32, name=test1_name if multi_groups else None)
+    g.ndata[test1_name] = test1
+    feats = g.ndata[test1_name][nids]
     assert np.all(F.asnumpy(feats) == 0)
     assert test1.count_nonzero() == 0
 
     # reference to a one that exists
-    test2 = dgl.distributed.DistTensor(new_shape, F.float32, 'test2', init_func=rand_init)
-    test3 = dgl.distributed.DistTensor(new_shape, F.float32, 'test2')
+    test2_name = f'test2_{group_id}'
+    test2 = dgl.distributed.DistTensor(new_shape, F.float32, test2_name, init_func=rand_init)
+    test3 = dgl.distributed.DistTensor(new_shape, F.float32, test2_name)
     assert np.all(F.asnumpy(test2[nids]) == F.asnumpy(test3[nids]))
 
     # create a tensor and destroy a tensor and create it again.
-    test3 = dgl.distributed.DistTensor(new_shape, F.float32, 'test3', init_func=rand_init)
+    test3_name = f'test3_{group_id}'
+    test3 = dgl.distributed.DistTensor(new_shape, F.float32, test3_name, init_func=rand_init)
     del test3
-    test3 = dgl.distributed.DistTensor((g.number_of_nodes(), 3), F.float32, 'test3')
+    test3 = dgl.distributed.DistTensor((g.number_of_nodes(), 3), F.float32, test3_name)
     del test3
 
     # add tests for anonymous distributed tensor.
-    test3 = dgl.distributed.DistTensor(new_shape, F.float32, init_func=rand_init)
-    data = test3[0:10]
-    test4 = dgl.distributed.DistTensor(new_shape, F.float32, init_func=rand_init)
-    del test3
-    test5 = dgl.distributed.DistTensor(new_shape, F.float32, init_func=rand_init)
-    assert np.sum(F.asnumpy(test5[0:10] != data)) > 0
+    if not multi_groups:
+        test3 = dgl.distributed.DistTensor(new_shape, F.float32, init_func=rand_init)
+        data = test3[0:10]
+        test4 = dgl.distributed.DistTensor(new_shape, F.float32, init_func=rand_init)
+        del test3
+        test5 = dgl.distributed.DistTensor(new_shape, F.float32, init_func=rand_init)
+        assert np.sum(F.asnumpy(test5[0:10] != data)) > 0
 
     # test a persistent tesnor
-    test4 = dgl.distributed.DistTensor(new_shape, F.float32, 'test4', init_func=rand_init,
+    test4_name = f'test4_{group_id}'
+    test4 = dgl.distributed.DistTensor(new_shape, F.float32, test4_name, init_func=rand_init,
                                        persistent=True)
     del test4
     try:
-        test4 = dgl.distributed.DistTensor((g.number_of_nodes(), 3), F.float32, 'test4')
+        test4 = dgl.distributed.DistTensor((g.number_of_nodes(), 3), F.float32, test4_name)
         raise Exception('')
     except:
         pass
 
     # Test write data
     new_feats = F.ones((len(nids), 2), F.int32, F.cpu())
-    g.ndata['test1'][nids] = new_feats
-    feats = g.ndata['test1'][nids]
+    g.ndata[test1_name][nids] = new_feats
+    feats = g.ndata[test1_name][nids]
     assert np.all(F.asnumpy(feats) == 1)
 
     # Test metadata operations.
@@ -265,7 +279,7 @@ def check_dist_graph(g, num_clients, num_nodes, num_edges):
     assert g.ndata['features'].shape == (g.number_of_nodes(), 1)
     assert g.ndata['features'].dtype == F.int64
     assert g.node_attr_schemes()['features'].dtype == F.int64
-    assert g.node_attr_schemes()['test1'].dtype == F.int32
+    assert g.node_attr_schemes()[test1_name].dtype == F.int32
     assert g.node_attr_schemes()['features'].shape == (1,)
 
     selected_nodes = np.random.randint(0, 100, size=g.number_of_nodes()) > 30
@@ -318,13 +332,13 @@ def check_dist_emb_server_client(shared_mem, num_servers, num_clients):
 
     print('clients have terminated')
 
-def check_server_client(shared_mem, num_servers, num_clients, num_groups=1):
+def check_server_client(shared_mem, num_servers, num_clients, num_groups=1, in_parallel=False):
     prepare_dist()
     g = create_random_graph(10000)
 
     # Partition the graph
     num_parts = 1
-    graph_name = 'dist_graph_test_multi'
+    graph_name = f'check_server_client_{shared_mem}_{num_servers}_{num_clients}_{num_groups}_{in_parallel}'
     g.ndata['features'] = F.unsqueeze(F.arange(0, g.number_of_nodes()), 1)
     g.edata['features'] = F.unsqueeze(F.arange(0, g.number_of_edges()), 1)
     partition_graph(g, graph_name, num_parts, '/tmp/dist_graph')
@@ -340,16 +354,30 @@ def check_server_client(shared_mem, num_servers, num_clients, num_groups=1):
         serv_ps.append(p)
         p.start()
 
-    for group_id in range(num_groups):
+    if in_parallel:
+        # launch different client groups simultaneously
         cli_ps = []
         for cli_id in range(num_clients):
-            print('start client[{}] for group[{}]'.format(cli_id, group_id))
-            p = ctx.Process(target=run_client, args=(graph_name, 0, num_servers, num_clients, g.number_of_nodes(),
-                                                    g.number_of_edges(), group_id))
-            p.start()
-            cli_ps.append(p)
+            for group_id in range(num_groups):
+                print('start client[{}] for group[{}]'.format(cli_id, group_id))
+                p = ctx.Process(target=run_client, args=(graph_name, 0, num_servers, num_clients, g.number_of_nodes(),
+                                                        g.number_of_edges(), group_id, num_groups > 1))
+                p.start()
+                cli_ps.append(p)
         for p in cli_ps:
             p.join()
+    else: 
+        # launch different client groups sequentially
+        for group_id in range(num_groups):
+            cli_ps = []
+            for cli_id in range(num_clients):
+                print('start client[{}] for group[{}]'.format(cli_id, group_id))
+                p = ctx.Process(target=run_client, args=(graph_name, 0, num_servers, num_clients, g.number_of_nodes(),
+                                                        g.number_of_edges(), group_id, False))
+                p.start()
+                cli_ps.append(p)
+            for p in cli_ps:
+                    p.join()
 
     if keep_alive:
         for p in serv_ps:
@@ -567,9 +595,6 @@ def check_server_client_hetero(shared_mem, num_servers, num_clients):
 def test_server_client():
     reset_envs()
     os.environ['DGL_DIST_MODE'] = 'distributed'
-    check_server_client(True, 2, 2)
-    check_server_client(True, 2, 2, 5)
-    return
     check_server_client_hierarchy(False, 1, 4)
     check_server_client_empty(True, 1, 1)
     check_server_client_hetero(True, 1, 1)
@@ -577,6 +602,10 @@ def test_server_client():
     check_server_client(True, 1, 1)
     check_server_client(False, 1, 1)
     check_server_client(True, 2, 2)
+    for flag in [True, False]:
+        check_server_client(flag, 1, 1, 5, flag)
+        check_server_client(flag, 1, 1, 5, not flag)
+        check_server_client(True, 2, 2, 5, flag)
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support distributed DistEmbedding")
