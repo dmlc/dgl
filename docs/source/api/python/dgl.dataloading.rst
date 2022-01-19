@@ -87,6 +87,9 @@ to generate negative edges.
 .. autoclass:: Uniform
     :members: __call__
 
+.. autoclass:: GlobalUniform
+    :members: __call__
+
 Async Copying to/from GPUs
 --------------------------
 .. currentmodule:: dgl.dataloading
