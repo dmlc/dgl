@@ -1,5 +1,6 @@
 """Functions used by server."""
 
+import time
 from . import rpc
 from .constants import MAX_QUEUE_SIZE
 
@@ -78,7 +79,9 @@ def start_server(server_id, ip_config, num_servers, num_clients, server_state, \
         client_namebook[client_id] = addr
     for client_id, addr in client_namebook.items():
         client_ip, client_port = addr.split(':')
-        assert rpc.connect_receiver(client_ip, client_port, client_id)
+        # TODO[Rhett]: server should not be blocked endlessly.
+        while not rpc.connect_receiver(client_ip, client_port, client_id):
+            time.sleep(1)
     if rpc.get_rank() == 0: # server_0 send all the IDs
         for client_id, _ in client_namebook.items():
             register_res = rpc.ClientRegisterResponse(client_id)
