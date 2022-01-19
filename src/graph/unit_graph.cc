@@ -1296,26 +1296,22 @@ HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DLContext &ctx,
   }
 }
 
-void UnitGraph::PinMemory(HeteroGraphPtr g) {
-  auto bg = std::dynamic_pointer_cast<UnitGraph>(g);
-  CHECK_NOTNULL(bg);
-  if (bg->in_csr_->defined())
-    bg->in_csr_->PinMemory_();
-  if (bg->out_csr_->defined())
-    bg->out_csr_->PinMemory_();
-  if (bg->coo_->defined())
-    bg->coo_->PinMemory_();
+void UnitGraph::PinMemory_() {
+  if (this->in_csr_->defined())
+    this->in_csr_->PinMemory_();
+  if (this->out_csr_->defined())
+    this->out_csr_->PinMemory_();
+  if (this->coo_->defined())
+    this->coo_->PinMemory_();
 }
 
-void UnitGraph::UnpinMemory(HeteroGraphPtr g) {
-  auto bg = std::dynamic_pointer_cast<UnitGraph>(g);
-  CHECK_NOTNULL(bg);
-  if (bg->in_csr_->defined())
-    bg->in_csr_->UnpinMemory_();
-  if (bg->out_csr_->defined())
-    bg->out_csr_->UnpinMemory_();
-  if (bg->coo_->defined())
-    bg->coo_->UnpinMemory_();
+void UnitGraph::UnpinMemory_() {
+  if (this->in_csr_->defined())
+    this->in_csr_->UnpinMemory_();
+  if (this->out_csr_->defined())
+    this->out_csr_->UnpinMemory_();
+  if (this->coo_->defined())
+    this->coo_->UnpinMemory_();
 }
 
 void UnitGraph::InvalidateCSR() {

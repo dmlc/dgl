@@ -209,8 +209,6 @@ NDArray NDArray::EmptyShared(const std::string &name,
 inline DLContext GetDevice(DLContext ctx) {
   switch (ctx.device_type) {
     case kDLCPU:
-      return ctx;
-      break;
     case kDLGPU:
       return ctx;
       break;
