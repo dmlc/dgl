@@ -25,6 +25,12 @@ class BlockSampler(object):
         raise NotImplementedError
 
     def assign_lazy_features(self, result):
+        # A LazyFeature is a placeholder telling the dataloader where and which IDs
+        # to prefetch.  It has the signature LazyFeature(name, id_).  id_ can be None
+        # if the LazyFeature is set into one of the subgraph's ``xdata``, in which case the
+        # dataloader will infer from the subgraph's ``xdata[dgl.NID]`` (or ``xdata[dgl.EID]``
+        # if the LazyFeature is set as edge features).
+        #
         # If you want to prefetch things other than ndata and edata, you can also
         # return a LazyFeature(name, id_).  If a LazyFeature is returned in places other than
         # in a graph's ndata/edata/srcdata/dstdata, the DataLoader will prefetch it
