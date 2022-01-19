@@ -31,15 +31,10 @@ bool TPSender::ConnectReceiver(const std::string &addr, int recv_id) {
   tensorpipe::Message tpmsg;
   tpmsg.metadata = "dglconnect";
   pipe->write(tpmsg, [done](const tensorpipe::Error &error) {
-    if (error) {
-      LOG(WARNING) << "Error occurred when write to pipe: " << error.what();
-      done->set_value(false);
-    } else {
-      done->set_value(true);
-    }
+    done->set_value(!error);
   });
   if (!done->get_future().get()) {
-    LOG(WARNING) << "Failed to connect to receiver[" << addr << "].";
+    DLOG(WARNING) << "Failed to connect to receiver[" << addr << "].";
     return false;
   }
   pipes_[recv_id] = pipe;
@@ -128,7 +123,7 @@ void TPReceiver::OnAccepted(const Error &error, std::shared_ptr<Pipe> pipe) {
   // read the handshake message: "dglconnect"
   pipe->readDescriptor([pipe, this](const Error &error, Descriptor descriptor) {
     if (error) {
-      LOG(WARNING) << "Unexpected error when reading from accepted pipe: " << error.what();
+      LOG(ERROR) << "Unexpected error when reading from accepted pipe: " << error.what();
       return;
     }
     Allocation allocation;
