@@ -3,7 +3,6 @@ cmake_minimum_required(VERSION 3.5)
 # Borrowed and adapted from TVM project
 ########################################
 project(dgl C CXX)
-set( CMAKE_CXX_FLAGS "-std=c++14" )
 message(STATUS "Start configuring project ${PROJECT_NAME}")
 
 # cmake utils
@@ -27,8 +26,8 @@ dgl_option(USE_CUDA "Build with CUDA" OFF)
 dgl_option(USE_NCCL "Build with NCCL support" OFF)
 dgl_option(USE_SYSTEM_NCCL "Build using system's NCCL library" OFF)
 dgl_option(USE_OPENMP "Build with OpenMP" ON)
-dgl_option(USE_AVX "Build with AVX optimization" OFF)
-dgl_option(USE_LIBXSMM "Build with LIBXSMM library optimization" OFF)
+dgl_option(USE_AVX "Build with AVX optimization" ON)
+dgl_option(USE_LIBXSMM "Build with LIBXSMM library optimization" ON)
 dgl_option(USE_FP16 "Build with fp16 support to enable mixed precision training" OFF)
 dgl_option(USE_TVM "Build with TVM kernels" OFF)
 dgl_option(BUILD_CPP_TEST "Build cpp unittest executables" OFF)
