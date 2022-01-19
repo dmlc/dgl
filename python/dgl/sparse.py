@@ -84,7 +84,7 @@ target_mapping = {
 }
 
 def _edge_softmax_backward(gidx, out, sds):
-    r""" Edge_softmax backward interface. 
+    r""" Edge_softmax backward interface.
 
     Parameters
     ----------
@@ -113,7 +113,7 @@ def _edge_softmax_backward(gidx, out, sds):
     return back_out
 
 def _edge_softmax_forward(gidx, e, op):
-    r""" Edge_softmax forward interface. 
+    r""" Edge_softmax forward interface.
 
     Parameters
     ----------
@@ -132,7 +132,7 @@ def _edge_softmax_forward(gidx, e, op):
     -----
     This function does not support gpu op.
     """
-    if(F.ndim(e) == 1):
+    if F.ndim(e) == 1:
         e = F.unsqueeze(e, -1)
         expand = True
     else:
