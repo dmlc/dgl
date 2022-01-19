@@ -83,7 +83,7 @@ target_mapping = {
     'dst': 2
 }
 
-def _edge_softmax_backward(gidx,out,sds):
+def _edge_softmax_backward(gidx, out, sds):
     r""" Edge_softmax backward interface. 
 
     Parameters
@@ -105,14 +105,14 @@ def _edge_softmax_backward(gidx,out,sds):
     """
     op = 'copy_rhs'
     back_out = F.zeros_like(out)
-    _CAPI_DGLKernelEdge_softmax_backward(gidx,op,
-                                to_dgl_nd(out),
-                                to_dgl_nd(sds),
-                                to_dgl_nd_for_write(back_out),
-                                to_dgl_nd(None))
+    _CAPI_DGLKernelEdge_softmax_backward(gidx, op,
+                                         to_dgl_nd(out),
+                                         to_dgl_nd(sds),
+                                         to_dgl_nd_for_write(back_out),
+                                         to_dgl_nd(None))
     return back_out
 
-def _edge_softmax_forward(gidx,e,op):
+def _edge_softmax_forward(gidx, e, op):
     r""" Edge_softmax forward interface. 
 
     Parameters
@@ -138,10 +138,10 @@ def _edge_softmax_forward(gidx,e,op):
     else:
         expand = False
     myout = F.zeros_like(e)
-    _CAPI_DGLKernelEdge_softmax_forward(gidx,op,
-                                to_dgl_nd(None),
-                                to_dgl_nd(e),
-                                to_dgl_nd_for_write(myout))
+    _CAPI_DGLKernelEdge_softmax_forward(gidx, op,
+                                        to_dgl_nd(None),
+                                        to_dgl_nd(e),
+                                        to_dgl_nd_for_write(myout))
     myout = F.squeeze(myout, -1) if expand else myout
     return myout
 
