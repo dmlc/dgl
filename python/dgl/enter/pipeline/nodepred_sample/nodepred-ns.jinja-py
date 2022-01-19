@@ -3,6 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import dgl
 
+{{ data_import_code }}
+
 {{ model_code }}
 
 {% if user_cfg.early_stop %}
@@ -165,7 +167,7 @@ class GNNWithEmbedding(nn.Module):
 def main():
     {{ user_cfg_str }}
     device = cfg['device']
-    data = dgl.data.{{ user_cfg.data.name }}()
+    data = {{data_initialize_code}}
     g = data[0]
     feat_size = g.ndata['feat'].shape[1]
     pipeline_cfg = cfg["general_pipeline"]

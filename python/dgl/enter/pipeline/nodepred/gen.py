@@ -74,10 +74,14 @@ class NodepredPipeline(PipelineBase):
             user_cfg_dict["model"]["name"])
         render_cfg["model_code"] = model_code
         render_cfg["model_class_name"] = NodeModelFactory.get_model_class_name(
-            user_cfg_dict["model"]["name"])
+            user_cfg_dict["model"]["name"])        
+        render_cfg.update(DataFactory.get_generated_code_dict(user_cfg_dict["data"]["name"], '**cfg["data"]'))
 
         generated_user_cfg = copy.deepcopy(user_cfg_dict)
-        generated_user_cfg.pop("data")
+        if len(generated_user_cfg["data"]) == 1:
+            generated_user_cfg.pop("data")
+        else:
+            generated_user_cfg["data"].pop("name")
         generated_user_cfg.pop("pipeline_name")
         generated_user_cfg["model"].pop("name")
         generated_user_cfg["general_pipeline"]["optimizer"].pop("name")

@@ -7,7 +7,7 @@ from .base_model import DGLBaseModel
 import yaml
 import inspect
 from pydantic import create_model_from_typeddict, create_model, Field
-from ...data import CoraGraphDataset, CiteseerGraphDataset, RedditDataset
+from ...data import CoraGraphDataset, CiteseerGraphDataset, RedditDataset, DGLCSVDataset
 from ...dataloading.negative_sampler import GlobalUniform, PerSourceUniform
 import inspect
 logger = logging.getLogger(__name__)
@@ -34,38 +34,45 @@ class PipelineBase(ABC):
 
 class DataFactory:
     registry = {}
-    import_code_registry = {}
+    cname_registry = {}
 
     @classmethod
-    def register(cls, name: str, args=(), import_code="import dgl") -> Callable:
-
-        def inner_wrapper(wrapped_class) -> Callable:
-            if name in cls.registry:
-                logger.warning(
-                    'Executor %s already exists. Will replace it', name)
-            cls.registry[name] = wrapped_class
-            cls.import_code_registry[name] = import_code
-            return wrapped_class
-
-        return inner_wrapper
+    def register(cls, name: str, import_code, class_name, extra_args={}) -> Callable:
+        out= {
+            "name": name,
+            "import_code": import_code,
+            "class_name": class_name,
+            "extra_args": extra_args}
+        cls.registry[name] = out
+        cls.cname_registry[name] = out
 
     @classmethod
     def get_dataset_enum(cls):
         enum_class = enum.Enum(
-            "DatasetName", {v.__name__: k for k, v in cls.registry.items()})
+            "DatasetName", {v["name"]: k for k, v in cls.registry.items()})
         return enum_class
 
     @classmethod
     def get_dataset_classname(cls, name):
-        return cls.registry[name].__name__
+        return cls.registry[name]["class_name"]
+
+    @classmethod
+    def get_constructor_arg_type(cls, model_name):
+        sigs = inspect.signature(cls.registry[model_name].__init__)
+        type_annotation_dict = {}
+        for k, param in dict(sigs.parameters).items():
+            type_annotation_dict[k] = param.annotation
+        return type_annotation_dict
 
     @classmethod
     def get_pydantic_config(cls):
         type_annotation_dict = {}
         dataset_list = []
         for k, v in cls.registry.items():
-            dataset_name = v.__name__
-
+            dataset_name = v["name"]
+            type_annotation_dict = v["extra_args"]
+            if "name" in type_annotation_dict:
+                del type_annotation_dict["name"]
             class Base(DGLBaseModel):
                 name: Literal[dataset_name]
 
@@ -76,12 +83,35 @@ class DataFactory:
         for d in dataset_list[1:]:
             output = Union[output, d]
         return output
+    
+    @classmethod
+    def get_import_code(cls, name):
+        return cls.registry[name]["import_code"]
 
+    @classmethod
+    def get_extra_args(cls, name):
+        return cls.registry[name]["extra_args"]
 
-DataFactory.register("cora", import_code="from dgl.data import CoraGraphDataset")(CoraGraphDataset)
-DataFactory.register("citeseer", import_code="from dgl.data import CiteseerGraphDataset")(CiteseerGraphDataset)
-DataFactory.register("ogbl-collab", import_code="from ogb.linkproppred import DglLinkPropPredDataset")("DglLinkPropPredDataset('ogbl-collab')")
-DataFactory.register("reddit")(RedditDataset)
+    @classmethod
+    def get_class_name(cls, name):
+        return cls.registry[name]["class_name"]
+
+    @classmethod
+    def get_generated_code_dict(cls, name, args='**cfg["data"]'):
+        d = {}
+        d["data_import_code"] = cls.registry[name]["import_code"]
+        data_initialize_code = cls.registry[name]["class_name"]
+        extra_args_dict = cls.registry[name]["extra_args"]
+        if len(extra_args_dict) > 0:
+            data_initialize_code = data_initialize_code.format('**cfg["data"]')
+        d["data_initialize_code"] = data_initialize_code
+        return d
+
+DataFactory.register("cora", import_code="from dgl.data import CoraGraphDataset", class_name="CoraGraphDataset()")
+DataFactory.register("citeseer", import_code="from dgl.data import CiteseerGraphDataset", class_name="CiteseerGraphDataset()")
+DataFactory.register("ogbl-collab", import_code="from ogb.linkproppred import DglLinkPropPredDataset", extra_args={}, class_name="DglLinkPropPredDataset('ogbl-collab')")
+DataFactory.register("csv", import_code="from dgl.data import DGLCSVDataset", extra_args={ "data_path": "./"}, class_name="DGLCSVDataset({})")
+DataFactory.register("reddit", import_code="from dgl.data import RedditDataset", class_name="RedditDataset()")
 
 
 class PipelineFactory:
