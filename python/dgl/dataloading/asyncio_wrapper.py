@@ -1,3 +1,4 @@
+"""Python asyncio wrapper class."""
 import asyncio
 import threading
 # Solution to enable running asyncio.run in Jupyter notebooks.

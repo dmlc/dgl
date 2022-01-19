@@ -10,8 +10,6 @@ import time
 import numpy as np
 from ogb.nodeproppred import DglNodePropPredDataset
 
-import dglnew
-
 class SAGE(nn.Module):
     def __init__(self, in_feats, n_hidden, n_classes):
         super().__init__()
@@ -37,10 +35,10 @@ def train(rank, world_size, graph, num_classes, split_idx):
 
     train_idx, valid_idx, test_idx = split_idx['train'], split_idx['valid'], split_idx['test']
 
-    sampler = dglnew.dataloading.NeighborSampler(
+    sampler = dgl.dataloading.NeighborSampler(
             [5, 5, 5], output_device='cpu', prefetch_node_feats=['feat'],
             prefetch_labels=['label'])
-    dataloader = dglnew.dataloading.NodeDataLoader(
+    dataloader = dgl.dataloading.NodeDataLoader(
             graph,
             train_idx,
             sampler,
@@ -87,7 +85,7 @@ if __name__ == '__main__':
     graph.ndata['label'] = labels
     split_idx = dataset.get_idx_split()
     num_classes = dataset.num_classes
-    n_procs = 8
+    n_procs = 4
 
     # Tested with mp.spawn and fork.  Both worked and got 4s per epoch with 4 GPUs
     # and 3.86s per epoch with 8 GPUs on p2.8x, compared to 5.2s from official examples.

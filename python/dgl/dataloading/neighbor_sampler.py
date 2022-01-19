@@ -1,5 +1,5 @@
-import dgl
-from dgl.frame import LazyFeature
+from ..base import NID, EID
+from ..transform import to_block
 from .base import BlockSampler
 
 class NeighborSampler(BlockSampler):
@@ -18,10 +18,10 @@ class NeighborSampler(BlockSampler):
                 seed_nodes, fanout, edge_dir=self.edge_dir, prob=self.prob,
                 replace=self.replace, output_device=self.output_device,
                 exclude_edges=exclude_edges)
-            eid = frontier.edata[dgl.EID]
-            block = dgl.to_block(frontier, seed_nodes)
-            block.edata[dgl.EID] = eid
-            seed_nodes = block.srcdata[dgl.NID]
+            eid = frontier.edata[EID]
+            block = to_block(frontier, seed_nodes)
+            block.edata[EID] = eid
+            seed_nodes = block.srcdata[NID]
             blocks.insert(0, block)
 
         return seed_nodes, output_nodes, blocks

@@ -1,133 +1,181 @@
-import dgl
-from collections import Mapping
-from dgl import backend as F
-from dgl import utils, transform
-from dgl.base import EID
-from dgl.utils import recursive_apply, recursive_apply_pair
-import numpy as np
-
-def _locate_eids_to_exclude(frontier_parent_eids, exclude_eids):
-    """Find the edges whose IDs in parent graph appeared in exclude_eids.
-
-    Note that both arguments are numpy arrays or numpy dicts.
-    """
-    func = lambda x, y: np.isin(x, y).nonzero()[0]
-    result = recursive_apply_pair(frontier_parent_eids, exclude_eids, func)
-    return recursive_apply(result, F.zerocopy_from_numpy)
-
-
-class _EidExcluder():
-    def __init__(self, exclude_eids):
-        device = None
-        if isinstance(exclude_eids, Mapping):
-            for _, v in exclude_eids.items():
-                if device is None:
-                    device = F.context(v)
-                    break
-        else:
-            device = F.context(exclude_eids)
-        self._exclude_eids = None
-        self._filter = None
-
-        if device == F.cpu():
-            # TODO(nv-dlasalle): Once Filter is implemented for the CPU, we
-            # should just use that irregardless of the device.
-            self._exclude_eids = (
-                recursive_apply(exclude_eids, F.zerocopy_to_numpy)
-                if exclude_eids is not None else None)
-        else:
-            self._filter = recursive_apply(exclude_eids, utils.Filter)
-
-    def _find_indices(self, parent_eids):
-        """ Find the set of edge indices to remove.
-        """
-        if self._exclude_eids is not None:
-            parent_eids_np = recursive_apply(parent_eids, F.zerocopy_to_numpy)
-            return _locate_eids_to_exclude(parent_eids_np, self._exclude_eids)
-        else:
-            assert self._filter is not None
-            func = lambda x, y: x.find_included_indices(y)
-            return recursive_apply_pair(self._filter, parent_eids, func)
-
-    def __call__(self, frontier):
-        parent_eids = frontier.edata[EID]
-        located_eids = self._find_indices(parent_eids)
-
-        if not isinstance(located_eids, Mapping):
-            # (BarclayII) If frontier already has a EID field and located_eids is empty,
-            # the returned graph will keep EID intact.  Otherwise, EID will change
-            # to the mapping from the new graph to the old frontier.
-            # So we need to test if located_eids is empty, and do the remapping ourselves.
-            if len(located_eids) > 0:
-                frontier = transform.remove_edges(
-                    frontier, located_eids, store_ids=True)
-                frontier.edata[EID] = F.gather_row(parent_eids, frontier.edata[EID])
-        else:
-            # (BarclayII) remove_edges only accepts removing one type of edges,
-            # so I need to keep track of the edge IDs left one by one.
-            new_eids = parent_eids.copy()
-            for k, v in located_eids.items():
-                if len(v) > 0:
-                    frontier = transform.remove_edges(
-                        frontier, v, etype=k, store_ids=True)
-                    new_eids[k] = F.gather_row(parent_eids[k], frontier.edges[k].data[EID])
-            frontier.edata[EID] = new_eids
-        return frontier
-
-class DGLGraphStorage(object):
-    # A thin wrapper of DGLGraph that makes it a GraphStorage
-    def __init__(self, g):
-        self.g = g
-
+class GraphStorage(object):
     @property
     def ntypes(self):
-        return self.g.ntypes
+        """The list of node types."""
+        pass
 
     @property
     def ndata(self):
-        return self.g.ndata
+        """Node data.
+
+        For graphs with one node type it's a dict whose keys are feature names and values are
+        either tensors or FeatureStorage objects.
+
+        For multiple node types it's a dict of dict.  The outer keys are feature names
+        and the inner keys are node type names:
+
+        .. code::
+
+           self.ndata[feature_name][ntype]
+        """
+        pass
 
     # Required in Link Prediction
     @property
     def etypes(self):
-        return self.g.etypes
+        """The list of edge types."""
+        pass
 
     # Required in Link Prediction
     @property
     def canonical_etypes(self):
-        return self.g.canonical_etypes
+        """The list of canonical edge types (triplets of "source node type", "edge type",
+        and "destination node type")."""
+        pass
 
     @property
     def edata(self):
-        return self.g.edata
+        """Edge data.
 
-    def sample_neighbors(self, seed_nodes, fanout, edge_dir='in', prob=None, replace=False,
-                         exclude_edges=None, output_device=None):
-        if self.g.device == 'cpu':
-            frontier = dgl.sampling.sample_neighbors(
-                self.g, seed_nodes, fanout, edge_dir=edge_dir, prob=prob, replace=replace,
-                exclude_edges=exclude_edges)
-        else:
-            frontier = dgl.sampling.sample_neighbors(
-                self.g, seed_nodes, fanout, edge_dir=edge_dir, prob=prob, replace=replace)
-            if exclude_edges is not None:
-                eid_excluder = _EidExcluder(exclude_edges)
-                frontier = eid_excluder(frontier)
-        return frontier if output_device is None else frontier.to(output_device)
+        For graphs with one edge type it's a dict whose keys are feature names and values are
+        either tensors or FeatureStorage objects.
+
+        For multiple edge types it's a dict of dict.  The outer keys are feature names
+        and the inner keys are canonical edge types or edge type names:
+
+        .. code::
+
+           self.edata[feature_name][etype]
+
+        Note that to maximize the compatibility with other DGL code it's better to support
+        both canonical edge types and edge type names as inner keys since users might use both.
+        """
+        pass
+
+    def sample_neighbors(self, seed_nodes, fanout, edge_dir='in', prob=None,
+                         exclude_edges=None, replace=False, output_device=None):
+        """Return a DGLGraph which is a subgraph induced by sampling neighboring edges of
+        the given nodes.
+
+        See ``dgl.sampling.sample_neighbors`` for detailed semantics.
+
+        Parameters
+        ----------
+        seed_nodes : Tensor or dict[str, Tensor]
+            Node IDs to sample neighbors from.
+
+            This argument can take a single ID tensor or a dictionary of node types and ID tensors.
+            If a single tensor is given, the graph must only have one type of nodes.
+        fanout : int or dict[etype, int]
+            The number of edges to be sampled for each node on each edge type.
+
+            This argument can take a single int or a dictionary of edge types and ints.
+            If a single int is given, DGL will sample this number of edges for each node for
+            every edge type.
+
+            If -1 is given for a single edge type, all the neighboring edges with that edge
+            type will be selected.
+        prob : str, optional
+            Feature name used as the (unnormalized) probabilities associated with each
+            neighboring edge of a node.  The feature must have only one element for each
+            edge.
+
+            The features must be non-negative floats, and the sum of the features of
+            inbound/outbound edges for every node must be positive (though they don't have
+            to sum up to one).  Otherwise, the result will be undefined.
+
+            If :attr:`prob` is not None, GPU sampling is not supported.
+        exclude_edges: tensor or dict
+            Edge IDs to exclude during sampling neighbors for the seed nodes.
+
+            This argument can take a single ID tensor or a dictionary of edge types and ID tensors.
+            If a single tensor is given, the graph must only have one type of nodes.
+        replace : bool, optional
+            If True, sample with replacement.
+        output_device : Framework-specific device context object, optional
+            The output device.  Default is the same as the input graph.
+
+        Returns
+        -------
+        DGLGraph
+            A sampled subgraph with the same nodes as the original graph, but only the sampled neighboring
+            edges.  The induced edge IDs will be in ``edata[dgl.EID]``.
+        """
+        pass
+
+    # Required in Cluster-GCN
+    def subgraph(self, nodes, relabel_nodes=False, output_device=None):
+        """Return a subgraph induced on given nodes.
+
+        This has the same semantics as ``dgl.node_subgraph``.
+
+        Parameters
+        ----------
+        nodes : nodes or dict[str, nodes]
+            The nodes to form the subgraph. The allowed nodes formats are:
+
+            * Int Tensor: Each element is a node ID. The tensor must have the same device type
+              and ID data type as the graph's.
+            * iterable[int]: Each element is a node ID.
+            * Bool Tensor: Each :math:`i^{th}` element is a bool flag indicating whether
+              node :math:`i` is in the subgraph.
+
+            If the graph is homogeneous, one can directly pass the above formats.
+            Otherwise, the argument must be a dictionary with keys being node types
+            and values being the node IDs in the above formats.
+        relabel_nodes : bool, optional
+            If True, the extracted subgraph will only have the nodes in the specified node set
+            and it will relabel the nodes in order.
+        output_device : Framework-specific device context object, optional
+            The output device.  Default is the same as the input graph.
+
+        Returns
+        -------
+        DGLGraph
+            The subgraph.
+        """
+        pass
 
     # Required in Link Prediction
-    def edge_subgraph(self, edges, output_device=None):
-        subg = self.g.edge_subgraph(edges, relabel_nodes=False)
-        return subg if output_device is None else subg.to(output_device)
+    def edge_subgraph(self, edges, relabel_nodes=False, output_device=None):
+        """Return a subgraph induced on given edges.
+
+        This has the same semantics as ``dgl.edge_subgraph``.
+
+        Parameters
+        ----------
+        edges : edges or dict[(str, str, str), edges]
+            The edges to form the subgraph. The allowed edges formats are:
+
+            * Int Tensor: Each element is an edge ID. The tensor must have the same device type
+              and ID data type as the graph's.
+            * iterable[int]: Each element is an edge ID.
+            * Bool Tensor: Each :math:`i^{th}` element is a bool flag indicating whether
+              edge :math:`i` is in the subgraph.
+
+            If the graph is homogeneous, one can directly pass the above formats.
+            Otherwise, the argument must be a dictionary with keys being edge types
+            and values being the edge IDs in the above formats.
+        relabel_nodes : bool, optional
+            If True, the extracted subgraph will only have the nodes in the specified node set
+            and it will relabel the nodes in order.
+        output_device : Framework-specific device context object, optional
+            The output device.  Default is the same as the input graph.
+
+        Returns
+        -------
+        DGLGraph
+            The subgraph.
+        """
+        pass
 
     # Required in Link Prediction negative sampler
     def find_edges(self, edges, etype=None, output_device=None):
-        src, dst = self.g.find_edges(edges, etype=etype)
-        if output_device is None:
-            return src, dst
-        else:
-            return src.to(output_device), dst.to(output_device)
+        """Return the source and destination node IDs given the edge IDs within the given edge type.
+        """
+        pass
 
     # Required in Link Prediction negative sampler
     def num_nodes(self, ntype):
-        return self.g.num_nodes(ntype)
+        """Return the number of nodes for the given node type."""
+        pass

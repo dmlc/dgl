@@ -35,20 +35,19 @@ graph, labels = dataset[0]
 split_idx = dataset.get_idx_split()
 train_idx, valid_idx, test_idx = split_idx['train'], split_idx['valid'], split_idx['test']
 
-graph.create_formats_()
-
 # This is an example of using feature storage other than tensors
 feat_np = graph.ndata['feat'].numpy()
 feat = np.memmap('feat.npy', mode='w+', shape=feat_np.shape, dtype='float32')
 print(feat.shape)
 feat[:] = feat_np
+graph.create_formats_()
 graph = dglnew.graph.OtherFeatureGraphStorage(graph,
-        ndata={'feat': dglnew.storages.NumpyStorage(feat), 'label': labels})
+        ndata={'feat': dgl.storages.NumpyStorage(feat), 'label': labels})
 
-sampler = dglnew.dataloading.NeighborSampler(
+sampler = dgl.dataloading.NeighborSampler(
         [5, 5, 5], output_device='cpu', prefetch_node_feats=['feat'],
         prefetch_labels=['label'])
-dataloader = dglnew.dataloading.NodeDataLoader(
+dataloader = dgl.dataloading.NodeDataLoader(
         graph,
         train_idx,
         sampler,

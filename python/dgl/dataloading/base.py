@@ -1,9 +1,10 @@
 from collections import Mapping
-import dgl
-from dgl import heterograph
-import dgl.backend as F
-from dgl.frame import LazyFeature
-from dgl.utils import recursive_apply
+from ..base import NID, EID
+from ..convert import heterograph
+from .. import backend as F
+from ..transform import compact_graphs
+from ..frame import LazyFeature
+from ..utils import recursive_apply
 
 class BlockSampler(object):
     """BlockSampler is an abstract class assuming to take in a set of nodes whose
@@ -189,17 +190,18 @@ class EdgeBlockSampler(object):
 
     def sample(self, g, seed_edges):
         exclude = self.exclude
-        pair_graph = g.edge_subgraph(seed_edges, self.output_device)
-        eids = pair_graph.edata[dgl.EID]
+        pair_graph = g.edge_subgraph(
+            seed_edges, relabel_nodes=False, output_device=self.output_device)
+        eids = pair_graph.edata[EID]
 
         if self.negative_sampler is not None:
             neg_graph = self._build_neg_graph(g, seed_edges)
-            pair_graph, neg_graph = dgl.compact_graphs([pair_graph, neg_graph])
+            pair_graph, neg_graph = compact_graphs([pair_graph, neg_graph])
         else:
-            pair_graph = dgl.compact_graphs(pair_graph)
+            pair_graph = compact_graphs(pair_graph)
 
-        pair_graph.edata[dgl.EID] = eids
-        seed_nodes = pair_graph.ndata[dgl.NID]
+        pair_graph.edata[EID] = eids
+        seed_nodes = pair_graph.ndata[NID]
 
         exclude_eids = find_exclude_eids(
             g, seed_edges, exclude, self.reverse_eids, self.reverse_etypes,

@@ -10,8 +10,6 @@ import numpy as np
 # (This is a long-standing issue)
 from ogb.nodeproppred import DglNodePropPredDataset
 
-import dglnew
-
 class SAGE(nn.Module):
     def __init__(self, in_feats, n_hidden, n_classes):
         super().__init__()
@@ -42,15 +40,10 @@ train_idx, valid_idx, test_idx = split_idx['train'], split_idx['valid'], split_i
 num_edges = graph.num_edges()
 train_eids = torch.arange(num_edges)
 
-graph.create_formats_()
-# We actually won't have this statement in formal examples - this is just to ensure that
-# my code doesn't depend on DGLGraph's internal interfaces that did not appear in the RFC.
-graph = dglnew.graph.DGLGraphStorage(graph)
-
-sampler = dglnew.dataloading.NeighborSampler(
+sampler = dgl.dataloading.NeighborSampler(
         [5, 5, 5], output_device='cpu', prefetch_node_feats=['feat'],
         prefetch_labels=['label'])
-dataloader = dglnew.dataloading.EdgeDataLoader(
+dataloader = dgl.dataloading.EdgeDataLoader(
         graph,
         train_eids,
         sampler,
@@ -70,14 +63,11 @@ dataloader = dglnew.dataloading.EdgeDataLoader(
 model = SAGE(graph.ndata['feat'].shape[1], 256, dataset.num_classes).cuda()
 opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
 
-def f(blocks):
-    return blocks[0].srcdata['feat']
-
 durations = []
 for _ in range(10):
     t0 = time.time()
     for it, (input_nodes, pair_graph, neg_pair_graph, blocks) in enumerate(dataloader):
-        x = f(blocks)
+        x = blocks[0].srcdata['feat']
         pos_score, neg_score = model(pair_graph, neg_pair_graph, blocks, x)
         pos_label = torch.ones_like(pos_score)
         neg_label = torch.zeros_like(neg_score)

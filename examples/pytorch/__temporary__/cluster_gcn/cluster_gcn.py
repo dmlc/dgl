@@ -17,10 +17,10 @@ class SAGE(nn.Module):
         self.layers.append(dglnn.SAGEConv(n_hidden, n_classes, 'mean'))
         self.dropout = nn.Dropout(0.5)
 
-    def forward(self, blocks, x):
+    def forward(self, sg, x):
         h = x
-        for l, (layer, block) in enumerate(zip(self.layers, blocks)):
-            h = layer(block, h)
+        for l, layer in enumerate(self.layers):
+            h = layer(sg, h)
             if l != len(self.layers) - 1:
                 h = F.relu(h)
                 h = self.dropout(h)
@@ -31,16 +31,24 @@ graph, labels = dataset[0]
 graph.ndata['label'] = labels
 split_idx = dataset.get_idx_split()
 train_idx, valid_idx, test_idx = split_idx['train'], split_idx['valid'], split_idx['test']
+graph.ndata['train_mask'] = torch.zeros(graph.num_nodes(), dtype=torch.bool).index_fill_(0, train_idx, True)
+graph.ndata['valid_mask'] = torch.zeros(graph.num_nodes(), dtype=torch.bool).index_fill_(0, valid_idx, True)
+graph.ndata['test_mask'] = torch.zeros(graph.num_nodes(), dtype=torch.bool).index_fill_(0, test_idx, True)
 
-sampler = dgl.dataloading.NeighborSampler(
-        [5, 5, 5], output_device='cpu', prefetch_node_feats=['feat'],
-        prefetch_labels=['label'])
-dataloader = dgl.dataloading.NodeDataLoader(
+num_partitions = 1000
+sampler = dgl.dataloading.ClusterGCNSampler(
+        graph, num_partitions,
+        prefetch_node_feats=['feat', 'label', 'train_mask', 'valid_mask', 'test_mask'])
+# DataLoader for generic dataloading with a graph, a set of indices (any indices, like
+# partition IDs here), and a graph sampler.
+# NodeDataLoader and EdgeDataLoader are simply special cases of DataLoader where the
+# indices are guaranteed to be node and edge IDs.
+dataloader = dgl.dataloading.DataLoader(
         graph,
-        train_idx,
+        torch.arange(num_partitions),
         sampler,
         device='cuda',
-        batch_size=1000,
+        batch_size=100,
         shuffle=True,
         drop_last=False,
         pin_memory=True,
@@ -55,16 +63,17 @@ opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
 durations = []
 for _ in range(10):
     t0 = time.time()
-    for it, (input_nodes, output_nodes, blocks) in enumerate(dataloader):
-        x = blocks[0].srcdata['feat']
-        y = blocks[-1].dstdata['label'][:, 0]
-        y_hat = model(blocks, x)
-        loss = F.cross_entropy(y_hat, y)
+    for it, sg in enumerate(dataloader):
+        x = sg.ndata['feat']
+        y = sg.ndata['label'][:, 0]
+        m = sg.ndata['train_mask']
+        y_hat = model(sg, x)
+        loss = F.cross_entropy(y_hat[m], y[m])
         opt.zero_grad()
         loss.backward()
         opt.step()
         if it % 20 == 0:
-            acc = MF.accuracy(y_hat, y)
+            acc = MF.accuracy(y_hat[m], y[m])
             mem = torch.cuda.max_memory_allocated() / 1000000
             print('Loss', loss.item(), 'Acc', acc.item(), 'GPU Mem', mem, 'MB')
     tt = time.time()

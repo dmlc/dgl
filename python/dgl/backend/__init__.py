@@ -42,7 +42,8 @@ def load_backend(mod_name):
     version = mod.__version__
     load_tensor_adapter(mod_name, version)
 
-    print('Using backend: %s' % mod_name, file=sys.stderr)
+    # With mp.spawn this message will show up every time a process spawns.
+    #print('Using backend: %s' % mod_name, file=sys.stderr)
     mod = importlib.import_module('.%s' % mod_name, __name__)
     thismod = sys.modules[__name__]
     for api in backend.__dict__.keys():

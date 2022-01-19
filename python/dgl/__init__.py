@@ -18,6 +18,7 @@ from . import container
 from . import distributed
 from . import random
 from . import sampling
+from . import storages
 from . import dataloading
 from . import ops
 from . import cuda

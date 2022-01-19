@@ -1,0 +1,13 @@
+from .base import FeatureStorage
+from .. import backend as F
+from ..utils import recursive_apply_pair
+
+def _fetch(indices, tensor, device):
+    return F.copy_to(F.gather_row(tensor, indices), device)
+
+class TensorStorage(FeatureStorage):
+    def __init__(self, tensor):
+        self.tensor = tensor
+
+    def fetch(self, indices, device, pin_memory=False):
+        return recursive_apply_pair(indices, self.tensor, _fetch, device)
