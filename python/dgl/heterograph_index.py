@@ -246,7 +246,7 @@ class HeteroGraphIndex(ObjectBase):
         HeteroGraphIndex
             The pinned graph index.
         """
-        return _CAPI_DGLHeteroPinMemory(self)
+        return _CAPI_DGLHeteroPinMemory_(self)
 
     def unpin_memory_(self):
         """Unpin this graph from the page-locked memory.
@@ -260,7 +260,7 @@ class HeteroGraphIndex(ObjectBase):
         HeteroGraphIndex
             The unpinned graph index.
         """
-        return _CAPI_DGLHeteroUnpinMemory(self)
+        return _CAPI_DGLHeteroUnpinMemory_(self)
 
     def is_pinned(self):
         """Check if this graph is pinned to the page-locked memory.
