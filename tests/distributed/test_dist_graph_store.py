@@ -18,35 +18,11 @@ import backend as F
 import math
 import unittest
 import pickle
+from utils import reset_envs, generate_ip_config
 
 if os.name != 'nt':
     import fcntl
     import struct
-
-def get_local_usable_addr():
-    """Get local usable IP and port
-
-    Returns
-    -------
-    str
-        IP address, e.g., '192.168.8.12:50051'
-    """
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        # doesn't even have to be reachable
-        sock.connect(('10.255.255.255', 1))
-        ip_addr = sock.getsockname()[0]
-    except ValueError:
-        ip_addr = '127.0.0.1'
-    finally:
-        sock.close()
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.bind(("", 0))
-    sock.listen(1)
-    port = sock.getsockname()[1]
-    sock.close()
-
-    return ip_addr + ' ' + str(port)
 
 def create_random_graph(n):
     arr = (spsp.random(n, n, density=0.001, format='coo', random_state=100) != 0).astype(np.int64)
@@ -96,7 +72,6 @@ def check_dist_graph_empty(g, num_clients, num_nodes, num_edges):
     print('end')
 
 def run_client_empty(graph_name, part_id, server_count, num_clients, num_nodes, num_edges):
-    time.sleep(5)
     os.environ['DGL_NUM_SERVER'] = str(server_count)
     dgl.distributed.initialize("kv_ip_config.txt")
     gpb, graph_name, _, _ = load_partition_book('/tmp/dist_graph/{}.json'.format(graph_name),
@@ -140,7 +115,6 @@ def check_server_client_empty(shared_mem, num_servers, num_clients):
     print('clients have terminated')
 
 def run_client(graph_name, part_id, server_count, num_clients, num_nodes, num_edges):
-    time.sleep(5)
     os.environ['DGL_NUM_SERVER'] = str(server_count)
     dgl.distributed.initialize("kv_ip_config.txt")
     gpb, graph_name, _, _ = load_partition_book('/tmp/dist_graph/{}.json'.format(graph_name),
@@ -149,7 +123,6 @@ def run_client(graph_name, part_id, server_count, num_clients, num_nodes, num_ed
     check_dist_graph(g, num_clients, num_nodes, num_edges)
 
 def run_emb_client(graph_name, part_id, server_count, num_clients, num_nodes, num_edges):
-    time.sleep(5)
     os.environ['DGL_NUM_SERVER'] = str(server_count)
     dgl.distributed.initialize("kv_ip_config.txt")
     gpb, graph_name, _, _ = load_partition_book('/tmp/dist_graph/{}.json'.format(graph_name),
@@ -158,7 +131,6 @@ def run_emb_client(graph_name, part_id, server_count, num_clients, num_nodes, nu
     check_dist_emb(g, num_clients, num_nodes, num_edges)
 
 def run_client_hierarchy(graph_name, part_id, server_count, node_mask, edge_mask, return_dict):
-    time.sleep(5)
     os.environ['DGL_NUM_SERVER'] = str(server_count)
     dgl.distributed.initialize("kv_ip_config.txt")
     gpb, graph_name, _, _ = load_partition_book('/tmp/dist_graph/{}.json'.format(graph_name),
@@ -440,7 +412,6 @@ def check_server_client_hierarchy(shared_mem, num_servers, num_clients):
 
 
 def run_client_hetero(graph_name, part_id, server_count, num_clients, num_nodes, num_edges):
-    time.sleep(5)
     os.environ['DGL_NUM_SERVER'] = str(server_count)
     dgl.distributed.initialize("kv_ip_config.txt")
     gpb, graph_name, _, _ = load_partition_book('/tmp/dist_graph/{}.json'.format(graph_name),
@@ -587,6 +558,7 @@ def check_server_client_hetero(shared_mem, num_servers, num_clients):
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support some of operations in DistGraph")
 @unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Turn off Mxnet support")
 def test_server_client():
+    reset_envs()
     os.environ['DGL_DIST_MODE'] = 'distributed'
     check_server_client_hierarchy(False, 1, 4)
     check_server_client_empty(True, 1, 1)
@@ -600,6 +572,7 @@ def test_server_client():
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support distributed DistEmbedding")
 @unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Mxnet doesn't support distributed DistEmbedding")
 def test_dist_emb_server_client():
+    reset_envs()
     os.environ['DGL_DIST_MODE'] = 'distributed'
     check_dist_emb_server_client(True, 1, 1)
     check_dist_emb_server_client(False, 1, 1)
@@ -608,6 +581,7 @@ def test_dist_emb_server_client():
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support some of operations in DistGraph")
 @unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Turn off Mxnet support")
 def test_standalone():
+    reset_envs()
     os.environ['DGL_DIST_MODE'] = 'standalone'
 
     g = create_random_graph(10000)
@@ -626,6 +600,7 @@ def test_standalone():
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support distributed DistEmbedding")
 @unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Mxnet doesn't support distributed DistEmbedding")
 def test_standalone_node_emb():
+    reset_envs()
     os.environ['DGL_DIST_MODE'] = 'standalone'
 
     g = create_random_graph(10000)
@@ -766,10 +741,7 @@ def test_split_even():
     assert np.all(all_edges == F.asnumpy(all_edges2))
 
 def prepare_dist():
-    ip_config = open("kv_ip_config.txt", "w")
-    ip_addr = get_local_usable_addr()
-    ip_config.write('{}\n'.format(ip_addr))
-    ip_config.close()
+    generate_ip_config("kv_ip_config.txt", 1, 1)
 
 if __name__ == '__main__':
     os.makedirs('/tmp/dist_graph', exist_ok=True)

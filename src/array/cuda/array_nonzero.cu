@@ -55,15 +55,7 @@ IdArray NonZero(IdArray array) {
   device->FreeWorkspace(ctx, temp);
 
   // copy number of selected elements from GPU to CPU
-  int64_t num_nonzeros;
-  device->CopyDataFromTo(
-      d_num_nonzeros, 0,
-      &num_nonzeros, 0,
-      sizeof(num_nonzeros),
-      ctx,
-      DGLContext{kDLCPU, 0},
-      DGLType{kDLInt, 64, 1},
-      stream);
+  int64_t num_nonzeros = cuda::GetCUDAScalar(device, ctx, d_num_nonzeros, stream);
   device->FreeWorkspace(ctx, d_num_nonzeros);
   device->StreamSync(ctx, stream);
 
