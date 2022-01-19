@@ -28,11 +28,11 @@ def create_random_graph(n):
     arr = (spsp.random(n, n, density=0.001, format='coo', random_state=100) != 0).astype(np.int64)
     return dgl.from_scipy(arr)
 
-def run_server(graph_name, server_id, server_count, num_clients, shared_mem):
+def run_server(graph_name, server_id, server_count, num_clients, shared_mem, keep_alive=False):
     g = DistGraphServer(server_id, "kv_ip_config.txt", server_count, num_clients,
                         '/tmp/dist_graph/{}.json'.format(graph_name),
                         disable_shared_mem=not shared_mem,
-                        graph_format=['csc', 'coo'])
+                        graph_format=['csc', 'coo'], keep_alive=keep_alive)
     print('start server', server_id)
     g.start()
 
@@ -114,8 +114,9 @@ def check_server_client_empty(shared_mem, num_servers, num_clients):
 
     print('clients have terminated')
 
-def run_client(graph_name, part_id, server_count, num_clients, num_nodes, num_edges):
+def run_client(graph_name, part_id, server_count, num_clients, num_nodes, num_edges, group_id=0):
     os.environ['DGL_NUM_SERVER'] = str(server_count)
+    os.environ['DGL_GROUP_ID'] = str(group_id)
     dgl.distributed.initialize("kv_ip_config.txt")
     gpb, graph_name, _, _ = load_partition_book('/tmp/dist_graph/{}.json'.format(graph_name),
                                                 part_id, None)
@@ -317,13 +318,13 @@ def check_dist_emb_server_client(shared_mem, num_servers, num_clients):
 
     print('clients have terminated')
 
-def check_server_client(shared_mem, num_servers, num_clients):
+def check_server_client(shared_mem, num_servers, num_clients, num_groups=1):
     prepare_dist()
     g = create_random_graph(10000)
 
     # Partition the graph
     num_parts = 1
-    graph_name = 'dist_graph_test_2'
+    graph_name = 'dist_graph_test_multi'
     g.ndata['features'] = F.unsqueeze(F.arange(0, g.number_of_nodes()), 1)
     g.edata['features'] = F.unsqueeze(F.arange(0, g.number_of_edges()), 1)
     partition_graph(g, graph_name, num_parts, '/tmp/dist_graph')
@@ -332,23 +333,29 @@ def check_server_client(shared_mem, num_servers, num_clients):
     # We cannot run multiple servers and clients on the same machine.
     serv_ps = []
     ctx = mp.get_context('spawn')
+    keep_alive = num_groups > 1
     for serv_id in range(num_servers):
         p = ctx.Process(target=run_server, args=(graph_name, serv_id, num_servers,
-                                                 num_clients, shared_mem))
+                                                 num_clients, shared_mem, keep_alive))
         serv_ps.append(p)
         p.start()
 
-    cli_ps = []
-    for cli_id in range(num_clients):
-        print('start client', cli_id)
-        p = ctx.Process(target=run_client, args=(graph_name, 0, num_servers, num_clients, g.number_of_nodes(),
-                                                 g.number_of_edges()))
-        p.start()
-        cli_ps.append(p)
+    for group_id in range(num_groups):
+        cli_ps = []
+        for cli_id in range(num_clients):
+            print('start client[{}] for group[{}]'.format(cli_id, group_id))
+            p = ctx.Process(target=run_client, args=(graph_name, 0, num_servers, num_clients, g.number_of_nodes(),
+                                                    g.number_of_edges(), group_id))
+            p.start()
+            cli_ps.append(p)
+        for p in cli_ps:
+            p.join()
 
-    for p in cli_ps:
-        p.join()
-
+    if keep_alive:
+        for p in serv_ps:
+            assert p.is_alive()
+        # force shutdown server
+        dgl.distributed.shutdown_servers("kv_ip_config.txt", num_servers)
     for p in serv_ps:
         p.join()
 
@@ -560,6 +567,9 @@ def check_server_client_hetero(shared_mem, num_servers, num_clients):
 def test_server_client():
     reset_envs()
     os.environ['DGL_DIST_MODE'] = 'distributed'
+    check_server_client(True, 2, 2)
+    check_server_client(True, 2, 2, 5)
+    return
     check_server_client_hierarchy(False, 1, 4)
     check_server_client_empty(True, 1, 1)
     check_server_client_hetero(True, 1, 1)

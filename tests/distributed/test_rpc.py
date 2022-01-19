@@ -248,9 +248,7 @@ def test_multi_client_groups():
     num_machines = 5
     # should test with larger number but due to possible port in-use issue.
     num_servers = 1
-    with open(ip_config, "w") as f:
-        for _ in range(num_machines):
-            f.write('%s\n' % get_local_usable_addr())
+    generate_ip_config(ip_config, num_machines, num_servers)
     # presssue test
     num_clients = 15
     num_groups = 15

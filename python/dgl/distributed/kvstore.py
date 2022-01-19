@@ -206,20 +206,23 @@ class BarrierRequest(rpc.Request):
     """
     def __init__(self, role):
         self.role = role
+        self.group_id = rpc.get_group_id()
 
     def __getstate__(self):
-        return self.role
+        return self.role, self.group_id
 
     def __setstate__(self, state):
-        self.role = state
+        self.role, self.group_id = state
 
     def process_request(self, server_state):
         kv_store = server_state.kv_store
-        role = server_state.roles
-        count = kv_store.barrier_count[self.role]
-        kv_store.barrier_count[self.role] = count + 1
-        if kv_store.barrier_count[self.role] == len(role[self.role]):
-            kv_store.barrier_count[self.role] = 0
+        roles = server_state.roles
+        role = roles[self.group_id]
+        barrier_count = kv_store.barrier_count[self.group_id]
+        count = barrier_count[self.role]
+        barrier_count[self.role] = count + 1
+        if barrier_count[self.role] == len(role[self.role]):
+            barrier_count[self.role] = 0
             res_list = []
             for client_id, _ in role[self.role]:
                 res_list.append((client_id, BarrierResponse(BARRIER_MSG)))
