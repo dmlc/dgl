@@ -10,7 +10,7 @@ from ..base import NID, EID, NTYPE, ETYPE, dgl_warning
 from ..convert import to_homogeneous
 from ..random import choice as random_choice
 from ..data.utils import load_graphs, save_graphs, load_tensors, save_tensors
-from ..transform import metis_partition_assignment, partition_graph_with_halo
+from ..partition import metis_partition_assignment, partition_graph_with_halo, get_peak_mem
 from .graph_partition_book import BasicPartitionBook, RangePartitionBook
 
 def _get_inner_node_mask(graph, ntype_id):
@@ -537,17 +537,23 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                     "For heterogeneous graphs, reshuffle must be enabled.")
 
     if num_parts == 1:
+        start = time.time()
         sim_g, balance_ntypes = get_homogeneous(g, balance_ntypes)
+        print('Converting to homogeneous graph takes {:.3f}s, peak mem: {:.3f} GB'.format(
+            time.time() - start, get_peak_mem()))
         assert num_trainers_per_machine >= 1
         if num_trainers_per_machine > 1:
             # First partition the whole graph to each trainer and save the trainer ids in
             # the node feature "trainer_id".
+            start = time.time()
             node_parts = metis_partition_assignment(
                 sim_g, num_parts * num_trainers_per_machine,
                 balance_ntypes=balance_ntypes,
                 balance_edges=balance_edges,
                 mode='k-way')
             _set_trainer_ids(g, sim_g, node_parts)
+            print('Assigning nodes to METIS partitions takes {:.3f}s, peak mem: {:.3f} GB'.format(
+                time.time() - start, get_peak_mem()))
 
         node_parts = F.zeros((sim_g.number_of_nodes(),), F.int64, F.cpu())
         parts = {0: sim_g.clone()}
@@ -563,9 +569,13 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         parts[0].ndata['inner_node'] = F.ones((sim_g.number_of_nodes(),), F.int8, F.cpu())
         parts[0].edata['inner_edge'] = F.ones((sim_g.number_of_edges(),), F.int8, F.cpu())
     elif part_method in ('metis', 'random'):
+        start = time.time()
         sim_g, balance_ntypes = get_homogeneous(g, balance_ntypes)
+        print('Converting to homogeneous graph takes {:.3f}s, peak mem: {:.3f} GB'.format(
+            time.time() - start, get_peak_mem()))
         if part_method == 'metis':
             assert num_trainers_per_machine >= 1
+            start = time.time()
             if num_trainers_per_machine > 1:
                 # First partition the whole graph to each trainer and save the trainer ids in
                 # the node feature "trainer_id".
@@ -583,10 +593,15 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                 node_parts = metis_partition_assignment(sim_g, num_parts,
                                                         balance_ntypes=balance_ntypes,
                                                         balance_edges=balance_edges)
+            print('Assigning nodes to METIS partitions takes {:.3f}s, peak mem: {:.3f} GB'.format(
+                time.time() - start, get_peak_mem()))
         else:
             node_parts = random_choice(num_parts, sim_g.number_of_nodes())
+        start = time.time()
         parts, orig_nids, orig_eids = partition_graph_with_halo(sim_g, node_parts, num_hops,
                                                                 reshuffle=reshuffle)
+        print('Splitting the graph into partitions takes {:.3f}s, peak mem: {:.3f} GB'.format(
+            time.time() - start, get_peak_mem()))
         if return_mapping:
             orig_nids, orig_eids = _get_orig_ids(g, sim_g, reshuffle, orig_nids, orig_eids)
     else:
@@ -833,10 +848,11 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         save_tensors(edge_feat_file, edge_feats)
 
         save_graphs(part_graph_file, [part])
+    print('Save partitions: {:.3f} seconds, peak memory: {:.3f} GB'.format(
+        time.time() - start, get_peak_mem()))
 
     with open('{}/{}.json'.format(out_path, graph_name), 'w') as outfile:
         json.dump(part_metadata, outfile, sort_keys=True, indent=4)
-    print('Save partitions: {:.3f} seconds'.format(time.time() - start))
 
     num_cuts = sim_g.number_of_edges() - tot_num_inner_edges
     if num_parts == 1:

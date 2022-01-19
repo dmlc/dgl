@@ -409,7 +409,9 @@ COOMatrix CSRRowWiseSampling(
  * // etype = [0, 0, 0, 2, 1]
  * CSRMatrix csr = ...;
  * IdArray rows = ... ; // [0, 3]
- * COOMatrix sampled = CSRRowWisePerEtypeSampling(csr, rows, etype, 2, FloatArray(), false);
+ * std::vector<int64_t> num_samples = {2, 2, 2};
+ * COOMatrix sampled = CSRRowWisePerEtypeSampling(csr, rows, etype, num_samples,
+ *                                                FloatArray(), false);
  * // possible sampled coo matrix:
  * // sampled.num_rows = 4
  * // sampled.num_cols = 4
@@ -420,7 +422,7 @@ COOMatrix CSRRowWiseSampling(
  * \param mat Input CSR matrix.
  * \param rows Rows to sample from.
  * \param etypes Edge types of each edge.
- * \param num_samples Number of samples
+ * \param num_samples Number of samples to choose per edge type.
  * \param prob Unnormalized probability array. Should be of the same length as the data array.
  *             If an empty array is provided, assume uniform.
  * \param replace True if sample with replacement
@@ -431,7 +433,7 @@ COOMatrix CSRRowWisePerEtypeSampling(
     CSRMatrix mat,
     IdArray rows,
     IdArray etypes,
-    int64_t num_samples,
+    const std::vector<int64_t>& num_samples,
     FloatArray prob = FloatArray(),
     bool replace = true,
     bool etype_sorted = false);
@@ -544,6 +546,29 @@ COOMatrix CSRRowWiseSamplingBiased(
     FloatArray bias,
     bool replace = true
 );
+
+/*!
+ * \brief Uniformly sample row-column pairs whose entries do not exist in the given
+ * sparse matrix using rejection sampling.
+ *
+ * \note The number of samples returned may not necessarily be the number of samples
+ * given.
+ *
+ * \param csr The CSR matrix.
+ * \param num_samples The number of samples.
+ * \param num_trials The number of trials.
+ * \param exclude_self_loops Do not include the examples where the row equals the column.
+ * \param replace Whether to sample with replacement.
+ * \param redundancy How much redundant negative examples to take in case of duplicate examples.
+ * \return A pair of row and column tensors.
+ */
+std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling(
+    const CSRMatrix& csr,
+    int64_t num_samples,
+    int num_trials,
+    bool exclude_self_loops,
+    bool replace,
+    double redundancy);
 
 /*!
  * \brief Sort the column index according to the tag of each column.

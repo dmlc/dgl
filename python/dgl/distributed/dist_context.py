@@ -226,6 +226,7 @@ def initialize(ip_config, num_servers=1, num_workers=0,
             'Please define DGL_CONF_PATH to run DistGraph server'
         formats = os.environ.get('DGL_GRAPH_FORMAT', 'csc').split(',')
         formats = [f.strip() for f in formats]
+        rpc.reset()
         serv = DistGraphServer(int(os.environ.get('DGL_SERVER_ID')),
                                os.environ.get('DGL_IP_CONFIG'),
                                int(os.environ.get('DGL_NUM_SERVER')),
@@ -268,8 +269,6 @@ def finalize_client():
     if os.environ.get('DGL_DIST_MODE', 'standalone') != 'standalone':
         rpc.finalize_sender()
         rpc.finalize_receiver()
-    global INITIALIZED
-    INITIALIZED = False
 
 
 def _exit():

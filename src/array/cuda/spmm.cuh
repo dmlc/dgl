@@ -160,22 +160,77 @@ __global__ void SpMMCsrKernel(
         DType out = BinaryOp::Call(uoff + lhs_add, eoff + rhs_add);
         ReduceOp::Call(&local_accum, &local_argu, &local_arge, out, cid, eid);
       }
-
-      // TODO(isratnisa, BarclayII)
-      // The use of += is a quick hack to compute for cross-type reducing
+      // The use of += is to compute cross-type reducing on heterogeneous graph
+      // when reduce op is `sum`.
       //     C = SpMM(SpA, B) + C
-      // To make it work on max-reducer and min-reducer, i.e.
-      //     C = Max(SpMM<BinaryOp, Max>(SpA, B), C)
-      // it requires at least the following:
-      // 1. Initialize the output buffer with ReducerOp::zero.
-      // 2. Record also which edge type has the maximum/minimum in argmax/argmin.
-      //    This requires non-trivial changes in SpMMCsrKernel itself or writing a new kernel.
-      //    So we leave it to future PRs.
+      // Separate kernel `SpMMCmpCsrHeteroKernel` is used for max- and min-reducer. It
+      // does not affect the output on homogeneous graph as `out` is initialized to zero.
       out[ty * out_len + tx] += local_accum;
       if (ReduceOp::require_arg && BinaryOp::use_lhs)
         arg_u[ty * out_len + tx] = local_argu;
       if (ReduceOp::require_arg && BinaryOp::use_rhs)
         arg_e[ty * out_len + tx] = local_arge;
+      tx += stride_x;
+    }
+    ty += stride_y;
+  }
+}
+
+/*!
+ * \brief CUDA kernel of SpMM-Min/Max on Csr format.
+ * \note it uses node parallel strategy, different threadblocks (on y-axis)
+ *       is responsible for the computation on different destination nodes.
+ *       Threadblocks on the x-axis are responsible for the computation on
+ *       different positions in feature dimension.
+ */
+template <typename Idx, typename DType,
+          typename BinaryOp, typename ReduceOp,
+          bool UseBcast = false, bool UseIdx = false>
+__global__ void SpMMCmpCsrHeteroKernel(
+  const DType* __restrict__ ufeat,
+  const DType* __restrict__ efeat,
+  DType* __restrict__ out,
+  Idx* __restrict__ arg_u, Idx* __restrict__ arg_e,
+  Idx* __restrict__ arg_u_ntype, Idx* __restrict__ arg_e_etype,
+  const Idx* __restrict__ indptr,
+  const Idx* __restrict__ indices,
+  const Idx* __restrict__ edge_map,
+  int64_t num_rows, int64_t num_cols,
+  const int64_t* __restrict__ ubcast_off,
+  const int64_t* __restrict__ ebcast_off,
+  int64_t ufeat_len, int64_t efeat_len, int64_t out_len,
+  const int src_type, const int etype) {
+  // SPMM with CSR.
+  int ty = blockIdx.y * blockDim.y + threadIdx.y;
+  const Idx stride_y = blockDim.y * gridDim.y;
+  const int stride_x = blockDim.x * gridDim.x;
+  while (ty < num_rows) {
+    int tx = blockIdx.x * blockDim.x + threadIdx.x;
+    while (tx < out_len) {
+      DType new_out = out[ty * out_len + tx];//ReduceOp::zero();
+      Idx local_argu = 0, local_arge = 0;
+      const int lhs_add = UseBcast ? ubcast_off[tx] : tx;
+      const int rhs_add = UseBcast ? ebcast_off[tx] : tx;
+      for (Idx i = indptr[ty]; i < indptr[ty + 1]; ++i) {
+        const Idx eid = UseIdx ? _ldg(edge_map + i) : i;
+        const Idx cid = _ldg(indices + i);
+        const DType* uoff = BinaryOp::use_lhs ? (ufeat + cid * ufeat_len): nullptr;
+        const DType* eoff = BinaryOp::use_rhs ? (efeat + eid * efeat_len): nullptr;
+        DType tmp_out = BinaryOp::Call(uoff + lhs_add, eoff + rhs_add);
+        ReduceOp::Call(&new_out, &local_argu, &local_arge, tmp_out, cid, eid);
+      }
+      // Update output only when max/min values are different that original output
+      if (out[ty * out_len + tx] != new_out) {
+        out[ty * out_len + tx] = new_out;
+        if (ReduceOp::require_arg && BinaryOp::use_lhs) {
+          arg_u[ty * out_len + tx] = local_argu;
+          arg_u_ntype[ty * out_len + tx] = src_type;
+        }
+        if (ReduceOp::require_arg && BinaryOp::use_rhs) {
+          arg_e[ty * out_len + tx] = local_arge;
+          arg_e_etype[ty * out_len + tx] = etype;
+        }
+      }
       tx += stride_x;
     }
     ty += stride_y;
@@ -313,6 +368,73 @@ void SpMMCsr(
         csr.num_rows, csr.num_cols,
         ubcast_off, ebcast_off,
         lhs_len, rhs_len, len)
+  });
+}
+
+/*!
+ * \brief CUDA kernel of SpMM-Min/Max on Csr format on heterogeneous graph.
+ * \param bcast Broadcast information.
+ * \param csr The Csr matrix.
+ * \param ufeat The feature on source nodes.
+ * \param efeat The feature on edges.
+ * \param out The result feature on destination nodes.
+ * \param argu Arg-Min/Max on source nodes, which refers the source node indices
+ *        correspond to the minimum/maximum values of reduction result on
+ *        destination nodes. It's useful in computing gradients of Min/Max reducer.
+ * \param arge Arg-Min/Max on edges. which refers the source node indices
+ *        correspond to the minimum/maximum values of reduction result on
+ *        destination nodes. It's useful in computing gradients of Min/Max reducer.
+ * \param argu_ntype Node type of the arg-Min/Max on source nodes, which refers the
+ *        source node types correspond to the minimum/maximum values of reduction result
+ *        on destination nodes. It's useful in computing gradients of Min/Max reducer.
+ * \param arge_etype Edge-type of the arg-Min/Max on edges. which refers the source
+ *        node indices correspond to the minimum/maximum values of reduction result on
+ *        destination nodes. It's useful in computing gradients of Min/Max reducer.
+ * \param src_type Node type of the source nodes of an etype
+ * \param etype Edge type
+ */
+template <typename Idx, typename DType,
+          typename BinaryOp, typename ReduceOp>
+void SpMMCmpCsrHetero(
+    const BcastOff& bcast,
+    const CSRMatrix& csr,
+    NDArray ufeat, NDArray efeat,
+    NDArray out, NDArray argu, NDArray arge,
+    NDArray argu_ntype, NDArray arge_etype,
+    const int src_type, const int etype) {
+  const Idx *indptr = csr.indptr.Ptr<Idx>();
+  const Idx *indices = csr.indices.Ptr<Idx>();
+  const Idx *edge_map = csr.data.Ptr<Idx>();
+  const DType *ufeat_data = ufeat.Ptr<DType>();
+  const DType *efeat_data = efeat.Ptr<DType>();
+  DType *out_data = out.Ptr<DType>();
+  Idx* argu_data = argu.Ptr<Idx>();
+  Idx* arge_data = arge.Ptr<Idx>();
+
+  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+
+  int64_t *ubcast_off = nullptr, *ebcast_off = nullptr;
+  int64_t len = bcast.out_len,
+          lhs_len = bcast.lhs_len,
+          rhs_len = bcast.rhs_len;
+  const int ntx = FindNumThreads(len);
+  const int nty = CUDA_MAX_NUM_THREADS / ntx;
+  const int nbx = (len + ntx - 1) / ntx;
+  const int nby = FindNumBlocks<'y'>((csr.num_rows + nty - 1) / nty);
+  const dim3 nblks(nbx, nby);
+  const dim3 nthrs(ntx, nty);
+  const bool use_idx = !IsNullArray(csr.data);
+
+  BCAST_IDX_CTX_SWITCH(bcast, use_idx, ufeat->ctx, ubcast_off, ebcast_off, {
+    CUDA_KERNEL_CALL((SpMMCmpCsrHeteroKernel<Idx, DType, BinaryOp, ReduceOp, UseBcast, UseIdx>),
+        nblks, nthrs, 0, thr_entry->stream,
+        ufeat_data, efeat_data, out_data, argu_data, arge_data,
+        static_cast<Idx*>(argu_ntype->data),
+        static_cast<Idx*>(arge_etype->data),
+        indptr, indices, edge_map,
+        csr.num_rows, csr.num_cols,
+        ubcast_off, ebcast_off,
+        lhs_len, rhs_len, len, src_type, etype)
   });
 }
 

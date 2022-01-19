@@ -117,6 +117,8 @@ def test_spmm(idtype, g, shp, msg, reducer):
     e = F.attach_grad(F.clone(he))
     with F.record_grad():
         v = gspmm(g, msg, reducer, u, e)
+        if reducer in ['max', 'min']:
+            v = F.replace_inf_with_zero(v)
         if g.number_of_edges() > 0:
             F.backward(F.reduce_sum(v))
             if msg != 'copy_rhs':
@@ -270,6 +272,8 @@ def test_segment_reduce(reducer):
     g = dgl.convert.heterograph({('_U', '_E', '_V'): (u, v)}, num_nodes_dict=num_nodes)
     with F.record_grad():
         rst1 = gspmm(g, 'copy_lhs', reducer, v1, None)
+        if reducer in ['max', 'min']:
+            rst1 = F.replace_inf_with_zero(rst1)
         F.backward(F.reduce_sum(rst1))
         grad1 = F.grad(v1)
 

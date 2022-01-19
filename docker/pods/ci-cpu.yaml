@@ -10,7 +10,7 @@ spec:
     tty: true
     resources:
       requests:
-        cpu: 8
+        cpu: 16
     volumeMounts:
       - name: persistent-storage
         mountPath: /tmp/dataset
