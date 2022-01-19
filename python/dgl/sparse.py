@@ -84,6 +84,25 @@ target_mapping = {
 }
 
 def _edge_softmax_backward(gidx,out,sds):
+    r""" Edge_softmax backward interface. 
+
+    Parameters
+    ----------
+    gidx : HeteroGraphIndex
+        The input graph index.
+    out : tensor
+        The result of Edge_softmax during forward.
+    sds : tensor
+        The result of out * gradient.
+
+    Returns
+    -------
+    The result of Edge_softmax during backward
+
+    Notes
+    -----
+    This function does not support gpu op.
+    """
     op = 'copy_rhs'
     back_out = F.zeros_like(out)
     _CAPI_DGLKernelEdge_softmax_backward(gidx,op,
@@ -94,6 +113,25 @@ def _edge_softmax_backward(gidx,out,sds):
     return back_out
 
 def _edge_softmax_forward(gidx,e,op):
+    r""" Edge_softmax forward interface. 
+
+    Parameters
+    ----------
+    gidx : HeteroGraphIndex
+        The input graph index.
+    op : str
+        The binary op's name, default as ``copy_rhs``.
+    e : tensor or None
+        The feature on edges.
+
+    Returns
+    -------
+    The result of Edge_softmax during forward
+
+    Notes
+    -----
+    This function does not support gpu op.
+    """
     if(F.ndim(e) == 1):
         e = F.unsqueeze(e, -1)
         expand = True

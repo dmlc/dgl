@@ -5,6 +5,7 @@
  */
 #ifndef DGL_ARRAY_CPU_SPMM_H_
 #define DGL_ARRAY_CPU_SPMM_H_
+
 #include <dgl/array.h>
 #include <dgl/bcast.h>
 #include <dgl/runtime/parallel_for.h>
@@ -240,7 +241,7 @@ void SpMMCmpCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
   const bool has_idx = !IsNullArray(csr.data);
   const IdType* indptr = static_cast<IdType*>(csr.indptr->data);
   const IdType* indices = static_cast<IdType*>(csr.indices->data);
-  const IdType* edges = 
+  const IdType* edges =
     has_idx ? static_cast<IdType*>(csr.data->data) : nullptr;
   const DType* X = Op::use_lhs ? static_cast<DType*>(ufeat->data) : nullptr;
   const DType* W = Op::use_rhs ? static_cast<DType*>(efeat->data) : nullptr;
@@ -343,7 +344,7 @@ void SpMMCmpCsrHetero(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat
   const bool has_idx = !IsNullArray(csr.data);
   const IdType* indptr = static_cast<IdType*>(csr.indptr->data);
   const IdType* indices = static_cast<IdType*>(csr.indices->data);
-  const IdType* edges = 
+  const IdType* edges =
     has_idx ? static_cast<IdType*>(csr.data->data) : nullptr;
   const DType* X = Op::use_lhs ? static_cast<DType*>(ufeat->data) : nullptr;
   const DType* W = Op::use_rhs ? static_cast<DType*>(efeat->data) : nullptr;
@@ -429,7 +430,7 @@ void SpMMCmpCoo(const BcastOff& bcast, const COOMatrix& coo, NDArray ufeat,
   const bool has_idx = !IsNullArray(coo.data);
   const IdType* row = static_cast<IdType*>(coo.row->data);
   const IdType* col = static_cast<IdType*>(coo.col->data);
-  const IdType* edges =  
+  const IdType* edges =
     has_idx ? static_cast<IdType*>(coo.data->data) : nullptr;
   const DType* X = Op::use_lhs ? static_cast<DType*>(ufeat->data) : nullptr;
   const DType* W = Op::use_rhs ? static_cast<DType*>(efeat->data) : nullptr;
@@ -561,16 +562,8 @@ void Edge_softmax_csr_backward(const BcastOff& bcast, const CSRMatrix& csr, NDAr
     }
   });
 }
-
-
-
 }  // namespace cpu
 }  // namespace aten
 }  // namespace dgl
 
 #endif  // DGL_ARRAY_CPU_SPMM_H_
-
-
-
-
-

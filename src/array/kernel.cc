@@ -52,7 +52,6 @@ void SpMM(const std::string& op, const std::string& reduce,
   });
 }
 
-
 /*! \brief Generalized Sparse Matrix-Matrix Multiplication with hetero-graph support. */
 void SpMMHetero(const std::string& op, const std::string& reduce,
           HeteroGraphPtr graph,
@@ -112,18 +111,15 @@ void SDDMM(const std::string& op,
   // TODO(zihao): format tuning
   SparseFormat format = graph->SelectFormat(0, COO_CODE);
   const auto &bcast = CalcBcastOff(op, lhs, rhs);
-  // std::cout<<"dim is:"<<bcast.out_len<<std::endl;
 
   ATEN_XPU_SWITCH_CUDA(graph->Context().device_type, XPU, "SDDMM", {
     ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
       ATEN_FLOAT_BITS_SWITCH(out->dtype, bits, "Feature data", {
         if (format == SparseFormat::kCSR) {
-          // std::cout<<"csr"<<std::endl;
           SDDMMCsr<XPU, IdType, bits>(
               op, bcast, graph->GetCSRMatrix(0),
               lhs, rhs, out, lhs_target, rhs_target);
         } else if (format == SparseFormat::kCOO) {
-          // std::cout<<"coo"<<std::endl;
           SDDMMCoo<XPU, IdType, bits>(
               op, bcast, graph->GetCOOMatrix(0),
               lhs, rhs, out, lhs_target, rhs_target);
@@ -392,9 +388,7 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSpMM")
         {0, 1, 2, 2, 2},
         {U, E, V, ArgU, ArgE},
         {"U_data", "E_data", "out", "Arg_U", "Arg_E"});
-
     SpMM(op, reduce_op, graph.sptr(), U, E, V, {ArgU, ArgE});
-
   });
 
 
@@ -469,8 +463,6 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSDDMM")
     NDArray out = args[4];
     int lhs_target = args[5];
     int rhs_target = args[6];
-
-
     CheckCtx(graph->Context(), {lhs, rhs, out}, {"lhs", "rhs", "out"});
     CheckContiguous({lhs, rhs, out}, {"lhs", "rhs", "out"});
     CHECK_EQ(graph->NumEdgeTypes(), 1);
@@ -483,14 +475,8 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSDDMM")
         {lhs_target, rhs_target, 1},
         {lhs, rhs, out},
         {"U_data", "E_data", "V_data"});
-
     SDDMM(op, graph.sptr(), lhs, rhs, out, lhs_target, rhs_target);
-
   });
-
-
-
-
 
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSDDMMHetero")
