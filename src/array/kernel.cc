@@ -210,7 +210,7 @@ void Edge_softmax(const std::string& op,
   ATEN_XPU_SWITCH(graph->Context().device_type, XPU, "edge_softmax", {
     ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
       ATEN_FLOAT_BITS_SWITCH(out->dtype, bits, "edge_softmax out data", {
-            Edge_softmax_csr<XPU, IdType, bits>(op,bcast,graph->GetCSCMatrix(0),ufeat, efeat, out);
+            Edge_softmax_csr<XPU, IdType, bits>(op, bcast,graph->GetCSCMatrix(0), ufeat, efeat, out);
       });
     });
   });
@@ -231,7 +231,7 @@ void Edge_softmax_back(const std::string& op,
   ATEN_XPU_SWITCH(graph->Context().device_type, XPU, "edge_softmax_back", {
     ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
       ATEN_FLOAT_BITS_SWITCH(out->dtype, bits, "edge_softmax out data_back", {
-            Edge_softmax_csr_back<XPU, IdType, bits>(op,bcast,graph->GetCSCMatrix(0),out, sds, back_out);
+            Edge_softmax_csr_back<XPU, IdType, bits>(op, bcast,graph->GetCSCMatrix(0), out, sds, back_out);
       });
     });
   });
@@ -397,7 +397,6 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelEdge_softmax_forward")
     NDArray U = args[2];
     NDArray E = args[3];
     NDArray V = args[4];
-    
     Edge_softmax(op, graph.sptr(), U, E, V);
 });
 

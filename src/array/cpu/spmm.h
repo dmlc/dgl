@@ -14,6 +14,7 @@
 #include <memory>
 #include <algorithm>
 #include<math.h>
+#include <vector>
 #include "spmm_binary_ops.h"
 #if !defined(_WIN32)
 #ifdef USE_AVX
@@ -489,8 +490,8 @@ void Edge_softmax_csr_forward(const BcastOff& bcast, const CSRMatrix& csr, NDArr
   runtime::parallel_for(0, csr.num_rows, [&](size_t b, size_t e) {
     for (auto rid = b; rid < e; ++rid) {
       const IdType row_start = indptr[rid], row_end = indptr[rid + 1];
-      std::vector<DType> data_e(row_end-row_start,0); 
-      std::vector<IdType> num(row_end-row_start,0);
+      std::vector<DType> data_e(row_end-row_start, 0); 
+      std::vector<IdType> num(row_end-row_start, 0);
       for (int64_t k = 0; k < dim; ++k) {
         DType max_v = -std::numeric_limits<DType>::infinity();
         for (IdType j = row_start; j < row_end; ++j) {
@@ -500,15 +501,15 @@ void Edge_softmax_csr_forward(const BcastOff& bcast, const CSRMatrix& csr, NDArr
               Op::use_rhs ? W + eid * rhs_dim + rhs_add : nullptr;
             data_e[j-row_start] = *rhs_off;
             num[j-row_start] = eid*rhs_dim+rhs_add;
-            max_v = std::max<DType>(max_v,(*rhs_off));
+            max_v = std::max<DType>(max_v, (*rhs_off));
         }
         DType exp_sum = 0;
-        for(auto& element : data_e){
+        for (auto& element : data_e){
             element -= max_v;
             element = std::exp(element);
             exp_sum += element;
         }
-        for(int i=0;i<row_end-row_start;i++){
+        for (int i=0; i < row_end-row_start; i++){
             out.Ptr<DType>()[num[i]] = data_e[i]/exp_sum;
         }
       }
@@ -530,7 +531,7 @@ void Edge_softmax_csr_backward(const BcastOff& bcast, const CSRMatrix& csr, NDAr
                 NDArray sds, NDArray back_out) {
   const bool has_idx = !IsNullArray(csr.data);
   const IdType* indptr = static_cast<IdType*>(csr.indptr->data);
-  const IdType* edges = 
+  const IdType* edges =
     has_idx ? static_cast<IdType*>(csr.data->data) : nullptr;
   const DType* W_out = Op::use_rhs ? static_cast<DType*>(out->data) : nullptr;
   const DType* W_sds = Op::use_rhs ? static_cast<DType*>(sds->data) : nullptr;
@@ -557,7 +558,6 @@ void Edge_softmax_csr_backward(const BcastOff& bcast, const CSRMatrix& csr, NDAr
           back_out.Ptr<DType>()[eid*rhs_dim+rhs_add] =  (*rhs_off_sds) - sum_sds*(*rhs_off_out);
         }
       }
-      
     }
   });
 }
