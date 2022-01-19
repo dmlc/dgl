@@ -390,7 +390,6 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSpMM")
     SpMM(op, reduce_op, graph.sptr(), U, E, V, {ArgU, ArgE});
   });
 
-
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelEdge_softmax_forward")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef graph = args[0];
@@ -402,7 +401,6 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelEdge_softmax_forward")
     Edge_softmax(op, graph.sptr(), U, E, V);
 });
 
-
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelEdge_softmax_backward")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef graph = args[0];
@@ -413,8 +411,6 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelEdge_softmax_backward")
     NDArray ufeat = args[5];
     Edge_softmax_back(op, graph.sptr(), out, sds, back_out, ufeat);
 });
-
-
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSpMMHetero")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
