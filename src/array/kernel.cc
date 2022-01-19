@@ -131,7 +131,6 @@ void SDDMM(const std::string& op,
   });
 }
 
-
 /*!
  * \brief Find the src/dst/etype id based on the target 'u', 'v' or 'e'.
  *
@@ -147,7 +146,6 @@ int get_typeid_by_target(HeteroGraphPtr graph, int target, dgl_type_t etype) {
     return pair.second;
   return etype;
 }
-
 
 /*! \brief Generalized Sampled Dense-Dense Matrix Multiplication. */
 void SDDMMHetero(const std::string& op,

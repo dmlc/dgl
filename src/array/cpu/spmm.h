@@ -483,7 +483,7 @@ void Edge_softmax_csr_forward(const BcastOff& bcast, const CSRMatrix& csr, NDArr
                 NDArray efeat, NDArray out) {
   const bool has_idx = !IsNullArray(csr.data);
   const IdType* indptr = static_cast<IdType*>(csr.indptr->data);
-  const IdType* edges = 
+  const IdType* edges =
     has_idx ? static_cast<IdType*>(csr.data->data) : nullptr;
   const DType* W = Op::use_rhs ? static_cast<DType*>(efeat->data) : nullptr;
   const int64_t dim = bcast.out_len, rhs_dim = bcast.rhs_len;
@@ -548,7 +548,7 @@ void Edge_softmax_csr_backward(const BcastOff& bcast, const CSRMatrix& csr, NDAr
               Op::use_rhs ? W_sds + eid * rhs_dim + rhs_add : nullptr;
             sum_sds += (*rhs_off_sds);
         }
-        for(IdType j = row_start; j< row_end; ++j){
+        for (IdType j = row_start; j< row_end; ++j){
           const IdType eid = has_idx ? edges[j] : j;
             const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
               const DType* rhs_off_out =
