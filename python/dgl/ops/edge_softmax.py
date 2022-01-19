@@ -1,5 +1,6 @@
 """dgl edge_softmax operator module."""
 from ..backend import edge_softmax as edge_softmax_internal
+from ..backend import edge_softmax_hetero as edge_softmax_hetero_internal
 from ..backend import astype
 from ..base import ALL, is_all
 
@@ -34,8 +35,9 @@ def edge_softmax(graph, logits, eids=ALL, norm_by='dst'):
     ----------
     graph : DGLGraph
         The graph over which edge softmax will be performed.
-    logits : torch.Tensor
-        The input edge feature.
+    logits : torch.Tensor or dict of torch.Tensor
+        The input edge feature. Heterogeneous graphs can have dict of tensors where
+        each tensor stores the edge features of the corresponding relation type.
     eids : torch.Tensor or ALL, optional
         The IDs of the edges to apply edge softmax. If ALL, it will apply edge
         softmax to all edges in the graph. Default: ALL.
@@ -44,7 +46,7 @@ def edge_softmax(graph, logits, eids=ALL, norm_by='dst'):
 
     Returns
     -------
-    Tensor
+    Tensor or tuple of tensors
         Softmax value.
 
     Notes
@@ -55,8 +57,8 @@ def edge_softmax(graph, logits, eids=ALL, norm_by='dst'):
           the graph.
         * Return shape: :math:`(E, *, 1)`
 
-    Examples
-    --------
+    Examples on a homogeneous graph
+    -------------------------------
     The following example uses PyTorch backend.
 
     >>> from dgl.nn.functional import edge_softmax
@@ -102,8 +104,45 @@ def edge_softmax(graph, logits, eids=ALL, norm_by='dst'):
                 [0.5000],
                 [1.0000],
                 [0.5000]])
+
+
+    Examples on a heterogeneous graph
+    ---------------------------------
+
+    Create a heterogeneous graph and initialize its edge features.
+
+    >>> hg = dgl.heterograph({
+    ...     ('user', 'follows', 'user'): ([0, 0, 1], [0, 1, 2]),
+    ...     ('developer', 'develops', 'game'): ([0, 1], [0, 1])
+    ...     })
+    >>> edata_follows = th.ones(3, 1).float()
+    >>> edata_develops = th.ones(2, 1).float()
+    >>> edata_dict = {('user', 'follows', 'user'): edata_follows,
+    ... ('developer','develops', 'game'): edata_develops}
+
+    Apply edge softmax over hg normalized by source nodes:
+
+    >>> edge_softmax(hg, edata_dict, norm_by='src')
+        {('developer', 'develops', 'game'): tensor([[1.],
+        [1.]]), ('user', 'follows', 'user'): tensor([[0.5000],
+        [0.5000],
+        [1.0000]])}
     """
     if not is_all(eids):
         eids = astype(eids, graph.idtype)
-    return edge_softmax_internal(graph._graph, logits,
-                                 eids=eids, norm_by=norm_by)
+    if graph._graph.number_of_etypes() == 1:
+        return edge_softmax_internal(graph._graph, logits,
+                                     eids=eids, norm_by=norm_by)
+    else:
+        logits_list = [None] * graph._graph.number_of_etypes()
+        for rel in graph.canonical_etypes:
+            etid = graph.get_etype_id(rel)
+            logits_list[etid] = logits[rel]
+        logits_tuple = tuple(logits_list)
+        score_tuple = edge_softmax_hetero_internal(graph._graph,
+                                                   eids, norm_by, *logits_tuple)
+        score = {}
+        for rel in graph.canonical_etypes:
+            etid = graph.get_etype_id(rel)
+            score[rel] = score_tuple[etid]
+        return score

@@ -4230,7 +4230,7 @@ class DGLHeteroGraph(object):
         """
         # parse argument
         if is_all(edges):
-            return dict(self._edge_frames[etid])
+            return self._edge_frames[etid]
         else:
             eid = utils.parse_edges_arg_to_eid(self, edges, etid, 'edges')
             return self._edge_frames[etid].subframe(eid)
@@ -4866,16 +4866,16 @@ class DGLHeteroGraph(object):
             _, dtid = self._graph.metagraph.find_edge(etid)
             g = self if etype is None else self[etype]
             ndata = core.message_passing(g, message_func, reduce_func, apply_node_func)
+            if core.is_builtin(reduce_func) and reduce_func.name in ['min', 'max'] and ndata:
+                # Replace infinity with zero for isolated nodes
+                key = list(ndata.keys())[0]
+                ndata[key] = F.replace_inf_with_zero(ndata[key])
             self._set_n_repr(dtid, ALL, ndata)
         else:   # heterogeneous graph with number of relation types > 1
             if not core.is_builtin(message_func) or not core.is_builtin(reduce_func):
                 raise DGLError("User defined functions are not yet "
                                "supported in update_all for heterogeneous graphs. "
                                "Please use multi_update_all instead.")
-            if reduce_func.name in ['max', 'min']:
-                raise NotImplementedError("Reduce op \'" + reduce_func.name + "\' is not yet "
-                                          "supported in update_all for heterogeneous graphs. "
-                                          "Please use multi_update_all instead.")
             if reduce_func.name in ['mean']:
                 raise NotImplementedError("Cannot set both intra-type and inter-type reduce "
                                           "operators as 'mean' using update_all. Please use "
@@ -4889,6 +4889,8 @@ class DGLHeteroGraph(object):
             for _, _, dsttype in g.canonical_etypes:
                 dtid = g.get_ntype_id(dsttype)
                 dst_tensor[key] = out_tensor_tuples[dtid]
+                if core.is_builtin(reduce_func) and reduce_func.name in ['min', 'max']:
+                    dst_tensor[key] = F.replace_inf_with_zero(dst_tensor[key])
                 self._node_frames[dtid].update(dst_tensor)
 
     #################################################################
@@ -4982,6 +4984,7 @@ class DGLHeteroGraph(object):
         all_out = defaultdict(list)
         merge_order = defaultdict(list)
         for etype, args in etype_dict.items():
+
             etid = self.get_etype_id(etype)
             _, dtid = self._graph.metagraph.find_edge(etid)
             args = pad_tuple(args, 3)
@@ -4994,11 +4997,16 @@ class DGLHeteroGraph(object):
             merge_order[dtid].append(etid)  # use edge type id as merge order hint
         for dtid, frames in all_out.items():
             # merge by cross_reducer
-            self._node_frames[dtid].update(
-                reduce_dict_data(frames, cross_reducer, merge_order[dtid]))
+            out = reduce_dict_data(frames, cross_reducer, merge_order[dtid])
+            # Replace infinity with zero for isolated nodes when reducer is min/max
+            if  core.is_builtin(rfunc) and rfunc.name in ['min', 'max']:
+                key = list(out.keys())[0]
+                out[key] = F.replace_inf_with_zero(out[key]) if out[key] is not None else None
+            self._node_frames[dtid].update(out)
             # apply
             if apply_node_func is not None:
                 self.apply_nodes(apply_node_func, ALL, self.ntypes[dtid])
+
 
 
     #################################################################

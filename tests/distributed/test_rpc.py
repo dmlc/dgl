@@ -7,6 +7,7 @@ import backend as F
 import unittest, pytest
 import multiprocessing as mp
 from numpy.testing import assert_array_equal
+from utils import reset_envs, generate_ip_config
 
 if os.name != 'nt':
     import fcntl
@@ -16,31 +17,6 @@ INTEGER = 2
 STR = 'hello world!'
 HELLO_SERVICE_ID = 901231
 TENSOR = F.zeros((10, 10), F.int64, F.cpu())
-
-def get_local_usable_addr():
-    """Get local usable IP and port
-
-    Returns
-    -------
-    str
-        IP address, e.g., '192.168.8.12:50051'
-    """
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        # doesn't even have to be reachable
-        sock.connect(('10.255.255.255', 1))
-        ip_addr = sock.getsockname()[0]
-    except ValueError:
-        ip_addr = '127.0.0.1'
-    finally:
-        sock.close()
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.bind(("", 0))
-    sock.listen(1)
-    port = sock.getsockname()[1]
-    sock.close()
-
-    return ip_addr + ' ' + str(port)
 
 def foo(x, y):
     assert x == 123
@@ -107,12 +83,13 @@ class HelloRequest(dgl.distributed.Request):
         res = HelloResponse(self.hello_str, self.integer, new_tensor)
         return res
 
-def start_server(num_clients, ip_config):
-    print("Sleep 5 seconds to test client re-connect.")
-    time.sleep(5)
+def start_server(num_clients, ip_config, server_id=0):
+    print("Sleep 2 seconds to test client re-connect.")
+    time.sleep(2)
     server_state = dgl.distributed.ServerState(None, local_g=None, partition_book=None)
     dgl.distributed.register_service(HELLO_SERVICE_ID, HelloRequest, HelloResponse)
-    dgl.distributed.start_server(server_id=0, 
+    print("Start server {}".format(server_id))
+    dgl.distributed.start_server(server_id=server_id, 
                                  ip_config=ip_config, 
                                  num_servers=1,
                                  num_clients=num_clients, 
@@ -154,6 +131,7 @@ def start_client(ip_config):
         assert_array_equal(F.asnumpy(res.tensor), F.asnumpy(TENSOR))
 
 def test_serialize():
+    reset_envs()
     os.environ['DGL_DIST_MODE'] = 'distributed'
     from dgl.distributed.rpc import serialize_to_payload, deserialize_from_payload
     SERVICE_ID = 12345
@@ -172,6 +150,7 @@ def test_serialize():
     assert res.x == res1.x
 
 def test_rpc_msg():
+    reset_envs()
     os.environ['DGL_DIST_MODE'] = 'distributed'
     from dgl.distributed.rpc import serialize_to_payload, deserialize_from_payload, RPCMessage
     SERVICE_ID = 32452
@@ -189,27 +168,22 @@ def test_rpc_msg():
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 def test_rpc():
+    reset_envs()
     os.environ['DGL_DIST_MODE'] = 'distributed'
-    ip_config = open("rpc_ip_config.txt", "w")
-    ip_addr = get_local_usable_addr()
-    ip_config.write('%s\n' % ip_addr)
-    ip_config.close()
+    generate_ip_config("rpc_ip_config.txt", 1, 1)
     ctx = mp.get_context('spawn')
     pserver = ctx.Process(target=start_server, args=(1, "rpc_ip_config.txt"))
     pclient = ctx.Process(target=start_client, args=("rpc_ip_config.txt",))
     pserver.start()
-    time.sleep(1)
     pclient.start()
     pserver.join()
     pclient.join()
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 def test_multi_client():
+    reset_envs()
     os.environ['DGL_DIST_MODE'] = 'distributed'
-    ip_config = open("rpc_ip_config_mul_client.txt", "w")
-    ip_addr = get_local_usable_addr()
-    ip_config.write('%s\n' % ip_addr)
-    ip_config.close()
+    generate_ip_config("rpc_ip_config_mul_client.txt", 1, 1)
     ctx = mp.get_context('spawn')
     pserver = ctx.Process(target=start_server, args=(10, "rpc_ip_config_mul_client.txt"))
     pclient_list = []
@@ -224,8 +198,48 @@ def test_multi_client():
     pserver.join()
 
 
+@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
+def test_multi_thread_rpc():
+    reset_envs()
+    os.environ['DGL_DIST_MODE'] = 'distributed'
+    num_servers = 2
+    generate_ip_config("rpc_ip_config_multithread.txt", num_servers, num_servers)
+    ctx = mp.get_context('spawn')
+    pserver_list = []
+    for i in range(num_servers):
+        pserver = ctx.Process(target=start_server, args=(1, "rpc_ip_config_multithread.txt", i))
+        pserver.start()
+        pserver_list.append(pserver)
+    def start_client_multithread(ip_config):
+        import threading
+        dgl.distributed.connect_to_server(ip_config=ip_config, num_servers=1)
+        dgl.distributed.register_service(HELLO_SERVICE_ID, HelloRequest, HelloResponse)
+        
+        req = HelloRequest(STR, INTEGER, TENSOR, simple_func)
+        dgl.distributed.send_request(0, req)
+
+        def subthread_call(server_id):            
+            req = HelloRequest(STR, INTEGER, TENSOR+ server_id, simple_func)
+            dgl.distributed.send_request(server_id, req)
+        
+        
+        subthread = threading.Thread(target=subthread_call, args=(1,))
+        subthread.start()
+        subthread.join()
+        
+        res0 = dgl.distributed.recv_response()
+        res1 = dgl.distributed.recv_response()
+        assert_array_equal(F.asnumpy(res0.tensor), F.asnumpy(TENSOR))
+        assert_array_equal(F.asnumpy(res1.tensor), F.asnumpy(TENSOR+1))
+        dgl.distributed.exit_client()
+
+    start_client_multithread("rpc_ip_config_multithread.txt")
+    pserver.join()
+
+
 if __name__ == '__main__':
     test_serialize()
     test_rpc_msg()
     test_rpc()
     test_multi_client()
+    test_multi_thread_rpc()

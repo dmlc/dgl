@@ -1,7 +1,6 @@
 """Functions used by server."""
 
 import time
-
 from . import rpc
 from .constants import MAX_QUEUE_SIZE
 
@@ -35,8 +34,8 @@ def start_server(server_id, ip_config, num_servers, num_clients, server_state, \
     """
     assert server_id >= 0, 'server_id (%d) cannot be a negative number.' % server_id
     assert num_servers > 0, 'num_servers (%d) must be a positive number.' % num_servers
-    assert num_clients >= 0, 'num_client (%d) cannot be a negative number.' % num_client
-    assert max_queue_size > 0, 'queue_size (%d) cannot be a negative number.' % queue_size
+    assert num_clients >= 0, 'num_client (%d) cannot be a negative number.' % num_clients
+    assert max_queue_size > 0, 'queue_size (%d) cannot be a negative number.' % max_queue_size
     assert net_type in ('socket'), 'net_type (%s) can only be \'socket\'' % net_type
     # Register signal handler.
     rpc.register_sig_handler()
@@ -64,24 +63,25 @@ def start_server(server_id, ip_config, num_servers, num_clients, server_state, \
     # wait all the senders connect to server.
     # Once all the senders connect to server, server will not
     # accept new sender's connection
-    print("Wait connections ...")
-    rpc.receiver_wait(ip_addr, port, num_clients)
-    print("%d clients connected!" % num_clients)
+    print("Wait connections non-blockingly...")
+    rpc.receiver_wait(ip_addr, port, num_clients, blocking=False)
     rpc.set_num_client(num_clients)
     # Recv all the client's IP and assign ID to clients
     addr_list = []
     client_namebook = {}
     for _ in range(num_clients):
+        # blocked until request is received
         req, _ = rpc.recv_request()
+        assert isinstance(req, rpc.ClientRegisterRequest)
         addr_list.append(req.ip_addr)
     addr_list.sort()
     for client_id, addr in enumerate(addr_list):
         client_namebook[client_id] = addr
     for client_id, addr in client_namebook.items():
         client_ip, client_port = addr.split(':')
-        rpc.add_receiver_addr(client_ip, client_port, client_id)
-    time.sleep(3) # wait client's socket ready. 3 sec is enough.
-    rpc.sender_connect()
+        # TODO[Rhett]: server should not be blocked endlessly.
+        while not rpc.connect_receiver(client_ip, client_port, client_id):
+            time.sleep(1)
     if rpc.get_rank() == 0: # server_0 send all the IDs
         for client_id, _ in client_namebook.items():
             register_res = rpc.ClientRegisterResponse(client_id)

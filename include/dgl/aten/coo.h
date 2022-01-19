@@ -382,7 +382,9 @@ COOMatrix COORowWiseSampling(
  * // etype = [0, 0, 0, 2, 1]
  * COOMatrix coo = ...;
  * IdArray rows = ... ; // [0, 3]
- * COOMatrix sampled = COORowWisePerEtypeSampling(coo, rows, etype, 2, FloatArray(), false);
+ * std::vector<int64_t> num_samples = {2, 2, 2};
+ * COOMatrix sampled = COORowWisePerEtypeSampling(coo, rows, etype, num_samples,
+ *                                                FloatArray(), false);
  * // possible sampled coo matrix:
  * // sampled.num_rows = 4
  * // sampled.num_cols = 4
@@ -405,7 +407,7 @@ COOMatrix COORowWisePerEtypeSampling(
     COOMatrix mat,
     IdArray rows,
     IdArray etypes,
-    int64_t num_samples,
+    const std::vector<int64_t>& num_samples,
     FloatArray prob = FloatArray(),
     bool replace = true,
     bool etype_sorted = false);

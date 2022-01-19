@@ -24,6 +24,7 @@ Welcome to Deep Graph Library Tutorials and Documentation
 
    guide/index
    guide_cn/index
+   guide_ko/index
    tutorials/large/index
    tutorials/cpu/index
    tutorials/multi/index

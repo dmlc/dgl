@@ -10,7 +10,7 @@ import multiprocessing as mp
 import numpy as np
 import backend as F
 import time
-from utils import get_local_usable_addr
+from utils import generate_ip_config, reset_envs
 from pathlib import Path
 import pytest
 from scipy import sparse as spsp
@@ -71,10 +71,7 @@ def start_get_degrees_client(rank, tmpdir, disable_shared_mem, nids=None):
     return in_deg, out_deg, all_in_deg, all_out_deg
 
 def check_rpc_sampling(tmpdir, num_server):
-    ip_config = open("rpc_ip_config.txt", "w")
-    for _ in range(num_server):
-        ip_config.write('{}\n'.format(get_local_usable_addr()))
-    ip_config.close()
+    generate_ip_config("rpc_ip_config.txt", num_server, num_server)
 
     g = CitationGraphDataset("cora")[0]
     g.readonly()
@@ -93,7 +90,6 @@ def check_rpc_sampling(tmpdir, num_server):
         time.sleep(1)
         pserver_list.append(p)
 
-    time.sleep(3)
     sampled_graph = start_sample_client(0, tmpdir, num_server > 1)
     print("Done sampling")
     for p in pserver_list:
@@ -107,10 +103,7 @@ def check_rpc_sampling(tmpdir, num_server):
         F.asnumpy(sampled_graph.edata[dgl.EID]), F.asnumpy(eids))
 
 def check_rpc_find_edges_shuffle(tmpdir, num_server):
-    ip_config = open("rpc_ip_config.txt", "w")
-    for _ in range(num_server):
-        ip_config.write('{}\n'.format(get_local_usable_addr()))
-    ip_config.close()
+    generate_ip_config("rpc_ip_config.txt", num_server, num_server)
 
     g = CitationGraphDataset("cora")[0]
     g.readonly()
@@ -129,7 +122,6 @@ def check_rpc_find_edges_shuffle(tmpdir, num_server):
         time.sleep(1)
         pserver_list.append(p)
 
-    time.sleep(3)
     eids = F.tensor(np.random.randint(g.number_of_edges(), size=100))
     u, v = g.find_edges(orig_eid[eids])
     du, dv = start_find_edges_client(0, tmpdir, num_server > 1, eids)
@@ -158,10 +150,7 @@ def create_random_hetero(dense=False, empty=False):
     return g
 
 def check_rpc_hetero_find_edges_shuffle(tmpdir, num_server):
-    ip_config = open("rpc_ip_config.txt", "w")
-    for _ in range(num_server):
-        ip_config.write('{}\n'.format(get_local_usable_addr()))
-    ip_config.close()
+    generate_ip_config("rpc_ip_config.txt", num_server, num_server)
 
     g = create_random_hetero()
     num_parts = num_server
@@ -179,7 +168,6 @@ def check_rpc_hetero_find_edges_shuffle(tmpdir, num_server):
         time.sleep(1)
         pserver_list.append(p)
 
-    time.sleep(3)
     eids = F.tensor(np.random.randint(g.number_of_edges('r1'), size=100))
     u, v = g.find_edges(orig_eid['r1'][eids], etype='r1')
     du, dv = start_find_edges_client(0, tmpdir, num_server > 1, eids, etype='r1')
@@ -194,6 +182,7 @@ def check_rpc_hetero_find_edges_shuffle(tmpdir, num_server):
 @unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Turn off Mxnet support")
 @pytest.mark.parametrize("num_server", [1, 2])
 def test_rpc_find_edges_shuffle(num_server):
+    reset_envs()
     import tempfile
     os.environ['DGL_DIST_MODE'] = 'distributed'
     with tempfile.TemporaryDirectory() as tmpdirname:
@@ -201,10 +190,7 @@ def test_rpc_find_edges_shuffle(num_server):
         check_rpc_find_edges_shuffle(Path(tmpdirname), num_server)
 
 def check_rpc_get_degree_shuffle(tmpdir, num_server):
-    ip_config = open("rpc_ip_config.txt", "w")
-    for _ in range(num_server):
-        ip_config.write('{}\n'.format(get_local_usable_addr()))
-    ip_config.close()
+    generate_ip_config("rpc_ip_config.txt", num_server, num_server)
 
     g = CitationGraphDataset("cora")[0]
     g.readonly()
@@ -225,7 +211,6 @@ def check_rpc_get_degree_shuffle(tmpdir, num_server):
     for i in range(num_server):
         part, _, _, _, _, _, _ = load_partition(tmpdir / 'test_get_degrees.json', i)
         orig_nid[part.ndata[dgl.NID]] = part.ndata['orig_id']
-    time.sleep(3)
 
     nids = F.tensor(np.random.randint(g.number_of_nodes(), size=100))
     in_degs, out_degs, all_in_degs, all_out_degs = start_get_degrees_client(0, tmpdir, num_server > 1, nids)
@@ -246,6 +231,7 @@ def check_rpc_get_degree_shuffle(tmpdir, num_server):
 @unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Turn off Mxnet support")
 @pytest.mark.parametrize("num_server", [1, 2])
 def test_rpc_get_degree_shuffle(num_server):
+    reset_envs()
     import tempfile
     os.environ['DGL_DIST_MODE'] = 'distributed'
     with tempfile.TemporaryDirectory() as tmpdirname:
@@ -255,16 +241,14 @@ def test_rpc_get_degree_shuffle(num_server):
 #@unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
 @unittest.skip('Only support partition with shuffle')
 def test_rpc_sampling():
+    reset_envs()
     import tempfile
     os.environ['DGL_DIST_MODE'] = 'distributed'
     with tempfile.TemporaryDirectory() as tmpdirname:
         check_rpc_sampling(Path(tmpdirname), 2)
 
 def check_rpc_sampling_shuffle(tmpdir, num_server):
-    ip_config = open("rpc_ip_config.txt", "w")
-    for _ in range(num_server):
-        ip_config.write('{}\n'.format(get_local_usable_addr()))
-    ip_config.close()
+    generate_ip_config("rpc_ip_config.txt", num_server, num_server)
 
     g = CitationGraphDataset("cora")[0]
     g.readonly()
@@ -282,7 +266,6 @@ def check_rpc_sampling_shuffle(tmpdir, num_server):
         time.sleep(1)
         pserver_list.append(p)
 
-    time.sleep(3)
     sampled_graph = start_sample_client(0, tmpdir, num_server > 1)
     print("Done sampling")
     for p in pserver_list:
@@ -359,10 +342,7 @@ def start_hetero_etype_sample_client(rank, tmpdir, disable_shared_mem, fanout=3,
     return block, gpb
 
 def check_rpc_hetero_sampling_shuffle(tmpdir, num_server):
-    ip_config = open("rpc_ip_config.txt", "w")
-    for _ in range(num_server):
-        ip_config.write('{}\n'.format(get_local_usable_addr()))
-    ip_config.close()
+    generate_ip_config("rpc_ip_config.txt", num_server, num_server)
 
     g = create_random_hetero()
     num_parts = num_server
@@ -379,7 +359,6 @@ def check_rpc_hetero_sampling_shuffle(tmpdir, num_server):
         time.sleep(1)
         pserver_list.append(p)
 
-    time.sleep(3)
     block, gpb = start_hetero_sample_client(0, tmpdir, num_server > 1,
                                             nodes = {'n3': [0, 10, 99, 66, 124, 208]})
     print("Done sampling")
@@ -427,10 +406,7 @@ def get_degrees(g, nids, ntype):
     return deg
 
 def check_rpc_hetero_sampling_empty_shuffle(tmpdir, num_server):
-    ip_config = open("rpc_ip_config.txt", "w")
-    for _ in range(num_server):
-        ip_config.write('{}\n'.format(get_local_usable_addr()))
-    ip_config.close()
+    generate_ip_config("rpc_ip_config.txt", num_server, num_server)
 
     g = create_random_hetero(empty=True)
     num_parts = num_server
@@ -448,7 +424,6 @@ def check_rpc_hetero_sampling_empty_shuffle(tmpdir, num_server):
         time.sleep(1)
         pserver_list.append(p)
 
-    time.sleep(3)
     deg = get_degrees(g, orig_nids['n3'], 'n3')
     empty_nids = F.nonzero_1d(deg == 0)
     block, gpb = start_hetero_sample_client(0, tmpdir, num_server > 1,
@@ -461,10 +436,8 @@ def check_rpc_hetero_sampling_empty_shuffle(tmpdir, num_server):
     assert len(block.etypes) == len(g.etypes)
 
 def check_rpc_hetero_etype_sampling_shuffle(tmpdir, num_server):
-    ip_config = open("rpc_ip_config.txt", "w")
-    for _ in range(num_server):
-        ip_config.write('{}\n'.format(get_local_usable_addr()))
-    ip_config.close()
+    generate_ip_config("rpc_ip_config.txt", num_server, num_server)
+
     g = create_random_hetero(dense=True)
     num_parts = num_server
     num_hops = 1
@@ -480,7 +453,6 @@ def check_rpc_hetero_etype_sampling_shuffle(tmpdir, num_server):
         time.sleep(1)
         pserver_list.append(p)
 
-    time.sleep(3)
     fanout = 3
     block, gpb = start_hetero_etype_sample_client(0, tmpdir, num_server > 1, fanout,
                                                   nodes={'n3': [0, 10, 99, 66, 124, 208]})
@@ -525,10 +497,8 @@ def check_rpc_hetero_etype_sampling_shuffle(tmpdir, num_server):
         assert np.all(F.asnumpy(orig_dst1) == orig_dst)
 
 def check_rpc_hetero_etype_sampling_empty_shuffle(tmpdir, num_server):
-    ip_config = open("rpc_ip_config.txt", "w")
-    for _ in range(num_server):
-        ip_config.write('{}\n'.format(get_local_usable_addr()))
-    ip_config.close()
+    generate_ip_config("rpc_ip_config.txt", num_server, num_server)
+
     g = create_random_hetero(dense=True, empty=True)
     num_parts = num_server
     num_hops = 1
@@ -545,7 +515,6 @@ def check_rpc_hetero_etype_sampling_empty_shuffle(tmpdir, num_server):
         time.sleep(1)
         pserver_list.append(p)
 
-    time.sleep(3)
     fanout = 3
     deg = get_degrees(g, orig_nids['n3'], 'n3')
     empty_nids = F.nonzero_1d(deg == 0)
@@ -564,6 +533,7 @@ def check_rpc_hetero_etype_sampling_empty_shuffle(tmpdir, num_server):
 @unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Turn off Mxnet support")
 @pytest.mark.parametrize("num_server", [1, 2])
 def test_rpc_sampling_shuffle(num_server):
+    reset_envs()
     import tempfile
     os.environ['DGL_DIST_MODE'] = 'distributed'
     with tempfile.TemporaryDirectory() as tmpdirname:
@@ -637,6 +607,7 @@ def check_standalone_etype_sampling_heterograph(tmpdir, reshuffle):
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
 def test_standalone_sampling():
+    reset_envs()
     import tempfile
     os.environ['DGL_DIST_MODE'] = 'standalone'
     with tempfile.TemporaryDirectory() as tmpdirname:
@@ -659,10 +630,7 @@ def start_in_subgraph_client(rank, tmpdir, disable_shared_mem, nodes):
 
 
 def check_rpc_in_subgraph_shuffle(tmpdir, num_server):
-    ip_config = open("rpc_ip_config.txt", "w")
-    for _ in range(num_server):
-        ip_config.write('{}\n'.format(get_local_usable_addr()))
-    ip_config.close()
+    generate_ip_config("rpc_ip_config.txt", num_server, num_server)
 
     g = CitationGraphDataset("cora")[0]
     g.readonly()
@@ -680,7 +648,6 @@ def check_rpc_in_subgraph_shuffle(tmpdir, num_server):
         pserver_list.append(p)
 
     nodes = [0, 10, 99, 66, 1024, 2008]
-    time.sleep(3)
     sampled_graph = start_in_subgraph_client(0, tmpdir, num_server > 1, nodes)
     for p in pserver_list:
         p.join()
@@ -710,6 +677,7 @@ def check_rpc_in_subgraph_shuffle(tmpdir, num_server):
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
 def test_rpc_in_subgraph():
+    reset_envs()
     import tempfile
     os.environ['DGL_DIST_MODE'] = 'distributed'
     with tempfile.TemporaryDirectory() as tmpdirname:
@@ -719,6 +687,7 @@ def test_rpc_in_subgraph():
 @unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
 @unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Turn off Mxnet support")
 def test_standalone_etype_sampling():
+    reset_envs()
     import tempfile
     with tempfile.TemporaryDirectory() as tmpdirname:
         os.environ['DGL_DIST_MODE'] = 'standalone'

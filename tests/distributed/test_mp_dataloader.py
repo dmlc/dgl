@@ -9,7 +9,7 @@ import sys
 import multiprocessing as mp
 import numpy as np
 import time
-from utils import get_local_usable_addr
+from utils import generate_ip_config, reset_envs
 from pathlib import Path
 from dgl.distributed import DistGraphServer, DistGraph, DistDataLoader
 import pytest
@@ -103,10 +103,8 @@ def start_dist_dataloader(rank, tmpdir, num_server, drop_last, orig_nid, orig_ei
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
 def test_standalone(tmpdir):
-    ip_config = open("mp_ip_config.txt", "w")
-    for _ in range(1):
-        ip_config.write('{}\n'.format(get_local_usable_addr()))
-    ip_config.close()
+    reset_envs()
+    generate_ip_config("mp_ip_config.txt", 1, 1)
 
     g = CitationGraphDataset("cora")[0]
     print(g.idtype)
@@ -175,10 +173,7 @@ def start_dist_neg_dataloader(rank, tmpdir, num_server, num_workers, orig_nid, g
     dgl.distributed.exit_client() # this is needed since there's two test here in one process
 
 def check_neg_dataloader(g, tmpdir, num_server, num_workers):
-    ip_config = open("mp_ip_config.txt", "w")
-    for _ in range(num_server):
-        ip_config.write('{}\n'.format(get_local_usable_addr()))
-    ip_config.close()
+    generate_ip_config("mp_ip_config.txt", num_server, num_server)
 
     num_parts = num_server
     num_hops = 1
@@ -198,7 +193,6 @@ def check_neg_dataloader(g, tmpdir, num_server, num_workers):
         p.start()
         time.sleep(1)
         pserver_list.append(p)
-    time.sleep(3)
     os.environ['DGL_DIST_MODE'] = 'distributed'
     os.environ['DGL_NUM_SAMPLER'] = str(num_workers)
     ptrainer_list = []
@@ -206,7 +200,6 @@ def check_neg_dataloader(g, tmpdir, num_server, num_workers):
     p = ctx.Process(target=start_dist_neg_dataloader, args=(
             0, tmpdir, num_server, num_workers, orig_nid, g))
     p.start()
-    time.sleep(1)
     ptrainer_list.append(p)
 
     for p in pserver_list:
@@ -221,10 +214,8 @@ def check_neg_dataloader(g, tmpdir, num_server, num_workers):
 @pytest.mark.parametrize("drop_last", [True, False])
 @pytest.mark.parametrize("reshuffle", [True, False])
 def test_dist_dataloader(tmpdir, num_server, num_workers, drop_last, reshuffle):
-    ip_config = open("mp_ip_config.txt", "w")
-    for _ in range(num_server):
-        ip_config.write('{}\n'.format(get_local_usable_addr()))
-    ip_config.close()
+    reset_envs()
+    generate_ip_config("mp_ip_config.txt", num_server, num_server)
 
     g = CitationGraphDataset("cora")[0]
     print(g.idtype)
@@ -244,13 +235,11 @@ def test_dist_dataloader(tmpdir, num_server, num_workers, drop_last, reshuffle):
         time.sleep(1)
         pserver_list.append(p)
 
-    time.sleep(3)
     os.environ['DGL_DIST_MODE'] = 'distributed'
     os.environ['DGL_NUM_SAMPLER'] = str(num_workers)
     ptrainer = ctx.Process(target=start_dist_dataloader, args=(
         0, tmpdir, num_server, drop_last, orig_nid, orig_eid))
     ptrainer.start()
-    time.sleep(1)
 
     for p in pserver_list:
         p.join()
@@ -278,7 +267,10 @@ def start_node_dataloader(rank, tmpdir, num_server, num_workers, orig_nid, orig_
         part, _, _, _, _, _, _ = load_partition(tmpdir / 'test_sampling.json', i)
 
     # Create sampler
-    sampler = dgl.dataloading.MultiLayerNeighborSampler([5, 10])
+    sampler = dgl.dataloading.MultiLayerNeighborSampler([
+        # test dict for hetero
+        {etype: 5 for etype in dist_graph.etypes} if len(dist_graph.etypes) > 1 else 5,
+        10])        # test int for hetero
 
     # We need to test creating DistDataLoader multiple times.
     for i in range(2):
@@ -360,10 +352,7 @@ def start_edge_dataloader(rank, tmpdir, num_server, num_workers, orig_nid, orig_
     dgl.distributed.exit_client() # this is needed since there's two test here in one process
 
 def check_dataloader(g, tmpdir, num_server, num_workers, dataloader_type):
-    ip_config = open("mp_ip_config.txt", "w")
-    for _ in range(num_server):
-        ip_config.write('{}\n'.format(get_local_usable_addr()))
-    ip_config.close()
+    generate_ip_config("mp_ip_config.txt", num_server, num_server)
 
     num_parts = num_server
     num_hops = 1
@@ -384,7 +373,6 @@ def check_dataloader(g, tmpdir, num_server, num_workers, dataloader_type):
         time.sleep(1)
         pserver_list.append(p)
 
-    time.sleep(3)
     os.environ['DGL_DIST_MODE'] = 'distributed'
     os.environ['DGL_NUM_SAMPLER'] = str(num_workers)
     ptrainer_list = []
@@ -392,13 +380,11 @@ def check_dataloader(g, tmpdir, num_server, num_workers, dataloader_type):
         p = ctx.Process(target=start_node_dataloader, args=(
             0, tmpdir, num_server, num_workers, orig_nid, orig_eid, g))
         p.start()
-        time.sleep(1)
         ptrainer_list.append(p)
     elif dataloader_type == 'edge':
         p = ctx.Process(target=start_edge_dataloader, args=(
             0, tmpdir, num_server, num_workers, orig_nid, orig_eid, g))
         p.start()
-        time.sleep(1)
         ptrainer_list.append(p)
     for p in pserver_list:
         p.join()
@@ -427,6 +413,7 @@ def create_random_hetero():
 @pytest.mark.parametrize("num_workers", [0, 4])
 @pytest.mark.parametrize("dataloader_type", ["node", "edge"])
 def test_dataloader(tmpdir, num_server, num_workers, dataloader_type):
+    reset_envs()
     g = CitationGraphDataset("cora")[0]
     check_dataloader(g, tmpdir, num_server, num_workers, dataloader_type)
     g = create_random_hetero()
@@ -438,6 +425,7 @@ def test_dataloader(tmpdir, num_server, num_workers, dataloader_type):
 @pytest.mark.parametrize("num_server", [3])
 @pytest.mark.parametrize("num_workers", [0, 4])
 def test_neg_dataloader(tmpdir, num_server, num_workers):
+    reset_envs()
     g = CitationGraphDataset("cora")[0]
     check_neg_dataloader(g, tmpdir, num_server, num_workers)
     g = create_random_hetero()
