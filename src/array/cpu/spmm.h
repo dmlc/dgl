@@ -9,11 +9,11 @@
 #include <dgl/array.h>
 #include <dgl/bcast.h>
 #include <dgl/runtime/parallel_for.h>
+#include <math.h>
 #include <algorithm>
 #include <limits>
 #include <memory>
 #include <algorithm>
-#include <math.h>
 #include <vector>
 #include "spmm_binary_ops.h"
 #if !defined(_WIN32)
@@ -490,7 +490,7 @@ void Edge_softmax_csr_forward(const BcastOff& bcast, const CSRMatrix& csr, NDArr
   runtime::parallel_for(0, csr.num_rows, [&](size_t b, size_t e) {
     for (auto rid = b; rid < e; ++rid) {
       const IdType row_start = indptr[rid], row_end = indptr[rid + 1];
-      std::vector<DType> data_e(row_end-row_start, 0); 
+      std::vector<DType> data_e(row_end-row_start, 0);
       std::vector<IdType> num(row_end-row_start, 0);
       for (int64_t k = 0; k < dim; ++k) {
         DType max_v = -std::numeric_limits<DType>::infinity();
