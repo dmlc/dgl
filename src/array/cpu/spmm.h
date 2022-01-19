@@ -13,7 +13,7 @@
 #include <limits>
 #include <memory>
 #include <algorithm>
-#include<math.h>
+#include <math.h>
 #include <vector>
 #include "spmm_binary_ops.h"
 #if !defined(_WIN32)
@@ -496,21 +496,21 @@ void Edge_softmax_csr_forward(const BcastOff& bcast, const CSRMatrix& csr, NDArr
         DType max_v = -std::numeric_limits<DType>::infinity();
         for (IdType j = row_start; j < row_end; ++j) {
           const IdType eid = has_idx ? edges[j] : j;
-            const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
-            const DType* rhs_off =
-              Op::use_rhs ? W + eid * rhs_dim + rhs_add : nullptr;
-            data_e[j-row_start] = *rhs_off;
-            num[j-row_start] = eid*rhs_dim+rhs_add;
-            max_v = std::max<DType>(max_v, (*rhs_off));
+          const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
+          const DType* rhs_off =
+            Op::use_rhs ? W + eid * rhs_dim + rhs_add : nullptr;
+          data_e[j-row_start] = *rhs_off;
+          num[j-row_start] = eid*rhs_dim+rhs_add;
+          max_v = std::max<DType>(max_v, (*rhs_off));
         }
         DType exp_sum = 0;
         for (auto& element : data_e){
-            element -= max_v;
-            element = std::exp(element);
-            exp_sum += element;
+          element -= max_v;
+          element = std::exp(element);
+          exp_sum += element;
         }
         for (int i=0; i < row_end-row_start; i++){
-            out.Ptr<DType>()[num[i]] = data_e[i]/exp_sum;
+          out.Ptr<DType>()[num[i]] = data_e[i]/exp_sum;
         }
       }
     }
@@ -543,18 +543,18 @@ void Edge_softmax_csr_backward(const BcastOff& bcast, const CSRMatrix& csr, NDAr
         DType sum_sds = 0;
         for (IdType j = row_start; j < row_end; ++j) {
           const IdType eid = has_idx ? edges[j] : j;
-            const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
-            const DType* rhs_off_sds =
-              Op::use_rhs ? W_sds + eid * rhs_dim + rhs_add : nullptr;
-            sum_sds += (*rhs_off_sds);
+          const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
+          const DType* rhs_off_sds =
+            Op::use_rhs ? W_sds + eid * rhs_dim + rhs_add : nullptr;
+          sum_sds += (*rhs_off_sds);
         }
         for (IdType j = row_start; j< row_end; ++j){
           const IdType eid = has_idx ? edges[j] : j;
-            const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
-              const DType* rhs_off_out =
-                Op::use_rhs ? W_out + eid * rhs_dim + rhs_add : nullptr;
-              const DType* rhs_off_sds =
-                Op::use_rhs ? W_sds + eid * rhs_dim + rhs_add : nullptr;
+          const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
+          const DType* rhs_off_out =
+            Op::use_rhs ? W_out + eid * rhs_dim + rhs_add : nullptr;
+          const DType* rhs_off_sds =
+            Op::use_rhs ? W_sds + eid * rhs_dim + rhs_add : nullptr;
           back_out.Ptr<DType>()[eid*rhs_dim+rhs_add] =  (*rhs_off_sds) - sum_sds*(*rhs_off_out);
         }
       }
