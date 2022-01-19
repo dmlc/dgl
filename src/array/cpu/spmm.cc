@@ -131,7 +131,7 @@ void Edge_softmax_csr(const std::string& op,
              const CSRMatrix& csr,
              NDArray ufeat,
              NDArray efeat,
-             NDArray out){
+             NDArray out) {
   SWITCH_BITS(bits, DType, {
       SWITCH_OP(op, Op, {
         cpu::Edge_softmax_csr_forward<IdType, DType, Op>(bcast, csr, ufeat, efeat, out);
@@ -146,7 +146,7 @@ void Edge_softmax_csr_back(const std::string& op,
              const CSRMatrix& csr,
              NDArray out,
              NDArray sds,
-             NDArray back_out){
+             NDArray back_out) {
   SWITCH_BITS(bits, DType, {
     SWITCH_OP(op, Op, {
       cpu::Edge_softmax_csr_backward<IdType, DType, Op>(bcast, csr, out, sds, back_out);

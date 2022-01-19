@@ -504,12 +504,12 @@ void Edge_softmax_csr_forward(const BcastOff& bcast, const CSRMatrix& csr, NDArr
           max_v = std::max<DType>(max_v, (*rhs_off));
         }
         DType exp_sum = 0;
-        for (auto& element : data_e){
+        for (auto& element : data_e) {
           element -= max_v;
           element = std::exp(element);
           exp_sum += element;
         }
-        for (int i=0; i < row_end-row_start; i++){
+        for (int i=0; i < row_end-row_start; i++) {
           out.Ptr<DType>()[num[i]] = data_e[i]/exp_sum;
         }
       }
@@ -548,7 +548,7 @@ void Edge_softmax_csr_backward(const BcastOff& bcast, const CSRMatrix& csr, NDAr
             Op::use_rhs ? W_sds + eid * rhs_dim + rhs_add : nullptr;
           sum_sds += (*rhs_off_sds);
         }
-        for (IdType j = row_start; j< row_end; ++j){
+        for (IdType j = row_start; j< row_end; ++j) {
           const IdType eid = has_idx ? edges[j] : j;
           const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
           const DType* rhs_off_out =
@@ -561,6 +561,7 @@ void Edge_softmax_csr_backward(const BcastOff& bcast, const CSRMatrix& csr, NDAr
     }
   });
 }
+
 }  // namespace cpu
 }  // namespace aten
 }  // namespace dgl
