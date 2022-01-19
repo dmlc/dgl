@@ -219,7 +219,7 @@ def test_multi_thread_rpc():
         dgl.distributed.send_request(0, req)
 
         def subthread_call(server_id):            
-            req = HelloRequest(STR, INTEGER, TENSOR+ server_id, simple_func)
+            req = HelloRequest(STR, INTEGER, TENSOR, simple_func)
             dgl.distributed.send_request(server_id, req)
         
         
@@ -229,8 +229,9 @@ def test_multi_thread_rpc():
         
         res0 = dgl.distributed.recv_response()
         res1 = dgl.distributed.recv_response()
+        # Order is not guaranteed
         assert_array_equal(F.asnumpy(res0.tensor), F.asnumpy(TENSOR))
-        assert_array_equal(F.asnumpy(res1.tensor), F.asnumpy(TENSOR+1))
+        assert_array_equal(F.asnumpy(res1.tensor), F.asnumpy(TENSOR))
         dgl.distributed.exit_client()
 
     start_client_multithread("rpc_ip_config_multithread.txt")
