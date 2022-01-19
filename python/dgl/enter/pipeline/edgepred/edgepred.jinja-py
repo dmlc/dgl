@@ -3,6 +3,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
+{{ data_import_code }}
+
 
 {{ edge_model_code }}
 
@@ -88,8 +90,7 @@ def main():
     {{user_cfg_str}}
     device = cfg['device']
     pipeline_cfg = cfg['general_pipeline']
-    from ogb.linkproppred import DglLinkPropPredDataset
-    dataset = dgl.data.LinkPredDataset(DglLinkPropPredDataset("ogbl-collab"))
+    dataset = dgl.data.LinkPredDataset({{ data_initialize_code }})
     feat_size = dataset.feat_size
     cfg["node_model"]["in_size"] = pipeline_cfg['node_embed_size'] if pipeline_cfg['node_embed_size'] > 0 else feat_size
     cfg["node_model"]["out_size"] = pipeline_cfg['hidden_size']

@@ -100,9 +100,20 @@ class EdgepredPipeline(PipelineBase):
         render_cfg["neg_sampler_name"] = NegativeSamplerFactory.get_model_class_name(
             user_cfg_dict["neg_sampler"]["name"])
         render_cfg["loss"] = user_cfg_dict["general_pipeline"]["loss"]
-
+        render_cfg["data_import_code"] = DataFactory.get_import_code(
+            user_cfg_dict["data"]["name"])
+        extra_args_dict = DataFactory.get_extra_args(
+            user_cfg_dict["data"]["name"])
+        data_initialize_code = DataFactory.get_class_name(
+            user_cfg_dict["data"]["name"])
+        if len(extra_args_dict) > 0:
+            data_initialize_code = data_initialize_code.format('**cfg["data"]')
+        render_cfg["data_initialize_code"] = data_initialize_code
         generated_user_cfg = copy.deepcopy(user_cfg_dict)
-        generated_user_cfg.pop("data")
+        if len(generated_user_cfg["data"]) == 1:
+            generated_user_cfg.pop("data")
+        else:
+            generated_user_cfg["data"].pop("name")
         generated_user_cfg.pop("pipeline_name")
         generated_user_cfg["node_model"].pop("name")
         generated_user_cfg["edge_model"].pop("name")
