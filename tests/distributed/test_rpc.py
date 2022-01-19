@@ -7,7 +7,7 @@ import backend as F
 import unittest, pytest
 import multiprocessing as mp
 from numpy.testing import assert_array_equal
-from utils import reset_envs
+from utils import reset_envs, generate_ip_config
 
 if os.name != 'nt':
     import fcntl
@@ -17,31 +17,6 @@ INTEGER = 2
 STR = 'hello world!'
 HELLO_SERVICE_ID = 901231
 TENSOR = F.zeros((10, 10), F.int64, F.cpu())
-
-def get_local_usable_addr():
-    """Get local usable IP and port
-
-    Returns
-    -------
-    str
-        IP address, e.g., '192.168.8.12:50051'
-    """
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        # doesn't even have to be reachable
-        sock.connect(('10.255.255.255', 1))
-        ip_addr = sock.getsockname()[0]
-    except ValueError:
-        ip_addr = '127.0.0.1'
-    finally:
-        sock.close()
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.bind(("", 0))
-    sock.listen(1)
-    port = sock.getsockname()[1]
-    sock.close()
-
-    return ip_addr + ' ' + str(port)
 
 def foo(x, y):
     assert x == 123
@@ -195,10 +170,7 @@ def test_rpc_msg():
 def test_rpc():
     reset_envs()
     os.environ['DGL_DIST_MODE'] = 'distributed'
-    ip_config = open("rpc_ip_config.txt", "w")
-    ip_addr = get_local_usable_addr()
-    ip_config.write('%s\n' % ip_addr)
-    ip_config.close()
+    generate_ip_config("rpc_ip_config.txt", 1, 1)
     ctx = mp.get_context('spawn')
     pserver = ctx.Process(target=start_server, args=(1, "rpc_ip_config.txt"))
     pclient = ctx.Process(target=start_client, args=("rpc_ip_config.txt",))
@@ -211,10 +183,7 @@ def test_rpc():
 def test_multi_client():
     reset_envs()
     os.environ['DGL_DIST_MODE'] = 'distributed'
-    ip_config = open("rpc_ip_config_mul_client.txt", "w")
-    ip_addr = get_local_usable_addr()
-    ip_config.write('%s\n' % ip_addr)
-    ip_config.close()
+    generate_ip_config("rpc_ip_config_mul_client.txt", 1, 1)
     ctx = mp.get_context('spawn')
     pserver = ctx.Process(target=start_server, args=(10, "rpc_ip_config_mul_client.txt"))
     pclient_list = []
@@ -233,11 +202,8 @@ def test_multi_client():
 def test_multi_thread_rpc():
     reset_envs()
     os.environ['DGL_DIST_MODE'] = 'distributed'
-    ip_config = open("rpc_ip_config_multithread.txt", "w")
     num_servers = 2
-    for _ in range(num_servers): # 3 servers
-        ip_config.write('{}\n'.format(get_local_usable_addr()))
-    ip_config.close()
+    generate_ip_config("rpc_ip_config_multithread.txt", num_servers, num_servers)
     ctx = mp.get_context('spawn')
     pserver_list = []
     for i in range(num_servers):
