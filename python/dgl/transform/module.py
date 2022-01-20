@@ -746,13 +746,14 @@ class GCNNorm(BaseTransform):
                 g.update_all(fn.copy_e(self.eweight_name, 'm'), fn.sum('m', 'deg'))
                 deg_inv_sqrt = 1. / F.sqrt(g.nodes[ntype].data['deg'])
                 g.nodes[ntype].data['w'] = F.replace_inf_with_zero(deg_inv_sqrt)
-                g.apply_edges(lambda edge: {
-                    'w': edge.src['w'] * edge.data[self.eweight_name] * edge.dst['w']})
+                g.apply_edges(lambda edge: {'w': edge.src['w'] * edge.data[self.eweight_name] *
+                                            edge.dst['w']},
+                              etype=c_etype)
             else:
                 deg = g.in_degrees(etype=c_etype)
-                deg_inv_sqrt = 1. / F.sqrt(deg)
+                deg_inv_sqrt = 1. / F.sqrt(F.astype(deg, F.float32))
                 g.nodes[ntype].data['w'] = F.replace_inf_with_zero(deg_inv_sqrt)
-                g.apply_edges(lambda edges: {'w': edges.src['w'] * edges.dst['w']})
+                g.apply_edges(lambda edges: {'w': edges.src['w'] * edges.dst['w']}, etype=c_etype)
             return g.edges[c_etype].data['w']
 
     def __call__(self, g):

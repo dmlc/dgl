@@ -1763,6 +1763,7 @@ def test_ismultigraph(idtype):
         {'A': 6, 'C': 6}, idtype=idtype, device=F.ctx())
     assert g.is_multigraph == True
 
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support an indexing operation")
 @parametrize_dtype
 def test_is_bidirected(idtype):
     g = dgl.graph(([0, 1], [1, 2]), idtype=idtype, device=F.ctx())
