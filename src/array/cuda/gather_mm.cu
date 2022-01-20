@@ -3,6 +3,7 @@
  * \file array/cuda/gather_mm.cu
  * \brief SDDMM C APIs and definitions.
  */
+#include <algorithm>    // std::swap
 #include <dgl/array.h>
 #include "./utils.h"
 #include "./functor.cuh"
@@ -11,9 +12,38 @@ namespace dgl {
 using namespace cuda;
 namespace aten {
 
-
-/*! \brief Call cuBLAS geam API for transpose operation for float and double. */
 namespace {
+/*! \brief Call cuBLAS geam API for transpose operation for float and double. */
+template <typename DType>
+cublasStatus_t Xgeam(cublasHandle_t handle, cublasOperation_t transa,
+    cublasOperation_t transb, int m, int n,
+    const DType* alpha, const DType* A, int lda,
+    const DType* beta, const DType* B, int ldb,
+    DType* C, int ldc) {
+  LOG(INFO) << "Not supported dtype";
+  return CUBLAS_STATUS_EXECUTION_FAILED;
+}
+
+template <>
+cublasStatus_t Xgeam<float>(cublasHandle_t handle, cublasOperation_t transa,
+    cublasOperation_t transb, int m, int n,
+    const float* alpha, const float* A, int lda,
+    const float* beta, const float* B, int ldb,
+    float* C, int ldc) {
+  return cublasSgeam(handle, transa, transb, m, n, alpha, A, lda,
+      beta, B, ldb, C, ldc);
+}
+
+template <>
+cublasStatus_t Xgeam<double>(cublasHandle_t handle, cublasOperation_t transa,
+    cublasOperation_t transb, int m, int n,
+    const double* alpha, const double* A, int lda,
+    const double* beta, const double* B, int ldb,
+    double* C, int ldc) {
+  return cublasDgeam(handle, transa, transb, m, n, alpha, A, lda,
+      beta, B, ldb, C, ldc);
+}
+
 template <typename DType>
 cublasStatus_t cublasGemm(cublasHandle_t handle, cublasOperation_t transa,
     cublasOperation_t transb, int m, int n, int k,
@@ -230,8 +260,10 @@ void gatherMM_SortedEtype(const NDArray h,
               const NDArray w,
               NDArray out,
               const NDArray E_per_rel,
-              const NDArray h_etype) {
+              const NDArray h_etype,
+              bool H_trans) {
     SWITCH_BITS(bits, DType, {
+        auto device = runtime::DeviceAPI::Get(h->ctx);
         int64_t num_rel = E_per_rel.NumElements();
         int n = w->shape[1];  // cols of B
         int k = h->shape[1];  // cols of A = rows of B
@@ -255,16 +287,34 @@ void gatherMM_SortedEtype(const NDArray h,
             ldc = n;
         for (int etype = 0; etype < num_rel; ++etype) {
             int m = E_per_rel_data[etype];  // rows of A
+            k = h->shape[1];
+            DType* h_trans_data = nullptr;
+            if (H_trans) {
+                // allocate matrix for temporary transposed output
+                h_trans_data = static_cast<DType*>(device->AllocWorkspace \
+                    (h->ctx, m * k * sizeof(DType)));
+                CUBLAS_CALL(Xgeam<DType>(
+                    thr_entry->cublas_handle,
+                    CUBLAS_OP_T,
+                    CUBLAS_OP_N,
+                    m, k,
+                    &alpha, h_data + h_offset, k,
+                    &beta, nullptr, m,
+                    h_trans_data, m));
+                std::swap(m, k);
+            }
             CUBLAS_CALL(cublasGemm<DType>(
-              thr_entry->cublas_handle,
-              CUBLAS_OP_N,
-              CUBLAS_OP_N,
-              n, m, k,
-              &alpha,
-              w_data + w_offset, ldb,
-              h_data + h_offset, lda,
-              &beta,
-              out_data + out_offset, ldc));
+                thr_entry->cublas_handle,
+                CUBLAS_OP_N,
+                CUBLAS_OP_N,
+                n, m, k,
+                &alpha,
+                w_data + w_offset, n,
+                ((H_trans)? h_trans_data : h_data) + h_offset, k,
+                &beta,
+                out_data + out_offset, n));
+            if (H_trans)
+                device->FreeWorkspace(h->ctx, h_trans_data);
             h_offset += m * k;
             w_offset += k * n;
             out_offset += m * n;
@@ -280,7 +330,7 @@ void gatherMM(const NDArray h,
           const NDArray etype,
           bool sortedE, bool H_trans, bool w_trans) {
     if (sortedE)  // similar to low-mem matmul
-        gatherMM_SortedEtype<XPU, IdType, bits>(h, w, out, E_per_rel, etype);
+        gatherMM_SortedEtype<XPU, IdType, bits>(h, w, out, E_per_rel, etype, H_trans);
     else  // similar to bmm without copying w to edges
         gatherMM_UnsortedEtype<XPU, IdType, bits>(h, w, out, E_per_rel, etype);
 }
