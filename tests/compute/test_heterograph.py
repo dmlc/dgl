@@ -1764,6 +1764,32 @@ def test_ismultigraph(idtype):
     assert g.is_multigraph == True
 
 @parametrize_dtype
+def test_is_bidirected(idtype):
+    g = dgl.graph(([0, 1], [1, 2]), idtype=idtype, device=F.ctx())
+    assert not g.is_bidirected()
+    g.edata['w'] = F.tensor([0.1, 0.1])
+    assert not g.is_bidirected(eweight='w')
+    g.edata['w'] = F.tensor([0.1, 0.2])
+    assert not g.is_bidirected(eweight='w')
+
+    g = dgl.graph(([0, 1, 2, 0], [1, 0, 0, 2]), idtype=idtype, device=F.ctx())
+    assert g.is_bidirected()
+    g.edata['w'] = F.tensor([0.1, 0.1, 0.2, 0.2])
+    assert g.is_bidirected(eweight='w')
+    g.edata['w'] = F.tensor([0.1, 0.3, 0.2, 0.2])
+    assert not g.is_bidirected(eweight='w')
+
+    g = dgl.heterograph({
+        ('paper', 'cites', 'paper'): ([0, 1], [1, 0]),
+        ('author', 'writes', 'paper'): ([0, 1], [1, 0]),
+        ('author', 'knows', 'author'): ([0, 1], [1, 2])
+    }, idtype=idtype, device=F.ctx())
+    assert not g.is_bidirected('writes')
+    assert not g.is_bidirected(('author', 'writes', 'paper'))
+    assert not g.is_bidirected(('author', 'knows', 'author'))
+    assert g.is_bidirected(('paper', 'cites', 'paper'))
+
+@parametrize_dtype
 def test_bipartite(idtype):
     g1 = dgl.heterograph({('A', 'AB', 'B'): ([0, 0, 1], [1, 2, 5])},
                          idtype=idtype, device=F.ctx())

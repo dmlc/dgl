@@ -164,6 +164,9 @@ def argtopk(input, k, dim, descending=True):
 def exp(input):
     return th.exp(input)
 
+def inverse(input):
+    return th.inverse(input)
+
 def sqrt(input):
     return th.sqrt(input)
 
@@ -275,6 +278,9 @@ def boolean_mask(input, mask):
 
 def equal(x, y):
     return x == y
+
+def allclose(x, y, rtol=1e-4, atol=1e-4):
+    return th.allclose(x, y, rtol=rtol, atol=atol)
 
 def logical_not(input):
     return ~input

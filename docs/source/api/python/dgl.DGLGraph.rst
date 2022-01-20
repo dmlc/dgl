@@ -57,6 +57,7 @@ neighborhood, etc.
     DGLGraph.is_unibipartite
     DGLGraph.is_multigraph
     DGLGraph.is_homogeneous
+    DGLGraph.is_bidirected
     DGLGraph.has_nodes
     DGLGraph.has_edges_between
     DGLGraph.predecessors
