@@ -8,7 +8,6 @@ import pandas as pd
 import yaml
 import pytest
 import dgl.data as data
-import dgl.data.csv_dataset as csv_ds
 from dgl import DGLError
 
 
@@ -164,6 +163,7 @@ def test_extract_archive():
 
 
 def _test_construct_graphs_homo():
+    from dgl.data.csv_dataset_base import NodeData, EdgeData, DGLGraphConstructor
     # node_ids could be non-sorted, duplicated, not labeled from 0 to num_nodes-1
     num_nodes = 100
     num_edges = 1000
@@ -179,13 +179,13 @@ def _test_construct_graphs_homo():
     _, u_indices = np.unique(node_ids, return_index=True)
     ndata = {'feat': t_ndata['feat'][u_indices],
              'label': t_ndata['label'][u_indices]}
-    node_data = csv_ds.NodeData(node_ids, t_ndata)
+    node_data = NodeData(node_ids, t_ndata)
     src_ids = np.random.choice(node_ids, size=num_edges)
     dst_ids = np.random.choice(node_ids, size=num_edges)
     edata = {'feat': np.random.rand(
         num_edges, num_dims), 'label': np.random.randint(2, size=num_edges)}
-    edge_data = csv_ds.EdgeData(src_ids, dst_ids, edata)
-    graphs, data_dict = csv_ds.DGLGraphConstructor.construct_graphs(
+    edge_data = EdgeData(src_ids, dst_ids, edata)
+    graphs, data_dict = DGLGraphConstructor.construct_graphs(
         node_data, edge_data)
     assert len(graphs) == 1
     assert len(data_dict) == 0
@@ -203,6 +203,7 @@ def _test_construct_graphs_homo():
 
 
 def _test_construct_graphs_hetero():
+    from dgl.data.csv_dataset_base import NodeData, EdgeData, DGLGraphConstructor
     # node_ids could be non-sorted, duplicated, not labeled from 0 to num_nodes-1
     num_nodes = 100
     num_edges = 1000
@@ -223,7 +224,7 @@ def _test_construct_graphs_hetero():
         _, u_indices = np.unique(node_ids, return_index=True)
         ndata = {'feat': t_ndata['feat'][u_indices],
                  'label': t_ndata['label'][u_indices]}
-        node_data.append(csv_ds.NodeData(node_ids, t_ndata, type=ntype))
+        node_data.append(NodeData(node_ids, t_ndata, type=ntype))
         node_ids_dict[ntype] = node_ids
         ndata_dict[ntype] = ndata
     etypes = [('user', 'follow', 'user'), ('user', 'like', 'item')]
@@ -234,10 +235,10 @@ def _test_construct_graphs_hetero():
         dst_ids = np.random.choice(node_ids_dict[dst_type], size=num_edges)
         edata = {'feat': np.random.rand(
             num_edges, num_dims), 'label': np.random.randint(2, size=num_edges)}
-        edge_data.append(csv_ds.EdgeData(src_ids, dst_ids, edata,
+        edge_data.append(EdgeData(src_ids, dst_ids, edata,
                          type=(src_type, e_type, dst_type)))
         edata_dict[(src_type, e_type, dst_type)] = edata
-    graphs, data_dict = csv_ds.DGLGraphConstructor.construct_graphs(
+    graphs, data_dict = DGLGraphConstructor.construct_graphs(
         node_data, edge_data)
     assert len(graphs) == 1
     assert len(data_dict) == 0
@@ -259,6 +260,7 @@ def _test_construct_graphs_hetero():
 
 
 def _test_construct_graphs_multiple():
+    from dgl.data.csv_dataset_base import NodeData, EdgeData, GraphData, DGLGraphConstructor
     num_nodes = 100
     num_edges = 1000
     num_graphs = 10
@@ -283,14 +285,14 @@ def _test_construct_graphs_multiple():
         egraph_ids = np.append(egraph_ids, np.full(num_edges, i))
     ndata = {'feat': np.random.rand(num_nodes*num_graphs, num_dims),
              'label': np.random.randint(2, size=num_nodes*num_graphs)}
-    node_data = csv_ds.NodeData(node_ids, ndata, graph_id=ngraph_ids)
+    node_data = NodeData(node_ids, ndata, graph_id=ngraph_ids)
     edata = {'feat': np.random.rand(
         num_edges*num_graphs, num_dims), 'label': np.random.randint(2, size=num_edges*num_graphs)}
-    edge_data = csv_ds.EdgeData(src_ids, dst_ids, edata, graph_id=egraph_ids)
+    edge_data = EdgeData(src_ids, dst_ids, edata, graph_id=egraph_ids)
     gdata = {'feat': np.random.rand(num_graphs, num_dims),
              'label': np.random.randint(2, size=num_graphs)}
-    graph_data = csv_ds.GraphData(np.arange(num_graphs), gdata)
-    graphs, data_dict = csv_ds.DGLGraphConstructor.construct_graphs(
+    graph_data = GraphData(np.arange(num_graphs), gdata)
+    graphs, data_dict = DGLGraphConstructor.construct_graphs(
         node_data, edge_data, graph_data)
     assert len(graphs) == num_graphs
     assert len(data_dict) == len(gdata)
@@ -313,10 +315,10 @@ def _test_construct_graphs_multiple():
         assert_data(edata, g.edata, num_edges)
 
     # Graph IDs found in node/edge CSV but not in graph CSV
-    graph_data = csv_ds.GraphData(np.arange(num_graphs-2), {})
+    graph_data = GraphData(np.arange(num_graphs-2), {})
     expect_except = False
     try:
-        _, _ = csv_ds.DGLGraphConstructor.construct_graphs(
+        _, _ = DGLGraphConstructor.construct_graphs(
             node_data, edge_data, graph_data)
     except:
         expect_except = True
@@ -324,6 +326,7 @@ def _test_construct_graphs_multiple():
 
 
 def _test_DefaultDataParser():
+    from dgl.data.csv_dataset_base import DefaultDataParser
     # common csv
     with tempfile.TemporaryDirectory() as test_dir:
         csv_path = os.path.join(test_dir, "nodes.csv")
@@ -337,7 +340,7 @@ def _test_DefaultDataParser():
                            'feat': [line.tolist() for line in feat],
                            })
         df.to_csv(csv_path, index=False)
-        dp = csv_ds.DefaultDataParser()
+        dp = DefaultDataParser()
         df = pd.read_csv(csv_path)
         dt = dp(df)
         assert np.array_equal(node_id, dt['node_id'])
@@ -349,7 +352,7 @@ def _test_DefaultDataParser():
         df = pd.DataFrame({'label': ['a', 'b', 'c'],
                            })
         df.to_csv(csv_path, index=False)
-        dp = csv_ds.DefaultDataParser()
+        dp = DefaultDataParser()
         df = pd.read_csv(csv_path)
         expect_except = False
         try:
@@ -363,13 +366,14 @@ def _test_DefaultDataParser():
         df = pd.DataFrame({'label': [1, 2, 3],
                            })
         df.to_csv(csv_path)
-        dp = csv_ds.DefaultDataParser()
+        dp = DefaultDataParser()
         df = pd.read_csv(csv_path)
         dt = dp(df)
         assert len(dt) == 1
 
 
 def _test_load_yaml_with_sanity_check():
+    from dgl.data.csv_dataset_base import load_yaml_with_sanity_check
     with tempfile.TemporaryDirectory() as test_dir:
         yaml_path = os.path.join(test_dir, 'meta.yaml')
         # workable but meaningless usually
@@ -377,7 +381,7 @@ def _test_load_yaml_with_sanity_check():
                      'node_data': [], 'edge_data': []}
         with open(yaml_path, 'w') as f:
             yaml.dump(yaml_data, f, sort_keys=False)
-        meta = csv_ds.load_yaml_with_sanity_check(yaml_path)
+        meta = load_yaml_with_sanity_check(yaml_path)
         assert meta.version == '1.0.0'
         assert meta.dataset_name == 'default'
         assert meta.separator == ','
@@ -390,7 +394,7 @@ def _test_load_yaml_with_sanity_check():
                      }
         with open(yaml_path, 'w') as f:
             yaml.dump(yaml_data, f, sort_keys=False)
-        meta = csv_ds.load_yaml_with_sanity_check(yaml_path)
+        meta = load_yaml_with_sanity_check(yaml_path)
         for ndata in meta.node_data:
             assert ndata.file_name == 'nodes.csv'
             assert ndata.ntype == '_V'
@@ -411,7 +415,7 @@ def _test_load_yaml_with_sanity_check():
                      }
         with open(yaml_path, 'w') as f:
             yaml.dump(yaml_data, f, sort_keys=False)
-        meta = csv_ds.load_yaml_with_sanity_check(yaml_path)
+        meta = load_yaml_with_sanity_check(yaml_path)
         assert len(meta.node_data) == 1
         ndata = meta.node_data[0]
         assert ndata.ntype == 'user'
@@ -436,7 +440,7 @@ def _test_load_yaml_with_sanity_check():
                 yaml.dump(ydata, f, sort_keys=False)
             expect_except = False
             try:
-                meta = csv_ds.load_yaml_with_sanity_check(yaml_path)
+                meta = load_yaml_with_sanity_check(yaml_path)
             except:
                 expect_except = True
             assert expect_except
@@ -448,7 +452,7 @@ def _test_load_yaml_with_sanity_check():
             yaml.dump(yaml_data, f, sort_keys=False)
         expect_except = False
         try:
-            meta = csv_ds.load_yaml_with_sanity_check(yaml_path)
+            meta = load_yaml_with_sanity_check(yaml_path)
         except DGLError:
             expect_except = True
         assert expect_except
@@ -460,7 +464,7 @@ def _test_load_yaml_with_sanity_check():
             yaml.dump(yaml_data, f, sort_keys=False)
         expect_except = False
         try:
-            meta = csv_ds.load_yaml_with_sanity_check(yaml_path)
+            meta = load_yaml_with_sanity_check(yaml_path)
         except DGLError:
             expect_except = True
         assert expect_except
@@ -472,22 +476,23 @@ def _test_load_yaml_with_sanity_check():
             yaml.dump(yaml_data, f, sort_keys=False)
         expect_except = False
         try:
-            meta = csv_ds.load_yaml_with_sanity_check(yaml_path)
+            meta = load_yaml_with_sanity_check(yaml_path)
         except DGLError:
             expect_except = True
         assert expect_except
 
 
 def _test_load_node_data_from_csv():
+    from dgl.data.csv_dataset_base import MetaNode, NodeData, DefaultDataParser
     with tempfile.TemporaryDirectory() as test_dir:
         num_nodes = 100
         # minimum
         df = pd.DataFrame({'node_id': np.arange(num_nodes)})
         csv_path = os.path.join(test_dir, 'nodes.csv')
         df.to_csv(csv_path, index=False)
-        meta_node = csv_ds.MetaNode(file_name=csv_path)
-        node_data = csv_ds.NodeData.load_from_csv(
-            meta_node, csv_ds.DefaultDataParser())
+        meta_node = MetaNode(file_name=csv_path)
+        node_data = NodeData.load_from_csv(
+            meta_node, DefaultDataParser())
         assert np.array_equal(df['node_id'], node_data.id)
         assert len(node_data.data) == 0
 
@@ -496,9 +501,9 @@ def _test_load_node_data_from_csv():
                           'label': np.random.randint(3, size=num_nodes)})
         csv_path = os.path.join(test_dir, 'nodes.csv')
         df.to_csv(csv_path, index=False)
-        meta_node = csv_ds.MetaNode(file_name=csv_path)
-        node_data = csv_ds.NodeData.load_from_csv(
-            meta_node, csv_ds.DefaultDataParser())
+        meta_node = MetaNode(file_name=csv_path)
+        node_data = NodeData.load_from_csv(
+            meta_node, DefaultDataParser())
         assert np.array_equal(df['node_id'], node_data.id)
         assert len(node_data.data) == 1
         assert np.array_equal(df['label'], node_data.data['label'])
@@ -510,9 +515,9 @@ def _test_load_node_data_from_csv():
             3, size=num_nodes), 'graph_id': np.full(num_nodes, 1)})
         csv_path = os.path.join(test_dir, 'nodes.csv')
         df.to_csv(csv_path, index=False)
-        meta_node = csv_ds.MetaNode(file_name=csv_path)
-        node_data = csv_ds.NodeData.load_from_csv(
-            meta_node, csv_ds.DefaultDataParser())
+        meta_node = MetaNode(file_name=csv_path)
+        node_data = NodeData.load_from_csv(
+            meta_node, DefaultDataParser())
         assert np.array_equal(df['node_id'], node_data.id)
         assert len(node_data.data) == 1
         assert np.array_equal(df['label'], node_data.data['label'])
@@ -523,17 +528,18 @@ def _test_load_node_data_from_csv():
         df = pd.DataFrame({'label': np.random.randint(3, size=num_nodes)})
         csv_path = os.path.join(test_dir, 'nodes.csv')
         df.to_csv(csv_path, index=False)
-        meta_node = csv_ds.MetaNode(file_name=csv_path)
+        meta_node = MetaNode(file_name=csv_path)
         expect_except = False
         try:
-            csv_ds.NodeData.load_from_csv(
-                meta_node, csv_ds.DefaultDataParser())
+            NodeData.load_from_csv(
+                meta_node, DefaultDataParser())
         except:
             expect_except = True
         assert expect_except
 
 
 def _test_load_edge_data_from_csv():
+    from dgl.data.csv_dataset_base import MetaEdge, EdgeData, DefaultDataParser
     with tempfile.TemporaryDirectory() as test_dir:
         num_nodes = 100
         num_edges = 1000
@@ -543,9 +549,9 @@ def _test_load_edge_data_from_csv():
                            })
         csv_path = os.path.join(test_dir, 'edges.csv')
         df.to_csv(csv_path, index=False)
-        meta_edge = csv_ds.MetaEdge(file_name=csv_path)
-        edge_data = csv_ds.EdgeData.load_from_csv(
-            meta_edge, csv_ds.DefaultDataParser())
+        meta_edge = MetaEdge(file_name=csv_path)
+        edge_data = EdgeData.load_from_csv(
+            meta_edge, DefaultDataParser())
         assert np.array_equal(df['src_id'], edge_data.src)
         assert np.array_equal(df['dst_id'], edge_data.dst)
         assert len(edge_data.data) == 0
@@ -556,9 +562,9 @@ def _test_load_edge_data_from_csv():
                            'label': np.random.randint(3, size=num_edges)})
         csv_path = os.path.join(test_dir, 'edges.csv')
         df.to_csv(csv_path, index=False)
-        meta_edge = csv_ds.MetaEdge(file_name=csv_path)
-        edge_data = csv_ds.EdgeData.load_from_csv(
-            meta_edge, csv_ds.DefaultDataParser())
+        meta_edge = MetaEdge(file_name=csv_path)
+        edge_data = EdgeData.load_from_csv(
+            meta_edge, DefaultDataParser())
         assert np.array_equal(df['src_id'], edge_data.src)
         assert np.array_equal(df['dst_id'], edge_data.dst)
         assert len(edge_data.data) == 1
@@ -574,9 +580,9 @@ def _test_load_edge_data_from_csv():
                            'label': np.random.randint(3, size=num_edges)})
         csv_path = os.path.join(test_dir, 'edges.csv')
         df.to_csv(csv_path, index=False)
-        meta_edge = csv_ds.MetaEdge(file_name=csv_path)
-        edge_data = csv_ds.EdgeData.load_from_csv(
-            meta_edge, csv_ds.DefaultDataParser())
+        meta_edge = MetaEdge(file_name=csv_path)
+        edge_data = EdgeData.load_from_csv(
+            meta_edge, DefaultDataParser())
         assert np.array_equal(df['src_id'], edge_data.src)
         assert np.array_equal(df['dst_id'], edge_data.dst)
         assert len(edge_data.data) == 2
@@ -590,11 +596,11 @@ def _test_load_edge_data_from_csv():
                            })
         csv_path = os.path.join(test_dir, 'edges.csv')
         df.to_csv(csv_path, index=False)
-        meta_edge = csv_ds.MetaEdge(file_name=csv_path)
+        meta_edge = MetaEdge(file_name=csv_path)
         expect_except = False
         try:
-            csv_ds.EdgeData.load_from_csv(
-                meta_edge, csv_ds.DefaultDataParser())
+            EdgeData.load_from_csv(
+                meta_edge, DefaultDataParser())
         except DGLError:
             expect_except = True
         assert expect_except
@@ -602,26 +608,27 @@ def _test_load_edge_data_from_csv():
                            })
         csv_path = os.path.join(test_dir, 'edges.csv')
         df.to_csv(csv_path, index=False)
-        meta_edge = csv_ds.MetaEdge(file_name=csv_path)
+        meta_edge = MetaEdge(file_name=csv_path)
         expect_except = False
         try:
-            csv_ds.EdgeData.load_from_csv(
-                meta_edge, csv_ds.DefaultDataParser())
+            EdgeData.load_from_csv(
+                meta_edge, DefaultDataParser())
         except DGLError:
             expect_except = True
         assert expect_except
 
 
 def _test_load_graph_data_from_csv():
+    from dgl.data.csv_dataset_base import MetaGraph, GraphData, DefaultDataParser
     with tempfile.TemporaryDirectory() as test_dir:
         num_graphs = 100
         # minimum
         df = pd.DataFrame({'graph_id': np.arange(num_graphs)})
         csv_path = os.path.join(test_dir, 'graph.csv')
         df.to_csv(csv_path, index=False)
-        meta_graph = csv_ds.MetaGraph(file_name=csv_path)
-        graph_data = csv_ds.GraphData.load_from_csv(
-            meta_graph, csv_ds.DefaultDataParser())
+        meta_graph = MetaGraph(file_name=csv_path)
+        graph_data = GraphData.load_from_csv(
+            meta_graph, DefaultDataParser())
         assert np.array_equal(df['graph_id'], graph_data.graph_id)
         assert len(graph_data.data) == 0
 
@@ -630,9 +637,9 @@ def _test_load_graph_data_from_csv():
                           'label': np.random.randint(3, size=num_graphs)})
         csv_path = os.path.join(test_dir, 'graph.csv')
         df.to_csv(csv_path, index=False)
-        meta_graph = csv_ds.MetaGraph(file_name=csv_path)
-        graph_data = csv_ds.GraphData.load_from_csv(
-            meta_graph, csv_ds.DefaultDataParser())
+        meta_graph = MetaGraph(file_name=csv_path)
+        graph_data = GraphData.load_from_csv(
+            meta_graph, DefaultDataParser())
         assert np.array_equal(df['graph_id'], graph_data.graph_id)
         assert len(graph_data.data) == 1
         assert np.array_equal(df['label'], graph_data.data['label'])
@@ -643,9 +650,9 @@ def _test_load_graph_data_from_csv():
                            'label': np.random.randint(3, size=num_graphs)})
         csv_path = os.path.join(test_dir, 'graph.csv')
         df.to_csv(csv_path, index=False)
-        meta_graph = csv_ds.MetaGraph(file_name=csv_path)
-        graph_data = csv_ds.GraphData.load_from_csv(
-            meta_graph, csv_ds.DefaultDataParser())
+        meta_graph = MetaGraph(file_name=csv_path)
+        graph_data = GraphData.load_from_csv(
+            meta_graph, DefaultDataParser())
         assert np.array_equal(df['graph_id'], graph_data.graph_id)
         assert len(graph_data.data) == 2
         assert np.array_equal(df['feat'], graph_data.data['feat'])
@@ -655,11 +662,11 @@ def _test_load_graph_data_from_csv():
         df = pd.DataFrame({'label': np.random.randint(3, size=num_graphs)})
         csv_path = os.path.join(test_dir, 'graph.csv')
         df.to_csv(csv_path, index=False)
-        meta_graph = csv_ds.MetaGraph(file_name=csv_path)
+        meta_graph = MetaGraph(file_name=csv_path)
         expect_except = False
         try:
-            csv_ds.GraphData.load_from_csv(
-                meta_graph, csv_ds.DefaultDataParser())
+            GraphData.load_from_csv(
+                meta_graph, DefaultDataParser())
         except DGLError:
             expect_except = True
         assert expect_except
@@ -716,7 +723,7 @@ def _test_DGLCSVDataset_single():
                 # remove original node data file to verify reload from cached files
                 os.remove(nodes_csv_path_0)
                 assert not os.path.exists(nodes_csv_path_0)
-            csv_dataset = csv_ds.DGLCSVDataset(
+            csv_dataset = data.DGLCSVDataset(
                 test_dir, force_reload=force_reload)
             assert len(csv_dataset) == 1
             g = csv_dataset[0]
@@ -799,7 +806,7 @@ def _test_DGLCSVDataset_multiple():
                 # remove original node data file to verify reload from cached files
                 os.remove(nodes_csv_path_0)
                 assert not os.path.exists(nodes_csv_path_0)
-            csv_dataset = csv_ds.DGLCSVDataset(
+            csv_dataset = data.DGLCSVDataset(
                 test_dir, force_reload=force_reload)
             assert len(csv_dataset) == num_graphs
             assert csv_dataset.has_cache()
@@ -885,7 +892,7 @@ def _test_DGLCSVDataset_customized_data_parser():
                     data[header] = dt
                 return data
         # load CSVDataset with customized node/edge/graph_data_parser
-        csv_dataset = csv_ds.DGLCSVDataset(
+        csv_dataset = data.DGLCSVDataset(
             test_dir, node_data_parser={'user': CustDataParser()}, edge_data_parser={('user', 'like', 'item'): CustDataParser()}, graph_data_parser=CustDataParser())
         assert len(csv_dataset) == num_graphs
         assert len(csv_dataset.data) == 1
@@ -906,10 +913,11 @@ def _test_DGLCSVDataset_customized_data_parser():
 
 
 def _test_NodeEdgeGraphData():
+    from dgl.data.csv_dataset_base import NodeData, EdgeData, GraphData
     # NodeData basics
     num_nodes = 100
     node_ids = np.arange(num_nodes, dtype=np.float)
-    ndata = csv_ds.NodeData(node_ids, {})
+    ndata = NodeData(node_ids, {})
     assert ndata.id.dtype == np.int64
     assert np.array_equal(ndata.id, node_ids.astype(np.int64))
     assert len(ndata.data) == 0
@@ -918,7 +926,7 @@ def _test_NodeEdgeGraphData():
     # NodeData more
     data = {'feat': np.random.rand(num_nodes, 3)}
     graph_id = np.arange(num_nodes)
-    ndata = csv_ds.NodeData(node_ids, data, type='user', graph_id=graph_id)
+    ndata = NodeData(node_ids, data, type='user', graph_id=graph_id)
     assert ndata.type == 'user'
     assert np.array_equal(ndata.graph_id, graph_id)
     assert len(ndata.data) == len(data)
@@ -928,7 +936,7 @@ def _test_NodeEdgeGraphData():
     # NodeData except
     expect_except = False
     try:
-        csv_ds.NodeData(np.arange(num_nodes), {'feat': np.random.rand(
+        NodeData(np.arange(num_nodes), {'feat': np.random.rand(
             num_nodes+1, 3)}, graph_id=np.arange(num_nodes-1))
     except:
         expect_except = True
@@ -939,7 +947,7 @@ def _test_NodeEdgeGraphData():
     num_edges = 1000
     src_ids = np.random.randint(num_nodes, size=num_edges)
     dst_ids = np.random.randint(num_nodes, size=num_edges)
-    edata = csv_ds.EdgeData(src_ids, dst_ids, {})
+    edata = EdgeData(src_ids, dst_ids, {})
     assert np.array_equal(edata.src, src_ids)
     assert np.array_equal(edata.dst, dst_ids)
     assert edata.type == ('_V', '_E', '_V')
@@ -951,7 +959,7 @@ def _test_NodeEdgeGraphData():
     data = {'feat': np.random.rand(num_edges, 3)}
     etype = ('user', 'like', 'item')
     graph_ids = np.arange(num_edges)
-    edata = csv_ds.EdgeData(src_ids, dst_ids, data,
+    edata = EdgeData(src_ids, dst_ids, data,
                             type=etype, graph_id=graph_ids)
     assert edata.src.dtype == np.int64
     assert edata.dst.dtype == np.int64
@@ -966,7 +974,7 @@ def _test_NodeEdgeGraphData():
     # EdgeData except
     expect_except = False
     try:
-        csv_ds.EdgeData(np.arange(num_edges), np.arange(
+        EdgeData(np.arange(num_edges), np.arange(
             num_edges+1), {'feat': np.random.rand(num_edges-1, 3)}, graph_id=np.arange(num_edges+2))
     except:
         expect_except = True
@@ -975,13 +983,13 @@ def _test_NodeEdgeGraphData():
     # GraphData basics
     num_graphs = 10
     graph_ids = np.arange(num_graphs)
-    gdata = csv_ds.GraphData(graph_ids, {})
+    gdata = GraphData(graph_ids, {})
     assert np.array_equal(gdata.graph_id, graph_ids)
     assert len(gdata.data) == 0
     # GraphData more
     graph_ids = np.arange(num_graphs).astype(np.float)
     data = {'feat': np.random.rand(num_graphs, 3)}
-    gdata = csv_ds.GraphData(graph_ids, data)
+    gdata = GraphData(graph_ids, data)
     assert gdata.graph_id.dtype == np.int64
     assert np.array_equal(gdata.graph_id, graph_ids)
     assert len(gdata.data) == len(data)
