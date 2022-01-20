@@ -2617,6 +2617,9 @@ class DGLHeteroGraph(object):
     def is_bidirected(self, etype=None, eweight=None):
         """Return whether the graph is a bidirected graph.
 
+        A graph is bidirected if for any edge :math:`(u, v)` in :math:`G` with weight :math:`w`,
+        there exists an edge :math:`(v, u)` in :math:`G` with the same weight.
+
         Parameters
         ----------
         etype : str or (str, str, str), optional
@@ -2667,17 +2670,29 @@ class DGLHeteroGraph(object):
 
         # Sort first by src then dst
         idx_src_dst = src * num_nodes + dst
-        perm_src_dst = F.argsort(idx_src_dst, dim=0, descending=False)
-        src1, dst1 = src[perm_src_dst], dst[perm_src_dst]
 
         # Sort first by dst then src
         idx_dst_src = dst * num_nodes + src
+
+        # if eweight exists, further sort by eweight
+        if eweight is not None:
+            eweight = self.edges[c_etype].data[eweight]
+            eweight = F.reshape(eweight, (self.num_edges(c_etype)))
+            # min-max normalization to ensure range [0, 1)
+            min_eweight = F.min(eweight, dim=0)
+            max_eweight = F.max(eweight, dim=0)
+            eweight = (eweight - min_eweight) / (max_eweight - min_eweight + 1e-5)
+            idx_src_dst = idx_src_dst + eweight
+            idx_dst_src = idx_dst_src + eweight
+
+        perm_src_dst = F.argsort(idx_src_dst, dim=0, descending=False)
+        src1, dst1 = src[perm_src_dst], dst[perm_src_dst]
+
         perm_dst_src = F.argsort(idx_dst_src, dim=0, descending=False)
         src2, dst2 = src[perm_dst_src], dst[perm_dst_src]
 
         same_edges = F.allclose(src1, dst2) and F.allclose(src2, dst1)
         if eweight is not None:
-            eweight = self.edges[c_etype].data[eweight]
             eweight1 = eweight[perm_src_dst]
             eweight2 = eweight[perm_dst_src]
             same_edges = same_edges and F.allclose(eweight1, eweight2)

@@ -747,7 +747,7 @@ class GCNNorm(BaseTransform):
                 deg_inv_sqrt = 1. / F.sqrt(g.nodes[ntype].data['deg'])
                 g.nodes[ntype].data['w'] = F.replace_inf_with_zero(deg_inv_sqrt)
                 g.apply_edges(lambda edge: {'w': edge.src['w'] * edge.data[self.eweight_name] *
-                                            edge.dst['w']},
+                                                 edge.dst['w']},
                               etype=c_etype)
             else:
                 deg = g.in_degrees(etype=c_etype)
@@ -775,24 +775,27 @@ class PPR(BaseTransform):
     Apply personalized PageRank (PPR) to an input graph for diffusion, as introduced in
     `The pagerank citation ranking: Bringing order to the web
     <http://ilpubs.stanford.edu:8090/422/>`__. A sparsification will be applied to the
-    weighted adjacency matrix after diffusion.
+    weighted adjacency matrix after diffusion. Specifically, edges whose weight is below
+    a threshold will be dropped.
 
     This module only works for homogeneous graphs.
 
     Parameters
     ----------
     alpha : float, optional
-        Return probability, which commonly lies in :math:`[0.05, 0.2]`.
+        Restart probability, which commonly lies in :math:`[0.05, 0.2]`.
     eweight_name : str, optional
         :attr:`edata` name to retrieve and store edge weights. If it does
         not exist in an input graph, this module initializes a weight of 1
         for all edges. The edge weights should be a tensor of shape :math:`(E)`,
         where E is the number of edges.
     eps : float, optional
-        The threshold to preserve edges in sparsification after diffusion.
+        The threshold to preserve edges in sparsification after diffusion. Edges of a
+        weight smaller than eps will be dropped.
     avg_degree : int, optional
-        The desired average node degree of the sparsified graph. It will only come into
-        effect only if :attr:`eps` is not specified.
+        The desired average node degree of the result graph. This is the other way to
+        control the sparsity of the result graph and will only be effective if
+        :attr:`eps` is not given.
 
     Example
     -------
@@ -868,6 +871,7 @@ class HeatKernel(BaseTransform):
     `Diffusion kernels on graphs and other discrete structures
     <https://www.ml.cmu.edu/research/dap-papers/kondor-diffusion-kernels.pdf>`__.
     A sparsification will be applied to the weighted adjacency matrix after diffusion.
+    Specifically, edges whose weight is below a threshold will be dropped.
 
     This module only works for homogeneous graphs.
 
@@ -881,10 +885,12 @@ class HeatKernel(BaseTransform):
         for all edges. The edge weights should be a tensor of shape :math:`(E)`,
         where E is the number of edges.
     eps : float, optional
-        The threshold to preserve edges in sparsification after diffusion.
+        The threshold to preserve edges in sparsification after diffusion. Edges of a
+        weight smaller than eps will be dropped.
     avg_degree : int, optional
-        The desired average node degree of the sparsified graph. It will only come into
-        effect only if :attr:`eps` is not specified.
+        The desired average node degree of the result graph. This is the other way to
+        control the sparsity of the result graph and will only be effective if
+        :attr:`eps` is not given.
 
     Example
     -------
@@ -963,8 +969,9 @@ class GDC(BaseTransform):
     Description
     -----------
     Apply graph diffusion convolution (GDC) to an input graph, as introduced in
-    `Diffusion Improves Graph Learning <https://www.in.tum.de/daml/gdc/>`__. It
-    performs graph diffusion followed by graph sparsification.
+    `Diffusion Improves Graph Learning <https://www.in.tum.de/daml/gdc/>`__. A sparsification
+    will be applied to the weighted adjacency matrix after diffusion. Specifically, edges whose
+    weight is below a threshold will be dropped.
 
     This module only works for homogeneous graphs.
 
@@ -978,10 +985,12 @@ class GDC(BaseTransform):
         for all edges. The edge weights should be a tensor of shape :math:`(E)`,
         where E is the number of edges.
     eps : float, optional
-        The threshold to preserve edges in sparsification after diffusion.
+        The threshold to preserve edges in sparsification after diffusion. Edges of a
+        weight smaller than eps will be dropped.
     avg_degree : int, optional
-        The desired average node degree of the sparsified graph. It will only come into
-        effect only if :attr:`eps` is not specified.
+        The desired average node degree of the result graph. This is the other way to
+        control the sparsity of the result graph and will only be effective if
+        :attr:`eps` is not given.
 
     Example
     -------
@@ -1068,6 +1077,7 @@ class NodeShuffle(BaseTransform):
     >>> g = dgl.graph(([0, 1], [1, 2]))
     >>> g.ndata['h1'] = torch.tensor([[1., 2.], [3., 4.], [5., 6.]])
     >>> g.ndata['h2'] = torch.tensor([[7., 8.], [9., 10.], [11., 12.]])
+    >>> g = transform(g)
     >>> print(g.ndata['h1'])
     tensor([[5., 6.],
             [3., 4.],
@@ -1184,7 +1194,7 @@ class DropEdge(BaseTransform):
             g.remove_edges(eids_to_remove, etype=c_etype)
         return g
 
-class RandomAddEdge(BaseTransform):
+class AddEdge(BaseTransform):
     r"""
 
     Description
@@ -1201,9 +1211,9 @@ class RandomAddEdge(BaseTransform):
     -------
 
     >>> import dgl
-    >>> from dgl import RandomAddEdge
+    >>> from dgl import AddEdge
 
-    >>> transform = RandomAddEdge()
+    >>> transform = AddEdge()
     >>> g = dgl.rand_graph(5, 20)
     >>> new_g = transform(g)
     >>> print(new_g.num_edges())

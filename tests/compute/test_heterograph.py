@@ -1773,11 +1773,11 @@ def test_is_bidirected(idtype):
     g.edata['w'] = F.tensor([0.1, 0.2])
     assert not g.is_bidirected(eweight='w')
 
-    g = dgl.graph(([0, 1, 2, 0], [1, 0, 0, 2]), idtype=idtype, device=F.ctx())
+    g = dgl.graph(([0, 0, 1, 1, 2, 0], [1, 1, 0, 0, 0, 2]), idtype=idtype, device=F.ctx())
     assert g.is_bidirected()
-    g.edata['w'] = F.tensor([0.1, 0.1, 0.2, 0.2])
+    g.edata['w'] = F.tensor([0.1, 0.2, 0.2, 0.1, 0.3, 0.3])
     assert g.is_bidirected(eweight='w')
-    g.edata['w'] = F.tensor([0.1, 0.3, 0.2, 0.2])
+    g.edata['w'] = F.tensor([0.1, 0.2, 0.2, 0.3, 0.3, 0.3])
     assert not g.is_bidirected(eweight='w')
 
     g = dgl.heterograph({

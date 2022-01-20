@@ -2282,8 +2282,8 @@ def test_module_drop_edge(idtype):
     assert new_g.canonical_etypes == g.canonical_etypes
 
 @parametrize_dtype
-def test_module_random_add_edge(idtype):
-    transform = dgl.RandomAddEdge()
+def test_module_add_edge(idtype):
+    transform = dgl.AddEdge()
     g = dgl.heterograph({
         ('A', 'r1', 'B'): ([0, 1, 2, 3, 4], [1, 2, 3, 4, 5]),
         ('C', 'r2', 'C'): ([0, 1, 2, 3, 4], [1, 2, 3, 4, 5])
