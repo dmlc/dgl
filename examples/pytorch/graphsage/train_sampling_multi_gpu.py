@@ -61,18 +61,8 @@ def run(proc_id, n_gpus, args, devices, data):
                                           rank=proc_id)
 
     # Unpack data
-    n_classes, train_g, val_g, test_g = data
-
-    if args.inductive:
-        train_nfeat = train_g.ndata.pop('features')
-        val_nfeat = val_g.ndata.pop('features')
-        test_nfeat = test_g.ndata.pop('features')
-        train_labels = train_g.ndata.pop('labels')
-        val_labels = val_g.ndata.pop('labels')
-        test_labels = test_g.ndata.pop('labels')
-    else:
-        train_nfeat = val_nfeat = test_nfeat = g.ndata.pop('features')
-        train_labels = val_labels = test_labels = g.ndata.pop('labels')
+    n_classes, train_g, val_g, test_g, train_nfeat, val_nfeat, test_nfeat, \
+    train_labels, val_labels, test_labels, train_nid, val_nid, test_nid = data
 
     if args.data_device == 'gpu':
         train_nfeat = train_nfeat.to(device)
@@ -82,13 +72,6 @@ def run(proc_id, n_gpus, args, devices, data):
         train_labels = dgl.contrib.UnifiedTensor(train_labels, device=device)
 
     in_feats = train_nfeat.shape[1]
-
-    train_mask = train_g.ndata['train_mask']
-    val_mask = val_g.ndata['val_mask']
-    test_mask = ~(test_g.ndata['train_mask'] | test_g.ndata['val_mask'])
-    train_nid = train_mask.nonzero().squeeze()
-    val_nid = val_mask.nonzero().squeeze()
-    test_nid = test_mask.nonzero().squeeze()
 
     if args.sample_device == 'gpu':
         train_nid = train_nid.to(device)
@@ -218,21 +201,52 @@ if __name__ == '__main__':
         g, n_classes = load_reddit()
     elif args.dataset == 'ogbn-products':
         g, n_classes = load_ogb('ogbn-products')
+    elif args.dataset == 'ogbn-papers100M':
+        g, n_classes = load_ogb('ogbn-papers100M', root='/workspace/dataset')
+        g = dgl.add_reverse_edges(g)
+        # convert labels to integer
+        g.ndata['labels'] = th.as_tensor(g.ndata['labels'], dtype=th.int64)
     else:
         raise Exception('unknown dataset')
 
     if args.inductive:
         train_g, val_g, test_g = inductive_split(g)
+        train_nfeat = train_g.ndata.pop('features')
+        val_nfeat = val_g.ndata.pop('features')
+        test_nfeat = test_g.ndata.pop('features')
+        train_labels = train_g.ndata.pop('labels')
+        val_labels = val_g.ndata.pop('labels')
+        test_labels = test_g.ndata.pop('labels')
     else:
         train_g = val_g = test_g = g
+        train_nfeat = val_nfeat = test_nfeat = g.ndata.pop('features')
+        train_labels = val_labels = test_labels = g.ndata.pop('labels')
+
+    train_mask = train_g.ndata['train_mask']
+    val_mask = val_g.ndata['val_mask']
+    test_mask = ~(test_g.ndata['train_mask'] | test_g.ndata['val_mask'])
+    train_nid = train_mask.nonzero().squeeze()
+    val_nid = val_mask.nonzero().squeeze()
+    test_nid = test_mask.nonzero().squeeze()
 
     # Create csr/coo/csc formats before launching training processes with multi-gpu.
     # This avoids creating certain formats in each sub-process, which saves momory and CPU.
     train_g.create_formats_()
     val_g.create_formats_()
     test_g.create_formats_()
+    if n_gpus > 1:
+        # Copy the graph to shared memory explicitly before pinning.
+        # In other cases, we can just rely on fork's copy-on-write.
+        # TODO: the original train_g is not freed.
+        if args.sample_device == 'uva':
+            train_g = train_g.shared_memory('train_g')
+        if args.data_device == 'uva':
+            train_nfeat = train_nfeat.share_memory_()
+            train_labels = train_labels.share_memory_()
+
     # Pack data
-    data = n_classes, train_g, val_g, test_g
+    data = n_classes, train_g, val_g, test_g, train_nfeat, val_nfeat, test_nfeat, \
+           train_labels, val_labels, test_labels, train_nid, val_nid, test_nid
 
     if devices[0] == -1:
         assert args.sample_device == 'cpu', \
