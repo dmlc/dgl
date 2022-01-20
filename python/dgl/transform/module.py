@@ -14,12 +14,14 @@
 #   limitations under the License.
 #
 """Modules for transform"""
+# pylint: disable= no-member, arguments-differ, invalid-name
+
+from scipy.linalg import expm
 
 from .. import convert
 from .. import backend as F
 from .. import function as fn
 from . import functional
-from scipy.linalg import expm
 
 try:
     import torch
@@ -744,8 +746,8 @@ class GCNNorm(BaseTransform):
                 g.update_all(fn.copy_e(self.eweight_name, 'm'), fn.sum('m', 'deg'))
                 deg_inv_sqrt = 1. / F.sqrt(g.nodes[ntype].data['deg'])
                 g.nodes[ntype].data['w'] = F.replace_inf_with_zero(deg_inv_sqrt)
-                g.apply_edges(lambda edges: {'w':
-                    edges.src['w'] * edges.data[self.eweight_name] * edges.dst['w']})
+                g.apply_edges(lambda edges:
+                    {'w': edges.src['w'] * edges.data[self.eweight_name] * edges.dst['w']})
             else:
                 deg = g.in_degrees(etype=c_etype)
                 deg_inv_sqrt = 1. / F.sqrt(deg)
@@ -855,6 +857,7 @@ class PPR(BaseTransform):
 
         return new_g
 
+# pylint: disable=C0103
 class HeatKernel(BaseTransform):
     r"""
 
@@ -1081,6 +1084,7 @@ class NodeShuffle(BaseTransform):
                 g.nodes[ntype].data[key] = feat[perm]
         return g
 
+# pylint: disable=C0103
 class DropNode(BaseTransform):
     r"""
 
@@ -1130,6 +1134,7 @@ class DropNode(BaseTransform):
             g.remove_nodes(nids_to_remove, ntype=ntype)
         return g
 
+# pylint: disable=C0103
 class DropEdge(BaseTransform):
     r"""
 
