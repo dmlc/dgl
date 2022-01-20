@@ -310,7 +310,7 @@ void gatherMM_SortedEtype(const NDArray h,
                 n, m, k,
                 &alpha,
                 w_data + w_offset, n,
-                ((H_trans)? h_trans_data : h_data) + h_offset, k,
+                (H_trans) ? h_trans_data : h_data + h_offset, k,
                 &beta,
                 out_data + out_offset, n));
             if (H_trans)
