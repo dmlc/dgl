@@ -365,6 +365,9 @@ class GetSharedDataRequest(rpc.Request):
         meta = {}
         kv_store = server_state.kv_store
         for name, data in kv_store.data_store.items():
+            if server_state.keep_alive:
+                if name not in kv_store.orig_data:
+                    continue
             meta[name] = (F.shape(data),
                           F.reverse_data_type_dict[F.dtype(data)],
                           kv_store.part_policy[name].policy_str)
@@ -674,6 +677,8 @@ class KVServer(object):
                              CountLocalNonzeroResponse)
         # Store the tensor data with specified data name
         self._data_store = {}
+        # Store original tensor data names when instantiating DistGraphServer
+        self._orig_data = set()
         # Store the partition information with specified data name
         self._policy_set = set()
         self._part_policy = {}
@@ -717,6 +722,11 @@ class KVServer(object):
     def data_store(self):
         """Get data store"""
         return self._data_store
+
+    @property
+    def orig_data(self):
+        """Get original data"""
+        return self._orig_data
 
     @property
     def part_policy(self):

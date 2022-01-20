@@ -354,6 +354,7 @@ class DistGraphServer(KVServer):
                 data_name = HeteroDataName(True, ntype, feat_name)
                 self.init_data(name=str(data_name), policy_str=data_name.policy_str,
                                data_tensor=node_feats[name])
+                self.orig_data.add(str(data_name))
             for name in edge_feats:
                 # The feature name has the following format: edge_type + "/" + feature_name to avoid
                 # feature name collision for different edge types.
@@ -361,6 +362,7 @@ class DistGraphServer(KVServer):
                 data_name = HeteroDataName(False, etype, feat_name)
                 self.init_data(name=str(data_name), policy_str=data_name.policy_str,
                                data_tensor=edge_feats[name])
+                self.orig_data.add(str(data_name))
 
     def start(self):
         """ Start graph store server.

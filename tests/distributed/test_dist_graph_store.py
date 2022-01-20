@@ -121,9 +121,6 @@ def run_client(graph_name, part_id, server_count, num_clients, num_nodes, num_ed
     gpb, graph_name, _, _ = load_partition_book('/tmp/dist_graph/{}.json'.format(graph_name),
                                                 part_id, None)
     g = DistGraph(graph_name, gpb=gpb)
-    if multi_groups:
-        # sync with all clients as no graph-data init is allowed when init DistGraph
-        time.sleep(5)
     check_dist_graph(g, num_clients, num_nodes, num_edges, multi_groups)
 
 def run_emb_client(graph_name, part_id, server_count, num_clients, num_nodes, num_edges):
