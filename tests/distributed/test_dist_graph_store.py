@@ -123,8 +123,9 @@ def run_client(graph_name, part_id, server_count, num_clients, num_nodes, num_ed
     g = DistGraph(graph_name, gpb=gpb)
     check_dist_graph(g, num_clients, num_nodes, num_edges, multi_groups)
 
-def run_emb_client(graph_name, part_id, server_count, num_clients, num_nodes, num_edges):
+def run_emb_client(graph_name, part_id, server_count, num_clients, num_nodes, num_edges, group_id):
     os.environ['DGL_NUM_SERVER'] = str(server_count)
+    os.environ['DGL_GROUP_ID'] = str(group_id)
     dgl.distributed.initialize("kv_ip_config.txt")
     gpb, graph_name, _, _ = load_partition_book('/tmp/dist_graph/{}.json'.format(graph_name),
                                                 part_id, None)
@@ -149,7 +150,9 @@ def check_dist_emb(g, num_clients, num_nodes, num_edges):
     from dgl.distributed import DistEmbedding
     # Test sparse emb
     try:
-        emb = DistEmbedding(g.number_of_nodes(), 1, 'emb1', emb_init)
+        group_id = os.environ.get('DGL_GROUP_ID', 0)
+        emb_name = f'emb1_{group_id}'
+        emb = DistEmbedding(g.number_of_nodes(), 1, emb_name, emb_init)
         nids = F.arange(0, int(g.number_of_nodes()))
         lr = 0.001
         optimizer = SparseAdagrad([emb], lr=lr)
@@ -168,12 +171,13 @@ def check_dist_emb(g, num_clients, num_nodes, num_edges):
 
         policy = dgl.distributed.PartitionPolicy('node', g.get_partition_book())
         grad_sum = dgl.distributed.DistTensor((g.number_of_nodes(), 1), F.float32,
-                                              'emb1_sum', policy)
+                                              emb_name + '_sum', policy)
         if num_clients == 1:
             assert np.all(F.asnumpy(grad_sum[nids]) == np.ones((len(nids), 1)) * num_clients)
         assert np.all(F.asnumpy(grad_sum[rest]) == np.zeros((len(rest), 1)))
 
-        emb = DistEmbedding(g.number_of_nodes(), 1, 'emb2', emb_init)
+        emb2_name = f'emb2_{group_id}'
+        emb = DistEmbedding(g.number_of_nodes(), 1, emb2_name, emb_init)
         with F.no_grad():
             feats1 = emb(nids)
         assert np.all(F.asnumpy(feats1) == 0)
@@ -201,9 +205,9 @@ def check_dist_emb(g, num_clients, num_nodes, num_edges):
         sys.exit(-1)
 
 def check_dist_graph(g, num_clients, num_nodes, num_edges, multi_groups=False):
-    """DistGraph/DistTensor are shared across all clients and all groups. For those
-    have same name, read simultaneously is ok while write simultaneously is undefined
-    behavior
+    """DistGraph/DistTensor are shared across all clients and all groups, so
+    the name is required to be globally unique except the original data when
+    DistGraphServer is constructed.
     """
     # Test API
     assert g.number_of_nodes() == num_nodes
@@ -290,52 +294,13 @@ def check_dist_graph(g, num_clients, num_nodes, num_edges, multi_groups=False):
 
     print('end')
 
-def check_dist_emb_server_client(shared_mem, num_servers, num_clients):
+def check_dist_emb_server_client(shared_mem, num_servers, num_clients, num_groups=1):
     prepare_dist()
     g = create_random_graph(10000)
 
     # Partition the graph
     num_parts = 1
-    graph_name = 'dist_graph_test_2'
-    g.ndata['features'] = F.unsqueeze(F.arange(0, g.number_of_nodes()), 1)
-    g.edata['features'] = F.unsqueeze(F.arange(0, g.number_of_edges()), 1)
-    partition_graph(g, graph_name, num_parts, '/tmp/dist_graph')
-
-    # let's just test on one partition for now.
-    # We cannot run multiple servers and clients on the same machine.
-    serv_ps = []
-    ctx = mp.get_context('spawn')
-    for serv_id in range(num_servers):
-        p = ctx.Process(target=run_server, args=(graph_name, serv_id, num_servers,
-                                                 num_clients, shared_mem))
-        serv_ps.append(p)
-        p.start()
-
-    cli_ps = []
-    for cli_id in range(num_clients):
-        print('start client', cli_id)
-        p = ctx.Process(target=run_emb_client, args=(graph_name, 0, num_servers, num_clients,
-                                                     g.number_of_nodes(),
-                                                     g.number_of_edges()))
-        p.start()
-        cli_ps.append(p)
-
-    for p in cli_ps:
-        p.join()
-        assert p.exitcode == 0
-
-    for p in serv_ps:
-        p.join()
-
-    print('clients have terminated')
-
-def check_server_client(shared_mem, num_servers, num_clients, num_groups=1, in_parallel=False):
-    prepare_dist()
-    g = create_random_graph(10000)
-
-    # Partition the graph
-    num_parts = 1
-    graph_name = f'check_server_client_{shared_mem}_{num_servers}_{num_clients}_{num_groups}_{in_parallel}'
+    graph_name = f'check_dist_emb_{shared_mem}_{num_servers}_{num_clients}_{num_groups}'
     g.ndata['features'] = F.unsqueeze(F.arange(0, g.number_of_nodes()), 1)
     g.edata['features'] = F.unsqueeze(F.arange(0, g.number_of_edges()), 1)
     partition_graph(g, graph_name, num_parts, '/tmp/dist_graph')
@@ -351,30 +316,64 @@ def check_server_client(shared_mem, num_servers, num_clients, num_groups=1, in_p
         serv_ps.append(p)
         p.start()
 
-    if in_parallel:
-        # launch different client groups simultaneously
-        cli_ps = []
-        for cli_id in range(num_clients):
-            for group_id in range(num_groups):
-                print('start client[{}] for group[{}]'.format(cli_id, group_id))
-                p = ctx.Process(target=run_client, args=(graph_name, 0, num_servers, num_clients, g.number_of_nodes(),
-                                                        g.number_of_edges(), group_id, num_groups > 1))
-                p.start()
-                cli_ps.append(p)
-        for p in cli_ps:
-            p.join()
-    else: 
-        # launch different client groups sequentially
+    cli_ps = []
+    for cli_id in range(num_clients):
         for group_id in range(num_groups):
-            cli_ps = []
-            for cli_id in range(num_clients):
-                print('start client[{}] for group[{}]'.format(cli_id, group_id))
-                p = ctx.Process(target=run_client, args=(graph_name, 0, num_servers, num_clients, g.number_of_nodes(),
-                                                        g.number_of_edges(), group_id, False))
-                p.start()
-                cli_ps.append(p)
-            for p in cli_ps:
-                    p.join()
+            print('start client[{}] for group[{}]'.format(cli_id, group_id))
+            p = ctx.Process(target=run_emb_client, args=(graph_name, 0, num_servers, num_clients,
+                                                        g.number_of_nodes(),
+                                                        g.number_of_edges(),
+                                                        group_id))
+            p.start()
+            cli_ps.append(p)
+
+    for p in cli_ps:
+        p.join()
+        assert p.exitcode == 0
+
+    if keep_alive:
+        for p in serv_ps:
+            assert p.is_alive()
+        # force shutdown server
+        dgl.distributed.shutdown_servers("kv_ip_config.txt", num_servers)
+    for p in serv_ps:
+        p.join()
+
+    print('clients have terminated')
+
+def check_server_client(shared_mem, num_servers, num_clients, num_groups=1):
+    prepare_dist()
+    g = create_random_graph(10000)
+
+    # Partition the graph
+    num_parts = 1
+    graph_name = f'check_server_client_{shared_mem}_{num_servers}_{num_clients}_{num_groups}'
+    g.ndata['features'] = F.unsqueeze(F.arange(0, g.number_of_nodes()), 1)
+    g.edata['features'] = F.unsqueeze(F.arange(0, g.number_of_edges()), 1)
+    partition_graph(g, graph_name, num_parts, '/tmp/dist_graph')
+
+    # let's just test on one partition for now.
+    # We cannot run multiple servers and clients on the same machine.
+    serv_ps = []
+    ctx = mp.get_context('spawn')
+    keep_alive = num_groups > 1
+    for serv_id in range(num_servers):
+        p = ctx.Process(target=run_server, args=(graph_name, serv_id, num_servers,
+                                                 num_clients, shared_mem, keep_alive))
+        serv_ps.append(p)
+        p.start()
+
+    # launch different client groups simultaneously
+    cli_ps = []
+    for cli_id in range(num_clients):
+        for group_id in range(num_groups):
+            print('start client[{}] for group[{}]'.format(cli_id, group_id))
+            p = ctx.Process(target=run_client, args=(graph_name, 0, num_servers, num_clients, g.number_of_nodes(),
+                                                    g.number_of_edges(), group_id, num_groups > 1))
+            p.start()
+            cli_ps.append(p)
+    for p in cli_ps:
+        p.join()
 
     if keep_alive:
         for p in serv_ps:
@@ -599,10 +598,9 @@ def test_server_client():
     check_server_client(True, 1, 1)
     check_server_client(False, 1, 1)
     check_server_client(True, 2, 2)
-    for flag in [True, False]:
-        check_server_client(flag, 1, 1, 5, flag)
-        check_server_client(flag, 1, 1, 5, not flag)
-        check_server_client(True, 2, 2, 5, flag)
+    check_server_client(True, 1, 1, 5)
+    check_server_client(False, 1, 1, 5)
+    check_server_client(True, 2, 2, 5)
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support distributed DistEmbedding")
@@ -613,6 +611,9 @@ def test_dist_emb_server_client():
     check_dist_emb_server_client(True, 1, 1)
     check_dist_emb_server_client(False, 1, 1)
     check_dist_emb_server_client(True, 2, 2)
+    check_dist_emb_server_client(True, 1, 1, 5)
+    check_dist_emb_server_client(False, 1, 1, 5)
+    check_dist_emb_server_client(True, 2, 2, 5)
 
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support some of operations in DistGraph")
 @unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Turn off Mxnet support")
