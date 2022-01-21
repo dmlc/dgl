@@ -3,10 +3,10 @@
  * \file array/cuda/gather_mm.cu
  * \brief SDDMM C APIs and definitions.
  */
-#include <algorithm>    // std::swap
 #include <dgl/array.h>
 #include "./utils.h"
 #include "./functor.cuh"
+#include <algorithm>  // std::swap
 
 namespace dgl {
 using namespace cuda;
