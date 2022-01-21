@@ -86,8 +86,7 @@ def main(args):
     else:
         args.device = torch.device("cpu")
 
-    dataset = GINDataset(args.dataset, not args.learn_eps)
-
+    dataset = GINDataset(args.dataset, not args.learn_eps, args.degree_as_nlabel)
     trainloader, validloader = GINDataLoader(
         dataset, batch_size=args.batch_size, device=args.device,
         seed=args.seed, shuffle=True,

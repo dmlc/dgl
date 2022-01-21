@@ -28,15 +28,22 @@ An experiment on the GIN in customized settings can be run with
 python main.py [--device 0 | --disable-cuda] --dataset COLLAB \
                --graph_pooling_type max --neighbor_pooling_type sum
 ```
+hint: **following the settings like the paper** is essential to reproduce the result reported.
+
+add `--degree_as_nlabel` to  use one-hot encodings of node degrees as node feature vectors
 
 Results
 -------
 
 Run with following with the double SUM pooling way:
-(tested dataset: "MUTAG"(default), "COLLAB", "IMDBBINARY", "IMDBMULTI")
+(tested dataset: "MUTAG"(default), "COLLAB", "IMDBBINARY", "IMDBMULTI"), results may **fluctuate**, due to random factors and the relatively small data set.
 ```bash
 python main.py --dataset MUTAG --device 0  \
                 --graph_pooling_type sum --neighbor_pooling_type sum
+
+python main.py --dataset COLLAB --device 0  \
+                --graph_pooling_type mean --neighbor_pooling_type sum --degree_as_nlabel
+
 ```
 
 * MUTAG: 0.85 (paper: ~0.89)

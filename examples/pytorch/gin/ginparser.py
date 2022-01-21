@@ -30,7 +30,10 @@ class Parser():
         self.parser.add_argument(
             '--filename', type=str, default="",
             help='output file')
-
+        self.parser.add_argument(
+            '--degree_as_nlabel', action="store_true",
+            help='use one-hot encodings of node degrees as node feature vectors')
+        
         # device
         self.parser.add_argument(
             '--disable-cuda', action='store_true',
