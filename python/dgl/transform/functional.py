@@ -46,6 +46,7 @@ __all__ = [
     'to_bidirected',
     'to_bidirected_stale',
     'add_reverse_edges',
+    'add_reverse_types',
     'laplacian_lambda_max',
     'knn_graph',
     'segmented_knn_graph',
@@ -859,6 +860,56 @@ def add_reverse_edges(g, readonly=None, copy_ndata=True,
         edge_frames = utils.extract_edge_subframes(g, eids)
         utils.set_new_frames(new_g, edge_frames=edge_frames)
 
+    return new_g
+
+def add_reverse_types(g, etypes=None, suffix='_inv', copy_ndata=True, copy_edata=True):
+    """Add a reverse edge type for each edge type specified.
+
+    Specifically, for each edge of type ``etype`` from source node ``u`` with type ``srctype``
+    and destination node ``v`` with type ``dsttype``, DGL adds another edge from ``v`` to
+    ``u`` with edge type name ``etype + suffix``.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        Input graph.
+    etypes : list[etype], optional
+        The list of edge types to add a reverse type for.  If None is given, DGL adds a
+        reverse edge type for every edge type.
+    suffix : str, optional
+        The reverse edge type suffix.
+    copy_ndata : bool, optional
+        If True, the node features of the new graph are copied from
+        the original graph. If False, the new graph will not have any
+        node features.
+
+        (Default: True)
+    copy_edata : bool, optional
+        If True, the edge features of the new graph are copied from
+        the original graph. If False, the new graph will not have any
+        edge features.
+
+        (Default: True)
+    """
+    new_edges = {}
+    new_edata = {}
+    new_ndata = {}
+    if etypes is None:
+        etypes = g.canonical_etypes
+    for etype in etypes:
+        utype, etype, vtype = g.to_canonical_etype(etype)
+        src, dst = g.edges(etype=etype)
+        rev_etype = etype + suffix
+        new_edges[(utype, etype, vtype)] = (src, dst)
+        new_edges[(vtype, rev_etype, utype)] = (dst, src)
+        new_edata[(utype, etype, vtype)] = g.edata[etype]
+        new_edata[(vtype, rev_etype, utype)] = g.edata[etype]
+    new_g = convert.heterograph(new_edges, num_nodes_dict={k: g.num_nodes(k) for k in g.ntypes})
+
+    for ntype in new_g.ntypes:
+        new_g.nodes[ntype].data.update(g.nodes[ntype].data)
+    for etype in new_g.canonical_etypes:
+        new_g.edges[etype].data.update(new_edata[etype])
     return new_g
 
 def line_graph(g, backtracking=True, shared=False):

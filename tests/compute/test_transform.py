@@ -400,6 +400,39 @@ def test_add_reverse_edges():
     assert F.array_equal(F.cat([g.edges['wins'].data['h'], g.edges['wins'].data['h']], dim=0),
                          bg.edges['wins'].data['h'])
 
+@parametrize_dtype
+def test_add_reverse_types(idtype):
+    g = dgl.heterograph({
+        ('A', 'AB', 'B'): (np.random.randint(0, 10, 20), np.random.randint(0, 10, 20)),
+        ('A', 'AA', 'A'): (np.random.randint(0, 10, 20), np.random.randint(0, 10, 20)),
+        ('B', 'BC', 'C'): (np.random.randint(0, 10, 20), np.random.randint(0, 20, 20))},
+        idtype=idtype, device=F.ctx())
+    g.ndata['x'] = {'A': F.randn((g.num_nodes('A'), 3)), 'C': F.randn((g.num_nodes('C'), 5))}
+    g.ndata.update({'y': {'B': F.randn((g.num_nodes('B'), 4)), 'C': F.randn((g.num_nodes('C'), 6))}})
+    g.edata['a'] = {'AB': F.randn((g.num_edges('AB'), 4)), 'BC': F.randn((g.num_edges('BC'), 5))}
+    g.edata.update({'b': {'BC': F.randn((g.num_edges('BC'), 6)), 'AA': F.randn((g.num_edges('AA'), 7))}})
+
+    def _test(g, new_g):
+        for etype in new_g.etypes:
+            if etype.endswith('_inv'):
+                another_etype = etype[:-4]
+                inv_src, inv_dst = new_g.edges(etype=etype)
+                src, dst = new_g.edges(etype=another_etype)
+                old_src, old_dst = g.edges(etype=another_etype)
+                assert F.array_equal(src, old_src)
+                assert F.array_equal(src, inv_dst)
+                assert F.array_equal(dst, old_dst)
+                assert F.array_equal(dst, inv_src)
+                for k in new_g.edges[etype].data:
+                    assert F.array_equal(new_g.edata[k][etype], new_g.edata[k][another_etype])
+                    assert F.array_equal(new_g.edata[k][etype], g.edata[k][another_etype])
+        for ntype in new_g.ntypes:
+            assert g.num_nodes(ntype) == new_g.num_nodes(ntype)
+            for k in g.nodes[ntype].data:
+                assert F.array_equal(g.ndata[k][ntype], new_g.ndata[k][ntype])
+    _test(g, dgl.add_reverse_types(g))
+    _test(g, dgl.add_reverse_types(g, ['AB', 'AA']))
+
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 def test_simple_graph():
