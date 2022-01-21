@@ -47,11 +47,9 @@ def start_server(rank, tmpdir, disable_shared_mem, num_clients, keep_alive=False
     g.start()
 
 
-def start_dist_dataloader(rank, tmpdir, num_server, drop_last, orig_nid, orig_eid, num_workers=0, group_id=0):
+def start_dist_dataloader(rank, tmpdir, num_server, drop_last, orig_nid, orig_eid, group_id=0):
     import dgl
     import torch as th
-    os.environ['DGL_DIST_MODE'] = 'distributed'
-    os.environ['DGL_NUM_SAMPLER'] = str(num_workers)
     os.environ['DGL_GROUP_ID'] = str(group_id)
     dgl.distributed.initialize("mp_ip_config.txt")
     gpb = None
@@ -239,12 +237,14 @@ def test_dist_dataloader(tmpdir, num_server, num_workers, drop_last, reshuffle, 
         time.sleep(1)
         pserver_list.append(p)
 
+    os.environ['DGL_DIST_MODE'] = 'distributed'
+    os.environ['DGL_NUM_SAMPLER'] = str(num_workers)
     ptrainer_list = []
     num_trainers = 1
     for trainer_id in range(num_trainers):
         for group_id in range(num_groups):
             p = ctx.Process(target=start_dist_dataloader, args=(
-                trainer_id, tmpdir, num_server, drop_last, orig_nid, orig_eid, num_workers, group_id))
+                trainer_id, tmpdir, num_server, drop_last, orig_nid, orig_eid, group_id))
             p.start()
             ptrainer_list.append(p)
 
@@ -451,7 +451,8 @@ if __name__ == "__main__":
         test_dataloader(Path(tmpdirname), 3, 4, 'node')
         test_dataloader(Path(tmpdirname), 3, 4, 'edge')
         test_neg_dataloader(Path(tmpdirname), 3, 4)
-        test_dist_dataloader(Path(tmpdirname), 3, 0, True, True)
-        test_dist_dataloader(Path(tmpdirname), 3, 4, True, True)
-        test_dist_dataloader(Path(tmpdirname), 3, 0, True, False)
-        test_dist_dataloader(Path(tmpdirname), 3, 4, True, False)
+        for num_groups in [1, 5]:
+            test_dist_dataloader(Path(tmpdirname), 3, 0, True, True)
+            test_dist_dataloader(Path(tmpdirname), 3, 4, True, True)
+            test_dist_dataloader(Path(tmpdirname), 3, 0, True, False)
+            test_dist_dataloader(Path(tmpdirname), 3, 4, True, False)
