@@ -67,10 +67,11 @@ class _TensorizedDatasetIter(object):
         return id_dict
 
 
-def _get_id_tensor_from_mapping(indices, device):
-    lengths = torch.LongTensor([indices[k].shape[0] for k in keys], device=device)
+def _get_id_tensor_from_mapping(indices, device, keys):
+    lengths = torch.LongTensor([
+        (indices[k].shape[0] if k in indices else 0) for k in keys], device=device)
     type_ids = torch.arange(len(keys), device=device).repeat_interleave(lengths)
-    all_indices = torch.cat([indices[k] for k in keys])
+    all_indices = torch.cat([indices[k] for k in keys if k in indices])
     return torch.stack([type_ids, all_indices], 1)
 
 
@@ -97,7 +98,7 @@ class TensorizedDataset(torch.utils.data.IterableDataset):
     def __init__(self, indices, keys, batch_size, drop_last):
         if isinstance(indices, Mapping):
             self._device = next(iter(indices.values())).device
-            self._tensor_dataset = _get_id_tensor_from_mapping(indices, self.device)
+            self._tensor_dataset = _get_id_tensor_from_mapping(indices, self._device, keys)
             self._mapping_keys = keys
         else:
             self._tensor_dataset = indices
@@ -152,7 +153,7 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
             name, id_ = _generate_shared_mem_name_id()
             if isinstance(indices, Mapping):
                 device = next(iter(indices.values())).device
-                id_tensor = _get_id_tensor_from_mapping(indices, device)
+                id_tensor = _get_id_tensor_from_mapping(indices, device, keys)
                 self._tensor_dataset = create_shared_mem_array(
                     name, (self.shared_mem_size, 2), torch.int64)
                 self._tensor_dataset[:id_tensor.shape[0], :] = id_tensor
