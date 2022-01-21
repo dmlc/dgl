@@ -1242,6 +1242,45 @@ def test_hetero_conv(agg, idtype):
     assert set(h.keys()) == {'user', 'game'}
 
 @parametrize_dtype
+@pytest.mark.parametrize('out_dim', [1, 2, 100])
+@pytest.mark.parametrize('feat_name', ['h', 'feat'])
+def test_hetero_linear_layer(idtype, out_dim, feat_name):
+    hg = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 0, 2, 1], [1, 2, 1, 3]),
+        ('user', 'plays', 'game'): ([0, 0, 0, 1, 2], [0, 2, 3, 0, 2]),
+        ('store', 'sells', 'game'): ([0, 0, 1, 1], [0, 3, 1, 2])},
+        idtype=idtype, device=F.ctx())
+    uf = F.randn((4, 2))
+    gf = F.randn((4, 4))
+    sf = F.randn((2, 3))
+    hg.nodes['user'].data[feat_name] = uf
+    hg.nodes['game'].data[feat_name] = gf
+    hg.nodes['store'].data[feat_name] = sf   
+    
+    conv = nn.HeteroLinearLayer(hg, out_dim, feat_name)
+    conv = conv.to(F.ctx())
+    g, feat = conv(hg)
+    
+    assert g.num_nodes() == hg.num_nodes()
+    assert feat.shape == (hg.num_nodes(), out_dim)
+
+@parametrize_dtype
+@pytest.mark.parametrize('out_dim', [1, 2, 100])
+def test_hetero_embedding(idtype, out_dim):
+    hg = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 0, 2, 1], [1, 2, 1, 3]),
+        ('user', 'plays', 'game'): ([0, 0, 0, 1, 2], [0, 2, 3, 0, 2]),
+        ('store', 'sells', 'game'): ([0, 0, 1, 1], [0, 3, 1, 2])},
+        idtype=idtype, device=F.ctx()) 
+    
+    conv = nn.HeteroEmbedding(hg, out_dim)
+    conv = conv.to(F.ctx())
+    g, feat = conv(hg)
+    
+    assert g.num_nodes() == hg.num_nodes()
+    assert feat.shape == (hg.num_nodes(), out_dim)
+    
+@parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
 @pytest.mark.parametrize('out_dim', [1, 2])
 def test_gnnexplainer(g, idtype, out_dim):
@@ -1383,4 +1422,6 @@ if __name__ == '__main__':
     test_atomic_conv()
     test_cf_conv()
     test_hetero_conv()
+    test_hetero_linear_layer()
+    test_hetero_embedding()
     test_twirls()
