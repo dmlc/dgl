@@ -896,6 +896,14 @@ def add_reverse_types(g, etypes=None, suffix='_inv', copy_ndata=True, copy_edata
     DGLGraph
         The new graph
 
+    Notes
+    -----
+    If :attr:`copy_ndata` is True, the resulting graph will share the node feature
+    tensors with the input graph. Hence, users should try to avoid in-place operations
+    which will be visible to both graphs. On the contrary, the two graphs do not share
+    the same edge feature storage.  The same applies to :attr:`copy_edata` and edge
+    features.
+
     Examples
     --------
     >>> g = dgl.heterograph({
@@ -905,8 +913,10 @@ def add_reverse_types(g, etypes=None, suffix='_inv', copy_ndata=True, copy_edata
     >>> new_g = dgl.add_reverse_types(g)
     >>> new_g
     Graph(num_nodes={'A': 5, 'B': 4, 'C': 4},
-          num_edges={('A', 'AB', 'B'): 3, ('A', 'AC', 'C'): 6, ('B', 'AB_inv', 'A'): 3, ('C', 'AC_inv', 'A'): 6},
-          metagraph=[('A', 'B', 'AB'), ('A', 'C', 'AC'), ('B', 'A', 'AB_inv'), ('C', 'A', 'AC_inv')])
+          num_edges={('A', 'AB', 'B'): 3, ('A', 'AC', 'C'): 6, ('B', 'AB_inv', 'A'): 3,
+                     ('C', 'AC_inv', 'A'): 6},
+          metagraph=[('A', 'B', 'AB'), ('A', 'C', 'AC'), ('B', 'A', 'AB_inv'),
+                     ('C', 'A', 'AC_inv')])
     >>> src, dst = new_g.edges(etype='AB')
     >>> new_src, new_dst = new_g.edges(etype='AB_inv')
     >>> torch.equal(src, new_dst) and torch.equal(dst, new_src)
@@ -927,10 +937,12 @@ def add_reverse_types(g, etypes=None, suffix='_inv', copy_ndata=True, copy_edata
         new_edata[(vtype, rev_etype, utype)] = g.edata[etype]
     new_g = convert.heterograph(new_edges, num_nodes_dict={k: g.num_nodes(k) for k in g.ntypes})
 
-    for ntype in new_g.ntypes:
-        new_g.nodes[ntype].data.update(g.nodes[ntype].data)
-    for etype in new_g.canonical_etypes:
-        new_g.edges[etype].data.update(new_edata[etype])
+    if copy_ndata:
+        for ntype in new_g.ntypes:
+            new_g.nodes[ntype].data.update(g.nodes[ntype].data)
+    if copy_edata:
+        for etype in new_g.canonical_etypes:
+            new_g.edges[etype].data.update(new_edata[etype])
     return new_g
 
 def line_graph(g, backtracking=True, shared=False):
