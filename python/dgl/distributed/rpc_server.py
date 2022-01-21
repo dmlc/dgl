@@ -67,7 +67,8 @@ def start_server(server_id, ip_config, num_servers, num_clients, server_state, \
     # wait all the senders connect to server.
     # Once all the senders connect to server, server will not
     # accept new sender's connection
-    print("Wait connections non-blockingly...")
+    print(
+        "Server is waiting for connections non-blockingly on [{}:{}]...".format(ip_addr, port))
     rpc.receiver_wait(ip_addr, port, num_clients, blocking=False)
     rpc.set_num_client(num_clients)
     recv_clients = {}
