@@ -177,6 +177,57 @@ __global__ void SpMMCsrKernel(
 }
 
 /*!
+ * \brief CUDA kernel of edge_softmax backward Kernel on Csr format.
+ * \note it uses node parallel strategy, different threadblocks (on y-axis)
+ *       is responsible for the computation on different destination nodes.
+ *       Threadblocks on the x-axis are responsible for the computation on
+ *       different positions in feature dimension.
+ */
+template <typename Idx, typename DType,
+          typename BinaryOp, typename ReduceOp,
+          bool UseBcast = false, bool UseIdx = false>
+__global__ void Edge_backwardKernel(
+  const DType* __restrict__ f_out_data,
+  const DType* __restrict__ sds_data,
+  DType* __restrict__ back_out_data,
+  const Idx* __restrict__ indptr,
+  const Idx* __restrict__ indices,
+  const Idx* __restrict__ edge_map,
+  int64_t num_rows, int64_t num_cols,
+  const int64_t* __restrict__ ubcast_off,
+  const int64_t* __restrict__ ebcast_off,
+  int64_t f_out_data_len, int64_t sds_data_len, int64_t back_out_data_len) {
+  // Edge softmax backward with CSR.
+  int ty = blockIdx.y * blockDim.y + threadIdx.y;
+  const Idx stride_y = blockDim.y * gridDim.y;
+  const int stride_x = blockDim.x * gridDim.x;
+  while (ty < num_rows) {
+    int tx = blockIdx.x * blockDim.x + threadIdx.x;
+    while (tx < back_out_data_len) {
+      DType local_accum = ReduceOp::zero();
+      Idx local_argu = 0, local_arge = 0;
+      const int lhs_add = UseBcast ? ubcast_off[tx] : tx;
+      const int rhs_add = UseBcast ? ebcast_off[tx] : tx;
+      for (Idx i = indptr[ty]; i < indptr[ty + 1]; ++i) {
+        const Idx eid = UseIdx ? _ldg(edge_map + i) : i;
+        const Idx cid = _ldg(indices + i);
+        const DType* sds_off = BinaryOp::use_rhs ? (sds_data + eid * sds_data_len): nullptr;
+        DType out = BinaryOp::Call(sds_off + rhs_add, sds_off + rhs_add);
+        ReduceOp::Call(&local_accum, &local_argu, &local_arge, out, cid, eid);
+      }
+      for (Idx i = indptr[ty]; i < indptr[ty + 1]; ++i) {
+        const Idx eid = UseIdx ? _ldg(edge_map + i) : i;
+        Idx tmp = eid * sds_data_len;
+        const DType* f_out_off = BinaryOp::use_rhs ? (f_out_data + tmp + rhs_add): nullptr;
+        const DType* sds_off = BinaryOp::use_rhs ? (sds_data + tmp): nullptr;
+        back_out_data[tmp + rhs_add] = (*(sds_off+ rhs_add)) - local_accum * (*(f_out_off));
+      }
+      tx += stride_x;
+    }
+    ty += stride_y;
+  }
+}
+/*!
  * \brief CUDA kernel of SpMM-Min/Max on Csr format.
  * \note it uses node parallel strategy, different threadblocks (on y-axis)
  *       is responsible for the computation on different destination nodes.
@@ -290,7 +341,7 @@ void SpMMCoo(
   const int nty = CUDA_MAX_NUM_THREADS / ntx;
   const int nbx = (len + ntx - 1) / ntx;
   const int nby = FindNumBlocks<'y'>((E + nty - 1) / nty);
-  //LOG(INFO) << "nblks=(" << nbx << ", " << nby << ") nthrs=(" << ntx << ", " << nty << ")";
+  // LOG(INFO) << "nblks=(" << nbx << ", " << nby << ") nthrs=(" << ntx << ", " << nty << ")";
   const dim3 nblks(nbx, nby);
   const dim3 nthrs(ntx, nty);
   const bool use_idx = !IsNullArray(coo.data);
@@ -355,7 +406,7 @@ void SpMMCsr(
   const int nty = CUDA_MAX_NUM_THREADS / ntx;
   const int nbx = (len + ntx - 1) / ntx;
   const int nby = FindNumBlocks<'y'>((csr.num_rows + nty - 1) / nty);
-  //LOG(INFO) << "nblks=(" << nbx << ", " << nby << ") nthrs=(" << ntx << ", " << nty << ")";
+  // LOG(INFO) << "nblks=(" << nbx << ", " << nby << ") nthrs=(" << ntx << ", " << nty << ")";
   const dim3 nblks(nbx, nby);
   const dim3 nthrs(ntx, nty);
   const bool use_idx = !IsNullArray(csr.data);
@@ -371,6 +422,53 @@ void SpMMCsr(
   });
 }
 
+/*!
+ * \brief CUDA implementation of edge_softmax backward on Csr format.
+ * \param bcast Broadcast information.
+ * \param csr The Csr matrix.
+ * \param f_out The result of edge_softmax forward.
+ * \param sds The result of  f_out * gradiet.
+ * \param back_out The result of edge_softmax backward, named grad_score in python .
+ */
+template <typename Idx, typename DType,
+          typename BinaryOp, typename ReduceOp>
+void Edge_softmax_csr_backward(
+    const BcastOff& bcast,
+    const CSRMatrix& csr,
+    NDArray f_out, NDArray sds,
+    NDArray back_out) {
+  const Idx *indptr = csr.indptr.Ptr<Idx>();
+  const Idx *indices = csr.indices.Ptr<Idx>();
+  const Idx *edge_map = csr.data.Ptr<Idx>();
+  const DType *f_out_data = f_out.Ptr<DType>();
+  const DType *sds_data = sds.Ptr<DType>();
+  DType *back_out_data = back_out.Ptr<DType>();
+
+  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+
+  int64_t *ubcast_off = nullptr, *ebcast_off = nullptr;
+  int64_t len = bcast.out_len,
+          lhs_len = bcast.lhs_len,
+          rhs_len = bcast.rhs_len;
+  const int ntx = FindNumThreads(len);
+  const int nty = CUDA_MAX_NUM_THREADS / ntx;
+  const int nbx = (len + ntx - 1) / ntx;
+  const int nby = FindNumBlocks<'y'>((csr.num_rows + nty - 1) / nty);
+  // LOG(INFO) << "rhs_len=(" <<rhs_len;
+  const dim3 nblks(nbx, nby);
+  const dim3 nthrs(ntx, nty);
+  const bool use_idx = !IsNullArray(csr.data);
+
+  BCAST_IDX_CTX_SWITCH(bcast, use_idx, f_out->ctx, ubcast_off, ebcast_off, {
+    CUDA_KERNEL_CALL((Edge_backwardKernel<Idx, DType, BinaryOp, ReduceOp, UseBcast, UseIdx>),
+        nblks, nthrs, 0, thr_entry->stream,
+        f_out_data, sds_data, back_out_data,
+        indptr, indices, edge_map,
+        csr.num_rows, csr.num_cols,
+        ubcast_off, ebcast_off,
+        rhs_len, rhs_len, len)
+  });
+}
 /*!
  * \brief CUDA kernel of SpMM-Min/Max on Csr format on heterogeneous graph.
  * \param bcast Broadcast information.
