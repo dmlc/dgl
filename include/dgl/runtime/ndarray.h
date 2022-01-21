@@ -172,7 +172,8 @@ class NDArray {
    */
   inline NDArray Clone(const DGLStreamHandle &stream = nullptr) const;
   /*!
-   * \brief Pin data of the current array.
+   * \brief In-place method to pin the current array by calling PinData
+   *        on the underlying DLTensor.
    * \note This is an in-place method. Behavior depends on the current context,
    *       kDLCPU: will be pinned;
    *       kDLCPUPinned: directly return;
@@ -180,14 +181,15 @@ class NDArray {
    */
   inline void PinMemory_();
   /*!
-   * \brief Unpin data of the current array.
+   * \brief In-place method to unpin the current array by calling UnpinData
+   *        on the underlying DLTensor.
    * \note This is an in-place method. Behavior depends on the current context,
    *       kDLCPUPinned: will be unpinned;
    *       others: directly return.
    */
   inline void UnpinMemory_();
   /*!
-   * \brief Check if the data is pinned.
+   * \brief Check if the array is pinned.
    */
   inline bool IsPinned() const;
   /*!
@@ -292,7 +294,7 @@ class NDArray {
       DLTensor* from, DLTensor* to, DGLStreamHandle stream = nullptr);
 
   /*!
-   * \brief Function to pin the data.
+   * \brief Function to pin the data of a DLTensor.
    * \param tensor The array to be pinned.
    * \note Data of the given array will be pinned inplace.
    *       Behavior depends on the current context,
@@ -303,7 +305,7 @@ class NDArray {
   DGL_DLL static void PinData(DLTensor* tensor);
 
   /*!
-   * \brief Function to unpin the data.
+   * \brief Function to unpin the data of a DLTensor.
    * \param tensor The array to be unpinned.
    * \note Data of the given array will be unpinned inplace.
    *       Behavior depends on the current context,
