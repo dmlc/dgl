@@ -65,6 +65,7 @@ Operators for generating new graphs by manipulating the structure of the existin
     add_self_loop
     remove_self_loop
     add_reverse_edges
+    add_reverse_types
     reverse
     to_bidirected
     to_simple

@@ -890,6 +890,27 @@ def add_reverse_types(g, etypes=None, suffix='_inv', copy_ndata=True, copy_edata
         edge features.
 
         (Default: True)
+
+    Returns
+    -------
+    DGLGraph
+        The new graph
+
+    Examples
+    --------
+    >>> g = dgl.heterograph({
+    ...     ('A', 'AB', 'B'): (torch.randint(0, 5, (3,)), torch.randint(0, 4, (3,))),
+    ...     ('A', 'AC', 'C'): (torch.randint(0, 5, (6,)), torch.randint(0, 5, (6,)))},
+    ...     num_nodes_dict={'A': 5, 'B': 4, 'C': 5})
+    >>> new_g = dgl.add_reverse_types(g)
+    >>> new_g
+    Graph(num_nodes={'A': 5, 'B': 4, 'C': 4},
+          num_edges={('A', 'AB', 'B'): 3, ('A', 'AC', 'C'): 6, ('B', 'AB_inv', 'A'): 3, ('C', 'AC_inv', 'A'): 6},
+          metagraph=[('A', 'B', 'AB'), ('A', 'C', 'AC'), ('B', 'A', 'AB_inv'), ('C', 'A', 'AC_inv')])
+    >>> src, dst = new_g.edges(etype='AB')
+    >>> new_src, new_dst = new_g.edges(etype='AB_inv')
+    >>> torch.equal(src, new_dst) and torch.equal(dst, new_src)
+    True
     """
     new_edges = {}
     new_edata = {}
