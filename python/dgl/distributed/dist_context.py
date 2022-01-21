@@ -269,8 +269,6 @@ def finalize_client():
     if os.environ.get('DGL_DIST_MODE', 'standalone') != 'standalone':
         rpc.finalize_sender()
         rpc.finalize_receiver()
-    global INITIALIZED
-    INITIALIZED = False
 
 
 def _exit():

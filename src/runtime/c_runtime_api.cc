@@ -99,6 +99,10 @@ DeviceAPI* DeviceAPI::Get(DGLContext ctx, bool allow_missing) {
       static_cast<int>(ctx.device_type), allow_missing);
 }
 
+DeviceAPI* DeviceAPI::Get(DLDeviceType dev_type, bool allow_missing) {
+  return DeviceAPIManager::Get(static_cast<int>(dev_type), allow_missing);
+}
+
 void* DeviceAPI::AllocWorkspace(DGLContext ctx,
                                 size_t size,
                                 DGLType type_hint) {
@@ -124,11 +128,11 @@ void DeviceAPI::SyncStreamFromTo(DGLContext ctx,
   LOG(FATAL) << "Device does not support stream api.";
 }
 
-void DeviceAPI::PinData(DGLContext ctx, void* ptr, size_t nbytes) {
+void DeviceAPI::PinData(void* ptr, size_t nbytes) {
   LOG(FATAL) << "Device does not support cudaHostRegister api.";
 }
 
-void DeviceAPI::UnpinData(DGLContext ctx, void* ptr) {
+void DeviceAPI::UnpinData(void* ptr) {
   LOG(FATAL) << "Device does not support cudaHostUnregister api.";
 }
 }  // namespace runtime
