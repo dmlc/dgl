@@ -924,7 +924,6 @@ def add_reverse_types(g, etypes=None, suffix='_inv', copy_ndata=True, copy_edata
     """
     new_edges = {}
     new_edata = {}
-    new_ndata = {}
     if etypes is None:
         etypes = g.canonical_etypes
     for etype in etypes:
