@@ -5461,9 +5461,8 @@ class DGLHeteroGraph(object):
     def pin_memory_(self):
         """Pin the graph structure to the page-locked memory.
 
-        NOTE: This is an inplace method.
-              The graph structure must be on CPU to be pinned.
-              If the graph struture is already pinned, the function directly returns it.
+        This is an **inplace** method. The graph structure must be on CPU to be pinned.
+        If the graph struture is already pinned, the function directly returns it.
 
         Materialization of new sparse formats for pinned graphs is not allowed.
         To avoid implicit formats materialization during training,
@@ -5504,9 +5503,8 @@ class DGLHeteroGraph(object):
     def unpin_memory_(self):
         """Unpin the graph structure from the page-locked memory.
 
-        NOTE: This is an inplace method.
-              If the graph struture is not pinned, e.g., on CPU or GPU,
-              the function directly returns it.
+        This is an **inplace** method.If the graph struture is not pinned,
+        e.g., on CPU or GPU, the function directly returns it.
 
         Returns
         -------
