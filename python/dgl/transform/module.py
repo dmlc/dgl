@@ -23,12 +23,6 @@ from .. import backend as F
 from .. import function as fn
 from . import functional
 
-try:
-    import torch
-    from torch.distributions import Bernoulli
-except ImportError:
-    pass
-
 __all__ = [
     'BaseTransform',
     'AddSelfLoop',
@@ -813,6 +807,8 @@ class PPR(BaseTransform):
             0.0510, 0.0217, 0.1500])
     """
     def __init__(self, alpha=0.15, eweight_name='w', eps=None, avg_degree=5):
+        import torch
+
         self.alpha = alpha
         self.eweight_name = eweight_name
         self.eps = eps
@@ -908,6 +904,8 @@ class HeatKernel(BaseTransform):
             0.1083, 0.0541, 0.1353])
     """
     def __init__(self, t=2., eweight_name='w', eps=None, avg_degree=5):
+        import torch
+
         self.t = t
         self.eweight_name = eweight_name
         self.eps = eps
@@ -1008,6 +1006,8 @@ class GDC(BaseTransform):
             0.0800, 0.0200, 0.3000])
     """
     def __init__(self, coefs, eweight_name='w', eps=None, avg_degree=5):
+        import torch
+
         self.coefs = coefs
         self.eweight_name = eweight_name
         self.eps = eps
@@ -1131,6 +1131,9 @@ class DropNode(BaseTransform):
     tensor([0, 6, 14, 5, 17, 3, 11])
     """
     def __init__(self, p=0.5):
+        import torch
+        from torch.distributions import Bernoulli
+
         self.p = p
         self.dist = Bernoulli(p)
 
@@ -1180,6 +1183,9 @@ class DropEdge(BaseTransform):
     tensor([0, 1, 3, 7, 8, 10, 11, 12, 13, 15, 18, 19])
     """
     def __init__(self, p=0.5):
+        import torch
+        from torch.distributions import Bernoulli
+
         self.p = p
         self.dist = Bernoulli(p)
 
