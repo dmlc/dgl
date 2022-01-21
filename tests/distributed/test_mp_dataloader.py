@@ -452,7 +452,7 @@ if __name__ == "__main__":
         test_dataloader(Path(tmpdirname), 3, 4, 'edge')
         test_neg_dataloader(Path(tmpdirname), 3, 4)
         for num_groups in [1, 5]:
-            test_dist_dataloader(Path(tmpdirname), 3, 0, True, True)
-            test_dist_dataloader(Path(tmpdirname), 3, 4, True, True)
-            test_dist_dataloader(Path(tmpdirname), 3, 0, True, False)
-            test_dist_dataloader(Path(tmpdirname), 3, 4, True, False)
+            test_dist_dataloader(Path(tmpdirname), 3, 0, True, True, num_groups)
+            test_dist_dataloader(Path(tmpdirname), 3, 4, True, True, num_groups)
+            test_dist_dataloader(Path(tmpdirname), 3, 0, True, False, num_groups)
+            test_dist_dataloader(Path(tmpdirname), 3, 4, True, False, num_groups)
