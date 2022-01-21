@@ -103,8 +103,8 @@ DropEdge
 .. autoclass:: DropEdge
     :show-inheritance:
 
-RandomAddEdge
+AddEdge
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: RandomAddEdge
+.. autoclass:: AddEdge
     :show-inheritance:

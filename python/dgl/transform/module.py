@@ -46,7 +46,7 @@ __all__ = [
     'NodeShuffle',
     'DropNode',
     'DropEdge',
-    'RandomAddEdge'
+    'AddEdge'
 ]
 
 def update_graph_structure(g, data_dict, copy_edata=True):
