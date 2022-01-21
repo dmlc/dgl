@@ -23,6 +23,12 @@ from .. import backend as F
 from .. import function as fn
 from . import functional
 
+try:
+    import torch
+    from torch.distributions import Bernoulli
+except ImportError:
+    pass
+
 __all__ = [
     'BaseTransform',
     'AddSelfLoop',
@@ -807,8 +813,6 @@ class PPR(BaseTransform):
             0.0510, 0.0217, 0.1500])
     """
     def __init__(self, alpha=0.15, eweight_name='w', eps=None, avg_degree=5):
-        import torch
-
         self.alpha = alpha
         self.eweight_name = eweight_name
         self.eps = eps
@@ -857,6 +861,27 @@ class PPR(BaseTransform):
 
         return new_g
 
+def is_bidirected(g):
+    """Return whether the graph is a bidirected graph.
+
+    A graph is bidirected if for any edge :math:`(u, v)` in :math:`G` with weight :math:`w`,
+    there exists an edge :math:`(v, u)` in :math:`G` with the same weight.
+    """
+    src, dst = g.edges()
+    num_nodes = g.num_nodes()
+
+    # Sort first by src then dst
+    idx_src_dst = src * num_nodes + dst
+    perm_src_dst = F.argsort(idx_src_dst, dim=0, descending=False)
+    src1, dst1 = src[perm_src_dst], dst[perm_src_dst]
+
+    # Sort first by dst then src
+    idx_dst_src = dst * num_nodes + src
+    perm_dst_src = F.argsort(idx_dst_src, dim=0, descending=False)
+    src2, dst2 = src[perm_dst_src], dst[perm_dst_src]
+
+    return F.allclose(src1, dst2) and F.allclose(src2, dst1)
+
 # pylint: disable=C0103
 class HeatKernel(BaseTransform):
     r"""
@@ -904,8 +929,6 @@ class HeatKernel(BaseTransform):
             0.1083, 0.0541, 0.1353])
     """
     def __init__(self, t=2., eweight_name='w', eps=None, avg_degree=5):
-        import torch
-
         self.t = t
         self.eweight_name = eweight_name
         self.eps = eps
@@ -942,14 +965,12 @@ class HeatKernel(BaseTransform):
         nids = F.astype(g.nodes(), F.int64)
         mat[nids, nids] = mat[nids, nids] - self.t
 
-        with g.local_scope():
-            g.edata['w'] = eweight
-            if g.is_bidirected(eweight='w'):
-                e, V = torch.linalg.eigh(mat, UPLO='U')
-                diff_mat = V @ torch.diag(e.exp()) @ V.t()
-            else:
-                diff_mat_np = expm(mat.cpu().numpy())
-                diff_mat = torch.Tensor(diff_mat_np).to(device)
+        if is_bidirected(g):
+            e, V = torch.linalg.eigh(mat, UPLO='U')
+            diff_mat = V @ torch.diag(e.exp()) @ V.t()
+        else:
+            diff_mat_np = expm(mat.cpu().numpy())
+            diff_mat = torch.Tensor(diff_mat_np).to(device)
 
         # Step2: sparsification
         num_nodes = g.num_nodes()
@@ -1006,8 +1027,6 @@ class GDC(BaseTransform):
             0.0800, 0.0200, 0.3000])
     """
     def __init__(self, coefs, eweight_name='w', eps=None, avg_degree=5):
-        import torch
-
         self.coefs = coefs
         self.eweight_name = eweight_name
         self.eps = eps
@@ -1131,9 +1150,6 @@ class DropNode(BaseTransform):
     tensor([0, 6, 14, 5, 17, 3, 11])
     """
     def __init__(self, p=0.5):
-        import torch
-        from torch.distributions import Bernoulli
-
         self.p = p
         self.dist = Bernoulli(p)
 
@@ -1183,9 +1199,6 @@ class DropEdge(BaseTransform):
     tensor([0, 1, 3, 7, 8, 10, 11, 12, 13, 15, 18, 19])
     """
     def __init__(self, p=0.5):
-        import torch
-        from torch.distributions import Bernoulli
-
         self.p = p
         self.dist = Bernoulli(p)
 
