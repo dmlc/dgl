@@ -5458,6 +5458,74 @@ class DGLHeteroGraph(object):
         """
         return self.to(F.cpu())
 
+    def pin_memory_(self):
+        """Pin the graph structure to the page-locked memory.
+
+        This is an **inplace** method. The graph structure must be on CPU to be pinned.
+        If the graph struture is already pinned, the function directly returns it.
+
+        Materialization of new sparse formats for pinned graphs is not allowed.
+        To avoid implicit formats materialization during training,
+        you should create all the needed formats before pinnning.
+        But cloning and materialization is fine. See the examples below.
+
+        Returns
+        -------
+        DGLGraph
+            The pinned graph.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        >>> g = dgl.graph((torch.tensor([1, 0]), torch.tensor([1, 2])))
+        >>> g.pin_memory_()
+
+        Materialization of new sparse formats is not allowed for pinned graphs.
+
+        >>> g.create_formats_()  # This would raise an error! You should do this before pinning.
+
+        Cloning and materializing new formats is allowed. The returned graph is **not** pinned.
+
+        >>> g1 = g.formats(['csc'])
+        >>> assert not g1.is_pinned()
+        """
+        if self._graph.is_pinned():
+            return self
+        if F.device_type(self.device) != 'cpu':
+            raise DGLError("The graph structure must be on CPU to be pinned.")
+        self._graph.pin_memory_()
+        return self
+
+    def unpin_memory_(self):
+        """Unpin the graph structure from the page-locked memory.
+
+        This is an **inplace** method.If the graph struture is not pinned,
+        e.g., on CPU or GPU, the function directly returns it.
+
+        Returns
+        -------
+        DGLGraph
+            The unpinned graph.
+        """
+        if not self._graph.is_pinned():
+            return self
+        self._graph.unpin_memory_()
+        return self
+
+    def is_pinned(self):
+        """Check if the graph structure is pinned to the page-locked memory.
+
+        Returns
+        -------
+        bool
+            True if the graph structure is pinned.
+        """
+        return self._graph.is_pinned()
+
     def clone(self):
         """Return a heterograph object that is a clone of current graph.
 
