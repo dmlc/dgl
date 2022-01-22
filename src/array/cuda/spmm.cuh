@@ -227,6 +227,7 @@ __global__ void Edge_backwardKernel(
     ty += stride_y;
   }
 }
+
 /*!
  * \brief CUDA kernel of SpMM-Min/Max on Csr format.
  * \note it uses node parallel strategy, different threadblocks (on y-axis)
