@@ -2,6 +2,7 @@ import dgl
 import argparse
 import torch as th
 import torch.optim as optim
+from torch.nn.functional import softmax
 from sklearn.metrics import roc_auc_score, recall_score
 
 from utils import EarlyStopping
@@ -22,7 +23,7 @@ def evaluate(model, loss_fn, dataloader, device='cpu'):
         # compute loss
         loss += loss_fn(logits_gnn, label).item() + args.sim_weight * loss_fn(logits_sim, label).item()
         recall += recall_score(label.cpu(), logits_gnn.argmax(dim=1).detach().cpu())
-        auc += roc_auc_score(label.cpu(), logits_gnn[:, 1].detach().cpu())
+        auc += roc_auc_score(label.cpu(), softmax(logits_gnn, dim=1)[:, 1].detach().cpu())
         num_blocks += 1
 
     return recall / num_blocks, auc / num_blocks, loss / num_blocks
@@ -121,7 +122,7 @@ def main(args):
             blk_loss = loss_fn(logits_gnn, train_label) + args.sim_weight * loss_fn(logits_sim, train_label)
             tr_loss += blk_loss.item()
             tr_recall += recall_score(train_label.cpu(), logits_gnn.argmax(dim=1).detach().cpu())
-            tr_auc += roc_auc_score(train_label.cpu(), logits_gnn[:, 1].detach().cpu())
+            tr_auc += roc_auc_score(train_label.cpu(), softmax(logits_gnn, dim=1)[:, 1].detach().cpu())
             tr_blk += 1
 
             # backward

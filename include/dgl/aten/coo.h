@@ -129,6 +129,37 @@ struct COOMatrix {
                      aten::IsNullArray(data) ? data : data.CopyTo(ctx, stream),
                      row_sorted, col_sorted);
   }
+
+  /*!
+  * \brief Pin the row, col and data (if not Null) of the matrix.
+  * \note This is an in-place method. Behavior depends on the current context,
+  *       kDLCPU: will be pinned;
+  *       kDLCPUPinned: directly return;
+  *       kDLGPU: invalid, will throw an error.
+  *       The context check is deferred to pinning the NDArray.
+  */
+  inline void PinMemory_() {
+    row.PinMemory_();
+    col.PinMemory_();
+    if (!aten::IsNullArray(data)) {
+      data.PinMemory_();
+    }
+  }
+
+  /*!
+  * \brief Unpin the row, col and data (if not Null) of the matrix.
+  * \note This is an in-place method. Behavior depends on the current context,
+  *       kDLCPUPinned: will be unpinned;
+  *       others: directly return.
+  *       The context check is deferred to unpinning the NDArray.
+  */
+  inline void UnpinMemory_() {
+    row.UnpinMemory_();
+    col.UnpinMemory_();
+    if (!aten::IsNullArray(data)) {
+      data.UnpinMemory_();
+    }
+  }
 };
 
 ///////////////////////// COO routines //////////////////////////

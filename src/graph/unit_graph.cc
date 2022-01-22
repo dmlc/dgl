@@ -133,6 +133,10 @@ class UnitGraph::COO : public BaseHeteroGraph {
     return adj_.row->ctx;
   }
 
+  bool IsPinned() const override {
+    return adj_.row.IsPinned();
+  }
+
   uint8_t NumBits() const override {
     return adj_.row->dtype.bits;
   }
@@ -154,6 +158,17 @@ class UnitGraph::COO : public BaseHeteroGraph {
     if (Context() == ctx)
       return *this;
     return COO(meta_graph_, adj_.CopyTo(ctx, stream));
+  }
+
+
+  /*! \brief Pin the adj_: COOMatrix of the COO graph. */
+  void PinMemory_() {
+    adj_.PinMemory_();
+  }
+
+  /*! \brief Unpin the adj_: COOMatrix of the COO graph. */
+  void UnpinMemory_() {
+    adj_.UnpinMemory_();
   }
 
   bool IsMultigraph() const override {
@@ -520,6 +535,10 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     return adj_.indices->ctx;
   }
 
+  bool IsPinned() const override {
+    return adj_.indices.IsPinned();
+  }
+
   uint8_t NumBits() const override {
     return adj_.indices->dtype.bits;
   }
@@ -545,6 +564,16 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     } else {
       return CSR(meta_graph_, adj_.CopyTo(ctx, stream));
     }
+  }
+
+  /*! \brief Pin the adj_: CSRMatrix of the CSR graph. */
+  void PinMemory_() {
+    adj_.PinMemory_();
+  }
+
+  /*! \brief Unpin the adj_: CSRMatrix of the CSR graph. */
+  void UnpinMemory_() {
+    adj_.UnpinMemory_();
   }
 
   bool IsMultigraph() const override {
@@ -827,6 +856,10 @@ DLDataType UnitGraph::DataType() const {
 
 DLContext UnitGraph::Context() const {
   return GetAny()->Context();
+}
+
+bool UnitGraph::IsPinned() const {
+  return GetAny()->IsPinned();
 }
 
 uint8_t UnitGraph::NumBits() const {
@@ -1263,6 +1296,24 @@ HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DLContext &ctx,
   }
 }
 
+void UnitGraph::PinMemory_() {
+  if (this->in_csr_->defined())
+    this->in_csr_->PinMemory_();
+  if (this->out_csr_->defined())
+    this->out_csr_->PinMemory_();
+  if (this->coo_->defined())
+    this->coo_->PinMemory_();
+}
+
+void UnitGraph::UnpinMemory_() {
+  if (this->in_csr_->defined())
+    this->in_csr_->UnpinMemory_();
+  if (this->out_csr_->defined())
+    this->out_csr_->UnpinMemory_();
+  if (this->coo_->defined())
+    this->coo_->UnpinMemory_();
+}
+
 void UnitGraph::InvalidateCSR() {
   this->out_csr_ = CSRPtr(new CSR());
 }
@@ -1334,6 +1385,10 @@ UnitGraph::CSRPtr UnitGraph::GetInCSR(bool inplace) const {
   // Prefers converting from COO since it is parallelized.
   // TODO(BarclayII): need benchmarking.
   if (!in_csr_->defined()) {
+    // inplace new formats materialization is not allowed for pinned graphs
+    if (inplace && IsPinned())
+      LOG(FATAL) << "Cannot create new formats for pinned graphs, " <<
+        "please create the CSC format before pinning.";
     if (coo_->defined()) {
       const auto& newadj = aten::COOToCSR(
             aten::COOTranspose(coo_->adj()));
@@ -1365,6 +1420,10 @@ UnitGraph::CSRPtr UnitGraph::GetOutCSR(bool inplace) const {
   // Prefers converting from COO since it is parallelized.
   // TODO(BarclayII): need benchmarking.
   if (!out_csr_->defined()) {
+    // inplace new formats materialization is not allowed for pinned graphs
+    if (inplace && IsPinned())
+      LOG(FATAL) << "Cannot create new formats for pinned graphs, " <<
+        "please create the CSR format before pinning.";
     if (coo_->defined()) {
       const auto& newadj = aten::COOToCSR(coo_->adj());
 
@@ -1393,6 +1452,10 @@ UnitGraph::COOPtr UnitGraph::GetCOO(bool inplace) const {
         CodeToStr(formats_) << ", cannot create COO matrix.";
   COOPtr ret = coo_;
   if (!coo_->defined()) {
+    // inplace new formats materialization is not allowed for pinned graphs
+    if (inplace && IsPinned())
+      LOG(FATAL) << "Cannot create new formats for pinned graphs, " <<
+        "please create the COO format before pinning.";
     if (in_csr_->defined()) {
       const auto& newadj = aten::COOTranspose(aten::CSRToCOO(in_csr_->adj(), true));
 
