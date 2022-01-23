@@ -3,6 +3,7 @@ DGL document and tutorial folder
 
 Requirements
 ------------
+You need to build DGL locally first (as described [here](https://docs.dgl.ai/contribute.html#building-and-testing)), and ensure the following python packages are installed:
 * sphinx
 * sphinx-gallery
 * sphinx_rtd_theme
