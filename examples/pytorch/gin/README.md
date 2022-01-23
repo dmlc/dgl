@@ -28,9 +28,7 @@ An experiment on the GIN in customized settings can be run with
 python main.py [--device 0 | --disable-cuda] --dataset COLLAB \
                --graph_pooling_type max --neighbor_pooling_type sum
 ```
-hint: **following the settings like the paper** is essential to reproduce the result reported.
-
-add `--degree_as_nlabel` to  use one-hot encodings of node degrees as node feature vectors
+add `--degree_as_nlabel` to use one-hot encodings of node degrees as node feature vectors
 
 Results
 -------
