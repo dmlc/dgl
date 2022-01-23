@@ -8,6 +8,9 @@ import yaml
 from ...utils.factory import PipelineFactory, NodeModelFactory, PipelineBase, DataFactory, EdgeModelFactory, NegativeSamplerFactory
 from ...utils.base_model import EarlyStopConfig, DeviceEnum
 
+from ...utils.yaml_dump import deep_convert_dict, merge_comment
+import ruamel.yaml
+from ruamel.yaml.comments import CommentedMap
 
 class EdgepredPipelineCfg(BaseModel):
     hidden_size: int = 256
@@ -19,6 +22,22 @@ class EdgepredPipelineCfg(BaseModel):
     eval_period: int = 5
     optimizer: dict = {"name": "Adam", "lr": 0.005}
     loss: str = "BCELoss"
+
+pipeline_comments = {
+    "hidden_size": "The intermediate hidden size between node model and edge model",
+    "node_embed_size": "The node learnable embedding size, -1 to disable",
+    "eval_batch_size": "Edge batch size when evaluating",
+    "train_batch_size": "Edge batch size when training",
+    "num_epochs": "Number of training epochs",
+    "eval_period": "Interval epochs between evaluations",
+    "early_stop": {
+        "patience": "Steps before early stop",
+        "checkpoint_path": "Early stop checkpoint model file path"
+    }
+}
+
+# def merge_comment(cfg_dict, comment_dict):
+
 
 
 @PipelineFactory.register("edgepred")
@@ -75,7 +94,26 @@ class EdgepredPipeline(PipelineBase):
                 "edge_model": {"name": edge_model.value},
             }
             output_cfg = self.user_cfg_cls(**generated_cfg).dict()
-            yaml.safe_dump(output_cfg, Path(cfg).open("w"), sort_keys=False)
+            output_cfg = deep_convert_dict(output_cfg)
+            comment_dict = {
+                "general_pipeline": pipeline_comments,
+                "node_model": NodeModelFactory.get_constructor_doc_dict(node_model.value),
+                "edge_model": EdgeModelFactory.get_constructor_doc_dict(edge_model.value),
+                "neg_sampler": NegativeSamplerFactory.get_constructor_doc_dict(neg_sampler.value)
+            }
+
+            # for k,v in pipeline_comments.items():
+            #     comment_dict["general_pipeline"].yaml_add_eol_comment(v, key=k, column=30)
+            # for k, v in NodeModelFactory.get_constructor_doc_dict(node_model.value).items():
+            #     comment_dict["node_model"].yaml_add_eol_comment(v, key=k, column=30)
+            # for k, v in EdgeModelFactory.get_constructor_doc_dict(edge_model.value).items():
+            #     comment_dict["edge_model"].yaml_add_eol_comment(v, key=k, column=30)
+            # for k, v in NegativeSamplerFactory.get_constructor_doc_dict(neg_sampler.value).items():
+            #     comment_dict["neg_sampler"].yaml_add_eol_comment(v, key=k, column=30)
+            comment_dict = merge_comment(output_cfg, comment_dict)
+            print(comment_dict)
+            yaml = ruamel.yaml.YAML()
+            yaml.dump(comment_dict, Path(cfg).open("w"))
 
         return config
 
@@ -100,15 +138,7 @@ class EdgepredPipeline(PipelineBase):
         render_cfg["neg_sampler_name"] = NegativeSamplerFactory.get_model_class_name(
             user_cfg_dict["neg_sampler"]["name"])
         render_cfg["loss"] = user_cfg_dict["general_pipeline"]["loss"]
-        render_cfg["data_import_code"] = DataFactory.get_import_code(
-            user_cfg_dict["data"]["name"])
-        extra_args_dict = DataFactory.get_extra_args(
-            user_cfg_dict["data"]["name"])
-        data_initialize_code = DataFactory.get_class_name(
-            user_cfg_dict["data"]["name"])
-        if len(extra_args_dict) > 0:
-            data_initialize_code = data_initialize_code.format('**cfg["data"]')
-        render_cfg["data_initialize_code"] = data_initialize_code
+        render_cfg.update(DataFactory.get_generated_code_dict(user_cfg_dict["data"]["name"], '**cfg["data"]'))
         generated_user_cfg = copy.deepcopy(user_cfg_dict)
         if len(generated_user_cfg["data"]) == 1:
             generated_user_cfg.pop("data")

@@ -17,7 +17,7 @@ class GCN(nn.Module):
 
         Parameters
         ----------
-        in_size : int
+        in_size : int 
             Number of input features.
         out_size : int
             Output size.

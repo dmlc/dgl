@@ -10,6 +10,7 @@ from pydantic import create_model_from_typeddict, create_model, Field
 from ...data import CoraGraphDataset, CiteseerGraphDataset, RedditDataset, DGLCSVDataset
 from ...dataloading.negative_sampler import GlobalUniform, PerSourceUniform
 import inspect
+from numpydoc import docscrape
 logger = logging.getLogger(__name__)
 
 
@@ -214,6 +215,15 @@ class ModelFactory:
             name: Literal[model_name]
         return create_model(f'{model_name.upper()}ModelConfig', **type_annotation_dict, __base__=Base)
 
+    def get_constructor_doc_dict(self, name):
+        model_class = self.registry[name]
+        docs = inspect.getdoc(model_class.__init__)
+        param_docs = docscrape.NumpyDocString(docs)
+        param_docs_dict = {}
+        for param in param_docs["Parameters"]:
+            param_docs_dict[param.name] =  param.desc[0]
+        return param_docs_dict
+
     def get_pydantic_model_config(self):
         model_list = []
         for k in self.registry:
@@ -300,6 +310,14 @@ class SamplerFactory:
             type_annotation_dict[k] = param.annotation
         return type_annotation_dict
 
+    def get_constructor_doc_dict(self, name):
+        model_class = self.registry[name]
+        docs = inspect.getdoc(model_class)
+        param_docs = docscrape.NumpyDocString(docs)
+        param_docs_dict = {}
+        for param in param_docs["Parameters"]:
+            param_docs_dict[param.name] =  param.desc[0]
+        return param_docs_dict
 
 
 NegativeSamplerFactory = SamplerFactory()

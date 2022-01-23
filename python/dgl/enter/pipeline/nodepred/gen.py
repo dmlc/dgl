@@ -7,6 +7,9 @@ from typing import Optional
 import yaml
 from ...utils.factory import PipelineFactory, NodeModelFactory, PipelineBase, DataFactory
 from ...utils.base_model import EarlyStopConfig, DeviceEnum
+from ...utils.yaml_dump import deep_convert_dict
+import ruamel.yaml
+from ruamel.yaml.comments import CommentedMap
 
 class NodepredPipelineCfg(BaseModel):
     node_embed_size: Optional[int] = -1
@@ -15,8 +18,6 @@ class NodepredPipelineCfg(BaseModel):
     eval_period: int = 5
     optimizer: dict = {"name": "Adam", "lr": 0.005}
     loss: str = "CrossEntropyLoss"
-
-
 @PipelineFactory.register("nodepred")
 class NodepredPipeline(PipelineBase):
 
@@ -56,7 +57,13 @@ class NodepredPipeline(PipelineBase):
                 "general_pipeline": NodepredPipelineCfg()
             }
             output_cfg = self.user_cfg_cls(**generated_cfg).dict()
-            yaml.safe_dump(output_cfg, Path(cfg).open("w"), sort_keys=False)
+            comment_dict = deep_convert_dict(output_cfg)
+            doc_dict = NodeModelFactory.get_constructor_doc_dict(model.value)
+            for k, v in doc_dict.items():
+                comment_dict["model"].yaml_add_eol_comment(v, key=k, column=30)
+
+            yaml = ruamel.yaml.YAML()
+            yaml.dump(comment_dict, Path(cfg).open("w"))
 
         return config
 
