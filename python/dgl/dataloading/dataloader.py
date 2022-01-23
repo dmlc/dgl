@@ -310,15 +310,18 @@ def _assign_for(item, feat):
         return item
 
 
-def _prefetcher_entry(dataloader_it, dataloader, queue, num_threads):
+def _prefetcher_entry(dataloader_it, dataloader, queue, num_threads, use_alternate_streams):
     use_asyncio = dataloader.use_asyncio
     # PyTorch will set the number of threads to 1 which slows down pin_memory() calls
     # in main process if a prefetching thread is created.
     if num_threads is not None:
         torch.set_num_threads(num_threads)
-    stream = (
-            torch.cuda.Stream(device=dataloader.device)
-            if dataloader.device.type == 'cuda' else None)
+    if use_alternate_streams:
+        stream = (
+                torch.cuda.Stream(device=dataloader.device)
+                if dataloader.device.type == 'cuda' else None)
+    else:
+        stream = None
 
     try:
         for batch in dataloader_it:
@@ -384,7 +387,8 @@ def restore_parent_storage_columns(item, g):
 
 
 class _PrefetchingIter(object):
-    def __init__(self, dataloader, dataloader_it, use_thread=False, num_threads=None):
+    def __init__(self, dataloader, dataloader_it, use_thread=False, use_alternate_streams=True,
+                 num_threads=None):
         self.queue = Queue(1)
         self.dataloader_it = dataloader_it
         self.dataloader = dataloader
@@ -393,10 +397,11 @@ class _PrefetchingIter(object):
         self.num_threads = num_threads
 
         self.use_thread = use_thread
+        self.use_alternate_streams = use_alternate_streams
         if use_thread:
             thread = threading.Thread(
                 target=_prefetcher_entry,
-                args=(dataloader_it, dataloader, self.queue, num_threads),
+                args=(dataloader_it, dataloader, self.queue, num_threads, use_alternate_streams),
                 daemon=True)
             thread.start()
             self.thread = thread
@@ -408,13 +413,16 @@ class _PrefetchingIter(object):
         batch = next(self.dataloader_it)
         batch = recursive_apply(batch, restore_parent_storage_columns, self.dataloader.graph)
         device = self.dataloader.device
-        stream = torch.cuda.Stream(device=device)
+        if self.use_alternate_streams:
+            stream = torch.cuda.Stream(device=device) if device.type == 'cuda' else None
+        else:
+            stream = None
         if self.dataloader.use_asyncio:
             feats = AsyncIO().run(_async_prefetch(batch, self.dataloader, stream))
         else:
             feats = _prefetch(batch, self.dataloader, stream)
         batch = recursive_apply(batch, lambda x: x.to(device, non_blocking=True))
-        stream_event = stream.record_event()
+        stream_event = stream.record_event() if stream is not None else None
         return batch, feats, stream_event
 
     def _next_threaded(self):
@@ -489,7 +497,8 @@ def create_tensorized_dataset(indices, keys, batch_size, drop_last, use_ddp, ddp
 class DataLoader(torch.utils.data.DataLoader):
     def __init__(self, graph, indices, graph_sampler, device='cpu', use_ddp=False,
                  ddp_seed=0, batch_size=1, drop_last=False, shuffle=False,
-                 use_asyncio=False, use_prefetch_thread=False, **kwargs):
+                 use_asyncio=False, use_prefetch_thread=False, use_alternate_streams=True,
+                 **kwargs):
         self.graph = graph
         if (torch.is_tensor(indices) or (
                 isinstance(indices, Mapping) and
@@ -503,6 +512,7 @@ class DataLoader(torch.utils.data.DataLoader):
         self.graph_sampler = graph_sampler
         self.use_asyncio = use_asyncio
         self.device = torch.device(device)
+        self.use_alternate_streams = use_alternate_streams
         if self.device.type == 'cuda' and self.device.index is None:
             self.device = torch.device('cuda', torch.cuda.current_device())
         self.use_prefetch_thread = use_prefetch_thread
@@ -531,7 +541,7 @@ class DataLoader(torch.utils.data.DataLoader):
         num_threads = torch.get_num_threads() if self.num_workers > 0 else None
         return _PrefetchingIter(
             self, super().__iter__(), use_thread=self.use_prefetch_thread,
-            num_threads=num_threads)
+            use_alternate_streams=self.use_alternate_streams, num_threads=num_threads)
 
     # To allow data other than node/edge data to be prefetched.
     def attach_data(self, name, storage):
@@ -546,8 +556,9 @@ class NodeDataLoader(DataLoader):
 class EdgeDataLoader(DataLoader):
     def __init__(self, graph, indices, graph_sampler, device='cpu', use_ddp=False,
                  ddp_seed=0, batch_size=1, drop_last=False, shuffle=False,
-                 use_asyncio=False, use_prefetch_thread=False, exclude=None,
-                 reverse_eids=None, reverse_etypes=None, negative_sampler=None, **kwargs):
+                 use_asyncio=False, use_prefetch_thread=False, use_alternate_streams=True,
+                 exclude=None, reverse_eids=None, reverse_etypes=None, negative_sampler=None,
+                 **kwargs):
         if isinstance(graph_sampler, BlockSampler):
             graph_sampler = EdgeBlockSampler(
                 graph_sampler, exclude=exclude, reverse_eids=reverse_eids,
@@ -556,4 +567,5 @@ class EdgeDataLoader(DataLoader):
         super().__init__(
             graph, indices, graph_sampler, device=device, use_ddp=use_ddp, ddp_seed=ddp_seed,
             batch_size=batch_size, drop_last=drop_last, shuffle=shuffle, use_asyncio=use_asyncio,
-            use_prefetch_thread=use_prefetch_thread, **kwargs)
+            use_prefetch_thread=use_prefetch_thread, use_alternate_streams=use_alternate_streams,
+            **kwargs)
