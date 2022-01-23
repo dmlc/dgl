@@ -30,7 +30,7 @@ def preprocess(g, num_rels):
     train_g = get_subset_g(g, g.edata['train_mask'], num_rels)
 
     # Get test graph
-    test_g = get_subset_g(g, g.edata['test_mask'], num_rels, bidirected=True)
+    test_g = get_subset_g(g, g.edata['train_mask'], num_rels, bidirected=True)
     test_g.edata['norm'] = dgl.norm_by_dst(test_g).unsqueeze(-1)
 
     return train_g, test_g
