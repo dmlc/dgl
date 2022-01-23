@@ -6,7 +6,7 @@ dgl.function
 ==================================
 
 This subpackage hosts all the **built-in functions** provided by DGL. Built-in functions
-are DGL's recommended way to express different types of ref:`guide-message-passing` computation
+are DGL's recommended way to express different types of :ref:`guide-message-passing` computation
 (i.e., via :func:`~dgl.DGLGraph.update_all`) or computing edge-wise features from
 node-wise features (i.e., via :func:`~dgl.DGLGraph.apply_edges`). Built-in functions
 describe the node-wise and edge-wise computation in a symbolic way without any
@@ -14,7 +14,7 @@ actual computation, so DGL can analyze and map them to efficient low-level kerne
 Here are some examples:
 
 .. code:: python
-   
+
    import dgl
    import dgl.function as fn
    import torch as th
