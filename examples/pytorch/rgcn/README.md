@@ -64,11 +64,11 @@ To use multiple GPUs, replace `entity_sample.py` with `entity_sample_multi_gpu.p
 multiple GPU IDs separated by comma, e.g., `--gpu 0,1`.
 
 ### Link Prediction
-FB15k-237: MRR 0.391 (DGL), 0.158 (paper)
+FB15k-237: MRR 0.163 (DGL), 0.158 (paper)
 ```
 python link.py --gpu 0 --eval-protocol raw
 ```
-FB15k-237: Filtered-MRR 0.558
+FB15k-237: Filtered-MRR 0.247
 ```
 python link.py --gpu 0 --eval-protocol filtered
 ```
