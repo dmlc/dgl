@@ -6,8 +6,8 @@ from __future__ import absolute_import
 import sys
 import os
 import ctypes
-import numpy as np
 import logging
+import numpy as np
 from . import libinfo
 
 #----------------------------
