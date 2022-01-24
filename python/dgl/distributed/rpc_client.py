@@ -175,7 +175,7 @@ def connect_to_server(ip_config, num_servers, max_queue_size=MAX_QUEUE_SIZE,
     client_ip, client_port = ip_addr.split(':')
     # wait server connect back
     rpc.receiver_wait(client_ip, client_port, num_servers, blocking=False)
-    print("Clien [{}] waits on {}:{}".format(os.getpid(), client_ip, client_port))
+    print("Client [{}] waits on {}:{}".format(os.getpid(), client_ip, client_port))
     # Register client on server
     register_req = rpc.ClientRegisterRequest(ip_addr)
     for server_id in range(num_servers):
