@@ -12,7 +12,7 @@ def _fetch_cpu(indices, tensor, feature_shape, device, pin_memory):
     return result
 
 def _fetch_cuda(indices, tensor, device):
-    return torch.index_select(self.tensor, 0, indices).to(device)
+    return torch.index_select(tensor, 0, indices).to(device)
 
 class TensorStorage(FeatureStorage):
     def __init__(self, tensor):
