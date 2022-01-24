@@ -471,6 +471,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
       msg.data = pickle_data;
       NDArray tensor = dgl::aten::VecToIdArray<dgl_id_t>(remote_ids[i]);
       msg.tensors.push_back(tensor);
+      msg.group_id = RPCContext::getInstance()->group_id;
       SendRPCMessage(msg, msg.server_id);
       msg_count++;
     }

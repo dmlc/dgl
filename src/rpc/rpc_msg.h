@@ -39,7 +39,7 @@ struct RPCMessage : public runtime::Object {
   std::vector<runtime::NDArray> tensors;
 
   /*! \brief Group ID. */
-  int32_t group_id;
+  int32_t group_id{0};
 
   bool Load(dmlc::Stream* stream) {
     stream->Read(&service_id);
