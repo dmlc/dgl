@@ -37,10 +37,13 @@
  *   // Now XPU is a placeholder for array->ctx.device_type
  *   DeviceSpecificImplementation<XPU>(...);
  * });
+ * 
+ * We treat pinned memory as normal host memory if we don't want
+ * to enable CUDA UVA access for this operator
  */
 #ifdef DGL_USE_CUDA
 #define ATEN_XPU_SWITCH_CUDA(val, XPU, op, ...) do {            \
-  if ((val) == kDLCPU) {                                        \
+  if ((val) == kDLCPU || (val) == kDLCPUPinned) {               \
     constexpr auto XPU = kDLCPU;                                \
     {__VA_ARGS__}                                               \
   } else if ((val) == kDLGPU) {                                 \
