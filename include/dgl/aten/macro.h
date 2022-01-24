@@ -232,6 +232,14 @@
     });                                                     \
   });
 
+// Dispatching according to the context of array to enable CUDA UVA
+#define ATEN_CSR_SWITCH_CUDA_UVA(csr, array, XPU, IdType, op, ...) \
+  ATEN_XPU_SWITCH_CUDA(array->ctx.device_type, XPU, op, {          \
+    ATEN_ID_TYPE_SWITCH((csr).indptr->dtype, IdType, {             \
+      {__VA_ARGS__}                                                \
+    });                                                            \
+  });
+
 // Macro to dispatch according to device context (allowing cuda)
 #ifdef DGL_USE_CUDA
 #define ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, op, ...)            \
@@ -247,14 +255,6 @@
     ATEN_ID_TYPE_SWITCH((coo).row->dtype, IdType, {              \
       {__VA_ARGS__}                                              \
     });                                                          \
-  });
-
-// Dispatching according to the context of array to enable CUDA UVA
-#define ATEN_CSR_SWITCH_CUDA_UVA(csr, array, XPU, IdType, op, ...) \
-  ATEN_XPU_SWITCH_CUDA(array->ctx.device_type, XPU, op, {          \
-    ATEN_ID_TYPE_SWITCH((csr).indptr->dtype, IdType, {             \
-      {__VA_ARGS__}                                                \
-    });                                                            \
   });
 #else  // DGL_USE_CUDA
 #define ATEN_CSR_SWITCH_CUDA ATEN_CSR_SWITCH
