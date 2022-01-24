@@ -1,3 +1,4 @@
+"""logging module for DGL"""
 import logging
 import os
 
@@ -24,11 +25,10 @@ def _setup_logger():
     console.setLevel(logging.DEBUG)
     logger.addHandler(console)
     logger.propagate = False
+    logger.setLevel(logging.INFO)
 
 
 _setup_logger()
+
 if "DGL_LOG_DEBUG" in os.environ and os.environ["DGL_LOG_DEBUG"] == "1":
     enable_verbose_logging()
-else:
-    logger = logging.getLogger("dgl-core")
-    logger.setLevel(logging.INFO)
