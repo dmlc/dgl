@@ -226,9 +226,10 @@ def _prefetch_update_feats(
                     raise DGLError(
                         'Found a LazyFeature with no ID specified, '
                         'and the graph does not have dgl.NID or dgl.EID columns')
-                feats[tid, key] = _prefetch_for_column(
-                    column.id_ or default_id, use_asyncio, storages[type_, parent_key],
-                    device, pin_memory)
+                if (type_, parent_key) in storages:
+                    feats[tid, key] = _prefetch_for_column(
+                        column.id_ or default_id, use_asyncio, storages[type_, parent_key],
+                        device, pin_memory)
 
 
 # This class exists to avoid recursion into the feature dictionary returned by the
@@ -483,7 +484,7 @@ def _prepare_storages_from_graph(graph, attr, types):
             storages[types[0], key] = _wrap_storage(value)
         else:
             for type_, v in value.items():
-                storages[type_, key] = v
+                storages[type_, key] = _wrap_storage(v)
     return storages
 
 
