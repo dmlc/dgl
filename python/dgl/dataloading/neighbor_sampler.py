@@ -25,3 +25,10 @@ class NeighborSampler(BlockSampler):
             blocks.insert(0, block)
 
         return seed_nodes, output_nodes, blocks
+
+MultiLayerNeighborSampler = NeighborSampler
+
+class MultiLayerFullNeighborSampler(NeighborSampler):
+    def __init__(self, num_layers, edge_dir='in', prob=None, replace=False, **kwargs):
+        super().__init__([-1] * num_layers, edge_dir=edge_dir, prob=prob, replace=replace,
+                         **kwargs)

@@ -1,4 +1,4 @@
-from collections.abc import Mapping, Awaitable
+from collections.abc import Mapping, Awaitable, Sequence
 from functools import partial
 from queue import Queue
 import itertools
@@ -6,8 +6,11 @@ import threading
 import asyncio
 import random
 import math
+import inspect
+
 import torch
 import torch.distributed as dist
+from torch.utils.data.distributed import DistributedSampler
 
 from ..base import NID, EID
 from ..heterograph import DGLHeteroGraph
@@ -19,6 +22,7 @@ from ..frame import Column, LazyFeature
 from .asyncio_wrapper import AsyncIO
 from ..storages import TensorStorage, FeatureStorage
 from .base import BlockSampler, EdgeBlockSampler
+from .. import backend as F
 
 class _TensorizedDatasetIter(object):
     def __init__(self, dataset, batch_size, drop_last, mapping_keys):
@@ -570,3 +574,190 @@ class EdgeDataLoader(DataLoader):
             batch_size=batch_size, drop_last=drop_last, shuffle=shuffle, use_asyncio=use_asyncio,
             use_prefetch_thread=use_prefetch_thread, use_alternate_streams=use_alternate_streams,
             **kwargs)
+
+
+######## Graph DataLoaders ########
+# GraphDataLoader loads a set of graphs so it's not relevant to the above.  They are currently
+# copied from the old DataLoader implementation.
+
+PYTORCH_VER = LooseVersion(th.__version__)
+PYTORCH_16 = PYTORCH_VER >= LooseVersion("1.6.0")
+PYTORCH_17 = PYTORCH_VER >= LooseVersion("1.7.0")
+
+def _create_dist_sampler(dataset, dataloader_kwargs, ddp_seed):
+    # Note: will change the content of dataloader_kwargs
+    dist_sampler_kwargs = {'shuffle': dataloader_kwargs['shuffle']}
+    dataloader_kwargs['shuffle'] = False
+    if PYTORCH_16:
+        dist_sampler_kwargs['seed'] = ddp_seed
+    if PYTORCH_17:
+        dist_sampler_kwargs['drop_last'] = dataloader_kwargs['drop_last']
+        dataloader_kwargs['drop_last'] = False
+
+    return DistributedSampler(dataset, **dist_sampler_kwargs)
+
+class GraphCollator(object):
+    """Given a set of graphs as well as their graph-level data, the collate function will batch the
+    graphs into a batched graph, and stack the tensors into a single bigger tensor.  If the
+    example is a container (such as sequences or mapping), the collate function preserves
+    the structure and collates each of the elements recursively.
+
+    If the set of graphs has no graph-level data, the collate function will yield a batched graph.
+
+    Examples
+    --------
+    To train a GNN for graph classification on a set of graphs in ``dataset`` (assume
+    the backend is PyTorch):
+
+    >>> dataloader = dgl.dataloading.GraphDataLoader(
+    ...     dataset, batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
+    >>> for batched_graph, labels in dataloader:
+    ...     train_on(batched_graph, labels)
+    """
+    def __init__(self):
+        self.graph_collate_err_msg_format = (
+            "graph_collate: batch must contain DGLGraph, tensors, numpy arrays, "
+            "numbers, dicts or lists; found {}")
+        self.np_str_obj_array_pattern = re.compile(r'[SaUO]')
+
+    #This implementation is based on torch.utils.data._utils.collate.default_collate
+    def collate(self, items):
+        """This function is similar to ``torch.utils.data._utils.collate.default_collate``.
+        It combines the sampled graphs and corresponding graph-level data
+        into a batched graph and tensors.
+
+        Parameters
+        ----------
+        items : list of data points or tuples
+            Elements in the list are expected to have the same length.
+            Each sub-element will be batched as a batched graph, or a
+            batched tensor correspondingly.
+
+        Returns
+        -------
+        A tuple of the batching results.
+        """
+        elem = items[0]
+        elem_type = type(elem)
+        if isinstance(elem, DGLGraph):
+            batched_graphs = batch(items)
+            return batched_graphs
+        elif F.is_tensor(elem):
+            return F.stack(items, 0)
+        elif elem_type.__module__ == 'numpy' and elem_type.__name__ != 'str_' \
+                and elem_type.__name__ != 'string_':
+            if elem_type.__name__ == 'ndarray' or elem_type.__name__ == 'memmap':
+                # array of string classes and object
+                if self.np_str_obj_array_pattern.search(elem.dtype.str) is not None:
+                    raise TypeError(self.graph_collate_err_msg_format.format(elem.dtype))
+
+                return self.collate([F.tensor(b) for b in items])
+            elif elem.shape == ():  # scalars
+                return F.tensor(items)
+        elif isinstance(elem, float):
+            return F.tensor(items, dtype=F.float64)
+        elif isinstance(elem, int):
+            return F.tensor(items)
+        elif isinstance(elem, (str, bytes)):
+            return items
+        elif isinstance(elem, Mapping):
+            return {key: self.collate([d[key] for d in items]) for key in elem}
+        elif isinstance(elem, tuple) and hasattr(elem, '_fields'):  # namedtuple
+            return elem_type(*(self.collate(samples) for samples in zip(*items)))
+        elif isinstance(elem, Sequence):
+            # check to make sure that the elements in batch have consistent size
+            item_iter = iter(items)
+            elem_size = len(next(item_iter))
+            if not all(len(elem) == elem_size for elem in item_iter):
+                raise RuntimeError('each element in list of batch should be of equal size')
+            transposed = zip(*items)
+            return [self.collate(samples) for samples in transposed]
+
+        raise TypeError(self.graph_collate_err_msg_format.format(elem_type))
+
+class GraphDataLoader(torch.utils.data.DataLoader):
+    """PyTorch dataloader for batch-iterating over a set of graphs, generating the batched
+    graph and corresponding label tensor (if provided) of the said minibatch.
+
+    Parameters
+    ----------
+    collate_fn : Function, default is None
+        The customized collate function. Will use the default collate
+        function if not given.
+    use_ddp : boolean, optional
+        If True, tells the DataLoader to split the training set for each
+        participating process appropriately using
+        :class:`torch.utils.data.distributed.DistributedSampler`.
+
+        Overrides the :attr:`sampler` argument of :class:`torch.utils.data.DataLoader`.
+    ddp_seed : int, optional
+        The seed for shuffling the dataset in
+        :class:`torch.utils.data.distributed.DistributedSampler`.
+
+        Only effective when :attr:`use_ddp` is True.
+    kwargs : dict
+        Arguments being passed to :py:class:`torch.utils.data.DataLoader`.
+
+    Examples
+    --------
+    To train a GNN for graph classification on a set of graphs in ``dataset`` (assume
+    the backend is PyTorch):
+
+    >>> dataloader = dgl.dataloading.GraphDataLoader(
+    ...     dataset, batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
+    >>> for batched_graph, labels in dataloader:
+    ...     train_on(batched_graph, labels)
+
+    **Using with Distributed Data Parallel**
+
+    If you are using PyTorch's distributed training (e.g. when using
+    :mod:`torch.nn.parallel.DistributedDataParallel`), you can train the model by
+    turning on the :attr:`use_ddp` option:
+
+    >>> dataloader = dgl.dataloading.GraphDataLoader(
+    ...     dataset, use_ddp=True, batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
+    >>> for epoch in range(start_epoch, n_epochs):
+    ...     dataloader.set_epoch(epoch)
+    ...     for batched_graph, labels in dataloader:
+    ...         train_on(batched_graph, labels)
+    """
+    collator_arglist = inspect.getfullargspec(GraphCollator).args
+
+    def __init__(self, dataset, collate_fn=None, use_ddp=False, ddp_seed=0, **kwargs):
+        collator_kwargs = {}
+        dataloader_kwargs = {}
+        for k, v in kwargs.items():
+            if k in self.collator_arglist:
+                collator_kwargs[k] = v
+            else:
+                dataloader_kwargs[k] = v
+
+        if collate_fn is None:
+            self.collate = _GraphCollator(self.subgraph_iterator, **collator_kwargs).collate
+        else:
+            self.collate = collate_fn
+
+        self.use_ddp = use_ddp
+        if use_ddp:
+            self.dist_sampler = _create_dist_sampler(dataset, dataloader_kwargs, ddp_seed)
+            dataloader_kwargs['sampler'] = self.dist_sampler
+
+        super().__init__(dataset=dataset, collate_fn=self.collate, **dataloader_kwargs)
+
+    def set_epoch(self, epoch):
+        """Sets the epoch number for the underlying sampler which ensures all replicas
+        to use a different ordering for each epoch.
+
+        Only available when :attr:`use_ddp` is True.
+
+        Calls :meth:`torch.utils.data.distributed.DistributedSampler.set_epoch`.
+
+        Parameters
+        ----------
+        epoch : int
+            The epoch number.
+        """
+        if self.use_ddp:
+            self.dist_sampler.set_epoch(epoch)
+        else:
+            raise DGLError('set_epoch is only available when use_ddp is True.')
