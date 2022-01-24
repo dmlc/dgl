@@ -55,7 +55,7 @@ following user-defined function:
    def udf_max(nodes):
       return {'h_max' : th.max(nodes.mailbox['m'], 1)[0]}
 
-All binary message function supports **broadcasting**, a mechansim for extending element-wise
+All binary message function supports **broadcasting**, a mechanism for extending element-wise
 operations to tensor inputs with different shapes. DGL generally follows the standard
 broadcasting semantic by `NumPy <https://docs.scipy.org/doc/numpy/user/basics.broadcasting.html>`_
 and `PyTorch <https://pytorch.org/docs/stable/notes/broadcasting.html>`_. Below are some
