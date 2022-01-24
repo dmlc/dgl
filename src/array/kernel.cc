@@ -57,14 +57,15 @@ void SpMM(const std::string& op, const std::string& reduce,
 void GatherMM(const NDArray H,
           const NDArray W,
           NDArray out,
-          const NDArray E_per_rel,
+          const NDArray H_per_rel,
+          const NDArray W_per_rel,
           const NDArray etypes,
           bool sortedE, bool H_trans, bool W_trans) {
   ATEN_XPU_SWITCH_CUDA(H->ctx.device_type, XPU, "GatherMM", {
     ATEN_ID_TYPE_SWITCH(etypes->dtype, IdType, {
       ATEN_FLOAT_BITS_SWITCH(H->dtype, bits, "Feature data", {
-        gatherMM<XPU, IdType, bits>(H, W, out, E_per_rel, etypes, sortedE,
-          H_trans, W_trans);
+        gatherMM<XPU, IdType, bits>(H, W, out, H_per_rel, W_per_rel,
+          etypes, sortedE, H_trans, W_trans);
       });
     });
   });
@@ -371,12 +372,13 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelGATHERMM")
     NDArray H = args[0];
     NDArray W = args[1];
     NDArray O = args[2];
-    NDArray E_per_rel = args[3];
-    NDArray etypes = args[4];
-    bool sortedE = args[5];
-    bool H_trans = args[6];
-    bool W_trans = args[7];
-    GatherMM(H, W, O, E_per_rel, etypes, sortedE, H_trans, W_trans);
+    NDArray H_per_rel = args[3];
+    NDArray W_per_rel = args[4];
+    NDArray etypes = args[5];
+    bool sortedE = args[6];
+    bool H_trans = args[7];
+    bool W_trans = args[8];
+    GatherMM(H, W, O, H_per_rel, W_per_rel, etypes, sortedE, H_trans, W_trans);
   });
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSpMMHetero")

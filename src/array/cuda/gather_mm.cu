@@ -4,9 +4,10 @@
  * \brief SDDMM C APIs and definitions.
  */
 #include <dgl/array.h>
+#include <algorithm>  // std::swap
+#include "./gather_mm.cuh"
 #include "./utils.h"
 #include "./functor.cuh"
-#include <algorithm>  // std::swap
 
 namespace dgl {
 using namespace cuda;
@@ -73,6 +74,40 @@ cublasStatus_t cublasGemm<double>(cublasHandle_t handle, cublasOperation_t trans
   return cublasDgemm(handle, transa, transb, m, n, k, alpha, A, lda,
       B, ldb, beta, C, ldc);
 }
+
+/*
+ * \brief Tranpose the input matrix.
+ * \param row number of rows of input matrix.
+ * \param col number of columns of input matrix.
+ */
+
+                // CUBLAS_CALL(Xgeam<DType>(
+                //     thr_entry->cublas_handle,
+                //     CUBLAS_OP_T,
+                //     CUBLAS_OP_N,
+                //     m, k,
+                //     &alpha, h_data + h_offset, k,
+                //     &beta, nullptr, m,
+                //     h_trans_data, m));
+template <typename DType>
+void _Transpose(cublasHandle_t handle,
+                const DType* in, DType* out,
+                int row, int col) {
+  DType alpha = 1., beta = 0.;
+  // auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  // if (!thr_entry->cublas_handle)
+    // CUBLAS_CALL(cublasCreate(&(thr_entry->cublas_handle)));
+  // CUBLAS_CALL(cublasSetStream(thr_entry->cublas_handle, thr_entry->stream));
+  CUBLAS_CALL(Xgeam<DType>(
+      handle,
+      CUBLAS_OP_T,
+      CUBLAS_OP_N,
+      row, col,
+      &alpha, in, col,
+      &beta, nullptr, row,
+      out, row));
+}
+
 }  // namespace
 
 /* Idea 1: tranpose W and compute dot product of each row vector of H
@@ -259,22 +294,20 @@ template <int XPU, typename IdType, int bits>
 void gatherMM_SortedEtype(const NDArray h,
               const NDArray w,
               NDArray out,
-              const NDArray E_per_rel,
-              const NDArray h_etype,
-              bool H_trans) {
+              const NDArray H_per_rel,
+              const NDArray W_per_rel,
+              bool H_trans, bool W_trans) {
     SWITCH_BITS(bits, DType, {
         auto device = runtime::DeviceAPI::Get(h->ctx);
-        int64_t num_rel = E_per_rel.NumElements();
-        int n = w->shape[1];  // cols of B
-        int k = h->shape[1];  // cols of A = rows of B
+        assert(H_per_rel.NumElements() == W_per_rel.NumElements());
+        int64_t num_rel = H_per_rel.NumElements();
         const DType *h_data = h.Ptr<DType>();
         const DType *w_data = w.Ptr<DType>();
-        const IdType* E_per_rel_data = E_per_rel.Ptr<IdType>();
+        const IdType* H_per_rel_data = H_per_rel.Ptr<IdType>();
+        const IdType* W_per_rel_data = W_per_rel.Ptr<IdType>();
         DType *out_data = out.Ptr<DType>();
-
-        int64_t h_offset = 0;
-        int64_t w_offset = 0;
-        int64_t out_offset = 0;
+        int64_t h_offset = 0, w_offset = 0, out_offset = 0;
+        int64_t m, n, k, h_col, w_row;
         DType alpha = 1., beta = 0.;
 
         auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
@@ -282,39 +315,50 @@ void gatherMM_SortedEtype(const NDArray h,
             CUBLAS_CALL(cublasCreate(&(thr_entry->cublas_handle)));
         CUBLAS_CALL(cublasSetStream(thr_entry->cublas_handle,
             thr_entry->stream));
-        int ldb = n,
-            lda = k,
-            ldc = n;
+
         for (int etype = 0; etype < num_rel; ++etype) {
-            int m = E_per_rel_data[etype];  // rows of A
-            k = h->shape[1];
+            assert((H_trans) ? H_per_rel_data[etype] : h->shape[1] ==  \
+                (W_trans) ? w->shape[1] : W_per_rel_data[etype]);
+            m = H_per_rel_data[etype];  // rows of A
+            n = w->shape[1];  // cols of B
+            k = W_per_rel_data[etype];  // rows of B == cols of A
+
             DType* h_trans_data = nullptr;
+            DType* w_trans_data = nullptr;
             if (H_trans) {
-                // allocate matrix for temporary transposed output
                 h_trans_data = static_cast<DType*>(device->AllocWorkspace \
                     (h->ctx, m * k * sizeof(DType)));
-                CUBLAS_CALL(Xgeam<DType>(
-                    thr_entry->cublas_handle,
-                    CUBLAS_OP_T,
-                    CUBLAS_OP_N,
-                    m, k,
-                    &alpha, h_data + h_offset, k,
-                    &beta, nullptr, m,
-                    h_trans_data, m));
-                std::swap(m, k);
+                _Transpose(thr_entry->cublas_handle, h_data + h_offset, h_trans_data, m, k);
             }
+            if (W_trans) {
+                w_trans_data = static_cast<DType*>(device->AllocWorkspace \
+                    (w->ctx, n * k * sizeof(DType)));
+                _Transpose(thr_entry->cublas_handle, w_data + w_offset, w_trans_data, k, n);
+            }
+            if (H_trans || W_trans) {
+                int64_t tmp = k;
+                if (H_trans)
+                    std::swap(m, k);
+                if (W_trans)  {
+                    k = tmp;
+                    std::swap(n, k);
+                }
+            }
+            int ldb = n, lda = k, ldc = n;
             CUBLAS_CALL(cublasGemm<DType>(
                 thr_entry->cublas_handle,
                 CUBLAS_OP_N,
                 CUBLAS_OP_N,
                 n, m, k,
                 &alpha,
-                w_data + w_offset, n,
+                (W_trans) ? w_trans_data : w_data + w_offset, n,
                 (H_trans) ? h_trans_data : h_data + h_offset, k,
                 &beta,
                 out_data + out_offset, n));
             if (H_trans)
                 device->FreeWorkspace(h->ctx, h_trans_data);
+            if (W_trans)
+                device->FreeWorkspace(w->ctx, w_trans_data);
             h_offset += m * k;
             w_offset += k * n;
             out_offset += m * n;
@@ -326,39 +370,41 @@ template <int XPU, typename IdType, int bits>
 void gatherMM(const NDArray h,
           const NDArray w,
           NDArray out,
-          const NDArray E_per_rel,
+          const NDArray H_per_rel,
+          const NDArray W_per_rel,
           const NDArray etype,
-          bool sortedE, bool H_trans, bool w_trans) {
+          bool sortedE, bool H_trans, bool W_trans) {
     if (sortedE)  // similar to low-mem matmul
-        gatherMM_SortedEtype<XPU, IdType, bits>(h, w, out, E_per_rel, etype, H_trans);
+        gatherMM_SortedEtype<XPU, IdType, bits>(h, w, out, H_per_rel,
+            W_per_rel, H_trans, W_trans);
     else  // similar to bmm without copying w to edges
-        gatherMM_UnsortedEtype<XPU, IdType, bits>(h, w, out, E_per_rel, etype);
+        gatherMM_UnsortedEtype<XPU, IdType, bits>(h, w, out, H_per_rel, etype);
 }
 
 template void gatherMM<kDLGPU, int32_t, 16>(
     const NDArray h, const NDArray w, NDArray out,
-    const NDArray E_per_rel, const NDArray etype,
-    bool sortedE, bool H_trans,  bool W_trans);
+    const NDArray H_per_rel, const NDArray W_per_rel,
+    const NDArray etype, bool sortedE, bool H_trans, bool W_trans);
 template void gatherMM<kDLGPU, int64_t, 16>(
     const NDArray h, const NDArray w, NDArray out,
-    const NDArray E_per_rel, const NDArray etype,
-    bool sortedE, bool H_trans,  bool W_trans);
+    const NDArray H_per_rel, const NDArray W_per_rel,
+    const NDArray etype, bool sortedE, bool H_trans, bool W_trans);
 template void gatherMM<kDLGPU, int32_t, 32>(
     const NDArray h, const NDArray w, NDArray out,
-    const NDArray E_per_rel, const NDArray etype,
-    bool sortedE, bool H_trans,  bool W_trans);
+    const NDArray H_per_rel, const NDArray W_per_rel,
+    const NDArray etype, bool sortedE, bool H_trans, bool W_trans);
 template void gatherMM<kDLGPU, int64_t, 32>(
     const NDArray h, const NDArray w, NDArray out,
-    const NDArray E_per_rel, const NDArray etype,
-    bool sortedE, bool H_trans,  bool W_trans);
+    const NDArray H_per_rel, const NDArray W_per_rel,
+    const NDArray etype, bool sortedE, bool H_trans, bool W_trans);
 template void gatherMM<kDLGPU, int32_t, 64>(
     const NDArray h, const NDArray w, NDArray out,
-    const NDArray E_per_rel, const NDArray etype,
-    bool sortedE, bool H_trans,  bool W_trans);
+    const NDArray H_per_rel, const NDArray W_per_rel,
+    const NDArray etype, bool sortedE, bool H_trans, bool W_trans);
 template void gatherMM<kDLGPU, int64_t, 64>(
     const NDArray h, const NDArray w, NDArray out,
-    const NDArray E_per_rel, const NDArray etype,
-    bool sortedE, bool H_trans,  bool W_trans);
+    const NDArray H_per_rel, const NDArray W_per_rel,
+    const NDArray etype, bool sortedE, bool H_trans, bool W_trans);
 
 }  // namespace aten
 }  // namespace dgl

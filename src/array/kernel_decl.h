@@ -119,7 +119,8 @@ template <int XPU, typename IdType, int bits>
 void gatherMM(const NDArray H,
           const NDArray W,
           NDArray out,
-          const NDArray E_per_rel,
+          const NDArray H_per_rel,
+          const NDArray W_per_rel,
           const NDArray etypes,
           bool sortedE, bool H_trans, bool W_trans);
 

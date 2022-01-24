@@ -328,21 +328,24 @@ def _gspmm_hetero(gidx, op, reduce_op, u_len, u_and_e_tuple):
     return out, (list_arg_u, list_arg_e, list_arg_u_ntype, list_arg_e_etype)
 
 
-def _gather_mm(h, w, out, E_per_rel, etypes, sortedE):
+def _gather_mm(h, w, out, h_per_rel, w_per_rel, etypes, sortedE):
     _CAPI_DGLKernelGATHERMM(to_dgl_nd(h),
                             to_dgl_nd(w),
                             to_dgl_nd_for_write(out),
-                            to_dgl_nd(E_per_rel),
+                            to_dgl_nd(h_per_rel),
+                            to_dgl_nd(w_per_rel),
                             to_dgl_nd(etypes),
                             sortedE, False, False)
     return out
 
 
-def _gather_mm_scatter(h, w, out, E_per_rel, etypes, sortedE, h_trans=False, w_trans=False):
+def _gather_mm_scatter(h, w, out, h_per_rel, w_per_rel, etypes, sortedE,
+                       h_trans=False, w_trans=False):
     _CAPI_DGLKernelGATHERMM(to_dgl_nd(h),
                             to_dgl_nd(w),
                             to_dgl_nd_for_write(out),
-                            to_dgl_nd(E_per_rel),
+                            to_dgl_nd(h_per_rel),
+                            to_dgl_nd(w_per_rel),
                             to_dgl_nd(etypes),
                             sortedE, h_trans, w_trans)
     return out
