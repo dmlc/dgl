@@ -370,7 +370,7 @@ nodes with a probability, one can simply define the sampler as follows:
             # Get all inbound edges to `seed_nodes`
             src, dst = dgl.in_subgraph(g, seed_nodes).all_edges()
             # Randomly select edges with a probability of p
-            mask = torch.zeros_like(src).bernoulli_(self.p)
+            mask = torch.zeros_like(src).bernoulli_(self.p).bool()
             src = src[mask]
             dst = dst[mask]
             # Return a new graph with the same nodes as the original graph as a
