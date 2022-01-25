@@ -10,7 +10,7 @@ case, you would like to have an *edge classification/regression* model.
 
 Here we generate a random graph for edge prediction as a demonstration.
 
-.. code:: ipython3
+.. code:: python
 
     src = np.random.randint(0, 100, 500)
     dst = np.random.randint(0, 100, 500)
@@ -328,5 +328,3 @@ file <https://github.com/dmlc/dgl/tree/master/examples/pytorch/gcmc>`__
 is called ``GCMCLayer``. The edge type predictor module is called
 ``BiDecoder``. Both of them are more complicated than the setting
 described here.
-
-

@@ -32,7 +32,7 @@ def ccorr(a, b):
 	-------
 	Tensor, having the same dimension as the input a.
 	"""
-	return th.irfft(com_mult(conj(th.rfft(a, 1)), th.rfft(b, 1)), 1, signal_sizes=(a.shape[-1],))
+	return th.fft.irfftn(th.conj(th.fft.rfftn(a, (-1))) * th.fft.rfftn(b, (-1)), (-1))
 
 #identify in/out edges, compute edge norm for each and store in edata
 def in_out_norm(graph):

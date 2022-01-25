@@ -208,6 +208,10 @@ Methods for getting or changing the device on which the graph is hosted.
 
     DGLGraph.to
     DGLGraph.device
+    DGLGraph.cpu
+    DGLGraph.pin_memory_
+    DGLGraph.unpin_memory_
+    DGLGraph.is_pinned
 
 Misc
 ----
