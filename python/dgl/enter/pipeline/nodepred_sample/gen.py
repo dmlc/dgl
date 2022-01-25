@@ -14,6 +14,7 @@ from ...utils.yaml_dump import deep_convert_dict
 import ruamel.yaml
 from ruamel.yaml.comments import CommentedMap
 
+
 class MultiLayerSamplerConfig(BaseModel):
     name: Literal["neighbor"]
     fan_out: List[int] = [5, 10]
@@ -21,6 +22,7 @@ class MultiLayerSamplerConfig(BaseModel):
     num_workers: int = 4
     eval_batch_size: int = 1024
     eval_num_workers: int = 4
+
     class Config:
         extra = 'forbid'
 
@@ -28,14 +30,17 @@ class MultiLayerSamplerConfig(BaseModel):
 class OtherSamplerConfig(BaseModel):
     name: Literal["other"]
     demo_batch_size: int = Field(64, description="Batch size")
+
     class Config:
         extra = 'forbid'
 
 
 SamplerConfig = Union[MultiLayerSamplerConfig,
-                   OtherSamplerConfig]
+                      OtherSamplerConfig]
 
 SamplerChoice = extract_name(SamplerConfig)
+
+
 class NodepredNSPipelineCfg(BaseModel):
     sampler: SamplerConfig = Field(..., discriminator='name')
     node_embed_size: Optional[int] = -1
@@ -44,6 +49,7 @@ class NodepredNSPipelineCfg(BaseModel):
     eval_period: int = 5
     optimizer: dict = {"name": "Adam", "lr": 0.005}
     loss: str = "CrossEntropyLoss"
+
 
 @PipelineFactory.register("nodepred-ns")
 class NodepredNsPipeline(PipelineBase):
@@ -59,7 +65,8 @@ class NodepredNsPipeline(PipelineBase):
             sampler: SamplerChoice = typer.Option(
                 "neighbor", help="Specify sampler name"),
             model: NodeModelFactory.get_model_enum() = typer.Option(..., help="Model name"),
-            device: DeviceEnum = typer.Option("cpu", help="Device, cpu or cuda"),
+            device: DeviceEnum = typer.Option(
+                "cpu", help="Device, cpu or cuda"),
         ):
             from ...utils.enter_config import UserConfig
             generated_cfg = {
@@ -67,7 +74,7 @@ class NodepredNsPipeline(PipelineBase):
                 "device": device,
                 "data": {"name": data.name},
                 "model": {"name": model.value},
-                "general_pipeline" : NodepredNSPipelineCfg(sampler={"name": sampler.value})
+                "general_pipeline": NodepredNSPipelineCfg(sampler={"name": sampler.value})
             }
             output_cfg = UserConfig(**generated_cfg).dict()
             output_cfg = self.user_cfg_cls(**generated_cfg).dict()
@@ -78,6 +85,8 @@ class NodepredNsPipeline(PipelineBase):
 
             yaml = ruamel.yaml.YAML()
             yaml.dump(comment_dict, Path(cfg).open("w"))
+            print("Configuration file is generated at {}".format(
+                Path(cfg).absolute()))
 
         return config
 
@@ -91,7 +100,8 @@ class NodepredNsPipeline(PipelineBase):
         with open(template_filename, "r") as f:
             template = Template(f.read())
         print(user_cfg_dict)
-        pipeline_cfg = NodepredNSPipelineCfg(**user_cfg_dict["general_pipeline"])
+        pipeline_cfg = NodepredNSPipelineCfg(
+            **user_cfg_dict["general_pipeline"])
 
         render_cfg = copy.deepcopy(user_cfg_dict)
         model_code = NodeModelFactory.get_source_code(
@@ -99,7 +109,8 @@ class NodepredNsPipeline(PipelineBase):
         render_cfg["model_code"] = model_code
         render_cfg["model_class_name"] = NodeModelFactory.get_model_class_name(
             user_cfg_dict["model"]["name"])
-        render_cfg.update(DataFactory.get_generated_code_dict(user_cfg_dict["data"]["name"], '**cfg["data"]'))
+        render_cfg.update(DataFactory.get_generated_code_dict(
+            user_cfg_dict["data"]["name"], '**cfg["data"]'))
         generated_user_cfg = copy.deepcopy(user_cfg_dict)
 
         if len(generated_user_cfg["data"]) == 1:

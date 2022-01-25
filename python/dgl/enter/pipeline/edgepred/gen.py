@@ -101,19 +101,11 @@ class EdgepredPipeline(PipelineBase):
                 "edge_model": EdgeModelFactory.get_constructor_doc_dict(edge_model.value),
                 "neg_sampler": NegativeSamplerFactory.get_constructor_doc_dict(neg_sampler.value)
             }
-
-            # for k,v in pipeline_comments.items():
-            #     comment_dict["general_pipeline"].yaml_add_eol_comment(v, key=k, column=30)
-            # for k, v in NodeModelFactory.get_constructor_doc_dict(node_model.value).items():
-            #     comment_dict["node_model"].yaml_add_eol_comment(v, key=k, column=30)
-            # for k, v in EdgeModelFactory.get_constructor_doc_dict(edge_model.value).items():
-            #     comment_dict["edge_model"].yaml_add_eol_comment(v, key=k, column=30)
-            # for k, v in NegativeSamplerFactory.get_constructor_doc_dict(neg_sampler.value).items():
-            #     comment_dict["neg_sampler"].yaml_add_eol_comment(v, key=k, column=30)
             comment_dict = merge_comment(output_cfg, comment_dict)
             print(comment_dict)
             yaml = ruamel.yaml.YAML()
             yaml.dump(comment_dict, Path(cfg).open("w"))
+            print("Configuration file is generated at {}".format(Path(cfg).absolute()))
 
         return config
 

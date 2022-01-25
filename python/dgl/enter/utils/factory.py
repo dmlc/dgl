@@ -118,7 +118,7 @@ class DataFactory:
 ALL_PIPELINE = ["nodepred", "nodepred-ns", "edgepred"]
 
 DataFactory.register(
-    "cora", import_code="from dgl.data import CoraGraphDataset", class_name="CoraGraphDataset()")
+    "cora", import_code="from dgl.data import CoraGraphDataset", class_name="CoraGraphDataset()", allowed_pipeline=["nodepred", "nodepred-ns", "edgepred"])
 DataFactory.register("citeseer", import_code="from dgl.data import CiteseerGraphDataset",
                      class_name="CiteseerGraphDataset()", allowed_pipeline=["nodepred", "nodepred-ns", "edgepred"])
 DataFactory.register("ogbl-collab", import_code="from ogb.linkproppred import DglLinkPropPredDataset",
