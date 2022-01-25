@@ -256,7 +256,7 @@ class HeteroLinearLayer(nn.Module):
     """Apply a linear transformation on the node features of a
     heterogeneous graph and return a homogeneous graph representation.
 
-    The underlying implementation invokes dgl.to_homogeneous. Therefore,
+    The underlying implementation invokes :func:`~dgl.to_homogeneous`. Therefore,
     the returned graph stores the following extra attributes:
     
       - ret_g.ndata[dgl.NID]: the original node IDs.
@@ -323,7 +323,7 @@ class HeteroEmbedding(nn.Module):
     """Create node embeddings for each node type and return a homogeneous
     graph representation.
 
-    The underlying implementation invokes dgl.to_homogeneous. Therefore,
+    The underlying implementation invokes :func:`~dgl.to_homogeneous`. Therefore,
     the returned graph stores the following extra attributes:
     
       - ret_g.ndata[dgl.NID]: the original node IDs.
@@ -340,6 +340,7 @@ class HeteroEmbedding(nn.Module):
 
     Examples
     --------
+    
     >>> hg = dgl.heterograph({('user', 'rate', 'movie') : ...,
                               ('user', 'follows', 'user') : ...})
     >>> print(hg.num_nodes('user'), hg.num_nodes('movie'))
@@ -352,6 +353,7 @@ class HeteroEmbedding(nn.Module):
     (1300, 100)
     >>> print(embed.requires_grad)
     True
+    
     """
     def __init__(self, hg, embed_size):
         super(HeteroEmbedding, self).__init__()

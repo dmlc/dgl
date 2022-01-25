@@ -1422,6 +1422,4 @@ if __name__ == '__main__':
     test_atomic_conv()
     test_cf_conv()
     test_hetero_conv()
-    test_hetero_linear_layer()
-    test_hetero_embedding()
     test_twirls()
