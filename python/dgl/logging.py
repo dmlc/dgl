@@ -30,5 +30,5 @@ def _setup_logger():
 
 _setup_logger()
 
-if "DGL_LOG_DEBUG" in os.environ and os.environ["DGL_LOG_DEBUG"] == "1":
+if os.environ.get("DGL_LOG_DEBUG", None) == "1":
     enable_verbose_logging()
