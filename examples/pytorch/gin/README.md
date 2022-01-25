@@ -33,10 +33,8 @@ add `--degree_as_nlabel` to use one-hot encodings of node degrees as node featur
 Results
 -------
 
-Run with following with the double SUM pooling way:
-(tested dataset: "MUTAG"(default), "COLLAB", "IMDBBINARY", "IMDBMULTI"), results may **fluctuate**, due to random factors and the relatively small data set.
+results may **fluctuate**, due to random factors and the relatively small data set. if you want to follow the paper's setting, consider the script below.
 
-if you want to follow the paper's setting, consider the script below.
 ```bash
 # 4 bioinformatics datasets setting graph_pooling_type=sum, the nodes have categorical input features 
 python main.py --dataset MUTAG --device 0  \
@@ -52,7 +50,7 @@ python main.py --dataset PROTEINS --device 0  \
                 --graph_pooling_type sum --neighbor_pooling_type sum --filename PROTEINS.txt
 
 # 5 social network datasets setting graph_pooling_type=mean, for the REDDIT datasets, we set all node feature vectors to be the same 
-# (thus, features here are uninformative); for the other social graphs, we use one-hot encodings of node degrees.  
+# (thus, features here are uninformative); for the other social networks, we use one-hot encodings of node degrees.  
 python main.py --dataset COLLAB --device 0  \
                 --graph_pooling_type mean --neighbor_pooling_type sum --degree_as_nlabel --filename COLLAB.txt
 
@@ -73,13 +71,13 @@ one fold of 10 result are below.
 
 | dataset       | our result | paper report |
 | ------------- | ---------- | ------------ |
-| MUTAG         | 0.894      | 89.4 ± 5.6   |
-| PTC           | 0.685      | 64.6 ± 7.0   |
-| NCI1          | 0.785      | 82.7 ± 1.7   |
-| PROTEINS      | 0.723      | 76.2 ± 2.8   |
-| COLLAB        | 0.816      | 80.2 ± 1.9   |
-| IMDBBINARY    | 0.730      | 75.1 ± 5.1   |
-| IMDBMULTI     | 0.540      | 52.3 ± 2.8   |
-| REDDITBINARY  | 0.880      | 92.4 ± 2.5   |
-| REDDITMULTI5K | 0.548      | 57.5 ± 1.5   |
+| MUTAG         | 89.4      | 89.4 ± 5.6   |
+| PTC           | 68.5      | 64.6 ± 7.0   |
+| NCI1          | 78.5      | 82.7 ± 1.7   |
+| PROTEINS      | 72.3      | 76.2 ± 2.8   |
+| COLLAB        | 81.6      | 80.2 ± 1.9   |
+| IMDBBINARY    | 73.0      | 75.1 ± 5.1   |
+| IMDBMULTI     | 54.0      | 52.3 ± 2.8   |
+| REDDITBINARY  | 88.0      | 92.4 ± 2.5   |
+| REDDITMULTI5K | 54.8      | 57.5 ± 1.5   |
 
