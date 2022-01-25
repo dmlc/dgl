@@ -271,6 +271,7 @@ def construct_dgl_server_env_vars(
     ip_config: str,
     num_servers: int,
     graph_format: str,
+    keep_alive: bool,
     pythonpath: Optional[str] = "",
 ) -> str:
     """Constructs the DGL server-specific env vars string that are required for DGL code to behave in the correct
@@ -287,6 +288,8 @@ def construct_dgl_server_env_vars(
             Relative path to workspace.
         num_servers:
         graph_format:
+        keep_alive:
+            Whether to keep server alive when clients exit
         pythonpath: Optional. If given, this will pass this as PYTHONPATH.
 
     Returns:
@@ -302,6 +305,7 @@ def construct_dgl_server_env_vars(
         "DGL_IP_CONFIG={DGL_IP_CONFIG} "
         "DGL_NUM_SERVER={DGL_NUM_SERVER} "
         "DGL_GRAPH_FORMAT={DGL_GRAPH_FORMAT} "
+        "DGL_KEEP_ALIVE={DGL_KEEP_ALIVE} "
         "{suffix_optional_envvars}"
     )
     suffix_optional_envvars = ""
@@ -316,6 +320,7 @@ def construct_dgl_server_env_vars(
         DGL_IP_CONFIG=ip_config,
         DGL_NUM_SERVER=num_servers,
         DGL_GRAPH_FORMAT=graph_format,
+        DGL_KEEP_ALIVE=int(keep_alive),
         suffix_optional_envvars=suffix_optional_envvars,
     )
 
@@ -328,6 +333,7 @@ def construct_dgl_client_env_vars(
     num_servers: int,
     graph_format: str,
     num_omp_threads: int,
+    group_id: int,
     pythonpath: Optional[str] = "",
 ) -> str:
     """Constructs the DGL client-specific env vars string that are required for DGL code to behave in the correct
@@ -344,6 +350,8 @@ def construct_dgl_client_env_vars(
         num_servers:
         graph_format:
         num_omp_threads:
+        group_id:
+            Used in client processes to indicate which group it belongs to.
         pythonpath: Optional. If given, this will pass this as PYTHONPATH.
 
     Returns:
@@ -360,6 +368,7 @@ def construct_dgl_client_env_vars(
         "DGL_NUM_SERVER={DGL_NUM_SERVER} "
         "DGL_GRAPH_FORMAT={DGL_GRAPH_FORMAT} "
         "OMP_NUM_THREADS={OMP_NUM_THREADS} "
+        "DGL_GROUP_ID={DGL_GROUP_ID} "
         "{suffix_optional_envvars}"
     )
     # append optional additional env-vars
@@ -376,6 +385,7 @@ def construct_dgl_client_env_vars(
         DGL_NUM_SERVER=num_servers,
         DGL_GRAPH_FORMAT=graph_format,
         OMP_NUM_THREADS=num_omp_threads,
+        DGL_GROUP_ID=group_id,
         suffix_optional_envvars=suffix_optional_envvars,
     )
 
@@ -424,6 +434,48 @@ def wrap_cmd_with_extra_envvars(cmd: str, env_vars: list) -> str:
     env_vars = " ".join(env_vars)
     return wrap_cmd_with_local_envvars(cmd, env_vars)
 
+
+monitor_file = None
+
+
+def has_server_alive(args):
+    """Check whether there exist alive servers."""
+    import hashlib
+    check_path = str(args.workspace + args.part_config +
+                     args.ip_config).encode('utf-8')
+    md5_v = hashlib.md5(check_path).hexdigest()
+    global monitor_file
+    monitor_file = '/tmp/dgl_monitor_' + str(md5_v)
+    ret = os.path.exists(monitor_file)
+    if ret:
+        print("Monitor file for alive servers already exist: {}.".format(monitor_file))
+    if args.keep_alive and not ret:
+        with open(monitor_file, 'w') as f:
+            f.write("1")
+        print("Monitor file for alive servers is created: {}.".format(monitor_file))
+    return ret
+
+
+def get_group_id():
+    """Get available group ID."""
+    if monitor_file is None or not os.path.exists(monitor_file):
+        return 0
+    lines = [line.rstrip('\n') for line in open(monitor_file)]
+    group_id = int(lines[0])
+    with open(monitor_file, 'w') as f:
+        f.write(str(group_id + 1))
+    return group_id
+
+def clean_server_alive():
+    """Remove keep alive related files"""
+    global monitor_file
+    try:
+        if monitor_file is not None:
+            os.remove(monitor_file)
+            print("Monitor file for servers keep alive is removed: {}.".format(monitor_file))
+    except:
+        print("Failed to delete monitor file for servers keep alive: {}.".format(monitor_file))
+
 def submit_jobs(args, udf_command):
     """Submit distributed jobs (server and client processes) via ssh"""
     hosts = []
@@ -457,23 +509,25 @@ def submit_jobs(args, udf_command):
 
     tot_num_clients = args.num_trainers * (1 + args.num_samplers) * len(hosts)
     # launch server tasks
-    server_env_vars = construct_dgl_server_env_vars(
-        num_samplers=args.num_samplers,
-        num_server_threads=args.num_server_threads,
-        tot_num_clients=tot_num_clients,
-        part_config=args.part_config,
-        ip_config=args.ip_config,
-        num_servers=args.num_servers,
-        graph_format=args.graph_format,
-        pythonpath=os.environ.get("PYTHONPATH", ""),
-    )
-    for i in range(len(hosts) * server_count_per_machine):
-        ip, _ = hosts[int(i / server_count_per_machine)]
-        server_env_vars_cur = f"{server_env_vars} DGL_SERVER_ID={i}"
-        cmd = wrap_cmd_with_local_envvars(udf_command, server_env_vars_cur)
-        cmd = wrap_cmd_with_extra_envvars(cmd, args.extra_envs) if len(args.extra_envs) > 0 else cmd
-        cmd = 'cd ' + str(args.workspace) + '; ' + cmd
-        thread_list.append(execute_remote(cmd, ip, args.ssh_port, username=args.ssh_username))
+    if not has_server_alive(args):
+        server_env_vars = construct_dgl_server_env_vars(
+            num_samplers=args.num_samplers,
+            num_server_threads=args.num_server_threads,
+            tot_num_clients=tot_num_clients,
+            part_config=args.part_config,
+            ip_config=args.ip_config,
+            num_servers=args.num_servers,
+            graph_format=args.graph_format,
+            keep_alive=args.keep_alive,
+            pythonpath=os.environ.get("PYTHONPATH", ""),
+        )
+        for i in range(len(hosts) * server_count_per_machine):
+            ip, _ = hosts[int(i / server_count_per_machine)]
+            server_env_vars_cur = f"{server_env_vars} DGL_SERVER_ID={i}"
+            cmd = wrap_cmd_with_local_envvars(udf_command, server_env_vars_cur)
+            cmd = wrap_cmd_with_extra_envvars(cmd, args.extra_envs) if len(args.extra_envs) > 0 else cmd
+            cmd = 'cd ' + str(args.workspace) + '; ' + cmd
+            thread_list.append(execute_remote(cmd, ip, args.ssh_port, username=args.ssh_username))
 
     # launch client tasks
     client_env_vars = construct_dgl_client_env_vars(
@@ -484,6 +538,7 @@ def submit_jobs(args, udf_command):
         num_servers=args.num_servers,
         graph_format=args.graph_format,
         num_omp_threads=os.environ.get("OMP_NUM_THREADS", str(args.num_omp_threads)),
+        group_id=get_group_id(),
         pythonpath=os.environ.get("PYTHONPATH", ""),
     )
 
@@ -513,6 +568,7 @@ def submit_jobs(args, udf_command):
         logging.info('Stop launcher')
         # We need to tell the cleanup process to kill remote training jobs.
         conn2.send('cleanup')
+        clean_server_alive()
         sys.exit(0)
     signal.signal(signal.SIGINT, signal_handler)
 
@@ -560,7 +616,10 @@ def main():
                         help='Extra environment parameters need to be set. For example, \
                         you can set the LD_LIBRARY_PATH and NCCL_DEBUG by adding: \
                         --extra_envs LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH NCCL_DEBUG=INFO ')
+    parser.add_argument('--keep_alive', action='store_true', help='Servers keep alive when clients exit')
     args, udf_command = parser.parse_known_args()
+    if args.keep_alive:
+        print("Servers will keep alive even clients exit...")
     assert len(udf_command) == 1, 'Please provide user command line.'
     assert args.num_trainers is not None and args.num_trainers > 0, \
             '--num_trainers must be a positive number.'
