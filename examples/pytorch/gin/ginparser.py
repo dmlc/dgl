@@ -19,7 +19,7 @@ class Parser():
         # dataset
         self.parser.add_argument(
             '--dataset', type=str, default="MUTAG",
-            choices=['MUTAG', 'COLLAB', 'IMDBBINARY', 'IMDBMULTI'],
+            choices=['MUTAG', 'COLLAB', 'IMDBBINARY', 'IMDBMULTI', 'NCI1', 'PROTEINS', 'PTC', 'REDDITBINARY', 'REDDITMULTI5K'],
             help='name of dataset (default: MUTAG)')
         self.parser.add_argument(
             '--batch_size', type=int, default=32,
