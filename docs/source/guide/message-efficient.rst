@@ -59,5 +59,5 @@ respectively:
 The above two implementations are mathematically equivalent. The latter
 one is more efficient because it does not need to save feat_src and
 feat_dst on edges, which is not memory-efficient. Plus, addition could
-be optimized with DGL’s built-in function ``u_add_v``, which further
+be optimized with DGL’s built-in function :func:`~dgl.function.u_add_v`, which further
 speeds up computation and saves memory footprint.
