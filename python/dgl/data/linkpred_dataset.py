@@ -38,9 +38,7 @@ class LinkPredDataset:
             if isinstance(dataset, DglLinkPropPredDataset):
                 self.is_ogb_dataset = True
                 self.edge_split = self.ds.get_edge_split()
-                train_edges = self.edge_split["train"]["edge"]
-                self.train_graph = graph(
-                    (train_edges[:, 0], train_edges[:, 1]), num_nodes=self.num_nodes)
+                self.train_graph = self.ds[0]
                 self.train_graph.ndata['feat'] = self.feat
                 pos_e_tensor, neg_e_tensor = self.edge_split["valid"][
                     "edge"], self.edge_split["valid"]["edge_neg"]
