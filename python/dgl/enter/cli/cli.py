@@ -7,10 +7,12 @@ from ..pipeline import *
 from ..model import *
 from .config_cli import config_app
 from .train_cli import train
+from .export_cli import export
 
-app = typer.Typer()
-app.add_typer(config_app, name="config")
-app.command(help="Train the model")(train)
+app = typer.Typer(no_args_is_help=True)
+app.add_typer(config_app, name="config", no_args_is_help=True)
+app.command(help="Train the model", no_args_is_help=True)(train)
+app.command(help="Export the python file from config", no_args_is_help=True)(export)
 
 def main():
     app()
