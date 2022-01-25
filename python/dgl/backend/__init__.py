@@ -4,12 +4,14 @@ import sys
 import os
 import json
 import importlib
+import logging
 
 from . import backend
 from .set_default_backend import set_default_backend
 
 _enabled_apis = set()
 
+logger = logging.getLogger("dgl-core")
 
 def _gen_missing_api(api, mod_name):
     def _missing_api(*args, **kwargs):
@@ -42,7 +44,7 @@ def load_backend(mod_name):
     version = mod.__version__
     load_tensor_adapter(mod_name, version)
 
-    print('Using backend: %s' % mod_name, file=sys.stderr)
+    logger.debug('Using backend: %s' % mod_name)
     mod = importlib.import_module('.%s' % mod_name, __name__)
     thismod = sys.modules[__name__]
     for api in backend.__dict__.keys():
