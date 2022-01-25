@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import dgl
+from dgl.data.nodepred_dataset import NodepredDataset
 {{ data_import_code }}
 
 {{ model_code }}
@@ -100,7 +101,7 @@ def main():
     {{ user_cfg_str }}
     device = cfg['device']
     pipeline_cfg = cfg['general_pipeline']
-    data = {{data_initialize_code}}
+    data = NodepredDataset({{data_initialize_code}})
     feat_size = data[0].ndata['feat'].shape[1]
     cfg["model"]["in_size"] = pipeline_cfg['node_embed_size'] if pipeline_cfg['node_embed_size'] > 0 else feat_size
     cfg["model"]["out_size"] = data.num_classes
