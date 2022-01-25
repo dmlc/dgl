@@ -23,6 +23,7 @@ import dgl.function as fn
 import dgl.partition
 import backend as F
 import unittest
+import math
 from utils import parametrize_dtype
 
 from test_heterograph import create_test_heterograph3, create_test_heterograph4, create_test_heterograph5
@@ -2155,6 +2156,145 @@ def test_module_compose(idtype):
     src, dst = new_g.edges()
     eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
     assert eset == {(0, 1), (1, 2), (1, 0), (2, 1), (0, 0), (1, 1), (2, 2)}
+
+@parametrize_dtype
+def test_module_gcnnorm(idtype):
+    g = dgl.heterograph({
+        ('A', 'r1', 'A'): ([0, 1, 2], [0, 0, 1]),
+        ('A', 'r2', 'B'): ([0, 0], [1, 1]),
+        ('B', 'r3', 'B'): ([0, 1, 2], [0, 0, 1])
+    }, idtype=idtype, device=F.ctx())
+    g.edges['r3'].data['w'] = F.tensor([0.1, 0.2, 0.3])
+    transform = dgl.GCNNorm()
+    new_g = transform(g)
+    assert 'w' not in new_g.edges[('A', 'r2', 'B')].data
+    assert F.allclose(new_g.edges[('A', 'r1', 'A')].data['w'],
+                      F.tensor([1./2, 1./math.sqrt(2), 0.]))
+    assert F.allclose(new_g.edges[('B', 'r3', 'B')].data['w'], F.tensor([1./3, 2./3, 0.]))
+
+@unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
+@parametrize_dtype
+def test_module_ppr(idtype):
+    g = dgl.graph(([0, 1, 2, 3, 4], [2, 3, 4, 5, 3]), idtype=idtype, device=F.ctx())
+    g.ndata['h'] = F.randn((6, 2))
+    transform = dgl.PPR(avg_degree=2)
+    new_g = transform(g)
+    assert new_g.idtype == g.idtype
+    assert new_g.device == g.device
+    assert new_g.num_nodes() == g.num_nodes()
+    src, dst = new_g.edges()
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 0), (0, 2), (0, 4), (1, 1), (1, 3), (1, 5), (2, 2),
+                    (2, 3), (2, 4), (3, 3), (3, 5), (4, 3), (4, 4), (4, 5), (5, 5)}
+    assert F.allclose(g.ndata['h'], new_g.ndata['h'])
+    assert 'w' in new_g.edata
+
+    # Prior edge weights
+    g.edata['w'] = F.tensor([0.1, 0.2, 0.3, 0.4, 0.5])
+    new_g = transform(g)
+    src, dst = new_g.edges()
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 0), (1, 1), (1, 3), (2, 2), (2, 3), (2, 4),
+                    (3, 3), (3, 5), (4, 3), (4, 4), (4, 5), (5, 5)}
+
+@unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
+@parametrize_dtype
+def test_module_heat_kernel(idtype):
+    # Case1: directed graph
+    g = dgl.graph(([0, 1, 2, 3, 4], [2, 3, 4, 5, 3]), idtype=idtype, device=F.ctx())
+    g.ndata['h'] = F.randn((6, 2))
+    transform = dgl.HeatKernel(avg_degree=1)
+    new_g = transform(g)
+    assert new_g.idtype == g.idtype
+    assert new_g.device == g.device
+    assert new_g.num_nodes() == g.num_nodes()
+    src, dst = new_g.edges()
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 2), (0, 4), (1, 3), (1, 5), (2, 3), (2, 4), (3, 5), (4, 5)}
+    assert F.allclose(g.ndata['h'], new_g.ndata['h'])
+    assert 'w' in new_g.edata
+
+    # Case2: weighted undirected graph
+    g = dgl.graph(([0, 1, 2, 3], [1, 0, 3, 2]), idtype=idtype, device=F.ctx())
+    g.edata['w'] = F.tensor([0.1, 0.2, 0.3, 0.4])
+    new_g = transform(g)
+    src, dst = new_g.edges()
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 0), (1, 1), (2, 2), (3, 3)}
+
+@unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
+@parametrize_dtype
+def test_module_gdc(idtype):
+    transform = dgl.GDC([0.1, 0.2, 0.1], avg_degree=1)
+    g = dgl.graph(([0, 1, 2, 3, 4], [2, 3, 4, 5, 3]), idtype=idtype, device=F.ctx())
+    g.ndata['h'] = F.randn((6, 2))
+    new_g = transform(g)
+    assert new_g.idtype == g.idtype
+    assert new_g.device == g.device
+    assert new_g.num_nodes() == g.num_nodes()
+    src, dst = new_g.edges()
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 0), (0, 2), (0, 4), (1, 1), (1, 3), (1, 5), (2, 2), (2, 3),
+                    (2, 4), (3, 3), (3, 5), (4, 3), (4, 4), (4, 5), (5, 5)}
+    assert F.allclose(g.ndata['h'], new_g.ndata['h'])
+    assert 'w' in new_g.edata
+
+    # Prior edge weights
+    g.edata['w'] = F.tensor([0.1, 0.2, 0.3, 0.4, 0.5])
+    new_g = transform(g)
+    src, dst = new_g.edges()
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 0), (1, 1), (2, 2), (3, 3), (4, 3), (4, 4), (5, 5)}
+
+@parametrize_dtype
+def test_module_node_shuffle(idtype):
+    transform = dgl.NodeShuffle()
+    g = dgl.heterograph({
+        ('A', 'r', 'B'): ([0, 1], [1, 2]),
+    }, idtype=idtype, device=F.ctx())
+    new_g = transform(g)
+
+@unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
+@parametrize_dtype
+def test_module_drop_node(idtype):
+    transform = dgl.DropNode()
+    g = dgl.heterograph({
+        ('A', 'r', 'B'): ([0, 1], [1, 2]),
+    }, idtype=idtype, device=F.ctx())
+    new_g = transform(g)
+    assert new_g.idtype == g.idtype
+    assert new_g.device == g.device
+    assert new_g.ntypes == g.ntypes
+    assert new_g.canonical_etypes == g.canonical_etypes
+
+@unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
+@parametrize_dtype
+def test_module_drop_edge(idtype):
+    transform = dgl.DropEdge()
+    g = dgl.heterograph({
+        ('A', 'r1', 'B'): ([0, 1], [1, 2]),
+        ('C', 'r2', 'C'): ([3, 4, 5], [6, 7, 8])
+    }, idtype=idtype, device=F.ctx())
+    new_g = transform(g)
+    assert new_g.idtype == g.idtype
+    assert new_g.device == g.device
+    assert new_g.ntypes == g.ntypes
+    assert new_g.canonical_etypes == g.canonical_etypes
+
+@parametrize_dtype
+def test_module_add_edge(idtype):
+    transform = dgl.AddEdge()
+    g = dgl.heterograph({
+        ('A', 'r1', 'B'): ([0, 1, 2, 3, 4], [1, 2, 3, 4, 5]),
+        ('C', 'r2', 'C'): ([0, 1, 2, 3, 4], [1, 2, 3, 4, 5])
+    }, idtype=idtype, device=F.ctx())
+    new_g = transform(g)
+    assert new_g.num_edges(('A', 'r1', 'B')) == 6
+    assert new_g.num_edges(('C', 'r2', 'C')) == 6
+    assert new_g.idtype == g.idtype
+    assert new_g.device == g.device
+    assert new_g.ntypes == g.ntypes
+    assert new_g.canonical_etypes == g.canonical_etypes
 
 if __name__ == '__main__':
     test_partition_with_halo()
