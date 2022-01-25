@@ -36,7 +36,7 @@ void matmul(const DType *A, const DType *B,
                 for (k = 0; k < K; k++) {
                     local_accum += A[i * K + k] * B[k * N + j];
                 }
-                C[i * N + j ] = local_accum;
+                C[i * N + j] = local_accum;
             }
         }
     }
@@ -49,7 +49,6 @@ void gatherMM_SortedEtype(const NDArray h,
               const NDArray h_per_rel,
               const NDArray w_per_rel,
               bool H_trans, bool W_trans) {
-    // auto device = runtime::DeviceAPI::Get(h->ctx);
     assert(h_per_rel.NumElements() == w_per_rel.NumElements());
     int64_t num_rel = h_per_rel.NumElements();
     const DType *h_data = h.Ptr<DType>();
@@ -67,7 +66,7 @@ void gatherMM_SortedEtype(const NDArray h,
         n = w->shape[1];  // cols of B
         k = w_per_rel_data[etype];
 
-        NDArray h_trans, w_trans; // = nullptr;
+        NDArray h_trans, w_trans;  // = nullptr;
 
         if (H_trans) {
             h_trans = NDArray::Empty({m * k}, h->dtype, h->ctx);
@@ -81,7 +80,7 @@ void gatherMM_SortedEtype(const NDArray h,
             int64_t tmp = k;
             if (H_trans)
                 std::swap(m, k);
-            if (W_trans)  {
+            if (W_trans) {
                 k = tmp;
                 std::swap(n, k);
             }
