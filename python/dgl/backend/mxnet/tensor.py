@@ -191,6 +191,9 @@ def argsort(input, dim, descending):
 def exp(input):
     return nd.exp(input)
 
+def inverse(input):
+    return nd.linalg_inverse(input)
+
 def sqrt(input):
     return nd.sqrt(input)
 
@@ -326,6 +329,9 @@ def boolean_mask(input, mask):
 
 def equal(x, y):
     return x == y
+
+def allclose(x, y, rtol=1e-4, atol=1e-4):
+    return np.allclose(x.asnumpy(), y.asnumpy(), rtol=rtol, atol=atol)
 
 def logical_not(input):
     return nd.logical_not(input)
