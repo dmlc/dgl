@@ -197,6 +197,22 @@ def connect_to_server(ip_config, num_servers, max_queue_size=MAX_QUEUE_SIZE,
 def shutdown_servers(ip_config, num_servers):
     """Issue commands to remote servers to shut them down.
 
+    This function is required to be called manually only when we
+    have booted servers which keep alive even clients exit. In
+    order to shut down server elegantly, we utilize existing
+    client logic/code to boot a special client which does nothing
+    but send shut down request to servers. Once such request is
+    received, servers will exit from endless wait loop, release
+    occupied resources and end its process. Please call this function
+    with same arguments used in `dgl.distributed.connect_to_server`.
+
+    Parameters
+    ----------
+    ip_config : str
+        Path of server IP configuration file.
+    num_servers : int
+        server count on each machine.
+
     Raises
     ------
     ConnectionError : If anything wrong with the connection.

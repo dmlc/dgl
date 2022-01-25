@@ -40,7 +40,7 @@ def start_server(server_id, ip_config, num_servers, num_clients, server_state, \
     assert net_type in ('socket'), 'net_type (%s) can only be \'socket\'' % net_type
     if server_state.keep_alive:
         print("As configured, this server will keep alive for multiple"
-              " client groups connect until force shutdown request is received.")
+              " client groups until force shutdown request is received.")
     # Register signal handler.
     rpc.register_sig_handler()
     # Register some basic services
@@ -74,7 +74,7 @@ def start_server(server_id, ip_config, num_servers, num_clients, server_state, \
     recv_clients = {}
     while True:
         # go through if any client group is ready for connection
-        for group_id in list(recv_clients):
+        for group_id in list(recv_clients.keys()):
             ips = recv_clients[group_id]
             if len(ips) < rpc.get_num_client():
                 continue
