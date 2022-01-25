@@ -18,36 +18,11 @@ import backend as F
 import math
 import unittest
 import pickle
-from utils import reset_envs
+from utils import reset_envs, generate_ip_config
 
 if os.name != 'nt':
     import fcntl
     import struct
-
-def get_local_usable_addr():
-    """Get local usable IP and port
-
-    Returns
-    -------
-    str
-        IP address, e.g., '192.168.8.12:50051'
-    """
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        # doesn't even have to be reachable
-        sock.connect(('10.255.255.255', 1))
-        ip_addr = sock.getsockname()[0]
-    except ValueError:
-        ip_addr = '127.0.0.1'
-    finally:
-        sock.close()
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.bind(("", 0))
-    sock.listen(1)
-    port = sock.getsockname()[1]
-    sock.close()
-
-    return ip_addr + ' ' + str(port)
 
 def create_random_graph(n):
     arr = (spsp.random(n, n, density=0.001, format='coo', random_state=100) != 0).astype(np.int64)
@@ -766,10 +741,7 @@ def test_split_even():
     assert np.all(all_edges == F.asnumpy(all_edges2))
 
 def prepare_dist():
-    ip_config = open("kv_ip_config.txt", "w")
-    ip_addr = get_local_usable_addr()
-    ip_config.write('{}\n'.format(ip_addr))
-    ip_config.close()
+    generate_ip_config("kv_ip_config.txt", 1, 1)
 
 if __name__ == '__main__':
     os.makedirs('/tmp/dist_graph', exist_ok=True)

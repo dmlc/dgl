@@ -79,7 +79,6 @@ class DataFactory:
             type_annotation_dict = v["extra_args"]
             if "name" in type_annotation_dict:
                 del type_annotation_dict["name"]
-
             class Base(DGLBaseModel):
                 name: Literal[dataset_name]
 
@@ -90,6 +89,10 @@ class DataFactory:
         for d in dataset_list[1:]:
             output = Union[output, d]
         return output
+    
+    @classmethod
+    def get_import_code(cls, name):
+        return cls.registry[name]["import_code"]
 
     @classmethod
     def get_import_code(cls, name):
