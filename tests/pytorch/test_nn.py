@@ -769,6 +769,35 @@ def test_tagconv_e_weight(g, idtype):
     h = conv(g, feat, edge_weight=eweight)
     assert h.shape[-1] == 5
 
+
+@parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
+def test_sign_conv(g, idtype):
+    g = g.astype(idtype).to(F.ctx())
+    ctx = F.ctx()
+    signconv = nn.SignConv(
+        5, 12, True
+    )
+    feat = F.randn((g.number_of_src_nodes(), 5))
+    signconv = signconv.to(ctx)
+    h = signconv(g, feat)
+
+    # test pickle
+    th.save(signconv, tmp_buffer)
+
+    assert h.shape == (g.number_of_dst_nodes(), 12)
+
+
+    signconvdeep = nn.SignConv(
+        5, 12, False
+    )
+    feat = F.randn((g.number_of_src_nodes(), 5))
+    signconvdeep = signconvdeep.to(ctx)
+    edata = th.randn(g.num_edges()).to(ctx)
+    h = signconvdeep(g, feat, edata)
+    assert h.shape == (g.number_of_dst_nodes(), 12)
+
+
 @parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite'], exclude=['zero-degree']))
 @pytest.mark.parametrize('aggregator_type', ['mean', 'max', 'sum'])
