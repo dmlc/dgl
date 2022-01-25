@@ -7,6 +7,7 @@ import asyncio
 import random
 import math
 import inspect
+from distutils.version import LooseVersion
 
 import torch
 import torch.distributed as dist
@@ -580,7 +581,7 @@ class EdgeDataLoader(DataLoader):
 # GraphDataLoader loads a set of graphs so it's not relevant to the above.  They are currently
 # copied from the old DataLoader implementation.
 
-PYTORCH_VER = LooseVersion(th.__version__)
+PYTORCH_VER = LooseVersion(torch.__version__)
 PYTORCH_16 = PYTORCH_VER >= LooseVersion("1.6.0")
 PYTORCH_17 = PYTORCH_VER >= LooseVersion("1.7.0")
 
