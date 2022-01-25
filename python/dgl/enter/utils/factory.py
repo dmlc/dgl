@@ -36,10 +36,15 @@ class PipelineBase(ABC):
 class DataFactory:
     registry = {}
     cname_registry = {}
+    pipeline_allowed = {
+        "nodepred": {},
+        "nodepred-ns": {},
+        "edgepred": {},
+    }
 
     @classmethod
-    def register(cls, name: str, import_code, class_name, extra_args={}) -> Callable:
-        out= {
+    def register(cls, name: str, import_code, class_name, allowed_pipeline, extra_args={}) -> Callable:
+        out = {
             "name": name,
             "import_code": import_code,
             "class_name": class_name,
@@ -74,6 +79,7 @@ class DataFactory:
             type_annotation_dict = v["extra_args"]
             if "name" in type_annotation_dict:
                 del type_annotation_dict["name"]
+
             class Base(DGLBaseModel):
                 name: Literal[dataset_name]
 
@@ -84,7 +90,7 @@ class DataFactory:
         for d in dataset_list[1:]:
             output = Union[output, d]
         return output
-    
+
     @classmethod
     def get_import_code(cls, name):
         return cls.registry[name]["import_code"]
@@ -108,11 +114,21 @@ class DataFactory:
         d["data_initialize_code"] = data_initialize_code
         return d
 
-DataFactory.register("cora", import_code="from dgl.data import CoraGraphDataset", class_name="CoraGraphDataset()")
-DataFactory.register("citeseer", import_code="from dgl.data import CiteseerGraphDataset", class_name="CiteseerGraphDataset()")
-DataFactory.register("ogbl-collab", import_code="from ogb.linkproppred import DglLinkPropPredDataset", extra_args={}, class_name="DglLinkPropPredDataset('ogbl-collab')")
-DataFactory.register("csv", import_code="from dgl.data import DGLCSVDataset", extra_args={ "data_path": "./"}, class_name="DGLCSVDataset({})")
-DataFactory.register("reddit", import_code="from dgl.data import RedditDataset", class_name="RedditDataset()")
+
+ALL_PIPELINE = ["nodepred", "nodepred-ns", "edgepred"]
+
+DataFactory.register(
+    "cora", import_code="from dgl.data import CoraGraphDataset", class_name="CoraGraphDataset()")
+DataFactory.register("citeseer", import_code="from dgl.data import CiteseerGraphDataset",
+                     class_name="CiteseerGraphDataset()", allowed_pipeline=["nodepred", "nodepred-ns", "edgepred"])
+DataFactory.register("ogbl-collab", import_code="from ogb.linkproppred import DglLinkPropPredDataset",
+                     extra_args={}, class_name="DglLinkPropPredDataset('ogbl-collab')", allowed_pipeline=["edgepred"])
+DataFactory.register("csv", import_code="from dgl.data import DGLCSVDataset", extra_args={
+                     "data_path": "./"}, class_name="DGLCSVDataset({})", allowed_pipeline=["nodepred", "nodepred-ns", "edgepred"])
+DataFactory.register(
+    "reddit", import_code="from dgl.data import RedditDataset", class_name="RedditDataset()", allowed_pipeline=["nodepred", "nodepred-ns", "edgepred"])
+DataFactory.register("co-buy-computer", import_code="from dgl.data import AmazonCoBuyComputerDataset",
+                     class_name="AmazonCoBuyComputerDataset()", allowed_pipeline=["nodepred", "nodepred-ns", "edgepred"])
 
 
 class PipelineFactory:
@@ -221,7 +237,7 @@ class ModelFactory:
         param_docs = docscrape.NumpyDocString(docs)
         param_docs_dict = {}
         for param in param_docs["Parameters"]:
-            param_docs_dict[param.name] =  param.desc[0]
+            param_docs_dict[param.name] = param.desc[0]
         return param_docs_dict
 
     def get_pydantic_model_config(self):
@@ -242,7 +258,6 @@ class ModelFactory:
         for k, param in dict(sigs.parameters).items():
             type_annotation_dict[k] = param.annotation
         return type_annotation_dict
-
 
 
 class SamplerFactory:
@@ -316,7 +331,7 @@ class SamplerFactory:
         param_docs = docscrape.NumpyDocString(docs)
         param_docs_dict = {}
         for param in param_docs["Parameters"]:
-            param_docs_dict[param.name] =  param.desc[0]
+            param_docs_dict[param.name] = param.desc[0]
         return param_docs_dict
 
 
