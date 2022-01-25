@@ -32,7 +32,6 @@ void gatherMM(const NDArray H,
           const NDArray etype,
           bool sortedE, bool H_trans, bool W_trans) {
     SWITCH_BITS(bits, DType, {
-        // cpu::gatherMM<IdType, DType>(lhs, rhs, out);
         if (sortedE)  // similar to low-mem matmul
             cpu::gatherMM_SortedEtype<XPU, IdType, DType>(H, W, out, H_per_rel,
                 W_per_rel, H_trans, W_trans);
