@@ -6,7 +6,7 @@ dgl.function
 ==================================
 
 This subpackage hosts all the **built-in functions** provided by DGL. Built-in functions
-are DGL's recommended way to express different types of ref:`guide-message-passing` computation
+are DGL's recommended way to express different types of :ref:`guide-message-passing` computation
 (i.e., via :func:`~dgl.DGLGraph.update_all`) or computing edge-wise features from
 node-wise features (i.e., via :func:`~dgl.DGLGraph.apply_edges`). Built-in functions
 describe the node-wise and edge-wise computation in a symbolic way without any
@@ -14,7 +14,7 @@ actual computation, so DGL can analyze and map them to efficient low-level kerne
 Here are some examples:
 
 .. code:: python
-   
+
    import dgl
    import dgl.function as fn
    import torch as th
@@ -55,7 +55,7 @@ following user-defined function:
    def udf_max(nodes):
       return {'h_max' : th.max(nodes.mailbox['m'], 1)[0]}
 
-All binary message function supports **broadcasting**, a mechansim for extending element-wise
+All binary message function supports **broadcasting**, a mechanism for extending element-wise
 operations to tensor inputs with different shapes. DGL generally follows the standard
 broadcasting semantic by `NumPy <https://docs.scipy.org/doc/numpy/user/basics.broadcasting.html>`_
 and `PyTorch <https://pytorch.org/docs/stable/notes/broadcasting.html>`_. Below are some
