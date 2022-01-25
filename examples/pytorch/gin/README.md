@@ -35,16 +35,51 @@ Results
 
 Run with following with the double SUM pooling way:
 (tested dataset: "MUTAG"(default), "COLLAB", "IMDBBINARY", "IMDBMULTI"), results may **fluctuate**, due to random factors and the relatively small data set.
+
+if you want to follow the paper's setting, consider the script below.
 ```bash
+# 4 bioinformatics datasets setting graph_pooling_type=sum, the nodes have categorical input features 
 python main.py --dataset MUTAG --device 0  \
-                --graph_pooling_type sum --neighbor_pooling_type sum
+                --graph_pooling_type sum --neighbor_pooling_type sum --filename MUTAG.txt
 
+python main.py --dataset PTC --device 0  \
+                --graph_pooling_type sum --neighbor_pooling_type sum --filename PTC.txt
+
+python main.py --dataset NCI1 --device 0  \
+                --graph_pooling_type sum --neighbor_pooling_type sum --filename NCI1.txt
+
+python main.py --dataset PROTEINS --device 0  \
+                --graph_pooling_type sum --neighbor_pooling_type sum --filename PROTEINS.txt
+
+# 5 social network datasets setting graph_pooling_type=mean, for the REDDIT datasets, we set all node feature vectors to be the same 
+# (thus, features here are uninformative); for the other social graphs, we use one-hot encodings of node degrees.  
 python main.py --dataset COLLAB --device 0  \
-                --graph_pooling_type mean --neighbor_pooling_type sum --degree_as_nlabel
+                --graph_pooling_type mean --neighbor_pooling_type sum --degree_as_nlabel --filename COLLAB.txt
 
+python main.py --dataset IMDBBINARY --device 0  \
+                --graph_pooling_type mean --neighbor_pooling_type sum --degree_as_nlabel --filename IMDBBINARY.txt
+
+python main.py --dataset IMDBMULTI --device 0  \
+                --graph_pooling_type mean --neighbor_pooling_type sum --degree_as_nlabel --filename IMDBMULTI.txt
+
+python main.py --dataset REDDITBINARY --device 0  \
+                --graph_pooling_type mean --neighbor_pooling_type sum --filename REDDITBINARY.txt --fold_idx 6 --epoch 120
+
+python main.py --dataset REDDITMULTI5K --device 0  \
+                --graph_pooling_type mean --neighbor_pooling_type sum --filename REDDITMULTI5K.txt
 ```
 
-* MUTAG: 0.85 (paper: ~0.89)
-* COLLAB: 0.89 (paper: ~0.80)
-* IMDBBINARY: 0.76 (paper: ~0.75)
-* IMDBMULTI: 0.51 (paper: ~0.52)
+one fold of 10 result are below.
+
+| dataset       | our result | paper report |
+| ------------- | ---------- | ------------ |
+| MUTAG         | 0.894      | 89.4 ± 5.6   |
+| PTC           | 0.685      | 64.6 ± 7.0   |
+| NCI1          | 0.785      | 82.7 ± 1.7   |
+| PROTEINS      | 0.723      | 76.2 ± 2.8   |
+| COLLAB        | 0.816      | 80.2 ± 1.9   |
+| IMDBBINARY    | 0.730      | 75.1 ± 5.1   |
+| IMDBMULTI     | 0.540      | 52.3 ± 2.8   |
+| REDDITBINARY  | 0.880      | 92.4 ± 2.5   |
+| REDDITMULTI5K | 0.548      | 57.5 ± 1.5   |
+
