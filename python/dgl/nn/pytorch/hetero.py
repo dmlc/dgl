@@ -357,8 +357,11 @@ class HeteroEmbedding(nn.Module):
     """
     def __init__(self, hg, embed_size):
         super(HeteroEmbedding, self).__init__()
-        self.embed_size = embed_size       
-
+        self.embed_size = embed_size
+        nodes = hg.num_nodes()      
+        self.embed = nn.Parameter(th.FloatTensor(nodes, self.embed_size))
+        nn.init.xavier_uniform_(self.embed, gain=nn.init.calculate_gain('relu'))
+        
     def forward(self, hg):
         """Forward function
         
@@ -374,9 +377,6 @@ class HeteroEmbedding(nn.Module):
         embed : Tensor
             Node embeddings.
         """
-        nodes = hg.num_nodes()
         g = to_homogeneous(hg)
-        embed = nn.Parameter(th.FloatTensor(nodes, self.embed_size))
-        nn.init.xavier_uniform_(embed, gain=nn.init.calculate_gain('relu'))
             
-        return g, embed
+        return g, self.embed
