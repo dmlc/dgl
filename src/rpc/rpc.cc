@@ -223,13 +223,19 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSetMsgSeq")
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetBarrierCount")
 .set_body([](DGLArgs args, DGLRetValue* rv) {
-  *rv = RPCContext::getInstance()->barrier_count;
+  const int32_t group_id = args[0];
+  auto&& cnt = RPCContext::getInstance()->barrier_count;
+  if (cnt.find(group_id) == cnt.end()) {
+    cnt.emplace(group_id, 0x0);
+  }
+  *rv = cnt[group_id];
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSetBarrierCount")
 .set_body([](DGLArgs args, DGLRetValue* rv) {
   const int32_t count = args[0];
-  RPCContext::getInstance()->barrier_count = count;
+  const int32_t group_id = args[1];
+  RPCContext::getInstance()->barrier_count[group_id] = count;
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetMachineID")
@@ -296,6 +302,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateRPCMessage")
     args[4];  // directly assigning string value raises errors :(
   rst->data = data;
   rst->tensors = ListValueToVector<NDArray>(args[5]);
+  rst->group_id = args[6];
   *rv = rst;
 });
 
@@ -464,6 +471,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
       msg.data = pickle_data;
       NDArray tensor = dgl::aten::VecToIdArray<dgl_id_t>(remote_ids[i]);
       msg.tensors.push_back(tensor);
+      msg.group_id = RPCContext::getInstance()->group_id;
       SendRPCMessage(msg, msg.server_id);
       msg_count++;
     }
@@ -497,6 +505,37 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
     }
   }
   *rv = res_tensor;
+});
+
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetGroupID")
+.set_body([](DGLArgs args, DGLRetValue* rv) {
+  *rv = RPCContext::getInstance()->group_id;
+});
+
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSetGroupID")
+.set_body([](DGLArgs args, DGLRetValue* rv) {
+  const int32_t group_id = args[0];
+  RPCContext::getInstance()->group_id = group_id;
+});
+
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCMessageGetGroupId")
+.set_body([](DGLArgs args, DGLRetValue* rv) {
+  const RPCMessageRef msg = args[0];
+  *rv = msg->group_id;
+});
+
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCRegisterClient")
+.set_body([](DGLArgs args, DGLRetValue* rv) {
+  const int32_t client_id = args[0];
+  const int32_t group_id = args[1];
+  *rv = RPCContext::getInstance()->RegisterClient(client_id, group_id);
+});
+
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCGetClient")
+.set_body([](DGLArgs args, DGLRetValue* rv) {
+  const int32_t client_id = args[0];
+  const int32_t group_id = args[1];
+  *rv = RPCContext::getInstance()->GetClient(client_id, group_id);
 });
 
 }  // namespace rpc

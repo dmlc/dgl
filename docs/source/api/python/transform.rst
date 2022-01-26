@@ -13,6 +13,12 @@ BaseTransform
     :members: __call__, __repr__
     :show-inheritance:
 
+Compose
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: Compose
+    :show-inheritance:
+
 AddSelfLoop
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -55,8 +61,50 @@ AddMetaPaths
 .. autoclass:: AddMetaPaths
     :show-inheritance:
 
-KNNGraph
+GCNNorm
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: KNNGraph
+.. autoclass:: GCNNorm
+    :show-inheritance:
+
+PPR
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: PPR
+    :show-inheritance:
+
+HeatKernel
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: HeatKernel
+    :show-inheritance:
+
+GDC
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: GDC
+    :show-inheritance:
+
+NodeShuffle
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: NodeShuffle
+    :show-inheritance:
+
+DropNode
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: DropNode
+    :show-inheritance:
+
+DropEdge
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: DropEdge
+    :show-inheritance:
+
+AddEdge
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: AddEdge
     :show-inheritance:

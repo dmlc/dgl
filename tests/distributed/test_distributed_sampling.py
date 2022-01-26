@@ -18,10 +18,11 @@ import random
 from dgl.distributed import DistGraphServer, DistGraph
 
 
-def start_server(rank, tmpdir, disable_shared_mem, graph_name, graph_format=['csc', 'coo']):
+def start_server(rank, tmpdir, disable_shared_mem, graph_name, graph_format=['csc', 'coo'],
+                 keep_alive=False):
     g = DistGraphServer(rank, "rpc_ip_config.txt", 1, 1,
                         tmpdir / (graph_name + '.json'), disable_shared_mem=disable_shared_mem,
-                        graph_format=graph_format)
+                        graph_format=graph_format, keep_alive=keep_alive)
     g.start()
 
 
@@ -38,6 +39,32 @@ def start_sample_client(rank, tmpdir, disable_shared_mem):
         sampled_graph = None
     dgl.distributed.exit_client()
     return sampled_graph
+
+
+def start_sample_client_shuffle(rank, tmpdir, disable_shared_mem, g, num_servers, group_id=0):
+    os.environ['DGL_GROUP_ID'] = str(group_id)
+    gpb = None
+    if disable_shared_mem:
+        _, _, _, gpb, _, _, _ = load_partition(tmpdir / 'test_sampling.json', rank)
+    dgl.distributed.initialize("rpc_ip_config.txt")
+    dist_graph = DistGraph("test_sampling", gpb=gpb)
+    sampled_graph = sample_neighbors(dist_graph, [0, 10, 99, 66, 1024, 2008], 3)
+
+    orig_nid = F.zeros((g.number_of_nodes(),), dtype=F.int64, ctx=F.cpu())
+    orig_eid = F.zeros((g.number_of_edges(),), dtype=F.int64, ctx=F.cpu())
+    for i in range(num_servers):
+        part, _, _, _, _, _, _ = load_partition(tmpdir / 'test_sampling.json', i)
+        orig_nid[part.ndata[dgl.NID]] = part.ndata['orig_id']
+        orig_eid[part.edata[dgl.EID]] = part.edata['orig_id']
+
+    src, dst = sampled_graph.edges()
+    src = orig_nid[src]
+    dst = orig_nid[dst]
+    assert sampled_graph.number_of_nodes() == g.number_of_nodes()
+    assert np.all(F.asnumpy(g.has_edges_between(src, dst)))
+    eids = g.edge_ids(src, dst)
+    eids1 = orig_eid[sampled_graph.edata[dgl.EID]]
+    assert np.array_equal(F.asnumpy(eids1), F.asnumpy(eids))
 
 def start_find_edges_client(rank, tmpdir, disable_shared_mem, eids, etype=None):
     gpb = None
@@ -247,7 +274,7 @@ def test_rpc_sampling():
     with tempfile.TemporaryDirectory() as tmpdirname:
         check_rpc_sampling(Path(tmpdirname), 2)
 
-def check_rpc_sampling_shuffle(tmpdir, num_server):
+def check_rpc_sampling_shuffle(tmpdir, num_server, num_groups=1):
     generate_ip_config("rpc_ip_config.txt", num_server, num_server)
 
     g = CitationGraphDataset("cora")[0]
@@ -260,32 +287,30 @@ def check_rpc_sampling_shuffle(tmpdir, num_server):
 
     pserver_list = []
     ctx = mp.get_context('spawn')
+    keep_alive = num_groups > 1
     for i in range(num_server):
-        p = ctx.Process(target=start_server, args=(i, tmpdir, num_server > 1, 'test_sampling'))
+        p = ctx.Process(target=start_server, args=(
+            i, tmpdir, num_server > 1, 'test_sampling', ['csc', 'coo'], keep_alive))
         p.start()
         time.sleep(1)
         pserver_list.append(p)
 
-    sampled_graph = start_sample_client(0, tmpdir, num_server > 1)
-    print("Done sampling")
+    pclient_list = []
+    num_clients = 1
+    for client_id in range(num_clients):
+        for group_id in range(num_groups):
+            p = ctx.Process(target=start_sample_client_shuffle, args=(client_id, tmpdir, num_server > 1, g, num_server, group_id))
+            p.start()
+            pclient_list.append(p)
+    for p in pclient_list:
+        p.join()
+    if keep_alive:
+        for p in pserver_list:
+            assert p.is_alive()
+        # force shutdown server
+        dgl.distributed.shutdown_servers("rpc_ip_config.txt", 1)
     for p in pserver_list:
         p.join()
-
-    orig_nid = F.zeros((g.number_of_nodes(),), dtype=F.int64, ctx=F.cpu())
-    orig_eid = F.zeros((g.number_of_edges(),), dtype=F.int64, ctx=F.cpu())
-    for i in range(num_server):
-        part, _, _, _, _, _, _ = load_partition(tmpdir / 'test_sampling.json', i)
-        orig_nid[part.ndata[dgl.NID]] = part.ndata['orig_id']
-        orig_eid[part.edata[dgl.EID]] = part.edata['orig_id']
-
-    src, dst = sampled_graph.edges()
-    src = orig_nid[src]
-    dst = orig_nid[dst]
-    assert sampled_graph.number_of_nodes() == g.number_of_nodes()
-    assert np.all(F.asnumpy(g.has_edges_between(src, dst)))
-    eids = g.edge_ids(src, dst)
-    eids1 = orig_eid[sampled_graph.edata[dgl.EID]]
-    assert np.array_equal(F.asnumpy(eids1), F.asnumpy(eids))
 
 def start_hetero_sample_client(rank, tmpdir, disable_shared_mem, nodes):
     gpb = None
@@ -538,6 +563,7 @@ def test_rpc_sampling_shuffle(num_server):
     os.environ['DGL_DIST_MODE'] = 'distributed'
     with tempfile.TemporaryDirectory() as tmpdirname:
         check_rpc_sampling_shuffle(Path(tmpdirname), num_server)
+        check_rpc_sampling_shuffle(Path(tmpdirname), num_server, num_groups=5)
         check_rpc_hetero_sampling_shuffle(Path(tmpdirname), num_server)
         check_rpc_hetero_sampling_empty_shuffle(Path(tmpdirname), num_server)
         check_rpc_hetero_etype_sampling_shuffle(Path(tmpdirname), num_server)
