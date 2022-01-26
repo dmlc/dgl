@@ -4,7 +4,6 @@ import torch as th
 from .... import backend as F
 from .... import utils
 from ...dist_tensor import DistTensor
-from ...rpc import detach_group_id
 
 class DistEmbedding:
     '''Distributed node embeddings.
@@ -122,15 +121,12 @@ class DistEmbedding:
     def name(self):
         """Return the name of the embeddings
 
-        As group ID is always attached when creating DistTesnor,
-        we need to detach so as to obtain original name.
-
         Returns
         -------
         str
             The name of the embeddings
         """
-        return detach_group_id(self._tensor.tensor_name)
+        return self._tensor.tensor_name
 
     @property
     def kvstore(self):

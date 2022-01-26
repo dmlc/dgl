@@ -1222,27 +1222,4 @@ def get_client(client_id, group_id):
     """
     return _CAPI_DGLRPCGetClient(int(client_id), int(group_id))
 
-def attach_group_id(name):
-    """Attach group ID
-
-    Returns
-    -------
-    str
-        new name with group ID attached
-    """
-    return "{}_{}".format(name, get_group_id())
-
-def detach_group_id(name):
-    """Detach group ID
-
-    Returns
-    -------
-    str
-        original name without group ID
-    """
-    suffix = "_{}".format(get_group_id())
-    if name.endswith(suffix):
-        return name[:-len(suffix)]
-    return name
-
 _init_api("dgl.distributed.rpc")

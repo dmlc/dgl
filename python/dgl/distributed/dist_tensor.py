@@ -7,7 +7,7 @@ from .kvstore import get_kvstore
 from .role import get_role
 from .. import utils
 from .. import backend as F
-from .rpc import attach_group_id
+from .rpc import get_group_id
 
 def _default_init_data(shape, dtype):
     return F.zeros(shape, dtype, F.cpu())
@@ -111,6 +111,7 @@ class DistTensor:
                 'Distributed module is not initialized. Please call dgl.distributed.initialize.'
         self._shape = shape
         self._dtype = dtype
+        self._attach = attach
 
         part_policies = self.kvstore.all_possible_part_policy
         # If a user doesn't provide a partition policy, we should find one based on
@@ -148,8 +149,7 @@ class DistTensor:
             name = 'anonymous-' + get_role() + '-' + str(DIST_TENSOR_ID)
             DIST_TENSOR_ID += 1
         assert isinstance(name, str), 'name {} is type {}'.format(name, type(name))
-        if attach:
-            name = attach_group_id(name)
+        name = self._attach_group_id(name)
         self._tensor_name = name
         data_name = part_policy.get_data_name(name)
         self._name = str(data_name)
@@ -225,7 +225,7 @@ class DistTensor:
         str
             The name of the tensor.
         '''
-        return self._name
+        return self._detach_group_id(self._name)
 
     @property
     def tensor_name(self):
@@ -236,7 +236,7 @@ class DistTensor:
         str
             The name of the tensor.
         '''
-        return self._tensor_name
+        return self._detach_group_id(self._tensor_name)
 
     def count_nonzero(self):
         '''Count and return the number of nonzero value
@@ -246,4 +246,29 @@ class DistTensor:
         int
             the number of nonzero value
         '''
-        return self.kvstore.count_nonzero(name=self.name)
+        return self.kvstore.count_nonzero(name=self._name)
+
+    def _attach_group_id(self, name):
+        """Attach group ID if needed
+
+        Returns
+        -------
+        str
+            new name with group ID attached
+        """
+        if not self._attach:
+            return name
+        return "{}_{}".format(name, get_group_id())
+
+    def _detach_group_id(self, name):
+        """Detach group ID if needed
+
+        Returns
+        -------
+        str
+            original name without group ID
+        """
+        if not self._attach:
+            return name
+        suffix = "_{}".format(get_group_id())
+        return name[:-len(suffix)]
