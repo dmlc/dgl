@@ -191,7 +191,7 @@ class NodeDataView(MutableMapping):
             dtype, shape, _ = g._client.get_data_meta(str(name))
             # We create a wrapper on the existing tensor in the kvstore.
             self._data[name.get_name()] = DistTensor(shape, dtype, name.get_name(),
-                                                     part_policy=policy)
+                                                     part_policy=policy, attach=False)
 
     def _get_names(self):
         return list(self._data.keys())
@@ -245,7 +245,7 @@ class EdgeDataView(MutableMapping):
             dtype, shape, _ = g._client.get_data_meta(str(name))
             # We create a wrapper on the existing tensor in the kvstore.
             self._data[name.get_name()] = DistTensor(shape, dtype, name.get_name(),
-                                                     part_policy=policy)
+                                                     part_policy=policy, attach=False)
 
     def _get_names(self):
         return list(self._data.keys())
@@ -308,16 +308,19 @@ class DistGraphServer(KVServer):
         Disable shared memory.
     graph_format : str or list of str
         The graph formats.
+    keep_alive : bool
+        Whether to keep server alive when clients exit
     '''
     def __init__(self, server_id, ip_config, num_servers,
                  num_clients, part_config, disable_shared_mem=False,
-                 graph_format=('csc', 'coo')):
+                 graph_format=('csc', 'coo'), keep_alive=False):
         super(DistGraphServer, self).__init__(server_id=server_id,
                                               ip_config=ip_config,
                                               num_servers=num_servers,
                                               num_clients=num_clients)
         self.ip_config = ip_config
         self.num_servers = num_servers
+        self.keep_alive = keep_alive
         # Load graph partition data.
         if self.is_backup_server():
             # The backup server doesn't load the graph partition. It'll initialized afterwards.
@@ -351,6 +354,7 @@ class DistGraphServer(KVServer):
                 data_name = HeteroDataName(True, ntype, feat_name)
                 self.init_data(name=str(data_name), policy_str=data_name.policy_str,
                                data_tensor=node_feats[name])
+                self.orig_data.add(str(data_name))
             for name in edge_feats:
                 # The feature name has the following format: edge_type + "/" + feature_name to avoid
                 # feature name collision for different edge types.
@@ -358,13 +362,16 @@ class DistGraphServer(KVServer):
                 data_name = HeteroDataName(False, etype, feat_name)
                 self.init_data(name=str(data_name), policy_str=data_name.policy_str,
                                data_tensor=edge_feats[name])
+                self.orig_data.add(str(data_name))
 
     def start(self):
         """ Start graph store server.
         """
         # start server
-        server_state = ServerState(kv_store=self, local_g=self.client_g, partition_book=self.gpb)
-        print('start graph service on server {} for part {}'.format(self.server_id, self.part_id))
+        server_state = ServerState(kv_store=self, local_g=self.client_g,
+                                   partition_book=self.gpb, keep_alive=self.keep_alive)
+        print('start graph service on server {} for part {}'.format(
+            self.server_id, self.part_id))
         start_server(server_id=self.server_id,
                      ip_config=self.ip_config,
                      num_servers=self.num_servers,

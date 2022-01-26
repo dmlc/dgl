@@ -38,6 +38,9 @@ struct RPCMessage : public runtime::Object {
   /*! \brief Extra payloads in the form of tensors.*/
   std::vector<runtime::NDArray> tensors;
 
+  /*! \brief Group ID. */
+  int32_t group_id{0};
+
   bool Load(dmlc::Stream* stream) {
     stream->Read(&service_id);
     stream->Read(&msg_seq);
@@ -45,6 +48,7 @@ struct RPCMessage : public runtime::Object {
     stream->Read(&server_id);
     stream->Read(&data);
     stream->Read(&tensors);
+    stream->Read(&group_id);
     return true;
   }
 
@@ -55,6 +59,7 @@ struct RPCMessage : public runtime::Object {
     stream->Write(server_id);
     stream->Write(data);
     stream->Write(tensors);
+    stream->Write(group_id);
   }
 
   static constexpr const char* _type_key = "rpc.RPCMessage";
