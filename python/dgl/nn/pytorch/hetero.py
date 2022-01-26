@@ -258,7 +258,7 @@ class HeteroLinearLayer(nn.Module):
 
     The underlying implementation invokes :func:`~dgl.to_homogeneous`. Therefore,
     the returned graph stores the following extra attributes:
-    
+
       - ret_g.ndata[dgl.NID]: the original node IDs.
       - ret_g.edata[dgl.EID]: the original edge IDs.
       - ret_g.ndata[dgl.NTYPE]: the type ID of each node.
@@ -295,10 +295,10 @@ class HeteroLinearLayer(nn.Module):
         for ntype in hg.ntypes:
             linear = nn.Linear(hg.nodes[ntype].data[feat_name].shape[1], out_size)
             self.linears[ntype] = linear
-    
+
     def forward(self, hg):
         """Forward function
-        
+
         Parameters
         ----------
         hg : DGLGraph
@@ -315,17 +315,17 @@ class HeteroLinearLayer(nn.Module):
         for ntype in hg.ntypes:
             features = self.linears[ntype](hg.nodes[ntype].data[self.feat_name])
             feat = th.cat((feat, features))
-        g = to_homogeneous(hg)   
-        
-        return g, feat          
-    
+        g = to_homogeneous(hg)
+
+        return g, feat
+
 class HeteroEmbedding(nn.Module):
     """Create node embeddings for each node type and return a homogeneous
     graph representation.
 
     The underlying implementation invokes :func:`~dgl.to_homogeneous`. Therefore,
     the returned graph stores the following extra attributes:
-    
+
       - ret_g.ndata[dgl.NID]: the original node IDs.
       - ret_g.edata[dgl.EID]: the original edge IDs.
       - ret_g.ndata[dgl.NTYPE]: the type ID of each node.
@@ -340,7 +340,7 @@ class HeteroEmbedding(nn.Module):
 
     Examples
     --------
-    
+
     >>> hg = dgl.heterograph({('user', 'rate', 'movie') : ...,
                               ('user', 'follows', 'user') : ...})
     >>> print(hg.num_nodes('user'), hg.num_nodes('movie'))
@@ -353,18 +353,18 @@ class HeteroEmbedding(nn.Module):
     (1300, 100)
     >>> print(embed.requires_grad)
     True
-    
+
     """
     def __init__(self, hg, embed_size):
         super(HeteroEmbedding, self).__init__()
         self.embed_size = embed_size
-        nodes = hg.num_nodes()      
+        nodes = hg.num_nodes()
         self.embed = nn.Parameter(th.FloatTensor(nodes, self.embed_size))
         nn.init.xavier_uniform_(self.embed, gain=nn.init.calculate_gain('relu'))
-        
+
     def forward(self, hg):
         """Forward function
-        
+
         Parameters
         ----------
         hg : DGLGraph
@@ -378,5 +378,5 @@ class HeteroEmbedding(nn.Module):
             Node embeddings.
         """
         g = to_homogeneous(hg)
-            
+
         return g, self.embed
