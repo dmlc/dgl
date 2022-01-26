@@ -66,9 +66,8 @@ def run(proc_id, n_gpus, args, devices, data):
                                           init_method=dist_init_method,
                                           world_size=world_size,
                                           rank=proc_id)
-    train_mask, val_mask, test_mask, n_classes, g = data
-    nfeat = g.ndata.pop('features')
-    labels = g.ndata.pop('labels')
+    train_nid, val_nid, test_nid, n_classes, g, nfeat, labels = data
+
     if args.data_device == 'gpu':
         nfeat = nfeat.to(device)
         labels = labels.to(device)
@@ -76,10 +75,6 @@ def run(proc_id, n_gpus, args, devices, data):
         nfeat = dgl.contrib.UnifiedTensor(nfeat, device=device)
         labels = dgl.contrib.UnifiedTensor(labels, device=device)
     in_feats = nfeat.shape[1]
-
-    train_nid = th.LongTensor(np.nonzero(train_mask)).squeeze()
-    val_nid = th.LongTensor(np.nonzero(val_mask)).squeeze()
-    test_nid = th.LongTensor(np.nonzero(test_mask)).squeeze()
 
     # Create PyTorch DataLoader for constructing blocks
     n_edges = g.num_edges()
@@ -182,7 +177,10 @@ def run(proc_id, n_gpus, args, devices, data):
     if proc_id == 0:
         print('Avg epoch time: {}'.format(avg / (epoch - 4)))
 
-def main(args, devices):
+def main(args):
+    devices = list(map(int, args.gpu.split(',')))
+    n_gpus = len(devices)
+
     # load dataset
     if args.dataset == 'reddit':
         g, n_classes = load_reddit(self_loop=False)
@@ -194,14 +192,28 @@ def main(args, devices):
     train_mask = g.ndata['train_mask']
     val_mask = g.ndata['val_mask']
     test_mask = g.ndata['test_mask']
+    train_nid = th.LongTensor(np.nonzero(train_mask)).squeeze()
+    val_nid = th.LongTensor(np.nonzero(val_mask)).squeeze()
+    test_nid = th.LongTensor(np.nonzero(test_mask)).squeeze()
+
+    nfeat = g.ndata.pop('features')
+    labels = g.ndata.pop('labels')
 
     # Create csr/coo/csc formats before launching training processes with multi-gpu.
     # This avoids creating certain formats in each sub-process, which saves memory and CPU.
     g.create_formats_()
+    if n_gpus > 1:
+        # Copy the graph to shared memory explicitly before pinning.
+        # In other cases, we can just rely on fork's copy-on-write.
+        # TODO: the original graph g is not freed.
+        if args.sample_device == 'uva':
+            g = g.shared_memory('g')
+        if args.data_device == 'uva':
+            nfeat = nfeat.share_memory_()
+            labels = labels.share_memory_()
     # Pack data
-    data = train_mask, val_mask, test_mask, n_classes, g
+    data = train_nid, val_nid, test_nid, n_classes, g, nfeat, labels
 
-    n_gpus = len(devices)
     if devices[0] == -1:
         assert args.sample_device == 'cpu', \
                f"Must have GPUs to enable {args.sample_device} sampling."
@@ -253,6 +265,4 @@ if __name__ == '__main__':
                                 "pinned host memory).")
     args = argparser.parse_args()
 
-    devices = list(map(int, args.gpu.split(',')))
-
-    main(args, devices)
+    main(args)

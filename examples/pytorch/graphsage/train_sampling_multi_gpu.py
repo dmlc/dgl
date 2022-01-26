@@ -202,7 +202,7 @@ if __name__ == '__main__':
     elif args.dataset == 'ogbn-products':
         g, n_classes = load_ogb('ogbn-products')
     elif args.dataset == 'ogbn-papers100M':
-        g, n_classes = load_ogb('ogbn-papers100M', root='/workspace/dataset')
+        g, n_classes = load_ogb('ogbn-papers100M')
         g = dgl.add_reverse_edges(g)
         # convert labels to integer
         g.ndata['labels'] = th.as_tensor(g.ndata['labels'], dtype=th.int64)
