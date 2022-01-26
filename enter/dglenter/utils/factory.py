@@ -6,7 +6,6 @@ from pathlib import Path
 from abc import ABC, abstractmethod, abstractstaticmethod
 from .base_model import DGLBaseModel
 import yaml
-import inspect
 from pydantic import create_model_from_typeddict, create_model, Field
 from dgl.dataloading.negative_sampler import GlobalUniform, PerSourceUniform
 import inspect

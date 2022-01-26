@@ -17,7 +17,8 @@ setup(name='dglenter',
           'isort>=5.10.1',
           'autoflake8>=0.2.2',
           'numpydoc>=1.1.0',
-          "pydantic>=1.9.0"
+          "pydantic>=1.9.0",
+          "ruamel.yaml>=0.17.20"
       ],
     license='APACHE',
       entry_points={

@@ -1,6 +1,7 @@
 from enum import Enum
 from pathlib import Path
-from typing import Optional, List, Literal, Union
+from typing import Optional, List, Union
+from typing_extensions import Literal
 from jinja2 import Template, ext
 from pydantic import BaseModel, Field
 import copy
