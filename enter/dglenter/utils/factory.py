@@ -1,6 +1,7 @@
 import enum
 import logging
-from typing import Callable, Dict, Literal, Union
+from typing import Callable, Dict, Union
+from typing_extensions import Literal
 from pathlib import Path
 from abc import ABC, abstractmethod, abstractstaticmethod
 from .base_model import DGLBaseModel
