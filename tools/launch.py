@@ -14,8 +14,6 @@ from functools import partial
 from threading import Thread
 from typing import Optional
 
-DEFAULT_PORT = 30050
-
 def cleanup_proc(get_all_remote_pids, conn):
     '''This process tries to clean up the remote training tasks.
     '''
@@ -435,46 +433,57 @@ def wrap_cmd_with_extra_envvars(cmd: str, env_vars: list) -> str:
     return wrap_cmd_with_local_envvars(cmd, env_vars)
 
 
-monitor_file = None
+g_monitor_file = None
+g_group_id = 0
 
-
-def has_server_alive(args):
-    """Check whether there exist alive servers."""
-    import hashlib
-    check_path = str(args.workspace + args.part_config +
-                     args.ip_config).encode('utf-8')
-    md5_v = hashlib.md5(check_path).hexdigest()
-    global monitor_file
-    monitor_file = '/tmp/dgl_monitor_' + str(md5_v)
-    ret = os.path.exists(monitor_file)
-    if ret:
-        print("Monitor file for alive servers already exist: {}.".format(monitor_file))
-    if args.keep_alive and not ret:
-        with open(monitor_file, 'w') as f:
-            f.write("1")
-        print("Monitor file for alive servers is created: {}.".format(monitor_file))
+def has_alive_servers(args):
+    """Check whether there exist alive servers and get available group ID if exist."""
+    if args.server_name is None:
+        return False
+    global g_monitor_file
+    global g_group_id
+    monitor_file = '/tmp/dgl_dist_monitor_' + args.server_name
+    from filelock import FileLock
+    lock = FileLock(monitor_file + '.lock')
+    with lock:
+        next_group_id = None
+        ret = os.path.exists(monitor_file)
+        if ret:
+            print("Monitor file for alive servers already exist: {}.".format(monitor_file))
+            lines = [line.rstrip('\n') for line in open(monitor_file)]
+            g_group_id = int(lines[0])
+            next_group_id = g_group_id + 1
+        if not ret and args.keep_alive:
+            next_group_id = 1
+            print("Monitor file for alive servers is created: {}.".format(monitor_file))
+            g_monitor_file = monitor_file
+        if next_group_id is not None:
+            with open(monitor_file, 'w') as f:
+                f.write(str(next_group_id))
     return ret
 
 
-def get_group_id():
-    """Get available group ID."""
-    if monitor_file is None or not os.path.exists(monitor_file):
-        return 0
-    lines = [line.rstrip('\n') for line in open(monitor_file)]
-    group_id = int(lines[0])
-    with open(monitor_file, 'w') as f:
-        f.write(str(group_id + 1))
-    return group_id
-
-def clean_server_alive():
+def clean_alive_servers():
     """Remove keep alive related files"""
-    global monitor_file
+    global g_monitor_file
     try:
-        if monitor_file is not None:
-            os.remove(monitor_file)
-            print("Monitor file for servers keep alive is removed: {}.".format(monitor_file))
+        if g_monitor_file is not None:
+            os.remove(g_monitor_file)
+            os.remove(g_monitor_file + '.lock')
+            print("Monitor file for alive servers is removed: {}.".format(g_monitor_file))
     except:
-        print("Failed to delete monitor file for servers keep alive: {}.".format(monitor_file))
+        print("Failed to delete monitor file for alive servers: {}.".format(g_monitor_file))
+
+def get_available_port(ip):
+    """Get available port with specified ip."""
+    import socket
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    for port in range(1234, 65535):
+        try:
+            sock.connect((ip, port))
+        except:
+            return port
+    raise RuntimeError("Failed to get available port for ip~{}".format(ip))
 
 def submit_jobs(args, udf_command):
     """Submit distributed jobs (server and client processes) via ssh"""
@@ -493,7 +502,7 @@ def submit_jobs(args, udf_command):
                 hosts.append((ip, port))
             elif len(result) == 1:
                 ip = result[0]
-                port = DEFAULT_PORT
+                port = get_available_port(ip)
                 hosts.append((ip, port))
             else:
                 raise RuntimeError("Format error of ip_config.")
@@ -509,7 +518,7 @@ def submit_jobs(args, udf_command):
 
     tot_num_clients = args.num_trainers * (1 + args.num_samplers) * len(hosts)
     # launch server tasks
-    if not has_server_alive(args):
+    if not has_alive_servers(args):
         server_env_vars = construct_dgl_server_env_vars(
             num_samplers=args.num_samplers,
             num_server_threads=args.num_server_threads,
@@ -528,6 +537,8 @@ def submit_jobs(args, udf_command):
             cmd = wrap_cmd_with_extra_envvars(cmd, args.extra_envs) if len(args.extra_envs) > 0 else cmd
             cmd = 'cd ' + str(args.workspace) + '; ' + cmd
             thread_list.append(execute_remote(cmd, ip, args.ssh_port, username=args.ssh_username))
+    else:
+        print("Alive servers whose name is {} are found, let's use them direclty.".format(args.server_name))
 
     # launch client tasks
     client_env_vars = construct_dgl_client_env_vars(
@@ -538,7 +549,7 @@ def submit_jobs(args, udf_command):
         num_servers=args.num_servers,
         graph_format=args.graph_format,
         num_omp_threads=os.environ.get("OMP_NUM_THREADS", str(args.num_omp_threads)),
-        group_id=get_group_id(),
+        group_id=g_group_id,
         pythonpath=os.environ.get("PYTHONPATH", ""),
     )
 
@@ -551,7 +562,7 @@ def submit_jobs(args, udf_command):
             num_nodes=len(hosts),
             node_rank=node_id,
             master_addr=hosts[0][0],
-            master_port=1234,
+            master_port=get_available_port(hosts[0][0]),
         )
         cmd = wrap_cmd_with_local_envvars(torch_dist_udf_command, client_env_vars)
         cmd = wrap_cmd_with_extra_envvars(cmd, args.extra_envs) if len(args.extra_envs) > 0 else cmd
@@ -568,7 +579,7 @@ def submit_jobs(args, udf_command):
         logging.info('Stop launcher')
         # We need to tell the cleanup process to kill remote training jobs.
         conn2.send('cleanup')
-        clean_server_alive()
+        clean_alive_servers()
         sys.exit(0)
     signal.signal(signal.SIGINT, signal_handler)
 
@@ -617,8 +628,11 @@ def main():
                         you can set the LD_LIBRARY_PATH and NCCL_DEBUG by adding: \
                         --extra_envs LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH NCCL_DEBUG=INFO ')
     parser.add_argument('--keep_alive', action='store_true', help='Servers keep alive when clients exit')
+    parser.add_argument('--server_name', type=str,
+                        help='Used to check whether there exist alive servers')
     args, udf_command = parser.parse_known_args()
     if args.keep_alive:
+        assert args.server_name is not None, "Server name is required if '--keep_alive' is enabled."
         print("Servers will keep alive even clients exit...")
     assert len(udf_command) == 1, 'Please provide user command line.'
     assert args.num_trainers is not None and args.num_trainers > 0, \

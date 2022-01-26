@@ -21,9 +21,6 @@ import torch.optim as optim
 import torch.multiprocessing as mp
 from torch.utils.data import DataLoader
 
-def get_unique_name(name):
-    return "{}_{}".format(name, dgl.distributed.get_group_id())
-
 def load_subtensor(g, seeds, input_nodes, device, load_feat=True):
     """
     Copys features and labels of a set of nodes onto GPU.
@@ -101,12 +98,12 @@ class DistSAGE(nn.Module):
         # TODO: can we standardize this?
         nodes = dgl.distributed.node_split(np.arange(g.number_of_nodes()),
                                            g.get_partition_book(), force_even=True)
-        y = dgl.distributed.DistTensor((g.number_of_nodes(), self.n_hidden), th.float32, get_unique_name('h'),
+        y = dgl.distributed.DistTensor((g.number_of_nodes(), self.n_hidden), th.float32, 'h',
                                        persistent=True)
         for l, layer in enumerate(self.layers):
             if l == len(self.layers) - 1:
                 y = dgl.distributed.DistTensor((g.number_of_nodes(), self.n_classes),
-                                               th.float32, get_unique_name('h_last'), persistent=True)
+                                               th.float32, 'h_last', persistent=True)
 
             sampler = NeighborSampler(g, [-1], dgl.distributed.sample_neighbors, device)
             print('|V|={}, eval batch size: {}'.format(g.number_of_nodes(), batch_size))
@@ -187,6 +184,7 @@ def pad_data(nids, device):
 def run(args, device, data):
     # Unpack data
     train_nid, val_nid, test_nid, in_feats, n_classes, g = data
+    # Below line causes error sometimes.
     # train_nid = pad_data(train_nid, device)
     # Create sampler
     sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')],
