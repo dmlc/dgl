@@ -8,6 +8,7 @@
 
 #include <dgl/array.h>
 #include <dgl/bcast.h>
+#include <utility>
 
 namespace dgl {
 namespace aten {
@@ -16,7 +17,7 @@ namespace cpu {
 template <typename DType>
 void transpose(const DType *in, DType *out, const int N, const int M) {
 #pragma omp parallel for
-    for(int n = 0; n < N * M; n++) {
+    for (int n = 0; n < N * M; n++) {
         int i = n / N;
         int j = n % N;
         out[n] = in[M * j + i];
@@ -99,9 +100,4 @@ void gatherMM_SortedEtype(const NDArray h,
 }  // namespace aten
 }  // namespace dgl
 
-#endif  // DGL_ARRAY_CPU_SPMM_H_
-
-
-
-
-
+#endif  // DGL_ARRAY_CPU_GATHER_MM_H_
