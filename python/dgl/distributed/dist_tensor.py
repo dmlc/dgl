@@ -7,6 +7,7 @@ from .kvstore import get_kvstore
 from .role import get_role
 from .. import utils
 from .. import backend as F
+from .rpc import attach_group_id
 
 def _default_init_data(shape, dtype):
     return F.zeros(shape, dtype, F.cpu())
@@ -80,6 +81,8 @@ class DistTensor:
         Whether the created tensor lives after the ``DistTensor`` object is destroyed.
     is_gdata : bool
         Whether the created tensor is a ndata/edata or not.
+    attach : bool
+        Whether to attach group ID into name to be globally unique.
 
     Examples
     --------
@@ -102,7 +105,7 @@ class DistTensor:
     do the same.
     '''
     def __init__(self, shape, dtype, name=None, init_func=None, part_policy=None,
-                 persistent=False, is_gdata=True):
+                 persistent=False, is_gdata=True, attach=True):
         self.kvstore = get_kvstore()
         assert self.kvstore is not None, \
                 'Distributed module is not initialized. Please call dgl.distributed.initialize.'
@@ -128,7 +131,6 @@ class DistTensor:
                     + 'its first dimension does not match the number of nodes or edges ' \
                     + 'of a distributed graph or there does not exist a distributed graph.'
 
-        self._tensor_name = name
         self._part_policy = part_policy
         assert part_policy.get_size() == shape[0], \
                 'The partition policy does not match the input shape.'
@@ -146,6 +148,9 @@ class DistTensor:
             name = 'anonymous-' + get_role() + '-' + str(DIST_TENSOR_ID)
             DIST_TENSOR_ID += 1
         assert isinstance(name, str), 'name {} is type {}'.format(name, type(name))
+        if attach:
+            name = attach_group_id(name)
+        self._tensor_name = name
         data_name = part_policy.get_data_name(name)
         self._name = str(data_name)
         self._persistent = persistent
