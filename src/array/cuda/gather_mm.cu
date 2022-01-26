@@ -1,11 +1,10 @@
 /*!
  *  Copyright (c) 2020 by Contributors
  * \file array/cuda/gather_mm.cu
- * \brief SDDMM C APIs and definitions.
+ * \brief GatherMM C APIs and definitions.
  */
 #include <dgl/array.h>
 #include <algorithm>  // std::swap
-#include "./gather_mm.cuh"
 #include "./utils.h"
 #include "./functor.cuh"
 
@@ -14,6 +13,7 @@ using namespace cuda;
 namespace aten {
 
 namespace {
+
 /*! \brief Call cuBLAS geam API for transpose operation for float and double. */
 template <typename DType>
 cublasStatus_t Xgeam(cublasHandle_t handle, cublasOperation_t transa,
@@ -45,6 +45,7 @@ cublasStatus_t Xgeam<double>(cublasHandle_t handle, cublasOperation_t transa,
       beta, B, ldb, C, ldc);
 }
 
+/*! \brief Call cuBLAS GEMM API for dense matmul operation for float and double. */
 template <typename DType>
 cublasStatus_t cublasGemm(cublasHandle_t handle, cublasOperation_t transa,
     cublasOperation_t transb, int m, int n, int k,
@@ -80,24 +81,11 @@ cublasStatus_t cublasGemm<double>(cublasHandle_t handle, cublasOperation_t trans
  * \param row number of rows of input matrix.
  * \param col number of columns of input matrix.
  */
-
-                // CUBLAS_CALL(Xgeam<DType>(
-                //     thr_entry->cublas_handle,
-                //     CUBLAS_OP_T,
-                //     CUBLAS_OP_N,
-                //     m, k,
-                //     &alpha, h_data + h_offset, k,
-                //     &beta, nullptr, m,
-                //     h_trans_data, m));
 template <typename DType>
 void _Transpose(cublasHandle_t handle,
                 const DType* in, DType* out,
                 int row, int col) {
   DType alpha = 1., beta = 0.;
-  // auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
-  // if (!thr_entry->cublas_handle)
-    // CUBLAS_CALL(cublasCreate(&(thr_entry->cublas_handle)));
-  // CUBLAS_CALL(cublasSetStream(thr_entry->cublas_handle, thr_entry->stream));
   CUBLAS_CALL(Xgeam<DType>(
       handle,
       CUBLAS_OP_T,
@@ -110,28 +98,28 @@ void _Transpose(cublasHandle_t handle,
 
 }  // namespace
 
-/* Idea 1: tranpose W and compute dot product of each row vector of H
-   and column vector of W. Reuse in H.
-   Idea 2: multiply 1 element of H with a row of W and compute partial
-   result of Out
+/* \Note
+   Idea 1: tranpose B and compute dot product of each row vector of A
+   and column vector of B. Reuse in A.
+   Idea 2: multiply 1 element of A with a row of B and compute partial
+   result of the output
 */
 
 /* Implementation of Idea 2
-One TB for one row of H. One WARP will multiply one element of H and
-a row of W to compute partial result of 1 row of Out. H is loaded once,
-W is used once. Only resuse is from Out which is put is shared
+  \Note One warp is assigned to process one row of A. Each WARP sequentially multiplies
+  one element of A and a row of B to compute partial result of the output. A is
+  loaded in shared memory in a coalesced way. Output matrix is loaded in registers.
+  B should get benefit from L2 cache.
 */
 
-/* uses shared mem to store output */
 template <typename Idx, typename DType>
-__global__ void gatherMMUnsortedEKernel_outInShmem(
-    const DType* __restrict__ H,
-    const DType* __restrict__ W,
-    DType* __restrict__ out,
+__global__ void gatherMMUnsortedEKernel(
+    const DType* __restrict__ A,
+    const DType* __restrict__ B,
+    DType* __restrict__ C,
     const Idx* __restrict__ etype,
     int64_t num_rows,
-    int64_t in_len, int64_t out_len) {
-
+    int64_t k_start, int64_t in_len, int64_t out_len) {
     unsigned int tId = threadIdx.x;
     unsigned int laneId = tId & 31;
     unsigned int gId = (blockIdx.x * blockDim.x + threadIdx.x);
@@ -139,128 +127,50 @@ __global__ void gatherMMUnsortedEKernel_outInShmem(
     unsigned int row = warpId;
     if (row < num_rows) {
         unsigned int local_row = row & 3;  // hardcoded for TB size 128 (4 warps)
-        // TODO(Israt): __shared__ does not take typename. Make compatible with double
-        extern __shared__ float sh_out[];
-        // global to shared
-        for (unsigned int k = laneId; k < out_len; k += 32)
-            sh_out[local_row * out_len + k] = 0;
+        const int sh_h_tile = 64;
+        __shared__ float sh_H[4 * sh_h_tile];
+        int h_tile = sh_h_tile;
+        if ((in_len - k_start) < h_tile) h_tile = in_len - k_start;
+        /* Load A in shared mem in a coalesced way */
+        for (unsigned int l = laneId; l < h_tile; l += 32)
+            sh_H[local_row * h_tile + l] = A[row * in_len + (k_start + l)];
         __syncthreads();
 
-        int w_offset = etype[row] * in_len * out_len;  // assume all weights are of same dim
-        /* iterate over elements of a row of H */
-        for (unsigned int i = 0; i < in_len; i++) {
-            DType h_val =  H[row * in_len + i];
-            /* iterate over elements of a row of W in parallel */
-            for (unsigned int k = laneId; k < out_len; k += 32) {
-                sh_out[local_row * out_len + k] += h_val * W[w_offset + (i * out_len + k)];
-                // out[row * out_len + k] += h_val * W[w_offset + (i * out_len + k)];
-            }
-        }
-        __syncthreads();
-        for (unsigned int k = laneId; k < out_len; k += 32) {
-            out[row * out_len + k] = sh_out[local_row * out_len + k];
-        }
-    }
-}
-
-/* uses registers to store output */
-template <typename Idx, typename DType>
-__global__ void gatherMMUnsortedEKernel_outInReg(
-    const DType* __restrict__ H,
-    const DType* __restrict__ W,
-    DType* __restrict__ out,
-    const Idx* __restrict__ etype,
-    int64_t num_rows,
-    int64_t in_len, int64_t out_len) {
-
-    unsigned int tId = threadIdx.x;
-    unsigned int laneId = tId & 31;
-    unsigned int gId = (blockIdx.x * blockDim.x + threadIdx.x);
-    unsigned int warpId = gId >> 5;
-    unsigned int row = warpId;
-    if (row < num_rows) {
-        int w_offset = etype[row] * in_len * out_len;  // assume all weights are of same dim
-        /* iterate over elements of a row of H */
+        int B_offset = etype[row] * in_len * out_len;  // assume all weights are of same dim
         for (unsigned int k_outloop = 0; k_outloop < out_len; k_outloop +=32) {
             float out_reg = 0;  // thread private
             unsigned int k = laneId;
             if (k < out_len) {
-                for (unsigned int i = 0; i < in_len; i++) {
-                    DType h_val =  H[row * in_len + i];
-                    /* iterate over elements of a row of W in parallel */
-                    out_reg += h_val * W[w_offset + (i * out_len + (k_outloop + k))];
+                /* iterate over elements of a row of A */
+                for (unsigned int i = 0; i < h_tile; i++) {
+                    DType h_val =  sh_H[local_row * h_tile + i];
+                    /* iterate over elements of a row of B in parallel */
+                    out_reg += h_val * B[B_offset + ((i + k_start) * out_len + (k_outloop + k))];
                 }
-                out[row * out_len + (k_outloop + k)] = out_reg;
+                C[row * out_len + (k_outloop + k)] += out_reg;
             }
         }
     }
 }
 
-/* uses registers to store output and shared mem to store input H
- Following version supports in_len <= 64. Change const int sh_h_tile to support
- larger in_len.
+/* \brief Implementation of GatherMM operator for un-sorted input matrix A.
+ * Each edge looks up the weight matrix according to it's edge type.
  */
-template <typename Idx, typename DType>
-__global__ void gatherMMUnsortedEKernel_optimal(
-    const DType* __restrict__ H,
-    const DType* __restrict__ W,
-    DType* __restrict__ out,
-    const Idx* __restrict__ etype,
-    int64_t num_rows,
-    int64_t in_len, int64_t out_len) {
-
-    unsigned int tId = threadIdx.x;
-    unsigned int laneId = tId & 31;
-    unsigned int gId = (blockIdx.x * blockDim.x + threadIdx.x);
-    unsigned int warpId = gId >> 5;
-    unsigned int row = warpId;
-    if (row < num_rows) {
-        unsigned int local_row = row & 3;  // hardcoded for TB size 128 (4 warps)
-        // TODO(Israt): Support inlen > 64
-        const int sh_h_tile = 64;
-        // TODO(Israt): Fix for inlen < 64.
-        __shared__ float sh_H[4 * sh_h_tile];
-        int h_tile = sh_h_tile;
-        if (in_len < h_tile) h_tile = in_len;
-        /* Load H in shared mem in a coalesced way */
-        for (int h_outloop = 0; h_outloop < in_len; h_outloop += h_tile) {
-            for (unsigned int l = laneId; l < h_tile; l += 32)
-                sh_H[local_row * h_tile + l] = H[row * in_len + (h_outloop + l)];
-            __syncthreads();
-
-            int w_offset = etype[row] * in_len * out_len;  // assume all weights are of same dim
-            /* iterate over elements of a row of H */
-            for (unsigned int k_outloop = 0; k_outloop < out_len; k_outloop +=32) {
-                float out_reg = 0;  // thread private
-                unsigned int k = laneId;
-                if (k < out_len) {
-                    for (unsigned int i = 0; i < h_tile; i++) {
-                        DType h_val =  sh_H[local_row * h_tile + i];
-                        /* iterate over elements of a row of W in parallel */
-                        out_reg += h_val * W[w_offset + (i * out_len + (k_outloop + k))];
-                    }
-                    out[row * out_len + (k_outloop + k)] += out_reg;
-                }
-            }
-        }
-    }
-}
-
 template <int XPU, typename IdType, int bits>
-void gatherMM_UnsortedEtype(const NDArray h,
-              const NDArray w,
-              NDArray out,
-              const NDArray E_per_rel,
+void gatherMM_UnsortedEtype(const NDArray A,
+              const NDArray B,
+              NDArray C,
+              const NDArray A_dim1_per_rel,
               const NDArray etype) {
     SWITCH_BITS(bits, DType, {
         auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
-        int64_t num_rel = E_per_rel.NumElements();
-        int n = w->shape[1];  // cols of B
-        int k = h->shape[1];  // cols of A
-        const IdType* E_per_rel_data = E_per_rel.Ptr<IdType>();
+        int64_t num_rel = A_dim1_per_rel.NumElements();
+        int n = B->shape[1];  // cols of B
+        int k = A->shape[1];  // cols of A
+        const IdType* E_rel_data  = A_dim1_per_rel.Ptr<IdType>();
         IdType tot_num_rows = 0;
         for (int i = 0; i < num_rel; ++i)
-            tot_num_rows += E_per_rel_data[i];
+            tot_num_rows += E_rel_data [i];
 
         const int ntx = 128;
         const int warp_size = 32;
@@ -268,46 +178,41 @@ void gatherMM_UnsortedEtype(const NDArray h,
         const dim3 nblks(nbx);
         const dim3 nthrs(ntx);
         const int warp_per_block = 4;  // ntx / warp_size;
-        if (k <= 64) {
-            CUDA_KERNEL_CALL((gatherMMUnsortedEKernel_optimal<IdType, DType>),
+        for (int k_start = 0; k_start < k; k_start += 64) {
+            CUDA_KERNEL_CALL((gatherMMUnsortedEKernel<IdType, DType>),
                 nblks, nthrs, 0, thr_entry->stream,
-                static_cast<DType*>(h->data),
-                static_cast<DType*>(w->data),
-                static_cast<DType*>(out->data),
+                static_cast<DType*>(A->data),
+                static_cast<DType*>(B->data),
+                static_cast<DType*>(C->data),
                 static_cast<IdType*>(etype->data),
                 tot_num_rows,
-                k, n);
-        } else {  // Still can use the  *_optimal kernel if `const int sh_h_tile is changed
-            CUDA_KERNEL_CALL((gatherMMUnsortedEKernel_outInReg<IdType, DType>),
-                nblks, nthrs, 0, thr_entry->stream,
-                static_cast<DType*>(h->data),
-                static_cast<DType*>(w->data),
-                static_cast<DType*>(out->data),
-                static_cast<IdType*>(etype->data),
-                tot_num_rows,
-                k, n);
+                k_start, k, n);
         }
     });
 }
 
+/* \brief Implementation of GatherMM operator where input matrix A is sorted
+ * according to relation types. Each relation type calls cuBLAS GEMM operator
+ * sequentially.
+ */
 template <int XPU, typename IdType, int bits>
-void gatherMM_SortedEtype(const NDArray h,
-              const NDArray w,
-              NDArray out,
-              const NDArray H_per_rel,
-              const NDArray W_per_rel,
-              bool H_trans, bool W_trans) {
+void gatherMM_SortedEtype(const NDArray A,
+              const NDArray B,
+              NDArray C,
+              const NDArray A_dim1_per_rel,
+              const NDArray B_dim1_per_rel,
+              bool a_trans, bool b_trans) {
     SWITCH_BITS(bits, DType, {
-        auto device = runtime::DeviceAPI::Get(h->ctx);
-        assert(H_per_rel.NumElements() == W_per_rel.NumElements());
-        int64_t num_rel = H_per_rel.NumElements();
-        const DType *h_data = h.Ptr<DType>();
-        const DType *w_data = w.Ptr<DType>();
-        const IdType* H_per_rel_data = H_per_rel.Ptr<IdType>();
-        const IdType* W_per_rel_data = W_per_rel.Ptr<IdType>();
-        DType *out_data = out.Ptr<DType>();
-        int64_t h_offset = 0, w_offset = 0, out_offset = 0;
-        int64_t m, n, k, h_col, w_row;
+        auto device = runtime::DeviceAPI::Get(A->ctx);
+        assert(A_dim1_per_rel.NumElements() == B_dim1_per_rel.NumElements());
+        int64_t num_rel = A_dim1_per_rel.NumElements();
+        const DType *A_data = A.Ptr<DType>();
+        const DType *B_data = B.Ptr<DType>();
+        const IdType* A_rel_data = A_dim1_per_rel.Ptr<IdType>();
+        const IdType* B_rel_data = B_dim1_per_rel.Ptr<IdType>();
+        DType *C_data = C.Ptr<DType>();
+        int64_t A_offset = 0, B_offset = 0, C_offset = 0;
+        int64_t m, n, k;
         DType alpha = 1., beta = 0.;
 
         auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
@@ -317,29 +222,29 @@ void gatherMM_SortedEtype(const NDArray h,
             thr_entry->stream));
 
         for (int etype = 0; etype < num_rel; ++etype) {
-            assert((H_trans) ? H_per_rel_data[etype] : h->shape[1] ==  \
-                (W_trans) ? w->shape[1] : W_per_rel_data[etype]);
-            m = H_per_rel_data[etype];  // rows of A
-            n = w->shape[1];  // cols of B
-            k = W_per_rel_data[etype];  // rows of B == cols of A
+            assert((a_trans) ? A_rel_data[etype] : A->shape[1] ==  \
+                (b_trans) ? B->shape[1] : B_rel_data[etype]);
+            m = A_rel_data[etype];  // rows of A
+            n = B->shape[1];  // cols of B
+            k = B_rel_data[etype];  // rows of B == cols of A
 
-            DType* h_trans_data = nullptr;
-            DType* w_trans_data = nullptr;
-            if (H_trans) {
-                h_trans_data = static_cast<DType*>(device->AllocWorkspace \
-                    (h->ctx, m * k * sizeof(DType)));
-                _Transpose(thr_entry->cublas_handle, h_data + h_offset, h_trans_data, m, k);
+            DType* A_trans_data = nullptr;
+            DType* B_trans_data = nullptr;
+            if (a_trans) {
+                A_trans_data = static_cast<DType*>(device->AllocWorkspace \
+                    (A->ctx, m * k * sizeof(DType)));
+                _Transpose(thr_entry->cublas_handle, A_data + A_offset, A_trans_data, m, k);
             }
-            if (W_trans) {
-                w_trans_data = static_cast<DType*>(device->AllocWorkspace \
-                    (w->ctx, n * k * sizeof(DType)));
-                _Transpose(thr_entry->cublas_handle, w_data + w_offset, w_trans_data, k, n);
+            if (b_trans) {
+                B_trans_data = static_cast<DType*>(device->AllocWorkspace \
+                    (B->ctx, n * k * sizeof(DType)));
+                _Transpose(thr_entry->cublas_handle, B_data + B_offset, B_trans_data, k, n);
             }
-            if (H_trans || W_trans) {
+            if (a_trans || b_trans) {
                 int64_t tmp = k;
-                if (H_trans)
+                if (a_trans)
                     std::swap(m, k);
-                if (W_trans)  {
+                if (b_trans)  {
                     k = tmp;
                     std::swap(n, k);
                 }
@@ -351,60 +256,74 @@ void gatherMM_SortedEtype(const NDArray h,
                 CUBLAS_OP_N,
                 n, m, k,
                 &alpha,
-                (W_trans) ? w_trans_data : w_data + w_offset, n,
-                (H_trans) ? h_trans_data : h_data + h_offset, k,
+                (b_trans) ? B_trans_data : B_data + B_offset, n,
+                (a_trans) ? A_trans_data : A_data + A_offset, k,
                 &beta,
-                out_data + out_offset, n));
-            if (H_trans)
-                device->FreeWorkspace(h->ctx, h_trans_data);
-            if (W_trans)
-                device->FreeWorkspace(w->ctx, w_trans_data);
-            h_offset += m * k;
-            w_offset += k * n;
-            out_offset += m * n;
+                C_data + C_offset, n));
+            if (a_trans)
+                device->FreeWorkspace(A->ctx, A_trans_data);
+            if (b_trans)
+                device->FreeWorkspace(B->ctx, B_trans_data);
+            A_offset += m * k;
+            B_offset += k * n;
+            C_offset += m * n;
         }
     });
 }
 
+/*!
+ * \brief Implementation of Gather_mm operator. The input matrix A is
+ *        expected to be sorted according to relation type.
+ * \param A The input dense matrix of dimension m x k
+ * \param B The input dense matrix of dimension k x n
+ * \param C The output dense matrix od dimension m x n
+ * \param A_dim1_per_rel The number of rows in each relation in A
+ * \param B_dim1_per_rel The number of rows in each relation in B
+ * \param etype relation types of each edge. Required by *UnsortedEtype kernel
+ * \param sortedA Matrix A is sorted according to relation type or not
+ * \param a_trans Matrix A to be transposed
+ * \param b_trans Matrix B to be transposed
+ */
 template <int XPU, typename IdType, int bits>
-void gatherMM(const NDArray h,
-          const NDArray w,
-          NDArray out,
-          const NDArray H_per_rel,
-          const NDArray W_per_rel,
+void gatherMM(const NDArray A,
+          const NDArray B,
+          NDArray C,
+          const NDArray A_dim1_per_rel,
+          const NDArray B_dim1_per_rel,
           const NDArray etype,
-          bool sortedE, bool H_trans, bool W_trans) {
-    if (sortedE)  // similar to low-mem matmul
-        gatherMM_SortedEtype<XPU, IdType, bits>(h, w, out, H_per_rel,
-            W_per_rel, H_trans, W_trans);
-    else  // similar to bmm without copying w to edges
-        gatherMM_UnsortedEtype<XPU, IdType, bits>(h, w, out, H_per_rel, etype);
+          bool sortedA, bool a_trans, bool b_trans) {
+    if (sortedA)  // similar to low-mem matmul
+        gatherMM_SortedEtype<XPU, IdType, bits>(A, B, C, A_dim1_per_rel,
+            B_dim1_per_rel, a_trans, b_trans);
+    else  // similar to bmm (high-mem) without copying weights to edges
+        // TODO(Israt): Add support for B with different dimension 1 per relation
+        gatherMM_UnsortedEtype<XPU, IdType, bits>(A, B, C, A_dim1_per_rel, etype);
 }
 
 template void gatherMM<kDLGPU, int32_t, 16>(
-    const NDArray h, const NDArray w, NDArray out,
-    const NDArray H_per_rel, const NDArray W_per_rel,
-    const NDArray etype, bool sortedE, bool H_trans, bool W_trans);
+    const NDArray A, const NDArray B, NDArray C,
+    const NDArray A_dim1_per_rel, const NDArray B_dim1_per_rel,
+    const NDArray etype, bool sortedA, bool a_trans, bool b_trans);
 template void gatherMM<kDLGPU, int64_t, 16>(
-    const NDArray h, const NDArray w, NDArray out,
-    const NDArray H_per_rel, const NDArray W_per_rel,
-    const NDArray etype, bool sortedE, bool H_trans, bool W_trans);
+    const NDArray A, const NDArray B, NDArray C,
+    const NDArray A_dim1_per_rel, const NDArray B_dim1_per_rel,
+    const NDArray etype, bool sortedA, bool a_trans, bool b_trans);
 template void gatherMM<kDLGPU, int32_t, 32>(
-    const NDArray h, const NDArray w, NDArray out,
-    const NDArray H_per_rel, const NDArray W_per_rel,
-    const NDArray etype, bool sortedE, bool H_trans, bool W_trans);
+    const NDArray A, const NDArray B, NDArray C,
+    const NDArray A_dim1_per_rel, const NDArray B_dim1_per_rel,
+    const NDArray etype, bool sortedA, bool a_trans, bool b_trans);
 template void gatherMM<kDLGPU, int64_t, 32>(
-    const NDArray h, const NDArray w, NDArray out,
-    const NDArray H_per_rel, const NDArray W_per_rel,
-    const NDArray etype, bool sortedE, bool H_trans, bool W_trans);
+    const NDArray A, const NDArray B, NDArray C,
+    const NDArray A_dim1_per_rel, const NDArray B_dim1_per_rel,
+    const NDArray etype, bool sortedA, bool a_trans, bool b_trans);
 template void gatherMM<kDLGPU, int32_t, 64>(
-    const NDArray h, const NDArray w, NDArray out,
-    const NDArray H_per_rel, const NDArray W_per_rel,
-    const NDArray etype, bool sortedE, bool H_trans, bool W_trans);
+    const NDArray A, const NDArray B, NDArray C,
+    const NDArray A_dim1_per_rel, const NDArray B_dim1_per_rel,
+    const NDArray etype, bool sortedA, bool a_trans, bool b_trans);
 template void gatherMM<kDLGPU, int64_t, 64>(
-    const NDArray h, const NDArray w, NDArray out,
-    const NDArray H_per_rel, const NDArray W_per_rel,
-    const NDArray etype, bool sortedE, bool H_trans, bool W_trans);
+    const NDArray A, const NDArray B, NDArray C,
+    const NDArray A_dim1_per_rel, const NDArray B_dim1_per_rel,
+    const NDArray etype, bool sortedA, bool a_trans, bool b_trans);
 
 }  // namespace aten
 }  // namespace dgl

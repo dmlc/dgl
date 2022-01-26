@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2022 by Contributors
  * \file array/cpu/gather_mm.h
- * \brief SPMM CPU kernel function header.
+ * \brief GATHER_MM CPU kernel function header.
  */
 #ifndef DGL_ARRAY_CPU_GATHER_MM_H_
 #define DGL_ARRAY_CPU_GATHER_MM_H_
@@ -43,56 +43,66 @@ void matmul(const DType *A, const DType *B,
     }
 }
 
+/*!
+ * \brief CPU kernel of Gather_mm. The input matrix A is expected to be
+ *        sorted according to relation type.
+ * \param A The input dense matrix of dimension m x k
+ * \param B The input dense matrix of dimension k x n
+ * \param C The output dense matrix od dimension m x n
+ * \param A_dim1_per_rel The number of rows in each relation in A
+ * \param B_dim1_per_rel The number of rows in each relation in B
+ * \param a_trans Matrix A to be transposed
+ * \param b_trans Matrix B to be transposed
+ */
 template <int XPU, typename IdType, typename DType>
-void gatherMM_SortedEtype(const NDArray h,
-              const NDArray w,
-              NDArray out,
-              const NDArray h_per_rel,
-              const NDArray w_per_rel,
-              bool H_trans, bool W_trans) {
-    assert(h_per_rel.NumElements() == w_per_rel.NumElements());
-    int64_t num_rel = h_per_rel.NumElements();
-    const DType *h_data = h.Ptr<DType>();
-    DType *w_data = w.Ptr<DType>();
-    const IdType* h_per_rel_data = h_per_rel.Ptr<IdType>();
-    const IdType* w_per_rel_data = w_per_rel.Ptr<IdType>();
-    DType *out_data = out.Ptr<DType>();
+void gatherMM_SortedEtype(const NDArray A,
+              const NDArray B,
+              NDArray C,
+              const NDArray A_dim1_per_rel,
+              const NDArray B_dim1_per_rel,
+              bool a_trans, bool b_trans) {
+    assert(A_dim1_per_rel.NumElements() == B_dim1_per_rel.NumElements());
+    int64_t num_rel = A_dim1_per_rel.NumElements();
+    const DType *A_data = A.Ptr<DType>();
+    const DType *B_data = B.Ptr<DType>();
+    const IdType* A_rel_data = A_dim1_per_rel.Ptr<IdType>();
+    const IdType* B_rel_data = B_dim1_per_rel.Ptr<IdType>();
+    DType *C_data = C.Ptr<DType>();
 
-    int64_t h_offset = 0, w_offset = 0, out_offset = 0;
+    int64_t A_offset = 0, B_offset = 0, C_offset = 0;
     int64_t m, n, k, h_col, w_row;
     for (int etype = 0; etype < num_rel; ++etype) {
-        assert((H_trans) ? h_per_rel_data[etype] : h->shape[1] ==  \
-            (W_trans) ? w->shape[1] : w_per_rel_data[etype]);
-        m = h_per_rel_data[etype];  // rows of A
-        n = w->shape[1];  // cols of B
-        k = w_per_rel_data[etype];
+        assert((a_trans) ? A_rel_data[etype] : A->shape[1] ==  \
+            (b_trans) ? B->shape[1] : B_rel_data[etype]);
+        m = A_rel_data[etype];  // rows of A
+        n = B->shape[1];  // cols of B
+        k = B_rel_data[etype];  // rows of B == cols of A
 
-        NDArray h_trans, w_trans;  // = nullptr;
-
-        if (H_trans) {
-            h_trans = NDArray::Empty({m * k}, h->dtype, h->ctx);
-            transpose<DType>(h_data + h_offset, static_cast<DType *>(h_trans->data), m, k);
+        NDArray A_trans, B_trans;
+        if (a_trans) {
+            A_trans = NDArray::Empty({m * k}, A->dtype, A->ctx);
+            transpose<DType>(A_data + A_offset, static_cast<DType *>(A_trans->data), m, k);
         }
-        if (W_trans) {
-            w_trans = NDArray::Empty({k * n}, w->dtype, w->ctx);
-            transpose<DType>(w_data + w_offset, static_cast<DType *>(w_trans->data), k, n);
+        if (b_trans) {
+            B_trans = NDArray::Empty({k * n}, B->dtype, B->ctx);
+            transpose<DType>(B_data + B_offset, static_cast<DType *>(B_trans->data), k, n);
         }
-        if (H_trans || W_trans) {
+        if (a_trans || b_trans) {
             int64_t tmp = k;
-            if (H_trans)
+            if (a_trans)
                 std::swap(m, k);
-            if (W_trans) {
+            if (b_trans) {
                 k = tmp;
                 std::swap(n, k);
             }
         }
         matmul<DType>(
-            (H_trans) ? static_cast<DType *>(h_trans->data) : h_data + h_offset,
-            (W_trans) ? static_cast<DType *>(w_trans->data) : w_data + w_offset,
-            out_data + out_offset, m, n, k);
-        h_offset += m * k;
-        w_offset += k * n;
-        out_offset += m * n;
+            (a_trans) ? static_cast<DType *>(A_trans->data) : A_data + A_offset,
+            (b_trans) ? static_cast<DType *>(B_trans->data) : B_data + B_offset,
+            C_data + C_offset, m, n, k);
+        A_offset += m * k;
+        B_offset += k * n;
+        C_offset += m * n;
     }
 }
 

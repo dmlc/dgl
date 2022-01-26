@@ -22,46 +22,50 @@ namespace aten {
     }                                                           \
   } while (0)
 
-/*! \brief Generalized SDDMM on Coo format. */
+/*! \brief Generalized GatherMM. */
 template <int XPU, typename IdType, int bits>
-void gatherMM(const NDArray H,
-          const NDArray W,
-          NDArray out,
-          const NDArray H_per_rel,
-          const NDArray W_per_rel,
+void gatherMM(const NDArray A,
+          const NDArray B,
+          NDArray C,
+          const NDArray A_dim1_per_rel,
+          const NDArray B_dim1_per_rel,
           const NDArray etype,
-          bool sortedE, bool H_trans, bool W_trans) {
+          bool sortedA, bool a_trans, bool b_trans) {
     SWITCH_BITS(bits, DType, {
-        if (sortedE)  // similar to low-mem matmul
-            cpu::gatherMM_SortedEtype<XPU, IdType, DType>(H, W, out, H_per_rel,
-                W_per_rel, H_trans, W_trans);
+        if (sortedA) { // similar to low-mem matmul
+            cpu::gatherMM_SortedEtype<XPU, IdType, DType>(A, B, C, A_dim1_per_rel,
+                B_dim1_per_rel, a_trans, b_trans);
+        } else {
+            LOG(FATAL) << "Unsupported CPU kernel for GatherMM. Input A needs to \
+                be sorted.";
+        }
   });
 }
 
 template void gatherMM<kDLCPU, int32_t, 16>(
-    const NDArray h, const NDArray w, NDArray out,
-    const NDArray H_per_rel, const NDArray W_per_rel,
-    const NDArray etype, bool sortedE, bool H_trans, bool W_trans);
+    const NDArray A, const NDArray B, NDArray C,
+    const NDArray A_dim1_per_rel, const NDArray B_dim1_per_rel,
+    const NDArray etype, bool sortedA, bool a_trans, bool b_trans);
 template void gatherMM<kDLCPU, int64_t, 16>(
-    const NDArray h, const NDArray w, NDArray out,
-    const NDArray H_per_rel, const NDArray W_per_rel,
-    const NDArray etype, bool sortedE, bool H_trans, bool W_trans);
+    const NDArray A, const NDArray B, NDArray C,
+    const NDArray A_dim1_per_rel, const NDArray B_dim1_per_rel,
+    const NDArray etype, bool sortedA, bool a_trans, bool b_trans);
 template void gatherMM<kDLCPU, int32_t, 32>(
-    const NDArray h, const NDArray w, NDArray out,
-    const NDArray H_per_rel, const NDArray W_per_rel,
-    const NDArray etype, bool sortedE, bool H_trans, bool W_trans);
+    const NDArray A, const NDArray B, NDArray C,
+    const NDArray A_dim1_per_rel, const NDArray B_dim1_per_rel,
+    const NDArray etype, bool sortedA, bool a_trans, bool b_trans);
 template void gatherMM<kDLCPU, int64_t, 32>(
-    const NDArray h, const NDArray w, NDArray out,
-    const NDArray H_per_rel, const NDArray W_per_rel,
-    const NDArray etype, bool sortedE, bool H_trans, bool W_trans);
+    const NDArray A, const NDArray B, NDArray C,
+    const NDArray A_dim1_per_rel, const NDArray B_dim1_per_rel,
+    const NDArray etype, bool sortedA, bool a_trans, bool b_trans);
 template void gatherMM<kDLCPU, int32_t, 64>(
-    const NDArray h, const NDArray w, NDArray out,
-    const NDArray H_per_rel, const NDArray W_per_rel,
-    const NDArray etype, bool sortedE, bool H_trans, bool W_trans);
+    const NDArray A, const NDArray B, NDArray C,
+    const NDArray A_dim1_per_rel, const NDArray B_dim1_per_rel,
+    const NDArray etype, bool sortedA, bool a_trans, bool b_trans);
 template void gatherMM<kDLCPU, int64_t, 64>(
-    const NDArray h, const NDArray w, NDArray out,
-    const NDArray H_per_rel, const NDArray W_per_rel,
-    const NDArray etype, bool sortedE, bool H_trans, bool W_trans);
+    const NDArray A, const NDArray B, NDArray C,
+    const NDArray A_dim1_per_rel, const NDArray B_dim1_per_rel,
+    const NDArray etype, bool sortedA, bool a_trans, bool b_trans);
 
 }  // namespace aten
 }  // namespace dgl
