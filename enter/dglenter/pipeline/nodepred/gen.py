@@ -65,7 +65,7 @@ class NodepredPipeline(PipelineBase):
                 "device": device,
                 "data": {"name": data.name},
                 "model": {"name": model.value},
-                "general_pipeline": NodepredPipelineCfg()
+                "general_pipeline": {}
             }
             output_cfg = self.user_cfg_cls(**generated_cfg).dict()
             output_cfg = deep_convert_dict(output_cfg)
