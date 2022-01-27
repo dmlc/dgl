@@ -41,8 +41,10 @@ feat = np.memmap('feat.npy', mode='w+', shape=feat_np.shape, dtype='float32')
 print(feat.shape)
 feat[:] = feat_np
 graph.create_formats_()
-graph = dglnew.graph.OtherFeatureGraphStorage(graph,
-        ndata={'feat': dgl.storages.NumpyStorage(feat), 'label': labels})
+# Because NumpyStorage is registered with memmap, one can directly add numpy memmaps
+graph = dglnew.graph.OtherFeatureGraphStorage(graph, ndata={'feat': feat, 'label': labels})
+#graph = dglnew.graph.OtherFeatureGraphStorage(graph,
+#        ndata={'feat': dgl.storages.NumpyStorage(feat), 'label': labels})
 
 sampler = dgl.dataloading.NeighborSampler(
         [5, 5, 5], output_device='cpu', prefetch_node_feats=['feat'],
@@ -57,7 +59,6 @@ dataloader = dgl.dataloading.NodeDataLoader(
         drop_last=False,
         pin_memory=True,
         num_workers=4,
-        use_asyncio=True,
         use_prefetch_thread=True)       # TBD: could probably remove this argument
 
 model = SAGE(feat.shape[1], 256, dataset.num_classes).cuda()

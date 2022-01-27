@@ -1,56 +1,23 @@
 class GraphStorage(object):
     @property
-    def ntypes(self):
-        """The list of node types."""
-        pass
-
-    @property
     def ndata(self):
-        """Node data.
-
-        For graphs with one node type it's a dict whose keys are feature names and values are
-        either tensors or FeatureStorage objects.
-
-        For multiple node types it's a dict of dict.  The outer keys are feature names
-        and the inner keys are node type names:
-
-        .. code::
-
-           self.ndata[feature_name][ntype]
-        """
-        pass
-
-    # Required in Link Prediction
-    @property
-    def etypes(self):
-        """The list of edge types."""
-        pass
-
-    # Required in Link Prediction
-    @property
-    def canonical_etypes(self):
-        """The list of canonical edge types (triplets of "source node type", "edge type",
-        and "destination node type")."""
         pass
 
     @property
     def edata(self):
-        """Edge data.
-
-        For graphs with one edge type it's a dict whose keys are feature names and values are
-        either tensors or FeatureStorage objects.
-
-        For multiple edge types it's a dict of dict.  The outer keys are feature names
-        and the inner keys are canonical edge types or edge type names:
-
-        .. code::
-
-           self.edata[feature_name][etype]
-
-        Note that to maximize the compatibility with other DGL code it's better to support
-        both canonical edge types and edge type names as inner keys since users might use both.
-        """
         pass
+
+    # Required for checking whether a single dict is allowed for ndata and edata.
+    @property
+    def ntypes(self):
+        pass
+
+    @property
+    def canonical_etypes(self):
+        pass
+
+    def etypes(self):
+        return [etype[1] for etype in self.canonical_etypes]
 
     def sample_neighbors(self, seed_nodes, fanout, edge_dir='in', prob=None,
                          exclude_edges=None, replace=False, output_device=None):
@@ -179,3 +146,7 @@ class GraphStorage(object):
     def num_nodes(self, ntype):
         """Return the number of nodes for the given node type."""
         pass
+
+    def global_uniform_negative_sampling(self, num_samples, exclude_self_loops=True,
+                                         replace=False, etype=None):
+        """Per source negative sampling as in ``dgl.dataloading.GlobalUniform``"""

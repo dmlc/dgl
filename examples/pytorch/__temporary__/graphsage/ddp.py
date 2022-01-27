@@ -10,6 +10,8 @@ import time
 import numpy as np
 from ogb.nodeproppred import DglNodePropPredDataset
 
+USE_WRAPPER = True
+
 class SAGE(nn.Module):
     def __init__(self, in_feats, n_hidden, n_classes):
         super().__init__()
@@ -34,6 +36,9 @@ def train(rank, world_size, graph, num_classes, split_idx):
     dist.init_process_group('nccl', 'tcp://127.0.0.1:12347', world_size=world_size, rank=rank)
 
     train_idx, valid_idx, test_idx = split_idx['train'], split_idx['valid'], split_idx['test']
+    if USE_WRAPPER:
+        import dglnew
+        graph = dglnew.graph.wrapper.DGLGraphStorage(graph)
 
     sampler = dgl.dataloading.NeighborSampler(
             [5, 5, 5], output_device='cpu', prefetch_node_feats=['feat'],
@@ -48,7 +53,6 @@ def train(rank, world_size, graph, num_classes, split_idx):
             drop_last=False,
             pin_memory=True,
             num_workers=4,
-            use_asyncio=False,
             persistent_workers=True,
             use_ddp=True,
             use_prefetch_thread=True)       # TBD: could probably remove this argument
@@ -83,6 +87,7 @@ if __name__ == '__main__':
     dataset = DglNodePropPredDataset('ogbn-products')
     graph, labels = dataset[0]
     graph.ndata['label'] = labels
+    graph.create_formats_()
     split_idx = dataset.get_idx_split()
     num_classes = dataset.num_classes
     n_procs = 4

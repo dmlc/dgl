@@ -6,6 +6,25 @@ from ..transform import compact_graphs
 from ..frame import LazyFeature
 from ..utils import recursive_apply
 
+def _set_lazy_features(x, xdata, feature_names):
+    if not isinstance(feature_names, Mapping):
+        xdata.update({k: LazyFeature(k) for k in feature_names})
+    else:
+        for type_, names in feature_names.items():
+            x[type_].data.update({k: LazyFeature(k) for k in names})
+
+def set_node_lazy_features(g, feature_names):
+    return _set_lazy_features(g.nodes, g.ndata, feature_names)
+
+def set_edge_lazy_features(g, feature_names):
+    return _set_lazy_features(g.edges, g.edata, feature_names)
+
+def set_src_lazy_features(g, feature_names):
+    return _set_lazy_features(g.srcnodes, g.srcdata, feature_names)
+
+def set_dst_lazy_features(g, feature_names):
+    return _set_lazy_features(g.dstnodes, g.dstdata, feature_names)
+
 class BlockSampler(object):
     """BlockSampler is an abstract class assuming to take in a set of nodes whose
     outputs are to compute, and return a list of blocks.
@@ -49,10 +68,10 @@ class BlockSampler(object):
         #     for blocks, other_feat in dataloader:
         #         train_on(blocks, other_feat)
         input_nodes, output_nodes, blocks = result
-        blocks[0].srcdata.update({k: LazyFeature(k) for k in self.prefetch_node_feats})
-        blocks[-1].dstdata.update({k: LazyFeature(k) for k in self.prefetch_labels})
+        set_src_lazy_features(blocks[0], self.prefetch_node_feats)
+        set_dst_lazy_features(blocks[-1], self.prefetch_labels)
         for block in blocks:
-            block.edata.update({k: LazyFeature(k) for k in self.prefetch_edge_feats})
+            set_edge_lazy_features(block, self.prefetch_edge_feats)
         return input_nodes, output_nodes, blocks
 
     def sample(self, g, seed_nodes):
@@ -171,7 +190,7 @@ class EdgeBlockSampler(object):
     def _build_neg_graph(self, g, seed_edges):
         neg_srcdst = self.negative_sampler(g, seed_edges)
         if not isinstance(neg_srcdst, Mapping):
-            assert len(g.etypes) == 1, \
+            assert len(g.canonical_etypes) == 1, \
                 'graph has multiple or no edge types; '\
                 'please return a dict in negative sampler.'
             neg_srcdst = {g.canonical_etypes[0]: neg_srcdst}
@@ -187,10 +206,11 @@ class EdgeBlockSampler(object):
     def assign_lazy_features(self, result):
         pair_graph = result[1]
         blocks = result[-1]
-        blocks[0].srcdata.update({k: LazyFeature(k) for k in self.prefetch_node_feats})
-        pair_graph.edata.update({k: LazyFeature(k) for k in self.prefetch_labels})
+
+        set_src_lazy_features(blocks[0], self.prefetch_node_feats)
+        set_edge_lazy_features(pair_graph, self.prefetch_labels)
         for block in blocks:
-            block.edata.update({k: LazyFeature(k) for k in self.prefetch_edge_feats})
+            set_edge_lazy_features(block, self.prefetch_edge_feats)
         # In-place updates
         return result
 

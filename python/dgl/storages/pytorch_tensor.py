@@ -1,7 +1,7 @@
 from collections.abc import Mapping
 import torch
 from ..utils import recursive_apply, recursive_apply_pair
-from .base import FeatureStorage
+from .base import FeatureStorage, register_storage_wrapper
 
 def _fetch_cpu(indices, tensor, feature_shape, device, pin_memory):
     result = torch.empty(
@@ -14,6 +14,7 @@ def _fetch_cpu(indices, tensor, feature_shape, device, pin_memory):
 def _fetch_cuda(indices, tensor, device):
     return torch.index_select(tensor, 0, indices).to(device)
 
+@register_storage_wrapper(torch.Tensor)
 class TensorStorage(FeatureStorage):
     def __init__(self, tensor):
         self.tensor = tensor

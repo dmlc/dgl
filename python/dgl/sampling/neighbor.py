@@ -9,7 +9,8 @@ from ..base import DGLError, EID
 from ..heterograph import DGLHeteroGraph
 from .. import ndarray as nd
 from .. import utils, transform
-from ..utils import recursive_apply, recursive_apply_pair, EidExcluder
+from ..utils import recursive_apply, recursive_apply_pair
+from .utils import EidExcluder
 
 __all__ = [
     'sample_etype_neighbors',

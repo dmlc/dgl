@@ -8,6 +8,8 @@ import time
 import numpy as np
 from ogb.nodeproppred import DglNodePropPredDataset
 
+USE_WRAPPER = False
+
 class SAGE(nn.Module):
     def __init__(self, in_feats, n_hidden, n_classes):
         super().__init__()
@@ -31,6 +33,10 @@ graph, labels = dataset[0]
 graph.ndata['label'] = labels
 split_idx = dataset.get_idx_split()
 train_idx, valid_idx, test_idx = split_idx['train'], split_idx['valid'], split_idx['test']
+if USE_WRAPPER:
+    import dglnew
+    graph.create_formats_()
+    graph = dglnew.graph.wrapper.DGLGraphStorage(graph)
 
 sampler = dgl.dataloading.NeighborSampler(
         [5, 5, 5], output_device='cpu', prefetch_node_feats=['feat'],
@@ -44,8 +50,7 @@ dataloader = dgl.dataloading.NodeDataLoader(
         shuffle=True,
         drop_last=False,
         pin_memory=True,
-        num_workers=8,
-        use_asyncio=False,
+        num_workers=16,
         persistent_workers=True,
         use_prefetch_thread=True)       # TBD: could probably remove this argument
 

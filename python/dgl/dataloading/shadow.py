@@ -1,5 +1,5 @@
 from ..frame import LazyFeature
-from ..utils import EidExcluder
+from ..sampling.utils import EidExcluder
 
 class ShaDowKHopSampler(object):
     """ShaDow-GNN Sampler."""

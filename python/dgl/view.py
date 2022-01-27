@@ -68,11 +68,7 @@ class HeteroNodeDataView(MutableMapping):
 
     def __setitem__(self, key, val):
         if isinstance(val, LazyFeature):
-            if isinstance(self._ntid, list):
-                for ntid in self._ntid:
-                    self._graph._node_frames[ntid][key] = val
-            else:
-                self._graph._node_frames[self._ntid][key] = val
+            self._graph._node_frames[self._ntid][key] = val
         elif isinstance(self._ntype, list):
             assert isinstance(val, dict), \
                 'Current HeteroNodeDataView has multiple node types, ' \
@@ -186,12 +182,8 @@ class HeteroEdgeDataView(MutableMapping):
 
     def __setitem__(self, key, val):
         if isinstance(val, LazyFeature):
-            if isinstance(self._etid, list):
-                for etid in self._etid:
-                    self._graph._edge_frames[etid][key] = val
-            else:
-                self._graph._edge_frames[self._etid][key] = val
-        if isinstance(self._etype, list):
+            self._graph._edge_frames[self._etid][key] = val
+        elif isinstance(self._etype, list):
             assert isinstance(val, dict), \
                 'Current HeteroEdgeDataView has multiple edge types, ' \
                 'please pass the edge type and the corresponding data through a dict.'

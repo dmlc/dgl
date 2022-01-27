@@ -11,6 +11,8 @@ import numpy as np
 from ogb.nodeproppred import DglNodePropPredDataset
 import tqdm
 
+USE_WRAPPER = True
+
 class HeteroGAT(nn.Module):
     def __init__(self, etypes, in_feats, n_hidden, n_classes, n_heads=4):
         super().__init__()
@@ -50,13 +52,24 @@ graph = dgl.AddReverse()(graph)
 graph.update_all(fn.copy_u('feat', 'm'), fn.mean('m', 'feat'), etype='rev_writes')
 graph.update_all(fn.copy_u('feat', 'm'), fn.mean('m', 'feat'), etype='has_topic')
 graph.update_all(fn.copy_u('feat', 'm'), fn.mean('m', 'feat'), etype='affiliated_with')
+graph.edges['cites'].data['weight'] = torch.ones(graph.num_edges('cites'))  # dummy edge weights
+
+model = HeteroGAT(graph.etypes, graph.ndata['feat']['paper'].shape[1], 256, dataset.num_classes).cuda()
+opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
+
+if USE_WRAPPER:
+    import dglnew
+    graph.create_formats_()
+    graph = dglnew.graph.wrapper.DGLGraphStorage(graph)
 
 split_idx = dataset.get_idx_split()
 train_idx, valid_idx, test_idx = split_idx['train'], split_idx['valid'], split_idx['test']
 
 sampler = dgl.dataloading.NeighborSampler(
-        [5, 5, 5], output_device='cpu', prefetch_node_feats=['feat'],
-        prefetch_labels=['label'])
+        [5, 5, 5], output_device='cpu',
+        prefetch_node_feats={k: ['feat'] for k in graph.ntypes},
+        prefetch_labels={'paper': ['label']},
+        prefetch_edge_feats={'cites': ['weight']})
 dataloader = dgl.dataloading.NodeDataLoader(
         graph,
         train_idx,
@@ -67,12 +80,8 @@ dataloader = dgl.dataloading.NodeDataLoader(
         drop_last=False,
         pin_memory=True,
         num_workers=8,
-        use_asyncio=False,
         persistent_workers=True,
         use_prefetch_thread=True)       # TBD: could probably remove this argument
-
-model = HeteroGAT(graph.etypes, graph.ndata['feat']['paper'].shape[1], 256, dataset.num_classes).cuda()
-opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
 
 durations = []
 for _ in range(10):

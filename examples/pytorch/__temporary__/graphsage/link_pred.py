@@ -10,6 +10,8 @@ import numpy as np
 # (This is a long-standing issue)
 from ogb.nodeproppred import DglNodePropPredDataset
 
+USE_WRAPPER = True
+
 class SAGE(nn.Module):
     def __init__(self, in_feats, n_hidden, n_classes):
         super().__init__()
@@ -39,6 +41,10 @@ split_idx = dataset.get_idx_split()
 train_idx, valid_idx, test_idx = split_idx['train'], split_idx['valid'], split_idx['test']
 num_edges = graph.num_edges()
 train_eids = torch.arange(num_edges)
+if USE_WRAPPER:
+    import dglnew
+    graph.create_formats_()
+    graph = dglnew.graph.wrapper.DGLGraphStorage(graph)
 
 sampler = dgl.dataloading.NeighborSampler(
         [5, 5, 5], output_device='cpu', prefetch_node_feats=['feat'],
@@ -53,7 +59,6 @@ dataloader = dgl.dataloading.EdgeDataLoader(
         drop_last=False,
         pin_memory=True,
         num_workers=8,
-        use_asyncio=False,
         persistent_workers=True,
         use_prefetch_thread=True,       # TBD: could probably remove this argument
         exclude='reverse_id',

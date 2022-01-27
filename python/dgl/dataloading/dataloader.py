@@ -1,13 +1,12 @@
-from collections.abc import Mapping, Awaitable, Sequence
+from collections.abc import Mapping, Sequence
 from functools import partial
 from queue import Queue
 import itertools
 import threading
-import asyncio
+from distutils.version import LooseVersion
 import random
 import math
 import inspect
-from distutils.version import LooseVersion
 
 import torch
 import torch.distributed as dist
@@ -17,11 +16,10 @@ from ..base import NID, EID
 from ..heterograph import DGLHeteroGraph
 from .. import ndarray as nd
 from ..utils import (
-    recursive_apply, ExceptionWrapper, async_recursive_apply, recursive_apply_pair,
-    set_num_threads, create_shared_mem_array, get_shared_mem_array)
+    recursive_apply, ExceptionWrapper, recursive_apply_pair, set_num_threads,
+    create_shared_mem_array, get_shared_mem_array)
 from ..frame import Column, LazyFeature
-from .asyncio_wrapper import AsyncIO
-from ..storages import TensorStorage, FeatureStorage
+from ..storages import TensorStorage, FeatureStorage, storage_wrappers
 from .base import BlockSampler, EdgeBlockSampler
 from .. import backend as F
 
@@ -100,11 +98,12 @@ class TensorizedDataset(torch.utils.data.IterableDataset):
     By default, using PyTorch's TensorDataset will return a list of scalar tensors
     which would introduce a lot of overhead, especially on GPU.
     """
-    def __init__(self, indices, keys, batch_size, drop_last):
+    def __init__(self, indices, batch_size, drop_last):
         if isinstance(indices, Mapping):
+            self._mapping_keys = list(indices.keys())
             self._device = next(iter(indices.values())).device
-            self._tensor_dataset = _get_id_tensor_from_mapping(indices, self._device, keys)
-            self._mapping_keys = keys
+            self._tensor_dataset = _get_id_tensor_from_mapping(
+                indices, self._device, self._mapping_keys)
         else:
             self._tensor_dataset = indices
             self._device = indices.device
@@ -134,7 +133,12 @@ def _generate_shared_mem_name_id():
     raise DGLError('Unable to generate a shared memory array')
 
 class DDPTensorizedDataset(torch.utils.data.IterableDataset):
-    def __init__(self, indices, keys, batch_size, drop_last, ddp_seed):
+    def __init__(self, indices, batch_size, drop_last, ddp_seed):
+        if isinstance(indices, Mapping):
+            self._mapping_keys = list(indices.keys())
+        else:
+            self._mapping_keys = None
+
         self.rank = dist.get_rank()
         self.num_replicas = dist.get_world_size()
         self.seed = ddp_seed
@@ -158,7 +162,7 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
             name, id_ = _generate_shared_mem_name_id()
             if isinstance(indices, Mapping):
                 device = next(iter(indices.values())).device
-                id_tensor = _get_id_tensor_from_mapping(indices, device, keys)
+                id_tensor = _get_id_tensor_from_mapping(indices, device, self._mapping_keys)
                 self._tensor_dataset = create_shared_mem_array(
                     name, (self.shared_mem_size, 2), torch.int64)
                 self._tensor_dataset[:id_tensor.shape[0], :] = id_tensor
@@ -187,11 +191,6 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
             self._tensor_dataset = indices_shared
             self._device = indices_shared.device
 
-        if isinstance(indices, Mapping):
-            self._mapping_keys = keys
-        else:
-            self._mapping_keys = None
-
     def shuffle(self):
         # Only rank 0 does the actual shuffling.  The other ranks wait for it.
         if self.rank == 0:
@@ -211,15 +210,7 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
             dataset, self.batch_size, self.drop_last, self._mapping_keys)
 
 
-def _prefetch_for_column(id_, use_asyncio, storage, device, pin_memory):
-    if use_asyncio:
-        return asyncio.create_task(storage.async_fetch(id_, device, pin_memory=pin_memory))
-    else:
-        return storage.fetch(id_, device, pin_memory=pin_memory)
-
-
-def _prefetch_update_feats(
-        feats, frames, types, storages, id_name, use_asyncio, device, pin_memory):
+def _prefetch_update_feats(feats, frames, types, storages, id_name, device, pin_memory):
     for tid, frame in enumerate(frames):
         type_ = types[tid]
         default_id = frame.get(id_name, None)
@@ -231,10 +222,8 @@ def _prefetch_update_feats(
                     raise DGLError(
                         'Found a LazyFeature with no ID specified, '
                         'and the graph does not have dgl.NID or dgl.EID columns')
-                if (type_, parent_key) in storages:
-                    feats[tid, key] = _prefetch_for_column(
-                        column.id_ or default_id, use_asyncio, storages[type_, parent_key],
-                        device, pin_memory)
+                feats[tid, key] = storages[parent_key][type_].fetch(
+                    column.id_ or default_id, device, pin_memory)
 
 
 # This class exists to avoid recursion into the feature dictionary returned by the
@@ -251,11 +240,11 @@ def _prefetch_for_subgraph(subg, dataloader):
 
     node_feats, edge_feats = {}, {}
     _prefetch_update_feats(
-        node_feats, subg._node_frames, subg.ntypes, dataloader.node_data,
-        NID, dataloader.use_asyncio, dataloader.device, dataloader.pin_memory)
+        node_feats, subg._node_frames, subg.ntypes, dataloader.node_storages,
+        NID, dataloader.device, dataloader.pin_memory)
     _prefetch_update_feats(
-        edge_feats, subg._edge_frames, subg.canonical_etypes, dataloader.edge_data,
-        EID, dataloader.use_asyncio, dataloader.device, dataloader.pin_memory)
+        edge_feats, subg._edge_frames, subg.canonical_etypes, dataloader.edge_storages,
+        EID, dataloader.device, dataloader.pin_memory)
     return _PrefetchedGraphFeatures(node_feats, edge_feats)
 
 
@@ -263,11 +252,21 @@ def _prefetch_for(item, dataloader):
     if isinstance(item, DGLHeteroGraph):
         return _prefetch_for_subgraph(item, dataloader)
     elif isinstance(item, LazyFeature):
-        return _prefetch_for_column(
-            item.id_, dataloader.use_asyncio, dataloader.other_data[item.name],
-            dataloader.device, dataloader.pin_memory)
+        return dataloader.other_storages[item.name].fetch(
+            item.id_, dataloader.device, dataloader.pin_memory)
     else:
         return None
+
+
+def _await_or_return(x):
+    if hasattr(x, 'wait'):
+        return x.wait()
+    elif isinstance(x, _PrefetchedGraphFeatures):
+        node_feats = recursive_apply(x.node_feats, _await_or_return)
+        edge_feats = recursive_apply(x.edge_feats, _await_or_return)
+        return _PrefetchedGraphFeatures(node_feats, edge_feats)
+    else:
+        return x
 
 
 def _prefetch(batch, dataloader, stream):
@@ -277,26 +276,12 @@ def _prefetch(batch, dataloader, stream):
     #     tensors or futures.
     # (2) each LazyFeature object is replaced with a tensor or future.
     # (3) everything else are replaced with None.
+    #
+    # Once the futures are fetched, this function waits for them to complete by
+    # calling its wait() method.
     with torch.cuda.stream(stream):
         feats = recursive_apply(batch, _prefetch_for, dataloader)
-    return feats
-
-
-async def _await_or_return(x):
-    if isinstance(x, Awaitable):
-        return await x
-    elif isinstance(x, _PrefetchedGraphFeatures):
-        node_feats = await async_recursive_apply(x.node_feats, _await_or_return)
-        edge_feats = await async_recursive_apply(x.edge_feats, _await_or_return)
-        return _PrefetchedGraphFeatures(node_feats, edge_feats)
-    else:
-        return x
-
-
-async def _async_prefetch(batch, dataloader, stream):
-    with torch.cuda.stream(stream):
-        feats = _prefetch(batch, dataloader, stream)
-        feats = await async_recursive_apply(feats, _await_or_return)
+        feats = recursive_apply(feats, _await_or_return)
     return feats
 
 
@@ -317,7 +302,6 @@ def _assign_for(item, feat):
 
 
 def _prefetcher_entry(dataloader_it, dataloader, queue, num_threads, use_alternate_streams):
-    use_asyncio = dataloader.use_asyncio
     # PyTorch will set the number of threads to 1 which slows down pin_memory() calls
     # in main process if a prefetching thread is created.
     if num_threads is not None:
@@ -332,10 +316,7 @@ def _prefetcher_entry(dataloader_it, dataloader, queue, num_threads, use_alterna
     try:
         for batch in dataloader_it:
             batch = recursive_apply(batch, restore_parent_storage_columns, dataloader.graph)
-            if use_asyncio:
-                feats = AsyncIO().run(_async_prefetch(batch, dataloader, stream))
-            else:
-                feats = _prefetch(batch, dataloader, stream)
+            feats = _prefetch(batch, dataloader, stream)
 
             queue.put((
                 # batch will be already in pinned memory as per the behavior of
@@ -423,10 +404,7 @@ class _PrefetchingIter(object):
             stream = torch.cuda.Stream(device=device) if device.type == 'cuda' else None
         else:
             stream = None
-        if self.dataloader.use_asyncio:
-            feats = AsyncIO().run(_async_prefetch(batch, self.dataloader, stream))
-        else:
-            feats = _prefetch(batch, self.dataloader, stream)
+        feats = _prefetch(batch, self.dataloader, stream)
         batch = recursive_apply(batch, lambda x: x.to(device, non_blocking=True))
         stream_event = stream.record_event() if stream is not None else None
         return batch, feats, stream_event
@@ -471,8 +449,10 @@ class WorkerInitWrapper(object):
 
 
 def _wrap_storage(storage):
-    if torch.is_tensor(storage):
-        return TensorStorage(storage)
+    for type_, storage_cls in storage_wrappers.items():
+        if isinstance(storage, type_):
+            return storage_cls(storage)
+
     assert isinstance(storage, FeatureStorage), (
         "The frame column must be a tensor or a FeatureStorage object, got {}"
         .format(type(storage)))
@@ -484,39 +464,38 @@ def _wrap_storage(storage):
 def _prepare_storages_from_graph(graph, attr, types):
     storages = {}
     for key, value in getattr(graph, attr).items():
+        storages[key] = {}
         if not isinstance(value, Mapping):
             assert len(types) == 1, "Expect a dict in {} if multiple types exist".format(attr)
-            storages[types[0], key] = _wrap_storage(value)
+            storages[key][types[0]] = _wrap_storage(value)
         else:
             for type_, v in value.items():
-                storages[type_, key] = _wrap_storage(v)
+                storages[key][type_] = _wrap_storage(v)
     return storages
 
 
-def create_tensorized_dataset(indices, keys, batch_size, drop_last, use_ddp, ddp_seed):
+def create_tensorized_dataset(indices, batch_size, drop_last, use_ddp, ddp_seed):
     if use_ddp:
-        return DDPTensorizedDataset(indices, keys, batch_size, drop_last, ddp_seed)
+        return DDPTensorizedDataset(indices, batch_size, drop_last, ddp_seed)
     else:
-        return TensorizedDataset(indices, keys, batch_size, drop_last)
+        return TensorizedDataset(indices, batch_size, drop_last)
 
 
 class DataLoader(torch.utils.data.DataLoader):
     def __init__(self, graph, indices, graph_sampler, device='cpu', use_ddp=False,
                  ddp_seed=0, batch_size=1, drop_last=False, shuffle=False,
-                 use_asyncio=False, use_prefetch_thread=False, use_alternate_streams=True,
-                 **kwargs):
+                 use_prefetch_thread=False, use_alternate_streams=True, **kwargs):
         self.graph = graph
         if (torch.is_tensor(indices) or (
                 isinstance(indices, Mapping) and
                 all(torch.is_tensor(v) for v in indices.values()))):
             self.dataset = create_tensorized_dataset(
-                indices, graph.ntypes, batch_size, drop_last, use_ddp, ddp_seed)
+                indices, batch_size, drop_last, use_ddp, ddp_seed)
         else:
             self.dataset = indices
         self.ddp_seed = ddp_seed
         self._shuffle_dataset = shuffle
         self.graph_sampler = graph_sampler
-        self.use_asyncio = use_asyncio
         self.device = torch.device(device)
         self.use_alternate_streams = use_alternate_streams
         if self.device.type == 'cuda' and self.device.index is None:
@@ -528,9 +507,9 @@ class DataLoader(torch.utils.data.DataLoader):
         if kwargs.get('num_workers', 0) > 0 and hasattr(self.graph, 'create_formats_'):
             self.graph.create_formats_()
 
-        self.node_data = _prepare_storages_from_graph(graph, 'ndata', graph.ntypes)
-        self.edge_data = _prepare_storages_from_graph(graph, 'edata', graph.canonical_etypes)
-        self.other_data = {}
+        self.node_storages = _prepare_storages_from_graph(graph, 'ndata', graph.ntypes)
+        self.edge_storages = _prepare_storages_from_graph(graph, 'edata', graph.canonical_etypes)
+        self.other_storages = {}
 
         super().__init__(
             self.dataset,
@@ -550,8 +529,8 @@ class DataLoader(torch.utils.data.DataLoader):
             use_alternate_streams=self.use_alternate_streams, num_threads=num_threads)
 
     # To allow data other than node/edge data to be prefetched.
-    def attach_data(self, name, storage):
-        self.other_data[name] = _wrap_storage(storage)
+    def attach_data(self, name, data):
+        self.other_storages[name] = _wrap_storage(storage)
 
 
 # Alias
@@ -562,7 +541,7 @@ class NodeDataLoader(DataLoader):
 class EdgeDataLoader(DataLoader):
     def __init__(self, graph, indices, graph_sampler, device='cpu', use_ddp=False,
                  ddp_seed=0, batch_size=1, drop_last=False, shuffle=False,
-                 use_asyncio=False, use_prefetch_thread=False, use_alternate_streams=True,
+                 use_prefetch_thread=False, use_alternate_streams=True,
                  exclude=None, reverse_eids=None, reverse_etypes=None, negative_sampler=None,
                  **kwargs):
         if isinstance(graph_sampler, BlockSampler):
@@ -572,7 +551,7 @@ class EdgeDataLoader(DataLoader):
 
         super().__init__(
             graph, indices, graph_sampler, device=device, use_ddp=use_ddp, ddp_seed=ddp_seed,
-            batch_size=batch_size, drop_last=drop_last, shuffle=shuffle, use_asyncio=use_asyncio,
+            batch_size=batch_size, drop_last=drop_last, shuffle=shuffle,
             use_prefetch_thread=use_prefetch_thread, use_alternate_streams=use_alternate_streams,
             **kwargs)
 
@@ -640,7 +619,7 @@ class GraphCollator(object):
         """
         elem = items[0]
         elem_type = type(elem)
-        if isinstance(elem, DGLGraph):
+        if isinstance(elem, DGLHeteroGraph):
             batched_graphs = batch(items)
             return batched_graphs
         elif F.is_tensor(elem):
