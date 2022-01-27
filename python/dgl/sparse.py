@@ -328,26 +328,47 @@ def _gspmm_hetero(gidx, op, reduce_op, u_len, u_and_e_tuple):
     return out, (list_arg_u, list_arg_e, list_arg_u_ntype, list_arg_e_etype)
 
 
-def _gather_mm(h, w, out, h_per_rel, w_per_rel, etypes, sortedE):
-    _CAPI_DGLKernelGATHERMM(to_dgl_nd(h),
-                            to_dgl_nd(w),
-                            to_dgl_nd_for_write(out),
-                            to_dgl_nd(h_per_rel),
-                            to_dgl_nd(w_per_rel),
-                            to_dgl_nd(etypes),
-                            sortedE, False, False)
-    return out
+def _gather_mm(h, w, out, h_per_rel, w_per_rel, etypes, sortedE=True,
+               h_trans=False, w_trans=False):
+    r""" Generalized Dense Matrix Multiplication interface. It multiplies
+    tensor h and w according to relation types and outputs in out. w is a
+    concatenated tensor across relation types. If sortedE is True which
+    means h is sorted according to relation types, h is also a concatenated
+    across relation types. Otherwise, h is unsorted and the relation type
+    is fetched from param etypes.
 
-
-def _gather_mm_scatter(h, w, out, h_per_rel, w_per_rel, etypes, sortedE,
-                       h_trans=False, w_trans=False):
-    _CAPI_DGLKernelGATHERMM(to_dgl_nd(h),
+    Parameters
+    ----------
+    h : tensor
+        The input dense matrix.
+    w : tensor
+        The input dense matrix.
+    out : tensor
+        The output dense matrix.
+    h_per_rel : tensor
+        The first dimensions of h matrix for each relation type
+    w_per_rel : tensor
+        The first dimensions of w matrix for each relation type
+    etypes : tensor
+        The etype ID for each edge. Has a length of |E|.
+    sortedE : bool
+        Indicates whether matrix h is sorted accoring to relation type
+    h_trans : bool
+        Indicates whether matrix h needs to be tranposed
+    w_trans : bool
+        Indicates whether matrix h needs to be tranposed
+    """
+    if F.context(h).type == 'cuda:0':
+        _CAPI_DGLKernelGATHERMM(to_dgl_nd(h),
                             to_dgl_nd(w),
                             to_dgl_nd_for_write(out),
                             to_dgl_nd(h_per_rel),
                             to_dgl_nd(w_per_rel),
                             to_dgl_nd(etypes),
                             sortedE, h_trans, w_trans)
+    else:
+        # TODO(Israt): Which file should have the implementation of gatherMM using PyTorch?
+        raise DGLError("For CPU use PyTorch's matmul operator")
     return out
 
 
