@@ -788,6 +788,11 @@ def test_gin_conv(g, idtype, aggregator_type):
     th.save(gin, tmp_buffer)
 
     assert h.shape == (g.number_of_dst_nodes(), 12)
+    
+    gin = nn.GINConv(None, aggregator_type)
+    th.save(gin, tmp_buffer)
+    gin = gin.to(ctx)
+    h = gin(g, feat)
 
 @parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['bipartite'], exclude=['zero-degree']))
