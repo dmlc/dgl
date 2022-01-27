@@ -1013,6 +1013,60 @@ def test_csvdataset():
     _test_DGLCSVDataset_multiple()
     _test_DGLCSVDataset_customized_data_parser()
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
+def test_add_nodepred_split():
+    dataset = data.AmazonCoBuyComputerDataset()
+    print('train_mask' in dataset[0].ndata)
+    data.utils.add_nodepred_split(dataset, [0.8, 0.1, 0.1])
+    assert 'train_mask' in dataset[0].ndata
+
+    dataset = data.AIFBDataset()
+    print('train_mask' in dataset[0].nodes['Publikationen'].data)
+    data.utils.add_nodepred_split(dataset, [0.8, 0.1, 0.1], ntype='Publikationen')
+    assert 'train_mask' in dataset[0].nodes['Publikationen'].data
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
+def test_as_nodepred1():
+    ds = data.AmazonCoBuyComputerDataset()
+    print('train_mask' in ds[0].ndata)
+    new_ds = data.AsNodePredDataset(ds, [0.8, 0.1, 0.1], verbose=True)
+    assert len(new_ds) == 1
+    assert new_ds[0].num_nodes() == ds[0].num_nodes()
+    assert new_ds[0].num_edges() == ds[0].num_edges()
+    assert 'train_mask' in new_ds[0].ndata
+
+    ds = data.AIFBDataset()
+    print('train_mask' in ds[0].nodes['Publikationen'].data)
+    new_ds = data.AsNodePredDataset(ds, [0.8, 0.1, 0.1], 'Publikationen', verbose=True)
+    assert len(new_ds) == 1
+    assert new_ds[0].ntypes == ds[0].ntypes
+    assert new_ds[0].canonical_etypes == ds[0].canonical_etypes
+    assert 'train_mask' in new_ds[0].nodes['Publikationen'].data
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
+def test_as_nodepred1():
+    # test proper reprocessing
+
+    # create
+    ds = data.AsNodePredDataset(data.AmazonCoBuyComputerDataset(), [0.8, 0.1, 0.1])
+    assert ds[0].ndata['train_mask'].sum() == int(ds[0].num_nodes() * 0.8)
+    # read from cache
+    ds = data.AsNodePredDataset(data.AmazonCoBuyComputerDataset(), [0.8, 0.1, 0.1])
+    assert ds[0].ndata['train_mask'].sum() == int(ds[0].num_nodes() * 0.8)
+    # invalid cache, re-read
+    ds = data.AsNodePredDataset(data.AmazonCoBuyComputerDataset(), [0.1, 0.1, 0.8])
+    assert ds[0].ndata['train_mask'].sum() == int(ds[0].num_nodes() * 0.1)
+
+    # create
+    ds = data.AsNodePredDataset(data.AIFBDataset(), [0.8, 0.1, 0.1], ntype='Publikationen')
+    assert ds[0].nodes['Publikationen'].data['train_mask'].sum() == int(ds[0].num_nodes('Publikationen') * 0.8)
+    # read from cache
+    ds = data.AsNodePredDataset(data.AIFBDataset(), [0.8, 0.1, 0.1], ntype='Publikationen')
+    assert ds[0].nodes['Publikationen'].data['train_mask'].sum() == int(ds[0].num_nodes('Publikationen') * 0.8)
+    # invalid cache, re-read
+    ds = data.AsNodePredDataset(data.AIFBDataset(), [0.8, 0.1, 0.1], ntype='Forschungsgebiete')
+    assert 'train_mask' not in ds[0].nodes['Forschungsgebiete'].ndata
+    assert ds[0].nodes['Forschungsgebiete'].data['train_mask'].sum() == int(ds[0].num_nodes('Forschungsgebiete') * 0.8)
 
 if __name__ == '__main__':
     test_minigc()
@@ -1023,3 +1077,6 @@ if __name__ == '__main__':
     test_fakenews()
     test_extract_archive()
     test_csvdataset()
+    test_add_nodepred_split()
+    test_as_nodepred1()
+    test_as_nodepred2()

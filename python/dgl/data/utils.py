@@ -19,8 +19,10 @@ from .tensor_serialize import save_tensors, load_tensors
 from .. import backend as F
 
 __all__ = ['loadtxt','download', 'check_sha1', 'extract_archive',
-           'get_download_dir', 'Subset', 'split_dataset',
-           'save_graphs', "load_graphs", "load_labels", "save_tensors", "load_tensors"]
+        'get_download_dir', 'Subset', 'split_dataset', 'save_graphs',
+        'load_graphs', 'load_labels', 'save_tensors', 'load_tensors',
+        'add_nodepred_split',
+]
 
 def loadtxt(path, delimiter, dtype=None):
     try:
@@ -351,3 +353,45 @@ class Subset(object):
             Number of datapoints in the subset
         """
         return len(self.indices)
+
+def add_nodepred_split(dataset, ratio, ntype=None):
+    """Split the given dataset into training, validation and test sets for
+    transductive node predction task.
+
+    It adds three node mask arrays ``'train_mask'``, ``'val_mask'`` and ``'test_mask'``,
+    to each graph in the dataset. Each sample in the dataset thus must be a :class:`DGLGraph`.
+
+    Fix the random seed of the backend framework in-use to make the result deterministic.
+
+    Parameters
+    ----------
+    dataset : DGLDataset
+        The dataset to modify.
+    ratio : (float, float, float)
+        Split ratios for training, validation and test sets. Must sum to one.
+    ntype : str, optional
+        The node type to add mask for.
+
+    Examples
+    --------
+    >>> dataset = dgl.data.AmazonCoBuyComputerDataset()
+    >>> print('train_mask' in dataset[0].ndata)
+    False
+    >>> dgl.data.utils.add_nodepred_split(dataset, [0.8, 0.1, 0.1])
+    >>> print('train_mask' in dataset[0].ndata)
+    True
+    """
+    for i in range(len(dataset)):
+        g = dataset[i]
+        n = g.num_nodes(ntype)
+        idx = F.rand_shuffle(F.arange(0, n, dtype=g.idtype))
+        train_mask = F.full_1d(n, False, F.bool, F.cpu())
+        val_mask = F.full_1d(n, False, F.bool, F.cpu())
+        test_mask = F.full_1d(n, False, F.bool, F.cpu())
+        n_train, n_val, n_test = int(n * ratio[0]), int(n * ratio[1]), int(n * ratio[2])
+        train_mask[idx[:n_train]] = True
+        val_mask[idx[n_train:n_train + n_val]] = True
+        test_mask[idx[n_train + n_val:]] =  True
+        g.nodes[ntype].data['train_mask'] = train_mask
+        g.nodes[ntype].data['val_mask'] = val_mask
+        g.nodes[ntype].data['test_mask'] = test_mask
