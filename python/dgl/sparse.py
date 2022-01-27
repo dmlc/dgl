@@ -328,44 +328,44 @@ def _gspmm_hetero(gidx, op, reduce_op, u_len, u_and_e_tuple):
     return out, (list_arg_u, list_arg_e, list_arg_u_ntype, list_arg_e_etype)
 
 
-def _gather_mm(h, w, out, h_per_rel, w_per_rel, etypes, sortedE=True,
-               h_trans=False, w_trans=False):
+def _gather_mm(A, B, out, A_per_rel, B_per_rel, etypes, sortedE=True,
+               A_trans=False, B_trans=False):
     r""" Generalized Dense Matrix Multiplication interface. It multiplies
-    tensor h and w according to relation types and outputs in out. w is a
+    tensor A and B according to relation types and outputs in out. B is a
     concatenated tensor across relation types. If sortedE is True which
-    means h is sorted according to relation types, h is also a concatenated
-    across relation types. Otherwise, h is unsorted and the relation type
+    means A is sorted according to relation types, A is also a concatenated
+    across relation types. Otherwise, A is unsorted and the relation type
     is fetched from param etypes.
 
     Parameters
     ----------
-    h : tensor
+    A : tensor
         The input dense matrix.
-    w : tensor
+    B : tensor
         The input dense matrix.
     out : tensor
         The output dense matrix.
-    h_per_rel : tensor
-        The first dimensions of h matrix for each relation type
-    w_per_rel : tensor
-        The first dimensions of w matrix for each relation type
+    A_per_rel : tensor
+        The first dimensions of A matrix for each relation type
+    B_per_rel : tensor
+        The first dimensions of B matrix for each relation type
     etypes : tensor
         The etype ID for each edge. Has a length of |E|.
     sortedE : bool
-        Indicates whether matrix h is sorted accoring to relation type
-    h_trans : bool
-        Indicates whether matrix h needs to be tranposed
-    w_trans : bool
-        Indicates whether matrix h needs to be tranposed
+        Indicates whether matrix A is sorted accoring to relation type
+    A_trans : bool
+        Indicates whether matrix A needs to be tranposed
+    B_trans : bool
+        Indicates whether matrix B needs to be tranposed
     """
-    if F.context(h).type == 'cuda:0':
-        _CAPI_DGLKernelGATHERMM(to_dgl_nd(h),
-                            to_dgl_nd(w),
-                            to_dgl_nd_for_write(out),
-                            to_dgl_nd(h_per_rel),
-                            to_dgl_nd(w_per_rel),
-                            to_dgl_nd(etypes),
-                            sortedE, h_trans, w_trans)
+    if F.context(A).type == 'cuda':
+        _CAPI_DGLKernelGATHERMM(to_dgl_nd(A),
+                                to_dgl_nd(B),
+                                to_dgl_nd_for_write(out),
+                                to_dgl_nd(A_per_rel),
+                                to_dgl_nd(B_per_rel),
+                                to_dgl_nd(etypes),
+                                sortedE, A_trans, B_trans)
     else:
         # TODO(Israt): Which file should have the implementation of gatherMM using PyTorch?
         raise DGLError("For CPU use PyTorch's matmul operator")
