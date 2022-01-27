@@ -17,19 +17,14 @@ def _fetch_cuda(indices, tensor, device):
 class TensorStorage(FeatureStorage):
     def __init__(self, tensor):
         self.tensor = tensor
-        self.feature_shape = recursive_apply(tensor, lambda x: x.shape[1:])
-        if isinstance(tensor, Mapping):
-            self.is_cuda = (next(iter(tensor.values())).device.type == 'cuda')
-        else:
-            self.is_cuda = (tensor.device.type == 'cuda')
+        self.feature_shape = tensor.shape[1:]
+        self.is_cuda = (tensor.device.type == 'cuda')
 
     def fetch(self, indices, device, pin_memory=False):
         device = torch.device(device)
         if not self.is_cuda:
             # CPU to CPU or CUDA - use pin_memory and async transfer if possible
-            return recursive_apply_pair(
-                indices, self.tensor, _fetch_cpu, self.feature_shape, device, pin_memory)
+            return _fetch_cpu(indices, self.tensor, self.feature_shape, device, pin_memory)
         else:
             # CUDA to CUDA or CPU
-            return recursive_apply_pair(
-                indices, self.tensor, _fetch_cuda, device)
+            return _fetch_cuda(indices, self.tensor, device)
