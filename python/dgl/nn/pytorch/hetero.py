@@ -312,6 +312,7 @@ class HeteroLinearLayer(nn.Module):
             Transformed node features.
         """
         feat = th.tensor([])
+        feat = feat.to(hg.ndata[self.feat_name][hg.ntypes[0]].device)
         for ntype in hg.ntypes:
             features = self.linears[ntype](hg.nodes[ntype].data[self.feat_name])
             feat = th.cat((feat, features))
