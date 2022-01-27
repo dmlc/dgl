@@ -3,8 +3,6 @@
 from setuptools import find_packages
 from distutils.core import setup
 
-print(find_packages())
-
 setup(name='dglenter',
       version='0.0.1',
       description='DGL',
