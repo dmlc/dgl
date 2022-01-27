@@ -154,6 +154,8 @@ class DistDataLoader:
         else:
             end_pos = self.current_pos + self.batch_size
         idx = self.data_idx[self.current_pos:end_pos].tolist()
-        ret = [self.dataset[i] for i in idx]
+        # Construct new tensor to avoid reference to original data which
+        # may cause error when sharing between processes.
+        ret = F.tensor([self.dataset[i] for i in idx])
         self.current_pos = end_pos
         return ret
