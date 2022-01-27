@@ -9,35 +9,11 @@ import unittest
 from dgl.graph_index import create_graph_index
 import multiprocessing as mp
 from numpy.testing import assert_array_equal
+from utils import generate_ip_config, reset_envs
 
 if os.name != 'nt':
     import fcntl
     import struct
-
-def get_local_usable_addr():
-    """Get local usable IP and port
-
-    Returns
-    -------
-    str
-        IP address, e.g., '192.168.8.12:50051'
-    """
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        # doesn't even have to be reachable
-        sock.connect(('10.255.255.255', 1))
-        ip_addr = sock.getsockname()[0]
-    except ValueError:
-        ip_addr = '127.0.0.1'
-    finally:
-        sock.close()
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.bind(("", 0))
-    sock.listen(1)
-    port = sock.getsockname()[1]
-    sock.close()
-
-    return ip_addr + ' ' + str(port)
 
 # Create an one-part Graph
 node_map = F.tensor([0,0,0,0,0,0], F.int64)
@@ -296,12 +272,10 @@ def start_client_mul_role(i):
 
 @unittest.skipIf(os.name == 'nt' or os.getenv('DGLBACKEND') == 'tensorflow', reason='Do not support windows and TF yet')
 def test_kv_store():
-    ip_config = open("kv_ip_config.txt", "w")
+    reset_envs()
     num_servers = 2
     num_clients = 2
-    ip_addr = get_local_usable_addr()
-    ip_config.write('{}\n'.format(ip_addr))
-    ip_config.close()
+    generate_ip_config("kv_ip_config.txt", 1, num_servers)
     ctx = mp.get_context('spawn')
     pserver_list = []
     pclient_list = []
@@ -321,15 +295,13 @@ def test_kv_store():
 
 @unittest.skipIf(os.name == 'nt' or os.getenv('DGLBACKEND') == 'tensorflow', reason='Do not support windows and TF yet')
 def test_kv_multi_role():
-    ip_config = open("kv_ip_mul_config.txt", "w")
+    reset_envs()
     num_servers = 2
     num_trainers = 2
     num_samplers = 2
+    generate_ip_config("kv_ip_mul_config.txt", 1, num_servers)
     # There are two trainer processes and each trainer process has two sampler processes.
     num_clients = num_trainers * (1 + num_samplers)
-    ip_addr = get_local_usable_addr()
-    ip_config.write('{}\n'.format(ip_addr))
-    ip_config.close()
     ctx = mp.get_context('spawn')
     pserver_list = []
     pclient_list = []

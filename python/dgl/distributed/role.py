@@ -39,20 +39,22 @@ class RegisterRoleRequest(rpc.Request):
         self.client_id = client_id
         self.machine_id = machine_id
         self.role = role
+        self.group_id = rpc.get_group_id()
 
     def __getstate__(self):
-        return self.client_id, self.machine_id, self.role
+        return self.client_id, self.machine_id, self.role, self.group_id
 
     def __setstate__(self, state):
-        self.client_id, self.machine_id, self.role = state
+        self.client_id, self.machine_id, self.role, self.group_id = state
 
     def process_request(self, server_state):
         kv_store = server_state.kv_store
-        role = server_state.roles
+        role = server_state.roles.setdefault(self.group_id, {})
         if self.role not in role:
             role[self.role] = set()
             if kv_store is not None:
-                kv_store.barrier_count[self.role] = 0
+                barrier_count = kv_store.barrier_count.setdefault(self.group_id, {})
+                barrier_count[self.role] = 0
         role[self.role].add((self.client_id, self.machine_id))
         total_count = 0
         for key in role:
@@ -84,15 +86,16 @@ class GetRoleRequest(rpc.Request):
     """Send a request to get the roles of all client processes."""
     def __init__(self):
         self.msg = GET_ROLE_MSG
+        self.group_id = rpc.get_group_id()
 
     def __getstate__(self):
-        return self.msg
+        return self.msg, self.group_id
 
     def __setstate__(self, state):
-        self.msg = state
+        self.msg, self.group_id = state
 
     def process_request(self, server_state):
-        return GetRoleResponse(server_state.roles)
+        return GetRoleResponse(server_state.roles[self.group_id])
 
 # The key is role, the value is a dict of mapping RPC rank to a rank within the role.
 PER_ROLE_RANK = {}

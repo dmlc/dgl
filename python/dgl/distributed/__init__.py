@@ -23,7 +23,7 @@ from . import optim
 
 from .rpc import *
 from .rpc_server import start_server
-from .rpc_client import connect_to_server
+from .rpc_client import connect_to_server, shutdown_servers
 from .dist_context import initialize, exit_client
 from .kvstore import KVServer, KVClient
 from .server_state import ServerState

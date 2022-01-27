@@ -34,9 +34,9 @@ class GINConv(nn.Module):
     ----------
     apply_func : callable activation function/layer or None
         If not None, apply this function to the updated node feature,
-        the :math:`f_\Theta` in the formula.
+        the :math:`f_\Theta` in the formula, default: None.
     aggregator_type : str
-        Aggregator type to use (``sum``, ``max`` or ``mean``).
+        Aggregator type to use (``sum``, ``max`` or ``mean``), default: 'sum'.
     init_eps : float, optional
         Initial :math:`\epsilon` value, default: ``0``.
     learn_eps : bool, optional
@@ -90,8 +90,8 @@ class GINConv(nn.Module):
              0.0000]], grad_fn=<ReluBackward0>)
     """
     def __init__(self,
-                 apply_func,
-                 aggregator_type,
+                 apply_func=None,
+                 aggregator_type='sum',
                  init_eps=0,
                  learn_eps=False,
                  activation=None):
@@ -107,22 +107,6 @@ class GINConv(nn.Module):
             self.eps = th.nn.Parameter(th.FloatTensor([init_eps]))
         else:
             self.register_buffer('eps', th.FloatTensor([init_eps]))
-
-        self.reset_parameters()
-
-    def reset_parameters(self):
-        r"""
-
-        Description
-        -----------
-        Reinitialize learnable parameters.
-
-        Note
-        ----
-        The model parameters are initialized using Glorot uniform initialization.
-        """
-        gain = nn.init.calculate_gain('relu')
-        nn.init.xavier_normal_(self.apply_func.weight, gain=gain)
 
     def forward(self, graph, feat, edge_weight=None):
         r"""
