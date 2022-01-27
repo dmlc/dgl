@@ -167,10 +167,10 @@ void gatherMM_UnsortedEtype(const NDArray A,
         int64_t num_rel = A_dim1_per_rel.NumElements();
         int n = B->shape[1];  // cols of B
         int k = A->shape[1];  // cols of A
-        const IdType* E_rel_data  = A_dim1_per_rel.Ptr<IdType>();
+        const IdType* A_rel_data = A_dim1_per_rel.Ptr<IdType>();
         IdType tot_num_rows = 0;
         for (int i = 0; i < num_rel; ++i)
-            tot_num_rows += E_rel_data [i];
+            tot_num_rows += A_rel_data[i];
 
         const int ntx = 128;
         const int warp_size = 32;

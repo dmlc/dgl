@@ -32,12 +32,11 @@ void gatherMM(const NDArray A,
           const NDArray etype,
           bool sortedA, bool a_trans, bool b_trans) {
     SWITCH_BITS(bits, DType, {
-        if (sortedA) { // similar to low-mem matmul
+        if (sortedA) {  // similar to low-mem matmul
             cpu::gatherMM_SortedEtype<XPU, IdType, DType>(A, B, C, A_dim1_per_rel,
                 B_dim1_per_rel, a_trans, b_trans);
         } else {
-            LOG(FATAL) << "Unsupported CPU kernel for GatherMM. Input A needs to \
-                be sorted.";
+            LOG(FATAL) << "Unsupported CPU kernel for GatherMM. Input A is not sorted.";
         }
   });
 }

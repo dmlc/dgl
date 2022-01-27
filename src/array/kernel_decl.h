@@ -113,7 +113,7 @@ void SDDMMCooHetero(const std::string& op,
               const std::vector<dgl_type_t>& rhs_eid);
 
 /*!
- * \brief gather mm.
+ * \brief Generalized GatherMM - Dense Matrix-Matrix Multiplication.
  */
 template <int XPU, typename IdType, int bits>
 void gatherMM(const NDArray H,

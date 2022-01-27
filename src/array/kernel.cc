@@ -53,19 +53,19 @@ void SpMM(const std::string& op, const std::string& reduce,
 }
 
 
-/*! \brief Generalized Sparse Matrix-Matrix Multiplication. */
-void GatherMM(const NDArray H,
-          const NDArray W,
+/*! \brief Generalized GatherMM - Dense Matrix-Matrix Multiplication. */
+void GatherMM(const NDArray A,
+          const NDArray B,
           NDArray out,
-          const NDArray H_per_rel,
-          const NDArray W_per_rel,
+          const NDArray A_dim1_per_rel,
+          const NDArray B_dim1_per_rel,
           const NDArray etypes,
-          bool sortedE, bool H_trans, bool W_trans) {
-  ATEN_XPU_SWITCH_CUDA(H->ctx.device_type, XPU, "GatherMM", {
+          bool sortedA, bool A_trans, bool B_trans) {
+  ATEN_XPU_SWITCH_CUDA(A->ctx.device_type, XPU, "GatherMM", {
     ATEN_ID_TYPE_SWITCH(etypes->dtype, IdType, {
-      ATEN_FLOAT_BITS_SWITCH(H->dtype, bits, "Feature data", {
-        gatherMM<XPU, IdType, bits>(H, W, out, H_per_rel, W_per_rel,
-          etypes, sortedE, H_trans, W_trans);
+      ATEN_FLOAT_BITS_SWITCH(A->dtype, bits, "Feature data", {
+        gatherMM<XPU, IdType, bits>(A, B, out, A_dim1_per_rel, B_dim1_per_rel,
+          etypes, sortedA, A_trans, B_trans);
       });
     });
   });
@@ -369,16 +369,16 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSpMM")
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelGATHERMM")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    NDArray H = args[0];
-    NDArray W = args[1];
+    NDArray A = args[0];
+    NDArray B = args[1];
     NDArray O = args[2];
-    NDArray H_per_rel = args[3];
-    NDArray W_per_rel = args[4];
+    NDArray A_dim1_per_rel = args[3];
+    NDArray B_dim1_per_rel = args[4];
     NDArray etypes = args[5];
-    bool sortedE = args[6];
-    bool H_trans = args[7];
-    bool W_trans = args[8];
-    GatherMM(H, W, O, H_per_rel, W_per_rel, etypes, sortedE, H_trans, W_trans);
+    bool sortedA = args[6];
+    bool A_trans = args[7];
+    bool B_trans = args[8];
+    GatherMM(A, B, O, A_dim1_per_rel, B_dim1_per_rel, etypes, sortedA, A_trans, B_trans);
   });
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSpMMHetero")
