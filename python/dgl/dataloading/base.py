@@ -57,7 +57,7 @@ class BlockSampler(object):
 
     def sample_blocks(self, g, seed_nodes, exclude_edges=None):
         """Generates a list of blocks from the given seed nodes.
-        
+
         This function must return a triplet where the first element is the input node IDs
         for the first GNN layer (a tensor or a dict of tensors for heterogeneous graphs),
         the second element is the output node IDs for the last GNN layer, and the third
@@ -245,7 +245,7 @@ class EdgeBlockSampler(object):
     def sample(self, g, seed_edges):
         """Samples a list of blocks, as well as a subgraph containing the sampled
         edges from the original graph.
-        
+
         If :attr:`negative_sampler` is given, also returns another graph containing the
         negative pairs as edges.
         """

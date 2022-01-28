@@ -1,5 +1,4 @@
 """ShaDow-GNN subgraph samplers."""
-from ..frame import LazyFeature
 from ..sampling.utils import EidExcluder
 from .. import transform
 from ..base import NID
@@ -81,6 +80,7 @@ class ShaDowKHopSampler(object):
         self.output_device = output_device
 
     def sample(self, g, seed_nodes, exclude_edges=None):
+        """Sample a subgraph given a tensor of seed nodes."""
         output_nodes = seed_nodes
         for fanout in reversed(self.fanouts):
             frontier = g.sample_neighbors(

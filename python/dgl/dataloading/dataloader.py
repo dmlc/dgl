@@ -1,5 +1,5 @@
+"""DGL PyTorch DataLoaders"""
 from collections.abc import Mapping, Sequence
-from functools import partial
 from queue import Queue
 import itertools
 import threading
@@ -14,14 +14,14 @@ import torch.distributed as dist
 from torch.utils.data.distributed import DistributedSampler
 
 from ..base import NID, EID
-from ..batch import batch
+from ..batch import batch as batch_graphs
 from ..heterograph import DGLHeteroGraph
 from .. import ndarray as nd
 from ..utils import (
     recursive_apply, ExceptionWrapper, recursive_apply_pair, set_num_threads,
     create_shared_mem_array, get_shared_mem_array)
-from ..frame import Column, LazyFeature
-from ..storages import TensorStorage, FeatureStorage, STORAGE_WRAPPERS
+from ..frame import LazyFeature
+from ..storages import FeatureStorage, STORAGE_WRAPPERS
 from .base import BlockSampler, EdgeBlockSampler
 from .. import backend as F
 
@@ -96,9 +96,6 @@ def _divide_by_worker(dataset):
 class TensorizedDataset(torch.utils.data.IterableDataset):
     """Custom Dataset wrapper that returns a minibatch as tensors or dicts of tensors.
     When the dataset is on the GPU, this significantly reduces the overhead.
-
-    By default, using PyTorch's TensorDataset will return a list of scalar tensors
-    which would introduce a lot of overhead, especially on GPU.
     """
     def __init__(self, indices, batch_size, drop_last):
         if isinstance(indices, Mapping):
@@ -114,6 +111,7 @@ class TensorizedDataset(torch.utils.data.IterableDataset):
         self.drop_last = drop_last
 
     def shuffle(self):
+        """Shuffle the dataset."""
         # TODO: may need an in-place shuffle kernel
         perm = torch.randperm(self._tensor_dataset.shape[0], device=self._device)
         self._tensor_dataset[:] = self._tensor_dataset[perm]
@@ -139,6 +137,12 @@ def _generate_shared_mem_name_id():
     raise DGLError('Unable to generate a shared memory array')
 
 class DDPTensorizedDataset(torch.utils.data.IterableDataset):
+    """Custom Dataset wrapper that returns a minibatch as tensors or dicts of tensors.
+    When the dataset is on the GPU, this significantly reduces the overhead.
+
+    This class additionally saves the index tensor in shared memory and therefore
+    avoids duplicating the same index tensor during shuffling.
+    """
     def __init__(self, indices, batch_size, drop_last, ddp_seed):
         if isinstance(indices, Mapping):
             self._mapping_keys = list(indices.keys())
@@ -198,6 +202,7 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
             self._device = indices_shared.device
 
     def shuffle(self):
+        """Shuffles the dataset."""
         # Only rank 0 does the actual shuffling.  The other ranks wait for it.
         if self.rank == 0:
             self._tensor_dataset[:self.num_indices] = self._tensor_dataset[
@@ -342,10 +347,14 @@ def _prefetcher_entry(dataloader_it, dataloader, queue, num_threads, use_alterna
 
 # DGLHeteroGraphs have the semantics of lazy feature slicing with subgraphs.  Such behavior depends
 # on that DGLHeteroGraph's ndata and edata are maintained by Frames.  So to maintain compatibility
-# with older code, DGLHeteroGraphs and other graph storages are handled separately: (1) DGLHeteroGraphs will
-# preserve the lazy feature slicing for subgraphs.  (2) Other graph storages will not have
-# lazy feature slicing; all feature slicing will be eager.
+# with older code, DGLHeteroGraphs and other graph storages are handled separately: (1)
+# DGLHeteroGraphs will preserve the lazy feature slicing for subgraphs.  (2) Other graph storages
+# will not have lazy feature slicing; all feature slicing will be eager.
 def remove_parent_storage_columns(item, g):
+    """Removes the storage objects in the given graphs' Frames if it is a sub-frame of the
+    given parent graph, so that the storages are not serialized during IPC from PyTorch
+    DataLoader workers.
+    """
     if not isinstance(item, DGLHeteroGraph) or not isinstance(g, DGLHeteroGraph):
         return item
 
@@ -365,6 +374,9 @@ def remove_parent_storage_columns(item, g):
 
 
 def restore_parent_storage_columns(item, g):
+    """Restores the storage objects in the given graphs' Frames if it is a sub-frame of the
+    given parent graph (i.e. when the storage object is None).
+    """
     if not isinstance(item, DGLHeteroGraph) or not isinstance(g, DGLHeteroGraph):
         return item
 
@@ -439,6 +451,9 @@ class _PrefetchingIter(object):
 
 # Make them classes to work with pickling in mp.spawn
 class CollateWrapper(object):
+    """Wraps a collate function with :func:`remove_parent_storage_columns` for serializing
+    from PyTorch DataLoader workers.
+    """
     def __init__(self, sample_func, g):
         self.sample_func = sample_func
         self.g = g
@@ -449,6 +464,9 @@ class CollateWrapper(object):
 
 
 class WorkerInitWrapper(object):
+    """Wraps the :attr:`worker_init_fn` argument of the DataLoader to set the number of DGL
+    OMP threads to 1 for PyTorch DataLoader workers.
+    """
     def __init__(self, func):
         self.func = func
 
@@ -485,6 +503,10 @@ def _prepare_storages_from_graph(graph, attr, types):
 
 
 def create_tensorized_dataset(indices, batch_size, drop_last, use_ddp, ddp_seed):
+    """Converts a given indices tensor to a TensorizedDataset, an IterableDataset
+    that returns views of the original tensor, to reduce overhead from having
+    a list of scalar tensors in default PyTorch DataLoader implementation.
+    """
     if use_ddp:
         return DDPTensorizedDataset(indices, batch_size, drop_last, ddp_seed)
     else:
@@ -492,6 +514,7 @@ def create_tensorized_dataset(indices, batch_size, drop_last, use_ddp, ddp_seed)
 
 
 class DataLoader(torch.utils.data.DataLoader):
+    """DataLoader class."""
     def __init__(self, graph, indices, graph_sampler, device='cpu', use_ddp=False,
                  ddp_seed=0, batch_size=1, drop_last=False, shuffle=False,
                  use_prefetch_thread=False, use_alternate_streams=True, **kwargs):
@@ -502,7 +525,7 @@ class DataLoader(torch.utils.data.DataLoader):
                 indices = {k: torch.tensor(v) for k, v in indices.items()}
             else:
                 indices = torch.tensor(indices)
-        except:
+        except:     # pylint: disable=bare-except
             # ignore when it fails to convert to torch Tensors.
             pass
 
@@ -551,7 +574,7 @@ class DataLoader(torch.utils.data.DataLoader):
 
     # To allow data other than node/edge data to be prefetched.
     def attach_data(self, name, data):
-        self.other_storages[name] = _wrap_storage(storage)
+        self.other_storages[name] = _wrap_storage(data)
 
 
 # Alias
@@ -560,6 +583,7 @@ class NodeDataLoader(DataLoader):
 
 
 class EdgeDataLoader(DataLoader):
+    """EdgeDataLoader class."""
     def __init__(self, graph, indices, graph_sampler, device='cpu', use_ddp=False,
                  ddp_seed=0, batch_size=1, drop_last=False, shuffle=False,
                  use_prefetch_thread=False, use_alternate_streams=True,
@@ -641,7 +665,7 @@ class GraphCollator(object):
         elem = items[0]
         elem_type = type(elem)
         if isinstance(elem, DGLHeteroGraph):
-            batched_graphs = batch(items)
+            batched_graphs = batch_graphs(items)
             return batched_graphs
         elif F.is_tensor(elem):
             return F.stack(items, 0)

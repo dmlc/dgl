@@ -1,3 +1,4 @@
+"""Cluster-GCN samplers."""
 import os
 import pickle
 import numpy as np
@@ -9,6 +10,26 @@ from ..frame import LazyFeature
 from .base import set_node_lazy_features, set_edge_lazy_features
 
 class ClusterGCNSampler(object):
+    """Cluster-GCN sampler.
+
+    This sampler first partitions the graph with METIS partitioning, then it caches the nodes of
+    each partition to a file within the given cache directory.
+
+    This is used in conjunction with :class:`dgl.dataloading.DataLoader`.
+
+    Notes
+    -----
+    The graph must be homogeneous and on CPU.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The original graph.
+    k : int
+        The number of partitions.
+    cache_path : str
+        The path to the cache directory for storing the partition result.
+    """
     def __init__(self, g, k, balance_ntypes=None, balance_edges=False, mode='k-way',
                  prefetch_node_feats=None, prefetch_edge_feats=None, output_device=None,
                  cache_path='cluster_gcn.pkl'):
@@ -46,6 +67,7 @@ class ClusterGCNSampler(object):
         self.output_device = output_device
 
     def sample(self, g, partition_ids):
+        """Samples a subgraph given a list of partition IDs."""
         node_ids = F.cat([
             self.partition_node_ids[self.partition_offset[i]:self.partition_offset[i+1]]
             for i in F.asnumpy(partition_ids)], 0)
