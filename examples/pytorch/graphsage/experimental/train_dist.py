@@ -184,8 +184,7 @@ def pad_data(nids, device):
 def run(args, device, data):
     # Unpack data
     train_nid, val_nid, test_nid, in_feats, n_classes, g = data
-    # Below line causes error sometimes.
-    # train_nid = pad_data(train_nid, device)
+    train_nid = pad_data(train_nid, device)
     # Create sampler
     sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')],
                               dgl.distributed.sample_neighbors, device)
