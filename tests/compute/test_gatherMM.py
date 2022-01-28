@@ -7,28 +7,26 @@ import numpy as np
 import unittest, pytest
 from test_utils import parametrize_dtype, get_cases
 
-# @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
-
 iters = 5
 n_edge_scale = 1
 num_rel_scale = 1
-
 in_feat = 16
 out_feat = 8
-
 print("in/out feat", in_feat, out_feat)
+
+@unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
 
 @parametrize_dtype
 def test_low_mem(idtype):
     def _test():
-        E_per_rel = F.tensor([50, 100, 20, 284, 89, 10, 82, 9200, 10, 20, 30, 100,
+        E_per_rel = F.copy_to(F.tensor([50, 100, 20, 284, 89, 10, 82, 9200, 10, 20, 30, 100,
             128, 20, 284, 89, 10, 82, 92, 10, 20, 30, 100, 1280, 20, 284, 89, 1000, 82,
-            92, 10, 2000, 30, 100, 128, 20, 284, 89, 10, 82, 92, 10, 20, 30]).to('cpu')
+            92, 10, 2000, 30, 100, 128, 20, 284, 89, 10, 82, 92, 10, 20, 30]), F.cpu())
 
         E_per_rel *= n_edge_scale
         num_rel = len(E_per_rel)
         print('num_rel', num_rel)
-        W_per_len = F.full((num_rel,) ,in_feat, dtype=F.dtype(E_per_rel)).to('cpu')
+        W_per_len = F.copy_to(F.full((num_rel,) ,in_feat, dtype=F.dtype(E_per_rel)), F.cpu())
 
         H_arr = []
         W_arr = []
