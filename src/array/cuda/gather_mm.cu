@@ -295,7 +295,7 @@ void gatherMM(const NDArray A,
     if (sortedA) {  // similar to low-mem matmul
         gatherMM_SortedEtype<XPU, IdType, bits>(A, B, C, A_dim1_per_rel,
             B_dim1_per_rel, a_trans, b_trans);
-    } else { // similar to bmm (high-mem) without copying weights to edges
+    } else {  // similar to bmm (high-mem) without copying weights to edges
         // TODO(Israt): Add support for A and B to have different dimension in relation types
         // TODO(Israt): Add tranpose operation for A and B
         if (a_trans || b_trans) {
