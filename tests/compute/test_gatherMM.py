@@ -15,6 +15,7 @@ out_feat = 8
 print("in/out feat", in_feat, out_feat)
 
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
+@unittest.skipIf(F._default_context_str == 'cpu', reason="Not implemented.")
 
 @parametrize_dtype
 def test_low_mem(idtype):
