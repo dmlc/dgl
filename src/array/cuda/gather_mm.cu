@@ -119,7 +119,7 @@ __global__ void gatherMMUnsortedEKernel(
     DType* __restrict__ C,
     const Idx* __restrict__ etype,
     int64_t num_rows,
-    int64_t k_start, int64_t in_len, int64_t out_len) {
+    int64_t in_len, int64_t out_len) {
     unsigned int tId = threadIdx.x;
     unsigned int laneId = tId & 31;
     unsigned int gId = (blockIdx.x * blockDim.x + threadIdx.x);
@@ -130,24 +130,26 @@ __global__ void gatherMMUnsortedEKernel(
         const int sh_h_tile = 64;
         __shared__ DType sh_H[4 * sh_h_tile];
         int h_tile = sh_h_tile;
-        if ((in_len - k_start) < h_tile) h_tile = in_len - k_start;
-        /* Load A in shared mem in a coalesced way */
-        for (unsigned int l = laneId; l < h_tile; l += 32)
-            sh_H[local_row * h_tile + l] = A[row * in_len + (k_start + l)];
-        __syncthreads();
+        for (unsigned int k_start = 0; k_start < in_len; k_start += 64) {
+            if ((in_len - k_start) < h_tile) h_tile = in_len - k_start;
+            /* Load A in shared mem in a coalesced way */
+            for (unsigned int l = laneId; l < h_tile; l += 32)
+                sh_H[local_row * h_tile + l] = A[row * in_len + (k_start + l)];
+            __syncwarp();
 
-        int B_offset = etype[row] * in_len * out_len;  // assume all weights are of same dim
-        for (unsigned int k_outloop = 0; k_outloop < out_len; k_outloop +=32) {
-            DType out_reg = 0;  // thread private
-            unsigned int k = laneId;
-            if (k < out_len) {
-                /* iterate over elements of a row of A */
-                for (unsigned int i = 0; i < h_tile; i++) {
-                    DType h_val =  sh_H[local_row * h_tile + i];
-                    /* iterate over elements of a row of B in parallel */
-                    out_reg += h_val * B[B_offset + ((i + k_start) * out_len + (k_outloop + k))];
+            int B_offset = etype[row] * in_len * out_len;  // assume all weights are of same dim
+            for (unsigned int k_outloop = 0; k_outloop < out_len; k_outloop +=32) {
+                DType out_reg = 0;  // thread private
+                unsigned int k = laneId;
+                if (k < out_len) {
+                    /* iterate over elements of a row of A */
+                    for (unsigned int i = 0; i < h_tile; i++) {
+                        DType h_val =  sh_H[local_row * h_tile + i];
+                        /* iterate over elements of a row of B in parallel */
+                        out_reg += h_val * B[B_offset + ((i + k_start) * out_len + (k_outloop + k))];
+                    }
+                    C[row * out_len + (k_outloop + k)] += out_reg;
                 }
-                C[row * out_len + (k_outloop + k)] += out_reg;
             }
         }
     }
@@ -171,23 +173,19 @@ void gatherMM_UnsortedEtype(const NDArray A,
         IdType tot_num_rows = 0;
         for (int i = 0; i < num_rel; ++i)
             tot_num_rows += A_rel_data[i];
-
         const int ntx = 128;
         const int warp_size = 32;
         const int nbx =  ((tot_num_rows * warp_size + ntx - 1) / ntx);
         const dim3 nblks(nbx);
         const dim3 nthrs(ntx);
-        const int warp_per_block = 4;  // ntx / warp_size;
-        for (int k_start = 0; k_start < k; k_start += 64) {
-            CUDA_KERNEL_CALL((gatherMMUnsortedEKernel<IdType, DType>),
-                nblks, nthrs, 0, thr_entry->stream,
-                static_cast<DType*>(A->data),
-                static_cast<DType*>(B->data),
-                static_cast<DType*>(C->data),
-                static_cast<IdType*>(etype->data),
-                tot_num_rows,
-                k_start, k, n);
-        }
+        CUDA_KERNEL_CALL((gatherMMUnsortedEKernel<IdType, DType>),
+            nblks, nthrs, 0, thr_entry->stream,
+            static_cast<DType*>(A->data),
+            static_cast<DType*>(B->data),
+            static_cast<DType*>(C->data),
+            static_cast<IdType*>(etype->data),
+            tot_num_rows,
+            k, n);
     });
 }
 
@@ -276,9 +274,9 @@ void gatherMM_SortedEtype(const NDArray A,
  *        expected to be sorted according to relation type.
  * \param A The input dense matrix of dimension m x k
  * \param B The input dense matrix of dimension k x n
- * \param C The output dense matrix od dimension m x n
- * \param A_dim1_per_rel The number of rows in each relation in A
- * \param B_dim1_per_rel The number of rows in each relation in B
+ * \param C The output dense matrix of dimension m x n
+ * \param A_dim1_per_rel The number of rows in each relation of A
+ * \param B_dim1_per_rel The number of rows in each relation of B
  * \param etype relation types of each edge. Required by *UnsortedEtype kernel
  * \param sortedA Matrix A is sorted according to relation type or not
  * \param a_trans Matrix A to be transposed

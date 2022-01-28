@@ -10,16 +10,16 @@ from test_utils import parametrize_dtype, get_cases
 iters = 5
 n_edge_scale = 1
 num_rel_scale = 1
-in_feat = 16
-out_feat = 8
-print("in/out feat", in_feat, out_feat)
 
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
 @unittest.skipIf(F._default_context_str == 'cpu', reason="Not implemented.")
 
 @parametrize_dtype
-def test_low_mem(idtype):
-    def _test():
+def test_gathermm(idtype):
+    def _test(feat_scale):
+        in_feat = 16 * feat_scale
+        out_feat = 8 * feat_scale
+        print("in/out feat", in_feat, out_feat)
         E_per_rel = F.copy_to(F.tensor([50, 100, 20, 284, 89, 10, 82, 9200, 10, 20, 30, 100,
             128, 20, 284, 89, 10, 82, 92, 10, 20, 30, 100, 1280, 20, 284, 89, 1000, 82,
             92, 10, 2000, 30, 100, 128, 20, 284, 89, 10, 82, 92, 10, 20, 30]), F.cpu())
@@ -111,11 +111,12 @@ def test_low_mem(idtype):
         assert F.allclose(out_low_mem, out_gmm_unsorted, atol=1e-3, rtol=1e-3)
         assert F.allclose(Wgrad_low_mem, W_grad_gmm_sorted, atol=1e-3, rtol=1e-3)
         assert F.allclose(Hgrad_low_mem, H_grad_gmm_sorted, atol=1e-3, rtol=1e-3)
-    _test()
-
+    _test(1)
+    _test(4)
+    _test(16)
+    _test(32)
 
 if __name__ == '__main__':
-    test_low_mem()
-    # test_gatherM()
+    test_gathermm()
 
 
