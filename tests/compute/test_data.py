@@ -1068,6 +1068,20 @@ def test_as_nodepred1():
     assert 'train_mask' not in ds[0].nodes['Forschungsgebiete'].ndata
     assert ds[0].nodes['Forschungsgebiete'].data['train_mask'].sum() == int(ds[0].num_nodes('Forschungsgebiete') * 0.8)
 
+
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
+def test_as_edgepred():
+    # test proper reprocessing
+
+    # create
+    ds = data.AsEdgePredDataset(data.CoraGraphDataset(), [0.8, 0.1, 0.1])
+    # Cora has 10556 edges, 10% test edges can be 1057
+    assert ds.get_test_edges()[0][0].shape[0] == 1057
+    # read from cache
+    ds = data.AsEdgePredDataset(data.CoraGraphDataset(), [0.8, 0.1, 0.1])
+    assert ds.get_test_edges()[0][0].shape[0] == 1057
+
 if __name__ == '__main__':
     test_minigc()
     test_gin()
