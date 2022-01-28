@@ -82,6 +82,6 @@ general_pipeline:
   loss: CrossEntropyLoss
 ```
 
-You can tweak the numbers and the options here as you wish, to try diffirent settings to get better performance.
+You can tweak the numbers and the options here as you wish, to try diffirent settings and get better performance.
 
 Then you can use `dgl-enter train --cfg cfg.yml` to train a model on the dataset specified. Or you can use `dgl-enter export --cfg cfg.yml --output run.py` to generate a self-contained, runnable python script. Then you can do any modification on the script as you like to adapt into your own pipeline
