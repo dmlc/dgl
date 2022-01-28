@@ -740,14 +740,12 @@ class RangePartitionBook(GraphPartitionBook):
         nid_range = [None] * len(self.ntypes)
         for i, ntype in enumerate(self.ntypes):
             nid_range[i] = (ntype, self._typed_nid_range[ntype])
-        nid_range_pickle = pickle.dumps(nid_range)
-        nid_range_pickle = [e for e in nid_range_pickle]
+        nid_range_pickle = list(pickle.dumps(nid_range))
 
         eid_range = [None] * len(self.etypes)
         for i, etype in enumerate(self.etypes):
             eid_range[i] = (etype, self._typed_eid_range[etype])
-        eid_range_pickle = pickle.dumps(eid_range)
-        eid_range_pickle = [e for e in eid_range_pickle]
+        eid_range_pickle = list(pickle.dumps(eid_range))
 
         self._meta = _move_metadata_to_shared_mem(graph_name,
                                                   0, # We don't need to provide the number of nodes
