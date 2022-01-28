@@ -16,6 +16,7 @@
 #include <vector>
 #include <string>
 #include <mutex>
+#include <unordered_map>
 
 #include "./rpc_msg.h"
 #include "./tensorpipe/tp_communicator.h"
@@ -68,7 +69,7 @@ struct RPCContext {
   /*!
    * \brief Current barrier count
    */
-  int32_t barrier_count = 0;
+  std::unordered_map<int32_t, int32_t> barrier_count;
 
   /*!
    * \brief Total number of server per machine.
@@ -101,6 +102,13 @@ struct RPCContext {
    */
   std::shared_ptr<ServerState> server_state;
 
+  /*!
+   * \brief Cuurent group ID
+   */
+  int32_t group_id = -1;
+  int32_t curr_client_id = -1;
+  std::unordered_map<int32_t, std::unordered_map<int32_t, int32_t>> clients_;
+
   /*! \brief Get the RPC context singleton */
   static RPCContext* getInstance() {
     static RPCContext ctx;
@@ -116,12 +124,35 @@ struct RPCContext {
     t->msg_seq = 0;
     t->num_servers = 0;
     t->num_clients = 0;
-    t->barrier_count = 0;
+    t->barrier_count.clear();
     t->num_servers_per_machine = 0;
     t->sender.reset();
     t->receiver.reset();
     t->ctx.reset();
     t->server_state.reset();
+    t->group_id = -1;
+    t->curr_client_id = -1;
+    t->clients_.clear();
+  }
+
+  int32_t RegisterClient(int32_t client_id, int32_t group_id) {
+    auto &&m = clients_[group_id];
+    if (m.find(client_id) != m.end()) {
+      return -1;
+    }
+    m[client_id] = ++curr_client_id;
+    return curr_client_id;
+  }
+
+  int32_t GetClient(int32_t client_id, int32_t group_id) const {
+    if (clients_.find(group_id) == clients_.end()) {
+      return -1;
+    }
+    const auto &m = clients_.at(group_id);
+    if (m.find(client_id) == m.end()) {
+      return -1;
+    }
+    return m.at(client_id);
   }
 };
 

@@ -83,6 +83,8 @@ class UnitGraph : public BaseHeteroGraph {
 
   DLContext Context() const override;
 
+  bool IsPinned() const override;
+
   uint8_t NumBits() const override;
 
   bool IsMultigraph() const override;
@@ -207,6 +209,25 @@ class UnitGraph : public BaseHeteroGraph {
   /*! \brief Copy the data to another context */
   static HeteroGraphPtr CopyTo(HeteroGraphPtr g, const DLContext &ctx,
                                const DGLStreamHandle &stream = nullptr);
+
+  /*!
+  * \brief Pin the in_csr_, out_scr_ and coo_ of the current graph.
+  * \note The graph will be pinned inplace. Behavior depends on the current context,
+  *       kDLCPU: will be pinned;
+  *       kDLCPUPinned: directly return;
+  *       kDLGPU: invalid, will throw an error.
+  *       The context check is deferred to pinning the NDArray.
+  */
+  void PinMemory_();
+
+  /*!
+  * \brief Unpin the in_csr_, out_scr_ and coo_ of the current graph.
+  * \note The graph will be unpinned inplace. Behavior depends on the current context,
+  *       kDLCPUPinned: will be unpinned;
+  *       others: directly return.
+  *       The context check is deferred to unpinning the NDArray.
+  */
+  void UnpinMemory_();
 
   /*! 
    * \brief Create in-edge CSR format of the unit graph.
