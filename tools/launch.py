@@ -437,7 +437,16 @@ g_monitor_file = None
 g_group_id = 0
 
 def has_alive_servers(args):
-    """Check whether there exist alive servers and get available group ID if exist."""
+    """Check whether there exist alive servers and get available group ID if exist.
+
+    For each group of long live servers, a monitor file named
+    'dgl_dist_monitor_{args.server_name}' is created under '/tmp/' directory.
+    We check the existence of this monitor file to determine whether to
+    launch new servers or utilize the existing alive ones. If there
+    exist alive servers, we obtain availale group ID from the monitor
+    file which could be used in current client groups.
+
+    """
     if args.server_name is None:
         return False
     global g_monitor_file
