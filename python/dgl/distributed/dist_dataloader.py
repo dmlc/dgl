@@ -153,7 +153,13 @@ class DistDataLoader:
                 end_pos = len(self.dataset)
         else:
             end_pos = self.current_pos + self.batch_size
-        idx = self.data_idx[self.current_pos:end_pos]
-        ret = self.dataset[idx]
+        idx = self.data_idx[self.current_pos:end_pos].tolist()
+        ret = [self.dataset[i] for i in idx]
+        # Sharing large number of tensors between processes will consume too many
+        # file descriptors, so let's convert each tensor to scalar value beforehand.
+        if isinstance(ret[0], tuple):
+            ret = [(type, F.as_scalar(id)) for (type, id) in ret]
+        else:
+            ret = [F.as_scalar(id) for id in ret]
         self.current_pos = end_pos
         return ret
