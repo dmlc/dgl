@@ -86,6 +86,7 @@ disable=design,
         import-outside-toplevel,    # due to inevitable imports within blocks
         using-constant-test,    # due to in-place object modification in C
         super-with-arguments,   # 2.3.0->2.6.0, should enable but there's too many...
+        not-callable,           # due to optional callables that can be None
 
 # Enable the message, report, category or checker with the given id(s). You can
 # either give multiple identifier separated by comma (,) or put this option

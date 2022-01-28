@@ -78,8 +78,8 @@ def start_server(server_id, ip_config, num_servers, num_clients, server_state, \
             ips = recv_clients[group_id]
             if len(ips) < rpc.get_num_client():
                 continue
-            else:
-                del recv_clients[group_id]
+
+            del recv_clients[group_id]
             # a new client group is ready
             ips.sort()
             client_namebook = dict(enumerate(ips))
