@@ -1801,6 +1801,7 @@ def test_reorder_graph(idtype):
     rfg = dgl.reorder_graph(fg)
     assert 'csr' in sum(rfg.formats().values(), [])
 
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support a slicing operation")
 @parametrize_dtype
 def test_norm_by_dst(idtype):
     # Case1: A homogeneous graph
