@@ -579,7 +579,6 @@ class DataLoader(torch.utils.data.DataLoader):
 # Alias
 class NodeDataLoader(DataLoader):
     """NodeDataLoader class."""
-    pass
 
 
 class EdgeDataLoader(DataLoader):
