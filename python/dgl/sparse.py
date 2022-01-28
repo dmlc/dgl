@@ -358,17 +358,14 @@ def _gather_mm(A, B, out, A_per_rel, B_per_rel, etypes, sortedE=True,
     B_trans : bool
         Indicates whether matrix B needs to be tranposed
     """
-    if F.context(A).type == 'cuda':
-        _CAPI_DGLKernelGATHERMM(to_dgl_nd(A),
-                                to_dgl_nd(B),
-                                to_dgl_nd_for_write(out),
-                                to_dgl_nd(A_per_rel),
-                                to_dgl_nd(B_per_rel),
-                                to_dgl_nd(etypes),
-                                sortedE, a_trans, b_trans)
-    else:
-        # TODO(Israt): Which file should have the implementation of gatherMM using PyTorch?
-        raise NotImplementedError("For CPU use PyTorch's matmul operator")
+    # TODO(Israt): Add CPU support. Currently, only handles GPU code
+    _CAPI_DGLKernelGATHERMM(to_dgl_nd(A),
+                            to_dgl_nd(B),
+                            to_dgl_nd_for_write(out),
+                            to_dgl_nd(A_per_rel),
+                            to_dgl_nd(B_per_rel),
+                            to_dgl_nd(etypes),
+                            sortedE, a_trans, b_trans)
     return out
 
 
