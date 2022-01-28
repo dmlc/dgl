@@ -7,12 +7,14 @@ from distutils.version import LooseVersion
 import random
 import math
 import inspect
+import re
 
 import torch
 import torch.distributed as dist
 from torch.utils.data.distributed import DistributedSampler
 
 from ..base import NID, EID
+from ..batch import batch
 from ..heterograph import DGLHeteroGraph
 from .. import ndarray as nd
 from ..utils import (
@@ -121,6 +123,10 @@ class TensorizedDataset(torch.utils.data.IterableDataset):
         return _TensorizedDatasetIter(
             dataset, self.batch_size, self.drop_last, self._mapping_keys)
 
+    def __len__(self):
+        num_samples = self._tensor_dataset.shape[0]
+        return (num_samples + (0 if self.drop_last else (self.batch_size - 1))) // self.batch_size
+
 def _get_shared_mem_name(id_):
     return f'ddp_{id_}'
 
@@ -208,6 +214,10 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
         dataset = _divide_by_worker(self._tensor_dataset[start:end])
         return _TensorizedDatasetIter(
             dataset, self.batch_size, self.drop_last, self._mapping_keys)
+
+    def __len__(self):
+        return (self.num_samples + (0 if self.drop_last else (self.batch_size - 1))) // \
+            self.batch_size
 
 
 def _prefetch_update_feats(feats, frames, types, storages, id_name, device, pin_memory):
@@ -486,6 +496,16 @@ class DataLoader(torch.utils.data.DataLoader):
                  ddp_seed=0, batch_size=1, drop_last=False, shuffle=False,
                  use_prefetch_thread=False, use_alternate_streams=True, **kwargs):
         self.graph = graph
+
+        try:
+            if isinstance(indices, Mapping):
+                indices = {k: torch.tensor(v) for k, v in indices.items()}
+            else:
+                indices = torch.tensor(indices)
+        except:
+            # ignore when it fails to convert to torch Tensors.
+            pass
+
         if (torch.is_tensor(indices) or (
                 isinstance(indices, Mapping) and
                 all(torch.is_tensor(v) for v in indices.values()))):
@@ -493,6 +513,7 @@ class DataLoader(torch.utils.data.DataLoader):
                 indices, batch_size, drop_last, use_ddp, ddp_seed)
         else:
             self.dataset = indices
+
         self.ddp_seed = ddp_seed
         self._shuffle_dataset = shuffle
         self.graph_sampler = graph_sampler
@@ -713,7 +734,7 @@ class GraphDataLoader(torch.utils.data.DataLoader):
                 dataloader_kwargs[k] = v
 
         if collate_fn is None:
-            self.collate = _GraphCollator(self.subgraph_iterator, **collator_kwargs).collate
+            self.collate = GraphCollator(**collator_kwargs).collate
         else:
             self.collate = collate_fn
 

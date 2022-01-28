@@ -6,6 +6,7 @@ from .. import backend as F
 from ..base import DGLError
 from ..partition import metis_partition_assignment
 from ..frame import LazyFeature
+from .base import set_node_lazy_features, set_edge_lazy_features
 
 class ClusterGCNSampler(object):
     def __init__(self, g, k, balance_ntypes=None, balance_edges=False, mode='k-way',
@@ -49,6 +50,6 @@ class ClusterGCNSampler(object):
             self.partition_node_ids[self.partition_offset[i]:self.partition_offset[i+1]]
             for i in F.asnumpy(partition_ids)], 0)
         sg = g.subgraph(node_ids, relabel_nodes=True, output_device=self.output_device)
-        sg.ndata.update({k: LazyFeature(k) for k in self.prefetch_node_feats})
-        sg.edata.update({k: LazyFeature(k) for k in self.prefetch_edge_feats})
+        set_node_lazy_features(sg, self.prefetch_node_feats)
+        set_edge_lazy_features(sg, self.prefetch_edge_feats)
         return sg

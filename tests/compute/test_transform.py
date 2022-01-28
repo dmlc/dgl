@@ -2298,3 +2298,4 @@ def test_module_add_edge(idtype):
 
 if __name__ == '__main__':
     test_partition_with_halo()
+    test_module_heat_kernel(F.int32)

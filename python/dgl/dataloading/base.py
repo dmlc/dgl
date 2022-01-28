@@ -7,6 +7,8 @@ from ..frame import LazyFeature
 from ..utils import recursive_apply
 
 def _set_lazy_features(x, xdata, feature_names):
+    if feature_names is None:
+        return
     if not isinstance(feature_names, Mapping):
         xdata.update({k: LazyFeature(k) for k in feature_names})
     else:
@@ -159,17 +161,15 @@ def _find_exclude_eids(g, exclude_mode, eids, **kwargs):
 
 def find_exclude_eids(g, seed_edges, exclude, reverse_eids=None, reverse_etypes=None,
                       output_device=None):
-    # find the edges to exclude
-    if exclude is not None:
-        exclude_eids = _find_exclude_eids(
-            g,
-            exclude,
-            seed_edges,
-            reverse_eid_map=reverse_eids,
-            reverse_etype_map=reverse_etypes)
+    exclude_eids = _find_exclude_eids(
+        g,
+        exclude,
+        seed_edges,
+        reverse_eid_map=reverse_eids,
+        reverse_etype_map=reverse_etypes)
+    if exclude_eids is not None:
         exclude_eids = recursive_apply(
             exclude_eids, lambda x: x.to(output_device))
-
     return exclude_eids
 
 

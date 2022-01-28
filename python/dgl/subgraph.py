@@ -870,7 +870,8 @@ def khop_out_subgraph(graph, nodes, k, *, relabel_nodes=True, store_ids=True, ou
             for hop_nodes in k_hop_nodes_], dim=0), return_inverse=True)
 
     sub_g = node_subgraph(graph, k_hop_nodes, relabel_nodes=relabel_nodes, store_ids=store_ids)
-    sub_g = sub_g.to(output_device)
+    if output_device is not None:
+        sub_g = sub_g.to(output_device)
     if relabel_nodes:
         if is_mapping:
             seed_inverse_indices = dict()
@@ -880,8 +881,9 @@ def khop_out_subgraph(graph, nodes, k, *, relabel_nodes=True, store_ids=True, ou
         else:
             seed_inverse_indices = F.slice_axis(
                 inverse_indices[nty], axis=0, begin=0, end=len(nodes[nty]))
-        seed_inverse_indices = recursive_apply(
-            seed_inverse_indices, lambda x: F.copy_to(x, output_device))
+        if output_device is not None:
+            seed_inverse_indices = recursive_apply(
+                seed_inverse_indices, lambda x: F.copy_to(x, output_device))
         return sub_g, seed_inverse_indices
     else:
         return sub_g
