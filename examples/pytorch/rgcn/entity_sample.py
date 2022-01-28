@@ -57,8 +57,7 @@ def init_dataloaders(args, g, train_idx, test_idx, target_idx, device, use_ddp=F
 def init_models(args, device, num_nodes, num_classes, num_rels):
     embed_layer = RelGraphEmbedLayer(device,
                                      num_nodes,
-                                     args.n_hidden,
-                                     dgl_sparse=args.dgl_sparse)
+                                     args.n_hidden)
 
     model = RGCN(args.n_hidden,
                  args.n_hidden,
@@ -137,11 +136,7 @@ def main(args):
     labels = labels.to(device)
     model = model.to(device)
 
-    if args.dgl_sparse:
-        emb_optimizer = dgl.optim.SparseAdam(params=[embed_layer.node_embed],
-                                             lr=args.sparse_lr, eps=1e-8)
-    else:
-        emb_optimizer = th.optim.SparseAdam(embed_layer.parameters(), lr=args.sparse_lr)
+    emb_optimizer = th.optim.SparseAdam(embed_layer.parameters(), lr=args.sparse_lr)
     optimizer = th.optim.Adam(model.parameters(), lr=1e-2, weight_decay=args.l2norm)
 
     for epoch in range(args.n_epochs):
@@ -184,8 +179,6 @@ if __name__ == '__main__':
                         help="include self feature as a special relation")
     parser.add_argument("--batch-size", type=int, default=100,
                         help="Mini-batch size")
-    parser.add_argument("--dgl-sparse", default=False, action='store_true',
-                        help='Use sparse embedding for node embeddings.')
     args = parser.parse_args()
 
     print(args)

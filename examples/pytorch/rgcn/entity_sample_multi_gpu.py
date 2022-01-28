@@ -36,7 +36,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, queue=None):
 
     dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
         master_ip='127.0.0.1', master_port='12345')
-    backend = 'nccl' if args.dgl_sparse else 'gloo'
+    backend = 'gloo'
     if proc_id == 0:
         print("backend using {}".format(backend))
     th.distributed.init_process_group(backend=backend,
@@ -53,14 +53,9 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, queue=None):
     labels = labels.to(device)
     model = model.to(device)
     model = DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id)
-    if not args.dgl_sparse:
-        embed_layer = DistributedDataParallel(embed_layer, device_ids=None, output_device=None)
+    embed_layer = DistributedDataParallel(embed_layer, device_ids=None, output_device=None)
 
-    if args.dgl_sparse:
-        emb_optimizer = dgl.optim.SparseAdam(params=[embed_layer.node_embed],
-                                             lr=args.sparse_lr, eps=1e-8)
-    else:
-        emb_optimizer = th.optim.SparseAdam(embed_layer.module.parameters(), lr=args.sparse_lr)
+    emb_optimizer = th.optim.SparseAdam(embed_layer.module.parameters(), lr=args.sparse_lr)
     optimizer = th.optim.Adam(model.parameters(), lr=1e-2, weight_decay=args.l2norm)
 
     th.set_num_threads(n_cpus)
@@ -141,8 +136,6 @@ if __name__ == '__main__':
                         help="include self feature as a special relation")
     parser.add_argument("--batch-size", type=int, default=100,
                         help="Mini-batch size. ")
-    parser.add_argument("--dgl-sparse", default=False, action='store_true',
-                        help='Use sparse embedding for node embeddings.')
     args = parser.parse_args()
     devices = list(map(int, args.gpu.split(',')))
 

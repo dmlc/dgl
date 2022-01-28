@@ -56,27 +56,18 @@ class RelGraphEmbedLayer(nn.Module):
         Number of nodes in the graph.
     embed_size : int
         Output embed size
-    dgl_sparse : bool, optional
-        If true, use dgl.nn.NodeEmbedding, otherwise use torch.nn.Embedding
     """
     def __init__(self,
                  out_dev,
                  num_nodes,
-                 embed_size,
-                 dgl_sparse=False):
+                 embed_size):
         super(RelGraphEmbedLayer, self).__init__()
         self.out_dev = out_dev
         self.embed_size = embed_size
-        self.dgl_sparse = dgl_sparse
 
         # create embeddings for all nodes
-        if dgl_sparse:
-            self.node_embed = dgl.nn.NodeEmbedding(
-                num_nodes, embed_size, name='emb',
-                init_func=initializer, device=th.device('cpu'))
-        else:
-            self.node_embed = nn.Embedding(num_nodes, embed_size, sparse=True)
-            nn.init.uniform_(self.node_embed.weight, -1.0, 1.0)
+        self.node_embed = nn.Embedding(num_nodes, embed_size, sparse=True)
+        nn.init.uniform_(self.node_embed.weight, -1.0, 1.0)
 
     def forward(self, node_ids):
         """Forward computation
@@ -91,9 +82,6 @@ class RelGraphEmbedLayer(nn.Module):
         tensor
             embeddings as the input of the next layer
         """
-        if self.dgl_sparse:
-            embeds = self.node_embed(node_ids, self.out_dev)
-        else:
-            embeds = self.node_embed(node_ids).to(self.out_dev)
+        embeds = self.node_embed(node_ids).to(self.out_dev)
 
         return embeds

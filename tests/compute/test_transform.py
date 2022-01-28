@@ -1816,6 +1816,7 @@ def test_norm_by_dst(idtype):
     eweight = dgl.norm_by_dst(g, etype=('user', 'plays', 'game'))
     assert F.allclose(eweight, F.tensor([0.5, 0.5, 1.0]))
 
+@parametrize_dtype
 def test_module_add_self_loop(idtype):
     g = dgl.graph(([1, 1], [1, 2]), idtype=idtype, device=F.ctx())
     g.ndata['h'] = F.randn((g.num_nodes(), 2))
