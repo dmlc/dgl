@@ -504,23 +504,6 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
   }
 }
 
-template <int XPU, typename IdType, int bits>
-void Edge_softmax_csr_backward(const std::string& op,
-             const BcastOff& bcast,
-             const CSRMatrix& csr,
-             NDArray f_out,
-             NDArray sds,
-             NDArray back_out) {
-  int64_t feat_len = bcast.out_len;
-  bool use_efeat = op != "copy_lhs";
-    SWITCH_BITS(bits, DType, {
-      SWITCH_OP(op, Op, {
-        cuda::Edge_softmax_csr_backward<IdType, DType, Op, cuda::reduce::Sum<IdType, DType> >(
-            bcast, csr, f_out, sds, back_out);
-      });
-    });
-}
-
 /*!
  * \brief CUDA implementation of g-SpMM on Csr format.
  * \note use cusparse if the reduce operator is `sum` and there is
@@ -748,35 +731,6 @@ template void SpMMCsr<kDLGPU, int64_t, 64>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
-
-
-
-
-template void Edge_softmax_csr_backward<kDLGPU, int32_t, 16>(
-    const std::string& op,
-    const BcastOff& bcast, const CSRMatrix& csr,
-    NDArray f_out, NDArray sds, NDArray back_out);
-template void Edge_softmax_csr_backward<kDLGPU, int64_t, 16>(
-    const std::string& op,
-    const BcastOff& bcast, const CSRMatrix& csr,
-    NDArray f_out, NDArray sds, NDArray back_out);
-template void Edge_softmax_csr_backward<kDLGPU, int32_t, 32>(
-    const std::string& op,
-    const BcastOff& bcast, const CSRMatrix& csr,
-    NDArray f_out, NDArray sds, NDArray back_out);
-template void Edge_softmax_csr_backward<kDLGPU, int64_t, 32>(
-    const std::string& op,
-    const BcastOff& bcast, const CSRMatrix& csr,
-    NDArray f_out, NDArray sds, NDArray back_out);
-template void Edge_softmax_csr_backward<kDLGPU, int32_t, 64>(
-    const std::string& op,
-    const BcastOff& bcast, const CSRMatrix& csr,
-    NDArray f_out, NDArray sds, NDArray back_out);
-template void Edge_softmax_csr_backward<kDLGPU, int64_t, 64>(
-    const std::string& op,
-    const BcastOff& bcast, const CSRMatrix& csr,
-    NDArray f_out, NDArray sds, NDArray back_out);
-
 
 template void SpMMCsrHetero<kDLGPU, int32_t, 16>(
     const std::string& op, const std::string& reduce,
