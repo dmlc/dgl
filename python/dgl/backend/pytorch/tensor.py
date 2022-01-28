@@ -14,8 +14,8 @@ from ..._deprecate import kernel as K
 from ...function.base import TargetCode
 from ...base import dgl_warning
 
-if LooseVersion(th.__version__) < LooseVersion("1.5.0"):
-    raise Exception("Detected an old version of PyTorch. Please update torch>=1.5.0 "
+if LooseVersion(th.__version__) < LooseVersion("1.8.0"):
+    raise Exception("Detected an old version of PyTorch. Please update torch>=1.8.0 "
                     "for the best experience.")
 
 def data_type_dict():
@@ -164,6 +164,9 @@ def argtopk(input, k, dim, descending=True):
 def exp(input):
     return th.exp(input)
 
+def inverse(input):
+    return th.inverse(input)
+
 def sqrt(input):
     return th.sqrt(input)
 
@@ -275,6 +278,9 @@ def boolean_mask(input, mask):
 
 def equal(x, y):
     return x == y
+
+def allclose(x, y, rtol=1e-4, atol=1e-4):
+    return th.allclose(x, y, rtol=rtol, atol=atol)
 
 def logical_not(input):
     return ~input

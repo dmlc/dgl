@@ -50,10 +50,10 @@ class SAGEConv(nn.Module):
         are required to be the same.
     out_feats : int
         Output feature size; i.e, the number of dimensions of :math:`h_i^{(l+1)}`.
-    feat_drop : float
-        Dropout rate on features, default: ``0``.
     aggregator_type : str
         Aggregator type to use (``mean``, ``gcn``, ``pool``, ``lstm``).
+    feat_drop : float
+        Dropout rate on features, default: ``0``.
     bias : bool
         If True, adds a learnable bias to the output. Default: ``True``.
     norm : callable activation function/layer or None, optional
@@ -199,7 +199,7 @@ class SAGEConv(nn.Module):
         torch.Tensor
             The output feature of shape :math:`(N_{dst}, D_{out})`
             where :math:`N_{dst}` is the number of destination nodes in the input graph,
-            math:`D_{out}` is size of output feature.
+            :math:`D_{out}` is the size of the output feature.
         """
         self._compatibility_check()
         with graph.local_scope():
