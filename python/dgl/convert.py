@@ -794,7 +794,7 @@ def to_heterogeneous(G, ntypes, etypes, ntype_field=NTYPE,
         data_dict[canonical_etypes[-1]] = \
             (src_of_etype, dst_of_etype)
     hg = heterograph(data_dict,
-                     {ntype: count for ntype, count in zip(ntypes, ntype_count)},
+                     dict(zip(ntypes, ntype_count)),
                      idtype=idtype, device=device)
 
     ntype2ngrp = {ntype : node_groups[ntid] for ntid, ntype in enumerate(ntypes)}
