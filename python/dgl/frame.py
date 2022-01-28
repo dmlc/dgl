@@ -39,16 +39,20 @@ class _LazyIndex(object):
         return flat_index
 
 class LazyFeature(object):
+    """Placeholder for prefetching from DataLoader.
+    """
     __slots__ = ['name', 'id_']
     def __init__(self, name=None, id_=None):
         self.name = name
         self.id_ = id_
 
-    def to(self, *args, **kwargs):
+    def to(self, *args, **kwargs):  # pylint: disable=invalid-name, unused-argument
+        """No-op.  For compatibility of :meth:`Frame.to` method."""
         return self
 
     @property
     def data(self):
+        """No-op.  For compatibility of :meth:`Frame.__repr__` method."""
         return self
 
 class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):

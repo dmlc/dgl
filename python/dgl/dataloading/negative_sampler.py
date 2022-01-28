@@ -1,7 +1,6 @@
 """Negative samplers"""
 from collections.abc import Mapping
 from .. import backend as F
-from ..sampling import global_uniform_negative_sampling
 
 class _BaseNegativeSampler(object):
     def _generate(self, g, eids, canonical_etype):

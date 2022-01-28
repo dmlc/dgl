@@ -1,15 +1,11 @@
 """Neighbor sampling APIs"""
 
-from collections.abc import Mapping
-import numpy as np
-
 from .._ffi.function import _init_api
 from .. import backend as F
 from ..base import DGLError, EID
 from ..heterograph import DGLHeteroGraph
 from .. import ndarray as nd
-from .. import utils, transform
-from ..utils import recursive_apply, recursive_apply_pair
+from .. import utils
 from .utils import EidExcluder
 
 __all__ = [
@@ -294,10 +290,11 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
     if g.device == F.cpu():
         frontier = _sample_neighbors(
             g, nodes, fanout, edge_dir=edge_dir, prob=prob, replace=replace,
-            exclude_edges=exclude_edges)
+            copy_ndata=copy_ndata, copy_edata=copy_edata, exclude_edges=exclude_edges)
     else:
         frontier = _sample_neighbors(
-            g, nodes, fanout, edge_dir=edge_dir, prob=prob, replace=replace)
+            g, nodes, fanout, edge_dir=edge_dir, prob=prob, replace=replace,
+            copy_ndata=copy_ndata, copy_edata=copy_edata)
         if exclude_edges is not None:
             eid_excluder = EidExcluder(exclude_edges)
             frontier = eid_excluder(frontier)

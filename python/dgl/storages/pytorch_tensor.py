@@ -1,6 +1,6 @@
-from collections.abc import Mapping
+"""Feature storages for PyTorch tensors."""
+
 import torch
-from ..utils import recursive_apply, recursive_apply_pair
 from .base import FeatureStorage, register_storage_wrapper
 
 def _fetch_cpu(indices, tensor, feature_shape, device, pin_memory):
@@ -16,6 +16,7 @@ def _fetch_cuda(indices, tensor, device):
 
 @register_storage_wrapper(torch.Tensor)
 class TensorStorage(FeatureStorage):
+    """Feature storages for slicing a PyTorch tensor."""
     def __init__(self, tensor):
         self.tensor = tensor
         self.feature_shape = tensor.shape[1:]

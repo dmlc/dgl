@@ -21,7 +21,7 @@ from ..utils import (
     recursive_apply, ExceptionWrapper, recursive_apply_pair, set_num_threads,
     create_shared_mem_array, get_shared_mem_array)
 from ..frame import Column, LazyFeature
-from ..storages import TensorStorage, FeatureStorage, storage_wrappers
+from ..storages import TensorStorage, FeatureStorage, STORAGE_WRAPPERS
 from .base import BlockSampler, EdgeBlockSampler
 from .. import backend as F
 
@@ -459,7 +459,7 @@ class WorkerInitWrapper(object):
 
 
 def _wrap_storage(storage):
-    for type_, storage_cls in storage_wrappers.items():
+    for type_, storage_cls in STORAGE_WRAPPERS.items():
         if isinstance(storage, type_):
             return storage_cls(storage)
 

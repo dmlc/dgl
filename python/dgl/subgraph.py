@@ -153,8 +153,8 @@ def node_subgraph(graph, nodes, *, relabel_nodes=True, store_ids=True, output_de
     # bug in #1453.
     if not relabel_nodes:
         induced_nodes = None
-    sg = _create_hetero_subgraph(graph, sgi, induced_nodes, induced_edges, store_ids=store_ids)
-    return sg if output_device is None else sg.to(output_device)
+    subg = _create_hetero_subgraph(graph, sgi, induced_nodes, induced_edges, store_ids=store_ids)
+    return subg if output_device is None else subg.to(output_device)
 
 DGLHeteroGraph.subgraph = utils.alias_func(node_subgraph)
 
@@ -308,8 +308,8 @@ def edge_subgraph(graph, edges, *, relabel_nodes=True, store_ids=True, output_de
         induced_edges.append(_process_edges(cetype, eids))
     sgi = graph._graph.edge_subgraph(induced_edges, not relabel_nodes)
     induced_nodes = sgi.induced_nodes if relabel_nodes else None
-    sg = _create_hetero_subgraph(graph, sgi, induced_nodes, induced_edges, store_ids=store_ids)
-    return sg if output_device is None else sg.to(output_device)
+    subg = _create_hetero_subgraph(graph, sgi, induced_nodes, induced_edges, store_ids=store_ids)
+    return subg if output_device is None else subg.to(output_device)
 
 DGLHeteroGraph.edge_subgraph = utils.alias_func(edge_subgraph)
 
@@ -436,8 +436,8 @@ def in_subgraph(graph, nodes, *, relabel_nodes=False, store_ids=True, output_dev
     sgi = _CAPI_DGLInSubgraph(graph._graph, nodes_all_types, relabel_nodes)
     induced_nodes = sgi.induced_nodes if relabel_nodes else None
     induced_edges = sgi.induced_edges
-    sg = _create_hetero_subgraph(graph, sgi, induced_nodes, induced_edges, store_ids=store_ids)
-    return sg if output_device is None else sg.to(output_device)
+    subg = _create_hetero_subgraph(graph, sgi, induced_nodes, induced_edges, store_ids=store_ids)
+    return subg if output_device is None else subg.to(output_device)
 
 DGLHeteroGraph.in_subgraph = utils.alias_func(in_subgraph)
 
@@ -564,8 +564,8 @@ def out_subgraph(graph, nodes, *, relabel_nodes=False, store_ids=True, output_de
     sgi = _CAPI_DGLOutSubgraph(graph._graph, nodes_all_types, relabel_nodes)
     induced_nodes = sgi.induced_nodes if relabel_nodes else None
     induced_edges = sgi.induced_edges
-    sg = _create_hetero_subgraph(graph, sgi, induced_nodes, induced_edges, store_ids=store_ids)
-    return sg if output_device is None else sg.to(output_device)
+    subg = _create_hetero_subgraph(graph, sgi, induced_nodes, induced_edges, store_ids=store_ids)
+    return subg if output_device is None else subg.to(output_device)
 
 DGLHeteroGraph.out_subgraph = utils.alias_func(out_subgraph)
 
@@ -607,7 +607,7 @@ def khop_in_subgraph(graph, nodes, k, *, relabel_nodes=True, store_ids=True, out
         If True, it will store the raw IDs of the extracted edges in the ``edata`` of the
         resulting graph under name ``dgl.EID``; if ``relabel_nodes`` is ``True``, it will
         also store the raw IDs of the extracted nodes in the ``ndata`` of the resulting
-        graph under name ``dgl.NID``. 
+        graph under name ``dgl.NID``.
     output_device : Framework-specific device context object, optional
         The output device.  Default is the same as the input graph.
 

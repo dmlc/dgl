@@ -1,11 +1,14 @@
+"""Base classes and functionalities for feature storages."""
+
 import threading
-from functools import partial
 
 
-storage_wrappers = {}
+STORAGE_WRAPPERS = {}
 def register_storage_wrapper(type_):
+    """Decorator that associates a type to a ``FeatureStorage`` object.
+    """
     def deco(cls):
-        storage_wrappers[type_] = cls
+        STORAGE_WRAPPERS[type_] = cls
         return cls
     return deco
 
@@ -16,7 +19,11 @@ class _FuncWrapper(object):
     def __call__(self, buf, *args):
         buf[0] = self.func(*args)
 
-class ThreadFutureWrapper(object):
+class ThreadedFuture(object):
+    """Wraps a function into a future asynchronously executed by a Python
+    ``threading.Thread`.  The function is being executed upon instantiation of
+    this object.
+    """
     def __init__(self, target, args):
         self.buf = [None]
 
@@ -28,6 +35,7 @@ class ThreadFutureWrapper(object):
         self.thread = thread
 
     def wait(self):
+        """Blocks the current thread until the result becomes available and returns it."""
         self.thread.join()
         return self.buf[0]
 
@@ -55,5 +63,8 @@ class FeatureStorage(object):
         .. code::
 
            {k: storage[k][indices[k]] for k in indices.keys()}
+
+        The subclasses can choose to utilize or ignore the flag :attr:`pin_memory`
+        depending on the underlying framework.
         """
         raise NotImplementedError

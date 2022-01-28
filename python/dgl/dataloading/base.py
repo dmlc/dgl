@@ -1,3 +1,4 @@
+"""Base classes and functionalities for dataloaders"""
 from collections import Mapping
 from ..base import NID, EID
 from ..convert import heterograph
@@ -16,15 +17,27 @@ def _set_lazy_features(x, xdata, feature_names):
             x[type_].data.update({k: LazyFeature(k) for k in names})
 
 def set_node_lazy_features(g, feature_names):
+    """Set lazy features for ``g.ndata`` if :attr:`feature_names` is a list of strings,
+    or ``g.nodes[ntype].data`` if :attr:`feature_names` is a dict of list of strings.
+    """
     return _set_lazy_features(g.nodes, g.ndata, feature_names)
 
 def set_edge_lazy_features(g, feature_names):
+    """Set lazy features for ``g.edata`` if :attr:`feature_names` is a list of strings,
+    or ``g.edges[etype].data`` if :attr:`feature_names` is a dict of list of strings.
+    """
     return _set_lazy_features(g.edges, g.edata, feature_names)
 
 def set_src_lazy_features(g, feature_names):
+    """Set lazy features for ``g.srcdata`` if :attr:`feature_names` is a list of strings,
+    or ``g.srcnodes[srctype].data`` if :attr:`feature_names` is a dict of list of strings.
+    """
     return _set_lazy_features(g.srcnodes, g.srcdata, feature_names)
 
 def set_dst_lazy_features(g, feature_names):
+    """Set lazy features for ``g.dstdata`` if :attr:`feature_names` is a list of strings,
+    or ``g.dstnodes[dsttype].data`` if :attr:`feature_names` is a dict of list of strings.
+    """
     return _set_lazy_features(g.dstnodes, g.dstdata, feature_names)
 
 class BlockSampler(object):
@@ -43,9 +56,17 @@ class BlockSampler(object):
         self.output_device = output_device
 
     def sample_blocks(self, g, seed_nodes, exclude_edges=None):
+        """Generates a list of blocks from the given seed nodes.
+        
+        This function must return a triplet where the first element is the input node IDs
+        for the first GNN layer (a tensor or a dict of tensors for heterogeneous graphs),
+        the second element is the output node IDs for the last GNN layer, and the third
+        element is the said list of blocks.
+        """
         raise NotImplementedError
 
     def assign_lazy_features(self, result):
+        """Assign lazy features for prefetching."""
         # A LazyFeature is a placeholder telling the dataloader where and which IDs
         # to prefetch.  It has the signature LazyFeature(name, id_).  id_ can be None
         # if the LazyFeature is set into one of the subgraph's ``xdata``, in which case the
@@ -77,6 +98,7 @@ class BlockSampler(object):
         return input_nodes, output_nodes, blocks
 
     def sample(self, g, seed_nodes):
+        """Sample a list of blocks from the given seed nodes."""
         result = self.sample_blocks(g, seed_nodes)
         return self.assign_lazy_features(result)
 
@@ -100,6 +122,23 @@ def _find_exclude_eids_with_reverse_types(g, eids, reverse_etype_map):
     return exclude_eids
 
 def _find_exclude_eids(g, exclude_mode, eids, **kwargs):
+    if exclude_mode is None:
+        return None
+    elif F.is_tensor(exclude_mode) or (
+            isinstance(exclude_mode, Mapping) and
+            all(F.is_tensor(v) for v in exclude_mode.values())):
+        return exclude_mode
+    elif exclude_mode == 'self':
+        return eids
+    elif exclude_mode == 'reverse_id':
+        return _find_exclude_eids_with_reverse_id(g, eids, kwargs['reverse_eid_map'])
+    elif exclude_mode == 'reverse_types':
+        return _find_exclude_eids_with_reverse_types(g, eids, kwargs['reverse_etype_map'])
+    else:
+        raise ValueError('unsupported mode {}'.format(exclude_mode))
+
+def find_exclude_eids(g, seed_edges, exclude, reverse_eids=None, reverse_etypes=None,
+                      output_device=None):
     """Find all edge IDs to exclude according to :attr:`exclude_mode`.
 
     Parameters
@@ -139,28 +178,13 @@ def _find_exclude_eids(g, exclude_mode, eids, **kwargs):
             will have ID ``e`` and type ``reverse_etype_map[etype]``.
     eids : Tensor or dict[etype, Tensor]
         The edge IDs.
-    reverse_eid_map : Tensor or dict[etype, Tensor]
+    reverse_eids : Tensor or dict[etype, Tensor]
         The mapping from edge ID to its reverse edge ID.
-    reverse_etype_map : dict[etype, etype]
+    reverse_etypes : dict[etype, etype]
         The mapping from edge etype to its reverse edge type.
+    output_device : device
+        The device of the output edge IDs.
     """
-    if exclude_mode is None:
-        return None
-    elif F.is_tensor(exclude_mode) or (
-            isinstance(exclude_mode, Mapping) and
-            all(F.is_tensor(v) for v in exclude_mode.values())):
-        return exclude_mode
-    elif exclude_mode == 'self':
-        return eids
-    elif exclude_mode == 'reverse_id':
-        return _find_exclude_eids_with_reverse_id(g, eids, kwargs['reverse_eid_map'])
-    elif exclude_mode == 'reverse_types':
-        return _find_exclude_eids_with_reverse_types(g, eids, kwargs['reverse_etype_map'])
-    else:
-        raise ValueError('unsupported mode {}'.format(exclude_mode))
-
-def find_exclude_eids(g, seed_edges, exclude, reverse_eids=None, reverse_etypes=None,
-                      output_device=None):
     exclude_eids = _find_exclude_eids(
         g,
         exclude,
@@ -174,6 +198,9 @@ def find_exclude_eids(g, seed_edges, exclude, reverse_eids=None, reverse_etypes=
 
 
 class EdgeBlockSampler(object):
+    """Adapts a :class:`BlockSampler` object's :attr:`sample` method for edge
+    classification and link prediction.
+    """
     def __init__(self, block_sampler, exclude=None, reverse_eids=None,
                  reverse_etypes=None, negative_sampler=None, prefetch_node_feats=None,
                  prefetch_labels=None, prefetch_edge_feats=None):
@@ -204,6 +231,7 @@ class EdgeBlockSampler(object):
         return neg_pair_graph
 
     def assign_lazy_features(self, result):
+        """Assign lazy features for prefetching."""
         pair_graph = result[1]
         blocks = result[-1]
 
@@ -215,6 +243,12 @@ class EdgeBlockSampler(object):
         return result
 
     def sample(self, g, seed_edges):
+        """Samples a list of blocks, as well as a subgraph containing the sampled
+        edges from the original graph.
+        
+        If :attr:`negative_sampler` is given, also returns another graph containing the
+        negative pairs as edges.
+        """
         exclude = self.exclude
         pair_graph = g.edge_subgraph(
             seed_edges, relabel_nodes=False, output_device=self.output_device)
