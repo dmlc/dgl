@@ -1058,14 +1058,14 @@ def test_as_nodepred1():
     assert ds[0].ndata['train_mask'].sum() == int(ds[0].num_nodes() * 0.1)
 
     # create
-    ds = data.AsNodePredDataset(data.AIFBDataset(), [0.8, 0.1, 0.1], ntype='Publikationen')
+    ds = data.AsNodePredDataset(data.AIFBDataset(), [0.8, 0.1, 0.1], split_ntype='Publikationen', verbose=True)
     assert ds[0].nodes['Publikationen'].data['train_mask'].sum() == int(ds[0].num_nodes('Publikationen') * 0.8)
     # read from cache
-    ds = data.AsNodePredDataset(data.AIFBDataset(), [0.8, 0.1, 0.1], ntype='Publikationen')
+    ds = data.AsNodePredDataset(data.AIFBDataset(), [0.8, 0.1, 0.1], split_ntype='Publikationen', verbose=True)
     assert ds[0].nodes['Publikationen'].data['train_mask'].sum() == int(ds[0].num_nodes('Publikationen') * 0.8)
     # invalid cache, re-read
-    ds = data.AsNodePredDataset(data.AIFBDataset(), [0.8, 0.1, 0.1], ntype='Forschungsgebiete')
-    assert 'train_mask' not in ds[0].nodes['Forschungsgebiete'].ndata
+    ds = data.AsNodePredDataset(data.AIFBDataset(), [0.8, 0.1, 0.1], split_ntype='Forschungsgebiete', verbose=True)
+    assert 'train_mask' not in ds[0].nodes['Publikationen'].data
     assert ds[0].nodes['Forschungsgebiete'].data['train_mask'].sum() == int(ds[0].num_nodes('Forschungsgebiete') * 0.8)
 
 if __name__ == '__main__':

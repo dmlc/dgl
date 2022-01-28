@@ -11,8 +11,13 @@ __all__ = ['AsNodePredDataset']
 class AsNodePredDataset(DGLDataset):
     """Repurpose a dataset for node prediction task.
 
-    The created dataset will include data needed for semi-supervised transductive
-    node prediction. It will keep only the first graph in the provided dataset and
+    The created dataset will be suitable for semi-supervised transductive
+    node prediction. Specifically,
+
+    - The dataset contains only one graph.
+    - 
+    
+    It will keep only the first graph in the provided dataset and
     generate train/val/test masks according to the given spplit ratio. The generated
     masks will be cached to disk for fast re-loading. If the provided split ratio
     differs from the cached one, it will re-process the dataset properly.
@@ -48,7 +53,7 @@ class AsNodePredDataset(DGLDataset):
                  split_ratio=[0.8, 0.1, 0.1],
                  split_ntype=None,
                  **kwargs):
-        self.g = dataset[0]
+        self.g = dataset[0].clone()
         self.split_ratio = split_ratio
         self.split_ntype = split_ntype
         self.num_classes = dataset.num_classes
@@ -57,7 +62,7 @@ class AsNodePredDataset(DGLDataset):
     def process(self):
         if self.verbose:
             print('Generating train/val/test masks...')
-        utils.add_nodepred_split(self, self.split_ratio)
+        utils.add_nodepred_split(self, self.split_ratio, self.split_ntype)
 
     def has_cache(self):
         return os.path.isfile(os.path.join(self.save_path, 'graph.bin'))
