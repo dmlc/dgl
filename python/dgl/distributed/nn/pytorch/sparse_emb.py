@@ -77,10 +77,10 @@ class DistEmbedding:
         if th.distributed.is_initialized():
             self._rank = th.distributed.get_rank()
             self._world_size = th.distributed.get_world_size()
-        else:
-            # [TODO] The following code is clearly wrong but changing it to "raise DGLError"
-            # actually fails unit test.  ???
-            # assert 'th.distributed should be initialized'
+        # [TODO] The following code is clearly wrong but changing it to "raise DGLError"
+        # actually fails unit test.  ???
+        # else:
+        #     assert 'th.distributed should be initialized'
         self._optm_state = None # track optimizer state
         self._part_policy = part_policy
 
