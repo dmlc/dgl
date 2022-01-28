@@ -661,12 +661,12 @@ class RangePartitionBook(GraphPartitionBook):
         for ntype in ntypes:
             ntype_id = ntypes[ntype]
             self._ntypes[ntype_id] = ntype
-        assert all([ntype is not None for ntype in self._ntypes]), \
+        assert all(ntype is not None for ntype in self._ntypes), \
                 "The node types have invalid IDs."
         for etype in etypes:
             etype_id = etypes[etype]
             self._etypes[etype_id] = etype
-        assert all([etype is not None for etype in self._etypes]), \
+        assert all(etype is not None for etype in self._etypes), \
                 "The edge types have invalid IDs."
 
         # This stores the node ID ranges for each node type in each partition.
