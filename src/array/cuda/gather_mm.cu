@@ -128,7 +128,7 @@ __global__ void gatherMMUnsortedEKernel(
     if (row < num_rows) {
         unsigned int local_row = row & 3;  // hardcoded for TB size 128 (4 warps)
         const int sh_h_tile = 64;
-        __shared__ float sh_H[4 * sh_h_tile];
+        __shared__ DType sh_H[4 * sh_h_tile];
         int h_tile = sh_h_tile;
         if ((in_len - k_start) < h_tile) h_tile = in_len - k_start;
         /* Load A in shared mem in a coalesced way */
@@ -138,7 +138,7 @@ __global__ void gatherMMUnsortedEKernel(
 
         int B_offset = etype[row] * in_len * out_len;  // assume all weights are of same dim
         for (unsigned int k_outloop = 0; k_outloop < out_len; k_outloop +=32) {
-            float out_reg = 0;  // thread private
+            DType out_reg = 0;  // thread private
             unsigned int k = laneId;
             if (k < out_len) {
                 /* iterate over elements of a row of A */
@@ -295,9 +295,13 @@ void gatherMM(const NDArray A,
     if (sortedA)  // similar to low-mem matmul
         gatherMM_SortedEtype<XPU, IdType, bits>(A, B, C, A_dim1_per_rel,
             B_dim1_per_rel, a_trans, b_trans);
-    else  // similar to bmm (high-mem) without copying weights to edges
+    else { // similar to bmm (high-mem) without copying weights to edges
         // TODO(Israt): Add support for B with different dimension 1 per relation
+        // TODO(Israt): Add tranpose operation for A and B
+       if (a_trans || b_trans)
+            LOG(FATAL) << "Tranpose operation is not supported for unsorted A (sortedA = False) ";
         gatherMM_UnsortedEtype<XPU, IdType, bits>(A, B, C, A_dim1_per_rel, etype);
+    }
 }
 
 template void gatherMM<kDLGPU, int32_t, 16>(

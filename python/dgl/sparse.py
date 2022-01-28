@@ -329,7 +329,7 @@ def _gspmm_hetero(gidx, op, reduce_op, u_len, u_and_e_tuple):
 
 
 def _gather_mm(A, B, out, A_per_rel, B_per_rel, etypes, sortedE=True,
-               A_trans=False, B_trans=False):
+               a_trans=False, b_trans=False):
     r""" Generalized Dense Matrix Multiplication interface. It multiplies
     tensor A and B according to relation types and outputs in out. B is a
     concatenated tensor across relation types. If sortedE is True which
@@ -365,7 +365,7 @@ def _gather_mm(A, B, out, A_per_rel, B_per_rel, etypes, sortedE=True,
                                 to_dgl_nd(A_per_rel),
                                 to_dgl_nd(B_per_rel),
                                 to_dgl_nd(etypes),
-                                sortedE, A_trans, B_trans)
+                                sortedE, a_trans, b_trans)
     else:
         # TODO(Israt): Which file should have the implementation of gatherMM using PyTorch?
         raise DGLError("For CPU use PyTorch's matmul operator")
