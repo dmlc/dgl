@@ -19,6 +19,6 @@ from .neighbor_sampler import *
 from .cluster_gcn import *
 from .shadow import *
 from .base import *
-import negative_sampler
+from . import negative_sampler
 if F.get_preferred_backend() == 'pytorch':
     from .dataloader import *

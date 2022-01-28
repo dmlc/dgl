@@ -19,7 +19,7 @@ from .dataloader import *
 from .cluster_gcn import *
 from .shadow import *
 
-import negative_sampler
+from . import negative_sampler
 from .async_transferer import AsyncTransferer
 
 from .. import backend as F
