@@ -138,17 +138,17 @@ __global__ void gatherMMUnsortedEKernel(
             __syncwarp();
 
             int B_offset = etype[row] * in_len * out_len;  // assume all weights are of same dim
-            for (unsigned int k_outloop = 0; k_outloop < out_len; k_outloop +=32) {
+            for (unsigned int outloop = 0; outloop < out_len; outloop +=32) {
                 DType out_reg = 0;  // thread private
-                unsigned int k = laneId;
-                if (k < out_len) {
+                unsigned int l = laneId;
+                if (l < out_len) {
                     /* iterate over elements of a row of A */
                     for (unsigned int i = 0; i < h_tile; i++) {
                         DType h_val =  sh_H[local_row * h_tile + i];
                         /* iterate over elements of a row of B in parallel */
-                        out_reg += h_val * B[B_offset + ((i + k_start) * out_len + (k_outloop + k))];
+                        out_reg += h_val * B[B_offset + ((i + k_start) * out_len + (outloop + l))];
                     }
-                    C[row * out_len + (k_outloop + k)] += out_reg;
+                    C[row * out_len + (outloop + l)] += out_reg;
                 }
             }
         }
