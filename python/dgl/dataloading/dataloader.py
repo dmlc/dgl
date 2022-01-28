@@ -251,8 +251,6 @@ class _PrefetchedGraphFeatures(object):
 
 
 def _prefetch_for_subgraph(subg, dataloader):
-    g = dataloader.graph
-
     node_feats, edge_feats = {}, {}
     _prefetch_update_feats(
         node_feats, subg._node_frames, subg.ntypes, dataloader.node_storages,
@@ -574,11 +572,13 @@ class DataLoader(torch.utils.data.DataLoader):
 
     # To allow data other than node/edge data to be prefetched.
     def attach_data(self, name, data):
+        """Add a data other than node and edge features for prefetching."""
         self.other_storages[name] = _wrap_storage(data)
 
 
 # Alias
 class NodeDataLoader(DataLoader):
+    """NodeDataLoader class."""
     pass
 
 

@@ -6,7 +6,6 @@ import numpy as np
 from .. import backend as F
 from ..base import DGLError
 from ..partition import metis_partition_assignment
-from ..frame import LazyFeature
 from .base import set_node_lazy_features, set_edge_lazy_features
 
 class ClusterGCNSampler(object):
