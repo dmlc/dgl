@@ -292,14 +292,15 @@ void gatherMM(const NDArray A,
           const NDArray B_dim1_per_rel,
           const NDArray etype,
           bool sortedA, bool a_trans, bool b_trans) {
-    if (sortedA)  // similar to low-mem matmul
+    if (sortedA) {  // similar to low-mem matmul
         gatherMM_SortedEtype<XPU, IdType, bits>(A, B, C, A_dim1_per_rel,
             B_dim1_per_rel, a_trans, b_trans);
-    else { // similar to bmm (high-mem) without copying weights to edges
-        // TODO(Israt): Add support for B with different dimension 1 per relation
+    } else { // similar to bmm (high-mem) without copying weights to edges
+        // TODO(Israt): Add support for A and B to have different dimension in relation types
         // TODO(Israt): Add tranpose operation for A and B
-       if (a_trans || b_trans)
+        if (a_trans || b_trans) {
             LOG(FATAL) << "Tranpose operation is not supported for unsorted A (sortedA = False) ";
+        }
         gatherMM_UnsortedEtype<XPU, IdType, bits>(A, B, C, A_dim1_per_rel, etype);
     }
 }
