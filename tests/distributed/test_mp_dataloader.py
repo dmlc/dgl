@@ -213,7 +213,7 @@ def check_neg_dataloader(g, tmpdir, num_server, num_workers):
 @pytest.mark.parametrize("num_workers", [0, 4])
 @pytest.mark.parametrize("drop_last", [True, False])
 @pytest.mark.parametrize("reshuffle", [True, False])
-@pytest.mark.parametrize("num_groups", [1, 5])
+@pytest.mark.parametrize("num_groups", [1, 2])
 def test_dist_dataloader(tmpdir, num_server, num_workers, drop_last, reshuffle, num_groups):
     reset_envs()
     generate_ip_config("mp_ip_config.txt", num_server, num_server)
@@ -451,7 +451,7 @@ if __name__ == "__main__":
         test_dataloader(Path(tmpdirname), 3, 4, 'node')
         test_dataloader(Path(tmpdirname), 3, 4, 'edge')
         test_neg_dataloader(Path(tmpdirname), 3, 4)
-        for num_groups in [1, 5]:
+        for num_groups in [1, 2]:
             test_dist_dataloader(Path(tmpdirname), 3, 0, True, True, num_groups)
             test_dist_dataloader(Path(tmpdirname), 3, 4, True, True, num_groups)
             test_dist_dataloader(Path(tmpdirname), 3, 0, True, False, num_groups)
