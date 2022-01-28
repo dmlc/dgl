@@ -368,7 +368,7 @@ def _gather_mm(A, B, out, A_per_rel, B_per_rel, etypes, sortedE=True,
                                 sortedE, a_trans, b_trans)
     else:
         # TODO(Israt): Which file should have the implementation of gatherMM using PyTorch?
-        raise DGLError("For CPU use PyTorch's matmul operator")
+        raise NotImplementedError("For CPU use PyTorch's matmul operator")
     return out
 
 
