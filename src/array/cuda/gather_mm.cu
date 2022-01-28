@@ -106,10 +106,10 @@ void _Transpose(cublasHandle_t handle,
 */
 
 /* Implementation of Idea 2
-  \Note One warp is assigned to process one row of A. Each WARP sequentially multiplies
-  one element of A and a row of B to compute partial result of the output. A is
-  loaded in shared memory in a coalesced way. Output matrix is loaded in registers.
-  B should get benefit from L2 cache.
+  \Note One warp is assigned to process one row of A. Each WARP sequentially
+  multiplies one element of A and a row of B to compute partial result of the
+  output. A is loaded in shared memory in a coalesced way. Output matrix is
+  loaded in registers. B should get benefit from L2 cache.
 */
 
 template <typename Idx, typename DType>
@@ -134,7 +134,7 @@ __global__ void gatherMMUnsortedEKernel(
             if ((in_len - k_start) < h_tile) h_tile = in_len - k_start;
             /* Load A in shared mem in a coalesced way */
             for (unsigned int l = laneId; l < h_tile; l += 32)
-                sh_H[local_row * h_tile + l] = A[row * in_len + (k_start + l)];
+                sh_H[local_row * sh_h_tile + l] = A[row * in_len + (k_start + l)];
             __syncwarp();
 
             int B_offset = etype[row] * in_len * out_len;  // assume all weights are of same dim
@@ -144,7 +144,7 @@ __global__ void gatherMMUnsortedEKernel(
                 if (l < out_len) {
                     /* iterate over elements of a row of A */
                     for (unsigned int i = 0; i < h_tile; i++) {
-                        DType h_val =  sh_H[local_row * h_tile + i];
+                        DType h_val =  sh_H[local_row * sh_h_tile + i];
                         /* iterate over elements of a row of B in parallel */
                         out_reg += h_val * B[B_offset + ((i + k_start) * out_len + (outloop + l))];
                     }
@@ -163,13 +163,22 @@ void gatherMM_UnsortedEtype(const NDArray A,
               const NDArray B,
               NDArray C,
               const NDArray A_dim1_per_rel,
+              const NDArray B_dim1_per_rel,
               const NDArray etype) {
     SWITCH_BITS(bits, DType, {
+        assert(A_dim1_per_rel.NumElements() == B_dim1_per_rel.NumElements());
+        const IdType* A_rel_data = A_dim1_per_rel.Ptr<IdType>();
+        const IdType* B_rel_data = B_dim1_per_rel.Ptr<IdType>();
+        for (int rel = 0; rel < B_dim1_per_rel.NumElements(); ++rel) {
+            if (B_rel_data[rel] != B_rel_data[0])
+                LOG(FATAL) << "Tensors in B do not share same dimension across relations. "
+                    << "Found " << B_rel_data[0] << " and " << B_rel_data[rel] << " in "
+                    << "relation 0 and " << rel << ". Use sorted version (sortedA =True).";
+        }
         auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
         int64_t num_rel = A_dim1_per_rel.NumElements();
         int n = B->shape[1];  // cols of B
         int k = A->shape[1];  // cols of A
-        const IdType* A_rel_data = A_dim1_per_rel.Ptr<IdType>();
         IdType tot_num_rows = 0;
         for (int i = 0; i < num_rel; ++i)
             tot_num_rows += A_rel_data[i];
@@ -299,7 +308,8 @@ void gatherMM(const NDArray A,
         if (a_trans || b_trans) {
             LOG(FATAL) << "Tranpose operation is not supported for unsorted A (sortedA = False) ";
         }
-        gatherMM_UnsortedEtype<XPU, IdType, bits>(A, B, C, A_dim1_per_rel, etype);
+        gatherMM_UnsortedEtype<XPU, IdType, bits>(A, B, C, A_dim1_per_rel,
+            B_dim1_per_rel, etype);
     }
 }
 
