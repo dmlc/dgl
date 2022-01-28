@@ -13,8 +13,8 @@ from ...distributed import DistGraph
 from ...distributed import DistDataLoader
 from ...ndarray import NDArray as DGLNDArray
 from ... import backend as F
-from ...base import DGLError
-from ...utils import to_dgl_context
+from ...base import DGLError, dgl_warning
+from ...utils import to_dgl_context, check_device
 from ..._ffi import streams as FS
 
 __all__ = ['NodeDataLoader', 'EdgeDataLoader', 'GraphDataLoader',
@@ -459,7 +459,7 @@ def _init_dataloader(collator, device, dataloader_kwargs, use_ddp, ddp_seed):
     use_scalar_batcher = False
     scalar_batcher = None
 
-    if th.device(device) != th.device('cpu') and dataloader_kwargs.get('num_workers', 0) == 0:
+    if F.device_type(device) == 'cuda' and dataloader_kwargs.get('num_workers', 0) == 0:
         batch_size = dataloader_kwargs.get('batch_size', 1)
 
         if batch_size > 1:
@@ -589,7 +589,8 @@ class NodeDataLoader:
       depending on the value of :attr:`num_workers`:
 
       - If :attr:`num_workers` is set to 0, the sampling will happen on the CPU, and then the
-        subgraphs will be constructed directly on the GPU. This is the recommend setting in
+        subgraphs will be constructed directly on the GPU. This hybrid mode is deprecated and
+        will be removed in the next release. Use UVA sampling instead, especially in
         multi-GPU configurations.
 
       - Otherwise, if :attr:`num_workers` is greater than 0, both the sampling and subgraph
@@ -611,8 +612,9 @@ class NodeDataLoader:
         if isinstance(g, DistGraph):
             if device is None:
                 # for the distributed case default to the CPU
-                device = 'cpu'
-            assert device == 'cpu', 'Only cpu is supported in the case of a DistGraph.'
+                device = th.device('cpu')
+            assert F.device_type(device) == 'cpu', \
+                'Only cpu is supported in the case of a DistGraph.'
             # Distributed DataLoader currently does not support heterogeneous graphs
             # and does not copy features.  Fallback to normal solution
             self.collator = NodeCollator(g, nids, graph_sampler, **collator_kwargs)
@@ -622,9 +624,23 @@ class NodeDataLoader:
                                              **dataloader_kwargs)
             self.is_distributed = True
         else:
-            if device is None:
-                # default to the same device the graph is on
-                device = th.device(g.device)
+            # default to the same device the graph is on
+            device = th.device(g.device if device is None else device)
+            num_workers = dataloader_kwargs.get('num_workers', 0)
+
+            if F.device_type(g.device) == 'cuda' or g.is_pinned():
+                st = 'UVA' if g.is_pinned() else 'GPU'
+                assert F.device_type(device) == 'cuda', \
+                    f"'device' must be a cuda device to enable {st} sampling, got {device}."
+                assert check_device(nids, device), \
+                    f"'nids' must be on {device} to use {st} sampling."
+                assert num_workers == 0, \
+                    f"'num_workers' must be 0 to use {st} sampling."
+            # g is on CPU
+            elif F.device_type(device) == 'cuda' and num_workers == 0:
+                dgl_warning('CPU-GPU hybrid sampling is deprecated and will be removed '
+                            'in the next release. Use pure GPU sampling if your graph can '
+                            'fit onto the GPU memory, or UVA sampling in other cases.')
 
             if not g.is_homogeneous:
                 if load_input or load_output:
@@ -637,7 +653,6 @@ class NodeDataLoader:
             # But if async_load is enabled, set_output_context should be skipped as
             # we'd like to avoid any graph/data transfer graphs across devices in
             # sampler. Such transfer will be handled in dataloader.
-            num_workers = dataloader_kwargs.get('num_workers', 0)
             if ((not async_load) and
                     callable(getattr(graph_sampler, "set_output_context", None)) and
                     num_workers == 0):
@@ -898,7 +913,7 @@ class EdgeDataLoader:
     """
     collator_arglist = inspect.getfullargspec(EdgeCollator).args
 
-    def __init__(self, g, eids, graph_sampler, device='cpu', use_ddp=False, ddp_seed=0, **kwargs):
+    def __init__(self, g, eids, graph_sampler, device=None, use_ddp=False, ddp_seed=0, **kwargs):
         collator_kwargs = {}
         dataloader_kwargs = {}
         for k, v in kwargs.items():
@@ -910,8 +925,9 @@ class EdgeDataLoader:
         if isinstance(g, DistGraph):
             if device is None:
                 # for the distributed case default to the CPU
-                device = 'cpu'
-            assert device == 'cpu', 'Only cpu is supported in the case of a DistGraph.'
+                device = th.device('cpu')
+            assert F.device_type(device) == 'cpu', \
+                'Only cpu is supported in the case of a DistGraph.'
             # Distributed DataLoader currently does not support heterogeneous graphs
             # and does not copy features.  Fallback to normal solution
             self.collator = EdgeCollator(g, eids, graph_sampler, **collator_kwargs)
@@ -921,13 +937,26 @@ class EdgeDataLoader:
                                              **dataloader_kwargs)
             self.is_distributed = True
         else:
-            if device is None:
-                # default to the same device the graph is on
-                device = th.device(g.device)
+            # default to the same device the graph is on
+            device = th.device(g.device if device is None else device)
+            num_workers = dataloader_kwargs.get('num_workers', 0)
+
+            if F.device_type(g.device) == 'cuda' or g.is_pinned():
+                st = 'UVA' if g.is_pinned() else 'GPU'
+                assert F.device_type(device) == 'cuda', \
+                    f"'device' must be a cuda device to enable {st} sampling, got {device}."
+                assert check_device(eids, device), \
+                    f"'eids' must be on {device} to use {st} sampling."
+                assert num_workers == 0, \
+                    f"'num_workers' must be 0 to use {st} sampling."
+            # g is on CPU
+            elif F.device_type(device) == 'cuda' and num_workers == 0:
+                dgl_warning('CPU-GPU hybrid sampling is deprecated and will be removed '
+                            'in the next release. Use pure GPU sampling if your graph can '
+                            'fit onto the GPU memory, or UVA sampling in other cases.')
 
             # if the sampler supports it, tell it to output to the
             # specified device
-            num_workers = dataloader_kwargs.get('num_workers', 0)
             if callable(getattr(graph_sampler, "set_output_context", None)) and num_workers == 0:
                 graph_sampler.set_output_context(to_dgl_context(device))
 

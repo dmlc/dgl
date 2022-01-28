@@ -130,6 +130,26 @@ def check_all_same_idtype(glist, name):
             raise DGLError('Expect {}[{}] to have {} type ID, but got {}.'.format(
                 name, i, idtype, g.idtype))
 
+def check_device(data, device):
+    """Check if data is on the target device.
+
+    Parameters
+    ----------
+    data : Tensor or dict[str, Tensor]
+    device: Backend device.
+
+    Returns
+    -------
+    Bool: True if the data is on the target device.
+    """
+    if isinstance(data, dict):
+        for v in data.values():
+            if v.device != device:
+                return False
+    elif data.device != device:
+        return False
+    return True
+
 def check_all_same_device(glist, name):
     """Check all the graphs have the same device."""
     if len(glist) == 0:

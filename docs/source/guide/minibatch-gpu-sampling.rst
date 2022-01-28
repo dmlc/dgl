@@ -73,49 +73,6 @@ GPU-based neighbor sampling also works for :class:`~dgl.dataloading.pytorch.Edge
   your sampler entirely works on GPU.
 
 
-Using CPU-GPU hybrid neighborhood sampling in DGL data loaders
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-The sampling procedure in DGL data loaders can be further divided into two phases:
-
-1. Sampling phase: sample frontiers from the big input graph.
-2. Subgraph construction phase: convert the sampled frontiers to MFG via
-   :func:`dgl.to_block`.
-
-The first step requires the graph stored on the GPU and cannot be applied to the case
-where the graph is too large to fit onto the GPU memory.
-In such a case, you can keep the graph on CPU memory while benifit from subgraph
-construction on the GPU via:
-
-* Set ``device`` argument to a GPU device.
-
-* Set ``num_workers`` argument to 0, because CUDA does not allow multiple processes
-  accessing the same context.
-
-All the other arguments for the :class:`~dgl.dataloading.pytorch.NodeDataLoader` can be
-the same as the other user guides and tutorials.
-
-.. code:: python
-
-   dataloader = dgl.dataloading.NodeDataLoader(
-       g,                                # The graph is on CPU.
-       train_nid,
-       sampler,
-       device=torch.device('cuda:0'),    # The device argument must be GPU.
-       num_workers=0,                    # Number of workers must be 0.
-       batch_size=1000,
-       drop_last=False,
-       shuffle=True)
-
-CPU-GPU hybrid neighborhood sampling is faster than pure CPU sampling in most cases,
-especially in multi-GPU training.
-
-.. note::
-
-   Currently :class:`~dgl.dataloading.pytorch.EdgeDataLoader` does not support CPU-GPU
-   hybrid neighborhood sampling.
-
-
 Using CUDA UVA-based neighborhood sampling in DGL data loaders
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -165,7 +122,8 @@ especially for multi-GPU training.
 Using GPU-based neighbor sampling with DGL functions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The following sampling functions support operating on GPU:
+You can build your own GPU sampling pipelines with the following functions that support
+operating on GPU:
 
 * :func:`dgl.sampling.sample_neighbors`
 
