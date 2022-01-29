@@ -1,6 +1,7 @@
 
 import socket
 import os
+import random
 
 
 def generate_ip_config(file_name, num_machines, num_servers):
@@ -19,7 +20,8 @@ def generate_ip_config(file_name, num_machines, num_servers):
     # scan available PORT
     ports = []
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    for port in range(10000, 65535):
+    start = random.randint(10000, 30000)
+    for port in range(start, 65535):
         try:
             sock.connect((ip, port))
             ports = []
