@@ -16,7 +16,6 @@ class AsNodePredDataset(DGLDataset):
 
       - Contains only one graph, accessible from ``dataset[0]``.
       - The graph stores:
-        - Node features in ``g.ndata['feat']``.
         - Node labels in ``g.ndata['label']``.
         - Train/val/test masks in ``g.ndata['train_mask']``, ``g.ndata['val_mask']``,
           and ``g.ndata['test_mask']`` respectively.
@@ -27,7 +26,6 @@ class AsNodePredDataset(DGLDataset):
     ``target_ntype`` argument to indicate which node type to make predictions for.
     In this case:
 
-      - Node features are stored in ``g.nodes[any_type].data['feat']``.
       - Node labels are stored in ``g.nodes[target_ntype].data['label']``.
       - Training masks are stored in ``g.nodes[target_ntype].data['train_mask']``.
         So do validation and test masks.
