@@ -13,7 +13,7 @@ import torch
 import torch.distributed as dist
 from torch.utils.data.distributed import DistributedSampler
 
-from ..base import NID, EID
+from ..base import NID, EID, dgl_warning
 from ..batch import batch as batch_graphs
 from ..heterograph import DGLHeteroGraph
 from .. import ndarray as nd
@@ -587,7 +587,12 @@ class EdgeDataLoader(DataLoader):
                  ddp_seed=0, batch_size=1, drop_last=False, shuffle=False,
                  use_prefetch_thread=False, use_alternate_streams=True,
                  exclude=None, reverse_eids=None, reverse_etypes=None, negative_sampler=None,
-                 **kwargs):
+                 g_sampling=None, **kwargs):
+        if g_sampling is not None:
+            dgl_warning(
+                "g_sampling is deprecated. "
+                "Please merge g_sampling and the original graph into one graph and use "
+                "the exclude argument to specify which edges you don't want to sample."
         if isinstance(graph_sampler, BlockSampler):
             graph_sampler = EdgeBlockSampler(
                 graph_sampler, exclude=exclude, reverse_eids=reverse_eids,
