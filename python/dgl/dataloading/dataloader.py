@@ -592,7 +592,7 @@ class EdgeDataLoader(DataLoader):
             dgl_warning(
                 "g_sampling is deprecated. "
                 "Please merge g_sampling and the original graph into one graph and use "
-                "the exclude argument to specify which edges you don't want to sample."
+                "the exclude argument to specify which edges you don't want to sample.")
         if isinstance(graph_sampler, BlockSampler):
             graph_sampler = EdgeBlockSampler(
                 graph_sampler, exclude=exclude, reverse_eids=reverse_eids,
