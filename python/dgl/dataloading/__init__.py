@@ -22,3 +22,4 @@ from .base import *
 from . import negative_sampler
 if F.get_preferred_backend() == 'pytorch':
     from .dataloader import *
+    from .dist_dataloader import *

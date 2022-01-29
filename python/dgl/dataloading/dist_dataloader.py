@@ -1,8 +1,9 @@
 """Distributed dataloaders.
 """
 import inspect
-from ...distributed import DistDataLoader
-from ..dataloader import NodeCollator, EdgeCollator
+from ..distributed import DistDataLoader
+# Still depends on the legacy NodeCollator...
+from .._dataloading.dataloader import NodeCollator, EdgeCollator
 
 def _remove_kwargs_dist(kwargs):
     if 'num_workers' in kwargs:
