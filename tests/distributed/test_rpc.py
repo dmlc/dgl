@@ -251,8 +251,8 @@ def test_multi_client_groups():
     num_servers = 1
     generate_ip_config(ip_config, num_machines, num_servers)
     # presssue test
-    num_clients = 15
-    num_groups = 15
+    num_clients = 2
+    num_groups = 2
     ctx = mp.get_context('spawn')
     pserver_list = []
     for i in range(num_servers*num_machines):
