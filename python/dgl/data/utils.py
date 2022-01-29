@@ -381,6 +381,8 @@ def add_nodepred_split(dataset, ratio, ntype=None):
     >>> print('train_mask' in dataset[0].ndata)
     True
     """
+    if len(ratio) != 3:
+        raise ValueError(f'Split ratio must be a float triplet but got {ratio}.')
     for i in range(len(dataset)):
         g = dataset[i]
         n = g.num_nodes(ntype)
