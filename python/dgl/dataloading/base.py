@@ -55,7 +55,7 @@ class BlockSampler(object):
         self.prefetch_edge_feats = prefetch_edge_feats or []
         self.output_device = output_device
 
-    def sample_blocks(self, g, seed_nodes, exclude_edges=None):
+    def sample_blocks(self, g, seed_nodes, exclude_eids=None):
         """Generates a list of blocks from the given seed nodes.
 
         This function must return a triplet where the first element is the input node IDs
