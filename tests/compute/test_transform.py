@@ -320,7 +320,7 @@ def test_add_reverse_edges():
 
     # zero edge graph
     g = dgl.graph(([], []))
-    bg = dgl.add_reverse_edges(g, copy_ndata=True, copy_edata=True)
+    bg = dgl.add_reverse_edges(g, copy_ndata=True, copy_edata=True, exclude_self=False)
 
     # heterogeneous graph
     g = dgl.heterograph({
@@ -401,6 +401,16 @@ def test_add_reverse_edges():
     assert F.array_equal(F.cat([g.edges['wins'].data['h'], g.edges['wins'].data['h']], dim=0),
                          bg.edges['wins'].data['h'])
 
+    # test exclude_self
+    g = dgl.heterograph({
+        ('A', 'r1', 'A'): (F.tensor([0, 0, 1, 1]), F.tensor([0, 1, 1, 2])),
+        ('A', 'r2', 'A'): (F.tensor([0, 1]), F.tensor([1, 2]))
+    })
+    g.edges['r1'].data['h'] = F.tensor([0, 1, 2, 3])
+    rg = dgl.add_reverse_edges(g, copy_edata=True, exclude_self=True)
+    assert rg.num_edges('r1') == 6
+    assert rg.num_edges('r2') == 4
+    assert F.array_equal(rg.edges['r1'].data['h'], F.tensor([0, 1, 2, 3, 1, 3]))
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 def test_simple_graph():
