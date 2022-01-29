@@ -1231,10 +1231,10 @@ class DistGraph:
         # Currently prob, exclude_edges, output_device, and edge_dir are ignored.
         if len(self.etypes) > 1:
             frontier = graph_services.sample_etype_neighbors(
-                self, seed_nodes, ETYPE, fanout, replace=self.replace)
+                self, seed_nodes, ETYPE, fanout, replace=replace)
         else:
             frontier = graph_services.sample_neighbors(
-                self, seed_nodes, fanout, replace=self.replace)
+                self, seed_nodes, fanout, replace=replace)
         return frontier
 
     def _get_ndata_names(self, ntype=None):
