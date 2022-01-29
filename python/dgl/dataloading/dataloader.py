@@ -209,7 +209,6 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
                 torch.randperm(self.num_indices, device=self._device)]
             if not self.drop_last:
                 # pad extra
-                print(self._tensor_dataset.shape, self.num_indices, self.total_size)
                 self._tensor_dataset[self.num_indices:] = \
                     self._tensor_dataset[:self.total_size - self.num_indices]
         dist.barrier()
