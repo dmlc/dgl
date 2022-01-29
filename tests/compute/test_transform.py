@@ -320,7 +320,7 @@ def test_add_reverse_edges():
 
     # zero edge graph
     g = dgl.graph(([], []))
-    bg = dgl.add_reverse_edges(g, copy_ndata=True, copy_edata=True)
+    bg = dgl.add_reverse_edges(g, copy_ndata=True, copy_edata=True, exclude_self=False)
 
     # heterogeneous graph
     g = dgl.heterograph({
