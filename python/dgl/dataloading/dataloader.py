@@ -165,7 +165,7 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
         # of indices since we will need to pad it after shuffling to make it evenly
         # divisible before every epoch.  If drop_last is False, we create an array
         # with the same size as the indices so we can trim it later.
-        self.shared_mem_size = self.total_size if self.drop_last else len(indices)
+        self.shared_mem_size = self.total_size if not self.drop_last else len(indices)
         self.num_indices = len(indices)
 
         if self.rank == 0:
@@ -209,6 +209,7 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
                 torch.randperm(self.num_indices, device=self._device)]
             if not self.drop_last:
                 # pad extra
+                print(self._tensor_dataset.shape, self.num_indices, self.total_size)
                 self._tensor_dataset[self.num_indices:] = \
                     self._tensor_dataset[:self.total_size - self.num_indices]
         dist.barrier()
