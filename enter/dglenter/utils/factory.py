@@ -32,48 +32,44 @@ class PipelineBase(ABC):
         pass
 
 
-class DataFactory:
-    registry = {}
-    cname_registry = {}
-    pipeline_allowed = {
-        "nodepred": {},
-        "nodepred-ns": {},
-        "edgepred": {},
-    }
+class DataFactoryClass:
 
-    @classmethod
-    def register(cls, name: str, import_code, class_name, allowed_pipeline, extra_args={}) -> Callable:
+    def __init__(self):
+        self.registry = {}
+        self.pipeline_allowed = {}
+
+    def register(self, name: str, import_code, class_name, allowed_pipeline, extra_args={}) -> Callable:
         out = {
             "name": name,
             "import_code": import_code,
             "class_name": class_name,
             "extra_args": extra_args}
-        cls.registry[name] = out
-        cls.cname_registry[name] = out
+        self.registry[name] = out
+        for pipeline in allowed_pipeline:
+            if pipeline in self.pipeline_allowed:
+                self.pipeline_allowed[pipeline].append(name)
+            else:
+                self.pipeline_allowed[pipeline] = [name]
 
-    @classmethod
-    def get_dataset_enum(cls):
+    def get_dataset_enum(self):
         enum_class = enum.Enum(
-            "DatasetName", {v["name"]: k for k, v in cls.registry.items()})
+            "DatasetName", {v["name"]: k for k, v in self.registry.items()})
         return enum_class
 
-    @classmethod
-    def get_dataset_classname(cls, name):
-        return cls.registry[name]["class_name"]
+    def get_dataset_classname(self, name):
+        return self.registry[name]["class_name"]
 
-    @classmethod
-    def get_constructor_arg_type(cls, model_name):
-        sigs = inspect.signature(cls.registry[model_name].__init__)
+    def get_constructor_arg_type(self, model_name):
+        sigs = inspect.signature(self.registry[model_name].__init__)
         type_annotation_dict = {}
         for k, param in dict(sigs.parameters).items():
             type_annotation_dict[k] = param.annotation
         return type_annotation_dict
 
-    @classmethod
-    def get_pydantic_config(cls):
+    def get_pydantic_config(self):
         type_annotation_dict = {}
         dataset_list = []
-        for k, v in cls.registry.items():
+        for k, v in self.registry.items():
             dataset_name = v["name"]
             type_annotation_dict = v["extra_args"]
             if "name" in type_annotation_dict:
@@ -89,32 +85,38 @@ class DataFactory:
             output = Union[output, d]
         return output
     
-    @classmethod
-    def get_import_code(cls, name):
-        return cls.registry[name]["import_code"]
+    def get_import_code(self, name):
+        return self.registry[name]["import_code"]
 
-    @classmethod
-    def get_import_code(cls, name):
-        return cls.registry[name]["import_code"]
+    def get_import_code(self, name):
+        return self.registry[name]["import_code"]
 
-    @classmethod
-    def get_extra_args(cls, name):
-        return cls.registry[name]["extra_args"]
+    def get_extra_args(self, name):
+        return self.registry[name]["extra_args"]
 
-    @classmethod
-    def get_class_name(cls, name):
-        return cls.registry[name]["class_name"]
+    def get_class_name(self, name):
+        return self.registry[name]["class_name"]
 
-    @classmethod
-    def get_generated_code_dict(cls, name, args='**cfg["data"]'):
+    def get_generated_code_dict(self, name, args='**cfg["data"]'):
         d = {}
-        d["data_import_code"] = cls.registry[name]["import_code"]
-        data_initialize_code = cls.registry[name]["class_name"]
-        extra_args_dict = cls.registry[name]["extra_args"]
+        d["data_import_code"] = self.registry[name]["import_code"]
+        data_initialize_code = self.registry[name]["class_name"]
+        extra_args_dict = self.registry[name]["extra_args"]
         if len(extra_args_dict) > 0:
             data_initialize_code = data_initialize_code.format('**cfg["data"]')
         d["data_initialize_code"] = data_initialize_code
         return d
+    
+    def filter(self, pipeline_name):
+        allowed_name = self.pipeline_allowed[pipeline_name]
+        new_registry = {k: v for k,v in self.registry.items() if k in allowed_name}
+        d = DataFactoryClass()
+        d.registry = new_registry
+        return d
+
+
+DataFactory = DataFactoryClass()
+
 
 
 ALL_PIPELINE = ["nodepred", "nodepred-ns", "edgepred"]

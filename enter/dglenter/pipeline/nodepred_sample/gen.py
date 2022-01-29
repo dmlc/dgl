@@ -70,7 +70,7 @@ class NodepredNsPipeline(PipelineBase):
     def setup_user_cfg_cls(cls):
         from ...utils.enter_config import UserConfig 
         class NodePredUserConfig(UserConfig):
-            data: DataFactory.get_pydantic_config() = Field(..., discriminator="name")
+            data: DataFactory.filter("nodepred-ns").get_pydantic_config() = Field(..., discriminator="name")
             model : NodeModelFactory.get_pydantic_model_config() = Field(..., discriminator="name")   
             general_pipeline: NodepredNSPipelineCfg
 
@@ -82,7 +82,7 @@ class NodepredNsPipeline(PipelineBase):
 
     def get_cfg_func(self):
         def config(
-            data: DataFactory.get_dataset_enum() = typer.Option(..., help="input data name"),
+            data: DataFactory.filter("nodepred-ns").get_dataset_enum() = typer.Option(..., help="input data name"),
             cfg: str = typer.Option(
                 "cfg.yml", help="output configuration path"),
             sampler: SamplerChoice = typer.Option(

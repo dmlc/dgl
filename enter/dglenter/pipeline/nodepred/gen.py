@@ -12,6 +12,8 @@ import ruamel.yaml
 from ruamel.yaml.comments import CommentedMap
 
 
+
+
 pipeline_comments = {
     "node_embed_size": "The node learnable embedding size, -1 to disable",
     "num_epochs": "Number of training epochs",
@@ -39,9 +41,9 @@ class NodepredPipeline(PipelineBase):
 
     @classmethod
     def setup_user_cfg_cls(cls):
-        from ...utils.enter_config import UserConfig
+        from ...utils.enter_config import UserConfig        
         class NodePredUserConfig(UserConfig):
-            data: DataFactory.get_pydantic_config() = Field(..., discriminator="name")
+            data: DataFactory.filter("nodepred").get_pydantic_config() = Field(..., discriminator="name")
             model : NodeModelFactory.get_pydantic_model_config() = Field(..., discriminator="name")   
             general_pipeline: NodepredPipelineCfg = NodepredPipelineCfg()
 
@@ -53,7 +55,7 @@ class NodepredPipeline(PipelineBase):
 
     def get_cfg_func(self):
         def config(
-            data: DataFactory.get_dataset_enum() = typer.Option(..., help="input data name"),
+            data: DataFactory.filter("nodepred").get_dataset_enum() = typer.Option(..., help="input data name"),
             cfg: str = typer.Option(
                 "cfg.yml", help="output configuration path"),
             model: NodeModelFactory.get_model_enum() = typer.Option(..., help="Model name"),

@@ -55,7 +55,7 @@ class EdgepredPipeline(PipelineBase):
 
         class EdgePredUserConfig(UserConfig):
             pipeline_name: str = "edgepred"
-            data: DataFactory.get_pydantic_config() = Field(..., discriminator="name")
+            data: DataFactory.filter("edgepred").get_pydantic_config() = Field(..., discriminator="name")
             node_model: NodeModelFactory.get_pydantic_model_config() = Field(...,
                                                                              discriminator="name")
             edge_model: EdgeModelFactory.get_pydantic_model_config() = Field(...,
@@ -72,7 +72,7 @@ class EdgepredPipeline(PipelineBase):
 
     def get_cfg_func(self):
         def config(
-            data: DataFactory.get_dataset_enum() = typer.Option(..., help="input data name"),
+            data: DataFactory.filter("edgepred").get_dataset_enum() = typer.Option(..., help="input data name"),
             cfg: str = typer.Option(
                 "cfg.yml", help="output configuration path"),
             node_model: NodeModelFactory.get_model_enum() = typer.Option(...,
@@ -102,7 +102,6 @@ class EdgepredPipeline(PipelineBase):
                 "neg_sampler": NegativeSamplerFactory.get_constructor_doc_dict(neg_sampler.value)
             }
             comment_dict = merge_comment(output_cfg, comment_dict)
-            print(comment_dict)
             yaml = ruamel.yaml.YAML()
             yaml.dump(comment_dict, Path(cfg).open("w"))
             print("Configuration file is generated at {}".format(Path(cfg).absolute()))
