@@ -580,7 +580,7 @@ class NodeCollator(Collator):
             items = utils.group_as_dict(items)
         items = utils.prepare_tensor_or_dict(self.g, items, 'items')
 
-        input_nodes, output_nodes, blocks = self.graph_sampler.sample(self.g, items)
+        input_nodes, output_nodes, blocks = self.graph_sampler.sample_blocks(self.g, items)
 
         return input_nodes, output_nodes, blocks
 
@@ -808,7 +808,7 @@ class EdgeCollator(Collator):
             reverse_eid_map=self.reverse_eids,
             reverse_etype_map=self.reverse_etypes)
 
-        input_nodes, _, blocks = self.graph_sampler.sample(
+        input_nodes, _, blocks = self.graph_sampler.sample_blocks(
             self.g_sampling, seed_nodes, exclude_eids=exclude_eids)
 
         return input_nodes, pair_graph, blocks
@@ -850,7 +850,7 @@ class EdgeCollator(Collator):
             reverse_eid_map=self.reverse_eids,
             reverse_etype_map=self.reverse_etypes)
 
-        input_nodes, _, blocks = self.graph_sampler.sample(
+        input_nodes, _, blocks = self.graph_sampler.sample_blocks(
             self.g_sampling, seed_nodes, exclude_eids=exclude_eids)
 
         return input_nodes, pair_graph, neg_pair_graph, blocks
