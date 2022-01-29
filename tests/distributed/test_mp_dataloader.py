@@ -146,14 +146,14 @@ def start_dist_neg_dataloader(rank, tmpdir, num_server, num_workers, orig_nid, g
     num_negs = 5
     sampler = dgl.dataloading.MultiLayerNeighborSampler([5,10])
     negative_sampler=dgl.dataloading.negative_sampler.Uniform(num_negs)
-    dataloader = dgl.dataloading.EdgeDataLoader(dist_graph,
-                                                train_eid,
-                                                sampler,
-                                                batch_size=batch_size,
-                                                negative_sampler=negative_sampler,
-                                                shuffle=True,
-                                                drop_last=False,
-                                                num_workers=num_workers)
+    dataloader = dgl.dataloading.DistEdgeDataLoader(dist_graph,
+                                                    train_eid,
+                                                    sampler,
+                                                    batch_size=batch_size,
+                                                    negative_sampler=negative_sampler,
+                                                    shuffle=True,
+                                                    drop_last=False,
+                                                    num_workers=num_workers)
     for _ in range(2):
         for _, (_, pos_graph, neg_graph, blocks) in zip(range(0, num_edges_to_sample, batch_size), dataloader):
             block = blocks[-1]
@@ -288,7 +288,7 @@ def start_node_dataloader(rank, tmpdir, num_server, num_workers, orig_nid, orig_
     # We need to test creating DistDataLoader multiple times.
     for i in range(2):
         # Create DataLoader for constructing blocks
-        dataloader = dgl.dataloading.NodeDataLoader(
+        dataloader = dgl.dataloading.DistNodeDataLoader(
             dist_graph,
             train_nid,
             sampler,
@@ -339,7 +339,7 @@ def start_edge_dataloader(rank, tmpdir, num_server, num_workers, orig_nid, orig_
     # We need to test creating DistDataLoader multiple times.
     for i in range(2):
         # Create DataLoader for constructing blocks
-        dataloader = dgl.dataloading.EdgeDataLoader(
+        dataloader = dgl.dataloading.DistEdgeDataLoader(
             dist_graph,
             train_eid,
             sampler,

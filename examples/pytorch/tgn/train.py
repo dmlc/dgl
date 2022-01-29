@@ -292,7 +292,7 @@ if __name__ == "__main__":
             if i < args.epochs-1 and args.fast_mode:
                 sampler.reset()
             print(log_content[0], log_content[1], log_content[2])
-    except:
+    except KeyboardInterrupt:
         traceback.print_exc()
         error_content = "Training Interreputed!"
         f.writelines(error_content)
