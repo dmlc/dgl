@@ -311,6 +311,7 @@ def check_dist_emb_server_client(shared_mem, num_servers, num_clients, num_group
                                                         g.number_of_edges(),
                                                         group_id))
             p.start()
+            time.sleep(1) # avoid race condition when instantiating DistGraph
             cli_ps.append(p)
 
     for p in cli_ps:
@@ -357,6 +358,7 @@ def check_server_client(shared_mem, num_servers, num_clients, num_groups=1):
             p = ctx.Process(target=run_client, args=(graph_name, 0, num_servers, num_clients, g.number_of_nodes(),
                                                     g.number_of_edges(), group_id))
             p.start()
+            time.sleep(1) # avoid race condition when instantiating DistGraph
             cli_ps.append(p)
     for p in cli_ps:
         p.join()

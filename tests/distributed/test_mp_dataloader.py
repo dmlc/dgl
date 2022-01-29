@@ -246,6 +246,7 @@ def test_dist_dataloader(tmpdir, num_server, num_workers, drop_last, reshuffle, 
             p = ctx.Process(target=start_dist_dataloader, args=(
                 trainer_id, tmpdir, num_server, drop_last, orig_nid, orig_eid, group_id))
             p.start()
+            time.sleep(1) # avoid race condition when instantiating DistGraph
             ptrainer_list.append(p)
 
     for p in ptrainer_list:
