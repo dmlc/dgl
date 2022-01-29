@@ -521,9 +521,10 @@ class DataLoader(torch.utils.data.DataLoader):
 
         try:
             if isinstance(indices, Mapping):
-                indices = {k: torch.tensor(v) for k, v in indices.items()}
+                indices = {k: (torch.tensor(v) if not torch.is_tensor(v) else v)
+                           for k, v in indices.items()}
             else:
-                indices = torch.tensor(indices)
+                indices = torch.tensor(indices) if not torch.is_tensor(indices) else indices
         except:     # pylint: disable=bare-except
             # ignore when it fails to convert to torch Tensors.
             pass

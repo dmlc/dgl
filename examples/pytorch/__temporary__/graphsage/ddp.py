@@ -10,7 +10,7 @@ import time
 import numpy as np
 from ogb.nodeproppred import DglNodePropPredDataset
 
-USE_WRAPPER = True
+USE_WRAPPER = False
 
 class SAGE(nn.Module):
     def __init__(self, in_feats, n_hidden, n_classes):
