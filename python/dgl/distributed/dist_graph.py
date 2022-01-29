@@ -1226,7 +1226,8 @@ class DistGraph:
 
     def sample_neighbors(self, seed_nodes, fanout, edge_dir='in', prob=None,
                          exclude_edges=None, replace=False,
-                         output_device=None):   # pylint: disable=unused-argument
+                         output_device=None):
+        # pylint: disable=unused-argument
         """Sample neighbors from a distributed graph."""
         # Currently prob, exclude_edges, output_device, and edge_dir are ignored.
         if len(self.etypes) > 1:
