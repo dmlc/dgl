@@ -1049,23 +1049,23 @@ def test_as_nodepred2():
 
     # create
     ds = data.AsNodePredDataset(data.AmazonCoBuyComputerDataset(), [0.8, 0.1, 0.1])
-    assert ds[0].ndata['train_mask'].sum() == int(ds[0].num_nodes() * 0.8)
+    assert F.sum(F.astype(ds[0].ndata['train_mask'], F.int32), 0) == int(ds[0].num_nodes() * 0.8)
     # read from cache
     ds = data.AsNodePredDataset(data.AmazonCoBuyComputerDataset(), [0.8, 0.1, 0.1])
-    assert ds[0].ndata['train_mask'].sum() == int(ds[0].num_nodes() * 0.8)
+    assert F.sum(F.astype(ds[0].ndata['train_mask'], F.int32), 0) == int(ds[0].num_nodes() * 0.8)
     # invalid cache, re-read
     ds = data.AsNodePredDataset(data.AmazonCoBuyComputerDataset(), [0.1, 0.1, 0.8])
-    assert ds[0].ndata['train_mask'].sum() == int(ds[0].num_nodes() * 0.1)
+    assert F.sum(F.astype(ds[0].ndata['train_mask'], F.int32), 0) == int(ds[0].num_nodes() * 0.1)
 
     # create
     ds = data.AsNodePredDataset(data.AIFBDataset(), [0.8, 0.1, 0.1], 'Personen', verbose=True)
-    assert ds[0].nodes['Personen'].data['train_mask'].sum() == int(ds[0].num_nodes('Personen') * 0.8)
+    assert F.sum(F.astype(ds[0].nodes['Personen'].data['train_mask'], F.int32), 0) == int(ds[0].num_nodes('Personen') * 0.8)
     # read from cache
     ds = data.AsNodePredDataset(data.AIFBDataset(), [0.8, 0.1, 0.1], 'Personen', verbose=True)
-    assert ds[0].nodes['Personen'].data['train_mask'].sum() == int(ds[0].num_nodes('Personen') * 0.8)
+    assert F.sum(F.astype(ds[0].nodes['Personen'].data['train_mask'], F.int32), 0) == int(ds[0].num_nodes('Personen') * 0.8)
     # invalid cache, re-read
     ds = data.AsNodePredDataset(data.AIFBDataset(), [0.1, 0.1, 0.8], 'Personen', verbose=True)
-    assert ds[0].nodes['Personen'].data['train_mask'].sum() == int(ds[0].num_nodes('Personen') * 0.1)
+    assert F.sum(F.astype(ds[0].nodes['Personen'].data['train_mask'], F.int32), 0) == int(ds[0].num_nodes('Personen') * 0.1)
 
 if __name__ == '__main__':
     test_minigc()
