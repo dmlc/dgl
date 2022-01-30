@@ -16,9 +16,9 @@ import dgl
 import dgl.backend as F
 from .dgl_dataset import DGLBuiltinDataset
 from .utils import save_graphs, load_graphs, save_info, load_info, _get_dgl_url
-from .utils import generate_mask_tensor, idx2mask, deprecate_property, deprecate_class
+from .utils import generate_mask_tensor, idx2mask
 
-__all__ = ['AIFB', 'MUTAG', 'BGS', 'AM', 'AIFBDataset', 'MUTAGDataset', 'BGSDataset', 'AMDataset']
+__all__ = ['AIFBDataset', 'MUTAGDataset', 'BGSDataset', 'AMDataset']
 
 # Dictionary for renaming reserved node/edge type names to the ones
 # that are allowed by nn.Module.
@@ -72,18 +72,10 @@ class RDFGraphDataset(DGLBuiltinDataset):
 
     Attributes
     ----------
-    graph : dgl.DGLraph
-        Graph structure
     num_classes : int
         Number of classes to predict
     predict_category : str
         The entity category (node type) that has labels for prediction
-    train_idx : Tensor
-        Entity IDs for training. All IDs are local IDs w.r.t. to ``predict_category``.
-    test_idx : Tensor
-        Entity IDs for testing. All IDs are local IDs w.r.t. to ``predict_category``.
-    labels : Tensor
-        All the labels of the entities in ``predict_category``
 
     Parameters
     ----------
@@ -243,13 +235,10 @@ class RDFGraphDataset(DGLBuiltinDataset):
         test_mask = generate_mask_tensor(test_mask)
         self._hg.nodes[self.predict_category].data['train_mask'] = train_mask
         self._hg.nodes[self.predict_category].data['test_mask'] = test_mask
+        # TODO(minjie): Deprecate 'labels', use 'label' for consistency.
         self._hg.nodes[self.predict_category].data['labels'] = labels
+        self._hg.nodes[self.predict_category].data['label'] = labels
         self._num_classes = num_classes
-
-        # save for compatability
-        self._train_idx = F.tensor(train_idx)
-        self._test_idx = F.tensor(test_idx)
-        self._labels = labels
 
     def build_graph(self, mg, src, dst, ntid, etid, ntypes, etypes):
         """Build the graphs
@@ -411,14 +400,10 @@ class RDFGraphDataset(DGLBuiltinDataset):
         self._num_classes = info['num_classes']
         self._predict_category = info['predict_category']
         self._hg = graphs[0]
-        train_mask = self._hg.nodes[self.predict_category].data['train_mask']
-        test_mask = self._hg.nodes[self.predict_category].data['test_mask']
-        self._labels = self._hg.nodes[self.predict_category].data['labels']
-
-        train_idx = F.nonzero_1d(train_mask)
-        test_idx = F.nonzero_1d(test_mask)
-        self._train_idx = train_idx
-        self._test_idx = test_idx
+        # For backward compatibility
+        if 'label' not in self._hg.nodes[self.predict_category].data:
+            self._hg.nodes[self.predict_category].data['label'] = \
+                    self._hg.nodes[self.predict_category].data['labels']
 
     def __getitem__(self, idx):
         r"""Gets the graph object
@@ -435,32 +420,12 @@ class RDFGraphDataset(DGLBuiltinDataset):
         return self.name + '_dgl_graph'
 
     @property
-    def graph(self):
-        deprecate_property('dataset.graph', 'hg = dataset[0]')
-        return self._hg
-
-    @property
     def predict_category(self):
         return self._predict_category
 
     @property
     def num_classes(self):
         return self._num_classes
-
-    @property
-    def train_idx(self):
-        deprecate_property('dataset.train_idx', 'train_mask = g.ndata[\'train_mask\']')
-        return self._train_idx
-
-    @property
-    def test_idx(self):
-        deprecate_property('dataset.test_idx', 'train_mask = g.ndata[\'test_mask\']')
-        return self._test_idx
-
-    @property
-    def labels(self):
-        deprecate_property('dataset.labels', 'train_mask = g.ndata[\'labels\']')
-        return self._labels
 
     @abc.abstractmethod
     def parse_entity(self, term):
@@ -541,27 +506,6 @@ def _get_id(dict, key):
 class AIFBDataset(RDFGraphDataset):
     r"""AIFB dataset for node classification task
 
-    .. deprecated:: 0.5.0
-
-        - ``graph`` is deprecated, it is replaced by:
-
-            >>> dataset = AIFBDataset()
-            >>> graph = dataset[0]
-
-        - ``train_idx`` is deprecated, it can be replaced by:
-
-            >>> dataset = AIFBDataset()
-            >>> graph = dataset[0]
-            >>> train_mask = graph.nodes[dataset.category].data['train_mask']
-            >>> train_idx = th.nonzero(train_mask, as_tuple=False).squeeze()
-
-        - ``test_idx`` is deprecated, it can be replaced by:
-
-            >>> dataset = AIFBDataset()
-            >>> graph = dataset[0]
-            >>> test_mask = graph.nodes[dataset.category].data['test_mask']
-            >>> test_idx = th.nonzero(test_mask, as_tuple=False).squeeze()
-
     AIFB DataSet is a Semantic Web (RDF) dataset used as a benchmark in
     data mining.  It records the organizational structure of AIFB at the
     University of Karlsruhe.
@@ -597,14 +541,6 @@ class AIFBDataset(RDFGraphDataset):
         Number of classes to predict
     predict_category : str
         The entity category (node type) that has labels for prediction
-    labels : Tensor
-        All the labels of the entities in ``predict_category``
-    graph : :class:`dgl.DGLGraph`
-        Graph structure
-    train_idx : Tensor
-        Entity IDs for training. All IDs are local IDs w.r.t. to ``predict_category``.
-    test_idx : Tensor
-        Entity IDs for testing. All IDs are local IDs w.r.t. to ``predict_category``.
 
     Examples
     --------
@@ -613,9 +549,9 @@ class AIFBDataset(RDFGraphDataset):
     >>> category = dataset.predict_category
     >>> num_classes = dataset.num_classes
     >>>
-    >>> train_mask = g.nodes[category].data.pop('train_mask')
-    >>> test_mask = g.nodes[category].data.pop('test_mask')
-    >>> labels = g.nodes[category].data.pop('labels')
+    >>> train_mask = g.nodes[category].data['train_mask']
+    >>> test_mask = g.nodes[category].data['test_mask']
+    >>> label = g.nodes[category].data['label']
     """
 
     entity_prefix = 'http://www.aifb.uni-karlsruhe.de/'
@@ -656,7 +592,7 @@ class AIFBDataset(RDFGraphDataset):
 
             - ``ndata['train_mask']``: mask for training node set
             - ``ndata['test_mask']``: mask for testing node set
-            - ``ndata['labels']``: mask for labels
+            - ``ndata['label']``: node labels
         """
         return super(AIFBDataset, self).__getitem__(idx)
 
@@ -701,46 +637,8 @@ class AIFBDataset(RDFGraphDataset):
         person, _, label = line.strip().split('\t')
         return person, label
 
-class AIFB(AIFBDataset):
-    """AIFB dataset. Same as AIFBDataset.
-    """
-    def __init__(self,
-                 print_every=10000,
-                 insert_reverse=True,
-                 raw_dir=None,
-                 force_reload=False,
-                 verbose=True):
-        deprecate_class('AIFB', 'AIFBDataset')
-        super(AIFB, self).__init__(print_every,
-                                   insert_reverse,
-                                   raw_dir,
-                                   force_reload,
-                                   verbose)
-
-
 class MUTAGDataset(RDFGraphDataset):
     r"""MUTAG dataset for node classification task
-
-    .. deprecated:: 0.5.0
-
-        - ``graph`` is deprecated, it is replaced by:
-
-            >>> dataset = MUTAGDataset()
-            >>> graph = dataset[0]
-
-        - ``train_idx`` is deprecated, it can be replaced by:
-
-            >>> dataset = MUTAGDataset()
-            >>> graph = dataset[0]
-            >>> train_mask = graph.nodes[dataset.category].data['train_mask']
-            >>> train_idx = th.nonzero(train_mask).squeeze()
-
-        - ``test_idx`` is deprecated, it can be replaced by:
-
-            >>> dataset = MUTAGDataset()
-            >>> graph = dataset[0]
-            >>> test_mask = graph.nodes[dataset.category].data['test_mask']
-            >>> test_idx = th.nonzero(test_mask).squeeze()
 
     Mutag dataset statistics:
 
@@ -773,14 +671,8 @@ class MUTAGDataset(RDFGraphDataset):
         Number of classes to predict
     predict_category : str
         The entity category (node type) that has labels for prediction
-    labels : Tensor
-        All the labels of the entities in ``predict_category``
     graph : :class:`dgl.DGLGraph`
         Graph structure
-    train_idx : Tensor
-        Entity IDs for training. All IDs are local IDs w.r.t. to ``predict_category``.
-    test_idx : Tensor
-        Entity IDs for testing. All IDs are local IDs w.r.t. to ``predict_category``.
 
     Examples
     --------
@@ -789,9 +681,9 @@ class MUTAGDataset(RDFGraphDataset):
     >>> category = dataset.predict_category
     >>> num_classes = dataset.num_classes
     >>>
-    >>> train_mask = g.nodes[category].data.pop('train_mask')
-    >>> test_mask = g.nodes[category].data.pop('test_mask')
-    >>> labels = g.nodes[category].data.pop('labels')
+    >>> train_mask = g.nodes[category].data['train_mask']
+    >>> test_mask = g.nodes[category].data['test_mask']
+    >>> label = g.nodes[category].data['label']
     """
 
     d_entity = re.compile("d[0-9]")
@@ -838,7 +730,7 @@ class MUTAGDataset(RDFGraphDataset):
 
             - ``ndata['train_mask']``: mask for training node set
             - ``ndata['test_mask']``: mask for testing node set
-            - ``ndata['labels']``: mask for labels
+            - ``ndata['label']``: node labels
         """
         return super(MUTAGDataset, self).__getitem__(idx)
 
@@ -900,45 +792,8 @@ class MUTAGDataset(RDFGraphDataset):
         bond, _, label = line.strip().split('\t')
         return bond, label
 
-class MUTAG(MUTAGDataset):
-    """MUTAG dataset. Same as MUTAGDataset.
-    """
-    def __init__(self,
-                 print_every=10000,
-                 insert_reverse=True,
-                 raw_dir=None,
-                 force_reload=False,
-                 verbose=True):
-        deprecate_class('MUTAG', 'MUTAGDataset')
-        super(MUTAG, self).__init__(print_every,
-                                    insert_reverse,
-                                    raw_dir,
-                                    force_reload,
-                                    verbose)
-
 class BGSDataset(RDFGraphDataset):
     r"""BGS dataset for node classification task
-
-    .. deprecated:: 0.5.0
-
-        - ``graph`` is deprecated, it is replaced by:
-
-            >>> dataset = BGSDataset()
-            >>> graph = dataset[0]
-
-        - ``train_idx`` is deprecated, it can be replaced by:
-
-            >>> dataset = BGSDataset()
-            >>> graph = dataset[0]
-            >>> train_mask = graph.nodes[dataset.category].data['train_mask']
-            >>> train_idx = th.nonzero(train_mask).squeeze()
-
-        - ``test_idx`` is deprecated, it can be replaced by:
-
-            >>> dataset = BGSDataset()
-            >>> graph = dataset[0]
-            >>> test_mask = graph.nodes[dataset.category].data['test_mask']
-            >>> test_idx = th.nonzero(test_mask).squeeze()
 
     BGS namespace convention:
     ``http://data.bgs.ac.uk/(ref|id)/<Major Concept>/<Sub Concept>/INSTANCE``.
@@ -976,15 +831,7 @@ class BGSDataset(RDFGraphDataset):
     num_classes : int
         Number of classes to predict
     predict_category : str
-        The entity category (node type) that has labels for prediction
-    labels : Tensor
         All the labels of the entities in ``predict_category``
-    graph : :class:`dgl.DGLGraph`
-        Graph structure
-    train_idx : Tensor
-        Entity IDs for training. All IDs are local IDs w.r.t. to ``predict_category``.
-    test_idx : Tensor
-        Entity IDs for testing. All IDs are local IDs w.r.t. to ``predict_category``.
 
     Examples
     --------
@@ -993,9 +840,9 @@ class BGSDataset(RDFGraphDataset):
     >>> category = dataset.predict_category
     >>> num_classes = dataset.num_classes
     >>>
-    >>> train_mask = g.nodes[category].data.pop('train_mask')
-    >>> test_mask = g.nodes[category].data.pop('test_mask')
-    >>> labels = g.nodes[category].data.pop('labels')
+    >>> train_mask = g.nodes[category].data['train_mask']
+    >>> test_mask = g.nodes[category].data['test_mask']
+    >>> label = g.nodes[category].data['label']
     """
 
     entity_prefix = 'http://data.bgs.ac.uk/'
@@ -1036,7 +883,7 @@ class BGSDataset(RDFGraphDataset):
 
             - ``ndata['train_mask']``: mask for training node set
             - ``ndata['test_mask']``: mask for testing node set
-            - ``ndata['labels']``: mask for labels
+            - ``ndata['label']``: node labels
         """
         return super(BGSDataset, self).__getitem__(idx)
 
@@ -1093,46 +940,8 @@ class BGSDataset(RDFGraphDataset):
         _, rock, label = line.strip().split('\t')
         return rock, label
 
-class BGS(BGSDataset):
-    """BGS dataset. Same as BGSDataset.
-    """
-    def __init__(self,
-                 print_every=10000,
-                 insert_reverse=True,
-                 raw_dir=None,
-                 force_reload=False,
-                 verbose=True):
-        deprecate_class('BGS', 'BGSDataset')
-        super(BGS, self).__init__(print_every,
-                                  insert_reverse,
-                                  raw_dir,
-                                  force_reload,
-                                  verbose)
-
-
 class AMDataset(RDFGraphDataset):
     """AM dataset. for node classification task
-
-    .. deprecated:: 0.5.0
-
-        - ``graph`` is deprecated, it is replaced by:
-
-            >>> dataset = AMDataset()
-            >>> graph = dataset[0]
-
-        - ``train_idx`` is deprecated, it can be replaced by:
-
-            >>> dataset = AMDataset()
-            >>> graph = dataset[0]
-            >>> train_mask = graph.nodes[dataset.category].data['train_mask']
-            >>> train_idx = th.nonzero(train_mask).squeeze()
-
-        - ``test_idx`` is deprecated, it can be replaced by:
-
-            >>> dataset = AMDataset()
-            >>> graph = dataset[0]
-            >>> test_mask = graph.nodes[dataset.category].data['test_mask']
-            >>> test_idx = th.nonzero(test_mask).squeeze()
 
     Namespace convention:
 
@@ -1173,14 +982,6 @@ class AMDataset(RDFGraphDataset):
         Number of classes to predict
     predict_category : str
         The entity category (node type) that has labels for prediction
-    labels : Tensor
-        All the labels of the entities in ``predict_category``
-    graph : :class:`dgl.DGLGraph`
-        Graph structure
-    train_idx : Tensor
-        Entity IDs for training. All IDs are local IDs w.r.t. to ``predict_category``.
-    test_idx : Tensor
-        Entity IDs for testing. All IDs are local IDs w.r.t. to ``predict_category``.
 
     Examples
     --------
@@ -1189,9 +990,9 @@ class AMDataset(RDFGraphDataset):
     >>> category = dataset.predict_category
     >>> num_classes = dataset.num_classes
     >>>
-    >>> train_mask = g.nodes[category].data.pop('train_mask')
-    >>> test_mask = g.nodes[category].data.pop('test_mask')
-    >>> labels = g.nodes[category].data.pop('labels')
+    >>> train_mask = g.nodes[category].data['train_mask']
+    >>> test_mask = g.nodes[category].data['test_mask']
+    >>> label = g.nodes[category].data['label']
     """
 
     entity_prefix = 'http://purl.org/collections/nl/am/'
@@ -1232,7 +1033,7 @@ class AMDataset(RDFGraphDataset):
 
             - ``ndata['train_mask']``: mask for training node set
             - ``ndata['test_mask']``: mask for testing node set
-            - ``ndata['labels']``: mask for labels
+            - ``ndata['label']``: node labels
         """
         return super(AMDataset, self).__getitem__(idx)
 
@@ -1287,22 +1088,3 @@ class AMDataset(RDFGraphDataset):
     def process_idx_file_line(self, line):
         proxy, _, label = line.strip().split('\t')
         return proxy, label
-
-class AM(AMDataset):
-    """AM dataset. Same as AMDataset.
-    """
-    def __init__(self,
-                 print_every=10000,
-                 insert_reverse=True,
-                 raw_dir=None,
-                 force_reload=False,
-                 verbose=True):
-        deprecate_class('AM', 'AMDataset')
-        super(AM, self).__init__(print_every,
-                                 insert_reverse,
-                                 raw_dir,
-                                 force_reload,
-                                 verbose)
-
-if __name__ == '__main__':
-    dataset = AIFB()
