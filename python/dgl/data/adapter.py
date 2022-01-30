@@ -75,9 +75,10 @@ class AsNodePredDataset(DGLDataset):
         if 'label' not in self.g.nodes[self.target_ntype].data:
             raise ValueError("Missing node labels. Make sure labels are stored "
                              "under name 'label'.")
-        if self.verbose:
-            print('Generating train/val/test masks...')
-        utils.add_nodepred_split(self, self.split_ratio, self.target_ntype)
+        if any(s not in self.g.nodes[self.target_ntype].ndata for s in ["train_mask", "val_mask", "test_mask"]):
+            if self.verbose:
+                print('Generating train/val/test masks...')
+            utils.add_nodepred_split(self, self.split_ratio, self.target_ntype)
 
     def has_cache(self):
         return os.path.isfile(os.path.join(self.save_path, 'graph.bin'))
