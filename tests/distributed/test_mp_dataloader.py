@@ -216,6 +216,10 @@ def check_neg_dataloader(g, tmpdir, num_server, num_workers):
 @pytest.mark.parametrize("num_groups", [1, 2])
 def test_dist_dataloader(tmpdir, num_server, num_workers, drop_last, reshuffle, num_groups):
     reset_envs()
+    # No multiple partitions on single machine for
+    # multiple client groups in case of race condition.
+    if num_groups > 1:
+        num_server = 1
     generate_ip_config("mp_ip_config.txt", num_server, num_server)
 
     g = CitationGraphDataset("cora")[0]
