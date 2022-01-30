@@ -21,7 +21,7 @@ from ..utils import (
     recursive_apply, ExceptionWrapper, recursive_apply_pair, set_num_threads,
     create_shared_mem_array, get_shared_mem_array)
 from ..frame import LazyFeature
-from ..storages import FeatureStorage, wrap_storage
+from ..storages import wrap_storage
 from .base import BlockSampler, EdgeBlockSampler
 from .. import backend as F
 
@@ -237,7 +237,7 @@ def _prefetch_update_feats(feats, frames, types, get_storage_func, id_name, devi
                     raise DGLError(
                         'Found a LazyFeature with no ID specified, '
                         'and the graph does not have dgl.NID or dgl.EID columns')
-                feats[tid, key] = get_storage_func(key, type_).fetch(
+                feats[tid, key] = get_storage_func(parent_key, type_).fetch(
                     column.id_ or default_id, device, pin_memory)
 
 

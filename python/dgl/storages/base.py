@@ -13,6 +13,9 @@ def register_storage_wrapper(type_):
     return deco
 
 def wrap_storage(storage):
+    """Wrap an object into a FeatureStorage as specified by the ``register_storage_wrapper``
+    decorators.
+    """
     for type_, storage_cls in STORAGE_WRAPPERS.items():
         if isinstance(storage, type_):
             return storage_cls(storage)
