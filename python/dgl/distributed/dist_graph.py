@@ -26,6 +26,7 @@ from . import rpc
 from . import role
 from .server_state import ServerState
 from .rpc_server import start_server
+from . import graph_services
 from .graph_services import find_edges as dist_find_edges
 from .graph_services import out_degrees as dist_out_degrees
 from .graph_services import in_degrees as dist_in_degrees
@@ -1222,6 +1223,20 @@ class DistGraph:
         Please use this API with caution.
         '''
         self._client.barrier()
+
+    def sample_neighbors(self, seed_nodes, fanout, edge_dir='in', prob=None,
+                         exclude_edges=None, replace=False,
+                         output_device=None):
+        # pylint: disable=unused-argument
+        """Sample neighbors from a distributed graph."""
+        # Currently prob, exclude_edges, output_device, and edge_dir are ignored.
+        if len(self.etypes) > 1:
+            frontier = graph_services.sample_etype_neighbors(
+                self, seed_nodes, ETYPE, fanout, replace=replace)
+        else:
+            frontier = graph_services.sample_neighbors(
+                self, seed_nodes, fanout, replace=replace)
+        return frontier
 
     def _get_ndata_names(self, ntype=None):
         ''' Get the names of all node data.

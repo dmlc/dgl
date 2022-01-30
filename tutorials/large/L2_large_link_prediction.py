@@ -369,12 +369,6 @@ for epoch in range(1):
 # Ultimately, they require the model to predict one scalar score given
 # a node pair among a set of node pairs.
 #
-# ``dgl.dataloading.EdgeDataLoader`` allows you to iterate over
-# the edges of a new graph with the same nodes, while performing
-# neighbor sampling on the original graph with ``g_sampling`` argument.
-# This functionality enables convenient evaluation of a link prediction
-# model.
-#
 # Assuming that you have the following test set with labels, where
 # ``test_pos_src`` and ``test_pos_dst`` are ground truth node pairs
 # with edges in between (or *positive* pairs), and ``test_neg_src``
@@ -383,10 +377,16 @@ for epoch in range(1):
 #
 
 # Positive pairs
-test_pos_src, test_pos_dst = graph.edges()
-# Negative pairs
+# These are randomly generated as an example.  You will need to
+# replace them with your own ground truth.
+n_test_pos = 1000
+test_pos_src, test_pos_dst = (
+    torch.randint(0, graph.num_nodes(), (n_test_pos,)),
+    torch.randint(0, graph.num_nodes(), (n_test_pos,)))
+# Negative pairs.  Likewise, you will need to replace them with your
+# own ground truth.
 test_neg_src = test_pos_src
-test_neg_dst = torch.randint(0, graph.num_nodes(), (graph.num_edges(),))
+test_neg_dst = torch.randint(0, graph.num_nodes(), (n_test_pos,))
 
 
 ######################################################################
@@ -398,8 +398,18 @@ test_neg_dst = torch.randint(0, graph.num_nodes(), (graph.num_edges(),))
 test_src = torch.cat([test_pos_src, test_pos_dst])
 test_dst = torch.cat([test_neg_src, test_neg_dst])
 test_graph = dgl.graph((test_src, test_dst), num_nodes=graph.num_nodes())
-test_graph.edata['label'] = torch.cat(
+test_ground_truth = torch.cat(
         [torch.ones_like(test_pos_src), torch.zeros_like(test_neg_src)])
+
+
+######################################################################
+# You will need to merge the test graph with the original graph.  The
+# testing edges' ID will be starting from ``graph.num_edges()``.
+#
+
+new_graph = dgl.merge([graph, test_graph])
+test_edge_ids = torch.arange(graph.num_edges(), new_graph.num_edges())
+
 
 
 ######################################################################
@@ -412,11 +422,11 @@ test_graph.edata['label'] = torch.cat(
 #
 test_dataloader = dgl.dataloading.EdgeDataLoader(
     # The following arguments are specific to EdgeDataLoader.
-    test_graph,                             # The graph to iterate edges over
-    torch.arange(test_graph.number_of_edges()),  # The edges to iterate over
+    new_graph,                              # The graph to iterate edges over
+    test_edge_ids,                          # The edges to iterate over
     sampler,                                # The neighbor sampler
     device=device,                          # Put the MFGs on CPU or GPU
-    g_sampling=graph,                       # Graph to sample neighbors
+    exclude=test_edge_ids,                  # Do not sample test edges as neighbors
     # The following arguments are inherited from PyTorch DataLoader.
     batch_size=1024,    # Batch size
     shuffle=True,       # Whether to shuffle the nodes for every epoch
@@ -447,7 +457,10 @@ with tqdm.tqdm(test_dataloader) as tq, torch.no_grad():
 
         outputs = model(mfgs, inputs)
         test_preds.append(predictor(pair_graph, outputs))
-        test_labels.append(pair_graph.edata['label'])
+        test_labels.append(
+            # Need to map the IDs of test edges in the merged graph back
+            # to that of test_ground_truth.
+            test_ground_truth[pair_graph.edata[dgl.EID] - graph.num_edges()])
 
 test_preds = torch.cat(test_preds).cpu().numpy()
 test_labels = torch.cat(test_labels).cpu().numpy()

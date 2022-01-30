@@ -14,15 +14,12 @@ Read the user guide :ref:`guide-minibatch`.
     This package is experimental and the interfaces may be subject
     to changes in future releases. It currently only has implementations in PyTorch.
 """
-from .neighbor import *
-from .dataloader import *
+from .. import backend as F
+from .neighbor_sampler import *
 from .cluster_gcn import *
 from .shadow import *
-
+from .base import *
 from . import negative_sampler
-from .async_transferer import AsyncTransferer
-
-from .. import backend as F
-
 if F.get_preferred_backend() == 'pytorch':
-    from .pytorch import *
+    from .dataloader import *
+    from .dist_dataloader import *
