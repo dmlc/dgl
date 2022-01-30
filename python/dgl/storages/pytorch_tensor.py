@@ -18,7 +18,7 @@ def _fetch_cuda(indices, tensor, device):
 class TensorStorage(FeatureStorage):
     """Feature storages for slicing a PyTorch tensor."""
     def __init__(self, tensor):
-        self.tensor = tensor
+        self.storage = tensor
         self.feature_shape = tensor.shape[1:]
         self.is_cuda = (tensor.device.type == 'cuda')
 
@@ -26,7 +26,7 @@ class TensorStorage(FeatureStorage):
         device = torch.device(device)
         if not self.is_cuda:
             # CPU to CPU or CUDA - use pin_memory and async transfer if possible
-            return _fetch_cpu(indices, self.tensor, self.feature_shape, device, pin_memory)
+            return _fetch_cpu(indices, self.storage, self.feature_shape, device, pin_memory)
         else:
             # CUDA to CUDA or CPU
-            return _fetch_cuda(indices, self.tensor, device)
+            return _fetch_cuda(indices, self.storage, device)

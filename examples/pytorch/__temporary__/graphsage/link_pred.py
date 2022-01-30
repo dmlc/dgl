@@ -39,6 +39,10 @@ graph, labels = dataset[0]
 graph.ndata['label'] = labels
 split_idx = dataset.get_idx_split()
 train_idx, valid_idx, test_idx = split_idx['train'], split_idx['valid'], split_idx['test']
+
+model = SAGE(graph.ndata['feat'].shape[1], 256, dataset.num_classes).cuda()
+opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
+
 num_edges = graph.num_edges()
 train_eids = torch.arange(num_edges)
 if USE_WRAPPER:
@@ -64,9 +68,6 @@ dataloader = dgl.dataloading.EdgeDataLoader(
         exclude='reverse_id',
         reverse_eids=torch.arange(num_edges) ^ 1,
         negative_sampler=dgl.dataloading.negative_sampler.Uniform(5))
-
-model = SAGE(graph.ndata['feat'].shape[1], 256, dataset.num_classes).cuda()
-opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
 
 durations = []
 for _ in range(10):

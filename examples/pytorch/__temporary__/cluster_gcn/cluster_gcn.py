@@ -37,6 +37,9 @@ graph.ndata['train_mask'] = torch.zeros(graph.num_nodes(), dtype=torch.bool).ind
 graph.ndata['valid_mask'] = torch.zeros(graph.num_nodes(), dtype=torch.bool).index_fill_(0, valid_idx, True)
 graph.ndata['test_mask'] = torch.zeros(graph.num_nodes(), dtype=torch.bool).index_fill_(0, test_idx, True)
 
+model = SAGE(graph.ndata['feat'].shape[1], 256, dataset.num_classes).cuda()
+opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
+
 if USE_WRAPPER:
     import dglnew
     graph.create_formats_()
@@ -62,9 +65,6 @@ dataloader = dgl.dataloading.DataLoader(
         num_workers=8,
         persistent_workers=True,
         use_prefetch_thread=True)       # TBD: could probably remove this argument
-
-model = SAGE(graph.ndata['feat'].shape[1], 256, dataset.num_classes).cuda()
-opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
 
 durations = []
 for _ in range(10):

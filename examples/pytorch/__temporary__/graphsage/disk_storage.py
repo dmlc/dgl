@@ -40,6 +40,10 @@ feat_np = graph.ndata['feat'].numpy()
 feat = np.memmap('feat.npy', mode='w+', shape=feat_np.shape, dtype='float32')
 print(feat.shape)
 feat[:] = feat_np
+
+model = SAGE(feat.shape[1], 256, dataset.num_classes).cuda()
+opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
+
 graph.create_formats_()
 # Because NumpyStorage is registered with memmap, one can directly add numpy memmaps
 graph = dglnew.graph.OtherFeatureGraphStorage(graph, ndata={'feat': feat, 'label': labels})
@@ -60,9 +64,6 @@ dataloader = dgl.dataloading.NodeDataLoader(
         pin_memory=True,
         num_workers=4,
         use_prefetch_thread=True)       # TBD: could probably remove this argument
-
-model = SAGE(feat.shape[1], 256, dataset.num_classes).cuda()
-opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
 
 durations = []
 for _ in range(10):

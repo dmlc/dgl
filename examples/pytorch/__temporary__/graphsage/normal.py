@@ -8,7 +8,7 @@ import time
 import numpy as np
 from ogb.nodeproppred import DglNodePropPredDataset
 
-USE_WRAPPER = False
+USE_WRAPPER = True
 
 class SAGE(nn.Module):
     def __init__(self, in_feats, n_hidden, n_classes):
@@ -33,6 +33,10 @@ graph, labels = dataset[0]
 graph.ndata['label'] = labels
 split_idx = dataset.get_idx_split()
 train_idx, valid_idx, test_idx = split_idx['train'], split_idx['valid'], split_idx['test']
+
+model = SAGE(graph.ndata['feat'].shape[1], 256, dataset.num_classes).cuda()
+opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
+
 if USE_WRAPPER:
     import dglnew
     graph.create_formats_()
@@ -53,9 +57,6 @@ dataloader = dgl.dataloading.NodeDataLoader(
         num_workers=16,
         persistent_workers=True,
         use_prefetch_thread=True)       # TBD: could probably remove this argument
-
-model = SAGE(graph.ndata['feat'].shape[1], 256, dataset.num_classes).cuda()
-opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
 
 durations = []
 for _ in range(10):

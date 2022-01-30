@@ -12,6 +12,16 @@ def register_storage_wrapper(type_):
         return cls
     return deco
 
+def wrap_storage(storage):
+    for type_, storage_cls in STORAGE_WRAPPERS.items():
+        if isinstance(storage, type_):
+            return storage_cls(storage)
+
+    assert isinstance(storage, FeatureStorage), (
+        "The frame column must be a tensor or a FeatureStorage object, got {}"
+        .format(type(storage)))
+    return storage
+
 class _FuncWrapper(object):
     def __init__(self, func):
         self.func = func

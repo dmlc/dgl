@@ -7,6 +7,7 @@ from collections.abc import MutableMapping
 from . import backend as F
 from .base import DGLError, dgl_warning
 from .init import zero_initializer
+from .storages import TensorStorage
 
 class _LazyIndex(object):
     def __init__(self, index):
@@ -94,7 +95,7 @@ def infer_scheme(tensor):
     """
     return Scheme(tuple(F.shape(tensor)[1:]), F.dtype(tensor))
 
-class Column(object):
+class Column(TensorStorage):
     """A column is a compact store of features of multiple nodes/edges.
 
     It batches all the feature tensors together along the first dimension
@@ -137,7 +138,7 @@ class Column(object):
         Index tensor
     """
     def __init__(self, storage, scheme=None, index=None, device=None):
-        self.storage = storage
+        super().__init__(storage)
         self.scheme = scheme if scheme else infer_scheme(storage)
         self.index = index
         self.device = device

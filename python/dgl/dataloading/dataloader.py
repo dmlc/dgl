@@ -21,7 +21,7 @@ from ..utils import (
     recursive_apply, ExceptionWrapper, recursive_apply_pair, set_num_threads,
     create_shared_mem_array, get_shared_mem_array)
 from ..frame import LazyFeature
-from ..storages import FeatureStorage, STORAGE_WRAPPERS
+from ..storages import FeatureStorage, wrap_storage
 from .base import BlockSampler, EdgeBlockSampler
 from .. import backend as F
 
@@ -225,7 +225,7 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
             self.batch_size
 
 
-def _prefetch_update_feats(feats, frames, types, storages, id_name, device, pin_memory):
+def _prefetch_update_feats(feats, frames, types, get_storage_func, id_name, device, pin_memory):
     for tid, frame in enumerate(frames):
         type_ = types[tid]
         default_id = frame.get(id_name, None)
@@ -237,7 +237,7 @@ def _prefetch_update_feats(feats, frames, types, storages, id_name, device, pin_
                     raise DGLError(
                         'Found a LazyFeature with no ID specified, '
                         'and the graph does not have dgl.NID or dgl.EID columns')
-                feats[tid, key] = storages[parent_key][type_].fetch(
+                feats[tid, key] = get_storage_func(key, type_).fetch(
                     column.id_ or default_id, device, pin_memory)
 
 
@@ -253,10 +253,10 @@ class _PrefetchedGraphFeatures(object):
 def _prefetch_for_subgraph(subg, dataloader):
     node_feats, edge_feats = {}, {}
     _prefetch_update_feats(
-        node_feats, subg._node_frames, subg.ntypes, dataloader.node_storages,
+        node_feats, subg._node_frames, subg.ntypes, dataloader.graph.get_node_storage,
         NID, dataloader.device, dataloader.pin_memory)
     _prefetch_update_feats(
-        edge_feats, subg._edge_frames, subg.canonical_etypes, dataloader.edge_storages,
+        edge_feats, subg._edge_frames, subg.canonical_etypes, dataloader.graph.get_edge_storage,
         EID, dataloader.device, dataloader.pin_memory)
     return _PrefetchedGraphFeatures(node_feats, edge_feats)
 
@@ -474,32 +474,6 @@ class WorkerInitWrapper(object):
             self.func(worker_id)
 
 
-def _wrap_storage(storage):
-    for type_, storage_cls in STORAGE_WRAPPERS.items():
-        if isinstance(storage, type_):
-            return storage_cls(storage)
-
-    assert isinstance(storage, FeatureStorage), (
-        "The frame column must be a tensor or a FeatureStorage object, got {}"
-        .format(type(storage)))
-    return storage
-
-
-# Serves for two purposes: (1) to get around the overhead of calling
-# g.ndata[key][ntype] etc., (2) to make tensors a TensorStorage.
-def _prepare_storages_from_graph(graph, attr, types):
-    storages = {}
-    for key, value in getattr(graph, attr).items():
-        storages[key] = {}
-        if not isinstance(value, Mapping):
-            assert len(types) == 1, "Expect a dict in {} if multiple types exist".format(attr)
-            storages[key][types[0]] = _wrap_storage(value)
-        else:
-            for type_, v in value.items():
-                storages[key][type_] = _wrap_storage(v)
-    return storages
-
-
 def create_tensorized_dataset(indices, batch_size, drop_last, use_ddp, ddp_seed):
     """Converts a given indices tensor to a TensorizedDataset, an IterableDataset
     that returns views of the original tensor, to reduce overhead from having
@@ -550,8 +524,6 @@ class DataLoader(torch.utils.data.DataLoader):
         if kwargs.get('num_workers', 0) > 0 and hasattr(self.graph, 'create_formats_'):
             self.graph.create_formats_()
 
-        self.node_storages = _prepare_storages_from_graph(graph, 'ndata', graph.ntypes)
-        self.edge_storages = _prepare_storages_from_graph(graph, 'edata', graph.canonical_etypes)
         self.other_storages = {}
 
         super().__init__(
@@ -574,7 +546,7 @@ class DataLoader(torch.utils.data.DataLoader):
     # To allow data other than node/edge data to be prefetched.
     def attach_data(self, name, data):
         """Add a data other than node and edge features for prefetching."""
-        self.other_storages[name] = _wrap_storage(data)
+        self.other_storages[name] = wrap_storage(data)
 
 
 # Alias

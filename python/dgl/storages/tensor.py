@@ -11,7 +11,7 @@ class TensorStorage(FeatureStorage):
     it to the given device.
     """
     def __init__(self, tensor):
-        self.tensor = tensor
+        self.storage = tensor
 
     def fetch(self, indices, device, pin_memory=False):     # pylint: disable=unused-argument
-        return recursive_apply_pair(indices, self.tensor, _fetch, device)
+        return recursive_apply_pair(indices, self.storage, _fetch, device)

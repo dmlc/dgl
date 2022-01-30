@@ -1,10 +1,8 @@
 class GraphStorage(object):
-    @property
-    def ndata(self):
+    def get_node_storage(self, key, ntype=None):
         pass
 
-    @property
-    def edata(self):
+    def get_edge_storage(self, key, etype=None):
         pass
 
     # Required for checking whether a single dict is allowed for ndata and edata.
