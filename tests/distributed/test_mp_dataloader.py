@@ -216,6 +216,10 @@ def check_neg_dataloader(g, tmpdir, num_server, num_workers):
 @pytest.mark.parametrize("num_groups", [1, 2])
 def test_dist_dataloader(tmpdir, num_server, num_workers, drop_last, reshuffle, num_groups):
     reset_envs()
+    # No multiple partitions on single machine for
+    # multiple client groups in case of race condition.
+    if num_groups > 1:
+        num_server = 1
     generate_ip_config("mp_ip_config.txt", num_server, num_server)
 
     g = CitationGraphDataset("cora")[0]
@@ -246,6 +250,7 @@ def test_dist_dataloader(tmpdir, num_server, num_workers, drop_last, reshuffle, 
             p = ctx.Process(target=start_dist_dataloader, args=(
                 trainer_id, tmpdir, num_server, drop_last, orig_nid, orig_eid, group_id))
             p.start()
+            time.sleep(1) # avoid race condition when instantiating DistGraph
             ptrainer_list.append(p)
 
     for p in ptrainer_list:
