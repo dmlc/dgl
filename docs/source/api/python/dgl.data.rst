@@ -233,6 +233,7 @@ Dataset adapters
 .. autoclass:: AsNodePredDataset
     :members: __getitem__, __len__
 
+
 .. autoclass:: AsEdgePredDataset
     :members: __getitem__, __len__
 

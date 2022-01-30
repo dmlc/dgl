@@ -361,7 +361,9 @@ def add_nodepred_split(dataset, ratio, ntype=None):
     It adds three node mask arrays ``'train_mask'``, ``'val_mask'`` and ``'test_mask'``,
     to each graph in the dataset. Each sample in the dataset thus must be a :class:`DGLGraph`.
 
-    Fix the random seed of the backend framework in-use to make the result deterministic.
+    Fix the random seed of NumPy to make the result deterministic::
+
+        numpy.random.seed(42)
 
     Parameters
     ----------
@@ -381,17 +383,17 @@ def add_nodepred_split(dataset, ratio, ntype=None):
     >>> print('train_mask' in dataset[0].ndata)
     True
     """
+    if len(ratio) != 3:
+        raise ValueError(f'Split ratio must be a float triplet but got {ratio}.')
     for i in range(len(dataset)):
         g = dataset[i]
         n = g.num_nodes(ntype)
-        idx = F.rand_shuffle(F.arange(0, n, dtype=g.idtype))
-        train_mask = F.full_1d(n, False, F.bool, F.cpu())
-        val_mask = F.full_1d(n, False, F.bool, F.cpu())
-        test_mask = F.full_1d(n, False, F.bool, F.cpu())
+        idx = np.arange(0, n)
+        np.random.shuffle(idx)
         n_train, n_val, n_test = int(n * ratio[0]), int(n * ratio[1]), int(n * ratio[2])
-        train_mask[idx[:n_train]] = True
-        val_mask[idx[n_train:n_train + n_val]] = True
-        test_mask[idx[n_train + n_val:]] =  True
+        train_mask = generate_mask_tensor(idx2mask(idx[:n_train], n))
+        val_mask = generate_mask_tensor(idx2mask(idx[n_train:n_train + n_val], n))
+        test_mask = generate_mask_tensor(idx2mask(idx[n_train + n_val:], n))
         g.nodes[ntype].data['train_mask'] = train_mask
         g.nodes[ntype].data['val_mask'] = val_mask
         g.nodes[ntype].data['test_mask'] = test_mask

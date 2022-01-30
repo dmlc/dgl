@@ -57,12 +57,12 @@ class DGLDataset(object):
     name : str
         The dataset name
     raw_dir : str
-        Root directory to store all the downloaded datasets.
+        Directory to store all the downloaded raw datasets.
     raw_path : str
-        Path to the downloaded dataset folder. An alias for
+        Path to the downloaded raw dataset folder. An alias for
         ``os.path.join(self.raw_dir, self.name)``.
     save_dir : str
-        Root directory to save all the processed datasets.
+        Directory to save all the processed datasets.
     save_path : str
         Path to the processed dataset folder. An alias for
         ``os.path.join(self.save_dir, self.name)``.
