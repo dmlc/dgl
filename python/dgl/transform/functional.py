@@ -714,12 +714,15 @@ def to_bidirected(g, copy_ndata=False, readonly=None):
     return g
 
 def add_reverse_edges(g, readonly=None, copy_ndata=True,
-                      copy_edata=False, ignore_bipartite=False):
+                      copy_edata=False, ignore_bipartite=False, exclude_self=True):
     r"""Add a reversed edge for each edge in the input graph and return a new graph.
 
     For a graph with edges :math:`(i_1, j_1), \cdots, (i_n, j_n)`, this
     function creates a new graph with edges
     :math:`(i_1, j_1), \cdots, (i_n, j_n), (j_1, i_1), \cdots, (j_n, i_n)`.
+
+    The returned graph may have duplicate edges. To create a bidirected graph without
+    duplicate edges, use :func:`to_bidirected`.
 
     The operation only works for edges whose two endpoints belong to the same node type.
     DGL will raise error if the input graph is heterogeneous and contains edges
@@ -750,6 +753,9 @@ def add_reverse_edges(g, readonly=None, copy_ndata=True,
         no error is raised. If False, an error will be raised if
         an edge type of the input heterogeneous graph is for a unidirectional
         bipartite graph.
+    exclude_self: bool, optional
+        If True, it does not add reverse edges for self-loops, which is likely
+        meaningless in most cases.
 
     Returns
     -------
@@ -812,32 +818,45 @@ def add_reverse_edges(g, readonly=None, copy_ndata=True,
     # get node cnt for each ntype
     num_nodes_dict = {}
     for ntype in g.ntypes:
-        num_nodes_dict[ntype] = g.number_of_nodes(ntype)
+        num_nodes_dict[ntype] = g.num_nodes(ntype)
 
     canonical_etypes = g.canonical_etypes
-    num_nodes_dict = {ntype: g.number_of_nodes(ntype) for ntype in g.ntypes}
+    num_nodes_dict = {ntype: g.num_nodes(ntype) for ntype in g.ntypes}
+    subgs = {}
+    rev_eids = {}
+
+    def add_for_etype(etype):
+        u, v = g.edges(form='uv', order='eid', etype=etype)
+        rev_u, rev_v = v, u
+        eid = F.copy_to(F.arange(0, g.num_edges(etype)), g.device)
+        if exclude_self:
+            self_loop_mask = F.equal(rev_u, rev_v)
+            non_self_loop_mask = F.logical_not(self_loop_mask)
+            rev_u = F.boolean_mask(rev_u, non_self_loop_mask)
+            rev_v = F.boolean_mask(rev_v, non_self_loop_mask)
+            non_self_loop_eid = F.boolean_mask(eid, non_self_loop_mask)
+            rev_eids[etype] = F.cat([eid, non_self_loop_eid], 0)
+        else:
+            rev_eids[etype] = F.cat([eid, eid], 0)
+        subgs[etype] = (F.cat([u, rev_u], dim=0), F.cat([v, rev_v], dim=0))
+
     # fast path
     if ignore_bipartite is False:
-        subgs = {}
         for c_etype in canonical_etypes:
             if c_etype[0] != c_etype[2]:
                 assert False, "add_reverse_edges is not well defined for " \
                     "unidirectional bipartite graphs" \
                     ", but {} is unidirectional bipartite".format(c_etype)
-
-            u, v = g.edges(form='uv', order='eid', etype=c_etype)
-            subgs[c_etype] = (F.cat([u, v], dim=0), F.cat([v, u], dim=0))
+            add_for_etype(c_etype)
 
         new_g = convert.heterograph(subgs, num_nodes_dict=num_nodes_dict)
     else:
-        subgs = {}
         for c_etype in canonical_etypes:
             if c_etype[0] != c_etype[2]:
                 u, v = g.edges(form='uv', order='eid', etype=c_etype)
                 subgs[c_etype] = (u, v)
             else:
-                u, v = g.edges(form='uv', order='eid', etype=c_etype)
-                subgs[c_etype] = (F.cat([u, v], dim=0), F.cat([v, u], dim=0))
+                add_for_etype(c_etype)
 
         new_g = convert.heterograph(subgs, num_nodes_dict=num_nodes_dict)
 
@@ -850,11 +869,10 @@ def add_reverse_edges(g, readonly=None, copy_ndata=True,
         # find indices
         eids = []
         for c_etype in canonical_etypes:
-            eid = F.copy_to(F.arange(0, g.number_of_edges(c_etype)), new_g.device)
             if c_etype[0] != c_etype[2]:
-                eids.append(eid)
+                eids.append(F.copy_to(F.arange(0, g.number_of_edges(c_etype)), new_g.device))
             else:
-                eids.append(F.cat([eid, eid], 0))
+                eids.append(rev_eids[c_etype])
 
         edge_frames = utils.extract_edge_subframes(g, eids)
         utils.set_new_frames(new_g, edge_frames=edge_frames)

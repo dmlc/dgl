@@ -287,6 +287,9 @@ class TemporalEdgeDataLoader(dgl.dataloading.EdgeDataLoader):
         if dataloader_kwargs.get('num_workers', 0) > 0:
             g.create_formats_()
 
+    def __iter__(self):
+        return iter(self.dataloader)
+
 # ====== Fast Mode ======
 
 # Part of code in reservoir sampling comes from PyG library
