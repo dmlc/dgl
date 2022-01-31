@@ -166,14 +166,16 @@ void gatherMM_UnsortedEtype(const NDArray A,
               const NDArray B_dim1_per_rel,
               const NDArray etype) {
     SWITCH_BITS(bits, DType, {
-        assert(A_dim1_per_rel.NumElements() == B_dim1_per_rel.NumElements());
         const IdType* A_rel_data = A_dim1_per_rel.Ptr<IdType>();
         const IdType* B_rel_data = B_dim1_per_rel.Ptr<IdType>();
-        for (int rel = 0; rel < B_dim1_per_rel.NumElements(); ++rel) {
-            if (B_rel_data[rel] != B_rel_data[0])
-                LOG(FATAL) << "Tensors in B do not share same dimension across relations. "
-                    << "Found " << B_rel_data[0] << " and " << B_rel_data[rel] << " in "
-                    << "relation 0 and " << rel << ". Use sorted version (sortedA =True).";
+        if (B_rel_data) {
+            assert(A_dim1_per_rel.NumElements() == B_dim1_per_rel.NumElements());
+            for (int rel = 0; rel < B_dim1_per_rel.NumElements(); ++rel) {
+                if (B_rel_data[rel] != B_rel_data[0])
+                    LOG(FATAL) << "Tensors in B do not share same dimension across relations. "
+                        << "Found " << B_rel_data[0] << " and " << B_rel_data[rel] << " in "
+                        << "relation 0 and " << rel << ". Use sorted version (sortedA =True).";
+            }
         }
         auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
         int64_t num_rel = A_dim1_per_rel.NumElements();
@@ -211,7 +213,6 @@ void gatherMM_SortedEtype(const NDArray A,
               bool a_trans, bool b_trans) {
     SWITCH_BITS(bits, DType, {
         auto device = runtime::DeviceAPI::Get(A->ctx);
-        assert(A_dim1_per_rel.NumElements() == B_dim1_per_rel.NumElements());
         int64_t num_rel = A_dim1_per_rel.NumElements();
         const DType *A_data = A.Ptr<DType>();
         const DType *B_data = B.Ptr<DType>();
@@ -221,19 +222,20 @@ void gatherMM_SortedEtype(const NDArray A,
         int64_t A_offset = 0, B_offset = 0, C_offset = 0;
         int64_t m, n, k;
         DType alpha = 1., beta = 0.;
-
+        if (B_rel_data)
+            assert(A_dim1_per_rel.NumElements() == B_dim1_per_rel.NumElements());
         auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
         if (!thr_entry->cublas_handle)
             CUBLAS_CALL(cublasCreate(&(thr_entry->cublas_handle)));
         CUBLAS_CALL(cublasSetStream(thr_entry->cublas_handle,
             thr_entry->stream));
-
         for (int etype = 0; etype < num_rel; ++etype) {
+            IdType B_dim1 = (B_rel_data) ? B_rel_data[etype] : (B->shape[0] / num_rel);
             assert((a_trans) ? A_rel_data[etype] : A->shape[1] ==  \
-                (b_trans) ? B->shape[1] : B_rel_data[etype]);
+                (b_trans) ? B->shape[1] : B_dim1);
             m = A_rel_data[etype];  // rows of A
             n = B->shape[1];  // cols of B
-            k = B_rel_data[etype];  // rows of B == cols of A
+            k = A->shape[1];  // cols of A == rows of B
 
             DType* A_trans_data = nullptr;
             DType* B_trans_data = nullptr;
@@ -243,16 +245,16 @@ void gatherMM_SortedEtype(const NDArray A,
                 _Transpose(thr_entry->cublas_handle, A_data + A_offset, A_trans_data, m, k);
             }
             if (b_trans) {
+                IdType tmp_k = B_dim1;
                 B_trans_data = static_cast<DType*>(device->AllocWorkspace \
-                    (B->ctx, n * k * sizeof(DType)));
-                _Transpose(thr_entry->cublas_handle, B_data + B_offset, B_trans_data, k, n);
+                    (B->ctx, n * tmp_k * sizeof(DType)));
+                _Transpose(thr_entry->cublas_handle, B_data + B_offset, B_trans_data, tmp_k, n);
             }
             if (a_trans || b_trans) {
-                int64_t tmp = k;
                 if (a_trans)
                     std::swap(m, k);
                 if (b_trans)  {
-                    k = tmp;
+                    k = B_dim1;
                     std::swap(n, k);
                 }
             }
@@ -263,10 +265,10 @@ void gatherMM_SortedEtype(const NDArray A,
                 CUBLAS_OP_N,
                 n, m, k,
                 &alpha,
-                (b_trans) ? B_trans_data : B_data + B_offset, n,
-                (a_trans) ? A_trans_data : A_data + A_offset, k,
+                (b_trans) ? B_trans_data : B_data + B_offset, ldb,
+                (a_trans) ? A_trans_data : A_data + A_offset, lda,
                 &beta,
-                C_data + C_offset, n));
+                C_data + C_offset, ldc));
             if (a_trans)
                 device->FreeWorkspace(A->ctx, A_trans_data);
             if (b_trans)

@@ -86,15 +86,15 @@ def test_gathermm(idtype):
 
         # forward pass
         out_gmm_sorted = F.zeros(Out.shape, dtype=F.dtype(Out))
-        dgl.sparse._gather_mm(H, W, out_gmm_sorted, E_per_rel, W_per_len, etypes, sortedE=True)
+        dgl.sparse._gather_mm(H, W, out_gmm_sorted, E_per_rel, etypes=etypes, sortedE=True)
 
         # backward pass
         # Compute H_grad = Out_grad * W^T
         H_grad_gmm_sorted = F.zeros(H.shape, dtype=F.dtype(H))
-        dgl.sparse._gather_mm(Out_grad, W, H_grad_gmm_sorted, E_per_rel, W_per_len, etypes, sortedE=True, b_trans=True)
+        dgl.sparse._gather_mm(Out_grad, W, H_grad_gmm_sorted, E_per_rel, etypes=etypes, sortedE=True, b_trans=True)
         # # Compute W_grad = H^T * Out_grad
         W_grad_gmm_sorted = F.zeros(W.shape, dtype=F.dtype(W))
-        dgl.sparse._gather_mm(H, Out_grad, W_grad_gmm_sorted, E_per_rel, W_per_len, etypes, sortedE=True, a_trans=True)
+        dgl.sparse._gather_mm(H, Out_grad, W_grad_gmm_sorted, E_per_rel, etypes=etypes, sortedE=True, a_trans=True)
 
 
         #################################################################
@@ -103,7 +103,7 @@ def test_gathermm(idtype):
 
         # forward pass
         out_gmm_unsorted = F.zeros(Out.shape, dtype=F.dtype(Out))
-        dgl.sparse._gather_mm(H, W, out_gmm_unsorted, E_per_rel, W_per_len, etypes, sortedE=False)
+        dgl.sparse._gather_mm(H, W, out_gmm_unsorted, E_per_rel, etypes=etypes, sortedE=False)
 
 
         # correctness check

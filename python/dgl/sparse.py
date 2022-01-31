@@ -328,7 +328,7 @@ def _gspmm_hetero(gidx, op, reduce_op, u_len, u_and_e_tuple):
     return out, (list_arg_u, list_arg_e, list_arg_u_ntype, list_arg_e_etype)
 
 
-def _gather_mm(A, B, out, A_per_rel, B_per_rel, etypes, sortedE=True,
+def _gather_mm(A, B, out, A_per_rel, B_per_rel=None, etypes=None, sortedE=True,
                a_trans=False, b_trans=False):
     r""" Generalized Dense Matrix Multiplication interface. It multiplies
     tensor A and B according to relation types and outputs in out. B is a
