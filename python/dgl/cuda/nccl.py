@@ -210,4 +210,7 @@ class Communicator(object):
         """
         return self._size
 
+def is_supported():
+    return _CAPI_DGLNCCLHasSupport()
+
 _init_api("dgl.cuda.nccl")

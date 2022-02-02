@@ -82,6 +82,10 @@ def test_nccl_sparse_pull_single_range():
     exp_rv = F.gather_row(value, req_index)
     assert F.array_equal(rv, exp_rv)
 
+def test_nccl_support():
+    # this is just a smoke test, as we don't have any other way to know
+    # if NCCL support is compiled in right now.
+    nccl.is_supported()
 
 if __name__ == '__main__':
     test_nccl_id()
