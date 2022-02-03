@@ -1600,6 +1600,14 @@ class DGLHeteroGraph(object):
     # View
     #################################################################
 
+    def get_node_storage(self, key, ntype=None):
+        """Get storage object of node feature of type :attr:`ntype` and name :attr:`key`."""
+        return self._node_frames[self.get_ntype_id(ntype)]._columns[key]
+
+    def get_edge_storage(self, key, etype=None):
+        """Get storage object of edge feature of type :attr:`etype` and name :attr:`key`."""
+        return self._edge_frames[self.get_etype_id(etype)]._columns[key]
+
     @property
     def nodes(self):
         """Return a node view
