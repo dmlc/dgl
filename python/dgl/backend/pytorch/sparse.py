@@ -2,7 +2,7 @@ import torch as th
 from distutils.version import LooseVersion
 from ...base import is_all, ALL
 from ...sparse import _gspmm, _gspmm_hetero, _gsddmm, _gsddmm_hetero, _segment_reduce, _bwd_segment_cmp
-from ...sparse import _csrmm, _csrsum, _csrmask, _scatter_add, _update_grad_minmax_hetero
+from ...sparse import _csrmm, _csrsum, _csrmask, _scatter_add, _update_grad_minmax_hetero, _gather_mm
 from ...heterograph_index import create_unitgraph_from_csr
 
 if LooseVersion(th.__version__) >= LooseVersion("1.6.0"):
@@ -27,7 +27,7 @@ else:
         return decorate_bwd
 
 __all__ = ['gspmm', 'gsddmm', 'gspmm_hetero', 'gsddmm_hetero', 'edge_softmax', 'edge_softmax_hetero',
-           'segment_reduce', 'scatter_add', 'csrmm', 'csrsum', 'csrmask']
+           'segment_reduce', 'scatter_add', 'csrmm', 'csrsum', 'csrmask', 'gather_mm']
 
 
 def _reduce_grad(grad, shape):
@@ -681,6 +681,31 @@ class CSRMask(th.autograd.Function):
         return None, csrmask(gidxB, dB_weights, gidxA), None
 
 
+class GATHERMM(th.autograd.Function):
+    @staticmethod
+    @custom_fwd(cast_inputs=th.float16)
+    def forward(ctx, A, B, out, A_per_rel, B_per_rel, etypes, sortedE,
+                a_trans, b_trans):
+        if not sortedE:
+            raise NotImplementedError("Backward operator not supported. Sort A"
+                                       " according to relation type.")
+        C = _gather_mm(A, B, out, A_per_rel, B_per_rel, etypes, sortedE, a_trans, b_trans)
+        ctx.backward_cache = A, B, A_per_rel, etypes
+        ctx.save_for_backward(out)
+        return out
+
+    @staticmethod
+    def backward(ctx, dZ):
+        A, B, A_per_rel, etypes = ctx.backward_cache
+        #  Compute H_grad = Out_grad * W^T
+        H_grad = th.zeros(A.shape, device=A.device, dtype=A.dtype)
+        H_grad = _gather_mm(dZ, B, H_grad, A_per_rel, B_per_rel=None, etypes=etypes, sortedE=True, b_trans=True)
+        #  Compute W_grad = H^T * Out_grad
+        W_grad = th.zeros(B.shape, device=B.device, dtype=B.dtype)
+        W_grad = _gather_mm(A, dZ, W_grad, A_per_rel, B_per_rel=None, etypes=etypes, sortedE=True, a_trans=True)
+        return H_grad, W_grad, None, None, None, None, None, None, None
+
+
 def gspmm(gidx, op, reduce_op, lhs_data, rhs_data):
     if op == 'sub':
         op = 'add'
@@ -756,3 +781,8 @@ def csrsum(gidxs, weights):
 
 def csrmask(gidxA, A_weights, gidxB):
     return CSRMask.apply(gidxA, A_weights, gidxB)
+
+def gather_mm(A, B, out, A_per_rel, B_per_rel=None, etypes=None, sortedE=True,
+              a_trans=False, b_trans=False):
+    return GATHERMM.apply(A, B, out, A_per_rel, B_per_rel, etypes, sortedE,
+              a_trans, b_trans)

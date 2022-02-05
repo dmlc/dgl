@@ -38,7 +38,7 @@ def test_gathermm(idtype):
             H_arr.append(F.randn((E_per_rel[eid], in_feat)))
             W_arr.append(F.randn((in_feat, out_feat)))
             Out_arr.append(F.zeros((E_per_rel[eid], out_feat)))
-            Out_grad_arr.append(F.randn((E_per_rel[eid], out_feat)))
+            Out_grad_arr.append(F.ones((E_per_rel[eid], out_feat)))
 
         H = F.cat([h for h in H_arr], 0)
         W = F.cat([w for w in W_arr], 0)
@@ -84,18 +84,14 @@ def test_gathermm(idtype):
         #  gather_mm where H sorted according to etype
         #################################################################
 
-        # forward pass
-        out_gmm_sorted = F.zeros(Out.shape, dtype=F.dtype(Out))
-        dgl.sparse._gather_mm(H, W, out_gmm_sorted, E_per_rel, etypes=etypes, sortedE=True)
-
-        # backward pass
-        # Compute H_grad = Out_grad * W^T
-        H_grad_gmm_sorted = F.zeros(H.shape, dtype=F.dtype(H))
-        dgl.sparse._gather_mm(Out_grad, W, H_grad_gmm_sorted, E_per_rel, etypes=etypes, sortedE=True, b_trans=True)
-        # # Compute W_grad = H^T * Out_grad
-        W_grad_gmm_sorted = F.zeros(W.shape, dtype=F.dtype(W))
-        dgl.sparse._gather_mm(H, Out_grad, W_grad_gmm_sorted, E_per_rel, etypes=etypes, sortedE=True, a_trans=True)
-
+        with F.record_grad():
+            H.requires_grad = True
+            W.requires_grad = True
+            out_gmm_sorted = F.zeros(Out.shape, dtype=F.dtype(Out))
+            out = F.gather_mm(H, W, out_gmm_sorted, E_per_rel, etypes=etypes, sortedE=True)
+            F.backward(F.reduce_sum(out))
+            Hgrad_gmm_sorted = H.grad
+            Wgrad_gmm_sorted = W.grad
 
         #################################################################
         #  gather_mm where H is not sorted (backward not supported yet)
@@ -109,8 +105,9 @@ def test_gathermm(idtype):
         # correctness check
         assert F.allclose(out_low_mem, out_gmm_sorted, atol=1e-3, rtol=1e-3)
         assert F.allclose(out_low_mem, out_gmm_unsorted, atol=1e-3, rtol=1e-3)
-        assert F.allclose(Wgrad_low_mem, W_grad_gmm_sorted, atol=1e-3, rtol=1e-3)
-        assert F.allclose(Hgrad_low_mem, H_grad_gmm_sorted, atol=1e-3, rtol=1e-3)
+        assert F.allclose(Hgrad_low_mem, Hgrad_gmm_sorted, atol=1e-3, rtol=1e-3)
+        assert F.allclose(Wgrad_low_mem, Wgrad_gmm_sorted, atol=1e-3, rtol=1e-3)
+
     _test(1)
     _test(4)
     _test(16)
