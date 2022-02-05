@@ -6,6 +6,7 @@ from mxnet import nd
 from mxnet.gluon import nn
 
 from .... import function as fn
+from ....base import DGLError
 from ....utils import expand_as_pair, check_eq_shape
 
 class SAGEConv(nn.Block):
@@ -101,6 +102,12 @@ class SAGEConv(nn.Block):
                  norm=None,
                  activation=None):
         super(SAGEConv, self).__init__()
+        valid_aggre_types = {'mean', 'gcn', 'pool', 'lstm'}
+        if aggregator_type not in valid_aggre_types:
+            raise DGLError(
+                'Invalid aggregator_type. Must be one of {}. '
+                'But got {!r} instead.'.format(valid_aggre_types, aggregator_type)
+            )
 
         self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
         self._out_feats = out_feats
