@@ -684,12 +684,11 @@ class CSRMask(th.autograd.Function):
 class GATHERMM(th.autograd.Function):
     @staticmethod
     @custom_fwd(cast_inputs=th.float16)
-    def forward(ctx, A, B, out, A_per_rel, B_per_rel, etypes, sortedE,
-                a_trans, b_trans):
+    def forward(ctx, A, B, out, A_per_rel, B_per_rel, etypes, sortedE):
         if not sortedE:
             raise NotImplementedError("Backward operator not supported. Sort A"
-                                       " according to relation type.")
-        C = _gather_mm(A, B, out, A_per_rel, B_per_rel, etypes, sortedE, a_trans, b_trans)
+                                      " according to relation type.")
+        C = _gather_mm(A, B, out, A_per_rel, B_per_rel, etypes, sortedE)
         ctx.backward_cache = A, B, A_per_rel, etypes
         ctx.save_for_backward(out)
         return out
@@ -697,13 +696,13 @@ class GATHERMM(th.autograd.Function):
     @staticmethod
     def backward(ctx, dZ):
         A, B, A_per_rel, etypes = ctx.backward_cache
-        #  Compute H_grad = Out_grad * W^T
-        H_grad = th.zeros(A.shape, device=A.device, dtype=A.dtype)
-        H_grad = _gather_mm(dZ, B, H_grad, A_per_rel, B_per_rel=None, etypes=etypes, sortedE=True, b_trans=True)
-        #  Compute W_grad = H^T * Out_grad
-        W_grad = th.zeros(B.shape, device=B.device, dtype=B.dtype)
-        W_grad = _gather_mm(A, dZ, W_grad, A_per_rel, B_per_rel=None, etypes=etypes, sortedE=True, a_trans=True)
-        return H_grad, W_grad, None, None, None, None, None, None, None
+        #  Compute A_grad = Out_grad * B^T
+        A_grad = th.zeros(A.shape, device=A.device, dtype=A.dtype)
+        A_grad = _gather_mm(dZ, B, A_grad, A_per_rel, B_per_rel=None, etypes=etypes, sortedE=True, b_trans=True)
+        #  Compute B_grad = A^T * Out_grad
+        B_grad = th.zeros(B.shape, device=B.device, dtype=B.dtype)
+        B_grad = _gather_mm(A, dZ, B_grad, A_per_rel, B_per_rel=None, etypes=etypes, sortedE=True, a_trans=True)
+        return A_grad, B_grad, None, None, None, None, None, None, None
 
 
 def gspmm(gidx, op, reduce_op, lhs_data, rhs_data):
@@ -782,7 +781,5 @@ def csrsum(gidxs, weights):
 def csrmask(gidxA, A_weights, gidxB):
     return CSRMask.apply(gidxA, A_weights, gidxB)
 
-def gather_mm(A, B, out, A_per_rel, B_per_rel=None, etypes=None, sortedE=True,
-              a_trans=False, b_trans=False):
-    return GATHERMM.apply(A, B, out, A_per_rel, B_per_rel, etypes, sortedE,
-              a_trans, b_trans)
+def gather_mm(A, B, out, A_per_rel, B_per_rel=None, etypes=None, sortedE=True):
+    return GATHERMM.apply(A, B, out, A_per_rel, B_per_rel, etypes, sortedE)
