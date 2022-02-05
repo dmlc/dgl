@@ -237,6 +237,74 @@ void gatherMM_SortedEtype(const NDArray A,
             n = B->shape[1];  // cols of B
             k = A->shape[1];  // cols of A == rows of B
 
+            int ldb = n, lda = k, ldc = n;
+            cublasOperation_t transB = CUBLAS_OP_N;
+            cublasOperation_t transA = CUBLAS_OP_N;
+            if (a_trans) {
+                transA = CUBLAS_OP_T;
+                ldb = n, lda = k, ldc = n;
+                std::swap(m, k);
+            }
+            if (b_trans) {
+                transB = CUBLAS_OP_T;
+                k = B_dim1;
+                ldb = n, lda = n, ldc = k;
+                std::swap(n, k);
+            }
+            CUBLAS_CALL(cublasGemm<DType>(
+                thr_entry->cublas_handle,
+                transB,
+                transA,
+                n, m, k,
+                &alpha,
+                B_data + B_offset, ldb,
+                A_data + A_offset, lda,
+                &beta,
+                C_data + C_offset, ldc));
+            A_offset += m * k;
+            B_offset += k * n;
+            C_offset += m * n;
+        }
+    });
+}
+
+/* \brief Implementation of GatherMM operator where input matrix A is sorted
+ * according to relation types. Each relation type calls cuBLAS GEMM operator
+ * sequentially.
+ */
+template <int XPU, typename IdType, int bits>
+void gatherMM_SortedEtype_explicitTranspose(const NDArray A,
+              const NDArray B,
+              NDArray C,
+              const NDArray A_dim1_per_rel,
+              const NDArray B_dim1_per_rel,
+              bool a_trans, bool b_trans) {
+    SWITCH_BITS(bits, DType, {
+        auto device = runtime::DeviceAPI::Get(A->ctx);
+        int64_t num_rel = A_dim1_per_rel.NumElements();
+        const DType *A_data = A.Ptr<DType>();
+        const DType *B_data = B.Ptr<DType>();
+        const IdType* A_rel_data = A_dim1_per_rel.Ptr<IdType>();
+        const IdType* B_rel_data = B_dim1_per_rel.Ptr<IdType>();
+        DType *C_data = C.Ptr<DType>();
+        int64_t A_offset = 0, B_offset = 0, C_offset = 0;
+        int64_t m, n, k;
+        DType alpha = 1., beta = 0.;
+        if (B_rel_data)
+            assert(A_dim1_per_rel.NumElements() == B_dim1_per_rel.NumElements());
+        auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+        if (!thr_entry->cublas_handle)
+            CUBLAS_CALL(cublasCreate(&(thr_entry->cublas_handle)));
+        CUBLAS_CALL(cublasSetStream(thr_entry->cublas_handle,
+            thr_entry->stream));
+        for (int etype = 0; etype < num_rel; ++etype) {
+            IdType B_dim1 = (B_rel_data) ? B_rel_data[etype] : (B->shape[0] / num_rel);
+            assert((a_trans) ? A_rel_data[etype] : A->shape[1] ==  \
+                (b_trans) ? B->shape[1] : B_dim1);
+            m = A_rel_data[etype];  // rows of A
+            n = B->shape[1];  // cols of B
+            k = A->shape[1];  // cols of A == rows of B
+
             DType* A_trans_data = nullptr;
             DType* B_trans_data = nullptr;
             if (a_trans) {
