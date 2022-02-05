@@ -57,16 +57,17 @@ class DGLDataset(object):
     name : str
         The dataset name
     raw_dir : str
-        Raw file directory contains the input data folder
+        Directory to store all the downloaded raw datasets.
     raw_path : str
-        Directory contains the input data files.
-        Default : ``os.path.join(self.raw_dir, self.name)``
+        Path to the downloaded raw dataset folder. An alias for
+        ``os.path.join(self.raw_dir, self.name)``.
     save_dir : str
-        Directory to save the processed dataset
+        Directory to save all the processed datasets.
     save_path : str
-        File path to save the processed dataset
+        Path to the processed dataset folder. An alias for
+        ``os.path.join(self.save_dir, self.name)``.
     verbose : bool
-        Whether to print information
+        Whether to print more runtime information.
     hash : str
         Hash value for the dataset and the setting.
     """
@@ -123,10 +124,11 @@ class DGLDataset(object):
         """
         pass
 
+    @abc.abstractmethod
     def process(self):
         r"""Overwrite to realize your own logic of processing the input data.
         """
-        raise NotImplementedError
+        pass
 
     def has_cache(self):
         r"""Overwrite to realize your own logic of
@@ -138,9 +140,11 @@ class DGLDataset(object):
 
     @retry_method_with_fix(download)
     def _download(self):
-        r"""Download dataset by calling ``self.download()`` if the dataset does not exists under ``self.raw_path``.
-            By default ``self.raw_path = os.path.join(self.raw_dir, self.name)``
-            One can overwrite ``raw_path()`` function to change the path.
+        """Download dataset by calling ``self.download()``
+        if the dataset does not exists under ``self.raw_path``.
+        
+        By default ``self.raw_path = os.path.join(self.raw_dir, self.name)``
+        One can overwrite ``raw_path()`` function to change the path.
         """
         if os.path.exists(self.raw_path):  # pragma: no cover
             return
@@ -149,14 +153,18 @@ class DGLDataset(object):
         self.download()
 
     def _load(self):
-        r"""Entry point from __init__ to load the dataset.
-            if the cache exists:
-                Load the dataset from saved dgl graph and information files.
-                If loadin process fails, re-download and process the dataset.
-            else:
-                1. Download the dataset if needed.
-                2. Process the dataset and build the dgl graph.
-                3. Save the processed dataset into files.
+        """Entry point from __init__ to load the dataset.
+
+        If cache exists:
+
+          - Load the dataset from saved dgl graph and information files.
+          - If loadin process fails, re-download and process the dataset.
+
+        else:
+        
+          - Download the dataset if needed.
+          - Process the dataset and build the dgl graph.
+          - Save the processed dataset into files.
         """
         load_flag = not self._force_reload and self.has_cache()
 
@@ -254,6 +262,10 @@ class DGLDataset(object):
     def __len__(self):
         r"""The number of examples in the dataset."""
         pass
+
+    def __repr__(self):
+        return f'Dataset("{self.name}", num_graphs={len(self)},' + \
+               f' save_path={self.save_path})'
 
 class DGLBuiltinDataset(DGLDataset):
     r"""The Basic DGL Builtin Dataset.

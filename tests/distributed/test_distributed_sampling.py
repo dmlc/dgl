@@ -301,6 +301,7 @@ def check_rpc_sampling_shuffle(tmpdir, num_server, num_groups=1):
         for group_id in range(num_groups):
             p = ctx.Process(target=start_sample_client_shuffle, args=(client_id, tmpdir, num_server > 1, g, num_server, group_id))
             p.start()
+            time.sleep(1) # avoid race condition when instantiating DistGraph
             pclient_list.append(p)
     for p in pclient_list:
         p.join()
@@ -563,7 +564,7 @@ def test_rpc_sampling_shuffle(num_server):
     os.environ['DGL_DIST_MODE'] = 'distributed'
     with tempfile.TemporaryDirectory() as tmpdirname:
         check_rpc_sampling_shuffle(Path(tmpdirname), num_server)
-        check_rpc_sampling_shuffle(Path(tmpdirname), num_server, num_groups=5)
+        check_rpc_sampling_shuffle(Path(tmpdirname), num_server, num_groups=2)
         check_rpc_hetero_sampling_shuffle(Path(tmpdirname), num_server)
         check_rpc_hetero_sampling_empty_shuffle(Path(tmpdirname), num_server)
         check_rpc_hetero_etype_sampling_shuffle(Path(tmpdirname), num_server)
