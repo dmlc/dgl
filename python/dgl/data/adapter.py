@@ -133,7 +133,7 @@ def negative_sample(g, num_samples):
     edges = edges[:, mask]
     if edges.shape[1] >= num_samples:
         edges = edges[:, :num_samples]
-    return F.tensor(edges)
+    return edges
 
 
 class AsEdgePredDataset(DGLDataset):
@@ -221,10 +221,10 @@ class AsEdgePredDataset(DGLDataset):
             neg_n_val, neg_n_test = self.neg_ratio * n_val, self.neg_ratio * n_test
             neg_val_src, neg_val_dst = neg_src[:neg_n_val], neg_dst[:neg_n_val]
             neg_test_src, neg_test_dst = neg_src[neg_n_val:], neg_dst[neg_n_val:]
-            self.val_edges = (src[val_pos_idx], dst[val_pos_idx]
-                              ), (neg_val_src, neg_val_dst)
-            self.test_edges = (src[test_pos_idx],
-                               dst[test_pos_idx]), (neg_test_src, neg_test_dst)
+            self.val_edges = (F.tensor(src[val_pos_idx]), F.tensor(dst[val_pos_idx])
+                              ), (F.tensor(neg_val_src), F.tensor(neg_val_dst))
+            self.test_edges = (F.tensor(src[test_pos_idx]),
+                               F.tensor(dst[test_pos_idx])), (F.tensor(neg_test_src), F.tensor(neg_test_dst))
             self.train_graph = create_dgl_graph(
                 (src[train_pos_idx], dst[train_pos_idx]), num_nodes=self.num_nodes)
             self.train_graph.ndata["feat"] = graph.ndata["feat"]
