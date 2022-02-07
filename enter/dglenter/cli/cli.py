@@ -5,10 +5,11 @@ from .config_cli import config_app
 from .train_cli import train
 from .export_cli import export
 
-app = typer.Typer(no_args_is_help=True)
-app.add_typer(config_app, name="config", no_args_is_help=True)
-app.command(help="Train the model", no_args_is_help=True)(train)
-app.command(help="Export the python file from config", no_args_is_help=True)(export)
+no_args_is_help = False
+app = typer.Typer(no_args_is_help=no_args_is_help)
+app.add_typer(config_app, name="config", no_args_is_help=no_args_is_help)
+app.command(help="Train the model", no_args_is_help=no_args_is_help)(train)
+app.command(help="Export the python file from config", no_args_is_help=no_args_is_help)(export)
 
 def main():
     app()
