@@ -73,12 +73,12 @@ def run(proc_id, n_gpus, args, devices, data):
 
     in_feats = train_nfeat.shape[1]
 
-    if args.sample_device == 'gpu':
+    if args.graph_device == 'gpu':
         train_nid = train_nid.to(device)
         train_g = train_g.formats(['csc'])
         train_g = train_g.to(device)
         args.num_workers = 0
-    elif args.sample_device == 'uva':
+    elif args.graph_device == 'uva':
         train_nid = train_nid.to(device)
         train_g.pin_memory_()
         args.num_workers = 0
@@ -182,7 +182,7 @@ if __name__ == '__main__':
                            help="Number of sampling processes. Use 0 for no extra process.")
     argparser.add_argument('--inductive', action='store_true',
                            help="Inductive learning setting")
-    argparser.add_argument('--sample-device', choices=('cpu', 'gpu', 'uva'), default='cpu',
+    argparser.add_argument('--graph-device', choices=('cpu', 'gpu', 'uva'), default='cpu',
                            help="Device to perform the sampling. "
                                 "Must have 0 workers for 'gpu' and 'uva'")
     argparser.add_argument('--data-device', choices=('cpu', 'gpu', 'uva'), default='gpu',
@@ -236,7 +236,7 @@ if __name__ == '__main__':
         # Copy the graph to shared memory explicitly before pinning.
         # In other cases, we can just rely on fork's copy-on-write.
         # TODO: the original train_g is not freed.
-        if args.sample_device == 'uva':
+        if args.graph_device == 'uva':
             train_g = train_g.shared_memory('train_g')
         if args.data_device == 'uva':
             train_nfeat = train_nfeat.share_memory_()
@@ -247,8 +247,8 @@ if __name__ == '__main__':
            train_labels, val_labels, test_labels, train_nid, val_nid, test_nid
 
     if devices[0] == -1:
-        assert args.sample_device == 'cpu', \
-               f"Must have GPUs to enable {args.sample_device} sampling."
+        assert args.graph_device == 'cpu', \
+               f"Must have GPUs to enable {args.graph_device} sampling."
         assert args.data_device == 'cpu', \
                f"Must have GPUs to enable {args.data_device} feature storage."
         run(0, 0, args, ['cpu'], data)

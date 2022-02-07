@@ -73,9 +73,9 @@ Micro F1 score reaches 0.9212 on test set.
 
 ### Use GPU sampling and CUDA UVA sampling
 
-For training scripts `train_sampling.py`, `train_sampling_multi_gpu.py` and `train_sampling_unsupervised.py`, we provide arguments `--sample-device` and `--data-device`.
+For training scripts `train_sampling.py`, `train_sampling_multi_gpu.py` and `train_sampling_unsupervised.py`, we provide arguments `--graph-device` and `--data-device`.
 
-For `--sample-device`, we provide the following choices:
+For `--graph-device`, we provide the following choices:
 - `cpu` (default): Use CPU to sample the graph structure stored in host memory.
 - `gpu`: Use GPU to sample the graph structure stored in GPU device memory. You have to copy the graph structure (only the `csc` format is needed) to GPU before passing it to the dataloader. This is the fastest way for sampling but requires storing the whole graph structure in GPU memory and will duplicate it in each GPU in multi-GPU training.
 - `uva`: Use GPU to sample the graph structure stored in **pinned** host memory through zero-copy access. You have to pin the graph structure before passing it to the dataloader. This is much faster than CPU sampling and especially useful when the graph structure is too large to fit into the GPU memory.

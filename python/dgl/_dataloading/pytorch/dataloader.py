@@ -454,7 +454,7 @@ def _init_dataloader(collator, device, dataloader_kwargs, use_ddp, ddp_seed):
     use_scalar_batcher = False
     scalar_batcher = None
 
-    if F.device_type(device) == 'cuda' and dataloader_kwargs.get('num_workers', 0) == 0:
+    if device.type == 'cuda' and dataloader_kwargs.get('num_workers', 0) == 0:
         batch_size = dataloader_kwargs.get('batch_size', 1)
 
         if batch_size > 1:
@@ -604,16 +604,16 @@ class NodeDataLoader(DataLoader):
         device = th.device(g.device if device is None else device)
         num_workers = dataloader_kwargs.get('num_workers', 0)
 
-        if F.device_type(g.device) == 'cuda' or g.is_pinned():
+        if g.device.type == 'cuda' or g.is_pinned():
             sampling_type = 'UVA sampling' if g.is_pinned() else 'GPU sampling'
-            assert F.device_type(device) == 'cuda', \
+            assert device.type == 'cuda', \
                 f"'device' must be a cuda device to enable {sampling_type}, got {device}."
             assert check_device(nids, device), \
                 f"'nids' must be on {device} to use {sampling_type}."
             assert num_workers == 0, \
                 f"'num_workers' must be 0 to use {sampling_type}."
         # g is on CPU
-        elif F.device_type(device) == 'cuda' and num_workers == 0:
+        elif device.type == 'cuda' and num_workers == 0:
             dgl_warning('CPU-GPU hybrid sampling is deprecated and will be removed '
                         'in the next release. Use pure GPU sampling if your graph can '
                         'fit onto the GPU memory, or UVA sampling in other cases.')
@@ -894,16 +894,16 @@ class EdgeDataLoader(DataLoader):
         device = th.device(g.device if device is None else device)
         num_workers = dataloader_kwargs.get('num_workers', 0)
 
-        if F.device_type(g.device) == 'cuda' or g.is_pinned():
+        if g.device.type == 'cuda' or g.is_pinned():
             sampling_type = 'UVA sampling' if g.is_pinned() else 'GPU sampling'
-            assert F.device_type(device) == 'cuda', \
+            assert device.type == 'cuda', \
                 f"'device' must be a cuda device to enable {sampling_type}, got {device}."
             assert check_device(eids, device), \
                 f"'eids' must be on {device} to use {sampling_type}."
             assert num_workers == 0, \
                 f"'num_workers' must be 0 to use {sampling_type}."
         # g is on CPU
-        elif F.device_type(device) == 'cuda' and num_workers == 0:
+        elif device.type == 'cuda' and num_workers == 0:
             dgl_warning('CPU-GPU hybrid sampling is deprecated and will be removed '
                         'in the next release. Use pure GPU sampling if your graph can '
                         'fit onto the GPU memory, or UVA sampling in other cases.')

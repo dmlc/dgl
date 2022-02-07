@@ -80,11 +80,11 @@ def run(proc_id, n_gpus, args, devices, data):
     n_edges = g.num_edges()
     train_seeds = th.arange(n_edges)
 
-    if args.sample_device == 'gpu':
+    if args.graph_device == 'gpu':
         train_seeds = train_seeds.to(device)
         g = g.to(device)
         args.num_workers = 0
-    elif args.sample_device == 'uva':
+    elif args.graph_device == 'uva':
         train_seeds = train_seeds.to(device)
         g.pin_memory_()
         args.num_workers = 0
@@ -99,7 +99,7 @@ def run(proc_id, n_gpus, args, devices, data):
             th.arange(n_edges // 2, n_edges),
             th.arange(0, n_edges // 2)]).to(train_seeds),
         negative_sampler=NegativeSampler(g, args.num_negs, args.neg_share,
-                                         device if args.sample_device == 'uva' else None),
+                                         device if args.graph_device == 'uva' else None),
         device=device,
         use_ddp=n_gpus > 1,
         batch_size=args.batch_size,
@@ -203,7 +203,7 @@ def main(args):
         # Copy the graph to shared memory explicitly before pinning.
         # In other cases, we can just rely on fork's copy-on-write.
         # TODO: the original graph g is not freed.
-        if args.sample_device == 'uva':
+        if args.graph_device == 'uva':
             g = g.shared_memory('g')
         if args.data_device == 'uva':
             nfeat = nfeat.share_memory_()
@@ -212,8 +212,8 @@ def main(args):
     data = train_nid, val_nid, test_nid, n_classes, g, nfeat, labels
 
     if devices[0] == -1:
-        assert args.sample_device == 'cpu', \
-               f"Must have GPUs to enable {args.sample_device} sampling."
+        assert args.graph_device == 'cpu', \
+               f"Must have GPUs to enable {args.graph_device} sampling."
         assert args.data_device == 'cpu', \
                f"Must have GPUs to enable {args.data_device} feature storage."
         run(0, 0, args, ['cpu'], data)
@@ -250,7 +250,7 @@ if __name__ == '__main__':
     argparser.add_argument('--dropout', type=float, default=0.5)
     argparser.add_argument('--num-workers', type=int, default=0,
                            help="Number of sampling processes. Use 0 for no extra process.")
-    argparser.add_argument('--sample-device', choices=('cpu', 'gpu', 'uva'), default='cpu',
+    argparser.add_argument('--graph-device', choices=('cpu', 'gpu', 'uva'), default='cpu',
                            help="Device to perform the sampling. "
                                 "Must have 0 workers for 'gpu' and 'uva'")
     argparser.add_argument('--data-device', choices=('cpu', 'gpu', 'uva'), default='gpu',

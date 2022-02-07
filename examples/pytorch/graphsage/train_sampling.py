@@ -53,13 +53,13 @@ def run(args, device, data):
     train_nid = train_g.ndata.pop('train_mask').nonzero().squeeze()
     val_nid = val_g.ndata.pop('val_mask').nonzero().squeeze()
 
-    if args.sample_device == 'gpu':
+    if args.graph_device == 'gpu':
         train_nid = train_nid.to(device)
         # copy only the csc to the GPU
         train_g = train_g.formats(['csc'])
         train_g = train_g.to(device)
         args.num_workers = 0
-    elif args.sample_device == 'uva':
+    elif args.graph_device == 'uva':
         train_nid = train_nid.to(device)
         train_g = train_g.formats(['csc'])
         train_g.pin_memory_()
@@ -144,7 +144,7 @@ if __name__ == '__main__':
                            help="Number of sampling processes. Use 0 for no extra process.")
     argparser.add_argument('--inductive', action='store_true',
                            help="Inductive learning setting")
-    argparser.add_argument('--sample-device', choices=('cpu', 'gpu', 'uva'), default='cpu',
+    argparser.add_argument('--graph-device', choices=('cpu', 'gpu', 'uva'), default='cpu',
                            help="Device to perform the sampling. "
                                 "Must have 0 workers for 'gpu' and 'uva'")
     argparser.add_argument('--data-device', choices=('cpu', 'gpu', 'uva'), default='gpu',
@@ -160,6 +160,10 @@ if __name__ == '__main__':
         device = th.device('cuda:%d' % args.gpu)
     else:
         device = th.device('cpu')
+        assert args.graph_device == 'cpu', \
+               f"Must have GPUs to enable {args.graph_device} sampling."
+        assert args.data_device == 'cpu', \
+               f"Must have GPUs to enable {args.data_device} feature storage."
 
     if args.dataset == 'reddit':
         g, n_classes = load_reddit()
