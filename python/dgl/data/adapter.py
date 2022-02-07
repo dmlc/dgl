@@ -178,17 +178,19 @@ class AsEdgePredDataset(DGLDataset):
                  dataset,
                  split_ratio=[0.8, 0.1, 0.1],
                  neg_ratio=3,
+                 add_self_loop=True,
                  **kwargs):
         self.g = dataset[0]
         self.dataset = dataset
         self.split_ratio = split_ratio
         self.neg_ratio = neg_ratio
-        super().__init__(dataset.name + '-as-edgepred', hash_key=(dataset._hash_key, neg_ratio, split_ratio), **kwargs)
+        self.add_self_loop = add_self_loop
+        super().__init__(dataset.name + '-as-edgepred', hash_key=(neg_ratio, split_ratio, add_self_loop), **kwargs)
 
     def process(self):
         if hasattr(self.dataset, "get_edge_split"):
             # This is likely to be an ogb dataset
-            self.edge_split = self.ds.get_edge_split()
+            self.edge_split = self.dataset.get_edge_split()
             self.train_graph = self.g
 
             pos_e_tensor, neg_e_tensor = self.edge_split["valid"][
@@ -226,6 +228,8 @@ class AsEdgePredDataset(DGLDataset):
             self.train_graph = create_dgl_graph(
                 (src[train_pos_idx], dst[train_pos_idx]), num_nodes=self.num_nodes)
             self.train_graph.ndata["feat"] = graph.ndata["feat"]
+        if self.add_self_loop:
+            self.train_graph = self.train_graph.add_self_loop()
 
     def has_cache(self):
         return os.path.isfile(os.path.join(self.save_path, 'graph_{}.bin'.format(self.hash)))
@@ -244,6 +248,7 @@ class AsEdgePredDataset(DGLDataset):
             info = json.load(f)
             self.split_ratio = info["split_ratio"]
             self.neg_ratio = info["neg_ratio"]
+            self.add_self_loop = bool(info["add_self_loop"])
 
     def save(self):
         tensor_dict = {
@@ -261,11 +266,12 @@ class AsEdgePredDataset(DGLDataset):
         with open(os.path.join(self.save_path, 'info_{}.json'.format(self.hash)), 'w') as f:
             json.dump({
                 'split_ratio': self.split_ratio,
-                'neg_ratio': self.neg_ratio}, f)
+                'neg_ratio': self.neg_ratio,
+                "add_self_loop": self.add_self_loop}, f)
 
     @property
     def feat_size(self):
-        return self.train_graph.ndata["feat"]
+        return self.train_graph.ndata["feat"].shape[-1]
 
     @property
     def num_nodes(self):
