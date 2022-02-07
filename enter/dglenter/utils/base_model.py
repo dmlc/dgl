@@ -20,10 +20,18 @@ class DGLBaseModel(PydanticBaseModel):
         return create_model(model_name, __base__=cls, **field_definitions)
 
 
+def get_literal_value(type_):
+    if hasattr(type_, "__values__"):
+        name = type_.__values__[0]
+    elif hasattr(type_, "__args__"):
+        name = type_.__args__[0]
+    return name
+
 def extract_name(union_type):
     name_dict = {}
     for t in union_type.__args__:
-        name =  t.__fields__['name'].type_.__args__[0]
+        type_ = t.__fields__['name'].type_
+        name = get_literal_value(type_)
         name_dict[name] = name
     return enum.Enum("Choice", name_dict)
 
