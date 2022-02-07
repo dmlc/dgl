@@ -209,6 +209,7 @@ class AsEdgePredDataset(DGLDataset):
             graph = self.dataset[0]
             n = graph.num_edges()
             src, dst = graph.edges()
+            src, dst = F.asnumpy(src), F.asnumpy(dst)
             n_train, n_val, n_test = int(
                 n * ratio[0]), int(n * ratio[1]), int(n * ratio[2])
 
