@@ -79,7 +79,7 @@ class AsNodePredDataset(DGLDataset):
         if 'label' not in self.g.nodes[self.target_ntype].data:
             raise ValueError("Missing node labels. Make sure labels are stored "
                              "under name 'label'.")
-        if any(s not in self.g.nodes[self.target_ntype].ndata for s in ["train_mask", "val_mask", "test_mask"]):
+        if any(s not in self.g.nodes[self.target_ntype].data for s in ["train_mask", "val_mask", "test_mask"]):
             # only generate when information not available
             if self.verbose:
                 print('Generating train/val/test masks...')
