@@ -1,5 +1,5 @@
 ##
-#   Copyright (c) 2021, NVIDIA CORPORATION.
+#   Copyright (c) 2021-2022, NVIDIA CORPORATION.
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -13,11 +13,12 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 #
-""" The MultiGPUDataStore class. """
+""" The MultiGPUFeatureStorage class. """
 
 from .. import backend as F
+from ..storage import FeatureStorage
 
-class MultiGPUDataStore:
+class MultiGPUFeatureStorage(FeatureStorage):
     """ Class for storing a large tensor split across GPU memory according to
     nodes. When reading memory from other GPUs, the call must be from all
     GPUs storing the data.
@@ -157,3 +158,14 @@ class MultiGPUDataStore:
     def device(self):
         # handle being treated like pytorch or tensorflow tensor
         return F.context(self._tensor)
+
+    # implement FeatureStorage interface
+    def requires_ddp(self):
+        # if we have multiple GPUs, we need to use ddp
+        return self._comm.size() > 1
+
+    def fetch(self, indices, device, pin_memory=False):
+        return self.all_gather_row(indices).to(device)
+   
+
+
