@@ -16,7 +16,7 @@
 """ The MultiGPUFeatureStorage class. """
 
 from .. import backend as F
-from ..storage import FeatureStorage
+from ..storages import FeatureStorage
 
 class MultiGPUFeatureStorage(FeatureStorage):
     """ Class for storing a large tensor split across GPU memory according to

@@ -22,12 +22,12 @@ import torch.nn.functional as F
 import torch.optim as optim
 import dgl.multiprocessing as mp
 import dgl.nn.pytorch as dglnn
-from dgl.contrib import MultiGPUNodeDataLoader
 import time
 import math
 import argparse
 from torch.nn.parallel import DistributedDataParallel
 import tqdm
+from dgl.contrib import MultiGPUFeatureGraphWrapper
 
 from model import SAGE
 from load_graph import load_reddit, inductive_split, load_ogb
@@ -113,29 +113,18 @@ def run(proc_id, n_gpus, args, devices, data):
         [int(fanout) for fanout in args.fan_out.split(',')])
 
     if not args.data_cpu:
-        dataloader = MultiGPUNodeDataLoader(
-            train_g,
-            train_nid,
-            sampler,
-            device=dev_id,
-            node_feat=train_nfeat,
-            node_label=train_labels,
-            use_ddp=n_gpus > 1,
-            batch_size=args.batch_size,
-            shuffle=True,
-            drop_last=False,
-            num_workers=args.num_workers)
-    else:
-        dataloader = dgl.dataloading.NodeDataLoader(
-            train_g,
-            train_nid,
-            sampler,
-            use_ddp=n_gpus > 1,
-            device=dev_id if args.num_workers == 0 else None,
-            batch_size=args.batch_size,
-            shuffle=True,
-            drop_last=False,
-            num_workers=args.num_workers)
+        train_g = MultiGPUFeatureGraphWrapper(g, dev_id)
+
+    dataloader = dgl.dataloading.NodeDataLoader(
+        train_g,
+        train_nid,
+        sampler,
+        use_ddp=n_gpus > 1,
+        device=dev_id if args.num_workers == 0 else None,
+        batch_size=args.batch_size,
+        shuffle=True,
+        drop_last=False,
+        num_workers=args.num_workers)
 
     # Define model and optimizer
     model = SAGE(in_feats, args.num_hidden, n_classes, args.num_layers, F.relu, args.dropout)

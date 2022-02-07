@@ -14,4 +14,4 @@
 #   limitations under the License.
 #
 
-from .multi_gpu_dataloader import MultiGPUNodeDataLoader
+from .multi_gpu_feature_graph_wrapper import MultiGPUFeatureGraphWrapper

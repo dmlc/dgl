@@ -23,4 +23,4 @@ from .unified_tensor import UnifiedTensor
 from .. import backend as F
 
 if F.get_preferred_backend() == 'pytorch':
-    from .pytorch import MultiGPUNodeDataLoader
+    from .pytorch import MultiGPUFeatureGraphWrapper
