@@ -519,7 +519,8 @@ NCCLUniqueId::NCCLUniqueId() :
   NCCL_CALL(ncclGetUniqueId(&id_));
   #else
   // when NCCL isn't enabled, use all zeros
-  std::fill(id_.internal, id_.internal + NCCL_UNIQUE_ID_BYTES, char(0));
+  std::fill(id_.internal, id_.internal + NCCL_UNIQUE_ID_BYTES,
+      static_cast<char>(0));
   #endif
 }
 
