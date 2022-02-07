@@ -79,7 +79,7 @@ class AsNodePredDataset(DGLDataset):
         if 'label' not in self.g.nodes[self.target_ntype].data:
             raise ValueError("Missing node labels. Make sure labels are stored "
                              "under name 'label'.")
-        if any(s not in self.g.nodes[self.target_ntype].ndata for s in ["train_mask", "val_mask", "test_mask"]):
+        if any(s not in self.g.nodes[self.target_ntype].data for s in ["train_mask", "val_mask", "test_mask"]):
             # only generate when information not available
             if self.verbose:
                 print('Generating train/val/test masks...')
@@ -133,7 +133,7 @@ def negative_sample(g, num_samples):
     edges = edges[:, mask]
     if edges.shape[1] >= num_samples:
         edges = edges[:, :num_samples]
-    return F.tensor(edges)
+    return edges
 
 
 class AsEdgePredDataset(DGLDataset):
@@ -209,6 +209,7 @@ class AsEdgePredDataset(DGLDataset):
             graph = self.dataset[0]
             n = graph.num_edges()
             src, dst = graph.edges()
+            src, dst = F.asnumpy(src), F.asnumpy(dst)
             n_train, n_val, n_test = int(
                 n * ratio[0]), int(n * ratio[1]), int(n * ratio[2])
 
@@ -221,10 +222,10 @@ class AsEdgePredDataset(DGLDataset):
             neg_n_val, neg_n_test = self.neg_ratio * n_val, self.neg_ratio * n_test
             neg_val_src, neg_val_dst = neg_src[:neg_n_val], neg_dst[:neg_n_val]
             neg_test_src, neg_test_dst = neg_src[neg_n_val:], neg_dst[neg_n_val:]
-            self.val_edges = (src[val_pos_idx], dst[val_pos_idx]
-                              ), (neg_val_src, neg_val_dst)
-            self.test_edges = (src[test_pos_idx],
-                               dst[test_pos_idx]), (neg_test_src, neg_test_dst)
+            self.val_edges = (F.tensor(src[val_pos_idx]), F.tensor(dst[val_pos_idx])
+                              ), (F.tensor(neg_val_src), F.tensor(neg_val_dst))
+            self.test_edges = (F.tensor(src[test_pos_idx]),
+                               F.tensor(dst[test_pos_idx])), (F.tensor(neg_test_src), F.tensor(neg_test_dst))
             self.train_graph = create_dgl_graph(
                 (src[train_pos_idx], dst[train_pos_idx]), num_nodes=self.num_nodes)
             self.train_graph.ndata["feat"] = graph.ndata["feat"]
