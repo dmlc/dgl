@@ -75,3 +75,43 @@ The launch script creates a specified number of training jobs (``--num_trainers`
 In addition, a user needs to specify the number of sampler processes for each trainer
 (``--num_samplers``). The number of sampler processes has to match with the number of worker processes
 specified in :func:`~dgl.distributed.initialize`.
+
+Below shows an example of launching long live servers and multiple distributed training jobs
+in a cluster. ``Long Live Servers`` means :class:`DistGraphServer` is launched once only and
+kept alive even training jobs finish and exit. Then any following training jobs could fetch
+graph structures and data from the same servers. As a result, we do not need to load graph
+multiple times which may take a lot of time for large graph.
+
+Launch long live servers and first group of distributed training job.
+
+.. code:: none
+
+    python3 tools/launch.py \
+    --workspace ~graphsage/ \
+    --num_trainers 2 \
+    --num_samplers 4 \
+    --num_servers 1 \
+    --part_config data/ogb-product.json \
+    --ip_config ip_config.txt \
+    --keep_alive \
+    --server_name long_live \
+    "python3 code/train_dist.py --graph-name ogb-product --ip_config ip_config.txt --num-epochs 5 --batch-size 1000 --lr 0.1 --num_workers 4"
+
+``--keep_alive`` is specified explicitly which indidcates boot long live servers. ``--server_name``
+is the name of long live servers which could be used in other launches.
+
+Launch another group of distributed training job which utilize existing long live servers.
+
+.. code:: none
+
+    python3 tools/launch.py \
+    --workspace ~graphsage/ \
+    --num_trainers 2 \
+    --num_samplers 4 \
+    --num_servers 1 \
+    --part_config data/ogb-product.json \
+    --ip_config ip_config.txt \
+    --server_name long_live \
+    "python3 code/train_dist.py --graph-name ogb-product --ip_config ip_config.txt --num-epochs 5 --batch-size 1000 --lr 0.1 --num_workers 4"
+
+``--server_name`` is specified as the same name of previous launch.
