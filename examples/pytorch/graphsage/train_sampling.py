@@ -48,9 +48,10 @@ def run(args, device, data):
     n_classes, train_g, val_g, test_g, train_nfeat, train_labels, \
     val_nfeat, val_labels, test_nfeat, test_labels = data
     in_feats = train_nfeat.shape[1]
-    train_nid = th.nonzero(train_g.ndata['train_mask'], as_tuple=True)[0]
-    val_nid = th.nonzero(val_g.ndata['val_mask'], as_tuple=True)[0]
-    test_nid = th.nonzero(~(test_g.ndata['train_mask'] | test_g.ndata['val_mask']), as_tuple=True)[0]
+    test_nid = test_g.ndata.pop('test_mask',
+        ~(test_g.ndata['train_mask'] | test_g.ndata['val_mask'])).nonzero().squeeze()
+    train_nid = train_g.ndata.pop('train_mask').nonzero().squeeze()
+    val_nid = val_g.ndata.pop('val_mask').nonzero().squeeze()
 
     if args.sample_device == 'gpu':
         train_nid = train_nid.to(device)

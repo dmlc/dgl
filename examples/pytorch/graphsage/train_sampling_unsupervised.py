@@ -189,12 +189,9 @@ def main(args):
     else:
         raise Exception('unknown dataset')
 
-    train_mask = g.ndata['train_mask']
-    val_mask = g.ndata['val_mask']
-    test_mask = g.ndata['test_mask']
-    train_nid = th.LongTensor(np.nonzero(train_mask)).squeeze()
-    val_nid = th.LongTensor(np.nonzero(val_mask)).squeeze()
-    test_nid = th.LongTensor(np.nonzero(test_mask)).squeeze()
+    train_nid = g.ndata.pop('train_mask').nonzero().squeeze()
+    val_nid = g.ndata.pop('val_mask').nonzero().squeeze()
+    test_nid = g.ndata.pop('test_mask').nonzero().squeeze()
 
     nfeat = g.ndata.pop('features')
     labels = g.ndata.pop('labels')

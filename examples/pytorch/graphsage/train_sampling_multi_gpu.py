@@ -222,12 +222,10 @@ if __name__ == '__main__':
         train_nfeat = val_nfeat = test_nfeat = g.ndata.pop('features')
         train_labels = val_labels = test_labels = g.ndata.pop('labels')
 
-    train_mask = train_g.ndata['train_mask']
-    val_mask = val_g.ndata['val_mask']
-    test_mask = ~(test_g.ndata['train_mask'] | test_g.ndata['val_mask'])
-    train_nid = train_mask.nonzero().squeeze()
-    val_nid = val_mask.nonzero().squeeze()
-    test_nid = test_mask.nonzero().squeeze()
+    test_nid = test_g.ndata.pop('test_mask',
+        ~(test_g.ndata['train_mask'] | test_g.ndata['val_mask'])).nonzero().squeeze()
+    train_nid = train_g.ndata.pop('train_mask').nonzero().squeeze()
+    val_nid = val_g.ndata.pop('val_mask').nonzero().squeeze()
 
     # Create csr/coo/csc formats before launching training processes with multi-gpu.
     # This avoids creating certain formats in each sub-process, which saves momory and CPU.

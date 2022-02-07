@@ -7,8 +7,8 @@ def load_reddit(self_loop=True):
     # load reddit data
     data = RedditDataset(self_loop=self_loop)
     g = data[0]
-    g.ndata['features'] = g.ndata['feat']
-    g.ndata['labels'] = g.ndata['label']
+    g.ndata['features'] = g.ndata.pop('feat')
+    g.ndata['labels'] = g.ndata.pop('label')
     return g, data.num_classes
 
 def load_ogb(name, root='dataset'):
@@ -21,7 +21,7 @@ def load_ogb(name, root='dataset'):
     graph, labels = data[0]
     labels = labels[:, 0]
 
-    graph.ndata['features'] = graph.ndata['feat']
+    graph.ndata['features'] = graph.ndata.pop('feat')
     graph.ndata['labels'] = labels
     in_feats = graph.ndata['features'].shape[1]
     num_labels = len(th.unique(labels[th.logical_not(th.isnan(labels))]))
