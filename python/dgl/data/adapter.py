@@ -117,8 +117,6 @@ class AsNodePredDataset(DGLDataset):
 
 
 
-
-
 def negative_sample(g, num_samples):
     """Random sample negative edges from graph, excluding self-loops"""
     num_nodes = g.num_nodes()
@@ -139,12 +137,13 @@ def negative_sample(g, num_samples):
 
 
 class AsEdgePredDataset(DGLDataset):
-    """Repurpose a dataset for node prediction task.
+    """Repurpose a dataset for edge prediction task.
 
-    The created dataset will include data needed for semi-supervised transductive
-    node prediction. It will keep only the first graph in the provided dataset and
-    generate train/val/test masks according to the given spplit ratio. The generated
-    masks will be cached to disk for fast re-loading. If the provided split ratio
+    The created dataset will include data needed for link prediction. 
+    It will keep only the first graph in the provided dataset and
+    generate train/val/test edges according to the given split ratio,
+    and the correspondent negative edges based on the neg_ratio. The generated
+    edges will be cached to disk for fast re-loading. If the provided split ratio
     differs from the cached one, it will re-process the dataset properly.
 
     Parameters
@@ -177,14 +176,14 @@ class AsEdgePredDataset(DGLDataset):
 
     def __init__(self,
                  dataset,
-                 neg_ratio=3,
                  split_ratio=[0.8, 0.1, 0.1],
+                 neg_ratio=3,
                  **kwargs):
         self.g = dataset[0]
         self.dataset = dataset
         self.split_ratio = split_ratio
         self.neg_ratio = neg_ratio
-        super().__init__(dataset.name + '-as-edgepred', **kwargs)
+        super().__init__(dataset.name + '-as-edgepred', hash_key=(dataset._hash_key, neg_ratio, split_ratio), **kwargs)
 
     def process(self):
         if hasattr(self.dataset, "get_edge_split"):
@@ -229,11 +228,11 @@ class AsEdgePredDataset(DGLDataset):
             self.train_graph.ndata["feat"] = graph.ndata["feat"]
 
     def has_cache(self):
-        return os.path.isfile(os.path.join(self.save_path, 'graph.bin'))
+        return os.path.isfile(os.path.join(self.save_path, 'graph_{}.bin'.format(self.hash)))
 
     def load(self):
         gs, tensor_dict = utils.load_graphs(
-            os.path.join(self.save_path, 'graph.bin'))
+            os.path.join(self.save_path, 'graph_{}.bin'.format(self.hash)))
         self.g = gs[0]
         self.train_graph = self.g
         self.val_edges = (tensor_dict["val_pos_src"], tensor_dict["val_pos_dst"]), (
@@ -241,7 +240,7 @@ class AsEdgePredDataset(DGLDataset):
         self.test_edges = (tensor_dict["test_pos_src"], tensor_dict["test_pos_dst"]), (
             tensor_dict["test_neg_src"], tensor_dict["test_neg_dst"])
 
-        with open(os.path.join(self.save_path, 'info.json'), 'r') as f:
+        with open(os.path.join(self.save_path, 'info_{}.json'.format(self.hash)), 'r') as f:
             info = json.load(f)
             self.split_ratio = info["split_ratio"]
             self.neg_ratio = info["neg_ratio"]
@@ -257,9 +256,9 @@ class AsEdgePredDataset(DGLDataset):
             "test_neg_src": self.test_edges[1][0],
             "test_neg_dst": self.test_edges[1][1],
         }
-        utils.save_graphs(os.path.join(self.save_path, 'graph.bin'), [
+        utils.save_graphs(os.path.join(self.save_path, 'graph_{}.bin'.format(self.hash)), [
                           self.train_graph], tensor_dict)
-        with open(os.path.join(self.save_path, 'info.json'), 'w') as f:
+        with open(os.path.join(self.save_path, 'info_{}.json'.format(self.hash)), 'w') as f:
             json.dump({
                 'split_ratio': self.split_ratio,
                 'neg_ratio': self.neg_ratio}, f)
