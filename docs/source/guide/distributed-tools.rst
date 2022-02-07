@@ -77,10 +77,10 @@ In addition, a user needs to specify the number of sampler processes for each tr
 specified in :func:`~dgl.distributed.initialize`.
 
 Below shows an example of launching long live servers and multiple distributed training jobs
-in a cluster. ``Long Live Servers`` means :class:`DistGraphServer` is launched once only and
-kept alive even training jobs finish and exit. Then any following training jobs could fetch
-graph structures and data from the same servers. As a result, we do not need to load graph
-multiple times which may take a lot of time for large graph.
+in a cluster. ``Long Live Servers`` means :class:`~dgl.distributed.DistGraph` servers are launched
+once only and kept alive even training jobs finish and exit. Then any following training jobs
+could fetch graph structures and data from the same servers. As a result, we do not need to load
+graph multiple times which may take a lot of time for large graph.
 
 Launch long live servers and first group of distributed training job.
 

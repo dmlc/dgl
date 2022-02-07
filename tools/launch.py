@@ -437,7 +437,7 @@ g_monitor_file = None
 g_group_id = 0
 
 def has_alive_servers(args):
-    """Check whether there exist alive servers and get available group ID if exist.
+    """Check whether there exists alive servers.
 
     For each group of long live servers, a monitor file named
     'dgl_dist_monitor_{args.server_name}' is created under '/tmp/' directory.
@@ -446,6 +446,10 @@ def has_alive_servers(args):
     exist alive servers, we obtain availale group ID from the monitor
     file which could be used in current client groups.
 
+    Returns
+    -------
+    bool
+        indicates whether there exists alive servers.
     """
     if args.server_name is None:
         return False
@@ -547,7 +551,7 @@ def submit_jobs(args, udf_command):
             cmd = 'cd ' + str(args.workspace) + '; ' + cmd
             thread_list.append(execute_remote(cmd, ip, args.ssh_port, username=args.ssh_username))
     else:
-        print("Alive servers whose name is {} are found, let's use them direclty.".format(args.server_name))
+        print(f"Use running server {args.server_name}.")
 
     # launch client tasks
     client_env_vars = construct_dgl_client_env_vars(
