@@ -1,12 +1,10 @@
 """ShaDow-GNN subgraph samplers."""
-from ..utils import prepare_tensor_or_dict
-from ..base import NID
+from ..sampling.utils import EidExcluder
 from .. import transform
-from ..sampling import sample_neighbors
-from .neighbor import NeighborSamplingMixin
-from .dataloader import exclude_edges, Sampler
+from ..base import NID
+from .base import set_node_lazy_features, set_edge_lazy_features
 
-class ShaDowKHopSampler(NeighborSamplingMixin, Sampler):
+class ShaDowKHopSampler(object):
     """K-hop subgraph sampler used by
     `ShaDow-GNN <https://arxiv.org/abs/2012.01380>`__.
 
@@ -70,29 +68,32 @@ class ShaDowKHopSampler(NeighborSamplingMixin, Sampler):
     If you would like non-uniform neighbor sampling:
 
     >>> g.edata['p'] = torch.rand(g.num_edges())   # any non-negative 1D vector works
-    >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([5, 10, 15], prob='p')
+    >>> sampler = dgl.dataloading.ShaDowKHopSampler([5, 10, 15], prob='p')
     """
-    def __init__(self, fanouts, replace=False, prob=None, output_ctx=None):
-        super().__init__(output_ctx)
+    def __init__(self, fanouts, replace=False, prob=None, prefetch_node_feats=None,
+                 prefetch_edge_feats=None, output_device=None):
         self.fanouts = fanouts
         self.replace = replace
         self.prob = prob
-        self.set_output_context(output_ctx)
+        self.prefetch_node_feats = prefetch_node_feats
+        self.prefetch_edge_feats = prefetch_edge_feats
+        self.output_device = output_device
 
-    def sample(self, g, seed_nodes, exclude_eids=None):
-        self._build_fanout(len(self.fanouts), g)
-        self._build_prob_arrays(g)
-        seed_nodes = prepare_tensor_or_dict(g, seed_nodes, 'seed nodes')
+    def sample(self, g, seed_nodes, exclude_edges=None):
+        """Sample a subgraph given a tensor of seed nodes."""
         output_nodes = seed_nodes
-
-        for i in range(len(self.fanouts)):
-            fanout = self.fanouts[i]
-            frontier = sample_neighbors(
-                g, seed_nodes, fanout, replace=self.replace, prob=self.prob_arrays)
+        for fanout in reversed(self.fanouts):
+            frontier = g.sample_neighbors(
+                seed_nodes, fanout, output_device=self.output_device,
+                replace=self.replace, prob=self.prob, exclude_edges=exclude_edges)
             block = transform.to_block(frontier, seed_nodes)
             seed_nodes = block.srcdata[NID]
 
-        subg = g.subgraph(seed_nodes, relabel_nodes=True)
-        subg = exclude_edges(subg, exclude_eids, self.output_device)
+        subg = g.subgraph(seed_nodes, relabel_nodes=True, output_device=self.output_device)
+        if exclude_edges is not None:
+            subg = EidExcluder(exclude_edges)(subg)
 
-        return seed_nodes, output_nodes, [subg]
+        set_node_lazy_features(subg, self.prefetch_node_feats)
+        set_edge_lazy_features(subg, self.prefetch_edge_feats)
+
+        return seed_nodes, output_nodes, subg

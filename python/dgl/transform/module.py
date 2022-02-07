@@ -14,10 +14,20 @@
 #   limitations under the License.
 #
 """Modules for transform"""
+# pylint: disable= no-member, arguments-differ, invalid-name
+
+from scipy.linalg import expm
 
 from .. import convert
 from .. import backend as F
+from .. import function as fn
 from . import functional
+
+try:
+    import torch
+    from torch.distributions import Bernoulli
+except ImportError:
+    pass
 
 __all__ = [
     'BaseTransform',
@@ -28,7 +38,15 @@ __all__ = [
     'LineGraph',
     'KHopGraph',
     'AddMetaPaths',
-    'Compose'
+    'Compose',
+    'GCNNorm',
+    'PPR',
+    'HeatKernel',
+    'GDC',
+    'NodeShuffle',
+    'DropNode',
+    'DropEdge',
+    'AddEdge'
 ]
 
 def update_graph_structure(g, data_dict, copy_edata=True):
@@ -672,3 +690,568 @@ class Compose(BaseTransform):
     def __repr__(self):
         args = ['  ' + str(transform) for transform in self.transforms]
         return self.__class__.__name__ + '([\n' + ',\n'.join(args) + '\n])'
+
+class GCNNorm(BaseTransform):
+    r"""
+
+    Description
+    -----------
+    Apply symmetric adjacency normalization to an input graph and save the result edge weights,
+    as described in `Semi-Supervised Classification with Graph Convolutional Networks
+    <https://arxiv.org/abs/1609.02907>`__.
+
+    For a heterogeneous graph, this only applies to symmetric canonical edge types, whose source
+    and destination node types are identical.
+
+    Parameters
+    ----------
+    eweight_name : str, optional
+        :attr:`edata` name to retrieve and store edge weights. The edge weights are optional.
+
+    Example
+    -------
+
+    >>> import dgl
+    >>> import torch
+    >>> from dgl import GCNNorm
+    >>> transform = GCNNorm()
+    >>> g = dgl.graph(([0, 1, 2], [0, 0, 1]))
+
+    Case1: Transform an unweighted graph
+
+    >>> g = transform(g)
+    >>> print(g.edata['w'])
+    tensor([0.5000, 0.7071, 0.0000])
+
+    Case2: Transform a weighted graph
+
+    >>> g.edata['w'] = torch.tensor([0.1, 0.2, 0.3])
+    >>> g = transform(g)
+    >>> print(g.edata['w'])
+    tensor([0.3333, 0.6667, 0.0000])
+    """
+    def __init__(self, eweight_name='w'):
+        self.eweight_name = eweight_name
+
+    def calc_etype(self, c_etype, g):
+        r"""
+
+        Description
+        -----------
+        Get edge weights for an edge type.
+        """
+        ntype = c_etype[0]
+        with g.local_scope():
+            if self.eweight_name in g.edges[c_etype].data:
+                g.update_all(fn.copy_e(self.eweight_name, 'm'), fn.sum('m', 'deg'), etype=c_etype)
+                deg_inv_sqrt = 1. / F.sqrt(g.nodes[ntype].data['deg'])
+                g.nodes[ntype].data['w'] = F.replace_inf_with_zero(deg_inv_sqrt)
+                g.apply_edges(lambda edge: {'w': edge.src['w'] * edge.data[self.eweight_name] *
+                                                 edge.dst['w']},
+                              etype=c_etype)
+            else:
+                deg = g.in_degrees(etype=c_etype)
+                deg_inv_sqrt = 1. / F.sqrt(F.astype(deg, F.float32))
+                g.nodes[ntype].data['w'] = F.replace_inf_with_zero(deg_inv_sqrt)
+                g.apply_edges(lambda edges: {'w': edges.src['w'] * edges.dst['w']}, etype=c_etype)
+            return g.edges[c_etype].data['w']
+
+    def __call__(self, g):
+        result = dict()
+        for c_etype in g.canonical_etypes:
+            utype, _, vtype = c_etype
+            if utype == vtype:
+                result[c_etype] = self.calc_etype(c_etype, g)
+
+        for c_etype, eweight in result.items():
+            g.edges[c_etype].data[self.eweight_name] = eweight
+        return g
+
+class PPR(BaseTransform):
+    r"""
+
+    Description
+    -----------
+    Apply personalized PageRank (PPR) to an input graph for diffusion, as introduced in
+    `The pagerank citation ranking: Bringing order to the web
+    <http://ilpubs.stanford.edu:8090/422/>`__. A sparsification will be applied to the
+    weighted adjacency matrix after diffusion. Specifically, edges whose weight is below
+    a threshold will be dropped.
+
+    This module only works for homogeneous graphs.
+
+    Parameters
+    ----------
+    alpha : float, optional
+        Restart probability, which commonly lies in :math:`[0.05, 0.2]`.
+    eweight_name : str, optional
+        :attr:`edata` name to retrieve and store edge weights. If it does
+        not exist in an input graph, this module initializes a weight of 1
+        for all edges. The edge weights should be a tensor of shape :math:`(E)`,
+        where E is the number of edges.
+    eps : float, optional
+        The threshold to preserve edges in sparsification after diffusion. Edges of a
+        weight smaller than eps will be dropped.
+    avg_degree : int, optional
+        The desired average node degree of the result graph. This is the other way to
+        control the sparsity of the result graph and will only be effective if
+        :attr:`eps` is not given.
+
+    Example
+    -------
+
+    >>> import dgl
+    >>> import torch
+    >>> from dgl import PPR
+
+    >>> transform = PPR(avg_degree=2)
+    >>> g = dgl.graph(([0, 1, 2, 3, 4], [2, 3, 4, 5, 3]))
+    >>> g.edata['w'] = torch.tensor([0.1, 0.2, 0.3, 0.4, 0.5])
+    >>> new_g = transform(g)
+    >>> print(new_g.edata['w'])
+    tensor([0.1500, 0.1500, 0.1500, 0.0255, 0.0163, 0.1500, 0.0638, 0.0383, 0.1500,
+            0.0510, 0.0217, 0.1500])
+    """
+    def __init__(self, alpha=0.15, eweight_name='w', eps=None, avg_degree=5):
+        self.alpha = alpha
+        self.eweight_name = eweight_name
+        self.eps = eps
+        self.avg_degree = avg_degree
+
+    def get_eps(self, num_nodes, mat):
+        r"""
+
+        Description
+        -----------
+        Get the threshold for graph sparsification.
+        """
+        if self.eps is None:
+            # Infer from self.avg_degree
+            if self.avg_degree > num_nodes:
+                return float('-inf')
+            sorted_weights = torch.sort(mat.flatten(), descending=True).values
+            return sorted_weights[self.avg_degree * num_nodes - 1]
+        else:
+            return self.eps
+
+    def __call__(self, g):
+        # Step1: PPR diffusion
+        # (α - 1) A
+        device = g.device
+        eweight = (self.alpha - 1) * g.edata.get(self.eweight_name, F.ones(
+            (g.num_edges(),), F.float32, device))
+        num_nodes = g.num_nodes()
+        mat = F.zeros((num_nodes, num_nodes), F.float32, device)
+        src, dst = g.edges()
+        src, dst = F.astype(src, F.int64), F.astype(dst, F.int64)
+        mat[dst, src] = eweight
+        # I_n + (α - 1) A
+        nids = F.astype(g.nodes(), F.int64)
+        mat[nids, nids] = mat[nids, nids] + 1
+        # α (I_n + (α - 1) A)^-1
+        diff_mat = self.alpha * F.inverse(mat)
+
+        # Step2: sparsification
+        num_nodes = g.num_nodes()
+        eps = self.get_eps(num_nodes, diff_mat)
+        dst, src = (diff_mat >= eps).nonzero(as_tuple=False).t()
+        data_dict = {g.canonical_etypes[0]: (src, dst)}
+        new_g = update_graph_structure(g, data_dict, copy_edata=False)
+        new_g.edata[self.eweight_name] = diff_mat[dst, src]
+
+        return new_g
+
+def is_bidirected(g):
+    """Return whether the graph is a bidirected graph.
+
+    A graph is bidirected if for any edge :math:`(u, v)` in :math:`G` with weight :math:`w`,
+    there exists an edge :math:`(v, u)` in :math:`G` with the same weight.
+    """
+    src, dst = g.edges()
+    num_nodes = g.num_nodes()
+
+    # Sort first by src then dst
+    idx_src_dst = src * num_nodes + dst
+    perm_src_dst = F.argsort(idx_src_dst, dim=0, descending=False)
+    src1, dst1 = src[perm_src_dst], dst[perm_src_dst]
+
+    # Sort first by dst then src
+    idx_dst_src = dst * num_nodes + src
+    perm_dst_src = F.argsort(idx_dst_src, dim=0, descending=False)
+    src2, dst2 = src[perm_dst_src], dst[perm_dst_src]
+
+    return F.allclose(src1, dst2) and F.allclose(src2, dst1)
+
+# pylint: disable=C0103
+class HeatKernel(BaseTransform):
+    r"""
+
+    Description
+    -----------
+    Apply heat kernel to an input graph for diffusion, as introduced in
+    `Diffusion kernels on graphs and other discrete structures
+    <https://www.ml.cmu.edu/research/dap-papers/kondor-diffusion-kernels.pdf>`__.
+    A sparsification will be applied to the weighted adjacency matrix after diffusion.
+    Specifically, edges whose weight is below a threshold will be dropped.
+
+    This module only works for homogeneous graphs.
+
+    Parameters
+    ----------
+    t : float, optional
+        Diffusion time, which commonly lies in :math:`[2, 10]`.
+    eweight_name : str, optional
+        :attr:`edata` name to retrieve and store edge weights. If it does
+        not exist in an input graph, this module initializes a weight of 1
+        for all edges. The edge weights should be a tensor of shape :math:`(E)`,
+        where E is the number of edges.
+    eps : float, optional
+        The threshold to preserve edges in sparsification after diffusion. Edges of a
+        weight smaller than eps will be dropped.
+    avg_degree : int, optional
+        The desired average node degree of the result graph. This is the other way to
+        control the sparsity of the result graph and will only be effective if
+        :attr:`eps` is not given.
+
+    Example
+    -------
+
+    >>> import dgl
+    >>> import torch
+    >>> from dgl import HeatKernel
+
+    >>> transform = HeatKernel(avg_degree=2)
+    >>> g = dgl.graph(([0, 1, 2, 3, 4], [2, 3, 4, 5, 3]))
+    >>> g.edata['w'] = torch.tensor([0.1, 0.2, 0.3, 0.4, 0.5])
+    >>> new_g = transform(g)
+    >>> print(new_g.edata['w'])
+    tensor([0.1353, 0.1353, 0.1353, 0.0541, 0.0406, 0.1353, 0.1353, 0.0812, 0.1353,
+            0.1083, 0.0541, 0.1353])
+    """
+    def __init__(self, t=2., eweight_name='w', eps=None, avg_degree=5):
+        self.t = t
+        self.eweight_name = eweight_name
+        self.eps = eps
+        self.avg_degree = avg_degree
+
+    def get_eps(self, num_nodes, mat):
+        r"""
+
+        Description
+        -----------
+        Get the threshold for graph sparsification.
+        """
+        if self.eps is None:
+            # Infer from self.avg_degree
+            if self.avg_degree > num_nodes:
+                return float('-inf')
+            sorted_weights = torch.sort(mat.flatten(), descending=True).values
+            return sorted_weights[self.avg_degree * num_nodes - 1]
+        else:
+            return self.eps
+
+    def __call__(self, g):
+        # Step1: heat kernel diffusion
+        # t A
+        device = g.device
+        eweight = self.t * g.edata.get(self.eweight_name, F.ones(
+            (g.num_edges(),), F.float32, device))
+        num_nodes = g.num_nodes()
+        mat = F.zeros((num_nodes, num_nodes), F.float32, device)
+        src, dst = g.edges()
+        src, dst = F.astype(src, F.int64), F.astype(dst, F.int64)
+        mat[dst, src] = eweight
+        # t (A - I_n)
+        nids = F.astype(g.nodes(), F.int64)
+        mat[nids, nids] = mat[nids, nids] - self.t
+
+        if is_bidirected(g):
+            e, V = torch.linalg.eigh(mat, UPLO='U')
+            diff_mat = V @ torch.diag(e.exp()) @ V.t()
+        else:
+            diff_mat_np = expm(mat.cpu().numpy())
+            diff_mat = torch.Tensor(diff_mat_np).to(device)
+
+        # Step2: sparsification
+        num_nodes = g.num_nodes()
+        eps = self.get_eps(num_nodes, diff_mat)
+        dst, src = (diff_mat >= eps).nonzero(as_tuple=False).t()
+        data_dict = {g.canonical_etypes[0]: (src, dst)}
+        new_g = update_graph_structure(g, data_dict, copy_edata=False)
+        new_g.edata[self.eweight_name] = diff_mat[dst, src]
+
+        return new_g
+
+class GDC(BaseTransform):
+    r"""
+
+    Description
+    -----------
+    Apply graph diffusion convolution (GDC) to an input graph, as introduced in
+    `Diffusion Improves Graph Learning <https://www.in.tum.de/daml/gdc/>`__. A sparsification
+    will be applied to the weighted adjacency matrix after diffusion. Specifically, edges whose
+    weight is below a threshold will be dropped.
+
+    This module only works for homogeneous graphs.
+
+    Parameters
+    ----------
+    coefs : list[float], optional
+        List of coefficients. :math:`\theta_k` for each power of the adjacency matrix.
+    eweight_name : str, optional
+        :attr:`edata` name to retrieve and store edge weights. If it does
+        not exist in an input graph, this module initializes a weight of 1
+        for all edges. The edge weights should be a tensor of shape :math:`(E)`,
+        where E is the number of edges.
+    eps : float, optional
+        The threshold to preserve edges in sparsification after diffusion. Edges of a
+        weight smaller than eps will be dropped.
+    avg_degree : int, optional
+        The desired average node degree of the result graph. This is the other way to
+        control the sparsity of the result graph and will only be effective if
+        :attr:`eps` is not given.
+
+    Example
+    -------
+
+    >>> import dgl
+    >>> import torch
+    >>> from dgl import GDC
+
+    >>> transform = GDC([0.3, 0.2, 0.1], avg_degree=2)
+    >>> g = dgl.graph(([0, 1, 2, 3, 4], [2, 3, 4, 5, 3]))
+    >>> g.edata['w'] = torch.tensor([0.1, 0.2, 0.3, 0.4, 0.5])
+    >>> new_g = transform(g)
+    >>> print(new_g.edata['w'])
+    tensor([0.3000, 0.3000, 0.0200, 0.3000, 0.0400, 0.3000, 0.1000, 0.0600, 0.3000,
+            0.0800, 0.0200, 0.3000])
+    """
+    def __init__(self, coefs, eweight_name='w', eps=None, avg_degree=5):
+        self.coefs = coefs
+        self.eweight_name = eweight_name
+        self.eps = eps
+        self.avg_degree = avg_degree
+
+    def get_eps(self, num_nodes, mat):
+        r"""
+
+        Description
+        -----------
+        Get the threshold for graph sparsification.
+        """
+        if self.eps is None:
+            # Infer from self.avg_degree
+            if self.avg_degree > num_nodes:
+                return float('-inf')
+            sorted_weights = torch.sort(mat.flatten(), descending=True).values
+            return sorted_weights[self.avg_degree * num_nodes - 1]
+        else:
+            return self.eps
+
+    def __call__(self, g):
+        # Step1: diffusion
+        # A
+        device = g.device
+        eweight = g.edata.get(self.eweight_name, F.ones(
+            (g.num_edges(),), F.float32, device))
+        num_nodes = g.num_nodes()
+        adj = F.zeros((num_nodes, num_nodes), F.float32, device)
+        src, dst = g.edges()
+        src, dst = F.astype(src, F.int64), F.astype(dst, F.int64)
+        adj[dst, src] = eweight
+
+        # theta_0 I_n
+        mat = torch.eye(num_nodes, device=device)
+        diff_mat = self.coefs[0] * mat
+        # add theta_k A^k
+        for coef in self.coefs[1:]:
+            mat = mat @ adj
+            diff_mat += coef * mat
+
+        # Step2: sparsification
+        num_nodes = g.num_nodes()
+        eps = self.get_eps(num_nodes, diff_mat)
+        dst, src = (diff_mat >= eps).nonzero(as_tuple=False).t()
+        data_dict = {g.canonical_etypes[0]: (src, dst)}
+        new_g = update_graph_structure(g, data_dict, copy_edata=False)
+        new_g.edata[self.eweight_name] = diff_mat[dst, src]
+
+        return new_g
+
+class NodeShuffle(BaseTransform):
+    r"""
+
+    Description
+    -----------
+    Randomly shuffle the nodes.
+
+    Example
+    -------
+
+    >>> import dgl
+    >>> import torch
+    >>> from dgl import NodeShuffle
+
+    >>> transform = NodeShuffle()
+    >>> g = dgl.graph(([0, 1], [1, 2]))
+    >>> g.ndata['h1'] = torch.tensor([[1., 2.], [3., 4.], [5., 6.]])
+    >>> g.ndata['h2'] = torch.tensor([[7., 8.], [9., 10.], [11., 12.]])
+    >>> g = transform(g)
+    >>> print(g.ndata['h1'])
+    tensor([[5., 6.],
+            [3., 4.],
+            [1., 2.]])
+    >>> print(g.ndata['h2'])
+    tensor([[11., 12.],
+            [ 9., 10.],
+            [ 7.,  8.]])
+    """
+    def __call__(self, g):
+        for ntype in g.ntypes:
+            nids = F.astype(g.nodes(ntype), F.int64)
+            perm = F.rand_shuffle(nids)
+            for key, feat in g.nodes[ntype].data.items():
+                g.nodes[ntype].data[key] = feat[perm]
+        return g
+
+# pylint: disable=C0103
+class DropNode(BaseTransform):
+    r"""
+
+    Description
+    -----------
+    Randomly drop nodes, as described in
+    `Graph Contrastive Learning with Augmentations <https://arxiv.org/abs/2010.13902>`__.
+
+    Parameters
+    ----------
+    p : float, optional
+        Probability of a node to be dropped.
+
+    Example
+    -------
+
+    >>> import dgl
+    >>> import torch
+    >>> from dgl import DropNode
+
+    >>> transform = DropNode()
+    >>> g = dgl.rand_graph(5, 20)
+    >>> g.ndata['h'] = torch.arange(g.num_nodes())
+    >>> g.edata['h'] = torch.arange(g.num_edges())
+    >>> new_g = transform(g)
+    >>> print(new_g)
+    Graph(num_nodes=3, num_edges=7,
+          ndata_schemes={'h': Scheme(shape=(), dtype=torch.int64)}
+          edata_schemes={'h': Scheme(shape=(), dtype=torch.int64)})
+    >>> print(new_g.ndata['h'])
+    tensor([0, 1, 2])
+    >>> print(new_g.edata['h'])
+    tensor([0, 6, 14, 5, 17, 3, 11])
+    """
+    def __init__(self, p=0.5):
+        self.p = p
+        self.dist = Bernoulli(p)
+
+    def __call__(self, g):
+        # Fast path
+        if self.p == 0:
+            return g
+
+        for ntype in g.ntypes:
+            samples = self.dist.sample(torch.Size([g.num_nodes(ntype)]))
+            nids_to_remove = g.nodes(ntype)[samples.bool().to(g.device)]
+            g.remove_nodes(nids_to_remove, ntype=ntype)
+        return g
+
+# pylint: disable=C0103
+class DropEdge(BaseTransform):
+    r"""
+
+    Description
+    -----------
+    Randomly drop edges, as described in
+    `DropEdge: Towards Deep Graph Convolutional Networks on Node Classification
+    <https://arxiv.org/abs/1907.10903>`__ and `Graph Contrastive Learning with Augmentations
+    <https://arxiv.org/abs/2010.13902>`__.
+
+    Parameters
+    ----------
+    p : float, optional
+        Probability of an edge to be dropped.
+
+    Example
+    -------
+
+    >>> import dgl
+    >>> import torch
+    >>> from dgl import DropEdge
+
+    >>> transform = DropEdge()
+    >>> g = dgl.rand_graph(5, 20)
+    >>> g.edata['h'] = torch.arange(g.num_edges())
+    >>> new_g = transform(g)
+    >>> print(new_g)
+    Graph(num_nodes=5, num_edges=12,
+          ndata_schemes={}
+          edata_schemes={'h': Scheme(shape=(), dtype=torch.int64)})
+    >>> print(new_g.edata['h'])
+    tensor([0, 1, 3, 7, 8, 10, 11, 12, 13, 15, 18, 19])
+    """
+    def __init__(self, p=0.5):
+        self.p = p
+        self.dist = Bernoulli(p)
+
+    def __call__(self, g):
+        # Fast path
+        if self.p == 0:
+            return g
+
+        for c_etype in g.canonical_etypes:
+            samples = self.dist.sample(torch.Size([g.num_edges(c_etype)]))
+            eids_to_remove = g.edges(form='eid', etype=c_etype)[samples.bool().to(g.device)]
+            g.remove_edges(eids_to_remove, etype=c_etype)
+        return g
+
+class AddEdge(BaseTransform):
+    r"""
+
+    Description
+    -----------
+    Randomly add edges, as described in `Graph Contrastive Learning with Augmentations
+    <https://arxiv.org/abs/2010.13902>`__.
+
+    Parameters
+    ----------
+    ratio : float, optional
+        Number of edges to add divided by the number of existing edges.
+
+    Example
+    -------
+
+    >>> import dgl
+    >>> from dgl import AddEdge
+
+    >>> transform = AddEdge()
+    >>> g = dgl.rand_graph(5, 20)
+    >>> new_g = transform(g)
+    >>> print(new_g.num_edges())
+    24
+    """
+    def __init__(self, ratio=0.2):
+        self.ratio = ratio
+
+    def __call__(self, g):
+        # Fast path
+        if self.ratio == 0.:
+            return g
+
+        device = g.device
+        idtype = g.idtype
+        for c_etype in g.canonical_etypes:
+            utype, _, vtype = c_etype
+            num_edges_to_add = int(g.num_edges(c_etype) * self.ratio)
+            src = F.randint([num_edges_to_add], idtype, device, low=0, high=g.num_nodes(utype))
+            dst = F.randint([num_edges_to_add], idtype, device, low=0, high=g.num_nodes(vtype))
+            g.add_edges(src, dst, etype=c_etype)
+        return g

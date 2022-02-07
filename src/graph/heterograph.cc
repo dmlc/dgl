@@ -267,6 +267,16 @@ HeteroGraphPtr HeteroGraph::CopyTo(HeteroGraphPtr g, const DLContext &ctx,
                                         hgindex->num_verts_per_type_));
 }
 
+void HeteroGraph::PinMemory_() {
+  for (auto g : relation_graphs_)
+    g->PinMemory_();
+}
+
+void HeteroGraph::UnpinMemory_() {
+  for (auto g : relation_graphs_)
+    g->UnpinMemory_();
+}
+
 std::string HeteroGraph::SharedMemName() const {
   return shared_mem_ ? shared_mem_->GetName() : "";
 }

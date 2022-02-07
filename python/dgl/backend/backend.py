@@ -570,6 +570,21 @@ def exp(input):
     """
     pass
 
+def inverse(input):
+    """Returns the inverse matrix of a square matrix if it exists.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input square matrix.
+
+    Returns
+    -------
+    Tensor
+        The output tensor.
+    """
+    pass
+
 def sqrt(input):
     """Returns a new tensor with the square root of the elements of the input tensor `input`.
 
@@ -1056,6 +1071,21 @@ def equal(x, y):
         The result, with the same shape as input.
     """
     pass
+
+def allclose(x, y, rtol=1e-4, atol=1e-4):
+    """Compares whether all elements are close.
+
+    Parameters
+    ----------
+    x : Tensor
+        First tensor
+    y : Tensor
+        Second tensor
+    rtol : float, optional
+        Relative tolerance
+    atol : float, optional
+        Absolute tolerance
+    """
 
 def logical_not(input):
     """Perform a logical not operation.  Equivalent to np.logical_not
