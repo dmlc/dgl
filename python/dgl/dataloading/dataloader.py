@@ -262,13 +262,11 @@ def _prefetch_for_subgraph(subg, dataloader):
 
 
 def _prefetch_for(item, dataloader):
-    if isinstance(item, DGLHeteroGraph):
-        return _prefetch_for_subgraph(item, dataloader)
-    elif isinstance(item, LazyFeature):
+    if isinstance(item, LazyFeature):
         return dataloader.other_storages[item.name].fetch(
             item.id_, dataloader.device, dataloader.pin_memory)
     else:
-        return None
+        return _prefetch_for_subgraph(item, dataloader)
 
 
 def _await_or_return(x):

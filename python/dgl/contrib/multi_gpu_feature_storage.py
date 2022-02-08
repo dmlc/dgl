@@ -165,7 +165,10 @@ class MultiGPUFeatureStorage(FeatureStorage):
         return self._comm.size() > 1
 
     def fetch(self, indices, device, pin_memory=False):
-        return self.all_gather_row(indices).to(device)
+        nvtx.range_push("multi_gpu.fetch()")
+        x = self.all_gather_row(indices).to(device)
+        nvtx.range_pop()
+        return x
    
 
 

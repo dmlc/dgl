@@ -3,6 +3,8 @@ from ..base import NID, EID
 from ..transform import to_block
 from .base import BlockSampler
 
+from torch.cuda import nvtx
+
 class NeighborSampler(BlockSampler):
     """Sampler that builds computational dependency of node representations via
     neighbor sampling for multilayer GNN.
@@ -72,12 +74,16 @@ class NeighborSampler(BlockSampler):
         output_nodes = seed_nodes
         blocks = []
         for fanout in reversed(self.fanouts):
+            nvtx.range_push("sample_neighbors")
             frontier = g.sample_neighbors(
                 seed_nodes, fanout, edge_dir=self.edge_dir, prob=self.prob,
                 replace=self.replace, output_device=self.output_device,
                 exclude_edges=exclude_eids)
+            nvtx.range_pop()
             eid = frontier.edata[EID]
+            nvtx.range_push("to_block")
             block = to_block(frontier, seed_nodes)
+            nvtx.range_pop()
             block.edata[EID] = eid
             seed_nodes = block.srcdata[NID]
             blocks.insert(0, block)

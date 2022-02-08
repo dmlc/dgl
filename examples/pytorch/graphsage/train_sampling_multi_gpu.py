@@ -32,6 +32,8 @@ from dgl.contrib import MultiGPUFeatureGraphWrapper
 from model import SAGE
 from load_graph import load_reddit, inductive_split, load_ogb
 
+from torch.cuda import nvtx
+
 def compute_acc(pred, labels):
     """
     Compute the accuracy of prediction given the labels.
@@ -81,18 +83,7 @@ def run(proc_id, n_gpus, args, devices, data):
     # Unpack data
     n_classes, train_g, val_g, test_g = data
 
-    if args.inductive:
-        train_nfeat = train_g.ndata.pop('features')
-        val_nfeat = val_g.ndata.pop('features')
-        test_nfeat = test_g.ndata.pop('features')
-        train_labels = train_g.ndata.pop('labels')
-        val_labels = val_g.ndata.pop('labels')
-        test_labels = test_g.ndata.pop('labels')
-    else:
-        train_nfeat = val_nfeat = test_nfeat = train_g.ndata.pop('features')
-        train_labels = val_labels = test_labels = train_g.ndata.pop('labels')
-
-    in_feats = train_nfeat.shape[1]
+    in_feats = train_g.ndata['features'].shape[1]
 
     train_mask = train_g.ndata.pop('train_mask')
     val_mask = val_g.ndata.pop('val_mask')
@@ -101,19 +92,12 @@ def run(proc_id, n_gpus, args, devices, data):
     val_nid = val_mask.nonzero().squeeze()
     test_nid = test_mask.nonzero().squeeze()
 
-    # remove uncessary edge and node data
-    for g in (train_g, val_g, test_g):
-        for k in list(g.edata.keys()):
-            g.edata.pop(k)
-        for k in list(g.ndata.keys()):
-            g.ndata.pop(k)
-
     # Create PyTorch DataLoader for constructing blocks
     sampler = dgl.dataloading.MultiLayerNeighborSampler(
         [int(fanout) for fanout in args.fan_out.split(',')])
 
     if not args.data_cpu:
-        train_g = MultiGPUFeatureGraphWrapper(g, dev_id)
+        train_g = MultiGPUFeatureGraphWrapper(train_g, dev_id)
 
     dataloader = dgl.dataloading.NodeDataLoader(
         train_g,
@@ -144,21 +128,21 @@ def run(proc_id, n_gpus, args, devices, data):
 
         # Loop over the dataloader to sample the computation dependency graph as a list of
         # blocks.
+        nvtx.range_push("dataloader")
         for step, data in enumerate(dataloader):
+            nvtx.range_pop()
             if proc_id == 0:
                 tic_step = time.time()
 
-            if len(data) == 3:
-                input_nodes, seeds, blocks = data
-                # manually load inputs and labels for this mini-batch
-                batch_inputs, batch_labels = load_subtensor(train_nfeat, train_labels,
-                                                            seeds, input_nodes, dev_id)
-            else:
-                # the dataloader is configured to load the labels and features
-                # for this mini-batch
-                input_nodes, seeds, blocks, batch_inputs, batch_labels = data
+            input_nodes, seeds, blocks = data
 
+            # manually load inputs and labels for this mini-batch
+            nvtx.range_push("feature_extraction")
+            batch_inputs = blocks[0].srcdata['features'].to(dev_id)
+            batch_labels = blocks[-1].dstdata['labels'].to(dev_id)
             blocks = [block.int().to(dev_id) for block in blocks]
+            nvtx.range_pop()
+
             # Compute loss and prediction
             batch_pred = model(blocks, batch_inputs)
             loss = loss_fcn(batch_pred, batch_labels)
@@ -172,6 +156,8 @@ def run(proc_id, n_gpus, args, devices, data):
                 acc = compute_acc(batch_pred, batch_labels)
                 print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MB'.format(
                     epoch, step, loss.item(), acc.item(), np.mean(iter_tput[3:]), th.cuda.max_memory_allocated() / 1000000))
+            nvtx.range_push("dataloader")
+        nvtx.range_pop()
 
         if n_gpus > 1:
             th.distributed.barrier()
