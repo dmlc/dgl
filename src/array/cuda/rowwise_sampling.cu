@@ -254,8 +254,6 @@ COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat,
                                     IdArray rows,
                                     const int64_t num_picks,
                                     const bool replace) {
-  if (mat.indptr->ctx.device_type != kDLGPU && mat.indptr->ctx.device_type != kDLCPUPinned)
-    LOG(FATAL) << "Graph must be on the GPU or pinned memory to enable GPU sampling.";
   const auto& ctx = rows->ctx;
   auto device = runtime::DeviceAPI::Get(ctx);
 

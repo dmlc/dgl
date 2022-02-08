@@ -232,13 +232,27 @@
     });                                                     \
   });
 
-// Dispatching according to the context of array to enable CUDA UVA
-#define ATEN_CSR_SWITCH_CUDA_UVA(csr, array, XPU, IdType, op, ...) \
-  ATEN_XPU_SWITCH_CUDA(array->ctx.device_type, XPU, op, {          \
-    ATEN_ID_TYPE_SWITCH((csr).indptr->dtype, IdType, {             \
-      {__VA_ARGS__}                                                \
-    });                                                            \
-  });
+#define CHECK_VALID_CONTEXT(VAR1, VAR2)                                                   \
+  CHECK(((VAR1)->ctx == (VAR2)->ctx) || ((VAR1)->ctx.device_type == kDLCPUPinned))        \
+    << "Expected " << (#VAR2) << "(" << (VAR2)->ctx << ")" << " to have the same device " \
+    << "context as " << (#VAR1) << "(" << (VAR1)->ctx << "). "                            \
+    << "Or " << (#VAR1) << "(" << (VAR1)->ctx << ")" << " is pinned";
+
+/*
+ * Macro to dispatch according to the context of array and dtype of csr
+ * to enable CUDA UVA ops.
+ * Context check is covered here to avoid confusion with CHECK_SAME_CONTEXT.
+ * If csr has the same context with array, same behivor as ATEN_CSR_SWITCH_CUDA.
+ * If csr is pinned, array's context will conduct the actual operation.
+ */
+#define ATEN_CSR_SWITCH_CUDA_UVA(csr, array, XPU, IdType, op, ...) do { \
+  CHECK_VALID_CONTEXT(csr.indices, array);                                \
+  ATEN_XPU_SWITCH_CUDA(array->ctx.device_type, XPU, op, {               \
+    ATEN_ID_TYPE_SWITCH((csr).indptr->dtype, IdType, {                  \
+      {__VA_ARGS__}                                                     \
+    });                                                                 \
+  });                                                                   \
+} while (0)
 
 // Macro to dispatch according to device context (allowing cuda)
 #ifdef DGL_USE_CUDA
@@ -302,12 +316,6 @@
     << "Expected " << (#VAR2) << " to have the same device context as " << (#VAR1) << "("   \
     << (VAR1)->ctx << ")"                                                                   \
     << ". But got " << (VAR2)->ctx << ".";
-
-#define CHECK_VALID_CONTEXT(VAR1, VAR2)                                                     \
-  CHECK(((VAR1)->ctx == (VAR2)->ctx) || ((VAR1)->ctx.device_type == kDLCPUPinned))          \
-    << "Expected " << (#VAR2) << "(" << (VAR2)->ctx << ")" << " to have the same device "   \
-    << "context as " << (#VAR1) << "(" << (VAR1)->ctx << "). "                              \
-    << "Or " << (#VAR1) << "(" << (VAR1)->ctx << ")" << " is pinned";
 
 #define CHECK_NO_OVERFLOW(dtype, val)                                                  \
   do {                                                                                 \
