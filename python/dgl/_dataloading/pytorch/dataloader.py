@@ -10,7 +10,6 @@ from torch.utils.data.distributed import DistributedSampler
 import torch.distributed as dist
 from ..dataloader import NodeCollator, EdgeCollator, GraphCollator, SubgraphIterator
 from ...distributed import DistGraph
-from ...distributed import DistDataLoader
 from ...ndarray import NDArray as DGLNDArray
 from ... import backend as F
 from ...base import DGLError
@@ -25,6 +24,10 @@ __all__ = ['NodeDataLoader', 'EdgeDataLoader', 'GraphDataLoader',
 PYTORCH_VER = LooseVersion(th.__version__)
 PYTORCH_16 = PYTORCH_VER >= LooseVersion("1.6.0")
 PYTORCH_17 = PYTORCH_VER >= LooseVersion("1.7.0")
+
+def _check_graph_type(g):
+    if isinstance(g, DistGraph):
+        raise TypeError("Please use DistNodeDataLoader or DistEdgeDataLoader for DistGraph")
 
 def _create_dist_sampler(dataset, dataloader_kwargs, ddp_seed):
     # Note: will change the content of dataloader_kwargs
@@ -166,14 +169,6 @@ class _ScalarDataBatcher(th.utils.data.IterableDataset):
         """Set epoch number for distributed training."""
         self.epoch = epoch
 
-def _remove_kwargs_dist(kwargs):
-    if 'num_workers' in kwargs:
-        del kwargs['num_workers']
-    if 'pin_memory' in kwargs:
-        del kwargs['pin_memory']
-        print('Distributed DataLoader does not support pin_memory')
-    return kwargs
-
 # The following code is a fix to the PyTorch-specific issue in
 # https://github.com/dmlc/dgl/issues/2137
 #
@@ -290,14 +285,14 @@ def _restore_storages(subgs, g):
             _restore_subgraph_storage(subg, g)
 
 class _NodeCollator(NodeCollator):
-    def collate(self, items):
+    def collate(self, items): # pylint: disable=missing-docstring
         # input_nodes, output_nodes, blocks
         result = super().collate(items)
         _pop_storages(result[-1], self.g)
         return result
 
 class _EdgeCollator(EdgeCollator):
-    def collate(self, items):
+    def collate(self, items): # pylint: disable=missing-docstring
         if self.negative_sampler is None:
             # input_nodes, pair_graph, blocks
             result = super().collate(items)
@@ -381,10 +376,10 @@ def _background_node_dataloader(dl_iter, g, device, results, load_input, load_ou
 
 
 class _NodeDataLoaderIter:
-    def __init__(self, node_dataloader):
+    def __init__(self, node_dataloader, iter_):
         self.device = node_dataloader.device
         self.node_dataloader = node_dataloader
-        self.iter_ = iter(node_dataloader.dataloader)
+        self.iter_ = iter_
         self.async_load = node_dataloader.async_load and (
             F.device_type(self.device) == 'cuda')
         if self.async_load:
@@ -418,10 +413,10 @@ class _NodeDataLoaderIter:
         return input_nodes, output_nodes, blocks
 
 class _EdgeDataLoaderIter:
-    def __init__(self, edge_dataloader):
+    def __init__(self, edge_dataloader, iter_):
         self.device = edge_dataloader.device
         self.edge_dataloader = edge_dataloader
-        self.iter_ = iter(edge_dataloader.dataloader)
+        self.iter_ = iter_
 
     # Make this an iterator for PyTorch Lightning compatibility
     def __iter__(self):
@@ -441,9 +436,9 @@ class _EdgeDataLoaderIter:
         return result
 
 class _GraphDataLoaderIter:
-    def __init__(self, graph_dataloader):
+    def __init__(self, graph_dataloader, iter_):
         self.dataloader = graph_dataloader
-        self.iter_ = iter(graph_dataloader.dataloader)
+        self.iter_ = iter_
 
     def __iter__(self):
         return self
@@ -490,14 +485,9 @@ def _init_dataloader(collator, device, dataloader_kwargs, use_ddp, ddp_seed):
     else:
         dist_sampler = None
 
-    dataloader = DataLoader(
-        dataset,
-        collate_fn=collator.collate,
-        **dataloader_kwargs)
+    return use_scalar_batcher, scalar_batcher, dataset, collator, dist_sampler
 
-    return use_scalar_batcher, scalar_batcher, dataloader, dist_sampler
-
-class NodeDataLoader:
+class NodeDataLoader(DataLoader):
     """PyTorch dataloader for batch-iterating over a set of nodes, generating the list
     of message flow graphs (MFGs) as computation dependency of the said minibatch.
 
@@ -600,6 +590,7 @@ class NodeDataLoader:
 
     def __init__(self, g, nids, graph_sampler, device=None, use_ddp=False, ddp_seed=0,
                  load_input=None, load_output=None, async_load=False, **kwargs):
+        _check_graph_type(g)
         collator_kwargs = {}
         dataloader_kwargs = {}
         for k, v in kwargs.items():
@@ -608,65 +599,42 @@ class NodeDataLoader:
             else:
                 dataloader_kwargs[k] = v
 
-        if isinstance(g, DistGraph):
-            if device is None:
-                # for the distributed case default to the CPU
-                device = 'cpu'
-            assert device == 'cpu', 'Only cpu is supported in the case of a DistGraph.'
-            # Distributed DataLoader currently does not support heterogeneous graphs
-            # and does not copy features.  Fallback to normal solution
-            self.collator = NodeCollator(g, nids, graph_sampler, **collator_kwargs)
-            _remove_kwargs_dist(dataloader_kwargs)
-            self.dataloader = DistDataLoader(self.collator.dataset,
-                                             collate_fn=self.collator.collate,
-                                             **dataloader_kwargs)
-            self.is_distributed = True
-        else:
-            if device is None:
-                # default to the same device the graph is on
-                device = th.device(g.device)
+        if device is None:
+            # default to the same device the graph is on
+            device = th.device(g.device)
 
-            if not g.is_homogeneous:
-                if load_input or load_output:
-                    raise DGLError('load_input/load_output not supported for heterograph yet.')
-            self.load_input = {} if load_input is None else load_input
-            self.load_output = {} if load_output is None else load_output
-            self.async_load = async_load
+        if not g.is_homogeneous:
+            if load_input or load_output:
+                raise DGLError('load_input/load_output not supported for heterograph yet.')
+        self.load_input = {} if load_input is None else load_input
+        self.load_output = {} if load_output is None else load_output
+        self.async_load = async_load
 
-            # if the sampler supports it, tell it to output to the specified device.
-            # But if async_load is enabled, set_output_context should be skipped as
-            # we'd like to avoid any graph/data transfer graphs across devices in
-            # sampler. Such transfer will be handled in dataloader.
-            num_workers = dataloader_kwargs.get('num_workers', 0)
-            if ((not async_load) and
-                    callable(getattr(graph_sampler, "set_output_context", None)) and
-                    num_workers == 0):
-                graph_sampler.set_output_context(to_dgl_context(device))
+        # if the sampler supports it, tell it to output to the specified device.
+        # But if async_load is enabled, set_output_context should be skipped as
+        # we'd like to avoid any graph/data transfer graphs across devices in
+        # sampler. Such transfer will be handled in dataloader.
+        num_workers = dataloader_kwargs.get('num_workers', 0)
+        if ((not async_load) and
+                callable(getattr(graph_sampler, "set_output_context", None)) and
+                num_workers == 0):
+            graph_sampler.set_output_context(to_dgl_context(device))
 
-            self.collator = _NodeCollator(g, nids, graph_sampler, **collator_kwargs)
-            self.use_scalar_batcher, self.scalar_batcher, self.dataloader, self.dist_sampler = \
-                _init_dataloader(self.collator, device, dataloader_kwargs, use_ddp, ddp_seed)
+        self.collator = _NodeCollator(g, nids, graph_sampler, **collator_kwargs)
+        self.use_scalar_batcher, self.scalar_batcher, self.dataloader, self.dist_sampler = \
+            _init_dataloader(self.collator, device, dataloader_kwargs, use_ddp, ddp_seed)
 
-            self.use_ddp = use_ddp
-            self.is_distributed = False
+        self.use_ddp = use_ddp
+        self.is_distributed = False
 
-            # Precompute the CSR and CSC representations so each subprocess does not
-            # duplicate.
-            if num_workers > 0:
-                g.create_formats_()
+        # Precompute the CSR and CSC representations so each subprocess does not
+        # duplicate.
+        if num_workers > 0:
+            g.create_formats_()
         self.device = device
 
     def __iter__(self):
-        """Return the iterator of the data loader."""
-        if self.is_distributed:
-            # Directly use the iterator of DistDataLoader, which doesn't copy features anyway.
-            return iter(self.dataloader)
-        else:
-            return _NodeDataLoaderIter(self)
-
-    def __len__(self):
-        """Return the number of batches of the data loader."""
-        return len(self.dataloader)
+        return _NodeDataLoaderIter(self, super().__iter__())
 
     def set_epoch(self, epoch):
         """Sets the epoch number for the underlying sampler which ensures all replicas
@@ -689,7 +657,7 @@ class NodeDataLoader:
         else:
             raise DGLError('set_epoch is only available when use_ddp is True.')
 
-class EdgeDataLoader:
+class EdgeDataLoader(DataLoader):
     """PyTorch dataloader for batch-iterating over a set of edges, generating the list
     of message flow graphs (MFGs) as computation dependency of the said minibatch for
     edge classification, edge regression, and link prediction.
@@ -897,8 +865,9 @@ class EdgeDataLoader:
     * Link prediction on heterogeneous graph: RGCN for link prediction.
     """
     collator_arglist = inspect.getfullargspec(EdgeCollator).args
-
-    def __init__(self, g, eids, graph_sampler, device='cpu', use_ddp=False, ddp_seed=0, **kwargs):
+    def __init__(self, g, eids, graph_sampler, device='cpu', use_ddp=False, ddp_seed=0,
+                 **kwargs):
+        _check_graph_type(g)
         collator_kwargs = {}
         dataloader_kwargs = {}
         for k, v in kwargs.items():
@@ -907,53 +876,30 @@ class EdgeDataLoader:
             else:
                 dataloader_kwargs[k] = v
 
-        if isinstance(g, DistGraph):
-            if device is None:
-                # for the distributed case default to the CPU
-                device = 'cpu'
-            assert device == 'cpu', 'Only cpu is supported in the case of a DistGraph.'
-            # Distributed DataLoader currently does not support heterogeneous graphs
-            # and does not copy features.  Fallback to normal solution
-            self.collator = EdgeCollator(g, eids, graph_sampler, **collator_kwargs)
-            _remove_kwargs_dist(dataloader_kwargs)
-            self.dataloader = DistDataLoader(self.collator.dataset,
-                                             collate_fn=self.collator.collate,
-                                             **dataloader_kwargs)
-            self.is_distributed = True
-        else:
             if device is None:
                 # default to the same device the graph is on
                 device = th.device(g.device)
 
-            # if the sampler supports it, tell it to output to the
-            # specified device
-            num_workers = dataloader_kwargs.get('num_workers', 0)
-            if callable(getattr(graph_sampler, "set_output_context", None)) and num_workers == 0:
-                graph_sampler.set_output_context(to_dgl_context(device))
+        # if the sampler supports it, tell it to output to the
+        # specified device
+        num_workers = dataloader_kwargs.get('num_workers', 0)
+        if callable(getattr(graph_sampler, "set_output_context", None)) and num_workers == 0:
+            graph_sampler.set_output_context(to_dgl_context(device))
 
-            self.collator = _EdgeCollator(g, eids, graph_sampler, **collator_kwargs)
-            self.use_scalar_batcher, self.scalar_batcher, self.dataloader, self.dist_sampler = \
-                    _init_dataloader(self.collator, device, dataloader_kwargs, use_ddp, ddp_seed)
-            self.use_ddp = use_ddp
-            self.is_distributed = False
+        self.collator = EdgeCollator(g, eids, graph_sampler, **collator_kwargs)
+        self.use_scalar_batcher, self.scalar_batcher, dataset, collator, self.dist_sampler = \
+                _init_dataloader(self.collator, device, dataloader_kwargs, use_ddp, ddp_seed)
+        self.use_ddp = use_ddp
+        super().__init__(dataset, collate_fn=collator.collate, **dataloader_kwargs)
 
-            # Precompute the CSR and CSC representations so each subprocess does not duplicate.
-            if num_workers > 0:
-                g.create_formats_()
+        # Precompute the CSR and CSC representations so each subprocess does not duplicate.
+        if num_workers > 0:
+            g.create_formats_()
 
         self.device = device
 
     def __iter__(self):
-        """Return the iterator of the data loader."""
-        if self.is_distributed:
-            # Directly use the iterator of DistDataLoader, which doesn't copy features anyway.
-            return iter(self.dataloader)
-        else:
-            return _EdgeDataLoaderIter(self)
-
-    def __len__(self):
-        """Return the number of batches of the data loader."""
-        return len(self.dataloader)
+        return _EdgeDataLoaderIter(self, super().__iter__())
 
     def set_epoch(self, epoch):
         """Sets the epoch number for the underlying sampler which ensures all replicas
@@ -976,7 +922,7 @@ class EdgeDataLoader:
         else:
             raise DGLError('set_epoch is only available when use_ddp is True.')
 
-class GraphDataLoader:
+class GraphDataLoader(DataLoader):
     """PyTorch dataloader for batch-iterating over a set of graphs, generating the batched
     graph and corresponding label tensor (if provided) of the said minibatch.
 
@@ -1023,7 +969,6 @@ class GraphDataLoader:
     ...         train_on(batched_graph, labels)
     """
     collator_arglist = inspect.getfullargspec(GraphCollator).args
-
     def __init__(self, dataset, collate_fn=None, use_ddp=False, ddp_seed=0, **kwargs):
         collator_kwargs = {}
         dataloader_kwargs = {}
@@ -1058,14 +1003,11 @@ class GraphDataLoader:
         if use_ddp:
             self.dist_sampler = _create_dist_sampler(dataset, dataloader_kwargs, ddp_seed)
             dataloader_kwargs['sampler'] = self.dist_sampler
-
-        self.dataloader = DataLoader(dataset=dataset,
-                                     collate_fn=self.collate,
-                                     **dataloader_kwargs)
+        super().__init__(dataset, collate_fn=self.collate, **dataloader_kwargs)
 
     def __iter__(self):
         """Return the iterator of the data loader."""
-        return _GraphDataLoaderIter(self)
+        return _GraphDataLoaderIter(self, super().__iter__())
 
     def __len__(self):
         """Return the number of batches of the data loader."""

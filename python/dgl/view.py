@@ -6,6 +6,7 @@ from collections.abc import MutableMapping
 
 from .base import ALL, DGLError
 from . import backend as F
+from .frame import LazyFeature
 
 NodeSpace = namedtuple('NodeSpace', ['data'])
 EdgeSpace = namedtuple('EdgeSpace', ['data'])
@@ -66,7 +67,9 @@ class HeteroNodeDataView(MutableMapping):
             return self._graph._get_n_repr(self._ntid, self._nodes)[key]
 
     def __setitem__(self, key, val):
-        if isinstance(self._ntype, list):
+        if isinstance(val, LazyFeature):
+            self._graph._node_frames[self._ntid][key] = val
+        elif isinstance(self._ntype, list):
             assert isinstance(val, dict), \
                 'Current HeteroNodeDataView has multiple node types, ' \
                 'please passing the node type and the corresponding data through a dict.'
@@ -89,36 +92,33 @@ class HeteroNodeDataView(MutableMapping):
         else:
             self._graph._pop_n_repr(self._ntid, key)
 
-    def __len__(self):
-        assert isinstance(self._ntype, list) is False, \
-            'Current HeteroNodeDataView has multiple node types, ' \
-            'can not support len().'
-        return len(self._graph._node_frames[self._ntid])
-
-    def __iter__(self):
-        assert isinstance(self._ntype, list) is False, \
-            'Current HeteroNodeDataView has multiple node types, ' \
-            'can not be iterated.'
-        return iter(self._graph._node_frames[self._ntid])
-
-    def keys(self):
-        return self._graph._node_frames[self._ntid].keys()
-
-    def values(self):
-        return self._graph._node_frames[self._ntid].values()
-
-    def __repr__(self):
+    def _transpose(self, as_dict=False):
         if isinstance(self._ntype, list):
             ret = defaultdict(dict)
             for (i, ntype) in enumerate(self._ntype):
                 data = self._graph._get_n_repr(self._ntid[i], self._nodes)
                 for key in self._graph._node_frames[self._ntid[i]]:
                     ret[key][ntype] = data[key]
-            return repr(ret)
         else:
-            data = self._graph._get_n_repr(self._ntid, self._nodes)
-            return repr({key : data[key]
-                         for key in self._graph._node_frames[self._ntid]})
+            ret = self._graph._get_n_repr(self._ntid, self._nodes)
+            if as_dict:
+                ret = {key: ret[key] for key in self._graph._node_frames[self._ntid]}
+        return ret
+
+    def __len__(self):
+        return len(self._transpose())
+
+    def __iter__(self):
+        return iter(self._transpose())
+
+    def keys(self):
+        return self._transpose().keys()
+
+    def values(self):
+        return self._transpose().values()
+
+    def __repr__(self):
+        return repr(self._transpose(as_dict=True))
 
 class HeteroEdgeView(object):
     """A EdgeView class to act as G.edges for a DGLHeteroGraph."""
@@ -181,7 +181,9 @@ class HeteroEdgeDataView(MutableMapping):
             return self._graph._get_e_repr(self._etid, self._edges)[key]
 
     def __setitem__(self, key, val):
-        if isinstance(self._etype, list):
+        if isinstance(val, LazyFeature):
+            self._graph._edge_frames[self._etid][key] = val
+        elif isinstance(self._etype, list):
             assert isinstance(val, dict), \
                 'Current HeteroEdgeDataView has multiple edge types, ' \
                 'please pass the edge type and the corresponding data through a dict.'
@@ -204,33 +206,30 @@ class HeteroEdgeDataView(MutableMapping):
         else:
             self._graph._pop_e_repr(self._etid, key)
 
-    def __len__(self):
-        assert isinstance(self._etype, list) is False, \
-            'Current HeteroEdgeDataView has multiple edge types, ' \
-            'can not support len().'
-        return len(self._graph._edge_frames[self._etid])
-
-    def __iter__(self):
-        assert isinstance(self._etype, list) is False, \
-            'Current HeteroEdgeDataView has multiple edge types, ' \
-            'can not be iterated.'
-        return iter(self._graph._edge_frames[self._etid])
-
-    def keys(self):
-        return self._graph._edge_frames[self._etid].keys()
-
-    def values(self):
-        return self._graph._edge_frames[self._etid].values()
-
-    def __repr__(self):
+    def _transpose(self, as_dict=False):
         if isinstance(self._etype, list):
             ret = defaultdict(dict)
             for (i, etype) in enumerate(self._etype):
                 data = self._graph._get_e_repr(self._etid[i], self._edges)
                 for key in self._graph._edge_frames[self._etid[i]]:
                     ret[key][etype] = data[key]
-            return repr(ret)
         else:
-            data = self._graph._get_e_repr(self._etid, self._edges)
-            return repr({key : data[key]
-                         for key in self._graph._edge_frames[self._etid]})
+            ret = self._graph._get_e_repr(self._etid, self._edges)
+            if as_dict:
+                ret = {key: ret[key] for key in self._graph._edge_frames[self._etid]}
+        return ret
+
+    def __len__(self):
+        return len(self._transpose())
+
+    def __iter__(self):
+        return iter(self._transpose())
+
+    def keys(self):
+        return self._transpose().keys()
+
+    def values(self):
+        return self._transpose().values()
+
+    def __repr__(self):
+        return repr(self._transpose(as_dict=True))

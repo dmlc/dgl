@@ -120,7 +120,7 @@ def main(args):
 		
             # compute loss
             tr_loss = loss_fn(logits, label)
-            train_loss.append(tr_loss)
+            train_loss.append(tr_loss.item())
 
             # backward
             optimizer.zero_grad()
@@ -142,7 +142,7 @@ def main(args):
             print("saving model...")
         else:
             kill_cnt += 1
-            if kill_cnt > 25:
+            if kill_cnt > 100:
                 print('early stop.')
                 break
         print("In epoch {}, Train Loss: {:.4f}, Valid MRR: {:.5}\n, Train time: {}, Valid time: {}"\
@@ -164,7 +164,7 @@ if __name__ == '__main__':
     parser.add_argument('--score_func', dest='score_func', default='conve', help='Score Function for Link prediction')
     parser.add_argument('--opn', dest='opn', default='ccorr', help='Composition Operation to be used in CompGCN')
 
-    parser.add_argument('--batch', dest='batch_size', default=128, type=int, help='Batch size')
+    parser.add_argument('--batch', dest='batch_size', default=1024, type=int, help='Batch size')
     parser.add_argument('--gpu', type=int, default='0', help='Set GPU Ids : Eg: For CPU = -1, For Single GPU = 0')
     parser.add_argument('--epoch', dest='max_epochs', type=int, default=500, help='Number of epochs')
     parser.add_argument('--l2', type=float, default=0.0, help='L2 Regularization for Optimizer')
