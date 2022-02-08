@@ -212,11 +212,11 @@ class Communicator(object):
 
 def is_supported():
     """ Check if DGL was built with NCCL support.
-        
+
         Returns
         -------
         bool
-            True if NCCL support was built in. 
+            True if NCCL support was built in.
     """
     return _CAPI_DGLNCCLHasSupport()
 
