@@ -124,13 +124,10 @@ def run(proc_id, n_gpus, args, devices, data):
     best_eval_acc = 0
     best_test_acc = 0
     for epoch in range(args.num_epochs):
-        if n_gpus > 1:
-            dataloader.set_epoch(epoch)
         tic = time.time()
 
         # Loop over the dataloader to sample the computation dependency graph as a list of
         # blocks.
-
         tic_step = time.time()
         for step, (input_nodes, pos_graph, neg_graph, blocks) in enumerate(dataloader):
             batch_inputs = nfeat[input_nodes].to(device)
@@ -199,6 +196,10 @@ def main(args):
     # Create csr/coo/csc formats before launching training processes with multi-gpu.
     # This avoids creating certain formats in each sub-process, which saves memory and CPU.
     g.create_formats_()
+
+    # this to avoid competition overhead on machines with many cores.
+    # Change it to a proper number on your machine, especially for multi-GPU training.
+    th.set_num_threads(8)
     if n_gpus > 1:
         # Copy the graph to shared memory explicitly before pinning.
         # In other cases, we can just rely on fork's copy-on-write.

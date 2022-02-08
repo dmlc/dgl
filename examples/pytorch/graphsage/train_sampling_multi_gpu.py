@@ -91,7 +91,7 @@ def run(proc_id, n_gpus, args, devices, data):
         train_nid,
         sampler,
         use_ddp=n_gpus > 1,
-        device=device if args.num_workers == 0 else None,
+        device=device,
         batch_size=args.batch_size,
         shuffle=True,
         drop_last=False,
@@ -109,8 +109,6 @@ def run(proc_id, n_gpus, args, devices, data):
     avg = 0
     iter_tput = []
     for epoch in range(args.num_epochs):
-        if n_gpus > 1:
-            dataloader.set_epoch(epoch)
         tic = time.time()
 
         # Loop over the dataloader to sample the computation dependency graph as a list of
@@ -206,6 +204,7 @@ if __name__ == '__main__':
         g = dgl.add_reverse_edges(g)
         # convert labels to integer
         g.ndata['labels'] = th.as_tensor(g.ndata['labels'], dtype=th.int64)
+        g.ndata.pop('year')
     else:
         raise Exception('unknown dataset')
 
@@ -232,6 +231,10 @@ if __name__ == '__main__':
     train_g.create_formats_()
     val_g.create_formats_()
     test_g.create_formats_()
+
+    # this to avoid competition overhead on machines with many cores.
+    # Change it to a proper number on your machine, especially for multi-GPU training.
+    th.set_num_threads(8)
     if n_gpus > 1:
         # Copy the graph to shared memory explicitly before pinning.
         # In other cases, we can just rely on fork's copy-on-write.
