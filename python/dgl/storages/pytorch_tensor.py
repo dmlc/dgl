@@ -2,6 +2,7 @@
 
 import torch
 from .base import FeatureStorage, register_storage_wrapper
+from .tensor import BaseTensorStorage
 
 def _fetch_cpu(indices, tensor, feature_shape, device, pin_memory):
     result = torch.empty(
@@ -15,18 +16,16 @@ def _fetch_cuda(indices, tensor, device):
     return torch.index_select(tensor, 0, indices).to(device)
 
 @register_storage_wrapper(torch.Tensor)
-class TensorStorage(FeatureStorage):
+class PyTorchTensorStorage(BaseTensorStorage):
     """Feature storages for slicing a PyTorch tensor."""
     def __init__(self, tensor):
-        self.storage = tensor
-        self.feature_shape = tensor.shape[1:]
-        self.is_cuda = (tensor.device.type == 'cuda')
+        self.storage = tensor   # calls setter of BaseFeatureStorage.storage
 
     def fetch(self, indices, device, pin_memory=False):
         device = torch.device(device)
-        if not self.is_cuda:
+        if not self._is_cuda:
             # CPU to CPU or CUDA - use pin_memory and async transfer if possible
-            return _fetch_cpu(indices, self.storage, self.feature_shape, device, pin_memory)
+            return _fetch_cpu(indices, self._storage, self._feature_shape, device, pin_memory)
         else:
             # CUDA to CUDA or CPU
-            return _fetch_cuda(indices, self.storage, device)
+            return _fetch_cuda(indices, self._storage, device)

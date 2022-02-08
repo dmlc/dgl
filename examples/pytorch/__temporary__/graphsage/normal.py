@@ -7,8 +7,9 @@ import dgl.nn as dglnn
 import time
 import numpy as np
 from ogb.nodeproppred import DglNodePropPredDataset
+import tqdm
 
-USE_WRAPPER = True
+GRAPH_ON_GPU = False
 
 class SAGE(nn.Module):
     def __init__(self, in_feats, n_hidden, n_classes):
@@ -18,6 +19,8 @@ class SAGE(nn.Module):
         self.layers.append(dglnn.SAGEConv(n_hidden, n_hidden, 'mean'))
         self.layers.append(dglnn.SAGEConv(n_hidden, n_classes, 'mean'))
         self.dropout = nn.Dropout(0.5)
+        self.n_hidden = n_hidden
+        self.n_classes = n_classes
 
     def forward(self, blocks, x):
         h = x
@@ -28,42 +31,65 @@ class SAGE(nn.Module):
                 h = self.dropout(h)
         return h
 
+    def inference(self, g, device, batch_size, num_workers, buffer_device=None):
+        # The difference between this inference function and the one in the official
+        # example is that the intermediate results can also benefit from prefetching.
+        g.ndata['h'] = g.ndata['feat']
+        sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1, prefetch_node_feats=['h'])
+        dataloader = dgl.dataloading.NodeDataLoader(
+                g, torch.arange(g.num_nodes()).to(g.device), sampler, device=device,
+                batch_size=1000, shuffle=False, drop_last=False, num_workers=num_workers)
+        if buffer_device is None:
+            buffer_device = device
+
+        for l, layer in enumerate(self.layers):
+            y = torch.zeros(
+                g.num_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes,
+                device=buffer_device)
+            for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
+                x = blocks[0].srcdata['h']
+                h = layer(blocks[0], x)
+                if l != len(self.layers) - 1:
+                    h = F.relu(h)
+                    h = self.dropout(h)
+                y[output_nodes] = h.to(buffer_device)
+            g.ndata['h'] = y
+        return y
+
 dataset = DglNodePropPredDataset('ogbn-products')
 graph, labels = dataset[0]
-graph.ndata['label'] = labels
+graph.ndata['label'] = labels.squeeze()
 split_idx = dataset.get_idx_split()
 train_idx, valid_idx, test_idx = split_idx['train'], split_idx['valid'], split_idx['test']
 
 model = SAGE(graph.ndata['feat'].shape[1], 256, dataset.num_classes).cuda()
 opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
 
-if USE_WRAPPER:
-    import dglnew
-    graph.create_formats_()
-    graph = dglnew.graph.wrapper.DGLGraphStorage(graph)
+if GRAPH_ON_GPU:
+    graph = graph.to('cuda')
+    train_idx = train_idx.to('cuda')
+    num_workers = 0
+else:
+    num_workers = 16
 
 sampler = dgl.dataloading.NeighborSampler(
-        [5, 5, 5], output_device='cpu', prefetch_node_feats=['feat'],
-        prefetch_labels=['label'])
-dataloader = dgl.dataloading.NodeDataLoader(
-        graph,
-        train_idx,
-        sampler,
-        device='cuda',
-        batch_size=1000,
-        shuffle=True,
-        drop_last=False,
-        pin_memory=True,
-        num_workers=16,
-        persistent_workers=True,
-        use_prefetch_thread=True)       # TBD: could probably remove this argument
+        [5, 5, 5], prefetch_node_feats=['feat'], prefetch_labels=['label'])
+train_dataloader = dgl.dataloading.NodeDataLoader(
+        graph, train_idx, sampler, device='cuda', batch_size=1000, shuffle=True,
+        drop_last=False, pin_memory=True, num_workers=num_workers, persistent_workers=True,
+        use_prefetch_thread=True)
+valid_dataloader = dgl.dataloading.NodeDataLoader(
+        graph, valid_idx, sampler, device='cuda', batch_size=1000, shuffle=True,
+        drop_last=False, pin_memory=True, num_workers=num_workers, persistent_workers=True,
+        use_prefetch_thread=True)
 
 durations = []
-for _ in range(10):
+for _ in range(1):
+    model.train()
     t0 = time.time()
-    for it, (input_nodes, output_nodes, blocks) in enumerate(dataloader):
+    for it, (input_nodes, output_nodes, blocks) in enumerate(train_dataloader):
         x = blocks[0].srcdata['feat']
-        y = blocks[-1].dstdata['label'][:, 0]
+        y = blocks[-1].dstdata['label']
         y_hat = model(blocks, x)
         loss = F.cross_entropy(y_hat, y)
         opt.zero_grad()
@@ -76,4 +102,21 @@ for _ in range(10):
     tt = time.time()
     print(tt - t0)
     durations.append(tt - t0)
+
+    model.eval()
+    ys = []
+    y_hats = []
+    for it, (input_nodes, output_nodes, blocks) in enumerate(valid_dataloader):
+        with torch.no_grad():
+            x = blocks[0].srcdata['feat']
+            ys.append(blocks[-1].dstdata['label'])
+            y_hats.append(model(blocks, x))
+    acc = MF.accuracy(torch.cat(y_hats), torch.cat(ys))
+    print('Validation acc:', acc.item())
+
 print(np.mean(durations[4:]), np.std(durations[4:]))
+
+# Test accuracy and offline inference of all nodes
+model.eval()
+with torch.no_grad():
+    pred = model.inference(graph, 'cuda', 1000, num_workers, 'cpu')

@@ -330,6 +330,10 @@ class Column(TensorStorage):
     def __copy__(self):
         return self.clone()
 
+    def fetch(self, indices, device, pin_memory=False):
+        _ = self.data           # materialize in case of lazy slicing & data transfer
+        return super().fetch(indices, device, pin_memory=False)
+
 class Frame(MutableMapping):
     """The columnar storage for node/edge features.
 
