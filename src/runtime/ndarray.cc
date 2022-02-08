@@ -489,8 +489,8 @@ int DGLArrayToDLPack(DGLArrayHandle from, DLManagedTensor** out,
   API_BEGIN();
   auto* nd_container = reinterpret_cast<NDArray::Container*>(from);
   DLTensor* nd = &(nd_container->dl_tensor);
-  if ((alignment != 0 && !is_aligned(nd->data, alignment) 
-      || nd->ctx.device_type == kDLCPUPinned)) {
+  if ((alignment != 0 && !is_aligned(nd->data, alignment))
+      || (nd->ctx.device_type == kDLCPUPinned)) {
     std::vector<int64_t> shape_vec(nd->shape, nd->shape + nd->ndim);
     NDArray copy_ndarray = NDArray::Empty(shape_vec, nd->dtype, GetDevice(nd->ctx));
     copy_ndarray.CopyFrom(nd);
