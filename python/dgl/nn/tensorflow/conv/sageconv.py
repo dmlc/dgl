@@ -23,7 +23,7 @@ class SAGEConv(layers.Layer):
         h_{i}^{(l+1)} &= \sigma \left(W \cdot \mathrm{concat}
         (h_{i}^{l}, h_{\mathcal{N}(i)}^{l+1}) \right)
 
-        h_{i}^{(l+1)} &= \mathrm{norm}(h_{i}^{l})
+        h_{i}^{(l+1)} &= \mathrm{norm}(h_{i}^{(l+1)})
 
     Parameters
     ----------
