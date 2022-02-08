@@ -532,7 +532,7 @@ template <class IdType> CSRMatrix UnSortedDenseCOOToCSR(const COOMatrix &coo) {
   std::vector<std::vector<IdType>> local_ptrs;
   std::vector<int64_t> thread_prefixsum;
 
-#pragma omp parallel
+#pragma omp parallel if (NNZ >= 1024)
   {
     const int num_threads = omp_get_num_threads();
     const int thread_id = omp_get_thread_num();
