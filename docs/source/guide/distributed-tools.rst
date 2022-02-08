@@ -114,4 +114,5 @@ Launch another group of distributed training job which utilize existing long liv
     --server_name long_live \
     "python3 code/train_dist.py --graph-name ogb-product --ip_config ip_config.txt --num-epochs 5 --batch-size 1000 --lr 0.1 --num_workers 4"
 
-``--server_name`` is specified as the same name of previous launch.
+All the arguments that are related to servers should be kept same as previous launch. But training
+specific arguments such as ``--num-epochs``, ``--batch-size`` and so on are free to change.
