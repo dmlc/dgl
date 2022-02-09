@@ -1072,12 +1072,22 @@ def test_as_nodepred2():
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
 def test_as_edgepred():
     # create
-    ds = data.AsEdgePredDataset(data.CoraGraphDataset(), split_ratio=[0.8, 0.1, 0.1])
+    ds = data.AsEdgePredDataset(data.CoraGraphDataset(), split_ratio=[0.8, 0.1, 0.1], neg_ratio=1)
     # Cora has 10556 edges, 10% test edges can be 1057
     assert ds.get_test_edges()[0][0].shape[0] == 1057
+    # negative samples, not guaranteed, so the assert is in a relaxed range
+    assert 1000 <= ds.get_test_edges()[1][0].shape[0] <= 1057
     # read from cache
-    ds = data.AsEdgePredDataset(data.CoraGraphDataset(), split_ratio=[0.8, 0.1, 0.1])
-    assert ds.get_test_edges()[0][0].shape[0] == 1057
+    ds = data.AsEdgePredDataset(data.CoraGraphDataset(), split_ratio=[0.7, 0.1, 0.2], neg_ratio=2)
+    assert ds.get_test_edges()[0][0].shape[0] == 2112
+    # negative samples, not guaranteed to be ratio 2, so the assert is in a relaxed range
+    assert 2000 < ds.get_test_edges()[1][0].shape[0] <= 2112
+
+    # read from cache
+    from ogb.linkproppred import DglLinkPropPredDataset
+    ds = data.AsEdgePredDataset(DglLinkPropPredDataset("ogbl-collab"), split_ratio=[0.7, 0.2, 0.1], neg_ratio=2)
+    assert ds.get_test_edges()[0][0].shape[0] == 46329
+
 
 
 if __name__ == '__main__':

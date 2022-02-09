@@ -73,7 +73,7 @@ class AsNodePredDataset(DGLDataset):
         self.split_ratio = split_ratio
         self.target_ntype = target_ntype
         self.num_classes = dataset.num_classes
-        super().__init__(dataset.name + '-as-nodepred', **kwargs)
+        super().__init__(dataset.name + '-as-nodepred', hash_key=(split_ratio, target_ntype),**kwargs)
 
     def process(self):
         if 'label' not in self.g.nodes[self.target_ntype].data:
@@ -86,7 +86,7 @@ class AsNodePredDataset(DGLDataset):
             utils.add_nodepred_split(self, self.split_ratio, self.target_ntype)
 
     def has_cache(self):
-        return os.path.isfile(os.path.join(self.save_path, 'graph.bin'))
+        return os.path.isfile(os.path.join(self.save_path, 'graph_{}.bin'.format(self.hash)))
 
     def load(self):
         with open(os.path.join(self.save_path, 'info.json'), 'r') as f:
@@ -178,14 +178,12 @@ class AsEdgePredDataset(DGLDataset):
                  dataset,
                  split_ratio=[0.8, 0.1, 0.1],
                  neg_ratio=3,
-                 add_self_loop=True,
                  **kwargs):
         self.g = dataset[0]
         self.dataset = dataset
         self.split_ratio = split_ratio
         self.neg_ratio = neg_ratio
-        self.add_self_loop = add_self_loop
-        super().__init__(dataset.name + '-as-edgepred', hash_key=(neg_ratio, split_ratio, add_self_loop), **kwargs)
+        super().__init__(dataset.name + '-as-edgepred', hash_key=(neg_ratio, split_ratio), **kwargs)
 
     def process(self):
         if hasattr(self.dataset, "get_edge_split"):
@@ -229,8 +227,6 @@ class AsEdgePredDataset(DGLDataset):
             self.train_graph = create_dgl_graph(
                 (src[train_pos_idx], dst[train_pos_idx]), num_nodes=self.num_nodes)
             self.train_graph.ndata["feat"] = graph.ndata["feat"]
-        if self.add_self_loop:
-            self.train_graph = self.train_graph.add_self_loop()
 
     def has_cache(self):
         return os.path.isfile(os.path.join(self.save_path, 'graph_{}.bin'.format(self.hash)))
@@ -249,7 +245,6 @@ class AsEdgePredDataset(DGLDataset):
             info = json.load(f)
             self.split_ratio = info["split_ratio"]
             self.neg_ratio = info["neg_ratio"]
-            self.add_self_loop = bool(info["add_self_loop"])
 
     def save(self):
         tensor_dict = {
@@ -267,8 +262,7 @@ class AsEdgePredDataset(DGLDataset):
         with open(os.path.join(self.save_path, 'info_{}.json'.format(self.hash)), 'w') as f:
             json.dump({
                 'split_ratio': self.split_ratio,
-                'neg_ratio': self.neg_ratio,
-                "add_self_loop": self.add_self_loop}, f)
+                'neg_ratio': self.neg_ratio}, f)
 
     @property
     def feat_size(self):
