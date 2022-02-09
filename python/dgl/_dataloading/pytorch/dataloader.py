@@ -4,10 +4,12 @@ import math
 import threading
 import queue
 from distutils.version import LooseVersion
+from python.dgl.dataloading.dist_dataloader import _remove_kwargs_dist, DistDataLoader
 import torch as th
 from torch.utils.data import DataLoader, IterableDataset
 from torch.utils.data.distributed import DistributedSampler
 import torch.distributed as dist
+import psutil
 from ..dataloader import NodeCollator, EdgeCollator, GraphCollator, SubgraphIterator
 from ...distributed import DistGraph
 from ...ndarray import NDArray as DGLNDArray
@@ -587,10 +589,34 @@ class NodeDataLoader(DataLoader):
         construction will take place on the CPU. This is the recommended setting when using a
         single-GPU and the whole graph does not fit in GPU memory.
     """
+
     collator_arglist = inspect.getfullargspec(NodeCollator).args
 
+    cpu_cores = None
+    user_def_worker_fn = None
+
+    def worker_init_function(self, worker_id):
+        """Worker init default function.
+ 
+              Parameters
+              ----------
+              worker_id : int
+                  Worker ID.
+        """
+        try:
+            psutil.Process().cpu_affinity([self.cpu_cores[worker_id]])
+            print('CPU-affinity worker {} has been assigned to core={}'
+                  .format(worker_id, self.cpu_cores[worker_id]))
+        except:
+            raise Exception('ERROR: cannot use affinity id={} cpu_cores={}'
+                            .format(worker_id, self.cpu_cores))
+
+        if self.user_def_worker_fn is not None:
+            self.user_def_worker_fn(worker_id)
+
     def __init__(self, g, nids, graph_sampler, device=None, use_ddp=False, ddp_seed=0,
-                 load_input=None, load_output=None, async_load=False, **kwargs):
+                 load_input=None, load_output=None, async_load=False,
+                 use_cpu_worker_affinity=False, cpu_worker_affinity_cores=None, **kwargs):
         _check_graph_type(g)
         collator_kwargs = {}
         dataloader_kwargs = {}
@@ -600,11 +626,53 @@ class NodeDataLoader(DataLoader):
             else:
                 dataloader_kwargs[k] = v
 
+        if use_cpu_worker_affinity:
+            if cpu_worker_affinity_cores is None:
+                cpu_worker_affinity_cores = []
+            if isinstance(cpu_worker_affinity_cores, list):
+                if 'num_workers' in dataloader_kwargs:
+                    nw_work = dataloader_kwargs['num_workers']
+                    if nw_work <= 0:
+                        raise Exception('ERROR: cpu_affinity --num-workers '
+                                        'must be greater than 0')
+                    if len(cpu_worker_affinity_cores):
+                        if nw_work == len(cpu_worker_affinity_cores):
+                            self.cpu_cores = cpu_worker_affinity_cores
+                        else:
+                            raise Exception('ERROR: cpu_affinity incorrect '
+                                            'settings for cores={} num_workers={}'
+                                            .format(cpu_worker_affinity_cores, nw_work))
+                    else:
+                        self.cpu_cores = [x for x in range(0, nw_work)]
+                    if 'worker_init_fn' in dataloader_kwargs:
+                        self.user_def_worker_fn = dataloader_kwargs['worker_init_fn']
+                    dataloader_kwargs['worker_init_fn'] = self.worker_init_function
+                else:
+                    raise Exception('ERROR: affinity '
+                                    'should be used with --num_workers=X')
+            else:
+                raise Exception('ERROR: cpu_worker_affinity_cores '
+                                'should be a list of cores')
+
         # default to the same device the graph is on
         device = th.device(g.device if device is None else device)
         num_workers = dataloader_kwargs.get('num_workers', 0)
 
-        if g.device.type == 'cuda' or g.is_pinned():
+        if isinstance(g, DistGraph):
+            if device is None:
+                # for the distributed case default to the CPU
+                device = 'cpu'
+            assert device == 'cpu', 'Only cpu is supported in the case of a DistGraph.'
+            # Distributed DataLoader currently does not support heterogeneous graphs
+            # and does not copy features.  Fallback to normal solution
+            self.collator = NodeCollator(g, nids, graph_sampler, **collator_kwargs)
+            _remove_kwargs_dist(dataloader_kwargs)
+            self.dataloader = DistDataLoader(self.collator.dataset,
+                                             collate_fn=self.collator.collate,
+                                             **dataloader_kwargs)
+            self.is_distributed = True
+
+        elif g.device.type == 'cuda' or g.is_pinned():
             sampling_type = 'UVA sampling' if g.is_pinned() else 'GPU sampling'
             assert device.type == 'cuda', \
                 f"'device' must be a cuda device to enable {sampling_type}, got {device}."

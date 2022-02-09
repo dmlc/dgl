@@ -281,7 +281,8 @@ def track_time(data):
     sampler = dgl.dataloading.MultiLayerNeighborSampler([fanout] * n_layers)
     loader = dgl.dataloading.NodeDataLoader(
         hg, {category: train_idx}, sampler,
-        batch_size=batch_size, shuffle=True, num_workers=4)
+        batch_size=batch_size, shuffle=True, num_workers=4,
+        use_cpu_worker_affinity=True)
 
     # dry run
     for i, (input_nodes, seeds, blocks) in enumerate(loader):

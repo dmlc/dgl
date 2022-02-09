@@ -103,7 +103,8 @@ def track_time(data):
         batch_size=batch_size,
         shuffle=True,
         drop_last=False,
-        num_workers=num_workers)
+        num_workers=num_workers,
+        use_cpu_worker_affinity=True)
 
     # Define model and optimizer
     model = GAT(in_feats, num_heads, num_hidden, n_classes, num_layers, F.relu, dropout)
