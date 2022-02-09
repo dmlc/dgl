@@ -9,7 +9,24 @@ class GraphSAGE(nn.Module):
                  num_layers: int = 1,
                  activation: str = "relu",
                  dropout: float = 0.5,
-                 aggregator_type: str = "gcn"):
+                 aggregator_type: str = "gcn"):        
+        """GraphSAGE model
+
+        Parameters
+        ----------
+        in_size : int 
+            Number of input features.
+        out_size : int
+            Output size.
+        hidden_size : int
+            Hidden size.
+        num_layers : int
+            Number of layers.
+        dropout : float
+            Dropout rate.
+        aggregator_type : str
+            Aggregator type to use (``mean``, ``gcn``, ``pool``, ``lstm``).
+        """
         super(GraphSAGE, self).__init__()
         self.layers = nn.ModuleList()
         self.dropout = nn.Dropout(dropout)

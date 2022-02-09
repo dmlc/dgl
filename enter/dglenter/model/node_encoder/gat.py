@@ -19,8 +19,7 @@ class GAT(nn.Module):
                  feat_drop : float = 0.6,
                  attn_drop: float = 0.6,
                  negative_slope: float = 0.2,
-                 residual: bool = False):
-        
+                 residual: bool = False):        
         """Graph Attention Networks
 
         Parameters
