@@ -19,11 +19,14 @@ def _fetch_cuda(indices, tensor, device):
 class PyTorchTensorStorage(BaseTensorStorage):
     """Feature storages for slicing a PyTorch tensor."""
     def __init__(self, tensor):
-        self.storage = tensor   # calls setter of BaseFeatureStorage.storage
+        self.storage = tensor   # also sets _feature_shape and _is_cuda
 
     def fetch(self, indices, device, pin_memory=False):
         device = torch.device(device)
         if not self._is_cuda:
+            if indices.device.type == 'cuda':
+                # Already on GPU after slicing so no need to have non_blocking=True
+                return self.get_unified_tensor(device)[indices].to(device)
             # CPU to CPU or CUDA - use pin_memory and async transfer if possible
             return _fetch_cpu(indices, self._storage, self._feature_shape, device, pin_memory)
         else:

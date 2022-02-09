@@ -9,7 +9,7 @@ import numpy as np
 from ogb.nodeproppred import DglNodePropPredDataset
 import tqdm
 
-GRAPH_ON_GPU = False
+MODE = "uva"   # "cpu", "uva", "cuda", "allcuda"
 
 class SAGE(nn.Module):
     def __init__(self, in_feats, n_hidden, n_classes):
@@ -62,26 +62,34 @@ graph.ndata['label'] = labels.squeeze()
 split_idx = dataset.get_idx_split()
 train_idx, valid_idx, test_idx = split_idx['train'], split_idx['valid'], split_idx['test']
 
-model = SAGE(graph.ndata['feat'].shape[1], 256, dataset.num_classes).cuda()
-opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
-
-if GRAPH_ON_GPU:
+if MODE == "allcuda":
     graph = graph.to('cuda')
+if MODE == 'uva':
+    graph.create_formats_()
+    graph.pin_memory_()
+if MODE in ["allcuda", "uva"]:
     train_idx = train_idx.to('cuda')
+    valid_idx = valid_idx.to('cuda')
+    test_idx = test_idx.to('cuda')
     num_workers = 0
-else:
+if MODE in ["cpu", "cuda"]:
     num_workers = 16
+device = 'cpu' if MODE == "cpu" else 'cuda'
+pin_prefetcher = (MODE == 'cpu')
+
+model = SAGE(graph.ndata['feat'].shape[1], 256, dataset.num_classes).to(device)
+opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
 
 sampler = dgl.dataloading.NeighborSampler(
         [5, 5, 5], prefetch_node_feats=['feat'], prefetch_labels=['label'])
 train_dataloader = dgl.dataloading.NodeDataLoader(
-        graph, train_idx, sampler, device='cuda', batch_size=1000, shuffle=True,
-        drop_last=False, pin_memory=True, num_workers=num_workers, persistent_workers=True,
-        use_prefetch_thread=True)
+        graph, train_idx, sampler, device=device, batch_size=1000, shuffle=True,
+        drop_last=False, pin_prefetcher=pin_prefetcher, num_workers=num_workers,
+        persistent_workers=(num_workers > 0), use_prefetch_thread=False)
 valid_dataloader = dgl.dataloading.NodeDataLoader(
-        graph, valid_idx, sampler, device='cuda', batch_size=1000, shuffle=True,
-        drop_last=False, pin_memory=True, num_workers=num_workers, persistent_workers=True,
-        use_prefetch_thread=True)
+        graph, valid_idx, sampler, device=device, batch_size=1000, shuffle=True,
+        drop_last=False, pin_prefetcher=pin_prefetcher, num_workers=num_workers,
+        persistent_workers=(num_workers > 0), use_prefetch_thread=False)
 
 durations = []
 for _ in range(1):
@@ -119,6 +127,6 @@ print(np.mean(durations[4:]), np.std(durations[4:]))
 # Test accuracy and offline inference of all nodes
 model.eval()
 with torch.no_grad():
-    pred = model.inference(graph, 'cuda', 1000, num_workers, 'cpu')
+    pred = model.inference(graph, device, 1000, num_workers, 'cpu')
     acc = MF.accuracy(pred.to(graph.device), graph.ndata['label'])
     print('Test acc:', acc.item())

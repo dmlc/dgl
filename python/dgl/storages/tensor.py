@@ -1,10 +1,9 @@
 """Feature storages for tensors across different frameworks."""
+from functools import lru_cache
 from .base import FeatureStorage
 from .. import backend as F
 from ..utils import recursive_apply_pair
-
-def _fetch(indices, tensor, device):
-    return F.copy_to(F.gather_row(tensor, indices), device)
+from ..contrib.unified_tensor import UnifiedTensor
 
 class BaseTensorStorage(FeatureStorage):
     """FeatureStorage that synchronously slices features from a tensor and transfers
@@ -25,6 +24,11 @@ class BaseTensorStorage(FeatureStorage):
         if val is not None:
             self._feature_shape = val.shape[1:]
             self._is_cuda = (val.device.type == 'cuda')
+        self.get_unified_tensor.cache_clear()
+
+    @lru_cache(maxsize=None)
+    def get_unified_tensor(self, device):
+        return UnifiedTensor(self.storage, device)
 
     def fetch(self, indices, device, pin_memory=False):     # pylint: disable=unused-argument
-        return recursive_apply_pair(indices, self.storage, _fetch, device)
+        return F.copy_to(F.gather_row(tensor, indices), device)

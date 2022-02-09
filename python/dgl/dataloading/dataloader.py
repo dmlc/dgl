@@ -65,7 +65,7 @@ class _TensorizedDatasetIter(object):
         type_id_uniq, type_id_count = torch.unique_consecutive(type_ids, return_counts=True)
         type_id_uniq = type_id_uniq.tolist()
         type_id_offset = type_id_count.cumsum(0).tolist()
-        type_id_offset.insert(0, 0)__initdivide_
+        type_id_offset.insert(0, 0)
         id_dict = {
             self.mapping_keys[type_id_uniq[i]]: indices[type_id_offset[i]:type_id_offset[i+1]]
             for i in range(len(type_id_uniq))}
@@ -119,7 +119,7 @@ class TensorizedDataset(torch.utils.data.IterableDataset):
         self._tensor_dataset[:] = self._tensor_dataset[perm]
 
     def __iter__(self):
-        dataset = _divide_by_worker(self._tensor_dataset)
+        dataset = _divide_by_worker(self._tensor_dataset, self.batch_size, self.drop_last)
         return _TensorizedDatasetIter(
             dataset, self.batch_size, self.drop_last, self._mapping_keys)
 
@@ -170,20 +170,20 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
         self.shared_mem_size = self.total_size if not self.drop_last else len(indices)
         self.num_indices = len(indices)
 
+        if isinstance(indices, Mapping):
+            self._device = next(iter(indices.values())).device
+            self._id_tensor = _get_id_tensor_from_mapping(
+                    indices, self._device, self._mapping_keys)
+        else:
+            self._id_tensor = indices
+            self._device = self._id_tensor.device
+
         if self.rank == 0:
             name, id_ = _generate_shared_mem_name_id()
-            if isinstance(indices, Mapping):
-                device = next(iter(indices.values())).device
-                id_tensor = _get_id_tensor_from_mapping(indices, device, self._mapping_keys)
-                self._tensor_dataset = create_shared_mem_array(
-                    name, (self.shared_mem_size, 2), torch.int64)
-                self._tensor_dataset[:id_tensor.shape[0], :] = id_tensor
-            else:
-                self._tensor_dataset = create_shared_mem_array(
-                    name, (self.shared_mem_size,), torch.int64)
-                self._tensor_dataset[:len(indices)] = indices
-            self._device = self._tensor_dataset.device
-            meta_info = torch.LongTensor([id_, self._tensor_dataset.shape[0]])
+            self._indices = create_shared_mem_array(
+                name, (self.shared_mem_size,), torch.int64)
+            self._indices[:self._id_tensor.shape[0]] = torch.arange(self._id_tensor.shape[0])
+            meta_info = torch.LongTensor([id_, self._indices.shape[0]])
         else:
             meta_info = torch.LongTensor([0, 0])
 
@@ -200,34 +200,34 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
                 indices_shared = get_shared_mem_array(name, (num_samples, 2), torch.int64)
             else:
                 indices_shared = get_shared_mem_array(name, (num_samples,), torch.int64)
-            self._tensor_dataset = indices_shared
-            self._device = indices_shared.device
+            self._indices = indices_shared
 
     def shuffle(self):
         """Shuffles the dataset."""
         # Only rank 0 does the actual shuffling.  The other ranks wait for it.
         if self.rank == 0:
-            self._tensor_dataset[:self.num_indices] = self._tensor_dataset[
+            self._indices[:self.num_indices] = self._indices[
                 torch.randperm(self.num_indices, device=self._device)]
             if not self.drop_last:
                 # pad extra
-                self._tensor_dataset[self.num_indices:] = \
-                    self._tensor_dataset[:self.total_size - self.num_indices]
+                self._indices[self.num_indices:] = \
+                    self._indices[:self.total_size - self.num_indices]
         dist.barrier()
 
     def __iter__(self):
         start = self.num_samples * self.rank
         end = self.num_samples * (self.rank + 1)
-        dataset = _divide_by_worker(self._tensor_dataset[start:end])
-        return _TensorizedDatasetIter(
-            dataset, self.batch_size, self.drop_last, self._mapping_keys)
+        indices = _divide_by_worker(self._indices[start:end], self.batch_size, self.drop_last)
+        for batch in _TensorizedDatasetIter(dataset, self.batch_size, self.drop_last,
+                                            self._mapping_keys):
+            yield self._id_tensor[batch.to(self._device)]
 
     def __len__(self):
         return (self.num_samples + (0 if self.drop_last else (self.batch_size - 1))) // \
             self.batch_size
 
 
-def _prefetch_update_feats(feats, frames, types, get_storage_func, id_name, device, pin_memory):
+def _prefetch_update_feats(feats, frames, types, get_storage_func, id_name, device, pin_prefetcher):
     for tid, frame in enumerate(frames):
         type_ = types[tid]
         default_id = frame.get(id_name, None)
@@ -240,7 +240,7 @@ def _prefetch_update_feats(feats, frames, types, get_storage_func, id_name, devi
                         'Found a LazyFeature with no ID specified, '
                         'and the graph does not have dgl.NID or dgl.EID columns')
                 feats[tid, key] = get_storage_func(parent_key, type_).fetch(
-                    column.id_ or default_id, device, pin_memory)
+                    column.id_ or default_id, device, pin_prefetcher)
 
 
 # This class exists to avoid recursion into the feature dictionary returned by the
@@ -256,10 +256,10 @@ def _prefetch_for_subgraph(subg, dataloader):
     node_feats, edge_feats = {}, {}
     _prefetch_update_feats(
         node_feats, subg._node_frames, subg.ntypes, dataloader.graph.get_node_storage,
-        NID, dataloader.device, dataloader.pin_memory)
+        NID, dataloader.device, dataloader.pin_prefetcher)
     _prefetch_update_feats(
         edge_feats, subg._edge_frames, subg.canonical_etypes, dataloader.graph.get_edge_storage,
-        EID, dataloader.device, dataloader.pin_memory)
+        EID, dataloader.device, dataloader.pin_prefetcher)
     return _PrefetchedGraphFeatures(node_feats, edge_feats)
 
 
@@ -268,7 +268,7 @@ def _prefetch_for(item, dataloader):
         return _prefetch_for_subgraph(item, dataloader)
     elif isinstance(item, LazyFeature):
         return dataloader.other_storages[item.name].fetch(
-            item.id_, dataloader.device, dataloader.pin_memory)
+            item.id_, dataloader.device, dataloader.pin_prefetcher)
     else:
         return None
 
@@ -402,7 +402,7 @@ class _PrefetchingIter(object):
         self.dataloader_it = dataloader_it
         self.dataloader = dataloader
         self.graph_sampler = self.dataloader.graph_sampler
-        self.pin_memory = self.dataloader.pin_memory
+        self.pin_prefetcher = self.dataloader.pin_prefetcher
         self.num_threads = num_threads
 
         self.use_thread = use_thread
@@ -491,7 +491,17 @@ class DataLoader(torch.utils.data.DataLoader):
     """DataLoader class."""
     def __init__(self, graph, indices, graph_sampler, device='cpu', use_ddp=False,
                  ddp_seed=0, batch_size=1, drop_last=False, shuffle=False,
-                 use_prefetch_thread=False, use_alternate_streams=True, **kwargs):
+                 use_prefetch_thread=False, use_alternate_streams=True,
+                 pin_prefetcher=False, **kwargs):
+        # (BarclayII) I hoped that pin_prefetcher can be merged into PyTorch's native
+        # pin_memory argument.  But our neighbor samplers and subgraph samplers
+        # return indices, which could be CUDA tensors (e.g. during UVA sampling)
+        # hence cannot be pinned.  PyTorch's native pin memory thread does not ignore
+        # CUDA tensors when pinning and will crash.  To enable pin memory for prefetching
+        # features and disable pin memory for sampler's return value, I had to use
+        # a different argument.  Of course I could change the meaning of pin_memory
+        # to pinning prefetched features and disable pin memory for sampler's returns
+        # no matter what, but I doubt if it's reasonable.
         self.graph = graph
 
         try:
@@ -517,6 +527,7 @@ class DataLoader(torch.utils.data.DataLoader):
         self.graph_sampler = graph_sampler
         self.device = torch.device(device)
         self.use_alternate_streams = use_alternate_streams
+        self.pin_prefetcher = pin_prefetcher
         if self.device.type == 'cuda' and self.device.index is None:
             self.device = torch.device('cuda', torch.cuda.current_device())
         self.use_prefetch_thread = use_prefetch_thread
@@ -561,22 +572,23 @@ class EdgeDataLoader(DataLoader):
     def __init__(self, graph, indices, graph_sampler, device='cpu', use_ddp=False,
                  ddp_seed=0, batch_size=1, drop_last=False, shuffle=False,
                  use_prefetch_thread=False, use_alternate_streams=True,
+                 pin_prefetcher=False,
                  exclude=None, reverse_eids=None, reverse_etypes=None, negative_sampler=None,
-                 g_sampling=None, **kwargs):
-        if g_sampling is not None:
-            dgl_warning(
-                "g_sampling is deprecated. "
-                "Please merge g_sampling and the original graph into one graph and use "
-                "the exclude argument to specify which edges you don't want to sample.")
+                 always_exclude=None, **kwargs):
         if isinstance(graph_sampler, BlockSampler):
             graph_sampler = EdgeBlockSampler(
                 graph_sampler, exclude=exclude, reverse_eids=reverse_eids,
-                reverse_etypes=reverse_etypes, negative_sampler=negative_sampler)
+                reverse_etypes=reverse_etypes, negative_sampler=negative_sampler,
+                always_exclude=always_exclude,
+                prefetch_node_feats=graph_sampler.prefetch_node_feats,
+                prefetch_labels=graph_sampler.prefetch_labels,
+                prefetch_edge_feats=graph_sampler.prefetch_edge_feats)
 
         super().__init__(
             graph, indices, graph_sampler, device=device, use_ddp=use_ddp, ddp_seed=ddp_seed,
             batch_size=batch_size, drop_last=drop_last, shuffle=shuffle,
             use_prefetch_thread=use_prefetch_thread, use_alternate_streams=use_alternate_streams,
+            pin_prefetcher=pin_prefetcher,
             **kwargs)
 
 
