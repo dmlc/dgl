@@ -516,20 +516,6 @@ template <class IdType> CSRMatrix UnSortedSparseCOOToCSR(const COOMatrix &coo) {
 }
 
 template <class IdType> CSRMatrix UnSortedDenseCOOToCSR(const COOMatrix &coo) {
-// uncomment to switch off OMP for small matrices
-#define X_SMALL_M_OMP_OFF
-
-// uncomment to add empty openmp parallel section with barriers
-// #define X_EMPTY_BARRIERS
-
-// uncomment to enable debug output
-// #define X_DEBUG_OUTPUT
-
-#ifdef X_DEBUG_OUTPUT
-  static int calln = 0;
-  auto tic = std::chrono::steady_clock::now();
-#endif
-
   const int64_t N = coo.num_rows;
   const int64_t NNZ = coo.row->shape[0];
   const IdType *const row_data = static_cast<IdType *>(coo.row->data);
@@ -549,11 +535,7 @@ template <class IdType> CSRMatrix UnSortedDenseCOOToCSR(const COOMatrix &coo) {
   std::vector<std::vector<IdType>> local_ptrs;
   std::vector<int64_t> thread_prefixsum;
 
-#if !defined(X_SMALL_M_OMP_OFF)
-#pragma omp parallel
-#else
 #pragma omp parallel if (NNZ >= 1024)
-#endif
   {
     const int num_threads = omp_get_num_threads();
     const int thread_id = omp_get_thread_num();
@@ -618,21 +600,6 @@ template <class IdType> CSRMatrix UnSortedDenseCOOToCSR(const COOMatrix &coo) {
     }
   }
   CHECK_EQ(Bp[N], NNZ);
-
-#ifdef X_EMPTY_BARRIERS
-  #pragma omp parallel
-  {
-    #pragma omp barrier
-    #pragma omp barrier
-    #pragma omp barrier
-  }
-#endif
-
-#ifdef X_DEBUG_OUTPUT
-  auto toc = std::chrono::steady_clock::now();
-  std::cout << "Call: " << calln << "\t NNZ: "  << NNZ << "\t N: " << N << "\t" << std::chrono::duration_cast<std::chrono::milliseconds>(toc - tic).count() << " ms" << std::endl;
-  calln++;
-#endif
 
   return CSRMatrix(coo.num_rows, coo.num_cols, ret_indptr, ret_indices,
                    ret_data, coo.col_sorted);
