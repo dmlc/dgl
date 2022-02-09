@@ -65,7 +65,7 @@ class _TensorizedDatasetIter(object):
         type_id_uniq, type_id_count = torch.unique_consecutive(type_ids, return_counts=True)
         type_id_uniq = type_id_uniq.tolist()
         type_id_offset = type_id_count.cumsum(0).tolist()
-        type_id_offset.insert(0, 0)
+        type_id_offset.insert(0, 0)__initdivide_
         id_dict = {
             self.mapping_keys[type_id_uniq[i]]: indices[type_id_offset[i]:type_id_offset[i+1]]
             for i in range(len(type_id_uniq))}
@@ -80,15 +80,17 @@ def _get_id_tensor_from_mapping(indices, device, keys):
     return torch.stack([type_ids, all_indices], 1)
 
 
-def _divide_by_worker(dataset):
+def _divide_by_worker(dataset, batch_size, drop_last):
     num_samples = dataset.shape[0]
     worker_info = torch.utils.data.get_worker_info()
     if worker_info:
-        chunk_size = num_samples // worker_info.num_workers
-        left_over = num_samples % worker_info.num_workers
-        start = (chunk_size * worker_info.id) + min(left_over, worker_info.id)
-        end = start + chunk_size + (worker_info.id < left_over)
-        assert worker_info.id < worker_info.num_workers - 1 or end == num_samples
+        num_batches = (num_samples + (0 if drop_last else batch_size - 1)) // batch_size
+        num_batches_per_worker = num_batches // worker_info.num_workers
+        left_over = num_batches % worker_info.num_workers
+        start = (num_batches_per_worker * worker_info.id) + min(left_over, worker_info.id)
+        end = start + num_batches_per_worker + (worker_info.id < left_over)
+        start *= batch_size
+        end = min(end * batch_size, num_samples)
         dataset = dataset[start:end]
     return dataset
 

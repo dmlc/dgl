@@ -120,3 +120,5 @@ print(np.mean(durations[4:]), np.std(durations[4:]))
 model.eval()
 with torch.no_grad():
     pred = model.inference(graph, 'cuda', 1000, num_workers, 'cpu')
+    acc = MF.accuracy(pred.to(graph.device), graph.ndata['label'])
+    print('Test acc:', acc.item())
