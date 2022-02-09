@@ -1857,6 +1857,28 @@ def gather_mm(A, B, A_per_rel, B_per_rel, etypes, sortedE):
     """
     pass
 
+def se_gather_mm(A, B, seglen_A):
+    r""" Dense Matrix Multiplication interface. It multiplies dense tensor A
+    and dense tensor B according to relation types. A is sorted and concatenated
+    according to relation types.
+
+    Parameters
+    ----------
+    A : tensor
+        2-D tensor of shape (N, D1)
+    B : tensor
+        3-D tensor of shape (R, D1, D2)
+    seglen_A : Tensor
+        An integer tensor of shape (R,). Each element is the length of segments
+        of input ``A``. The summation of all elements must be equal to N.
+
+    Returns
+    -------
+    Tensor
+        The output dense matrix of shape (N, D2)
+    """
+    pass
+
 
 ###############################################################################
 # Other interfaces

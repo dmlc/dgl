@@ -328,6 +328,41 @@ def _gspmm_hetero(gidx, op, reduce_op, u_len, u_and_e_tuple):
     return out, (list_arg_u, list_arg_e, list_arg_u_ntype, list_arg_e_etype)
 
 
+def _se_gather_mm(A, B, out, seglen_A, a_trans=False, b_trans=False):
+    r""" Dense Matrix Multiplication interface. It multiplies dense tensor A
+    and dense tensor B according to relation types. A is sorted and concatenated
+    according to relation types.
+
+    Parameters
+    ----------
+    A : tensor
+        2-D tensor of shape (N, D1)
+    B : tensor
+        2-D tensor of shape (R * D1, D2)
+    seglen_A : Tensor
+        An integer tensor of shape (R,). Each element is the length of segments
+        of input ``A``. The summation of all elements must be equal to N.
+    a_trans : bool
+        Indicates whether matrix A needs to be tranposed
+    b_trans : bool
+        Indicates whether matrix B needs to be tranposed
+
+    Returns
+    -------
+    Tensor
+        The output dense matrix of shape (N, D2)
+    """
+    # TODO(Israt): Add CPU support. Currently, only handles GPU code
+    _CAPI_DGLKernelGATHERMM(to_dgl_nd(A),
+                            to_dgl_nd(B),
+                            to_dgl_nd_for_write(out),
+                            to_dgl_nd(seglen_A),
+                            to_dgl_nd(None),
+                            to_dgl_nd(None),
+                            True, a_trans, b_trans)
+    return out
+
+
 def _gather_mm(A, B, out, A_per_rel, B_per_rel=None, etypes=None, sortedE=True,
                a_trans=False, b_trans=False):
     r""" Generalized Dense Matrix Multiplication interface. It multiplies

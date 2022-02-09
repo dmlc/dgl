@@ -85,10 +85,11 @@ def test_gathermm(idtype):
         #  gather_mm where H sorted according to etype
         #################################################################
 
+        seglen_A = E_per_rel
         with F.record_grad():
             H.requires_grad = True
             W_3D.requires_grad = True
-            out_gmm_sorted = F.gather_mm(H, W_3D, E_per_rel, etypes=etypes, sortedE=True)
+            out_gmm_sorted = F.se_gather_mm(H, W_3D, seglen_A)
             F.backward(F.reduce_sum(out_gmm_sorted))
             Hgrad_gmm_sorted = H.grad
             Wgrad_gmm_sorted = W_3D.grad
