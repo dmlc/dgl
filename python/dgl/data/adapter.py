@@ -12,6 +12,7 @@ from . import utils
 
 __all__ = ['AsNodePredDataset', 'AsEdgePredDataset']
 
+
 class AsNodePredDataset(DGLDataset):
     """Repurpose a dataset for a standard semi-supervised transductive
     node prediction task.
@@ -33,7 +34,7 @@ class AsNodePredDataset(DGLDataset):
       - Node labels are stored in ``g.nodes[target_ntype].data['label']``.
       - Training masks are stored in ``g.nodes[target_ntype].data['train_mask']``.
         So do validation and test masks.
-    
+
     The class will keep only the first graph in the provided dataset and
     generate train/val/test masks according to the given spplit ratio. The generated
     masks will be cached to disk for fast re-loading. If the provided split ratio
@@ -64,6 +65,7 @@ class AsNodePredDataset(DGLDataset):
     >>> print('train_mask' in new_ds[0].ndata)
     True
     """
+
     def __init__(self,
                  dataset,
                  split_ratio=None,
@@ -73,16 +75,20 @@ class AsNodePredDataset(DGLDataset):
         self.split_ratio = split_ratio
         self.target_ntype = target_ntype
         self.num_classes = dataset.num_classes
-        super().__init__(dataset.name + '-as-nodepred', hash_key=(split_ratio, target_ntype),**kwargs)
+        super().__init__(dataset.name + '-as-nodepred',
+                         hash_key=(split_ratio, target_ntype), **kwargs)
 
     def process(self):
         if 'label' not in self.g.nodes[self.target_ntype].data:
             raise ValueError("Missing node labels. Make sure labels are stored "
                              "under name 'label'.")
         if self.split_ratio is None:
-            assert "train_mask" in self.g.nodes[self.target_ntype].data, "train_mask is not provided, please specify split_ratio to generate the masks"
-            assert "val_mask" in self.g.nodes[self.target_ntype].data, "val_mask is not provided, please specify split_ratio to generate the masks"
-            assert "test_mask" in self.g.nodes[self.target_ntype].data, "test_mask is not provided, please specify split_ratio to generate the masks"
+            assert "train_mask" in self.g.nodes[self.target_ntype].data, \
+                "train_mask is not provided, please specify split_ratio to generate the masks"
+            assert "val_mask" in self.g.nodes[self.target_ntype].data, \
+                "val_mask is not provided, please specify split_ratio to generate the masks"
+            assert "test_mask" in self.g.nodes[self.target_ntype].data, \
+                "test_mask is not provided, please specify split_ratio to generate the masks"
         else:
             if self.verbose:
                 print('Generating train/val/test masks...')
@@ -92,32 +98,31 @@ class AsNodePredDataset(DGLDataset):
         return os.path.isfile(os.path.join(self.save_path, 'graph_{}.bin'.format(self.hash)))
 
     def load(self):
-        with open(os.path.join(self.save_path, 'info.json'), 'r') as f:
+        with open(os.path.join(self.save_path, 'info_{}.json'.format(self.hash)), 'r') as f:
             info = json.load(f)
             if (info['split_ratio'] != self.split_ratio
-                or info['target_ntype'] != self.target_ntype):
+                    or info['target_ntype'] != self.target_ntype):
                 raise ValueError('Provided split ratio is different from the cached file. '
                                  'Re-process the dataset.')
             self.split_ratio = info['split_ratio']
             self.target_ntype = info['target_ntype']
             self.num_classes = info['num_classes']
-        gs, _ = utils.load_graphs(os.path.join(self.save_path, 'graph.bin'))
+        gs, _ = utils.load_graphs(os.path.join(self.save_path, 'graph_{}.bin'.format(self.hash)))
         self.g = gs[0]
 
     def save(self):
-        utils.save_graphs(os.path.join(self.save_path, 'graph.bin'), [self.g])
-        with open(os.path.join(self.save_path, 'info.json'), 'w') as f:
+        utils.save_graphs(os.path.join(self.save_path, 'graph_{}.bin'.format(self.hash)), [self.g])
+        with open(os.path.join(self.save_path, 'info_{}.json'.format(self.hash)), 'w') as f:
             json.dump({
-                'split_ratio' : self.split_ratio,
-                'target_ntype' : self.target_ntype,
-                'num_classes' : self.num_classes}, f)
+                'split_ratio': self.split_ratio,
+                'target_ntype': self.target_ntype,
+                'num_classes': self.num_classes}, f)
 
     def __getitem__(self, idx):
         return self.g
 
     def __len__(self):
         return 1
-
 
 
 def negative_sample(g, num_samples):
@@ -142,7 +147,8 @@ def negative_sample(g, num_samples):
 class AsEdgePredDataset(DGLDataset):
     """Repurpose a dataset for edge prediction task.
 
-    The created dataset will include data needed for link prediction. 
+    The created dataset will include data needed for link prediction.
+    Currently only support homogeneous graph. 
     It will keep only the first graph in the provided dataset and
     generate train/val/test edges according to the given split ratio,
     and the correspondent negative edges based on the neg_ratio. The generated
@@ -186,10 +192,13 @@ class AsEdgePredDataset(DGLDataset):
         self.dataset = dataset
         self.split_ratio = split_ratio
         self.neg_ratio = neg_ratio
-        super().__init__(dataset.name + '-as-edgepred', hash_key=(neg_ratio, split_ratio), **kwargs)
+        super().__init__(dataset.name + '-as-edgepred',
+                         hash_key=(neg_ratio, split_ratio), **kwargs)
 
     def process(self):
-        if hasattr(self.dataset, "get_edge_split"):
+        if self.split_ratio is None:
+            assert hasattr(self.dataset, "get_edge_split"), \
+                "dataset doesn't have get_edge_split method, please specify split_ratio and neg_ratio to generate the split"
             # This is likely to be an ogb dataset
             self.edge_split = self.dataset.get_edge_split()
             self.train_graph = self.g
