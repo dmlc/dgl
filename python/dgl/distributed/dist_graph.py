@@ -654,6 +654,17 @@ class DistGraph:
         # TODO(da?): describe when self._g is None and device shouldn't be called.
         return F.cpu()
 
+    def is_pinned(self):
+        """Check if the graph structure is pinned to the page-locked memory.
+
+        Returns
+        -------
+        bool
+            True if the graph structure is pinned.
+        """
+        # (Xin Yao): Currently we don't support pinning a DistGraph.
+        return False
+
     @property
     def ntypes(self):
         """Return the list of node types of this graph.
