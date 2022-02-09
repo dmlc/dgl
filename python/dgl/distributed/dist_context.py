@@ -228,7 +228,7 @@ def initialize(ip_config, num_servers=1, num_workers=0,
         formats = os.environ.get('DGL_GRAPH_FORMAT', 'csc').split(',')
         formats = [f.strip() for f in formats]
         rpc.reset()
-        keep_alive = os.environ.get('DGL_KEEP_ALIVE') is not None
+        keep_alive = bool(int(os.environ.get('DGL_KEEP_ALIVE', 0)))
         serv = DistGraphServer(int(os.environ.get('DGL_SERVER_ID')),
                                os.environ.get('DGL_IP_CONFIG'),
                                int(os.environ.get('DGL_NUM_SERVER')),
@@ -322,6 +322,8 @@ def exit_client():
     needs to call `exit_client` before calling `initialize` again.
     """
     # Only client with rank_0 will send shutdown request to servers.
+    print("Client[{}] in group[{}] is exiting...".format(
+        rpc.get_rank(), rpc.get_group_id()))
     finalize_worker()  # finalize workers should be earilier than barrier, and non-blocking
     # collect data such as DistTensor before exit
     gc.collect()
