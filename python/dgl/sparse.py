@@ -340,11 +340,11 @@ def _gather_mm(A, B, out, A_per_rel, B_per_rel=None, etypes=None, sortedE=True,
     Parameters
     ----------
     A : tensor
-        The input dense matrix.
+        2-D tensor of shape (N, D1)
     B : tensor
-        The input dense matrix.
+        2-D tensor of shape (R * D1, D2)
     out : tensor
-        The output dense matrix.
+        The output dense matrix of shape (N, D2)
     A_per_rel : tensor
         The first dimensions of A matrix for each relation type
     B_per_rel : tensor

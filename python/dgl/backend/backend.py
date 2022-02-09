@@ -1827,7 +1827,7 @@ def csrmask(A, A_weights, B):
     """
     pass
 
-def gather_mm(A, B, out, A_per_rel, B_per_rel, etypes, sortedE):
+def gather_mm(A, B, A_per_rel, B_per_rel, etypes, sortedE):
     r""" Dense Matrix Multiplication interface. It multiplies dense tensor A
     and dense tensor B according to relation types and outputs in out. B is a
     concatenated weight tensor across relation types. If sortedE is True which
@@ -1838,11 +1838,9 @@ def gather_mm(A, B, out, A_per_rel, B_per_rel, etypes, sortedE):
     Parameters
     ----------
     A : tensor
-        The input dense matrix.
+        2-D tensor of shape (N, D1)
     B : tensor
-        The input dense matrix.
-    out : tensor
-        The output dense matrix.
+        3-D tensor of shape (R, D1, D2)
     A_per_rel : tensor
         The first dimensions of A matrix for each relation type
     B_per_rel : tensor or None
@@ -1851,6 +1849,11 @@ def gather_mm(A, B, out, A_per_rel, B_per_rel, etypes, sortedE):
         The etype ID for each edge. Has a length of |E|.
     sortedE : bool
         Indicates whether matrix A is sorted accoring to relation type
+
+    Returns
+    -------
+    Tensor
+        The output dense matrix of shape (N, D2)
     """
     pass
 

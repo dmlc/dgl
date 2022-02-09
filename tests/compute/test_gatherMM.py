@@ -79,6 +79,7 @@ def test_gathermm(idtype):
             W_grad.append(F.matmul(Hi.transpose(0,1), Out_gradi))
         Hgrad_low_mem = F.cat(H_grad, 0)
         Wgrad_low_mem = F.cat(W_grad, 0)
+        Wgrad_low_mem = Wgrad_low_mem.reshape(num_rel, in_feat, out_feat)
 
         #################################################################
         #  gather_mm where H sorted according to etype
@@ -86,12 +87,11 @@ def test_gathermm(idtype):
 
         with F.record_grad():
             H.requires_grad = True
-            W.requires_grad = True
-            out_gmm_sorted = F.zeros(Out.shape, dtype=F.dtype(Out))
-            out = F.gather_mm(H, W, out_gmm_sorted, E_per_rel, etypes=etypes, sortedE=True)
-            F.backward(F.reduce_sum(out))
+            W_3D.requires_grad = True
+            out_gmm_sorted = F.gather_mm(H, W_3D, E_per_rel, etypes=etypes, sortedE=True)
+            F.backward(F.reduce_sum(out_gmm_sorted))
             Hgrad_gmm_sorted = H.grad
-            Wgrad_gmm_sorted = W.grad
+            Wgrad_gmm_sorted = W_3D.grad
 
         #################################################################
         #  gather_mm where H is not sorted (backward not supported yet)
