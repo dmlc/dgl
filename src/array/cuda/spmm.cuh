@@ -290,7 +290,7 @@ void SpMMCoo(
   const int nty = CUDA_MAX_NUM_THREADS / ntx;
   const int nbx = (len + ntx - 1) / ntx;
   const int nby = FindNumBlocks<'y'>((E + nty - 1) / nty);
-  // LOG(INFO) << "nblks=(" << nbx << ", " << nby << ") nthrs=(" << ntx << ", " << nty << ")";
+  //LOG(INFO) << "nblks=(" << nbx << ", " << nby << ") nthrs=(" << ntx << ", " << nty << ")";
   const dim3 nblks(nbx, nby);
   const dim3 nthrs(ntx, nty);
   const bool use_idx = !IsNullArray(coo.data);
@@ -355,7 +355,7 @@ void SpMMCsr(
   const int nty = CUDA_MAX_NUM_THREADS / ntx;
   const int nbx = (len + ntx - 1) / ntx;
   const int nby = FindNumBlocks<'y'>((csr.num_rows + nty - 1) / nty);
-  // LOG(INFO) << "nblks=(" << nbx << ", " << nby << ") nthrs=(" << ntx << ", " << nty << ")";
+  //LOG(INFO) << "nblks=(" << nbx << ", " << nby << ") nthrs=(" << ntx << ", " << nty << ")";
   const dim3 nblks(nbx, nby);
   const dim3 nthrs(ntx, nty);
   const bool use_idx = !IsNullArray(csr.data);
