@@ -249,7 +249,8 @@ def track_time(data):
         batch_size=batch_size,
         shuffle=True,
         drop_last=False,
-        num_workers=num_workers)
+        num_workers=num_workers,
+        use_cpu_worker_affinity=True)
 
     # node features
     # None for one-hot feature, if not none, it should be the feature tensor.
