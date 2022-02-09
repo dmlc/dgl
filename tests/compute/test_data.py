@@ -1081,7 +1081,7 @@ def test_as_edgepred():
     ds = data.AsEdgePredDataset(data.CoraGraphDataset(), split_ratio=[0.7, 0.1, 0.2], neg_ratio=2)
     assert ds.get_test_edges()[0][0].shape[0] == 2112
     # negative samples, not guaranteed to be ratio 2, so the assert is in a relaxed range
-    assert 2000 < ds.get_test_edges()[1][0].shape[0] <= 2112
+    assert 4000 < ds.get_test_edges()[1][0].shape[0] <= 4224
 
     # read from cache
     from ogb.linkproppred import DglLinkPropPredDataset
