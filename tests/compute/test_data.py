@@ -9,7 +9,7 @@ import yaml
 import pytest
 import dgl.data as data
 from dgl import DGLError
-
+import dgl
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
 def test_minigc():
@@ -1083,11 +1083,16 @@ def test_as_edgepred():
     # negative samples, not guaranteed to be ratio 2, so the assert is in a relaxed range
     assert 4000 < ds.get_test_edges()[1][0].shape[0] <= 4224
 
-    # read from cache
-    from ogb.linkproppred import DglLinkPropPredDataset
-    ds = data.AsEdgePredDataset(DglLinkPropPredDataset("ogbl-collab"), split_ratio=[0.7, 0.2, 0.1], neg_ratio=2)
-    assert ds.get_test_edges()[0][0].shape[0] == 46329
 
+@unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason="ogb only supports pytorch")
+def test_as_edgepred_ogb():
+    from ogb.linkproppred import DglLinkPropPredDataset
+    ds = data.AsEdgePredDataset(DglLinkPropPredDataset("ogbl-collab"), split_ratio=None)
+    # original dataset has 46329 test edges
+    assert ds.get_test_edges()[0][0].shape[0] == 46329
+    # force generate new split
+    ds = data.AsEdgePredDataset(DglLinkPropPredDataset("ogbl-collab"), split_ratio=[0.7, 0.2, 0.1])
+    assert ds.get_test_edges()[0][0].shape[0] == 235812
 
 
 if __name__ == '__main__':
