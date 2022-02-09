@@ -99,8 +99,12 @@ def _check_device(data):
         assert data.device == F.ctx()
 
 @pytest.mark.parametrize('sampler_name', ['full', 'neighbor', 'neighbor2'])
-def test_node_dataloader(sampler_name):
+@pytest.mark.parametrize('pin_graph', [True, False])
+def test_node_dataloader(sampler_name, pin_graph):
     g1 = dgl.graph(([0, 0, 0, 1, 1], [1, 2, 3, 3, 4]))
+    if F.ctx() != F.cpu() and pin_graph:
+        g1.create_formats_()
+        g1.pin_memory_()
     g1.ndata['feat'] = F.copy_to(F.randn((5, 8)), F.cpu())
     g1.ndata['label'] = F.copy_to(F.randn((g1.num_nodes(),)), F.cpu())
 
@@ -141,14 +145,20 @@ def test_node_dataloader(sampler_name):
         _check_device(output_nodes)
         _check_device(blocks)
 
+    if g1.is_pinned():
+        g1.unpin_memory_()
 
 @pytest.mark.parametrize('sampler_name', ['full', 'neighbor'])
 @pytest.mark.parametrize('neg_sampler', [
     dgl.dataloading.negative_sampler.Uniform(2),
     dgl.dataloading.negative_sampler.GlobalUniform(15, False, 3),
     dgl.dataloading.negative_sampler.GlobalUniform(15, True, 3)])
-def test_edge_dataloader(sampler_name, neg_sampler):
+@pytest.mark.parametrize('pin_graph', [True, False])
+def test_edge_dataloader(sampler_name, neg_sampler, pin_graph):
     g1 = dgl.graph(([0, 0, 0, 1, 1], [1, 2, 3, 3, 4]))
+    if F.ctx() != F.cpu() and pin_graph:
+        g1.create_formats_()
+        g1.pin_memory_()
     g1.ndata['feat'] = F.copy_to(F.randn((5, 8)), F.cpu())
 
     sampler = {
@@ -209,6 +219,9 @@ def test_edge_dataloader(sampler_name, neg_sampler):
         _check_device(neg_pair_graph)
         _check_device(blocks)
 
+    if g1.is_pinned():
+        g1.unpin_memory_()
+
 if __name__ == '__main__':
     test_graph_dataloader()
     test_cluster_gcn(0)
@@ -219,4 +232,5 @@ if __name__ == '__main__':
                 dgl.dataloading.negative_sampler.Uniform(2),
                 dgl.dataloading.negative_sampler.GlobalUniform(2, False),
                 dgl.dataloading.negative_sampler.GlobalUniform(2, True)]:
-            test_edge_dataloader(sampler, neg_sampler)
+            for pin_graph in [True, False]:
+                test_edge_dataloader(sampler, neg_sampler, pin_graph)
