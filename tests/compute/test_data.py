@@ -1093,8 +1093,8 @@ def test_as_nodepred_csvdataset():
                            'feat': [line.tolist() for line in feat_ndata],
                            })
         df.to_csv(nodes_csv_path, index=False)
-        df = pd.DataFrame({'src_id': np.random.randint(num_nodes - 1, size=num_edges),
-                           'dst_id': np.random.randint(num_nodes - 1, size=num_edges),
+        df = pd.DataFrame({'src_id': np.random.randint(num_nodes, size=num_edges),
+                           'dst_id': np.random.randint(num_nodes, size=num_edges),
                            })
         df.to_csv(edges_csv_path, index=False)
 
@@ -1103,10 +1103,10 @@ def test_as_nodepred_csvdataset():
         assert 'label' in ds[0].ndata
         assert 'train_mask' not in ds[0].ndata
         assert not hasattr(ds[0], 'num_classes')
-        assert not all(ds[0].in_degrees())
-        new_ds = data.AsNodePredDataset(ds, add_self_loop=True, force_reload=True)
+        new_ds = data.AsNodePredDataset(ds, force_reload=True)
         assert new_ds.num_classes == num_classes
-        assert all(new_ds[0].in_degrees())
+        assert 'feat' in new_ds[0].ndata
+        assert 'label' in new_ds[0].ndata
         assert 'train_mask' in new_ds[0].ndata
 
 if __name__ == '__main__':

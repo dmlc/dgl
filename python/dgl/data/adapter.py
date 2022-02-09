@@ -44,8 +44,6 @@ class AsNodePredDataset(DGLDataset):
         Split ratios for training, validation and test sets. Must sum to one.
     target_ntype : str, optional
         The node type to add split mask for.
-    add_self_loop : bool, optional
-        Indicates whether to add self loop for graph in case of 0-degree nodes.
 
     Attributes
     ----------
@@ -67,12 +65,10 @@ class AsNodePredDataset(DGLDataset):
                  dataset,
                  split_ratio=[0.8, 0.1, 0.1],
                  target_ntype=None,
-                 add_self_loop=False,
                  **kwargs):
         self.g = dataset[0].clone()
         self.split_ratio = split_ratio
         self.target_ntype = target_ntype
-        self.add_self_loop = add_self_loop
         if hasattr(dataset, 'num_classes'):
             self.num_classes = dataset.num_classes
         else:
@@ -80,8 +76,6 @@ class AsNodePredDataset(DGLDataset):
         super().__init__(dataset.name + '-as-nodepred', **kwargs)
 
     def process(self):
-        if self.add_self_loop:
-            self.g = self.g.add_self_loop()
         if 'label' not in self.g.nodes[self.target_ntype].data:
             raise ValueError("Missing node labels. Make sure labels are stored "
                              "under name 'label'.")
