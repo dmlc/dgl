@@ -594,3 +594,6 @@ def test_khop_out_subgraph(idtype):
     assert edge_set == {(0, 1)}
     assert F.array_equal(F.astype(inv['user'], idtype), F.tensor([0], idtype))
     assert F.array_equal(F.astype(inv['game'], idtype), F.tensor([0], idtype))
+
+if __name__ == '__main__':
+    test_khop_out_subgraph(F.int64)

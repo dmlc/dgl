@@ -80,7 +80,7 @@ def run_client_empty(graph_name, part_id, server_count, num_clients, num_nodes, 
     check_dist_graph_empty(g, num_clients, num_nodes, num_edges)
 
 def check_server_client_empty(shared_mem, num_servers, num_clients):
-    prepare_dist()
+    prepare_dist(num_servers)
     g = create_random_graph(10000)
 
     # Partition the graph
@@ -281,7 +281,7 @@ def check_dist_graph(g, num_clients, num_nodes, num_edges):
     print('end')
 
 def check_dist_emb_server_client(shared_mem, num_servers, num_clients, num_groups=1):
-    prepare_dist()
+    prepare_dist(num_servers)
     g = create_random_graph(10000)
 
     # Partition the graph
@@ -311,6 +311,7 @@ def check_dist_emb_server_client(shared_mem, num_servers, num_clients, num_group
                                                         g.number_of_edges(),
                                                         group_id))
             p.start()
+            time.sleep(1) # avoid race condition when instantiating DistGraph
             cli_ps.append(p)
 
     for p in cli_ps:
@@ -328,7 +329,7 @@ def check_dist_emb_server_client(shared_mem, num_servers, num_clients, num_group
     print('clients have terminated')
 
 def check_server_client(shared_mem, num_servers, num_clients, num_groups=1):
-    prepare_dist()
+    prepare_dist(num_servers)
     g = create_random_graph(10000)
 
     # Partition the graph
@@ -357,6 +358,7 @@ def check_server_client(shared_mem, num_servers, num_clients, num_groups=1):
             p = ctx.Process(target=run_client, args=(graph_name, 0, num_servers, num_clients, g.number_of_nodes(),
                                                     g.number_of_edges(), group_id))
             p.start()
+            time.sleep(1) # avoid race condition when instantiating DistGraph
             cli_ps.append(p)
     for p in cli_ps:
         p.join()
@@ -372,7 +374,7 @@ def check_server_client(shared_mem, num_servers, num_clients, num_groups=1):
     print('clients have terminated')
 
 def check_server_client_hierarchy(shared_mem, num_servers, num_clients):
-    prepare_dist()
+    prepare_dist(num_servers)
     g = create_random_graph(10000)
 
     # Partition the graph
@@ -535,7 +537,7 @@ def check_dist_graph_hetero(g, num_clients, num_nodes, num_edges):
     print('end')
 
 def check_server_client_hetero(shared_mem, num_servers, num_clients):
-    prepare_dist()
+    prepare_dist(num_servers)
     g = create_random_hetero()
 
     # Partition the graph
@@ -641,7 +643,6 @@ def test_standalone_node_emb():
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 def test_split():
-    #prepare_dist()
     g = create_random_graph(10000)
     num_parts = 4
     num_hops = 2
@@ -696,7 +697,6 @@ def test_split():
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 def test_split_even():
-    #prepare_dist(1)
     g = create_random_graph(10000)
     num_parts = 4
     num_hops = 2
@@ -763,8 +763,8 @@ def test_split_even():
     assert np.all(all_nodes == F.asnumpy(all_nodes2))
     assert np.all(all_edges == F.asnumpy(all_edges2))
 
-def prepare_dist():
-    generate_ip_config("kv_ip_config.txt", 1, 1)
+def prepare_dist(num_servers=1):
+    generate_ip_config("kv_ip_config.txt", 1, num_servers=num_servers)
 
 if __name__ == '__main__':
     os.makedirs('/tmp/dist_graph', exist_ok=True)

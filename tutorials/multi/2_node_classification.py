@@ -158,7 +158,6 @@ def run(proc_id, devices):
     
     # Copied from previous tutorial with changes highlighted.
     for epoch in range(10):
-        train_dataloader.set_epoch(epoch)    # <--- necessary for dataloader with DDP.
         model.train()
 
         with tqdm.tqdm(train_dataloader) as tq:
