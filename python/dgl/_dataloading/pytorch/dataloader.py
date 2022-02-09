@@ -4,13 +4,13 @@ import math
 import threading
 import queue
 from distutils.version import LooseVersion
-from python.dgl.dataloading.dist_dataloader import _remove_kwargs_dist, DistDataLoader
 import torch as th
 from torch.utils.data import DataLoader, IterableDataset
 from torch.utils.data.distributed import DistributedSampler
 import torch.distributed as dist
 import psutil
 from ..dataloader import NodeCollator, EdgeCollator, GraphCollator, SubgraphIterator
+from ...dataloading.dist_dataloader import _remove_kwargs_dist, DistDataLoader
 from ...distributed import DistGraph
 from ...ndarray import NDArray as DGLNDArray
 from ... import backend as F
@@ -597,7 +597,7 @@ class NodeDataLoader(DataLoader):
 
     def worker_init_function(self, worker_id):
         """Worker init default function.
- 
+
               Parameters
               ----------
               worker_id : int
@@ -643,7 +643,7 @@ class NodeDataLoader(DataLoader):
                                             'settings for cores={} num_workers={}'
                                             .format(cpu_worker_affinity_cores, nw_work))
                     else:
-                        self.cpu_cores = [x for x in range(0, nw_work)]
+                        self.cpu_cores = range(0, nw_work)
                     if 'worker_init_fn' in dataloader_kwargs:
                         self.user_def_worker_fn = dataloader_kwargs['worker_init_fn']
                     dataloader_kwargs['worker_init_fn'] = self.worker_init_function
