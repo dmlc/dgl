@@ -67,7 +67,7 @@ class AsNodePredDataset(DGLDataset):
                  dataset,
                  split_ratio=[0.8, 0.1, 0.1],
                  target_ntype=None,
-                 add_self_loop=True,
+                 add_self_loop=False,
                  **kwargs):
         self.g = dataset[0].clone()
         self.split_ratio = split_ratio
