@@ -6,7 +6,7 @@ from .. import utils
 
 # The benchmarks for ops edge_softmax
 @utils.benchmark('time', timeout=600)
-@utils.parametrize('graph', ['ogbn-arxiv','reddit' 'cora', 'pubmed',])
+@utils.parametrize('graph', ['ogbn-arxiv', 'reddit', 'cora', 'pubmed'])
 @utils.parametrize('num_heads', [1, 4, 8])
 def track_time(graph, num_heads):
     device = utils.get_bench_device()
