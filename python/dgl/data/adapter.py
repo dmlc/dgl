@@ -66,7 +66,7 @@ class AsNodePredDataset(DGLDataset):
     """
     def __init__(self,
                  dataset,
-                 split_ratio=[0.8, 0.1, 0.1],
+                 split_ratio=None,
                  target_ntype=None,
                  **kwargs):
         self.g = dataset[0].clone()
@@ -79,8 +79,11 @@ class AsNodePredDataset(DGLDataset):
         if 'label' not in self.g.nodes[self.target_ntype].data:
             raise ValueError("Missing node labels. Make sure labels are stored "
                              "under name 'label'.")
-        if any(s not in self.g.nodes[self.target_ntype].data for s in ["train_mask", "val_mask", "test_mask"]):
-            # only generate when information not available
+        if self.split_ratio is None:
+            assert "train_mask" in self.g.nodes[self.target_ntype].data, "train_mask is not provided, please specify split_ratio to generate the masks"
+            assert "val_mask" in self.g.nodes[self.target_ntype].data, "val_mask is not provided, please specify split_ratio to generate the masks"
+            assert "test_mask" in self.g.nodes[self.target_ntype].data, "test_mask is not provided, please specify split_ratio to generate the masks"
+        else:
             if self.verbose:
                 print('Generating train/val/test masks...')
             utils.add_nodepred_split(self, self.split_ratio, self.target_ntype)
@@ -176,7 +179,7 @@ class AsEdgePredDataset(DGLDataset):
 
     def __init__(self,
                  dataset,
-                 split_ratio=[0.8, 0.1, 0.1],
+                 split_ratio=None,
                  neg_ratio=3,
                  **kwargs):
         self.g = dataset[0]
