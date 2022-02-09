@@ -1,3 +1,4 @@
+import os
 import dgl
 import numpy as np
 import torch as th
@@ -199,7 +200,7 @@ def main(args):
 
     # this to avoid competition overhead on machines with many cores.
     # Change it to a proper number on your machine, especially for multi-GPU training.
-    th.set_num_threads(8)
+    os.environ['OMP_NUM_THREADS'] = str(mp.cpu_count() // 2 // n_gpus)
     if n_gpus > 1:
         # Copy the graph to shared memory explicitly before pinning.
         # In other cases, we can just rely on fork's copy-on-write.
