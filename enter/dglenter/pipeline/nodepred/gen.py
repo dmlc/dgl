@@ -11,9 +11,6 @@ from ...utils.yaml_dump import deep_convert_dict, merge_comment
 import ruamel.yaml
 from ruamel.yaml.comments import CommentedMap
 
-
-
-
 pipeline_comments = {
     "node_embed_size": "The node learnable embedding size, -1 to disable",
     "num_epochs": "Number of training epochs",
@@ -21,7 +18,8 @@ pipeline_comments = {
     "early_stop": {
         "patience": "Steps before early stop",
         "checkpoint_path": "Early stop checkpoint model file path"
-    }
+    },
+    "num_runs": "Number of experiments to run",
 }
 
 class NodepredPipelineCfg(BaseModel):
@@ -29,8 +27,10 @@ class NodepredPipelineCfg(BaseModel):
     early_stop: Optional[EarlyStopConfig] = EarlyStopConfig()
     num_epochs: int = 200
     eval_period: int = 5
-    optimizer: dict = {"name": "Adam", "lr": 0.005}
+    optimizer: dict = {"name": "Adam", "lr": 0.01, "weight_decay": 5e-4}
     loss: str = "CrossEntropyLoss"
+    num_runs: int = 1
+
 @PipelineFactory.register("nodepred")
 class NodepredPipeline(PipelineBase):
 

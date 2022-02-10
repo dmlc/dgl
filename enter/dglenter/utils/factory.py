@@ -1,6 +1,6 @@
 import enum
 import logging
-from typing import Callable, Dict, Union
+from typing import Callable, Dict, Union, List
 from typing_extensions import Literal
 from pathlib import Path
 from abc import ABC, abstractmethod, abstractstaticmethod
@@ -12,6 +12,7 @@ import inspect
 from numpydoc import docscrape
 logger = logging.getLogger(__name__)
 
+ALL_PIPELINE = ["nodepred", "nodepred-ns", "edgepred"]
 
 class PipelineBase(ABC):
 
@@ -38,18 +39,24 @@ class DataFactoryClass:
         self.registry = {}
         self.pipeline_allowed = {}
 
-    def register(self, name: str, import_code, class_name, allowed_pipeline, extra_args={}) -> Callable:
-        out = {
+    def register(self,
+                 name: str,
+                 import_code: str,
+                 class_name: str,
+                 allowed_pipeline: List[str],
+                 extra_args={}):
+        self.registry[name] = {
             "name": name,
             "import_code": import_code,
             "class_name": class_name,
-            "extra_args": extra_args}
-        self.registry[name] = out
+            "extra_args": extra_args
+        }
         for pipeline in allowed_pipeline:
             if pipeline in self.pipeline_allowed:
                 self.pipeline_allowed[pipeline].append(name)
             else:
                 self.pipeline_allowed[pipeline] = [name]
+        return self
 
     def get_dataset_enum(self):
         enum_class = enum.Enum(
@@ -117,22 +124,49 @@ class DataFactoryClass:
 
 DataFactory = DataFactoryClass()
 
-
-
-ALL_PIPELINE = ["nodepred", "nodepred-ns", "edgepred"]
+DataFactory.register(
+    "cora",
+    import_code="from dgl.data import CoraGraphDataset",
+    class_name="CoraGraphDataset()",
+    allowed_pipeline=["nodepred", "nodepred-ns", "edgepred"])
 
 DataFactory.register(
-    "cora", import_code="from dgl.data import CoraGraphDataset", class_name="CoraGraphDataset()", allowed_pipeline=["nodepred", "nodepred-ns", "edgepred"])
-DataFactory.register("citeseer", import_code="from dgl.data import CiteseerGraphDataset",
-                     class_name="CiteseerGraphDataset()", allowed_pipeline=["nodepred", "nodepred-ns", "edgepred"])
-DataFactory.register("ogbl-collab", import_code="from ogb.linkproppred import DglLinkPropPredDataset",
-                     extra_args={}, class_name="DglLinkPropPredDataset('ogbl-collab')", allowed_pipeline=["edgepred"])
-DataFactory.register("csv", import_code="from dgl.data import DGLCSVDataset", extra_args={
-                     "data_path": "./"}, class_name="DGLCSVDataset({})", allowed_pipeline=["nodepred", "nodepred-ns", "edgepred"])
+    "citeseer",
+    import_code="from dgl.data import CiteseerGraphDataset",
+    class_name="CiteseerGraphDataset()",
+    allowed_pipeline=["nodepred", "nodepred-ns", "edgepred"])
+
 DataFactory.register(
-    "reddit", import_code="from dgl.data import RedditDataset", class_name="RedditDataset()", allowed_pipeline=["nodepred", "nodepred-ns", "edgepred"])
-DataFactory.register("co-buy-computer", import_code="from dgl.data import AmazonCoBuyComputerDataset",
-                     class_name="AmazonCoBuyComputerDataset()", allowed_pipeline=["nodepred", "nodepred-ns", "edgepred"])
+    "pubmed",
+    import_code="from dgl.data import PubmedGraphDataset",
+    class_name="PubmedGraphDataset()",
+    allowed_pipeline=["nodepred", "nodepred-ns", "edgepred"])
+
+DataFactory.register(
+    "ogbl-collab",
+    import_code="from ogb.linkproppred import DglLinkPropPredDataset",
+    extra_args={},
+    class_name="DglLinkPropPredDataset('ogbl-collab')",
+    allowed_pipeline=["edgepred"])
+
+DataFactory.register(
+    "csv",
+    import_code="from dgl.data import DGLCSVDataset",
+    extra_args={"data_path": "./"},
+    class_name="DGLCSVDataset({})",
+    allowed_pipeline=["nodepred", "nodepred-ns", "edgepred"])
+
+DataFactory.register(
+    "reddit",
+    import_code="from dgl.data import RedditDataset",
+    class_name="RedditDataset()",
+    allowed_pipeline=["nodepred", "nodepred-ns", "edgepred"])
+
+DataFactory.register(
+    "co-buy-computer",
+    import_code="from dgl.data import AmazonCoBuyComputerDataset",
+    class_name="AmazonCoBuyComputerDataset()",
+    allowed_pipeline=["nodepred", "nodepred-ns", "edgepred"])
 
 
 class PipelineFactory:
