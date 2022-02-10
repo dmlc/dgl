@@ -7,6 +7,7 @@ class GCN(nn.Module):
     def __init__(self,
                  in_size,
                  out_size,
+                 embed_size: int = -1,
                  hidden_size: int = 16,
                  num_layers: int = 1,
                  norm: str = "both",
@@ -21,6 +22,8 @@ class GCN(nn.Module):
             Number of input features.
         out_size : int
             Output size.
+        embed_size : int
+            The dimension of created embedding table. -1 means using original node embedding
         hidden_size : int
             Hidden size.
         num_layers : int
@@ -38,6 +41,8 @@ class GCN(nn.Module):
         self.use_edge_weight = use_edge_weight
         self.out_size = out_size
         self.layers = nn.ModuleList()
+        if embed_size > 0:
+            self.embed = nn.Embedding(num_nodes, embed_size)
         # input layer
         self.layers.append(dgl.nn.GraphConv(in_size, hidden_size, norm=norm))
         # hidden layers
