@@ -1070,29 +1070,29 @@ def test_as_nodepred2():
 
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
-def test_as_edgepred():
+def test_as_linkpred():
     # create
-    ds = data.AsEdgePredDataset(data.CoraGraphDataset(), split_ratio=[0.8, 0.1, 0.1], neg_ratio=1, verbose=True)
+    ds = data.AsLinkPredDataset(data.CoraGraphDataset(), split_ratio=[0.8, 0.1, 0.1], neg_ratio=1, verbose=True)
     # Cora has 10556 edges, 10% test edges can be 1057
-    assert ds.get_test_edges()[0][0].shape[0] == 1057
+    assert ds.test_edges[0][0].shape[0] == 1057
     # negative samples, not guaranteed, so the assert is in a relaxed range
-    assert 1000 <= ds.get_test_edges()[1][0].shape[0] <= 1057
+    assert 1000 <= ds.test_edges[1][0].shape[0] <= 1057
     # read from cache
-    ds = data.AsEdgePredDataset(data.CoraGraphDataset(), split_ratio=[0.7, 0.1, 0.2], neg_ratio=2, verbose=True)
-    assert ds.get_test_edges()[0][0].shape[0] == 2112
+    ds = data.AsLinkPredDataset(data.CoraGraphDataset(), split_ratio=[0.7, 0.1, 0.2], neg_ratio=2, verbose=True)
+    assert ds.test_edges[0][0].shape[0] == 2112
     # negative samples, not guaranteed to be ratio 2, so the assert is in a relaxed range
-    assert 4000 < ds.get_test_edges()[1][0].shape[0] <= 4224
+    assert 4000 < ds.test_edges[1][0].shape[0] <= 4224
 
 
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason="ogb only supports pytorch")
-def test_as_edgepred_ogb():
+def test_as_linkpred_ogb():
     from ogb.linkproppred import DglLinkPropPredDataset
-    ds = data.AsEdgePredDataset(DglLinkPropPredDataset("ogbl-collab"), split_ratio=None, verbose=True)
+    ds = data.AsLinkPredDataset(DglLinkPropPredDataset("ogbl-collab"), split_ratio=None, verbose=True)
     # original dataset has 46329 test edges
-    assert ds.get_test_edges()[0][0].shape[0] == 46329
+    assert ds.test_edges[0][0].shape[0] == 46329
     # force generate new split
-    ds = data.AsEdgePredDataset(DglLinkPropPredDataset("ogbl-collab"), split_ratio=[0.7, 0.2, 0.1], verbose=True)
-    assert ds.get_test_edges()[0][0].shape[0] == 235812
+    ds = data.AsLinkPredDataset(DglLinkPropPredDataset("ogbl-collab"), split_ratio=[0.7, 0.2, 0.1], verbose=True)
+    assert ds.test_edges[0][0].shape[0] == 235812
 
 
 if __name__ == '__main__':
