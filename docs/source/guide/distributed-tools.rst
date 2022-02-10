@@ -50,7 +50,7 @@ Below shows an example of launching a distributed training job in a cluster.
     --num_servers 1 \
     --part_config data/ogb-product.json \
     --ip_config ip_config.txt \
-    "python3 code/train_dist.py --graph-name ogb-product --ip_config ip_config.txt --num-epochs 5 --batch-size 1000 --lr 0.1 --num_workers 4"
+    "python3 code/train_dist.py --graph-name ogb-product --ip_config ip_config.txt --num-epochs 5 --batch-size 1000 --lr 0.1"
 
 The configuration file *ip_config.txt* contains the IP addresses of the machines in a cluster.
 A typical example of *ip_config.txt* is as follows:
@@ -75,3 +75,48 @@ The launch script creates a specified number of training jobs (``--num_trainers`
 In addition, a user needs to specify the number of sampler processes for each trainer
 (``--num_samplers``). The number of sampler processes has to match with the number of worker processes
 specified in :func:`~dgl.distributed.initialize`.
+
+It is common that users may want to try different models or training configurations
+against the same graph data. To avoid repetitively loading the same graph data, DGL
+allows users to launch a persistent graph server to be shared across multiple training
+jobs. A persistent graph server will stay alive even all training workers have 
+finished and exited. Below shows an example of launching a persistent graph server:
+
+We first launch the graph server together with the first group of training workers.
+
+.. code:: none
+
+    python3 tools/launch.py \
+    --workspace ~graphsage/ \
+    --num_trainers 2 \
+    --num_samplers 4 \
+    --num_servers 1 \
+    --part_config data/ogb-product.json \
+    --ip_config ip_config.txt \
+    --keep_alive \
+    --server_name long_live \
+    "python3 code/train_dist.py --graph-name ogb-product --ip_config ip_config.txt --num-epochs 5 --batch-size 1000 --lr 0.1"
+
+Pay attention to the ``--keep_alive`` option, which indicates the server should
+stay alive after workers have finished. ``--server_name`` is the given name of
+the server which will be referred when launching new training jobs.
+
+Launch another group of distributed training job and connect to the existing persistent server.
+
+.. code:: none
+
+    python3 tools/launch.py \
+    --workspace ~graphsage/ \
+    --num_trainers 2 \
+    --num_samplers 4 \
+    --num_servers 1 \
+    --part_config data/ogb-product.json \
+    --ip_config ip_config.txt \
+    --server_name long_live \
+    "python3 code/train_dist.py --graph-name ogb-product --ip_config ip_config.txt --num-epochs 5 --batch-size 1000 --lr 0.1"
+
+.. note::
+  All the arguments for ``launch.py`` should be kept same as previous launch. And below
+  arguments for specific training script should be kept same as well: ``--graph-name``,
+  ``--ip_config``. The rest arguments such as ``--num-epochs``, ``--batch-size`` and so
+  on are free to change.
