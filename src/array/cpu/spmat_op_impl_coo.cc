@@ -532,9 +532,13 @@ template <class IdType> CSRMatrix UnSortedDenseCOOToCSR(const COOMatrix &coo) {
   std::vector<std::vector<IdType>> local_ptrs;
   std::vector<int64_t> thread_prefixsum;
 
-#pragma omp parallel
   {
-    const int num_threads = omp_get_num_threads();
+    // The implementation of this algorithm was parallel
+    // but in some scenarios, in particular when num_workers != 0,
+    // the sequential implementation, when no OpenMP runtime is used,
+    // turns out to be faster.
+    // TODO(tpatejko): rewrite code so it doesn't use threading or OpenMP API.
+    const int num_threads = 1;
     const int thread_id = omp_get_thread_num();
     CHECK_LT(thread_id, num_threads);
 
@@ -546,21 +550,18 @@ template <class IdType> CSRMatrix UnSortedDenseCOOToCSR(const COOMatrix &coo) {
     const int64_t n_start = thread_id * n_chunk;
     const int64_t n_end = std::min(N, n_start + n_chunk);
 
-#pragma omp master
     {
       local_ptrs.resize(num_threads);
       thread_prefixsum.resize(num_threads + 1);
     }
 
-#pragma omp barrier
     local_ptrs[thread_id].resize(N, 0);
 
     for (int64_t i = nz_start; i < nz_end; ++i) {
       ++local_ptrs[thread_id][row_data[i]];
     }
 
-#pragma omp barrier
-    // compute prefixsum in parallel
+    // compute prefixsum
     int64_t sum = 0;
     for (int64_t i = n_start; i < n_end; ++i) {
       IdType tmp = 0;
@@ -573,22 +574,18 @@ template <class IdType> CSRMatrix UnSortedDenseCOOToCSR(const COOMatrix &coo) {
     }
     thread_prefixsum[thread_id + 1] = sum;
 
-#pragma omp barrier
-#pragma omp master
     {
       for (int64_t i = 0; i < num_threads; ++i) {
         thread_prefixsum[i + 1] += thread_prefixsum[i];
       }
       CHECK_EQ(thread_prefixsum[num_threads], NNZ);
     }
-#pragma omp barrier
 
     sum = thread_prefixsum[thread_id];
     for (int64_t i = n_start; i < n_end; ++i) {
       Bp[i + 1] += sum;
     }
 
-#pragma omp barrier
     for (int64_t i = nz_start; i < nz_end; ++i) {
       const IdType r = row_data[i];
       const int64_t index = Bp[r] + local_ptrs[thread_id][r]++;
