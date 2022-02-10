@@ -1094,6 +1094,47 @@ def test_as_linkpred_ogb():
     ds = data.AsLinkPredDataset(DglLinkPropPredDataset("ogbl-collab"), split_ratio=[0.7, 0.2, 0.1], verbose=True)
     assert ds.test_edges[0][0].shape[0] == 235812
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
+def test_as_nodepred_csvdataset():
+    with tempfile.TemporaryDirectory() as test_dir:
+        # generate YAML/CSVs
+        meta_yaml_path = os.path.join(test_dir, "meta.yaml")
+        edges_csv_path = os.path.join(test_dir, "test_edges.csv")
+        nodes_csv_path = os.path.join(test_dir, "test_nodes.csv")
+        meta_yaml_data = {'version': '1.0.0', 'dataset_name': 'default_name',
+                          'node_data': [{'file_name': os.path.basename(nodes_csv_path)
+                                         }],
+                          'edge_data': [{'file_name': os.path.basename(edges_csv_path)
+                                         }],
+                          }
+        with open(meta_yaml_path, 'w') as f:
+            yaml.dump(meta_yaml_data, f, sort_keys=False)
+        num_nodes = 100
+        num_edges = 500
+        num_dims = 3
+        num_classes = num_nodes
+        feat_ndata = np.random.rand(num_nodes, num_dims)
+        label_ndata = np.arange(num_classes)
+        df = pd.DataFrame({'node_id': np.arange(num_nodes),
+                           'label': label_ndata,
+                           'feat': [line.tolist() for line in feat_ndata],
+                           })
+        df.to_csv(nodes_csv_path, index=False)
+        df = pd.DataFrame({'src_id': np.random.randint(num_nodes, size=num_edges),
+                           'dst_id': np.random.randint(num_nodes, size=num_edges),
+                           })
+        df.to_csv(edges_csv_path, index=False)
+
+        ds = data.DGLCSVDataset(test_dir, force_reload=True)
+        assert 'feat' in ds[0].ndata
+        assert 'label' in ds[0].ndata
+        assert 'train_mask' not in ds[0].ndata
+        assert not hasattr(ds[0], 'num_classes')
+        new_ds = data.AsNodePredDataset(ds, force_reload=True)
+        assert new_ds.num_classes == num_classes
+        assert 'feat' in new_ds[0].ndata
+        assert 'label' in new_ds[0].ndata
+        assert 'train_mask' in new_ds[0].ndata
 
 if __name__ == '__main__':
     test_minigc()
@@ -1107,3 +1148,4 @@ if __name__ == '__main__':
     test_add_nodepred_split()
     test_as_nodepred1()
     test_as_nodepred2()
+    test_as_nodepred_csvdataset()
