@@ -51,7 +51,13 @@ class CSVDataset(DGLDataset):
         any available graph-level data such as graph-level feature, labels.
 
     Examples
-    [TODO]: link to a detailed web page.
+    --------
+    ``meta.yaml`` and CSV files are under ``csv_dir``.
+    
+    >>> csv_dataset = dgl.data.DGLCSVDataset(csv_dir)
+
+    See more details in :ref:`guide-data-pipeline-loadcsv`.
+
     """
     META_YAML_NAME = 'meta.yaml'
 
