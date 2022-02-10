@@ -162,28 +162,12 @@ template <int XPU, typename IdType, int bits>
 void gatherMM_UnsortedEtype(const NDArray A,
               const NDArray B,
               NDArray C,
-              const NDArray A_dim1_per_rel,
-              const NDArray B_dim1_per_rel,
-              const NDArray etype) {
+              const NDArray idx_b) {
     SWITCH_BITS(bits, DType, {
-        const IdType* A_rel_data = A_dim1_per_rel.Ptr<IdType>();
-        const IdType* B_rel_data = B_dim1_per_rel.Ptr<IdType>();
-        if (B_rel_data) {
-            assert(A_dim1_per_rel.NumElements() == B_dim1_per_rel.NumElements());
-            for (int rel = 0; rel < B_dim1_per_rel.NumElements(); ++rel) {
-                if (B_rel_data[rel] != B_rel_data[0])
-                    LOG(FATAL) << "Tensors in B do not share same dimension across relations. "
-                        << "Found " << B_rel_data[0] << " and " << B_rel_data[rel] << " in "
-                        << "relation 0 and " << rel << ". Use sorted version (sortedA =True).";
-            }
-        }
         auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
-        int64_t num_rel = A_dim1_per_rel.NumElements();
         int n = B->shape[1];  // cols of B
         int k = A->shape[1];  // cols of A
-        IdType tot_num_rows = 0;
-        for (int i = 0; i < num_rel; ++i)
-            tot_num_rows += A_rel_data[i];
+        IdType tot_num_rows = A->shape[0];
         const int ntx = 128;
         const int warp_size = 32;
         const int nbx =  ((tot_num_rows * warp_size + ntx - 1) / ntx);
@@ -194,7 +178,7 @@ void gatherMM_UnsortedEtype(const NDArray A,
             static_cast<DType*>(A->data),
             static_cast<DType*>(B->data),
             static_cast<DType*>(C->data),
-            static_cast<IdType*>(etype->data),
+            static_cast<IdType*>(idx_b->data),
             tot_num_rows,
             k, n);
     });
@@ -378,8 +362,7 @@ void gatherMM(const NDArray A,
         if (a_trans || b_trans) {
             LOG(FATAL) << "Tranpose operation is not supported for unsorted A (sortedA = False) ";
         }
-        gatherMM_UnsortedEtype<XPU, IdType, bits>(A, B, C, A_dim1_per_rel,
-            B_dim1_per_rel, etype);
+        gatherMM_UnsortedEtype<XPU, IdType, bits>(A, B, C, etype);
     }
 }
 

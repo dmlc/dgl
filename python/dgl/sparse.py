@@ -363,14 +363,12 @@ def _se_gather_mm(A, B, out, seglen_A, a_trans=False, b_trans=False):
     return out
 
 
-def _gather_mm(A, B, out, A_per_rel, B_per_rel=None, etypes=None, sortedE=True,
+def _gather_mm(A, B, out, idx_a=None, idx_b=None,
                a_trans=False, b_trans=False):
     r""" Generalized Dense Matrix Multiplication interface. It multiplies
     tensor A and B according to relation types and outputs in out. B is a
-    concatenated tensor across relation types. If sortedE is True which
-    means A is sorted according to relation types, A is also a concatenated
-    across relation types. Otherwise, A is unsorted and the relation type
-    is fetched from param etypes.
+    concatenated tensor across relation types. A is unsorted and the
+    relation type is fetched from param etypes.
 
     Parameters
     ----------
@@ -378,29 +376,28 @@ def _gather_mm(A, B, out, A_per_rel, B_per_rel=None, etypes=None, sortedE=True,
         2-D tensor of shape (N, D1)
     B : tensor
         2-D tensor of shape (R * D1, D2)
-    out : tensor
-        The output dense matrix of shape (N, D2)
-    A_per_rel : tensor
-        The first dimensions of A matrix for each relation type
-    B_per_rel : tensor
-        The first dimensions of B matrix for each relation type
-    etypes : tensor
-        The etype ID for each edge. Has a length of |E|.
-    sortedE : bool
-        Indicates whether matrix A is sorted accoring to relation type
+    idx_a : Tensor, optional
+        If specified, must be a 1-D integer tensor of shape (K,)
+    idx_b : Tensor, optional
+        If specified, must be a 1-D integer tensor of shape (N,)
     A_trans : bool
         Indicates whether matrix A needs to be tranposed
     B_trans : bool
         Indicates whether matrix B needs to be tranposed
+
+    Returns
+    -------
+    Tensor
+        The output dense matrix of shape (N, D2)
     """
     # TODO(Israt): Add CPU support. Currently, only handles GPU code
     _CAPI_DGLKernelGATHERMM(to_dgl_nd(A),
                             to_dgl_nd(B),
                             to_dgl_nd_for_write(out),
-                            to_dgl_nd(A_per_rel),
-                            to_dgl_nd(B_per_rel),
-                            to_dgl_nd(etypes),
-                            sortedE, a_trans, b_trans)
+                            to_dgl_nd(None),
+                            to_dgl_nd(idx_a),
+                            to_dgl_nd(idx_b),
+                            False, a_trans, b_trans)
     return out
 
 

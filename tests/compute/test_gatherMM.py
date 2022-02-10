@@ -99,8 +99,9 @@ def test_gathermm(idtype):
         #################################################################
 
         # forward pass
-        out_gmm_unsorted = F.zeros(Out.shape, dtype=F.dtype(Out))
-        dgl.sparse._gather_mm(H, W, out_gmm_unsorted, E_per_rel, etypes=etypes, sortedE=False)
+        out_gmm_unsorted = F.gather_mm(H, W_3D, idx_b=etypes)
+        # out_gmm_unsorted = F.zeros(Out.shape, dtype=F.dtype(Out))
+        # out_gmm_unsorted = dgl.sparse._gather_mm(H, W, out_gmm_unsorted, idx_b=etypes)
 
 
         # correctness check
