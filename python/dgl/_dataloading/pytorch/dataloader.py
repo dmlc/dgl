@@ -10,7 +10,6 @@ from torch.utils.data.distributed import DistributedSampler
 import torch.distributed as dist
 import psutil
 from ..dataloader import NodeCollator, EdgeCollator, GraphCollator, SubgraphIterator
-from ...dataloading.dist_dataloader import _remove_kwargs_dist, DistDataLoader
 from ...distributed import DistGraph
 from ...ndarray import NDArray as DGLNDArray
 from ... import backend as F
@@ -658,21 +657,7 @@ class NodeDataLoader(DataLoader):
         device = th.device(g.device if device is None else device)
         num_workers = dataloader_kwargs.get('num_workers', 0)
 
-        if isinstance(g, DistGraph):
-            if device is None:
-                # for the distributed case default to the CPU
-                device = 'cpu'
-            assert device == 'cpu', 'Only cpu is supported in the case of a DistGraph.'
-            # Distributed DataLoader currently does not support heterogeneous graphs
-            # and does not copy features.  Fallback to normal solution
-            self.collator = NodeCollator(g, nids, graph_sampler, **collator_kwargs)
-            _remove_kwargs_dist(dataloader_kwargs)
-            self.dataloader = DistDataLoader(self.collator.dataset,
-                                             collate_fn=self.collator.collate,
-                                             **dataloader_kwargs)
-            self.is_distributed = True
-
-        elif g.device.type == 'cuda' or g.is_pinned():
+        if g.device.type == 'cuda' or g.is_pinned():
             sampling_type = 'UVA sampling' if g.is_pinned() else 'GPU sampling'
             assert device.type == 'cuda', \
                 f"'device' must be a cuda device to enable {sampling_type}, got {device}."
