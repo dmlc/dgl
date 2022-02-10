@@ -126,7 +126,9 @@ class AsNodePredDataset(DGLDataset):
 
 
 def negative_sample(g, num_samples):
-    """Random sample negative edges from graph, excluding self-loops"""
+    """Random sample negative edges from graph, excluding self-loops,
+       the result samples might be less than num_samples
+    """
     num_nodes = g.num_nodes()
     redundancy = _calc_redundancy(
         num_samples, g.num_edges(), num_nodes ** 2)
