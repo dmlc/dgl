@@ -21,7 +21,7 @@ class GraphSAGE(nn.Module):
         hidden_size : int
             Hidden size.
         num_layers : int
-            Number of layers.
+            Number of hidden layers.
         dropout : float
             Dropout rate.
         aggregator_type : str

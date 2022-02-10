@@ -1,5 +1,3 @@
-
-
 from typing import List
 import torch
 import torch.nn as nn
@@ -48,7 +46,7 @@ class GAT(nn.Module):
         super(GAT, self).__init__()
         self.in_size = in_size
         self.out_size = out_size
-        self.num_layers = num_layers-1
+        self.num_layers = num_layers
         self.gat_layers = nn.ModuleList()
         self.activation = getattr(torch.nn.functional, activation)
         # input projection (no residual)
@@ -56,7 +54,7 @@ class GAT(nn.Module):
             in_size, hidden_size, heads[0],
             feat_drop, attn_drop, negative_slope, False, self.activation))
         # hidden layers
-        for l in range(1, self.num_layers):
+        for l in range(1, self.num_layers - 1):
             # due to multi-head, the in_size = num_hidden * num_heads
             self.gat_layers.append(GATConv(
                 hidden_size * heads[l-1], hidden_size, heads[l],
@@ -68,7 +66,7 @@ class GAT(nn.Module):
 
     def forward(self, graph, node_feat, edge_feat = None):
         h = node_feat
-        for l in range(self.num_layers):
+        for l in range(self.num_layers - 1):
             h = self.gat_layers[l](graph, h).flatten(1)
         # output projection
         logits = self.gat_layers[-1](graph, h).mean(1)
@@ -76,7 +74,7 @@ class GAT(nn.Module):
 
     def forward_block(self,  blocks, node_feat, edge_feat = None):
         h = node_feat
-        for l in range(self.num_layers):
+        for l in range(self.num_layers - 1):
             h = self.gat_layers[l](blocks[l], h).flatten(1)        
         logits = self.gat_layers[-1](blocks[-1], h).mean(1)
         return logits
