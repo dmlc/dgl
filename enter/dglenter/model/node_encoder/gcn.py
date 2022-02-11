@@ -5,8 +5,7 @@ import dgl
 
 class GCN(nn.Module):
     def __init__(self,
-                 in_size,
-                 out_size,
+                 data_info: dict,
                  embed_size: int = -1,
                  hidden_size: int = 16,
                  num_layers: int = 1,
@@ -39,21 +38,24 @@ class GCN(nn.Module):
         """
         super().__init__()
         self.use_edge_weight = use_edge_weight
-        self.out_size = out_size
+        self.out_size = data_info["out_size"]
+        self.in_size = data_info["in_size"]
         self.layers = nn.ModuleList()
-        if embed_size > 0:
-            self.embed = nn.Embedding(num_nodes, embed_size)
+        if data_info["num_nodes"] > 0:
+            self.embed = nn.Embedding(data_info["num_nodes"], embed_size)
         # input layer
-        self.layers.append(dgl.nn.GraphConv(in_size, hidden_size, norm=norm))
+        self.layers.append(dgl.nn.GraphConv(self.in_size, hidden_size, norm=norm))
         # hidden layers
         for i in range(num_layers - 1):
             self.layers.append(dgl.nn.GraphConv(hidden_size, hidden_size, norm=norm))
         # output layer
-        self.layers.append(dgl.nn.GraphConv(hidden_size, out_size, norm=norm))
+        self.layers.append(dgl.nn.GraphConv(hidden_size, self.out_size, norm=norm))
         self.dropout = nn.Dropout(p=dropout)
         self.act = getattr(torch, activation)
 
     def forward(self, g, node_feat, edge_feat = None):
+        if node_feat is None:
+            assert 
         h = node_feat
         edge_weight = edge_feat if self.use_edge_weight else None
         for l, layer in enumerate(self.layers):
