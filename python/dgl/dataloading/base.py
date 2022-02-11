@@ -134,7 +134,7 @@ def _find_exclude_eids(g, exclude_mode, eids, **kwargs):
         raise ValueError('unsupported mode {}'.format(exclude_mode))
 
 def find_exclude_eids(g, seed_edges, exclude, reverse_eids=None, reverse_etypes=None,
-                      output_device=None, always_exclude=None):
+                      output_device=None):
     """Find all edge IDs to exclude according to :attr:`exclude_mode`.
 
     Parameters
@@ -198,12 +198,11 @@ class EdgeBlockSampler(object):
     classification and link prediction.
     """
     def __init__(self, block_sampler, exclude=None, reverse_eids=None,
-                 reverse_etypes=None, negative_sampler=None, always_exclude=None,
+                 reverse_etypes=None, negative_sampler=None,
                  prefetch_node_feats=None, prefetch_labels=None, prefetch_edge_feats=None):
         self.reverse_eids = reverse_eids
         self.reverse_etypes = reverse_etypes
         self.exclude = exclude
-        self.always_exclude = always_exclude
         self.block_sampler = block_sampler
         self.negative_sampler = negative_sampler
         self.prefetch_node_feats = prefetch_node_feats or []
@@ -262,7 +261,7 @@ class EdgeBlockSampler(object):
 
         exclude_eids = find_exclude_eids(
             g, seed_edges, exclude, self.reverse_eids, self.reverse_etypes,
-            self.output_device, self.always_exclude)
+            self.output_device)
 
         input_nodes, _, blocks = self.block_sampler.sample_blocks(g, seed_nodes, exclude_eids)
 

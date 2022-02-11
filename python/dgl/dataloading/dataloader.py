@@ -13,7 +13,7 @@ import torch
 import torch.distributed as dist
 from torch.utils.data.distributed import DistributedSampler
 
-from ..base import NID, EID, dgl_warning
+from ..base import NID, EID
 from ..batch import batch as batch_graphs
 from ..heterograph import DGLHeteroGraph
 from .. import ndarray as nd
@@ -218,9 +218,9 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
         start = self.num_samples * self.rank
         end = self.num_samples * (self.rank + 1)
         indices = _divide_by_worker(self._indices[start:end], self.batch_size, self.drop_last)
-        for batch in _TensorizedDatasetIter(dataset, self.batch_size, self.drop_last,
-                                            self._mapping_keys):
-            yield self._id_tensor[batch.to(self._device)]
+        id_tensor = self._id_tensor[indices.to(self._device)]
+        return _TensorizedDatasetIter(
+            id_tensor, self.batch_size, self.drop_last, self._mapping_keys)
 
     def __len__(self):
         return (self.num_samples + (0 if self.drop_last else (self.batch_size - 1))) // \
@@ -574,12 +574,11 @@ class EdgeDataLoader(DataLoader):
                  use_prefetch_thread=False, use_alternate_streams=True,
                  pin_prefetcher=False,
                  exclude=None, reverse_eids=None, reverse_etypes=None, negative_sampler=None,
-                 always_exclude=None, **kwargs):
+                 **kwargs):
         if isinstance(graph_sampler, BlockSampler):
             graph_sampler = EdgeBlockSampler(
                 graph_sampler, exclude=exclude, reverse_eids=reverse_eids,
                 reverse_etypes=reverse_etypes, negative_sampler=negative_sampler,
-                always_exclude=always_exclude,
                 prefetch_node_feats=graph_sampler.prefetch_node_feats,
                 prefetch_labels=graph_sampler.prefetch_labels,
                 prefetch_edge_feats=graph_sampler.prefetch_edge_feats)

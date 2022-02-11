@@ -1,7 +1,7 @@
 """Feature storages for PyTorch tensors."""
 
 import torch
-from .base import FeatureStorage, register_storage_wrapper
+from .base import register_storage_wrapper
 from .tensor import BaseTensorStorage
 from ..utils import gather_pinned_tensor_rows
 
@@ -19,9 +19,6 @@ def _fetch_cuda(indices, tensor, device):
 @register_storage_wrapper(torch.Tensor)
 class PyTorchTensorStorage(BaseTensorStorage):
     """Feature storages for slicing a PyTorch tensor."""
-    def __init__(self, tensor):
-        self.storage = tensor
-
     def fetch(self, indices, device, pin_memory=False):
         device = torch.device(device)
         storage_device_type = self.storage.device.type

@@ -1,9 +1,6 @@
 """Feature storages for tensors across different frameworks."""
-from functools import lru_cache
 from .base import FeatureStorage
 from .. import backend as F
-from ..utils import recursive_apply_pair
-from ..contrib.unified_tensor import UnifiedTensor
 
 class BaseTensorStorage(FeatureStorage):
     """FeatureStorage that synchronously slices features from a tensor and transfers
