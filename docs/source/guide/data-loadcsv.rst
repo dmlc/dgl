@@ -26,7 +26,7 @@ To create a DGLCSVDataset object:
     import dgl
     ds = dgl.data.DGLCSVDataset('/path/to/dataset')
 
-The returned ``ds`` object is as standard :class:`~dgl.dadta.DGLDataset`. For example, if the
+The returned ``ds`` object is as standard :class:`~dgl.data.DGLDataset`. For example, if the
 dataset is for single-graph node classification, you can use it as:
 
 .. code:: python
@@ -42,9 +42,9 @@ Data folder structure
 
     /path/to/dataset/
     |-- meta.yaml     # metadata of the dataset
-    |-- edges_0.csv   # edge-level features
+    |-- edges_0.csv   # edge data including src_id, dst_id, feature, label and so on
     |-- ...   # you can have as many CSVs for edge data as you want
-    |-- nodes_0.csv   # node-level features
+    |-- nodes_0.csv   # node data including node_id, feature, label and so on
     |-- ...   # you can have as many CSVs for node data as you want
     |-- graphs.csv    # graph-level features
 
@@ -60,7 +60,7 @@ Dataset of a single feature-less graph
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 When the dataset contains only one graph with no node or edge features, there need only three
-files in the data folder: meta.yaml, one CSV for node IDs and one CSV for edges:
+files in the data folder: ``meta.yaml``, one CSV for node IDs and one CSV for edges:
 
 .. code::
 
@@ -191,11 +191,10 @@ After loaded, the dataset has one graph with features and labels:
     #    edata_schemes={'label': Scheme(shape=(), dtype=torch.int64), 'train_mask': Scheme(shape=(), dtype=torch.bool), 'val_mask': Scheme(shape=(), dtype=torch.bool), 'test_mask': Scheme(shape=(), dtype=torch.bool), 'feat': Scheme(shape=(3,), dtype=torch.float64)})
 
 .. note::
-    All columns will be read and set as edge/node attributes except ``node_id`` in ``nodes.csv``,
+    All columns will be read, parsed and set as edge/node attributes except ``node_id`` in ``nodes.csv``,
     ``src_id`` and ``dst_id`` in ``edges.csv``. User is able to access directly like: ``g.ndata[‘label’]``.
-    All the data in each row should be either numeric or a list of numeric. As for the list of numerics
-    which probably is the format of ``feat``, it’s a string in a raw CSV cell. Such a string will be
-    converted back to a list of numerics when read.
+    The keys in ``g.ndata`` and ``g.edata`` are the same as original column names. Data format is
+    infered automatically during parse.
 
 Dataset of a single heterogeneous graph
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -215,7 +214,9 @@ only 5 files in the data folder: ``meta.yaml``, 2 CSV for nodes and 2 CSV for ed
 ``meta.yaml``
 For heterogeneous graph, ``etype`` and ``ntype`` are MUST HAVE and UNIQUE in ``edge_data`` and
 ``node_data`` respectively, or only the last etype/ntype is kept when generating graph as all
-of them use the same default etype/ntype name.
+of them use the same default etype/ntype name. What's more, each node/edge csv file should
+contains single and unique ntype/etype. If there exist several ntype/etypes, multiple node/edge
+csv files are required.
 
 .. code:: yaml
 
@@ -495,12 +496,13 @@ Optional. String. It specifies which column to be read for graph ids. Default va
 Parse node/edge/grpah data on your own
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-In default, all the data are attached to ``g.ndata`` with the same key as column name in ``nodes.csv``.
-So does data in ``edges.csv``. Data is not formatted unless it's a string of float values(feature data
-is often of this format). For better experience, user is able to self-define node/edge/graph data parser
-and passed such callable instance while instantiating ``DGLCSVDataset``. Below is an example.
+In default, all the data are attached to ``g.ndata`` with the same key as column name in ``nodes.csv``
+except ``node_id``. So does data in ``edges.csv``. Data is auto-formatted via ``pandas`` unless it's
+a string of float values(feature data is often of this format). For better experience, user is able
+to self-define node/edge/graph data parser which is callable and accept ``pandas.DataFrame`` as input
+data. Then pass such callable instance while instantiating ``DGLCSVDataset``. Below is an example.
 
-``DataParser``:
+``SelfDefinedDataParser``:
 
 .. code:: python
 
@@ -518,10 +520,8 @@ and passed such callable instance while instantiating ``DGLCSVDataset``. Below i
                     print("Unamed column is found. Ignored...")
                     continue
                 dt = df[header].to_numpy().squeeze()
-                print("{},{}".format(header, dt))
                 if header == 'label':
                     dt = np.array([1 if e == 'positive' else 0 for e in dt])
-                print("{},{}".format(header, dt))
                 data[header] = dt
             return data
 
@@ -578,7 +578,9 @@ After loaded, the dataset has one graph with features and labels:
 .. code:: python
 
     import dgl
-    dataset = dgl.data.DGLCSVDataset('./customized_parser_dataset', node_data_parser={'_V':SelfDefinedDataParser()}, edge_data_parser={('_V','_E','_V'):SelfDefinedDataParser()})
+    dataset = dgl.data.DGLCSVDataset('./customized_parser_dataset',
+                                     node_data_parser={'_V': SelfDefinedDataParser()},
+                                     edge_data_parser={('_V','_E','_V'): SelfDefinedDataParser()})
     print(dataset[0].ndata['label'])
     #tensor([1, 0, 1, 0, 1])
     print(dataset[0].edata['label'])
@@ -590,9 +592,12 @@ FAQs:
 What's the data type in CSV files?
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-All data is required to be numeric. Specifically, all data except features should be ``integer``.
-For Feature, it’s a ``string`` composed of ``float`` values. Such strings will be splitted and cast
-into float values.
+A default data parser is used for parsing node/edge/graph csv files in default which infer data type
+automatically. ID related data such as ``node_id``, ``src_id``, ``dst_id``, ``graph_id`` are required
+to be ``numeric`` as these fields are used for constructing graph. Any other data will be attached to
+``g.ndata`` or ``g.edata`` directly, so it's user's responsibility to make sure the data type is expected
+when using within graph. In particular, ``string`` data which is composed of ``float`` values is splitted
+and cast into float value array by default data parser.
 
 What if some lines in CSV have missing values in several fields?
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
