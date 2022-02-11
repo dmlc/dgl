@@ -32,8 +32,6 @@ from dgl.contrib import MultiGPUFeatureGraphWrapper
 from model import SAGE
 from load_graph import load_reddit, inductive_split, load_ogb
 
-from torch.cuda import nvtx
-
 def compute_acc(pred, labels):
     """
     Compute the accuracy of prediction given the labels.
@@ -108,6 +106,7 @@ def run(proc_id, n_gpus, args, devices, data):
         batch_size=args.batch_size,
         shuffle=True,
         drop_last=False,
+        use_alternate_streams=False,
         num_workers=args.num_workers)
 
     # Define model and optimizer
@@ -128,20 +127,16 @@ def run(proc_id, n_gpus, args, devices, data):
 
         # Loop over the dataloader to sample the computation dependency graph as a list of
         # blocks.
-        nvtx.range_push("dataloader")
         for step, data in enumerate(dataloader):
-            nvtx.range_pop()
             if proc_id == 0:
                 tic_step = time.time()
 
             input_nodes, seeds, blocks = data
 
             # manually load inputs and labels for this mini-batch
-            nvtx.range_push("feature_extraction")
             batch_inputs = blocks[0].srcdata['features'].to(dev_id)
             batch_labels = blocks[-1].dstdata['labels'].to(dev_id)
             blocks = [block.int().to(dev_id) for block in blocks]
-            nvtx.range_pop()
 
             # Compute loss and prediction
             batch_pred = model(blocks, batch_inputs)
@@ -156,8 +151,6 @@ def run(proc_id, n_gpus, args, devices, data):
                 acc = compute_acc(batch_pred, batch_labels)
                 print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MB'.format(
                     epoch, step, loss.item(), acc.item(), np.mean(iter_tput[3:]), th.cuda.max_memory_allocated() / 1000000))
-            nvtx.range_push("dataloader")
-        nvtx.range_pop()
 
         if n_gpus > 1:
             th.distributed.barrier()
