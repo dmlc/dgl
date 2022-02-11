@@ -183,6 +183,26 @@ std::pair<CSRMatrix, NDArray> CSRSum(
     const std::vector<CSRMatrix>& A,
     const std::vector<NDArray>& A_weights);
 
+/*!
+ * \brief Edge_softmax_csr forward function on Csr format.
+ */
+template <int XPU, typename IdType, int bits>
+void Edge_softmax_csr_forward(const std::string& op,
+             const BcastOff& bcast,
+             const aten::CSRMatrix& csr,
+             NDArray ufeat,
+             NDArray efeat,
+             NDArray out);
+/*!
+ * \brief Edge_softmax_csr backward function on Csr format.
+ */
+template <int XPU, typename IdType, int bits>
+void Edge_softmax_csr_backward(const std::string& op,
+             const BcastOff& bcast,
+             const aten::CSRMatrix& csr,
+             NDArray ufeat,
+             NDArray efeat,
+             NDArray out);
 }  // namespace aten
 }  // namespace dgl
 

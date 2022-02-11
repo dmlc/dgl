@@ -234,6 +234,10 @@ Dataset adapters
     :members: __getitem__, __len__
 
 
+.. autoclass:: AsEdgePredDataset
+    :members: __getitem__, __len__
+
+
 Utilities
 -----------------
 
