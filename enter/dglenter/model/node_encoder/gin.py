@@ -1,18 +1,22 @@
-
 import torch.nn as nn
 from dgl.nn import GINConv
-
+from dgl.base import dgl_warning
 
 class GIN(nn.Module):
-    def __init__(self, in_size, out_size, hidden_size=64, num_layers=3, aggregator_type='sum'):
+    def __init__(self,
+                 data_info: dict,
+                 embed_size: int = -1,
+                 hidden_size=64,
+                 num_layers=3,
+                 aggregator_type='sum'):
         """Graph Isomophism Networks
 
         Parameters
         ----------
-        in_size : int 
-            Number of input features.
-        out_size : int
-            Output size.
+        data_info : dict
+            the information about the input dataset. Should contain feilds "in_size", "out_size", "num_nodes"
+        embed_size : int
+            The dimension of created embedding table. -1 means using original node embedding
         hidden_size : int
             Hidden size.
         num_layers : int
@@ -22,10 +26,16 @@ class GIN(nn.Module):
         """
         super().__init__()
         self.conv_list = nn.ModuleList()
+        self.data_info = data_info
+        self.out_size = data_info["out_size"]
+        self.in_size = data_info["in_size"]
+        self.embed_size = embed_size
         self.num_layers = num_layers
+        if embed_size > 0:
+            self.embed = nn.Embedding(data_info["num_nodes"], embed_size)
         for i in range(num_layers):
             if i == 0:
-                input_dim = in_size
+                input_dim = self.in_size
             else:
                 input_dim = hidden_size
             mlp = nn.Sequential(nn.Linear(input_dim, hidden_size),
@@ -33,10 +43,14 @@ class GIN(nn.Module):
                                 nn.Linear(hidden_size, hidden_size), nn.ReLU())
 
             self.conv_list.append(GINConv(mlp, aggregator_type, 1e-5, True))
-        self.out_mlp = nn.Linear(hidden_size, out_size)
+        self.out_mlp = nn.Linear(hidden_size, self.out_size)
 
     def forward(self, graph, node_feat, edge_feat=None):
-        h = node_feat
+        if self.embed_size > 0:
+            dgl_warning("The embedding for node feature is used, and input node_feat is ignored, due to the provided embed_size.", norepeat=True)
+            h = self.embed.weight
+        else:
+            h = node_feat
         for i in range(self.num_layers):
             h = self.conv_list[i](graph, h)
         h = self.out_mlp(h)

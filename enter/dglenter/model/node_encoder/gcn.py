@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
-from dgl.nn import GraphConv
 import dgl
+from dgl.base import dgl_warning
 
 class GCN(nn.Module):
     def __init__(self,
@@ -17,10 +17,8 @@ class GCN(nn.Module):
 
         Parameters
         ----------
-        in_size : int 
-            Number of input features.
-        out_size : int
-            Output size.
+        data_info : dict
+            the information about the input dataset. Should contain feilds "in_size", "out_size", "num_nodes"
         embed_size : int
             The dimension of created embedding table. -1 means using original node embedding
         hidden_size : int
@@ -38,10 +36,12 @@ class GCN(nn.Module):
         """
         super().__init__()
         self.use_edge_weight = use_edge_weight
+        self.data_info = data_info
         self.out_size = data_info["out_size"]
         self.in_size = data_info["in_size"]
+        self.embed_size = embed_size
         self.layers = nn.ModuleList()
-        if data_info["num_nodes"] > 0:
+        if embed_size > 0:
             self.embed = nn.Embedding(data_info["num_nodes"], embed_size)
         # input layer
         self.layers.append(dgl.nn.GraphConv(self.in_size, hidden_size, norm=norm))
@@ -54,9 +54,11 @@ class GCN(nn.Module):
         self.act = getattr(torch, activation)
 
     def forward(self, g, node_feat, edge_feat = None):
-        if node_feat is None:
-            assert 
-        h = node_feat
+        if self.embed_size > 0:
+            dgl_warning("The embedding for node feature is used, and input node_feat is ignored, due to the provided embed_size.", norepeat=True)
+            h = self.embed.weight
+        else:
+            h = node_feat
         edge_weight = edge_feat if self.use_edge_weight else None
         for l, layer in enumerate(self.layers):
             h = layer(g, h, edge_weight=edge_weight)
