@@ -7,6 +7,7 @@
 #include <algorithm>  // std::swap
 #include "./utils.h"
 #include "./functor.cuh"
+#include "./atomic.cuh"
 
 namespace dgl {
 using namespace cuda;
@@ -191,8 +192,8 @@ __global__ void gatherMMUnsortedEKernel_scatter(
                         DType a_val = sh_A[local_row * sh_a_tile + i];
                         /* iterate over elements of a row of B in parallel */
                         DType C_val = a_val * b_val;
-                        atomicAdd(&C[C_offset + ((i + k_start) * out_len + (outloop + l))],
-                            C_val);
+                        atomicAdd((float*)&C[C_offset + ((i + k_start) * out_len + (outloop + l))],
+                            (float)C_val);
                     }
                 }
             }
