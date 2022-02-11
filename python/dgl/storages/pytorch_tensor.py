@@ -34,10 +34,9 @@ class PyTorchTensorStorage(BaseTensorStorage):
                         f'to GPU with to() method, or (2) pin the graph with '
                         f'pin_memory_() method.')
             # CPU to CPU or CUDA - use pin_memory and async transfer if possible
-            elif indices_device_type == 'cpu':
+            else:
                 return _fetch_cpu(indices, self.storage, self.storage.shape[1:], device,
                                   pin_memory)
-
         else:
             # CUDA to CUDA or CPU
             return _fetch_cuda(indices, self.storage, device)
