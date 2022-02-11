@@ -5467,7 +5467,7 @@ class DGLHeteroGraph(object):
         return self.to(F.cpu())
 
     def pin_memory_(self):
-        """Pin the graph structure to the page-locked memory.
+        """Pin the graph structure to the page-locked memory for GPU zero-copy access.
 
         This is an **inplace** method. The graph structure must be on CPU to be pinned.
         If the graph struture is already pinned, the function directly returns it.
@@ -5500,6 +5500,30 @@ class DGLHeteroGraph(object):
 
         >>> g1 = g.formats(['csc'])
         >>> assert not g1.is_pinned()
+
+        The pinned graph can be access from both CPU and GPU. The concrete device depends
+        on the context of ``query``. For example, ``eid`` in ``find_edges()`` is a query.
+        When ``eid`` is on CPU, ``find_edges()`` is executed on CPU, and the returned
+        values are CPU tensors
+
+        >>> g.unpin_memory_()
+        >>> g.create_formats_()
+        >>> g.pin_memory_()
+        >>> eid = torch.tensor([1])
+        >>> g.find_edges(eids)
+        (tensor([0]), tensor([2]))
+
+        Moving ``eid`` to GPU, ``find_edges()`` will be executed on GPU, and the returned
+        values are GPU tensors.
+
+        >>> eid = eid.to('cuda:0')
+        >>> g.find_edges(eids)
+        (tensor([0], device='cuda:0'), tensor([2], device='cuda:0'))
+
+        If you don't provide a ``query``, methods will be executed on CPU by default.
+
+        >>> g.in_degrees()
+        tensor([0, 1, 1])
         """
         if self._graph.is_pinned():
             return self

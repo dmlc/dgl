@@ -15,7 +15,7 @@ from .. import backend as F
 
 __all__ = ['set_rank', 'get_rank', 'Request', 'Response', 'register_service', \
 'create_sender', 'create_receiver', 'finalize_sender', 'finalize_receiver', \
-'receiver_wait', 'connect_receiver', 'read_ip_config', \
+'receiver_wait', 'connect_receiver', 'read_ip_config', 'get_group_id', \
 'get_num_machines', 'set_num_machines', 'get_machine_id', 'set_machine_id', \
 'send_request', 'recv_request', 'send_response', 'recv_response', 'remote_call', \
 'send_request_to_machine', 'remote_call_to_machine', 'fast_pull', \
