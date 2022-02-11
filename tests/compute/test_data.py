@@ -9,7 +9,7 @@ import yaml
 import pytest
 import dgl.data as data
 from dgl import DGLError
-
+import dgl
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
 def test_minigc():
@@ -1067,6 +1067,33 @@ def test_as_nodepred2():
     ds = data.AsNodePredDataset(data.AIFBDataset(), [0.1, 0.1, 0.8], 'Personen', verbose=True)
     assert F.sum(F.astype(ds[0].nodes['Personen'].data['train_mask'], F.int32), 0) == int(ds[0].num_nodes('Personen') * 0.1)
 
+
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
+def test_as_linkpred():
+    # create
+    ds = data.AsLinkPredDataset(data.CoraGraphDataset(), split_ratio=[0.8, 0.1, 0.1], neg_ratio=1, verbose=True)
+    # Cora has 10556 edges, 10% test edges can be 1057
+    assert ds.test_edges[0][0].shape[0] == 1057
+    # negative samples, not guaranteed, so the assert is in a relaxed range
+    assert 1000 <= ds.test_edges[1][0].shape[0] <= 1057
+    # read from cache
+    ds = data.AsLinkPredDataset(data.CoraGraphDataset(), split_ratio=[0.7, 0.1, 0.2], neg_ratio=2, verbose=True)
+    assert ds.test_edges[0][0].shape[0] == 2112
+    # negative samples, not guaranteed to be ratio 2, so the assert is in a relaxed range
+    assert 4000 < ds.test_edges[1][0].shape[0] <= 4224
+
+
+@unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason="ogb only supports pytorch")
+def test_as_linkpred_ogb():
+    from ogb.linkproppred import DglLinkPropPredDataset
+    ds = data.AsLinkPredDataset(DglLinkPropPredDataset("ogbl-collab"), split_ratio=None, verbose=True)
+    # original dataset has 46329 test edges
+    assert ds.test_edges[0][0].shape[0] == 46329
+    # force generate new split
+    ds = data.AsLinkPredDataset(DglLinkPropPredDataset("ogbl-collab"), split_ratio=[0.7, 0.2, 0.1], verbose=True)
+    assert ds.test_edges[0][0].shape[0] == 235812
+
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
 def test_as_nodepred_csvdataset():
     with tempfile.TemporaryDirectory() as test_dir:
@@ -1103,7 +1130,7 @@ def test_as_nodepred_csvdataset():
         assert 'label' in ds[0].ndata
         assert 'train_mask' not in ds[0].ndata
         assert not hasattr(ds[0], 'num_classes')
-        new_ds = data.AsNodePredDataset(ds, force_reload=True)
+        new_ds = data.AsNodePredDataset(ds, split_ratio=[0.8, 0.1, 0.1], force_reload=True)
         assert new_ds.num_classes == num_classes
         assert 'feat' in new_ds[0].ndata
         assert 'label' in new_ds[0].ndata
