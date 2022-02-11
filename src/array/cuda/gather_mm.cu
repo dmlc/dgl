@@ -113,6 +113,8 @@ void _Transpose(cublasHandle_t handle,
   loaded in registers. B should get benefit from L2 cache.
 */
 
+namespace cuda {
+
 template <typename Idx, typename DType>
 __global__ void gatherMMUnsortedEKernel(
     const DType* __restrict__ A,
@@ -190,10 +192,9 @@ __global__ void gatherMMUnsortedEKernel_scatter(
                     /* iterate over elements of a row of A */
                     for (unsigned int i = 0; i < a_tile; i++) {
                         DType a_val = sh_A[local_row * sh_a_tile + i];
-                        /* iterate over elements of a row of B in parallel */
-                        DType C_val = a_val * b_val;
-                        atomicAdd((float*)&C[C_offset + ((i + k_start) * out_len + (outloop + l))],
-                            (float)C_val);
+                        Idx C_idx = C_offset + ((i + k_start) * out_len + (outloop + l));
+                        atomicAdd(reinterpret_cast<float*>(&C[C_idx]),
+                            static_cast<float>(a_val * b_val));
                     }
                 }
             }
@@ -206,7 +207,7 @@ __global__ void gatherMMUnsortedEKernel_scatter(
  * Each edge looks up the weight matrix according to it's edge type.
  */
 template <int XPU, typename IdType, int bits>
-void gatherMM_UnsortedEtype(const NDArray A,
+void gatherMM(const NDArray A,
               const NDArray B,
               NDArray C,
               const NDArray idx_b, int num_rel,
@@ -266,12 +267,14 @@ void gatherMM_UnsortedEtype(const NDArray A,
     });
 }
 
+}  //namespace cuda
+
 /* \brief Implementation of GatherMM operator where input matrix A is sorted
  * according to relation types. Each relation type calls cuBLAS GEMM operator
  * sequentially.
  */
 template <int XPU, typename IdType, int bits>
-void gatherMM_SortedEtype(const NDArray A,
+void segment_mm(const NDArray A,
               const NDArray B,
               NDArray C,
               const NDArray seglen_A,
@@ -336,7 +339,7 @@ void gatherMM_SortedEtype(const NDArray A,
  * sequentially.
  */
 template <int XPU, typename IdType, int bits>
-void gatherMM_SortedEtype_explicitTranspose(const NDArray A,
+void segment_mm_explicitTranspose(const NDArray A,
               const NDArray B,
               NDArray C,
               const NDArray seglen_A,
@@ -428,9 +431,7 @@ void gatherMM(const NDArray A,
           const NDArray idx_a,
           const NDArray idx_b,
           bool a_trans, bool b_trans) {
-    if (a_trans && b_trans)
-        LOG(FATAL) << "Tranpose operation is not supported for unsorted A (sortedA = False) ";
-    gatherMM_UnsortedEtype<XPU, IdType, bits>(A, B, C, idx_b, num_rel, a_trans, b_trans);
+    cuda::gatherMM<XPU, IdType, bits>(A, B, C, idx_b, num_rel, a_trans, b_trans);
 }
 
 /*!
@@ -450,7 +451,7 @@ void segmentMM(const NDArray A,
           NDArray C,
           const NDArray seglen_A,
           bool a_trans, bool b_trans) {
-    gatherMM_SortedEtype<XPU, IdType, bits>(A, B, C, seglen_A, a_trans, b_trans);
+    segment_mm<XPU, IdType, bits>(A, B, C, seglen_A, a_trans, b_trans);
 }
 
 
