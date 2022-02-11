@@ -124,6 +124,10 @@ def _find_exclude_eids_with_reverse_types(g, eids, reverse_etype_map):
 def _find_exclude_eids(g, exclude_mode, eids, **kwargs):
     if exclude_mode is None:
         return None
+    elif F.is_tensor(exclude_mode) or (
+            isinstance(exclude_mode, Mapping) and
+            all(F.is_tensor(v) for v in exclude_mode.values())):
+        return exclude_mode
     elif exclude_mode == 'self':
         return eids
     elif exclude_mode == 'reverse_id':
