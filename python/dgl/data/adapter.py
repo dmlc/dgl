@@ -5,6 +5,7 @@ import json
 
 from .dgl_dataset import DGLDataset
 from . import utils
+from .. import backend as F
 
 __all__ = ['AsNodePredDataset']
 
@@ -68,13 +69,15 @@ class AsNodePredDataset(DGLDataset):
         self.g = dataset[0].clone()
         self.split_ratio = split_ratio
         self.target_ntype = target_ntype
-        self.num_classes = dataset.num_classes
+        self.num_classes = getattr(dataset, 'num_classes', None)
         super().__init__(dataset.name + '-as-nodepred', **kwargs)
 
     def process(self):
         if 'label' not in self.g.nodes[self.target_ntype].data:
             raise ValueError("Missing node labels. Make sure labels are stored "
                              "under name 'label'.")
+        if self.num_classes is None:
+            self.num_classes = len(F.unique(self.g.nodes[self.target_ntype].data['label']))
         if self.verbose:
             print('Generating train/val/test masks...')
         utils.add_nodepred_split(self, self.split_ratio, self.target_ntype)

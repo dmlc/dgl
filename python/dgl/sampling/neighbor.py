@@ -287,8 +287,9 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
     tensor([False, False, False])
 
     """
-    if g.device == F.cpu():
-        # also copy nodes to CPU
+    if F.device_type(g.device) == 'cpu' and not g.is_pinned():
+        # copy the nodes back to the CPU in the case the output_device
+        # is not accessible from the CPU
         nodes = nodes.to(g.device)
         frontier = _sample_neighbors(
             g, nodes, fanout, edge_dir=edge_dir, prob=prob, replace=replace,

@@ -27,7 +27,8 @@ NDArray IndexSelect(NDArray array, IdArray index) {
     shape.emplace_back(array->shape[d]);
   }
 
-  NDArray ret = NDArray::Empty(shape, array->dtype, array->ctx);
+  // use index->ctx for kDLCPUPinned array
+  NDArray ret = NDArray::Empty(shape, array->dtype, index->ctx);
   if (len == 0)
     return ret;
   DType* ret_data = static_cast<DType*>(ret->data);
