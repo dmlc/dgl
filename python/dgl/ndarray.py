@@ -222,6 +222,7 @@ class SparseMatrix(ObjectBase):
 
 _set_class_ndarray(NDArray)
 _init_api("dgl.ndarray")
+_init_api("dgl.ndarray.uvm", __name__)
 
 # An array representing null (no value) that can be safely converted to
 # other backend tensors.

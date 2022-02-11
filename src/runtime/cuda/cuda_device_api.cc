@@ -187,6 +187,42 @@ class CUDADeviceAPI final : public DeviceAPI {
     CUDA_CALL(cudaHostUnregister(ptr));
   }
 
+  bool IsPinned(const void* ptr) override {
+    // can't be a pinned tensor if CUDA context is unavailable.
+    if (!is_available_)
+      return false;
+
+    cudaPointerAttributes attr;
+    cudaError_t status = cudaPointerGetAttributes(&attr, ptr);
+    bool result = false;
+
+    switch (status) {
+    case cudaErrorInvalidValue:
+      // might be a normal CPU tensor in CUDA 10.2-
+      cudaGetLastError();   // clear error
+      break;
+    case cudaSuccess:
+      result = (attr.type == cudaMemoryTypeHost);
+      break;
+    case cudaErrorInitializationError:
+    case cudaErrorNoDevice:
+    case cudaErrorInsufficientDriver:
+    case cudaErrorInvalidDevice:
+      // We don't want to fail in these particular cases since this function can be called
+      // when users only want to run on CPU even if CUDA API is enabled, or in a forked
+      // subprocess where CUDA context cannot be initialized.  So we just mark the CUDA
+      // context to unavailable and return.
+      is_available_ = false;
+      cudaGetLastError();   // clear error
+      break;
+    default:
+      LOG(FATAL) << "error while determining memory status: " << cudaGetErrorString(status);
+      break;
+    }
+
+    return result;
+  }
+
   void* AllocWorkspace(DGLContext ctx, size_t size, DGLType type_hint) final {
     return CUDAThreadEntry::ThreadLocal()->pool.AllocWorkspace(ctx, size);
   }
@@ -213,6 +249,8 @@ class CUDADeviceAPI final : public DeviceAPI {
       CUDA_CALL(cudaStreamSynchronize(stream));
     }
   }
+
+  bool is_available_ = true;
 };
 
 typedef dmlc::ThreadLocalStore<CUDAThreadEntry> CUDAThreadStore;

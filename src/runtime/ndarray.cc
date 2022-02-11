@@ -237,11 +237,26 @@ NDArray NDArray::Empty(std::vector<int64_t> shape,
   return ret;
 }
 
+inline void PatchCPUPinnedDeviceType(DLTensor* tensor) {
+  // Patch the flag only if the tensor is a CPU tensor, ...
+  if (tensor->ctx.device_type != kDLCPU)
+    return;
+  // ... and CUDA device API is enabled, and the tensor is indeed in pinned memory.
+  auto device = DeviceAPI::Get(kDLGPU, true);
+  if (!device || !(device->IsPinned(tensor->data)))
+    return;
+  tensor->ctx.device_type = kDLCPUPinned;
+}
+
 NDArray NDArray::FromDLPack(DLManagedTensor* tensor) {
   NDArray::Container* data = new NDArray::Container();
   data->deleter = Internal::DLPackDeleter;
   data->manager_ctx = tensor;
   data->dl_tensor = tensor->dl_tensor;
+
+  // Since some backends (e.g. PyTorch) might still return kDLCPU device type even if the tensor
+  // is pinned, I'm fixing the device type here.
+  PatchCPUPinnedDeviceType(&data->dl_tensor);
   return NDArray(data);
 }
 

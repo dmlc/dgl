@@ -5,6 +5,7 @@ from collections import namedtuple
 from collections.abc import MutableMapping
 
 from . import backend as F
+from . import utils
 from .base import DGLError, dgl_warning
 from .init import zero_initializer
 from .storages import TensorStorage
@@ -55,6 +56,12 @@ class LazyFeature(object):
     def data(self):
         """No-op.  For compatibility of :meth:`Frame.__repr__` method."""
         return self
+
+    def pin_memory_(self):
+        """No-op.  For compatibility of :meth:`Frame.pin_memory_` method."""
+
+    def unpin_memory_(self):
+        """No-op.  For compatibility of :meth:`Frame.unpin_memory_` method."""
 
 class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
     """The column scheme.
@@ -333,6 +340,14 @@ class Column(TensorStorage):
     def fetch(self, indices, device, pin_memory=False):
         _ = self.data           # materialize in case of lazy slicing & data transfer
         return super().fetch(indices, device, pin_memory=False)
+
+    def pin_memory_(self):
+        """Registers the column data into pinned memory, materializing it if necessary."""
+        utils.pin_memory_inplace(self.data)
+
+    def unpin_memory_(self):
+        """Unregisters the column data from pinned memory, materializing it if necessary."""
+        utils.unpin_memory_inplace(self.data)
 
 class Frame(MutableMapping):
     """The columnar storage for node/edge features.
@@ -706,3 +721,15 @@ class Frame(MutableMapping):
 
     def __repr__(self):
         return repr(dict(self))
+
+    def pin_memory_(self):
+        """Registers the data of every column into pinned memory, materializing them if
+        necessary."""
+        for column in self._columns.values():
+            column.pin_memory_()
+
+    def unpin_memory_(self):
+        """Unregisters the data of every column from pinned memory, materializing them
+        if necessary."""
+        for column in self._columns.values():
+            column.unpin_memory_()

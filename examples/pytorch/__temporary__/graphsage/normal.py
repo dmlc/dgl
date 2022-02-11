@@ -9,7 +9,7 @@ import numpy as np
 from ogb.nodeproppred import DglNodePropPredDataset
 import tqdm
 
-MODE = "uva"   # "cpu", "uva", "cuda", "allcuda"
+MODE = "cuda"   # "cpu", "uva", "cuda", "allcuda"
 
 class SAGE(nn.Module):
     def __init__(self, in_feats, n_hidden, n_classes):
@@ -62,6 +62,8 @@ graph.ndata['label'] = labels.squeeze()
 split_idx = dataset.get_idx_split()
 train_idx, valid_idx, test_idx = split_idx['train'], split_idx['valid'], split_idx['test']
 
+# Just an example of how to perform sampling on different devices - not sure how we should
+# organize the training source files.
 if MODE == "allcuda":
     graph = graph.to('cuda')
 if MODE == 'uva':
@@ -75,7 +77,8 @@ if MODE in ["allcuda", "uva"]:
 if MODE in ["cpu", "cuda"]:
     num_workers = 16
 device = 'cpu' if MODE == "cpu" else 'cuda'
-pin_prefetcher = (MODE == 'cpu')
+pin_prefetcher = (MODE == 'cuda')
+use_prefetch_thread = (MODE == 'cuda')
 
 model = SAGE(graph.ndata['feat'].shape[1], 256, dataset.num_classes).to(device)
 opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
@@ -85,14 +88,14 @@ sampler = dgl.dataloading.NeighborSampler(
 train_dataloader = dgl.dataloading.NodeDataLoader(
         graph, train_idx, sampler, device=device, batch_size=1000, shuffle=True,
         drop_last=False, pin_prefetcher=pin_prefetcher, num_workers=num_workers,
-        persistent_workers=(num_workers > 0), use_prefetch_thread=False)
+        persistent_workers=(num_workers > 0), use_prefetch_thread=use_prefetch_thread)
 valid_dataloader = dgl.dataloading.NodeDataLoader(
         graph, valid_idx, sampler, device=device, batch_size=1000, shuffle=True,
         drop_last=False, pin_prefetcher=pin_prefetcher, num_workers=num_workers,
-        persistent_workers=(num_workers > 0), use_prefetch_thread=False)
+        persistent_workers=(num_workers > 0), use_prefetch_thread=use_prefetch_thread)
 
 durations = []
-for _ in range(1):
+for _ in range(10):
     model.train()
     t0 = time.time()
     for it, (input_nodes, output_nodes, blocks) in enumerate(train_dataloader):
