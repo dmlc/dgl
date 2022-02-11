@@ -1125,7 +1125,7 @@ def test_as_nodepred_csvdataset():
                            })
         df.to_csv(edges_csv_path, index=False)
 
-        ds = data.DGLCSVDataset(test_dir, split_ratio=[0.8, 0.1, 0.1], force_reload=True)
+        ds = data.DGLCSVDataset(test_dir, force_reload=True)
         assert 'feat' in ds[0].ndata
         assert 'label' in ds[0].ndata
         assert 'train_mask' not in ds[0].ndata
