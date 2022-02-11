@@ -119,10 +119,21 @@ template <int XPU, typename IdType, int bits>
 void gatherMM(const NDArray A,
           const NDArray B,
           NDArray out,
-          const int num_rel,
           const NDArray idx_a,
           const NDArray idx_b,
-          bool a_trans, bool b_trans);
+          const int num_rel);
+
+/*!
+ * \brief Generalized Dense Matrix-Matrix Multiplication according to relation types.
+ */
+template <int XPU, typename IdType, int bits>
+void gatherMM_scatter(const NDArray A,
+          const NDArray B,
+          NDArray out,
+          const NDArray idx_a,
+          const NDArray idx_b,
+          const NDArray idx_c,
+          const int num_rel, bool a_trans, bool b_trans);
 
 /*!
  * \brief Generalized segmented dense Matrix-Matrix Multiplication.

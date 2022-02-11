@@ -2,7 +2,7 @@ import torch as th
 from distutils.version import LooseVersion
 from ...base import is_all, ALL
 from ...sparse import _gspmm, _gspmm_hetero, _gsddmm, _gsddmm_hetero, _segment_reduce, _bwd_segment_cmp
-from ...sparse import _csrmm, _csrsum, _csrmask, _scatter_add, _update_grad_minmax_hetero, _gather_mm, _segment_mm
+from ...sparse import _csrmm, _csrsum, _csrmask, _scatter_add, _update_grad_minmax_hetero, _gather_mm, _gather_mm_scatter, _segment_mm
 from ...sparse import _gspmm, _gspmm_hetero, _gsddmm, _gsddmm_hetero, _segment_reduce, _bwd_segment_cmp, _edge_softmax_forward, _edge_softmax_backward
 from ...sparse import _csrmm, _csrsum, _csrmask, _scatter_add, _update_grad_minmax_hetero
 from ...heterograph_index import create_unitgraph_from_csr
@@ -742,10 +742,10 @@ class GATHERMM(th.autograd.Function):
         A, B, idx_a, idx_b, B_3D_shape = ctx.backward_cache
         #  Compute A_grad = Out_grad * B^T
         A_grad = th.zeros(A.shape, device=A.device, dtype=A.dtype)
-        A_grad = _gather_mm(dZ, B, A_grad, B_3D_shape[0], idx_b=idx_b, b_trans=True)
+        A_grad = _gather_mm_scatter(dZ, B, A_grad, B_3D_shape[0], idx_b=idx_b, b_trans=True)
         #  Compute B_grad = A^T * Out_grad
         B_grad = th.zeros(B.shape, device=B.device, dtype=B.dtype)
-        B_grad = _gather_mm(A, dZ, B_grad, B_3D_shape[0], idx_b=idx_b, a_trans=True)
+        B_grad = _gather_mm_scatter(A, dZ, B_grad, B_3D_shape[0], idx_c=idx_b, a_trans=True)
         B_grad = B_grad.reshape(B_3D_shape[0], B_3D_shape[1], B_3D_shape[2])
         return A_grad, B_grad, None, None, None, None, None, None
 
