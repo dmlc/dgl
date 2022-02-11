@@ -1,3 +1,4 @@
+import os
 import dgl
 import numpy as np
 import torch as th
@@ -48,7 +49,9 @@ def load_subtensor(nfeat, labels, seeds, input_nodes, dev_id):
 
 def run(proc_id, n_gpus, args, devices, data):
     # Start up distributed training, if enabled.
-    dev_id = devices[proc_id]
+    device = th.device(devices[proc_id])
+    if n_gpus > 0:
+        th.cuda.set_device(device)
     if n_gpus > 1:
         dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
             master_ip='127.0.0.1', master_port='12345')
@@ -57,34 +60,29 @@ def run(proc_id, n_gpus, args, devices, data):
                                           init_method=dist_init_method,
                                           world_size=world_size,
                                           rank=proc_id)
-    th.cuda.set_device(dev_id)
 
     # Unpack data
-    n_classes, train_g, val_g, test_g = data
+    n_classes, train_g, val_g, test_g, train_nfeat, val_nfeat, test_nfeat, \
+    train_labels, val_labels, test_labels, train_nid, val_nid, test_nid = data
 
-    if args.inductive:
-        train_nfeat = train_g.ndata.pop('features')
-        val_nfeat = val_g.ndata.pop('features')
-        test_nfeat = test_g.ndata.pop('features')
-        train_labels = train_g.ndata.pop('labels')
-        val_labels = val_g.ndata.pop('labels')
-        test_labels = test_g.ndata.pop('labels')
-    else:
-        train_nfeat = val_nfeat = test_nfeat = g.ndata.pop('features')
-        train_labels = val_labels = test_labels = g.ndata.pop('labels')
-
-    if not args.data_cpu:
-        train_nfeat = train_nfeat.to(dev_id)
-        train_labels = train_labels.to(dev_id)
+    if args.data_device == 'gpu':
+        train_nfeat = train_nfeat.to(device)
+        train_labels = train_labels.to(device)
+    elif args.data_device == 'uva':
+        train_nfeat = dgl.contrib.UnifiedTensor(train_nfeat, device=device)
+        train_labels = dgl.contrib.UnifiedTensor(train_labels, device=device)
 
     in_feats = train_nfeat.shape[1]
 
-    train_mask = train_g.ndata['train_mask']
-    val_mask = val_g.ndata['val_mask']
-    test_mask = ~(test_g.ndata['train_mask'] | test_g.ndata['val_mask'])
-    train_nid = train_mask.nonzero().squeeze()
-    val_nid = val_mask.nonzero().squeeze()
-    test_nid = test_mask.nonzero().squeeze()
+    if args.graph_device == 'gpu':
+        train_nid = train_nid.to(device)
+        train_g = train_g.formats(['csc'])
+        train_g = train_g.to(device)
+        args.num_workers = 0
+    elif args.graph_device == 'uva':
+        train_nid = train_nid.to(device)
+        train_g.pin_memory_()
+        args.num_workers = 0
 
     # Create PyTorch DataLoader for constructing blocks
     sampler = dgl.dataloading.MultiLayerNeighborSampler(
@@ -94,7 +92,7 @@ def run(proc_id, n_gpus, args, devices, data):
         train_nid,
         sampler,
         use_ddp=n_gpus > 1,
-        device=dev_id if args.num_workers == 0 else None,
+        device=device,
         batch_size=args.batch_size,
         shuffle=True,
         drop_last=False,
@@ -102,9 +100,9 @@ def run(proc_id, n_gpus, args, devices, data):
 
     # Define model and optimizer
     model = SAGE(in_feats, args.num_hidden, n_classes, args.num_layers, F.relu, args.dropout)
-    model = model.to(dev_id)
+    model = model.to(device)
     if n_gpus > 1:
-        model = DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id)
+        model = DistributedDataParallel(model, device_ids=[device], output_device=device)
     loss_fcn = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
@@ -112,8 +110,6 @@ def run(proc_id, n_gpus, args, devices, data):
     avg = 0
     iter_tput = []
     for epoch in range(args.num_epochs):
-        if n_gpus > 1:
-            dataloader.set_epoch(epoch)
         tic = time.time()
 
         # Loop over the dataloader to sample the computation dependency graph as a list of
@@ -124,8 +120,8 @@ def run(proc_id, n_gpus, args, devices, data):
 
             # Load the input features as well as output labels
             batch_inputs, batch_labels = load_subtensor(train_nfeat, train_labels,
-                                                        seeds, input_nodes, dev_id)
-            blocks = [block.int().to(dev_id) for block in blocks]
+                                                        seeds, input_nodes, device)
+            blocks = [block.int().to(device) for block in blocks]
             # Compute loss and prediction
             batch_pred = model(blocks, batch_inputs)
             loss = loss_fcn(batch_pred, batch_labels)
@@ -162,7 +158,6 @@ def run(proc_id, n_gpus, args, devices, data):
                 print('Eval Acc {:.4f}'.format(eval_acc))
                 print('Test Acc: {:.4f}'.format(test_acc))
 
-
     if n_gpus > 1:
         th.distributed.barrier()
     if proc_id == 0:
@@ -186,13 +181,18 @@ if __name__ == '__main__':
                            help="Number of sampling processes. Use 0 for no extra process.")
     argparser.add_argument('--inductive', action='store_true',
                            help="Inductive learning setting")
-    argparser.add_argument('--data-cpu', action='store_true',
+    argparser.add_argument('--graph-device', choices=('cpu', 'gpu', 'uva'), default='cpu',
+                           help="Device to perform the sampling. "
+                                "Must have 0 workers for 'gpu' and 'uva'")
+    argparser.add_argument('--data-device', choices=('cpu', 'gpu', 'uva'), default='gpu',
                            help="By default the script puts all node features and labels "
                                 "on GPU when using it to save time for data copy. This may "
                                 "be undesired if they cannot fit in GPU memory at once. "
-                                "This flag disables that.")
+                                "Use 'cpu' to keep the features on host memory and "
+                                "'uva' to enable UnifiedTensor (GPU zero-copy access on "
+                                "pinned host memory).")
     args = argparser.parse_args()
-    
+
     devices = list(map(int, args.gpu.split(',')))
     n_gpus = len(devices)
 
@@ -200,26 +200,63 @@ if __name__ == '__main__':
         g, n_classes = load_reddit()
     elif args.dataset == 'ogbn-products':
         g, n_classes = load_ogb('ogbn-products')
+    elif args.dataset == 'ogbn-papers100M':
+        g, n_classes = load_ogb('ogbn-papers100M')
+        g = dgl.add_reverse_edges(g)
+        # convert labels to integer
+        g.ndata['labels'] = th.as_tensor(g.ndata['labels'], dtype=th.int64)
+        g.ndata.pop('year')
     else:
         raise Exception('unknown dataset')
 
-    # Construct graph
-    g = dgl.as_heterograph(g)
-
     if args.inductive:
         train_g, val_g, test_g = inductive_split(g)
+        train_nfeat = train_g.ndata.pop('features')
+        val_nfeat = val_g.ndata.pop('features')
+        test_nfeat = test_g.ndata.pop('features')
+        train_labels = train_g.ndata.pop('labels')
+        val_labels = val_g.ndata.pop('labels')
+        test_labels = test_g.ndata.pop('labels')
     else:
         train_g = val_g = test_g = g
+        train_nfeat = val_nfeat = test_nfeat = g.ndata.pop('features')
+        train_labels = val_labels = test_labels = g.ndata.pop('labels')
+
+    test_nid = test_g.ndata.pop('test_mask',
+        ~(test_g.ndata['train_mask'] | test_g.ndata['val_mask'])).nonzero().squeeze()
+    train_nid = train_g.ndata.pop('train_mask').nonzero().squeeze()
+    val_nid = val_g.ndata.pop('val_mask').nonzero().squeeze()
 
     # Create csr/coo/csc formats before launching training processes with multi-gpu.
     # This avoids creating certain formats in each sub-process, which saves momory and CPU.
     train_g.create_formats_()
     val_g.create_formats_()
     test_g.create_formats_()
-    # Pack data
-    data = n_classes, train_g, val_g, test_g
 
-    if n_gpus == 1:
+    # this to avoid competition overhead on machines with many cores.
+    # Change it to a proper number on your machine, especially for multi-GPU training.
+    os.environ['OMP_NUM_THREADS'] = str(mp.cpu_count() // 2 // n_gpus)
+    if n_gpus > 1:
+        # Copy the graph to shared memory explicitly before pinning.
+        # In other cases, we can just rely on fork's copy-on-write.
+        # TODO: the original train_g is not freed.
+        if args.graph_device == 'uva':
+            train_g = train_g.shared_memory('train_g')
+        if args.data_device == 'uva':
+            train_nfeat = train_nfeat.share_memory_()
+            train_labels = train_labels.share_memory_()
+
+    # Pack data
+    data = n_classes, train_g, val_g, test_g, train_nfeat, val_nfeat, test_nfeat, \
+           train_labels, val_labels, test_labels, train_nid, val_nid, test_nid
+
+    if devices[0] == -1:
+        assert args.graph_device == 'cpu', \
+               f"Must have GPUs to enable {args.graph_device} sampling."
+        assert args.data_device == 'cpu', \
+               f"Must have GPUs to enable {args.data_device} feature storage."
+        run(0, 0, args, ['cpu'], data)
+    elif n_gpus == 1:
         run(0, n_gpus, args, devices, data)
     else:
         procs = []

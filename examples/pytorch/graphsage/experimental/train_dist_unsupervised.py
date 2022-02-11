@@ -69,7 +69,7 @@ class SAGE(nn.Module):
             y = th.zeros(g.number_of_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
 
             sampler = dgl.dataloading.MultiLayerNeighborSampler([None])
-            dataloader = dgl.dataloading.NodeDataLoader(
+            dataloader = dgl.dataloading.DistNodeDataLoader(
                 g,
                 th.arange(g.number_of_nodes()),
                 sampler,

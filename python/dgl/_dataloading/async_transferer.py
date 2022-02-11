@@ -101,4 +101,4 @@ class AsyncTransferer(object):
         return Transfer(transfer_id, self._handle)
 
 
-_init_api("dgl.dataloading.async_transferer")
+_init_api("dataloading.async_transferer", "dgl._dataloading.async_transferer")
