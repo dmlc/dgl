@@ -267,7 +267,7 @@ void gatherMM(const NDArray A,
     });
 }
 
-}  //namespace cuda
+}  // namespace cuda
 
 /* \brief Implementation of GatherMM operator where input matrix A is sorted
  * according to relation types. Each relation type calls cuBLAS GEMM operator
