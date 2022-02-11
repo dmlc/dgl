@@ -2,7 +2,7 @@ import torch as th
 from distutils.version import LooseVersion
 from ...base import is_all, ALL
 from ...sparse import _gspmm, _gspmm_hetero, _gsddmm, _gsddmm_hetero, _segment_reduce, _bwd_segment_cmp
-from ...sparse import _csrmm, _csrsum, _csrmask, _scatter_add, _update_grad_minmax_hetero, _gather_mm, _se_gather_mm
+from ...sparse import _csrmm, _csrsum, _csrmask, _scatter_add, _update_grad_minmax_hetero, _gather_mm, _segment_mm
 from ...heterograph_index import create_unitgraph_from_csr
 
 if LooseVersion(th.__version__) >= LooseVersion("1.6.0"):
@@ -27,7 +27,7 @@ else:
         return decorate_bwd
 
 __all__ = ['gspmm', 'gsddmm', 'gspmm_hetero', 'gsddmm_hetero', 'edge_softmax', 'edge_softmax_hetero',
-           'segment_reduce', 'scatter_add', 'csrmm', 'csrsum', 'csrmask', 'gather_mm', 'se_gather_mm']
+           'segment_reduce', 'scatter_add', 'csrmm', 'csrsum', 'csrmask', 'gather_mm', 'segment_mm']
 
 
 def _reduce_grad(grad, shape):
@@ -681,7 +681,7 @@ class CSRMask(th.autograd.Function):
         return None, csrmask(gidxB, dB_weights, gidxA), None
 
 
-class SE_GATHERMM(th.autograd.Function):
+class SEGMENTMM(th.autograd.Function):
     @staticmethod
     @custom_fwd(cast_inputs=th.float16)
     def forward(ctx, A, B, seglen_A):
@@ -694,7 +694,7 @@ class SE_GATHERMM(th.autograd.Function):
         B_3D_shape = B.shape
         B = B.reshape(B.shape[0] * B.shape[1], B.shape[2])
         C = th.zeros((A.shape[0], B.shape[1]), device=A.device, dtype=A.dtype)
-        C = _se_gather_mm(A, B, C, seglen_A)
+        C = _segment_mm(A, B, C, seglen_A)
         ctx.backward_cache = A, B, seglen_A, B_3D_shape
         return C
 
@@ -703,10 +703,10 @@ class SE_GATHERMM(th.autograd.Function):
         A, B, seglen_A, B_3D_shape = ctx.backward_cache
         #  Compute A_grad = Out_grad * B^T
         A_grad = th.zeros(A.shape, device=A.device, dtype=A.dtype)
-        A_grad = _se_gather_mm(dZ, B, A_grad, seglen_A, b_trans=True)
+        A_grad = _segment_mm(dZ, B, A_grad, seglen_A, b_trans=True)
         #  Compute B_grad = A^T * Out_grad
         B_grad = th.zeros(B.shape, device=B.device, dtype=B.dtype)
-        B_grad = _se_gather_mm(A, dZ, B_grad, seglen_A, a_trans=True)
+        B_grad = _segment_mm(A, dZ, B_grad, seglen_A, a_trans=True)
         B_grad = B_grad.reshape(B_3D_shape[0], B_3D_shape[1], B_3D_shape[2])
         return A_grad, B_grad, None, None, None, None, None, None
 
@@ -721,10 +721,21 @@ class GATHERMM(th.autograd.Function):
         B_3D_shape = B.shape
         B = B.reshape(B.shape[0] * B.shape[1], B.shape[2])
         C = th.zeros((A.shape[0], B.shape[1]), device=A.device, dtype=A.dtype)
-        C = _gather_mm(A, B, C, idx_a, idx_b)
+        C = _gather_mm(A, B, C, B_3D_shape[0], idx_a, idx_b)
         ctx.backward_cache = A, B, idx_a, idx_b, B_3D_shape
         return C
-        # TODO(Israt): add backward operator
+
+    @staticmethod
+    def backward(ctx, dZ):
+        A, B, idx_a, idx_b, B_3D_shape = ctx.backward_cache
+        #  Compute A_grad = Out_grad * B^T
+        A_grad = th.zeros(A.shape, device=A.device, dtype=A.dtype)
+        A_grad = _gather_mm(dZ, B, A_grad, B_3D_shape[0], idx_b=idx_b, b_trans=True)
+        #  Compute B_grad = A^T * Out_grad
+        B_grad = th.zeros(B.shape, device=B.device, dtype=B.dtype)
+        B_grad = _gather_mm(A, dZ, B_grad, B_3D_shape[0], idx_b=idx_b, a_trans=True)
+        B_grad = B_grad.reshape(B_3D_shape[0], B_3D_shape[1], B_3D_shape[2])
+        return A_grad, B_grad, None, None, None, None, None, None
 
 def gspmm(gidx, op, reduce_op, lhs_data, rhs_data):
     if op == 'sub':
@@ -802,8 +813,8 @@ def csrsum(gidxs, weights):
 def csrmask(gidxA, A_weights, gidxB):
     return CSRMask.apply(gidxA, A_weights, gidxB)
 
-def se_gather_mm(A, B, seglen_A):
-    return SE_GATHERMM.apply(A, B, seglen_A)
+def segment_mm(A, B, seglen_A):
+    return SEGMENTMM.apply(A, B, seglen_A)
 
 def gather_mm(A, B, idx_a = None, idx_b = None):
     return GATHERMM.apply(A, B, idx_a, idx_b)

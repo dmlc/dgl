@@ -86,10 +86,10 @@ def test_gathermm(idtype):
         #################################################################
 
         seglen_A = E_per_rel
+        F.attach_grad(H)
+        F.attach_grad(W_3D)
         with F.record_grad():
-            H.requires_grad = True
-            W_3D.requires_grad = True
-            out_gmm_sorted = F.se_gather_mm(H, W_3D, seglen_A)
+            out_gmm_sorted = F.segment_mm(H, W_3D, seglen_A)
             F.backward(F.reduce_sum(out_gmm_sorted))
             Hgrad_gmm_sorted = H.grad
             Wgrad_gmm_sorted = W_3D.grad
@@ -98,17 +98,22 @@ def test_gathermm(idtype):
         #  gather_mm where H is not sorted (backward not supported yet)
         #################################################################
 
-        # forward pass
-        out_gmm_unsorted = F.gather_mm(H, W_3D, idx_b=etypes)
-        # out_gmm_unsorted = F.zeros(Out.shape, dtype=F.dtype(Out))
-        # out_gmm_unsorted = dgl.sparse._gather_mm(H, W, out_gmm_unsorted, idx_b=etypes)
+        F.attach_grad(H)
+        F.attach_grad(W_3D)
+        with F.record_grad():
+            out_gmm_unsorted = F.gather_mm(H, W_3D, idx_b=etypes)
+            F.backward(F.reduce_sum(out_gmm_unsorted))
+            Hgrad_gmm_unsorted = H.grad
+            Wgrad_gmm_unsorted = W_3D.grad
 
 
         # correctness check
         assert F.allclose(out_low_mem, out_gmm_sorted, atol=1e-3, rtol=1e-3)
-        assert F.allclose(out_low_mem, out_gmm_unsorted, atol=1e-3, rtol=1e-3)
         assert F.allclose(Hgrad_low_mem, Hgrad_gmm_sorted, atol=1e-3, rtol=1e-3)
         assert F.allclose(Wgrad_low_mem, Wgrad_gmm_sorted, atol=1e-3, rtol=1e-3)
+        assert F.allclose(out_low_mem, out_gmm_unsorted, atol=1e-3, rtol=1e-3)
+        assert F.allclose(Hgrad_low_mem, Hgrad_gmm_unsorted, atol=1e-3, rtol=1e-3)
+        assert F.allclose(Wgrad_low_mem, Wgrad_gmm_unsorted, atol=1e-3, rtol=1e-3)
 
     _test(1)
     _test(4)

@@ -328,7 +328,7 @@ def _gspmm_hetero(gidx, op, reduce_op, u_len, u_and_e_tuple):
     return out, (list_arg_u, list_arg_e, list_arg_u_ntype, list_arg_e_etype)
 
 
-def _se_gather_mm(A, B, out, seglen_A, a_trans=False, b_trans=False):
+def _segment_mm(A, B, out, seglen_A, a_trans=False, b_trans=False):
     r""" Dense Matrix Multiplication interface. It multiplies dense tensor A
     and dense tensor B according to relation types. A is sorted and concatenated
     according to relation types.
@@ -353,17 +353,15 @@ def _se_gather_mm(A, B, out, seglen_A, a_trans=False, b_trans=False):
         The output dense matrix of shape (N, D2)
     """
     # TODO(Israt): Add CPU support. Currently, only handles GPU code
-    _CAPI_DGLKernelGATHERMM(to_dgl_nd(A),
+    _CAPI_DGLKernelSEGMENTMM(to_dgl_nd(A),
                             to_dgl_nd(B),
                             to_dgl_nd_for_write(out),
                             to_dgl_nd(seglen_A),
-                            to_dgl_nd(None),
-                            to_dgl_nd(None),
-                            True, a_trans, b_trans)
+                            a_trans, b_trans)
     return out
 
 
-def _gather_mm(A, B, out, idx_a=None, idx_b=None,
+def _gather_mm(A, B, out, num_rel, idx_a=None, idx_b=None,
                a_trans=False, b_trans=False):
     r""" Generalized Dense Matrix Multiplication interface. It multiplies
     tensor A and B according to relation types and outputs in out. B is a
@@ -394,10 +392,10 @@ def _gather_mm(A, B, out, idx_a=None, idx_b=None,
     _CAPI_DGLKernelGATHERMM(to_dgl_nd(A),
                             to_dgl_nd(B),
                             to_dgl_nd_for_write(out),
-                            to_dgl_nd(None),
+                            num_rel,
                             to_dgl_nd(idx_a),
                             to_dgl_nd(idx_b),
-                            False, a_trans, b_trans)
+                            a_trans, b_trans)
     return out
 
 

@@ -53,23 +53,40 @@ void SpMM(const std::string& op, const std::string& reduce,
 }
 
 
-/*! \brief Generalized GatherMM - Dense Matrix-Matrix Multiplication. */
+/*! \brief Generalized Dense Matrix-Matrix Multiplication according to relation types. */
 void GatherMM(const NDArray A,
           const NDArray B,
-          NDArray out,
-          const NDArray A_dim1_per_rel,
-          const NDArray B_dim1_per_rel,
-          const NDArray etypes,
-          bool sortedA, bool A_trans, bool B_trans) {
+          NDArray C,
+          const int num_rel,
+          const NDArray idx_a,
+          const NDArray idx_b,
+          bool A_trans, bool B_trans) {
   ATEN_XPU_SWITCH_CUDA(A->ctx.device_type, XPU, "GatherMM", {
-    ATEN_ID_TYPE_SWITCH(etypes->dtype, IdType, {
+    ATEN_ID_TYPE_SWITCH(idx_b->dtype, IdType, {
       ATEN_FLOAT_BITS_SWITCH(A->dtype, bits, "Feature data", {
-        gatherMM<XPU, IdType, bits>(A, B, out, A_dim1_per_rel, B_dim1_per_rel,
-          etypes, sortedA, A_trans, B_trans);
+        gatherMM<XPU, IdType, bits>(A, B, C, num_rel,
+          idx_a, idx_b, A_trans, B_trans);
       });
     });
   });
 }
+
+
+/*! \brief Generalized segmented dense Matrix-Matrix Multiplication. */
+void SegmentMM(const NDArray A,
+          const NDArray B,
+          NDArray C,
+          const NDArray seglen_A,
+          bool A_trans, bool B_trans) {
+  ATEN_XPU_SWITCH_CUDA(A->ctx.device_type, XPU, "GatherMM", {
+    ATEN_ID_TYPE_SWITCH(seglen_A->dtype, IdType, {
+      ATEN_FLOAT_BITS_SWITCH(A->dtype, bits, "Feature data", {
+        segmentMM<XPU, IdType, bits>(A, B, C, seglen_A, A_trans, B_trans);
+      });
+    });
+  });
+}
+
 
 /*! \brief Generalized Sparse Matrix-Matrix Multiplication with hetero-graph support. */
 void SpMMHetero(const std::string& op, const std::string& reduce,
@@ -371,14 +388,24 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelGATHERMM")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     NDArray A = args[0];
     NDArray B = args[1];
-    NDArray O = args[2];
-    NDArray A_dim1_per_rel = args[3];
-    NDArray B_dim1_per_rel = args[4];
-    NDArray etypes = args[5];
-    bool sortedA = args[6];
-    bool A_trans = args[7];
-    bool B_trans = args[8];
-    GatherMM(A, B, O, A_dim1_per_rel, B_dim1_per_rel, etypes, sortedA, A_trans, B_trans);
+    NDArray C = args[2];
+    int num_rel = args[3];
+    NDArray idx_a = args[4];
+    NDArray idx_b = args[5];
+    bool A_trans = args[6];
+    bool B_trans = args[7];
+    GatherMM(A, B, C, num_rel, idx_a, idx_b, A_trans, B_trans);
+  });
+
+DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSEGMENTMM")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    NDArray A = args[0];
+    NDArray B = args[1];
+    NDArray C = args[2];
+    NDArray seglen_A = args[3];
+    bool A_trans = args[4];
+    bool B_trans = args[5];
+    SegmentMM(A, B, C, seglen_A, A_trans, B_trans);
   });
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSpMMHetero")

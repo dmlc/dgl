@@ -27,44 +27,65 @@ template <int XPU, typename IdType, int bits>
 void gatherMM(const NDArray A,
           const NDArray B,
           NDArray C,
-          const NDArray A_dim1_per_rel,
-          const NDArray B_dim1_per_rel,
-          const NDArray etype,
-          bool sortedA, bool a_trans, bool b_trans) {
+          const int num_rel,
+          const NDArray idx_a,
+          const NDArray idx_b,
+          bool a_trans, bool b_trans) {
     SWITCH_BITS(bits, DType, {
-        if (sortedA) {  // similar to low-mem matmul
-            cpu::gatherMM_SortedEtype<XPU, IdType, DType>(A, B, C, A_dim1_per_rel,
-                B_dim1_per_rel, a_trans, b_trans);
-        } else {
-            LOG(FATAL) << "Unsupported CPU kernel for GatherMM. Input A is not sorted.";
-        }
+        LOG(FATAL) << "Unsupported CPU kernel for GatherMM.";
+  });
+}
+
+/*! \brief Generalized segmentMM. */
+template <int XPU, typename IdType, int bits>
+void segmentMM(const NDArray A,
+          const NDArray B,
+          NDArray C,
+          const NDArray seglen_A,
+          bool a_trans, bool b_trans) {
+    SWITCH_BITS(bits, DType, {
+        // cpu::gatherMM_SortedEtype<XPU, IdType, DType>(A, B, C, A_dim1_per_rel,
+        //     B_dim1_per_rel, a_trans, b_trans);
   });
 }
 
 template void gatherMM<kDLCPU, int32_t, 16>(
-    const NDArray A, const NDArray B, NDArray C,
-    const NDArray A_dim1_per_rel, const NDArray B_dim1_per_rel,
-    const NDArray etype, bool sortedA, bool a_trans, bool b_trans);
+    const NDArray A, const NDArray B, NDArray C, const int num_rel,
+    const NDArray idx_a, const NDArray idx_b, bool a_trans, bool b_trans);
 template void gatherMM<kDLCPU, int64_t, 16>(
-    const NDArray A, const NDArray B, NDArray C,
-    const NDArray A_dim1_per_rel, const NDArray B_dim1_per_rel,
-    const NDArray etype, bool sortedA, bool a_trans, bool b_trans);
+    const NDArray A, const NDArray B, NDArray C, const int num_rel,
+    const NDArray idx_a, const NDArray idx_b, bool a_trans, bool b_trans);
 template void gatherMM<kDLCPU, int32_t, 32>(
-    const NDArray A, const NDArray B, NDArray C,
-    const NDArray A_dim1_per_rel, const NDArray B_dim1_per_rel,
-    const NDArray etype, bool sortedA, bool a_trans, bool b_trans);
+    const NDArray A, const NDArray B, NDArray C, const int num_rel,
+    const NDArray idx_a, const NDArray idx_b, bool a_trans, bool b_trans);
 template void gatherMM<kDLCPU, int64_t, 32>(
-    const NDArray A, const NDArray B, NDArray C,
-    const NDArray A_dim1_per_rel, const NDArray B_dim1_per_rel,
-    const NDArray etype, bool sortedA, bool a_trans, bool b_trans);
+    const NDArray A, const NDArray B, NDArray C, const int num_rel,
+    const NDArray idx_a, const NDArray idx_b, bool a_trans, bool b_trans);
 template void gatherMM<kDLCPU, int32_t, 64>(
-    const NDArray A, const NDArray B, NDArray C,
-    const NDArray A_dim1_per_rel, const NDArray B_dim1_per_rel,
-    const NDArray etype, bool sortedA, bool a_trans, bool b_trans);
+    const NDArray A, const NDArray B, NDArray C, const int num_rel,
+    const NDArray idx_a, const NDArray idx_b, bool a_trans, bool b_trans);
 template void gatherMM<kDLCPU, int64_t, 64>(
+    const NDArray A, const NDArray B, NDArray C, const int num_rel,
+    const NDArray idx_a, const NDArray idx_b, bool a_trans, bool b_trans);
+
+template void segmentMM<kDLCPU, int32_t, 16>(
     const NDArray A, const NDArray B, NDArray C,
-    const NDArray A_dim1_per_rel, const NDArray B_dim1_per_rel,
-    const NDArray etype, bool sortedA, bool a_trans, bool b_trans);
+    const NDArray seglen_A, bool a_trans, bool b_trans);
+template void segmentMM<kDLCPU, int64_t, 16>(
+    const NDArray A, const NDArray B, NDArray C,
+    const NDArray seglen_A, bool a_trans, bool b_trans);
+template void segmentMM<kDLCPU, int32_t, 32>(
+    const NDArray A, const NDArray B, NDArray C,
+    const NDArray seglen_A, bool a_trans, bool b_trans);
+template void segmentMM<kDLCPU, int64_t, 32>(
+    const NDArray A, const NDArray B, NDArray C,
+    const NDArray seglen_A, bool a_trans, bool b_trans);
+template void segmentMM<kDLCPU, int32_t, 64>(
+    const NDArray A, const NDArray B, NDArray C,
+    const NDArray seglen_A, bool a_trans, bool b_trans);
+template void segmentMM<kDLCPU, int64_t, 64>(
+    const NDArray A, const NDArray B, NDArray C,
+    const NDArray seglen_A, bool a_trans, bool b_trans);
 
 }  // namespace aten
 }  // namespace dgl

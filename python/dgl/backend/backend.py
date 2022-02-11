@@ -1850,7 +1850,7 @@ def gather_mm(A, B, idx_a, idx_b):
     """
     pass
 
-def se_gather_mm(A, B, seglen_A):
+def segment_mm(A, B, seglen_A):
     r""" Dense Matrix Multiplication interface. It multiplies dense tensor A
     and dense tensor B according to relation types. A is sorted and concatenated
     according to relation types.
