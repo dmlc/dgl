@@ -288,6 +288,8 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
 
     """
     if g.device == F.cpu():
+        # also copy nodes to CPU
+        nodes = nodes.to(g.device)
         frontier = _sample_neighbors(
             g, nodes, fanout, edge_dir=edge_dir, prob=prob, replace=replace,
             copy_ndata=copy_ndata, copy_edata=copy_edata, exclude_edges=exclude_edges)

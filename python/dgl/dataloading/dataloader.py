@@ -262,7 +262,10 @@ def _prefetch_for_subgraph(subg, dataloader):
 
 
 def _prefetch_for(item, dataloader):
-    if isinstance(item, LazyFeature):
+    if F.is_tensor(item):
+        # if the dataloader doesn't support lazy loading
+        return item
+    elif isinstance(item, LazyFeature):
         return dataloader.other_storages[item.name].fetch(
             item.id_, dataloader.device, dataloader.pin_memory)
     else:

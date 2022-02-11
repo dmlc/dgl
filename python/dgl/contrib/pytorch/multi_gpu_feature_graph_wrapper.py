@@ -22,21 +22,21 @@ import torch as th
 from ...dataloading import NodeDataLoader
 from ...partition import NDArrayPartition, create_edge_partition_from_nodes
 from ...cuda import nccl
+from ...sampling import neighbor
+from ...base import EID
 from ..multi_gpu_feature_storage import MultiGPUFeatureStorage
 from ... import backend as F
 from typing import Mapping
 
-# delete
-from torch.cuda import nvtx
-
 def _load_tensor(tensor, device, comm, part):
-    nvtx.range_push("Loading multi-gpu tensor")
     loaded_tensor = MultiGPUFeatureStorage(
         shape=tensor.shape, dtype=tensor.dtype,
         device=device, comm=comm, partition=part)
     loaded_tensor.all_set_global(tensor)
-    nvtx.range_pop()
     return loaded_tensor
+
+def _gather_row(tensor, index):
+    return tensor.all_gather_row(index)
 
 class MultiGPUFeatureGraphWrapper:
     """.
@@ -74,6 +74,7 @@ class MultiGPUFeatureGraphWrapper:
     def __init__(self, g, device, partition=None, **kwargs):
         assert device != th.device("cpu"), "The device must be a GPU."
 
+        self._device = device
         self._g = g
 
         # create the nccl communicator (if we have multiple processes)
@@ -142,15 +143,58 @@ class MultiGPUFeatureGraphWrapper:
                                                 edge_partition[etype])
             self._e_feat[etype] = feats
 
+    def sample_neighbors(self, nodes, fanout, edge_dir='in', prob=None,
+                         replace=False, output_device=None, exclude_edges=None):
+
+        if output_device is None:
+            output_device = self._device
+        assert output_device == self._device, \
+            "The output device of the sampler must be the same device as " \
+            "the GPU feature store: {} vs. {}".format(
+                output_device, self._device)
+        
+        frontier = neighbor.sample_neighbors(
+            g=self._g, nodes=nodes, fanout=fanout, edge_dir=edge_dir,
+            prob=prob, replace=replace, copy_ndata=False, copy_edata=False,
+            exclude_edges=exclude_edges, output_device=output_device)
+
+        # manually copy node features
+        node_frames = []
+        for ntype in frontier.ntypes:
+            index = frontier.nodes(ntype).to(self._device)
+            frame = Frame(num_rows=len(index))
+            for k, v in self._n_feat[ntype].items():
+                data = _gather_row(v, index).to(output_device)
+                frame.update_column(k, data)
+            node_frames.append(frame)
+        
+        # manually copy edge features
+        edge_frames = []
+        for etype in frontier.canonical_etypes:
+            index = frontier.edges(form='eid', etype=etype).to(self._device)
+            if isinstance(index, Mapping):
+                index = index[frontier.to_canonical_etype(etype)]
+            frame = Frame(num_rows=len(index))
+            for k, v in self._e_feat[etype].items():
+                data = _gather_row(v, index).to(output_device)
+                frame.update_column(k, data)
+
+            # add eids if they do not exist
+            if EID not in frame:
+                frame.update_column(EID, index.to(output_device))
+            edge_frames.append(frame)
+
+        utils.set_new_frames(frontier, node_frames=node_frames,
+            edge_frames=edge_frames)
+
+        return frontier
+
     def get_node_storage(self, key, ntype=None):
-        nvtx.range_push("get_node_storage")
         if ntype == None:
             assert len(self._n_feat) == 1, "ntype must be specified for " \
                                            "graphs with more than one ntype."
             ntype = self._n_feat.keys()[0]
-        x= self._n_feat[ntype][key]
-        nvtx.range_pop()
-        return x
+        return self._n_feat[ntype][key]
             
     def get_edge_storage(self, key, etype=None):
         if etype == None:
@@ -160,7 +204,7 @@ class MultiGPUFeatureGraphWrapper:
         return self._e_feat[etype][key]
  
     def __getattr__(self, key):
-        if key in ['ntypes', 'etypes', 'canonical_etypes', 'sample_neighbors',
+        if key in ['ntypes', 'etypes', 'canonical_etypes',
                    'subgraph', 'edge_subgraph', 'find_edges', 'num_nodes']:
             # Delegate to the wrapped GraphStorage instance.
             return getattr(self._g, key)
