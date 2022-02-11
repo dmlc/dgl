@@ -68,14 +68,7 @@ def run(proc_id, n_gpus, args, devices, data):
     n_classes, train_g, val_g, test_g, train_nfeat, val_nfeat, test_nfeat, \
     train_labels, val_labels, test_labels, train_nid, val_nid, test_nid = data
 
-    in_feats = train_g.ndata['features'].shape[1]
-
-    train_mask = train_g.ndata.pop('train_mask')
-    val_mask = val_g.ndata.pop('val_mask')
-    test_mask = test_g.ndata.pop('test_mask')
-    train_nid = train_mask.nonzero().squeeze()
-    val_nid = val_mask.nonzero().squeeze()
-    test_nid = test_mask.nonzero().squeeze()
+    in_feats = train_nfeat.shape[1]
 
     if args.graph_device == 'gpu':
         train_nid = train_nid.to(device)
@@ -88,9 +81,9 @@ def run(proc_id, n_gpus, args, devices, data):
         args.num_workers = 0
 
     if args.data_device == 'gpu':
-        train_g.ndata['features'] = train_feat
+        train_g.ndata['features'] = train_nfeat
         train_g.ndata['labels'] = train_labels
-        train_g = MultiGPUFeatureGraphWrapper(train_g, dev_id)
+        train_g = MultiGPUFeatureGraphWrapper(train_g, device)
     elif args.data_device == 'uva':
         train_g.ndata['features'] = dgl.contrib.UnifiedTensor(train_nfeat, device=device)
         train_g.ndata['labels'] = dgl.contrib.UnifiedTensor(train_labels, device=device)
@@ -134,9 +127,9 @@ def run(proc_id, n_gpus, args, devices, data):
             input_nodes, seeds, blocks = data
 
             # manually load inputs and labels for this mini-batch
-            batch_inputs = blocks[0].srcdata['features'].to(dev_id)
-            batch_labels = blocks[-1].dstdata['labels'].to(dev_id)
-            blocks = [block.int().to(dev_id) for block in blocks]
+            batch_inputs = blocks[0].srcdata['features'].to(device)
+            batch_labels = blocks[-1].dstdata['labels'].to(device)
+            blocks = [block.to(device) for block in blocks]
 
             # Compute loss and prediction
             batch_pred = model(blocks, batch_inputs)
