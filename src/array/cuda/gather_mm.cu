@@ -124,14 +124,14 @@ __global__ void gatherMMKernel(
         unsigned int local_row = row & 3;  // hardcoded for TB size 128 (4 warps)
         Idx A_offset = (idx_a) ? idx_a[row] * in_len * out_len : 0;
         Idx B_offset = (idx_b) ? idx_b[row] * in_len * out_len : 0;
-        const int sh_h_tile = 64;
-        __shared__ DType sh_H[4 * sh_h_tile];
-        int h_tile = sh_h_tile;
+        const int sh_a_tile = 64;
+        __shared__ DType sh_A[4 * sh_a_tile];
+        int a_tile = sh_a_tile;
         for (unsigned int k_start = 0; k_start < in_len; k_start += 64) {
-            if ((in_len - k_start) < h_tile) h_tile = in_len - k_start;
+            if ((in_len - k_start) < a_tile) a_tile = in_len - k_start;
             /* Load A in shared mem in a coalesced way */
-            for (unsigned int l = laneId; l < h_tile; l += 32)
-                sh_H[local_row * sh_h_tile + l] = A[A_offset + (row * in_len + (k_start + l))];
+            for (unsigned int l = laneId; l < a_tile; l += 32)
+                sh_A[local_row * sh_a_tile + l] = A[A_offset + (row * in_len + (k_start + l))];
             __syncwarp();
 
             for (unsigned int outloop = 0; outloop < out_len; outloop +=32) {
@@ -139,10 +139,10 @@ __global__ void gatherMMKernel(
                 unsigned int l = laneId;
                 if (l < out_len) {
                     /* iterate over elements of a row of A */
-                    for (unsigned int i = 0; i < h_tile; i++) {
-                        DType h_val =  sh_H[local_row * sh_h_tile + i];
+                    for (unsigned int i = 0; i < a_tile; i++) {
+                        DType a_val =  sh_A[local_row * sh_a_tile + i];
                         /* iterate over elements of a row of B in parallel */
-                        out_reg += h_val * B[B_offset + ((i + k_start) * out_len + (outloop + l))];
+                        out_reg += a_val * B[B_offset + ((i + k_start) * out_len + (outloop + l))];
                     }
                     C[row * out_len + (outloop + l)] += out_reg;
                 }
@@ -257,17 +257,17 @@ void gatherMM_scatter(const NDArray A,
     SWITCH_BITS(bits, DType, {
         auto device = runtime::DeviceAPI::Get(A->ctx);
         auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
-        const DType *A_data = A.Ptr<DType>();
-        const DType *B_data = B.Ptr<DType>();
+        const IdType *idx_c_data = idx_c.Ptr<IdType>();
         int out_len = B->shape[1];  // cols of B
         int in_len = A->shape[1];  // cols of A
-        int64_t A_offset = 0, B_offset = 0, C_offset = 0;
         if (!thr_entry->cublas_handle)
             CUBLAS_CALL(cublasCreate(&(thr_entry->cublas_handle)));
         CUBLAS_CALL(cublasSetStream(thr_entry->cublas_handle,
             thr_entry->stream));
         DType* B_trans_data = nullptr;
         if (b_trans) {
+            int64_t B_offset = 0;
+            const DType *B_data = B.Ptr<DType>();
             in_len = B->shape[0]/num_rel;
             B_trans_data = static_cast<DType*>(device->AllocWorkspace \
                 (B->ctx, B->shape[0] * B->shape[1] * sizeof(DType)));
@@ -285,7 +285,9 @@ void gatherMM_scatter(const NDArray A,
         const int nbx =  ((tot_num_rows * warp_size + ntx - 1) / ntx);
         const dim3 nblks(nbx);
         const dim3 nthrs(ntx);
-        if (a_trans) {
+        if (a_trans && idx_c_data) {
+        // Custom kernel for W_grad[idx_c[i]] = H^T[i] * C.grad[i]
+        // This kernel accesses rows of A in a transposed way w/o explicitly converting A
             CUDA_KERNEL_CALL((gatherMMScatterKernel<IdType, DType>),
                 nblks, nthrs, 0, thr_entry->stream,
                 static_cast<DType*>(A->data),
@@ -296,16 +298,20 @@ void gatherMM_scatter(const NDArray A,
                 static_cast<IdType*>(idx_c->data),
                 tot_num_rows,
                 in_len, out_len);
-        } else {  // b_trans
-            CUDA_KERNEL_CALL((gatherMMKernel<IdType, DType>),
-                nblks, nthrs, 0, thr_entry->stream,
-                static_cast<DType*>(A->data),
-                (b_trans) ? B_trans_data : static_cast<DType*>(B->data),
-                static_cast<DType*>(C->data),
-                static_cast<IdType*>(idx_a->data),
-                static_cast<IdType*>(idx_b->data),
-                tot_num_rows,
-                in_len, out_len);
+        } else if (!idx_c_data) {  // use generic gather_mm
+            if (!a_trans) {  // Can't transpose A w/o E per etype info
+                CUDA_KERNEL_CALL((gatherMMKernel<IdType, DType>),
+                    nblks, nthrs, 0, thr_entry->stream,
+                    static_cast<DType*>(A->data),
+                    (b_trans) ? B_trans_data : static_cast<DType*>(B->data),
+                    static_cast<DType*>(C->data),
+                    static_cast<IdType*>(idx_a->data),
+                    static_cast<IdType*>(idx_b->data),
+                    tot_num_rows,
+                    in_len, out_len);
+            }
+        } else {
+            LOG(FATAL) << "Not implemented";
         }
         if (b_trans)
             device->FreeWorkspace(B->ctx, B_trans_data);
@@ -484,8 +490,8 @@ void segmentMM(const NDArray A,
  * \param A The input dense matrix of dimension m x k
  * \param B The input dense matrix of dimension k x n
  * \param C The output dense matrix of dimension m x n
- * \param idx_a : The input vector to gather left hand operand on
- * \param idx_b : The input vector to gather right hand operand on
+ * \param idx_a The input vector to gather left hand operand on
+ * \param idx_b The input vector to gather right hand operand on
  * \param num_rel The number of idx types in idx_b
  */
 template <int XPU, typename IdType, int bits>
@@ -504,9 +510,9 @@ void gatherMM(const NDArray A,
  * \param A The input dense matrix of dimension m x k
  * \param B The input dense matrix of dimension k x n
  * \param C The output dense matrix of dimension m x n
- * \param idx_a : The input vector to gather left hand operand on
- * \param idx_b : The input vector to gather right hand operand on
- * \param idx_c : The input vector to gather output operand on
+ * \param idx_a The input vector to gather left hand operand on
+ * \param idx_b The input vector to gather right hand operand on
+ * \param idx_c The input vector to gather output operand on
  * \param num_rel The number of idx types in idx_b
  * \param a_trans Matrix A to be transposed
  * \param b_trans Matrix B to be transposed
