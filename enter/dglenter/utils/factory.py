@@ -169,6 +169,13 @@ DataFactory.register(
     allowed_pipeline=["nodepred", "nodepred-ns", "edgepred"])
 
 DataFactory.register(
+    "ogbn-products",
+    import_code="from ogb.nodeproppred import DglNodePropPredDataset",
+    extra_args={},
+    class_name="DglNodePropPredDataset('ogbn-products')",
+    allowed_pipeline=["nodepred", "nodepred-ns", "edgepred"])
+
+DataFactory.register(
     "ogbl-collab",
     import_code="from ogb.linkproppred import DglLinkPropPredDataset",
     extra_args={},

@@ -1,6 +1,7 @@
 import torch.nn as nn
 import dgl
 from dgl.base import dgl_warning
+
 class GraphSAGE(nn.Module):
     def __init__(self,
                  data_info: dict,
@@ -29,22 +30,23 @@ class GraphSAGE(nn.Module):
         """
         super(GraphSAGE, self).__init__()
         self.data_info = data_info
-        self.out_size = data_info["out_size"]
-        self.in_size = data_info["in_size"]
         self.embed_size = embed_size
         if embed_size > 0:
             self.embed = nn.Embedding(data_info["num_nodes"], embed_size)
+            in_size = embed_size
+        else:
+            in_size = data_info["in_size"]
         self.layers = nn.ModuleList()
         self.dropout = nn.Dropout(dropout)
         self.activation = getattr(nn.functional, activation)
 
         # input layer
-        self.layers.append(dgl.nn.SAGEConv(self.in_size, hidden_size, aggregator_type))
+        self.layers.append(dgl.nn.SAGEConv(in_size, hidden_size, aggregator_type))
         # hidden layers
         for i in range(num_layers - 1):
             self.layers.append(dgl.nn.SAGEConv(hidden_size, hidden_size, aggregator_type))
         # output layer
-        self.layers.append(dgl.nn.SAGEConv(hidden_size, self.out_size, aggregator_type)) # activation None
+        self.layers.append(dgl.nn.SAGEConv(hidden_size, data_info["out_size"], aggregator_type)) # activation None
 
     def forward(self, graph, node_feat, edge_feat = None):
         if self.embed_size > 0:

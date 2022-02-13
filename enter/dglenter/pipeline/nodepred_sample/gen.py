@@ -42,23 +42,23 @@ SamplerConfig = Union[MultiLayerSamplerConfig,
 SamplerChoice = extract_name(SamplerConfig)
 
 pipeline_comments = {
-    "node_embed_size": "The node learnable embedding size, -1 to disable",
     "num_epochs": "Number of training epochs",
     "eval_period": "Interval epochs between evaluations",
     "early_stop": {
         "patience": "Steps before early stop",
         "checkpoint_path": "Early stop checkpoint model file path"
-    }
+    },
+    "num_runs": "Number of experiments to run",
 }
 
 class NodepredNSPipelineCfg(BaseModel):
     sampler: SamplerConfig = Field(..., discriminator='name')
-    node_embed_size: Optional[int] = -1
     early_stop: Optional[EarlyStopConfig] = EarlyStopConfig()
     num_epochs: int = 200
     eval_period: int = 5
-    optimizer: dict = {"name": "Adam", "lr": 0.005}
+    optimizer: dict = {"name": "Adam", "lr": 0.005, "weight_decay": 0.0}
     loss: str = "CrossEntropyLoss"
+    num_runs: int = 1
 
 @PipelineFactory.register("nodepred-ns")
 class NodepredNsPipeline(PipelineBase):

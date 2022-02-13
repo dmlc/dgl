@@ -37,19 +37,20 @@ class GCN(nn.Module):
         super().__init__()
         self.use_edge_weight = use_edge_weight
         self.data_info = data_info
-        self.out_size = data_info["out_size"]
-        self.in_size = data_info["in_size"]
         self.embed_size = embed_size
         self.layers = nn.ModuleList()
         if embed_size > 0:
             self.embed = nn.Embedding(data_info["num_nodes"], embed_size)
+            in_size = embed_size
+        else:
+            in_size = data_info["in_size"]
         # input layer
-        self.layers.append(dgl.nn.GraphConv(self.in_size, hidden_size, norm=norm))
+        self.layers.append(dgl.nn.GraphConv(in_size, hidden_size, norm=norm))
         # hidden layers
         for i in range(num_layers - 1):
             self.layers.append(dgl.nn.GraphConv(hidden_size, hidden_size, norm=norm))
         # output layer
-        self.layers.append(dgl.nn.GraphConv(hidden_size, self.out_size, norm=norm))
+        self.layers.append(dgl.nn.GraphConv(hidden_size, data_info["out_size"], norm=norm))
         self.dropout = nn.Dropout(p=dropout)
         self.act = getattr(torch, activation)
 
