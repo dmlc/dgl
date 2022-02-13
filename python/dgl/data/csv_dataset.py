@@ -33,6 +33,10 @@ class DGLCSVDataset(DGLDataset):
         A callable object which is used to parse corresponding column graph
         data. Default: None. If None, a default data parser is applied
         which load data directly and tries to convert list into array.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Attributes
     ----------
@@ -46,7 +50,8 @@ class DGLCSVDataset(DGLDataset):
     """
     META_YAML_NAME = 'meta.yaml'
 
-    def __init__(self, data_path, force_reload=False, verbose=True, node_data_parser=None, edge_data_parser=None, graph_data_parser=None):
+    def __init__(self, data_path, force_reload=False, verbose=True, node_data_parser=None,
+                 edge_data_parser=None, graph_data_parser=None, transform=None):
         from .csv_dataset_base import load_yaml_with_sanity_check, DefaultDataParser
         self.graphs = None
         self.data = None
@@ -61,7 +66,7 @@ class DGLCSVDataset(DGLDataset):
         self.meta_yaml = load_yaml_with_sanity_check(meta_yaml_path)
         ds_name = self.meta_yaml.dataset_name
         super().__init__(ds_name, raw_dir=os.path.dirname(
-            meta_yaml_path), force_reload=force_reload, verbose=verbose)
+            meta_yaml_path), force_reload=force_reload, verbose=verbose, transform=transform)
 
 
     def process(self):
@@ -122,10 +127,15 @@ class DGLCSVDataset(DGLDataset):
         self.graphs, self.data = load_graphs(graph_path)
 
     def __getitem__(self, i):
-        if 'label' in self.data:
-            return self.graphs[i], self.data['label'][i]
+        if self._transform is None:
+            g = self.graphs[i]
         else:
-            return self.graphs[i]
+            g = self._transform(self.graphs[i])
+
+        if 'label' in self.data:
+            return g, self.data['label'][i]
+        else:
+            return g
 
     def __len__(self):
         return len(self.graphs)
