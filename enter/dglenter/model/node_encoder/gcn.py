@@ -18,7 +18,7 @@ class GCN(nn.Module):
         Parameters
         ----------
         data_info : dict
-            the information about the input dataset. Should contain feilds "in_size", "out_size", "num_nodes"
+            The information about the input dataset.
         embed_size : int
             The dimension of created embedding table. -1 means using original node embedding
         hidden_size : int

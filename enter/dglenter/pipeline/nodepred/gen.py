@@ -12,7 +12,6 @@ import ruamel.yaml
 from ruamel.yaml.comments import CommentedMap
 
 pipeline_comments = {
-    "node_embed_size": "The node learnable embedding size, -1 to disable",
     "num_epochs": "Number of training epochs",
     "eval_period": "Interval epochs between evaluations",
     "early_stop": {
@@ -23,7 +22,6 @@ pipeline_comments = {
 }
 
 class NodepredPipelineCfg(BaseModel):
-    node_embed_size: Optional[int] = -1
     early_stop: Optional[EarlyStopConfig] = EarlyStopConfig()
     num_epochs: int = 200
     eval_period: int = 5

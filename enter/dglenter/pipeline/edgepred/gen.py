@@ -14,7 +14,6 @@ from ruamel.yaml.comments import CommentedMap
 
 class EdgepredPipelineCfg(BaseModel):
     hidden_size: int = 256
-    node_embed_size: Optional[int] = -1
     early_stop: Optional[EarlyStopConfig] = EarlyStopConfig()
     eval_batch_size: int = 32769
     train_batch_size: int = 32769
@@ -25,7 +24,6 @@ class EdgepredPipelineCfg(BaseModel):
 
 pipeline_comments = {
     "hidden_size": "The intermediate hidden size between node model and edge model",
-    "node_embed_size": "The node learnable embedding size, -1 to disable",
     "eval_batch_size": "Edge batch size when evaluating",
     "train_batch_size": "Edge batch size when training",
     "num_epochs": "Number of training epochs",
