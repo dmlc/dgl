@@ -87,6 +87,9 @@ def run(proc_id, n_gpus, args, devices, data):
     elif args.data_device == 'uva':
         train_g.ndata['features'] = dgl.contrib.UnifiedTensor(train_nfeat, device=device)
         train_g.ndata['labels'] = dgl.contrib.UnifiedTensor(train_labels, device=device)
+    else:
+        train_g.ndata['features'] = train_nfeat
+        train_g.ndata['labels'] = train_labels
 
     # Create PyTorch DataLoader for constructing blocks
     sampler = dgl.dataloading.MultiLayerNeighborSampler(

@@ -120,6 +120,9 @@ def copy_to(input, ctx, **kwargs):
     else:
         raise RuntimeError('Invalid context', ctx)
 
+def is_pinned(input):
+    return input.is_pinned()
+
 def sum(input, dim, keepdims=False):
     return th.sum(input, dim=dim, keepdim=keepdims)
 
@@ -186,7 +189,7 @@ def repeat(input, repeats, dim):
     return th.repeat_interleave(input, repeats, dim) # PyTorch 1.1
 
 def gather_row(data, row_index):
-    return th.index_select(data, 0, row_index.long())
+    return data[row_index.long()]
 
 def slice_axis(data, axis, begin, end):
     return th.narrow(data, axis, begin, end - begin)

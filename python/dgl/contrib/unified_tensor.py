@@ -111,6 +111,10 @@ class UnifiedTensor: #UnifiedTensor
         if hasattr(self, '_input'):
             self._input = None
 
+    def is_pinned(self):
+        """Check if the tensor is in pinned memory."""
+        return True
+
     @property
     def shape(self):
         """Shape of this tensor"""
