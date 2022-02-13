@@ -7,6 +7,7 @@ from ..heterograph import DGLHeteroGraph
 from .. import ndarray as nd
 from .. import utils
 from .utils import EidExcluder
+from typing import Mapping
 
 __all__ = [
     'sample_etype_neighbors',
@@ -290,7 +291,10 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
     if F.device_type(g.device) == 'cpu' and not g.is_pinned():
         # copy the nodes back to the CPU in the case the output_device
         # is not accessible from the CPU
-        nodes = nodes.to(g.device)
+        if isinstance(nodes, Mapping):
+            nodes = {k: v.to(g.device) for k,v in nodes.items()}
+        else:
+            nodes = nodes.to(g.device)
         frontier = _sample_neighbors(
             g, nodes, fanout, edge_dir=edge_dir, prob=prob, replace=replace,
             copy_ndata=copy_ndata, copy_edata=copy_edata, exclude_edges=exclude_edges)

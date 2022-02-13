@@ -1,5 +1,5 @@
 ##
-#   Copyright (c) 2021, NVIDIA CORPORATION.
+#   Copyright (c) 2021-2022, NVIDIA CORPORATION.
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -17,7 +17,8 @@
 import dgl
 import backend as F
 import unittest
-from dgl.contrib import MultiGPUNodeDataLoader
+from dgl.dataloading import NodeDataLoader
+from dgl.contrib import MultiGPUFeatureGraphWrapper
 
 class DummyCommunicator:
     def __init__(self, rank, size):
@@ -44,40 +45,32 @@ def test_node_dataloader():
     g1 = dgl.graph(([0, 0, 0, 1, 1], [1, 2, 3, 3, 4]))
     g1.ndata['feat'] = F.copy_to(F.randn((5, 8)), F.cpu())
     graph_data_dim = g1.ndata['feat'].shape[1]
-    node_feat = F.copy_to(F.randn((5, 4)), F.cpu())
-    node_label = F.randint(low=0, high=3, shape=[5], dtype=F.int32, ctx=F.cpu())
+    g1.ndata['label'] = F.randint(low=0, high=3, shape=[5], dtype=F.int32, ctx=F.cpu())
 
     batch_size = 2
 
-    dataloader = MultiGPUNodeDataLoader(
-        g1, g1.nodes(), sampler, device=F.ctx(),
-        node_feat=node_feat,
-        node_label=node_label,
+
+    dataloader = NodeDataLoader(
+        MultiGPUFeatureGraphWrapper(g1, F.ctx()),
+        g1.nodes(), sampler, device=F.ctx(),
         use_ddp=False,
         batch_size=batch_size,
         shuffle=True,
         drop_last=False)
 
-    for input_nodes, output_nodes, blocks, block_feat, block_label in dataloader:
+    for input_nodes, output_nodes, blocks in dataloader:
+        block_label = g1.ndata['label']
         # make sure everything is on the GPU
         assert input_nodes.device == F.ctx()
         assert output_nodes.device == F.ctx()
         for block in blocks:
             assert block.device == F.ctx()
-        assert block_feat.device == F.ctx()
-        assert block_label.device == F.ctx()
 
         # make sure we have the same features
         for block in blocks:
             for ntype in block.ntypes:
                 block_data_dim = block.ndata['feat'][ntype].shape[1]
                 assert block_data_dim == graph_data_dim
-        exp_feat = node_feat[input_nodes]
-        act_feat = F.copy_to(block_feat, F.cpu())
-        assert F.array_equal(exp_feat, act_feat)
-        exp_label = node_label[output_nodes]
-        act_label = F.copy_to(block_label, F.cpu())
-        assert F.array_equal(exp_label, act_label)
 
 
 @unittest.skipIf(F._default_context_str == 'cpu',
@@ -108,18 +101,16 @@ def test_node_dataloader_hg():
     batch_size = max(g1.num_nodes(nty) for nty in g1.ntypes)
 
     sampler = dgl.dataloading.MultiLayerFullNeighborSampler(2)
-    dataloader = MultiGPUNodeDataLoader(
-        g1, {nty: g1.nodes(nty) for nty in g1.ntypes},
+    dataloader = NodeDataLoader(
+        MultiGPUFeatureGraphWrapper(g1, F.ctx()),
+        {nty: g1.nodes(nty) for nty in g1.ntypes},
         sampler, device=F.ctx(),
-        node_feat=node_feat,
         use_ddp=False,
         batch_size=batch_size,
         shuffle=True,
         drop_last=False)
 
-
-
-    for input_nodes, output_nodes, blocks, block_feat in dataloader:
+    for input_nodes, output_nodes, blocks in dataloader:
         # make sure everything is on the GPU
         for _, tensor in input_nodes.items():
             assert tensor.device == F.ctx()
@@ -127,21 +118,17 @@ def test_node_dataloader_hg():
             assert tensor.device == F.ctx()
         for block in blocks:
             assert block.device == F.ctx()
-        for _, feat in block_feat.items():
-            assert feat.device == F.ctx()
 
         # make sure we have the same features
         for block in blocks:
             for ntype in block.ntypes:
-                block_data_dim = block.ndata['feat'][ntype].shape[1]
-                assert block_data_dim == graph_ndata_dim[ntype]
+                act_feat = F.copy_to(block.ndata['feat'][ntype], F.cpu())
+                exp_feat = g1.ndata['feat'][ntype][block.nodes(ntype)]
+                assert F.array_equal(exp_feat, act_feat)
             for etype in block.canonical_etypes:
-                block_edata_dim = block.edata['feat'][etype].shape[1]
-                assert block_edata_dim == graph_edata_dim[etype[1]]
-        for ntype in g1.ntypes:
-            exp_feat = node_feat[ntype][input_nodes[ntype]]
-            act_feat = F.copy_to(block_feat[ntype], F.cpu())
-            assert F.array_equal(exp_feat, act_feat)
+                act_feat = F.copy_to(block.edata['feat'][etype], F.cpu())
+                exp_feat = g1.edata['feat'][etype][block.edges(form='eid', etype=etype)]
+                assert F.array_equal(exp_feat, act_feat)
 
 if __name__ == '__main__':
     test_node_dataloader()

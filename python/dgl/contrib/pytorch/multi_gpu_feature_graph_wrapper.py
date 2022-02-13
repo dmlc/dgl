@@ -38,7 +38,7 @@ def _load_tensor(tensor, device, comm, part):
 def _gather_row(tensor, index):
     return tensor.all_gather_row(index)
 
-class MultiGPUFeatureGraphWrapper:
+class MultiGPUFeatureGraphWrapper(object):
     """.
 
     Parameters
@@ -204,7 +204,7 @@ class MultiGPUFeatureGraphWrapper:
         return self._e_feat[etype][key]
  
     def __getattr__(self, key):
-        if key in ['ntypes', 'etypes', 'canonical_etypes',
+        if key in ['ntypes', 'etypes', 'canonical_etypes', 'nodes',
                    'subgraph', 'edge_subgraph', 'find_edges', 'num_nodes']:
             # Delegate to the wrapped GraphStorage instance.
             return getattr(self._g, key)
