@@ -136,11 +136,11 @@ __global__ void gatherMMKernel(
 
             for (unsigned int outloop = 0; outloop < out_len; outloop +=32) {
                 DType out_reg = 0;  // thread private
-                unsigned int l = laneId;
+                const unsigned int l = laneId;
                 if (l < out_len) {
                     /* iterate over elements of a row of A */
                     for (unsigned int i = 0; i < a_tile; i++) {
-                        DType a_val =  sh_A[local_row * sh_a_tile + i];
+                        const DType a_val =  sh_A[local_row * sh_a_tile + i];
                         /* iterate over elements of a row of B in parallel */
                         out_reg += a_val * B[B_offset + ((i + k_start) * out_len + (outloop + l))];
                     }
@@ -187,13 +187,13 @@ __global__ void gatherMMScatterKernel(
 
             for (unsigned int outloop = 0; outloop < out_len; outloop +=32) {
                 DType out_reg = 0;  // thread private
-                unsigned int l = laneId;
+                const unsigned int l = laneId;
                 if (l < out_len) {
-                    DType b_val = B[row * out_len + (outloop + l)];
+                    const DType b_val = B[row * out_len + (outloop + l)];
                     /* iterate over elements of a row of A */
                     for (unsigned int i = 0; i < a_tile; i++) {
-                        DType a_val = sh_A[local_row * sh_a_tile + i];
-                        Idx C_idx = C_offset + ((i + k_start) * out_len + (outloop + l));
+                        const DType a_val = sh_A[local_row * sh_a_tile + i];
+                        const Idx C_idx = C_offset + ((i + k_start) * out_len + (outloop + l));
                         atomicAdd(reinterpret_cast<float*>(&C[C_idx]),
                             static_cast<float>(a_val * b_val));
                     }
@@ -213,19 +213,19 @@ void gatherMM(const NDArray A,
               NDArray C,
               const NDArray idx_a,
               const NDArray idx_b,
-              int num_rel) {
+              int64_t num_rel) {
     SWITCH_BITS(bits, DType, {
         auto device = runtime::DeviceAPI::Get(A->ctx);
         auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
         const DType *A_data = A.Ptr<DType>();
         const DType *B_data = B.Ptr<DType>();
-        int out_len = B->shape[1];  // cols of B
-        int in_len = A->shape[1];  // cols of A
+        int64_t out_len = B->shape[1];  // cols of B
+        int64_t in_len = A->shape[1];  // cols of A
         if (!thr_entry->cublas_handle)
             CUBLAS_CALL(cublasCreate(&(thr_entry->cublas_handle)));
         CUBLAS_CALL(cublasSetStream(thr_entry->cublas_handle,
             thr_entry->stream));
-        IdType tot_num_rows = A->shape[0];
+        int64_t tot_num_rows = A->shape[0];
         const int ntx = 128;
         const int warp_size = 32;
         const int nbx =  ((tot_num_rows * warp_size + ntx - 1) / ntx);
@@ -258,8 +258,8 @@ void gatherMM_scatter(const NDArray A,
         auto device = runtime::DeviceAPI::Get(A->ctx);
         auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
         const IdType *idx_c_data = idx_c.Ptr<IdType>();
-        int out_len = B->shape[1];  // cols of B
-        int in_len = A->shape[1];  // cols of A
+        int64_t out_len = B->shape[1];  // cols of B
+        int64_t in_len = A->shape[1];  // cols of A
         if (!thr_entry->cublas_handle)
             CUBLAS_CALL(cublasCreate(&(thr_entry->cublas_handle)));
         CUBLAS_CALL(cublasSetStream(thr_entry->cublas_handle,
@@ -279,7 +279,7 @@ void gatherMM_scatter(const NDArray A,
             }
             std::swap(in_len, out_len);
         }
-        IdType tot_num_rows = A->shape[0];
+        int64_t tot_num_rows = A->shape[0];
         const int ntx = 128;
         const int warp_size = 32;
         const int nbx =  ((tot_num_rows * warp_size + ntx - 1) / ntx);
@@ -322,7 +322,7 @@ void gatherMM_scatter(const NDArray A,
 
 /* \brief Implementation of SegmentMM operator. Each segment calls cuBLAS
  * GEMM operator to multiply segment of A and B. When A or B needs to be
- * tranposed, cuBLAS GEMM swtiches it's transpose parameter (CUBLAS_OP_T).
+ * tranposed, cuBLAS GEMM switches it's transpose parameter (CUBLAS_OP_T).
  */
 template <int XPU, typename IdType, int bits>
 void segment_mm(const NDArray A,
