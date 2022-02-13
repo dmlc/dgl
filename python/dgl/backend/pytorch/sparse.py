@@ -713,13 +713,16 @@ class SEGMENTMM(th.autograd.Function):
     @staticmethod
     def backward(ctx, dZ):
         A, B, seglen_A, B_3D_shape = ctx.backward_cache
-        #  Compute A_grad = Out_grad * B^T
-        A_grad = th.zeros(A.shape, device=A.device, dtype=A.dtype)
-        A_grad = _segment_mm(dZ, B, A_grad, seglen_A, b_trans=True)
-        #  Compute B_grad = A^T * Out_grad
-        B_grad = th.zeros(B.shape, device=B.device, dtype=B.dtype)
-        B_grad = _segment_mm(A, dZ, B_grad, seglen_A, a_trans=True)
-        B_grad = B_grad.reshape(B_3D_shape[0], B_3D_shape[1], B_3D_shape[2])
+        A_grad = B_grad = None
+        if ctx.needs_input_grad[0]:
+            #  Compute A_grad = Out_grad * B^T
+            A_grad = th.zeros(A.shape, device=A.device, dtype=A.dtype)
+            A_grad = _segment_mm(dZ, B, A_grad, seglen_A, b_trans=True)
+        if ctx.needs_input_grad[1]:
+            #  Compute B_grad = A^T * Out_grad
+            B_grad = th.zeros(B.shape, device=B.device, dtype=B.dtype)
+            B_grad = _segment_mm(A, dZ, B_grad, seglen_A, a_trans=True)
+            B_grad = B_grad.reshape(B_3D_shape[0], B_3D_shape[1], B_3D_shape[2])
         return A_grad, B_grad, None, None, None, None, None, None
 
 
@@ -740,13 +743,18 @@ class GATHERMM(th.autograd.Function):
     @staticmethod
     def backward(ctx, dZ):
         A, B, idx_a, idx_b, B_3D_shape = ctx.backward_cache
-        #  Compute A_grad = Out_grad * B^T
-        A_grad = th.zeros(A.shape, device=A.device, dtype=A.dtype)
-        A_grad = _gather_mm_scatter(dZ, B, A_grad, B_3D_shape[0], idx_b=idx_b, b_trans=True)
-        #  Compute B_grad = A^T * Out_grad
-        B_grad = th.zeros(B.shape, device=B.device, dtype=B.dtype)
-        B_grad = _gather_mm_scatter(A, dZ, B_grad, B_3D_shape[0], idx_c=idx_b, a_trans=True)
-        B_grad = B_grad.reshape(B_3D_shape[0], B_3D_shape[1], B_3D_shape[2])
+        A_grad = B_grad = None
+        if ctx.needs_input_grad[0]:
+            #  Compute A_grad = Out_grad * B^T
+            A_grad = th.zeros(A.shape, device=A.device, dtype=A.dtype)
+            A_grad = _gather_mm_scatter(dZ, B, A_grad, B_3D_shape[0],
+                idx_b=idx_b, idx_c=idx_a, b_trans=True)
+        if ctx.needs_input_grad[1]:
+            #  Compute B_grad = A^T * Out_grad
+            B_grad = th.zeros(B.shape, device=B.device, dtype=B.dtype)
+            B_grad = _gather_mm_scatter(A, dZ, B_grad, B_3D_shape[0],
+                idx_a=idx_a, idx_c=idx_b, a_trans=True)
+            B_grad = B_grad.reshape(B_3D_shape[0], B_3D_shape[1], B_3D_shape[2])
         return A_grad, B_grad, None, None, None, None, None, None
 
 def gspmm(gidx, op, reduce_op, lhs_data, rhs_data):

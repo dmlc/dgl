@@ -89,7 +89,7 @@ def test_gathermm(idtype):
         F.attach_grad(H)
         F.attach_grad(W_3D)
         with F.record_grad():
-            out_gmm_sorted = F.segment_mm(H, W_3D, seglen_A)
+            out_gmm_sorted = dgl.ops.segment_mm(H, W_3D, seglen_A)
             F.backward(F.reduce_sum(out_gmm_sorted))
             Hgrad_gmm_sorted = H.grad
             Wgrad_gmm_sorted = W_3D.grad
@@ -101,7 +101,7 @@ def test_gathermm(idtype):
         F.attach_grad(H)
         F.attach_grad(W_3D)
         with F.record_grad():
-            out_gmm_unsorted = F.gather_mm(H, W_3D, idx_b=etypes)
+            out_gmm_unsorted = dgl.ops.gather_mm(H, W_3D, idx_b=etypes)
             F.backward(F.reduce_sum(out_gmm_unsorted))
             Hgrad_gmm_unsorted = H.grad
             Wgrad_gmm_unsorted = W_3D.grad
@@ -122,5 +122,3 @@ def test_gathermm(idtype):
 
 if __name__ == '__main__':
     test_gathermm()
-
-

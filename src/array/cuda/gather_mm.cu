@@ -101,10 +101,11 @@ void _Transpose(cublasHandle_t handle,
 
 namespace cuda {
 
-/* \Note One warp is assigned to process one row of A. Each WARP sequentially
-  multiplies one element of A and a row of B to compute partial result of the
-  output. A is loaded in shared memory in a coalesced way. Output matrix is
-  loaded in registers. B should get benefit from L2 cache.
+/* \Note Each row of A multiplies a segment of matrix of B of dimension in_len * outlen.
+  One warp is assigned to process one row of A. Each WARP sequentially multiplies
+  one element of A and a row of B to compute partial result of the output. A
+  is loaded in shared memory in a coalesced way. Output matrix is loaded in
+  registers. B should get benefit from L2 cache.
 */
 template <typename Idx, typename DType>
 __global__ void gatherMMKernel(
@@ -122,8 +123,9 @@ __global__ void gatherMMKernel(
     unsigned int row = warpId;
     if (row < num_rows) {
         unsigned int local_row = row & 3;  // hardcoded for TB size 128 (4 warps)
-        Idx A_offset = (idx_a) ? idx_a[row] * in_len * out_len : 0;
-        Idx B_offset = (idx_b) ? idx_b[row] * in_len * out_len : 0;
+        Idx cur_rowA = (idx_a) ? idx_a[row] : row;
+        Idx cur_rowB = (idx_b) ? idx_b[row] : row / in_len;
+        Idx B_offset = cur_rowB * in_len * out_len;
         const int sh_a_tile = 64;
         __shared__ DType sh_A[4 * sh_a_tile];
         int a_tile = sh_a_tile;
@@ -131,7 +133,7 @@ __global__ void gatherMMKernel(
             if ((in_len - k_start) < a_tile) a_tile = in_len - k_start;
             /* Load A in shared mem in a coalesced way */
             for (unsigned int l = laneId; l < a_tile; l += 32)
-                sh_A[local_row * sh_a_tile + l] = A[A_offset + (row * in_len + (k_start + l))];
+                sh_A[local_row * sh_a_tile + l] = A[cur_rowA * in_len + (k_start + l)];
             __syncwarp();
 
             for (unsigned int outloop = 0; outloop < out_len; outloop +=32) {
@@ -378,85 +380,6 @@ void segment_mm(const NDArray A,
                 A_data + A_offset, lda,
                 &beta,
                 C_data + C_offset, ldc));
-            A_offset += m * k;
-            B_offset += k * n;
-            C_offset += m * n;
-        }
-    });
-}
-
-/* \brief Implementation of SegmentMM operator. Each segment calls cuBLAS
- * GEMM operator to multiply segment of A and B. When A or B needs to be
- * tranposed, cuBLAS's Xgeam operation is used to tranpose the teh matrix
- * prior to calling the GEMM operation.
- */
-template <int XPU, typename IdType, int bits>
-void segment_mm_explicitTranspose(const NDArray A,
-              const NDArray B,
-              NDArray C,
-              const NDArray seglen_A,
-              bool a_trans, bool b_trans) {
-    SWITCH_BITS(bits, DType, {
-        auto device = runtime::DeviceAPI::Get(A->ctx);
-        const DType *A_data = A.Ptr<DType>();
-        const DType *B_data = B.Ptr<DType>();
-        const IdType* seglen_A_data = seglen_A.Ptr<IdType>();
-        DType *C_data = C.Ptr<DType>();
-        int64_t A_offset = 0, B_offset = 0, C_offset = 0;
-        int64_t m, n, k;
-        int64_t num_rel = seglen_A.NumElements();
-        DType alpha = 1., beta = 0.;
-
-        auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
-        if (!thr_entry->cublas_handle)
-            CUBLAS_CALL(cublasCreate(&(thr_entry->cublas_handle)));
-        CUBLAS_CALL(cublasSetStream(thr_entry->cublas_handle,
-            thr_entry->stream));
-
-        for (int etype = 0; etype < num_rel; ++etype) {
-            IdType B_dim1 = B->shape[0] / num_rel;
-            assert((a_trans) ? seglen_A_data[etype] : A->shape[1] ==  \
-                (b_trans) ? B->shape[1] : B_dim1);
-            m = seglen_A_data[etype];  // rows of A
-            n = B->shape[1];  // cols of B
-            k = A->shape[1];  // cols of A == rows of B
-
-            DType* A_trans_data = nullptr;
-            DType* B_trans_data = nullptr;
-            if (a_trans) {
-                A_trans_data = static_cast<DType*>(device->AllocWorkspace \
-                    (A->ctx, m * k * sizeof(DType)));
-                _Transpose(thr_entry->cublas_handle, A_data + A_offset, A_trans_data, m, k);
-            }
-            if (b_trans) {
-                IdType tmp_k = B_dim1;
-                B_trans_data = static_cast<DType*>(device->AllocWorkspace \
-                    (B->ctx, n * tmp_k * sizeof(DType)));
-                _Transpose(thr_entry->cublas_handle, B_data + B_offset, B_trans_data, tmp_k, n);
-            }
-            if (a_trans || b_trans) {
-                if (a_trans)
-                    std::swap(m, k);
-                if (b_trans)  {
-                    k = B_dim1;
-                    std::swap(n, k);
-                }
-            }
-            int ldb = n, lda = k, ldc = n;
-            CUBLAS_CALL(cublasGemm<DType>(
-                thr_entry->cublas_handle,
-                CUBLAS_OP_N,
-                CUBLAS_OP_N,
-                n, m, k,
-                &alpha,
-                (b_trans) ? B_trans_data : B_data + B_offset, ldb,
-                (a_trans) ? A_trans_data : A_data + A_offset, lda,
-                &beta,
-                C_data + C_offset, ldc));
-            if (a_trans)
-                device->FreeWorkspace(A->ctx, A_trans_data);
-            if (b_trans)
-                device->FreeWorkspace(B->ctx, B_trans_data);
             A_offset += m * k;
             B_offset += k * n;
             C_offset += m * n;
