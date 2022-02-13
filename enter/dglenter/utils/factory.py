@@ -143,13 +143,6 @@ DataFactory.register(
     allowed_pipeline=["nodepred", "nodepred-ns", "edgepred"])
 
 DataFactory.register(
-    "ogbl-collab",
-    import_code="from ogb.linkproppred import DglLinkPropPredDataset",
-    extra_args={},
-    class_name="DglLinkPropPredDataset('ogbl-collab')",
-    allowed_pipeline=["edgepred"])
-
-DataFactory.register(
     "csv",
     import_code="from dgl.data import DGLCSVDataset",
     extra_args={"data_path": "./"},
@@ -168,6 +161,19 @@ DataFactory.register(
     class_name="AmazonCoBuyComputerDataset()",
     allowed_pipeline=["nodepred", "nodepred-ns", "edgepred"])
 
+DataFactory.register(
+    "ogbn-arxiv",
+    import_code="from ogb.nodeproppred import DglNodePropPredDataset",
+    extra_args={},
+    class_name="DglNodePropPredDataset('ogbn-arxiv')",
+    allowed_pipeline=["nodepred", "nodepred-ns", "edgepred"])
+
+DataFactory.register(
+    "ogbl-collab",
+    import_code="from ogb.linkproppred import DglLinkPropPredDataset",
+    extra_args={},
+    class_name="DglLinkPropPredDataset('ogbl-collab')",
+    allowed_pipeline=["edgepred"])
 
 class PipelineFactory:
     """ The factory class for creating executors"""

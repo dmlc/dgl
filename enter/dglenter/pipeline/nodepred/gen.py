@@ -61,7 +61,7 @@ class NodepredPipeline(PipelineBase):
         ):  
             self.__class__.setup_user_cfg_cls()
             generated_cfg = {
-                "pipeline_name": "nodepred",
+                "pipeline_name": self.pipeline_name,
                 "device": device,
                 "data": {"name": data.name},
                 "model": {"name": model.value},

@@ -72,29 +72,49 @@ class AsNodePredDataset(DGLDataset):
                  split_ratio=None,
                  target_ntype=None,
                  **kwargs):
-        self.g = dataset[0].clone()
+        self.dataset = dataset
         self.split_ratio = split_ratio
         self.target_ntype = target_ntype
-        self.num_classes = getattr(dataset, 'num_classes', None)
-        super().__init__(dataset.name + '-as-nodepred',
+        super().__init__(self.dataset.name + '-as-nodepred',
                          hash_key=(split_ratio, target_ntype), **kwargs)
 
     def process(self):
+        is_ogb = hasattr(self.dataset, 'get_idx_split')
+        if is_ogb:
+            g, label = self.dataset[0]
+            self.g = g.clone()
+            self.g.ndata['label'] = F.reshape(label, (g.num_nodes(),))
+        else:
+            self.g = self.dataset[0].clone()
+
         if 'label' not in self.g.nodes[self.target_ntype].data:
             raise ValueError("Missing node labels. Make sure labels are stored "
                              "under name 'label'.")
+
         if self.split_ratio is None:
-            assert "train_mask" in self.g.nodes[self.target_ntype].data, \
-                "train_mask is not provided, please specify split_ratio to generate the masks"
-            assert "val_mask" in self.g.nodes[self.target_ntype].data, \
-                "val_mask is not provided, please specify split_ratio to generate the masks"
-            assert "test_mask" in self.g.nodes[self.target_ntype].data, \
-                "test_mask is not provided, please specify split_ratio to generate the masks"
+            if is_ogb:
+                split = self.dataset.get_idx_split()
+                train_idx, val_idx, test_idx = split['train'], split['valid'], split['test']
+                n = self.g.num_nodes()
+                train_mask = utils.generate_mask_tensor(utils.idx2mask(train_idx, n))
+                val_mask = utils.generate_mask_tensor(utils.idx2mask(val_idx, n))
+                test_mask = utils.generate_mask_tensor(utils.idx2mask(test_idx, n))
+                self.g.ndata['train_mask'] = train_mask
+                self.g.ndata['val_mask'] = val_mask
+                self.g.ndata['test_mask'] = test_mask
+            else:
+                assert "train_mask" in self.g.nodes[self.target_ntype].data, \
+                    "train_mask is not provided, please specify split_ratio to generate the masks"
+                assert "val_mask" in self.g.nodes[self.target_ntype].data, \
+                    "val_mask is not provided, please specify split_ratio to generate the masks"
+                assert "test_mask" in self.g.nodes[self.target_ntype].data, \
+                    "test_mask is not provided, please specify split_ratio to generate the masks"
         else:
             if self.verbose:
                 print('Generating train/val/test masks...')
             utils.add_nodepred_split(self, self.split_ratio, self.target_ntype)
 
+        self.num_classes = getattr(self.dataset, 'num_classes', None)
         if self.num_classes is None:
             self.num_classes = len(F.unique(self.g.nodes[self.target_ntype].data['label']))
 
