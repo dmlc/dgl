@@ -39,7 +39,8 @@ def _gather_row(tensor, index):
     return tensor.all_gather_row(index)
 
 class MultiGPUFeatureGraphWrapper(object):
-    """.
+    """This class wraps a DGLGraph object and enables neighbor sampling where
+       the features are stored split across the GPUs.
 
     Parameters
     ----------
@@ -61,9 +62,9 @@ class MultiGPUFeatureGraphWrapper(object):
     a homogeneous graph where each node takes messages from all neighbors (assume
     the backend is PyTorch):
 
-    >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
-    >>> dataloader = dgl.contrib.MultiGPUNodeDataLoader(
-    ...     g, train_nid, sampler,
+    >>> sampler = MultiLayerNeighborSampler([15, 10, 5])
+    >>> dataloader = NodeDataLoader(
+    ...     MultiGPUFeatureGraphWrapper(g, dev_id), train_nid, sampler,
     ...     device=dev_id, node_feat=nfeat,
     ...     node_label=labels, batch_size=1024, shuffle=True,
     ...     drop_last=False)
@@ -145,6 +146,37 @@ class MultiGPUFeatureGraphWrapper(object):
 
     def sample_neighbors(self, nodes, fanout, edge_dir='in', prob=None,
                          replace=False, output_device=None, exclude_edges=None):
+        """Sample neighboring edges of the given nodes and return the
+        induced subgraph.
+
+        Parameters
+        ----------
+        nodes : tensor or dict
+            The nodes to sample from.
+        fanout : int or dict[etype, int]
+            The number of edges to sample per node. For graphs with multiple
+            edge types, a dictionary can be supplied with a different fanout
+            per type. A value of -1 will result in all edges being selected.
+        edge_dir : str, optional
+            The direction of edges to sample. ``in`` for inbound edges and
+            ``out`` for outbound edges.
+        prob : str, optional
+            The feature name used a probability for each edge. Feature must be
+            a single dimension of float type, and all value must be
+            non-negative.
+        replace : bool, optional
+            Whether to sample with replacement.
+        output_device : Framework-specific device context object, optional
+            The output device. Default is the same as this objet. 
+        exclude_edges: tensor or dict
+            Edges to exclude during neihgbor sampling.
+
+        Returns
+        -------
+        DGLGraph
+            A sampled subgraph containing only the sampled neighboring edges.
+        """
+
 
         if output_device is None:
             output_device = self._device
@@ -190,6 +222,21 @@ class MultiGPUFeatureGraphWrapper(object):
         return frontier
 
     def get_node_storage(self, key, ntype=None):
+        """Get the node feature storage for the given features 'key' and
+        'ntype'.
+
+        Paramters
+        ---------
+        key : String
+            The name of the feature to get.
+        ntype : String, Tuple
+            The edge type to get the feature of.
+
+        Returns
+        -------
+        FeatureStorage
+            The feature storage of the given feature.
+        """
         if ntype == None:
             assert len(self._n_feat) == 1, "ntype must be specified for " \
                                            "graphs with more than one ntype."
@@ -197,6 +244,21 @@ class MultiGPUFeatureGraphWrapper(object):
         return self._n_feat[ntype][key]
             
     def get_edge_storage(self, key, etype=None):
+        """Get the edge feature storage for the given features 'key' and
+        'etype'.
+
+        Paramters
+        ---------
+        key : String
+            The name of the feature to get.
+        etype : String, Tuple
+            The edge type to get the feature of.
+
+        Returns
+        -------
+        FeatureStorage
+            The feature storage of the given feature.
+        """
         if etype == None:
             assert len(self._e_feat) == 1, "etype must be specified for " \
                                            "graphs with more than one etype."
