@@ -7,6 +7,7 @@ import os
 import pandas as pd
 import yaml
 import pytest
+import dgl
 import dgl.data as data
 from dgl import DGLError
 
@@ -16,7 +17,11 @@ def test_minigc():
     ds = data.MiniGCDataset(16, 10, 20)
     g, l = list(zip(*ds))
     print(g, l)
-
+    g1 = ds[0][0]
+    transform = dgl.AddSelfLoop(allow_duplicate=True)
+    ds = data.MiniGCDataset(16, 10, 20, transform=transform)
+    g2 = ds[0][0]
+    assert g2.num_edges() - g1.num_edges() == g1.num_nodes()
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
 def test_gin():
@@ -27,27 +32,46 @@ def test_gin():
         'PROTEINS': 1113,
         'PTC': 344,
     }
+    transform = dgl.AddSelfLoop(allow_duplicate=True)
     for name, n_graphs in ds_n_graphs.items():
         ds = data.GINDataset(name, self_loop=False, degree_as_nlabel=False)
         assert len(ds) == n_graphs, (len(ds), name)
-
+        g1 = ds[0][0]
+        ds = data.GINDataset(name, self_loop=False, degree_as_nlabel=False, transform=transform)
+        g2 = ds[0][0]
+        assert g2.num_edges() - g1.num_edges() == g1.num_nodes()
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
 def test_fraud():
+    transform = dgl.AddSelfLoop(allow_duplicate=True)
+
     g = data.FraudDataset('amazon')[0]
     assert g.num_nodes() == 11944
+    num_edges1 = g.num_edges()
+    g2 = data.FraudDataset('amazon', transform=transform)[0]
+    # 3 edge types
+    assert g2.num_edges() - num_edges1 == g.num_nodes() * 3
 
     g = data.FraudAmazonDataset()[0]
     assert g.num_nodes() == 11944
+    g2 = data.FraudAmazonDataset(transform=transform)[0]
+    # 3 edge types
+    assert g2.num_edges() - g.num_edges() == g.num_nodes() * 3
 
     g = data.FraudYelpDataset()[0]
     assert g.num_nodes() == 45954
-
+    g2 = data.FraudYelpDataset(transform=transform)[0]
+    # 3 edge types
+    assert g2.num_edges() - g.num_edges() == g.num_nodes() * 3
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
 def test_fakenews():
+    transform = dgl.AddSelfLoop(allow_duplicate=True)
+
     ds = data.FakeNewsDataset('politifact', 'bert')
     assert len(ds) == 314
+    g = ds[0][0]
+    g2 = data.FakeNewsDataset('politifact', 'bert', transform=transform)[0][0]
 
     ds = data.FakeNewsDataset('gossipcop', 'profile')
     assert len(ds) == 5464

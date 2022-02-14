@@ -221,7 +221,7 @@ class FakeNewsDataset(DGLBuiltinDataset):
         if self._transform is None:
             g = self.graphs[i]
         else:
-            g = self._transform(g)
+            g = self._transform(self.graphs[i])
         return g, self.labels[i]
 
     def __len__(self):
