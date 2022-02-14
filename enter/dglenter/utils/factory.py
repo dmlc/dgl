@@ -1,6 +1,6 @@
 import enum
 import logging
-from typing import Callable, Dict, Union, List
+from typing import Callable, Dict, Union, List, Tuple, Optional
 from typing_extensions import Literal
 from pathlib import Path
 from abc import ABC, abstractmethod, abstractstaticmethod
@@ -37,6 +37,7 @@ class DataFactoryClass:
 
     def __init__(self):
         self.registry = {}
+        self.pipeline_name = None
         self.pipeline_allowed = {}
 
     def register(self,
@@ -74,6 +75,7 @@ class DataFactoryClass:
         return type_annotation_dict
 
     def get_pydantic_config(self):
+
         type_annotation_dict = {}
         dataset_list = []
         for k, v in self.registry.items():
@@ -81,11 +83,9 @@ class DataFactoryClass:
             type_annotation_dict = v["extra_args"]
             if "name" in type_annotation_dict:
                 del type_annotation_dict["name"]
-            class Base(DGLBaseModel):
-                name: Literal[dataset_name]
-
+            base = self.get_base_class(dataset_name, self.pipeline_name)
             dataset_list.append(create_model(
-                f'{dataset_name}Config', **type_annotation_dict, __base__=Base))
+                f'{dataset_name}Config', **type_annotation_dict, __base__=base))
 
         output = dataset_list[0]
         for d in dataset_list[1:]:
@@ -119,7 +119,24 @@ class DataFactoryClass:
         new_registry = {k: v for k,v in self.registry.items() if k in allowed_name}
         d = DataFactoryClass()
         d.registry = new_registry
+        d.pipeline_name = pipeline_name
         return d
+
+    @staticmethod
+    def get_base_class(dataset_name, pipeline_name):
+        if pipeline_name == "edgepred":
+            class EdgeBase(DGLBaseModel):
+                name: Literal[dataset_name]
+                split_ratio: Optional[Tuple[float, float, float]] = None
+                neg_ratio: Optional[int] = None
+            return EdgeBase
+        else:
+            class NodeBase(DGLBaseModel):
+                name: Literal[dataset_name]
+                split_ratio: Optional[Tuple[float, float, float]] = None
+            return NodeBase
+        
+
 
 
 DataFactory = DataFactoryClass()

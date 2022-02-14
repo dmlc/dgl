@@ -97,7 +97,11 @@ class EdgepredPipeline(PipelineBase):
                 "general_pipeline": pipeline_comments,
                 "node_model": NodeModelFactory.get_constructor_doc_dict(node_model.value),
                 "edge_model": EdgeModelFactory.get_constructor_doc_dict(edge_model.value),
-                "neg_sampler": NegativeSamplerFactory.get_constructor_doc_dict(neg_sampler.value)
+                "neg_sampler": NegativeSamplerFactory.get_constructor_doc_dict(neg_sampler.value),                
+                "data": {
+                    "split_ratio": 'List of float, e.q. [0.8, 0.1, 0.1]. Split ratios for training, validation and test sets. Must sum to one. Leave blank to use builtin split in original dataset',
+                    "neg_ratio": 'Int, e.q. 2. Indicate how much negative samples to be sampled per positive samples. Leave blank to use builtin split in original dataset'
+                },
             }
             comment_dict = merge_comment(output_cfg, comment_dict)
             yaml = ruamel.yaml.YAML()

@@ -102,6 +102,9 @@ class NodepredNsPipeline(PipelineBase):
             output_cfg = self.user_cfg_cls(**generated_cfg).dict()
             output_cfg = deep_convert_dict(output_cfg)
             comment_dict = {
+                "data": {
+                    "split_ratio": 'Ratio to generate split masks, for example set to [0.8, 0.1, 0.1] for 80% train/10% val/10% test. Leave blank to use builtin split in original dataset'
+                },
                 "general_pipeline": pipeline_comments,
                 "model": NodeModelFactory.get_constructor_doc_dict(model.value)
             }
