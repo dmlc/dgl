@@ -101,7 +101,7 @@ def test_gathermm(idtype):
         F.attach_grad(H)
         F.attach_grad(W_3D)
         with F.record_grad():
-            out_gmm_unsorted = dgl.ops.gather_mm(H, W_3D, idx_b=etypes)
+            out_gmm_unsorted = dgl.ops.gather_mm(H, W_3D, idx_rhs=etypes)
             F.backward(F.reduce_sum(out_gmm_unsorted))
             Hgrad_gmm_unsorted = H.grad
             Wgrad_gmm_unsorted = W_3D.grad
