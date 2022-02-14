@@ -292,8 +292,12 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
         # copy the nodes back to the CPU in the case the output_device
         # is not accessible from the CPU
         if isinstance(nodes, Mapping):
-            nodes = {k: v.to(g.device) for k, v in nodes.items()}
+            nodes = {k: F.copy_to( \
+                v if F.is_tensor(v) else F.tensor(v), g.device) \
+                for k, v in nodes.items()}
         else:
+            if not F.is_tensor(nodes):
+                nodes = F.tensor(nodes)
             nodes = nodes.to(g.device)
         frontier = _sample_neighbors(
             g, nodes, fanout, edge_dir=edge_dir, prob=prob, replace=replace,
