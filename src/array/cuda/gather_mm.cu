@@ -176,6 +176,8 @@ __global__ void gatherMMScatterKernel(
     unsigned int row = warpId;
     if (row < num_rows) {
         unsigned int local_row = row & 3;  // hardcoded for TB size 128 (4 warps)
+        unsigned int row_a = (idx_a) ? idx_a[row] : row;
+        unsigned int row_b = (idx_b) ? idx_b[row] : row;
         Idx C_offset = (idx_c) ? idx_c[row] * in_len * out_len : 0;
         const int sh_a_tile = 64;
         __shared__ DType sh_A[4 * sh_a_tile];
@@ -184,14 +186,14 @@ __global__ void gatherMMScatterKernel(
             if ((in_len - k_start) < a_tile) a_tile = in_len - k_start;
             /* Load A in shared mem in a coalesced way */
             for (unsigned int l = laneId; l < a_tile; l += 32)
-                sh_A[local_row * sh_a_tile + l] = A[row * in_len + (k_start + l)];
+                sh_A[local_row * sh_a_tile + l] = A[row_a * in_len + (k_start + l)];
             __syncwarp();
 
             for (unsigned int outloop = 0; outloop < out_len; outloop +=32) {
                 DType out_reg = 0;  // thread private
                 const unsigned int l = laneId;
                 if (l < out_len) {
-                    const DType b_val = B[row * out_len + (outloop + l)];
+                    const DType b_val = B[row_b * out_len + (outloop + l)];
                     /* iterate over elements of a row of A */
                     for (unsigned int i = 0; i < a_tile; i++) {
                         const DType a_val = sh_A[local_row * sh_a_tile + i];
@@ -287,9 +289,10 @@ void gatherMM_scatter(const NDArray A,
         const int nbx =  ((tot_num_rows * warp_size + ntx - 1) / ntx);
         const dim3 nblks(nbx);
         const dim3 nthrs(ntx);
-        if (a_trans && idx_c_data) {
-        // Custom kernel for W_grad[idx_c[i]] = H^T[i] * C.grad[i]
-        // This kernel accesses rows of A in a transposed way w/o explicitly converting A
+
+        if (idx_c_data) {
+            // Custom kernel for W_grad[idx_c[i]] = H^T[i] * C.grad[i]
+            // This kernel accesses rows of A in a transposed way w/o explicitly converting A
             CUDA_KERNEL_CALL((gatherMMScatterKernel<IdType, DType>),
                 nblks, nthrs, 0, thr_entry->stream,
                 static_cast<DType*>(A->data),
@@ -300,8 +303,7 @@ void gatherMM_scatter(const NDArray A,
                 static_cast<IdType*>(idx_c->data),
                 tot_num_rows,
                 in_len, out_len);
-        } else if (!idx_c_data) {  // use generic gather_mm
-            if (!a_trans) {  // Can't transpose A w/o E per etype info
+        } else {  // use generic gather_mm
                 CUDA_KERNEL_CALL((gatherMMKernel<IdType, DType>),
                     nblks, nthrs, 0, thr_entry->stream,
                     static_cast<DType*>(A->data),
@@ -311,9 +313,6 @@ void gatherMM_scatter(const NDArray A,
                     static_cast<IdType*>(idx_b->data),
                     tot_num_rows,
                     in_len, out_len);
-            }
-        } else {
-            LOG(FATAL) << "Not implemented";
         }
         if (b_trans)
             device->FreeWorkspace(B->ctx, B_trans_data);

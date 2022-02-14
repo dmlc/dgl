@@ -753,7 +753,7 @@ class GATHERMM(th.autograd.Function):
             #  Compute B_grad = A^T * Out_grad
             B_grad = th.zeros(B.shape, device=B.device, dtype=B.dtype)
             B_grad = _gather_mm_scatter(A, dZ, B_grad, B_3D_shape[0],
-                idx_a=idx_a, idx_c=idx_b, a_trans=True)
+                idx_a=idx_a, idx_c=idx_b)
             B_grad = B_grad.reshape(B_3D_shape[0], B_3D_shape[1], B_3D_shape[2])
         return A_grad, B_grad, None, None, None, None, None, None
 
