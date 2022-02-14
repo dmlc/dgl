@@ -2826,6 +2826,7 @@ def test_adj_sparse(idtype, fmt):
 def _test_forking_pickler_entry(g, q):
     q.put(g.formats())
 
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="MXNet doesn't support spawning")
 def test_forking_pickler():
     ctx = mp.get_context('spawn')
     g = dgl.graph(([0,1,2],[1,2,3]))
