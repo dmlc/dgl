@@ -72,16 +72,24 @@ def test_fakenews():
     assert len(ds) == 314
     g = ds[0][0]
     g2 = data.FakeNewsDataset('politifact', 'bert', transform=transform)[0][0]
+    assert g2.num_edges() - g.num_edges() == g.num_nodes()
 
     ds = data.FakeNewsDataset('gossipcop', 'profile')
     assert len(ds) == 5464
-
+    g = ds[0][0]
+    g2 = data.FakeNewsDataset('gossipcop', 'profile', transform=transform)[0][0]
+    assert g2.num_edges() - g.num_edges() == g.num_nodes()
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
 def test_tudataset_regression():
     ds = data.TUDataset('ZINC_test', force_reload=True)
     assert len(ds) == 5000
+    g = ds[0][0]
 
+    transform = dgl.AddSelfLoop(allow_duplicate=True)
+    ds = data.TUDataset('ZINC_test', force_reload=True, transform=transform)
+    g2 = ds[0][0]
+    assert g2.num_edges() - g.num_edges() == g.num_nodes()
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
 def test_data_hash():
@@ -102,12 +110,16 @@ def test_data_hash():
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
 def test_citation_graph():
+    transform = dgl.AddSelfLoop(allow_duplicate=True)
+
     # cora
     g = data.CoraGraphDataset()[0]
     assert g.num_nodes() == 2708
     assert g.num_edges() == 10556
     dst = F.asnumpy(g.edges()[1])
     assert np.array_equal(dst, np.sort(dst))
+    g2 = data.CoraGraphDataset(transform=transform)[0]
+    assert g2.num_edges() - g.num_edges() == g.num_nodes()
 
     # Citeseer
     g = data.CiteseerGraphDataset()[0]
@@ -115,6 +127,8 @@ def test_citation_graph():
     assert g.num_edges() == 9228
     dst = F.asnumpy(g.edges()[1])
     assert np.array_equal(dst, np.sort(dst))
+    g2 = data.CiteseerGraphDataset(transform=transform)[0]
+    assert g2.num_edges() - g.num_edges() == g.num_nodes()
 
     # Pubmed
     g = data.PubmedGraphDataset()[0]
@@ -122,16 +136,22 @@ def test_citation_graph():
     assert g.num_edges() == 88651
     dst = F.asnumpy(g.edges()[1])
     assert np.array_equal(dst, np.sort(dst))
+    g2 = data.PubmedGraphDataset(transform=transform)[0]
+    assert g2.num_edges() - g.num_edges() == g.num_nodes()
 
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
 def test_gnn_benchmark():
+    transform = dgl.AddSelfLoop(allow_duplicate=True)
+
     # AmazonCoBuyComputerDataset
     g = data.AmazonCoBuyComputerDataset()[0]
     assert g.num_nodes() == 13752
     assert g.num_edges() == 491722
     dst = F.asnumpy(g.edges()[1])
     assert np.array_equal(dst, np.sort(dst))
+    g2 = data.AmazonCoBuyComputerDataset(transform=transform)[0]
+    assert g2.num_edges() - g.num_edges() == g.num_nodes()
 
     # AmazonCoBuyPhotoDataset
     g = data.AmazonCoBuyPhotoDataset()[0]
@@ -139,6 +159,8 @@ def test_gnn_benchmark():
     assert g.num_edges() == 238163
     dst = F.asnumpy(g.edges()[1])
     assert np.array_equal(dst, np.sort(dst))
+    g2 = data.AmazonCoBuyPhotoDataset(transform=transform)[0]
+    assert g2.num_edges() - g.num_edges() == g.num_nodes()
 
     # CoauthorPhysicsDataset
     g = data.CoauthorPhysicsDataset()[0]
@@ -146,6 +168,8 @@ def test_gnn_benchmark():
     assert g.num_edges() == 495924
     dst = F.asnumpy(g.edges()[1])
     assert np.array_equal(dst, np.sort(dst))
+    g2 = data.CoauthorPhysicsDataset(transform=transform)[0]
+    assert g2.num_edges() - g.num_edges() == g.num_nodes()
 
     # CoauthorCSDataset
     g = data.CoauthorCSDataset()[0]
@@ -153,6 +177,8 @@ def test_gnn_benchmark():
     assert g.num_edges() == 163788
     dst = F.asnumpy(g.edges()[1])
     assert np.array_equal(dst, np.sort(dst))
+    g2 = data.CoauthorCSDataset(transform=transform)[0]
+    assert g2.num_edges() - g.num_edges() == g.num_nodes()
 
     # CoraFullDataset
     g = data.CoraFullDataset()[0]
@@ -160,6 +186,8 @@ def test_gnn_benchmark():
     assert g.num_edges() == 126842
     dst = F.asnumpy(g.edges()[1])
     assert np.array_equal(dst, np.sort(dst))
+    g2 = data.CoraFullDataset(transform=transform)[0]
+    assert g2.num_edges() - g.num_edges() == g.num_nodes()
 
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
@@ -170,6 +198,10 @@ def test_reddit():
     assert g.num_edges() == 114615892
     dst = F.asnumpy(g.edges()[1])
     assert np.array_equal(dst, np.sort(dst))
+
+    transform = dgl.AddSelfLoop(allow_duplicate=True)
+    g2 = data.RedditDataset(transform=transform)[0]
+    assert g2.num_edges() - g.num_edges() == g.num_nodes()
 
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
