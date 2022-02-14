@@ -52,6 +52,7 @@ Welcome to Deep Graph Library Tutorials and Documentation
    api/python/dgl.multiprocessing
    api/python/dgl.contrib.UnifiedTensor
    api/python/udf
+   api/python/transform
 
 .. toctree::
    :maxdepth: 1
