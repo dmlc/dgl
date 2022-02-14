@@ -12,7 +12,7 @@ import inspect
 from numpydoc import docscrape
 logger = logging.getLogger(__name__)
 
-ALL_PIPELINE = ["nodepred", "nodepred-ns", "edgepred"]
+ALL_PIPELINE = ["nodepred", "nodepred-ns", "linkpred"]
 
 class PipelineBase(ABC):
 
@@ -124,7 +124,7 @@ class DataFactoryClass:
 
     @staticmethod
     def get_base_class(dataset_name, pipeline_name):
-        if pipeline_name == "edgepred":
+        if pipeline_name == "linkpred":
             class EdgeBase(DGLBaseModel):
                 name: Literal[dataset_name]
                 split_ratio: Optional[Tuple[float, float, float]] = None
@@ -145,59 +145,59 @@ DataFactory.register(
     "cora",
     import_code="from dgl.data import CoraGraphDataset",
     class_name="CoraGraphDataset()",
-    allowed_pipeline=["nodepred", "nodepred-ns", "edgepred"])
+    allowed_pipeline=["nodepred", "nodepred-ns", "linkpred"])
 
 DataFactory.register(
     "citeseer",
     import_code="from dgl.data import CiteseerGraphDataset",
     class_name="CiteseerGraphDataset()",
-    allowed_pipeline=["nodepred", "nodepred-ns", "edgepred"])
+    allowed_pipeline=["nodepred", "nodepred-ns", "linkpred"])
 
 DataFactory.register(
     "pubmed",
     import_code="from dgl.data import PubmedGraphDataset",
     class_name="PubmedGraphDataset()",
-    allowed_pipeline=["nodepred", "nodepred-ns", "edgepred"])
+    allowed_pipeline=["nodepred", "nodepred-ns", "linkpred"])
 
 DataFactory.register(
     "csv",
     import_code="from dgl.data import DGLCSVDataset",
     extra_args={"data_path": "./"},
     class_name="DGLCSVDataset({})",
-    allowed_pipeline=["nodepred", "nodepred-ns", "edgepred"])
+    allowed_pipeline=["nodepred", "nodepred-ns", "linkpred"])
 
 DataFactory.register(
     "reddit",
     import_code="from dgl.data import RedditDataset",
     class_name="RedditDataset()",
-    allowed_pipeline=["nodepred", "nodepred-ns", "edgepred"])
+    allowed_pipeline=["nodepred", "nodepred-ns", "linkpred"])
 
 DataFactory.register(
     "co-buy-computer",
     import_code="from dgl.data import AmazonCoBuyComputerDataset",
     class_name="AmazonCoBuyComputerDataset()",
-    allowed_pipeline=["nodepred", "nodepred-ns", "edgepred"])
+    allowed_pipeline=["nodepred", "nodepred-ns", "linkpred"])
 
 DataFactory.register(
     "ogbn-arxiv",
     import_code="from ogb.nodeproppred import DglNodePropPredDataset",
     extra_args={},
     class_name="DglNodePropPredDataset('ogbn-arxiv')",
-    allowed_pipeline=["nodepred", "nodepred-ns", "edgepred"])
+    allowed_pipeline=["nodepred", "nodepred-ns", "linkpred"])
 
 DataFactory.register(
     "ogbn-products",
     import_code="from ogb.nodeproppred import DglNodePropPredDataset",
     extra_args={},
     class_name="DglNodePropPredDataset('ogbn-products')",
-    allowed_pipeline=["nodepred", "nodepred-ns", "edgepred"])
+    allowed_pipeline=["nodepred", "nodepred-ns", "linkpred"])
 
 DataFactory.register(
     "ogbl-collab",
     import_code="from ogb.linkproppred import DglLinkPropPredDataset",
     extra_args={},
     class_name="DglLinkPropPredDataset('ogbl-collab')",
-    allowed_pipeline=["edgepred"])
+    allowed_pipeline=["linkpred"])
 
 class PipelineFactory:
     """ The factory class for creating executors"""

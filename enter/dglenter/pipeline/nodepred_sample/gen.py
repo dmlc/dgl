@@ -16,7 +16,7 @@ import ruamel.yaml
 from ruamel.yaml.comments import CommentedMap
 
 
-class MultiLayerSamplerConfig(BaseModel):
+class SamplerConfig(BaseModel):
     name: Literal["neighbor"]
     fan_out: List[int] = [5, 10]
     batch_size: int = Field(64, description="Batch size")
@@ -28,18 +28,10 @@ class MultiLayerSamplerConfig(BaseModel):
         extra = 'forbid'
 
 
-class OtherSamplerConfig(BaseModel):
-    name: Literal["other"]
-    demo_batch_size: int = Field(64, description="Batch size")
 
-    class Config:
-        extra = 'forbid'
+# SamplerConfig = SamplerConfig
 
-
-SamplerConfig = Union[MultiLayerSamplerConfig,
-                      OtherSamplerConfig]
-
-SamplerChoice = extract_name(SamplerConfig)
+# SamplerChoice = extract_name(SamplerConfig)
 
 pipeline_comments = {
     "num_epochs": "Number of training epochs",
@@ -52,7 +44,7 @@ pipeline_comments = {
 }
 
 class NodepredNSPipelineCfg(BaseModel):
-    sampler: SamplerConfig = Field(..., discriminator='name')
+    sampler: SamplerConfig = Field("neighbor")
     early_stop: Optional[EarlyStopConfig] = EarlyStopConfig()
     num_epochs: int = 200
     eval_period: int = 5
@@ -85,8 +77,6 @@ class NodepredNsPipeline(PipelineBase):
             data: DataFactory.filter("nodepred-ns").get_dataset_enum() = typer.Option(..., help="input data name"),
             cfg: str = typer.Option(
                 "cfg.yml", help="output configuration path"),
-            sampler: SamplerChoice = typer.Option(
-                "neighbor", help="Specify sampler name"),
             model: NodeModelFactory.get_model_enum() = typer.Option(..., help="Model name"),
             device: DeviceEnum = typer.Option(
                 "cpu", help="Device, cpu or cuda"),
@@ -97,7 +87,7 @@ class NodepredNsPipeline(PipelineBase):
                 "device": device,
                 "data": {"name": data.name},
                 "model": {"name": model.value},
-                "general_pipeline": {"sampler":{"name": sampler.value}}
+                "general_pipeline": {"sampler":{"name": "neighbor"}}
             }
             output_cfg = self.user_cfg_cls(**generated_cfg).dict()
             output_cfg = deep_convert_dict(output_cfg)

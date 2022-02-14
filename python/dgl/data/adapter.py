@@ -189,7 +189,7 @@ class AsLinkPredDataset(DGLDataset):
         Split ratios for training, validation and test sets. Must sum to one.
     neg_ratio : int, optional
         Indicate how much negative samples to be sampled
-        The number of the negative samples will be neg_ratio * num_positive_edges.
+        The number of the negative samples will be equal or less than neg_ratio * num_positive_edges.
 
     Attributes
     -------
@@ -219,7 +219,7 @@ class AsLinkPredDataset(DGLDataset):
     def __init__(self,
                  dataset,
                  split_ratio=None,
-                 neg_ratio=3,
+                 neg_ratio=None,
                  **kwargs):
         self.g = dataset[0]
         self.num_nodes = self.g.num_nodes()
@@ -230,7 +230,7 @@ class AsLinkPredDataset(DGLDataset):
                          hash_key=(neg_ratio, split_ratio), **kwargs)
 
     def process(self):
-        if self.split_ratio is None:
+        if (self.split_ratio is None) and (self.neg_ratio is None):
             assert hasattr(self.dataset, "get_edge_split"), \
                 "dataset doesn't have get_edge_split method, please specify split_ratio and neg_ratio to generate the split"
             # This is likely to be an ogb dataset
@@ -249,6 +249,8 @@ class AsLinkPredDataset(DGLDataset):
             neg_e = (neg_e_tensor[:, 0], neg_e_tensor[:, 1])
             self._test_edges = pos_e, neg_e
         else:
+            assert self.split_ratio is not None, "Need to specify split_ratio"
+            assert self.neg_ratio is not None, "Need to specify neg_ratio"
             ratio = self.split_ratio
             graph = self.dataset[0]
             n = graph.num_edges()

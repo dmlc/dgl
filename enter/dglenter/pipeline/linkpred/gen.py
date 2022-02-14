@@ -12,7 +12,7 @@ from ...utils.yaml_dump import deep_convert_dict, merge_comment
 import ruamel.yaml
 from ruamel.yaml.comments import CommentedMap
 
-class EdgepredPipelineCfg(BaseModel):
+class LinkpredPipelineCfg(BaseModel):
     hidden_size: int = 256
     early_stop: Optional[EarlyStopConfig] = EarlyStopConfig()
     eval_batch_size: int = 32769
@@ -38,31 +38,31 @@ pipeline_comments = {
 
 
 
-@PipelineFactory.register("edgepred")
-class EdgepredPipeline(PipelineBase):
+@PipelineFactory.register("linkpred")
+class LinkpredPipeline(PipelineBase):
 
     user_cfg_cls = None
-    pipeline_name = "edgepred"
+    pipeline_name = "linkpred"
 
     def __init__(self):
-        self.pipeline_name = "edgepred"
+        self.pipeline_name = "linkpred"
 
     @classmethod
     def setup_user_cfg_cls(cls):
         from ...utils.enter_config import UserConfig
 
-        class EdgePredUserConfig(UserConfig):
-            pipeline_name: str = "edgepred"
-            data: DataFactory.filter("edgepred").get_pydantic_config() = Field(..., discriminator="name")
+        class LinkPredUserConfig(UserConfig):
+            pipeline_name: str = "linkpred"
+            data: DataFactory.filter("linkpred").get_pydantic_config() = Field(..., discriminator="name")
             node_model: NodeModelFactory.get_pydantic_model_config() = Field(...,
                                                                              discriminator="name")
             edge_model: EdgeModelFactory.get_pydantic_model_config() = Field(...,
                                                                              discriminator="name")
             neg_sampler: NegativeSamplerFactory.get_pydantic_model_config() = Field(...,
                                                                                     discriminator="name")
-            general_pipeline: EdgepredPipelineCfg = EdgepredPipelineCfg()
+            general_pipeline: LinkpredPipelineCfg = LinkpredPipelineCfg()
 
-        cls.user_cfg_cls = EdgePredUserConfig
+        cls.user_cfg_cls = LinkPredUserConfig
 
     @property
     def user_cfg_cls(self):
@@ -70,7 +70,7 @@ class EdgepredPipeline(PipelineBase):
 
     def get_cfg_func(self):
         def config(
-            data: DataFactory.filter("edgepred").get_dataset_enum() = typer.Option(..., help="input data name"),
+            data: DataFactory.filter("linkpred").get_dataset_enum() = typer.Option(..., help="input data name"),
             cfg: str = typer.Option(
                 "cfg.yml", help="output configuration path"),
             node_model: NodeModelFactory.get_model_enum() = typer.Option(...,
@@ -84,7 +84,7 @@ class EdgepredPipeline(PipelineBase):
         ):
             self.__class__.setup_user_cfg_cls()
             generated_cfg = {
-                "pipeline_name": "edgepred",
+                "pipeline_name": "linkpred",
                 "device": device.value,
                 "data": {"name": data.name},
                 "neg_sampler": {"name": neg_sampler.value},
@@ -116,7 +116,7 @@ class EdgepredPipeline(PipelineBase):
         # Check validation
         user_cfg = cls.user_cfg_cls(**user_cfg_dict)
         file_current_dir = Path(__file__).resolve().parent
-        with open(file_current_dir / "edgepred.jinja-py", "r") as f:
+        with open(file_current_dir / "linkpred.jinja-py", "r") as f:
             template = Template(f.read())
 
         render_cfg = copy.deepcopy(user_cfg_dict)
@@ -152,4 +152,4 @@ class EdgepredPipeline(PipelineBase):
 
     @staticmethod
     def get_description() -> str:
-        return "Edge classification pipeline"
+        return "Link prediction pipeline"
