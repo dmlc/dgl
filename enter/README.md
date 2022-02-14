@@ -17,7 +17,7 @@ How to train a model on a dataset with task:
 
 
 
-`dgl-ente` currently provides 4 pipelines:
+`dgl-enter` currently provides 4 pipelines:
 - nodepred (Node prediction tasks, suitable for small dataset to prototype)
 - nodepred-ns (Node prediction tasks with sampling method, suitable for medium and large dataset)
 - edgepred (Link prediction tasks, to predict whether edge exists among node pairs based on node features)
