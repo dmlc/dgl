@@ -293,11 +293,11 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
         # is not accessible from the CPU
         if isinstance(nodes, Mapping):
             nodes = {k: F.copy_to( \
-                v if F.is_tensor(v) else F.tensor(v), g.device) \
+                v if F.is_tensor(v) else F.tensor(v, dtype=F.int64), g.device) \
                 for k, v in nodes.items()}
         else:
             if not F.is_tensor(nodes):
-                nodes = F.tensor(nodes)
+                nodes = F.tensor(nodes, dtype=F.int64)
             nodes = F.copy_to(nodes, g.device)
         frontier = _sample_neighbors(
             g, nodes, fanout, edge_dir=edge_dir, prob=prob, replace=replace,
