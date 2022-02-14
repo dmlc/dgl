@@ -1,5 +1,6 @@
 """Neighbor sampling APIs"""
 
+from typing import Mapping
 from .._ffi.function import _init_api
 from .. import backend as F
 from ..base import DGLError, EID
@@ -7,7 +8,6 @@ from ..heterograph import DGLHeteroGraph
 from .. import ndarray as nd
 from .. import utils
 from .utils import EidExcluder
-from typing import Mapping
 
 __all__ = [
     'sample_etype_neighbors',
@@ -292,7 +292,7 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
         # copy the nodes back to the CPU in the case the output_device
         # is not accessible from the CPU
         if isinstance(nodes, Mapping):
-            nodes = {k: v.to(g.device) for k,v in nodes.items()}
+            nodes = {k: v.to(g.device) for k, v in nodes.items()}
         else:
             nodes = nodes.to(g.device)
         frontier = _sample_neighbors(
