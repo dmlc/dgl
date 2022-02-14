@@ -165,7 +165,7 @@ class MultiGPUFeatureStorage(FeatureStorage):
         return self._comm.size() > 1
 
     def fetch(self, indices, device, pin_memory=False):
-        x = self.all_gather_row(indices).to(device)
+        x = F.copy_to(self.all_gather_row(indices), device)
         return x
    
 
