@@ -18,7 +18,6 @@ from . import utils
 from . import backend as F
 from .frame import Frame
 from .view import HeteroNodeView, HeteroNodeDataView, HeteroEdgeView, HeteroEdgeDataView
-from .ndarray import NDArray
 
 __all__ = ['DGLHeteroGraph', 'combine_names']
 
