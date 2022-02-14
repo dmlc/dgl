@@ -17,7 +17,7 @@
 import unittest
 import backend as F
 import dgl
-from dgl.contrib.multi_gpu_datastore import MultiGPUDataStore
+from dgl.contrib.multi_gpu_feature_storage import MultiGPUFeatureStorage
 from dgl.partition import NDArrayPartition
 
 
@@ -43,7 +43,7 @@ def test_get_global_1part():
     t = F.copy_to(F.tensor([[1,2,3],[4,5,6],[7,8,9],[10,11,12]]), F.ctx())
     comm = DummyCommunicator(0, 1)
     partition = NDArrayPartition(len(t), comm.size(), mode='remainder')
-    mt = MultiGPUDataStore(t.shape, t.dtype, F.ctx(), comm, partition)
+    mt = MultiGPUFeatureStorage(t.shape, t.dtype, F.ctx(), comm, partition)
     mt.all_set_global(t)
 
     idxs = F.copy_to(F.tensor([1,3], dtype=F.int64), ctx=F.ctx())
@@ -58,7 +58,7 @@ def test_get_global_3part():
     t = F.copy_to(F.tensor([[1,2,3],[4,5,6],[7,8,9],[10,11,12]]), F.ctx())
     comm = DummyCommunicator(2, 3)
     partition = NDArrayPartition(len(t), comm.size(), mode='remainder')
-    mt = MultiGPUDataStore(t.shape, t.dtype, F.ctx(), comm, partition)
+    mt = MultiGPUFeatureStorage(t.shape, t.dtype, F.ctx(), comm, partition)
     mt.all_set_global(t)
 
     idxs = F.copy_to(F.tensor([2], dtype=F.int64), ctx=F.ctx())
@@ -69,11 +69,40 @@ def test_get_global_3part():
 
 @unittest.skipIf(F._default_context_str == 'cpu',
                  reason="MutliGPUTensor only works on GPUs.")
+def test_fetch_3part():
+    t = F.copy_to(F.tensor([[1,2,3],[4,5,6],[7,8,9],[10,11,12]]), F.ctx())
+    comm = DummyCommunicator(2, 3)
+    partition = NDArrayPartition(len(t), comm.size(), mode='remainder')
+    mt = MultiGPUFeatureStorage(t.shape, t.dtype, F.ctx(), comm, partition)
+    mt.all_set_global(t)
+
+    idxs = F.copy_to(F.tensor([2], dtype=F.int64), ctx=F.ctx())
+    act = mt.fetch(idxs, F.ctx())
+    exp = F.gather_row(t, idxs)
+
+    assert F.array_equal(exp, act)
+
+@unittest.skipIf(F._default_context_str == 'cpu',
+                 reason="MutliGPUTensor only works on GPUs.")
+def test_requires_ddp():
+    t = F.copy_to(F.tensor([[1,2,3],[4,5,6],[7,8,9],[10,11,12]]), F.ctx())
+    comm = DummyCommunicator(2, 3)
+    partition = NDArrayPartition(len(t), comm.size(), mode='remainder')
+    mt = MultiGPUFeatureStorage(t.shape, t.dtype, F.ctx(), comm, partition)
+    assert mt.requires_ddp()
+
+    comm = DummyCommunicator(0, 1)
+    partition = NDArrayPartition(len(t), comm.size(), mode='remainder')
+    mt = MultiGPUFeatureStorage(t.shape, t.dtype, F.ctx(), comm, partition)
+    assert not mt.requires_ddp()
+
+@unittest.skipIf(F._default_context_str == 'cpu',
+                 reason="MutliGPUTensor only works on GPUs.")
 def test_get_local_1part():
     t = F.copy_to(F.tensor([[1,2,3],[4,5,6],[7,8,9],[10,11,12]]), F.ctx())
     comm = DummyCommunicator(0, 1)
     partition = NDArrayPartition(len(t), comm.size(), mode='remainder')
-    mt = MultiGPUDataStore(t.shape, t.dtype, F.ctx(), comm, partition)
+    mt = MultiGPUFeatureStorage(t.shape, t.dtype, F.ctx(), comm, partition)
     mt.all_set_global(t)
 
     act = mt.get_local()
@@ -87,7 +116,7 @@ def test_get_local_3part():
     t = F.copy_to(F.tensor([[1,2,3],[4,5,6],[7,8,9],[10,11,12]]), F.ctx())
     comm = DummyCommunicator(2, 3)
     partition = NDArrayPartition(len(t), comm.size(), mode='remainder')
-    mt = MultiGPUDataStore(t.shape, t.dtype, F.ctx(), comm, partition)
+    mt = MultiGPUFeatureStorage(t.shape, t.dtype, F.ctx(), comm, partition)
     mt.all_set_global(t)
 
     act = mt.get_local()
@@ -101,7 +130,7 @@ def test_set_local_1part():
     t = F.copy_to(F.tensor([[1,2,3],[4,5,6],[7,8,9],[10,11,12]]), F.ctx())
     comm = DummyCommunicator(0, 1)
     partition = NDArrayPartition(len(t), comm.size(), mode='remainder')
-    mt = MultiGPUDataStore(t.shape, t.dtype, F.ctx(), comm, partition)
+    mt = MultiGPUFeatureStorage(t.shape, t.dtype, F.ctx(), comm, partition)
     t_local = t
     mt.set_local(t_local)
 
@@ -116,7 +145,7 @@ def test_set_local_3part():
     t = F.copy_to(F.tensor([[1,2,3],[4,5,6],[7,8,9],[10,11,12]]), F.ctx())
     comm = DummyCommunicator(2, 3)
     partition = NDArrayPartition(len(t), comm.size(), mode='remainder')
-    mt = MultiGPUDataStore(t.shape, t.dtype, F.ctx(), comm, partition)
+    mt = MultiGPUFeatureStorage(t.shape, t.dtype, F.ctx(), comm, partition)
     t_local = F.gather_row(t, F.tensor([2], dtype=F.int64))
     mt.set_local(t_local)
 
@@ -131,7 +160,7 @@ def test_backend():
     t = F.copy_to(F.tensor([[1,2,3],[4,5,6],[7,8,9],[10,11,12]]), F.ctx())
     comm = DummyCommunicator(2, 3)
     partition = NDArrayPartition(len(t), comm.size(), mode='remainder')
-    mt = MultiGPUDataStore(t.shape, t.dtype, F.ctx(), comm, partition)
+    mt = MultiGPUFeatureStorage(t.shape, t.dtype, F.ctx(), comm, partition)
     t_local = F.gather_row(t, F.tensor([2], dtype=F.int64))
     mt.set_local(t_local)
 
