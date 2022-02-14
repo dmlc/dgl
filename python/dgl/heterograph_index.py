@@ -2,6 +2,7 @@
 from __future__ import absolute_import
 
 import itertools
+from multiprocessing.reduction import ForkingPickler
 import numpy as np
 import scipy
 
@@ -1364,5 +1365,23 @@ class HeteroPickleStates(ObjectBase):
             num_nodes_per_type = F.zerocopy_to_dgl_ndarray(num_nodes_per_type)
             self.__init_handle_by_constructor__(
                 _CAPI_DGLCreateHeteroPickleStatesOld, metagraph, num_nodes_per_type, adjs)
+
+def _forking_rebuild(pk_state):
+    meta, arrays = pk_state
+    arrays = [F.to_dgl_nd(arr) for arr in arrays]
+    states = _CAPI_DGLCreateHeteroPickleStates(meta, arrays)
+    return _CAPI_DGLHeteroForkingUnpickle(states)
+
+def _forking_reduce(graph_index):
+    states = _CAPI_DGLHeteroForkingPickle(graph_index)
+    arrays = [F.from_dgl_nd(arr) for arr in states.arrays]
+    # Similar to what being mentioned in HeteroGraphIndex.__getstate__, we need to save
+    # the tensors as an attribute of the original graph index object.  Otherwise
+    # PyTorch will throw weird errors like bad value(s) in fds_to_keep or unable to
+    # resize file.
+    graph_index._forking_pk_state = (states.meta, arrays)
+    return _forking_rebuild, (graph_index._forking_pk_state,)
+
+ForkingPickler.register(HeteroGraphIndex, _forking_reduce)
 
 _init_api("dgl.heterograph_index")

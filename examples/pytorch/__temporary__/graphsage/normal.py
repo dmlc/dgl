@@ -95,7 +95,7 @@ valid_dataloader = dgl.dataloading.NodeDataLoader(
         persistent_workers=(num_workers > 0), use_prefetch_thread=use_prefetch_thread)
 
 durations = []
-for _ in range(10):
+for _ in range(100):
     model.train()
     t0 = time.time()
     for it, (input_nodes, output_nodes, blocks) in enumerate(train_dataloader):

@@ -11,6 +11,7 @@ import numpy as np
 from ogb.nodeproppred import DglNodePropPredDataset
 
 USE_WRAPPER = False
+MODE = 'uva'           # 'cuda' or 'uva'
 
 class SAGE(nn.Module):
     def __init__(self, in_feats, n_hidden, n_classes):
@@ -43,6 +44,14 @@ def train(rank, world_size, graph, num_classes, split_idx):
     if USE_WRAPPER:
         import dglnew
         graph = dglnew.graph.wrapper.DGLGraphStorage(graph)
+    print(rank, graph.formats())
+
+    if MODE == 'uva':
+        train_idx = train_idx.to('cuda')
+        graph.pin_memory_()
+    use_prefetch_thread = (MODE == 'cuda')
+    pin_prefetcher = (MODE == 'cuda')
+    num_workers = 0 if (MODE == 'uva') else 4
 
     sampler = dgl.dataloading.NeighborSampler(
             [5, 5, 5], output_device='cpu', prefetch_node_feats=['feat'],
@@ -55,11 +64,11 @@ def train(rank, world_size, graph, num_classes, split_idx):
             batch_size=1000,
             shuffle=True,
             drop_last=False,
-            pin_memory=True,
-            num_workers=4,
-            persistent_workers=True,
+            pin_prefetcher=pin_prefetcher,
+            num_workers=num_workers,
+            persistent_workers=(num_workers > 0),
             use_ddp=True,
-            use_prefetch_thread=True)       # TBD: could probably remove this argument
+            use_prefetch_thread=use_prefetch_thread)       # TBD: could probably remove this argument
 
     durations = []
     for _ in range(10):
@@ -92,15 +101,16 @@ if __name__ == '__main__':
     num_classes = dataset.num_classes
     n_procs = 4
 
+    if MODE == 'uva':
+        # put the graph into shared memory
+        new_graph = graph.shared_memory('shm')
+        new_graph.ndata['feat'] = graph.ndata['feat']
+        new_graph.ndata['label'] = graph.ndata['label']
+        new_graph.create_formats_()
+        graph = new_graph
+
+    print(graph.formats())
     # Tested with mp.spawn and fork.  Both worked and got 4s per epoch with 4 GPUs
     # and 3.86s per epoch with 8 GPUs on p2.8x, compared to 5.2s from official examples.
-    #import torch.multiprocessing as mp
-    #mp.spawn(train, args=(n_procs, graph, num_classes, split_idx), nprocs=n_procs)
-    import dgl.multiprocessing as mp
-    procs = []
-    for i in range(n_procs):
-        p = mp.Process(target=train, args=(i, n_procs, graph, num_classes, split_idx))
-        p.start()
-        procs.append(p)
-    for p in procs:
-        p.join()
+    import torch.multiprocessing as mp
+    mp.spawn(train, args=(n_procs, graph, num_classes, split_idx), nprocs=n_procs)
