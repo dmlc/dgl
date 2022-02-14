@@ -15,6 +15,7 @@
 #
 
 import dgl
+from dgl import NID, EID
 import backend as F
 import unittest
 from dgl.dataloading import NodeDataLoader
@@ -123,11 +124,13 @@ def test_node_dataloader_hg():
         for block in blocks:
             for ntype in block.ntypes:
                 act_feat = F.copy_to(block.ndata['feat'][ntype], F.cpu())
-                exp_feat = g1.ndata['feat'][ntype][block.nodes(ntype)]
+                index = block.ndata[NID][ntype]
+                exp_feat = g1.ndata['feat'][ntype][index]
                 assert F.array_equal(exp_feat, act_feat)
             for etype in block.canonical_etypes:
                 act_feat = F.copy_to(block.edata['feat'][etype], F.cpu())
-                exp_feat = g1.edata['feat'][etype][block.edges(form='eid', etype=etype)]
+                index = block.edata[EID][etype]
+                exp_feat = g1.edata['feat'][etype][index]
                 assert F.array_equal(exp_feat, act_feat)
 
 if __name__ == '__main__':
