@@ -146,10 +146,10 @@ def test_pack_traces():
     assert F.array_equal(result[2], F.tensor([2, 7], dtype=F.int64))
     assert F.array_equal(result[3], F.tensor([0, 2], dtype=F.int64))
 
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 def test_pinsage_sampling():
     def _test_sampler(g, sampler, ntype):
-        neighbor_g = sampler(F.tensor([0, 2], dtype=F.int64))
+        seeds = F.copy_to(F.tensor([0, 2], dtype=F.int64), F.ctx())
+        neighbor_g = sampler(seeds)
         assert neighbor_g.ntypes == [ntype]
         u, v = neighbor_g.all_edges(form='uv', order='eid')
         uv = list(zip(F.asnumpy(u).tolist(), F.asnumpy(v).tolist()))
@@ -159,6 +159,7 @@ def test_pinsage_sampling():
     g = dgl.heterograph({
         ('item', 'bought-by', 'user'): ([0, 0, 1, 1, 2, 2, 3, 3], [0, 1, 0, 1, 2, 3, 2, 3]),
         ('user', 'bought', 'item'): ([0, 1, 0, 1, 2, 3, 2, 3], [0, 0, 1, 1, 2, 2, 3, 3])})
+    g = g.to(F.ctx())
     sampler = dgl.sampling.PinSAGESampler(g, 'item', 'user', 4, 0.5, 3, 2)
     _test_sampler(g, sampler, 'item')
     sampler = dgl.sampling.RandomWalkNeighborSampler(g, 4, 0.5, 3, 2, ['bought-by', 'bought'])
@@ -168,12 +169,14 @@ def test_pinsage_sampling():
     _test_sampler(g, sampler, 'item')
     g = dgl.graph(([0, 0, 1, 1, 2, 2, 3, 3],
                    [0, 1, 0, 1, 2, 3, 2, 3]))
+    g = g.to(F.ctx())
     sampler = dgl.sampling.RandomWalkNeighborSampler(g, 4, 0.5, 3, 2)
     _test_sampler(g, sampler, g.ntypes[0])
     g = dgl.heterograph({
         ('A', 'AB', 'B'): ([0, 2], [1, 3]),
         ('B', 'BC', 'C'): ([1, 3], [2, 1]),
         ('C', 'CA', 'A'): ([2, 1], [0, 2])})
+    g = g.to(F.ctx())
     sampler = dgl.sampling.RandomWalkNeighborSampler(g, 4, 0.5, 3, 2, ['AB', 'BC', 'CA'])
     _test_sampler(g, sampler, 'A')
 
@@ -887,6 +890,41 @@ def test_sample_neighbors_exclude_edges_homoG(dtype):
 
     assert not np.any(F.asnumpy(sg.has_edges_between(excluded_nodes_U,excluded_nodes_V)))
 
+@pytest.mark.parametrize('dtype', ['int32', 'int64'])
+def test_global_uniform_negative_sampling(dtype):
+    g = dgl.graph(([], []), num_nodes=1000).to(F.ctx())
+    src, dst = dgl.sampling.global_uniform_negative_sampling(g, 2000, False, True)
+    assert len(src) == 2000
+    assert len(dst) == 2000
+
+    g = dgl.graph((np.random.randint(0, 20, (300,)), np.random.randint(0, 20, (300,)))).to(F.ctx())
+    src, dst = dgl.sampling.global_uniform_negative_sampling(g, 20, False, True)
+    assert not F.asnumpy(g.has_edges_between(src, dst)).any()
+
+    src, dst = dgl.sampling.global_uniform_negative_sampling(g, 20, False, False)
+    assert not F.asnumpy(g.has_edges_between(src, dst)).any()
+    src = F.asnumpy(src)
+    dst = F.asnumpy(dst)
+    s = set(zip(src.tolist(), dst.tolist()))
+    assert len(s) == len(src)
+
+    g = dgl.graph(([0], [1])).to(F.ctx())
+    src, dst = dgl.sampling.global_uniform_negative_sampling(g, 20, True, False, redundancy=10)
+    src = F.asnumpy(src)
+    dst = F.asnumpy(dst)
+    # should have either no element or (1, 0)
+    assert len(src) < 2
+    assert len(dst) < 2
+    if len(src) == 1:
+        assert src[0] == 1
+        assert dst[0] == 0
+
+    g = dgl.heterograph({
+        ('A', 'AB', 'B'): (np.random.randint(0, 20, (300,)), np.random.randint(0, 40, (300,))),
+        ('B', 'BA', 'A'): (np.random.randint(0, 40, (200,)), np.random.randint(0, 20, (200,)))}).to(F.ctx())
+    src, dst = dgl.sampling.global_uniform_negative_sampling(g, 20, False, etype='AB')
+    assert not F.asnumpy(g.has_edges_between(src, dst, etype='AB')).any()
+
 
 if __name__ == '__main__':
     from itertools import product
@@ -903,3 +941,5 @@ if __name__ == '__main__':
     test_sample_neighbors_biased_bipartite()
     test_sample_neighbors_exclude_edges_heteroG('int32')
     test_sample_neighbors_exclude_edges_homoG('int32')
+    test_global_uniform_negative_sampling('int32')
+    test_global_uniform_negative_sampling('int64')

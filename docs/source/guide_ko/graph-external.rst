@@ -35,7 +35,7 @@
           ndata_schemes={}
           edata_schemes={})
 
-`nx.path_graph(5)`로부터 만들면 생성된 :class:`~dgl.DGLGraph` 는 4개가 아니라 8개의 에지를 갖는 점을 유의하자. 이유는 `nx.path_graph(5)`는 방향이 없는 NetworkX 그래프 :class:`networkx.Graph` 를 만드는데, :class:`~dgl.DGLGraph` 는 항상 방향이 있는 그래프이기 때문이다. 방향이 없는 NetworkX 그래프를 :class:`~dgl.DGLGraph` 로 변환하면, DGL은 내부적으로 방향이 없는 에지를 두개의 방향이 있는 에지로 변환한다. :class:`networkx.DiGraph` 를 사용하면 이런 현상을 피할 수 있다.
+`nx.path_graph(5)` 로부터 만들면 생성된 :class:`~dgl.DGLGraph` 는 4개가 아니라 8개의 에지를 갖는 점을 유의하자. 이유는 `nx.path_graph(5)` 는 방향이 없는 NetworkX 그래프 :class:`networkx.Graph` 를 만드는데, :class:`~dgl.DGLGraph` 는 항상 방향이 있는 그래프이기 때문이다. 방향이 없는 NetworkX 그래프를 :class:`~dgl.DGLGraph` 로 변환하면, DGL은 내부적으로 방향이 없는 에지를 두개의 방향이 있는 에지로 변환한다. :class:`networkx.DiGraph` 를 사용하면 이런 현상을 피할 수 있다.
 
 .. code::
 
@@ -46,9 +46,6 @@
           edata_schemes={})
 
 .. note::
-
-    DGL internally converts SciPy matrices and NetworkX graphs to tensors to construct graphs.
-    Hence, these construction methods are not meant for performance critical parts.
 
     내부적으로 DGL은 SciPy 행렬과 NetworkX 그래프를 텐서로 변환해서 그래프를 만든다. 따라서, 이 생성 방법은 성능이 중요한 곳에 사용되기 적합하지 않다.
 
@@ -95,7 +92,7 @@ Comma Separated Values (CSV)
 JSON/GML 포멧
 """"""""""""
 
-특별히 빠르지는 않지만 NetworkX는 `다양한 데이터 포멧<https://networkx.github.io/documentation/stable/reference/readwrite/index.html>`을 파싱하는 유틸리티들을 제공하는데, 이를 통해서 DGL 그래프를 만들 수 있다.
+특별히 빠르지는 않지만 NetworkX는 `다양한 데이터 포멧 <https://networkx.github.io/documentation/stable/reference/readwrite/index.html>`_ 을 파싱하는 유틸리티들을 제공하는데, 이를 통해서 DGL 그래프를 만들 수 있다.
 
 DGL 바이너리 포멧
 """"""""""""""

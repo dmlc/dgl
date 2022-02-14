@@ -122,6 +122,37 @@ struct CSRMatrix {
                      aten::IsNullArray(data) ? data : data.CopyTo(ctx, stream),
                      sorted);
   }
+
+  /*!
+  * \brief Pin the indptr, indices and data (if not Null) of the matrix.
+  * \note This is an in-place method. Behavior depends on the current context,
+  *       kDLCPU: will be pinned;
+  *       kDLCPUPinned: directly return;
+  *       kDLGPU: invalid, will throw an error.
+  *       The context check is deferred to pinning the NDArray.
+  */
+  inline void PinMemory_() {
+    indptr.PinMemory_();
+    indices.PinMemory_();
+    if (!aten::IsNullArray(data)) {
+      data.PinMemory_();
+    }
+  }
+
+  /*!
+  * \brief Unpin the indptr, indices and data (if not Null) of the matrix.
+  * \note This is an in-place method. Behavior depends on the current context,
+  *       kDLCPUPinned: will be unpinned;
+  *       others: directly return.
+  *       The context check is deferred to unpinning the NDArray.
+  */
+  inline void UnpinMemory_() {
+    indptr.UnpinMemory_();
+    indices.UnpinMemory_();
+    if (!aten::IsNullArray(data)) {
+      data.UnpinMemory_();
+    }
+  }
 };
 
 ///////////////////////// CSR routines //////////////////////////
@@ -546,6 +577,29 @@ COOMatrix CSRRowWiseSamplingBiased(
     FloatArray bias,
     bool replace = true
 );
+
+/*!
+ * \brief Uniformly sample row-column pairs whose entries do not exist in the given
+ * sparse matrix using rejection sampling.
+ *
+ * \note The number of samples returned may not necessarily be the number of samples
+ * given.
+ *
+ * \param csr The CSR matrix.
+ * \param num_samples The number of samples.
+ * \param num_trials The number of trials.
+ * \param exclude_self_loops Do not include the examples where the row equals the column.
+ * \param replace Whether to sample with replacement.
+ * \param redundancy How much redundant negative examples to take in case of duplicate examples.
+ * \return A pair of row and column tensors.
+ */
+std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling(
+    const CSRMatrix& csr,
+    int64_t num_samples,
+    int num_trials,
+    bool exclude_self_loops,
+    bool replace,
+    double redundancy);
 
 /*!
  * \brief Sort the column index according to the tag of each column.

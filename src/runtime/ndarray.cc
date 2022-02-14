@@ -18,6 +18,8 @@ extern "C" void NDArrayDLPackDeleter(DLManagedTensor* tensor);
 
 namespace dgl {
 
+constexpr DLDataType DLDataTypeTraits<int8_t>::dtype;
+constexpr DLDataType DLDataTypeTraits<int16_t>::dtype;
 constexpr DLDataType DLDataTypeTraits<int32_t>::dtype;
 constexpr DLDataType DLDataTypeTraits<int64_t>::dtype;
 constexpr DLDataType DLDataTypeTraits<uint32_t>::dtype;
@@ -58,11 +60,13 @@ struct NDArray::Internal {
     using dgl::runtime::NDArray;
     if (ptr->manager_ctx != nullptr) {
       static_cast<NDArray::Container*>(ptr->manager_ctx)->DecRef();
-#ifndef _WIN32
     } else if (ptr->mem) {
       ptr->mem = nullptr;
-#endif  // _WIN32
     } else if (ptr->dl_tensor.data != nullptr) {
+      // if the array is still pinned before freeing, unpin it.
+      if (ptr->dl_tensor.ctx.device_type == kDLCPUPinned) {
+        UnpinData(&(ptr->dl_tensor));
+      }
       dgl::runtime::DeviceAPI::Get(ptr->dl_tensor.ctx)->FreeDataSpace(
           ptr->dl_tensor.ctx, ptr->dl_tensor.data);
     }
@@ -191,7 +195,6 @@ NDArray NDArray::EmptyShared(const std::string &name,
   NDArray ret = Internal::Create(shape, dtype, ctx);
   // setup memory content
   size_t size = GetDataSize(ret.data_->dl_tensor);
-#ifndef _WIN32
   auto mem = std::make_shared<SharedMemory>(name);
   if (is_create) {
     ret.data_->dl_tensor.data = mem->CreateNew(size);
@@ -200,10 +203,20 @@ NDArray NDArray::EmptyShared(const std::string &name,
   }
 
   ret.data_->mem = mem;
-#else
-  LOG(FATAL) << "Windows doesn't support NDArray with shared memory";
-#endif  // _WIN32
   return ret;
+}
+
+inline DLContext GetDevice(DLContext ctx) {
+  switch (ctx.device_type) {
+    case kDLCPU:
+    case kDLGPU:
+      return ctx;
+      break;
+    default:
+      // fallback to CPU
+      return DLContext{kDLCPU, 0};
+      break;
+  }
 }
 
 NDArray NDArray::Empty(std::vector<int64_t> shape,
@@ -213,7 +226,7 @@ NDArray NDArray::Empty(std::vector<int64_t> shape,
   if (td->IsAvailable())
     return td->Empty(shape, dtype, ctx);
 
-  NDArray ret = Internal::Create(shape, dtype, ctx);
+  NDArray ret = Internal::Create(shape, dtype, GetDevice(ctx));
   // setup memory content
   size_t size = GetDataSize(ret.data_->dl_tensor);
   size_t alignment = GetDataAlignment(ret.data_->dl_tensor);
@@ -247,12 +260,28 @@ void NDArray::CopyFromTo(DLTensor* from,
 
   // Use the context that is *not* a cpu context to get the correct device
   // api manager.
-  DGLContext ctx = from->ctx.device_type != kDLCPU ? from->ctx : to->ctx;
+  DGLContext ctx = GetDevice(from->ctx).device_type != kDLCPU ? from->ctx : to->ctx;
 
   DeviceAPI::Get(ctx)->CopyDataFromTo(
     from->data, static_cast<size_t>(from->byte_offset),
     to->data, static_cast<size_t>(to->byte_offset),
     from_size, from->ctx, to->ctx, from->dtype, stream);
+}
+
+void NDArray::PinData(DLTensor* tensor) {
+  // Only need to call PinData once, since the pinned memory can be seen
+  // by all CUDA contexts, not just the one that performed the allocation
+  if (tensor->ctx.device_type == kDLCPUPinned) return;
+  CHECK_EQ(tensor->ctx.device_type, kDLCPU)
+    << "Only NDArray on CPU can be pinned";
+  DeviceAPI::Get(kDLGPU)->PinData(tensor->data, GetDataSize(*tensor));
+  tensor->ctx = DLContext{kDLCPUPinned, 0};
+}
+
+void NDArray::UnpinData(DLTensor* tensor) {
+  if (tensor->ctx.device_type != kDLCPUPinned) return;
+  DeviceAPI::Get(kDLGPU)->UnpinData(tensor->data);
+  tensor->ctx = DLContext{kDLCPU, 0};
 }
 
 template<typename T>
@@ -310,11 +339,9 @@ template std::vector<uint64_t> NDArray::ToVector<uint64_t>() const;
 template std::vector<float> NDArray::ToVector<float>() const;
 template std::vector<double> NDArray::ToVector<double>() const;
 
-#ifndef _WIN32
 std::shared_ptr<SharedMemory> NDArray::GetSharedMem() const {
   return this->data_->mem;
 }
-#endif  // _WIN32
 
 
 void NDArray::Save(dmlc::Stream* strm) const {
@@ -462,9 +489,10 @@ int DGLArrayToDLPack(DGLArrayHandle from, DLManagedTensor** out,
   API_BEGIN();
   auto* nd_container = reinterpret_cast<NDArray::Container*>(from);
   DLTensor* nd = &(nd_container->dl_tensor);
-  if (alignment != 0 && !is_aligned(nd->data, alignment)) {
+  if ((alignment != 0 && !is_aligned(nd->data, alignment))
+      || (nd->ctx.device_type == kDLCPUPinned)) {
     std::vector<int64_t> shape_vec(nd->shape, nd->shape + nd->ndim);
-    NDArray copy_ndarray = NDArray::Empty(shape_vec, nd->dtype, nd->ctx);
+    NDArray copy_ndarray = NDArray::Empty(shape_vec, nd->dtype, GetDevice(nd->ctx));
     copy_ndarray.CopyFrom(nd);
     *out = copy_ndarray.ToDLPack();
   } else {
@@ -514,16 +542,13 @@ int DGLArrayCopyToBytes(DGLArrayHandle handle,
 int DGLArrayPinData(DGLArrayHandle handle,
                     DLContext ctx) {
   API_BEGIN();
-  CHECK_EQ(ctx.device_type, kDLGPU);
-  DeviceAPI::Get(ctx)->PinData(ctx, handle->data,
-                                        GetDataSize(*handle));
+  NDArray::PinData(handle);
   API_END();
 }
 
 int DGLArrayUnpinData(DGLArrayHandle handle,
                       DLContext ctx) {
   API_BEGIN();
-  CHECK_EQ(ctx.device_type, kDLGPU);
-  DeviceAPI::Get(ctx)->UnpinData(ctx, handle->data);
+  NDArray::UnpinData(handle);
   API_END();
 }

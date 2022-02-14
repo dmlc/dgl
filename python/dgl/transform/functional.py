@@ -13,7 +13,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 #
-"""Module for graph transformation utilities."""
+"""Functional interface for transform"""
 
 from collections.abc import Iterable, Mapping
 from collections import defaultdict
@@ -21,22 +21,22 @@ import numpy as np
 import scipy.sparse as sparse
 import scipy.sparse.linalg
 
-from ._ffi.function import _init_api
-from .base import dgl_warning, DGLError
-from . import convert
-from .heterograph import DGLHeteroGraph, DGLBlock
-from .heterograph_index import create_metagraph_index, create_heterograph_from_relations
-from .frame import Frame
-from . import ndarray as nd
-from . import backend as F
-from . import utils, batch
-from .partition import metis_partition_assignment
-from .partition import partition_graph_with_halo
-from .partition import metis_partition
-from . import subgraph
+from .._ffi.function import _init_api
+from ..base import dgl_warning, DGLError
+from .. import convert
+from ..heterograph import DGLHeteroGraph, DGLBlock
+from ..heterograph_index import create_metagraph_index, create_heterograph_from_relations
+from ..frame import Frame
+from .. import ndarray as nd
+from .. import backend as F
+from .. import utils, batch
+from ..partition import metis_partition_assignment
+from ..partition import partition_graph_with_halo
+from ..partition import metis_partition
+from .. import subgraph
 
 # TO BE DEPRECATED
-from ._deprecate.graph import DGLGraph as DGLGraphStale
+from .._deprecate.graph import DGLGraph as DGLGraphStale
 
 __all__ = [
     'line_graph',
@@ -93,7 +93,7 @@ def knn_graph(x, k, algorithm='bruteforce-blas', dist='euclidean'):
     columns correspond to coordinate/feature dimensions.
 
     The nodes of the returned graph correspond to the points, where the predecessors
-    of each point are its k-nearest neighbors measured by the Euclidean distance.
+    of each point are its k-nearest neighbors measured by the chosen distance.
 
     If :attr:`x` is a 3D tensor, then each submatrix will be transformed
     into a separate graph. DGL then composes the graphs into a large
@@ -254,7 +254,7 @@ def _knn_graph_blas(x, k, dist='euclidean'):
 
     ctx = F.context(x)
     dist = pairwise_squared_distance(x)
-    k_indices = F.argtopk(dist, k, 2, descending=False)
+    k_indices = F.astype(F.argtopk(dist, k, 2, descending=False), F.int64)
     # index offset for each sample
     offset = F.arange(0, n_samples, ctx=ctx) * n_points
     offset = F.unsqueeze(offset, 1)
@@ -634,8 +634,8 @@ def to_bidirected(g, copy_ndata=False, readonly=None):
     r"""Convert the graph to a bi-directional simple graph and return.
 
     For an input graph :math:`G`, return a new graph :math:`G'` such that an edge
-    :math:`(u, v)\in G'` if and only if there exists an edge :math:`(u, v)\in G` or
-    an edge :math:`(v, u)\in G`. The resulting graph :math:`G'` is a simple graph,
+    :math:`(u, v)\in G'` exists if and only if there exists an edge
+    :math:`(v, u)\in G`. The resulting graph :math:`G'` is a simple graph,
     meaning there is no parallel edge.
 
     The operation only works for edges whose two endpoints belong to the same node type.
@@ -709,19 +709,20 @@ def to_bidirected(g, copy_ndata=False, readonly=None):
                 "unidirectional bipartite graphs" \
                 ", but {} is unidirectional bipartite".format(c_etype)
 
-    assert g.is_multigraph is False, "to_bidirected only support simple graph"
-
     g = add_reverse_edges(g, copy_ndata=copy_ndata, copy_edata=False)
     g = to_simple(g, return_counts=None, copy_ndata=copy_ndata, copy_edata=False)
     return g
 
 def add_reverse_edges(g, readonly=None, copy_ndata=True,
-                      copy_edata=False, ignore_bipartite=False):
-    r"""Add an reversed edge for each edge in the input graph and return a new graph.
+                      copy_edata=False, ignore_bipartite=False, exclude_self=True):
+    r"""Add a reversed edge for each edge in the input graph and return a new graph.
 
     For a graph with edges :math:`(i_1, j_1), \cdots, (i_n, j_n)`, this
     function creates a new graph with edges
     :math:`(i_1, j_1), \cdots, (i_n, j_n), (j_1, i_1), \cdots, (j_n, i_n)`.
+
+    The returned graph may have duplicate edges. To create a bidirected graph without
+    duplicate edges, use :func:`to_bidirected`.
 
     The operation only works for edges whose two endpoints belong to the same node type.
     DGL will raise error if the input graph is heterogeneous and contains edges
@@ -742,16 +743,19 @@ def add_reverse_edges(g, readonly=None, copy_ndata=True,
         (Default: True)
     copy_edata: bool, optional
         If True, the features of the reversed edges will be identical to
-        the original ones."
+        the original ones.
 
         If False, the new graph will not have any edge features.
 
         (Default: False)
     ignore_bipartite: bool, optional
         If True, unidirectional bipartite graphs are ignored and
-        no error is raised. If False, an error  will be raised if
+        no error is raised. If False, an error will be raised if
         an edge type of the input heterogeneous graph is for a unidirectional
         bipartite graph.
+    exclude_self: bool, optional
+        If True, it does not add reverse edges for self-loops, which is likely
+        meaningless in most cases.
 
     Returns
     -------
@@ -814,32 +818,45 @@ def add_reverse_edges(g, readonly=None, copy_ndata=True,
     # get node cnt for each ntype
     num_nodes_dict = {}
     for ntype in g.ntypes:
-        num_nodes_dict[ntype] = g.number_of_nodes(ntype)
+        num_nodes_dict[ntype] = g.num_nodes(ntype)
 
     canonical_etypes = g.canonical_etypes
-    num_nodes_dict = {ntype: g.number_of_nodes(ntype) for ntype in g.ntypes}
+    num_nodes_dict = {ntype: g.num_nodes(ntype) for ntype in g.ntypes}
+    subgs = {}
+    rev_eids = {}
+
+    def add_for_etype(etype):
+        u, v = g.edges(form='uv', order='eid', etype=etype)
+        rev_u, rev_v = v, u
+        eid = F.copy_to(F.arange(0, g.num_edges(etype)), g.device)
+        if exclude_self:
+            self_loop_mask = F.equal(rev_u, rev_v)
+            non_self_loop_mask = F.logical_not(self_loop_mask)
+            rev_u = F.boolean_mask(rev_u, non_self_loop_mask)
+            rev_v = F.boolean_mask(rev_v, non_self_loop_mask)
+            non_self_loop_eid = F.boolean_mask(eid, non_self_loop_mask)
+            rev_eids[etype] = F.cat([eid, non_self_loop_eid], 0)
+        else:
+            rev_eids[etype] = F.cat([eid, eid], 0)
+        subgs[etype] = (F.cat([u, rev_u], dim=0), F.cat([v, rev_v], dim=0))
+
     # fast path
     if ignore_bipartite is False:
-        subgs = {}
         for c_etype in canonical_etypes:
             if c_etype[0] != c_etype[2]:
                 assert False, "add_reverse_edges is not well defined for " \
                     "unidirectional bipartite graphs" \
                     ", but {} is unidirectional bipartite".format(c_etype)
-
-            u, v = g.edges(form='uv', order='eid', etype=c_etype)
-            subgs[c_etype] = (F.cat([u, v], dim=0), F.cat([v, u], dim=0))
+            add_for_etype(c_etype)
 
         new_g = convert.heterograph(subgs, num_nodes_dict=num_nodes_dict)
     else:
-        subgs = {}
         for c_etype in canonical_etypes:
             if c_etype[0] != c_etype[2]:
                 u, v = g.edges(form='uv', order='eid', etype=c_etype)
                 subgs[c_etype] = (u, v)
             else:
-                u, v = g.edges(form='uv', order='eid', etype=c_etype)
-                subgs[c_etype] = (F.cat([u, v], dim=0), F.cat([v, u], dim=0))
+                add_for_etype(c_etype)
 
         new_g = convert.heterograph(subgs, num_nodes_dict=num_nodes_dict)
 
@@ -852,11 +869,10 @@ def add_reverse_edges(g, readonly=None, copy_ndata=True,
         # find indices
         eids = []
         for c_etype in canonical_etypes:
-            eid = F.copy_to(F.arange(0, g.number_of_edges(c_etype)), new_g.device)
             if c_etype[0] != c_etype[2]:
-                eids.append(eid)
+                eids.append(F.copy_to(F.arange(0, g.number_of_edges(c_etype)), new_g.device))
             else:
-                eids.append(F.cat([eid, eid], 0))
+                eids.append(rev_eids[c_etype])
 
         edge_frames = utils.extract_edge_subframes(g, eids)
         utils.set_new_frames(new_g, edge_frames=edge_frames)
@@ -867,7 +883,7 @@ def line_graph(g, backtracking=True, shared=False):
     """Return the line graph of this graph.
 
     The line graph ``L(G)`` of a given graph ``G`` is defined as another graph where
-    the nodes in ``L(G)`` maps to the edges in ``G``.  For any pair of edges ``(u, v)``
+    the nodes in ``L(G)`` correspond to the edges in ``G``.  For any pair of edges ``(u, v)``
     and ``(v, w)`` in ``G``, the corresponding node of edge ``(u, v)`` in ``L(G)`` will
     have an edge connecting to the corresponding node of edge ``(v, w)``.
 
@@ -1052,7 +1068,7 @@ def khop_graph(g, k, copy_ndata=True):
     col = np.repeat(adj_k.col, multiplicity)
     # TODO(zihao): we should support creating multi-graph from scipy sparse matrix
     # in the future.
-    new_g = convert.graph((row, col), num_nodes=n)
+    new_g = convert.graph((row, col), num_nodes=n, idtype=g.idtype, device=g.device)
 
     # handle ndata
     if copy_ndata:
@@ -2352,7 +2368,7 @@ def to_simple(g,
         (Default: "count")
     writeback_mapping: bool, optional
         If True, return an extra write-back mapping for each edge
-        type.  The write-back mapping is a tensor recording
+        type. The write-back mapping is a tensor recording
         the mapping from the edge IDs in the input graph to
         the edge IDs in the result graph. If the graph is
         heterogeneous, DGL returns a dictionary of edge types and such
@@ -3197,4 +3213,4 @@ def rcmk_perm(g):
     perm = sparse.csgraph.reverse_cuthill_mckee(csr_adj)
     return perm.copy()
 
-_init_api("dgl.transform")
+_init_api("dgl.transform", __name__)

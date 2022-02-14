@@ -5,12 +5,12 @@ spec:
     runAsUser: 0
   containers:
   - name: dgl-ci-cpu
-    image: dgllib/dgl-ci-cpu:conda
+    image: dgllib/dgl-ci-cpu:cu101_v220123
     imagePullPolicy: Always
     tty: true
     resources:
       requests:
-        cpu: 8
+        cpu: 16
     volumeMounts:
       - name: persistent-storage
         mountPath: /tmp/dataset

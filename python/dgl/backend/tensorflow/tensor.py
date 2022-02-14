@@ -244,6 +244,10 @@ def exp(input):
     return tf.exp(input)
 
 
+def inverse(input):
+    return tf.linalg.inv(input)
+
+
 def sqrt(input):
     return tf.sqrt(input)
 
@@ -320,7 +324,10 @@ def reshape(input, shape):
 
 
 def swapaxes(input, axis1, axis2):
-    return tf.transpose(input, perm=[axis1, axis2])
+    ndim = input.ndim
+    t = list(range(ndim))
+    t[axis1], t[axis2] = axis2 % ndim, axis1 % ndim
+    return tf.transpose(input, perm=t)
 
 
 def zeros(shape, dtype, ctx):
@@ -391,6 +398,11 @@ def boolean_mask(input, mask):
 
 def equal(x, y):
     return x == y
+
+
+def allclose(x, y, rtol=1e-4, atol=1e-4):
+    return np.allclose(tf.convert_to_tensor(x).numpy(),
+                       tf.convert_to_tensor(y).numpy(), rtol=rtol, atol=atol)
 
 
 def logical_not(input):

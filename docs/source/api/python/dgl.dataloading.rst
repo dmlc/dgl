@@ -17,6 +17,8 @@ and an ``EdgeDataLoader`` for edge/link prediction task.
 .. autoclass:: NodeDataLoader
 .. autoclass:: EdgeDataLoader
 .. autoclass:: GraphDataLoader
+.. autoclass:: DistNodeDataLoader
+.. autoclass:: DistEdgeDataLoader
 
 .. _api-dataloading-neighbor-sampling:
 
@@ -85,6 +87,9 @@ Negative samplers are classes that control the behavior of the ``EdgeDataLoader`
 to generate negative edges.
 
 .. autoclass:: Uniform
+    :members: __call__
+
+.. autoclass:: GlobalUniform
     :members: __call__
 
 Async Copying to/from GPUs

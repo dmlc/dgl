@@ -83,6 +83,67 @@ target_mapping = {
     'dst': 2
 }
 
+def _edge_softmax_backward(gidx, out, sds):
+    r""" Edge_softmax backward interface.
+
+    Parameters
+    ----------
+    gidx : HeteroGraphIndex
+        The input graph index.
+    out : tensor
+        The result of Edge_softmax during forward.
+    sds : tensor
+        The result of out * gradient.
+
+    Returns
+    -------
+    The result of Edge_softmax during backward
+
+    Notes
+    -----
+    This function does not support gpu op.
+    """
+    op = 'copy_rhs'
+    back_out = F.zeros_like(out)
+    _CAPI_DGLKernelEdge_softmax_backward(gidx, op,
+                                         to_dgl_nd(out),
+                                         to_dgl_nd(sds),
+                                         to_dgl_nd_for_write(back_out),
+                                         to_dgl_nd(None))
+    return back_out
+
+def _edge_softmax_forward(gidx, e, op):
+    r""" Edge_softmax forward interface.
+
+    Parameters
+    ----------
+    gidx : HeteroGraphIndex
+        The input graph index.
+    op : str
+        The binary op's name, default as ``copy_rhs``.
+    e : tensor or None
+        The feature on edges.
+
+    Returns
+    -------
+    The result of Edge_softmax during forward
+
+    Notes
+    -----
+    This function does not support gpu op.
+    """
+    if F.ndim(e) == 1:
+        e = F.unsqueeze(e, -1)
+        expand = True
+    else:
+        expand = False
+    myout = F.zeros_like(e)
+    _CAPI_DGLKernelEdge_softmax_forward(gidx, op,
+                                        to_dgl_nd(None),
+                                        to_dgl_nd(e),
+                                        to_dgl_nd_for_write(myout))
+    myout = F.squeeze(myout, -1) if expand else myout
+    return myout
 
 def _gspmm(gidx, op, reduce_op, u, e):
     r""" Generalized Sparse Matrix Multiplication interface. It takes the result of
@@ -456,7 +517,7 @@ def _gsddmm_hetero(gidx, op, lhs_len, lhs_target='u', rhs_target='v', lhs_and_rh
                                    [to_dgl_nd_for_write(out) for out in out_list],
                                    lhs_target, rhs_target)
 
-    for l in range(gidx.number_of_ntypes()):
+    for l in range(gidx.number_of_etypes()):
         # Replace None by empty tensor. Forward func doesn't accept None in tuple.
         e = out_list[l]
         e = F.tensor([]) if e is None else e
@@ -702,5 +763,105 @@ def _csrmask(A, A_weights, B):
         The output weights.
     """
     return F.from_dgl_nd(_CAPI_DGLCSRMask(A, F.to_dgl_nd(A_weights), B))
+
+
+
+###################################################################################################
+## Libra Graph Partition
+def libra_vertex_cut(nc, node_degree, edgenum_unassigned,
+                     community_weights, u, v, w, out, N, N_e, dataset):
+    """
+    This function invokes C/C++ code for Libra based graph partitioning.
+    Parameter details are present in dgl/src/array/libra_partition.cc
+    """
+    _CAPI_DGLLibraVertexCut(nc,
+                            to_dgl_nd_for_write(node_degree),
+                            to_dgl_nd_for_write(edgenum_unassigned),
+                            to_dgl_nd_for_write(community_weights),
+                            to_dgl_nd(u),
+                            to_dgl_nd(v),
+                            to_dgl_nd(w),
+                            to_dgl_nd_for_write(out),
+                            N,
+                            N_e,
+                            dataset)
+
+
+def libra2dgl_build_dict(a, b, indices, ldt_key, gdt_key, gdt_value, node_map,
+                         offset, nc, c, fsize, dataset):
+    """
+    This function invokes C/C++ code for pre-processing Libra output.
+    After graph partitioning using Libra, during conversion from Libra output to DGL/DistGNN input,
+    this function creates dictionaries to assign local node ids to the partitioned nodes
+    and also to create a database of the split nodes.
+    Parameter details are present in dgl/src/array/libra_partition.cc
+    """
+    ret = _CAPI_DGLLibra2dglBuildDict(to_dgl_nd_for_write(a),
+                                      to_dgl_nd_for_write(b),
+                                      to_dgl_nd_for_write(indices),
+                                      to_dgl_nd_for_write(ldt_key),
+                                      to_dgl_nd_for_write(gdt_key),
+                                      to_dgl_nd_for_write(gdt_value),
+                                      to_dgl_nd_for_write(node_map),
+                                      to_dgl_nd_for_write(offset),
+                                      nc,
+                                      c,
+                                      fsize,
+                                      dataset)
+    return ret
+
+
+def libra2dgl_build_adjlist(feat, gfeat, adj, inner_node, ldt, gdt_key,
+                            gdt_value, node_map, lr, lrtensor, num_nodes,
+                            nc, c, feat_size, labels, trainm, testm, valm,
+                            glabels, gtrainm, gtestm, gvalm, feat_shape):
+    """
+    This function invokes C/C++ code for pre-processing Libra output.
+    After graph partitioning using Libra, once the local and global dictionaries are built,
+    for each node in each partition, this function copies the split node details from the
+    global dictionary. It also copies features, label, train, test, and validation information
+    for each node from the input graph to the corresponding partitions.
+    Parameter details are present in dgl/src/array/libra_partition.cc
+    """
+    _CAPI_DGLLibra2dglBuildAdjlist(to_dgl_nd(feat),
+                                   to_dgl_nd_for_write(gfeat),
+                                   to_dgl_nd_for_write(adj),
+                                   to_dgl_nd_for_write(inner_node),
+                                   to_dgl_nd(ldt),
+                                   to_dgl_nd(gdt_key),
+                                   to_dgl_nd(gdt_value),
+                                   to_dgl_nd(node_map),
+                                   to_dgl_nd_for_write(lr),
+                                   to_dgl_nd(lrtensor),
+                                   num_nodes,
+                                   nc,
+                                   c,
+                                   feat_size,
+                                   to_dgl_nd(labels),
+                                   to_dgl_nd(trainm),
+                                   to_dgl_nd(testm),
+                                   to_dgl_nd(valm),
+                                   to_dgl_nd_for_write(glabels),
+                                   to_dgl_nd_for_write(gtrainm),
+                                   to_dgl_nd_for_write(gtestm),
+                                   to_dgl_nd_for_write(gvalm),
+                                   feat_shape)
+
+
+
+def libra2dgl_set_lr(gdt_key, gdt_value, lrtensor, nc, Nn):
+    """
+    This function invokes C/C++ code for pre-processing Libra output.
+    To prepare the graph partitions for DistGNN input, this function sets the leaf
+    and root (1-level tree) among the split copies (across different partitions)
+    of a node from input graph.
+    Parameter details are present in dgl/src/array/libra_partition.cc
+    """
+    _CAPI_DGLLibra2dglSetLR(to_dgl_nd(gdt_key),
+                            to_dgl_nd(gdt_value),
+                            to_dgl_nd_for_write(lrtensor),
+                            nc,
+                            Nn)
+
 
 _init_api("dgl.sparse")

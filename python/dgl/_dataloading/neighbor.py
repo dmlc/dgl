@@ -71,7 +71,7 @@ class MultiLayerNeighborSampler(NeighborSamplingMixin, BlockSampler):
 
         If -1 is provided for one edge type on one layer, then all inbound edges
         of that edge type will be included.
-    replace : bool, default True
+    replace : bool, default False
         Whether to sample with replacement
     return_eids : bool, default False
         Whether to return the edge IDs involved in message passing in the MFG.
@@ -126,7 +126,8 @@ class MultiLayerNeighborSampler(NeighborSamplingMixin, BlockSampler):
 
     @classmethod
     def exclude_edges_in_frontier(cls, g):
-        return not isinstance(g, distributed.DistGraph) and g.device == F.cpu()
+        return not isinstance(g, distributed.DistGraph) and g.device == F.cpu() \
+               and not g.is_pinned()
 
     def sample_frontier(self, block_id, g, seed_nodes, exclude_eids=None):
         fanout = self.fanouts[block_id]

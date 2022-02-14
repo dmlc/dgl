@@ -1,3 +1,38 @@
+## DistGNN vertex-cut based graph partitioning (using Libra)
+
+### How to run graph partitioning
+```python ../../../../python/dgl/distgnn/partition/main_Libra.py <dataset> <#partitions>```
+
+Example: The following command-line creates 4 partitions of pubmed graph   
+```python ../../../../python/dgl/distgnn/partition/main_Libra.py pubmed 4```
+ 
+The ouptut partitions are created in the current directory in Libra_result_\<dataset\>/ folder.  
+The *upcoming DistGNN* application can directly use these partitions for distributed training.  
+
+### How Libra partitioning works
+Libra is a vertex-cut based graph partitioning method. It applies greedy heuristics to uniquely distribute the input graph edges among the partitions. It generates the partitions as a list of edges. Script ```main_Libra.py```  after getting the Libra partitions converts the Libra output to DGL/DistGNN input format.  
+
+
+Note: Current Libra implementation is sequential. Extra overhead is paid due to the additional work of format conversion of the partitioned graph.  
+
+
+### Expected partitioning timinigs  
+Cora, Pubmed, Citeseer: < 10 sec (<10GB)  
+Reddit: 1500 sec (~ 25GB)  
+OGBN-Products: ~2000 sec (~30GB)  
+Proteins: 18000 sec (Format conversion from public data takes time)  (~100GB)  
+OGBN-Paper100M: 25000 sec (~200GB)  
+
+
+### Settings
+Tested with:
+Cent OS 7.6
+gcc v8.3.0
+PyTorch 1.7.1
+Python 3.7.10
+
+
+
 ## Distributed training
 
 This is an example of training GraphSage in a distributed fashion. Before training, please install some python libs by pip:
@@ -112,7 +147,7 @@ This script generates partitioned graphs and store them in the directory called 
 DGL provides a script to launch the training job in the cluster. `part_config` and `ip_config`
 specify relative paths to the path of the workspace.
 
-The command below launches one training process on each machine and each training process has 4 sampling processes.
+The command below launches one process per machine for both sampling and training.
 
 ```bash
 python3 ~/workspace/dgl/tools/launch.py \

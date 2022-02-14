@@ -570,6 +570,21 @@ def exp(input):
     """
     pass
 
+def inverse(input):
+    """Returns the inverse matrix of a square matrix if it exists.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input square matrix.
+
+    Returns
+    -------
+    Tensor
+        The output tensor.
+    """
+    pass
+
 def sqrt(input):
     """Returns a new tensor with the square root of the elements of the input tensor `input`.
 
@@ -1056,6 +1071,21 @@ def equal(x, y):
         The result, with the same shape as input.
     """
     pass
+
+def allclose(x, y, rtol=1e-4, atol=1e-4):
+    """Compares whether all elements are close.
+
+    Parameters
+    ----------
+    x : Tensor
+        First tensor
+    y : Tensor
+        Second tensor
+    rtol : float, optional
+        Relative tolerance
+    atol : float, optional
+        Absolute tolerance
+    """
 
 def logical_not(input):
     """Perform a logical not operation.  Equivalent to np.logical_not
@@ -1615,6 +1645,43 @@ def edge_softmax(gidx, logits, eids, norm_by):
     eids : torch.Tensor or ALL, optional
         Edges on which to apply edge softmax. If ALL, apply edge
         softmax on all edges in the graph. Default: ALL.
+    norm_by : str, could be `src` or `dst`
+        Normalized by source nodes or destination nodes. Default: `dst`.
+
+    Returns
+    -------
+    Tensor
+        Softmax value
+    """
+    pass
+
+def edge_softmax_hetero(gidx, eids, norm_by, *logits):
+    r"""Compute edge softmax.
+
+    For a node :math:`i`, edge softmax is an operation of computing
+
+    .. math::
+      a_{ij} = \frac{\exp(z_{ij})}{\sum_{j\in\mathcal{N}(i)}\exp(z_{ij})}
+
+    where :math:`z_{ij}` is a signal of edge :math:`j\rightarrow i`, also
+    called logits in the context of softmax. :math:`\mathcal{N}(i)` is
+    the set of nodes that have an edge to :math:`i`.
+
+    By default edge softmax is normalized by destination nodes(i.e. :math:`ij`
+    are incoming edges of `i` in the formula above). We also support edge
+    softmax normalized by source nodes(i.e. :math:`ij` are outgoing edges of
+    `i` in the formula). The previous case correspond to softmax in GAT and
+    Transformer, and the later case correspond to softmax in Capsule network.
+
+    Parameters
+    ----------
+    gidx : HeteroGraphIndex
+        The graph to perfor edge softmax on.
+    eids : dict of tensors
+        Each tensor has the edges on which to apply edge softmax for a
+        corresponsing relation type.
+    logits : tuple of tensors
+        The input edge features of different relation types.
     norm_by : str, could be `src` or `dst`
         Normalized by source nodes or destination nodes. Default: `dst`.
 
