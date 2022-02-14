@@ -9,7 +9,7 @@ import numpy as np
 from ogb.nodeproppred import DglNodePropPredDataset
 import tqdm
 
-MODE = "cuda"   # "cpu", "uva", "cuda", "allcuda"
+MODE = "uva"   # "cpu", "uva", "cuda", "allcuda"
 
 class SAGE(nn.Module):
     def __init__(self, in_feats, n_hidden, n_classes):
@@ -95,7 +95,7 @@ valid_dataloader = dgl.dataloading.NodeDataLoader(
         persistent_workers=(num_workers > 0), use_prefetch_thread=use_prefetch_thread)
 
 durations = []
-for _ in range(100):
+for _ in range(1):
     model.train()
     t0 = time.time()
     for it, (input_nodes, output_nodes, blocks) in enumerate(train_dataloader):

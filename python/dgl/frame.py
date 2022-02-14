@@ -149,6 +149,7 @@ class Column(TensorStorage):
         self.scheme = scheme if scheme else infer_scheme(storage)
         self.index = index
         self.device = device
+        self.pinned = False
 
     def __len__(self):
         """The number of features (number of rows) in this column."""
@@ -190,6 +191,7 @@ class Column(TensorStorage):
         """Update the column data."""
         self.index = None
         self.storage = val
+        self.pinned = False
 
     def to(self, device, **kwargs): # pylint: disable=invalid-name
         """ Return a new column with columns copy to the targeted device (cpu/gpu).
@@ -343,11 +345,19 @@ class Column(TensorStorage):
 
     def pin_memory_(self):
         """Registers the column data into pinned memory, materializing it if necessary."""
+        if self.pinned or F.is_pinned(self.data):   # F.is_pinned for externally pinned tensors
+            return
         utils.pin_memory_inplace(self.data)
+        self.pinned = True
 
     def unpin_memory_(self):
         """Unregisters the column data from pinned memory, materializing it if necessary."""
-        utils.unpin_memory_inplace(self.data)
+        if self.pinned:
+            utils.unpin_memory_inplace(self.data)
+            self.pinned = False
+
+    def __del__(self):
+        self.unpin_memory_()
 
 class Frame(MutableMapping):
     """The columnar storage for node/edge features.
