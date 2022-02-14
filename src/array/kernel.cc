@@ -131,7 +131,6 @@ void SDDMM(const std::string& op,
   });
 }
 
-
 /*!
  * \brief Find the src/dst/etype id based on the target 'u', 'v' or 'e'.
  *
@@ -147,7 +146,6 @@ int get_typeid_by_target(HeteroGraphPtr graph, int target, dgl_type_t etype) {
     return pair.second;
   return etype;
 }
-
 
 /*! \brief Generalized Sampled Dense-Dense Matrix Multiplication. */
 void SDDMMHetero(const std::string& op,
@@ -195,6 +193,50 @@ void SDDMMHetero(const std::string& op,
     });
   });
 }
+
+
+/*! \brief Generalized Edge_softmax op for forward */
+void Edge_softmax_forward(const std::string& op,
+          HeteroGraphPtr graph,
+          NDArray ufeat,
+          NDArray efeat,
+          NDArray out) {
+  // TODO(zhejiang): add gpu op for edge_softmax
+  SparseFormat format = graph->SelectFormat(0, CSC_CODE);
+  const auto& bcast = CalcBcastOff(op, ufeat, efeat);
+
+  ATEN_XPU_SWITCH(graph->Context().device_type, XPU, "edge_softmax", {
+    ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
+      ATEN_FLOAT_BITS_SWITCH(out->dtype, bits, "edge_softmax out data", {
+        Edge_softmax_csr_forward<XPU, IdType, bits>(
+          op, bcast, graph->GetCSCMatrix(0), ufeat, efeat, out);
+      });
+    });
+  });
+}
+
+
+/*! \brief Generalized Edge_softmax op for backward */
+void Edge_softmax_backward(const std::string& op,
+          HeteroGraphPtr graph,
+          NDArray out,
+          NDArray sds,
+          NDArray back_out,
+          NDArray ufeat) {
+  // TODO(zhejiang): add gpu op for edge_softmax
+  SparseFormat format = graph->SelectFormat(0, CSC_CODE);
+  const auto& bcast = CalcBcastOff(op, ufeat, sds);
+
+  ATEN_XPU_SWITCH(graph->Context().device_type, XPU, "edge_softmax_back", {
+    ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
+      ATEN_FLOAT_BITS_SWITCH(out->dtype, bits, "edge_softmax out data_back", {
+        Edge_softmax_csr_backward<XPU, IdType, bits>(
+          op, bcast, graph->GetCSCMatrix(0), out, sds, back_out);
+      });
+    });
+  });
+}
+
 
 NDArray GetEdgeMapping(HeteroGraphRef graph) {
   SparseFormat format = graph->SelectFormat(0, CSC_CODE);
@@ -347,6 +389,27 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSpMM")
         {"U_data", "E_data", "out", "Arg_U", "Arg_E"});
     SpMM(op, reduce_op, graph.sptr(), U, E, V, {ArgU, ArgE});
   });
+
+DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelEdge_softmax_forward")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef graph = args[0];
+    const std::string op = args[1];
+    NDArray U = args[2];
+    NDArray E = args[3];
+    NDArray V = args[4];
+    Edge_softmax_forward(op, graph.sptr(), U, E, V);
+});
+
+DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelEdge_softmax_backward")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef graph = args[0];
+    const std::string op = args[1];
+    NDArray out = args[2];
+    NDArray sds = args[3];
+    NDArray back_out = args[4];
+    NDArray ufeat = args[5];
+    Edge_softmax_backward(op, graph.sptr(), out, sds, back_out, ufeat);
+});
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSpMMHetero")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
