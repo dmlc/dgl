@@ -29,10 +29,6 @@ class SamplerConfig(BaseModel):
 
 
 
-# SamplerConfig = SamplerConfig
-
-# SamplerChoice = extract_name(SamplerConfig)
-
 pipeline_comments = {
     "num_epochs": "Number of training epochs",
     "eval_period": "Interval epochs between evaluations",
@@ -62,6 +58,7 @@ class NodepredNsPipeline(PipelineBase):
     def setup_user_cfg_cls(cls):
         from ...utils.enter_config import UserConfig 
         class NodePredUserConfig(UserConfig):
+            eval_device: DeviceEnum = Field("cpu")
             data: DataFactory.filter("nodepred-ns").get_pydantic_config() = Field(..., discriminator="name")
             model : NodeModelFactory.get_pydantic_model_config() = Field(..., discriminator="name")   
             general_pipeline: NodepredNSPipelineCfg

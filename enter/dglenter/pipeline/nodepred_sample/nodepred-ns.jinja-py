@@ -53,7 +53,7 @@ def load_subtensor(nfeat, labels, seeds, input_nodes, device):
     batch_labels = labels[seeds].to(device)
     return batch_inputs, batch_labels
 
-def evaluate(model, g, nfeat, labels, val_nid, device, cfg):
+def evaluate(model, g, nfeat, labels, val_nid, eval_device):
     """
     Evaluate the model on the validation set specified by ``val_nid``.
     g : The entire graph.
@@ -63,27 +63,11 @@ def evaluate(model, g, nfeat, labels, val_nid, device, cfg):
     device : The GPU device to evaluate on.
     """
     model.eval()
-    batch_size = cfg["general_pipeline"]["sampler"]["eval_batch_size"]
-    num_workers = cfg["general_pipeline"]["sampler"]["eval_num_workers"]
-    sampler = dgl.dataloading.MultiLayerFullNeighborSampler(len(cfg["general_pipeline"]["sampler"]["fan_out"]))
-    dataloader = dgl.dataloading.NodeDataLoader(
-        g,
-        torch.arange(g.num_nodes()),
-        sampler,
-        device=device,
-        batch_size=batch_size,
-        shuffle=False,
-        drop_last=False,
-        num_workers=num_workers)
+    eval_model = model.to(eval_device)
+    g = g.to(eval_device)
+    nfeat = nfeat.to(eval_device)
     with torch.no_grad():
-        y = None
-        for input_nodes, output_nodes, subgs in dataloader:
-            batch_inputs = nfeat[input_nodes].to(device)
-            subgs = [subg.int().to(device) for subg in subgs]
-            h = model.forward_block(subgs, batch_inputs)
-            if y is None:
-                y = torch.zeros((g.num_nodes(),) +  h.shape[1:])
-            y[output_nodes] = h.cpu()
+        y = eval_model(g, nfeat)
     model.train()
     return accuracy(y[val_nid], labels[val_nid].to(y.device))
 
@@ -123,6 +107,7 @@ def train(cfg, pipeline_cfg, device, data, model, optimizer, loss_fcn):
     val_acc = 0.
     for epoch in range(pipeline_cfg['num_epochs']):
         model.train()
+        model = model.to(device)
         for step, (input_nodes, seeds, subgs) in enumerate(dataloader):
             # Load the input features as well as output labels
             batch_inputs, batch_labels = load_subtensor(train_nfeat, train_labels,
@@ -140,7 +125,7 @@ def train(cfg, pipeline_cfg, device, data, model, optimizer, loss_fcn):
                 format(epoch, step, loss.item(), train_acc))
 
         if epoch % pipeline_cfg["eval_period"] == 0 and epoch != 0:
-            val_acc = evaluate(model, val_g, val_nfeat, val_labels, val_nid, device, cfg)
+            val_acc = evaluate(model, val_g, val_nfeat, val_labels, val_nid, cfg["eval_device"])
             print('Eval Acc {:.4f}'.format(val_acc))
         {% if user_cfg.early_stop %}
         if stopper.step(val_acc, model):            
@@ -152,7 +137,7 @@ def train(cfg, pipeline_cfg, device, data, model, optimizer, loss_fcn):
     {% endif %}
     model.eval()
     with torch.no_grad():
-        test_acc = evaluate(model, test_g, test_nfeat, test_labels, test_nid, device, cfg)
+        test_acc = evaluate(model, test_g, test_nfeat, test_labels, test_nid, cfg["eval_device"])
     return test_acc
 
 def main():
