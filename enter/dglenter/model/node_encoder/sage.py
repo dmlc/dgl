@@ -39,14 +39,11 @@ class GraphSAGE(nn.Module):
         self.layers = nn.ModuleList()
         self.dropout = nn.Dropout(dropout)
         self.activation = getattr(nn.functional, activation)
-
-        # input layer
-        self.layers.append(dgl.nn.SAGEConv(in_size, hidden_size, aggregator_type))
-        # hidden layers
-        for i in range(num_layers - 1):
-            self.layers.append(dgl.nn.SAGEConv(hidden_size, hidden_size, aggregator_type))
-        # output layer
-        self.layers.append(dgl.nn.SAGEConv(hidden_size, data_info["out_size"], aggregator_type)) # activation None
+        
+        for i in range(num_layers):
+            in_hidden = hidden_size if i > 0 else in_size
+            out_hidden = hidden_size if i < num_layers - 1 else data_info["out_size"]
+            self.layers.append(dgl.nn.SAGEConv(in_hidden, out_hidden, aggregator_type))
 
     def forward(self, graph, node_feat, edge_feat = None):
         if self.embed_size > 0:

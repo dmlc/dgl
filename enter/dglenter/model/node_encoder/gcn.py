@@ -44,13 +44,13 @@ class GCN(nn.Module):
             in_size = embed_size
         else:
             in_size = data_info["in_size"]
-        # input layer
-        self.layers.append(dgl.nn.GraphConv(in_size, hidden_size, norm=norm))
-        # hidden layers
-        for i in range(num_layers - 1):
-            self.layers.append(dgl.nn.GraphConv(hidden_size, hidden_size, norm=norm))
-        # output layer
-        self.layers.append(dgl.nn.GraphConv(hidden_size, data_info["out_size"], norm=norm))
+        
+        for i in range(num_layers):
+            in_hidden = hidden_size if i > 0 else in_size
+            out_hidden = hidden_size if i < num_layers - 1 else data_info["out_size"]
+
+            self.layers.append(dgl.nn.GraphConv(in_hidden, out_hidden, norm=norm))
+
         self.dropout = nn.Dropout(p=dropout)
         self.act = getattr(torch, activation)
 

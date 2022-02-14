@@ -2,6 +2,7 @@ import torch.nn as nn
 from dgl.nn import GINConv
 from dgl.base import dgl_warning
 
+
 class GIN(nn.Module):
     def __init__(self,
                  data_info: dict,
@@ -25,19 +26,17 @@ class GIN(nn.Module):
             Aggregator type to use (``sum``, ``max`` or ``mean``), default: 'sum'.
         """
         super().__init__()
-        self.conv_list = nn.ModuleList()
         self.data_info = data_info
-        self.out_size = data_info["out_size"]
-        self.in_size = data_info["in_size"]
         self.embed_size = embed_size
+        self.conv_list = nn.ModuleList()
         self.num_layers = num_layers
         if embed_size > 0:
             self.embed = nn.Embedding(data_info["num_nodes"], embed_size)
+            in_size = embed_size
+        else:
+            in_size = data_info["in_size"]
         for i in range(num_layers):
-            if i == 0:
-                input_dim = self.in_size
-            else:
-                input_dim = hidden_size
+            input_dim = in_size if i == 0 else hidden_size
             mlp = nn.Sequential(nn.Linear(input_dim, hidden_size),
                                 nn.BatchNorm1d(hidden_size), nn.ReLU(),
                                 nn.Linear(hidden_size, hidden_size), nn.ReLU())
@@ -47,7 +46,8 @@ class GIN(nn.Module):
 
     def forward(self, graph, node_feat, edge_feat=None):
         if self.embed_size > 0:
-            dgl_warning("The embedding for node feature is used, and input node_feat is ignored, due to the provided embed_size.", norepeat=True)
+            dgl_warning(
+                "The embedding for node feature is used, and input node_feat is ignored, due to the provided embed_size.", norepeat=True)
             h = self.embed.weight
         else:
             h = node_feat
