@@ -74,7 +74,7 @@ class _TensorizedDatasetIter(object):
 
 def _get_id_tensor_from_mapping(indices, device, keys):
     lengths = torch.LongTensor([
-        (indices[k].shape[0] if k in indices else 0) for k in keys], device=device)
+        (indices[k].shape[0] if k in indices else 0) for k in keys]).to(device)
     type_ids = torch.arange(len(keys), device=device).repeat_interleave(lengths)
     all_indices = torch.cat([indices[k] for k in keys if k in indices])
     return torch.stack([type_ids, all_indices], 1)
@@ -574,11 +574,13 @@ class EdgeDataLoader(DataLoader):
                  use_prefetch_thread=False, use_alternate_streams=True,
                  pin_prefetcher=False,
                  exclude=None, reverse_eids=None, reverse_etypes=None, negative_sampler=None,
+                 always_exclude=None,
                  **kwargs):
         if isinstance(graph_sampler, BlockSampler):
             graph_sampler = EdgeBlockSampler(
                 graph_sampler, exclude=exclude, reverse_eids=reverse_eids,
                 reverse_etypes=reverse_etypes, negative_sampler=negative_sampler,
+                always_exclude=always_exclude,
                 prefetch_node_feats=graph_sampler.prefetch_node_feats,
                 prefetch_labels=graph_sampler.prefetch_labels,
                 prefetch_edge_feats=graph_sampler.prefetch_edge_feats)
