@@ -76,7 +76,7 @@ def train(cfg, pipeline_cfg, device, dataset, model, optimizer, loss_fcn):
         neg_result = model.inference(train_g, node_feat, test_neg_edges)
         test_hits = calc_hitsk(pos_result, neg_result, k=50)
         print("Test Hits@50 {:.4f}".format(test_hits))
-
+    return test_hits
 
 class GNNWithEmbedding(nn.Module):
     def __init__(self, num_nodes, embed_size, gnn):
@@ -96,7 +96,7 @@ def main():
     if 'feat' not in dataset[0].ndata:
         assert cfg["node_model"]["embed_size"] > 0, "Need to specify embed size if graph doesn't have feat in ndata"
     cfg["node_model"]["data_info"] = {
-        "in_size": model_cfg['embed_size'] if cfg["node_model"]['embed_size'] > 0 else dataset[0].ndata['feat'].shape[1],
+        "in_size": cfg["node_model"]['embed_size'] if cfg["node_model"]['embed_size'] > 0 else dataset[0].ndata['feat'].shape[1],
         "out_size": pipeline_cfg['hidden_size'],
         "num_nodes": dataset[0].num_nodes()
         }
@@ -109,8 +109,17 @@ def main():
     params = model.parameters()
     loss = torch.nn.{{ loss }}()
     optimizer = torch.optim.Adam(params, **pipeline_cfg["optimizer"])
-    train(cfg, pipeline_cfg, device, dataset, model, optimizer, loss)
-
+    test_hits = train(cfg, pipeline_cfg, device, dataset, model, optimizer, loss)
+    return test_hits
 
 if __name__ == '__main__':
-    main()
+    all_acc = []
+    num_runs = {{ user_cfg.general_pipeline.num_runs }}
+    for run in range(num_runs):
+        print(f'Run experiment #{run}')
+        test_acc = main()
+        print("Test Hits@50 {:.4f}".format(test_acc))
+        all_acc.append(test_acc)
+    avg_acc = np.round(np.mean(all_acc), 6)
+    std_acc = np.round(np.std(all_acc), 6)
+    print(f'Test Hits@50 across {num_runs} runs: {avg_acc} ± {std_acc}')

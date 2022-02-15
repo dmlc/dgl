@@ -14,13 +14,15 @@ from ruamel.yaml.comments import CommentedMap
 
 class LinkpredPipelineCfg(BaseModel):
     hidden_size: int = 256
-    early_stop: Optional[EarlyStopConfig] = EarlyStopConfig()
+    # early_stop: Optional[EarlyStopConfig] = EarlyStopConfig()
     eval_batch_size: int = 32769
     train_batch_size: int = 32769
     num_epochs: int = 200
     eval_period: int = 5
     optimizer: dict = {"name": "Adam", "lr": 0.005}
     loss: str = "BCELoss"
+    num_runs: int = 1
+
 
 pipeline_comments = {
     "hidden_size": "The intermediate hidden size between node model and edge model",
@@ -28,10 +30,11 @@ pipeline_comments = {
     "train_batch_size": "Edge batch size when training",
     "num_epochs": "Number of training epochs",
     "eval_period": "Interval epochs between evaluations",
-    "early_stop": {
-        "patience": "Steps before early stop",
-        "checkpoint_path": "Early stop checkpoint model file path"
-    }
+    # "early_stop": {
+    #     "patience": "Steps before early stop",
+    #     "checkpoint_path": "Early stop checkpoint model file path"
+    # },
+    "num_runs": "Number of experiments to run",
 }
 
 # def merge_comment(cfg_dict, comment_dict):
