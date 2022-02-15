@@ -41,10 +41,6 @@ def train(rank, world_size, graph, num_classes, split_idx):
     opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
 
     train_idx, valid_idx, test_idx = split_idx['train'], split_idx['valid'], split_idx['test']
-    if USE_WRAPPER:
-        import dglnew
-        graph = dglnew.graph.wrapper.DGLGraphStorage(graph)
-    print(rank, graph.formats())
 
     if MODE == 'uva':
         train_idx = train_idx.to('cuda')
@@ -54,8 +50,7 @@ def train(rank, world_size, graph, num_classes, split_idx):
     num_workers = 0 if (MODE == 'uva') else 4
 
     sampler = dgl.dataloading.NeighborSampler(
-            [5, 5, 5], output_device='cpu', prefetch_node_feats=['feat'],
-            prefetch_labels=['label'])
+            [5, 5, 5], prefetch_node_feats=['feat'], prefetch_labels=['label'])
     dataloader = dgl.dataloading.NodeDataLoader(
             graph,
             train_idx,
@@ -106,10 +101,11 @@ if __name__ == '__main__':
         new_graph = graph.shared_memory('shm')
         new_graph.ndata['feat'] = graph.ndata['feat']
         new_graph.ndata['label'] = graph.ndata['label']
+        new_graph.ndata['feat'].share_memory_()
+        new_graph.ndata['label'].share_memory_()
         new_graph.create_formats_()
         graph = new_graph
 
-    print(graph.formats())
     # Tested with mp.spawn and fork.  Both worked and got 4s per epoch with 4 GPUs
     # and 3.86s per epoch with 8 GPUs on p2.8x, compared to 5.2s from official examples.
     import torch.multiprocessing as mp

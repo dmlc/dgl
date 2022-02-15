@@ -356,9 +356,6 @@ class Column(TensorStorage):
             utils.unpin_memory_inplace(self.data)
             self.pinned = False
 
-    def __del__(self):
-        self.unpin_memory_()
-
 class Frame(MutableMapping):
     """The columnar storage for node/edge features.
 
