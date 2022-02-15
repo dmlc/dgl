@@ -12,7 +12,6 @@ n_edge_scale = 1
 num_rel_scale = 1
 
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
-@unittest.skipIf(F._default_context_str == 'cpu', reason="Not implemented.")
 
 @parametrize_dtype
 def test_gathermm(idtype):
