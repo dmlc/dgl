@@ -265,11 +265,13 @@ def _prefetch_for(item, dataloader):
     if F.is_tensor(item):
         # if the dataloader doesn't support lazy loading
         return item
+    elif isinstance(item, DGLHeteroGraph):
+        return _prefetch_for_subgraph(item, dataloader)
     elif isinstance(item, LazyFeature):
         return dataloader.other_storages[item.name].fetch(
             item.id_, dataloader.device, dataloader.pin_memory)
     else:
-        return _prefetch_for_subgraph(item, dataloader)
+        return None
 
 
 def _await_or_return(x):
