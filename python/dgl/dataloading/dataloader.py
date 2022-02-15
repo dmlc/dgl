@@ -232,7 +232,7 @@ def _prefetch_update_feats(feats, frames, types, get_storage_func, id_name, devi
         type_ = types[tid]
         default_id = frame.get(id_name, None)
         for key in frame.keys():
-            column = frame[key]
+            column = frame._columns[key]
             if isinstance(column, LazyFeature):
                 parent_key = column.name or key
                 if column.id_ is None and default_id is None:
