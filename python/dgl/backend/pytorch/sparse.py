@@ -1,7 +1,7 @@
 import torch as th
 from distutils.version import LooseVersion
 from ...base import is_all, ALL
-from ...sparse import _gspmm, _gspmm_hetero, _gsddmm, _gsddmm_hetero, _segment_reduce, _bwd_segment_cmp
+from ...sparse import _gspmm, _gspmm_hetero, _gsddmm, _gsddmm_hetero, _segment_reduce, _bwd_segment_cmp, _edge_softmax_forward, _edge_softmax_backward
 from ...sparse import _csrmm, _csrsum, _csrmask, _scatter_add, _update_grad_minmax_hetero
 from ...heterograph_index import create_unitgraph_from_csr
 
@@ -470,10 +470,15 @@ class EdgeSoftmax(th.autograd.Function):
             gidx = gidx.edge_subgraph([eids], True).graph
         if norm_by == 'src':
             gidx = gidx.reverse()
-        score_max = _gspmm(gidx, 'copy_rhs', 'max', None, score)[0]
-        score = th.exp(_gsddmm(gidx, 'sub', score, score_max, 'e', 'v'))
-        score_sum = _gspmm(gidx, 'copy_rhs', 'sum', None, score)[0]
-        out = _gsddmm(gidx, 'div', score, score_sum, 'e', 'v')
+        #Note: Now _edge_softmax_forward op only supports CPU
+        #TODO(Zhejiang): We will support GPU in the future
+        if(score.is_cuda):
+            score_max = _gspmm(gidx, 'copy_rhs', 'max', None, score)[0]
+            score = th.exp(_gsddmm(gidx, 'sub', score, score_max, 'e', 'v'))
+            score_sum = _gspmm(gidx, 'copy_rhs', 'sum', None, score)[0]
+            out = _gsddmm(gidx, 'div', score, score_sum, 'e', 'v')
+        else:
+            out = _edge_softmax_forward(gidx, score, 'copy_rhs')
         ctx.backward_cache = gidx
         ctx.save_for_backward(out)
         return out
@@ -500,9 +505,14 @@ class EdgeSoftmax(th.autograd.Function):
         ctx.backward_cache = None
         out, = ctx.saved_tensors
         sds = out * grad_out
-        accum = gspmm(gidx, 'copy_rhs', 'sum', None, sds)
+        #Note: Now _edge_softmax_backward op only supports CPU
+        #TODO(Zhejiang): We will support GPU in the future
+        if(out.is_cuda):
+            accum = gspmm(gidx, 'copy_rhs', 'sum', None, sds)
 
-        grad_score = sds - gsddmm(gidx, 'mul', out, accum, 'e', 'v')
+            grad_score = sds - gsddmm(gidx, 'mul', out, accum, 'e', 'v')
+        else:
+            grad_score = _edge_softmax_backward(gidx, out, sds)
         return None, grad_score, None, None
 
 

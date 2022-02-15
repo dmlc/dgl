@@ -9,9 +9,12 @@
 #include <dgl/array.h>
 #include <dgl/bcast.h>
 #include <dgl/runtime/parallel_for.h>
+#include <math.h>
 #include <algorithm>
 #include <limits>
 #include <memory>
+#include <algorithm>
+#include <vector>
 #include "spmm_binary_ops.h"
 #if !defined(_WIN32)
 #ifdef USE_AVX
@@ -464,6 +467,99 @@ void SpMMCmpCoo(const BcastOff& bcast, const COOMatrix& coo, NDArray ufeat,
       }
     }
   }
+}
+
+
+/*!
+ * \brief CPU kernel of Edge_softmax_csr_forward on Csr format.
+ * \param bcast Broadcast information.
+ * \param csr The Csr matrix.
+ * \param ufeat The feature on source nodes.
+ * \param efeat The feature on edges.
+ * \param out The result of edge_softmax_forward.
+ */
+template <typename IdType, typename DType, typename Op>
+void Edge_softmax_csr_forward(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
+                NDArray efeat, NDArray out) {
+  const bool has_idx = !IsNullArray(csr.data);
+  const IdType* indptr = static_cast<IdType*>(csr.indptr->data);
+  const IdType* edges =
+    has_idx ? static_cast<IdType*>(csr.data->data) : nullptr;
+  const DType* W = Op::use_rhs ? static_cast<DType*>(efeat->data) : nullptr;
+  const int64_t dim = bcast.out_len, rhs_dim = bcast.rhs_len;
+  runtime::parallel_for(0, csr.num_rows, [&](size_t b, size_t e) {
+    for (auto rid = b; rid < e; ++rid) {
+      const IdType row_start = indptr[rid], row_end = indptr[rid + 1];
+      std::vector<DType> data_e(row_end-row_start, 0);
+      std::vector<IdType> num(row_end-row_start, 0);
+      for (int64_t k = 0; k < dim; ++k) {
+        DType max_v = -std::numeric_limits<DType>::infinity();
+        for (IdType j = row_start; j < row_end; ++j) {
+          const IdType eid = has_idx ? edges[j] : j;
+          const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
+          const DType* rhs_off =
+            Op::use_rhs ? W + eid * rhs_dim + rhs_add : nullptr;
+          data_e[j-row_start] = *rhs_off;
+          num[j-row_start] = eid*rhs_dim+rhs_add;
+          max_v = std::max<DType>(max_v, (*rhs_off));
+        }
+        DType exp_sum = 0;
+        for (auto& element : data_e) {
+          element -= max_v;
+          element = std::exp(element);
+          exp_sum += element;
+        }
+        for (int i=0; i < row_end-row_start; i++) {
+          out.Ptr<DType>()[num[i]] = data_e[i]/exp_sum;
+        }
+      }
+    }
+  });
+}
+
+
+/*!
+ * \brief CPU kernel of Edge_softmax_csr_backward on Csr format.
+ * \param bcast Broadcast information.
+ * \param csr The Csr matrix.
+ * \param out The result of forward.
+ * \param sds The result of gradiet * out.
+ * \param back_out The result of edge_softmax_backward.
+ */
+template <typename IdType, typename DType, typename Op>
+void Edge_softmax_csr_backward(const BcastOff& bcast, const CSRMatrix& csr, NDArray out,
+                NDArray sds, NDArray back_out) {
+  const bool has_idx = !IsNullArray(csr.data);
+  const IdType* indptr = static_cast<IdType*>(csr.indptr->data);
+  const IdType* edges =
+    has_idx ? static_cast<IdType*>(csr.data->data) : nullptr;
+  const DType* W_out = Op::use_rhs ? static_cast<DType*>(out->data) : nullptr;
+  const DType* W_sds = Op::use_rhs ? static_cast<DType*>(sds->data) : nullptr;
+  const int64_t dim = bcast.out_len, rhs_dim = bcast.rhs_len;
+  runtime::parallel_for(0, csr.num_rows, [&](size_t b, size_t e) {
+    for (auto rid = b; rid < e; ++rid) {
+      const IdType row_start = indptr[rid], row_end = indptr[rid + 1];
+      for (int64_t k = 0; k < dim; ++k) {
+        DType sum_sds = 0;
+        for (IdType j = row_start; j < row_end; ++j) {
+          const IdType eid = has_idx ? edges[j] : j;
+          const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
+          const DType* rhs_off_sds =
+            Op::use_rhs ? W_sds + eid * rhs_dim + rhs_add : nullptr;
+          sum_sds += (*rhs_off_sds);
+        }
+        for (IdType j = row_start; j< row_end; ++j) {
+          const IdType eid = has_idx ? edges[j] : j;
+          const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
+          const DType* rhs_off_out =
+            Op::use_rhs ? W_out + eid * rhs_dim + rhs_add : nullptr;
+          const DType* rhs_off_sds =
+            Op::use_rhs ? W_sds + eid * rhs_dim + rhs_add : nullptr;
+          back_out.Ptr<DType>()[eid*rhs_dim+rhs_add] =  (*rhs_off_sds) - sum_sds*(*rhs_off_out);
+        }
+      }
+    }
+  });
 }
 
 }  // namespace cpu
