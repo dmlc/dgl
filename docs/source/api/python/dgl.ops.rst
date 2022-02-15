@@ -247,7 +247,7 @@ DGL provide operators to reduce value tensor along the first dimension by segmen
    segment_reduce
 
 GatherMM and SegmentMM Module
----------------------
+-----------------------------
 
 SegmentMM: DGL provide operators to perform matrix multiplication according to segments.
 

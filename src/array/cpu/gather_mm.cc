@@ -31,8 +31,7 @@ void segmentMM(const NDArray A,
           const NDArray seglen_A,
           bool a_trans, bool b_trans) {
     SWITCH_BITS(bits, DType, {
-        // cpu::gatherMM_SortedEtype<XPU, IdType, DType>(A, B, C, A_dim1_per_rel,
-        //     B_dim1_per_rel, a_trans, b_trans);
+        LOG(FATAL) << "Unsupported CPU kernel for SegmentMM.";
   });
 }
 
