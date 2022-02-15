@@ -53,19 +53,19 @@ class EGATConv(nn.Module):
 
     >>> num_nodes, num_edges = 8, 30
     >>> # generate a graph
-    >>> graph = dgl.rand_graph((num_nodes,num_edges))
+    >>> graph = dgl.rand_graph(num_nodes,num_edges)
 
     >>> node_feats = th.rand((num_nodes, 20))
     >>> edge_feats = th.rand((num_edges, 12))
     >>> egat = EGATConv(in_node_feats=20,
-                        in_edge_feats=12,
-                        out_node_feats=15,
-                        out_edge_feats=10,
-                        num_heads=3)
+    ...                 in_edge_feats=12,
+    ...                 out_node_feats=15,
+    ...                 out_edge_feats=10,
+    ...                 num_heads=3)
     >>> #forward pass
     >>> new_node_feats, new_edge_feats = egat(graph, node_feats, edge_feats)
     >>> new_node_feats.shape, new_edge_feats.shape
-    ((8, 3, 12), (30, 3, 10))
+    torch.Size([8, 3, 15]) torch.Size([30, 3, 10])
     """
 
     def __init__(self,
