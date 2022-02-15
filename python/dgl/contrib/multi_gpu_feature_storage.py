@@ -23,6 +23,9 @@ class MultiGPUFeatureStorage(FeatureStorage):
     nodes. When reading memory from other GPUs, the call must be from all
     GPUs storing the data.
 
+    NOTE: This class is currently experimental, and it's interface and
+    functionality are subject to change in future versions of DGL.
+
     Example:
     --------
 

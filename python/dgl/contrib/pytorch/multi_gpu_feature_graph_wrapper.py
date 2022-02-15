@@ -40,7 +40,10 @@ def _gather_row(tensor, index):
 
 class MultiGPUFeatureGraphWrapper(object):
     """This class wraps a DGLGraph object and enables neighbor sampling where
-       the features are stored split across the GPUs.
+    the features are stored split across the GPUs.
+
+    NOTE: This class is currently experimental, and it's interface and
+    functionality are subject to change in future versions of DGL.
 
     Parameters
     ----------
