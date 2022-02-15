@@ -112,8 +112,7 @@ class MultiGPUFeatureStorage(FeatureStorage):
                 self._comm.rank(),
                 ctx=F.context(self._tensor)),
             F.context(values))
-        self.set_local(F.copy_to(F.gather_row(values, idxs),
-                                 ctx=F.context(self._tensor)))
+        self.set_local(F.gather_row(values, idxs))
 
     def get_local(self):
         """ Independently get the local tensor of this GPU.
@@ -137,7 +136,11 @@ class MultiGPUFeatureStorage(FeatureStorage):
         assert self._tensor.shape == values.shape, "Can only replace local " \
             "tensor with one of same shape: {} vs. {}".format(
                 self._tensor.shape, values.shape)
-        self._tensor = F.copy_to(values, ctx=F.context(self._tensor))
+        # save context and then free local tensor
+        ctx = F.context(self._tensor.device)
+        self._tensor = None
+
+        self._tensor = F.copy_to(values, ctx=ctx)
 
     @property
     def shape(self):
