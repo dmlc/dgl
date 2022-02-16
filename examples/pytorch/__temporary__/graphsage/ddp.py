@@ -63,7 +63,7 @@ def train(rank, world_size, graph, num_classes, split_idx):
             persistent_workers=(num_workers > 0),
             use_ddp=True,
             use_prefetch_thread=use_prefetch_thread,
-            use_uvm=(MODE == 'uva'))
+            use_uva=(MODE == 'uva'))
 
     durations = []
     for _ in range(10):

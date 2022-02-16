@@ -8,8 +8,9 @@ import time
 import numpy as np
 from ogb.nodeproppred import DglNodePropPredDataset
 import tqdm
+import argparse
 
-MODE = "uva"   # "cpu", "uva", "cuda", "allcuda"
+USE_UVA = True    # Set to True for UVA sampling
 
 class SAGE(nn.Module):
     def __init__(self, in_feats, n_hidden, n_classes):
@@ -62,20 +63,12 @@ graph.ndata['label'] = labels.squeeze()
 split_idx = dataset.get_idx_split()
 train_idx, valid_idx, test_idx = split_idx['train'], split_idx['valid'], split_idx['test']
 
-# Just an example of how to perform sampling on different devices - not sure how we should
-# organize the training source files.
-if MODE == "allcuda":
+if not USE_UVA:
     graph = graph.to('cuda')
-if MODE in ["allcuda", "uva"]:
     train_idx = train_idx.to('cuda')
     valid_idx = valid_idx.to('cuda')
     test_idx = test_idx.to('cuda')
-    num_workers = 0
-if MODE in ["cpu", "cuda"]:
-    num_workers = 12
-device = 'cpu' if MODE == "cpu" else 'cuda'
-pin_prefetcher = (MODE == 'cuda')
-use_prefetch_thread = (MODE == 'cuda')
+device = 'cuda'
 
 model = SAGE(graph.ndata['feat'].shape[1], 256, dataset.num_classes).to(device)
 opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
@@ -84,14 +77,10 @@ sampler = dgl.dataloading.NeighborSampler(
         [15, 10, 5], prefetch_node_feats=['feat'], prefetch_labels=['label'])
 train_dataloader = dgl.dataloading.NodeDataLoader(
         graph, train_idx, sampler, device=device, batch_size=1024, shuffle=True,
-        drop_last=False, pin_prefetcher=pin_prefetcher, num_workers=num_workers,
-        persistent_workers=(num_workers > 0), use_prefetch_thread=use_prefetch_thread,
-        use_uvm=(MODE == 'uva'))
+        drop_last=False, num_workers=0, use_uva=USE_UVA)
 valid_dataloader = dgl.dataloading.NodeDataLoader(
         graph, valid_idx, sampler, device=device, batch_size=1024, shuffle=True,
-        drop_last=False, pin_prefetcher=pin_prefetcher, num_workers=num_workers,
-        persistent_workers=(num_workers > 0), use_prefetch_thread=use_prefetch_thread,
-        use_uvm=(MODE == 'uva'))
+        drop_last=False, num_workers=num_workers, use_uva=USE_UVA)
 
 durations = []
 for _ in range(10):
@@ -129,6 +118,6 @@ print(np.mean(durations[4:]), np.std(durations[4:]))
 # Test accuracy and offline inference of all nodes
 model.eval()
 with torch.no_grad():
-    pred = model.inference(graph, device, 1000, num_workers, 'cpu')
+    pred = model.inference(graph, device, 1000, 12, 'cpu')
     acc = MF.accuracy(pred.to(graph.device), graph.ndata['label'])
     print('Test acc:', acc.item())

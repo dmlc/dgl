@@ -12,7 +12,6 @@ import tqdm
 from ogb.linkproppred import DglLinkPropPredDataset
 
 device = 'cuda'
-num_workers = 0
 
 def to_bidirected_with_reverse_mapping(g):
     """Makes a graph bidirectional, and returns a mapping array ``mapping`` where ``mapping[i]``
@@ -126,16 +125,13 @@ opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
 
 sampler = dgl.dataloading.NeighborSampler([15, 10, 5], prefetch_node_feats=['feat'])
 dataloader = dgl.dataloading.EdgeDataLoader(
-        graph, torch.arange(graph.num_edges()).to(device), sampler,
+        graph, torch.arange(graph.num_edges()), sampler,
         device=device, batch_size=1000, shuffle=True,
-        drop_last=False, num_workers=num_workers,
-        persistent_workers=num_workers > 0,
-        pin_prefetcher=False,
-        use_prefetch_thread=False,
+        drop_last=False, num_workers=0,
         exclude='reverse_id',
-        reverse_eids=reverse_eids.to(device),
+        reverse_eids=reverse_eids,
         negative_sampler=dgl.dataloading.negative_sampler.Uniform(1),
-        use_uvm=True)
+        use_uva=True)
 
 durations = []
 for epoch in range(150):
@@ -152,14 +148,16 @@ for epoch in range(150):
         opt.zero_grad()
         loss.backward()
         opt.step()
-        if it % 20 == 0:
+        if (it + 1) % 20 == 0:
             mem = torch.cuda.max_memory_allocated() / 1000000
             print('Loss', loss.item(), 'GPU Mem', mem, 'MB')
-            tt = time.time()
-            print(tt - t0)
-            t0 = time.time()
+            if (it + 1) == 1000:
+                tt = time.time()
+                print(tt - t0)
+                durations.append(tt - t0)
+                break
     if epoch % 10 == 0:
         model.eval()
-        valid_mrr, test_mrr = evaluate(model, edge_split, device, num_workers)
+        valid_mrr, test_mrr = evaluate(model, edge_split, device, 12)
         print('Validation MRR:', valid_mrr.item(), 'Test MRR:', test_mrr.item())
 print(np.mean(durations[4:]), np.std(durations[4:]))
