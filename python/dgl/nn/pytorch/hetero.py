@@ -3,7 +3,6 @@ from functools import partial
 import torch as th
 import torch.nn as nn
 from ...base import DGLError
-from ...convert import to_homogeneous
 
 __all__ = ['HeteroGraphConv', 'HeteroLinearLayer', 'HeteroEmbedding']
 
@@ -358,6 +357,13 @@ class HeteroEmbedding(nn.Module):
 
     @property
     def weight(self):
+        """Get the embeddings of all nodes
+
+        Returns
+        -------
+        dict[str, Tensor]
+            Node embeddings.
+        """
         return {ntype: emb.weight for ntype, emb in self.embeds.items()}
 
     def forward(self, input_nodes):
