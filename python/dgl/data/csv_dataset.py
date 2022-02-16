@@ -5,7 +5,7 @@ from .utils import save_graphs, load_graphs
 from ..base import DGLError
 
 
-class DGLCSVDataset(DGLDataset):
+class CSVDataset(DGLDataset):
     """ This class aims to parse data from CSV files, construct DGLGraph
         and behaves as a DGLDataset.
 
@@ -59,10 +59,10 @@ class DGLCSVDataset(DGLDataset):
         self.edge_data_parser = {} if edge_data_parser is None else edge_data_parser
         self.graph_data_parser = graph_data_parser
         self.default_data_parser = DefaultDataParser()
-        meta_yaml_path = os.path.join(data_path, DGLCSVDataset.META_YAML_NAME)
+        meta_yaml_path = os.path.join(data_path, CSVDataset.META_YAML_NAME)
         if not os.path.exists(meta_yaml_path):
             raise DGLError(
-                "'{}' cannot be found under {}.".format(DGLCSVDataset.META_YAML_NAME, data_path))
+                "'{}' cannot be found under {}.".format(CSVDataset.META_YAML_NAME, data_path))
         self.meta_yaml = load_yaml_with_sanity_check(meta_yaml_path)
         ds_name = self.meta_yaml.dataset_name
         super().__init__(ds_name, raw_dir=os.path.dirname(
