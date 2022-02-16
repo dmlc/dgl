@@ -4,7 +4,7 @@ import torch as th
 import torch.nn as nn
 from ...base import DGLError
 
-__all__ = ['HeteroGraphConv', 'HeteroLinearLayer', 'HeteroEmbedding']
+__all__ = ['HeteroGraphConv', 'HeteroLinear', 'HeteroEmbedding']
 
 class HeteroGraphConv(nn.Module):
     r"""A generic module for computing convolution on heterogeneous graphs.
@@ -251,9 +251,8 @@ def get_aggregate_fn(agg):
     else:
         return partial(_agg_func, fn=fn)
 
-class HeteroLinearLayer(nn.Module):
-    """Apply a linear transformation on the node features of a
-    heterogeneous graph.
+class HeteroLinear(nn.Module):
+    """Apply linear transformations on heterogeneous inputs.
 
     Parameters
     ----------
@@ -269,14 +268,14 @@ class HeteroLinearLayer(nn.Module):
 
     >>> import dgl
     >>> import torch
-    >>> from dgl.nn import HeteroLinearLayer
+    >>> from dgl.nn import HeteroLinear
     >>> g = dgl.heterograph({
     ...     ('A', 'r1', 'B'): ([0, 1], [1, 2]),
     ...     ('B', 'r2', 'B'): ([1], [2])
     ... })
     >>> g.nodes['A'].data['h'] = torch.randn(2, 3)
     >>> g.nodes['B'].data['h'] = torch.randn(3, 4)
-    >>> layer = HeteroLinearLayer(g, 5, 'h')
+    >>> layer = HeteroLinear(g, 5, 'h')
     >>> out_feats = layer({nty: g.nodes[nty].data['h'] for nty in g.ntypes})
     >>> print(out_feats['A'].shape)
     torch.Size([2, 5])
@@ -284,7 +283,7 @@ class HeteroLinearLayer(nn.Module):
     torch.Size([3, 5])
     """
     def __init__(self, hg, out_size, feat_name):
-        super(HeteroLinearLayer, self).__init__()
+        super(HeteroLinear, self).__init__()
 
         self.feat_name = feat_name
         self.linears = nn.ModuleDict()
@@ -312,14 +311,15 @@ class HeteroLinearLayer(nn.Module):
         return out_feat
 
 class HeteroEmbedding(nn.Module):
-    """Create node embeddings for each node type and return a homogeneous
-    graph representation.
+    """Create a heterogeneous embedding table.
+
+    It internally contains multiple ``torch.nn.Embedding`` with different dictionary sizes.
 
     Parameters
     ----------
     hg : DGLGraph
         A heterogeneous graph.
-    embed_size : int
+    embedding_dim : int
         Node embedding size.
 
     Examples
@@ -348,12 +348,12 @@ class HeteroEmbedding(nn.Module):
     >>> print(embeds['B'].shape)
     torch.Size([2, 5])
     """
-    def __init__(self, hg, embed_size):
+    def __init__(self, hg, embedding_dim):
         super(HeteroEmbedding, self).__init__()
 
         self.embeds = nn.ModuleDict()
         for ntype in hg.ntypes:
-            self.embeds[ntype] = nn.Embedding(hg.num_nodes(ntype), embed_size)
+            self.embeds[ntype] = nn.Embedding(hg.num_nodes(ntype), embedding_dim)
 
     @property
     def weight(self):
