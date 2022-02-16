@@ -72,6 +72,8 @@ template NDArray IndexSelectCPUFromGPU<int64_t, int32_t>(NDArray, IdArray);
 template NDArray IndexSelectCPUFromGPU<int64_t, int64_t>(NDArray, IdArray);
 template NDArray IndexSelectCPUFromGPU<float, int32_t>(NDArray, IdArray);
 template NDArray IndexSelectCPUFromGPU<float, int64_t>(NDArray, IdArray);
+template NDArray IndexSelectCPUFromGPU<double, int32_t>(NDArray, IdArray);
+template NDArray IndexSelectCPUFromGPU<double, int64_t>(NDArray, IdArray);
 
 }  // namespace impl
 }  // namespace aten

@@ -937,4 +937,7 @@ def recursive_apply_pair(data1, data2, fn, *args, **kwargs):
     else:
         return fn(data1, data2, *args, **kwargs)
 
+def context_of(data):
+    return F.context(next(iter(data.values())) if isinstance(data, Mapping) else data)
+
 _init_api("dgl.utils.internal")

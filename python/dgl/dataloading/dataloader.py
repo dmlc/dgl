@@ -13,13 +13,13 @@ import torch
 import torch.distributed as dist
 from torch.utils.data.distributed import DistributedSampler
 
-from ..base import NID, EID
+from ..base import NID, EID, dgl_warning
 from ..batch import batch as batch_graphs
 from ..heterograph import DGLHeteroGraph
 from .. import ndarray as nd
 from ..utils import (
     recursive_apply, ExceptionWrapper, recursive_apply_pair, set_num_threads,
-    create_shared_mem_array, get_shared_mem_array)
+    create_shared_mem_array, get_shared_mem_array, context_of)
 from ..frame import LazyFeature
 from ..storages import wrap_storage
 from .base import BlockSampler, EdgeBlockSampler
@@ -492,7 +492,7 @@ class DataLoader(torch.utils.data.DataLoader):
     def __init__(self, graph, indices, graph_sampler, device='cpu', use_ddp=False,
                  ddp_seed=0, batch_size=1, drop_last=False, shuffle=False,
                  use_prefetch_thread=False, use_alternate_streams=True,
-                 pin_prefetcher=False, **kwargs):
+                 pin_prefetcher=False, use_uvm=False, **kwargs):
         # (BarclayII) I hoped that pin_prefetcher can be merged into PyTorch's native
         # pin_memory argument.  But our neighbor samplers and subgraph samplers
         # return indices, which could be CUDA tensors (e.g. during UVA sampling)
@@ -508,8 +508,10 @@ class DataLoader(torch.utils.data.DataLoader):
             if isinstance(indices, Mapping):
                 indices = {k: (torch.tensor(v) if not torch.is_tensor(v) else v)
                            for k, v in indices.items()}
+                indices_device = next(iter(indices.values())).device
             else:
                 indices = torch.tensor(indices) if not torch.is_tensor(indices) else indices
+                indices_device = indices.device
         except:     # pylint: disable=bare-except
             # ignore when it fails to convert to torch Tensors.
             pass
@@ -522,14 +524,47 @@ class DataLoader(torch.utils.data.DataLoader):
         else:
             self.dataset = indices
 
+        self.device = torch.device(device)
+        if self.device.type == 'cuda' and self.device.index is None:
+            self.device = torch.device('cuda', torch.cuda.current_device())
+
+        # Check graph and indices device
+        if use_uvm:
+            if self.graph.device.type != 'cpu':
+                raise ValueError('Graph must be on CPU if UVM sampling is enabled.')
+            if indices_device.type != 'cuda':
+                raise ValueError('Indices must be on CUDA if UVM sampling is enabled.')
+            if num_workers > 0:
+                raise ValueError('num_workers must be 0 if UVM sampling is enabled.')
+
+            self.graph.create_formats_()
+            self.graph.pin_memory_()
+        else:
+            if self.graph.device != indices_device:
+                raise ValueError(
+                    'Expect graph and indices to be on the same device. '
+                    'If you wish to use UVM sampling, please set use_uvm=True.')
+            if self.graph.device.type == 'cuda' and num_workers > 0:
+                raise ValueError('num_workers must be 0 if graph and indices are on CUDA.')
+
+        # Check pin_prefetcher and use_prefetch_thread - should be only effective
+        # if performing CPU sampling but output device is CUDA
+        if not (self.device.type == 'cuda' and self.graph.device.type == 'cpu' and
+                not use_uvm):
+            if pin_prefetcher:
+                raise ValueError(
+                    'pin_prefetcher=True is only effective when device=cuda and '
+                    'sampling is performed on CPU.')
+            if use_prefetch_thread:
+                raise ValueError(
+                    'use_prefetch_thread=True is only effective when device=cuda and '
+                    'sampling is performed on CPU.')
+
         self.ddp_seed = ddp_seed
         self._shuffle_dataset = shuffle
         self.graph_sampler = graph_sampler
-        self.device = torch.device(device)
         self.use_alternate_streams = use_alternate_streams
         self.pin_prefetcher = pin_prefetcher
-        if self.device.type == 'cuda' and self.device.index is None:
-            self.device = torch.device('cuda', torch.cuda.current_device())
         self.use_prefetch_thread = use_prefetch_thread
         worker_init_fn = WorkerInitWrapper(kwargs.get('worker_init_fn', None))
 
@@ -577,6 +612,11 @@ class EdgeDataLoader(DataLoader):
                  always_exclude=None,
                  **kwargs):
         if isinstance(graph_sampler, BlockSampler):
+            if reverse_eids is not None:
+                reverse_eids_device = context_of(reverse_eids)
+                indices_device = context_of(indices)
+                if indices_device != reverse_eids_device:
+                    raise ValueError('Expect the same device for indices and reverse_eids')
             graph_sampler = EdgeBlockSampler(
                 graph_sampler, exclude=exclude, reverse_eids=reverse_eids,
                 reverse_etypes=reverse_etypes, negative_sampler=negative_sampler,

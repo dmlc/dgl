@@ -66,16 +66,13 @@ train_idx, valid_idx, test_idx = split_idx['train'], split_idx['valid'], split_i
 # organize the training source files.
 if MODE == "allcuda":
     graph = graph.to('cuda')
-if MODE == 'uva':
-    graph.create_formats_()
-    graph.pin_memory_()
 if MODE in ["allcuda", "uva"]:
     train_idx = train_idx.to('cuda')
     valid_idx = valid_idx.to('cuda')
     test_idx = test_idx.to('cuda')
     num_workers = 0
 if MODE in ["cpu", "cuda"]:
-    num_workers = 16
+    num_workers = 12
 device = 'cpu' if MODE == "cpu" else 'cuda'
 pin_prefetcher = (MODE == 'cuda')
 use_prefetch_thread = (MODE == 'cuda')
@@ -84,13 +81,13 @@ model = SAGE(graph.ndata['feat'].shape[1], 256, dataset.num_classes).to(device)
 opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
 
 sampler = dgl.dataloading.NeighborSampler(
-        [5, 5, 5], prefetch_node_feats=['feat'], prefetch_labels=['label'])
+        [15, 10, 5], prefetch_node_feats=['feat'], prefetch_labels=['label'])
 train_dataloader = dgl.dataloading.NodeDataLoader(
-        graph, train_idx, sampler, device=device, batch_size=1000, shuffle=True,
+        graph, train_idx, sampler, device=device, batch_size=1024, shuffle=True,
         drop_last=False, pin_prefetcher=pin_prefetcher, num_workers=num_workers,
         persistent_workers=(num_workers > 0), use_prefetch_thread=use_prefetch_thread)
 valid_dataloader = dgl.dataloading.NodeDataLoader(
-        graph, valid_idx, sampler, device=device, batch_size=1000, shuffle=True,
+        graph, valid_idx, sampler, device=device, batch_size=1024, shuffle=True,
         drop_last=False, pin_prefetcher=pin_prefetcher, num_workers=num_workers,
         persistent_workers=(num_workers > 0), use_prefetch_thread=use_prefetch_thread)
 
