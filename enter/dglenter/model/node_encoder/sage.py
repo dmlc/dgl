@@ -25,7 +25,7 @@ class GraphSAGE(nn.Module):
             Number of hidden layers.
         dropout : float
             Dropout rate.
-        activation: str
+        activation : str
             Activation function name under torch.nn.functional
         aggregator_type : str
             Aggregator type to use (``mean``, ``gcn``, ``pool``, ``lstm``).
