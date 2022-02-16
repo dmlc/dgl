@@ -331,6 +331,8 @@ void segment_mm(const NDArray A,
               NDArray C,
               const NDArray seglen_A,
               bool a_trans, bool b_trans) {
+    CHECK_EQ(seglen_A->ctx.device_type, kDLCPU)
+      << "segment_mm requires the \"seglen\" array to be on CPU.";
     SWITCH_BITS(bits, DType, {
         auto device = runtime::DeviceAPI::Get(A->ctx);
         const DType *A_data = A.Ptr<DType>();
