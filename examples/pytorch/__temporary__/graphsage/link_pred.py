@@ -138,7 +138,6 @@ dataloader = dgl.dataloading.EdgeDataLoader(
         exclude='reverse_id',
         reverse_eids=reverse_eids,
         negative_sampler=dgl.dataloading.negative_sampler.Uniform(1),
-        use_alternate_streams=False, pin_prefetcher=True, use_prefetch_thread=True,
         use_uva=USE_UVA)
 
 durations = []
