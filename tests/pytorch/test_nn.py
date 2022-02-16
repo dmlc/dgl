@@ -1258,7 +1258,7 @@ def test_hetero_linear_layer(idtype, out_dim):
 
     conv = nn.HeteroLinearLayer(hg, out_dim, 'h')
     conv = conv.to(F.ctx())
-    feat = conv(hg)
+    feat = conv({nty: hg.nodes[nty].data['h'] for nty in hg.ntypes})
     assert feat['A'].shape == (2, out_dim)
     assert feat['B'].shape == (3, out_dim)
 

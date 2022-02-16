@@ -277,7 +277,7 @@ class HeteroLinearLayer(nn.Module):
     >>> g.nodes['A'].data['h'] = torch.randn(2, 3)
     >>> g.nodes['B'].data['h'] = torch.randn(3, 4)
     >>> layer = HeteroLinearLayer(g, 5, 'h')
-    >>> out_feats = layer(g)
+    >>> out_feats = layer({nty: g.nodes[nty].data['h'] for nty in g.ntypes})
     >>> print(out_feats['A'].shape)
     torch.Size([2, 5])
     >>> print(out_feats['B'].shape)
@@ -292,24 +292,24 @@ class HeteroLinearLayer(nn.Module):
             linear = nn.Linear(hg.nodes[ntype].data[feat_name].shape[1], out_size)
             self.linears[ntype] = linear
 
-    def forward(self, hg):
+    def forward(self, feat):
         """Forward function
 
         Parameters
         ----------
-        hg : DGLGraph
-            The input heterogeneous graph.
+        feat : dict[str, Tensor]
+            Input node features. It maps node types to node features.
 
         Returns
         -------
         dict[str, Tensor]
             Transformed node features.
         """
-        feat = dict()
-        for ntype in hg.ntypes:
-            feat[ntype] = self.linears[ntype](hg.nodes[ntype].data[self.feat_name])
+        out_feat = dict()
+        for ntype, nfeat in feat.items():
+            out_feat[ntype] = self.linears[ntype](nfeat)
 
-        return feat
+        return out_feat
 
 class HeteroEmbedding(nn.Module):
     """Create node embeddings for each node type and return a homogeneous
