@@ -570,7 +570,8 @@ class DataLoader(torch.utils.data.DataLoader):
         # Check use_alternate_streams
         if use_alternate_streams is None:
             use_alternate_streams = (
-                self.device.type == 'cuda' and self.graph.device.type == 'cpu')
+                self.device.type == 'cuda' and self.graph.device.type == 'cpu' and
+                not use_uva)
 
         if (torch.is_tensor(indices) or (
                 isinstance(indices, Mapping) and

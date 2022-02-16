@@ -60,6 +60,7 @@ dataloader = dgl.dataloading.DataLoader(
 durations = []
 for _ in range(10):
     t0 = time.time()
+    model.train()
     for it, sg in enumerate(dataloader):
         x = sg.ndata['feat']
         y = sg.ndata['label'][:, 0]
@@ -76,4 +77,27 @@ for _ in range(10):
     tt = time.time()
     print(tt - t0)
     durations.append(tt - t0)
+
+    model.eval()
+    with torch.no_grad():
+        val_preds, test_preds = [], []
+        val_labels, test_labels = [], []
+        for it, sg in enumerate(dataloader):
+            x = sg.ndata['feat']
+            y = sg.ndata['label'][:, 0]
+            m_val = sg.ndata['valid_mask']
+            m_test = sg.ndata['test_mask']
+            y_hat = model(sg, x)
+            val_preds.append(y_hat[m_val])
+            val_labels.append(y[m_val])
+            test_preds.append(y_hat[m_test])
+            test_labels.append(y[m_test])
+        val_preds = torch.cat(val_preds, 0)
+        val_labels = torch.cat(val_labels, 0)
+        test_preds = torch.cat(test_preds, 0)
+        test_labels = torch.cat(test_labels, 0)
+        val_acc = MF.accuracy(val_preds, val_labels)
+        test_acc = MF.accuracy(test_preds, test_labels)
+        print('Validation acc:', val_acc.item(), 'Test acc:', test_acc.item())
+
 print(np.mean(durations[4:]), np.std(durations[4:]))
