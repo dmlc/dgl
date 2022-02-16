@@ -85,11 +85,13 @@ sampler = dgl.dataloading.NeighborSampler(
 train_dataloader = dgl.dataloading.NodeDataLoader(
         graph, train_idx, sampler, device=device, batch_size=1024, shuffle=True,
         drop_last=False, pin_prefetcher=pin_prefetcher, num_workers=num_workers,
-        persistent_workers=(num_workers > 0), use_prefetch_thread=use_prefetch_thread)
+        persistent_workers=(num_workers > 0), use_prefetch_thread=use_prefetch_thread,
+        use_uvm=(MODE == 'uva'))
 valid_dataloader = dgl.dataloading.NodeDataLoader(
         graph, valid_idx, sampler, device=device, batch_size=1024, shuffle=True,
         drop_last=False, pin_prefetcher=pin_prefetcher, num_workers=num_workers,
-        persistent_workers=(num_workers > 0), use_prefetch_thread=use_prefetch_thread)
+        persistent_workers=(num_workers > 0), use_prefetch_thread=use_prefetch_thread,
+        use_uvm=(MODE == 'uva'))
 
 durations = []
 for _ in range(10):

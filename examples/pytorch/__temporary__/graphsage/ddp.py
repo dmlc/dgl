@@ -44,7 +44,6 @@ def train(rank, world_size, graph, num_classes, split_idx):
 
     if MODE == 'uva':
         train_idx = train_idx.to('cuda')
-        graph.pin_memory_()
     use_prefetch_thread = (MODE == 'cuda')
     pin_prefetcher = (MODE == 'cuda')
     num_workers = 0 if (MODE == 'uva') else 4
@@ -63,7 +62,8 @@ def train(rank, world_size, graph, num_classes, split_idx):
             num_workers=num_workers,
             persistent_workers=(num_workers > 0),
             use_ddp=True,
-            use_prefetch_thread=use_prefetch_thread)       # TBD: could probably remove this argument
+            use_prefetch_thread=use_prefetch_thread,
+            use_uvm=(MODE == 'uva'))
 
     durations = []
     for _ in range(10):
