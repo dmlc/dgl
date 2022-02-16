@@ -126,7 +126,8 @@ class MultiLayerNeighborSampler(NeighborSamplingMixin, BlockSampler):
 
     @classmethod
     def exclude_edges_in_frontier(cls, g):
-        return not isinstance(g, distributed.DistGraph) and g.device == F.cpu()
+        return not isinstance(g, distributed.DistGraph) and g.device == F.cpu() \
+               and not g.is_pinned()
 
     def sample_frontier(self, block_id, g, seed_nodes, exclude_eids=None):
         fanout = self.fanouts[block_id]

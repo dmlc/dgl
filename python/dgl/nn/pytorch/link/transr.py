@@ -50,7 +50,7 @@ class TransR(nn.Module):
     >>> num_rels = 3
     >>> feats = 4
 
-    >>> scorer = TransE(num_rels=num_rels, rfeats=2, nfeats=feats)
+    >>> scorer = TransR(num_rels=num_rels, rfeats=2, nfeats=feats)
     >>> g = dgl.rand_graph(num_nodes=num_nodes, num_edges=num_edges)
     >>> src, dst = g.edges()
     >>> h = th.randn(num_nodes, feats)

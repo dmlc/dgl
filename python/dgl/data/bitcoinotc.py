@@ -39,6 +39,10 @@ class BitcoinOTCDataset(DGLBuiltinDataset):
     verbose: bool
         Whether to print out progress information.
         Default: True.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Attributes
     ----------
@@ -67,12 +71,13 @@ class BitcoinOTCDataset(DGLBuiltinDataset):
     _url = 'https://snap.stanford.edu/data/soc-sign-bitcoinotc.csv.gz'
     _sha1_str = 'c14281f9e252de0bd0b5f1c6e2bae03123938641'
 
-    def __init__(self, raw_dir=None, force_reload=False, verbose=False):
+    def __init__(self, raw_dir=None, force_reload=False, verbose=False, transform=None):
         super(BitcoinOTCDataset, self).__init__(name='bitcoinotc',
                                                 url=self._url,
                                                 raw_dir=raw_dir,
                                                 force_reload=force_reload,
-                                                verbose=verbose)
+                                                verbose=verbose,
+                                                transform=transform)
 
     def download(self):
         gz_file_path = os.path.join(self.raw_dir, self.name + '.csv.gz')
@@ -143,7 +148,10 @@ class BitcoinOTCDataset(DGLBuiltinDataset):
 
             - ``edata['h']`` : edge weights
         """
-        return self.graphs[item]
+        if self._transform is None:
+            return self.graphs[item]
+        else:
+            return self._transform(self.graphs[item])
 
     @property
     def is_temporal(self):

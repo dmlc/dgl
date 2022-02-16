@@ -227,6 +227,17 @@ Fake news dataset
 .. autoclass:: FakeNewsDataset
     :members: __getitem__, __len__
 
+Dataset adapters
+```````````````````````````````````
+
+.. autoclass:: AsNodePredDataset
+    :members: __getitem__, __len__
+
+
+.. autoclass:: AsEdgePredDataset
+    :members: __getitem__, __len__
+
+
 Utilities
 -----------------
 
@@ -241,6 +252,7 @@ Utilities
     utils.load_labels
     utils.save_info
     utils.load_info
+    utils.add_nodepred_split
 
 .. autoclass:: dgl.data.utils.Subset
     :members: __getitem__, __len__
