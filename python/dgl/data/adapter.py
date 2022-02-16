@@ -231,23 +231,39 @@ class AsLinkPredDataset(DGLDataset):
 
     def process(self):
         if (self.split_ratio is None) and (self.neg_ratio is None):
+            # Handle logics for OGB link prediction dataset
             assert hasattr(self.dataset, "get_edge_split"), \
                 "dataset doesn't have get_edge_split method, please specify split_ratio and neg_ratio to generate the split"
             # This is likely to be an ogb dataset
             self.edge_split = self.dataset.get_edge_split()
             self._train_graph = self.g
+            if 'source_node' in self.edge_split["test"]:
+                # Probably ogbl-citation2
+                pos_e = (self.edge_split["valid"]["source_node"], self.edge_split["valid"]["target_node"])
+                neg_e_size = self.edge_split["valid"]['target_node_neg'].shape[-1]
+                neg_e_src = np.repeat(self.edge_split['valid']['source_node'], neg_e_size)
+                neg_e_dst = np.reshape(self.edge_split["valid"]["target_node_neg"], -1)
+                self._val_edges = pos_e, (neg_e_src, neg_e_dst)
+                pos_e = (self.edge_split["test"]["source_node"], self.edge_split["test"]["target_node"])
+                neg_e_size = self.edge_split["test"]['target_node_neg'].shape[-1]
+                neg_e_src = np.repeat(self.edge_split['test']['source_node'], neg_e_size)
+                neg_e_dst = np.reshape(self.edge_split["test"]["target_node_neg"], -1)
+                self._test_edges = pos_e, (neg_e_src, neg_e_dst)
+            elif 'edge' in self.edge_split["test"]:
+                # Probably ogbl-collab
+                pos_e_tensor, neg_e_tensor = self.edge_split["valid"][
+                    "edge"], self.edge_split["valid"]["edge_neg"]
+                pos_e = (pos_e_tensor[:, 0], pos_e_tensor[:, 1])
+                neg_e = (neg_e_tensor[:, 0], neg_e_tensor[:, 1])
+                self._val_edges = pos_e, neg_e
 
-            pos_e_tensor, neg_e_tensor = self.edge_split["valid"][
-                "edge"], self.edge_split["valid"]["edge_neg"]
-            pos_e = (pos_e_tensor[:, 0], pos_e_tensor[:, 1])
-            neg_e = (neg_e_tensor[:, 0], neg_e_tensor[:, 1])
-            self._val_edges = pos_e, neg_e
-
-            pos_e_tensor, neg_e_tensor = self.edge_split["test"][
-                "edge"], self.edge_split["test"]["edge_neg"]
-            pos_e = (pos_e_tensor[:, 0], pos_e_tensor[:, 1])
-            neg_e = (neg_e_tensor[:, 0], neg_e_tensor[:, 1])
-            self._test_edges = pos_e, neg_e
+                pos_e_tensor, neg_e_tensor = self.edge_split["test"][
+                    "edge"], self.edge_split["test"]["edge_neg"]
+                pos_e = (pos_e_tensor[:, 0], pos_e_tensor[:, 1])
+                neg_e = (neg_e_tensor[:, 0], neg_e_tensor[:, 1])
+                self._test_edges = pos_e, neg_e
+            # delete edge split to save memory
+            self.edge_split = None
         else:
             assert self.split_ratio is not None, "Need to specify split_ratio"
             assert self.neg_ratio is not None, "Need to specify neg_ratio"
