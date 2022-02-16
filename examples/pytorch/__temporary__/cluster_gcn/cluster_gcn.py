@@ -8,8 +8,6 @@ import time
 import numpy as np
 from ogb.nodeproppred import DglNodePropPredDataset
 
-USE_WRAPPER = True
-
 class SAGE(nn.Module):
     def __init__(self, in_feats, n_hidden, n_classes):
         super().__init__()
@@ -40,11 +38,6 @@ graph.ndata['test_mask'] = torch.zeros(graph.num_nodes(), dtype=torch.bool).inde
 model = SAGE(graph.ndata['feat'].shape[1], 256, dataset.num_classes).cuda()
 opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
 
-if USE_WRAPPER:
-    import dglnew
-    graph.create_formats_()
-    graph = dglnew.graph.wrapper.DGLGraphStorage(graph)
-
 num_partitions = 1000
 sampler = dgl.dataloading.ClusterGCNSampler(
         graph, num_partitions,
@@ -61,10 +54,8 @@ dataloader = dgl.dataloading.DataLoader(
         batch_size=100,
         shuffle=True,
         drop_last=False,
-        pin_memory=True,
-        num_workers=8,
-        persistent_workers=True,
-        use_prefetch_thread=True)       # TBD: could probably remove this argument
+        num_workers=0,
+        use_uva=True)
 
 durations = []
 for _ in range(10):

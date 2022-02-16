@@ -303,6 +303,9 @@ template<typename T>
 NDArray NDArray::FromVector(const std::vector<T>& vec, DLContext ctx) {
   const DLDataType dtype = DLDataTypeTraits<T>::dtype;
   int64_t size = static_cast<int64_t>(vec.size());
+  if (ctx.device_type == kDLCPUPinned)
+    // Temporary set the device to CPU - OK to modify in-place since ctx is passed-by-value anyway.
+    ctx.device_type = kDLCPU;
   NDArray ret = NDArray::Empty({size}, dtype, ctx);
   DeviceAPI::Get(ctx)->CopyDataFromTo(
       vec.data(),
