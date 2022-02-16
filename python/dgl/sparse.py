@@ -83,6 +83,67 @@ target_mapping = {
     'dst': 2
 }
 
+def _edge_softmax_backward(gidx, out, sds):
+    r""" Edge_softmax backward interface.
+
+    Parameters
+    ----------
+    gidx : HeteroGraphIndex
+        The input graph index.
+    out : tensor
+        The result of Edge_softmax during forward.
+    sds : tensor
+        The result of out * gradient.
+
+    Returns
+    -------
+    The result of Edge_softmax during backward
+
+    Notes
+    -----
+    This function does not support gpu op.
+    """
+    op = 'copy_rhs'
+    back_out = F.zeros_like(out)
+    _CAPI_DGLKernelEdge_softmax_backward(gidx, op,
+                                         to_dgl_nd(out),
+                                         to_dgl_nd(sds),
+                                         to_dgl_nd_for_write(back_out),
+                                         to_dgl_nd(None))
+    return back_out
+
+def _edge_softmax_forward(gidx, e, op):
+    r""" Edge_softmax forward interface.
+
+    Parameters
+    ----------
+    gidx : HeteroGraphIndex
+        The input graph index.
+    op : str
+        The binary op's name, default as ``copy_rhs``.
+    e : tensor or None
+        The feature on edges.
+
+    Returns
+    -------
+    The result of Edge_softmax during forward
+
+    Notes
+    -----
+    This function does not support gpu op.
+    """
+    if F.ndim(e) == 1:
+        e = F.unsqueeze(e, -1)
+        expand = True
+    else:
+        expand = False
+    myout = F.zeros_like(e)
+    _CAPI_DGLKernelEdge_softmax_forward(gidx, op,
+                                        to_dgl_nd(None),
+                                        to_dgl_nd(e),
+                                        to_dgl_nd_for_write(myout))
+    myout = F.squeeze(myout, -1) if expand else myout
+    return myout
 
 def _gspmm(gidx, op, reduce_op, u, e):
     r""" Generalized Sparse Matrix Multiplication interface. It takes the result of
@@ -326,6 +387,111 @@ def _gspmm_hetero(gidx, op, reduce_op, u_len, u_and_e_tuple):
         list_v[l] = v
     out = tuple(list_v)
     return out, (list_arg_u, list_arg_e, list_arg_u_ntype, list_arg_e_etype)
+
+
+def _segment_mm(A, B, out, seglen_A, a_trans=False, b_trans=False):
+    r""" Dense Matrix Multiplication interface. It multiplies dense tensor A
+    and dense tensor B according to relation types. A is sorted and concatenated
+    according to relation types.
+
+    Parameters
+    ----------
+    A : tensor
+        2-D tensor of shape (N, D1)
+    B : tensor
+        2-D tensor of shape (R * D1, D2)
+    seglen_A : Tensor
+        An integer tensor of shape (R,). Each element is the length of segments
+        of input ``A``. The summation of all elements must be equal to N.
+    a_trans : bool
+        Indicates whether matrix A needs to be tranposed
+    b_trans : bool
+        Indicates whether matrix B needs to be tranposed
+
+    Returns
+    -------
+    Tensor
+        The output dense matrix of shape (N, D2)
+    """
+    # TODO(Israt): Add CPU support. Currently, only handles GPU code
+    _CAPI_DGLKernelSEGMENTMM(to_dgl_nd(A),
+                            to_dgl_nd(B),
+                            to_dgl_nd_for_write(out),
+                            to_dgl_nd(seglen_A),
+                            a_trans, b_trans)
+    return out
+
+
+def _gather_mm(A, B, out, num_rel, idx_a=None, idx_b=None):
+    r""" Generalized Dense Matrix Multiplication interface. It multiplies
+    tensor A and B according to relation types and outputs in out. B is a
+    concatenated tensor across relation types. A is unsorted and the
+    relation type is fetched from param etypes.
+
+    Parameters
+    ----------
+    A : tensor
+        2-D tensor of shape (N, D1)
+    B : tensor
+        2-D tensor of shape (R * D1, D2)
+    idx_a : Tensor, optional
+        If specified, must be a 1-D integer tensor of shape (K,)
+    idx_b : Tensor, optional
+        If specified, must be a 1-D integer tensor of shape (N,)
+
+    Returns
+    -------
+    Tensor
+        The output dense matrix of shape (N, D2)
+    """
+    # TODO(Israt): Add CPU support. Currently, only handles GPU code
+    _CAPI_DGLKernelGATHERMM(to_dgl_nd(A),
+                            to_dgl_nd(B),
+                            to_dgl_nd_for_write(out),
+                            to_dgl_nd(idx_a),
+                            to_dgl_nd(idx_b),
+                            num_rel)
+    return out
+
+
+def _gather_mm_scatter(A, B, out, num_rel, idx_a=None, idx_b=None, idx_c=None,
+                       a_trans=False, b_trans=False):
+    r""" Generalized Dense Matrix Multiplication interface. It multiplies
+    tensor A and B according to relation types and outputs in out. B is a
+    concatenated tensor across relation types. A is unsorted and the
+    relation type is fetched from param etypes.
+
+    Parameters
+    ----------
+    A : tensor
+        2-D tensor of shape (N, D1)
+    B : tensor
+        2-D tensor of shape (R * D1, D2)
+    idx_a : Tensor, optional
+        If specified, must be a 1-D integer tensor of shape (K,)
+    idx_b : Tensor, optional
+        If specified, must be a 1-D integer tensor of shape (N,)
+    idx_c : Tensor, optional
+        If specified, must be a 1-D integer tensor of shape (N,)
+    A_trans : bool
+        Indicates whether matrix A needs to be tranposed
+    B_trans : bool
+        Indicates whether matrix B needs to be tranposed
+
+    Returns
+    -------
+    Tensor
+        The output dense matrix of shape (N, D2)
+    """
+    # TODO(Israt): Add CPU support. Currently, only handles GPU code
+    _CAPI_DGLKernelGATHERMMSCATTER(to_dgl_nd(A),
+                            to_dgl_nd(B),
+                            to_dgl_nd_for_write(out),
+                            to_dgl_nd(idx_a),
+                            to_dgl_nd(idx_b),
+                            to_dgl_nd(idx_c),
+                            num_rel, a_trans, b_trans)
+    return out
 
 
 def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):

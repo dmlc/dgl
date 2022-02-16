@@ -2,8 +2,10 @@ import torch as th
 import dgl
 
 class NegativeSampler(object):
-    def __init__(self, g, k, neg_share=False):
-        self.weights = g.in_degrees().float() ** 0.75
+    def __init__(self, g, k, neg_share=False, device=None):
+        if device is None:
+            device = g.device
+        self.weights = g.in_degrees().float().to(device) ** 0.75
         self.k = k
         self.neg_share = neg_share
 

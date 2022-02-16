@@ -36,8 +36,7 @@ def local_ip4_addr_list():
                     "Warning! Interface: %s \n"
                     "IP address not available for interface.", name)
                 continue
-            else:
-                raise e
+            raise e
 
         ip_addr = socket.inet_ntoa(ip_of_ni[20:24])
         nic.add(ip_addr)
