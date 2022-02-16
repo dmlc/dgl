@@ -10,8 +10,7 @@ import time
 import numpy as np
 from ogb.nodeproppred import DglNodePropPredDataset
 
-USE_WRAPPER = False
-MODE = 'uva'           # 'cuda' or 'uva'
+USE_UVA = True
 
 class SAGE(nn.Module):
     def __init__(self, in_feats, n_hidden, n_classes):
@@ -42,11 +41,8 @@ def train(rank, world_size, graph, num_classes, split_idx):
 
     train_idx, valid_idx, test_idx = split_idx['train'], split_idx['valid'], split_idx['test']
 
-    if MODE == 'uva':
+    if USE_UVA:
         train_idx = train_idx.to('cuda')
-    use_prefetch_thread = (MODE == 'cuda')
-    pin_prefetcher = (MODE == 'cuda')
-    num_workers = 0 if (MODE == 'uva') else 4
 
     sampler = dgl.dataloading.NeighborSampler(
             [5, 5, 5], prefetch_node_feats=['feat'], prefetch_labels=['label'])
@@ -58,12 +54,9 @@ def train(rank, world_size, graph, num_classes, split_idx):
             batch_size=1000,
             shuffle=True,
             drop_last=False,
-            pin_prefetcher=pin_prefetcher,
-            num_workers=num_workers,
-            persistent_workers=(num_workers > 0),
+            num_workers=0,
             use_ddp=True,
-            use_prefetch_thread=use_prefetch_thread,
-            use_uva=(MODE == 'uva'))
+            use_uva=USE_UVA)
 
     durations = []
     for _ in range(10):
@@ -96,15 +89,7 @@ if __name__ == '__main__':
     num_classes = dataset.num_classes
     n_procs = 4
 
-    if MODE == 'uva':
-        # put the graph into shared memory
-        new_graph = graph.shared_memory('shm')
-        new_graph.ndata['feat'] = graph.ndata['feat']
-        new_graph.ndata['label'] = graph.ndata['label']
-        new_graph.ndata['feat'].share_memory_()
-        new_graph.ndata['label'].share_memory_()
-        new_graph.create_formats_()
-        graph = new_graph
+    graph.create_formats_()
 
     # Tested with mp.spawn and fork.  Both worked and got 4s per epoch with 4 GPUs
     # and 3.86s per epoch with 8 GPUs on p2.8x, compared to 5.2s from official examples.
