@@ -17,22 +17,27 @@ class CSVDataset(DGLDataset):
         Whether to reload the dataset. Default: False
     verbose: bool, optional
         Whether to print out progress information. Default: True.
-    node_data_parser : dict[str, callable], optional
-        A dictionary used for node data parsing when loading from CSV files.
-        The key is node type which specifies the header in CSV file and the
-        value is a callable object which is used to parse corresponding
-        column data. Default: None. If None, a default data parser is applied
-        which load data directly and tries to convert list into array.
-    edge_data_parser : dict[(str, str, str), callable], optional
-        A dictionary used for edge data parsing when loading from CSV files.
-        The key is edge type which specifies the header in CSV file and the
-        value is a callable object which is used to parse corresponding
-        column data. Default: None. If None, a default data parser is applied
-        which load data directly and tries to convert list into array.
-    graph_data_parser : callable, optional
-        A callable object which is used to parse corresponding column graph
-        data. Default: None. If None, a default data parser is applied
-        which load data directly and tries to convert list into array.
+    ndata_parser : dict[str, callable] or callable, optional
+        Callable object which takes in the ``pandas.DataFrame`` object created from
+        CSV file, parses node data and returns a dictionary of parsed data. If given a
+        dictionary, the key is node type and the value is a callable object which is
+        used to parse data of corresponding node type. If given a single callable
+        object, such object is used to parse data of all node type data. Default: None.
+        If None, a default data parser is applied which load data directly and tries to
+        convert list into array.
+    edata_parser : dict[(str, str, str), callable], or callable, optional
+        Callable object which takes in the ``pandas.DataFrame`` object created from
+        CSV file, parses edge data and returns a dictionary of parsed data. If given a
+        dictionary, the key is edge type and the value is a callable object which is
+        used to parse data of corresponding edge type. If given a single callable
+        object, such object is used to parse data of all edge type data. Default: None.
+        If None, a default data parser is applied which load data directly and tries to
+        convert list into array.
+    gdata_parser : callable, optional
+        Callable object which takes in the ``pandas.DataFrame`` object created from
+        CSV file, parses graph data and returns a dictionary of parsed data. Default:
+        None. If None, a default data parser is applied which load data directly and
+        tries to convert list into array.
     transform : callable, optional
         A transform that takes in a :class:`~dgl.DGLGraph` object and returns
         a transformed version. The :class:`~dgl.DGLGraph` object will be
@@ -50,14 +55,14 @@ class CSVDataset(DGLDataset):
     """
     META_YAML_NAME = 'meta.yaml'
 
-    def __init__(self, data_path, force_reload=False, verbose=True, node_data_parser=None,
-                 edge_data_parser=None, graph_data_parser=None, transform=None):
+    def __init__(self, data_path, force_reload=False, verbose=True, ndata_parser=None,
+                 edata_parser=None, gdata_parser=None, transform=None):
         from .csv_dataset_base import load_yaml_with_sanity_check, DefaultDataParser
         self.graphs = None
         self.data = None
-        self.node_data_parser = {} if node_data_parser is None else node_data_parser
-        self.edge_data_parser = {} if edge_data_parser is None else edge_data_parser
-        self.graph_data_parser = graph_data_parser
+        self.ndata_parser = {} if ndata_parser is None else ndata_parser
+        self.edata_parser = {} if edata_parser is None else edata_parser
+        self.gdata_parser = gdata_parser
         self.default_data_parser = DefaultDataParser()
         meta_yaml_path = os.path.join(data_path, CSVDataset.META_YAML_NAME)
         if not os.path.exists(meta_yaml_path):
@@ -80,8 +85,8 @@ class CSVDataset(DGLDataset):
             if meta_node is None:
                 continue
             ntype = meta_node.ntype
-            data_parser = self.node_data_parser.get(
-                ntype, self.default_data_parser)
+            data_parser = self.ndata_parser if callable(
+                self.ndata_parser) else self.ndata_parser.get(ntype, self.default_data_parser)
             ndata = NodeData.load_from_csv(
                 meta_node, base_dir=base_dir, separator=meta_yaml.separator, data_parser=data_parser)
             node_data.append(ndata)
@@ -90,15 +95,15 @@ class CSVDataset(DGLDataset):
             if meta_edge is None:
                 continue
             etype = tuple(meta_edge.etype)
-            data_parser = self.edge_data_parser.get(
-                etype, self.default_data_parser)
+            data_parser = self.edata_parser if callable(
+                self.edata_parser) else self.edata_parser.get(etype, self.default_data_parser)
             edata = EdgeData.load_from_csv(
                 meta_edge, base_dir=base_dir, separator=meta_yaml.separator, data_parser=data_parser)
             edge_data.append(edata)
         graph_data = None
         if meta_yaml.graph_data is not None:
             meta_graph = meta_yaml.graph_data
-            data_parser = self.default_data_parser if self.graph_data_parser is None else self.graph_data_parser
+            data_parser = self.default_data_parser if self.gdata_parser is None else self.gdata_parser
             graph_data = GraphData.load_from_csv(
                 meta_graph, base_dir=base_dir, separator=meta_yaml.separator, data_parser=data_parser)
         # construct graphs
