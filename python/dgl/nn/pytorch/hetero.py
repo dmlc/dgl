@@ -254,42 +254,24 @@ def get_aggregate_fn(agg):
 
 class HeteroLinearLayer(nn.Module):
     """Apply a linear transformation on the node features of a
-    heterogeneous graph and return a homogeneous graph representation.
-
-    The underlying implementation invokes :func:`~dgl.to_homogeneous`. Therefore,
-    the returned graph stores the following extra attributes:
-
-      - ret_g.ndata[dgl.NID]: the original node IDs.
-      - ret_g.edata[dgl.EID]: the original edge IDs.
-      - ret_g.ndata[dgl.NTYPE]: the type ID of each node.
-      - ret_g.edata[dgl.ETYPE]: the type ID of each edge.
+    heterogeneous graph.
 
     Parameters
     ----------
     hg : DGLGraph
-        A heterogeneous DGL graph.
+        A heterogeneous graph.
     out_size : int
         Output feature size.
     feat_name : str
-        Which feature to transform.
+        Name of the node feature to transform.
 
     Examples
     --------
-    >>> hg = dgl.heterograph({('user', 'rate', 'movie') : ...,
-                              ('user', 'follows', 'user') : ...})
-    >>> print(hg.num_nodes('user'), hg.num_nodes('movie'))
-    300 1000
-    >>> hg.nodes['user'].data['feat'] = torch.randn(hg.num_nodes('user'), 32)
-    >>> hg.nodes['movie'].data['feat'] = torch.randn(hg.num_nodes('movie'), 64)
-    >>> layer = dgl.nn.HeteroLinearLayer(hg, 100, 'feat')
-    >>> g, feat = layer(hg)
-    >>> print(g.num_nodes())
-    1300
-    >>> print(feat.shape)
-    (1300, 100)
+
     """
     def __init__(self, hg, out_size, feat_name):
         super(HeteroLinearLayer, self).__init__()
+
         self.feat_name = feat_name
         self.linears = nn.ModuleDict()
         for ntype in hg.ntypes:
@@ -302,82 +284,59 @@ class HeteroLinearLayer(nn.Module):
         Parameters
         ----------
         hg : DGLGraph
-            The input heterogeneous DGL graph.
+            The input heterogeneous graph.
 
         Returns
         -------
-        g : DGLGraph
-            The homogenized DGL graph.
-        feat : Tensor
+        dict[str, Tensor]
             Transformed node features.
         """
-        feat = th.tensor([])
-        feat = feat.to(hg.ndata[self.feat_name][hg.ntypes[0]].device)
+        feat = dict()
         for ntype in hg.ntypes:
-            features = self.linears[ntype](hg.nodes[ntype].data[self.feat_name])
-            feat = th.cat((feat, features))
-        g = to_homogeneous(hg)
+            feat[ntype] = self.linears[ntype](hg.nodes[ntype].data[self.feat_name])
 
-        return g, feat
+        return feat
 
 class HeteroEmbedding(nn.Module):
     """Create node embeddings for each node type and return a homogeneous
     graph representation.
 
-    The underlying implementation invokes :func:`~dgl.to_homogeneous`. Therefore,
-    the returned graph stores the following extra attributes:
-
-      - ret_g.ndata[dgl.NID]: the original node IDs.
-      - ret_g.edata[dgl.EID]: the original edge IDs.
-      - ret_g.ndata[dgl.NTYPE]: the type ID of each node.
-      - ret_g.edata[dgl.ETYPE]: the type ID of each edge.
-
     Parameters
     ----------
     hg : DGLGraph
-        A heterogeneous DGL graph.
+        A heterogeneous graph.
     embed_size : int
         Node embedding size.
 
     Examples
     --------
-
-    >>> hg = dgl.heterograph({('user', 'rate', 'movie') : ...,
-                              ('user', 'follows', 'user') : ...})
-    >>> print(hg.num_nodes('user'), hg.num_nodes('movie'))
-    300 1000
-    >>> layer = dgl.nn.HeteroEmbedding(hg, 100)
-    >>> g, embed = layer(hg)
-    >>> print(g.num_nodes())
-    1300
-    >>> print(embed.shape)
-    (1300, 100)
-    >>> print(embed.requires_grad)
-    True
-
     """
     def __init__(self, hg, embed_size):
         super(HeteroEmbedding, self).__init__()
-        self.embed_size = embed_size
-        nodes = hg.num_nodes()
-        self.embed = nn.Parameter(th.FloatTensor(nodes, self.embed_size))
-        nn.init.xavier_uniform_(self.embed, gain=nn.init.calculate_gain('relu'))
 
-    def forward(self, hg):
+        self.embeds = nn.ModuleDict()
+        for ntype in hg.ntypes:
+            self.embeds[ntype] = nn.Embedding(hg.num_nodes(ntype), embed_size)
+
+    @property
+    def weight(self):
+        return {ntype: emb.weight for ntype, emb in self.embeds.items()}
+
+    def forward(self, input_nodes):
         """Forward function
 
         Parameters
         ----------
-        hg : DGLGraph
-            The input heterogeneous DGL graph.
+        input_nodes : dict[str, Tensor]
+            The node IDs to retrieve embeddings. It maps node types to type-specific node IDs.
 
         Returns
         -------
-        g : DGLGraph
-            The homogenized DGL graph.
-        embed : Tensor
-            Node embeddings.
+        dict[str, Tensor]
+            The retrieved node embeddings.
         """
-        g = to_homogeneous(hg)
+        embeds = dict()
+        for ntype, nids in input_nodes.items():
+            embeds[ntype] = self.embeds[ntype](nids)
 
-        return g, self.embed
+        return embeds
