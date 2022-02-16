@@ -199,6 +199,13 @@ DataFactory.register(
     class_name="DglLinkPropPredDataset('ogbl-collab')",
     allowed_pipeline=["linkpred"])
 
+DataFactory.register(
+    "ogbl-citation2",
+    import_code="from ogb.linkproppred import DglLinkPropPredDataset",
+    extra_args={},
+    class_name="DglLinkPropPredDataset('ogbl-citation2')",
+    allowed_pipeline=["linkpred"])
+
 class PipelineFactory:
     """ The factory class for creating executors"""
 
@@ -290,7 +297,7 @@ class ModelFactory:
         arg_dict = self.get_constructor_default_args(model_name)
         type_annotation_dict = {}
         # type_annotation_dict["name"] = Literal[""]
-        exempt_keys = ['self', 'in_size', 'out_size']
+        exempt_keys = ['self', 'in_size', 'out_size', 'data_info']
         for k, param in arg_dict.items():
             if k not in exempt_keys:
                 type_annotation_dict[k] = arg_dict[k]

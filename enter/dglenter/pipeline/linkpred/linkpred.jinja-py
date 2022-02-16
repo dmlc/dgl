@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
+import numpy as np
 
 {{ data_import_code }}
 
@@ -13,17 +14,25 @@ from torch.utils.data import DataLoader
 {{ node_model_code}}
 
 class Model(nn.Module):
-    def __init__(self, node_model, edge_model, neg_sampler):
+    def __init__(self, node_model, edge_model, neg_sampler, eval_batch_size):
         super().__init__()
         self.node_model = node_model
         self.edge_model = edge_model
         self.neg_sampler = neg_sampler
+        self.eval_batch_size = eval_batch_size
 
     def inference(self, g, x, edges):
         src, dst = edges
         h = self.node_model(g, x)
-        score = self.edge_model(h[src], h[dst])
-        return score
+        eid_dataloader = DataLoader(
+            range(
+                src.shape[-1]),
+            batch_size=self.eval_batch_size) 
+        score_list = []
+        for eids in eid_dataloader:
+            score = self.edge_model(h[src[eids]], h[dst[eids]])
+        score_list.append(score)
+        return torch.cat(score_list, dim=0)
 
 def calc_hitsk(y_pred_pos, y_pred_neg, k):
     kth_score_in_negative_edges = torch.topk(y_pred_neg.flatten(), k)[0][-1]
@@ -54,9 +63,8 @@ def train(cfg, pipeline_cfg, device, dataset, model, optimizer, loss_fcn):
             optimizer.step()
         with torch.no_grad():
             model.eval()
-            neg_src, neg_dst = dataset.val_edges[1]
-            h = model.node_model(train_g, node_feat)
-            val_neg_score = model.edge_model(h[neg_src], h[neg_dst])
+            val_neg_edges = dataset.val_edges[1]
+            val_neg_score = model.inference(train_g, node_feat, val_neg_edges)
         train_hits = calc_hitsk(pos_score, val_neg_score, k=50)
         print("Epoch {:05d} | Loss {:.4f} | Train Hits@50 {:.4f}".format(epoch, loss, train_hits))
 
@@ -78,15 +86,6 @@ def train(cfg, pipeline_cfg, device, dataset, model, optimizer, loss_fcn):
         print("Test Hits@50 {:.4f}".format(test_hits))
     return test_hits
 
-class GNNWithEmbedding(nn.Module):
-    def __init__(self, num_nodes, embed_size, gnn):
-        super().__init__()
-        self.embed = nn.Embedding(num_nodes, embed_size)
-        self.gnn = gnn
-
-    def forward(self, g, node_feat, edge_feat):
-        return self.gnn(g, self.embed.weight, edge_feat)
-
 
 def main():
     {{user_cfg_str}}
@@ -100,11 +99,14 @@ def main():
         "out_size": pipeline_cfg['hidden_size'],
         "num_nodes": dataset[0].num_nodes()
         }
-    cfg["edge_model"]["in_size"] = pipeline_cfg['hidden_size']
+    cfg["edge_model"]["data_info"] = {
+        "in_size": pipeline_cfg['hidden_size'],
+        "out_size": 1 # output each edge score
+    }
     node_model = {{node_model_class_name}}(**cfg["node_model"])
     edge_model = {{edge_model_class_name}}(**cfg["edge_model"])
     neg_sampler = dgl.dataloading.negative_sampler.{{ neg_sampler_name }}(**cfg["neg_sampler"])
-    model = Model(node_model, edge_model, neg_sampler)
+    model = Model(node_model, edge_model, neg_sampler, pipeline_cfg["eval_batch_size"])
     model = model.to(device)
     params = model.parameters()
     loss = torch.nn.{{ loss }}()

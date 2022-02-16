@@ -134,6 +134,7 @@ class LinkpredPipeline(PipelineBase):
         render_cfg["neg_sampler_name"] = NegativeSamplerFactory.get_model_class_name(
             user_cfg_dict["neg_sampler"]["name"])
         render_cfg["loss"] = user_cfg_dict["general_pipeline"]["loss"]
+        # update import and initialization code
         render_cfg.update(DataFactory.get_generated_code_dict(user_cfg_dict["data"]["name"], '**cfg["data"]'))
         generated_user_cfg = copy.deepcopy(user_cfg_dict)
         if len(generated_user_cfg["data"]) == 1:
@@ -148,6 +149,13 @@ class LinkpredPipeline(PipelineBase):
         generated_user_cfg["general_pipeline"].pop("loss")
         generated_train_cfg = copy.deepcopy(user_cfg_dict["general_pipeline"])
         generated_train_cfg["optimizer"].pop("name")
+
+
+        if user_cfg_dict["data"].get("split_ratio", None) is not None:
+            assert user_cfg_dict["data"].get("neg_ratio", None) is not None, "Please specify both split_ratio and neg_ratio"
+            render_cfg["data_initialize_code"] = "{}, split_ratio={}, neg_ratio={}".format(render_cfg["data_initialize_code"], user_cfg_dict["data"]["split_ratio"], user_cfg_dict["data"]["neg_ratio"])
+            generated_user_cfg["data"].pop("split_ratio")
+            generated_user_cfg["data"].pop("neg_ratio")
 
         render_cfg["user_cfg_str"] = f"cfg = {str(generated_user_cfg)}"
         render_cfg["user_cfg"] = user_cfg_dict
