@@ -268,6 +268,21 @@ class HeteroLinearLayer(nn.Module):
     Examples
     --------
 
+    >>> import dgl
+    >>> import torch
+    >>> from dgl.nn import HeteroLinearLayer
+    >>> g = dgl.heterograph({
+    ...     ('A', 'r1', 'B'): ([0, 1], [1, 2]),
+    ...     ('B', 'r2', 'B'): ([1], [2])
+    ... })
+    >>> g.nodes['A'].data['h'] = torch.randn(2, 3)
+    >>> g.nodes['B'].data['h'] = torch.randn(3, 4)
+    >>> layer = HeteroLinearLayer(g, 5, 'h')
+    >>> out_feats = layer(g)
+    >>> print(out_feats['A'].shape)
+    torch.Size([2, 5])
+    >>> print(out_feats['B'].shape)
+    torch.Size([3, 5])
     """
     def __init__(self, hg, out_size, feat_name):
         super(HeteroLinearLayer, self).__init__()
@@ -310,6 +325,29 @@ class HeteroEmbedding(nn.Module):
 
     Examples
     --------
+
+    >>> import dgl
+    >>> import torch
+    >>> from dgl.nn import HeteroEmbedding
+    >>> g = dgl.heterograph({
+    ...     ('A', 'r1', 'B'): ([0, 1], [1, 2]),
+    ...     ('B', 'r2', 'B'): ([1], [2])
+    ... })
+    >>> layer = HeteroEmbedding(g, 5)
+
+    >>> # Get the embeddings of all nodes
+    >>> embeds = layer.weight
+    >>> print(embeds['A'].shape)
+    torch.Size([2, 5])
+    >>> print(embeds['B'].shape)
+    torch.Size([3, 5])
+
+    >>> # Get the embeddings for a node subset
+    >>> embeds = layer({'A': torch.LongTensor([0]), 'B': torch.LongTensor([0, 2])})
+    >>> print(embeds['A'].shape)
+    torch.Size([1, 5])
+    >>> print(embeds['B'].shape)
+    torch.Size([2, 5])
     """
     def __init__(self, hg, embed_size):
         super(HeteroEmbedding, self).__init__()

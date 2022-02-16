@@ -788,7 +788,7 @@ def test_gin_conv(g, idtype, aggregator_type):
     th.save(gin, tmp_buffer)
 
     assert h.shape == (g.number_of_dst_nodes(), 12)
-    
+
     gin = nn.GINConv(None, aggregator_type)
     th.save(gin, tmp_buffer)
     gin = gin.to(ctx)
@@ -1248,43 +1248,42 @@ def test_hetero_conv(agg, idtype):
 
 @parametrize_dtype
 @pytest.mark.parametrize('out_dim', [1, 2, 100])
-@pytest.mark.parametrize('feat_name', ['h', 'feat'])
-def test_hetero_linear_layer(idtype, out_dim, feat_name):
+def test_hetero_linear_layer(idtype, out_dim):
     hg = dgl.heterograph({
-        ('user', 'follows', 'user'): ([0, 0, 2, 1], [1, 2, 1, 3]),
-        ('user', 'plays', 'game'): ([0, 0, 0, 1, 2], [0, 2, 3, 0, 2]),
-        ('store', 'sells', 'game'): ([0, 0, 1, 1], [0, 3, 1, 2])},
-        idtype=idtype, device=F.ctx())
-    uf = F.randn((4, 2))
-    gf = F.randn((4, 4))
-    sf = F.randn((2, 3))
-    hg.nodes['user'].data[feat_name] = uf
-    hg.nodes['game'].data[feat_name] = gf
-    hg.nodes['store'].data[feat_name] = sf   
-    
-    conv = nn.HeteroLinearLayer(hg, out_dim, feat_name)
+        ('A', 'r1', 'B'): ([0, 1], [1, 2]),
+        ('B', 'r2', 'B'): ([1], [2])
+        }, idtype=idtype, device=F.ctx())
+    hg.nodes['A'].data['h'] = F.randn((2, 3))
+    hg.nodes['B'].data['h'] = F.randn((3, 4))
+
+    conv = nn.HeteroLinearLayer(hg, out_dim, 'h')
     conv = conv.to(F.ctx())
-    g, feat = conv(hg)
-    
-    assert g.num_nodes() == hg.num_nodes()
-    assert feat.shape == (hg.num_nodes(), out_dim)
+    feat = conv(hg)
+    assert feat['A'].shape == (2, out_dim)
+    assert feat['B'].shape == (3, out_dim)
 
 @parametrize_dtype
 @pytest.mark.parametrize('out_dim', [1, 2, 100])
 def test_hetero_embedding(idtype, out_dim):
     hg = dgl.heterograph({
-        ('user', 'follows', 'user'): ([0, 0, 2, 1], [1, 2, 1, 3]),
-        ('user', 'plays', 'game'): ([0, 0, 0, 1, 2], [0, 2, 3, 0, 2]),
-        ('store', 'sells', 'game'): ([0, 0, 1, 1], [0, 3, 1, 2])},
-        idtype=idtype, device=F.ctx()) 
-    
+        ('A', 'r1', 'B'): ([0, 1], [1, 2]),
+        ('B', 'r2', 'B'): ([1], [2])
+    }, idtype=idtype, device=F.ctx())
+
     conv = nn.HeteroEmbedding(hg, out_dim)
     conv = conv.to(F.ctx())
-    g, feat = conv(hg)
-    
-    assert g.num_nodes() == hg.num_nodes()
-    assert feat.shape == (hg.num_nodes(), out_dim)
-    
+
+    embeds = conv.weight
+    assert embeds['A'].shape == (2, out_dim)
+    assert embeds['B'].shape == (3, out_dim)
+
+    embeds = conv({
+        'A': F.tensor([0], dtype=F.int64),
+        'B': F.tensor([0, 2], dtype=F.int64)
+    })
+    assert embeds['A'].shape == (1, out_dim)
+    assert embeds['B'].shape == (2, out_dim)
+
 @parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
 @pytest.mark.parametrize('out_dim', [1, 2])
@@ -1387,13 +1386,13 @@ def test_ke_score_funcs():
     score_func(h_src, h_dst, rels).shape == (num_edges)
 
 
-def test_twirls(): 
+def test_twirls():
     g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
     feat = th.ones(6, 10)
     conv = nn.TWIRLSConv(10, 2, 128, prop_step = 64)
     res = conv(g , feat)
     assert ( res.size() == (6,2) )
-    
+
 
 
 if __name__ == '__main__':
