@@ -38,6 +38,42 @@ def _load_tensor(tensor, device, comm, part):
 def _gather_row(tensor, index):
     return tensor.all_gather_row(index)
 
+
+class _MultiGPUFrame(object):
+    def __init__(self):
+        self._column_names = []
+
+    def subframe(self, rowids):
+        frame = Frame(num_rows = len(rowids))
+        for name in self._column_names:
+            col = self._get_storage(name).fetch(rowids, F.context(rowids))
+            frame.update_column(name, col)
+        return frame
+
+    def add_column(self, name):
+        self._column_names.append(name)
+
+
+class _MultiGPUNodeFrame(_MultiGPUFrame):
+    def __init__(self, ntype, data):
+        super().__init__()
+        self._ntype = ntype
+        self._data = data
+
+    def _get_storage(self, name):
+        return self._data.get_node_storage(name, self._ntype)
+
+
+class _MultiGPUEdgeFrame(_MultiGPUFrame):
+    def __init__(self, etype, data):
+        super().__init__()
+        self._etype = etype
+        self._data = data
+
+    def _get_storage(self, name):
+        return self._data.get_edge_storage(name, self._etype)
+
+
 class MultiGPUFeatureGraphWrapper(object):
     """This class wraps a DGLGraph object and enables neighbor sampling where
     the features are stored split across the GPUs.
@@ -123,8 +159,10 @@ class MultiGPUFeatureGraphWrapper(object):
 
         # save all node features to GPU
         self._n_feat = {}
+        self._n_frames = []
         for i, ntype in enumerate(g.ntypes):
             feats = {}
+            self._n_frames.append(_MultiGPUNodeFrame(ntype, self))
             for feat_name in list(g._node_frames[i].keys()):
                 if isinstance(g.ndata[feat_name], Mapping):
                     data = g.ndata[feat_name][ntype]
@@ -132,12 +170,15 @@ class MultiGPUFeatureGraphWrapper(object):
                     data = g.ndata[feat_name]
                 feats[feat_name] = _load_tensor(data, device, comm,
                                                 partition[ntype])
+                self._n_frames[i].add_column(feat_name)
             self._n_feat[ntype] = feats
 
         # save all edge features to GPU
         self._e_feat = {}
+        self._e_frames = []
         for i, etype in enumerate(g.canonical_etypes):
             feats = {}
+            self._e_frames.append(_MultiGPUEdgeFrame(etype, self))
             for feat_name in list(g._edge_frames[i].keys()):
                 if isinstance(g.edata[feat_name], Mapping):
                     data = g.edata[feat_name][etype]
@@ -145,6 +186,7 @@ class MultiGPUFeatureGraphWrapper(object):
                     data = g.edata[feat_name]
                 feats[feat_name] = _load_tensor(data, device, comm,
                                                 edge_partition[etype])
+                self._e_frames[i].add_column(feat_name)
             self._e_feat[etype] = feats
 
     def sample_neighbors(self, nodes, fanout, edge_dir='in', prob=None,
@@ -170,7 +212,7 @@ class MultiGPUFeatureGraphWrapper(object):
         replace : bool, optional
             Whether to sample with replacement.
         output_device : Framework-specific device context object, optional
-            The output device. Default is the same as this objet. 
+            The output device. Default is the same as this objet.
         exclude_edges: tensor or dict
             Edges to exclude during neihgbor sampling.
 
@@ -179,48 +221,35 @@ class MultiGPUFeatureGraphWrapper(object):
         DGLGraph
             A sampled subgraph containing only the sampled neighboring edges.
         """
-
-
         if output_device is None:
             output_device = self._device
         assert output_device == self._device, \
             "The output device of the sampler must be the same device as " \
             "the GPU feature store: {} vs. {}".format(
                 output_device, self._device)
-        
+
+        # _dist_training must be true to get the eid's properly attached
+        # without copying features from the CPU
         frontier = neighbor.sample_neighbors(
             g=self._g, nodes=nodes, fanout=fanout, edge_dir=edge_dir,
             prob=prob, replace=replace, copy_ndata=False, copy_edata=False,
-            exclude_edges=exclude_edges, output_device=output_device)
+            exclude_edges=exclude_edges, output_device=output_device,
+            _dist_training=True)
 
-        # manually copy node features
-        node_frames = []
-        for ntype in frontier.ntypes:
-            index = frontier.nodes(ntype).to(self._device)
-            frame = Frame(num_rows=len(index))
-            for k, v in self._n_feat[ntype].items():
-                data = _gather_row(v, index).to(output_device)
-                frame.update_column(k, data)
-            node_frames.append(frame)
-        
-        # manually copy edge features
-        edge_frames = []
-        for etype in frontier.canonical_etypes:
-            index = frontier.edges(form='eid', etype=etype).to(self._device)
-            if isinstance(index, Mapping):
-                index = index[frontier.to_canonical_etype(etype)]
-            frame = Frame(num_rows=len(index))
-            for k, v in self._e_feat[etype].items():
-                data = _gather_row(v, index).to(output_device)
-                frame.update_column(k, data)
+        induced_edges = {etype: frontier.edges[etype].data[EID] \
+            for etype in frontier.canonical_etypes}
 
-            # add eids if they do not exist
-            if EID not in frame:
-                frame.update_column(EID, index.to(output_device))
-            edge_frames.append(frame)
+        # set node frames
+        utils.set_new_frames(frontier, node_frames=self._n_frames)
 
-        utils.set_new_frames(frontier, node_frames=node_frames,
-            edge_frames=edge_frames)
+        # need to insert eid into edge frames
+        e_frames = []
+        for i, etype in enumerate(frontier.canonical_etypes):
+            e_frames.append(self._e_frames[i].subframe(induced_edges[etype]))
+            e_frames[i][EID] = induced_edges[etype]
+
+        # set edge frames
+        utils.set_new_frames(frontier, edge_frames=e_frames)
 
         return frontier
 
@@ -245,7 +274,7 @@ class MultiGPUFeatureGraphWrapper(object):
                                            "graphs with more than one ntype."
             ntype = self._n_feat.keys()[0]
         return self._n_feat[ntype][key]
-            
+
     def get_edge_storage(self, key, etype=None):
         """Get the edge feature storage for the given features 'key' and
         'etype'.
@@ -267,12 +296,22 @@ class MultiGPUFeatureGraphWrapper(object):
                                            "graphs with more than one etype."
             etype = self._e_feat.keys()[0]
         return self._e_feat[etype][key]
- 
-    def __getattr__(self, key):
-        if key in ['ntypes', 'etypes', 'canonical_etypes', 'nodes',
-                   'subgraph', 'edge_subgraph', 'find_edges', 'num_nodes']:
-            # Delegate to the wrapped GraphStorage instance.
-            return getattr(self._g, key)
-        else:
-            return super().__getattr__(key)
 
+    @property
+    def ntypes(self):
+        return self._g.ntypes
+
+    @property
+    def etypes(self):
+        return self._g.etypes
+
+    @property
+    def canonical_etypes(self):
+        return self._g.canonical_etypes
+
+    def num_nodes(self, ntype=None):
+        return self._g.num_nodes(ntype=ntype)
+
+    @property
+    def nodes(self):
+        return self._g.nodes

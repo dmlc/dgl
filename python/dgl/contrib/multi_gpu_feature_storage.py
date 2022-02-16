@@ -136,10 +136,15 @@ class MultiGPUFeatureStorage(FeatureStorage):
         assert self._tensor.shape == values.shape, "Can only replace local " \
             "tensor with one of same shape: {} vs. {}".format(
                 self._tensor.shape, values.shape)
-        # save context and then free local tensor
-        ctx = F.context(self._tensor.device)
+        # save information about the local tensor and free it
+        ctx = F.context(self._tensor)
+        dtype = F.dtype(self._tensor)
         self._tensor = None
 
+        # convert to our type
+        values = F.astype(values, dtype)
+
+        # replace free'd tensor
         self._tensor = F.copy_to(values, ctx=ctx)
 
     @property

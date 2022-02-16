@@ -301,11 +301,13 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
             nodes = F.copy_to(nodes, g.device)
         frontier = _sample_neighbors(
             g, nodes, fanout, edge_dir=edge_dir, prob=prob, replace=replace,
-            copy_ndata=copy_ndata, copy_edata=copy_edata, exclude_edges=exclude_edges)
+            copy_ndata=copy_ndata, copy_edata=copy_edata, exclude_edges=exclude_edges,
+            _dist_training=_dist_training)
     else:
         frontier = _sample_neighbors(
             g, nodes, fanout, edge_dir=edge_dir, prob=prob, replace=replace,
-            copy_ndata=copy_ndata, copy_edata=copy_edata)
+            copy_ndata=copy_ndata, copy_edata=copy_edata,
+            _dist_training=_dist_training)
         if exclude_edges is not None:
             eid_excluder = EidExcluder(exclude_edges)
             frontier = eid_excluder(frontier)
