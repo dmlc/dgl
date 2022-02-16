@@ -960,31 +960,47 @@ def _test_CSVDataset_customized_data_parser():
                     data[header] = dt
                 return data
         # load CSVDataset with customized node/edge/gdata_parser
-        def verify(csv_dataset):
-            assert len(csv_dataset) == num_graphs
-            assert len(csv_dataset.data) == 1
-            assert 'label' in csv_dataset.data
-            for i, (g, g_data) in enumerate(csv_dataset):
-                assert not g.is_homogeneous
-                assert F.asnumpy(g_data['label']) == label_gdata[i] + 2
-                for ntype in g.ntypes:
-                    assert g.num_nodes(ntype) == num_nodes
-                    offset = 2 if ntype == 'user' else 0
-                    assert np.array_equal(label_ndata[i*num_nodes:(i+1)*num_nodes]+offset,
-                                        F.asnumpy(g.nodes[ntype].data['label']))
-                for etype in g.etypes:
-                    assert g.num_edges(etype) == num_edges
-                    offset = 2 if etype == 'like' else 0
-                    assert np.array_equal(label_edata[i*num_edges:(i+1)*num_edges]+offset,
-                                        F.asnumpy(g.edges[etype].data['label']))
         # specify via dict[ntype/etype, callable]
         csv_dataset = data.CSVDataset(
-            test_dir, ndata_parser={'user': CustDataParser()}, edata_parser={('user', 'like', 'item'): CustDataParser()}, gdata_parser=CustDataParser())
-        verify(csv_dataset)
+            test_dir, force_reload=True, ndata_parser={'user': CustDataParser()},
+            edata_parser={('user', 'like', 'item'): CustDataParser()},
+            gdata_parser=CustDataParser())
+        assert len(csv_dataset) == num_graphs
+        assert len(csv_dataset.data) == 1
+        assert 'label' in csv_dataset.data
+        for i, (g, g_data) in enumerate(csv_dataset):
+            assert not g.is_homogeneous
+            assert F.asnumpy(g_data['label']) == label_gdata[i] + 2
+            for ntype in g.ntypes:
+                assert g.num_nodes(ntype) == num_nodes
+                offset = 2 if ntype == 'user' else 0
+                assert np.array_equal(label_ndata[i*num_nodes:(i+1)*num_nodes]+offset,
+                                    F.asnumpy(g.nodes[ntype].data['label']))
+            for etype in g.etypes:
+                assert g.num_edges(etype) == num_edges
+                offset = 2 if etype == 'like' else 0
+                assert np.array_equal(label_edata[i*num_edges:(i+1)*num_edges]+offset,
+                                    F.asnumpy(g.edges[etype].data['label']))
         # specify via callable
         csv_dataset = data.CSVDataset(
-            test_dir, ndata_parser=CustDataParser(), edata_parser=CustDataParser(), gdata_parser=CustDataParser())
-        verify(csv_dataset)
+            test_dir, force_reload=True, ndata_parser=CustDataParser(),
+            edata_parser=CustDataParser(), gdata_parser=CustDataParser())
+        assert len(csv_dataset) == num_graphs
+        assert len(csv_dataset.data) == 1
+        assert 'label' in csv_dataset.data
+        for i, (g, g_data) in enumerate(csv_dataset):
+            assert not g.is_homogeneous
+            assert F.asnumpy(g_data['label']) == label_gdata[i] + 2
+            for ntype in g.ntypes:
+                assert g.num_nodes(ntype) == num_nodes
+                offset = 2
+                assert np.array_equal(label_ndata[i*num_nodes:(i+1)*num_nodes]+offset,
+                                    F.asnumpy(g.nodes[ntype].data['label']))
+            for etype in g.etypes:
+                assert g.num_edges(etype) == num_edges
+                offset = 2
+                assert np.array_equal(label_edata[i*num_edges:(i+1)*num_edges]+offset,
+                                    F.asnumpy(g.edges[etype].data['label']))
 
 
 def _test_NodeEdgeGraphData():
