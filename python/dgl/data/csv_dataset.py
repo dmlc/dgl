@@ -132,8 +132,9 @@ class CSVDataset(DGLDataset):
         else:
             g = self._transform(self.graphs[i])
 
-        if 'label' in self.data:
-            return g, self.data['label'][i]
+        if len(self.data) > 0:
+            data = {k: v[i] for (k, v) in self.data.items()}
+            return g, data
         else:
             return g
 

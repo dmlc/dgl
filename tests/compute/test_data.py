@@ -882,9 +882,10 @@ def _test_CSVDataset_multiple():
             assert 'label' in csv_dataset.data
             assert F.array_equal(F.tensor(feat_gdata),
                                  csv_dataset.data['feat'])
-            for i, (g, label) in enumerate(csv_dataset):
+            for i, (g, g_data) in enumerate(csv_dataset):
                 assert not g.is_homogeneous
-                assert F.asnumpy(label) == label_gdata[i]
+                assert F.asnumpy(g_data['label']) == label_gdata[i]
+                assert F.array_equal(g_data['feat'], F.tensor(feat_gdata[i]))
                 for ntype in g.ntypes:
                     assert g.num_nodes(ntype) == num_nodes
                     assert F.array_equal(F.tensor(feat_ndata[i*num_nodes:(i+1)*num_nodes]),
@@ -964,9 +965,9 @@ def _test_CSVDataset_customized_data_parser():
         assert len(csv_dataset) == num_graphs
         assert len(csv_dataset.data) == 1
         assert 'label' in csv_dataset.data
-        for i, (g, label) in enumerate(csv_dataset):
+        for i, (g, g_data) in enumerate(csv_dataset):
             assert not g.is_homogeneous
-            assert F.asnumpy(label) == label_gdata[i] + 2
+            assert F.asnumpy(g_data['label']) == label_gdata[i] + 2
             for ntype in g.ntypes:
                 assert g.num_nodes(ntype) == num_nodes
                 offset = 2 if ntype == 'user' else 0
