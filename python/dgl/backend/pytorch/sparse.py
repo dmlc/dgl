@@ -737,6 +737,9 @@ class GATHERMM(th.autograd.Function):
     def backward(ctx, dZ):
         A, B, idx_a, idx_b, B_3D_shape = ctx.backward_cache
         A_grad = B_grad = None
+        if idx_a is not None:
+            raise NotImplementedError('Backward operator on GPU is not supported' +
+                ' when idx_a is valid')
         if ctx.needs_input_grad[0]:
             #  Compute A_grad = Out_grad * B^T
             A_grad = th.zeros(A.shape, device=A.device, dtype=A.dtype)
