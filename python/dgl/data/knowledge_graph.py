@@ -352,7 +352,7 @@ class FB15k237Dataset(KnowledgeGraphDataset):
             >>> graph = dataset[0]
             >>> train_mask = graph.edata['train_mask']
             >>> train_idx = th.nonzero(train_mask, as_tuple=False).squeeze()
-            >>> src, dst = graph.edges(train_idx)
+            >>> src, dst = graph.find_edges(train_idx)
             >>> rel = graph.edata['etype'][train_idx]
 
         - ``valid`` is deprecated, it is replaced by:
@@ -361,7 +361,7 @@ class FB15k237Dataset(KnowledgeGraphDataset):
             >>> graph = dataset[0]
             >>> val_mask = graph.edata['val_mask']
             >>> val_idx = th.nonzero(val_mask, as_tuple=False).squeeze()
-            >>> src, dst = graph.edges(val_idx)
+            >>> src, dst = graph.find_edges(val_idx)
             >>> rel = graph.edata['etype'][val_idx]
 
         - ``test`` is deprecated, it is replaced by:
@@ -370,7 +370,7 @@ class FB15k237Dataset(KnowledgeGraphDataset):
             >>> graph = dataset[0]
             >>> test_mask = graph.edata['test_mask']
             >>> test_idx = th.nonzero(test_mask, as_tuple=False).squeeze()
-            >>> src, dst = graph.edges(test_idx)
+            >>> src, dst = graph.find_edges(test_idx)
             >>> rel = graph.edata['etype'][test_idx]
 
     FB15k-237 is a subset of FB15k where inverse
