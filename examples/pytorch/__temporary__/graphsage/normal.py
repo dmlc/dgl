@@ -80,7 +80,7 @@ train_dataloader = dgl.dataloading.NodeDataLoader(
         drop_last=False, num_workers=0, use_uva=USE_UVA)
 valid_dataloader = dgl.dataloading.NodeDataLoader(
         graph, valid_idx, sampler, device=device, batch_size=1024, shuffle=True,
-        drop_last=False, num_workers=num_workers, use_uva=USE_UVA)
+        drop_last=False, num_workers=0, use_uva=USE_UVA)
 
 durations = []
 for _ in range(10):

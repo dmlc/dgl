@@ -509,6 +509,7 @@ class DataLoader(torch.utils.data.DataLoader):
         # to pinning prefetched features and disable pin memory for sampler's returns
         # no matter what, but I doubt if it's reasonable.
         self.graph = graph
+        self.indices = indices      # For PyTorch-Lightning
         num_workers = kwargs.get('num_workers', 0)
 
         try:
@@ -526,7 +527,7 @@ class DataLoader(torch.utils.data.DataLoader):
         self.device = _get_device(device)
 
         # Sanity check - we only check for DGLGraphs.
-        if isinstance(self.graph, DGLGraph):
+        if isinstance(self.graph, DGLHeteroGraph):
             # Check graph and indices device as well as num_workers
             if use_uva:
                 if self.graph.device.type != 'cpu':
@@ -583,7 +584,10 @@ class DataLoader(torch.utils.data.DataLoader):
             self.dataset = indices
 
         self.ddp_seed = ddp_seed
-        self._shuffle_dataset = shuffle
+        self.use_ddp = use_ddp
+        self.use_uva = use_uva
+        self.shuffle = shuffle
+        self.drop_last = drop_last
         self.graph_sampler = graph_sampler
         self.use_alternate_streams = use_alternate_streams
         self.pin_prefetcher = pin_prefetcher
@@ -604,7 +608,7 @@ class DataLoader(torch.utils.data.DataLoader):
             **kwargs)
 
     def __iter__(self):
-        if self._shuffle_dataset:
+        if self.shuffle:
             self.dataset.shuffle()
         # When using multiprocessing PyTorch sometimes set the number of PyTorch threads to 1
         # when spawning new Python threads.  This drastically slows down pinning features.
