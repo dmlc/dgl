@@ -132,6 +132,8 @@ class RelGraphConv2(nn.Module):
             self.h_bias = nn.Parameter(th.Tensor(out_feat))
             nn.init.zeros_(self.h_bias)
 
+        # TODO(minjie): we may want to remove those options in the future to make
+        #   the module only about graph convolution.
         # layer norm
         if self.layer_norm:
             self.layer_norm_weight = nn.LayerNorm(out_feat, elementwise_affine=True)
