@@ -233,7 +233,7 @@
   });
 
 #define CHECK_VALID_CONTEXT(VAR1, VAR2)                                                   \
-  CHECK(((VAR1)->ctx == (VAR2)->ctx) || ((VAR1)->ctx.device_type == kDLCPUPinned))        \
+  CHECK(((VAR1)->ctx == (VAR2)->ctx) || (VAR1).IsPinned())        \
     << "Expected " << (#VAR2) << "(" << (VAR2)->ctx << ")" << " to have the same device " \
     << "context as " << (#VAR1) << "(" << (VAR1)->ctx << "). "                            \
     << "Or " << (#VAR1) << "(" << (VAR1)->ctx << ")" << " is pinned";

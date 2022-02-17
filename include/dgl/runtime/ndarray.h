@@ -191,7 +191,7 @@ class NDArray {
   /*!
    * \brief Check if the array is pinned.
    */
-  inline bool IsPinned() const;
+  bool IsPinned() const;
   /*!
    * \brief Load NDArray from stream
    * \param stream The input data stream
@@ -481,11 +481,6 @@ inline void NDArray::PinMemory_() {
 inline void NDArray::UnpinMemory_() {
   CHECK(data_ != nullptr);
   UnpinData(&(data_->dl_tensor));
-}
-
-inline bool NDArray::IsPinned() const {
-  CHECK(data_ != nullptr);
-  return data_->dl_tensor.ctx.device_type == kDLCPUPinned;
 }
 
 inline int NDArray::use_count() const {

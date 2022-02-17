@@ -24,7 +24,7 @@ NDArray IndexSelectCPUFromGPU(NDArray array, IdArray index) {
   int64_t num_feat = 1;
   std::vector<int64_t> shape{len};
 
-  CHECK_EQ(array->ctx.device_type, kDLCPUPinned);
+  CHECK(array.IsPinned());
   CHECK_EQ(index->ctx.device_type, kDLGPU);
 
   for (int d = 1; d < array->ndim; ++d) {
