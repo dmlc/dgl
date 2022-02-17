@@ -116,8 +116,8 @@ def test_gathermm(idtype):
 
     _test(1)
     _test(4)
-    _test(16)
-    _test(32)
+    # _test(16)
+    # _test(32)
 
 if __name__ == '__main__':
     test_gathermm()

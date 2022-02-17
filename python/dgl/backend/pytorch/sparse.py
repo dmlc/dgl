@@ -697,11 +697,6 @@ class SEGMENTMM(th.autograd.Function):
     @staticmethod
     @custom_fwd(cast_inputs=th.float16)
     def forward(ctx, A, B, seglen_A):
-        if A.shape[0] != th.sum(seglen_A):
-            raise Exception("The summation of the elements of seglen_A must be equal to " +
-                "dimension 0 of A. Expected "+ str(A.shape[0]) + "got" + str(th.sum(seglen_A)))
-        if B.dim() != 3:
-            raise Exception("Expected dimension of B is 3. Got " + str(B.dim()))
         # Reshaping B form 3D to 2D
         B_3D_shape = B.shape
         B = B.reshape(B.shape[0] * B.shape[1], B.shape[2])
@@ -730,8 +725,6 @@ class GATHERMM(th.autograd.Function):
     @staticmethod
     @custom_fwd(cast_inputs=th.float16)
     def forward(ctx, A, B, idx_a, idx_b):
-        if B.dim() != 3:
-            raise Exception("Expected dimension of B is 3. Got " + str(B.dim()))
         # Reshaping B form 3D to 2D
         B_3D_shape = B.shape
         B = B.reshape(B.shape[0] * B.shape[1], B.shape[2])
@@ -834,6 +827,11 @@ def csrmask(gidxA, A_weights, gidxB):
     return CSRMask.apply(gidxA, A_weights, gidxB)
 
 def segment_mm(A, B, seglen_A):
+    if B.dim() != 3:
+        raise Exception("Expected dimension of B is 3. Got " + str(B.dim()))
+    if A.shape[0] != th.sum(seglen_A):
+        raise Exception("The summation of the elements of seglen_A must be equal to " +
+            "dimension 0 of A. Expected "+ str(A.shape[0]) + "got" + str(th.sum(seglen_A)))
     if str(A.device) == "cpu":
         Ci = []
         offset_A = 0
@@ -845,6 +843,11 @@ def segment_mm(A, B, seglen_A):
     return SEGMENTMM.apply(A, B, seglen_A)
 
 def gather_mm(A, B, idx_a = None, idx_b = None):
+    if B.dim() != 3:
+        raise Exception("Expected dimension of B is 3. Got " + str(B.dim()))
+    if idx_b is None and B.shape[0] < A.shape[0]:
+        raise Exception("Found " + str(B.dim()) + " matrices in B. Expected " + str(A.shape[0]) +
+            " matrices when idx_b is None.")
     if str(A.device) == "cpu":
         C = th.zeros((A.shape[0], B.shape[2]), device=A.device, dtype=A.dtype)
         for i in range(A.shape[0]):

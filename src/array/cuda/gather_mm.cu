@@ -124,7 +124,7 @@ __global__ void gatherMMKernel(
     if (row < num_rows) {
         unsigned int local_row = row & 3;  // hardcoded for TB size 128 (4 warps)
         Idx cur_rowA = (idx_a) ? idx_a[row] : row;
-        Idx cur_rowB = (idx_b) ? idx_b[row] : row / in_len;
+        Idx cur_rowB = (idx_b) ? idx_b[row] : row;
         Idx B_offset = cur_rowB * in_len * out_len;
         const int sh_a_tile = 64;
         __shared__ DType sh_A[4 * sh_a_tile];
