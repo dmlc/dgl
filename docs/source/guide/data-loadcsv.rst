@@ -1,36 +1,27 @@
 .. _guide-data-pipeline-loadcsv:
 
-4.6 Loading datasets from CSV files
+4.6 Loading data from CSV files
 ----------------------------------------------
 
-Problem & Motivation
-~~~~~~~~~~~~~~~~~~~~
+Comma Separated Value (CSV) is a widely used data storage format. DGL provides
+:class:`~dgl.data.CSVDataset` for loading and parsing graph data stored in
+CSV format.
 
-With the growing interests in graph deep learning, many ML researchers or data scientists
-wish to try GNN models on custom datasets. Although DGL has a recommended practice on how
-a dataset object should behave (see :ref:`guide-data-pipeline-dataset`) once loaded into
-RAM, the on-disk storage format is still largely arbitrary. This proposal is to define an
-on-disk graph storage format based on Comma Separated Value (CSV) as well as to add a new
-dataset class called :class:`~dgl.data.DGLCSVDataset` for loading and processing it to
-accord with the current data pipeline practice. We choose CSV format due to its wide
-acceptance, good readability and rich set of toolkits for loading, creating and manipulating
-it (e.g., ``pandas``).
-
-Use :class:`~dgl.data.DGLCSVDataset` in DGL
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-To create a DGLCSVDataset object:
+To create a ``CSVDataset`` object:
 
 .. code:: python
 
     import dgl
-    ds = dgl.data.DGLCSVDataset('/path/to/dataset')
+    ds = dgl.data.CSVDataset('/path/to/dataset')
 
-The returned ``ds`` object is as standard :class:`~dgl.data.DGLDataset`. For example, if the
-dataset is for single-graph node classification, you can use it as:
+The returned ``ds`` object is a standard :class:`~dgl.data.DGLDataset`. For
+example, one can get graph samples using ``__getitem__`` as well as node/edge
+features using ``ndata``/``edata``.
 
 .. code:: python
 
+    # A demonstration of how to use the loaded dataset. The feature names
+    # may vary depending on the CSV contents.
     g = ds[0] # get the graph
     label = g.ndata['label']
     feat = g.ndata['feat']
@@ -43,21 +34,18 @@ Data folder structure
     /path/to/dataset/
     |-- meta.yaml     # metadata of the dataset
     |-- edges_0.csv   # edge data including src_id, dst_id, feature, label and so on
-    |-- ...   # you can have as many CSVs for edge data as you want
+    |-- ...           # you can have as many CSVs for edge data as you want
     |-- nodes_0.csv   # node data including node_id, feature, label and so on
-    |-- ...   # you can have as many CSVs for node data as you want
+    |-- ...           # you can have as many CSVs for node data as you want
     |-- graphs.csv    # graph-level features
 
 Node/edge/graph-level data are stored in CSV files. ``meta.yaml`` is a metadata file specifying
-where to read nodes/edges/graphs data and how to parse them in order to construct the dataset
+where to read nodes/edges/graphs data and how to parse them to construct the dataset
 object. A minimal data folder contains one ``meta.yaml`` and two CSVs, one for node data and one
-for edge data, in which case the dataset only contains a single graph with no graph-level data.
-
-Examples
-~~~~~~~~
+for edge data, in which case the dataset contains only a single graph with no graph-level data.
 
 Dataset of a single feature-less graph
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 When the dataset contains only one graph with no node or edge features, there need only three
 files in the data folder: ``meta.yaml``, one CSV for node IDs and one CSV for edges:
@@ -111,25 +99,30 @@ After loaded, the dataset has one graph without any features:
 
 .. code:: python
 
-    import dgl
-    dataset = dgl.data.DGLCSVDataset('./mini_featureless_dataset')
-    g = dataset[0]  # only one graph
-    print(g)
-    #Graph(num_nodes=5, num_edges=10,
-    #    ndata_schemes={}
-    #    edata_schemes={})
+    >>> import dgl
+    >>> dataset = dgl.data.CSVDataset('./mini_featureless_dataset')
+    >>> g = dataset[0]  # only one graph
+    >>> print(g)
+    Graph(num_nodes=5, num_edges=10,
+          ndata_schemes={}
+          edata_schemes={})
+
+.. note::
+    Non-integer node IDs are allowed. When constructing the graph, ``CSVDataset`` will
+    map each raw ID to an integer ID starting from zero.
+
+.. note::
+    Edges are always directed. To have both directions, add reversed edges in the edge
+    CSV file or use :class:`~dgl.transform.AddReverse` to transform the loaded graph.
 
 
 A graph without any feature is often of less interest. In the next example, we will show
-how node or edge features are stored.
-
-.. note::
-    Graph generated here is always directed. If you need reverse edges, please specify manually.
+how to load and parse node or edge features.
 
 Dataset of a single graph with features and labels
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-When the dataset contains only one graph with node or edge features and labels, there still
+When the dataset contains a single graph with node or edge features and labels, there still
 need only three files in the data folder: ``meta.yaml``, one CSV for node IDs and one CSV
 for edges:
 
@@ -150,57 +143,58 @@ for edges:
     node_data:
     - file_name: nodes.csv
 
-``edges.csv``:
+``edges.csv`` with five synthetic edge data (``label``, ``train_mask``, ``val_mask``, ``test_mask``, ``feat``):
 
 .. code::
 
     src_id,dst_id,label,train_mask,val_mask,test_mask,feat
-    4,0,2,False,True,True,"[0.5477868606453535, 0.4470617033458436, 0.936706701616337]"
-    4,0,0,False,False,True,"[0.9794634290792008, 0.23682038840665198, 0.049629338970987646]"
-    0,3,1,True,True,True,"[0.8586722047523594, 0.5746912787380253, 0.6462162561249654]"
-    0,1,2,True,False,False,"[0.2730008213674695, 0.5937484188166621, 0.765544096939567]"
-    0,2,1,True,True,True,"[0.45441619816038514, 0.1681403185591509, 0.9952376085297715]"
-    0,0,0,False,False,False,"[0.4197669213305396, 0.849983324532477, 0.16974127573016262]"
-    2,2,1,False,True,True,"[0.5495035052928215, 0.21394654203489705, 0.7174910641836348]"
-    1,0,2,False,True,False,"[0.008790817766266334, 0.4216530595907526, 0.529195480661293]"
-    3,0,0,True,True,True,"[0.6598715708878852, 0.1932390907048961, 0.9774471538377553]"
-    4,0,1,False,False,False,"[0.16846068931179736, 0.41516080644186737, 0.002158116134429955]"
+    4,0,2,False,True,True,"0.5477868606453535, 0.4470617033458436, 0.936706701616337"
+    4,0,0,False,False,True,"0.9794634290792008, 0.23682038840665198, 0.049629338970987646"
+    0,3,1,True,True,True,"0.8586722047523594, 0.5746912787380253, 0.6462162561249654"
+    0,1,2,True,False,False,"0.2730008213674695, 0.5937484188166621, 0.765544096939567"
+    0,2,1,True,True,True,"0.45441619816038514, 0.1681403185591509, 0.9952376085297715"
+    0,0,0,False,False,False,"0.4197669213305396, 0.849983324532477, 0.16974127573016262"
+    2,2,1,False,True,True,"0.5495035052928215, 0.21394654203489705, 0.7174910641836348"
+    1,0,2,False,True,False,"0.008790817766266334, 0.4216530595907526, 0.529195480661293"
+    3,0,0,True,True,True,"0.6598715708878852, 0.1932390907048961, 0.9774471538377553"
+    4,0,1,False,False,False,"0.16846068931179736, 0.41516080644186737, 0.002158116134429955"
 
 
-``nodes.csv``:
+``nodes.csv`` with five synthetic node data (``label``, ``train_mask``, ``val_mask``, ``test_mask``, ``feat``):
 
 .. code::
 
     node_id,label,train_mask,val_mask,test_mask,feat
-    0,1,False,True,True,"[0.07816474278491703, 0.9137336384979067, 0.4654086994009452]"
-    1,1,True,True,True,"[0.05354099924658973, 0.8753101998792645, 0.33929432608774135]"
-    2,1,True,False,True,"[0.33234211884156384, 0.9370522452510665, 0.6694943496824788]"
-    3,0,False,True,False,"[0.9784264442230887, 0.22131880861864428, 0.3161154827254189]"
-    4,1,True,True,False,"[0.23142237259162102, 0.8715767748481147, 0.19117861103555467]"
+    0,1,False,True,True,"0.07816474278491703, 0.9137336384979067, 0.4654086994009452"
+    1,1,True,True,True,"0.05354099924658973, 0.8753101998792645, 0.33929432608774135"
+    2,1,True,False,True,"0.33234211884156384, 0.9370522452510665, 0.6694943496824788"
+    3,0,False,True,False,"0.9784264442230887, 0.22131880861864428, 0.3161154827254189"
+    4,1,True,True,False,"0.23142237259162102, 0.8715767748481147, 0.19117861103555467"
 
-After loaded, the dataset has one graph with features and labels:
+After loaded, the dataset has one graph. Node/edge features are stored in ```ndata`` and ``edata``
+with the same column names. The example demonstrates how to specify a vector-shaped feature --
+using comma-separated list enclosed by double quotes ``"..."``.
 
 .. code:: python
 
-    import dgl
-    dataset = dgl.data.DGLCSVDataset('./mini_feature_dataset')
-    g = dataset[0]  # only one graph
-    print(g)
-    #Graph(num_nodes=5, num_edges=10,
-    #    ndata_schemes={'label': Scheme(shape=(), dtype=torch.int64), 'train_mask': Scheme(shape=(), dtype=torch.bool), 'val_mask': Scheme(shape=(), dtype=torch.bool), 'test_mask': Scheme(shape=(), dtype=torch.bool), 'feat': Scheme(shape=(3,), dtype=torch.float64)}
-    #    edata_schemes={'label': Scheme(shape=(), dtype=torch.int64), 'train_mask': Scheme(shape=(), dtype=torch.bool), 'val_mask': Scheme(shape=(), dtype=torch.bool), 'test_mask': Scheme(shape=(), dtype=torch.bool), 'feat': Scheme(shape=(3,), dtype=torch.float64)})
+    >>> import dgl
+    >>> dataset = dgl.data.CSVDataset('./mini_feature_dataset')
+    >>> g = dataset[0]  # only one graph
+    >>> print(g)
+    Graph(num_nodes=5, num_edges=10,
+          ndata_schemes={'label': Scheme(shape=(), dtype=torch.int64), 'train_mask': Scheme(shape=(), dtype=torch.bool), 'val_mask': Scheme(shape=(), dtype=torch.bool), 'test_mask': Scheme(shape=(), dtype=torch.bool), 'feat': Scheme(shape=(3,), dtype=torch.float64)}
+          edata_schemes={'label': Scheme(shape=(), dtype=torch.int64), 'train_mask': Scheme(shape=(), dtype=torch.bool), 'val_mask': Scheme(shape=(), dtype=torch.bool), 'test_mask': Scheme(shape=(), dtype=torch.bool), 'feat': Scheme(shape=(3,), dtype=torch.float64)})
 
 .. note::
-    All columns will be read, parsed and set as edge/node attributes except ``node_id`` in ``nodes.csv``,
-    ``src_id`` and ``dst_id`` in ``edges.csv``. User is able to access directly like: ``g.ndata[‘label’]``.
-    The keys in ``g.ndata`` and ``g.edata`` are the same as original column names. Data format is
-    infered automatically during parse.
+    By default, ``CSVDatatset`` assumes all feature data to be numerical values (e.g., int, float, bool or
+    list) and missing values are not allowed. Users could provide custom data parser for these cases.
+    See `Custom Data Parser`_ for more details.
 
 Dataset of a single heterogeneous graph
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-When the dataset contains only one heterograph with 2 node/edge types respectively, there need
-only 5 files in the data folder: ``meta.yaml``, 2 CSV for nodes and 2 CSV for edges:
+One can specify multiple node and edge CSV files (each for one type) to represent a heterogeneous graph.
+Here is an example data with two node types and two edge types:
 
 .. code::
 
@@ -211,34 +205,28 @@ only 5 files in the data folder: ``meta.yaml``, 2 CSV for nodes and 2 CSV for ed
     |-- edges_0.csv
     |-- edges_1.csv
 
-``meta.yaml``
-For heterogeneous graph, ``etype`` and ``ntype`` are MUST HAVE and UNIQUE in ``edge_data`` and
-``node_data`` respectively, or only the last etype/ntype is kept when generating graph as all
-of them use the same default etype/ntype name. What's more, each node/edge csv file should
-contains single and unique ntype/etype. If there exist several ntype/etypes, multiple node/edge
-csv files are required.
+The ``meta.yaml`` specifies the node type name (using ``ntype``) and edge type name (using ``etype``)
+of each CSV file. The edge type name is a string triplet containing the source node type name, relation
+name and the destination node type name.
 
 .. code:: yaml
 
     dataset_name: mini_hetero_dataset
     edge_data:
     - file_name: edges_0.csv
-      etype:
-      - user
-      - follow
-      - user
+      etype: [user, follow, user]
     - file_name: edges_1.csv
-      etype:
-      - user
-      - like
-      - item
+      etype: [user, like, item]
     node_data:
     - file_name: nodes_0.csv
       ntype: user
     - file_name: nodes_1.csv
       ntype: item
 
-``edges_0.csv``, ``edges_1.csv`` (Both are the same, just for example only.)
+The node and edge CSV files follow the same format as in homogeneous graphs. Here are some synthetic
+data for demonstration purposes:
+
+``edges_0.csv`` and ``edges_1.csv``:
 
 .. code::
 
@@ -254,7 +242,7 @@ csv files are required.
     1,1,2,"0.698592283371875,0.038622249776255946,0.5563827995742111"
     0,4,1,"0.5227112950269823,0.3148264185956532,0.47562693094002173"
 
-``nodes_0.csv``, ``nodes_1.csv`` (Both are the same, just for example only.)
+``nodes_0.csv`` and ``nodes_1.csv``:
 
 .. code::
 
@@ -269,37 +257,36 @@ After loaded, the dataset has one heterograph with features and labels:
 
 .. code:: python
 
-    import dgl
-    dataset = dgl.data.DGLCSVDataset('./mini_hetero_dataset')
-    g = dataset[0]  # only one graph
-    print(g)
-    #Graph(num_nodes={'item': 5, 'user': 5},
-    #    num_edges={('user', 'follow', 'user'): 10, ('user', 'like', 'item'): 10},
-    #    metagraph=[('user', 'user', 'follow'), ('user', 'item', 'like')])
-    g.nodes['user'].data
-    #{'label': tensor([2, 1, 2, 1, 1]), 'feat': tensor([[0.5401, 0.7588, 0.4268],
-    #        [0.0868, 0.1145, 0.7197],
-    #        [0.8964, 0.2337, 0.8813],
-    #        [0.5455, 0.7819, 0.3028],
-    #        [0.5365, 0.8975, 0.7614]], dtype=torch.float64)}
-    g.edges['like'].data
-    #{'label': tensor([1, 2, 2, 0, 1, 2, 1, 0, 2, 1]), 'feat': tensor([[0.7368, 0.1052, 0.9419],
-    #        [0.5749, 0.2018, 0.4909],
-    #        [0.7697, 0.4940, 0.1086],
-    #        [0.1364, 0.1393, 0.7902],
-    #        [0.4299, 0.1839, 0.1843],
-    #        [0.8613, 0.6799, 0.6580],
-    #        [0.6595, 0.2650, 0.7891],
-    #        [0.3665, 0.9512, 0.8495],
-    #        [0.6986, 0.0386, 0.5564],
-    #        [0.5227, 0.3148, 0.4756]], dtype=torch.float64)}
+    >>> import dgl
+    >>> dataset = dgl.data.CSVDataset('./mini_hetero_dataset')
+    >>> g = dataset[0]  # only one graph
+    >>> print(g)
+    Graph(num_nodes={'item': 5, 'user': 5},
+          num_edges={('user', 'follow', 'user'): 10, ('user', 'like', 'item'): 10},
+          metagraph=[('user', 'user', 'follow'), ('user', 'item', 'like')])
+    >>> g.nodes['user'].data
+    {'label': tensor([2, 1, 2, 1, 1]), 'feat': tensor([[0.5401, 0.7588, 0.4268],
+            [0.0868, 0.1145, 0.7197],
+            [0.8964, 0.2337, 0.8813],
+            [0.5455, 0.7819, 0.3028],
+            [0.5365, 0.8975, 0.7614]], dtype=torch.float64)}
+    >>> g.edges['like'].data
+    {'label': tensor([1, 2, 2, 0, 1, 2, 1, 0, 2, 1]), 'feat': tensor([[0.7368, 0.1052, 0.9419],
+            [0.5749, 0.2018, 0.4909],
+            [0.7697, 0.4940, 0.1086],
+            [0.1364, 0.1393, 0.7902],
+            [0.4299, 0.1839, 0.1843],
+            [0.8613, 0.6799, 0.6580],
+            [0.6595, 0.2650, 0.7891],
+            [0.3665, 0.9512, 0.8495],
+            [0.6986, 0.0386, 0.5564],
+            [0.5227, 0.3148, 0.4756]], dtype=torch.float64)}
 
 Dataset of multiple graphs
-^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-When the dataset contains multiple graphs(for now, only homograph is supported) with node/edge/graph
-level features, there need only 4 files in the data folder: ``meta.yaml``, one CSV file for
-nodes/edge/graphs respectively:
+When there are multiple graphs, one can include an additional CSV file for storing graph-level features.
+Here is an example:
 
 .. code::
 
@@ -309,7 +296,8 @@ nodes/edge/graphs respectively:
     |-- edges.csv
     |-- graphs.csv
 
-``meta.yaml``:
+Accordingly, the ``meta.yaml`` should include an extra ``graph_data`` key to tell which CSV file to
+load graph-level features from.
 
 .. code:: yaml
 
@@ -319,11 +307,10 @@ nodes/edge/graphs respectively:
     node_data:
     - file_name: nodes.csv
     graph_data:
-    file_name: graphs.csv
+    - file_name: graphs.csv
 
-.. note::
-    ``graph_id`` should be specified in nodes/edges/graphs CSV files or default value ``0`` is
-    used instead which probably caused unexpected/undefined behavior.
+To distinguish nodes and edges of different graphs, the ``node.csv`` and ``edge.csv`` must contain
+an extra column ``graph_id``:
 
 ``edges.csv``:
 
@@ -367,7 +354,9 @@ nodes/edge/graphs respectively:
     1,3,"0.5614197853127827,0.059172654879085296,0.4692371689047904"
     1,4,"0.17583413999295983,0.5191278830882644,0.8453123358491914"
 
-``graphs.csv``:
+The ``graphs.csv`` contains a ``graph_id`` column and arbitrary number of feature columns.
+The example dataset here has two graphs, each with a ``feat`` and a ``label`` graph-level
+data.
 
 .. code::
 
@@ -375,159 +364,46 @@ nodes/edge/graphs respectively:
     0,"0.7426272601929126,0.5197462471155317,0.8149104951283953",0
     1,"0.534822233529295,0.2863627767733977,0.1154897249106891",0
 
-
 After loaded, the dataset has multiple homographs with features and labels:
 
 .. code:: python
 
-    import dgl
-    dataset = dgl.data.DGLCSVDataset('./mini_multi_dataset')
-    print(len(dataset))
-    #2
-    graph, label = dataset[0]
-    print(graph, label)
-    #Graph(num_nodes=5, num_edges=10,
-    #    ndata_schemes={'feat': Scheme(shape=(3,), dtype=torch.float64)}
-    #    edata_schemes={'feat': Scheme(shape=(3,), dtype=torch.float64)}) tensor(0)
-    print(dataset.data)
-    #{'feat': tensor([[0.7426, 0.5197, 0.8149],
-    #        [0.5348, 0.2864, 0.1155]], dtype=torch.float64), 'label': tensor([0, 0])}
+    >>> import dgl
+    >>> dataset = dgl.data.CSVDataset('./mini_multi_dataset')
+    >>> print(len(dataset))
+    2
+    >>> graph0, data0 = dataset[0]
+    >>> print(graph0)
+    Graph(num_nodes=5, num_edges=10,
+          ndata_schemes={'feat': Scheme(shape=(3,), dtype=torch.float64)}
+          edata_schemes={'feat': Scheme(shape=(3,), dtype=torch.float64)})
+    >>> print(data0)
+    {'feat': tensor([0.7426, 0.5197, 0.8149]), 'label': tensor([0])}
+    >>> graph1, data1 = dataset[1]
+    >>> print(graph1)
+    Graph(num_nodes=5, num_edges=10,
+          ndata_schemes={'feat': Scheme(shape=(3,), dtype=torch.float64)}
+          edata_schemes={'feat': Scheme(shape=(3,), dtype=torch.float64)})
+    >>> print(data1)
+    {'feat': tensor([0.5348, 0.2864, 0.1155]), 'label': tensor([0])}
 
-YAML Specification
+.. note::
+
+    When there are multiple graphs, ``CSVDataset`` currently requires them to be homogeneous.
+
+
+Custom Data Parser
 ~~~~~~~~~~~~~~~~~~
 
-Example
-^^^^^^^
+By default, ``CSVDataset`` assumes that all the stored node-/edge-/graph- level data are numerical
+values. Users can provide custom ``DataParser`` to ``CSVDataset`` to handle more complex
+data type. A ``DataParser`` needs to implement the ``__call__`` method which takes in the
+:class:`pandas.DataFrame` object created from CSV file and should return a dictionary of
+parsed feature data. The parsed feature data will be saved to the ``ndata`` and ``edata`` of
+the corresponding ``DGLGraph`` object, and thus must be tensors or numpy arrays. Below shows an example
+``DataParser`` which converts string type labels to integers:
 
-In the YAML file below, all supported keys are listed together including those that have default
-values though not all the keys are required for a specific use.
-
-.. code:: yaml
-
-    version: 1.0.0
-    dataset_name: full_yaml
-    separator: ','
-    edge_data:
-    - file_name: edges_0.csv
-      etype:
-      - user
-      - follow
-      - user
-      src_id_field: src_id
-      dst_id_field: dst_id
-    - file_name: edges_1.csv
-      etype:
-      - user
-      - like
-      - item
-      src_id_field: src_id
-      dst_id_field: dst_id
-    node_data:
-    - file_name: nodes_0.csv
-      ntype: user
-      node_id_field: node_id
-    - file_name: nodes_1.csv
-      ntype: item
-      node_id_field: node_id
-    graph_data:
-      file_name: graphs.csv
-      graph_id_field: graph_id
-
-Top-level keys
-^^^^^^^^^^^^^^
-
-At the top level, only 6 keys are available.
-
-``version``
-Optional. String. It specifies which version of ``meta.yaml`` is used. more feature may be added and
-version is changed accordingly.
-
-``dataset_name``
-Required. String. It specifies the dataset name.
-
-``separator``
-Optional. String. It specifies how to parse data in CSV files. Default value: ``,``.
-
-``edge_data``
-Required. List of dict. It includes several sub-keys to help parse edges from CSV files.
-
-``node_data``
-Required. List of dict. It includes several sub-keys to help parse nodes from CSV files.
-
-``graph_data``
-Required. Dict. It includes several sub-keys to help parse graph-level information from CSV files.
-
-Keys for ``edge_data``
-^^^^^^^^^^^^^^^^^^^^^^
-
-``file_name``
-Required. String. It specifies the file name which stores edge data.
-
-``etype``
-Optional. List of string. It specifies the canonical edge type.
-
-``src_id_field``
-Optional. String. It specifies which column to be read for src ids. Default value: ``src_id``.
-
-``dst_id_field``
-Optional. String. It specifies which column to be read for dst ids. Default value: ``dst_id``.
-
-Keys for ``node_data``
-^^^^^^^^^^^^^^^^^^^^^^
-
-``file_name``
-Required. String. It specifies the file name which stores node data.
-
-``ntype``
-Optional. List of string. It specifies the canonical node type.
-
-``node_id_field``
-Optional. String. It specifies which column to be read for node ids. Default value: ``node_id``.
-
-Keys for ``graph_data``
-^^^^^^^^^^^^^^^^^^^^^^
-
-``file_name``
-Required. String. It specifies the file name which stores graph data.
-
-``graph_id_field``
-Optional. String. It specifies which column to be read for graph ids. Default value: ``graph_id``.
-
-Parse node/edge/grpah data on your own
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-In default, all the data are attached to ``g.ndata`` with the same key as column name in ``nodes.csv``
-except ``node_id``. So does data in ``edges.csv``. Data is auto-formatted via ``pandas`` unless it's
-a string of float values(feature data is often of this format). For better experience, user is able
-to self-define node/edge/graph data parser which is callable and accept ``pandas.DataFrame`` as input
-data. Then pass such callable instance while instantiating ``DGLCSVDataset``. Below is an example.
-
-``SelfDefinedDataParser``:
-
-.. code:: python
-
-    import numpy as np
-    import ast
-    import pandas as pd
-
-    class SelfDefinedDataParser:
-        """Convert labels which are in string format into numeric values.
-        """
-        def __call__(self, df: pd.DataFrame):
-            data = {}
-            for header in df:
-                if 'Unnamed' in header:
-                    print("Unamed column is found. Ignored...")
-                    continue
-                dt = df[header].to_numpy().squeeze()
-                if header == 'label':
-                    dt = np.array([1 if e == 'positive' else 0 for e in dt])
-                data[header] = dt
-            return data
-
-Example:
-
-``customized_parser_dataset``:
+Given a dataset as follows,
 
 .. code::
 
@@ -573,40 +449,126 @@ Example:
     3,negative
     4,positive
 
-After loaded, the dataset has one graph with features and labels:
+To parse the string type labels, one can define a ``DataParser`` class as follows:
 
 .. code:: python
 
-    import dgl
-    dataset = dgl.data.DGLCSVDataset('./customized_parser_dataset',
-                                     node_data_parser={'_V': SelfDefinedDataParser()},
-                                     edge_data_parser={('_V','_E','_V'): SelfDefinedDataParser()})
-    print(dataset[0].ndata['label'])
-    #tensor([1, 0, 1, 0, 1])
-    print(dataset[0].edata['label'])
-    #tensor([1, 0, 1, 1, 0, 1, 0, 1, 0, 1])
+    import numpy as np
+    import pandas as pd
 
-FAQs:
-~~~~~
+    class MyDataParser:
+        def __call__(self, df: pd.DataFrame):
+            parsed = {}
+            for header in df:
+                if 'Unnamed' in header:  # Handle Unnamed column
+                    print("Unamed column is found. Ignored...")
+                    continue
+                dt = df[header].to_numpy().squeeze()
+                if header == 'label':
+                    dt = np.array([1 if e == 'positive' else 0 for e in dt])
+                parsed[header] = dt
+            return parsed
 
-What's the data type in CSV files?
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ Create a ``CSVDataset`` using the defined ``DataParser``:
 
-A default data parser is used for parsing node/edge/graph csv files in default which infer data type
-automatically. ID related data such as ``node_id``, ``src_id``, ``dst_id``, ``graph_id`` are required
-to be ``numeric`` as these fields are used for constructing graph. Any other data will be attached to
-``g.ndata`` or ``g.edata`` directly, so it's user's responsibility to make sure the data type is expected
-when using within graph. In particular, ``string`` data which is composed of ``float`` values is splitted
-and cast into float value array by default data parser.
+.. code:: python
 
-What if some lines in CSV have missing values in several fields?
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    >>> dataset = dgl.data.CSVDataset('./customized_parser_dataset',
+    ...                               ndata_parser=MyDataParser(),
+    ...                               edata_parser=MyDataParser())
+    >>> print(dataset[0].ndata['label'])
+    tensor([1, 0, 1, 0, 1])
+    >>> print(dataset[0].edata['label'])
+    tensor([1, 0, 1, 1, 0, 1, 0, 1, 0, 1])
 
-It’s undefined behavior. Please make sure the data is complete.
+.. note::
 
-What if ``graph_id`` is not specified in CSV?
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    To specify different ``DataParser`` s for different node/edge types, pass a dictionary to
+    ``ndata_parser`` and ``edata_parser``, where the key is type name (a single string for
+    node type; a string triplet for edge type) and the value is the ``DataParser`` to use.
 
-For a single graph, such field in ``edge_data`` and ``node_data`` is not used at all. So it’s ok
-to ignore it. For multiple graphs, ``graph_id`` should be provided, or all edge/node data will be
-regarded as ``graph_id = 0``. This usually is not what you expect.
+
+Full YAML Specification
+~~~~~~~~~~~~~~~~~~~~~~~
+
+``CSVDataset`` allows more flexible control over the loading and parsing process. For example, one
+can change the ID column names via ``meta.yaml``. The example below lists all the supported keys.
+
+.. code:: yaml
+
+    version: 1.0.0
+    dataset_name: some_complex_data
+    separator: ','                   # CSV separator symbol. Default: ','
+    edge_data:
+    - file_name: edges_0.csv
+      etype: [user, follow, user]
+      src_id_field: src_id           # Column name for source node IDs. Default: src_id
+      dst_id_field: dst_id           # Column name for destination node IDs. Default: dst_id
+    - file_name: edges_1.csv
+      etype: [user, like, item]
+      src_id_field: src_id
+      dst_id_field: dst_id
+    node_data:
+    - file_name: nodes_0.csv
+      ntype: user
+      node_id_field: node_id         # Column name for node IDs. Default: node_id
+    - file_name: nodes_1.csv
+      ntype: item
+      node_id_field: node_id         # Column name for node IDs. Default: node_id
+    graph_data:
+      file_name: graphs.csv
+      graph_id_field: graph_id       # Column name for graph IDs. Default: graph_id
+
+Top-level
+^^^^^^^^^^^^^^
+
+At the top level, only 6 keys are available:
+
+  - ``version``: Optional. String.
+    It specifies which version of ``meta.yaml`` is used. More feature may be added in the future.
+  - ``dataset_name``: Required. String.
+    It specifies the dataset name.
+  - ``separator``: Optional. String.
+    It specifies how to parse data in CSV files. Default: ``','``.
+  - ``edge_data``: Required. List of ``EdgeData``.
+    Meta data for parsing edge CSV files.
+  - ``node_data``: Required. List of ``NodeData``.
+    Meta data for parsing node CSV files.
+  - ``graph_data``: Optional. ``GraphData``.
+    Meta data for parsing the graph CSV file.
+
+``EdgeData``
+^^^^^^^^^^^^^^^^^^^^^^
+
+There are 4 keys:
+
+  - ``file_name``: Required. String.
+    The CSV file to load data from.
+  - ``etype``: Optional. List of string.
+    Edge type name in string triplet: [source node type, relation type, destination node type].
+  - ``src_id_field``: Optional. String.
+    Which column to read for source node IDs. Default: ``src_id``.
+  - ``dst_id_field``: Optional. String.
+    Which column to read for destination node IDs. Default: ``dst_id``.
+
+``NodeData``
+^^^^^^^^^^^^^^^^^^^^^^
+
+There are 3 keys:
+
+  - ``file_name``: Required. String.
+    The CSV file to load data from.
+  - ``ntype``: Optional. String.
+    Node type name.
+  - ``node_id_field``: Optional. String.
+    Which column to read for node IDs. Default: ``node_id``.
+
+``GraphData``
+^^^^^^^^^^^^^^^^^^^^^^
+
+There are 2 keys:
+
+  - ``file_name``: Required. String.
+    The CSV file to load data from.
+  - ``graph_id_field``: Optional. String.
+    Which column to read for graph IDs. Default: ``graph_id``.
