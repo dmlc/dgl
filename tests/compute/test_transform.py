@@ -1811,6 +1811,22 @@ def test_reorder_graph(idtype):
     rfg = dgl.reorder_graph(fg)
     assert 'csr' in sum(rfg.formats().values(), [])
 
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support a slicing operation")
+@parametrize_dtype
+def test_norm_by_dst(idtype):
+    # Case1: A homogeneous graph
+    g = dgl.graph(([0, 1, 1], [1, 1, 2]), idtype=idtype, device=F.ctx())
+    eweight = dgl.norm_by_dst(g)
+    assert F.allclose(eweight, F.tensor([0.5, 0.5, 1.0]))
+
+    # Case2: A heterogeneous graph
+    g = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 1], [1, 2]),
+        ('user', 'plays', 'game'): ([0, 1, 1], [1, 1, 2])
+    }, idtype=idtype, device=F.ctx())
+    eweight = dgl.norm_by_dst(g, etype=('user', 'plays', 'game'))
+    assert F.allclose(eweight, F.tensor([0.5, 0.5, 1.0]))
+
 @parametrize_dtype
 def test_module_add_self_loop(idtype):
     g = dgl.graph(([1, 1], [1, 2]), idtype=idtype, device=F.ctx())
