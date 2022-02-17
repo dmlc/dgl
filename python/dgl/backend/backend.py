@@ -1827,6 +1827,51 @@ def csrmask(A, A_weights, B):
     """
     pass
 
+def gather_mm(A, B, idx_a, idx_b):
+    r""" Dense Matrix Multiplication interface. It multiplies 2D dense tensor A
+    and 3D dense tensor B according to their relation types. A is unsorted and
+    the relation type is fetched from idx_b.
+
+    Parameters
+    ----------
+    A : tensor
+        2-D tensor of shape (N, D1)
+    B : tensor
+        3-D tensor of shape (R, D1, D2)
+    idx_a : Tensor, optional
+        If specified, must be a 1-D integer tensor of shape (K,).
+    idx_b : Tensor, optional
+        If specified, must be a 1-D integer tensor of shape (K,).
+
+    Returns
+    -------
+    Tensor
+        The output dense matrix of shape (N, D2)
+    """
+    pass
+
+def segment_mm(A, B, seglen_A):
+    r""" Dense Matrix Multiplication interface. It multiplies dense tensor A
+    and dense tensor B according to relation types. A is sorted and concatenated
+    according to relation types.
+
+    Parameters
+    ----------
+    A : tensor
+        2-D tensor of shape (N, D1)
+    B : tensor
+        3-D tensor of shape (R, D1, D2)
+    seglen_A : Tensor
+        An integer tensor of shape (R,). Each element is the length of segments
+        of input ``A``. The summation of all elements must be equal to N.
+
+    Returns
+    -------
+    Tensor
+        The output dense matrix of shape (N, D2)
+    """
+    pass
+
 
 ###############################################################################
 # Other interfaces
