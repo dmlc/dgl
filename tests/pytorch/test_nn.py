@@ -1246,43 +1246,35 @@ def test_hetero_conv(agg, idtype):
              {'user': uf, 'game': gf, 'store': sf[0:0]}))
     assert set(h.keys()) == {'user', 'game'}
 
-@parametrize_dtype
 @pytest.mark.parametrize('out_dim', [1, 2, 100])
-def test_hetero_linear(idtype, out_dim):
-    hg = dgl.heterograph({
-        ('A', 'r1', 'B'): ([0, 1], [1, 2]),
-        ('B', 'r2', 'B'): ([1], [2])
-        }, idtype=idtype, device=F.ctx())
-    hg.nodes['A'].data['h'] = F.randn((2, 3))
-    hg.nodes['B'].data['h'] = F.randn((3, 4))
+def test_hetero_linear(out_dim):
+    in_feats = {
+        'user': F.randn((2, 1)),
+        ('user', 'follows', 'user'): F.randn((3, 2))
+    }
 
-    conv = nn.HeteroLinear(hg, out_dim, 'h')
-    conv = conv.to(F.ctx())
-    feat = conv({nty: hg.nodes[nty].data['h'] for nty in hg.ntypes})
-    assert feat['A'].shape == (2, out_dim)
-    assert feat['B'].shape == (3, out_dim)
+    layer = nn.HeteroLinear({'user': 1, ('user', 'follows', 'user'): 2}, out_dim)
+    layer = layer.to(F.ctx())
+    out_feats = layer(in_feats)
+    assert out_feats['user'].shape == (2, out_dim)
+    assert out_feats[('user', 'follows', 'user')].shape == (3, out_dim)
 
 @parametrize_dtype
 @pytest.mark.parametrize('out_dim', [1, 2, 100])
-def test_hetero_embedding(idtype, out_dim):
-    hg = dgl.heterograph({
-        ('A', 'r1', 'B'): ([0, 1], [1, 2]),
-        ('B', 'r2', 'B'): ([1], [2])
-    }, idtype=idtype, device=F.ctx())
+def test_hetero_embedding(out_dim):
+    layer = nn.HeteroEmbedding({'user': 2, ('user', 'follows', 'user'): 3}, out_dim)
+    layer = layer.to(F.ctx())
 
-    conv = nn.HeteroEmbedding(hg, out_dim)
-    conv = conv.to(F.ctx())
+    embeds = layer.weight
+    assert embeds['user'].shape == (2, out_dim)
+    assert embeds[('user', 'follows', 'user')].shape == (3, out_dim)
 
-    embeds = conv.weight
-    assert embeds['A'].shape == (2, out_dim)
-    assert embeds['B'].shape == (3, out_dim)
-
-    embeds = conv({
-        'A': F.tensor([0], dtype=F.int64),
-        'B': F.tensor([0, 2], dtype=F.int64)
+    embeds = layer({
+        'user': F.tensor([0], dtype=F.int64),
+        ('user', 'follows', 'user'): F.tensor([0, 2], dtype=F.int64)
     })
-    assert embeds['A'].shape == (1, out_dim)
-    assert embeds['B'].shape == (2, out_dim)
+    assert embeds['user'].shape == (1, out_dim)
+    assert embeds[('user', 'follows', 'user')].shape == (2, out_dim)
 
 @parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))

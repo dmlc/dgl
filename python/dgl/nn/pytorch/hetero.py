@@ -267,18 +267,14 @@ class HeteroLinear(nn.Module):
     >>> import dgl
     >>> import torch
     >>> from dgl.nn import HeteroLinear
-    >>> g = dgl.heterograph({
-    ...     ('A', 'r1', 'B'): ([0, 1], [1, 2]),
-    ...     ('B', 'r2', 'B'): ([1], [2])
-    ... })
-    >>> g.nodes['A'].data['h'] = torch.randn(2, 3)
-    >>> g.nodes['B'].data['h'] = torch.randn(3, 4)
-    >>> layer = HeteroLinear(g, 5, 'h')
-    >>> out_feats = layer({nty: g.nodes[nty].data['h'] for nty in g.ntypes})
-    >>> print(out_feats['A'].shape)
-    torch.Size([2, 5])
-    >>> print(out_feats['B'].shape)
-    torch.Size([3, 5])
+
+    >>> layer = HeteroLinear({'user': 1, ('user', 'follows', 'user'): 2}, 3)
+    >>> in_feats = {'user': torch.randn(2, 1), ('user', 'follows', 'user'): torch.randn(3, 2)}
+    >>> out_feats = layer(in_feats)
+    >>> print(out_feats['user'].shape)
+    torch.Size([2, 3])
+    >>> print(out_feats[('user', 'follows', 'user')].shape)
+    torch.Size([3, 3])
     """
     def __init__(self, in_size, out_size):
         super(HeteroLinear, self).__init__()
@@ -324,25 +320,23 @@ class HeteroEmbedding(nn.Module):
     >>> import dgl
     >>> import torch
     >>> from dgl.nn import HeteroEmbedding
-    >>> g = dgl.heterograph({
-    ...     ('A', 'r1', 'B'): ([0, 1], [1, 2]),
-    ...     ('B', 'r2', 'B'): ([1], [2])
-    ... })
-    >>> layer = HeteroEmbedding(g, 5)
 
-    >>> # Get the embeddings of all nodes
+    >>> layer = HeteroEmbedding({'user': 2, ('user', 'follows', 'user'): 3}, 4)
+    >>> # Get the heterogeneous embedding table
     >>> embeds = layer.weight
-    >>> print(embeds['A'].shape)
-    torch.Size([2, 5])
-    >>> print(embeds['B'].shape)
-    torch.Size([3, 5])
+    >>> print(embeds['user'].shape)
+    torch.Size([2, 4])
+    >>> print(embeds[('user', 'follows', 'user')].shape)
+    torch.Size([3, 4])
 
-    >>> # Get the embeddings for a node subset
-    >>> embeds = layer({'A': torch.LongTensor([0]), 'B': torch.LongTensor([0, 2])})
-    >>> print(embeds['A'].shape)
-    torch.Size([1, 5])
-    >>> print(embeds['B'].shape)
-    torch.Size([2, 5])
+    >>> # Get the embeddings for a subset
+    >>> input_ids = {'user': torch.LongTensor([0]),
+    ...              ('user', 'follows', 'user'): torch.LongTensor([0, 2])}
+    >>> embeds = layer(input_ids)
+    >>> print(embeds['user'].shape)
+    torch.Size([1, 4])
+    >>> print(embeds[('user', 'follows', 'user')].shape)
+    torch.Size([2, 4])
     """
     def __init__(self, num_embeddings, embedding_dim):
         super(HeteroEmbedding, self).__init__()
@@ -362,7 +356,7 @@ class HeteroEmbedding(nn.Module):
         dict[key, Tensor]
             Heterogeneous embedding table
         """
-        return {self.raw_keys[ntype]: emb.weight for ntype, emb in self.embeds.items()}
+        return {self.raw_keys[typ]: emb.weight for typ, emb in self.embeds.items()}
 
     def forward(self, input_ids):
         """Forward function
