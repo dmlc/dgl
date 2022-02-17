@@ -18,6 +18,10 @@ Base Dataset Class
 .. autoclass:: DGLDataset
     :members: download, save, load, process, has_cache, __getitem__, __len__
 
+CSV Dataset Class
+-----------------
+
+.. autoclass:: CSVDataset
 
 Node Prediction Datasets
 ---------------------------------------
