@@ -493,7 +493,6 @@ def _get_device(device):
         device = torch.device('cuda', torch.cuda.current_device())
     return device
 
-
 class DataLoader(torch.utils.data.DataLoader):
     """DataLoader class."""
     def __init__(self, graph, indices, graph_sampler, device='cpu', use_ddp=False,
@@ -526,52 +525,54 @@ class DataLoader(torch.utils.data.DataLoader):
 
         self.device = _get_device(device)
 
-        # Check graph and indices device as well as num_workers
-        if use_uva:
-            if self.graph.device.type != 'cpu':
-                raise ValueError('Graph must be on CPU if UVM sampling is enabled.')
-            if num_workers > 0:
-                raise ValueError('num_workers must be 0 if UVM sampling is enabled.')
-
-            self.graph.create_formats_()
-            self.graph.pin_memory_()
-            indices = recursive_apply(indices, lambda x: x.to(self.device))
-        else:
-            if self.graph.device != indices_device:
-                raise ValueError(
-                    'Expect graph and indices to be on the same device. '
-                    'If you wish to use UVM sampling, please set use_uva=True.')
-            if self.graph.device.type == 'cuda':
+        # Sanity check - we only check for DGLGraphs.
+        if isinstance(self.graph, DGLGraph):
+            # Check graph and indices device as well as num_workers
+            if use_uva:
+                if self.graph.device.type != 'cpu':
+                    raise ValueError('Graph must be on CPU if UVM sampling is enabled.')
                 if num_workers > 0:
-                    raise ValueError('num_workers must be 0 if graph and indices are on CUDA.')
+                    raise ValueError('num_workers must be 0 if UVM sampling is enabled.')
 
-        # Check pin_prefetcher and use_prefetch_thread - should be only effective
-        # if performing CPU sampling but output device is CUDA
-        if not (self.device.type == 'cuda' and self.graph.device.type == 'cpu'):
-            if pin_prefetcher is True:
-                raise ValueError(
-                    'pin_prefetcher=True is only effective when device=cuda and '
-                    'sampling is performed on CPU.')
-            if pin_prefetcher is None:
-                pin_prefetcher = False
+                self.graph.create_formats_()
+                self.graph.pin_memory_()
+                indices = recursive_apply(indices, lambda x: x.to(self.device))
+            else:
+                if self.graph.device != indices_device:
+                    raise ValueError(
+                        'Expect graph and indices to be on the same device. '
+                        'If you wish to use UVM sampling, please set use_uva=True.')
+                if self.graph.device.type == 'cuda':
+                    if num_workers > 0:
+                        raise ValueError('num_workers must be 0 if graph and indices are on CUDA.')
 
-            if use_prefetch_thread is True:
-                raise ValueError(
-                    'use_prefetch_thread=True is only effective when device=cuda and '
-                    'sampling is performed on CPU.')
-            if pin_prefetcher is None:
-                pin_prefetcher = False
-        else:
-            if pin_prefetcher is None:
-                pin_prefetcher = True
-            if use_prefetch_thread is None:
-                use_prefetch_thread = True
+            # Check pin_prefetcher and use_prefetch_thread - should be only effective
+            # if performing CPU sampling but output device is CUDA
+            if not (self.device.type == 'cuda' and self.graph.device.type == 'cpu'):
+                if pin_prefetcher is True:
+                    raise ValueError(
+                        'pin_prefetcher=True is only effective when device=cuda and '
+                        'sampling is performed on CPU.')
+                if pin_prefetcher is None:
+                    pin_prefetcher = False
 
-        # Check use_alternate_streams
-        if use_alternate_streams is None:
-            use_alternate_streams = (
-                self.device.type == 'cuda' and self.graph.device.type == 'cpu' and
-                not use_uva)
+                if use_prefetch_thread is True:
+                    raise ValueError(
+                        'use_prefetch_thread=True is only effective when device=cuda and '
+                        'sampling is performed on CPU.')
+                if pin_prefetcher is None:
+                    pin_prefetcher = False
+            else:
+                if pin_prefetcher is None:
+                    pin_prefetcher = True
+                if use_prefetch_thread is None:
+                    use_prefetch_thread = True
+
+            # Check use_alternate_streams
+            if use_alternate_streams is None:
+                use_alternate_streams = (
+                    self.device.type == 'cuda' and self.graph.device.type == 'cpu' and
+                    not use_uva)
 
         if (torch.is_tensor(indices) or (
                 isinstance(indices, Mapping) and
