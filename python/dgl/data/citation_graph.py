@@ -43,10 +43,14 @@ class CitationGraphDataset(DGLBuiltinDataset):
         Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
-    verbose: bool
+    verbose : bool
         Whether to print out progress information. Default: True.
-    reverse_edge: bool
+    reverse_edge : bool
         Whether to add reverse edges in graph. Default: True.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
     """
     _urls = {
         'cora_v2' : 'dataset/cora_v2.zip',
@@ -54,7 +58,8 @@ class CitationGraphDataset(DGLBuiltinDataset):
         'pubmed' : 'dataset/pubmed.zip',
     }
 
-    def __init__(self, name, raw_dir=None, force_reload=False, verbose=True, reverse_edge=True):
+    def __init__(self, name, raw_dir=None, force_reload=False,
+                 verbose=True, reverse_edge=True, transform=None):
         assert name.lower() in ['cora', 'citeseer', 'pubmed']
 
         # Previously we use the pre-processing in pygcn (https://github.com/tkipf/pygcn)
@@ -69,7 +74,8 @@ class CitationGraphDataset(DGLBuiltinDataset):
                                                    url=url,
                                                    raw_dir=raw_dir,
                                                    force_reload=force_reload,
-                                                   verbose=verbose)
+                                                   verbose=verbose,
+                                                   transform=transform)
 
     def process(self):
         """Loads input data from data directory and reorder graph for better locality
@@ -213,7 +219,10 @@ class CitationGraphDataset(DGLBuiltinDataset):
 
     def __getitem__(self, idx):
         assert idx == 0, "This dataset has only one graph"
-        return self._g
+        if self._transform is None:
+            return self._g
+        else:
+            return self._transform(self._g)
 
     def __len__(self):
         return 1
@@ -267,7 +276,7 @@ class CitationGraphDataset(DGLBuiltinDataset):
     @property
     def reverse_edge(self):
         return self._reverse_edge
-    
+
 
 def _preprocess_features(features):
     """Row-normalize feature matrix and convert to tuple representation"""
@@ -356,10 +365,14 @@ class CoraGraphDataset(CitationGraphDataset):
         Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
-    verbose: bool
+    verbose : bool
         Whether to print out progress information. Default: True.
-    reverse_edge: bool
+    reverse_edge : bool
         Whether to add reverse edges in graph. Default: True.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Attributes
     ----------
@@ -400,10 +413,12 @@ class CoraGraphDataset(CitationGraphDataset):
     >>> label = g.ndata['label']
 
     """
-    def __init__(self, raw_dir=None, force_reload=False, verbose=True, reverse_edge=True):
+    def __init__(self, raw_dir=None, force_reload=False, verbose=True,
+                 reverse_edge=True, transform=None):
         name = 'cora'
 
-        super(CoraGraphDataset, self).__init__(name, raw_dir, force_reload, verbose, reverse_edge)
+        super(CoraGraphDataset, self).__init__(name, raw_dir, force_reload,
+                                               verbose, reverse_edge, transform)
 
     def __getitem__(self, idx):
         r"""Gets the graph object
@@ -496,10 +511,14 @@ class CiteseerGraphDataset(CitationGraphDataset):
         Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
-    verbose: bool
+    verbose : bool
         Whether to print out progress information. Default: True.
-    reverse_edge: bool
+    reverse_edge : bool
         Whether to add reverse edges in graph. Default: True.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Attributes
     ----------
@@ -543,10 +562,12 @@ class CiteseerGraphDataset(CitationGraphDataset):
     >>> label = g.ndata['label']
 
     """
-    def __init__(self, raw_dir=None, force_reload=False, verbose=True, reverse_edge=True):
+    def __init__(self, raw_dir=None, force_reload=False,
+                 verbose=True, reverse_edge=True, transform=None):
         name = 'citeseer'
 
-        super(CiteseerGraphDataset, self).__init__(name, raw_dir, force_reload, verbose, reverse_edge)
+        super(CiteseerGraphDataset, self).__init__(name, raw_dir, force_reload,
+                                                   verbose, reverse_edge, transform)
 
     def __getitem__(self, idx):
         r"""Gets the graph object
@@ -639,10 +660,14 @@ class PubmedGraphDataset(CitationGraphDataset):
         Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
-    verbose: bool
+    verbose : bool
         Whether to print out progress information. Default: True.
-    reverse_edge: bool
+    reverse_edge : bool
         Whether to add reverse edges in graph. Default: True.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Attributes
     ----------
@@ -683,10 +708,12 @@ class PubmedGraphDataset(CitationGraphDataset):
     >>> label = g.ndata['label']
 
     """
-    def __init__(self, raw_dir=None, force_reload=False, verbose=True, reverse_edge=True):
+    def __init__(self, raw_dir=None, force_reload=False, verbose=True,
+                 reverse_edge=True, transform=None):
         name = 'pubmed'
 
-        super(PubmedGraphDataset, self).__init__(name, raw_dir, force_reload, verbose, reverse_edge)
+        super(PubmedGraphDataset, self).__init__(name, raw_dir, force_reload,
+                                                 verbose, reverse_edge, transform)
 
     def __getitem__(self, idx):
         r"""Gets the graph object
@@ -714,7 +741,7 @@ class PubmedGraphDataset(CitationGraphDataset):
         r"""The number of graphs in the dataset."""
         return super(PubmedGraphDataset, self).__len__()
 
-def load_cora(raw_dir=None, force_reload=False, verbose=True, reverse_edge=True):
+def load_cora(raw_dir=None, force_reload=False, verbose=True, reverse_edge=True, transform=None):
     """Get CoraGraphDataset
 
     Parameters
@@ -724,19 +751,24 @@ def load_cora(raw_dir=None, force_reload=False, verbose=True, reverse_edge=True)
         Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
-    verbose: bool
-    Whether to print out progress information. Default: True.
-    reverse_edge: bool
+    verbose : bool
+        Whether to print out progress information. Default: True.
+    reverse_edge : bool
         Whether to add reverse edges in graph. Default: True.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Return
     -------
     CoraGraphDataset
     """
-    data = CoraGraphDataset(raw_dir, force_reload, verbose, reverse_edge)
+    data = CoraGraphDataset(raw_dir, force_reload, verbose, reverse_edge, transform)
     return data
 
-def load_citeseer(raw_dir=None, force_reload=False, verbose=True, reverse_edge=True):
+def load_citeseer(raw_dir=None, force_reload=False, verbose=True,
+                  reverse_edge=True, transform=None):
     """Get CiteseerGraphDataset
 
     Parameters
@@ -746,38 +778,47 @@ def load_citeseer(raw_dir=None, force_reload=False, verbose=True, reverse_edge=T
         Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
-    verbose: bool
-    Whether to print out progress information. Default: True.
-    reverse_edge: bool
+    verbose : bool
+        Whether to print out progress information. Default: True.
+    reverse_edge : bool
         Whether to add reverse edges in graph. Default: True.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Return
     -------
     CiteseerGraphDataset
     """
-    data = CiteseerGraphDataset(raw_dir, force_reload, verbose, reverse_edge)
+    data = CiteseerGraphDataset(raw_dir, force_reload, verbose, reverse_edge, transform)
     return data
 
-def load_pubmed(raw_dir=None, force_reload=False, verbose=True, reverse_edge=True):
+def load_pubmed(raw_dir=None, force_reload=False, verbose=True,
+                reverse_edge=True, transform=None):
     """Get PubmedGraphDataset
 
     Parameters
     -----------
-        raw_dir : str
-            Raw file directory to download/contains the input data directory.
-            Default: ~/.dgl/
-        force_reload : bool
-            Whether to reload the dataset. Default: False
-        verbose: bool
+    raw_dir : str
+        Raw file directory to download/contains the input data directory.
+        Default: ~/.dgl/
+    force_reload : bool
+        Whether to reload the dataset. Default: False
+    verbose : bool
         Whether to print out progress information. Default: True.
-    reverse_edge: bool
+    reverse_edge : bool
         Whether to add reverse edges in graph. Default: True.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Return
     -------
     PubmedGraphDataset
     """
-    data = PubmedGraphDataset(raw_dir, force_reload, verbose, reverse_edge)
+    data = PubmedGraphDataset(raw_dir, force_reload, verbose, reverse_edge, transform)
     return data
 
 class CoraBinary(DGLBuiltinDataset):
@@ -798,15 +839,20 @@ class CoraBinary(DGLBuiltinDataset):
         Whether to reload the dataset. Default: False
     verbose: bool
         Whether to print out progress information. Default: True.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
     """
-    def __init__(self, raw_dir=None, force_reload=False, verbose=True):
+    def __init__(self, raw_dir=None, force_reload=False, verbose=True, transform=None):
         name = 'cora_binary'
         url = _get_dgl_url('dataset/cora_binary.zip')
         super(CoraBinary, self).__init__(name,
                                          url=url,
                                          raw_dir=raw_dir,
                                          force_reload=force_reload,
-                                         verbose=verbose)
+                                         verbose=verbose,
+                                         transform=transform)
 
     def process(self):
         root = self.raw_path
@@ -894,7 +940,11 @@ class CoraBinary(DGLBuiltinDataset):
         (dgl.DGLGraph, scipy.sparse.coo_matrix, int)
             The graph, scipy sparse coo_matrix and its label.
         """
-        return (self.graphs[i], self.pmpds[i], self.labels[i])
+        if self._transform is None:
+            g = self.graphs[i]
+        else:
+            g = self._transform(self.graphs[i])
+        return (g, self.pmpds[i], self.labels[i])
 
     @property
     def save_name(self):

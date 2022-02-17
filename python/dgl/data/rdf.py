@@ -94,15 +94,20 @@ class RDFGraphDataset(DGLBuiltinDataset):
         Default: ~/.dgl/
     force_reload : bool, optional
         If true, force load and process from raw data. Ignore cached pre-processed data.
-    verbose: bool
+    verbose : bool
         Whether to print out progress information. Default: True.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
     """
     def __init__(self, name, url, predict_category,
                  print_every=10000,
                  insert_reverse=True,
                  raw_dir=None,
                  force_reload=False,
-                 verbose=True):
+                 verbose=True,
+                 transform=None):
         self._insert_reverse = insert_reverse
         self._print_every = print_every
         self._predict_category = predict_category
@@ -110,7 +115,8 @@ class RDFGraphDataset(DGLBuiltinDataset):
         super(RDFGraphDataset, self).__init__(name, url,
                                               raw_dir=raw_dir,
                                               force_reload=force_reload,
-                                              verbose=verbose)
+                                              verbose=verbose,
+                                              transform=transform)
 
     def process(self):
         raw_tuples = self.load_raw_tuples(self.raw_path)
@@ -409,6 +415,8 @@ class RDFGraphDataset(DGLBuiltinDataset):
         r"""Gets the graph object
         """
         g = self._hg
+        if self._transform is not None:
+            g = self._transform(g)
         return g
 
     def __len__(self):
@@ -523,17 +531,21 @@ class AIFBDataset(RDFGraphDataset):
 
     Parameters
     -----------
-    print_every: int
+    print_every : int
         Preprocessing log for every X tuples. Default: 10000.
-    insert_reverse: bool
+    insert_reverse : bool
         If true, add reverse edge and reverse relations to the final graph. Default: True.
     raw_dir : str
         Raw file directory to download/contains the input data directory.
         Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
-    verbose: bool
-      Whether to print out progress information. Default: True.
+    verbose : bool
+        Whether to print out progress information. Default: True.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Attributes
     ----------
@@ -562,7 +574,8 @@ class AIFBDataset(RDFGraphDataset):
                  insert_reverse=True,
                  raw_dir=None,
                  force_reload=False,
-                 verbose=True):
+                 verbose=True,
+                 transform=None):
         import rdflib as rdf
         self.employs = rdf.term.URIRef("http://swrc.ontoware.org/ontology#employs")
         self.affiliation = rdf.term.URIRef("http://swrc.ontoware.org/ontology#affiliation")
@@ -574,7 +587,8 @@ class AIFBDataset(RDFGraphDataset):
                                           insert_reverse=insert_reverse,
                                           raw_dir=raw_dir,
                                           force_reload=force_reload,
-                                          verbose=verbose)
+                                          verbose=verbose,
+                                          transform=transform)
 
     def __getitem__(self, idx):
         r"""Gets the graph object
@@ -653,17 +667,21 @@ class MUTAGDataset(RDFGraphDataset):
 
     Parameters
     -----------
-    print_every: int
+    print_every : int
         Preprocessing log for every X tuples. Default: 10000.
-    insert_reverse: bool
+    insert_reverse : bool
         If true, add reverse edge and reverse relations to the final graph. Default: True.
     raw_dir : str
         Raw file directory to download/contains the input data directory.
         Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
-    verbose: bool
-      Whether to print out progress information. Default: True.
+    verbose : bool
+        Whether to print out progress information. Default: True.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Attributes
     ----------
@@ -697,7 +715,8 @@ class MUTAGDataset(RDFGraphDataset):
                  insert_reverse=True,
                  raw_dir=None,
                  force_reload=False,
-                 verbose=True):
+                 verbose=True,
+                 transform=None):
         import rdflib as rdf
         self.is_mutagenic = rdf.term.URIRef("http://dl-learner.org/carcinogenesis#isMutagenic")
         self.rdf_type = rdf.term.URIRef("http://www.w3.org/1999/02/22-rdf-syntax-ns#type")
@@ -712,7 +731,8 @@ class MUTAGDataset(RDFGraphDataset):
                                            insert_reverse=insert_reverse,
                                            raw_dir=raw_dir,
                                            force_reload=force_reload,
-                                           verbose=verbose)
+                                           verbose=verbose,
+                                           transform=transform)
 
     def __getitem__(self, idx):
         r"""Gets the graph object
@@ -814,17 +834,21 @@ class BGSDataset(RDFGraphDataset):
 
     Parameters
     -----------
-    print_every: int
+    print_every : int
         Preprocessing log for every X tuples. Default: 10000.
-    insert_reverse: bool
+    insert_reverse : bool
         If true, add reverse edge and reverse relations to the final graph. Default: True.
     raw_dir : str
         Raw file directory to download/contains the input data directory.
         Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
-    verbose: bool
-      Whether to print out progress information. Default: True.
+    verbose : bool
+        Whether to print out progress information. Default: True.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Attributes
     ----------
@@ -854,7 +878,8 @@ class BGSDataset(RDFGraphDataset):
                  insert_reverse=True,
                  raw_dir=None,
                  force_reload=False,
-                 verbose=True):
+                 verbose=True,
+                 transform=None):
         import rdflib as rdf
         url = _get_dgl_url('dataset/rdf/bgs-hetero.zip')
         name = 'bgs-hetero'
@@ -865,7 +890,8 @@ class BGSDataset(RDFGraphDataset):
                                          insert_reverse=insert_reverse,
                                          raw_dir=raw_dir,
                                          force_reload=force_reload,
-                                         verbose=verbose)
+                                         verbose=verbose,
+                                         transform=transform)
 
     def __getitem__(self, idx):
         r"""Gets the graph object
@@ -964,17 +990,21 @@ class AMDataset(RDFGraphDataset):
 
     Parameters
     -----------
-    print_every: int
+    print_every : int
         Preprocessing log for every X tuples. Default: 10000.
-    insert_reverse: bool
+    insert_reverse : bool
         If true, add reverse edge and reverse relations to the final graph. Default: True.
     raw_dir : str
         Raw file directory to download/contains the input data directory.
         Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
-    verbose: bool
-      Whether to print out progress information. Default: True.
+    verbose : bool
+        Whether to print out progress information. Default: True.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Attributes
     ----------
@@ -1003,7 +1033,8 @@ class AMDataset(RDFGraphDataset):
                  insert_reverse=True,
                  raw_dir=None,
                  force_reload=False,
-                 verbose=True):
+                 verbose=True,
+                 transform=None):
         import rdflib as rdf
         self.objectCategory = rdf.term.URIRef("http://purl.org/collections/nl/am/objectCategory")
         self.material = rdf.term.URIRef("http://purl.org/collections/nl/am/material")
@@ -1015,7 +1046,8 @@ class AMDataset(RDFGraphDataset):
                                         insert_reverse=insert_reverse,
                                         raw_dir=raw_dir,
                                         force_reload=force_reload,
-                                        verbose=verbose)
+                                        verbose=verbose,
+                                        transform=transform)
 
     def __getitem__(self, idx):
         r"""Gets the graph object

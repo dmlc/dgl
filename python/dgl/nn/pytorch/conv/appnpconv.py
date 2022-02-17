@@ -86,7 +86,7 @@ class APPNPConv(nn.Module):
         edge_weight: torch.Tensor, optional
             edge_weight to use in the message passing process. This is equivalent to
             using weighted adjacency matrix in the equation above, and
-            :math:\tilde{D}^{-1/2}\tilde{A} \tilde{D}^{-1/2}
+            :math:`\tilde{D}^{-1/2}\tilde{A} \tilde{D}^{-1/2}`
             is based on :class:`dgl.nn.pytorch.conv.graphconv.EdgeWeightNorm`.
 
         Returns
@@ -114,10 +114,9 @@ class APPNPConv(nn.Module):
                 if edge_weight is None:
                     feat = feat * src_norm
                 graph.ndata['h'] = feat
-                if edge_weight is None:
-                    edge_weight = th.ones(graph.number_of_edges(), 1)
-                graph.edata['w'] = self.edge_drop(
-                    edge_weight).to(feat.device)
+                w = th.ones(graph.number_of_edges(),
+                            1) if edge_weight is None else edge_weight
+                graph.edata['w'] = self.edge_drop(w).to(feat.device)
                 graph.update_all(fn.u_mul_e('h', 'w', 'm'),
                                  fn.sum('m', 'h'))
                 feat = graph.ndata.pop('h')
