@@ -1259,7 +1259,6 @@ def test_hetero_linear(out_dim):
     assert out_feats['user'].shape == (2, out_dim)
     assert out_feats[('user', 'follows', 'user')].shape == (3, out_dim)
 
-@parametrize_dtype
 @pytest.mark.parametrize('out_dim', [1, 2, 100])
 def test_hetero_embedding(out_dim):
     layer = nn.HeteroEmbedding({'user': 2, ('user', 'follows', 'user'): 3}, out_dim)
