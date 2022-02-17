@@ -150,7 +150,7 @@ class SGConv(nn.Module):
         edge_weight: torch.Tensor, optional
             edge_weight to use in the message passing process. This is equivalent to
             using weighted adjacency matrix in the equation above, and
-            :math:\tilde{D}^{-1/2}\tilde{A} \tilde{D}^{-1/2}
+            :math:`\tilde{D}^{-1/2}\tilde{A} \tilde{D}^{-1/2}`
             is based on :class:`dgl.nn.pytorch.conv.graphconv.EdgeWeightNorm`.
 
         Returns
