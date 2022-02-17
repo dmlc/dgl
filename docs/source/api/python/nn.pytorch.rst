@@ -305,9 +305,9 @@ HeteroGraphConv
    :members:
    :show-inheritance:
 
-HeteroLinearLayer
+HeteroLinear
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-.. autoclass:: dgl.nn.pytorch.HeteroLinearLayer
+.. autoclass:: dgl.nn.pytorch.HeteroLinear
    :members:
    :show-inheritance:
 
