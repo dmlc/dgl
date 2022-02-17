@@ -220,7 +220,7 @@ def test_extract_archive():
 
 def _test_construct_graphs_homo():
     from dgl.data.csv_dataset_base import NodeData, EdgeData, DGLGraphConstructor
-    # node_ids could be non-sorted, duplicated, not labeled from 0 to num_nodes-1
+    # node_id/src_id/dst_id could be non-sorted, duplicated, non-numeric.
     num_nodes = 100
     num_edges = 1000
     num_dims = 3
@@ -228,8 +228,12 @@ def _test_construct_graphs_homo():
     node_ids = np.random.choice(
         np.arange(num_nodes*2), size=num_nodes, replace=False)
     assert len(node_ids) == num_nodes
+    # to be non-sorted
     np.random.shuffle(node_ids)
+    # to be duplicated
     node_ids = np.hstack((node_ids, node_ids[:num_dup_nodes]))
+    # to be non-numeric
+    node_ids = ['id_{}'.format(id) for id in node_ids]
     t_ndata = {'feat': np.random.rand(num_nodes+num_dup_nodes, num_dims),
                'label': np.random.randint(2, size=num_nodes+num_dup_nodes)}
     _, u_indices = np.unique(node_ids, return_index=True)
@@ -260,7 +264,7 @@ def _test_construct_graphs_homo():
 
 def _test_construct_graphs_hetero():
     from dgl.data.csv_dataset_base import NodeData, EdgeData, DGLGraphConstructor
-    # node_ids could be non-sorted, duplicated, not labeled from 0 to num_nodes-1
+    # node_id/src_id/dst_id could be non-sorted, duplicated, non-numeric.
     num_nodes = 100
     num_edges = 1000
     num_dims = 3
@@ -273,8 +277,12 @@ def _test_construct_graphs_hetero():
         node_ids = np.random.choice(
             np.arange(num_nodes*2), size=num_nodes, replace=False)
         assert len(node_ids) == num_nodes
+        # to be non-sorted
         np.random.shuffle(node_ids)
+        # to be duplicated
         node_ids = np.hstack((node_ids, node_ids[:num_dup_nodes]))
+        # to be non-numeric
+        node_ids = ['id_{}'.format(id) for id in node_ids]
         t_ndata = {'feat': np.random.rand(num_nodes+num_dup_nodes, num_dims),
                    'label': np.random.randint(2, size=num_nodes+num_dup_nodes)}
         _, u_indices = np.unique(node_ids, return_index=True)
@@ -341,13 +349,16 @@ def _test_construct_graphs_multiple():
         egraph_ids = np.append(egraph_ids, np.full(num_edges, i))
     ndata = {'feat': np.random.rand(num_nodes*num_graphs, num_dims),
              'label': np.random.randint(2, size=num_nodes*num_graphs)}
+    ngraph_ids = ['graph_{}'.format(id) for id in ngraph_ids]
     node_data = NodeData(node_ids, ndata, graph_id=ngraph_ids)
+    egraph_ids = ['graph_{}'.format(id) for id in egraph_ids]
     edata = {'feat': np.random.rand(
         num_edges*num_graphs, num_dims), 'label': np.random.randint(2, size=num_edges*num_graphs)}
     edge_data = EdgeData(src_ids, dst_ids, edata, graph_id=egraph_ids)
     gdata = {'feat': np.random.rand(num_graphs, num_dims),
              'label': np.random.randint(2, size=num_graphs)}
-    graph_data = GraphData(np.arange(num_graphs), gdata)
+    graph_ids = ['graph_{}'.format(id) for id in np.arange(num_graphs)]
+    graph_data = GraphData(graph_ids, gdata)
     graphs, data_dict = DGLGraphConstructor.construct_graphs(
         node_data, edge_data, graph_data)
     assert len(graphs) == num_graphs
@@ -728,7 +739,7 @@ def _test_load_graph_data_from_csv():
         assert expect_except
 
 
-def _test_DGLCSVDataset_single():
+def _test_CSVDataset_single():
     with tempfile.TemporaryDirectory() as test_dir:
         # generate YAML/CSVs
         meta_yaml_path = os.path.join(test_dir, "meta.yaml")
@@ -779,7 +790,7 @@ def _test_DGLCSVDataset_single():
                 # remove original node data file to verify reload from cached files
                 os.remove(nodes_csv_path_0)
                 assert not os.path.exists(nodes_csv_path_0)
-            csv_dataset = data.DGLCSVDataset(
+            csv_dataset = data.CSVDataset(
                 test_dir, force_reload=force_reload)
             assert len(csv_dataset) == 1
             g = csv_dataset[0]
@@ -799,7 +810,7 @@ def _test_DGLCSVDataset_single():
                                       F.asnumpy(g.edges[etype].data['label']))
 
 
-def _test_DGLCSVDataset_multiple():
+def _test_CSVDataset_multiple():
     with tempfile.TemporaryDirectory() as test_dir:
         # generate YAML/CSVs
         meta_yaml_path = os.path.join(test_dir, "meta.yaml")
@@ -856,13 +867,13 @@ def _test_DGLCSVDataset_multiple():
                            })
         df.to_csv(graph_csv_path, index=False)
 
-        # load CSVDataset with default node/edge/graph_data_parser
+        # load CSVDataset with default node/edge/gdata_parser
         for force_reload in [True, False]:
             if not force_reload:
                 # remove original node data file to verify reload from cached files
                 os.remove(nodes_csv_path_0)
                 assert not os.path.exists(nodes_csv_path_0)
-            csv_dataset = data.DGLCSVDataset(
+            csv_dataset = data.CSVDataset(
                 test_dir, force_reload=force_reload)
             assert len(csv_dataset) == num_graphs
             assert csv_dataset.has_cache()
@@ -871,9 +882,10 @@ def _test_DGLCSVDataset_multiple():
             assert 'label' in csv_dataset.data
             assert F.array_equal(F.tensor(feat_gdata),
                                  csv_dataset.data['feat'])
-            for i, (g, label) in enumerate(csv_dataset):
+            for i, (g, g_data) in enumerate(csv_dataset):
                 assert not g.is_homogeneous
-                assert F.asnumpy(label) == label_gdata[i]
+                assert F.asnumpy(g_data['label']) == label_gdata[i]
+                assert F.array_equal(g_data['feat'], F.tensor(feat_gdata[i]))
                 for ntype in g.ntypes:
                     assert g.num_nodes(ntype) == num_nodes
                     assert F.array_equal(F.tensor(feat_ndata[i*num_nodes:(i+1)*num_nodes]),
@@ -888,7 +900,7 @@ def _test_DGLCSVDataset_multiple():
                                           F.asnumpy(g.edges[etype].data['label']))
 
 
-def _test_DGLCSVDataset_customized_data_parser():
+def _test_CSVDataset_customized_data_parser():
     with tempfile.TemporaryDirectory() as test_dir:
         # generate YAML/CSVs
         meta_yaml_path = os.path.join(test_dir, "meta.yaml")
@@ -947,25 +959,48 @@ def _test_DGLCSVDataset_customized_data_parser():
                         dt += 2
                     data[header] = dt
                 return data
-        # load CSVDataset with customized node/edge/graph_data_parser
-        csv_dataset = data.DGLCSVDataset(
-            test_dir, node_data_parser={'user': CustDataParser()}, edge_data_parser={('user', 'like', 'item'): CustDataParser()}, graph_data_parser=CustDataParser())
+        # load CSVDataset with customized node/edge/gdata_parser
+        # specify via dict[ntype/etype, callable]
+        csv_dataset = data.CSVDataset(
+            test_dir, force_reload=True, ndata_parser={'user': CustDataParser()},
+            edata_parser={('user', 'like', 'item'): CustDataParser()},
+            gdata_parser=CustDataParser())
         assert len(csv_dataset) == num_graphs
         assert len(csv_dataset.data) == 1
         assert 'label' in csv_dataset.data
-        for i, (g, label) in enumerate(csv_dataset):
+        for i, (g, g_data) in enumerate(csv_dataset):
             assert not g.is_homogeneous
-            assert F.asnumpy(label) == label_gdata[i] + 2
+            assert F.asnumpy(g_data['label']) == label_gdata[i] + 2
             for ntype in g.ntypes:
                 assert g.num_nodes(ntype) == num_nodes
                 offset = 2 if ntype == 'user' else 0
                 assert np.array_equal(label_ndata[i*num_nodes:(i+1)*num_nodes]+offset,
-                                      F.asnumpy(g.nodes[ntype].data['label']))
+                                    F.asnumpy(g.nodes[ntype].data['label']))
             for etype in g.etypes:
                 assert g.num_edges(etype) == num_edges
                 offset = 2 if etype == 'like' else 0
                 assert np.array_equal(label_edata[i*num_edges:(i+1)*num_edges]+offset,
-                                      F.asnumpy(g.edges[etype].data['label']))
+                                    F.asnumpy(g.edges[etype].data['label']))
+        # specify via callable
+        csv_dataset = data.CSVDataset(
+            test_dir, force_reload=True, ndata_parser=CustDataParser(),
+            edata_parser=CustDataParser(), gdata_parser=CustDataParser())
+        assert len(csv_dataset) == num_graphs
+        assert len(csv_dataset.data) == 1
+        assert 'label' in csv_dataset.data
+        for i, (g, g_data) in enumerate(csv_dataset):
+            assert not g.is_homogeneous
+            assert F.asnumpy(g_data['label']) == label_gdata[i] + 2
+            for ntype in g.ntypes:
+                assert g.num_nodes(ntype) == num_nodes
+                offset = 2
+                assert np.array_equal(label_ndata[i*num_nodes:(i+1)*num_nodes]+offset,
+                                    F.asnumpy(g.nodes[ntype].data['label']))
+            for etype in g.etypes:
+                assert g.num_edges(etype) == num_edges
+                offset = 2
+                assert np.array_equal(label_edata[i*num_edges:(i+1)*num_edges]+offset,
+                                    F.asnumpy(g.edges[etype].data['label']))
 
 
 def _test_NodeEdgeGraphData():
@@ -974,8 +1009,7 @@ def _test_NodeEdgeGraphData():
     num_nodes = 100
     node_ids = np.arange(num_nodes, dtype=np.float)
     ndata = NodeData(node_ids, {})
-    assert ndata.id.dtype == np.int64
-    assert np.array_equal(ndata.id, node_ids.astype(np.int64))
+    assert np.array_equal(ndata.id, node_ids)
     assert len(ndata.data) == 0
     assert ndata.type == '_V'
     assert np.array_equal(ndata.graph_id, np.full(num_nodes, 0))
@@ -1017,8 +1051,6 @@ def _test_NodeEdgeGraphData():
     graph_ids = np.arange(num_edges)
     edata = EdgeData(src_ids, dst_ids, data,
                             type=etype, graph_id=graph_ids)
-    assert edata.src.dtype == np.int64
-    assert edata.dst.dtype == np.int64
     assert np.array_equal(edata.src, src_ids)
     assert np.array_equal(edata.dst, dst_ids)
     assert edata.type == etype
@@ -1046,7 +1078,6 @@ def _test_NodeEdgeGraphData():
     graph_ids = np.arange(num_graphs).astype(np.float)
     data = {'feat': np.random.rand(num_graphs, 3)}
     gdata = GraphData(graph_ids, data)
-    assert gdata.graph_id.dtype == np.int64
     assert np.array_equal(gdata.graph_id, graph_ids)
     assert len(gdata.data) == len(data)
     for k, v in data.items():
@@ -1065,9 +1096,9 @@ def test_csvdataset():
     _test_load_node_data_from_csv()
     _test_load_edge_data_from_csv()
     _test_load_graph_data_from_csv()
-    _test_DGLCSVDataset_single()
-    _test_DGLCSVDataset_multiple()
-    _test_DGLCSVDataset_customized_data_parser()
+    _test_CSVDataset_single()
+    _test_CSVDataset_multiple()
+    _test_CSVDataset_customized_data_parser()
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
 def test_add_nodepred_split():
@@ -1181,7 +1212,7 @@ def test_as_nodepred_csvdataset():
                            })
         df.to_csv(edges_csv_path, index=False)
 
-        ds = data.DGLCSVDataset(test_dir, force_reload=True)
+        ds = data.CSVDataset(test_dir, force_reload=True)
         assert 'feat' in ds[0].ndata
         assert 'label' in ds[0].ndata
         assert 'train_mask' not in ds[0].ndata
