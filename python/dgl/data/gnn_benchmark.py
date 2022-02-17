@@ -27,13 +27,14 @@ class GNNBenchmarkDataset(DGLBuiltinDataset):
 
     Reference: https://github.com/shchur/gnn-benchmark#datasets
     """
-    def __init__(self, name, raw_dir=None, force_reload=False, verbose=False):
+    def __init__(self, name, raw_dir=None, force_reload=False, verbose=False, transform=None):
         _url = _get_dgl_url('dataset/' + name + '.zip')
         super(GNNBenchmarkDataset, self).__init__(name=name,
                                                   url=_url,
                                                   raw_dir=raw_dir,
                                                   force_reload=force_reload,
-                                                  verbose=verbose)
+                                                  verbose=verbose,
+                                                  transform=transform)
 
     def process(self):
         npz_path = os.path.join(self.raw_path, self.name + '.npz')
@@ -128,7 +129,10 @@ class GNNBenchmarkDataset(DGLBuiltinDataset):
             - ``ndata['label']``: node labels
         """
         assert idx == 0, "This dataset has only one graph"
-        return self._graph
+        if self._transform is None:
+            return self._graph
+        else:
+            return self._transform(self._graph)
 
     def __len__(self):
         r"""Number of graphs in the dataset"""
@@ -164,8 +168,12 @@ class CoraFullDataset(GNNBenchmarkDataset):
         Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
-    verbose: bool
+    verbose : bool
         Whether to print out progress information. Default: True.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Attributes
     ----------
@@ -182,11 +190,12 @@ class CoraFullDataset(GNNBenchmarkDataset):
     >>> feat = g.ndata['feat']  # get node feature
     >>> label = g.ndata['label']  # get node labels
     """
-    def __init__(self, raw_dir=None, force_reload=False, verbose=False):
+    def __init__(self, raw_dir=None, force_reload=False, verbose=False, transform=None):
         super(CoraFullDataset, self).__init__(name="cora_full",
                                               raw_dir=raw_dir,
                                               force_reload=force_reload,
-                                              verbose=verbose)
+                                              verbose=verbose,
+                                              transform=transform)
 
     @property
     def num_classes(self):
@@ -231,8 +240,12 @@ class CoauthorCSDataset(GNNBenchmarkDataset):
         Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
-    verbose: bool
+    verbose : bool
         Whether to print out progress information. Default: True.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Attributes
     ----------
@@ -249,11 +262,12 @@ class CoauthorCSDataset(GNNBenchmarkDataset):
     >>> feat = g.ndata['feat']  # get node feature
     >>> label = g.ndata['label']  # get node labels
     """
-    def __init__(self, raw_dir=None, force_reload=False, verbose=False):
+    def __init__(self, raw_dir=None, force_reload=False, verbose=False, transform=None):
         super(CoauthorCSDataset, self).__init__(name='coauthor_cs',
                                                 raw_dir=raw_dir,
                                                 force_reload=force_reload,
-                                                verbose=verbose)
+                                                verbose=verbose,
+                                                transform=transform)
 
     @property
     def num_classes(self):
@@ -298,8 +312,12 @@ class CoauthorPhysicsDataset(GNNBenchmarkDataset):
         Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
-    verbose: bool
+    verbose : bool
         Whether to print out progress information. Default: True.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Attributes
     ----------
@@ -316,11 +334,12 @@ class CoauthorPhysicsDataset(GNNBenchmarkDataset):
     >>> feat = g.ndata['feat']  # get node feature
     >>> label = g.ndata['label']  # get node labels
     """
-    def __init__(self, raw_dir=None, force_reload=False, verbose=False):
+    def __init__(self, raw_dir=None, force_reload=False, verbose=False, transform=None):
         super(CoauthorPhysicsDataset, self).__init__(name='coauthor_physics',
                                                      raw_dir=raw_dir,
                                                      force_reload=force_reload,
-                                                     verbose=verbose)
+                                                     verbose=verbose,
+                                                     transform=transform)
 
     @property
     def num_classes(self):
@@ -364,8 +383,12 @@ class AmazonCoBuyComputerDataset(GNNBenchmarkDataset):
         Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
-    verbose: bool
+    verbose : bool
         Whether to print out progress information. Default: True.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Attributes
     ----------
@@ -382,11 +405,12 @@ class AmazonCoBuyComputerDataset(GNNBenchmarkDataset):
     >>> feat = g.ndata['feat']  # get node feature
     >>> label = g.ndata['label']  # get node labels
     """
-    def __init__(self, raw_dir=None, force_reload=False, verbose=False):
+    def __init__(self, raw_dir=None, force_reload=False, verbose=False, transform=None):
         super(AmazonCoBuyComputerDataset, self).__init__(name='amazon_co_buy_computer',
                                                          raw_dir=raw_dir,
                                                          force_reload=force_reload,
-                                                         verbose=verbose)
+                                                         verbose=verbose,
+                                                         transform=transform)
 
     @property
     def num_classes(self):
@@ -430,8 +454,12 @@ class AmazonCoBuyPhotoDataset(GNNBenchmarkDataset):
         Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
-    verbose: bool
+    verbose : bool
         Whether to print out progress information. Default: True.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Attributes
     ----------
@@ -448,11 +476,12 @@ class AmazonCoBuyPhotoDataset(GNNBenchmarkDataset):
     >>> feat = g.ndata['feat']  # get node feature
     >>> label = g.ndata['label']  # get node labels
     """
-    def __init__(self, raw_dir=None, force_reload=False, verbose=False):
+    def __init__(self, raw_dir=None, force_reload=False, verbose=False, transform=None):
         super(AmazonCoBuyPhotoDataset, self).__init__(name='amazon_co_buy_photo',
                                                       raw_dir=raw_dir,
                                                       force_reload=force_reload,
-                                                      verbose=verbose)
+                                                      verbose=verbose,
+                                                      transform=transform)
 
     @property
     def num_classes(self):

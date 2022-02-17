@@ -265,7 +265,8 @@ Pytorch's `DistributedDataParallel`.
 Distributed mini-batch sampler
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-We can use the same `NodeDataLoader` to create a distributed mini-batch sampler for
+We can use the same :class:`~dgl.dataloading.pytorch.DistNodeDataLoader`, the distributed counterpart
+of :class:`~dgl.dataloading.pytorch.NodeDataLoader`, to create a distributed mini-batch sampler for
 node classification.
 
 
@@ -274,10 +275,10 @@ node classification.
 .. code-block:: python
 
     sampler = dgl.dataloading.MultiLayerNeighborSampler([25,10])
-    train_dataloader = dgl.dataloading.NodeDataLoader(
+    train_dataloader = dgl.dataloading.DistNodeDataLoader(
                                  g, train_nid, sampler, batch_size=1024,
                                  shuffle=True, drop_last=False)
-    valid_dataloader = dgl.dataloading.NodeDataLoader(
+    valid_dataloader = dgl.dataloading.DistNodeDataLoader(
                                  g, valid_nid, sampler, batch_size=1024,
                                  shuffle=False, drop_last=False)
 

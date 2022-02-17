@@ -264,14 +264,14 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {
   const int nb = (nnz + nt - 1) / nt;
 
   // Copy indices.
-  IdArray ret_indices = NDArray::Empty({nnz}, csr.indptr->dtype, csr.indptr->ctx);
+  IdArray ret_indices = NDArray::Empty({nnz}, csr.indptr->dtype, rows->ctx);
   CUDA_KERNEL_CALL(_SegmentCopyKernel,
       nb, nt, 0, thr_entry->stream,
       csr.indptr.Ptr<IdType>(), csr.indices.Ptr<IdType>(),
       rows.Ptr<IdType>(), nnz, len,
       ret_indptr.Ptr<IdType>(), ret_indices.Ptr<IdType>());
   // Copy data.
-  IdArray ret_data = NDArray::Empty({nnz}, csr.indptr->dtype, csr.indptr->ctx);
+  IdArray ret_data = NDArray::Empty({nnz}, csr.indptr->dtype, rows->ctx);
   CUDA_KERNEL_CALL(_SegmentCopyKernel,
       nb, nt, 0, thr_entry->stream,
       csr.indptr.Ptr<IdType>(), CSRHasData(csr)? csr.data.Ptr<IdType>() : nullptr,
