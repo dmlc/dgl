@@ -223,7 +223,7 @@ graph, label = dataset[0]
 print(graph, label)
 
 ######################################################################
-# Creating Dataset from CSV via :class:`~dgl.data.DGLCSVDataset`
+# Creating Dataset from CSV via :class:`~dgl.data.CSVDataset`
 # ------------------------------------------------------------
 #
 # The previous examples describe how to create a dataset from CSV files
