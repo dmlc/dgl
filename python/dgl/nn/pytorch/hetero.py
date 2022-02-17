@@ -4,7 +4,7 @@ import torch as th
 import torch.nn as nn
 from ...base import DGLError
 
-__all__ = ['HeteroGraphConv', 'HeteroLinearLayer', 'HeteroEmbedding']
+__all__ = ['HeteroGraphConv', 'HeteroLinear', 'HeteroEmbedding']
 
 class HeteroGraphConv(nn.Module):
     r"""A generic module for computing convolution on heterogeneous graphs.
@@ -251,76 +251,72 @@ def get_aggregate_fn(agg):
     else:
         return partial(_agg_func, fn=fn)
 
-class HeteroLinearLayer(nn.Module):
-    """Apply a linear transformation on the node features of a
-    heterogeneous graph.
+class HeteroLinear(nn.Module):
+    """Apply linear transformations on heterogeneous inputs.
 
     Parameters
     ----------
-    hg : DGLGraph
-        A heterogeneous graph.
+    in_size : dict[key, int]
+        Input feature size for heterogeneous inputs. A key can be a string or a tuple of strings.
     out_size : int
         Output feature size.
-    feat_name : str
-        Name of the node feature to transform.
 
     Examples
     --------
 
     >>> import dgl
     >>> import torch
-    >>> from dgl.nn import HeteroLinearLayer
+    >>> from dgl.nn import HeteroLinear
     >>> g = dgl.heterograph({
     ...     ('A', 'r1', 'B'): ([0, 1], [1, 2]),
     ...     ('B', 'r2', 'B'): ([1], [2])
     ... })
     >>> g.nodes['A'].data['h'] = torch.randn(2, 3)
     >>> g.nodes['B'].data['h'] = torch.randn(3, 4)
-    >>> layer = HeteroLinearLayer(g, 5, 'h')
+    >>> layer = HeteroLinear(g, 5, 'h')
     >>> out_feats = layer({nty: g.nodes[nty].data['h'] for nty in g.ntypes})
     >>> print(out_feats['A'].shape)
     torch.Size([2, 5])
     >>> print(out_feats['B'].shape)
     torch.Size([3, 5])
     """
-    def __init__(self, hg, out_size, feat_name):
-        super(HeteroLinearLayer, self).__init__()
+    def __init__(self, in_size, out_size):
+        super(HeteroLinear, self).__init__()
 
-        self.feat_name = feat_name
         self.linears = nn.ModuleDict()
-        for ntype in hg.ntypes:
-            linear = nn.Linear(hg.nodes[ntype].data[feat_name].shape[1], out_size)
-            self.linears[ntype] = linear
+        for typ, typ_in_size in in_size.items():
+            self.linears[str(typ)] = nn.Linear(typ_in_size, out_size)
 
     def forward(self, feat):
         """Forward function
 
         Parameters
         ----------
-        feat : dict[str, Tensor]
-            Input node features. It maps node types to node features.
+        feat : dict[key, Tensor]
+            Heterogeneous input features. It maps keys to features.
 
         Returns
         -------
-        dict[str, Tensor]
-            Transformed node features.
+        dict[key, Tensor]
+            Transformed features.
         """
         out_feat = dict()
-        for ntype, nfeat in feat.items():
-            out_feat[ntype] = self.linears[ntype](nfeat)
+        for typ, typ_feat in feat.items():
+            out_feat[typ] = self.linears[str(typ)](typ_feat)
 
         return out_feat
 
 class HeteroEmbedding(nn.Module):
-    """Create node embeddings for each node type and return a homogeneous
-    graph representation.
+    """Create a heterogeneous embedding table.
+
+    It internally contains multiple ``torch.nn.Embedding`` with different dictionary sizes.
 
     Parameters
     ----------
-    hg : DGLGraph
-        A heterogeneous graph.
-    embed_size : int
-        Node embedding size.
+    num_embeddings : dict[key, int]
+        Size of the dictionaries. A key can be a string or a tuple of strings.
+    embedding_dim : int
+        Size of each embedding vector.
 
     Examples
     --------
@@ -348,39 +344,41 @@ class HeteroEmbedding(nn.Module):
     >>> print(embeds['B'].shape)
     torch.Size([2, 5])
     """
-    def __init__(self, hg, embed_size):
+    def __init__(self, num_embeddings, embedding_dim):
         super(HeteroEmbedding, self).__init__()
 
         self.embeds = nn.ModuleDict()
-        for ntype in hg.ntypes:
-            self.embeds[ntype] = nn.Embedding(hg.num_nodes(ntype), embed_size)
+        self.raw_keys = dict()
+        for typ, typ_num_rows in num_embeddings.items():
+            self.embeds[str(typ)] = nn.Embedding(typ_num_rows, embedding_dim)
+            self.raw_keys[str(typ)] = typ
 
     @property
     def weight(self):
-        """Get the embeddings of all nodes
+        """Get the heterogeneous embedding table
 
         Returns
         -------
-        dict[str, Tensor]
-            Node embeddings.
+        dict[key, Tensor]
+            Heterogeneous embedding table
         """
-        return {ntype: emb.weight for ntype, emb in self.embeds.items()}
+        return {self.raw_keys[ntype]: emb.weight for ntype, emb in self.embeds.items()}
 
-    def forward(self, input_nodes):
+    def forward(self, input_ids):
         """Forward function
 
         Parameters
         ----------
-        input_nodes : dict[str, Tensor]
-            The node IDs to retrieve embeddings. It maps node types to type-specific node IDs.
+        input_ids : dict[key, Tensor]
+            The row IDs to retrieve embeddings. It maps a key to key-specific IDs.
 
         Returns
         -------
-        dict[str, Tensor]
-            The retrieved node embeddings.
+        dict[key, Tensor]
+            The retrieved embeddings.
         """
         embeds = dict()
-        for ntype, nids in input_nodes.items():
-            embeds[ntype] = self.embeds[ntype](nids)
+        for typ, typ_ids in input_ids.items():
+            embeds[typ] = self.embeds[str(typ)](typ_ids)
 
         return embeds
