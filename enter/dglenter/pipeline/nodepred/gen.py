@@ -116,6 +116,7 @@ class NodepredPipeline(PipelineBase):
 
         if user_cfg_dict["data"].get("split_ratio", None) is not None:
             render_cfg["data_initialize_code"] = "{}, split_ratio={}".format(render_cfg["data_initialize_code"], user_cfg_dict["data"]["split_ratio"])
+        if "split_ratio" in generated_user_cfg["data"]:
             generated_user_cfg["data"].pop("split_ratio")
 
         render_cfg["user_cfg_str"] = f"cfg = {str(generated_user_cfg)}"

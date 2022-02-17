@@ -2,11 +2,22 @@
 
 (What is DGL-Enter? Why design this? What is it for?)
 
-DGL-Enter is a commanline tool for user to quickly bootstrap models with 
-
+DGL-Enter is a commanline tool for user to quickly bootstrap models with multiple datasets. And provide full capability for user to customize the pipeline into their own takks.
 
 ## Installation guide
-You can install DGL-enter easily by `pip install dglenter`. Then you should be able to use DGL-Enter in you commandline tool by `dgl-enter`
+You can install DGL-enter easily by `pip install dglenter`. Then you should be able to use DGL-Enter in you commandline tool by type in `dgl-enter`
+```
+Usage: dgl-enter [OPTIONS] COMMAND [ARGS]...
+
+Options:
+  --help  Show this message and exit.
+
+Commands:
+  config  Generate the config files
+  export  Export the python file from config
+  train   Train the model
+```
+
 
 ## Train GraphSAGE on Cora from scratch
 Here we'll use one of the most classic model GraphSAGE and Cora citation graph dataset as an example, to show how easy to train a model with DGL-Enter.
@@ -170,18 +181,20 @@ You can modify the generated script in anyway you want. However, we also provide
 
 Step 1: Prepare your csv and metadata file.
 
-Following the tutorial at [Loading data from CSV files](https://docs.dgl.ai/en/latest/guide/data-loadcsv.html#guide-data-pipeline-loadcsv`), Prepare your own CSV dataset includes three files minimally, node data csv, edge data csv and the meta data file.
+Following the tutorial at [Loading data from CSV files](https://docs.dgl.ai/en/latest/guide/data-loadcsv.html#guide-data-pipeline-loadcsv`), Prepare your own CSV dataset includes three files minimally, node data csv, edge data csv and the meta data file (meta.yml).
 
 ```yml
-dataset_name: mini_featureless_dataset
+dataset_name: my_csv_dataset
 edge_data:
 - file_name: edges.csv
 node_data:
 - file_name: nodes.csv
 ```
 
-Step 2: Choose csv dataset in the `dgl-enter config` stage
+Step 2: Choose to csv dataset in the `dgl-enter config` stage
 Try `dgl-enter config nodepred --data csv --model sage --cfg csv_sage.yml`, to use SAGE model for your dataset. You'll see the data part is now the configuration related to CSV dataset. `data_path` is used to specify the data folder, and `./` means the current folder. 
+
+If your dataset doesn't have the builtin split on the nodes for train/val/test, you need to manually set the split ratio in the config yml file, DGL will random generate the split for you.
 
 ```yml
 data:
@@ -192,7 +205,7 @@ data:
 
 
 Step 3: `train` the model/`export` the script
-Then you can do the same as the tutorial above, either train the model by `dgl-eneter train --cfg csv_sage.yaml` or `dgl-enter export --cfg csv_sage.yml --output my_dataset.py`
+Then you can do the same as the tutorial above, either train the model by `dgl-eneter train --cfg csv_sage.yaml` or use `dgl-enter export --cfg csv_sage.yml --output my_dataset.py` to get the training script.
 
 ## API Referencce
 
