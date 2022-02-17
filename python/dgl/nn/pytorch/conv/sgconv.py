@@ -75,7 +75,7 @@ class SGConv(nn.Module):
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
     >>> g = dgl.add_self_loop(g)
     >>> feat = th.ones(6, 10)
-    >>> conv = SGConv(10, 2, k=2, cached=True)
+    >>> conv = SGConv(10, 2, k=2)
     >>> res = conv(g, feat)
     >>> res
     tensor([[-1.9441, -0.9343],
