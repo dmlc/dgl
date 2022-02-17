@@ -113,6 +113,11 @@ class NodepredPipeline(PipelineBase):
         generated_train_cfg = copy.deepcopy(user_cfg_dict["general_pipeline"])
         generated_train_cfg["optimizer"].pop("name")
 
+
+        if user_cfg_dict["data"].get("split_ratio", None) is not None:
+            render_cfg["data_initialize_code"] = "{}, split_ratio={}".format(render_cfg["data_initialize_code"], user_cfg_dict["data"]["split_ratio"])
+            generated_user_cfg["data"].pop("split_ratio")
+
         render_cfg["user_cfg_str"] = f"cfg = {str(generated_user_cfg)}"
         render_cfg["user_cfg"] = user_cfg_dict
         return template.render(**render_cfg)

@@ -10,7 +10,7 @@ import isort
 import autopep8
 
 def train(
-    cfg: str = typer.Option("cfg.yml", help="yaml file name"),
+    cfg: str = typer.Option("cfg.yml", help="config yaml file name"),
 ):
     user_cfg = yaml.safe_load(Path(cfg).open("r"))
     pipeline_name = user_cfg["pipeline_name"]
