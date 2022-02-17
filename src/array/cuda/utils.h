@@ -192,6 +192,53 @@ inline DType GetCUDAScalar(
   return result;
 }
 
+/*!
+ * \brief Given a sorted array and a value this function returns the index
+ * of the firs element which compares greater than value.
+ *
+ * @param A: ascending sorted array
+ * @param n: size of the A
+ * @param x: value to search in A
+ */
+template <typename IdType>
+__device__ IdType _UpperBound(const IdType *A, int64_t n, IdType x) {
+  IdType l = 0, r = n, m = 0;
+  while (l < r) {
+    m = l + (r-l)/2;
+    if (x >= A[m]) {
+      l = m+1;
+    } else {
+      r = m;
+    }
+  }
+  return l;
+}
+
+/*!
+ * \brief Given a sorted and a value this function returns the index
+ * of the element who is equal to val. If not exist returns n+1
+ *
+ * @param A: ascending sorted array
+ * @param n: size of the A
+ * @param x: value to search in A
+ */
+template <typename IdType>
+__device__ IdType _BinarySearch(const IdType *A, int64_t n, IdType x) {
+  IdType l = 0, r = n, m = 0;
+  while (l <= r) {
+    m = l + (r-l)/2;
+    if (A[m] == x) {
+      return m;
+    }
+    if (A[m] < x) {
+      l = m+1;
+    } else {
+      r = m-1;
+    }
+  }
+  return n+1;
+}
+
 }  // namespace cuda
 }  // namespace dgl
 
