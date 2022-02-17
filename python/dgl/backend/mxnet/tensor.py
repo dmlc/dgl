@@ -353,14 +353,20 @@ def count_nonzero(input):
     tmp = input.asnumpy()
     return np.count_nonzero(tmp)
 
-def unique(input, return_inverse=False):
+def unique(input, return_inverse=False, return_counts=False):
     # TODO: fallback to numpy is unfortunate
     tmp = input.asnumpy()
-    if return_inverse:
-        tmp, inv = np.unique(tmp, return_inverse=True)
+    if return_inverse and return_counts:
+        tmp, inv, count = np.unique(tmp, return_inverse=True, return_counts=True)
         tmp = nd.array(tmp, ctx=input.context, dtype=input.dtype)
         inv = nd.array(inv, ctx=input.context)
-        return tmp, inv
+        count = nd.array(count, ctx=input.context)
+        return tmp, inv, count
+    elif return_inverse or return_counts:
+        tmp, tmp2 = np.unique(tmp, return_inverse=return_inverse, return_counts=return_counts)
+        tmp = nd.array(tmp, ctx=input.context, dtype=input.dtype)
+        tmp2 = nd.array(tmp2, ctx=input.context)
+        return tmp, tmp2
     else:
         tmp = np.unique(tmp)
         return nd.array(tmp, ctx=input.context, dtype=input.dtype)
