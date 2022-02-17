@@ -849,10 +849,11 @@ def gather_mm(A, B, idx_a = None, idx_b = None):
         raise Exception("Found " + str(B.dim()) + " matrices in B. Expected " + str(A.shape[0]) +
             " matrices when idx_b is None.")
     if str(A.device) == "cpu":
-        C = th.zeros((A.shape[0], B.shape[2]), device=A.device, dtype=A.dtype)
+        C = []
         for i in range(A.shape[0]):
             idxA = idx_a[i] if idx_a is not None else i
             idxB = idx_b[i] if idx_b is not None else i
-            C[i] = A[idxA] @ B[idxB]
+            C.append(A[idxA] @ B[idxB])
+        C = th.stack(C, 0)
         return C
     return GATHERMM.apply(A, B, idx_a, idx_b)
