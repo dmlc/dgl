@@ -171,8 +171,8 @@ for edges:
     3,0,False,True,False,"0.9784264442230887, 0.22131880861864428, 0.3161154827254189"
     4,1,True,True,False,"0.23142237259162102, 0.8715767748481147, 0.19117861103555467"
 
-After loaded, the dataset has one graph. Node/edge features are stored in ```ndata`` and ``edata``
-with the same column names. The example demonstrates how to specify a vector-shaped feature --
+After loaded, the dataset has one graph. Node/edge features are stored in ``ndata`` and ``edata``
+with the same column names. The example demonstrates how to specify a vector-shaped feature
 using comma-separated list enclosed by double quotes ``"..."``.
 
 .. code:: python
@@ -378,18 +378,14 @@ After loaded, the dataset has multiple homographs with features and labels:
           ndata_schemes={'feat': Scheme(shape=(3,), dtype=torch.float64)}
           edata_schemes={'feat': Scheme(shape=(3,), dtype=torch.float64)})
     >>> print(data0)
-    {'feat': tensor([0.7426, 0.5197, 0.8149]), 'label': tensor([0])}
+    {'feat': tensor([0.7426, 0.5197, 0.8149], dtype=torch.float64), 'label': tensor(0)}
     >>> graph1, data1 = dataset[1]
     >>> print(graph1)
     Graph(num_nodes=5, num_edges=10,
           ndata_schemes={'feat': Scheme(shape=(3,), dtype=torch.float64)}
           edata_schemes={'feat': Scheme(shape=(3,), dtype=torch.float64)})
     >>> print(data1)
-    {'feat': tensor([0.5348, 0.2864, 0.1155]), 'label': tensor([0])}
-
-.. note::
-
-    When there are multiple graphs, ``CSVDataset`` currently requires them to be homogeneous.
+    {'feat': tensor([0.5348, 0.2864, 0.1155], dtype=torch.float64), 'label': tensor(0)}
 
 
 Custom Data Parser
@@ -469,10 +465,11 @@ To parse the string type labels, one can define a ``DataParser`` class as follow
                 parsed[header] = dt
             return parsed
 
- Create a ``CSVDataset`` using the defined ``DataParser``:
+Create a ``CSVDataset`` using the defined ``DataParser``:
 
 .. code:: python
 
+    >>> import dgl
     >>> dataset = dgl.data.CSVDataset('./customized_parser_dataset',
     ...                               ndata_parser=MyDataParser(),
     ...                               edata_parser=MyDataParser())
@@ -483,7 +480,7 @@ To parse the string type labels, one can define a ``DataParser`` class as follow
 
 .. note::
 
-    To specify different ``DataParser`` s for different node/edge types, pass a dictionary to
+    To specify different ``DataParser``\s for different node/edge types, pass a dictionary to
     ``ndata_parser`` and ``edata_parser``, where the key is type name (a single string for
     node type; a string triplet for edge type) and the value is the ``DataParser`` to use.
 

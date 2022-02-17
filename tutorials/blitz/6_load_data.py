@@ -226,12 +226,10 @@ print(graph, label)
 # Creating Dataset from CSV via :class:`~dgl.data.DGLCSVDataset`
 # ------------------------------------------------------------
 #
-# In the previous examples, dataset is created directly from raw CSV
-# files via :class:`~dgl.data.DGLDataset`. DGL provides utility class
-# :class:`~dgl.data.DGLCSVDataset` to read data from CSV files and
-# construct :class:`~dgl.DGLGraph` more flexibly. Please refer to
-# :ref:`guide-data-pipeline-loadcsv` and see if this utility is more
-# suitable for your case.
+# The previous examples describe how to create a dataset from CSV files
+# step-by-step. DGL also provides a utility class :class:`~dgl.data.CSVDataset`
+# for reading and parsing data from CSV files. See :ref:`guide-data-pipeline-loadcsv`
+# for more details.
 #
 
 
