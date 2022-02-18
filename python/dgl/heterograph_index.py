@@ -1382,6 +1382,6 @@ def _forking_reduce(graph_index):
     graph_index._forking_pk_state = (states.meta, arrays)
     return _forking_rebuild, (graph_index._forking_pk_state,)
 
-ForkingPickler.register(HeteroGraphIndex, _forking_reduce)
+#ForkingPickler.register(HeteroGraphIndex, _forking_reduce)
 
 _init_api("dgl.heterograph_index")

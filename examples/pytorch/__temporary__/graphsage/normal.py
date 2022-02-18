@@ -77,13 +77,13 @@ sampler = dgl.dataloading.NeighborSampler(
         [15, 10, 5], prefetch_node_feats=['feat'], prefetch_labels=['label'])
 train_dataloader = dgl.dataloading.NodeDataLoader(
         graph, train_idx, sampler, device=device, batch_size=1024, shuffle=True,
-        drop_last=False, num_workers=4, use_uva=False)
+        drop_last=False, num_workers=12, use_uva=False)
 valid_dataloader = dgl.dataloading.NodeDataLoader(
         graph, valid_idx, sampler, device=device, batch_size=1024, shuffle=True,
-        drop_last=False, num_workers=4, use_uva=False)
+        drop_last=False, num_workers=12, use_uva=False)
 
 durations = []
-for _ in range(2):
+for _ in range(0):
     model.train()
     t0 = time.time()
     for it, (input_nodes, output_nodes, blocks) in enumerate(train_dataloader):
@@ -118,6 +118,6 @@ print(np.mean(durations[4:]), np.std(durations[4:]))
 # Test accuracy and offline inference of all nodes
 model.eval()
 with torch.no_grad():
-    pred = model.inference(graph, device, 4096, 4, 'cpu')
+    pred = model.inference(graph, device, 4096, 1, 'cpu')
     acc = MF.accuracy(pred.to(graph.device), graph.ndata['label'])
     print('Test acc:', acc.item())

@@ -134,11 +134,11 @@ sampler = dgl.dataloading.NeighborSampler([15, 10, 5], prefetch_node_feats=['fea
 dataloader = dgl.dataloading.EdgeDataLoader(
         graph, seed_edges, sampler,
         device=device, batch_size=512, shuffle=True,
-        drop_last=False, num_workers=12,
+        drop_last=False, num_workers=0,
         exclude='reverse_id',
         reverse_eids=reverse_eids,
         negative_sampler=dgl.dataloading.negative_sampler.Uniform(1),
-        use_uva=False)
+        use_uva=USE_UVA)
 
 durations = []
 for epoch in range(10):
