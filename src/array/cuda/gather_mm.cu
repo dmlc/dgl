@@ -327,12 +327,10 @@ void gatherMM_scatter(const NDArray A,
  */
 template <int XPU, typename IdType, int bits>
 void segment_mm(const NDArray A,
-              const NDArray B,
-              NDArray C,
-              const NDArray seglen_A,
-              bool a_trans, bool b_trans) {
-    CHECK_EQ(seglen_A->ctx.device_type, kDLCPU)
-      << "segment_mm requires the \"seglen\" array to be on CPU.";
+                const NDArray B,
+                NDArray C,
+                const NDArray seglen_A,
+                bool a_trans, bool b_trans) {
     SWITCH_BITS(bits, DType, {
         auto device = runtime::DeviceAPI::Get(A->ctx);
         const DType *A_data = A.Ptr<DType>();
@@ -350,24 +348,22 @@ void segment_mm(const NDArray A,
         CUBLAS_CALL(cublasSetStream(thr_entry->cublas_handle,
             thr_entry->stream));
 
-        for (int etype = 0; etype < num_rel; ++etype) {
-            IdType B_dim1 = B->shape[0] / num_rel;
-            assert((a_trans) ? seglen_A_data[etype] : A->shape[1] ==  \
-                (b_trans) ? B->shape[1] : B_dim1);
+        IdType m_offset = 0;
+        for (IdType etype = 0; etype < num_rel; ++etype) {
+            CHECK_LT(m_offset, A->shape[0]) << "Segement index out of bound of A->shape[0].";
             m = seglen_A_data[etype];  // rows of A
-            n = B->shape[1];  // cols of B
-            k = A->shape[1];  // cols of A == rows of B
+            n = B->shape[2];  // cols of B
+            k = B->shape[1];  // cols of A == rows of B
             int ldb = n, lda = k, ldc = n;
             cublasOperation_t transB = CUBLAS_OP_N;
             cublasOperation_t transA = CUBLAS_OP_N;
-            if (a_trans) {
-                transA = CUBLAS_OP_T;
-                ldb = n, lda = k, ldc = n;
-                std::swap(m, k);
-            }
+            //if (a_trans) {
+                //transA = CUBLAS_OP_T;
+                //ldb = n, lda = k, ldc = n;
+                //std::swap(m, k);
+            //}
             if (b_trans) {
                 transB = CUBLAS_OP_T;
-                k = B_dim1;
                 ldb = n, lda = n, ldc = k;
                 std::swap(n, k);
             }
@@ -384,6 +380,7 @@ void segment_mm(const NDArray A,
             A_offset += m * k;
             B_offset += k * n;
             C_offset += m * n;
+            m_offset += m;
         }
     });
 }

@@ -2,7 +2,8 @@ import torch as th
 from distutils.version import LooseVersion
 from ...base import is_all, ALL
 from ...sparse import _gspmm, _gspmm_hetero, _gsddmm, _gsddmm_hetero, _segment_reduce, _bwd_segment_cmp
-from ...sparse import _csrmm, _csrsum, _csrmask, _scatter_add, _update_grad_minmax_hetero, _gather_mm, _gather_mm_scatter, _segment_mm
+from ...sparse import _csrmm, _csrsum, _csrmask, _scatter_add, _update_grad_minmax_hetero
+from ...sparse import _gather_mm, _gather_mm_scatter, _segment_mm, _segment_mm_backward_B
 from ...sparse import _gspmm, _gspmm_hetero, _gsddmm, _gsddmm_hetero, _segment_reduce, _bwd_segment_cmp, _edge_softmax_forward, _edge_softmax_backward
 from ...sparse import _csrmm, _csrsum, _csrmask, _scatter_add, _update_grad_minmax_hetero
 from ...heterograph_index import create_unitgraph_from_csr
@@ -697,22 +698,16 @@ class SEGMENTMM(th.autograd.Function):
     @staticmethod
     @custom_fwd(cast_inputs=th.float16)
     def forward(ctx, A, B, seglen_A):
-        if A.shape[0] != th.sum(seglen_A):
-            raise Exception("The summation of the elements of seglen_A must be equal to " +
-                "dimension 0 of A. Expected "+ str(A.shape[0]) + "got" + str(th.sum(seglen_A)))
         if B.dim() != 3:
-            raise Exception("Expected dimension of B is 3. Got " + str(B.dim()))
-        # Reshaping B form 3D to 2D
-        B_3D_shape = B.shape
-        B = B.reshape(B.shape[0] * B.shape[1], B.shape[2])
-        C = th.zeros((A.shape[0], B.shape[1]), device=A.device, dtype=A.dtype)
+            raise ValueError("segment_mm expects B to be a 3D tensor.")
+        C = th.zeros((A.shape[0], B.shape[2]), device=A.device, dtype=A.dtype)
         C = _segment_mm(A, B, C, seglen_A)
-        ctx.backward_cache = A, B, seglen_A, B_3D_shape
+        ctx.backward_cache = A, B, seglen_A
         return C
 
     @staticmethod
     def backward(ctx, dZ):
-        A, B, seglen_A, B_3D_shape = ctx.backward_cache
+        A, B, seglen_A = ctx.backward_cache
         A_grad = B_grad = None
         if ctx.needs_input_grad[0]:
             #  Compute A_grad = Out_grad * B^T
@@ -721,9 +716,8 @@ class SEGMENTMM(th.autograd.Function):
         if ctx.needs_input_grad[1]:
             #  Compute B_grad = A^T * Out_grad
             B_grad = th.zeros(B.shape, device=B.device, dtype=B.dtype)
-            B_grad = _segment_mm(A, dZ, B_grad, seglen_A, a_trans=True)
-            B_grad = B_grad.reshape(B_3D_shape[0], B_3D_shape[1], B_3D_shape[2])
-        return A_grad, B_grad, None, None, None, None, None, None
+            B_grad = _segment_mm_backward_B(A, dZ, B_grad, seglen_A)
+        return A_grad, B_grad, None
 
 
 class GATHERMM(th.autograd.Function):
@@ -755,7 +749,7 @@ class GATHERMM(th.autograd.Function):
             B_grad = _gather_mm_scatter(A, dZ, B_grad, B_3D_shape[0],
                 idx_a=idx_a, idx_c=idx_b)
             B_grad = B_grad.reshape(B_3D_shape[0], B_3D_shape[1], B_3D_shape[2])
-        return A_grad, B_grad, None, None, None, None, None, None
+        return A_grad, B_grad, None, None
 
 def gspmm(gidx, op, reduce_op, lhs_data, rhs_data):
     if op == 'sub':

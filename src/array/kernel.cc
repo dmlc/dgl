@@ -55,10 +55,23 @@ void SpMM(const std::string& op, const std::string& reduce,
 
 /*! \brief Generalized segmented dense Matrix-Matrix Multiplication. */
 void SegmentMM(const NDArray A,
-          const NDArray B,
-          NDArray C,
-          const NDArray seglen_A,
-          bool A_trans, bool B_trans) {
+               const NDArray B,
+               NDArray C,
+               const NDArray seglen_A,
+               bool A_trans, bool B_trans) {
+  CHECK_EQ(A->ndim, 2) << "segment_mm operator expects a 2D tensor for the first input.";
+  CHECK_EQ(B->ndim, 3) << "segment_mm operator expects a 3D tensor for the second input.";
+  CHECK(!A_trans);
+  if (B_trans) {
+    CHECK_EQ(A->shape[1], B->shape[2])
+      << "segment_mm operator expects A.shape[1] == B.shape[2] when B_trans=True";
+  } else {
+    CHECK_EQ(A->shape[1], B->shape[1]) << "segment_mm operator expects A.shape[1] == B.shape[1]";
+  }
+  CHECK_EQ(B->shape[0], seglen_A.NumElements())
+    << "segment_mm operator expects len(seglen_A) == B.shape[0]";
+  CHECK_EQ(seglen_A->ctx.device_type, kDLCPU)
+    << "segment_mm expects seglen_A to be on CPU.";
   ATEN_XPU_SWITCH_CUDA(A->ctx.device_type, XPU, "GatherMM", {
     ATEN_ID_TYPE_SWITCH(seglen_A->dtype, IdType, {
       ATEN_FLOAT_BITS_SWITCH(A->dtype, bits, "Feature data", {
@@ -71,11 +84,11 @@ void SegmentMM(const NDArray A,
 
 /*! \brief Generalized Dense Matrix-Matrix Multiplication according to relation types. */
 void GatherMM(const NDArray A,
-          const NDArray B,
-          NDArray C,
-          const NDArray idx_a,
-          const NDArray idx_b,
-          const int num_rel) {
+              const NDArray B,
+              NDArray C,
+              const NDArray idx_a,
+              const NDArray idx_b,
+              const int num_rel) {
   ATEN_XPU_SWITCH_CUDA(A->ctx.device_type, XPU, "GatherMM", {
     ATEN_ID_TYPE_SWITCH(idx_b->dtype, IdType, {
       ATEN_FLOAT_BITS_SWITCH(A->dtype, bits, "Feature data", {
