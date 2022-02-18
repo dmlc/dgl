@@ -535,8 +535,17 @@ class DataLoader(torch.utils.data.DataLoader):
                 if num_workers > 0:
                     raise ValueError('num_workers must be 0 if UVM sampling is enabled.')
 
+                # Create all the formats and pin the features - custom GraphStorages
+                # will need to do that themselves.
                 self.graph.create_formats_()
                 self.graph.pin_memory_()
+                for ntype in self.graph.ntypes:
+                    for key, value in self.graph.nodes[ntype].data.items():
+                        self.graph.nodes[ntype].data[key] = value.pin_memory()
+                for etype in self.graph.canonical_etypes:
+                    for key, value in self.graph.edges[etype].data.items():
+                        self.graph.edges[etype].data[key] = value.pin_memory()
+
                 indices = recursive_apply(indices, lambda x: x.to(self.device))
             else:
                 if self.graph.device != indices_device:

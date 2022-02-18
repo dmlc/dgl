@@ -343,25 +343,6 @@ class Column(TensorStorage):
         _ = self.data           # materialize in case of lazy slicing & data transfer
         return super().fetch(indices, device, pin_memory=False)
 
-    def pin_memory_(self):
-        """Registers the column data into pinned memory, materializing it if necessary."""
-        if self.pinned or F.is_pinned(self.data):   # F.is_pinned for externally pinned tensors
-            return
-        utils.pin_memory_inplace(self.data)
-        self.pinned = True
-
-    def unpin_memory_(self):
-        """Unregisters the column data from pinned memory, materializing it if necessary."""
-        if self.pinned:
-            utils.unpin_memory_inplace(self.data)
-            self.pinned = False
-
-    def __del__(self):
-        try:
-            self.unpin_memory_()
-        except:     # pylint: disable=bare-except
-            pass
-
 class Frame(MutableMapping):
     """The columnar storage for node/edge features.
 

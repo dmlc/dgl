@@ -5466,7 +5466,7 @@ class DGLHeteroGraph(object):
         """
         return self.to(F.cpu())
 
-    def pin_memory_(self, pin_ndata=True, pin_edata=True):
+    def pin_memory_(self):
         """Pin the graph structure to the page-locked memory for GPU zero-copy access.
 
         This is an **inplace** method. The graph structure must be on CPU to be pinned.
@@ -5476,13 +5476,6 @@ class DGLHeteroGraph(object):
         To avoid implicit formats materialization during training,
         you should create all the needed formats before pinning.
         But cloning and materialization is fine. See the examples below.
-
-        Parameters
-        ----------
-        pin_ndata : bool, optional
-            Whether to pin the node features.  Default: True.
-        pin_edata : bool, optional
-            Whether to pin the edge features.  Default: True.
 
         Returns
         -------
@@ -5538,27 +5531,13 @@ class DGLHeteroGraph(object):
             raise DGLError("The graph structure must be on CPU to be pinned.")
         self._graph.pin_memory_()
 
-        if pin_ndata:
-            for frame in self._node_frames:
-                frame.pin_memory_()
-        if pin_edata:
-            for frame in self._edge_frames:
-                frame.pin_memory_()
-
         return self
 
-    def unpin_memory_(self, unpin_ndata=True, unpin_edata=True):
+    def unpin_memory_(self):
         """Unpin the graph structure from the page-locked memory.
 
         This is an **inplace** method.If the graph struture is not pinned,
         e.g., on CPU or GPU, the function directly returns it.
-
-        Parameters
-        ----------
-        unpin_ndata : bool, optional
-            Whether to unpin the node features.  Default: True.
-        unpin_edata : bool, optional
-            Whether to unpin the edge features.  Default: True.
 
         Returns
         -------
@@ -5568,13 +5547,6 @@ class DGLHeteroGraph(object):
         if not self._graph.is_pinned():
             return self
         self._graph.unpin_memory_()
-
-        if unpin_ndata:
-            for frame in self._node_frames:
-                frame.unpin_memory_()
-        if unpin_edata:
-            for frame in self._edge_frames:
-                frame.unpin_memory_()
 
         return self
 

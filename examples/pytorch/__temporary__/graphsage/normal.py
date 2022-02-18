@@ -39,7 +39,7 @@ class SAGE(nn.Module):
         sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1, prefetch_node_feats=['h'])
         dataloader = dgl.dataloading.NodeDataLoader(
                 g, torch.arange(g.num_nodes()).to(g.device), sampler, device=device,
-                batch_size=1000, shuffle=False, drop_last=False, num_workers=num_workers)
+                batch_size=batch_size, shuffle=False, drop_last=False, num_workers=num_workers)
         if buffer_device is None:
             buffer_device = device
 
@@ -83,7 +83,7 @@ valid_dataloader = dgl.dataloading.NodeDataLoader(
         drop_last=False, num_workers=0, use_uva=USE_UVA)
 
 durations = []
-for _ in range(10):
+for _ in range(1):
     model.train()
     t0 = time.time()
     for it, (input_nodes, output_nodes, blocks) in enumerate(train_dataloader):
@@ -118,6 +118,6 @@ print(np.mean(durations[4:]), np.std(durations[4:]))
 # Test accuracy and offline inference of all nodes
 model.eval()
 with torch.no_grad():
-    pred = model.inference(graph, device, 1000, 12, 'cpu')
+    pred = model.inference(graph, device, 4096, 12, 'cpu')
     acc = MF.accuracy(pred.to(graph.device), graph.ndata['label'])
     print('Test acc:', acc.item())
