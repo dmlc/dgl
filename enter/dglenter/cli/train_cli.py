@@ -5,7 +5,6 @@ from enum import Enum
 import typing
 import yaml
 from pathlib import Path
-
 import isort
 import autopep8
 
@@ -18,8 +17,8 @@ def train(
 
     f_code = autopep8.fix_code(output_file_content, options={'aggressive': 1})
     f_code = isort.code(f_code)
-    exec(f_code,  {'__name__': '__main__'})
-
+    code = compile(f_code, 'dglenter_tmp.py', 'exec')
+    exec(code,  {'__name__': '__main__'})
 
 if __name__ == "__main__":
     train_app = typer.Typer()

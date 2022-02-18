@@ -17,7 +17,9 @@ setup(name='dglenter',
           "pydantic>=1.9.0",
           "ruamel.yaml>=0.17.20"
       ],
-    license='APACHE',
+      package_data={"": ["./*"]},
+      include_package_data=True,
+      license='APACHE',
       entry_points={
           'console_scripts': [
               "dgl-enter = dglenter.cli.cli:main"
