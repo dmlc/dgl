@@ -315,8 +315,16 @@ def _assign_for(item, feat):
     else:
         return item
 
+def _put_if_event_not_set(queue, result, event):
+    while not event.is_set():
+        try:
+            queue.put(result, timeout=5000)
+        except queue.Full:
+            continue
 
-def _prefetcher_entry(dataloader_it, dataloader, queue, num_threads, use_alternate_streams):
+def _prefetcher_entry(
+        dataloader_it, dataloader, queue, num_threads, use_alternate_streams,
+        done_event):
     # PyTorch will set the number of threads to 1 which slows down pin_memory() calls
     # in main process if a prefetching thread is created.
     if num_threads is not None:
@@ -329,20 +337,27 @@ def _prefetcher_entry(dataloader_it, dataloader, queue, num_threads, use_alterna
         stream = None
 
     try:
-        for batch in dataloader_it:
+        while not done_event.is_set():
+            try:
+                batch = next(dataloader_it)
+            except StopIteration:
+                break
             batch = recursive_apply(batch, restore_parent_storage_columns, dataloader.graph)
             feats = _prefetch(batch, dataloader, stream)
 
-            queue.put((
+            _put_if_event_not_set(queue, (
                 # batch will be already in pinned memory as per the behavior of
                 # PyTorch DataLoader.
-                recursive_apply(batch, lambda x: x.to(dataloader.device, non_blocking=True)),
+                recursive_apply(
+                    batch, lambda x: x.to(dataloader.device, non_blocking=True)),
                 feats,
                 stream.record_event() if stream is not None else None,
-                None))
-        queue.put((None, None, None, None))
+                None),
+                done_event)
+        _put_if_event_not_set(queue, (None, None, None, None), done_event)
     except:     # pylint: disable=bare-except
-        queue.put((None, None, None, ExceptionWrapper(where='in prefetcher')))
+        _put_if_event_not_set(
+            queue, (None, None, None, ExceptionWrapper(where='in prefetcher')), done_event)
 
 
 # DGLHeteroGraphs have the semantics of lazy feature slicing with subgraphs.  Such behavior depends
@@ -407,16 +422,33 @@ class _PrefetchingIter(object):
 
         self.use_thread = use_thread
         self.use_alternate_streams = use_alternate_streams
+        self._shutting_down = False
         if use_thread:
+            self._done_event = threading.Event()
             thread = threading.Thread(
                 target=_prefetcher_entry,
-                args=(dataloader_it, dataloader, self.queue, num_threads, use_alternate_streams),
+                args=(dataloader_it, dataloader, self.queue, num_threads,
+                      use_alternate_streams, self._done_event),
                 daemon=True)
             thread.start()
             self.thread = thread
 
     def __iter__(self):
         return self
+
+    def _shutdown(self):
+        if not self._shutting_down:
+            self._shutting_down = True
+            self._done_event.set()
+            try:
+                self.queue.get_nowait()     # In case the thread is blocking on put().
+            except Queue.Empty:
+                pass
+            self.thread.join()
+
+    def __del__(self):
+        if self.use_thread:
+            self._shutdown()
 
     def _next_non_threaded(self):
         batch = next(self.dataloader_it)

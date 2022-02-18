@@ -77,10 +77,10 @@ sampler = dgl.dataloading.NeighborSampler(
         [15, 10, 5], prefetch_node_feats=['feat'], prefetch_labels=['label'])
 train_dataloader = dgl.dataloading.NodeDataLoader(
         graph, train_idx, sampler, device=device, batch_size=1024, shuffle=True,
-        drop_last=False, num_workers=0, use_uva=USE_UVA)
+        drop_last=False, num_workers=0, use_uva=False)
 valid_dataloader = dgl.dataloading.NodeDataLoader(
         graph, valid_idx, sampler, device=device, batch_size=1024, shuffle=True,
-        drop_last=False, num_workers=0, use_uva=USE_UVA)
+        drop_last=False, num_workers=0, use_uva=False)
 
 durations = []
 for _ in range(10000):
@@ -98,21 +98,20 @@ for _ in range(10000):
             acc = MF.accuracy(y_hat, y)
             mem = torch.cuda.max_memory_allocated() / 1000000
             print('Loss', loss.item(), 'Acc', acc.item(), 'GPU Mem', mem, 'MB')
-        break
-    #tt = time.time()
-    #print(tt - t0)
-    #durations.append(tt - t0)
+    tt = time.time()
+    print(tt - t0)
+    durations.append(tt - t0)
 
-    #model.eval()
-    #ys = []
-    #y_hats = []
-    #for it, (input_nodes, output_nodes, blocks) in enumerate(valid_dataloader):
-    #    with torch.no_grad():
-    #        x = blocks[0].srcdata['feat']
-    #        ys.append(blocks[-1].dstdata['label'])
-    #        y_hats.append(model(blocks, x))
-    #acc = MF.accuracy(torch.cat(y_hats), torch.cat(ys))
-    #print('Validation acc:', acc.item())
+    model.eval()
+    ys = []
+    y_hats = []
+    for it, (input_nodes, output_nodes, blocks) in enumerate(valid_dataloader):
+        with torch.no_grad():
+            x = blocks[0].srcdata['feat']
+            ys.append(blocks[-1].dstdata['label'])
+            y_hats.append(model(blocks, x))
+    acc = MF.accuracy(torch.cat(y_hats), torch.cat(ys))
+    print('Validation acc:', acc.item())
 
 print(np.mean(durations[4:]), np.std(durations[4:]))
 
