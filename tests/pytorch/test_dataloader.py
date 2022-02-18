@@ -100,7 +100,8 @@ def _check_device(data):
         assert data.device == F.ctx()
 
 @pytest.mark.parametrize('sampler_name', ['full', 'neighbor', 'neighbor2'])
-@pytest.mark.parametrize('pin_graph', [True, False])
+# TODO(BarclayII): Re-enable pin_graph = True after PyTorch is upgraded to 1.9.0 on CI
+@pytest.mark.parametrize('pin_graph', [False])
 def test_node_dataloader(sampler_name, pin_graph):
     g1 = dgl.graph(([0, 0, 0, 1, 1], [1, 2, 3, 3, 4]))
     if F.ctx() != F.cpu() and pin_graph:
@@ -154,7 +155,8 @@ def test_node_dataloader(sampler_name, pin_graph):
     dgl.dataloading.negative_sampler.Uniform(2),
     dgl.dataloading.negative_sampler.GlobalUniform(15, False, 3),
     dgl.dataloading.negative_sampler.GlobalUniform(15, True, 3)])
-@pytest.mark.parametrize('pin_graph', [True, False])
+# TODO(BarclayII): Re-enable pin_graph = True after PyTorch is upgraded to 1.9.0 on CI
+@pytest.mark.parametrize('pin_graph', [False])
 def test_edge_dataloader(sampler_name, neg_sampler, pin_graph):
     g1 = dgl.graph(([0, 0, 0, 1, 1], [1, 2, 3, 3, 4]))
     if F.ctx() != F.cpu() and pin_graph:
