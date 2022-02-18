@@ -194,11 +194,14 @@ inline DType GetCUDAScalar(
 
 /*!
  * \brief Given a sorted array and a value this function returns the index
- * of the firs element which compares greater than value.
+ * of the first element which compares greater than value.
  *
+ * This function assumes 0-based index
  * @param A: ascending sorted array
  * @param n: size of the A
  * @param x: value to search in A
+ * @return index, i, of the first element st. A[i]>x. If x>=A[n-1] returns n.
+ * if x<A[0] then it returns 0.
  */
 template <typename IdType>
 __device__ IdType _UpperBound(const IdType *A, int64_t n, IdType x) {
@@ -215,16 +218,18 @@ __device__ IdType _UpperBound(const IdType *A, int64_t n, IdType x) {
 }
 
 /*!
- * \brief Given a sorted and a value this function returns the index
+ * \brief Given a sorted array and a value this function returns the index
  * of the element who is equal to val. If not exist returns n+1
  *
+ * This function assumes 0-based index
  * @param A: ascending sorted array
  * @param n: size of the A
  * @param x: value to search in A
+ * @return index, i, st. A[i]==x. If such an index not exists returns 'n'.
  */
 template <typename IdType>
 __device__ IdType _BinarySearch(const IdType *A, int64_t n, IdType x) {
-  IdType l = 0, r = n, m = 0;
+  IdType l = 0, r = n-1, m = 0;
   while (l <= r) {
     m = l + (r-l)/2;
     if (A[m] == x) {
@@ -236,7 +241,7 @@ __device__ IdType _BinarySearch(const IdType *A, int64_t n, IdType x) {
       r = m-1;
     }
   }
-  return n+1;
+  return n; // not found
 }
 
 }  // namespace cuda

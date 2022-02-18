@@ -413,25 +413,11 @@ __global__ void _SegmentMaskColKernel(
   while (tx < num_nnz) {
     IdType rpos = dgl::cuda::_UpperBound(indptr, num_rows, tx) - 1;
     IdType cur_c = indices[tx];
-    IdType i = dgl::cuda::_BinarySearch(col, col_len-1, cur_c);
+    IdType i = dgl::cuda::_BinarySearch(col, col_len, cur_c);
     if (i < col_len) {
       mask[tx] = 1;
       cuda::AtomicAdd(count+rpos, IdType(1));
     }
-    tx += stride_x;
-  }
-}
-
-template <typename IdType>
-__global__ void _CheckSorted(const IdType* A, int64_t n, int8_t *flags) {
-  int tx = blockIdx.x * blockDim.x + threadIdx.x;
-  const int stride_x = gridDim.x * blockDim.x;
-  while (tx < n-1) {
-    bool f = true;
-    if (A[tx] > A[tx+1]) {
-      f = false;
-    }
-    flags[tx] = f;
     tx += stride_x;
   }
 }
@@ -471,35 +457,24 @@ CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray 
   // Hence checking and sorting array first. Sorting is not in place.
   auto device = runtime::DeviceAPI::Get(ctx);
   auto cols_size = cols->shape[0];
-  int8_t* flags = static_cast<int8_t*>(device->AllocWorkspace(ctx, cols_size-1));
-  int nb = (cols_size + nt - 1) / nt;
-  CUDA_KERNEL_CALL(_CheckSorted,
-      nb, nt, 0, thr_entry->stream,
-      cols.Ptr<IdType>(), cols_size, flags);
-  bool is_sorted = dgl::cuda::AllTrue(flags, cols_size-1, ctx);
-  device->FreeWorkspace(ctx, flags);
 
-  IdType *sorted_cols = cols.Ptr<IdType>();
-  if (is_sorted == false) {
-    IdArray sorted_array = NewIdArray(cols->shape[0], ctx, cols->dtype.bits);
-    auto ptr_out = sorted_array.Ptr<IdType>();
-    auto ptr_in = cols.Ptr<IdType>();
-    size_t workspace_size = 0;
-    cub::DeviceRadixSort::SortKeys(
-      nullptr, workspace_size, ptr_in, ptr_out, cols->shape[0]);
-    void *workspace = device->AllocWorkspace(ctx, workspace_size);
-    cub::DeviceRadixSort::SortKeys(
-      workspace, workspace_size, ptr_in, ptr_out, cols->shape[0]);
-    device->FreeWorkspace(ctx, workspace);
-    sorted_cols = ptr_out;
-  }
+  IdArray sorted_array = NewIdArray(cols->shape[0], ctx, cols->dtype.bits);
+  auto ptr_sorted_cols = sorted_array.Ptr<IdType>();
+  auto ptr_cols = cols.Ptr<IdType>();
+  size_t workspace_size = 0;
+  cub::DeviceRadixSort::SortKeys(
+    nullptr, workspace_size, ptr_cols, ptr_sorted_cols, cols->shape[0]);
+  void *workspace = device->AllocWorkspace(ctx, workspace_size);
+  cub::DeviceRadixSort::SortKeys(
+    workspace, workspace_size, ptr_cols, ptr_sorted_cols, cols->shape[0]);
+  device->FreeWorkspace(ctx, workspace);
 
-  // Execute SetmentMaskColKernel
-  nb = (nnz_csr + nt - 1) / nt;
+  // Execute SegmentMaskColKernel
+  int nb = (nnz_csr + nt - 1) / nt;
   CUDA_KERNEL_CALL(_SegmentMaskColKernel,
       nb, nt, 0, thr_entry->stream,
       csr.indptr.Ptr<IdType>(), csr.indices.Ptr<IdType>(), csr.num_rows, nnz_csr,
-      sorted_cols, cols->shape[0],
+      ptr_sorted_cols, cols_size,
       mask.Ptr<IdType>(), count.Ptr<IdType>());
 
   IdArray idx = AsNumBits(NonZero(mask), nbits);
