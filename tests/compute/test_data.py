@@ -1154,7 +1154,12 @@ def test_as_nodepred2():
     ds = data.AsNodePredDataset(data.AIFBDataset(), [0.1, 0.1, 0.8], 'Personen', verbose=True)
     assert F.sum(F.astype(ds[0].nodes['Personen'].data['train_mask'], F.int32), 0) == int(ds[0].num_nodes('Personen') * 0.1)
 
-
+@unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason="ogb only supports pytorch")
+def test_as_nodepred_ogb():
+    from ogb.nodeproppred import DglNodePropPredDataset
+    ds = data.AsNodePredDataset(DglNodePropPredDataset("ogbn-arxiv"), split_ratio=None, verbose=True)
+    # force generate new split
+    ds = data.AsNodePredDataset(DglNodePropPredDataset("ogbn-arxiv"), split_ratio=[0.7, 0.2, 0.1], verbose=True)
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
 def test_as_linkpred():
