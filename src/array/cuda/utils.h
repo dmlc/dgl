@@ -241,7 +241,7 @@ __device__ IdType _BinarySearch(const IdType *A, int64_t n, IdType x) {
       r = m-1;
     }
   }
-  return n; // not found
+  return n;  // not found
 }
 
 }  // namespace cuda
