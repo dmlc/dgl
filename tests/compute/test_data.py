@@ -257,7 +257,9 @@ def _test_construct_graphs_homo():
     def assert_data(lhs, rhs):
         for key, value in lhs.items():
             assert key in rhs
-            assert F.array_equal(F.tensor(value), rhs[key])
+            assert F.dtype(rhs[key]) != F.float64
+            assert F.array_equal(
+                F.tensor(value, dtype=F.dtype(rhs[key])), rhs[key])
     assert_data(ndata, g.ndata)
     assert_data(edata, g.edata)
 
@@ -314,7 +316,9 @@ def _test_construct_graphs_hetero():
     def assert_data(lhs, rhs):
         for key, value in lhs.items():
             assert key in rhs
-            assert F.array_equal(F.tensor(value), rhs[key])
+            assert F.dtype(rhs[key]) != F.float64
+            assert F.array_equal(
+                F.tensor(value, dtype=F.dtype(rhs[key])), rhs[key])
     for ntype in g.ntypes:
         assert g.num_nodes(ntype) == num_nodes
         assert_data(ndata_dict[ntype], g.nodes[ntype].data)
@@ -364,7 +368,8 @@ def _test_construct_graphs_multiple():
     assert len(graphs) == num_graphs
     assert len(data_dict) == len(gdata)
     for k, v in data_dict.items():
-        assert F.array_equal(F.tensor(gdata[k]), v)
+        assert F.dtype(v) != F.float64
+        assert F.array_equal(F.tensor(gdata[k], dtype=F.dtype(v)), v)
     for i, g in enumerate(graphs):
         assert g.is_homogeneous
         assert g.num_nodes() == num_nodes
@@ -377,7 +382,9 @@ def _test_construct_graphs_multiple():
                 if node:
                     indices = u_indices[i*size:(i+1)*size]
                     value = value[indices]
-                assert F.array_equal(F.tensor(value), rhs[key])
+                assert F.dtype(rhs[key]) != F.float64
+                assert F.array_equal(
+                    F.tensor(value, dtype=F.dtype(rhs[key])), rhs[key])
         assert_data(ndata, g.ndata, num_nodes, node=True)
         assert_data(edata, g.edata, num_edges)
 
@@ -798,13 +805,13 @@ def _test_CSVDataset_single():
             assert csv_dataset.has_cache()
             for ntype in g.ntypes:
                 assert g.num_nodes(ntype) == num_nodes
-                assert F.array_equal(F.tensor(feat_ndata),
+                assert F.array_equal(F.tensor(feat_ndata, dtype=F.float32),
                                      g.nodes[ntype].data['feat'])
                 assert np.array_equal(label_ndata,
                                       F.asnumpy(g.nodes[ntype].data['label']))
             for etype in g.etypes:
                 assert g.num_edges(etype) == num_edges
-                assert F.array_equal(F.tensor(feat_edata),
+                assert F.array_equal(F.tensor(feat_edata, dtype=F.float32),
                                      g.edges[etype].data['feat'])
                 assert np.array_equal(label_edata,
                                       F.asnumpy(g.edges[etype].data['label']))
@@ -880,21 +887,21 @@ def _test_CSVDataset_multiple():
             assert len(csv_dataset.data) == 2
             assert 'feat' in csv_dataset.data
             assert 'label' in csv_dataset.data
-            assert F.array_equal(F.tensor(feat_gdata),
+            assert F.array_equal(F.tensor(feat_gdata, dtype=F.float32),
                                  csv_dataset.data['feat'])
             for i, (g, g_data) in enumerate(csv_dataset):
                 assert not g.is_homogeneous
                 assert F.asnumpy(g_data['label']) == label_gdata[i]
-                assert F.array_equal(g_data['feat'], F.tensor(feat_gdata[i]))
+                assert F.array_equal(g_data['feat'], F.tensor(feat_gdata[i], dtype=F.float32))
                 for ntype in g.ntypes:
                     assert g.num_nodes(ntype) == num_nodes
-                    assert F.array_equal(F.tensor(feat_ndata[i*num_nodes:(i+1)*num_nodes]),
+                    assert F.array_equal(F.tensor(feat_ndata[i*num_nodes:(i+1)*num_nodes], dtype=F.float32),
                                          g.nodes[ntype].data['feat'])
                     assert np.array_equal(label_ndata[i*num_nodes:(i+1)*num_nodes],
                                           F.asnumpy(g.nodes[ntype].data['label']))
                 for etype in g.etypes:
                     assert g.num_edges(etype) == num_edges
-                    assert F.array_equal(F.tensor(feat_edata[i*num_edges:(i+1)*num_edges]),
+                    assert F.array_equal(F.tensor(feat_edata[i*num_edges:(i+1)*num_edges], dtype=F.float32),
                                          g.edges[etype].data['feat'])
                     assert np.array_equal(label_edata[i*num_edges:(i+1)*num_edges],
                                           F.asnumpy(g.edges[etype].data['label']))
@@ -1154,7 +1161,12 @@ def test_as_nodepred2():
     ds = data.AsNodePredDataset(data.AIFBDataset(), [0.1, 0.1, 0.8], 'Personen', verbose=True)
     assert F.sum(F.astype(ds[0].nodes['Personen'].data['train_mask'], F.int32), 0) == int(ds[0].num_nodes('Personen') * 0.1)
 
-
+@unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason="ogb only supports pytorch")
+def test_as_nodepred_ogb():
+    from ogb.nodeproppred import DglNodePropPredDataset
+    ds = data.AsNodePredDataset(DglNodePropPredDataset("ogbn-arxiv"), split_ratio=None, verbose=True)
+    # force generate new split
+    ds = data.AsNodePredDataset(DglNodePropPredDataset("ogbn-arxiv"), split_ratio=[0.7, 0.2, 0.1], verbose=True)
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
 def test_as_linkpred():
