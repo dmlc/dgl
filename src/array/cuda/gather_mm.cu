@@ -321,16 +321,23 @@ void gatherMM_scatter(const NDArray A,
 
 }  // namespace cuda
 
-/* \brief Implementation of SegmentMM operator. Each segment calls cuBLAS
- * GEMM operator to multiply segment of A and B. When A or B needs to be
- * tranposed, cuBLAS GEMM switches it's transpose parameter (CUBLAS_OP_T).
+/*!
+ * \brief Implementation of Gather_mm operator. The input matrix A is
+ *        expected to be sorted according to relation type.
+ * \param A The input dense matrix of dimension m x k
+ * \param B The input dense matrix of dimension k x n
+ * \param C The output dense matrix of dimension m x n
+ * \param seglen_A The input vector of size R. Each element
+ *        is the length of segments of input ``A``
+ * \param a_trans Matrix A to be transposed
+ * \param b_trans Matrix B to be transposed
  */
 template <int XPU, typename IdType, int bits>
-void segment_mm(const NDArray A,
-                const NDArray B,
-                NDArray C,
-                const NDArray seglen_A,
-                bool a_trans, bool b_trans) {
+void SegmentMM(const NDArray A,
+               const NDArray B,
+               NDArray C,
+               const NDArray seglen_A,
+               bool a_trans, bool b_trans) {
     SWITCH_BITS(bits, DType, {
         auto device = runtime::DeviceAPI::Get(A->ctx);
         const DType *A_data = A.Ptr<DType>();
@@ -385,24 +392,58 @@ void segment_mm(const NDArray A,
     });
 }
 
-/*!
- * \brief Implementation of Gather_mm operator. The input matrix A is
- *        expected to be sorted according to relation type.
- * \param A The input dense matrix of dimension m x k
- * \param B The input dense matrix of dimension k x n
- * \param C The output dense matrix of dimension m x n
- * \param seglen_A The input vector of size R. Each element
- *        is the length of segments of input ``A``
- * \param a_trans Matrix A to be transposed
- * \param b_trans Matrix B to be transposed
- */
 template <int XPU, typename IdType, int bits>
-void segmentMM(const NDArray A,
-          const NDArray B,
-          NDArray C,
-          const NDArray seglen_A,
-          bool a_trans, bool b_trans) {
-    segment_mm<XPU, IdType, bits>(A, B, C, seglen_A, a_trans, b_trans);
+void SegmentMMBackwardB(const NDArray A,
+                        const NDArray dC,
+                        NDArray dB,
+                        const NDArray seglen) {
+    SWITCH_BITS(bits, DType, {
+        auto device = runtime::DeviceAPI::Get(A->ctx);
+        const DType *A_data = A.Ptr<DType>();
+        const DType *dC_data = dC.Ptr<DType>();
+        const IdType* seglen_data = seglen.Ptr<IdType>();
+        DType *dB_data = dB.Ptr<DType>();
+        int64_t A_offset = 0, dC_offset = 0, dB_offset = 0;
+        int64_t m, n, k;
+        int64_t num_rel = seglen.NumElements();
+        DType alpha = 1., beta = 1.;
+
+        auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+        if (!thr_entry->cublas_handle)
+            CUBLAS_CALL(cublasCreate(&(thr_entry->cublas_handle)));
+        CUBLAS_CALL(cublasSetStream(thr_entry->cublas_handle,
+            thr_entry->stream));
+
+        IdType m_offset = 0;
+        for (IdType etype = 0; etype < num_rel; ++etype) {
+            CHECK_LT(m_offset, A->shape[0]) << "Segement index out of bound of A->shape[0].";
+            m = seglen_data[etype];  // rows of A
+            n = B->shape[2];  // cols of B
+            k = B->shape[1];  // cols of A == rows of B
+            int ldb = n, lda = k, ldc = n;
+            cublasOperation_t transB = CUBLAS_OP_N;
+            cublasOperation_t transA = CUBLAS_OP_N;
+            //if (a_trans) {
+                //transA = CUBLAS_OP_T;
+                //ldb = n, lda = k, ldc = n;
+                //std::swap(m, k);
+            //}
+            CUBLAS_CALL(cublasGemm<DType>(
+                thr_entry->cublas_handle,
+                transB,
+                transA,
+                n, m, k,
+                &alpha,
+                B_data + B_offset, ldb,
+                A_data + A_offset, lda,
+                &beta,
+                C_data + C_offset, ldc));
+            A_offset += m * k;
+            B_offset += k * n;
+            C_offset += m * n;
+            m_offset += m;
+        }
+    });
 }
 
 /*!
@@ -496,24 +537,37 @@ template void gatherMM_scatter<kDLGPU, int64_t, 64>(
     const NDArray idx_a, const NDArray idx_b, const NDArray idx_c,
     const int num_rel, bool a_trans, bool b_trans);
 
-template void segmentMM<kDLGPU, int32_t, 16>(
+template void SegmentMM<kDLGPU, int32_t, 16>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray seglen_A, bool a_trans, bool b_trans);
-template void segmentMM<kDLGPU, int64_t, 16>(
+template void SegmentMM<kDLGPU, int64_t, 16>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray seglen_A, bool a_trans, bool b_trans);
-template void segmentMM<kDLGPU, int32_t, 32>(
+template void SegmentMM<kDLGPU, int32_t, 32>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray seglen_A, bool a_trans, bool b_trans);
-template void segmentMM<kDLGPU, int64_t, 32>(
+template void SegmentMM<kDLGPU, int64_t, 32>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray seglen_A, bool a_trans, bool b_trans);
-template void segmentMM<kDLGPU, int32_t, 64>(
+template void SegmentMM<kDLGPU, int32_t, 64>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray seglen_A, bool a_trans, bool b_trans);
-template void segmentMM<kDLGPU, int64_t, 64>(
+template void SegmentMM<kDLGPU, int64_t, 64>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray seglen_A, bool a_trans, bool b_trans);
+
+template void SegmentMMBackwardB<kDLGPU, int32_t, 16>(
+    const NDArray A, const NDArray dC, NDArray dB, const NDArray seglen);
+template void SegmentMMBackwardB<kDLGPU, int64_t, 16>(
+    const NDArray A, const NDArray dC, NDArray dB, const NDArray seglen);
+template void SegmentMMBackwardB<kDLGPU, int32_t, 32>(
+    const NDArray A, const NDArray dC, NDArray dB, const NDArray seglen);
+template void SegmentMMBackwardB<kDLGPU, int64_t, 32>(
+    const NDArray A, const NDArray dC, NDArray dB, const NDArray seglen);
+template void SegmentMMBackwardB<kDLGPU, int32_t, 64>(
+    const NDArray A, const NDArray dC, NDArray dB, const NDArray seglen);
+template void SegmentMMBackwardB<kDLGPU, int64_t, 64>(
+    const NDArray A, const NDArray dC, NDArray dB, const NDArray seglen);
 
 }  // namespace aten
 }  // namespace dgl

@@ -72,10 +72,28 @@ void SegmentMM(const NDArray A,
     << "segment_mm operator expects len(seglen_A) == B.shape[0]";
   CHECK_EQ(seglen_A->ctx.device_type, kDLCPU)
     << "segment_mm expects seglen_A to be on CPU.";
-  ATEN_XPU_SWITCH_CUDA(A->ctx.device_type, XPU, "GatherMM", {
+  ATEN_XPU_SWITCH_CUDA(A->ctx.device_type, XPU, "SegmentMM", {
     ATEN_ID_TYPE_SWITCH(seglen_A->dtype, IdType, {
       ATEN_FLOAT_BITS_SWITCH(A->dtype, bits, "Feature data", {
-        segmentMM<XPU, IdType, bits>(A, B, C, seglen_A, A_trans, B_trans);
+        SegmentMM<XPU, IdType, bits>(A, B, C, seglen_A, A_trans, B_trans);
+      });
+    });
+  });
+}
+
+void SegmentMMBackwardB(const NDArray A,
+                        const NDArray dC,
+                        NDArray dB,
+                        const NDArray seglen) {
+  CHECK_EQ(A->ndim, 2) << "segment_mm_backward operator expects a 2D tensor for the first input.";
+  CHECK_EQ(dC->ndim, 2)
+    << "segment_mm_backward operator expects a 2D tensor for the second input.";
+  CHECK_EQ(seglen->ctx.device_type, kDLCPU)
+    << "segment_mm expects seglen_A to be on CPU.";
+  ATEN_XPU_SWITCH_CUDA(A->ctx.device_type, XPU, "SegmentMMBackwardB", {
+    ATEN_ID_TYPE_SWITCH(seglen_A->dtype, IdType, {
+      ATEN_FLOAT_BITS_SWITCH(A->dtype, bits, "Feature data", {
+        SegmentMMBackwardB<XPU, IdType, bits>(A, dC, dB, seglen);
       });
     });
   });
@@ -491,6 +509,15 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSEGMENTMM")
     bool A_trans = args[4];
     bool B_trans = args[5];
     SegmentMM(A, B, C, seglen_A, A_trans, B_trans);
+  });
+
+DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSEGMENTMMBackwardB")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    NDArray A = args[0];
+    NDArray dC = args[1];
+    NDArray dB = args[2];
+    NDArray seglen = args[3];
+    SegmentMMBackwardB(A, dC, dB, seglen);
   });
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelEdge_softmax_forward")

@@ -139,11 +139,17 @@ void gatherMM_scatter(const NDArray A,
  * \brief Generalized segmented dense Matrix-Matrix Multiplication.
  */
 template <int XPU, typename IdType, int bits>
-void segmentMM(const NDArray A,
-          const NDArray B,
-          NDArray out,
-          const NDArray seglen_A,
-          bool a_trans, bool b_trans);
+void SegmentMM(const NDArray A,
+               const NDArray B,
+               NDArray out,
+               const NDArray seglen_A,
+               bool a_trans, bool b_trans);
+
+template <int XPU, typename IdType, int bits>
+void SegmentMMBackwardB(const NDArray A,
+                        const NDArray dC,
+                        NDArray dB,
+                        const NDArray seglen);
 
 /*!
  * \brief Segment reduce.

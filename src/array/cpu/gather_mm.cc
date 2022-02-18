@@ -23,9 +23,9 @@ namespace aten {
   } while (0)
 
 
-/*! \brief Generalized segmentMM. */
+/*! \brief Generalized SegmentMM. */
 template <int XPU, typename IdType, int bits>
-void segmentMM(const NDArray A,
+void SegmentMM(const NDArray A,
           const NDArray B,
           NDArray C,
           const NDArray seglen_A,
@@ -107,22 +107,22 @@ template void gatherMM_scatter<kDLCPU, int64_t, 64>(
     const NDArray idx_a, const NDArray idx_b, const NDArray idx_c,
     const int num_rel, bool a_trans, bool b_trans);
 
-template void segmentMM<kDLCPU, int32_t, 16>(
+template void SegmentMM<kDLCPU, int32_t, 16>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray seglen_A, bool a_trans, bool b_trans);
-template void segmentMM<kDLCPU, int64_t, 16>(
+template void SegmentMM<kDLCPU, int64_t, 16>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray seglen_A, bool a_trans, bool b_trans);
-template void segmentMM<kDLCPU, int32_t, 32>(
+template void SegmentMM<kDLCPU, int32_t, 32>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray seglen_A, bool a_trans, bool b_trans);
-template void segmentMM<kDLCPU, int64_t, 32>(
+template void SegmentMM<kDLCPU, int64_t, 32>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray seglen_A, bool a_trans, bool b_trans);
-template void segmentMM<kDLCPU, int32_t, 64>(
+template void SegmentMM<kDLCPU, int32_t, 64>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray seglen_A, bool a_trans, bool b_trans);
-template void segmentMM<kDLCPU, int64_t, 64>(
+template void SegmentMM<kDLCPU, int64_t, 64>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray seglen_A, bool a_trans, bool b_trans);
 
