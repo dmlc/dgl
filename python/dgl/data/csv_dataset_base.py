@@ -78,7 +78,9 @@ def _validate_data_length(data_dict):
 
 
 def _tensor(data, dtype=None):
-    """Float64 is not supported in DGL kernels, so let's convert to float32."""
+    """Float32 is the default dtype for float tensor in DGL
+    so let's cast float64 into float32 to avoid dtype mismatch.
+    """
     ret = F.tensor(data, dtype)
     if F.dtype(ret) == F.float64:
         ret = F.tensor(ret, dtype=F.float32)
