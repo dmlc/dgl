@@ -219,7 +219,7 @@ class AsLinkPredDataset(DGLDataset):
     def __init__(self,
                  dataset,
                  split_ratio=None,
-                 neg_ratio=None,
+                 neg_ratio=3,
                  **kwargs):
         self.g = dataset[0]
         self.num_nodes = self.g.num_nodes()
@@ -230,7 +230,7 @@ class AsLinkPredDataset(DGLDataset):
                          hash_key=(neg_ratio, split_ratio), **kwargs)
 
     def process(self):
-        if (self.split_ratio is None) and (self.neg_ratio is None):
+        if self.split_ratio is None:
             # Handle logics for OGB link prediction dataset
             assert hasattr(self.dataset, "get_edge_split"), \
                 "dataset doesn't have get_edge_split method, please specify split_ratio and neg_ratio to generate the split"
