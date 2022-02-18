@@ -83,7 +83,7 @@ valid_dataloader = dgl.dataloading.NodeDataLoader(
         drop_last=False, num_workers=0, use_uva=USE_UVA)
 
 durations = []
-for _ in range(10):
+for _ in range(10000):
     model.train()
     t0 = time.time()
     for it, (input_nodes, output_nodes, blocks) in enumerate(train_dataloader):
@@ -98,20 +98,21 @@ for _ in range(10):
             acc = MF.accuracy(y_hat, y)
             mem = torch.cuda.max_memory_allocated() / 1000000
             print('Loss', loss.item(), 'Acc', acc.item(), 'GPU Mem', mem, 'MB')
-    tt = time.time()
-    print(tt - t0)
-    durations.append(tt - t0)
+        break
+    #tt = time.time()
+    #print(tt - t0)
+    #durations.append(tt - t0)
 
-    model.eval()
-    ys = []
-    y_hats = []
-    for it, (input_nodes, output_nodes, blocks) in enumerate(valid_dataloader):
-        with torch.no_grad():
-            x = blocks[0].srcdata['feat']
-            ys.append(blocks[-1].dstdata['label'])
-            y_hats.append(model(blocks, x))
-    acc = MF.accuracy(torch.cat(y_hats), torch.cat(ys))
-    print('Validation acc:', acc.item())
+    #model.eval()
+    #ys = []
+    #y_hats = []
+    #for it, (input_nodes, output_nodes, blocks) in enumerate(valid_dataloader):
+    #    with torch.no_grad():
+    #        x = blocks[0].srcdata['feat']
+    #        ys.append(blocks[-1].dstdata['label'])
+    #        y_hats.append(model(blocks, x))
+    #acc = MF.accuracy(torch.cat(y_hats), torch.cat(ys))
+    #print('Validation acc:', acc.item())
 
 print(np.mean(durations[4:]), np.std(durations[4:]))
 
