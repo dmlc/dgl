@@ -1,6 +1,6 @@
 """DGL PyTorch DataLoaders"""
 from collections.abc import Mapping, Sequence
-from queue import Queue
+from queue import Queue, Empty, Full
 import itertools
 import threading
 from distutils.version import LooseVersion
@@ -8,6 +8,8 @@ import random
 import math
 import inspect
 import re
+import atexit
+import os
 
 import torch
 import torch.distributed as dist
@@ -24,6 +26,14 @@ from ..frame import LazyFeature
 from ..storages import wrap_storage
 from .base import BlockSampler, EdgeBlockSampler
 from .. import backend as F
+
+python_exit_status = False
+def _set_python_exit_flag():
+    global python_exit_status
+    python_exit_status = True
+atexit.register(_set_python_exit_flag)
+
+prefetcher_timeout = int(os.environ.get('DGL_PREFETCHER_TIMEOUT', '10'))
 
 class _TensorizedDatasetIter(object):
     def __init__(self, dataset, batch_size, drop_last, mapping_keys):
@@ -318,8 +328,9 @@ def _assign_for(item, feat):
 def _put_if_event_not_set(queue, result, event):
     while not event.is_set():
         try:
-            queue.put(result, timeout=5000)
-        except queue.Full:
+            queue.put(result, timeout=1.0)
+            break
+        except Full:
             continue
 
 def _prefetcher_entry(
@@ -437,14 +448,25 @@ class _PrefetchingIter(object):
         return self
 
     def _shutdown(self):
+        # Sometimes when Python is exiting complicated operations like
+        # self.queue.get_nowait() will hang.  So we set it to no-op and let Python handle
+        # the rest since the thread is daemonic.
+        # PyTorch takes the same solution.
+        if python_exit_status is True or python_exit_status is None:
+            return
         if not self._shutting_down:
-            self._shutting_down = True
-            self._done_event.set()
             try:
-                self.queue.get_nowait()     # In case the thread is blocking on put().
-            except Queue.Empty:
+                self._shutting_down = True
+                self._done_event.set()
+
+                try:
+                    self.queue.get_nowait()     # In case the thread is blocking on put().
+                except:
+                    pass
+
+                self.thread.join()
+            except:
                 pass
-            self.thread.join()
 
     def __del__(self):
         if self.use_thread:
@@ -464,7 +486,11 @@ class _PrefetchingIter(object):
         return batch, feats, stream_event
 
     def _next_threaded(self):
-        batch, feats, stream_event, exception = self.queue.get()
+        try:
+            batch, feats, stream_event, exception = self.queue.get(timeout=prefetcher_timeout)
+        except Empty:
+            raise RuntimeError(
+                f'Prefetcher thread timed out at {prefetcher_timeout} seconds.')
         if batch is None:
             self.thread.join()
             if exception is None:
