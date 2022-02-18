@@ -634,7 +634,118 @@ class DataLoader(torch.utils.data.DataLoader):
 
 # Alias
 class NodeDataLoader(DataLoader):
-    """NodeDataLoader class."""
+    """PyTorch dataloader for batch-iterating over a set of nodes, generating the list
+    of message flow graphs (MFGs) as computation dependency of the said minibatch.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The graph.
+    nids : Tensor or dict[ntype, Tensor]
+        The node set to compute outputs.
+    graph_sampler : dgl.dataloading.Sampler
+        The neighborhood sampler.
+    device : device context, optional
+        The device of the generated MFGs in each iteration, which should be a
+        PyTorch device object (e.g., ``torch.device``).
+
+        By default this value is the same as the device of :attr:`g`.
+    use_ddp : boolean, optional
+        If True, tells the DataLoader to split the training set for each
+        participating process appropriately using
+        :class:`torch.utils.data.distributed.DistributedSampler`.
+
+        Note that :func:`~dgl.dataloading.NodeDataLoader.set_epoch` must be called
+        at the beginning of every epoch if :attr:`use_ddp` is True.
+
+        Overrides the :attr:`sampler` argument of :class:`torch.utils.data.DataLoader`.
+    ddp_seed : int, optional
+        The seed for shuffling the dataset in
+        :class:`torch.utils.data.distributed.DistributedSampler`.
+
+        Only effective when :attr:`use_ddp` is True.
+    use_uva : bool, optional
+        Whether to use Unified Virtual Addressing (UVA) to directly sample the graph
+        and slice the features from CPU into GPU.  Setting it to True will pin the
+        graph and feature tensors into pinned memory.
+
+        Default: False.
+    use_prefetch_thread : bool, optional
+        (Advanced option)
+        Spawns a new Python thread to perform feature slicing
+        asynchronously.  Can make things faster at the cost of GPU memory.
+
+        Default: True if the graph is on CPU and :attr:`device` is CUDA.  False otherwise.
+    use_alternate_streams : bool, optional
+        (Advanced option)
+        Whether to slice and transfers the features to GPU on a non-default stream.
+
+        Default: True if the graph is on CPU, :attr:`device` is CUDA, and :attr:`use_uva`
+        is False.  False otherwise.
+    pin_prefetcher : bool, optional
+        (Advanced option)
+        Whether to pin the feature tensors into pinned memory.
+
+        Default: True if the graph is on CPU and :attr:`device` is CUDA.  False otherwise.
+    batch_size : int, optional
+    drop_last : bool, optional
+    shuffle : bool, optional
+    kwargs : dict
+        Arguments being passed to :py:class:`torch.utils.data.DataLoader`.
+
+    Examples
+    --------
+    To train a 3-layer GNN for node classification on a set of nodes ``train_nid`` on
+    a homogeneous graph where each node takes messages from all neighbors (assume
+    the backend is PyTorch):
+
+    >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
+    >>> dataloader = dgl.dataloading.NodeDataLoader(
+    ...     g, train_nid, sampler,
+    ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
+    >>> for input_nodes, output_nodes, blocks in dataloader:
+    ...     train_on(input_nodes, output_nodes, blocks)
+
+    **Using with Distributed Data Parallel**
+
+    If you are using PyTorch's distributed training (e.g. when using
+    :mod:`torch.nn.parallel.DistributedDataParallel`), you can train the model by turning
+    on the `use_ddp` option:
+
+    >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
+    >>> dataloader = dgl.dataloading.NodeDataLoader(
+    ...     g, train_nid, sampler, use_ddp=True,
+    ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
+    >>> for epoch in range(start_epoch, n_epochs):
+    ...     dataloader.set_epoch(epoch)
+    ...     for input_nodes, output_nodes, blocks in dataloader:
+    ...         train_on(input_nodes, output_nodes, blocks)
+
+    Notes
+    -----
+    Please refer to
+    :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`
+    and :ref:`User Guide Section 6 <guide-minibatch>` for usage.
+
+    **Tips for selecting the proper device**
+
+    * If the input graph :attr:`g` is on GPU, the output device :attr:`device` must be the same GPU
+      and :attr:`num_workers` must be zero. In this case, the sampling and subgraph construction
+      will take place on the GPU. This is the recommended setting when using a single-GPU and
+      the whole graph fits in GPU memory.
+
+    * If the input graph :attr:`g` is on CPU while the output device :attr:`device` is GPU, then
+      depending on the value of :attr:`num_workers`:
+
+      - If :attr:`num_workers` is set to 0, the sampling will happen on the CPU, and then the
+        subgraphs will be constructed directly on the GPU. This hybrid mode is deprecated and
+        will be removed in the next release. Use UVA sampling instead, especially in
+        multi-GPU configurations.
+
+      - Otherwise, if :attr:`num_workers` is greater than 0, both the sampling and subgraph
+        construction will take place on the CPU. This is the recommended setting when using a
+        single-GPU and the whole graph does not fit in GPU memory.
+    """
 
 
 class EdgeDataLoader(DataLoader):
