@@ -852,11 +852,16 @@ def gather_mm(A, B, idx_a = None, idx_b = None):
         raise Exception("Found " + str(B.dim()) + " matrices in B. Expected " + str(A.shape[0]) +
             " matrices when idx_b is None.")
     if str(A.device) == "cpu":
-        C = []
-        for i in range(A.shape[0]):
-            idxA = idx_a[i] if idx_a is not None else i
-            idxB = idx_b[i] if idx_b is not None else i
-            C.append(A[idxA] @ B[idxB])
-        C = th.stack(C, 0)
+        # TODO(Israt): Customized condition for 0.8 release. Intel folks will be working on this.
+        if idx_a is None and idx_b is not None:
+            B_high_mem = B.index_select(0, idx_b)
+            C = th.bmm(A.unsqueeze(1), B_high_mem).squeeze(1)
+        else:
+            C = []
+            for i in range(A.shape[0]):
+                idxA = idx_a[i] if idx_a is not None else i
+                idxB = idx_b[i] if idx_b is not None else i
+                C.append(A[idxA] @ B[idxB])
+            C = th.stack(C, 0)
         return C
     return GATHERMM.apply(A, B, idx_a, idx_b)
