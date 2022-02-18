@@ -14,7 +14,6 @@ from ruamel.yaml.comments import CommentedMap
 
 class LinkpredPipelineCfg(BaseModel):
     hidden_size: int = 256
-    # early_stop: Optional[EarlyStopConfig] = EarlyStopConfig()
     eval_batch_size: int = 32769
     train_batch_size: int = 32769
     num_epochs: int = 200
@@ -30,15 +29,8 @@ pipeline_comments = {
     "train_batch_size": "Edge batch size when training",
     "num_epochs": "Number of training epochs",
     "eval_period": "Interval epochs between evaluations",
-    # "early_stop": {
-    #     "patience": "Steps before early stop",
-    #     "checkpoint_path": "Early stop checkpoint model file path"
-    # },
     "num_runs": "Number of experiments to run",
 }
-
-# def merge_comment(cfg_dict, comment_dict):
-
 
 
 @PipelineFactory.register("linkpred")
