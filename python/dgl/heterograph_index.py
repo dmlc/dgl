@@ -1064,13 +1064,6 @@ class HeteroSubgraphIndex(ObjectBase):
         ret = _CAPI_DGLHeteroSubgraphGetInducedEdges(self)
         return [F.from_dgl_nd(v) for v in ret]
 
-    def __del__(self):
-        try:
-            self.unpin_memory_()
-        except:     # pylint: disable=bare-except
-            pass
-        super().__del__()
-
 
 #################################################################
 # Creators

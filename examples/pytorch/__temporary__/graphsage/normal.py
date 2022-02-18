@@ -83,7 +83,7 @@ valid_dataloader = dgl.dataloading.NodeDataLoader(
         drop_last=False, num_workers=0, use_uva=USE_UVA)
 
 durations = []
-for _ in range(1):
+for _ in range(10):
     model.train()
     t0 = time.time()
     for it, (input_nodes, output_nodes, blocks) in enumerate(train_dataloader):
