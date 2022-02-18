@@ -5,7 +5,6 @@ from collections import namedtuple
 from collections.abc import MutableMapping
 
 from . import backend as F
-from . import utils
 from .base import DGLError, dgl_warning
 from .init import zero_initializer
 from .storages import TensorStorage
