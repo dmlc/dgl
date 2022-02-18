@@ -788,7 +788,7 @@ def test_gin_conv(g, idtype, aggregator_type):
     th.save(gin, tmp_buffer)
 
     assert h.shape == (g.number_of_dst_nodes(), 12)
-    
+
     gin = nn.GINConv(None, aggregator_type)
     th.save(gin, tmp_buffer)
     gin = gin.to(ctx)
@@ -1246,6 +1246,35 @@ def test_hetero_conv(agg, idtype):
              {'user': uf, 'game': gf, 'store': sf[0:0]}))
     assert set(h.keys()) == {'user', 'game'}
 
+@pytest.mark.parametrize('out_dim', [1, 2, 100])
+def test_hetero_linear(out_dim):
+    in_feats = {
+        'user': F.randn((2, 1)),
+        ('user', 'follows', 'user'): F.randn((3, 2))
+    }
+
+    layer = nn.HeteroLinear({'user': 1, ('user', 'follows', 'user'): 2}, out_dim)
+    layer = layer.to(F.ctx())
+    out_feats = layer(in_feats)
+    assert out_feats['user'].shape == (2, out_dim)
+    assert out_feats[('user', 'follows', 'user')].shape == (3, out_dim)
+
+@pytest.mark.parametrize('out_dim', [1, 2, 100])
+def test_hetero_embedding(out_dim):
+    layer = nn.HeteroEmbedding({'user': 2, ('user', 'follows', 'user'): 3}, out_dim)
+    layer = layer.to(F.ctx())
+
+    embeds = layer.weight
+    assert embeds['user'].shape == (2, out_dim)
+    assert embeds[('user', 'follows', 'user')].shape == (3, out_dim)
+
+    embeds = layer({
+        'user': F.tensor([0], dtype=F.int64),
+        ('user', 'follows', 'user'): F.tensor([0, 2], dtype=F.int64)
+    })
+    assert embeds['user'].shape == (1, out_dim)
+    assert embeds[('user', 'follows', 'user')].shape == (2, out_dim)
+
 @parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
 @pytest.mark.parametrize('out_dim', [1, 2])
@@ -1348,13 +1377,13 @@ def test_ke_score_funcs():
     score_func(h_src, h_dst, rels).shape == (num_edges)
 
 
-def test_twirls(): 
+def test_twirls():
     g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
     feat = th.ones(6, 10)
     conv = nn.TWIRLSConv(10, 2, 128, prop_step = 64)
     res = conv(g , feat)
     assert ( res.size() == (6,2) )
-    
+
 
 
 if __name__ == '__main__':

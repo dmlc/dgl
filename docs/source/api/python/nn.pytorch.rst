@@ -299,9 +299,21 @@ Heterogeneous Graph Convolution Module
 ----------------------------------------
 
 HeteroGraphConv
-~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: dgl.nn.pytorch.HeteroGraphConv
+   :members:
+   :show-inheritance:
+
+HeteroLinear
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. autoclass:: dgl.nn.pytorch.HeteroLinear
+   :members:
+   :show-inheritance:
+
+HeteroEmbedding
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. autoclass:: dgl.nn.pytorch.HeteroEmbedding
    :members:
    :show-inheritance:
 

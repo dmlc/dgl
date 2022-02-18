@@ -49,6 +49,10 @@ class DGLDataset(object):
         Whether to reload the dataset. Default: False
     verbose : bool
         Whether to print out progress information
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Attributes
     ----------
@@ -72,13 +76,14 @@ class DGLDataset(object):
         Hash value for the dataset and the setting.
     """
     def __init__(self, name, url=None, raw_dir=None, save_dir=None,
-                 hash_key=(), force_reload=False, verbose=False):
+                 hash_key=(), force_reload=False, verbose=False, transform=None):
         self._name = name
         self._url = url
         self._force_reload = force_reload
         self._verbose = verbose
         self._hash_key = hash_key
         self._hash = self._get_hash()
+        self._transform = transform
 
         # if no dir is provided, the default dgl download dir is used.
         if raw_dir is None:
@@ -142,7 +147,7 @@ class DGLDataset(object):
     def _download(self):
         """Download dataset by calling ``self.download()``
         if the dataset does not exists under ``self.raw_path``.
-        
+
         By default ``self.raw_path = os.path.join(self.raw_dir, self.name)``
         One can overwrite ``raw_path()`` function to change the path.
         """
@@ -161,7 +166,7 @@ class DGLDataset(object):
           - If loadin process fails, re-download and process the dataset.
 
         else:
-        
+
           - Download the dataset if needed.
           - Process the dataset and build the dgl graph.
           - Save the processed dataset into files.
@@ -287,17 +292,23 @@ class DGLBuiltinDataset(DGLDataset):
         from the same dataset class by comparing the hash values.
     force_reload : bool
         Whether to reload the dataset. Default: False
-    verbose: bool
+    verbose : bool
         Whether to print out progress information. Default: False
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
     """
-    def __init__(self, name, url, raw_dir=None, hash_key=(), force_reload=False, verbose=False):
+    def __init__(self, name, url, raw_dir=None, hash_key=(),
+                 force_reload=False, verbose=False, transform=None):
         super(DGLBuiltinDataset, self).__init__(name,
                                                 url=url,
                                                 raw_dir=raw_dir,
                                                 save_dir=None,
                                                 hash_key=hash_key,
                                                 force_reload=force_reload,
-                                                verbose=verbose)
+                                                verbose=verbose,
+                                                transform=transform)
 
     def download(self):
         r""" Automatically download data and extract it.
