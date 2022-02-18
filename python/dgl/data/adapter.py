@@ -72,29 +72,49 @@ class AsNodePredDataset(DGLDataset):
                  split_ratio=None,
                  target_ntype=None,
                  **kwargs):
-        self.g = dataset[0].clone()
+        self.dataset = dataset
         self.split_ratio = split_ratio
         self.target_ntype = target_ntype
-        self.num_classes = getattr(dataset, 'num_classes', None)
-        super().__init__(dataset.name + '-as-nodepred',
+        super().__init__(self.dataset.name + '-as-nodepred',
                          hash_key=(split_ratio, target_ntype), **kwargs)
 
     def process(self):
+        is_ogb = hasattr(self.dataset, 'get_idx_split')
+        if is_ogb:
+            g, label = self.dataset[0]
+            self.g = g.clone()
+            self.g.ndata['label'] = F.reshape(label, (g.num_nodes(),))
+        else:
+            self.g = self.dataset[0].clone()
+
         if 'label' not in self.g.nodes[self.target_ntype].data:
             raise ValueError("Missing node labels. Make sure labels are stored "
                              "under name 'label'.")
+
         if self.split_ratio is None:
-            assert "train_mask" in self.g.nodes[self.target_ntype].data, \
-                "train_mask is not provided, please specify split_ratio to generate the masks"
-            assert "val_mask" in self.g.nodes[self.target_ntype].data, \
-                "val_mask is not provided, please specify split_ratio to generate the masks"
-            assert "test_mask" in self.g.nodes[self.target_ntype].data, \
-                "test_mask is not provided, please specify split_ratio to generate the masks"
+            if is_ogb:
+                split = self.dataset.get_idx_split()
+                train_idx, val_idx, test_idx = split['train'], split['valid'], split['test']
+                n = self.g.num_nodes()
+                train_mask = utils.generate_mask_tensor(utils.idx2mask(train_idx, n))
+                val_mask = utils.generate_mask_tensor(utils.idx2mask(val_idx, n))
+                test_mask = utils.generate_mask_tensor(utils.idx2mask(test_idx, n))
+                self.g.ndata['train_mask'] = train_mask
+                self.g.ndata['val_mask'] = val_mask
+                self.g.ndata['test_mask'] = test_mask
+            else:
+                assert "train_mask" in self.g.nodes[self.target_ntype].data, \
+                    "train_mask is not provided, please specify split_ratio to generate the masks"
+                assert "val_mask" in self.g.nodes[self.target_ntype].data, \
+                    "val_mask is not provided, please specify split_ratio to generate the masks"
+                assert "test_mask" in self.g.nodes[self.target_ntype].data, \
+                    "test_mask is not provided, please specify split_ratio to generate the masks"
         else:
             if self.verbose:
                 print('Generating train/val/test masks...')
             utils.add_nodepred_split(self, self.split_ratio, self.target_ntype)
 
+        self.num_classes = getattr(self.dataset, 'num_classes', None)
         if self.num_classes is None:
             self.num_classes = len(F.unique(self.g.nodes[self.target_ntype].data['label']))
 
@@ -169,7 +189,7 @@ class AsLinkPredDataset(DGLDataset):
         Split ratios for training, validation and test sets. Must sum to one.
     neg_ratio : int, optional
         Indicate how much negative samples to be sampled
-        The number of the negative samples will be neg_ratio * num_positive_edges.
+        The number of the negative samples will be equal or less than neg_ratio * num_positive_edges.
 
     Attributes
     -------
@@ -211,24 +231,42 @@ class AsLinkPredDataset(DGLDataset):
 
     def process(self):
         if self.split_ratio is None:
+            # Handle logics for OGB link prediction dataset
             assert hasattr(self.dataset, "get_edge_split"), \
                 "dataset doesn't have get_edge_split method, please specify split_ratio and neg_ratio to generate the split"
             # This is likely to be an ogb dataset
             self.edge_split = self.dataset.get_edge_split()
             self._train_graph = self.g
+            if 'source_node' in self.edge_split["test"]:
+                # Probably ogbl-citation2
+                pos_e = (self.edge_split["valid"]["source_node"], self.edge_split["valid"]["target_node"])
+                neg_e_size = self.edge_split["valid"]['target_node_neg'].shape[-1]
+                neg_e_src = np.repeat(self.edge_split['valid']['source_node'], neg_e_size)
+                neg_e_dst = np.reshape(self.edge_split["valid"]["target_node_neg"], -1)
+                self._val_edges = pos_e, (neg_e_src, neg_e_dst)
+                pos_e = (self.edge_split["test"]["source_node"], self.edge_split["test"]["target_node"])
+                neg_e_size = self.edge_split["test"]['target_node_neg'].shape[-1]
+                neg_e_src = np.repeat(self.edge_split['test']['source_node'], neg_e_size)
+                neg_e_dst = np.reshape(self.edge_split["test"]["target_node_neg"], -1)
+                self._test_edges = pos_e, (neg_e_src, neg_e_dst)
+            elif 'edge' in self.edge_split["test"]:
+                # Probably ogbl-collab
+                pos_e_tensor, neg_e_tensor = self.edge_split["valid"][
+                    "edge"], self.edge_split["valid"]["edge_neg"]
+                pos_e = (pos_e_tensor[:, 0], pos_e_tensor[:, 1])
+                neg_e = (neg_e_tensor[:, 0], neg_e_tensor[:, 1])
+                self._val_edges = pos_e, neg_e
 
-            pos_e_tensor, neg_e_tensor = self.edge_split["valid"][
-                "edge"], self.edge_split["valid"]["edge_neg"]
-            pos_e = (pos_e_tensor[:, 0], pos_e_tensor[:, 1])
-            neg_e = (neg_e_tensor[:, 0], neg_e_tensor[:, 1])
-            self._val_edges = pos_e, neg_e
-
-            pos_e_tensor, neg_e_tensor = self.edge_split["test"][
-                "edge"], self.edge_split["test"]["edge_neg"]
-            pos_e = (pos_e_tensor[:, 0], pos_e_tensor[:, 1])
-            neg_e = (neg_e_tensor[:, 0], neg_e_tensor[:, 1])
-            self._test_edges = pos_e, neg_e
+                pos_e_tensor, neg_e_tensor = self.edge_split["test"][
+                    "edge"], self.edge_split["test"]["edge_neg"]
+                pos_e = (pos_e_tensor[:, 0], pos_e_tensor[:, 1])
+                neg_e = (neg_e_tensor[:, 0], neg_e_tensor[:, 1])
+                self._test_edges = pos_e, neg_e
+            # delete edge split to save memory
+            self.edge_split = None
         else:
+            assert self.split_ratio is not None, "Need to specify split_ratio"
+            assert self.neg_ratio is not None, "Need to specify neg_ratio"
             ratio = self.split_ratio
             graph = self.dataset[0]
             n = graph.num_edges()
