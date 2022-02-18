@@ -1,36 +1,9 @@
 """dgl gather_mm operator module."""
-from ..backend import gather_mm as gather_mm_internal
-from ..backend import segment_mm as segment_mm_internal
+from .. import backend as F
 
-__all__ = ['gather_mm', 'segment_mm']
+__all__ = ['gather_mm']
 
-def segment_mm(a, b, seglen_a):
-    r""" Performs matrix multiplication according to segments.
-
-    Suppose ``seglen_a == [10, 5, 0, 3]``, the operator will perform
-    four matrix multiplications::
-    
-        a[0:10] @ b[0], a[10:15] @ b[1],
-        a[15:15] @ b[2], a[15:18] @ b[3]
-
-    Parameters
-    ----------
-    a : Tensor
-        The left operand, 2-D tensor of shape ``(N, D1)``
-    b : Tensor
-        The right operand, 3-D tensor of shape ``(R, D1, D2)``
-    seglen_a : Tensor
-        An integer tensor of shape ``(R,)``. Each element is the length of segments
-        of input ``a``. The summation of all elements must be equal to ``N``.
-
-    Returns
-    -------
-    Tensor
-        The output dense matrix of shape ``(N, D2)``
-    """
-    return segment_mm_internal(a, b, seglen_a)
-
-def gather_mm(a, b, idx_a = None, idx_b = None):
+def gather_mm(a, b, idx_a=None, idx_b=None):
     r"""Gather data according to the given indices and perform matrix multiplication.
 
     Let the result tensor be ``c``, the operator conducts the following computation:
@@ -67,4 +40,19 @@ def gather_mm(a, b, idx_a = None, idx_b = None):
     Tensor
         The output dense matrix of shape ``(N, D2)``
     """
-    return gather_mm_internal(a, b, idx_a, idx_b)
+    if idx_a is None and idx_b is None:
+        raise ValueError('gather_mm operator requires at least one of idx_a or idx_b given.')
+    N, D1 = F.shape(a)
+    R, _, D2 = F.shape(b)
+    if ((idx_a is None and idx_b is not None) and
+        (N > 1000000 or D1 > 8 or D2 > 8)):
+        # Use segment_mm for large workload
+        import torch
+        sorted_idx_b, perm = torch.sort(idx_b)
+        sorted_a = a[perm]
+        pos_l = torch.searchsorted(sorted_idx_b, torch.arange(R, device=a.device))
+        pos_r = torch.cat([pos_l[1:], torch.tensor([len(idx_b)], device=a.device)])
+        seglen = (pos_r - pos_l).cpu()  # XXX(minjie): cause device synchronize
+        return F.segment_mm(sorted_a, b, seglen)
+    else:
+        return F.gather_mm(a, b, idx_a, idx_b)

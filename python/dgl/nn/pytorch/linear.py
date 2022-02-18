@@ -9,6 +9,11 @@ __all__ = ['TypedLinear']
 
 class TypedLinear(nn.Module):
     """Linear transformation according to types.
+
+    Given a batch of input samples :math:`X` and :math:`W` 
+
+    Parameters
+    ----------
     """
     def __init__(self, in_size, out_size, num_types,
                  regularizer=None, num_bases=None):
@@ -74,7 +79,7 @@ class TypedLinear(nn.Module):
             pos_l = torch.searchsorted(x_type, torch.arange(self.num_types, device=x.device))
             pos_r = torch.cat([pos_l[1:], torch.tensor([len(x_type)], device=x.device)])
             seglen = (pos_r - pos_l).cpu()  # XXX(minjie): cause device synchronize
-            return segment_mm(x, w, seglen)
+            return segment_mm(x, w, seglen_a=seglen)
         else:
             return gather_mm(x, w, idx_b=x_type)
 

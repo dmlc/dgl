@@ -834,7 +834,20 @@ def csrmask(gidxA, A_weights, gidxB):
     return CSRMask.apply(gidxA, A_weights, gidxB)
 
 def segment_mm(A, B, seglen_A):
-    return SEGMENTMM.apply(A, B, seglen_A)
+    if A.device.type == 'cpu':
+        C = []
+        off = 0
+        for i in range(B.shape[0]):
+            C.append(A[off:off+seglen_A[i]] @ B[i])
+            off += seglen_A[i]
+        return th.cat(C)
+    else:
+        return SEGMENTMM.apply(A, B, seglen_A)
 
-def gather_mm(A, B, idx_a = None, idx_b = None):
-    return GATHERMM.apply(A, B, idx_a, idx_b)
+def gather_mm(A, B, idx_A=None, idx_B=None):
+    if A.device.type == 'cpu':
+        A = A[idx_A] if idx_A is not None else A
+        B = B[idx_B] if idx_B is not None else B
+        return th.bmm(A.unsqueeze(1), B).squeeze(1)
+    else:
+        return GATHERMM.apply(A, B, idx_A, idx_B)
