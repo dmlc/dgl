@@ -6,8 +6,7 @@ from ..base import DGLError
 
 
 class CSVDataset(DGLDataset):
-    """ This class aims to parse data from CSV files, construct DGLGraph
-        and behaves as a DGLDataset.
+    """Dataset class that loads and parses graph data from CSV files.
 
     Parameters
     ----------
@@ -51,7 +50,9 @@ class CSVDataset(DGLDataset):
         any available graph-level data such as graph-level feature, labels.
 
     Examples
-    [TODO]: link to a detailed web page.
+    --------
+    Please refer to :ref:`guide-data-pipeline-loadcsv`.
+
     """
     META_YAML_NAME = 'meta.yaml'
 
