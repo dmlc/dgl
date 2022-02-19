@@ -1,14 +1,9 @@
 """Torch Module for Relational graph convolution layer"""
 # pylint: disable= no-member, arguments-differ, invalid-name
-import functools
-import numpy as np
 import torch as th
 from torch import nn
 
 from .... import function as fn
-from .. import utils
-from ....base import DGLError
-from .... import edge_subgraph
 from ..linear import TypedLinear
 
 class RelGraphConv(nn.Module):
@@ -133,6 +128,7 @@ class RelGraphConv(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def message(self, edges):
+        """Message function."""
         m = self.linear_r(edges.src['h'], edges.data['etype'])
         if 'norm' in edges.data:
             m = m * edges.data['norm']

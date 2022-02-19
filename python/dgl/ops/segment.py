@@ -105,7 +105,7 @@ def segment_mm(a, b, seglen_a):
 
     Suppose ``seglen_a == [10, 5, 0, 3]``, the operator will perform
     four matrix multiplications::
-    
+
         a[0:10] @ b[0], a[10:15] @ b[1],
         a[15:15] @ b[2], a[15:18] @ b[3]
 

@@ -13,7 +13,7 @@ class TypedLinear(nn.Module):
     For each sample of the input batch :math:`x \in X`, apply linear transformation
     :math:`xW_t`, where :math:`t` is the type of :math:`x`.
 
-    The module supports two regularization methods (basis-decomposition and 
+    The module supports two regularization methods (basis-decomposition and
     block-diagonal-decomposition) proposed by "`Modeling Relational Data
     with Graph Convolutional Networks <https://arxiv.org/abs/1703.06103>`__"
 
@@ -112,6 +112,7 @@ class TypedLinear(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
+        """Reset parameters"""
         if self.regularizer is None:
             nn.init.xavier_uniform_(self.W, gain=nn.init.calculate_gain('relu'))
         elif self.regularizer == 'basis':
@@ -124,6 +125,7 @@ class TypedLinear(nn.Module):
                 f'Supported regularizer options: "basis", "bdd", but got {regularizer}')
 
     def get_weight(self):
+        """Get type-wise weight"""
         if self.regularizer is None:
             return self.W
         elif self.regularizer == 'basis':
@@ -145,7 +147,7 @@ class TypedLinear(nn.Module):
         x_type : torch.Tensor
             A 1D integer tensor. Each element is the corresponding type of ``x``. Shape: (N,)
         sorted_by_type : bool, optional
-            Whether the inputs have been sorted by the types. Forward on pre-sorted inputs may 
+            Whether the inputs have been sorted by the types. Forward on pre-sorted inputs may
             be faster.
 
         Returns
