@@ -77,6 +77,15 @@ def _validate_data_length(data_dict):
             "All data are required to have same length while some of them does not. Length of data={}".format(str(len_dict)))
 
 
+def _tensor(data, dtype=None):
+    """Float32 is the default dtype for float tensor in DGL
+    so let's cast float64 into float32 to avoid dtype mismatch.
+    """
+    ret = F.tensor(data, dtype)
+    if F.dtype(ret) == F.float64:
+        ret = F.tensor(ret, dtype=F.float32)
+    return ret
+
 class BaseData:
     """ Class of base data which is inherited by Node/Edge/GraphData. Internal use only. """
     @staticmethod
@@ -137,7 +146,7 @@ class NodeData(BaseData):
                     node_dict[graph_id] = {}
                 node_dict[graph_id][n_data.type] = {'mapping': {index: i for i,
                                                                 index in enumerate(ids[u_indices])},
-                                                    'data': {k: F.tensor(v[idx][u_indices])
+                                                    'data': {k: _tensor(v[idx][u_indices])
                                                              for k, v in n_data.data.items()}}
         return node_dict
 
@@ -187,8 +196,8 @@ class EdgeData(BaseData):
                 dst_ids = [dst_mapping[index] for index in e_data.dst[idx]]
                 if graph_id not in edge_dict:
                     edge_dict[graph_id] = {}
-                edge_dict[graph_id][e_data.type] = {'edges': (F.tensor(src_ids), F.tensor(dst_ids)),
-                                                    'data': {k: F.tensor(v[idx])
+                edge_dict[graph_id][e_data.type] = {'edges': (_tensor(src_ids), _tensor(dst_ids)),
+                                                    'data': {k: _tensor(v[idx])
                                                              for k, v in e_data.data.items()}}
         return edge_dict
 
@@ -226,7 +235,7 @@ class GraphData(BaseData):
                     {('_V', '_E', '_V'): ([], [])})
         for graph_id in graph_ids:
             graphs.append(graphs_dict[graph_id])
-        data = {k: F.tensor(v) for k, v in graph_data.data.items()}
+        data = {k: _tensor(v) for k, v in graph_data.data.items()}
         return graphs, data
 
 
