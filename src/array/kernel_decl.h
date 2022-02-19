@@ -116,24 +116,22 @@ void SDDMMCooHetero(const std::string& op,
  * \brief Generalized Dense Matrix-Matrix Multiplication according to relation types.
  */
 template <int XPU, typename IdType, int bits>
-void gatherMM(const NDArray A,
-          const NDArray B,
-          NDArray out,
-          const NDArray idx_a,
-          const NDArray idx_b,
-          const int num_rel);
+void GatherMM(const NDArray A,
+              const NDArray B,
+              NDArray out,
+              const NDArray idx_a,
+              const NDArray idx_b);
 
 /*!
  * \brief Generalized Dense Matrix-Matrix Multiplication according to relation types.
  */
 template <int XPU, typename IdType, int bits>
-void gatherMM_scatter(const NDArray A,
+void GatherMMScatter(const NDArray A,
           const NDArray B,
           NDArray out,
           const NDArray idx_a,
           const NDArray idx_b,
-          const NDArray idx_c,
-          const int num_rel, bool a_trans, bool b_trans);
+          const NDArray idx_c);
 
 /*!
  * \brief Generalized segmented dense Matrix-Matrix Multiplication.

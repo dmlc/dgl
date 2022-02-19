@@ -725,30 +725,26 @@ class GATHERMM(th.autograd.Function):
     @custom_fwd(cast_inputs=th.float16)
     def forward(ctx, A, B, idx_a, idx_b):
         if B.dim() != 3:
-            raise Exception("Expected dimension of B is 3. Got " + str(B.dim()))
-        # Reshaping B form 3D to 2D
-        B_3D_shape = B.shape
-        B = B.reshape(B.shape[0] * B.shape[1], B.shape[2])
-        C = th.zeros((A.shape[0], B.shape[1]), device=A.device, dtype=A.dtype)
-        C = _gather_mm(A, B, C, B_3D_shape[0], idx_a, idx_b)
-        ctx.backward_cache = A, B, idx_a, idx_b, B_3D_shape
+            raise ValueError("Expected dimension of B is 3. Got " + str(B.dim()))
+        N = len(idx_b) if idx_a is None else len(idx_a)
+        C = th.zeros((N, B.shape[2]), device=A.device, dtype=A.dtype)
+        C = _gather_mm(A, B, C, idx_a, idx_b)
+        ctx.backward_cache = A, B, idx_a, idx_b
         return C
 
     @staticmethod
     def backward(ctx, dZ):
-        A, B, idx_a, idx_b, B_3D_shape = ctx.backward_cache
+        A, B, idx_a, idx_b = ctx.backward_cache
         A_grad = B_grad = None
         if ctx.needs_input_grad[0]:
             #  Compute A_grad = Out_grad * B^T
             A_grad = th.zeros(A.shape, device=A.device, dtype=A.dtype)
-            A_grad = _gather_mm_scatter(dZ, B, A_grad, B_3D_shape[0],
-                idx_b=idx_b, idx_c=idx_a, b_trans=True)
+            A_grad = _gather_mm_scatter(dZ, B.transpose(1, 2), A_grad,
+                idx_b=idx_b, idx_c=idx_a)
         if ctx.needs_input_grad[1]:
             #  Compute B_grad = A^T * Out_grad
             B_grad = th.zeros(B.shape, device=B.device, dtype=B.dtype)
-            B_grad = _gather_mm_scatter(A, dZ, B_grad, B_3D_shape[0],
-                idx_a=idx_a, idx_c=idx_b)
-            B_grad = B_grad.reshape(B_3D_shape[0], B_3D_shape[1], B_3D_shape[2])
+            B_grad = _gather_mm_scatter(A, dZ, B_grad, idx_a=idx_a, idx_c=idx_b)
         return A_grad, B_grad, None, None
 
 def gspmm(gidx, op, reduce_op, lhs_data, rhs_data):

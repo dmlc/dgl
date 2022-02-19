@@ -407,75 +407,25 @@ def _segment_mm_backward_B(A, dC, dB, seglen):
             to_dgl_nd(seglen))
     return dB
 
-def _gather_mm(A, B, out, num_rel, idx_a=None, idx_b=None):
-    r""" Generalized Dense Matrix Multiplication interface. It multiplies
-    tensor A and B according to relation types and outputs in out. B is a
-    concatenated tensor across relation types. A is unsorted and the
-    relation type is fetched from param etypes.
-
-    Parameters
-    ----------
-    A : tensor
-        2-D tensor of shape (N, D1)
-    B : tensor
-        2-D tensor of shape (R * D1, D2)
-    idx_a : Tensor, optional
-        If specified, must be a 1-D integer tensor of shape (K,)
-    idx_b : Tensor, optional
-        If specified, must be a 1-D integer tensor of shape (N,)
-
-    Returns
-    -------
-    Tensor
-        The output dense matrix of shape (N, D2)
-    """
-    # TODO(Israt): Add CPU support. Currently, only handles GPU code
+def _gather_mm(A, B, out, idx_a=None, idx_b=None):
+    r"""Invoke the C API of the gather_mm operator."""
     _CAPI_DGLKernelGATHERMM(to_dgl_nd(A),
                             to_dgl_nd(B),
                             to_dgl_nd_for_write(out),
                             to_dgl_nd(idx_a),
-                            to_dgl_nd(idx_b),
-                            num_rel)
+                            to_dgl_nd(idx_b))
     return out
 
 
-def _gather_mm_scatter(A, B, out, num_rel, idx_a=None, idx_b=None, idx_c=None,
-                       a_trans=False, b_trans=False):
-    r""" Generalized Dense Matrix Multiplication interface. It multiplies
-    tensor A and B according to relation types and outputs in out. B is a
-    concatenated tensor across relation types. A is unsorted and the
-    relation type is fetched from param etypes.
-
-    Parameters
-    ----------
-    A : tensor
-        2-D tensor of shape (N, D1)
-    B : tensor
-        2-D tensor of shape (R * D1, D2)
-    idx_a : Tensor, optional
-        If specified, must be a 1-D integer tensor of shape (K,)
-    idx_b : Tensor, optional
-        If specified, must be a 1-D integer tensor of shape (N,)
-    idx_c : Tensor, optional
-        If specified, must be a 1-D integer tensor of shape (N,)
-    A_trans : bool
-        Indicates whether matrix A needs to be tranposed
-    B_trans : bool
-        Indicates whether matrix B needs to be tranposed
-
-    Returns
-    -------
-    Tensor
-        The output dense matrix of shape (N, D2)
-    """
-    # TODO(Israt): Add CPU support. Currently, only handles GPU code
-    _CAPI_DGLKernelGATHERMMSCATTER(to_dgl_nd(A),
-                            to_dgl_nd(B),
-                            to_dgl_nd_for_write(out),
-                            to_dgl_nd(idx_a),
-                            to_dgl_nd(idx_b),
-                            to_dgl_nd(idx_c),
-                            num_rel, a_trans, b_trans)
+def _gather_mm_scatter(A, B, out, idx_a=None, idx_b=None, idx_c=None):
+    r"""Invoke the C API of the gather_mm_scatter operator."""
+    _CAPI_DGLKernelGATHERMMSCATTER(
+        to_dgl_nd(A),
+        to_dgl_nd(B),
+        to_dgl_nd_for_write(out),
+        to_dgl_nd(idx_a),
+        to_dgl_nd(idx_b),
+        to_dgl_nd(idx_c))
     return out
 
 
