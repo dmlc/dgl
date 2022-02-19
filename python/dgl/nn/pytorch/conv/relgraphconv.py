@@ -59,7 +59,7 @@ class RelGraphConv(nn.Module):
     regularizer : str, optional
         Which weight regularizer to use "basis" or "bdd":
 
-         - "basis" is short for basis-diagonal-decomposition.
+         - "basis" is short for basis-decomposition.
          - "bdd" is short for block-diagonal-decomposition.
 
         Default applies no regularization.
@@ -86,9 +86,7 @@ class RelGraphConv(nn.Module):
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
     >>> feat = th.ones(6, 10)
     >>> conv = RelGraphConv(10, 2, 3, regularizer='basis', num_bases=2)
-    >>> conv.weight.shape
-    torch.Size([2, 10, 2])
-    >>> etype = th.tensor(np.array([0,1,2,0,1,2]).astype(np.int64))
+    >>> etype = th.tensor([0,1,2,0,1,2])
     >>> res = conv(g, feat, etype)
     >>> res
     tensor([[ 0.3996, -2.3303],
@@ -97,17 +95,6 @@ class RelGraphConv(nn.Module):
             [ 2.1046, -2.8654],
             [-0.4323, -0.1440],
             [-0.1309, -1.0000]], grad_fn=<AddBackward0>)
-
-    >>> # One-hot input
-    >>> one_hot_feat = th.tensor(np.array([0,1,2,3,4,5]).astype(np.int64))
-    >>> res = conv(g, one_hot_feat, etype)
-    >>> res
-    tensor([[ 0.5925,  0.0985],
-            [-0.3953,  0.8408],
-            [-0.9819,  0.5284],
-            [-1.0085, -0.1721],
-            [ 0.5962,  1.2002],
-            [ 0.0365, -0.3532]], grad_fn=<AddBackward0>)
     """
     def __init__(self,
                  in_feat,
@@ -132,7 +119,7 @@ class RelGraphConv(nn.Module):
             self.h_bias = nn.Parameter(th.Tensor(out_feat))
             nn.init.zeros_(self.h_bias)
 
-        # TODO(minjie): we may want to remove those options in the future to make
+        # TODO(minjie): consider remove those options in the future to make
         #   the module only about graph convolution.
         # layer norm
         if self.layer_norm:

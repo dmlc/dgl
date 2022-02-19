@@ -8,12 +8,78 @@ from ...ops import segment_mm, gather_mm
 __all__ = ['TypedLinear']
 
 class TypedLinear(nn.Module):
-    """Linear transformation according to types.
+    r"""Linear transformation according to types.
 
-    Given a batch of input samples :math:`X` and :math:`W` 
+    For each sample of the input batch :math:`x \in X`, apply linear transformation
+    :math:`xW_t`, where :math:`t` is the type of :math:`x`.
+
+    The module supports two regularization methods (basis-decomposition and 
+    block-diagonal-decomposition) proposed by "`Modeling Relational Data
+    with Graph Convolutional Networks <https://arxiv.org/abs/1703.06103>`__"
+
+    The basis regularization decomposes :math:`W_t` by:
+
+    .. math::
+
+       W_t^{(l)} = \sum_{b=1}^B a_{tb}^{(l)}V_b^{(l)}
+
+    where :math:`B` is the number of bases, :math:`V_b^{(l)}` are linearly combined
+    with coefficients :math:`a_{tb}^{(l)}`.
+
+    The block-diagonal-decomposition regularization decomposes :math:`W_t` into :math:`B`
+    number of block diagonal matrices. We refer :math:`B` as the number of bases.
+
+    The block regularization decomposes :math:`W_t` by:
+
+    .. math::
+
+       W_t^{(l)} = \oplus_{b=1}^B Q_{tb}^{(l)}
+
+    where :math:`B` is the number of bases, :math:`Q_{tb}^{(l)}` are block
+    bases with shape :math:`R^{(d^{(l+1)}/B)*(d^{l}/B)}`.
 
     Parameters
     ----------
+    in_size : int
+        Input feature size.
+    out_size : int
+        Output feature size.
+    num_types : int
+        Total number of types.
+    regularizer : str, optional
+        Which weight regularizer to use "basis" or "bdd":
+
+         - "basis" is short for basis-decomposition.
+         - "bdd" is short for block-diagonal-decomposition.
+
+        Default applies no regularization.
+    num_bases : int, optional
+        Number of bases. Needed when ``regularizer`` is specified. Default: ``None``.
+
+    Examples
+    --------
+
+    No regularization.
+    >>> from dgl.nn import TypedLinear
+    >>> import torch
+    >>>
+    >>> x = torch.randn(100, 32)
+    >>> x_type = torch.randint(0, 5, (100,))
+    >>> m = TypedLinear(32, 64, 5)
+    >>> y = m(x, x_type)
+    >>> print(y.shape)
+    torch.Size([100, 64])
+
+    With basis regularization
+    >>> from dgl.nn import TypedLinear
+    >>> import torch
+    >>>
+    >>> x = torch.randn(100, 32)
+    >>> x_type = torch.randint(0, 5, (100,))
+    >>> m = TypedLinear(32, 64, 5, regularizer='basis', num_bases=4)
+    >>> y = m(x, x_type)
+    >>> print(y.shape)
+    torch.Size([100, 64])
     """
     def __init__(self, in_size, out_size, num_types,
                  regularizer=None, num_bases=None):
@@ -70,6 +136,23 @@ class TypedLinear(nn.Module):
                 f'Supported regularizer options: "basis", "bdd", but got {regularizer}')
 
     def forward(self, x, x_type, sorted_by_type=False):
+        """Forward computation.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            A 2D input tensor. Shape: (N, D1)
+        x_type : torch.Tensor
+            A 1D integer tensor. Each element is the corresponding type of ``x``. Shape: (N,)
+        sorted_by_type : bool, optional
+            Whether the inputs have been sorted by the types. Forward on pre-sorted inputs may 
+            be faster.
+
+        Returns
+        -------
+        y : torch.Tensor
+            The transformed output tensor. Shape: (N, D2)
+        """
         w = self.get_weight()
         if self.regularizer == 'bdd':
             w = w.index_select(0, x_type).view(-1, self.submat_in, self.submat_out)
