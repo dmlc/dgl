@@ -30,9 +30,15 @@ void SegmentMM(const NDArray A,
           NDArray C,
           const NDArray seglen_A,
           bool a_trans, bool b_trans) {
-    SWITCH_BITS(bits, DType, {
-        LOG(FATAL) << "Unsupported CPU kernel for SegmentMM.";
-  });
+    LOG(FATAL) << "Unsupported CPU kernel for SegmentMM.";
+}
+
+template <int XPU, typename IdType, int bits>
+void SegmentMMBackwardB(const NDArray A,
+                        const NDArray dC,
+                        NDArray dB,
+                        const NDArray seglen) {
+    LOG(FATAL) << "Unsupported CPU kernel for SegmentMMBackwardB.";
 }
 
 /*! \brief Generalized GatherMM. */
@@ -43,9 +49,7 @@ void gatherMM(const NDArray A,
           const NDArray idx_a,
           const NDArray idx_b,
           const int num_rel) {
-    SWITCH_BITS(bits, DType, {
-        LOG(FATAL) << "Unsupported CPU kernel for GatherMM.";
-  });
+    LOG(FATAL) << "Unsupported CPU kernel for GatherMM.";
 }
 
 /*! \brief Generalized GatherMM_scatter. */
@@ -58,9 +62,7 @@ void gatherMM_scatter(const NDArray A,
           const NDArray idx_c,
           const int num_rel,
           bool a_trans, bool b_trans) {
-    SWITCH_BITS(bits, DType, {
-        LOG(FATAL) << "Unsupported CPU kernel for GatherMM.";
-  });
+    LOG(FATAL) << "Unsupported CPU kernel for GatherMM.";
 }
 
 template void gatherMM<kDLCPU, int32_t, 16>(
@@ -125,6 +127,19 @@ template void SegmentMM<kDLCPU, int32_t, 64>(
 template void SegmentMM<kDLCPU, int64_t, 64>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray seglen_A, bool a_trans, bool b_trans);
+
+template void SegmentMMBackwardB<kDLCPU, int32_t, 16>(
+    const NDArray A, const NDArray dC, NDArray dB, const NDArray seglen);
+template void SegmentMMBackwardB<kDLCPU, int64_t, 16>(
+    const NDArray A, const NDArray dC, NDArray dB, const NDArray seglen);
+template void SegmentMMBackwardB<kDLCPU, int32_t, 32>(
+    const NDArray A, const NDArray dC, NDArray dB, const NDArray seglen);
+template void SegmentMMBackwardB<kDLCPU, int64_t, 32>(
+    const NDArray A, const NDArray dC, NDArray dB, const NDArray seglen);
+template void SegmentMMBackwardB<kDLCPU, int32_t, 64>(
+    const NDArray A, const NDArray dC, NDArray dB, const NDArray seglen);
+template void SegmentMMBackwardB<kDLCPU, int64_t, 64>(
+    const NDArray A, const NDArray dC, NDArray dB, const NDArray seglen);
 
 }  // namespace aten
 }  // namespace dgl

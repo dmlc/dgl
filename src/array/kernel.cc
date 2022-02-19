@@ -89,9 +89,9 @@ void SegmentMMBackwardB(const NDArray A,
   CHECK_EQ(dC->ndim, 2)
     << "segment_mm_backward operator expects a 2D tensor for the second input.";
   CHECK_EQ(seglen->ctx.device_type, kDLCPU)
-    << "segment_mm expects seglen_A to be on CPU.";
+    << "segment_mm expects seglen to be on CPU.";
   ATEN_XPU_SWITCH_CUDA(A->ctx.device_type, XPU, "SegmentMMBackwardB", {
-    ATEN_ID_TYPE_SWITCH(seglen_A->dtype, IdType, {
+    ATEN_ID_TYPE_SWITCH(seglen->dtype, IdType, {
       ATEN_FLOAT_BITS_SWITCH(A->dtype, bits, "Feature data", {
         SegmentMMBackwardB<XPU, IdType, bits>(A, dC, dB, seglen);
       });

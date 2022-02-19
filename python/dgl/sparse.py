@@ -405,7 +405,7 @@ def _segment_mm_backward_B(A, dC, dB, seglen):
             to_dgl_nd(dC),
             to_dgl_nd_for_write(dB),
             to_dgl_nd(seglen))
-    return out
+    return dB
 
 def _gather_mm(A, B, out, num_rel, idx_a=None, idx_b=None):
     r""" Generalized Dense Matrix Multiplication interface. It multiplies

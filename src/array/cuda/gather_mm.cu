@@ -364,11 +364,6 @@ void SegmentMM(const NDArray A,
             int ldb = n, lda = k, ldc = n;
             cublasOperation_t transB = CUBLAS_OP_N;
             cublasOperation_t transA = CUBLAS_OP_N;
-            //if (a_trans) {
-                //transA = CUBLAS_OP_T;
-                //ldb = n, lda = k, ldc = n;
-                //std::swap(m, k);
-            //}
             if (b_trans) {
                 transB = CUBLAS_OP_T;
                 ldb = n, lda = n, ldc = k;
@@ -414,34 +409,30 @@ void SegmentMMBackwardB(const NDArray A,
         CUBLAS_CALL(cublasSetStream(thr_entry->cublas_handle,
             thr_entry->stream));
 
-        IdType m_offset = 0;
+        IdType k_offset = 0;
         for (IdType etype = 0; etype < num_rel; ++etype) {
-            CHECK_LT(m_offset, A->shape[0]) << "Segement index out of bound of A->shape[0].";
-            m = seglen_data[etype];  // rows of A
-            n = B->shape[2];  // cols of B
-            k = B->shape[1];  // cols of A == rows of B
-            int ldb = n, lda = k, ldc = n;
-            cublasOperation_t transB = CUBLAS_OP_N;
-            cublasOperation_t transA = CUBLAS_OP_N;
-            //if (a_trans) {
-                //transA = CUBLAS_OP_T;
-                //ldb = n, lda = k, ldc = n;
-                //std::swap(m, k);
-            //}
+            CHECK_LT(k_offset, A->shape[0]) << "Segement index out of bound of A->shape[0].";
+            m = dC->shape[1];
+            n = A->shape[1];
+            k = seglen_data[etype];
+            //int ldb = n, lda = k, ldc = n;
+            int lddC = m, ldA = n, lddB = m;
+            cublasOperation_t trans_dC = CUBLAS_OP_N;
+            cublasOperation_t trans_A = CUBLAS_OP_T;
             CUBLAS_CALL(cublasGemm<DType>(
                 thr_entry->cublas_handle,
-                transB,
-                transA,
-                n, m, k,
+                trans_dC,
+                trans_A,
+                m, n, k,
                 &alpha,
-                B_data + B_offset, ldb,
-                A_data + A_offset, lda,
+                dC_data + dC_offset, lddC,
+                A_data + A_offset, ldA,
                 &beta,
-                C_data + C_offset, ldc));
-            A_offset += m * k;
-            B_offset += k * n;
-            C_offset += m * n;
-            m_offset += m;
+                dB_data + dB_offset, lddB));
+            dC_offset += m * k;
+            A_offset += n * k;
+            dB_offset += m * n;
+            k_offset += k;
         }
     });
 }
