@@ -3,7 +3,7 @@ from .. import backend as F
 
 __all__ = ['gather_mm']
 
-def gather_mm(a, b, idx_b):
+def gather_mm(a, b, *, idx_b):
     r"""Gather data according to the given indices and perform matrix multiplication.
 
     Let the result tensor be ``c``, the operator conducts the following computation:

@@ -1354,38 +1354,25 @@ def test_twirls():
     conv = nn.TWIRLSConv(10, 2, 128, prop_step = 64)
     res = conv(g , feat)
     assert ( res.size() == (6,2) )
-    
 
+@pytest.mark.parametrize('feat_size', [4, 32])
+@pytest.mark.parametrize('regularizer,num_bases', [(None, None), ('basis', 4), ('bdd', 4)])
+def test_typed_linear(feat_size, regularizer, num_bases):
+    dev = F.ctx()
+    num_types = 5
+    lin = nn.TypedLinear(feat_size, feat_size * 2, 5, regularizer=regularizer, num_bases=num_bases).to(dev)
+    print(lin)
+    x = th.randn(100, feat_size).to(dev)
+    x_type = th.randint(0, 5, (100,)).to(dev)
+    x_type_sorted, idx = th.sort(x_type)
+    _, rev_idx = th.sort(idx)
+    x_sorted = x[idx]
 
-if __name__ == '__main__':
-    test_graph_conv()
-    test_graph_conv_e_weight()
-    test_graph_conv_e_weight_norm()
-    test_set2set()
-    test_glob_att_pool()
-    test_simple_pool()
-    test_set_trans()
-    test_rgcn()
-    test_rgcn_sorted()
-    test_tagconv()
-    test_gat_conv()
-    test_gatv2_conv()
-    test_egat_conv()
-    test_sage_conv()
-    test_sgc_conv()
-    test_appnp_conv()
-    test_gin_conv()
-    test_agnn_conv()
-    test_gated_graph_conv()
-    test_gated_graph_conv_one_etype()
-    test_nn_conv()
-    test_gmm_conv()
-    test_dotgat_conv()
-    test_dense_graph_conv()
-    test_dense_sage_conv()
-    test_dense_cheb_conv()
-    test_sequential()
-    test_atomic_conv()
-    test_cf_conv()
-    test_hetero_conv()
-    test_twirls()
+    # test unsorted
+    y = lin(x, x_type)
+    assert y.shape == (100, feat_size * 2)
+    # test sorted
+    y_sorted = lin(x_sorted, x_type_sorted, sorted_by_type=True)
+    assert y_sorted.shape == (100, feat_size * 2)
+
+    assert th.allclose(y, y_sorted[rev_idx], atol=1e-4, rtol=1e-4)
