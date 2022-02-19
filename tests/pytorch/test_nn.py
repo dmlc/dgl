@@ -356,12 +356,13 @@ def test_set_trans():
     h2 = st_dec(bg, h1)
     assert h2.shape[0] == 3 and h2.shape[1] == 200 and h2.dim() == 2
 
-@pytest.mark.parametrize('O', [1, 2, 8])
-def test_rgcn(O):
+@parametrize_dtype
+@pytest.mark.parametrize('O', [1, 8, 32])
+def test_rgcn(idtype, O):
     ctx = F.ctx()
     etype = []
-    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
-    g = g.to(F.ctx())
+    g = dgl.from_scipy(sp.sparse.random(100, 100, density=0.1))
+    g = g.astype(idtype).to(F.ctx())
     # 5 etypes
     R = 5
     for i in range(g.number_of_edges()):
@@ -369,161 +370,28 @@ def test_rgcn(O):
     B = 2
     I = 10
 
-    rgc_basis = nn.RelGraphConv(I, O, R, "basis", B).to(ctx)
+    h = th.randn((100, I)).to(ctx)
+    r = th.tensor(etype).to(ctx)
+    norm = th.rand((g.number_of_edges(), 1)).to(ctx)
 
+    rgc_basis = nn.RelGraphConv(I, O, R, "basis", B).to(ctx)
+    h_new = rgc_basis(g, h, r)
+    assert h_new.shape == (100, O)
     # test pickle
     th.save(rgc_basis, tmp_buffer)
-
-    rgc_basis_low = nn.RelGraphConv(I, O, R, "basis", B, low_mem=True).to(ctx)
-    rgc_basis_low.weight = rgc_basis.weight
-    rgc_basis_low.w_comp = rgc_basis.w_comp
-    rgc_basis_low.loop_weight = rgc_basis.loop_weight
-    h = th.randn((100, I)).to(ctx)
-    r = th.tensor(etype).to(ctx)
-    h_new = rgc_basis(g, h, r)
-    h_new_low = rgc_basis_low(g, h, r)
-    assert list(h_new.shape) == [100, O]
-    assert list(h_new_low.shape) == [100, O]
-    assert F.allclose(h_new, h_new_low)
-
     if O % B == 0:
         rgc_bdd = nn.RelGraphConv(I, O, R, "bdd", B).to(ctx)
-        rgc_bdd_low = nn.RelGraphConv(I, O, R, "bdd", B, low_mem=True).to(ctx)
-        rgc_bdd_low.weight = rgc_bdd.weight
-        rgc_bdd_low.loop_weight = rgc_bdd.loop_weight
-        h = th.randn((100, I)).to(ctx)
-        r = th.tensor(etype).to(ctx)
         h_new = rgc_bdd(g, h, r)
-        h_new_low = rgc_bdd_low(g, h, r)
-        assert list(h_new.shape) == [100, O]
-        assert list(h_new_low.shape) == [100, O]
-        assert F.allclose(h_new, h_new_low)
+        assert h_new.shape == (100, O)
+        # test pickle
+        th.save(rgc_bdd, tmp_buffer)
 
     # with norm
-    norm = th.rand((g.number_of_edges(), 1)).to(ctx)
-
-    rgc_basis = nn.RelGraphConv(I, O, R, "basis", B).to(ctx)
-    rgc_basis_low = nn.RelGraphConv(I, O, R, "basis", B, low_mem=True).to(ctx)
-    rgc_basis_low.weight = rgc_basis.weight
-    rgc_basis_low.w_comp = rgc_basis.w_comp
-    rgc_basis_low.loop_weight = rgc_basis.loop_weight
-    h = th.randn((100, I)).to(ctx)
-    r = th.tensor(etype).to(ctx)
     h_new = rgc_basis(g, h, r, norm)
-    h_new_low = rgc_basis_low(g, h, r, norm)
-    assert list(h_new.shape) == [100, O]
-    assert list(h_new_low.shape) == [100, O]
-    assert F.allclose(h_new, h_new_low)
-
+    assert h_new.shape == (100, O)
     if O % B == 0:
-        rgc_bdd = nn.RelGraphConv(I, O, R, "bdd", B).to(ctx)
-        rgc_bdd_low = nn.RelGraphConv(I, O, R, "bdd", B, low_mem=True).to(ctx)
-        rgc_bdd_low.weight = rgc_bdd.weight
-        rgc_bdd_low.loop_weight = rgc_bdd.loop_weight
-        h = th.randn((100, I)).to(ctx)
-        r = th.tensor(etype).to(ctx)
         h_new = rgc_bdd(g, h, r, norm)
-        h_new_low = rgc_bdd_low(g, h, r, norm)
-        assert list(h_new.shape) == [100, O]
-        assert list(h_new_low.shape) == [100, O]
-        assert F.allclose(h_new, h_new_low)
-
-    # id input
-    rgc_basis = nn.RelGraphConv(I, O, R, "basis", B).to(ctx)
-    rgc_basis_low = nn.RelGraphConv(I, O, R, "basis", B, low_mem=True).to(ctx)
-    rgc_basis_low.weight = rgc_basis.weight
-    rgc_basis_low.w_comp = rgc_basis.w_comp
-    rgc_basis_low.loop_weight = rgc_basis.loop_weight
-    h = th.randint(0, I, (100,)).to(ctx)
-    r = th.tensor(etype).to(ctx)
-    h_new = rgc_basis(g, h, r)
-    h_new_low = rgc_basis_low(g, h, r)
-    assert list(h_new.shape) == [100, O]
-    assert list(h_new_low.shape) == [100, O]
-    assert F.allclose(h_new, h_new_low)
-
-
-@pytest.mark.parametrize('O', [1, 2, 8])
-def test_rgcn_sorted(O):
-    ctx = F.ctx()
-    etype = []
-    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
-    g = g.to(F.ctx())
-    # 5 etypes
-    R = 5
-    etype = [200, 200, 200, 200, 200]
-    B = 2
-    I = 10
-
-    rgc_basis = nn.RelGraphConv(I, O, R, "basis", B).to(ctx)
-    rgc_basis_low = nn.RelGraphConv(I, O, R, "basis", B, low_mem=True).to(ctx)
-    rgc_basis_low.weight = rgc_basis.weight
-    rgc_basis_low.w_comp = rgc_basis.w_comp
-    rgc_basis_low.loop_weight = rgc_basis.loop_weight
-    h = th.randn((100, I)).to(ctx)
-    r = etype
-    h_new = rgc_basis(g, h, r)
-    h_new_low = rgc_basis_low(g, h, r)
-    assert list(h_new.shape) == [100, O]
-    assert list(h_new_low.shape) == [100, O]
-    assert F.allclose(h_new, h_new_low)
-
-    if O % B == 0:
-        rgc_bdd = nn.RelGraphConv(I, O, R, "bdd", B).to(ctx)
-        rgc_bdd_low = nn.RelGraphConv(I, O, R, "bdd", B, low_mem=True).to(ctx)
-        rgc_bdd_low.weight = rgc_bdd.weight
-        rgc_bdd_low.loop_weight = rgc_bdd.loop_weight
-        h = th.randn((100, I)).to(ctx)
-        r = etype
-        h_new = rgc_bdd(g, h, r)
-        h_new_low = rgc_bdd_low(g, h, r)
-        assert list(h_new.shape) == [100, O]
-        assert list(h_new_low.shape) == [100, O]
-        assert F.allclose(h_new, h_new_low)
-
-    # with norm
-    norm = th.rand((g.number_of_edges(), 1)).to(ctx)
-
-    rgc_basis = nn.RelGraphConv(I, O, R, "basis", B).to(ctx)
-    rgc_basis_low = nn.RelGraphConv(I, O, R, "basis", B, low_mem=True).to(ctx)
-    rgc_basis_low.weight = rgc_basis.weight
-    rgc_basis_low.w_comp = rgc_basis.w_comp
-    rgc_basis_low.loop_weight = rgc_basis.loop_weight
-    h = th.randn((100, I)).to(ctx)
-    r = etype
-    h_new = rgc_basis(g, h, r, norm)
-    h_new_low = rgc_basis_low(g, h, r, norm)
-    assert list(h_new.shape) == [100, O]
-    assert list(h_new_low.shape) == [100, O]
-    assert F.allclose(h_new, h_new_low)
-
-    if O % B == 0:
-        rgc_bdd = nn.RelGraphConv(I, O, R, "bdd", B).to(ctx)
-        rgc_bdd_low = nn.RelGraphConv(I, O, R, "bdd", B, low_mem=True).to(ctx)
-        rgc_bdd_low.weight = rgc_bdd.weight
-        rgc_bdd_low.loop_weight = rgc_bdd.loop_weight
-        h = th.randn((100, I)).to(ctx)
-        r = etype
-        h_new = rgc_bdd(g, h, r, norm)
-        h_new_low = rgc_bdd_low(g, h, r, norm)
-        assert list(h_new.shape) == [100, O]
-        assert list(h_new_low.shape) == [100, O]
-        assert F.allclose(h_new, h_new_low)
-
-    # id input
-    rgc_basis = nn.RelGraphConv(I, O, R, "basis", B).to(ctx)
-    rgc_basis_low = nn.RelGraphConv(I, O, R, "basis", B, low_mem=True).to(ctx)
-    rgc_basis_low.weight = rgc_basis.weight
-    rgc_basis_low.w_comp = rgc_basis.w_comp
-    rgc_basis_low.loop_weight = rgc_basis.loop_weight
-    h = th.randint(0, I, (100,)).to(ctx)
-    r = etype
-    h_new = rgc_basis(g, h, r)
-    h_new_low = rgc_basis_low(g, h, r)
-    assert list(h_new.shape) == [100, O]
-    assert list(h_new_low.shape) == [100, O]
-    assert F.allclose(h_new, h_new_low)
-
+        assert h_new.shape == (100, O)
 
 @parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite'], exclude=['zero-degree']))
