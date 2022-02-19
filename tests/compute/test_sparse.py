@@ -333,7 +333,7 @@ def test_gather_mm_idx_b(idtype, feat_size):
     a.requires_grad_()
     b = torch.tensor(np.random.rand(10, feat_size, feat_size + 1)).to(dev)
     b.requires_grad_()
-    idx = torch.tensor(np.random.randint(0, 10, 100)).to(dev)
+    idx = torch.tensor(np.random.randint(0, 10, 100)).to(dev).long()
     dc = torch.tensor(np.random.rand(100, feat_size + 1)).to(dev)
     # compute
     c = dgl.ops.gather_mm(a, b, idx_b=idx)
