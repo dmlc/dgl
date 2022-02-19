@@ -298,7 +298,7 @@ def test_segment_mm(idtype, feat_size):
     a.requires_grad_()
     b = torch.tensor(np.random.rand(10, feat_size, feat_size + 1)).to(dev)
     b.requires_grad_()
-    seglen_a = torch.tensor([10, 15, 8, 0, 1, 9, 8, 12, 15, 22])
+    seglen_a = torch.tensor([10, 15, 8, 0, 1, 9, 18, 24, 15, 0])
     dc = torch.tensor(np.random.rand(100, feat_size + 1)).to(dev)
     # compute
     c = dgl.ops.segment_mm(a, b, seglen_a)

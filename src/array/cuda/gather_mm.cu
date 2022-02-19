@@ -205,8 +205,8 @@ void SegmentMM(const NDArray A,
 
         IdType m_offset = 0;
         for (IdType etype = 0; etype < num_rel; ++etype) {
-            CHECK_LT(m_offset, A->shape[0]) << "Segement index out of bound of A->shape[0].";
             m = seglen_A_data[etype];  // rows of A
+            CHECK_LE(m_offset + m, A->shape[0]) << "Segment index out of bound of A->shape[0].";
             n = B->shape[2];  // cols of B
             k = B->shape[1];  // cols of A == rows of B
             int ldb = n, lda = k, ldc = n;
@@ -259,10 +259,10 @@ void SegmentMMBackwardB(const NDArray A,
 
         IdType k_offset = 0;
         for (IdType etype = 0; etype < num_rel; ++etype) {
-            CHECK_LT(k_offset, A->shape[0]) << "Segement index out of bound of A->shape[0].";
             m = dC->shape[1];
             n = A->shape[1];
             k = seglen_data[etype];
+            CHECK_LE(k_offset + k, A->shape[0]) << "Segement index out of bound of A->shape[0].";
             //int ldb = n, lda = k, ldc = n;
             int lddC = m, ldA = n, lddB = m;
             cublasOperation_t trans_dC = CUBLAS_OP_N;
