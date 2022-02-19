@@ -161,7 +161,7 @@ void GatherMMScatter(const NDArray A,
       << "gather_mm_scatter expects len(idx_a) == B.shape[0] when idx_b is None.";
     CHECK(A->ctx == idx_a->ctx)
       << "gather_mm_scatter expects all arguments to be on the same device.";
-  } else if (!aten::IsNullArray(idx_b) && !aten::IsNullArray(idx_a)){
+  } else if (!aten::IsNullArray(idx_b) && !aten::IsNullArray(idx_a)) {
     CHECK_EQ(idx_a->shape[0], idx_b->shape[0])
       << "gather_mm_scatter expects len(idx_a) == len(idx_b) "
       << "when both idx_a and idx_b are given.";

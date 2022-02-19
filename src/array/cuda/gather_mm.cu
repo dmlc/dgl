@@ -263,7 +263,6 @@ void SegmentMMBackwardB(const NDArray A,
             n = A->shape[1];
             k = seglen_data[etype];
             CHECK_LE(k_offset + k, A->shape[0]) << "Segement index out of bound of A->shape[0].";
-            //int ldb = n, lda = k, ldc = n;
             int lddC = m, ldA = n, lddB = m;
             cublasOperation_t trans_dC = CUBLAS_OP_N;
             cublasOperation_t trans_A = CUBLAS_OP_T;
