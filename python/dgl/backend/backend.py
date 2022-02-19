@@ -330,6 +330,21 @@ def copy_to(input, ctx, **kwargs):
     """
     pass
 
+def is_pinned(input):
+    """Check if a tensor is in pinned memory.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor
+
+    Returns
+    -------
+    Bool
+        True if the tensor data is pinnned in memory.
+    """
+    pass
+
 ###############################################################################
 # Tensor functions on feature data
 # --------------------------------

@@ -70,6 +70,9 @@ enum class AllToAllMode : int {
 
 
 template<typename T> ncclDataType_t NCCLType();
+template<> ncclDataType_t NCCLType<uint8_t>() {
+    return ncclInt8;
+}
 template<> ncclDataType_t NCCLType<int32_t>() {
     return ncclInt32;
 }
@@ -650,6 +653,12 @@ void NCCLCommunicator::AllToAll(
 }
 
 template
+void NCCLCommunicator::AllToAll<uint8_t>(
+    const uint8_t * const send,
+    uint8_t * const recv,
+    const int64_t count,
+    cudaStream_t stream);
+template
 void NCCLCommunicator::AllToAll<int32_t>(
     const int32_t * const send,
     int32_t * const recv,
@@ -789,9 +798,14 @@ DGL_REGISTER_GLOBAL("cuda.nccl._CAPI_DGLNCCLSparseAllToAllPull")
   NDArrayPartitionRef part = args[3];
 
   ATEN_ID_TYPE_SWITCH(req_idx->dtype, IdType, {
-    ATEN_DTYPE_SWITCH(tensor->dtype, DType, "values", {
-      *rv = SparsePull<IdType, DType>(comm, req_idx, tensor, part);
-    });
+    if (tensor->dtype.bits == 8 && tensor->dtype.code == kDLUInt) {
+      // handle boolean types
+      *rv = SparsePull<IdType, uint8_t>(comm, req_idx, tensor, part);
+    } else {
+      ATEN_DTYPE_SWITCH(tensor->dtype, DType, "values", {
+        *rv = SparsePull<IdType, DType>(comm, req_idx, tensor, part);
+      });
+    }
   });
 });
 

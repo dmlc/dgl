@@ -1,7 +1,24 @@
+##
+#   Copyright 2020-2021 Contributors
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+#
+
 """Module for graph partition utilities."""
 import os
 import re
 import time
+from collections.abc import Mapping
 import numpy as np
 
 from ._ffi.function import _init_api
@@ -475,6 +492,7 @@ class NDArrayPartition(object):
                 part_ranges)
         else:
             assert False, 'Unknown partition mode "{}"'.format(mode)
+        self._mode = mode
         self._array_size = array_size
         self._num_parts = num_parts
 
@@ -516,5 +534,66 @@ class NDArrayPartition(object):
         return F.zerocopy_from_dgl_ndarray(_CAPI_DGLNDArrayPartitionMapToGlobal(
             self._partition, F.zerocopy_to_dgl_ndarray(idxs), part_id))
 
+    def mode(self):
+        """ Get the type of partition.
+        """
+        return self._mode
+
+def create_edge_partition_from_nodes(partition, graph):
+    """ Create a new partition of the edges in the graph from the partition of
+        the vertices. Edges may not be assigned to the same partition as their
+        source or destination vertex.
+    """
+    if isinstance(partition, Mapping):
+        edge_partition = {}
+        for etype in graph.canonical_etypes:
+            srctype = etype[0]
+            # assign edges based on their srctype
+            npart = partition[srctype]
+            if npart.mode() == 'remainder':
+                # This mode has no locality, so we don't bother to assign vertices to
+                # the same partition
+                edge_partition[etype] = NDArrayPartition(
+                    array_size=graph.number_of_edges(etype),
+                    num_parts=npart.num_parts(),
+                    mode=npart._mode)
+            else:
+                assert npart.mode() == 'range'
+                # This mode makes use of locality, so we want to preserve the same
+                # locality for edges. To do this, we find the number of edges
+                # per-partition and use the prefix-sum of this for the range
+                rng = [0]
+                for part in range(npart.num_parts()):
+                    idx = npart.get_local_indices(part, ctx=F.cpu())
+                    rng.append(rng[-1] + \
+                        F.as_scalar(F.sum(graph.out_degrees(u=idx, etype=etype),
+                                          dim=0)))
+                edge_partition[etype] = NDArrayPartition(
+                    array_size=graph.number_of_edges(),
+                    num_parts=npart.num_parts(),
+                    mode=npart.mode(),
+                    part_ranges=rng)
+        return edge_partition
+    else:
+        if partition.mode() == 'remainder':
+            # This mode has no locality, so we don't bother to assign vertices to
+            # the same partition
+            return NDArrayPartition(array_size=graph.number_of_edges(),
+                                    num_parts=partition.num_parts(),
+                                    mode=partition.mode())
+        else:
+            assert partition.mode() == 'range'
+            # This mode makes use of locality, so we want to preserve the same
+            # locality for edges. To do this, we find the number of edges
+            # per-partition and use the prefix-sum of this for the range
+            rng = [0]
+            for part in range(partition.num_parts()):
+                idx = partition.get_local_indices(part, ctx=F.cpu())
+                rng.append(rng[-1] + \
+                    F.as_scalar(F.sum(graph.out_degrees(u=idx), dim=0)))
+            return NDArrayPartition(array_size=graph.number_of_edges(),
+                                    num_parts=partition.num_parts(),
+                                    mode=partition.mode(),
+                                    part_ranges=rng)
 
 _init_api("dgl.partition")

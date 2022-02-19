@@ -1,5 +1,6 @@
 """Neighbor sampling APIs"""
 
+from typing import Mapping
 from .._ffi.function import _init_api
 from .. import backend as F
 from ..base import DGLError, EID
@@ -288,13 +289,25 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
 
     """
     if F.device_type(g.device) == 'cpu' and not g.is_pinned():
+        # copy the nodes back to the CPU in the case the output_device
+        # is not accessible from the CPU
+        if isinstance(nodes, Mapping):
+            nodes = {k: F.copy_to( \
+                v if F.is_tensor(v) else F.tensor(v, dtype=F.int64), g.device) \
+                for k, v in nodes.items()}
+        else:
+            if not F.is_tensor(nodes):
+                nodes = F.tensor(nodes, dtype=F.int64)
+            nodes = F.copy_to(nodes, g.device)
         frontier = _sample_neighbors(
             g, nodes, fanout, edge_dir=edge_dir, prob=prob, replace=replace,
-            copy_ndata=copy_ndata, copy_edata=copy_edata, exclude_edges=exclude_edges)
+            copy_ndata=copy_ndata, copy_edata=copy_edata, exclude_edges=exclude_edges,
+            _dist_training=_dist_training)
     else:
         frontier = _sample_neighbors(
             g, nodes, fanout, edge_dir=edge_dir, prob=prob, replace=replace,
-            copy_ndata=copy_ndata, copy_edata=copy_edata)
+            copy_ndata=copy_ndata, copy_edata=copy_edata,
+            _dist_training=_dist_training)
         if exclude_edges is not None:
             eid_excluder = EidExcluder(exclude_edges)
             frontier = eid_excluder(frontier)

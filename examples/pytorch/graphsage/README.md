@@ -53,6 +53,14 @@ Accuracy:
 | N.S. (Inductive)      | 0.9460   |
 | Control Variate       | 0.9490   |
 
+
+### Multi-GPU Training on ogbn-papers100M
+Due to the large size of the graph and associated features, this must either be
+run with at least 192GB of aggregate GPU memory, or with the `--data-cpu` flag.
+```bash
+python3 train_sampling_multi_gpu.py --dataset ogbn-papers100M --num-epochs 30 --gpu 0,1,2,3,4,5,6,7 --batch-size=1024 --fan-out 8,8
+```
+
 ### Unsupervised training
 
 Train w/ mini-batch sampling in an unsupervised fashion (on the Reddit dataset)

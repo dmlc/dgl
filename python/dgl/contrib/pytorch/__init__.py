@@ -14,13 +14,4 @@
 #   limitations under the License.
 #
 
-from . import sampling
-from . import graph_store
-from .dis_kvstore import KVClient, KVServer
-from .dis_kvstore import read_ip_config
-from .unified_tensor import UnifiedTensor
-
-from .. import backend as F
-
-if F.get_preferred_backend() == 'pytorch':
-    from .pytorch import MultiGPUFeatureGraphWrapper
+from .multi_gpu_feature_graph_wrapper import MultiGPUFeatureGraphWrapper

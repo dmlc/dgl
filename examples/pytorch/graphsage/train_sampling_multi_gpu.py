@@ -12,6 +12,7 @@ import math
 import argparse
 from torch.nn.parallel import DistributedDataParallel
 import tqdm
+from dgl.contrib import MultiGPUFeatureGraphWrapper
 
 from model import SAGE
 from load_graph import load_reddit, inductive_split, load_ogb
@@ -22,9 +23,11 @@ def compute_acc(pred, labels):
     """
     return (th.argmax(pred, dim=1) == labels).float().sum() / len(pred)
 
-def evaluate(model, g, nfeat, labels, val_nid, device):
+def evaluate(args, model, g, nfeat, labels, val_nid, device):
     """
     Evaluate the model on the validation set specified by ``val_nid``.
+    args: The arguments to the training script.
+    model: The model to evaluate.
     g : The entire graph.
     inputs : The features of all the nodes.
     labels : The labels of all the nodes.
@@ -65,13 +68,6 @@ def run(proc_id, n_gpus, args, devices, data):
     n_classes, train_g, val_g, test_g, train_nfeat, val_nfeat, test_nfeat, \
     train_labels, val_labels, test_labels, train_nid, val_nid, test_nid = data
 
-    if args.data_device == 'gpu':
-        train_nfeat = train_nfeat.to(device)
-        train_labels = train_labels.to(device)
-    elif args.data_device == 'uva':
-        train_nfeat = dgl.contrib.UnifiedTensor(train_nfeat, device=device)
-        train_labels = dgl.contrib.UnifiedTensor(train_labels, device=device)
-
     in_feats = train_nfeat.shape[1]
 
     if args.graph_device == 'gpu':
@@ -84,9 +80,21 @@ def run(proc_id, n_gpus, args, devices, data):
         train_g.pin_memory_()
         args.num_workers = 0
 
+    if args.data_device == 'gpu':
+        train_g.ndata['features'] = train_nfeat
+        train_g.ndata['labels'] = train_labels
+        train_g = MultiGPUFeatureGraphWrapper(train_g, device)
+    elif args.data_device == 'uva':
+        train_g.ndata['features'] = dgl.contrib.UnifiedTensor(train_nfeat, device=device)
+        train_g.ndata['labels'] = dgl.contrib.UnifiedTensor(train_labels, device=device)
+    else:
+        train_g.ndata['features'] = train_nfeat
+        train_g.ndata['labels'] = train_labels
+
     # Create PyTorch DataLoader for constructing blocks
     sampler = dgl.dataloading.MultiLayerNeighborSampler(
         [int(fanout) for fanout in args.fan_out.split(',')])
+
     dataloader = dgl.dataloading.NodeDataLoader(
         train_g,
         train_nid,
@@ -96,6 +104,7 @@ def run(proc_id, n_gpus, args, devices, data):
         batch_size=args.batch_size,
         shuffle=True,
         drop_last=False,
+        use_alternate_streams=False,
         num_workers=args.num_workers)
 
     # Define model and optimizer
@@ -114,14 +123,17 @@ def run(proc_id, n_gpus, args, devices, data):
 
         # Loop over the dataloader to sample the computation dependency graph as a list of
         # blocks.
-        for step, (input_nodes, seeds, blocks) in enumerate(dataloader):
+        for step, data in enumerate(dataloader):
             if proc_id == 0:
                 tic_step = time.time()
 
-            # Load the input features as well as output labels
-            batch_inputs, batch_labels = load_subtensor(train_nfeat, train_labels,
-                                                        seeds, input_nodes, device)
-            blocks = [block.int().to(device) for block in blocks]
+            input_nodes, seeds, blocks = data
+
+            # manually load inputs and labels for this mini-batch
+            batch_inputs = blocks[0].srcdata['features'].to(device)
+            batch_labels = blocks[-1].dstdata['labels'].to(device)
+            blocks = [block.to(device) for block in blocks]
+
             # Compute loss and prediction
             batch_pred = model(blocks, batch_inputs)
             loss = loss_fcn(batch_pred, batch_labels)
@@ -147,14 +159,14 @@ def run(proc_id, n_gpus, args, devices, data):
             if epoch % args.eval_every == 0 and epoch != 0:
                 if n_gpus == 1:
                     eval_acc = evaluate(
-                        model, val_g, val_nfeat, val_labels, val_nid, devices[0])
+                        args, model, val_g, val_nfeat, val_labels, val_nid, devices[0])
                     test_acc = evaluate(
-                        model, test_g, test_nfeat, test_labels, test_nid, devices[0])
+                        args, model, test_g, test_nfeat, test_labels, test_nid, devices[0])
                 else:
                     eval_acc = evaluate(
-                        model.module, val_g, val_nfeat, val_labels, val_nid, devices[0])
+                        args, model.module, val_g, val_nfeat, val_labels, val_nid, devices[0])
                     test_acc = evaluate(
-                        model.module, test_g, test_nfeat, test_labels, test_nid, devices[0])
+                        args, model.module, test_g, test_nfeat, test_labels, test_nid, devices[0])
                 print('Eval Acc {:.4f}'.format(eval_acc))
                 print('Test Acc: {:.4f}'.format(test_acc))
 
@@ -163,7 +175,7 @@ def run(proc_id, n_gpus, args, devices, data):
     if proc_id == 0:
         print('Avg epoch time: {}'.format(avg / (epoch - 4)))
 
-if __name__ == '__main__':
+def main():
     argparser = argparse.ArgumentParser("multi-gpu training")
     argparser.add_argument('--gpu', type=str, default='0',
                            help="Comma separated list of GPU device IDs.")
@@ -205,6 +217,7 @@ if __name__ == '__main__':
         g = dgl.add_reverse_edges(g)
         # convert labels to integer
         g.ndata['labels'] = th.as_tensor(g.ndata['labels'], dtype=th.int64)
+        # remove unused feature
         g.ndata.pop('year')
     else:
         raise Exception('unknown dataset')
@@ -260,9 +273,12 @@ if __name__ == '__main__':
         run(0, n_gpus, args, devices, data)
     else:
         procs = []
-        for proc_id in range(n_gpus):
+        for proc_id in range(0, n_gpus):
             p = mp.Process(target=run, args=(proc_id, n_gpus, args, devices, data))
             p.start()
             procs.append(p)
         for p in procs:
             p.join()
+
+if __name__ == '__main__':
+    main()

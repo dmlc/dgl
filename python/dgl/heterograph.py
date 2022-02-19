@@ -4117,7 +4117,8 @@ class DGLHeteroGraph(object):
             if nfeats != num_nodes:
                 raise DGLError('Expect number of features to match number of nodes (len(u)).'
                                ' Got %d and %d instead.' % (nfeats, num_nodes))
-            if F.context(val) != self.device:
+            # pinned memory is accessible from CPU or GPU
+            if F.context(val) != self.device and not F.is_pinned(val):
                 raise DGLError('Cannot assign node feature "{}" on device {} to a graph on'
                                ' device {}. Call DGLGraph.to() to copy the graph to the'
                                ' same device.'.format(key, F.context(val), self.device))
