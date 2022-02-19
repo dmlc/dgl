@@ -64,7 +64,8 @@ class _TensorizedDatasetIter(object):
     def __next__(self):
         batch = self._next_indices()
         if self.mapping_keys is None:
-            return batch
+            # clone() fixes #3755.  Not sure why.  Need to take a look afterwards.
+            return batch.clone()
 
         # convert the type-ID pairs to dictionary
         type_ids = batch[:, 0]
@@ -77,7 +78,8 @@ class _TensorizedDatasetIter(object):
         type_id_offset = type_id_count.cumsum(0).tolist()
         type_id_offset.insert(0, 0)
         id_dict = {
-            self.mapping_keys[type_id_uniq[i]]: indices[type_id_offset[i]:type_id_offset[i+1]]
+            self.mapping_keys[type_id_uniq[i]]:
+                indices[type_id_offset[i]:type_id_offset[i+1]].clone()
             for i in range(len(type_id_uniq))}
         return id_dict
 
@@ -206,10 +208,7 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
         if self.rank != 0:
             id_, num_samples = meta_info.tolist()
             name = _get_shared_mem_name(id_)
-            if isinstance(indices, Mapping):
-                indices_shared = get_shared_mem_array(name, (num_samples, 2), torch.int64)
-            else:
-                indices_shared = get_shared_mem_array(name, (num_samples,), torch.int64)
+            indices_shared = get_shared_mem_array(name, (num_samples,), torch.int64)
             self._indices = indices_shared
 
     def shuffle(self):
