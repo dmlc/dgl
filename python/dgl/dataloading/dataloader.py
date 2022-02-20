@@ -27,10 +27,10 @@ from ..storages import wrap_storage
 from .base import BlockSampler, EdgeBlockSampler
 from .. import backend as F
 
-python_exit_status = False
+PYTHON_EXIT_STATUS = False
 def _set_python_exit_flag():
-    global python_exit_status
-    python_exit_status = True
+    global PYTHON_EXIT_STATUS
+    PYTHON_EXIT_STATUS = True
 atexit.register(_set_python_exit_flag)
 
 prefetcher_timeout = int(os.environ.get('DGL_PREFETCHER_TIMEOUT', '10'))
@@ -460,7 +460,7 @@ class _PrefetchingIter(object):
         # self.queue.get_nowait() will hang.  So we set it to no-op and let Python handle
         # the rest since the thread is daemonic.
         # PyTorch takes the same solution.
-        if python_exit_status is True or python_exit_status is None:
+        if PYTHON_EXIT_STATUS is True or PYTHON_EXIT_STATUS is None:
             return
         if not self._shutting_down:
             try:
@@ -469,11 +469,11 @@ class _PrefetchingIter(object):
 
                 try:
                     self.queue.get_nowait()     # In case the thread is blocking on put().
-                except:
+                except:     # pylint: disable=bare-except
                     pass
 
                 self.thread.join()
-            except:
+            except:         # pylint: disable=bare-except
                 pass
 
     def __del__(self):

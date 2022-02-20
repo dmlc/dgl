@@ -11,7 +11,7 @@ import tqdm
 # (This is a long-standing issue)
 from ogb.linkproppred import DglLinkPropPredDataset
 
-USE_UVA = True
+USE_UVA = False
 device = 'cuda'
 
 def to_bidirected_with_reverse_mapping(g):
