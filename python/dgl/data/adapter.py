@@ -76,7 +76,7 @@ class AsNodePredDataset(DGLDataset):
         self.split_ratio = split_ratio
         self.target_ntype = target_ntype
         super().__init__(self.dataset.name + '-as-nodepred',
-                         hash_key=(split_ratio, target_ntype), **kwargs)
+                         hash_key=(split_ratio, target_ntype, dataset.name, 'nodepred'), **kwargs)
 
     def process(self):
         is_ogb = hasattr(self.dataset, 'get_idx_split')
@@ -211,7 +211,7 @@ class AsLinkPredDataset(DGLDataset):
     Dataset("cora_v2", num_graphs=1, save_path=...)
     >>> new_ds = dgl.data.AsNodePredDataset(ds, [0.8, 0.1, 0.1])
     >>> print(new_ds)
-    Dataset("cora_v2-as-edgepred", num_graphs=1, save_path=/home/ubuntu/.dgl/cora_v2-as-edgepred)
+    Dataset("cora_v2-as-linkpred", num_graphs=1, save_path=/home/ubuntu/.dgl/cora_v2-as-linkpred)
     >>> print(hasattr(new_ds, "get_test_edges"))
     True
     """
@@ -226,8 +226,8 @@ class AsLinkPredDataset(DGLDataset):
         self.dataset = dataset
         self.split_ratio = split_ratio
         self.neg_ratio = neg_ratio
-        super().__init__(dataset.name + '-as-edgepred',
-                         hash_key=(neg_ratio, split_ratio), **kwargs)
+        super().__init__(dataset.name + '-as-linkpred',
+                         hash_key=(neg_ratio, split_ratio, dataset.name, 'linkpred'), **kwargs)
 
     def process(self):
         if self.split_ratio is None:
