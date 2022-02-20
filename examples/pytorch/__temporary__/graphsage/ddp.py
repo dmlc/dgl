@@ -87,6 +87,7 @@ def train(rank, world_size, graph, num_classes, split_idx):
         model.train()
         t0 = time.time()
         for it, (input_nodes, output_nodes, blocks) in enumerate(train_dataloader):
+            print(output_nodes[:5])
             x = blocks[0].srcdata['feat']
             y = blocks[-1].dstdata['label'][:, 0]
             y_hat = model(blocks, x)
@@ -119,7 +120,7 @@ def train(rank, world_size, graph, num_classes, split_idx):
         print(np.mean(durations[4:]), np.std(durations[4:]))
         model.eval()
         with torch.no_grad():
-            pred = model.module.inference(graph, graph.device, 1000, 12, 'cpu')
+            pred = model.module.inference(graph, graph.device, 1000, 12, graph.device)
             acc = MF.accuracy(pred.to(graph.device), graph.ndata['label'])
             print('Test acc:', acc.item())
 
