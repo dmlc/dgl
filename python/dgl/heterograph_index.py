@@ -1,10 +1,10 @@
 """Module for heterogeneous graph index class definition."""
 from __future__ import absolute_import
 
+import sys
 import itertools
 import numpy as np
 import scipy
-import sys
 
 from ._ffi.object import register_object, ObjectBase
 from ._ffi.function import _init_api
