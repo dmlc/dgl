@@ -161,9 +161,9 @@ DataFactory.register(
 
 DataFactory.register(
     "csv",
-    import_code="from dgl.data import DGLCSVDataset",
+    import_code="from dgl.data import CSVDataset",
     extra_args={"data_path": "./"},
-    class_name="DGLCSVDataset({})",
+    class_name="CSVDataset({})",
     allowed_pipeline=["nodepred", "nodepred-ns", "linkpred"])
 
 DataFactory.register(
