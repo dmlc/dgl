@@ -64,7 +64,7 @@ class _TensorizedDatasetIter(object):
     def __next__(self):
         batch = self._next_indices()
         if self.mapping_keys is None:
-            # clone() fixes #3755.  Not sure why.  Need to take a look afterwards.
+            # clone() fixes #3755, probably.  Not sure why.  Need to take a look afterwards.
             return batch.clone()
 
         # convert the type-ID pairs to dictionary
@@ -112,31 +112,39 @@ class TensorizedDataset(torch.utils.data.IterableDataset):
     When the dataset is on the GPU, this significantly reduces the overhead.
     """
     def __init__(self, indices, batch_size, drop_last):
+        name, _ = _generate_shared_mem_name_id()
         if isinstance(indices, Mapping):
             self._mapping_keys = list(indices.keys())
             self._device = next(iter(indices.values())).device
-            self._tensor_dataset = _get_id_tensor_from_mapping(
+            self._id_tensor = _get_id_tensor_from_mapping(
                 indices, self._device, self._mapping_keys)
         else:
-            self._tensor_dataset = indices
+            self._id_tensor = indices
             self._device = indices.device
             self._mapping_keys = None
+        # Use a shared memory array to permute indices for shuffling.  This is to make sure that
+        # the worker processes can see it when persistent_workers=True, where self._indices
+        # would not be duplicated every epoch.
+        self._indices = create_shared_mem_array(name, (self._id_tensor.shape[0],), torch.int64)
+        self._indices[:] = torch.arange(self._id_tensor.shape[0])
         self.batch_size = batch_size
         self.drop_last = drop_last
+        self.shared_mem_name = name
+        self.shared_mem_size = self._indices.shape[0]
 
     def shuffle(self):
         """Shuffle the dataset."""
         # TODO: may need an in-place shuffle kernel
-        perm = torch.randperm(self._tensor_dataset.shape[0], device=self._device)
-        self._tensor_dataset[:] = self._tensor_dataset[perm]
+        self._indices[:] = self._indices[torch.randperm(self._indices.shape[0])]
 
     def __iter__(self):
-        dataset = _divide_by_worker(self._tensor_dataset, self.batch_size, self.drop_last)
+        indices = _divide_by_worker(self._indices, self.batch_size, self.drop_last)
+        id_tensor = self._id_tensor[indices.to(self._device)]
         return _TensorizedDatasetIter(
-            dataset, self.batch_size, self.drop_last, self._mapping_keys)
+            id_tensor, self.batch_size, self.drop_last, self._mapping_keys)
 
     def __len__(self):
-        num_samples = self._tensor_dataset.shape[0]
+        num_samples = self._id_tensor.shape[0]
         return (num_samples + (0 if self.drop_last else (self.batch_size - 1))) // self.batch_size
 
 def _get_shared_mem_name(id_):
@@ -210,6 +218,7 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
             name = _get_shared_mem_name(id_)
             indices_shared = get_shared_mem_array(name, (num_samples,), torch.int64)
             self._indices = indices_shared
+        self.shared_mem_name = name
 
     def shuffle(self):
         """Shuffles the dataset."""

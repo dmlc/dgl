@@ -10,7 +10,7 @@ from ogb.nodeproppred import DglNodePropPredDataset
 import tqdm
 import argparse
 
-USE_UVA = True    # Set to True for UVA sampling
+USE_UVA = False    # Set to True for UVA sampling
 
 class SAGE(nn.Module):
     def __init__(self, in_feats, n_hidden, n_classes):
@@ -78,13 +78,13 @@ sampler = dgl.dataloading.NeighborSampler(
         [15, 10, 5], prefetch_node_feats=['feat'], prefetch_labels=['label'])
 train_dataloader = dgl.dataloading.NodeDataLoader(
         graph, train_idx, sampler, device=device, batch_size=1024, shuffle=True,
-        drop_last=False, num_workers=12)
+        drop_last=False, num_workers=0, use_uva=USE_UVA)
 valid_dataloader = dgl.dataloading.NodeDataLoader(
         graph, valid_idx, sampler, device=device, batch_size=1024, shuffle=True,
-        drop_last=False, num_workers=12)
+        drop_last=False, num_workers=0, use_uva=USE_UVA)
 
 durations = []
-for _ in range(0):
+for _ in range(10):
     model.train()
     t0 = time.time()
     for it, (input_nodes, output_nodes, blocks) in enumerate(train_dataloader):
@@ -119,6 +119,6 @@ print(np.mean(durations[4:]), np.std(durations[4:]))
 # Test accuracy and offline inference of all nodes
 model.eval()
 with torch.no_grad():
-    pred = model.inference(graph, device, 4096, 1, 'cpu')
+    pred = model.inference(graph, device, 4096, 12 if USE_UVA else 0, graph.device)
     acc = MF.accuracy(pred.to(graph.device), graph.ndata['label'])
     print('Test acc:', acc.item())
