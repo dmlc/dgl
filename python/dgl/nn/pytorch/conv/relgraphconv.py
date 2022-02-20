@@ -129,12 +129,12 @@ class RelGraphConv(nn.Module):
 
     def message(self, edges):
         """Message function."""
-        m = self.linear_r(edges.src['h'], edges.data['etype'])
+        m = self.linear_r(edges.src['h'], edges.data['etype'], self.presorted)
         if 'norm' in edges.data:
             m = m * edges.data['norm']
         return {'m' : m}
 
-    def forward(self, g, feat, etypes, norm=None):
+    def forward(self, g, feat, etypes, norm=None, *, presorted=False):
         """Forward computation.
 
         Parameters
@@ -147,12 +147,18 @@ class RelGraphConv(nn.Module):
             An 1D integer tensor of edge types. Shape: :math:`(|E|,)`.
         norm : torch.Tensor, optional
             An 1D tensor of edge norm value.  Shape: :math:`(|E|,)`.
+        presorted : bool, optional
+            Whether the edges of the input graph have been sorted by their types.
+            Forward on pre-sorted graph may be faster. Graphs created
+            by :func:`~dgl.to_homogeneous` are automatically sorted by etype.
+            Also see :func:`~dgl.reorder_graph` for sorting edges manually.
 
         Returns
         -------
         torch.Tensor
             New node features. Shape: :math:`(|V|, D')`.
         """
+        self.presorted = presorted
         with g.local_scope():
             g.srcdata['h'] = feat
             if norm is not None:
