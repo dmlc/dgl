@@ -2,9 +2,9 @@
 from __future__ import absolute_import
 
 import itertools
-from multiprocessing.reduction import ForkingPickler
 import numpy as np
 import scipy
+import sys
 
 from ._ffi.object import register_object, ObjectBase
 from ._ffi.function import _init_api
@@ -1382,6 +1382,11 @@ def _forking_reduce(graph_index):
     graph_index._forking_pk_state = (states.meta, arrays)
     return _forking_rebuild, (graph_index._forking_pk_state,)
 
-ForkingPickler.register(HeteroGraphIndex, _forking_reduce)
+
+if not (F.get_preferred_backend() == 'mxnet' and sys.version_info.minor <= 6):
+    # Python 3.6 MXNet crashes with the following statement; remove until we no longer support
+    # 3.6 (which is EOL anyway).
+    from multiprocessing.reduction import ForkingPickler
+    ForkingPickler.register(HeteroGraphIndex, _forking_reduce)
 
 _init_api("dgl.heterograph_index")
