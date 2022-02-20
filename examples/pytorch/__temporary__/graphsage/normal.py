@@ -39,7 +39,8 @@ class SAGE(nn.Module):
         sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1, prefetch_node_feats=['h'])
         dataloader = dgl.dataloading.NodeDataLoader(
                 g, torch.arange(g.num_nodes()).to(g.device), sampler, device=device,
-                batch_size=batch_size, shuffle=False, drop_last=False, num_workers=num_workers)
+                batch_size=batch_size, shuffle=False, drop_last=False, num_workers=num_workers,
+                persistent_workers=True)
         if buffer_device is None:
             buffer_device = device
 

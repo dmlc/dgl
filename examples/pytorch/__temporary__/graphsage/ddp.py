@@ -40,7 +40,8 @@ class SAGE(nn.Module):
         sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1, prefetch_node_feats=['h'])
         dataloader = dgl.dataloading.NodeDataLoader(
                 g, torch.arange(g.num_nodes()).to(g.device), sampler, device=device,
-                batch_size=1000, shuffle=False, drop_last=False, num_workers=num_workers)
+                batch_size=1000, shuffle=False, drop_last=False, num_workers=num_workers,
+                persistent_workers=True)
         if buffer_device is None:
             buffer_device = device
 
@@ -87,7 +88,6 @@ def train(rank, world_size, graph, num_classes, split_idx):
         model.train()
         t0 = time.time()
         for it, (input_nodes, output_nodes, blocks) in enumerate(train_dataloader):
-            print(output_nodes[:5])
             x = blocks[0].srcdata['feat']
             y = blocks[-1].dstdata['label'][:, 0]
             y_hat = model(blocks, x)
