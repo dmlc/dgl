@@ -120,7 +120,7 @@ def train(rank, world_size, graph, num_classes, split_idx):
         print(np.mean(durations[4:]), np.std(durations[4:]))
         model.eval()
         with torch.no_grad():
-            pred = model.module.inference(graph, graph.device, 1000, 12, graph.device)
+            pred = model.module.inference(graph, 'cuda', 1000, 12, graph.device)
             acc = MF.accuracy(pred.to(graph.device), graph.ndata['label'])
             print('Test acc:', acc.item())
 
