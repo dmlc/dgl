@@ -105,7 +105,6 @@ class BlockSampler(object):
 
 def _find_exclude_eids_with_reverse_id(g, eids, reverse_eid_map):
     if isinstance(eids, Mapping):
-        eids = {g.to_canonical_etype(k): v for k, v in eids.items()}
         exclude_eids = {
             k: F.cat([v, F.gather_row(reverse_eid_map[k], v)], 0)
             for k, v in eids.items()}
@@ -126,6 +125,10 @@ def _find_exclude_eids(g, exclude_mode, eids, **kwargs):
         return None
     elif callable(exclude_mode):
         return exclude_mode(eids)
+    elif F.is_tensor(exclude_mode) or (
+            isinstance(exclude_mode, Mapping) and
+            all(F.is_tensor(v) for v in exclude_mode.values())):
+        return exclude_mode
     elif exclude_mode == 'self':
         return eids
     elif exclude_mode == 'reverse_id':
@@ -247,6 +250,8 @@ class EdgeBlockSampler(object):
         If :attr:`negative_sampler` is given, also returns another graph containing the
         negative pairs as edges.
         """
+        if isinstance(seed_edges, Mapping):
+            seed_edges = {g.to_canonical_etype(k): v for k, v in seed_edges.items()}
         exclude = self.exclude
         pair_graph = g.edge_subgraph(
             seed_edges, relabel_nodes=False, output_device=self.output_device)
