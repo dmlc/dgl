@@ -5884,7 +5884,7 @@ class DGLHeteroGraph(object):
         return ret
 
     # TODO: Formats should not be specified, just saving all the materialized formats
-    def shared_memory(self, name=None, formats=('coo', 'csr', 'csc'), inplace=False):
+    def shared_memory(self, name, formats=('coo', 'csr', 'csc')):
         """Return a copy of this graph in shared memory, without node data or edge data.
 
         It moves the graph index to shared memory and returns a DGLHeterograph object which
@@ -5897,32 +5897,21 @@ class DGLHeteroGraph(object):
             The name of the shared memory.
         formats : str or a list of str (optional)
             Desired formats to be materialized.
-        inplace : bool
-            Whether to change the graph storage to shared memory in-place.
 
         Returns
         -------
         HeteroGraph
             The graph in shared memory
         """
+        assert len(name) > 0, "The name of shared memory cannot be empty"
         assert len(formats) > 0
         if isinstance(formats, str):
             formats = [formats]
         for fmt in formats:
             assert fmt in ("coo", "csr", "csc"), '{} is not coo, csr or csc'.format(fmt)
-        gidx = self._graph.shared_memory(name, self.ntypes, self.etypes, formats, inplace)
-        return self if inplace else DGLHeteroGraph(gidx, self.ntypes, self.etypes)
+        gidx = self._graph.shared_memory(name, self.ntypes, self.etypes, formats)
+        return DGLHeteroGraph(gidx, self.ntypes, self.etypes)
 
-    def shared_memory_name(self):
-        """Get the name of the graph's underlying shared memory storage.
-
-        Returns an empty string if the graph is not in shared memory.
-
-        Returns
-        -------
-        str
-        """
-        return self._graph.shared_memory_name()
 
     def long(self):
         """Cast the graph to one with idtype int64

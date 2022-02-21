@@ -111,9 +111,7 @@ class TensorizedDataset(torch.utils.data.IterableDataset):
     """Custom Dataset wrapper that returns a minibatch as tensors or dicts of tensors.
     When the dataset is on the GPU, this significantly reduces the overhead.
     """
-    def __init__(self, graph, indices, batch_size, drop_last):
-        self.graph = graph
-
+    def __init__(self, indices, batch_size, drop_last):
         name, _ = _generate_shared_mem_name_id()
         if isinstance(indices, Mapping):
             self._mapping_keys = list(indices.keys())
@@ -167,9 +165,7 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
     This class additionally saves the index tensor in shared memory and therefore
     avoids duplicating the same index tensor during shuffling.
     """
-    def __init__(self, graph, indices, batch_size, drop_last, ddp_seed):
-        self.graph = graph
-
+    def __init__(self, indices, batch_size, drop_last, ddp_seed):
         if isinstance(indices, Mapping):
             self._mapping_keys = list(indices.keys())
         else:
@@ -546,15 +542,15 @@ class WorkerInitWrapper(object):
             self.func(worker_id)
 
 
-def create_tensorized_dataset(graph, indices, batch_size, drop_last, use_ddp, ddp_seed):
+def create_tensorized_dataset(indices, batch_size, drop_last, use_ddp, ddp_seed):
     """Converts a given indices tensor to a TensorizedDataset, an IterableDataset
     that returns views of the original tensor, to reduce overhead from having
     a list of scalar tensors in default PyTorch DataLoader implementation.
     """
     if use_ddp:
-        return DDPTensorizedDataset(graph, indices, batch_size, drop_last, ddp_seed)
+        return DDPTensorizedDataset(indices, batch_size, drop_last, ddp_seed)
     else:
-        return TensorizedDataset(graph, indices, batch_size, drop_last)
+        return TensorizedDataset(indices, batch_size, drop_last)
 
 
 def _get_device(device):
@@ -619,17 +615,9 @@ class DataLoader(torch.utils.data.DataLoader):
                     raise ValueError(
                         'Expect graph and indices to be on the same device. '
                         'If you wish to use UVA sampling, please set use_uva=True.')
-                if self.graph.device.type == 'cuda' and num_workers > 0:
-                    raise ValueError('num_workers must be 0 if graph and indices are on CUDA.')
-                elif self.graph.device.type == 'cpu' and num_workers > 0:
-                    # Instantiate all the formats if the number of workers is greater than 0.
-                    self.graph.create_formats_()
-                    # Put the graph into shared memory so that it doesn't need to be
-                    # duplicated for every worker
-                    # [TODO](?) Our shared memory manager implementation has trouble handling
-                    # signals where the shared memory objects are not properly unlinked
-                    # sometimes...
-                    self.graph.shared_memory(inplace=True)
+                if self.graph.device.type == 'cuda':
+                    if num_workers > 0:
+                        raise ValueError('num_workers must be 0 if graph and indices are on CUDA.')
 
             # Check pin_prefetcher and use_prefetch_thread - should be only effective
             # if performing CPU sampling but output device is CUDA
@@ -663,7 +651,7 @@ class DataLoader(torch.utils.data.DataLoader):
                 isinstance(indices, Mapping) and
                 all(torch.is_tensor(v) for v in indices.values()))):
             self.dataset = create_tensorized_dataset(
-                graph, indices, batch_size, drop_last, use_ddp, ddp_seed)
+                indices, batch_size, drop_last, use_ddp, ddp_seed)
         else:
             self.dataset = indices
 
@@ -677,6 +665,10 @@ class DataLoader(torch.utils.data.DataLoader):
         self.pin_prefetcher = pin_prefetcher
         self.use_prefetch_thread = use_prefetch_thread
         worker_init_fn = WorkerInitWrapper(kwargs.get('worker_init_fn', None))
+
+        # Instantiate all the formats if the number of workers is greater than 0.
+        if num_workers > 0 and hasattr(self.graph, 'create_formats_'):
+            self.graph.create_formats_()
 
         self.other_storages = {}
 
