@@ -258,7 +258,7 @@ class HeteroGraph : public BaseHeteroGraph {
   static HeteroGraphPtr CopyToSharedMem(
       HeteroGraphPtr g, const std::string& name, const std::vector<std::string>& ntypes,
       const std::vector<std::string>& etypes, const std::set<std::string>& fmts,
-      bool inplace = false);
+      bool inplace=false);
 
   /*! \brief The name of the shared memory. Return empty string if it is not in shared memory. */
   std::string SharedMemName() const;
