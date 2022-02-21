@@ -5,6 +5,7 @@ import dgl.ops as OPS
 import backend as F
 import unittest
 import torch
+from functools import partial
 from torch.utils.data import DataLoader
 from collections import defaultdict
 from collections.abc import Iterator, Mapping
@@ -253,7 +254,7 @@ def _create_heterogeneous():
         'AB': torch.arange(0, 1000, device=F.ctx())}
     return g, reverse_etypes, always_exclude, seed_edges
 
-def _find_edges_to_exclude(g, pair_eids, exclude, always_exclude):
+def _find_edges_to_exclude(g, exclude, always_exclude, pair_eids):
     if exclude == None:
         return always_exclude
     elif exclude == 'self':
@@ -262,15 +263,18 @@ def _find_edges_to_exclude(g, pair_eids, exclude, always_exclude):
         pair_eids = torch.cat([pair_eids, pair_eids + 1000])
         return torch.cat([pair_eids, always_exclude]) if always_exclude is not None else pair_eids
     elif exclude == 'reverse_types':
-        pair_eids = {
-            ('A', 'AA', 'A'): pair_eids[('A', 'AA', 'A')],
-            ('A', 'AB', 'B'): pair_eids[('A', 'AB', 'B')],
-            ('A', 'rev-AA', 'A'): pair_eids[('A', 'AA', 'A')],
-            ('B', 'rev-AB', 'A'): pair_eids[('A', 'AB', 'B')]}
+        pair_eids = {g.to_canonical_etype(k): v for k, v in pair_eids.items()}
+        if ('A', 'AA', 'A') in pair_eids:
+            pair_eids[('A', 'rev-AA', 'A')] = pair_eids[('A', 'AA', 'A')]
+        if ('A', 'AB', 'B') in pair_eids:
+            pair_eids[('B', 'rev-AB', 'A')] = pair_eids[('A', 'AB', 'B')]
         if always_exclude is not None:
+            always_exclude = {g.to_canonical_etype(k): v for k, v in always_exclude.items()}
             for k in always_exclude.keys():
-                canonical_etype = g.to_canonical_etype(k)
-                pair_eids[canonical_etype] = torch.cat([pair_eids[canonical_etype], always_exclude[k]])
+                if k in pair_eids:
+                    pair_eids[k] = torch.cat([pair_eids[k], always_exclude[k]])
+                else:
+                    pair_eids[k] = always_exclude[k]
         return pair_eids
 
 @pytest.mark.parametrize('always_exclude_flag', [False, True])
@@ -286,8 +290,9 @@ def test_edge_dataloader_excludes(exclude, always_exclude_flag):
         always_exclude = None
 
     kwargs = {}
-    kwargs['exclude'] = exclude
-    kwargs['always_exclude'] = always_exclude
+    kwargs['exclude'] = (
+        partial(_find_edges_to_exclude, g, exclude, always_exclude) if always_exclude_flag
+        else exclude)
     kwargs['reverse_eids'] = reverse_eids if exclude == 'reverse_id' else None
     kwargs['reverse_etypes'] = reverse_etypes if exclude == 'reverse_types' else None
 
@@ -298,7 +303,7 @@ def test_edge_dataloader_excludes(exclude, always_exclude_flag):
         pair_eids = pair_graph.edata[dgl.EID]
         block_eids = block.edata[dgl.EID]
 
-        edges_to_exclude = _find_edges_to_exclude(g, pair_eids, exclude, always_exclude)
+        edges_to_exclude = _find_edges_to_exclude(g, exclude, always_exclude, pair_eids)
         if edges_to_exclude is None:
             continue
         edges_to_exclude = dgl.utils.recursive_apply(edges_to_exclude, lambda x: x.cpu().numpy())
