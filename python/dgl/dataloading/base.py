@@ -105,6 +105,7 @@ class BlockSampler(object):
 
 def _find_exclude_eids_with_reverse_id(g, eids, reverse_eid_map):
     if isinstance(eids, Mapping):
+        eids = {g.to_canonical_etype(k): v for k, v in eids.items()}
         exclude_eids = {
             k: F.cat([v, F.gather_row(reverse_eid_map[k], v)], 0)
             for k, v in eids.items()}
