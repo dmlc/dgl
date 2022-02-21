@@ -21,7 +21,8 @@ from ..heterograph import DGLHeteroGraph
 from .. import ndarray as nd
 from ..utils import (
     recursive_apply, ExceptionWrapper, recursive_apply_pair, set_num_threads,
-    create_shared_mem_array, get_shared_mem_array, context_of)
+    create_shared_mem_array, get_shared_mem_array, context_of, pin_memory_inplace,
+    unpin_memory_inplace)
 from ..frame import LazyFeature
 from ..storages import wrap_storage
 from .base import BlockSampler, EdgeBlockSampler
@@ -597,9 +598,9 @@ class DataLoader(torch.utils.data.DataLoader):
             # Check graph and indices device as well as num_workers
             if use_uva:
                 if self.graph.device.type != 'cpu':
-                    raise ValueError('Graph must be on CPU if UVM sampling is enabled.')
+                    raise ValueError('Graph must be on CPU if UVA sampling is enabled.')
                 if num_workers > 0:
-                    raise ValueError('num_workers must be 0 if UVM sampling is enabled.')
+                    raise ValueError('num_workers must be 0 if UVA sampling is enabled.')
 
                 # Create all the formats and pin the features - custom GraphStorages
                 # will need to do that themselves.
@@ -607,17 +608,17 @@ class DataLoader(torch.utils.data.DataLoader):
                 self.graph.pin_memory_()
                 for ntype in self.graph.ntypes:
                     for key, value in self.graph.nodes[ntype].data.items():
-                        self.graph.nodes[ntype].data[key] = value.pin_memory()
+                        pin_memory_inplace(self.graph.nodes[ntype].data[key])
                 for etype in self.graph.canonical_etypes:
                     for key, value in self.graph.edges[etype].data.items():
-                        self.graph.edges[etype].data[key] = value.pin_memory()
+                        pin_memory_inplace(self.graph.edges[etype].data[key])
 
                 indices = recursive_apply(indices, lambda x: x.to(self.device))
             else:
                 if self.graph.device != indices_device:
                     raise ValueError(
                         'Expect graph and indices to be on the same device. '
-                        'If you wish to use UVM sampling, please set use_uva=True.')
+                        'If you wish to use UVA sampling, please set use_uva=True.')
                 if self.graph.device.type == 'cuda':
                     if num_workers > 0:
                         raise ValueError('num_workers must be 0 if graph and indices are on CUDA.')
@@ -705,12 +706,14 @@ class NodeDataLoader(DataLoader):
 
     Parameters
     ----------
-    g : DGLGraph
+    graph : DGLGraph
         The graph.
-    nids : Tensor or dict[ntype, Tensor]
+    indices : Tensor or dict[ntype, Tensor]
         The node set to compute outputs.
-    graph_sampler : dgl.dataloading.Sampler
-        The neighborhood sampler.
+    graph_sampler : object
+        The neighborhood sampler.  It could be any object that has a :attr:`sample`
+        method. The :attr:`sample` methods must take in a graph object and either a tensor
+        of node indices or a dict of such tensors.
     device : device context, optional
         The device of the generated MFGs in each iteration, which should be a
         PyTorch device object (e.g., ``torch.device``).
@@ -801,21 +804,20 @@ class NodeDataLoader(DataLoader):
       the whole graph fits in GPU memory.
 
     * If the input graph :attr:`g` is on CPU while the output device :attr:`device` is GPU, then
-      depending on the value of :attr:`num_workers`:
+      depending on the value of :attr:`use_uva`:
 
-      - If :attr:`num_workers` is set to 0, the sampling will happen on the CPU, and then the
-        subgraphs will be constructed directly on the GPU. This hybrid mode is deprecated and
-        will be removed in the next release. Use UVA sampling instead, especially in
-        multi-GPU configurations.
+      - If :attr:`use_uva` is set to True, the sampling and subgraph construction will happen
+        on GPU even if the GPU itself cannot hold the entire graph. This is the recommended
+        setting unless there are operations not supporting UVA. :attr:`num_workers` must be 0
+        in this case.
 
-      - Otherwise, if :attr:`num_workers` is greater than 0, both the sampling and subgraph
-        construction will take place on the CPU. This is the recommended setting when using a
-        single-GPU and the whole graph does not fit in GPU memory.
+      - Otherwise, both the sampling and subgraph construction will take place on the CPU.
     """
 
 
 class EdgeDataLoader(DataLoader):
-    """EdgeDataLoader class."""
+    """EdgeDataLoader class.
+    """
     def __init__(self, graph, indices, graph_sampler, device='cpu', use_ddp=False,
                  ddp_seed=0, batch_size=1, drop_last=False, shuffle=False,
                  use_prefetch_thread=False, use_alternate_streams=True,

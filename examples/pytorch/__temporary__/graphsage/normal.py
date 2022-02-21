@@ -10,7 +10,7 @@ from ogb.nodeproppred import DglNodePropPredDataset
 import tqdm
 import argparse
 
-USE_UVA = False    # Set to True for UVA sampling
+USE_UVA = True    # Set to True for UVA sampling
 
 class SAGE(nn.Module):
     def __init__(self, in_feats, n_hidden, n_classes):
@@ -40,7 +40,7 @@ class SAGE(nn.Module):
         dataloader = dgl.dataloading.NodeDataLoader(
                 g, torch.arange(g.num_nodes()).to(g.device), sampler, device=device,
                 batch_size=batch_size, shuffle=False, drop_last=False, num_workers=num_workers,
-                persistent_workers=True)
+                persistent_workers=(num_workers > 0))
         if buffer_device is None:
             buffer_device = device
 

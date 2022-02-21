@@ -41,7 +41,7 @@ class SAGE(nn.Module):
         dataloader = dgl.dataloading.NodeDataLoader(
                 g, torch.arange(g.num_nodes()).to(g.device), sampler, device=device,
                 batch_size=1000, shuffle=False, drop_last=False, num_workers=num_workers,
-                persistent_workers=True)
+                persistent_workers=(num_workers > 0))
         if buffer_device is None:
             buffer_device = device
 
