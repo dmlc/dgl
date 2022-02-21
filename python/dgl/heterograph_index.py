@@ -276,8 +276,6 @@ class HeteroGraphIndex(ObjectBase):
         return bool(_CAPI_DGLHeteroIsPinned(self))
 
     def shared_memory_name(self):
-        """Return the name of shared memory storage of the graph index, or an empty string
-        if the graph is not in shared memory."""
         return _CAPI_DGLHeteroGetSharedMemName(self)
 
     def shared_memory(self, name=None, ntypes=None, etypes=None, formats=('coo', 'csr', 'csc'),
@@ -1379,7 +1377,7 @@ class HeteroPickleStates(ObjectBase):
                 _CAPI_DGLCreateHeteroPickleStatesOld, metagraph, num_nodes_per_type, adjs)
 
 def _generate_shared_mem_name():
-    return f'dglshm_{os.getpid()}_{time.time()}' # unique identifier
+    return f'dglshm_{os.getpid()}_{time.time_ns()}' # unique identifier
 
 def _forking_shared_mem_rebuild(shared_mem_name):
     graph_index, _, _ = create_heterograph_from_shared_memory(shared_mem_name)
