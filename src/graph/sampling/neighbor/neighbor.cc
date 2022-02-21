@@ -31,7 +31,7 @@ HeteroSubgraph ExcludeCertainEdges(
                                sg.induced_edges[etype]->shape[0],
                                sg.induced_edges[etype]->dtype.bits,
                                sg.induced_edges[etype]->ctx);
-      if (exclude_edges[etype].GetSize() == 0) {
+      if (exclude_edges[etype].GetSize() == 0 || edge_ids.GetSize() == 0) {
         remain_edges[etype] = edge_ids;
         remain_induced_edges[etype] = sg.induced_edges[etype];
         continue;
