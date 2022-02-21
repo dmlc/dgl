@@ -21,8 +21,7 @@ from ..heterograph import DGLHeteroGraph
 from .. import ndarray as nd
 from ..utils import (
     recursive_apply, ExceptionWrapper, recursive_apply_pair, set_num_threads,
-    create_shared_mem_array, get_shared_mem_array, context_of, pin_memory_inplace,
-    unpin_memory_inplace)
+    create_shared_mem_array, get_shared_mem_array, context_of, pin_memory_inplace)
 from ..frame import LazyFeature
 from ..storages import wrap_storage
 from .base import BlockSampler, EdgeBlockSampler
@@ -606,12 +605,9 @@ class DataLoader(torch.utils.data.DataLoader):
                 # will need to do that themselves.
                 self.graph.create_formats_()
                 self.graph.pin_memory_()
-                for ntype in self.graph.ntypes:
-                    for key, value in self.graph.nodes[ntype].data.items():
-                        pin_memory_inplace(self.graph.nodes[ntype].data[key])
-                for etype in self.graph.canonical_etypes:
-                    for key, value in self.graph.edges[etype].data.items():
-                        pin_memory_inplace(self.graph.edges[etype].data[key])
+                for frame in itertools.chain(self.graph._node_frames, self.graph._edge_frames):
+                    for col in frame._columns.values():
+                        pin_memory_inplace(col.data)
 
                 indices = recursive_apply(indices, lambda x: x.to(self.device))
             else:
