@@ -307,7 +307,7 @@ load graph-level features from.
     node_data:
     - file_name: nodes.csv
     graph_data:
-    - file_name: graphs.csv
+      file_name: graphs.csv
 
 To distinguish nodes and edges of different graphs, the ``node.csv`` and ``edge.csv`` must contain
 an extra column ``graph_id``:

@@ -147,7 +147,8 @@ class NodeData(BaseData):
                 node_dict[graph_id][n_data.type] = {'mapping': {index: i for i,
                                                                 index in enumerate(ids[u_indices])},
                                                     'data': {k: _tensor(v[idx][u_indices])
-                                                             for k, v in n_data.data.items()}}
+                                                             for k, v in n_data.data.items()},
+                                                    'dtype': ids.dtype}
         return node_dict
 
 
@@ -192,8 +193,10 @@ class EdgeData(BaseData):
                 idx = e_data.graph_id == graph_id
                 src_mapping = node_dict[graph_id][src_type]['mapping']
                 dst_mapping = node_dict[graph_id][dst_type]['mapping']
-                src_ids = [src_mapping[index] for index in e_data.src[idx]]
-                dst_ids = [dst_mapping[index] for index in e_data.dst[idx]]
+                orig_src_ids = e_data.src[idx].astype(node_dict[graph_id][src_type]['dtype'])
+                orig_dst_ids = e_data.dst[idx].astype(node_dict[graph_id][dst_type]['dtype'])
+                src_ids = [src_mapping[index] for index in orig_src_ids]
+                dst_ids = [dst_mapping[index] for index in orig_dst_ids]
                 if graph_id not in edge_dict:
                     edge_dict[graph_id] = {}
                 edge_dict[graph_id][e_data.type] = {'edges': (_tensor(src_ids), _tensor(dst_ids)),

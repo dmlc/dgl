@@ -218,6 +218,43 @@ def test_extract_archive():
             assert os.path.exists(os.path.join(dst_dir, gz_file))
 
 
+def _test_construct_graphs_mixed_ids():
+    from dgl.data.csv_dataset_base import NodeData, EdgeData, DGLGraphConstructor
+    # node_ids/src_ids/dst_ids are mixed with numeric and non-numeric values
+    # homogeneous graph
+    node_ids = [1, 2, 3, 'a']
+    src_ids = [1, 2, 3]
+    dst_ids = ['a', 1, 2]
+    node_data = NodeData(node_ids, {})
+    edge_data = EdgeData(src_ids, dst_ids, {})
+    graphs, data_dict = DGLGraphConstructor.construct_graphs(
+        node_data, edge_data)
+    assert len(graphs) == 1
+    assert len(data_dict) == 0
+    g = graphs[0]
+    assert g.is_homogeneous
+    assert g.num_nodes() == len(node_ids)
+    assert g.num_edges() == len(src_ids)
+
+    # heterogeneous graph
+    node_ids_user = [1, 2, 3]
+    node_ids_item = ['a', 'b', 'c']
+    src_ids = node_ids_user
+    dst_ids = node_ids_item
+    node_data_user = NodeData(node_ids_user, {}, type='user')
+    node_data_item = NodeData(node_ids_item, {}, type='item')
+    edge_data = EdgeData(src_ids, dst_ids, {}, type=('user', 'like', 'item'))
+    graphs, data_dict = DGLGraphConstructor.construct_graphs(
+        [node_data_user, node_data_item], edge_data)
+    assert len(graphs) == 1
+    assert len(data_dict) == 0
+    g = graphs[0]
+    assert not g.is_homogeneous
+    assert g.num_nodes('user') == len(node_ids_user)
+    assert g.num_nodes('item') == len(node_ids_item)
+    assert g.num_edges() == len(src_ids)
+
+
 def _test_construct_graphs_homo():
     from dgl.data.csv_dataset_base import NodeData, EdgeData, DGLGraphConstructor
     # node_id/src_id/dst_id could be non-sorted, duplicated, non-numeric.
@@ -1095,6 +1132,7 @@ def _test_NodeEdgeGraphData():
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
 def test_csvdataset():
     _test_NodeEdgeGraphData()
+    _test_construct_graphs_mixed_ids()
     _test_construct_graphs_homo()
     _test_construct_graphs_hetero()
     _test_construct_graphs_multiple()
