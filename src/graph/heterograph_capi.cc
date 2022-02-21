@@ -495,6 +495,13 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroUnpinMemory_")
     *rv = hg;
   });
 
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetSharedMemName")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    auto hgindex = std::dynamic_pointer_cast<HeteroGraph>(hg.sptr());
+    *rv = hgindex->SharedMemName();
+  });
+
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCopyToSharedMem")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
@@ -502,6 +509,7 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCopyToSharedMem")
     List<Value> ntypes = args[2];
     List<Value> etypes = args[3];
     List<Value> fmts = args[4];
+    bool inplace = args[5];
     auto ntypes_vec = ListValueToVector<std::string>(ntypes);
     auto etypes_vec = ListValueToVector<std::string>(etypes);
     std::set<std::string> fmts_set;
@@ -510,7 +518,7 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCopyToSharedMem")
       fmts_set.insert(fmt_data);
     }
     auto hg_share = HeteroGraph::CopyToSharedMem(
-        hg.sptr(), name, ntypes_vec, etypes_vec, fmts_set);
+        hg.sptr(), name, ntypes_vec, etypes_vec, fmts_set, inplace);
     *rv = HeteroGraphRef(hg_share);
   });
 

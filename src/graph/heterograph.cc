@@ -283,7 +283,8 @@ std::string HeteroGraph::SharedMemName() const {
 
 HeteroGraphPtr HeteroGraph::CopyToSharedMem(
       HeteroGraphPtr g, const std::string& name, const std::vector<std::string>& ntypes,
-      const std::vector<std::string>& etypes, const std::set<std::string>& fmts) {
+      const std::vector<std::string>& etypes, const std::set<std::string>& fmts,
+      bool inplace) {
   // TODO(JJ): Raise error when calling shared_memory if graph index is on gpu
   auto hg = std::dynamic_pointer_cast<HeteroGraph>(g);
   CHECK_NOTNULL(hg);
@@ -323,14 +324,18 @@ HeteroGraphPtr HeteroGraph::CopyToSharedMem(
     }
     relgraphs[etype] = UnitGraph::CreateHomographFrom(csc, csr, coo, has_csc, has_csr, has_coo);
   }
-
-  auto ret = std::shared_ptr<HeteroGraph>(
-      new HeteroGraph(hg->meta_graph_, relgraphs, hg->num_verts_per_type_));
-  ret->shared_mem_ = mem;
-
   shm.Write(ntypes);
   shm.Write(etypes);
-  return ret;
+
+  if (!inplace) {
+    auto ret = std::shared_ptr<HeteroGraph>(
+        new HeteroGraph(hg->meta_graph_, relgraphs, hg->num_verts_per_type_));
+    ret->shared_mem_ = mem;
+    return ret;
+  } else {
+    hg->shared_mem_ = mem;
+    return g;
+  }
 }
 
 std::tuple<HeteroGraphPtr, std::vector<std::string>, std::vector<std::string>>

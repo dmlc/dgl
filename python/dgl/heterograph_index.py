@@ -3,6 +3,8 @@ from __future__ import absolute_import
 
 import sys
 import itertools
+import os
+import time
 import numpy as np
 import scipy
 
@@ -273,7 +275,11 @@ class HeteroGraphIndex(ObjectBase):
         """
         return bool(_CAPI_DGLHeteroIsPinned(self))
 
-    def shared_memory(self, name, ntypes=None, etypes=None, formats=('coo', 'csr', 'csc')):
+    def shared_memory_name(self):
+        return _CAPI_DGLHeteroGetSharedMemName(self)
+
+    def shared_memory(self, name=None, ntypes=None, etypes=None, formats=('coo', 'csr', 'csc'),
+                      inplace=False):
         """Return a copy of this graph in shared memory
 
         Parameters
@@ -286,19 +292,23 @@ class HeteroGraphIndex(ObjectBase):
             Name of edge types
         format : list of str
             Desired formats to be materialized.
+        inplace : bool
+            Whether to change the graph storage to shared memory in-place.
 
         Returns
         -------
         HeteroGraphIndex
             The graph index in shared memory
         """
+        if name is None:
+            name = _generate_shared_mem_name()
         assert len(name) > 0, "The name of shared memory cannot be empty"
         assert len(formats) > 0
         for fmt in formats:
             assert fmt in ("coo", "csr", "csc")
         ntypes = [] if ntypes is None else ntypes
         etypes = [] if etypes is None else etypes
-        return _CAPI_DGLHeteroCopyToSharedMem(self, name, ntypes, etypes, formats)
+        return _CAPI_DGLHeteroCopyToSharedMem(self, name, ntypes, etypes, formats, inplace)
 
     def is_multigraph(self):
         """Return whether the graph is a multigraph
@@ -1366,6 +1376,14 @@ class HeteroPickleStates(ObjectBase):
             self.__init_handle_by_constructor__(
                 _CAPI_DGLCreateHeteroPickleStatesOld, metagraph, num_nodes_per_type, adjs)
 
+def _generate_shared_mem_name():
+    return f'dglshm_{os.getpid()}_{time.time_ns()}' # unique identifier
+
+def _forking_shared_mem_rebuild(shared_mem_name):
+    graph_index, _, _ = create_heterograph_from_shared_memory(shared_mem_name)
+    assert graph_index is not None
+    return graph_index
+
 def _forking_rebuild(pk_state):
     meta, arrays = pk_state
     arrays = [F.to_dgl_nd(arr) for arr in arrays]
@@ -1373,6 +1391,12 @@ def _forking_rebuild(pk_state):
     return _CAPI_DGLHeteroForkingUnpickle(states)
 
 def _forking_reduce(graph_index):
+    shared_mem = graph_index.shared_memory_name()
+    if shared_mem != "":
+        # This may have a problem: if a graph is put into shared memory, then immediately
+        # released while the graph is being transferred to another process, the target
+        # process will unable to reconstruct the graph.  The use case should be rare though.
+        return _forking_shared_mem_rebuild, (shared_mem,)
     states = _CAPI_DGLHeteroForkingPickle(graph_index)
     arrays = [F.from_dgl_nd(arr) for arr in states.arrays]
     # Similar to what being mentioned in HeteroGraphIndex.__getstate__, we need to save

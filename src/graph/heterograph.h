@@ -257,7 +257,11 @@ class HeteroGraph : public BaseHeteroGraph {
   */
   static HeteroGraphPtr CopyToSharedMem(
       HeteroGraphPtr g, const std::string& name, const std::vector<std::string>& ntypes,
-      const std::vector<std::string>& etypes, const std::set<std::string>& fmts);
+      const std::vector<std::string>& etypes, const std::set<std::string>& fmts,
+      bool inplace=false);
+
+  /*! \brief The name of the shared memory. Return empty string if it is not in shared memory. */
+  std::string SharedMemName() const;
 
   /*! \brief Create a heterograph from 
   *   \return the HeteroGraphPtr, names of node types, names of edge types
@@ -299,9 +303,6 @@ class HeteroGraph : public BaseHeteroGraph {
 
   /*! \brief The shared memory object for meta info*/
   std::shared_ptr<runtime::SharedMemory> shared_mem_;
-
-  /*! \brief The name of the shared memory. Return empty string if it is not in shared memory. */
-  std::string SharedMemName() const;
 
   /*! \brief template class for Flatten operation
   * 
