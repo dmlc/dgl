@@ -619,9 +619,11 @@ class DataLoader(torch.utils.data.DataLoader):
                     raise ValueError(
                         'Expect graph and indices to be on the same device. '
                         'If you wish to use UVA sampling, please set use_uva=True.')
+
                 if self.graph.device.type == 'cuda' and num_workers > 0:
                     raise ValueError('num_workers must be 0 if graph and indices are on CUDA.')
-                elif self.graph.device.type == 'cpu' and num_workers > 0:
+
+                if self.graph.device.type == 'cpu' and num_workers > 0:
                     # Instantiate all the formats if the number of workers is greater than 0.
                     self.graph.create_formats_()
                     # Put the graph into shared memory so that it doesn't need to be
