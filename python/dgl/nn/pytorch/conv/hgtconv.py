@@ -9,6 +9,62 @@ from ..linear import TypedLinear
 from ..softmax import edge_softmax
 
 class HGTConv(nn.Module):
+    r"""Heterogeneous graph transformer convolution.
+
+    Introduced in "`Heterogeneous Graph Transformer <https://arxiv.org/abs/2003.01332>`__".
+    Given a graph :math:`G(V, E)` and input node features :math:`H^{(l-1)}`,
+    it computes the new node features as follows:
+
+    Compute a multi-head attention score for each edge :math:`(s, e, t)` in the graph:
+
+    .. math::
+
+      Attention(s, e, t) = \text{Softmax}\left(||_{i\in[1,h]}ATT-head^i(s, e, t)\right) \\
+      ATT-head^i(s, e, t) = \left(K^i(s)W^{ATT}_{\phi(e)}Q^i(t)^{\top}\right)\cdot
+        \frac{\mu_{(\tau(s),\phi(e),\tau(t)}}{\sqrt{d}} \\
+      K^i(s) = \text{K-Linear}^i_{\tau(s)}(H^{(l-1)}[s]) \\
+      Q^i(t) = \text{Q-Linear}^i_{\tau(t)}(H^{(l-1)}[t]) \\
+
+    Compute the message to send on each edge :math:`(s, e, t)`:
+
+    .. math::
+
+      Message(s, e, t) = ||_{i\in[1, h]} MSG-head^i(s, e, t) \\
+      MSG-head^i(s, e, t) = \text{M-Linear}^i_{\tau(s)}(H^{(l-1)}[s])W^{MSG}_{\phi(e)} \\
+
+    Send messages to target nodes :math:`t` and aggregate:
+
+    .. math::
+
+      \tilde{H}^{(l)}[t] = \sum_{\forall s\in \mathcal{N}(t)}\left( Attention(s,e,t)
+      \cdot Message(s,e,t)\right)
+
+    Compute new node features:
+
+    .. math::
+
+      H^{(l)}[t]=\text{A-Linear}_{\tau(t)}(\sigma(\tilde(H)^{(l)}[t])) + H^{(l-1)}[t]
+
+    Parameters
+    ----------
+    in_size : int
+        Input node feature size.
+    head_size : int
+        Output head size. The output node feature size is ``head_size * num_heads``.
+    num_heads : int
+        Number of heads. The output node feature size is ``head_size * num_heads``.
+    num_ntypes : int
+        Number of node types.
+    num_etypes : int
+        Number of edge types.
+    dropout : optional, float
+        Dropout rate.
+    use_norm : optiona, bool
+        If true, apply a layer norm on the output node feature.
+
+    Examples
+    --------
+    """
     def __init__(self,
                  in_size,
                  head_size,
@@ -44,6 +100,29 @@ class HGTConv(nn.Module):
             nn.init.xavier_uniform_(self.residual_w)
 
     def forward(self, g, x, ntype, etype, *, presorted=False):
+        """Forward computation.
+
+        Parameters
+        ----------
+        g : DGLGraph
+            The input graph.
+        x : torch.Tensor
+            A 2D tensor of node features. Shape: :math:`(|V|, D_{in})`.
+        ntype : torch.Tensor
+            An 1D integer tensor of node types. Shape: :math:`(|V|,)`.
+        etype : torch.Tensor
+            An 1D integer tensor of edge types. Shape: :math:`(|E|,)`.
+        presorted : bool, optional
+            Whether *both* the nodes and the edges of the input graph have been sorted by
+            their types. Forward on pre-sorted graph may be faster. Graphs created by
+            :func:`~dgl.to_homogeneous` automatically satisfy the condition.
+            Also see :func:`~dgl.reorder_graph` for manually reordering the nodes and edges.
+
+        Returns
+        -------
+        torch.Tensor
+            New node features. Shape: :math:`(|V|, D_{head} * N_{head})`.
+        """
         self.presorted = presorted
         with g.local_scope():
             k = self.linear_k(x, ntype, presorted).view(-1, self.num_heads, self.head_size)
@@ -69,6 +148,7 @@ class HGTConv(nn.Module):
             return h
 
     def message(self, edges):
+        """Message function."""
         a, m = [], []
         etype = edges.data['etype']
         k = torch.unbind(edges.src['k'], dim=1)

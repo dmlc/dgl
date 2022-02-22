@@ -142,7 +142,7 @@ class RelGraphConv(nn.Module):
         g : DGLGraph
             The graph.
         feat : torch.Tensor
-            A 2D tensor of node features. Shape: :math:`(|V|, D)`.
+            A 2D tensor of node features. Shape: :math:`(|V|, D_{in})`.
         etypes : torch.Tensor or list[int]
             An 1D integer tensor of edge types. Shape: :math:`(|E|,)`.
         norm : torch.Tensor, optional
@@ -150,13 +150,13 @@ class RelGraphConv(nn.Module):
         presorted : bool, optional
             Whether the edges of the input graph have been sorted by their types.
             Forward on pre-sorted graph may be faster. Graphs created
-            by :func:`~dgl.to_homogeneous` are automatically sorted by etype.
+            by :func:`~dgl.to_homogeneous` automatically satisfy the condition.
             Also see :func:`~dgl.reorder_graph` for sorting edges manually.
 
         Returns
         -------
         torch.Tensor
-            New node features. Shape: :math:`(|V|, D')`.
+            New node features. Shape: :math:`(|V|, D_{out})`.
         """
         self.presorted = presorted
         with g.local_scope():

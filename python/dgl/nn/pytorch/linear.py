@@ -27,16 +27,14 @@ class TypedLinear(nn.Module):
     with coefficients :math:`a_{tb}^{(l)}`.
 
     The block-diagonal-decomposition regularization decomposes :math:`W_t` into :math:`B`
-    number of block diagonal matrices. We refer :math:`B` as the number of bases.
-
-    The block regularization decomposes :math:`W_t` by:
+    block-diagonal matrices. We refer to :math:`B` as the number of bases:
 
     .. math::
 
        W_t^{(l)} = \oplus_{b=1}^B Q_{tb}^{(l)}
 
     where :math:`B` is the number of bases, :math:`Q_{tb}^{(l)}` are block
-    bases with shape :math:`R^{(d^{(l+1)}/B)*(d^{l}/B)}`.
+    bases with shape :math:`R^{(d^{(l+1)}/B)\times(d^{l}/B)}`.
 
     Parameters
     ----------
@@ -54,12 +52,15 @@ class TypedLinear(nn.Module):
 
         Default applies no regularization.
     num_bases : int, optional
-        Number of bases. Needed when ``regularizer`` is specified. Default: ``None``.
+        Number of bases. Needed when ``regularizer`` is specified. Typically smaller
+        than ``num_types``.
+        Default: ``None``.
 
     Examples
     --------
 
     No regularization.
+
     >>> from dgl.nn import TypedLinear
     >>> import torch
     >>>
@@ -71,9 +72,7 @@ class TypedLinear(nn.Module):
     torch.Size([100, 64])
 
     With basis regularization
-    >>> from dgl.nn import TypedLinear
-    >>> import torch
-    >>>
+
     >>> x = torch.randn(100, 32)
     >>> x_type = torch.randint(0, 5, (100,))
     >>> m = TypedLinear(32, 64, 5, regularizer='basis', num_bases=4)
@@ -96,9 +95,11 @@ class TypedLinear(nn.Module):
             self.coeff = nn.Parameter(torch.Tensor(num_types, num_bases))
             self.num_bases = num_bases
         elif regularizer == 'bdd':
+            if num_bases is None:
+                raise ValueError('Missing "num_bases" for bdd regularization.')
             if in_size % num_bases != 0 or out_size % num_bases != 0:
                 raise ValueError(
-                    'Input and output sizes must be a multiplier of num_bases.'
+                    'Input and output sizes must be divisible by num_bases.'
                 )
             self.submat_in = in_size // num_bases
             self.submat_out = out_size // num_bases
@@ -145,7 +146,8 @@ class TypedLinear(nn.Module):
         x : torch.Tensor
             A 2D input tensor. Shape: (N, D1)
         x_type : torch.Tensor
-            A 1D integer tensor. Each element is the corresponding type of ``x``. Shape: (N,)
+            A 1D integer tensor storing the type of the elements in ``x`` with one-to-one
+            correspondenc. Shape: (N,)
         sorted_by_type : bool, optional
             Whether the inputs have been sorted by the types. Forward on pre-sorted inputs may
             be faster.
@@ -174,5 +176,5 @@ class TypedLinear(nn.Module):
                     f'num_types={self.num_types})')
         else:
             return (f'TypedLinear(in_size={self.in_size}, out_size={self.out_size}, '
-                    f'num_types={self.num_types}, regularizer={self.regularizer}), '
-                    f'num_bases={self.num_bases}')
+                    f'num_types={self.num_types}, regularizer={self.regularizer}, '
+                    f'num_bases={self.num_bases})')

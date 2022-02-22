@@ -373,25 +373,45 @@ def test_rgcn(idtype, O):
     h = th.randn((100, I)).to(ctx)
     r = th.tensor(etype).to(ctx)
     norm = th.rand((g.number_of_edges(), 1)).to(ctx)
+    sorted_r, idx = th.sort(r)
+    sorted_g = dgl.reorder_graph(g, edge_permute_algo='custom', permute_config={'edges_perm' : idx.to(idtype)})
+    sorted_norm = norm[idx]
 
+    rgc = nn.RelGraphConv(I, O, R).to(ctx)
+    th.save(rgc, tmp_buffer)  # test pickle
     rgc_basis = nn.RelGraphConv(I, O, R, "basis", B).to(ctx)
-    h_new = rgc_basis(g, h, r)
-    assert h_new.shape == (100, O)
-    # test pickle
-    th.save(rgc_basis, tmp_buffer)
+    th.save(rgc_basis, tmp_buffer)  # test pickle
     if O % B == 0:
         rgc_bdd = nn.RelGraphConv(I, O, R, "bdd", B).to(ctx)
-        h_new = rgc_bdd(g, h, r)
-        assert h_new.shape == (100, O)
-        # test pickle
-        th.save(rgc_bdd, tmp_buffer)
+        th.save(rgc_bdd, tmp_buffer)  # test pickle
 
-    # with norm
+    # basic usage
+    h_new = rgc(g, h, r)
+    assert h_new.shape == (100, O)
+    h_new_basis = rgc_basis(g, h, r)
+    assert h_new_basis.shape == (100, O)
+    if O % B == 0:
+        h_new_bdd = rgc_bdd(g, h, r)
+        assert h_new_bdd.shape == (100, O)
+
+    # sorted input
+    h_new_sorted = rgc(sorted_g, h, sorted_r, presorted=True)
+    assert th.allclose(h_new, h_new_sorted, atol=1e-4, rtol=1e-4)
+    h_new_basis_sorted = rgc_basis(sorted_g, h, sorted_r, presorted=True)
+    assert th.allclose(h_new_basis, h_new_basis_sorted, atol=1e-4, rtol=1e-4)
+    if O % B == 0:
+        h_new_bdd_sorted = rgc_bdd(sorted_g, h, sorted_r, presorted=True)
+        assert th.allclose(h_new_bdd, h_new_bdd_sorted, atol=1e-4, rtol=1e-4)
+
+    # norm input
+    h_new = rgc(g, h, r, norm)
+    assert h_new.shape == (100, O)
     h_new = rgc_basis(g, h, r, norm)
     assert h_new.shape == (100, O)
     if O % B == 0:
         h_new = rgc_bdd(g, h, r, norm)
         assert h_new.shape == (100, O)
+
 
 @parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite'], exclude=['zero-degree']))
@@ -1273,3 +1293,37 @@ def test_typed_linear(feat_size, regularizer, num_bases):
     assert y_sorted.shape == (100, feat_size * 2)
 
     assert th.allclose(y, y_sorted[rev_idx], atol=1e-4, rtol=1e-4)
+
+@parametrize_dtype
+@pytest.mark.parametrize('in_size', [4])
+@pytest.mark.parametrize('num_heads', [1])
+def test_hgt(idtype, in_size, num_heads):
+    dev = F.ctx()
+    num_etypes = 5
+    num_ntypes = 2
+    head_size = in_size // num_heads
+
+    g = dgl.from_scipy(sp.sparse.random(100, 100, density=0.01))
+    g = g.astype(idtype).to(dev)
+    etype = th.tensor([i % num_etypes for i in range(g.num_edges())]).to(dev)
+    ntype = th.tensor([i % num_ntypes for i in range(g.num_nodes())]).to(dev)
+    x = th.randn(g.num_nodes(), in_size).to(dev)
+    
+    m = nn.HGTConv(in_size, head_size, num_heads, num_ntypes, num_etypes).to(dev)
+
+    y = m(g, x, ntype, etype)
+    assert y.shape == (g.num_nodes(), head_size * num_heads)
+    # presorted
+    sorted_ntype, idx_nt = th.sort(ntype)
+    sorted_etype, idx_et = th.sort(etype)
+    _, rev_idx = th.sort(idx_nt)
+    g.ndata['t'] = ntype
+    g.ndata['x'] = x
+    g.edata['t'] = etype
+    sorted_g = dgl.reorder_graph(g, node_permute_algo='custom', edge_permute_algo='custom',
+                                 permute_config={'nodes_perm' : idx_nt.to(idtype), 'edges_perm' : idx_et.to(idtype)})
+    print(sorted_g.ndata['t'])
+    print(sorted_g.edata['t'])
+    sorted_x = sorted_g.ndata['x']
+    sorted_y = m(sorted_g, sorted_x, sorted_ntype, sorted_etype, presorted=True)
+    assert th.allclose(y, sorted_y[rev_idx], atol=1e-4, rtol=1e-4)
