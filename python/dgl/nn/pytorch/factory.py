@@ -1,6 +1,6 @@
 """Modules that transforms between graphs and between graph and tensors."""
 import torch.nn as nn
-from ...transform import knn_graph, segmented_knn_graph
+from ...transforms import knn_graph, segmented_knn_graph
 
 def pairwise_squared_distance(x):
     '''

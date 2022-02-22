@@ -1,10 +1,17 @@
 .. _apitransform-namespace:
 
-dgl.transform
-=============
+dgl.transforms
+==============
 
-.. currentmodule:: dgl.transform
-.. automodule:: dgl.transform
+.. currentmodule:: dgl.transforms
+
+.. autosummary::
+    :nosignatures:
+    {% for cls in dgl.transforms.classes %}
+      {{ cls }}
+    {% endfor %}
+
+.. automodule:: dgl.transforms
 
 BaseTransform
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

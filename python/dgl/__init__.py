@@ -41,7 +41,7 @@ from .heterograph import DGLHeteroGraph as DGLGraph  # pylint: disable=reimporte
 from .merge import *
 from .subgraph import *
 from .traversal import *
-from .transform import *
+from .transforms import *
 from .propagate import *
 from .random import *
 from .data.utils import save_graphs, load_graphs

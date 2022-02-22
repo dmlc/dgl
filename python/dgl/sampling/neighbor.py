@@ -496,7 +496,7 @@ def sample_neighbors_biased(g, nodes, fanout, bias, edge_dir='in',
 
     Sort the graph (necessary!)
 
-    >>> g_sorted = dgl.transform.sort_csr_by_tag(g, tag)
+    >>> g_sorted = dgl.transforms.sort_csr_by_tag(g, tag)
     >>> g_sorted.ndata['_TAG_OFFSET']
     tensor([[0, 1, 2],
             [0, 2, 2],

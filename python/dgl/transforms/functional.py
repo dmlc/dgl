@@ -1042,7 +1042,7 @@ def khop_graph(g, k, copy_ndata=True):
 
     >>> import dgl
     >>> g = dgl.graph(([0, 1], [1, 2]))
-    >>> g_2 = dgl.transform.khop_graph(g, 2)
+    >>> g_2 = dgl.transforms.khop_graph(g, 2)
     >>> print(g_2.edges())
     (tensor([0]), tensor([2]))
 
@@ -3252,4 +3252,4 @@ def norm_by_dst(g, etype=None):
 
     return norm
 
-_init_api("dgl.transform", __name__)
+_init_api("dgl.transforms", __name__)
