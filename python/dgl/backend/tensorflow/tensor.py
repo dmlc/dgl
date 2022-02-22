@@ -162,6 +162,8 @@ def copy_to(input, ctx, **kwargs):
         new_tensor = tf.identity(input)
     return new_tensor
 
+def is_pinned(input):
+    return False        # not sure how to do this
 
 def sum(input, dim, keepdims=False):
     if input.dtype == tf.bool:

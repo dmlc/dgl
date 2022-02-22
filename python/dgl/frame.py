@@ -56,6 +56,12 @@ class LazyFeature(object):
         """No-op.  For compatibility of :meth:`Frame.__repr__` method."""
         return self
 
+    def pin_memory_(self):
+        """No-op.  For compatibility of :meth:`Frame.pin_memory_` method."""
+
+    def unpin_memory_(self):
+        """No-op.  For compatibility of :meth:`Frame.unpin_memory_` method."""
+
 class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
     """The column scheme.
 
@@ -142,6 +148,7 @@ class Column(TensorStorage):
         self.scheme = scheme if scheme else infer_scheme(storage)
         self.index = index
         self.device = device
+        self.pinned = False
 
     def __len__(self):
         """The number of features (number of rows) in this column."""
@@ -183,6 +190,7 @@ class Column(TensorStorage):
         """Update the column data."""
         self.index = None
         self.storage = val
+        self.pinned = False
 
     def to(self, device, **kwargs): # pylint: disable=invalid-name
         """ Return a new column with columns copy to the targeted device (cpu/gpu).
@@ -329,6 +337,10 @@ class Column(TensorStorage):
 
     def __copy__(self):
         return self.clone()
+
+    def fetch(self, indices, device, pin_memory=False):
+        _ = self.data           # materialize in case of lazy slicing & data transfer
+        return super().fetch(indices, device, pin_memory=False)
 
 class Frame(MutableMapping):
     """The columnar storage for node/edge features.
@@ -702,3 +714,15 @@ class Frame(MutableMapping):
 
     def __repr__(self):
         return repr(dict(self))
+
+    def pin_memory_(self):
+        """Registers the data of every column into pinned memory, materializing them if
+        necessary."""
+        for column in self._columns.values():
+            column.pin_memory_()
+
+    def unpin_memory_(self):
+        """Unregisters the data of every column from pinned memory, materializing them
+        if necessary."""
+        for column in self._columns.values():
+            column.unpin_memory_()
