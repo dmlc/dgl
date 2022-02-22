@@ -60,14 +60,9 @@ class SAGE(nn.Module):
         return y
 
 
-def train(rank, world_size, shared_memory_name, features, num_classes, split_idx):
+def train(rank, world_size, graph, num_classes, split_idx):
     torch.cuda.set_device(rank)
     dist.init_process_group('nccl', 'tcp://127.0.0.1:12347', world_size=world_size, rank=rank)
-
-    graph = dgl.hetero_from_shared_memory(shared_memory_name)
-    feat, labels = features
-    graph.ndata['feat'] = feat
-    graph.ndata['label'] = labels
 
     model = SAGE(graph.ndata['feat'].shape[1], 256, num_classes).cuda()
     model = nn.parallel.DistributedDataParallel(model, device_ids=[rank], output_device=rank)
@@ -132,9 +127,8 @@ def train(rank, world_size, shared_memory_name, features, num_classes, split_idx
 if __name__ == '__main__':
     dataset = DglNodePropPredDataset('ogbn-products')
     graph, labels = dataset[0]
-    shared_memory_name = 'shm'      # can be any string
-    feat = graph.ndata['feat']
-    graph = graph.shared_memory(shared_memory_name)
+    graph.ndata['label'] = labels
+    graph.create_formats_()     # must be called before mp.spawn().
     split_idx = dataset.get_idx_split()
     num_classes = dataset.num_classes
     n_procs = 4
@@ -142,4 +136,4 @@ if __name__ == '__main__':
     # Tested with mp.spawn and fork.  Both worked and got 4s per epoch with 4 GPUs
     # and 3.86s per epoch with 8 GPUs on p2.8x, compared to 5.2s from official examples.
     import torch.multiprocessing as mp
-    mp.spawn(train, args=(n_procs, shared_memory_name, (feat, labels), num_classes, split_idx), nprocs=n_procs)
+    mp.spawn(train, args=(n_procs, graph, num_classes, split_idx), nprocs=n_procs)

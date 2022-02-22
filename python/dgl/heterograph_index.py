@@ -1370,9 +1370,13 @@ def _forking_rebuild(pk_state):
     meta, arrays = pk_state
     arrays = [F.to_dgl_nd(arr) for arr in arrays]
     states = _CAPI_DGLCreateHeteroPickleStates(meta, arrays)
-    return _CAPI_DGLHeteroForkingUnpickle(states)
+    graph_index = _CAPI_DGLHeteroForkingUnpickle(states)
+    graph_index._forking_pk_state = pk_state
+    return graph_index
 
 def _forking_reduce(graph_index):
+    if hasattr(graph_index, '_forking_pk_state'):
+        return _forking_rebuild, (graph_index._forking_pk_state,)
     states = _CAPI_DGLHeteroForkingPickle(graph_index)
     arrays = [F.from_dgl_nd(arr) for arr in states.arrays]
     # Similar to what being mentioned in HeteroGraphIndex.__getstate__, we need to save
