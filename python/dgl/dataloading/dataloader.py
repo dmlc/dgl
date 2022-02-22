@@ -33,7 +33,7 @@ def _set_python_exit_flag():
     PYTHON_EXIT_STATUS = True
 atexit.register(_set_python_exit_flag)
 
-prefetcher_timeout = int(os.environ.get('DGL_PREFETCHER_TIMEOUT', '10'))
+prefetcher_timeout = int(os.environ.get('DGL_PREFETCHER_TIMEOUT', '30'))
 
 class _TensorizedDatasetIter(object):
     def __init__(self, dataset, batch_size, drop_last, mapping_keys):
@@ -615,9 +615,11 @@ class DataLoader(torch.utils.data.DataLoader):
                     raise ValueError(
                         'Expect graph and indices to be on the same device. '
                         'If you wish to use UVA sampling, please set use_uva=True.')
-                if self.graph.device.type == 'cuda':
-                    if num_workers > 0:
-                        raise ValueError('num_workers must be 0 if graph and indices are on CUDA.')
+                if self.graph.device.type == 'cuda' and num_workers > 0:
+                    raise ValueError('num_workers must be 0 if graph and indices are on CUDA.')
+                if self.graph.device.type == 'cpu' and num_workers > 0:
+                    # Instantiate all the formats if the number of workers is greater than 0.
+                    self.graph.create_formats_()
 
             # Check pin_prefetcher and use_prefetch_thread - should be only effective
             # if performing CPU sampling but output device is CUDA
@@ -665,10 +667,6 @@ class DataLoader(torch.utils.data.DataLoader):
         self.pin_prefetcher = pin_prefetcher
         self.use_prefetch_thread = use_prefetch_thread
         worker_init_fn = WorkerInitWrapper(kwargs.get('worker_init_fn', None))
-
-        # Instantiate all the formats if the number of workers is greater than 0.
-        if num_workers > 0 and hasattr(self.graph, 'create_formats_'):
-            self.graph.create_formats_()
 
         self.other_storages = {}
 
@@ -732,6 +730,14 @@ class NodeDataLoader(DataLoader):
         graph and feature tensors into pinned memory.
 
         Default: False.
+
+        .. warning::
+
+           Using UVA with multiple GPUs may crash with device mismatch errors with
+           older CUDA drivers. We have confirmed that CUDA driver 450.142 will
+           crash while 465.19 will work. Therefore we recommend you to upgrade your
+           CUDA driver if you wish to use UVA with multiple GPUs.
+
     use_prefetch_thread : bool, optional
         (Advanced option)
         Spawns a new Python thread to perform feature slicing
@@ -916,6 +922,14 @@ class EdgeDataLoader(DataLoader):
         graph and feature tensors into pinned memory.
 
         Default: False.
+
+        .. warning::
+
+           Using UVA with multiple GPUs may crash with device mismatch errors with
+           older CUDA drivers. We have confirmed that CUDA driver 450.142 will
+           crash while 465.19 will work. Therefore we recommend you to upgrade your
+           CUDA driver if you wish to use UVA with multiple GPUs.
+
     batch_size : int, optional
     drop_last : bool, optional
     shuffle : bool, optional

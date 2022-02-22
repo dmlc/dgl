@@ -1370,9 +1370,21 @@ def _forking_rebuild(pk_state):
     meta, arrays = pk_state
     arrays = [F.to_dgl_nd(arr) for arr in arrays]
     states = _CAPI_DGLCreateHeteroPickleStates(meta, arrays)
-    return _CAPI_DGLHeteroForkingUnpickle(states)
+    graph_index = _CAPI_DGLHeteroForkingUnpickle(states)
+    graph_index._forking_pk_state = pk_state
+    return graph_index
 
 def _forking_reduce(graph_index):
+    # Because F.from_dgl_nd(F.to_dgl_nd(x)) loses the information of shared memory
+    # file descriptor (because DLPack does not keep it), without caching the tensors
+    # PyTorch will allocate one shared memory region for every single worker.
+    # The downside is that if a graph_index is shared by forking and new formats are created
+    # afterwards, then sharing it again will not bring together the new formats.  This case
+    # should be rare though because (1) DataLoader will create all the formats if num_workers > 0
+    # anyway, and (2) we require the users to explicitly create all formats before calling
+    # mp.spawn().
+    if hasattr(graph_index, '_forking_pk_state'):
+        return _forking_rebuild, (graph_index._forking_pk_state,)
     states = _CAPI_DGLHeteroForkingPickle(graph_index)
     arrays = [F.from_dgl_nd(arr) for arr in states.arrays]
     # Similar to what being mentioned in HeteroGraphIndex.__getstate__, we need to save
