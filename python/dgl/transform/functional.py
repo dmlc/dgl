@@ -3122,8 +3122,16 @@ def reorder_graph(g, node_permute_algo=None, edge_permute_algo='src',
             [0],
             [2],
             [1]]), '_ID': tensor([0, 2, 4, 1, 3])}
-    
-    Reorder according to ``'custom'`` permute algorithm with user-provided nodes_perm.
+
+    Reorder according to node and edge types:
+
+    >>> ntype = ...  # some node type array
+    >>> etype = ...  # some edge type array
+    >>> sorted_ntype, idx_nt = torch.sort(ntype)
+    >>> sorted_etype, idx_et = torch.sort(etype)
+    >>> rg = dgl.reorder_graph(g, node_permute_algo='custom', edge_permute_algo='custom',
+    ...                        permute_config={'nodes_perm' : idx_nt.to(g.idtype),
+    ...                                        'edges_perm' : idx_et.to(g.idtype)})
     """
     # sanity checks
     if not g.is_homogeneous:
