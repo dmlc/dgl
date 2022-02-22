@@ -1325,5 +1325,5 @@ def test_hgt(idtype, in_size, num_heads):
     print(sorted_g.ndata['t'])
     print(sorted_g.edata['t'])
     sorted_x = sorted_g.ndata['x']
-    sorted_y = m(sorted_g, sorted_x, sorted_ntype, sorted_etype, presorted=True)
+    sorted_y = m(sorted_g, sorted_x, sorted_ntype, sorted_etype, presorted=False)
     assert th.allclose(y, sorted_y[rev_idx], atol=1e-4, rtol=1e-4)

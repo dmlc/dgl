@@ -22,7 +22,7 @@ import scipy.sparse as sparse
 import scipy.sparse.linalg
 
 from .._ffi.function import _init_api
-from ..base import dgl_warning, DGLError
+from ..base import dgl_warning, DGLError, NID, EID
 from .. import convert
 from ..heterograph import DGLHeteroGraph, DGLBlock
 from ..heterograph_index import create_metagraph_index, create_heterograph_from_relations
@@ -3127,7 +3127,7 @@ def reorder_graph(g, node_permute_algo=None, edge_permute_algo='src',
     """
     # sanity checks
     if not g.is_homogeneous:
-        raise DGLError("Homograph is supported only.")
+        raise DGLError("Only homogeneous graphs are supported.")
     expected_node_algo = ['rcmk', 'metis', 'custom']
     if node_permute_algo is not None and node_permute_algo not in expected_node_algo:
         raise DGLError("Unexpected node_permute_algo is specified: {}. Expected algos: {}".format(
@@ -3136,24 +3136,19 @@ def reorder_graph(g, node_permute_algo=None, edge_permute_algo='src',
     if edge_permute_algo not in expected_edge_algo:
         raise DGLError("Unexpected edge_permute_algo is specified: {}. Expected algos: {}".format(
             edge_permute_algo, expected_edge_algo))
-    if edge_permute_algo == 'custom':
-        if permute_config is None or 'edges_perm' not in permute_config:
-            raise DGLError(
-                "edge_permute_algo is specified as custom, but no 'edges_perm' is specified in \
-                    permute_config.")
-        if node_permute_algo is not None:
-            g.edata['__orig__'] = F.arange(0, g.num_edges(), g.idtype, g.device)
+
+    g.edata['__orig__'] = F.arange(0, g.num_edges(), g.idtype, g.device)
 
     # reorder nodes
     if node_permute_algo == 'rcmk':
         nodes_perm = rcmk_perm(g)
-        rg = subgraph.node_subgraph(g, nodes_perm, store_ids=store_ids)
+        rg = subgraph.node_subgraph(g, nodes_perm, store_ids=False)
     elif node_permute_algo == 'metis':
         if permute_config is None or 'k' not in permute_config:
             raise DGLError(
                 "Partition parts 'k' is required for metis. Please specify in permute_config.")
         nodes_perm = metis_perm(g, permute_config['k'])
-        rg = subgraph.node_subgraph(g, nodes_perm, store_ids=store_ids)
+        rg = subgraph.node_subgraph(g, nodes_perm, store_ids=False)
     elif node_permute_algo == 'custom':
         if permute_config is None or 'nodes_perm' not in permute_config:
             raise DGLError(
@@ -3163,28 +3158,40 @@ def reorder_graph(g, node_permute_algo=None, edge_permute_algo='src',
         if len(nodes_perm) != g.num_nodes():
             raise DGLError("Length of 'nodes_perm' ({}) does not \
                     match graph num_nodes ({}).".format(len(nodes_perm), g.num_nodes()))
-        rg = subgraph.node_subgraph(g, nodes_perm, store_ids=store_ids)
+        rg = subgraph.node_subgraph(g, nodes_perm, store_ids=False)
     else:
-        rg = g
+        nodes_perm = F.arange(0, g.num_nodes(), g.idtype, g.device)
+        rg = g.clone()
+
+    if store_ids:
+        rg.ndata[NID] = F.copy_to(F.tensor(nodes_perm, g.idtype), g.device)
+
+    g.edata.pop('__orig__')
 
     # reorder edges
     if edge_permute_algo == 'src':
         edges_perm = np.argsort(F.asnumpy(rg.edges()[0]))
         rg = subgraph.edge_subgraph(
-            rg, edges_perm, relabel_nodes=False, store_ids=store_ids)
+            rg, edges_perm, relabel_nodes=False, store_ids=False)
     elif edge_permute_algo == 'dst':
         edges_perm = np.argsort(F.asnumpy(rg.edges()[1]))
         rg = subgraph.edge_subgraph(
-            rg, edges_perm, relabel_nodes=False, store_ids=store_ids)
+            rg, edges_perm, relabel_nodes=False, store_ids=False)
     elif edge_permute_algo == 'custom':
+        if permute_config is None or 'edges_perm' not in permute_config:
+            raise DGLError(
+                "edge_permute_algo is specified as custom, but no 'edges_perm' is specified in \
+                    permute_config.")
         edges_perm = permute_config['edges_perm']
-        if '__orig__' in rg.edata:
-            # First revert the edge reorder caused by node reorder and then
-            # apply user-provided edge permutation
-            rev_id = F.argsort(rg.edata.pop('__orig__'), 0, False)
-            edges_perm = F.astype(F.gather_row(rev_id, edges_perm), rg.idtype)
+        # First revert the edge reorder caused by node reorder and then
+        # apply user-provided edge permutation
+        rev_id = F.argsort(rg.edata['__orig__'], 0, False)
+        edges_perm = F.astype(F.gather_row(rev_id, edges_perm), rg.idtype)
         rg = subgraph.edge_subgraph(
-            rg, edges_perm, relabel_nodes=False, store_ids=store_ids)
+            rg, edges_perm, relabel_nodes=False, store_ids=False)
+
+    if store_ids:
+        rg.edata[EID] = rg.edata.pop('__orig__')
 
     return rg
 

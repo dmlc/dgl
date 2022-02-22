@@ -1,5 +1,6 @@
 """Various commonly used linear modules"""
 # pylint: disable= no-member, arguments-differ, invalid-name, W0235
+import math
 import torch
 import torch.nn as nn
 
@@ -114,16 +115,18 @@ class TypedLinear(nn.Module):
 
     def reset_parameters(self):
         """Reset parameters"""
-        if self.regularizer is None:
-            nn.init.xavier_uniform_(self.W, gain=nn.init.calculate_gain('relu'))
-        elif self.regularizer == 'basis':
-            nn.init.xavier_uniform_(self.W, gain=nn.init.calculate_gain('relu'))
-            nn.init.xavier_uniform_(self.coeff, gain=nn.init.calculate_gain('relu'))
-        elif self.regularizer == 'bdd':
-            nn.init.xavier_uniform_(self.W, gain=nn.init.calculate_gain('relu'))
-        else:
-            raise ValueError(
-                f'Supported regularizer options: "basis", "bdd", but got {regularizer}')
+        with torch.no_grad():
+            # Follow torch.nn.Linear 's initialization to use kaiming_uniform_ on in_size
+            if self.regularizer is None:
+                nn.init.uniform_(self.W, -1/math.sqrt(self.in_size), 1/math.sqrt(self.in_size))
+            elif self.regularizer == 'basis':
+                nn.init.uniform_(self.W, -1/math.sqrt(self.in_size), 1/math.sqrt(self.in_size))
+                nn.init.xavier_uniform_(self.coeff, gain=nn.init.calculate_gain('relu'))
+            elif self.regularizer == 'bdd':
+                nn.init.uniform_(self.W, -1/math.sqrt(self.submat_in), 1/math.sqrt(self.submat_in))
+            else:
+                raise ValueError(
+                    f'Supported regularizer options: "basis", "bdd", but got {regularizer}')
 
     def get_weight(self):
         """Get type-wise weight"""
