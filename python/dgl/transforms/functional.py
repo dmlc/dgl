@@ -3252,4 +3252,4 @@ def norm_by_dst(g, etype=None):
 
     return norm
 
-_init_api("dgl.transforms", __name__)
+_init_api("dgl.transform", __name__)
