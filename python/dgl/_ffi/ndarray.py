@@ -316,25 +316,15 @@ class NDArrayBase(_NDArrayBase):
             raise ValueError("Unsupported target type %s" % str(type(target)))
         return target
 
-    def pin_memory_(self, ctx):
+    def pin_memory_(self):
         """Pin host memory and map into GPU address space (in-place)
-
-        Parameters
-        ----------
-        ctx : DGLContext
-            The target GPU to map the host memory space
         """
-        check_call(_LIB.DGLArrayPinData(self.handle, ctx))
+        check_call(_LIB.DGLArrayPinData(self.handle))
 
-    def unpin_memory_(self, ctx):
+    def unpin_memory_(self):
         """Unpin host memory pinned by pin_memory_()
-
-        Parameters
-        ----------
-        ctx : DGLContext
-            The target GPU to map the host memory space
         """
-        check_call(_LIB.DGLArrayUnpinData(self.handle, ctx))
+        check_call(_LIB.DGLArrayUnpinData(self.handle))
 
 
 def free_extension_handle(handle, type_code):

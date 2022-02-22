@@ -23,6 +23,7 @@ namespace dgl {
 
 // Forward declaration
 class BaseHeteroGraph;
+class HeteroPickleStates;
 typedef std::shared_ptr<BaseHeteroGraph> HeteroGraphPtr;
 
 struct FlattenedHeteroGraph;
@@ -435,6 +436,21 @@ class BaseHeteroGraph : public runtime::Object {
    * \return A CSR matrix.
    */
   virtual aten::CSRMatrix GetCSCMatrix(dgl_type_t etype) const = 0;
+
+  /*!
+   * \brief Set the COO matrix representation for a given edge type.
+   */
+  virtual void SetCOOMatrix(dgl_type_t etype, aten::COOMatrix coo) = 0;
+
+  /*!
+   * \brief Set the CSR matrix representation for a given edge type.
+   */
+  virtual void SetCSRMatrix(dgl_type_t etype, aten::CSRMatrix csr) = 0;
+
+  /*!
+   * \brief Set the CSC matrix representation for a given edge type.
+   */
+  virtual void SetCSCMatrix(dgl_type_t etype, aten::CSRMatrix csc) = 0;
 
   /*!
    * \brief Extract the induced subgraph by the given vertices.
@@ -863,6 +879,25 @@ HeteroPickleStates HeteroPickle(HeteroGraphPtr graph);
  * \return A heterograph pointer
  */
 HeteroGraphPtr HeteroUnpickleOld(const HeteroPickleStates& states);
+
+/*!
+ * \brief Create heterograph from pickling states pickled by ForkingPickler.
+ *
+ * This is different from HeteroUnpickle where
+ * (1) Backward compatibility is not required,
+ * (2) All graph formats are pickled instead of only one.
+ */
+HeteroGraphPtr HeteroForkingUnpickle(const HeteroPickleStates& states);
+
+/*!
+ * \brief Get the pickling states of the relation graph structure in backend tensors for
+ * ForkingPickler.
+ *
+ * This is different from HeteroPickle where
+ * (1) Backward compatibility is not required,
+ * (2) All graph formats are pickled instead of only one.
+ */
+HeteroPickleStates HeteroForkingPickle(HeteroGraphPtr graph);
 
 #define FORMAT_HAS_CSC(format) \
   ((format) & CSC_CODE)
