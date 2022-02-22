@@ -730,6 +730,14 @@ class NodeDataLoader(DataLoader):
         graph and feature tensors into pinned memory.
 
         Default: False.
+
+        .. warning::
+
+           Using UVA with multiple GPUs may crash with device mismatch errors with
+           older CUDA drivers. We have confirmed that CUDA driver 450.142 will
+           crash while 465.19 will work. Therefore we recommend you to upgrade your
+           CUDA driver if you wish to use UVA with multiple GPUs.
+
     use_prefetch_thread : bool, optional
         (Advanced option)
         Spawns a new Python thread to perform feature slicing
@@ -914,6 +922,14 @@ class EdgeDataLoader(DataLoader):
         graph and feature tensors into pinned memory.
 
         Default: False.
+
+        .. warning::
+
+           Using UVA with multiple GPUs may crash with device mismatch errors with
+           older CUDA drivers. We have confirmed that CUDA driver 450.142 will
+           crash while 465.19 will work. Therefore we recommend you to upgrade your
+           CUDA driver if you wish to use UVA with multiple GPUs.
+
     batch_size : int, optional
     drop_last : bool, optional
     shuffle : bool, optional
