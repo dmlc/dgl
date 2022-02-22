@@ -9,8 +9,9 @@ import dgl.nn as dglnn
 import time
 import numpy as np
 from ogb.nodeproppred import DglNodePropPredDataset
+import tqdm
 
-USE_WRAPPER = False
+USE_UVA = True
 
 class SAGE(nn.Module):
     def __init__(self, in_feats, n_hidden, n_classes):
@@ -20,6 +21,8 @@ class SAGE(nn.Module):
         self.layers.append(dglnn.SAGEConv(n_hidden, n_hidden, 'mean'))
         self.layers.append(dglnn.SAGEConv(n_hidden, n_classes, 'mean'))
         self.dropout = nn.Dropout(0.5)
+        self.n_hidden = n_hidden
+        self.n_classes = n_classes
 
     def forward(self, blocks, x):
         h = x
@@ -30,41 +33,66 @@ class SAGE(nn.Module):
                 h = self.dropout(h)
         return h
 
+    def inference(self, g, device, batch_size, num_workers, buffer_device=None):
+        # The difference between this inference function and the one in the official
+        # example is that the intermediate results can also benefit from prefetching.
+        g.ndata['h'] = g.ndata['feat']
+        sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1, prefetch_node_feats=['h'])
+        dataloader = dgl.dataloading.NodeDataLoader(
+                g, torch.arange(g.num_nodes()).to(g.device), sampler, device=device,
+                batch_size=1000, shuffle=False, drop_last=False, num_workers=num_workers,
+                persistent_workers=(num_workers > 0))
+        if buffer_device is None:
+            buffer_device = device
 
-def train(rank, world_size, graph, num_classes, split_idx):
+        for l, layer in enumerate(self.layers):
+            y = torch.zeros(
+                g.num_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes,
+                device=buffer_device)
+            for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
+                x = blocks[0].srcdata['h']
+                h = layer(blocks[0], x)
+                if l != len(self.layers) - 1:
+                    h = F.relu(h)
+                    h = self.dropout(h)
+                y[output_nodes] = h.to(buffer_device)
+            g.ndata['h'] = y
+        return y
+
+
+def train(rank, world_size, shared_memory_name, features, num_classes, split_idx):
     torch.cuda.set_device(rank)
     dist.init_process_group('nccl', 'tcp://127.0.0.1:12347', world_size=world_size, rank=rank)
+
+    graph = dgl.hetero_from_shared_memory(shared_memory_name)
+    feat, labels = features
+    graph.ndata['feat'] = feat
+    graph.ndata['label'] = labels
 
     model = SAGE(graph.ndata['feat'].shape[1], 256, num_classes).cuda()
     model = nn.parallel.DistributedDataParallel(model, device_ids=[rank], output_device=rank)
     opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
 
     train_idx, valid_idx, test_idx = split_idx['train'], split_idx['valid'], split_idx['test']
-    if USE_WRAPPER:
-        import dglnew
-        graph = dglnew.graph.wrapper.DGLGraphStorage(graph)
+
+    if USE_UVA:
+        train_idx = train_idx.to('cuda')
 
     sampler = dgl.dataloading.NeighborSampler(
-            [5, 5, 5], output_device='cpu', prefetch_node_feats=['feat'],
-            prefetch_labels=['label'])
-    dataloader = dgl.dataloading.NodeDataLoader(
-            graph,
-            train_idx,
-            sampler,
-            device='cuda',
-            batch_size=1000,
-            shuffle=True,
-            drop_last=False,
-            pin_memory=True,
-            num_workers=4,
-            persistent_workers=True,
-            use_ddp=True,
-            use_prefetch_thread=True)       # TBD: could probably remove this argument
+            [15, 10, 5], prefetch_node_feats=['feat'], prefetch_labels=['label'])
+    train_dataloader = dgl.dataloading.NodeDataLoader(
+            graph, train_idx, sampler,
+            device='cuda', batch_size=1000, shuffle=True, drop_last=False,
+            num_workers=0, use_ddp=True, use_uva=USE_UVA)
+    valid_dataloader = dgl.dataloading.NodeDataLoader(
+            graph, valid_idx, sampler, device='cuda', batch_size=1024, shuffle=True,
+            drop_last=False, num_workers=0, use_uva=USE_UVA)
 
     durations = []
     for _ in range(10):
+        model.train()
         t0 = time.time()
-        for it, (input_nodes, output_nodes, blocks) in enumerate(dataloader):
+        for it, (input_nodes, output_nodes, blocks) in enumerate(train_dataloader):
             x = blocks[0].srcdata['feat']
             y = blocks[-1].dstdata['label'][:, 0]
             y_hat = model(blocks, x)
@@ -80,27 +108,38 @@ def train(rank, world_size, graph, num_classes, split_idx):
         if rank == 0:
             print(tt - t0)
             durations.append(tt - t0)
+
+            model.eval()
+            ys = []
+            y_hats = []
+            for it, (input_nodes, output_nodes, blocks) in enumerate(valid_dataloader):
+                with torch.no_grad():
+                    x = blocks[0].srcdata['feat']
+                    ys.append(blocks[-1].dstdata['label'])
+                    y_hats.append(model.module(blocks, x))
+            acc = MF.accuracy(torch.cat(y_hats), torch.cat(ys))
+            print('Validation acc:', acc.item())
+        dist.barrier()
+
     if rank == 0:
         print(np.mean(durations[4:]), np.std(durations[4:]))
+        model.eval()
+        with torch.no_grad():
+            pred = model.module.inference(graph, 'cuda', 1000, 12, graph.device)
+            acc = MF.accuracy(pred.to(graph.device), graph.ndata['label'])
+            print('Test acc:', acc.item())
 
 if __name__ == '__main__':
     dataset = DglNodePropPredDataset('ogbn-products')
     graph, labels = dataset[0]
-    graph.ndata['label'] = labels
-    graph.create_formats_()
+    shared_memory_name = 'shm'      # can be any string
+    feat = graph.ndata['feat']
+    graph = graph.shared_memory(shared_memory_name)
     split_idx = dataset.get_idx_split()
     num_classes = dataset.num_classes
     n_procs = 4
 
     # Tested with mp.spawn and fork.  Both worked and got 4s per epoch with 4 GPUs
     # and 3.86s per epoch with 8 GPUs on p2.8x, compared to 5.2s from official examples.
-    #import torch.multiprocessing as mp
-    #mp.spawn(train, args=(n_procs, graph, num_classes, split_idx), nprocs=n_procs)
-    import dgl.multiprocessing as mp
-    procs = []
-    for i in range(n_procs):
-        p = mp.Process(target=train, args=(i, n_procs, graph, num_classes, split_idx))
-        p.start()
-        procs.append(p)
-    for p in procs:
-        p.join()
+    import torch.multiprocessing as mp
+    mp.spawn(train, args=(n_procs, shared_memory_name, (feat, labels), num_classes, split_idx), nprocs=n_procs)
