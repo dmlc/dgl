@@ -232,7 +232,7 @@ Fake news dataset
     :members: __getitem__, __len__
 
 Dataset adapters
-```````````````````````````````````
+-------------------
 
 .. autoclass:: AsNodePredDataset
     :members: __getitem__, __len__
