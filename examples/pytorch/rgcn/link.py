@@ -20,7 +20,8 @@ class LinkPredict(nn.Module):
     def __init__(self, in_dim, num_rels, h_dim=500, num_bases=100, dropout=0.2, reg_param=0.01):
         super(LinkPredict, self).__init__()
         self.rgcn = RGCN(in_dim, h_dim, h_dim, num_rels * 2, regularizer="bdd",
-                         num_bases=num_bases, dropout=dropout, self_loop=True, link_pred=True)
+                         num_bases=num_bases, dropout=dropout, self_loop=True)
+        self.dropout = nn.Dropout(dropout)
         self.reg_param = reg_param
         self.w_relation = nn.Parameter(th.Tensor(num_rels, h_dim))
         nn.init.xavier_uniform_(self.w_relation,
@@ -34,8 +35,8 @@ class LinkPredict(nn.Module):
         score = th.sum(s * r * o, dim=1)
         return score
 
-    def forward(self, g, h):
-        return self.rgcn(g, h)
+    def forward(self, g, nids):
+        return self.dropout(self.rgcn(g, nids=nids))
 
     def regularization_loss(self, embedding):
         return th.mean(embedding.pow(2)) + th.mean(self.w_relation.pow(2))
@@ -54,7 +55,7 @@ def main(args):
     num_rels = data.num_rels
 
     train_g, test_g = preprocess(graph, num_rels)
-    test_node_id = th.arange(0, num_nodes).view(-1, 1)
+    test_nids = th.arange(0, num_nodes)
     test_mask = graph.edata['test_mask']
     subg_iter = SubgraphIterator(train_g, num_rels, args.edge_sampler)
     dataloader = GraphDataLoader(subg_iter, batch_size=1, collate_fn=lambda x: x[0])
@@ -77,14 +78,14 @@ def main(args):
     for epoch, batch_data in enumerate(dataloader):
         model.train()
 
-        g, node_id, data, labels = batch_data
+        g, train_nids, edges, labels = batch_data
         g = g.to(device)
-        node_id = node_id.to(device)
-        data = data.to(device)
+        train_nids = train_nids.to(device)
+        edges = edges.to(device)
         labels = labels.to(device)
 
-        embed = model(g, node_id)
-        loss = model.get_loss(embed, data, labels)
+        embed = model(g, train_nids)
+        loss = model.get_loss(embed, edges, labels)
         optimizer.zero_grad()
         loss.backward()
         nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0) # clip gradients
@@ -97,7 +98,7 @@ def main(args):
             model = model.cpu()
             model.eval()
             print("start eval")
-            embed = model(test_g, test_node_id)
+            embed = model(test_g, test_nids)
             mrr = calc_mrr(embed, model.w_relation, test_mask, triplets,
                            batch_size=500, eval_p=args.eval_protocol)
             # save best model
@@ -114,7 +115,7 @@ def main(args):
     model.eval()
     model.load_state_dict(checkpoint['state_dict'])
     print("Using best epoch: {}".format(checkpoint['epoch']))
-    embed = model(test_g, test_node_id)
+    embed = model(test_g, test_nids)
     calc_mrr(embed, model.w_relation, test_mask, triplets,
              batch_size=500, eval_p=args.eval_protocol)
 

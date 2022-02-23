@@ -1,9 +1,7 @@
 """
 Differences compared to tkipf/relation-gcn
-* l2norm applied to all weights
-* remove nodes that won't be touched
+* weight decay applied to all weights
 """
-
 import argparse
 import torch as th
 import torch.nn.functional as F
@@ -17,13 +15,7 @@ def main(args):
     g, num_rels, num_classes, labels, train_idx, test_idx, target_idx = load_data(
         args.dataset, get_norm=True)
 
-    num_nodes = g.num_nodes()
-
-    # Since the nodes are featureless, learn node embeddings from scratch
-    # This requires passing the node IDs to the model.
-    feats = th.arange(num_nodes)
-
-    model = RGCN(num_nodes,
+    model = RGCN(g.num_nodes(),
                  args.n_hidden,
                  num_classes,
                  num_rels,
@@ -33,16 +25,15 @@ def main(args):
         device = th.device(args.gpu)
     else:
         device = th.device('cpu')
-    feats = feats.to(device)
     labels = labels.to(device)
     model = model.to(device)
-    g = g.to(device)
+    g = g.int().to(device)
 
-    optimizer = th.optim.Adam(model.parameters(), lr=1e-2, weight_decay=args.l2norm)
+    optimizer = th.optim.Adam(model.parameters(), lr=1e-2, weight_decay=args.wd)
 
     model.train()
-    for epoch in range(50):
-        logits = model(g, feats)
+    for epoch in range(100):
+        logits = model(g)
         logits = logits[target_idx]
         loss = F.cross_entropy(logits[train_idx], labels[train_idx])
         optimizer.zero_grad()
@@ -56,7 +47,7 @@ def main(args):
 
     model.eval()
     with th.no_grad():
-        logits = model(g, feats)
+        logits = model(g)
     logits = logits[target_idx]
     test_acc = accuracy(logits[test_idx].argmax(dim=1), labels[test_idx]).item()
     print("Test Accuracy: {:.4f}".format(test_acc))
@@ -72,8 +63,8 @@ if __name__ == '__main__':
     parser.add_argument("-d", "--dataset", type=str, required=True,
                         choices=['aifb', 'mutag', 'bgs', 'am'],
                         help="dataset to use")
-    parser.add_argument("--l2norm", type=float, default=5e-4,
-                        help="l2 norm coef")
+    parser.add_argument("--wd", type=float, default=5e-4,
+                        help="weight decay")
 
     args = parser.parse_args()
     print(args)
