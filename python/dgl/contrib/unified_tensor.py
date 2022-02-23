@@ -75,7 +75,7 @@ class UnifiedTensor: #UnifiedTensor
         self._array = F.zerocopy_to_dgl_ndarray(self._input)
         self._device = device
 
-        self._array.pin_memory_(utils.to_dgl_context(self._device))
+        self._array.pin_memory_()
 
     def __len__(self):
         return len(self._array)
@@ -105,7 +105,7 @@ class UnifiedTensor: #UnifiedTensor
 
     def __del__(self):
         if hasattr(self, '_array') and self._array != None:
-            self._array.unpin_memory_(utils.to_dgl_context(self._device))
+            self._array.unpin_memory_()
             self._array = None
 
         if hasattr(self, '_input'):

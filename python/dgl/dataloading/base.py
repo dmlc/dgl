@@ -124,6 +124,8 @@ def _find_exclude_eids_with_reverse_types(g, eids, reverse_etype_map):
 def _find_exclude_eids(g, exclude_mode, eids, **kwargs):
     if exclude_mode is None:
         return None
+    elif callable(exclude_mode):
+        return exclude_mode(eids)
     elif F.is_tensor(exclude_mode) or (
             isinstance(exclude_mode, Mapping) and
             all(F.is_tensor(v) for v in exclude_mode.values())):
@@ -151,9 +153,6 @@ def find_exclude_eids(g, seed_edges, exclude, reverse_eids=None, reverse_etypes=
         None (default)
             Does not exclude any edge.
 
-        Tensor or dict[etype, Tensor]
-            Exclude the given edge IDs.
-
         'self'
             Exclude the given edges themselves but nothing else.
 
@@ -176,6 +175,10 @@ def find_exclude_eids(g, seed_edges, exclude, reverse_eids=None, reverse_etypes=
 
             This mode assumes that the reverse of an edge with ID ``e`` and type ``etype``
             will have ID ``e`` and type ``reverse_etype_map[etype]``.
+
+        callable
+            Any function that takes in a single argument :attr:`seed_edges` and returns
+            a tensor or dict of tensors.
     eids : Tensor or dict[etype, Tensor]
         The edge IDs.
     reverse_eids : Tensor or dict[etype, Tensor]
@@ -191,9 +194,8 @@ def find_exclude_eids(g, seed_edges, exclude, reverse_eids=None, reverse_etypes=
         seed_edges,
         reverse_eid_map=reverse_eids,
         reverse_etype_map=reverse_etypes)
-    if exclude_eids is not None:
-        exclude_eids = recursive_apply(
-            exclude_eids, lambda x: x.to(output_device))
+    if exclude_eids is not None and output_device is not None:
+        exclude_eids = recursive_apply(exclude_eids, lambda x: F.copy_to(x, output_device))
     return exclude_eids
 
 
@@ -202,8 +204,8 @@ class EdgeBlockSampler(object):
     classification and link prediction.
     """
     def __init__(self, block_sampler, exclude=None, reverse_eids=None,
-                 reverse_etypes=None, negative_sampler=None, prefetch_node_feats=None,
-                 prefetch_labels=None, prefetch_edge_feats=None):
+                 reverse_etypes=None, negative_sampler=None,
+                 prefetch_node_feats=None, prefetch_labels=None, prefetch_edge_feats=None,):
         self.reverse_eids = reverse_eids
         self.reverse_etypes = reverse_etypes
         self.exclude = exclude
@@ -249,6 +251,8 @@ class EdgeBlockSampler(object):
         If :attr:`negative_sampler` is given, also returns another graph containing the
         negative pairs as edges.
         """
+        if isinstance(seed_edges, Mapping):
+            seed_edges = {g.to_canonical_etype(k): v for k, v in seed_edges.items()}
         exclude = self.exclude
         pair_graph = g.edge_subgraph(
             seed_edges, relabel_nodes=False, output_device=self.output_device)

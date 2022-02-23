@@ -295,7 +295,7 @@ TransR
     :members: rel_emb, rel_project, forward, reset_parameters
     :show-inheritance:
 
-Heterogeneous Graph Convolution Module
+Heterogeneous Learning Module
 ----------------------------------------
 
 HeteroGraphConv
@@ -319,8 +319,16 @@ HeteroEmbedding
 
 .. _apinn-pytorch-util:
 
+
 Utility Modules
 ----------------------------------------
+
+TypedLinear
+----------------------------------------
+
+.. autoclass:: dgl.nn.pytorch.TypedLinear
+    :members: forward
+    :show-inheritance:
 
 Sequential
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
