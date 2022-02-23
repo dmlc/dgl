@@ -334,6 +334,14 @@ class ModelFactory:
             type_annotation_dict[k] = param.annotation
         return type_annotation_dict
 
+    def filter(self, filter_func):
+        new_fac = ModelFactory()
+        for name in self.registry:
+            if filter_func(self.registry[name]):
+                new_fac.registry[name] = self.registry[name]
+                new_fac.code_registry[name] = self.code_registry[name]
+        return new_fac
+
 
 class SamplerFactory:
     """ The factory class for creating executors"""
@@ -411,7 +419,7 @@ class SamplerFactory:
 
 
 NegativeSamplerFactory = SamplerFactory()
-NegativeSamplerFactory.register("uniform")(GlobalUniform)
+NegativeSamplerFactory.register("global")(GlobalUniform)
 NegativeSamplerFactory.register("persource")(PerSourceUniform)
 
 NodeModelFactory = ModelFactory()

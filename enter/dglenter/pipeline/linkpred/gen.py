@@ -73,7 +73,7 @@ class LinkpredPipeline(PipelineBase):
             edge_model: EdgeModelFactory.get_model_enum() = typer.Option(...,
                                                                          help="Model name"),
             neg_sampler: NegativeSamplerFactory.get_model_enum() = typer.Option(
-                "uniform", help="Negative sampler name"),
+                "persource", help="Negative sampler name"),
             device: DeviceEnum = typer.Option(
                 "cpu", help="Device, cpu or cuda"),
         ):
@@ -99,6 +99,9 @@ class LinkpredPipeline(PipelineBase):
                 },
             }
             comment_dict = merge_comment(output_cfg, comment_dict)
+
+            if cfg is None:
+                cfg = "_".join(["linkpred", data.value, node_model.value, edge_model.value]) + ".yml"
             yaml = ruamel.yaml.YAML()
             yaml.dump(comment_dict, Path(cfg).open("w"))
             print("Configuration file is generated at {}".format(Path(cfg).absolute()))

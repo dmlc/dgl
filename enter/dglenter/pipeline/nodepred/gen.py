@@ -54,8 +54,8 @@ class NodepredPipeline(PipelineBase):
     def get_cfg_func(self):
         def config(
             data: DataFactory.filter("nodepred").get_dataset_enum() = typer.Option(..., help="input data name"),
-            cfg: str = typer.Option(
-                "cfg.yml", help="output configuration path"),
+            cfg: Optional[str] = typer.Option(
+                None, help="output configuration path"),
             model: NodeModelFactory.get_model_enum() = typer.Option(..., help="Model name"),
             device: DeviceEnum = typer.Option("cpu", help="Device, cpu or cuda"),
         ):  
@@ -79,6 +79,8 @@ class NodepredPipeline(PipelineBase):
             comment_dict = merge_comment(output_cfg, comment_dict)
 
             yaml = ruamel.yaml.YAML()
+            if cfg is None:
+                cfg = "_".join(["nodepred", data.value, model.value]) + ".yml"
             yaml.dump(comment_dict, Path(cfg).open("w"))
             print("Configuration file is generated at {}".format(Path(cfg).absolute()))
 
