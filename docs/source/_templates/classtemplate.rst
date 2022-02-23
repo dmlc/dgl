@@ -6,5 +6,5 @@
 {{ name | underline}}
 
 .. autoclass:: {{ name }}
-    :members:
     :show-inheritance:
+    :members: download, save, load, process, has_cache, __getitem__, __len__, collate_fn
