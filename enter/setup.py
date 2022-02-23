@@ -15,7 +15,8 @@ setup(name='dglenter',
           'autopep8>=1.6.0',
           'numpydoc>=1.1.0',
           "pydantic>=1.9.0",
-          "ruamel.yaml>=0.17.20"
+          "ruamel.yaml>=0.17.20",
+          "PyYAML>=5.1"
       ],
       package_data={"": ["./*"]},
       include_package_data=True,

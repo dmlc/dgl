@@ -80,7 +80,7 @@ class NodepredPipeline(PipelineBase):
 
             yaml = ruamel.yaml.YAML()
             if cfg is None:
-                cfg = "_".join(["nodepred", data.value, model.value]) + ".yml"
+                cfg = "_".join(["nodepred", data.value, model.value]) + ".yaml"
             yaml.dump(comment_dict, Path(cfg).open("w"))
             print("Configuration file is generated at {}".format(Path(cfg).absolute()))
 

@@ -109,7 +109,7 @@ class NodepredNsPipeline(PipelineBase):
                 comment_dict['general_pipeline']["sampler"]["fan_out"] = [5,10,15,15,15][:int(comment_dict['model']["num_layers"])]
 
             if cfg is None:
-                cfg = "_".join(["nodepred-ns", data.value, model.value]) + ".yml"
+                cfg = "_".join(["nodepred-ns", data.value, model.value]) + ".yaml"
             yaml = ruamel.yaml.YAML()
             yaml.dump(comment_dict, Path(cfg).open("w"))
             print("Configuration file is generated at {}".format(

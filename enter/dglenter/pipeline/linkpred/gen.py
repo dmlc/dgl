@@ -67,7 +67,7 @@ class LinkpredPipeline(PipelineBase):
         def config(
             data: DataFactory.filter("linkpred").get_dataset_enum() = typer.Option(..., help="input data name"),
             cfg: str = typer.Option(
-                "cfg.yml", help="output configuration path"),
+                "cfg.yaml", help="output configuration path"),
             node_model: NodeModelFactory.get_model_enum() = typer.Option(...,
                                                                          help="Model name"),
             edge_model: EdgeModelFactory.get_model_enum() = typer.Option(...,
@@ -101,7 +101,7 @@ class LinkpredPipeline(PipelineBase):
             comment_dict = merge_comment(output_cfg, comment_dict)
 
             if cfg is None:
-                cfg = "_".join(["linkpred", data.value, node_model.value, edge_model.value]) + ".yml"
+                cfg = "_".join(["linkpred", data.value, node_model.value, edge_model.value]) + ".yaml"
             yaml = ruamel.yaml.YAML()
             yaml.dump(comment_dict, Path(cfg).open("w"))
             print("Configuration file is generated at {}".format(Path(cfg).absolute()))
