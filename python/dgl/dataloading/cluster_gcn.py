@@ -55,7 +55,7 @@ class ClusterGCNSampler(object):
             partition_node_ids = np.argsort(partition_ids)
             partition_size = F.zerocopy_from_numpy(np.bincount(partition_ids, minlength=k))
             partition_offset = F.zerocopy_from_numpy(np.insert(np.cumsum(partition_size), 0, 0))
-            partition_node_ids = F.zerocopy_from_numpy(partition_ids)
+            partition_node_ids = F.zerocopy_from_numpy(partition_node_ids)
             with open(cache_path, 'wb') as f:
                 pickle.dump((partition_offset, partition_node_ids), f)
             self.partition_offset = partition_offset

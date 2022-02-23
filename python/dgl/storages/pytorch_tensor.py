@@ -1,7 +1,9 @@
 """Feature storages for PyTorch tensors."""
 
 import torch
-from .base import FeatureStorage, register_storage_wrapper
+from .base import register_storage_wrapper
+from .tensor import BaseTensorStorage
+from ..utils import gather_pinned_tensor_rows
 
 def _fetch_cpu(indices, tensor, feature_shape, device, pin_memory):
     result = torch.empty(
@@ -15,18 +17,26 @@ def _fetch_cuda(indices, tensor, device):
     return torch.index_select(tensor, 0, indices).to(device)
 
 @register_storage_wrapper(torch.Tensor)
-class TensorStorage(FeatureStorage):
+class PyTorchTensorStorage(BaseTensorStorage):
     """Feature storages for slicing a PyTorch tensor."""
-    def __init__(self, tensor):
-        self.storage = tensor
-        self.feature_shape = tensor.shape[1:]
-        self.is_cuda = (tensor.device.type == 'cuda')
-
     def fetch(self, indices, device, pin_memory=False):
         device = torch.device(device)
-        if not self.is_cuda:
+        storage_device_type = self.storage.device.type
+        indices_device_type = indices.device.type
+        if storage_device_type != 'cuda':
+            if indices_device_type == 'cuda':
+                if self.storage.is_pinned():
+                    return gather_pinned_tensor_rows(self.storage, indices)
+                else:
+                    raise ValueError(
+                        f'Got indices on device {indices.device} whereas the feature tensor '
+                        f'is on {self.storage.device}. Please either (1) move the graph '
+                        f'to GPU with to() method, or (2) pin the graph with '
+                        f'pin_memory_() method.')
             # CPU to CPU or CUDA - use pin_memory and async transfer if possible
-            return _fetch_cpu(indices, self.storage, self.feature_shape, device, pin_memory)
+            else:
+                return _fetch_cpu(indices, self.storage, self.storage.shape[1:], device,
+                                  pin_memory)
         else:
             # CUDA to CUDA or CPU
             return _fetch_cuda(indices, self.storage, device)
