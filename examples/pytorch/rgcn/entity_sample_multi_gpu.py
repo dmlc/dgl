@@ -1,7 +1,6 @@
 """
 Differences compared to tkipf/relation-gcn
-* l2norm applied to all weights
-* remove nodes that won't be touched
+* weight decay applied to all weights
 """
 import argparse
 import gc
@@ -14,7 +13,8 @@ from torchmetrics.functional import accuracy
 from torch.nn.parallel import DistributedDataParallel
 
 from entity_utils import load_data
-from entity_sample import init_dataloaders, init_models, train, evaluate
+from entity_sample import init_dataloaders, train, evaluate
+from model import RGCN
 
 def collect_eval(n_gpus, queue, labels):
     eval_logits = []
@@ -48,21 +48,25 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, queue=None):
     use_ddp = True if n_gpus > 1 else False
     train_loader, val_loader, test_loader = init_dataloaders(
         args, g, train_idx, test_idx, target_idx, dev_id, use_ddp=use_ddp)
-    embed_layer, model = init_models(args, device, g.num_nodes(), num_classes, num_rels)
 
+    model = RGCN(g.num_nodes(),
+                 args.n_hidden,
+                 num_classes,
+                 num_rels,
+                 num_bases=args.n_bases,
+                 dropout=args.dropout,
+                 self_loop=args.use_self_loop,
+                 ns_mode=True)
     labels = labels.to(device)
     model = model.to(device)
     model = DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id)
-    embed_layer = DistributedDataParallel(embed_layer, device_ids=None, output_device=None)
 
-    emb_optimizer = th.optim.SparseAdam(embed_layer.module.parameters(), lr=args.sparse_lr)
-    optimizer = th.optim.Adam(model.parameters(), lr=1e-2, weight_decay=args.l2norm)
+    optimizer = th.optim.Adam(model.parameters(), lr=1e-2, weight_decay=args.wd)
 
     th.set_num_threads(n_cpus)
     for epoch in range(args.n_epochs):
-        train_loader.set_epoch(epoch)
-        train_acc, loss = train(model, embed_layer, train_loader, inv_target,
-                                labels, emb_optimizer, optimizer)
+        train_acc, loss = train(model, train_loader, inv_target,
+                                labels, optimizer)
 
         if proc_id == 0:
             print("Epoch {:05d}/{:05d} | Train Accuracy: {:.4f} | Train Loss: {:.4f}".format(
@@ -71,7 +75,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, queue=None):
         # garbage collection that empties the queue
         gc.collect()
 
-        val_logits, val_seeds = evaluate(model, embed_layer, val_loader, inv_target)
+        val_logits, val_seeds = evaluate(model, val_loader, inv_target)
         queue.put((val_logits, val_seeds))
 
         # gather evaluation result from multiple processes
@@ -81,7 +85,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, queue=None):
 
     # garbage collection that empties the queue
     gc.collect()
-    test_logits, test_seeds = evaluate(model, embed_layer, test_loader, inv_target)
+    test_logits, test_seeds = evaluate(model, test_loader, inv_target)
     queue.put((test_logits, test_seeds))
     if proc_id == 0:
         test_acc = collect_eval(n_gpus, queue, labels)
@@ -119,8 +123,6 @@ if __name__ == '__main__':
                         help="number of hidden units")
     parser.add_argument("--gpu", type=str, default='0',
                         help="gpu")
-    parser.add_argument("--sparse-lr", type=float, default=2e-2,
-                        help="sparse embedding learning rate")
     parser.add_argument("--n-bases", type=int, default=-1,
                         help="number of filter weight matrices, default: -1 [use all]")
     parser.add_argument("--n-epochs", type=int, default=50,
@@ -128,8 +130,8 @@ if __name__ == '__main__':
     parser.add_argument("-d", "--dataset", type=str, required=True,
                         choices=['aifb', 'mutag', 'bgs', 'am'],
                         help="dataset to use")
-    parser.add_argument("--l2norm", type=float, default=5e-4,
-                        help="l2 norm coef")
+    parser.add_argument("--wd", type=float, default=5e-4,
+                        help="weight decay")
     parser.add_argument("--fanout", type=str, default="4, 4",
                         help="Fan-out of neighbor sampling")
     parser.add_argument("--use-self-loop", default=False, action='store_true',
