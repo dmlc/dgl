@@ -9,7 +9,7 @@ dgl.transforms
 .. autosummary::
     :toctree: ../../generated/
     :nosignatures:
-    :template: transtemplate.rst
+    :template: classtemplate.rst
 
     BaseTransform
     Compose

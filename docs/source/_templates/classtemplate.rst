@@ -6,4 +6,5 @@
 {{ name | underline}}
 
 .. autoclass:: {{ name }}
-    :show-inheritance: __call__, __repr__
+    :members:
+    :show-inheritance:
