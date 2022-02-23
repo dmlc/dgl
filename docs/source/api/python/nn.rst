@@ -89,7 +89,7 @@ Score Modules for Link Prediction and Knowledge Graph Completion
     TransE
     TransR
 
-Modules for Heterogeneous Graphs
+Heterogeneous Learning Modules
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. currentmodule:: dgl.nn.pytorch
@@ -103,6 +103,7 @@ Modules for Heterogeneous Graphs
     HeteroGraphConv
     HeteroLinear
     HeteroEmbedding
+    TypedLinear
 
 Utility Modules
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -160,7 +161,7 @@ Global Pooling Layers
     SortPooling
     GlobalAttentionPooling
 
-Modules for Heterogeneous Graphs
+Heterogeneous Learning Modules
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. currentmodule:: dgl.nn.tensorflow
@@ -232,7 +233,7 @@ Global Pooling Layers
     GlobalAttentionPooling
     Set2Set
 
-Modules for Heterogeneous Graphs
+Heterogeneous Learning Modules
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. currentmodule:: dgl.nn.mxnet
