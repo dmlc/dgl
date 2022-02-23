@@ -123,11 +123,134 @@ Utility Modules
 TensorFlow
 ----------------------------------------
 
+Conv Layers
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. currentmodule:: dgl.nn.tensorflow.conv
+.. automodule:: dgl.nn.tensorflow.conv
+
+.. autosummary::
+    :toctree: ../../generated/
+    :nosignatures:
+    :template: classtemplate.rst
+
+    GraphConv
+    RelGraphConv
+    GATConv
+    SAGEConv
+    ChebConv
+    SGConv
+    APPNPConv
+    GINConv
+
+Global Pooling Layers
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. currentmodule:: dgl.nn.tensorflow.glob
+.. automodule:: dgl.nn.tensorflow.glob
+
+.. autosummary::
+    :toctree: ../../generated/
+    :nosignatures:
+    :template: classtemplate.rst
+
+    SumPooling
+    AvgPooling
+    MaxPooling
+    SortPooling
+    GlobalAttentionPooling
+
+Modules for Heterogeneous Graphs
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. currentmodule:: dgl.nn.tensorflow
+.. automodule:: dgl.nn.tensorflow
+
+.. autosummary::
+    :toctree: ../../generated/
+    :nosignatures:
+    :template: classtemplate.rst
+
+    HeteroGraphConv
+
 MXNet
 ----------------------------------------
 
-.. toctree::
+Conv Layers
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-   nn.pytorch
-   nn.mxnet
-   nn.tensorflow
+.. currentmodule:: dgl.nn.mxnet.conv
+.. automodule:: dgl.nn.mxnet.conv
+
+.. autosummary::
+    :toctree: ../../generated/
+    :nosignatures:
+    :template: classtemplate.rst
+
+    GraphConv
+    RelGraphConv
+    TAGConv
+    GATConv
+    EdgeConv
+    SAGEConv
+    SGConv
+    APPNPConv
+    GINConv
+    GatedGraphConv
+    GMMConv
+    ChebConv
+    AGNNConv
+    NNConv
+
+Dense Conv Layers
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autosummary::
+    :toctree: ../../generated/
+    :nosignatures:
+    :template: classtemplate.rst
+
+    DenseGraphConv
+    DenseSAGEConv
+    DenseChebConv
+
+Global Pooling Layers
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. currentmodule:: dgl.nn.mxnet.glob
+.. automodule:: dgl.nn.mxnet.glob
+
+.. autosummary::
+    :toctree: ../../generated/
+    :nosignatures:
+    :template: classtemplate.rst
+
+    SumPooling
+    AvgPooling
+    MaxPooling
+    SortPooling
+    GlobalAttentionPooling
+    Set2Set
+
+Modules for Heterogeneous Graphs
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. currentmodule:: dgl.nn.mxnet
+.. automodule:: dgl.nn.mxnet
+
+.. autosummary::
+    :toctree: ../../generated/
+    :nosignatures:
+    :template: classtemplate.rst
+
+    HeteroGraphConv
+
+Utility Modules
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autosummary::
+    :toctree: ../../generated/
+    :nosignatures:
+    :template: classtemplate.rst
+
+    ~utils.Sequential
