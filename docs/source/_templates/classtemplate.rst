@@ -7,4 +7,4 @@
 
 .. autoclass:: {{ name }}
     :show-inheritance:
-    :members: download, save, load, process, has_cache, __getitem__, __len__, collate_fn
+    :members: __getitem__, __len__, collate_fn, forward, reset_parameters
