@@ -110,6 +110,8 @@ After loaded, the dataset has one graph without any features:
 .. note::
     Non-integer node IDs are allowed. When constructing the graph, ``CSVDataset`` will
     map each raw ID to an integer ID starting from zero.
+    If the node IDs are already distinct integers from 0 to ``num_nodes-1``, no mapping
+    is applied.
 
 .. note::
     Edges are always directed. To have both directions, add reversed edges in the edge

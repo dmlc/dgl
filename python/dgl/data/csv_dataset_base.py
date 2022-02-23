@@ -131,17 +131,18 @@ class NodeData(BaseData):
 
     @staticmethod
     def to_dict(node_data: List['NodeData']) -> dict:
-        # node_ids could be arbitrary numeric values, namely non-sorted, duplicated, not labeled from 0 to num_nodes-1
+        # node_ids could be numeric or non-numeric values, but duplication is not allowed.
         node_dict = {}
         for n_data in node_data:
             graph_ids = np.unique(n_data.graph_id)
             for graph_id in graph_ids:
                 idx = n_data.graph_id == graph_id
                 ids = n_data.id[idx]
-                u_ids, u_indices = np.unique(ids, return_index=True)
+                u_ids, u_indices, u_counts = np.unique(
+                    ids, return_index=True, return_counts=True)
                 if len(ids) > len(u_ids):
-                    dgl_warning(
-                        "There exist duplicated ids and only the first ones are kept.")
+                    raise DGLError("Node IDs are required to be unique but the following ids are duplicate: {}".format(
+                        u_ids[u_counts > 1]))
                 if graph_id not in node_dict:
                     node_dict[graph_id] = {}
                 node_dict[graph_id][n_data.type] = {'mapping': {index: i for i,
