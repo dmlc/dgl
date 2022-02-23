@@ -7,7 +7,7 @@ from torch.nn import init
 from .... import function as fn
 from ....base import DGLError
 from ....utils import expand_as_pair
-from ....transform import reverse
+from ....transforms import reverse
 from ....convert import block_to_graph
 from ....heterograph import DGLBlock
 
