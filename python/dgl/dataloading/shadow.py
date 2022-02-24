@@ -79,7 +79,7 @@ class ShaDowKHopSampler(Sampler):
         self.prefetch_edge_feats = prefetch_edge_feats
         self.output_device = output_device
 
-    def sample(self, g, seed_nodes, exclude_eids=None):
+    def sample(self, g, seed_nodes, exclude_eids=None):     # pylint: disable=arguments-differ
         """Sample a subgraph given a tensor of seed nodes."""
         output_nodes = seed_nodes
         for fanout in reversed(self.fanouts):
