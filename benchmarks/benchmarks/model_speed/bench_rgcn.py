@@ -6,7 +6,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .. import utils
+# from .. import utils
+import utils
 
 class RGCN(nn.Module):
     def __init__(self,
@@ -41,7 +42,11 @@ class RGCN(nn.Module):
 def track_time(data, use_type_count):
     # args
     if data == 'aifb':
-        num_bases = -1
+        if dgl.__version__.startswith("0.8"):
+            num_bases = None
+        else:
+            num_bases = -1
+            
         l2norm = 0.
     elif data == 'am':
         num_bases = 40
@@ -121,3 +126,5 @@ def track_time(data, use_type_count):
     t1 = time.time()
 
     return (t1 - t0) / num_epochs
+
+track_time('aifb', True)
