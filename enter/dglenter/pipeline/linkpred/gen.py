@@ -74,13 +74,11 @@ class LinkpredPipeline(PipelineBase):
                                                                          help="Model name"),
             neg_sampler: NegativeSamplerFactory.get_model_enum() = typer.Option(
                 "persource", help="Negative sampler name"),
-            device: DeviceEnum = typer.Option(
-                "cpu", help="Device, cpu or cuda"),
         ):
             self.__class__.setup_user_cfg_cls()
             generated_cfg = {
                 "pipeline_name": "linkpred",
-                "device": device.value,
+                "device": "cpu",
                 "data": {"name": data.name},
                 "neg_sampler": {"name": neg_sampler.value},
                 "node_model": {"name": node_model.value},
@@ -89,6 +87,7 @@ class LinkpredPipeline(PipelineBase):
             output_cfg = self.user_cfg_cls(**generated_cfg).dict()
             output_cfg = deep_convert_dict(output_cfg)
             comment_dict = {
+                "device": "Torch device name, e.q. cpu or cuda or cuda:0",
                 "general_pipeline": pipeline_comments,
                 "node_model": NodeModelFactory.get_constructor_doc_dict(node_model.value),
                 "edge_model": EdgeModelFactory.get_constructor_doc_dict(edge_model.value),

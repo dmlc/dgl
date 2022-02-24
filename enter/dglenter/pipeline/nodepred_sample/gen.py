@@ -82,13 +82,11 @@ class NodepredNsPipeline(PipelineBase):
             cfg: Optional[str] = typer.Option(
                 None, help="output configuration path"),
             model: NodeModelFactory.filter(lambda cls: hasattr(cls, "forward_block")).get_model_enum() = typer.Option(..., help="Model name"),
-            device: DeviceEnum = typer.Option(
-                "cpu", help="Device, cpu or cuda"),
         ):
             self.__class__.setup_user_cfg_cls()
-            generated_cfg = {
+            generated_cfg = {                
                 "pipeline_name": "nodepred-ns",
-                "device": device,
+                "device": "cpu",
                 "data": {"name": data.name},
                 "model": {"name": model.value},
                 "general_pipeline": {"sampler":{"name": "neighbor"}}
@@ -96,6 +94,7 @@ class NodepredNsPipeline(PipelineBase):
             output_cfg = self.user_cfg_cls(**generated_cfg).dict()
             output_cfg = deep_convert_dict(output_cfg)
             comment_dict = {
+                "device": "Torch device name, e.q. cpu or cuda or cuda:0",
                 "data": {
                     "split_ratio": 'Ratio to generate split masks, for example set to [0.8, 0.1, 0.1] for 80% train/10% val/10% test. Leave blank to use builtin split in original dataset'
                 },
