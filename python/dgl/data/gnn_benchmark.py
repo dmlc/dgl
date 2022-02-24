@@ -39,7 +39,7 @@ class GNNBenchmarkDataset(DGLBuiltinDataset):
     def process(self):
         npz_path = os.path.join(self.raw_path, self.name + '.npz')
         g = self._load_npz(npz_path)
-        g = transform.reorder_graph(
+        g = transforms.reorder_graph(
             g, node_permute_algo='rcmk', edge_permute_algo='dst', store_ids=False)
         self._graph = g
         self._data = [g]
@@ -96,7 +96,7 @@ class GNNBenchmarkDataset(DGLBuiltinDataset):
             else:
                 labels = None
         g = dgl_graph((adj_matrix.row, adj_matrix.col))
-        g = transform.to_bidirected(g)
+        g = transforms.to_bidirected(g)
         g.ndata['feat'] = F.tensor(attr_matrix, F.data_type_dict['float32'])
         g.ndata['label'] = F.tensor(labels, F.data_type_dict['int64'])
         return g
