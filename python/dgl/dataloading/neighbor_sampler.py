@@ -1,6 +1,6 @@
 """Data loading components for neighbor sampling"""
 from ..base import NID, EID
-from ..transform import to_block
+from ..transforms import to_block
 from .base import BlockSampler
 
 class NeighborSampler(BlockSampler):

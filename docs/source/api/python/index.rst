@@ -15,4 +15,4 @@ API Reference
    dgl.sampling
    dgl.contrib.UnifiedTensor
    udf
-   transform
+   transforms

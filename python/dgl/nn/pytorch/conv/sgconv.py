@@ -9,12 +9,8 @@ from .graphconv import EdgeWeightNorm
 
 
 class SGConv(nn.Module):
-    r"""
-
-    Description
-    -----------
-    Simplifying Graph Convolution layer from paper `Simplifying Graph
-    Convolutional Networks <https://arxiv.org/pdf/1902.07153.pdf>`__.
+    r"""SGC layer from `Simplifying Graph
+    Convolutional Networks <https://arxiv.org/pdf/1902.07153.pdf>`__
 
     .. math::
         H^{K} = (\tilde{D}^{-1/2} \tilde{A} \tilde{D}^{-1/2})^K X \Theta

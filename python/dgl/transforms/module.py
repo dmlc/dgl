@@ -671,7 +671,7 @@ class Compose(BaseTransform):
     -------
 
     >>> import dgl
-    >>> from dgl import transform as T
+    >>> from dgl import transforms as T
 
     >>> g = dgl.graph(([0, 0], [1, 1]))
     >>> transform = T.Compose([T.ToSimple(), T.AddReverse()])

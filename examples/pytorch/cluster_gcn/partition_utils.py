@@ -4,7 +4,7 @@ import numpy as np
 
 from utils import arg_list
 
-from dgl.transform import metis_partition
+from dgl.transforms import metis_partition
 from dgl import backend as F
 import dgl
 

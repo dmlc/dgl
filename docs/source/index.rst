@@ -51,7 +51,7 @@ Welcome to Deep Graph Library Tutorials and Documentation
    api/python/dgl.sampling
    api/python/dgl.multiprocessing
    api/python/dgl.contrib.UnifiedTensor
-   api/python/transform
+   api/python/transforms
    api/python/udf
 
 .. toctree::
