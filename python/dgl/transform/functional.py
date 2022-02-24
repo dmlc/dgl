@@ -2993,11 +2993,11 @@ def reorder_graph(g, node_permute_algo=None, edge_permute_algo='src',
     ----------
     g : DGLGraph
         The homogeneous graph.
-    node_permute_algo: None or str, optional
+    node_permute_algo: str, optional
         The permutation algorithm to re-order nodes. If given, the options are ``rcmk`` or
         ``metis`` or ``custom``.
 
-        * ``None``: No nodes are re-ordered.
+        * ``None``: Keep the current node order.
         * ``rcmk``: Use the `Reverse Cuthill–McKee <https://docs.scipy.org/doc/scipy/reference/
           generated/scipy.sparse.csgraph.reverse_cuthill_mckee.html#
           scipy-sparse-csgraph-reverse-cuthill-mckee>`__ from ``scipy`` to generate nodes
