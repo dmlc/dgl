@@ -58,11 +58,11 @@ class AsNodePredDataset(DGLDataset):
     num_classes : int
         Number of classes to predict.
     train_idx : Tensor
-        Indexes for train.
+        An 1-D integer tensor of training node IDs.
     val_idx : Tensor
-        Indexes for validation.
+        An 1-D integer tensor of validation node IDs.
     test_idx : Tensor
-        Indexes for test.
+        An 1-D integer tensor of test node IDs.
 
     Examples
     --------
