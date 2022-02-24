@@ -139,6 +139,8 @@ class NodepredNsPipeline(PipelineBase):
             user_cfg_dict["data"]["name"], '**cfg["data"]'))
         generated_user_cfg = copy.deepcopy(user_cfg_dict)
 
+        if "split_ratio" in generated_user_cfg["data"]:
+            generated_user_cfg["data"].pop("split_ratio")
         if len(generated_user_cfg["data"]) == 1:
             generated_user_cfg.pop("data")
         else:
@@ -151,8 +153,6 @@ class NodepredNsPipeline(PipelineBase):
 
         if user_cfg_dict["data"].get("split_ratio", None) is not None:
             render_cfg["data_initialize_code"] = "{}, split_ratio={}".format(render_cfg["data_initialize_code"], user_cfg_dict["data"]["split_ratio"])
-        if "split_ratio" in generated_user_cfg["data"]:
-            generated_user_cfg["data"].pop("split_ratio")
 
         render_cfg["user_cfg_str"] = f"cfg = {str(generated_user_cfg)}"
         render_cfg["user_cfg"] = user_cfg_dict

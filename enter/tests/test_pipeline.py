@@ -1,6 +1,7 @@
 import subprocess
 from typing import NamedTuple
 import pytest
+from pathlib import Path
 # class DatasetSpec:
 
 dataset_spec = {
@@ -30,3 +31,32 @@ def test_train(spec):
     assert run.stderr is None or len(run.stderr) == 0, "Found error message: {}".format(run.stderr)
     output = run.stdout.decode("utf-8")
     print(output)
+
+TEST_RECIPE_FOLDER = "my_recipes"
+
+@pytest.fixture
+def setup_recipe_folder():
+    run = subprocess.run(["dgl-enter", "recipe", "copy", "--dir", TEST_RECIPE_FOLDER], timeout=15, capture_output=True)
+
+@pytest.mark.parametrize("file", [str(f) for f in Path(TEST_RECIPE_FOLDER).glob("*.yaml")])
+def test_recipe(file, setup_recipe_folder):
+    print("DGL enter train {}".format(file))
+    try:    
+        run = subprocess.run(["dgl-enter", "train", "--cfg", file], timeout=5, capture_output=True)
+        sh_stdout, sh_stderr = run.stdout, run.stderr
+    except subprocess.TimeoutExpired as e:
+        sh_stdout = e.stdout
+        sh_stderr = e.stderr
+    if sh_stderr is not None and len(sh_stderr) != 0:
+        error_str = sh_stderr.decode("utf-8")
+        lines = error_str.split("\n")
+        for line in lines:
+            line = line.strip()
+            if line.startswith("WARNING") or line.startswith("Aborted") or line.startswith("0%"):
+                continue
+            else:
+                assert len(line) == 0, error_str
+    print("{} stdout: {}".format(file, sh_stdout))
+    print("{} stderr: {}".format(file, sh_stderr))
+
+# test_recipe( , None)

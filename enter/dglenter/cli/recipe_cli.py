@@ -17,11 +17,11 @@ def list_receipes():
         print("| {:<30} |  {:<18} | {:<20} |".format(file.name, cfg["pipeline_name"], cfg["data"]["name"]))
     print("="*len(header))
 
-def copy_receipes():
+def copy_receipes(dir: str = typer.Option("dglenter_templates", help="directory name for recipes")):
     file_current_dir = Path(__file__).resolve().parent
     recipe_dir = file_current_dir.parent.parent / "recipes"
     current_dir = Path(os.getcwd())
-    new_dir = current_dir / "dglenter_templates"
+    new_dir = current_dir / dir
     new_dir.mkdir(parents=True, exist_ok=True)
     for file in recipe_dir.glob("*.yaml"):
         shutil.copy(file, new_dir)

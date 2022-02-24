@@ -11,7 +11,7 @@ import autopep8
 
 def export(
     cfg: str = typer.Option("cfg.yaml", help="config yaml file name"),
-    output: str = typer.Option("output.py", help="output python file name")
+    output: str = typer.Option("script.py", help="output python file name")
 ):
     user_cfg = yaml.safe_load(Path(cfg).open("r"))
     pipeline_name = user_cfg["pipeline_name"]
