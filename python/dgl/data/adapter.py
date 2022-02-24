@@ -228,10 +228,10 @@ class AsLinkPredDataset(DGLDataset):
     >>> ds = dgl.data.CoraGraphDataset()
     >>> print(ds)
     Dataset("cora_v2", num_graphs=1, save_path=...)
-    >>> new_ds = dgl.data.AsNodePredDataset(ds, [0.8, 0.1, 0.1])
+    >>> new_ds = dgl.data.AsLinkPredDataset(ds, [0.8, 0.1, 0.1])
     >>> print(new_ds)
     Dataset("cora_v2-as-linkpred", num_graphs=1, save_path=/home/ubuntu/.dgl/cora_v2-as-linkpred)
-    >>> print(hasattr(new_ds, "get_test_edges"))
+    >>> print(hasattr(new_ds, "test_edges"))
     True
     """
 
