@@ -55,7 +55,7 @@ class GraphSAGE(nn.Module):
             h = node_feat
         h = self.dropout(h)
         for l, layer in enumerate(self.layers):
-            h = layer(graph, h)
+            h = layer(graph, h, edge_feat)
             if l != len(self.layers) - 1:
                 h = self.activation(h)
                 h = self.dropout(h)
@@ -64,7 +64,7 @@ class GraphSAGE(nn.Module):
     def forward_block(self, blocks, node_feat, edge_feat = None):
         h = node_feat
         for l, (layer, block) in enumerate(zip(self.layers, blocks)):
-            h = layer(block, h)
+            h = layer(block, h, edge_feat)
             if l != len(self.layers) - 1:
                 h = self.activation(h)
                 h = self.dropout(h)

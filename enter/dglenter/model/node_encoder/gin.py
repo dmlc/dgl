@@ -12,6 +12,8 @@ class GIN(nn.Module):
                  aggregator_type='sum'):
         """Graph Isomophism Networks
 
+        Edge feature is ignored in this model.
+
         Parameters
         ----------
         data_info : dict

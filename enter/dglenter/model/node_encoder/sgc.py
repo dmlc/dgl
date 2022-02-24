@@ -14,6 +14,8 @@ class SGC(nn.Module):
                  bias=True, k=2):
         """ Simplifying Graph Convolutional Networks
 
+        Edge feature is ignored in this model.
+
         Parameters
         ----------
         data_info : dict
