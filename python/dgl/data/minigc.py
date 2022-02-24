@@ -7,7 +7,7 @@ from .dgl_dataset import DGLDataset
 from .utils import save_graphs, load_graphs, makedirs
 from .. import backend as F
 from ..convert import from_networkx
-from ..transform import add_self_loop
+from ..transforms import add_self_loop
 
 __all__ = ['MiniGCDataset']
 
