@@ -144,6 +144,9 @@ def asnumpy(input):
 def copy_to(input, ctx, **kwargs):
     return input.as_in_context(ctx)
 
+def is_pinned(input):
+    return input.context == mx.cpu_pinned()
+
 def sum(input, dim, keepdims=False):
     if len(input) == 0:
         return nd.array([0.], dtype=input.dtype, ctx=input.context)

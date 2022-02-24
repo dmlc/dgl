@@ -232,13 +232,18 @@ Fake news dataset
     :members: __getitem__, __len__
 
 Dataset adapters
-```````````````````````````````````
+-------------------
+
+Node prediction adapter
+```````````````````````
 
 .. autoclass:: AsNodePredDataset
     :members: __getitem__, __len__
 
+Link prediction adapter
+```````````````````````
 
-.. autoclass:: AsEdgePredDataset
+.. autoclass:: AsLinkPredDataset
     :members: __getitem__, __len__
 
 

@@ -134,7 +134,7 @@ struct COOMatrix {
   * \brief Pin the row, col and data (if not Null) of the matrix.
   * \note This is an in-place method. Behavior depends on the current context,
   *       kDLCPU: will be pinned;
-  *       kDLCPUPinned: directly return;
+  *       IsPinned: directly return;
   *       kDLGPU: invalid, will throw an error.
   *       The context check is deferred to pinning the NDArray.
   */
@@ -149,7 +149,7 @@ struct COOMatrix {
   /*!
   * \brief Unpin the row, col and data (if not Null) of the matrix.
   * \note This is an in-place method. Behavior depends on the current context,
-  *       kDLCPUPinned: will be unpinned;
+  *       IsPinned: will be unpinned;
   *       others: directly return.
   *       The context check is deferred to unpinning the NDArray.
   */
