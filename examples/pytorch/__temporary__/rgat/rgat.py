@@ -11,7 +11,7 @@ import numpy as np
 from ogb.nodeproppred import DglNodePropPredDataset
 import tqdm
 
-USE_WRAPPER = True
+USE_UVA = False
 
 class HeteroGAT(nn.Module):
     def __init__(self, etypes, in_feats, n_hidden, n_classes, n_heads=4):
@@ -52,44 +52,62 @@ graph = dgl.AddReverse()(graph)
 graph.update_all(fn.copy_u('feat', 'm'), fn.mean('m', 'feat'), etype='rev_writes')
 graph.update_all(fn.copy_u('feat', 'm'), fn.mean('m', 'feat'), etype='has_topic')
 graph.update_all(fn.copy_u('feat', 'm'), fn.mean('m', 'feat'), etype='affiliated_with')
-graph.edges['cites'].data['weight'] = torch.ones(graph.num_edges('cites'))  # dummy edge weights
 
 model = HeteroGAT(graph.etypes, graph.ndata['feat']['paper'].shape[1], 256, dataset.num_classes).cuda()
 opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
 
-if USE_WRAPPER:
-    import dglnew
-    graph.create_formats_()
-    graph = dglnew.graph.wrapper.DGLGraphStorage(graph)
-
 split_idx = dataset.get_idx_split()
 train_idx, valid_idx, test_idx = split_idx['train'], split_idx['valid'], split_idx['test']
 
-sampler = dgl.dataloading.NeighborSampler(
-        [5, 5, 5], output_device='cpu',
+if not USE_UVA:
+    graph = graph.to('cuda')
+    train_idx = recursive_apply(train_idx, lambda x: x.to('cuda'))
+    valid_idx = recursive_apply(valid_idx, lambda x: x.to('cuda'))
+    test_idx = recursive_apply(test_idx, lambda x: x.to('cuda'))
+
+train_sampler = dgl.dataloading.NeighborSampler(
+        [5, 5, 5],
         prefetch_node_feats={k: ['feat'] for k in graph.ntypes},
-        prefetch_labels={'paper': ['label']},
-        prefetch_edge_feats={'cites': ['weight']})
-dataloader = dgl.dataloading.NodeDataLoader(
-        graph,
-        train_idx,
-        sampler,
-        device='cuda',
-        batch_size=1000,
-        shuffle=True,
-        drop_last=False,
-        pin_memory=True,
-        num_workers=8,
-        persistent_workers=True,
-        use_prefetch_thread=True)       # TBD: could probably remove this argument
+        prefetch_labels={'paper': ['label']})
+valid_sampler = dgl.dataloading.NeighborSampler(
+        [10, 10, 10],   # Slightly more
+        prefetch_node_feats={k: ['feat'] for k in graph.ntypes},
+        prefetch_labels={'paper': ['label']})
+train_dataloader = dgl.dataloading.NodeDataLoader(
+        graph, train_idx, train_sampler,
+        device='cuda', batch_size=1000, shuffle=True,
+        drop_last=False, num_workers=0, use_uva=USE_UVA)
+valid_dataloader = dgl.dataloading.NodeDataLoader(
+        graph, valid_idx, valid_sampler,
+        device='cuda', batch_size=1000, shuffle=False,
+        drop_last=False, num_workers=0, use_uva=USE_UVA)
+test_dataloader = dgl.dataloading.NodeDataLoader(
+        graph, test_idx, valid_sampler,
+        device='cuda', batch_size=1000, shuffle=False,
+        drop_last=False, num_workers=0, use_uva=USE_UVA)
+
+def evaluate(model, dataloader):
+    preds = []
+    labels = []
+    with torch.no_grad():
+        for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
+            x = blocks[0].srcdata['feat']
+            y = blocks[-1].dstdata['label']['paper'][:, 0]
+            y_hat = model(blocks, x)
+            preds.append(y_hat)
+            labels.append(y)
+        preds = torch.cat(preds, 0)
+        labels = torch.cat(labels, 0)
+        acc = MF.accuracy(preds, labels)
+        return acc
 
 durations = []
 for _ in range(10):
+    model.train()
     t0 = time.time()
-    for it, (input_nodes, output_nodes, blocks) in enumerate(dataloader):
+    for it, (input_nodes, output_nodes, blocks) in enumerate(train_dataloader):
         x = blocks[0].srcdata['feat']
         y = blocks[-1].dstdata['label']['paper'][:, 0]
-        assert y.min() >= 0 and y.max() < dataset.num_classes
         y_hat = model(blocks, x)
         loss = F.cross_entropy(y_hat, y)
         opt.zero_grad()
@@ -102,4 +120,9 @@ for _ in range(10):
     tt = time.time()
     print(tt - t0)
     durations.append(tt - t0)
+
+    model.eval()
+    valid_acc = evaluate(model, valid_dataloader)
+    test_acc = evaluate(model, test_dataloader)
+    print('Validation acc:', valid_acc, 'Test acc:', test_acc)
 print(np.mean(durations[4:]), np.std(durations[4:]))
