@@ -1,5 +1,6 @@
 """Base classes and functionalities for dataloaders"""
 from collections import Mapping
+import inspect
 from ..base import NID, EID
 from ..convert import heterograph
 from .. import backend as F
@@ -17,39 +18,175 @@ def _set_lazy_features(x, xdata, feature_names):
             x[type_].data.update({k: LazyFeature(k) for k in names})
 
 def set_node_lazy_features(g, feature_names):
-    """Set lazy features for ``g.ndata`` if :attr:`feature_names` is a list of strings,
-    or ``g.nodes[ntype].data`` if :attr:`feature_names` is a dict of list of strings.
+    """Assign LazyFeature objects to ``g.ndata`` for given feature names for prefetching
+    with :class:`dgl.dataloading.NodeDataLoader` and :class:`dgl.dataloading.EdgeDataLoader`.
+
+    If the graph is homogeneous, this is equivalent to:
+
+    .. code:: python
+
+       g.ndata.update({k: LazyFeature(k, g.ndata[dgl.NID]) for k in feature_names})
+
+    If the graph is heterogeneous, this is equivalent to:
+
+    .. code:: python
+
+        for type_, names in feature_names.items():
+            g.nodes[type_].data.update(
+                {k: LazyFeature(k, g.nodes[type_].data[dgl.NID]) for k in names})
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The graph.
+    feature_names : list[str] or dict[ntype, list[str]]
+        The feature names to prefetch.
+
+    See also
+    --------
+    dgl.frame.LazyFeature
     """
     return _set_lazy_features(g.nodes, g.ndata, feature_names)
 
 def set_edge_lazy_features(g, feature_names):
-    """Set lazy features for ``g.edata`` if :attr:`feature_names` is a list of strings,
-    or ``g.edges[etype].data`` if :attr:`feature_names` is a dict of list of strings.
+    """Assign LazyFeature objects to ``g.edata`` for given feature names for prefetching
+    with :class:`dgl.dataloading.NodeDataLoader` and :class:`dgl.dataloading.EdgeDataLoader`.
+
+    If the graph is homogeneous, this is equivalent to:
+
+    .. code:: python
+
+       g.edata.update({k: LazyFeature(k, g.edata[dgl.EID]) for k in feature_names})
+
+    If the graph is heterogeneous, this is equivalent to:
+
+    .. code:: python
+
+        for type_, names in feature_names.items():
+            g.edges[type_].data.update(
+                {k: LazyFeature(k, g.edges[type_].data[dgl.EID]) for k in names})
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The graph.
+    feature_names : list[str] or dict[etype, list[str]]
+        The feature names to prefetch.
+
+    See also
+    --------
+    dgl.frame.LazyFeature
     """
     return _set_lazy_features(g.edges, g.edata, feature_names)
 
 def set_src_lazy_features(g, feature_names):
-    """Set lazy features for ``g.srcdata`` if :attr:`feature_names` is a list of strings,
-    or ``g.srcnodes[srctype].data`` if :attr:`feature_names` is a dict of list of strings.
+    """Assign LazyFeature objects to ``g.srcdata`` for given feature names for prefetching
+    with :class:`dgl.dataloading.NodeDataLoader` and :class:`dgl.dataloading.EdgeDataLoader`.
+
+    If the graph is homogeneous, this is equivalent to:
+
+    .. code:: python
+
+       g.srcdata.update({k: LazyFeature(k, g.srcdata[dgl.NID]) for k in feature_names})
+
+    If the graph is heterogeneous, this is equivalent to:
+
+    .. code:: python
+
+        for type_, names in feature_names.items():
+            g.srcnodes[type_].data.update(
+                {k: LazyFeature(k, g.srcnodes[type_].data[dgl.NID]) for k in names})
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The graph.
+    feature_names : list[str] or dict[ntype, list[str]]
+        The feature names to prefetch.
+
+    See also
+    --------
+    dgl.frame.LazyFeature
     """
     return _set_lazy_features(g.srcnodes, g.srcdata, feature_names)
 
 def set_dst_lazy_features(g, feature_names):
-    """Set lazy features for ``g.dstdata`` if :attr:`feature_names` is a list of strings,
-    or ``g.dstnodes[dsttype].data`` if :attr:`feature_names` is a dict of list of strings.
+    """Assign LazyFeature objects to ``g.srcdata`` for given feature names for prefetching
+    with :class:`dgl.dataloading.NodeDataLoader` and :class:`dgl.dataloading.EdgeDataLoader`.
+
+    If the graph is homogeneous, this is equivalent to:
+
+    .. code:: python
+
+       g.dstdata.update({k: LazyFeature(k, g.dstdata[dgl.NID]) for k in feature_names})
+
+    If the graph is heterogeneous, this is equivalent to:
+
+    .. code:: python
+
+        for type_, names in feature_names.items():
+            g.dstnodes[type_].data.update(
+                {k: LazyFeature(k, g.dstnodes[type_].data[dgl.NID]) for k in names})
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The graph.
+    feature_names : list[str] or dict[ntype, list[str]]
+        The feature names to prefetch.
+
+    See also
+    --------
+    dgl.frame.LazyFeature
     """
     return _set_lazy_features(g.dstnodes, g.dstdata, feature_names)
 
-class BlockSampler(object):
-    """BlockSampler is an abstract class assuming to take in a set of nodes whose
-    outputs are to compute, and return a list of blocks.
+class Sampler(object):
+    """Abstract sampler class."""
+    def sample(self, g, indices):
+        """Abstract sample method.
 
-    Moreover, it assumes that the input node features will be put in the first block's
-    ``srcdata``, the output node labels will be put in the last block's ``dstdata``, and
-    the edge data will be put in all the blocks' ``edata``.
+        Parameters
+        ----------
+        g : DGLGraph
+            The graph.
+        indices : object
+            Any object representing the indices selected in the current minibatch.
+        """
+        raise NotImplementedError
+
+class BlockSampler(Sampler):
+    """Abstract class that assumes to take in a set of nodes whose
+    outputs are to compute, and returns a list of MFGs.
+
+    Moreover, it assumes that the input node features will be put in the first MFG's
+    ``srcdata``, the output node labels will be put in the last MFG's ``dstdata``, and
+    the edge data will be put in all the MFGs' ``edata``.
+
+    Parameters
+    ----------
+    prefetch_node_feats : list[str] or dict[ntype, list[str]], optional
+        The node data to prefetch for the first MFG.
+        
+        DGL will populate the first layer's MFG's ``srcnodes`` and ``srcdata`` with
+        the node data of the given names from the original graph.
+    prefetch_labels : list[str] or dict[ntype, list[str]], optional
+        The node data to prefetch for the last MFG.
+
+        DGL will populate the last layer's MFG's ``dstnodes`` and ``dstdata`` with
+        the node data of the given names from the original graph.
+    prefetch_edge_feats : list[str] or dict[etype, list[str]], optional
+        The edge data names to prefetch for all the MFGs.
+
+        DGL will populate every MFG's ``edges`` and ``edata`` with the edge data
+        of the given names from the original graph.
+    output_device : device, optional
+        The device of the output subgraphs or MFGs.  Default is the same as the
+        minibatch of seed nodes.
     """
     def __init__(self, prefetch_node_feats=None, prefetch_labels=None,
                  prefetch_edge_feats=None, output_device=None):
+        super().__init__()
         self.prefetch_node_feats = prefetch_node_feats or []
         self.prefetch_labels = prefetch_labels or []
         self.prefetch_edge_feats = prefetch_edge_feats or []
@@ -97,9 +234,9 @@ class BlockSampler(object):
             set_edge_lazy_features(block, self.prefetch_edge_feats)
         return input_nodes, output_nodes, blocks
 
-    def sample(self, g, seed_nodes):
+    def sample(self, g, seed_nodes, exclude_eids=None):
         """Sample a list of blocks from the given seed nodes."""
-        result = self.sample_blocks(g, seed_nodes)
+        result = self.sample_blocks(g, seed_nodes, exclude_eids=exclude_eids)
         return self.assign_lazy_features(result)
 
 
@@ -198,23 +335,30 @@ def find_exclude_eids(g, seed_edges, exclude, reverse_eids=None, reverse_etypes=
         exclude_eids = recursive_apply(exclude_eids, lambda x: F.copy_to(x, output_device))
     return exclude_eids
 
+class EdgePredictionSampler(Sampler):
+    """Sampler class that wraps an existing sampler for node classification into another
+    one for edge classification or link prediction.
 
-class EdgeBlockSampler(object):
-    """Adapts a :class:`BlockSampler` object's :attr:`sample` method for edge
-    classification and link prediction.
+    See also
+    --------
+    as_edge_prediction_sampler
     """
-    def __init__(self, block_sampler, exclude=None, reverse_eids=None,
-                 reverse_etypes=None, negative_sampler=None,
-                 prefetch_node_feats=None, prefetch_labels=None, prefetch_edge_feats=None,):
+    def __init__(self, sampler, exclude=None, reverse_eids=None,
+                 reverse_etypes=None, negative_sampler=None, prefetch_labels=None):
+        super().__init__()
+        # Check if the sampler's sample method has an optional third argument.
+        argspec = inspect.getfullargspec(sampler.sample)
+        if len(argspec.args) < 4:       # ['self', 'g', 'indices', 'exclude_eids']
+            raise TypeError(
+                "This sampler does not support edge or link prediction; please add an"
+                "optional third argument for edge IDs to exclude in its sample() method.")
         self.reverse_eids = reverse_eids
         self.reverse_etypes = reverse_etypes
         self.exclude = exclude
-        self.block_sampler = block_sampler
+        self.sampler = sampler
         self.negative_sampler = negative_sampler
-        self.prefetch_node_feats = prefetch_node_feats or []
         self.prefetch_labels = prefetch_labels or []
-        self.prefetch_edge_feats = prefetch_edge_feats or []
-        self.output_device = block_sampler.output_device
+        self.output_device = sampler.output_device
 
     def _build_neg_graph(self, g, seed_edges):
         neg_srcdst = self.negative_sampler(g, seed_edges)
@@ -235,12 +379,7 @@ class EdgeBlockSampler(object):
     def assign_lazy_features(self, result):
         """Assign lazy features for prefetching."""
         pair_graph = result[1]
-        blocks = result[-1]
-
-        set_src_lazy_features(blocks[0], self.prefetch_node_feats)
         set_edge_lazy_features(pair_graph, self.prefetch_labels)
-        for block in blocks:
-            set_edge_lazy_features(block, self.prefetch_edge_feats)
         # In-place updates
         return result
 
@@ -271,9 +410,171 @@ class EdgeBlockSampler(object):
             g, seed_edges, exclude, self.reverse_eids, self.reverse_etypes,
             self.output_device)
 
-        input_nodes, _, blocks = self.block_sampler.sample_blocks(g, seed_nodes, exclude_eids)
+        input_nodes, _, blocks = self.sampler.sample(g, seed_nodes, exclude_eids)
 
         if self.negative_sampler is None:
             return self.assign_lazy_features((input_nodes, pair_graph, blocks))
         else:
             return self.assign_lazy_features((input_nodes, pair_graph, neg_graph, blocks))
+
+def as_edge_prediction_sampler(
+        sampler, exclude=None, reverse_eids=None, reverse_etypes=None, negative_sampler=None,
+        prefetch_labels=None):
+    """Wrap a sampler for node classification/regression into another sampler for
+    edge classification/regression or link prediction.
+
+    For each iteration, the sampler will yield
+
+    * A tensor of input nodes necessary for computing the representation on edges, or
+      a dictionary of node type names and such tensors.
+
+    * A subgraph that contains only the edges in the minibatch and their incident nodes.
+      Note that the graph has an identical metagraph with the original graph.
+
+    * If a negative sampler is given, another graph that contains the "negative edges",
+      connecting the source and destination nodes yielded from the given negative sampler.
+
+    * A list of MFGs necessary for computing the representation of the incident nodes
+      of the edges in the minibatch.
+
+    Parameters
+    ----------
+    sampler : Sampler
+        The sampler object.  It additionally requires that the :attr:`sample` method
+        must have an optional third argument :attr:`exclude_eids` representing the
+        edge IDs to exclude from neighborhood.  The argument will be either a tensor
+        for homogeneous graphs or a dict of edge types and tensors for heterogeneous
+        graphs.
+    exclude : str, optional
+        Whether and how to exclude dependencies related to the sampled edges in the
+        minibatch.  Possible values are
+
+        * None, for not excluding any edges.
+
+        * ``self``, for excluding only the edges sampled as seed edges in this minibatch.
+
+        * ``reverse_id``, for excluding not only the edges sampled in the minibatch but
+          also their reverse edges of the same edge type.  Requires the argument
+          :attr:`reverse_eids`.
+
+        * ``reverse_types``, for excluding not only the edges sampled in the minibatch
+          but also their reverse edges of different types but with the same IDs.
+          Requires the argument :attr:`reverse_etypes`.
+
+        * A callable which takes in a tensor or a dictionary of tensors and their
+          canonical edge types and returns a tensor or dictionary of tensors to
+          exclude.
+    reverse_eids : Tensor or dict[etype, Tensor], optional
+        A tensor of reverse edge ID mapping.  The i-th element indicates the ID of
+        the i-th edge's reverse edge.
+
+        If the graph is heterogeneous, this argument requires a dictionary of edge
+        types and the reverse edge ID mapping tensors.
+
+        See the description of the argument with the same name in the docstring of
+        :class:`~dgl.dataloading.EdgeCollator` for more details.
+    reverse_etypes : dict[etype, etype], optional
+        The mapping from the original edge types to their reverse edge types.
+
+        See the description of the argument with the same name in the docstring of
+        :class:`~dgl.dataloading.EdgeCollator` for more details.
+    negative_sampler : callable, optional
+        The negative sampler.
+
+        See the description of the argument with the same name in the docstring of
+        :class:`~dgl.dataloading.EdgeCollator` for more details.
+    prefetch_labels : list[str] or dict[etype, list[str]], optional
+        The node data to prefetch for the returned positive pair graph.
+
+        DGL will populate the pair graph's ``edges`` and ``edata`` with
+        the edge data of the given names from the original graph.
+
+    Examples
+    --------
+    The following example shows how to train a 3-layer GNN for edge classification on a
+    set of edges ``train_eid`` on a homogeneous undirected graph. Each node takes
+    messages from all neighbors.
+
+    Say that you have an array of source node IDs ``src`` and another array of destination
+    node IDs ``dst``.  One can make it bidirectional by adding another set of edges
+    that connects from ``dst`` to ``src``:
+
+    >>> g = dgl.graph((torch.cat([src, dst]), torch.cat([dst, src])))
+
+    One can then know that the ID difference of an edge and its reverse edge is ``|E|``,
+    where ``|E|`` is the length of your source/destination array.  The reverse edge
+    mapping can be obtained by
+
+    >>> E = len(src)
+    >>> reverse_eids = torch.cat([torch.arange(E, 2 * E), torch.arange(0, E)])
+
+    Note that the sampled edges as well as their reverse edges are removed from
+    computation dependencies of the incident nodes.  That is, the edge will not
+    involve in neighbor sampling and message aggregation.  This is a common trick
+    to avoid information leakage.
+
+    >>> sampler = dgl.dataloading.NeighborSampler([15, 10, 5])
+    >>> sampler = dgl.dataloading.as_edge_prediction_sampler(
+    ...     sampler, exclude='reverse_id', reverse_eids=reverse_eids)
+    >>> dataloader = dgl.dataloading.EdgeDataLoader(
+    ...     g, train_eid, sampler,
+    ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
+    >>> for input_nodes, pair_graph, blocks in dataloader:
+    ...     train_on(input_nodes, pair_graph, blocks)
+
+    To train a 3-layer GNN for link prediction on a set of edges ``train_eid`` on a
+    homogeneous graph where each node takes messages from all neighbors (assume the
+    backend is PyTorch), with 5 uniformly chosen negative samples per edge:
+
+    >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
+    >>> neg_sampler = dgl.dataloading.negative_sampler.Uniform(5)
+    >>> sampler = dgl.dataloading.as_edge_prediction_sampler(
+    ...     sampler, exclude='reverse_id', reverse_eids=reverse_eids,
+    ...     negative_sampler=neg_sampler)
+    >>> dataloader = dgl.dataloading.EdgeDataLoader(
+    ...     g, train_eid, sampler,
+    ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
+    >>> for input_nodes, pos_pair_graph, neg_pair_graph, blocks in dataloader:
+    ...     train_on(input_nodes, pair_graph, neg_pair_graph, blocks)
+
+    For heterogeneous graphs, the reverse of an edge may have a different edge type
+    from the original edge.  For instance, consider that you have an array of
+    user-item clicks, representated by a user array ``user`` and an item array ``item``.
+    You may want to build a heterogeneous graph with a user-click-item relation and an
+    item-clicked-by-user relation.
+
+    >>> g = dgl.heterograph({
+    ...     ('user', 'click', 'item'): (user, item),
+    ...     ('item', 'clicked-by', 'user'): (item, user)})
+
+    To train a 3-layer GNN for edge classification on a set of edges ``train_eid`` with
+    type ``click``, you can write
+
+    >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
+    >>> sampler = dgl.dataloading.as_edge_prediction_sampler(
+    ...     sampler, exclude='reverse_types',
+    ...     reverse_etypes={'click': 'clicked-by', 'clicked-by': 'click'})
+    >>> dataloader = dgl.dataloading.EdgeDataLoader(
+    ...     g, {'click': train_eid}, sampler,
+    ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
+    >>> for input_nodes, pair_graph, blocks in dataloader:
+    ...     train_on(input_nodes, pair_graph, blocks)
+
+    To train a 3-layer GNN for link prediction on a set of edges ``train_eid`` with type
+    ``click``, you can write
+
+    >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
+    >>> neg_sampler = dgl.dataloading.negative_sampler.Uniform(5)
+    >>> sampler = dgl.dataloading.as_edge_prediction_sampler(
+    ...     sampler, exclude='reverse_types',
+    ...     reverse_etypes={'click': 'clicked-by', 'clicked-by': 'click'},
+    ...     negative_sampler=neg_sampler)
+    >>> dataloader = dgl.dataloading.EdgeDataLoader(
+    ...     g, train_eid, sampler,
+    ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
+    >>> for input_nodes, pos_pair_graph, neg_pair_graph, blocks in dataloader:
+    ...     train_on(input_nodes, pair_graph, neg_pair_graph, blocks)
+    """
+    return EdgePredictionSampler(
+        sampler, exclude=exclude, reverse_eids=reverse_eids, reverse_etypes=reverse_etypes,
+        negative_sampler=negative_sampler, prefetch_labels=prefetch_labels)

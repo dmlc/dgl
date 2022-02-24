@@ -46,6 +46,8 @@ from .propagate import *
 from .random import *
 from .data.utils import save_graphs, load_graphs
 from . import optim
+from .frame import LazyFeature
+from .utils import recursive_apply
 
 from ._deprecate.graph import DGLGraph as DGLGraphStale
 from ._deprecate.nodeflow import *

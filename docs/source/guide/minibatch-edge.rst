@@ -50,6 +50,8 @@ putting the list of generated MFGs onto GPU.
    detailed explanation of the concept of MFGs, please refer to
    :ref:`guide-minibatch-customizing-neighborhood-sampler`.
 
+.. _guide-minibatch-edge-classification-sampler-exclude:
+
 Removing edges in the minibatch from the original graph for neighbor sampling
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 

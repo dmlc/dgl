@@ -181,3 +181,4 @@ Other utilities for controlling randomness, saving and loading graphs, etc.
     seed
     save_graphs
     load_graphs
+    recursive_apply

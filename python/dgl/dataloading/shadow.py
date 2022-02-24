@@ -2,9 +2,9 @@
 from ..sampling.utils import EidExcluder
 from .. import transform
 from ..base import NID
-from .base import set_node_lazy_features, set_edge_lazy_features
+from .base import set_node_lazy_features, set_edge_lazy_features, Sampler
 
-class ShaDowKHopSampler(object):
+class ShaDowKHopSampler(Sampler):
     """K-hop subgraph sampler used by
     `ShaDow-GNN <https://arxiv.org/abs/2012.01380>`__.
 
@@ -12,9 +12,6 @@ class ShaDowKHopSampler(object):
     MFGs, it returns a single subgraph induced by all the sampled nodes. The
     seed nodes from which the neighbors are sampled will appear the first in the
     induced nodes of the subgraph.
-
-    This is used in conjunction with :class:`dgl.dataloading.pytorch.NodeDataLoader`
-    and :class:`dgl.dataloading.pytorch.EdgeDataLoader`.
 
     Parameters
     ----------
@@ -36,13 +33,15 @@ class ShaDowKHopSampler(object):
 
     Examples
     --------
+    **Node classification**
+
     To train a 3-layer GNN for node classification on a set of nodes ``train_nid`` on
     a homogeneous graph where each node takes messages from 5, 10, 15 neighbors for
     the first, second, and third layer respectively (assuming the backend is PyTorch):
 
     >>> g = dgl.data.CoraFullDataset()[0]
     >>> sampler = dgl.dataloading.ShaDowKHopSampler([5, 10, 15])
-    >>> dataloader = dgl.dataloading.NodeDataLoader(
+    >>> dataloader = dgl.dataloading.DataLoader(
     ...     g, torch.arange(g.num_nodes()), sampler,
     ...     batch_size=5, shuffle=True, drop_last=False, num_workers=4)
     >>> for input_nodes, output_nodes, (subgraph,) in dataloader:
@@ -72,6 +71,7 @@ class ShaDowKHopSampler(object):
     """
     def __init__(self, fanouts, replace=False, prob=None, prefetch_node_feats=None,
                  prefetch_edge_feats=None, output_device=None):
+        super().__init__()
         self.fanouts = fanouts
         self.replace = replace
         self.prob = prob
