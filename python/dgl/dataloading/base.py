@@ -167,7 +167,7 @@ class BlockSampler(Sampler):
     ----------
     prefetch_node_feats : list[str] or dict[ntype, list[str]], optional
         The node data to prefetch for the first MFG.
-        
+
         DGL will populate the first layer's MFG's ``srcnodes`` and ``srcdata`` with
         the node data of the given names from the original graph.
     prefetch_labels : list[str] or dict[ntype, list[str]], optional
@@ -234,7 +234,7 @@ class BlockSampler(Sampler):
             set_edge_lazy_features(block, self.prefetch_edge_feats)
         return input_nodes, output_nodes, blocks
 
-    def sample(self, g, seed_nodes, exclude_eids=None):
+    def sample(self, g, seed_nodes, exclude_eids=None):     # pylint: disable=arguments-differ
         """Sample a list of blocks from the given seed nodes."""
         result = self.sample_blocks(g, seed_nodes, exclude_eids=exclude_eids)
         return self.assign_lazy_features(result)
@@ -383,7 +383,7 @@ class EdgePredictionSampler(Sampler):
         # In-place updates
         return result
 
-    def sample(self, g, seed_edges):
+    def sample(self, g, seed_edges):    # pylint: disable=arguments-differ
         """Samples a list of blocks, as well as a subgraph containing the sampled
         edges from the original graph.
 

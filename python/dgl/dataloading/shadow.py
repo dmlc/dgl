@@ -79,19 +79,19 @@ class ShaDowKHopSampler(Sampler):
         self.prefetch_edge_feats = prefetch_edge_feats
         self.output_device = output_device
 
-    def sample(self, g, seed_nodes, exclude_edges=None):
+    def sample(self, g, seed_nodes, exclude_eids=None):
         """Sample a subgraph given a tensor of seed nodes."""
         output_nodes = seed_nodes
         for fanout in reversed(self.fanouts):
             frontier = g.sample_neighbors(
                 seed_nodes, fanout, output_device=self.output_device,
-                replace=self.replace, prob=self.prob, exclude_edges=exclude_edges)
+                replace=self.replace, prob=self.prob, exclude_edges=exclude_eids)
             block = transforms.to_block(frontier, seed_nodes)
             seed_nodes = block.srcdata[NID]
 
         subg = g.subgraph(seed_nodes, relabel_nodes=True, output_device=self.output_device)
-        if exclude_edges is not None:
-            subg = EidExcluder(exclude_edges)(subg)
+        if exclude_eids is not None:
+            subg = EidExcluder(exclude_eids)(subg)
 
         set_node_lazy_features(subg, self.prefetch_node_feats)
         set_edge_lazy_features(subg, self.prefetch_edge_feats)

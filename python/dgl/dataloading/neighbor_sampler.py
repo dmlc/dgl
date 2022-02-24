@@ -32,7 +32,7 @@ class NeighborSampler(BlockSampler):
         Whether to sample with replacement
     prefetch_node_feats : list[str] or dict[ntype, list[str]], optional
         The node data to prefetch for the first MFG.
-        
+
         DGL will populate the first layer's MFG's ``srcnodes`` and ``srcdata`` with
         the node data of the given names from the original graph.
     prefetch_labels : list[str] or dict[ntype, list[str]], optional

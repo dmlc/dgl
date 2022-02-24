@@ -97,7 +97,7 @@ class ClusterGCNSampler(Sampler):
         self.prefetch_edata = prefetch_edata or []
         self.output_device = output_device
 
-    def sample(self, g, partition_ids):
+    def sample(self, g, partition_ids):     # pylint: disable=arguments-differ
         """Samples a subgraph given a list of partition IDs."""
         node_ids = F.cat([
             self.partition_node_ids[self.partition_offset[i]:self.partition_offset[i+1]]
