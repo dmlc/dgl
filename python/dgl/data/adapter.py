@@ -22,11 +22,14 @@ class AsNodePredDataset(DGLDataset):
 
       - Contains only one graph, accessible from ``dataset[0]``.
       - The graph stores:
+
         - Node labels in ``g.ndata['label']``.
         - Train/val/test masks in ``g.ndata['train_mask']``, ``g.ndata['val_mask']``,
           and ``g.ndata['test_mask']`` respectively.
       - In addition, the dataset contains the following attributes:
+
         - ``num_classes``, the number of classes to predict.
+        - ``train_idx``, ``val_idx``, ``test_idx``, train/val/test indexes.
 
     If the input dataset contains heterogeneous graphs, users need to specify the
     ``target_ntype`` argument to indicate which node type to make predictions for.
@@ -54,6 +57,12 @@ class AsNodePredDataset(DGLDataset):
     ----------
     num_classes : int
         Number of classes to predict.
+    train_idx : Tensor
+        An 1-D integer tensor of training node IDs.
+    val_idx : Tensor
+        An 1-D integer tensor of validation node IDs.
+    test_idx : Tensor
+        An 1-D integer tensor of test node IDs.
 
     Examples
     --------
@@ -114,6 +123,8 @@ class AsNodePredDataset(DGLDataset):
                 print('Generating train/val/test masks...')
             utils.add_nodepred_split(self, self.split_ratio, self.target_ntype)
 
+        self._set_split_index()
+
         self.num_classes = getattr(self.dataset, 'num_classes', None)
         if self.num_classes is None:
             self.num_classes = len(F.unique(self.g.nodes[self.target_ntype].data['label']))
@@ -133,6 +144,7 @@ class AsNodePredDataset(DGLDataset):
             self.num_classes = info['num_classes']
         gs, _ = utils.load_graphs(os.path.join(self.save_path, 'graph_{}.bin'.format(self.hash)))
         self.g = gs[0]
+        self._set_split_index()
 
     def save(self):
         utils.save_graphs(os.path.join(self.save_path, 'graph_{}.bin'.format(self.hash)), [self.g])
@@ -147,6 +159,13 @@ class AsNodePredDataset(DGLDataset):
 
     def __len__(self):
         return 1
+
+    def _set_split_index(self):
+        """Add train_idx/val_idx/test_idx as dataset attributes according to corresponding mask."""
+        ndata = self.g.nodes[self.target_ntype].data
+        self.train_idx = F.nonzero_1d(ndata['train_mask'])
+        self.val_idx = F.nonzero_1d(ndata['val_mask'])
+        self.test_idx = F.nonzero_1d(ndata['test_mask'])
 
 
 def negative_sample(g, num_samples):
