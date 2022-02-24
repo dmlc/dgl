@@ -49,7 +49,7 @@ class GCN(nn.Module):
             in_hidden = hidden_size if i > 0 else in_size
             out_hidden = hidden_size if i < num_layers - 1 else data_info["out_size"]
 
-            self.layers.append(dgl.nn.GraphConv(in_hidden, out_hidden, norm=norm))
+            self.layers.append(dgl.nn.GraphConv(in_hidden, out_hidden, norm=norm, allow_zero_in_degree=True))
 
         self.dropout = nn.Dropout(p=dropout)
         self.act = getattr(torch, activation)
