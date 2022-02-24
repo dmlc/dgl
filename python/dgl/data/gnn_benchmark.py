@@ -7,7 +7,7 @@ from .dgl_dataset import DGLBuiltinDataset
 from .utils import save_graphs, load_graphs, _get_dgl_url, deprecate_property, deprecate_class
 from ..convert import graph as dgl_graph
 from .. import backend as F
-from .. import transform
+from .. import transforms
 
 __all__ = ["AmazonCoBuyComputerDataset", "AmazonCoBuyPhotoDataset", "CoauthorPhysicsDataset", "CoauthorCSDataset",
            "CoraFullDataset", "AmazonCoBuy", "Coauthor", "CoraFull"]
