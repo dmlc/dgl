@@ -112,6 +112,7 @@ def main():
     loss = torch.nn.{{ loss }}()
     optimizer = torch.optim.Adam(params, **pipeline_cfg["optimizer"])
     test_hits = train(cfg, pipeline_cfg, device, dataset, model, optimizer, loss)
+    torch.save(model, pipeline_cfg["save_path"])
     return test_hits
 
 if __name__ == '__main__':

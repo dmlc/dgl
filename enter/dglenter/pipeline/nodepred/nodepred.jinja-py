@@ -112,6 +112,7 @@ def main():
     optimizer = torch.optim.{{ user_cfg.general_pipeline.optimizer.name }}(model.parameters(), **pipeline_cfg["optimizer"])
     # train
     test_acc = train(cfg, pipeline_cfg, device, data, model, optimizer, loss)
+    torch.save(model, pipeline_cfg["save_path"])
     return test_acc
 
 if __name__ == '__main__':

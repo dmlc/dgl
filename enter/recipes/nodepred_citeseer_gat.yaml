@@ -28,4 +28,5 @@ general_pipeline:
     lr: 0.005
     weight_decay: 0.0005
   loss: CrossEntropyLoss
+  save_path: "model.pth"
   num_runs: 10               # Number of experiments to run

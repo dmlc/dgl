@@ -31,4 +31,5 @@ general_pipeline:
     name: Adam
     lr: 0.005
   loss: BCELoss
+  save_path: "model.pth"
   num_runs: 1                 # Number of experiments to run

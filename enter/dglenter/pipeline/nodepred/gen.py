@@ -18,6 +18,7 @@ pipeline_comments = {
         "patience": "Steps before early stop",
         "checkpoint_path": "Early stop checkpoint model file path"
     },
+    "save_path": "Path to save the model",
     "num_runs": "Number of experiments to run",
 }
 
@@ -27,6 +28,7 @@ class NodepredPipelineCfg(BaseModel):
     eval_period: int = 5
     optimizer: dict = {"name": "Adam", "lr": 0.01, "weight_decay": 5e-4}
     loss: str = "CrossEntropyLoss"
+    save_path: str = "model.pth"
     num_runs: int = 1
 
 @PipelineFactory.register("nodepred")
@@ -90,7 +92,7 @@ class NodepredPipeline(PipelineBase):
     def gen_script(cls, user_cfg_dict):
         # Check validation
         cls.setup_user_cfg_cls()
-        user_cfg = cls.user_cfg_cls(**user_cfg_dict)
+        user_cfg = cls.user_cfg_cls(**user_cfg_dict)        
         file_current_dir = Path(__file__).resolve().parent
         with open(file_current_dir / "nodepred.jinja-py", "r") as f:
             template = Template(f.read())

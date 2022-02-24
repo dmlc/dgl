@@ -20,6 +20,7 @@ class LinkpredPipelineCfg(BaseModel):
     eval_period: int = 5
     optimizer: dict = {"name": "Adam", "lr": 0.005}
     loss: str = "BCELoss"
+    save_path: str = "model.pth"
     num_runs: int = 1
 
 
@@ -29,6 +30,7 @@ pipeline_comments = {
     "train_batch_size": "Edge batch size when training",
     "num_epochs": "Number of training epochs",
     "eval_period": "Interval epochs between evaluations",
+    "save_path": "Path to save the model",
     "num_runs": "Number of experiments to run",
 }
 
