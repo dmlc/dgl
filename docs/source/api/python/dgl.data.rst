@@ -86,6 +86,17 @@ Datasets for graph classification/regression tasks
     AsNodePredDataset
     AsEdgePredDataset
 
+Dataset adapters
+-------------------
+
+.. autosummary::
+    :toctree: ../../generated/
+    :nosignatures:
+    :template: classtemplate.rst
+
+    AsNodePredDataset
+    AsLinkPredDataset
+
 Utilities
 -----------------
 

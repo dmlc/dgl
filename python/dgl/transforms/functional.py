@@ -2995,8 +2995,9 @@ def reorder_graph(g, node_permute_algo=None, edge_permute_algo='src',
         The homogeneous graph.
     node_permute_algo: str, optional
         The permutation algorithm to re-order nodes. If given, the options are ``rcmk`` or
-        ``metis`` or ``custom``. ``rcmk`` is the default value.
+        ``metis`` or ``custom``.
 
+        * ``None``: Keep the current node order.
         * ``rcmk``: Use the `Reverse Cuthill–McKee <https://docs.scipy.org/doc/scipy/reference/
           generated/scipy.sparse.csgraph.reverse_cuthill_mckee.html#
           scipy-sparse-csgraph-reverse-cuthill-mckee>`__ from ``scipy`` to generate nodes
@@ -3009,8 +3010,8 @@ def reorder_graph(g, node_permute_algo=None, edge_permute_algo='src',
         * ``custom``: Reorder the graph according to the user-provided node permutation
           array (provided in :attr:`permute_config`).
     edge_permute_algo: str, optional
-        The permutation algorithm to reorder edges. Options are ``src`` or ``dst``.
-        ``src`` is the default value.
+        The permutation algorithm to reorder edges. Options are ``src`` or ``dst`` or
+        ``custom``. ``src`` is the default value.
 
         * ``src``: Edges are arranged according to their source nodes.
         * ``dst``: Edges are arranged according to their destination nodes.
@@ -3059,7 +3060,7 @@ def reorder_graph(g, node_permute_algo=None, edge_permute_algo='src',
 
     Reorder according to ``'rcmk'`` permute algorithm.
 
-    >>> rg = dgl.reorder_graph(g)
+    >>> rg = dgl.reorder_graph(g, node_permute_algo='rcmk')
     >>> rg.ndata
     {'h': tensor([[8, 9],
             [6, 7],
@@ -3075,7 +3076,7 @@ def reorder_graph(g, node_permute_algo=None, edge_permute_algo='src',
 
     Reorder according to ``'metis'`` permute algorithm.
 
-    >>> rg = dgl.reorder_graph(g, 'metis', permute_config={'k':2})
+    >>> rg = dgl.reorder_graph(g, node_permute_algo='metis', permute_config={'k':2})
     >>> rg.ndata
     {'h': tensor([[4, 5],
             [2, 3],
@@ -3091,10 +3092,8 @@ def reorder_graph(g, node_permute_algo=None, edge_permute_algo='src',
 
     Reorder according to ``'custom'`` permute algorithm with user-provided nodes_perm.
 
-    >>> nodes_perm = torch.randperm(g.num_nodes())
-    >>> nodes_perm
-    tensor([3, 2, 0, 4, 1])
-    >>> rg = dgl.reorder_graph(g, 'custom', permute_config={'nodes_perm':nodes_perm})
+    >>> rg = dgl.reorder_graph(g, node_permute_algo='custom',
+    ...                        permute_config={'nodes_perm': [3, 2, 0, 4, 1]})
     >>> rg.ndata
     {'h': tensor([[6, 7],
             [4, 5],
@@ -3108,30 +3107,40 @@ def reorder_graph(g, node_permute_algo=None, edge_permute_algo='src',
             [4],
             [1]]), '_ID': tensor([3, 2, 0, 4, 1])}
 
-    Reorder according to ``dst`` edge permute algorithm and refine further
-    according to self-generated edges permutation. Please assure to specify
-    ``relabel_nodes`` as ``False`` to keep the nodes order.
+    Reorder nodes according to ``'rcmk'`` and reorder edges according to ``dst``
+    edge permute algorithm.
 
-    >>> rg = dgl.reorder_graph(g, edge_permute_algo='dst')
-    >>> rg.edges()
-    (tensor([0, 3, 1, 2, 4]), tensor([1, 1, 3, 3, 3]))
-    >>> eg = dgl.edge_subgraph(rg, [0, 2, 4, 1, 3], relabel_nodes=False)
-    >>> eg.edata
+    >>> rg = dgl.reorder_graph(g, node_permute_algo='rcmk', edge_permute_algo='dst')
+    >>> print(rg.ndata)
+    {'h': tensor([[8, 9],
+            [6, 7],
+            [2, 3],
+            [4, 5],
+            [0, 1]]), '_ID': tensor([4, 3, 1, 2, 0])}
+    >>> print(rg.edata)
     {'w': tensor([[4],
-            [3],
-            [0],
             [2],
-            [1]]), '_ID': tensor([0, 2, 4, 1, 3])}
+            [3],
+            [1],
+            [0]]), '_ID': tensor([4, 2, 3, 1, 0])}
 
-    Reorder according to node and edge types:
+    Nodes are not reordered but edges are reordered according to ``'custom'`` permute
+    algorithm with user-provided edges_perm.
 
-    >>> ntype = ...  # some node type array
-    >>> etype = ...  # some edge type array
-    >>> sorted_ntype, idx_nt = torch.sort(ntype)
-    >>> sorted_etype, idx_et = torch.sort(etype)
-    >>> rg = dgl.reorder_graph(g, node_permute_algo='custom', edge_permute_algo='custom',
-    ...                        permute_config={'nodes_perm' : idx_nt.to(g.idtype),
-    ...                                        'edges_perm' : idx_et.to(g.idtype)})
+    >>> rg = dgl.reorder_graph(g, edge_permute_algo='custom',
+    ...                        permute_config={'edges_perm': [1, 2, 3, 4, 0]})
+    >>> print(rg.ndata)
+    {'h': tensor([[0, 1],
+            [2, 3],
+            [4, 5],
+            [6, 7],
+            [8, 9]]), '_ID': tensor([0, 1, 2, 3, 4])}
+    >>> print(rg.edata)
+    {'w': tensor([[1],
+            [2],
+            [3],
+            [4],
+            [0]]), '_ID': tensor([1, 2, 3, 4, 0])}
     """
     # sanity checks
     if not g.is_homogeneous:
@@ -3194,7 +3203,7 @@ def reorder_graph(g, node_permute_algo=None, edge_permute_algo='src',
         # First revert the edge reorder caused by node reorder and then
         # apply user-provided edge permutation
         rev_id = F.argsort(rg.edata['__orig__'], 0, False)
-        edges_perm = F.astype(F.gather_row(rev_id, edges_perm), rg.idtype)
+        edges_perm = F.astype(F.gather_row(rev_id, F.tensor(edges_perm)), rg.idtype)
         rg = subgraph.edge_subgraph(
             rg, edges_perm, relabel_nodes=False, store_ids=False)
 
