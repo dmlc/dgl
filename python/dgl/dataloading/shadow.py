@@ -1,6 +1,6 @@
 """ShaDow-GNN subgraph samplers."""
 from ..sampling.utils import EidExcluder
-from .. import transform
+from .. import transforms
 from ..base import NID
 from .base import set_node_lazy_features, set_edge_lazy_features
 

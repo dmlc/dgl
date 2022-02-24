@@ -5,7 +5,7 @@ import numpy as np
 from ..utils import recursive_apply, recursive_apply_pair
 from ..base import EID
 from .. import backend as F
-from .. import transform, utils
+from .. import transforms, utils
 
 def _locate_eids_to_exclude(frontier_parent_eids, exclude_eids):
     """Find the edges whose IDs in parent graph appeared in exclude_eids.

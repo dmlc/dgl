@@ -1,7 +1,7 @@
 """ShaDow-GNN subgraph samplers."""
 from ..utils import prepare_tensor_or_dict
 from ..base import NID
-from .. import transform
+from .. import transforms
 from ..sampling import sample_neighbors
 from .neighbor import NeighborSamplingMixin
 from .dataloader import exclude_edges, Sampler

@@ -4,7 +4,7 @@ from collections.abc import Mapping, Sequence
 from abc import ABC, abstractproperty, abstractmethod
 import re
 import numpy as np
-from .. import transform
+from .. import transforms
 from ..base import NID, EID
 from .. import backend as F
 from .. import utils
