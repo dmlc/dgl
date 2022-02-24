@@ -4,7 +4,7 @@ import inspect
 from ..base import NID, EID
 from ..convert import heterograph
 from .. import backend as F
-from ..transform import compact_graphs
+from ..transforms import compact_graphs
 from ..frame import LazyFeature
 from ..utils import recursive_apply
 

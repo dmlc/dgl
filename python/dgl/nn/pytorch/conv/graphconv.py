@@ -7,16 +7,12 @@ from torch.nn import init
 from .... import function as fn
 from ....base import DGLError
 from ....utils import expand_as_pair
-from ....transform import reverse
+from ....transforms import reverse
 from ....convert import block_to_graph
 from ....heterograph import DGLBlock
 
 class EdgeWeightNorm(nn.Module):
-    r"""
-
-    Description
-    -----------
-    This module normalizes positive scalar edge weights on a graph
+    r"""This module normalizes positive scalar edge weights on a graph
     following the form in `GCN <https://arxiv.org/abs/1609.02907>`__.
 
     Mathematically, setting ``norm='both'`` yields the following normalization term:
@@ -139,12 +135,10 @@ class EdgeWeightNorm(nn.Module):
 
 # pylint: disable=W0235
 class GraphConv(nn.Module):
-    r"""
+    r"""Graph convolutional layer from `Semi-Supervised Classification with Graph Convolutional
+    Networks <https://arxiv.org/abs/1609.02907>`__
 
-    Description
-    -----------
-    Graph convolution was introduced in `GCN <https://arxiv.org/abs/1609.02907>`__
-    and mathematically is defined as follows:
+    Mathematically it is defined as follows:
 
     .. math::
       h_i^{(l+1)} = \sigma(b^{(l)} + \sum_{j\in\mathcal{N}(i)}\frac{1}{c_{ji}}h_j^{(l)}W^{(l)})

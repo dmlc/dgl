@@ -9,7 +9,7 @@ from .dgl_dataset import DGLBuiltinDataset
 from .utils import _get_dgl_url, generate_mask_tensor, load_graphs, save_graphs, deprecate_property
 from .. import backend as F
 from ..convert import from_scipy
-from ..transform import reorder_graph
+from ..transforms import reorder_graph
 
 
 class RedditDataset(DGLBuiltinDataset):

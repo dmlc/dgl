@@ -9,9 +9,9 @@ from ..linear import TypedLinear
 from ..softmax import edge_softmax
 
 class HGTConv(nn.Module):
-    r"""Heterogeneous graph transformer convolution.
+    r"""Heterogeneous graph transformer convolution from `Heterogeneous Graph Transformer
+    <https://arxiv.org/abs/2003.01332>`__
 
-    Introduced in "`Heterogeneous Graph Transformer <https://arxiv.org/abs/2003.01332>`__".
     Given a graph :math:`G(V, E)` and input node features :math:`H^{(l-1)}`,
     it computes the new node features as follows:
 
