@@ -86,7 +86,7 @@ class ShaDowKHopSampler(object):
             frontier = g.sample_neighbors(
                 seed_nodes, fanout, output_device=self.output_device,
                 replace=self.replace, prob=self.prob, exclude_edges=exclude_edges)
-            block = transform.to_block(frontier, seed_nodes)
+            block = transforms.to_block(frontier, seed_nodes)
             seed_nodes = block.srcdata[NID]
 
         subg = g.subgraph(seed_nodes, relabel_nodes=True, output_device=self.output_device)
