@@ -9,11 +9,8 @@ from ....utils import expand_as_pair
 
 
 class DotGatConv(nn.Module):
-    r"""
-
-    Description
-    -----------
-    Apply dot product version of self attention in GCN.
+    r"""Apply dot product version of self attention in `Graph Attention Network
+    <https://arxiv.org/pdf/1710.10903.pdf>`__
 
         .. math::
             h_i^{(l+1)} = \sum_{j\in \mathcal{N}(i)} \alpha_{i, j} h_j^{(l)}

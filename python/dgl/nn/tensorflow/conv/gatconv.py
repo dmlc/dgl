@@ -13,12 +13,8 @@ from ..utils import Identity
 
 
 class GATConv(layers.Layer):
-    r"""
-
-    Description
-    -----------
-    Apply `Graph Attention Network <https://arxiv.org/pdf/1710.10903.pdf>`__
-    over an input signal.
+    r"""Graph Attention Layer from `Graph Attention Network
+    <https://arxiv.org/pdf/1710.10903.pdf>`__
 
     .. math::
         h_i^{(l+1)} = \sum_{j\in \mathcal{N}(i)} \alpha_{i,j} W^{(l)} h_j^{(l)}
@@ -182,11 +178,7 @@ class GATConv(layers.Layer):
         self.activation = activation
 
     def set_allow_zero_in_degree(self, set_value):
-        r"""
-
-        Description
-        -----------
-        Set allow_zero_in_degree flag.
+        r"""Set allow_zero_in_degree flag.
 
         Parameters
         ----------
@@ -196,11 +188,7 @@ class GATConv(layers.Layer):
         self._allow_zero_in_degree = set_value
 
     def call(self, graph, feat, get_attention=False):
-        r"""
-
-        Description
-        -----------
-        Compute graph attention network layer.
+        r"""Compute graph attention network layer.
 
         Parameters
         ----------
