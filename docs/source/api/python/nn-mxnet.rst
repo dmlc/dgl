@@ -6,28 +6,25 @@ dgl.nn (MXNet)
 Conv Layers
 ----------------------------------------
 
-.. currentmodule:: dgl.nn.mxnet.conv
-.. automodule:: dgl.nn.mxnet.conv
-
 .. autosummary::
     :toctree: ../../generated/
     :nosignatures:
     :template: classtemplate.rst
 
-    GraphConv
-    RelGraphConv
-    TAGConv
-    GATConv
-    EdgeConv
-    SAGEConv
-    SGConv
-    APPNPConv
-    GINConv
-    GatedGraphConv
-    GMMConv
-    ChebConv
-    AGNNConv
-    NNConv
+    ~dgl.nn.mxnet.conv.GraphConv
+    ~dgl.nn.mxnet.conv.RelGraphConv
+    ~dgl.nn.mxnet.conv.TAGConv
+    ~dgl.nn.mxnet.conv.GATConv
+    ~dgl.nn.mxnet.conv.EdgeConv
+    ~dgl.nn.mxnet.conv.SAGEConv
+    ~dgl.nn.mxnet.conv.SGConv
+    ~dgl.nn.mxnet.conv.APPNPConv
+    ~dgl.nn.mxnet.conv.GINConv
+    ~dgl.nn.mxnet.conv.GatedGraphConv
+    ~dgl.nn.mxnet.conv.GMMConv
+    ~dgl.nn.mxnet.conv.ChebConv
+    ~dgl.nn.mxnet.conv.AGNNConv
+    ~dgl.nn.mxnet.conv.NNConv
 
 Dense Conv Layers
 ----------------------------------------
@@ -37,40 +34,34 @@ Dense Conv Layers
     :nosignatures:
     :template: classtemplate.rst
 
-    DenseGraphConv
-    DenseSAGEConv
-    DenseChebConv
+    ~dgl.nn.mxnet.conv.DenseGraphConv
+    ~dgl.nn.mxnet.conv.DenseSAGEConv
+    ~dgl.nn.mxnet.conv.DenseChebConv
 
 Global Pooling Layers
 ----------------------------------------
 
-.. currentmodule:: dgl.nn.mxnet.glob
-.. automodule:: dgl.nn.mxnet.glob
-
 .. autosummary::
     :toctree: ../../generated/
     :nosignatures:
     :template: classtemplate.rst
 
-    SumPooling
-    AvgPooling
-    MaxPooling
-    SortPooling
-    GlobalAttentionPooling
-    Set2Set
+    ~dgl.nn.mxnet.glob.SumPooling
+    ~dgl.nn.mxnet.glob.AvgPooling
+    ~dgl.nn.mxnet.glob.MaxPooling
+    ~dgl.nn.mxnet.glob.SortPooling
+    ~dgl.nn.mxnet.glob.GlobalAttentionPooling
+    ~dgl.nn.mxnet.glob.Set2Set
 
 Heterogeneous Learning Modules
 ----------------------------------------
 
-.. currentmodule:: dgl.nn.mxnet
-.. automodule:: dgl.nn.mxnet
-
 .. autosummary::
     :toctree: ../../generated/
     :nosignatures:
     :template: classtemplate.rst
 
-    HeteroGraphConv
+    ~dgl.nn.mxnet.HeteroGraphConv
 
 Utility Modules
 ----------------------------------------
@@ -80,4 +71,4 @@ Utility Modules
     :nosignatures:
     :template: classtemplate.rst
 
-    ~utils.Sequential
+    ~dgl.nn.mxnet.utils.Sequential
