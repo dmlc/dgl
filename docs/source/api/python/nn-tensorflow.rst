@@ -6,46 +6,40 @@ dgl.nn (TensorFlow)
 Conv Layers
 ----------------------------------------
 
-.. currentmodule:: dgl.nn.tensorflow.conv
-
 .. autosummary::
     :toctree: ../../generated/
     :nosignatures:
     :template: classtemplate.rst
 
-    GraphConv
-    RelGraphConv
-    GATConv
-    SAGEConv
-    ChebConv
-    SGConv
-    APPNPConv
-    GINConv
+    ~dgl.nn.tensorflow.conv.GraphConv
+    ~dgl.nn.tensorflow.conv.RelGraphConv
+    ~dgl.nn.tensorflow.conv.GATConv
+    ~dgl.nn.tensorflow.conv.SAGEConv
+    ~dgl.nn.tensorflow.conv.ChebConv
+    ~dgl.nn.tensorflow.conv.SGConv
+    ~dgl.nn.tensorflow.conv.APPNPConv
+    ~dgl.nn.tensorflow.conv.GINConv
 
 Global Pooling Layers
 ----------------------------------------
 
-.. currentmodule:: dgl.nn.tensorflow.glob
-
 .. autosummary::
     :toctree: ../../generated/
     :nosignatures:
     :template: classtemplate.rst
 
-    SumPooling
-    AvgPooling
-    MaxPooling
-    SortPooling
-    GlobalAttentionPooling
+    ~dgl.nn.tensorflow.glob.SumPooling
+    ~dgl.nn.tensorflow.glob.AvgPooling
+    ~dgl.nn.tensorflow.glob.MaxPooling
+    ~dgl.nn.tensorflow.glob.SortPooling
+    ~dgl.nn.tensorflow.glob.GlobalAttentionPooling
 
 Heterogeneous Learning Modules
 ----------------------------------------
 
-.. currentmodule:: dgl.nn.tensorflow
-
 .. autosummary::
     :toctree: ../../generated/
     :nosignatures:
     :template: classtemplate.rst
 
-    HeteroGraphConv
+    ~dgl.nn.tensorflow.glob.HeteroGraphConv
