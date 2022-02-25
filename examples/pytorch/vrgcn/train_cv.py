@@ -4,7 +4,6 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import dgl.multiprocessing as mp
 import dgl.function as fn
 import dgl.nn.pytorch as dglnn
 import time
@@ -12,7 +11,6 @@ import argparse
 import tqdm
 from dgl.data import RedditDataset
 from torch.utils.data import DataLoader
-from torch.nn.parallel import DistributedDataParallel
 
 class SAGEConvWithCV(nn.Module):
     def __init__(self, in_feats, out_feats, activation):

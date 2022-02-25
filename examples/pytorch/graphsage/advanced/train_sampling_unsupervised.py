@@ -5,13 +5,12 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import dgl.multiprocessing as mp
+import torch.multiprocessing as mp
 import dgl.function as fn
 import dgl.nn.pytorch as dglnn
 import time
 import argparse
 from torch.nn.parallel import DistributedDataParallel
-import tqdm
 
 from model import SAGE, compute_acc_unsupervised as compute_acc
 from negative_sampler import NegativeSampler
@@ -33,7 +32,7 @@ class CrossEntropyLoss(nn.Module):
         loss = F.binary_cross_entropy_with_logits(score, label.float())
         return loss
 
-def evaluate(model, g, nfeat, labels, train_nids, val_nids, test_nids, device):
+def evaluate(model, g, nfeat, labels, train_nids, val_nids, test_nids, device, args):
     """
     Evaluate the model on the validation set specified by ``val_mask``.
     g : The entire graph.
@@ -71,10 +70,8 @@ def run(proc_id, n_gpus, args, devices, data):
 
     if args.data_device == 'gpu':
         nfeat = nfeat.to(device)
-        labels = labels.to(device)
     elif args.data_device == 'uva':
         nfeat = dgl.contrib.UnifiedTensor(nfeat, device=device)
-        labels = dgl.contrib.UnifiedTensor(labels, device=device)
     in_feats = nfeat.shape[1]
 
     # Create PyTorch DataLoader for constructing blocks
@@ -91,22 +88,25 @@ def run(proc_id, n_gpus, args, devices, data):
         args.num_workers = 0
 
     # Create sampler
-    sampler = dgl.dataloading.MultiLayerNeighborSampler(
+    sampler = dgl.dataloading.NeighborSampler(
         [int(fanout) for fanout in args.fan_out.split(',')])
-    dataloader = dgl.dataloading.EdgeDataLoader(
-        g, train_seeds, sampler, exclude='reverse_id',
+    sampler = dgl.dataloading.as_edge_prediction_sampler(
+        sampler, exclude='reverse_id',
         # For each edge with ID e in Reddit dataset, the reverse edge is e ± |E|/2.
         reverse_eids=th.cat([
             th.arange(n_edges // 2, n_edges),
             th.arange(0, n_edges // 2)]).to(train_seeds),
         negative_sampler=NegativeSampler(g, args.num_negs, args.neg_share,
-                                         device if args.graph_device == 'uva' else None),
+                                         device if args.graph_device == 'uva' else None))
+    dataloader = dgl.dataloading.EdgeDataLoader(
+        g, train_seeds, sampler,
         device=device,
         use_ddp=n_gpus > 1,
         batch_size=args.batch_size,
         shuffle=True,
         drop_last=False,
-        num_workers=args.num_workers)
+        num_workers=args.num_workers,
+        use_uva=args.graph_device == 'uva')
 
     # Define model and optimizer
     model = SAGE(in_feats, args.num_hidden, args.num_hidden, args.num_layers, F.relu, args.dropout)
@@ -157,18 +157,19 @@ def run(proc_id, n_gpus, args, devices, data):
                     proc_id, epoch, step, loss.item(), np.mean(iter_pos[3:]), np.mean(iter_neg[3:]), np.mean(iter_d[3:]), np.mean(iter_t[3:]), gpu_mem_alloc))
             tic_step = time.time()
 
-            if step % args.eval_every == 0 and proc_id == 0:
-                eval_acc, test_acc = evaluate(model, g, nfeat, labels, train_nid, val_nid, test_nid, device)
+        toc = time.time()
+        if proc_id == 0:
+            print('Epoch Time(s): {:.4f}'.format(toc - tic))
+            if epoch >= 5:
+                avg += toc - tic
+            if (epoch + 1) % args.eval_every == 0:
+                eval_acc, test_acc = evaluate(model, g, nfeat, labels, train_nid, val_nid, test_nid, device, args)
                 print('Eval Acc {:.4f} Test Acc {:.4f}'.format(eval_acc, test_acc))
                 if eval_acc > best_eval_acc:
                     best_eval_acc = eval_acc
                     best_test_acc = test_acc
                 print('Best Eval Acc {:.4f} Test Acc {:.4f}'.format(best_eval_acc, best_test_acc))
-        toc = time.time()
-        if proc_id == 0:
-            print('Epoch Time(s): {:.4f}'.format(toc - tic))
-        if epoch >= 5:
-            avg += toc - tic
+
         if n_gpus > 1:
             th.distributed.barrier()
 
@@ -201,15 +202,7 @@ def main(args):
     # this to avoid competition overhead on machines with many cores.
     # Change it to a proper number on your machine, especially for multi-GPU training.
     os.environ['OMP_NUM_THREADS'] = str(mp.cpu_count() // 2 // n_gpus)
-    if n_gpus > 1:
-        # Copy the graph to shared memory explicitly before pinning.
-        # In other cases, we can just rely on fork's copy-on-write.
-        # TODO: the original graph g is not freed.
-        if args.graph_device == 'uva':
-            g = g.shared_memory('g')
-        if args.data_device == 'uva':
-            nfeat = nfeat.share_memory_()
-            labels = labels.share_memory_()
+
     # Pack data
     data = train_nid, val_nid, test_nid, n_classes, g, nfeat, labels
 
@@ -222,13 +215,7 @@ def main(args):
     elif n_gpus == 1:
         run(0, n_gpus, args, devices, data)
     else:
-        procs = []
-        for proc_id in range(n_gpus):
-            p = mp.Process(target=run, args=(proc_id, n_gpus, args, devices, data))
-            p.start()
-            procs.append(p)
-        for p in procs:
-            p.join()
+        mp.spawn(run, args=(n_gpus, args, devices, data), nprocs=n_gpus)
 
 
 if __name__ == '__main__':
@@ -247,7 +234,7 @@ if __name__ == '__main__':
     argparser.add_argument('--fan-out', type=str, default='10,25')
     argparser.add_argument('--batch-size', type=int, default=10000)
     argparser.add_argument('--log-every', type=int, default=20)
-    argparser.add_argument('--eval-every', type=int, default=1000)
+    argparser.add_argument('--eval-every', type=int, default=5)
     argparser.add_argument('--lr', type=float, default=0.003)
     argparser.add_argument('--dropout', type=float, default=0.5)
     argparser.add_argument('--num-workers', type=int, default=0,

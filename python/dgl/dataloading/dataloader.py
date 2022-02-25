@@ -744,7 +744,12 @@ class DataLoader(torch.utils.data.DataLoader):
 
             # Check pin_prefetcher and use_prefetch_thread - should be only effective
             # if performing CPU sampling but output device is CUDA
-            if not (self.device.type == 'cuda' and self.graph.device.type == 'cpu'):
+            if self.device.type == 'cuda' and self.graph.device.type == 'cpu' and not use_uva:
+                if pin_prefetcher is None:
+                    pin_prefetcher = True
+                if use_prefetch_thread is None:
+                    use_prefetch_thread = True
+            else:
                 if pin_prefetcher is True:
                     raise ValueError(
                         'pin_prefetcher=True is only effective when device=cuda and '
@@ -758,11 +763,6 @@ class DataLoader(torch.utils.data.DataLoader):
                         'sampling is performed on CPU.')
                 if use_prefetch_thread is None:
                     use_prefetch_thread = False
-            else:
-                if pin_prefetcher is None:
-                    pin_prefetcher = True
-                if use_prefetch_thread is None:
-                    use_prefetch_thread = True
 
             # Check use_alternate_streams
             if use_alternate_streams is None:
