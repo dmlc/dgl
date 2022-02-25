@@ -22,12 +22,12 @@ exps = [ExperimentSpec(pipeline="nodepred", dataset="cora", model="sage", timeou
 @pytest.mark.parametrize("spec", exps)
 def test_train(spec):
     cfg_path = "/tmp/test.yaml"
-    run = subprocess.run(["dglcli", "config", spec.pipeline, "--data", spec.dataset, "--model", spec.model, "--cfg", cfg_path], timeout=spec.timeout, capture_output=True)
+    run = subprocess.run(["dgl", "config", spec.pipeline, "--data", spec.dataset, "--model", spec.model, "--cfg", cfg_path], timeout=spec.timeout, capture_output=True)
     assert run.stderr is None or len(run.stderr) == 0, "Found error message: {}".format(run.stderr)
     output = run.stdout.decode("utf-8")
     print(output)
 
-    run = subprocess.run(["dglcli", "train", "--cfg", cfg_path], timeout=spec.timeout, capture_output=True)
+    run = subprocess.run(["dgl", "train", "--cfg", cfg_path], timeout=spec.timeout, capture_output=True)
     assert run.stderr is None or len(run.stderr) == 0, "Found error message: {}".format(run.stderr)
     output = run.stdout.decode("utf-8")
     print(output)
@@ -36,13 +36,13 @@ TEST_RECIPE_FOLDER = "my_recipes"
 
 @pytest.fixture
 def setup_recipe_folder():
-    run = subprocess.run(["dglcli", "recipe", "copy", "--dir", TEST_RECIPE_FOLDER], timeout=15, capture_output=True)
+    run = subprocess.run(["dgl", "recipe", "copy", "--dir", TEST_RECIPE_FOLDER], timeout=15, capture_output=True)
 
 @pytest.mark.parametrize("file", [str(f) for f in Path(TEST_RECIPE_FOLDER).glob("*.yaml")])
 def test_recipe(file, setup_recipe_folder):
     print("DGL enter train {}".format(file))
     try:    
-        run = subprocess.run(["dglcli", "train", "--cfg", file], timeout=5, capture_output=True)
+        run = subprocess.run(["dgl", "train", "--cfg", file], timeout=5, capture_output=True)
         sh_stdout, sh_stderr = run.stdout, run.stderr
     except subprocess.TimeoutExpired as e:
         sh_stdout = e.stdout

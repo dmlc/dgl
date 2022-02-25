@@ -17,7 +17,7 @@ def list_receipes():
         print("| {:<30} |  {:<18} | {:<20} |".format(file.name, cfg["pipeline_name"], cfg["data"]["name"]))
     print("="*len(header))
 
-def copy_receipes(dir: str = typer.Option("dglcli_example_recipes", help="directory name for recipes")):
+def copy_receipes(dir: str = typer.Option("dglgo_example_recipes", help="directory name for recipes")):
     file_current_dir = Path(__file__).resolve().parent
     recipe_dir = file_current_dir.parent.parent / "recipes"
     current_dir = Path(os.getcwd())

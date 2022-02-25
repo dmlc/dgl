@@ -17,7 +17,7 @@ def train(
 
     f_code = autopep8.fix_code(output_file_content, options={'aggressive': 1})
     f_code = isort.code(f_code)
-    code = compile(f_code, 'dglcli_tmp.py', 'exec')
+    code = compile(f_code, 'dglgo_tmp.py', 'exec')
     exec(code,  {'__name__': '__main__'})
 
 if __name__ == "__main__":
