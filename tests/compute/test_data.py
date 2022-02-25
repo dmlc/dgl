@@ -1196,6 +1196,12 @@ def test_as_nodepred1():
     assert new_ds[0].num_nodes() == ds[0].num_nodes()
     assert new_ds[0].num_edges() == ds[0].num_edges()
     assert 'train_mask' in new_ds[0].ndata
+    assert F.array_equal(new_ds.train_idx, F.nonzero_1d(
+        new_ds[0].ndata['train_mask']))
+    assert F.array_equal(new_ds.val_idx, F.nonzero_1d(
+        new_ds[0].ndata['val_mask']))
+    assert F.array_equal(new_ds.test_idx, F.nonzero_1d(
+        new_ds[0].ndata['test_mask']))
 
     ds = data.AIFBDataset()
     print('train_mask' in ds[0].nodes['Personen'].data)
@@ -1204,6 +1210,12 @@ def test_as_nodepred1():
     assert new_ds[0].ntypes == ds[0].ntypes
     assert new_ds[0].canonical_etypes == ds[0].canonical_etypes
     assert 'train_mask' in new_ds[0].nodes['Personen'].data
+    assert F.array_equal(new_ds.train_idx, F.nonzero_1d(
+        new_ds[0].nodes['Personen'].data['train_mask']))
+    assert F.array_equal(new_ds.val_idx, F.nonzero_1d(
+        new_ds[0].nodes['Personen'].data['val_mask']))
+    assert F.array_equal(new_ds.test_idx, F.nonzero_1d(
+        new_ds[0].nodes['Personen'].data['test_mask']))
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
 def test_as_nodepred2():
@@ -1212,27 +1224,38 @@ def test_as_nodepred2():
     # create
     ds = data.AsNodePredDataset(data.AmazonCoBuyComputerDataset(), [0.8, 0.1, 0.1])
     assert F.sum(F.astype(ds[0].ndata['train_mask'], F.int32), 0) == int(ds[0].num_nodes() * 0.8)
+    assert len(ds.train_idx) == int(ds[0].num_nodes() * 0.8)
     # read from cache
     ds = data.AsNodePredDataset(data.AmazonCoBuyComputerDataset(), [0.8, 0.1, 0.1])
     assert F.sum(F.astype(ds[0].ndata['train_mask'], F.int32), 0) == int(ds[0].num_nodes() * 0.8)
+    assert len(ds.train_idx) == int(ds[0].num_nodes() * 0.8)
     # invalid cache, re-read
     ds = data.AsNodePredDataset(data.AmazonCoBuyComputerDataset(), [0.1, 0.1, 0.8])
     assert F.sum(F.astype(ds[0].ndata['train_mask'], F.int32), 0) == int(ds[0].num_nodes() * 0.1)
+    assert len(ds.train_idx) == int(ds[0].num_nodes() * 0.1)
 
     # create
     ds = data.AsNodePredDataset(data.AIFBDataset(), [0.8, 0.1, 0.1], 'Personen', verbose=True)
     assert F.sum(F.astype(ds[0].nodes['Personen'].data['train_mask'], F.int32), 0) == int(ds[0].num_nodes('Personen') * 0.8)
+    assert len(ds.train_idx) == int(ds[0].num_nodes('Personen') * 0.8)
     # read from cache
     ds = data.AsNodePredDataset(data.AIFBDataset(), [0.8, 0.1, 0.1], 'Personen', verbose=True)
     assert F.sum(F.astype(ds[0].nodes['Personen'].data['train_mask'], F.int32), 0) == int(ds[0].num_nodes('Personen') * 0.8)
+    assert len(ds.train_idx) == int(ds[0].num_nodes('Personen') * 0.8)
     # invalid cache, re-read
     ds = data.AsNodePredDataset(data.AIFBDataset(), [0.1, 0.1, 0.8], 'Personen', verbose=True)
     assert F.sum(F.astype(ds[0].nodes['Personen'].data['train_mask'], F.int32), 0) == int(ds[0].num_nodes('Personen') * 0.1)
+    assert len(ds.train_idx) == int(ds[0].num_nodes('Personen') * 0.1)
 
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason="ogb only supports pytorch")
 def test_as_nodepred_ogb():
     from ogb.nodeproppred import DglNodePropPredDataset
     ds = data.AsNodePredDataset(DglNodePropPredDataset("ogbn-arxiv"), split_ratio=None, verbose=True)
+    split = DglNodePropPredDataset("ogbn-arxiv").get_idx_split()
+    train_idx, val_idx, test_idx = split['train'], split['valid'], split['test']
+    assert F.array_equal(ds.train_idx, F.tensor(train_idx))
+    assert F.array_equal(ds.val_idx, F.tensor(val_idx))
+    assert F.array_equal(ds.test_idx, F.tensor(test_idx))
     # force generate new split
     ds = data.AsNodePredDataset(DglNodePropPredDataset("ogbn-arxiv"), split_ratio=[0.7, 0.2, 0.1], verbose=True)
 
