@@ -6,8 +6,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-# from .. import utils
-import utils
+from .. import utils
 
 class RGCN(nn.Module):
     def __init__(self,
