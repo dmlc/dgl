@@ -183,8 +183,9 @@ from torch.optim import Adam
 def main(rank, world_size, dataset, seed=0):
     init_process_group(world_size, rank)
     # Assume the GPU ID to be the same as the process ID
-    device = torch.device('cuda:{:d}'.format(rank))
-    torch.cuda.set_device(device)
+    # Uncomment the following two lines to make them work on multi-GPU.
+    #device = torch.device('cuda:{:d}'.format(rank))
+    #torch.cuda.set_device(device)
 
     model = init_model(seed, device)
     criterion = nn.CrossEntropyLoss()
