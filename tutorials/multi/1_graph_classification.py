@@ -144,7 +144,10 @@ from torch.nn.parallel import DistributedDataParallel
 def init_model(seed, device):
     torch.manual_seed(seed)
     model = GIN().to(device)
-    model = DistributedDataParallel(model, device_ids=[device], output_device=device)
+    if device.type == 'cpu':
+        model = DistributedDataParallel(model)
+    else:
+        model = DistributedDataParallel(model, device_ids=[device], output_device=device)
 
     return model
 

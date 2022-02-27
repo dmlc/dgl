@@ -1156,12 +1156,12 @@ PYTORCH_17 = PYTORCH_VER >= LooseVersion("1.7.0")
 
 def _create_dist_sampler(dataset, dataloader_kwargs, ddp_seed):
     # Note: will change the content of dataloader_kwargs
-    dist_sampler_kwargs = {'shuffle': dataloader_kwargs['shuffle']}
+    dist_sampler_kwargs = {'shuffle': dataloader_kwargs.get('shuffle', False)}
     dataloader_kwargs['shuffle'] = False
     if PYTORCH_16:
         dist_sampler_kwargs['seed'] = ddp_seed
     if PYTORCH_17:
-        dist_sampler_kwargs['drop_last'] = dataloader_kwargs['drop_last']
+        dist_sampler_kwargs['drop_last'] = dataloader_kwargs.get('drop_last', False)
         dataloader_kwargs['drop_last'] = False
 
     return DistributedSampler(dataset, **dist_sampler_kwargs)
