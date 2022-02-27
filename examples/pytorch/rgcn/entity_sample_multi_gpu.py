@@ -6,7 +6,7 @@ import argparse
 import gc
 import torch as th
 import torch.nn.functional as F
-import dgl.multiprocessing as mp
+import torch.multiprocessing as mp
 import dgl
 
 from torchmetrics.functional import accuracy
@@ -31,8 +31,8 @@ def collect_eval(n_gpus, queue, labels):
 
 def run(proc_id, n_gpus, n_cpus, args, devices, dataset, queue=None):
     dev_id = devices[proc_id]
-    g, num_classes, num_rels, target_idx, inv_target, train_idx,\
-        test_idx, labels = dataset
+    g, num_rels, num_classes, labels, train_idx, test_idx,\
+        target_idx, inv_target = dataset
 
     dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
         master_ip='127.0.0.1', master_port='12345')
@@ -93,8 +93,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, queue=None):
     th.distributed.barrier()
 
 def main(args, devices):
-    g, num_rels, num_classes, labels, train_idx, test_idx, target_idx, inv_target = load_data(
-        args.dataset, inv_target=True)
+    data = load_data(args.dataset, inv_target=True)
 
     # Create csr/coo/csc formats before launching training processes.
     # This avoids creating certain formats in each sub-process, which saves momory and CPU.
@@ -103,17 +102,8 @@ def main(args, devices):
     n_gpus = len(devices)
     n_cpus = mp.cpu_count()
     queue = mp.Queue(n_gpus)
-    procs = []
-    for proc_id in range(n_gpus):
-        # We use distributed data parallel dataloader to handle the data splitting
-        p = mp.Process(target=run, args=(proc_id, n_gpus, n_cpus // n_gpus, args, devices,
-                                        (g, num_classes, num_rels, target_idx,
-                                         inv_target, train_idx, test_idx, labels),
-                                         queue))
-        p.start()
-        procs.append(p)
-    for p in procs:
-        p.join()
+    mp.spawn(run, args=(n_gpus, n_cpus // n_gpus, args, devices, data, queue),
+             nprocs=n_gpus)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='RGCN for entity classification with sampling and multiple gpus')

@@ -11,7 +11,6 @@ import tqdm
 # (This is a long-standing issue)
 from ogb.linkproppred import DglLinkPropPredDataset
 
-USE_UVA = False
 device = 'cuda'
 
 def to_bidirected_with_reverse_mapping(g):
@@ -119,26 +118,21 @@ def evaluate(model, edge_split, device, num_workers):
 dataset = DglLinkPropPredDataset('ogbl-citation2')
 graph = dataset[0]
 graph, reverse_eids = to_bidirected_with_reverse_mapping(graph)
-seed_edges = torch.arange(graph.num_edges())
+reverse_eids = reverse_eids.to(device)
+seed_edges = torch.arange(graph.num_edges()).to(device)
 edge_split = dataset.get_edge_split()
 
 model = SAGE(graph.ndata['feat'].shape[1], 256).to(device)
 opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
 
-if not USE_UVA:
-    graph = graph.to(device)
-    reverse_eids = reverse_eids.to(device)
-    seed_edges = torch.arange(graph.num_edges()).to(device)
-
 sampler = dgl.dataloading.NeighborSampler([15, 10, 5], prefetch_node_feats=['feat'])
-dataloader = dgl.dataloading.EdgeDataLoader(
+sampler = dgl.dataloading.as_edge_prediction_sampler(
+        sampler, exclude='reverse_id', reverse_eids=reverse_eids,
+        negative_sampler=dgl.dataloading.negative_sampler.Uniform(1))
+dataloader = dgl.dataloading.DataLoader(
         graph, seed_edges, sampler,
         device=device, batch_size=512, shuffle=True,
-        drop_last=False, num_workers=0,
-        exclude='reverse_id',
-        reverse_eids=reverse_eids,
-        negative_sampler=dgl.dataloading.negative_sampler.Uniform(1),
-        use_uva=USE_UVA)
+        drop_last=False, num_workers=0, use_uva=True)
 
 durations = []
 for epoch in range(10):

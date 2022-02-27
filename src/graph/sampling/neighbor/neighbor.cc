@@ -79,6 +79,8 @@ HeteroSubgraph SampleNeighbors(
   CHECK_EQ(prob.size(), hg->NumEdgeTypes())
     << "Number of probability tensors must match the number of edge types.";
 
+  DLContext ctx = aten::GetContextOf(nodes);
+
   std::vector<HeteroGraphPtr> subrels(hg->NumEdgeTypes());
   std::vector<IdArray> induced_edges(hg->NumEdgeTypes());
   for (dgl_type_t etype = 0; etype < hg->NumEdgeTypes(); ++etype) {
@@ -93,8 +95,8 @@ HeteroSubgraph SampleNeighbors(
         hg->GetRelationGraph(etype)->NumVertexTypes(),
         hg->NumVertices(src_vtype),
         hg->NumVertices(dst_vtype),
-        hg->DataType(), hg->Context());
-      induced_edges[etype] = aten::NullArray(hg->DataType(), hg->Context());
+        hg->DataType(), ctx);
+      induced_edges[etype] = aten::NullArray(hg->DataType(), ctx);
     } else if (fanouts[etype] == -1) {
       const auto &earr = (dir == EdgeDir::kOut) ?
         hg->OutEdges(etype, nodes_ntype) :

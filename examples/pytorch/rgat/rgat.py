@@ -5,13 +5,11 @@ import torchmetrics.functional as MF
 import dgl
 import dgl.function as fn
 import dgl.nn as dglnn
-from dgl.utils import recursive_apply
+from dgl import apply_each
 import time
 import numpy as np
 from ogb.nodeproppred import DglNodePropPredDataset
 import tqdm
-
-USE_UVA = False
 
 class HeteroGAT(nn.Module):
     def __init__(self, etypes, in_feats, n_hidden, n_classes, n_heads=4):
@@ -35,10 +33,10 @@ class HeteroGAT(nn.Module):
             h = layer(block, h)
             # One thing is that h might return tensors with zero rows if the number of dst nodes
             # of one node type is 0.  x.view(x.shape[0], -1) wouldn't work in this case.
-            h = recursive_apply(h, lambda x: x.view(x.shape[0], x.shape[1] * x.shape[2]))
+            h = apply_each(h, lambda x: x.view(x.shape[0], x.shape[1] * x.shape[2]))
             if l != len(self.layers) - 1:
-                h = recursive_apply(h, F.relu)
-                h = recursive_apply(h, self.dropout)
+                h = apply_each(h, F.relu)
+                h = apply_each(h, self.dropout)
         return self.linear(h['paper'])
 
 dataset = DglNodePropPredDataset('ogbn-mag')
@@ -58,12 +56,9 @@ opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
 
 split_idx = dataset.get_idx_split()
 train_idx, valid_idx, test_idx = split_idx['train'], split_idx['valid'], split_idx['test']
-
-if not USE_UVA:
-    graph = graph.to('cuda')
-    train_idx = recursive_apply(train_idx, lambda x: x.to('cuda'))
-    valid_idx = recursive_apply(valid_idx, lambda x: x.to('cuda'))
-    test_idx = recursive_apply(test_idx, lambda x: x.to('cuda'))
+train_idx = apply_each(train_idx, lambda x: x.to('cuda'))
+valid_idx = apply_each(valid_idx, lambda x: x.to('cuda'))
+test_idx = apply_each(test_idx, lambda x: x.to('cuda'))
 
 train_sampler = dgl.dataloading.NeighborSampler(
         [5, 5, 5],
@@ -73,18 +68,18 @@ valid_sampler = dgl.dataloading.NeighborSampler(
         [10, 10, 10],   # Slightly more
         prefetch_node_feats={k: ['feat'] for k in graph.ntypes},
         prefetch_labels={'paper': ['label']})
-train_dataloader = dgl.dataloading.NodeDataLoader(
+train_dataloader = dgl.dataloading.DataLoader(
         graph, train_idx, train_sampler,
         device='cuda', batch_size=1000, shuffle=True,
-        drop_last=False, num_workers=0, use_uva=USE_UVA)
-valid_dataloader = dgl.dataloading.NodeDataLoader(
+        drop_last=False, num_workers=0, use_uva=True)
+valid_dataloader = dgl.dataloading.DataLoader(
         graph, valid_idx, valid_sampler,
         device='cuda', batch_size=1000, shuffle=False,
-        drop_last=False, num_workers=0, use_uva=USE_UVA)
-test_dataloader = dgl.dataloading.NodeDataLoader(
+        drop_last=False, num_workers=0, use_uva=True)
+test_dataloader = dgl.dataloading.DataLoader(
         graph, test_idx, valid_sampler,
         device='cuda', batch_size=1000, shuffle=False,
-        drop_last=False, num_workers=0, use_uva=USE_UVA)
+        drop_last=False, num_workers=0, use_uva=True)
 
 def evaluate(model, dataloader):
     preds = []
@@ -94,8 +89,8 @@ def evaluate(model, dataloader):
             x = blocks[0].srcdata['feat']
             y = blocks[-1].dstdata['label']['paper'][:, 0]
             y_hat = model(blocks, x)
-            preds.append(y_hat)
-            labels.append(y)
+            preds.append(y_hat.cpu())
+            labels.append(y.cpu())
         preds = torch.cat(preds, 0)
         labels = torch.cat(labels, 0)
         acc = MF.accuracy(preds, labels)
