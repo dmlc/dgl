@@ -18,8 +18,11 @@ def _set_lazy_features(x, xdata, feature_names):
             x[type_].data.update({k: LazyFeature(k) for k in names})
 
 def set_node_lazy_features(g, feature_names):
-    """Assign LazyFeature objects to ``g.ndata`` for given feature names for prefetching
-    with :class:`dgl.dataloading.NodeDataLoader` and :class:`dgl.dataloading.EdgeDataLoader`.
+    """Assign :class:`~dgl.LazyFeature`s to the node data of the input graph.
+
+    When used in a :class:`~dgl.dataloading.Sampler`, lazy features mark which data
+    should be fetched before computation in model. See :ref:`guide-minibatch-prefetching`
+    for a detailed explanation.
 
     If the graph is homogeneous, this is equivalent to:
 
@@ -39,18 +42,21 @@ def set_node_lazy_features(g, feature_names):
     ----------
     g : DGLGraph
         The graph.
-    feature_names : list[str] or dict[ntype, list[str]]
+    feature_names : list[str] or dict[str, list[str]]
         The feature names to prefetch.
 
     See also
     --------
-    dgl.frame.LazyFeature
+    dgl.LazyFeature
     """
     return _set_lazy_features(g.nodes, g.ndata, feature_names)
 
 def set_edge_lazy_features(g, feature_names):
-    """Assign LazyFeature objects to ``g.edata`` for given feature names for prefetching
-    with :class:`dgl.dataloading.NodeDataLoader` and :class:`dgl.dataloading.EdgeDataLoader`.
+    """Assign :class:`~dgl.LazyFeature`s to the edge data of the input graph.
+
+    When used in a :class:`~dgl.dataloading.Sampler`, lazy features mark which data
+    should be fetched before computation in model. See :ref:`guide-minibatch-prefetching`
+    for a detailed explanation.
 
     If the graph is homogeneous, this is equivalent to:
 
@@ -71,17 +77,21 @@ def set_edge_lazy_features(g, feature_names):
     g : DGLGraph
         The graph.
     feature_names : list[str] or dict[etype, list[str]]
-        The feature names to prefetch.
+        The feature names to prefetch. The ``etype`` key is either a string
+        or a triplet.
 
     See also
     --------
-    dgl.frame.LazyFeature
+    dgl.LazyFeature
     """
     return _set_lazy_features(g.edges, g.edata, feature_names)
 
 def set_src_lazy_features(g, feature_names):
-    """Assign LazyFeature objects to ``g.srcdata`` for given feature names for prefetching
-    with :class:`dgl.dataloading.NodeDataLoader` and :class:`dgl.dataloading.EdgeDataLoader`.
+    """Assign :class:`~dgl.LazyFeature`s to the source node data of the input MFG.
+
+    When used in a :class:`~dgl.dataloading.Sampler`, lazy features mark which data
+    should be fetched before computation in model. See :ref:`guide-minibatch-prefetching`
+    for a detailed explanation.
 
     If the graph is homogeneous, this is equivalent to:
 
@@ -101,18 +111,21 @@ def set_src_lazy_features(g, feature_names):
     ----------
     g : DGLGraph
         The graph.
-    feature_names : list[str] or dict[ntype, list[str]]
+    feature_names : list[str] or dict[str, list[str]]
         The feature names to prefetch.
 
     See also
     --------
-    dgl.frame.LazyFeature
+    dgl.LazyFeature
     """
     return _set_lazy_features(g.srcnodes, g.srcdata, feature_names)
 
 def set_dst_lazy_features(g, feature_names):
-    """Assign LazyFeature objects to ``g.srcdata`` for given feature names for prefetching
-    with :class:`dgl.dataloading.NodeDataLoader` and :class:`dgl.dataloading.EdgeDataLoader`.
+    """Assign :class:`~dgl.LazyFeature`s to the destination node data of the input MFG.
+
+    When used in a :class:`~dgl.dataloading.Sampler`, lazy features mark which data
+    should be fetched before computation in model. See :ref:`guide-minibatch-prefetching`
+    for a detailed explanation.
 
     If the graph is homogeneous, this is equivalent to:
 
@@ -132,12 +145,12 @@ def set_dst_lazy_features(g, feature_names):
     ----------
     g : DGLGraph
         The graph.
-    feature_names : list[str] or dict[ntype, list[str]]
+    feature_names : list[str] or dict[str, list[str]]
         The feature names to prefetch.
 
     See also
     --------
-    dgl.frame.LazyFeature
+    dgl.LazyFeature
     """
     return _set_lazy_features(g.dstnodes, g.dstdata, feature_names)
 
@@ -165,12 +178,12 @@ class BlockSampler(Sampler):
 
     Parameters
     ----------
-    prefetch_node_feats : list[str] or dict[ntype, list[str]], optional
+    prefetch_node_feats : list[str] or dict[str, list[str]], optional
         The node data to prefetch for the first MFG.
 
         DGL will populate the first layer's MFG's ``srcnodes`` and ``srcdata`` with
         the node data of the given names from the original graph.
-    prefetch_labels : list[str] or dict[ntype, list[str]], optional
+    prefetch_labels : list[str] or dict[str, list[str]], optional
         The node data to prefetch for the last MFG.
 
         DGL will populate the last layer's MFG's ``dstnodes`` and ``dstdata`` with
@@ -420,8 +433,12 @@ class EdgePredictionSampler(Sampler):
 def as_edge_prediction_sampler(
         sampler, exclude=None, reverse_eids=None, reverse_etypes=None, negative_sampler=None,
         prefetch_labels=None):
-    """Wrap a sampler for node classification/regression into another sampler for
-    edge classification/regression or link prediction.
+    """Create an edge-wise sampler from a node-wise sampler.
+
+    For each batch of edges, the sampler applies the provided node-wise sampler to
+    their source and destination nodes to extract subgraphs. It also generates negative
+    edges if a negative sampler is provided, and extract subgraphs for their incident
+    nodes as well.
 
     For each iteration, the sampler will yield
 
@@ -434,14 +451,15 @@ def as_edge_prediction_sampler(
     * If a negative sampler is given, another graph that contains the "negative edges",
       connecting the source and destination nodes yielded from the given negative sampler.
 
-    * A list of MFGs necessary for computing the representation of the incident nodes
-      of the edges in the minibatch.
+    * The subgraphs or MFGs returned by the provided node-wise sampler, generated
+      from the incident nodes of the edges in the minibatch (as well as those of the
+      negative edges if applicable).
 
     Parameters
     ----------
     sampler : Sampler
-        The sampler object.  It additionally requires that the :attr:`sample` method
-        must have an optional third argument :attr:`exclude_eids` representing the
+        The node-wise sampler object.  It additionally requires that the :attr:`sample`
+        method must have an optional third argument :attr:`exclude_eids` representing the
         edge IDs to exclude from neighborhood.  The argument will be either a tensor
         for homogeneous graphs or a dict of edge types and tensors for heterogeneous
         graphs.
@@ -451,43 +469,32 @@ def as_edge_prediction_sampler(
 
         * None, for not excluding any edges.
 
-        * ``self``, for excluding only the edges sampled as seed edges in this minibatch.
+        * ``self``, for excluding the edges in the current minibatch.
 
-        * ``reverse_id``, for excluding not only the edges sampled in the minibatch but
-          also their reverse edges of the same edge type.  Requires the argument
+        * ``reverse_id``, for excluding not only the edges in the current minibatch but
+          also their reverse edges according to the ID mapping in the argument
           :attr:`reverse_eids`.
 
-        * ``reverse_types``, for excluding not only the edges sampled in the minibatch
-          but also their reverse edges of different types but with the same IDs.
-          Requires the argument :attr:`reverse_etypes`.
+        * ``reverse_types``, for excluding not only the edges in the current minibatch
+          but also their reverse edges stored in another type according to
+          the argument :attr:`reverse_etypes`.
 
-        * A callable which takes in a tensor or a dictionary of tensors and their
-          canonical edge types and returns a tensor or dictionary of tensors to
-          exclude.
+        * User-defined exclusion rule. It is a callable with edges in the current
+          minibatch as a single argument and should return the edges to be excluded.
     reverse_eids : Tensor or dict[etype, Tensor], optional
         A tensor of reverse edge ID mapping.  The i-th element indicates the ID of
         the i-th edge's reverse edge.
 
         If the graph is heterogeneous, this argument requires a dictionary of edge
         types and the reverse edge ID mapping tensors.
-
-        See the description of the argument with the same name in the docstring of
-        :class:`~dgl.dataloading.EdgeCollator` for more details.
     reverse_etypes : dict[etype, etype], optional
         The mapping from the original edge types to their reverse edge types.
-
-        See the description of the argument with the same name in the docstring of
-        :class:`~dgl.dataloading.EdgeCollator` for more details.
     negative_sampler : callable, optional
         The negative sampler.
-
-        See the description of the argument with the same name in the docstring of
-        :class:`~dgl.dataloading.EdgeCollator` for more details.
     prefetch_labels : list[str] or dict[etype, list[str]], optional
-        The node data to prefetch for the returned positive pair graph.
+        The edge labels to prefetch for the returned positive pair graph.
 
-        DGL will populate the pair graph's ``edges`` and ``edata`` with
-        the edge data of the given names from the original graph.
+        See :ref:`guide-minibatch-prefetching` for a detailed explanation of prefetching.
 
     Examples
     --------
@@ -495,40 +502,36 @@ def as_edge_prediction_sampler(
     set of edges ``train_eid`` on a homogeneous undirected graph. Each node takes
     messages from all neighbors.
 
-    Say that you have an array of source node IDs ``src`` and another array of destination
-    node IDs ``dst``.  One can make it bidirectional by adding another set of edges
-    that connects from ``dst`` to ``src``:
+    Given an array of source node IDs ``src`` and another array of destination
+    node IDs ``dst``, the following code creates a bidirectional graph:
 
     >>> g = dgl.graph((torch.cat([src, dst]), torch.cat([dst, src])))
 
-    One can then know that the ID difference of an edge and its reverse edge is ``|E|``,
-    where ``|E|`` is the length of your source/destination array.  The reverse edge
-    mapping can be obtained by
+    Edge :math:`i`'s reverse edge in the graph above is edge :math:`i + |E|`. Therefore, we can
+    create a reverse edge mapping ``reverse_eids`` by:
 
     >>> E = len(src)
     >>> reverse_eids = torch.cat([torch.arange(E, 2 * E), torch.arange(0, E)])
 
-    Note that the sampled edges as well as their reverse edges are removed from
-    computation dependencies of the incident nodes.  That is, the edge will not
-    involve in neighbor sampling and message aggregation.  This is a common trick
-    to avoid information leakage.
+    By passing ``reverse_eids`` to the edge sampler, the edges in the current mini-batch and their
+    reversed edges will be excluded from the extracted subgraphs to avoid information leakage.
 
-    >>> sampler = dgl.dataloading.NeighborSampler([15, 10, 5])
     >>> sampler = dgl.dataloading.as_edge_prediction_sampler(
-    ...     sampler, exclude='reverse_id', reverse_eids=reverse_eids)
+    ...     dgl.dataloading.NeighborSampler([15, 10, 5]),
+    ...     exclude='reverse_id', reverse_eids=reverse_eids)
     >>> dataloader = dgl.dataloading.EdgeDataLoader(
     ...     g, train_eid, sampler,
     ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
     >>> for input_nodes, pair_graph, blocks in dataloader:
     ...     train_on(input_nodes, pair_graph, blocks)
 
-    To train a 3-layer GNN for link prediction on a set of edges ``train_eid`` on a
-    homogeneous graph where each node takes messages from all neighbors (assume the
-    backend is PyTorch), with 5 uniformly chosen negative samples per edge:
+    For link prediction, one can provide a negative sampler to sample negative edges.
+    The code below uses DGL's :class:`~dgl.dataloading.negative_sampler.Uniform`
+    to generate 5 negative samples per edge:
 
-    >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
     >>> neg_sampler = dgl.dataloading.negative_sampler.Uniform(5)
     >>> sampler = dgl.dataloading.as_edge_prediction_sampler(
+    ...     dgl.dataloading.NeighborSampler([15, 10, 5]),
     ...     sampler, exclude='reverse_id', reverse_eids=reverse_eids,
     ...     negative_sampler=neg_sampler)
     >>> dataloader = dgl.dataloading.EdgeDataLoader(
@@ -537,22 +540,21 @@ def as_edge_prediction_sampler(
     >>> for input_nodes, pos_pair_graph, neg_pair_graph, blocks in dataloader:
     ...     train_on(input_nodes, pair_graph, neg_pair_graph, blocks)
 
-    For heterogeneous graphs, the reverse of an edge may have a different edge type
-    from the original edge.  For instance, consider that you have an array of
-    user-item clicks, representated by a user array ``user`` and an item array ``item``.
-    You may want to build a heterogeneous graph with a user-click-item relation and an
-    item-clicked-by-user relation.
+    For heterogeneous graphs, reverse edges may belong to a different relation. For example,
+    the relations "user-click-item" and "item-click-by-user" in the graph below are
+    mutual reverse.
 
     >>> g = dgl.heterograph({
     ...     ('user', 'click', 'item'): (user, item),
     ...     ('item', 'clicked-by', 'user'): (item, user)})
 
-    To train a 3-layer GNN for edge classification on a set of edges ``train_eid`` with
-    type ``click``, you can write
+    To correctly exclude edges from each mini-batch, set ``exclude='reverse_types'`` and
+    pass a dictionary ``{'click': 'clicked-by', 'clicked-by': 'click'}`` to the
+    ``reverse_etypes`` argument.
 
-    >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
     >>> sampler = dgl.dataloading.as_edge_prediction_sampler(
-    ...     sampler, exclude='reverse_types',
+    ...     dgl.dataloading.NeighborSampler([15, 10, 5]),
+    ...     exclude='reverse_types',
     ...     reverse_etypes={'click': 'clicked-by', 'clicked-by': 'click'})
     >>> dataloader = dgl.dataloading.EdgeDataLoader(
     ...     g, {'click': train_eid}, sampler,
@@ -560,13 +562,12 @@ def as_edge_prediction_sampler(
     >>> for input_nodes, pair_graph, blocks in dataloader:
     ...     train_on(input_nodes, pair_graph, blocks)
 
-    To train a 3-layer GNN for link prediction on a set of edges ``train_eid`` with type
-    ``click``, you can write
+    For link prediction, provide a negative sampler to generate negative samples:
 
-    >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
     >>> neg_sampler = dgl.dataloading.negative_sampler.Uniform(5)
     >>> sampler = dgl.dataloading.as_edge_prediction_sampler(
-    ...     sampler, exclude='reverse_types',
+    ...     dgl.dataloading.NeighborSampler([15, 10, 5]),
+    ...     exclude='reverse_types',
     ...     reverse_etypes={'click': 'clicked-by', 'clicked-by': 'click'},
     ...     negative_sampler=neg_sampler)
     >>> dataloader = dgl.dataloading.EdgeDataLoader(

@@ -14,10 +14,9 @@ class ClusterGCNSampler(Sampler):
     This sampler first partitions the graph with METIS partitioning, then it caches the nodes of
     each partition to a file within the given cache directory.
 
-    For each data loader iteration, the data loader will pick a fixed number of
-    partitions, take the union of all nodes within those partitions, and return
-    an induced subgraph.  The number of partitions for each iteration is determined
-    by the :attr:`batch_size` argument in the :class:`~dgl.dataloading.DataLoader`.
+    The sampler then selects the graph partitions according to the provided
+    partition IDs, take the union of all nodes in those partitions, and return an
+    induced subgraph in its :attr:`sample` method.
 
     Parameters
     ----------
@@ -32,13 +31,11 @@ class ClusterGCNSampler(Sampler):
     prefetch_ndata : list[str], optional
         The node data to prefetch for the subgraph.
 
-        DGL will populate the subgraph's ``ndata`` with the node data of the given
-        names from the original graph.
+        See :ref:`guide-minibatch-prefetching` for a detailed explanation of prefetching.
     prefetch_edata : list[str], optional
         The edge data to prefetch for the subgraph.
 
-        DGL will populate the subgraph's ``edata`` with the edge data of the given
-        names from the original graph.
+        See :ref:`guide-minibatch-prefetching` for a detailed explanation of prefetching.
     output_device : device, optional
         The device of the output subgraphs or MFGs.  Default is the same as the
         minibatch of partition indices.
@@ -98,7 +95,20 @@ class ClusterGCNSampler(Sampler):
         self.output_device = output_device
 
     def sample(self, g, partition_ids):     # pylint: disable=arguments-differ
-        """Samples a subgraph given a list of partition IDs."""
+        """Sampling function.
+
+        Parameters
+        ----------
+        g : DGLGraph
+            The graph to sample from.
+        partition_ids : Tensor
+            A 1-D integer tensor of partition IDs.
+
+        Returns
+        -------
+        DGLGraph
+            The sampled subgraph.
+        """
         node_ids = F.cat([
             self.partition_node_ids[self.partition_offset[i]:self.partition_offset[i+1]]
             for i in F.asnumpy(partition_ids)], 0)

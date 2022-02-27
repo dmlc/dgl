@@ -5,7 +5,7 @@ import torchmetrics.functional as MF
 import dgl
 import dgl.function as fn
 import dgl.nn as dglnn
-from dgl import recursive_apply
+from dgl import apply_each
 import time
 import numpy as np
 from ogb.nodeproppred import DglNodePropPredDataset
@@ -33,10 +33,10 @@ class HeteroGAT(nn.Module):
             h = layer(block, h)
             # One thing is that h might return tensors with zero rows if the number of dst nodes
             # of one node type is 0.  x.view(x.shape[0], -1) wouldn't work in this case.
-            h = recursive_apply(h, lambda x: x.view(x.shape[0], x.shape[1] * x.shape[2]))
+            h = apply_each(h, lambda x: x.view(x.shape[0], x.shape[1] * x.shape[2]))
             if l != len(self.layers) - 1:
-                h = recursive_apply(h, F.relu)
-                h = recursive_apply(h, self.dropout)
+                h = apply_each(h, F.relu)
+                h = apply_each(h, self.dropout)
         return self.linear(h['paper'])
 
 dataset = DglNodePropPredDataset('ogbn-mag')
@@ -56,9 +56,9 @@ opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
 
 split_idx = dataset.get_idx_split()
 train_idx, valid_idx, test_idx = split_idx['train'], split_idx['valid'], split_idx['test']
-train_idx = recursive_apply(train_idx, lambda x: x.to('cuda'))
-valid_idx = recursive_apply(valid_idx, lambda x: x.to('cuda'))
-test_idx = recursive_apply(test_idx, lambda x: x.to('cuda'))
+train_idx = apply_each(train_idx, lambda x: x.to('cuda'))
+valid_idx = apply_each(valid_idx, lambda x: x.to('cuda'))
+test_idx = apply_each(test_idx, lambda x: x.to('cuda'))
 
 train_sampler = dgl.dataloading.NeighborSampler(
         [5, 5, 5],

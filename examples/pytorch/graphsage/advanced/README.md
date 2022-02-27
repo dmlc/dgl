@@ -1,4 +1,4 @@
-Advanced usages of GraphSAGE
+More Examples for Training GraphSAGE
 ============================
 
 ### Unsupervised training

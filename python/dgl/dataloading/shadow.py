@@ -8,10 +8,9 @@ class ShaDowKHopSampler(Sampler):
     """K-hop subgraph sampler used by
     `ShaDow-GNN <https://arxiv.org/abs/2012.01380>`__.
 
-    It performs node-wise neighbor sampling but instead of returning a list of
-    MFGs, it returns a single subgraph induced by all the sampled nodes. The
-    seed nodes from which the neighbors are sampled will appear the first in the
-    induced nodes of the subgraph.
+    It performs node-wise neighbor sampling and returns the subgraph induced by
+    all the sampled nodes. The seed nodes from which the neighbors are sampled
+    will appear the first in the induced nodes of the subgraph.
 
     Parameters
     ----------
@@ -80,7 +79,23 @@ class ShaDowKHopSampler(Sampler):
         self.output_device = output_device
 
     def sample(self, g, seed_nodes, exclude_eids=None):     # pylint: disable=arguments-differ
-        """Sample a subgraph given a tensor of seed nodes."""
+        """Sampling function.
+
+        Parameters
+        ----------
+        g : DGLGraph
+            The graph to sampler from.
+        seed_nodes : Tensor or dict[str, Tensor]
+            The nodes sampled in the current minibatch.
+        exclude_eids : Tensor or dict[etype, Tensor], optional
+            The edges to exclude from neighborhood expansion.
+
+        Returns
+        -------
+        input_nodes, output_nodes, subg
+            A triplet containing (1) the node IDs inducing the subgraph, (2) the node
+            IDs that are sampled in this minibatch, and (3) the subgraph itself.
+        """
         output_nodes = seed_nodes
         for fanout in reversed(self.fanouts):
             frontier = g.sample_neighbors(

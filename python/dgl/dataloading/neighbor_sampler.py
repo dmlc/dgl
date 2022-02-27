@@ -31,20 +31,14 @@ class NeighborSampler(BlockSampler):
     replace : bool, default False
         Whether to sample with replacement
     prefetch_node_feats : list[str] or dict[ntype, list[str]], optional
-        The node data to prefetch for the first MFG.
-
-        DGL will populate the first layer's MFG's ``srcnodes`` and ``srcdata`` with
-        the node data of the given names from the original graph.
+        The source node data to prefetch for the first MFG, corresponding to the
+        input node features necessary for the first GNN layer.
     prefetch_labels : list[str] or dict[ntype, list[str]], optional
-        The node data to prefetch for the last MFG.
-
-        DGL will populate the last layer's MFG's ``dstnodes`` and ``dstdata`` with
-        the node data of the given names from the original graph.
+        The destination node data to prefetch for the last MFG, corresponding to
+        the node labels of the minibatch.
     prefetch_edge_feats : list[str] or dict[etype, list[str]], optional
-        The edge data names to prefetch for all the MFGs.
-
-        DGL will populate every MFG's ``edges`` and ``edata`` with the edge data
-        of the given names from the original graph.
+        The edge data names to prefetch for all the MFGs, corresponding to the
+        edge features necessary for all GNN layers.
     output_device : device, optional
         The device of the output subgraphs or MFGs.  Default is the same as the
         minibatch of seed nodes.
