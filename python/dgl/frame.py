@@ -40,7 +40,7 @@ class _LazyIndex(object):
         return flat_index
 
 class LazyFeature(object):
-    """Placeholder for prefetching from DataLoader.
+    """Placeholder for feature prefetching.
 
     One can assign this object to ``ndata`` or ``edata`` of the graphs returned by various
     samplers' :attr:`sample` method.  When DGL's dataloader receives the subgraphs
