@@ -11,13 +11,8 @@ from ....utils import expand_as_pair
 
 
 class AGNNConv(nn.Block):
-    r"""
-
-    Description
-    -----------
-    Attention-based Graph Neural Network layer from paper `Attention-based
-    Graph Neural Network for Semi-Supervised Learning
-    <https://arxiv.org/abs/1803.03735>`__.
+    r"""Attention-based Graph Neural Network layer from `Attention-based Graph Neural Network for
+    Semi-Supervised Learning <https://arxiv.org/abs/1803.03735>`__
 
     .. math::
         H^{l+1} = P H^{l}

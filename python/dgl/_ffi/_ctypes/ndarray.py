@@ -82,8 +82,6 @@ class NDArrayBase(object):
         Indicates the alignment requirement when converting to dlpack. Will copy to a
         new tensor if the alignment requirement is not satisfied.
         0 means no alignment requirement.
-        Will copy to a new tensor if the array is pinned because some backends,
-        e.g., pytorch, do not support kDLCPUPinned device type.
 
 
         Returns

@@ -12,14 +12,10 @@ from .graphconv import EdgeWeightNorm
 
 
 class GCN2Conv(nn.Module):
+    r"""Graph Convolutional Network via Initial residual
+    and Identity mapping (GCNII) from `Simple and Deep Graph Convolutional
+    Networks <https://arxiv.org/abs/2007.02133>`__
 
-    r"""
-
-    Description
-    -----------
-    The Graph Convolutional Network via Initial residual
-    and Identity mapping (GCNII) was introduced in `"Simple and Deep Graph Convolutional
-    Networks" <https://arxiv.org/abs/2007.02133>`_ paper.
     It is mathematically is defined as follows:
 
     .. math::

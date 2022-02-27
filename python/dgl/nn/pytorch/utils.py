@@ -104,11 +104,7 @@ class Identity(nn.Module):
         return x
 
 class Sequential(nn.Sequential):
-    r"""
-
-    Description
-    -----------
-    A sequential container for stacking graph neural network modules.
+    r"""A sequential container for stacking graph neural network modules
 
     DGL supports two modes: sequentially apply GNN modules on 1) the same graph or
     2) a list of given graphs. In the second case, the number of graphs equals the
@@ -227,11 +223,10 @@ class Sequential(nn.Sequential):
         return feats
 
 class WeightBasis(nn.Module):
-    r"""Basis decomposition module.
+    r"""Basis decomposition from `Modeling Relational Data with Graph
+    Convolutional Networks <https://arxiv.org/abs/1703.06103>`__
 
-    Basis decomposition is introduced in "`Modeling Relational Data with Graph
-    Convolutional Networks <https://arxiv.org/abs/1703.06103>`__"
-    and can be described as below:
+    It can be described as below:
 
     .. math::
 
@@ -284,13 +279,10 @@ class WeightBasis(nn.Module):
         return weight.view(self.num_outputs, *self.shape)
 
 class JumpingKnowledge(nn.Module):
-    r"""
+    r"""The Jumping Knowledge aggregation module from `Representation Learning on
+    Graphs with Jumping Knowledge Networks <https://arxiv.org/abs/1806.03536>`__
 
-    Description
-    -----------
-    The Jumping Knowledge aggregation module introduced in `Representation Learning on
-    Graphs with Jumping Knowledge Networks <https://arxiv.org/abs/1806.03536>`__. It
-    aggregates the output representations of multiple GNN layers with
+    It aggregates the output representations of multiple GNN layers with
 
     **concatenation**
 

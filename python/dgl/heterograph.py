@@ -5474,7 +5474,7 @@ class DGLHeteroGraph(object):
 
         Materialization of new sparse formats for pinned graphs is not allowed.
         To avoid implicit formats materialization during training,
-        you should create all the needed formats before pinnning.
+        you should create all the needed formats before pinning.
         But cloning and materialization is fine. See the examples below.
 
         Returns
@@ -5530,6 +5530,7 @@ class DGLHeteroGraph(object):
         if F.device_type(self.device) != 'cpu':
             raise DGLError("The graph structure must be on CPU to be pinned.")
         self._graph.pin_memory_()
+
         return self
 
     def unpin_memory_(self):
@@ -5546,6 +5547,7 @@ class DGLHeteroGraph(object):
         if not self._graph.is_pinned():
             return self
         self._graph.unpin_memory_()
+
         return self
 
     def is_pinned(self):
