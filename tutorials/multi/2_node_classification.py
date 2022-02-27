@@ -118,8 +118,8 @@ def run(proc_id, devices):
     # Define training and validation dataloader, copied from the previous tutorial
     # but with one line of difference: use_ddp to enable distributed data parallel
     # data loading.
-    sampler = dgl.dataloading.MultiLayerNeighborSampler([4, 4])
-    train_dataloader = dgl.dataloading.NodeDataLoader(
+    sampler = dgl.dataloading.NeighborSampler([4, 4])
+    train_dataloader = dgl.dataloading.DataLoader(
         # The following arguments are specific to NodeDataLoader.
         graph,              # The graph
         train_nids,         # The node IDs to iterate over in minibatches
@@ -133,7 +133,7 @@ def run(proc_id, devices):
         drop_last=False,    # Whether to drop the last incomplete batch
         num_workers=0       # Number of sampler processes
     )
-    valid_dataloader = dgl.dataloading.NodeDataLoader(
+    valid_dataloader = dgl.dataloading.DataLoader(
         graph, valid_nids, sampler,
         device=device,
         use_ddp=False,
@@ -247,16 +247,10 @@ graph.create_formats_()
 # 
 
 # Say you have four GPUs.
-num_gpus = 4
-import dgl.multiprocessing as mp
-devices = list(range(num_gpus))
-procs = []
-for proc_id in range(num_gpus):
-    p = mp.Process(target=run, args=(proc_id, devices))
-    p.start()
-    procs.append(p)
-for p in procs:
-    p.join()
+if __name__ == '__main__':
+    num_gpus = 4
+    import torch.multiprocessing as mp
+    mp.spawn(run, args=(list(range(num_gpus)),), nprocs=num_gpus)
 
 # Thumbnail credits: Stanford CS224W Notes
 # sphinx_gallery_thumbnail_path = '_static/blitz_1_introduction.png'
