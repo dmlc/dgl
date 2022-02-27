@@ -1,6 +1,6 @@
 .. _guide-minibatch-customizing-neighborhood-sampler:
 
-6.4 Implementing custom samplers
+6.4 Implementing custom graph samplers
 ----------------------------------------------
 
 Implementing custom samplers involves subclassing the :class:`dgl.dataloading.Sampler`
@@ -12,26 +12,109 @@ method should take in two arguments:
    def sample(self, g, indices):
        pass
 
-The first argument :attr:`g` is the original graph and the second argument
-:attr:`indices` is the indices yielded by the data loader.  Recall that the dataloader
-signature is:
+The first argument :attr:`g` is the original graph to sample from while
+the second argument :attr:`indices` is the indices of the current mini-batch
+-- it generally could be anything depending on what indices are given to the
+accompanied :class:`~dgl.dataloading.DataLoader` but are typically seed node
+or seed edge IDs. The function returns the mini-batch of samples for
+the current iteration.
+
+.. note::
+
+    The design here is similar to PyTorch's ``torch.utils.data.DataLoader``,
+    which is an iterator of dataset. Users can customize how to batch samples
+    using its ``collate_fn`` argument. Here in DGL, ``dgl.dataloading.DataLoader``
+    is an iterator of ``indices`` (e.g., training node IDs) while ``Sampler``
+    converts a batch of indices into a batch of graph- or tensor-type samples.
+
+
+The code below implements a classical neighbor sampler:
 
 .. code:: python
 
-   def __init__(self, graph, indices, graph_sampler, device='cpu', use_ddp=False,
-                ddp_seed=0, batch_size=1, drop_last=False, shuffle=False,
-                use_prefetch_thread=None, use_alternate_streams=None,
-                pin_prefetcher=None, use_uva=False, **kwargs):
-       pass
+   class NeighborSampler(dgl.dataloading.Sampler):
+       def __init__(self, fanouts : list[int]):
+           super().__init__()
+           self.fanouts = fanouts
 
-The :attr:`indices` argument will have the same type as the indices argument of the data
-loader, i.e. a tensor if the latter is a tensor, and a dictionary of tensors if the
-latter is a dictionary of tensors.
+       def sample(self, g, seed_nodes):
+           output_nodes = seed_nodes
+           subgs = []
+           for fanout in reversed(self.fanouts):
+               # Sample a fixed number of neighbors of the current seed nodes.
+               sg = g.sample_neighbors(seed_nodes, fanout)
+               # Convert this subgraph to a message flow graph.
+               sg = dgl.to_block(sg, seed_nodes)
+               seed_nodes = sg.srcdata[NID]
+               subgs.insert(0, sg)
+            input_nodes = seed_nodes
+            return input_nodes, output_nodes, subgs
 
-An example
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+To use this sampler with ``DataLoader``:
 
-The main logic of DGL's neighborhood sampler looks like this:
+.. code:: python
+
+    graph = ...  # the graph to be sampled from
+    train_nids = ...  # an 1-D tensor of training node IDs
+    sampler = NeighborSampler([10, 15])  # create a sampler
+    dataloader = dgl.dataloading.DataLoader(
+        graph,
+        train_nids,
+        sampler,
+        batch_size=32,    # batch_size decides how many IDs are passed to sampler at once
+        ...               # other arguments
+    )
+    for i, mini_batch in enumerate(dataloader):
+        # unpack the mini batch
+        input_nodes, output_nodes, subgs = mini_batch
+        train(input_nodes, output_nodes, subgs)
+
+Sampler for Heterogeneous Graphs
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To write a sampler for heterogeneous graphs, one needs to be aware that
+the argument ``g`` will be a heterogeneous graph while ``indices`` could be a
+dictionary of ID tensors. Most of DGL's graph sampling operators (e.g.,
+the ``sample_neighbors`` and ``to_block`` functions in the above example) can
+work on heterogeneous graph natively, so many samplers are automatically
+ready for heterogeneous graph. For example, the above ``NeighborSampler``
+can be used on heterogeneous graphs:
+
+.. code:: python
+
+    hg = dgl.heterograph({
+        ('user', 'like', 'movie') : ...,
+        ('user', 'follow', 'user') : ...,
+        ('movie', 'liked-by', 'user') : ...,
+    })
+    train_nids = {'user' : ..., 'movie' : ...}  # training IDs of 'user' and 'movie' nodes
+    sampler = NeighborSampler([10, 15])  # create a sampler
+    dataloader = dgl.dataloading.DataLoader(
+        hg,
+        train_nids,
+        sampler,
+        batch_size=32,    # batch_size decides how many IDs are passed to sampler at once
+        ...               # other arguments
+    )
+    for i, mini_batch in enumerate(dataloader):
+        # unpack the mini batch
+        # input_nodes and output_nodes are dictionary while subgs are a list of
+        # heterogeneous graphs
+        input_nodes, output_nodes, subgs = mini_batch
+        train(input_nodes, output_nodes, subgs)
+
+Exclude Edges During Sampling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The examples above all belong to *node-wise sampler* because the ``indices`` argument
+to the ``sample`` method represents a batch of seed node IDs. Another common type of
+samplers is *edge-wise sampler* which, as name suggested, takes in a batch of seed
+edge IDs to construct mini-batch data. DGL provides a utility
+:func:`dgl.dataloading.as_edge_prediction_sampler` to turn a node-wise sampler to
+an edge-wise sampler. To prevent information leakge, it requires the node-wise sampler
+to have an additional third argument ``exclude_eids``. The code below modifies
+the ``NeighborSampler`` we just defined to properly exclude edges from the sampled
+subgraph:
 
 .. code:: python
 
@@ -40,120 +123,23 @@ The main logic of DGL's neighborhood sampler looks like this:
            super().__init__()
            self.fanouts = fanouts
 
-       def sample(self, g, seed_nodes):
-           output_nodes = seed_nodes
-           blocks = []
-           for fanout in reversed(self.fanouts):
-               # Samples a fixed number of neighbors for the current layer of nodes,
-               # inducing a subgraph in the process.
-               frontier = g.sample_neighbors(seed_nodes, fanout)
-               # Convert this subgraph to a message flow graph (see the stochastic
-               # training tutorials for definition).
-               block = to_block(frontier, seed_nodes)
-               seed_nodes = block.srcdata[NID]
-               blocks.insert(0, block)
-   
-           return seed_nodes, output_nodes, blocks
-
-For example, if you wish to re-implement your own neighbor sampler, but instead
-of sampling a fixed number of neighbors, you would like to drop the incoming edges
-with a probability, you can replace the statement with ``g.sample_neighbors`` above
-with statements that performs edge dropping:
-
-.. code:: python
-
-   class DropoutSampler(Sampler):
-       def __init__(self, fanouts):
-           super().__init__()
-           self.fanouts = fanouts
-
-       def sample(self, g, seed_nodes):
-           output_nodes = seed_nodes
-           blocks = []
-           for fanout in reversed(self.fanouts):
-               # Get all the edge IDs.
-               sg = g.in_subgraph(seed_nodes)
-               # Randomly drop some of them.
-               mask = torch.zeros_like(edge_ids).bernoulli_(self.p).bool()
-               # Obtain a subgraph induced by those edges.
-               frontier = g.edge_subgraph(mask)
-               # Convert this subgraph to a message flow graph (see the stochastic
-               # training tutorials for definition).
-               block = to_block(frontier, seed_nodes)
-               seed_nodes = block.srcdata[NID]
-               blocks.insert(0, block)
-   
-           return seed_nodes, output_nodes, blocks
-
-Heterogeneous graphs
-~~~~~~~~~~~~~~~~~~~~
-
-If the graph is heterogeneous, the second argument of :attr:`sample` method will be a
-dictionary of node IDs.
-
-.. code:: python
-
-   class DropoutSampler(Sampler):
-       def __init__(self, fanouts):
-           super().__init__()
-           self.fanouts = fanouts
-
-       def sample(self, g, seed_nodes):
-           output_nodes = seed_nodes
-           blocks = []
-           for fanout in reversed(self.fanouts):
-               # Get all inbound edges to `seed_nodes`
-               sg = dgl.in_subgraph(g, seed_nodes)
-               new_edges_masks = {}
-               # Iterate over all edge types
-               for etype in sg.canonical_etypes:
-                   edge_mask = torch.zeros(sg.number_of_edges(etype))
-                   edge_mask.bernoulli_(self.p)
-                   new_edges_masks[etype] = edge_mask.bool()
-               # Return a new graph with the same nodes as the original graph as a
-               # frontier
-               frontier = dgl.edge_subgraph(new_edges_masks, relabel_nodes=False)
-               # Convert this subgraph to a message flow graph (see the stochastic
-               # training tutorials for definition).
-               block = to_block(frontier, seed_nodes)
-               seed_nodes = block.srcdata[NID]
-               blocks.insert(0, block)
-   
-           return seed_nodes, output_nodes, blocks
-
-Implementing custom samplers for use with :func:`dgl.dataloading.as_edge_prediction_sampler`
-^^^^^^^^^^
-
-You could wrap your sampler written for node classification into another sampler
-for edge classification and link prediction with the same sampling algorithm by calling
-:func:`dgl.dataloading.as_edge_prediction_sampler`.  However, sometimes it is better
-to exclude the edges related to the ones sampled in the minibatch from neighbor
-expansion, as mentioned in :ref:<guide-minibatch-edge-classification-sampler-exclude>.
-Therefore, :func:`~dgl.dataloading.as_edge_prediction_sampler` requires the sampler's
-:attr:`sample` method to have an additional optional third argument ``exclude_eids``.
-An example is given below, adapting the neighbor sampler above to the case where
-a given set of edges should be excluded from neighbor expansion:
-
-.. code:: python
-
-   class NeighborSampler(Sampler):
-       def __init__(self, fanouts):
-           super().__init__()
-           self.fanouts = fanouts
-
-       # NOTE: there is an additional third argument
+       # NOTE: There is an additional third argument. For homogeneous graphs,
+       #   it is an 1-D tensor of integer IDs. For heterogeneous graphs, it
+       #   is a dictionary of ID tensors. We usually set its default value to be None.
        def sample(self, g, seed_nodes, exclude_eids=None):
            output_nodes = seed_nodes
-           blocks = []
+           subgs = []
            for fanout in reversed(self.fanouts):
-               # Samples a fixed number of neighbors for the current layer of nodes,
-               # inducing a subgraph in the process.
-               frontier = g.sample_neighbors(seed_nodes, fanout, exclude_edges=exclude_eids)
-               # Convert this subgraph to a message flow graph (see the stochastic
-               # training tutorials for definition).
-               block = to_block(frontier, seed_nodes)
-               seed_nodes = block.srcdata[NID]
-               blocks.insert(0, block)
-   
-           return seed_nodes, output_nodes, blocks
+               # Sample a fixed number of neighbors of the current seed nodes.
+               sg = g.sample_neighbors(seed_nodes, fanout, exclude_edges=exclude_eids)
+               # Convert this subgraph to a message flow graph.
+               sg = dgl.to_block(sg, seed_nodes)
+               seed_nodes = sg.srcdata[NID]
+               subgs.insert(0, sg)
+            input_nodes = seed_nodes
+            return input_nodes, output_nodes, subgs
 
+Further Readings
+~~~~~~~~~~~~~~~~~~
+See :ref:`guide-minibatch-prefetching` for how to write a custom graph sampler
+with feature prefetching.
