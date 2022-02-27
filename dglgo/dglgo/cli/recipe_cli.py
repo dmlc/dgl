@@ -28,7 +28,7 @@ def copy_receipes(dir: str = typer.Option("dglgo_example_recipes", help="directo
     print("Example recipes are copied to {}".format(new_dir.absolute()))
 
 
-recipe_app = typer.Typer(help="Get the example recipes")
+recipe_app = typer.Typer(help="Get example recipes")
 recipe_app.command(name="list", help="List all available example recipes")(list_receipes)
 recipe_app.command(name="copy", help="Copy all available example recipes to current directory")(copy_receipes)
 

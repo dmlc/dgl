@@ -10,8 +10,8 @@ no_args_is_help = False
 app = typer.Typer(no_args_is_help=True, add_completion=False)
 app.add_typer(config_app, name="configure", no_args_is_help=no_args_is_help)
 app.add_typer(recipe_app, name="recipe", no_args_is_help=True)
-app.command(help="Train the model", no_args_is_help=no_args_is_help)(train)
-app.command(help="Export the python file from config", no_args_is_help=no_args_is_help)(export)
+app.command(help="Launch training", no_args_is_help=no_args_is_help)(train)
+app.command(help="Export a runnable python script", no_args_is_help=no_args_is_help)(export)
 
 def main():
     app()
