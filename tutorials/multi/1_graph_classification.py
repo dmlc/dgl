@@ -223,28 +223,16 @@ def main(rank, world_size, dataset, seed=0):
 ###############################################################################
 # Finally we load the dataset and launch the processes.
 # 
-# .. note::
-# 
-#    You will need to use ``dgl.multiprocessing`` instead of the Python
-#    ``multiprocessing`` package. ``dgl.multiprocessing`` is identical to
-#    Python’s built-in ``multiprocessing`` except that it handles the
-#    subtleties between forking and multithreading in Python.
-#
 
 if __name__ == '__main__':
-    import dgl.multiprocessing as mp
+    import torch.multiprocessing as mp
 
     from dgl.data import GINDataset
 
     num_gpus = 4
     procs = []
     dataset = GINDataset(name='IMDBBINARY', self_loop=False)
-    for rank in range(num_gpus):
-        p = mp.Process(target=main, args=(rank, num_gpus, dataset))
-        p.start()
-        procs.append(p)
-    for p in procs:
-        p.join()
+    mp.spawn(main, args=(num_gpus, dataset), nprocs=num_gpus)
 
 # Thumbnail credits: DGL
 # sphinx_gallery_thumbnail_path = '_static/blitz_5_graph_classification.png'

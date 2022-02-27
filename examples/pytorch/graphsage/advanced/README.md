@@ -19,6 +19,8 @@ Notably,
 
 Micro F1 score reaches 0.9212 on test set.
 
+This example also demonstrates the advanced usages of multi-GPU `DDP` training, UVA-base sampling, full GPU sampling, and fine control of storing the graph structure and features individually.
+
 ### Training with PyTorch Lightning
 
 We also provide minibatch training scripts with PyTorch Lightning in `train_lightning.py` and `train_lightning_unsupervised.py`.

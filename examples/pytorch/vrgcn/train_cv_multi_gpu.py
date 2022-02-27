@@ -4,7 +4,7 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import dgl.multiprocessing as mp
+import torch.multiprocessing as mp
 import dgl.function as fn
 import dgl.nn.pytorch as dglnn
 import time
@@ -370,10 +370,4 @@ if __name__ == '__main__':
     if n_gpus == 1:
         run(0, n_gpus, args, devices, data)
     else:
-        procs = []
-        for proc_id in range(n_gpus):
-            p = mp.Process(target=run, args=(proc_id, n_gpus, args, devices, data))
-            p.start()
-            procs.append(p)
-        for p in procs:
-            p.join()
+        mp.spawn(run, args=(n_gpus, args, devices, data), nprocs=n_gpus)
