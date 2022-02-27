@@ -50,11 +50,7 @@ __all__ = [
 ]
 
 def update_graph_structure(g, data_dict, copy_edata=True):
-    r"""
-
-    Description
-    -----------
-    Update the structure of a graph.
+    r"""Update the structure of a graph.
 
     Parameters
     ----------
@@ -93,12 +89,7 @@ def update_graph_structure(g, data_dict, copy_edata=True):
     return new_g
 
 class BaseTransform:
-    r"""
-
-    Description
-    -----------
-    An abstract class for writing transforms.
-    """
+    r"""An abstract class for writing transforms."""
     def __call__(self, g):
         raise NotImplementedError
 
@@ -106,11 +97,7 @@ class BaseTransform:
         return self.__class__.__name__ + '()'
 
 class AddSelfLoop(BaseTransform):
-    r"""
-
-    Description
-    -----------
-    Add self-loops for each node in the graph and return a new graph.
+    r"""Add self-loops for each node in the graph and return a new graph.
 
     For heterogeneous graphs, self-loops are added only for edge types with same
     source and destination node types.
@@ -210,11 +197,7 @@ class AddSelfLoop(BaseTransform):
         return g
 
 class RemoveSelfLoop(BaseTransform):
-    r"""
-
-    Description
-    -----------
-    Remove self-loops for each node in the graph and return a new graph.
+    r"""Remove self-loops for each node in the graph and return a new graph.
 
     For heterogeneous graphs, this operation only applies to edge types with same
     source and destination node types.
@@ -246,11 +229,7 @@ class RemoveSelfLoop(BaseTransform):
     (tensor([1]), tensor([2]))
     """
     def transform_etype(self, c_etype, g):
-        r"""
-
-        Description
-        -----------
-        Transform the graph corresponding to a canonical edge type.
+        r"""Transform the graph corresponding to a canonical edge type.
 
         Parameters
         ----------
@@ -275,11 +254,7 @@ class RemoveSelfLoop(BaseTransform):
         return g
 
 class AddReverse(BaseTransform):
-    r"""
-
-    Description
-    -----------
-    Add a reverse edge :math:`(i,j)` for each edge :math:`(j,i)` in the input graph and
+    r"""Add a reverse edge :math:`(i,j)` for each edge :math:`(j,i)` in the input graph and
     return a new graph.
 
     For a heterogeneous graph, it adds a "reverse" edge type for each edge type
@@ -343,11 +318,7 @@ class AddReverse(BaseTransform):
         self.sym_new_etype = sym_new_etype
 
     def transform_symmetric_etype(self, c_etype, g, data_dict):
-        r"""
-
-        Description
-        -----------
-        Transform the graph corresponding to a symmetric canonical edge type.
+        r"""Transform the graph corresponding to a symmetric canonical edge type.
 
         Parameters
         ----------
@@ -366,11 +337,7 @@ class AddReverse(BaseTransform):
             data_dict[c_etype] = (src, dst)
 
     def transform_asymmetric_etype(self, c_etype, g, data_dict):
-        r"""
-
-        Description
-        -----------
-        Transform the graph corresponding to an asymmetric canonical edge type.
+        r"""Transform the graph corresponding to an asymmetric canonical edge type.
 
         Parameters
         ----------
@@ -389,11 +356,7 @@ class AddReverse(BaseTransform):
         })
 
     def transform_etype(self, c_etype, g, data_dict):
-        r"""
-
-        Description
-        -----------
-        Transform the graph corresponding to a canonical edge type.
+        r"""Transform the graph corresponding to a canonical edge type.
 
         Parameters
         ----------
@@ -434,11 +397,7 @@ class AddReverse(BaseTransform):
         return new_g
 
 class ToSimple(BaseTransform):
-    r"""
-
-    Description
-    -----------
-    Convert a graph to a simple graph without parallel edges and return a new graph.
+    r"""Convert a graph to a simple graph without parallel edges and return a new graph.
 
     Parameters
     ----------
@@ -496,11 +455,7 @@ class ToSimple(BaseTransform):
                                     aggregator=self.aggregator)
 
 class LineGraph(BaseTransform):
-    r"""
-
-    Description
-    -----------
-    Return the line graph of the input graph.
+    r"""Return the line graph of the input graph.
 
     The line graph :math:`L(G)` of a given graph :math:`G` is a graph where
     the nodes in :math:`L(G)` correspond to the edges in :math:`G`. For a pair
@@ -553,11 +508,7 @@ class LineGraph(BaseTransform):
         return functional.line_graph(g, backtracking=self.backtracking, shared=True)
 
 class KHopGraph(BaseTransform):
-    r"""
-
-    Description
-    -----------
-    Return the graph whose edges connect the :math:`k`-hop neighbors of the original graph.
+    r"""Return the graph whose edges connect the :math:`k`-hop neighbors of the original graph.
 
     This module only works for homogeneous graphs.
 
@@ -585,13 +536,10 @@ class KHopGraph(BaseTransform):
         return functional.khop_graph(g, self.k)
 
 class AddMetaPaths(BaseTransform):
-    r"""
+    r"""Add new edges to an input graph based on given metapaths, as described in
+    `Heterogeneous Graph Attention Network <https://arxiv.org/abs/1903.07293>`__.
 
-    Description
-    -----------
-    Add new edges to an input graph based on given metapaths, as described in
-    `Heterogeneous Graph Attention Network <https://arxiv.org/abs/1903.07293>`__. Formally,
-    a metapath is a path of the form
+    Formally, a metapath is a path of the form
 
     .. math::
 
@@ -655,11 +603,7 @@ class AddMetaPaths(BaseTransform):
         return new_g
 
 class Compose(BaseTransform):
-    r"""
-
-    Description
-    -----------
-    Create a transform composed of multiple transforms in sequence.
+    r"""Create a transform composed of multiple transforms in sequence.
 
     Parameters
     ----------
@@ -692,12 +636,8 @@ class Compose(BaseTransform):
         return self.__class__.__name__ + '([\n' + ',\n'.join(args) + '\n])'
 
 class GCNNorm(BaseTransform):
-    r"""
-
-    Description
-    -----------
-    Apply symmetric adjacency normalization to an input graph and save the result edge weights,
-    as described in `Semi-Supervised Classification with Graph Convolutional Networks
+    r"""Apply symmetric adjacency normalization to an input graph and save the result edge
+    weights, as described in `Semi-Supervised Classification with Graph Convolutional Networks
     <https://arxiv.org/abs/1609.02907>`__.
 
     For a heterogeneous graph, this only applies to symmetric canonical edge types, whose source
@@ -768,15 +708,12 @@ class GCNNorm(BaseTransform):
         return g
 
 class PPR(BaseTransform):
-    r"""
-
-    Description
-    -----------
-    Apply personalized PageRank (PPR) to an input graph for diffusion, as introduced in
+    r"""Apply personalized PageRank (PPR) to an input graph for diffusion, as introduced in
     `The pagerank citation ranking: Bringing order to the web
-    <http://ilpubs.stanford.edu:8090/422/>`__. A sparsification will be applied to the
-    weighted adjacency matrix after diffusion. Specifically, edges whose weight is below
-    a threshold will be dropped.
+    <http://ilpubs.stanford.edu:8090/422/>`__.
+
+    A sparsification will be applied to the weighted adjacency matrix after diffusion.
+    Specifically, edges whose weight is below a threshold will be dropped.
 
     This module only works for homogeneous graphs.
 
@@ -819,11 +756,7 @@ class PPR(BaseTransform):
         self.avg_degree = avg_degree
 
     def get_eps(self, num_nodes, mat):
-        r"""
-
-        Description
-        -----------
-        Get the threshold for graph sparsification.
+        r"""Get the threshold for graph sparsification.
         """
         if self.eps is None:
             # Infer from self.avg_degree
@@ -884,13 +817,10 @@ def is_bidirected(g):
 
 # pylint: disable=C0103
 class HeatKernel(BaseTransform):
-    r"""
-
-    Description
-    -----------
-    Apply heat kernel to an input graph for diffusion, as introduced in
+    r"""Apply heat kernel to an input graph for diffusion, as introduced in
     `Diffusion kernels on graphs and other discrete structures
     <https://www.ml.cmu.edu/research/dap-papers/kondor-diffusion-kernels.pdf>`__.
+
     A sparsification will be applied to the weighted adjacency matrix after diffusion.
     Specifically, edges whose weight is below a threshold will be dropped.
 
@@ -935,11 +865,7 @@ class HeatKernel(BaseTransform):
         self.avg_degree = avg_degree
 
     def get_eps(self, num_nodes, mat):
-        r"""
-
-        Description
-        -----------
-        Get the threshold for graph sparsification.
+        r"""Get the threshold for graph sparsification.
         """
         if self.eps is None:
             # Infer from self.avg_degree
@@ -983,14 +909,11 @@ class HeatKernel(BaseTransform):
         return new_g
 
 class GDC(BaseTransform):
-    r"""
+    r"""Apply graph diffusion convolution (GDC) to an input graph, as introduced in
+    `Diffusion Improves Graph Learning <https://www.in.tum.de/daml/gdc/>`__.
 
-    Description
-    -----------
-    Apply graph diffusion convolution (GDC) to an input graph, as introduced in
-    `Diffusion Improves Graph Learning <https://www.in.tum.de/daml/gdc/>`__. A sparsification
-    will be applied to the weighted adjacency matrix after diffusion. Specifically, edges whose
-    weight is below a threshold will be dropped.
+    A sparsification will be applied to the weighted adjacency matrix after diffusion.
+    Specifically, edges whose weight is below a threshold will be dropped.
 
     This module only works for homogeneous graphs.
 
@@ -1033,12 +956,7 @@ class GDC(BaseTransform):
         self.avg_degree = avg_degree
 
     def get_eps(self, num_nodes, mat):
-        r"""
-
-        Description
-        -----------
-        Get the threshold for graph sparsification.
-        """
+        r"""Get the threshold for graph sparsification."""
         if self.eps is None:
             # Infer from self.avg_degree
             if self.avg_degree > num_nodes:
@@ -1079,11 +997,7 @@ class GDC(BaseTransform):
         return new_g
 
 class NodeShuffle(BaseTransform):
-    r"""
-
-    Description
-    -----------
-    Randomly shuffle the nodes.
+    r"""Randomly shuffle the nodes.
 
     Example
     -------
@@ -1116,11 +1030,7 @@ class NodeShuffle(BaseTransform):
 
 # pylint: disable=C0103
 class DropNode(BaseTransform):
-    r"""
-
-    Description
-    -----------
-    Randomly drop nodes, as described in
+    r"""Randomly drop nodes, as described in
     `Graph Contrastive Learning with Augmentations <https://arxiv.org/abs/2010.13902>`__.
 
     Parameters
@@ -1166,11 +1076,7 @@ class DropNode(BaseTransform):
 
 # pylint: disable=C0103
 class DropEdge(BaseTransform):
-    r"""
-
-    Description
-    -----------
-    Randomly drop edges, as described in
+    r"""Randomly drop edges, as described in
     `DropEdge: Towards Deep Graph Convolutional Networks on Node Classification
     <https://arxiv.org/abs/1907.10903>`__ and `Graph Contrastive Learning with Augmentations
     <https://arxiv.org/abs/2010.13902>`__.
@@ -1214,11 +1120,7 @@ class DropEdge(BaseTransform):
         return g
 
 class AddEdge(BaseTransform):
-    r"""
-
-    Description
-    -----------
-    Randomly add edges, as described in `Graph Contrastive Learning with Augmentations
+    r"""Randomly add edges, as described in `Graph Contrastive Learning with Augmentations
     <https://arxiv.org/abs/2010.13902>`__.
 
     Parameters
