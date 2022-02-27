@@ -40,7 +40,45 @@ class _LazyIndex(object):
         return flat_index
 
 class LazyFeature(object):
-    """Placeholder for prefetching from DataLoader.
+    """Placeholder for feature prefetching.
+
+    One can assign this object to ``ndata`` or ``edata`` of the graphs returned by various
+    samplers' :attr:`sample` method.  When DGL's dataloader receives the subgraphs
+    returned by the sampler, it will automatically look up all the ``ndata`` and ``edata``
+    whose data is a LazyFeature, replacing them with the actual data of the corresponding
+    nodes/edges from the original graph instead.  In particular, for a subgraph returned
+    by the sampler has a LazyFeature with name ``k`` in ``subgraph.ndata[key]``:
+
+    .. code:: python
+
+       subgraph.ndata[key] = LazyFeature(k)
+
+    Assuming that ``graph`` is the original graph, DGL's dataloader will perform
+
+    .. code:: python
+
+       subgraph.ndata[key] = graph.ndata[k][subgraph.ndata[dgl.NID]]
+
+    DGL dataloader performs similar replacement for ``edata``.
+    For heterogeneous graphs, the replacement is:
+
+    .. code:: python
+
+       subgraph.nodes[ntype].data[key] = graph.nodes[ntype].data[k][
+           subgraph.nodes[ntype].data[dgl.NID]]
+
+    For MFGs' ``srcdata`` (and similarly ``dstdata``), the replacement is
+
+    .. code:: python
+
+       mfg.srcdata[key] = graph.ndata[k][mfg.srcdata[dgl.NID]]
+
+    Parameters
+    ----------
+    name : str
+        The name of the data in the original graph.
+    id_ : Tensor, optional
+        The ID tensor.
     """
     __slots__ = ['name', 'id_']
     def __init__(self, name=None, id_=None):

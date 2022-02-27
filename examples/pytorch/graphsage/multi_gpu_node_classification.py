@@ -11,8 +11,6 @@ import numpy as np
 from ogb.nodeproppred import DglNodePropPredDataset
 import tqdm
 
-USE_UVA = True
-
 class SAGE(nn.Module):
     def __init__(self, in_feats, n_hidden, n_classes):
         super().__init__()
@@ -70,18 +68,18 @@ def train(rank, world_size, graph, num_classes, split_idx):
 
     train_idx, valid_idx, test_idx = split_idx['train'], split_idx['valid'], split_idx['test']
 
-    if USE_UVA:
-        train_idx = train_idx.to('cuda')
+    train_idx = train_idx.to('cuda')
+    valid_idx = valid_idx.to('cuda')
 
     sampler = dgl.dataloading.NeighborSampler(
             [15, 10, 5], prefetch_node_feats=['feat'], prefetch_labels=['label'])
-    train_dataloader = dgl.dataloading.NodeDataLoader(
+    train_dataloader = dgl.dataloading.DataLoader(
             graph, train_idx, sampler,
             device='cuda', batch_size=1000, shuffle=True, drop_last=False,
-            num_workers=0, use_ddp=True, use_uva=USE_UVA)
+            num_workers=0, use_ddp=True, use_uva=True)
     valid_dataloader = dgl.dataloading.NodeDataLoader(
             graph, valid_idx, sampler, device='cuda', batch_size=1024, shuffle=True,
-            drop_last=False, num_workers=0, use_uva=USE_UVA)
+            drop_last=False, num_workers=0, use_uva=True)
 
     durations = []
     for _ in range(10):
