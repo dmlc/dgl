@@ -28,6 +28,7 @@ Operators for constructing :class:`DGLGraph` from raw data formats.
     segmented_knn_graph
     create_block
     block_to_graph
+    merge
 
 .. _api-subgraph-extraction:
 
