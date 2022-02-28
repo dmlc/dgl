@@ -4,14 +4,11 @@ import torch
 import torch.nn as nn
 
 class TransR(nn.Module):
-    r"""
-
-    Description
-    -----------
-    Similarity measure introduced in
+    r"""Similarity measure from
     `Learning entity and relation embeddings for knowledge graph completion
-    <https://ojs.aaai.org/index.php/AAAI/article/view/9491>`__. Mathematically,
-    it is defined as follows:
+    <https://ojs.aaai.org/index.php/AAAI/article/view/9491>`__
+
+    Mathematically, it is defined as follows:
 
     .. math::
 

@@ -355,6 +355,29 @@ IdArray VecToIdArray(const std::vector<T>& vec,
   return ret.CopyTo(ctx);
 }
 
+/*!
+ * \brief Get the context of the first non-null array, and check if the non-null arrays'
+ * contexts are the same.
+ *
+ * Throws an error if all the arrays are null arrays.
+ */
+inline DLContext GetContextOf(const std::vector<IdArray>& arrays) {
+  bool first = true;
+  DLContext result;
+  for (auto& array : arrays) {
+    if (IsNullArray(array))
+      continue;
+    if (first) {
+      first = false;
+      result = array->ctx;
+    } else {
+      CHECK_EQ(array->ctx, result) << "Context of the input arrays are different";
+    }
+  }
+  CHECK(!first) << "All input arrays are empty.";
+  return result;
+}
+
 }  // namespace aten
 }  // namespace dgl
 

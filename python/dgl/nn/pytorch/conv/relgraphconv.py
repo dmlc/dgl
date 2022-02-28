@@ -7,11 +7,10 @@ from .... import function as fn
 from ..linear import TypedLinear
 
 class RelGraphConv(nn.Module):
-    r"""Relational graph convolution layer.
+    r"""Relational graph convolution layer from `Modeling Relational Data with Graph
+    Convolutional Networks <https://arxiv.org/abs/1703.06103>`__
 
-    Relational graph convolution is introduced in "`Modeling Relational Data with Graph
-    Convolutional Networks <https://arxiv.org/abs/1703.06103>`__"
-    and can be described in DGL as below:
+    It can be described in as below:
 
     .. math::
 
