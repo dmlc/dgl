@@ -3,19 +3,26 @@
 dgl.dataloading
 =================================
 
-.. automodule:: dgl.dataloading
 .. currentmodule:: dgl.dataloading
+
+The ``dgl.dataloading`` package contains:
+
+* ``DataLoader`` classes for iterating over a set of nodes or edges in a graph and generates
+  sampled mini-batches.
+
+* Various ``Sampler`` classes that extract subgraphs and sub-features.
+
+* Negative samplers for link prediction.
+
+The user guide chapter :ref:`guide-minibatch` explains how different components work together.
 
 DataLoaders
 -----------
 
-DGL DataLoader for mini-batch training works similarly to PyTorch's DataLoader.
-It has a generator interface that returns mini-batches sampled from some given graphs.
-DGL provides two DataLoaders: a ``NodeDataLoader`` for node classification task
-and an ``EdgeDataLoader`` for edge/link prediction task.
-
 .. autosummary::
     :toctree: ../../generated/
+    :nosignatures:
+    :template: classtemplate.rst
 
     DataLoader
     NodeDataLoader
@@ -31,6 +38,8 @@ Samplers
 
 .. autosummary::
     :toctree: ../../generated/
+    :nosignatures:
+    :template: classtemplate.rst
 
     Sampler
     BlockSampler
@@ -38,13 +47,6 @@ Samplers
     MultiLayerFullNeighborSampler
     ClusterGCNSampler
     ShaDowKHopSampler
-
-Sampler Transformations
------------------------
-
-.. autosummary::
-    :toctree: ../../generated/
-
     as_edge_prediction_sampler
 
 .. _api-dataloading-negative-sampling:
@@ -53,10 +55,10 @@ Negative Samplers for Link Prediction
 -------------------------------------
 .. currentmodule:: dgl.dataloading.negative_sampler
 
-Negative samplers are classes that control the behavior of the edge prediction samplers
-
 .. autosummary::
     :toctree: ../../generated/
+    :nosignatures:
+    :template: classtemplate.rst
 
     Uniform
     PerSourceUniform
@@ -68,9 +70,11 @@ Utility Class and Functions for Feature Prefetching
 
 .. autosummary::
     :toctree: ../../generated/
+    :nosignatures:
+    :template: classtemplate.rst
 
-    LazyFeature
     set_node_lazy_features
     set_edge_lazy_features
     set_src_lazy_features
     set_dst_lazy_features
+    LazyFeature
