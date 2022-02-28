@@ -127,7 +127,7 @@ std::pair<IdArray, IdArray> RandomWalkUniform(
       device->AllocWorkspace(ctx, (num_etypes) * sizeof(GraphKernelData<IdType>)));
   auto d_metapath_data = metapath_data;
   // copy graph metadata pointers to GPU
-  device->CopyDataFromTo(h_graphs, 0, d_graphs, 0,
+  device->CopyDataFromTo(h_graphs.data(), 0, d_graphs, 0,
       (num_etypes) * sizeof(GraphKernelData<IdType>),
       DGLContext{kDLCPU, 0},
       ctx,
