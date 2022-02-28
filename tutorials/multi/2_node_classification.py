@@ -245,12 +245,13 @@ graph.create_formats_()
 #    Python’s built-in ``multiprocessing`` except that it handles the
 #    subtleties between forking and multithreading in Python.
 # 
-
-# Say you have four GPUs.
-if __name__ == '__main__':
-    num_gpus = 4
-    import torch.multiprocessing as mp
-    mp.spawn(run, args=(list(range(num_gpus)),), nprocs=num_gpus)
+# .. code:: python
+#
+#    # Say you have four GPUs.
+#    if __name__ == '__main__':
+#        num_gpus = 4
+#        import torch.multiprocessing as mp
+#        mp.spawn(run, args=(list(range(num_gpus)),), nprocs=num_gpus)
 
 # Thumbnail credits: Stanford CS224W Notes
 # sphinx_gallery_thumbnail_path = '_static/blitz_1_introduction.png'
