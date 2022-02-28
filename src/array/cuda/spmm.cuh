@@ -18,7 +18,6 @@ namespace dgl {
 using namespace cuda;
 
 namespace aten {
-namespace cuda {
 
 namespace {
 
@@ -410,6 +409,8 @@ void CusparseCsrmm2Hetero(
       LOG(FATAL) << "Unsupported SpMM binary operator: " << op;     \
     }                                                               \
   } while (0)
+
+namespace cuda {
 
 
 /*!

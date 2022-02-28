@@ -58,7 +58,7 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
       for (int i = 1; i < ufeat->ndim; ++i)
         x_length *= ufeat->shape[i];
       SWITCH_BITS(bits, DType, {
-        cusparse::CusparseCsrmm2<DType, IdType>(
+        CusparseCsrmm2<DType, IdType>(
             ufeat->ctx, csr,
             static_cast<DType*>(ufeat->data),
             nullptr,
@@ -76,7 +76,7 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
         });
       }
       SWITCH_BITS(bits, DType, {
-        cusparse::CusparseCsrmm2<DType, IdType>(
+        CusparseCsrmm2<DType, IdType>(
             ufeat->ctx, csr,
             static_cast<DType*>(ufeat->data),
             static_cast<DType*>(efeat->data),

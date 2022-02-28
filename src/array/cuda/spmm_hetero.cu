@@ -130,7 +130,7 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
           /* If CUDA is less than 11.0, put the output in trans_out for later transposition */
           DType *out = (CUDART_VERSION < 11000) ? trans_out[dst_id] :
             static_cast<DType*>((*vec_out)[dst_id]->data);
-          cusparse::CusparseCsrmm2Hetero<DType, IdType>(
+          CusparseCsrmm2Hetero<DType, IdType>(
               csr.indptr->ctx, csr,
               static_cast<DType*>(vec_ufeat[src_id]->data),
               nullptr,
@@ -141,7 +141,7 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
           NDArray efeat = vec_efeat[etype];
           if (!IsNullArray(csr.data))
             efeat = _IndexSelect<DType, IdType>(efeat, csr.data);
-          cusparse::CusparseCsrmm2Hetero<DType, IdType>(
+          CusparseCsrmm2Hetero<DType, IdType>(
               csr.indptr->ctx, csr,
               static_cast<DType*>(vec_ufeat[src_id]->data),
               static_cast<DType*>(efeat->data),
