@@ -83,8 +83,6 @@ Datasets for graph classification/regression tasks
     LegacyTUDataset
     GINDataset
     FakeNewsDataset
-    AsNodePredDataset
-    AsEdgePredDataset
 
 Dataset adapters
 -------------------
