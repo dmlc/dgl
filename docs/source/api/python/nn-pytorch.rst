@@ -34,6 +34,7 @@ Conv Layers
     ~dgl.nn.pytorch.conv.TWIRLSConv
     ~dgl.nn.pytorch.conv.TWIRLSUnfoldingAndAttention
     ~dgl.nn.pytorch.conv.GCN2Conv
+    ~dgl.nn.pytorch.conv.HGTConv
 
 Dense Conv Layers
 ----------------------------------------
