@@ -24,7 +24,9 @@ Commands:
   train      Launch training
 ```
 
-![img](./dglgo.png)
+<p align="center">
+  <img src="./dglgo.png" height="400">
+</p>
 
 Using DGL-Go is as easy as three steps:
 
