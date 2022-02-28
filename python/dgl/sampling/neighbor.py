@@ -309,6 +309,10 @@ def _sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
         nodes = {g.ntypes[0] : nodes}
 
     nodes = utils.prepare_tensor_dict(g, nodes, 'nodes')
+    if len(nodes) == 0:
+        raise ValueError(
+            "Got an empty dictionary in the nodes argument. "
+            "Please pass in a dictionary with empty tensors as values instead.")
     ctx = utils.to_dgl_context(F.context(next(iter(nodes.values()))))
     nodes_all_types = []
     for ntype in g.ntypes:
