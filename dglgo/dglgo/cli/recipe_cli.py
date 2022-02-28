@@ -27,7 +27,6 @@ def list_recipes():
         typer.echo("| {:<30} |  {:<18} | {:<20} |".format(f["file_name"], f["pipeline_name"], f["dataset_name"]))
     typer.echo("="*len(header))
 
-
 def get_recipe(recipe_name: Optional[str] = typer.Argument(None, help="The recipe filename to get, e.q. nodepred_citeseer_gcn.yaml")):
     if recipe_name is None:
         typer.echo("Usage: dgl recipe get [RECIPE_NAME] \n")
