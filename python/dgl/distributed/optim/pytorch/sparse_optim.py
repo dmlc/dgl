@@ -48,17 +48,16 @@ class DistSparseGradOptimizer(abc.ABC):
             for emb in self._params:
                 name = emb._tensor.name
                 kvstore = emb._tensor.kvstore
-                trace = emb._trace
                 trainers_per_server = self._world_size // kvstore.num_servers
 
                 idics = []
                 grads = []
-                for t in trace:
-                    if t[1].grad is not None:
-                        idics.append(t[0])
-                        grads.append(t[1].grad.data)
+                for trace in emb._trace:
+                    if trace[1].grad is not None:
+                        idics.append(trace[0])
+                        grads.append(trace[1].grad.data)
                     else:
-                        assert len(t[0]) == 0
+                        assert len(trace[0]) == 0
                 # If the sparse embedding is not used in the previous forward step
                 # The idx and grad will be empty, initialize them as empty tensors to
                 # avoid crashing the optimizer step logic.
