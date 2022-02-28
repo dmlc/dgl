@@ -227,17 +227,18 @@ def main(rank, world_size, dataset, seed=0):
 
 ###############################################################################
 # Finally we load the dataset and launch the processes.
-# 
-
-if __name__ == '__main__':
-    import torch.multiprocessing as mp
-
-    from dgl.data import GINDataset
-
-    num_gpus = 4
-    procs = []
-    dataset = GINDataset(name='IMDBBINARY', self_loop=False)
-    mp.spawn(main, args=(num_gpus, dataset), nprocs=num_gpus)
+#
+# .. code:: python
+#
+#    if __name__ == '__main__':
+#        import torch.multiprocessing as mp
+#    
+#        from dgl.data import GINDataset
+#    
+#        num_gpus = 4
+#        procs = []
+#        dataset = GINDataset(name='IMDBBINARY', self_loop=False)
+#        mp.spawn(main, args=(num_gpus, dataset), nprocs=num_gpus)
 
 # Thumbnail credits: DGL
 # sphinx_gallery_thumbnail_path = '_static/blitz_5_graph_classification.png'
