@@ -97,6 +97,7 @@ def main(args, devices):
 
     # Create csr/coo/csc formats before launching training processes.
     # This avoids creating certain formats in each sub-process, which saves momory and CPU.
+    g = data[0]
     g.create_formats_()
 
     n_gpus = len(devices)
