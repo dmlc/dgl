@@ -110,7 +110,7 @@ std::pair<IdArray, IdArray> RandomWalkUniform(
   IdType *traces_data = traces.Ptr<IdType>();
   IdType *eids_data = eids.Ptr<IdType>();
 
-  GraphKernelData<IdType> h_graphs[num_etypes];
+  std::vector<GraphKernelData<IdType>> h_graphs(num_etypes);
   DGLContext ctx;
   for (int64_t etype = 0; etype < num_etypes; ++etype) {
     const CSRMatrix &csr = hg->GetCSRMatrix(etype);
