@@ -21,6 +21,7 @@ def list_recipes():
             "pipeline_name": cfg["pipeline_name"],
             "dataset_name": cfg["data"]["name"]
         })
+    # sort by pipeline, if same sort by dataset, if same sort by file name
     output_list.sort(key=lambda f: (f["pipeline_name"], f["dataset_name"], f["file_name"]))
     for f in output_list:
         typer.echo("| {:<30} |  {:<18} | {:<20} |".format(f["file_name"], f["pipeline_name"], f["dataset_name"]))
