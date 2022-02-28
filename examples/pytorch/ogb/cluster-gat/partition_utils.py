@@ -3,7 +3,7 @@ from time import time
 import numpy as np
 
 import dgl
-from dgl.transform import metis_partition
+from dgl.transforms import metis_partition
 from dgl import backend as F
 
 def get_partition_list(g, psize):

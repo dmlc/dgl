@@ -2,6 +2,7 @@
 from .conv import *
 from .explain import *
 from .link import *
+from .linear import *
 from .glob import *
 from .softmax import *
 from .factory import *

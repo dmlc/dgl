@@ -131,23 +131,25 @@ class NodeData(BaseData):
 
     @staticmethod
     def to_dict(node_data: List['NodeData']) -> dict:
-        # node_ids could be arbitrary numeric values, namely non-sorted, duplicated, not labeled from 0 to num_nodes-1
+        # node_ids could be numeric or non-numeric values, but duplication is not allowed.
         node_dict = {}
         for n_data in node_data:
             graph_ids = np.unique(n_data.graph_id)
             for graph_id in graph_ids:
                 idx = n_data.graph_id == graph_id
                 ids = n_data.id[idx]
-                u_ids, u_indices = np.unique(ids, return_index=True)
+                u_ids, u_indices, u_counts = np.unique(
+                    ids, return_index=True, return_counts=True)
                 if len(ids) > len(u_ids):
-                    dgl_warning(
-                        "There exist duplicated ids and only the first ones are kept.")
+                    raise DGLError("Node IDs are required to be unique but the following ids are duplicate: {}".format(
+                        u_ids[u_counts > 1]))
                 if graph_id not in node_dict:
                     node_dict[graph_id] = {}
                 node_dict[graph_id][n_data.type] = {'mapping': {index: i for i,
                                                                 index in enumerate(ids[u_indices])},
                                                     'data': {k: _tensor(v[idx][u_indices])
-                                                             for k, v in n_data.data.items()}}
+                                                             for k, v in n_data.data.items()},
+                                                    'dtype': ids.dtype}
         return node_dict
 
 
@@ -192,8 +194,10 @@ class EdgeData(BaseData):
                 idx = e_data.graph_id == graph_id
                 src_mapping = node_dict[graph_id][src_type]['mapping']
                 dst_mapping = node_dict[graph_id][dst_type]['mapping']
-                src_ids = [src_mapping[index] for index in e_data.src[idx]]
-                dst_ids = [dst_mapping[index] for index in e_data.dst[idx]]
+                orig_src_ids = e_data.src[idx].astype(node_dict[graph_id][src_type]['dtype'])
+                orig_dst_ids = e_data.dst[idx].astype(node_dict[graph_id][dst_type]['dtype'])
+                src_ids = [src_mapping[index] for index in orig_src_ids]
+                dst_ids = [dst_mapping[index] for index in orig_dst_ids]
                 if graph_id not in edge_dict:
                     edge_dict[graph_id] = {}
                 edge_dict[graph_id][e_data.type] = {'edges': (_tensor(src_ids), _tensor(dst_ids)),

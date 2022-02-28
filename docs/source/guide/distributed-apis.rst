@@ -202,8 +202,8 @@ DGL provides two levels of APIs for sampling nodes and edges to generate mini-ba
 (see the section of mini-batch training). The low-level APIs require users to write code
 to explicitly define how a layer of nodes are sampled (e.g., using :func:`dgl.sampling.sample_neighbors` ).
 The high-level sampling APIs implement a few popular sampling algorithms for node classification
-and link prediction tasks (e.g., :class:`~dgl.dataloading.pytorch.NodeDataLoader` and
-:class:`~dgl.dataloading.pytorch.EdgeDataLoader` ).
+and link prediction tasks (e.g., :class:`~dgl.dataloading.NodeDataLoader` and
+:class:`~dgl.dataloading.EdgeDataLoader` ).
 
 The distributed sampling module follows the same design and provides two levels of sampling APIs.
 For the lower-level sampling API, it provides :func:`~dgl.distributed.sample_neighbors` for
@@ -240,10 +240,10 @@ difference is that users need to use :func:`dgl.distributed.sample_neighbors` an
         for batch in dataloader:
             ...
 
-The high-level sampling APIs (:class:`~dgl.dataloading.pytorch.NodeDataLoader` and
-:class:`~dgl.dataloading.pytorch.EdgeDataLoader` ) has distributed counterparts
-(:class:`~dgl.dataloading.pytorch.DistNodeDataLoader` and
-:class:`~dgl.dataloading.pytorch.DistEdgeDataLoader`).  The code is exactly the
+The high-level sampling APIs (:class:`~dgl.dataloading.NodeDataLoader` and
+:class:`~dgl.dataloading.EdgeDataLoader` ) has distributed counterparts
+(:class:`~dgl.dataloading.DistNodeDataLoader` and
+:class:`~dgl.dataloading.DistEdgeDataLoader`).  The code is exactly the
 same as single-process sampling otherwise.
 
 .. code:: python

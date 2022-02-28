@@ -173,7 +173,8 @@ set at each iteration. ``prop_edges_YYY`` applies traversal algorithm ``YYY`` an
 Utilities
 -----------------------------------------------
 
-Other utilities for controlling randomness, saving and loading graphs, etc.
+Other utilities for controlling randomness, saving and loading graphs, functions that applies
+the same function to every elements in a container, etc.
 
 .. autosummary::
     :toctree: ../../generated/
@@ -181,3 +182,4 @@ Other utilities for controlling randomness, saving and loading graphs, etc.
     seed
     save_graphs
     load_graphs
+    apply_each
