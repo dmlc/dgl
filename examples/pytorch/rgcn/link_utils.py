@@ -158,7 +158,7 @@ class SubgraphIterator:
         sub_g = dgl.graph((src, dst), num_nodes=num_nodes)
         sub_g.edata[dgl.ETYPE] = th.from_numpy(rel)
         sub_g.edata['norm'] = dgl.norm_by_dst(sub_g).unsqueeze(-1)
-        uniq_v = th.from_numpy(uniq_v).view(-1, 1).long()
+        uniq_v = th.from_numpy(uniq_v).view(-1).long()
 
         return sub_g, uniq_v, samples, labels
 

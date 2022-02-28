@@ -8,6 +8,16 @@ from ..base import DGLError
 class CSVDataset(DGLDataset):
     """Dataset class that loads and parses graph data from CSV files.
 
+    This class requires the following additional packages:
+
+        - pyyaml >= 5.4.1
+        - pandas >= 1.1.5
+        - pydantic >= 1.9.0
+
+    The parsed graph and feature data will be cached for faster reloading. If
+    the source CSV files are modified, please specify ``force_reload=True``
+    to re-parse from them.
+
     Parameters
     ----------
     data_path : str

@@ -8,12 +8,8 @@ from ....utils import expand_as_pair
 
 
 class GINConv(nn.Block):
-    r"""
-
-    Description
-    -----------
-    Graph Isomorphism Network layer from paper `How Powerful are Graph
-    Neural Networks? <https://arxiv.org/pdf/1810.00826.pdf>`__.
+    r"""Graph Isomorphism layer from `How Powerful are Graph
+    Neural Networks? <https://arxiv.org/pdf/1810.00826.pdf>`__
 
     .. math::
         h_i^{(l+1)} = f_\Theta \left((1 + \epsilon) h_i^{l} +
