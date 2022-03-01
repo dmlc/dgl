@@ -159,6 +159,8 @@ ToBlock<kDLCPU, int64_t>(HeteroGraphPtr graph,
   return ToBlockCPU<int64_t>(graph, rhs_nodes, include_rhs_in_lhs, lhs_nodes);
 }
 
+#ifdef DGL_USE_CUDA
+
 // Forward declaration of GPU ToBlock implementations - actual implementation is in
 // ./cuda/cuda_to_block.cu
 // This is to get around the broken name mangling in VS2019 CL 16.5.5 + CUDA 11.3
@@ -186,6 +188,7 @@ ToBlock<kDLGPU, int64_t>(HeteroGraphPtr graph,
   return ToBlockGPU64(graph, rhs_nodes, include_rhs_in_lhs, lhs_nodes);
 }
 
+#endif  // DGL_USE_CUDA
 
 DGL_REGISTER_GLOBAL("transform._CAPI_DGLToBlock")
 .set_body([] (DGLArgs args, DGLRetValue *rv) {
