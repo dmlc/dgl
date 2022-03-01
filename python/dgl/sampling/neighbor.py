@@ -309,12 +309,17 @@ def _sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
         nodes = {g.ntypes[0] : nodes}
 
     nodes = utils.prepare_tensor_dict(g, nodes, 'nodes')
+    if len(nodes) == 0:
+        raise ValueError(
+            "Got an empty dictionary in the nodes argument. "
+            "Please pass in a dictionary with empty tensors as values instead.")
+    ctx = utils.to_dgl_context(F.context(next(iter(nodes.values()))))
     nodes_all_types = []
     for ntype in g.ntypes:
         if ntype in nodes:
             nodes_all_types.append(F.to_dgl_nd(nodes[ntype]))
         else:
-            nodes_all_types.append(nd.array([], ctx=nd.cpu()))
+            nodes_all_types.append(nd.array([], ctx=ctx))
 
     if isinstance(fanout, nd.NDArray):
         fanout_array = fanout
@@ -354,7 +359,7 @@ def _sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
             if etype in exclude_edges:
                 excluded_edges_all_t.append(F.to_dgl_nd(exclude_edges[etype]))
             else:
-                excluded_edges_all_t.append(nd.array([], ctx=nd.cpu()))
+                excluded_edges_all_t.append(nd.array([], ctx=ctx))
 
     subgidx = _CAPI_DGLSampleNeighbors(g._graph, nodes_all_types, fanout_array,
                                        edge_dir, prob_arrays, excluded_edges_all_t, replace)
