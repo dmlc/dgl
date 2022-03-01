@@ -381,9 +381,9 @@ ToBlockGPU(
 
 }  // namespace
 
-template<>
 std::tuple<HeteroGraphPtr, std::vector<IdArray>>
-ToBlock<kDLGPU, int32_t>(
+// ToBlock<kDLGPU, int32_t>
+ToBlockGPU32(
     HeteroGraphPtr graph,
     const std::vector<IdArray> &rhs_nodes,
     bool include_rhs_in_lhs,
@@ -391,9 +391,9 @@ ToBlock<kDLGPU, int32_t>(
   return ToBlockGPU<int32_t>(graph, rhs_nodes, include_rhs_in_lhs, lhs_nodes);
 }
 
-template<>
 std::tuple<HeteroGraphPtr, std::vector<IdArray>>
-ToBlock<kDLGPU, int64_t>(
+// ToBlock<kDLGPU, int64_t>
+ToBlockGPU64(
     HeteroGraphPtr graph,
     const std::vector<IdArray> &rhs_nodes,
     bool include_rhs_in_lhs,
