@@ -85,11 +85,11 @@ test_nids = idx_split['test']
 # DGL provides tools to iterate over the dataset in minibatches
 # while generating the computation dependencies to compute their outputs
 # with the MFGs above. For node classification, you can use
-# ``dgl.dataloading.NodeDataLoader`` for iterating over the dataset.
+# ``dgl.dataloading.DataLoader`` for iterating over the dataset.
 # It accepts a sampler object to control how to generate the computation
 # dependencies in the form of MFGs.  DGL provides
 # implementations of common sampling algorithms such as
-# ``dgl.dataloading.MultiLayerNeighborSampler`` which randomly picks
+# ``dgl.dataloading.NeighborSampler`` which randomly picks
 # a fixed number of neighbors for each node.
 #
 # .. note::
@@ -97,7 +97,7 @@ test_nids = idx_split['test']
 #    To write your own neighbor sampler, please refer to :ref:`this user
 #    guide section <guide-minibatch-customizing-neighborhood-sampler>`.
 #
-# The syntax of ``dgl.dataloading.NodeDataLoader`` is mostly similar to a
+# The syntax of ``dgl.dataloading.DataLoader`` is mostly similar to a
 # PyTorch ``DataLoader``, with the addition that it needs a graph to
 # generate computation dependency from, a set of node IDs to iterate on,
 # and the neighbor sampler you defined.
@@ -107,9 +107,9 @@ test_nids = idx_split['test']
 # like the following.
 #
 
-sampler = dgl.dataloading.MultiLayerNeighborSampler([4, 4])
-train_dataloader = dgl.dataloading.NodeDataLoader(
-    # The following arguments are specific to NodeDataLoader.
+sampler = dgl.dataloading.NeighborSampler([4, 4])
+train_dataloader = dgl.dataloading.DataLoader(
+    # The following arguments are specific to DGL's DataLoader.
     graph,              # The graph
     train_nids,         # The node IDs to iterate over in minibatches
     sampler,            # The neighbor sampler
@@ -141,7 +141,7 @@ print("To compute {} nodes' outputs, we need {} nodes' input features".format(le
 
 
 ######################################################################
-# ``NodeDataLoader`` gives us three items per iteration.
+# DGL's ``DataLoader`` gives us three items per iteration.
 #
 # -  An ID tensor for the input nodes, i.e., nodes whose input features
 #    are needed on the first GNN layer for this minibatch.
@@ -262,7 +262,7 @@ opt = torch.optim.Adam(model.parameters())
 # loader.
 #
 
-valid_dataloader = dgl.dataloading.NodeDataLoader(
+valid_dataloader = dgl.dataloading.DataLoader(
     graph, valid_nids, sampler,
     batch_size=1024,
     shuffle=False,

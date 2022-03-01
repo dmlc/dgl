@@ -38,14 +38,18 @@ from .convert import *
 from .generators import *
 from .heterograph import DGLHeteroGraph
 from .heterograph import DGLHeteroGraph as DGLGraph  # pylint: disable=reimported
+from .dataloading import set_src_lazy_features, set_dst_lazy_features, set_edge_lazy_features, \
+    set_node_lazy_features
 from .merge import *
 from .subgraph import *
 from .traversal import *
-from .transform import *
+from .transforms import *
 from .propagate import *
 from .random import *
 from .data.utils import save_graphs, load_graphs
 from . import optim
+from .frame import LazyFeature
+from .utils import apply_each
 
 from ._deprecate.graph import DGLGraph as DGLGraphStale
 from ._deprecate.nodeflow import *

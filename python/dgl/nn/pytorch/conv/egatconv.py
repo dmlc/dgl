@@ -10,15 +10,10 @@ from ....base import DGLError
 
 # pylint: enable=W0235
 class EGATConv(nn.Module):
-    r"""
-    Description
-    -----------
-    Apply Graph Attention Layer over input graph. EGAT is an extension
-    of regular `Graph Attention Network <https://arxiv.org/pdf/1710.10903.pdf>`__
-    handling edge features, detailed description is available in `Rossmann-Toolbox
-    <https://pubmed.ncbi.nlm.nih.gov/34571541/>`__ (see supplementary data).
-    The difference appears in the method how unnormalized attention scores :math:`e_{ij}`
-    are obtained:
+    r"""Graph attention layer that handles edge features from `Rossmann-Toolbox
+    <https://pubmed.ncbi.nlm.nih.gov/34571541/>`__ (see supplementary data)
+
+    The difference lies in how unnormalized attention scores :math:`e_{ij}` are obtained:
 
     .. math::
         e_{ij} &= \vec{F} (f_{ij}^{\prime})
@@ -27,7 +22,7 @@ class EGATConv(nn.Module):
 
     where :math:`f_{ij}^{\prime}` are edge features, :math:`\mathrm{A}` is weight matrix and
 
-    :math: `\vec{F}` is weight vector. After that resulting node features
+    :math: `\vec{F}` is weight vector. After that, resulting node features
     :math:`h_{i}^{\prime}` are updated in the same way as in regular GAT.
 
     Parameters
@@ -53,19 +48,19 @@ class EGATConv(nn.Module):
 
     >>> num_nodes, num_edges = 8, 30
     >>> # generate a graph
-    >>> graph = dgl.rand_graph((num_nodes,num_edges))
+    >>> graph = dgl.rand_graph(num_nodes,num_edges)
 
     >>> node_feats = th.rand((num_nodes, 20))
     >>> edge_feats = th.rand((num_edges, 12))
     >>> egat = EGATConv(in_node_feats=20,
-                        in_edge_feats=12,
-                        out_node_feats=15,
-                        out_edge_feats=10,
-                        num_heads=3)
+    ...                 in_edge_feats=12,
+    ...                 out_node_feats=15,
+    ...                 out_edge_feats=10,
+    ...                 num_heads=3)
     >>> #forward pass
     >>> new_node_feats, new_edge_feats = egat(graph, node_feats, edge_feats)
     >>> new_node_feats.shape, new_edge_feats.shape
-    ((8, 3, 12), (30, 3, 10))
+    torch.Size([8, 3, 15]) torch.Size([30, 3, 10])
     """
 
     def __init__(self,

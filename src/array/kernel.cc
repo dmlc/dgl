@@ -52,6 +52,132 @@ void SpMM(const std::string& op, const std::string& reduce,
   });
 }
 
+
+/*! \brief Generalized segmented dense Matrix-Matrix Multiplication. */
+void SegmentMM(const NDArray A,
+               const NDArray B,
+               NDArray C,
+               const NDArray seglen_A,
+               bool A_trans, bool B_trans) {
+  CHECK_EQ(A->ndim, 2) << "segment_mm expects a 2D tensor for the first input.";
+  CHECK_EQ(B->ndim, 3) << "segment_mm expects a 3D tensor for the second input.";
+  CHECK(!A_trans);
+  if (B_trans) {
+    CHECK_EQ(A->shape[1], B->shape[2])
+      << "segment_mm expects A.shape[1] == B.shape[2] when B_trans=True";
+  } else {
+    CHECK_EQ(A->shape[1], B->shape[1]) << "segment_mm expects A.shape[1] == B.shape[1]";
+  }
+  CHECK_EQ(B->shape[0], seglen_A.NumElements())
+    << "segment_mm expects len(seglen_A) == B.shape[0]";
+  CHECK_EQ(seglen_A->ctx.device_type, kDLCPU)
+    << "segment_mm expects seglen_A to be on CPU.";
+  CHECK(A->ctx == B->ctx) << "segment_mm expects A and B to be of the same device";
+  ATEN_XPU_SWITCH_CUDA(A->ctx.device_type, XPU, "SegmentMM", {
+    ATEN_ID_TYPE_SWITCH(seglen_A->dtype, IdType, {
+      ATEN_FLOAT_BITS_SWITCH(A->dtype, bits, "Feature data", {
+        SegmentMM<XPU, IdType, bits>(A, B, C, seglen_A, A_trans, B_trans);
+      });
+    });
+  });
+}
+
+void SegmentMMBackwardB(const NDArray A,
+                        const NDArray dC,
+                        NDArray dB,
+                        const NDArray seglen) {
+  CHECK_EQ(A->ndim, 2) << "segment_mm_backward operator expects a 2D tensor for the first input.";
+  CHECK_EQ(dC->ndim, 2)
+    << "segment_mm_backward operator expects a 2D tensor for the second input.";
+  CHECK_EQ(seglen->ctx.device_type, kDLCPU)
+    << "segment_mm expects seglen to be on CPU.";
+  ATEN_XPU_SWITCH_CUDA(A->ctx.device_type, XPU, "SegmentMMBackwardB", {
+    ATEN_ID_TYPE_SWITCH(seglen->dtype, IdType, {
+      ATEN_FLOAT_BITS_SWITCH(A->dtype, bits, "Feature data", {
+        SegmentMMBackwardB<XPU, IdType, bits>(A, dC, dB, seglen);
+      });
+    });
+  });
+}
+
+
+/*! \brief Generalized Dense Matrix-Matrix Multiplication according to relation types. */
+void GatherMM(const NDArray A,
+              const NDArray B,
+              NDArray C,
+              const NDArray idx_a,
+              const NDArray idx_b) {
+  CHECK_EQ(A->ndim, 2) << "gather_mm operator expects a 2D tensor for the first input.";
+  CHECK_EQ(B->ndim, 3) << "gather_mm operator expects a 3D tensor for the second input.";
+  CHECK(A->ctx == B->ctx)
+    << "gather_mm expects all arguments to be on the same device.";
+  if (aten::IsNullArray(idx_a)) {
+    CHECK_EQ(A->shape[0], idx_b->shape[0])
+      << "gather_mm expects len(idx_b) == A.shape[0] when idx_a is None.";
+    CHECK(A->ctx == idx_b->ctx)
+      << "gather_mm expects all arguments to be on the same device.";
+  } else if (aten::IsNullArray(idx_b)) {
+    CHECK_EQ(B->shape[0], idx_a->shape[0])
+      << "gather_mm expects len(idx_a) == B.shape[0] when idx_b is None.";
+    CHECK(A->ctx == idx_a->ctx)
+      << "gather_mm expects all arguments to be on the same device.";
+  } else {
+    CHECK_EQ(idx_a->shape[0], idx_b->shape[0])
+      << "gather_mm expects len(idx_a) == len(idx_b) when both idx_a and idx_b are given.";
+    CHECK(A->ctx == idx_a->ctx && A->ctx == idx_b->ctx)
+      << "gather_mm expects all arguments to be on the same device.";
+  }
+  const auto idtype = aten::IsNullArray(idx_a)? idx_b->dtype : idx_a->dtype;
+  ATEN_XPU_SWITCH_CUDA(A->ctx.device_type, XPU, "GatherMM", {
+    ATEN_ID_TYPE_SWITCH(idtype, IdType, {
+      ATEN_FLOAT_BITS_SWITCH(A->dtype, bits, "Feature data", {
+        GatherMM<XPU, IdType, bits>(A, B, C, idx_a, idx_b);
+      });
+    });
+  });
+}
+
+
+/*! \brief Generalized Dense Matrix-Matrix Multiplication according to relation types. */
+void GatherMMScatter(const NDArray A,
+                     const NDArray B,
+                     NDArray C,
+                     const NDArray idx_a,
+                     const NDArray idx_b,
+                     const NDArray idx_c) {
+  CHECK_EQ(A->ndim, 2) << "gather_mm_scatter expects a 2D tensor for the first input.";
+  CHECK(A->ctx == B->ctx)
+    << "gather_mm_scatter expects all arguments to be on the same device.";
+  if (!aten::IsNullArray(idx_c))
+    CHECK(A->ctx == idx_c->ctx)
+      << "gather_mm_scatter expects all arguments to be on the same device.";
+  if (aten::IsNullArray(idx_a) && !aten::IsNullArray(idx_b)) {
+    CHECK_EQ(A->shape[0], idx_b->shape[0])
+      << "gather_mm_scatter expects len(idx_b) == A.shape[0] when idx_a is None.";
+    CHECK(A->ctx == idx_b->ctx)
+      << "gather_mm_scatter expects all arguments to be on the same device.";
+  } else if (aten::IsNullArray(idx_b) && !aten::IsNullArray(idx_a)) {
+    CHECK_EQ(B->shape[0], idx_a->shape[0])
+      << "gather_mm_scatter expects len(idx_a) == B.shape[0] when idx_b is None.";
+    CHECK(A->ctx == idx_a->ctx)
+      << "gather_mm_scatter expects all arguments to be on the same device.";
+  } else if (!aten::IsNullArray(idx_b) && !aten::IsNullArray(idx_a)) {
+    CHECK_EQ(idx_a->shape[0], idx_b->shape[0])
+      << "gather_mm_scatter expects len(idx_a) == len(idx_b) "
+      << "when both idx_a and idx_b are given.";
+    CHECK(A->ctx == idx_a->ctx && A->ctx == idx_b->ctx)
+      << "gather_mm_scatter expects all arguments to be on the same device.";
+  }
+  ATEN_XPU_SWITCH_CUDA(A->ctx.device_type, XPU, "GatherMM", {
+    ATEN_ID_TYPE_SWITCH(idx_c->dtype, IdType, {
+      ATEN_FLOAT_BITS_SWITCH(A->dtype, bits, "Feature data", {
+        GatherMMScatter<XPU, IdType, bits>(A, B, C, idx_a, idx_b, idx_c);
+      });
+    });
+  });
+}
+
+
 /*! \brief Generalized Sparse Matrix-Matrix Multiplication with hetero-graph support. */
 void SpMMHetero(const std::string& op, const std::string& reduce,
           HeteroGraphPtr graph,
@@ -388,6 +514,47 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSpMM")
         {U, E, V, ArgU, ArgE},
         {"U_data", "E_data", "out", "Arg_U", "Arg_E"});
     SpMM(op, reduce_op, graph.sptr(), U, E, V, {ArgU, ArgE});
+  });
+
+DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelGATHERMM")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    NDArray A = args[0];
+    NDArray B = args[1];
+    NDArray C = args[2];
+    NDArray idx_a = args[3];
+    NDArray idx_b = args[4];
+    GatherMM(A, B, C, idx_a, idx_b);
+  });
+
+DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelGATHERMMSCATTER")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    NDArray A = args[0];
+    NDArray B = args[1];
+    NDArray C = args[2];
+    NDArray idx_a = args[3];
+    NDArray idx_b = args[4];
+    NDArray idx_c = args[5];
+    GatherMMScatter(A, B, C, idx_a, idx_b, idx_c);
+  });
+
+DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSEGMENTMM")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    NDArray A = args[0];
+    NDArray B = args[1];
+    NDArray C = args[2];
+    NDArray seglen_A = args[3];
+    bool A_trans = args[4];
+    bool B_trans = args[5];
+    SegmentMM(A, B, C, seglen_A, A_trans, B_trans);
+  });
+
+DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSEGMENTMMBackwardB")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    NDArray A = args[0];
+    NDArray dC = args[1];
+    NDArray dB = args[2];
+    NDArray seglen = args[3];
+    SegmentMMBackwardB(A, dC, dB, seglen);
   });
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelEdge_softmax_forward")

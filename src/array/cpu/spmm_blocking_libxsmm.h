@@ -454,7 +454,7 @@ void SpMMRedopCsrOpt(
   const IdType K = csr.num_cols;
   const IdType* indptr = csr.indptr.Ptr<IdType>();
   CHECK_NOTNULL(indptr);
-  const int total_nnz = indptr[M];
+  const IdType total_nnz = indptr[M];
   if (M <= 0 || K <= 0 || N <= 0 || total_nnz <= 0) return;
 
   const double avg_degree = total_nnz * 1.0 / M;

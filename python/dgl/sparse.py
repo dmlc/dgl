@@ -389,6 +389,46 @@ def _gspmm_hetero(gidx, op, reduce_op, u_len, u_and_e_tuple):
     return out, (list_arg_u, list_arg_e, list_arg_u_ntype, list_arg_e_etype)
 
 
+def _segment_mm(A, B, out, seglen_A, b_trans=False):
+    """Invoke the C API of segment_mm."""
+    _CAPI_DGLKernelSEGMENTMM(to_dgl_nd(A),
+                            to_dgl_nd(B),
+                            to_dgl_nd_for_write(out),
+                            to_dgl_nd(seglen_A),
+                            False, b_trans)
+    return out
+
+def _segment_mm_backward_B(A, dC, dB, seglen):
+    """Invoke the C API of the backward of segment_mm on B."""
+    _CAPI_DGLKernelSEGMENTMMBackwardB(
+            to_dgl_nd(A),
+            to_dgl_nd(dC),
+            to_dgl_nd_for_write(dB),
+            to_dgl_nd(seglen))
+    return dB
+
+def _gather_mm(A, B, out, idx_a=None, idx_b=None):
+    r"""Invoke the C API of the gather_mm operator."""
+    _CAPI_DGLKernelGATHERMM(to_dgl_nd(A),
+                            to_dgl_nd(B),
+                            to_dgl_nd_for_write(out),
+                            to_dgl_nd(idx_a),
+                            to_dgl_nd(idx_b))
+    return out
+
+
+def _gather_mm_scatter(A, B, out, idx_a=None, idx_b=None, idx_c=None):
+    r"""Invoke the C API of the gather_mm_scatter operator."""
+    _CAPI_DGLKernelGATHERMMSCATTER(
+        to_dgl_nd(A),
+        to_dgl_nd(B),
+        to_dgl_nd_for_write(out),
+        to_dgl_nd(idx_a),
+        to_dgl_nd(idx_b),
+        to_dgl_nd(idx_c))
+    return out
+
+
 def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
     r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface. It
     takes the result of :attr:`op` on source node feature and destination node

@@ -162,6 +162,8 @@ def copy_to(input, ctx, **kwargs):
         new_tensor = tf.identity(input)
     return new_tensor
 
+def is_pinned(input):
+    return False        # not sure how to do this
 
 def sum(input, dim, keepdims=False):
     if input.dtype == tf.bool:
@@ -425,8 +427,13 @@ def count_nonzero(input):
     return int(tf.math.count_nonzero(input))
 
 
-def unique(input, return_inverse=False):
-    if return_inverse:
+def unique(input, return_inverse=False, return_counts=False):
+    if return_inverse and return_counts:
+        return tf.unique_with_counts(input)
+    elif return_counts:
+        result = tf.unique_with_counts(input)
+        return result.y, result.count
+    elif return_inverse:
         return tf.unique(input)
     else:
         return tf.unique(input).y
