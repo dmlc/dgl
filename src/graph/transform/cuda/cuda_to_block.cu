@@ -381,6 +381,9 @@ ToBlockGPU(
 
 }  // namespace
 
+// Use explicit names to get around MSVC's broken mangling that thinks the following two
+// functions are the same.
+// Using template<> fails to export the symbols.
 std::tuple<HeteroGraphPtr, std::vector<IdArray>>
 // ToBlock<kDLGPU, int32_t>
 ToBlockGPU32(
