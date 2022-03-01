@@ -14,6 +14,8 @@ from torch.nn.parallel import DistributedDataParallel
 
 from model import SAGE, compute_acc_unsupervised as compute_acc
 from negative_sampler import NegativeSampler
+import sys
+sys.path.append('../')
 from load_graph import load_reddit, load_ogb
 
 class CrossEntropyLoss(nn.Module):
