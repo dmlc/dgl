@@ -1600,6 +1600,14 @@ class DGLHeteroGraph(object):
     # View
     #################################################################
 
+    def get_node_storage(self, key, ntype=None):
+        """Get storage object of node feature of type :attr:`ntype` and name :attr:`key`."""
+        return self._node_frames[self.get_ntype_id(ntype)]._columns[key]
+
+    def get_edge_storage(self, key, etype=None):
+        """Get storage object of edge feature of type :attr:`etype` and name :attr:`key`."""
+        return self._edge_frames[self.get_etype_id(etype)]._columns[key]
+
     @property
     def nodes(self):
         """Return a node view
@@ -5457,6 +5465,100 @@ class DGLHeteroGraph(object):
         to
         """
         return self.to(F.cpu())
+
+    def pin_memory_(self):
+        """Pin the graph structure to the page-locked memory for GPU zero-copy access.
+
+        This is an **inplace** method. The graph structure must be on CPU to be pinned.
+        If the graph struture is already pinned, the function directly returns it.
+
+        Materialization of new sparse formats for pinned graphs is not allowed.
+        To avoid implicit formats materialization during training,
+        you should create all the needed formats before pinning.
+        But cloning and materialization is fine. See the examples below.
+
+        Returns
+        -------
+        DGLGraph
+            The pinned graph.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        >>> g = dgl.graph((torch.tensor([1, 0]), torch.tensor([1, 2])))
+        >>> g.pin_memory_()
+
+        Materialization of new sparse formats is not allowed for pinned graphs.
+
+        >>> g.create_formats_()  # This would raise an error! You should do this before pinning.
+
+        Cloning and materializing new formats is allowed. The returned graph is **not** pinned.
+
+        >>> g1 = g.formats(['csc'])
+        >>> assert not g1.is_pinned()
+
+        The pinned graph can be access from both CPU and GPU. The concrete device depends
+        on the context of ``query``. For example, ``eid`` in ``find_edges()`` is a query.
+        When ``eid`` is on CPU, ``find_edges()`` is executed on CPU, and the returned
+        values are CPU tensors
+
+        >>> g.unpin_memory_()
+        >>> g.create_formats_()
+        >>> g.pin_memory_()
+        >>> eid = torch.tensor([1])
+        >>> g.find_edges(eids)
+        (tensor([0]), tensor([2]))
+
+        Moving ``eid`` to GPU, ``find_edges()`` will be executed on GPU, and the returned
+        values are GPU tensors.
+
+        >>> eid = eid.to('cuda:0')
+        >>> g.find_edges(eids)
+        (tensor([0], device='cuda:0'), tensor([2], device='cuda:0'))
+
+        If you don't provide a ``query``, methods will be executed on CPU by default.
+
+        >>> g.in_degrees()
+        tensor([0, 1, 1])
+        """
+        if self._graph.is_pinned():
+            return self
+        if F.device_type(self.device) != 'cpu':
+            raise DGLError("The graph structure must be on CPU to be pinned.")
+        self._graph.pin_memory_()
+
+        return self
+
+    def unpin_memory_(self):
+        """Unpin the graph structure from the page-locked memory.
+
+        This is an **inplace** method.If the graph struture is not pinned,
+        e.g., on CPU or GPU, the function directly returns it.
+
+        Returns
+        -------
+        DGLGraph
+            The unpinned graph.
+        """
+        if not self._graph.is_pinned():
+            return self
+        self._graph.unpin_memory_()
+
+        return self
+
+    def is_pinned(self):
+        """Check if the graph structure is pinned to the page-locked memory.
+
+        Returns
+        -------
+        bool
+            True if the graph structure is pinned.
+        """
+        return self._graph.is_pinned()
 
     def clone(self):
         """Return a heterograph object that is a clone of current graph.

@@ -8,15 +8,10 @@ from .. import utils
 
 
 class RelGraphConv(layers.Layer):
-    r"""
+    r"""Relational graph convolution layer from `Modeling Relational Data with Graph
+    Convolutional Networks <https://arxiv.org/abs/1703.06103>`__
 
-    Description
-    -----------
-    Relational graph convolution layer.
-
-    Relational graph convolution is introduced in "`Modeling Relational Data with Graph
-    Convolutional Networks <https://arxiv.org/abs/1703.06103>`__"
-    and can be described as below:
+    It can be described as below:
 
     .. math::
 
@@ -248,7 +243,7 @@ class RelGraphConv(layers.Layer):
         return {'msg': msg}
 
     def call(self, g, x, etypes, norm=None):
-        """ Forward computation
+        """Forward computation
 
         Parameters
         ----------

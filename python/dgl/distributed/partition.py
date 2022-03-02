@@ -241,7 +241,7 @@ def _get_orig_ids(g, sim_g, reshuffle, orig_nids, orig_eids):
     -------
     tensor or dict of tensors, tensor or dict of tensors
     '''
-    is_hetero = len(g.etypes) > 1 or len(g.ntypes) > 1
+    is_hetero = not g.is_homogeneous
     if reshuffle and is_hetero:
         # Get the type IDs
         orig_ntype = F.gather_row(sim_g.ndata[NTYPE], orig_nids)
@@ -275,7 +275,7 @@ def _set_trainer_ids(g, sim_g, node_parts):
     node_parts : tensor
         The node partition ID for each node in `sim_g`.
     '''
-    if len(g.etypes) == 1:
+    if g.is_homogeneous:
         g.ndata['trainer_id'] = node_parts
         # An edge is assigned to a partition based on its destination node.
         g.edata['trainer_id'] = F.gather_row(node_parts, g.edges()[1])
@@ -497,7 +497,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     ...                                 'output/test.json', 0)
     '''
     def get_homogeneous(g, balance_ntypes):
-        if len(g.etypes) == 1:
+        if g.is_homogeneous:
             sim_g = to_homogeneous(g)
             if isinstance(balance_ntypes, dict):
                 assert len(balance_ntypes) == 1
@@ -612,7 +612,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     # NTYPE: the node type.
     # orig_id: the global node IDs in the homogeneous version of input graph.
     # NID: the global node IDs in the reshuffled homogeneous version of the input graph.
-    if len(g.etypes) > 1:
+    if not g.is_homogeneous:
         if reshuffle:
             for name in parts:
                 orig_ids = parts[name].ndata['orig_id']
@@ -778,7 +778,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                 inner_edge_mask = _get_inner_edge_mask(part, etype_id)
                 # This is global edge IDs.
                 local_edges = F.boolean_mask(part.edata[edata_name], inner_edge_mask)
-                if len(g.etypes) > 1:
+                if not g.is_homogeneous:
                     local_edges = F.gather_row(sim_g.edata[EID], local_edges)
                     print('part {} has {} edges of type {} and {} are inside the partition'.format(
                         part_id, F.as_scalar(F.sum(part.edata[ETYPE] == etype_id, 0)),
@@ -813,7 +813,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                     else:
                         node_feats[ntype + '/' + name] = g.nodes[ntype].data[name]
             for etype in g.etypes:
-                if reshuffle and len(g.etypes) > 1:
+                if reshuffle and not g.is_homogeneous:
                     edata_name = 'orig_id'
                     etype_id = g.get_etype_id(etype)
                     inner_edge_mask = _get_inner_edge_mask(part, etype_id)
@@ -831,7 +831,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                     else:
                         edge_feats[etype + '/' + name] = g.edges[etype].data[name]
         # Some adjustment for heterogeneous graphs.
-        if len(g.etypes) > 1:
+        if not g.is_homogeneous:
             part.ndata['orig_id'] = F.gather_row(sim_g.ndata[NID], part.ndata['orig_id'])
             part.edata['orig_id'] = F.gather_row(sim_g.edata[EID], part.edata['orig_id'])
 

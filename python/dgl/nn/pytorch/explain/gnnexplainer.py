@@ -10,13 +10,10 @@ from ....base import NID, EID
 from ....subgraph import khop_in_subgraph
 
 class GNNExplainer(nn.Module):
-    r"""
+    r"""GNNExplainer model from `GNNExplainer: Generating Explanations for
+    Graph Neural Networks <https://arxiv.org/abs/1903.03894>`__
 
-    Description
-    -----------
-    GNNExplainer model from paper `GNNExplainer: Generating Explanations for
-    Graph Neural Networks <https://arxiv.org/abs/1903.03894>`__ for identifying
-    compact subgraph structures and small subsets of node features that play a
+    It identifies compact subgraph structures and small subsets of node features that play a
     critical role in GNN-based node classification and graph classification.
 
     Parameters
@@ -219,7 +216,7 @@ class GNNExplainer(nn.Module):
         >>> new_center
         tensor([1])
         >>> sg.num_edges()
-        26
+        12
         >>> # Old IDs of the nodes in the subgraph
         >>> sg.ndata[dgl.NID]
         tensor([ 9, 10, 11, 12])
@@ -229,9 +226,8 @@ class GNNExplainer(nn.Module):
         >>> feat_mask
         tensor([0.2638, 0.2738, 0.3039,  ..., 0.2794, 0.2643, 0.2733])
         >>> edge_mask
-        tensor([0.8291, 0.2065, 0.1379, 0.2265, 0.8618, 0.7038, 0.2094, 0.8847, 0.2157,
-                0.6595, 0.1906, 0.8184, 0.2033, 0.7211, 0.1279, 0.1668, 0.1441, 0.8571,
-                0.1903, 0.1125, 0.8235, 0.1913, 0.5834, 0.2248, 0.8345, 0.9270])
+        tensor([0.0937, 0.1496, 0.8287, 0.8132, 0.8825, 0.8515, 0.8146, 0.0915, 0.1145,
+                0.9011, 0.1311, 0.8437])
         """
         self.model.eval()
         num_nodes = graph.num_nodes()

@@ -63,6 +63,10 @@ struct NDArray::Internal {
     } else if (ptr->mem) {
       ptr->mem = nullptr;
     } else if (ptr->dl_tensor.data != nullptr) {
+      // if the array is still pinned before freeing, unpin it.
+      if (IsDataPinned(&(ptr->dl_tensor))) {
+        UnpinData(&(ptr->dl_tensor));
+      }
       dgl::runtime::DeviceAPI::Get(ptr->dl_tensor.ctx)->FreeDataSpace(
           ptr->dl_tensor.ctx, ptr->dl_tensor.data);
     }
@@ -225,6 +229,7 @@ NDArray NDArray::FromDLPack(DLManagedTensor* tensor) {
   data->deleter = Internal::DLPackDeleter;
   data->manager_ctx = tensor;
   data->dl_tensor = tensor->dl_tensor;
+
   return NDArray(data);
 }
 
@@ -249,6 +254,18 @@ void NDArray::CopyFromTo(DLTensor* from,
     from->data, static_cast<size_t>(from->byte_offset),
     to->data, static_cast<size_t>(to->byte_offset),
     from_size, from->ctx, to->ctx, from->dtype, stream);
+}
+
+void NDArray::PinData(DLTensor* tensor) {
+  if (IsDataPinned(tensor)) return;
+  CHECK_EQ(tensor->ctx.device_type, kDLCPU)
+    << "Only NDArray on CPU can be pinned";
+  DeviceAPI::Get(kDLGPU)->PinData(tensor->data, GetDataSize(*tensor));
+}
+
+void NDArray::UnpinData(DLTensor* tensor) {
+  if (!IsDataPinned(tensor)) return;
+  DeviceAPI::Get(kDLGPU)->UnpinData(tensor->data);
 }
 
 template<typename T>
@@ -310,6 +327,14 @@ std::shared_ptr<SharedMemory> NDArray::GetSharedMem() const {
   return this->data_->mem;
 }
 
+bool NDArray::IsDataPinned(DLTensor* tensor) {
+  // Can only be pinned if on CPU...
+  if (tensor->ctx.device_type != kDLCPU)
+    return false;
+  // ... and CUDA device API is enabled, and the tensor is indeed in pinned memory.
+  auto device = DeviceAPI::Get(kDLGPU, true);
+  return device && device->IsPinned(tensor->data);
+}
 
 void NDArray::Save(dmlc::Stream* strm) const {
   auto zc_strm = dynamic_cast<StreamWithBuffer*>(strm);
@@ -508,16 +533,13 @@ int DGLArrayCopyToBytes(DGLArrayHandle handle,
 int DGLArrayPinData(DGLArrayHandle handle,
                     DLContext ctx) {
   API_BEGIN();
-  CHECK_EQ(ctx.device_type, kDLGPU);
-  DeviceAPI::Get(ctx)->PinData(ctx, handle->data,
-                                        GetDataSize(*handle));
+  NDArray::PinData(handle);
   API_END();
 }
 
 int DGLArrayUnpinData(DGLArrayHandle handle,
                       DLContext ctx) {
   API_BEGIN();
-  CHECK_EQ(ctx.device_type, kDLGPU);
-  DeviceAPI::Get(ctx)->UnpinData(ctx, handle->data);
+  NDArray::UnpinData(handle);
   API_END();
 }

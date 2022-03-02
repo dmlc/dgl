@@ -7,6 +7,7 @@ from collections.abc import MutableMapping
 from . import backend as F
 from .base import DGLError, dgl_warning
 from .init import zero_initializer
+from .storages import TensorStorage
 
 class _LazyIndex(object):
     def __init__(self, index):
@@ -37,6 +38,67 @@ class _LazyIndex(object):
                 index = F.copy_to(index, F.context(flat_index))
             flat_index = F.gather_row(flat_index, index)
         return flat_index
+
+class LazyFeature(object):
+    """Placeholder for feature prefetching.
+
+    One can assign this object to ``ndata`` or ``edata`` of the graphs returned by various
+    samplers' :attr:`sample` method.  When DGL's dataloader receives the subgraphs
+    returned by the sampler, it will automatically look up all the ``ndata`` and ``edata``
+    whose data is a LazyFeature, replacing them with the actual data of the corresponding
+    nodes/edges from the original graph instead.  In particular, for a subgraph returned
+    by the sampler has a LazyFeature with name ``k`` in ``subgraph.ndata[key]``:
+
+    .. code:: python
+
+       subgraph.ndata[key] = LazyFeature(k)
+
+    Assuming that ``graph`` is the original graph, DGL's dataloader will perform
+
+    .. code:: python
+
+       subgraph.ndata[key] = graph.ndata[k][subgraph.ndata[dgl.NID]]
+
+    DGL dataloader performs similar replacement for ``edata``.
+    For heterogeneous graphs, the replacement is:
+
+    .. code:: python
+
+       subgraph.nodes[ntype].data[key] = graph.nodes[ntype].data[k][
+           subgraph.nodes[ntype].data[dgl.NID]]
+
+    For MFGs' ``srcdata`` (and similarly ``dstdata``), the replacement is
+
+    .. code:: python
+
+       mfg.srcdata[key] = graph.ndata[k][mfg.srcdata[dgl.NID]]
+
+    Parameters
+    ----------
+    name : str
+        The name of the data in the original graph.
+    id_ : Tensor, optional
+        The ID tensor.
+    """
+    __slots__ = ['name', 'id_']
+    def __init__(self, name=None, id_=None):
+        self.name = name
+        self.id_ = id_
+
+    def to(self, *args, **kwargs):  # pylint: disable=invalid-name, unused-argument
+        """No-op.  For compatibility of :meth:`Frame.to` method."""
+        return self
+
+    @property
+    def data(self):
+        """No-op.  For compatibility of :meth:`Frame.__repr__` method."""
+        return self
+
+    def pin_memory_(self):
+        """No-op.  For compatibility of :meth:`Frame.pin_memory_` method."""
+
+    def unpin_memory_(self):
+        """No-op.  For compatibility of :meth:`Frame.unpin_memory_` method."""
 
 class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
     """The column scheme.
@@ -77,7 +139,7 @@ def infer_scheme(tensor):
     """
     return Scheme(tuple(F.shape(tensor)[1:]), F.dtype(tensor))
 
-class Column(object):
+class Column(TensorStorage):
     """A column is a compact store of features of multiple nodes/edges.
 
     It batches all the feature tensors together along the first dimension
@@ -120,10 +182,11 @@ class Column(object):
         Index tensor
     """
     def __init__(self, storage, scheme=None, index=None, device=None):
-        self.storage = storage
+        super().__init__(storage)
         self.scheme = scheme if scheme else infer_scheme(storage)
         self.index = index
         self.device = device
+        self.pinned = False
 
     def __len__(self):
         """The number of features (number of rows) in this column."""
@@ -165,6 +228,7 @@ class Column(object):
         """Update the column data."""
         self.index = None
         self.storage = val
+        self.pinned = False
 
     def to(self, device, **kwargs): # pylint: disable=invalid-name
         """ Return a new column with columns copy to the targeted device (cpu/gpu).
@@ -312,6 +376,10 @@ class Column(object):
     def __copy__(self):
         return self.clone()
 
+    def fetch(self, indices, device, pin_memory=False):
+        _ = self.data           # materialize in case of lazy slicing & data transfer
+        return super().fetch(indices, device, pin_memory=False)
+
 class Frame(MutableMapping):
     """The columnar storage for node/edge features.
 
@@ -336,10 +404,13 @@ class Frame(MutableMapping):
             assert not isinstance(data, Frame)  # sanity check for code refactor
             # Note that we always create a new column for the given data.
             # This avoids two frames accidentally sharing the same column.
-            self._columns = {k : Column.create(v) for k, v in data.items()}
+            self._columns = {k : v if isinstance(v, LazyFeature) else Column.create(v)
+                             for k, v in data.items()}
             self._num_rows = num_rows
             # infer num_rows & sanity check
             for name, col in self._columns.items():
+                if isinstance(col, LazyFeature):
+                    continue
                 if self._num_rows is None:
                     self._num_rows = len(col)
                 elif len(col) != self._num_rows:
@@ -504,6 +575,10 @@ class Frame(MutableMapping):
         data : Column or data convertible to Column
             The column data.
         """
+        if isinstance(data, LazyFeature):
+            self._columns[name] = data
+            return
+
         col = Column.create(data)
         if len(col) != self.num_rows:
             raise DGLError('Expected data to have %d rows, got %d.' %
@@ -677,3 +752,15 @@ class Frame(MutableMapping):
 
     def __repr__(self):
         return repr(dict(self))
+
+    def pin_memory_(self):
+        """Registers the data of every column into pinned memory, materializing them if
+        necessary."""
+        for column in self._columns.values():
+            column.pin_memory_()
+
+    def unpin_memory_(self):
+        """Unregisters the data of every column from pinned memory, materializing them
+        if necessary."""
+        for column in self._columns.values():
+            column.unpin_memory_()
