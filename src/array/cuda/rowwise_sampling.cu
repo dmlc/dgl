@@ -132,7 +132,7 @@ __global__ void _CSRRowWiseSampleKernel(
   const int64_t last_row = min(static_cast<int64_t>(blockIdx.x+1)*TILE_SIZE, num_rows);
 
   curandState rng;
- curand_init((rand_seed*gridDim.x+blockIdx.x)*blockDim.y+threadIdx.y, threadIdx.x, 0, &rng);
+  curand_init((rand_seed*gridDim.x+blockIdx.x)*blockDim.y+threadIdx.y, threadIdx.x, 0, &rng);
 
   while (out_row < last_row) {
     const int64_t row = in_rows[out_row];
