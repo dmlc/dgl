@@ -10,7 +10,8 @@ import argparse
 import tqdm
 import glob
 import os
-
+import sys
+sys.path.append('../')
 from load_graph import load_reddit, inductive_split, load_ogb
 
 from torchmetrics import Accuracy

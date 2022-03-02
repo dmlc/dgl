@@ -14,10 +14,11 @@ import os
 
 from negative_sampler import NegativeSampler
 
-from pytorch_lightning.metrics import Accuracy
 from pytorch_lightning.callbacks import ModelCheckpoint, Callback
 from pytorch_lightning import LightningDataModule, LightningModule, Trainer
 from model import SAGE, compute_acc_unsupervised as compute_acc
+import sys
+sys.path.append('../')
 from load_graph import load_reddit, inductive_split, load_ogb
 
 class CrossEntropyLoss(nn.Module):

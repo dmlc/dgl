@@ -159,6 +159,37 @@ ToBlock<kDLCPU, int64_t>(HeteroGraphPtr graph,
   return ToBlockCPU<int64_t>(graph, rhs_nodes, include_rhs_in_lhs, lhs_nodes);
 }
 
+#ifdef DGL_USE_CUDA
+
+// Forward declaration of GPU ToBlock implementations - actual implementation is in
+// ./cuda/cuda_to_block.cu
+// This is to get around the broken name mangling in VS2019 CL 16.5.5 + CUDA 11.3
+// which complains that the two template specializations have the same signature.
+std::tuple<HeteroGraphPtr, std::vector<IdArray>>
+ToBlockGPU32(HeteroGraphPtr, const std::vector<IdArray>&, bool, std::vector<IdArray>* const);
+std::tuple<HeteroGraphPtr, std::vector<IdArray>>
+ToBlockGPU64(HeteroGraphPtr, const std::vector<IdArray>&, bool, std::vector<IdArray>* const);
+
+template<>
+std::tuple<HeteroGraphPtr, std::vector<IdArray>>
+ToBlock<kDLGPU, int32_t>(HeteroGraphPtr graph,
+                         const std::vector<IdArray> &rhs_nodes,
+                         bool include_rhs_in_lhs,
+                         std::vector<IdArray>* const lhs_nodes) {
+  return ToBlockGPU32(graph, rhs_nodes, include_rhs_in_lhs, lhs_nodes);
+}
+
+template<>
+std::tuple<HeteroGraphPtr, std::vector<IdArray>>
+ToBlock<kDLGPU, int64_t>(HeteroGraphPtr graph,
+                         const std::vector<IdArray> &rhs_nodes,
+                         bool include_rhs_in_lhs,
+                         std::vector<IdArray>* const lhs_nodes) {
+  return ToBlockGPU64(graph, rhs_nodes, include_rhs_in_lhs, lhs_nodes);
+}
+
+#endif  // DGL_USE_CUDA
+
 DGL_REGISTER_GLOBAL("transform._CAPI_DGLToBlock")
 .set_body([] (DGLArgs args, DGLRetValue *rv) {
     const HeteroGraphRef graph_ref = args[0];
