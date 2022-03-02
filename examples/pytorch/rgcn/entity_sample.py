@@ -105,6 +105,8 @@ def main(args):
 
     if args.gpu >= 0 and th.cuda.is_available():
         device = th.device(args.gpu)
+        g = g.to(device)
+        target_idx = target_idx.to(device)
     else:
         device = th.device('cpu')
 
