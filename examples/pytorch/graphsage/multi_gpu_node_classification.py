@@ -68,19 +68,20 @@ def train(rank, world_size, graph, num_classes, split_idx):
 
     train_idx, valid_idx, test_idx = split_idx['train'], split_idx['valid'], split_idx['test']
 
-    train_idx = train_idx.to('cuda')
-    valid_idx = valid_idx.to('cuda')
+    #train_idx = train_idx.to('cuda')
+    #valid_idx = valid_idx.to('cuda')
 
-    sampler = dgl.dataloading.NeighborSampler(
-            [15, 10, 5], prefetch_node_feats=['feat'], prefetch_labels=['label'])
-    train_dataloader = dgl.dataloading.DataLoader(
+    sampler = dgl.dataloading.MultiLayerNeighborSampler(
+            [15, 10, 5])
+    train_dataloader = dgl.dataloading.NodeDataLoader(
             graph, train_idx, sampler,
             device='cuda', batch_size=1000, shuffle=True, drop_last=False,
-            num_workers=0, use_ddp=True, use_uva=True)
+            num_workers=int(16/world_size), use_ddp=True)
+    """
     valid_dataloader = dgl.dataloading.NodeDataLoader(
             graph, valid_idx, sampler, device='cuda', batch_size=1024, shuffle=True,
             drop_last=False, num_workers=0, use_uva=True)
-
+    """
     durations = []
     for _ in range(10):
         model.train()
@@ -101,7 +102,7 @@ def train(rank, world_size, graph, num_classes, split_idx):
         if rank == 0:
             print(tt - t0)
             durations.append(tt - t0)
-
+            """
             model.eval()
             ys = []
             y_hats = []
@@ -112,24 +113,29 @@ def train(rank, world_size, graph, num_classes, split_idx):
                     y_hats.append(model.module(blocks, x))
             acc = MF.accuracy(torch.cat(y_hats), torch.cat(ys))
             print('Validation acc:', acc.item())
+            """
         dist.barrier()
 
     if rank == 0:
-        print(np.mean(durations[4:]), np.std(durations[4:]))
+        #print(np.mean(durations[4:]), np.std(durations[4:]))
+        print(f'Elapsed time: {np.mean(durations[4:]):.4f} ± {np.std(durations[4:]):.4f}')
+        """
         model.eval()
         with torch.no_grad():
             pred = model.module.inference(graph, 'cuda', 1000, 12, graph.device)
             acc = MF.accuracy(pred.to(graph.device), graph.ndata['label'])
             print('Test acc:', acc.item())
+        """
 
 if __name__ == '__main__':
+    print("---------- DGL version: {}".format(dgl.__version__))
     dataset = DglNodePropPredDataset('ogbn-products')
     graph, labels = dataset[0]
     graph.ndata['label'] = labels
     graph.create_formats_()     # must be called before mp.spawn().
     split_idx = dataset.get_idx_split()
     num_classes = dataset.num_classes
-    n_procs = 4
+    n_procs = 1
 
     # Tested with mp.spawn and fork.  Both worked and got 4s per epoch with 4 GPUs
     # and 3.86s per epoch with 8 GPUs on p2.8x, compared to 5.2s from official examples.
