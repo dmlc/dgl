@@ -10,32 +10,10 @@
 #ifndef TENSORADAPTER_H_
 #define TENSORADAPTER_H_
 
-#include <dlpack/dlpack.h>
-#include <vector>
-
 #if defined(WIN32) || defined(_WIN32)
 #define TA_EXPORTS __declspec(dllexport)
 #else
 #define TA_EXPORTS
 #endif
-
-namespace tensoradapter {
-
-extern "C" {
-
-/*!
- * \brief Allocate an empty tensor
- *
- * \param shape The shape
- * \param dtype The data type
- * \param ctx The device
- * \return The allocated tensor
- */
-TA_EXPORTS DLManagedTensor* TAempty(
-    std::vector<int64_t> shape, DLDataType dtype, DLContext ctx);
-
-}
-
-};  // namespace tensoradapter
 
 #endif  // TENSORADAPTER_H_
