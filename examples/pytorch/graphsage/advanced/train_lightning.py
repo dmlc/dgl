@@ -11,7 +11,7 @@ import tqdm
 import glob
 import os
 import sys
-sys.path.append('../')
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from load_graph import load_reddit, inductive_split, load_ogb
 
 from torchmetrics import Accuracy
