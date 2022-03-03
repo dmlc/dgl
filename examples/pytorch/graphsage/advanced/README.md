@@ -1,6 +1,12 @@
 More Examples for Training GraphSAGE
 ============================
 
+### Pure GPU sampling
+
+```bash
+python3 pure_gpu_node_classification.py
+```
+
 ### Unsupervised training
 
 Train w/ mini-batch sampling in an unsupervised fashion (on the Reddit dataset)
