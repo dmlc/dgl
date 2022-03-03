@@ -4,7 +4,7 @@
  * \brief Implementation of PyTorch adapter library.
  */
 
-#include <tensoradapter.h>
+#include <tensoradapter_exports.h>
 #include <torch/torch.h>
 #include <ATen/DLConvertor.h>
 #include <vector>
