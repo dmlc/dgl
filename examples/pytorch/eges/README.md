@@ -14,6 +14,8 @@ https://arxiv.org/abs/1803.02349
 https://wx.jdcloud.com/market/jdata/list/17
 
 ## How to run
+Create folder named `data`. Download two csv files from [here](https://github.com/Wang-Yu-Qing/dgl_data/tree/master/eges_data into the data folder) into the `data` folder.
+
 Run command: `python main.py` with default configuration, and the following message will shown up:
 
 ```
