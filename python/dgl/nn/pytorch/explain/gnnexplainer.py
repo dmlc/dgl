@@ -10,13 +10,10 @@ from ....base import NID, EID
 from ....subgraph import khop_in_subgraph
 
 class GNNExplainer(nn.Module):
-    r"""
+    r"""GNNExplainer model from `GNNExplainer: Generating Explanations for
+    Graph Neural Networks <https://arxiv.org/abs/1903.03894>`__
 
-    Description
-    -----------
-    GNNExplainer model from paper `GNNExplainer: Generating Explanations for
-    Graph Neural Networks <https://arxiv.org/abs/1903.03894>`__ for identifying
-    compact subgraph structures and small subsets of node features that play a
+    It identifies compact subgraph structures and small subsets of node features that play a
     critical role in GNN-based node classification and graph classification.
 
     Parameters

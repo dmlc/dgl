@@ -200,6 +200,9 @@ function-naming-style=snake_case
 # f - files
 # i, j, k - loop variables
 # u, v, e - nodes and edges
+# s, d - source and destination
+# t - time
+# r - relation type
 # n, m - general integers representing quantity
 # w, x, y, z - general math variables
 # g, G - graphs
@@ -207,7 +210,10 @@ function-naming-style=snake_case
 # sg - subgraphs
 # fn - functions
 # us, vs, es, gs - plural form of u, v, g, e
-good-names=f,i,j,k,u,v,e,n,m,w,x,y,z,g,G,hg,sg,fn,ex,Run,_,us,vs,gs,es,op,ty
+# op - operators
+# ty - type
+# A, B, C, W - for tensor operators like matmul
+good-names=f,i,j,k,u,v,e,n,m,w,x,y,z,s,d,t,r,g,G,hg,sg,fn,ex,Run,_,us,vs,gs,es,op,ty,A,B,C,W,a,b,N,D1,D2,R
 
 # Include a hint for the correct naming format with invalid-name.
 include-naming-hint=no

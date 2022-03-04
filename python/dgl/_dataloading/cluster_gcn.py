@@ -3,7 +3,7 @@ import os
 import pickle
 import numpy as np
 
-from ..transform import metis_partition_assignment
+from ..transforms import metis_partition_assignment
 from .. import backend as F
 from .dataloader import SubgraphIterator
 

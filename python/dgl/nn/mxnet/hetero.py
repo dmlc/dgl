@@ -5,7 +5,7 @@ from mxnet.gluon import nn
 __all__ = ['HeteroGraphConv']
 
 class HeteroGraphConv(nn.Block):
-    r"""A generic module for computing convolution on heterogeneous graphs.
+    r"""A generic module for computing convolution on heterogeneous graphs
 
     The heterograph convolution applies sub-modules on their associating
     relation graphs, which reads the features from source nodes and writes the
