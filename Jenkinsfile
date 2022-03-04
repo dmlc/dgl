@@ -335,16 +335,20 @@ pipeline {
               stages {
                 stage('Unit test') {
                   steps {
+                    sh 'ln -s /tmp/dataset/dgldata ~/.dgl > /dev/null'
                     unit_test_linux('pytorch', 'cpu')
                   }
                 }
                 stage('Example test') {
                   steps {
+                    sh 'ln -s /tmp/dataset/dgldata ~/.dgl > /dev/null'
                     example_test_linux('pytorch', 'cpu')
                   }
                 }
                 stage('Tutorial test') {
                   steps {
+                    sh 'ln -s /tmp/dataset/dgldata ~/.dgl > /dev/null'
+                    sh 'ln -s /tmp/dataset/ogbdata ./tutorials/dataset > /dev/null'
                     tutorial_test_linux('pytorch')
                   }
                 }
