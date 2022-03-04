@@ -18,7 +18,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint, Callback
 from pytorch_lightning import LightningDataModule, LightningModule, Trainer
 from model import SAGE, compute_acc_unsupervised as compute_acc
 import sys
-sys.path.append('../')
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from load_graph import load_reddit, inductive_split, load_ogb
 
 class CrossEntropyLoss(nn.Module):
