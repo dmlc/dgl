@@ -335,13 +335,13 @@ pipeline {
               stages {
                 stage('Unit test') {
                   steps {
-                    sh 'ln -s /tmp/dataset/dgldata ~/.dgl > /dev/null'
+                    sh 'ln -s /tmp/dataset/dgldata ~/.dgl'
                     unit_test_linux('pytorch', 'cpu')
                   }
                 }
                 stage('Example test') {
                   steps {
-                    sh 'ln -s /tmp/dataset/dgldata ~/.dgl > /dev/null'
+                    sh 'ln -s /tmp/dataset/dgldata ~/.dgl'
                     example_test_linux('pytorch', 'cpu')
                   }
                 }
