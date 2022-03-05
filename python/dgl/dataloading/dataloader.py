@@ -703,6 +703,8 @@ class DataLoader(torch.utils.data.DataLoader):
                            for k, v in indices.items()}
                 indices_device = next(iter(indices.values())).device
             else:
+                if hasattr(indices, "device"):
+                    indices_device = indices.device
                 indices = torch.tensor(indices) if not torch.is_tensor(indices) else indices
                 indices_device = indices.device
         except:     # pylint: disable=bare-except
