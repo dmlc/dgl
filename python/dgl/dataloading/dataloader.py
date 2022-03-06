@@ -713,8 +713,6 @@ class DataLoader(torch.utils.data.DataLoader):
             if not hasattr(indices, 'device'):
                 raise AttributeError('Custom indices dataset requires a \"device\" attribute indicating where the indices is.')
             indices_device = indices.device
-
-
         self.device = _get_device(device)
 
         # Sanity check - we only check for DGLGraphs.
