@@ -697,19 +697,23 @@ class DataLoader(torch.utils.data.DataLoader):
         self.indices = indices      # For PyTorch-Lightning
         num_workers = kwargs.get('num_workers', 0)
 
+        indices_device = None
         try:
             if isinstance(indices, Mapping):
                 indices = {k: (torch.tensor(v) if not torch.is_tensor(v) else v)
                            for k, v in indices.items()}
                 indices_device = next(iter(indices.values())).device
             else:
-                if hasattr(indices, "device"):
-                    indices_device = indices.device
                 indices = torch.tensor(indices) if not torch.is_tensor(indices) else indices
                 indices_device = indices.device
         except:     # pylint: disable=bare-except
             # ignore when it fails to convert to torch Tensors.
             pass
+        if indices_device is None:
+            if not hasattr(indices, 'device'):
+                raise AttributeError('Custom indices dataset requires a \"device\" attribute indicating where the indices is.')
+            indices_device = indices.device
+
 
         self.device = _get_device(device)
 
