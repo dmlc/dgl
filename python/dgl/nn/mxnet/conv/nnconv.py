@@ -9,12 +9,8 @@ from ....utils import expand_as_pair
 
 
 class NNConv(nn.Block):
-    r"""
-
-    Description
-    -----------
-    Graph Convolution layer introduced in `Neural Message Passing
-    for Quantum Chemistry <https://arxiv.org/pdf/1704.01212.pdf>`__.
+    r"""Graph Convolution layer from `Neural Message Passing
+    for Quantum Chemistry <https://arxiv.org/pdf/1704.01212.pdf>`__
 
     .. math::
         h_{i}^{l+1} = h_{i}^{l} + \mathrm{aggregate}\left(\left\{

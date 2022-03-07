@@ -115,7 +115,7 @@ After loaded, the dataset has one graph without any features:
 
 .. note::
     Edges are always directed. To have both directions, add reversed edges in the edge
-    CSV file or use :class:`~dgl.transform.AddReverse` to transform the loaded graph.
+    CSV file or use :class:`~dgl.transforms.AddReverse` to transform the loaded graph.
 
 
 A graph without any feature is often of less interest. In the next example, we will show
