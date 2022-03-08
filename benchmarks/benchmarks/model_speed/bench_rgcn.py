@@ -125,5 +125,3 @@ def track_time(data, use_type_count):
     t1 = time.time()
 
     return (t1 - t0) / num_epochs
-
-track_time('aifb', True)
