@@ -173,10 +173,11 @@ pipeline {
       stages {
         stage('Lint Check') {
           agent {
-            kubernetes {
-              yamlFile 'docker/pods/ci-lint.yaml'
-              defaultContainer 'dgl-ci-lint'
-            }
+              docker {
+                  label 'linux-benchmark-node'
+                  image 'dgllib/dgl-ci-lint'
+                  alwaysPull true
+              }
           }
           steps {
             init_git()
