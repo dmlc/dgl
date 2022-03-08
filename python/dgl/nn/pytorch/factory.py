@@ -1,6 +1,6 @@
 """Modules that transforms between graphs and between graph and tensors."""
 import torch.nn as nn
-from ...transform import knn_graph, segmented_knn_graph
+from ...transforms import knn_graph, segmented_knn_graph
 
 def pairwise_squared_distance(x):
     '''
@@ -12,11 +12,7 @@ def pairwise_squared_distance(x):
 
 
 class KNNGraph(nn.Module):
-    r"""
-
-    Description
-    -----------
-    Layer that transforms one point set into a graph, or a batch of
+    r"""Layer that transforms one point set into a graph, or a batch of
     point sets with the same number of points into a union of those graphs.
 
     The KNNGraph is implemented in the following steps:
@@ -127,11 +123,7 @@ class KNNGraph(nn.Module):
 
 
 class SegmentedKNNGraph(nn.Module):
-    r"""
-
-    Description
-    -----------
-    Layer that transforms one point set into a graph, or a batch of
+    r"""Layer that transforms one point set into a graph, or a batch of
     point sets with different number of points into a union of those graphs.
 
     If a batch of point sets is provided, then the point :math:`j` in the point

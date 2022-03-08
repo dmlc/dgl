@@ -20,8 +20,7 @@ from data import MovieLens
 from model import GCMCLayer, DenseBiDecoder, BiDecoder
 from utils import get_activation, get_optimizer, torch_total_param_num, torch_net_info, MetricLogger, to_etype_name
 import dgl
-import dgl.multiprocessing as mp
-from dgl.multiprocessing import Queue
+import torch.multiprocessing as mp
 
 class Net(nn.Module):
     def __init__(self, args, dev_id):
@@ -382,10 +381,4 @@ if __name__ == '__main__':
         # This avoids creating certain formats in each sub-process, which saves momory and CPU.
         dataset.train_enc_graph.create_formats_()
         dataset.train_dec_graph.create_formats_()
-        procs = []
-        for proc_id in range(n_gpus):
-            p = mp.Process(target=run, args=(proc_id, n_gpus, args, devices, dataset))
-            p.start()
-            procs.append(p)
-        for p in procs:
-            p.join()
+        mp.spawn(run, args=(n_gpus, args, devices, dataset), nprocs=n_gpus)

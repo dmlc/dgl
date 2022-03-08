@@ -6,11 +6,7 @@ import torch.nn as nn
 from .... import function as fn
 
 class ShiftedSoftplus(nn.Module):
-    r"""
-
-    Description
-    -----------
-    Applies the element-wise function:
+    r"""Applies the element-wise function:
 
     .. math::
         \text{SSP}(x) = \frac{1}{\beta} * \log(1 + \exp(\beta * x)) - \log(\text{shift})
@@ -48,14 +44,8 @@ class ShiftedSoftplus(nn.Module):
         return self.softplus(inputs) - np.log(float(self.shift))
 
 class CFConv(nn.Module):
-    r"""
-
-    Description
-    -----------
-    CFConv in SchNet.
-
-    SchNet is introduced in `SchNet: A continuous-filter convolutional neural network for
-    modeling quantum interactions <https://arxiv.org/abs/1706.08566>`__.
+    r"""CFConv from `SchNet: A continuous-filter convolutional neural network for
+    modeling quantum interactions <https://arxiv.org/abs/1706.08566>`__
 
     It combines node and edge features in message passing and updates node representations.
 
