@@ -276,7 +276,8 @@ def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False, m
     mode : str, "k-way" or "recursive"
         Whether use multilevel recursive bisection or multilevel k-way paritioning.
     objtype : str, "cut" or "vol"
-        Set the objective function as minimizing cut of minimizing communication volume.
+        Set the objective as edge-cut minimization or communication volume minimization. This argument is used by
+        the Metis algorithm.
 
     Returns
     -------

@@ -473,6 +473,9 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         each node will be stored in the node feature 'trainer_id'. Then the partitions of trainers
         on the same machine will be coalesced into one larger partition. The final number of
         partitions is `num_part`.
+    objtype : str, "cut" or "vol"
+        Set the objective as edge-cut minimization or communication volume minimization. This argument is used by
+        the Metis algorithm.
 
     Returns
     -------
