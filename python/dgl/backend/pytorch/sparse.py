@@ -129,6 +129,14 @@ class GSpMM(th.autograd.Function):
         ctx.backward_cache = gidx, op, reduce_op, X_shape, Y_shape, dtype, device, reduce_last
         req_grad_X = X.requires_grad if X is not None else False
         req_grad_Y = Y.requires_grad if Y is not None else False
+        if not spmm_cache_X(op, reduce_op, req_grad_X, req_grad_Y):
+            X = None
+        if not spmm_cache_Y(op, reduce_op, req_grad_X, req_grad_Y):
+            Y = None
+        if not spmm_cache_argX(op, reduce_op, req_grad_X, req_grad_Y):
+            argX = None
+        if not spmm_cache_argY(op, reduce_op, req_grad_X, req_grad_Y):
+            argY = None
         ctx.save_for_backward(X, Y, argX, argY)
         return out
 
