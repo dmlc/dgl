@@ -39,8 +39,8 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
              const std::vector<CSRMatrix>& csr,
              const std::vector<NDArray>& ufeat,
              const std::vector<NDArray>& efeat,
-             std::vector<NDArray> out,
-             const std::vector<NDArray>& out_aux,
+             std::vector<NDArray>* out,
+             std::vector<std::vector<NDArray>>* out_aux,
              const std::vector<dgl_type_t>& ufeat_eid,
              const std::vector<dgl_type_t>& out_eid);
 /*!
@@ -97,6 +97,59 @@ void SDDMMCoo(const std::string& op,
               int rhs_target);
 
 /*!
+ * \brief Generalized Sampled Dense-Dense Matrix Multiplication on Coo
+ format with heterograph support.
+  */
+template <int XPU, typename IdType, int bits>
+void SDDMMCooHetero(const std::string& op,
+              const BcastOff& bcast,
+              const std::vector<COOMatrix>& vec_coo,
+              const std::vector<NDArray>& vec_lhs,
+              const std::vector<NDArray>& vec_rhs,
+              std::vector<NDArray> vec_out,
+              int lhs_target,
+              int rhs_target,
+              const std::vector<dgl_type_t>& lhs_eid,
+              const std::vector<dgl_type_t>& rhs_eid);
+
+/*!
+ * \brief Generalized Dense Matrix-Matrix Multiplication according to relation types.
+ */
+template <int XPU, typename IdType, int bits>
+void GatherMM(const NDArray A,
+              const NDArray B,
+              NDArray out,
+              const NDArray idx_a,
+              const NDArray idx_b);
+
+/*!
+ * \brief Generalized Dense Matrix-Matrix Multiplication according to relation types.
+ */
+template <int XPU, typename IdType, int bits>
+void GatherMMScatter(const NDArray A,
+          const NDArray B,
+          NDArray out,
+          const NDArray idx_a,
+          const NDArray idx_b,
+          const NDArray idx_c);
+
+/*!
+ * \brief Generalized segmented dense Matrix-Matrix Multiplication.
+ */
+template <int XPU, typename IdType, int bits>
+void SegmentMM(const NDArray A,
+               const NDArray B,
+               NDArray out,
+               const NDArray seglen_A,
+               bool a_trans, bool b_trans);
+
+template <int XPU, typename IdType, int bits>
+void SegmentMMBackwardB(const NDArray A,
+                        const NDArray dC,
+                        NDArray dB,
+                        const NDArray seglen);
+
+/*!
  * \brief Segment reduce.
  */
 template <int XPU, typename IdType, int bits>
@@ -113,6 +166,17 @@ template <int XPU, typename IdType, int bits>
 void ScatterAdd(NDArray feat,
                 NDArray idx,
                 NDArray out);
+
+/*!
+ * \brief Update gradients for reduce operator max and min on first dimension.
+ */
+template <int XPU, typename IdType, int bits>
+void UpdateGradMinMax_hetero(const HeteroGraphPtr& g,
+                const std::string& op,
+                const std::vector<NDArray>& feat,
+                const std::vector<NDArray>& idx,
+                const std::vector<NDArray>& idx_etype,
+                std::vector<NDArray>* out);
 
 /*!
  * \brief Backward function of segment cmp.
@@ -156,6 +220,26 @@ std::pair<CSRMatrix, NDArray> CSRSum(
     const std::vector<CSRMatrix>& A,
     const std::vector<NDArray>& A_weights);
 
+/*!
+ * \brief Edge_softmax_csr forward function on Csr format.
+ */
+template <int XPU, typename IdType, int bits>
+void Edge_softmax_csr_forward(const std::string& op,
+             const BcastOff& bcast,
+             const aten::CSRMatrix& csr,
+             NDArray ufeat,
+             NDArray efeat,
+             NDArray out);
+/*!
+ * \brief Edge_softmax_csr backward function on Csr format.
+ */
+template <int XPU, typename IdType, int bits>
+void Edge_softmax_csr_backward(const std::string& op,
+             const BcastOff& bcast,
+             const aten::CSRMatrix& csr,
+             NDArray ufeat,
+             NDArray efeat,
+             NDArray out);
 }  // namespace aten
 }  // namespace dgl
 

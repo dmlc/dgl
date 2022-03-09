@@ -1,7 +1,7 @@
 """Internal utilities."""
 from __future__ import absolute_import, division
 
-from collections.abc import Mapping, Iterable
+from collections.abc import Mapping, Iterable, Sequence
 from collections import defaultdict
 from functools import wraps
 import numpy as np
@@ -691,6 +691,11 @@ class FlattenedDict(object):
         g = self._groups[k]
         return k, g[j]
 
+def maybe_flatten_dict(data):
+    """Return a FlattenedDict if the input is a Mapping, or the data itself otherwise.
+    """
+    return FlattenedDict(data) if isinstance(data, Mapping) else data
+
 def compensate(ids, origin_ids):
     """computing the compensate set of ids from origin_ids
 
@@ -904,5 +909,101 @@ def alias_func(func):
         return func(*args, **kwargs)
     _fn.__doc__ = """Alias of :func:`dgl.{}`.""".format(func.__name__)
     return _fn
+
+def apply_each(data, fn, *args, **kwargs):
+    """Apply a function to every element in a container.
+
+    If the input data is a list or any sequence other than a string, returns a list
+    whose elements are the same elements applied with the given function.
+
+    If the input data is a dict or any mapping, returns a dict whose keys are the same
+    and values are the elements applied with the given function.
+
+    The first argument of the function will be passed with the individual elements from
+    the input data, followed by the arguments in :attr:`args` and :attr:`kwargs`.
+
+    Parameters
+    ----------
+    data : any
+        Any object.
+    fn : callable
+        Any function.
+    args, kwargs :
+        Additional arguments and keyword-arguments passed to the function.
+
+    Examples
+    --------
+    Applying a ReLU function to a dictionary of tensors:
+
+    >>> h = {k: torch.randn(3) for k in ['A', 'B', 'C']}
+    >>> h = apply_each(h, torch.nn.functional.relu)
+    >>> assert all((v >= 0).all() for v in h.values())
+    """
+    if isinstance(data, Mapping):
+        return {k: fn(v, *args, **kwargs) for k, v in data.items()}
+    elif isinstance(data, Sequence):
+        return [fn(v, *args, **kwargs) for v in data]
+    else:
+        return fn(data, *args, **kwargs)
+
+def recursive_apply(data, fn, *args, **kwargs):
+    """Recursively apply a function to every element in a container.
+
+    If the input data is a list or any sequence other than a string, returns a list
+    whose elements are the same elements applied with the given function.
+
+    If the input data is a dict or any mapping, returns a dict whose keys are the same
+    and values are the elements applied with the given function.
+
+    If the input data is a nested container, the result will have the same nested
+    structure where each element is transformed recursively.
+
+    The first argument of the function will be passed with the individual elements from
+    the input data, followed by the arguments in :attr:`args` and :attr:`kwargs`.
+
+    Parameters
+    ----------
+    data : any
+        Any object.
+    fn : callable
+        Any function.
+    args, kwargs :
+        Additional arguments and keyword-arguments passed to the function.
+
+    Examples
+    --------
+    Applying a ReLU function to a dictionary of tensors:
+
+    >>> h = {k: torch.randn(3) for k in ['A', 'B', 'C']}
+    >>> h = recursive_apply(h, torch.nn.functional.relu)
+    >>> assert all((v >= 0).all() for v in h.values())
+    """
+    if isinstance(data, str):   # str is a Sequence
+        return fn(data, *args, **kwargs)
+    elif isinstance(data, Mapping):
+        return {k: recursive_apply(v, fn, *args, **kwargs) for k, v in data.items()}
+    elif isinstance(data, Sequence):
+        return [recursive_apply(v, fn, *args, **kwargs) for v in data]
+    else:
+        return fn(data, *args, **kwargs)
+
+def recursive_apply_pair(data1, data2, fn, *args, **kwargs):
+    """Recursively apply a function to every pair of elements in two containers with the
+    same nested structure.
+    """
+    if isinstance(data1, str) or isinstance(data2, str):
+        return fn(data1, data2, *args, **kwargs)
+    elif isinstance(data1, Mapping) and isinstance(data2, Mapping):
+        return {
+            k: recursive_apply_pair(data1[k], data2[k], fn, *args, **kwargs)
+            for k in data1.keys()}
+    elif isinstance(data1, Sequence) and isinstance(data2, Sequence):
+        return [recursive_apply_pair(x, y, fn, *args, **kwargs) for x, y in zip(data1, data2)]
+    else:
+        return fn(data1, data2, *args, **kwargs)
+
+def context_of(data):
+    """Return the device of the data which can be either a tensor or a dict of tensors."""
+    return F.context(next(iter(data.values())) if isinstance(data, Mapping) else data)
 
 _init_api("dgl.utils.internal")

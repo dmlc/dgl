@@ -48,11 +48,16 @@ class DistSparseGradOptimizer(abc.ABC):
             for emb in self._params:
                 name = emb._tensor.name
                 kvstore = emb._tensor.kvstore
-                trace = emb._trace
                 trainers_per_server = self._world_size // kvstore.num_servers
 
-                idics = [t[0] for t in trace]
-                grads = [t[1].grad.data for t in trace]
+                idics = []
+                grads = []
+                for trace in emb._trace:
+                    if trace[1].grad is not None:
+                        idics.append(trace[0])
+                        grads.append(trace[1].grad.data)
+                    else:
+                        assert len(trace[0]) == 0
                 # If the sparse embedding is not used in the previous forward step
                 # The idx and grad will be empty, initialize them as empty tensors to
                 # avoid crashing the optimizer step logic.
@@ -69,7 +74,7 @@ class DistSparseGradOptimizer(abc.ABC):
                 # will send grad to each corresponding trainer
                 if self._world_size > 1:
                     # get idx split from kvstore
-                    idx_split = kvstore.get_partid(name, idics)
+                    idx_split = kvstore.get_partid(emb.data_name, idics)
                     idx_split_size = []
                     idics_list = []
                     grad_list = []
@@ -331,8 +336,18 @@ class SparseAdam(DistSparseGradOptimizer):
         grad_indices, inverse, cnt = th.unique(idx, return_inverse=True, return_counts=True)
         # update grad state
         state_idx = grad_indices.to(state_dev)
-        state_step[state_idx] += 1
-        state_step = state_step[state_idx].to(exec_dev, non_blocking=True)
+        # The original implementation will cause read/write contension.
+        #    state_step[state_idx] += 1
+        #    state_step = state_step[state_idx].to(exec_dev, non_blocking=True)
+        # In a distributed environment, the first line of code will send write requests to
+        # kvstore servers to update the state_step which is asynchronous and the second line
+        # of code will also send read requests to kvstore servers. The write and read requests
+        # may be handled by different kvstore servers managing the same portion of the
+        # state_step dist tensor in the same node. So that, the read request may read an old
+        # value (i.e., 0 in the first iteration) which will cause update_power_corr to be NaN
+        state_val = state_step[state_idx] + 1
+        state_step[state_idx] = state_val
+        state_step = state_val.to(exec_dev, non_blocking=True)
         orig_mem = state_mem[state_idx].to(exec_dev, non_blocking=True)
         orig_power = state_power[state_idx].to(exec_dev, non_blocking=True)
 

@@ -254,7 +254,7 @@ COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat,
                                     IdArray rows,
                                     const int64_t num_picks,
                                     const bool replace) {
-  const auto& ctx = mat.indptr->ctx;
+  const auto& ctx = rows->ctx;
   auto device = runtime::DeviceAPI::Get(ctx);
 
   // TODO(dlasalle): Once the device api supports getting the stream from the

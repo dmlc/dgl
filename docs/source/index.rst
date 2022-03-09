@@ -24,7 +24,9 @@ Welcome to Deep Graph Library Tutorials and Documentation
 
    guide/index
    guide_cn/index
+   guide_ko/index
    tutorials/large/index
+   tutorials/cpu/index
    tutorials/multi/index
    tutorials/dist/index
    tutorials/models/index
@@ -42,13 +44,16 @@ Welcome to Deep Graph Library Tutorials and Documentation
    api/python/dgl.distributed
    api/python/dgl.function
    api/python/dgl.geometry
-   api/python/nn
+   api/python/nn-pytorch
+   api/python/nn-tensorflow
+   api/python/nn-mxnet
    api/python/nn.functional
    api/python/dgl.ops
    api/python/dgl.optim
    api/python/dgl.sampling
    api/python/dgl.multiprocessing
    api/python/dgl.contrib.UnifiedTensor
+   api/python/transforms
    api/python/udf
 
 .. toctree::

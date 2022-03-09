@@ -151,7 +151,7 @@ cscope.*
 # parameters
 *.params
 
-# vscode 
+# vscode
 .clangd
 .vscode
 
@@ -161,3 +161,6 @@ cscope.*
 config.cmake
 .ycm_extra_conf.py
 **.png
+
+# model file
+*.pth

@@ -10,7 +10,7 @@ from ..base import NID, EID, NTYPE, ETYPE, dgl_warning
 from ..convert import to_homogeneous
 from ..random import choice as random_choice
 from ..data.utils import load_graphs, save_graphs, load_tensors, save_tensors
-from ..transform import metis_partition_assignment, partition_graph_with_halo
+from ..partition import metis_partition_assignment, partition_graph_with_halo, get_peak_mem
 from .graph_partition_book import BasicPartitionBook, RangePartitionBook
 
 def _get_inner_node_mask(graph, ntype_id):
@@ -241,7 +241,7 @@ def _get_orig_ids(g, sim_g, reshuffle, orig_nids, orig_eids):
     -------
     tensor or dict of tensors, tensor or dict of tensors
     '''
-    is_hetero = len(g.etypes) > 1 or len(g.ntypes) > 1
+    is_hetero = not g.is_homogeneous
     if reshuffle and is_hetero:
         # Get the type IDs
         orig_ntype = F.gather_row(sim_g.ndata[NTYPE], orig_nids)
@@ -275,7 +275,7 @@ def _set_trainer_ids(g, sim_g, node_parts):
     node_parts : tensor
         The node partition ID for each node in `sim_g`.
     '''
-    if len(g.etypes) == 1:
+    if g.is_homogeneous:
         g.ndata['trainer_id'] = node_parts
         # An edge is assigned to a partition based on its destination node.
         g.edata['trainer_id'] = F.gather_row(node_parts, g.edges()[1])
@@ -497,7 +497,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     ...                                 'output/test.json', 0)
     '''
     def get_homogeneous(g, balance_ntypes):
-        if len(g.etypes) == 1:
+        if g.is_homogeneous:
             sim_g = to_homogeneous(g)
             if isinstance(balance_ntypes, dict):
                 assert len(balance_ntypes) == 1
@@ -540,17 +540,23 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                     "For heterogeneous graphs, reshuffle must be enabled.")
 
     if num_parts == 1:
+        start = time.time()
         sim_g, balance_ntypes = get_homogeneous(g, balance_ntypes)
+        print('Converting to homogeneous graph takes {:.3f}s, peak mem: {:.3f} GB'.format(
+            time.time() - start, get_peak_mem()))
         assert num_trainers_per_machine >= 1
         if num_trainers_per_machine > 1:
             # First partition the whole graph to each trainer and save the trainer ids in
             # the node feature "trainer_id".
+            start = time.time()
             node_parts = metis_partition_assignment(
                 sim_g, num_parts * num_trainers_per_machine,
                 balance_ntypes=balance_ntypes,
                 balance_edges=balance_edges,
                 mode='k-way')
             _set_trainer_ids(g, sim_g, node_parts)
+            print('Assigning nodes to METIS partitions takes {:.3f}s, peak mem: {:.3f} GB'.format(
+                time.time() - start, get_peak_mem()))
 
         node_parts = F.zeros((sim_g.number_of_nodes(),), F.int64, F.cpu())
         parts = {0: sim_g.clone()}
@@ -566,9 +572,13 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         parts[0].ndata['inner_node'] = F.ones((sim_g.number_of_nodes(),), F.int8, F.cpu())
         parts[0].edata['inner_edge'] = F.ones((sim_g.number_of_edges(),), F.int8, F.cpu())
     elif part_method in ('metis', 'random'):
+        start = time.time()
         sim_g, balance_ntypes = get_homogeneous(g, balance_ntypes)
+        print('Converting to homogeneous graph takes {:.3f}s, peak mem: {:.3f} GB'.format(
+            time.time() - start, get_peak_mem()))
         if part_method == 'metis':
             assert num_trainers_per_machine >= 1
+            start = time.time()
             if num_trainers_per_machine > 1:
                 # First partition the whole graph to each trainer and save the trainer ids in
                 # the node feature "trainer_id".
@@ -587,10 +597,15 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                                                         balance_ntypes=balance_ntypes,
                                                         balance_edges=balance_edges,
                                                         objtype=objtype)
+            print('Assigning nodes to METIS partitions takes {:.3f}s, peak mem: {:.3f} GB'.format(
+                time.time() - start, get_peak_mem()))
         else:
             node_parts = random_choice(num_parts, sim_g.number_of_nodes())
+        start = time.time()
         parts, orig_nids, orig_eids = partition_graph_with_halo(sim_g, node_parts, num_hops,
                                                                 reshuffle=reshuffle)
+        print('Splitting the graph into partitions takes {:.3f}s, peak mem: {:.3f} GB'.format(
+            time.time() - start, get_peak_mem()))
         if return_mapping:
             orig_nids, orig_eids = _get_orig_ids(g, sim_g, reshuffle, orig_nids, orig_eids)
     else:
@@ -601,7 +616,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     # NTYPE: the node type.
     # orig_id: the global node IDs in the homogeneous version of input graph.
     # NID: the global node IDs in the reshuffled homogeneous version of the input graph.
-    if len(g.etypes) > 1:
+    if not g.is_homogeneous:
         if reshuffle:
             for name in parts:
                 orig_ids = parts[name].ndata['orig_id']
@@ -767,7 +782,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                 inner_edge_mask = _get_inner_edge_mask(part, etype_id)
                 # This is global edge IDs.
                 local_edges = F.boolean_mask(part.edata[edata_name], inner_edge_mask)
-                if len(g.etypes) > 1:
+                if not g.is_homogeneous:
                     local_edges = F.gather_row(sim_g.edata[EID], local_edges)
                     print('part {} has {} edges of type {} and {} are inside the partition'.format(
                         part_id, F.as_scalar(F.sum(part.edata[ETYPE] == etype_id, 0)),
@@ -802,7 +817,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                     else:
                         node_feats[ntype + '/' + name] = g.nodes[ntype].data[name]
             for etype in g.etypes:
-                if reshuffle and len(g.etypes) > 1:
+                if reshuffle and not g.is_homogeneous:
                     edata_name = 'orig_id'
                     etype_id = g.get_etype_id(etype)
                     inner_edge_mask = _get_inner_edge_mask(part, etype_id)
@@ -820,7 +835,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                     else:
                         edge_feats[etype + '/' + name] = g.edges[etype].data[name]
         # Some adjustment for heterogeneous graphs.
-        if len(g.etypes) > 1:
+        if not g.is_homogeneous:
             part.ndata['orig_id'] = F.gather_row(sim_g.ndata[NID], part.ndata['orig_id'])
             part.edata['orig_id'] = F.gather_row(sim_g.edata[EID], part.edata['orig_id'])
 
@@ -837,10 +852,11 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         save_tensors(edge_feat_file, edge_feats)
 
         save_graphs(part_graph_file, [part])
+    print('Save partitions: {:.3f} seconds, peak memory: {:.3f} GB'.format(
+        time.time() - start, get_peak_mem()))
 
     with open('{}/{}.json'.format(out_path, graph_name), 'w') as outfile:
         json.dump(part_metadata, outfile, sort_keys=True, indent=4)
-    print('Save partitions: {:.3f} seconds'.format(time.time() - start))
 
     num_cuts = sim_g.number_of_edges() - tot_num_inner_edges
     if num_parts == 1:

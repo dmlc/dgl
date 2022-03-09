@@ -4,16 +4,13 @@ import tensorflow as tf
 from tensorflow.keras import layers
 
 from .... import function as fn
+from ....base import DGLError
 from ....utils import expand_as_pair, check_eq_shape
 
 
 class SAGEConv(layers.Layer):
-    r"""
-
-    Description
-    -----------
-    GraphSAGE layer from paper `Inductive Representation Learning on
-    Large Graphs <https://arxiv.org/pdf/1706.02216.pdf>`__.
+    r"""GraphSAGE layer from `Inductive Representation Learning on
+    Large Graphs <https://arxiv.org/pdf/1706.02216.pdf>`__
 
     .. math::
         h_{\mathcal{N}(i)}^{(l+1)} &= \mathrm{aggregate}
@@ -22,7 +19,7 @@ class SAGEConv(layers.Layer):
         h_{i}^{(l+1)} &= \sigma \left(W \cdot \mathrm{concat}
         (h_{i}^{l}, h_{\mathcal{N}(i)}^{l+1}) \right)
 
-        h_{i}^{(l+1)} &= \mathrm{norm}(h_{i}^{l})
+        h_{i}^{(l+1)} &= \mathrm{norm}(h_{i}^{(l+1)})
 
     Parameters
     ----------
@@ -40,10 +37,10 @@ class SAGEConv(layers.Layer):
         are required to be the same.
     out_feats : int
         Output feature size; i.e, the number of dimensions of :math:`h_i^{(l+1)}`.
-    feat_drop : float
-        Dropout rate on features, default: ``0``.
     aggregator_type : str
         Aggregator type to use (``mean``, ``gcn``, ``pool``, ``lstm``).
+    feat_drop : float
+        Dropout rate on features, default: ``0``.
     bias : bool
         If True, adds a learnable bias to the output. Default: ``True``.
     norm : callable activation function/layer or None, optional
@@ -100,6 +97,12 @@ class SAGEConv(layers.Layer):
                  norm=None,
                  activation=None):
         super(SAGEConv, self).__init__()
+        valid_aggre_types = {'mean', 'gcn', 'pool', 'lstm'}
+        if aggregator_type not in valid_aggre_types:
+            raise DGLError(
+                'Invalid aggregator_type. Must be one of {}. '
+                'But got {!r} instead.'.format(valid_aggre_types, aggregator_type)
+            )
 
         self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
         self._out_feats = out_feats
@@ -126,11 +129,7 @@ class SAGEConv(layers.Layer):
         return {'neigh': rst}
 
     def call(self, graph, feat):
-        r"""
-
-        Description
-        -----------
-        Compute GraphSAGE layer.
+        r"""Compute GraphSAGE layer.
 
         Parameters
         ----------

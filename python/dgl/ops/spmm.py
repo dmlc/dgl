@@ -75,19 +75,16 @@ def gspmm(g, op, reduce_op, lhs_data, rhs_data):
         ret = gspmm_internal(g._graph, op,
                              'sum' if reduce_op == 'mean' else reduce_op,
                              lhs_data, rhs_data)
-        # Replace infinity with zero for isolated nodes when reducer is min/max
-        if reduce_op in ['min', 'max']:
-            ret = F.replace_inf_with_zero(ret)
     else:
         # lhs_data or rhs_data is None only in unary functions like ``copy-u`` or ``copy_e``
         lhs_data = [None] * g._graph.number_of_ntypes() if lhs_data is None else lhs_data
         rhs_data = [None] * g._graph.number_of_etypes() if rhs_data is None else rhs_data
         # TODO (Israt): Call reshape func
         lhs_and_rhs_tuple = tuple(list(lhs_data) + list(rhs_data))
-        ret = gspmm_internal_hetero(g, op,
+        ret = gspmm_internal_hetero(g._graph, op,
                                     'sum' if reduce_op == 'mean' else reduce_op,
                                     len(lhs_data), *lhs_and_rhs_tuple)
-    # TODO (Israt): Add support for 'max', 'min', 'mean' in heterograph
+    # TODO (Israt): Add support for 'mean' in heterograph
     # divide in degrees for mean reducer.
     if reduce_op == 'mean':
         ret_shape = F.shape(ret)

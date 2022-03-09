@@ -32,7 +32,7 @@ implementation would be like:
 
     linear = nn.Parameter(torch.FloatTensor(size=(node_feat_dim * 2, out_dim)))
     def concat_message_function(edges):
-         return {'cat_feat': torch.cat([edges.src['feat'], edges.dst['feat']])}
+         return {'cat_feat': torch.cat([edges.src['feat'], edges.dst['feat']], dim=1)}
     g.apply_edges(concat_message_function)
     g.edata['out'] = g.edata['cat_feat'] @ linear
 
@@ -59,5 +59,5 @@ respectively:
 The above two implementations are mathematically equivalent. The latter
 one is more efficient because it does not need to save feat_src and
 feat_dst on edges, which is not memory-efficient. Plus, addition could
-be optimized with DGL’s built-in function ``u_add_v``, which further
+be optimized with DGL’s built-in function :func:`~dgl.function.u_add_v`, which further
 speeds up computation and saves memory footprint.

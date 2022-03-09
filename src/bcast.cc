@@ -83,12 +83,6 @@ BcastOff CalcBcastOff(const std::string& op, NDArray lhs, NDArray rhs) {
       rst.out_len /= rst.reduce_size;  // out_len is divied by reduce_size in dot.
     }
   }
-#ifdef DEBUG
-  LOG(INFO) << "lhs_len: " << rst.lhs_len << " " <<
-               "rhs_len: " << rst.rhs_len << " " <<
-               "out_len: " << rst.out_len << " " <<
-               "reduce_size: " << rst.reduce_size << std::endl;
-#endif
   return rst;
 }
 

@@ -5,12 +5,8 @@ import torch as th
 import torch.nn as nn
 
 class RadialPooling(nn.Module):
-    r"""
-
-    Description
-    -----------
-    Radial pooling from paper `Atomic Convolutional Networks for
-    Predicting Protein-Ligand Binding Affinity <https://arxiv.org/abs/1703.10603>`__.
+    r"""Radial pooling from `Atomic Convolutional Networks for
+    Predicting Protein-Ligand Binding Affinity <https://arxiv.org/abs/1703.10603>`__
 
     We denote the distance between atom :math:`i` and :math:`j` by :math:`r_{ij}`.
 
@@ -132,12 +128,8 @@ def reduce_func(nodes):
     return {'hv_new': nodes.mailbox['m'].sum(1)}
 
 class AtomicConv(nn.Module):
-    r"""
-
-    Description
-    -----------
-    Atomic Convolution Layer from paper `Atomic Convolutional Networks for
-    Predicting Protein-Ligand Binding Affinity <https://arxiv.org/abs/1703.10603>`__.
+    r"""Atomic Convolution Layer from `Atomic Convolutional Networks for
+    Predicting Protein-Ligand Binding Affinity <https://arxiv.org/abs/1703.10603>`__
 
     Denoting the type of atom :math:`i` by :math:`z_i` and the distance between atom
     :math:`i` and :math:`j` by :math:`r_{ij}`.

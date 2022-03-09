@@ -13,11 +13,12 @@ from . import heterograph_index
 from . import ndarray as nd
 from .heterograph import DGLHeteroGraph
 from . import utils
+from .utils import recursive_apply
 
 __all__ = ['node_subgraph', 'edge_subgraph', 'node_type_subgraph', 'edge_type_subgraph',
-           'in_subgraph', 'out_subgraph']
+           'in_subgraph', 'out_subgraph', 'khop_in_subgraph', 'khop_out_subgraph']
 
-def node_subgraph(graph, nodes, *, relabel_nodes=True, store_ids=True):
+def node_subgraph(graph, nodes, *, relabel_nodes=True, store_ids=True, output_device=None):
     """Return a subgraph induced on the given nodes.
 
     A node-induced subgraph is a graph with edges whose endpoints are both in the
@@ -53,6 +54,8 @@ def node_subgraph(graph, nodes, *, relabel_nodes=True, store_ids=True):
         resulting graph under name ``dgl.EID``; if ``relabel_nodes`` is ``True``, it will
         also store the raw IDs of the specified nodes in the ``ndata`` of the resulting
         graph under name ``dgl.NID``.
+    output_device : Framework-specific device context object, optional
+        The output device.  Default is the same as the input graph.
 
     Returns
     -------
@@ -146,12 +149,17 @@ def node_subgraph(graph, nodes, *, relabel_nodes=True, store_ids=True):
         induced_nodes.append(_process_nodes(ntype, nids))
     sgi = graph._graph.node_subgraph(induced_nodes, relabel_nodes)
     induced_edges = sgi.induced_edges
-    induced_nodes = sgi.induced_nodes if relabel_nodes else None
-    return _create_hetero_subgraph(graph, sgi, induced_nodes, induced_edges, store_ids=store_ids)
+    # (BarclayII) should not write induced_nodes = sgi.induced_nodes due to the same
+    # bug in #1453.
+    if not relabel_nodes:
+        induced_nodes = None
+    subg = _create_hetero_subgraph(graph, sgi, induced_nodes, induced_edges, store_ids=store_ids)
+    return subg if output_device is None else subg.to(output_device)
 
 DGLHeteroGraph.subgraph = utils.alias_func(node_subgraph)
 
-def edge_subgraph(graph, edges, *, relabel_nodes=True, store_ids=True, **deprecated_kwargs):
+def edge_subgraph(graph, edges, *, relabel_nodes=True, store_ids=True, output_device=None,
+                  **deprecated_kwargs):
     """Return a subgraph induced on the given edges.
 
     An edge-induced subgraph is equivalent to creating a new graph using the given
@@ -187,6 +195,8 @@ def edge_subgraph(graph, edges, *, relabel_nodes=True, store_ids=True, **depreca
         resulting graph under name ``dgl.EID``; if ``relabel_nodes`` is ``True``, it will
         also store the raw IDs of the incident nodes in the ``ndata`` of the resulting
         graph under name ``dgl.NID``.
+    output_device : Framework-specific device context object, optional
+        The output device.  Default is the same as the input graph.
 
     Returns
     -------
@@ -298,11 +308,12 @@ def edge_subgraph(graph, edges, *, relabel_nodes=True, store_ids=True, **depreca
         induced_edges.append(_process_edges(cetype, eids))
     sgi = graph._graph.edge_subgraph(induced_edges, not relabel_nodes)
     induced_nodes = sgi.induced_nodes if relabel_nodes else None
-    return _create_hetero_subgraph(graph, sgi, induced_nodes, induced_edges, store_ids=store_ids)
+    subg = _create_hetero_subgraph(graph, sgi, induced_nodes, induced_edges, store_ids=store_ids)
+    return subg if output_device is None else subg.to(output_device)
 
 DGLHeteroGraph.edge_subgraph = utils.alias_func(edge_subgraph)
 
-def in_subgraph(graph, nodes, *, relabel_nodes=False, store_ids=True):
+def in_subgraph(graph, nodes, *, relabel_nodes=False, store_ids=True, output_device=None):
     """Return the subgraph induced on the inbound edges of all the edge types of the
     given nodes.
 
@@ -337,6 +348,8 @@ def in_subgraph(graph, nodes, *, relabel_nodes=False, store_ids=True):
         resulting graph under name ``dgl.EID``; if ``relabel_nodes`` is ``True``, it will
         also store the raw IDs of the extracted nodes in the ``ndata`` of the resulting
         graph under name ``dgl.NID``.
+    output_device : Framework-specific device context object, optional
+        The output device.  Default is the same as the input graph.
 
     Returns
     -------
@@ -423,11 +436,12 @@ def in_subgraph(graph, nodes, *, relabel_nodes=False, store_ids=True):
     sgi = _CAPI_DGLInSubgraph(graph._graph, nodes_all_types, relabel_nodes)
     induced_nodes = sgi.induced_nodes if relabel_nodes else None
     induced_edges = sgi.induced_edges
-    return _create_hetero_subgraph(graph, sgi, induced_nodes, induced_edges, store_ids=store_ids)
+    subg = _create_hetero_subgraph(graph, sgi, induced_nodes, induced_edges, store_ids=store_ids)
+    return subg if output_device is None else subg.to(output_device)
 
 DGLHeteroGraph.in_subgraph = utils.alias_func(in_subgraph)
 
-def out_subgraph(graph, nodes, *, relabel_nodes=False, store_ids=True):
+def out_subgraph(graph, nodes, *, relabel_nodes=False, store_ids=True, output_device=None):
     """Return the subgraph induced on the outbound edges of all the edge types of the
     given nodes.
 
@@ -462,6 +476,8 @@ def out_subgraph(graph, nodes, *, relabel_nodes=False, store_ids=True):
         resulting graph under name ``dgl.EID``; if ``relabel_nodes`` is ``True``, it will
         also store the raw IDs of the extracted nodes in the ``ndata`` of the resulting
         graph under name ``dgl.NID``.
+    output_device : Framework-specific device context object, optional
+        The output device.  Default is the same as the input graph.
 
     Returns
     -------
@@ -548,11 +564,333 @@ def out_subgraph(graph, nodes, *, relabel_nodes=False, store_ids=True):
     sgi = _CAPI_DGLOutSubgraph(graph._graph, nodes_all_types, relabel_nodes)
     induced_nodes = sgi.induced_nodes if relabel_nodes else None
     induced_edges = sgi.induced_edges
-    return _create_hetero_subgraph(graph, sgi, induced_nodes, induced_edges, store_ids=store_ids)
+    subg = _create_hetero_subgraph(graph, sgi, induced_nodes, induced_edges, store_ids=store_ids)
+    return subg if output_device is None else subg.to(output_device)
 
 DGLHeteroGraph.out_subgraph = utils.alias_func(out_subgraph)
 
-def node_type_subgraph(graph, ntypes):
+def khop_in_subgraph(graph, nodes, k, *, relabel_nodes=True, store_ids=True, output_device=None):
+    """Return the subgraph induced by k-hop in-neighborhood of the specified node(s).
+
+    We can expand a set of nodes by including the predecessors of them. From a
+    specified node set, a k-hop in subgraph is obtained by first repeating the node set
+    expansion for k times and then creating a node induced subgraph. In addition to
+    extracting the subgraph, DGL also copies the features of the extracted nodes and
+    edges to the resulting graph. The copy is *lazy* and incurs data movement only
+    when needed.
+
+    If the graph is heterogeneous, DGL extracts a subgraph per relation and composes
+    them as the resulting graph. Thus the resulting graph has the same set of relations
+    as the input one.
+
+    Parameters
+    ----------
+    graph : DGLGraph
+        The input graph.
+    nodes : nodes or dict[str, nodes]
+        The starting node(s) to expand. The allowed formats are:
+
+        * Int: ID of a single node.
+        * Int Tensor: Each element is a node ID. The tensor must have the same device
+          type and ID data type as the graph's.
+        * iterable[int]: Each element is a node ID.
+
+        If the graph is homogeneous, one can directly pass the above formats.
+        Otherwise, the argument must be a dictionary with keys being node types
+        and values being the node IDs in the above formats.
+    k : int
+        The number of hops.
+    relabel_nodes : bool, optional
+        If True, it will remove the isolated nodes and relabel the rest nodes in the
+        extracted subgraph.
+    store_ids : bool, optional
+        If True, it will store the raw IDs of the extracted edges in the ``edata`` of the
+        resulting graph under name ``dgl.EID``; if ``relabel_nodes`` is ``True``, it will
+        also store the raw IDs of the extracted nodes in the ``ndata`` of the resulting
+        graph under name ``dgl.NID``.
+    output_device : Framework-specific device context object, optional
+        The output device.  Default is the same as the input graph.
+
+    Returns
+    -------
+    DGLGraph
+        The subgraph.
+    Tensor or dict[str, Tensor], optional
+        The new IDs of the input :attr:`nodes` after node relabeling. This is returned
+        only when :attr:`relabel_nodes` is True. It is in the same form as :attr:`nodes`.
+
+    Notes
+    -----
+
+    When k is 1, the result subgraph is different from the one obtained by
+    :func:`dgl.in_subgraph`. The 1-hop in subgraph also includes the edges
+    among the neighborhood.
+
+    Examples
+    --------
+    The following example uses PyTorch backend.
+
+    >>> import dgl
+    >>> import torch
+
+    Extract a two-hop subgraph from a homogeneous graph.
+
+    >>> g = dgl.graph(([1, 1, 2, 3, 4], [0, 2, 0, 4, 2]))
+    >>> g.edata['w'] = torch.arange(10).view(5, 2)
+    >>> sg, inverse_indices = dgl.khop_in_subgraph(g, 0, k=2)
+    >>> sg
+    Graph(num_nodes=4, num_edges=4,
+          ndata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64)}
+          edata_schemes={'w': Scheme(shape=(2,), dtype=torch.int64),
+                         '_ID': Scheme(shape=(), dtype=torch.int64)})
+    >>> sg.edges()
+    (tensor([1, 1, 2, 3]), tensor([0, 2, 0, 2]))
+    >>> sg.edata[dgl.EID]  # original edge IDs
+    tensor([0, 1, 2, 4])
+    >>> sg.edata['w']  # also extract the features
+    tensor([[0, 1],
+            [2, 3],
+            [4, 5],
+            [8, 9]])
+    >>> inverse_indices
+    tensor([0])
+
+    Extract a subgraph from a heterogeneous graph.
+
+    >>> g = dgl.heterograph({
+    ...     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
+    ...     ('user', 'follows', 'user'): ([0, 1, 1], [1, 2, 2])})
+    >>> sg, inverse_indices = dgl.khop_in_subgraph(g, {'game': 0}, k=2)
+    >>> sg
+    Graph(num_nodes={'game': 1, 'user': 2},
+          num_edges={('user', 'follows', 'user'): 1, ('user', 'plays', 'game'): 2},
+          metagraph=[('user', 'user', 'follows'), ('user', 'game', 'plays')])
+    >>> inverse_indices
+    {'game': tensor([0])}
+
+    See also
+    --------
+    khop_out_subgraph
+    """
+    if graph.is_block:
+        raise DGLError('Extracting subgraph of a block graph is not allowed.')
+
+    is_mapping = isinstance(nodes, Mapping)
+    if not is_mapping:
+        assert len(graph.ntypes) == 1, \
+            'need a dict of node type and IDs for graph with multiple node types'
+        nodes = {graph.ntypes[0]: nodes}
+
+    for nty, nty_nodes in nodes.items():
+        nodes[nty] = utils.prepare_tensor(graph, nty_nodes, 'nodes["{}"]'.format(nty))
+
+    last_hop_nodes = nodes
+    k_hop_nodes_ = [last_hop_nodes]
+    place_holder = F.copy_to(F.tensor([], dtype=graph.idtype), graph.device)
+    for _ in range(k):
+        current_hop_nodes = {nty: [] for nty in graph.ntypes}
+        for cetype in graph.canonical_etypes:
+            srctype, _, dsttype = cetype
+            in_nbrs, _ = graph.in_edges(last_hop_nodes.get(dsttype, place_holder), etype=cetype)
+            current_hop_nodes[srctype].append(in_nbrs)
+        for nty in graph.ntypes:
+            if len(current_hop_nodes[nty]) == 0:
+                current_hop_nodes[nty] = place_holder
+                continue
+            current_hop_nodes[nty] = F.unique(F.cat(current_hop_nodes[nty], dim=0))
+        k_hop_nodes_.append(current_hop_nodes)
+        last_hop_nodes = current_hop_nodes
+
+    k_hop_nodes = dict()
+    inverse_indices = dict()
+    for nty in graph.ntypes:
+        k_hop_nodes[nty], inverse_indices[nty] = F.unique(F.cat([
+            hop_nodes.get(nty, place_holder)
+            for hop_nodes in k_hop_nodes_], dim=0), return_inverse=True)
+
+    sub_g = node_subgraph(graph, k_hop_nodes, relabel_nodes=relabel_nodes, store_ids=store_ids)
+    if output_device is not None:
+        sub_g = sub_g.to(output_device)
+    if relabel_nodes:
+        if is_mapping:
+            seed_inverse_indices = dict()
+            for nty in nodes:
+                seed_inverse_indices[nty] = F.slice_axis(
+                    inverse_indices[nty], axis=0, begin=0, end=len(nodes[nty]))
+        else:
+            seed_inverse_indices = F.slice_axis(
+                inverse_indices[nty], axis=0, begin=0, end=len(nodes[nty]))
+        if output_device is not None:
+            seed_inverse_indices = recursive_apply(
+                seed_inverse_indices, lambda x: F.copy_to(x, output_device))
+        return sub_g, seed_inverse_indices
+    else:
+        return sub_g
+
+DGLHeteroGraph.khop_in_subgraph = utils.alias_func(khop_in_subgraph)
+
+def khop_out_subgraph(graph, nodes, k, *, relabel_nodes=True, store_ids=True, output_device=None):
+    """Return the subgraph induced by k-hop out-neighborhood of the specified node(s).
+
+    We can expand a set of nodes by including the successors of them. From a
+    specified node set, a k-hop out subgraph is obtained by first repeating the node set
+    expansion for k times and then creating a node induced subgraph. In addition to
+    extracting the subgraph, DGL also copies the features of the extracted nodes and
+    edges to the resulting graph. The copy is *lazy* and incurs data movement only
+    when needed.
+
+    If the graph is heterogeneous, DGL extracts a subgraph per relation and composes
+    them as the resulting graph. Thus the resulting graph has the same set of relations
+    as the input one.
+
+    Parameters
+    ----------
+    graph : DGLGraph
+        The input graph.
+    nodes : nodes or dict[str, nodes]
+        The starting node(s) to expand. The allowed formats are:
+
+        * Int: ID of a single node.
+        * Int Tensor: Each element is a node ID. The tensor must have the same device
+          type and ID data type as the graph's.
+        * iterable[int]: Each element is a node ID.
+
+        If the graph is homogeneous, one can directly pass the above formats.
+        Otherwise, the argument must be a dictionary with keys being node types
+        and values being the node IDs in the above formats.
+    k : int
+        The number of hops.
+    relabel_nodes : bool, optional
+        If True, it will remove the isolated nodes and relabel the rest nodes in the
+        extracted subgraph.
+    store_ids : bool, optional
+        If True, it will store the raw IDs of the extracted edges in the ``edata`` of the
+        resulting graph under name ``dgl.EID``; if ``relabel_nodes`` is ``True``, it will
+        also store the raw IDs of the extracted nodes in the ``ndata`` of the resulting
+        graph under name ``dgl.NID``.
+    output_device : Framework-specific device context object, optional
+        The output device.  Default is the same as the input graph.
+
+    Returns
+    -------
+    DGLGraph
+        The subgraph.
+    Tensor or dict[str, Tensor], optional
+        The new IDs of the input :attr:`nodes` after node relabeling. This is returned
+        only when :attr:`relabel_nodes` is True. It is in the same form as :attr:`nodes`.
+
+    Notes
+    -----
+
+    When k is 1, the result subgraph is different from the one obtained by
+    :func:`dgl.out_subgraph`. The 1-hop out subgraph also includes the edges
+    among the neighborhood.
+
+    Examples
+    --------
+    The following example uses PyTorch backend.
+
+    >>> import dgl
+    >>> import torch
+
+    Extract a two-hop subgraph from a homogeneous graph.
+
+    >>> g = dgl.graph(([0, 2, 0, 4, 2], [1, 1, 2, 3, 4]))
+    >>> g.edata['w'] = torch.arange(10).view(5, 2)
+    >>> sg, inverse_indices = dgl.khop_out_subgraph(g, 0, k=2)
+    >>> sg
+    Graph(num_nodes=4, num_edges=4,
+          ndata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64)}
+          edata_schemes={'w': Scheme(shape=(2,), dtype=torch.int64),
+                         '_ID': Scheme(shape=(), dtype=torch.int64)})
+    >>> sg.edges()
+    (tensor([0, 0, 2, 2]), tensor([1, 2, 1, 3]))
+    >>> sg.edata[dgl.EID]  # original edge IDs
+    tensor([0, 2, 1, 4])
+    >>> sg.edata['w']  # also extract the features
+    tensor([[0, 1],
+            [4, 5],
+            [2, 3],
+            [8, 9]])
+    >>> inverse_indices
+    tensor([0])
+
+    Extract a subgraph from a heterogeneous graph.
+
+    >>> g = dgl.heterograph({
+    ...     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
+    ...     ('user', 'follows', 'user'): ([0, 1], [1, 3])})
+    >>> sg, inverse_indices = dgl.khop_out_subgraph(g, {'user': 0}, k=2)
+    >>> sg
+    Graph(num_nodes={'game': 2, 'user': 3},
+          num_edges={('user', 'follows', 'user'): 2, ('user', 'plays', 'game'): 2},
+          metagraph=[('user', 'user', 'follows'), ('user', 'game', 'plays')])
+    >>> inverse_indices
+    {'user': tensor([0])}
+
+    See also
+    --------
+    khop_in_subgraph
+    """
+    if graph.is_block:
+        raise DGLError('Extracting subgraph of a block graph is not allowed.')
+
+    is_mapping = isinstance(nodes, Mapping)
+    if not is_mapping:
+        assert len(graph.ntypes) == 1, \
+            'need a dict of node type and IDs for graph with multiple node types'
+        nodes = {graph.ntypes[0]: nodes}
+
+    for nty, nty_nodes in nodes.items():
+        nodes[nty] = utils.prepare_tensor(graph, nty_nodes, 'nodes["{}"]'.format(nty))
+
+    last_hop_nodes = nodes
+    k_hop_nodes_ = [last_hop_nodes]
+    place_holder = F.copy_to(F.tensor([], dtype=graph.idtype), graph.device)
+    for _ in range(k):
+        current_hop_nodes = {nty: [] for nty in graph.ntypes}
+        for cetype in graph.canonical_etypes:
+            srctype, _, dsttype = cetype
+            _, out_nbrs = graph.out_edges(last_hop_nodes.get(
+                srctype, place_holder), etype=cetype)
+            current_hop_nodes[dsttype].append(out_nbrs)
+        for nty in graph.ntypes:
+            if len(current_hop_nodes[nty]) == 0:
+                current_hop_nodes[nty] = place_holder
+                continue
+            current_hop_nodes[nty] = F.unique(F.cat(current_hop_nodes[nty], dim=0))
+        k_hop_nodes_.append(current_hop_nodes)
+        last_hop_nodes = current_hop_nodes
+
+    k_hop_nodes = dict()
+    inverse_indices = dict()
+    for nty in graph.ntypes:
+        k_hop_nodes[nty], inverse_indices[nty] = F.unique(F.cat([
+            hop_nodes.get(nty, place_holder)
+            for hop_nodes in k_hop_nodes_], dim=0), return_inverse=True)
+
+    sub_g = node_subgraph(graph, k_hop_nodes, relabel_nodes=relabel_nodes, store_ids=store_ids)
+    if output_device is not None:
+        sub_g = sub_g.to(output_device)
+    if relabel_nodes:
+        if is_mapping:
+            seed_inverse_indices = dict()
+            for nty in nodes:
+                seed_inverse_indices[nty] = F.slice_axis(
+                    inverse_indices[nty], axis=0, begin=0, end=len(nodes[nty]))
+        else:
+            seed_inverse_indices = F.slice_axis(
+                inverse_indices[nty], axis=0, begin=0, end=len(nodes[nty]))
+        if output_device is not None:
+            seed_inverse_indices = recursive_apply(
+                seed_inverse_indices, lambda x: F.copy_to(x, output_device))
+        return sub_g, seed_inverse_indices
+    else:
+        return sub_g
+
+DGLHeteroGraph.khop_out_subgraph = utils.alias_func(khop_out_subgraph)
+
+def node_type_subgraph(graph, ntypes, output_device=None):
     """Return the subgraph induced on given node types.
 
     A node-type-induced subgraph contains all the nodes of the given subset of
@@ -567,6 +905,8 @@ def node_type_subgraph(graph, ntypes):
         The graph to extract subgraphs from.
     ntypes : list[str]
         The type names of the nodes in the subgraph.
+    output_device : Framework-specific device context object, optional
+        The output device.  Default is the same as the input graph.
 
     Returns
     -------
@@ -625,11 +965,11 @@ def node_type_subgraph(graph, ntypes):
             etypes.append(graph.canonical_etypes[etid])
     if len(etypes) == 0:
         raise DGLError('There are no edges among nodes of the specified types.')
-    return edge_type_subgraph(graph, etypes)
+    return edge_type_subgraph(graph, etypes, output_device=output_device)
 
 DGLHeteroGraph.node_type_subgraph = utils.alias_func(node_type_subgraph)
 
-def edge_type_subgraph(graph, etypes):
+def edge_type_subgraph(graph, etypes, output_device=None):
     """Return the subgraph induced on given edge types.
 
     An edge-type-induced subgraph contains all the edges of the given subset of
@@ -650,6 +990,8 @@ def edge_type_subgraph(graph, etypes):
         * ``(str, str, str)`` for source node type, edge type and destination node type.
         * or one ``str`` for the edge type name  if the name can uniquely identify a
           triplet format in the graph.
+    output_device : Framework-specific device context object, optional
+        The output device.  Default is the same as the input graph.
 
     Returns
     -------
@@ -719,7 +1061,7 @@ def edge_type_subgraph(graph, etypes):
     hgidx = heterograph_index.create_heterograph_from_relations(
         metagraph, rel_graphs, utils.toindex(num_nodes_per_induced_type, "int64"))
     hg = DGLHeteroGraph(hgidx, induced_ntypes, induced_etypes, node_frames, edge_frames)
-    return hg
+    return hg if output_device is None else hg.to(output_device)
 
 DGLHeteroGraph.edge_type_subgraph = utils.alias_func(edge_type_subgraph)
 

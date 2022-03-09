@@ -57,6 +57,10 @@ def evaluate(model, g, labels, mask, multilabel=False):
 
 # load data of GraphSAINT and convert them to the format of dgl
 def load_data(args, multilabel):
+    if not os.path.exists('graphsaintdata') and not os.path.exists('data'):
+        raise ValueError("The directory graphsaintdata does not exist!")
+    elif os.path.exists('graphsaintdata') and not os.path.exists('data'):
+        os.rename('graphsaintdata', 'data')
     prefix = "data/{}".format(args.dataset)
     DataType = namedtuple('Dataset', ['num_classes', 'train_nid', 'g'])
 

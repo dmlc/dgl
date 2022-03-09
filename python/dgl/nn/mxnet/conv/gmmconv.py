@@ -12,13 +12,8 @@ from ....utils import expand_as_pair
 
 
 class GMMConv(nn.Block):
-    r"""
-
-    Description
-    -----------
-    The Gaussian Mixture Model Convolution layer from `Geometric Deep
-    Learning on Graphs and Manifolds using Mixture Model CNNs
-    <http://openaccess.thecvf.com/content_cvpr_2017/papers/Monti_Geometric_Deep_Learning_CVPR_2017_paper.pdf>`__.
+    r"""Gaussian Mixture Model Convolution layer from `Geometric Deep Learning on Graphs and
+    Manifolds using Mixture Model CNNs <https://arxiv.org/abs/1611.08402>`__
 
     .. math::
         u_{ij} &= f(x_i, x_j), x_j \in \mathcal{N}(i)

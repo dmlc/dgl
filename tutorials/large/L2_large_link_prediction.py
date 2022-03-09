@@ -91,7 +91,7 @@ test_nids = idx_split['test']
 # in a similar fashion introduced in the :doc:`large-scale node classification
 # tutorial <L1_large_node_classification>`.
 #
-# DGL provides ``dgl.dataloading.EdgeDataLoader`` to
+# DGL provides ``dgl.dataloading.as_edge_prediction_sampler`` to
 # iterate over edges for edge classification or link prediction tasks.
 #
 # To perform link prediction, you need to specify a negative sampler. DGL
@@ -105,18 +105,19 @@ negative_sampler = dgl.dataloading.negative_sampler.Uniform(5)
 
 ######################################################################
 # After defining the negative sampler, one can then define the edge data
-# loader with neighbor sampling.  To create an ``EdgeDataLoader`` for
+# loader with neighbor sampling.  To create an ``DataLoader`` for
 # link prediction, provide a neighbor sampler object as well as the negative
 # sampler object created above.
 #
 
-sampler = dgl.dataloading.MultiLayerNeighborSampler([4, 4])
-train_dataloader = dgl.dataloading.EdgeDataLoader(
-    # The following arguments are specific to NodeDataLoader.
+sampler = dgl.dataloading.NeighborSampler([4, 4])
+sampler = dgl.dataloading.as_edge_prediction_sampler(
+    sampler, negative_sampler=negative_sampler)
+train_dataloader = dgl.dataloading.DataLoader(
+    # The following arguments are specific to DataLoader.
     graph,                                  # The graph
     torch.arange(graph.number_of_edges()),  # The edges to iterate over
     sampler,                                # The neighbor sampler
-    negative_sampler=negative_sampler,      # The negative sampler
     device=device,                          # Put the MFGs on CPU or GPU
     # The following arguments are inherited from PyTorch DataLoader.
     batch_size=1024,    # Batch size
@@ -218,15 +219,16 @@ class DotPredictor(nn.Module):
 
 
 ######################################################################
-# Evaluating Performance (Optional)
-# ---------------------------------
+# Evaluating Performance with Unsupervised Learning (Optional)
+# ------------------------------------------------------------
 #
 # There are various ways to evaluate the performance of link prediction.
 # This tutorial follows the practice of `GraphSAGE
-# paper <https://cs.stanford.edu/people/jure/pubs/graphsage-nips17.pdf>`__,
-# where it treats the node embeddings learned by link prediction via
-# training and evaluating a linear classifier on top of the learned node
-# embeddings.
+# paper <https://cs.stanford.edu/people/jure/pubs/graphsage-nips17.pdf>`__.
+# Basically, it first trains a GNN via link prediction, and get an embedding
+# for each node.  Then it trains a downstream classifier on top of this
+# embedding and compute the accuracy as an assessment of the embedding
+# quality.
 #
 
 
@@ -246,8 +248,8 @@ def inference(model, graph, node_features):
     with torch.no_grad():
         nodes = torch.arange(graph.number_of_nodes())
 
-        sampler = dgl.dataloading.MultiLayerNeighborSampler([4, 4])
-        train_dataloader = dgl.dataloading.NodeDataLoader(
+        sampler = dgl.dataloading.NeighborSampler([4, 4])
+        train_dataloader = dgl.dataloading.DataLoader(
             graph, torch.arange(graph.number_of_nodes()), sampler,
             batch_size=1024,
             shuffle=False,
@@ -354,6 +356,64 @@ for epoch in range(1):
 
                 # Note that this tutorial do not train the whole model to the end.
                 break
+
+
+######################################################################
+# Evaluating Performance with Link Prediction (Optional)
+# ------------------------------------------------------
+#
+# In practice, it is more common to evaluate the link prediction
+# model to see whether it can predict new edges. There are different
+# evaluation metrics such as
+# `AUC <https://en.wikipedia.org/wiki/Receiver_operating_characteristic#Area_under_the_curve>`__
+# or `various metrics from information retrieval <https://en.wikipedia.org/wiki/Evaluation_measures_(information_retrieval)>`__.
+# Ultimately, they require the model to predict one scalar score given
+# a node pair among a set of node pairs.
+#
+# Assuming that you have the following test set with labels, where
+# ``test_pos_src`` and ``test_pos_dst`` are ground truth node pairs
+# with edges in between (or *positive* pairs), and ``test_neg_src``
+# and ``test_neg_dst`` are ground truth node pairs without edges
+# in between (or *negative* pairs).
+#
+
+# Positive pairs
+# These are randomly generated as an example.  You will need to
+# replace them with your own ground truth.
+n_test_pos = 1000
+test_pos_src, test_pos_dst = (
+    torch.randint(0, graph.num_nodes(), (n_test_pos,)),
+    torch.randint(0, graph.num_nodes(), (n_test_pos,)))
+# Negative pairs.  Likewise, you will need to replace them with your
+# own ground truth.
+test_neg_src = test_pos_src
+test_neg_dst = torch.randint(0, graph.num_nodes(), (n_test_pos,))
+
+
+######################################################################
+# First you need to compute the node representations for all the nodes
+# with the ``inference`` method above:
+#
+
+node_reprs = inference(model, graph, node_features)
+
+######################################################################
+# Since the predictor is a dot product, you can now easily compute the
+# score of positive and negative test pairs to compute metrics such
+# as AUC:
+#
+
+h_pos_src = node_reprs[test_pos_src]
+h_pos_dst = node_reprs[test_pos_dst]
+h_neg_src = node_reprs[test_neg_src]
+h_neg_dst = node_reprs[test_neg_dst]
+score_pos = (h_pos_src * h_pos_dst).sum(1)
+score_neg = (h_neg_src * h_neg_dst).sum(1)
+test_preds = torch.cat([score_pos, score_neg]).cpu().numpy()
+test_labels = torch.cat([torch.ones_like(score_pos), torch.zeros_like(score_neg)]).cpu().numpy()
+
+auc = sklearn.metrics.roc_auc_score(test_labels, test_preds)
+print('Link Prediction AUC:', auc)
 
 
 ######################################################################

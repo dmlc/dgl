@@ -28,6 +28,7 @@ Operators for constructing :class:`DGLGraph` from raw data formats.
     segmented_knn_graph
     create_block
     block_to_graph
+    merge
 
 .. _api-subgraph-extraction:
 
@@ -45,6 +46,8 @@ Operators for extracting and returning subgraphs.
     edge_type_subgraph
     in_subgraph
     out_subgraph
+    khop_in_subgraph
+    khop_out_subgraph
 
 .. _api-transform:
 
@@ -171,7 +174,8 @@ set at each iteration. ``prop_edges_YYY`` applies traversal algorithm ``YYY`` an
 Utilities
 -----------------------------------------------
 
-Other utilities for controlling randomness, saving and loading graphs, etc.
+Other utilities for controlling randomness, saving and loading graphs, functions that applies
+the same function to every elements in a container, etc.
 
 .. autosummary::
     :toctree: ../../generated/
@@ -179,3 +183,4 @@ Other utilities for controlling randomness, saving and loading graphs, etc.
     seed
     save_graphs
     load_graphs
+    apply_each
