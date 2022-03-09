@@ -131,6 +131,17 @@ class DistEmbedding:
         return self._tensor.tensor_name
 
     @property
+    def data_name(self):
+        """Return the data name of the embeddings
+
+        Returns
+        -------
+        str
+            The data name of the embeddings
+        """
+        return self._tensor._name
+
+    @property
     def kvstore(self):
         """Return the kvstore client
 
