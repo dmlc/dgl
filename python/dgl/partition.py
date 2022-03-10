@@ -248,7 +248,8 @@ def get_peak_mem():
             return int(mem) / 1024 / 1024
     return 0.0
 
-def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False, mode="k-way", objtype='cut'):
+def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False,
+                               mode="k-way", objtype='cut'):
     ''' This assigns nodes to different partitions with Metis partitioning algorithm.
 
     When performing Metis partitioning, we can put some constraint on the partitioning.
@@ -276,8 +277,8 @@ def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False, m
     mode : str, "k-way" or "recursive"
         Whether use multilevel recursive bisection or multilevel k-way paritioning.
     objtype : str, "cut" or "vol"
-        Set the objective as edge-cut minimization or communication volume minimization. This argument is used by
-        the Metis algorithm.
+        Set the objective as edge-cut minimization or communication volume minimization. This argument
+        is used by the Metis algorithm.
 
     Returns
     -------
