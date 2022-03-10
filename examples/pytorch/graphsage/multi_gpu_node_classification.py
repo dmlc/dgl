@@ -117,7 +117,7 @@ def train(rank, world_size, graph, num_classes, split_idx, q):
             loss.backward()
             opt.step()
             if it % 20 == 0 and rank == 0:
-                acc = MF.accuracy(torch.argmax(y_hat, dim=1), y)
+                acc = MF.accuracy(y_hat, y)
                 mem = torch.cuda.max_memory_allocated() / 1000000
                 print('Loss', loss.item(), 'Acc', acc.item(), 'GPU Mem', mem, 'MB')
         tt = time.time()
@@ -134,7 +134,7 @@ def train(rank, world_size, graph, num_classes, split_idx, q):
                 x = blocks[0].srcdata['feat']
                 ys.append(blocks[-1].dstdata['label'])
                 y_hats.append(model.module(blocks, x))
-        acc = MF.accuracy(torch.argmax(torch.cat(y_hats), dim=1), torch.cat(ys)) / world_size
+        acc = MF.accuracy(torch.cat(y_hats), torch.cat(ys)) / world_size
         dist.reduce(acc, 0)
         if rank == 0:
             print('Validation acc:', acc.item())
@@ -148,7 +148,7 @@ def train(rank, world_size, graph, num_classes, split_idx, q):
         pred = model.module.inference(graph, device='cuda', batch_size=2**16,
                                       buffer_device='cpu', q=q)
         if rank == 0:
-            acc = MF.accuracy(torch.argmax(pred[test_idx], dim=1), graph.ndata['label'][test_idx])
+            acc = MF.accuracy(pred[test_idx], graph.ndata['label'][test_idx])
             print('Test acc:', acc.item())
 
 if __name__ == '__main__':
