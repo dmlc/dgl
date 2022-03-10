@@ -91,7 +91,7 @@ IdArray MetisPartition(UnitGraphPtr g, int k, NDArray vwgt_arr, const std::strin
               << g->NumEdges(0) << " edges into " << k << " parts and "
               << "the communication volume is " << objval;
   }
-  
+
   switch (ret) {
     case METIS_OK:
       return part_arr;
