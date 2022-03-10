@@ -49,7 +49,7 @@ IdArray MetisPartition(GraphPtr g, int k, NDArray vwgt_arr, bool obj_cut) {
   options[METIS_OPTION_NITER] = 1;
   options[METIS_OPTION_NIPARTS] = 1;
   options[METIS_OPTION_DROPEDGES] = 1;
-  
+
   if (obj_cut) {
     options[METIS_OPTION_OBJTYPE] = METIS_OBJTYPE_CUT;
   } else {
@@ -71,7 +71,7 @@ IdArray MetisPartition(GraphPtr g, int k, NDArray vwgt_arr, bool obj_cut) {
                                 &objval,      // the edge-cut or the total communication volume of
                                 // the partitioning solution
                                 part);
-  
+
   if (obj_cut) {
     LOG(INFO) << "Partition a graph with " << g->NumVertices() << " nodes and "
               << g->NumEdges() << " edges into " << k << " parts and "
