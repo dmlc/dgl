@@ -19,7 +19,8 @@ namespace transform {
 
 #if !defined(_WIN32)
 
-IdArray MetisPartition(UnitGraphPtr g, int k, NDArray vwgt_arr, const std::string &mode, bool obj_cut) {
+IdArray MetisPartition(UnitGraphPtr g, int k, NDArray vwgt_arr,
+                       const std::string &mode, bool obj_cut) {
   // Mode can only be "k-way" or "recursive"
   CHECK(mode == "k-way" || mode == "recursive")
     << "mode can only be \"k-way\" or \"recursive\"";
