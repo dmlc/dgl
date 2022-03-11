@@ -51,7 +51,7 @@ class SAGE(nn.Module):
     def inference(self, g, device, batch_size,
                   buffer_device, q):
         sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
-        dataloader = dgl.dataloading.NodeDataLoader(
+        dataloader = dgl.dataloading.DataLoader(
                 g, torch.arange(g.num_nodes(), device=device), sampler, device=device,
                 batch_size=batch_size, shuffle=False, drop_last=False,
                 num_workers=0, use_ddp=True, use_uva=True)
@@ -99,7 +99,7 @@ def train(rank, world_size, graph, num_classes, split_idx, q):
             graph, train_idx, sampler,
             device='cuda', batch_size=1024, shuffle=True, drop_last=False,
             num_workers=0, use_ddp=True, use_uva=True)
-    valid_dataloader = dgl.dataloading.NodeDataLoader(
+    valid_dataloader = dgl.dataloading.DataLoader(
             graph, valid_idx, sampler, device='cuda', batch_size=1024, shuffle=True,
             drop_last=False, num_workers=0, use_ddp=True,
             use_uva=True)
