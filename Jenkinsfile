@@ -107,9 +107,10 @@ pipeline {
   stages {
     stage('Regression Test Trigger') {
       agent {
-        kubernetes {
-          yamlFile 'docker/pods/ci-lint.yaml'
-          defaultContainer 'dgl-ci-lint'
+        docker {
+            label 'linux-benchmark-node'
+            image 'dgllib/dgl-ci-lint'
+            alwaysPull true
         }
       }
       when { triggeredBy 'IssueCommentCause' }
@@ -345,8 +346,6 @@ pipeline {
                 }
                 stage('Tutorial test') {
                   steps {
-                    sh 'ls -l /tmp/dataset/*'
-                    sh 'ls -l /tmp/dataset/'
                     tutorial_test_linux('pytorch')
                   }
                 }
