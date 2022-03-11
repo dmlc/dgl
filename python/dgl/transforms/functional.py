@@ -3319,15 +3319,15 @@ def radius_graph(x, r, p=2, self_loop=False, get_distances=False):
     Parameters
     ----------
     x : Tensor
-        The point coordinates. It can be either on CPU or GPU. 
+        The point coordinates. It can be either on CPU or GPU.
         Device of the point coordinates specifies device of the radius graph and
         ``x[i]`` corresponds to the i-th node in the radius graph.
     r : float
-        Radius of neighbors.
+        Radius of the neighbors.
     p : float, optional
-        Power parameter for the Minkowski metric. When :attr:`p = 1` it is the 
-        equivalent of Manhattan distance (L1 norm) and Euclidean distance 
-        (L2 norm) for :attr:`p = 2`
+        Power parameter for the Minkowski metric. When :attr:`p = 1` it is the
+        equivalent of Manhattan distance (L1 norm) and Euclidean distance
+        (L2 norm) for :attr:`p = 2`.
 
         (default: 2)
     self_loop : bool, optional
@@ -3335,8 +3335,8 @@ def radius_graph(x, r, p=2, self_loop=False, get_distances=False):
 
         (default: False)
     get_distances : bool, optional
-        Whether to return the distances for the corresponding edges in the 
-        radius graph
+        Whether to return the distances for the corresponding edges in the
+        radius graph.
 
         (default: False)
 
@@ -3345,8 +3345,8 @@ def radius_graph(x, r, p=2, self_loop=False, get_distances=False):
     DGLGraph
         The constructed graph. The node IDs are in the same order as :attr:`x`.
     torch.Tensor, optional
-        The distances for the edges in the constructed graph. The distances are 
-        in the same order as edge IDs
+        The distances for the edges in the constructed graph. The distances are
+        in the same order as edge IDs.
 
     Examples
     --------
@@ -3364,7 +3364,7 @@ def radius_graph(x, r, p=2, self_loop=False, get_distances=False):
     >>> r_g.edges()
     (tensor([0, 1, 2, 2, 3, 3]), tensor([3, 2, 1, 3, 0, 2]))
 
-    When :attr:`get_distances` is True, function returns the radius graph and 
+    When :attr:`get_distances` is True, function returns the radius graph and
     distances for the corresponding edges.
 
     >>> x = torch.tensor([[0.0, 0.0, 1.0],

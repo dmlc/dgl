@@ -233,7 +233,7 @@ class SegmentedKNNGraph(nn.Module):
 
 
 class RadiusGraph(nn.Module):
-    r"""Layer that transforms one point set into a bidirected graph with 
+    r"""Layer that transforms one point set into a bidirected graph with
     neighbors within given distance.
 
     The RadiusGraph is implemented in the following steps:
@@ -248,11 +248,11 @@ class RadiusGraph(nn.Module):
     Parameters
     ----------
     r : float
-        Radius of neighbors.
+        Radius of the neighbors.
     p : float, optional
-        Power parameter for the Minkowski metric. When :attr:`p = 1` it is the 
-        equivalent of Manhattan distance (L1 norm) and Euclidean distance 
-        (L2 norm) for :attr:`p = 2`
+        Power parameter for the Minkowski metric. When :attr:`p = 1` it is the
+        equivalent of Manhattan distance (L1 norm) and Euclidean distance
+        (L2 norm) for :attr:`p = 2`.
 
         (default: 2)
     self_loop : bool, optional
@@ -262,7 +262,7 @@ class RadiusGraph(nn.Module):
 
     Examples
     --------
-    The following example uses PyTorch backend.
+    The following examples uses PyTorch backend.
 
     >>> import dgl
     >>> from dgl.nn.pytorch.factory import RadiusGraph
@@ -276,7 +276,7 @@ class RadiusGraph(nn.Module):
     >>> g.edges()
     (tensor([0, 1, 2, 2, 3, 3]), tensor([3, 2, 1, 3, 0, 2]))
 
-    When :attr:`get_distances` is True, forward pass returns the radius graph and 
+    When :attr:`get_distances` is True, forward pass returns the radius graph and
     distances for the corresponding edges.
 
     >>> x = torch.tensor([[0.0, 0.0, 1.0],
@@ -309,13 +309,13 @@ class RadiusGraph(nn.Module):
         Parameters
         ----------
         x : Tensor
-            The point coordinates. :math:`(N, D)` where :math:`N` means the 
-            number of points in the point set, and :math:`D` means the size of 
-            the features. It can be either on CPU or GPU. Device of the point 
-            coordinates specifies device of the radius graph
+            The point coordinates. :math:`(N, D)` where :math:`N` means the
+            number of points in the point set, and :math:`D` means the size of
+            the features. It can be either on CPU or GPU. Device of the point
+            coordinates specifies device of the radius graph.
         get_distances : bool, optional
-            Whether to return the distances for the corresponding edges in the 
-            radius graph
+            Whether to return the distances for the corresponding edges in the
+            radius graph.
 
             (default: False)
 
@@ -324,7 +324,7 @@ class RadiusGraph(nn.Module):
         DGLGraph
             The constructed graph. The node IDs are in the same order as :attr:`x`.
         torch.Tensor, optional
-            The distances for the edges in the constructed graph. The distances 
-            are in the same order as edge IDs
+            The distances for the edges in the constructed graph. The distances
+            are in the same order as edge IDs.
         """
         return radius_graph(x, self.r, self.p, self.self_loop, get_distances)
