@@ -231,7 +231,7 @@ class SegmentedKNNGraph(nn.Module):
 
         return segmented_knn_graph(x, self.k, segs, algorithm=algorithm, dist=dist)
 
-#pylint: disable=invalid-name
+
 class RadiusGraph(nn.Module):
     r"""Layer that transforms one point set into a bidirected graph with
     neighbors within given distance.
@@ -295,6 +295,7 @@ class RadiusGraph(nn.Module):
             [0.7000],
             [0.2828]])
     """
+    #pylint: disable=invalid-name
     def __init__(self, r, p=2, self_loop=False):
         super(RadiusGraph, self).__init__()
         self.r = r
