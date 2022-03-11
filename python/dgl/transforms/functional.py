@@ -3303,6 +3303,7 @@ def norm_by_dst(g, etype=None):
     return norm
 
 
+#pylint: disable=invalid-name
 def radius_graph(x, r, p=2, self_loop=False, get_distances=False):
     r"""Construct a graph from a set of points with neighbors within given distance.
 
