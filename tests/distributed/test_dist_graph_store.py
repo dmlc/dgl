@@ -681,6 +681,7 @@ def test_split(hetero):
         nodes1 = np.intersect1d(selected_nodes, F.asnumpy(local_nids))
         nodes2 = node_split(node_mask, gpb, ntype=ntype, rank=i, force_even=False)
         assert np.all(np.sort(nodes1) == np.sort(F.asnumpy(nodes2)))
+        local_nids = F.asnumpy(local_nids)
         for n in F.asnumpy(nodes2):
             assert n in local_nids
 
@@ -699,6 +700,7 @@ def test_split(hetero):
         edges1 = np.intersect1d(selected_edges, F.asnumpy(local_eids))
         edges2 = edge_split(edge_mask, gpb, etype=etype, rank=i, force_even=False)
         assert np.all(np.sort(edges1) == np.sort(F.asnumpy(edges2)))
+        local_eids = F.asnumpy(local_eids)
         for e in F.asnumpy(edges2):
             assert e in local_eids
 
