@@ -678,6 +678,8 @@ def test_split(hetero):
         if hetero:
             ntype_ids, nids = gpb.map_to_per_ntype(local_nids)
             local_nids = F.asnumpy(nids)[F.asnumpy(ntype_ids) == 0]
+        else:
+            local_nids = F.asnumpy(local_nids)
         nodes1 = np.intersect1d(selected_nodes, local_nids)
         nodes2 = node_split(node_mask, gpb, ntype=ntype, rank=i, force_even=False)
         assert np.all(np.sort(nodes1) == np.sort(F.asnumpy(nodes2)))
@@ -696,6 +698,8 @@ def test_split(hetero):
         if hetero:
             etype_ids, eids = gpb.map_to_per_etype(local_eids)
             local_eids = F.asnumpy(eids)[F.asnumpy(etype_ids) == 0]
+        else:
+            local_eids = F.asnumpy(local_eids)
         edges1 = np.intersect1d(selected_edges, local_eids)
         edges2 = edge_split(edge_mask, gpb, etype=etype, rank=i, force_even=False)
         assert np.all(np.sort(edges1) == np.sort(F.asnumpy(edges2)))
