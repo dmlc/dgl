@@ -3397,7 +3397,7 @@ def radius_graph(x, r, p=2, self_loop=False, get_distances=False):
 
     edges = th.nonzero(distances <= r, as_tuple=True)
 
-    g = convert.graph(edges, device=x.device)
+    g = convert.graph(edges, num_nodes=x.shape[0], device=x.device)
 
     if get_distances:
         distances = distances[edges].unsqueeze(-1)
