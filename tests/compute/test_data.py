@@ -218,24 +218,94 @@ def test_extract_archive():
             assert os.path.exists(os.path.join(dst_dir, gz_file))
 
 
+def _test_construct_graphs_node_ids():
+    from dgl.data.csv_dataset_base import NodeData, EdgeData, DGLGraphConstructor
+    num_nodes = 100
+    num_edges = 1000
+
+    # node IDs are required to be unique
+    node_ids = np.random.choice(np.arange(num_nodes / 2), num_nodes)
+    src_ids = np.random.choice(node_ids, size=num_edges)
+    dst_ids = np.random.choice(node_ids, size=num_edges)
+    node_data = NodeData(node_ids, {})
+    edge_data = EdgeData(src_ids, dst_ids, {})
+    expect_except = False
+    try:
+        _, _ = DGLGraphConstructor.construct_graphs(
+            node_data, edge_data)
+    except:
+        expect_except = True
+    assert expect_except
+
+    # node IDs are already labelled from 0~num_nodes-1
+    node_ids = np.arange(num_nodes)
+    np.random.shuffle(node_ids)
+    _, idx = np.unique(node_ids, return_index=True)
+    src_ids = np.random.choice(node_ids, size=num_edges)
+    dst_ids = np.random.choice(node_ids, size=num_edges)
+    node_feat = np.random.rand(num_nodes, 3)
+    node_data = NodeData(node_ids, {'feat':node_feat})
+    edge_data = EdgeData(src_ids, dst_ids, {})
+    graphs, data_dict = DGLGraphConstructor.construct_graphs(
+        node_data, edge_data)
+    assert len(graphs) == 1
+    assert len(data_dict) == 0
+    g = graphs[0]
+    assert g.is_homogeneous
+    assert g.num_nodes() == len(node_ids)
+    assert g.num_edges() == len(src_ids)
+    assert F.array_equal(F.tensor(node_feat[idx], dtype=F.float32), g.ndata['feat'])
+
+    # node IDs are mixed with numeric and non-numeric values
+    # homogeneous graph
+    node_ids = [1, 2, 3, 'a']
+    src_ids = [1, 2, 3]
+    dst_ids = ['a', 1, 2]
+    node_data = NodeData(node_ids, {})
+    edge_data = EdgeData(src_ids, dst_ids, {})
+    graphs, data_dict = DGLGraphConstructor.construct_graphs(
+        node_data, edge_data)
+    assert len(graphs) == 1
+    assert len(data_dict) == 0
+    g = graphs[0]
+    assert g.is_homogeneous
+    assert g.num_nodes() == len(node_ids)
+    assert g.num_edges() == len(src_ids)
+
+    # heterogeneous graph
+    node_ids_user = [1, 2, 3]
+    node_ids_item = ['a', 'b', 'c']
+    src_ids = node_ids_user
+    dst_ids = node_ids_item
+    node_data_user = NodeData(node_ids_user, {}, type='user')
+    node_data_item = NodeData(node_ids_item, {}, type='item')
+    edge_data = EdgeData(src_ids, dst_ids, {}, type=('user', 'like', 'item'))
+    graphs, data_dict = DGLGraphConstructor.construct_graphs(
+        [node_data_user, node_data_item], edge_data)
+    assert len(graphs) == 1
+    assert len(data_dict) == 0
+    g = graphs[0]
+    assert not g.is_homogeneous
+    assert g.num_nodes('user') == len(node_ids_user)
+    assert g.num_nodes('item') == len(node_ids_item)
+    assert g.num_edges() == len(src_ids)
+
+
 def _test_construct_graphs_homo():
     from dgl.data.csv_dataset_base import NodeData, EdgeData, DGLGraphConstructor
-    # node_id/src_id/dst_id could be non-sorted, duplicated, non-numeric.
+    # node_id could be non-sorted, non-numeric.
     num_nodes = 100
     num_edges = 1000
     num_dims = 3
-    num_dup_nodes = int(num_nodes*0.2)
     node_ids = np.random.choice(
         np.arange(num_nodes*2), size=num_nodes, replace=False)
     assert len(node_ids) == num_nodes
     # to be non-sorted
     np.random.shuffle(node_ids)
-    # to be duplicated
-    node_ids = np.hstack((node_ids, node_ids[:num_dup_nodes]))
     # to be non-numeric
     node_ids = ['id_{}'.format(id) for id in node_ids]
-    t_ndata = {'feat': np.random.rand(num_nodes+num_dup_nodes, num_dims),
-               'label': np.random.randint(2, size=num_nodes+num_dup_nodes)}
+    t_ndata = {'feat': np.random.rand(num_nodes, num_dims),
+               'label': np.random.randint(2, size=num_nodes)}
     _, u_indices = np.unique(node_ids, return_index=True)
     ndata = {'feat': t_ndata['feat'][u_indices],
              'label': t_ndata['label'][u_indices]}
@@ -270,7 +340,6 @@ def _test_construct_graphs_hetero():
     num_nodes = 100
     num_edges = 1000
     num_dims = 3
-    num_dup_nodes = int(num_nodes*0.2)
     ntypes = ['user', 'item']
     node_data = []
     node_ids_dict = {}
@@ -281,12 +350,10 @@ def _test_construct_graphs_hetero():
         assert len(node_ids) == num_nodes
         # to be non-sorted
         np.random.shuffle(node_ids)
-        # to be duplicated
-        node_ids = np.hstack((node_ids, node_ids[:num_dup_nodes]))
         # to be non-numeric
         node_ids = ['id_{}'.format(id) for id in node_ids]
-        t_ndata = {'feat': np.random.rand(num_nodes+num_dup_nodes, num_dims),
-                   'label': np.random.randint(2, size=num_nodes+num_dup_nodes)}
+        t_ndata = {'feat': np.random.rand(num_nodes, num_dims),
+                   'label': np.random.randint(2, size=num_nodes)}
         _, u_indices = np.unique(node_ids, return_index=True)
         ndata = {'feat': t_ndata['feat'][u_indices],
                  'label': t_ndata['label'][u_indices]}
@@ -1095,6 +1162,7 @@ def _test_NodeEdgeGraphData():
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
 def test_csvdataset():
     _test_NodeEdgeGraphData()
+    _test_construct_graphs_node_ids()
     _test_construct_graphs_homo()
     _test_construct_graphs_hetero()
     _test_construct_graphs_multiple()
@@ -1128,6 +1196,12 @@ def test_as_nodepred1():
     assert new_ds[0].num_nodes() == ds[0].num_nodes()
     assert new_ds[0].num_edges() == ds[0].num_edges()
     assert 'train_mask' in new_ds[0].ndata
+    assert F.array_equal(new_ds.train_idx, F.nonzero_1d(
+        new_ds[0].ndata['train_mask']))
+    assert F.array_equal(new_ds.val_idx, F.nonzero_1d(
+        new_ds[0].ndata['val_mask']))
+    assert F.array_equal(new_ds.test_idx, F.nonzero_1d(
+        new_ds[0].ndata['test_mask']))
 
     ds = data.AIFBDataset()
     print('train_mask' in ds[0].nodes['Personen'].data)
@@ -1136,6 +1210,12 @@ def test_as_nodepred1():
     assert new_ds[0].ntypes == ds[0].ntypes
     assert new_ds[0].canonical_etypes == ds[0].canonical_etypes
     assert 'train_mask' in new_ds[0].nodes['Personen'].data
+    assert F.array_equal(new_ds.train_idx, F.nonzero_1d(
+        new_ds[0].nodes['Personen'].data['train_mask']))
+    assert F.array_equal(new_ds.val_idx, F.nonzero_1d(
+        new_ds[0].nodes['Personen'].data['val_mask']))
+    assert F.array_equal(new_ds.test_idx, F.nonzero_1d(
+        new_ds[0].nodes['Personen'].data['test_mask']))
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
 def test_as_nodepred2():
@@ -1144,27 +1224,38 @@ def test_as_nodepred2():
     # create
     ds = data.AsNodePredDataset(data.AmazonCoBuyComputerDataset(), [0.8, 0.1, 0.1])
     assert F.sum(F.astype(ds[0].ndata['train_mask'], F.int32), 0) == int(ds[0].num_nodes() * 0.8)
+    assert len(ds.train_idx) == int(ds[0].num_nodes() * 0.8)
     # read from cache
     ds = data.AsNodePredDataset(data.AmazonCoBuyComputerDataset(), [0.8, 0.1, 0.1])
     assert F.sum(F.astype(ds[0].ndata['train_mask'], F.int32), 0) == int(ds[0].num_nodes() * 0.8)
+    assert len(ds.train_idx) == int(ds[0].num_nodes() * 0.8)
     # invalid cache, re-read
     ds = data.AsNodePredDataset(data.AmazonCoBuyComputerDataset(), [0.1, 0.1, 0.8])
     assert F.sum(F.astype(ds[0].ndata['train_mask'], F.int32), 0) == int(ds[0].num_nodes() * 0.1)
+    assert len(ds.train_idx) == int(ds[0].num_nodes() * 0.1)
 
     # create
     ds = data.AsNodePredDataset(data.AIFBDataset(), [0.8, 0.1, 0.1], 'Personen', verbose=True)
     assert F.sum(F.astype(ds[0].nodes['Personen'].data['train_mask'], F.int32), 0) == int(ds[0].num_nodes('Personen') * 0.8)
+    assert len(ds.train_idx) == int(ds[0].num_nodes('Personen') * 0.8)
     # read from cache
     ds = data.AsNodePredDataset(data.AIFBDataset(), [0.8, 0.1, 0.1], 'Personen', verbose=True)
     assert F.sum(F.astype(ds[0].nodes['Personen'].data['train_mask'], F.int32), 0) == int(ds[0].num_nodes('Personen') * 0.8)
+    assert len(ds.train_idx) == int(ds[0].num_nodes('Personen') * 0.8)
     # invalid cache, re-read
     ds = data.AsNodePredDataset(data.AIFBDataset(), [0.1, 0.1, 0.8], 'Personen', verbose=True)
     assert F.sum(F.astype(ds[0].nodes['Personen'].data['train_mask'], F.int32), 0) == int(ds[0].num_nodes('Personen') * 0.1)
+    assert len(ds.train_idx) == int(ds[0].num_nodes('Personen') * 0.1)
 
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason="ogb only supports pytorch")
 def test_as_nodepred_ogb():
     from ogb.nodeproppred import DglNodePropPredDataset
     ds = data.AsNodePredDataset(DglNodePropPredDataset("ogbn-arxiv"), split_ratio=None, verbose=True)
+    split = DglNodePropPredDataset("ogbn-arxiv").get_idx_split()
+    train_idx, val_idx, test_idx = split['train'], split['valid'], split['test']
+    assert F.array_equal(ds.train_idx, F.tensor(train_idx))
+    assert F.array_equal(ds.val_idx, F.tensor(val_idx))
+    assert F.array_equal(ds.test_idx, F.tensor(test_idx))
     # force generate new split
     ds = data.AsNodePredDataset(DglNodePropPredDataset("ogbn-arxiv"), split_ratio=[0.7, 0.2, 0.1], verbose=True)
 

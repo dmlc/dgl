@@ -9,7 +9,7 @@ import numpy as np
 from ..heterograph import DGLHeteroGraph
 from ..convert import heterograph as dgl_heterograph
 from ..convert import graph as dgl_graph
-from ..transform import compact_graphs
+from ..transforms import compact_graphs
 from .. import heterograph_index
 from .. import backend as F
 from ..base import NID, EID, NTYPE, ETYPE, ALL, is_all

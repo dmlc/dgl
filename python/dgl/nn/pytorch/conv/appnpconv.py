@@ -8,13 +8,9 @@ from .graphconv import EdgeWeightNorm
 
 
 class APPNPConv(nn.Module):
-    r"""
-
-    Description
-    -----------
-    Approximate Personalized Propagation of Neural Predictions
-    layer from paper `Predict then Propagate: Graph Neural Networks
-    meet Personalized PageRank <https://arxiv.org/pdf/1810.05997.pdf>`__.
+    r"""Approximate Personalized Propagation of Neural Predictions layer from `Predict then
+    Propagate: Graph Neural Networks meet Personalized PageRank
+    <https://arxiv.org/pdf/1810.05997.pdf>`__
 
     .. math::
         H^{0} &= X

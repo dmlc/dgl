@@ -110,10 +110,12 @@ After loaded, the dataset has one graph without any features:
 .. note::
     Non-integer node IDs are allowed. When constructing the graph, ``CSVDataset`` will
     map each raw ID to an integer ID starting from zero.
+    If the node IDs are already distinct integers from 0 to ``num_nodes-1``, no mapping
+    is applied.
 
 .. note::
     Edges are always directed. To have both directions, add reversed edges in the edge
-    CSV file or use :class:`~dgl.transform.AddReverse` to transform the loaded graph.
+    CSV file or use :class:`~dgl.transforms.AddReverse` to transform the loaded graph.
 
 
 A graph without any feature is often of less interest. In the next example, we will show
@@ -307,7 +309,7 @@ load graph-level features from.
     node_data:
     - file_name: nodes.csv
     graph_data:
-    - file_name: graphs.csv
+      file_name: graphs.csv
 
 To distinguish nodes and edges of different graphs, the ``node.csv`` and ``edge.csv`` must contain
 an extra column ``graph_id``:

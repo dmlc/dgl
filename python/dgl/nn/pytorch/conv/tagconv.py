@@ -8,12 +8,8 @@ from .graphconv import EdgeWeightNorm
 
 
 class TAGConv(nn.Module):
-    r"""
-
-    Description
-    -----------
-    Topology Adaptive Graph Convolutional layer from paper `Topology
-    Adaptive Graph Convolutional Networks <https://arxiv.org/pdf/1710.10370.pdf>`__.
+    r"""Topology Adaptive Graph Convolutional layer from `Topology
+    Adaptive Graph Convolutional Networks <https://arxiv.org/pdf/1710.10370.pdf>`__
 
     .. math::
         H^{K} = {\sum}_{k=0}^K (D^{-1/2} A D^{-1/2})^{k} X {\Theta}_{k},
