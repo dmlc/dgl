@@ -11,7 +11,6 @@ from .egatconv import EGATConv
 from .ginconv import GINConv
 from .gmmconv import GMMConv
 from .graphconv import GraphConv, EdgeWeightNorm
-from .grouprevres import GroupRevRes
 from .nnconv import NNConv
 from .relgraphconv import RelGraphConv
 from .sageconv import SAGEConv
@@ -27,9 +26,10 @@ from .dotgatconv import DotGatConv
 from .twirlsconv import TWIRLSConv, TWIRLSUnfoldingAndAttention
 from .gcn2conv import GCN2Conv
 from .hgtconv import HGTConv
+from .grouprevres import GroupRevRes
 
 __all__ = ['GraphConv', 'EdgeWeightNorm', 'GATConv', 'GATv2Conv', 'EGATConv', 'TAGConv',
            'RelGraphConv', 'SAGEConv', 'SGConv', 'APPNPConv', 'GINConv', 'GatedGraphConv',
            'GMMConv', 'ChebConv', 'AGNNConv', 'NNConv', 'DenseGraphConv', 'DenseSAGEConv',
            'DenseChebConv', 'EdgeConv', 'AtomicConv', 'CFConv', 'DotGatConv', 'TWIRLSConv',
-           'TWIRLSUnfoldingAndAttention', 'GCN2Conv', 'HGTConv']
+           'TWIRLSUnfoldingAndAttention', 'GCN2Conv', 'HGTConv', 'GroupRevRes']

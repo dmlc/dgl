@@ -127,6 +127,7 @@ class GroupRevRes(nn.Module):
         y_chunks = torch.chunk(y, self.group, dim=-1)
 
         x_chunks = []
+        # self.group-1, ..., 0
         for i in range(self.group-1, -1, -1):
             if i != 0:
                 y_in = y_chunks[i-1]
