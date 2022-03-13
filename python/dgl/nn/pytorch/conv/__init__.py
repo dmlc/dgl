@@ -11,6 +11,7 @@ from .egatconv import EGATConv
 from .ginconv import GINConv
 from .gmmconv import GMMConv
 from .graphconv import GraphConv, EdgeWeightNorm
+from .grouprevres import GroupRevRes
 from .nnconv import NNConv
 from .relgraphconv import RelGraphConv
 from .sageconv import SAGEConv
