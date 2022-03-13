@@ -69,7 +69,7 @@ class InvertibleCheckpoint(torch.autograd.Function):
         gradients = tuple(input_gradients) + gradients[-len(ctx.weights):]
 
         # None for fn, fn_inverse
-        return (None, None, None, None) + gradients
+        return (None, None) + gradients
 
 class GroupRevRes(nn.Module):
     r"""Grouped reversible residual connections for GNNs, as introduced in
