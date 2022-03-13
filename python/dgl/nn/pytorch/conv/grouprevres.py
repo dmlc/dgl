@@ -100,6 +100,7 @@ class GroupRevRes(nn.Module):
     >>> out = model(g, h)
     """
     def __init__(self, gnn_module, group=2):
+        super().__init__()
         self.gnn_modules = nn.ModuleList()
         self.group = group
         for i in range(group):
