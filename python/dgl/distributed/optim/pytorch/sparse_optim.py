@@ -74,7 +74,7 @@ class DistSparseGradOptimizer(abc.ABC):
                 # will send grad to each corresponding trainer
                 if self._world_size > 1:
                     # get idx split from kvstore
-                    idx_split = kvstore.get_partid(name, idics)
+                    idx_split = kvstore.get_partid(emb.data_name, idics)
                     idx_split_size = []
                     idics_list = []
                     grad_list = []

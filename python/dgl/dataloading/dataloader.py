@@ -169,8 +169,10 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
     def __init__(self, indices, batch_size, drop_last, ddp_seed):
         if isinstance(indices, Mapping):
             self._mapping_keys = list(indices.keys())
+            len_indices = sum(len(v) for v in indices.values())
         else:
             self._mapping_keys = None
+            len_indices = len(indices)
 
         self.rank = dist.get_rank()
         self.num_replicas = dist.get_world_size()
@@ -179,17 +181,17 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
         self.batch_size = batch_size
         self.drop_last = drop_last
 
-        if self.drop_last and len(indices) % self.num_replicas != 0:
-            self.num_samples = math.ceil((len(indices) - self.num_replicas) / self.num_replicas)
+        if self.drop_last and len_indices % self.num_replicas != 0:
+            self.num_samples = math.ceil((len_indices - self.num_replicas) / self.num_replicas)
         else:
-            self.num_samples = math.ceil(len(indices) / self.num_replicas)
+            self.num_samples = math.ceil(len_indices / self.num_replicas)
         self.total_size = self.num_samples * self.num_replicas
         # If drop_last is True, we create a shared memory array larger than the number
         # of indices since we will need to pad it after shuffling to make it evenly
         # divisible before every epoch.  If drop_last is False, we create an array
         # with the same size as the indices so we can trim it later.
-        self.shared_mem_size = self.total_size if not self.drop_last else len(indices)
-        self.num_indices = len(indices)
+        self.shared_mem_size = self.total_size if not self.drop_last else len_indices
+        self.num_indices = len_indices
 
         if isinstance(indices, Mapping):
             self._device = next(iter(indices.values())).device
