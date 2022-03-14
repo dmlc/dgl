@@ -1,5 +1,5 @@
 """Torch module for grouped reversible residual connections for GNNs"""
-# pylint: disable= no-member, arguments-differ, invalid-name
+# pylint: disable= no-member, arguments-differ, invalid-name, C0116, R1728
 from copy import deepcopy
 import numpy as np
 import torch
