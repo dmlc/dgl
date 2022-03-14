@@ -132,8 +132,12 @@ class GroupRevRes(nn.Module):
 
     def _forward(self, x, g, *args):
         xs = torch.chunk(x, self.group, dim=-1)
-        chunked_args = list(map(lambda arg: torch.chunk(arg, self.group, dim=-1), args))
-        args_chunks = list(zip(*chunked_args))
+
+        if len(args) == 0:
+            args_chunks = [()] * self.group
+        else:
+            chunked_args = list(map(lambda arg: torch.chunk(arg, self.group, dim=-1), args))
+            args_chunks = list(zip(*chunked_args))
         y_in = sum(xs[1:])
 
         ys = []
@@ -149,8 +153,12 @@ class GroupRevRes(nn.Module):
 
     def _inverse(self, y, g, *args):
         ys = torch.chunk(y, self.group, dim=-1)
-        chunked_args = list(map(lambda arg: torch.chunk(arg, self.group, dim=-1), args))
-        args_chunks = list(zip(*chunked_args))
+
+        if len(args) == 0:
+            args_chunks = [()] * self.group
+        else:
+            chunked_args = list(map(lambda arg: torch.chunk(arg, self.group, dim=-1), args))
+            args_chunks = list(zip(*chunked_args))
 
         xs = []
         for i in range(self.group-1, -1, -1):
