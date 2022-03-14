@@ -711,7 +711,8 @@ class DataLoader(torch.utils.data.DataLoader):
             pass
         if indices_device is None:
             if not hasattr(indices, 'device'):
-                raise AttributeError('Custom indices dataset requires a \"device\" attribute indicating where the indices is.')
+                raise AttributeError('Custom indices dataset requires a \"device\" \
+                attribute indicating where the indices is.')
             indices_device = indices.device
         self.device = _get_device(device)
 
