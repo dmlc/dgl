@@ -14,7 +14,8 @@ class InvertibleCheckpoint(torch.autograd.Function):
         ctx.weights = inputs_and_weights[num_inputs:]
         inputs = inputs_and_weights[:num_inputs]
 
-        ctx.input_requires_grad = [element.requires_grad for element in inputs]
+        # ctx.input_requires_grad = [element.requires_grad for element in inputs]
+        ctx.input_requires_grad = []
 
         with torch.no_grad():
             # Makes a detached copy which shares the storage
@@ -22,8 +23,10 @@ class InvertibleCheckpoint(torch.autograd.Function):
             for element in inputs:
                 if isinstance(element, torch.Tensor):
                     x.append(element.detach())
+                    ctx.input_requires_grad.append(element.requires_grad)
                 else:
                     x.append(element)
+                    ctx.input_requires_grad.append(None)
             # Detach y in-place (inbetween computations can now be discarded)
             outputs = ctx.fn(*x).detach_()
 
@@ -60,14 +63,13 @@ class InvertibleCheckpoint(torch.autograd.Function):
         # compute gradients
         with torch.set_grad_enabled(True):
             detached_inputs = []
-            for element in inputs:
+            for i, element in enumerate(inputs):
                 if isinstance(element, torch.Tensor):
-                    detached_inputs.append(element.detach())
-                else:
-                    detached_inputs.append(element)
+                    element = element.detach()
+                    element.requires_grad = ctx.input_requires_grad[i]
+                detached_inputs.append(element)
+
             detached_inputs = tuple(detached_inputs)
-            for det_input, requires_grad in zip(detached_inputs, ctx.input_requires_grad):
-                det_input.requires_grad = requires_grad
             temp_output = ctx.fn(*detached_inputs)
 
         filtered_detached_inputs = tuple(filter(lambda x: x.requires_grad, detached_inputs))
