@@ -118,8 +118,13 @@ class CitationGraphDataset(DGLBuiltinDataset):
 
         if self.reverse_edge:
             graph = nx.DiGraph(nx.from_dict_of_lists(graph))
+            g = from_networkx(graph)
         else:
             graph = nx.Graph(nx.from_dict_of_lists(graph))
+            edges = list(graph.edges())
+            u, v = map(list, zip(*edges))
+            g = dgl_graph((u, v))
+            graph = g.to_networkx()
 
         onehot_labels = np.vstack((ally, ty))
         onehot_labels[test_idx_reorder, :] = onehot_labels[test_idx_range, :]
@@ -134,7 +139,6 @@ class CitationGraphDataset(DGLBuiltinDataset):
         test_mask = generate_mask_tensor(_sample_mask(idx_test, labels.shape[0]))
 
         self._graph = graph
-        g = from_networkx(graph)
 
         g.ndata['train_mask'] = train_mask
         g.ndata['val_mask'] = val_mask
