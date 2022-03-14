@@ -305,10 +305,6 @@ class UnitGraph : public BaseHeteroGraph {
 
   void InvalidateCOO();
 
-  void SetCOOMatrix(dgl_type_t etype, aten::COOMatrix coo) override;
-  void SetCSRMatrix(dgl_type_t etype, aten::CSRMatrix csr) override;
-  void SetCSCMatrix(dgl_type_t etype, aten::CSRMatrix csc) override;
-
  private:
   friend class Serializer;
   friend class HeteroGraph;
