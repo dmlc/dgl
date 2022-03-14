@@ -6,19 +6,17 @@ import torch
 import torch.nn as nn
 
 class InvertibleCheckpoint(torch.autograd.Function):
+    r"""Extension of torch.autograd"""
     @staticmethod
     def forward(ctx, fn, fn_inverse, num_inputs, *inputs_and_weights):
-        # store in context
         ctx.fn = fn
         ctx.fn_inverse = fn_inverse
         ctx.weights = inputs_and_weights[num_inputs:]
         inputs = inputs_and_weights[:num_inputs]
-
-        # ctx.input_requires_grad = [element.requires_grad for element in inputs]
         ctx.input_requires_grad = []
 
         with torch.no_grad():
-            # Makes a detached copy which shares the storage
+            # Make a detached copy, which shares the storage
             x = []
             for element in inputs:
                 if isinstance(element, torch.Tensor):
@@ -27,33 +25,35 @@ class InvertibleCheckpoint(torch.autograd.Function):
                 else:
                     x.append(element)
                     ctx.input_requires_grad.append(None)
-            # Detach y in-place (inbetween computations can now be discarded)
+            # Detach the output, which then allows discarding the intermediary results
             outputs = ctx.fn(*x).detach_()
 
-        # clear memory from inputs
-        # only clear memory of node features
+        # clear memory of input node features
         inputs[0].storage().resize_(0)
 
-        # store these tensor nodes for backward pass
+        # store for backward pass
         ctx.inputs = [inputs]
         ctx.outputs = [outputs]
 
         return outputs
 
     @staticmethod
-    def backward(ctx, *grad_outputs):  # pragma: no cover
+    def backward(ctx, *grad_outputs):
         if not torch.autograd._is_checkpoint_valid():
-            raise RuntimeError("InvertibleCheckpoint is not compatible with .grad(), please use .backward() if possible")
+            raise RuntimeError("InvertibleCheckpoint is not compatible with .grad(), \
+                               please use .backward() if possible")
         # retrieve input and output tensor nodes
         if len(ctx.outputs) == 0:
-            raise RuntimeError("Trying to perform backward on the InvertibleCheckpoint for more than once.")
+            raise RuntimeError("Trying to perform backward on the InvertibleCheckpoint \
+                               for more than once.")
         inputs = ctx.inputs.pop()
         outputs = ctx.outputs.pop()
 
-        # recompute input
+        # reconstruct input node features
         with torch.no_grad():
+            # inputs[0] used to have the input node features
             inputs_inverted = ctx.fn_inverse(*((outputs,)+inputs[1:]))
-            # clear memory from outputs
+            # clear memory of outputs
             outputs.storage().resize_(0)
 
             x = inputs[0]
