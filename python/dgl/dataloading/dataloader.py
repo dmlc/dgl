@@ -557,7 +557,7 @@ def create_tensorized_dataset(indices, batch_size, drop_last, use_ddp, ddp_seed)
 
 
 def _get_device(device):
-    device = 'cpu' if device == None else device
+    device = 'cpu' if device is None else device
     device = torch.device(device)
     if device.type == 'cuda' and device.index is None:
         device = torch.device('cuda', torch.cuda.current_device())
