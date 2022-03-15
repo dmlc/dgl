@@ -120,26 +120,23 @@ class HeteroNodeDataView(MutableMapping):
     def __repr__(self):
         return repr(self._transpose(as_dict=True))
 
-    def half_(self):
+    def __astype_float(self, new_type):
+        assert new_type in [F.float64, F.float32, F.float16], \
+            "'new_type' must be floating-point type: %s" % str(type)
         for key in self:
             value = self[key]
             type = value.dtype
-            if type == F.float32 or type == F.float64:
-                self[key] = F.astype(value, F.float16)
+            if type != new_type and type in [F.float64, F.float32, F.float16]:
+                self[key] = F.astype(value, new_type)
+
+    def half_(self):
+        self.__astype_float(F.float16)
 
     def float_(self):
-        for key in self:
-            value = self[key]
-            type = value.dtype
-            if type == F.float16 or type == F.float64:
-                self[key] = F.astype(value, F.float32)
+        self.__astype_float(F.float32)
 
     def double_(self):
-        for key in self:
-            value = self[key]
-            type = value.dtype
-            if type == F.float16 or type == F.float32:
-                self[key] = F.astype(value, F.float64)
+        self.__astype_float(F.float64)
 
 class HeteroEdgeView(object):
     """A EdgeView class to act as G.edges for a DGLHeteroGraph."""
@@ -255,23 +252,20 @@ class HeteroEdgeDataView(MutableMapping):
     def __repr__(self):
         return repr(self._transpose(as_dict=True))
 
-    def half_(self):
+    def __astype_float(self, new_type):
+        assert new_type in [F.float64, F.float32, F.float16], \
+            "'new_type' must be floating-point type: %s" % str(type)
         for key in self:
             value = self[key]
             type = value.dtype
-            if type == F.float32 or type == F.float64:
-                self[key] = F.astype(value, F.float16)
+            if type != new_type and type in [F.float64, F.float32, F.float16]:
+                self[key] = F.astype(value, new_type)
+
+    def half_(self):
+        self.__astype_float(F.float16)
 
     def float_(self):
-        for key in self:
-            value = self[key]
-            type = value.dtype
-            if type == F.float16 or type == F.float64:
-                self[key] = F.astype(value, F.float32)
+        self.__astype_float(F.float32)
 
     def double_(self):
-        for key in self:
-            value = self[key]
-            type = value.dtype
-            if type == F.float16 or type == F.float32:
-                self[key] = F.astype(value, F.float64)
+        self.__astype_float(F.float64)
