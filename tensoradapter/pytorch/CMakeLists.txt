@@ -3,11 +3,16 @@ project(tensoradapter_pytorch C CXX)
 
 # Find PyTorch cmake files and PyTorch versions with the python interpreter $PYTHON_INTERP
 # (or "python" if empty)
-file(TO_NATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/find_cmake.py FIND_CMAKE_PY)
+find_package(Python 3 REQUIRED COMPONENTS Interpreter)
+if (Python_FOUND)
+  set(PYTHON_INTERP "${Python_EXECUTABLE}")
+endif()
 if(NOT PYTHON_INTERP)
-  set(PYTHON_INTERP python3)
+  # if we didn't find python via the package, try the basic executable
+  set(PYTHON_INTERP python)
 endif()
 message(STATUS "Using Python interpreter: ${PYTHON_INTERP}")
+file(TO_NATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/find_cmake.py FIND_CMAKE_PY)
 execute_process(
   COMMAND ${PYTHON_INTERP} ${FIND_CMAKE_PY}
   OUTPUT_VARIABLE TORCH_PREFIX_VER
