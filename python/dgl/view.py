@@ -120,6 +120,27 @@ class HeteroNodeDataView(MutableMapping):
     def __repr__(self):
         return repr(self._transpose(as_dict=True))
 
+    def half_(self):
+        for key in self:
+            value = self[key]
+            type = value.dtype
+            if type == F.float32 or type == F.float64:
+                self[key] = F.astype(value, F.float16)
+
+    def float_(self):
+        for key in self:
+            value = self[key]
+            type = value.dtype
+            if type == F.float16 or type == F.float64:
+                self[key] = F.astype(value, F.float32)
+
+    def double_(self):
+        for key in self:
+            value = self[key]
+            type = value.dtype
+            if type == F.float16 or type == F.float32:
+                self[key] = F.astype(value, F.float64)
+
 class HeteroEdgeView(object):
     """A EdgeView class to act as G.edges for a DGLHeteroGraph."""
     __slots__ = ['_graph']
@@ -233,3 +254,24 @@ class HeteroEdgeDataView(MutableMapping):
 
     def __repr__(self):
         return repr(self._transpose(as_dict=True))
+
+    def half_(self):
+        for key in self:
+            value = self[key]
+            type = value.dtype
+            if type == F.float32 or type == F.float64:
+                self[key] = F.astype(value, F.float16)
+
+    def float_(self):
+        for key in self:
+            value = self[key]
+            type = value.dtype
+            if type == F.float16 or type == F.float64:
+                self[key] = F.astype(value, F.float32)
+
+    def double_(self):
+        for key in self:
+            value = self[key]
+            type = value.dtype
+            if type == F.float16 or type == F.float32:
+                self[key] = F.astype(value, F.float64)
