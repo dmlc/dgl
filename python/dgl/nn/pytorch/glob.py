@@ -455,7 +455,7 @@ class GlobalAttentionPooling(nn.Module):
             graph.ndata['r'] = feat * gate
             readout = sum_nodes(graph, 'r')
             graph.ndata.pop('r')
-            
+
             if get_attention:
                 return readout, gate
             else:
