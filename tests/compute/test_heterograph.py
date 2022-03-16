@@ -1923,6 +1923,45 @@ def test_dtype_cast(idtype):
         assert g_cast.idtype == F.int32
     test_utils.check_graph_equal(g, g_cast, check_idtype=False)
 
+def test_float_cast():
+    g = dgl.graph(([0, 1, 0, 2], [0, 1, 1, 0]), idtype=F.int32, device=F.ctx())
+    for t in [F.float16, F.float32, F.float64]:
+        nvalues = [3, 4, 5]
+        evalues = [3, 4, 5, 6]
+        g.ndata["a"] = F.tensor(nvalues, dtype=F.float16)
+        g.ndata["b"] = F.tensor(nvalues, dtype=F.float32)
+        g.ndata["c"] = F.tensor(nvalues, dtype=F.float64)
+        g.ndata["i"] = F.tensor(nvalues, dtype=F.int32)
+        g.edata["d"] = F.tensor(evalues, dtype=F.float16)
+        g.edata["e"] = F.tensor(evalues, dtype=F.float32)
+        g.edata["f"] = F.tensor(evalues, dtype=F.float64)
+        g.edata["j"] = F.tensor(evalues, dtype=F.int64)
+
+        if t == F.float16:
+            g.half_()
+        if t == F.float32:
+            g.float_()
+        if t == F.float64:
+            g.double_()
+
+        for key in ["a", "b", "c"]:
+            assert g.ndata[key].dtype == t
+            for i in range(len(nvalues)):
+                assert g.ndata[key][i] == nvalues[i]
+
+        for key in ["d", "e", "f"]:
+            assert g.edata[key].dtype == t
+            for i in range(len(evalues)):
+                assert g.edata[key][i] == evalues[i]
+                
+        # integer tensors shouldn't be converted
+        assert g.ndata["i"].dtype == F.int32
+        for i in range(len(nvalues)):
+            assert g.ndata["i"][i] == nvalues[i]
+        assert g.edata["j"].dtype == F.int64
+        for i in range(len(evalues)):
+            assert g.edata["j"][i] == evalues[i]
+
 @parametrize_dtype
 def test_format(idtype):
     # single relation
@@ -2864,6 +2903,7 @@ if __name__ == '__main__':
     # test_isolated_ntype()
     # test_bipartite()
     # test_dtype_cast()
+    # test_float_cast()
     # test_reverse("int32")
     # test_format()
     #test_add_edges(F.int32)
