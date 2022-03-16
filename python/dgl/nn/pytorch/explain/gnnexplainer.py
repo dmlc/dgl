@@ -35,28 +35,41 @@ class GNNExplainer(nn.Module):
         The learning rate to use, default to 0.01.
     num_epochs : int, optional
         The number of epochs to train.
+    edge_size : float, optional
+        A higher value will make the explanation edge masks more sparse by decreasing
+        the sum of the edge mask.
+    edge_ent : float, optional
+        A higher value will make the explanation edge masks more sparse by decreasing
+        the entropy of the edge mask.
+    node_feat_size : float, optional
+        A higher value will make the explanation node feature masks more sparse by
+        decreasing the mean of the node feature mask.
+    node_feat_ent : float, optional
+        A higher value will make the explanation node feature masks more sparse by
+        decreasing the entropy of the node feature mask.
     log : bool, optional
         If True, it will log the computation process, default to True.
     """
-
-    coeffs = {
-        'edge_size': 0.005,
-        'edge_ent': 1.0,
-        'node_feat_size': 1.0,
-        'node_feat_ent': 0.1
-    }
 
     def __init__(self,
                  model,
                  num_hops,
                  lr=0.01,
                  num_epochs=100,
+                 edge_size=0.005,
+                 edge_ent=1.0,
+                 node_feat_size=1.0,
+                 node_feat_ent=0.1,
                  log=True):
         super(GNNExplainer, self).__init__()
         self.model = model
         self.num_hops = num_hops
         self.lr = lr
         self.num_epochs = num_epochs
+        self.edge_size = edge_size
+        self.edge_ent = edge_ent
+        self.node_feat_size = node_feat_size
+        self.node_feat_ent = node_feat_ent
         self.log = log
 
     def _init_masks(self, graph, feat):
@@ -114,19 +127,19 @@ class GNNExplainer(nn.Module):
 
         edge_mask = edge_mask.sigmoid()
         # Edge mask sparsity regularization
-        loss = loss + self.coeffs['edge_size'] * torch.sum(edge_mask)
+        loss = loss + self.edge_size * torch.sum(edge_mask)
         # Edge mask entropy regularization
         ent = - edge_mask * torch.log(edge_mask + eps) - \
             (1 - edge_mask) * torch.log(1 - edge_mask + eps)
-        loss = loss + self.coeffs['edge_ent'] * ent.mean()
+        loss = loss + self.edge_ent * ent.mean()
 
         feat_mask = feat_mask.sigmoid()
         # Feature mask sparsity regularization
-        loss = loss + self.coeffs['node_feat_size'] * torch.mean(feat_mask)
+        loss = loss + self.node_feat_size * torch.mean(feat_mask)
         # Feature mask entropy regularization
-        ent = -feat_mask * torch.log(feat_mask + eps) - \
+        ent = - feat_mask * torch.log(feat_mask + eps) - \
             (1 - feat_mask) * torch.log(1 - feat_mask + eps)
-        loss = loss + self.coeffs['node_feat_ent'] * ent.mean()
+        loss = loss + self.node_feat_ent * ent.mean()
 
         return loss
 
