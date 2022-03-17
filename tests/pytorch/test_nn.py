@@ -1337,9 +1337,9 @@ def test_group_rev_res(idtype):
     num_nodes = 5
     num_edges = 20
     feats = 32
-    group = 2
+    groups = 2
     g = dgl.rand_graph(num_nodes, num_edges).to(dev)
     h = th.randn(num_nodes, feats).to(dev)
-    conv = nn.GraphConv(feats // group, feats // group)
-    model = nn.GroupRevRes(conv, group).to(dev)
+    conv = nn.GraphConv(feats // groups, feats // groups)
+    model = nn.GroupRevRes(conv, groups).to(dev)
     model(g, h)
