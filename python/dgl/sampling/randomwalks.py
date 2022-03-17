@@ -168,9 +168,20 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
     else:
         metapath = [g.get_etype_id(etype) for etype in metapath]
 
+    if max(nodes) > g.num_nodes(g.canonical_etypes[metapath[0]][0]):
+        raise DGLError("Seed node ID exceeds the maximum number of nodes.")
+
     gidx = g._graph
-    nodes = F.to_dgl_nd(utils.prepare_tensor(g, nodes, 'nodes'))
-    metapath = F.to_dgl_nd(utils.prepare_tensor(g, metapath, 'metapath'))
+    nodes = utils.prepare_tensor(g, nodes, 'nodes')
+    metapath = utils.prepare_tensor(g, metapath, 'metapath')
+    if g.is_pinned():
+        if prob is not None:
+            raise DGLError("Prob must be None when the graph is pinned.")
+        if F.device_type(F.context(nodes)) != 'cuda':
+            raise DGLError("Seed nodes must be on GPU when the graph is pinned.")
+        metapath = metapath.to(F.context(nodes))
+    nodes = F.to_dgl_nd(nodes)
+    metapath = F.to_dgl_nd(metapath)
 
     # Load the probability tensor from the edge frames
     if prob is None:

@@ -98,24 +98,20 @@ std::pair<IdArray, IdArray> RandomWalkUniform(
   const int64_t max_num_steps = metapath->shape[0];
   const IdType *metapath_data = static_cast<IdType *>(metapath->data);
   int64_t num_etypes = hg->NumEdgeTypes();
+  auto ctx = seeds->ctx;
 
-  CHECK(seeds->ctx.device_type == kDLGPU) << "seeds should be in GPU.";
-  CHECK(metapath->ctx.device_type == kDLGPU) << "metapath should be in GPU.";
   const IdType *seed_data = static_cast<const IdType*>(seeds->data);
   CHECK(seeds->ndim == 1) << "seeds shape is not one dimension.";
   const int64_t num_seeds = seeds->shape[0];
   int64_t trace_length = max_num_steps + 1;
-  IdArray traces = IdArray::Empty({num_seeds, trace_length}, seeds->dtype, seeds->ctx);
-  IdArray eids = IdArray::Empty({num_seeds, max_num_steps}, seeds->dtype, seeds->ctx);
+  IdArray traces = IdArray::Empty({num_seeds, trace_length}, seeds->dtype, ctx);
+  IdArray eids = IdArray::Empty({num_seeds, max_num_steps}, seeds->dtype, ctx);
   IdType *traces_data = traces.Ptr<IdType>();
   IdType *eids_data = eids.Ptr<IdType>();
 
   std::vector<GraphKernelData<IdType>> h_graphs(num_etypes);
-  DGLContext ctx;
   for (int64_t etype = 0; etype < num_etypes; ++etype) {
     const CSRMatrix &csr = hg->GetCSRMatrix(etype);
-    ctx = csr.indptr->ctx;
-    CHECK(ctx.device_type == kDLGPU) << "graph should be in GPU.";
     h_graphs[etype].in_ptr  = static_cast<const IdType*>(csr.indptr->data);
     h_graphs[etype].in_cols = static_cast<const IdType*>(csr.indices->data);
     h_graphs[etype].data = (CSRHasData(csr) ? static_cast<const IdType*>(csr.data->data) : nullptr);
@@ -194,9 +190,9 @@ std::pair<IdArray, IdArray> RandomWalkWithRestart(
       LOG(FATAL) << "Non-uniform choice is not supported in GPU.";
     }
   }
+  auto device_ctx = seeds->ctx;
   auto restart_prob_array = NDArray::Empty(
-      {1}, DLDataType{kDLFloat, 64, 1}, seeds->ctx);
-  auto device_ctx = restart_prob_array->ctx;
+      {1}, DLDataType{kDLFloat, 64, 1}, device_ctx);
   auto device = dgl::runtime::DeviceAPI::Get(device_ctx);
 
   // use default stream
