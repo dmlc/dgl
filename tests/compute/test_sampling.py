@@ -24,72 +24,6 @@ def check_random_walk(g, metapath, traces, ntypes, prob=None, trace_eids=None):
                 u, v = g.find_edges(trace_eids[i, j], etype=metapath[j])
                 assert (u == traces[i, j]) and (v == traces[i, j + 1])
 
-@unittest.skipIf(F._default_context_str == 'cpu', reason="UVA testing is for GPU device")
-def test_random_walk_uva():
-    g1 = dgl.heterograph({
-            ('user', 'follow', 'user'): ([0, 1, 2], [1, 2, 0])
-        })
-    g2 = dgl.heterograph({
-            ('user', 'follow', 'user'): ([0, 1, 1, 2, 3], [1, 2, 3, 0, 0])
-        })
-    g3 = dgl.heterograph({
-            ('user', 'follow', 'user'): ([0, 1, 2], [1, 2, 0]),
-            ('user', 'view', 'item'): ([0, 1, 2], [0, 1, 2]),
-            ('item', 'viewed-by', 'user'): ([0, 1, 2], [0, 1, 2])
-        })
-    g4 = dgl.heterograph({
-            ('user', 'follow', 'user'): ([0, 1, 1, 2, 3], [1, 2, 3, 0, 0]),
-            ('user', 'view', 'item'): ([0, 0, 1, 2, 3, 3], [0, 1, 1, 2, 2, 1]),
-            ('item', 'viewed-by', 'user'): ([0, 1, 1, 2, 2, 1], [0, 0, 1, 2, 3, 3])
-        })
-
-    for g in (g1, g2, g3, g4):
-        g.create_formats_()
-        g.pin_memory_()
-
-    traces, eids, ntypes = dgl.sampling.random_walk(
-        g1, F.tensor([0, 1, 2, 0, 1, 2]), length=4, return_eids=True)
-    check_random_walk(g1, ['follow'] * 4, traces, ntypes, trace_eids=eids)
-    try:
-        dgl.sampling.random_walk(g1, F.tensor([0, 1, 2, 10]), length=4, return_eids=True)
-        fail = False        # shouldn't abort
-    except:
-        fail = True
-    assert fail
-    traces, eids, ntypes = dgl.sampling.random_walk(
-        g1, F.tensor([0, 1, 2, 0, 1, 2]), length=4, restart_prob=0., return_eids=True)
-    check_random_walk(g1, ['follow'] * 4, traces, ntypes, trace_eids=eids)
-    traces, ntypes = dgl.sampling.random_walk(
-        g1, F.tensor([0, 1, 2, 0, 1, 2]), length=4, restart_prob=F.zeros((4,), F.float32))
-    check_random_walk(g1, ['follow'] * 4, traces, ntypes)
-    traces, ntypes = dgl.sampling.random_walk(
-        g1, F.tensor([0, 1, 2, 0, 1, 2]), length=5,
-        restart_prob=F.tensor([0, 0, 0, 0, 1], dtype=F.float32))
-    check_random_walk(
-        g1, ['follow'] * 4, F.slice_axis(traces, 1, 0, 5), F.slice_axis(ntypes, 0, 0, 5))
-    assert (F.asnumpy(traces)[:, 5] == -1).all()
-
-    traces, eids, ntypes = dgl.sampling.random_walk(
-        g2, F.tensor([0, 1, 2, 3, 0, 1, 2, 3]), length=4, return_eids=True)
-    check_random_walk(g2, ['follow'] * 4, traces, ntypes, trace_eids=eids)
-
-    metapath = ['follow', 'view', 'viewed-by'] * 2
-    traces, eids, ntypes = dgl.sampling.random_walk(
-        g3, F.tensor([0, 1, 2, 0, 1, 2]), metapath=metapath, return_eids=True)
-    check_random_walk(g3, metapath, traces, ntypes, trace_eids=eids)
-
-    metapath = ['follow', 'view', 'viewed-by'] * 2
-    traces, eids, ntypes = dgl.sampling.random_walk(
-        g4, F.tensor([0, 1, 2, 3, 0, 1, 2, 3]), metapath=metapath, return_eids=True)
-    check_random_walk(g4, metapath, traces, ntypes, trace_eids=eids)
-
-    traces, eids, ntypes = dgl.sampling.random_walk(
-        g4, F.tensor([0, 1, 2, 0, 1, 2]), metapath=metapath, return_eids=True)
-    check_random_walk(g4, metapath, traces, ntypes, trace_eids=eids)
-
-    for g in (g1, g2, g3, g4):
-        g.unpin_memory_()
-
 def test_random_walk():
     g1 = dgl.heterograph({
             ('user', 'follow', 'user'): ([0, 1, 2], [1, 2, 0])
@@ -183,6 +117,73 @@ def test_random_walk():
             restart_prob=F.tensor([0, 0, 0, 0, 0, 0, 1], F.float32), return_eids=True)
         check_random_walk(g4, metapath, traces[:, :7], ntypes[:7], 'p', trace_eids=eids)
         assert (F.asnumpy(traces[:, 7]) == -1).all()
+
+
+@unittest.skipIf(F._default_context_str == 'cpu', reason="UVA testing is for GPU device only")
+def test_random_walk_uva():
+    g1 = dgl.heterograph({
+            ('user', 'follow', 'user'): ([0, 1, 2], [1, 2, 0])
+        })
+    g2 = dgl.heterograph({
+            ('user', 'follow', 'user'): ([0, 1, 1, 2, 3], [1, 2, 3, 0, 0])
+        })
+    g3 = dgl.heterograph({
+            ('user', 'follow', 'user'): ([0, 1, 2], [1, 2, 0]),
+            ('user', 'view', 'item'): ([0, 1, 2], [0, 1, 2]),
+            ('item', 'viewed-by', 'user'): ([0, 1, 2], [0, 1, 2])
+        })
+    g4 = dgl.heterograph({
+            ('user', 'follow', 'user'): ([0, 1, 1, 2, 3], [1, 2, 3, 0, 0]),
+            ('user', 'view', 'item'): ([0, 0, 1, 2, 3, 3], [0, 1, 1, 2, 2, 1]),
+            ('item', 'viewed-by', 'user'): ([0, 1, 1, 2, 2, 1], [0, 0, 1, 2, 3, 3])
+        })
+
+    for g in (g1, g2, g3, g4):
+        g.create_formats_()
+        g.pin_memory_()
+
+    traces, eids, ntypes = dgl.sampling.random_walk(
+        g1, F.tensor([0, 1, 2, 0, 1, 2]), length=4, return_eids=True)
+    check_random_walk(g1, ['follow'] * 4, traces, ntypes, trace_eids=eids)
+    try:
+        dgl.sampling.random_walk(g1, F.tensor([0, 1, 2, 10]), length=4, return_eids=True)
+        fail = False        # shouldn't abort
+    except:
+        fail = True
+    assert fail
+    traces, eids, ntypes = dgl.sampling.random_walk(
+        g1, F.tensor([0, 1, 2, 0, 1, 2]), length=4, restart_prob=0., return_eids=True)
+    check_random_walk(g1, ['follow'] * 4, traces, ntypes, trace_eids=eids)
+    traces, ntypes = dgl.sampling.random_walk(
+        g1, F.tensor([0, 1, 2, 0, 1, 2]), length=4, restart_prob=F.zeros((4,), F.float32))
+    check_random_walk(g1, ['follow'] * 4, traces, ntypes)
+    traces, ntypes = dgl.sampling.random_walk(
+        g1, F.tensor([0, 1, 2, 0, 1, 2]), length=5,
+        restart_prob=F.tensor([0, 0, 0, 0, 1], dtype=F.float32))
+    check_random_walk(
+        g1, ['follow'] * 4, F.slice_axis(traces, 1, 0, 5), F.slice_axis(ntypes, 0, 0, 5))
+    assert (F.asnumpy(traces)[:, 5] == -1).all()
+
+    traces, eids, ntypes = dgl.sampling.random_walk(
+        g2, F.tensor([0, 1, 2, 3, 0, 1, 2, 3]), length=4, return_eids=True)
+    check_random_walk(g2, ['follow'] * 4, traces, ntypes, trace_eids=eids)
+
+    metapath = ['follow', 'view', 'viewed-by'] * 2
+    traces, eids, ntypes = dgl.sampling.random_walk(
+        g3, F.tensor([0, 1, 2, 0, 1, 2]), metapath=metapath, return_eids=True)
+    check_random_walk(g3, metapath, traces, ntypes, trace_eids=eids)
+
+    metapath = ['follow', 'view', 'viewed-by'] * 2
+    traces, eids, ntypes = dgl.sampling.random_walk(
+        g4, F.tensor([0, 1, 2, 3, 0, 1, 2, 3]), metapath=metapath, return_eids=True)
+    check_random_walk(g4, metapath, traces, ntypes, trace_eids=eids)
+
+    traces, eids, ntypes = dgl.sampling.random_walk(
+        g4, F.tensor([0, 1, 2, 0, 1, 2]), metapath=metapath, return_eids=True)
+    check_random_walk(g4, metapath, traces, ntypes, trace_eids=eids)
+
+    for g in (g1, g2, g3, g4):
+        g.unpin_memory_()
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU random walk not implemented")
 def test_node2vec():
