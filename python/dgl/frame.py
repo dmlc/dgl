@@ -792,3 +792,21 @@ class Frame(MutableMapping):
         if necessary."""
         for column in self._columns.values():
             column.unpin_memory_()
+
+    def __astype_float(self, new_type):
+        assert new_type in [F.float64, F.float32, F.float16], \
+            "'new_type' must be floating-point type: %s" % str(type)
+        for key in self:
+            value = self[key]
+            type = value.dtype
+            if type != new_type and type in [F.float64, F.float32, F.float16]:
+                self[key] = F.astype(value, new_type)
+
+    def half_(self):
+        self.__astype_float(F.float16)
+
+    def float_(self):
+        self.__astype_float(F.float32)
+
+    def double_(self):
+        self.__astype_float(F.float64)

@@ -6051,8 +6051,10 @@ class DGLHeteroGraph(object):
         DGLHeteroGraph
             Graph with the feature data converted to float16.
         """
-        self.edata.half_()
-        self.ndata.half_()
+        for frame in self._edge_frames:
+            frame.half_()
+        for frame in self._node_frames:
+            frame.half_()
         return self
 
     def float_(self):
@@ -6067,8 +6069,10 @@ class DGLHeteroGraph(object):
         DGLHeteroGraph
             Graph with the feature data converted to float32.
         """
-        self.edata.float_()
-        self.ndata.float_()
+        for frame in self._edge_frames:
+            frame.float_()
+        for frame in self._node_frames:
+            frame.float_()
         return self
 
     def double_(self):
@@ -6083,8 +6087,10 @@ class DGLHeteroGraph(object):
         DGLHeteroGraph
             Graph with the feature data converted to float64.
         """
-        self.edata.double_()
-        self.ndata.double_()
+        for frame in self._edge_frames:
+            frame.double_()
+        for frame in self._node_frames:
+            frame.double_()
         return self
 
     #################################################################
