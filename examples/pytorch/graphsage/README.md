@@ -13,7 +13,6 @@ Requirements
 pip install requests
 ```
 
-
 Results
 -------
 
@@ -35,6 +34,15 @@ Train w/ mini-batch sampling for node classification on OGB-products:
 ```bash
 python3 node_classification.py
 python3 multi_gpu_node_classification.py
+```
+
+### PyTorch Lightning for node classification
+
+Train w/ mini-batch sampling for node classification with PyTorch Lightning on OGB-products.
+Works with both single GPU and multiple GPUs:
+
+```bash
+python3 lightning/node_classification.py
 ```
 
 ### Minibatch training for link prediction
