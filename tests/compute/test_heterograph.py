@@ -1924,18 +1924,32 @@ def test_dtype_cast(idtype):
     test_utils.check_graph_equal(g, g_cast, check_idtype=False)
 
 def test_float_cast():
-    g = dgl.graph(([0, 1, 0, 2], [0, 1, 1, 0]), idtype=F.int32, device=F.ctx())
     for t in [F.float16, F.float32, F.float64]:
-        nvalues = [3, 4, 5]
-        evalues = [3, 4, 5, 6]
-        g.ndata["a"] = F.tensor(nvalues, dtype=F.float16)
-        g.ndata["b"] = F.tensor(nvalues, dtype=F.float32)
-        g.ndata["c"] = F.tensor(nvalues, dtype=F.float64)
-        g.ndata["i"] = F.tensor(nvalues, dtype=F.int32)
-        g.edata["d"] = F.tensor(evalues, dtype=F.float16)
-        g.edata["e"] = F.tensor(evalues, dtype=F.float32)
-        g.edata["f"] = F.tensor(evalues, dtype=F.float64)
-        g.edata["j"] = F.tensor(evalues, dtype=F.int64)
+        idtype = F.int32
+        g = dgl.heterograph({
+            ('user', 'follows', 'user'): (F.tensor([0, 1, 1, 2, 2, 3], dtype=idtype),
+                                        F.tensor([0, 0, 1, 1, 2, 2], dtype=idtype)),
+            ('user', 'plays', 'game'): (F.tensor([0, 1, 1], dtype=idtype),
+                                        F.tensor([0, 0, 1], dtype=idtype))},
+            idtype=idtype, device=F.ctx())
+        uvalues = [1, 2, 3, 4]
+        gvalues = [5, 6]
+        fvalues = [7, 8, 9, 10, 11, 12]
+        pvalues = [13, 14, 15]
+        dataNamesTypes = [
+            ('a',F.float16),
+            ('b',F.float32),
+            ('c',F.float64),
+            ('d',F.int32),
+            ('e',F.int64)]
+        for name,type in dataNamesTypes:
+            g.nodes['user'].data[name] = F.copy_to(F.tensor(uvalues, dtype=type), ctx=F.ctx())
+        for name,type in dataNamesTypes:
+            g.nodes['game'].data[name] = F.copy_to(F.tensor(gvalues, dtype=type), ctx=F.ctx())
+        for name,type in dataNamesTypes:
+            g.edges['follows'].data[name] = F.copy_to(F.tensor(fvalues, dtype=type), ctx=F.ctx())
+        for name,type in dataNamesTypes:
+            g.edges['plays'].data[name] = F.copy_to(F.tensor(pvalues, dtype=type), ctx=F.ctx())
 
         if t == F.float16:
             g.half_()
@@ -1944,23 +1958,33 @@ def test_float_cast():
         if t == F.float64:
             g.double_()
 
-        for key in ["a", "b", "c"]:
-            assert g.ndata[key].dtype == t
-            for i in range(len(nvalues)):
-                assert g.ndata[key][i] == nvalues[i]
+        for name,origType in dataNamesTypes:
+            # integer tensors shouldn't be converted
+            reqType = t if (origType in [F.float16,F.float32,F.float64]) else origType
 
-        for key in ["d", "e", "f"]:
-            assert g.edata[key].dtype == t
-            for i in range(len(evalues)):
-                assert g.edata[key][i] == evalues[i]
-                
-        # integer tensors shouldn't be converted
-        assert g.ndata["i"].dtype == F.int32
-        for i in range(len(nvalues)):
-            assert g.ndata["i"][i] == nvalues[i]
-        assert g.edata["j"].dtype == F.int64
-        for i in range(len(evalues)):
-            assert g.edata["j"][i] == evalues[i]
+            values = g.nodes['user'].data[name]
+            assert values.dtype == reqType
+            assert len(values) == len(uvalues)
+            for i in range(len(values)):
+                assert values[i] == uvalues[i]
+
+            values = g.nodes['game'].data[name]
+            assert values.dtype == reqType
+            assert len(values) == len(gvalues)
+            for i in range(len(values)):
+                assert values[i] == gvalues[i]
+
+            values = g.edges['follows'].data[name]
+            assert values.dtype == reqType
+            assert len(values) == len(fvalues)
+            for i in range(len(values)):
+                assert values[i] == fvalues[i]
+
+            values = g.edges['plays'].data[name]
+            assert values.dtype == reqType
+            assert len(values) == len(pvalues)
+            for i in range(len(values)):
+                assert values[i] == pvalues[i]
 
 @parametrize_dtype
 def test_format(idtype):
