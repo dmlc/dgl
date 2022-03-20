@@ -5,7 +5,7 @@ spec:
     runAsUser: 0
   containers:
   - name: dgl-ci-gpu-compile
-    image: dgllib/dgl-ci-gpu:conda
+    image: dgllib/dgl-ci-gpu:cu101_v220123
     imagePullPolicy: Always
     tty: true
     resources:

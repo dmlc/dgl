@@ -133,6 +133,10 @@ class UnitGraph::COO : public BaseHeteroGraph {
     return adj_.row->ctx;
   }
 
+  bool IsPinned() const override {
+    return adj_.row.IsPinned();
+  }
+
   uint8_t NumBits() const override {
     return adj_.row->dtype.bits;
   }
@@ -154,6 +158,17 @@ class UnitGraph::COO : public BaseHeteroGraph {
     if (Context() == ctx)
       return *this;
     return COO(meta_graph_, adj_.CopyTo(ctx, stream));
+  }
+
+
+  /*! \brief Pin the adj_: COOMatrix of the COO graph. */
+  void PinMemory_() {
+    adj_.PinMemory_();
+  }
+
+  /*! \brief Unpin the adj_: COOMatrix of the COO graph. */
+  void UnpinMemory_() {
+    adj_.UnpinMemory_();
   }
 
   bool IsMultigraph() const override {
@@ -344,6 +359,18 @@ class UnitGraph::COO : public BaseHeteroGraph {
     return aten::CSRMatrix();
   }
 
+  void SetCOOMatrix(dgl_type_t etype, aten::COOMatrix coo) override {
+    adj_ = coo;
+  }
+
+  void SetCSRMatrix(dgl_type_t etype, aten::CSRMatrix csr) override {
+    LOG(FATAL) << "Not enabled for COO graph";
+  }
+
+  void SetCSCMatrix(dgl_type_t etype, aten::CSRMatrix csc) override {
+    LOG(FATAL) << "Not enabled for COO graph";
+  }
+
   SparseFormat SelectFormat(dgl_type_t etype, dgl_format_code_t preferred_formats) const override {
     LOG(FATAL) << "Not enabled for COO graph";
     return SparseFormat::kCOO;
@@ -520,6 +547,10 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     return adj_.indices->ctx;
   }
 
+  bool IsPinned() const override {
+    return adj_.indices.IsPinned();
+  }
+
   uint8_t NumBits() const override {
     return adj_.indices->dtype.bits;
   }
@@ -545,6 +576,16 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     } else {
       return CSR(meta_graph_, adj_.CopyTo(ctx, stream));
     }
+  }
+
+  /*! \brief Pin the adj_: CSRMatrix of the CSR graph. */
+  void PinMemory_() {
+    adj_.PinMemory_();
+  }
+
+  /*! \brief Unpin the adj_: CSRMatrix of the CSR graph. */
+  void UnpinMemory_() {
+    adj_.UnpinMemory_();
   }
 
   bool IsMultigraph() const override {
@@ -750,6 +791,18 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     return adj_;
   }
 
+  void SetCOOMatrix(dgl_type_t etype, aten::COOMatrix coo) override {
+    LOG(FATAL) << "Not enabled for CSR graph";
+  }
+
+  void SetCSRMatrix(dgl_type_t etype, aten::CSRMatrix csr) override {
+    adj_ = csr;
+  }
+
+  void SetCSCMatrix(dgl_type_t etype, aten::CSRMatrix csc) override {
+    LOG(FATAL) << "Please use in_csr_->SetCSRMatrix(etype, csc) instead.";
+  }
+
   SparseFormat SelectFormat(dgl_type_t etype, dgl_format_code_t preferred_formats) const override {
     LOG(FATAL) << "Not enabled for CSR graph";
     return SparseFormat::kCSR;
@@ -827,6 +880,10 @@ DLDataType UnitGraph::DataType() const {
 
 DLContext UnitGraph::Context() const {
   return GetAny()->Context();
+}
+
+bool UnitGraph::IsPinned() const {
+  return GetAny()->IsPinned();
 }
 
 uint8_t UnitGraph::NumBits() const {
@@ -1210,7 +1267,7 @@ HeteroGraphPtr UnitGraph::CreateFromCSC(
   if (num_vtypes == 1)
     CHECK_EQ(num_src, num_dst);
   auto mg = CreateUnitGraphMetaGraph(num_vtypes);
-  CSRPtr csc(new CSR(mg, num_src, num_dst, indptr, indices, edge_ids));
+  CSRPtr csc(new CSR(mg, num_dst, num_src, indptr, indices, edge_ids));
   return HeteroGraphPtr(new UnitGraph(mg, csc, nullptr, nullptr, formats));
 }
 
@@ -1261,6 +1318,24 @@ HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DLContext &ctx,
     return HeteroGraphPtr(
         new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, new_coo, bg->formats_));
   }
+}
+
+void UnitGraph::PinMemory_() {
+  if (this->in_csr_->defined())
+    this->in_csr_->PinMemory_();
+  if (this->out_csr_->defined())
+    this->out_csr_->PinMemory_();
+  if (this->coo_->defined())
+    this->coo_->PinMemory_();
+}
+
+void UnitGraph::UnpinMemory_() {
+  if (this->in_csr_->defined())
+    this->in_csr_->UnpinMemory_();
+  if (this->out_csr_->defined())
+    this->out_csr_->UnpinMemory_();
+  if (this->coo_->defined())
+    this->coo_->UnpinMemory_();
 }
 
 void UnitGraph::InvalidateCSR() {
@@ -1334,6 +1409,10 @@ UnitGraph::CSRPtr UnitGraph::GetInCSR(bool inplace) const {
   // Prefers converting from COO since it is parallelized.
   // TODO(BarclayII): need benchmarking.
   if (!in_csr_->defined()) {
+    // inplace new formats materialization is not allowed for pinned graphs
+    if (inplace && IsPinned())
+      LOG(FATAL) << "Cannot create new formats for pinned graphs, " <<
+        "please create the CSC format before pinning.";
     if (coo_->defined()) {
       const auto& newadj = aten::COOToCSR(
             aten::COOTranspose(coo_->adj()));
@@ -1365,6 +1444,10 @@ UnitGraph::CSRPtr UnitGraph::GetOutCSR(bool inplace) const {
   // Prefers converting from COO since it is parallelized.
   // TODO(BarclayII): need benchmarking.
   if (!out_csr_->defined()) {
+    // inplace new formats materialization is not allowed for pinned graphs
+    if (inplace && IsPinned())
+      LOG(FATAL) << "Cannot create new formats for pinned graphs, " <<
+        "please create the CSR format before pinning.";
     if (coo_->defined()) {
       const auto& newadj = aten::COOToCSR(coo_->adj());
 
@@ -1393,6 +1476,10 @@ UnitGraph::COOPtr UnitGraph::GetCOO(bool inplace) const {
         CodeToStr(formats_) << ", cannot create COO matrix.";
   COOPtr ret = coo_;
   if (!coo_->defined()) {
+    // inplace new formats materialization is not allowed for pinned graphs
+    if (inplace && IsPinned())
+      LOG(FATAL) << "Cannot create new formats for pinned graphs, " <<
+        "please create the COO format before pinning.";
     if (in_csr_->defined()) {
       const auto& newadj = aten::COOTranspose(aten::CSRToCOO(in_csr_->adj(), true));
 
@@ -1423,6 +1510,54 @@ aten::CSRMatrix UnitGraph::GetCSRMatrix(dgl_type_t etype) const {
 
 aten::COOMatrix UnitGraph::GetCOOMatrix(dgl_type_t etype) const {
   return GetCOO()->adj();
+}
+
+void UnitGraph::SetCOOMatrix(dgl_type_t etype, COOMatrix coo) {
+  if (!(formats_ & COO_CODE)) {
+    LOG(FATAL) << "The graph have restricted sparse format " <<
+      CodeToStr(formats_) << ", cannot set COO matrix.";
+    return;
+  }
+  if (IsPinned()) {
+    LOG(FATAL) << "Cannot set COOMatrix if the graph is pinned, please unpin the graph.";
+    return;
+  }
+  if (!coo_->defined())
+    *(const_cast<UnitGraph*>(this)->coo_) = COO(meta_graph(), coo);
+  else
+    coo_->SetCOOMatrix(0, coo);
+}
+
+void UnitGraph::SetCSRMatrix(dgl_type_t etype, CSRMatrix csr) {
+  if (!(formats_ & CSR_CODE)) {
+    LOG(FATAL) << "The graph have restricted sparse format " <<
+      CodeToStr(formats_) << ", cannot set CSR matrix.";
+    return;
+  }
+  if (IsPinned()) {
+    LOG(FATAL) << "Cannot set CSRMatrix if the graph is pinned, please unpin the graph.";
+    return;
+  }
+  if (!out_csr_->defined())
+    *(const_cast<UnitGraph*>(this)->out_csr_) = CSR(meta_graph(), csr);
+  else
+    out_csr_->SetCSRMatrix(0, csr);
+}
+
+void UnitGraph::SetCSCMatrix(dgl_type_t etype, CSRMatrix csc) {
+  if (!(formats_ & CSC_CODE)) {
+    LOG(FATAL) << "The graph have restricted sparse format " <<
+      CodeToStr(formats_) << ", cannot set CSC matrix.";
+    return;
+  }
+  if (IsPinned()) {
+    LOG(FATAL) << "Cannot set CSCMatrix if the graph is pinned, please unpin the graph.";
+    return;
+  }
+  if (!in_csr_->defined())
+    *(const_cast<UnitGraph*>(this)->in_csr_) = CSR(meta_graph(), csc);
+  else
+    in_csr_->SetCSRMatrix(0, csc);
 }
 
 HeteroGraphPtr UnitGraph::GetAny() const {

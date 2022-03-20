@@ -7,7 +7,7 @@ from .dgl_dataset import DGLDataset
 from .utils import save_graphs, load_graphs, makedirs
 from .. import backend as F
 from ..convert import from_networkx
-from ..transform import add_self_loop
+from ..transforms import add_self_loop
 
 __all__ = ['MiniGCDataset']
 
@@ -33,8 +33,12 @@ class MiniGCDataset(DGLDataset):
         Minimum number of nodes for graphs
     max_num_v: int
         Maximum number of nodes for graphs
-    seed : int, default is 0
+    seed: int, default is 0
         Random seed for data generation
+    transform: callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Attributes
     ----------
@@ -75,7 +79,7 @@ class MiniGCDataset(DGLDataset):
     """
 
     def __init__(self, num_graphs, min_num_v, max_num_v, seed=0,
-                 save_graph=True, force_reload=False, verbose=False):
+                 save_graph=True, force_reload=False, verbose=False, transform=None):
         self.num_graphs = num_graphs
         self.min_num_v = min_num_v
         self.max_num_v = max_num_v
@@ -84,7 +88,7 @@ class MiniGCDataset(DGLDataset):
 
         super(MiniGCDataset, self).__init__(name="minigc", hash_key=(num_graphs, min_num_v, max_num_v, seed),
                                             force_reload=force_reload,
-                                            verbose=verbose)
+                                            verbose=verbose, transform=transform)
 
     def process(self):
         self.graphs = []
@@ -108,7 +112,11 @@ class MiniGCDataset(DGLDataset):
         (:class:`dgl.Graph`, Tensor)
             The graph and its label.
         """
-        return self.graphs[idx], self.labels[idx]
+        if self._transform is None:
+            g = self.graphs[idx]
+        else:
+            g = self._transform(self.graphs[idx])
+        return g, self.labels[idx]
 
     def has_cache(self):
         graph_path = os.path.join(self.save_path, 'dgl_graph_{}.bin'.format(self.hash))

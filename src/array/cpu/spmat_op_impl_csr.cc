@@ -52,9 +52,12 @@ NDArray CSRIsNonZero(CSRMatrix csr, NDArray row, NDArray col) {
   const IdType* col_data = static_cast<IdType*>(col->data);
   const int64_t row_stride = (rowlen == 1 && collen != 1) ? 0 : 1;
   const int64_t col_stride = (collen == 1 && rowlen != 1) ? 0 : 1;
-  for (int64_t i = 0, j = 0; i < rowlen && j < collen; i += row_stride, j += col_stride) {
-    *(rst_data++) = CSRIsNonZero<XPU, IdType>(csr, row_data[i], col_data[j])? 1 : 0;
-  }
+  runtime::parallel_for(0, std::max(rowlen, collen), 1, [=](int64_t b, int64_t e) {
+    int64_t i = (row_stride == 0) ? 0 : b;
+    int64_t j = (col_stride == 0) ? 0 : b;
+    for (int64_t k = b; i < e && j < e; i += row_stride, j += col_stride, ++k)
+      rst_data[k] = CSRIsNonZero<XPU, IdType>(csr, row_data[i], col_data[j]) ? 1 : 0;
+  });
   return rst;
 }
 

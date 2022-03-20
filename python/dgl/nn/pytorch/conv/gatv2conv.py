@@ -11,13 +11,8 @@ from ....utils import expand_as_pair
 
 # pylint: enable=W0235
 class GATv2Conv(nn.Module):
-    r"""
-
-    Description
-    -----------
-    Apply GATv2 from
-    `How Attentive are Graph Attention Networks? <https://arxiv.org/pdf/2105.14491.pdf>`__
-    over an input signal.
+    r"""GATv2 from `How Attentive are Graph Attention Networks?
+    <https://arxiv.org/pdf/2105.14491.pdf>`__
 
     .. math::
         h_i^{(l+1)} = \sum_{j\in \mathcal{N}(i)} \alpha_{ij}^{(l)} W^{(l)}_{right} h_j^{(l)}
@@ -174,7 +169,7 @@ class GATv2Conv(nn.Module):
         self.attn_drop = nn.Dropout(attn_drop)
         self.leaky_relu = nn.LeakyReLU(negative_slope)
         if residual:
-            if self._in_dst_feats != out_feats:
+            if self._in_dst_feats != out_feats * num_heads:
                 self.res_fc = nn.Linear(
                     self._in_dst_feats, num_heads * out_feats, bias=bias)
             else:
@@ -287,6 +282,7 @@ class GATv2Conv(nn.Module):
                         -1, self._num_heads, self._out_feats)
                 if graph.is_block:
                     feat_dst = feat_src[:graph.number_of_dst_nodes()]
+                    h_dst = h_dst[:graph.number_of_dst_nodes()]
             graph.srcdata.update({'el': feat_src})# (num_src_edge, num_heads, out_dim)
             graph.dstdata.update({'er': feat_dst})
             graph.apply_edges(fn.u_add_v('el', 'er', 'e'))

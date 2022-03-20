@@ -366,7 +366,7 @@ def run(args, device, data):
     val_fanouts = [int(fanout) for fanout in args.validation_fanout.split(',')]
 
     sampler = dgl.dataloading.MultiLayerNeighborSampler(fanouts)
-    dataloader = dgl.dataloading.NodeDataLoader(
+    dataloader = dgl.dataloading.DistNodeDataLoader(
         g,
         {'paper': train_nid},
         sampler,
@@ -375,7 +375,7 @@ def run(args, device, data):
         drop_last=False)
 
     valid_sampler = dgl.dataloading.MultiLayerNeighborSampler(val_fanouts)
-    valid_dataloader = dgl.dataloading.NodeDataLoader(
+    valid_dataloader = dgl.dataloading.DistNodeDataLoader(
         g,
         {'paper': val_nid},
         valid_sampler,
@@ -384,7 +384,7 @@ def run(args, device, data):
         drop_last=False)
 
     test_sampler = dgl.dataloading.MultiLayerNeighborSampler(val_fanouts)
-    test_dataloader = dgl.dataloading.NodeDataLoader(
+    test_dataloader = dgl.dataloading.DistNodeDataLoader(
         g,
         {'paper': test_nid},
         test_sampler,

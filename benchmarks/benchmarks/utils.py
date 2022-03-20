@@ -251,7 +251,7 @@ class PinsageDataset:
 
 
 def load_nowplaying_rs():
-    import torchtext
+    import torchtext.legacy as torchtext
     # follow examples/pytorch/pinsage/README to create nowplaying_rs.pkl
     name = 'nowplaying_rs.pkl'
     dataset_dir = os.path.join(os.getcwd(), 'dataset')

@@ -6,12 +6,9 @@ from torch.nn import init
 
 
 class DenseGraphConv(nn.Module):
-    """
+    """Graph Convolutional layer from `Semi-Supervised Classification with Graph
+    Convolutional Networks <https://arxiv.org/abs/1609.02907>`__
 
-    Description
-    -----------
-    Graph Convolutional Network layer where the graph structure
-    is given by an adjacency matrix.
     We recommend user to use this module when applying graph convolution on
     dense graphs.
 
@@ -92,11 +89,7 @@ class DenseGraphConv(nn.Module):
             init.zeros_(self.bias)
 
     def forward(self, adj, feat):
-        r"""
-
-        Description
-        -----------
-        Compute (Dense) Graph Convolution layer.
+        r"""Compute (Dense) Graph Convolution layer.
 
         Parameters
         ----------

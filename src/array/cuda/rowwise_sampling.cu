@@ -132,7 +132,7 @@ __global__ void _CSRRowWiseSampleKernel(
   const int64_t last_row = min(static_cast<int64_t>(blockIdx.x+1)*TILE_SIZE, num_rows);
 
   curandState rng;
-  curand_init(rand_seed*gridDim.x+blockIdx.x, threadIdx.y*WARP_SIZE+threadIdx.x, 0, &rng);
+  curand_init((rand_seed*gridDim.x+blockIdx.x)*blockDim.y+threadIdx.y, threadIdx.x, 0, &rng);
 
   while (out_row < last_row) {
     const int64_t row = in_rows[out_row];
@@ -221,7 +221,7 @@ __global__ void _CSRRowWiseSampleReplaceKernel(
   const int64_t last_row = min(static_cast<int64_t>(blockIdx.x+1)*TILE_SIZE, num_rows);
 
   curandState rng;
-  curand_init(rand_seed*gridDim.x+blockIdx.x, threadIdx.y*WARP_SIZE+threadIdx.x, 0, &rng);
+  curand_init((rand_seed*gridDim.x+blockIdx.x)*blockDim.y+threadIdx.y, threadIdx.x, 0, &rng);
 
   while (out_row < last_row) {
     const int64_t row = in_rows[out_row];
@@ -254,7 +254,7 @@ COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat,
                                     IdArray rows,
                                     const int64_t num_picks,
                                     const bool replace) {
-  const auto& ctx = mat.indptr->ctx;
+  const auto& ctx = rows->ctx;
   auto device = runtime::DeviceAPI::Get(ctx);
 
   // TODO(dlasalle): Once the device api supports getting the stream from the

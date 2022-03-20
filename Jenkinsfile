@@ -65,7 +65,7 @@ def unit_test_linux(backend, dev) {
 def unit_test_win64(backend, dev) {
   init_git_win64()
   unpack_lib("dgl-${dev}-win64", dgl_win64_libs)
-  timeout(time: 10, unit: 'MINUTES') {
+  timeout(time: 20, unit: 'MINUTES') {
     bat "CALL tests\\scripts\\task_unit_test.bat ${backend}"
   }
 }
@@ -107,9 +107,10 @@ pipeline {
   stages {
     stage('Regression Test Trigger') {
       agent {
-        kubernetes {
-          yamlFile 'docker/pods/ci-lint.yaml'
-          defaultContainer 'dgl-ci-lint'
+        docker {
+            label 'linux-benchmark-node'
+            image 'dgllib/dgl-ci-lint'
+            alwaysPull true
         }
       }
       when { triggeredBy 'IssueCommentCause' }
@@ -345,8 +346,6 @@ pipeline {
                 }
                 stage('Tutorial test') {
                   steps {
-                    sh 'ls -l /tmp/dataset/*'
-                    sh 'ls -l /tmp/dataset/'
                     tutorial_test_linux('pytorch')
                   }
                 }

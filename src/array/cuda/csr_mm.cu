@@ -16,7 +16,7 @@ using namespace dgl::runtime;
 namespace aten {
 namespace cusparse {
 
-#if __CUDACC_VER_MAJOR__ == 11
+#if 0   // disabling CUDA 11.0+ implementation for now because of problems on bigger graphs
 
 /*! \brief Cusparse implementation of SpGEMM on Csr format for CUDA 11.0+ */
 template <typename DType, typename IdType>

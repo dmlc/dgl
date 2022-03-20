@@ -58,6 +58,10 @@ class HeteroGraph : public BaseHeteroGraph {
     return relation_graphs_[0]->Context();
   }
 
+  bool IsPinned() const override {
+    return relation_graphs_[0]->IsPinned();
+  }
+
   uint8_t NumBits() const override {
     return relation_graphs_[0]->NumBits();
   }
@@ -228,6 +232,25 @@ class HeteroGraph : public BaseHeteroGraph {
   static HeteroGraphPtr CopyTo(HeteroGraphPtr g, const DLContext &ctx,
                                const DGLStreamHandle &stream = nullptr);
 
+  /*!
+  * \brief Pin all relation graphs of the current graph.
+  * \note The graph will be pinned inplace. Behavior depends on the current context,
+  *       kDLCPU: will be pinned;
+  *       IsPinned: directly return;
+  *       kDLGPU: invalid, will throw an error.
+  *       The context check is deferred to pinning the NDArray.
+  */
+  void PinMemory_();
+
+  /*!
+  * \brief Unpin all relation graphs of the current graph.
+  * \note The graph will be unpinned inplace. Behavior depends on the current context,
+  *       IsPinned: will be unpinned;
+  *       others: directly return.
+  *       The context check is deferred to unpinning the NDArray.
+  */
+  void UnpinMemory_();
+
   /*! \brief Copy the data to shared memory.
   *
   * Also save names of node types and edge types of the HeteroGraph object to shared memory
@@ -247,6 +270,18 @@ class HeteroGraph : public BaseHeteroGraph {
 
   const std::vector<UnitGraphPtr>& relation_graphs() const {
     return relation_graphs_;
+  }
+
+  void SetCOOMatrix(dgl_type_t etype, aten::COOMatrix coo) override {
+    GetRelationGraph(etype)->SetCOOMatrix(0, coo);
+  }
+
+  void SetCSRMatrix(dgl_type_t etype, aten::CSRMatrix csr) override {
+    GetRelationGraph(etype)->SetCSRMatrix(0, csr);
+  }
+
+  void SetCSCMatrix(dgl_type_t etype, aten::CSRMatrix csc) override {
+    GetRelationGraph(etype)->SetCSCMatrix(0, csc);
   }
 
  private:

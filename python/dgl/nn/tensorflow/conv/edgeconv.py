@@ -9,21 +9,25 @@ from ....utils import expand_as_pair
 
 
 class EdgeConv(layers.Layer):
-    r"""
-    Description
-    -----------
-    EdgeConv layer.
-    Introduced in "`Dynamic Graph CNN for Learning on Point Clouds
-    <https://arxiv.org/pdf/1801.07829>`__".  Can be described as follows:
+    r"""EdgeConv layer from `Dynamic Graph CNN for Learning on Point Clouds
+    <https://arxiv.org/pdf/1801.07829>`__
+
+    It can be described as follows:
+
     .. math::
+
        h_i^{(l+1)} = \max_{j \in \mathcal{N}(i)} (
        \Theta \cdot (h_j^{(l)} - h_i^{(l)}) + \Phi \cdot h_i^{(l)})
-    where :math:`\mathcal{N}(i)` is the neighbor of :math:`i`.
+
+    where :math:`\mathcal{N}(i)` is the neighbor of :math:`i`,
     :math:`\Theta` and :math:`\Phi` are linear layers.
+
     .. note::
+
        The original formulation includes a ReLU inside the maximum operator.
        This is equivalent to first applying a maximum operator then applying
        the ReLU.
+
     Parameters
     ----------
     in_feat : int
@@ -38,14 +42,18 @@ class EdgeConv(layers.Layer):
         causing silent performance regression. This module will raise a DGLError if it detects
         0-in-degree nodes in input graph. By setting ``True``, it will suppress the check
         and let the users handle it by themselves. Default: ``False``.
+
     Note
     ----
+
     Zero in-degree nodes will lead to invalid output value. This is because no message
     will be passed to those nodes, the aggregation function will be appied on empty input.
     A common practice to avoid this is to add a self-loop for each node in the graph if
     it is homogeneous, which can be achieved by:
+
     >>> g = ... # a DGLGraph
     >>> g = dgl.add_self_loop(g)
+
     Calling ``add_self_loop`` will not work for some graphs, for example, heterogeneous graph
     since the edge type can not be decided for self_loop edges. Set ``allow_zero_in_degree``
     to ``True`` for those cases to unblock the code and handle zere-in-degree nodes manually.
@@ -66,10 +74,8 @@ class EdgeConv(layers.Layer):
             self.bn = layers.BatchNormalization()
 
     def set_allow_zero_in_degree(self, set_value):
-        r"""
-        Description
-        -----------
-        Set allow_zero_in_degree flag.
+        r"""Set allow_zero_in_degree flag.
+
         Parameters
         ----------
         set_value : bool
@@ -78,10 +84,8 @@ class EdgeConv(layers.Layer):
         self._allow_zero_in_degree = set_value
 
     def call(self, g, feat):
-        """
-        Description
-        -----------
-        Forward computation
+        """Forward computation
+
         Parameters
         ----------
         g : DGLGraph
@@ -92,10 +96,12 @@ class EdgeConv(layers.Layer):
             If a pair of tensors is given, the graph must be a uni-bipartite graph
             with only one edge type, and the two tensors must have the same
             dimensionality on all except the first axis.
+
         Returns
         -------
         tf.Tensor or pair of tf.Tensor
             New node features.
+
         Raises
         ------
         DGLError
