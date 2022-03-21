@@ -66,6 +66,7 @@ class GNNExplainer(nn.Module):
                  num_hops,
                  lr=0.01,
                  num_epochs=100,
+                 *,
                  alpha1=0.005,
                  alpha2=1.0,
                  beta1=1.0,
