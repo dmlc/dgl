@@ -1511,7 +1511,7 @@ def node_split(nodes, partition_book=None, ntype='_N', rank=None, force_even=Tru
                                         num_client_per_part, client_id_in_part)
     else:
         # Get all nodes that belong to the rank.
-        local_nids = partition_book.partid2nids(partition_book.partid)
+        local_nids = partition_book.partid2nids(partition_book.partid, ntype=ntype)
         return _split_local(partition_book, rank, nodes, local_nids)
 
 def edge_split(edges, partition_book=None, etype='_E', rank=None, force_even=True,
@@ -1591,7 +1591,7 @@ def edge_split(edges, partition_book=None, etype='_E', rank=None, force_even=Tru
                                         num_client_per_part, client_id_in_part)
     else:
         # Get all edges that belong to the rank.
-        local_eids = partition_book.partid2eids(partition_book.partid)
+        local_eids = partition_book.partid2eids(partition_book.partid, etype=etype)
         return _split_local(partition_book, rank, edges, local_eids)
 
 rpc.register_service(INIT_GRAPH, InitGraphRequest, InitGraphResponse)
