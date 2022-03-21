@@ -1308,7 +1308,7 @@ def test_hgt(idtype, in_size, num_heads):
     etype = th.tensor([i % num_etypes for i in range(g.num_edges())]).to(dev)
     ntype = th.tensor([i % num_ntypes for i in range(g.num_nodes())]).to(dev)
     x = th.randn(g.num_nodes(), in_size).to(dev)
-    
+
     m = nn.HGTConv(in_size, head_size, num_heads, num_ntypes, num_etypes).to(dev)
 
     y = m(g, x, ntype, etype)
