@@ -70,7 +70,9 @@ __all__ = [
     'adj_product_graph',
     'adj_sum_graph',
     'reorder_graph',
-    'norm_by_dst'
+    'norm_by_dst',
+    'rwpe',
+    'laplacian_pe'
     ]
 
 
@@ -3299,5 +3301,70 @@ def norm_by_dst(g, etype=None):
     norm = F.replace_inf_with_zero(norm)
 
     return norm
+
+def rwpe(g, k):
+    r"""Return random walk positional encodings.
+
+    For internal use.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The homogeneous graph.
+    k : int
+        The number of random walk steps.
+
+    Returns
+    -------
+    Tensor
+        The random walk positional encodings.
+    """
+    # get 1-step random walk probabilities as A * D^-1
+    A = g.adj(scipy_fmt='csr') # adjacency matrix
+    Dinv = sparse.diags(F.asnumpy(g.in_degrees()).clip(1) ** -1.0, dtype=float) # D^-1
+    RW = A * Dinv
+
+    # Iterate for k steps
+    PE = [F.tensor(RW.diagonal()).float()]
+    RW_power = RW
+    for _ in range(k-1):
+        RW_power = RW_power * RW
+        PE.append(F.tensor(RW_power.diagonal()).float())
+    PE = F.stack(PE,dim=-1)
+    
+    return PE
+
+def laplacian_pe(g, k):
+    r"""Return laplacian positional encodings.
+
+    For internal use.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The homogeneous graph.
+    k : int
+        Number of smallest non-trivial eigenvectors to use for positional encoding.
+
+    Returns
+    -------
+    Tensor
+        The laplacian positional encodings.
+    """
+    # get laplacian matrix as I - D^-0.5 * A * D^-0.5
+    A = g.adj(scipy_fmt='csr') # adjacency matrix
+    N = sparse.diags(F.asnumpy(g.in_degrees()).clip(1) ** -0.5, dtype=float) # D^-1/2
+    L = sparse.eye(g.number_of_nodes()) - N * A * N
+
+    # select eigenvectors with smaller eigenvalues
+    EigVal, EigVec = np.linalg.eig(L.toarray())
+    idx = EigVal.argsort() # increasing order
+    EigVal, EigVec = EigVal[idx], np.real(EigVec[:,idx])
+
+    # get random flip signs
+    rand_sign = 2 * (np.random.rand(k) > 0.5) - 1.
+    PE = F.tensor(rand_sign * EigVec[:, 1:k+1]).float()
+    
+    return PE
 
 _init_api("dgl.transform", __name__)
