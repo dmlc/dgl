@@ -38,6 +38,7 @@ Samplers
     MultiLayerFullNeighborSampler
     ClusterGCNSampler
     ShaDowKHopSampler
+    SAINTSampler
 
 Sampler Transformations
 -----------------------

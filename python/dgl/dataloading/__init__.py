@@ -17,6 +17,7 @@ Read the user guide :ref:`guide-minibatch`.
 from .. import backend as F
 from .neighbor_sampler import *
 from .cluster_gcn import *
+from .graphsaint import *
 from .shadow import *
 from .base import *
 from . import negative_sampler
