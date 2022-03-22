@@ -20,6 +20,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 import torch.multiprocessing as mp
 from torch.utils.data import DataLoader
+import socket
 
 def load_subtensor(g, seeds, input_nodes, device, load_feat=True):
     """
@@ -209,8 +210,7 @@ def run(args, device, data):
         if args.num_gpus == -1:
             model = th.nn.parallel.DistributedDataParallel(model)
         else:
-            dev_id = g.rank() % args.num_gpus
-            model = th.nn.parallel.DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id)
+            model = th.nn.parallel.DistributedDataParallel(model, device_ids=[device], output_device=device)
     loss_fcn = nn.CrossEntropyLoss()
     loss_fcn = loss_fcn.to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
@@ -249,6 +249,7 @@ def run(args, device, data):
             batch_labels = batch_labels.to(device)
             # Compute loss and prediction
             start = time.time()
+            #print(g.rank(), blocks[0].device, model.module.layers[0].fc_neigh.weight.device, dev_id)
             batch_pred = model(blocks, batch_inputs)
             loss = loss_fcn(batch_pred, batch_labels)
             forward_end = time.time()
@@ -285,11 +286,14 @@ def run(args, device, data):
                                                                                   time.time() - start))
 
 def main(args):
+    print(socket.gethostname(), 'Initializing DGL dist')
     dgl.distributed.initialize(args.ip_config)
     if not args.standalone:
+        print(socket.gethostname(), 'Initializing DGL process group')
         th.distributed.init_process_group(backend=args.backend)
+    print(socket.gethostname(), 'Initializing DistGraph')
     g = dgl.distributed.DistGraph(args.graph_name, part_config=args.part_config)
-    print('rank:', g.rank())
+    print(socket.gethostname(), 'rank:', g.rank())
 
     pb = g.get_partition_book()
     if 'trainer_id' in g.ndata:
@@ -311,7 +315,8 @@ def main(args):
     if args.num_gpus == -1:
         device = th.device('cpu')
     else:
-        device = th.device('cuda:'+str(args.local_rank))
+        dev_id = g.rank() % args.num_gpus
+        device = th.device('cuda:'+str(dev_id))
     labels = g.ndata['labels'][np.arange(g.number_of_nodes())]
     n_classes = len(th.unique(labels[th.logical_not(th.isnan(labels))]))
     print('#labels:', n_classes)
