@@ -199,6 +199,7 @@ pipeline {
                 docker {
                   label "linux-cpu-node"
                   image "dgllib/dgl-ci-cpu:cu101_v220123"  
+                  args "-u root"
                   alwaysPull true
                 }
               }
@@ -216,6 +217,7 @@ pipeline {
                 docker {
                   label "linux-cpu-node"
                   image "dgllib/dgl-ci-gpu:cu101_v220123"  
+                  args "-u root"
                   alwaysPull true
                 }
               }
