@@ -100,9 +100,7 @@ def is_authorized(name) {
 }
 
 pipeline {
-  agent {
-    label "linux-cpu-node"
-  }
+  agent any
   triggers {
         issueCommentTrigger('@dgl-bot .*')
   }
