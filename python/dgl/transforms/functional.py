@@ -3303,7 +3303,9 @@ def norm_by_dst(g, etype=None):
     return norm
 
 def rwpe(g, k):
-    r"""Return random walk positional encodings.
+    r"""Random Walk Positional Encoding, as introduced in
+    `Graph Neural Networks with Learnable Structural and Positional Representations
+    <https://arxiv.org/abs/2110.07875>`__
 
     For internal use.
 
