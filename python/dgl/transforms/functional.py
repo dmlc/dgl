@@ -3349,7 +3349,7 @@ def laplacian_pe(g, k):
     g : DGLGraph
         The homogeneous graph.
     k : int
-        Number of smallest non-trivial eigenvectors to use for positional encoding.
+        Number of smallest non-trivial eigenvectors to use for positional encoding (smaller than the number of nodes).
 
     Returns
     -------
