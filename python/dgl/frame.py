@@ -385,9 +385,9 @@ class Column(TensorStorage):
     def __copy__(self):
         return self.clone()
 
-    def fetch(self, indices, device, pin_memory=False):
+    def fetch(self, indices, device, pin_memory=False, **kwargs):
         _ = self.data           # materialize in case of lazy slicing & data transfer
-        return super().fetch(indices, device, pin_memory=False)
+        return super().fetch(indices, device, pin_memory=False, **kwargs)
 
     def pin_memory_(self):
         """Pin the storage into page-locked memory.
