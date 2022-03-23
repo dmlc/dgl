@@ -3326,9 +3326,8 @@ def rwpe(g, k):
     Example
     -------
     >>> import dgl
-    >>> from dgl import functional as F
     >>> g = dgl.graph(([0,1,1], [1,1,0]))
-    >>> F.rwpe(g, 2)
+    >>> dgl.rwpe(g, 2)
     tensor([[0.0000, 0.5000],
             [0.5000, 0.7500]])
     """
@@ -3371,9 +3370,8 @@ def lappe(g, k):
     Example
     -------
     >>> import dgl
-    >>> from dgl import functional as F
     >>> g = dgl.rand_graph(6, 12)
-    >>> F.lappe(g, 2)
+    >>> dgl.lappe(g, 2)
     tensor([[-0.8931, -0.7713],
             [-0.0000,  0.6198],
             [ 0.2704, -0.0138],
@@ -3393,12 +3391,14 @@ def lappe(g, k):
 
     # select eigenvectors with smaller eigenvalues
     EigVal, EigVec = np.linalg.eig(L.toarray())
-    idx = EigVal.argsort() # increasing order
-    EigVal, EigVec = EigVal[idx], np.real(EigVec[:,idx])
+    kpartition_indices = np.argpartition(EigVal, k+1)[:k+1]
+    topk_eigvals = EigVal[kpartition_indices]
+    topk_indices = kpartition_indices[topk_eigvals.argsort()][1:]
+    topk_EigVec = np.real(EigVec[:, topk_indices])
 
     # get random flip signs
     rand_sign = 2 * (np.random.rand(k) > 0.5) - 1.
-    PE = F.tensor(rand_sign * EigVec[:, 1:k+1]).float()
+    PE = F.tensor(rand_sign * topk_EigVec).float()
     
     return PE
 
