@@ -1006,4 +1006,8 @@ def context_of(data):
     """Return the device of the data which can be either a tensor or a dict of tensors."""
     return F.context(next(iter(data.values())) if isinstance(data, Mapping) else data)
 
+def dtype_of(data):
+    """Return the dtype of the data which can be either a tensor or a dict of tensors."""
+    return F.dtype(next(iter(data.values())) if isinstance(data, Mapping) else data)
+
 _init_api("dgl.utils.internal")
