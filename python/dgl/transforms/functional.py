@@ -3338,7 +3338,9 @@ def rwpe(g, k):
     return PE
 
 def laplacian_pe(g, k):
-    r"""Return laplacian positional encodings.
+    r"""Laplacian Positional Encoding, as introduced in
+    `A Generalization of Transformer Networks to Graphs
+    <https://arxiv.org/abs/2012.09699>`__
 
     For internal use.
 
