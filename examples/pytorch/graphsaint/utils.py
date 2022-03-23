@@ -38,11 +38,11 @@ def evaluate(device, model, g, mask, multilabel=False):
 
 # load data of GraphSAINT and convert them to the format of dgl
 def load_data(args, multilabel):
-    if not os.path.exists('graphsaintdata') and not os.path.exists('data'):
-        raise ValueError("The directory graphsaintdata does not exist!")
-    elif os.path.exists('graphsaintdata') and not os.path.exists('data'):
-        os.rename('graphsaintdata', 'data')
-    prefix = "data/{}".format(args.dataset)
+    if os.path.exists(args.dataset):
+        prefix = args.dataset
+    elif os.path.exists('graphsaintdata'):
+        prefix = "graphsaintdata/{}".format(args.dataset)
+
     DataType = namedtuple('Dataset', ['num_classes', 'train_nid', 'g'])
 
     adj_full = scipy.sparse.load_npz('./{}/adj_full.npz'.format(prefix)).astype(np.bool)

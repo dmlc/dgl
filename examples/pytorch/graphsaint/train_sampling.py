@@ -94,7 +94,7 @@ def main(args, task):
 
             optimizer.zero_grad()
             loss.backward()
-            torch.nn.utils.clip_grad_norm(model.parameters(), 5)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 5)
             optimizer.step()
 
         val_f1_mic, val_f1_mac = evaluate(eval_device, model, g, 'val_mask', multilabel)
