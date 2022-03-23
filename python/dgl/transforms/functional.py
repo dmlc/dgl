@@ -3314,7 +3314,8 @@ def rwpe(g, k):
     g : DGLGraph
         The homogeneous graph.
     k : int
-        The number of random walk steps.
+        The number of random walk steps. The paper found the best value to be 16 and 20
+        for two experiments.
 
     Returns
     -------
