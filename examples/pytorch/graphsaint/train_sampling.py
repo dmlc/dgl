@@ -7,7 +7,6 @@ import torch.nn.functional as F
 
 from config import CONFIG
 from dgl.dataloading import SAINTSampler, DataLoader
-from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from modules import GCNNet
