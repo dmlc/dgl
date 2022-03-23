@@ -8,31 +8,10 @@ import numpy as np
 import torch
 from sklearn.metrics import f1_score
 
-
-class Logger(object):
-    '''A custom logger to log stdout to a logging file.'''
-    def __init__(self, path):
-        """Initialize the logger.
-
-        Parameters
-        ---------
-        path : str
-            The file path to be stored in.
-        """
-        self.path = path
-
-    def write(self, s):
-        with open(self.path, 'a') as f:
-            f.write(str(s))
-        print(s)
-        return
-
-
 def save_log_dir(args):
-    log_dir = './log/{}/{}'.format(args.dataset, args.log_dir)
+    log_dir = './log/{}'.format(args.dataset)
     os.makedirs(log_dir, exist_ok=True)
     return log_dir
-
 
 def calc_f1(y_true, y_pred, multilabel):
     if multilabel:
@@ -43,9 +22,12 @@ def calc_f1(y_true, y_pred, multilabel):
     return f1_score(y_true, y_pred, average="micro"), \
         f1_score(y_true, y_pred, average="macro")
 
-
-def evaluate(model, g, labels, mask, multilabel=False):
+def evaluate(device, model, g, mask, multilabel=False):
+    model = model.to(device)
+    g = g.to(device)
     model.eval()
+    labels = g.ndata['label']
+    mask = g.ndata[mask]
     with torch.no_grad():
         logits = model(g)
         logits = logits[mask]
@@ -53,7 +35,6 @@ def evaluate(model, g, labels, mask, multilabel=False):
         f1_mic, f1_mac = calc_f1(labels.cpu().numpy(),
                                  logits.cpu().numpy(), multilabel)
         return f1_mic, f1_mac
-
 
 # load data of GraphSAINT and convert them to the format of dgl
 def load_data(args, multilabel):
