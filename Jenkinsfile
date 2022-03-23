@@ -395,7 +395,7 @@ pipeline {
                 docker {
                   label "linux-gpu-node"
                   image "dgllib/dgl-ci-gpu:cu101_v220123"  
-                  args "--runtime nvidia --shm-size=4gb"
+                  args "--runtime nvidia --shm-size=8gb"
                   alwaysPull true
                 }
               }
