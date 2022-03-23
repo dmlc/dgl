@@ -20,6 +20,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 import torch.multiprocessing as mp
 from torch.utils.data import DataLoader
+from torch.distributed.algorithms.join import Join
 import socket
 
 def load_subtensor(g, seeds, input_nodes, device, load_feat=True):
@@ -156,41 +157,11 @@ def evaluate(model, g, inputs, labels, val_nid, test_nid, batch_size, device):
     model.train()
     return compute_acc(pred[val_nid], labels[val_nid]), compute_acc(pred[test_nid], labels[test_nid])
 
-def pad_data(nids, device):
-    """
-    In distributed traning scenario, we need to make sure that each worker has same number of
-    batches. Otherwise the synchronization(barrier) is called diffirent times, which results in
-    the worker with more batches hangs up.
-
-    This function pads the nids to the same size for all workers, by repeating the head ids till
-    the maximum size among all workers.
-    """
-    import torch.distributed as dist
-    # NCCL backend only supports GPU tensors, thus here we need to allocate it to gpu
-    num_nodes = th.tensor(nids.numel()).to(device)
-    dist.all_reduce(num_nodes, dist.ReduceOp.MAX)
-    max_num_nodes = int(num_nodes)
-    nids_length = nids.shape[0]
-    if max_num_nodes > nids_length:
-        pad_size = max_num_nodes % nids_length
-        repeat_size = max_num_nodes // nids_length
-        new_nids = th.cat([nids for _ in range(repeat_size)] + [nids[:pad_size]], axis=0)
-        print("Pad nids from {} to {}".format(nids_length, max_num_nodes))
-    else:
-        new_nids = nids
-    assert new_nids.shape[0] == max_num_nodes
-    return new_nids
-
 
 def run(args, device, data):
     # Unpack data
     train_nid, val_nid, test_nid, in_feats, n_classes, g = data
     shuffle = True
-    if args.pad_data:
-        train_nid = pad_data(train_nid, device)
-        # Current pipeline doesn't support duplicate node id within the same batch
-        # Therefore turn off shuffling to avoid potential duplicate node id within the same batch
-        shuffle = False
     # Create sampler
     sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')],
                               dgl.distributed.sample_neighbors, device)
@@ -233,44 +204,46 @@ def run(args, device, data):
         # Loop over the dataloader to sample the computation dependency graph as a list of
         # blocks.
         step_time = []
-        for step, blocks in enumerate(dataloader):
-            tic_step = time.time()
-            sample_time += tic_step - start
 
-            # The nodes for input lies at the LHS side of the first block.
-            # The nodes for output lies at the RHS side of the last block.
-            batch_inputs = blocks[0].srcdata['features']
-            batch_labels = blocks[-1].dstdata['labels']
-            batch_labels = batch_labels.long()
+        with Join([model]):
+            for step, blocks in enumerate(dataloader):
+                tic_step = time.time()
+                sample_time += tic_step - start
 
-            num_seeds += len(blocks[-1].dstdata[dgl.NID])
-            num_inputs += len(blocks[0].srcdata[dgl.NID])
-            blocks = [block.to(device) for block in blocks]
-            batch_labels = batch_labels.to(device)
-            # Compute loss and prediction
-            start = time.time()
-            #print(g.rank(), blocks[0].device, model.module.layers[0].fc_neigh.weight.device, dev_id)
-            batch_pred = model(blocks, batch_inputs)
-            loss = loss_fcn(batch_pred, batch_labels)
-            forward_end = time.time()
-            optimizer.zero_grad()
-            loss.backward()
-            compute_end = time.time()
-            forward_time += forward_end - start
-            backward_time += compute_end - forward_end
+                # The nodes for input lies at the LHS side of the first block.
+                # The nodes for output lies at the RHS side of the last block.
+                batch_inputs = blocks[0].srcdata['features']
+                batch_labels = blocks[-1].dstdata['labels']
+                batch_labels = batch_labels.long()
 
-            optimizer.step()
-            update_time += time.time() - compute_end
+                num_seeds += len(blocks[-1].dstdata[dgl.NID])
+                num_inputs += len(blocks[0].srcdata[dgl.NID])
+                blocks = [block.to(device) for block in blocks]
+                batch_labels = batch_labels.to(device)
+                # Compute loss and prediction
+                start = time.time()
+                #print(g.rank(), blocks[0].device, model.module.layers[0].fc_neigh.weight.device, dev_id)
+                batch_pred = model(blocks, batch_inputs)
+                loss = loss_fcn(batch_pred, batch_labels)
+                forward_end = time.time()
+                optimizer.zero_grad()
+                loss.backward()
+                compute_end = time.time()
+                forward_time += forward_end - start
+                backward_time += compute_end - forward_end
 
-            step_t = time.time() - tic_step
-            step_time.append(step_t)
-            iter_tput.append(len(blocks[-1].dstdata[dgl.NID]) / step_t)
-            if step % args.log_every == 0:
-                acc = compute_acc(batch_pred, batch_labels)
-                gpu_mem_alloc = th.cuda.max_memory_allocated() / 1000000 if th.cuda.is_available() else 0
-                print('Part {} | Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MB | time {:.3f} s'.format(
-                    g.rank(), epoch, step, loss.item(), acc.item(), np.mean(iter_tput[3:]), gpu_mem_alloc, np.sum(step_time[-args.log_every:])))
-            start = time.time()
+                optimizer.step()
+                update_time += time.time() - compute_end
+
+                step_t = time.time() - tic_step
+                step_time.append(step_t)
+                iter_tput.append(len(blocks[-1].dstdata[dgl.NID]) / step_t)
+                if step % args.log_every == 0:
+                    acc = compute_acc(batch_pred, batch_labels)
+                    gpu_mem_alloc = th.cuda.max_memory_allocated() / 1000000 if th.cuda.is_available() else 0
+                    print('Part {} | Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MB | time {:.3f} s'.format(
+                        g.rank(), epoch, step, loss.item(), acc.item(), np.mean(iter_tput[3:]), gpu_mem_alloc, np.sum(step_time[-args.log_every:])))
+                start = time.time()
 
         toc = time.time()
         print('Part {}, Epoch Time(s): {:.4f}, sample+data_copy: {:.4f}, forward: {:.4f}, backward: {:.4f}, update: {:.4f}, #seeds: {}, #inputs: {}'.format(
