@@ -171,10 +171,7 @@ class LapPE(BaseTransform):
         self.feat_name = feat_name
     
     def __call__(self, g):
-        n = g.num_nodes()
-        if n <= self.k:
-            assert f"the number of eigenvectors k must be smaller than the number of nodes n, {self.k} and {n} detected."
-        PE = functional.laplacian_pe(g, k=self.k)
+        PE = functional.lappe(g, k=self.k)
         g.ndata[self.feat_name] = PE
         
         return g

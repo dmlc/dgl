@@ -72,7 +72,7 @@ __all__ = [
     'reorder_graph',
     'norm_by_dst',
     'rwpe',
-    'laplacian_pe'
+    'lappe'
     ]
 
 
@@ -3307,7 +3307,8 @@ def rwpe(g, k):
     `Graph Neural Networks with Learnable Structural and Positional Representations
     <https://arxiv.org/abs/2110.07875>`__
 
-    For internal use.
+    This function computes the random walk positional encodings as landing probabilities
+    from 1-step to k-step, starting from each node to itself.
 
     Parameters
     ----------
@@ -3321,6 +3322,15 @@ def rwpe(g, k):
     -------
     Tensor
         The random walk positional encodings.
+
+    Example
+    -------
+    >>> import dgl
+    >>> from dgl import functional as F
+    >>> g = dgl.graph(([0,1,1], [1,1,0]))
+    >>> F.rwpe(g, 2)
+    tensor([[0.0000, 0.5000],
+            [0.5000, 0.7500]])
     """
     # get 1-step random walk probabilities as A * D^-1
     A = g.adj(scipy_fmt='csr') # adjacency matrix
@@ -3337,12 +3347,14 @@ def rwpe(g, k):
     
     return PE
 
-def laplacian_pe(g, k):
+def lappe(g, k):
     r"""Laplacian Positional Encoding, as introduced in
     `A Generalization of Transformer Networks to Graphs
     <https://arxiv.org/abs/2012.09699>`__
 
-    For internal use.
+    This function computes the laplacian positional encodings as the
+    k smallest non-trivial eigenvectors (k << n). k and n are the positional
+    encoding dimensions and the number of nodes in the given graph.
 
     Parameters
     ----------
@@ -3355,7 +3367,25 @@ def laplacian_pe(g, k):
     -------
     Tensor
         The laplacian positional encodings.
+
+    Example
+    -------
+    >>> import dgl
+    >>> from dgl import functional as F
+    >>> g = dgl.rand_graph(6, 12)
+    >>> F.lappe(g, 2)
+    tensor([[-0.8931, -0.7713],
+            [-0.0000,  0.6198],
+            [ 0.2704, -0.0138],
+            [-0.0000,  0.0554],
+            [ 0.3595, -0.0477],
+            [-0.0000,  0.1240]])
     """
+    # check for the "k < n" constraint
+    n = g.num_nodes()
+    if n <= k:
+        assert f"the number of eigenvectors k must be smaller than the number of nodes n, {k} and {n} detected."
+    
     # get laplacian matrix as I - D^-0.5 * A * D^-0.5
     A = g.adj(scipy_fmt='csr') # adjacency matrix
     N = sparse.diags(F.asnumpy(g.in_degrees()).clip(1) ** -0.5, dtype=float) # D^-1/2
