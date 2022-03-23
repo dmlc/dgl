@@ -102,6 +102,7 @@ def main(args, devices):
     g.create_formats_()
 
     n_gpus = len(devices)
+    # required for mp.Queue() to work with mp.spawn()
     mp.set_start_method('spawn')
     n_cpus = mp.cpu_count()
     queue = mp.Queue(n_gpus)
