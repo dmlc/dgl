@@ -17,7 +17,18 @@ Contributor: Jiahang Li ([@ljh1064126026](https://github.com/ljh1064126026))  Ta
 
 ## Dataset
 
-All datasets used are provided by Author's [code](https://github.com/GraphSAINT/GraphSAINT). They are available in [Google Drive](https://drive.google.com/drive/folders/1zycmmDES39zVlbVCYs88JTJ1Wm5FbfLz) (alternatively, [Baidu Wangpan (code: f1ao)](https://pan.baidu.com/s/1SOb0SiSAXavwAcNqkttwcg#list/path=%2F)). Dataset summary("m" stands for multi-label binary classification, and "s" for single-label.):
+All datasets used are provided by Author's [code](https://github.com/GraphSAINT/GraphSAINT). They are available in [Google Drive](https://drive.google.com/drive/folders/1zycmmDES39zVlbVCYs88JTJ1Wm5FbfLz) (alternatively, [Baidu Wangpan (code: f1ao)](https://pan.baidu.com/s/1SOb0SiSAXavwAcNqkttwcg#list/path=%2F)).
+
+For google drive, you can proceed as follows
+
+```bash
+pip install gdown
+gdown --folder URL
+```
+
+where URL is for a single dataset.
+
+Dataset summary("m" stands for multi-label binary classification, and "s" for single-label.):
 | Dataset | Nodes | Edges | Degree | Feature | Classes |
 | :-: | :-: | :-: | :-: | :-: | :-: |
 | PPI | 14,755 | 225,270 | 15 | 50 | 121(m) |
@@ -27,21 +38,6 @@ All datasets used are provided by Author's [code](https://github.com/GraphSAINT/
 | Amazon | 1,598,960 | 132,169,734 | 83 | 200 | 107 (m) |
 
 Note that the PPI dataset here is different from DGL's built-in variant.
-
-## Config
-
-- The config file is `config.py`, which contains best configs for experiments below.
-- Please refer to `sampler.py` to see explanations of some key parameters.
-
-### Parameters
-
-| **val_every**                                                | **num_workers_sampler**                                      | **num_subg_sampler**                                            |
-| validate per 'val_every' epochs                              | number of workers (processes) specified for internal dataloader in SAINTSampler, which is to pre-sample subgraphs | the maximal number of pre-sampled subgraphs                  |
-| **batch_size_sampler**                                          | **num_workers**                                              |                                                              |                                                              |
-| batch size of internal dataloader in SAINTSampler            | number of workers (processes) specified for external dataloader in train_sampling.py, which is to sample subgraphs in training phase |                                                              |                                                              |
-
-
-
 
 ## Minibatch training
 

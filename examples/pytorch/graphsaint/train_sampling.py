@@ -20,7 +20,7 @@ def main(args, task):
     # load and preprocess dataset
     data = load_data(args, multilabel)
     g = data.g
-    train_g = dgl.subgraph(g, data.train_nid)
+    train_g = dgl.node_subgraph(g, data.train_nid)
     train_g.ndata['D_norm'] = 1. / train_g.in_degrees().clamp(min=1).unsqueeze(1)
     g.ndata['D_norm'] = 1. / g.in_degrees().clamp(min=1).unsqueeze(1)
 
