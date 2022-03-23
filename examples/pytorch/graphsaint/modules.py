@@ -15,10 +15,12 @@ class GCNLayer(nn.Module):
         self.act = act
         self.dropout = nn.Dropout(dropout)
 
+        self.batch_norm = batch_norm
         if batch_norm:
-            self.batch_norm = nn.BatchNorm1d(out_dim)
-        else:
-            self.batch_norm = None
+            self.offset, self.scale = nn.ParameterList(), nn.ParameterList()
+            for _ in range(order + 1):
+                self.offset.append(nn.Parameter(th.zeros(out_dim)))
+                self.scale.append(nn.Parameter(th.ones(out_dim)))
 
     def feat_trans(self, features, idx):  # linear transformation + activation + batch normalization
         h = self.lins[idx](features)
@@ -27,7 +29,9 @@ class GCNLayer(nn.Module):
             h = self.act(h)
 
         if self.batch_norm:
-            h = self.batch_norm(h)
+            mean = h.mean(dim=1).view(h.shape[0], 1)
+            var = h.var(dim=1, unbiased=False).view(h.shape[0], 1) + 1e-9
+            h = (h - mean) * self.scale[idx] * th.rsqrt(var) + self.offset[idx]
 
         return h
 
@@ -39,10 +43,10 @@ class GCNLayer(nn.Module):
         D_norm = g.ndata['D_norm']
         for _ in range(self.order):  # forward propagation
             g.ndata['h'] = h_hop[-1]
-            if 'w' in g.edata:
-                g.update_all(fn.u_mul_e('h', 'w', 'm'), fn.sum('m', 'h'))
-            else:
-                g.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
+            if 'w' not in g.edata:
+                g.edata['w'] = th.ones((g.num_edges(), )).to(features.device)
+            g.update_all(fn.u_mul_e('h', 'w', 'm'),
+                         fn.sum('m', 'h'))
             h = g.ndata['h'] * D_norm
             h_hop.append(h)
 
@@ -50,6 +54,7 @@ class GCNLayer(nn.Module):
         h_out = th.cat(h_part, 1)
 
         return h_out
+
 
 class GCNNet(nn.Module):
     def __init__(self, in_dim, hid_dim, out_dim, arch="1-1-0",
@@ -84,3 +89,4 @@ class GCNNet(nn.Module):
         h = self.out_layer(graph, h)
 
         return h
+
