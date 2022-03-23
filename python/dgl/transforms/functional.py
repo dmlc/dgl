@@ -3354,7 +3354,7 @@ def laplacian_pe(g, k):
     # get laplacian matrix as I - D^-0.5 * A * D^-0.5
     A = g.adj(scipy_fmt='csr') # adjacency matrix
     N = sparse.diags(F.asnumpy(g.in_degrees()).clip(1) ** -0.5, dtype=float) # D^-1/2
-    L = sparse.eye(g.number_of_nodes()) - N * A * N
+    L = sparse.eye(g.num_nodes()) - N * A * N
 
     # select eigenvectors with smaller eigenvalues
     EigVal, EigVec = np.linalg.eig(L.toarray())
