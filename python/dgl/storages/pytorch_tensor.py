@@ -10,7 +10,7 @@ def _fetch_cpu(indices, tensor, feature_shape, device, pin_memory, **kwargs):
         indices.shape[0], *feature_shape, dtype=tensor.dtype,
         pin_memory=pin_memory)
     torch.index_select(tensor, 0, indices, out=result)
-    kwargs['non_blocking'] = True
+    kwargs['non_blocking'] = pin_memory
     result = result.to(device, **kwargs)
     return result
 
