@@ -3389,7 +3389,7 @@ def lappe(g, k):
     N = sparse.diags(F.asnumpy(g.in_degrees()).clip(1) ** -0.5, dtype=float) # D^-1/2
     L = sparse.eye(g.num_nodes()) - N * A * N
 
-    # select eigenvectors with smaller eigenvalues
+    # select eigenvectors with smaller eigenvalues O(n + klogk)
     EigVal, EigVec = np.linalg.eig(L.toarray())
     kpartition_indices = np.argpartition(EigVal, k+1)[:k+1]
     topk_eigvals = EigVal[kpartition_indices]
