@@ -2329,6 +2329,25 @@ def test_module_add_edge(idtype):
     assert new_g.ntypes == g.ntypes
     assert new_g.canonical_etypes == g.canonical_etypes
 
+@parametrize_dtype
+def test_module_rwpe(idtype):
+    transform = dgl.RWPE(2, 'rwpe')
+    g = dgl.graph(([0, 1, 1], [1, 1, 0]), idtype=idtype)
+    new_g = transform(g)
+    tgt = F.tensor([[0., 0.5],[0.5, 0.75]])
+    assert (new_g.ndata['rwpe'] - tgt).norm() < 1e-3
+
+@parametrize_dtype
+def test_module_lappe(idtype):
+    transform = dgl.LapPE(2, 'lappe')
+    g = dgl.graph(([2, 1, 0, 3, 1, 1],[3, 0, 1, 3, 3, 1]), idtype=idtype)
+    new_g = transform(g)
+    tgt = F.tensor([[ 0.2497, -0.0000],
+        [ 0.1177, -0.0000],
+        [-0.8324, -1.0000],
+        [-0.4806, -0.0000]])
+    assert (new_g.ndata['lappe'].abs() - tgt.abs()).norm() < 1e-3
+
 if __name__ == '__main__':
     test_partition_with_halo()
     test_module_heat_kernel(F.int32)
