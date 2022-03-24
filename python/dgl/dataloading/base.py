@@ -1,5 +1,5 @@
 """Base classes and functionalities for dataloaders"""
-from collections import Mapping
+from collections.abc import Mapping
 import inspect
 from ..base import NID, EID
 from ..convert import heterograph
