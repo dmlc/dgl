@@ -419,7 +419,7 @@ class GlobalAttentionPooling(nn.Module):
         self.gate_nn = gate_nn
         self.feat_nn = feat_nn
 
-    def forward(self, graph, feat):
+    def forward(self, graph, feat, get_attention=False):
         r"""
 
         Compute global attention pooling.
@@ -431,12 +431,17 @@ class GlobalAttentionPooling(nn.Module):
         feat : torch.Tensor
             The input node feature with shape :math:`(N, D)` where :math:`N` is the
             number of nodes in the graph, and :math:`D` means the size of features.
+        get_attention : bool, optional
+            Whether to return the attention values from gate_nn. Default to False.
 
         Returns
         -------
         torch.Tensor
             The output feature with shape :math:`(B, D)`, where :math:`B` refers
             to the batch size.
+        torch.Tensor, optional
+            The attention values of shape :math:`(N, 1)`, where :math:`N` is the number of
+            nodes in the graph. This is returned only when :attr:`get_attention` is ``True``.
         """
         with graph.local_scope():
             gate = self.gate_nn(feat)
@@ -451,7 +456,10 @@ class GlobalAttentionPooling(nn.Module):
             readout = sum_nodes(graph, 'r')
             graph.ndata.pop('r')
 
-            return readout
+            if get_attention:
+                return readout, gate
+            else:
+                return readout
 
 
 class Set2Set(nn.Module):
