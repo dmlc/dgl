@@ -3,7 +3,8 @@ import abc
 from abc import abstractmethod
 import torch as th
 
-from ...utils import get_shared_mem_array, create_shared_mem_array
+from ...utils import get_shared_mem_array, create_shared_mem_array, \
+                     pin_memory_inplace, gather_pinned_tensor_rows
 from ...nn.pytorch import NodeEmbedding
 from ...cuda import nccl
 from ...partition import NDArrayPartition
@@ -581,6 +582,9 @@ class SparseAdam(SparseGradOptimizer):
                         emb.weight.shape, th.float32)
                     state_power = get_shared_mem_array(emb_name+'_power', \
                         emb.weight.shape, th.float32)
+                # pin memory on the CPU
+                pin_memory_inplace(state_mem)
+                pin_memory_inplace(state_power)
             else:
                 # distributed state on on gpu
                 state_step = th.empty(
@@ -635,8 +639,9 @@ class SparseAdam(SparseGradOptimizer):
             state_idx = grad_indices.to(state_dev)
             state_step[state_idx] += 1
             state_step = state_step[state_idx].to(exec_dev)
-            orig_mem = state_mem[state_idx].to(exec_dev)
-            orig_power = state_power[state_idx].to(exec_dev)
+            
+            orig_mem = gather_pinned_tensor_rows(state_mem, grad_indices)
+            orig_power = gather_pinned_tensor_rows(state_power, grad_indices)
 
             grad_values = th.zeros((grad_indices.shape[0], grad.shape[1]), device=exec_dev)
             grad_values.index_add_(0, inverse, grad)
@@ -647,12 +652,9 @@ class SparseAdam(SparseGradOptimizer):
 
             update_mem = beta1 * orig_mem + (1.-beta1) * grad_mem
             update_power = beta2 * orig_power + (1.-beta2) * grad_power
-            update_mem_dst = update_mem.to(state_dev, non_blocking=True)
-            update_power_dst = update_power.to(state_dev, non_blocking=True)
-            if state_block:
-                # use events to try and overlap CPU and GPU as much as possible
-                update_event = th.cuda.Event()
-                update_event.record()
+            
+            gather_pinned_tensor_rows(state_mem, grad_indices)
+            gather_pinned_tensor_rows(state_power, grad_indices)
 
             update_mem_corr = update_mem / (1. - th.pow(th.tensor(beta1, device=exec_dev),
                                                         state_step)).unsqueeze(1)
@@ -664,11 +666,6 @@ class SparseAdam(SparseGradOptimizer):
             if state_block:
                 std_event = th.cuda.Event()
                 std_event.record()
-                # wait for our transfers from exec_dev to state_dev to finish
-                # before we can use them
-                update_event.wait()
-            state_mem[state_idx] = update_mem_dst
-            state_power[state_idx] = update_power_dst
 
             if state_block:
                 # wait for the transfer of std_values to finish before we
