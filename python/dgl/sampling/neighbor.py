@@ -107,7 +107,9 @@ def sample_etype_neighbors(g, nodes, etype_field, fanout, edge_dir='in', prob=No
     if isinstance(nodes, dict):
         assert len(nodes) == 1, "The input graph should not have node types"
         nodes = list(nodes.values())[0]
-    nodes = F.to_dgl_nd(utils.prepare_tensor(g, nodes, 'nodes'))
+    nodes = utils.prepare_tensor(g, nodes, 'nodes')
+    device = utils.context_of(nodes)
+    nodes = F.to_dgl_nd(nodes)
     # treat etypes as int32, it is much cheaper than int64
     # TODO(xiangsx): int8 can be a better choice.
     etypes = F.to_dgl_nd(F.astype(g.edata[etype_field], ty=F.int32))
@@ -135,7 +137,7 @@ def sample_etype_neighbors(g, nodes, etype_field, fanout, edge_dir='in', prob=No
     # only set the edge IDs.
     if not _dist_training:
         if copy_ndata:
-            node_frames = utils.extract_node_subframes(g, None)
+            node_frames = utils.extract_node_subframes(g, device)
             utils.set_new_frames(ret, node_frames=node_frames)
 
         if copy_edata:
@@ -313,7 +315,8 @@ def _sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
         raise ValueError(
             "Got an empty dictionary in the nodes argument. "
             "Please pass in a dictionary with empty tensors as values instead.")
-    ctx = utils.to_dgl_context(F.context(next(iter(nodes.values()))))
+    device = utils.context_of(nodes)
+    ctx = utils.to_dgl_context(device)
     nodes_all_types = []
     for ntype in g.ntypes:
         if ntype in nodes:
@@ -373,7 +376,7 @@ def _sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
     # only set the edge IDs.
     if not _dist_training:
         if copy_ndata:
-            node_frames = utils.extract_node_subframes(g, None)
+            node_frames = utils.extract_node_subframes(g, device)
             utils.set_new_frames(ret, node_frames=node_frames)
 
         if copy_edata:
@@ -531,6 +534,7 @@ def sample_neighbors_biased(g, nodes, fanout, bias, edge_dir='in',
         nodes = F.tensor(nodes)
     if isinstance(bias, list):
         bias = F.tensor(bias)
+    device = utils.context_of(nodes)
 
     nodes_array = F.to_dgl_nd(nodes)
     bias_array = F.to_dgl_nd(bias)
@@ -547,7 +551,7 @@ def sample_neighbors_biased(g, nodes, fanout, bias, edge_dir='in',
     ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
 
     if copy_ndata:
-        node_frames = utils.extract_node_subframes(g, None)
+        node_frames = utils.extract_node_subframes(g, device)
         utils.set_new_frames(ret, node_frames=node_frames)
 
     if copy_edata:
@@ -651,6 +655,7 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False,
 
     # Parse nodes into a list of NDArrays.
     nodes = utils.prepare_tensor_dict(g, nodes, 'nodes')
+    device = utils.context_of(nodes)
     nodes_all_types = []
     for ntype in g.ntypes:
         if ntype in nodes:
@@ -684,7 +689,7 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False,
 
     # handle features
     if copy_ndata:
-        node_frames = utils.extract_node_subframes(g, None)
+        node_frames = utils.extract_node_subframes(g, device)
         utils.set_new_frames(ret, node_frames=node_frames)
 
     if copy_edata:
