@@ -178,7 +178,7 @@ def start_torch_adam_worker(rank, world_size, weight, has_zero_grad=False,
     th.distributed.barrier()
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
-@unittest.skipIf(F.ctx().type == 'gpu', reason='cpu only test')
+@unittest.skipIf(F.ctx().type != 'cpu', reason='cpu only test')
 @pytest.mark.parametrize("num_workers", [2, 4])
 def test_multiprocess_cpu_sparse_adam(num_workers):
     backend = 'gloo'
@@ -282,7 +282,7 @@ def test_multiprocess_sparse_adam_cuda_tensor(num_workers):
     assert F.allclose(dgl_weight, torch_weight)
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
-@unittest.skipIf(F.ctx().type == 'gpu', reason='cpu only test')
+@unittest.skipIf(F.ctx().type != 'cpu', reason='cpu only test')
 @pytest.mark.parametrize("num_workers", [2, 4])
 def test_multiprocess_sparse_adam_cpu_zero_step(num_workers):
     backend = 'gloo'
