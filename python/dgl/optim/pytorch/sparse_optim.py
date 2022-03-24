@@ -520,6 +520,12 @@ class SparseAdam(SparseGradOptimizer):
     eps : float, Optional
         The term added to the denominator to improve numerical stability
         Default: 1e-8
+    use_uva : bool, Optional
+        Whether to use pinned memory for storing 'mem' and 'power' parameters,
+        when the embedding is stored on the CPU. This will improve training
+        speed, but will require locking a large number of virtual memory pages.
+        Default: True if the embedding is on the CPU, and False if it is on the
+        GPU.
 
     Examples
     --------
@@ -535,12 +541,15 @@ class SparseAdam(SparseGradOptimizer):
     ...     loss.backward()
     ...     optimizer.step()
     '''
-    def __init__(self, params, lr, betas=(0.9, 0.999), eps=1e-08):
+    def __init__(self, params, lr, betas=(0.9, 0.999), eps=1e-08, \
+                 use_uva=None, dtype=th.float32):
         super(SparseAdam, self).__init__(params, lr)
         self._lr = lr
         self._beta1 = betas[0]
         self._beta2 = betas[1]
         self._eps = eps
+        self._use_uva = use_uva
+        self._dtype = dtype
 
     def setup(self, params):
         # We need to register a state sum for each embedding in the kvstore.
@@ -549,27 +558,29 @@ class SparseAdam(SparseGradOptimizer):
                 'SparseAdam only supports dgl.nn.NodeEmbedding'
             emb_name = emb.name
             if th.device(emb.emb_tensor.device) == th.device('cpu'):
+                if self._use_uva == None:
+                    self._use_uva = True
                 # if our embedding is on the CPU, our state also has to be
                 if self._rank < 0:
                     state_step = th.empty(
                         (emb.weight.shape[0],),
-                        dtype=th.float32,
+                        dtype=th.int32,
                         device=th.device('cpu')).zero_()
                     state_mem = th.empty(
                         emb.weight.shape,
-                        dtype=th.float32,
+                        dtype=self._dtype,
                         device=th.device('cpu')).zero_()
                     state_power = th.empty(
                         emb.weight.shape,
-                        dtype=th.float32,
+                        dtype=self._dtype,
                         device=th.device('cpu')).zero_()
                 elif self._rank == 0:
                     state_step = create_shared_mem_array(emb_name+'_step', \
-                        (emb.weight.shape[0],), th.float32).zero_()
+                        (emb.weight.shape[0],), th.int32).zero_()
                     state_mem = create_shared_mem_array(emb_name+'_mem', \
-                        emb.weight.shape, th.float32).zero_()
+                        emb.weight.shape, self._dtype).zero_()
                     state_power = create_shared_mem_array(emb_name+'_power', \
-                        emb.weight.shape, th.float32).zero_()
+                        emb.weight.shape, self._dtype).zero_()
 
                     if self._world_size > 1:
                         emb.store.set(emb_name+'_opt', emb_name)
@@ -577,27 +588,31 @@ class SparseAdam(SparseGradOptimizer):
                     # receive
                     emb.store.wait([emb_name+'_opt'])
                     state_step = get_shared_mem_array(emb_name+'_step', \
-                        (emb.weight.shape[0],), th.float32)
+                        (emb.weight.shape[0],), th.int32)
                     state_mem = get_shared_mem_array(emb_name+'_mem', \
-                        emb.weight.shape, th.float32)
+                        emb.weight.shape, self._dtype)
                     state_power = get_shared_mem_array(emb_name+'_power', \
-                        emb.weight.shape, th.float32)
+                        emb.weight.shape, self._dtype)
                 # pin memory on the CPU
-                pin_memory_inplace(state_mem)
-                pin_memory_inplace(state_power)
+                if self._use_uva:
+                    pin_memory_inplace(state_mem)
+                    pin_memory_inplace(state_power)
             else:
+                assert self._use_uva != True, "Cannot use UVA memory in " \
+                    "{} when embedding device is {}".format( \
+                        self.__class__.__name__, th.device(emb.emb_tensor.device))
                 # distributed state on on gpu
                 state_step = th.empty(
                     [emb.emb_tensor.shape[0]],
-                    dtype=th.float32,
+                    dtype=th.int32,
                     device=emb.emb_tensor.device).zero_()
                 state_mem = th.empty(
                     emb.emb_tensor.shape,
-                    dtype=th.float32,
+                    dtype=self._dtype,
                     device=emb.emb_tensor.device).zero_()
                 state_power = th.empty(
                     emb.emb_tensor.shape,
-                    dtype=th.float32,
+                    dtype=self._dtype,
                     device=emb.emb_tensor.device).zero_()
             state = (state_step, state_mem, state_power)
             emb.set_optm_state(state)
@@ -640,8 +655,12 @@ class SparseAdam(SparseGradOptimizer):
             state_step[state_idx] += 1
             state_step = state_step[state_idx].to(exec_dev)
             
-            orig_mem = gather_pinned_tensor_rows(state_mem, grad_indices)
-            orig_power = gather_pinned_tensor_rows(state_power, grad_indices)
+            if self._use_uva:
+                orig_mem = gather_pinned_tensor_rows(state_mem, grad_indices)
+                orig_power = gather_pinned_tensor_rows(state_power, grad_indices)
+            else:
+                orig_mem = state_mem[state_idx].to(exec_dev)
+                orig_power = state_power[state_idx].to(exec_dev)
 
             grad_values = th.zeros((grad_indices.shape[0], grad.shape[1]), device=exec_dev)
             grad_values.index_add_(0, inverse, grad)
@@ -653,8 +672,16 @@ class SparseAdam(SparseGradOptimizer):
             update_mem = beta1 * orig_mem + (1.-beta1) * grad_mem
             update_power = beta2 * orig_power + (1.-beta2) * grad_power
             
-            gather_pinned_tensor_rows(state_mem, grad_indices)
-            gather_pinned_tensor_rows(state_power, grad_indices)
+            if self._use_uva:
+                gather_pinned_tensor_rows(state_mem, grad_indices)
+                gather_pinned_tensor_rows(state_power, grad_indices)
+            else:
+                update_mem_dst = update_mem.to(state_dev, non_blocking=True)
+                update_power_dst = update_power.to(state_dev, non_blocking=True)
+                if state_block:
+                    # use events to try and overlap CPU and GPU as much as possible
+                    update_event = th.cuda.Event()
+                    update_event.record()
 
             update_mem_corr = update_mem / (1. - th.pow(th.tensor(beta1, device=exec_dev),
                                                         state_step)).unsqueeze(1)
@@ -666,6 +693,14 @@ class SparseAdam(SparseGradOptimizer):
             if state_block:
                 std_event = th.cuda.Event()
                 std_event.record()
+
+            if not self._use_uva:
+                if state_block:
+                    # wait for our transfers from exec_dev to state_dev to finish
+                    # before we can use them
+                    update_event.wait()
+                state_mem[state_idx] = update_mem_dst
+                state_power[state_idx] = update_power_dst
 
             if state_block:
                 # wait for the transfer of std_values to finish before we
