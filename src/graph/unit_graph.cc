@@ -63,7 +63,7 @@ class UnitGraph::COO : public BaseHeteroGraph {
  public:
   COO(GraphPtr metagraph, int64_t num_src, int64_t num_dst, IdArray src,
       IdArray dst, bool row_sorted = false, bool col_sorted = false)
-    : BaseHeteroGraph(metagraph), is_pinned_(false) {
+    : BaseHeteroGraph(metagraph) {
     CHECK(aten::IsValidIdArray(src));
     CHECK(aten::IsValidIdArray(dst));
     CHECK_EQ(src->shape[0], dst->shape[0]) << "Input arrays should have the same length.";
@@ -73,7 +73,7 @@ class UnitGraph::COO : public BaseHeteroGraph {
   }
 
   COO(GraphPtr metagraph, const aten::COOMatrix& coo)
-    : BaseHeteroGraph(metagraph), adj_(coo), is_pinned_(false) {
+    : BaseHeteroGraph(metagraph), adj_(coo) {
     // Data index should not be inherited. Edges in COO format are always
     // assigned ids from 0 to num_edges - 1.
     CHECK(!COOHasData(coo)) << "[BUG] COO should not contain data.";
@@ -85,7 +85,6 @@ class UnitGraph::COO : public BaseHeteroGraph {
     // adj_.num_rows == 0 and adj_.num_cols == 0 means empty UnitGraph which is supported
     adj_.num_rows = -1;
     adj_.num_cols = -1;
-    is_pinned_ = false;
   };
 
   bool defined() const {
@@ -135,7 +134,7 @@ class UnitGraph::COO : public BaseHeteroGraph {
   }
 
   bool IsPinned() const override {
-    return is_pinned_;
+    return adj_.is_pinned;
   }
 
   uint8_t NumBits() const override {
@@ -165,13 +164,11 @@ class UnitGraph::COO : public BaseHeteroGraph {
   /*! \brief Pin the adj_: COOMatrix of the COO graph. */
   void PinMemory_() {
     adj_.PinMemory_();
-    is_pinned_ = true;
   }
 
   /*! \brief Unpin the adj_: COOMatrix of the COO graph. */
   void UnpinMemory_() {
     adj_.UnpinMemory_();
-    is_pinned_ = false;
   }
 
   bool IsMultigraph() const override {
@@ -456,8 +453,6 @@ class UnitGraph::COO : public BaseHeteroGraph {
 
   /*! \brief internal adjacency matrix. Data array is empty */
   aten::COOMatrix adj_;
-
-  bool is_pinned_;
 };
 
 //////////////////////////////////////////////////////////
@@ -471,7 +466,7 @@ class UnitGraph::CSR : public BaseHeteroGraph {
  public:
   CSR(GraphPtr metagraph, int64_t num_src, int64_t num_dst,
       IdArray indptr, IdArray indices, IdArray edge_ids)
-    : BaseHeteroGraph(metagraph), is_pinned_(false) {
+    : BaseHeteroGraph(metagraph) {
     CHECK(aten::IsValidIdArray(indptr));
     CHECK(aten::IsValidIdArray(indices));
     if (aten::IsValidIdArray(edge_ids))
@@ -484,7 +479,7 @@ class UnitGraph::CSR : public BaseHeteroGraph {
   }
 
   CSR(GraphPtr metagraph, const aten::CSRMatrix& csr)
-    : BaseHeteroGraph(metagraph), adj_(csr), is_pinned_(false) {
+    : BaseHeteroGraph(metagraph), adj_(csr) {
   }
 
   CSR() {
@@ -492,7 +487,6 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     // adj_.num_rows == 0 and adj_.num_cols == 0 means empty UnitGraph which is supported
     adj_.num_rows = -1;
     adj_.num_cols = -1;
-    is_pinned_ = false;
   };
 
   bool defined() const {
@@ -542,7 +536,7 @@ class UnitGraph::CSR : public BaseHeteroGraph {
   }
 
   bool IsPinned() const override {
-    return is_pinned_;
+    return adj_.is_pinned;
   }
 
   uint8_t NumBits() const override {
@@ -575,13 +569,11 @@ class UnitGraph::CSR : public BaseHeteroGraph {
   /*! \brief Pin the adj_: CSRMatrix of the CSR graph. */
   void PinMemory_() {
     adj_.PinMemory_();
-    is_pinned_ = true;
   }
 
   /*! \brief Unpin the adj_: CSRMatrix of the CSR graph. */
   void UnpinMemory_() {
     adj_.UnpinMemory_();
-    is_pinned_ = false;
   }
 
   bool IsMultigraph() const override {
@@ -850,8 +842,6 @@ class UnitGraph::CSR : public BaseHeteroGraph {
 
   /*! \brief internal adjacency matrix. Data array stores edge ids */
   aten::CSRMatrix adj_;
-
-  bool is_pinned_ = false;
 };
 
 //////////////////////////////////////////////////////////
