@@ -8,6 +8,7 @@ from . import backend as F
 from .base import DGLError, dgl_warning
 from .init import zero_initializer
 from .storages import TensorStorage
+from .utils import gather_pinned_tensor_rows, pin_memory_inplace, unpin_memory_inplace
 
 class _LazyIndex(object):
     def __init__(self, index):
@@ -186,7 +187,7 @@ class Column(TensorStorage):
         self.scheme = scheme if scheme else infer_scheme(storage)
         self.index = index
         self.device = device
-        self.pinned = False
+        self.pinned_by_dgl = False
 
     def __len__(self):
         """The number of features (number of rows) in this column."""
@@ -206,15 +207,23 @@ class Column(TensorStorage):
         if self.index is not None:
             if isinstance(self.index, _LazyIndex):
                 self.index = self.index.flatten()
-            # If index and storage is not in the same context,
-            # copy index to the same context of storage.
-            # Copy index is usually cheaper than copy data
-            if F.context(self.storage) != F.context(self.index):
-                kwargs = {}
-                if self.device is not None:
-                    kwargs = self.device[1]
-                self.index = F.copy_to(self.index, F.context(self.storage), **kwargs)
-            self.storage = F.gather_row(self.storage, self.index)
+
+            storage_ctx = F.context(self.storage)
+            index_ctx = F.context(self.index)
+            # If under the special case where the storage is pinned and the index is on
+            # CUDA, directly call UVA slicing (even if they aree not in the same context).
+            if storage_ctx != index_ctx and storage_ctx == F.cpu() and F.is_pinned(self.storage):
+                self.storage = gather_pinned_tensor_rows(self.storage, self.index)
+            else:
+                # If index and storage is not in the same context,
+                # copy index to the same context of storage.
+                # Copy index is usually cheaper than copy data
+                if storage_ctx != index_ctx:
+                    kwargs = {}
+                    if self.device is not None:
+                        kwargs = self.device[1]
+                    self.index = F.copy_to(self.index, storage_ctx, **kwargs)
+                self.storage = F.gather_row(self.storage, self.index)
             self.index = None
 
         # move data to the right device
@@ -228,7 +237,7 @@ class Column(TensorStorage):
         """Update the column data."""
         self.index = None
         self.storage = val
-        self.pinned = False
+        self.pinned_by_dgl = False
 
     def to(self, device, **kwargs): # pylint: disable=invalid-name
         """ Return a new column with columns copy to the targeted device (cpu/gpu).
@@ -376,9 +385,28 @@ class Column(TensorStorage):
     def __copy__(self):
         return self.clone()
 
-    def fetch(self, indices, device, pin_memory=False):
+    def fetch(self, indices, device, pin_memory=False, **kwargs):
         _ = self.data           # materialize in case of lazy slicing & data transfer
-        return super().fetch(indices, device, pin_memory=False)
+        return super().fetch(indices, device, pin_memory=False, **kwargs)
+
+    def pin_memory_(self):
+        """Pin the storage into page-locked memory.
+
+        Does nothing if the storage is already pinned.
+        """
+        if not self.pinned_by_dgl and not F.is_pinned(self.data):
+            pin_memory_inplace(self.data)
+            self.pinned_by_dgl = True
+
+    def unpin_memory_(self):
+        """Unpin the storage pinned by ``pin_memory_`` method.
+
+        Does nothing if the storage is not pinned by ``pin_memory_`` method, even if
+        it is actually in page-locked memory.
+        """
+        if self.pinned_by_dgl:
+            unpin_memory_inplace(self.data)
+            self.pinned_by_dgl = False
 
 class Frame(MutableMapping):
     """The columnar storage for node/edge features.
