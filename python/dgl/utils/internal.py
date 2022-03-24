@@ -11,6 +11,10 @@ from .. import backend as F
 from .. import ndarray as nd
 from .._ffi.function import _init_api
 
+def is_listlike(data):
+    """Return if the data is a sequence but not a string."""
+    return isinstance(data, Sequence) and not isinstance(data, str)
+
 class InconsistentDtypeException(DGLError):
     """Exception class for inconsistent dtype between graph and tensor"""
     def __init__(self, msg='', *args, **kwargs): #pylint: disable=W1113
@@ -788,7 +792,7 @@ def extract_node_subframes(graph, nodes_or_device, store_ids=True):
     """
     if nodes_or_device is None:
         node_frames = [nf.clone() for nf in graph._node_frames]
-    elif isinstance(nodes_or_device, Sequence):
+    elif is_listlike(nodes_or_device):
         node_frames = []
         for i, ind_nodes in enumerate(nodes_or_device):
             subf = graph._node_frames[i].subframe(ind_nodes)
@@ -864,7 +868,7 @@ def extract_edge_subframes(graph, edges_or_device, store_ids=True):
     """
     if edges_or_device is None:
         edge_frames = [nf.clone() for nf in graph._edge_frames]
-    elif isinstance(edges_or_device, Sequence):
+    elif is_listlike(edges_or_device):
         edge_frames = []
         for i, ind_edges in enumerate(edges_or_device):
             subf = graph._edge_frames[i].subframe(ind_edges)
@@ -949,7 +953,7 @@ def apply_each(data, fn, *args, **kwargs):
     """
     if isinstance(data, Mapping):
         return {k: fn(v, *args, **kwargs) for k, v in data.items()}
-    elif isinstance(data, Sequence):
+    elif is_listlike(data):
         return [fn(v, *args, **kwargs) for v in data]
     else:
         return fn(data, *args, **kwargs)
@@ -986,11 +990,9 @@ def recursive_apply(data, fn, *args, **kwargs):
     >>> h = recursive_apply(h, torch.nn.functional.relu)
     >>> assert all((v >= 0).all() for v in h.values())
     """
-    if isinstance(data, str):   # str is a Sequence
-        return fn(data, *args, **kwargs)
-    elif isinstance(data, Mapping):
+    if isinstance(data, Mapping):
         return {k: recursive_apply(v, fn, *args, **kwargs) for k, v in data.items()}
-    elif isinstance(data, Sequence):
+    elif is_listlike(data):
         return [recursive_apply(v, fn, *args, **kwargs) for v in data]
     else:
         return fn(data, *args, **kwargs)
@@ -999,13 +1001,11 @@ def recursive_apply_pair(data1, data2, fn, *args, **kwargs):
     """Recursively apply a function to every pair of elements in two containers with the
     same nested structure.
     """
-    if isinstance(data1, str) or isinstance(data2, str):
-        return fn(data1, data2, *args, **kwargs)
-    elif isinstance(data1, Mapping) and isinstance(data2, Mapping):
+    if isinstance(data1, Mapping) and isinstance(data2, Mapping):
         return {
             k: recursive_apply_pair(data1[k], data2[k], fn, *args, **kwargs)
             for k in data1.keys()}
-    elif isinstance(data1, Sequence) and isinstance(data2, Sequence):
+    elif is_listlike(data1) and is_listlike(data2):
         return [recursive_apply_pair(x, y, fn, *args, **kwargs) for x, y in zip(data1, data2)]
     else:
         return fn(data1, data2, *args, **kwargs)
@@ -1014,7 +1014,7 @@ def context_of(data):
     """Return the device of the data which can be either a tensor or a list/dict of tensors."""
     if isinstance(data, Mapping):
         return F.context(next(iter(data.values())))
-    elif isinstance(data, Sequence):
+    elif is_listlike(data):
         return F.context(next(iter(data)))
     else:
         return F.context(data)
