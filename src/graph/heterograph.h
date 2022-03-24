@@ -272,18 +272,6 @@ class HeteroGraph : public BaseHeteroGraph {
     return relation_graphs_;
   }
 
-  void SetCOOMatrix(dgl_type_t etype, aten::COOMatrix coo) override {
-    GetRelationGraph(etype)->SetCOOMatrix(0, coo);
-  }
-
-  void SetCSRMatrix(dgl_type_t etype, aten::CSRMatrix csr) override {
-    GetRelationGraph(etype)->SetCSRMatrix(0, csr);
-  }
-
-  void SetCSCMatrix(dgl_type_t etype, aten::CSRMatrix csc) override {
-    GetRelationGraph(etype)->SetCSCMatrix(0, csc);
-  }
-
  private:
   // To create empty class
   friend class Serializer;
