@@ -111,7 +111,7 @@ to the ``sample`` method represents a batch of seed node IDs. Another common typ
 samplers is *edge-wise sampler* which, as name suggested, takes in a batch of seed
 edge IDs to construct mini-batch data. DGL provides a utility
 :func:`dgl.dataloading.as_edge_prediction_sampler` to turn a node-wise sampler to
-an edge-wise sampler. To prevent information leakge, it requires the node-wise sampler
+an edge-wise sampler. To prevent information leakage, it requires the node-wise sampler
 to have an additional third argument ``exclude_eids``. The code below modifies
 the ``NeighborSampler`` we just defined to properly exclude edges from the sampled
 subgraph:
