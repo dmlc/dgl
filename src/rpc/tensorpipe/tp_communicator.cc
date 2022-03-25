@@ -66,13 +66,17 @@ void TPSender::Send(const RPCMessage &msg, int recv_id) {
       LOG(FATAL) << "Cannot send a empty NDArray.";
     }
   }
+  // Let's write blockingly in case of congestion in underlying transports.
+  auto done = std::make_shared<std::promise<void>>();
   pipe->write(tp_msg,
-              [ndarray_holder, recv_id](const tensorpipe::Error &error) {
+              [ndarray_holder, recv_id, done](const tensorpipe::Error &error) {
                 if (error) {
                   LOG(FATAL) << "Failed to send message to " << recv_id
                              << ". Details: " << error.what();
                 }
+                done->set_value();
               });
+  done->get_future().wait();
 }
 
 void TPSender::Finalize() {
