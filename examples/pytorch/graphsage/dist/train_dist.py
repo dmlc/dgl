@@ -20,7 +20,6 @@ import torch.nn.functional as F
 import torch.optim as optim
 import torch.multiprocessing as mp
 from torch.utils.data import DataLoader
-from torch.distributed.algorithms.join import Join
 import socket
 
 def load_subtensor(g, seeds, input_nodes, device, load_feat=True):
@@ -205,7 +204,7 @@ def run(args, device, data):
         # blocks.
         step_time = []
 
-        with Join([model]):
+        with model.join():
             for step, blocks in enumerate(dataloader):
                 tic_step = time.time()
                 sample_time += tic_step - start
