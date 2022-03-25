@@ -33,7 +33,7 @@ def prepare_tensor(g, data, name):
         if F.dtype(data) != g.idtype:
             raise DGLError(f'Expect argument "{name}" to have data type {g.idtype}. '
                            f'But got {F.dtype(data)}.')
-        if not g.is_pinned() and F.context(data) != g.device:
+        if F.context(data) != g.device and not g.is_pinned():
             raise DGLError(f'Expect argument "{name}" to have device {g.device}. '
                            f'But got {F.context(data)}.')
         ret = data
