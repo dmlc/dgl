@@ -6,6 +6,8 @@ This is an example of training GraphSage in a distributed fashion. Before traini
 sudo pip3 install ogb
 ```
 
+**Requires PyTorch 1.10.0+ to work.**
+
 To train GraphSage, it has five steps:
 
 ### Step 0: Setup a Distributed File System
