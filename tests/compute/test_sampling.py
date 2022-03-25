@@ -106,43 +106,43 @@ def test_uniform_random_walk(use_uva):
 
     try:
         traces, eids, ntypes = dgl.sampling.random_walk(
-            g1, F.tensor([0, 1, 2, 0, 1, 2]), length=4, return_eids=True)
+            g1, F.tensor([0, 1, 2, 0, 1, 2], dtype=g1.idtype), length=4, return_eids=True)
         check_random_walk(g1, ['follow'] * 4, traces, ntypes, trace_eids=eids)
         try:
-            dgl.sampling.random_walk(g1, F.tensor([0, 1, 2, 10]), length=4, return_eids=True)
+            dgl.sampling.random_walk(g1, F.tensor([0, 1, 2, 10], dtype=g1.idtype), length=4, return_eids=True)
             fail = False        # shouldn't abort
         except:
             fail = True
         assert fail
         traces, eids, ntypes = dgl.sampling.random_walk(
-            g1, F.tensor([0, 1, 2, 0, 1, 2]), length=4, restart_prob=0., return_eids=True)
+            g1, F.tensor([0, 1, 2, 0, 1, 2], dtype=g1.idtype), length=4, restart_prob=0., return_eids=True)
         check_random_walk(g1, ['follow'] * 4, traces, ntypes, trace_eids=eids)
         traces, ntypes = dgl.sampling.random_walk(
-            g1, F.tensor([0, 1, 2, 0, 1, 2]), length=4, restart_prob=F.zeros((4,), F.float32))
+            g1, F.tensor([0, 1, 2, 0, 1, 2], dtype=g1.idtype), length=4, restart_prob=F.zeros((4,), F.float32))
         check_random_walk(g1, ['follow'] * 4, traces, ntypes)
         traces, ntypes = dgl.sampling.random_walk(
-            g1, F.tensor([0, 1, 2, 0, 1, 2]), length=5,
+            g1, F.tensor([0, 1, 2, 0, 1, 2], dtype=g1.idtype), length=5,
             restart_prob=F.tensor([0, 0, 0, 0, 1], dtype=F.float32))
         check_random_walk(
             g1, ['follow'] * 4, F.slice_axis(traces, 1, 0, 5), F.slice_axis(ntypes, 0, 0, 5))
         assert (F.asnumpy(traces)[:, 5] == -1).all()
 
         traces, eids, ntypes = dgl.sampling.random_walk(
-            g2, F.tensor([0, 1, 2, 3, 0, 1, 2, 3]), length=4, return_eids=True)
+            g2, F.tensor([0, 1, 2, 3, 0, 1, 2, 3], dtype=g2.idtype), length=4, return_eids=True)
         check_random_walk(g2, ['follow'] * 4, traces, ntypes, trace_eids=eids)
 
         metapath = ['follow', 'view', 'viewed-by'] * 2
         traces, eids, ntypes = dgl.sampling.random_walk(
-            g3, F.tensor([0, 1, 2, 0, 1, 2]), metapath=metapath, return_eids=True)
+            g3, F.tensor([0, 1, 2, 0, 1, 2], dtype=g3.idtype), metapath=metapath, return_eids=True)
         check_random_walk(g3, metapath, traces, ntypes, trace_eids=eids)
 
         metapath = ['follow', 'view', 'viewed-by'] * 2
         traces, eids, ntypes = dgl.sampling.random_walk(
-            g4, F.tensor([0, 1, 2, 3, 0, 1, 2, 3]), metapath=metapath, return_eids=True)
+            g4, F.tensor([0, 1, 2, 3, 0, 1, 2, 3], dtype=g4.idtype), metapath=metapath, return_eids=True)
         check_random_walk(g4, metapath, traces, ntypes, trace_eids=eids)
 
         traces, eids, ntypes = dgl.sampling.random_walk(
-            g4, F.tensor([0, 1, 2, 0, 1, 2]), metapath=metapath, return_eids=True)
+            g4, F.tensor([0, 1, 2, 0, 1, 2], dtype=g4.idtype), metapath=metapath, return_eids=True)
         check_random_walk(g4, metapath, traces, ntypes, trace_eids=eids)
     finally:    # make sure to unpin the graphs even if some test fails
         for g in (g1, g2, g3, g4):
@@ -185,7 +185,7 @@ def test_pack_traces():
 @pytest.mark.parametrize('use_uva', _use_uva())
 def test_pinsage_sampling(use_uva):
     def _test_sampler(g, sampler, ntype):
-        seeds = F.copy_to(F.tensor([0, 2], dtype=F.int64), F.ctx())
+        seeds = F.copy_to(F.tensor([0, 2], dtype=g.idtype), F.ctx())
         neighbor_g = sampler(seeds)
         assert neighbor_g.ntypes == [ntype]
         u, v = neighbor_g.all_edges(form='uv', order='eid')
