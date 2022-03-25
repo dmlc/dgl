@@ -302,6 +302,7 @@ HeteroGraphPtr HeteroGraph::CopyToSharedMem(
     aten::COOMatrix coo;
     aten::CSRMatrix csr, csc;
     std::string prefix = name + "_" + std::to_string(etype);
+    auto relgraph = g->GetRelationGraph(etype);
     if (has_coo) {
       coo = shm.CopyToSharedMem(hg->GetCOOMatrix(etype), prefix + "_coo");
     }
@@ -311,7 +312,8 @@ HeteroGraphPtr HeteroGraph::CopyToSharedMem(
     if (has_csc) {
       csc = shm.CopyToSharedMem(hg->GetCSCMatrix(etype), prefix + "_csc");
     }
-    relgraphs[etype] = UnitGraph::CreateHomographFrom(csc, csr, coo, has_csc, has_csr, has_coo);
+    relgraphs[etype] = UnitGraph::CreateHeterographFrom(csc, csr, coo, has_csc, has_csr, has_coo,
+            (int)relgraph->NumVertexTypes());
   }
 
   auto ret = std::shared_ptr<HeteroGraph>(

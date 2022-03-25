@@ -1325,6 +1325,36 @@ HeteroGraphPtr UnitGraph::CreateHomographFrom(
   return HeteroGraphPtr(new UnitGraph(mg, in_csr_ptr, out_csr_ptr, coo_ptr, formats));
 }
 
+HeteroGraphPtr UnitGraph::CreateHeterographFrom(
+        const aten::CSRMatrix &in_csr,
+        const aten::CSRMatrix &out_csr,
+        const aten::COOMatrix &coo,
+        bool has_in_csr,
+        bool has_out_csr,
+        bool has_coo,
+        int num_vtypes,
+        dgl_format_code_t formats) {
+  auto mg = CreateUnitGraphMetaGraph(num_vtypes);
+
+  CSRPtr in_csr_ptr = nullptr;
+  CSRPtr out_csr_ptr = nullptr;
+  COOPtr coo_ptr = nullptr;
+
+  if (has_in_csr)
+      in_csr_ptr = CSRPtr(new CSR(mg, in_csr));
+  else
+      in_csr_ptr = CSRPtr(new CSR());
+  if (has_out_csr)
+      out_csr_ptr = CSRPtr(new CSR(mg, out_csr));
+  else
+      out_csr_ptr = CSRPtr(new CSR());
+  if (has_coo)
+      coo_ptr = COOPtr(new COO(mg, coo));
+  else
+      coo_ptr = COOPtr(new COO());
+  return HeteroGraphPtr(new UnitGraph(mg, in_csr_ptr, out_csr_ptr, coo_ptr, formats));
+}
+
 UnitGraph::CSRPtr UnitGraph::GetInCSR(bool inplace) const {
   if (inplace)
     if (!(formats_ & CSC_CODE))

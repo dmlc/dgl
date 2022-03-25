@@ -321,6 +321,28 @@ class UnitGraph : public BaseHeteroGraph {
       bool has_coo,
       dgl_format_code_t formats = ALL_CODE);
 
+
+/*!
+   * \brief constructor
+   * \param metagraph metagraph
+   * \param in_csr in edge csr
+   * \param out_csr out edge csr
+   * \param coo coo
+   * \param has_in_csr whether in_csr is valid
+   * \param has_out_csr whether out_csr is valid
+   * \param has_coo whether coo is valid
+   * \param number of vertex types
+ */
+  static HeteroGraphPtr CreateHeterographFrom(
+      const aten::CSRMatrix &in_csr,
+      const aten::CSRMatrix &out_csr,
+      const aten::COOMatrix &coo,
+      bool has_in_csr,
+      bool has_out_csr,
+      bool has_coo,
+      int num_vtypes,
+      dgl_format_code_t formats = ALL_CODE);
+
   /*! \return Return any existing format. */
   HeteroGraphPtr GetAny() const;
 
