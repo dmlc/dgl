@@ -299,23 +299,24 @@ The training loop for distributed training is also exactly the same as the singl
     for epoch in range(10):
         # Loop over the dataloader to sample mini-batches.
         losses = []
-        for step, (input_nodes, seeds, blocks) in enumerate(train_dataloader):
-            # Load the input features as well as output labels
-            batch_inputs = g.ndata['feat'][input_nodes]
-            batch_labels = g.ndata['labels'][seeds]
+        with model.join():
+            for step, (input_nodes, seeds, blocks) in enumerate(train_dataloader):
+                # Load the input features as well as output labels
+                batch_inputs = g.ndata['feat'][input_nodes]
+                batch_labels = g.ndata['labels'][seeds]
 
-            # Compute loss and prediction
-            batch_pred = model(blocks, batch_inputs)
-            loss = loss_fcn(batch_pred, batch_labels)
-            optimizer.zero_grad()
-            loss.backward()
-            losses.append(loss.detach().cpu().numpy())
-            optimizer.step()
+                # Compute loss and prediction
+                batch_pred = model(blocks, batch_inputs)
+                loss = loss_fcn(batch_pred, batch_labels)
+                optimizer.zero_grad()
+                loss.backward()
+                losses.append(loss.detach().cpu().numpy())
+                optimizer.step()
 
         # validation
         predictions = []
         labels = []
-        with th.no_grad():
+        with th.no_grad(), model.join():
             for step, (input_nodes, seeds, blocks) in enumerate(valid_dataloader):
                 inputs = g.ndata['feat'][input_nodes]
                 labels.append(g.ndata['labels'][seeds].numpy())

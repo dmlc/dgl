@@ -196,7 +196,12 @@ HeteroGraphPtr HeteroForkingUnpickle(const HeteroPickleStates &states) {
     dgl_format_code_t created_formats, allowed_formats;
     CHECK(strm->Read(&created_formats)) << "Invalid code for created formats";
     CHECK(strm->Read(&allowed_formats)) << "Invalid code for allowed formats";
-    HeteroGraphPtr relgraph = nullptr;
+    aten::COOMatrix coo;
+    aten::CSRMatrix csr;
+    aten::CSRMatrix csc;
+    bool has_coo = (created_formats & COO_CODE);
+    bool has_csr = (created_formats & CSR_CODE);
+    bool has_csc = (created_formats & CSC_CODE);
 
     if (created_formats & COO_CODE) {
       CHECK_GE(states.arrays.end() - array_itr, 2);
@@ -206,11 +211,7 @@ HeteroGraphPtr HeteroForkingUnpickle(const HeteroPickleStates &states) {
       bool csorted;
       CHECK(strm->Read(&rsorted)) << "Invalid flag 'rsorted'";
       CHECK(strm->Read(&csorted)) << "Invalid flag 'csorted'";
-      auto coo = aten::COOMatrix(num_src, num_dst, row, col, aten::NullArray(), rsorted, csorted);
-      if (!relgraph)
-        relgraph = CreateFromCOO(num_vtypes, coo, allowed_formats);
-      else
-        relgraph->SetCOOMatrix(0, coo);
+      coo = aten::COOMatrix(num_src, num_dst, row, col, aten::NullArray(), rsorted, csorted);
     }
     if (created_formats & CSR_CODE) {
       CHECK_GE(states.arrays.end() - array_itr, 3);
@@ -219,11 +220,7 @@ HeteroGraphPtr HeteroForkingUnpickle(const HeteroPickleStates &states) {
       const auto &edge_id = *(array_itr++);
       bool sorted;
       CHECK(strm->Read(&sorted)) << "Invalid flag 'sorted'";
-      auto csr = aten::CSRMatrix(num_src, num_dst, indptr, indices, edge_id, sorted);
-      if (!relgraph)
-        relgraph = CreateFromCSR(num_vtypes, csr, allowed_formats);
-      else
-        relgraph->SetCSRMatrix(0, csr);
+      csr = aten::CSRMatrix(num_src, num_dst, indptr, indices, edge_id, sorted);
     }
     if (created_formats & CSC_CODE) {
       CHECK_GE(states.arrays.end() - array_itr, 3);
@@ -232,13 +229,10 @@ HeteroGraphPtr HeteroForkingUnpickle(const HeteroPickleStates &states) {
       const auto &edge_id = *(array_itr++);
       bool sorted;
       CHECK(strm->Read(&sorted)) << "Invalid flag 'sorted'";
-      auto csc = aten::CSRMatrix(num_dst, num_src, indptr, indices, edge_id, sorted);
-      if (!relgraph)
-        relgraph = CreateFromCSC(num_vtypes, csc, allowed_formats);
-      else
-        relgraph->SetCSCMatrix(0, csc);
+      csc = aten::CSRMatrix(num_dst, num_src, indptr, indices, edge_id, sorted);
     }
-    relgraphs[etype] = relgraph;
+    relgraphs[etype] = UnitGraph::CreateUnitGraphFrom(
+        num_vtypes, csc, csr, coo, has_csc, has_csr, has_coo, allowed_formats);
   }
   return CreateHeteroGraph(metagraph, relgraphs, num_nodes_per_type);
 }
