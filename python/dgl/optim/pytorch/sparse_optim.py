@@ -4,7 +4,8 @@ from abc import abstractmethod
 import torch as th
 
 from ...utils import get_shared_mem_array, create_shared_mem_array, \
-                     pin_memory_inplace, gather_pinned_tensor_rows
+                     pin_memory_inplace, gather_pinned_tensor_rows, \
+                     scatter_pinned_tensor_rows
 from ...nn.pytorch import NodeEmbedding
 from ...cuda import nccl
 from ...partition import NDArrayPartition
@@ -558,7 +559,7 @@ class SparseAdam(SparseGradOptimizer):
                 'SparseAdam only supports dgl.nn.NodeEmbedding'
             emb_name = emb.name
             if th.device(emb.emb_tensor.device) == th.device('cpu'):
-                if self._use_uva == None:
+                if self._use_uva is None:
                     self._use_uva = True
                 # if our embedding is on the CPU, our state also has to be
                 if self._rank < 0:
@@ -601,6 +602,8 @@ class SparseAdam(SparseGradOptimizer):
                 assert self._use_uva != True, "Cannot use UVA memory in " \
                     "{} when embedding device is {}".format( \
                         self.__class__.__name__, th.device(emb.emb_tensor.device))
+                if self._use_uva is None:
+                    self._use_uva = False
                 # distributed state on on gpu
                 state_step = th.empty(
                     [emb.emb_tensor.shape[0]],
@@ -638,6 +641,7 @@ class SparseAdam(SparseGradOptimizer):
 
             clr = self._lr
             state_step, state_mem, state_power = emb.optm_state
+            exec_dtype = grad.dtype
             exec_dev = grad.device
             state_dev = state_step.device
 
@@ -661,6 +665,9 @@ class SparseAdam(SparseGradOptimizer):
             else:
                 orig_mem = state_mem[state_idx].to(exec_dev)
                 orig_power = state_power[state_idx].to(exec_dev)
+            # convert to exec dtype
+            orig_mem = orig_mem.to(dtype=exec_dtype)
+            orig_power = orig_power.to(dtype=exec_dtype)
 
             grad_values = th.zeros((grad_indices.shape[0], grad.shape[1]), device=exec_dev)
             grad_values.index_add_(0, inverse, grad)
@@ -673,11 +680,19 @@ class SparseAdam(SparseGradOptimizer):
             update_power = beta2 * orig_power + (1.-beta2) * grad_power
             
             if self._use_uva:
-                gather_pinned_tensor_rows(state_mem, grad_indices)
-                gather_pinned_tensor_rows(state_power, grad_indices)
+                scatter_pinned_tensor_rows(state_mem, \
+                                           grad_indices, \
+                                           update_mem.to(dtype=self._dtype))
+                scatter_pinned_tensor_rows(state_power, \
+                                           grad_indices, \
+                                           update_power.to(dtype=self._dtype))
             else:
-                update_mem_dst = update_mem.to(state_dev, non_blocking=True)
-                update_power_dst = update_power.to(state_dev, non_blocking=True)
+                update_mem_dst = update_mem.to(state_dev, \
+                                               dtype=self._dtype, \
+                                               non_blocking=True)
+                update_power_dst = update_power.to(state_dev, \
+                                                   dtype=self._dtype, \
+                                                   non_blocking=True)
                 if state_block:
                     # use events to try and overlap CPU and GPU as much as possible
                     update_event = th.cuda.Event()
