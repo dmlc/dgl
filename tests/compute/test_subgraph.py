@@ -2,6 +2,7 @@ import numpy as np
 import networkx as nx
 import unittest
 import scipy.sparse as ssp
+import pytest
 
 import dgl
 import backend as F
@@ -595,5 +596,39 @@ def test_khop_out_subgraph(idtype):
     assert F.array_equal(F.astype(inv['user'], idtype), F.tensor([0], idtype))
     assert F.array_equal(F.astype(inv['game'], idtype), F.tensor([0], idtype))
 
+@unittest.skipIf(not F.gpu_ctx(), 'only necessary with GPU')
+@unittest.skipIf(dgl.backend.backend_name != "pytorch", reason="UVA only supported for PyTorch")
+@pytest.mark.parametrize(
+    'parent_idx_device', [('cpu', F.cpu()), ('cuda', F.cuda()), ('uva', F.cpu()), ('uva', F.cuda())])
+@pytest.mark.parametrize('child_device', [F.cpu(), F.cuda()])
+def test_subframes(parent_idx_device, child_device):
+    parent_device, idx_device = parent_idx_device
+    g = dgl.graph((F.tensor([1,2,3], dtype=F.int64), F.tensor([2,3,4], dtype=F.int64)))
+    print(g.device)
+    g.ndata['x'] = F.randn((5, 4))
+    g.edata['a'] = F.randn((3, 6))
+    idx = F.tensor([1, 2], dtype=F.int64)
+    if parent_device == 'cuda':
+        g = g.to(F.cuda())
+    elif parent_device == 'uva':
+        g = g.to(F.cpu())
+        g.create_formats_()
+        g.pin_memory_()
+    elif parent_device == 'cpu':
+        g = g.to(F.cpu())
+    idx = F.copy_to(idx, idx_device)
+    sg = g.sample_neighbors(idx, 2).to(child_device)
+    assert sg.device == sg.ndata['x'].device
+    assert sg.device == sg.edata['a'].device
+    assert sg.device == child_device
+    if parent_device != 'uva':
+        sg = g.to(child_device).sample_neighbors(F.copy_to(idx, child_device), 2)
+        assert sg.device == sg.ndata['x'].device
+        assert sg.device == sg.edata['a'].device
+        assert sg.device == child_device
+    if parent_device == 'uva':
+        g.unpin_memory_()
+
 if __name__ == '__main__':
     test_khop_out_subgraph(F.int64)
+    test_subframes(('cpu', F.cpu()), F.cuda())
