@@ -53,14 +53,15 @@ are the same as :ref:`mini-batch training <guide-minibatch>`.
 
     # training loop
     for epoch in range(args.num_epochs):
-        for step, blocks in enumerate(dataloader):
-            batch_inputs, batch_labels = load_subtensor(g, blocks[0].srcdata[dgl.NID],
-                                                        blocks[-1].dstdata[dgl.NID])
-            batch_pred = model(blocks, batch_inputs)
-            loss = loss_fcn(batch_pred, batch_labels)
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+        with model.join():
+            for step, blocks in enumerate(dataloader):
+                batch_inputs, batch_labels = load_subtensor(g, blocks[0].srcdata[dgl.NID],
+                                                            blocks[-1].dstdata[dgl.NID])
+                batch_pred = model(blocks, batch_inputs)
+                loss = loss_fcn(batch_pred, batch_labels)
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
 
 When running the training script in a cluster of machines, DGL provides tools to copy data
 to the cluster's machines and launch the training job on all machines.
