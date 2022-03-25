@@ -182,11 +182,12 @@ class Column(TensorStorage):
     index : Tensor
         Index tensor
     """
-    def __init__(self, storage, scheme=None, index=None, device=None):
+    def __init__(self, storage, scheme=None, index=None, device=None, deferred_dtype=None):
         super().__init__(storage)
         self.scheme = scheme if scheme else infer_scheme(storage)
         self.index = index
         self.device = device
+        self.deferred_dtype = deferred_dtype
         self.pinned_by_dgl = False
 
     def __len__(self):
@@ -230,6 +231,11 @@ class Column(TensorStorage):
         if self.device is not None:
             self.storage = F.copy_to(self.storage, self.device[0], **self.device[1])
             self.device = None
+
+        # convert data to the right type
+        if self.deferred_dtype is not None:
+            self.storage = F.astype(self.storage, self.deferred_dtype)
+            self.deferred_dtype = None
         return self.storage
 
     @data.setter
@@ -256,6 +262,30 @@ class Column(TensorStorage):
         """
         col = self.clone()
         col.device = (device, kwargs)
+        return col
+
+    @property
+    def dtype(self):
+        if self.deferred_dtype is not None:
+            return self.deferred_dtype
+        return self.storage.dtype
+
+    def astype(self, new_dtype):
+        """ Return a new column such that when its data is requested, it will be converted to new_dtype.
+
+        Parameters
+        ----------
+        new_dtype : Framework-specific type object
+            The type to convert the data to.
+
+        Returns
+        -------
+        Column
+            A new column
+        """
+        col = self.clone()
+        if col.dtype != new_dtype:
+            col.deferred_dtype = new_dtype
         return col
 
     def __getitem__(self, rowids):
@@ -329,7 +359,7 @@ class Column(TensorStorage):
 
     def clone(self):
         """Return a shallow copy of this column."""
-        return Column(self.storage, self.scheme, self.index, self.device)
+        return Column(self.storage, self.scheme, self.index, self.device, self.deferred_dtype)
 
     def deepclone(self):
         """Return a deepcopy of this column.
@@ -358,13 +388,13 @@ class Column(TensorStorage):
             Sub-column
         """
         if self.index is None:
-            return Column(self.storage, self.scheme, rowids, self.device)
+            return Column(self.storage, self.scheme, rowids, self.device, self.deferred_dtype)
         else:
             index = self.index
             if not isinstance(index, _LazyIndex):
                 index = _LazyIndex(self.index)
             index = index.slice(rowids)
-            return Column(self.storage, self.scheme, index, self.device)
+            return Column(self.storage, self.scheme, index, self.device, self.deferred_dtype)
 
     @staticmethod
     def create(data):
@@ -796,11 +826,10 @@ class Frame(MutableMapping):
     def __astype_float(self, new_type):
         assert new_type in [F.float64, F.float32, F.float16], \
             "'new_type' must be floating-point type: %s" % str(type)
-        for key in self:
-            value = self[key]
-            type = value.dtype
+        for name, column in self._columns.items():
+            type = column.dtype
             if type != new_type and type in [F.float64, F.float32, F.float16]:
-                self[key] = F.astype(value, new_type)
+                self._columns[name] = column.astype(new_type)
 
     def half_(self):
         self.__astype_float(F.float16)
