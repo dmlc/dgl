@@ -75,6 +75,59 @@ template NDArray IndexSelectCPUFromGPU<float, int64_t>(NDArray, IdArray);
 template NDArray IndexSelectCPUFromGPU<double, int32_t>(NDArray, IdArray);
 template NDArray IndexSelectCPUFromGPU<double, int64_t>(NDArray, IdArray);
 
+
+template<typename DType, typename IdType>
+void IndexScatterGPUToCPU(NDArray dest, IdArray index, NDArray source) {
+  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  DType* dest_data = static_cast<DType*>(dest->data);
+  const DType* source_data = static_cast<DType*>(source->data);
+  const IdType* idx_data = static_cast<IdType*>(index->data);
+  const int64_t arr_len = dest->shape[0];
+  const int64_t len = index->shape[0];
+  int64_t num_feat = 1;
+  std::vector<int64_t> shape{len};
+
+  CHECK(dest.IsPinned());
+  CHECK_EQ(index->ctx.device_type, kDLGPU);
+
+  for (int d = 1; d < source->ndim; ++d) {
+    num_feat *= source->shape[d];
+  }
+
+  if (len == 0)
+    return;
+
+  if (num_feat == 1) {
+      const int nt = cuda::FindNumThreads(len);
+      const int nb = (len + nt - 1) / nt;
+      CUDA_KERNEL_CALL(IndexScatterSingleKernel, nb, nt, 0,
+          thr_entry->stream, source_data, idx_data, len, arr_len, dest_data);
+  } else {
+      dim3 block(256, 1);
+      while (static_cast<int64_t>(block.x) >= 2*num_feat) {
+          block.x /= 2;
+          block.y *= 2;
+      }
+      const dim3 grid((len+block.y-1)/block.y);
+      CUDA_KERNEL_CALL(IndexScatterMultiKernel, grid, block, 0,
+          thr_entry->stream, source_data, num_feat, idx_data,
+          len, arr_len, dest_data);
+  }
+}
+
+template void IndexScatterGPUToCPU<int8_t, int32_t>(NDArray, IdArray, NDArray);
+template void IndexScatterGPUToCPU<int8_t, int64_t>(NDArray, IdArray, NDArray);
+template void IndexScatterGPUToCPU<int16_t, int32_t>(NDArray, IdArray, NDArray);
+template void IndexScatterGPUToCPU<int16_t, int64_t>(NDArray, IdArray, NDArray);
+template void IndexScatterGPUToCPU<int32_t, int32_t>(NDArray, IdArray, NDArray);
+template void IndexScatterGPUToCPU<int32_t, int64_t>(NDArray, IdArray, NDArray);
+template void IndexScatterGPUToCPU<int64_t, int32_t>(NDArray, IdArray, NDArray);
+template void IndexScatterGPUToCPU<int64_t, int64_t>(NDArray, IdArray, NDArray);
+template void IndexScatterGPUToCPU<float, int32_t>(NDArray, IdArray, NDArray);
+template void IndexScatterGPUToCPU<float, int64_t>(NDArray, IdArray, NDArray);
+template void IndexScatterGPUToCPU<double, int32_t>(NDArray, IdArray, NDArray);
+template void IndexScatterGPUToCPU<double, int64_t>(NDArray, IdArray, NDArray);
+
 }  // namespace impl
 }  // namespace aten
 }  // namespace dgl
