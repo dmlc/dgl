@@ -177,7 +177,7 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
         assert prob is None, "Prob must be None when the graph is pinned."
         assert F.device_type(F.context(nodes)) != 'cpu', \
             "Seed nodes must be on GPU when the graph is pinned."
-        metapath = metapath.to(F.context(nodes))
+        metapath = F.copy_to(metapath, F.context(nodes))
     nodes = F.to_dgl_nd(nodes)
     metapath = F.to_dgl_nd(metapath)
 
