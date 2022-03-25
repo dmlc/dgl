@@ -599,7 +599,7 @@ class SparseAdam(SparseGradOptimizer):
                     pin_memory_inplace(state_mem)
                     pin_memory_inplace(state_power)
             else:
-                assert self._use_uva != True, "Cannot use UVA memory in " \
+                assert not self._use_uva, "Cannot use UVA memory in " \
                     "{} when embedding device is {}".format( \
                         self.__class__.__name__, th.device(emb.emb_tensor.device))
                 if self._use_uva is None:
@@ -658,7 +658,7 @@ class SparseAdam(SparseGradOptimizer):
             state_idx = grad_indices.to(state_dev)
             state_step[state_idx] += 1
             state_step = state_step[state_idx].to(exec_dev)
-            
+
             if self._use_uva:
                 orig_mem = gather_pinned_tensor_rows(state_mem, grad_indices)
                 orig_power = gather_pinned_tensor_rows(state_power, grad_indices)
@@ -678,7 +678,7 @@ class SparseAdam(SparseGradOptimizer):
 
             update_mem = beta1 * orig_mem + (1.-beta1) * grad_mem
             update_power = beta2 * orig_power + (1.-beta2) * grad_power
-            
+
             if self._use_uva:
                 scatter_pinned_tensor_rows(state_mem, \
                                            grad_indices, \
