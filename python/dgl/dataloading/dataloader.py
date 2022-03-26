@@ -21,7 +21,7 @@ from ..heterograph import DGLHeteroGraph
 from .. import ndarray as nd
 from ..utils import (
     recursive_apply, ExceptionWrapper, recursive_apply_pair, set_num_threads,
-    create_shared_mem_array, get_shared_mem_array, context_of)
+    create_shared_mem_array, get_shared_mem_array, context_of, dtype_of)
 from ..frame import LazyFeature
 from ..storages import wrap_storage
 from .base import BlockSampler, as_edge_prediction_sampler
@@ -86,9 +86,11 @@ class _TensorizedDatasetIter(object):
 
 
 def _get_id_tensor_from_mapping(indices, device, keys):
-    lengths = torch.LongTensor([
-        (indices[k].shape[0] if k in indices else 0) for k in keys]).to(device)
-    type_ids = torch.arange(len(keys), device=device).repeat_interleave(lengths)
+    dtype = dtype_of(indices)
+    lengths = torch.tensor(
+        [(indices[k].shape[0] if k in indices else 0) for k in keys],
+        dtype=dtype, device=device)
+    type_ids = torch.arange(len(keys), dtype=dtype, device=device).repeat_interleave(lengths)
     all_indices = torch.cat([indices[k] for k in keys if k in indices])
     return torch.stack([type_ids, all_indices], 1)
 
