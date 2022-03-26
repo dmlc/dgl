@@ -1,6 +1,6 @@
 .. _guide-minibatch-customizing-neighborhood-sampler:
 
-6.4 Implementing custom graph samplers
+6.4 Implementing Custom Graph Samplers
 ----------------------------------------------
 
 Implementing custom samplers involves subclassing the :class:`dgl.dataloading.Sampler`

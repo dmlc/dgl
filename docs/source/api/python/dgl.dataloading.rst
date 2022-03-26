@@ -5,16 +5,16 @@ dgl.dataloading
 
 .. currentmodule:: dgl.dataloading
 
-The ``dgl.dataloading`` package contains:
+The ``dgl.dataloading`` package provides two privimitives to compose a data pipeline
+for loading from graph data. ``Sampler`` represents algorithms
+to generate subgraph samples from the original graph, and ``DataLoader``
+represents the iterable over these samples.
 
-* ``DataLoader`` classes for iterating over a set of nodes or edges in a graph and generates
-  sampled mini-batches.
+DGL provides a number of built-in samplers that subclass :class:`~dgl.dataloading.Sampler`.
+Creating new samplers follow the same paradigm. Read our user guide chapter
+:ref:`guide-minibatch` for more examples and explanations.
 
-* Various ``Sampler`` classes that extract subgraphs and sub-features.
-
-* Negative samplers for link prediction.
-
-The user guide chapter :ref:`guide-minibatch` explains how different components work together.
+The entire package only works for PyTorch backend.
 
 DataLoaders
 -----------
@@ -25,9 +25,9 @@ DataLoaders
     :template: classtemplate.rst
 
     DataLoader
+    GraphDataLoader
     NodeDataLoader
     EdgeDataLoader
-    GraphDataLoader
     DistNodeDataLoader
     DistEdgeDataLoader
 
@@ -42,12 +42,12 @@ Samplers
     :template: classtemplate.rst
 
     Sampler
-    BlockSampler
     NeighborSampler
     MultiLayerFullNeighborSampler
     ClusterGCNSampler
     ShaDowKHopSampler
     as_edge_prediction_sampler
+    BlockSampler
 
 .. _api-dataloading-negative-sampling:
 
