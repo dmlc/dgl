@@ -36,7 +36,7 @@ class SAGE(nn.Module):
         # example is that the intermediate results can also benefit from prefetching.
         g.ndata['h'] = g.ndata['feat']
         sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1, prefetch_node_feats=['h'])
-        dataloader = dgl.dataloading.NodeDataLoader(
+        dataloader = dgl.dataloading.DataLoader(
                 g, torch.arange(g.num_nodes()).to(g.device), sampler, device=device,
                 batch_size=1000, shuffle=False, drop_last=False, num_workers=num_workers,
                 persistent_workers=(num_workers > 0))
@@ -77,7 +77,7 @@ def train(rank, world_size, graph, num_classes, split_idx):
             graph, train_idx, sampler,
             device='cuda', batch_size=1000, shuffle=True, drop_last=False,
             num_workers=0, use_ddp=True, use_uva=True)
-    valid_dataloader = dgl.dataloading.NodeDataLoader(
+    valid_dataloader = dgl.dataloading.DataLoader(
             graph, valid_idx, sampler, device='cuda', batch_size=1024, shuffle=True,
             drop_last=False, num_workers=0, use_uva=True)
 

@@ -6,6 +6,8 @@ This is an example of training GraphSage in a distributed fashion. Before traini
 sudo pip3 install ogb
 ```
 
+**Requires PyTorch 1.10.0+ to work.**
+
 To train GraphSage, it has five steps:
 
 ### Step 0: Setup a Distributed File System
@@ -116,7 +118,7 @@ The command below launches one process per machine for both sampling and trainin
 
 ```bash
 python3 ~/workspace/dgl/tools/launch.py \
---workspace ~/workspace/dgl/examples/pytorch/graphsage/experimental/ \
+--workspace ~/workspace/dgl/examples/pytorch/graphsage/dist/ \
 --num_trainers 1 \
 --num_samplers 0 \
 --num_servers 1 \
@@ -129,7 +131,7 @@ To run unsupervised training:
 
 ```bash
 python3 ~/workspace/dgl/tools/launch.py \
---workspace ~/workspace/dgl/examples/pytorch/graphsage/experimental/ \
+--workspace ~/workspace/dgl/examples/pytorch/graphsage/dist/ \
 --num_trainers 1 \
 --num_samplers 0 \
 --num_servers 1 \
@@ -143,7 +145,7 @@ By default, this code will run on CPU. If you have GPU support, you can just add
 
 ```bash
 python3 ~/workspace/dgl/tools/launch.py \
---workspace ~/workspace/dgl/examples/pytorch/graphsage/experimental/ \
+--workspace ~/workspace/dgl/examples/pytorch/graphsage/dist/ \
 --num_trainers 4 \
 --num_samplers 0 \
 --num_servers 1 \
@@ -154,7 +156,7 @@ python3 ~/workspace/dgl/tools/launch.py \
 
 To run supervised with transductive setting (nodes are initialized with node embedding)
 ```bash
-python3 ~/workspace/dgl/tools/launch.py --workspace ~/workspace/dgl/examples/pytorch/graphsage/experimental/ \
+python3 ~/workspace/dgl/tools/launch.py --workspace ~/workspace/dgl/examples/pytorch/graphsage/dist/ \
 --num_trainers 4 \
 --num_samplers 4 \
 --num_servers 1 \
@@ -166,7 +168,7 @@ python3 ~/workspace/dgl/tools/launch.py --workspace ~/workspace/dgl/examples/pyt
 
 To run supervised with transductive setting using dgl distributed DistEmbedding
 ```bash
-python3 ~/workspace/dgl/tools/launch.py --workspace ~/workspace/dgl/examples/pytorch/graphsage/experimental/ \
+python3 ~/workspace/dgl/tools/launch.py --workspace ~/workspace/dgl/examples/pytorch/graphsage/dist/ \
 --num_trainers 4 \
 --num_samplers 4 \
 --num_servers 1 \
@@ -178,7 +180,7 @@ python3 ~/workspace/dgl/tools/launch.py --workspace ~/workspace/dgl/examples/pyt
 
 To run unsupervised with transductive setting (nodes are initialized with node embedding)
 ```bash
-python3 ~/workspace/dgl/tools/launch.py --workspace ~/workspace/dgl/examples/pytorch/graphsage/experimental/ \
+python3 ~/workspace/dgl/tools/launch.py --workspace ~/workspace/dgl/examples/pytorch/graphsage/dist/ \
 --num_trainers 4 \
 --num_samplers 0 \
 --num_servers 1 \
@@ -190,7 +192,7 @@ python3 ~/workspace/dgl/tools/launch.py --workspace ~/workspace/dgl/examples/pyt
 
 To run unsupervised with transductive setting using dgl distributed DistEmbedding
 ```bash
-python3 ~/workspace/dgl/tools/launch.py --workspace ~/workspace/dgl/examples/pytorch/graphsage/experimental/ \
+python3 ~/workspace/dgl/tools/launch.py --workspace ~/workspace/dgl/examples/pytorch/graphsage/dist/ \
 --num_trainers 4 \
 --num_samplers 0 \
 --num_servers 1 \

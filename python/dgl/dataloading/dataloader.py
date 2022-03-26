@@ -21,7 +21,7 @@ from ..heterograph import DGLHeteroGraph
 from .. import ndarray as nd
 from ..utils import (
     recursive_apply, ExceptionWrapper, recursive_apply_pair, set_num_threads,
-    create_shared_mem_array, get_shared_mem_array, context_of, pin_memory_inplace)
+    create_shared_mem_array, get_shared_mem_array, context_of, dtype_of)
 from ..frame import LazyFeature
 from ..storages import wrap_storage
 from .base import BlockSampler, as_edge_prediction_sampler
@@ -86,9 +86,11 @@ class _TensorizedDatasetIter(object):
 
 
 def _get_id_tensor_from_mapping(indices, device, keys):
-    lengths = torch.LongTensor([
-        (indices[k].shape[0] if k in indices else 0) for k in keys]).to(device)
-    type_ids = torch.arange(len(keys), device=device).repeat_interleave(lengths)
+    dtype = dtype_of(indices)
+    lengths = torch.tensor(
+        [(indices[k].shape[0] if k in indices else 0) for k in keys],
+        dtype=dtype, device=device)
+    type_ids = torch.arange(len(keys), dtype=dtype, device=device).repeat_interleave(lengths)
     all_indices = torch.cat([indices[k] for k in keys if k in indices])
     return torch.stack([type_ids, all_indices], 1)
 
@@ -169,8 +171,10 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
     def __init__(self, indices, batch_size, drop_last, ddp_seed):
         if isinstance(indices, Mapping):
             self._mapping_keys = list(indices.keys())
+            len_indices = sum(len(v) for v in indices.values())
         else:
             self._mapping_keys = None
+            len_indices = len(indices)
 
         self.rank = dist.get_rank()
         self.num_replicas = dist.get_world_size()
@@ -179,17 +183,17 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
         self.batch_size = batch_size
         self.drop_last = drop_last
 
-        if self.drop_last and len(indices) % self.num_replicas != 0:
-            self.num_samples = math.ceil((len(indices) - self.num_replicas) / self.num_replicas)
+        if self.drop_last and len_indices % self.num_replicas != 0:
+            self.num_samples = math.ceil((len_indices - self.num_replicas) / self.num_replicas)
         else:
-            self.num_samples = math.ceil(len(indices) / self.num_replicas)
+            self.num_samples = math.ceil(len_indices / self.num_replicas)
         self.total_size = self.num_samples * self.num_replicas
         # If drop_last is True, we create a shared memory array larger than the number
         # of indices since we will need to pad it after shuffling to make it evenly
         # divisible before every epoch.  If drop_last is False, we create an array
         # with the same size as the indices so we can trim it later.
-        self.shared_mem_size = self.total_size if not self.drop_last else len(indices)
-        self.num_indices = len(indices)
+        self.shared_mem_size = self.total_size if not self.drop_last else len_indices
+        self.num_indices = len_indices
 
         if isinstance(indices, Mapping):
             self._device = next(iter(indices.values())).device
@@ -728,9 +732,6 @@ class DataLoader(torch.utils.data.DataLoader):
                 # will need to do that themselves.
                 self.graph.create_formats_()
                 self.graph.pin_memory_()
-                for frame in itertools.chain(self.graph._node_frames, self.graph._edge_frames):
-                    for col in frame._columns.values():
-                        pin_memory_inplace(col.data)
             else:
                 if self.graph.device != indices_device:
                     raise ValueError(

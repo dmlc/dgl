@@ -3,7 +3,9 @@ import numpy as np
 import torch as th
 import argparse
 import time
-
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from load_graph import load_reddit, load_ogb
 
 if __name__ == '__main__':
