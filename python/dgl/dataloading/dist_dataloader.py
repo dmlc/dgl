@@ -15,7 +15,7 @@ def _remove_kwargs_dist(kwargs):
 
 class DistNodeDataLoader(DistDataLoader):
     """Sampled graph data loader over nodes for distributed graph storage.
-    
+
     It wraps an iterable over a set of nodes, generating the list
     of message flow graphs (MFGs) as computation dependency of the said minibatch, on
     a distributed graph.

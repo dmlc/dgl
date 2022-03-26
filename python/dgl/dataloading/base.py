@@ -163,7 +163,7 @@ class Sampler(object):
     .. code:: python
 
         from dgl.dataloading import Sampler
-        
+
         class SubgraphSampler(Sampler):
             def __init__(self):
                 super().__init__()
@@ -186,7 +186,7 @@ class Sampler(object):
 class BlockSampler(Sampler):
     """Base class for sampling mini-batches in the form of Message-passing
     Flow Graphs (MFGs).
-    
+
     It provides prefetching options to fetch the node features for the first MFG's ``srcdata``,
     the node labels for the last MFG's ``dstdata`` and the edge features of all MFG's ``edata``.
 

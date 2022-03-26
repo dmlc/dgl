@@ -567,7 +567,7 @@ def _get_device(device):
 class DataLoader(torch.utils.data.DataLoader):
     """Sampled graph data loader. Wrap a :class:`~dgl.DGLGraph` and a
     :class:`~dgl.dataloading.Sampler` into an iterable over mini-batches of samples.
-    
+
     DGL's ``DataLoader`` extends PyTorch's ``DataLoader`` by handling creation
     and transmission of graph samples. It supports iterating over a set of nodes,
     edges or any kinds of indices to get samples in the form of ``DGLGraph``, message
@@ -634,7 +634,7 @@ class DataLoader(torch.utils.data.DataLoader):
           - ``batch_size`` (int): The number of indices in each batch.
           - ``drop_last`` (bool): Whether to drop the last incomplete batch.
           - ``shuffle`` (bool): Whether to randomly shuffle the indices at each epoch.
-        
+
 
     Examples
     --------
@@ -832,7 +832,7 @@ class NodeDataLoader(DataLoader):
 
 
 class EdgeDataLoader(DataLoader):
-    """(DEPRECATED) Sapmled graph data loader over a set of edges.
+    """(DEPRECATED) Sampled graph data loader over a set of edges.
 
     .. deprecated:: 0.8
 
@@ -997,7 +997,7 @@ class GraphCollator(object):
 
 class GraphDataLoader(torch.utils.data.DataLoader):
     """Batched graph data loader.
-    
+
     PyTorch dataloader for batch-iterating over a set of graphs, generating the batched
     graph and corresponding label tensor (if provided) of the said minibatch.
 
