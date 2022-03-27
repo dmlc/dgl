@@ -5,8 +5,8 @@ from ..base import NID
 from .base import set_node_lazy_features, set_edge_lazy_features, Sampler
 
 class ShaDowKHopSampler(Sampler):
-    """K-hop subgraph sampler used by
-    `ShaDow-GNN <https://arxiv.org/abs/2012.01380>`__.
+    """K-hop subgraph sampler from `Deep Graph Neural Networks with Shallow
+    Subgraph Samplers <https://arxiv.org/abs/2012.01380>`__.
 
     It performs node-wise neighbor sampling and returns the subgraph induced by
     all the sampled nodes. The seed nodes from which the neighbors are sampled
