@@ -57,7 +57,7 @@ def main(args):
     n_classes = train_dataset.num_labels
     num_feats = g.ndata['feat'].shape[1]
     g = g.int().to(device)
-    heads = ([args.num_heads] * args.num_layers) + [args.num_out_heads]
+    heads = ([args.num_heads] * (args.num_layers-1)) + [args.num_out_heads]
     # define the model
     model = GAT(g,
                 args.num_layers,
@@ -129,7 +129,7 @@ if __name__ == '__main__':
                         help="number of hidden attention heads")
     parser.add_argument("--num-out-heads", type=int, default=6,
                         help="number of output attention heads")
-    parser.add_argument("--num-layers", type=int, default=2,
+    parser.add_argument("--num-layers", type=int, default=3,
                         help="number of hidden layers")
     parser.add_argument("--num-hidden", type=int, default=256,
                         help="number of hidden units")

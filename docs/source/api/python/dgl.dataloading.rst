@@ -3,24 +3,31 @@
 dgl.dataloading
 =================================
 
-.. automodule:: dgl.dataloading
 .. currentmodule:: dgl.dataloading
+
+The ``dgl.dataloading`` package provides two privimitives to compose a data pipeline
+for loading from graph data. ``Sampler`` represents algorithms
+to generate subgraph samples from the original graph, and ``DataLoader``
+represents the iterable over these samples.
+
+DGL provides a number of built-in samplers that subclass :class:`~dgl.dataloading.Sampler`.
+Creating new samplers follow the same paradigm. Read our user guide chapter
+:ref:`guide-minibatch` for more examples and explanations.
+
+The entire package only works for PyTorch backend.
 
 DataLoaders
 -----------
 
-DGL DataLoader for mini-batch training works similarly to PyTorch's DataLoader.
-It has a generator interface that returns mini-batches sampled from some given graphs.
-DGL provides two DataLoaders: a ``NodeDataLoader`` for node classification task
-and an ``EdgeDataLoader`` for edge/link prediction task.
-
 .. autosummary::
     :toctree: ../../generated/
+    :nosignatures:
+    :template: classtemplate.rst
 
     DataLoader
+    GraphDataLoader
     NodeDataLoader
     EdgeDataLoader
-    GraphDataLoader
     DistNodeDataLoader
     DistEdgeDataLoader
 
@@ -31,9 +38,10 @@ Samplers
 
 .. autosummary::
     :toctree: ../../generated/
+    :nosignatures:
+    :template: classtemplate.rst
 
     Sampler
-    BlockSampler
     NeighborSampler
     MultiLayerFullNeighborSampler
     ClusterGCNSampler
@@ -47,6 +55,7 @@ Sampler Transformations
     :toctree: ../../generated/
 
     as_edge_prediction_sampler
+    BlockSampler
 
 .. _api-dataloading-negative-sampling:
 
@@ -54,10 +63,10 @@ Negative Samplers for Link Prediction
 -------------------------------------
 .. currentmodule:: dgl.dataloading.negative_sampler
 
-Negative samplers are classes that control the behavior of the edge prediction samplers
-
 .. autosummary::
     :toctree: ../../generated/
+    :nosignatures:
+    :template: classtemplate.rst
 
     Uniform
     PerSourceUniform
@@ -69,9 +78,11 @@ Utility Class and Functions for Feature Prefetching
 
 .. autosummary::
     :toctree: ../../generated/
+    :nosignatures:
+    :template: classtemplate.rst
 
-    LazyFeature
     set_node_lazy_features
     set_edge_lazy_features
     set_src_lazy_features
     set_dst_lazy_features
+    LazyFeature
