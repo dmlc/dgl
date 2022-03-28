@@ -259,6 +259,15 @@ class RadiusGraph(nn.Module):
         Whether the radius graph will contain self-loops.
 
         (default: False)
+    compute_mode : str, optional
+        ``use_mm_for_euclid_dist_if_necessary`` - will use matrix multiplication
+        approach to calculate euclidean distance (p = 2) if P > 25 or R > 25
+        ``use_mm_for_euclid_dist`` - will always use matrix multiplication 
+        approach to calculate euclidean distance (p = 2)
+        ``donot_use_mm_for_euclid_dist`` - will never use matrix multiplication 
+        approach to calculate euclidean distance (p = 2).
+
+        (default: donot_use_mm_for_euclid_dist)
 
     Examples
     --------
@@ -296,11 +305,13 @@ class RadiusGraph(nn.Module):
             [0.2828]])
     """
     #pylint: disable=invalid-name
-    def __init__(self, r, p=2, self_loop=False):
+    def __init__(self, r, p=2, self_loop=False,
+                 compute_mode='donot_use_mm_for_euclid_dist'):
         super(RadiusGraph, self).__init__()
         self.r = r
         self.p = p
         self.self_loop = self_loop
+        self.compute_mode = compute_mode
 
     #pylint: disable=invalid-name
     def forward(self, x, get_distances=False):
@@ -328,4 +339,5 @@ class RadiusGraph(nn.Module):
             The distances for the edges in the constructed graph. The distances
             are in the same order as edge IDs.
         """
-        return radius_graph(x, self.r, self.p, self.self_loop, get_distances)
+        return radius_graph(x, self.r, self.p, self.self_loop,
+                            self.compute_mode, get_distances)

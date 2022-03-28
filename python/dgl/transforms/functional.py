@@ -3303,7 +3303,8 @@ def norm_by_dst(g, etype=None):
     return norm
 
 
-def radius_graph(x, r, p=2, self_loop=False, get_distances=False):
+def radius_graph(x, r, p=2, self_loop=False,
+                 compute_mode='donot_use_mm_for_euclid_dist', get_distances=False):
     r"""Construct a graph from a set of points with neighbors within given distance.
 
     The function transforms the coordinates/features of a point set
@@ -3334,6 +3335,15 @@ def radius_graph(x, r, p=2, self_loop=False, get_distances=False):
         Whether the radius graph will contain self-loops.
 
         (default: False)
+    compute_mode : str, optional
+        ``use_mm_for_euclid_dist_if_necessary`` - will use matrix multiplication
+        approach to calculate euclidean distance (p = 2) if P > 25 or R > 25
+        ``use_mm_for_euclid_dist`` - will always use matrix multiplication 
+        approach to calculate euclidean distance (p = 2)
+        ``donot_use_mm_for_euclid_dist`` - will never use matrix multiplication 
+        approach to calculate euclidean distance (p = 2).
+
+        (default: donot_use_mm_for_euclid_dist)
     get_distances : bool, optional
         Whether to return the distances for the corresponding edges in the
         radius graph.
@@ -3390,7 +3400,7 @@ def radius_graph(x, r, p=2, self_loop=False, get_distances=False):
     if F.shape(x)[0] == 0:
         raise DGLError("Find empty point set")
 
-    distances = th.cdist(x, x, p=p, compute_mode='donot_use_mm_for_euclid_dist')
+    distances = th.cdist(x, x, p=p, compute_mode=compute_mode)
 
     if not self_loop:
         distances.fill_diagonal_(r + 1e-4)
