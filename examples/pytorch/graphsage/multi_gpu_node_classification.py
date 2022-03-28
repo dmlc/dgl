@@ -143,6 +143,10 @@ def train(rank, world_size, graph, num_classes, split_idx):
     valid_idx = valid_idx.to('cuda')
     test_idx = test_idx.to('cuda')
 
+    # For training, each process/GPU will get a subset of the
+    # train_idx/valid_idx, and generate mini-batches indepednetly. This allows
+    # the only communication neccessary in training to be the all-reduce for
+    # the gradients performed by the DDP wrapper (created above).
     sampler = dgl.dataloading.NeighborSampler(
             [15, 10, 5], prefetch_node_feats=['feat'], prefetch_labels=['label'])
     train_dataloader = dgl.dataloading.DataLoader(
