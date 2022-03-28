@@ -6,14 +6,15 @@ import torch.distributed.optim
 import torchmetrics.functional as MF
 import dgl
 import dgl.nn as dglnn
-from dgl.utils import pin_memory_inplace, unpin_memory_inplace, gather_pinned_tensor_rows
+from dgl.utils import pin_memory_inplace, unpin_memory_inplace, \
+    gather_pinned_tensor_rows, create_shared_mem_array, get_shared_mem_array
 import time
 import numpy as np
 from ogb.nodeproppred import DglNodePropPredDataset
 import tqdm
 
 
-def shared_tensor(*shape, device, q):
+def shared_tensor(*shape, device, name, dtype=torch.float32):
     """ Create a tensor in shared memroy, pinned in each process's CUDA
     context.
 
@@ -23,10 +24,10 @@ def shared_tensor(*shape, device, q):
             A sequence of integers describing the shape of the new tensor.
         device : context
             The device of the result tensor.
-        q : Queue
-            A multiprocessing Queue for passing tensors from process 0
-            to the other processes. Must be created using the same start-method
-            as the processes (.e.g., 'spawn').
+        name : string
+            The name of the shared allocation.
+        dtype : dtype, optional
+            The datatype of the allocation. Default: torch.float32
 
     Returns
     -------
@@ -34,14 +35,11 @@ def shared_tensor(*shape, device, q):
             The shared tensor.
     """
     rank = dist.get_rank()
-    world_size = dist.get_world_size()
     if rank == 0:
-        y = torch.zeros(
-            *shape, device=device)
-        for i in range(1, world_size):
-            q.put(y)
+        y = create_shared_mem_array(
+            name, shape, dtype)
     else:
-        y = q.get()
+        y = get_shared_mem_array(name, shape, dtype)
     dist.barrier()
     pin_memory_inplace(y)
     return y
@@ -71,7 +69,7 @@ class SAGE(nn.Module):
             h = self._forward_layer(l, blocks[l], h)
         return h
 
-    def inference(self, g, device, batch_size, q):
+    def inference(self, g, device, batch_size):
         """
         Perform inference in layer-major order rather than batch-major order.
         That is, infer the first layer for the entire graph, and store the
@@ -89,10 +87,6 @@ class SAGE(nn.Module):
                 The device this process should use for inference
             batch_size : int
                 The number of items to collect in a batch.
-            q : Queue
-                The Queue to use to communicate tensors between processes.
-                Must be created using the same start-method as the
-                processes (.e.g., 'spawn').
 
         Returns
         -------
@@ -113,7 +107,7 @@ class SAGE(nn.Module):
             y = shared_tensor(
                     g.num_nodes(),
                     self.n_hidden if l != len(self.layers) - 1 else self.n_classes,
-                    device='cpu', q=q)
+                    device='cpu', name='layer_{}_output'.format(l))
 
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader) \
                     if dist.get_rank() == 0 else dataloader:
@@ -134,7 +128,7 @@ class SAGE(nn.Module):
         return y
 
 
-def train(rank, world_size, graph, num_classes, split_idx, q):
+def train(rank, world_size, graph, num_classes, split_idx):
     torch.cuda.set_device(rank)
     dist.init_process_group('nccl', 'tcp://127.0.0.1:12347', world_size=world_size, rank=rank)
 
@@ -201,8 +195,7 @@ def train(rank, world_size, graph, num_classes, split_idx, q):
     model.eval()
     with torch.no_grad():
         # since we do 1-layer at a time, use a very large batch size
-        pred = model.module.inference(graph, device='cuda', batch_size=2**16,
-                                      q=q)
+        pred = model.module.inference(graph, device='cuda', batch_size=2**16)
         if rank == 0:
             acc = MF.accuracy(pred[test_idx], graph.ndata['label'][test_idx])
             print('Test acc:', acc.item())
@@ -220,6 +213,4 @@ if __name__ == '__main__':
     # Tested with mp.spawn and fork.  Both worked and got 4s per epoch with 4 GPUs
     # and 3.86s per epoch with 8 GPUs on p2.8x, compared to 5.2s from official examples.
     import torch.multiprocessing as mp
-    ctx = mp.get_context('spawn')
-    q = ctx.Queue()
-    mp.spawn(train, args=(n_procs, graph, num_classes, split_idx, q), nprocs=n_procs)
+    mp.spawn(train, args=(n_procs, graph, num_classes, split_idx), nprocs=n_procs)
