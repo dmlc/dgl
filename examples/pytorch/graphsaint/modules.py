@@ -5,7 +5,7 @@ import dgl.function as fn
 
 class GCNLayer(nn.Module):
     def __init__(self, in_dim, out_dim, order=1, act=None,
-                 dropout=0, batch_norm=False):
+                 dropout=0, norm=False):
         super(GCNLayer, self).__init__()
         self.lins = nn.ModuleList()
         for _ in range(order + 1):
@@ -15,23 +15,19 @@ class GCNLayer(nn.Module):
         self.act = act
         self.dropout = nn.Dropout(dropout)
 
-        self.batch_norm = batch_norm
-        if batch_norm:
-            self.offset, self.scale = nn.ParameterList(), nn.ParameterList()
-            for _ in range(order + 1):
-                self.offset.append(nn.Parameter(th.zeros(out_dim)))
-                self.scale.append(nn.Parameter(th.ones(out_dim)))
+        if norm:
+            self.norm = nn.LayerNorm(out_dim)
+        else:
+            self.norm = None
 
-    def feat_trans(self, features, idx):  # linear transformation + activation + batch normalization
+    def feat_trans(self, features, idx):  # linear transformation + activation + layer normalization
         h = self.lins[idx](features)
 
         if self.act is not None:
             h = self.act(h)
 
-        if self.batch_norm:
-            mean = h.mean(dim=1).view(h.shape[0], 1)
-            var = h.var(dim=1, unbiased=False).view(h.shape[0], 1) + 1e-9
-            h = (h - mean) * self.scale[idx] * th.rsqrt(var) + self.offset[idx]
+        if self.norm:
+            h = self.norm(h)
 
         return h
 
@@ -58,26 +54,26 @@ class GCNLayer(nn.Module):
 
 class GCNNet(nn.Module):
     def __init__(self, in_dim, hid_dim, out_dim, arch="1-1-0",
-                 act=F.relu, dropout=0, batch_norm=True):
+                 act=F.relu, dropout=0, norm=True):
         super(GCNNet, self).__init__()
         self.gcn = nn.ModuleList()
 
         orders = list(map(int, arch.split('-')))
         self.gcn.append(GCNLayer(in_dim=in_dim, out_dim=hid_dim, order=orders[0],
-                                 act=act, dropout=dropout, batch_norm=batch_norm))
+                                 act=act, dropout=dropout, norm=norm))
         pre_out = (orders[0] + 1) * hid_dim
 
         for i in range(1, len(orders)-1):
             self.gcn.append(GCNLayer(in_dim=pre_out, out_dim=hid_dim, order=orders[i],
-                                     act=act, dropout=dropout, batch_norm=batch_norm))
+                                     act=act, dropout=dropout, norm=norm))
             pre_out = (orders[i] + 1) * hid_dim
 
         self.gcn.append(GCNLayer(in_dim=pre_out, out_dim=hid_dim, order=orders[-1],
-                                 act=act, dropout=dropout, batch_norm=batch_norm))
+                                 act=act, dropout=dropout, norm=norm))
         pre_out = (orders[-1] + 1) * hid_dim
 
         self.out_layer = GCNLayer(in_dim=pre_out, out_dim=out_dim, order=0,
-                                  act=None, dropout=dropout, batch_norm=False)
+                                  act=None, dropout=dropout, norm=False)
 
     def forward(self, graph):
         h = graph.ndata['feat']
