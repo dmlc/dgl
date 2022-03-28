@@ -2,14 +2,9 @@ cmake_minimum_required(VERSION 3.5)
 project(tensoradapter_pytorch C CXX)
 
 # Find PyTorch cmake files and PyTorch versions with the python interpreter $PYTHON_INTERP
-# (or "python" if empty)
-find_package(Python 3 REQUIRED COMPONENTS Interpreter)
-if (Python_FOUND)
-  set(PYTHON_INTERP "${Python_EXECUTABLE}")
-endif()
+# ("python3" or "python" if empty)
 if(NOT PYTHON_INTERP)
-  # if we didn't find python via the package, try the basic executable
-  set(PYTHON_INTERP python)
+  find_program(PYTHON_INTERP NAMES python3 python)
 endif()
 message(STATUS "Using Python interpreter: ${PYTHON_INTERP}")
 file(TO_NATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/find_cmake.py FIND_CMAKE_PY)
