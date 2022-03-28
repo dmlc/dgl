@@ -438,21 +438,6 @@ class BaseHeteroGraph : public runtime::Object {
   virtual aten::CSRMatrix GetCSCMatrix(dgl_type_t etype) const = 0;
 
   /*!
-   * \brief Set the COO matrix representation for a given edge type.
-   */
-  virtual void SetCOOMatrix(dgl_type_t etype, aten::COOMatrix coo) = 0;
-
-  /*!
-   * \brief Set the CSR matrix representation for a given edge type.
-   */
-  virtual void SetCSRMatrix(dgl_type_t etype, aten::CSRMatrix csr) = 0;
-
-  /*!
-   * \brief Set the CSC matrix representation for a given edge type.
-   */
-  virtual void SetCSCMatrix(dgl_type_t etype, aten::CSRMatrix csc) = 0;
-
-  /*!
    * \brief Extract the induced subgraph by the given vertices.
    *
    * The length of the given vector should be equal to the number of vertex types.
