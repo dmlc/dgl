@@ -37,12 +37,20 @@ atexit.register(_set_python_exit_flag)
 prefetcher_timeout = int(os.environ.get('DGL_PREFETCHER_TIMEOUT', '30'))
 
 class _TensorizedDatasetIter(object):
-    def __init__(self, dataset, batch_size, drop_last, mapping_keys):
+    def __init__(self, dataset, batch_size, drop_last, mapping_keys, \
+            num_batches=None):
         self.dataset = dataset
         self.batch_size = batch_size
         self.drop_last = drop_last
         self.mapping_keys = mapping_keys
         self.index = 0
+        if num_batches is None:
+            if drop_last:
+                num_batches = len(dataset) / batch_size
+            else:
+                num_batches = math.ceil(len(dataset), batch_size)
+        self.num_batches = num_batches
+        self.sample = 0
 
     # For PyTorch Lightning compatibility
     def __iter__(self):
@@ -52,13 +60,19 @@ class _TensorizedDatasetIter(object):
         num_items = self.dataset.shape[0]
         if self.index >= num_items:
             raise StopIteration
-        end_idx = self.index + self.batch_size
+
+        batch_size = self.batch_size
+        end_idx = self.index + batch_size
         if end_idx > num_items:
             if self.drop_last:
                 raise StopIteration
             end_idx = num_items
+        if not self.drop_last and end_idx == num_items and self.sample + 1 < self.num_batches:
+            # trim current batch size to save one for last batch
+            end_idx -= 1
         batch = self.dataset[self.index:end_idx]
-        self.index += self.batch_size
+        self.index = end_idx
+        self.sample += 1
 
         return batch
 
@@ -185,9 +199,14 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
 
         if self.drop_last and len_indices % self.num_replicas != 0:
             self.num_samples = math.ceil((len_indices - self.num_replicas) / self.num_replicas)
+            self.total_size = self.num_samples * self.num_replicas
         else:
+            # keep the number of batches equal, but modify thier size
             self.num_samples = math.ceil(len_indices / self.num_replicas)
-        self.total_size = self.num_samples * self.num_replicas
+            self.total_size = len_indices
+
+        self.num_batches = math.ceil(self.num_samples / self.batch_size)
+
         # If drop_last is True, we create a shared memory array larger than the number
         # of indices since we will need to pad it after shuffling to make it evenly
         # divisible before every epoch.  If drop_last is False, we create an array
@@ -231,19 +250,16 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
         if self.rank == 0:
             self._indices[:self.num_indices] = self._indices[
                 torch.randperm(self.num_indices, device=self._device)]
-            if not self.drop_last:
-                # pad extra
-                self._indices[self.num_indices:] = \
-                    self._indices[:self.total_size - self.num_indices]
         dist.barrier()
 
     def __iter__(self):
         start = self.num_samples * self.rank
-        end = self.num_samples * (self.rank + 1)
+        end = min(self.num_samples * (self.rank + 1), len(self._indices))
         indices = _divide_by_worker(self._indices[start:end], self.batch_size, self.drop_last)
         id_tensor = self._id_tensor[indices.to(self._device)]
         return _TensorizedDatasetIter(
-            id_tensor, self.batch_size, self.drop_last, self._mapping_keys)
+            id_tensor, self.batch_size, self.drop_last, self._mapping_keys, \
+                self.num_batches)
 
     def __len__(self):
         return (self.num_samples + (0 if self.drop_last else (self.batch_size - 1))) // \
