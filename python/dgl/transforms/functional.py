@@ -3338,9 +3338,9 @@ def radius_graph(x, r, p=2, self_loop=False,
     compute_mode : str, optional
         ``use_mm_for_euclid_dist_if_necessary`` - will use matrix multiplication
         approach to calculate euclidean distance (p = 2) if P > 25 or R > 25
-        ``use_mm_for_euclid_dist`` - will always use matrix multiplication 
+        ``use_mm_for_euclid_dist`` - will always use matrix multiplication
         approach to calculate euclidean distance (p = 2)
-        ``donot_use_mm_for_euclid_dist`` - will never use matrix multiplication 
+        ``donot_use_mm_for_euclid_dist`` - will never use matrix multiplication
         approach to calculate euclidean distance (p = 2).
 
         (default: donot_use_mm_for_euclid_dist)
