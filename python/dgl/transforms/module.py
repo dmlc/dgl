@@ -141,7 +141,7 @@ class RandomWalkPE(BaseTransform):
 
 class LaplacianPE(BaseTransform):
     r"""Laplacian Positional Encoding, as introduced in
-    `A Generalization of Transformer Networks to Graphs
+    `Benchmarking Graph Neural Networks
     <https://arxiv.org/abs/2003.00982>`__
     
     This module only works for homogeneous bidirected graphs.

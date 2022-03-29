@@ -3358,7 +3358,7 @@ def random_walk_pe(g, k, eweight_name=None):
 
 def laplacian_pe(g, k):
     r"""Laplacian Positional Encoding, as introduced in
-    `A Generalization of Transformer Networks to Graphs
+    `Benchmarking Graph Neural Networks
     <https://arxiv.org/abs/2003.00982>`__
 
     This function computes the laplacian positional encodings as the
