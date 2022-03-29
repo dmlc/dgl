@@ -483,7 +483,7 @@ pipeline {
                 keepAll: true,
                 reportDir: 'cireport',
                 reportFiles: 'index.html',
-                reportName: 'DGL CI report'
+                reportName: 'dgl'
               ]
             sh('aws s3 sync ./cireport s3://dgl-ci-result/${BUILD_ID}')
           }
