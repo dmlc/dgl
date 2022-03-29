@@ -4,7 +4,6 @@ from queue import Queue, Empty, Full
 import itertools
 import threading
 from distutils.version import LooseVersion
-import random
 import math
 import inspect
 import re
@@ -18,7 +17,6 @@ from torch.utils.data.distributed import DistributedSampler
 from ..base import NID, EID, dgl_warning
 from ..batch import batch as batch_graphs
 from ..heterograph import DGLHeteroGraph
-from .. import ndarray as nd
 from ..utils import (
     recursive_apply, ExceptionWrapper, recursive_apply_pair, set_num_threads,
     context_of, dtype_of)
