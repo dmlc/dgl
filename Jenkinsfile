@@ -474,38 +474,22 @@ pipeline {
   }
   post {
     always {
-      stages{
-      stage('Generate Report') {
-        steps{
-          publishHTML target: [
-              allowMissing: false,
-              alwaysLinkToLastBuild: false,
-              keepAll: true,
-              reportDir: 'cireport',
-              reportFiles: 'index.html',
-              reportName: 'DGL CI report'
-            ]
-          stash includes: 'cireport', name: 'cireport'
+      script {
+        docker.image('amazon/aws-cli').label("linux-core-worker") {           
+            publishHTML target: [
+                allowMissing: false,
+                alwaysLinkToLastBuild: false,
+                keepAll: true,
+                reportDir: 'cireport',
+                reportFiles: 'index.html',
+                reportName: 'DGL CI report'
+              ]
+            sh('aws s3 sync ./cireport s3://dgl-ci-result/${BUILD_ID}')
+
         }
-      }
-      stage('Upload Report') {
-        agent {
-          docker {
-            label "linux-core-worker"
-            image "amazon/aws-cli"  
-            alwaysPull true
-          }
-        }
-        steps {
-          unstash 'cireport'
-          sh('aws s3 sync ./cireport s3://dgl-ci-result/${BUILD_ID}')
-        }
-      }
-      stage('Clean up windows') {
         node('windows') {
-          bat "rmvirtualenv ${BUILD_TAG}"
+            bat "rmvirtualenv ${BUILD_TAG}"
         }
-      }
       }
     }
   }
