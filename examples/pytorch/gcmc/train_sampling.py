@@ -20,7 +20,7 @@ from data import MovieLens
 from model import GCMCLayer, DenseBiDecoder, BiDecoder
 from utils import get_activation, get_optimizer, torch_total_param_num, torch_net_info, MetricLogger, to_etype_name
 import dgl
-import torch.multiprocessing as mp
+import dgl.multiprocessing as mp
 
 class Net(nn.Module):
     def __init__(self, args, dev_id):

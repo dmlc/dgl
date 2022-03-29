@@ -11,7 +11,7 @@ import dgl.nn as dglnn
 import torch.nn as nn
 import torch.nn.functional as F
 import argparse
-import torch.multiprocessing as mp
+import dgl.multiprocessing as mp
 import sys
 from torch.nn.parallel import DistributedDataParallel
 from collections import OrderedDict

@@ -68,9 +68,6 @@ def train(rank, world_size, graph, num_classes, split_idx):
 
     train_idx, valid_idx, test_idx = split_idx['train'], split_idx['valid'], split_idx['test']
 
-    train_idx = train_idx.to('cuda')
-    valid_idx = valid_idx.to('cuda')
-
     sampler = dgl.dataloading.NeighborSampler(
             [15, 10, 5], prefetch_node_feats=['feat'], prefetch_labels=['label'])
     train_dataloader = dgl.dataloading.DataLoader(
@@ -129,9 +126,9 @@ if __name__ == '__main__':
     graph.create_formats_()     # must be called before mp.spawn().
     split_idx = dataset.get_idx_split()
     num_classes = dataset.num_classes
-    n_procs = 4
+    n_procs = 2
 
     # Tested with mp.spawn and fork.  Both worked and got 4s per epoch with 4 GPUs
     # and 3.86s per epoch with 8 GPUs on p2.8x, compared to 5.2s from official examples.
-    import torch.multiprocessing as mp
+    import dgl.multiprocessing as mp
     mp.spawn(train, args=(n_procs, graph, num_classes, split_idx), nprocs=n_procs)

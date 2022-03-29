@@ -6,8 +6,8 @@ import argparse
 import gc
 import torch as th
 import torch.nn.functional as F
-import torch.multiprocessing as mp
 import dgl
+import dgl.multiprocessing as mp
 
 from torchmetrics.functional import accuracy
 from torch.nn.parallel import DistributedDataParallel

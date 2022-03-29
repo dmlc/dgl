@@ -15,7 +15,7 @@ from numpy import random
 from torch.nn.parameter import Parameter
 import dgl
 import dgl.function as fn
-import torch.multiprocessing as mp
+import dgl.multiprocessing as mp
 
 from utils import *
 

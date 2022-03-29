@@ -21,12 +21,13 @@ from ..heterograph import DGLHeteroGraph
 from .. import ndarray as nd
 from ..utils import (
     recursive_apply, ExceptionWrapper, recursive_apply_pair, set_num_threads,
-    create_shared_mem_array, get_shared_mem_array, context_of, dtype_of)
+    context_of, dtype_of)
 from ..frame import LazyFeature
 from ..storages import wrap_storage
 from .base import BlockSampler, as_edge_prediction_sampler
 from .. import backend as F
 from ..distributed import DistGraph
+from ..multiprocessing import call_once_and_share
 
 PYTHON_EXIT_STATUS = False
 def _set_python_exit_flag():
@@ -115,7 +116,6 @@ class TensorizedDataset(torch.utils.data.IterableDataset):
     When the dataset is on the GPU, this significantly reduces the overhead.
     """
     def __init__(self, indices, batch_size, drop_last):
-        name, _ = _generate_shared_mem_name_id()
         if isinstance(indices, Mapping):
             self._mapping_keys = list(indices.keys())
             self._device = next(iter(indices.values())).device
@@ -128,12 +128,10 @@ class TensorizedDataset(torch.utils.data.IterableDataset):
         # Use a shared memory array to permute indices for shuffling.  This is to make sure that
         # the worker processes can see it when persistent_workers=True, where self._indices
         # would not be duplicated every epoch.
-        self._indices = create_shared_mem_array(name, (self._id_tensor.shape[0],), torch.int64)
+        self._indices = torch.empty(self._id_tensor.shape[0], dtype=torch.int64).share_memory_()
         self._indices[:] = torch.arange(self._id_tensor.shape[0])
         self.batch_size = batch_size
         self.drop_last = drop_last
-        self.shared_mem_name = name
-        self.shared_mem_size = self._indices.shape[0]
 
     def shuffle(self):
         """Shuffle the dataset."""
@@ -149,17 +147,6 @@ class TensorizedDataset(torch.utils.data.IterableDataset):
     def __len__(self):
         num_samples = self._id_tensor.shape[0]
         return (num_samples + (0 if self.drop_last else (self.batch_size - 1))) // self.batch_size
-
-def _get_shared_mem_name(id_):
-    return f'ddp_{id_}'
-
-def _generate_shared_mem_name_id():
-    for _ in range(3):     # 3 trials
-        id_ = random.getrandbits(32)
-        name = _get_shared_mem_name(id_)
-        if not nd.exist_shared_mem_array(name):
-            return name, id_
-    raise DGLError('Unable to generate a shared memory array')
 
 class DDPTensorizedDataset(torch.utils.data.IterableDataset):
     """Custom Dataset wrapper that returns a minibatch as tensors or dicts of tensors.
@@ -197,33 +184,19 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
 
         if isinstance(indices, Mapping):
             self._device = next(iter(indices.values())).device
-            self._id_tensor = _get_id_tensor_from_mapping(
-                    indices, self._device, self._mapping_keys)
+            self._id_tensor = call_once_and_share(
+                lambda: _get_id_tensor_from_mapping(
+                    indices, self._device, self._mapping_keys))
         else:
             self._id_tensor = indices
             self._device = self._id_tensor.device
 
-        if self.rank == 0:
-            name, id_ = _generate_shared_mem_name_id()
-            self._indices = create_shared_mem_array(
-                name, (self.shared_mem_size,), torch.int64)
-            self._indices[:self._id_tensor.shape[0]] = torch.arange(self._id_tensor.shape[0])
-            meta_info = torch.LongTensor([id_, self._indices.shape[0]])
-        else:
-            meta_info = torch.LongTensor([0, 0])
+        self._indices = call_once_and_share(self._create_shared_indices)
 
-        if dist.get_backend() == 'nccl':
-            # Use default CUDA device; PyTorch DDP required the users to set the CUDA
-            # device for each process themselves so calling .cuda() should be safe.
-            meta_info = meta_info.cuda()
-        dist.broadcast(meta_info, src=0)
-
-        if self.rank != 0:
-            id_, num_samples = meta_info.tolist()
-            name = _get_shared_mem_name(id_)
-            indices_shared = get_shared_mem_array(name, (num_samples,), torch.int64)
-            self._indices = indices_shared
-        self.shared_mem_name = name
+    def _create_shared_indices(self):
+        indices = torch.empty(self.shared_mem_size, dtype=torch.int64)
+        indices[:self._id_tensor.shape[0]] = torch.arange(self._id_tensor.shape[0])
+        return indices
 
     def shuffle(self):
         """Shuffles the dataset."""
@@ -525,11 +498,16 @@ class CollateWrapper(object):
     """Wraps a collate function with :func:`remove_parent_storage_columns` for serializing
     from PyTorch DataLoader workers.
     """
-    def __init__(self, sample_func, g):
+    def __init__(self, sample_func, g, use_uva, device):
         self.sample_func = sample_func
         self.g = g
+        self.use_uva = use_uva
+        self.device = device
 
     def __call__(self, items):
+        if self.use_uva:
+            # Only copy the indices to the given device if in UVA mode.
+            items = recursive_apply(items, lambda x: x.to(self.device))
         batch = self.sample_func(self.g, items)
         return recursive_apply(batch, remove_parent_storage_columns, self.g)
 
@@ -727,10 +705,6 @@ class DataLoader(torch.utils.data.DataLoader):
             if use_uva:
                 if self.graph.device.type != 'cpu':
                     raise ValueError('Graph must be on CPU if UVA sampling is enabled.')
-                if indices_device != self.device:
-                    raise ValueError(
-                        f'Indices must be on the same device as the device argument '
-                        f'({self.device})')
                 if num_workers > 0:
                     raise ValueError('num_workers must be 0 if UVA sampling is enabled.')
 
@@ -800,7 +774,8 @@ class DataLoader(torch.utils.data.DataLoader):
 
         super().__init__(
             self.dataset,
-            collate_fn=CollateWrapper(self.graph_sampler.sample, graph),
+            collate_fn=CollateWrapper(
+                self.graph_sampler.sample, graph, self.use_uva, self.device),
             batch_size=None,
             worker_init_fn=worker_init_fn,
             **kwargs)
