@@ -1965,26 +1965,22 @@ def test_float_cast():
             values = g.nodes['user'].data[name]
             assert values.dtype == reqType
             assert len(values) == len(uvalues)
-            for i in range(len(values)):
-                assert values[i] == uvalues[i]
+            assert F.allclose(values, F.tensor(uvalues), 0, 0)
 
             values = g.nodes['game'].data[name]
             assert values.dtype == reqType
             assert len(values) == len(gvalues)
-            for i in range(len(values)):
-                assert values[i] == gvalues[i]
+            assert F.allclose(values, F.tensor(gvalues), 0, 0)
 
             values = g.edges['follows'].data[name]
             assert values.dtype == reqType
             assert len(values) == len(fvalues)
-            for i in range(len(values)):
-                assert values[i] == fvalues[i]
+            assert F.allclose(values, F.tensor(fvalues), 0, 0)
 
             values = g.edges['plays'].data[name]
             assert values.dtype == reqType
             assert len(values) == len(pvalues)
-            for i in range(len(values)):
-                assert values[i] == pvalues[i]
+            assert F.allclose(values, F.tensor(pvalues), 0, 0)
 
 @parametrize_dtype
 def test_format(idtype):
