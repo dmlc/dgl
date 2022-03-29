@@ -3347,11 +3347,11 @@ def random_walk_pe(g, k, eweight_name=None):
     RW = np.array(A / (A.sum(1) + 1e-30)) # 1-step transition probability
 
     # Iterate for k steps
-    PE = [F.tensor(RW.diagonal()).float()]
+    PE = [F.astype(F.tensor(RW.diagonal()), F.float32)]
     RW_power = RW
     for _ in range(k-1):
         RW_power = RW_power @ RW
-        PE.append(F.tensor(RW_power.diagonal()).float())
+        PE.append(F.astype(F.tensor(RW_power.diagonal()), F.float32))
     PE = F.stack(PE,dim=-1)
 
     return PE
@@ -3411,7 +3411,7 @@ def laplacian_pe(g, k):
 
     # get random flip signs
     rand_sign = 2 * (np.random.rand(k) > 0.5) - 1.
-    PE = F.tensor(rand_sign * topk_EigVec).float()
+    PE = F.astype(F.tensor(rand_sign * topk_EigVec), F.float32)
 
     return PE
 

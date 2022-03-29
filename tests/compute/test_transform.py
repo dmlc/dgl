@@ -2332,7 +2332,7 @@ def test_module_add_edge(idtype):
 @parametrize_dtype
 def test_module_random_walk_pe(idtype):
     transform = dgl.RandomWalkPE(2, 'rwpe')
-    g = dgl.graph(([0, 1, 1], [1, 1, 0]), idtype=idtype)
+    g = dgl.graph(([0, 1, 1], [1, 1, 0]), idtype=idtype, device=F.ctx())
     new_g = transform(g)
     tgt = F.tensor([[0., 0.5],[0.5, 0.75]])
     assert (new_g.ndata['rwpe'] - tgt).norm() < 1e-3
@@ -2340,7 +2340,7 @@ def test_module_random_walk_pe(idtype):
 @parametrize_dtype
 def test_module_laplacian_pe(idtype):
     transform = dgl.LaplacianPE(2, 'lappe')
-    g = dgl.graph(([2, 1, 0, 3, 1, 1],[3, 0, 1, 3, 3, 1]), idtype=idtype)
+    g = dgl.graph(([2, 1, 0, 3, 1, 1],[3, 0, 1, 3, 3, 1]), idtype=idtype, device=F.ctx())
     new_g = transform(g)
     tgt = F.tensor([[ 0.2497, -0.0000],
         [ 0.1177, -0.0000],
