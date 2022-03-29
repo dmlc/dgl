@@ -557,7 +557,6 @@ def create_tensorized_dataset(indices, batch_size, drop_last, use_ddp, ddp_seed)
 
 
 def _get_device(device):
-    device = 'cpu' if device is None else device
     device = torch.device(device)
     if device.type == 'cuda' and device.index is None:
         device = torch.device('cuda', torch.cuda.current_device())
@@ -679,7 +678,7 @@ class DataLoader(torch.utils.data.DataLoader):
 
       - Otherwise, both the sampling and subgraph construction will take place on the CPU.
     """
-    def __init__(self, graph, indices, graph_sampler, device='cpu', use_ddp=False,
+    def __init__(self, graph, indices, graph_sampler, device=None, use_ddp=False,
                  ddp_seed=0, batch_size=1, drop_last=False, shuffle=False,
                  use_prefetch_thread=None, use_alternate_streams=None,
                  pin_prefetcher=None, use_uva=False, **kwargs):
@@ -712,6 +711,7 @@ class DataLoader(torch.utils.data.DataLoader):
             # ignore when it fails to convert to torch Tensors.
             pass
 
+        device = self.graph.device.type if device is None else device
         self.device = _get_device(device)
 
         # Sanity check - we only check for DGLGraphs.
