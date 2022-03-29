@@ -2342,11 +2342,11 @@ def test_module_laplacian_pe(idtype):
     transform = dgl.LaplacianPE(2, 'lappe')
     g = dgl.graph(([2, 1, 0, 3, 1, 1],[3, 0, 1, 3, 3, 1]), idtype=idtype, device=F.ctx())
     new_g = transform(g)
-    tgt = F.copy_to(F.tensor([[ 0.2497, -0.0000],
-        [ 0.1177, -0.0000],
-        [-0.8324, -1.0000],
-        [-0.4806, -0.0000]]), g.device)
-    assert F.allclose(new_g.ndata['lappe'], tgt)
+    tgt = F.copy_to(F.tensor([[ 0.24971116, 0.],
+        [ 0.11771496, 0.],
+        [ 0.83237050, 1.],
+        [ 0.48056933, 0.]]), g.device)
+    assert F.allclose(new_g.ndata['lappe'].abs(), tgt)
 
 if __name__ == '__main__':
     test_partition_with_halo()
