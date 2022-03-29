@@ -48,7 +48,7 @@ class _TensorizedDatasetIter(object):
             if drop_last:
                 num_batches = len(dataset) / batch_size
             else:
-                num_batches = math.ceil(len(dataset), batch_size)
+                num_batches = math.ceil(len(dataset) / batch_size)
         self.num_batches = num_batches
         self.sample = 0
 
