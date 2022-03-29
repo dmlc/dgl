@@ -266,12 +266,14 @@ class Column(TensorStorage):
 
     @property
     def dtype(self):
+        """ Return the effective data type of this Column """
         if self.deferred_dtype is not None:
             return self.deferred_dtype
         return self.storage.dtype
 
     def astype(self, new_dtype):
-        """ Return a new column such that when its data is requested, it will be converted to new_dtype.
+        """ Return a new column such that when its data is requested,
+        it will be converted to new_dtype.
 
         Parameters
         ----------
@@ -825,17 +827,20 @@ class Frame(MutableMapping):
 
     def __astype_float(self, new_type):
         assert new_type in [F.float64, F.float32, F.float16], \
-            "'new_type' must be floating-point type: %s" % str(type)
+            "'new_type' must be floating-point type: %s" % str(new_type)
         for name, column in self._columns.items():
-            type = column.dtype
-            if type != new_type and type in [F.float64, F.float32, F.float16]:
+            dtype = column.dtype
+            if dtype != new_type and dtype in [F.float64, F.float32, F.float16]:
                 self._columns[name] = column.astype(new_type)
 
     def half_(self):
+        """Converts all floating-point columns to half-precision (float16)"""
         self.__astype_float(F.float16)
 
     def float_(self):
+        """Converts all floating-point columns to single-precision (float32)"""
         self.__astype_float(F.float32)
 
     def double_(self):
+        """Converts all floating-point columns to double-precision (float64)"""
         self.__astype_float(F.float64)
