@@ -477,6 +477,7 @@ pipeline {
       script {
         node("linux-core-worker") {
           docker.image('amazon/aws-cli').inside {
+            sh("mkdir -p cireport")
             publishHTML target: [
                 allowMissing: false,
                 alwaysLinkToLastBuild: false,
@@ -485,6 +486,8 @@ pipeline {
                 reportFiles: 'index.html',
                 reportName: 'dgl'
               ]
+            sh("ls -l cireport/")
+            sh("ls -l cireport")
             sh('aws s3 sync ./cireport s3://dgl-ci-result/${BUILD_ID}')
           }
         }
