@@ -482,7 +482,7 @@ pipeline {
           }
         }
         node('windows') {
-            bat "(rmvirtualenv ${BUILD_TAG} )|| (exit 0)"
+            bat "(rmvirtualenv ${BUILD_TAG})|| (exit 0)"
         }
       }
     }
