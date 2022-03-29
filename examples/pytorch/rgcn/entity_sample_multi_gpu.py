@@ -31,12 +31,13 @@ def collect_eval(n_gpus, queue, labels):
 
 def run(proc_id, n_gpus, n_cpus, args, devices, dataset, queue=None):
     dev_id = devices[proc_id]
+    th.cuda.set_device(dev_id)
     g, num_rels, num_classes, labels, train_idx, test_idx,\
         target_idx, inv_target = dataset
 
     dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
         master_ip='127.0.0.1', master_port='12345')
-    backend = 'gloo'
+    backend = 'nccl'
     if proc_id == 0:
         print("backend using {}".format(backend))
     th.distributed.init_process_group(backend=backend,
@@ -101,6 +102,8 @@ def main(args, devices):
     g.create_formats_()
 
     n_gpus = len(devices)
+    # required for mp.Queue() to work with mp.spawn()
+    mp.set_start_method('spawn')
     n_cpus = mp.cpu_count()
     queue = mp.Queue(n_gpus)
     mp.spawn(run, args=(n_gpus, n_cpus // n_gpus, args, devices, data, queue),
