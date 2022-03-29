@@ -483,7 +483,7 @@ pipeline {
           }
         }
         node('windows') {
-            bat "rmvirtualenv ${BUILD_TAG} > NULL"
+            bat "rmvirtualenv ${BUILD_TAG} 2> nul"
         }
       }
     }
