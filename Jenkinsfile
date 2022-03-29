@@ -477,14 +477,13 @@ pipeline {
       script {
         node("linux-core-worker") {
           docker.image('amazon/aws-cli').inside("--entrypoint=''") {
-            sh("ls -l cireport/")
+            sh("echo test > cireport")
             sh("ls -l cireport")
-            sh("touch cireport")
-            sh('aws s3 sync ./cireport s3://dgl-ci-result/${BUILD_ID}')
+            sh('aws s3 cp ./cireport s3://dgl-ci-result/${BUILD_ID}')
           }
         }
         node('windows') {
-            bat "rmvirtualenv ${BUILD_TAG}"
+            bat "rmvirtualenv ${BUILD_TAG} > NULL"
         }
       }
     }
