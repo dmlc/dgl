@@ -135,7 +135,7 @@ class RandomWalkPE(BaseTransform):
 
     def __call__(self, g):
         PE = functional.random_walk_pe(g, k=self.k, eweight_name=self.eweight_name)
-        g.ndata[self.feat_name] = PE
+        g.ndata[self.feat_name] = F.copy_to(PE, g.device)
 
         return g
 
@@ -176,7 +176,7 @@ class LaplacianPE(BaseTransform):
 
     def __call__(self, g):
         PE = functional.laplacian_pe(g, k=self.k)
-        g.ndata[self.feat_name] = PE
+        g.ndata[self.feat_name] = F.copy_to(PE, g.device)
 
         return g
 
