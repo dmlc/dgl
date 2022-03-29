@@ -2346,7 +2346,12 @@ def test_module_laplacian_pe(idtype):
         [ 0.11771496, 0.],
         [ 0.83237050, 1.],
         [ 0.48056933, 0.]]), g.device)
-    assert F.allclose(new_g.ndata['lappe'].abs(), tgt)
+    # tensorflow has no abs() api
+    if dgl.backend.backend_name == 'tensorflow':
+        assert F.allclose(new_g.ndata['lappe'].__abs__(), tgt)
+    # pytorch & mxnet
+    else:
+        assert F.allclose(new_g.ndata['lappe'].abs(), tgt)
 
 if __name__ == '__main__':
     test_partition_with_halo()
