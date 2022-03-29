@@ -478,7 +478,7 @@ pipeline {
         node("linux-core-worker") {
           docker.image('amazon/aws-cli').inside("--entrypoint=''") {
             sh("curl -o cireport.log ${BUILD_URL}consoleText")
-            sh('aws s3 cp cireport.log s3://dgl-ci-result/${JOB_NAME}/${BUILD_NUMBER}/${BUILD_ID} --acl public-read')
+            sh('aws s3 cp cireport.log s3://dgl-ci-result/${JOB_NAME}/${BUILD_NUMBER}/${BUILD_ID}/cireport.log --acl public-read')
           }
         }
         node('windows') {
