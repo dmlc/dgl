@@ -474,6 +474,7 @@ pipeline {
   }
   post {
     always {
+      stages{
       stage('Generate Report') {
         steps{
           publishHTML target: [
@@ -504,6 +505,7 @@ pipeline {
         node('windows') {
           bat "rmvirtualenv ${BUILD_TAG}"
         }
+      }
       }
     }
   }
