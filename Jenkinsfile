@@ -477,9 +477,8 @@ pipeline {
       script {
         node("linux-core-worker") {
           docker.image('amazon/aws-cli').inside("--entrypoint=''") {
-            sh("echo test > cireport.log")
-            sh("ls -l cireport.log")
-            sh('aws s3 cp cireport.log s3://dgl-ci-result/${BUILD_ID}')
+            sh("cat ${JENKINS_HOME}/jobs/${JOB_NAME}/builds/${BUILD_NUMBER}/log >> cireport.log")
+            sh('aws s3 cp cireport.log s3://dgl-ci-result/${JOB_NAME}/${BUILD_NUMBER}/${BUILD_ID}')
           }
         }
         node('windows') {
