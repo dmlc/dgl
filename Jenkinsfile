@@ -475,7 +475,8 @@ pipeline {
   post {
     always {
       script {
-        docker.image('amazon/aws-cli').label("linux-core-worker") {           
+        node("linux-core-worker") {
+          docker.image('amazon/aws-cli').inside {
             publishHTML target: [
                 allowMissing: false,
                 alwaysLinkToLastBuild: false,
@@ -485,7 +486,7 @@ pipeline {
                 reportName: 'DGL CI report'
               ]
             sh('aws s3 sync ./cireport s3://dgl-ci-result/${BUILD_ID}')
-
+          }
         }
         node('windows') {
             bat "rmvirtualenv ${BUILD_TAG}"
