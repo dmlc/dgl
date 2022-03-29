@@ -40,9 +40,9 @@ def dgl_warning_format(message, category, filename, lineno, line=None):
     else:
         return _default_formatwarning(message, category, filename, lineno, line=None)
 
-def dgl_warning(message, category=DGLWarning, stacklevel=1):
+def dgl_warning(message, category=DGLWarning, stacklevel=2):
     """DGL warning wrapper that defaults to ``DGLWarning`` instead of ``UserWarning`` category."""
-    return warnings.warn(message, category=category, stacklevel=1)
+    return warnings.warn(message, category=category, stacklevel=stacklevel)
 
 warnings.formatwarning = dgl_warning_format
 
