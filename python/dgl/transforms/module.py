@@ -104,7 +104,7 @@ class RandomWalkPE(BaseTransform):
     <https://arxiv.org/abs/2110.07875>`__
 
     This module only works for homogeneous graphs.
-    
+
     Parameters
     ----------
     k : int
@@ -132,7 +132,7 @@ class RandomWalkPE(BaseTransform):
         self.k = k
         self.feat_name = feat_name
         self.eweight_name = eweight_name
-    
+
     def __call__(self, g):
         PE = functional.random_walk_pe(g, k=self.k, eweight_name=self.eweight_name)
         g.ndata[self.feat_name] = PE
@@ -143,19 +143,20 @@ class LaplacianPE(BaseTransform):
     r"""Laplacian Positional Encoding, as introduced in
     `Benchmarking Graph Neural Networks
     <https://arxiv.org/abs/2003.00982>`__
-    
+
     This module only works for homogeneous bidirected graphs.
-    
+
     Parameters
     ----------
     k : int
-        Number of smallest non-trivial eigenvectors to use for positional encoding (smaller than the number of nodes).
+        Number of smallest non-trivial eigenvectors to use for positional encoding
+        (smaller than the number of nodes).
     feat_name : str, optional
         Name to store the computed positional encodings in ndata.
 
     Example
     -------
-    
+
     >>> import dgl
     >>> from dgl import LaplacianPE
 
@@ -172,11 +173,11 @@ class LaplacianPE(BaseTransform):
     def __init__(self, k, feat_name='PE'):
         self.k = k
         self.feat_name = feat_name
-    
+
     def __call__(self, g):
         PE = functional.laplacian_pe(g, k=self.k)
         g.ndata[self.feat_name] = PE
-        
+
         return g
 
 class AddSelfLoop(BaseTransform):

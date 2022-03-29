@@ -3370,7 +3370,8 @@ def laplacian_pe(g, k):
     g : DGLGraph
         The input graph. Must be homogeneous.
     k : int
-        Number of smallest non-trivial eigenvectors to use for positional encoding (smaller than the number of nodes).
+        Number of smallest non-trivial eigenvectors to use for positional encoding
+        (smaller than the number of nodes).
 
     Returns
     -------
@@ -3393,8 +3394,9 @@ def laplacian_pe(g, k):
     # check for the "k < n" constraint
     n = g.num_nodes()
     if n <= k:
-        assert f"the number of eigenvectors k must be smaller than the number of nodes n, {k} and {n} detected."
-    
+        assert "the number of eigenvectors k must be smaller than the number of nodes n, " + \
+            f"{k} and {n} detected."
+
     # get laplacian matrix as I - D^-0.5 * A * D^-0.5
     A = g.adj(scipy_fmt='csr') # adjacency matrix
     N = sparse.diags(F.asnumpy(g.in_degrees()).clip(1) ** -0.5, dtype=float) # D^-1/2
@@ -3410,7 +3412,7 @@ def laplacian_pe(g, k):
     # get random flip signs
     rand_sign = 2 * (np.random.rand(k) > 0.5) - 1.
     PE = F.tensor(rand_sign * topk_EigVec).float()
-    
+
     return PE
 
 _init_api("dgl.transform", __name__)
