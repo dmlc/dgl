@@ -46,6 +46,8 @@ def call_once_and_share(func, rank=0):
     """Invoke the function in a single process of the process group spawned by
     :func:`spawn`, and share the result to other processes.
 
+    Requires the subprocesses to be spawned with :func:`dgl.multiprocessing.pytorch.spawn`.
+
     Parameters
     ----------
     func : callable
