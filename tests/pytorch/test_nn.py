@@ -1308,7 +1308,7 @@ def test_hgt(idtype, in_size, num_heads):
     etype = th.tensor([i % num_etypes for i in range(g.num_edges())]).to(dev)
     ntype = th.tensor([i % num_ntypes for i in range(g.num_nodes())]).to(dev)
     x = th.randn(g.num_nodes(), in_size).to(dev)
-    
+
     m = nn.HGTConv(in_size, head_size, num_heads, num_ntypes, num_etypes).to(dev)
 
     y = m(g, x, ntype, etype)
@@ -1329,3 +1329,17 @@ def test_hgt(idtype, in_size, num_heads):
     assert sorted_y.shape == (g.num_nodes(), head_size * num_heads)
     # TODO(minjie): enable the following check
     #assert th.allclose(y, sorted_y[rev_idx], atol=1e-4, rtol=1e-4)
+
+@parametrize_dtype
+def test_group_rev_res(idtype):
+    dev = F.ctx()
+
+    num_nodes = 5
+    num_edges = 20
+    feats = 32
+    groups = 2
+    g = dgl.rand_graph(num_nodes, num_edges).to(dev)
+    h = th.randn(num_nodes, feats).to(dev)
+    conv = nn.GraphConv(feats // groups, feats // groups)
+    model = nn.GroupRevRes(conv, groups).to(dev)
+    model(g, h)

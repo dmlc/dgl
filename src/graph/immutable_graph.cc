@@ -635,8 +635,8 @@ HeteroGraphPtr ImmutableGraph::AsHeteroGraph() const {
   if (coo_)
     coo = GetCOO()->ToCOOMatrix();
 
-  auto g = UnitGraph::CreateHomographFrom(
-      in_csr, out_csr, coo,
+  auto g = UnitGraph::CreateUnitGraphFrom(
+      1, in_csr, out_csr, coo,
       in_csr_ != nullptr,
       out_csr_ != nullptr,
       coo_ != nullptr);

@@ -10,6 +10,7 @@ from torch.utils.data import DataLoader
 from collections import defaultdict
 from collections.abc import Iterator, Mapping
 from itertools import product
+from test_utils import parametrize_dtype
 import pytest
 
 
@@ -89,6 +90,15 @@ def test_neighbor_nonuniform(num_workers):
         elif seed == 0:
             assert neighbors == {3, 4}
 
+def _check_dtype(data, dtype, attr_name):
+    if isinstance(data, dict):
+        for k, v in data.items():
+            assert getattr(v, attr_name) == dtype
+    elif isinstance(data, list):
+        for v in data:
+            assert getattr(v, attr_name) == dtype
+    else:
+        assert getattr(data, attr_name) == dtype
 
 def _check_device(data):
     if isinstance(data, dict):
@@ -100,11 +110,11 @@ def _check_device(data):
     else:
         assert data.device == F.ctx()
 
+@parametrize_dtype
 @pytest.mark.parametrize('sampler_name', ['full', 'neighbor', 'neighbor2'])
-# TODO(BarclayII): Re-enable pin_graph = True after PyTorch is upgraded to 1.9.0 on CI
-@pytest.mark.parametrize('pin_graph', [False])
-def test_node_dataloader(sampler_name, pin_graph):
-    g1 = dgl.graph(([0, 0, 0, 1, 1], [1, 2, 3, 3, 4]))
+@pytest.mark.parametrize('pin_graph', [False, True])
+def test_node_dataloader(idtype, sampler_name, pin_graph):
+    g1 = dgl.graph(([0, 0, 0, 1, 1], [1, 2, 3, 3, 4])).astype(idtype)
     if F.ctx() != F.cpu() and pin_graph:
         g1.create_formats_()
         g1.pin_memory_()
@@ -124,13 +134,16 @@ def test_node_dataloader(sampler_name, pin_graph):
             _check_device(input_nodes)
             _check_device(output_nodes)
             _check_device(blocks)
+            _check_dtype(input_nodes, idtype, 'dtype')
+            _check_dtype(output_nodes, idtype, 'dtype')
+            _check_dtype(blocks, idtype, 'idtype')
 
     g2 = dgl.heterograph({
          ('user', 'follow', 'user'): ([0, 0, 0, 1, 1, 1, 2], [1, 2, 3, 0, 2, 3, 0]),
          ('user', 'followed-by', 'user'): ([1, 2, 3, 0, 2, 3, 0], [0, 0, 0, 1, 1, 1, 2]),
          ('user', 'play', 'game'): ([0, 1, 1, 3, 5], [0, 1, 2, 0, 2]),
          ('game', 'played-by', 'user'): ([0, 1, 2, 0, 2], [0, 1, 1, 3, 5])
-    })
+    }).astype(idtype)
     for ntype in g2.ntypes:
         g2.nodes[ntype].data['feat'] = F.copy_to(F.randn((g2.num_nodes(ntype), 8)), F.cpu())
     batch_size = max(g2.num_nodes(nty) for nty in g2.ntypes)
@@ -147,6 +160,9 @@ def test_node_dataloader(sampler_name, pin_graph):
         _check_device(input_nodes)
         _check_device(output_nodes)
         _check_device(blocks)
+        _check_dtype(input_nodes, idtype, 'dtype')
+        _check_dtype(output_nodes, idtype, 'dtype')
+        _check_dtype(blocks, idtype, 'idtype')
 
     if g1.is_pinned():
         g1.unpin_memory_()
@@ -156,8 +172,7 @@ def test_node_dataloader(sampler_name, pin_graph):
     dgl.dataloading.negative_sampler.Uniform(2),
     dgl.dataloading.negative_sampler.GlobalUniform(15, False, 3),
     dgl.dataloading.negative_sampler.GlobalUniform(15, True, 3)])
-# TODO(BarclayII): Re-enable pin_graph = True after PyTorch is upgraded to 1.9.0 on CI
-@pytest.mark.parametrize('pin_graph', [False])
+@pytest.mark.parametrize('pin_graph', [False, True])
 def test_edge_dataloader(sampler_name, neg_sampler, pin_graph):
     g1 = dgl.graph(([0, 0, 0, 1, 1], [1, 2, 3, 3, 4]))
     if F.ctx() != F.cpu() and pin_graph:
