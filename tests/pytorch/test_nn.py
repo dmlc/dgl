@@ -1408,7 +1408,7 @@ def test_radius_graph(self_loop, get_distances):
     assert th.equal(dst, dst_target)
 
     if get_distances:
-        assert th.equal(dists, dists_target)
+        assert th.allclose(dists, dists_target, rtol=1e-03)
 
 @parametrize_dtype
 def test_group_rev_res(idtype):
