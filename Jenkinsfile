@@ -476,7 +476,7 @@ pipeline {
     always {
       script {
         node("linux-core-worker") {
-          docker.image('amazon/aws-cli').inside("--entrypoint=/bin/bash") {
+          docker.image('amazon/aws-cli').inside("--entrypoint=''") {
             sh("ls -l cireport/")
             sh("ls -l cireport")
             sh("touch cireport")
