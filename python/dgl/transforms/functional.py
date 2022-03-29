@@ -71,8 +71,8 @@ __all__ = [
     'adj_sum_graph',
     'reorder_graph',
     'norm_by_dst',
-    'rwpe',
-    'lappe'
+    'random_walk_pe',
+    'laplacian_pe'
     ]
 
 
@@ -3302,7 +3302,7 @@ def norm_by_dst(g, etype=None):
 
     return norm
 
-def rwpe(g, k):
+def random_walk_pe(g, k, eweight_name=None):
     r"""Random Walk Positional Encoding, as introduced in
     `Graph Neural Networks with Learnable Structural and Positional Representations
     <https://arxiv.org/abs/2110.07875>`__
@@ -3313,43 +3313,53 @@ def rwpe(g, k):
     Parameters
     ----------
     g : DGLGraph
-        The homogeneous graph.
+        The input graph. Must be homogeneous.
     k : int
         The number of random walk steps. The paper found the best value to be 16 and 20
         for two experiments.
+    eweight_name : str, optional
+        The name to retrieve the edge weights. Default: None, not using the edge weights.
 
     Returns
     -------
     Tensor
-        The random walk positional encodings.
+        The random walk positional encodings of shape :math:`(N, k)`, where :math:`N` is the
+        number of nodes in the input graph.
 
     Example
     -------
     >>> import dgl
     >>> g = dgl.graph(([0,1,1], [1,1,0]))
-    >>> dgl.rwpe(g, 2)
+    >>> dgl.random_walk_pe(g, 2)
     tensor([[0.0000, 0.5000],
             [0.5000, 0.7500]])
     """
-    # get 1-step random walk probabilities as A * D^-1
+    N = g.num_nodes() # number of nodes
+    M = g.num_edges() # number of edges
     A = g.adj(scipy_fmt='csr') # adjacency matrix
-    Dinv = sparse.diags(F.asnumpy(g.in_degrees()).clip(1) ** -1.0, dtype=float) # D^-1
-    RW = A * Dinv
+    if eweight_name is not None:
+        # add edge weights if required
+        W = sparse.csr_matrix(
+            (g.edata[eweight_name].squeeze(), g.find_edges(list(range(M)))),
+            shape = (N, N)
+        )
+        A = A.multiply(W)
+    RW = np.array(A / (A.sum(1) + 1e-30)) # 1-step transition probability
 
     # Iterate for k steps
     PE = [F.tensor(RW.diagonal()).float()]
     RW_power = RW
     for _ in range(k-1):
-        RW_power = RW_power * RW
+        RW_power = RW_power @ RW
         PE.append(F.tensor(RW_power.diagonal()).float())
     PE = F.stack(PE,dim=-1)
-    
+
     return PE
 
-def lappe(g, k):
+def laplacian_pe(g, k):
     r"""Laplacian Positional Encoding, as introduced in
     `A Generalization of Transformer Networks to Graphs
-    <https://arxiv.org/abs/2012.09699>`__
+    <https://arxiv.org/abs/2003.00982>`__
 
     This function computes the laplacian positional encodings as the
     k smallest non-trivial eigenvectors (k << n). k and n are the positional
@@ -3358,20 +3368,21 @@ def lappe(g, k):
     Parameters
     ----------
     g : DGLGraph
-        The homogeneous graph.
+        The input graph. Must be homogeneous.
     k : int
         Number of smallest non-trivial eigenvectors to use for positional encoding (smaller than the number of nodes).
 
     Returns
     -------
     Tensor
-        The laplacian positional encodings.
+        The laplacian positional encodings of shape :math:`(N, k)`, where :math:`N` is the
+        number of nodes in the input graph.
 
     Example
     -------
     >>> import dgl
     >>> g = dgl.rand_graph(6, 12)
-    >>> dgl.lappe(g, 2)
+    >>> dgl.laplacian_pe(g, 2)
     tensor([[-0.8931, -0.7713],
             [-0.0000,  0.6198],
             [ 0.2704, -0.0138],

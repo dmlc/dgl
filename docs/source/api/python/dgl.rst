@@ -93,8 +93,8 @@ Operators for generating positional encodings of each node.
 .. autosummary::
     :toctree: ../../generated
 
-    rwpe
-    lappe
+    random_walk_pe
+    laplacian_pe
 
 .. _api-partition:
 

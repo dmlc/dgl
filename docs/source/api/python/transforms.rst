@@ -28,5 +28,5 @@ dgl.transforms
     DropNode
     DropEdge
     AddEdge
-    RWPE
-    LapPE
+    RandomWalkPE
+    LaplacianPE

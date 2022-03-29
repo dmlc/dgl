@@ -2330,16 +2330,16 @@ def test_module_add_edge(idtype):
     assert new_g.canonical_etypes == g.canonical_etypes
 
 @parametrize_dtype
-def test_module_rwpe(idtype):
-    transform = dgl.RWPE(2, 'rwpe')
+def test_module_random_walk_pe(idtype):
+    transform = dgl.RandomWalkPE(2, 'rwpe')
     g = dgl.graph(([0, 1, 1], [1, 1, 0]), idtype=idtype)
     new_g = transform(g)
     tgt = F.tensor([[0., 0.5],[0.5, 0.75]])
     assert (new_g.ndata['rwpe'] - tgt).norm() < 1e-3
 
 @parametrize_dtype
-def test_module_lappe(idtype):
-    transform = dgl.LapPE(2, 'lappe')
+def test_module_laplacian_pe(idtype):
+    transform = dgl.LaplacianPE(2, 'lappe')
     g = dgl.graph(([2, 1, 0, 3, 1, 1],[3, 0, 1, 3, 3, 1]), idtype=idtype)
     new_g = transform(g)
     tgt = F.tensor([[ 0.2497, -0.0000],

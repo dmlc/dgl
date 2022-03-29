@@ -31,8 +31,8 @@ except ImportError:
 
 __all__ = [
     'BaseTransform',
-    'RWPE',
-    'LapPE',
+    'RandomWalkPE',
+    'LaplacianPE',
     'AddSelfLoop',
     'RemoveSelfLoop',
     'AddReverse',
@@ -98,7 +98,7 @@ class BaseTransform:
     def __repr__(self):
         return self.__class__.__name__ + '()'
 
-class RWPE(BaseTransform):
+class RandomWalkPE(BaseTransform):
     r"""Random Walk Positional Encoding, as introduced in
     `Graph Neural Networks with Learnable Structural and Positional Representations
     <https://arxiv.org/abs/2110.07875>`__
@@ -112,34 +112,37 @@ class RWPE(BaseTransform):
         for two experiments.
     feat_name : str, optional
         Name to store the computed positional encodings in ndata.
+    eweight_name : str, optional
+        Name to retrieve the edge weights. Default: None, not using the edge weights.
 
     Example
     -------
 
     >>> import dgl
-    >>> from dgl import RWPE
+    >>> from dgl import RandomWalkPE
 
-    >>> transform = RWPE(k=2)
+    >>> transform = RandomWalkPE(k=2)
     >>> g = dgl.graph(([0, 1, 1], [1, 1, 0]))
     >>> g = transform(g)
     >>> print(g.ndata['PE'])
     tensor([[0.0000, 0.5000],
             [0.5000, 0.7500]])
     """
-    def __init__(self, k, feat_name='PE'):
+    def __init__(self, k, feat_name='PE', eweight_name=None):
         self.k = k
         self.feat_name = feat_name
+        self.eweight_name = eweight_name
     
     def __call__(self, g):
-        PE = functional.rwpe(g, k=self.k)
+        PE = functional.random_walk_pe(g, k=self.k, eweight_name=self.eweight_name)
         g.ndata[self.feat_name] = PE
 
         return g
 
-class LapPE(BaseTransform):
+class LaplacianPE(BaseTransform):
     r"""Laplacian Positional Encoding, as introduced in
     `A Generalization of Transformer Networks to Graphs
-    <https://arxiv.org/abs/2012.09699>`__
+    <https://arxiv.org/abs/2003.00982>`__
     
     This module only works for homogeneous bidirected graphs.
     
@@ -154,9 +157,9 @@ class LapPE(BaseTransform):
     -------
     
     >>> import dgl
-    >>> from dgl import LapPE
+    >>> from dgl import LaplacianPE
 
-    >>> transform = LapPE(k=3)
+    >>> transform = LaplacianPE(k=3)
     >>> g = dgl.rand_graph(5, 10)
     >>> g = transform(g)
     >>> print(g.ndata['PE'])
@@ -171,7 +174,7 @@ class LapPE(BaseTransform):
         self.feat_name = feat_name
     
     def __call__(self, g):
-        PE = functional.lappe(g, k=self.k)
+        PE = functional.laplacian_pe(g, k=self.k)
         g.ndata[self.feat_name] = PE
         
         return g
