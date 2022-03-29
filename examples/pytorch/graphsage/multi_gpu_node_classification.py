@@ -159,7 +159,7 @@ def train(rank, world_size, graph, num_classes, split_idx):
             use_uva=True)
 
     durations = []
-    for _ in range(1):
+    for _ in range(10):
         model.train()
         t0 = time.time()
         for it, (input_nodes, output_nodes, blocks) in enumerate(train_dataloader):
