@@ -59,7 +59,8 @@ def call_once_and_share(func, rank=0):
     if _PROCESS_CONTEXT is None:
         raise RuntimeError(
             'call_once_and_share can only be called within processes spawned by '
-            'dgl.multiprocessing.spawn() function.')
+            'dgl.multiprocessing.spawn() function. '
+            'Please replace torch.multiprocessing.spawn() with dgl.multiprocessing.spawn().')
 
     if _PROCESS_CONTEXT.rank == rank:
         result = func()
