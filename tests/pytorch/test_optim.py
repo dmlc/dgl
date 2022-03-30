@@ -96,7 +96,7 @@ def test_sparse_adam_dtype(dtype):
     th.manual_seed(0)
     th.nn.init.uniform_(dgl_emb.weight, 0, 1.0)
 
-    dgl_adam = SparseAdam(params=[dgl_emb], lr=0.01, use_uva=use_uva)
+    dgl_adam = SparseAdam(params=[dgl_emb], lr=0.01, dtype=dtype)
     torch_adam = th.optim.SparseAdam(list(torch_emb.parameters()), lr=0.01)
 
     # first step
