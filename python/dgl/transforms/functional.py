@@ -20,6 +20,7 @@ from collections import defaultdict
 import numpy as np
 import scipy.sparse as sparse
 import scipy.sparse.linalg
+import torch as th
 
 from .._ffi.function import _init_api
 from ..base import dgl_warning, DGLError, NID, EID
@@ -71,6 +72,7 @@ __all__ = [
     'adj_sum_graph',
     'reorder_graph',
     'norm_by_dst',
+    'radius_graph',
     'random_walk_pe',
     'laplacian_pe'
     ]
@@ -3301,6 +3303,119 @@ def norm_by_dst(g, etype=None):
     norm = F.replace_inf_with_zero(norm)
 
     return norm
+
+def radius_graph(x, r, p=2, self_loop=False,
+                 compute_mode='donot_use_mm_for_euclid_dist', get_distances=False):
+    r"""Construct a graph from a set of points with neighbors within given distance.
+
+    The function transforms the coordinates/features of a point set
+    into a bidirected homogeneous graph. The coordinates of the point
+    set is specified as a matrix whose rows correspond to points and
+    columns correspond to coordinate/feature dimensions.
+
+    The nodes of the returned graph correspond to the points, where the neighbors
+    of each point are within given distance.
+
+    The function requires the PyTorch backend.
+
+    Parameters
+    ----------
+    x : Tensor
+        The point coordinates. It can be either on CPU or GPU.
+        Device of the point coordinates specifies device of the radius graph and
+        ``x[i]`` corresponds to the i-th node in the radius graph.
+    r : float
+        Radius of the neighbors.
+    p : float, optional
+        Power parameter for the Minkowski metric. When :attr:`p = 1` it is the
+        equivalent of Manhattan distance (L1 norm) and Euclidean distance
+        (L2 norm) for :attr:`p = 2`.
+
+        (default: 2)
+    self_loop : bool, optional
+        Whether the radius graph will contain self-loops.
+
+        (default: False)
+    compute_mode : str, optional
+        ``use_mm_for_euclid_dist_if_necessary`` - will use matrix multiplication
+        approach to calculate euclidean distance (p = 2) if P > 25 or R > 25
+        ``use_mm_for_euclid_dist`` - will always use matrix multiplication
+        approach to calculate euclidean distance (p = 2)
+        ``donot_use_mm_for_euclid_dist`` - will never use matrix multiplication
+        approach to calculate euclidean distance (p = 2).
+
+        (default: donot_use_mm_for_euclid_dist)
+    get_distances : bool, optional
+        Whether to return the distances for the corresponding edges in the
+        radius graph.
+
+        (default: False)
+
+    Returns
+    -------
+    DGLGraph
+        The constructed graph. The node IDs are in the same order as :attr:`x`.
+    torch.Tensor, optional
+        The distances for the edges in the constructed graph. The distances are
+        in the same order as edge IDs.
+
+    Examples
+    --------
+
+    The following examples use PyTorch backend.
+
+    >>> import dgl
+    >>> import torch
+
+    >>> x = torch.tensor([[0.0, 0.0, 1.0],
+    ...                   [1.0, 0.5, 0.5],
+    ...                   [0.5, 0.2, 0.2],
+    ...                   [0.3, 0.2, 0.4]])
+    >>> r_g = dgl.radius_graph(x, 0.75)  # Each node has neighbors within 0.75 distance
+    >>> r_g.edges()
+    (tensor([0, 1, 2, 2, 3, 3]), tensor([3, 2, 1, 3, 0, 2]))
+
+    When :attr:`get_distances` is True, function returns the radius graph and
+    distances for the corresponding edges.
+
+    >>> x = torch.tensor([[0.0, 0.0, 1.0],
+    ...                   [1.0, 0.5, 0.5],
+    ...                   [0.5, 0.2, 0.2],
+    ...                   [0.3, 0.2, 0.4]])
+    >>> r_g, dist = dgl.radius_graph(x, 0.75, get_distances=True)
+    >>> r_g.edges()
+    (tensor([0, 1, 2, 2, 3, 3]), tensor([3, 2, 1, 3, 0, 2]))
+    >>> dist
+    tensor([[0.7000],
+            [0.6557],
+            [0.6557],
+            [0.2828],
+            [0.7000],
+            [0.2828]])
+    """
+    # check invalid r
+    if r <= 0:
+        raise DGLError("Invalid r value. expect r > 0, got r = {}".format(r))
+
+    # check empty point set
+    if F.shape(x)[0] == 0:
+        raise DGLError("Find empty point set")
+
+    distances = th.cdist(x, x, p=p, compute_mode=compute_mode)
+
+    if not self_loop:
+        distances.fill_diagonal_(r + 1e-4)
+
+    edges = th.nonzero(distances <= r, as_tuple=True)
+
+    g = convert.graph(edges, num_nodes=x.shape[0], device=x.device)
+
+    if get_distances:
+        distances = distances[edges].unsqueeze(-1)
+
+        return g, distances
+
+    return g
 
 def random_walk_pe(g, k, eweight_name=None):
     r"""Random Walk Positional Encoding, as introduced in
