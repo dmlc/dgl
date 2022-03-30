@@ -101,10 +101,10 @@ class SAINTSampler(Sampler):
 
     def edge_sampler(self, g):
         """Node ID sampler for random edge sampler"""
+        src, dst = g.edges()
         if self.cache and self.prob is not None:
             prob = self.prob
         else:
-            src, dst = g.edges()
             in_deg = g.in_degrees().float().clamp(min=1)
             out_deg = g.out_degrees().float().clamp(min=1)
             # We can reduce the sample space by half if graphs are always symmetric.
