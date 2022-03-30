@@ -47,9 +47,9 @@ std::tuple<IdArray, IdArray, IdArray> _ComputePrefixSums(const std::vector<COOMa
     }
   });
 
-  return {CumSum(prefix_src_arr, true),
-          CumSum(prefix_dst_arr, true),
-          CumSum(prefix_elm_arr, true)};
+  return std::make_tuple(CumSum(prefix_src_arr, true),
+                         CumSum(prefix_dst_arr, true),
+                         CumSum(prefix_elm_arr, true));
 }
 
 template <DLDeviceType XPU, typename IdType>

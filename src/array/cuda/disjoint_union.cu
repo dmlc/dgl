@@ -20,6 +20,7 @@
 #include <dgl/runtime/parallel_for.h>
 #include <dgl/array.h>
 #include <vector>
+#include <tuple>
 #include "../../runtime/cuda/cuda_common.h"
 #include "./utils.h"
 
@@ -65,9 +66,9 @@ std::tuple<IdArray, IdArray, IdArray> _ComputePrefixSums(const std::vector<COOMa
     }
   });
 
-  return {CumSum(n_rows.CopyTo(coos[0].row->ctx), true),
-          CumSum(n_cols.CopyTo(coos[0].row->ctx), true),
-          CumSum(n_elms.CopyTo(coos[0].row->ctx), true)};
+  return std::make_tuple(CumSum(n_rows.CopyTo(coos[0].row->ctx), true),
+                         CumSum(n_cols.CopyTo(coos[0].row->ctx), true),
+                         CumSum(n_elms.CopyTo(coos[0].row->ctx), true));
 }
 
 template <DLDeviceType XPU, typename IdType>
