@@ -132,6 +132,8 @@ def test_node_dataloader(idtype, sampler_name, pin_graph):
         else:
             g1 = g1.to('cuda')
 
+    use_uva = pin_graph is not None and F.ctx() != F.cpu()
+
     for num_workers in [0, 1, 2]:
         sampler = {
             'full': dgl.dataloading.MultiLayerFullNeighborSampler(2),
@@ -141,7 +143,7 @@ def test_node_dataloader(idtype, sampler_name, pin_graph):
             g1, indices, sampler, device=F.ctx(),
             batch_size=g1.num_nodes(),
             num_workers=(num_workers if (pin_graph and F.ctx() == F.cpu()) else 0),
-            use_uva=(pin_graph is not None))
+            use_uva=use_uva)
         for input_nodes, output_nodes, blocks in dataloader:
             _check_device(input_nodes)
             _check_device(output_nodes)
@@ -185,7 +187,7 @@ def test_node_dataloader(idtype, sampler_name, pin_graph):
         g2, {nty: g2.nodes(nty) for nty in g2.ntypes},
         sampler, device=F.ctx(), batch_size=batch_size,
         num_workers=(num_workers if (pin_graph and F.ctx() == F.cpu()) else 0),
-        use_uva=(pin_graph is not None))
+        use_uva=use_uva)
     assert isinstance(iter(dataloader), Iterator)
     for input_nodes, output_nodes, blocks in dataloader:
         _check_device(input_nodes)
