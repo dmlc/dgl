@@ -83,6 +83,19 @@ Operators for generating new graphs by manipulating the structure of the existin
     sort_csr_by_tag
     sort_csc_by_tag
 
+.. _api-positional-encoding:
+
+Graph Positional Encoding Ops:
+-----------------------------------------
+
+Operators for generating positional encodings of each node.
+
+.. autosummary::
+    :toctree: ../../generated
+
+    random_walk_pe
+    laplacian_pe
+
 .. _api-partition:
 
 Graph Partition Utilities
