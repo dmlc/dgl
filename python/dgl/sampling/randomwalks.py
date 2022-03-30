@@ -170,12 +170,13 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
 
     gidx = g._graph
     nodes = utils.prepare_tensor(g, nodes, 'nodes')
+    # (Xin): When it comes to the C++ code, the matapath is already on the GPU
+    # and we have to copy it back to CPU to get num_nodes.
+    # Check it here before moving metapath to GPU to save the copy.
     assert F.max(nodes, dim=0) < g.num_nodes(g.canonical_etypes[metapath[0]][0]), \
         "Seed node ID exceeds the maximum number of nodes."
     metapath = utils.prepare_tensor(g, metapath, 'metapath')
     if g.is_pinned():
-        assert F.device_type(F.context(nodes)) != 'cpu', \
-            "Seed nodes must be on GPU when the graph is pinned."
         metapath = F.copy_to(metapath, F.context(nodes))
     nodes = F.to_dgl_nd(nodes)
     metapath = F.to_dgl_nd(metapath)
