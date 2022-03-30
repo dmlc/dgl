@@ -73,6 +73,8 @@ __all__ = [
     'reorder_graph',
     'norm_by_dst',
     'radius_graph',
+    'random_walk_pe',
+    'laplacian_pe'
     ]
 
 
@@ -3302,7 +3304,6 @@ def norm_by_dst(g, etype=None):
 
     return norm
 
-
 def radius_graph(x, r, p=2, self_loop=False,
                  compute_mode='donot_use_mm_for_euclid_dist', get_distances=False):
     r"""Construct a graph from a set of points with neighbors within given distance.
@@ -3415,5 +3416,118 @@ def radius_graph(x, r, p=2, self_loop=False,
         return g, distances
 
     return g
+
+def random_walk_pe(g, k, eweight_name=None):
+    r"""Random Walk Positional Encoding, as introduced in
+    `Graph Neural Networks with Learnable Structural and Positional Representations
+    <https://arxiv.org/abs/2110.07875>`__
+
+    This function computes the random walk positional encodings as landing probabilities
+    from 1-step to k-step, starting from each node to itself.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The input graph. Must be homogeneous.
+    k : int
+        The number of random walk steps. The paper found the best value to be 16 and 20
+        for two experiments.
+    eweight_name : str, optional
+        The name to retrieve the edge weights. Default: None, not using the edge weights.
+
+    Returns
+    -------
+    Tensor
+        The random walk positional encodings of shape :math:`(N, k)`, where :math:`N` is the
+        number of nodes in the input graph.
+
+    Example
+    -------
+    >>> import dgl
+    >>> g = dgl.graph(([0,1,1], [1,1,0]))
+    >>> dgl.random_walk_pe(g, 2)
+    tensor([[0.0000, 0.5000],
+            [0.5000, 0.7500]])
+    """
+    N = g.num_nodes() # number of nodes
+    M = g.num_edges() # number of edges
+    A = g.adj(scipy_fmt='csr') # adjacency matrix
+    if eweight_name is not None:
+        # add edge weights if required
+        W = sparse.csr_matrix(
+            (g.edata[eweight_name].squeeze(), g.find_edges(list(range(M)))),
+            shape = (N, N)
+        )
+        A = A.multiply(W)
+    RW = np.array(A / (A.sum(1) + 1e-30)) # 1-step transition probability
+
+    # Iterate for k steps
+    PE = [F.astype(F.tensor(RW.diagonal()), F.float32)]
+    RW_power = RW
+    for _ in range(k-1):
+        RW_power = RW_power @ RW
+        PE.append(F.astype(F.tensor(RW_power.diagonal()), F.float32))
+    PE = F.stack(PE,dim=-1)
+
+    return PE
+
+def laplacian_pe(g, k):
+    r"""Laplacian Positional Encoding, as introduced in
+    `Benchmarking Graph Neural Networks
+    <https://arxiv.org/abs/2003.00982>`__
+
+    This function computes the laplacian positional encodings as the
+    k smallest non-trivial eigenvectors (k << n). k and n are the positional
+    encoding dimensions and the number of nodes in the given graph.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The input graph. Must be homogeneous.
+    k : int
+        Number of smallest non-trivial eigenvectors to use for positional encoding
+        (smaller than the number of nodes).
+
+    Returns
+    -------
+    Tensor
+        The laplacian positional encodings of shape :math:`(N, k)`, where :math:`N` is the
+        number of nodes in the input graph.
+
+    Example
+    -------
+    >>> import dgl
+    >>> g = dgl.rand_graph(6, 12)
+    >>> dgl.laplacian_pe(g, 2)
+    tensor([[-0.8931, -0.7713],
+            [-0.0000,  0.6198],
+            [ 0.2704, -0.0138],
+            [-0.0000,  0.0554],
+            [ 0.3595, -0.0477],
+            [-0.0000,  0.1240]])
+    """
+    # check for the "k < n" constraint
+    n = g.num_nodes()
+    if n <= k:
+        assert "the number of eigenvectors k must be smaller than the number of nodes n, " + \
+            f"{k} and {n} detected."
+
+    # get laplacian matrix as I - D^-0.5 * A * D^-0.5
+    A = g.adj(scipy_fmt='csr') # adjacency matrix
+    N = sparse.diags(F.asnumpy(g.in_degrees()).clip(1) ** -0.5, dtype=float) # D^-1/2
+    L = sparse.eye(g.num_nodes()) - N * A * N
+
+    # select eigenvectors with smaller eigenvalues O(n + klogk)
+    EigVal, EigVec = np.linalg.eig(L.toarray())
+    kpartition_indices = np.argpartition(EigVal, k+1)[:k+1]
+    topk_eigvals = EigVal[kpartition_indices]
+    topk_indices = kpartition_indices[topk_eigvals.argsort()][1:]
+    topk_EigVec = np.real(EigVec[:, topk_indices])
+
+    # get random flip signs
+    rand_sign = 2 * (np.random.rand(k) > 0.5) - 1.
+    PE = F.astype(F.tensor(rand_sign * topk_EigVec), F.float32)
+
+    return PE
 
 _init_api("dgl.transform", __name__)
