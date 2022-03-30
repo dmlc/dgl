@@ -104,6 +104,7 @@ Utility Modules
     ~dgl.nn.pytorch.utils.WeightBasis
     ~dgl.nn.pytorch.factory.KNNGraph
     ~dgl.nn.pytorch.factory.SegmentedKNNGraph
+    ~dgl.nn.pytorch.factory.RadiusGraph
     ~dgl.nn.pytorch.utils.JumpingKnowledge
     ~dgl.nn.pytorch.sparse_emb.NodeEmbedding
     ~dgl.nn.pytorch.explain.GNNExplainer

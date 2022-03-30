@@ -46,6 +46,14 @@ Samplers
     MultiLayerFullNeighborSampler
     ClusterGCNSampler
     ShaDowKHopSampler
+    SAINTSampler
+
+Sampler Transformations
+-----------------------
+
+.. autosummary::
+    :toctree: ../../generated/
+
     as_edge_prediction_sampler
     BlockSampler
 
