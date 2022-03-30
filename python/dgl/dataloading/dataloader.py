@@ -193,7 +193,9 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
 
     def _create_shared_indices(self):
         indices = torch.empty(self.shared_mem_size, dtype=torch.int64)
-        indices[:self._id_tensor.shape[0]] = torch.arange(self._id_tensor.shape[0])
+        num_ids = self._id_tensor.shape[0]
+        indices[:num_ids] = torch.arange(num_ids)
+        indices[num_ids:] = torch.arange(self.shared_mem_size - num_ids)
         return indices
 
     def shuffle(self):
