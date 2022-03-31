@@ -711,7 +711,11 @@ class DataLoader(torch.utils.data.DataLoader):
             # ignore when it fails to convert to torch Tensors.
             pass
 
-        device = self.graph.device.type if device is None else device
+        if device is None:
+            if use_uva:
+                device = torch.cuda.current_device()
+            else:
+                device = self.graph.device
         self.device = _get_device(device)
 
         # Sanity check - we only check for DGLGraphs.
