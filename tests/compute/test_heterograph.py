@@ -1299,6 +1299,21 @@ def test_subgraph_mask(idtype):
                                'wishes': F.tensor([False, True], dtype=F.bool)})
         _check_subgraph(g, sg2)
 
+@unittest.skipIf(F._default_context_str == 'cpu', reason="GPU for uva testing.")
+@parametrize_dtype
+def test_subgraph_uva(idtype):
+    g = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 1], [1, 2]),
+        ('user', 'plays', 'game'): ([0, 1, 2, 1], [0, 0, 1, 1]),
+        ('user', 'wishes', 'game'): ([0, 2], [1, 0]),
+        ('developer', 'develops', 'game'): ([0, 1], [0, 1])
+    }, idtype=idtype, device=F.cpu())
+
+    g.pin_memory_()
+
+    # just a smoke test to ensure the it doesn't fail checks
+    sg1 = g.edge_subgraph({'follows': F.copy_to(F.tensor([0,1], dtype=F.int64), ctx=F.ctx())})
+
 @parametrize_dtype
 def test_subgraph(idtype):
     g = create_test_heterograph(idtype)
