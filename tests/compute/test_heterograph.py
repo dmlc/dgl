@@ -1312,7 +1312,8 @@ def test_subgraph_uva(idtype):
     g.pin_memory_()
 
     # just a smoke test to ensure the it doesn't fail checks
-    sg1 = g.edge_subgraph({'follows': F.copy_to(F.tensor([0,1], dtype=F.int64), ctx=F.ctx())})
+    sg1 = g.edge_subgraph({'follows': F.copy_to(F.tensor([0,1], dtype=idtype), \
+                                                ctx=F.ctx())})
 
 @parametrize_dtype
 def test_subgraph(idtype):
