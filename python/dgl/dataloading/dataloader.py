@@ -883,6 +883,12 @@ class EdgeDataLoader(DataLoader):
                  pin_prefetcher=False,
                  exclude=None, reverse_eids=None, reverse_etypes=None, negative_sampler=None,
                  use_uva=False, **kwargs):
+
+        if device is None:
+            if use_uva:
+                device = torch.cuda.current_device()
+            else:
+                device = self.graph.device
         device = _get_device(device)
 
         if isinstance(graph_sampler, BlockSampler):
