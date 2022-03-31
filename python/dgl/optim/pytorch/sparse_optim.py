@@ -552,6 +552,11 @@ class SparseAdam(SparseGradOptimizer):
         self._use_uva = use_uva
         self._dtype = dtype
 
+    def _setup_uva(self, mem, power):
+        self._use_uva = True
+        pin_memory_inplace(mem)
+        pin_memory_inplace(power)
+
     def setup(self, params):
         # We need to register a state sum for each embedding in the kvstore.
         for emb in params:
@@ -559,8 +564,6 @@ class SparseAdam(SparseGradOptimizer):
                 'SparseAdam only supports dgl.nn.NodeEmbedding'
             emb_name = emb.name
             if th.device(emb.emb_tensor.device) == th.device('cpu'):
-                if self._use_uva is None:
-                    self._use_uva = True
                 # if our embedding is on the CPU, our state also has to be
                 if self._rank < 0:
                     state_step = th.empty(
@@ -594,16 +597,16 @@ class SparseAdam(SparseGradOptimizer):
                         emb.weight.shape, self._dtype)
                     state_power = get_shared_mem_array(emb_name+'_power', \
                         emb.weight.shape, self._dtype)
-                # pin memory on the CPU
                 if self._use_uva:
-                    pin_memory_inplace(state_mem)
-                    pin_memory_inplace(state_power)
+                    # if use_uva has been explicitly set to true, otherwise
+                    # wait until first step to decide
+                    self._setup_uva(state_mem, state_power)
             else:
+                # make sure we don't use UVA when data is on the GPU
                 assert not self._use_uva, "Cannot use UVA memory in " \
                     "{} when embedding device is {}".format( \
                         self.__class__.__name__, th.device(emb.emb_tensor.device))
-                if self._use_uva is None:
-                    self._use_uva = False
+                self._use_uva = False
                 # distributed state on on gpu
                 state_step = th.empty(
                     [emb.emb_tensor.shape[0]],
@@ -635,16 +638,24 @@ class SparseAdam(SparseGradOptimizer):
             Sparse embedding to update.
         """
         with th.no_grad():
-            beta1 = self._beta1
-            beta2 = self._beta2
-            eps = self._eps
-
-            clr = self._lr
             state_step, state_mem, state_power = emb.optm_state
             exec_dtype = grad.dtype
             exec_dev = grad.device
             state_dev = state_step.device
 
+            if self._use_uva is None \
+                    and state_dev == th.device('cpu') and exec_dev != state_dev:
+                # we should use UVA going forward
+                self._setup_uva(state_mem, state_power)
+            elif self._use_uva is None:
+                # we shouldn't use UVA going forward
+                self._use_uva = False
+
+            beta1 = self._beta1
+            beta2 = self._beta2
+            eps = self._eps
+
+            clr = self._lr
             # only perform async copies cpu -> gpu, or gpu-> gpu, but block
             # when copying to the cpu, so as to ensure the copy is finished
             # before operating on the data on the cpu

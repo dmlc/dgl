@@ -46,13 +46,16 @@ def test_sparse_adam():
     # DGL sparseAdam use a per embedding step
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
-@unittest.skipIf(F.ctx().type == 'cpu', reason='gpu only test')
-@pytest.mark.parametrize('use_uva', [False, True])
+@pytest.mark.parametrize('use_uva', [False, True, None])
 def test_sparse_adam_uva(use_uva):
+    if F.ctx().type == 'cpu' and use_uva == True:
+        # we want to only test values of False and None when not using GPU
+        pytest.skip("UVA cannot be used without GPUs.")
+
     num_embs = 10
     emb_dim = 4
     device=F.ctx()
-    dgl_emb = NodeEmbedding(num_embs, emb_dim, 'test')
+    dgl_emb = NodeEmbedding(num_embs, emb_dim, 'test_uva{}'.format(use_uva))
     torch_emb = th.nn.Embedding(num_embs, emb_dim, sparse=True)
     th.manual_seed(0)
     th.nn.init.uniform_(torch_emb.weight, 0, 1.0)
@@ -89,7 +92,7 @@ def test_sparse_adam_dtype(dtype):
     num_embs = 10
     emb_dim = 4
     device=F.ctx()
-    dgl_emb = NodeEmbedding(num_embs, emb_dim, 'test')
+    dgl_emb = NodeEmbedding(num_embs, emb_dim, 'test_dtype{}'.format(dtype))
     torch_emb = th.nn.Embedding(num_embs, emb_dim, sparse=True)
     th.manual_seed(0)
     th.nn.init.uniform_(torch_emb.weight, 0, 1.0)
