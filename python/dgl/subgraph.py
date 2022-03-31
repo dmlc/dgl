@@ -142,12 +142,12 @@ def node_subgraph(graph, nodes, *, relabel_nodes=True, store_ids=True, output_de
             return F.astype(F.nonzero_1d(F.copy_to(v, graph.device)), graph.idtype)
         else:
             return utils.prepare_tensor(graph, v, 'nodes["{}"]'.format(ntype))
+    nodes = {ntype: _process_nodes(ntype, v) for ntype, v in nodes.items()}
+    device = context_of(nodes)
 
-    induced_nodes = []
-    for ntype in graph.ntypes:
-        nids = nodes.get(ntype, F.copy_to(F.tensor([], graph.idtype), graph.device))
-        induced_nodes.append(_process_nodes(ntype, nids))
-    device = context_of(induced_nodes)
+    induced_nodes = [
+        nodes.get(ntype, F.copy_to(F.tensor([], graph.idtype), device))
+        for ntype in graph.ntypes]
     sgi = graph._graph.node_subgraph(induced_nodes, relabel_nodes)
     induced_edges = sgi.induced_edges
     # (BarclayII) should not write induced_nodes = sgi.induced_nodes due to the same
@@ -301,13 +301,13 @@ def edge_subgraph(graph, edges, *, relabel_nodes=True, store_ids=True, output_de
             return F.astype(F.nonzero_1d(F.copy_to(e, graph.device)), graph.idtype)
         else:
             return utils.prepare_tensor(graph, e, 'edges["{}"]'.format(etype))
-
     edges = {graph.to_canonical_etype(etype): e for etype, e in edges.items()}
-    induced_edges = []
-    for cetype in graph.canonical_etypes:
-        eids = edges.get(cetype, F.copy_to(F.tensor([], graph.idtype), graph.device))
-        induced_edges.append(_process_edges(cetype, eids))
-    device = context_of(induced_edges)
+    edges = {etype: _process_edges(etype, e) for etype, e in edges.items()}
+    device = context_of(edges)
+    induced_edges = [
+        edges.get(cetype, F.copy_to(F.tensor([], graph.idtype), device))
+        for cetype in graph.canonical_etypes]
+
     sgi = graph._graph.edge_subgraph(induced_edges, not relabel_nodes)
     induced_nodes_or_device = sgi.induced_nodes if relabel_nodes else device
     subg = _create_hetero_subgraph(
@@ -430,12 +430,9 @@ def in_subgraph(graph, nodes, *, relabel_nodes=False, store_ids=True, output_dev
         nodes = {graph.ntypes[0] : nodes}
     nodes = utils.prepare_tensor_dict(graph, nodes, 'nodes')
     device = context_of(nodes)
-    nodes_all_types = []
-    for ntype in graph.ntypes:
-        if ntype in nodes:
-            nodes_all_types.append(F.to_dgl_nd(nodes[ntype]))
-        else:
-            nodes_all_types.append(nd.NULL[graph._idtype_str])
+    nodes_all_types = [
+        F.to_dgl_nd(nodes.get(ntype, F.copy_to(F.tensor([], graph.idtype), device)))
+        for ntype in graph.ntypes]
 
     sgi = _CAPI_DGLInSubgraph(graph._graph, nodes_all_types, relabel_nodes)
     induced_nodes_or_device = sgi.induced_nodes if relabel_nodes else device
@@ -560,12 +557,9 @@ def out_subgraph(graph, nodes, *, relabel_nodes=False, store_ids=True, output_de
         nodes = {graph.ntypes[0] : nodes}
     nodes = utils.prepare_tensor_dict(graph, nodes, 'nodes')
     device = context_of(nodes)
-    nodes_all_types = []
-    for ntype in graph.ntypes:
-        if ntype in nodes:
-            nodes_all_types.append(F.to_dgl_nd(nodes[ntype]))
-        else:
-            nodes_all_types.append(nd.NULL[graph._idtype_str])
+    nodes_all_types = [
+        F.to_dgl_nd(nodes.get(ntype, F.copy_to(F.tensor([], graph.idtype), device)))
+        for ntype in graph.ntypes]
 
     sgi = _CAPI_DGLOutSubgraph(graph._graph, nodes_all_types, relabel_nodes)
     induced_nodes_or_device = sgi.induced_nodes if relabel_nodes else device
@@ -693,7 +687,8 @@ def khop_in_subgraph(graph, nodes, k, *, relabel_nodes=True, store_ids=True, out
 
     last_hop_nodes = nodes
     k_hop_nodes_ = [last_hop_nodes]
-    place_holder = F.copy_to(F.tensor([], dtype=graph.idtype), graph.device)
+    device = context_of(nodes)
+    place_holder = F.copy_to(F.tensor([], dtype=graph.idtype), device)
     for _ in range(k):
         current_hop_nodes = {nty: [] for nty in graph.ntypes}
         for cetype in graph.canonical_etypes:
@@ -853,7 +848,8 @@ def khop_out_subgraph(graph, nodes, k, *, relabel_nodes=True, store_ids=True, ou
 
     last_hop_nodes = nodes
     k_hop_nodes_ = [last_hop_nodes]
-    place_holder = F.copy_to(F.tensor([], dtype=graph.idtype), graph.device)
+    device = context_of(nodes)
+    place_holder = F.copy_to(F.tensor([], dtype=graph.idtype), device)
     for _ in range(k):
         current_hop_nodes = {nty: [] for nty in graph.ntypes}
         for cetype in graph.canonical_etypes:
