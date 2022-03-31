@@ -14,12 +14,14 @@ def _remove_kwargs_dist(kwargs):
     return kwargs
 
 class DistNodeDataLoader(DistDataLoader):
-    """PyTorch dataloader for batch-iterating over a set of nodes, generating the list
+    """Sampled graph data loader over nodes for distributed graph storage.
+
+    It wraps an iterable over a set of nodes, generating the list
     of message flow graphs (MFGs) as computation dependency of the said minibatch, on
     a distributed graph.
 
     All the arguments have the same meaning as the single-machine counterpart
-    :class:`dgl.dataloading.pytorch.NodeDataLoader` except the first argument
+    :class:`dgl.dataloading.DataLoader` except the first argument
     :attr:`g` which must be a :class:`dgl.distributed.DistGraph`.
 
     Parameters
@@ -28,11 +30,11 @@ class DistNodeDataLoader(DistDataLoader):
         The distributed graph.
 
     nids, graph_sampler, device, kwargs :
-        See :class:`dgl.dataloading.pytorch.NodeDataLoader`.
+        See :class:`dgl.dataloading.DataLoader`.
 
     See also
     --------
-    dgl.dataloading.pytorch.NodeDataLoader
+    dgl.dataloading.DataLoader
     """
     def __init__(self, g, nids, graph_sampler, device=None, **kwargs):
         collator_kwargs = {}
@@ -57,13 +59,15 @@ class DistNodeDataLoader(DistDataLoader):
         self.device = device
 
 class DistEdgeDataLoader(DistDataLoader):
-    """PyTorch dataloader for batch-iterating over a set of edges, generating the list
+    """Sampled graph data loader over edges for distributed graph storage.
+
+    It wraps an iterable over a set of edges, generating the list
     of message flow graphs (MFGs) as computation dependency of the said minibatch for
     edge classification, edge regression, and link prediction, on a distributed
     graph.
 
     All the arguments have the same meaning as the single-machine counterpart
-    :class:`dgl.dataloading.pytorch.EdgeDataLoader` except the first argument
+    :class:`dgl.dataloading.EdgeDataLoader` except the first argument
     :attr:`g` which must be a :class:`dgl.distributed.DistGraph`.
 
     Parameters
@@ -72,11 +76,11 @@ class DistEdgeDataLoader(DistDataLoader):
         The distributed graph.
 
     eids, graph_sampler, device, kwargs :
-        See :class:`dgl.dataloading.pytorch.EdgeDataLoader`.
+        See :class:`dgl.dataloading.EdgeDataLoader`.
 
     See also
     --------
-    dgl.dataloading.pytorch.EdgeDataLoader
+    dgl.dataloading.EdgeDataLoader
     """
     def __init__(self, g, eids, graph_sampler, device=None, **kwargs):
         collator_kwargs = {}

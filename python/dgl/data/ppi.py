@@ -6,31 +6,13 @@ from networkx.readwrite import json_graph
 import os
 
 from .dgl_dataset import DGLBuiltinDataset
-from .utils import _get_dgl_url, save_graphs, save_info, load_info, load_graphs, deprecate_property
+from .utils import _get_dgl_url, save_graphs, save_info, load_info, load_graphs
 from .. import backend as F
 from ..convert import from_networkx
 
 
 class PPIDataset(DGLBuiltinDataset):
     r""" Protein-Protein Interaction dataset for inductive node classification
-
-    .. deprecated:: 0.5.0
-
-        - ``lables`` is deprecated, it is replaced by:
-
-            >>> dataset = PPIDataset()
-            >>> for g in dataset:
-            ....    labels = g.ndata['label']
-            ....
-            >>>
-
-        - ``features`` is deprecated, it is replaced by:
-
-            >>> dataset = PPIDataset()
-            >>> for g in dataset:
-            ....    features = g.ndata['feat']
-            ....
-            >>>
 
     A toy Protein-Protein Interaction network dataset. The dataset contains
     24 graphs. The average number of nodes per graph is 2372. Each node has
@@ -153,16 +135,6 @@ class PPIDataset(DGLBuiltinDataset):
     @property
     def num_labels(self):
         return 121
-
-    @property
-    def labels(self):
-        deprecate_property('dataset.labels', 'dataset.graphs[i].ndata[\'label\']')
-        return self._labels
-
-    @property
-    def features(self):
-        deprecate_property('dataset.features', 'dataset.graphs[i].ndata[\'feat\']')
-        return self._feats
 
     def __len__(self):
         """Return number of samples in this dataset."""
