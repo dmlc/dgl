@@ -589,7 +589,9 @@ class DataLoader(torch.utils.data.DataLoader):
         The device of the generated MFGs in each iteration, which should be a
         PyTorch device object (e.g., ``torch.device``).
 
-        By default this value is the same as the device of :attr:`g`.
+        By default this value is None. If :attr:`use_uva` is True, MFGs and graphs will 
+        generated in torch.cuda.current_device(), otherwise the generated in same device 
+        of :attr:`g`.
     use_ddp : boolean, optional
         If True, tells the DataLoader to split the training set for each
         participating process appropriately using
