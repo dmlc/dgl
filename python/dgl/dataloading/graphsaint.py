@@ -61,8 +61,7 @@ class SAINTSampler(Sampler):
     >>> num_iters = 1000
     >>> sampler = SAINTSampler(mode='node', budget=6000)
     >>> # Assume g.ndata['feat'] and g.ndata['label'] hold node features and labels
-    >>> dataloader = DataLoader(g, torch.arange(num_iters), sampler, num_workers=4,
-    ...                         prefetch_ndata=['feat', 'label'])
+    >>> dataloader = DataLoader(g, torch.arange(num_iters), sampler, num_workers=4)
     >>> for subg in dataloader:
     ...     train_on(subg)
     """
