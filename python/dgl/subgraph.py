@@ -303,9 +303,10 @@ def edge_subgraph(graph, edges, *, relabel_nodes=True, store_ids=True, output_de
             return utils.prepare_tensor(graph, e, 'edges["{}"]'.format(etype))
 
     edges = {graph.to_canonical_etype(etype): e for etype, e in edges.items()}
+    edges_device = F.context(list(edges.values())[0]) if len(edges) > 0 else g.device
     induced_edges = []
     for cetype in graph.canonical_etypes:
-        eids = edges.get(cetype, F.copy_to(F.tensor([], graph.idtype), graph.device))
+        eids = edges.get(cetype, F.copy_to(F.tensor([], graph.idtype), edges_device))
         induced_edges.append(_process_edges(cetype, eids))
     device = context_of(induced_edges)
     sgi = graph._graph.edge_subgraph(induced_edges, not relabel_nodes)
