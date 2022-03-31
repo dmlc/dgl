@@ -5,6 +5,8 @@ Inductive Representation Learning on Large Graphs (GraphSAGE)
 - Author's code repo: [https://github.com/williamleif/graphsage-simple](https://github.com/williamleif/graphsage-simple). Note that the original code is 
 simple reference implementation of GraphSAGE.
 
+Advanced usages, including how to run pure GPU sampling, how to train with PyTorch Lightning, etc., are in the `advanced` directory.
+
 Requirements
 ------------
 - requests

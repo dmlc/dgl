@@ -5,6 +5,7 @@ from collections.abc import Mapping, Iterable
 from contextlib import contextmanager
 import copy
 import numbers
+import itertools
 import networkx as nx
 import numpy as np
 
@@ -4121,6 +4122,15 @@ class DGLHeteroGraph(object):
                 raise DGLError('Cannot assign node feature "{}" on device {} to a graph on'
                                ' device {}. Call DGLGraph.to() to copy the graph to the'
                                ' same device.'.format(key, F.context(val), self.device))
+            # To prevent users from doing things like:
+            #
+            #     g.pin_memory_()
+            #     g.ndata['x'] = torch.randn(...)
+            #     sg = g.sample_neighbors(torch.LongTensor([...]).cuda())
+            #     sg.ndata['x']    # Becomes a CPU tensor even if sg is on GPU due to lazy slicing
+            if self.is_pinned() and F.context(val) == 'cpu' and not F.is_pinned(val):
+                raise DGLError('Pinned graph requires the node data to be pinned as well. '
+                               'Please pin the node data before assignment.')
 
         if is_all(u):
             self._node_frames[ntid].update(data)
@@ -4213,6 +4223,15 @@ class DGLHeteroGraph(object):
                 raise DGLError('Cannot assign edge feature "{}" on device {} to a graph on'
                                ' device {}. Call DGLGraph.to() to copy the graph to the'
                                ' same device.'.format(key, F.context(val), self.device))
+            # To prevent users from doing things like:
+            #
+            #     g.pin_memory_()
+            #     g.edata['x'] = torch.randn(...)
+            #     sg = g.sample_neighbors(torch.LongTensor([...]).cuda())
+            #     sg.edata['x']    # Becomes a CPU tensor even if sg is on GPU due to lazy slicing
+            if self.is_pinned() and F.context(val) == 'cpu' and not F.is_pinned(val):
+                raise DGLError('Pinned graph requires the edge data to be pinned as well. '
+                               'Please pin the edge data before assignment.')
 
         # set
         if is_all(edges):
@@ -5467,7 +5486,8 @@ class DGLHeteroGraph(object):
         return self.to(F.cpu())
 
     def pin_memory_(self):
-        """Pin the graph structure to the page-locked memory for GPU zero-copy access.
+        """Pin the graph structure and node/edge data to the page-locked memory for
+        GPU zero-copy access.
 
         This is an **inplace** method. The graph structure must be on CPU to be pinned.
         If the graph struture is already pinned, the function directly returns it.
@@ -5530,13 +5550,16 @@ class DGLHeteroGraph(object):
         if F.device_type(self.device) != 'cpu':
             raise DGLError("The graph structure must be on CPU to be pinned.")
         self._graph.pin_memory_()
+        for frame in itertools.chain(self._node_frames, self._edge_frames):
+            for col in frame._columns.values():
+                col.pin_memory_()
 
         return self
 
     def unpin_memory_(self):
-        """Unpin the graph structure from the page-locked memory.
+        """Unpin the graph structure and node/edge data from the page-locked memory.
 
-        This is an **inplace** method.If the graph struture is not pinned,
+        This is an **inplace** method. If the graph struture is not pinned,
         e.g., on CPU or GPU, the function directly returns it.
 
         Returns
@@ -5547,6 +5570,9 @@ class DGLHeteroGraph(object):
         if not self._graph.is_pinned():
             return self
         self._graph.unpin_memory_()
+        for frame in itertools.chain(self._node_frames, self._edge_frames):
+            for col in frame._columns.values():
+                col.unpin_memory_()
 
         return self
 
