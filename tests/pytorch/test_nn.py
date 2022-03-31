@@ -1423,3 +1423,39 @@ def test_group_rev_res(idtype):
     conv = nn.GraphConv(feats // groups, feats // groups)
     model = nn.GroupRevRes(conv, groups).to(dev)
     model(g, h)
+
+@pytest.mark.parametrize('in_size', [16, 32])
+@pytest.mark.parametrize('hidden_size', [16, 32])
+@pytest.mark.parametrize('out_size', [16, 32])
+@pytest.mark.parametrize('edge_feat_size', [16, 10])
+def test_egnn_conv(in_size, hidden_size, out_size, edge_feat_size):
+    dev = F.ctx()
+    num_nodes = 5
+    num_edges = 20
+    g = dgl.rand_graph(num_nodes, num_edges).to(dev)
+    h = th.randn(num_nodes, in_size).to(dev)
+    x = th.randn(num_nodes, 3).to(dev)
+    e = th.randn(num_edges, edge_feat_size).to(dev)
+    model = nn.EGNNConv(in_size, hidden_size, out_size, edge_feat_size).to(dev)
+    model(g, h, x, e)
+
+@pytest.mark.parametrize('in_size', [16, 32])
+@pytest.mark.parametrize('out_size', [16, 32])
+@pytest.mark.parametrize('aggregators', 
+    [('mean', 'max', 'sum'), ('min', 'std', 'var'), ('moment3', 'moment4', 'moment5')])
+@pytest.mark.parametrize('scalers', [('identity'), ('amplification', 'attenuation')])
+@pytest.mark.parametrize('delta', [2.5, 7.4])
+@pytest.mark.parametrize('dropout', [0., 0.1])
+@pytest.mark.parametrize('num_towers', [1, 4])
+@pytest.mark.parametrize('edge_feat_size', [16, 0])
+def test_pna_conv(in_size, out_size, aggregators, scalers, delta,
+    dropout, num_towers, edge_feat_size):
+    dev = F.ctx()
+    num_nodes = 5
+    num_edges = 20
+    g = dgl.rand_graph(num_nodes, num_edges).to(dev)
+    h = th.randn(num_nodes, in_size).to(dev)
+    e = th.randn(num_edges, edge_feat_size).to(dev)
+    model = nn.PNAConv(in_size, out_size, aggregators, scalers, delta, dropout,
+        num_towers, edge_feat_size).to(dev)
+    model(g, h, edge_feat=e)
