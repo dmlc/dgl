@@ -10,7 +10,6 @@ from .base import DGLError, dgl_warning
 from . import backend as F
 from . import graph_index
 from . import heterograph_index
-from . import ndarray as nd
 from .heterograph import DGLHeteroGraph
 from . import utils
 from .utils import recursive_apply, context_of
