@@ -877,7 +877,7 @@ class EdgeDataLoader(DataLoader):
                 g, train_eid, sampler,
                 batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
     """
-    def __init__(self, graph, indices, graph_sampler, device='cpu', use_ddp=False,
+    def __init__(self, graph, indices, graph_sampler, device=None, use_ddp=False,
                  ddp_seed=0, batch_size=1, drop_last=False, shuffle=False,
                  use_prefetch_thread=False, use_alternate_streams=True,
                  pin_prefetcher=False,
