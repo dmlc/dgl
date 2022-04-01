@@ -525,8 +525,10 @@ class SparseAdam(SparseGradOptimizer):
         Whether to use pinned memory for storing 'mem' and 'power' parameters,
         when the embedding is stored on the CPU. This will improve training
         speed, but will require locking a large number of virtual memory pages.
-        Default: True if the embedding is on the CPU, and False if it is on the
-        GPU.
+        For embeddings which are stored in GPU memory, this setting will have
+        no effect.
+        Default: True if the gradients are generated on the GPU, and False
+        if the gradients are on the CPU.
 
     Examples
     --------
@@ -550,10 +552,11 @@ class SparseAdam(SparseGradOptimizer):
         self._beta2 = betas[1]
         self._eps = eps
         self._use_uva = use_uva
+        self._is_using_uva = {}
         self._dtype = dtype
 
-    def _setup_uva(self, mem, power):
-        self._use_uva = True
+    def _setup_uva(self, name, mem, power):
+        self._is_using_uva[name] = True
         pin_memory_inplace(mem)
         pin_memory_inplace(power)
 
@@ -563,6 +566,7 @@ class SparseAdam(SparseGradOptimizer):
             assert isinstance(emb, NodeEmbedding), \
                 'SparseAdam only supports dgl.nn.NodeEmbedding'
             emb_name = emb.name
+            self._is_using_uva[emb_name] = self._use_uva
             if th.device(emb.emb_tensor.device) == th.device('cpu'):
                 # if our embedding is on the CPU, our state also has to be
                 if self._rank < 0:
@@ -597,16 +601,15 @@ class SparseAdam(SparseGradOptimizer):
                         emb.weight.shape, self._dtype)
                     state_power = get_shared_mem_array(emb_name+'_power', \
                         emb.weight.shape, self._dtype)
-                if self._use_uva:
+
+                if self._is_using_uva[emb_name]:
                     # if use_uva has been explicitly set to true, otherwise
                     # wait until first step to decide
-                    self._setup_uva(state_mem, state_power)
+                    self._setup_uva(emb_name, state_mem, state_power)
             else:
                 # make sure we don't use UVA when data is on the GPU
-                assert not self._use_uva, "Cannot use UVA memory in " \
-                    "{} when embedding device is {}".format( \
-                        self.__class__.__name__, th.device(emb.emb_tensor.device))
-                self._use_uva = False
+                self._is_using_uva[emb_name] = False
+
                 # distributed state on on gpu
                 state_step = th.empty(
                     [emb.emb_tensor.shape[0]],
@@ -643,13 +646,15 @@ class SparseAdam(SparseGradOptimizer):
             exec_dev = grad.device
             state_dev = state_step.device
 
-            if self._use_uva is None \
+            if self._is_using_uva[emb.name] is None \
                     and state_dev == th.device('cpu') and exec_dev != state_dev:
                 # we should use UVA going forward
-                self._setup_uva(state_mem, state_power)
-            elif self._use_uva is None:
+                self._setup_uva(emb.name, state_mem, state_power)
+            elif self._is_using_uva[emb.name] is None:
                 # we shouldn't use UVA going forward
-                self._use_uva = False
+                self._is_using_uva[emb.name] = False
+
+            use_uva = self._is_using_uva[emb.name]
 
             beta1 = self._beta1
             beta2 = self._beta2
@@ -670,7 +675,7 @@ class SparseAdam(SparseGradOptimizer):
             state_step[state_idx] += 1
             state_step = state_step[state_idx].to(exec_dev)
 
-            if self._use_uva:
+            if use_uva:
                 orig_mem = gather_pinned_tensor_rows(state_mem, grad_indices)
                 orig_power = gather_pinned_tensor_rows(state_power, grad_indices)
             else:
@@ -690,7 +695,7 @@ class SparseAdam(SparseGradOptimizer):
             update_mem = beta1 * orig_mem + (1.-beta1) * grad_mem
             update_power = beta2 * orig_power + (1.-beta2) * grad_power
 
-            if self._use_uva:
+            if use_uva:
                 scatter_pinned_tensor_rows(state_mem, \
                                            grad_indices, \
                                            update_mem.to(dtype=self._dtype))
@@ -720,7 +725,7 @@ class SparseAdam(SparseGradOptimizer):
                 std_event = th.cuda.Event()
                 std_event.record()
 
-            if not self._use_uva:
+            if not use_uva:
                 if state_block:
                     # wait for our transfers from exec_dev to state_dev to finish
                     # before we can use them
