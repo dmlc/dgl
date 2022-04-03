@@ -63,8 +63,8 @@ split_idx = dataset.get_idx_split()
 train_idx, valid_idx, test_idx = split_idx['train'], split_idx['valid'], split_idx['test']
 
 device = 'cuda'
-#train_idx = train_idx.to(device)
-#valid_idx = valid_idx.to(device)
+train_idx = train_idx.to(device)
+valid_idx = valid_idx.to(device)
 
 model = SAGE(graph.ndata['feat'].shape[1], 256, dataset.num_classes).to(device)
 opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
@@ -73,10 +73,10 @@ sampler = dgl.dataloading.NeighborSampler(
         [15, 10, 5], prefetch_node_feats=['feat'], prefetch_labels=['label'])
 train_dataloader = dgl.dataloading.DataLoader(
         graph, train_idx, sampler, device=device, batch_size=1024, shuffle=True,
-        drop_last=False, num_workers=12, use_uva=False, persistent_workers=True)
+        drop_last=False, num_workers=0, use_uva=True)
 valid_dataloader = dgl.dataloading.NodeDataLoader(
         graph, valid_idx, sampler, device=device, batch_size=1024, shuffle=True,
-        drop_last=False, num_workers=12, use_uva=False, persistent_workers=True)
+        drop_last=False, num_workers=0, use_uva=True)
 
 durations = []
 for _ in range(10):
