@@ -38,7 +38,7 @@ class Process(mp.Process):
         target = thread_wrapped_func(target)
         super().__init__(group, target, name, args, kwargs, daemon=daemon)
 
-ProcessContext = namedtuple('ProcessContext', ['queue', 'queue_ack', 'rank', 'nprocs'])
+ProcessContext = namedtuple('ProcessContext', ['queue', 'barrier', 'rank', 'nprocs'])
 mp_timeout = int(os.environ.get('DGL_MP_TIMEOUT', '10'))
 _PROCESS_CONTEXT = None
 
@@ -66,18 +66,14 @@ def call_once_and_share(func, rank=0):
         result = func()
         for _ in range(_PROCESS_CONTEXT.nprocs - 1):
             _PROCESS_CONTEXT.queue.put(result)
-        # Synchronize
-        for _ in range(_PROCESS_CONTEXT.nprocs - 1):
-            _PROCESS_CONTEXT.queue_ack.get(timeout=mp_timeout)
     else:
         result = _PROCESS_CONTEXT.queue.get(timeout=mp_timeout)
-        # Synchronize
-        _PROCESS_CONTEXT.queue_ack.put(None)
+    _PROCESS_CONTEXT.barrier.wait(timeout=mp_timeout)
     return result
 
-def _spawn_entry(rank, queue, queue_ack, nprocs, fn, *args):
+def _spawn_entry(rank, queue, barrier, nprocs, fn, *args):
     global _PROCESS_CONTEXT
-    _PROCESS_CONTEXT = ProcessContext(queue, queue_ack, rank, nprocs)
+    _PROCESS_CONTEXT = ProcessContext(queue, barrier, rank, nprocs)
     fn(rank, *args)
 
 def spawn(fn, args=(), nprocs=1, join=True, daemon=False, start_method='spawn'):
@@ -87,7 +83,7 @@ def spawn(fn, args=(), nprocs=1, join=True, daemon=False, start_method='spawn'):
 
     # The following two queues are for call_once_and_share
     queue = ctx.Queue()
-    queue_ack = ctx.Queue()
+    barrier = ctx.Barrier(nprocs)
 
-    mp.spawn(_spawn_entry, args=(queue, queue_ack, nprocs, fn) + tuple(args), nprocs=nprocs,
+    mp.spawn(_spawn_entry, args=(queue, barrier, nprocs, fn) + tuple(args), nprocs=nprocs,
              join=join, daemon=daemon, start_method=start_method)
