@@ -51,6 +51,24 @@ def test_shadow(num_workers):
         if i == 5:
             break
 
+@pytest.mark.parametrize('num_workers', [0, 4])
+@pytest.mark.parametrize('mode', ['node', 'edge', 'walk'])
+def test_saint(num_workers, mode):
+    g = dgl.data.CoraFullDataset()[0]
+
+    if mode == 'node':
+        budget = 100
+    elif mode == 'edge':
+        budget = 200
+    elif mode == 'walk':
+        budget = (3, 2)
+
+    sampler = dgl.dataloading.SAINTSampler(mode, budget)
+    dataloader = dgl.dataloading.DataLoader(
+        g, torch.arange(100), sampler, num_workers=num_workers)
+    assert len(dataloader) == 100
+    for sg in dataloader:
+        pass
 
 @pytest.mark.parametrize('num_workers', [0, 4])
 def test_neighbor_nonuniform(num_workers):

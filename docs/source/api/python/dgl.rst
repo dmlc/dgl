@@ -26,6 +26,7 @@ Operators for constructing :class:`DGLGraph` from raw data formats.
     rand_bipartite
     knn_graph
     segmented_knn_graph
+    radius_graph
     create_block
     block_to_graph
     merge
@@ -82,6 +83,19 @@ Operators for generating new graphs by manipulating the structure of the existin
     reorder_graph
     sort_csr_by_tag
     sort_csc_by_tag
+
+.. _api-positional-encoding:
+
+Graph Positional Encoding Ops:
+-----------------------------------------
+
+Operators for generating positional encodings of each node.
+
+.. autosummary::
+    :toctree: ../../generated
+
+    random_walk_pe
+    laplacian_pe
 
 .. _api-partition:
 

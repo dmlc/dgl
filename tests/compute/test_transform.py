@@ -2329,6 +2329,30 @@ def test_module_add_edge(idtype):
     assert new_g.ntypes == g.ntypes
     assert new_g.canonical_etypes == g.canonical_etypes
 
+@parametrize_dtype
+def test_module_random_walk_pe(idtype):
+    transform = dgl.RandomWalkPE(2, 'rwpe')
+    g = dgl.graph(([0, 1, 1], [1, 1, 0]), idtype=idtype, device=F.ctx())
+    new_g = transform(g)
+    tgt = F.copy_to(F.tensor([[0., 0.5],[0.5, 0.75]]), g.device)
+    assert F.allclose(new_g.ndata['rwpe'], tgt)
+
+@parametrize_dtype
+def test_module_laplacian_pe(idtype):
+    transform = dgl.LaplacianPE(2, 'lappe')
+    g = dgl.graph(([2, 1, 0, 3, 1, 1],[3, 0, 1, 3, 3, 1]), idtype=idtype, device=F.ctx())
+    new_g = transform(g)
+    tgt = F.copy_to(F.tensor([[ 0.24971116, 0.],
+        [ 0.11771496, 0.],
+        [ 0.83237050, 1.],
+        [ 0.48056933, 0.]]), g.device)
+    # tensorflow has no abs() api
+    if dgl.backend.backend_name == 'tensorflow':
+        assert F.allclose(new_g.ndata['lappe'].__abs__(), tgt)
+    # pytorch & mxnet
+    else:
+        assert F.allclose(new_g.ndata['lappe'].abs(), tgt)
+
 if __name__ == '__main__':
     test_partition_with_halo()
     test_module_heat_kernel(F.int32)
