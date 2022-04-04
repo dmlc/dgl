@@ -287,7 +287,24 @@ class Column(TensorStorage):
         """
         col = self.clone()
         if col.dtype != new_dtype:
-            col.deferred_dtype = new_dtype
+            # If there is already a pending conversion, ensure that the pending
+            # conversion and transfer/sampling are done before this new conversion.
+            if col.deferred_dtype is not None:
+                _ = col.data
+
+            if (col.device is None) and (col.index is None):
+                # Do the conversion immediately if no device transfer or index
+                # sampling is pending.  The assumption is that this is most
+                # likely to be the desired behaviour, such as converting an
+                # entire graph's feature data to float16 (half) before transfer
+                # to device when training, or converting back to float32 (float)
+                # after fetching the data to a device.
+                col.storage = F.astype(col.storage, new_dtype)
+            else:
+                # Defer the conversion if there is a pending transfer or sampling.
+                # This is so that feature data that never gets accessed on the
+                # device never needs to be transferred or sampled or converted.
+                col.deferred_dtype = new_dtype
         return col
 
     def __getitem__(self, rowids):
