@@ -38,9 +38,9 @@ def shared_tensor(*shape, device, name, dtype=torch.float32):
     if rank == 0:
         y = create_shared_mem_array(
             name, shape, dtype)
-    else:
-        y = get_shared_mem_array(name, shape, dtype)
     dist.barrier()
+    if rank != 0:
+        y = get_shared_mem_array(name, shape, dtype)
     pin_memory_inplace(y)
     return y
 
