@@ -1,10 +1,14 @@
 """PyTorch multiprocessing wrapper."""
 from functools import wraps
+import random
 import os
 from collections import namedtuple
 import traceback
 from _thread import start_new_thread
+import torch
 import torch.multiprocessing as mp
+
+from ..utils import create_shared_mem_array, get_shared_mem_array
 
 def thread_wrapped_func(func):
     """
@@ -38,11 +42,10 @@ class Process(mp.Process):
         target = thread_wrapped_func(target)
         super().__init__(group, target, name, args, kwargs, daemon=daemon)
 
-ProcessContext = namedtuple('ProcessContext', ['queue', 'barrier', 'rank', 'nprocs'])
-mp_timeout = int(os.environ.get('DGL_MP_TIMEOUT', '10'))
-_PROCESS_CONTEXT = None
+def _get_shared_mem_name(id_):
+    return "shared" + str(id_)
 
-def call_once_and_share(func, rank=0):
+def call_once_and_share(func, shape, dtype, rank=0):
     """Invoke the function in a single process of the process group spawned by
     :func:`spawn`, and share the result to other processes.
 
@@ -52,38 +55,37 @@ def call_once_and_share(func, rank=0):
     ----------
     func : callable
         Any callable that accepts no arguments and returns an arbitrary object.
+    shape : tuple[int]
+        The shape of the shared tensor.  Must match the output of :attr:`func`.
+    dtype : torch.dtype
+        The data type of the shared tensor.  Must match the output of :attr:`func`.
     rank : int, optional
         The process ID to actually execute the function.
     """
-    global _PROCESS_CONTEXT
-    if _PROCESS_CONTEXT is None:
-        raise RuntimeError(
-            'call_once_and_share can only be called within processes spawned by '
-            'dgl.multiprocessing.spawn() function. '
-            'Please replace torch.multiprocessing.spawn() with dgl.multiprocessing.spawn().')
+    current_rank = torch.distributed.get_rank()
+    dist_buf = torch.LongTensor([1])
+    exc = None
 
-    if _PROCESS_CONTEXT.rank == rank:
-        result = func()
-        for _ in range(_PROCESS_CONTEXT.nprocs - 1):
-            _PROCESS_CONTEXT.queue.put(result)
-    else:
-        result = _PROCESS_CONTEXT.queue.get(timeout=mp_timeout)
-    _PROCESS_CONTEXT.barrier.wait(timeout=mp_timeout)
+    if torch.distributed.get_backend() == 'nccl':
+        # Use .cuda() to transfer it to the correct device.  Should be OK since
+        # PyTorch recommends the users to call set_device() after getting inside
+        # torch.multiprocessing.spawn()
+        dist_buf = dist_buf.cuda()
+
+    # Process with the given rank creates and populates the shared memory array.
+    if current_rank == rank:
+        id_ = random.getrandbits(32)
+        name = _get_shared_mem_name(id_)
+        result = create_shared_mem_array(name, shape, dtype)
+        result[:] = func()
+        dist_buf[0] = id_
+
+    # Broadcasts the name of the shared array to other processes.
+    torch.distributed.broadcast(dist_buf, rank)
+    # If no exceptions, other processes open the same shared memory object.
+    if current_rank != rank:
+        id_ = dist_buf.item()
+        name = _get_shared_mem_name(id_)
+        result = get_shared_mem_array(name, shape, dtype)
+
     return result
-
-def _spawn_entry(rank, queue, barrier, nprocs, fn, *args):
-    global _PROCESS_CONTEXT
-    _PROCESS_CONTEXT = ProcessContext(queue, barrier, rank, nprocs)
-    fn(rank, *args)
-
-def spawn(fn, args=(), nprocs=1, join=True, daemon=False, start_method='spawn'):
-    """A wrapper around :func:`torch.multiprocessing.spawn` that allows calling
-    DGL-specific multiprocessing functions in :mod:`dgl.multiprocessing` namespace."""
-    ctx = mp.get_context(start_method)
-
-    # The following two queues are for call_once_and_share
-    queue = ctx.Queue()
-    barrier = ctx.Barrier(nprocs)
-
-    mp.spawn(_spawn_entry, args=(queue, barrier, nprocs, fn) + tuple(args), nprocs=nprocs,
-             join=join, daemon=daemon, start_method=start_method)

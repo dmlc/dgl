@@ -4,7 +4,7 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import dgl.multiprocessing as mp
+import torch.multiprocessing as mp
 import dgl.function as fn
 import dgl.nn.pytorch as dglnn
 import time

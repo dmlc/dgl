@@ -183,13 +183,14 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
         if isinstance(indices, Mapping):
             self._device = next(iter(indices.values())).device
             self._id_tensor = call_once_and_share(
-                lambda: _get_id_tensor_from_mapping(
-                    indices, self._device, self._mapping_keys))
+                lambda: _get_id_tensor_from_mapping(indices, self._device, self._mapping_keys),
+                (self.num_indices, 2), dtype_of(indices))
         else:
             self._id_tensor = indices
             self._device = self._id_tensor.device
 
-        self._indices = call_once_and_share(self._create_shared_indices)
+        self._indices = call_once_and_share(
+            self._create_shared_indices, (self.shared_mem_size,), torch.int64)
 
     def _create_shared_indices(self):
         indices = torch.empty(self.shared_mem_size, dtype=torch.int64)

@@ -130,5 +130,5 @@ if __name__ == '__main__':
 
     # Tested with mp.spawn and fork.  Both worked and got 4s per epoch with 4 GPUs
     # and 3.86s per epoch with 8 GPUs on p2.8x, compared to 5.2s from official examples.
-    import dgl.multiprocessing as mp
+    import torch.multiprocessing as mp
     mp.spawn(train, args=(n_procs, graph, num_classes, split_idx), nprocs=n_procs)
