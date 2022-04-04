@@ -1,3 +1,4 @@
+import argparse
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -10,6 +11,11 @@ import tqdm
 # OGB must follow DGL if both DGL and PyG are installed. Otherwise DataLoader will hang.
 # (This is a long-standing issue)
 from ogb.linkproppred import DglLinkPropPredDataset
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--pure-gpu', action='store_true',
+                    help='Perform both sampling and training on GPU.')
+args = parser.parse_args()
 
 device = 'cuda'
 
@@ -69,8 +75,8 @@ class SAGE(nn.Module):
     def inference(self, g, device, batch_size, num_workers, buffer_device=None):
         # The difference between this inference function and the one in the official
         # example is that the intermediate results can also benefit from prefetching.
-        g.ndata['h'] = g.ndata['feat']
-        sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1, prefetch_node_feats=['h'])
+        feat = g.ndata['feat']
+        sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1, prefetch_node_feats=['feat'])
         dataloader = dgl.dataloading.NodeDataLoader(
                 g, torch.arange(g.num_nodes()).to(g.device), sampler, device=device,
                 batch_size=1000, shuffle=False, drop_last=False, num_workers=num_workers)
@@ -78,14 +84,17 @@ class SAGE(nn.Module):
             buffer_device = device
 
         for l, layer in enumerate(self.layers):
-            y = torch.zeros(g.num_nodes(), self.n_hidden, device=buffer_device)
+            y = torch.zeros(g.num_nodes(), self.n_hidden, device=buffer_device,
+                            pin_memory=args.pure_gpu)
+            feat = feat.to(device)
+
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
-                x = blocks[0].srcdata['h']
+                x = feat[input_nodes]
                 h = layer(blocks[0], x)
                 if l != len(self.layers) - 1:
                     h = F.relu(h)
                 y[output_nodes] = h.to(buffer_device)
-            g.ndata['h'] = y
+            feat = y
         return y
 
 
@@ -118,6 +127,7 @@ def evaluate(model, edge_split, device, num_workers):
 dataset = DglLinkPropPredDataset('ogbl-citation2')
 graph = dataset[0]
 graph, reverse_eids = to_bidirected_with_reverse_mapping(graph)
+graph = graph.to('cuda' if args.pure_gpu else 'cpu')
 reverse_eids = reverse_eids.to(device)
 seed_edges = torch.arange(graph.num_edges()).to(device)
 edge_split = dataset.get_edge_split()
@@ -132,7 +142,7 @@ sampler = dgl.dataloading.as_edge_prediction_sampler(
 dataloader = dgl.dataloading.DataLoader(
         graph, seed_edges, sampler,
         device=device, batch_size=512, shuffle=True,
-        drop_last=False, num_workers=0, use_uva=True)
+        drop_last=False, num_workers=0, use_uva=not args.pure_gpu)
 
 durations = []
 for epoch in range(10):
@@ -159,6 +169,6 @@ for epoch in range(10):
                 break
     if epoch % 10 == 0:
         model.eval()
-        valid_mrr, test_mrr = evaluate(model, edge_split, device, 12)
+        valid_mrr, test_mrr = evaluate(model, edge_split, device, 0 if args.pure_gpu else 12)
         print('Validation MRR:', valid_mrr.item(), 'Test MRR:', test_mrr.item())
 print(np.mean(durations[4:]), np.std(durations[4:]))
