@@ -373,8 +373,12 @@ class EdgePredictionSampler(Sampler):
             neg_srcdst = {g.canonical_etypes[0]: neg_srcdst}
 
         dtype = F.dtype(list(neg_srcdst.values())[0][0])
+        ctx = F.context(list(seed_edges.values())[0][0]) if seed_edges \
+                                                         else g.device
         neg_edges = {
-            etype: neg_srcdst.get(etype, (F.tensor([], dtype), F.tensor([], dtype)))
+            etype: neg_srcdst.get(etype,
+                                  (F.copy_to(F.tensor([], dtype), ctx=ctx),
+                                   F.copy_to(F.tensor([], dtype), ctx=ctx)))
             for etype in g.canonical_etypes}
         neg_pair_graph = heterograph(
             neg_edges, {ntype: g.num_nodes(ntype) for ntype in g.ntypes})

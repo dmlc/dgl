@@ -28,11 +28,11 @@ def create_test_graph(idtype):
 @parametrize_dtype
 def test_edge_prediction_sampler(idtype):
     g = create_test_graph(idtype)
-    sampler = NeighborSampler([{'follows':10}, {'follows':10}])
+    sampler = NeighborSampler([10,10])
     sampler = as_edge_prediction_sampler(
         sampler, negative_sampler=negative_sampler.Uniform(1))
 
-    seeds = F.copy_to(F.arange(0, 2, dtype=F.int64), ctx=F.ctx())
+    seeds = F.copy_to(F.arange(0, 2, dtype=idtype), ctx=F.ctx())
     # just a smoke test to make sure we don't fail internal assertions
     result = sampler.sample(g, {'follows': seeds})
 
