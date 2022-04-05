@@ -1,8 +1,6 @@
 """PyTorch multiprocessing wrapper."""
 from functools import wraps
 import random
-import os
-from collections import namedtuple
 import traceback
 from _thread import start_new_thread
 import torch
@@ -64,7 +62,6 @@ def call_once_and_share(func, shape, dtype, rank=0):
     """
     current_rank = torch.distributed.get_rank()
     dist_buf = torch.LongTensor([1])
-    exc = None
 
     if torch.distributed.get_backend() == 'nccl':
         # Use .cuda() to transfer it to the correct device.  Should be OK since
