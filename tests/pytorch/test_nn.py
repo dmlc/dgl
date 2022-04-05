@@ -1427,7 +1427,7 @@ def test_group_rev_res(idtype):
 @pytest.mark.parametrize('in_size', [16, 32])
 @pytest.mark.parametrize('hidden_size', [16, 32])
 @pytest.mark.parametrize('out_size', [16, 32])
-@pytest.mark.parametrize('edge_feat_size', [16, 10])
+@pytest.mark.parametrize('edge_feat_size', [16, 10, 0])
 def test_egnn_conv(in_size, hidden_size, out_size, edge_feat_size):
     dev = F.ctx()
     num_nodes = 5

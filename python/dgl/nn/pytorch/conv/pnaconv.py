@@ -62,7 +62,8 @@ SCALERS = {
 }
 
 class PNAConvTower(nn.Module):
-    def __init__(self, in_size, out_size, aggregators, scalers, delta, dropout=0., edge_feat_size=0):
+    def __init__(self, in_size, out_size, aggregators, scalers,
+        delta, dropout=0., edge_feat_size=0):
         super(PNAConvTower, self).__init__()
         self.in_size = in_size
         self.out_size = out_size
@@ -70,44 +71,42 @@ class PNAConvTower(nn.Module):
         self.scalers = scalers
         self.delta = delta
         self.edge_feat_size = edge_feat_size
-        
+
         self.M = nn.Linear(2 * in_size + edge_feat_size, in_size)
         self.U = nn.Linear((len(aggregators) * len(scalers) + 1) * in_size, out_size)
         self.dropout = nn.Dropout(dropout)
         self.batchnorm = nn.BatchNorm1d(out_size)
-        
+
         def message_func(edges):
             if self.edge_feat_size > 0:
                 f = torch.cat([edges.src['h'], edges.dst['h'], edges.data['a']], dim=-1)
             else:
                 f = torch.cat([edges.src['h'], edges.dst['h']], dim=-1)
             return {'msg': self.M(f)}
-        
+
         def reduce_func(nodes):
             msg = nodes.mailbox['msg']
             degree = msg.size(1)
             h = torch.cat([aggregator(msg) for aggregator in self.aggregators], dim=1)
             h = torch.cat([scaler(h, D=degree, delta=self.delta) for scaler in self.scalers], dim=1)
             return {'h_neigh': h}
-        
+
         self.message_func = message_func
         self.reduce_func = reduce_func
-        
+
     def forward(self, graph, node_feat, snorm_n=None, edge_feat=None):
         with graph.local_scope():
             graph.ndata['h'] = node_feat
             if self.edge_feat_size > 0 and edge_feat is not None:
                 graph.edata['a'] = edge_feat
-                
+
             graph.update_all(self.message_func, self.reduce_func)
             h = self.U(
                 torch.cat([node_feat, graph.ndata['h_neigh']], dim=-1)
             )
             h = h * snorm_n
             return self.dropout(self.batchnorm(h))
-        
 
-        
 class PNAConv(nn.Module):
     r"""Principal Neighbourhood Aggregation Layer from `Principal Neighbourhood Aggregation
     for Graph Nets <https://arxiv.org/abs/2004.05718>`__
@@ -137,7 +136,7 @@ class PNAConv(nn.Module):
     aggregators : List[str]
         List of aggregation function names(each aggregator specify a way to aggregate
         messages from neighbours), selected from:
-        
+
         * ``mean``: the mean of neighbour messages 
 
         * ``max``: the maximum of neighbour messages
@@ -154,7 +153,7 @@ class PNAConv(nn.Module):
         :math:`(E[(X-E[X])^n])^{1/n}`
     scalers: List[str]
         List of scaler function names, selected from:
-        
+
         * ``identity``: no scaling
 
         * ``amplification``: multiply the aggregated message by :math:`\log(d+1)/\delta`,
@@ -182,17 +181,18 @@ class PNAConv(nn.Module):
     >>> conv = PNAConv(10, 10, ('mean', 'max', 'sum'), ('identity', 'amplification'), 2.5)
     >>> ret = conv(g, feat)
     """
-    def __init__(self, in_size, out_size, aggregators, scalers, delta, dropout=0., num_towers=1, edge_feat_size=0):
+    def __init__(self, in_size, out_size, aggregators, scalers, delta,
+        dropout=0., num_towers=1, edge_feat_size=0):
         super(PNAConv, self).__init__()
         aggregators = [AGGREGATORS[aggr] for aggr in aggregators]
         scalers = [SCALERS[scale] for scale in scalers]
-        
+
         self.in_size = in_size
         self.out_size = out_size
         self.tower_in_size = in_size // num_towers
         self.tower_out_size = out_size // num_towers
         self.edge_feat_size = edge_feat_size
-        
+
         self.towers = nn.ModuleList([
             PNAConvTower(
                 self.tower_in_size, self.tower_out_size,
@@ -200,12 +200,12 @@ class PNAConv(nn.Module):
                 dropout=dropout, edge_feat_size=edge_feat_size
             ) for _ in range(num_towers)
         ])
-        
+
         self.mixing_layer = nn.Sequential(
             nn.Linear(out_size, out_size),
             nn.LeakyReLU()
         )
-        
+
     def forward(self, graph, node_feat, snorm_n=None, edge_feat=None):
         r"""
         Description
@@ -239,7 +239,7 @@ class PNAConv(nn.Module):
             snorm_n = (torch.ones(N, 1).to(node_feat) / N).sqrt()
         h_cat = torch.cat([
             tower(
-                g,
+                graph,
                 node_feat[:, ti * self.tower_in_size: (ti + 1) * self.tower_in_size],
                 snorm_n,
                 edge_feat
@@ -250,6 +250,5 @@ class PNAConv(nn.Module):
         # add residual connection
         if self.in_size == self.out_size:
             h_out = h_out + node_feat
-            
+  
         return h_out
-        

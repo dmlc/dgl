@@ -1,16 +1,18 @@
-"""Torch Module for E(n) Equivariant Graph Convolution Layer"""
+"""Torch Module for E(n) Equivariant Graph Convolutional Layer"""
 # pylint: disable= no-member, arguments-differ, invalid-name
 import torch
 import torch.nn as nn
+from .... import function as fn
+
 
 class EGNNConv(nn.Module):
-    r"""E(n) Equivariant Convolutional Layer from `E(n) Equivariant Graph
+    r"""Equivariant Graph Convolutional Layer from `E(n) Equivariant Graph
     Neural Networks <https://arxiv.org/abs/2102.09844>`__
 
     .. math::
         m_{ij}=\phi_e(h_i^l, h_j^l, ||x_i^l-x_j^l||^2, a_{ij})
-        x_i^{l+1} = x_i^l + C\sum(x_i^l-x_j^l)\phi_x(m_{ij})
-        m_i = \sum m_{ij}
+        x_i^{l+1} = x_i^l + C\sum_{j\in\mathcal{N}(i)}(x_i^l-x_j^l)\phi_x(m_{ij})
+        m_i = \sum_{j\in\mathcal{N}(i)} m_{ij}
         h_i^{l+1} = \phi_h(h_i^l, m_i)
 
     where :math:`h_i`, :math:`x_i`, :math:`a_{ij}` are node features, coordinate
@@ -23,7 +25,8 @@ class EGNNConv(nn.Module):
     in_size : int
         Input feature size; i.e. the size of :math:`h_i^l`.
     hidden_size : int
-        Hidden feature size; i.e. the size of hidden layer in :math:`\phi(\cdot)`.
+        Hidden feature size; i.e. the size of hidden layer in the two-layer MLPs in
+        :math:`\phi_e, \phi_x, \phi_h`.
     out_size : int
         Output feature size; i.e. the size of :math:`h_i^{l+1}`.
     edge_feat_size : int, optional
@@ -51,7 +54,7 @@ class EGNNConv(nn.Module):
 
         # \phi_e
         self.edge_mlp = nn.Sequential(
-            # +1 for the radial feature: |x_i - x_j|^2
+            # +1 for the radial feature: ||x_i - x_j||^2
             nn.Linear(in_size * 2 + edge_feat_size + 1, hidden_size),
             act_fn,
             nn.Linear(hidden_size, hidden_size),
@@ -72,31 +75,20 @@ class EGNNConv(nn.Module):
             nn.Linear(hidden_size, 1, bias=False)
         )
 
-        def message_func(edges):
-            coord_diff = edges.src['x'] - edges.dst['x']
-            radial = coord_diff.square().sum(dim=1).unsqueeze(-1)
-            # normalize coordinate difference
-            coord_diff = coord_diff / (radial + 1e-30)
+    def message(self, edges):
+        # concat features for edge mlp
+        if self.edge_feat_size > 0:
+            f = torch.cat(
+                [edges.src['h'], edges.dst['h'], edges.data['radial'], edges.data['a']],
+                dim=-1
+            )
+        else:
+            f = torch.cat([edges.src['h'], edges.dst['h'], edges.data['radial']], dim=-1)
 
-            # concat features for edge mlp
-            if self.edge_feat_size > 0:
-                f = torch.cat([edges.src['h'], edges.dst['h'], radial, edges.data['a']], dim=-1)
-            else:
-                f = torch.cat([edges.src['h'], edges.dst['h'], radial], dim=-1)
+        msg_h = self.edge_mlp(f)
+        msg_x = self.coord_mlp(msg_h) * edges.data['x_diff']
 
-            msg_h = self.edge_mlp(f)
-            msg_x = self.coord_mlp(msg_h) * coord_diff
-
-            return {'msg_x': msg_x, 'msg_h': msg_h}
-
-        def reduce_func(nodes):
-            h = torch.sum(nodes.mailbox['msg_h'], dim=1)
-            x = torch.mean(nodes.mailbox['msg_x'], dim=1)
-
-            return {'h_neigh': h, 'x_neigh': x}
-
-        self.message_func = message_func
-        self.reduce_func = reduce_func
+        return {'msg_x': msg_x, 'msg_h': msg_h}
 
     def forward(self, graph, node_feat, coord_feat, edge_feat=None):
         r"""
@@ -112,8 +104,8 @@ class EGNNConv(nn.Module):
             The input feature of shape :math:`(N, h_n)`. :math:`N` is the number of
             nodes, and :math:`h_n` must be the same as in_size.
         coord_feat : torch.Tensor
-            The coordinate feature of shape :math:`(N, *)` :math:`N` is the
-            number of nodes, and :math:`*` could be of any shape.
+            The coordinate feature of shape :math:`(N, h_x)`. :math:`N` is the
+            number of nodes, and :math:`h_x` can be any positive integer.
         edge_feat : torch.Tensor, optional
             The edge feature of shape :math:`(M, h_e)`. :math:`M` is the number of
             edges, and :math:`h_e` must be the same as edge_feat_size.
@@ -122,10 +114,10 @@ class EGNNConv(nn.Module):
         -------
         node_feat_out : torch.Tensor
             The output node feature of shape :math:`(N, h_n')` where :math:`h_n'`
-            should be the same as out_size.
+            is the same as out_size.
         coord_feat_out: torch.Tensor
-            The output coordinate feature of shape :math:`(N, *)` where :math:`*`
-            should be the same as input coordinate shape.
+            The output coordinate feature of shape :math:`(N, h_x)` where :math:`h_x`
+            is the same as the input coordinate feature dimension.
         """
         with graph.local_scope():
             # node feature
@@ -133,12 +125,20 @@ class EGNNConv(nn.Module):
             # coordinate feature
             graph.ndata['x'] = coord_feat
             # edge feature
-            if self.edge_feat_size > 0 and edge_feat is not None:
+            if self.edge_feat_size > 0:
+                assert edge_feat is not None, "Edge features must be provided."
                 graph.edata['a'] = edge_feat
+            # get coordinate diff & radial features
+            graph.apply_edges(fn.u_sub_v('x', 'x', 'x_diff'))
+            graph.edata['radial'] = graph.edata['x_diff'].square().sum(dim=1).unsqueeze(-1)
+            # normalize coordinate difference
+            graph.edata['x_diff'] = graph.edata['x_diff'] / (graph.edata['radial'].sqrt() + 1e-30)
+            graph.apply_edges(self.message)
+            graph.update_all(fn.copy_e('msg_x', 'm'), fn.mean('m', 'x_neigh'))
+            graph.update_all(fn.copy_e('msg_h', 'm'), fn.sum('m', 'h_neigh'))
 
-            graph.update_all(self.message_func, self.reduce_func)
             h_neigh, x_neigh = graph.ndata['h_neigh'], graph.ndata['x_neigh']
-            
+
             h = self.node_mlp(
                 torch.cat([node_feat, h_neigh], dim=-1)
             )
