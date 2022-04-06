@@ -1442,8 +1442,8 @@ def test_egnn_conv(in_size, hidden_size, out_size, edge_feat_size):
 @pytest.mark.parametrize('in_size', [16, 32])
 @pytest.mark.parametrize('out_size', [16, 32])
 @pytest.mark.parametrize('aggregators', 
-    [('mean', 'max', 'sum'), ('min', 'std', 'var'), ('moment3', 'moment4', 'moment5')])
-@pytest.mark.parametrize('scalers', [('identity'), ('amplification', 'attenuation')])
+    [['mean', 'max', 'sum'], ['min', 'std', 'var'], ['moment3', 'moment4', 'moment5']])
+@pytest.mark.parametrize('scalers', [['identity'], ['amplification', 'attenuation']])
 @pytest.mark.parametrize('delta', [2.5, 7.4])
 @pytest.mark.parametrize('dropout', [0., 0.1])
 @pytest.mark.parametrize('num_towers', [1, 4])

@@ -77,13 +77,6 @@ class PNAConvTower(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.batchnorm = nn.BatchNorm1d(out_size)
 
-        def message_func(edges):
-            if self.edge_feat_size > 0:
-                f = torch.cat([edges.src['h'], edges.dst['h'], edges.data['a']], dim=-1)
-            else:
-                f = torch.cat([edges.src['h'], edges.dst['h']], dim=-1)
-            return {'msg': self.M(f)}
-
         def reduce_func(nodes):
             msg = nodes.mailbox['msg']
             degree = msg.size(1)
@@ -91,16 +84,24 @@ class PNAConvTower(nn.Module):
             h = torch.cat([scaler(h, D=degree, delta=self.delta) for scaler in self.scalers], dim=1)
             return {'h_neigh': h}
 
-        self.message_func = message_func
         self.reduce_func = reduce_func
 
+    def message(self, edges):
+        if self.edge_feat_size > 0:
+            f = torch.cat([edges.src['h'], edges.dst['h'], edges.data['a']], dim=-1)
+        else:
+            f = torch.cat([edges.src['h'], edges.dst['h']], dim=-1)
+        return {'msg': self.M(f)}
+
     def forward(self, graph, node_feat, snorm_n=None, edge_feat=None):
+        """compute the forward pass of a single tower in PNA convolution layer"""
         with graph.local_scope():
             graph.ndata['h'] = node_feat
-            if self.edge_feat_size > 0 and edge_feat is not None:
+            if self.edge_feat_size > 0:
+                assert edge_feat is not None, "Edge features must be provided."
                 graph.edata['a'] = edge_feat
 
-            graph.update_all(self.message_func, self.reduce_func)
+            graph.update_all(self.message, self.reduce_func)
             h = self.U(
                 torch.cat([node_feat, graph.ndata['h_neigh']], dim=-1)
             )
@@ -133,8 +134,8 @@ class PNAConv(nn.Module):
         Input feature size; i.e. the size of :math:`h_i^l`.
     out_size : int
         Output feature size; i.e. the size of :math:`h_i^{l+1}`.
-    aggregators : List[str]
-        List of aggregation function names(each aggregator specify a way to aggregate
+    aggregators : list of str
+        List of aggregation function names(each aggregator specifies a way to aggregate
         messages from neighbours), selected from:
 
         * ``mean``: the mean of neighbour messages 
@@ -151,7 +152,7 @@ class PNAConv(nn.Module):
 
         * ``moment3``, ``moment4``, ``moment5``: the normalized moments aggregation
         :math:`(E[(X-E[X])^n])^{1/n}`
-    scalers: List[str]
+    scalers: list of str
         List of scaler function names, selected from:
 
         * ``identity``: no scaling
@@ -170,6 +171,7 @@ class PNAConv(nn.Module):
         The number of towers used. Default: 1.
     edge_feat_size: int, optional
         The edge feature size. Default: 0.
+
     Example
     -------
     >>> import dgl
@@ -178,7 +180,7 @@ class PNAConv(nn.Module):
     >>>
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
     >>> feat = th.ones(6, 10)
-    >>> conv = PNAConv(10, 10, ('mean', 'max', 'sum'), ('identity', 'amplification'), 2.5)
+    >>> conv = PNAConv(10, 10, ['mean', 'max', 'sum'], ['identity', 'amplification'], 2.5)
     >>> ret = conv(g, feat)
     """
     def __init__(self, in_size, out_size, aggregators, scalers, delta,
@@ -189,6 +191,8 @@ class PNAConv(nn.Module):
 
         self.in_size = in_size
         self.out_size = out_size
+        assert in_size % num_towers == 0, 'in_size must be divisible by num_towers'
+        assert out_size % num_towers == 0, 'out_size must be divisible by num_towers'
         self.tower_in_size = in_size // num_towers
         self.tower_out_size = out_size // num_towers
         self.edge_feat_size = edge_feat_size
@@ -206,7 +210,7 @@ class PNAConv(nn.Module):
             nn.LeakyReLU()
         )
 
-    def forward(self, graph, node_feat, snorm_n=None, edge_feat=None):
+    def forward(self, graph, node_feat, edge_feat=None, residual=True):
         r"""
         Description
         -----------
@@ -219,14 +223,13 @@ class PNAConv(nn.Module):
         node_feat : torch.Tensor
             The input feature of shape :math:`(N, h_n)`. :math:`N` is the number of
             nodes, and :math:`h_n` must be the same as in_size.
-        snorm_n : torch.Tensor, optional
-            The normalization tensor of shape :math:`(N, 1)` related to the size of
-            the graph, computed as :math:`[[|g_1|^{-1}], [|g_1|^{-1}], [|g_2|^{-1}],\cdots]`.
-            If not provided, we calculate it according to the overall size of the input graph.
-            The parameter is required for a batched graph.
         edge_feat : torch.Tensor, optional
             The edge feature of shape :math:`(M, h)`. :math:`M` is the number of
             edges, and :math:`h_e` must be the same as edge_feat_size.
+        residual : bool, optional
+            The bool flag that determines whether to add a residual connection for the
+            output. Default, True. If in_size and out_size of the PNA conv layer is not
+            the same, this flag will be ignored.
 
         Returns
         -------
@@ -234,9 +237,11 @@ class PNAConv(nn.Module):
             The output node feature of shape :math:`(N, h_n')` where :math:`h_n'`
             should be the same as out_size.
         """
-        N = graph.num_nodes()
-        if snorm_n is None:
-            snorm_n = (torch.ones(N, 1).to(node_feat) / N).sqrt()
+        # calculate graph normalization factors
+        snorm_n = torch.cat(
+            [torch.ones(N, 1).to(node_feat) / N for N in graph.batch_num_nodes()],
+            dim=0
+        ).sqrt()
         h_cat = torch.cat([
             tower(
                 graph,
@@ -248,7 +253,7 @@ class PNAConv(nn.Module):
         ], dim=1)
         h_out = self.mixing_layer(h_cat)
         # add residual connection
-        if self.in_size == self.out_size:
+        if residual and (self.in_size == self.out_size):
             h_out = h_out + node_feat
   
         return h_out
