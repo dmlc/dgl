@@ -76,6 +76,7 @@ class EGNNConv(nn.Module):
         )
 
     def message(self, edges):
+        """message function for EGNN"""
         # concat features for edge mlp
         if self.edge_feat_size > 0:
             f = torch.cat(

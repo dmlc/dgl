@@ -5,49 +5,61 @@ import torch
 import torch.nn as nn
 
 def aggregate_mean(h):
+    """mean aggregation"""
     return torch.mean(h, dim=1)
 
 def aggregate_max(h):
+    """max aggregation"""
     return torch.max(h, dim=1)[0]
 
 def aggregate_min(h):
+    """min aggregation"""
     return torch.min(h, dim=1)[0]
 
 def aggregate_sum(h):
+    """sum aggregation"""
     return torch.sum(h, dim=1)
 
 def aggregate_std(h):
+    """standard deviation aggregation"""
     return torch.sqrt(aggregate_var(h) + 1e-30)
 
 def aggregate_var(h):
+    """variance aggregation"""
     h_mean_squares = torch.mean(h * h, dim=1)
     h_mean = torch.mean(h, dim=1)
     var = torch.relu(h_mean_squares - h_mean * h_mean)
     return var
 
 def _aggregate_moment(h, n):
-    # for each node (E[(X-E[X])^n])^{1/n}
+    """moment aggregation: for each node (E[(X-E[X])^n])^{1/n}"""
     h_mean = torch.mean(h, dim=1, keepdim=True)
     h_n = torch.mean(torch.pow(h - h_mean, n))
     rooted_h_n = torch.sign(h_n) * torch.pow(torch.abs(h_n) + 1e-30, 1. / n)
     return rooted_h_n
 
 def aggregate_moment_3(h):
+    """moment aggregation with n=3"""
     return _aggregate_moment(h, n=3)
 
 def aggregate_moment_4(h):
+    """moment aggregation with n=4"""
     return _aggregate_moment(h, n=4)
 
 def aggregate_moment_5(h):
+    """moment aggregation with n=5"""
     return _aggregate_moment(h, n=5)
 
 def scale_identity(h, D=None, delta=None):
+    """identity scaling (no scaling operation)"""
     return h
 
 def scale_amplification(h, D, delta):
+    """amplification scaling"""
     return h * (np.log(D + 1) / delta)
 
 def scale_attenuation(h, D, delta):
+    """attenuation scaling"""
     return h * (delta / np.log(D + 1))
 
 AGGREGATORS = {
@@ -62,6 +74,7 @@ SCALERS = {
 }
 
 class PNAConvTower(nn.Module):
+    """A single PNA tower in PNA layers"""
     def __init__(self, in_size, out_size, aggregators, scalers,
         delta, dropout=0., edge_feat_size=0):
         super(PNAConvTower, self).__init__()
@@ -78,6 +91,8 @@ class PNAConvTower(nn.Module):
         self.batchnorm = nn.BatchNorm1d(out_size)
 
         def reduce_func(nodes):
+            """reduce function for PNA layer:
+            tensordot of multiple aggregation and scaling operations"""
             msg = nodes.mailbox['msg']
             degree = msg.size(1)
             h = torch.cat([aggregator(msg) for aggregator in self.aggregators], dim=1)
@@ -87,6 +102,7 @@ class PNAConvTower(nn.Module):
         self.reduce_func = reduce_func
 
     def message(self, edges):
+        """message function for PNA layer"""
         if self.edge_feat_size > 0:
             f = torch.cat([edges.src['h'], edges.dst['h'], edges.data['a']], dim=-1)
         else:
@@ -173,12 +189,13 @@ class PNAConv(nn.Module):
     dropout: float, optional
         The dropout ratio. Default: 0.0.
     num_towers: int, optional
-        The number of towers used. Default: 1.
+        The number of towers used. Default: 1. Note that in_size and out_size must be divisible
+        by num_towers.
     edge_feat_size: int, optional
         The edge feature size. Default: 0.
     residual : bool, optional
         The bool flag that determines whether to add a residual connection for the
-        output. Default: True. If in_size and out_size of the PNA conv layer is not
+        output. Default: True. If in_size and out_size of the PNA conv layer are not
         the same, this flag will be set as False forcibly.
 
     Example
@@ -257,5 +274,5 @@ class PNAConv(nn.Module):
         # add residual connection
         if self.residual:
             h_out = h_out + node_feat
-  
+
         return h_out
