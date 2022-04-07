@@ -93,8 +93,13 @@ class PNAConvTower(nn.Module):
             f = torch.cat([edges.src['h'], edges.dst['h']], dim=-1)
         return {'msg': self.M(f)}
 
-    def forward(self, graph, node_feat, snorm_n=None, edge_feat=None):
+    def forward(self, graph, node_feat, edge_feat=None):
         """compute the forward pass of a single tower in PNA convolution layer"""
+        # calculate graph normalization factors
+        snorm_n = torch.cat(
+            [torch.ones(N, 1).to(node_feat) / N for N in graph.batch_num_nodes()],
+            dim=0
+        ).sqrt()
         with graph.local_scope():
             graph.ndata['h'] = node_feat
             if self.edge_feat_size > 0:
@@ -171,6 +176,10 @@ class PNAConv(nn.Module):
         The number of towers used. Default: 1.
     edge_feat_size: int, optional
         The edge feature size. Default: 0.
+    residual : bool, optional
+        The bool flag that determines whether to add a residual connection for the
+        output. Default: True. If in_size and out_size of the PNA conv layer is not
+        the same, this flag will be set as False forcibly.
 
     Example
     -------
@@ -184,7 +193,7 @@ class PNAConv(nn.Module):
     >>> ret = conv(g, feat)
     """
     def __init__(self, in_size, out_size, aggregators, scalers, delta,
-        dropout=0., num_towers=1, edge_feat_size=0):
+        dropout=0., num_towers=1, edge_feat_size=0, residual=True):
         super(PNAConv, self).__init__()
         aggregators = [AGGREGATORS[aggr] for aggr in aggregators]
         scalers = [SCALERS[scale] for scale in scalers]
@@ -196,6 +205,9 @@ class PNAConv(nn.Module):
         self.tower_in_size = in_size // num_towers
         self.tower_out_size = out_size // num_towers
         self.edge_feat_size = edge_feat_size
+        self.residual = residual
+        if self.in_size != self.out_size:
+            self.residual = False
 
         self.towers = nn.ModuleList([
             PNAConvTower(
@@ -210,7 +222,7 @@ class PNAConv(nn.Module):
             nn.LeakyReLU()
         )
 
-    def forward(self, graph, node_feat, edge_feat=None, residual=True):
+    def forward(self, graph, node_feat, edge_feat=None):
         r"""
         Description
         -----------
@@ -226,10 +238,6 @@ class PNAConv(nn.Module):
         edge_feat : torch.Tensor, optional
             The edge feature of shape :math:`(M, h)`. :math:`M` is the number of
             edges, and :math:`h_e` must be the same as edge_feat_size.
-        residual : bool, optional
-            The bool flag that determines whether to add a residual connection for the
-            output. Default, True. If in_size and out_size of the PNA conv layer is not
-            the same, this flag will be ignored.
 
         Returns
         -------
@@ -237,23 +245,17 @@ class PNAConv(nn.Module):
             The output node feature of shape :math:`(N, h_n')` where :math:`h_n'`
             should be the same as out_size.
         """
-        # calculate graph normalization factors
-        snorm_n = torch.cat(
-            [torch.ones(N, 1).to(node_feat) / N for N in graph.batch_num_nodes()],
-            dim=0
-        ).sqrt()
         h_cat = torch.cat([
             tower(
                 graph,
                 node_feat[:, ti * self.tower_in_size: (ti + 1) * self.tower_in_size],
-                snorm_n,
                 edge_feat
             )
             for ti, tower in enumerate(self.towers)
         ], dim=1)
         h_out = self.mixing_layer(h_cat)
         # add residual connection
-        if residual and (self.in_size == self.out_size):
+        if self.residual:
             h_out = h_out + node_feat
   
         return h_out

@@ -1448,8 +1448,9 @@ def test_egnn_conv(in_size, hidden_size, out_size, edge_feat_size):
 @pytest.mark.parametrize('dropout', [0., 0.1])
 @pytest.mark.parametrize('num_towers', [1, 4])
 @pytest.mark.parametrize('edge_feat_size', [16, 0])
+@pytest.mark.parametrize('residual', [True, False])
 def test_pna_conv(in_size, out_size, aggregators, scalers, delta,
-    dropout, num_towers, edge_feat_size):
+    dropout, num_towers, edge_feat_size, residual):
     dev = F.ctx()
     num_nodes = 5
     num_edges = 20
@@ -1457,5 +1458,5 @@ def test_pna_conv(in_size, out_size, aggregators, scalers, delta,
     h = th.randn(num_nodes, in_size).to(dev)
     e = th.randn(num_edges, edge_feat_size).to(dev)
     model = nn.PNAConv(in_size, out_size, aggregators, scalers, delta, dropout,
-        num_towers, edge_feat_size).to(dev)
+        num_towers, edge_feat_size, residual).to(dev)
     model(g, h, edge_feat=e)
