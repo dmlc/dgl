@@ -62,7 +62,7 @@ class FeatureStorage(object):
         """
         return False
 
-    def fetch(self, indices, device, pin_memory=False):
+    def fetch(self, indices, device, pin_memory=False, **kwargs):
         """Retrieve the features at the given indices.
 
         If :attr:`indices` is a tensor, this is equivalent to

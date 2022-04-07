@@ -4,7 +4,7 @@ import dgl
 import dgl.function as fn
 
 N = 100
-g = nx.nx.erdos_renyi_graph(N, 0.05)
+g = nx.erdos_renyi_graph(N, 0.05)
 g = dgl.DGLGraph(g)
 
 DAMP = 0.85

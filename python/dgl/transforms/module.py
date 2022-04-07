@@ -31,6 +31,8 @@ except ImportError:
 
 __all__ = [
     'BaseTransform',
+    'RandomWalkPE',
+    'LaplacianPE',
     'AddSelfLoop',
     'RemoveSelfLoop',
     'AddReverse',
@@ -95,6 +97,88 @@ class BaseTransform:
 
     def __repr__(self):
         return self.__class__.__name__ + '()'
+
+class RandomWalkPE(BaseTransform):
+    r"""Random Walk Positional Encoding, as introduced in
+    `Graph Neural Networks with Learnable Structural and Positional Representations
+    <https://arxiv.org/abs/2110.07875>`__
+
+    This module only works for homogeneous graphs.
+
+    Parameters
+    ----------
+    k : int
+        Number of random walk steps. The paper found the best value to be 16 and 20
+        for two experiments.
+    feat_name : str, optional
+        Name to store the computed positional encodings in ndata.
+    eweight_name : str, optional
+        Name to retrieve the edge weights. Default: None, not using the edge weights.
+
+    Example
+    -------
+
+    >>> import dgl
+    >>> from dgl import RandomWalkPE
+
+    >>> transform = RandomWalkPE(k=2)
+    >>> g = dgl.graph(([0, 1, 1], [1, 1, 0]))
+    >>> g = transform(g)
+    >>> print(g.ndata['PE'])
+    tensor([[0.0000, 0.5000],
+            [0.5000, 0.7500]])
+    """
+    def __init__(self, k, feat_name='PE', eweight_name=None):
+        self.k = k
+        self.feat_name = feat_name
+        self.eweight_name = eweight_name
+
+    def __call__(self, g):
+        PE = functional.random_walk_pe(g, k=self.k, eweight_name=self.eweight_name)
+        g.ndata[self.feat_name] = F.copy_to(PE, g.device)
+
+        return g
+
+class LaplacianPE(BaseTransform):
+    r"""Laplacian Positional Encoding, as introduced in
+    `Benchmarking Graph Neural Networks
+    <https://arxiv.org/abs/2003.00982>`__
+
+    This module only works for homogeneous bidirected graphs.
+
+    Parameters
+    ----------
+    k : int
+        Number of smallest non-trivial eigenvectors to use for positional encoding
+        (smaller than the number of nodes).
+    feat_name : str, optional
+        Name to store the computed positional encodings in ndata.
+
+    Example
+    -------
+
+    >>> import dgl
+    >>> from dgl import LaplacianPE
+
+    >>> transform = LaplacianPE(k=3)
+    >>> g = dgl.rand_graph(5, 10)
+    >>> g = transform(g)
+    >>> print(g.ndata['PE'])
+    tensor([[ 0.0000, -0.3646,  0.3646],
+            [ 0.0000,  0.2825, -0.2825],
+            [ 1.0000, -0.6315,  0.6315],
+            [ 0.0000,  0.3739, -0.3739],
+            [ 0.0000, -0.1663,  0.1663]])
+    """
+    def __init__(self, k, feat_name='PE'):
+        self.k = k
+        self.feat_name = feat_name
+
+    def __call__(self, g):
+        PE = functional.laplacian_pe(g, k=self.k)
+        g.ndata[self.feat_name] = F.copy_to(PE, g.device)
+
+        return g
 
 class AddSelfLoop(BaseTransform):
     r"""Add self-loops for each node in the graph and return a new graph.

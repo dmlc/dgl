@@ -79,7 +79,7 @@ def main(args):
     g = dgl.add_self_loop(g)
     n_edges = g.number_of_edges()
     # create model
-    heads = ([args.num_heads] * args.num_layers) + [args.num_out_heads]
+    heads = ([args.num_heads] * (args.num_layers-1)) + [args.num_out_heads]
     model = GAT(g,
                 args.num_layers,
                 num_feats,
@@ -155,7 +155,7 @@ if __name__ == '__main__':
                         help="number of hidden attention heads")
     parser.add_argument("--num-out-heads", type=int, default=1,
                         help="number of output attention heads")
-    parser.add_argument("--num-layers", type=int, default=1,
+    parser.add_argument("--num-layers", type=int, default=2,
                         help="number of hidden layers")
     parser.add_argument("--num-hidden", type=int, default=8,
                         help="number of hidden units")
