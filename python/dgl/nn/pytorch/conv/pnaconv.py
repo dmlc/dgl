@@ -34,7 +34,7 @@ def aggregate_var(h):
 def _aggregate_moment(h, n):
     """moment aggregation: for each node (E[(X-E[X])^n])^{1/n}"""
     h_mean = torch.mean(h, dim=1, keepdim=True)
-    h_n = torch.mean(torch.pow(h - h_mean, n))
+    h_n = torch.mean(torch.pow(h - h_mean, n), dim=1)
     rooted_h_n = torch.sign(h_n) * torch.pow(torch.abs(h_n) + 1e-30, 1. / n)
     return rooted_h_n
 
