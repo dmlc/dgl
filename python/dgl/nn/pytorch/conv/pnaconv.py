@@ -50,7 +50,7 @@ def aggregate_moment_5(h):
     """moment aggregation with n=5"""
     return _aggregate_moment(h, n=5)
 
-def scale_identity(h, D=None, delta=None):
+def scale_identity(h):
     """identity scaling (no scaling operation)"""
     return h
 
@@ -96,7 +96,10 @@ class PNAConvTower(nn.Module):
         msg = nodes.mailbox['msg']
         degree = msg.size(1)
         h = torch.cat([aggregator(msg) for aggregator in self.aggregators], dim=1)
-        h = torch.cat([scaler(h, D=degree, delta=self.delta) for scaler in self.scalers], dim=1)
+        h = torch.cat([
+            scaler(h, D=degree, delta=self.delta) if scaler is not scale_identity else h
+            for scaler in self.scalers
+        ], dim=1)
         return {'h_neigh': h}
 
     def message(self, edges):
