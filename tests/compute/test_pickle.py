@@ -163,6 +163,26 @@ def test_pickling_subgraph():
     f1.close()
     f2.close()
 
+@unittest.skipIf(F._default_context_str != 'gpu', reason="Need GPU for pin")
+@parametrize_dtype
+def test_pickling_is_pinned(idtype):
+    from copy import deepcopy
+    g = dgl.rand_graph(10, 20, idtype=idtype, device=F.cpu())
+    hg = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 1], [1, 2]),
+        ('user', 'plays', 'game'): ([0, 1, 2, 1], [0, 0, 1, 1]),
+        ('user', 'wishes', 'game'): ([0, 2], [1, 0]),
+        ('developer', 'develops', 'game'): ([0, 1], [0, 1])
+    }, idtype=idtype, device=F.cpu())
+    for graph in [g, hg]:
+        assert not graph.is_pinned()
+        graph.pin_memory_()
+        assert graph.is_pinned()
+        pg = _reconstruct_pickle(graph)
+        assert pg.is_pinned()
+        assert deepcopy(graph).is_pinned()
+
+
 if __name__ == '__main__':
     test_pickling_index()
     test_pickling_graph_index()
@@ -172,3 +192,4 @@ if __name__ == '__main__':
     test_pickling_batched_graph()
     test_pickling_heterograph()
     test_pickling_batched_heterograph()
+    test_pickling_is_pinned()
