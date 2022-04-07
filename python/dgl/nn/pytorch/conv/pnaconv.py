@@ -90,16 +90,14 @@ class PNAConvTower(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.batchnorm = nn.BatchNorm1d(out_size)
 
-        def reduce_func(nodes):
-            """reduce function for PNA layer:
-            tensordot of multiple aggregation and scaling operations"""
-            msg = nodes.mailbox['msg']
-            degree = msg.size(1)
-            h = torch.cat([aggregator(msg) for aggregator in self.aggregators], dim=1)
-            h = torch.cat([scaler(h, D=degree, delta=self.delta) for scaler in self.scalers], dim=1)
-            return {'h_neigh': h}
-
-        self.reduce_func = reduce_func
+    def reduce_func(self, nodes):
+        """reduce function for PNA layer:
+        tensordot of multiple aggregation and scaling operations"""
+        msg = nodes.mailbox['msg']
+        degree = msg.size(1)
+        h = torch.cat([aggregator(msg) for aggregator in self.aggregators], dim=1)
+        h = torch.cat([scaler(h, D=degree, delta=self.delta) for scaler in self.scalers], dim=1)
+        return {'h_neigh': h}
 
     def message(self, edges):
         """message function for PNA layer"""
@@ -159,7 +157,7 @@ class PNAConv(nn.Module):
         List of aggregation function names(each aggregator specifies a way to aggregate
         messages from neighbours), selected from:
 
-        * ``mean``: the mean of neighbour messages 
+        * ``mean``: the mean of neighbour messages
 
         * ``max``: the maximum of neighbour messages
 
