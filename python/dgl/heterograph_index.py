@@ -1356,10 +1356,10 @@ class HeteroPickleStates(ObjectBase):
 
     def __setstate__(self, state):
         if isinstance(state[0], int):
-            _, meta, arrays = state
+            version, meta, arrays = state
             arrays = [F.zerocopy_to_dgl_ndarray(arr) for arr in arrays]
             self.__init_handle_by_constructor__(
-                _CAPI_DGLCreateHeteroPickleStates, meta, arrays)
+                _CAPI_DGLCreateHeteroPickleStates, version, meta, arrays)
         else:
             metagraph, num_nodes_per_type, adjs = state
             num_nodes_per_type = F.zerocopy_to_dgl_ndarray(num_nodes_per_type)

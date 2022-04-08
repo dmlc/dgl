@@ -18,6 +18,7 @@ namespace dgl {
 
 HeteroPickleStates HeteroPickle(HeteroGraphPtr graph) {
   HeteroPickleStates states;
+  states.version = 2;
   dmlc::MemoryStringStream ofs(&states.meta);
   dmlc::Stream *strm = &ofs;
   strm->Write(ImmutableGraph::ToImmutable(graph->meta_graph()));
@@ -100,7 +101,9 @@ HeteroGraphPtr HeteroUnpickle(const HeteroPickleStates& states) {
   std::vector<int64_t> num_nodes_per_type;
   CHECK(strm->Read(&num_nodes_per_type)) << "Invalid num_nodes_per_type";
   bool is_pinned = false;
-  CHECK(strm->Read(&is_pinned)) << "Invalid flag 'is_pinned'";
+  if (states.version > 1) {
+    CHECK(strm->Read(&is_pinned)) << "Invalid flag 'is_pinned'";
+  }
 
   auto array_itr = states.arrays.begin();
   for (dgl_type_t etype = 0; etype < metagraph->NumEdges(); ++etype) {
@@ -145,7 +148,6 @@ HeteroGraphPtr HeteroUnpickle(const HeteroPickleStates& states) {
     }
     relgraphs[etype] = relgraph;
   }
-  return CreateHeteroGraph(metagraph, relgraphs, num_nodes_per_type);
   auto graph = CreateHeteroGraph(metagraph, relgraphs, num_nodes_per_type);
   if (is_pinned) {
     graph->PinMemory_();
@@ -193,7 +195,9 @@ HeteroGraphPtr HeteroForkingUnpickle(const HeteroPickleStates &states) {
   std::vector<int64_t> num_nodes_per_type;
   CHECK(strm->Read(&num_nodes_per_type)) << "Invalid num_nodes_per_type";
   bool is_pinned = false;
-  CHECK(strm->Read(&is_pinned)) << "Invalid flag 'is_pinned'";
+  if (states.version > 1) {
+    CHECK(strm->Read(&is_pinned)) << "Invalid flag 'is_pinned'";
+  }
 
   auto array_itr = states.arrays.begin();
   for (dgl_type_t etype = 0; etype < metagraph->NumEdges(); ++etype) {
@@ -245,7 +249,6 @@ HeteroGraphPtr HeteroForkingUnpickle(const HeteroPickleStates &states) {
     relgraphs[etype] = UnitGraph::CreateUnitGraphFrom(
         num_vtypes, csc, csr, coo, has_csc, has_csr, has_coo, allowed_formats);
   }
-  return CreateHeteroGraph(metagraph, relgraphs, num_nodes_per_type);
   auto graph = CreateHeteroGraph(metagraph, relgraphs, num_nodes_per_type);
   if (is_pinned) {
     graph->PinMemory_();
@@ -282,10 +285,11 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroPickleStatesGetArraysNum")
 
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLCreateHeteroPickleStates")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    std::string meta = args[0];
-    const List<Value> arrays = args[1];
+    const int version = args[0];
+    std::string meta = args[1];
+    const List<Value> arrays = args[2];
     std::shared_ptr<HeteroPickleStates> st( new HeteroPickleStates );
-    st->version = 1;
+    st->version = version == 0 ? 1 : version;
     st->meta = meta;
     st->arrays.reserve(arrays.size());
     for (const auto& ref : arrays) {
@@ -319,10 +323,11 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroUnpickle")
         graph = HeteroUnpickleOld(*ref.sptr());
         break;
       case 1:
+      case 2:
         graph = HeteroUnpickle(*ref.sptr());
         break;
       default:
-        LOG(FATAL) << "Version can only be 0 or 1.";
+        LOG(FATAL) << "Version can only be 0 or 1 or 2.";
     }
     *rv = HeteroGraphRef(graph);
   });
