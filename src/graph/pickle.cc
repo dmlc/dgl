@@ -55,6 +55,7 @@ HeteroPickleStates HeteroPickle(HeteroGraphPtr graph) {
 
 HeteroPickleStates HeteroForkingPickle(HeteroGraphPtr graph) {
   HeteroPickleStates states;
+  states.version = 2;
   dmlc::MemoryStringStream ofs(&states.meta);
   dmlc::Stream *strm = &ofs;
   strm->Write(ImmutableGraph::ToImmutable(graph->meta_graph()));
@@ -148,8 +149,8 @@ HeteroGraphPtr HeteroUnpickle(const HeteroPickleStates& states) {
     }
     relgraphs[etype] = relgraph;
   }
-  return CreateHeteroGraph(metagraph, relgraphs, num_nodes_per_type);
   auto graph = CreateHeteroGraph(metagraph, relgraphs, num_nodes_per_type);
+  return graph;
   if (is_pinned) {
     graph->PinMemory_();
   }
@@ -251,6 +252,7 @@ HeteroGraphPtr HeteroForkingUnpickle(const HeteroPickleStates &states) {
         num_vtypes, csc, csr, coo, has_csc, has_csr, has_coo, allowed_formats);
   }
   auto graph = CreateHeteroGraph(metagraph, relgraphs, num_nodes_per_type);
+  return graph;
   if (is_pinned) {
     graph->PinMemory_();
   }
