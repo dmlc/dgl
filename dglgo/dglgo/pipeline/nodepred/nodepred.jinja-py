@@ -76,9 +76,9 @@ def train(cfg, pipeline_cfg, device, data, model, optimizer, loss_fcn):
         train_acc = accuracy(logits[train_mask], label[train_mask])
         if epoch != 0 and epoch % pipeline_cfg['eval_period'] == 0:
             val_acc = accuracy(logits[val_mask], label[val_mask])
-            
+
             {% if user_cfg.general_pipeline.early_stop %}
-            if stopper.step(val_acc, model):            
+            if stopper.step(val_acc, model):
                 break
             {% endif %}
         print("Epoch {:05d} | Loss {:.4f} | TrainAcc {:.4f} | ValAcc {:.4f}".
@@ -112,7 +112,7 @@ def main():
     optimizer = torch.optim.{{ user_cfg.general_pipeline.optimizer.name }}(model.parameters(), **pipeline_cfg["optimizer"])
     # train
     test_acc = train(cfg, pipeline_cfg, device, data, model, optimizer, loss)
-    torch.save(model, pipeline_cfg["save_path"])
+    torch.save(model.state_dict(), pipeline_cfg["save_path"])
     return test_acc
 
 if __name__ == '__main__':
