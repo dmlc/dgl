@@ -150,7 +150,6 @@ HeteroGraphPtr HeteroUnpickle(const HeteroPickleStates& states) {
     relgraphs[etype] = relgraph;
   }
   auto graph = CreateHeteroGraph(metagraph, relgraphs, num_nodes_per_type);
-  return graph;
   if (is_pinned) {
     graph->PinMemory_();
   }
@@ -252,7 +251,6 @@ HeteroGraphPtr HeteroForkingUnpickle(const HeteroPickleStates &states) {
         num_vtypes, csc, csr, coo, has_csc, has_csr, has_coo, allowed_formats);
   }
   auto graph = CreateHeteroGraph(metagraph, relgraphs, num_nodes_per_type);
-  return graph;
   if (is_pinned) {
     graph->PinMemory_();
   }
