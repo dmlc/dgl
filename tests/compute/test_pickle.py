@@ -181,7 +181,11 @@ def test_pickling_is_pinned(idtype):
         assert graph.is_pinned()
         pg = _reconstruct_pickle(graph)
         assert pg.is_pinned()
-        assert deepcopy(graph).is_pinned()
+        pg.unpin_memory_()
+        dg = deepcopy(graph)
+        assert dg.is_pinned()
+        dg.unpin_memory_()
+        graph.unpin_memory_()
 
 
 if __name__ == '__main__':
