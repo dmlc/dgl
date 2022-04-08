@@ -148,6 +148,7 @@ HeteroGraphPtr HeteroUnpickle(const HeteroPickleStates& states) {
     }
     relgraphs[etype] = relgraph;
   }
+  return CreateHeteroGraph(metagraph, relgraphs, num_nodes_per_type);
   auto graph = CreateHeteroGraph(metagraph, relgraphs, num_nodes_per_type);
   if (is_pinned) {
     graph->PinMemory_();

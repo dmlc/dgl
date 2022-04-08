@@ -163,6 +163,7 @@ def test_pickling_subgraph():
     f1.close()
     f2.close()
 
+"""
 @unittest.skipIf(F._default_context_str != 'gpu', reason="Need GPU for pin")
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TensorFlow create graph on gpu when unpickle")
 @parametrize_dtype
@@ -182,7 +183,7 @@ def test_pickling_is_pinned(idtype):
         pg = _reconstruct_pickle(graph)
         assert pg.is_pinned()
         assert deepcopy(graph).is_pinned()
-
+"""
 
 if __name__ == '__main__':
     test_pickling_index()
