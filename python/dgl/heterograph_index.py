@@ -1356,10 +1356,10 @@ class HeteroPickleStates(ObjectBase):
 
     def __setstate__(self, state):
         if isinstance(state[0], int):
-            _, meta, arrays = state
+            version, meta, arrays = state
             arrays = [F.zerocopy_to_dgl_ndarray(arr) for arr in arrays]
             self.__init_handle_by_constructor__(
-                _CAPI_DGLCreateHeteroPickleStates, meta, arrays)
+                _CAPI_DGLCreateHeteroPickleStates, version, meta, arrays)
         else:
             metagraph, num_nodes_per_type, adjs = state
             num_nodes_per_type = F.zerocopy_to_dgl_ndarray(num_nodes_per_type)
@@ -1367,9 +1367,9 @@ class HeteroPickleStates(ObjectBase):
                 _CAPI_DGLCreateHeteroPickleStatesOld, metagraph, num_nodes_per_type, adjs)
 
 def _forking_rebuild(pk_state):
-    meta, arrays = pk_state
+    version, meta, arrays = pk_state
     arrays = [F.to_dgl_nd(arr) for arr in arrays]
-    states = _CAPI_DGLCreateHeteroPickleStates(meta, arrays)
+    states = _CAPI_DGLCreateHeteroPickleStates(version, meta, arrays)
     graph_index = _CAPI_DGLHeteroForkingUnpickle(states)
     graph_index._forking_pk_state = pk_state
     return graph_index
@@ -1391,7 +1391,7 @@ def _forking_reduce(graph_index):
     # the tensors as an attribute of the original graph index object.  Otherwise
     # PyTorch will throw weird errors like bad value(s) in fds_to_keep or unable to
     # resize file.
-    graph_index._forking_pk_state = (states.meta, arrays)
+    graph_index._forking_pk_state = (states.version, states.meta, arrays)
     return _forking_rebuild, (graph_index._forking_pk_state,)
 
 
