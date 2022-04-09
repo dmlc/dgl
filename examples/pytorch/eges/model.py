@@ -54,6 +54,3 @@ class EGES(th.nn.Module):
 
     def query_cold_item(self):
         pass
-    
-
-
