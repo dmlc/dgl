@@ -98,13 +98,3 @@ if __name__ == "__main__":
     )
 
     model = train(args, train_g, sku_info, num_skus, num_brands, num_shops, num_cates)
-
-
-
-
-
-
-    
-
-    
-
