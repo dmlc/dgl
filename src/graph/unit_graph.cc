@@ -381,7 +381,8 @@ class UnitGraph::COO : public BaseHeteroGraph {
     CHECK(aten::IsValidIdArray(dstvids)) << "Invalid vertex id array.";
     HeteroSubgraph subg;
     const auto& submat = aten::COOSliceMatrix(adj_, srcvids, dstvids);
-    IdArray sub_eids = aten::Range(0, submat.data->shape[0], NumBits(), Context());
+    DLContext ctx = aten::GetContextOf(vids);
+    IdArray sub_eids = aten::Range(0, submat.data->shape[0], NumBits(), ctx);
     subg.graph = std::make_shared<COO>(meta_graph(), submat.num_rows, submat.num_cols,
         submat.row, submat.col);
     subg.induced_vertices = vids;
@@ -801,7 +802,8 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     CHECK(aten::IsValidIdArray(dstvids)) << "Invalid vertex id array.";
     HeteroSubgraph subg;
     const auto& submat = aten::CSRSliceMatrix(adj_, srcvids, dstvids);
-    IdArray sub_eids = aten::Range(0, submat.data->shape[0], NumBits(), Context());
+    DLContext ctx = aten::GetContextOf(vids);
+    IdArray sub_eids = aten::Range(0, submat.data->shape[0], NumBits(), ctx);
     subg.graph = std::make_shared<CSR>(meta_graph(), submat.num_rows, submat.num_cols,
         submat.indptr, submat.indices, sub_eids);
     subg.induced_vertices = vids;
