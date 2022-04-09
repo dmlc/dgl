@@ -213,7 +213,3 @@ def split_train_test_graph(graph):
     test_graph = test_edges
 
     return graph, test_graph
-
-    
-           
-
