@@ -10,9 +10,13 @@ class EGNNConv(nn.Module):
     Neural Networks <https://arxiv.org/abs/2102.09844>`__
 
     .. math::
+
         m_{ij}=\phi_e(h_i^l, h_j^l, ||x_i^l-x_j^l||^2, a_{ij})
+
         x_i^{l+1} = x_i^l + C\sum_{j\in\mathcal{N}(i)}(x_i^l-x_j^l)\phi_x(m_{ij})
+
         m_i = \sum_{j\in\mathcal{N}(i)} m_{ij}
+
         h_i^{l+1} = \phi_h(h_i^l, m_i)
 
     where :math:`h_i`, :math:`x_i`, :math:`a_{ij}` are node features, coordinate
