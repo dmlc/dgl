@@ -68,7 +68,7 @@ class SAGE(LightningModule):
         y = blocks[-1].dstdata['label']
         y_hat = self(blocks, x)
         loss = F.cross_entropy(y_hat, y)
-        self.train_acc(torch.softmax(y_hat, 1), y)
+        self.train_acc(torch.argmax(y_hat, 1), y)
         self.log('train_acc', self.train_acc, prog_bar=True, on_step=True, on_epoch=False)
         return loss
 
@@ -77,7 +77,7 @@ class SAGE(LightningModule):
         x = blocks[0].srcdata['feat']
         y = blocks[-1].dstdata['label']
         y_hat = self(blocks, x)
-        self.val_acc(torch.softmax(y_hat, 1), y)
+        self.val_acc(torch.argmax(y_hat, 1), y)
         self.log('val_acc', self.val_acc, prog_bar=True, on_step=True, on_epoch=True, sync_dist=True)
 
     def configure_optimizers(self):
