@@ -112,6 +112,11 @@ class BaseHeteroGraph : public runtime::Object {
   virtual DLContext Context() const = 0;
 
   /*!
+   * \brief Pin graph.
+   */
+  virtual void PinMemory_() = 0;
+
+  /*!
    * \brief Check if this graph is pinned.
    */
   virtual bool IsPinned() const = 0;
