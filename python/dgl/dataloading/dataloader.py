@@ -86,12 +86,19 @@ class _TensorizedDatasetIter(object):
 
 def _get_id_tensor_from_mapping(indices, device, keys):
     dtype = dtype_of(indices)
-    lengths = torch.tensor(
-        [(indices[k].shape[0] if k in indices else 0) for k in keys],
-        dtype=dtype, device=device)
-    type_ids = torch.arange(len(keys), dtype=dtype, device=device).repeat_interleave(lengths)
-    all_indices = torch.cat([indices[k] for k in keys if k in indices])
-    return torch.stack([type_ids, all_indices], 1)
+    id_tensor = torch.empty(
+        sum(v.shape[0] for v in indices.values()), 2, dtype=dtype, device=device)
+
+    offset = 0
+    for i, k in enumerate(keys):
+        if k not in indices:
+            continue
+        index = indices[k]
+        length = index.shape[0]
+        id_tensor[offset:offset+length, 0] = i
+        id_tensor[offset:offset+length, 1] = index
+        offset += length
+    return id_tensor
 
 
 def _divide_by_worker(dataset, batch_size, drop_last):

@@ -89,3 +89,23 @@ def call_once_and_share(func, shape, dtype, rank=0):
         result = get_shared_mem_array(name, shape, dtype)
 
     return result
+
+def shared_tensor(shape, dtype=torch.float32):
+    """Create a tensor in shared memory accessible by all processes within the same
+    ``torch.distsributed`` process group.
+
+    The content is uninitialized.
+
+    Parameters
+    ----------
+    shape : tuple[int]
+        The shape of the tensor.
+    dtype : torch.dtype, optional
+        The dtype of the tensor.
+
+    Returns
+    -------
+    Tensor
+        The shared tensor.
+    """
+    return call_once_and_share(lambda: torch.empty(*shape, dtype=dtype), shape, dtype)
