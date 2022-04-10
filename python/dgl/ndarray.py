@@ -141,7 +141,6 @@ def get_shared_mem_array(name, shape, dtype):
     F.tensor
         The tensor got from shared memory.
     """
-    name = 'DGL_'+name
     new_arr = empty_shared_mem(name, False, shape, F.reverse_data_type_dict[dtype])
     dlpack = new_arr.to_dlpack()
     return F.zerocopy_from_dlpack(dlpack)
@@ -163,7 +162,6 @@ def create_shared_mem_array(name, shape, dtype):
     F.tensor
         The created tensor.
     """
-    name = 'DGL_'+name
     new_arr = empty_shared_mem(name, True, shape, F.reverse_data_type_dict[dtype])
     dlpack = new_arr.to_dlpack()
     return F.zerocopy_from_dlpack(dlpack)
@@ -181,7 +179,7 @@ def exist_shared_mem_array(name):
     bool
         The existence of the array
     """
-    return _CAPI_DGLExistSharedMemArray("DGL_" + name)
+    return _CAPI_DGLExistSharedMemArray(name)
 
 class SparseFormat:
     """Format code"""
