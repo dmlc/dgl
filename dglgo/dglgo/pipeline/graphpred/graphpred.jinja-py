@@ -1,0 +1,11 @@
+def main():
+    {{ user_cfg_str }}
+    device = cfg['device']
+    pipeline_cfg = cfg['general_pipeline']
+    # load data
+
+if __name__ == '__main__':
+    all_acc = []
+    num_runs = {{ user_cfg.general_pipeline.num_runs }}
+    for run in range(num_runs):
+        print(f'Run experiment #{run}')

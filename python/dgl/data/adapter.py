@@ -2,6 +2,7 @@
 
 import os
 import json
+from tkinter.filedialog import test
 import numpy as np
 
 from .. import backend as F
@@ -9,6 +10,7 @@ from ..convert import graph as create_dgl_graph
 from ..sampling.negative import _calc_redundancy
 from .dgl_dataset import DGLDataset
 from . import utils
+from ..base import DGLError
 from .. import backend as F
 
 __all__ = ['AsNodePredDataset', 'AsLinkPredDataset']
@@ -18,7 +20,7 @@ class AsNodePredDataset(DGLDataset):
     """Repurpose a dataset for a standard semi-supervised transductive
     node prediction task.
 
-    The class converts a given dataset into a new dataset object that:
+    The class converts a given dataset into a new dataset object such that:
 
       - Contains only one graph, accessible from ``dataset[0]``.
       - The graph stores:
@@ -49,7 +51,7 @@ class AsNodePredDataset(DGLDataset):
     dataset : DGLDataset
         The dataset to be converted.
     split_ratio : (float, float, float), optional
-        Split ratios for training, validation and test sets. Must sum to one.
+        Split ratios for training, validation and test sets. They must sum to one.
     target_ntype : str, optional
         The node type to add split mask for.
 
@@ -193,7 +195,7 @@ class AsLinkPredDataset(DGLDataset):
     """Repurpose a dataset for link prediction task.
 
     The created dataset will include data needed for link prediction.
-    Currently only support homogeneous graph. 
+    Currently it only supports homogeneous graphs.
     It will keep only the first graph in the provided dataset and
     generate train/val/test edges according to the given split ratio,
     and the correspondent negative edges based on the neg_ratio. The generated
@@ -368,3 +370,112 @@ class AsLinkPredDataset(DGLDataset):
 
     def __len__(self):
         return 1
+
+class AsGraphPredDataset(DGLDataset):
+    """Repurpose a dataset for standard graph property prediction task.
+
+    The created dataset will include data needed for graph property prediction.
+    Currently it only supports homogeneous graphs.
+
+    The class converts a given dataset into a new dataset object such that:
+
+      - The i-th graph is accessible from ``dataset[i]``.
+
+    Parameters
+    ----------
+    dataset : DGLDataset
+        The dataset to be converted.
+    split_ratio : (float, float, float), optional
+        Split ratios for training, validation and test sets. They must sum to one.
+
+    Examples
+    --------
+    """
+    def __init__(self,
+                 dataset,
+                 split_ratio=None,
+                 **kwargs):
+        self.dataset = dataset
+        self.split_ratio = split_ratio
+        super().__init__(dataset.name + '-as-graphpred',
+                         hash_key=(split_ratio, dataset.name, 'graphpred'), **kwargs)
+
+    def process(self):
+        is_ogb = hasattr(self.dataset, 'get_idx_split')
+        if self.split_ratio is None:
+            if is_ogb:
+                split = self.dataset.get_idx_split()
+                self.train_idx = split['train']
+                self.val_idx = split['valid']
+                self.test_idx = split['test']
+            else:
+                # Handle FakeNewsDataset
+                try:
+                    self.train_idx = F.nonzero_1d(self.dataset.train_mask)
+                    self.val_idx = F.nonzero_1d(self.dataset.val_mask)
+                    self.test_ix = F.nonzero_1d(self.dataset.test_mask)
+                except:
+                    raise DGLError('split_ratio is required to generate the split.')
+        else:
+            if self.verbose:
+                print('Generating train/val/test split...')
+            train_ratio, val_ratio, test_ratio = self.split_ratio
+            num_graphs = len(self.dataset)
+            num_train = int(num_graphs * train_ratio)
+            num_val = int(num_graphs * val_ratio)
+
+            idx = np.random.permutation(num_graphs)
+            self.train_idx = F.tensor(idx[:num_train])
+            self.val_idx = F.tensor(idx[num_train: num_train + num_val])
+            self.test_idx = F.tensor(idx[num_train + num_val:])
+
+        # Determine single-task or multi-task
+        self.num_tasks = getattr(self.dataset, 'num_tasks', None)
+
+        if hasattr(self.dataset, 'gclasses'):
+            # GINDataset
+            self.num_classes = self.dataset.gclasses
+        elif hasattr(self.dataset, 'num_classes'):
+            # MiniGCDataset, FakeNewsDataset
+            self.num_classes = self.dataset.num_classes
+        else:
+            # None for multi-label classification
+            self.num_classes = None
+
+        # Regression
+        # QM7bDataset, QM9Dataset, QM9EdgeDataset
+        self.num_labels = getattr(self.dataset, 'num_labels', None)
+
+    def has_cache(self):
+        return os.path.isfile(os.path.join(self.save_path, 'info_{}.json'.format(self.hash)))
+
+    def load(self):
+        with open(os.path.join(self.save_path, 'info_{}.json'.format(self.hash)), 'r') as f:
+            info = json.load(f)
+            if info['split_ratio'] != self.split_ratio:
+                raise ValueError('Provided split ratio is different from the cached file. '
+                                 'Re-process the dataset.')
+            self.split_ratio = info['split_ratio']
+            self.num_tasks = info['num_tasks']
+            self.num_classes = info['num_classes']
+            self.num_labels = info['num_labels']
+            self.train_idx = info['train_idx']
+            self.val_idx = info['val_idx']
+            self.test_idx = info['test_idx']
+
+    def save(self):
+        with open(os.path.join(self.save_path, 'info_{}.json'.format(self.hash)), 'w') as f:
+            json.dump({
+                'split_ratio': self.split_ratio,
+                'num_tasks': self.num_tasks,
+                'num_classes': self.num_classes,
+                'num_labels': self.num_labels,
+                'train_idx': self.train_idx,
+                'val_idx': self.val_idx,
+                'test_idx': self.test_idx}, f)
+
+    def __getitem__(self, idx):
+        return self.dataset[idx]
+
+    def __len__(self):
+        return len(self.dataset)
