@@ -471,6 +471,9 @@ class AsGraphPredDataset(DGLDataset):
             self.test_idx = info['test_idx']
 
     def save(self):
+        f_path = os.path.dirname(self.save_path)
+        if not os.path.exists(f_path):
+            os.makedirs(f_path)
         with open(os.path.join(self.save_path, 'info_{}.json'.format(self.hash)), 'w') as f:
             json.dump({
                 'split_ratio': self.split_ratio,
