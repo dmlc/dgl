@@ -379,7 +379,7 @@ class AsGraphPredDataset(DGLDataset):
     The class converts a given dataset into a new dataset object such that:
 
       - It stores ``len(dataset)`` graphs.
-      - The i-th graph is accessible from ``dataset[i]``.
+      - The i-th graph and its label is accessible from ``dataset[i]``.
 
     Parameters
     ----------
@@ -396,6 +396,13 @@ class AsGraphPredDataset(DGLDataset):
     >>> dataset = DglGraphPropPredDataset(name='ogbg-molhiv')
     >>> new_dataset = AsGraphPredDataset(dataset)
     >>> print(new_dataset)
+    Dataset("ogbg-molhiv-as-graphpred", num_graphs=41127, save_path=...)
+    >>> print(len(new_dataset))
+    41127
+    >>> print(new_dataset[0])
+    (Graph(num_nodes=19, num_edges=40,
+           ndata_schemes={'feat': Scheme(shape=(9,), dtype=torch.int64)}
+           edata_schemes={'feat': Scheme(shape=(3,), dtype=torch.int64)}), tensor([0]))
     """
     def __init__(self,
                  dataset,
@@ -435,9 +442,6 @@ class AsGraphPredDataset(DGLDataset):
             self.val_idx = F.tensor(idx[num_train: num_train + num_val])
             self.test_idx = F.tensor(idx[num_train + num_val:])
 
-        # Determine single-task or multi-task
-        self.num_tasks = getattr(self.dataset, 'num_tasks', None)
-
         if hasattr(self.dataset, 'gclasses'):
             # GINDataset
             self.num_classes = self.dataset.gclasses
@@ -448,9 +452,14 @@ class AsGraphPredDataset(DGLDataset):
             # None for multi-label classification
             self.num_classes = None
 
-        # Regression
-        # QM7bDataset, QM9Dataset, QM9EdgeDataset
-        self.num_labels = getattr(self.dataset, 'num_labels', None)
+        if hasattr(self.dataset, 'num_tasks'):
+            # OGB datasets
+            self.num_tasks = self.dataset.num_tasks
+        elif hasattr(self.dataset, 'num_labels'):
+            # QM7bDataset, QM9Dataset, QM9EdgeDataset
+            self.num_tasks = self.dataset.num_labels
+        else:
+            self.num_tasks = 1
 
     def has_cache(self):
         return os.path.isfile(os.path.join(self.save_path, 'info_{}.json'.format(self.hash)))
@@ -464,7 +473,6 @@ class AsGraphPredDataset(DGLDataset):
             self.split_ratio = info['split_ratio']
             self.num_tasks = info['num_tasks']
             self.num_classes = info['num_classes']
-            self.num_labels = info['num_labels']
 
         split = np.load(os.path.join(self.save_path, 'split_{}.npz'.format(self.hash)))
         self.train_idx = F.zerocopy_from_numpy(split['train_idx'])
@@ -478,8 +486,7 @@ class AsGraphPredDataset(DGLDataset):
             json.dump({
                 'split_ratio': self.split_ratio,
                 'num_tasks': self.num_tasks,
-                'num_classes': self.num_classes,
-                'num_labels': self.num_labels}, f)
+                'num_classes': self.num_classes}, f)
         np.savez(os.path.join(self.save_path, 'split_{}.npz'.format(self.hash)),
                  train_idx=F.zerocopy_to_numpy(self.train_idx),
                  val_idx=F.zerocopy_to_numpy(self.val_idx),
