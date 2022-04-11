@@ -465,11 +465,11 @@ class AsGraphPredDataset(DGLDataset):
             self.num_tasks = info['num_tasks']
             self.num_classes = info['num_classes']
             self.num_labels = info['num_labels']
-            import ipdb
-            ipdb.set_trace()
-            self.train_idx = info['train_idx']
-            self.val_idx = info['val_idx']
-            self.test_idx = info['test_idx']
+
+        split = np.load(os.path.join(self.save_path, 'split_{}.npz'.format(self.hash)))
+        self.train_idx = F.zerocopy_from_numpy(split['train_idx'])
+        self.val_idx = F.zerocopy_from_numpy(split['val_idx'])
+        self.test_idx = F.zerocopy_from_numpy(split['test_idx'])
 
     def save(self):
         if not os.path.exists(self.save_path):
@@ -479,10 +479,11 @@ class AsGraphPredDataset(DGLDataset):
                 'split_ratio': self.split_ratio,
                 'num_tasks': self.num_tasks,
                 'num_classes': self.num_classes,
-                'num_labels': self.num_labels,
-                'train_idx': F.zerocopy_to_numpy(self.train_idx),
-                'val_idx': F.zerocopy_to_numpy(self.val_idx),
-                'test_idx': F.zerocopy_to_numpy(self.test_idx)}, f)
+                'num_labels': self.num_labels}, f)
+        np.savez(os.path.join(self.save_path, 'split_{}.npz'.format(self.hash)),
+                 train_idx=F.zerocopy_to_numpy(self.train_idx),
+                 val_idx=F.zerocopy_to_numpy(self.val_idx),
+                 test_idx=F.zerocopy_to_numpy(self.test_idx))
 
     def __getitem__(self, idx):
         return self.dataset[idx]
