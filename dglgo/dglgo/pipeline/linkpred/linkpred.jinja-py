@@ -27,7 +27,7 @@ class Model(nn.Module):
         eid_dataloader = DataLoader(
             range(
                 src.shape[-1]),
-            batch_size=self.eval_batch_size) 
+            batch_size=self.eval_batch_size)
         score_list = []
         for eids in eid_dataloader:
             score = self.edge_model(h[src[eids]], h[dst[eids]])
@@ -56,7 +56,7 @@ def train(cfg, pipeline_cfg, device, dataset, model, optimizer, loss_fcn):
             neg_score = model.edge_model(h[neg_src], h[neg_dst])
             loss = loss_fcn(torch.cat([pos_score, neg_score]),  torch.cat(
                 [torch.ones_like(pos_score), torch.zeros_like(neg_score)]))
-        
+
             optimizer.zero_grad()
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
@@ -78,7 +78,7 @@ def train(cfg, pipeline_cfg, device, dataset, model, optimizer, loss_fcn):
             print("Epoch {:05d} | Val Hits@50 {:.4f}".format(epoch, val_hits))
 
     with torch.no_grad():
-        model.eval()        
+        model.eval()
         test_pos_edge, test_neg_edges = dataset.test_edges
         pos_result = model.inference(train_g, node_feat, test_pos_edge)
         neg_result = model.inference(train_g, node_feat, test_neg_edges)
@@ -112,7 +112,7 @@ def main():
     loss = torch.nn.{{ loss }}()
     optimizer = torch.optim.Adam(params, **pipeline_cfg["optimizer"])
     test_hits = train(cfg, pipeline_cfg, device, dataset, model, optimizer, loss)
-    torch.save(model, pipeline_cfg["save_path"])
+    torch.save(model.state_dict(), pipeline_cfg["save_path"])
     return test_hits
 
 if __name__ == '__main__':
