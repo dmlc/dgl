@@ -173,7 +173,7 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
     nodes = F.to_dgl_nd(nodes)
     # (Xin) Since metapath array is created by us, safe to skip the check
     #       and keep it on CPU to make max_nodes sanity check easier.
-    metapath = F.to_dgl_nd(F.tensor(metapath))
+    metapath = F.to_dgl_nd(F.astype(F.tensor(metapath), g.idtype))
 
     # Load the probability tensor from the edge frames
     if prob is None:
