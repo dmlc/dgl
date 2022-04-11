@@ -35,9 +35,9 @@ std::tuple<IdArray, IdArray, IdArray> _ComputePrefixSums(const std::vector<COOMa
   IdArray prefix_elm_arr = NewIdArray(
     coos.size(), coos[0].row->ctx, coos[0].row->dtype.bits);
 
-  IdType* prefix_src = static_cast<IdType*>(prefix_src_arr->data);
-  IdType* prefix_dst = static_cast<IdType*>(prefix_dst_arr->data);
-  IdType* prefix_elm = static_cast<IdType*>(prefix_elm_arr->data);
+  auto prefix_src = static_cast<IdArray>(prefix_src_arr).Ptr<IdType>();
+  auto prefix_dst = static_cast<IdArray>(prefix_dst_arr).Ptr<IdType>();
+  auto prefix_elm = static_cast<IdArray>(prefix_elm_arr).Ptr<IdType>();
 
   dgl::runtime::parallel_for(0, coos.size(), [&](IdType b, IdType e){
     for (IdType i = b; i < e; ++i) {
@@ -65,9 +65,9 @@ COOMatrix DisjointUnionCoo(const std::vector<COOMatrix>& coos) {
   }
 
   auto prefixes = _ComputePrefixSums<XPU, IdType>(coos);
-  auto prefix_src = static_cast<IdType*>(std::get<0>(prefixes)->data);
-  auto prefix_dst = static_cast<IdType*>(std::get<1>(prefixes)->data);
-  auto prefix_elm = static_cast<IdType*>(std::get<2>(prefixes)->data);
+  auto prefix_src = static_cast<IdArray>(std::get<0>(prefixes)).Ptr<IdType>();
+  auto prefix_dst = static_cast<IdArray>(std::get<1>(prefixes)).Ptr<IdType>();
+  auto prefix_elm = static_cast<IdArray>(std::get<2>(prefixes)).Ptr<IdType>();
 
   auto result_src = NewIdArray(
     prefix_elm[coos.size()], coos[0].row->ctx, coos[0].row->dtype.bits);
@@ -79,9 +79,9 @@ COOMatrix DisjointUnionCoo(const std::vector<COOMatrix>& coos) {
       prefix_elm[coos.size()], coos[0].row->ctx, coos[0].row->dtype.bits);
   }
 
-  auto res_src_data = static_cast<IdType*>(result_src->data);
-  auto res_dst_data = static_cast<IdType*>(result_dst->data);
-  auto res_dat_data = static_cast<IdType*>(result_dat->data);
+  auto res_src_data = static_cast<IdArray>(result_src).Ptr<IdType>();
+  auto res_dst_data = static_cast<IdArray>(result_dst).Ptr<IdType>();
+  auto res_dat_data = static_cast<IdArray>(result_dat).Ptr<IdType>();
 
   dgl::runtime::parallel_for(0, coos.size(), [&](IdType b, IdType e){
     for (IdType i = b; i < e; ++i) {
@@ -89,9 +89,9 @@ COOMatrix DisjointUnionCoo(const std::vector<COOMatrix>& coos) {
       if (!coo.row_sorted) row_sorted = false;
       if (!coo.col_sorted) col_sorted = false;
 
-      auto edges_src = static_cast<IdType*>(coo.row->data);
-      auto edges_dst = static_cast<IdType*>(coo.col->data);
-      auto edges_dat = static_cast<IdType*>(coo.data->data);
+      auto edges_src = static_cast<IdArray>(coo.row).Ptr<IdType>();
+      auto edges_dst = static_cast<IdArray>(coo.col).Ptr<IdType>();
+      auto edges_dat = static_cast<IdArray>(coo.data).Ptr<IdType>();
 
       for (IdType j = 0; j < coo.row->shape[0]; j++) {
         res_src_data[prefix_elm[i] + j] = edges_src[j] + prefix_src[i];
@@ -103,7 +103,7 @@ COOMatrix DisjointUnionCoo(const std::vector<COOMatrix>& coos) {
 
       if (has_data) {
         for (IdType j = 0; j < coo.row->shape[0]; j++) {
-          const auto d = (!COOHasData(coo)) ? IdType(j) : edges_dat[j];
+          const auto d = (!COOHasData(coo)) ? j : edges_dat[j];
           res_dat_data[prefix_elm[i]+j] = d + prefix_elm[i];
         }
       }
