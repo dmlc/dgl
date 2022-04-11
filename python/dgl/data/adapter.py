@@ -391,6 +391,12 @@ class AsGraphPredDataset(DGLDataset):
 
     Examples
     --------
+
+    >>> from dgl.data import AsGraphPredDataset
+    >>> from ogb.graphproppred import DglGraphPropPredDataset
+    >>> dataset = DglGraphPropPredDataset(name='ogbg-molhiv')
+    >>> new_dataset = AsGraphPredDataset(dataset)
+    >>> print(new_dataset)
     """
     def __init__(self,
                  dataset,
