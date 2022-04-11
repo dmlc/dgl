@@ -349,9 +349,4 @@ def test_edge_dataloader_excludes(exclude, always_exclude_flag):
             assert not np.isin(edges_to_exclude, block_eids).any()
 
 if __name__ == '__main__':
-    test_graph_dataloader()
-    test_cluster_gcn(0)
-    test_neighbor_nonuniform(0)
-    for exclude in [None, 'self', 'reverse_id', 'reverse_types']:
-        test_edge_dataloader_excludes(exclude, False)
-        test_edge_dataloader_excludes(exclude, True)
+    test_edge_dataloader('neighbor', dgl.dataloading.negative_sampler.GlobalUniform(15, True, 3), True)

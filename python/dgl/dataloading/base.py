@@ -6,7 +6,7 @@ from ..convert import heterograph
 from .. import backend as F
 from ..transforms import compact_graphs
 from ..frame import LazyFeature
-from ..utils import recursive_apply
+from ..utils import recursive_apply, context_of
 
 def _set_lazy_features(x, xdata, feature_names):
     if feature_names is None:
