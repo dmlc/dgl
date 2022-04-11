@@ -32,6 +32,16 @@ void CheckRandomWalkInputs(
   CHECK_INT(metapath, "metapath");
   CHECK_NDIM(seeds, 1, "seeds");
   CHECK_NDIM(metapath, 1, "metapath");
+  // (Xin): metapath is copied to GPU in CUDA random walk code
+  // CHECK_SAME_CONTEXT(seeds, metapath);
+
+  if (hg->IsPinned()) {
+    CHECK_EQ(seeds->ctx.device_type, kDLGPU) << "Expected seeds (" << seeds->ctx << ")" \
+      << " to be on the GPU when the graph is pinned.";
+  } else if (hg->Context() != seeds->ctx) {
+    LOG(FATAL) << "Expected seeds (" << seeds->ctx << ")" << " to have the same " \
+      << "context as graph (" << hg->Context() << ").";
+  }
   for (uint64_t i = 0; i < prob.size(); ++i) {
     FloatArray p = prob[i];
     CHECK_FLOAT(p, "probability");
@@ -51,7 +61,7 @@ std::tuple<IdArray, IdArray, TypeArray> RandomWalk(
 
   TypeArray vtypes;
   std::pair<IdArray, IdArray> result;
-  ATEN_XPU_SWITCH_CUDA(hg->Context().device_type, XPU, "RandomWalk", {
+  ATEN_XPU_SWITCH_CUDA(seeds->ctx.device_type, XPU, "RandomWalk", {
     ATEN_ID_TYPE_SWITCH(seeds->dtype, IdxType, {
       vtypes = impl::GetNodeTypesFromMetapath<XPU, IdxType>(hg, metapath);
       result = impl::RandomWalk<XPU, IdxType>(hg, seeds, metapath, prob);
@@ -72,7 +82,7 @@ std::tuple<IdArray, IdArray, TypeArray> RandomWalkWithRestart(
 
   TypeArray vtypes;
   std::pair<IdArray, IdArray> result;
-  ATEN_XPU_SWITCH_CUDA(hg->Context().device_type, XPU, "RandomWalkWithRestart", {
+  ATEN_XPU_SWITCH_CUDA(seeds->ctx.device_type, XPU, "RandomWalkWithRestart", {
     ATEN_ID_TYPE_SWITCH(seeds->dtype, IdxType, {
       vtypes = impl::GetNodeTypesFromMetapath<XPU, IdxType>(hg, metapath);
       result = impl::RandomWalkWithRestart<XPU, IdxType>(hg, seeds, metapath, prob, restart_prob);
@@ -93,7 +103,7 @@ std::tuple<IdArray, IdArray, TypeArray> RandomWalkWithStepwiseRestart(
 
   TypeArray vtypes;
   std::pair<IdArray, IdArray> result;
-  ATEN_XPU_SWITCH_CUDA(hg->Context().device_type, XPU, "RandomWalkWithStepwiseRestart", {
+  ATEN_XPU_SWITCH_CUDA(seeds->ctx.device_type, XPU, "RandomWalkWithStepwiseRestart", {
     ATEN_ID_TYPE_SWITCH(seeds->dtype, IdxType, {
       vtypes = impl::GetNodeTypesFromMetapath<XPU, IdxType>(hg, metapath);
       result = impl::RandomWalkWithStepwiseRestart<XPU, IdxType>(
