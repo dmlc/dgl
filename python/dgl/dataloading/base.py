@@ -373,8 +373,7 @@ class EdgePredictionSampler(Sampler):
             neg_srcdst = {g.canonical_etypes[0]: neg_srcdst}
 
         dtype = F.dtype(list(neg_srcdst.values())[0][0])
-        ctx = F.context(list(seed_edges.values())[0][0]) if seed_edges \
-                                                         else g.device
+        ctx = context_of(seed_edges) if seed_edges is not None else g.device
         neg_edges = {
             etype: neg_srcdst.get(etype,
                                   (F.copy_to(F.tensor([], dtype), ctx=ctx),
