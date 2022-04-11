@@ -13,6 +13,7 @@
 #include <utility>
 #include <tuple>
 
+#include "../../../runtime/cuda/cuda_common.h"
 #include "frequency_hashmap.cuh"
 
 namespace dgl {
@@ -40,6 +41,7 @@ __global__ void _RandomWalkKernel(
     const GraphKernelData<IdType>* graphs,
     const FloatType* restart_prob_data,
     const int64_t restart_prob_size,
+    const int64_t max_nodes,
     IdType *out_traces_data,
     IdType *out_eids_data) {
   assert(BLOCK_SIZE == blockDim.x);
@@ -53,6 +55,7 @@ __global__ void _RandomWalkKernel(
 
   while (idx < last_idx) {
     IdType curr = seed_data[idx];
+    assert(curr < max_nodes);
     IdType *traces_data_ptr = &out_traces_data[idx * trace_length];
     IdType *eids_data_ptr = &out_eids_data[idx * max_num_steps];
     *(traces_data_ptr++) = curr;
@@ -97,6 +100,8 @@ std::pair<IdArray, IdArray> RandomWalkUniform(
     FloatArray restart_prob) {
   const int64_t max_num_steps = metapath->shape[0];
   const IdType *metapath_data = static_cast<IdType *>(metapath->data);
+  const int64_t begin_ntype = hg->meta_graph()->FindEdge(metapath_data[0]).first;
+  const int64_t max_nodes = hg->NumVertices(begin_ntype);
   int64_t num_etypes = hg->NumEdgeTypes();
   auto ctx = seeds->ctx;
 
@@ -121,7 +126,6 @@ std::pair<IdArray, IdArray> RandomWalkUniform(
   auto device = DeviceAPI::Get(ctx);
   auto d_graphs = static_cast<GraphKernelData<IdType>*>(
       device->AllocWorkspace(ctx, (num_etypes) * sizeof(GraphKernelData<IdType>)));
-  auto d_metapath_data = metapath_data;
   // copy graph metadata pointers to GPU
   device->CopyDataFromTo(h_graphs.data(), 0, d_graphs, 0,
       (num_etypes) * sizeof(GraphKernelData<IdType>),
@@ -129,6 +133,9 @@ std::pair<IdArray, IdArray> RandomWalkUniform(
       ctx,
       hg->GetCSRMatrix(0).indptr->dtype,
       stream);
+  // copy metapath to GPU
+  auto d_metapath = metapath.CopyTo(ctx);
+  const IdType *d_metapath_data = static_cast<IdType *>(d_metapath->data);
 
   constexpr int BLOCK_SIZE = 256;
   constexpr int TILE_SIZE = BLOCK_SIZE * 4;
@@ -140,17 +147,20 @@ std::pair<IdArray, IdArray> RandomWalkUniform(
     CHECK(restart_prob->ndim == 1) << "restart prob dimension should be 1.";
     const FloatType *restart_prob_data = restart_prob.Ptr<FloatType>();
     const int64_t restart_prob_size = restart_prob->shape[0];
-    _RandomWalkKernel<IdType, FloatType, BLOCK_SIZE, TILE_SIZE> <<<grid, block, 0, stream>>>(
-        random_seed,
-        seed_data,
-        num_seeds,
-        d_metapath_data,
-        max_num_steps,
-        d_graphs,
-        restart_prob_data,
-        restart_prob_size,
-        traces_data,
-        eids_data);
+    CUDA_KERNEL_CALL(
+      (_RandomWalkKernel<IdType, FloatType, BLOCK_SIZE, TILE_SIZE>),
+      grid, block, 0, stream,
+      random_seed,
+      seed_data,
+      num_seeds,
+      d_metapath_data,
+      max_num_steps,
+      d_graphs,
+      restart_prob_data,
+      restart_prob_size,
+      max_nodes,
+      traces_data,
+      eids_data);
   });
 
   device->FreeWorkspace(ctx, d_graphs);

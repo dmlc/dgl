@@ -32,7 +32,8 @@ void CheckRandomWalkInputs(
   CHECK_INT(metapath, "metapath");
   CHECK_NDIM(seeds, 1, "seeds");
   CHECK_NDIM(metapath, 1, "metapath");
-  CHECK_SAME_CONTEXT(seeds, metapath);
+  // (Xin): metapath is copied to GPU in CUDA random walk code
+  // CHECK_SAME_CONTEXT(seeds, metapath);
 
   if (hg->IsPinned()) {
     CHECK_EQ(seeds->ctx.device_type, kDLGPU) << "Expected seeds (" << seeds->ctx << ")" \

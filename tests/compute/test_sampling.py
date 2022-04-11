@@ -108,12 +108,9 @@ def test_uniform_random_walk(use_uva):
         traces, eids, ntypes = dgl.sampling.random_walk(
             g1, F.tensor([0, 1, 2, 0, 1, 2], dtype=g1.idtype), length=4, return_eids=True)
         check_random_walk(g1, ['follow'] * 4, traces, ntypes, trace_eids=eids)
-        try:
-            dgl.sampling.random_walk(g1, F.tensor([0, 1, 2, 10], dtype=g1.idtype), length=4, return_eids=True)
-            fail = False        # shouldn't abort
-        except:
-            fail = True
-        assert fail
+        if F._default_context_str == 'cpu':
+            with pytest.raises(dgl.DGLError):
+                dgl.sampling.random_walk(g1, F.tensor([0, 1, 2, 10], dtype=g1.idtype), length=4, return_eids=True)
         traces, eids, ntypes = dgl.sampling.random_walk(
             g1, F.tensor([0, 1, 2, 0, 1, 2], dtype=g1.idtype), length=4, restart_prob=0., return_eids=True)
         check_random_walk(g1, ['follow'] * 4, traces, ntypes, trace_eids=eids)
@@ -993,7 +990,8 @@ if __name__ == '__main__':
     from itertools import product
     for args in product(['coo', 'csr', 'csc'], ['in', 'out'], [False, True]):
         test_sample_neighbors_etype_homogeneous(*args)
-    test_random_walk()
+    test_non_uniform_random_walk()
+    test_uniform_random_walk(False)
     test_pack_traces()
     test_pinsage_sampling()
     test_sample_neighbors_outedge()
