@@ -9,12 +9,10 @@ Advanced usages, including how to run pure GPU sampling, how to train with PyTor
 
 Requirements
 ------------
-- requests
 
 ```bash
-pip install requests
+pip install requests torchmetrics
 ```
-
 
 Results
 -------
