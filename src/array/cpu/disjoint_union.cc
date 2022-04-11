@@ -35,9 +35,9 @@ std::tuple<IdArray, IdArray, IdArray> _ComputePrefixSums(const std::vector<COOMa
   IdArray prefix_elm_arr = NewIdArray(
     coos.size(), coos[0].row->ctx, coos[0].row->dtype.bits);
 
-  auto prefix_src = static_cast<IdArray>(prefix_src_arr).Ptr<IdType>();
-  auto prefix_dst = static_cast<IdArray>(prefix_dst_arr).Ptr<IdType>();
-  auto prefix_elm = static_cast<IdArray>(prefix_elm_arr).Ptr<IdType>();
+  auto prefix_src = prefix_src_arr.Ptr<IdType>();
+  auto prefix_dst = prefix_dst_arr.Ptr<IdType>();
+  auto prefix_elm = prefix_elm_arr.Ptr<IdType>();
 
   dgl::runtime::parallel_for(0, coos.size(), [&](IdType b, IdType e){
     for (IdType i = b; i < e; ++i) {
@@ -69,19 +69,19 @@ COOMatrix DisjointUnionCoo(const std::vector<COOMatrix>& coos) {
   auto prefix_dst = static_cast<IdArray>(std::get<1>(prefixes)).Ptr<IdType>();
   auto prefix_elm = static_cast<IdArray>(std::get<2>(prefixes)).Ptr<IdType>();
 
-  auto result_src = NewIdArray(
+  IdArray result_src = NewIdArray(
     prefix_elm[coos.size()], coos[0].row->ctx, coos[0].row->dtype.bits);
-  auto result_dst = NewIdArray(
+  IdArray result_dst = NewIdArray(
     prefix_elm[coos.size()], coos[0].col->ctx, coos[0].col->dtype.bits);
-  auto result_dat = NullArray();
+  IdArray result_dat = NullArray();
   if (has_data) {
     result_dat =  NewIdArray(
       prefix_elm[coos.size()], coos[0].row->ctx, coos[0].row->dtype.bits);
   }
 
-  auto res_src_data = static_cast<IdArray>(result_src).Ptr<IdType>();
-  auto res_dst_data = static_cast<IdArray>(result_dst).Ptr<IdType>();
-  auto res_dat_data = static_cast<IdArray>(result_dat).Ptr<IdType>();
+  auto res_src_data = result_src.Ptr<IdType>();
+  auto res_dst_data = result_dst.Ptr<IdType>();
+  auto res_dat_data = result_dat.Ptr<IdType>();
 
   dgl::runtime::parallel_for(0, coos.size(), [&](IdType b, IdType e){
     for (IdType i = b; i < e; ++i) {
@@ -89,9 +89,9 @@ COOMatrix DisjointUnionCoo(const std::vector<COOMatrix>& coos) {
       if (!coo.row_sorted) row_sorted = false;
       if (!coo.col_sorted) col_sorted = false;
 
-      auto edges_src = static_cast<IdArray>(coo.row).Ptr<IdType>();
-      auto edges_dst = static_cast<IdArray>(coo.col).Ptr<IdType>();
-      auto edges_dat = static_cast<IdArray>(coo.data).Ptr<IdType>();
+      auto edges_src = coo.row.Ptr<IdType>();
+      auto edges_dst = coo.col.Ptr<IdType>();
+      auto edges_dat = coo.data.Ptr<IdType>();
 
       for (IdType j = 0; j < coo.row->shape[0]; j++) {
         res_src_data[prefix_elm[i] + j] = edges_src[j] + prefix_src[i];
