@@ -13,7 +13,7 @@ from . import utils
 from ..base import DGLError
 from .. import backend as F
 
-__all__ = ['AsNodePredDataset', 'AsLinkPredDataset']
+__all__ = ['AsNodePredDataset', 'AsLinkPredDataset', 'AsGraphPredDataset']
 
 
 class AsNodePredDataset(DGLDataset):
