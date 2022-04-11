@@ -379,6 +379,7 @@ class AsGraphPredDataset(DGLDataset):
 
     The class converts a given dataset into a new dataset object such that:
 
+      - It stores ``len(dataset)`` graphs.
       - The i-th graph is accessible from ``dataset[i]``.
 
     Parameters
