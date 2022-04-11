@@ -75,7 +75,7 @@ COOMatrix DisjointUnionCoo(const std::vector<COOMatrix>& coos) {
     prefix_elm[coos.size()], coos[0].col->ctx, coos[0].col->dtype.bits);
   IdArray result_dat = NullArray();
   if (has_data) {
-    result_dat =  NewIdArray(
+    result_dat = NewIdArray(
       prefix_elm[coos.size()], coos[0].row->ctx, coos[0].row->dtype.bits);
   }
 
