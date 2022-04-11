@@ -41,7 +41,7 @@ class AsNodePredDataset(DGLDataset):
         So do validation and test masks.
 
     The class will keep only the first graph in the provided dataset and
-    generate train/val/test masks according to the given spplit ratio. The generated
+    generate train/val/test masks according to the given split ratio. The generated
     masks will be cached to disk for fast re-loading. If the provided split ratio
     differs from the cached one, it will re-process the dataset properly.
 
@@ -381,12 +381,29 @@ class AsGraphPredDataset(DGLDataset):
       - It stores ``len(dataset)`` graphs.
       - The i-th graph and its label is accessible from ``dataset[i]``.
 
+    The class will generate a train/val/test split if :attr:`split_ratio` is provided.
+    The generated split will be cached to disk for fast re-loading. If the provided split
+    ratio differs from the cached one, it will re-process the dataset properly.
+
     Parameters
     ----------
     dataset : DGLDataset
         The dataset to be converted.
     split_ratio : (float, float, float), optional
         Split ratios for training, validation and test sets. They must sum to one.
+
+    Attributes
+    ----------
+    num_tasks : int
+        Number of tasks to predict.
+    num_classes : int
+        Number of classes to predict per task.
+    train_idx : Tensor
+        An 1-D integer tensor of training node IDs.
+    val_idx : Tensor
+        An 1-D integer tensor of validation node IDs.
+    test_idx : Tensor
+        An 1-D integer tensor of test node IDs.
 
     Examples
     --------
@@ -426,7 +443,7 @@ class AsGraphPredDataset(DGLDataset):
                 try:
                     self.train_idx = F.nonzero_1d(self.dataset.train_mask)
                     self.val_idx = F.nonzero_1d(self.dataset.val_mask)
-                    self.test_ix = F.nonzero_1d(self.dataset.test_mask)
+                    self.test_idx = F.nonzero_1d(self.dataset.test_mask)
                 except:
                     raise DGLError('split_ratio is required to generate the split.')
         else:
@@ -447,7 +464,7 @@ class AsGraphPredDataset(DGLDataset):
             self.num_classes = self.dataset.gclasses
         elif hasattr(self.dataset, 'num_classes'):
             # MiniGCDataset, FakeNewsDataset
-            self.num_classes = self.dataset.num_classes
+            self.num_classes = int(self.dataset.num_classes)
         else:
             # None for multi-label classification
             self.num_classes = None

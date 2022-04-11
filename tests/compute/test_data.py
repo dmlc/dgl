@@ -1326,6 +1326,17 @@ def test_as_nodepred_csvdataset():
         assert 'label' in new_ds[0].ndata
         assert 'train_mask' in new_ds[0].ndata
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
+def test_as_graphpred():
+    ds = data.GINDataset(name='MUTAG', self_loop=True)
+    new_ds = data.AsGraphPredDataset(ds, [0.8, 0.1, 0.1], verbose=True)
+    assert len(new_ds) == 188
+    assert new_ds.num_tasks == 1
+    assert new_ds.num_classes == 2
+
+    ds = data.FakeNewsDataset('politifact', 'profile')
+    new_ds = data.AsGraphPredDataset(ds, verbose=True)
+
 if __name__ == '__main__':
     test_minigc()
     test_gin()
