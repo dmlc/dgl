@@ -45,7 +45,7 @@ class GATv2(nn.Module):
     def forward(self, g, inputs):
         h = inputs
         for l in range(self.num_layers):
-            h = self.gatv2_layers[l](h).flatten(1)
+            h = self.gatv2_layers[l](g, h).flatten(1)
         # output projection
-        logits = self.gatv2_layers[-1](h).mean(1)
+        logits = self.gatv2_layers[-1](g, h).mean(1)
         return logits
