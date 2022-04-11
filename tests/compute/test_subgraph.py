@@ -100,6 +100,8 @@ def create_test_heterograph(idtype):
         ('user', 'wishes', 'game'): ([0, 2], [1, 0]),
         ('developer', 'develops', 'game'): ([0, 1], [0, 1])
     }, idtype=idtype, device=F.ctx())
+    for etype in g.etypes:
+        g.edges[etype].data['weight'] = F.randn((g.num_edges(etype),))
     assert g.idtype == idtype
     assert g.device == F.ctx()
     return g
@@ -629,6 +631,28 @@ def test_subframes(parent_idx_device, child_device):
     if parent_device == 'uva':
         g.unpin_memory_()
 
+@unittest.skipIf(F._default_context_str != "gpu", reason="UVA only available on GPU")
+@pytest.mark.parametrize('device', [F.cpu(), F.cuda()])
+@parametrize_dtype
+def test_uva_subgraph(idtype, device):
+    g = create_test_heterograph(idtype)
+    g = g.to(F.cpu())
+    g.create_formats_()
+    g.pin_memory_()
+    indices = {'user': F.copy_to(F.tensor([0], idtype), device)}
+    edge_indices = {'follows': F.copy_to(F.tensor([0], idtype), device)}
+    assert g.subgraph(indices).device == device
+    assert g.edge_subgraph(edge_indices).device == device
+    assert g.in_subgraph(indices).device == device
+    assert g.out_subgraph(indices).device == device
+    if dgl.backend.backend_name != 'tensorflow':
+        # (BarclayII) Most of Tensorflow functions somehow do not preserve device: a CPU tensor
+        # becomes a GPU tensor after operations such as concat(), unique() or even sin().
+        # Not sure what should be the best fix.
+        assert g.khop_in_subgraph(indices, 1)[0].device == device
+        assert g.khop_out_subgraph(indices, 1)[0].device == device
+    assert g.sample_neighbors(indices, 1).device == device
+    g.unpin_memory_()
+
 if __name__ == '__main__':
-    test_khop_out_subgraph(F.int64)
-    test_subframes(('cpu', F.cpu()), F.cuda())
+    test_uva_subgraph(F.int64, F.cpu())
