@@ -240,7 +240,7 @@ class HeteroGraph : public BaseHeteroGraph {
   *       kDLGPU: invalid, will throw an error.
   *       The context check is deferred to pinning the NDArray.
   */
-  void PinMemory_();
+  void PinMemory_() override;
 
   /*!
   * \brief Unpin all relation graphs of the current graph.
