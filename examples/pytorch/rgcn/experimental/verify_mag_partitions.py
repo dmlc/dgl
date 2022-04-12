@@ -45,6 +45,7 @@ for key in node_feats:
 for key in edge_feats:
     edge_feats[key] = th.cat(edge_feats[key])
 
+# Construct the mapping from node/edge type IDs to node/edge type.
 ntype_map = metadata['ntypes']
 ntypes = [None] * len(ntype_map)
 for key in ntype_map:
@@ -59,6 +60,9 @@ for key in etype_map:
 etype2canonical = {etype: (srctype, etype, dsttype)
                    for srctype, etype, dsttype in hg.canonical_etypes}
 
+# Construct the mapping of nodes and edges.
+# These mappings can be used to map node/edge IDs to partition IDs; they can also be used
+# to map homogeneous node/edge IDs to per-type node/edge IDs.
 node_map = metadata['node_map']
 for key in node_map:
     node_map[key] = th.stack([th.tensor(row) for row in node_map[key]], 0)
@@ -67,7 +71,7 @@ edge_map = metadata['edge_map']
 for key in edge_map:
     edge_map[key] = th.stack([th.tensor(row) for row in edge_map[key]], 0)
 eid_map = dgl.distributed.id_map.IdMap(edge_map)
-
+# Verify the correctness of the mappings.
 for ntype in node_map:
     assert hg.number_of_nodes(ntype) == th.sum(
         node_map[ntype][:, 1] - node_map[ntype][:, 0])
@@ -116,9 +120,13 @@ for partid in range(num_parts):
     print('test part', partid)
     part_file = '{}/part{}/graph.dgl'.format(partitions_folder, partid)
     subg = dgl.load_graphs(part_file)[0][0]
+    # Source nodes and destination nodes with local node IDs.
     subg_src_id, subg_dst_id = subg.edges()
+    # The node IDs in the very original input graph.
     orig_src_id = subg.ndata['orig_id'][subg_src_id]
     orig_dst_id = subg.ndata['orig_id'][subg_dst_id]
+    # The global node IDs in the distributed graph.
+    # These IDs are assigned after ID shuffling in the graph partition.
     global_src_id = subg.ndata[dgl.NID][subg_src_id]
     global_dst_id = subg.ndata[dgl.NID][subg_dst_id]
     subg_ntype = subg.ndata[dgl.NTYPE]
