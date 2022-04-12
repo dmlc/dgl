@@ -9,6 +9,7 @@ from .gatconv import GATConv
 from .gatv2conv import GATv2Conv
 from .egatconv import EGATConv
 from .ginconv import GINConv
+from .gineconv import GINEConv
 from .gmmconv import GMMConv
 from .graphconv import GraphConv, EdgeWeightNorm
 from .nnconv import NNConv

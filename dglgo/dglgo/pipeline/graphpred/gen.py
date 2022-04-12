@@ -2,9 +2,9 @@ from pathlib import Path
 from jinja2 import Template
 import copy
 import typer
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
-from ...utils.factory import PipelineFactory, PipelineBase
+from ...utils.factory import PipelineFactory, PipelineBase, DataFactory
 from ...utils.yaml_dump import deep_convert_dict, merge_comment
 import ruamel.yaml
 
@@ -13,6 +13,7 @@ pipeline_comments = {
 }
 
 class GraphpredPipelineCfg(BaseModel):
+    save_path: str = "model.pth"
     num_runs: int = 1
 
 @PipelineFactory.register("graphpred")
@@ -24,6 +25,7 @@ class GraphpredPipeline(PipelineBase):
     def setup_user_cfg_cls(cls):
         from ...utils.enter_config import UserConfig
         class GraphPredUserConfig(UserConfig):
+            data: DataFactory.filter("graphpred").get_pydantic_config() = Field(..., discriminator="name")
             general_pipeline: GraphpredPipelineCfg = GraphpredPipelineCfg()
 
         cls.user_cfg_cls = GraphPredUserConfig
@@ -34,6 +36,7 @@ class GraphpredPipeline(PipelineBase):
 
     def get_cfg_func(self):
         def config(
+            data: DataFactory.filter("graphpred").get_dataset_enum() = typer.Option(..., help="input data name"),
             cfg: Optional[str] = typer.Option(
                 None, help="output configuration path"),
         ):
@@ -41,12 +44,16 @@ class GraphpredPipeline(PipelineBase):
             generated_cfg = {
                 "pipeline_name": self.pipeline_name,
                 "device": "cpu",
+                "data": {"name": data.name},
                 "general_pipeline": {}
             }
             output_cfg = self.user_cfg_cls(**generated_cfg).dict()
             output_cfg = deep_convert_dict(output_cfg)
             comment_dict = {
                 "device": "Torch device name, e.q. cpu or cuda or cuda:0",
+                "data": {
+                    "split_ratio": 'Ratio to generate data split, for example set to [0.8, 0.1, 0.1] for 80% train/10% val/10% test. Leave blank to use builtin split in original dataset'
+                },
                 "general_pipeline": pipeline_comments,
             }
             comment_dict = merge_comment(output_cfg, comment_dict)
@@ -65,12 +72,21 @@ class GraphpredPipeline(PipelineBase):
             template = Template(f.read())
 
         render_cfg = copy.deepcopy(user_cfg_dict)
+        render_cfg.update(DataFactory.get_generated_code_dict(user_cfg_dict["data"]["name"], '**cfg["data"]'))
 
         generated_user_cfg = copy.deepcopy(user_cfg_dict)
+        if "split_ratio" in generated_user_cfg["data"]:
+            generated_user_cfg["data"].pop("split_ratio")
+        if len(generated_user_cfg["data"]) == 1:
+            generated_user_cfg.pop("data")
+        else:
+            generated_user_cfg["data"].pop("name")
         generated_user_cfg.pop("pipeline_name")
 
         generated_train_cfg = copy.deepcopy(user_cfg_dict["general_pipeline"])
 
+        if user_cfg_dict["data"].get("split_ratio", None) is not None:
+            render_cfg["data_initialize_code"] = "{}, split_ratio={}".format(render_cfg["data_initialize_code"], user_cfg_dict["data"]["split_ratio"])
         render_cfg["user_cfg_str"] = f"cfg = {str(generated_user_cfg)}"
         render_cfg["user_cfg"] = user_cfg_dict
         return template.render(**render_cfg)

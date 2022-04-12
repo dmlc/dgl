@@ -12,7 +12,7 @@ import inspect
 from numpydoc import docscrape
 logger = logging.getLogger(__name__)
 
-ALL_PIPELINE = ["nodepred", "nodepred-ns", "linkpred"]
+ALL_PIPELINE = ["nodepred", "nodepred-ns", "linkpred", "graphpred"]
 
 class PipelineBase(ABC):
 
@@ -91,7 +91,7 @@ class DataFactoryClass:
         for d in dataset_list[1:]:
             output = Union[output, d]
         return output
-    
+
     def get_import_code(self, name):
         return self.registry[name]["import_code"]
 
@@ -113,7 +113,7 @@ class DataFactoryClass:
             data_initialize_code = data_initialize_code.format('**cfg["data"]')
         d["data_initialize_code"] = data_initialize_code
         return d
-    
+
     def filter(self, pipeline_name):
         allowed_name = self.pipeline_allowed[pipeline_name]
         new_registry = {k: v for k,v in self.registry.items() if k in allowed_name}
@@ -135,7 +135,7 @@ class DataFactoryClass:
                 name: Literal[dataset_name]
                 split_ratio: Optional[Tuple[float, float, float]] = None
             return NodeBase
-        
+
 
 
 
@@ -205,6 +205,13 @@ DataFactory.register(
     extra_args={},
     class_name="DglLinkPropPredDataset('ogbl-citation2')",
     allowed_pipeline=["linkpred"])
+
+DataFactory.register(
+    "ogbg-molhiv",
+    import_code="from ogb.graphproppred import DglGraphPropPredDataset",
+    extra_args={},
+    class_name="DglGraphPropPredDataset(name='ogbg-molhiv')",
+    allowed_pipeline=["graphpred"])
 
 class PipelineFactory:
     """ The factory class for creating executors"""
@@ -424,3 +431,4 @@ NegativeSamplerFactory.register("persource")(PerSourceUniform)
 
 NodeModelFactory = ModelFactory()
 EdgeModelFactory = ModelFactory()
+GraphModelFactory = ModelFactory()

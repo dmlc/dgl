@@ -1,8 +1,12 @@
+from dgl.data import AsGraphPredDataset
+
 def main():
     {{ user_cfg_str }}
     device = cfg['device']
     pipeline_cfg = cfg['general_pipeline']
     # load data
+    data = AsGraphPredDataset({{data_initialize_code}})
+    # create model
 
 if __name__ == '__main__':
     all_acc = []
