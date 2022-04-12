@@ -678,6 +678,36 @@ class DataLoader(torch.utils.data.DataLoader):
                  ddp_seed=0, batch_size=1, drop_last=False, shuffle=False,
                  use_prefetch_thread=None, use_alternate_streams=None,
                  pin_prefetcher=None, use_uva=False, **kwargs):
+        # (BarclayII) PyTorch Lightning sometimes will recreate a DataLoader from an existing
+        # DataLoader with modifications to the original arguments.  The arguments are retrieved
+        # from the attributes with the same name, and because we change certain arguments
+        # when calling super().__init__() (e.g. batch_size attribute is None even if the
+        # batch_size argument is not, so the next DataLoader's batch_size argument will be
+        # None), we cannot reinitialize the DataLoader with attributes from the previous
+        # DataLoader directly.
+        # A workaround is to check whether "collate_fn" appears in kwargs.  If "collate_fn"
+        # is indeed in kwargs and it's already a CollateWrapper object, we can assume that
+        # the arguments come from a previously created DGL DataLoader, and directly initialize
+        # the new DataLoader from kwargs without any changes.
+        if isinstance(kwargs.get('collate_fn', None), CollateWrapper):
+            assert batch_size is None       # must be None
+            # restore attributes
+            self.graph = graph
+            self.indices = indices
+            self.graph_sampler = graph_sampler
+            self.device = device
+            self.use_ddp = use_ddp
+            self.ddp_seed = ddp_seed
+            self.shuffle = shuffle
+            self.drop_last = drop_last
+            self.use_prefetch_thread = use_prefetch_thread
+            self.use_alternate_streams = use_alternate_streams
+            self.pin_prefetcher = pin_prefetcher
+            self.use_uva = use_uva
+            kwargs['batch_size'] = None
+            super().__init__(**kwargs)
+            return
+
         if isinstance(graph, DistGraph):
             raise TypeError(
                 'Please use dgl.dataloading.DistNodeDataLoader or '
@@ -790,6 +820,7 @@ class DataLoader(torch.utils.data.DataLoader):
         self.use_alternate_streams = use_alternate_streams
         self.pin_prefetcher = pin_prefetcher
         self.use_prefetch_thread = use_prefetch_thread
+
         worker_init_fn = WorkerInitWrapper(kwargs.get('worker_init_fn', None))
 
         self.other_storages = {}
