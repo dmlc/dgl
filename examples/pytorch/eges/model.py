@@ -51,6 +51,3 @@ class EGES(th.nn.Module):
         dots = th.clamp(dots, min=1e-7, max=1 - 1e-7)
 
         return th.mean(- (labels * th.log(dots) + (1 - labels) * th.log(1 - dots)))
-
-    def query_cold_item(self):
-        pass
