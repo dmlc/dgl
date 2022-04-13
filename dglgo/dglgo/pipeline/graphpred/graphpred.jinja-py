@@ -81,8 +81,9 @@ def main(run):
     model = {{ model_class_name }}(**cfg["model"])
     model = model.to(device)
 
-    criterion = nn.{{ pipeline_cfg.loss }}()
-    optimizer = torch.optim.{{ pipeline_cfg.optimizer.name }}(model.parameters(), **pipeline_cfg["optimizer"])
+    criterion = nn.{{ user_cfg.general_pipeline.loss }}()
+    optimizer = torch.optim.{{ user_cfg.general_pipeline.optimizer.name }}(
+        model.parameters(), **pipeline_cfg["optimizer"])
     best_val_metric = 0.
 
     for epoch in range(pipeline_cfg['num_epochs']):
