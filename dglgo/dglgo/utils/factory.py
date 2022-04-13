@@ -213,6 +213,13 @@ DataFactory.register(
     class_name="DglGraphPropPredDataset(name='ogbg-molhiv')",
     allowed_pipeline=["graphpred"])
 
+DataFactory.register(
+    "ogbg-molpcba",
+    import_code="from ogb.graphproppred import DglGraphPropPredDataset",
+    extra_args={},
+    class_name="DglGraphPropPredDataset(name='ogbg-molpcba')",
+    allowed_pipeline=["graphpred"])
+
 class PipelineFactory:
     """ The factory class for creating executors"""
 
