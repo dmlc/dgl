@@ -162,12 +162,16 @@ def copy_to(input, ctx, **kwargs):
         new_tensor = tf.identity(input)
     return new_tensor
 
+def is_pinned(input):
+    return False        # not sure how to do this
 
 def sum(input, dim, keepdims=False):
     if input.dtype == tf.bool:
         input = tf.cast(input, tf.int32)
     return tf.reduce_sum(input, axis=dim, keepdims=keepdims)
 
+def floor_div(in1, in2):
+    return astype(in1 / in2, dtype(in1))
 
 def reduce_sum(input):
     if input.dtype == tf.bool:
@@ -186,7 +190,7 @@ def mean(input, dim):
 
 
 def reduce_mean(input):
-    return th.reduce_mean(input)
+    return tf.reduce_mean(input)
 
 
 def max(input, dim):
@@ -242,6 +246,10 @@ def exp(input):
     return tf.exp(input)
 
 
+def inverse(input):
+    return tf.linalg.inv(input)
+
+
 def sqrt(input):
     return tf.sqrt(input)
 
@@ -259,7 +267,7 @@ def stack(seq, dim):
 
 
 def split(input, sizes_or_sections, dim):
-    return tf.split(input, sizes_or_sections, axis=dim)
+    return [copy_to(_, input.device) for _ in tf.split(input, sizes_or_sections, axis=dim)]
 
 
 def repeat(input, repeats, dim):
@@ -318,7 +326,10 @@ def reshape(input, shape):
 
 
 def swapaxes(input, axis1, axis2):
-    return tf.transpose(input, perm=[axis1, axis2])
+    ndim = input.ndim
+    t = list(range(ndim))
+    t[axis1], t[axis2] = axis2 % ndim, axis1 % ndim
+    return tf.transpose(input, perm=t)
 
 
 def zeros(shape, dtype, ctx):
@@ -391,6 +402,11 @@ def equal(x, y):
     return x == y
 
 
+def allclose(x, y, rtol=1e-4, atol=1e-4):
+    return np.allclose(tf.convert_to_tensor(x).numpy(),
+                       tf.convert_to_tensor(y).numpy(), rtol=rtol, atol=atol)
+
+
 def logical_not(input):
     return ~input
 
@@ -407,8 +423,20 @@ def clamp(data, min_val, max_val):
 def replace_inf_with_zero(x):
     return tf.where(tf.abs(x) == np.inf, 0, x)
 
-def unique(input):
-    return tf.unique(input).y
+def count_nonzero(input):
+    return int(tf.math.count_nonzero(input))
+
+
+def unique(input, return_inverse=False, return_counts=False):
+    if return_inverse and return_counts:
+        return tf.unique_with_counts(input)
+    elif return_counts:
+        result = tf.unique_with_counts(input)
+        return result.y, result.count
+    elif return_inverse:
+        return tf.unique(input)
+    else:
+        return tf.unique(input).y
 
 
 def full_1d(length, fill_value, dtype, ctx):

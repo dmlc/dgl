@@ -6,9 +6,9 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from dgl.data.gindt import GINDataset
-from dataloader import GraphDataLoader, collate
-from parser import Parser
+from dgl.data import GINDataset
+from dataloader import GINDataLoader
+from ginparser import Parser
 from gin import GIN
 
 
@@ -23,8 +23,8 @@ def train(args, net, trainloader, optimizer, criterion, epoch):
     for pos, (graphs, labels) in zip(bar, trainloader):
         # batch graphs will be shipped to device in forward part of model
         labels = labels.to(args.device)
-        feat = graphs.ndata.pop('attr').to(args.device)
         graphs = graphs.to(args.device)
+        feat = graphs.ndata.pop('attr')
         outputs = net(graphs, feat)
 
         loss = criterion(outputs, labels)
@@ -53,9 +53,9 @@ def eval_net(args, net, dataloader, criterion):
 
     for data in dataloader:
         graphs, labels = data
-        feat = graphs.ndata.pop('attr').to(args.device)
         graphs = graphs.to(args.device)
         labels = labels.to(args.device)
+        feat = graphs.ndata.pop('attr')
         total += len(labels)
         outputs = net(graphs, feat)
         _, predicted = torch.max(outputs.data, 1)
@@ -86,11 +86,10 @@ def main(args):
     else:
         args.device = torch.device("cpu")
 
-    dataset = GINDataset(args.dataset, not args.learn_eps)
-
-    trainloader, validloader = GraphDataLoader(
+    dataset = GINDataset(args.dataset, not args.learn_eps, args.degree_as_nlabel)
+    trainloader, validloader = GINDataLoader(
         dataset, batch_size=args.batch_size, device=args.device,
-        collate_fn=collate, seed=args.seed, shuffle=True,
+        seed=args.seed, shuffle=True,
         split_name='fold10', fold_idx=args.fold_idx).train_valid_loader()
     # or split_name='rand', split_ratio=0.7
 
@@ -129,11 +128,12 @@ def main(args):
 
         if not args.filename == "":
             with open(args.filename, 'a') as f:
-                f.write('%s %s %s %s' % (
+                f.write('%s %s %s %s %s' % (
                     args.dataset,
                     args.learn_eps,
                     args.neighbor_pooling_type,
-                    args.graph_pooling_type
+                    args.graph_pooling_type,
+                    epoch
                 ))
                 f.write("\n")
                 f.write("%f %f %f %f" % (

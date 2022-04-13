@@ -8,6 +8,7 @@
 
 #include <dgl/array.h>
 #include <dgl/bcast.h>
+#include <dgl/runtime/parallel_for.h>
 #include "../selector.h"
 
 namespace dgl {
@@ -40,24 +41,27 @@ void SDDMMCsr(const BcastOff& bcast,
                 rhs_dim = bcast.rhs_len,
                 reduce_size = bcast.reduce_size;
   DType* O = out.Ptr<DType>();
-#pragma omp parallel for
-  for (IdType rid = 0; rid < csr.num_rows; ++rid) {
-    const IdType row_start = indptr[rid], row_end = indptr[rid + 1];
-    for (IdType j = row_start; j < row_end; ++j) {
-      const IdType cid = indices[j];
-      const IdType eid = has_idx? edges[j] : j;
-      DType* out_off = O + eid * dim;
-      for (int64_t k = 0; k < dim; ++k) {
-        const int64_t lhs_add = bcast.use_bcast ? bcast.lhs_offset[k] : k;
-        const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
-        const DType* lhs_off = Op::use_lhs?
-          X + Selector<LhsTarget>::Call(rid, eid, cid) * lhs_dim + lhs_add * reduce_size : nullptr;
-        const DType* rhs_off = Op::use_rhs?
-          Y + Selector<RhsTarget>::Call(rid, eid, cid) * rhs_dim + rhs_add * reduce_size : nullptr;
-        out_off[k] = Op::Call(lhs_off, rhs_off, reduce_size);
+  runtime::parallel_for(0, csr.num_rows, [=](IdType b, IdType e) {
+    for (auto rid = b; rid < e; ++rid) {
+      const IdType row_start = indptr[rid], row_end = indptr[rid + 1];
+      for (IdType j = row_start; j < row_end; ++j) {
+        const IdType cid = indices[j];
+        const IdType eid = has_idx? edges[j] : j;
+        DType* out_off = O + eid * dim;
+        for (int64_t k = 0; k < dim; ++k) {
+          const int64_t lhs_add = bcast.use_bcast ? bcast.lhs_offset[k] : k;
+          const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
+          const DType* lhs_off = Op::use_lhs
+            ? X + Selector<LhsTarget>::Call(rid, eid, cid) * lhs_dim + lhs_add * reduce_size
+            : nullptr;
+          const DType* rhs_off = Op::use_rhs
+            ? Y + Selector<RhsTarget>::Call(rid, eid, cid) * rhs_dim + rhs_add * reduce_size
+            : nullptr;
+          out_off[k] = Op::Call(lhs_off, rhs_off, reduce_size);
+        }
       }
     }
-  }
+  });
 }
 
 /*!
@@ -86,9 +90,8 @@ void SDDMMCoo(const BcastOff& bcast,
                 rhs_dim = bcast.rhs_len,
                 reduce_size = bcast.reduce_size;
   DType* O = out.Ptr<DType>();
-  const int64_t nnz = coo.row->shape[0];
 #pragma omp parallel for
-  for (IdType i = 0; i < nnz; ++i) {
+  for (int64_t i = 0; i < coo.row->shape[0]; ++i) {
     const IdType rid = row[i];
     const IdType cid = col[i];
     const IdType eid = has_idx? edges[i] : i;

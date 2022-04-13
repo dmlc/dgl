@@ -23,7 +23,7 @@ namespace sampling {
 namespace impl {
 
 template<DLDeviceType XPU, typename IdxType>
-IdArray RandomWalkWithRestart(
+std::pair<IdArray, IdArray> RandomWalkWithRestart(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
@@ -37,14 +37,14 @@ IdArray RandomWalkWithRestart(
 }
 
 template
-IdArray RandomWalkWithRestart<kDLCPU, int32_t>(
+std::pair<IdArray, IdArray> RandomWalkWithRestart<kDLCPU, int32_t>(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
     const std::vector<FloatArray> &prob,
     double restart_prob);
 template
-IdArray RandomWalkWithRestart<kDLCPU, int64_t>(
+std::pair<IdArray, IdArray> RandomWalkWithRestart<kDLCPU, int64_t>(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
@@ -52,13 +52,13 @@ IdArray RandomWalkWithRestart<kDLCPU, int64_t>(
     double restart_prob);
 
 template<DLDeviceType XPU, typename IdxType>
-IdArray RandomWalkWithStepwiseRestart(
+std::pair<IdArray, IdArray> RandomWalkWithStepwiseRestart(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
     const std::vector<FloatArray> &prob,
     FloatArray restart_prob) {
-  IdArray result;
+  std::pair<IdArray, IdArray> result;
 
   ATEN_FLOAT_TYPE_SWITCH(restart_prob->dtype, DType, "restart probability", {
     DType *restart_prob_data = static_cast<DType *>(restart_prob->data);
@@ -73,14 +73,14 @@ IdArray RandomWalkWithStepwiseRestart(
 }
 
 template
-IdArray RandomWalkWithStepwiseRestart<kDLCPU, int32_t>(
+std::pair<IdArray, IdArray> RandomWalkWithStepwiseRestart<kDLCPU, int32_t>(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
     const std::vector<FloatArray> &prob,
     FloatArray restart_prob);
 template
-IdArray RandomWalkWithStepwiseRestart<kDLCPU, int64_t>(
+std::pair<IdArray, IdArray> RandomWalkWithStepwiseRestart<kDLCPU, int64_t>(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,

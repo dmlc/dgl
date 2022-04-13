@@ -9,11 +9,7 @@ from .... import function as fn
 
 
 class TAGConv(gluon.Block):
-    r"""
-
-    Description
-    -----------
-    Topology Adaptive Graph Convolutional layer from paper `Topology
+    r"""Topology Adaptive Graph Convolutional layer from `Topology
     Adaptive Graph Convolutional Networks <https://arxiv.org/pdf/1710.10370.pdf>`__.
 
     .. math::

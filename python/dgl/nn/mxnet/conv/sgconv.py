@@ -10,12 +10,8 @@ from ....base import DGLError
 
 
 class SGConv(nn.Block):
-    r"""
-
-    Description
-    -----------
-    Simplifying Graph Convolution layer from paper `Simplifying Graph
-    Convolutional Networks <https://arxiv.org/pdf/1902.07153.pdf>`__.
+    r"""SGC layer from `Simplifying Graph Convolutional Networks
+    <https://arxiv.org/pdf/1902.07153.pdf>`__
 
     .. math::
         H^{K} = (\tilde{D}^{-1/2} \tilde{A} \tilde{D}^{-1/2})^K X \Theta
@@ -62,8 +58,8 @@ class SGConv(nn.Block):
 
     Calling ``add_self_loop`` will not work for some graphs, for example, heterogeneous graph
     since the edge type can not be decided for self_loop edges. Set ``allow_zero_in_degree``
-    to ``True`` for those cases to unblock the code and handle zere-in-degree nodes manually.
-    A common practise to handle this is to filter out the nodes with zere-in-degree when use
+    to ``True`` for those cases to unblock the code and handle zero-in-degree nodes manually.
+    A common practise to handle this is to filter out the nodes with zero-in-degree when use
     after conv.
 
     Example

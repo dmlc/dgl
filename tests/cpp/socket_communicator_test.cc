@@ -25,6 +25,7 @@ using dgl::network::Message;
 using dgl::network::DefaultMessageDeleter;
 
 const int64_t kQueueSize = 500 * 1024;
+const int kThreadNum = 2;
 
 #ifndef WIN32
 
@@ -61,7 +62,7 @@ TEST(SocketCommunicatorTest, SendAndRecv) {
 }
 
 void start_client() {
-  SocketSender sender(kQueueSize);
+  SocketSender sender(kQueueSize, kThreadNum);
   for (int i = 0; i < kNumReceiver; ++i) {
     sender.AddReceiver(ip_addr[i], i);
   }
@@ -89,7 +90,7 @@ void start_client() {
 
 void start_server(int id) {
   sleep(5);
-  SocketReceiver receiver(kQueueSize);
+  SocketReceiver receiver(kQueueSize, kThreadNum);
   receiver.Wait(ip_addr[id], kNumSender);
   for (int i = 0; i < kNumMessage; ++i) {
     for (int n = 0; n < kNumSender; ++n) {
@@ -168,7 +169,7 @@ static void start_client() {
   std::string ip_addr((std::istreambuf_iterator<char>(t)),
                        std::istreambuf_iterator<char>());
   t.close();
-  SocketSender sender(kQueueSize);
+  SocketSender sender(kQueueSize, kThreadNum);
   sender.AddReceiver(ip_addr.c_str(), 0);
   sender.Connect();
   char* str_data = new char[9];
@@ -185,7 +186,7 @@ static bool start_server() {
   std::string ip_addr((std::istreambuf_iterator<char>(t)),
                        std::istreambuf_iterator<char>());
   t.close();
-  SocketReceiver receiver(kQueueSize);
+  SocketReceiver receiver(kQueueSize, kThreadNum);
   receiver.Wait(ip_addr.c_str(), 1);
   Message msg;
   EXPECT_EQ(receiver.RecvFrom(&msg, 0), REMOVE_SUCCESS);

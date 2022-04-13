@@ -8,9 +8,10 @@ Please feel free to remove inapplicable items for your PR.
 - [ ] Changes are complete (i.e. I finished coding on this PR)
 - [ ] All changes have test coverage
 - [ ] Code is well-documented
-- [ ] To the my best knowledge, examples are either not affected by this change,
+- [ ] To the best of my knowledge, examples are either not affected by this change,
       or have been fixed to be compatible with this change
 - [ ] Related issue is referred in this PR
+- [ ] If the PR is for a new model/paper, I've updated the example index [here](../examples/README.md).
 
 ## Changes
 <!-- You could use following template

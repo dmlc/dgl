@@ -4,12 +4,14 @@ import sys
 import os
 import json
 import importlib
+import logging
 
 from . import backend
 from .set_default_backend import set_default_backend
 
 _enabled_apis = set()
 
+logger = logging.getLogger("dgl-core")
 
 def _gen_missing_api(api, mod_name):
     def _missing_api(*args, **kwargs):
@@ -19,7 +21,30 @@ def _gen_missing_api(api, mod_name):
     return _missing_api
 
 def load_backend(mod_name):
-    print('Using backend: %s' % mod_name, file=sys.stderr)
+    # Load backend does four things:
+    # (1) Import backend framework (PyTorch, MXNet, Tensorflow, etc.)
+    # (2) Import DGL C library.  DGL imports it *after* PyTorch/MXNet/Tensorflow.  Otherwise
+    #     DGL will crash with errors like `munmap_chunk(): invalid pointer`.
+    # (3) Sets up the tensoradapter library path.
+    # (4) Import the Python wrappers of the backend framework.  DGL does this last because
+    #     it already depends on both the backend framework and the DGL C library.
+    if mod_name == 'pytorch':
+        import torch
+        mod = torch
+    elif mod_name == 'mxnet':
+        import mxnet
+        mod = mxnet
+    elif mod_name == 'tensorflow':
+        import tensorflow
+        mod = tensorflow
+    else:
+        raise NotImplementedError('Unsupported backend: %s' % mod_name)
+
+    from .._ffi.base import load_tensor_adapter # imports DGL C library
+    version = mod.__version__
+    load_tensor_adapter(mod_name, version)
+
+    logger.debug('Using backend: %s' % mod_name)
     mod = importlib.import_module('.%s' % mod_name, __name__)
     thismod = sys.modules[__name__]
     for api in backend.__dict__.keys():
@@ -37,9 +62,16 @@ def load_backend(mod_name):
 
             # override data type dict function
             setattr(thismod, 'data_type_dict', data_type_dict)
+
+            # for data types with aliases, treat the first listed type as
+            # the true one
+            rev_data_type_dict = {}
+            for k, v in data_type_dict.items():
+                if not v in rev_data_type_dict.keys():
+                    rev_data_type_dict[v] = k
             setattr(thismod,
                     'reverse_data_type_dict',
-                    {v: k for k, v in data_type_dict.items()})
+                    rev_data_type_dict)
             # log backend name
             setattr(thismod, 'backend_name', mod_name)
         else:
@@ -50,9 +82,13 @@ def load_backend(mod_name):
             else:
                 setattr(thismod, api, _gen_missing_api(api, mod_name))
 
-
 def get_preferred_backend():
-    config_path = os.path.join(os.path.expanduser('~'), '.dgl', 'config.json')
+    default_dir = None
+    if "DGLDEFAULTDIR" in os.environ:
+        default_dir = os.getenv('DGLDEFAULTDIR')
+    else:
+        default_dir = os.path.join(os.path.expanduser('~'), '.dgl')
+    config_path = os.path.join(default_dir, 'config.json')
     backend_name = None
     if "DGLBACKEND" in os.environ:
         backend_name = os.getenv('DGLBACKEND')
@@ -66,7 +102,7 @@ def get_preferred_backend():
     else:
         print("DGL backend not selected or invalid.  "
               "Assuming PyTorch for now.", file=sys.stderr)
-        set_default_backend('pytorch')
+        set_default_backend(default_dir, 'pytorch')
         return 'pytorch'
 
 

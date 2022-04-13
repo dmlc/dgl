@@ -83,6 +83,8 @@ class UnitGraph : public BaseHeteroGraph {
 
   DLContext Context() const override;
 
+  bool IsPinned() const override;
+
   uint8_t NumBits() const override;
 
   bool IsMultigraph() const override;
@@ -174,37 +176,58 @@ class UnitGraph : public BaseHeteroGraph {
   /*! \brief Create a graph from COO arrays */
   static HeteroGraphPtr CreateFromCOO(
       int64_t num_vtypes, int64_t num_src, int64_t num_dst,
-      IdArray row, IdArray col, dgl_format_code_t formats = all_code);
+      IdArray row, IdArray col, bool row_sorted = false,
+      bool col_sorted = false, dgl_format_code_t formats = ALL_CODE);
 
   static HeteroGraphPtr CreateFromCOO(
       int64_t num_vtypes, const aten::COOMatrix& mat,
-      dgl_format_code_t formats = all_code);
+      dgl_format_code_t formats = ALL_CODE);
 
   /*! \brief Create a graph from (out) CSR arrays */
   static HeteroGraphPtr CreateFromCSR(
       int64_t num_vtypes, int64_t num_src, int64_t num_dst,
       IdArray indptr, IdArray indices, IdArray edge_ids,
-      dgl_format_code_t formats = all_code);
+      dgl_format_code_t formats = ALL_CODE);
 
   static HeteroGraphPtr CreateFromCSR(
       int64_t num_vtypes, const aten::CSRMatrix& mat,
-      dgl_format_code_t formats = all_code);
+      dgl_format_code_t formats = ALL_CODE);
 
   /*! \brief Create a graph from (in) CSC arrays */
   static HeteroGraphPtr CreateFromCSC(
       int64_t num_vtypes, int64_t num_src, int64_t num_dst,
       IdArray indptr, IdArray indices, IdArray edge_ids,
-      dgl_format_code_t formats = all_code);
+      dgl_format_code_t formats = ALL_CODE);
 
   static HeteroGraphPtr CreateFromCSC(
       int64_t num_vtypes, const aten::CSRMatrix& mat,
-      dgl_format_code_t formats = all_code);
+      dgl_format_code_t formats = ALL_CODE);
 
   /*! \brief Convert the graph to use the given number of bits for storage */
   static HeteroGraphPtr AsNumBits(HeteroGraphPtr g, uint8_t bits);
 
   /*! \brief Copy the data to another context */
-  static HeteroGraphPtr CopyTo(HeteroGraphPtr g, const DLContext& ctx);
+  static HeteroGraphPtr CopyTo(HeteroGraphPtr g, const DLContext &ctx,
+                               const DGLStreamHandle &stream = nullptr);
+
+  /*!
+  * \brief Pin the in_csr_, out_scr_ and coo_ of the current graph.
+  * \note The graph will be pinned inplace. Behavior depends on the current context,
+  *       kDLCPU: will be pinned;
+  *       IsPinned: directly return;
+  *       kDLGPU: invalid, will throw an error.
+  *       The context check is deferred to pinning the NDArray.
+  */
+  void PinMemory_() override;
+
+  /*!
+  * \brief Unpin the in_csr_, out_scr_ and coo_ of the current graph.
+  * \note The graph will be unpinned inplace. Behavior depends on the current context,
+  *       IsPinned: will be unpinned;
+  *       others: directly return.
+  *       The context check is deferred to unpinning the NDArray.
+  */
+  void UnpinMemory_();
 
   /*! 
    * \brief Create in-edge CSR format of the unit graph.
@@ -276,10 +299,17 @@ class UnitGraph : public BaseHeteroGraph {
    */
   std::tuple<UnitGraphPtr, IdArray, IdArray>ToSimple() const;
 
+  void InvalidateCSR();
+
+  void InvalidateCSC();
+
+  void InvalidateCOO();
+
  private:
   friend class Serializer;
   friend class HeteroGraph;
   friend class ImmutableGraph;
+  friend HeteroGraphPtr HeteroForkingUnpickle(const HeteroPickleStates& states);
 
   // private empty constructor
   UnitGraph() {}
@@ -292,10 +322,11 @@ class UnitGraph : public BaseHeteroGraph {
    * \param coo coo
    */
   UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr coo,
-            dgl_format_code_t formats = all_code);
+            dgl_format_code_t formats = ALL_CODE);
 
   /*!
    * \brief constructor
+   * \param num_vtypes number of vertex types (1 or 2)
    * \param metagraph metagraph
    * \param in_csr in edge csr
    * \param out_csr out edge csr
@@ -304,14 +335,15 @@ class UnitGraph : public BaseHeteroGraph {
    * \param has_out_csr whether out_csr is valid
    * \param has_coo whether coo is valid
    */
-  static HeteroGraphPtr CreateHomographFrom(
+  static HeteroGraphPtr CreateUnitGraphFrom(
+      int num_vtypes,
       const aten::CSRMatrix &in_csr,
       const aten::CSRMatrix &out_csr,
       const aten::COOMatrix &coo,
       bool has_in_csr,
       bool has_out_csr,
       bool has_coo,
-      dgl_format_code_t formats = all_code);
+      dgl_format_code_t formats = ALL_CODE);
 
   /*! \return Return any existing format. */
   HeteroGraphPtr GetAny() const;

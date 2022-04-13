@@ -7,13 +7,8 @@ from mxnet.gluon import nn
 
 
 class DenseChebConv(nn.Block):
-    r"""
-
-    Description
-    -----------
-    Chebyshev Spectral Graph Convolution layer from paper `Convolutional
-    Neural Networks on Graphs with Fast Localized Spectral Filtering
-    <https://arxiv.org/pdf/1606.09375.pdf>`__.
+    r"""Chebyshev Spectral Graph Convolution layer from `Convolutional Neural Networks on Graphs
+    with Fast Localized Spectral Filtering <https://arxiv.org/pdf/1606.09375.pdf>`__
 
     We recommend to use this module when applying ChebConv on dense graphs.
 

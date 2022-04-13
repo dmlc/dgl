@@ -5,17 +5,13 @@ import mxnet as mx
 from mxnet import nd
 from mxnet.gluon import nn
 
-from .... import laplacian_lambda_max, broadcast_nodes, function as fn
+from ....base import dgl_warning
+from .... import broadcast_nodes, function as fn
 
 
 class ChebConv(nn.Block):
-    r"""
-
-    Description
-    -----------
-    Chebyshev Spectral Graph Convolution layer from paper `Convolutional
-    Neural Networks on Graphs with Fast Localized Spectral Filtering
-    <https://arxiv.org/pdf/1606.09375.pdf>`__.
+    r"""Chebyshev Spectral Graph Convolution layer from `Convolutional Neural Networks on Graphs
+    with Fast Localized Spectral Filtering <https://arxiv.org/pdf/1606.09375.pdf>`__
 
     .. math::
         h_i^{l+1} &= \sum_{k=0}^{K-1} W^{k, l}z_i^{k, l}
@@ -50,7 +46,6 @@ class ChebConv(nn.Block):
     >>> import numpy as np
     >>> import mxnet as mx
     >>> from dgl.nn import ChebConv
-    >>>
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
     >>> feat = mx.nd.ones((6, 10))
     >>> conv = ChebConv(10, 2, 2)
@@ -106,8 +101,9 @@ class ChebConv(nn.Block):
             A list(tensor) with length :math:`B`, stores the largest eigenvalue
             of the normalized laplacian of each individual graph in ``graph``,
             where :math:`B` is the batch size of the input graph. Default: None.
-            If None, this method would compute the list by calling
-            ``dgl.laplacian_lambda_max``.
+
+            If None, this method would set the default value to 2.
+            One can use :func:`dgl.laplacian_lambda_max` to compute this value.
 
         Returns
         -------
@@ -119,8 +115,13 @@ class ChebConv(nn.Block):
             degs = graph.in_degrees().astype('float32')
             norm = mx.nd.power(mx.nd.clip(degs, a_min=1, a_max=float("inf")), -0.5)
             norm = norm.expand_dims(-1).as_in_context(feat.context)
+
             if lambda_max is None:
-                lambda_max = laplacian_lambda_max(graph)
+                dgl_warning(
+                    "lambda_max is not provided, using default value of 2.  "
+                    "Please use dgl.laplacian_lambda_max to compute the eigenvalues.")
+                lambda_max = [2] * graph.batch_size
+
             if isinstance(lambda_max, list):
                 lambda_max = nd.array(lambda_max).as_in_context(feat.context)
             if lambda_max.ndim == 1:

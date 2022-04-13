@@ -11,14 +11,18 @@ __all__ = [
     'random_walk',
     'pack_traces']
 
-def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob=None):
+def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob=None,
+                return_eids=False):
     """Generate random walk traces from an array of starting nodes based on the given metapath.
 
-    For a single starting node, ``num_traces`` traces would be generated.  A trace would
+    Each starting node will have one trace generated, which
 
     1. Start from the given node and set ``t`` to 0.
     2. Pick and traverse along edge type ``metapath[t]`` from the current node.
     3. If no edge can be found, halt.  Otherwise, increment ``t`` and go to step 2.
+
+    To generate multiple traces for a single node, you can specify the same node multiple
+    times.
 
     The returned traces all have length ``len(metapath) + 1``, where the first node
     is the starting node itself.
@@ -29,11 +33,11 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
     Parameters
     ----------
     g : DGLGraph
-        The graph.  Must be on CPU.
+        The graph.
     nodes : Tensor
         Node ID tensor from which the random walk traces starts.
 
-        The tensor must be on CPU, and must have the same dtype as the ID type
+        The tensor must have the same dtype as the ID type
         of the graph.
     metapath : list[str or tuple of str], optional
         Metapath, specified as a list of edge types.
@@ -62,20 +66,24 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
 
         If a tensor is given, :attr:`restart_prob` should have the same length as
         :attr:`metapath` or :attr:`length`.
+    return_eids : bool, optional
+        If True, additionally return the edge IDs traversed.
+
+        Default: False.
 
     Returns
     -------
     traces : Tensor
         A 2-dimensional node ID tensor with shape ``(num_seeds, len(metapath) + 1)`` or
         ``(num_seeds, length + 1)`` if :attr:`metapath` is None.
+    eids : Tensor, optional
+        A 2-dimensional edge ID tensor with shape ``(num_seeds, len(metapath))`` or
+        ``(num_seeds, length)`` if :attr:`metapath` is None.  Only returned if
+        :attr:`return_eids` is True.
     types : Tensor
         A 1-dimensional node type ID tensor with shape ``(len(metapath) + 1)`` or
         ``(length + 1)``.
         The type IDs match the ones in the original graph ``g``.
-
-    Notes
-    -----
-    The returned tensors are on CPU.
 
     Examples
     --------
@@ -89,6 +97,19 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
              [1, 3, 0, 1, 3],
              [2, 0, 1, 3, 0],
              [0, 1, 2, 0, 1]]), tensor([0, 0, 0, 0, 0]))
+
+    Or returning edge IDs:
+
+    >>> dgl.sampling.random_walk(g1, [0, 1, 2, 0], length=4, return_eids=True)
+    (tensor([[0, 1, 2, 0, 1],
+             [1, 3, 0, 1, 2],
+             [2, 0, 1, 3, 0],
+             [0, 1, 3, 0, 1]]),
+     tensor([[0, 1, 3, 0],
+             [2, 4, 0, 1],
+             [3, 0, 2, 4],
+             [0, 2, 4, 0]]),
+     tensor([0, 0, 0, 0, 0]))
 
     The first tensor indicates the random walk path for each seed node.
     The j-th element in the second tensor indicates the node type ID of the j-th node
@@ -135,7 +156,6 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
              [ 2,  0,  1,  1,  3,  2,  2],
              [ 0,  1,  1,  3,  0,  0,  0]]), tensor([0, 0, 1, 0, 0, 1, 0]))
     """
-    assert g.device == F.cpu(), "Graph must be on CPU."
     n_etypes = len(g.canonical_etypes)
     n_ntypes = len(g.ntypes)
 
@@ -149,8 +169,11 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
         metapath = [g.get_etype_id(etype) for etype in metapath]
 
     gidx = g._graph
-    nodes = F.to_dgl_nd(utils.prepare_tensor(g, nodes, 'nodes'))
-    metapath = F.to_dgl_nd(utils.prepare_tensor(g, metapath, 'metapath'))
+    nodes = utils.prepare_tensor(g, nodes, 'nodes')
+    nodes = F.to_dgl_nd(nodes)
+    # (Xin) Since metapath array is created by us, safe to skip the check
+    #       and keep it on CPU to make max_nodes sanity check easier.
+    metapath = F.to_dgl_nd(F.astype(F.tensor(metapath), g.idtype))
 
     # Load the probability tensor from the edge frames
     if prob is None:
@@ -170,18 +193,19 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
 
     # Actual random walk
     if restart_prob is None:
-        traces, types = _CAPI_DGLSamplingRandomWalk(gidx, nodes, metapath, p_nd)
+        traces, eids, types = _CAPI_DGLSamplingRandomWalk(gidx, nodes, metapath, p_nd)
     elif F.is_tensor(restart_prob):
         restart_prob = F.to_dgl_nd(restart_prob)
-        traces, types = _CAPI_DGLSamplingRandomWalkWithStepwiseRestart(
+        traces, eids, types = _CAPI_DGLSamplingRandomWalkWithStepwiseRestart(
             gidx, nodes, metapath, p_nd, restart_prob)
     else:
-        traces, types = _CAPI_DGLSamplingRandomWalkWithRestart(
+        traces, eids, types = _CAPI_DGLSamplingRandomWalkWithRestart(
             gidx, nodes, metapath, p_nd, restart_prob)
 
     traces = F.from_dgl_nd(traces)
     types = F.from_dgl_nd(types)
-    return traces, types
+    eids = F.from_dgl_nd(eids)
+    return (traces, eids, types) if return_eids else (traces, types)
 
 def pack_traces(traces, types):
     """Pack the padded traces returned by ``random_walk()`` into a concatenated array.

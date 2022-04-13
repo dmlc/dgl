@@ -11,6 +11,7 @@
 #include <dgl/array.h>
 #include <vector>
 #include <utility>
+#include <tuple>
 #include <functional>
 
 namespace dgl {
@@ -27,8 +28,8 @@ namespace impl {
  */
 template<typename IdxType>
 using StepFunc = std::function<
-  //        ID        terminate?
-  std::pair<dgl_id_t, bool>(
+  //        ID        Edge ID   terminate?
+  std::tuple<dgl_id_t, dgl_id_t, bool>(
       IdxType *,    // node IDs generated so far
       dgl_id_t,     // last node ID
       int64_t)>;    // # of steps
@@ -52,11 +53,13 @@ TypeArray GetNodeTypesFromMetapath(
  *        each edge by edge type.  An empty float array assumes uniform transition.
  * \return A 2D array of shape (len(seeds), len(metapath) + 1) with node IDs.  The
  *         paths that terminated early are padded with -1.
+ *         A 2D array of shape (len(seeds), len(metapath)) with edge IDs.  The
+ *         paths that terminated early are padded with -1.
  * \note This function should be called together with GetNodeTypesFromMetapath to
  *       determine the node type of each node in the random walk traces.
  */
 template<DLDeviceType XPU, typename IdxType>
-IdArray RandomWalk(
+std::pair<IdArray, IdArray> RandomWalk(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
@@ -73,11 +76,13 @@ IdArray RandomWalk(
  * \param restart_prob Restart probability
  * \return A 2D array of shape (len(seeds), len(metapath) + 1) with node IDs.  The
  *         paths that terminated early are padded with -1.
+ *         A 2D array of shape (len(seeds), len(metapath)) with edge IDs.  The
+ *         paths that terminated early are padded with -1.
  * \note This function should be called together with GetNodeTypesFromMetapath to
  *       determine the node type of each node in the random walk traces.
  */
 template<DLDeviceType XPU, typename IdxType>
-IdArray RandomWalkWithRestart(
+std::pair<IdArray, IdArray> RandomWalkWithRestart(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
@@ -97,16 +102,25 @@ IdArray RandomWalkWithRestart(
  *        as \c metapath, indicating the probability to terminate after transition.
  * \return A 2D array of shape (len(seeds), len(metapath) + 1) with node IDs.  The
  *         paths that terminated early are padded with -1.
+ *         A 2D array of shape (len(seeds), len(metapath)) with edge IDs.  The
+ *         paths that terminated early are padded with -1.
  * \note This function should be called together with GetNodeTypesFromMetapath to
  *       determine the node type of each node in the random walk traces.
  */
 template<DLDeviceType XPU, typename IdxType>
-IdArray RandomWalkWithStepwiseRestart(
+std::pair<IdArray, IdArray> RandomWalkWithStepwiseRestart(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
     const std::vector<FloatArray> &prob,
     FloatArray restart_prob);
+
+template<DLDeviceType XPU, typename IdxType>
+std::tuple<IdArray, IdArray, IdArray> SelectPinSageNeighbors(
+    const IdArray src,
+    const IdArray dst,
+    const int64_t num_samples_per_node,
+    const int64_t k);
 
 };  // namespace impl
 

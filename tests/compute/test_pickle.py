@@ -11,46 +11,7 @@ import io
 import unittest, pytest
 import test_utils
 from test_utils import parametrize_dtype, get_cases
-
-def _assert_is_identical(g, g2):
-    assert g.is_readonly == g2.is_readonly
-    assert g.number_of_nodes() == g2.number_of_nodes()
-    src, dst = g.all_edges(order='eid')
-    src2, dst2 = g2.all_edges(order='eid')
-    assert F.array_equal(src, src2)
-    assert F.array_equal(dst, dst2)
-
-    assert len(g.ndata) == len(g2.ndata)
-    assert len(g.edata) == len(g2.edata)
-    for k in g.ndata:
-        assert F.allclose(g.ndata[k], g2.ndata[k])
-    for k in g.edata:
-        assert F.allclose(g.edata[k], g2.edata[k])
-
-def _assert_is_identical_hetero(g, g2):
-    assert g.is_readonly == g2.is_readonly
-    assert g.ntypes == g2.ntypes
-    assert g.canonical_etypes == g2.canonical_etypes
-
-    # check if two metagraphs are identical
-    for edges, features in g.metagraph().edges(keys=True).items():
-        assert g2.metagraph().edges(keys=True)[edges] == features
-
-    # check if node ID spaces and feature spaces are equal
-    for ntype in g.ntypes:
-        assert g.number_of_nodes(ntype) == g2.number_of_nodes(ntype)
-        assert len(g.nodes[ntype].data) == len(g2.nodes[ntype].data)
-        for k in g.nodes[ntype].data:
-            assert F.allclose(g.nodes[ntype].data[k], g2.nodes[ntype].data[k])
-
-    # check if edge ID spaces and feature spaces are equal
-    for etype in g.canonical_etypes:
-        src, dst = g.all_edges(etype=etype, order='eid')
-        src2, dst2 = g2.all_edges(etype=etype, order='eid')
-        assert F.array_equal(src, src2)
-        assert F.array_equal(dst, dst2)
-        for k in g.edges[etype].data:
-            assert F.allclose(g.edges[etype].data[k], g2.edges[etype].data[k])
+from utils import assert_is_identical, assert_is_identical_hetero
 
 def _assert_is_identical_nodeflow(nf1, nf2):
     assert nf1.is_readonly == nf2.is_readonly
@@ -74,13 +35,13 @@ def _assert_is_identical_nodeflow(nf1, nf2):
             assert F.allclose(nf1.blocks[i].data[k], nf2.blocks[i].data[k])
 
 def _assert_is_identical_batchedgraph(bg1, bg2):
-    _assert_is_identical(bg1, bg2)
+    assert_is_identical(bg1, bg2)
     assert bg1.batch_size == bg2.batch_size
     assert bg1.batch_num_nodes == bg2.batch_num_nodes
     assert bg1.batch_num_edges == bg2.batch_num_edges
 
 def _assert_is_identical_batchedhetero(bg1, bg2):
-    _assert_is_identical_hetero(bg1, bg2)
+    assert_is_identical_hetero(bg1, bg2)
     for ntype in bg1.ntypes:
         assert bg1.batch_num_nodes(ntype) == bg2.batch_num_nodes(ntype)
     for canonical_etype in bg1.canonical_etypes:
@@ -202,6 +163,31 @@ def test_pickling_subgraph():
     f1.close()
     f2.close()
 
+@unittest.skipIf(F._default_context_str != 'gpu', reason="Need GPU for pin")
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TensorFlow create graph on gpu when unpickle")
+@parametrize_dtype
+def test_pickling_is_pinned(idtype):
+    from copy import deepcopy
+    g = dgl.rand_graph(10, 20, idtype=idtype, device=F.cpu())
+    hg = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 1], [1, 2]),
+        ('user', 'plays', 'game'): ([0, 1, 2, 1], [0, 0, 1, 1]),
+        ('user', 'wishes', 'game'): ([0, 2], [1, 0]),
+        ('developer', 'develops', 'game'): ([0, 1], [0, 1])
+    }, idtype=idtype, device=F.cpu())
+    for graph in [g, hg]:
+        assert not graph.is_pinned()
+        graph.pin_memory_()
+        assert graph.is_pinned()
+        pg = _reconstruct_pickle(graph)
+        assert pg.is_pinned()
+        pg.unpin_memory_()
+        dg = deepcopy(graph)
+        assert dg.is_pinned()
+        dg.unpin_memory_()
+        graph.unpin_memory_()
+
+
 if __name__ == '__main__':
     test_pickling_index()
     test_pickling_graph_index()
@@ -211,3 +197,4 @@ if __name__ == '__main__':
     test_pickling_batched_graph()
     test_pickling_heterograph()
     test_pickling_batched_heterograph()
+    test_pickling_is_pinned()

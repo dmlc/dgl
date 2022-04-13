@@ -1,5 +1,5 @@
 /*!
- *  Copyright (c) 2019 by Contributors
+ *  Copyright (c) 2019-2021 by Contributors
  * \file array/array.cc
  * \brief DGL array utilities implementation
  */
@@ -57,6 +57,20 @@ IdArray Full(int64_t val, int64_t length, uint8_t nbits, DLContext ctx) {
   return ret;
 }
 
+template <typename DType>
+NDArray Full(DType val, int64_t length, DLContext ctx) {
+  NDArray ret;
+  ATEN_XPU_SWITCH_CUDA(ctx.device_type, XPU, "Full", {
+    ret = impl::Full<XPU, DType>(val, length, ctx);
+  });
+  return ret;
+}
+
+template NDArray Full<int32_t>(int32_t val, int64_t length, DLContext ctx);
+template NDArray Full<int64_t>(int64_t val, int64_t length, DLContext ctx);
+template NDArray Full<float>(float val, int64_t length, DLContext ctx);
+template NDArray Full<double>(double val, int64_t length, DLContext ctx);
+
 IdArray AsNumBits(IdArray arr, uint8_t bits) {
   CHECK(bits == 32 || bits == 64)
     << "Invalid ID type. Must be int32 or int64, but got int"
@@ -98,12 +112,12 @@ IdArray HStack(IdArray lhs, IdArray rhs) {
 
 NDArray IndexSelect(NDArray array, IdArray index) {
   NDArray ret;
-  CHECK_SAME_CONTEXT(array, index);
   CHECK_GE(array->ndim, 1) << "Only support array with at least 1 dimension";
-  CHECK_EQ(array->shape[0], array.NumElements()) << "Only support tensor"
-    << " whose first dimension equals number of elements, e.g. (5,), (5, 1)";
   CHECK_EQ(index->ndim, 1) << "Index array must be an 1D array.";
-  ATEN_XPU_SWITCH_CUDA(array->ctx.device_type, XPU, "IndexSelect", {
+  // if array is not pinned, index has the same context as array
+  // if array is pinned, op dispatching depends on the context of index
+  CHECK_VALID_CONTEXT(array, index);
+  ATEN_XPU_SWITCH_CUDA(index->ctx.device_type, XPU, "IndexSelect", {
     ATEN_DTYPE_SWITCH(array->dtype, DType, "values", {
       ATEN_ID_TYPE_SWITCH(index->dtype, IdType, {
         ret = impl::IndexSelect<XPU, DType, IdType>(array, index);
@@ -193,7 +207,7 @@ NDArray Repeat(NDArray array, IdArray repeats) {
 
 IdArray Relabel_(const std::vector<IdArray>& arrays) {
   IdArray ret;
-  ATEN_XPU_SWITCH(arrays[0]->ctx.device_type, XPU, "Relabel_", {
+  ATEN_XPU_SWITCH_CUDA(arrays[0]->ctx.device_type, XPU, "Relabel_", {
     ATEN_ID_TYPE_SWITCH(arrays[0]->dtype, IdType, {
       ret = impl::Relabel_<XPU, IdType>(arrays);
     });
@@ -286,7 +300,7 @@ IdArray NonZero(NDArray array) {
   return ret;
 }
 
-std::pair<IdArray, IdArray> Sort(IdArray array) {
+std::pair<IdArray, IdArray> Sort(IdArray array, const int num_bits) {
   if (array.NumElements() == 0) {
     IdArray idx = NewIdArray(0, array->ctx, 64);
     return std::make_pair(array, idx);
@@ -294,7 +308,7 @@ std::pair<IdArray, IdArray> Sort(IdArray array) {
   std::pair<IdArray, IdArray> ret;
   ATEN_XPU_SWITCH_CUDA(array->ctx.device_type, XPU, "Sort", {
     ATEN_ID_TYPE_SWITCH(array->dtype, IdType, {
-      ret = impl::Sort<XPU, IdType>(array);
+      ret = impl::Sort<XPU, IdType>(array, num_bits);
     });
   });
   return ret;
@@ -331,9 +345,8 @@ NDArray CSRIsNonZero(CSRMatrix csr, NDArray row, NDArray col) {
   NDArray ret;
   CHECK_SAME_DTYPE(csr.indices, row);
   CHECK_SAME_DTYPE(csr.indices, col);
-  CHECK_SAME_CONTEXT(csr.indices, row);
-  CHECK_SAME_CONTEXT(csr.indices, col);
-  ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRIsNonZero", {
+  CHECK_SAME_CONTEXT(row, col);
+  ATEN_CSR_SWITCH_CUDA_UVA(csr, row, XPU, IdType, "CSRIsNonZero", {
     ret = impl::CSRIsNonZero<XPU, IdType>(csr, row, col);
   });
   return ret;
@@ -359,8 +372,7 @@ int64_t CSRGetRowNNZ(CSRMatrix csr, int64_t row) {
 NDArray CSRGetRowNNZ(CSRMatrix csr, NDArray row) {
   NDArray ret;
   CHECK_SAME_DTYPE(csr.indices, row);
-  CHECK_SAME_CONTEXT(csr.indices, row);
-  ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRGetRowNNZ", {
+  ATEN_CSR_SWITCH_CUDA_UVA(csr, row, XPU, IdType, "CSRGetRowNNZ", {
     ret = impl::CSRGetRowNNZ<XPU, IdType>(csr, row);
   });
   return ret;
@@ -398,22 +410,38 @@ NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols) {
   NDArray ret;
   CHECK_SAME_DTYPE(csr.indices, rows);
   CHECK_SAME_DTYPE(csr.indices, cols);
-  CHECK_SAME_CONTEXT(csr.indices, rows);
-  CHECK_SAME_CONTEXT(csr.indices, cols);
-  ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRGetData", {
+  CHECK_SAME_CONTEXT(rows, cols);
+  ATEN_CSR_SWITCH_CUDA_UVA(csr, rows, XPU, IdType, "CSRGetData", {
     ret = impl::CSRGetData<XPU, IdType>(csr, rows, cols);
   });
   return ret;
 }
 
+template <typename DType>
+NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols, NDArray weights, DType filler) {
+  NDArray ret;
+  CHECK_SAME_DTYPE(csr.indices, rows);
+  CHECK_SAME_DTYPE(csr.indices, cols);
+  CHECK_SAME_CONTEXT(rows, cols);
+  CHECK_SAME_CONTEXT(rows, weights);
+  ATEN_CSR_SWITCH_CUDA_UVA(csr, rows, XPU, IdType, "CSRGetData", {
+    ret = impl::CSRGetData<XPU, IdType, DType>(csr, rows, cols, weights, filler);
+  });
+  return ret;
+}
+
+template NDArray CSRGetData<float>(
+    CSRMatrix csr, NDArray rows, NDArray cols, NDArray weights, float filler);
+template NDArray CSRGetData<double>(
+    CSRMatrix csr, NDArray rows, NDArray cols, NDArray weights, double filler);
+
 std::vector<NDArray> CSRGetDataAndIndices(
     CSRMatrix csr, NDArray rows, NDArray cols) {
   CHECK_SAME_DTYPE(csr.indices, rows);
   CHECK_SAME_DTYPE(csr.indices, cols);
-  CHECK_SAME_CONTEXT(csr.indices, rows);
-  CHECK_SAME_CONTEXT(csr.indices, cols);
+  CHECK_SAME_CONTEXT(rows, cols);
   std::vector<NDArray> ret;
-  ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRGetDataAndIndices", {
+  ATEN_CSR_SWITCH_CUDA_UVA(csr, rows, XPU, IdType, "CSRGetDataAndIndices", {
     ret = impl::CSRGetDataAndIndices<XPU, IdType>(csr, rows, cols);
   });
   return ret;
@@ -460,9 +488,8 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, int64_t start, int64_t end) {
 
 CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {
   CHECK_SAME_DTYPE(csr.indices, rows);
-  CHECK_SAME_CONTEXT(csr.indices, rows);
   CSRMatrix ret;
-  ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRSliceRows", {
+  ATEN_CSR_SWITCH_CUDA_UVA(csr, rows, XPU, IdType, "CSRSliceRows", {
     ret = impl::CSRSliceRows<XPU, IdType>(csr, rows);
   });
   return ret;
@@ -471,10 +498,9 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {
 CSRMatrix CSRSliceMatrix(CSRMatrix csr, NDArray rows, NDArray cols) {
   CHECK_SAME_DTYPE(csr.indices, rows);
   CHECK_SAME_DTYPE(csr.indices, cols);
-  CHECK_SAME_CONTEXT(csr.indices, rows);
-  CHECK_SAME_CONTEXT(csr.indices, cols);
+  CHECK_SAME_CONTEXT(rows, cols);
   CSRMatrix ret;
-  ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRSliceMatrix", {
+  ATEN_CSR_SWITCH_CUDA_UVA(csr, rows, XPU, IdType, "CSRSliceMatrix", {
     ret = impl::CSRSliceMatrix<XPU, IdType>(csr, rows, cols);
   });
   return ret;
@@ -486,6 +512,21 @@ void CSRSort_(CSRMatrix* csr) {
   ATEN_CSR_SWITCH_CUDA(*csr, XPU, IdType, "CSRSort_", {
     impl::CSRSort_<XPU, IdType>(csr);
   });
+}
+
+std::pair<CSRMatrix, NDArray> CSRSortByTag(
+    const CSRMatrix &csr, IdArray tag, int64_t num_tags) {
+  CHECK_EQ(csr.num_cols, tag->shape[0])
+      << "The length of the tag array should be equal to the number of columns ";
+  CHECK_SAME_CONTEXT(csr.indices, tag);
+  CHECK_INT(tag, "tag");
+  std::pair<CSRMatrix, NDArray> ret;
+  ATEN_CSR_SWITCH(csr, XPU, IdType, "CSRSortByTag", {
+    ATEN_ID_TYPE_SWITCH(tag->dtype, TagType, {
+      ret = impl::CSRSortByTag<XPU, IdType, TagType>(csr, tag, num_tags);
+    });
+  });
+  return ret;
 }
 
 CSRMatrix CSRReorder(CSRMatrix csr, runtime::NDArray new_row_ids, runtime::NDArray new_col_ids) {
@@ -507,18 +548,40 @@ CSRMatrix CSRRemove(CSRMatrix csr, IdArray entries) {
 COOMatrix CSRRowWiseSampling(
     CSRMatrix mat, IdArray rows, int64_t num_samples, FloatArray prob, bool replace) {
   COOMatrix ret;
-  ATEN_CSR_SWITCH(mat, XPU, IdType, "CSRRowWiseSampling", {
-    if (IsNullArray(prob)) {
+  if (IsNullArray(prob)) {
+    ATEN_CSR_SWITCH_CUDA_UVA(mat, rows, XPU, IdType, "CSRRowWiseSampling", {
       ret = impl::CSRRowWiseSamplingUniform<XPU, IdType>(mat, rows, num_samples, replace);
-    } else {
+    });
+  } else {
+    ATEN_CSR_SWITCH(mat, XPU, IdType, "CSRRowWiseSampling", {
       ATEN_FLOAT_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
         ret = impl::CSRRowWiseSampling<XPU, IdType, FloatType>(
             mat, rows, num_samples, prob, replace);
+      });
+    });
+  }
+  return ret;
+}
+
+COOMatrix CSRRowWisePerEtypeSampling(
+    CSRMatrix mat, IdArray rows, IdArray etypes,
+    const std::vector<int64_t>& num_samples, FloatArray prob, bool replace,
+    bool etype_sorted) {
+  COOMatrix ret;
+  ATEN_CSR_SWITCH(mat, XPU, IdType, "CSRRowWisePerEtypeSampling", {
+    if (IsNullArray(prob)) {
+      ret = impl::CSRRowWisePerEtypeSamplingUniform<XPU, IdType>(
+            mat, rows, etypes, num_samples, replace, etype_sorted);
+    } else {
+      ATEN_FLOAT_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
+        ret = impl::CSRRowWisePerEtypeSampling<XPU, IdType, FloatType>(
+            mat, rows, etypes, num_samples, prob, replace, etype_sorted);
       });
     }
   });
   return ret;
 }
+
 
 COOMatrix CSRRowWiseTopk(
     CSRMatrix mat, IdArray rows, int64_t k, NDArray weight, bool ascending) {
@@ -530,6 +593,40 @@ COOMatrix CSRRowWiseTopk(
     });
   });
   return ret;
+}
+
+COOMatrix CSRRowWiseSamplingBiased(
+    CSRMatrix mat,
+    IdArray rows,
+    int64_t num_samples,
+    NDArray tag_offset,
+    FloatArray bias,
+    bool replace) {
+  COOMatrix ret;
+  ATEN_CSR_SWITCH(mat, XPU, IdType, "CSRRowWiseSamplingBiased", {
+    ATEN_FLOAT_TYPE_SWITCH(bias->dtype, FloatType, "bias", {
+        ret = impl::CSRRowWiseSamplingBiased<XPU, IdType, FloatType>(
+          mat, rows, num_samples, tag_offset, bias, replace);
+    });
+  });
+  return ret;
+}
+
+std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling(
+    const CSRMatrix& csr,
+    int64_t num_samples,
+    int num_trials,
+    bool exclude_self_loops,
+    bool replace,
+    double redundancy) {
+  CHECK_GT(num_samples, 0) << "Number of samples must be positive";
+  CHECK_GT(num_trials, 0) << "Number of sampling trials must be positive";
+  std::pair<IdArray, IdArray> result;
+  ATEN_CSR_SWITCH_CUDA(csr, XPU, IdType, "CSRGlobalUniformNegativeSampling", {
+    result = impl::CSRGlobalUniformNegativeSampling<XPU, IdType>(
+        csr, num_samples, num_trials, exclude_self_loops, replace, redundancy);
+  });
+  return result;
 }
 
 
@@ -592,7 +689,7 @@ bool COOHasDuplicate(COOMatrix coo) {
 
 int64_t COOGetRowNNZ(COOMatrix coo, int64_t row) {
   int64_t ret = 0;
-  ATEN_COO_SWITCH(coo, XPU, IdType, "COOGetRowNNZ", {
+  ATEN_COO_SWITCH_CUDA(coo, XPU, IdType, "COOGetRowNNZ", {
     ret = impl::COOGetRowNNZ<XPU, IdType>(coo, row);
   });
   return ret;
@@ -600,7 +697,7 @@ int64_t COOGetRowNNZ(COOMatrix coo, int64_t row) {
 
 NDArray COOGetRowNNZ(COOMatrix coo, NDArray row) {
   NDArray ret;
-  ATEN_COO_SWITCH(coo, XPU, IdType, "COOGetRowNNZ", {
+  ATEN_COO_SWITCH_CUDA(coo, XPU, IdType, "COOGetRowNNZ", {
     ret = impl::COOGetRowNNZ<XPU, IdType>(coo, row);
   });
   return ret;
@@ -715,6 +812,25 @@ COOMatrix COORowWiseSampling(
       ATEN_FLOAT_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
         ret = impl::COORowWiseSampling<XPU, IdType, FloatType>(
             mat, rows, num_samples, prob, replace);
+      });
+    }
+  });
+  return ret;
+}
+
+COOMatrix COORowWisePerEtypeSampling(
+    COOMatrix mat, IdArray rows, IdArray etypes,
+    const std::vector<int64_t>& num_samples, FloatArray prob, bool replace,
+    bool etype_sorted) {
+  COOMatrix ret;
+  ATEN_COO_SWITCH(mat, XPU, IdType, "COORowWisePerEtypeSampling", {
+    if (IsNullArray(prob)) {
+      ret = impl::COORowWisePerEtypeSamplingUniform<XPU, IdType>(
+            mat, rows, etypes, num_samples, replace, etype_sorted);
+    } else {
+      ATEN_FLOAT_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
+        ret = impl::COORowWisePerEtypeSampling<XPU, IdType, FloatType>(
+            mat, rows, etypes, num_samples, prob, replace, etype_sorted);
       });
     }
   });

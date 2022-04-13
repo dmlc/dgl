@@ -4,7 +4,7 @@ import os
 import numpy as np
 
 from . import rpc
-from .graph_partition_book import PartitionPolicy
+from .graph_partition_book import NodePartitionPolicy, EdgePartitionPolicy
 from .standalone_kvstore import KVClient as SA_KVClient
 
 from .. import backend as F
@@ -206,20 +206,23 @@ class BarrierRequest(rpc.Request):
     """
     def __init__(self, role):
         self.role = role
+        self.group_id = rpc.get_group_id()
 
     def __getstate__(self):
-        return self.role
+        return self.role, self.group_id
 
     def __setstate__(self, state):
-        self.role = state
+        self.role, self.group_id = state
 
     def process_request(self, server_state):
         kv_store = server_state.kv_store
-        role = server_state.roles
-        count = kv_store.barrier_count[self.role]
-        kv_store.barrier_count[self.role] = count + 1
-        if kv_store.barrier_count[self.role] == len(role[self.role]):
-            kv_store.barrier_count[self.role] = 0
+        roles = server_state.roles
+        role = roles[self.group_id]
+        barrier_count = kv_store.barrier_count[self.group_id]
+        count = barrier_count[self.role]
+        barrier_count[self.role] = count + 1
+        if barrier_count[self.role] == len(role[self.role]):
+            barrier_count[self.role] = 0
             res_list = []
             for client_id, _ in role[self.role]:
                 res_list.append((client_id, BarrierResponse(BARRIER_MSG)))
@@ -362,11 +365,12 @@ class GetSharedDataRequest(rpc.Request):
         meta = {}
         kv_store = server_state.kv_store
         for name, data in kv_store.data_store.items():
+            if server_state.keep_alive:
+                if name not in kv_store.orig_data:
+                    continue
             meta[name] = (F.shape(data),
                           F.reverse_data_type_dict[F.dtype(data)],
                           kv_store.part_policy[name].policy_str)
-        if len(meta) == 0:
-            raise RuntimeError('There is no data on kvserver.')
         res = GetSharedDataResponse(meta)
         return res
 
@@ -531,6 +535,42 @@ class DeleteDataRequest(rpc.Request):
         res = DeleteDataResponse(DELETE_MSG)
         return res
 
+COUNT_LOCAL_NONZERO = 901241
+
+class CountLocalNonzeroResponse(rpc.Response):
+    """Send the number of nonzero value in local data
+    """
+    def __init__(self, num_local_nonzero):
+        self.num_local_nonzero = num_local_nonzero
+
+    def __getstate__(self):
+        return self.num_local_nonzero
+
+    def __setstate__(self, state):
+        self.num_local_nonzero = state
+
+class CountLocalNonzeroRequest(rpc.Request):
+    """Send data name to server to count local nonzero value
+    Parameters
+    ----------
+    name : str
+        data name
+    """
+    def __init__(self, name):
+        self.name = name
+
+    def __getstate__(self):
+        return self.name
+
+    def __setstate__(self, state):
+        self.name = state
+
+    def process_request(self, server_state):
+        kv_store = server_state.kv_store
+        num_local_nonzero = kv_store.count_local_nonzero(self.name)
+        res = CountLocalNonzeroResponse(num_local_nonzero)
+        return res
+
 ############################ KVServer ###############################
 
 def default_push_handler(target, name, id_tensor, data_tensor):
@@ -632,8 +672,13 @@ class KVServer(object):
         rpc.register_service(DELETE_DATA,
                              DeleteDataRequest,
                              DeleteDataResponse)
+        rpc.register_service(COUNT_LOCAL_NONZERO,
+                             CountLocalNonzeroRequest,
+                             CountLocalNonzeroResponse)
         # Store the tensor data with specified data name
         self._data_store = {}
+        # Store original tensor data names when instantiating DistGraphServer
+        self._orig_data = set()
         # Store the partition information with specified data name
         self._policy_set = set()
         self._part_policy = {}
@@ -677,6 +722,11 @@ class KVServer(object):
     def data_store(self):
         """Get data store"""
         return self._data_store
+
+    @property
+    def orig_data(self):
+        """Get original data"""
+        return self._orig_data
 
     @property
     def part_policy(self):
@@ -760,6 +810,24 @@ class KVServer(object):
                 return policy
         raise RuntimeError("Cannot find policy_str: %s from kvserver." % policy_str)
 
+    def count_local_nonzero(self, name):
+        """Count nonzero in local data
+
+        Parameters
+        ----------
+        name : str
+            data name.
+
+        Returns
+        -------
+        int
+            the number of nonzero in local data.
+        """
+        assert len(name) > 0, 'name cannot be empty.'
+        if name not in self._data_store:
+            raise RuntimeError("Data %s has not be created!" % name)
+        return F.count_nonzero(self._data_store[name])
+
 ############################ KVClient ###############################
 
 class KVClient(object):
@@ -817,6 +885,9 @@ class KVClient(object):
         rpc.register_service(DELETE_DATA,
                              DeleteDataRequest,
                              DeleteDataResponse)
+        rpc.register_service(COUNT_LOCAL_NONZERO,
+                             CountLocalNonzeroRequest,
+                             CountLocalNonzeroResponse)
         # Store the tensor data with specified data name
         self._data_store = {}
         # Store the partition information with specified data name
@@ -827,6 +898,8 @@ class KVClient(object):
         self._full_data_shape = {}
         # Store all the data name
         self._data_name_list = set()
+        # Store all graph data name
+        self._gdata_name_list = set()
         # Basic information
         self._server_namebook = rpc.read_ip_config(ip_config, num_servers)
         self._server_count = len(self._server_namebook)
@@ -886,9 +959,9 @@ class KVClient(object):
         def push_handler(data_store, name, local_offset, data)
         ```
 
-        `data_store` is a dict that contains all tensors in the kvstore. `name` is the name
-        of the tensor where new data is pushed to. `local_offset` is the offset where new
-        data should be written in the tensor in the local partition. `data` is the new data
+        ``data_store`` is a dict that contains all tensors in the kvstore. ``name`` is the name
+        of the tensor where new data is pushed to. ``local_offset`` is the offset where new
+        data should be written in the tensor in the local partition. ``data`` is the new data
         to be written.
 
         Parameters
@@ -919,8 +992,8 @@ class KVClient(object):
         def pull_handler(data_store, name, local_offset)
         ```
 
-        `data_store` is a dict that contains all tensors in the kvstore. `name` is the name
-        of the tensor where new data is pushed to. `local_offset` is the offset where new
+        ``data_store`` is a dict that contains all tensors in the kvstore. ``name`` is the name
+        of the tensor where new data is pushed to. ``local_offset`` is the offset where new
         data should be written in the tensor in the local partition.
 
         Parameters
@@ -942,7 +1015,7 @@ class KVClient(object):
         self._pull_handlers[name] = func
         self.barrier()
 
-    def init_data(self, name, shape, dtype, part_policy, init_func):
+    def init_data(self, name, shape, dtype, part_policy, init_func, is_gdata=True):
         """Send message to kvserver to initialize new data tensor and mapping this
         data from server side to client side.
 
@@ -958,6 +1031,8 @@ class KVClient(object):
             partition policy.
         init_func : func
             UDF init function
+        is_gdata : bool
+            Whether the created tensor is a ndata/edata or not.
         """
         assert len(name) > 0, 'name cannot be empty.'
         assert len(shape) > 0, 'shape cannot be empty'
@@ -999,6 +1074,8 @@ class KVClient(object):
         dlpack = shared_data.to_dlpack()
         self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
         self._data_name_list.add(name)
+        if is_gdata:
+            self._gdata_name_list.add(name)
         self._full_data_shape[name] = tuple(shape)
         self._pull_handlers[name] = default_pull_handler
         self._push_handlers[name] = default_push_handler
@@ -1042,6 +1119,8 @@ class KVClient(object):
 
         self.barrier()
         self._data_name_list.remove(name)
+        if name in self._gdata_name_list:
+            self._gdata_name_list.remove(name)
         # TODO(chao) : remove the delete log print
         del self._data_store[name]
         del self._full_data_shape[name]
@@ -1058,6 +1137,14 @@ class KVClient(object):
         partition_book : GraphPartitionBook
             Store the partition information
         """
+        # Get all partition policies
+        for ntype in partition_book.ntypes:
+            policy = NodePartitionPolicy(partition_book, ntype)
+            self._all_possible_part_policy[policy.policy_str] = policy
+        for etype in partition_book.etypes:
+            policy = EdgePartitionPolicy(partition_book, etype)
+            self._all_possible_part_policy[policy.policy_str] = policy
+
         # Get shared data from server side
         self.barrier()
         request = GetSharedDataRequest(GET_SHARED_MSG)
@@ -1066,11 +1153,11 @@ class KVClient(object):
         for name, meta in response.meta.items():
             if name not in self._data_name_list:
                 shape, dtype, policy_str = meta
+                assert policy_str in self._all_possible_part_policy
                 shared_data = empty_shared_mem(name+'-kvdata-', False, shape, dtype)
                 dlpack = shared_data.to_dlpack()
                 self._data_store[name] = F.zerocopy_from_dlpack(dlpack)
-                self._part_policy[name] = PartitionPolicy(policy_str, partition_book)
-                self._all_possible_part_policy[policy_str] = self._part_policy[name]
+                self._part_policy[name] = self._all_possible_part_policy[policy_str]
                 self._pull_handlers[name] = default_pull_handler
                 self._push_handlers[name] = default_push_handler
         # Get full data shape across servers
@@ -1104,7 +1191,14 @@ class KVClient(object):
                 response = rpc.recv_response()
                 assert response.msg == SEND_META_TO_BACKUP_MSG
             self._data_name_list.add(name)
+            # map_shared_data happens only at DistGraph initialization
+            # TODO(xiangsx): We assume there is no non-graph data initialized at this time
+            self._gdata_name_list.add(name)
         self.barrier()
+
+    def gdata_name_list(self):
+        """Get all the graph data name"""
+        return list(self._gdata_name_list)
 
     def data_name_list(self):
         """Get all the data name"""
@@ -1118,6 +1212,25 @@ class KVClient(object):
         data_shape = self._full_data_shape[name]
         part_policy = self._part_policy[name]
         return (data_type, data_shape, part_policy)
+
+    def get_partid(self, name, id_tensor):
+        """
+        Parameters
+        ----------
+        name : str
+            data name
+        id_tensor : tensor
+            a vector storing the global data ID
+        """
+        assert len(name) > 0, 'name cannot be empty.'
+        id_tensor = utils.toindex(id_tensor)
+        id_tensor = id_tensor.tousertensor()
+        assert F.ndim(id_tensor) == 1, 'ID must be a vector.'
+        # partition data
+        machine_id = self._part_policy[name].to_partid(id_tensor)
+
+        return machine_id
+
 
     def push(self, name, id_tensor, data_tensor):
         """Push data to KVServer.
@@ -1242,6 +1355,35 @@ class KVClient(object):
         """Used by sort response list
         """
         return elem.server_id
+
+    def count_nonzero(self, name):
+        """Count nonzero value by pull request from KVServers.
+
+        Parameters
+        ----------
+        name : str
+            data name
+
+        Returns
+        -------
+        int
+            the number of nonzero in this data.
+        """
+        total = 0
+        pull_count = 0
+        for machine_id in range(self._machine_count):
+            if machine_id == self._machine_id:
+                local_id = F.tensor(np.arange(self._part_policy[name].get_part_size(),
+                                              dtype=np.int64))
+                total += F.count_nonzero(self._data_store[name][local_id])
+            else:
+                request = CountLocalNonzeroRequest(name)
+                rpc.send_request_to_machine(machine_id, request)
+                pull_count += 1
+        for _ in range(pull_count):
+            res = rpc.recv_response()
+            total += res.num_local_nonzero
+        return total
 
 KVCLIENT = None
 

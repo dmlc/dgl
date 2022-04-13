@@ -180,7 +180,7 @@ class DiffPool(nn.Module):
             out_all.append(readout)
 
         adj, h = self.first_diffpool_layer(g, g_embedding)
-        node_per_pool_graph = int(adj.size()[0] / self.batch_size)
+        node_per_pool_graph = int(adj.size()[0] / len(g.batch_num_nodes()))
 
         h, adj = batch2tensor(adj, h, node_per_pool_graph)
         h = self.gcn_forward_tensorized(
@@ -214,6 +214,8 @@ class DiffPool(nn.Module):
         #softmax + CE
         criterion = nn.CrossEntropyLoss()
         loss = criterion(pred, label)
+        for key, value in self.first_diffpool_layer.loss_log.items():
+            loss += value
         for diffpool_layer in self.diffpool_layers:
             for key, value in diffpool_layer.loss_log.items():
                 loss += value

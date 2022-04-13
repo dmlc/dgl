@@ -1,5 +1,6 @@
 """dgl edge_softmax operator module."""
 from ..backend import edge_softmax as edge_softmax_internal
+from ..backend import edge_softmax_hetero as edge_softmax_hetero_internal
 from ..backend import astype
 from ..base import ALL, is_all
 
@@ -7,11 +8,9 @@ __all__ = ['edge_softmax']
 
 
 def edge_softmax(graph, logits, eids=ALL, norm_by='dst'):
-    r"""
+    r"""Compute softmax over weights of incoming edges for every node.
 
-    Description
-    -----------
-    Compute edge softmax. For a node :math:`i`, edge softmax is an operation that computes
+    For a node :math:`i`, edge softmax is an operation that computes
 
     .. math::
       a_{ij} = \frac{\exp(z_{ij})}{\sum_{j\in\mathcal{N}(i)}\exp(z_{ij})}
@@ -23,27 +22,31 @@ def edge_softmax(graph, logits, eids=ALL, norm_by='dst'):
     By default edge softmax is normalized by destination nodes(i.e. :math:`ij`
     are incoming edges of `i` in the formula above). We also support edge
     softmax normalized by source nodes(i.e. :math:`ij` are outgoing edges of
-    `i` in the formula). The previous case correspond to softmax in GAT and
-    Transformer, and the later case correspond to softmax in Capsule network.
+    `i` in the formula). The former case corresponds to softmax in GAT and
+    Transformer, and the latter case corresponds to softmax in Capsule network.
     An example of using edge softmax is in
     `Graph Attention Network <https://arxiv.org/pdf/1710.10903.pdf>`__ where
-    the attention weights are computed with such an edge softmax operation.
+    the attention weights are computed with this operation.
+    Other non-GNN examples using this are
+    `Transformer <https://papers.nips.cc/paper/7181-attention-is-all-you-need.pdf>`__,
+    `Capsule <https://arxiv.org/pdf/1710.09829.pdf>`__, etc.
 
     Parameters
     ----------
     graph : DGLGraph
-        The graph to perform edge softmax on.
-    logits : torch.Tensor
-        The input edge feature.
+        The graph over which edge softmax will be performed.
+    logits : torch.Tensor or dict of torch.Tensor
+        The input edge feature. Heterogeneous graphs can have dict of tensors where
+        each tensor stores the edge features of the corresponding relation type.
     eids : torch.Tensor or ALL, optional
-        A tensor of edge index on which to apply edge softmax. If ALL, apply edge
-        softmax on all edges in the graph. Default: ALL.
+        The IDs of the edges to apply edge softmax. If ALL, it will apply edge
+        softmax to all edges in the graph. Default: ALL.
     norm_by : str, could be `src` or `dst`
         Normalized by source nodes or destination nodes. Default: `dst`.
 
     Returns
     -------
-    Tensor
+    Tensor or tuple of tensors
         Softmax value.
 
     Notes
@@ -54,19 +57,17 @@ def edge_softmax(graph, logits, eids=ALL, norm_by='dst'):
           the graph.
         * Return shape: :math:`(E, *, 1)`
 
-    Examples
-    --------
+    Examples on a homogeneous graph
+    -------------------------------
     The following example uses PyTorch backend.
 
-    >>> from dgl.ops import edge_softmax
+    >>> from dgl.nn.functional import edge_softmax
     >>> import dgl
     >>> import torch as th
 
-    Create a :code:`DGLGraph` object g and initialize its edge features.
+    Create a :code:`DGLGraph` object and initialize its edge features.
 
-    >>> g = dgl.DGLGraph()
-    >>> g.add_nodes(3)
-    >>> g.add_edges([0, 0, 0, 1, 1, 2], [0, 1, 2, 1, 2, 2])
+    >>> g = dgl.graph((th.tensor([0, 0, 0, 1, 1, 2]), th.tensor([0, 1, 2, 1, 2, 2])))
     >>> edata = th.ones(6, 1).float()
     >>> edata
         tensor([[1.],
@@ -76,7 +77,7 @@ def edge_softmax(graph, logits, eids=ALL, norm_by='dst'):
                 [1.],
                 [1.]])
 
-    Apply edge softmax on g:
+    Apply edge softmax over g:
 
     >>> edge_softmax(g, edata)
         tensor([[1.0000],
@@ -86,7 +87,7 @@ def edge_softmax(graph, logits, eids=ALL, norm_by='dst'):
                 [0.3333],
                 [0.3333]])
 
-    Apply edge softmax on g normalized by source nodes:
+    Apply edge softmax over g normalized by source nodes:
 
     >>> edge_softmax(g, edata, norm_by='src')
         tensor([[0.3333],
@@ -96,13 +97,36 @@ def edge_softmax(graph, logits, eids=ALL, norm_by='dst'):
                 [0.5000],
                 [1.0000]])
 
-    Apply edge softmax on first 4 edges of g:
+    Apply edge softmax to first 4 edges of g:
 
     >>> edge_softmax(g, edata[:4], th.Tensor([0,1,2,3]))
         tensor([[1.0000],
                 [0.5000],
                 [1.0000],
                 [0.5000]])
+
+
+    Examples on a heterogeneous graph
+    ---------------------------------
+
+    Create a heterogeneous graph and initialize its edge features.
+
+    >>> hg = dgl.heterograph({
+    ...     ('user', 'follows', 'user'): ([0, 0, 1], [0, 1, 2]),
+    ...     ('developer', 'develops', 'game'): ([0, 1], [0, 1])
+    ...     })
+    >>> edata_follows = th.ones(3, 1).float()
+    >>> edata_develops = th.ones(2, 1).float()
+    >>> edata_dict = {('user', 'follows', 'user'): edata_follows,
+    ... ('developer','develops', 'game'): edata_develops}
+
+    Apply edge softmax over hg normalized by source nodes:
+
+    >>> edge_softmax(hg, edata_dict, norm_by='src')
+        {('developer', 'develops', 'game'): tensor([[1.],
+        [1.]]), ('user', 'follows', 'user'): tensor([[0.5000],
+        [0.5000],
+        [1.0000]])}
     """
     if not is_all(eids):
         eids = astype(eids, graph.idtype)

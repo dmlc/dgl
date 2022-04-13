@@ -144,10 +144,16 @@ def asnumpy(input):
 def copy_to(input, ctx, **kwargs):
     return input.as_in_context(ctx)
 
+def is_pinned(input):
+    return input.context == mx.cpu_pinned()
+
 def sum(input, dim, keepdims=False):
     if len(input) == 0:
         return nd.array([0.], dtype=input.dtype, ctx=input.context)
     return nd.sum(input, axis=dim, keepdims=keepdims)
+
+def floor_div(in1, in2):
+    return in1 / in2
 
 def reduce_sum(input):
     return input.sum()
@@ -187,6 +193,9 @@ def argsort(input, dim, descending):
 
 def exp(input):
     return nd.exp(input)
+
+def inverse(input):
+    return nd.linalg_inverse(input)
 
 def sqrt(input):
     return nd.sqrt(input)
@@ -324,6 +333,9 @@ def boolean_mask(input, mask):
 def equal(x, y):
     return x == y
 
+def allclose(x, y, rtol=1e-4, atol=1e-4):
+    return np.allclose(x.asnumpy(), y.asnumpy(), rtol=rtol, atol=atol)
+
 def logical_not(input):
     return nd.logical_not(input)
 
@@ -339,11 +351,28 @@ def clamp(data, min_val, max_val):
 def replace_inf_with_zero(x):
     return nd.where(nd.abs(x) == np.inf, nd.zeros_like(x), x)
 
-def unique(input):
+def count_nonzero(input):
     # TODO: fallback to numpy is unfortunate
     tmp = input.asnumpy()
-    tmp = np.unique(tmp)
-    return nd.array(tmp, ctx=input.context, dtype=input.dtype)
+    return np.count_nonzero(tmp)
+
+def unique(input, return_inverse=False, return_counts=False):
+    # TODO: fallback to numpy is unfortunate
+    tmp = input.asnumpy()
+    if return_inverse and return_counts:
+        tmp, inv, count = np.unique(tmp, return_inverse=True, return_counts=True)
+        tmp = nd.array(tmp, ctx=input.context, dtype=input.dtype)
+        inv = nd.array(inv, ctx=input.context)
+        count = nd.array(count, ctx=input.context)
+        return tmp, inv, count
+    elif return_inverse or return_counts:
+        tmp, tmp2 = np.unique(tmp, return_inverse=return_inverse, return_counts=return_counts)
+        tmp = nd.array(tmp, ctx=input.context, dtype=input.dtype)
+        tmp2 = nd.array(tmp2, ctx=input.context)
+        return tmp, tmp2
+    else:
+        tmp = np.unique(tmp)
+        return nd.array(tmp, ctx=input.context, dtype=input.dtype)
 
 def full_1d(length, fill_value, dtype, ctx):
     return nd.full((length,), fill_value, dtype=dtype, ctx=ctx)
@@ -382,6 +411,7 @@ def zerocopy_to_numpy(arr):
     return arr.asnumpy()
 
 def zerocopy_from_numpy(np_data):
+    np_data = np.asarray(np_data, order='C')
     return mx.nd.from_numpy(np_data, zero_copy=True)
 
 def zerocopy_to_dgl_ndarray(arr):

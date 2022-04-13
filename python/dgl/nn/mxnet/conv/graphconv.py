@@ -10,12 +10,10 @@ from ....base import DGLError
 from ....utils import expand_as_pair
 
 class GraphConv(gluon.Block):
-    r"""
+    r"""Graph convolutional layer from `Semi-Supervised Classification with Graph Convolutional
+    Networks <https://arxiv.org/abs/1609.02907>`__
 
-    Description
-    -----------
-    Graph convolution was introduced in `GCN <https://arxiv.org/abs/1609.02907>`__
-    and mathematically is defined as follows:
+    Mathematically it is defined as follows:
 
     .. math::
       h_i^{(l+1)} = \sigma(b^{(l)} + \sum_{j\in\mathcal{N}(i)}\frac{1}{c_{ij}}h_j^{(l)}W^{(l)})
@@ -32,10 +30,18 @@ class GraphConv(gluon.Block):
     out_feats : int
         Output feature size; i.e., the number of dimensions of :math:`h_i^{(l+1)}`.
     norm : str, optional
-        How to apply the normalizer. If is `'right'`, divide the aggregated messages
-        by each node's in-degrees, which is equivalent to averaging the received messages.
-        If is `'none'`, no normalization is applied. Default is `'both'`,
-        where the :math:`c_{ij}` in the paper is applied.
+        How to apply the normalizer.  Can be one of the following values:
+
+        * ``right``, to divide the aggregated messages by each node's in-degrees,
+          which is equivalent to averaging the received messages.
+
+        * ``none``, where no normalization is applied.
+
+        * ``both`` (default), where the messages are scaled with :math:`1/c_{ji}` above, equivalent
+          to symmetric normalization.
+
+        * ``left``, to divide the messages sent out from each node by its out-degrees,
+          equivalent to random walk normalization.
     weight : bool, optional
         If True, apply a linear layer. Otherwise, aggregating the messages
         without a weight matrix.
@@ -70,8 +76,8 @@ class GraphConv(gluon.Block):
 
     Calling ``add_self_loop`` will not work for some graphs, for example, heterogeneous graph
     since the edge type can not be decided for self_loop edges. Set ``allow_zero_in_degree``
-    to ``True`` for those cases to unblock the code and handle zere-in-degree nodes manually.
-    A common practise to handle this is to filter out the nodes with zere-in-degree when use
+    to ``True`` for those cases to unblock the code and handle zero-in-degree nodes manually.
+    A common practise to handle this is to filter out the nodes with zero-in-degree when use
     after conv.
 
     Examples
@@ -136,8 +142,8 @@ class GraphConv(gluon.Block):
                  activation=None,
                  allow_zero_in_degree=False):
         super(GraphConv, self).__init__()
-        if norm not in ('none', 'both', 'right'):
-            raise DGLError('Invalid norm value. Must be either "none", "both" or "right".'
+        if norm not in ('none', 'both', 'right', 'left'):
+            raise DGLError('Invalid norm value. Must be either "none", "both", "right" or "left".'
                            ' But got "{}".'.format(norm))
         self._in_feats = in_feats
         self._out_feats = out_feats
@@ -230,14 +236,17 @@ class GraphConv(gluon.Block):
                                    'suppress the check and let the code run.')
 
             feat_src, feat_dst = expand_as_pair(feat, graph)
-
-            if self._norm == 'both':
-                degs = graph.out_degrees().as_in_context(feat_src.context).astype('float32')
+            if self._norm in ['both', 'left']:
+                degs = graph.out_degrees().as_in_context(feat_dst.context).astype('float32')
                 degs = mx.nd.clip(degs, a_min=1, a_max=float("inf"))
-                norm = mx.nd.power(degs, -0.5)
+                if self._norm == 'both':
+                    norm = mx.nd.power(degs, -0.5)
+                else:
+                    norm = 1.0 / degs
                 shp = norm.shape + (1,) * (feat_src.ndim - 1)
                 norm = norm.reshape(shp)
                 feat_src = feat_src * norm
+
 
             if weight is not None:
                 if self.weight is not None:
@@ -264,7 +273,7 @@ class GraphConv(gluon.Block):
                 if weight is not None:
                     rst = mx.nd.dot(rst, weight)
 
-            if self._norm != 'none':
+            if self._norm in ['both', 'right']:
                 degs = graph.in_degrees().as_in_context(feat_dst.context).astype('float32')
                 degs = mx.nd.clip(degs, a_min=1, a_max=float("inf"))
                 if self._norm == 'both':

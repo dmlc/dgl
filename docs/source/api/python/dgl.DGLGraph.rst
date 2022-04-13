@@ -35,6 +35,8 @@ when the graph is heterogeneous.
     DGLGraph.metagraph
     DGLGraph.to_canonical_etype
 
+.. _apigraph-querying-graph-structure:
+
 Querying graph structure
 ------------------------
 
@@ -130,6 +132,7 @@ under the ``dgl`` namespace.
     DGLGraph.add_self_loop
     DGLGraph.remove_self_loop
     DGLGraph.to_simple
+    DGLGraph.reorder_graph
 
 Adjacency and incidence matrix
 ---------------------------------
@@ -140,6 +143,7 @@ Methods for getting the adjacency and the incidence matrix of the graph.
     :toctree: ../../generated/
 
     DGLGraph.adj
+    DGLGraph.adj_sparse
     DGLGraph.adjacency_matrix
     DGLGraph.inc
     DGLGraph.incidence_matrix
@@ -164,10 +168,10 @@ Methods for performing message passing, applying functions on node/edge features
     DGLGraph.filter_nodes
     DGLGraph.filter_edges
 
-Querying batch summary
----------------------------------
+Querying and manipulating batch information
+----------------------------------------------
 
-Methods for getting the batching information if the current graph is a batched
+Methods for getting/setting the batching information if the current graph is a batched
 graph generated from :func:`dgl.batch`. They are also widely used in the
 :ref:`api-batch`.
 
@@ -177,6 +181,9 @@ graph generated from :func:`dgl.batch`. They are also widely used in the
     DGLGraph.batch_size
     DGLGraph.batch_num_nodes
     DGLGraph.batch_num_edges
+    DGLGraph.set_batch_num_nodes
+    DGLGraph.set_batch_num_edges
+
 
 Mutating topology
 -----------------
@@ -201,6 +208,10 @@ Methods for getting or changing the device on which the graph is hosted.
 
     DGLGraph.to
     DGLGraph.device
+    DGLGraph.cpu
+    DGLGraph.pin_memory_
+    DGLGraph.unpin_memory_
+    DGLGraph.is_pinned
 
 Misc
 ----

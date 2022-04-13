@@ -48,8 +48,6 @@ HeteroSubgraph EdgeSubgraphNoPreserveNodes(
     const HeteroGraph* hg, const std::vector<IdArray>& eids) {
   // TODO(minjie): In general, all relabeling should be separated with subgraph
   //   operations.
-  CHECK(hg->Context().device_type != kDLGPU)
-    << "Edge subgraph with relabeling does not support GPU.";
   CHECK_EQ(eids.size(), hg->NumEdgeTypes())
     << "Invalid input: the input list size must be the same as the number of edge type.";
   HeteroSubgraph ret;
@@ -254,7 +252,8 @@ HeteroGraphPtr HeteroGraph::AsNumBits(HeteroGraphPtr g, uint8_t bits) {
                                         hgindex->num_verts_per_type_));
 }
 
-HeteroGraphPtr HeteroGraph::CopyTo(HeteroGraphPtr g, const DLContext& ctx) {
+HeteroGraphPtr HeteroGraph::CopyTo(HeteroGraphPtr g, const DLContext &ctx,
+                                   const DGLStreamHandle &stream) {
   if (ctx == g->Context()) {
     return g;
   }
@@ -262,10 +261,20 @@ HeteroGraphPtr HeteroGraph::CopyTo(HeteroGraphPtr g, const DLContext& ctx) {
   CHECK_NOTNULL(hgindex);
   std::vector<HeteroGraphPtr> rel_graphs;
   for (auto g : hgindex->relation_graphs_) {
-    rel_graphs.push_back(UnitGraph::CopyTo(g, ctx));
+    rel_graphs.push_back(UnitGraph::CopyTo(g, ctx, stream));
   }
   return HeteroGraphPtr(new HeteroGraph(hgindex->meta_graph_, rel_graphs,
                                         hgindex->num_verts_per_type_));
+}
+
+void HeteroGraph::PinMemory_() {
+  for (auto g : relation_graphs_)
+    g->PinMemory_();
+}
+
+void HeteroGraph::UnpinMemory_() {
+  for (auto g : relation_graphs_)
+    g->UnpinMemory_();
 }
 
 std::string HeteroGraph::SharedMemName() const {
@@ -300,6 +309,8 @@ HeteroGraphPtr HeteroGraph::CopyToSharedMem(
   std::vector<HeteroGraphPtr> relgraphs(g->NumEdgeTypes());
 
   for (dgl_type_t etype = 0 ; etype < g->NumEdgeTypes() ; ++etype) {
+    auto src_dst_type = g->GetEndpointTypes(etype);
+    int num_vtypes = (src_dst_type.first == src_dst_type.second ? 1 : 2);
     aten::COOMatrix coo;
     aten::CSRMatrix csr, csc;
     std::string prefix = name + "_" + std::to_string(etype);
@@ -312,7 +323,8 @@ HeteroGraphPtr HeteroGraph::CopyToSharedMem(
     if (has_csc) {
       csc = shm.CopyToSharedMem(hg->GetCSCMatrix(etype), prefix + "_csc");
     }
-    relgraphs[etype] = UnitGraph::CreateHomographFrom(csc, csr, coo, has_csc, has_csr, has_coo);
+    relgraphs[etype] = UnitGraph::CreateUnitGraphFrom(
+        num_vtypes, csc, csr, coo, has_csc, has_csr, has_coo);
   }
 
   auto ret = std::shared_ptr<HeteroGraph>(
@@ -352,6 +364,8 @@ std::tuple<HeteroGraphPtr, std::vector<std::string>, std::vector<std::string>>
 
   std::vector<HeteroGraphPtr> relgraphs(metagraph->NumEdges());
   for (dgl_type_t etype = 0 ; etype < metagraph->NumEdges() ; ++etype) {
+    auto src_dst = metagraph->FindEdge(etype);
+    int num_vtypes = (src_dst.first == src_dst.second) ? 1 : 2;
     aten::COOMatrix coo;
     aten::CSRMatrix csr, csc;
     std::string prefix = name + "_" + std::to_string(etype);
@@ -365,7 +379,8 @@ std::tuple<HeteroGraphPtr, std::vector<std::string>, std::vector<std::string>>
       shm.CreateFromSharedMem(&csc, prefix + "_csc");
     }
 
-    relgraphs[etype] = UnitGraph::CreateHomographFrom(csc, csr, coo, has_csc, has_csr, has_coo);
+    relgraphs[etype] = UnitGraph::CreateUnitGraphFrom(
+        num_vtypes, csc, csr, coo, has_csc, has_csr, has_coo);
   }
 
   auto ret = std::make_shared<HeteroGraph>(metagraph, relgraphs, num_verts_per_type);

@@ -21,7 +21,7 @@ pushd ${TUTORIAL_ROOT} > /dev/null
 pip install -r requirements.txt || fail "installing requirements"
 
 # Test
-for f in $(find . -name "*.py" ! -name "*_mx.py")
+for f in $(find . -path ./dist -prune -false -o -name "*.py" ! -name "*_mx.py")
 do
     echo "Running tutorial ${f} ..."
     python3 $f || fail "run ${f}"

@@ -7,12 +7,9 @@ from mxnet.gluon import nn
 
 
 class DenseGraphConv(nn.Block):
-    """
+    """Graph Convolutional layer from `Semi-Supervised Classification with Graph
+    Convolutional Networks <https://arxiv.org/abs/1609.02907>`__
 
-    Description
-    -----------
-    Graph Convolutional Network layer where the graph structure
-    is given by an adjacency matrix.
     We recommend user to use this module when applying graph convolution on
     dense graphs.
 

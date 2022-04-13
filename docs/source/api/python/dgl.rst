@@ -26,6 +26,10 @@ Operators for constructing :class:`DGLGraph` from raw data formats.
     rand_bipartite
     knn_graph
     segmented_knn_graph
+    radius_graph
+    create_block
+    block_to_graph
+    merge
 
 .. _api-subgraph-extraction:
 
@@ -43,6 +47,8 @@ Operators for extracting and returning subgraphs.
     edge_type_subgraph
     in_subgraph
     out_subgraph
+    khop_in_subgraph
+    khop_out_subgraph
 
 .. _api-transform:
 
@@ -72,6 +78,35 @@ Operators for generating new graphs by manipulating the structure of the existin
     line_graph
     khop_graph
     metapath_reachable_graph
+    adj_product_graph
+    adj_sum_graph
+    reorder_graph
+    sort_csr_by_tag
+    sort_csc_by_tag
+
+.. _api-positional-encoding:
+
+Graph Positional Encoding Ops:
+-----------------------------------------
+
+Operators for generating positional encodings of each node.
+
+.. autosummary::
+    :toctree: ../../generated
+
+    random_walk_pe
+    laplacian_pe
+
+.. _api-partition:
+
+Graph Partition Utilities
+-------------------------
+.. autosummary::
+    :toctree: ../../generated/
+
+    metis_partition
+    metis_partition_assignment
+    partition_graph_with_halo
 
 .. _api-batch:
 
@@ -86,6 +121,7 @@ operators for computing graph-level representation for both single and batched g
 
     batch
     unbatch
+    slice_batch
     readout_nodes
     readout_edges
     sum_nodes
@@ -112,10 +148,33 @@ Utilities for computing adjacency matrix and Lapacian matrix.
     khop_adj
     laplacian_lambda_max
 
-Traversals
+Graph Traversal & Message Propagation
 ------------------------------------------
 
-Utilities for traversing graphs.
+DGL implements graph traversal algorithms implemented as python generators,
+which returns the visited set of nodes or edges (in ID tensor) at each iteration.
+The naming convention is ``<algorithm>_[nodes|edges]_generator``.
+An example usage is as follows.
+
+.. code:: python
+
+    g = ...  # some DGLGraph
+    for nodes in dgl.bfs_nodes_generator(g, 0):
+        do_something(nodes)
+
+.. autosummary::
+    :toctree: ../../generated/
+
+    bfs_nodes_generator
+    bfs_edges_generator
+    topological_nodes_generator
+    dfs_edges_generator
+    dfs_labeled_edges_generator
+
+DGL provides APIs to perform message passing following graph traversal order. ``prop_nodes_XXX``
+calls traversal algorithm ``XXX`` and triggers :func:`~DGLGraph.pull()` on the visited node
+set at each iteration. ``prop_edges_YYY`` applies traversal algorithm ``YYY`` and triggers
+:func:`~DGLGraph.send_and_recv()` on the visited edge set at each iteration.
 
 .. autosummary::
     :toctree: ../../generated/
@@ -129,7 +188,8 @@ Utilities for traversing graphs.
 Utilities
 -----------------------------------------------
 
-Other utilities for controlling randomness, saving and loading graphs, etc.
+Other utilities for controlling randomness, saving and loading graphs, functions that applies
+the same function to every elements in a container, etc.
 
 .. autosummary::
     :toctree: ../../generated/
@@ -137,3 +197,4 @@ Other utilities for controlling randomness, saving and loading graphs, etc.
     seed
     save_graphs
     load_graphs
+    apply_each

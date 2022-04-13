@@ -3,6 +3,8 @@
 import os
 import socket
 import atexit
+import logging
+import time
 
 from . import rpc
 from .constants import MAX_QUEUE_SIZE
@@ -13,9 +15,14 @@ if os.name != 'nt':
 
 def local_ip4_addr_list():
     """Return a set of IPv4 address
+
+    You can use
+    `logging.getLogger("dgl-distributed-socket").setLevel(logging.WARNING+1)`
+    to disable the warning here
     """
     assert os.name != 'nt', 'Do not support Windows rpc yet.'
     nic = set()
+    logger = logging.getLogger("dgl-distributed-socket")
     for if_nidx in socket.if_nameindex():
         name = if_nidx[1]
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -25,13 +32,11 @@ def local_ip4_addr_list():
                                    struct.pack('256s', name[:15].encode("UTF-8")))
         except OSError as e:
             if e.errno == 99: # EADDRNOTAVAIL
-                print("Warning!",
-                      "Interface: {}".format(name),
-                      "IP address not available for interface.",
-                      sep='\n')
+                logger.warning(
+                    "Warning! Interface: %s \n"
+                    "IP address not available for interface.", name)
                 continue
-            else:
-                raise e
+            raise e
 
         ip_addr = socket.inet_ntoa(ip_of_ni[20:24])
         nic.add(ip_addr)
@@ -71,7 +76,7 @@ def get_local_machine_id(server_namebook):
             break
     return res
 
-def get_local_usable_addr():
+def get_local_usable_addr(probe_addr):
     """Get local usable IP and port
 
     Returns
@@ -81,8 +86,8 @@ def get_local_usable_addr():
     """
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
-        # doesn't even have to be reachable
-        sock.connect(('10.255.255.255', 1))
+        # should get the address on the same subnet as probe_addr's
+        sock.connect((probe_addr, 1))
         ip_addr = sock.getsockname()[0]
     except ValueError:
         ip_addr = '127.0.0.1'
@@ -97,7 +102,8 @@ def get_local_usable_addr():
     return ip_addr + ':' + str(port)
 
 
-def connect_to_server(ip_config, num_servers, max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
+def connect_to_server(ip_config, num_servers, max_queue_size=MAX_QUEUE_SIZE,
+                      net_type='socket', group_id=0):
     """Connect this client to server.
 
     Parameters
@@ -112,6 +118,10 @@ def connect_to_server(ip_config, num_servers, max_queue_size=MAX_QUEUE_SIZE, net
         it will not allocate 20GB memory at once.
     net_type : str
         Networking type. Current options are: 'socket'.
+    group_id : int
+        Indicates which group this client belongs to. Clients that are
+        booted together in each launch are gathered as a group and should
+        have same unique group_id.
 
     Raises
     ------
@@ -133,7 +143,7 @@ def connect_to_server(ip_config, num_servers, max_queue_size=MAX_QUEUE_SIZE, net
     rpc.register_service(rpc.CLIENT_BARRIER,
                          rpc.ClientBarrierRequest,
                          rpc.ClientBarrierResponse)
-    rpc.register_ctrl_c()
+    rpc.register_sig_handler()
     server_namebook = rpc.read_ip_config(ip_config, num_servers)
     num_servers = len(server_namebook)
     rpc.set_num_server(num_servers)
@@ -150,28 +160,30 @@ def connect_to_server(ip_config, num_servers, max_queue_size=MAX_QUEUE_SIZE, net
     rpc.set_num_machines(num_machines)
     machine_id = get_local_machine_id(server_namebook)
     rpc.set_machine_id(machine_id)
+    rpc.set_group_id(group_id)
     rpc.create_sender(max_queue_size, net_type)
     rpc.create_receiver(max_queue_size, net_type)
     # Get connected with all server nodes
     for server_id, addr in server_namebook.items():
         server_ip = addr[1]
         server_port = addr[2]
-        rpc.add_receiver_addr(server_ip, server_port, server_id)
-    rpc.sender_connect()
+        while not rpc.connect_receiver(server_ip, server_port, server_id):
+            time.sleep(3)
     # Get local usable IP address and port
-    ip_addr = get_local_usable_addr()
+    ip_addr = get_local_usable_addr(server_ip)
     client_ip, client_port = ip_addr.split(':')
+    # wait server connect back
+    rpc.receiver_wait(client_ip, client_port, num_servers, blocking=False)
+    print("Client [{}] waits on {}:{}".format(os.getpid(), client_ip, client_port))
     # Register client on server
     register_req = rpc.ClientRegisterRequest(ip_addr)
     for server_id in range(num_servers):
         rpc.send_request(server_id, register_req)
-    # wait server connect back
-    rpc.receiver_wait(client_ip, client_port, num_servers)
     # recv client ID from server
     res = rpc.recv_response()
     rpc.set_rank(res.client_id)
-    print("Machine (%d) client (%d) connect to server successfuly!" \
-        % (machine_id, rpc.get_rank()))
+    print("Machine (%d) group (%d) client (%d) connect to server successfuly!" \
+        % (machine_id, group_id, rpc.get_rank()))
     # get total number of client
     get_client_num_req = rpc.GetNumberClientsRequest(rpc.get_rank())
     rpc.send_request(0, get_client_num_req)
@@ -179,16 +191,46 @@ def connect_to_server(ip_config, num_servers, max_queue_size=MAX_QUEUE_SIZE, net
     rpc.set_num_client(res.num_client)
     from .dist_context import exit_client, set_initialized
     atexit.register(exit_client)
-    set_initialized()
+    set_initialized(True)
 
-def shutdown_servers():
+def shutdown_servers(ip_config, num_servers):
     """Issue commands to remote servers to shut them down.
+
+    This function is required to be called manually only when we
+    have booted servers which keep alive even clients exit. In
+    order to shut down server elegantly, we utilize existing
+    client logic/code to boot a special client which does nothing
+    but send shut down request to servers. Once such request is
+    received, servers will exit from endless wait loop, release
+    occupied resources and end its process. Please call this function
+    with same arguments used in `dgl.distributed.connect_to_server`.
+
+    Parameters
+    ----------
+    ip_config : str
+        Path of server IP configuration file.
+    num_servers : int
+        server count on each machine.
 
     Raises
     ------
     ConnectionError : If anything wrong with the connection.
     """
-    if rpc.get_rank() == 0:  # Only client_0 issue this command
-        req = rpc.ShutDownRequest(rpc.get_rank())
-        for server_id in range(rpc.get_num_server()):
-            rpc.send_request(server_id, req)
+    rpc.register_service(rpc.SHUT_DOWN_SERVER,
+                         rpc.ShutDownRequest,
+                         None)
+    rpc.register_sig_handler()
+    server_namebook = rpc.read_ip_config(ip_config, num_servers)
+    num_servers = len(server_namebook)
+    rpc.create_sender(MAX_QUEUE_SIZE, 'socket')
+    # Get connected with all server nodes
+    for server_id, addr in server_namebook.items():
+        server_ip = addr[1]
+        server_port = addr[2]
+        while not rpc.connect_receiver(server_ip, server_port, server_id):
+            time.sleep(1)
+    # send ShutDownRequest to all servers
+    req = rpc.ShutDownRequest(0, True)
+    for server_id in range(num_servers):
+        rpc.send_request(server_id, req)
+    rpc.finalize_sender()

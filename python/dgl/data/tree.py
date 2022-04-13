@@ -23,7 +23,7 @@ class SSTDataset(DGLBuiltinDataset):
     r"""Stanford Sentiment Treebank dataset.
 
     .. deprecated:: 0.5.0
-        
+
         - ``trees`` is deprecated, it is replaced by:
 
             >>> dataset = SSTDataset()
@@ -63,8 +63,12 @@ class SSTDataset(DGLBuiltinDataset):
         Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
-    verbose: bool
+    verbose : bool
         Whether to print out progress information. Default: True.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Attributes
     ----------
@@ -120,7 +124,8 @@ class SSTDataset(DGLBuiltinDataset):
                  vocab_file=None,
                  raw_dir=None,
                  force_reload=False,
-                 verbose=False):
+                 verbose=False,
+                 transform=None):
         assert mode in ['train', 'dev', 'test', 'tiny']
         _url = _get_dgl_url('dataset/sst.zip')
         self._glove_embed_file = glove_embed_file if mode == 'train' else None
@@ -130,7 +135,8 @@ class SSTDataset(DGLBuiltinDataset):
                                          url=_url,
                                          raw_dir=raw_dir,
                                          force_reload=force_reload,
-                                         verbose=verbose)
+                                         verbose=verbose,
+                                         transform=transform)
 
     def process(self):
         from nltk.corpus.reader import BracketParseCorpusReader
@@ -255,7 +261,10 @@ class SSTDataset(DGLBuiltinDataset):
             - ``ndata['y']:`` label of the node
             - ``ndata['mask']``: 1 if the node is a leaf, otherwise 0
         """
-        return self._trees[idx]
+        if self._transform is None:
+            return self._trees[idx]
+        else:
+            return self._transform(self._trees[idx])
 
     def __len__(self):
         r"""Number of graphs in the dataset."""

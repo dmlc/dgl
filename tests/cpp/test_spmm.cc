@@ -1,5 +1,6 @@
 #if !defined(_WIN32)
-#include <../../src/array/cpu/spmm.h>
+#ifdef USE_AVX
+#include <../src/array/cpu/spmm.h>
 #include <dgl/array.h>
 #include <gtest/gtest.h>
 #include <time.h>
@@ -313,4 +314,5 @@ TEST(SpmmTest, TestSpmmDiv) {
   _TestSpmmDiv<float>();
   _TestSpmmDiv<double>();
 }
-#endif
+#endif  // USE_AVX
+#endif  // _WIN32

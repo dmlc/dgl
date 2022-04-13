@@ -34,6 +34,13 @@ class KarateClubDataset(DGLDataset):
     - Edges: 156
     - Number of Classes: 2
 
+    Parameters
+    ----------
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
+
     Attributes
     ----------
     num_classes : int
@@ -48,8 +55,8 @@ class KarateClubDataset(DGLDataset):
     >>> g = dataset[0]
     >>> labels = g.ndata['label']
     """
-    def __init__(self):
-        super(KarateClubDataset, self).__init__(name='karate_club')
+    def __init__(self, transform=None):
+        super(KarateClubDataset, self).__init__(name='karate_club', transform=transform)
 
     def process(self):
         kc_graph = nx.karate_club_graph()
@@ -88,7 +95,10 @@ class KarateClubDataset(DGLDataset):
             - ``ndata['label']``: ground truth labels
         """
         assert idx == 0, "This dataset has only one graph"
-        return self._graph
+        if self._transform is None:
+            return self._graph
+        else:
+            return self._transform(self._graph)
 
     def __len__(self):
         r"""The number of graphs in the dataset."""

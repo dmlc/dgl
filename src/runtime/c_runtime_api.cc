@@ -10,6 +10,7 @@
 #include <dgl/runtime/module.h>
 #include <dgl/runtime/registry.h>
 #include <dgl/runtime/device_api.h>
+#include <dgl/runtime/tensordispatch.h>
 #include <array>
 #include <algorithm>
 #include <string>
@@ -98,6 +99,10 @@ DeviceAPI* DeviceAPI::Get(DGLContext ctx, bool allow_missing) {
       static_cast<int>(ctx.device_type), allow_missing);
 }
 
+DeviceAPI* DeviceAPI::Get(DLDeviceType dev_type, bool allow_missing) {
+  return DeviceAPIManager::Get(static_cast<int>(dev_type), allow_missing);
+}
+
 void* DeviceAPI::AllocWorkspace(DGLContext ctx,
                                 size_t size,
                                 DGLType type_hint) {
@@ -121,6 +126,14 @@ void DeviceAPI::SyncStreamFromTo(DGLContext ctx,
                                  DGLStreamHandle event_src,
                                  DGLStreamHandle event_dst) {
   LOG(FATAL) << "Device does not support stream api.";
+}
+
+void DeviceAPI::PinData(void* ptr, size_t nbytes) {
+  LOG(FATAL) << "Device does not support cudaHostRegister api.";
+}
+
+void DeviceAPI::UnpinData(void* ptr) {
+  LOG(FATAL) << "Device does not support cudaHostUnregister api.";
 }
 }  // namespace runtime
 }  // namespace dgl
@@ -347,6 +360,15 @@ int DGLSetStream(int device_type, int device_id, DGLStreamHandle stream) {
   API_END();
 }
 
+int DGLGetStream(int device_type, int device_id, DGLStreamHandle* stream) {
+  API_BEGIN();
+  DGLContext ctx;
+  ctx.device_type = static_cast<DLDeviceType>(device_type);
+  ctx.device_id = device_id;
+  *stream = DeviceAPIManager::Get(ctx)->GetStream();
+  API_END();
+}
+
 int DGLSynchronize(int device_type, int device_id, DGLStreamHandle stream) {
   API_BEGIN();
   DGLContext ctx;
@@ -376,6 +398,10 @@ int DGLCbArgToReturn(DGLValue* value, int code) {
   rv.MoveToCHost(value, &tcode);
   CHECK_EQ(tcode, code);
   API_END();
+}
+
+int DGLLoadTensorAdapter(const char *path) {
+  return TensorDispatcher::Global()->Load(path) ? 0 : -1;
 }
 
 // set device api

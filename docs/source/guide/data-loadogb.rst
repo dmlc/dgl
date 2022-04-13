@@ -26,7 +26,7 @@ Prediction* tasks.
     import dgl
     import torch
     from ogb.graphproppred import DglGraphPropPredDataset
-    from torch.utils.data import DataLoader
+    from dgl.dataloading import GraphDataLoader
     
     
     def _collate_fn(batch):
@@ -41,9 +41,9 @@ Prediction* tasks.
     dataset = DglGraphPropPredDataset(name='ogbg-molhiv')
     split_idx = dataset.get_idx_split()
     # dataloader
-    train_loader = DataLoader(dataset[split_idx["train"]], batch_size=32, shuffle=True, collate_fn=_collate_fn)
-    valid_loader = DataLoader(dataset[split_idx["valid"]], batch_size=32, shuffle=False, collate_fn=_collate_fn)
-    test_loader = DataLoader(dataset[split_idx["test"]], batch_size=32, shuffle=False, collate_fn=_collate_fn)
+    train_loader = GraphDataLoader(dataset[split_idx["train"]], batch_size=32, shuffle=True, collate_fn=_collate_fn)
+    valid_loader = GraphDataLoader(dataset[split_idx["valid"]], batch_size=32, shuffle=False, collate_fn=_collate_fn)
+    test_loader = GraphDataLoader(dataset[split_idx["test"]], batch_size=32, shuffle=False, collate_fn=_collate_fn)
 
 Loading *Node Property Prediction* datasets is similar, but note that
 there is only one graph object in this kind of dataset.

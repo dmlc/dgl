@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import dgl.function as fn
-from dgl.ops import edge_softmax
+from dgl.nn.functional import edge_softmax
 
 class HGTLayer(nn.Module):
     def __init__(self,
@@ -73,12 +73,12 @@ class HGTLayer(nn.Module):
                 relation_pri = self.relation_pri[e_id]
                 relation_msg = self.relation_msg[e_id]
 
-                k = torch.einsum("bij,ijk->bik", k, realtion_att)
+                k = torch.einsum("bij,ijk->bik", k, relation_att)
                 v = torch.einsum("bij,ijk->bik", v, relation_msg)
 
                 sub_graph.srcdata['k'] = k
                 sub_graph.dstdata['q'] = q
-                sub_graph.srcdata['v'] = v
+                sub_graph.srcdata['v_%d' % e_id] = v
 
                 sub_graph.apply_edges(fn.v_dot_u('q', 'k', 't'))
                 attn_score = sub_graph.edata.pop('t').sum(-1) * relation_pri / self.sqrt_dk
@@ -86,8 +86,8 @@ class HGTLayer(nn.Module):
 
                 sub_graph.edata['t'] = attn_score.unsqueeze(-1)
 
-            G.multi_update_all({etype : (fn.u_mul_e('v', 't', 'm'), fn.sum('m', 't')) \
-                                for etype in edge_dict}, cross_reducer = 'mean')
+            G.multi_update_all({etype : (fn.u_mul_e('v_%d' % e_id, 't', 'm'), fn.sum('m', 't')) \
+                                for etype, e_id in edge_dict.items()}, cross_reducer = 'mean')
 
             new_h = {}
             for ntype in G.ntypes:
@@ -173,5 +173,5 @@ class HeteroRGCN(nn.Module):
         h_dict = self.layer1(G, input_dict)
         h_dict = {k : F.leaky_relu(h) for k, h in h_dict.items()}
         h_dict = self.layer2(G, h_dict)
-        # get paper logits
+        # get appropriate logits
         return h_dict[out_key]

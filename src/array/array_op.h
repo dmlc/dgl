@@ -47,7 +47,7 @@ template <DLDeviceType XPU, typename DType>
 IdArray NonZero(BoolArray bool_arr);
 
 template <DLDeviceType XPU, typename DType>
-std::pair<IdArray, IdArray> Sort(IdArray array);
+std::pair<IdArray, IdArray> Sort(IdArray array, int num_bits);
 
 template <DLDeviceType XPU, typename DType, typename IdType>
 NDArray Scatter(NDArray array, IdArray indices);
@@ -102,8 +102,22 @@ runtime::NDArray CSRGetRowData(CSRMatrix csr, int64_t row);
 template <DLDeviceType XPU, typename IdType>
 bool CSRIsSorted(CSRMatrix csr);
 
+template <DLDeviceType XPU, typename IdType, typename DType>
+runtime::NDArray CSRGetData(
+    CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols, bool return_eids,
+    runtime::NDArray weights, DType filler);
+
+template <DLDeviceType XPU, typename IdType, typename DType>
+runtime::NDArray CSRGetData(
+    CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols,
+    runtime::NDArray weights, DType filler) {
+  return CSRGetData<XPU, IdType, DType>(csr, rows, cols, false, weights, filler);
+}
+
 template <DLDeviceType XPU, typename IdType>
-runtime::NDArray CSRGetData(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols);
+NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols) {
+  return CSRGetData<XPU, IdType, IdType>(csr, rows, cols, true, NullArray(rows->dtype), -1);
+}
 
 template <DLDeviceType XPU, typename IdType>
 std::vector<runtime::NDArray> CSRGetDataAndIndices(
@@ -132,6 +146,10 @@ CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray 
 template <DLDeviceType XPU, typename IdType>
 void CSRSort_(CSRMatrix* csr);
 
+template <DLDeviceType XPU, typename IdType, typename TagType>
+std::pair<CSRMatrix, NDArray> CSRSortByTag(
+    const CSRMatrix &csr, IdArray tag_array, int64_t num_tags);
+
 template <DLDeviceType XPU, typename IdType>
 CSRMatrix CSRReorder(CSRMatrix csr, runtime::NDArray new_row_ids, runtime::NDArray new_col_ids);
 
@@ -146,14 +164,44 @@ template <DLDeviceType XPU, typename IdType, typename FloatType>
 COOMatrix CSRRowWiseSampling(
     CSRMatrix mat, IdArray rows, int64_t num_samples, FloatArray prob, bool replace);
 
+// FloatType is the type of probability data.
+template <DLDeviceType XPU, typename IdType, typename FloatType>
+COOMatrix CSRRowWisePerEtypeSampling(
+    CSRMatrix mat, IdArray rows, IdArray etypes,
+    const std::vector<int64_t>& num_samples, FloatArray prob, bool replace,
+    bool etype_sorted);
+
 template <DLDeviceType XPU, typename IdType>
 COOMatrix CSRRowWiseSamplingUniform(
     CSRMatrix mat, IdArray rows, int64_t num_samples, bool replace);
+
+template <DLDeviceType XPU, typename IdType>
+COOMatrix CSRRowWisePerEtypeSamplingUniform(
+    CSRMatrix mat, IdArray rows, IdArray etypes, const std::vector<int64_t>& num_samples,
+    bool replace, bool etype_sorted);
 
 // FloatType is the type of weight data.
 template <DLDeviceType XPU, typename IdType, typename DType>
 COOMatrix CSRRowWiseTopk(
     CSRMatrix mat, IdArray rows, int64_t k, NDArray weight, bool ascending);
+
+template <DLDeviceType XPU, typename IdType, typename FloatType>
+COOMatrix CSRRowWiseSamplingBiased(
+    CSRMatrix mat,
+    IdArray rows,
+    int64_t num_samples,
+    NDArray tag_offset,
+    FloatArray bias,
+    bool replace);
+
+template <DLDeviceType XPU, typename IdType>
+std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling(
+    const CSRMatrix& csr,
+    int64_t num_samples,
+    int num_trials,
+    bool exclude_self_loops,
+    bool replace,
+    double redundancy);
 
 // Union CSRMatrixes
 template <DLDeviceType XPU, typename IdType>
@@ -222,9 +270,20 @@ template <DLDeviceType XPU, typename IdType, typename FloatType>
 COOMatrix COORowWiseSampling(
     COOMatrix mat, IdArray rows, int64_t num_samples, FloatArray prob, bool replace);
 
+// FloatType is the type of probability data.
+template <DLDeviceType XPU, typename IdType, typename FloatType>
+COOMatrix COORowWisePerEtypeSampling(
+    COOMatrix mat, IdArray rows, IdArray etypes,
+    const std::vector<int64_t>& num_samples, FloatArray prob, bool replace, bool etype_sorted);
+
 template <DLDeviceType XPU, typename IdType>
 COOMatrix COORowWiseSamplingUniform(
     COOMatrix mat, IdArray rows, int64_t num_samples, bool replace);
+
+template <DLDeviceType XPU, typename IdType>
+COOMatrix COORowWisePerEtypeSamplingUniform(
+    COOMatrix mat, IdArray rows, IdArray etypes, const std::vector<int64_t>& num_samples,
+    bool replace, bool etype_sorted);
 
 // FloatType is the type of weight data.
 template <DLDeviceType XPU, typename IdType, typename FloatType>

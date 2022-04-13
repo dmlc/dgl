@@ -5,19 +5,14 @@ from torch import nn
 from torch.nn import functional as F
 
 from .... import function as fn
-from ....ops import edge_softmax
+from ...functional import edge_softmax
 from ....base import DGLError
 from ....utils import expand_as_pair
 
 
 class AGNNConv(nn.Module):
-    r"""
-
-    Description
-    -----------
-    Attention-based Graph Neural Network layer from paper `Attention-based
-    Graph Neural Network for Semi-Supervised Learning
-    <https://arxiv.org/abs/1803.03735>`__.
+    r"""Attention-based Graph Neural Network layer from `Attention-based Graph Neural Network for
+    Semi-Supervised Learning <https://arxiv.org/abs/1803.03735>`__
 
     .. math::
         H^{l+1} = P H^{l}
@@ -54,8 +49,8 @@ class AGNNConv(nn.Module):
 
     Calling ``add_self_loop`` will not work for some graphs, for example, heterogeneous graph
     since the edge type can not be decided for self_loop edges. Set ``allow_zero_in_degree``
-    to ``True`` for those cases to unblock the code and handle zere-in-degree nodes manually.
-    A common practise to handle this is to filter out the nodes with zere-in-degree when use
+    to ``True`` for those cases to unblock the code and handle zero-in-degree nodes manually.
+    A common practise to handle this is to filter out the nodes with zero-in-degree when use
     after conv.
 
     Example

@@ -11,6 +11,9 @@ include(CheckCXXCompilerFlag)
 check_cxx_compiler_flag("-std=c++14"   SUPPORT_CXX14)
 
 set(dgl_known_gpu_archs "35 50 60 70")
+if (CUDA_VERSION_MAJOR GREATER_EQUAL "11")
+  set(dgl_known_gpu_archs "${dgl_known_gpu_archs} 80")
+endif()
 
 ################################################################################################
 # A function for automatic detection of GPUs installed  (if autodetection is enabled)
@@ -84,7 +87,7 @@ endfunction()
 #   dgl_select_nvcc_arch_flags(out_variable)
 function(dgl_select_nvcc_arch_flags out_variable)
   # List of arch names
-  set(__archs_names "Fermi" "Kepler" "Maxwell" "Pascal" "Volta" "All" "Manual")
+  set(__archs_names "Fermi" "Kepler" "Maxwell" "Pascal" "Volta" "Ampere" "All" "Manual")
   set(__archs_name_default "All")
   if(NOT CMAKE_CROSSCOMPILING)
     list(APPEND __archs_names "Auto")
@@ -121,6 +124,8 @@ function(dgl_select_nvcc_arch_flags out_variable)
     set(__cuda_arch_bin "60 61")
   elseif(${CUDA_ARCH_NAME} STREQUAL "Volta")
     set(__cuda_arch_bin "70")
+  elseif(${CUDA_ARCH_NAME} STREQUAL "Ampere")
+    set(__cuda_arch_bin "80")
   elseif(${CUDA_ARCH_NAME} STREQUAL "All")
     set(__cuda_arch_bin ${dgl_known_gpu_archs})
   elseif(${CUDA_ARCH_NAME} STREQUAL "Auto")
@@ -136,7 +141,7 @@ function(dgl_select_nvcc_arch_flags out_variable)
   string(REGEX MATCHALL "[0-9]+"   __cuda_arch_ptx "${__cuda_arch_ptx}")
   mshadow_list_unique(__cuda_arch_bin __cuda_arch_ptx)
 
-  set(__nvcc_flags "")
+  set(__nvcc_flags "--expt-relaxed-constexpr")
   set(__nvcc_archs_readable "")
 
   # Tell NVCC to add binaries for the specified GPUs
@@ -164,7 +169,7 @@ function(dgl_select_nvcc_arch_flags out_variable)
 endfunction()
 
 ################################################################################################
-# Short command for cuda comnpilation
+# Short command for cuda compilation
 # Usage:
 #   dgl_cuda_compile(<objlist_variable> <cuda_files>)
 macro(dgl_cuda_compile objlist_variable)
@@ -233,10 +238,16 @@ macro(dgl_config_cuda out_variable)
   file(GLOB_RECURSE DGL_CUDA_SRC
     src/array/cuda/*.cc
     src/array/cuda/*.cu
+    src/array/cuda/uvm/*.cc
+    src/array/cuda/uvm/*.cu
     src/kernel/cuda/*.cc
     src/kernel/cuda/*.cu
+    src/partition/cuda/*.cu
     src/runtime/cuda/*.cc
+    src/runtime/cuda/*.cu
     src/geometry/cuda/*.cu
+    src/graph/transform/cuda/*.cu
+    src/graph/sampling/randomwalks/*.cu
   )
 
   # NVCC flags
@@ -246,6 +257,9 @@ macro(dgl_config_cuda out_variable)
   # 0. Add host flags
   message(STATUS "${CMAKE_CXX_FLAGS}")
   string(REGEX REPLACE "[ \t\n\r]" "," CXX_HOST_FLAGS "${CMAKE_CXX_FLAGS}")
+  if(MSVC AND NOT USE_MSVC_MT)
+    string(CONCAT CXX_HOST_FLAGS ${CXX_HOST_FLAGS} ",/MD")
+  endif()
   list(APPEND CUDA_NVCC_FLAGS "-Xcompiler ,${CXX_HOST_FLAGS}")
 
   # 1. Add arch flags
@@ -260,14 +274,15 @@ macro(dgl_config_cuda out_variable)
   include(CheckCXXCompilerFlag)
   check_cxx_compiler_flag("-std=c++14"    SUPPORT_CXX14)
   string(REPLACE "-std=c++11" "" CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS}")
-  list(APPEND CUDA_NVCC_FLAGS "--std=c++14")
+  list(APPEND CUDA_NVCC_FLAGS "-std=c++14")
 
   message(STATUS "CUDA flags: ${CUDA_NVCC_FLAGS}")
 
   list(APPEND DGL_LINKER_LIBS
     ${CUDA_CUDART_LIBRARY}
     ${CUDA_CUBLAS_LIBRARIES}
-    ${CUDA_cusparse_LIBRARY})
+    ${CUDA_cusparse_LIBRARY}
+    ${CUDA_CURAND_LIBRARY})
 
   set(${out_variable} ${DGL_CUDA_SRC})
 endmacro()

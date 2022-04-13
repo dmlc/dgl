@@ -10,6 +10,7 @@
 #include <dgl/array.h>
 #include <vector>
 #include <utility>
+#include <tuple>
 
 namespace dgl {
 
@@ -26,9 +27,11 @@ namespace sampling {
  * \return A pair of
  *         1. One 2D array of shape (len(seeds), len(metapath) + 1) with node IDs.  The
  *            paths that terminated early are padded with -1.
- *         2. One 1D array of shape (len(metapath) + 1) with node type IDs.
+ *         2. One 2D array of shape (len(seeds), len(metapath)) with edge IDs.  The
+ *            paths that terminated early are padded with -1.
+ *         3. One 1D array of shape (len(metapath) + 1) with node type IDs.
  */
-std::pair<IdArray, TypeArray> RandomWalk(
+std::tuple<IdArray, IdArray, TypeArray> RandomWalk(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
@@ -46,9 +49,11 @@ std::pair<IdArray, TypeArray> RandomWalk(
  * \return A pair of
  *         1. One 2D array of shape (len(seeds), len(metapath) + 1) with node IDs.  The
  *            paths that terminated early are padded with -1.
- *         2. One 1D array of shape (len(metapath) + 1) with node type IDs.
+ *         2. One 2D array of shape (len(seeds), len(metapath)) with edge IDs.  The
+ *            paths that terminated early are padded with -1.
+ *         3. One 1D array of shape (len(metapath) + 1) with node type IDs.
  */
-std::pair<IdArray, TypeArray> RandomWalkWithRestart(
+std::tuple<IdArray, IdArray, TypeArray> RandomWalkWithRestart(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
@@ -69,9 +74,11 @@ std::pair<IdArray, TypeArray> RandomWalkWithRestart(
  * \return A pair of
  *         1. One 2D array of shape (len(seeds), len(metapath) + 1) with node IDs.  The
  *            paths that terminated early are padded with -1.
- *         2. One 1D array of shape (len(metapath) + 1) with node type IDs.
+ *         2. One 2D array of shape (len(seeds), len(metapath)) with edge IDs.  The
+ *            paths that terminated early are padded with -1.
+ *         3. One 1D array of shape (len(metapath) + 1) with node type IDs.
  */
-std::pair<IdArray, TypeArray> RandomWalkWithStepwiseRestart(
+std::tuple<IdArray, IdArray, TypeArray> RandomWalkWithStepwiseRestart(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,

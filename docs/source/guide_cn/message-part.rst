@@ -14,4 +14,4 @@
     sg = g.subgraph(nid)
     sg.update_all(message_func, reduce_func, apply_node_func)
 
-这是小批量训练中的常见用法。更多详细用法请参考用户指南 :ref:`第6章：在大图上的随机（批次）训练 <guide-minibatch>`。
+这是小批量训练中的常见用法。更多详细用法请参考用户指南 :ref:`guide_cn-minibatch`。

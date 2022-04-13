@@ -9,6 +9,7 @@ if __name__ == "__main__":
     experiment_times = 1
     percent = 0.05
     file = open(".../output_file_path/...")
+    file_1 = open(".../label 2/googlescholar.8area.venue.label.txt")
     file_2 = open(".../label 2/googlescholar.8area.author.label.txt")
     check_venue = {}
     check_author = {}
@@ -58,16 +59,13 @@ if __name__ == "__main__":
         count = 0
         for author in authors:
             count += 1
-            print("one more author " + str(count))
+            # print("one more author " + str(count))
             temp_1 = np.array(author_embed_dict[author])
             if len(author_embedding) == 0:
                 author_embedding = temp_1
             else:
                 author_embedding = np.vstack((author_embedding, temp_1))
         # split data into training and testing
-        author_split = int(author_count * 0.8)
-        author_training = author_embedding[:author_split+1,:]
-        author_testing = author_embedding[author_split+1:,:]
         print("splitting")
         venue_split = int(venue_count * percent)
         venue_training = venue_embedding[:venue_split,:]

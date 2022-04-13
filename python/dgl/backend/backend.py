@@ -330,6 +330,21 @@ def copy_to(input, ctx, **kwargs):
     """
     pass
 
+def is_pinned(input):
+    """Check whether the tensor is in pinned memory.
+
+    Parameters
+    ----------
+    input : Tensor
+        The tensor.
+
+    Returns
+    -------
+    bool
+        Whether the tensor is in pinned memory.
+    """
+    pass
+
 ###############################################################################
 # Tensor functions on feature data
 # --------------------------------
@@ -354,6 +369,22 @@ def sum(input, dim, keepdims=False):
         A framework-specific tensor.
     """
     pass
+
+def floor_div(in1, in2):
+    """Element-wise integer division and rounds each quotient towards zero.
+
+    Parameters
+    ----------
+    in1 : Tensor
+        The input tensor
+    in2 : Tensor or integer
+        The input
+
+    Returns
+    -------
+    Tensor
+        A framework-specific tensor.
+    """
 
 def reduce_sum(input):
     """Returns the sum of all elements in the input tensor.
@@ -546,6 +577,21 @@ def exp(input):
     ----------
     input : Tensor
         The input tensor.
+
+    Returns
+    -------
+    Tensor
+        The output tensor.
+    """
+    pass
+
+def inverse(input):
+    """Returns the inverse matrix of a square matrix if it exists.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input square matrix.
 
     Returns
     -------
@@ -1041,6 +1087,21 @@ def equal(x, y):
     """
     pass
 
+def allclose(x, y, rtol=1e-4, atol=1e-4):
+    """Compares whether all elements are close.
+
+    Parameters
+    ----------
+    x : Tensor
+        First tensor
+    y : Tensor
+        Second tensor
+    rtol : float, optional
+        Relative tolerance
+    atol : float, optional
+        Absolute tolerance
+    """
+
 def logical_not(input):
     """Perform a logical not operation.  Equivalent to np.logical_not
 
@@ -1109,6 +1170,21 @@ def replace_inf_with_zero(x):
     """
     pass
 
+def count_nonzero(input):
+    """Return the count of non-zero values in the tensor input.
+
+    Parameters
+    ----------
+    input : Tensor
+        The tensor to be counted
+
+    Returns
+    -------
+    Integer
+        The result
+    """
+    pass
+
 ###############################################################################
 # Tensor functions used *only* on index tensor
 # ----------------
@@ -1117,18 +1193,29 @@ def replace_inf_with_zero(x):
 # DGL should contain all the operations on index, so this set of operators
 # should be gradually removed.
 
-def unique(input):
+def unique(input, return_inverse=False, return_counts=False):
     """Returns the unique scalar elements in a tensor.
 
     Parameters
     ----------
     input : Tensor
         Must be a 1-D tensor.
+    return_inverse : bool, optional
+        Whether to also return the indices for where elements in the original
+        input ended up in the returned unique list.
+    return_counts : bool, optional
+        Whether to also return the counts for each unique element.
 
     Returns
     -------
     Tensor
         A 1-D tensor containing unique elements.
+    Tensor, optional
+        A 1-D tensor containing the new positions of the elements in the input.
+        It is returned if return_inverse is True.
+    Tensor, optional
+        A 1-D tensor containing the number of occurrences for each unique value or tensor.
+        It is returned if return_counts is True.
     """
     pass
 
@@ -1436,6 +1523,47 @@ def gspmm(gidx, op, reduce_op, lhs_data, rhs_data):
     """
     pass
 
+def gspmm_hetero(g, op, reduce_op, lhs_len, *lhs_and_rhs_tuple):
+    r""" Generalized Sparse Matrix Multiplication interface on heterogenenous graph.
+    All the relation types of the heterogeneous graph will be processed together.
+    It fuses two steps into one kernel.
+    (1) Computes messages by :attr:`op` source node and edge features.
+    (2) Aggregate the messages by :attr:`reduce_op` as the features on destination nodes.
+
+    .. math::
+        x_v = \psi_{(u, v, e)\in \mathcal{G}}(\rho(x_u, x_e))
+
+    where :math:`x_v` is the returned feature on destination nodes, and :math`x_u`,
+    :math:`x_e` refers to :attr:`u`, :attr:`e` respectively. :math:`\rho` means binary
+    operator :attr:`op` and :math:`\psi` means reduce operator :attr:`reduce_op`,
+    :math:`\mathcal{G}` is the graph we apply gspmm on: :attr:`g`.
+
+    Note that this function does not handle gradients.
+
+    Parameters
+    ----------
+    g : HeteroGraph
+        The input graph.
+    op : str
+        The binary op's name, could be ``add``, ``sub``, ``mul``, ``div``,
+        ``copy_lhs``, ``copy_rhs``.
+    reduce_op : str
+        Reduce operator, could be ``sum``, ``max``, ``min``.
+    lhs_len : int
+        Length of the lhs data
+    lhs_and_rhs_tuple : tuple of tensors
+        lhs_data and rhs_data are concatenated to one tuple. lhs_data is
+        also a tuple of tensors of size number of ntypes. Same is true for
+        rhs_data.
+        The tensor(s) in the tuple could be None
+
+    Returns
+    -------
+    tuple of tensor
+        The resulting tuple of tensor.
+    """
+    pass
+
 def gsddmm(gidx, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
     r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface.
     It computes edge features by :attr:`op` lhs features and rhs features.
@@ -1468,6 +1596,46 @@ def gsddmm(gidx, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
     -------
     tensor
         The result tensor.
+    """
+    pass
+
+def gsddmm_hetero(g, op, lhs_len, lhs_target='u', rhs_target='v', *lhs_and_rhs_tuple):
+    r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface on
+    heterogenenous graph. All the relation types of the heterogeneous graph
+    will be processed together.
+    It computes edge features by :attr:`op` lhs features and rhs features.
+
+    .. math::
+        x_{e} = \phi(x_{lhs}, x_{rhs}), \forall (u,e,v)\in \mathcal{G}
+
+    where :math:`x_{e}` is the returned feature on edges and :math:`x_u`,
+    :math:`x_v` refers to :attr:`u`, :attr:`v` respectively. :math:`\phi`
+    is the binary operator :attr:`op`, and :math:`\mathcal{G}` is the graph
+    we apply gsddmm on: :attr:`g`. $lhs$ and $rhs$ are one of $u,v,e$'s.
+
+    Parameters
+    ----------
+    gidx : HeteroGraphIndex
+        The input graph.
+    op : str
+        Binary operator, could be ``add``, ``sub``, ``mul``, ``div``, ``dot``,
+        ``copy_lhs``, ``copy_rhs``.
+    lhs_len : int
+        Length of the lhs data
+    lhs_target: str
+        Choice of `u`(source), `e`(edge) or `v`(destination) for left operand.
+    rhs_target: str
+        Choice of `u`(source), `e`(edge) or `v`(destination) for right operand.
+    lhs_and_rhs_tuple : tuple of tensors
+        lhs_data and rhs_data are concatenated to one tuple. lhs_data is
+        also a tuple of tensors of size number of ntypes. Same is true for
+        rhs_data.
+        The tensor(s) in the tuple could be None
+
+    Returns
+    -------
+    tuple of tensor
+        The resulting tuple of tensor.
     """
     pass
 
@@ -1508,6 +1676,43 @@ def edge_softmax(gidx, logits, eids, norm_by):
     """
     pass
 
+def edge_softmax_hetero(gidx, eids, norm_by, *logits):
+    r"""Compute edge softmax.
+
+    For a node :math:`i`, edge softmax is an operation of computing
+
+    .. math::
+      a_{ij} = \frac{\exp(z_{ij})}{\sum_{j\in\mathcal{N}(i)}\exp(z_{ij})}
+
+    where :math:`z_{ij}` is a signal of edge :math:`j\rightarrow i`, also
+    called logits in the context of softmax. :math:`\mathcal{N}(i)` is
+    the set of nodes that have an edge to :math:`i`.
+
+    By default edge softmax is normalized by destination nodes(i.e. :math:`ij`
+    are incoming edges of `i` in the formula above). We also support edge
+    softmax normalized by source nodes(i.e. :math:`ij` are outgoing edges of
+    `i` in the formula). The previous case correspond to softmax in GAT and
+    Transformer, and the later case correspond to softmax in Capsule network.
+
+    Parameters
+    ----------
+    gidx : HeteroGraphIndex
+        The graph to perfor edge softmax on.
+    eids : dict of tensors
+        Each tensor has the edges on which to apply edge softmax for a
+        corresponsing relation type.
+    logits : tuple of tensors
+        The input edge features of different relation types.
+    norm_by : str, could be `src` or `dst`
+        Normalized by source nodes or destination nodes. Default: `dst`.
+
+    Returns
+    -------
+    Tensor
+        Softmax value
+    """
+    pass
+
 def segment_reduce(op, x, offsets):
     """Segment reduction operator.
 
@@ -1533,6 +1738,158 @@ def segment_reduce(op, x, offsets):
     -------
     Tensor
         Aggregated tensor of shape ``(len(offsets) - 1, value.shape[1:])``.
+    """
+    pass
+
+def scatter_add(x, idx, m):
+
+    """Scatter add (on first dimension) operator.
+
+    Math: y[idx[i], *] += x[i, *]
+
+    Parameters
+    ----------
+    x : Tensor
+        The input feature.
+    idx : Tensor
+        The indices array.
+    m : int
+        The length of output.
+
+    Returns
+    -------
+    Tensor
+        The output tensor.
+    """
+    pass
+
+def csrmm(A, A_weights, B, B_weights, num_vtypes):
+    """Compute weighted adjacency matrix multiplication.
+
+    Notes
+    -----
+    Both A and B must allow creation of CSR representations, and must be simple graphs
+    (i.e. having at most one edge between two nodes).
+
+    The output unit graph has no format restriction.
+
+    Parameters
+    ----------
+    A : HeteroGraphIndex
+        The unit graph as left operand.
+    A_weights : Tensor
+        The edge weights of A.  Must be a 1D vector.
+    B : HeteroGraphIndex
+        The unit graph as right operand.
+    B_weights : Tensor
+        The edge weights of B.  Must be a 1D vector.
+    num_vtypes : int
+        The number of node types of the output graph.  Must be either 1 or 2.
+
+    Returns
+    -------
+    HeteroGraphIndex
+        The output unit graph.
+    Tensor
+        The output edge weights.
+    """
+    pass
+
+def csrsum(gidxs, weights):
+    """Compute weighted adjacency matrix summation.
+
+    Notes
+    -----
+    All unit graphs must allow creation of CSR representations, and must be simple graphs
+    (i.e. having at most one edge between two nodes).
+
+    The output unit graph has no format restriction.
+
+    Parameters
+    ----------
+    gidxs : list[HeteroGraphIndex]
+        The unit graphs.
+    weights : list[Tensor]
+        The edge weights of each graph.  Must be 1D vectors.
+
+    Returns
+    -------
+    HeteroGraphIndex
+        The output unit graph.
+    Tensor
+        The output edge weights.
+    """
+    pass
+
+def csrmask(A, A_weights, B):
+    """Retrieve the values in the weighted adjacency matrix of graph :attr:`A` at the
+    non-zero positions of graph :attr:`B`'s adjacency matrix.
+
+    In scipy, this is equivalent to ``A[B != 0]``.
+
+    Notes
+    -----
+    Both A and B must allow creation of CSR representations, and must be simple graphs
+    (i.e. having at most one edge between two nodes).
+
+    Parameters
+    ----------
+    A : HeteroGraphIndex
+        The unit graph as left operand.
+    A_weights : Tensor
+        The edge weights of A.  Must be a 1D vector.
+    B : HeteroGraphIndex
+        The unit graph as right operand.
+
+    Returns
+    -------
+    Tensor
+        The output tensor.
+    """
+    pass
+
+def gather_mm(A, B, idx_a, idx_b):
+    r""" Dense Matrix Multiplication interface. It multiplies 2D dense tensor A
+    and 3D dense tensor B according to their relation types. A is unsorted and
+    the relation type is fetched from idx_b.
+
+    Parameters
+    ----------
+    A : tensor
+        2-D tensor of shape (N, D1)
+    B : tensor
+        3-D tensor of shape (R, D1, D2)
+    idx_a : Tensor, optional
+        If specified, must be a 1-D integer tensor of shape (K,).
+    idx_b : Tensor, optional
+        If specified, must be a 1-D integer tensor of shape (K,).
+
+    Returns
+    -------
+    Tensor
+        The output dense matrix of shape (N, D2)
+    """
+    pass
+
+def segment_mm(A, B, seglen_A):
+    r""" Dense Matrix Multiplication interface. It multiplies dense tensor A
+    and dense tensor B according to relation types. A is sorted and concatenated
+    according to relation types.
+
+    Parameters
+    ----------
+    A : tensor
+        2-D tensor of shape (N, D1)
+    B : tensor
+        3-D tensor of shape (R, D1, D2)
+    seglen_A : Tensor
+        An integer tensor of shape (R,). Each element is the length of segments
+        of input ``A``. The summation of all elements must be equal to N.
+
+    Returns
+    -------
+    Tensor
+        The output dense matrix of shape (N, D2)
     """
     pass
 

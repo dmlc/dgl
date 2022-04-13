@@ -57,6 +57,10 @@ struct Message {
    */
   int64_t size;
   /*!
+   * \brief message receiver id
+   */
+  int receiver_id = -1;
+  /*!
    * \brief user-defined deallocator, which can be nullptr
    */
   std::function<void(Message*)> deallocator = nullptr;

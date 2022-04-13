@@ -1,11 +1,19 @@
 """
 .. _model-dgmg:
 
-Tutorial: Generative models of graphs
+Generative Models of Graphs
 ===========================================
 
 **Author**: `Mufei Li <https://github.com/mufeili>`_,
 `Lingfan Yu <https://github.com/ylfdq1118>`_, Zheng Zhang
+
+.. warning::
+
+    The tutorial aims at gaining insights into the paper, with code as a mean
+    of explanation. The implementation thus is NOT optimized for running
+    efficiency. For recommended implementation, please refer to the `official
+    examples <https://github.com/dmlc/dgl/tree/master/examples>`_.
+
 """
 
 ##############################################################################

@@ -6,19 +6,15 @@ import numpy as np
 
 from .... import function as fn
 from ....base import DGLError
-from ....ops import edge_softmax
+from ...functional import edge_softmax
 from ..utils import Identity
 
 # pylint: enable=W0235
 
 
 class GATConv(layers.Layer):
-    r"""
-
-    Description
-    -----------
-    Apply `Graph Attention Network <https://arxiv.org/pdf/1710.10903.pdf>`__
-    over an input signal.
+    r"""Graph Attention Layer from `Graph Attention Network
+    <https://arxiv.org/pdf/1710.10903.pdf>`__
 
     .. math::
         h_i^{(l+1)} = \sum_{j\in \mathcal{N}(i)} \alpha_{i,j} W^{(l)} h_j^{(l)}
@@ -75,8 +71,8 @@ class GATConv(layers.Layer):
 
     Calling ``add_self_loop`` will not work for some graphs, for example, heterogeneous graph
     since the edge type can not be decided for self_loop edges. Set ``allow_zero_in_degree``
-    to ``True`` for those cases to unblock the code and handle zere-in-degree nodes manually.
-    A common practise to handle this is to filter out the nodes with zere-in-degree when use
+    to ``True`` for those cases to unblock the code and handle zero-in-degree nodes manually.
+    A common practise to handle this is to filter out the nodes with zero-in-degree when use
     after conv.
 
     Examples
@@ -117,7 +113,7 @@ class GATConv(layers.Layer):
     >>> # Case 2: Unidirectional bipartite graph
     >>> u = [0, 1, 0, 0, 1]
     >>> v = [0, 1, 2, 3, 2]
-    >>> g = dgl.bipartite((u, v))
+    >>> g = dgl.heterograph({('A', 'r', 'B'): (u, v)})
     >>> with tf.device("CPU:0"):
     >>>     u_feat = tf.convert_to_tensor(np.random.rand(2, 5))
     >>>     v_feat = tf.convert_to_tensor(np.random.rand(4, 10))
@@ -182,11 +178,7 @@ class GATConv(layers.Layer):
         self.activation = activation
 
     def set_allow_zero_in_degree(self, set_value):
-        r"""
-
-        Description
-        -----------
-        Set allow_zero_in_degree flag.
+        r"""Set allow_zero_in_degree flag.
 
         Parameters
         ----------
@@ -196,31 +188,27 @@ class GATConv(layers.Layer):
         self._allow_zero_in_degree = set_value
 
     def call(self, graph, feat, get_attention=False):
-        r"""
-
-        Description
-        -----------
-        Compute graph attention network layer.
+        r"""Compute graph attention network layer.
 
         Parameters
         ----------
         graph : DGLGraph
             The graph.
         feat : tf.Tensor or pair of tf.Tensor
-            If a tf.Tensor is given, the input feature of shape :math:`(N, D_{in})` where
+            If a tf.Tensor is given, the input feature of shape :math:`(N, *, D_{in})` where
             :math:`D_{in}` is size of input feature, :math:`N` is the number of nodes.
             If a pair of tf.Tensor is given, the pair must contain two tensors of shape
-            :math:`(N_{in}, D_{in_{src}})` and :math:`(N_{out}, D_{in_{dst}})`.
+            :math:`(N_{in}, *, D_{in_{src}})` and :math:`(N_{out}, *, D_{in_{dst}})`.
         get_attention : bool, optional
             Whether to return the attention values. Default to False.
 
         Returns
         -------
         tf.Tensor
-            The output feature of shape :math:`(N, H, D_{out})` where :math:`H`
+            The output feature of shape :math:`(N, *, H, D_{out})` where :math:`H`
             is the number of heads, and :math:`D_{out}` is size of output feature.
         tf.Tensor, optional
-            The attention values of shape :math:`(E, H, 1)`, where :math:`E` is the number of
+            The attention values of shape :math:`(E, *, H, 1)`, where :math:`E` is the number of
             edges. This is returned only when :attr:`get_attention` is ``True``.
 
         Raises
@@ -244,18 +232,27 @@ class GATConv(layers.Layer):
                                    'suppress the check and let the code run.')
 
             if isinstance(feat, tuple):
+                src_prefix_shape = tuple(feat[0].shape[:-1])
+                dst_prefix_shape = tuple(feat[1].shape[:-1])
                 h_src = self.feat_drop(feat[0])
                 h_dst = self.feat_drop(feat[1])
                 if not hasattr(self, 'fc_src'):
                     self.fc_src, self.fc_dst = self.fc, self.fc
-                feat_src = tf.reshape(self.fc_src(h_src), (-1, self._num_heads, self._out_feats))
-                feat_dst = tf.reshape(self.fc_dst(h_dst), (-1, self._num_heads, self._out_feats))
+                feat_src = tf.reshape(
+                    self.fc_src(h_src),
+                    src_prefix_shape + (self._num_heads, self._out_feats))
+                feat_dst = tf.reshape(
+                    self.fc_dst(h_dst),
+                    dst_prefix_shape + (self._num_heads, self._out_feats))
             else:
+                src_prefix_shape = dst_prefix_shape = tuple(feat.shape[:-1])
                 h_src = h_dst = self.feat_drop(feat)
                 feat_src = feat_dst = tf.reshape(
-                    self.fc(h_src), (-1, self._num_heads, self._out_feats))
+                    self.fc(h_src), src_prefix_shape + (self._num_heads, self._out_feats))
                 if graph.is_block:
                     feat_dst = feat_src[:graph.number_of_dst_nodes()]
+                    h_dst = h_dst[:graph.number_of_dst_nodes()]
+                    dst_prefix_shape = (graph.number_of_dst_nodes(),) + dst_prefix_shape[1:]
             # NOTE: GAT paper uses "first concatenation then linear projection"
             # to compute attention scores, while ours is "first projection then
             # addition", the two approaches are mathematically equivalent:
@@ -282,7 +279,7 @@ class GATConv(layers.Layer):
             # residual
             if self.res_fc is not None:
                 resval = tf.reshape(self.res_fc(
-                    h_dst), (h_dst.shape[0], -1, self._out_feats))
+                    h_dst), dst_prefix_shape + (-1, self._out_feats))
                 rst = rst + resval
             # activation
             if self.activation:

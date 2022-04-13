@@ -6,13 +6,9 @@ import numpy as np
 
 
 class DenseChebConv(layers.Layer):
-    r"""
-
-    Description
-    -----------
-    Chebyshev Spectral Graph Convolution layer from paper `Convolutional
+    r"""Chebyshev Spectral Graph Convolution layer from `Convolutional
     Neural Networks on Graphs with Fast Localized Spectral Filtering
-    <https://arxiv.org/pdf/1606.09375.pdf>`__.
+    <https://arxiv.org/pdf/1606.09375.pdf>`__
 
     We recommend to use this module when applying ChebConv on dense graphs.
 
@@ -57,11 +53,7 @@ class DenseChebConv(layers.Layer):
             self.bias = None
 
     def call(self, adj, feat, lambda_max=None):
-        r"""
-
-        Description
-        -----------
-        Compute (Dense) Chebyshev Spectral Graph Convolution layer.
+        r"""Compute (Dense) Chebyshev Spectral Graph Convolution layer.
 
         Parameters
         ----------

@@ -3,14 +3,68 @@
  * \file array/cpu/geometry_op_impl.cc
  * \brief Geometry operator CPU implementation
  */
-#include <dgl/array.h>
+#include <dgl/random.h>
 #include <numeric>
 #include <vector>
+#include <utility>
+#include "../geometry_op.h"
 
 namespace dgl {
 using runtime::NDArray;
 namespace geometry {
 namespace impl {
+
+/*! \brief Knuth shuffle algorithm */
+template <typename IdType>
+void IndexShuffle(IdType *idxs, int64_t num_elems) {
+  for (int64_t i = num_elems - 1; i > 0; --i) {
+    int64_t j = dgl::RandomEngine::ThreadLocal()->RandInt(i);
+    std::swap(idxs[i], idxs[j]);
+  }
+}
+template void IndexShuffle<int32_t>(int32_t *idxs, int64_t num_elems);
+template void IndexShuffle<int64_t>(int64_t *idxs, int64_t num_elems);
+
+/*! \brief Groupwise index shuffle algorithm. This function will perform shuffle in subarrays
+ * indicated by group index. The group index is similar to indptr in CSRMatrix.
+ * 
+ * \param group_idxs group index array.
+ * \param idxs index array for shuffle.
+ * \param num_groups_idxs length of group_idxs
+ * \param num_elems length of idxs
+ */
+template <typename IdType>
+void GroupIndexShuffle(const IdType *group_idxs, IdType *idxs,
+                       int64_t num_groups_idxs, int64_t num_elems) {
+  if (num_groups_idxs < 2) return;  // empty idxs array
+  CHECK_LE(group_idxs[num_groups_idxs - 1], num_elems) << "group_idxs out of range";
+  for (int64_t i = 0; i < num_groups_idxs - 1; ++i) {
+    auto subarray_len = group_idxs[i + 1] - group_idxs[i];
+    IndexShuffle(idxs + group_idxs[i], subarray_len);
+  }
+}
+template void GroupIndexShuffle<int32_t>(
+    const int32_t *group_idxs, int32_t *idxs, int64_t num_groups_idxs, int64_t num_elems);
+template void GroupIndexShuffle<int64_t>(
+    const int64_t *group_idxs, int64_t *idxs, int64_t num_groups_idxs, int64_t num_elems);
+
+template <typename IdType>
+IdArray RandomPerm(int64_t num_nodes) {
+  IdArray perm = aten::NewIdArray(num_nodes, DLContext{kDLCPU, 0}, sizeof(IdType) * 8);
+  IdType* perm_data = static_cast<IdType*>(perm->data);
+  std::iota(perm_data, perm_data + num_nodes, 0);
+  IndexShuffle(perm_data, num_nodes);
+  return perm;
+}
+
+template <typename IdType>
+IdArray GroupRandomPerm(const IdType *group_idxs, int64_t num_group_idxs, int64_t num_nodes) {
+  IdArray perm = aten::NewIdArray(num_nodes, DLContext{kDLCPU, 0}, sizeof(IdType) * 8);
+  IdType* perm_data = static_cast<IdType*>(perm->data);
+  std::iota(perm_data, perm_data + num_nodes, 0);
+  GroupIndexShuffle(group_idxs, perm_data, num_group_idxs, num_nodes);
+  return perm;
+}
 
 /*!
  * \brief Farthest Point Sampler without the need to compute all pairs of distance.
@@ -81,7 +135,6 @@ void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_poin
     ret_start += sample_points;
   }
 }
-
 template void FarthestPointSampler<kDLCPU, float, int32_t>(
     NDArray array, int64_t batch_size, int64_t sample_points,
     NDArray dist, IdArray start_idx, IdArray result);
@@ -94,6 +147,82 @@ template void FarthestPointSampler<kDLCPU, double, int32_t>(
 template void FarthestPointSampler<kDLCPU, double, int64_t>(
     NDArray array, int64_t batch_size, int64_t sample_points,
     NDArray dist, IdArray start_idx, IdArray result);
+
+template <DLDeviceType XPU, typename FloatType, typename IdType>
+void WeightedNeighborMatching(const aten::CSRMatrix &csr, const NDArray weight, IdArray result) {
+  const int64_t num_nodes = result->shape[0];
+  const IdType *indptr_data = static_cast<IdType*>(csr.indptr->data);
+  const IdType *indices_data = static_cast<IdType*>(csr.indices->data);
+  IdType *result_data = static_cast<IdType*>(result->data);
+  FloatType *weight_data = static_cast<FloatType*>(weight->data);
+
+  // build node visiting order
+  IdArray vis_order = RandomPerm<IdType>(num_nodes);
+  IdType *vis_order_data = static_cast<IdType*>(vis_order->data);
+
+  for (int64_t n = 0; n < num_nodes; ++n) {
+    auto u = vis_order_data[n];
+
+    // if marked
+    if (result_data[u] >= 0) continue;
+
+    auto v_max = u;
+    FloatType weight_max = 0;
+
+    for (auto e = indptr_data[u]; e < indptr_data[u + 1]; ++e) {
+      auto v = indices_data[e];
+      if (result_data[v] >= 0) continue;
+      if (weight_data[e] >= weight_max) {
+        v_max = v;
+        weight_max = weight_data[e];
+      }
+    }
+    result_data[u] = std::min(u, v_max);
+    result_data[v_max] = result_data[u];
+  }
+}
+template void WeightedNeighborMatching<kDLCPU, float, int32_t>(
+    const aten::CSRMatrix &csr, const NDArray weight, IdArray result);
+template void WeightedNeighborMatching<kDLCPU, float, int64_t>(
+    const aten::CSRMatrix &csr, const NDArray weight, IdArray result);
+template void WeightedNeighborMatching<kDLCPU, double, int32_t>(
+    const aten::CSRMatrix &csr, const NDArray weight, IdArray result);
+template void WeightedNeighborMatching<kDLCPU, double, int64_t>(
+    const aten::CSRMatrix &csr, const NDArray weight, IdArray result);
+
+template <DLDeviceType XPU, typename IdType>
+void NeighborMatching(const aten::CSRMatrix &csr, IdArray result) {
+  const int64_t num_nodes = result->shape[0];
+  const IdType *indptr_data = static_cast<IdType*>(csr.indptr->data);
+  const IdType *indices_data = static_cast<IdType*>(csr.indices->data);
+  IdType *result_data = static_cast<IdType*>(result->data);
+
+  // build vis order
+  IdArray u_vis_order = RandomPerm<IdType>(num_nodes);
+  IdType *u_vis_order_data = static_cast<IdType*>(u_vis_order->data);
+  IdArray v_vis_order = GroupRandomPerm<IdType>(
+    indptr_data, csr.indptr->shape[0], csr.indices->shape[0]);
+  IdType *v_vis_order_data = static_cast<IdType*>(v_vis_order->data);
+
+  for (int64_t n = 0; n < num_nodes; ++n) {
+    auto u = u_vis_order_data[n];
+
+    // if marked
+    if (result_data[u] >= 0) continue;
+
+    result_data[u] = u;
+
+    for (auto e = indptr_data[u]; e < indptr_data[u + 1]; ++e) {
+      auto v = indices_data[v_vis_order_data[e]];
+      if (result_data[v] >= 0) continue;
+      result_data[u] = std::min(u, v);
+      result_data[v] = result_data[u];
+      break;
+    }
+  }
+}
+template void NeighborMatching<kDLCPU, int32_t>(const aten::CSRMatrix &csr, IdArray result);
+template void NeighborMatching<kDLCPU, int64_t>(const aten::CSRMatrix &csr, IdArray result);
 
 }  // namespace impl
 }  // namespace geometry

@@ -2,9 +2,12 @@ import tensorflow as tf
 import numpy as np
 from .tensor import tensor, copy_to, context, asnumpy, zerocopy_from_numpy
 from ...base import is_all, ALL
-from ...sparse import _gspmm, _gsddmm, _segment_reduce, _bwd_segment_cmp
+from ...sparse import _gspmm, _gsddmm, _segment_reduce, _bwd_segment_cmp, _scatter_add
+from ...sparse import _csrmm, _csrsum, _csrmask
+from ...heterograph_index import create_unitgraph_from_csr
 
-__all__ = ['gspmm', 'gsddmm', 'edge_softmax', 'segment_reduce']
+__all__ = ['gspmm', 'gsddmm', 'edge_softmax', 'segment_reduce', 'scatter_add',
+           'csrmm', 'csrsum', 'csrmask']
 
 
 def _scatter_nd(index, src, n_rows):

@@ -6,32 +6,18 @@ PyTorch compatible dataloader
 import math
 import numpy as np
 import torch
-from torch.utils.data import DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
 from sklearn.model_selection import StratifiedKFold
 import dgl
+from dgl.dataloading import GraphDataLoader
 
 
-# default collate function
-def collate(samples):
-    # The input `samples` is a list of pairs (graph, label).
-    graphs, labels = map(list, zip(*samples))
-    for g in graphs:
-        # deal with node feats
-        for key in g.node_attr_schemes().keys():
-            g.ndata[key] = g.ndata[key].float()
-        # no edge feats
-    batched_graph = dgl.batch(graphs)
-    labels = torch.tensor(labels)
-    return batched_graph, labels
-
-
-class GraphDataLoader():
+class GINDataLoader():
     def __init__(self,
                  dataset,
                  batch_size,
                  device,
-                 collate_fn=collate,
+                 collate_fn=None,
                  seed=0,
                  shuffle=True,
                  split_name='fold10',
@@ -56,10 +42,10 @@ class GraphDataLoader():
         train_sampler = SubsetRandomSampler(train_idx)
         valid_sampler = SubsetRandomSampler(valid_idx)
 
-        self.train_loader = DataLoader(
+        self.train_loader = GraphDataLoader(
             dataset, sampler=train_sampler,
             batch_size=batch_size, collate_fn=collate_fn, **self.kwargs)
-        self.valid_loader = DataLoader(
+        self.valid_loader = GraphDataLoader(
             dataset, sampler=valid_sampler,
             batch_size=batch_size, collate_fn=collate_fn, **self.kwargs)
 

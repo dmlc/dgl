@@ -96,21 +96,14 @@ follows:
     import dgl
     import torch
 
-    from torch.utils.data import DataLoader
+    from dgl.dataloading import GraphDataLoader
     
     # load data
     dataset = QM7bDataset()
     num_labels = dataset.num_labels
     
-    # create collate_fn
-    def _collate_fn(batch):
-        graphs, labels = batch
-        g = dgl.batch(graphs)
-        labels = torch.tensor(labels, dtype=torch.long)
-        return g, labels
-    
     # create dataloaders
-    dataloader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=_collate_fn)
+    dataloader = GraphDataLoader(dataset, batch_size=1, shuffle=True)
     
     # training
     for epoch in range(100):
@@ -139,6 +132,13 @@ Different from graph classification, node classification is typically on
 a single graph. As such, splits of the dataset are on the nodes of the
 graph. DGL recommends using node masks to specify the splits. The section uses
 builtin dataset `CitationGraphDataset <https://docs.dgl.ai/en/0.5.x/_modules/dgl/data/citation_graph.html#CitationGraphDataset>`__ as an example:
+
+In addition, DGL recommends re-arrange the nodes and edges so that nodes
+near to each other have IDs in a close range. The procedure could improve
+the locality to access a node's neighbors, which may benefit follow-up
+computation and analysis conducted on the graph. DGL provides an API called
+:func:`dgl.reorder_graph` for this purpose. Please refer to ``process()``
+part in below example for more details.
 
 .. code:: 
 
@@ -180,7 +180,8 @@ builtin dataset `CitationGraphDataset <https://docs.dgl.ai/en/0.5.x/_modules/dgl
                                            dtype=F.data_type_dict['float32'])
             self._num_labels = onehot_labels.shape[1]
             self._labels = labels
-            self._g = g
+            # reorder graph to obtain better locality.
+            self._g = dgl.reorder_graph(g)
     
         def __getitem__(self, idx):
             assert idx == 0, "This dataset has only one graph"
@@ -308,7 +309,7 @@ to see the complete code. The following code uses a subclass of ``KnowledgeGraph
     
     # get training mask
     train_mask = graph.edata['train_mask']
-    train_idx = torch.nonzero(train_mask).squeeze()
+    train_idx = torch.nonzero(train_mask, as_tuple=False).squeeze()
     src, dst = graph.edges(train_idx)
     # get edge types in training set
     rel = graph.edata['etype'][train_idx]

@@ -7,17 +7,13 @@ from mxnet.gluon.contrib.nn import Identity
 
 from .... import function as fn
 from ....base import DGLError
-from ....ops import edge_softmax
+from ...functional import edge_softmax
 from ....utils import expand_as_pair
 
 #pylint: enable=W0235
 class GATConv(nn.Block):
-    r"""
-
-    Description
-    -----------
-    Apply `Graph Attention Network <https://arxiv.org/pdf/1710.10903.pdf>`__
-    over an input signal.
+    r"""Graph attention layer from `Graph Attention Network
+    <https://arxiv.org/pdf/1710.10903.pdf>`__
 
     .. math::
         h_i^{(l+1)} = \sum_{j\in \mathcal{N}(i)} \alpha_{i,j} W^{(l)} h_j^{(l)}
@@ -74,8 +70,8 @@ class GATConv(nn.Block):
 
     Calling ``add_self_loop`` will not work for some graphs, for example, heterogeneous graph
     since the edge type can not be decided for self_loop edges. Set ``allow_zero_in_degree``
-    to ``True`` for those cases to unblock the code and handle zere-in-degree nodes manually.
-    A common practise to handle this is to filter out the nodes with zere-in-degree when use
+    to ``True`` for those cases to unblock the code and handle zero-in-degree nodes manually.
+    A common practise to handle this is to filter out the nodes with zero-in-degree when use
     after conv.
 
     Examples
@@ -117,7 +113,7 @@ class GATConv(nn.Block):
     >>> # Case 2: Unidirectional bipartite graph
     >>> u = [0, 1, 0, 0, 1]
     >>> v = [0, 1, 2, 3, 2]
-    >>> g = dgl.bipartite((u, v))
+    >>> g = dgl.heterograph({('A', 'r', 'B'): (u, v)})
     >>> u_feat = mx.nd.random.randn(2, 5)
     >>> v_feat = mx.nd.random.randn(4, 10)
     >>> gatconv = GATConv((5,10), 2, 3)
@@ -213,20 +209,20 @@ class GATConv(nn.Block):
         graph : DGLGraph
             The graph.
         feat : mxnet.NDArray or pair of mxnet.NDArray
-            If a mxnet.NDArray is given, the input feature of shape :math:`(N, D_{in})` where
+            If a mxnet.NDArray is given, the input feature of shape :math:`(N, *, D_{in})` where
             :math:`D_{in}` is size of input feature, :math:`N` is the number of nodes.
             If a pair of mxnet.NDArray is given, the pair must contain two tensors of shape
-            :math:`(N_{in}, D_{in_{src}})` and :math:`(N_{out}, D_{in_{dst}})`.
+            :math:`(N_{in}, *, D_{in_{src}})` and :math:`(N_{out}, *, D_{in_{dst}})`.
         get_attention : bool, optional
             Whether to return the attention values. Default to False.
 
         Returns
         -------
         mxnet.NDArray
-            The output feature of shape :math:`(N, H, D_{out})` where :math:`H`
+            The output feature of shape :math:`(N, *, H, D_{out})` where :math:`H`
             is the number of heads, and :math:`D_{out}` is size of output feature.
         mxnet.NDArray, optional
-            The attention values of shape :math:`(E, H, 1)`, where :math:`E` is the number of
+            The attention values of shape :math:`(E, *, H, 1)`, where :math:`E` is the number of
             edges. This is returned only when :attr:`get_attention` is ``True``.
 
         Raises
@@ -250,20 +246,27 @@ class GATConv(nn.Block):
                                    'suppress the check and let the code run.')
 
             if isinstance(feat, tuple):
+                src_prefix_shape = feat[0].shape[:-1]
+                dst_prefix_shape = feat[1].shape[:-1]
+                feat_dim = feat[0].shape[-1]
                 h_src = self.feat_drop(feat[0])
                 h_dst = self.feat_drop(feat[1])
                 if not hasattr(self, 'fc_src'):
                     self.fc_src, self.fc_dst = self.fc, self.fc
-                feat_src = self.fc_src(h_src).reshape(
-                    -1, self._num_heads, self._out_feats)
-                feat_dst = self.fc_dst(h_dst).reshape(
-                    -1, self._num_heads, self._out_feats)
+                feat_src = self.fc_src(h_src.reshape(-1, feat_dim)).reshape(
+                    *src_prefix_shape, self._num_heads, self._out_feats)
+                feat_dst = self.fc_dst(h_dst.reshape(-1, feat_dim)).reshape(
+                    *dst_prefix_shape, self._num_heads, self._out_feats)
             else:
+                src_prefix_shape = dst_prefix_shape = feat.shape[:-1]
+                feat_dim = feat[0].shape[-1]
                 h_src = h_dst = self.feat_drop(feat)
-                feat_src = feat_dst = self.fc(h_src).reshape(
-                    -1, self._num_heads, self._out_feats)
+                feat_src = feat_dst = self.fc(h_src.reshape(-1, feat_dim)).reshape(
+                    *src_prefix_shape, self._num_heads, self._out_feats)
                 if graph.is_block:
                     feat_dst = feat_src[:graph.number_of_dst_nodes()]
+                    h_dst = h_dst[:graph.number_of_dst_nodes()]
+                    dst_prefix_shape = (graph.number_of_dst_nodes(),) + dst_prefix_shape[1:]
             # NOTE: GAT paper uses "first concatenation then linear projection"
             # to compute attention scores, while ours is "first projection then
             # addition", the two approaches are mathematically equivalent:
@@ -288,7 +291,8 @@ class GATConv(nn.Block):
             rst = graph.dstdata['ft']
             # residual
             if self.res_fc is not None:
-                resval = self.res_fc(h_dst).reshape(h_dst.shape[0], -1, self._out_feats)
+                resval = self.res_fc(h_dst.reshape(-1, feat_dim)).reshape(
+                    *dst_prefix_shape, -1, self._out_feats)
                 rst = rst + resval
             # activation
             if self.activation:

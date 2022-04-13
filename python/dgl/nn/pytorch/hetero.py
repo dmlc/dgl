@@ -1,8 +1,10 @@
 """Heterograph NN modules"""
+from functools import partial
 import torch as th
 import torch.nn as nn
+from ...base import DGLError
 
-__all__ = ['HeteroGraphConv']
+__all__ = ['HeteroGraphConv', 'HeteroLinear', 'HeteroEmbedding']
 
 class HeteroGraphConv(nn.Module):
     r"""A generic module for computing convolution on heterogeneous graphs.
@@ -11,8 +13,25 @@ class HeteroGraphConv(nn.Module):
     relation graphs, which reads the features from source nodes and writes the
     updated ones to destination nodes. If multiple relations have the same
     destination node types, their results are aggregated by the specified method.
-
     If the relation graph has no edge, the corresponding module will not be called.
+
+    Pseudo-code:
+
+    .. code::
+
+        outputs = {nty : [] for nty in g.dsttypes}
+        # Apply sub-modules on their associating relation graphs in parallel
+        for relation in g.canonical_etypes:
+            stype, etype, dtype = relation
+            dstdata = relation_submodule(g[relation], ...)
+            outputs[dtype].append(dstdata)
+
+        # Aggregate the results for each destination node type
+        rsts = {}
+        for ntype, ntype_outputs in outputs.items():
+            if len(ntype_outputs) != 0:
+                rsts[ntype] = aggregate(ntype_outputs)
+        return rsts
 
     Examples
     --------
@@ -150,8 +169,6 @@ class HeteroGraphConv(nn.Module):
 
             for stype, etype, dtype in g.canonical_etypes:
                 rel_graph = g[stype, etype, dtype]
-                if rel_graph.number_of_edges() == 0:
-                    continue
                 if stype not in src_inputs or dtype not in dst_inputs:
                     continue
                 dstdata = self.mods[etype](
@@ -163,13 +180,11 @@ class HeteroGraphConv(nn.Module):
         else:
             for stype, etype, dtype in g.canonical_etypes:
                 rel_graph = g[stype, etype, dtype]
-                if rel_graph.number_of_edges() == 0:
-                    continue
                 if stype not in inputs:
                     continue
                 dstdata = self.mods[etype](
                     rel_graph,
-                    inputs[stype],
+                    (inputs[stype], inputs[dtype]),
                     *mod_args.get(etype, ()),
                     **mod_kwargs.get(etype, {}))
                 outputs[dtype].append(dstdata)
@@ -178,6 +193,29 @@ class HeteroGraphConv(nn.Module):
             if len(alist) != 0:
                 rsts[nty] = self.agg_fn(alist, nty)
         return rsts
+
+def _max_reduce_func(inputs, dim):
+    return th.max(inputs, dim=dim)[0]
+
+def _min_reduce_func(inputs, dim):
+    return th.min(inputs, dim=dim)[0]
+
+def _sum_reduce_func(inputs, dim):
+    return th.sum(inputs, dim=dim)
+
+def _mean_reduce_func(inputs, dim):
+    return th.mean(inputs, dim=dim)
+
+def _stack_agg_func(inputs, dsttype): # pylint: disable=unused-argument
+    if len(inputs) == 0:
+        return None
+    return th.stack(inputs, dim=1)
+
+def _agg_func(inputs, dsttype, fn): # pylint: disable=unused-argument
+    if len(inputs) == 0:
+        return None
+    stacked = th.stack(inputs, dim=0)
+    return fn(stacked, dim=0)
 
 def get_aggregate_fn(agg):
     """Internal function to get the aggregation function for node data
@@ -196,28 +234,145 @@ def get_aggregate_fn(agg):
         and returns one aggregated tensor.
     """
     if agg == 'sum':
-        fn = th.sum
+        fn = _sum_reduce_func
     elif agg == 'max':
-        fn = lambda inputs, dim: th.max(inputs, dim=dim)[0]
+        fn = _max_reduce_func
     elif agg == 'min':
-        fn = lambda inputs, dim: th.min(inputs, dim=dim)[0]
+        fn = _min_reduce_func
     elif agg == 'mean':
-        fn = th.mean
+        fn = _mean_reduce_func
     elif agg == 'stack':
         fn = None  # will not be called
     else:
         raise DGLError('Invalid cross type aggregator. Must be one of '
                        '"sum", "max", "min", "mean" or "stack". But got "%s"' % agg)
     if agg == 'stack':
-        def stack_agg(inputs, dsttype):  # pylint: disable=unused-argument
-            if len(inputs) == 0:
-                return None
-            return th.stack(inputs, dim=1)
-        return stack_agg
+        return _stack_agg_func
     else:
-        def aggfn(inputs, dsttype):  # pylint: disable=unused-argument
-            if len(inputs) == 0:
-                return None
-            stacked = th.stack(inputs, dim=0)
-            return fn(stacked, dim=0)
-        return aggfn
+        return partial(_agg_func, fn=fn)
+
+class HeteroLinear(nn.Module):
+    """Apply linear transformations on heterogeneous inputs.
+
+    Parameters
+    ----------
+    in_size : dict[key, int]
+        Input feature size for heterogeneous inputs. A key can be a string or a tuple of strings.
+    out_size : int
+        Output feature size.
+
+    Examples
+    --------
+
+    >>> import dgl
+    >>> import torch
+    >>> from dgl.nn import HeteroLinear
+
+    >>> layer = HeteroLinear({'user': 1, ('user', 'follows', 'user'): 2}, 3)
+    >>> in_feats = {'user': torch.randn(2, 1), ('user', 'follows', 'user'): torch.randn(3, 2)}
+    >>> out_feats = layer(in_feats)
+    >>> print(out_feats['user'].shape)
+    torch.Size([2, 3])
+    >>> print(out_feats[('user', 'follows', 'user')].shape)
+    torch.Size([3, 3])
+    """
+    def __init__(self, in_size, out_size):
+        super(HeteroLinear, self).__init__()
+
+        self.linears = nn.ModuleDict()
+        for typ, typ_in_size in in_size.items():
+            self.linears[str(typ)] = nn.Linear(typ_in_size, out_size)
+
+    def forward(self, feat):
+        """Forward function
+
+        Parameters
+        ----------
+        feat : dict[key, Tensor]
+            Heterogeneous input features. It maps keys to features.
+
+        Returns
+        -------
+        dict[key, Tensor]
+            Transformed features.
+        """
+        out_feat = dict()
+        for typ, typ_feat in feat.items():
+            out_feat[typ] = self.linears[str(typ)](typ_feat)
+
+        return out_feat
+
+class HeteroEmbedding(nn.Module):
+    """Create a heterogeneous embedding table.
+
+    It internally contains multiple ``torch.nn.Embedding`` with different dictionary sizes.
+
+    Parameters
+    ----------
+    num_embeddings : dict[key, int]
+        Size of the dictionaries. A key can be a string or a tuple of strings.
+    embedding_dim : int
+        Size of each embedding vector.
+
+    Examples
+    --------
+
+    >>> import dgl
+    >>> import torch
+    >>> from dgl.nn import HeteroEmbedding
+
+    >>> layer = HeteroEmbedding({'user': 2, ('user', 'follows', 'user'): 3}, 4)
+    >>> # Get the heterogeneous embedding table
+    >>> embeds = layer.weight
+    >>> print(embeds['user'].shape)
+    torch.Size([2, 4])
+    >>> print(embeds[('user', 'follows', 'user')].shape)
+    torch.Size([3, 4])
+
+    >>> # Get the embeddings for a subset
+    >>> input_ids = {'user': torch.LongTensor([0]),
+    ...              ('user', 'follows', 'user'): torch.LongTensor([0, 2])}
+    >>> embeds = layer(input_ids)
+    >>> print(embeds['user'].shape)
+    torch.Size([1, 4])
+    >>> print(embeds[('user', 'follows', 'user')].shape)
+    torch.Size([2, 4])
+    """
+    def __init__(self, num_embeddings, embedding_dim):
+        super(HeteroEmbedding, self).__init__()
+
+        self.embeds = nn.ModuleDict()
+        self.raw_keys = dict()
+        for typ, typ_num_rows in num_embeddings.items():
+            self.embeds[str(typ)] = nn.Embedding(typ_num_rows, embedding_dim)
+            self.raw_keys[str(typ)] = typ
+
+    @property
+    def weight(self):
+        """Get the heterogeneous embedding table
+
+        Returns
+        -------
+        dict[key, Tensor]
+            Heterogeneous embedding table
+        """
+        return {self.raw_keys[typ]: emb.weight for typ, emb in self.embeds.items()}
+
+    def forward(self, input_ids):
+        """Forward function
+
+        Parameters
+        ----------
+        input_ids : dict[key, Tensor]
+            The row IDs to retrieve embeddings. It maps a key to key-specific IDs.
+
+        Returns
+        -------
+        dict[key, Tensor]
+            The retrieved embeddings.
+        """
+        embeds = dict()
+        for typ, typ_ids in input_ids.items():
+            embeds[typ] = self.embeds[str(typ)](typ_ids)
+
+        return embeds

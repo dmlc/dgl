@@ -34,8 +34,12 @@ class QM7bDataset(DGLDataset):
         Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
-    verbose: bool
+    verbose : bool
         Whether to print out progress information. Default: True.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Attributes
     ----------
@@ -65,12 +69,13 @@ class QM7bDataset(DGLDataset):
            'datasets/qm7b.mat'
     _sha1_str = '4102c744bb9d6fd7b40ac67a300e49cd87e28392'
 
-    def __init__(self, raw_dir=None, force_reload=False, verbose=False):
+    def __init__(self, raw_dir=None, force_reload=False, verbose=False, transform=None):
         super(QM7bDataset, self).__init__(name='qm7b',
                                           url=self._url,
                                           raw_dir=raw_dir,
                                           force_reload=force_reload,
-                                          verbose=verbose)
+                                          verbose=verbose,
+                                          transform=transform)
 
     def process(self):
         mat_path = self.raw_path + '.mat'
@@ -129,7 +134,11 @@ class QM7bDataset(DGLDataset):
         -------
         (:class:`dgl.DGLGraph`, Tensor)
         """
-        return self.graphs[idx], self.label[idx]
+        if self._transform is None:
+            g = self.graphs[idx]
+        else:
+            g = self._transform(self.graphs[idx])
+        return g, self.label[idx]
 
     def __len__(self):
         r"""Number of graphs in the dataset.
