@@ -4,8 +4,8 @@ import torch.nn.functional as F
 from torch.nn import init
 import random
 import numpy as np
-import dgl.multiprocessing as mp
-from dgl.multiprocessing import Queue
+import torch.multiprocessing as mp
+from torch.multiprocessing import Queue
 
 def init_emb2neg_index(negative, batch_size):
     '''select embedding of negative nodes from a batch of node embeddings 
