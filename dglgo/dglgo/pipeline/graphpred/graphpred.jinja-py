@@ -5,6 +5,9 @@ from dgl.data import AsGraphPredDataset
 from dgl.dataloading import GraphDataLoader
 from sklearn.metrics import roc_auc_score
 from tqdm import tqdm
+{{ data_import_code }}
+
+{{ model_code }}
 
 def train(device, loader, model, criterion, optimizer):
     model.train()
