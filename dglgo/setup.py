@@ -18,7 +18,8 @@ setup(name='dglgo',
           "ruamel.yaml>=0.17.20",
           "PyYAML>=5.1",
           "ogb>=1.3.3",
-          "rdkit-pypi"
+          "rdkit-pypi",
+          "scikit-learn>=0.20.0"
       ],
       package_data={"": ["./*"]},
       include_package_data=True,

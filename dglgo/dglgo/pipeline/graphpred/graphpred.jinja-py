@@ -1,15 +1,112 @@
+import numpy as np
+import torch
+import torch.nn as nn
 from dgl.data import AsGraphPredDataset
+from dgl.dataloading import GraphDataLoader
+from sklearn.metrics import roc_auc_score
+from tqdm import tqdm
 
-def main():
+def train(device, loader, model, criterion, optimizer):
+    model.train()
+
+    for _, (g, labels) in enumerate(tqdm(loader, desc="Iteration")):
+        if g.batch_size == 1:
+            continue
+
+        g = g.to(device)
+        labels = labels.to(device)
+        node_feat = g.ndata['feat']
+        edge_feat = g.edata['feat']
+
+        pred = model(g, node_feat, edge_feat)
+        optimizer.zero_grad()
+        # ignore nan targets (unlabeled) when computing training loss
+        is_labeled = labels == labels
+        loss = criterion(pred.float()[is_labeled], labels.float()[is_labeled])
+        loss.backward()
+        optimizer.step()
+
+def calc_rocauc(y_true, y_pred):
+    rocauc_list = []
+    for i in range(y_true.shape[1]):
+        # AUC is only defined when there is at least one positive and negative datapoint.
+        if np.sum(y_true[:, i] == 1) > 0 and np.sum(y_true[:, i] == 0) > 0:
+            # ignore nan values
+            is_labeled = y_true[:, i] == y_true[:, i]
+            rocauc_list.append(roc_auc_score(y_true[is_labeled, i], y_pred[is_labeled, i]))
+
+    return sum(rocauc_list) / len(rocauc_list)
+
+def evaluate(device, loader, model):
+    model.eval()
+    y_true = []
+    y_pred = []
+
+    for _, (g, labels) in enumerate(tqdm(loader, desc="Iteration")):
+        g = g.to(device)
+        labels = labels.to(device)
+        node_feat = g.ndata['feat']
+        edge_feat = g.edata['feat']
+
+        with torch.no_grad():
+            pred = model(g, node_feat, edge_feat)
+        y_true.append(labels.view(pred.shape).detach().cpu())
+        y_pred.append(pred.detach().cpu())
+
+    y_true = torch.cat(y_true, dim=0).numpy()
+    y_pred = torch.cat(y_pred, dim=0).numpy()
+
+    return calc_rocauc(y_true, y_pred)
+
+def main(run):
     {{ user_cfg_str }}
     device = cfg['device']
     pipeline_cfg = cfg['general_pipeline']
+    save_path = pipeline_cfg['save_path']
+
     # load data
     data = AsGraphPredDataset({{data_initialize_code}})
+    train_loader = GraphDataLoader(data.train_idx, batch_size=pipeline_cfg['train_batch_size'],
+                                   shuffle=True, num_workers=pipeline_cfg['num_workers'])
+    val_loader = GraphDataLoader(data.val_idx, batch_size=pipeline_cfg['eval_batch_size'],
+                                 shuffle=False, num_workers=pipeline_cfg['num_workers'])
+    test_loader = GraphDataLoader(data.test_idx, batch_size=pipeline_cfg['eval_batch_size'],
+                                  shuffle=False, num_workers=pipeline_cfg['num_workers'])
+
     # create model
+    model_cfg = cfg["model"]
+    cfg["model"]["data_info"] = {
+        "out_size": data.num_tasks
+    }
+    model = {{ model_class_name }}(**cfg["model"])
+    model = model.to(device)
+
+    criterion = nn.{{ pipeline_cfg.loss }}()
+    optimizer = torch.optim.{{ pipeline_cfg.optimizer.name }}(model.parameters(), **pipeline_cfg["optimizer"])
+    best_val_metric = 0.
+
+    for epoch in range(pipeline_cfg['num_epochs']):
+        train(device, train_loader, model, criterion, optimizer)
+        val_metric = evaluate(device, val_loader, model)
+        if val_metric >= best_val_metric:
+            best_val_metric = val_metric
+            torch.save(model.state_dict(), save_path)
+        print('Run {:d} | Epoch {:d} | Val Metric {:.4f} | Best Val Metric {:.4f}'.format(
+              run, epoch, val_metric, best_val_metric))
+
+    model.load_state_dict(torch.load(save_path))
+    test_metric = evaluate(device, test_loader, model)
+    print('Test Metric: {:.4f}'.format(test_metric)
+
+    return test_metric
 
 if __name__ == '__main__':
-    all_acc = []
+    all_run_metrics = []
     num_runs = {{ user_cfg.general_pipeline.num_runs }}
     for run in range(num_runs):
-        print(f'Run experiment #{run}')
+        print('Run experiment #{run}')
+        test_metric = main(run)
+        all_run_metrics.append(test_metric)
+    avg_metric = np.round(np.mean(all_run_metrics), 6)
+    std_metric = np.round(np.std(all_run_metrics), 6)
+    print('Test Metric across {num_runs} runs: {avg_metric} ± {std_metric}')

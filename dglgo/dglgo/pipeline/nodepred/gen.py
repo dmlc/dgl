@@ -41,14 +41,14 @@ class NodepredPipeline(PipelineBase):
 
     @classmethod
     def setup_user_cfg_cls(cls):
-        from ...utils.enter_config import UserConfig        
+        from ...utils.enter_config import UserConfig
         class NodePredUserConfig(UserConfig):
             data: DataFactory.filter("nodepred").get_pydantic_config() = Field(..., discriminator="name")
-            model : NodeModelFactory.get_pydantic_model_config() = Field(..., discriminator="name")   
+            model : NodeModelFactory.get_pydantic_model_config() = Field(..., discriminator="name")
             general_pipeline: NodepredPipelineCfg = NodepredPipelineCfg()
 
         cls.user_cfg_cls = NodePredUserConfig
-    
+
     @property
     def user_cfg_cls(self):
         return self.__class__.user_cfg_cls
@@ -59,7 +59,7 @@ class NodepredPipeline(PipelineBase):
             cfg: Optional[str] = typer.Option(
                 None, help="output configuration path"),
             model: NodeModelFactory.get_model_enum() = typer.Option(..., help="Model name"),
-        ):  
+        ):
             self.__class__.setup_user_cfg_cls()
             generated_cfg = {
                 "pipeline_name": self.pipeline_name,
@@ -92,7 +92,7 @@ class NodepredPipeline(PipelineBase):
     def gen_script(cls, user_cfg_dict):
         # Check validation
         cls.setup_user_cfg_cls()
-        user_cfg = cls.user_cfg_cls(**user_cfg_dict)        
+        user_cfg = cls.user_cfg_cls(**user_cfg_dict)
         file_current_dir = Path(__file__).resolve().parent
         with open(file_current_dir / "nodepred.jinja-py", "r") as f:
             template = Template(f.read())
@@ -102,7 +102,7 @@ class NodepredPipeline(PipelineBase):
             user_cfg_dict["model"]["name"])
         render_cfg["model_code"] = model_code
         render_cfg["model_class_name"] = NodeModelFactory.get_model_class_name(
-            user_cfg_dict["model"]["name"])        
+            user_cfg_dict["model"]["name"])
         render_cfg.update(DataFactory.get_generated_code_dict(user_cfg_dict["data"]["name"], '**cfg["data"]'))
 
         generated_user_cfg = copy.deepcopy(user_cfg_dict)
