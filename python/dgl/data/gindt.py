@@ -18,12 +18,19 @@ from ..convert import graph as dgl_graph
 
 class GINDataset(DGLBuiltinDataset):
     """Dataset Class for `How Powerful Are Graph Neural Networks? <https://arxiv.org/abs/1810.00826>`_.
-    
+
     This is adapted from `<https://github.com/weihua916/powerful-gnns/blob/master/dataset.zip>`_.
-    
+
     The class provides an interface for nine datasets used in the paper along with the paper-specific
     settings. The datasets are ``'MUTAG'``, ``'COLLAB'``, ``'IMDBBINARY'``, ``'IMDBMULTI'``,
     ``'NCI1'``, ``'PROTEINS'``, ``'PTC'``, ``'REDDITBINARY'``, ``'REDDITMULTI5K'``.
+
+    If ``degree_as_nlabel`` is set to ``False``, then ``ndata['label']`` stores the provided node label,
+    otherwise ``ndata['label']`` stores the node in-degrees.
+
+    For graphs that have node attributes, ``ndata['attr']`` stores the node attributes.
+    For graphs that have no attribute, ``ndata['attr']`` stores the corresponding one-hot encoding
+    of ``ndata['label']``.
 
     Parameters
     ---------
@@ -37,6 +44,10 @@ class GINDataset(DGLBuiltinDataset):
         add self to self edge if true
     degree_as_nlabel: bool
         take node degree as label and feature if true
+    transform: callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Examples
     --------
@@ -49,7 +60,7 @@ class GINDataset(DGLBuiltinDataset):
     >>> g, label = data[128]
     >>> g
     Graph(num_nodes=13, num_edges=26,
-          ndata_schemes={'label': Scheme(shape=(), dtype=torch.int64), 'attr': Scheme(shape=(7,), dtype=torch.float64)}
+          ndata_schemes={'label': Scheme(shape=(), dtype=torch.int64), 'attr': Scheme(shape=(7,), dtype=torch.float32)}
           edata_schemes={})
     >>> label
     tensor(1)
@@ -61,12 +72,12 @@ class GINDataset(DGLBuiltinDataset):
     >>> batched_labels = torch.tensor(labels)
     >>> batched_graphs
     Graph(num_nodes=330, num_edges=748,
-          ndata_schemes={'label': Scheme(shape=(), dtype=torch.int64), 'attr': Scheme(shape=(7,), dtype=torch.float64)}
+          ndata_schemes={'label': Scheme(shape=(), dtype=torch.int64), 'attr': Scheme(shape=(7,), dtype=torch.float32)}
           edata_schemes={})
     """
 
     def __init__(self, name, self_loop, degree_as_nlabel=False,
-                 raw_dir=None, force_reload=False, verbose=False):
+                 raw_dir=None, force_reload=False, verbose=False, transform=None):
 
         self._name = name  # MUTAG
         gin_url = 'https://raw.githubusercontent.com/weihua916/powerful-gnns/master/dataset.zip'
@@ -99,7 +110,8 @@ class GINDataset(DGLBuiltinDataset):
         self.nlabels_flag = False
 
         super(GINDataset, self).__init__(name=name, url=gin_url, hash_key=(name, self_loop, degree_as_nlabel),
-                                         raw_dir=raw_dir, force_reload=force_reload, verbose=verbose)
+                                         raw_dir=raw_dir, force_reload=force_reload,
+                                         verbose=verbose, transform=transform)
 
     @property
     def raw_path(self):
@@ -129,7 +141,11 @@ class GINDataset(DGLBuiltinDataset):
         (:class:`dgl.Graph`, Tensor)
             The graph and its label.
         """
-        return self.graphs[idx], self.labels[idx]
+        if self._transform is None:
+            g = self.graphs[idx]
+        else:
+            g = self._transform(self.graphs[idx])
+        return g, self.labels[idx]
 
     def _file_path(self):
         return os.path.join(self.raw_dir, "GINDataset", 'dataset', self.name, "{}.txt".format(self.name))
@@ -175,7 +191,6 @@ class GINDataset(DGLBuiltinDataset):
                     if tmp == len(nrow):
                         # no node attributes
                         nrow = [int(w) for w in nrow]
-                        nattr = None
                     elif tmp > len(nrow):
                         nrow = [int(w) for w in nrow[:tmp]]
                         nattr = [float(w) for w in nrow[tmp:]]
@@ -208,10 +223,8 @@ class GINDataset(DGLBuiltinDataset):
 
                 if nattrs != []:
                     nattrs = np.stack(nattrs)
-                    g.ndata['attr'] = F.tensor(nattrs)
+                    g.ndata['attr'] = F.tensor(nattrs, F.float32)
                     self.nattrs_flag = True
-                else:
-                    nattrs = None
 
                 g.ndata['label'] = F.tensor(nlabels)
                 if len(self.nlabel_dict) > 1:
@@ -230,7 +243,6 @@ class GINDataset(DGLBuiltinDataset):
         if not self.nattrs_flag:
             if self.verbose:
                 print('there are no node features in this dataset!')
-            label2idx = {}
             # generate node attr by node degree
             if self.degree_as_nlabel:
                 if self.verbose:
@@ -265,7 +277,7 @@ class GINDataset(DGLBuiltinDataset):
                     g.number_of_nodes(), len(label2idx)))
                 attr[range(g.number_of_nodes()), [label2idx[nl]
                                                   for nl in F.asnumpy(g.ndata['label']).tolist()]] = 1
-                g.ndata['attr'] = F.tensor(attr)
+                g.ndata['attr'] = F.tensor(attr, F.float32)
 
         # after load, get the #classes and #dim
         self.gclasses = len(self.glabel_dict)

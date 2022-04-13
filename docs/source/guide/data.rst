@@ -23,6 +23,7 @@ shows how to implement each component of it.
 * :ref:`guide-data-pipeline-process`
 * :ref:`guide-data-pipeline-savenload`
 * :ref:`guide-data-pipeline-loadogb`
+* :ref:`guide-data-pipeline-loadcsv`
 
 .. toctree::
     :maxdepth: 1
@@ -34,3 +35,4 @@ shows how to implement each component of it.
     data-process
     data-savenload
     data-loadogb
+    data-loadcsv

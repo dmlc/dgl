@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <dmlc/omp.h>
 #include <dgl/array.h>
 #include "./common.h"
 
@@ -17,7 +18,7 @@ aten::CSRMatrix CSR1(DLContext ctx = CTX) {
   return aten::CSRMatrix(
       4, 5,
       aten::VecToIdArray(std::vector<IDX>({0, 2, 3, 5, 5}), sizeof(IDX)*8, ctx),
-      aten::VecToIdArray(std::vector<IDX>({1, 2, 0, 3, 2}), sizeof(IDX)*8, ctx),
+      aten::VecToIdArray(std::vector<IDX>({1, 2, 0, 2, 3}), sizeof(IDX)*8, ctx),
       aten::VecToIdArray(std::vector<IDX>({0, 2, 3, 4, 1}), sizeof(IDX)*8, ctx),
       false);
 }
@@ -112,6 +113,74 @@ aten::COOMatrix COO3(DLContext ctx) {
       aten::VecToIdArray(std::vector<IDX>({2, 2, 1, 0, 3, 2}), sizeof(IDX)*8, ctx));
 }
 
+struct SparseCOOCSR {
+  static constexpr uint64_t NUM_ROWS = 100;
+  static constexpr uint64_t NUM_COLS = 150;
+  static constexpr uint64_t NUM_NZ = 5;
+  template <typename IDX>
+  static aten::COOMatrix COOSparse(const DLContext &ctx = CTX) {
+    return aten::COOMatrix(NUM_ROWS, NUM_COLS,
+                           aten::VecToIdArray(std::vector<IDX>({0, 1, 2, 3, 4}),
+                                              sizeof(IDX) * 8, ctx),
+                           aten::VecToIdArray(std::vector<IDX>({1, 2, 3, 4, 5}),
+                                              sizeof(IDX) * 8, ctx));
+  }
+
+  template <typename IDX>
+  static aten::CSRMatrix CSRSparse(const DLContext &ctx = CTX) {
+    auto &&indptr = std::vector<IDX>(NUM_ROWS + 1, NUM_NZ);
+    for (size_t i = 0; i < NUM_NZ; ++i) {
+      indptr[i + 1] = static_cast<IDX>(i + 1);
+    }
+    indptr[0] = 0;
+    return aten::CSRMatrix(NUM_ROWS, NUM_COLS,
+                           aten::VecToIdArray(indptr, sizeof(IDX) * 8, ctx),
+                           aten::VecToIdArray(std::vector<IDX>({1, 2, 3, 4, 5}),
+                                              sizeof(IDX) * 8, ctx),
+                           aten::VecToIdArray(std::vector<IDX>({1, 1, 1, 1, 1}),
+                                              sizeof(IDX) * 8, ctx),
+                           false);
+  }
+};
+
+bool isSparseCOO(const int64_t &num_threads, const int64_t &num_nodes,
+                 const int64_t &num_edges) {
+  // refer to COOToCSR<>() in ~dgl/src/array/cpu/spmat_op_impl_coo for details.
+  return num_threads * num_nodes > 4 * num_edges;
+}
+
+template <typename IDX>
+aten::COOMatrix RowSorted_NullData_COO(DLContext ctx = CTX) {
+  // [[0, 1, 1, 0, 0],
+  //  [1, 0, 0, 0, 0],
+  //  [0, 0, 1, 1, 0],
+  //  [0, 0, 0, 0, 0]]
+  // row : [0, 0, 1, 2, 2]
+  // col : [1, 2, 0, 2, 3]
+  return aten::COOMatrix(4, 5,
+                         aten::VecToIdArray(std::vector<IDX>({0, 0, 1, 2, 2}),
+                                            sizeof(IDX) * 8, ctx),
+                         aten::VecToIdArray(std::vector<IDX>({1, 2, 0, 2, 3}),
+                                            sizeof(IDX) * 8, ctx),
+                         aten::NullArray(), true, false);
+}
+
+template <typename IDX>
+aten::CSRMatrix RowSorted_NullData_CSR(DLContext ctx = CTX) {
+  // [[0, 1, 1, 0, 0],
+  //  [1, 0, 0, 0, 0],
+  //  [0, 0, 1, 1, 0],
+  //  [0, 0, 0, 0, 0]]
+  // data: [0, 1, 2, 3, 4]
+  return aten::CSRMatrix(4, 5,
+                         aten::VecToIdArray(std::vector<IDX>({0, 2, 3, 5, 5}),
+                                            sizeof(IDX) * 8, ctx),
+                         aten::VecToIdArray(std::vector<IDX>({1, 2, 0, 2, 3}),
+                                            sizeof(IDX) * 8, ctx),
+                         aten::VecToIdArray(std::vector<IDX>({0, 1, 2, 3, 4}),
+                                            sizeof(IDX) * 8, ctx),
+                         false);
+}
 }  // namespace
 
 template <typename IDX>
@@ -119,9 +188,13 @@ void _TestCOOToCSR(DLContext ctx) {
   auto coo = COO1<IDX>(ctx);
   auto csr = CSR1<IDX>(ctx);
   auto tcsr = aten::COOToCSR(coo);
-  ASSERT_EQ(coo.num_rows, csr.num_rows);
-  ASSERT_EQ(coo.num_cols, csr.num_cols);
+  ASSERT_FALSE(coo.row_sorted);
+  ASSERT_FALSE(
+      isSparseCOO(omp_get_num_threads(), coo.num_rows, coo.row->shape[0]));
+  ASSERT_EQ(csr.num_rows, tcsr.num_rows);
+  ASSERT_EQ(csr.num_cols, tcsr.num_cols);
   ASSERT_TRUE(ArrayEQ<IDX>(csr.indptr, tcsr.indptr));
+  ASSERT_TRUE(ArrayEQ<IDX>(csr.indices, tcsr.indices));
 
   coo = COO2<IDX>(ctx);
   csr = CSR2<IDX>(ctx);
@@ -135,6 +208,7 @@ void _TestCOOToCSR(DLContext ctx) {
   auto rs_coo = aten::COOSort(coo, false);
   auto rs_csr = CSR1<IDX>(ctx);
   auto rs_tcsr = aten::COOToCSR(rs_coo);
+  ASSERT_TRUE(rs_coo.row_sorted);
   ASSERT_EQ(coo.num_rows, rs_tcsr.num_rows);
   ASSERT_EQ(coo.num_cols, rs_tcsr.num_cols);
   ASSERT_TRUE(ArrayEQ<IDX>(rs_csr.indptr, rs_tcsr.indptr));
@@ -150,6 +224,20 @@ void _TestCOOToCSR(DLContext ctx) {
   ASSERT_TRUE(ArrayEQ<IDX>(rs_csr.indptr, rs_tcsr.indptr));
   ASSERT_TRUE(ArrayEQ<IDX>(rs_tcsr.indices, rs_coo.col));
   ASSERT_TRUE(ArrayEQ<IDX>(rs_tcsr.data, rs_coo.data));
+
+  rs_coo = RowSorted_NullData_COO<IDX>(ctx);
+  ASSERT_TRUE(rs_coo.row_sorted);
+  rs_csr = RowSorted_NullData_CSR<IDX>(ctx);
+  rs_tcsr = aten::COOToCSR(rs_coo);
+  ASSERT_EQ(coo.num_rows, rs_tcsr.num_rows);
+  ASSERT_EQ(rs_csr.num_rows, rs_tcsr.num_rows);
+  ASSERT_EQ(coo.num_cols, rs_tcsr.num_cols);
+  ASSERT_EQ(rs_csr.num_cols, rs_tcsr.num_cols);
+  ASSERT_TRUE(ArrayEQ<IDX>(rs_csr.indptr, rs_tcsr.indptr));
+  ASSERT_TRUE(ArrayEQ<IDX>(rs_csr.indices, rs_tcsr.indices));
+  ASSERT_TRUE(ArrayEQ<IDX>(rs_csr.data, rs_tcsr.data));
+  ASSERT_TRUE(ArrayEQ<IDX>(rs_coo.col, rs_tcsr.indices));
+  ASSERT_FALSE(ArrayEQ<IDX>(rs_coo.data, rs_tcsr.data));
 
   // Convert from col sorted coo
   coo = COO1<IDX>(ctx);
@@ -173,6 +261,17 @@ void _TestCOOToCSR(DLContext ctx) {
   ASSERT_TRUE(ArrayEQ<IDX>(src_tcsr.indptr, src_csr.indptr));
   ASSERT_TRUE(ArrayEQ<IDX>(src_tcsr.indices, src_coo.col));
   ASSERT_TRUE(ArrayEQ<IDX>(src_tcsr.data, src_coo.data));
+
+  coo = SparseCOOCSR::COOSparse<IDX>(ctx);
+  csr = SparseCOOCSR::CSRSparse<IDX>(ctx);
+  tcsr = aten::COOToCSR(coo);
+  ASSERT_FALSE(coo.row_sorted);
+  ASSERT_TRUE(
+      isSparseCOO(omp_get_num_threads(), coo.num_rows, coo.row->shape[0]));
+  ASSERT_EQ(csr.num_rows, tcsr.num_rows);
+  ASSERT_EQ(csr.num_cols, tcsr.num_cols);
+  ASSERT_TRUE(ArrayEQ<IDX>(csr.indptr, tcsr.indptr));
+  ASSERT_TRUE(ArrayEQ<IDX>(csr.indices, tcsr.indices));
 }
 
 TEST(SpmatTest, COOToCSR) {

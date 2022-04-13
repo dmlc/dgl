@@ -126,6 +126,10 @@ class DeviceAPI {
    */
   virtual void SetStream(DGLContext ctx, DGLStreamHandle stream) {}
   /*!
+   * \brief Get the stream
+   */
+  virtual DGLStreamHandle GetStream() const { return nullptr; }
+  /*!
    * \brief Synchronize 2 streams of execution.
    *
    * An event is created in event_src stream that the second then
@@ -140,6 +144,29 @@ class DeviceAPI {
   DGL_DLL virtual void SyncStreamFromTo(DGLContext ctx,
                                         DGLStreamHandle event_src,
                                         DGLStreamHandle event_dst);
+
+  /*!
+   * \brief Pin host memory using cudaHostRegister().
+   *
+   * \param ptr The host memory pointer to be pinned.
+   * \param nbytes The size to be pinned.   
+   */  
+  DGL_DLL virtual void PinData(void* ptr, size_t nbytes);
+
+  /*!
+   * \brief Unpin host memory using cudaHostUnregister().
+   *
+   * \param ptr The host memory pointer to be unpinned.   
+   */ 
+  DGL_DLL virtual void UnpinData(void* ptr);
+
+  /*!
+   * \brief Check whether the memory is in pinned memory.
+   */
+  DGL_DLL virtual bool IsPinned(const void* ptr) {
+    return false;
+  }
+
   /*!
    * \brief Allocate temporal workspace for backend execution.
    *
@@ -168,12 +195,21 @@ class DeviceAPI {
   DGL_DLL virtual void FreeWorkspace(DGLContext ctx, void* ptr);
 
   /*!
-   * \brief Get device API base don context.
+   * \brief Get device API based on context.
    * \param ctx The context
    * \param allow_missing Whether allow missing
    * \return The corresponding device API.
    */
   DGL_DLL static DeviceAPI* Get(DGLContext ctx, bool allow_missing = false);
+
+
+  /*!
+   * \brief Get device API based on context.
+   * \param dev_type The device type
+   * \param allow_missing Whether allow missing
+   * \return The corresponding device API.
+   */
+  DGL_DLL static DeviceAPI* Get(DLDeviceType dev_type, bool allow_missing = false);
 };
 
 /*! \brief The device type bigger than this is RPC device */

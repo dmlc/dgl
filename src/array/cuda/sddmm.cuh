@@ -10,7 +10,9 @@
 #include "macro.cuh"
 #include "atomic.cuh"
 #include "functor.cuh"
+#include "fp16.cuh"
 #include "./utils.h"
+#include "./functor.cuh"
 #include "../selector.h"
 #include "../../runtime/cuda/cuda_common.h"
 
@@ -20,6 +22,66 @@ using namespace cuda;
 
 namespace aten {
 namespace cuda {
+
+#define SWITCH_OP(op, Op, ...)                                      \
+  do {                                                              \
+    if ((op) == "add") {                                            \
+      typedef cuda::binary::Add<DType> Op;                          \
+      { __VA_ARGS__ }                                               \
+    } else if ((op) == "sub") {                                     \
+      typedef cuda::binary::Sub<DType> Op;                          \
+      { __VA_ARGS__ }                                               \
+    } else if ((op) == "mul") {                                     \
+      typedef cuda::binary::Mul<DType> Op;                          \
+      { __VA_ARGS__ }                                               \
+    } else if ((op) == "div") {                                     \
+      typedef cuda::binary::Div<DType> Op;                          \
+      { __VA_ARGS__ }                                               \
+    } else if ((op) == "copy_lhs") {                                \
+      typedef cuda::binary::CopyLhs<DType> Op;                      \
+      { __VA_ARGS__ }                                               \
+    } else if ((op) == "copy_rhs") {                                \
+      typedef cuda::binary::CopyRhs<DType> Op;                      \
+      { __VA_ARGS__ }                                               \
+    } else if ((op) == "dot") {                                     \
+      typedef cuda::binary::Dot<DType> Op;                          \
+      { __VA_ARGS__ }                                               \
+    } else {                                                        \
+      LOG(FATAL) << "Unsupported SpMM/SDDMM binary operator: " << op;     \
+    }                                                               \
+  } while (0)
+
+#define SWITCH_RHS(rhs_target, RhsTarget, ...)                        \
+  do {                                                                \
+    if ((rhs_target) == 0) {                                          \
+      constexpr int RhsTarget = 0;                                    \
+      { __VA_ARGS__ }                                                 \
+    } else if ((rhs_target) == 1) {                                   \
+      constexpr int RhsTarget = 1;                                    \
+      { __VA_ARGS__ }                                                 \
+    } else if ((rhs_target) == 2) {                                   \
+      constexpr int RhsTarget = 2;                                    \
+      { __VA_ARGS__ }                                                 \
+    } else {                                                          \
+      LOG(INFO) << "Invalid rhs target: " << (rhs_target);            \
+    }                                                                 \
+  } while (0)
+
+#define SWITCH_TARGET(lhs_target, rhs_target, LhsTarget, RhsTarget, ...)\
+  do {                                                                  \
+    if ((lhs_target) == 0) {                                            \
+      constexpr int LhsTarget = 0;                                      \
+      SWITCH_RHS(rhs_target, RhsTarget, __VA_ARGS__);                   \
+    } else if ((lhs_target) == 1) {                                     \
+      constexpr int LhsTarget = 1;                                      \
+      SWITCH_RHS(rhs_target, RhsTarget, __VA_ARGS__);                   \
+    } else if ((lhs_target) == 2) {                                     \
+      constexpr int LhsTarget = 2;                                      \
+      SWITCH_RHS(rhs_target, RhsTarget, __VA_ARGS__);                   \
+    } else {                                                            \
+      LOG(INFO) << "Invalid lhs target: " << (lhs_target);              \
+    }                                                                   \
+  } while (0)
 
 constexpr unsigned int full_mask = 0xffffffff;
 
@@ -105,7 +167,7 @@ __global__ void SDDMMCooTreeReduceKernel(
     for (int i = blockIdx.y; i < out_len; i += gridDim.y) {  // over output feature dimension
       const Idx lhs_add = UseBcast ? __ldg(lhs_off + i) : i;
       const Idx rhs_add = UseBcast ? __ldg(rhs_off + i) : i;
-      DType val = 0.;
+      DType val = reduce::Sum<Idx, DType>::zero();;
       for (int j = tx; j < reduce_size; j += 64) {
         val += lhsoff[lhs_add * reduce_size + j] * rhsoff[rhs_add * reduce_size + j];
         if (j + 32 < reduce_size)
@@ -308,6 +370,7 @@ void SDDMMCsr(
         lhs_len, rhs_len, len);
   });
 }
+
 
 }  // namespace cuda
 }  // namespace aten

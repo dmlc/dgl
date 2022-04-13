@@ -32,10 +32,14 @@ fi
 
 conda activate ${DGLBACKEND}-ci
 
+python3 -m pip install pytest pyyaml pandas pydantic rdflib ogb || fail "pip install"
 python3 -m pytest -v --junitxml=pytest_compute.xml tests/compute || fail "compute"
 python3 -m pytest -v --junitxml=pytest_backend.xml tests/$DGLBACKEND || fail "backend-specific"
 
+
+export PYTHONUNBUFFERED=1
 export OMP_NUM_THREADS=1
+export DMLC_LOG_DEBUG=1
 if [ $2 != "gpu" ]; then
-    python3 -m pytest -v --junitxml=pytest_distributed.xml tests/distributed || fail "distributed"
+    python3 -m pytest -v --capture=tee-sys --junitxml=pytest_distributed.xml tests/distributed/*.py || fail "distributed"
 fi

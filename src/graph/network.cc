@@ -9,6 +9,7 @@
 
 #include <dgl/runtime/container.h>
 #include <dgl/runtime/ndarray.h>
+#include <dgl/runtime/parallel_for.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/immutable_graph.h>
 #include <dgl/nodeflow.h>
@@ -205,7 +206,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_DGLSenderCreate")
     int64_t msg_queue_size = args[1];
     network::Sender* sender = nullptr;
     if (type == "socket") {
-      sender = new network::SocketSender(msg_queue_size);
+      sender = new network::SocketSender(msg_queue_size, 0);
     } else {
       LOG(FATAL) << "Unknown communicator type: " << type;
     }
@@ -219,7 +220,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_DGLReceiverCreate")
     int64_t msg_queue_size = args[1];
     network::Receiver* receiver = nullptr;
     if (type == "socket") {
-      receiver = new network::SocketReceiver(msg_queue_size);
+      receiver = new network::SocketReceiver(msg_queue_size, 0);
     } else {
       LOG(FATAL) << "Unknown communicator type: " << type;
     }
@@ -829,15 +830,16 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
     char *return_data = new char[ID_size*row_size];
     const int64_t local_ids_size = local_ids.size();
     // Copy local data
-#pragma omp parallel for
-    for (int64_t i = 0; i < local_ids_size; ++i) {
-      CHECK_GE(ID_size*row_size, local_ids_orginal[i] * row_size + row_size);
-      CHECK_GE(data_size, local_ids[i] * row_size + row_size);
-      CHECK_GE(local_ids[i], 0);
-      memcpy(return_data + local_ids_orginal[i] * row_size,
-             local_data_char + local_ids[i] * row_size,
-             row_size);
-    }
+    runtime::parallel_for(0, local_ids_size, [&](size_t b, size_t e) {
+      for (auto i = b; i < e; ++i) {
+        CHECK_GE(ID_size*row_size, local_ids_orginal[i] * row_size + row_size);
+        CHECK_GE(data_size, local_ids[i] * row_size + row_size);
+        CHECK_GE(local_ids[i], 0);
+        memcpy(return_data + local_ids_orginal[i] * row_size,
+               local_data_char + local_ids[i] * row_size,
+               row_size);
+      }
+    });
     // Recv remote message
     for (int i = 0; i < msg_count; ++i) {
       KVStoreMsg *kv_msg = recv_kv_message(receiver);

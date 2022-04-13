@@ -25,19 +25,24 @@ class KnowledgeGraphDataset(DGLBuiltinDataset):
 
     Parameters
     -----------
-    name: str
+    name : str
         Name can be 'FB15k-237', 'FB15k' or 'wn18'.
-    reverse: bool
+    reverse : bool
         Whether add reverse edges. Default: True.
     raw_dir : str
         Raw file directory to download/contains the input data directory.
         Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
-    verbose: bool
-      Whether to print out progress information. Default: True.
+    verbose : bool
+        Whether to print out progress information. Default: True.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
     """
-    def __init__(self, name, reverse=True, raw_dir=None, force_reload=False, verbose=True):
+    def __init__(self, name, reverse=True, raw_dir=None, force_reload=False,
+                 verbose=True, transform=None):
         self._name = name
         self.reverse = reverse
         url = _get_dgl_url('dataset/') + '{}.tgz'.format(name)
@@ -45,7 +50,8 @@ class KnowledgeGraphDataset(DGLBuiltinDataset):
                                                     url=url,
                                                     raw_dir=raw_dir,
                                                     force_reload=force_reload,
-                                                    verbose=verbose)
+                                                    verbose=verbose,
+                                                    transform=transform)
 
     def download(self):
         r""" Automatically download data and extract it.
@@ -112,7 +118,10 @@ class KnowledgeGraphDataset(DGLBuiltinDataset):
 
     def __getitem__(self, idx):
         assert idx == 0, "This dataset has only one graph"
-        return self._g
+        if self._transform is None:
+            return self._g
+        else:
+            return self._transform(self._g)
 
     def __len__(self):
         return 1
@@ -342,8 +351,8 @@ class FB15k237Dataset(KnowledgeGraphDataset):
             >>> dataset = FB15k237Dataset()
             >>> graph = dataset[0]
             >>> train_mask = graph.edata['train_mask']
-            >>> train_idx = th.nonzero(train_mask).squeeze()
-            >>> src, dst = graph.edges(train_idx)
+            >>> train_idx = th.nonzero(train_mask, as_tuple=False).squeeze()
+            >>> src, dst = graph.find_edges(train_idx)
             >>> rel = graph.edata['etype'][train_idx]
 
         - ``valid`` is deprecated, it is replaced by:
@@ -351,8 +360,8 @@ class FB15k237Dataset(KnowledgeGraphDataset):
             >>> dataset = FB15k237Dataset()
             >>> graph = dataset[0]
             >>> val_mask = graph.edata['val_mask']
-            >>> val_idx = th.nonzero(val_mask).squeeze()
-            >>> src, dst = graph.edges(val_idx)
+            >>> val_idx = th.nonzero(val_mask, as_tuple=False).squeeze()
+            >>> src, dst = graph.find_edges(val_idx)
             >>> rel = graph.edata['etype'][val_idx]
 
         - ``test`` is deprecated, it is replaced by:
@@ -360,8 +369,8 @@ class FB15k237Dataset(KnowledgeGraphDataset):
             >>> dataset = FB15k237Dataset()
             >>> graph = dataset[0]
             >>> test_mask = graph.edata['test_mask']
-            >>> test_idx = th.nonzero(test_mask).squeeze()
-            >>> src, dst = graph.edges(test_idx)
+            >>> test_idx = th.nonzero(test_mask, as_tuple=False).squeeze()
+            >>> src, dst = graph.find_edges(test_idx)
             >>> rel = graph.edata['etype'][test_idx]
 
     FB15k-237 is a subset of FB15k where inverse
@@ -389,8 +398,12 @@ class FB15k237Dataset(KnowledgeGraphDataset):
         Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
-    verbose: bool
+    verbose : bool
         Whether to print out progress information. Default: True.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Attributes
     ----------
@@ -422,20 +435,22 @@ class FB15k237Dataset(KnowledgeGraphDataset):
     >>> # build train_g
     >>> train_edges = train_set
     >>> train_g = g.edge_subgraph(train_edges,
-                                  preserve_nodes=True)
+                                  relabel_nodes=False)
     >>> train_g.edata['e_type'] = e_type[train_edges];
     >>>
     >>> # build val_g
     >>> val_edges = th.cat([train_edges, val_edges])
     >>> val_g = g.edge_subgraph(val_edges,
-                                preserve_nodes=True)
+                                relabel_nodes=False)
     >>> val_g.edata['e_type'] = e_type[val_edges];
     >>>
     >>> # Train, Validation and Test
     """
-    def __init__(self, reverse=True, raw_dir=None, force_reload=False, verbose=True):
+    def __init__(self, reverse=True, raw_dir=None, force_reload=False,
+                 verbose=True, transform=None):
         name = 'FB15k-237'
-        super(FB15k237Dataset, self).__init__(name, reverse, raw_dir, force_reload, verbose)
+        super(FB15k237Dataset, self).__init__(name, reverse, raw_dir,
+                                              force_reload, verbose, transform)
 
     def __getitem__(self, idx):
         r"""Gets the graph object
@@ -464,7 +479,7 @@ class FB15k237Dataset(KnowledgeGraphDataset):
 
     def __len__(self):
         r"""The number of graphs in the dataset."""
-        return super(FB15k237Dataset, self).__len__(idx)
+        return super(FB15k237Dataset, self).__len__()
 
 class FB15kDataset(KnowledgeGraphDataset):
     r"""FB15k link prediction dataset.
@@ -476,7 +491,7 @@ class FB15kDataset(KnowledgeGraphDataset):
             >>> dataset = FB15kDataset()
             >>> graph = dataset[0]
             >>> train_mask = graph.edata['train_mask']
-            >>> train_idx = th.nonzero(train_mask).squeeze()
+            >>> train_idx = th.nonzero(train_mask, as_tuple=False).squeeze()
             >>> src, dst = graph.edges(train_idx)
             >>> rel = graph.edata['etype'][train_idx]
 
@@ -485,7 +500,7 @@ class FB15kDataset(KnowledgeGraphDataset):
             >>> dataset = FB15kDataset()
             >>> graph = dataset[0]
             >>> val_mask = graph.edata['val_mask']
-            >>> val_idx = th.nonzero(val_mask).squeeze()
+            >>> val_idx = th.nonzero(val_mask, as_tuple=False).squeeze()
             >>> src, dst = graph.edges(val_idx)
             >>> rel = graph.edata['etype'][val_idx]
 
@@ -494,7 +509,7 @@ class FB15kDataset(KnowledgeGraphDataset):
             >>> dataset = FB15kDataset()
             >>> graph = dataset[0]
             >>> test_mask = graph.edata['test_mask']
-            >>> test_idx = th.nonzero(test_mask).squeeze()
+            >>> test_idx = th.nonzero(test_mask, as_tuple=False).squeeze()
             >>> src, dst = graph.edges(test_idx)
             >>> rel = graph.edata['etype'][test_idx]
 
@@ -526,8 +541,12 @@ class FB15kDataset(KnowledgeGraphDataset):
         Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
-    verbose: bool
+    verbose : bool
         Whether to print out progress information. Default: True.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Attributes
     ----------
@@ -558,21 +577,23 @@ class FB15kDataset(KnowledgeGraphDataset):
     >>> # build train_g
     >>> train_edges = train_set
     >>> train_g = g.edge_subgraph(train_edges,
-                                  preserve_nodes=True)
+                                  relabel_nodes=False)
     >>> train_g.edata['e_type'] = e_type[train_edges];
     >>>
     >>> # build val_g
     >>> val_edges = th.cat([train_edges, val_edges])
     >>> val_g = g.edge_subgraph(val_edges,
-                                preserve_nodes=True)
+                                relabel_nodes=False)
     >>> val_g.edata['e_type'] = e_type[val_edges];
     >>>
     >>> # Train, Validation and Test
     >>>
     """
-    def __init__(self, reverse=True, raw_dir=None, force_reload=False, verbose=True):
+    def __init__(self, reverse=True, raw_dir=None, force_reload=False,
+                 verbose=True, transform=None):
         name = 'FB15k'
-        super(FB15kDataset, self).__init__(name, reverse, raw_dir, force_reload, verbose)
+        super(FB15kDataset, self).__init__(name, reverse, raw_dir,
+                                           force_reload, verbose, transform)
 
     def __getitem__(self, idx):
         r"""Gets the graph object
@@ -601,7 +622,7 @@ class FB15kDataset(KnowledgeGraphDataset):
 
     def __len__(self):
         r"""The number of graphs in the dataset."""
-        return super(FB15kDataset, self).__len__(idx)
+        return super(FB15kDataset, self).__len__()
 
 class WN18Dataset(KnowledgeGraphDataset):
     r""" WN18 link prediction dataset.
@@ -613,7 +634,7 @@ class WN18Dataset(KnowledgeGraphDataset):
             >>> dataset = WN18Dataset()
             >>> graph = dataset[0]
             >>> train_mask = graph.edata['train_mask']
-            >>> train_idx = th.nonzero(train_mask).squeeze()
+            >>> train_idx = th.nonzero(train_mask, as_tuple=False).squeeze()
             >>> src, dst = graph.edges(train_idx)
             >>> rel = graph.edata['etype'][train_idx]
 
@@ -622,7 +643,7 @@ class WN18Dataset(KnowledgeGraphDataset):
             >>> dataset = WN18Dataset()
             >>> graph = dataset[0]
             >>> val_mask = graph.edata['val_mask']
-            >>> val_idx = th.nonzero(val_mask).squeeze()
+            >>> val_idx = th.nonzero(val_mask, as_tuple=False).squeeze()
             >>> src, dst = graph.edges(val_idx)
             >>> rel = graph.edata['etype'][val_idx]
 
@@ -631,7 +652,7 @@ class WN18Dataset(KnowledgeGraphDataset):
             >>> dataset = WN18Dataset()
             >>> graph = dataset[0]
             >>> test_mask = graph.edata['test_mask']
-            >>> test_idx = th.nonzero(test_mask).squeeze()
+            >>> test_idx = th.nonzero(test_mask, as_tuple=False).squeeze()
             >>> src, dst = graph.edges(test_idx)
             >>> rel = graph.edata['etype'][test_idx]
 
@@ -662,8 +683,12 @@ class WN18Dataset(KnowledgeGraphDataset):
         Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
-    verbose: bool
+    verbose : bool
         Whether to print out progress information. Default: True.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Attributes
     ----------
@@ -694,21 +719,23 @@ class WN18Dataset(KnowledgeGraphDataset):
     >>> # build train_g
     >>> train_edges = train_set
     >>> train_g = g.edge_subgraph(train_edges,
-                                  preserve_nodes=True)
+                                  relabel_nodes=False)
     >>> train_g.edata['e_type'] = e_type[train_edges];
     >>>
     >>> # build val_g
     >>> val_edges = th.cat([train_edges, val_edges])
     >>> val_g = g.edge_subgraph(val_edges,
-                                preserve_nodes=True)
+                                relabel_nodes=False)
     >>> val_g.edata['e_type'] = e_type[val_edges];
     >>>
     >>> # Train, Validation and Test
     >>>
     """
-    def __init__(self, reverse=True, raw_dir=None, force_reload=False, verbose=True):
+    def __init__(self, reverse=True, raw_dir=None, force_reload=False,
+                 verbose=True, transform=None):
         name = 'wn18'
-        super(WN18Dataset, self).__init__(name, reverse, raw_dir, force_reload, verbose)
+        super(WN18Dataset, self).__init__(name, reverse, raw_dir,
+                                          force_reload, verbose, transform)
 
     def __getitem__(self, idx):
         r"""Gets the graph object
@@ -737,7 +764,7 @@ class WN18Dataset(KnowledgeGraphDataset):
 
     def __len__(self):
         r"""The number of graphs in the dataset."""
-        return super(WN18Dataset, self).__len__(idx)
+        return super(WN18Dataset, self).__len__()
 
 def load_data(dataset):
     r"""Load knowledge graph dataset for RGCN link prediction tasks

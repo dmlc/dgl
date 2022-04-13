@@ -84,7 +84,7 @@ def bmm_maybe_select(A, B, index):
         return B[index, A, :]
     else:
         BB = nd.take(B, index, axis=0)
-        return nd.batch_dot(A.expand_dims(1), BB).squeeze()
+        return nd.batch_dot(A.expand_dims(1), BB).squeeze(1)
 
 def normalize(x, p=2, axis=1, eps=1e-12):
     r"""Performs :math:`L_p` normalization of inputs over specified dimension.
@@ -108,7 +108,7 @@ def normalize(x, p=2, axis=1, eps=1e-12):
     return x / denom
 
 class Sequential(gluon.nn.Sequential):
-    r"""A squential container for stacking graph neural network blocks.
+    r"""A squential container for stacking graph neural network blocks
 
     We support two modes: sequentially apply GNN blocks on the same graph or
     a list of given graphs. In the second case, the number of graphs equals the

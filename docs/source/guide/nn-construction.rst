@@ -35,7 +35,7 @@ The construction function performs the following steps:
 
 In construction function, one first needs to set the data dimensions. For
 general PyTorch module, the dimensions are usually input dimension,
-output dimension and hidden dimensions. For graph neural, the input
+output dimension and hidden dimensions. For graph neural networks, the input
 dimension can be split into source node dimension and destination node
 dimension.
 
@@ -52,14 +52,14 @@ SAGEConv paper, such normalization can be l2 normalization:
 
 .. code::
 
-            # aggregator type: mean, max_pool, lstm, gcn
-            if aggregator_type not in ['mean', 'max_pool', 'lstm', 'gcn']:
+            # aggregator type: mean, pool, lstm, gcn
+            if aggregator_type not in ['mean', 'pool', 'lstm', 'gcn']:
                 raise KeyError('Aggregator type {} not supported.'.format(aggregator_type))
-            if aggregator_type == 'max_pool':
+            if aggregator_type == 'pool':
                 self.fc_pool = nn.Linear(self._in_src_feats, self._in_src_feats)
             if aggregator_type == 'lstm':
                 self.lstm = nn.LSTM(self._in_src_feats, self._in_src_feats, batch_first=True)
-            if aggregator_type in ['mean', 'max_pool', 'lstm']:
+            if aggregator_type in ['mean', 'pool', 'lstm']:
                 self.fc_self = nn.Linear(self._in_dst_feats, out_feats, bias=bias)
             self.fc_neigh = nn.Linear(self._in_src_feats, out_feats, bias=bias)
             self.reset_parameters()
@@ -75,7 +75,7 @@ function, weight initialization is applied by calling
         def reset_parameters(self):
             """Reinitialize learnable parameters."""
             gain = nn.init.calculate_gain('relu')
-            if self._aggre_type == 'max_pool':
+            if self._aggre_type == 'pool':
                 nn.init.xavier_uniform_(self.fc_pool.weight, gain=gain)
             if self._aggre_type == 'lstm':
                 self.lstm.reset_parameters()

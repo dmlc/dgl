@@ -1,0 +1,4 @@
+tf:
+  ckpt_path: 'pretrained/dimenet_pp/mu'
+torch:
+  dump_path: 'pretrained/converted'

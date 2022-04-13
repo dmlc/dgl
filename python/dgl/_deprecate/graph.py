@@ -3563,7 +3563,7 @@ class DGLGraph(DGLBaseGraph):
         tensor([0, 1, 4])
         >>> SG.parent_eid
         tensor([0, 4])
-        >>> SG = G.edge_subgraph([0, 4], preserve_nodes=True)
+        >>> SG = G.edge_subgraph([0, 4], relabel_nodes=False)
         >>> SG.nodes()
         tensor([0, 1, 2, 3, 4])
         >>> SG.edges()
@@ -3692,14 +3692,14 @@ class DGLGraph(DGLBaseGraph):
     def line_graph(self, backtracking=True, shared=False):
         """Return the line graph of this graph.
 
-        See :func:`~dgl.transform.line_graph`.
+        See :func:`~dgl.transforms.line_graph`.
         """
         return dgl.line_graph(self, backtracking, shared)
 
     def reverse(self, share_ndata=False, share_edata=False):
         """Return the reverse of this graph.
 
-        See :func:`~dgl.transform.reverse`.
+        See :func:`~dgl.transforms.reverse`.
         """
         return dgl.reverse(self, share_ndata, share_edata)
 

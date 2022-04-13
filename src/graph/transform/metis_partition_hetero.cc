@@ -19,7 +19,11 @@ namespace transform {
 
 #if !defined(_WIN32)
 
-IdArray MetisPartition(UnitGraphPtr g, int k, NDArray vwgt_arr) {
+IdArray MetisPartition(UnitGraphPtr g, int k, NDArray vwgt_arr,
+                       const std::string &mode, bool obj_cut) {
+  // Mode can only be "k-way" or "recursive"
+  CHECK(mode == "k-way" || mode == "recursive")
+    << "mode can only be \"k-way\" or \"recursive\"";
   // The index type of Metis needs to be compatible with DGL index type.
   CHECK_EQ(sizeof(idx_t), sizeof(int64_t))
     << "Metis only supports int64 graph for now";
@@ -47,6 +51,8 @@ IdArray MetisPartition(UnitGraphPtr g, int k, NDArray vwgt_arr) {
     vwgt = static_cast<idx_t *>(vwgt_arr->data);
   }
 
+  auto partition_func = (mode == "k-way") ? METIS_PartGraphKway : METIS_PartGraphRecursive;
+
   idx_t options[METIS_NOPTIONS];
   METIS_SetDefaultOptions(options);
   options[METIS_OPTION_ONDISK] = 1;
@@ -54,7 +60,13 @@ IdArray MetisPartition(UnitGraphPtr g, int k, NDArray vwgt_arr) {
   options[METIS_OPTION_NIPARTS] = 1;
   options[METIS_OPTION_DROPEDGES] = 1;
 
-  int ret = METIS_PartGraphKway(
+  if (obj_cut) {
+    options[METIS_OPTION_OBJTYPE] = METIS_OBJTYPE_CUT;
+  } else {
+    options[METIS_OPTION_OBJTYPE] = METIS_OBJTYPE_VOL;
+  }
+
+  int ret = partition_func(
     &nvtxs,  // The number of vertices
     &ncon,   // The number of balancing constraints.
     xadj,    // indptr
@@ -70,9 +82,17 @@ IdArray MetisPartition(UnitGraphPtr g, int k, NDArray vwgt_arr) {
     &objval,  // the edge-cut or the total communication volume of
     // the partitioning solution
     part);
-  LOG(INFO) << "Partition a graph with " << g->NumVertices(0) << " nodes and "
-            << g->NumEdges(0) << " edges into " << k << " parts and get "
-            << objval << " edge cuts";
+
+  if (obj_cut) {
+    LOG(INFO) << "Partition a graph with " << g->NumVertices(0) << " nodes and "
+              << g->NumEdges(0) << " edges into " << k << " parts and "
+              << "get " << objval << " edge cuts";
+  } else {
+    LOG(INFO) << "Partition a graph with " << g->NumVertices(0) << " nodes and "
+              << g->NumEdges(0) << " edges into " << k << " parts and "
+              << "the communication volume is " << objval;
+  }
+
   switch (ret) {
     case METIS_OK:
       return part_arr;
@@ -99,8 +119,10 @@ DGL_REGISTER_GLOBAL("partition._CAPI_DGLMetisPartition_Hetero")
     auto ugptr = hgptr->relation_graphs()[0];
     int k = args[1];
     NDArray vwgt = args[2];
+    std::string mode = args[3];
+    bool obj_cut = args[4];
 #if !defined(_WIN32)
-    *rv = MetisPartition(ugptr, k, vwgt);
+    *rv = MetisPartition(ugptr, k, vwgt, mode, obj_cut);
 #else
     LOG(FATAL) << "Metis partition does not support Windows.";
 #endif  // !defined(_WIN32)

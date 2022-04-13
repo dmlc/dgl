@@ -1,10 +1,8 @@
 import argparse
-import os
 import time
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import dgl
 import dgl.function as fn
 from dataset import load_dataset
@@ -139,7 +137,6 @@ def train(model, feats, labels, loss_fcn, optimizer, train_loader):
 def test(model, feats, labels, test_loader, evaluator,
          train_nid, val_nid, test_nid):
     model.eval()
-    num_nodes = labels.shape[0]
     device = labels.device
     preds = []
     for batch in test_loader:

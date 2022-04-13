@@ -47,6 +47,8 @@ struct COOMatrix {
   bool row_sorted = false;
   /*! \brief whether the column indices per row are sorted */
   bool col_sorted = false;
+  /*! \brief whether the matrix is in pinned memory */
+  bool is_pinned = false;
   /*! \brief default constructor */
   COOMatrix() = default;
   /*! \brief constructor */
@@ -120,13 +122,51 @@ struct COOMatrix {
   }
 
   /*! \brief Return a copy of this matrix on the give device context. */
-  inline COOMatrix CopyTo(const DLContext& ctx) const {
+  inline COOMatrix CopyTo(const DLContext &ctx,
+                          const DGLStreamHandle &stream = nullptr) const {
     if (ctx == row->ctx)
       return *this;
-    return COOMatrix(num_rows, num_cols,
-                     row.CopyTo(ctx), col.CopyTo(ctx),
-                     aten::IsNullArray(data)? data : data.CopyTo(ctx),
+    return COOMatrix(num_rows, num_cols, row.CopyTo(ctx, stream),
+                     col.CopyTo(ctx, stream),
+                     aten::IsNullArray(data) ? data : data.CopyTo(ctx, stream),
                      row_sorted, col_sorted);
+  }
+
+  /*!
+  * \brief Pin the row, col and data (if not Null) of the matrix.
+  * \note This is an in-place method. Behavior depends on the current context,
+  *       kDLCPU: will be pinned;
+  *       IsPinned: directly return;
+  *       kDLGPU: invalid, will throw an error.
+  *       The context check is deferred to pinning the NDArray.
+  */
+  inline void PinMemory_() {
+    if (is_pinned)
+      return;
+    row.PinMemory_();
+    col.PinMemory_();
+    if (!aten::IsNullArray(data)) {
+      data.PinMemory_();
+    }
+    is_pinned = true;
+  }
+
+  /*!
+  * \brief Unpin the row, col and data (if not Null) of the matrix.
+  * \note This is an in-place method. Behavior depends on the current context,
+  *       IsPinned: will be unpinned;
+  *       others: directly return.
+  *       The context check is deferred to unpinning the NDArray.
+  */
+  inline void UnpinMemory_() {
+    if (!is_pinned)
+      return;
+    row.UnpinMemory_();
+    col.UnpinMemory_();
+    if (!aten::IsNullArray(data)) {
+      data.UnpinMemory_();
+    }
+    is_pinned = false;
   }
 };
 
@@ -220,7 +260,7 @@ COOMatrix COOTranspose(COOMatrix coo);
  * - The function first check whether the input COO matrix is sorted
  *   using a linear scan.
  * - If the COO matrix is row sorted, the conversion can be done very
- *   efficiently in a sequential scan. The result indices and data arrays 
+ *   efficiently in a sequential scan. The result indices and data arrays
  *   are directly equal to the column and data arrays from the input.
  * - If the COO matrix is further column sorted, the result CSR is
  *   also column sorted.
@@ -360,6 +400,58 @@ COOMatrix COORowWiseSampling(
     bool replace = true);
 
 /*!
+ * \brief Randomly select a fixed number of non-zero entries for each edge type
+ *        along each given row independently.
+ *
+ * The function performs random choices along each row independently.
+ * In each row, num_samples samples is picked for each edge type. (The edge
+ * type is stored in etypes)
+ * The picked indices are returned in the form of a COO matrix.
+ *
+ * If replace is false and a row has fewer non-zero values than num_samples,
+ * all the values are picked.
+ *
+ * Examples:
+ *
+ * // coo.num_rows = 4;
+ * // coo.num_cols = 4;
+ * // coo.rows = [0, 0, 0, 0, 3]
+ * // coo.cols = [0, 1, 3, 2, 3]
+ * // coo.data = [2, 3, 0, 1, 4]
+ * // etype = [0, 0, 0, 2, 1]
+ * COOMatrix coo = ...;
+ * IdArray rows = ... ; // [0, 3]
+ * std::vector<int64_t> num_samples = {2, 2, 2};
+ * COOMatrix sampled = COORowWisePerEtypeSampling(coo, rows, etype, num_samples,
+ *                                                FloatArray(), false);
+ * // possible sampled coo matrix:
+ * // sampled.num_rows = 4
+ * // sampled.num_cols = 4
+ * // sampled.rows = [0, 0, 0, 3]
+ * // sampled.cols = [0, 3, 2, 3]
+ * // sampled.data = [2, 0, 1, 4]
+ *
+ * \param mat Input coo matrix.
+ * \param rows Rows to sample from.
+ * \param etypes Edge types of each edge.
+ * \param num_samples Number of samples
+ * \param prob Unnormalized probability array. Should be of the same length as the data array.
+ *             If an empty array is provided, assume uniform.
+ * \param replace True if sample with replacement
+ * \param etype_sorted True if the edge types are already sorted
+ * \return A COOMatrix storing the picked row and col indices. Its data field stores the
+ *         the index of the picked elements in the value array.
+ */
+COOMatrix COORowWisePerEtypeSampling(
+    COOMatrix mat,
+    IdArray rows,
+    IdArray etypes,
+    const std::vector<int64_t>& num_samples,
+    FloatArray prob = FloatArray(),
+    bool replace = true,
+    bool etype_sorted = false);
+
+/*!
  * \brief Select K non-zero entries with the largest weights along each given row.
  *
  * The function performs top-k selection along each row independently.
@@ -405,7 +497,7 @@ COOMatrix COORowWiseTopk(
 
 /*!
  * \brief Union two COOMatrix into one COOMatrix.
- * 
+ *
  * Two Matrix must have the same shape.
  *
  * Example:
@@ -477,7 +569,7 @@ COOMatrix DisjointUnionCoo(
  *      [3, 0, 2],
  *      [1, 1, 0],
  *      [0, 0, 4]]
- * 
+ *
  * B, cnt, edge_map = COOToSimple(A)
  *
  * B = [[0, 0, 0],
@@ -546,8 +638,49 @@ std::vector<COOMatrix> DisjointPartitionCooBySizes(
   const std::vector<uint64_t> &dst_vertex_cumsum);
 
 /*!
+ * \brief Slice a contiguous chunk from a COOMatrix
+ *
+ * Examples:
+ *
+ * C = [[0, 0, 1, 0, 0],
+ *      [1, 0, 1, 0, 0],
+ *      [0, 1, 0, 0, 0],
+ *      [0, 0, 0, 0, 0],
+ *      [0, 0, 0, 1, 0],
+ *      [0, 0, 0, 0, 1]]
+ * COOMatrix_C.num_rows : 6
+ * COOMatrix_C.num_cols : 5
+ *
+ * edge_range : [4, 6]
+ * src_vertex_range : [3, 6]
+ * dst_vertex_range : [3, 5]
+ *
+ * ret = COOSliceContiguousChunk(C,
+ *                               edge_range,
+ *                               src_vertex_range,
+ *                               dst_vertex_range)
+ *
+ * ret = [[0, 0],
+ *        [1, 0],
+ *        [0, 1]]
+ * COOMatrix_ret.num_rows : 3
+ * COOMatrix_ret.num_cols : 2
+ *
+ * \param coo COOMatrix to slice.
+ * \param edge_range ID range of the edges in the chunk
+ * \param src_vertex_range ID range of the src vertices in the chunk.
+ * \param dst_vertex_range ID range of the dst vertices in the chunk.
+ * \return COOMatrix representing the chunk.
+ */
+COOMatrix COOSliceContiguousChunk(
+  const COOMatrix &coo,
+  const std::vector<uint64_t> &edge_range,
+  const std::vector<uint64_t> &src_vertex_range,
+  const std::vector<uint64_t> &dst_vertex_range);
+
+/*!
  * \brief Create a LineGraph of input coo
- * 
+ *
  * A = [[0, 0, 1],
  *      [1, 0, 1],
  *      [1, 1, 0]]

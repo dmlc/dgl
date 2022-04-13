@@ -2,7 +2,7 @@ from pytablewriter import RstGridTableWriter, MarkdownTableWriter
 import numpy as np
 import pandas as pd
 from dgl import DGLGraph
-from dgl.data.gnn_benckmark import AmazonCoBuy, CoraFull, Coauthor
+from dgl.data.gnn_benchmark import AmazonCoBuy, CoraFull, Coauthor
 from dgl.data.karate import KarateClub
 from dgl.data.gindt import GINDataset
 from dgl.data.bitcoinotc import BitcoinOTC

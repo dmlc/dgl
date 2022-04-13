@@ -27,9 +27,9 @@ DGL通过其核心数据结构  :class:`~dgl.DGLGraph` 提供了一个以图为�
     :hidden:
     :glob:
 
-    graph_cn-basic
-    graph_cn-graphs-nodes-edges
-    graph_cn-feature
-    graph_cn-external
-    graph_cn-heterogeneous
-    graph_cn-gpu
+    graph-basic
+    graph-graphs-nodes-edges
+    graph-feature
+    graph-external
+    graph-heterogeneous
+    graph-gpu

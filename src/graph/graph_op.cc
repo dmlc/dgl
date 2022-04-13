@@ -8,6 +8,7 @@
 #include <dgl/immutable_graph.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/runtime/container.h>
+#include <dgl/runtime/parallel_for.h>
 #include <algorithm>
 #include "../c_api_common.h"
 
@@ -261,34 +262,36 @@ IdArray GraphOp::MapParentIdToSubgraphId(IdArray parent_vids, IdArray query) {
 
   const bool is_sorted = std::is_sorted(parent_data, parent_data + parent_len);
   if (is_sorted) {
-#pragma omp parallel for
-    for (int64_t i = 0; i < query_len; i++) {
-      const dgl_id_t id = query_data[i];
-      const auto it = std::find(parent_data, parent_data + parent_len, id);
-      // If the vertex Id doesn't exist, the vid in the subgraph is -1.
-      if (it != parent_data + parent_len) {
-        rst_data[i] = it - parent_data;
-      } else {
-        rst_data[i] = -1;
+    runtime::parallel_for(0, query_len, [&](size_t b, size_t e) {
+      for (auto i = b; i < e; ++i) {
+        const dgl_id_t id = query_data[i];
+        const auto it = std::find(parent_data, parent_data + parent_len, id);
+        // If the vertex Id doesn't exist, the vid in the subgraph is -1.
+        if (it != parent_data + parent_len) {
+          rst_data[i] = it - parent_data;
+        } else {
+          rst_data[i] = -1;
+        }
       }
-    }
+    });
   } else {
     std::unordered_map<dgl_id_t, dgl_id_t> parent_map;
     for (int64_t i = 0; i < parent_len; i++) {
       const dgl_id_t id = parent_data[i];
       parent_map[id] = i;
     }
-#pragma omp parallel for
-    for (int64_t i = 0; i < query_len; i++) {
-      const dgl_id_t id = query_data[i];
-      auto it = parent_map.find(id);
-      // If the vertex Id doesn't exist, the vid in the subgraph is -1.
-      if (it != parent_map.end()) {
-        rst_data[i] = it->second;
-      } else {
-        rst_data[i] = -1;
+    runtime::parallel_for(0, query_len, [&](size_t b, size_t e) {
+      for (auto i = b; i < e; ++i) {
+        const dgl_id_t id = query_data[i];
+        auto it = parent_map.find(id);
+        // If the vertex Id doesn't exist, the vid in the subgraph is -1.
+        if (it != parent_map.end()) {
+          rst_data[i] = it->second;
+        } else {
+          rst_data[i] = -1;
+        }
       }
-    }
+    });
   }
   return rst;
 }
@@ -567,14 +570,15 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLPartitionWithHalo")
     graph_ptr->GetInCSR();
     std::vector<std::shared_ptr<HaloSubgraph> > subgs(max_part_id + 1);
     int num_partitions = part_nodes.size();
-#pragma omp parallel for
-    for (int i = 0; i < num_partitions; i++) {
-      auto nodes = aten::VecToIdArray(part_nodes[i]);
-      HaloSubgraph subg = GraphOp::GetSubgraphWithHalo(graph_ptr, nodes, num_hops);
-      std::shared_ptr<HaloSubgraph> subg_ptr(new HaloSubgraph(subg));
-      int part_id = part_ids[i];
-      subgs[part_id] = subg_ptr;
-    }
+    runtime::parallel_for(0, num_partitions, [&](size_t b, size_t e) {
+      for (auto i = b; i < e; ++i) {
+        auto nodes = aten::VecToIdArray(part_nodes[i]);
+        HaloSubgraph subg = GraphOp::GetSubgraphWithHalo(graph_ptr, nodes, num_hops);
+        std::shared_ptr<HaloSubgraph> subg_ptr(new HaloSubgraph(subg));
+        int part_id = part_ids[i];
+        subgs[part_id] = subg_ptr;
+      }
+    });
     List<SubgraphRef> ret_list;
     for (size_t i = 0; i < subgs.size(); i++) {
       ret_list.push_back(SubgraphRef(subgs[i]));
@@ -717,6 +721,64 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLMapSubgraphNID")
     const IdArray parent_vids = args[0];
     const IdArray query = args[1];
     *rv = GraphOp::MapParentIdToSubgraphId(parent_vids, query);
+  });
+
+template<class IdType>
+IdArray MapIds(IdArray ids, IdArray range_starts, IdArray range_ends, IdArray typed_map,
+               int num_parts, int num_types) {
+  int64_t num_ids = ids->shape[0];
+  int64_t num_ranges = range_starts->shape[0];
+  IdArray ret = IdArray::Empty({num_ids * 2}, ids->dtype, ids->ctx);
+
+  const IdType *range_start_data = static_cast<IdType *>(range_starts->data);
+  const IdType *range_end_data = static_cast<IdType *>(range_ends->data);
+  const IdType *ids_data = static_cast<IdType *>(ids->data);
+  const IdType *typed_map_data = static_cast<IdType *>(typed_map->data);
+  IdType *types_data = static_cast<IdType *>(ret->data);
+  IdType *per_type_ids_data = static_cast<IdType *>(ret->data) + num_ids;
+  runtime::parallel_for(0, ids->shape[0], [&](size_t b, size_t e) {
+    for (auto i = b; i < e; ++i) {
+      IdType id = ids_data[i];
+      auto it = std::lower_bound(range_end_data, range_end_data + num_ranges, id);
+      // The range must exist.
+      BUG_IF_FAIL(it != range_end_data + num_ranges);
+      size_t range_id = it - range_end_data;
+      int type_id = range_id % num_types;
+      types_data[i] = type_id;
+      int part_id = range_id / num_types;
+      BUG_IF_FAIL(part_id < num_parts);
+      if (part_id == 0) {
+        per_type_ids_data[i] = id - range_start_data[range_id];
+      } else {
+        per_type_ids_data[i] = id - range_start_data[range_id]
+          + typed_map_data[num_parts * type_id + part_id - 1];
+      }
+    }
+  });
+  return ret;
+}
+
+DGL_REGISTER_GLOBAL("distributed.id_map._CAPI_DGLHeteroMapIds")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    const IdArray ids = args[0];
+    const IdArray range_starts = args[1];
+    const IdArray range_ends = args[2];
+    const IdArray typed_map = args[3];
+    int num_parts = args[4];
+    int num_types = args[5];
+    int num_ranges = range_starts->shape[0];
+
+    CHECK_EQ(range_starts->dtype.bits, ids->dtype.bits);
+    CHECK_EQ(range_ends->dtype.bits, ids->dtype.bits);
+    CHECK_EQ(typed_map->dtype.bits, ids->dtype.bits);
+    CHECK_EQ(num_ranges, num_parts * num_types);
+    CHECK_EQ(num_ranges, range_ends->shape[0]);
+
+    IdArray ret;
+    ATEN_ID_TYPE_SWITCH(ids->dtype, IdType, {
+      ret = MapIds<IdType>(ids, range_starts, range_ends, typed_map, num_parts, num_types);
+    });
+    *rv = ret;
   });
 
 }  // namespace dgl

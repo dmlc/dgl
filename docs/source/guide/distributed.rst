@@ -1,5 +1,9 @@
+.. _guide-distributed:
+
 Chapter 7: Distributed Training
 =====================================
+
+:ref:`(中文版) <guide_cn-distributed>`
 
 DGL adopts a fully distributed approach that distributes both data and computation
 across a collection of computation resources. In the context of this section, we
@@ -12,7 +16,7 @@ For the training script, DGL provides distributed APIs that are similar to the o
 mini-batch training. This makes distributed training require only small code modifications
 from mini-batch training on a single machine. Below shows an example of training GraphSage
 in a distributed fashion. The only code modifications are located on line 4-7:
-1) initialize DGL's distributed module, 2) create a distributed graph object, and 
+1) initialize DGL's distributed module, 2) create a distributed graph object, and
 3) split the training set and calculate the nodes for the local process.
 The rest of the code, including sampler creation, model definition, training loops
 are the same as :ref:`mini-batch training <guide-minibatch>`.
@@ -22,7 +26,7 @@ are the same as :ref:`mini-batch training <guide-minibatch>`.
     import dgl
     import torch as th
 
-    dgl.distributed.initialize('ip_config.txt', num_servers, num_workers)
+    dgl.distributed.initialize('ip_config.txt')
     th.distributed.init_process_group(backend='gloo')
     g = dgl.distributed.DistGraph('graph_name', 'part_config.json')
     pb = g.get_partition_book()
@@ -31,7 +35,7 @@ are the same as :ref:`mini-batch training <guide-minibatch>`.
 
     # Create sampler
     sampler = NeighborSampler(g, [10,25],
-                              dgl.distributed.sample_neighbors, 
+                              dgl.distributed.sample_neighbors,
                               device)
 
     dataloader = DistDataLoader(
@@ -49,21 +53,20 @@ are the same as :ref:`mini-batch training <guide-minibatch>`.
 
     # training loop
     for epoch in range(args.num_epochs):
-        for step, blocks in enumerate(dataloader):
-            batch_inputs, batch_labels = load_subtensor(g, blocks[0].srcdata[dgl.NID],
-                                                        blocks[-1].dstdata[dgl.NID])
-            batch_pred = model(blocks, batch_inputs)
-            loss = loss_fcn(batch_pred, batch_labels)
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+        with model.join():
+            for step, blocks in enumerate(dataloader):
+                batch_inputs, batch_labels = load_subtensor(g, blocks[0].srcdata[dgl.NID],
+                                                            blocks[-1].dstdata[dgl.NID])
+                batch_pred = model(blocks, batch_inputs)
+                loss = loss_fcn(batch_pred, batch_labels)
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
 
 When running the training script in a cluster of machines, DGL provides tools to copy data
 to the cluster's machines and launch the training job on all machines.
 
 **Note**: The current distributed training API only supports the Pytorch backend.
-
-**Note**: The current implementation only supports graphs with one node type and one edge type.
 
 DGL implements a few distributed components to support distributed training. The figure below
 shows the components and their interactions.
@@ -94,6 +97,7 @@ the following distributed components:
 
 * :ref:`guide-distributed-preprocessing`
 * :ref:`guide-distributed-apis`
+* :ref:`guide-distributed-hetero`
 * :ref:`guide-distributed-tools`
 
 .. toctree::
@@ -103,4 +107,5 @@ the following distributed components:
 
     distributed-preprocessing
     distributed-apis
+    distributed-hetero
     distributed-tools

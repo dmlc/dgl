@@ -10,8 +10,6 @@ import dgl.function as fn
 import dgl.nn.pytorch as dglnn
 import time
 import argparse
-from _thread import start_new_thread
-from functools import wraps
 from dgl.data import RedditDataset
 import tqdm
 import traceback
@@ -202,7 +200,7 @@ if __name__ == '__main__':
     else:
         device = th.device('cpu')
 
-    # load reddit data
+    # load ogbn-products data
     data = DglNodePropPredDataset(name='ogbn-products')
     splitted_idx = data.get_idx_split()
     train_idx, val_idx, test_idx = splitted_idx['train'], splitted_idx['valid'], splitted_idx['test']

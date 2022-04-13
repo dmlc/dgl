@@ -4,9 +4,9 @@
  * \brief Array cumsum GPU implementation
  */
 #include <dgl/array.h>
-#include <cub/cub.cuh>
 #include "../../runtime/cuda/cuda_common.h"
 #include "./utils.h"
+#include "./dgl_cub.cuh"
 
 namespace dgl {
 using runtime::NDArray;

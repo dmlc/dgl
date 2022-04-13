@@ -68,7 +68,7 @@ class ParallelLauncher {
   // Wait n jobs to finish
   int WaitForJobs() {
     while (num_pending_.load() != 0) {
-      dgl::runtime::threading::Yield();
+      dgl::runtime::threading::YieldThread();
     }
     if (!has_error_.load()) return 0;
     // the following is intended to use string due to
@@ -143,7 +143,7 @@ class SpscTaskQueue {
    */
   void Push(const Task& input) {
     while (!Enqueue(input)) {
-      dgl::runtime::threading::Yield();
+      dgl::runtime::threading::YieldThread();
     }
     if (pending_.fetch_add(1) == -1) {
       std::unique_lock<std::mutex> lock(mutex_);
@@ -162,7 +162,7 @@ class SpscTaskQueue {
     // If a new task comes to the queue quickly, this wait avoid the worker from sleeping.
     // The default spin count is set by following the typical omp convention
     for (uint32_t i = 0; i < spin_count && pending_.load() == 0; ++i) {
-      dgl::runtime::threading::Yield();
+      dgl::runtime::threading::YieldThread();
     }
     if (pending_.fetch_sub(1) == 0) {
       std::unique_lock<std::mutex> lock(mutex_);
@@ -374,7 +374,7 @@ int DGLBackendParallelBarrier(int task_id, DGLParallelGroupEnv* penv) {
     if (i != task_id) {
       while (sync_counter[i * kSyncStride].load(
                  std::memory_order_relaxed) <= old_counter) {
-        dgl::runtime::threading::Yield();
+        dgl::runtime::threading::YieldThread();
       }
     }
   }

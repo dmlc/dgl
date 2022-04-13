@@ -177,6 +177,7 @@ for epoch in range(10):
     for g, x, y in test_loader:
         x = x.to(device)
         y = y.to(device)
+        g = [g_i.to(device) for g_i in g]
         out = model(g, x)
         hit += (out.max(-1)[1] == y).sum().item()
         tot += len(y)

@@ -9,6 +9,7 @@
 #include <dgl/runtime/container.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/random.h>
+#include <dgl/runtime/parallel_for.h>
 #include <dmlc/omp.h>
 #include <algorithm>
 #include <cstdlib>
@@ -850,19 +851,20 @@ std::vector<NodeFlow> NeighborSamplingImpl(const ImmutableGraphPtr gptr,
     BuildCsr(*gptr, neigh_type);
     // generate node flows
     std::vector<NodeFlow> nflows(num_workers);
-#pragma omp parallel for
-    for (int i = 0; i < num_workers; i++) {
-      // create per-worker seed nodes.
-      const int64_t start = (batch_start_id + i) * batch_size;
-      const int64_t end = std::min(start + batch_size, num_seeds);
-      // TODO(minjie): the vector allocation/copy is unnecessary
-      std::vector<dgl_id_t> worker_seeds(end - start);
-      std::copy(seed_nodes_data + start, seed_nodes_data + end,
-                worker_seeds.begin());
-      nflows[i] = SamplerOp::NeighborSample(
+    runtime::parallel_for(0, num_workers, [&](size_t b, size_t e) {
+      for (auto i = b; i < e; ++i) {
+        // create per-worker seed nodes.
+        const int64_t start = (batch_start_id + i) * batch_size;
+        const int64_t end = std::min(start + batch_size, num_seeds);
+        // TODO(minjie): the vector allocation/copy is unnecessary
+        std::vector<dgl_id_t> worker_seeds(end - start);
+        std::copy(seed_nodes_data + start, seed_nodes_data + end,
+                  worker_seeds.begin());
+        nflows[i] = SamplerOp::NeighborSample(
           gptr.get(), worker_seeds, neigh_type, num_hops, expand_factor,
           add_self_loop, probability);
-    }
+      }
+    });
     return nflows;
 }
 
@@ -977,18 +979,19 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_LayerSampling")
     BuildCsr(*gptr, neigh_type);
     // generate node flows
     std::vector<NodeFlow> nflows(num_workers);
-#pragma omp parallel for
-    for (int i = 0; i < num_workers; i++) {
-      // create per-worker seed nodes.
-      const int64_t start = (batch_start_id + i) * batch_size;
-      const int64_t end = std::min(start + batch_size, num_seeds);
-      // TODO(minjie): the vector allocation/copy is unnecessary
-      std::vector<dgl_id_t> worker_seeds(end - start);
-      std::copy(seed_nodes_data + start, seed_nodes_data + end,
-                worker_seeds.begin());
-      nflows[i] = SamplerOp::LayerUniformSample(
-          gptr.get(), worker_seeds, neigh_type, layer_sizes);
-    }
+    runtime::parallel_for(0, num_workers, [&](size_t b, size_t e) {
+      for (auto i = b; i < e; ++i) {
+        // create per-worker seed nodes.
+        const int64_t start = (batch_start_id + i) * batch_size;
+        const int64_t end = std::min(start + batch_size, num_seeds);
+        // TODO(minjie): the vector allocation/copy is unnecessary
+        std::vector<dgl_id_t> worker_seeds(end - start);
+        std::copy(seed_nodes_data + start, seed_nodes_data + end,
+                  worker_seeds.begin());
+        nflows[i] = SamplerOp::LayerUniformSample(
+            gptr.get(), worker_seeds, neigh_type, layer_sizes);
+      }
+    });
     *rv = List<NodeFlow>(nflows);
   });
 
@@ -1466,54 +1469,55 @@ public:
     std::vector<SubgraphRef> positive_subgs(num_workers);
     std::vector<SubgraphRef> negative_subgs(num_workers);
 
-#pragma omp parallel for
-    for (int64_t i = 0; i < num_workers; i++) {
-      const int64_t start = (batch_curr_id_ + i) * batch_size_;
-      const int64_t end = std::min(start + batch_size_, num_seeds_);
-      const int64_t num_edges = end - start;
-      IdArray worker_seeds;
+    runtime::parallel_for(0, num_workers, [&](size_t b, size_t e) {
+      for (auto i = b; i < e; ++i) {
+        const int64_t start = (batch_curr_id_ + i) * batch_size_;
+        const int64_t end = std::min(start + batch_size_, num_seeds_);
+        const int64_t num_edges = end - start;
+        IdArray worker_seeds;
 
-      if (replacement_ == false) {
-        worker_seeds = seed_edges_.CreateView({num_edges}, DLDataType{kDLInt, 64, 1},
-                                              sizeof(dgl_id_t) * start);
-      } else {
-        std::vector<dgl_id_t> seeds;
-        const dgl_id_t *seed_edge_ids = static_cast<const dgl_id_t *>(seed_edges_->data);
-        // sampling of each edge is a standalone event
-        for (int64_t i = 0; i < num_edges; ++i) {
-          int64_t seed = static_cast<const int64_t>(
-              RandomEngine::ThreadLocal()->RandInt(num_seeds_));
-          seeds.push_back(seed_edge_ids[seed]);
+        if (replacement_ == false) {
+          worker_seeds = seed_edges_.CreateView({num_edges}, DLDataType{kDLInt, 64, 1},
+                                                sizeof(dgl_id_t) * start);
+        } else {
+          std::vector<dgl_id_t> seeds;
+          const dgl_id_t *seed_edge_ids = static_cast<const dgl_id_t *>(seed_edges_->data);
+          // sampling of each edge is a standalone event
+          for (int64_t i = 0; i < num_edges; ++i) {
+            int64_t seed = static_cast<const int64_t>(
+                RandomEngine::ThreadLocal()->RandInt(num_seeds_));
+            seeds.push_back(seed_edge_ids[seed]);
+          }
+
+          worker_seeds = aten::VecToIdArray(seeds, seed_edges_->dtype.bits);
         }
 
-        worker_seeds = aten::VecToIdArray(seeds, seed_edges_->dtype.bits);
-      }
+        EdgeArray arr = gptr_->FindEdges(worker_seeds);
+        const dgl_id_t *src_ids = static_cast<const dgl_id_t *>(arr.src->data);
+        const dgl_id_t *dst_ids = static_cast<const dgl_id_t *>(arr.dst->data);
+        std::vector<dgl_id_t> src_vec(src_ids, src_ids + num_edges);
+        std::vector<dgl_id_t> dst_vec(dst_ids, dst_ids + num_edges);
+        // TODO(zhengda) what if there are duplicates in the src and dst vectors.
 
-      EdgeArray arr = gptr_->FindEdges(worker_seeds);
-      const dgl_id_t *src_ids = static_cast<const dgl_id_t *>(arr.src->data);
-      const dgl_id_t *dst_ids = static_cast<const dgl_id_t *>(arr.dst->data);
-      std::vector<dgl_id_t> src_vec(src_ids, src_ids + num_edges);
-      std::vector<dgl_id_t> dst_vec(dst_ids, dst_ids + num_edges);
-      // TODO(zhengda) what if there are duplicates in the src and dst vectors.
-
-      Subgraph subg = gptr_->EdgeSubgraph(worker_seeds, false);
-      positive_subgs[i] = ConvertRef(subg);
-      // For chunked negative sampling, we accept "chunk-head" for corrupting head
-      // nodes and "chunk-tail" for corrupting tail nodes.
-      if (neg_mode_.substr(0, 5) == "chunk") {
-        NegSubgraph neg_subg = genChunkedNegEdgeSubgraph(subg, neg_mode_.substr(6),
-                                                         neg_sample_size_,
-                                                         exclude_positive_,
-                                                         check_false_neg_);
-        negative_subgs[i] = ConvertRef(neg_subg);
-      } else if (neg_mode_ == "head" || neg_mode_ == "tail") {
-        NegSubgraph neg_subg = genNegEdgeSubgraph(subg, neg_mode_,
-                                                  neg_sample_size_,
-                                                  exclude_positive_,
-                                                  check_false_neg_);
-        negative_subgs[i] = ConvertRef(neg_subg);
+        Subgraph subg = gptr_->EdgeSubgraph(worker_seeds, false);
+        positive_subgs[i] = ConvertRef(subg);
+        // For chunked negative sampling, we accept "chunk-head" for corrupting head
+        // nodes and "chunk-tail" for corrupting tail nodes.
+        if (neg_mode_.substr(0, 5) == "chunk") {
+          NegSubgraph neg_subg = genChunkedNegEdgeSubgraph(subg, neg_mode_.substr(6),
+                                                           neg_sample_size_,
+                                                           exclude_positive_,
+                                                           check_false_neg_);
+          negative_subgs[i] = ConvertRef(neg_subg);
+        } else if (neg_mode_ == "head" || neg_mode_ == "tail") {
+          NegSubgraph neg_subg = genNegEdgeSubgraph(subg, neg_mode_,
+                                                    neg_sample_size_,
+                                                    exclude_positive_,
+                                                    check_false_neg_);
+          negative_subgs[i] = ConvertRef(neg_subg);
+        }
       }
-    }
+    });
     if (neg_mode_.size() > 0) {
       positive_subgs.insert(positive_subgs.end(), negative_subgs.begin(), negative_subgs.end());
     }

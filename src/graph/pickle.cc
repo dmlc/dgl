@@ -18,12 +18,14 @@ namespace dgl {
 
 HeteroPickleStates HeteroPickle(HeteroGraphPtr graph) {
   HeteroPickleStates states;
+  states.version = 2;
   dmlc::MemoryStringStream ofs(&states.meta);
   dmlc::Stream *strm = &ofs;
   strm->Write(ImmutableGraph::ToImmutable(graph->meta_graph()));
   strm->Write(graph->NumVerticesPerType());
+  strm->Write(graph->IsPinned());
   for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
-    SparseFormat fmt = graph->SelectFormat(etype, all_code);
+    SparseFormat fmt = graph->SelectFormat(etype, ALL_CODE);
     switch (fmt) {
       case SparseFormat::kCOO: {
         strm->Write(SparseFormat::kCOO);
@@ -51,6 +53,44 @@ HeteroPickleStates HeteroPickle(HeteroGraphPtr graph) {
   return states;
 }
 
+HeteroPickleStates HeteroForkingPickle(HeteroGraphPtr graph) {
+  HeteroPickleStates states;
+  states.version = 2;
+  dmlc::MemoryStringStream ofs(&states.meta);
+  dmlc::Stream *strm = &ofs;
+  strm->Write(ImmutableGraph::ToImmutable(graph->meta_graph()));
+  strm->Write(graph->NumVerticesPerType());
+  strm->Write(graph->IsPinned());
+  for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
+    auto created_formats = graph->GetCreatedFormats();
+    auto allowed_formats = graph->GetAllowedFormats();
+    strm->Write(created_formats);
+    strm->Write(allowed_formats);
+    if (created_formats & COO_CODE) {
+      const auto &coo = graph->GetCOOMatrix(etype);
+      strm->Write(coo.row_sorted);
+      strm->Write(coo.col_sorted);
+      states.arrays.push_back(coo.row);
+      states.arrays.push_back(coo.col);
+    }
+    if (created_formats & CSR_CODE) {
+      const auto &csr = graph->GetCSRMatrix(etype);
+      strm->Write(csr.sorted);
+      states.arrays.push_back(csr.indptr);
+      states.arrays.push_back(csr.indices);
+      states.arrays.push_back(csr.data);
+    }
+    if (created_formats & CSC_CODE) {
+      const auto &csc = graph->GetCSCMatrix(etype);
+      strm->Write(csc.sorted);
+      states.arrays.push_back(csc.indptr);
+      states.arrays.push_back(csc.indices);
+      states.arrays.push_back(csc.data);
+    }
+  }
+  return states;
+}
+
 HeteroGraphPtr HeteroUnpickle(const HeteroPickleStates& states) {
   char *buf = const_cast<char *>(states.meta.c_str());  // a readonly stream?
   dmlc::MemoryFixedSizeStream ifs(buf, states.meta.size());
@@ -61,6 +101,10 @@ HeteroGraphPtr HeteroUnpickle(const HeteroPickleStates& states) {
   std::vector<HeteroGraphPtr> relgraphs(metagraph->NumEdges());
   std::vector<int64_t> num_nodes_per_type;
   CHECK(strm->Read(&num_nodes_per_type)) << "Invalid num_nodes_per_type";
+  bool is_pinned = false;
+  if (states.version > 1) {
+    CHECK(strm->Read(&is_pinned)) << "Invalid flag 'is_pinned'";
+  }
 
   auto array_itr = states.arrays.begin();
   for (dgl_type_t etype = 0; etype < metagraph->NumEdges(); ++etype) {
@@ -84,7 +128,7 @@ HeteroGraphPtr HeteroUnpickle(const HeteroPickleStates& states) {
         CHECK(strm->Read(&csorted)) << "Invalid flag 'csorted'";
         auto coo = aten::COOMatrix(num_src, num_dst, row, col, aten::NullArray(), rsorted, csorted);
         // TODO(zihao) fix
-        relgraph = CreateFromCOO(num_vtypes, coo, all_code);
+        relgraph = CreateFromCOO(num_vtypes, coo, ALL_CODE);
         break;
       }
       case SparseFormat::kCSR: {
@@ -96,7 +140,7 @@ HeteroGraphPtr HeteroUnpickle(const HeteroPickleStates& states) {
         CHECK(strm->Read(&sorted)) << "Invalid flag 'sorted'";
         auto csr = aten::CSRMatrix(num_src, num_dst, indptr, indices, edge_id, sorted);
         // TODO(zihao) fix
-        relgraph = CreateFromCSR(num_vtypes, csr, all_code);
+        relgraph = CreateFromCSR(num_vtypes, csr, ALL_CODE);
         break;
       }
       case SparseFormat::kCSC:
@@ -105,7 +149,11 @@ HeteroGraphPtr HeteroUnpickle(const HeteroPickleStates& states) {
     }
     relgraphs[etype] = relgraph;
   }
-  return CreateHeteroGraph(metagraph, relgraphs, num_nodes_per_type);
+  auto graph = CreateHeteroGraph(metagraph, relgraphs, num_nodes_per_type);
+  if (is_pinned) {
+    graph->PinMemory_();
+  }
+  return graph;
 }
 
 // For backward compatibility
@@ -137,6 +185,78 @@ HeteroGraphPtr HeteroUnpickleOld(const HeteroPickleStates& states) {
   return CreateHeteroGraph(metagraph, relgraphs, num_nodes_per_type);
 }
 
+HeteroGraphPtr HeteroForkingUnpickle(const HeteroPickleStates &states) {
+  char *buf = const_cast<char *>(states.meta.c_str());  // a readonly stream?
+  dmlc::MemoryFixedSizeStream ifs(buf, states.meta.size());
+  dmlc::Stream *strm = &ifs;
+  auto meta_imgraph = Serializer::make_shared<ImmutableGraph>();
+  CHECK(strm->Read(&meta_imgraph)) << "Invalid meta graph";
+  GraphPtr metagraph = meta_imgraph;
+  std::vector<HeteroGraphPtr> relgraphs(metagraph->NumEdges());
+  std::vector<int64_t> num_nodes_per_type;
+  CHECK(strm->Read(&num_nodes_per_type)) << "Invalid num_nodes_per_type";
+  bool is_pinned = false;
+  if (states.version > 1) {
+    CHECK(strm->Read(&is_pinned)) << "Invalid flag 'is_pinned'";
+  }
+
+  auto array_itr = states.arrays.begin();
+  for (dgl_type_t etype = 0; etype < metagraph->NumEdges(); ++etype) {
+    const auto& pair = metagraph->FindEdge(etype);
+    const dgl_type_t srctype = pair.first;
+    const dgl_type_t dsttype = pair.second;
+    const int64_t num_vtypes = (srctype == dsttype) ? 1 : 2;
+    int64_t num_src = num_nodes_per_type[srctype];
+    int64_t num_dst = num_nodes_per_type[dsttype];
+
+    dgl_format_code_t created_formats, allowed_formats;
+    CHECK(strm->Read(&created_formats)) << "Invalid code for created formats";
+    CHECK(strm->Read(&allowed_formats)) << "Invalid code for allowed formats";
+    aten::COOMatrix coo;
+    aten::CSRMatrix csr;
+    aten::CSRMatrix csc;
+    bool has_coo = (created_formats & COO_CODE);
+    bool has_csr = (created_formats & CSR_CODE);
+    bool has_csc = (created_formats & CSC_CODE);
+
+    if (created_formats & COO_CODE) {
+      CHECK_GE(states.arrays.end() - array_itr, 2);
+      const auto &row = *(array_itr++);
+      const auto &col = *(array_itr++);
+      bool rsorted;
+      bool csorted;
+      CHECK(strm->Read(&rsorted)) << "Invalid flag 'rsorted'";
+      CHECK(strm->Read(&csorted)) << "Invalid flag 'csorted'";
+      coo = aten::COOMatrix(num_src, num_dst, row, col, aten::NullArray(), rsorted, csorted);
+    }
+    if (created_formats & CSR_CODE) {
+      CHECK_GE(states.arrays.end() - array_itr, 3);
+      const auto &indptr = *(array_itr++);
+      const auto &indices = *(array_itr++);
+      const auto &edge_id = *(array_itr++);
+      bool sorted;
+      CHECK(strm->Read(&sorted)) << "Invalid flag 'sorted'";
+      csr = aten::CSRMatrix(num_src, num_dst, indptr, indices, edge_id, sorted);
+    }
+    if (created_formats & CSC_CODE) {
+      CHECK_GE(states.arrays.end() - array_itr, 3);
+      const auto &indptr = *(array_itr++);
+      const auto &indices = *(array_itr++);
+      const auto &edge_id = *(array_itr++);
+      bool sorted;
+      CHECK(strm->Read(&sorted)) << "Invalid flag 'sorted'";
+      csc = aten::CSRMatrix(num_dst, num_src, indptr, indices, edge_id, sorted);
+    }
+    relgraphs[etype] = UnitGraph::CreateUnitGraphFrom(
+        num_vtypes, csc, csr, coo, has_csc, has_csr, has_coo, allowed_formats);
+  }
+  auto graph = CreateHeteroGraph(metagraph, relgraphs, num_nodes_per_type);
+  if (is_pinned) {
+    graph->PinMemory_();
+  }
+  return graph;
+}
+
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroPickleStatesGetVersion")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroPickleStatesRef st = args[0];
@@ -166,10 +286,11 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroPickleStatesGetArraysNum")
 
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLCreateHeteroPickleStates")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    std::string meta = args[0];
-    const List<Value> arrays = args[1];
+    const int version = args[0];
+    std::string meta = args[1];
+    const List<Value> arrays = args[2];
     std::shared_ptr<HeteroPickleStates> st( new HeteroPickleStates );
-    st->version = 1;
+    st->version = version == 0 ? 1 : version;
     st->meta = meta;
     st->arrays.reserve(arrays.size());
     for (const auto& ref : arrays) {
@@ -186,6 +307,14 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroPickle")
     *rv = HeteroPickleStatesRef(st);
   });
 
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroForkingPickle")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef ref = args[0];
+    std::shared_ptr<HeteroPickleStates> st( new HeteroPickleStates );
+    *st = HeteroForkingPickle(ref.sptr());
+    *rv = HeteroPickleStatesRef(st);
+  });
+
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroUnpickle")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroPickleStatesRef ref = args[0];
@@ -195,11 +324,19 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroUnpickle")
         graph = HeteroUnpickleOld(*ref.sptr());
         break;
       case 1:
+      case 2:
         graph = HeteroUnpickle(*ref.sptr());
         break;
       default:
-        LOG(FATAL) << "Version can only be 0 or 1.";
+        LOG(FATAL) << "Version can only be 0 or 1 or 2.";
     }
+    *rv = HeteroGraphRef(graph);
+  });
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroForkingUnpickle")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroPickleStatesRef ref = args[0];
+    HeteroGraphPtr graph = HeteroForkingUnpickle(*ref.sptr());
     *rv = HeteroGraphRef(graph);
   });
 

@@ -4,7 +4,6 @@ This kvstore is used when running in the standalone mode
 """
 
 from .. import backend as F
-from .graph_partition_book import PartitionPolicy, NODE_PART_POLICY, EDGE_PART_POLICY
 
 class KVClient(object):
     ''' The fake KVStore client.
@@ -17,11 +16,18 @@ class KVClient(object):
         self._all_possible_part_policy = {}
         self._push_handlers = {}
         self._pull_handlers = {}
+        # Store all graph data name
+        self._gdata_name_list = set()
 
     @property
     def all_possible_part_policy(self):
         """Get all possible partition policies"""
         return self._all_possible_part_policy
+
+    @property
+    def num_servers(self):
+        """Get the number of servers"""
+        return 1
 
     def barrier(self):
         '''barrier'''
@@ -34,15 +40,20 @@ class KVClient(object):
         '''register pull handler'''
         self._pull_handlers[name] = func
 
-    def add_data(self, name, tensor):
+    def add_data(self, name, tensor, part_policy):
         '''add data to the client'''
         self._data[name] = tensor
+        self._gdata_name_list.add(name)
+        if part_policy.policy_str not in self._all_possible_part_policy:
+            self._all_possible_part_policy[part_policy.policy_str] = part_policy
 
-    def init_data(self, name, shape, dtype, part_policy, init_func):
+    def init_data(self, name, shape, dtype, part_policy, init_func, is_gdata=True):
         '''add new data to the client'''
         self._data[name] = init_func(shape, dtype)
         if part_policy.policy_str not in self._all_possible_part_policy:
             self._all_possible_part_policy[part_policy.policy_str] = part_policy
+        if is_gdata:
+            self._gdata_name_list.add(name)
 
     def delete_data(self, name):
         '''delete the data'''
@@ -51,6 +62,10 @@ class KVClient(object):
     def data_name_list(self):
         '''get the names of all data'''
         return list(self._data.keys())
+
+    def gdata_name_list(self):
+        '''get the names of graph data'''
+        return list(self._gdata_name_list)
 
     def get_data_meta(self, name):
         '''get the metadata of data'''
@@ -72,7 +87,18 @@ class KVClient(object):
 
     def map_shared_data(self, partition_book):
         '''Mapping shared-memory tensor from server to client.'''
-        self._all_possible_part_policy[NODE_PART_POLICY] = PartitionPolicy(NODE_PART_POLICY,
-                                                                           partition_book)
-        self._all_possible_part_policy[EDGE_PART_POLICY] = PartitionPolicy(EDGE_PART_POLICY,
-                                                                           partition_book)
+
+    def count_nonzero(self, name):
+        """Count nonzero value by pull request from KVServers.
+
+        Parameters
+        ----------
+        name : str
+            data name
+
+        Returns
+        -------
+        int
+            the number of nonzero in this data.
+        """
+        return F.count_nonzero(self._data[name])

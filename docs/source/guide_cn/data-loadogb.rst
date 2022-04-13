@@ -24,7 +24,7 @@
     import dgl
     import torch
     from ogb.graphproppred import DglGraphPropPredDataset
-    from torch.utils.data import DataLoader
+    from dgl.dataloading import GraphDataLoader
     
     def _collate_fn(batch):
         # 小批次是一个元组(graph, label)列表
@@ -38,9 +38,9 @@
     dataset = DglGraphPropPredDataset(name='ogbg-molhiv')
     split_idx = dataset.get_idx_split()
     # dataloader
-    train_loader = DataLoader(dataset[split_idx["train"]], batch_size=32, shuffle=True, collate_fn=_collate_fn)
-    valid_loader = DataLoader(dataset[split_idx["valid"]], batch_size=32, shuffle=False, collate_fn=_collate_fn)
-    test_loader = DataLoader(dataset[split_idx["test"]], batch_size=32, shuffle=False, collate_fn=_collate_fn)
+    train_loader = GraphDataLoader(dataset[split_idx["train"]], batch_size=32, shuffle=True, collate_fn=_collate_fn)
+    valid_loader = GraphDataLoader(dataset[split_idx["valid"]], batch_size=32, shuffle=False, collate_fn=_collate_fn)
+    test_loader = GraphDataLoader(dataset[split_idx["test"]], batch_size=32, shuffle=False, collate_fn=_collate_fn)
 
 加载 *Node Property Prediction* 数据集类似，但要注意的是这种数据集只有一个图对象。
 

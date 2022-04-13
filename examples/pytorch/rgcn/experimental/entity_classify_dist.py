@@ -10,7 +10,7 @@ import argparse
 import itertools
 import numpy as np
 import time
-import os
+import os, gc
 os.environ['DGLBACKEND']='pytorch'
 
 import torch as th
@@ -21,15 +21,124 @@ from torch.multiprocessing import Queue
 from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader
 import dgl
+from dgl import nn as dglnn
 from dgl import DGLGraph
 from dgl.distributed import DistDataLoader
 from functools import partial
 
-from dgl.nn import RelGraphConv
 import tqdm
 
 from ogb.nodeproppred import DglNodePropPredDataset
-from pyinstrument import Profiler
+
+
+class RelGraphConvLayer(nn.Module):
+    r"""Relational graph convolution layer.
+    Parameters
+    ----------
+    in_feat : int
+        Input feature size.
+    out_feat : int
+        Output feature size.
+    rel_names : list[str]
+        Relation names.
+    num_bases : int, optional
+        Number of bases. If is none, use number of relations. Default: None.
+    weight : bool, optional
+        True if a linear layer is applied after message passing. Default: True
+    bias : bool, optional
+        True if bias is added. Default: True
+    activation : callable, optional
+        Activation function. Default: None
+    self_loop : bool, optional
+        True to include self loop message. Default: False
+    dropout : float, optional
+        Dropout rate. Default: 0.0
+    """
+    def __init__(self,
+                 in_feat,
+                 out_feat,
+                 rel_names,
+                 num_bases,
+                 *,
+                 weight=True,
+                 bias=True,
+                 activation=None,
+                 self_loop=False,
+                 dropout=0.0):
+        super(RelGraphConvLayer, self).__init__()
+        self.in_feat = in_feat
+        self.out_feat = out_feat
+        self.rel_names = rel_names
+        self.num_bases = num_bases
+        self.bias = bias
+        self.activation = activation
+        self.self_loop = self_loop
+
+        self.conv = dglnn.HeteroGraphConv({
+                rel : dglnn.GraphConv(in_feat, out_feat, norm='right', weight=False, bias=False)
+                for rel in rel_names
+            })
+
+        self.use_weight = weight
+        self.use_basis = num_bases < len(self.rel_names) and weight
+        if self.use_weight:
+            if self.use_basis:
+                self.basis = dglnn.WeightBasis((in_feat, out_feat), num_bases, len(self.rel_names))
+            else:
+                self.weight = nn.Parameter(th.Tensor(len(self.rel_names), in_feat, out_feat))
+                nn.init.xavier_uniform_(self.weight, gain=nn.init.calculate_gain('relu'))
+
+        # bias
+        if bias:
+            self.h_bias = nn.Parameter(th.Tensor(out_feat))
+            nn.init.zeros_(self.h_bias)
+
+        # weight for self loop
+        if self.self_loop:
+            self.loop_weight = nn.Parameter(th.Tensor(in_feat, out_feat))
+            nn.init.xavier_uniform_(self.loop_weight,
+                                    gain=nn.init.calculate_gain('relu'))
+
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, g, inputs):
+        """Forward computation
+        Parameters
+        ----------
+        g : DGLHeteroGraph
+            Input graph.
+        inputs : dict[str, torch.Tensor]
+            Node feature for each node type.
+        Returns
+        -------
+        dict[str, torch.Tensor]
+            New node features for each node type.
+        """
+        g = g.local_var()
+        if self.use_weight:
+            weight = self.basis() if self.use_basis else self.weight
+            wdict = {self.rel_names[i] : {'weight' : w.squeeze(0)}
+                     for i, w in enumerate(th.split(weight, 1, dim=0))}
+        else:
+            wdict = {}
+
+        if g.is_block:
+            inputs_src = inputs
+            inputs_dst = {k: v[:g.number_of_dst_nodes(k)] for k, v in inputs.items()}
+        else:
+            inputs_src = inputs_dst = inputs
+
+        hs = self.conv(g, inputs, mod_kwargs=wdict)
+
+        def _apply(ntype, h):
+            if self.self_loop:
+                h = h + th.matmul(inputs_dst[ntype], self.loop_weight)
+            if self.bias:
+                h = h + self.h_bias
+            if self.activation:
+                h = self.activation(h)
+            return self.dropout(h)
+        return {ntype : _apply(ntype, h) for ntype, h in hs.items()}
 
 class EntityClassify(nn.Module):
     """ Entity classification class for RGCN
@@ -43,8 +152,8 @@ class EntityClassify(nn.Module):
         Hidden dim size.
     out_dim : int
         Output dim size.
-    num_rels : int
-        Numer of relation types.
+    rel_names : list of str
+        A list of relation names.
     num_bases : int
         Number of bases. If is none, use number of relations.
     num_hidden_layers : int
@@ -53,51 +162,43 @@ class EntityClassify(nn.Module):
         Dropout
     use_self_loop : bool
         Use self loop if True, default False.
-    low_mem : bool
-        True to use low memory implementation of relation message passing function
-        trade speed with memory consumption
     """
     def __init__(self,
                  device,
                  h_dim,
                  out_dim,
-                 num_rels,
+                 rel_names,
                  num_bases=None,
                  num_hidden_layers=1,
                  dropout=0,
                  use_self_loop=False,
-                 low_mem=False,
                  layer_norm=False):
         super(EntityClassify, self).__init__()
         self.device = device
         self.h_dim = h_dim
         self.out_dim = out_dim
-        self.num_rels = num_rels
         self.num_bases = None if num_bases < 0 else num_bases
         self.num_hidden_layers = num_hidden_layers
         self.dropout = dropout
         self.use_self_loop = use_self_loop
-        self.low_mem = low_mem
         self.layer_norm = layer_norm
 
         self.layers = nn.ModuleList()
         # i2h
-        self.layers.append(RelGraphConv(
-            self.h_dim, self.h_dim, self.num_rels, "basis",
+        self.layers.append(RelGraphConvLayer(
+            self.h_dim, self.h_dim, rel_names,
             self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
-            low_mem=self.low_mem, dropout=self.dropout))
+            dropout=self.dropout))
         # h2h
         for idx in range(self.num_hidden_layers):
-            self.layers.append(RelGraphConv(
-                self.h_dim, self.h_dim, self.num_rels, "basis",
+            self.layers.append(RelGraphConvLayer(
+                self.h_dim, self.h_dim, rel_names,
                 self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
-                low_mem=self.low_mem, dropout=self.dropout))
+                dropout=self.dropout))
         # h2o
-        self.layers.append(RelGraphConv(
-            self.h_dim, self.out_dim, self.num_rels, "basis",
-            self.num_bases, activation=None,
-            self_loop=self.use_self_loop,
-            low_mem=self.low_mem))
+        self.layers.append(RelGraphConvLayer(
+            self.h_dim, self.out_dim, rel_names,
+            self.num_bases, activation=None, self_loop=self.use_self_loop))
 
     def forward(self, blocks, feats, norm=None):
         if blocks is None:
@@ -106,7 +207,7 @@ class EntityClassify(nn.Module):
         h = feats
         for layer, block in zip(self.layers, blocks):
             block = block.to(self.device)
-            h = layer(block, h, block.edata['etype'], block.edata['norm'])
+            h = layer(block, h)
         return h
 
 def init_emb(shape, dtype):
@@ -122,8 +223,6 @@ class DistEmbedLayer(nn.Module):
         Device to run the layer.
     g : DistGraph
         training graph
-    num_of_ntype : int
-        Number of node types
     embed_size : int
         Output embed size
     sparse_emb: bool
@@ -138,55 +237,70 @@ class DistEmbedLayer(nn.Module):
     def __init__(self,
                  dev_id,
                  g,
-                 num_of_ntype,
                  embed_size,
                  sparse_emb=False,
                  dgl_sparse_emb=False,
+                 feat_name='feat',
                  embed_name='node_emb'):
         super(DistEmbedLayer, self).__init__()
         self.dev_id = dev_id
-        self.num_of_ntype = num_of_ntype
         self.embed_size = embed_size
         self.embed_name = embed_name
+        self.feat_name = feat_name
         self.sparse_emb = sparse_emb
+        self.g = g
+        self.ntype_id_map = {g.get_ntype_id(ntype):ntype for ntype in g.ntypes}
 
+        self.node_projs = nn.ModuleDict()
+        for ntype in g.ntypes:
+            if feat_name in g.nodes[ntype].data:
+                self.node_projs[ntype] = nn.Linear(g.nodes[ntype].data[feat_name].shape[1], embed_size)
+                nn.init.xavier_uniform_(self.node_projs[ntype].weight)
+                print('node {} has data {}'.format(ntype, feat_name))
         if sparse_emb:
             if dgl_sparse_emb:
-                self.node_embeds = dgl.distributed.DistEmbedding(g.number_of_nodes(),
-                                                                 self.embed_size,
-                                                                 embed_name,
-                                                                 init_emb)
+                self.node_embeds = {}
+                for ntype in g.ntypes:
+                    # We only create embeddings for nodes without node features.
+                    if feat_name not in g.nodes[ntype].data:
+                        part_policy = g.get_node_partition_policy(ntype)
+                        self.node_embeds[ntype] = dgl.distributed.DistEmbedding(g.number_of_nodes(ntype),
+                                self.embed_size,
+                                embed_name + '_' + ntype,
+                                init_emb,
+                                part_policy)
             else:
-                self.node_embeds = th.nn.Embedding(g.number_of_nodes(), self.embed_size, sparse=self.sparse_emb)
-                nn.init.uniform_(self.node_embeds.weight, -1.0, 1.0)
+                self.node_embeds = nn.ModuleDict()
+                for ntype in g.ntypes:
+                    # We only create embeddings for nodes without node features.
+                    if feat_name not in g.nodes[ntype].data:
+                        self.node_embeds[ntype] = th.nn.Embedding(g.number_of_nodes(ntype), self.embed_size, sparse=self.sparse_emb)
+                        nn.init.uniform_(self.node_embeds[ntype].weight, -1.0, 1.0)
         else:
-            self.node_embeds = th.nn.Embedding(g.number_of_nodes(), self.embed_size)
-            nn.init.uniform_(self.node_embeds.weight, -1.0, 1.0)
+            self.node_embeds = nn.ModuleDict()
+            for ntype in g.ntypes:
+                # We only create embeddings for nodes without node features.
+                if feat_name not in g.nodes[ntype].data:
+                    self.node_embeds[ntype] = th.nn.Embedding(g.number_of_nodes(ntype), self.embed_size)
+                    nn.init.uniform_(self.node_embeds[ntype].weight, -1.0, 1.0)
 
-    def forward(self, node_ids, node_tids, features):
+    def forward(self, node_ids):
         """Forward computation
         Parameters
         ----------
-        node_ids : tensor
+        node_ids : dict of Tensor
             node ids to generate embedding for.
-        node_ids : tensor
-            node type ids
-        features : list of features
-            list of initial features for nodes belong to different node type.
-            If None, the corresponding features is an one-hot encoding feature,
-            else use the features directly as input feature and matmul a
-            projection matrix.
         Returns
         -------
         tensor
             embeddings as the input of the next layer
         """
-        embeds = th.empty(node_ids.shape[0], self.embed_size)
-        for ntype in range(self.num_of_ntype):
-            assert features[ntype] is None, 'Currently Dist RGCN only support non input feature'
-            loc = node_tids == ntype
-            embeds[loc] = self.node_embeds(node_ids[loc])
-
+        embeds = {}
+        for ntype in node_ids:
+            if self.feat_name in self.g.nodes[ntype].data:
+                embeds[ntype] = self.node_projs[ntype](self.g.nodes[ntype].data[self.feat_name][node_ids[ntype]].to(self.dev_id))
+            else:
+                embeds[ntype] = self.node_embeds[ntype](node_ids[ntype]).to(self.dev_id)
         return embeds
 
 def compute_acc(results, labels):
@@ -196,7 +310,7 @@ def compute_acc(results, labels):
     labels = labels.long()
     return (results == labels).float().sum() / len(results)
 
-def evaluate(g, model, embed_layer, labels, eval_loader, test_loader, node_feats, global_val_nid, global_test_nid):
+def evaluate(g, model, embed_layer, labels, eval_loader, test_loader, all_val_nid, all_test_nid):
     model.eval()
     embed_layer.eval()
     eval_logits = []
@@ -205,13 +319,16 @@ def evaluate(g, model, embed_layer, labels, eval_loader, test_loader, node_feats
     global_results = dgl.distributed.DistTensor(labels.shape, th.long, 'results', persistent=True)
 
     with th.no_grad():
+        th.cuda.empty_cache()
         for sample_data in tqdm.tqdm(eval_loader):
-            seeds, blocks = sample_data
-            feats = embed_layer(blocks[0].srcdata[dgl.NID],
-                                blocks[0].srcdata[dgl.NTYPE],
-                                node_feats)
+            input_nodes, seeds, blocks = sample_data
+            seeds = seeds['paper']
+            feats = embed_layer(input_nodes)
             logits = model(blocks, feats)
+            assert len(logits) == 1
+            logits = logits['paper']
             eval_logits.append(logits.cpu().detach())
+            assert np.all(seeds.numpy() < g.number_of_nodes('paper'))
             eval_seeds.append(seeds.cpu().detach())
     eval_logits = th.cat(eval_logits)
     eval_seeds = th.cat(eval_seeds)
@@ -220,13 +337,16 @@ def evaluate(g, model, embed_layer, labels, eval_loader, test_loader, node_feats
     test_logits = []
     test_seeds = []
     with th.no_grad():
+        th.cuda.empty_cache()
         for sample_data in tqdm.tqdm(test_loader):
-            seeds, blocks = sample_data
-            feats = embed_layer(blocks[0].srcdata[dgl.NID],
-                                blocks[0].srcdata[dgl.NTYPE],
-                                node_feats)
+            input_nodes, seeds, blocks = sample_data
+            seeds = seeds['paper']
+            feats = embed_layer(input_nodes)
             logits = model(blocks, feats)
+            assert len(logits) == 1
+            logits = logits['paper']
             test_logits.append(logits.cpu().detach())
+            assert np.all(seeds.numpy() < g.number_of_nodes('paper'))
             test_seeds.append(seeds.cpu().detach())
     test_logits = th.cat(test_logits)
     test_seeds = th.cat(test_seeds)
@@ -234,121 +354,100 @@ def evaluate(g, model, embed_layer, labels, eval_loader, test_loader, node_feats
 
     g.barrier()
     if g.rank() == 0:
-        return compute_acc(global_results[global_val_nid], labels[global_val_nid]), \
-            compute_acc(global_results[global_test_nid], labels[global_test_nid])
+        return compute_acc(global_results[all_val_nid], labels[all_val_nid]), \
+            compute_acc(global_results[all_test_nid], labels[all_test_nid])
     else:
         return -1, -1
 
-class NeighborSampler:
-    """Neighbor sampler
-    Parameters
-    ----------
-    g : DGLHeterograph
-        Full graph
-    target_idx : tensor
-        The target training node IDs in g
-    fanouts : list of int
-        Fanout of each hop starting from the seed nodes. If a fanout is None,
-        sample full neighbors.
-    """
-    def __init__(self, g, fanouts, sample_neighbors):
-        self.g = g
-        self.fanouts = fanouts
-        self.sample_neighbors = sample_neighbors
-
-    def sample_blocks(self, seeds):
-        """Do neighbor sample
-        Parameters
-        ----------
-        seeds :
-            Seed nodes
-        Returns
-        -------
-        tensor
-            Seed nodes, also known as target nodes
-        blocks
-            Sampled subgraphs
-        """
-        blocks = []
-        etypes = []
-        norms = []
-        ntypes = []
-        seeds = th.LongTensor(np.asarray(seeds))
-        cur = seeds
-        for fanout in self.fanouts:
-            frontier = self.sample_neighbors(self.g, cur, fanout, replace=True)
-            etypes = self.g.edata[dgl.ETYPE][frontier.edata[dgl.EID]]
-            norm = self.g.edata['norm'][frontier.edata[dgl.EID]]
-            block = dgl.to_block(frontier, cur)
-            block.srcdata[dgl.NTYPE] = self.g.ndata[dgl.NTYPE][block.srcdata[dgl.NID]]
-            block.edata['etype'] = etypes
-            block.edata['norm'] = norm
-            cur = block.srcdata[dgl.NID]
-            blocks.insert(0, block)
-        return seeds, blocks
-
 def run(args, device, data):
-    g, node_feats, num_of_ntype, num_classes, num_rels, \
-        train_nid, val_nid, test_nid, labels, global_val_nid, global_test_nid = data
+    g, num_classes, train_nid, val_nid, test_nid, labels, all_val_nid, all_test_nid = data
 
     fanouts = [int(fanout) for fanout in args.fanout.split(',')]
     val_fanouts = [int(fanout) for fanout in args.validation_fanout.split(',')]
-    sampler = NeighborSampler(g, fanouts, dgl.distributed.sample_neighbors)
-    # Create DataLoader for constructing blocks
-    dataloader = DistDataLoader(
-        dataset=train_nid.numpy(),
+
+    sampler = dgl.dataloading.MultiLayerNeighborSampler(fanouts)
+    dataloader = dgl.dataloading.DistNodeDataLoader(
+        g,
+        {'paper': train_nid},
+        sampler,
         batch_size=args.batch_size,
-        collate_fn=sampler.sample_blocks,
         shuffle=True,
         drop_last=False)
 
-    valid_sampler = NeighborSampler(g, val_fanouts, dgl.distributed.sample_neighbors)
-    # Create DataLoader for constructing blocks
-    valid_dataloader = DistDataLoader(
-        dataset=val_nid.numpy(),
+    valid_sampler = dgl.dataloading.MultiLayerNeighborSampler(val_fanouts)
+    valid_dataloader = dgl.dataloading.DistNodeDataLoader(
+        g,
+        {'paper': val_nid},
+        valid_sampler,
         batch_size=args.batch_size,
-        collate_fn=valid_sampler.sample_blocks,
         shuffle=False,
         drop_last=False)
 
-    test_sampler = NeighborSampler(g, [-1] * args.n_layers, dgl.distributed.sample_neighbors)
-    # Create DataLoader for constructing blocks
-    test_dataloader = DistDataLoader(
-        dataset=test_nid.numpy(),
-        batch_size=args.batch_size,
-        collate_fn=test_sampler.sample_blocks,
+    test_sampler = dgl.dataloading.MultiLayerNeighborSampler(val_fanouts)
+    test_dataloader = dgl.dataloading.DistNodeDataLoader(
+        g,
+        {'paper': test_nid},
+        test_sampler,
+        batch_size=args.eval_batch_size,
         shuffle=False,
         drop_last=False)
 
     embed_layer = DistEmbedLayer(device,
                                  g,
-                                 num_of_ntype,
                                  args.n_hidden,
                                  sparse_emb=args.sparse_embedding,
-                                 dgl_sparse_emb=args.dgl_sparse)
+                                 dgl_sparse_emb=args.dgl_sparse,
+                                 feat_name='feat')
 
     model = EntityClassify(device,
                            args.n_hidden,
                            num_classes,
-                           num_rels,
+                           g.etypes,
                            num_bases=args.n_bases,
                            num_hidden_layers=args.n_layers-2,
                            dropout=args.dropout,
                            use_self_loop=args.use_self_loop,
-                           low_mem=args.low_mem,
                            layer_norm=args.layer_norm)
     model = model.to(device)
+
     if not args.standalone:
-        model = th.nn.parallel.DistributedDataParallel(model)
-        if args.sparse_embedding and not args.dgl_sparse:
-            embed_layer = DistributedDataParallel(embed_layer, device_ids=None, output_device=None)
+        if args.num_gpus == -1:
+            model = DistributedDataParallel(model)
+            # If there are dense parameters in the embedding layer
+            # or we use Pytorch saprse embeddings.
+            if len(embed_layer.node_projs) > 0 or not args.dgl_sparse:
+                embed_layer = DistributedDataParallel(embed_layer)
+        else:
+            dev_id = g.rank() % args.num_gpus
+            model = DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id)
+            # If there are dense parameters in the embedding layer
+            # or we use Pytorch saprse embeddings.
+            if len(embed_layer.node_projs) > 0 or not args.dgl_sparse:
+                embed_layer = embed_layer.to(device)
+                embed_layer = DistributedDataParallel(embed_layer, device_ids=[dev_id], output_device=dev_id)
 
     if args.sparse_embedding:
-        if args.dgl_sparse:
-            emb_optimizer = dgl.distributed.SparseAdagrad([embed_layer.node_embeds], lr=args.sparse_lr)
+        if args.dgl_sparse and args.standalone:
+            emb_optimizer = dgl.distributed.optim.SparseAdam(list(embed_layer.node_embeds.values()), lr=args.sparse_lr)
+            print('optimize DGL sparse embedding:', embed_layer.node_embeds.keys())
+        elif args.dgl_sparse:
+            emb_optimizer = dgl.distributed.optim.SparseAdam(list(embed_layer.module.node_embeds.values()), lr=args.sparse_lr)
+            print('optimize DGL sparse embedding:', embed_layer.module.node_embeds.keys())
+        elif args.standalone:
+            emb_optimizer = th.optim.SparseAdam(list(embed_layer.node_embeds.parameters()), lr=args.sparse_lr)
+            print('optimize Pytorch sparse embedding:', embed_layer.node_embeds)
         else:
-            emb_optimizer = th.optim.SparseAdam(embed_layer.module.node_embeds.parameters(), lr=args.sparse_lr)
-        optimizer = th.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.l2norm)
+            emb_optimizer = th.optim.SparseAdam(list(embed_layer.module.node_embeds.parameters()), lr=args.sparse_lr)
+            print('optimize Pytorch sparse embedding:', embed_layer.module.node_embeds)
+
+        dense_params = list(model.parameters())
+        if args.standalone:
+            dense_params += list(embed_layer.node_projs.parameters())
+            print('optimize dense projection:', embed_layer.node_projs)
+        else:
+            dense_params += list(embed_layer.module.node_projs.parameters())
+            print('optimize dense projection:', embed_layer.module.node_projs)
+        optimizer = th.optim.Adam(dense_params, lr=args.lr, weight_decay=args.l2norm)
     else:
         all_params = list(model.parameters()) + list(embed_layer.parameters())
         optimizer = th.optim.Adam(all_params, lr=args.lr, weight_decay=args.l2norm)
@@ -364,6 +463,7 @@ def run(args, device, data):
         backward_time = 0
         update_time = 0
         number_train = 0
+        number_input = 0
 
         step_time = []
         iter_t = []
@@ -379,97 +479,108 @@ def run(args, device, data):
         # blocks.
         step_time = []
         for step, sample_data in enumerate(dataloader):
-            seeds, blocks = sample_data
+            input_nodes, seeds, blocks = sample_data
+            seeds = seeds['paper']
             number_train += seeds.shape[0]
+            number_input += np.sum([blocks[0].num_src_nodes(ntype) for ntype in blocks[0].ntypes])
             tic_step = time.time()
             sample_time += tic_step - start
             sample_t.append(tic_step - start)
 
-            feats = embed_layer(blocks[0].srcdata[dgl.NID],
-                                blocks[0].srcdata[dgl.NTYPE],
-                                node_feats)
-            label = labels[seeds]
+            feats = embed_layer(input_nodes)
+            label = labels[seeds].to(device)
             copy_time = time.time()
             feat_copy_t.append(copy_time - tic_step)
 
             # forward
             logits = model(blocks, feats)
+            assert len(logits) == 1
+            logits = logits['paper']
             loss = F.cross_entropy(logits, label)
             forward_end = time.time()
 
             # backward
             optimizer.zero_grad()
-            if args.sparse_embedding and not args.dgl_sparse:
+            if args.sparse_embedding:
                 emb_optimizer.zero_grad()
             loss.backward()
-            optimizer.step()
-            if args.sparse_embedding:
-                emb_optimizer.step()
             compute_end = time.time()
             forward_t.append(forward_end - copy_time)
             backward_t.append(compute_end - forward_end)
 
-            # Aggregate gradients in multiple nodes.
+            # Update model parameters
             optimizer.step()
+            if args.sparse_embedding:
+                emb_optimizer.step()
             update_t.append(time.time() - compute_end)
             step_t = time.time() - start
             step_time.append(step_t)
 
+            train_acc = th.sum(logits.argmax(dim=1) == label).item() / len(seeds)
+
             if step % args.log_every == 0:
-                print('[{}] Epoch {:05d} | Step {:05d} | Loss {:.4f} | time {:.3f} s' \
+                print('[{}] Epoch {:05d} | Step {:05d} | Train acc {:.4f} | Loss {:.4f} | time {:.3f} s' \
                         '| sample {:.3f} | copy {:.3f} | forward {:.3f} | backward {:.3f} | update {:.3f}'.format(
-                    g.rank(), epoch, step, loss.item(), np.sum(step_time[-args.log_every:]),
+                    g.rank(), epoch, step, train_acc, loss.item(), np.sum(step_time[-args.log_every:]),
                     np.sum(sample_t[-args.log_every:]), np.sum(feat_copy_t[-args.log_every:]), np.sum(forward_t[-args.log_every:]),
                     np.sum(backward_t[-args.log_every:]), np.sum(update_t[-args.log_every:])))
             start = time.time()
 
-        print('[{}]Epoch Time(s): {:.4f}, sample: {:.4f}, data copy: {:.4f}, forward: {:.4f}, backward: {:.4f}, update: {:.4f}, #number_train: {}'.format(
-            g.rank(), np.sum(step_time), np.sum(sample_t), np.sum(feat_copy_t), np.sum(forward_t), np.sum(backward_t), np.sum(update_t), number_train))
+        gc.collect()
+        print('[{}]Epoch Time(s): {:.4f}, sample: {:.4f}, data copy: {:.4f}, forward: {:.4f}, backward: {:.4f}, update: {:.4f}, #train: {}, #input: {}'.format(
+            g.rank(), np.sum(step_time), np.sum(sample_t), np.sum(feat_copy_t), np.sum(forward_t), np.sum(backward_t), np.sum(update_t), number_train, number_input))
         epoch += 1
 
         start = time.time()
         g.barrier()
         val_acc, test_acc = evaluate(g, model, embed_layer, labels,
-            valid_dataloader, test_dataloader, node_feats, global_val_nid, global_test_nid)
+            valid_dataloader, test_dataloader, all_val_nid, all_test_nid)
         if val_acc >= 0:
             print('Val Acc {:.4f}, Test Acc {:.4f}, time: {:.4f}'.format(val_acc, test_acc,
                                                                          time.time() - start))
 
 def main(args):
-    dgl.distributed.initialize(args.ip_config, args.num_servers, num_workers=args.num_workers)
+    dgl.distributed.initialize(args.ip_config)
     if not args.standalone:
         th.distributed.init_process_group(backend='gloo')
 
     g = dgl.distributed.DistGraph(args.graph_name, part_config=args.conf_path)
     print('rank:', g.rank())
-    print('number of edges', g.number_of_edges())
 
     pb = g.get_partition_book()
-    train_nid = dgl.distributed.node_split(g.ndata['train_mask'], pb, force_even=True)
-    val_nid = dgl.distributed.node_split(g.ndata['val_mask'], pb, force_even=True)
-    test_nid = dgl.distributed.node_split(g.ndata['test_mask'], pb, force_even=True)
-    local_nid = pb.partid2nids(pb.partid).detach().numpy()
+    if 'trainer_id' in g.nodes['paper'].data:
+        train_nid = dgl.distributed.node_split(g.nodes['paper'].data['train_mask'],
+                                               pb, ntype='paper', force_even=True,
+                                               node_trainer_ids=g.nodes['paper'].data['trainer_id'])
+        val_nid = dgl.distributed.node_split(g.nodes['paper'].data['val_mask'],
+                                             pb, ntype='paper', force_even=True,
+                                             node_trainer_ids=g.nodes['paper'].data['trainer_id'])
+        test_nid = dgl.distributed.node_split(g.nodes['paper'].data['test_mask'],
+                                              pb, ntype='paper', force_even=True,
+                                              node_trainer_ids=g.nodes['paper'].data['trainer_id'])
+    else:
+        train_nid = dgl.distributed.node_split(g.nodes['paper'].data['train_mask'],
+                                               pb, ntype='paper', force_even=True)
+        val_nid = dgl.distributed.node_split(g.nodes['paper'].data['val_mask'],
+                                             pb, ntype='paper', force_even=True)
+        test_nid = dgl.distributed.node_split(g.nodes['paper'].data['test_mask'],
+                                              pb, ntype='paper', force_even=True)
+    local_nid = pb.partid2nids(pb.partid, 'paper').detach().numpy()
     print('part {}, train: {} (local: {}), val: {} (local: {}), test: {} (local: {})'.format(
           g.rank(), len(train_nid), len(np.intersect1d(train_nid.numpy(), local_nid)),
           len(val_nid), len(np.intersect1d(val_nid.numpy(), local_nid)),
           len(test_nid), len(np.intersect1d(test_nid.numpy(), local_nid))))
-    device = th.device('cpu')
-    labels = g.ndata['labels'][np.arange(g.number_of_nodes())]
-    global_val_nid = th.LongTensor(np.nonzero(g.ndata['val_mask'][np.arange(g.number_of_nodes())])).squeeze()
-    global_test_nid = th.LongTensor(np.nonzero(g.ndata['test_mask'][np.arange(g.number_of_nodes())])).squeeze()
+    if args.num_gpus == -1:
+        device = th.device('cpu')
+    else:
+        device = th.device('cuda:'+str(args.local_rank))
+    labels = g.nodes['paper'].data['labels'][np.arange(g.number_of_nodes('paper'))]
+    all_val_nid = th.LongTensor(np.nonzero(g.nodes['paper'].data['val_mask'][np.arange(g.number_of_nodes('paper'))])).squeeze()
+    all_test_nid = th.LongTensor(np.nonzero(g.nodes['paper'].data['test_mask'][np.arange(g.number_of_nodes('paper'))])).squeeze()
     n_classes = len(th.unique(labels[labels >= 0]))
-    print(labels.shape)
     print('#classes:', n_classes)
 
-    # these two infor should have a better place to store and retrive
-    num_of_ntype = len(th.unique(g.ndata[dgl.NTYPE][np.arange(g.number_of_nodes())]))
-    num_rels = len(th.unique(g.edata[dgl.ETYPE][np.arange(g.number_of_edges())]))
-
-    # no initial node features
-    node_feats = [None] * num_of_ntype
-
-    run(args, device, (g, node_feats, num_of_ntype, n_classes, num_rels,
-                       train_nid, val_nid, test_nid, labels, global_val_nid, global_test_nid))
+    run(args, device, (g, n_classes, train_nid, val_nid, test_nid, labels, all_val_nid, all_test_nid))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='RGCN')
@@ -478,12 +589,10 @@ if __name__ == '__main__':
     parser.add_argument('--id', type=int, help='the partition id')
     parser.add_argument('--ip-config', type=str, help='The file for IP configuration')
     parser.add_argument('--conf-path', type=str, help='The path to the partition config file')
-    parser.add_argument('--num-client', type=int, help='The number of clients')
-    parser.add_argument('--num-servers', type=int, default=1, help='Server count on each machine.')
 
     # rgcn related
-    parser.add_argument("--gpu", type=str, default='0',
-            help="gpu")
+    parser.add_argument('--num_gpus', type=int, default=-1,
+                        help="the number of GPU device. Use -1 for CPU training")
     parser.add_argument("--dropout", type=float, default=0,
             help="dropout probability")
     parser.add_argument("--n-hidden", type=int, default=16,
@@ -515,20 +624,12 @@ if __name__ == '__main__':
     parser.add_argument("--eval-batch-size", type=int, default=128,
             help="Mini-batch size. ")
     parser.add_argument('--log-every', type=int, default=20)
-    parser.add_argument("--num-workers", type=int, default=1,
-            help="Number of workers for distributed dataloader.")
     parser.add_argument("--low-mem", default=False, action='store_true',
             help="Whether use low mem RelGraphCov")
-    parser.add_argument("--mix-cpu-gpu", default=False, action='store_true',
-            help="Whether store node embeddins in cpu")
     parser.add_argument("--sparse-embedding", action='store_true',
             help='Use sparse embedding for node embeddings.')
     parser.add_argument("--dgl-sparse", action='store_true',
             help='Whether to use DGL sparse embedding')
-    parser.add_argument('--node-feats', default=False, action='store_true',
-            help='Whether use node features')
-    parser.add_argument('--global-norm', default=False, action='store_true',
-            help='User global norm instead of per node type norm')
     parser.add_argument('--layer-norm', default=False, action='store_true',
             help='Use layer norm')
     parser.add_argument('--local_rank', type=int, help='get rank of the process')

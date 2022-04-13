@@ -31,16 +31,18 @@ dgl::runtime::PackedFunc ConvertNDArrayVectorToPackedFunc(
     const std::vector<dgl::runtime::NDArray>& vec);
 
 /*!
- * \brief Copy a vector to an int64_t NDArray.
+ * \brief Copy a vector to an NDArray.
  *
- * The element type of the vector must be convertible to int64_t.
+ * The data type of the NDArray will be IdType, which must be an integer type.
+ * The element type (DType) of the vector must be convertible to IdType.
  */
 template<typename IdType, typename DType>
 dgl::runtime::NDArray CopyVectorToNDArray(
     const std::vector<DType>& vec) {
   using dgl::runtime::NDArray;
   const int64_t len = vec.size();
-  NDArray a = NDArray::Empty({len}, DLDataType{kDLInt, sizeof(IdType), 1}, DLContext{kDLCPU, 0});
+  NDArray a = NDArray::Empty({len}, DLDataType{kDLInt, sizeof(IdType) * 8, 1},
+                             DLContext{kDLCPU, 0});
   std::copy(vec.begin(), vec.end(), static_cast<IdType*>(a->data));
   return a;
 }

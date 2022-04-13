@@ -3,6 +3,8 @@
 7.2 Distributed APIs
 --------------------
 
+:ref:`(中文版) <guide_cn-distributed-apis>`
+
 This section covers the distributed APIs used in the training script. DGL provides three distributed
 data structures and various APIs for initialization, distributed sampling and workload split.
 For distributed training/inference, DGL provides three distributed data structures:
@@ -21,7 +23,7 @@ Typically, the initialization APIs should be invoked in the following order:
 
 .. code:: python
 
-    dgl.distributed.initialize('ip_config.txt', num_workers=4)
+    dgl.distributed.initialize('ip_config.txt')
     th.distributed.init_process_group(backend='gloo')
 
 **Note**: If the training script contains user-defined functions (UDFs) that have to be invoked on
@@ -99,13 +101,11 @@ Users can also assign a new :class:`~dgl.distributed.DistTensor` to
 
 .. code:: python
 
-    g.ndata['train_mask']
-    <dgl.distributed.dist_graph.DistTensor at 0x7fec820937b8>
-    g.ndata['train_mask'][0]
-    tensor([1], dtype=torch.uint8)
+    g.ndata['train_mask']  # <dgl.distributed.dist_graph.DistTensor at 0x7fec820937b8>
+    g.ndata['train_mask'][0]  # tensor([1], dtype=torch.uint8)
 
 Distributed Tensor
-~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
 
 As mentioned earlier, DGL shards node/edge features and stores them in a cluster of machines.
 DGL provides distributed tensors with a tensor-like interface to access the partitioned
@@ -122,10 +122,10 @@ in the cluster even if the :class:`~dgl.distributed.DistTensor` object disappear
 
 .. code:: python
 
-    tensor = dgl.distributed.DistTensor((g.number_of_nodes(), 10), th.float32, name=’test’)
+    tensor = dgl.distributed.DistTensor((g.number_of_nodes(), 10), th.float32, name='test')
 
 **Note**: :class:`~dgl.distributed.DistTensor` creation is a synchronized operation. All trainers
-have to invoke the creation and the creation succeeds only when all trainers call it. 
+have to invoke the creation and the creation succeeds only when all trainers call it.
 
 A user can add a :class:`~dgl.distributed.DistTensor` to a :class:`~dgl.distributed.DistGraph`
 object as one of the node data or edge data.
@@ -153,7 +153,7 @@ computation operators, such as sum and mean.
 when a machine runs multiple servers. This may result in data corruption. One way to avoid concurrent
 writes to the same row of data is to run one server process on a machine.
 
-Distributed Embedding
+Distributed DistEmbedding
 ~~~~~~~~~~~~~~~~~~~~~
 
 DGL provides :class:`~dgl.distributed.DistEmbedding` to support transductive models that require
@@ -202,27 +202,21 @@ DGL provides two levels of APIs for sampling nodes and edges to generate mini-ba
 (see the section of mini-batch training). The low-level APIs require users to write code
 to explicitly define how a layer of nodes are sampled (e.g., using :func:`dgl.sampling.sample_neighbors` ).
 The high-level sampling APIs implement a few popular sampling algorithms for node classification
-and link prediction tasks (e.g., :class:`~dgl.dataloading.pytorch.NodeDataloader` and
-:class:`~dgl.dataloading.pytorch.EdgeDataloader` ).
+and link prediction tasks (e.g., :class:`~dgl.dataloading.NodeDataLoader` and
+:class:`~dgl.dataloading.EdgeDataLoader` ).
 
 The distributed sampling module follows the same design and provides two levels of sampling APIs.
 For the lower-level sampling API, it provides :func:`~dgl.distributed.sample_neighbors` for
 distributed neighborhood sampling on :class:`~dgl.distributed.DistGraph`. In addition, DGL provides
-a distributed Dataloader (:class:`~dgl.distributed.DistDataLoader` ) for distributed sampling.
-The distributed Dataloader has the same interface as Pytorch DataLoader except that users cannot
+a distributed DataLoader (:class:`~dgl.distributed.DistDataLoader` ) for distributed sampling.
+The distributed DataLoader has the same interface as Pytorch DataLoader except that users cannot
 specify the number of worker processes when creating a dataloader. The worker processes are created
 in :func:`dgl.distributed.initialize`.
 
 **Note**: When running :func:`dgl.distributed.sample_neighbors` on :class:`~dgl.distributed.DistGraph`,
-the sampler cannot run in Pytorch Dataloader with multiple worker processes. The main reason is that
-Pytorch Dataloader creates new sampling worker processes in every epoch, which leads to creating and
+the sampler cannot run in Pytorch DataLoader with multiple worker processes. The main reason is that
+Pytorch DataLoader creates new sampling worker processes in every epoch, which leads to creating and
 destroying :class:`~dgl.distributed.DistGraph` objects many times.
-
-The same high-level sampling APIs (:class:`~dgl.dataloading.pytorch.NodeDataloader` and
-:class:`~dgl.dataloading.pytorch.EdgeDataloader` ) work for both :class:`~dgl.DGLGraph`
-and :class:`~dgl.distributed.DistGraph`. When using :class:`~dgl.dataloading.pytorch.NodeDataloader`
-and :class:`~dgl.dataloading.pytorch.EdgeDataloader`, the distributed sampling code is exactly
-the same as single-process sampling.
 
 When using the low-level API, the sampling code is similar to single-process sampling. The only
 difference is that users need to use :func:`dgl.distributed.sample_neighbors` and
@@ -246,32 +240,40 @@ difference is that users need to use :func:`dgl.distributed.sample_neighbors` an
         for batch in dataloader:
             ...
 
-When using the high-level API, the distributed sampling code is identical to the single-machine sampling:
+The high-level sampling APIs (:class:`~dgl.dataloading.NodeDataLoader` and
+:class:`~dgl.dataloading.EdgeDataLoader` ) has distributed counterparts
+(:class:`~dgl.dataloading.DistNodeDataLoader` and
+:class:`~dgl.dataloading.DistEdgeDataLoader`).  The code is exactly the
+same as single-process sampling otherwise.
 
 .. code:: python
 
     sampler = dgl.sampling.MultiLayerNeighborSampler([10, 25])
-    dataloader = dgl.sampling.NodeDataLoader(g, train_nid, sampler,
-                                             batch_size=batch_size, shuffle=True)
+    dataloader = dgl.sampling.DistNodeDataLoader(g, train_nid, sampler,
+                                                 batch_size=batch_size, shuffle=True)
     for batch in dataloader:
-        ... 
+        ...
 
 
 Split workloads
 ~~~~~~~~~~~~~~~
 
-Users need to split the training set so that each trainer works on its own subset. Similarly,
+To train a model, users first need to split the dataset into training, validation and test sets.
+For distributed training, this step is usually done before we invoke :func:`dgl.distributed.partition_graph`
+to partition a graph. We recommend to store the data split in boolean arrays as node data or edge data.
+For node classification tasks, the length of these boolean arrays is the number of nodes in a graph
+and each of their elements indicates the existence of a node in a training/validation/test set.
+Similar boolean arrays should be used for link prediction tasks.
+:func:`dgl.distributed.partition_graph` splits these boolean arrays (because they are stored as
+the node data or edge data of the graph) based on the graph partitioning
+result and store them with graph partitions.
+
+During distributed training, users need to assign training nodes/edges to each trainer. Similarly,
 we also need to split the validation and test set in the same way.
-
-For distributed training and evaluation, the recommended approach is to use boolean arrays to
-indicate the training/validation/test set. For node classification tasks, the length of these
-boolean arrays is the number of nodes in a graph and each of their elements indicates the existence
-of a node in a training/validation/test set. Similar boolean arrays should be used for
-link prediction tasks.
-
 DGL provides :func:`~dgl.distributed.node_split` and :func:`~dgl.distributed.edge_split` to
 split the training, validation and test set at runtime for distributed training. The two functions
-take the boolean arrays as input, split them and return a portion for the local trainer.
+take the boolean arrays constructed before graph partitioning as input, split them and
+return a portion for the local trainer.
 By default, they ensure that all portions have the same number of nodes/edges. This is
 important for synchronous SGD, which assumes each trainer has the same number of mini-batches.
 

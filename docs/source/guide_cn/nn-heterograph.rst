@@ -77,7 +77,7 @@ HeteroGraphConv的实现逻辑
 
 上述代码中的for循环为处理异构图计算的主要逻辑。首先我们遍历图中所有的关系(通过调用 ``canonical_etypes``)。
 通过关系名，我们可以使用g[ ``stype, etype, dtype`` ]的语法将只包含该关系的子图( ``rel_graph`` )抽取出来。
-对于二部图，输入特征将被组织为元组 ``(src_inputs[stype], dst_inputs[dtype])``。
+对于二分图，输入特征将被组织为元组 ``(src_inputs[stype], dst_inputs[dtype])``。
 接着调用用户预先注册在该关系上的NN模块，并将结果保存在outputs字典中。
 
 .. code::

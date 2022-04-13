@@ -44,14 +44,14 @@
 
 .. code::
 
-            # 聚合类型：mean、max_pool、lstm、gcn
-            if aggregator_type not in ['mean', 'max_pool', 'lstm', 'gcn']:
+            # 聚合类型：mean、pool、lstm、gcn
+            if aggregator_type not in ['mean', 'pool', 'lstm', 'gcn']:
                 raise KeyError('Aggregator type {} not supported.'.format(aggregator_type))
-            if aggregator_type == 'max_pool':
+            if aggregator_type == 'pool':
                 self.fc_pool = nn.Linear(self._in_src_feats, self._in_src_feats)
             if aggregator_type == 'lstm':
                 self.lstm = nn.LSTM(self._in_src_feats, self._in_src_feats, batch_first=True)
-            if aggregator_type in ['mean', 'max_pool', 'lstm']:
+            if aggregator_type in ['mean', 'pool', 'lstm']:
                 self.fc_self = nn.Linear(self._in_dst_feats, out_feats, bias=bias)
             self.fc_neigh = nn.Linear(self._in_src_feats, out_feats, bias=bias)
             self.reset_parameters()
@@ -64,7 +64,7 @@
         def reset_parameters(self):
             """重新初始化可学习的参数"""
             gain = nn.init.calculate_gain('relu')
-            if self._aggre_type == 'max_pool':
+            if self._aggre_type == 'pool':
                 nn.init.xavier_uniform_(self.fc_pool.weight, gain=gain)
             if self._aggre_type == 'lstm':
                 self.lstm.reset_parameters()

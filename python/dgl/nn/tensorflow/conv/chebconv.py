@@ -5,17 +5,13 @@ from tensorflow.keras import layers
 import numpy as np
 
 from ....base import dgl_warning
-from .... import laplacian_lambda_max, broadcast_nodes, function as fn
+from .... import broadcast_nodes, function as fn
 
 
 class ChebConv(layers.Layer):
-    r"""
-
-    Description
-    -----------
-    Chebyshev Spectral Graph Convolution layer from paper `Convolutional
+    r"""Chebyshev Spectral Graph Convolution layer from `Convolutional
     Neural Networks on Graphs with Fast Localized Spectral Filtering
-    <https://arxiv.org/pdf/1606.09375.pdf>`__.
+    <https://arxiv.org/pdf/1606.09375.pdf>`__
 
     .. math::
         h_i^{l+1} &= \sum_{k=0}^{K-1} W^{k, l}z_i^{k, l}
@@ -29,7 +25,6 @@ class ChebConv(layers.Layer):
         \tilde{L} &= 2\left(I - \tilde{D}^{-1/2} \tilde{A} \tilde{D}^{-1/2}\right)/\lambda_{max} - I
 
     where :math:`\tilde{A}` is :math:`A` + :math:`I`, :math:`W` is learnable weight.
-
 
     Parameters
     ----------
@@ -50,13 +45,12 @@ class ChebConv(layers.Layer):
     >>> import numpy as np
     >>> import tensorflow as tf
     >>> from dgl.nn import ChebConv
-    >>>
     >>> with tf.device("CPU:0"):
-    >>>     g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
-    >>>     feat = tf.ones((6, 10))
-    >>>     conv = ChebConv(10, 2, 2)
-    >>>     res = conv(g, feat)
-    >>>     res
+    ...     g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
+    ...     feat = tf.ones((6, 10))
+    ...     conv = ChebConv(10, 2, 2)
+    ...     res = conv(g, feat)
+    ...     res
     <tf.Tensor: shape=(6, 2), dtype=float32, numpy=
     array([[ 0.6163, -0.1809],
             [ 0.6163, -0.1809],
@@ -80,11 +74,7 @@ class ChebConv(layers.Layer):
         self.linear = layers.Dense(out_feats, use_bias=bias)
 
     def call(self, graph, feat, lambda_max=None):
-        r"""
-
-        Description
-        -----------
-        Compute ChebNet layer.
+        r"""Compute ChebNet layer.
 
         Parameters
         ----------
@@ -97,8 +87,9 @@ class ChebConv(layers.Layer):
             A list(tensor) with length :math:`B`, stores the largest eigenvalue
             of the normalized laplacian of each individual graph in ``graph``,
             where :math:`B` is the batch size of the input graph. Default: None.
-            If None, this method would compute the list by calling
-            ``dgl.laplacian_lambda_max``.
+
+            If None, this method would set the default value to 2.
+            One can use :func:`dgl.laplacian_lambda_max` to compute this value.
 
         Returns
         -------
@@ -117,15 +108,12 @@ class ChebConv(layers.Layer):
                                           clip_value_min=1,
                                           clip_value_max=np.inf)
             D_invsqrt = tf.expand_dims(tf.pow(in_degrees, -0.5), axis=-1)
+
             if lambda_max is None:
-                try:
-                    lambda_max = laplacian_lambda_max(graph)
-                except BaseException:
-                    # if the largest eigenvalue is not found
-                    dgl_warning(
-                        "Largest eigonvalue not found, using default value 2 for lambda_max",
-                        RuntimeWarning)
-                    lambda_max = tf.constant(2, dtype=tf.float32)
+                dgl_warning(
+                    "lambda_max is not provided, using default value of 2.  "
+                    "Please use dgl.laplacian_lambda_max to compute the eigenvalues.")
+                lambda_max = [2] * graph.batch_size
 
             if isinstance(lambda_max, list):
                 lambda_max = tf.constant(lambda_max, dtype=tf.float32)

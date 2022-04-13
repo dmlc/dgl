@@ -30,6 +30,8 @@ namespace sampling {
  * \param dir Edge direction.
  * \param probability A vector of 1D float arrays, indicating the transition probability of
  *        each edge by edge type.  An empty float array assumes uniform transition.
+ * \param exclude_edges Edges IDs of each type which will be excluded during sampling.
+ *        The vector length must be equal to the number of edges types. Empty array is allowed.
  * \param replace If true, sample with replacement.
  * \return Sampled neighborhoods as a graph. The return graph has the same schema as the
  *         original one.
@@ -40,6 +42,7 @@ HeteroSubgraph SampleNeighbors(
     const std::vector<int64_t>& fanouts,
     EdgeDir dir,
     const std::vector<FloatArray>& probability,
+    const std::vector<IdArray>& exclude_edges,
     bool replace = true);
 
 /*!
@@ -69,6 +72,15 @@ HeteroSubgraph SampleNeighborsTopk(
     const std::vector<FloatArray>& weight,
     bool ascending = false);
 
+HeteroSubgraph SampleNeighborsBiased(
+    const HeteroGraphPtr hg,
+    const IdArray& nodes,
+    const int64_t fanouts,
+    const NDArray& bias,
+    const NDArray& tag_offset,
+    const EdgeDir dir,
+    const bool replace
+);
 }  // namespace sampling
 }  // namespace dgl
 

@@ -3,6 +3,8 @@
 Chapter 6: Stochastic Training on Large Graphs
 =======================================================
 
+:ref:`(中文版) <guide_cn-minibatch>`
+
 If we have a massive graph with, say, millions or even billions of nodes
 or edges, usually full-graph training as described in
 :ref:`guide-training`
@@ -56,6 +58,10 @@ conducted in mini-batches.
 * :ref:`guide-minibatch-custom-gnn-module`
 * :ref:`guide-minibatch-inference`
 
+The following are performance tips for implementing and using neighborhood
+sampling:
+
+* :ref:`guide-minibatch-gpu-sampling`
 
 .. toctree::
     :maxdepth: 1
@@ -68,3 +74,5 @@ conducted in mini-batches.
     minibatch-custom-sampler
     minibatch-nn
     minibatch-inference
+    minibatch-gpu-sampling
+    minibatch-prefetching

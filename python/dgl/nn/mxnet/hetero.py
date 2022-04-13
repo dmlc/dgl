@@ -5,14 +5,31 @@ from mxnet.gluon import nn
 __all__ = ['HeteroGraphConv']
 
 class HeteroGraphConv(nn.Block):
-    r"""A generic module for computing convolution on heterogeneous graphs.
+    r"""A generic module for computing convolution on heterogeneous graphs
 
     The heterograph convolution applies sub-modules on their associating
     relation graphs, which reads the features from source nodes and writes the
     updated ones to destination nodes. If multiple relations have the same
     destination node types, their results are aggregated by the specified method.
-
     If the relation graph has no edge, the corresponding module will not be called.
+
+    Pseudo-code:
+
+    .. code::
+
+        outputs = {nty : [] for nty in g.dsttypes}
+        # Apply sub-modules on their associating relation graphs in parallel
+        for relation in g.canonical_etypes:
+            stype, etype, dtype = relation
+            dstdata = relation_submodule(g[relation], ...)
+            outputs[dtype].append(dstdata)
+
+        # Aggregate the results for each destination node type
+        rsts = {}
+        for ntype, ntype_outputs in outputs.items():
+            if len(ntype_outputs) != 0:
+                rsts[ntype] = aggregate(ntype_outputs)
+        return rsts
 
     Examples
     --------
@@ -40,7 +57,7 @@ class HeteroGraphConv(nn.Block):
     ``'user'`` and ``'game'`` nodes.
 
     >>> import mxnet.ndarray as nd
-    >>> h1 = {'user' : nd.randomrandn(g.number_of_nodes('user'), 5)}
+    >>> h1 = {'user' : nd.random.randn(g.number_of_nodes('user'), 5)}
     >>> h2 = conv(g, h1)
     >>> print(h2.keys())
     dict_keys(['user', 'game'])
@@ -148,8 +165,6 @@ class HeteroGraphConv(nn.Block):
             src_inputs, dst_inputs = inputs
             for stype, etype, dtype in g.canonical_etypes:
                 rel_graph = g[stype, etype, dtype]
-                if rel_graph.number_of_edges() == 0:
-                    continue
                 if stype not in src_inputs or dtype not in dst_inputs:
                     continue
                 dstdata = self.mods[etype](
@@ -161,13 +176,11 @@ class HeteroGraphConv(nn.Block):
         else:
             for stype, etype, dtype in g.canonical_etypes:
                 rel_graph = g[stype, etype, dtype]
-                if rel_graph.number_of_edges() == 0:
-                    continue
                 if stype not in inputs:
                     continue
                 dstdata = self.mods[etype](
                     rel_graph,
-                    inputs[stype],
+                    (inputs[stype], inputs[dtype]),
                     *mod_args.get(etype, ()),
                     **mod_kwargs.get(etype, {}))
                 outputs[dtype].append(dstdata)

@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Pod
+spec:
+  securityContext:
+    runAsUser: 0
+  containers:
+    - name: dgl-ci-gpu
+      image: dgllib/dgl-ci-gpu:cu101_v220217
+      imagePullPolicy: Always
+      tty: true
+      resources:
+        limits:
+          nvidia.com/gpu: 1 # requesting 1 GPU
+      volumeMounts:
+        - name: dshm
+          mountPath: /dev/shm
+  volumes:
+  - name: dshm
+    emptyDir:
+      medium: Memory
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: beta.kubernetes.io/instance-type
+            operator: In
+            values:
+            - g4dn.2xlarge

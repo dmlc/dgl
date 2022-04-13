@@ -25,7 +25,7 @@ def main(args):
     category = dataset.predict_category
     num_classes = dataset.num_classes
     test_mask = g.nodes[category].data.pop('test_mask')
-    test_idx = th.nonzero(test_mask).squeeze()
+    test_idx = th.nonzero(test_mask, as_tuple=False).squeeze()
     labels = g.nodes[category].data.pop('labels')
 
     # check cuda

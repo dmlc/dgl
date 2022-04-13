@@ -229,21 +229,21 @@ def src_mul_edge(src, edge, out):
 
     Notes
     -----
-    This function is deprecated. Please use u_mul_e instead.
+    This function is deprecated. Please use :func:`~dgl.function.u_mul_e` instead.
 
     Parameters
     ----------
     src : str
         The source feature field.
-    dst : str
-        The destination feature field.
+    edge : str
+        The edge feature field.
     out : str
         The output message field.
 
     Examples
     --------
     >>> import dgl
-    >>> message_func = dgl.function.src_mul_edge('h', 'h', 'm')
+    >>> message_func = dgl.function.src_mul_edge('h', 'e', 'm')
     """
     return getattr(sys.modules[__name__], "u_mul_e")(src, edge, out)
 
@@ -254,7 +254,7 @@ def copy_src(src, out):
 
     Notes
     -----
-    This function is deprecated. Please use copy_u instead.
+    This function is deprecated. Please use :func:`~dgl.function.copy_u` instead.
 
     Parameters
     ----------
@@ -281,7 +281,7 @@ def copy_edge(edge, out):
 
     Notes
     -----
-    This function is deprecated. Please use copy_e instead.
+    This function is deprecated. Please use :func:`~dgl.function.copy_e` instead.
 
     Parameters
     ----------

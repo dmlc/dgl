@@ -1,58 +1,12 @@
 # pylint: disable=global-variable-undefined, invalid-name
 """Multiprocess dataloader for distributed training"""
-import multiprocessing as mp
-from queue import Queue
-import traceback
-
 from .dist_context import get_sampler_pool
 from .. import backend as F
 
 __all__ = ["DistDataLoader"]
 
-
-def call_collate_fn(name, next_data):
-    """Call collate function"""
-    try:
-        result = DGL_GLOBAL_COLLATE_FNS[name](next_data)
-        DGL_GLOBAL_MP_QUEUES[name].put(result)
-    except Exception as e:
-        traceback.print_exc()
-        print(e)
-        raise e
-    return 1
-
-DGL_GLOBAL_COLLATE_FNS = {}
-DGL_GLOBAL_MP_QUEUES = {}
-
-def init_fn(barrier, name, collate_fn, queue):
-    """Initialize setting collate function and mp.Queue in the subprocess"""
-    global DGL_GLOBAL_COLLATE_FNS
-    global DGL_GLOBAL_MP_QUEUES
-    DGL_GLOBAL_MP_QUEUES[name] = queue
-    DGL_GLOBAL_COLLATE_FNS[name] = collate_fn
-    barrier.wait()
-    return 1
-
-def cleanup_fn(barrier, name):
-    """Clean up the data of a dataloader in the worker process"""
-    global DGL_GLOBAL_COLLATE_FNS
-    global DGL_GLOBAL_MP_QUEUES
-    del DGL_GLOBAL_MP_QUEUES[name]
-    del DGL_GLOBAL_COLLATE_FNS[name]
-    # sleep here is to ensure this function is executed in all worker processes
-    # probably need better solution in the future
-    barrier.wait()
-    return 1
-
-
-def enable_mp_debug():
-    """Print multiprocessing debug information. This is only
-    for debug usage"""
-    import logging
-    logger = mp.log_to_stderr()
-    logger.setLevel(logging.DEBUG)
-
 DATALOADER_ID = 0
+
 
 class DistDataLoader:
     """DGL customized multiprocessing dataloader.
@@ -64,7 +18,7 @@ class DistDataLoader:
     Parameters
     ----------
     dataset: a tensor
-        A tensor of node IDs or edge IDs.
+        Tensors of node IDs or edge IDs.
     batch_size: int
         The number of samples per batch to load.
     shuffle: bool, optional
@@ -112,55 +66,48 @@ class DistDataLoader:
         self.pool, self.num_workers = get_sampler_pool()
         if queue_size is None:
             queue_size = self.num_workers * 4 if self.num_workers > 0 else 4
-        self.queue_size = queue_size
+        self.queue_size = queue_size  # prefetch size
         self.batch_size = batch_size
         self.num_pending = 0
         self.collate_fn = collate_fn
         self.current_pos = 0
-        if self.pool is not None:
-            self.m = mp.Manager()
-            self.barrier = self.m.Barrier(self.num_workers)
-            self.queue = self.m.Queue(maxsize=queue_size)
-        else:
-            self.queue = Queue(maxsize=queue_size)
+        self.queue = [] # Only used when pool is None
         self.drop_last = drop_last
         self.recv_idxs = 0
         self.shuffle = shuffle
         self.is_closed = False
 
-        self.dataset = F.tensor(dataset)
+        self.dataset = dataset
+        self.data_idx = F.arange(0, len(dataset))
         self.expected_idxs = len(dataset) // self.batch_size
         if not self.drop_last and len(dataset) % self.batch_size != 0:
             self.expected_idxs += 1
 
-        # We need to have a unique Id for each data loader to identify itself
+        # We need to have a unique ID for each data loader to identify itself
         # in the sampler processes.
         global DATALOADER_ID
         self.name = "dataloader-" + str(DATALOADER_ID)
         DATALOADER_ID += 1
 
         if self.pool is not None:
-            results = []
-            for _ in range(self.num_workers):
-                results.append(self.pool.apply_async(
-                    init_fn, args=(self.barrier, self.name, self.collate_fn, self.queue)))
-            for res in results:
-                res.get()
+            self.pool.set_collate_fn(self.collate_fn, self.name)
 
     def __del__(self):
+        # When the process exits, the process pool may have been closed. We should try
+        # and get the process pool again and see if we need to clean up the process pool.
+        self.pool, self.num_workers = get_sampler_pool()
         if self.pool is not None:
-            results = []
-            for _ in range(self.num_workers):
-                results.append(self.pool.apply_async(cleanup_fn, args=(self.barrier, self.name,)))
-            for res in results:
-                res.get()
+            self.pool.delete_collate_fn(self.name)
 
     def __next__(self):
-        num_reqs = self.queue_size - self.num_pending
+        if self.pool is None:
+            num_reqs = 1
+        else:
+            num_reqs = self.queue_size - self.num_pending
         for _ in range(num_reqs):
             self._request_next_batch()
         if self.recv_idxs < self.expected_idxs:
-            result = self.queue.get(timeout=1800)
+            result = self._get_data_from_result_queue()
             self.recv_idxs += 1
             self.num_pending -= 1
             return result
@@ -168,9 +115,16 @@ class DistDataLoader:
             assert self.num_pending == 0
             raise StopIteration
 
+    def _get_data_from_result_queue(self, timeout=1800):
+        if self.pool is None:
+            ret = self.queue.pop(0)
+        else:
+            ret = self.pool.get_result(self.name, timeout=timeout)
+        return ret
+
     def __iter__(self):
         if self.shuffle:
-            self.dataset = F.rand_shuffle(self.dataset)
+            self.data_idx = F.rand_shuffle(self.data_idx)
         self.recv_idxs = 0
         self.current_pos = 0
         self.num_pending = 0
@@ -181,10 +135,10 @@ class DistDataLoader:
         if next_data is None:
             return
         elif self.pool is not None:
-            self.pool.apply_async(call_collate_fn, args=(self.name, next_data, ))
+            self.pool.submit_task(self.name, next_data)
         else:
             result = self.collate_fn(next_data)
-            self.queue.put(result)
+            self.queue.append(result)
         self.num_pending += 1
 
     def _next_data(self):
@@ -199,6 +153,13 @@ class DistDataLoader:
                 end_pos = len(self.dataset)
         else:
             end_pos = self.current_pos + self.batch_size
-        ret = self.dataset[self.current_pos:end_pos]
+        idx = self.data_idx[self.current_pos:end_pos].tolist()
+        ret = [self.dataset[i] for i in idx]
+        # Sharing large number of tensors between processes will consume too many
+        # file descriptors, so let's convert each tensor to scalar value beforehand.
+        if isinstance(ret[0], tuple):
+            ret = [(type, F.as_scalar(id)) for (type, id) in ret]
+        else:
+            ret = [F.as_scalar(id) for id in ret]
         self.current_pos = end_pos
         return ret

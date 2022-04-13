@@ -1,13 +1,10 @@
 from __future__ import absolute_import
 import numpy as np
 import os
-import random
-
 
 from .dgl_dataset import DGLBuiltinDataset
 from .utils import loadtxt, save_graphs, load_graphs, save_info, load_info
 from .. import backend as F
-from ..utils import retry_method_with_fix
 from ..convert import graph as dgl_graph
 
 class LegacyTUDataset(DGLBuiltinDataset):
@@ -16,7 +13,7 @@ class LegacyTUDataset(DGLBuiltinDataset):
     Parameters
     ----------
     name : str
-        Dataset Name, such as ``ENZYMES``, ``DD``, ``COLLAB``, ``MUTAG``, can be the 
+        Dataset Name, such as ``ENZYMES``, ``DD``, ``COLLAB``, ``MUTAG``, can be the
         datasets name on `<https://chrsmrrs.github.io/datasets/docs/datasets/>`_.
     use_pandas : bool
         Numpy's file read function has performance issue when file is large,
@@ -29,6 +26,10 @@ class LegacyTUDataset(DGLBuiltinDataset):
     max_allow_node : int
         Remove graphs that contains more nodes than ``max_allow_node``.
         Default : None
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Attributes
     ----------
@@ -36,6 +37,14 @@ class LegacyTUDataset(DGLBuiltinDataset):
         Maximum number of nodes
     num_labels : int
         Number of classes
+
+    Notes
+    -----
+    LegacyTUDataset uses provided node feature by default. If no feature provided, it uses one-hot node label instead.
+    If neither labels provided, it uses constant for node feature.
+
+    The dataset sorts graphs by their labels.
+    Shuffle is preferred before manual train/val split.
 
     Examples
     --------
@@ -48,7 +57,7 @@ class LegacyTUDataset(DGLBuiltinDataset):
     >>> g, label = data[1024]
     >>> g
     Graph(num_nodes=88, num_edges=410,
-          ndata_schemes={'feat': Scheme(shape=(89,), dtype=torch.float64), '_ID': Scheme(shape=(), dtype=torch.int64)}
+          ndata_schemes={'feat': Scheme(shape=(89,), dtype=torch.float32), '_ID': Scheme(shape=(), dtype=torch.int64)}
           edata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64)})
     >>> label
     tensor(1)
@@ -60,20 +69,15 @@ class LegacyTUDataset(DGLBuiltinDataset):
     >>> batched_labels = torch.tensor(labels)
     >>> batched_graphs
     Graph(num_nodes=9539, num_edges=47382,
-          ndata_schemes={'feat': Scheme(shape=(89,), dtype=torch.float64), '_ID': Scheme(shape=(), dtype=torch.int64)}
+          ndata_schemes={'feat': Scheme(shape=(89,), dtype=torch.float32), '_ID': Scheme(shape=(), dtype=torch.int64)}
           edata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64)})
-
-    Notes
-    -----
-    LegacyTUDataset uses provided node feature by default. If no feature provided, it uses one-hot node label instead.
-    If neither labels provided, it uses constant for node feature.
     """
 
     _url = r"https://www.chrsmrrs.com/graphkerneldatasets/{}.zip"
 
     def __init__(self, name, use_pandas=False,
                  hidden_size=10, max_allow_node=None,
-                 raw_dir=None, force_reload=False, verbose=False):
+                 raw_dir=None, force_reload=False, verbose=False, transform=None):
 
         url = self._url.format(name)
         self.hidden_size = hidden_size
@@ -81,7 +85,7 @@ class LegacyTUDataset(DGLBuiltinDataset):
         self.use_pandas = use_pandas
         super(LegacyTUDataset, self).__init__(name=name, url=url, raw_dir=raw_dir,
                                               hash_key=(name, use_pandas, hidden_size, max_allow_node),
-                                              force_reload=force_reload, verbose=verbose)
+                                              force_reload=force_reload, verbose=verbose, transform=transform)
 
     def process(self):
         self.data_mode = None
@@ -96,8 +100,17 @@ class LegacyTUDataset(DGLBuiltinDataset):
 
         DS_indicator = self._idx_from_zero(
             np.genfromtxt(self._file_path("graph_indicator"), dtype=int))
-        DS_graph_labels = self._idx_from_zero(
-            np.genfromtxt(self._file_path("graph_labels"), dtype=int))
+        if os.path.exists(self._file_path("graph_labels")):
+            DS_graph_labels = self._idx_from_zero(
+                np.genfromtxt(self._file_path("graph_labels"), dtype=int))
+            self.num_labels = max(DS_graph_labels) + 1
+            self.graph_labels = DS_graph_labels
+        elif os.path.exists(self._file_path("graph_attributes")):
+            DS_graph_labels = np.genfromtxt(self._file_path("graph_attributes"), dtype=float)
+            self.num_labels = None
+            self.graph_labels = DS_graph_labels
+        else:
+            raise Exception("Unknown graph label or graph attributes")
 
         g = dgl_graph(([], []))
         g.add_nodes(int(DS_edge_list.max()) + 1)
@@ -112,8 +125,6 @@ class LegacyTUDataset(DGLBuiltinDataset):
                 self.max_num_node = len(node_idx[0])
 
         self.graph_lists = [g.subgraph(node_idx) for node_idx in node_idx_list]
-        self.num_labels = max(DS_graph_labels) + 1
-        self.graph_labels = DS_graph_labels
 
         try:
             DS_node_labels = self._idx_from_zero(
@@ -121,7 +132,7 @@ class LegacyTUDataset(DGLBuiltinDataset):
             g.ndata['node_label'] = F.tensor(DS_node_labels)
             one_hot_node_labels = self._to_onehot(DS_node_labels)
             for idxs, g in zip(node_idx_list, self.graph_lists):
-                g.ndata['feat'] = F.tensor(one_hot_node_labels[idxs, :])
+                g.ndata['feat'] = F.tensor(one_hot_node_labels[idxs, :], F.float32)
             self.data_mode = "node_label"
         except IOError:
             print("No Node Label Data")
@@ -132,17 +143,18 @@ class LegacyTUDataset(DGLBuiltinDataset):
             if DS_node_attr.ndim == 1:
                 DS_node_attr = np.expand_dims(DS_node_attr, -1)
             for idxs, g in zip(node_idx_list, self.graph_lists):
-                g.ndata['feat'] = F.tensor(DS_node_attr[idxs, :])
+                g.ndata['feat'] = F.tensor(DS_node_attr[idxs, :], F.float32)
             self.data_mode = "node_attr"
         except IOError:
             print("No Node Attribute Data")
 
         if 'feat' not in g.ndata.keys():
             for idxs, g in zip(node_idx_list, self.graph_lists):
-                g.ndata['feat'] = np.ones((g.number_of_nodes(), hidden_size))
+                g.ndata['feat'] = F.ones((g.number_of_nodes(), self.hidden_size),
+                                         F.float32, F.cpu())
             self.data_mode = "constant"
             if self.verbose:
-                print("Use Constant one as Feature with hidden size {}".format(hidden_size))
+                print("Use Constant one as Feature with hidden size {}".format(self.hidden_size))
 
         # remove graphs that are too large by user given standard
         # optional pre-processing steop in conformity with Rex Ying's original
@@ -203,6 +215,8 @@ class LegacyTUDataset(DGLBuiltinDataset):
             And its label.
         """
         g = self.graph_lists[idx]
+        if self._transform is not None:
+            g = self._transform(g)
         return g, self.graph_labels[idx]
 
     def __len__(self):
@@ -237,8 +251,12 @@ class TUDataset(DGLBuiltinDataset):
     Parameters
     ----------
     name : str
-        Dataset Name, such as ``ENZYMES``, ``DD``, ``COLLAB``, ``MUTAG``, can be the 
+        Dataset Name, such as ``ENZYMES``, ``DD``, ``COLLAB``, ``MUTAG``, can be the
         datasets name on `<https://chrsmrrs.github.io/datasets/docs/datasets/>`_.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Attributes
     ----------
@@ -246,6 +264,25 @@ class TUDataset(DGLBuiltinDataset):
         Maximum number of nodes
     num_labels : int
         Number of classes
+
+    Notes
+    -----
+    **IMPORTANT:** Some of the datasets have duplicate edges exist in the graphs, e.g.
+    the edges in ``IMDB-BINARY`` are all duplicated.  DGL faithfully keeps the duplicates
+    as per the original data.  Other frameworks such as PyTorch Geometric removes the
+    duplicates by default.  You can remove the duplicate edges with :func:`dgl.to_simple`.
+
+    Graphs may have node labels, node attributes, edge labels, and edge attributes,
+    varing from different dataset.
+
+    Labels are mapped to :math:`\lbrace 0,\cdots,n-1 \rbrace` where :math:`n` is the
+    number of labels (some datasets have raw labels :math:`\lbrace -1, 1 \rbrace` which
+    will be mapped to :math:`\lbrace 0, 1 \rbrace`). In previous versions, the minimum
+    label was added so that :math:`\lbrace -1, 1 \rbrace` was mapped to
+    :math:`\lbrace 0, 2 \rbrace`.
+
+    The dataset sorts graphs by their labels.
+    Shuffle is preferred before manual train/val split.
 
     Examples
     --------
@@ -273,33 +310,33 @@ class TUDataset(DGLBuiltinDataset):
           ndata_schemes={'node_labels': Scheme(shape=(1,), dtype=torch.int64), '_ID': Scheme(shape=(), dtype=torch.int64)}
           edata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64)})
 
-    Notes
-    -----
-    Graphs may have node labels, node attributes, edge labels, and edge attributes,
-    varing from different dataset.
-
-    Labels are mapped to :math:`\lbrace 0,\cdots,n-1 \rbrace` where :math:`n` is the
-    number of labels (some datasets have raw labels :math:`\lbrace -1, 1 \rbrace` which
-    will be mapped to :math:`\lbrace 0, 1 \rbrace`). In previous versions, the minimum
-    label was added so that :math:`\lbrace -1, 1 \rbrace` was mapped to
-    :math:`\lbrace 0, 2 \rbrace`.
     """
 
     _url = r"https://www.chrsmrrs.com/graphkerneldatasets/{}.zip"
 
-    def __init__(self, name, raw_dir=None, force_reload=False, verbose=False):
+    def __init__(self, name, raw_dir=None, force_reload=False, verbose=False, transform=None):
         url = self._url.format(name)
         super(TUDataset, self).__init__(name=name, url=url,
                                         raw_dir=raw_dir, force_reload=force_reload,
-                                        verbose=verbose)
-    
+                                        verbose=verbose, transform=transform)
+
     def process(self):
         DS_edge_list = self._idx_from_zero(
             loadtxt(self._file_path("A"), delimiter=",").astype(int))
         DS_indicator = self._idx_from_zero(
             loadtxt(self._file_path("graph_indicator"), delimiter=",").astype(int))
-        DS_graph_labels = self._idx_reset(
-            loadtxt(self._file_path("graph_labels"), delimiter=",").astype(int))
+
+        if os.path.exists(self._file_path("graph_labels")):
+            DS_graph_labels = self._idx_reset(
+                loadtxt(self._file_path("graph_labels"), delimiter=",").astype(int))
+            self.num_labels = max(DS_graph_labels) + 1
+            self.graph_labels = F.tensor(DS_graph_labels)
+        elif os.path.exists(self._file_path("graph_attributes")):
+            DS_graph_labels = loadtxt(self._file_path("graph_attributes"), delimiter=",").astype(float)
+            self.num_labels = None
+            self.graph_labels = F.tensor(DS_graph_labels)
+        else:
+            raise Exception("Unknown graph label or graph attributes")
 
         g = dgl_graph(([], []))
         g.add_nodes(int(DS_edge_list.max()) + 1)
@@ -313,8 +350,6 @@ class TUDataset(DGLBuiltinDataset):
             if len(node_idx[0]) > self.max_num_node:
                 self.max_num_node = len(node_idx[0])
 
-        self.num_labels = max(DS_graph_labels) + 1
-        self.graph_labels = F.tensor(DS_graph_labels)
 
         self.attr_dict = {
             'node_labels': ('ndata', 'node_labels'),
@@ -326,7 +361,7 @@ class TUDataset(DGLBuiltinDataset):
         for filename, field_name in self.attr_dict.items():
             try:
                 data = loadtxt(self._file_path(filename),
-                               delimiter=',').astype(int)
+                               delimiter=',')
                 if 'label' in filename:
                     data = F.tensor(self._idx_from_zero(data))
                 else:
@@ -359,7 +394,7 @@ class TUDataset(DGLBuiltinDataset):
 
     def has_cache(self):
         graph_path = os.path.join(self.save_path, 'tu_{}.bin'.format(self.name))
-        info_path = os.path.join(self.save_path, 'legacy_tu_{}.pkl'.format(self.name))
+        info_path = os.path.join(self.save_path, 'tu_{}.pkl'.format(self.name))
         if os.path.exists(graph_path) and os.path.exists(info_path):
             return True
         return False
@@ -379,6 +414,8 @@ class TUDataset(DGLBuiltinDataset):
             And its label.
         """
         g = self.graph_lists[idx]
+        if self._transform is not None:
+            g = self._transform(g)
         return g, self.graph_labels[idx]
 
     def __len__(self):

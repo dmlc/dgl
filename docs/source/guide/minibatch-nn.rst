@@ -3,10 +3,18 @@
 6.5 Implementing Custom GNN Module for Mini-batch Training
 -------------------------------------------------------------
 
+:ref:`(中文版) <guide_cn-minibatch-custom-gnn-module>`
+
+.. note::
+
+   :doc:`This tutorial <tutorials/large/L4_message_passing>` has similar
+   content to this section for the homogeneous graph case.
+
+
 If you were familiar with how to write a custom GNN module for updating
 the entire graph for homogeneous or heterogeneous graphs (see
 :ref:`guide-nn`), the code for computing on
-blocks is similar, with the exception that the nodes are divided into
+MFGs is similar, with the exception that the nodes are divided into
 input nodes and output nodes.
 
 For example, consider the following custom graph convolution module
@@ -28,7 +36,7 @@ like.
                 return self.W(torch.cat([g.ndata['h'], g.ndata['h_neigh']], 1))
 
 If you have a custom message passing NN module for the full graph, and
-you would like to make it work for blocks, you only need to rewrite the
+you would like to make it work for MFGs, you only need to rewrite the
 forward function as follows. Note that the corresponding statements from
 the full-graph implementation are commented; you can compare the
 original statements with the new statements.
@@ -60,7 +68,7 @@ original statements with the new statements.
                     [block.dstdata['h'], block.dstdata['h_neigh']], 1))
 
 In general, you need to do the following to make your NN module work for
-blocks.
+MFGs.
 
 -  Obtain the features for output nodes from the input features by
    slicing the first few rows. The number of rows can be obtained by
@@ -147,22 +155,22 @@ serve for input or output.
                 return {ntype: g.dstnodes[ntype].data['h_dst']
                         for ntype in g.ntypes}
 
-Writing modules that work on homogeneous graphs, bipartite graphs, and blocks
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Writing modules that work on homogeneous graphs, bipartite graphs, and MFGs
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 All message passing modules in DGL work on homogeneous graphs,
 unidirectional bipartite graphs (that have two node types and one edge
-type), and a block with one edge type. Essentially, the input graph and
+type), and a MFG with one edge type. Essentially, the input graph and
 feature of a builtin DGL neural network module must satisfy either of
 the following cases.
 
 -  If the input feature is a pair of tensors, then the input graph must
    be unidirectional bipartite.
 -  If the input feature is a single tensor and the input graph is a
-   block, DGL will automatically set the feature on the output nodes as
+   MFG, DGL will automatically set the feature on the output nodes as
    the first few rows of the input node features.
 -  If the input feature must be a single tensor and the input graph is
-   not a block, then the input graph must be homogeneous.
+   not a MFG, then the input graph must be homogeneous.
 
 For example, the following is simplified from the PyTorch implementation
 of :class:`dgl.nn.pytorch.SAGEConv` (also available in MXNet and Tensorflow)
@@ -192,6 +200,6 @@ of :class:`dgl.nn.pytorch.SAGEConv` (also available in MXNet and Tensorflow)
                 self.W(torch.cat([g.dstdata['h'], g.dstdata['h_neigh']], 1)))
 
 :ref:`guide-nn` also provides a walkthrough on :class:`dgl.nn.pytorch.SAGEConv`,
-which works on unidirectional bipartite graphs, homogeneous graphs, and blocks.
+which works on unidirectional bipartite graphs, homogeneous graphs, and MFGs.
 
 

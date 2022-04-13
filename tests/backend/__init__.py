@@ -56,8 +56,8 @@ def randn(shape):
 def tensor(data, dtype=None):
     return copy_to(_tensor(data, dtype), _default_context)
 
-def arange(start, stop, dtype=int64):
-    return copy_to(_arange(start, stop, dtype), _default_context)
+def arange(start, stop, dtype=int64, ctx=None):
+    return _arange(start, stop, dtype, ctx if ctx is not None else _default_context)
 
 def full(shape, fill_value, dtype, ctx=_default_context):
     return _full(shape, fill_value, dtype, ctx)

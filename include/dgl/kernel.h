@@ -8,6 +8,7 @@
 
 #include <string>
 #include <vector>
+#include <utility>
 
 #include "array.h"
 #include "./bcast.h"
@@ -50,6 +51,28 @@ void SDDMM(const std::string& op,
            NDArray ufeat,
            NDArray efeat,
            NDArray out);
+
+/*!
+ * \brief Sparse-sparse matrix multiplication.
+ *
+ * The sparse matrices must have scalar weights (i.e. \a A_weights and \a B_weights
+ * are 1D vectors.)
+ */
+std::pair<CSRMatrix, NDArray> CSRMM(
+    CSRMatrix A,
+    NDArray A_weights,
+    CSRMatrix B,
+    NDArray B_weights);
+
+/*!
+ * \brief Summing up a list of sparse matrices.
+ *
+ * The sparse matrices must have scalar weights (i.e. the arrays in \a A_weights
+ * are 1D vectors.)
+ */
+std::pair<CSRMatrix, NDArray> CSRSum(
+    const std::vector<CSRMatrix>& A,
+    const std::vector<NDArray>& A_weights);
 
 }  // namespace aten
 }  // namespace dgl
