@@ -97,7 +97,7 @@ def main(run):
 
     model.load_state_dict(torch.load(save_path))
     test_metric = evaluate(device, test_loader, model)
-    print('Test Metric: {:.4f}'.format(test_metric)
+    print('Test Metric: {:.4f}'.format(test_metric))
 
     return test_metric
 
