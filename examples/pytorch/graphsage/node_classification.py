@@ -10,6 +10,11 @@ from ogb.nodeproppred import DglNodePropPredDataset
 import tqdm
 import argparse
 
+parser = argparse.ArgumentParser()
+parser.add_argument('--pure-gpu', action='store_true',
+                    help='Perform both sampling and training on GPU.')
+args = parser.parse_args()
+
 class SAGE(nn.Module):
     def __init__(self, in_feats, n_hidden, n_classes):
         super().__init__()
@@ -31,29 +36,32 @@ class SAGE(nn.Module):
         return h
 
     def inference(self, g, device, batch_size, num_workers, buffer_device=None):
-        # The difference between this inference function and the one in the official
-        # example is that the intermediate results can also benefit from prefetching.
-        g.ndata['h'] = g.ndata['feat']
-        sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1, prefetch_node_feats=['h'])
+        feat = g.ndata['feat']
+        sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1, prefetch_node_feats=['feat'])
         dataloader = dgl.dataloading.NodeDataLoader(
                 g, torch.arange(g.num_nodes()).to(g.device), sampler, device=device,
-                batch_size=batch_size, shuffle=False, drop_last=False, num_workers=num_workers,
-                persistent_workers=(num_workers > 0))
+                batch_size=batch_size, shuffle=False, drop_last=False,
+                num_workers=num_workers)
+
         if buffer_device is None:
             buffer_device = device
 
         for l, layer in enumerate(self.layers):
-            y = torch.zeros(
+            y = torch.empty(
                 g.num_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes,
-                device=buffer_device)
+                device=buffer_device, pin_memory=True)
+            feat = feat.to(device)
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
-                x = blocks[0].srcdata['h']
+                # use an explicitly contiguous slice
+                x = feat[input_nodes]
                 h = layer(blocks[0], x)
                 if l != len(self.layers) - 1:
                     h = F.relu(h)
                     h = self.dropout(h)
-                y[output_nodes] = h.to(buffer_device)
-            g.ndata['h'] = y
+                # be design, our output nodes are contiguous so we can take
+                # advantage of that here
+                y[output_nodes[0]:output_nodes[-1]+1] = h.to(buffer_device)
+            feat = y
         return y
 
 dataset = DglNodePropPredDataset('ogbn-products')
@@ -65,6 +73,9 @@ train_idx, valid_idx, test_idx = split_idx['train'], split_idx['valid'], split_i
 device = 'cuda'
 train_idx = train_idx.to(device)
 valid_idx = valid_idx.to(device)
+test_idx = test_idx.to(device)
+
+graph = graph.to('cuda' if args.pure_gpu else 'cpu')
 
 model = SAGE(graph.ndata['feat'].shape[1], 256, dataset.num_classes).to(device)
 opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
@@ -73,10 +84,10 @@ sampler = dgl.dataloading.NeighborSampler(
         [15, 10, 5], prefetch_node_feats=['feat'], prefetch_labels=['label'])
 train_dataloader = dgl.dataloading.DataLoader(
         graph, train_idx, sampler, device=device, batch_size=1024, shuffle=True,
-        drop_last=False, num_workers=0, use_uva=True)
+        drop_last=False, num_workers=0, use_uva=not args.pure_gpu)
 valid_dataloader = dgl.dataloading.NodeDataLoader(
         graph, valid_idx, sampler, device=device, batch_size=1024, shuffle=True,
-        drop_last=False, num_workers=0, use_uva=True)
+        drop_last=False, num_workers=0, use_uva=not args.pure_gpu)
 
 durations = []
 for _ in range(10):
@@ -114,8 +125,8 @@ print(np.mean(durations[4:]), np.std(durations[4:]))
 # Test accuracy and offline inference of all nodes
 model.eval()
 with torch.no_grad():
-    pred = model.inference(graph, device, 4096, 12, graph.device)
-    pred = pred[test_idx]
+    pred = model.inference(graph, device, 4096, 0, 'cpu')
+    pred = pred[test_idx].to(device)
     label = graph.ndata['label'][test_idx]
     acc = MF.accuracy(pred, label)
     print('Test acc:', acc.item())
