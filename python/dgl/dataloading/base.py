@@ -6,7 +6,7 @@ from ..convert import heterograph
 from .. import backend as F
 from ..transforms import compact_graphs
 from ..frame import LazyFeature
-from ..utils import recursive_apply
+from ..utils import recursive_apply, context_of
 
 def _set_lazy_features(x, xdata, feature_names):
     if feature_names is None:
@@ -373,8 +373,11 @@ class EdgePredictionSampler(Sampler):
             neg_srcdst = {g.canonical_etypes[0]: neg_srcdst}
 
         dtype = F.dtype(list(neg_srcdst.values())[0][0])
+        ctx = context_of(seed_edges) if seed_edges is not None else g.device
         neg_edges = {
-            etype: neg_srcdst.get(etype, (F.tensor([], dtype), F.tensor([], dtype)))
+            etype: neg_srcdst.get(etype,
+                                  (F.copy_to(F.tensor([], dtype), ctx=ctx),
+                                   F.copy_to(F.tensor([], dtype), ctx=ctx)))
             for etype in g.canonical_etypes}
         neg_pair_graph = heterograph(
             neg_edges, {ntype: g.num_nodes(ntype) for ntype in g.ntypes})

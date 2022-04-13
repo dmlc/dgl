@@ -4,7 +4,6 @@ from queue import Queue, Empty, Full
 import itertools
 import threading
 from distutils.version import LooseVersion
-import random
 import math
 import inspect
 import re
@@ -18,15 +17,15 @@ from torch.utils.data.distributed import DistributedSampler
 from ..base import NID, EID, dgl_warning
 from ..batch import batch as batch_graphs
 from ..heterograph import DGLHeteroGraph
-from .. import ndarray as nd
 from ..utils import (
     recursive_apply, ExceptionWrapper, recursive_apply_pair, set_num_threads,
-    create_shared_mem_array, get_shared_mem_array, context_of, dtype_of)
+    context_of, dtype_of)
 from ..frame import LazyFeature
 from ..storages import wrap_storage
 from .base import BlockSampler, as_edge_prediction_sampler
 from .. import backend as F
 from ..distributed import DistGraph
+from ..multiprocessing import call_once_and_share
 
 PYTHON_EXIT_STATUS = False
 def _set_python_exit_flag():
@@ -87,12 +86,19 @@ class _TensorizedDatasetIter(object):
 
 def _get_id_tensor_from_mapping(indices, device, keys):
     dtype = dtype_of(indices)
-    lengths = torch.tensor(
-        [(indices[k].shape[0] if k in indices else 0) for k in keys],
-        dtype=dtype, device=device)
-    type_ids = torch.arange(len(keys), dtype=dtype, device=device).repeat_interleave(lengths)
-    all_indices = torch.cat([indices[k] for k in keys if k in indices])
-    return torch.stack([type_ids, all_indices], 1)
+    id_tensor = torch.empty(
+        sum(v.shape[0] for v in indices.values()), 2, dtype=dtype, device=device)
+
+    offset = 0
+    for i, k in enumerate(keys):
+        if k not in indices:
+            continue
+        index = indices[k]
+        length = index.shape[0]
+        id_tensor[offset:offset+length, 0] = i
+        id_tensor[offset:offset+length, 1] = index
+        offset += length
+    return id_tensor
 
 
 def _divide_by_worker(dataset, batch_size, drop_last):
@@ -115,7 +121,6 @@ class TensorizedDataset(torch.utils.data.IterableDataset):
     When the dataset is on the GPU, this significantly reduces the overhead.
     """
     def __init__(self, indices, batch_size, drop_last):
-        name, _ = _generate_shared_mem_name_id()
         if isinstance(indices, Mapping):
             self._mapping_keys = list(indices.keys())
             self._device = next(iter(indices.values())).device
@@ -128,12 +133,10 @@ class TensorizedDataset(torch.utils.data.IterableDataset):
         # Use a shared memory array to permute indices for shuffling.  This is to make sure that
         # the worker processes can see it when persistent_workers=True, where self._indices
         # would not be duplicated every epoch.
-        self._indices = create_shared_mem_array(name, (self._id_tensor.shape[0],), torch.int64)
+        self._indices = torch.empty(self._id_tensor.shape[0], dtype=torch.int64).share_memory_()
         self._indices[:] = torch.arange(self._id_tensor.shape[0])
         self.batch_size = batch_size
         self.drop_last = drop_last
-        self.shared_mem_name = name
-        self.shared_mem_size = self._indices.shape[0]
 
     def shuffle(self):
         """Shuffle the dataset."""
@@ -149,17 +152,6 @@ class TensorizedDataset(torch.utils.data.IterableDataset):
     def __len__(self):
         num_samples = self._id_tensor.shape[0]
         return (num_samples + (0 if self.drop_last else (self.batch_size - 1))) // self.batch_size
-
-def _get_shared_mem_name(id_):
-    return f'ddp_{id_}'
-
-def _generate_shared_mem_name_id():
-    for _ in range(3):     # 3 trials
-        id_ = random.getrandbits(32)
-        name = _get_shared_mem_name(id_)
-        if not nd.exist_shared_mem_array(name):
-            return name, id_
-    raise DGLError('Unable to generate a shared memory array')
 
 class DDPTensorizedDataset(torch.utils.data.IterableDataset):
     """Custom Dataset wrapper that returns a minibatch as tensors or dicts of tensors.
@@ -197,33 +189,22 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
 
         if isinstance(indices, Mapping):
             self._device = next(iter(indices.values())).device
-            self._id_tensor = _get_id_tensor_from_mapping(
-                    indices, self._device, self._mapping_keys)
+            self._id_tensor = call_once_and_share(
+                lambda: _get_id_tensor_from_mapping(indices, self._device, self._mapping_keys),
+                (self.num_indices, 2), dtype_of(indices))
         else:
             self._id_tensor = indices
             self._device = self._id_tensor.device
 
-        if self.rank == 0:
-            name, id_ = _generate_shared_mem_name_id()
-            self._indices = create_shared_mem_array(
-                name, (self.shared_mem_size,), torch.int64)
-            self._indices[:self._id_tensor.shape[0]] = torch.arange(self._id_tensor.shape[0])
-            meta_info = torch.LongTensor([id_, self._indices.shape[0]])
-        else:
-            meta_info = torch.LongTensor([0, 0])
+        self._indices = call_once_and_share(
+            self._create_shared_indices, (self.shared_mem_size,), torch.int64)
 
-        if dist.get_backend() == 'nccl':
-            # Use default CUDA device; PyTorch DDP required the users to set the CUDA
-            # device for each process themselves so calling .cuda() should be safe.
-            meta_info = meta_info.cuda()
-        dist.broadcast(meta_info, src=0)
-
-        if self.rank != 0:
-            id_, num_samples = meta_info.tolist()
-            name = _get_shared_mem_name(id_)
-            indices_shared = get_shared_mem_array(name, (num_samples,), torch.int64)
-            self._indices = indices_shared
-        self.shared_mem_name = name
+    def _create_shared_indices(self):
+        indices = torch.empty(self.shared_mem_size, dtype=torch.int64)
+        num_ids = self._id_tensor.shape[0]
+        indices[:num_ids] = torch.arange(num_ids)
+        indices[num_ids:] = torch.arange(self.shared_mem_size - num_ids)
+        return indices
 
     def shuffle(self):
         """Shuffles the dataset."""
@@ -525,11 +506,16 @@ class CollateWrapper(object):
     """Wraps a collate function with :func:`remove_parent_storage_columns` for serializing
     from PyTorch DataLoader workers.
     """
-    def __init__(self, sample_func, g):
+    def __init__(self, sample_func, g, use_uva, device):
         self.sample_func = sample_func
         self.g = g
+        self.use_uva = use_uva
+        self.device = device
 
     def __call__(self, items):
+        if self.use_uva:
+            # Only copy the indices to the given device if in UVA mode.
+            items = recursive_apply(items, lambda x: x.to(self.device))
         batch = self.sample_func(self.g, items)
         return recursive_apply(batch, remove_parent_storage_columns, self.g)
 
@@ -692,6 +678,36 @@ class DataLoader(torch.utils.data.DataLoader):
                  ddp_seed=0, batch_size=1, drop_last=False, shuffle=False,
                  use_prefetch_thread=None, use_alternate_streams=None,
                  pin_prefetcher=None, use_uva=False, **kwargs):
+        # (BarclayII) PyTorch Lightning sometimes will recreate a DataLoader from an existing
+        # DataLoader with modifications to the original arguments.  The arguments are retrieved
+        # from the attributes with the same name, and because we change certain arguments
+        # when calling super().__init__() (e.g. batch_size attribute is None even if the
+        # batch_size argument is not, so the next DataLoader's batch_size argument will be
+        # None), we cannot reinitialize the DataLoader with attributes from the previous
+        # DataLoader directly.
+        # A workaround is to check whether "collate_fn" appears in kwargs.  If "collate_fn"
+        # is indeed in kwargs and it's already a CollateWrapper object, we can assume that
+        # the arguments come from a previously created DGL DataLoader, and directly initialize
+        # the new DataLoader from kwargs without any changes.
+        if isinstance(kwargs.get('collate_fn', None), CollateWrapper):
+            assert batch_size is None       # must be None
+            # restore attributes
+            self.graph = graph
+            self.indices = indices
+            self.graph_sampler = graph_sampler
+            self.device = device
+            self.use_ddp = use_ddp
+            self.ddp_seed = ddp_seed
+            self.shuffle = shuffle
+            self.drop_last = drop_last
+            self.use_prefetch_thread = use_prefetch_thread
+            self.use_alternate_streams = use_alternate_streams
+            self.pin_prefetcher = pin_prefetcher
+            self.use_uva = use_uva
+            kwargs['batch_size'] = None
+            super().__init__(**kwargs)
+            return
+
         if isinstance(graph, DistGraph):
             raise TypeError(
                 'Please use dgl.dataloading.DistNodeDataLoader or '
@@ -741,10 +757,6 @@ class DataLoader(torch.utils.data.DataLoader):
             if use_uva:
                 if self.graph.device.type != 'cpu':
                     raise ValueError('Graph must be on CPU if UVA sampling is enabled.')
-                if indices_device != self.device:
-                    raise ValueError(
-                        f'Indices must be on the same device as the device argument '
-                        f'({self.device})')
                 if num_workers > 0:
                     raise ValueError('num_workers must be 0 if UVA sampling is enabled.')
 
@@ -808,13 +820,15 @@ class DataLoader(torch.utils.data.DataLoader):
         self.use_alternate_streams = use_alternate_streams
         self.pin_prefetcher = pin_prefetcher
         self.use_prefetch_thread = use_prefetch_thread
+
         worker_init_fn = WorkerInitWrapper(kwargs.get('worker_init_fn', None))
 
         self.other_storages = {}
 
         super().__init__(
             self.dataset,
-            collate_fn=CollateWrapper(self.graph_sampler.sample, graph),
+            collate_fn=CollateWrapper(
+                self.graph_sampler.sample, graph, self.use_uva, self.device),
             batch_size=None,
             worker_init_fn=worker_init_fn,
             **kwargs)

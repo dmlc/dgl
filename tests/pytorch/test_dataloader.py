@@ -130,14 +130,27 @@ def _check_device(data):
 
 @parametrize_dtype
 @pytest.mark.parametrize('sampler_name', ['full', 'neighbor', 'neighbor2'])
-@pytest.mark.parametrize('pin_graph', [False, True])
+@pytest.mark.parametrize('pin_graph', [None, 'cuda_indices', 'cpu_indices'])
 def test_node_dataloader(idtype, sampler_name, pin_graph):
     g1 = dgl.graph(([0, 0, 0, 1, 1], [1, 2, 3, 3, 4])).astype(idtype)
-    if F.ctx() != F.cpu() and pin_graph:
-        g1.create_formats_()
-        g1.pin_memory_()
     g1.ndata['feat'] = F.copy_to(F.randn((5, 8)), F.cpu())
     g1.ndata['label'] = F.copy_to(F.randn((g1.num_nodes(),)), F.cpu())
+    indices = F.arange(0, g1.num_nodes(), idtype)
+    if F.ctx() != F.cpu():
+        if pin_graph:
+            g1.create_formats_()
+            g1.pin_memory_()
+            if pin_graph == 'cpu_indices':
+                indices = F.arange(0, g1.num_nodes(), idtype, F.cpu())
+            elif pin_graph == 'cuda_indices':
+                if F._default_context_str == 'gpu':
+                    indices = F.arange(0, g1.num_nodes(), idtype, F.cuda())
+                else:
+                    return  # skip
+        else:
+            g1 = g1.to('cuda')
+
+    use_uva = pin_graph is not None and F.ctx() != F.cpu()
 
     for num_workers in [0, 1, 2]:
         sampler = {
@@ -145,9 +158,10 @@ def test_node_dataloader(idtype, sampler_name, pin_graph):
             'neighbor': dgl.dataloading.MultiLayerNeighborSampler([3, 3]),
             'neighbor2': dgl.dataloading.MultiLayerNeighborSampler([3, 3])}[sampler_name]
         dataloader = dgl.dataloading.NodeDataLoader(
-            g1, g1.nodes(), sampler, device=F.ctx(),
+            g1, indices, sampler, device=F.ctx(),
             batch_size=g1.num_nodes(),
-            num_workers=num_workers)
+            num_workers=(num_workers if (pin_graph and F.ctx() == F.cpu()) else 0),
+            use_uva=use_uva)
         for input_nodes, output_nodes, blocks in dataloader:
             _check_device(input_nodes)
             _check_device(output_nodes)
@@ -155,6 +169,8 @@ def test_node_dataloader(idtype, sampler_name, pin_graph):
             _check_dtype(input_nodes, idtype, 'dtype')
             _check_dtype(output_nodes, idtype, 'dtype')
             _check_dtype(blocks, idtype, 'idtype')
+    if g1.is_pinned():
+        g1.unpin_memory_()
 
     g2 = dgl.heterograph({
          ('user', 'follow', 'user'): ([0, 0, 0, 1, 1, 1, 2], [1, 2, 3, 0, 2, 3, 0]),
@@ -164,6 +180,21 @@ def test_node_dataloader(idtype, sampler_name, pin_graph):
     }).astype(idtype)
     for ntype in g2.ntypes:
         g2.nodes[ntype].data['feat'] = F.copy_to(F.randn((g2.num_nodes(ntype), 8)), F.cpu())
+    indices = {nty: F.arange(0, g2.num_nodes(nty)) for nty in g2.ntypes}
+    if F.ctx() != F.cpu():
+        if pin_graph:
+            g2.create_formats_()
+            g2.pin_memory_()
+            if pin_graph == 'cpu_indices':
+                indices = {nty: F.arange(0, g2.num_nodes(nty), idtype, F.cpu()) for nty in g2.ntypes}
+            elif pin_graph == 'cuda_indices':
+                if F._default_context_str == 'gpu':
+                    indices = {nty: F.arange(0, g2.num_nodes(), idtype, F.cuda()) for nty in g2.ntypes}
+                else:
+                    return  # skip
+        else:
+            g2 = g2.to('cuda')
+
     batch_size = max(g2.num_nodes(nty) for nty in g2.ntypes)
     sampler = {
         'full': dgl.dataloading.MultiLayerFullNeighborSampler(2),
@@ -172,7 +203,9 @@ def test_node_dataloader(idtype, sampler_name, pin_graph):
 
     dataloader = dgl.dataloading.NodeDataLoader(
         g2, {nty: g2.nodes(nty) for nty in g2.ntypes},
-        sampler, device=F.ctx(), batch_size=batch_size)
+        sampler, device=F.ctx(), batch_size=batch_size,
+        num_workers=(num_workers if (pin_graph and F.ctx() == F.cpu()) else 0),
+        use_uva=use_uva)
     assert isinstance(iter(dataloader), Iterator)
     for input_nodes, output_nodes, blocks in dataloader:
         _check_device(input_nodes)
@@ -182,8 +215,8 @@ def test_node_dataloader(idtype, sampler_name, pin_graph):
         _check_dtype(output_nodes, idtype, 'dtype')
         _check_dtype(blocks, idtype, 'idtype')
 
-    if g1.is_pinned():
-        g1.unpin_memory_()
+    if g2.is_pinned():
+        g2.unpin_memory_()
 
 @pytest.mark.parametrize('sampler_name', ['full', 'neighbor'])
 @pytest.mark.parametrize('neg_sampler', [
@@ -349,9 +382,4 @@ def test_edge_dataloader_excludes(exclude, always_exclude_flag):
             assert not np.isin(edges_to_exclude, block_eids).any()
 
 if __name__ == '__main__':
-    test_graph_dataloader()
-    test_cluster_gcn(0)
-    test_neighbor_nonuniform(0)
-    for exclude in [None, 'self', 'reverse_id', 'reverse_types']:
-        test_edge_dataloader_excludes(exclude, False)
-        test_edge_dataloader_excludes(exclude, True)
+    test_node_dataloader(F.int32, 'neighbor', None)

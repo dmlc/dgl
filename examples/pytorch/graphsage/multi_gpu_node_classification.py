@@ -6,43 +6,12 @@ import torch.distributed.optim
 import torchmetrics.functional as MF
 import dgl
 import dgl.nn as dglnn
-from dgl.utils import pin_memory_inplace, unpin_memory_inplace, \
-    gather_pinned_tensor_rows, create_shared_mem_array, get_shared_mem_array
+from dgl.utils import pin_memory_inplace, unpin_memory_inplace
+from dgl.multiprocessing import shared_tensor
 import time
 import numpy as np
 from ogb.nodeproppred import DglNodePropPredDataset
 import tqdm
-
-
-def shared_tensor(*shape, device, name, dtype=torch.float32):
-    """ Create a tensor in shared memroy, pinned in each process's CUDA
-    context.
-
-    Parameters
-    ----------
-        shape : int... 
-            A sequence of integers describing the shape of the new tensor.
-        device : context
-            The device of the result tensor.
-        name : string
-            The name of the shared allocation.
-        dtype : dtype, optional
-            The datatype of the allocation. Default: torch.float32
-
-    Returns
-    -------
-        Tensor :
-            The shared tensor.
-    """
-    rank = dist.get_rank()
-    if rank == 0:
-        y = create_shared_mem_array(
-            name, shape, dtype)
-    dist.barrier()
-    if rank != 0:
-        y = get_shared_mem_array(name, shape, dtype)
-    pin_memory_inplace(y)
-    return y
 
 
 class SAGE(nn.Module):
@@ -105,9 +74,8 @@ class SAGE(nn.Module):
             # shared output tensor 'y' in host memory, pin it to allow UVA
             # access from each GPU during forward propagation.
             y = shared_tensor(
-                    g.num_nodes(),
-                    self.n_hidden if l != len(self.layers) - 1 else self.n_classes,
-                    device='cpu', name='layer_{}_output'.format(l))
+                    (g.num_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes))
+            pin_memory_inplace(y)
 
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader) \
                     if dist.get_rank() == 0 else dataloader:
