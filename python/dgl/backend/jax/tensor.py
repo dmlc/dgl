@@ -457,7 +457,7 @@ def zerocopy_to_dgl_ndarray(data):
     return nd.from_dlpack(jax.dlpack.to_dlpack(data, take_ownership=False))
 
 def zerocopy_to_dgl_ndarray_for_write(input):
-    return nd.from_dlpack(jax.dlpack.to_dlpack(jnp.array(input), take_ownership=False))
+    return nd.from_dlpack(jax.dlpack.to_dlpack(input, take_ownership=False))
 
 def zerocopy_from_dgl_ndarray(data):
     if jax.devices()[0].platform == "gpu":
