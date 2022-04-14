@@ -31,7 +31,7 @@ class OGBGGIN(nn.Module):
     def __init__(self,
                  data_info: dict,
                  embed_size: int = 300,
-                 num_layers: int = 500,
+                 num_layers: int = 5,
                  dropout: float = 0.5,
                  virtual_node : bool = False):
         """Graph Isomorphism Network (GIN) variant introduced in baselines
