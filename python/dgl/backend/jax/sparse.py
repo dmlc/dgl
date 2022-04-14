@@ -129,21 +129,6 @@ def spmm_cache_argY(binary_op, reduce_op, req_grad_X, req_grad_Y):
 @partial(jax.custom_vjp, nondiff_argnums=(0, 1, 2))
 def GSpMM(gidx, op, reduce_op, X, Y):
     out, (argX, argY) = _gspmm(gidx, op, reduce_op, X, Y)
-    reduce_last = _need_reduce_last_dim(X, Y)
-    X_shape = X.shape if X is not None else None
-    Y_shape = Y.shape if Y is not None else None
-    dtype = X.dtype if X is not None else Y.dtype
-    device = X.device if X is not None else Y.device
-    req_grad_X = True # X.requires_grad if X is not None else False
-    req_grad_Y = True # Y.requires_grad if Y is not None else False
-    if not spmm_cache_X(op, reduce_op, req_grad_X, req_grad_Y):
-        X = None
-    if not spmm_cache_Y(op, reduce_op, req_grad_X, req_grad_Y):
-        Y = None
-    if not spmm_cache_argX(op, reduce_op, req_grad_X, req_grad_Y):
-        argX = None
-    if not spmm_cache_argY(op, reduce_op, req_grad_X, req_grad_Y):
-        argY = None
     return out
 
 def GSpMM_fwd(gidx, op, reduce_op, X, Y):
@@ -226,293 +211,269 @@ def sddmm_cache_Y(op, req_grad_X, req_grad_Y):
         return True
     return False
 
+@partial(jax.custom_vjp, nondiff_argnums=(0, 1, 4, 5))
+def GSDDMM(gidx, op, X, Y, lhs_target, rhs_target):
+    out = _gsddmm(gidx, op, X, Y, lhs_target, rhs_target)
+    return out
 
-class GSDDMM(th.autograd.Function):
-    @staticmethod
-    def forward(ctx, gidx, op, X, Y, lhs_target, rhs_target):
-        out = _gsddmm(gidx, op, X, Y, lhs_target, rhs_target)
-        X_shape = X.shape if X is not None else None
-        Y_shape = Y.shape if Y is not None else None
-        ctx.backward_cache = gidx, op, lhs_target, rhs_target, X_shape, Y_shape
-        req_grad_X = X.requires_grad if X is not None else False
-        req_grad_Y = Y.requires_grad if Y is not None else False
-        if not sddmm_cache_X(op, req_grad_X, req_grad_Y):
-            X = None
-        if not sddmm_cache_Y(op, req_grad_X, req_grad_Y):
-            Y = None
-        ctx.save_for_backward(X, Y)
-        return out
+def GSDDMM_fwd(gidx, op, X, Y, lhs_target, rhs_target):
+    out = _gsddmm(gidx, op, X, Y, lhs_target, rhs_target)
+    X_shape = X.shape if X is not None else None
+    Y_shape = Y.shape if Y is not None else None
+    req_grad_X = True # X.requires_grad if X is not None else False
+    req_grad_Y = True # Y.requires_grad if Y is not None else False
+    if not sddmm_cache_X(op, req_grad_X, req_grad_Y):
+        X = None
+    if not sddmm_cache_Y(op, req_grad_X, req_grad_Y):
+        Y = None
+    cache = gidx, op, lhs_target, rhs_target, X_shape, Y_shape, X, Y
+    return out, cache
 
-    @staticmethod
-    def backward(ctx, dZ):
-        gidx, op, lhs_target, rhs_target, X_shape, Y_shape = ctx.backward_cache
-        ctx.backward_cache = None
-        X, Y = ctx.saved_tensors
-        if op != 'copy_rhs' and ctx.needs_input_grad[2]:
-            if lhs_target in ['u', 'v']:
-                _gidx = gidx if lhs_target == 'v' else gidx.reverse()
-                if op in ['add', 'copy_lhs']:
-                    dX = gspmm(_gidx, 'copy_rhs', 'sum', None, dZ)
-                else:  # mul, dot
-                    if rhs_target == lhs_target:
-                        dX = gspmm(_gidx, 'copy_rhs', 'sum', None, dZ) *  Y
-                    elif rhs_target == 'e':
-                        dX = gspmm(_gidx, 'copy_rhs', 'sum', None, dZ * Y)
-                    else:  # rhs_target = !lhs_target
-                        dX = gspmm(_gidx, 'mul', 'sum', Y, dZ)
-            else:  # lhs_target == 'e'
-                if op in ['add', 'copy_lhs']:
-                    dX = dZ
-                else:  # mul, dot
-                    dX = gsddmm(gidx, 'mul', dZ, Y, 'e', rhs_target)
-            dX = _reduce_grad(dX, X_shape)
+def GSDDMM_bwd(cache, dZ):
+    gidx, op, lhs_target, rhs_target, X_shape, Y_shape, X, Y = cache
+    if op != 'copy_rhs':
+        if lhs_target in ['u', 'v']:
+            _gidx = gidx if lhs_target == 'v' else gidx.reverse()
+            if op in ['add', 'copy_lhs']:
+                dX = gspmm(_gidx, 'copy_rhs', 'sum', None, dZ)
+            else:  # mul, dot
+                if rhs_target == lhs_target:
+                    dX = gspmm(_gidx, 'copy_rhs', 'sum', None, dZ) *  Y
+                elif rhs_target == 'e':
+                    dX = gspmm(_gidx, 'copy_rhs', 'sum', None, dZ * Y)
+                else:  # rhs_target = !lhs_target
+                    dX = gspmm(_gidx, 'mul', 'sum', Y, dZ)
+        else:  # lhs_target == 'e'
+            if op in ['add', 'copy_lhs']:
+                dX = dZ
+            else:  # mul, dot
+                dX = gsddmm(gidx, 'mul', dZ, Y, 'e', rhs_target)
+        dX = _reduce_grad(dX, X_shape)
+    else:
+        dX = None
+    if op != 'copy_lhs':
+        if rhs_target in ['u', 'v']:
+            _gidx = gidx if rhs_target == 'v' else gidx.reverse()
+            if op in ['add', 'copy_rhs']:
+                dY = gspmm(_gidx, 'copy_rhs', 'sum', None, dZ)
+            else:  # mul, dot
+                if lhs_target == rhs_target:
+                    dY = gspmm(_gidx, 'copy_rhs', 'sum', None, dZ) * X
+                elif lhs_target == 'e':
+                    dY = gspmm(_gidx, 'copy_rhs', 'sum', None, dZ * X)
+                else:  # rhs_target = !lhs_target
+                    dY = gspmm(_gidx, 'mul', 'sum', X, dZ)
         else:
-            dX = None
-        if op != 'copy_lhs' and ctx.needs_input_grad[3]:
-            if rhs_target in ['u', 'v']:
-                _gidx = gidx if rhs_target == 'v' else gidx.reverse()
-                if op in ['add', 'copy_rhs']:
-                    dY = gspmm(_gidx, 'copy_rhs', 'sum', None, dZ)
-                else:  # mul, dot
-                    if lhs_target == rhs_target:
-                        dY = gspmm(_gidx, 'copy_rhs', 'sum', None, dZ) * X
-                    elif lhs_target == 'e':
-                        dY = gspmm(_gidx, 'copy_rhs', 'sum', None, dZ * X)
-                    else:  # rhs_target = !lhs_target
-                        dY = gspmm(_gidx, 'mul', 'sum', X, dZ)
-            else:
-                if op in ['add', 'copy_rhs']:
-                    dY = dZ
-                else:  # mul, dot
-                    dY = gsddmm(gidx, 'mul', dZ, X, 'e', lhs_target)
-            dY = _reduce_grad(dY, Y_shape)
-        else:
-            dY = None
-        return None, None, dX, dY, None, None
+            if op in ['add', 'copy_rhs']:
+                dY = dZ
+            else:  # mul, dot
+                dY = gsddmm(gidx, 'mul', dZ, X, 'e', lhs_target)
+        dY = _reduce_grad(dY, Y_shape)
+    else:
+        dY = None
+    return None, None, dX, dY, None, None
 
+GSDDMM.defvjp(GSDDMM_fwd, GSDDMM_bwd)
 
-class EdgeSoftmax(th.autograd.Function):
-    @staticmethod
-    def forward(ctx, gidx, score, eids, norm_by):
-        """Forward function.
+@partial(jax.custom_vjp, nondiff_argnums=(0, 2, 3))
+def EdgeSoftmax(gidx, score, eids, norm_by):
+    """Forward function.
 
-        Pseudo-code:
+    Pseudo-code:
 
-        .. code:: python
+    .. code:: python
 
-            score = dgl.EData(g, score)
-            score_max = score.dst_max()  # of type dgl.NData
-            score = score - score_max  # edge_sub_dst, ret dgl.EData
-            score_sum = score.dst_sum()  # of type dgl.NData
-            out = score / score_sum    # edge_div_dst, ret dgl.EData
-            return out.data
-        """
-        # remember to save the graph to backward cache before making it
-        # a local variable
-        if not is_all(eids):
-            gidx = gidx.edge_subgraph([eids], True).graph
-        if norm_by == 'src':
-            gidx = gidx.reverse()
-        #Note: Now _edge_softmax_forward op only supports CPU
-        #TODO(Zhejiang): We will support GPU in the future
-        if(score.is_cuda):
-            score_max = _gspmm(gidx, 'copy_rhs', 'max', None, score)[0]
-            score = th.exp(_gsddmm(gidx, 'sub', score, score_max, 'e', 'v'))
-            score_sum = _gspmm(gidx, 'copy_rhs', 'sum', None, score)[0]
-            out = _gsddmm(gidx, 'div', score, score_sum, 'e', 'v')
-        else:
-            out = _edge_softmax_forward(gidx, score, 'copy_rhs')
-        ctx.backward_cache = gidx
-        ctx.save_for_backward(out)
-        return out
+        score = dgl.EData(g, score)
+        score_max = score.dst_max()  # of type dgl.NData
+        score = score - score_max  # edge_sub_dst, ret dgl.EData
+        score_sum = score.dst_sum()  # of type dgl.NData
+        out = score / score_sum    # edge_div_dst, ret dgl.EData
+        return out.data
+    """
+    # remember to save the graph to backward cache before making it
+    # a local variable
+    if not is_all(eids):
+        gidx = gidx.edge_subgraph([eids], True).graph
+    if norm_by == 'src':
+        gidx = gidx.reverse()
+    #Note: Now _edge_softmax_forward op only supports CPU
+    #TODO(Zhejiang): We will support GPU in the future
+    if jax.devices()[0].platform == "gpu":
+        score_max = _gspmm(gidx, 'copy_rhs', 'max', None, score)[0]
+        score = jnp.exp(_gsddmm(gidx, 'sub', score, score_max, 'e', 'v'))
+        score_sum = _gspmm(gidx, 'copy_rhs', 'sum', None, score)[0]
+        out = _gsddmm(gidx, 'div', score, score_sum, 'e', 'v')
+    else:
+        out = _edge_softmax_forward(gidx, score, 'copy_rhs')
 
-    @staticmethod
-    def backward(ctx, grad_out):
-        """Backward function.
+    return out
 
-        Pseudo-code:
+def EdgeSoftmax_fwd(gidx, score, eids, norm_by):
+    """Forward function.
 
-        .. code:: python
+    Pseudo-code:
 
-            g, out = ctx.backward_cache
-            grad_out = dgl.EData(g, grad_out)
-            out = dgl.EData(g, out)
-            sds = out * grad_out  # type dgl.EData
-            sds_sum = sds.dst_sum()  # type dgl.NData
-            grad_score = sds - out * sds_sum  # multiple expressions
-            return grad_score.data
-        """
-        gidx = ctx.backward_cache
-        # See https://github.com/dmlc/dgl/pull/3386
-        ctx.backward_cache = None
-        out, = ctx.saved_tensors
-        sds = out * grad_out
-        #Note: Now _edge_softmax_backward op only supports CPU
-        #TODO(Zhejiang): We will support GPU in the future
-        if(out.is_cuda):
-            accum = gspmm(gidx, 'copy_rhs', 'sum', None, sds)
+    .. code:: python
 
-            grad_score = sds - gsddmm(gidx, 'mul', out, accum, 'e', 'v')
-        else:
-            grad_score = _edge_softmax_backward(gidx, out, sds)
-        return None, grad_score, None, None
+        score = dgl.EData(g, score)
+        score_max = score.dst_max()  # of type dgl.NData
+        score = score - score_max  # edge_sub_dst, ret dgl.EData
+        score_sum = score.dst_sum()  # of type dgl.NData
+        out = score / score_sum    # edge_div_dst, ret dgl.EData
+        return out.data
+    """
+    # remember to save the graph to backward cache before making it
+    # a local variable
+    if not is_all(eids):
+        gidx = gidx.edge_subgraph([eids], True).graph
+    if norm_by == 'src':
+        gidx = gidx.reverse()
+    #Note: Now _edge_softmax_forward op only supports CPU
+    #TODO(Zhejiang): We will support GPU in the future
+    if jax.devices()[0].platform == "gpu":
+        score_max = _gspmm(gidx, 'copy_rhs', 'max', None, score)[0]
+        score = jnp.exp(_gsddmm(gidx, 'sub', score, score_max, 'e', 'v'))
+        score_sum = _gspmm(gidx, 'copy_rhs', 'sum', None, score)[0]
+        out = _gsddmm(gidx, 'div', score, score_sum, 'e', 'v')
+    else:
+        out = _edge_softmax_forward(gidx, score, 'copy_rhs')
 
-class SegmentReduce(th.autograd.Function):
-    @staticmethod
-    @custom_fwd(cast_inputs=th.float16)
-    def forward(ctx, op, x, offsets):
-        y, arg = _segment_reduce(op, x, offsets)
-        ctx.save_for_backward(arg, offsets)
-        ctx.backward_cache = op
-        return y
+    cache = (gidx, out)
+    return out, cache
 
-    @staticmethod
-    @custom_bwd
-    def backward(ctx, dy):
-        op = ctx.backward_cache
-        # See https://github.com/dmlc/dgl/pull/3386
-        ctx.backward_cache = None
-        arg, offsets = ctx.saved_tensors
-        m = offsets[-1].item()
-        if op == 'sum':
-            offsets = offsets[1:]
-            # To address the issue of trailing zeros, related issue:
-            # https://github.com/dmlc/dgl/pull/2610
-            indices = th.zeros(
-                (m + 1,), device=offsets.device, dtype=offsets.dtype)
-            indices.scatter_add_(0, offsets, th.ones_like(offsets))
-            indices = th.cumsum(indices, -1)[:-1]
-            dx = dy[indices]
-        else:
-            dx = _bwd_segment_cmp(dy, arg, m)
-        return None, dx, None
+def EdgeSoftmax_bwd(cache, grad_out):
+    """Backward function.
 
+    Pseudo-code:
 
-class ScatterAdd(th.autograd.Function):
-    @staticmethod
-    def forward(ctx, x, idx, m):
-        y = _scatter_add(x, idx, m)
-        ctx.save_for_backward(idx)
-        return y
+    .. code:: python
 
-    @staticmethod
-    @custom_bwd
-    def backward(ctx, dy):
-        idx = ctx.saved_tensors
-        return dy[idx], None, None
+        g, out = ctx.backward_cache
+        grad_out = dgl.EData(g, grad_out)
+        out = dgl.EData(g, out)
+        sds = out * grad_out  # type dgl.EData
+        sds_sum = sds.dst_sum()  # type dgl.NData
+        grad_score = sds - out * sds_sum  # multiple expressions
+        return grad_score.data
+    """
+    gidx, out = cache
+    sds = out * grad_out
+    #Note: Now _edge_softmax_backward op only supports CPU
+    #TODO(Zhejiang): We will support GPU in the future
+    if jax.devices()[0].platform == "gpu":
+        accum = gspmm(gidx, 'copy_rhs', 'sum', None, sds)
 
+        grad_score = sds - gsddmm(gidx, 'mul', out, accum, 'e', 'v')
+    else:
+        grad_score = _edge_softmax_backward(gidx, out, sds)
+    return None, grad_score, None, None
 
-class CSRMM(th.autograd.Function):
-    @staticmethod
-    def forward(ctx, gidxA, A_weights, gidxB, B_weights, num_vtypes):
-        gidxC, C_weights = _csrmm(gidxA, A_weights, gidxB, B_weights, num_vtypes)
-        nrows, ncols, C_indptr, C_indices, C_eids = gidxC.adjacency_matrix_tensors(0, False, 'csr')
-        # Note: the returned C_indptr, C_indices and C_eids tensors MUST be the same
-        # as the underlying tensors of the created graph gidxC.
-        ctx.backward_cache = gidxA, gidxB, gidxC
-        ctx.save_for_backward(A_weights, B_weights)
-        return th.tensor(nrows), th.tensor(ncols), C_indptr, C_indices, C_eids, C_weights
+EdgeSoftmax.defvjp(EdgeSoftmax_fwd, EdgeSoftmax_bwd)
 
-    @staticmethod
-    def backward(ctx, dnrows, dncols, dC_indptr, dC_indices, dC_eids, dC_weights):
-        # Only the last argument is meaningful.
-        gidxA, gidxB, gidxC = ctx.backward_cache
-        ctx.backward_cache = None
-        A_weights, B_weights = ctx.saved_tensors
-        dgidxA, dA_weights = csrmm(
-            gidxC, dC_weights, gidxB.reverse(), B_weights, gidxA.number_of_ntypes())
-        dgidxB, dB_weights = csrmm(
-            gidxA.reverse(), A_weights, gidxC, dC_weights, gidxB.number_of_ntypes())
-        dA_weights = csrmask(dgidxA, dA_weights, gidxA)
-        dB_weights = csrmask(dgidxB, dB_weights, gidxB)
-        return None, dA_weights, None, dB_weights, None
+@partial(jax.custom_vjp, nondiff_argnums=(0, 2))
+def SegmentReduce(op, x, offsets):
+    y, arg = _segment_reduce(op, x, offsets)
+    return y
 
+def SegmentReduce_fwd(op, x, offsets):
+    y, arg = _segment_reduce(op, x, offsets)
+    cache = (arg, offsets, op)
+    return y, cache
 
-class CSRSum(th.autograd.Function):
-    @staticmethod
-    def forward(ctx, gidxs, *weights):
-        # PyTorch tensors must be explicit arguments of the forward function
-        gidxC, C_weights = _csrsum(gidxs, weights)
-        nrows, ncols, C_indptr, C_indices, C_eids = gidxC.adjacency_matrix_tensors(
-            0, False, 'csr')
-        # Note: the returned C_indptr, C_indices and C_eids tensors MUST be the same
-        # as the underlying tensors of the created graph gidxC.
-        ctx.backward_cache = gidxs, gidxC
-        return th.tensor(nrows), th.tensor(ncols), C_indptr, C_indices, C_eids, C_weights
+def SegmentReduce_fwd(cache, dy):
+    (arg, offsets, op) = cache
+    m = offsets[-1].item()
+    if op == 'sum':
+        offsets = offsets[1:]
+        # To address the issue of trailing zeros, related issue:
+        # https://github.com/dmlc/dgl/pull/2610
+        indices = th.zeros(
+            (m + 1,), device=offsets.device, dtype=offsets.dtype)
+        indices.scatter_add_(0, offsets, th.ones_like(offsets))
+        indices = th.cumsum(indices, -1)[:-1]
+        dx = dy[indices]
+    else:
+        dx = _bwd_segment_cmp(dy, arg, m)
+    return None, dx, None
 
-    @staticmethod
-    def backward(ctx, dnrows, dncols, dC_indptr, dC_indices, dC_eids, dC_weights):
-        # Only the last argument is meaningful.
-        gidxs, gidxC = ctx.backward_cache
-        ctx.backward_cache = None
-        return (None,) + tuple(csrmask(gidxC, dC_weights, gidx) for gidx in gidxs)
+@partial(jax.custom_vjp, nondiff_argnums=(1, 2))
+def ScatterAdd(x, idx, m):
+    y = _scatter_add(x, idx, m)
+    return y
 
+def ScatterAdd_fwd(x, idx, m):
+    y = _scatter_add(x, idx, m)
+    cache = idx
+    return y, cache
 
-class CSRMask(th.autograd.Function):
-    @staticmethod
-    def forward(ctx, gidxA, A_weights, gidxB):
-        ctx.backward_cache = gidxA, gidxB
-        return _csrmask(gidxA, A_weights, gidxB)
+def ScatterAdd_bwd(cache, dy):
+    idx = cache
+    return dy[idx], None, None
 
-    @staticmethod
-    def backward(ctx, dB_weights):
-        gidxA, gidxB = ctx.backward_cache
-        ctx.backward_cache = None
-        return None, csrmask(gidxB, dB_weights, gidxA), None
+def CSRMM(gidxA, A_weights, gidxB, B_weights, num_vtypes):
+    gidxC, C_weights = _csrmm(gidxA, A_weights, gidxB, B_weights, num_vtypes)
+    nrows, ncols, C_indptr, C_indices, C_eids = gidxC.adjacency_matrix_tensors(0, False, 'csr')
+    # Note: the returned C_indptr, C_indices and C_eids tensors MUST be the same
+    # as the underlying tensors of the created graph gidxC.
+    return th.tensor(nrows), th.tensor(ncols), C_indptr, C_indices, C_eids, C_weights
 
+def CSRMM_fwd(gidxA, A_weights, gidxB, B_weights, num_vtypes):
+    gidxC, C_weights = _csrmm(gidxA, A_weights, gidxB, B_weights, num_vtypes)
+    nrows, ncols, C_indptr, C_indices, C_eids = gidxC.adjacency_matrix_tensors(0, False, 'csr')
+    # Note: the returned C_indptr, C_indices and C_eids tensors MUST be the same
+    # as the underlying tensors of the created graph gidxC.
+    cache = gidxA, gidxB, gidxC, A_weights, B_weights
+    return (th.tensor(nrows), th.tensor(ncols), C_indptr, C_indices, C_eids, C_weights), cache
 
-class SEGMENTMM(th.autograd.Function):
-    @staticmethod
-    @custom_fwd(cast_inputs=th.float16)
-    def forward(ctx, A, B, seglen_A):
-        if B.dim() != 3:
-            raise ValueError("segment_mm expects B to be a 3D tensor.")
-        C = th.zeros((A.shape[0], B.shape[2]), device=A.device, dtype=A.dtype)
-        C = _segment_mm(A, B, C, seglen_A)
-        ctx.backward_cache = A, B, seglen_A
-        return C
+def CSRMM_bwd(cache, dnrows, dncols, dC_indptr, dC_indices, dC_eids, dC_weights):
+    gidxA, gidxB, gidxC, A_weights, B_weights = cache
+    dgidxA, dA_weights = csrmm(
+        gidxC, dC_weights, gidxB.reverse(), B_weights, gidxA.number_of_ntypes())
+    dgidxB, dB_weights = csrmm(
+        gidxA.reverse(), A_weights, gidxC, dC_weights, gidxB.number_of_ntypes())
+    dA_weights = csrmask(dgidxA, dA_weights, gidxA)
+    dB_weights = csrmask(dgidxB, dB_weights, gidxB)
+    return None, dA_weights, None, dB_weights, None
 
-    @staticmethod
-    def backward(ctx, dZ):
-        A, B, seglen_A = ctx.backward_cache
-        A_grad = B_grad = None
-        if ctx.needs_input_grad[0]:
-            #  Compute A_grad = Out_grad * B^T
-            A_grad = th.zeros(A.shape, device=A.device, dtype=A.dtype)
-            A_grad = _segment_mm(dZ, B, A_grad, seglen_A, b_trans=True)
-        if ctx.needs_input_grad[1]:
-            #  Compute B_grad = A^T * Out_grad
-            B_grad = th.zeros(B.shape, device=B.device, dtype=B.dtype)
-            B_grad = _segment_mm_backward_B(A, dZ, B_grad, seglen_A)
-        return A_grad, B_grad, None
+CSRMM.defvjp(CSRMM_fwd, CSRMM_bwd)
 
+@jax.custom_vjp(nondiff_argnums=(0)):
+def CSRSum(gidx, *weights):
+    gidxC, C_weights = _csrsum(gidxs, weights)
+    nrows, ncols, C_indptr, C_indices, C_eids = gidxC.adjacency_matrix_tensors(
+        0, False, 'csr')
+    # Note: the returned C_indptr, C_indices and C_eids tensors MUST be the same
+    # as the underlying tensors of the created graph gidxC.
+    cache = gidxs, gidxC
+    return th.tensor(nrows), th.tensor(ncols), C_indptr, C_indices, C_eids, C_weights
 
-class GATHERMM(th.autograd.Function):
-    @staticmethod
-    @custom_fwd(cast_inputs=th.float16)
-    def forward(ctx, A, B, idx_a, idx_b):
-        if B.dim() != 3:
-            raise ValueError("Expected dimension of B is 3. Got " + str(B.dim()))
-        N = len(idx_b) if idx_a is None else len(idx_a)
-        C = th.zeros((N, B.shape[2]), device=A.device, dtype=A.dtype)
-        C = _gather_mm(A, B, C, idx_a, idx_b)
-        ctx.backward_cache = A, B, idx_a, idx_b
-        return C
+def CSRSum_fwd(gidxs, *weights):
+    # PyTorch tensors must be explicit arguments of the forward function
+    gidxC, C_weights = _csrsum(gidxs, weights)
+    nrows, ncols, C_indptr, C_indices, C_eids = gidxC.adjacency_matrix_tensors(
+        0, False, 'csr')
+    # Note: the returned C_indptr, C_indices and C_eids tensors MUST be the same
+    # as the underlying tensors of the created graph gidxC.
+    cache = gidxs, gidxC
+    return (th.tensor(nrows), th.tensor(ncols), C_indptr, C_indices, C_eids, C_weights), cache
 
-    @staticmethod
-    def backward(ctx, dZ):
-        A, B, idx_a, idx_b = ctx.backward_cache
-        A_grad = B_grad = None
-        if ctx.needs_input_grad[0]:
-            #  Compute A_grad = Out_grad * B^T
-            A_grad = th.zeros(A.shape, device=A.device, dtype=A.dtype)
-            A_grad = _gather_mm_scatter(dZ, B.transpose(1, 2), A_grad,
-                idx_b=idx_b, idx_c=idx_a)
-        if ctx.needs_input_grad[1]:
-            #  Compute B_grad = A^T * Out_grad
-            B_grad = th.zeros(B.shape, device=B.device, dtype=B.dtype)
-            B_grad = _gather_mm_scatter(A, dZ, B_grad, idx_a=idx_a, idx_c=idx_b)
-        return A_grad, B_grad, None, None
+def CSRSum_bwd(cache, dnrows, dncols, dC_indptr, dC_indices, dC_eids, dC_weights):
+    gidxs, gidxC = cache
+    return (None,) + tuple(csrmask(gidxC, dC_weights, gidx) for gidx in gidxs)
+
+CSRSum.defvjp(CSRMM_fwd, CSRMM_bwd)
+
+@partial(jax.custom_vjp, nondiff_argnums=(0, 2))
+def CSRMask(gidxA, A_weights, gidxB):
+    return _csrmask(gidxA, A_weights, gidxB)
+
+def CSRMask_fwd(gidxA, A_weights, gidxB):
+    cache = gidxA, gidxB
+    return _csrmask(gidxA, A_weights, gidxB), cache
+
+def CSRMask_bwd(cache, dB_weights):
+    gidxA, gidxB = cache
+    return None, csrmask(gidxB, dB_weights, gidxA), None
 
 def gspmm(gidx, op, reduce_op, lhs_data, rhs_data):
     if op == 'sub':
@@ -530,20 +491,20 @@ def gsddmm(gidx, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
     if op == 'div':
         op = 'mul'
         rhs_data = 1. / rhs_data
-    return GSDDMM.apply(gidx, op, lhs_data, rhs_data, lhs_target, rhs_target)
+    return GSDDMM(gidx, op, lhs_data, rhs_data, lhs_target, rhs_target)
 
 def edge_softmax(gidx, logits, eids=ALL, norm_by='dst'):
-    return EdgeSoftmax.apply(gidx, logits, eids, norm_by)
+    return EdgeSoftmax(gidx, logits, eids, norm_by)
 
 def segment_reduce(op, x, offsets):
-    return SegmentReduce.apply(op, x, offsets)
+    return SegmentReduce(op, x, offsets)
 
 def scatter_add(x, idx, m):
-    return ScatterAdd.apply(x, idx, m)
+    return ScatterAdd(x, idx, m)
 
 def csrmm(gidxA, A_weights, gidxB, B_weights, num_vtypes):
     nrows, ncols, C_indptr, C_indices, C_eids, C_weights = \
-        CSRMM.apply(gidxA, A_weights, gidxB, B_weights, num_vtypes)
+        CSRMM(gidxA, A_weights, gidxB, B_weights, num_vtypes)
     gidxC = create_unitgraph_from_csr(
         num_vtypes, nrows.item(), ncols.item(), C_indptr, C_indices, C_eids,
         ["coo", "csr", "csc"])
@@ -557,23 +518,4 @@ def csrsum(gidxs, weights):
     return gidxC, C_weights
 
 def csrmask(gidxA, A_weights, gidxB):
-    return CSRMask.apply(gidxA, A_weights, gidxB)
-
-def segment_mm(A, B, seglen_A):
-    if A.device.type == 'cpu':
-        C = []
-        off = 0
-        for i in range(B.shape[0]):
-            C.append(A[off:off+seglen_A[i]] @ B[i])
-            off += seglen_A[i]
-        return th.cat(C)
-    else:
-        return SEGMENTMM.apply(A, B, seglen_A)
-
-def gather_mm(A, B, idx_A=None, idx_B=None):
-    if A.device.type == 'cpu':
-        A = A[idx_A] if idx_A is not None else A
-        B = B[idx_B] if idx_B is not None else B
-        return th.bmm(A.unsqueeze(1), B).squeeze(1)
-    else:
-        return GATHERMM.apply(A, B, idx_A, idx_B)
+    return CSRMask(gidxA, A_weights, gidxB)
