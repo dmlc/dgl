@@ -30,10 +30,10 @@ class MLP(nn.Module):
 class OGBGGIN(nn.Module):
     def __init__(self,
                  data_info: dict,
-                 embed_size: int,
-                 num_layers: int,
-                 dropout: float,
-                 virtual_node : bool):
+                 embed_size: int = 300,
+                 num_layers: int = 500,
+                 dropout: float = 0.5,
+                 virtual_node : bool = False):
         """Graph Isomorphism Network (GIN) variant introduced in baselines
         for OGB graph property prediction datasets
 
