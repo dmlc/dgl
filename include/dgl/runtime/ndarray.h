@@ -176,7 +176,7 @@ class NDArray {
    *        on the underlying DLTensor.
    * \note This is an in-place method. Behavior depends on the current context,
    *       kDLCPU: will be pinned;
-   *       kDLCPUPinned: directly return;
+   *       IsPinned: directly return;
    *       kDLGPU: invalid, will throw an error.
    */
   inline void PinMemory_();
@@ -184,7 +184,7 @@ class NDArray {
    * \brief In-place method to unpin the current array by calling UnpinData
    *        on the underlying DLTensor.
    * \note This is an in-place method. Behavior depends on the current context,
-   *       kDLCPUPinned: will be unpinned;
+   *       IsPinned: will be unpinned;
    *       others: directly return.
    */
   inline void UnpinMemory_();
@@ -299,7 +299,7 @@ class NDArray {
    * \note Data of the given array will be pinned inplace.
    *       Behavior depends on the current context,
    *       kDLCPU: will be pinned;
-   *       kDLCPUPinned: directly return;
+   *       IsPinned: directly return;
    *       kDLGPU: invalid, will throw an error.
    */
   DGL_DLL static void PinData(DLTensor* tensor);
@@ -309,10 +309,17 @@ class NDArray {
    * \param tensor The array to be unpinned.
    * \note Data of the given array will be unpinned inplace.
    *       Behavior depends on the current context,
-   *       kDLCPUPinned: will be unpinned;
+   *       IsPinned: will be unpinned;
    *       others: directly return.
    */
   DGL_DLL static void UnpinData(DLTensor* tensor);
+
+  /*!
+   * \brief Function check if the data of a DLTensor is pinned.
+   * \param tensor The array to be checked.
+   * \return true if pinned.
+   */
+  DGL_DLL static bool IsDataPinned(DLTensor* tensor);
 
   // internal namespace
   struct Internal;
@@ -485,7 +492,7 @@ inline void NDArray::UnpinMemory_() {
 
 inline bool NDArray::IsPinned() const {
   CHECK(data_ != nullptr);
-  return data_->dl_tensor.ctx.device_type == kDLCPUPinned;
+  return IsDataPinned(&(data_->dl_tensor));
 }
 
 inline int NDArray::use_count() const {

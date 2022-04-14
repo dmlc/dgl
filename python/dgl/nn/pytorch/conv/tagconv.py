@@ -8,12 +8,8 @@ from .graphconv import EdgeWeightNorm
 
 
 class TAGConv(nn.Module):
-    r"""
-
-    Description
-    -----------
-    Topology Adaptive Graph Convolutional layer from paper `Topology
-    Adaptive Graph Convolutional Networks <https://arxiv.org/pdf/1710.10370.pdf>`__.
+    r"""Topology Adaptive Graph Convolutional layer from `Topology
+    Adaptive Graph Convolutional Networks <https://arxiv.org/pdf/1710.10370.pdf>`__
 
     .. math::
         H^{K} = {\sum}_{k=0}^K (D^{-1/2} A D^{-1/2})^{k} X {\Theta}_{k},
@@ -108,7 +104,7 @@ class TAGConv(nn.Module):
         edge_weight: torch.Tensor, optional
             edge_weight to use in the message passing process. This is equivalent to
             using weighted adjacency matrix in the equation above, and
-            :math:\tilde{D}^{-1/2}\tilde{A} \tilde{D}^{-1/2}
+            :math:`\tilde{D}^{-1/2}\tilde{A} \tilde{D}^{-1/2}`
             is based on :class:`dgl.nn.pytorch.conv.graphconv.EdgeWeightNorm`.
 
         Returns

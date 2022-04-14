@@ -11,6 +11,10 @@ from .. import backend as F
 from .. import ndarray as nd
 from .._ffi.function import _init_api
 
+def is_listlike(data):
+    """Return if the data is a sequence but not a string."""
+    return isinstance(data, Sequence) and not isinstance(data, str)
+
 class InconsistentDtypeException(DGLError):
     """Exception class for inconsistent dtype between graph and tensor"""
     def __init__(self, msg='', *args, **kwargs): #pylint: disable=W1113
@@ -759,9 +763,9 @@ def relabel(x):
                                F.copy_to(F.arange(0, len(unique_x), dtype), ctx))
     return unique_x, old_to_new
 
-def extract_node_subframes(graph, nodes, store_ids=True):
+def extract_node_subframes(graph, nodes_or_device, store_ids=True):
     """Extract node features of the given nodes from :attr:`graph`
-    and return them in frames.
+    and return them in frames on the given device.
 
     Note that this function does not perform actual tensor memory copy but using `Frame.subframe`
     to get the features. If :attr:`nodes` is None, it performs a shallow copy of the
@@ -772,9 +776,11 @@ def extract_node_subframes(graph, nodes, store_ids=True):
     ----------
     graph : DGLGraph
         The graph to extract features from.
-    nodes : list[Tensor] or None
-        Node IDs. If not None, the list length must be equal to the number of node types
-        in the graph. If None, the whole frame is shallow-copied.
+    nodes : list[Tensor] or device or None
+        Node IDs or device.
+        If a list, the list length must be equal to the number of node types
+        in the graph.
+        If None, the whole frame is shallow-copied.
     store_ids : bool
         If True, the returned frames will store :attr:`nodes` in the ``dgl.NID`` field
         unless it is None.
@@ -784,15 +790,17 @@ def extract_node_subframes(graph, nodes, store_ids=True):
     list[Frame]
         Extracted node frames.
     """
-    if nodes is None:
+    if nodes_or_device is None:
         node_frames = [nf.clone() for nf in graph._node_frames]
-    else:
+    elif is_listlike(nodes_or_device):
         node_frames = []
-        for i, ind_nodes in enumerate(nodes):
+        for i, ind_nodes in enumerate(nodes_or_device):
             subf = graph._node_frames[i].subframe(ind_nodes)
             if store_ids:
                 subf[NID] = ind_nodes
             node_frames.append(subf)
+    else:   # device object
+        node_frames = [nf.to(nodes_or_device) for nf in graph._node_frames]
     return node_frames
 
 def extract_node_subframes_for_block(graph, srcnodes, dstnodes):
@@ -831,7 +839,7 @@ def extract_node_subframes_for_block(graph, srcnodes, dstnodes):
         node_frames.append(subf)
     return node_frames
 
-def extract_edge_subframes(graph, edges, store_ids=True):
+def extract_edge_subframes(graph, edges_or_device, store_ids=True):
     """Extract edge features of the given edges from :attr:`graph`
     and return them in frames.
 
@@ -844,9 +852,11 @@ def extract_edge_subframes(graph, edges, store_ids=True):
     ----------
     graph : DGLGraph
         The graph to extract features from.
-    edges : list[Tensor] or None
-        Edge IDs. If not None, the list length must be equal to the number of edge types
-        in the graph. If None, the whole frame is shallow-copied.
+    edges_or_device : list[Tensor] or device or None
+        Edge IDs.
+        If a list, the list length must be equal to the number of edge types
+        in the graph.
+        If None, the whole frame is shallow-copied.
     store_ids : bool
         If True, the returned frames will store :attr:`edges` in the ``dgl.EID`` field
         unless it is None.
@@ -856,15 +866,17 @@ def extract_edge_subframes(graph, edges, store_ids=True):
     list[Frame]
         Extracted edge frames.
     """
-    if edges is None:
+    if edges_or_device is None:
         edge_frames = [nf.clone() for nf in graph._edge_frames]
-    else:
+    elif is_listlike(edges_or_device):
         edge_frames = []
-        for i, ind_edges in enumerate(edges):
+        for i, ind_edges in enumerate(edges_or_device):
             subf = graph._edge_frames[i].subframe(ind_edges)
             if store_ids:
                 subf[EID] = ind_edges
             edge_frames.append(subf)
+    else:   # device object
+        edge_frames = [nf.to(device) for nf in graph._edge_frames]
     return edge_frames
 
 def set_new_frames(graph, *, node_frames=None, edge_frames=None):
@@ -910,14 +922,77 @@ def alias_func(func):
     _fn.__doc__ = """Alias of :func:`dgl.{}`.""".format(func.__name__)
     return _fn
 
+def apply_each(data, fn, *args, **kwargs):
+    """Apply a function to every element in a container.
+
+    If the input data is a list or any sequence other than a string, returns a list
+    whose elements are the same elements applied with the given function.
+
+    If the input data is a dict or any mapping, returns a dict whose keys are the same
+    and values are the elements applied with the given function.
+
+    The first argument of the function will be passed with the individual elements from
+    the input data, followed by the arguments in :attr:`args` and :attr:`kwargs`.
+
+    Parameters
+    ----------
+    data : any
+        Any object.
+    fn : callable
+        Any function.
+    args, kwargs :
+        Additional arguments and keyword-arguments passed to the function.
+
+    Examples
+    --------
+    Applying a ReLU function to a dictionary of tensors:
+
+    >>> h = {k: torch.randn(3) for k in ['A', 'B', 'C']}
+    >>> h = apply_each(h, torch.nn.functional.relu)
+    >>> assert all((v >= 0).all() for v in h.values())
+    """
+    if isinstance(data, Mapping):
+        return {k: fn(v, *args, **kwargs) for k, v in data.items()}
+    elif is_listlike(data):
+        return [fn(v, *args, **kwargs) for v in data]
+    else:
+        return fn(data, *args, **kwargs)
+
 def recursive_apply(data, fn, *args, **kwargs):
     """Recursively apply a function to every element in a container.
+
+    If the input data is a list or any sequence other than a string, returns a list
+    whose elements are the same elements applied with the given function.
+
+    If the input data is a dict or any mapping, returns a dict whose keys are the same
+    and values are the elements applied with the given function.
+
+    If the input data is a nested container, the result will have the same nested
+    structure where each element is transformed recursively.
+
+    The first argument of the function will be passed with the individual elements from
+    the input data, followed by the arguments in :attr:`args` and :attr:`kwargs`.
+
+    Parameters
+    ----------
+    data : any
+        Any object.
+    fn : callable
+        Any function.
+    args, kwargs :
+        Additional arguments and keyword-arguments passed to the function.
+
+    Examples
+    --------
+    Applying a ReLU function to a dictionary of tensors:
+
+    >>> h = {k: torch.randn(3) for k in ['A', 'B', 'C']}
+    >>> h = recursive_apply(h, torch.nn.functional.relu)
+    >>> assert all((v >= 0).all() for v in h.values())
     """
-    if isinstance(data, str):   # str is a Sequence
-        return fn(data, *args, **kwargs)
-    elif isinstance(data, Mapping):
+    if isinstance(data, Mapping):
         return {k: recursive_apply(v, fn, *args, **kwargs) for k, v in data.items()}
-    elif isinstance(data, Sequence):
+    elif is_listlike(data):
         return [recursive_apply(v, fn, *args, **kwargs) for v in data]
     else:
         return fn(data, *args, **kwargs)
@@ -926,15 +1001,26 @@ def recursive_apply_pair(data1, data2, fn, *args, **kwargs):
     """Recursively apply a function to every pair of elements in two containers with the
     same nested structure.
     """
-    if isinstance(data1, str) or isinstance(data2, str):
-        return fn(data1, data2, *args, **kwargs)
-    elif isinstance(data1, Mapping) and isinstance(data2, Mapping):
+    if isinstance(data1, Mapping) and isinstance(data2, Mapping):
         return {
             k: recursive_apply_pair(data1[k], data2[k], fn, *args, **kwargs)
             for k in data1.keys()}
-    elif isinstance(data1, Sequence) and isinstance(data2, Sequence):
+    elif is_listlike(data1) and is_listlike(data2):
         return [recursive_apply_pair(x, y, fn, *args, **kwargs) for x, y in zip(data1, data2)]
     else:
         return fn(data1, data2, *args, **kwargs)
+
+def context_of(data):
+    """Return the device of the data which can be either a tensor or a list/dict of tensors."""
+    if isinstance(data, Mapping):
+        return F.context(next(iter(data.values())))
+    elif is_listlike(data):
+        return F.context(next(iter(data)))
+    else:
+        return F.context(data)
+
+def dtype_of(data):
+    """Return the dtype of the data which can be either a tensor or a dict of tensors."""
+    return F.dtype(next(iter(data.values())) if isinstance(data, Mapping) else data)
 
 _init_api("dgl.utils.internal")

@@ -40,7 +40,7 @@ bool TensorDispatcher::Load(const char *path) {
   handle_ = dlopen(path, RTLD_LAZY);
 
   if (!handle_) {
-    LOG(WARNING) << "TensorDispatcher: dlopen failed: " << dlerror();
+    DLOG(WARNING) << "TensorDispatcher: dlopen failed: " << dlerror();
     return false;
   }
 

@@ -47,6 +47,8 @@ struct COOMatrix {
   bool row_sorted = false;
   /*! \brief whether the column indices per row are sorted */
   bool col_sorted = false;
+  /*! \brief whether the matrix is in pinned memory */
+  bool is_pinned = false;
   /*! \brief default constructor */
   COOMatrix() = default;
   /*! \brief constructor */
@@ -134,31 +136,37 @@ struct COOMatrix {
   * \brief Pin the row, col and data (if not Null) of the matrix.
   * \note This is an in-place method. Behavior depends on the current context,
   *       kDLCPU: will be pinned;
-  *       kDLCPUPinned: directly return;
+  *       IsPinned: directly return;
   *       kDLGPU: invalid, will throw an error.
   *       The context check is deferred to pinning the NDArray.
   */
   inline void PinMemory_() {
+    if (is_pinned)
+      return;
     row.PinMemory_();
     col.PinMemory_();
     if (!aten::IsNullArray(data)) {
       data.PinMemory_();
     }
+    is_pinned = true;
   }
 
   /*!
   * \brief Unpin the row, col and data (if not Null) of the matrix.
   * \note This is an in-place method. Behavior depends on the current context,
-  *       kDLCPUPinned: will be unpinned;
+  *       IsPinned: will be unpinned;
   *       others: directly return.
   *       The context check is deferred to unpinning the NDArray.
   */
   inline void UnpinMemory_() {
+    if (!is_pinned)
+      return;
     row.UnpinMemory_();
     col.UnpinMemory_();
     if (!aten::IsNullArray(data)) {
       data.UnpinMemory_();
     }
+    is_pinned = false;
   }
 };
 

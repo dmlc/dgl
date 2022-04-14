@@ -4,12 +4,12 @@
  * \brief frequency hashmap - used to select top-k frequency edges of each node
  */
 
-#include <cub/cub.cuh>
 #include <algorithm>
 #include <tuple>
 #include <utility>
 #include "../../../runtime/cuda/cuda_common.h"
 #include "../../../array/cuda/atomic.cuh"
+#include "../../../array/cuda/dgl_cub.cuh"
 #include "frequency_hashmap.cuh"
 
 namespace dgl {

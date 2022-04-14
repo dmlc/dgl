@@ -5,12 +5,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class EdgePredictor(nn.Module):
-    r"""
+    r"""Predictor/score function for pairs of node representations
 
-    Description
-    -----------
-    Predictor/score function for pairs of node representations. Given a pair of node
-    representations, :math:`h_i` and :math:`h_j`, it combines them with
+    Given a pair of node representations, :math:`h_i` and :math:`h_j`, it combines them with
 
     **dot product**
 

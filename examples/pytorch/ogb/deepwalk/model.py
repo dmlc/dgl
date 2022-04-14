@@ -4,8 +4,8 @@ import torch.nn.functional as F
 from torch.nn import init
 import random
 import numpy as np
-import dgl.multiprocessing as mp
-from dgl.multiprocessing import Queue
+import torch.multiprocessing as mp
+from torch.multiprocessing import Queue
 
 
 def init_emb2pos_index(walk_length, window_size, batch_size):

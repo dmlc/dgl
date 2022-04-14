@@ -16,22 +16,19 @@ class RGCN(nn.Module):
                  num_rels,
                  num_bases,
                  num_hidden_layers,
-                 dropout,
-                 lowmem):
+                 dropout):
         super(RGCN, self).__init__()
         self.layers = nn.ModuleList()
         # i2h
         self.layers.append(RelGraphConv(num_nodes, n_hidden, num_rels, "basis",
-                                        num_bases, activation=F.relu, dropout=dropout,
-                                        low_mem=lowmem))
+                                        num_bases, activation=F.relu, dropout=dropout))
         # h2h
         for i in range(num_hidden_layers):
             self.layers.append(RelGraphConv(n_hidden, n_hidden, num_rels, "basis",
-                                            num_bases, activation=F.relu, dropout=dropout,
-                                            low_mem=lowmem))
+                                            num_bases, activation=F.relu, dropout=dropout))
         # o2h
         self.layers.append(RelGraphConv(n_hidden, num_classes, num_rels, "basis",
-                                        num_bases, activation=None, low_mem=lowmem))
+                                        num_bases, activation=None))
 
     def forward(self, g, h, r, norm):
         for layer in self.layers:
@@ -40,12 +37,15 @@ class RGCN(nn.Module):
 
 @utils.benchmark('time', 300)
 @utils.parametrize('data', ['aifb'])
-@utils.parametrize('lowmem', [True, False])
 @utils.parametrize('use_type_count', [True, False])
-def track_time(data, lowmem, use_type_count):
+def track_time(data, use_type_count):
     # args
     if data == 'aifb':
-        num_bases = -1
+        if dgl.__version__.startswith("0.8"):
+            num_bases = None
+        else:
+            num_bases = -1
+            
         l2norm = 0.
     elif data == 'am':
         num_bases = 40
@@ -108,8 +108,7 @@ def track_time(data, lowmem, use_type_count):
                  num_rels,
                  num_bases,
                  0,
-                 0,
-                 lowmem).to(device)
+                 0).to(device)
 
     optimizer = torch.optim.Adam(model.parameters(),
                                  lr=1e-2,

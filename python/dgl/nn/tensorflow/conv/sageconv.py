@@ -9,12 +9,8 @@ from ....utils import expand_as_pair, check_eq_shape
 
 
 class SAGEConv(layers.Layer):
-    r"""
-
-    Description
-    -----------
-    GraphSAGE layer from paper `Inductive Representation Learning on
-    Large Graphs <https://arxiv.org/pdf/1706.02216.pdf>`__.
+    r"""GraphSAGE layer from `Inductive Representation Learning on
+    Large Graphs <https://arxiv.org/pdf/1706.02216.pdf>`__
 
     .. math::
         h_{\mathcal{N}(i)}^{(l+1)} &= \mathrm{aggregate}
@@ -133,11 +129,7 @@ class SAGEConv(layers.Layer):
         return {'neigh': rst}
 
     def call(self, graph, feat):
-        r"""
-
-        Description
-        -----------
-        Compute GraphSAGE layer.
+        r"""Compute GraphSAGE layer.
 
         Parameters
         ----------

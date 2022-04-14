@@ -120,6 +120,9 @@ def copy_to(input, ctx, **kwargs):
     else:
         raise RuntimeError('Invalid context', ctx)
 
+def is_pinned(input):
+    return input.is_pinned()
+
 def sum(input, dim, keepdims=False):
     return th.sum(input, dim=dim, keepdim=keepdims)
 
@@ -301,10 +304,10 @@ def count_nonzero(input):
     # TODO: fallback to numpy for backward compatibility
     return np.count_nonzero(input)
 
-def unique(input, return_inverse=False):
+def unique(input, return_inverse=False, return_counts=False):
     if input.dtype == th.bool:
         input = input.type(th.int8)
-    return th.unique(input, return_inverse=return_inverse)
+    return th.unique(input, return_inverse=return_inverse, return_counts=return_counts)
 
 def full_1d(length, fill_value, dtype, ctx):
     return th.full((length,), fill_value, dtype=dtype, device=ctx)

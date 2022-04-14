@@ -12,6 +12,7 @@ import test_utils
 from test_utils import parametrize_dtype, get_cases
 from utils import assert_is_identical_hetero
 from scipy.sparse import rand
+import multiprocessing as mp
 
 def create_test_heterograph(idtype):
     # test heterograph from the docstring, plus a user -- wishes -- game relation
@@ -205,6 +206,32 @@ def test_create(idtype):
         assert g.idtype == idtype
         assert g.device == F.cpu()
         assert F.array_equal(g.edata['w'], F.copy_to(F.tensor(adj.data), F.cpu()))
+
+def test_create2():
+    mat = ssp.random(20, 30, 0.1)
+
+    # coo
+    mat = mat.tocoo()
+    row = F.tensor(mat.row, dtype=F.int64)
+    col = F.tensor(mat.col, dtype=F.int64)
+    g = dgl.heterograph(
+        {('A', 'AB', 'B'): ('coo', (row, col))}, num_nodes_dict={'A': 20, 'B': 30})
+
+    # csr
+    mat = mat.tocsr()
+    indptr = F.tensor(mat.indptr, dtype=F.int64)
+    indices = F.tensor(mat.indices, dtype=F.int64)
+    data = F.tensor([], dtype=F.int64)
+    g = dgl.heterograph(
+        {('A', 'AB', 'B'): ('csr', (indptr, indices, data))}, num_nodes_dict={'A': 20, 'B': 30})
+
+    # csc
+    mat = mat.tocsc()
+    indptr = F.tensor(mat.indptr, dtype=F.int64)
+    indices = F.tensor(mat.indices, dtype=F.int64)
+    data = F.tensor([], dtype=F.int64)
+    g = dgl.heterograph(
+        {('A', 'AB', 'B'): ('csc', (indptr, indices, data))}, num_nodes_dict={'A': 20, 'B': 30})
 
 @parametrize_dtype
 def test_query(idtype):
@@ -982,9 +1009,6 @@ def test_pin_memory_(idtype):
         for etype in g.canonical_etypes:
             assert F.context(g.batch_num_edges(etype)) == F.cpu()
 
-        # not allowed to create new formats for the pinned graph
-        with pytest.raises(DGLError):
-            g.create_formats_()
         # it's fine to clone with new formats, but new graphs are not pinned
         # >>> g.formats()
         # {'created': ['coo'], 'not created': ['csr', 'csc']}
@@ -993,7 +1017,7 @@ def test_pin_memory_(idtype):
         # 'coo' formats is already created and thus not cloned
         assert g.formats('coo').is_pinned()
 
-        # pin a pinned graph, direcly return
+        # pin a pinned graph, directly return
         g.pin_memory_()
         assert g.is_pinned()
         assert g.device == F.cpu()
@@ -2794,6 +2818,24 @@ def test_adj_sparse(idtype, fmt):
         indices_sorted_np = np.zeros(len(indices), dtype=A_csc.indices.dtype)
         indices_sorted_np[A_csc.data] = A_csc.indices
         assert np.array_equal(F.asnumpy(indices_sorted), indices_sorted_np)
+
+
+def _test_forking_pickler_entry(g, q):
+    q.put(g.formats())
+
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="MXNet doesn't support spawning")
+def test_forking_pickler():
+    ctx = mp.get_context('spawn')
+    g = dgl.graph(([0,1,2],[1,2,3]))
+    g.create_formats_()
+    q = ctx.Queue(1)
+    proc = ctx.Process(target=_test_forking_pickler_entry, args=(g, q))
+    proc.start()
+    fmt = q.get()['created']
+    proc.join()
+    assert 'coo' in fmt
+    assert 'csr' in fmt
+    assert 'csc' in fmt
 
 
 if __name__ == '__main__':

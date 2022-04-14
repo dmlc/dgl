@@ -20,7 +20,7 @@ from .. import batch
 from .. import backend as F
 from ..convert import graph as dgl_graph
 from ..convert import from_networkx, to_networkx
-from ..transform import reorder_graph
+from ..transforms import reorder_graph
 
 backend = os.environ.get('DGLBACKEND', 'pytorch')
 

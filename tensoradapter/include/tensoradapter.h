@@ -13,12 +13,6 @@
 #include <dlpack/dlpack.h>
 #include <vector>
 
-#if defined(WIN32) || defined(_WIN32)
-#define TA_EXPORTS __declspec(dllexport)
-#else
-#define TA_EXPORTS
-#endif
-
 namespace tensoradapter {
 
 extern "C" {
@@ -31,7 +25,7 @@ extern "C" {
  * \param ctx The device
  * \return The allocated tensor
  */
-TA_EXPORTS DLManagedTensor* TAempty(
+DLManagedTensor* TAempty(
     std::vector<int64_t> shape, DLDataType dtype, DLContext ctx);
 
 }

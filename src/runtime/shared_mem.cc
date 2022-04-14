@@ -55,17 +55,23 @@ SharedMemory::SharedMemory(const std::string &name) {
 
 SharedMemory::~SharedMemory() {
 #ifndef _WIN32
-  CHECK(munmap(ptr_, size_) != -1) << strerror(errno);
-  close(fd_);
+  if (ptr_ && size_ != 0)
+    CHECK(munmap(ptr_, size_) != -1) << strerror(errno);
+  if (fd_ != -1)
+    close(fd_);
   if (own_) {
     // LOG(INFO) << "remove " << name << " for shared memory";
-    shm_unlink(name.c_str());
+    if (name != "") {
+      shm_unlink(name.c_str());
     // The resource has been deleted. We don't need to keep track of it any more.
-    DeleteResource(name);
+      DeleteResource(name);
+    }
   }
 #else
-  CHECK(UnmapViewOfFile(ptr_)) << "Win32 Error: " << GetLastError();
-  CloseHandle(handle_);
+  if (ptr_)
+    CHECK(UnmapViewOfFile(ptr_)) << "Win32 Error: " << GetLastError();
+  if (handle_)
+    CloseHandle(handle_);
   // Windows do not need a separate shm_unlink step.
 #endif  // _WIN32
 }

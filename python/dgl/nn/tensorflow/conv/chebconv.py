@@ -9,13 +9,9 @@ from .... import broadcast_nodes, function as fn
 
 
 class ChebConv(layers.Layer):
-    r"""
-
-    Description
-    -----------
-    Chebyshev Spectral Graph Convolution layer from paper `Convolutional
+    r"""Chebyshev Spectral Graph Convolution layer from `Convolutional
     Neural Networks on Graphs with Fast Localized Spectral Filtering
-    <https://arxiv.org/pdf/1606.09375.pdf>`__.
+    <https://arxiv.org/pdf/1606.09375.pdf>`__
 
     .. math::
         h_i^{l+1} &= \sum_{k=0}^{K-1} W^{k, l}z_i^{k, l}
@@ -29,7 +25,6 @@ class ChebConv(layers.Layer):
         \tilde{L} &= 2\left(I - \tilde{D}^{-1/2} \tilde{A} \tilde{D}^{-1/2}\right)/\lambda_{max} - I
 
     where :math:`\tilde{A}` is :math:`A` + :math:`I`, :math:`W` is learnable weight.
-
 
     Parameters
     ----------
@@ -79,11 +74,7 @@ class ChebConv(layers.Layer):
         self.linear = layers.Dense(out_feats, use_bias=bias)
 
     def call(self, graph, feat, lambda_max=None):
-        r"""
-
-        Description
-        -----------
-        Compute ChebNet layer.
+        r"""Compute ChebNet layer.
 
         Parameters
         ----------

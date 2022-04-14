@@ -12,14 +12,10 @@ from .graphconv import EdgeWeightNorm
 
 
 class GCN2Conv(nn.Module):
+    r"""Graph Convolutional Network via Initial residual
+    and Identity mapping (GCNII) from `Simple and Deep Graph Convolutional
+    Networks <https://arxiv.org/abs/2007.02133>`__
 
-    r"""
-
-    Description
-    -----------
-    The Graph Convolutional Network via Initial residual
-    and Identity mapping (GCNII) was introduced in `"Simple and Deep Graph Convolutional
-    Networks" <https://arxiv.org/abs/2007.02133>`_ paper.
     It is mathematically is defined as follows:
 
     .. math::
@@ -192,7 +188,7 @@ class GCN2Conv(nn.Module):
         edge_weight: torch.Tensor, optional
             edge_weight to use in the message passing process. This is equivalent to
             using weighted adjacency matrix in the equation above, and
-            :math:\tilde{D}^{-1/2}\tilde{A} \tilde{D}^{-1/2}
+            :math:`\tilde{D}^{-1/2}\tilde{A} \tilde{D}^{-1/2}`
             is based on :class:`dgl.nn.pytorch.conv.graphconv.EdgeWeightNorm`.
 
 

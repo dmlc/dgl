@@ -77,6 +77,15 @@ def _validate_data_length(data_dict):
             "All data are required to have same length while some of them does not. Length of data={}".format(str(len_dict)))
 
 
+def _tensor(data, dtype=None):
+    """Float32 is the default dtype for float tensor in DGL
+    so let's cast float64 into float32 to avoid dtype mismatch.
+    """
+    ret = F.tensor(data, dtype)
+    if F.dtype(ret) == F.float64:
+        ret = F.tensor(ret, dtype=F.float32)
+    return ret
+
 class BaseData:
     """ Class of base data which is inherited by Node/Edge/GraphData. Internal use only. """
     @staticmethod
@@ -100,12 +109,13 @@ class NodeData(BaseData):
     """ Class of node data which is used for DGLGraph construction. Internal use only. """
 
     def __init__(self, node_id, data, type=None, graph_id=None):
-        self.id = np.array(node_id, dtype=np.int64)
+        self.id = np.array(node_id)
         self.data = data
         self.type = type if type is not None else '_V'
-        self.graph_id = np.array(graph_id, dtype=np.int) if graph_id is not None else np.full(
-            len(node_id), 0)
-        _validate_data_length({**{'id': self.id, 'graph_id': self.graph_id}, **self.data})
+        self.graph_id = np.array(
+            graph_id) if graph_id is not None else np.full(len(node_id), 0)
+        _validate_data_length(
+            {**{'id': self.id, 'graph_id': self.graph_id}, **self.data})
 
     @staticmethod
     def load_from_csv(meta: MetaNode, data_parser: Callable, base_dir=None, separator=','):
@@ -121,23 +131,25 @@ class NodeData(BaseData):
 
     @staticmethod
     def to_dict(node_data: List['NodeData']) -> dict:
-        # node_ids could be arbitrary numeric values, namely non-sorted, duplicated, not labeled from 0 to num_nodes-1
+        # node_ids could be numeric or non-numeric values, but duplication is not allowed.
         node_dict = {}
         for n_data in node_data:
             graph_ids = np.unique(n_data.graph_id)
             for graph_id in graph_ids:
                 idx = n_data.graph_id == graph_id
                 ids = n_data.id[idx]
-                u_ids, u_indices = np.unique(ids, return_index=True)
+                u_ids, u_indices, u_counts = np.unique(
+                    ids, return_index=True, return_counts=True)
                 if len(ids) > len(u_ids):
-                    dgl_warning(
-                        "There exist duplicated ids and only the first ones are kept.")
+                    raise DGLError("Node IDs are required to be unique but the following ids are duplicate: {}".format(
+                        u_ids[u_counts > 1]))
                 if graph_id not in node_dict:
                     node_dict[graph_id] = {}
                 node_dict[graph_id][n_data.type] = {'mapping': {index: i for i,
                                                                 index in enumerate(ids[u_indices])},
-                                                    'data': {k: F.tensor(v[idx][u_indices])
-                                                             for k, v in n_data.data.items()}}
+                                                    'data': {k: _tensor(v[idx][u_indices])
+                                                             for k, v in n_data.data.items()},
+                                                    'dtype': ids.dtype}
         return node_dict
 
 
@@ -145,13 +157,14 @@ class EdgeData(BaseData):
     """ Class of edge data which is used for DGLGraph construction. Internal use only. """
 
     def __init__(self, src_id, dst_id, data, type=None, graph_id=None):
-        self.src = np.array(src_id, dtype=np.int64)
-        self.dst = np.array(dst_id, dtype=np.int64)
+        self.src = np.array(src_id)
+        self.dst = np.array(dst_id)
         self.data = data
         self.type = type if type is not None else ('_V', '_E', '_V')
-        self.graph_id = np.array(graph_id, dtype=np.int) if graph_id is not None else np.full(
-            len(src_id), 0)
-        _validate_data_length({**{'src': self.src, 'dst': self.dst, 'graph_id': self.graph_id}, **self.data})
+        self.graph_id = np.array(
+            graph_id) if graph_id is not None else np.full(len(src_id), 0)
+        _validate_data_length(
+            {**{'src': self.src, 'dst': self.dst, 'graph_id': self.graph_id}, **self.data})
 
     @staticmethod
     def load_from_csv(meta: MetaEdge, data_parser: Callable, base_dir=None, separator=','):
@@ -181,12 +194,14 @@ class EdgeData(BaseData):
                 idx = e_data.graph_id == graph_id
                 src_mapping = node_dict[graph_id][src_type]['mapping']
                 dst_mapping = node_dict[graph_id][dst_type]['mapping']
-                src_ids = [src_mapping[index] for index in e_data.src[idx]]
-                dst_ids = [dst_mapping[index] for index in e_data.dst[idx]]
+                orig_src_ids = e_data.src[idx].astype(node_dict[graph_id][src_type]['dtype'])
+                orig_dst_ids = e_data.dst[idx].astype(node_dict[graph_id][dst_type]['dtype'])
+                src_ids = [src_mapping[index] for index in orig_src_ids]
+                dst_ids = [dst_mapping[index] for index in orig_dst_ids]
                 if graph_id not in edge_dict:
                     edge_dict[graph_id] = {}
-                edge_dict[graph_id][e_data.type] = {'edges': (F.tensor(src_ids), F.tensor(dst_ids)),
-                                                    'data': {k: F.tensor(v[idx])
+                edge_dict[graph_id][e_data.type] = {'edges': (_tensor(src_ids), _tensor(dst_ids)),
+                                                    'data': {k: _tensor(v[idx])
                                                              for k, v in e_data.data.items()}}
         return edge_dict
 
@@ -195,7 +210,7 @@ class GraphData(BaseData):
     """ Class of graph data which is used for DGLGraph construction. Internal use only. """
 
     def __init__(self, graph_id, data):
-        self.graph_id = np.array(graph_id, dtype=np.int64)
+        self.graph_id = np.array(graph_id)
         self.data = data
         _validate_data_length({**{'graph_id': self.graph_id}, **self.data})
 
@@ -224,7 +239,7 @@ class GraphData(BaseData):
                     {('_V', '_E', '_V'): ([], [])})
         for graph_id in graph_ids:
             graphs.append(graphs_dict[graph_id])
-        data = {k: F.tensor(v) for k, v in graph_data.data.items()}
+        data = {k: _tensor(v) for k, v in graph_data.data.items()}
         return graphs, data
 
 
@@ -269,7 +284,7 @@ class DGLGraphConstructor:
 
 
 class DefaultDataParser:
-    """ Default data parser for DGLCSVDataset. It
+    """ Default data parser for CSVDataset. It
         1. ignores any columns which does not have a header.
         2. tries to convert to list of numeric values(generated by
             np.array().tolist()) if cell data is a str separated by ','.

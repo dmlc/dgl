@@ -15,7 +15,7 @@ from numpy import random
 from torch.nn.parameter import Parameter
 import dgl
 import dgl.function as fn
-import dgl.multiprocessing as mp
+import torch.multiprocessing as mp
 
 from utils import *
 
@@ -491,13 +491,7 @@ def train_model(network_data):
     if n_gpus == 1:
         run(0, n_gpus, args, devices, data)
     else:
-        procs = []
-        for proc_id in range(n_gpus):
-            p = mp.Process(target=run, args=(proc_id, n_gpus, args, devices, data))
-            p.start()
-            procs.append(p)
-        for p in procs:
-            p.join()
+        mp.spawn(run, args=(n_gpus, args, devices, data), nprocs=n_gpus)
 
 
 if __name__ == "__main__":

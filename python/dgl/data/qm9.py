@@ -6,7 +6,7 @@ import scipy.sparse as sp
 from .dgl_dataset import DGLDataset
 from .utils import download, _get_dgl_url
 from ..convert import graph as dgl_graph
-from ..transform import to_bidirected
+from ..transforms import to_bidirected
 from .. import backend as F
 
 class QM9Dataset(DGLDataset):

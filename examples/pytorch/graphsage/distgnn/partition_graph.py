@@ -19,6 +19,7 @@ from statistics import mean
 import random
 import time
 import argparse
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from load_graph import load_ogb
 import dgl
 from dgl.data import load_data

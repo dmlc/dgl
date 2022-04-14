@@ -8,6 +8,7 @@ from . import backend as F
 from .base import DGLError, dgl_warning
 from .init import zero_initializer
 from .storages import TensorStorage
+from .utils import gather_pinned_tensor_rows, pin_memory_inplace, unpin_memory_inplace
 
 class _LazyIndex(object):
     def __init__(self, index):
@@ -40,7 +41,45 @@ class _LazyIndex(object):
         return flat_index
 
 class LazyFeature(object):
-    """Placeholder for prefetching from DataLoader.
+    """Placeholder for feature prefetching.
+
+    One can assign this object to ``ndata`` or ``edata`` of the graphs returned by various
+    samplers' :attr:`sample` method.  When DGL's dataloader receives the subgraphs
+    returned by the sampler, it will automatically look up all the ``ndata`` and ``edata``
+    whose data is a LazyFeature, replacing them with the actual data of the corresponding
+    nodes/edges from the original graph instead.  In particular, for a subgraph returned
+    by the sampler has a LazyFeature with name ``k`` in ``subgraph.ndata[key]``:
+
+    .. code:: python
+
+       subgraph.ndata[key] = LazyFeature(k)
+
+    Assuming that ``graph`` is the original graph, DGL's dataloader will perform
+
+    .. code:: python
+
+       subgraph.ndata[key] = graph.ndata[k][subgraph.ndata[dgl.NID]]
+
+    DGL dataloader performs similar replacement for ``edata``.
+    For heterogeneous graphs, the replacement is:
+
+    .. code:: python
+
+       subgraph.nodes[ntype].data[key] = graph.nodes[ntype].data[k][
+           subgraph.nodes[ntype].data[dgl.NID]]
+
+    For MFGs' ``srcdata`` (and similarly ``dstdata``), the replacement is
+
+    .. code:: python
+
+       mfg.srcdata[key] = graph.ndata[k][mfg.srcdata[dgl.NID]]
+
+    Parameters
+    ----------
+    name : str
+        The name of the data in the original graph.
+    id_ : Tensor, optional
+        The ID tensor.
     """
     __slots__ = ['name', 'id_']
     def __init__(self, name=None, id_=None):
@@ -55,6 +94,12 @@ class LazyFeature(object):
     def data(self):
         """No-op.  For compatibility of :meth:`Frame.__repr__` method."""
         return self
+
+    def pin_memory_(self):
+        """No-op.  For compatibility of :meth:`Frame.pin_memory_` method."""
+
+    def unpin_memory_(self):
+        """No-op.  For compatibility of :meth:`Frame.unpin_memory_` method."""
 
 class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
     """The column scheme.
@@ -142,6 +187,7 @@ class Column(TensorStorage):
         self.scheme = scheme if scheme else infer_scheme(storage)
         self.index = index
         self.device = device
+        self.pinned_by_dgl = False
 
     def __len__(self):
         """The number of features (number of rows) in this column."""
@@ -161,15 +207,23 @@ class Column(TensorStorage):
         if self.index is not None:
             if isinstance(self.index, _LazyIndex):
                 self.index = self.index.flatten()
-            # If index and storage is not in the same context,
-            # copy index to the same context of storage.
-            # Copy index is usually cheaper than copy data
-            if F.context(self.storage) != F.context(self.index):
-                kwargs = {}
-                if self.device is not None:
-                    kwargs = self.device[1]
-                self.index = F.copy_to(self.index, F.context(self.storage), **kwargs)
-            self.storage = F.gather_row(self.storage, self.index)
+
+            storage_ctx = F.context(self.storage)
+            index_ctx = F.context(self.index)
+            # If under the special case where the storage is pinned and the index is on
+            # CUDA, directly call UVA slicing (even if they aree not in the same context).
+            if storage_ctx != index_ctx and storage_ctx == F.cpu() and F.is_pinned(self.storage):
+                self.storage = gather_pinned_tensor_rows(self.storage, self.index)
+            else:
+                # If index and storage is not in the same context,
+                # copy index to the same context of storage.
+                # Copy index is usually cheaper than copy data
+                if storage_ctx != index_ctx:
+                    kwargs = {}
+                    if self.device is not None:
+                        kwargs = self.device[1]
+                    self.index = F.copy_to(self.index, storage_ctx, **kwargs)
+                self.storage = F.gather_row(self.storage, self.index)
             self.index = None
 
         # move data to the right device
@@ -183,6 +237,7 @@ class Column(TensorStorage):
         """Update the column data."""
         self.index = None
         self.storage = val
+        self.pinned_by_dgl = False
 
     def to(self, device, **kwargs): # pylint: disable=invalid-name
         """ Return a new column with columns copy to the targeted device (cpu/gpu).
@@ -329,6 +384,29 @@ class Column(TensorStorage):
 
     def __copy__(self):
         return self.clone()
+
+    def fetch(self, indices, device, pin_memory=False, **kwargs):
+        _ = self.data           # materialize in case of lazy slicing & data transfer
+        return super().fetch(indices, device, pin_memory=False, **kwargs)
+
+    def pin_memory_(self):
+        """Pin the storage into page-locked memory.
+
+        Does nothing if the storage is already pinned.
+        """
+        if not self.pinned_by_dgl and not F.is_pinned(self.data):
+            pin_memory_inplace(self.data)
+            self.pinned_by_dgl = True
+
+    def unpin_memory_(self):
+        """Unpin the storage pinned by ``pin_memory_`` method.
+
+        Does nothing if the storage is not pinned by ``pin_memory_`` method, even if
+        it is actually in page-locked memory.
+        """
+        if self.pinned_by_dgl:
+            unpin_memory_inplace(self.data)
+            self.pinned_by_dgl = False
 
 class Frame(MutableMapping):
     """The columnar storage for node/edge features.
@@ -702,3 +780,15 @@ class Frame(MutableMapping):
 
     def __repr__(self):
         return repr(dict(self))
+
+    def pin_memory_(self):
+        """Registers the data of every column into pinned memory, materializing them if
+        necessary."""
+        for column in self._columns.values():
+            column.pin_memory_()
+
+    def unpin_memory_(self):
+        """Unregisters the data of every column from pinned memory, materializing them
+        if necessary."""
+        for column in self._columns.values():
+            column.unpin_memory_()

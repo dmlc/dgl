@@ -10,12 +10,8 @@ from ....utils import expand_as_pair, check_eq_shape, dgl_warning
 
 
 class SAGEConv(nn.Module):
-    r"""
-
-    Description
-    -----------
-    GraphSAGE layer from paper `Inductive Representation Learning on
-    Large Graphs <https://arxiv.org/pdf/1706.02216.pdf>`__.
+    r"""GraphSAGE layer from `Inductive Representation Learning on
+    Large Graphs <https://arxiv.org/pdf/1706.02216.pdf>`__
 
     .. math::
         h_{\mathcal{N}(i)}^{(l+1)} &= \mathrm{aggregate}

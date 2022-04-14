@@ -236,16 +236,16 @@ class HeteroGraph : public BaseHeteroGraph {
   * \brief Pin all relation graphs of the current graph.
   * \note The graph will be pinned inplace. Behavior depends on the current context,
   *       kDLCPU: will be pinned;
-  *       kDLCPUPinned: directly return;
+  *       IsPinned: directly return;
   *       kDLGPU: invalid, will throw an error.
   *       The context check is deferred to pinning the NDArray.
   */
-  void PinMemory_();
+  void PinMemory_() override;
 
   /*!
   * \brief Unpin all relation graphs of the current graph.
   * \note The graph will be unpinned inplace. Behavior depends on the current context,
-  *       kDLCPUPinned: will be unpinned;
+  *       IsPinned: will be unpinned;
   *       others: directly return.
   *       The context check is deferred to unpinning the NDArray.
   */

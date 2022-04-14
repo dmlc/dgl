@@ -97,7 +97,7 @@ def main():
 
     print('partition graph...')
 
-    part_dict = dgl.transform.metis_partition(g, num_parts, 1)
+    part_dict = dgl.transforms.metis_partition(g, num_parts, 1)
 
     tot_num_inner_edges = 0
     for part_id in part_dict:

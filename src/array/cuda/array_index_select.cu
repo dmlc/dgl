@@ -27,7 +27,7 @@ NDArray IndexSelect(NDArray array, IdArray index) {
     shape.emplace_back(array->shape[d]);
   }
 
-  // use index->ctx for kDLCPUPinned array
+  // use index->ctx for pinned array
   NDArray ret = NDArray::Empty(shape, array->dtype, index->ctx);
   if (len == 0)
     return ret;
