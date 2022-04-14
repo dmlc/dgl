@@ -197,6 +197,8 @@ def track_time(data):
     lr = 0.01
     low_mem = True
     num_workers = 4
+    iter_start = 3
+    iter_count = 10
 
     hg = dataset[0]
     category = dataset.predict_category
@@ -283,32 +285,11 @@ def track_time(data):
     optimizer = th.optim.Adam(all_params, lr=lr, weight_decay=l2norm)
     emb_optimizer = th.optim.SparseAdam(list(embed_layer.node_embeds.parameters()), lr=lr)
 
-    # dry run
-    for i, sample_data in enumerate(loader):
-        input_nodes, output_nodes, blocks = sample_data
-        feats = embed_layer(input_nodes,
-                            blocks[0].srcdata['ntype'],
-                            blocks[0].srcdata['type_id'],
-                            node_feats)
-        logits = model(blocks, feats)
-        seed_idx = blocks[-1].dstdata['type_id']
-        loss = F.cross_entropy(logits, labels[seed_idx])
-        optimizer.zero_grad()
-        emb_optimizer.zero_grad()
-
-        loss.backward()
-        optimizer.step()
-        emb_optimizer.step()
-
-        if i >= 3:
-            break
-
     print("start training...")
     model.train()
     embed_layer.train()
 
-    t0 = time.time()
-    for i, sample_data in enumerate(loader):
+    for step, sample_data in enumerate(loader):
         input_nodes, output_nodes, blocks = sample_data
         feats = embed_layer(input_nodes,
                             blocks[0].srcdata['ntype'],
@@ -324,8 +305,12 @@ def track_time(data):
         optimizer.step()
         emb_optimizer.step()
         
-        if i >= 9:  # time 10 loops
+        # start timer at before iter_start
+        if step == iter_start - 1:
+            t0 = time.time()
+        elif step == iter_count + iter_start - 1:  # time iter_count iterations
             break
+
     t1 = time.time()
 
-    return (t1 - t0) / (i + 1)
+    return (t1 - t0) / iter_count
