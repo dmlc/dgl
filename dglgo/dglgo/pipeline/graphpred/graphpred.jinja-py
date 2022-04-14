@@ -69,11 +69,11 @@ def main(run):
 
     # load data
     data = AsGraphPredDataset({{data_initialize_code}})
-    train_loader = GraphDataLoader(data.train_idx, batch_size=pipeline_cfg['train_batch_size'],
+    train_loader = GraphDataLoader(data[data.train_idx], batch_size=pipeline_cfg['train_batch_size'],
                                    shuffle=True, num_workers=pipeline_cfg['num_workers'])
-    val_loader = GraphDataLoader(data.val_idx, batch_size=pipeline_cfg['eval_batch_size'],
+    val_loader = GraphDataLoader(data[data.val_idx], batch_size=pipeline_cfg['eval_batch_size'],
                                  shuffle=False, num_workers=pipeline_cfg['num_workers'])
-    test_loader = GraphDataLoader(data.test_idx, batch_size=pipeline_cfg['eval_batch_size'],
+    test_loader = GraphDataLoader(data[data.test_idx], batch_size=pipeline_cfg['eval_batch_size'],
                                   shuffle=False, num_workers=pipeline_cfg['num_workers'])
 
     # create model
@@ -108,9 +108,10 @@ if __name__ == '__main__':
     all_run_metrics = []
     num_runs = {{ user_cfg.general_pipeline.num_runs }}
     for run in range(num_runs):
-        print('Run experiment #{run}')
+        print('Run experiment {:d}'.format(run))
         test_metric = main(run)
         all_run_metrics.append(test_metric)
     avg_metric = np.round(np.mean(all_run_metrics), 6)
     std_metric = np.round(np.std(all_run_metrics), 6)
-    print('Test Metric across {num_runs} runs: {avg_metric} ± {std_metric}')
+    print('Test Metric across {:d} runs: {:.6f} ± {:.6f}'.format(
+        num_runs, avg_metric, std_metric))
