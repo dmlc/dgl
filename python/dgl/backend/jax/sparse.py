@@ -380,7 +380,7 @@ def SegmentReduce_fwd(op, x, offsets):
     cache = (arg, offsets, op)
     return y, cache
 
-def SegmentReduce_fwd(cache, dy):
+def SegmentReduce_bwd(cache, dy):
     (arg, offsets, op) = cache
     m = offsets[-1].item()
     if op == 'sum':
@@ -396,6 +396,8 @@ def SegmentReduce_fwd(cache, dy):
         dx = _bwd_segment_cmp(dy, arg, m)
     return None, dx, None
 
+SegmentReduce.defvjp(SegmentReduce_fwd, SegmentReduce_bwd)
+
 @partial(jax.custom_vjp, nondiff_argnums=(1, 2))
 def ScatterAdd(x, idx, m):
     y = _scatter_add(x, idx, m)
@@ -410,6 +412,7 @@ def ScatterAdd_bwd(cache, dy):
     idx = cache
     return dy[idx], None, None
 
+@partial(jax.custom_vjp, nondiff_argnums=(0, 2, 4))
 def CSRMM(gidxA, A_weights, gidxB, B_weights, num_vtypes):
     gidxC, C_weights = _csrmm(gidxA, A_weights, gidxB, B_weights, num_vtypes)
     nrows, ncols, C_indptr, C_indices, C_eids = gidxC.adjacency_matrix_tensors(0, False, 'csr')
@@ -437,7 +440,7 @@ def CSRMM_bwd(cache, dnrows, dncols, dC_indptr, dC_indices, dC_eids, dC_weights)
 
 CSRMM.defvjp(CSRMM_fwd, CSRMM_bwd)
 
-@jax.custom_vjp(nondiff_argnums=(0)):
+@partial(jax.custom_vjp, nondiff_argnums=(0))
 def CSRSum(gidx, *weights):
     gidxC, C_weights = _csrsum(gidxs, weights)
     nrows, ncols, C_indptr, C_indices, C_eids = gidxC.adjacency_matrix_tensors(
