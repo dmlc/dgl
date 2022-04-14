@@ -37,6 +37,9 @@ def load_backend(mod_name):
     elif mod_name == 'tensorflow':
         import tensorflow
         mod = tensorflow
+    elif mod_name == "jax":
+        import jax
+        mod = jax
     else:
         raise NotImplementedError('Unsupported backend: %s' % mod_name)
 
