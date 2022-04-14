@@ -841,7 +841,7 @@ class DataLoader(torch.utils.data.DataLoader):
                 raise Exception('ERROR: cpu_affinity incorrect '
                                 'settings for cores={} num_workers={}'
                                 .format(cpu_worker_affinity_cores, nw_work))
-                                
+
             self.cpu_cores = (cpu_worker_affinity_cores
                                 if len(cpu_worker_affinity_cores)
                                 else range(0, nw_work))
