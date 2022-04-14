@@ -10,9 +10,6 @@
 #include <unordered_map>
 #include <tuple>
 #include <numeric>
-#include <fstream>
-#include <string>
-#include <chrono>
 #include "array_utils.h"
 
 namespace dgl {
@@ -535,7 +532,7 @@ template <class IdType> CSRMatrix UnSortedDenseCOOToCSR(const COOMatrix &coo) {
   std::vector<std::vector<IdType>> local_ptrs;
   std::vector<int64_t> thread_prefixsum;
 
-#pragma omp parallel if (NNZ >= 1024)
+#pragma omp parallel
   {
     const int num_threads = omp_get_num_threads();
     const int thread_id = omp_get_thread_num();

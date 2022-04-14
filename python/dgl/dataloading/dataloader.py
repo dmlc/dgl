@@ -9,6 +9,7 @@ import inspect
 import re
 import atexit
 import os
+import psutil
 
 import torch
 import torch.distributed as dist
