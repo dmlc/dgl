@@ -304,11 +304,7 @@ def index_add_inplace(data, row_idx, value):
     raise NotImplementedError
 
 def scatter_row(data, row_index, value):
-    return jax.ops.index_update(
-        data,
-        row_index,
-        value
-    )
+    return data.at[row_index].set(value)
 
 def scatter_row_inplace(data, row_index, value):
     raise NotImplementedError

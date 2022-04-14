@@ -88,4 +88,4 @@ def dot(a, b):
     return sum(mul(a, b), dim=-1)
 
 def abs(a):
-    return a.abs()
+    return jnp.abs(a)
