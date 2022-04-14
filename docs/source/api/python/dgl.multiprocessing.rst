@@ -12,3 +12,11 @@ additional documentation.
 
 In addition, if your backend is PyTorch, this module will also be compatible with
 :mod:`torch.multiprocessing` module.
+
+.. currentmodule:: dgl.multiprocessing.pytorch
+.. autosummary::
+    :toctree: ../../generated/
+
+    spawn
+    call_once_and_share
+    shared_tensor

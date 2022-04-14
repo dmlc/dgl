@@ -1,7 +1,7 @@
 """ShaDow-GNN subgraph samplers."""
 from ..utils import prepare_tensor_or_dict
 from ..base import NID
-from .. import transform
+from .. import transforms
 from ..sampling import sample_neighbors
 from .neighbor import NeighborSamplingMixin
 from .dataloader import exclude_edges, Sampler
@@ -89,7 +89,7 @@ class ShaDowKHopSampler(NeighborSamplingMixin, Sampler):
             fanout = self.fanouts[i]
             frontier = sample_neighbors(
                 g, seed_nodes, fanout, replace=self.replace, prob=self.prob_arrays)
-            block = transform.to_block(frontier, seed_nodes)
+            block = transforms.to_block(frontier, seed_nodes)
             seed_nodes = block.srcdata[NID]
 
         subg = g.subgraph(seed_nodes, relabel_nodes=True)

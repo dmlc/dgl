@@ -11,6 +11,7 @@ import backend as F
 import unittest
 import pickle
 import random
+import tempfile
 
 def _get_inner_node_mask(graph, ntype_id):
     if dgl.NTYPE in graph.ndata:
@@ -374,6 +375,24 @@ def check_partition(g, part_method, reshuffle, num_parts=4, num_trainers_per_mac
         assert F.dtype(eid2pid) in (F.int32, F.int64)
         assert np.all(F.asnumpy(eid2pid) == edge_map)
 
+def check_hetero_partition_single_etype(num_trainers):
+    user_ids = np.arange(1000)
+    item_ids = np.arange(2000)
+    num_edges = 3 * 1000
+    src_ids = np.random.choice(user_ids, size=num_edges)
+    dst_ids = np.random.choice(item_ids, size=num_edges)
+    hg = dgl.heterograph({('user', 'like', 'item'): (src_ids, dst_ids)})
+
+    with tempfile.TemporaryDirectory() as test_dir:
+        orig_nids, orig_eids = partition_graph(
+            hg, 'test', 2, test_dir, num_trainers_per_machine=num_trainers, return_mapping=True)
+        assert len(orig_nids) == len(hg.ntypes)
+        assert len(orig_eids) == len(hg.etypes)
+        for ntype in hg.ntypes:
+            assert len(orig_nids[ntype]) == hg.number_of_nodes(ntype)
+        for etype in hg.etypes:
+            assert len(orig_eids[etype]) == hg.number_of_edges(etype)
+
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 def test_partition():
     g = create_random_graph(1000)
@@ -387,6 +406,8 @@ def test_partition():
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support some of operations in DistGraph")
 def test_hetero_partition():
+    check_hetero_partition_single_etype(1)
+    check_hetero_partition_single_etype(4)
     hg = create_random_hetero()
     check_hetero_partition(hg, 'metis')
     check_hetero_partition(hg, 'metis', 1, 8)

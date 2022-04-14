@@ -43,7 +43,7 @@
  */
 #ifdef DGL_USE_CUDA
 #define ATEN_XPU_SWITCH_CUDA(val, XPU, op, ...) do {            \
-  if ((val) == kDLCPU || (val) == kDLCPUPinned) {               \
+  if ((val) == kDLCPU) {                                        \
     constexpr auto XPU = kDLCPU;                                \
     {__VA_ARGS__}                                               \
   } else if ((val) == kDLGPU) {                                 \
@@ -233,7 +233,7 @@
   });
 
 #define CHECK_VALID_CONTEXT(VAR1, VAR2)                                                   \
-  CHECK(((VAR1)->ctx == (VAR2)->ctx) || ((VAR1)->ctx.device_type == kDLCPUPinned))        \
+  CHECK(((VAR1)->ctx == (VAR2)->ctx) || (VAR1).IsPinned())                                \
     << "Expected " << (#VAR2) << "(" << (VAR2)->ctx << ")" << " to have the same device " \
     << "context as " << (#VAR1) << "(" << (VAR1)->ctx << "). "                            \
     << "Or " << (#VAR1) << "(" << (VAR1)->ctx << ")" << " is pinned";
@@ -246,7 +246,7 @@
  * If csr is pinned, array's context will conduct the actual operation.
  */
 #define ATEN_CSR_SWITCH_CUDA_UVA(csr, array, XPU, IdType, op, ...) do { \
-  CHECK_VALID_CONTEXT(csr.indices, array);                                \
+  CHECK_VALID_CONTEXT(csr.indices, array);                              \
   ATEN_XPU_SWITCH_CUDA(array->ctx.device_type, XPU, op, {               \
     ATEN_ID_TYPE_SWITCH((csr).indptr->dtype, IdType, {                  \
       {__VA_ARGS__}                                                     \
@@ -264,7 +264,7 @@
   });
 
 // Macro to dispatch according to device context and index type.
-#define ATEN_COO_SWITCH_CUDA(coo, XPU, IdType, op, ...)               \
+#define ATEN_COO_SWITCH_CUDA(coo, XPU, IdType, op, ...)          \
   ATEN_XPU_SWITCH_CUDA((coo).row->ctx.device_type, XPU, op, {    \
     ATEN_ID_TYPE_SWITCH((coo).row->dtype, IdType, {              \
       {__VA_ARGS__}                                              \

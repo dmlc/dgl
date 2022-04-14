@@ -44,6 +44,8 @@ struct CSRMatrix {
   IdArray data;
   /*! \brief whether the column indices per row are sorted */
   bool sorted = false;
+  /*! \brief whether the matrix is in pinned memory */
+  bool is_pinned = false;
   /*! \brief default constructor */
   CSRMatrix() = default;
   /*! \brief constructor */
@@ -127,31 +129,37 @@ struct CSRMatrix {
   * \brief Pin the indptr, indices and data (if not Null) of the matrix.
   * \note This is an in-place method. Behavior depends on the current context,
   *       kDLCPU: will be pinned;
-  *       kDLCPUPinned: directly return;
+  *       IsPinned: directly return;
   *       kDLGPU: invalid, will throw an error.
   *       The context check is deferred to pinning the NDArray.
   */
   inline void PinMemory_() {
+    if (is_pinned)
+      return;
     indptr.PinMemory_();
     indices.PinMemory_();
     if (!aten::IsNullArray(data)) {
       data.PinMemory_();
     }
+    is_pinned = true;
   }
 
   /*!
   * \brief Unpin the indptr, indices and data (if not Null) of the matrix.
   * \note This is an in-place method. Behavior depends on the current context,
-  *       kDLCPUPinned: will be unpinned;
+  *       IsPinned: will be unpinned;
   *       others: directly return.
   *       The context check is deferred to unpinning the NDArray.
   */
   inline void UnpinMemory_() {
+    if (!is_pinned)
+      return;
     indptr.UnpinMemory_();
     indices.UnpinMemory_();
     if (!aten::IsNullArray(data)) {
       data.UnpinMemory_();
     }
+    is_pinned = false;
   }
 };
 

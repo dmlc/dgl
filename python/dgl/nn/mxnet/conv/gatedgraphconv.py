@@ -7,12 +7,8 @@ from mxnet.gluon import nn
 from .... import function as fn
 
 class GatedGraphConv(nn.Block):
-    r"""
-
-    Description
-    -----------
-    Gated Graph Convolution layer from paper `Gated Graph Sequence
-    Neural Networks <https://arxiv.org/pdf/1511.05493.pdf>`__.
+    r"""Gated Graph Convolution layer from `Gated Graph Sequence
+    Neural Networks <https://arxiv.org/pdf/1511.05493.pdf>`__
 
     .. math::
         h_{i}^{0} &= [ x_i \| \mathbf{0} ]

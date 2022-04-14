@@ -4,12 +4,9 @@ import torch
 import torch.nn as nn
 
 class TransE(nn.Module):
-    r"""
+    r"""Similarity measure from `Translating Embeddings for Modeling Multi-relational Data
+    <https://papers.nips.cc/paper/2013/hash/1cecc7a77928ca8133fa24680a88d2f9-Abstract.html>`__
 
-    Description
-    -----------
-    Similarity measure introduced in `Translating Embeddings for Modeling Multi-relational Data
-    <https://papers.nips.cc/paper/2013/hash/1cecc7a77928ca8133fa24680a88d2f9-Abstract.html>`__.
     Mathematically, it is defined as follows:
 
     .. math::

@@ -7,12 +7,9 @@ import torch.nn.functional as F
 from .... import function as fn
 
 class TWIRLSConv(nn.Module):
-    r"""
-
-    Description
-    -----------
-    Together with iteratively reweighting least squre from paper `Graph Neural Networks Inspired
-    by Classical Iterative Algorithms <https://arxiv.org/pdf/2103.06064.pdf>`__.
+    r"""Convolution together with iteratively reweighting least squre from
+    `Graph Neural Networks Inspired by Classical Iterative Algorithms
+    <https://arxiv.org/pdf/2103.06064.pdf>`__
 
     Parameters
     ----------

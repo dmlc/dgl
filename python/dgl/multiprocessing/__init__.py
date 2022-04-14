@@ -9,8 +9,8 @@ from .. import backend as F
 if F.get_preferred_backend() == 'pytorch':
     # Wrap around torch.multiprocessing...
     from torch.multiprocessing import *
-    # ... and override the Process initializer
-    from .pytorch import Process
+    # ... and override the Process initializer and spawn function.
+    from .pytorch import *
 else:
     # Just import multiprocessing module.
     from multiprocessing import *           # pylint: disable=redefined-builtin

@@ -12,12 +12,10 @@ from ....utils import expand_as_pair
 
 
 class GraphConv(layers.Layer):
-    r"""
+    r"""Graph convolution from `Semi-Supervised Classification with Graph Convolutional Networks
+    <https://arxiv.org/abs/1609.02907>`__
 
-    Description
-    -----------
-    Graph convolution was introduced in `GCN <https://arxiv.org/abs/1609.02907>`__
-    and mathematically is defined as follows:
+    Mathematically it is defined as follows:
 
     .. math::
       h_i^{(l+1)} = \sigma(b^{(l)} + \sum_{j\in\mathcal{N}(i)}\frac{1}{c_{ij}}h_j^{(l)}W^{(l)})
@@ -170,11 +168,7 @@ class GraphConv(layers.Layer):
         self._activation = activation
 
     def set_allow_zero_in_degree(self, set_value):
-        r"""
-
-        Description
-        -----------
-        Set allow_zero_in_degree flag.
+        r"""Set allow_zero_in_degree flag.
 
         Parameters
         ----------
@@ -184,11 +178,7 @@ class GraphConv(layers.Layer):
         self._allow_zero_in_degree = set_value
 
     def call(self, graph, feat, weight=None):
-        r"""
-
-        Description
-        -----------
-        Compute graph convolution.
+        r"""Compute graph convolution.
 
         Parameters
         ----------

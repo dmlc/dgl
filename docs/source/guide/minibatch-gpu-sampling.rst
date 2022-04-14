@@ -13,58 +13,37 @@ For example, `OGB Products <https://ogb.stanford.edu/docs/nodeprop/#ogbn-product
 a graph depends on the number of edges.  Therefore it is entirely possible to fit the
 whole graph onto GPU.
 
-Put the node features onto GPU memory
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-If the node features can also fit onto GPU memory, it is recommended to put them onto GPU
-to reduce the time for data transfer from CPU to GPU, which usually becomes a bottleneck
-when using GPU for sampling. For exampling, in the above OGB Products, each node has
-100-dimensional features and they take less than 1GB memory in total. It is easy to
-transfer these features to GPU before training via the following code.
-
-.. code:: python
-
-   # pop the features and labels
-   features = g.ndata.pop('features')
-   labels = g.ndata.pop('labels')
-   # put them onto GPU
-   features = features.to('cuda:0')
-   labels = labels.to('cuda:0')
-
-If the node features are too large to fit onto GPU memory, :class:`~dgl.contrib.UnifiedTensor`
-enables GPU zero-copy access to the features stored on CPU memory and greatly reduces
-the time for data transfer from CPU to GPU.
-
 
 Using GPU-based neighborhood sampling in DGL data loaders
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 One can use GPU-based neighborhood sampling with DGL data loaders via:
 
-* Putting the graph onto GPU.
+* Put the graph onto GPU.
+
+* Put the ``train_nid`` onto GPU.
 
 * Set ``device`` argument to a GPU device.
 
 * Set ``num_workers`` argument to 0, because CUDA does not allow multiple processes
   accessing the same context.
 
-All the other arguments for the :class:`~dgl.dataloading.pytorch.NodeDataLoader` can be
+All the other arguments for the :class:`~dgl.dataloading.DataLoader` can be
 the same as the other user guides and tutorials.
 
 .. code:: python
 
    g = g.to('cuda:0')
-   dataloader = dgl.dataloading.NodeDataLoader(
+   train_nid = train_nid.to('cuda:0')
+   dataloader = dgl.dataloading.DataLoader(
        g,                                # The graph must be on GPU.
-       train_nid,
+       train_nid,                        # train_nid must be on GPU.
        sampler,
        device=torch.device('cuda:0'),    # The device argument must be GPU.
        num_workers=0,                    # Number of workers must be 0.
        batch_size=1000,
        drop_last=False,
        shuffle=True)
-
-GPU-based neighbor sampling also works for :class:`~dgl.dataloading.pytorch.EdgeDataLoader` since DGL 0.8.
 
 .. note::
 
@@ -84,29 +63,31 @@ CUDA UVA (Unified Virtual Addressing)-based sampling, in which GPUs perform the 
 on the graph pinned on CPU memory via zero-copy access.
 You can enable UVA-based neighborhood sampling in DGL data loaders via:
 
-* Pin the graph to page-locked memory via :func:`dgl.DGLGraph.pin_memory_`.
+* Put the ``train_nid`` onto GPU.
 
 * Set ``device`` argument to a GPU device.
 
 * Set ``num_workers`` argument to 0, because CUDA does not allow multiple processes
   accessing the same context.
 
-All the other arguments for the :class:`~dgl.dataloading.pytorch.NodeDataLoader` can be
+* Set ``use_uva=True``.
+
+All the other arguments for the :class:`~dgl.dataloading.DataLoader` can be
 the same as the other user guides and tutorials.
-UVA-based neighbor sampling also works for :class:`~dgl.dataloading.pytorch.EdgeDataLoader`.
 
 .. code:: python
 
-   g = g.pin_memory_()
-   dataloader = dgl.dataloading.NodeDataLoader(
-       g,                                # The graph must be pinned.
-       train_nid,
+   train_nid = train_nid.to('cuda:0')
+   dataloader = dgl.dataloading.DataLoader(
+       g,
+       train_nid,                        # train_nid must be on GPU.
        sampler,
        device=torch.device('cuda:0'),    # The device argument must be GPU.
        num_workers=0,                    # Number of workers must be 0.
        batch_size=1000,
        drop_last=False,
-       shuffle=True)
+       shuffle=True,
+       use_uva=True)                     # Set use_uva=True
 
 UVA-based sampling is the recommended solution for mini-batch training on large graphs,
 especially for multi-GPU training.
@@ -114,9 +95,8 @@ especially for multi-GPU training.
 .. note::
 
   To use UVA-based sampling in multi-GPU training, you should first materialize all the
-  necessary sparse formats of the graph and copy them to the shared memory explicitly
-  before spawning training processes. Then you should pin the shared graph in each training
-  process respectively. Refer to our `GraphSAGE example <https://github.com/dmlc/dgl/blob/master/examples/pytorch/graphsage/train_sampling_multi_gpu.py>`_ for more details.
+  necessary sparse formats of the graph before spawning training processes.
+  Refer to our `GraphSAGE example <https://github.com/dmlc/dgl/blob/master/examples/pytorch/graphsage/multi_gpu_node_classification.py>`_ for more details.
 
 
 Using GPU-based neighbor sampling with DGL functions

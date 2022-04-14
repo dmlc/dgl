@@ -64,7 +64,7 @@ struct NDArray::Internal {
       ptr->mem = nullptr;
     } else if (ptr->dl_tensor.data != nullptr) {
       // if the array is still pinned before freeing, unpin it.
-      if (ptr->dl_tensor.ctx.device_type == kDLCPUPinned) {
+      if (IsDataPinned(&(ptr->dl_tensor))) {
         UnpinData(&(ptr->dl_tensor));
       }
       dgl::runtime::DeviceAPI::Get(ptr->dl_tensor.ctx)->FreeDataSpace(
@@ -206,19 +206,6 @@ NDArray NDArray::EmptyShared(const std::string &name,
   return ret;
 }
 
-inline DLContext GetDevice(DLContext ctx) {
-  switch (ctx.device_type) {
-    case kDLCPU:
-    case kDLGPU:
-      return ctx;
-      break;
-    default:
-      // fallback to CPU
-      return DLContext{kDLCPU, 0};
-      break;
-  }
-}
-
 NDArray NDArray::Empty(std::vector<int64_t> shape,
                        DLDataType dtype,
                        DLContext ctx) {
@@ -226,7 +213,7 @@ NDArray NDArray::Empty(std::vector<int64_t> shape,
   if (td->IsAvailable())
     return td->Empty(shape, dtype, ctx);
 
-  NDArray ret = Internal::Create(shape, dtype, GetDevice(ctx));
+  NDArray ret = Internal::Create(shape, dtype, ctx);
   // setup memory content
   size_t size = GetDataSize(ret.data_->dl_tensor);
   size_t alignment = GetDataAlignment(ret.data_->dl_tensor);
@@ -242,6 +229,7 @@ NDArray NDArray::FromDLPack(DLManagedTensor* tensor) {
   data->deleter = Internal::DLPackDeleter;
   data->manager_ctx = tensor;
   data->dl_tensor = tensor->dl_tensor;
+
   return NDArray(data);
 }
 
@@ -260,7 +248,7 @@ void NDArray::CopyFromTo(DLTensor* from,
 
   // Use the context that is *not* a cpu context to get the correct device
   // api manager.
-  DGLContext ctx = GetDevice(from->ctx).device_type != kDLCPU ? from->ctx : to->ctx;
+  DGLContext ctx = from->ctx.device_type != kDLCPU ? from->ctx : to->ctx;
 
   DeviceAPI::Get(ctx)->CopyDataFromTo(
     from->data, static_cast<size_t>(from->byte_offset),
@@ -269,19 +257,15 @@ void NDArray::CopyFromTo(DLTensor* from,
 }
 
 void NDArray::PinData(DLTensor* tensor) {
-  // Only need to call PinData once, since the pinned memory can be seen
-  // by all CUDA contexts, not just the one that performed the allocation
-  if (tensor->ctx.device_type == kDLCPUPinned) return;
+  if (IsDataPinned(tensor)) return;
   CHECK_EQ(tensor->ctx.device_type, kDLCPU)
     << "Only NDArray on CPU can be pinned";
   DeviceAPI::Get(kDLGPU)->PinData(tensor->data, GetDataSize(*tensor));
-  tensor->ctx = DLContext{kDLCPUPinned, 0};
 }
 
 void NDArray::UnpinData(DLTensor* tensor) {
-  if (tensor->ctx.device_type != kDLCPUPinned) return;
+  if (!IsDataPinned(tensor)) return;
   DeviceAPI::Get(kDLGPU)->UnpinData(tensor->data);
-  tensor->ctx = DLContext{kDLCPU, 0};
 }
 
 template<typename T>
@@ -343,6 +327,14 @@ std::shared_ptr<SharedMemory> NDArray::GetSharedMem() const {
   return this->data_->mem;
 }
 
+bool NDArray::IsDataPinned(DLTensor* tensor) {
+  // Can only be pinned if on CPU...
+  if (tensor->ctx.device_type != kDLCPU)
+    return false;
+  // ... and CUDA device API is enabled, and the tensor is indeed in pinned memory.
+  auto device = DeviceAPI::Get(kDLGPU, true);
+  return device && device->IsPinned(tensor->data);
+}
 
 void NDArray::Save(dmlc::Stream* strm) const {
   auto zc_strm = dynamic_cast<StreamWithBuffer*>(strm);
@@ -489,10 +481,9 @@ int DGLArrayToDLPack(DGLArrayHandle from, DLManagedTensor** out,
   API_BEGIN();
   auto* nd_container = reinterpret_cast<NDArray::Container*>(from);
   DLTensor* nd = &(nd_container->dl_tensor);
-  if ((alignment != 0 && !is_aligned(nd->data, alignment))
-      || (nd->ctx.device_type == kDLCPUPinned)) {
+  if (alignment != 0 && !is_aligned(nd->data, alignment)) {
     std::vector<int64_t> shape_vec(nd->shape, nd->shape + nd->ndim);
-    NDArray copy_ndarray = NDArray::Empty(shape_vec, nd->dtype, GetDevice(nd->ctx));
+    NDArray copy_ndarray = NDArray::Empty(shape_vec, nd->dtype, nd->ctx);
     copy_ndarray.CopyFrom(nd);
     *out = copy_ndarray.ToDLPack();
   } else {

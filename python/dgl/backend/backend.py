@@ -330,6 +330,21 @@ def copy_to(input, ctx, **kwargs):
     """
     pass
 
+def is_pinned(input):
+    """Check whether the tensor is in pinned memory.
+
+    Parameters
+    ----------
+    input : Tensor
+        The tensor.
+
+    Returns
+    -------
+    bool
+        Whether the tensor is in pinned memory.
+    """
+    pass
+
 ###############################################################################
 # Tensor functions on feature data
 # --------------------------------
@@ -1178,7 +1193,7 @@ def count_nonzero(input):
 # DGL should contain all the operations on index, so this set of operators
 # should be gradually removed.
 
-def unique(input, return_inverse=False):
+def unique(input, return_inverse=False, return_counts=False):
     """Returns the unique scalar elements in a tensor.
 
     Parameters
@@ -1188,13 +1203,19 @@ def unique(input, return_inverse=False):
     return_inverse : bool, optional
         Whether to also return the indices for where elements in the original
         input ended up in the returned unique list.
+    return_counts : bool, optional
+        Whether to also return the counts for each unique element.
 
     Returns
     -------
     Tensor
         A 1-D tensor containing unique elements.
-    Tensor
+    Tensor, optional
         A 1-D tensor containing the new positions of the elements in the input.
+        It is returned if return_inverse is True.
+    Tensor, optional
+        A 1-D tensor containing the number of occurrences for each unique value or tensor.
+        It is returned if return_counts is True.
     """
     pass
 

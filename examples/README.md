@@ -181,6 +181,9 @@ To quickly locate the examples of your interest, search for the tagged keywords 
 - <a name='geniepath'></a> Liu Z, et al. Geniepath: Graph neural networks with adaptive receptive paths. [Paper link](https://arxiv.org/abs/1802.00910).
     - Example code: [PyTorch](../examples/pytorch/geniepath)
     - Tags:  Fraud detection, Node classification, Graph attention, LSTM, Adaptive receptive fields
+- <a name='pgnn'></a> You J, et al. Position-aware graph neural networks. [Paper link](https://arxiv.org/abs/1906.04817).
+    - Example code: [PyTorch](../examples/pytorch/P-GNN)
+    - Tags:  Positional encoding, Link prediction, Link-pair prediction
 
 ## 2018
 

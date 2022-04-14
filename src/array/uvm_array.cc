@@ -15,7 +15,7 @@ namespace aten {
 
 NDArray IndexSelectCPUFromGPU(NDArray array, IdArray index) {
 #ifdef DGL_USE_CUDA
-  CHECK_EQ(array->ctx.device_type, kDLCPUPinned)
+  CHECK(array.IsPinned())
     << "Only the CPUPinned device type input array is supported";
   CHECK_EQ(index->ctx.device_type, kDLGPU)
     << "Only the GPU device type input index is supported";

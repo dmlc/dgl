@@ -11,7 +11,7 @@ import dgl.nn as dglnn
 import torch.nn as nn
 import torch.nn.functional as F
 import argparse
-import dgl.multiprocessing as mp
+import torch.multiprocessing as mp
 import sys
 from torch.nn.parallel import DistributedDataParallel
 from collections import OrderedDict
@@ -282,13 +282,6 @@ if __name__ == '__main__':
     num_features = dataset.num_paper_features
     feats = np.memmap(args.full_feature_path, mode='r', dtype='float16', shape=(num_nodes, num_features))
 
-    procs = []
-    for proc_id in range(n_gpus):
-        p = mp.Process(target=train, args=(proc_id, n_gpus, args, dataset, g, feats, paper_offset))
-        p.start()
-        procs.append(p)
-
-    for p in procs:
-        p.join()
+    mp.spawn(train, args=(n_gpus, args, dataset, g, feats, paper_offset), nprocs=n_gpus)
 
     test(args, dataset, g, feats, paper_offset)

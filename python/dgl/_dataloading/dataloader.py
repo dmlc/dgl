@@ -4,7 +4,7 @@ from collections.abc import Mapping, Sequence
 from abc import ABC, abstractproperty, abstractmethod
 import re
 import numpy as np
-from .. import transform
+from .. import transforms
 from ..base import NID, EID
 from .. import backend as F
 from .. import utils
@@ -83,7 +83,7 @@ class _EidExcluder():
             # to the mapping from the new graph to the old frontier.
             # So we need to test if located_eids is empty, and do the remapping ourselves.
             if len(located_eids) > 0:
-                frontier = transform.remove_edges(
+                frontier = transforms.remove_edges(
                     frontier, located_eids, store_ids=True)
                 frontier.edata[EID] = F.gather_row(parent_eids, frontier.edata[EID])
         else:
@@ -92,7 +92,7 @@ class _EidExcluder():
             new_eids = parent_eids.copy()
             for k, v in located_eids.items():
                 if len(v) > 0:
-                    frontier = transform.remove_edges(
+                    frontier = transforms.remove_edges(
                         frontier, v, etype=k, store_ids=True)
                     new_eids[k] = F.gather_row(parent_eids[k], frontier.edges[k].data[EID])
             frontier.edata[EID] = new_eids
@@ -455,7 +455,7 @@ class BlockSampler(Sampler):
             if not self.exclude_edges_in_frontier(g):
                 frontier = exclude_edges(frontier, exclude_eids, self.output_device)
 
-            block = transform.to_block(frontier, seed_nodes_out)
+            block = transforms.to_block(frontier, seed_nodes_out)
             if self.return_eids:
                 self.assign_block_eids(block, frontier)
 
@@ -838,7 +838,7 @@ class EdgeCollator(Collator):
         neg_pair_graph = heterograph(
             neg_edges, {ntype: self.g.number_of_nodes(ntype) for ntype in self.g.ntypes})
 
-        pair_graph, neg_pair_graph = transform.compact_graphs([pair_graph, neg_pair_graph])
+        pair_graph, neg_pair_graph = transforms.compact_graphs([pair_graph, neg_pair_graph])
         pair_graph.edata[EID] = induced_edges
 
         seed_nodes = pair_graph.ndata[NID]

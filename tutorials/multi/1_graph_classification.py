@@ -74,7 +74,7 @@ import torch.distributed as dist
 
 def init_process_group(world_size, rank):
     dist.init_process_group(
-        backend='nccl',
+        backend='gloo',     # change to 'nccl' for multiple GPUs
         init_method='tcp://127.0.0.1:12345',
         world_size=world_size,
         rank=rank)
@@ -144,7 +144,10 @@ from torch.nn.parallel import DistributedDataParallel
 def init_model(seed, device):
     torch.manual_seed(seed)
     model = GIN().to(device)
-    model = DistributedDataParallel(model, device_ids=[device], output_device=device)
+    if device.type == 'cpu':
+        model = DistributedDataParallel(model)
+    else:
+        model = DistributedDataParallel(model, device_ids=[device], output_device=device)
 
     return model
 
@@ -182,9 +185,11 @@ from torch.optim import Adam
 
 def main(rank, world_size, dataset, seed=0):
     init_process_group(world_size, rank)
-    # Assume the GPU ID to be the same as the process ID
-    device = torch.device('cuda:{:d}'.format(rank))
-    torch.cuda.set_device(device)
+    if torch.cuda.is_available():
+        device = torch.device('cuda:{:d}'.format(rank))
+        torch.cuda.set_device(device)
+    else:
+        device = torch.device('cpu')
 
     model = init_model(seed, device)
     criterion = nn.CrossEntropyLoss()
@@ -222,29 +227,18 @@ def main(rank, world_size, dataset, seed=0):
 
 ###############################################################################
 # Finally we load the dataset and launch the processes.
-# 
-# .. note::
-# 
-#    You will need to use ``dgl.multiprocessing`` instead of the Python
-#    ``multiprocessing`` package. ``dgl.multiprocessing`` is identical to
-#    Python’s built-in ``multiprocessing`` except that it handles the
-#    subtleties between forking and multithreading in Python.
 #
-
-if __name__ == '__main__':
-    import dgl.multiprocessing as mp
-
-    from dgl.data import GINDataset
-
-    num_gpus = 4
-    procs = []
-    dataset = GINDataset(name='IMDBBINARY', self_loop=False)
-    for rank in range(num_gpus):
-        p = mp.Process(target=main, args=(rank, num_gpus, dataset))
-        p.start()
-        procs.append(p)
-    for p in procs:
-        p.join()
+# .. code:: python
+#
+#    if __name__ == '__main__':
+#        import torch.multiprocessing as mp
+#    
+#        from dgl.data import GINDataset
+#    
+#        num_gpus = 4
+#        procs = []
+#        dataset = GINDataset(name='IMDBBINARY', self_loop=False)
+#        mp.spawn(main, args=(num_gpus, dataset), nprocs=num_gpus)
 
 # Thumbnail credits: DGL
 # sphinx_gallery_thumbnail_path = '_static/blitz_5_graph_classification.png'

@@ -10,15 +10,10 @@ from ....base import DGLError
 
 # pylint: enable=W0235
 class EGATConv(nn.Module):
-    r"""
-    Description
-    -----------
-    Apply Graph Attention Layer over input graph. EGAT is an extension
-    of regular `Graph Attention Network <https://arxiv.org/pdf/1710.10903.pdf>`__
-    handling edge features, detailed description is available in `Rossmann-Toolbox
-    <https://pubmed.ncbi.nlm.nih.gov/34571541/>`__ (see supplementary data).
-    The difference appears in the method how unnormalized attention scores :math:`e_{ij}`
-    are obtained:
+    r"""Graph attention layer that handles edge features from `Rossmann-Toolbox
+    <https://pubmed.ncbi.nlm.nih.gov/34571541/>`__ (see supplementary data)
+
+    The difference lies in how unnormalized attention scores :math:`e_{ij}` are obtained:
 
     .. math::
         e_{ij} &= \vec{F} (f_{ij}^{\prime})
@@ -27,7 +22,7 @@ class EGATConv(nn.Module):
 
     where :math:`f_{ij}^{\prime}` are edge features, :math:`\mathrm{A}` is weight matrix and
 
-    :math: `\vec{F}` is weight vector. After that resulting node features
+    :math: `\vec{F}` is weight vector. After that, resulting node features
     :math:`h_{i}^{\prime}` are updated in the same way as in regular GAT.
 
     Parameters
