@@ -835,17 +835,17 @@ class DataLoader(torch.utils.data.DataLoader):
 
             if not isinstance(cpu_worker_affinity_cores, list):
                 raise Exception('ERROR: cpu_worker_affinity_cores should be a list of cores')
-            elif not (nw_work > 0):
+            if not nw_work > 0:
                 raise Exception('ERROR: affinity should be used with --num_workers=X')
-            elif len(cpu_worker_affinity_cores) not in [0, nw_work]:
+            if len(cpu_worker_affinity_cores) not in [0, nw_work]:
                 raise Exception('ERROR: cpu_affinity incorrect '
                                 'settings for cores={} num_workers={}'
                                 .format(cpu_worker_affinity_cores, nw_work))
-            else:
-                self.cpu_cores = (cpu_worker_affinity_cores
-                                  if len(cpu_worker_affinity_cores)
-                                  else range(0, nw_work))
-                worker_init_fn = self.worker_init_function
+                                
+            self.cpu_cores = (cpu_worker_affinity_cores
+                                if len(cpu_worker_affinity_cores)
+                                else range(0, nw_work))
+            worker_init_fn = self.worker_init_function
 
         super().__init__(
             self.dataset,
