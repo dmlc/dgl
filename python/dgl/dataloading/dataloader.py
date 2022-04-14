@@ -845,7 +845,6 @@ class DataLoader(torch.utils.data.DataLoader):
                 self.cpu_cores = (cpu_worker_affinity_cores
                                   if len(cpu_worker_affinity_cores)
                                   else range(0, nw_work))
-
                 worker_init_fn = self.worker_init_function
 
         super().__init__(
@@ -873,8 +872,6 @@ class DataLoader(torch.utils.data.DataLoader):
               worker_id : int
                   Worker ID.
         """
-        #set_num_threads(1)
-
         try:
             psutil.Process().cpu_affinity([self.cpu_cores[worker_id]])
             print('CPU-affinity worker {} has been assigned to core={}'
