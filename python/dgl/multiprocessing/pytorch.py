@@ -45,7 +45,7 @@ def _get_shared_mem_name(id_):
 
 def call_once_and_share(func, shape, dtype, rank=0):
     """Invoke the function in a single process of the PyTorch distributed process group,
-    and share the result to other processes.
+    and share the result with other processes.
 
     Parameters
     ----------
