@@ -17,6 +17,5 @@ In addition, if your backend is PyTorch, this module will also be compatible wit
 .. autosummary::
     :toctree: ../../generated/
 
-    spawn
     call_once_and_share
     shared_tensor

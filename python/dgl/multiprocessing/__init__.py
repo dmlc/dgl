@@ -9,7 +9,7 @@ from .. import backend as F
 if F.get_preferred_backend() == 'pytorch':
     # Wrap around torch.multiprocessing...
     from torch.multiprocessing import *
-    # ... and override the Process initializer and spawn function.
+    # ... and override the Process initializer.
     from .pytorch import *
 else:
     # Just import multiprocessing module.
