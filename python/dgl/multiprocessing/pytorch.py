@@ -87,7 +87,7 @@ def call_once_and_share(func, shape, dtype, rank=0):
 
 def shared_tensor(shape, dtype=torch.float32):
     """Create a tensor in shared memory accessible by all processes within the same
-    ``torch.distsributed`` process group.
+    ``torch.distributed`` process group.
 
     The content is uninitialized.
 
