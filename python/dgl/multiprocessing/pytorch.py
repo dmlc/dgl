@@ -44,10 +44,8 @@ def _get_shared_mem_name(id_):
     return "shared" + str(id_)
 
 def call_once_and_share(func, shape, dtype, rank=0):
-    """Invoke the function in a single process of the process group spawned by
-    :func:`spawn`, and share the result to other processes.
-
-    Requires the subprocesses to be spawned with :func:`dgl.multiprocessing.pytorch.spawn`.
+    """Invoke the function in a single process of the PyTorch distributed process group,
+    and share the result to other processes.
 
     Parameters
     ----------
