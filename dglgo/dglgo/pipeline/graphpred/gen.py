@@ -64,7 +64,7 @@ class GraphpredPipeline(PipelineBase):
             output_cfg = self.user_cfg_cls(**generated_cfg).dict()
             output_cfg = deep_convert_dict(output_cfg)
             comment_dict = {
-                "device": "Torch device name, e.q. cpu or cuda or cuda:0",
+                "device": "Torch device name, e.g., cpu or cuda or cuda:0",
                 "data": {
                     "split_ratio": 'Ratio to generate data split, for example set to [0.8, 0.1, 0.1] for 80% train/10% val/10% test. Leave blank to use builtin split in original dataset'
                 },
