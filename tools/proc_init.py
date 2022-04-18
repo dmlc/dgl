@@ -236,7 +236,7 @@ def run(rank, size, params):
     print( 'Rank: ', rank, ', LstNodeTypeCounts: ', lstNodeTypeCounts )
         
     # after this call node_data = [ globalId, node_type, orig_node_type_id, line_id, local_type_id ]
-    node_data, rank_offset_globalid = assignGlobalNodeIds ( rank, size, lstNodeTypeCounts, node_data )
+    node_data, node_offset_globalid = assignGlobalNodeIds ( rank, size, lstNodeTypeCounts, node_data )
     print( 'Rank: ', rank, ' Done assign Global ids to nodes...')
 
     #Work on the edge and assign GlobalIds
@@ -252,7 +252,7 @@ def run(rank, size, params):
         lstEdgeTypeCounts.append( (etype, edgeCounts[etype]) )
     print('Rank: ', rank, ', LstEdgeTypeCounts: ', lstEdgeTypeCounts )
 
-    edge_data = assignGlobalEdgeIds ( rank, size, lstEdgeTypeCounts, edge_data )
+    edge_data, edge_offset_globalid = assignGlobalEdgeIds ( rank, size, lstEdgeTypeCounts, edge_data )
     print( 'Rank: ', rank, ' Done assign Global ids to edges...')
 
     edge_data = getGlobalIdsForEdges( rank, size, edge_data, metis_partitions, node_data)
@@ -271,7 +271,7 @@ def run(rank, size, params):
     pipelineArgs["node-ntype-orig-ids" ] = node_data[:, 2]
     pipelineArgs["node-orig-id" ] = node_data[:, 3]
     pipelineArgs["node-local-node-type-id" ] = node_data[:, 4]
-    pipelineArgs["node-global-node-id-offset"] = rank_offset_globalid
+    pipelineArgs["node-global-node-id-offset"] = node_offset_globalid
     pipelineArgs["node-features"] = node_features
 
     #pipelineArgs[ "edge_data" ] = edge_data
@@ -281,6 +281,8 @@ def run(rank, size, params):
     pipelineArgs[ "edge-orig-dst-id" ] = edge_data[:,3]
     pipelineArgs[ "edge-orig-edge-id" ] = edge_data[:,4]
     pipelineArgs[ "edge-etype-ids" ] = edge_data[:,5]
+    pipelineArgs[ "edge-global-ids" ] = edge_data[:,6]
+    pipelineArgs[ "edge-global-edge-id-offset" ] = edge_offset_globalid
 
     #call convert_parititio.py for serialization 
     json_metadata, output_dir, graph_name = processMetisPartitions (False, pipelineArgs, params)

@@ -97,7 +97,8 @@ def get_global_node_ids(rank, world_size, nodeids_ranks, partitions, node_data):
         #list of node-ids to lookup
         node_ids = i.tolist()
         if (len(node_ids) != 0):
-            values = node_data[ :, 0][ node_data[:,3] == node_ids ]
+            common, ind1, ind2 = np.intersect1d(node_data[:,3], node_ids, return_indices=True)
+            values = node_data[ind1,0]
             send_nodes.append(torch.Tensor(values).type(dtype=torch.int32))
         else: 
             send_nodes.append(torch.Tensor([]).type(dtype=torch.int32))

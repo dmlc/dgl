@@ -270,7 +270,12 @@ def processMetisPartitions (isCmdLineExec, pipelineArgs, args):
                 part_dir, "edge_feat.dgl"), edge_feats)
 
         # Determine the edge ID range of different edge types.
-        edge_id_start = num_edges
+        if (isCmdLineExec == True): 
+            edge_id_start = num_edges
+        else:
+            edge_id_start = pipelineArgs[ "edge-global-edge-id-offset" ]
+            num_edges = pipelineArgs[ "edge-global-edge-id-offset" ]
+
         for etype_name in eid_ranges:
             etype_id = etypes_map[etype_name]
             edge_map_val[etype_name].append([int(edge_id_start),
