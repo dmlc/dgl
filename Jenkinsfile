@@ -485,7 +485,8 @@ pipeline {
               sh("curl -L ${BUILD_URL}wfapi")
               sh("cat status.py")
               sh("pytest --html=report.html --self-contained-html report.py || true")
-              sh('aws s3 sync ./ s3://dgl-ci-result/${JOB_NAME}/${BUILD_NUMBER}/${BUILD_ID}/logs/ --acl public-read --content-type text/plain')
+              sh("aws s3 sync ./ s3://dgl-ci-result/${JOB_NAME}/${BUILD_NUMBER}/${BUILD_ID}/logs/  --exclude '*' --include '*.log' --acl public-read --content-type text/plain")
+              sh("aws s3 sync ./ s3://dgl-ci-result/${JOB_NAME}/${BUILD_NUMBER}/${BUILD_ID}/logs/  --exclude '*.log' --acl public-read")
 
               def comment = sh(returnStdout: true, script: "python3 status.py").trim()
               echo(comment)
