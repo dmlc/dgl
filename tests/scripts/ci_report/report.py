@@ -64,6 +64,8 @@ for key, node in nodes_dict.items():
     logs = get_jenkins_json(
         node['_links']['log']['href']).get('text', '')
     node_name = node['name']
+    if "Post Action" in node_name:
+        continue
     node_status = node['status']
     id = node['id']
     full_name = get_node_full_name(node, nodes_dict)
