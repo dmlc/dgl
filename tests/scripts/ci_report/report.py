@@ -40,17 +40,19 @@ def get_jenkins_json(path):
 for stage in stages:
     link = stage['_links']['self']['href']
     stage_name = stage['name']
-    res = requests.get(urljoin(domain,link)).json()
-    nodes = res['stageFlowNodes']
-    # failed_nodes = list(filter(lambda x: x['status'] != 'SUCCESS', nodes))
-    for node in nodes:
-        failed_log = get_jenkins_json(node['_links']['log']['href']).get('text', '')
-        node_name = node['name']
-        node_status = node['status']
-        final_dict["{}/{}".format(stage_name, node_name)] = {            
-            "status": JENKINS_STATUS_MAPPING[node_status],
-            "logs": failed_log
-        }
+    if "Post Actions" not in stage_name:
+        # ignore post actions related items
+        res = requests.get(urljoin(domain,link)).json()
+        nodes = res['stageFlowNodes']
+        # failed_nodes = list(filter(lambda x: x['status'] != 'SUCCESS', nodes))
+        for node in nodes:
+            failed_log = get_jenkins_json(node['_links']['log']['href']).get('text', '')
+            node_name = node['name']
+            node_status = node['status']
+            final_dict["{}/{}".format(stage_name, node_name)] = {            
+                "status": JENKINS_STATUS_MAPPING[node_status],
+                "logs": failed_log
+            }
 
 
 @pytest.mark.parametrize("test_name", final_dict)
