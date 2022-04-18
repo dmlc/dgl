@@ -67,7 +67,7 @@ def test_generate_report(test_name):
     tmp.write(final_dict[test_name]["logs"])
     filename = Path(tmp.name).name
     # print(final_dict[test_name]["logs"])
-    print("Log path: {}".format(filename))
+    print("Log path: {}".format(prefix+filename))
 
     if final_dict[test_name]["status"] == JobStatus.FAIL:
         pytest.fail("Test failed. Please see the log at {}".format(prefix+filename))
