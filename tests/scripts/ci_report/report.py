@@ -1,8 +1,12 @@
+from urllib.parse import urlparse, urljoin
+import os
+import requests
 import pytest
 import json
 import enum
 from pathlib import Path
 import tempfile
+
 
 class JobStatus(enum.Enum):
     SUCCESS = 0
@@ -21,9 +25,6 @@ JENKINS_STATUS_MAPPING = {
     "UNSTABLE": JobStatus.FAIL,
 }
 
-import requests
-from urllib.parse import urlparse,urljoin
-import os
 assert "BUILD_URL" in os.environ, "Are you in the Jenkins environment?"
 job_link = os.environ["BUILD_URL"]
 response = requests.get('{}wfapi'.format(job_link)).json()
@@ -32,27 +33,44 @@ stages = response["stages"]
 
 final_dict = {}
 failed_nodes = []
-# failed_stages = list(filter(lambda x: x['status'] != 'SUCCESS', stages))
+nodes_dict = {}
+
 
 def get_jenkins_json(path):
     return requests.get(urljoin(domain, path)).json()
 
+
 for stage in stages:
     link = stage['_links']['self']['href']
     stage_name = stage['name']
-    if "Post Actions" not in stage_name:
-        # ignore post actions related items
-        res = requests.get(urljoin(domain,link)).json()
-        nodes = res['stageFlowNodes']
-        # failed_nodes = list(filter(lambda x: x['status'] != 'SUCCESS', nodes))
-        for node in nodes:
-            failed_log = get_jenkins_json(node['_links']['log']['href']).get('text', '')
-            node_name = node['name']
-            node_status = node['status']
-            final_dict["{}/{}".format(stage_name, node_name)] = {            
-                "status": JENKINS_STATUS_MAPPING[node_status],
-                "logs": failed_log
-            }
+    res = requests.get(urljoin(domain, link)).json()
+    nodes = res['stageFlowNodes']
+    for node in nodes:
+        nodes_dict[node['id']] = node
+        nodes_dict[node['id']]['stageName'] = stage_name
+
+def get_node_full_name(node, node_dict):
+    name = ""
+    while "parentNodes" in node:
+        name = name + "/" + node["name"]
+        id = node['parentNodes'][0]
+        if id in nodes_dict:
+            node = node_dict[id]
+        else:
+            break
+    return name
+
+for key, node in nodes_dict.items():
+    logs = get_jenkins_json(
+        node['_links']['log']['href']).get('text', '')
+    node_name = node['name']
+    node_status = node['status']
+    id = node['id']
+    full_name = get_node_full_name(node, nodes_dict)
+    final_dict["{}_{}/{}".format(id, node['stageName'], full_name)] = {
+        "status": JENKINS_STATUS_MAPPING[node_status],
+        "logs": logs
+    }
 
 JOB_NAME = os.getenv("JOB_NAME")
 BUILD_NUMBER = os.getenv("BUILD_NUMBER")
@@ -60,16 +78,20 @@ BUILD_ID = os.getenv("BUILD_ID")
 
 prefix = f"https://dgl-ci-result.s3.us-west-2.amazonaws.com/{JOB_NAME}/{BUILD_NUMBER}/{BUILD_ID}/logs/logs_dir/"
 
+
 @pytest.mark.parametrize("test_name", final_dict)
 def test_generate_report(test_name):
     os.makedirs("./logs_dir/", exist_ok=True)
-    tmp = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix=".log", dir="./logs_dir/")
+    tmp = tempfile.NamedTemporaryFile(
+        mode='w', delete=False, suffix=".log", dir="./logs_dir/")
     tmp.write(final_dict[test_name]["logs"])
     filename = Path(tmp.name).name
     # print(final_dict[test_name]["logs"])
     print("Log path: {}".format(prefix+filename))
 
     if final_dict[test_name]["status"] == JobStatus.FAIL:
-        pytest.fail("Test failed. Please see the log at {}".format(prefix+filename))
+        pytest.fail(
+            "Test failed. Please see the log at {}".format(prefix+filename))
     elif final_dict[test_name]["status"] == JobStatus.SKIP:
-        pytest.skip("Test skipped. Please see the log at {}".format(prefix+filename))
+        pytest.skip(
+            "Test skipped. Please see the log at {}".format(prefix+filename))
