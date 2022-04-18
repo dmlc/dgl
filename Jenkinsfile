@@ -480,8 +480,11 @@ pipeline {
             sh("curl -o cireport.log ${BUILD_URL}consoleText")
             sh("curl -o report.py https://dgl-ci-result.s3.us-west-2.amazonaws.com/scripts/report.py")
             sh("pytest --html=report.html --self-contained-html report.py || true")
-            sh('aws s3 sync ./ s3://dgl-ci-result/${JOB_NAME}/${BUILD_NUMBER}/${BUILD_ID}/cireport.log --acl public-read')
-            pullRequest.comment("Test at s3")
+            sh('aws s3 sync ./ s3://dgl-ci-result/${JOB_NAME}/${BUILD_NUMBER}/${BUILD_ID}/logs/ --acl public-read')
+            pullRequest.comment("""            
+            Report at https://dgl-ci-result.s3.us-west-2.amazonaws.com/${JOB_NAME}/${BUILD_NUMBER}/${BUILD_ID}/logs/report.html \n
+            Full logs at https://dgl-ci-result.s3.us-west-2.amazonaws.com/${JOB_NAME}/${BUILD_NUMBER}/${BUILD_ID}/logs/cireport.log
+            """)
           }
         }
         node('windows') {
