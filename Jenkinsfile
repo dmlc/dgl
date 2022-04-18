@@ -482,7 +482,7 @@ pipeline {
             sh("curl -o status.py https://dgl-ci-result.s3.us-west-2.amazonaws.com/scripts/status.py")
             sh("pytest --html=report.html --self-contained-html report.py || true")
             sh('aws s3 sync ./ s3://dgl-ci-result/${JOB_NAME}/${BUILD_NUMBER}/${BUILD_ID}/logs/ --acl public-read')
-            def comment = sh("python3 status.py")
+            def comment = sh(returnStdout: true, script: "python3 status.py").trim()
             pullRequest.comment(comment)
           }
         }
