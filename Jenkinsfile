@@ -478,8 +478,8 @@ pipeline {
         node("linux-core-worker") {
           docker.image('dgllib/dgl-ci-awscli:v220418').inside("--pull always --entrypoint=''") {
             sh("curl -o cireport.log ${BUILD_URL}consoleText")
-            sh("curl -o report.py https://dgl-ci-scripts.s3.us-west-2.amazonaws.com/scripts/report.py")
-            sh("curl -o status.py https://dgl-ci-scripts.s3.us-west-2.amazonaws.com/scripts/status.py")
+            sh("curl -o report.py https://dgl-ci-result.s3.us-west-2.amazonaws.com/scripts/report.py")
+            sh("curl -o status.py https://dgl-ci-result.s3.us-west-2.amazonaws.com/scripts/status.py")
             sh("cat status.py")
             sh("pytest --html=report.html --self-contained-html report.py || true")
             sh('aws s3 sync ./ s3://dgl-ci-result/${JOB_NAME}/${BUILD_NUMBER}/${BUILD_ID}/logs/ --acl public-read')
