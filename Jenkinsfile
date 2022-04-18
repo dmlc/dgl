@@ -476,13 +476,16 @@ pipeline {
     always {
       script {
         node("linux-core-worker") {
-          docker.image('amazon/aws-cli').inside("--entrypoint=''") {
+          docker.image('dgllib/dgl-ci-awscli:v220418').inside("--entrypoint=''") {
             sh("curl -o cireport.log ${BUILD_URL}consoleText")
-            sh('aws s3 cp cireport.log s3://dgl-ci-result/${JOB_NAME}/${BUILD_NUMBER}/${BUILD_ID}/cireport.log --acl public-read')
+            sh("curl -o report.py https://dgl-ci-result.s3.us-west-2.amazonaws.com/scripts/report.py")
+            sh("pytest --html=report.html --self-contained-html report.py")
+            sh('aws s3 sync ./ s3://dgl-ci-result/${JOB_NAME}/${BUILD_NUMBER}/${BUILD_ID}/cireport.log --acl public-read')
+            pullRequest.comment("Test at s3")
           }
         }
         node('windows') {
-            bat "(rmvirtualenv ${BUILD_TAG})|| (exit 0)"
+            bat "set +e(rmvirtualenv ${BUILD_TAG})|| (exit 0)"
         }
       }
     }
