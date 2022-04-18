@@ -54,6 +54,11 @@ for stage in stages:
                 "logs": failed_log
             }
 
+JOB_NAME = os.getenv("JOB_NAME")
+BUILD_NUMBER = os.getenv("BUILD_NUMBER")
+BUILD_ID = os.getenv("BUILD_ID")
+
+prefix = f"https://dgl-ci-result.s3.us-west-2.amazonaws.com/{JOB_NAME}/{BUILD_NUMBER}/{BUILD_ID}/logs/logs_dir/"
 
 @pytest.mark.parametrize("test_name", final_dict)
 def test_generate_report(test_name):
@@ -65,6 +70,6 @@ def test_generate_report(test_name):
     print("Log path: {}".format(filename))
 
     if final_dict[test_name]["status"] == JobStatus.FAIL:
-        pytest.fail("Test failed. Please see the log at {}".format(filename))
+        pytest.fail("Test failed. Please see the log at {}".format(prefix+filename))
     elif final_dict[test_name]["status"] == JobStatus.SKIP:
-        pytest.skip("Test skipped. Please see the log at {}".format(filename))
+        pytest.skip("Test skipped. Please see the log at {}".format(prefix+filename))
