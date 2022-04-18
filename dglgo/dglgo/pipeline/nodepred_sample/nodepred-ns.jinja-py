@@ -102,7 +102,7 @@ def train(cfg, pipeline_cfg, device, data, model, optimizer, loss_fcn):
         num_workers=pipeline_cfg["sampler"]["num_workers"])
 
     {% if user_cfg.early_stop %}
-    stopper = EarlyStopping(pipeline_cfg['patience'], pipeline_cfg['checkpoint_path'])    
+    stopper = EarlyStopping(pipeline_cfg['patience'], pipeline_cfg['checkpoint_path'])
     {% endif %}
     val_acc = 0.
     for epoch in range(pipeline_cfg['num_epochs']):
@@ -119,16 +119,16 @@ def train(cfg, pipeline_cfg, device, data, model, optimizer, loss_fcn):
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            
-            train_acc = accuracy(batch_pred, batch_labels)                
-            print("Epoch {:05d} | Step {:05d} | Loss {:.4f} | TrainAcc {:.4f}".                
+
+            train_acc = accuracy(batch_pred, batch_labels)
+            print("Epoch {:05d} | Step {:05d} | Loss {:.4f} | TrainAcc {:.4f}".
                 format(epoch, step, loss.item(), train_acc))
 
         if epoch % pipeline_cfg["eval_period"] == 0 and epoch != 0:
             val_acc = evaluate(model, val_g, val_nfeat, val_labels, val_nid, cfg["eval_device"])
             print('Eval Acc {:.4f}'.format(val_acc))
         {% if user_cfg.early_stop %}
-        if stopper.step(val_acc, model):            
+        if stopper.step(val_acc, model):
             break
         {% endif %}
 
@@ -158,7 +158,7 @@ def main():
     loss = torch.nn.{{ user_cfg.general_pipeline.loss }}()
     optimizer = torch.optim.{{ user_cfg.general_pipeline.optimizer.name }}(model.parameters(), **pipeline_cfg["optimizer"])
     test_acc = train(cfg, pipeline_cfg, device, data, model, optimizer, loss)
-    torch.save(model, pipeline_cfg["save_path"])
+    torch.save(model.state_dict(), pipeline_cfg["save_path"])
     return test_acc
 
 if __name__ == '__main__':

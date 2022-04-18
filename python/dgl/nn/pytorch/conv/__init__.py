@@ -27,9 +27,12 @@ from .twirlsconv import TWIRLSConv, TWIRLSUnfoldingAndAttention
 from .gcn2conv import GCN2Conv
 from .hgtconv import HGTConv
 from .grouprevres import GroupRevRes
+from .egnnconv import EGNNConv
+from .pnaconv import PNAConv
 
 __all__ = ['GraphConv', 'EdgeWeightNorm', 'GATConv', 'GATv2Conv', 'EGATConv', 'TAGConv',
            'RelGraphConv', 'SAGEConv', 'SGConv', 'APPNPConv', 'GINConv', 'GatedGraphConv',
            'GMMConv', 'ChebConv', 'AGNNConv', 'NNConv', 'DenseGraphConv', 'DenseSAGEConv',
            'DenseChebConv', 'EdgeConv', 'AtomicConv', 'CFConv', 'DotGatConv', 'TWIRLSConv',
-           'TWIRLSUnfoldingAndAttention', 'GCN2Conv', 'HGTConv', 'GroupRevRes']
+           'TWIRLSUnfoldingAndAttention', 'GCN2Conv', 'HGTConv', 'GroupRevRes', 'EGNNConv',
+           'PNAConv']
