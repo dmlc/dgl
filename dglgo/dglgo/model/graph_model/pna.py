@@ -139,7 +139,6 @@ class PNA(nn.Module):
                  embed_size: int = 80,
                  aggregators: str = 'mean, max, min, std',
                  scalers: str = 'identity, amplification, attenuation',
-                 delta: float = None,
                  dropout: float = 0.3,
                  batch_norm: bool = True,
                  residual: bool = True,
@@ -176,10 +175,6 @@ class PNA(nn.Module):
               where :math:`d` is the degree of the node.
 
             * ``attenuation``: multiply the aggregated message by :math:`\delta/\log(d+1)`
-        delta : float
-            The degree-related normalization factor computed over the training set,
-            used by scalers for normalization. :math:`E[\log(d+1)]`, where :math:`d`
-            is the degree for each node in the training set.
         dropout : float
             Dropout rate.
         batch_norm : bool
@@ -196,7 +191,6 @@ class PNA(nn.Module):
         super(PNA, self).__init__()
         self.data_info = data_info
         self.embed_size = embed_size
-        self.delta = delta
         self.dropout = dropout
         self.batch_norm = batch_norm
         self.residual = residual
@@ -225,7 +219,7 @@ class PNA(nn.Module):
         self.conv_layers = nn.ModuleList([SimplePNAConv(feat_size=embed_size,
                                                         aggregators=aggregators,
                                                         scalers=scalers,
-                                                        delta=delta,
+                                                        delta=data_info['delta'],
                                                         dropout=dropout,
                                                         batch_norm=batch_norm,
                                                         residual=residual,
