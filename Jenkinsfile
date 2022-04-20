@@ -304,7 +304,7 @@ pipeline {
                 }
               }
               stages {
-                stage('Unit test') {
+                stage('Tensorflow CPU Unit test') {
                   steps {
                     unit_test_linux('tensorflow', 'cpu')
                   }
@@ -326,7 +326,7 @@ pipeline {
                 }
               }
               stages {
-                stage('Unit test') {
+                stage('Tensorflow GPU Unit test') {
                   steps {
                     unit_test_linux('tensorflow', 'gpu')
                   }
@@ -348,17 +348,17 @@ pipeline {
                 }
               }
               stages {
-                stage('Unit test') {
+                stage('Torch CPU Unit test') {
                   steps {
                     unit_test_linux('pytorch', 'cpu')
                   }
                 }
-                stage('Example test') {
+                stage('Torch CPU Example test') {
                   steps {
                     example_test_linux('pytorch', 'cpu')
                   }
                 }
-                stage('Tutorial test') {
+                stage('Torch CPU Tutorial test') {
                   steps {
                     tutorial_test_linux('pytorch')
                   }
@@ -373,12 +373,12 @@ pipeline {
             stage('Torch CPU (Win64)') {
               agent { label 'windows' }
               stages {
-                stage('Unit test') {
+                stage('Torch CPU (Win64) Unit test') {
                   steps {
                     unit_test_win64('pytorch', 'cpu')
                   }
                 }
-                stage('Example test') {
+                stage('Torch CPU (Win64) Example test') {
                   steps {
                     example_test_win64('pytorch', 'cpu')
                   }
@@ -400,13 +400,13 @@ pipeline {
                 }
               }
               stages {
-                stage('Unit test') {
+                stage('Torch GPU Unit test') {
                   steps {
                     sh 'nvidia-smi'
                     unit_test_linux('pytorch', 'gpu')
                   }
                 }
-                stage('Example test') {
+                stage('Torch GPU Example test') {
                   steps {
                     example_test_linux('pytorch', 'gpu')
                   }
@@ -427,7 +427,7 @@ pipeline {
                 }
               }
               stages {
-                stage('Unit test') {
+                stage('MXNet CPU Unit test') {
                   steps {
                     unit_test_linux('mxnet', 'cpu')
                   }
@@ -454,7 +454,7 @@ pipeline {
                 }
               }
               stages {
-                stage('Unit test') {
+                stage('MXNet GPU Unit test') {
                   steps {
                     sh 'nvidia-smi'
                     unit_test_linux('mxnet', 'gpu')
