@@ -1,3 +1,4 @@
+from typing import List
 import dgl.function as fn
 import numpy as np
 import torch
@@ -5,7 +6,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from dgl.nn import SumPooling, AvgPooling
 from ogb.graphproppred.mol_encoder import AtomEncoder
-from typing import List
 
 def aggregate_mean(h):
     """mean aggregation"""
@@ -137,8 +137,8 @@ class PNA(nn.Module):
     def __init__(self,
                  data_info: dict,
                  embed_size: int = 80,
-                 aggregators: List[str] = None,
-                 scalers: List[str] = None,
+                 aggregators: str = 'mean, max, min, std',
+                 scalers: str = 'identity, amplification, attenuation',
                  delta: float = None,
                  dropout: float = 0.3,
                  batch_norm: bool = True,
@@ -154,9 +154,9 @@ class PNA(nn.Module):
             The information about the input dataset.
         embed_size : int
             Embedding size.
-        aggregators : list of str
-            List of aggregation function names(each aggregator specifies a way to aggregate
-            messages from neighbours), selected from:
+        aggregators : str
+            Aggregation function names separated by comma(each aggregator specifies a way to
+            aggregate messages from neighbours), selected from:
 
             * ``mean``: the mean of neighbour messages
 
@@ -167,8 +167,8 @@ class PNA(nn.Module):
             * ``std``: the standard deviation of neighbour messages
 
             * ``sum``: the sum of neighbour messages
-        scalers : list of str
-            List of scaler function names, selected from:
+        scalers : str
+            Scaler function names separated by comma, selected from:
 
             * ``identity``: no scaling
 
