@@ -9,7 +9,7 @@ model:
   embed_size: 300             # Embedding size.
   num_layers: 5               # Number of layers.
   dropout: 0.5                # Dropout rate.
-  virtual_node: false         # Whether to use virtual node.
+  virtual_node: true          # Whether to use virtual node.
 general_pipeline:
   num_runs: 5                 # Number of experiments to run
   train_batch_size: 32        # Graph batch size when training

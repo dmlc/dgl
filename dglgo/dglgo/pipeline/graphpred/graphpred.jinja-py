@@ -13,9 +13,6 @@ def train(device, loader, model, criterion, optimizer):
     model.train()
 
     for _, (g, labels) in enumerate(tqdm(loader, desc="Iteration")):
-        if g.batch_size == 1:
-            continue
-
         g = g.to(device)
         labels = labels.to(device)
         node_feat = g.ndata['feat']
@@ -23,9 +20,7 @@ def train(device, loader, model, criterion, optimizer):
 
         pred = model(g, node_feat, edge_feat)
         optimizer.zero_grad()
-        # ignore nan targets (unlabeled) when computing training loss
-        is_labeled = labels == labels
-        loss = criterion(pred.float()[is_labeled], labels.float()[is_labeled])
+        loss = criterion(pred.float(), labels.float())
         loss.backward()
         optimizer.step()
 
@@ -34,9 +29,7 @@ def calc_rocauc(y_true, y_pred):
     for i in range(y_true.shape[1]):
         # AUC is only defined when there is at least one positive and negative datapoint.
         if np.sum(y_true[:, i] == 1) > 0 and np.sum(y_true[:, i] == 0) > 0:
-            # ignore nan values
-            is_labeled = y_true[:, i] == y_true[:, i]
-            rocauc_list.append(roc_auc_score(y_true[is_labeled, i], y_pred[is_labeled, i]))
+            rocauc_list.append(roc_auc_score(y_true, y_pred))
 
     return sum(rocauc_list) / len(rocauc_list)
 

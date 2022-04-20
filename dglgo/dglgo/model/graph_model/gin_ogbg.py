@@ -8,13 +8,7 @@ from ogb.graphproppred.mol_encoder import AtomEncoder, BondEncoder
 class MLP(nn.Module):
     def __init__(self,
                  feat_size: int):
-        """Multilayer Perceptron (MLP)
-
-        Parameters
-        ----------
-        feat_size : int
-            Input and output feature size.
-        """
+        """Multilayer Perceptron (MLP)"""
         super(MLP, self).__init__()
         self.mlp = nn.Sequential(
             nn.Linear(feat_size, 2 * feat_size),
@@ -78,7 +72,7 @@ class OGBGGIN(nn.Module):
 
     def forward(self, graph, node_feat, edge_feat):
         if self.virtual_node:
-            virtual_emb = self.virtual_emb(torch.zeros(graph.batch_size).long().to(graph.device))
+            virtual_emb = self.virtual_emb.weight.expand(graph.batch_size, -1)
 
         hn = self.node_encoder(node_feat)
 
