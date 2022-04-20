@@ -683,7 +683,7 @@ def test_gin_conv(g, idtype, aggregator_type):
     h = gin(g, feat)
 
 @parametrize_dtype
-@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite'], exclude=['zero-degree']))
+@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite']))
 def test_gine_conv(g, idtype):
     ctx = F.ctx()
     g = g.astype(idtype).to(ctx)
