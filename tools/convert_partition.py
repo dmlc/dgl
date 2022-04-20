@@ -10,12 +10,20 @@ import pandas as pd
 from pyarrow import csv
 
 def read_feats(file_name):
+    """
+    Read feature file for nodes/edges
+    """
     attrs = csv.read_csv(file_name, read_options=pyarrow.csv.ReadOptions(autogenerate_column_names=True),
                          parse_options=pyarrow.csv.ParseOptions(delimiter=' '))
     num_cols = len(attrs.columns)
     return np.stack([attrs.columns[i].to_numpy() for i in range(num_cols)], 1)
 
-def processMetisPartitions (isCmdLineExec, pipelineArgs, args): 
+
+def gen_dgl_objs(cmd_line_exec, pipeline_args, args): 
+    """
+    convert_partition functionality moved into this function. 
+    This function received appropriate information from data processing pipeline via commandline args.
+    """
 
     input_dir = args.input_dir
     graph_name = args.graph_name
@@ -31,7 +39,7 @@ def processMetisPartitions (isCmdLineExec, pipelineArgs, args):
     self_loop_edges = None
     duplicate_edges = None
 
-    if removed_edges is not None:
+    if (removed_edges is not None) and (cmd_line_exec == True):
         removed_file = '{}/{}'.format(input_dir, removed_edges)
         removed_df = csv.read_csv(removed_file, read_options=pyarrow.csv.ReadOptions(autogenerate_column_names=True),
                               parse_options=pyarrow.csv.ParseOptions(delimiter=' '))
@@ -64,7 +72,6 @@ def processMetisPartitions (isCmdLineExec, pipelineArgs, args):
     ntypes = [(key, nid_ranges[key][0, 0]) for key in nid_ranges]
     ntypes.sort(key=lambda e: e[1])
     ntype_offset_np = np.array([e[1] for e in ntypes])
-    print( 'Rank: ', pipelineArgs[ 'rank' ], ' -- ntype Offsets: ', ntype_offset_np )
     ntypes = [e[0] for e in ntypes]
     ntypes_map = {e: i for i, e in enumerate(ntypes)}
     etypes = [(key, eid_ranges[key][0, 0]) for key in eid_ranges]
@@ -81,16 +88,16 @@ def processMetisPartitions (isCmdLineExec, pipelineArgs, args):
     edge_map_val = {etype: [] for etype in etypes}
 
     lst_num_parts = None
-    if isCmdLineExec == True: 
+    if cmd_line_exec == True: 
         lst_num_parts = [ x for x in range(num_parts) ]
     else: 
-        lst_num_parts = [ pipelineArgs[ 'rank' ] ]
+        lst_num_parts = [ pipeline_args[ 'rank' ] ]
 
     for part_id in lst_num_parts:
         part_dir = output_dir + '/part' + str(part_id)
         os.makedirs(part_dir, exist_ok=True)
 
-        if isCmdLineExec == True: 
+        if cmd_line_exec == True: 
             node_file = 'p{:03}-{}_nodes.txt'.format(part_id, graph_name)
             # The format of each line in the node file:
             # <node_id> <node_type> <weight1> ... <orig_type_node_id> <attributes>
@@ -107,23 +114,23 @@ def processMetisPartitions (isCmdLineExec, pipelineArgs, args):
             nids, ntype_ids, orig_type_nid = nodes.columns[0].to_numpy(), nodes.columns[1].to_numpy(), \
                 nodes.columns[2].to_numpy()
         else: 
-            #nids = pipelineArgs[ "node-nids" ]
-            #ntype_ids = pipelineArgs[ "node-ntype-ids" ]
-            #orig_type_nid = pipelineArgs[ "node-ntype-orig-ids" ]
+            #nids = pipeline_args[ "node-nids" ]
+            #ntype_ids = pipeline_args[ "node-ntype-ids" ]
+            #orig_type_nid = pipeline_args[ "node-ntype-orig-ids" ]
             #nodes = nids
 
-            nids = pipelineArgs["node-global-id" ]# = node_data[: ,0]
-            ntype_ids = pipelineArgs["node-ntype"]# = node_data[: ,1]
-            #pipelineArgs["node-ntype-orig-ids" ]# = node_data[:, 2]
-            #pipelineArgs["node-orig-id" ]# = node_data[:, 3]
-            orig_type_nid = pipelineArgs["node-local-node-type-id" ]# = node_data[:, 4]
+            nids = pipeline_args["node-global-id" ]# = node_data[: ,0]
+            ntype_ids = pipeline_args["node-ntype"]# = node_data[: ,1]
+            #pipeline_args["node-ntype-orig-ids" ]# = node_data[:, 2]
+            #pipeline_args["node-orig-id" ]# = node_data[:, 3]
+            orig_type_nid = pipeline_args["node-local-node-type-id" ]# = node_data[:, 4]
             nodes = nids
 
         # Determine the node ID range of different node types.
-        if (isCmdLineExec == True): 
+        if (cmd_line_exec == True): 
             node_id_start = num_nodes
         else: 
-            node_id_start = pipelineArgs["node-global-node-id-offset"]
+            node_id_start = pipeline_args["node-global-node-id-offset"]
 
         for ntype_name in nid_ranges: 
             ntype_id = ntypes_map[ntype_name]
@@ -142,7 +149,7 @@ def processMetisPartitions (isCmdLineExec, pipelineArgs, args):
             # In practice, this is not the same, in which we need more complex solution to
             # encode and decode node attributes.
             node_feats = {}
-            if isCmdLineExec == True: 
+            if cmd_line_exec == True: 
                 os.system('cut -d\' \' -f {}- {} > {}'.format(first_attr_col,
                                                       input_dir + '/' + node_file,
                                                       tmp_output))
@@ -160,21 +167,19 @@ def processMetisPartitions (isCmdLineExec, pipelineArgs, args):
                 # node-type-ids are already received by the current rank
                 # write the node-type-ids into a file and these are converted
                 # by the get_mag_data.py from node-type-ids to node-features. 
-                node_attrs = pipelineArgs[ 'node-features' ]
-                for k,v in node_feats.items (): 
-                    print( 'Rank: ', pipelineArgs[ 'rank' ], 'key: ', k, ' Value: ', v.size if v is not None else v )
+                node_feats = pipeline_args[ "node-features" ]
 
             dgl.data.utils.save_tensors(os.path.join(
                 part_dir, "node_feat.dgl"), node_feats)
         else: 
-            print( 'Rank: ', pipelineArgs[ 'rank' ], ': node_attr_dtype is not specified... not generating node_feat.dgl file')
+            print( 'Rank: ', pipeline_args[ 'rank' ], ': node_attr_dtype is not specified... not generating node_feat.dgl file')
 
 
 
         # The format of each line in the edge file:
         # <src_id> <dst_id> <orig_src_id> <orig_dst_id> <orig_edge_id> <edge_type> <attributes>
 
-        if isCmdLineExec == True: 
+        if cmd_line_exec == True: 
             edge_file = 'p{:03}-{}_edges.txt'.format(part_id, graph_name)
             tmp_output = workspace_dir + '/' + edge_file + '.tmp'
             os.system('awk \'{print $1, $2, $3, $4, $5, $6}\'' + ' {} > {}'.format(input_dir + '/' + edge_file,
@@ -185,12 +190,12 @@ def processMetisPartitions (isCmdLineExec, pipelineArgs, args):
             src_id, dst_id, orig_src_id, orig_dst_id, orig_edge_id, etype_ids = [
                 edges.columns[i].to_numpy() for i in range(num_cols)]
         else: 
-            src_id = pipelineArgs[ 'edge-src-id' ]
-            dst_id = pipelineArgs[ 'edge-dst-id' ]
-            orig_src_id = pipelineArgs[ 'edge-orig-src-id' ]
-            orig_dst_id = pipelineArgs[ 'edge-orig-dst-id' ]
-            orig_edge_id = pipelineArgs[ 'edge-orig-edge-id' ]
-            etype_ids = pipelineArgs[ 'edge-etype-ids' ]
+            src_id = pipeline_args[ 'edge-src-id' ]
+            dst_id = pipeline_args[ 'edge-dst-id' ]
+            orig_src_id = pipeline_args[ 'edge-orig-src-id' ]
+            orig_dst_id = pipeline_args[ 'edge-orig-dst-id' ]
+            orig_edge_id = pipeline_args[ 'edge-orig-edge-id' ]
+            etype_ids = pipeline_args[ 'edge-etype-ids' ]
 
         # Let's merge the self-loops and duplicated edges to the partition.
         src_id_list, dst_id_list = [src_id], [dst_id]
@@ -268,13 +273,22 @@ def processMetisPartitions (isCmdLineExec, pipelineArgs, args):
                            '/feat'] = th.as_tensor(edge_attrs[etype_ids == etype_id])
             dgl.data.utils.save_tensors(os.path.join(
                 part_dir, "edge_feat.dgl"), edge_feats)
+        else:
+            edge_feats = {}
+            edge_attrs = th.as_tensor([])
+            for etype_name in eid_ranges:
+                etype_id = etypes_map[etype_name]
+                edge_feats[etype_name +
+                           '/feat'] = th.as_tensor(edge_attrs)
+            dgl.data.utils.save_tensors(os.path.join(
+                part_dir, "edge_feat.dgl"), edge_feats)
 
         # Determine the edge ID range of different edge types.
-        if (isCmdLineExec == True): 
+        if (cmd_line_exec == True): 
             edge_id_start = num_edges
         else:
-            edge_id_start = pipelineArgs[ "edge-global-edge-id-offset" ]
-            num_edges = pipelineArgs[ "edge-global-edge-id-offset" ]
+            edge_id_start = pipeline_args[ "edge-global-edge-id-offset" ]
+            num_edges = pipeline_args[ "edge-global-edge-id-offset" ]
 
         for etype_name in eid_ranges:
             etype_id = etypes_map[etype_name]
@@ -374,13 +388,9 @@ def processMetisPartitions (isCmdLineExec, pipelineArgs, args):
                                                 'edge_feats': edge_feat_file,
                                                 'part_graph': part_graph_file}
 
-    if (isCmdLineExec == True): 
+    if (cmd_line_exec == True): 
         with open('{}/{}.json'.format(output_dir, graph_name ), 'w') as outfile:
             json.dump(part_metadata, outfile, sort_keys=True, indent=4)
-
-    '''
-    end of the function -- processMetisPartitions
-    '''
 
     return part_metadata, output_dir, graph_name
 
@@ -409,5 +419,5 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    processMetisPartitions( False, None, args )
+    gen_dgl_objs( False, None, args )
     

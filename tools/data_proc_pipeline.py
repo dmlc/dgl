@@ -1,19 +1,18 @@
-
-import sys
-import math
 import argparse
 import numpy as np
-import torch
-import torch.distributed as dist
 import torch.multiprocessing as mp
 
-from read_nodes import include_recv_proc_nodes, include_recv_proc_edges, \
-                        read_nodes_file, read_edge_file, \
-                        read_node_features_file, read_edge_features_file
-from read_metis_partitions import read_metis_partitions
-from proc_init import run, init_process
+from initialize import proc_exec, init_process 
 
 def log_params(params): 
+    """
+    Print all the arguments for debugging purposes.
+
+    Parameters:
+    -----------
+    params: Argument Parser structure listing all the pre-defined parameters
+    """
+
     print('Input Dir: ', params.input_dir)
     print('Graph Name: ', params.graph_name)
     print('Schema File: ', params.schema)
@@ -32,14 +31,24 @@ def log_params(params):
     print('Metis partitions: ', params.metis_partitions)
 
 
-def localRun(params): 
+def start_local_run(params): 
+    """
+    Function designed to run distributed implementation on a single machine
+
+    Parameters:
+    -----------
+    params : Argument Parser structure with pre-determined arguments as defined
+             at the bottom of this file.
+    """
+
     log_params(params)
-    size = params.world_size
     processes = []
     mp.set_start_method("spawn")
 
-    for rank in range(size):
-        p = mp.Process(target=init_process, args=(rank, size, run, params))
+    #Invoke `target` function from each of the spawned process for distributed 
+    #implementation
+    for rank in range(params.world_size):
+        p = mp.Process(target=init_process, args=(rank, params.world_size, proc_exec, params))
         p.start()
         processes.append(p)
 
@@ -48,6 +57,11 @@ def localRun(params):
 
 
 if __name__ == "__main__":
+    """
+    Start of execution from this point. 
+    Invoke the appropriate function to begin execution
+    """
+    #arguments which are already needed by the existing implementation of convert_partition.py
     parser = argparse.ArgumentParser(description='Construct graph partitions')
     parser.add_argument('--input-dir', required=True, type=str,
                      help='The directory path that contains the partition results.')
@@ -70,6 +84,7 @@ if __name__ == "__main__":
     parser.add_argument('--removed-edges', help='a file that contains the removed self-loops and duplicated edges',
                     default=None, type=str)
 
+    #arguments needed for the distributed implementation
     parser.add_argument('--world-size', help='no. of processes to spawn',
                     default=1, type=int, required=True)
     parser.add_argument('--nodes-file', help='filename of the nodes metadata', 
@@ -84,4 +99,4 @@ if __name__ == "__main__":
                     default=None, type=str)
     params = parser.parse_args()
 
-    localRun(params)
+    start_local_run(params)
