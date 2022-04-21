@@ -23,7 +23,7 @@ general_pipeline:
   optimizer:
     name: Adam
     lr: 0.01
-    weight_decay: 3e-6
+    weight_decay: 0.000003
   lr_scheduler:
     name: ReduceLROnPlateau
     mode: max
