@@ -74,6 +74,9 @@ def main(run):
     cfg["model"]["data_info"] = {
         "out_size": data.num_tasks
     }
+    if cfg["model_name"] == 'pna':
+        in_deg = torch.cat([g.in_degrees() for (g, _) in data[data.train_idx]])
+        cfg["model"]["data_info"]["delta"] = torch.mean(torch.log(in_deg + 1))
     model = {{ model_class_name }}(**cfg["model"])
     model = model.to(device)
 
@@ -92,7 +95,7 @@ def main(run):
             torch.save(model.state_dict(), save_path)
         print('Run {:d} | Epoch {:d} | Val Metric {:.4f} | Best Val Metric {:.4f}'.format(
               run, epoch, val_metric, best_val_metric))
-        lr_scheduler.step()
+        lr_scheduler.step(val_metric)
 
     model.load_state_dict(torch.load(save_path))
     test_metric = evaluate(device, test_loader, model)
