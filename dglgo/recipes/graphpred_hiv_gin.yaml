@@ -19,6 +19,10 @@ general_pipeline:
     name: Adam
     lr: 0.001
     weight_decay: 0
+  lr_scheduler:
+    name: StepLR
+    step_size: 100
+    gamma: 1
   loss: BCEWithLogitsLoss
   num_epochs: 100             # Number of training epochs
   save_path: model.pth        # Path to save the model

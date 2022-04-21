@@ -23,7 +23,8 @@ class GraphpredPipelineCfg(BaseModel):
     eval_batch_size: int = 32
     num_workers: int = 4
     optimizer: dict = {"name": "Adam", "lr": 0.001, "weight_decay": 0}
-    lr_scheduler: dict = {"name": "StepLR", "step_size": 100, "gamma": 1, "verbose": True}
+    # Default to no lr decay
+    lr_scheduler: dict = {"name": "StepLR", "step_size": 100, "gamma": 1}
     loss: str = "BCEWithLogitsLoss"
     num_epochs: int = 100
     save_path: str = "model.pth"
