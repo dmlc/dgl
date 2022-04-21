@@ -154,9 +154,9 @@ class PNA(nn.Module):
         embed_size : int
             Embedding size.
         aggregators : str
-            Aggregation function names separated by comma, can include mean, max, min, std, sum
+            Aggregation function names separated by space, can include mean, max, min, std, sum
         scalers : str
-            Scaler function names separated by comma, can include identity, amplification, and attenuation
+            Scaler function names separated by space, can include identity, amplification, and attenuation
         dropout : float
             Dropout rate.
         batch_norm : bool
@@ -183,14 +183,14 @@ class PNA(nn.Module):
         if aggregators is None:
             aggregators = ['mean', 'max', 'min', 'std']
         else:
-            aggregators = aggregators.split(',')
+            aggregators = [agg.strip() for agg in aggregators.split(' ')]
             assert set(aggregators).issubset({'mean', 'max', 'min', 'std', 'sum'}), \
                 "Expect aggregators to be a subset of ['mean', 'max', 'min', 'std', 'sum'], \
                     got {}".format(aggregators)
         if scalers is None:
             scalers = ['identity', 'amplification', 'attenuation']
         else:
-            scalers = scalers.split(',')
+            scalers = [scl.strip() for scl in scalers.split(' ')]
             assert set(scalers).issubset({'identity', 'amplification', 'attenuation'}), \
                 "Expect scalers to be a subset of ['identity', 'amplification', 'attenuation'], \
                     got {}".format(scalers)
