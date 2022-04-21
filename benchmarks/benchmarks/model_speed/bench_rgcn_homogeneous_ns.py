@@ -180,9 +180,11 @@ def track_time(data):
     device = utils.get_bench_device()
 
     if data == 'am':
+        batch_size = 64
         n_bases = 40
         l2norm = 5e-4
     elif data == 'ogbn-mag':
+        batch_size = 1024
         n_bases = 2
         l2norm = 0
     else:
@@ -190,7 +192,6 @@ def track_time(data):
 
     fanouts = [25,15]
     n_layers = 2
-    batch_size = 1024
     n_hidden = 64
     dropout = 0.5
     use_self_loop = True
