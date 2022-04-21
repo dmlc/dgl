@@ -69,7 +69,8 @@ class MLP(nn.Module):
             for i in range(num_layers - 1):
                 self.layers.append(nn.Linear(in_feat_size // 2 ** i,
                                              in_feat_size // 2 ** (i + 1)))
-            self.layers.append(in_feat_size // 2 ** (num_layers - 1), out_feat_size)
+            self.layers.append(nn.Linear(in_feat_size // 2 ** (num_layers - 1),
+                                         out_feat_size))
         else:
             self.layers.append(nn.Linear(in_feat_size, out_feat_size))
             for _ in range(num_layers - 1):
