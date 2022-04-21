@@ -60,7 +60,6 @@ class GraphpredPipeline(PipelineBase):
                 "pipeline_name": self.pipeline_name,
                 "device": "cpu",
                 "data": {"name": data.name},
-                "model_name": model.value,
                 "model": {"name": model.value},
                 "general_pipeline": {}
             }
@@ -107,7 +106,7 @@ class GraphpredPipeline(PipelineBase):
         else:
             generated_user_cfg["data"].pop("name")
         generated_user_cfg.pop("pipeline_name")
-        generated_user_cfg["model"].pop("name")
+        generated_user_cfg["model_name"] = generated_user_cfg["model"].pop("name")
         generated_user_cfg["general_pipeline"]["optimizer"].pop("name")
         generated_user_cfg["general_pipeline"]["lr_scheduler"].pop("name")
 
