@@ -21,7 +21,9 @@ def train(device, loader, model, criterion, optimizer):
 
         pred = model(g, node_feat, edge_feat)
         optimizer.zero_grad()
-        loss = criterion(pred.float(), labels.float())
+        # ignore nan targets (unlabeled) when computing training loss
+        is_labeled = labels == labels
+        loss = criterion(pred.float()[is_labeled], labels.float()[is_labeled])
         loss.backward()
         optimizer.step()
 
