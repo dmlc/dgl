@@ -92,6 +92,7 @@ def main(run):
             torch.save(model.state_dict(), save_path)
         print('Run {:d} | Epoch {:d} | Val Metric {:.4f} | Best Val Metric {:.4f}'.format(
               run, epoch, val_metric, best_val_metric))
+        lr_scheduler.step()
 
     model.load_state_dict(torch.load(save_path))
     test_metric = evaluate(device, test_loader, model)
