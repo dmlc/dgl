@@ -154,27 +154,9 @@ class PNA(nn.Module):
         embed_size : int
             Embedding size.
         aggregators : str
-            Aggregation function names separated by comma(each aggregator specifies a way to
-            aggregate messages from neighbours), selected from:
-
-            * ``mean``: the mean of neighbour messages
-
-            * ``max``: the maximum of neighbour messages
-
-            * ``min``: the minimum of neighbour messages
-
-            * ``std``: the standard deviation of neighbour messages
-
-            * ``sum``: the sum of neighbour messages
+            Aggregation function names separated by comma, can include mean, max, min, std, sum
         scalers : str
-            Scaler function names separated by comma, selected from:
-
-            * ``identity``: no scaling
-
-            * ``amplification``: multiply the aggregated message by :math:`\log(d+1)/\delta`,
-              where :math:`d` is the degree of the node.
-
-            * ``attenuation``: multiply the aggregated message by :math:`\delta/\log(d+1)`
+            Scaler function names separated by comma, can include identity, amplification, and attenuation
         dropout : float
             Dropout rate.
         batch_norm : bool

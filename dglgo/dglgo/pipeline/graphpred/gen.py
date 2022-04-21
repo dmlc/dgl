@@ -60,6 +60,7 @@ class GraphpredPipeline(PipelineBase):
                 "pipeline_name": self.pipeline_name,
                 "device": "cpu",
                 "data": {"name": data.name},
+                "model_name": model.value,
                 "model": {"name": model.value},
                 "general_pipeline": {}
             }
