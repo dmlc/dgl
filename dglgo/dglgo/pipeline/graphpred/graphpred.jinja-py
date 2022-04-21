@@ -80,6 +80,8 @@ def main(run):
     criterion = nn.{{ user_cfg.general_pipeline.loss }}()
     optimizer = torch.optim.{{ user_cfg.general_pipeline.optimizer.name }}(
         model.parameters(), **pipeline_cfg["optimizer"])
+    lr_scheduler = torch.optim.lr_scheduler.{{ user_cfg.general_pipeline.lr_scheduler.name }}(
+        optimizer, **pipeline_cfg["lr_scheduler"])
     best_val_metric = 0.
 
     for epoch in range(pipeline_cfg['num_epochs']):

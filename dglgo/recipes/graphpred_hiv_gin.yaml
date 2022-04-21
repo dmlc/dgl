@@ -11,7 +11,7 @@ model:
   dropout: 0.5                # Dropout rate.
   virtual_node: true          # Whether to use virtual node.
 general_pipeline:
-  num_runs: 5                 # Number of experiments to run
+  num_runs: 10                # Number of experiments to run
   train_batch_size: 32        # Graph batch size when training
   eval_batch_size: 32         # Graph batch size when evaluating
   num_workers: 4              # Number of workers for data loading
@@ -20,5 +20,5 @@ general_pipeline:
     lr: 0.001
     weight_decay: 0
   loss: BCEWithLogitsLoss
-  num_epochs: 50              # Number of training epochs
+  num_epochs: 100             # Number of training epochs
   save_path: model.pth        # Path to save the model

@@ -23,6 +23,7 @@ class GraphpredPipelineCfg(BaseModel):
     eval_batch_size: int = 32
     num_workers: int = 4
     optimizer: dict = {"name": "Adam", "lr": 0.001, "weight_decay": 0}
+    lr_scheduler: dict = {"name": "StepLR", "step_size": 100, "gamma": 1, "verbose": True}
     loss: str = "BCEWithLogitsLoss"
     num_epochs: int = 100
     save_path: str = "model.pth"
@@ -106,9 +107,11 @@ class GraphpredPipeline(PipelineBase):
         generated_user_cfg.pop("pipeline_name")
         generated_user_cfg["model"].pop("name")
         generated_user_cfg["general_pipeline"]["optimizer"].pop("name")
+        generated_user_cfg["general_pipeline"]["lr_scheduler"].pop("name")
 
         generated_train_cfg = copy.deepcopy(user_cfg_dict["general_pipeline"])
         generated_train_cfg["optimizer"].pop("name")
+        generated_train_cfg["lr_scheduler"].pop("name")
 
         if user_cfg_dict["data"].get("split_ratio", None) is not None:
             render_cfg["data_initialize_code"] = "{}, split_ratio={}".format(render_cfg["data_initialize_code"], user_cfg_dict["data"]["split_ratio"])
