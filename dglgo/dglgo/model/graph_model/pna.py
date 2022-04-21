@@ -183,14 +183,14 @@ class PNA(nn.Module):
         if aggregators is None:
             aggregators = ['mean', 'max', 'min', 'std']
         else:
-            aggregators = aggregators.split()
+            aggregators = aggregators.split(',')
             assert set(aggregators).issubset({'mean', 'max', 'min', 'std', 'sum'}), \
                 "Expect aggregators to be a subset of ['mean', 'max', 'min', 'std', 'sum'], \
                     got {}".format(aggregators)
         if scalers is None:
             scalers = ['identity', 'amplification', 'attenuation']
         else:
-            scalers = scalers.split()
+            scalers = scalers.split(',')
             assert set(scalers).issubset({'identity', 'amplification', 'attenuation'}), \
                 "Expect scalers to be a subset of ['identity', 'amplification', 'attenuation'], \
                     got {}".format(scalers)
