@@ -4,6 +4,7 @@ import torch.nn as nn
 from dgl.data import AsGraphPredDataset
 from dgl.dataloading import GraphDataLoader
 from sklearn.metrics import roc_auc_score
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 from tqdm import tqdm
 {{ data_import_code }}
 
@@ -95,7 +96,11 @@ def main(run):
             torch.save(model.state_dict(), save_path)
         print('Run {:d} | Epoch {:d} | Val Metric {:.4f} | Best Val Metric {:.4f}'.format(
               run, epoch, val_metric, best_val_metric))
-        lr_scheduler.step(val_metric)
+
+        if isinstance(lr_scheduler, ReduceLROnPlateau):
+            lr_scheduler.step(val_metric)
+        else:
+            lr_scheduler.step()
 
     model.load_state_dict(torch.load(save_path))
     test_metric = evaluate(device, test_loader, model)
