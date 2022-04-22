@@ -1,6 +1,6 @@
 version: 0.0.1
 pipeline_name: graphpred
-device: cpu                   # Torch device name, e.q. cpu or cuda or cuda:0
+device: cuda:0                # Torch device name, e.q. cpu or cuda or cuda:0
 data:
   name: ogbg-molhiv
   split_ratio:                # Ratio to generate data split, for example set to [0.8, 0.1, 0.1] for 80% train/10% val/10% test. Leave blank to use builtin split in original dataset

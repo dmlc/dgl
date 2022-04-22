@@ -64,6 +64,8 @@ def evaluate(device, loader, model):
 def main(run):
     {{ user_cfg_str }}
     device = cfg['device']
+    if not torch.cuda.is_available():
+        device = 'cpu'
     pipeline_cfg = cfg['general_pipeline']
     save_path = pipeline_cfg['save_path']
 

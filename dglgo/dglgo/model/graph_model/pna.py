@@ -206,7 +206,7 @@ class PNA(nn.Module):
                                                         dropout=dropout,
                                                         batch_norm=batch_norm,
                                                         residual=residual,
-                                                        num_mlp_layers=num_layers)
+                                                        num_mlp_layers=num_mlp_layers)
                                           for _ in range(num_layers)])
 
         if readout == 'sum':
