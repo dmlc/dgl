@@ -56,4 +56,4 @@ class GAT(nn.Module):
         for l in range(self.num_layers):
             h = self.gat_layers[l](self.g, h)
             h = h.flatten(1) if l != self.num_layers - 1 else h.mean(1)
-        return logits
+        return h
