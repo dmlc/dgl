@@ -247,6 +247,7 @@ class HeteroGraphIndex(ObjectBase):
         HeteroGraphIndex
             The pinned graph index.
         """
+        #Return the context of this graph index.Return the context of this graph index.Return the context of this graph index.Return the context of this graph index.Return the context of this graph index.Return the context of this graph index.
         return _CAPI_DGLHeteroPinMemory_(self)
 
     def unpin_memory_(self):
