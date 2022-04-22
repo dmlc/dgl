@@ -178,7 +178,7 @@ def test_pickling_is_pinned(idtype):
     for graph in [g, hg]:
         assert not graph.is_pinned()
         graph.pin_memory_()
-        assert graph.is_pinned()
+        assert not graph.is_pinned()
         pg = _reconstruct_pickle(graph)
         assert pg.is_pinned()
         pg.unpin_memory_()
