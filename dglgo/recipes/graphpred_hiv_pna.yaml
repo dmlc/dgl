@@ -32,5 +32,6 @@ general_pipeline:
     min_lr: 0.0001
     verbose: true
   loss: BCEWithLogitsLoss
+  metric: roc_auc_score
   num_epochs: 200             # Number of training epochs
   save_path: model.pth        # Path to save the model
