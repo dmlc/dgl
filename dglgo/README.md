@@ -112,6 +112,7 @@ will list the available recipes:
 ===============================================================================
 | Filename                       |  Pipeline           | Dataset              |
 ===============================================================================
+| graphpred_pcba_gin.yaml        |  graphpred          | ogbg-molpcba         |
 | graphpred_hiv_pna.yaml         |  graphpred          | ogbg-molhiv          |
 | graphpred_hiv_gin.yaml         |  graphpred          | ogbg-molhiv          |
 | linkpred_citation2_sage.yaml   |  linkpred           | ogbl-citation2       |
