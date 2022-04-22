@@ -32,7 +32,9 @@ def calc_rocauc(y_true, y_pred):
     for i in range(y_true.shape[1]):
         # AUC is only defined when there is at least one positive and negative datapoint.
         if np.sum(y_true[:, i] == 1) > 0 and np.sum(y_true[:, i] == 0) > 0:
-            rocauc_list.append(roc_auc_score(y_true, y_pred))
+            # ignore nan values
+            is_labeled = y_true[:,i] == y_true[:,i]
+            rocauc_list.append(roc_auc_score(y_true[is_labeled, i], y_pred[is_labeled, i]))
 
     return sum(rocauc_list) / len(rocauc_list)
 
