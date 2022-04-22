@@ -26,6 +26,7 @@ class GraphpredPipelineCfg(BaseModel):
     # Default to no lr decay
     lr_scheduler: dict = {"name": "StepLR", "step_size": 100, "gamma": 1}
     loss: str = "BCEWithLogitsLoss"
+    metric: str = "roc_auc_score"
     num_epochs: int = 100
     save_path: str = "model.pth"
 

@@ -1,9 +1,9 @@
 import numpy as np
+import sklearn
 import torch
 import torch.nn as nn
 from dgl.data import AsGraphPredDataset
 from dgl.dataloading import GraphDataLoader
-from sklearn.metrics import roc_auc_score
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from tqdm import tqdm
 {{ data_import_code }}
@@ -27,16 +27,18 @@ def train(device, loader, model, criterion, optimizer):
         loss.backward()
         optimizer.step()
 
-def calc_rocauc(y_true, y_pred):
-    rocauc_list = []
+def calc_metric(y_true, y_pred):
+    task_metric_list = []
     for i in range(y_true.shape[1]):
         # AUC is only defined when there is at least one positive and negative datapoint.
         if np.sum(y_true[:, i] == 1) > 0 and np.sum(y_true[:, i] == 0) > 0:
             # ignore nan values
             is_labeled = y_true[:,i] == y_true[:,i]
-            rocauc_list.append(roc_auc_score(y_true[is_labeled, i], y_pred[is_labeled, i]))
+            task_metric = sklearn.metrics.{{ user_cfg.general_pipeline.metric }}(
+                y_true[is_labeled, i], y_pred[is_labeled, i])
+            task_metric_list.append(task_metric)
 
-    return sum(rocauc_list) / len(rocauc_list)
+    return sum(task_metric_list) / len(task_metric_list)
 
 def evaluate(device, loader, model):
     model.eval()
@@ -57,7 +59,7 @@ def evaluate(device, loader, model):
     y_true = torch.cat(y_true, dim=0).numpy()
     y_pred = torch.cat(y_pred, dim=0).numpy()
 
-    return calc_rocauc(y_true, y_pred)
+    return calc_metric(y_true, y_pred)
 
 def main(run):
     {{ user_cfg_str }}
