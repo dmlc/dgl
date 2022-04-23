@@ -82,6 +82,8 @@ def main(run):
     model_cfg = cfg["model"]
     cfg["model"]["data_info"] = {
         "name": cfg["data_name"],
+        "node_feat_size": data[0].ndata['feat'].shape[-1],
+        "edge_feat_size": data[0].edata['feat'].shape[-1],
         "out_size": data.num_tasks
     }
     if cfg["model_name"] == 'pna':

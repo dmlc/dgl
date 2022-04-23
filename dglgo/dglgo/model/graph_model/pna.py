@@ -202,7 +202,7 @@ class PNA(nn.Module):
             self.node_encoder = AtomEncoder(embed_size)
         else:
             # Handle other datasets
-            self.node_encoder = lambda x: x
+            self.node_encoder = nn.Linear(data_info['node_feat_size'], embed_size)
         self.conv_layers = nn.ModuleList([SimplePNAConv(feat_size=embed_size,
                                                         aggregators=aggregators,
                                                         scalers=scalers,
