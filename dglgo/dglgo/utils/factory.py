@@ -164,7 +164,7 @@ DataFactory.register(
     import_code="from dgl.data import CSVDataset",
     extra_args={"data_path": "./"},
     class_name="CSVDataset({})",
-    allowed_pipeline=["nodepred", "nodepred-ns", "linkpred"])
+    allowed_pipeline=["nodepred", "nodepred-ns", "linkpred", "graphpred"])
 
 DataFactory.register(
     "reddit",
