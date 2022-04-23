@@ -120,6 +120,8 @@ class CSVDataset(DGLDataset):
         # construct graphs
         self.graphs, self.data = DGLGraphConstructor.construct_graphs(
             node_data, edge_data, graph_data)
+        if len(self.data) == 1:
+            self.labels = list(self.data.values())[0]
 
     def has_cache(self):
         graph_path = os.path.join(self.save_path,
@@ -148,7 +150,9 @@ class CSVDataset(DGLDataset):
         else:
             g = self._transform(self.graphs[i])
 
-        if len(self.data) > 0:
+        if len(self.data) == 1:
+            return g, self.labels[i]
+        elif len(self.data) > 0:
             data = {k: v[i] for (k, v) in self.data.items()}
             return g, data
         else:
