@@ -198,7 +198,11 @@ class PNA(nn.Module):
         self.aggregators = aggregators
         self.scalers = scalers
 
-        self.node_encoder = AtomEncoder(embed_size)
+        if data_info['name'] in ['ogbg-molhiv', 'ogbg-molpcba']:
+            self.node_encoder = AtomEncoder(embed_size)
+        else:
+            # Handle other datasets
+            self.node_encoder = lambda x: x
         self.conv_layers = nn.ModuleList([SimplePNAConv(feat_size=embed_size,
                                                         aggregators=aggregators,
                                                         scalers=scalers,

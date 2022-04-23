@@ -50,13 +50,20 @@ class OGBGGIN(nn.Module):
         self.num_layers = num_layers
         self.virtual_node = virtual_node
 
-        self.node_encoder = AtomEncoder(embed_size)
         self.edge_encoders = nn.ModuleList()
-        self.conv_layers = nn.ModuleList()
+        if data_info['name'] in ['ogbg-molhiv', 'ogbg-molpcba']:
+            self.node_encoder = AtomEncoder(embed_size)
+            for _ in range(num_layers):
+                self.edge_encoders.append(BondEncoder(embed_size))
+        else:
+            # Handle other datasets
+            self.node_encoder = lambda x: x
+            for _ in range(num_layers):
+                self.edge_encoders.append(lambda x: x)
 
+        self.conv_layers = nn.ModuleList()
         for _ in range(num_layers):
             self.conv_layers.append(GINEConv(MLP(embed_size)))
-            self.edge_encoders.append(BondEncoder(embed_size))
 
         self.dropout = nn.Dropout(dropout)
         self.pool = AvgPooling()

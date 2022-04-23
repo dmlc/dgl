@@ -81,6 +81,7 @@ def main(run):
     # create model
     model_cfg = cfg["model"]
     cfg["model"]["data_info"] = {
+        "name": cfg["data_name"]
         "out_size": data.num_tasks
     }
     if cfg["model_name"] == 'pna':
