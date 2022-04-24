@@ -144,6 +144,8 @@ class CSVDataset(DGLDataset):
         graph_path = os.path.join(self.save_path,
                                   self.name + '.bin')
         self.graphs, self.data = load_graphs(graph_path)
+        if len(self.data) == 1:
+            self.labels = list(self.data.values())[0]
 
     def __getitem__(self, i):
         if F.is_tensor(i) and F.ndim(i) == 1:
