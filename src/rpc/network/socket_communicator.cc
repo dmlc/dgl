@@ -57,7 +57,7 @@ bool SocketSender::ConnectReceiver(const std::string& addr, int recv_id) {
   return true;
 }
 
-bool SocketSender::Connect(){
+bool SocketSender::Connect() {
   // Create N sockets for Receiver
   int receiver_count = static_cast<int>(receiver_addrs_.size());
   if (max_thread_count_ == 0 || max_thread_count_ > receiver_count) {
@@ -102,7 +102,7 @@ bool SocketSender::Connect(){
   return true;
 }
 
-void SocketSender::Send(const rpc::RPCMessage& msg, int recv_id){
+void SocketSender::Send(const rpc::RPCMessage& msg, int recv_id) {
   std::shared_ptr<std::string> zerocopy_blob(new std::string());
   StreamWithBuffer zc_write_strm(zerocopy_blob.get(), true);
   zc_write_strm.Write(msg);
@@ -276,7 +276,7 @@ bool SocketReceiver::Wait(const std::string &addr, int num_sender) {
   return true;
 }
 
-void SocketReceiver::Recv(rpc::RPCMessage* msg){
+void SocketReceiver::Recv(rpc::RPCMessage* msg) {
   Message rpc_meta_msg;
   int send_id;
   CHECK_EQ(Recv(

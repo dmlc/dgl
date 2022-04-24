@@ -1,8 +1,12 @@
+/*!
+ *  Copyright (c) 2022 by Contributors
+ * \file net_type.h
+ * \brief Base communicator for DGL distributed training.
+ */
 #ifndef DGL_RPC_NET_TYPE_H_
 #define DGL_RPC_NET_TYPE_H_
 
 #include "rpc_msg.h"
-#include <string>
 
 namespace dgl {
 namespace rpc {
@@ -66,7 +70,7 @@ struct RPCReceiver : RPCBase {
   virtual void Recv(RPCMessage *msg) = 0;
 };
 
-} // namespace rpc
-} // namespace dgl
+}  // namespace rpc
+}  // namespace dgl
 
-#endif // DGL_RPC_NET_TYPE_H_
+#endif  // DGL_RPC_NET_TYPE_H_

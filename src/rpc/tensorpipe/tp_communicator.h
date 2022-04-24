@@ -30,7 +30,7 @@ typedef Queue<RPCMessage> RPCMessageQueue;
  * TPSender is the communicator implemented by tcp socket.
  */
 class TPSender : public RPCSender {
-public:
+ public:
   /*!
    * \brief Sender constructor
    * \param queue_size size of message queue
@@ -75,7 +75,7 @@ public:
     return net_type;
   }
 
-private:
+ private:
   /*!
    * \brief global context of tensorpipe
    */
@@ -99,7 +99,7 @@ private:
  * Tensorpipe Receiver is the communicator implemented by tcp socket.
  */
 class TPReceiver : public RPCReceiver {
-public:
+ public:
   /*!
    * \brief Receiver constructor
    * \param queue_size size of message queue.

@@ -125,7 +125,8 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateSender")
   } else {
     LOG(FATAL) << "Unknown communicator type for rpc sender: " << type;
   }
-  LOG(INFO) << "Sender with NetType~" << RPCContext::getInstance()->sender->NetType() << " is created.";
+  LOG(INFO) << "Sender with NetType~"
+            << RPCContext::getInstance()->sender->NetType() << " is created.";
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateReceiver")
@@ -143,7 +144,8 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateReceiver")
   } else {
     LOG(FATAL) << "Unknown communicator type for rpc receiver: " << type;
   }
-  LOG(INFO) << "Receiver with NetType~" << RPCContext::getInstance()->receiver->NetType() << " is created.";
+  LOG(INFO) << "Receiver with NetType~"
+            << RPCContext::getInstance()->receiver->NetType() << " is created.";
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFinalizeSender")
