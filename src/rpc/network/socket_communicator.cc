@@ -20,8 +20,6 @@
 #include <unistd.h>
 #endif  // _WIN32
 
-#include "../rpc.h"
-
 namespace dgl {
 namespace network {
 

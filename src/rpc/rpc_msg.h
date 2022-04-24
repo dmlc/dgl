@@ -72,4 +72,9 @@ DGL_DEFINE_OBJECT_REF(RPCMessageRef, RPCMessage);
 
 }  // namespace rpc
 }  // namespace dgl
+
+namespace dmlc {
+DMLC_DECLARE_TRAITS(has_saveload, dgl::rpc::RPCMessage, true);
+}  // namespace dmlc
+
 #endif  // DGL_RPC_RPC_MSG_H_
