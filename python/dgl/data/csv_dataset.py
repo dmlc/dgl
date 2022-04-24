@@ -1,7 +1,8 @@
 import os
 import numpy as np
 from .dgl_dataset import DGLDataset
-from .utils import save_graphs, load_graphs
+from .utils import save_graphs, load_graphs, Subset
+from .. import backend as F
 from ..base import DGLError
 
 
@@ -145,6 +146,9 @@ class CSVDataset(DGLDataset):
         self.graphs, self.data = load_graphs(graph_path)
 
     def __getitem__(self, i):
+        if F.is_tensor(i) and F.ndim(i) == 1:
+            return Subset(self, F.copy_to(i, F.cpu()))
+
         if self._transform is None:
             g = self.graphs[i]
         else:
