@@ -17,11 +17,10 @@
 #include <vector>
 #include <atomic>
 #include "./queue.h"
+#include "../net_type.h"
 
 namespace dgl {
 namespace rpc {
-
-class RPCMessage;
 
 typedef Queue<RPCMessage> RPCMessageQueue;
 
@@ -30,8 +29,8 @@ typedef Queue<RPCMessage> RPCMessageQueue;
  *
  * TPSender is the communicator implemented by tcp socket.
  */
-class TPSender {
- public:
+class TPSender : public RPCSender {
+public:
   /*!
    * \brief Sender constructor
    * \param queue_size size of message queue
@@ -54,25 +53,29 @@ class TPSender {
    *
    * ConnectReceiver() is not thread-safe and only one thread can invoke this API.
    */
-  bool ConnectReceiver(const std::string& addr, int recv_id);
+  bool ConnectReceiver(const std::string& addr, int recv_id) override;
 
   /*!
    * \brief Send RPCMessage to specified Receiver.
-   * \param msg data message \param recv_id receiver's ID
+   * \param msg data message
+   * \param recv_id receiver's ID
    */
-  void Send(const RPCMessage& msg, int recv_id);
+  void Send(const RPCMessage& msg, int recv_id) override;
 
   /*!
    * \brief Finalize TPSender
    */
-  void Finalize();
+  void Finalize() override;
 
   /*!
    * \brief Communicator type: 'tp'
    */
-  inline std::string Type() const { return std::string("tp"); }
+  const std::string &NetType() const override {
+    static const std::string net_type = "tensorpipe";
+    return net_type;
+  }
 
- private:
+private:
   /*!
    * \brief global context of tensorpipe
    */
@@ -95,8 +98,8 @@ class TPSender {
  *
  * Tensorpipe Receiver is the communicator implemented by tcp socket.
  */
-class TPReceiver {
- public:
+class TPReceiver : public RPCReceiver {
+public:
   /*!
    * \brief Receiver constructor
    * \param queue_size size of message queue.
@@ -121,33 +124,28 @@ class TPReceiver {
    *
    * Wait() is not thread-safe and only one thread can invoke this API.
    */
-  bool Wait(const std::string &addr, int num_sender, bool blocking = true);
+  bool Wait(const std::string &addr, int num_sender) override;
 
   /*!
    * \brief Recv RPCMessage from Sender. Actually removing data from queue.
    * \param msg pointer of RPCmessage
-   * \param send_id which sender current msg comes from
-   * \return Status code
-   *
-   * (1) The Recv() API is blocking, which will not
-   *     return until getting data from message queue.
-   * (2) The Recv() API is thread-safe.
-   * (3) Memory allocated by communicator but will not own it after the function
-   * returns.
    */
-  void Recv(RPCMessage* msg);
+  void Recv(RPCMessage* msg) override;
 
   /*!
    * \brief Finalize SocketReceiver
    *
    * Finalize() is not thread-safe and only one thread can invoke this API.
    */
-  void Finalize();
+  void Finalize() override;
 
   /*!
    * \brief Communicator type: 'tp' (tensorpipe)
    */
-  inline std::string Type() const { return std::string("tp"); }
+  const std::string &NetType() const override {
+    static const std::string net_type = "tensorpipe";
+    return net_type;
+  }
 
   /*!
    * \brief Issue a receive request on pipe, and push the result into queue

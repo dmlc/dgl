@@ -259,7 +259,7 @@ def run(args, device, data):
 
 def main(args):
     print(socket.gethostname(), 'Initializing DGL dist')
-    dgl.distributed.initialize(args.ip_config)
+    dgl.distributed.initialize(args.ip_config, net_type='socket')
     if not args.standalone:
         print(socket.gethostname(), 'Initializing DGL process group')
         th.distributed.init_process_group(backend=args.backend)

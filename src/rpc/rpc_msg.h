@@ -7,6 +7,8 @@
 #define DGL_RPC_RPC_MSG_H_
 
 #include <dgl/runtime/object.h>
+#include <dgl/runtime/ndarray.h>
+#include <dgl/zerocopy_serializer.h>
 
 #include <string>
 #include <vector>

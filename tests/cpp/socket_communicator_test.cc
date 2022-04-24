@@ -64,7 +64,7 @@ TEST(SocketCommunicatorTest, SendAndRecv) {
 void start_client() {
   SocketSender sender(kQueueSize, kThreadNum);
   for (int i = 0; i < kNumReceiver; ++i) {
-    sender.AddReceiver(ip_addr[i], i);
+    sender.ConnectReceiver(ip_addr[i], i);
   }
   sender.Connect();
   for (int i = 0; i < kNumMessage; ++i) {
@@ -170,7 +170,7 @@ static void start_client() {
                        std::istreambuf_iterator<char>());
   t.close();
   SocketSender sender(kQueueSize, kThreadNum);
-  sender.AddReceiver(ip_addr.c_str(), 0);
+  sender.ConnectReceiver(ip_addr.c_str(), 0);
   sender.Connect();
   char* str_data = new char[9];
   memcpy(str_data, "123456789", 9);

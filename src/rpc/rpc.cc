@@ -114,18 +114,36 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateSender")
 .set_body([](DGLArgs args, DGLRetValue* rv) {
   int64_t msg_queue_size = args[0];
   std::string type = args[1];
-  InitGlobalTpContext();
-  RPCContext::getInstance()->sender =
-    std::make_shared<TPSender>(RPCContext::getInstance()->ctx);
+  int max_thread_count = args[2];
+  if (type == "tensorpipe") {
+    InitGlobalTpContext();
+    RPCContext::getInstance()->sender.reset(
+        new TPSender(RPCContext::getInstance()->ctx));
+  } else if (type == "socket") {
+    RPCContext::getInstance()->sender.reset(
+        new network::SocketSender(msg_queue_size, max_thread_count));
+  } else {
+    LOG(FATAL) << "Unknown communicator type for rpc sender: " << type;
+  }
+  LOG(INFO) << "Sender with NetType~" << RPCContext::getInstance()->sender->NetType() << " is created.";
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateReceiver")
 .set_body([](DGLArgs args, DGLRetValue* rv) {
   int64_t msg_queue_size = args[0];
   std::string type = args[1];
-  InitGlobalTpContext();
-  RPCContext::getInstance()->receiver =
-    std::make_shared<TPReceiver>(RPCContext::getInstance()->ctx);
+  int max_thread_count = args[2];
+  if (type == "tensorpipe") {
+    InitGlobalTpContext();
+    RPCContext::getInstance()->receiver.reset(
+        new TPReceiver(RPCContext::getInstance()->ctx));
+  } else if (type == "socket") {
+    RPCContext::getInstance()->receiver.reset(
+        new network::SocketReceiver(msg_queue_size, max_thread_count));
+  } else {
+    LOG(FATAL) << "Unknown communicator type for rpc receiver: " << type;
+  }
+  LOG(INFO) << "Receiver with NetType~" << RPCContext::getInstance()->receiver->NetType() << " is created.";
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFinalizeSender")
@@ -143,10 +161,9 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCReceiverWait")
   std::string ip = args[0];
   int port = args[1];
   int num_sender = args[2];
-  bool blocking = args[3];
   std::string addr;
   addr = StringPrintf("tcp://%s:%d", ip.c_str(), port);
-  if (RPCContext::getInstance()->receiver->Wait(addr, num_sender, blocking) == false) {
+  if (RPCContext::getInstance()->receiver->Wait(addr, num_sender) == false) {
     LOG(FATAL) << "Wait sender socket failed.";
   }
 });
@@ -159,6 +176,11 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCConnectReceiver")
   std::string addr;
   addr = StringPrintf("tcp://%s:%d", ip.c_str(), port);
   *rv = RPCContext::getInstance()->sender->ConnectReceiver(addr, recv_id);
+});
+
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSenderConnect")
+.set_body([](DGLArgs args, DGLRetValue* rv) {
+  RPCContext::getInstance()->sender->Connect();
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSetRank")

@@ -112,7 +112,7 @@ def create_sender(max_queue_size, net_type):
     max_queue_size : int
         Maximal size (bytes) of network queue buffer.
     net_type : str
-        Networking type. Current options are: 'socket'.
+        Networking type. Current options are: 'socket', 'tensorpipe'.
     """
     max_thread_count = int(os.getenv('DGL_SOCKET_MAX_THREAD_COUNT', '0'))
     _CAPI_DGLRPCCreateSender(int(max_queue_size), net_type, max_thread_count)
@@ -125,7 +125,7 @@ def create_receiver(max_queue_size, net_type):
     max_queue_size : int
         Maximal size (bytes) of network queue buffer.
     net_type : str
-        Networking type. Current options are: 'socket'.
+        Networking type. Current options are: 'socket', 'tensorpipe'.
     """
     max_thread_count = int(os.getenv('DGL_SOCKET_MAX_THREAD_COUNT', '0'))
     _CAPI_DGLRPCCreateReceiver(int(max_queue_size), net_type, max_thread_count)
@@ -140,7 +140,7 @@ def finalize_receiver():
     """
     _CAPI_DGLRPCFinalizeReceiver()
 
-def receiver_wait(ip_addr, port, num_senders, blocking=True):
+def receiver_wait(ip_addr, port, num_senders):
     """Wait all of the senders' connections.
 
     This api will be blocked until all the senders connect to the receiver.
@@ -153,10 +153,8 @@ def receiver_wait(ip_addr, port, num_senders, blocking=True):
         receiver's port
     num_senders : int
         total number of senders
-    blocking : bool
-        whether to wait blockingly
     """
-    _CAPI_DGLRPCReceiverWait(ip_addr, int(port), int(num_senders), blocking)
+    _CAPI_DGLRPCReceiverWait(ip_addr, int(port), int(num_senders))
 
 def connect_receiver(ip_addr, port, recv_id, group_id=-1):
     """Connect to target receiver
@@ -174,6 +172,10 @@ def connect_receiver(ip_addr, port, recv_id, group_id=-1):
     if target_id < 0:
         raise DGLError("Invalid target id: {}".format(target_id))
     return _CAPI_DGLRPCConnectReceiver(ip_addr, int(port), int(target_id))
+
+def sender_connect():
+    """Connect to target socket receivers"""
+    _CAPI_DGLRPCSenderConnect()
 
 def set_rank(rank):
     """Set the rank of this process.

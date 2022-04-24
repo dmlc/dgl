@@ -19,7 +19,9 @@
 #include <unordered_map>
 
 #include "./rpc_msg.h"
-#include "./tensorpipe/tp_communicator.h"
+#include "net_type.h"
+#include "network/socket_communicator.h"
+#include "tensorpipe/tp_communicator.h"
 #include "./network/common.h"
 #include "./server_state.h"
 
@@ -79,12 +81,12 @@ struct RPCContext {
   /*!
    * \brief Sender communicator.
    */
-  std::shared_ptr<TPSender> sender;
+  std::shared_ptr<RPCSender> sender;
 
   /*!
    * \brief Receiver communicator.
    */
-  std::shared_ptr<TPReceiver> receiver;
+  std::shared_ptr<RPCReceiver> receiver;
 
   /*!
    * \brief Tensorpipe global context

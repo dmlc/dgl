@@ -6,7 +6,7 @@ from . import rpc
 from .constants import MAX_QUEUE_SIZE, SERVER_EXIT, SERVER_KEEP_ALIVE
 
 def start_server(server_id, ip_config, num_servers, num_clients, server_state, \
-    max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
+    max_queue_size=MAX_QUEUE_SIZE, net_type='tensorpipe'):
     """Start DGL server, which will be shared with all the rpc services.
 
     This is a blocking function -- it returns only when the server shutdown.
@@ -31,14 +31,17 @@ def start_server(server_id, ip_config, num_servers, num_clients, server_state, \
         Note that the 20 GB is just an upper-bound because DGL uses zero-copy and
         it will not allocate 20GB memory at once.
     net_type : str
-        Networking type. Current options are: 'socket'.
+        Networking type. Current options are: ``'socket'`` or ``'tensorpipe'``.
     """
     assert server_id >= 0, 'server_id (%d) cannot be a negative number.' % server_id
     assert num_servers > 0, 'num_servers (%d) must be a positive number.' % num_servers
     assert num_clients >= 0, 'num_client (%d) cannot be a negative number.' % num_clients
     assert max_queue_size > 0, 'queue_size (%d) cannot be a negative number.' % max_queue_size
-    assert net_type in ('socket'), 'net_type (%s) can only be \'socket\'' % net_type
+    assert net_type in ('socket', 'tensorpipe'), \
+        'net_type (%s) can only be \'socket\' or \'tensorpipe\'' % net_type
     if server_state.keep_alive:
+        assert net_type == 'tensorpipe', \
+            "net_type can only be 'tensorpipe' if 'keep_alive' is enabled."
         print("As configured, this server will keep alive for multiple"
               " client groups until force shutdown request is received.")
     # Register signal handler.
@@ -68,8 +71,8 @@ def start_server(server_id, ip_config, num_servers, num_clients, server_state, \
     # Once all the senders connect to server, server will not
     # accept new sender's connection
     print(
-        "Server is waiting for connections non-blockingly on [{}:{}]...".format(ip_addr, port))
-    rpc.receiver_wait(ip_addr, port, num_clients, blocking=False)
+        "Server is waiting for connections on [{}:{}]...".format(ip_addr, port))
+    rpc.receiver_wait(ip_addr, port, num_clients)
     rpc.set_num_client(num_clients)
     recv_clients = {}
     while True:
@@ -88,6 +91,9 @@ def start_server(server_id, ip_config, num_servers, num_clients, server_state, \
                 # TODO[Rhett]: server should not be blocked endlessly.
                 while not rpc.connect_receiver(client_ip, client_port, client_id, group_id):
                     time.sleep(1)
+            if net_type == 'socket':
+                # In 'socket' mode, 'connect_receiver' just adds receivers only.
+                rpc.sender_connect()
             if rpc.get_rank() == 0:  # server_0 send all the IDs
                 for client_id, _ in client_namebook.items():
                     register_res = rpc.ClientRegisterResponse(client_id)
