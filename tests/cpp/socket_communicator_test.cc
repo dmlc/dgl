@@ -34,9 +34,9 @@ const int kNumReceiver = 3;
 const int kNumMessage = 10;
 
 const char* ip_addr[] = {
-  "socket://127.0.0.1:50091",
-  "socket://127.0.0.1:50092",
-  "socket://127.0.0.1:50093"
+  "tcp://127.0.0.1:50091",
+  "tcp://127.0.0.1:50092",
+  "tcp://127.0.0.1:50093"
 };
 
 static void start_client();
@@ -140,7 +140,7 @@ TEST(SocketCommunicatorTest, SendAndRecv) {
 
   srand((unsigned)time(NULL));
   int port = (rand() % (5000-3000+1))+ 3000;
-  std::string ip_addr = "socket://127.0.0.1:" + std::to_string(port);
+  std::string ip_addr = "tcp://127.0.0.1:" + std::to_string(port);
   std::ofstream out("addr.txt");
   out << ip_addr;
   out.close();
