@@ -6,6 +6,7 @@
 #ifndef DGL_RPC_NET_TYPE_H_
 #define DGL_RPC_NET_TYPE_H_
 
+#include <string>
 #include "rpc_msg.h"
 
 namespace dgl {
