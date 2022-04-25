@@ -683,6 +683,29 @@ def test_gin_conv(g, idtype, aggregator_type):
     h = gin(g, feat)
 
 @parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite']))
+def test_gine_conv(g, idtype):
+    ctx = F.ctx()
+    g = g.astype(idtype).to(ctx)
+    gine = nn.GINEConv(
+        th.nn.Linear(5, 12)
+    )
+    th.save(gine, tmp_buffer)
+    nfeat = F.randn((g.number_of_src_nodes(), 5))
+    efeat = F.randn((g.num_edges(), 5))
+    gine = gine.to(ctx)
+    h = gine(g, nfeat, efeat)
+
+    # test pickle
+    th.save(gine, tmp_buffer)
+    assert h.shape == (g.number_of_dst_nodes(), 12)
+
+    gine = nn.GINEConv(None)
+    th.save(gine, tmp_buffer)
+    gine = gine.to(ctx)
+    h = gine(g, nfeat, efeat)
+
+@parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['bipartite'], exclude=['zero-degree']))
 @pytest.mark.parametrize('aggregator_type', ['mean', 'max', 'sum'])
 def test_gin_conv_bi(g, idtype, aggregator_type):
@@ -1441,7 +1464,7 @@ def test_egnn_conv(in_size, hidden_size, out_size, edge_feat_size):
 
 @pytest.mark.parametrize('in_size', [16, 32])
 @pytest.mark.parametrize('out_size', [16, 32])
-@pytest.mark.parametrize('aggregators', 
+@pytest.mark.parametrize('aggregators',
     [['mean', 'max', 'sum'], ['min', 'std', 'var'], ['moment3', 'moment4', 'moment5']])
 @pytest.mark.parametrize('scalers', [['identity'], ['amplification', 'attenuation']])
 @pytest.mark.parametrize('delta', [2.5, 7.4])
