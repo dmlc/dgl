@@ -83,7 +83,7 @@ class HelloRequest(dgl.distributed.Request):
         res = HelloResponse(self.hello_str, self.integer, new_tensor)
         return res
 
-def start_server(num_clients, ip_config, server_id=0, keep_alive=False, num_servers=1, net_type='socket'):
+def start_server(num_clients, ip_config, server_id=0, keep_alive=False, num_servers=1, net_type='tensorpipe'):
     print("Sleep 1 seconds to test client re-connect.")
     time.sleep(1)
     server_state = dgl.distributed.ServerState(
@@ -98,7 +98,7 @@ def start_server(num_clients, ip_config, server_id=0, keep_alive=False, num_serv
                                  server_state=server_state,
                                  net_type=net_type)
 
-def start_client(ip_config, group_id=0, num_servers=1, net_type='socket'):
+def start_client(ip_config, group_id=0, num_servers=1, net_type='tensorpipe'):
     dgl.distributed.register_service(HELLO_SERVICE_ID, HelloRequest, HelloResponse)
     dgl.distributed.connect_to_server(
         ip_config=ip_config, num_servers=num_servers, group_id=group_id, net_type=net_type)

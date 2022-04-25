@@ -86,6 +86,7 @@ def start_server(server_id, ip_config, num_servers, num_clients, server_state, \
             # a new client group is ready
             ips.sort()
             client_namebook = dict(enumerate(ips))
+            time.sleep(3) # wait for clients' receivers ready
             for client_id, addr in client_namebook.items():
                 client_ip, client_port = addr.split(':')
                 # TODO[Rhett]: server should not be blocked endlessly.

@@ -48,6 +48,8 @@ class SocketSender : public Sender {
   SocketSender(int64_t queue_size, int max_thread_count)
     : Sender(queue_size, max_thread_count) {}
 
+  ~SocketSender() { Finalize(); }
+
   /*!
    * \brief Connect to receiver with address and ID
    * \param addr Networking address, e.g., 'tcp://127.0.0.1:50091'
@@ -151,6 +153,8 @@ class SocketReceiver : public Receiver {
    */
   SocketReceiver(int64_t queue_size, int max_thread_count)
     : Receiver(queue_size, max_thread_count) {}
+
+  ~SocketReceiver() { Finalize(); }
 
   /*!
    * \brief Wait for all the Senders to connect
