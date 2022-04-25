@@ -139,10 +139,6 @@ STATUS SocketSender::Send(Message msg, int recv_id) {
 }
 
 void SocketSender::Finalize() {
-  static bool has_been_here = false;
-  if (has_been_here) {
-    return;
-  }
   // Send a signal to tell the msg_queue to finish its job
   for (int i = 0; i < max_thread_count_; ++i) {
     // wait until queue is empty
@@ -164,7 +160,6 @@ void SocketSender::Finalize() {
       socket.second->Close();
     }
   }
-  has_been_here = true;
 }
 
 void SendCore(Message msg, TCPSocket* socket) {
@@ -328,10 +323,6 @@ STATUS SocketReceiver::RecvFrom(Message* msg, int send_id) {
 }
 
 void SocketReceiver::Finalize() {
-  static bool has_been_here = false;
-  if (has_been_here) {
-    return;
-  }
   // Send a signal to tell the message queue to finish its job
   for (auto& mq : msg_queue_) {
     // wait until queue is empty
@@ -352,7 +343,6 @@ void SocketReceiver::Finalize() {
   }
   server_socket_->Close();
   delete server_socket_;
-  has_been_here = true;
 }
 
 int64_t RecvDataSize(TCPSocket* socket) {
