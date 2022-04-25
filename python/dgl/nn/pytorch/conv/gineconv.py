@@ -8,7 +8,7 @@ from .... import function as fn
 from ....utils import expand_as_pair
 
 class GINEConv(nn.Module):
-    r"""Graph Isomorphism Network layer variant from
+    r"""Graph Isomorphism Network with Edge Features, introduced by
     `Strategies for Pre-training Graph Neural Networks <https://arxiv.org/abs/1905.12265>`__
 
     .. math::
@@ -26,6 +26,24 @@ class GINEConv(nn.Module):
         Initial :math:`\epsilon` value, default: ``0``.
     learn_eps : bool, optional
         If True, :math:`\epsilon` will be a learnable parameter. Default: ``False``.
+
+    Examples
+    --------
+
+    >>> import dgl
+    >>> import torch
+    >>> import torch.nn as nn
+    >>> from dgl.nn import GINEConv
+
+    >>> g = dgl.graph(([0, 1, 2], [1, 1, 3]))
+    >>> in_feats = 10
+    >>> out_feats = 20
+    >>> nfeat = torch.randn(g.num_nodes(), in_feats)
+    >>> efeat = torch.randn(g.num_edges(), in_feats)
+    >>> conv = GINEConv(nn.Linear(in_feats, out_feats))
+    >>> res = conv(g, nfeat, efeat)
+    >>> print(res.shape)
+    torch.Size([4, 20])
     """
     def __init__(self,
                  apply_func=None,
@@ -39,14 +57,18 @@ class GINEConv(nn.Module):
         else:
             self.register_buffer('eps', th.FloatTensor([init_eps]))
 
-    def forward(self, graph, feat, edge_feat):
+    def message(self, edges):
+        r"""User-defined Message Function"""
+        return {'m': F.relu(edges.src['hn'] + edges.data['he'])}
+
+    def forward(self, graph, node_feat, edge_feat):
         r"""Forward computation.
 
         Parameters
         ----------
         graph : DGLGraph
             The graph.
-        feat : torch.Tensor or pair of torch.Tensor
+        node_feat : torch.Tensor or pair of torch.Tensor
             If a torch.Tensor is given, it is the input feature of shape :math:`(N, D_{in})` where
             :math:`D_{in}` is size of input feature, :math:`N` is the number of nodes.
             If a pair of torch.Tensor is given, the pair must contain two tensors of shape
@@ -66,11 +88,10 @@ class GINEConv(nn.Module):
             as :math:`D_{in}`.
         """
         with graph.local_scope():
-            feat_src, feat_dst = expand_as_pair(feat, graph)
-            graph.srcdata['h'] = feat_src
-            graph.apply_edges(fn.copy_u('h', 'h'))
-            graph.edata['h'] = F.relu(graph.edata['h'] + edge_feat)
-            graph.update_all(fn.copy_e('h', 'm'), fn.sum('m', 'neigh'))
+            feat_src, feat_dst = expand_as_pair(node_feat, graph)
+            graph.srcdata['hn'] = feat_src
+            graph.edata['he'] = edge_feat
+            graph.update_all(self.message, fn.sum('m', 'neigh'))
             rst = (1 + self.eps) * feat_dst + graph.dstdata['neigh']
             if self.apply_func is not None:
                 rst = self.apply_func(rst)
