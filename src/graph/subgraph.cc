@@ -13,11 +13,12 @@ HeteroSubgraph InEdgeGraphRelabelNodes(
   CHECK_EQ(vids.size(), graph->NumVertexTypes())
     << "Invalid input: the input list size must be the same as the number of vertex types.";
   std::vector<IdArray> eids(graph->NumEdgeTypes());
+  DLContext ctx = aten::GetContextOf(vids);
   for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
     auto pair = graph->meta_graph()->FindEdge(etype);
     const dgl_type_t dst_vtype = pair.second;
     if (aten::IsNullArray(vids[dst_vtype])) {
-      eids[etype] = IdArray::Empty({0}, graph->DataType(), graph->Context());
+      eids[etype] = IdArray::Empty({0}, graph->DataType(), ctx);
     } else {
       const auto& earr = graph->InEdges(etype, {vids[dst_vtype]});
       eids[etype] = earr.id;
@@ -33,6 +34,7 @@ HeteroSubgraph InEdgeGraphNoRelabelNodes(
     << "Invalid input: the input list size must be the same as the number of vertex types.";
   std::vector<HeteroGraphPtr> subrels(graph->NumEdgeTypes());
   std::vector<IdArray> induced_edges(graph->NumEdgeTypes());
+  DLContext ctx = aten::GetContextOf(vids);
   for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
     auto pair = graph->meta_graph()->FindEdge(etype);
     const dgl_type_t src_vtype = pair.first;
@@ -44,7 +46,7 @@ HeteroSubgraph InEdgeGraphNoRelabelNodes(
         relgraph->NumVertexTypes(),
         graph->NumVertices(src_vtype),
         graph->NumVertices(dst_vtype),
-        graph->DataType(), graph->Context());
+        graph->DataType(), ctx);
       induced_edges[etype] = IdArray::Empty({0}, graph->DataType(), graph->Context());
     } else {
       const auto& earr = graph->InEdges(etype, {vids[dst_vtype]});
@@ -77,11 +79,12 @@ HeteroSubgraph OutEdgeGraphRelabelNodes(
   CHECK_EQ(vids.size(), graph->NumVertexTypes())
     << "Invalid input: the input list size must be the same as the number of vertex types.";
   std::vector<IdArray> eids(graph->NumEdgeTypes());
+  DLContext ctx = aten::GetContextOf(vids);
   for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
     auto pair = graph->meta_graph()->FindEdge(etype);
     const dgl_type_t src_vtype = pair.first;
     if (aten::IsNullArray(vids[src_vtype])) {
-      eids[etype] = IdArray::Empty({0}, graph->DataType(), graph->Context());
+      eids[etype] = IdArray::Empty({0}, graph->DataType(), ctx);
     } else {
       const auto& earr = graph->OutEdges(etype, {vids[src_vtype]});
       eids[etype] = earr.id;
@@ -97,6 +100,7 @@ HeteroSubgraph OutEdgeGraphNoRelabelNodes(
     << "Invalid input: the input list size must be the same as the number of vertex types.";
   std::vector<HeteroGraphPtr> subrels(graph->NumEdgeTypes());
   std::vector<IdArray> induced_edges(graph->NumEdgeTypes());
+  DLContext ctx = aten::GetContextOf(vids);
   for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
     auto pair = graph->meta_graph()->FindEdge(etype);
     const dgl_type_t src_vtype = pair.first;
@@ -108,7 +112,7 @@ HeteroSubgraph OutEdgeGraphNoRelabelNodes(
         relgraph->NumVertexTypes(),
         graph->NumVertices(src_vtype),
         graph->NumVertices(dst_vtype),
-        graph->DataType(), graph->Context());
+        graph->DataType(), ctx);
       induced_edges[etype] = IdArray::Empty({0}, graph->DataType(), graph->Context());
     } else {
       const auto& earr = graph->OutEdges(etype, {vids[src_vtype]});

@@ -16,7 +16,7 @@ if os.name != 'nt':
 INTEGER = 2
 STR = 'hello world!'
 HELLO_SERVICE_ID = 901231
-TENSOR = F.zeros((10, 10), F.int64, F.cpu())
+TENSOR = F.zeros((1000, 1000), F.int64, F.cpu())
 
 def foo(x, y):
     assert x == 123
@@ -188,15 +188,16 @@ def test_multi_client():
     os.environ['DGL_DIST_MODE'] = 'distributed'
     generate_ip_config("rpc_ip_config_mul_client.txt", 1, 1)
     ctx = mp.get_context('spawn')
-    pserver = ctx.Process(target=start_server, args=(10, "rpc_ip_config_mul_client.txt"))
+    num_clients = 20
+    pserver = ctx.Process(target=start_server, args=(num_clients, "rpc_ip_config_mul_client.txt"))
     pclient_list = []
-    for i in range(10):
+    for i in range(num_clients):
         pclient = ctx.Process(target=start_client, args=("rpc_ip_config_mul_client.txt",))
         pclient_list.append(pclient)
     pserver.start()
-    for i in range(10):
+    for i in range(num_clients):
         pclient_list[i].start()
-    for i in range(10):
+    for i in range(num_clients):
         pclient_list[i].join()
     pserver.join()
 

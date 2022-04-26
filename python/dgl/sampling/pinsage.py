@@ -113,6 +113,7 @@ class RandomWalkNeighborSampler(object):
             to the algorithm above.  The returned graph is on CPU.
         """
         seed_nodes = utils.prepare_tensor(self.G, seed_nodes, 'seed_nodes')
+        self.restart_prob = F.copy_to(self.restart_prob, F.context(seed_nodes))
 
         seed_nodes = F.repeat(seed_nodes, self.num_random_walks, 0)
         paths, _ = random_walk(

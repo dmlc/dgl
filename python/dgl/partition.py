@@ -248,7 +248,8 @@ def get_peak_mem():
             return int(mem) / 1024 / 1024
     return 0.0
 
-def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False, mode="k-way"):
+def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False,
+                               mode="k-way", objtype='cut'):
     ''' This assigns nodes to different partitions with Metis partitioning algorithm.
 
     When performing Metis partitioning, we can put some constraint on the partitioning.
@@ -275,6 +276,9 @@ def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False, m
         Indicate whether to balance the edges.
     mode : str, "k-way" or "recursive"
         Whether use multilevel recursive bisection or multilevel k-way paritioning.
+    objtype : str, "cut" or "vol"
+        Set the objective as edge-cut minimization or communication volume minimization. This
+        argument is used by the Metis algorithm.
 
     Returns
     -------
@@ -334,7 +338,7 @@ def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False, m
         time.time() - start, get_peak_mem()))
 
     start = time.time()
-    node_part = _CAPI_DGLMetisPartition_Hetero(sym_g._graph, k, vwgt, mode)
+    node_part = _CAPI_DGLMetisPartition_Hetero(sym_g._graph, k, vwgt, mode, (objtype == 'cut'))
     print('Metis partitioning: {:.3f} seconds, peak memory: {:.3f} GB'.format(
         time.time() - start, get_peak_mem()))
     if len(node_part) == 0:
