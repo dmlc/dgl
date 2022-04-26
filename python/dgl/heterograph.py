@@ -3501,7 +3501,7 @@ class DGLHeteroGraph(object):
         etid = self.get_etype_id(etype)
         if is_all(v):
             v = self.dstnodes(dsttype)
-        
+
         v_tensor = utils.prepare_tensor(self, v, 'v')
         deg = self._graph.in_degrees(etid, v_tensor)
         if isinstance(v, numbers.Integral):

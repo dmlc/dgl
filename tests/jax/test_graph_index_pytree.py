@@ -25,5 +25,3 @@ def test_graph_index_reconstruct():
             structured, flat, tree, unflattened))
 
     show_example(g)
-
-test_graph_index_reconstruct()

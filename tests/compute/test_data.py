@@ -117,7 +117,7 @@ def test_citation_graph():
     assert g.num_nodes() == 2708
     assert g.num_edges() == 10556
     dst = F.asnumpy(g.edges()[1])
-    assert np.array_equal(dst, np.sort(dst))
+    assert np.allclose(dst, np.sort(dst))
     g2 = data.CoraGraphDataset(transform=transform)[0]
     assert g2.num_edges() - g.num_edges() == g.num_nodes()
 
@@ -126,7 +126,7 @@ def test_citation_graph():
     assert g.num_nodes() == 3327
     assert g.num_edges() == 9228
     dst = F.asnumpy(g.edges()[1])
-    assert np.array_equal(dst, np.sort(dst))
+    assert np.allclose(dst, np.sort(dst))
     g2 = data.CiteseerGraphDataset(transform=transform)[0]
     assert g2.num_edges() - g.num_edges() == g.num_nodes()
 
@@ -135,7 +135,7 @@ def test_citation_graph():
     assert g.num_nodes() == 19717
     assert g.num_edges() == 88651
     dst = F.asnumpy(g.edges()[1])
-    assert np.array_equal(dst, np.sort(dst))
+    assert np.allclose(dst, np.sort(dst))
     g2 = data.PubmedGraphDataset(transform=transform)[0]
     assert g2.num_edges() - g.num_edges() == g.num_nodes()
 
@@ -149,7 +149,7 @@ def test_gnn_benchmark():
     assert g.num_nodes() == 13752
     assert g.num_edges() == 491722
     dst = F.asnumpy(g.edges()[1])
-    assert np.array_equal(dst, np.sort(dst))
+    assert np.allclose(dst, np.sort(dst))
     g2 = data.AmazonCoBuyComputerDataset(transform=transform)[0]
     assert g2.num_edges() - g.num_edges() == g.num_nodes()
 
@@ -158,7 +158,7 @@ def test_gnn_benchmark():
     assert g.num_nodes() == 7650
     assert g.num_edges() == 238163
     dst = F.asnumpy(g.edges()[1])
-    assert np.array_equal(dst, np.sort(dst))
+    assert np.allclose(dst, np.sort(dst))
     g2 = data.AmazonCoBuyPhotoDataset(transform=transform)[0]
     assert g2.num_edges() - g.num_edges() == g.num_nodes()
 
@@ -167,7 +167,7 @@ def test_gnn_benchmark():
     assert g.num_nodes() == 34493
     assert g.num_edges() == 495924
     dst = F.asnumpy(g.edges()[1])
-    assert np.array_equal(dst, np.sort(dst))
+    assert np.allclose(dst, np.sort(dst))
     g2 = data.CoauthorPhysicsDataset(transform=transform)[0]
     assert g2.num_edges() - g.num_edges() == g.num_nodes()
 
@@ -176,7 +176,7 @@ def test_gnn_benchmark():
     assert g.num_nodes() == 18333
     assert g.num_edges() == 163788
     dst = F.asnumpy(g.edges()[1])
-    assert np.array_equal(dst, np.sort(dst))
+    assert np.allclose(dst, np.sort(dst))
     g2 = data.CoauthorCSDataset(transform=transform)[0]
     assert g2.num_edges() - g.num_edges() == g.num_nodes()
 
@@ -185,7 +185,7 @@ def test_gnn_benchmark():
     assert g.num_nodes() == 19793
     assert g.num_edges() == 126842
     dst = F.asnumpy(g.edges()[1])
-    assert np.array_equal(dst, np.sort(dst))
+    assert np.allclose(dst, np.sort(dst))
     g2 = data.CoraFullDataset(transform=transform)[0]
     assert g2.num_edges() - g.num_edges() == g.num_nodes()
 
@@ -197,7 +197,7 @@ def test_reddit():
     assert g.num_nodes() == 232965
     assert g.num_edges() == 114615892
     dst = F.asnumpy(g.edges()[1])
-    assert np.array_equal(dst, np.sort(dst))
+    assert np.allclose(dst, np.sort(dst))
 
     transform = dgl.AddSelfLoop(allow_duplicate=True)
     g2 = data.RedditDataset(transform=transform)[0]
@@ -254,7 +254,7 @@ def _test_construct_graphs_node_ids():
     assert g.is_homogeneous
     assert g.num_nodes() == len(node_ids)
     assert g.num_edges() == len(src_ids)
-    assert F.array_equal(F.tensor(node_feat[idx], dtype=F.float32), g.ndata['feat'])
+    assert F.allclose(F.tensor(node_feat[idx], dtype=F.float32), g.ndata['feat'])
 
     # node IDs are mixed with numeric and non-numeric values
     # homogeneous graph
@@ -328,7 +328,7 @@ def _test_construct_graphs_homo():
         for key, value in lhs.items():
             assert key in rhs
             assert F.dtype(rhs[key]) != F.float64
-            assert F.array_equal(
+            assert F.allclose(
                 F.tensor(value, dtype=F.dtype(rhs[key])), rhs[key])
     assert_data(ndata, g.ndata)
     assert_data(edata, g.edata)
@@ -384,7 +384,7 @@ def _test_construct_graphs_hetero():
         for key, value in lhs.items():
             assert key in rhs
             assert F.dtype(rhs[key]) != F.float64
-            assert F.array_equal(
+            assert F.allclose(
                 F.tensor(value, dtype=F.dtype(rhs[key])), rhs[key])
     for ntype in g.ntypes:
         assert g.num_nodes(ntype) == num_nodes
@@ -436,7 +436,7 @@ def _test_construct_graphs_multiple():
     assert len(data_dict) == len(gdata)
     for k, v in data_dict.items():
         assert F.dtype(v) != F.float64
-        assert F.array_equal(F.tensor(gdata[k], dtype=F.dtype(v)), v)
+        assert F.allclose(F.tensor(gdata[k], dtype=F.dtype(v)), v)
     for i, g in enumerate(graphs):
         assert g.is_homogeneous
         assert g.num_nodes() == num_nodes
@@ -450,7 +450,7 @@ def _test_construct_graphs_multiple():
                     indices = u_indices[i*size:(i+1)*size]
                     value = value[indices]
                 assert F.dtype(rhs[key]) != F.float64
-                assert F.array_equal(
+                assert F.allclose(
                     F.tensor(value, dtype=F.dtype(rhs[key])), rhs[key])
         assert_data(ndata, g.ndata, num_nodes, node=True)
         assert_data(edata, g.edata, num_edges)
@@ -484,9 +484,9 @@ def _test_DefaultDataParser():
         dp = DefaultDataParser()
         df = pd.read_csv(csv_path)
         dt = dp(df)
-        assert np.array_equal(node_id, dt['node_id'])
-        assert np.array_equal(label, dt['label'])
-        assert np.array_equal(feat, dt['feat'])
+        assert np.allclose(node_id, dt['node_id'])
+        assert np.allclose(label, dt['label'])
+        assert np.allclose(feat, dt['feat'])
     # string consists of non-numeric values
     with tempfile.TemporaryDirectory() as test_dir:
         csv_path = os.path.join(test_dir, "nodes.csv")
@@ -634,7 +634,7 @@ def _test_load_node_data_from_csv():
         meta_node = MetaNode(file_name=csv_path)
         node_data = NodeData.load_from_csv(
             meta_node, DefaultDataParser())
-        assert np.array_equal(df['node_id'], node_data.id)
+        assert np.allclose(df['node_id'], node_data.id)
         assert len(node_data.data) == 0
 
         # common case
@@ -645,10 +645,10 @@ def _test_load_node_data_from_csv():
         meta_node = MetaNode(file_name=csv_path)
         node_data = NodeData.load_from_csv(
             meta_node, DefaultDataParser())
-        assert np.array_equal(df['node_id'], node_data.id)
+        assert np.allclose(df['node_id'], node_data.id)
         assert len(node_data.data) == 1
-        assert np.array_equal(df['label'], node_data.data['label'])
-        assert np.array_equal(np.full(num_nodes, 0), node_data.graph_id)
+        assert np.allclose(df['label'], node_data.data['label'])
+        assert np.allclose(np.full(num_nodes, 0), node_data.graph_id)
         assert node_data.type == '_V'
 
         # add more fields into nodes.csv
@@ -659,10 +659,10 @@ def _test_load_node_data_from_csv():
         meta_node = MetaNode(file_name=csv_path)
         node_data = NodeData.load_from_csv(
             meta_node, DefaultDataParser())
-        assert np.array_equal(df['node_id'], node_data.id)
+        assert np.allclose(df['node_id'], node_data.id)
         assert len(node_data.data) == 1
-        assert np.array_equal(df['label'], node_data.data['label'])
-        assert np.array_equal(df['graph_id'], node_data.graph_id)
+        assert np.allclose(df['label'], node_data.data['label'])
+        assert np.allclose(df['graph_id'], node_data.graph_id)
         assert node_data.type == '_V'
 
         # required header is missing
@@ -693,8 +693,8 @@ def _test_load_edge_data_from_csv():
         meta_edge = MetaEdge(file_name=csv_path)
         edge_data = EdgeData.load_from_csv(
             meta_edge, DefaultDataParser())
-        assert np.array_equal(df['src_id'], edge_data.src)
-        assert np.array_equal(df['dst_id'], edge_data.dst)
+        assert np.allclose(df['src_id'], edge_data.src)
+        assert np.allclose(df['dst_id'], edge_data.dst)
         assert len(edge_data.data) == 0
 
         # common case
@@ -706,11 +706,11 @@ def _test_load_edge_data_from_csv():
         meta_edge = MetaEdge(file_name=csv_path)
         edge_data = EdgeData.load_from_csv(
             meta_edge, DefaultDataParser())
-        assert np.array_equal(df['src_id'], edge_data.src)
-        assert np.array_equal(df['dst_id'], edge_data.dst)
+        assert np.allclose(df['src_id'], edge_data.src)
+        assert np.allclose(df['dst_id'], edge_data.dst)
         assert len(edge_data.data) == 1
-        assert np.array_equal(df['label'], edge_data.data['label'])
-        assert np.array_equal(np.full(num_edges, 0), edge_data.graph_id)
+        assert np.allclose(df['label'], edge_data.data['label'])
+        assert np.allclose(np.full(num_edges, 0), edge_data.graph_id)
         assert edge_data.type == ('_V', '_E', '_V')
 
         # add more fields into edges.csv
@@ -724,12 +724,12 @@ def _test_load_edge_data_from_csv():
         meta_edge = MetaEdge(file_name=csv_path)
         edge_data = EdgeData.load_from_csv(
             meta_edge, DefaultDataParser())
-        assert np.array_equal(df['src_id'], edge_data.src)
-        assert np.array_equal(df['dst_id'], edge_data.dst)
+        assert np.allclose(df['src_id'], edge_data.src)
+        assert np.allclose(df['dst_id'], edge_data.dst)
         assert len(edge_data.data) == 2
-        assert np.array_equal(df['feat'], edge_data.data['feat'])
-        assert np.array_equal(df['label'], edge_data.data['label'])
-        assert np.array_equal(df['graph_id'], edge_data.graph_id)
+        assert np.allclose(df['feat'], edge_data.data['feat'])
+        assert np.allclose(df['label'], edge_data.data['label'])
+        assert np.allclose(df['graph_id'], edge_data.graph_id)
         assert edge_data.type == ('_V', '_E', '_V')
 
         # required headers are missing
@@ -770,7 +770,7 @@ def _test_load_graph_data_from_csv():
         meta_graph = MetaGraph(file_name=csv_path)
         graph_data = GraphData.load_from_csv(
             meta_graph, DefaultDataParser())
-        assert np.array_equal(df['graph_id'], graph_data.graph_id)
+        assert np.allclose(df['graph_id'], graph_data.graph_id)
         assert len(graph_data.data) == 0
 
         # common case
@@ -781,9 +781,9 @@ def _test_load_graph_data_from_csv():
         meta_graph = MetaGraph(file_name=csv_path)
         graph_data = GraphData.load_from_csv(
             meta_graph, DefaultDataParser())
-        assert np.array_equal(df['graph_id'], graph_data.graph_id)
+        assert np.allclose(df['graph_id'], graph_data.graph_id)
         assert len(graph_data.data) == 1
-        assert np.array_equal(df['label'], graph_data.data['label'])
+        assert np.allclose(df['label'], graph_data.data['label'])
 
         # add more fields into graph.csv
         df = pd.DataFrame({'graph_id': np.arange(num_graphs),
@@ -794,10 +794,10 @@ def _test_load_graph_data_from_csv():
         meta_graph = MetaGraph(file_name=csv_path)
         graph_data = GraphData.load_from_csv(
             meta_graph, DefaultDataParser())
-        assert np.array_equal(df['graph_id'], graph_data.graph_id)
+        assert np.allclose(df['graph_id'], graph_data.graph_id)
         assert len(graph_data.data) == 2
-        assert np.array_equal(df['feat'], graph_data.data['feat'])
-        assert np.array_equal(df['label'], graph_data.data['label'])
+        assert np.allclose(df['feat'], graph_data.data['feat'])
+        assert np.allclose(df['label'], graph_data.data['label'])
 
         # required header is missing
         df = pd.DataFrame({'label': np.random.randint(3, size=num_graphs)})
@@ -872,15 +872,15 @@ def _test_CSVDataset_single():
             assert csv_dataset.has_cache()
             for ntype in g.ntypes:
                 assert g.num_nodes(ntype) == num_nodes
-                assert F.array_equal(F.tensor(feat_ndata, dtype=F.float32),
+                assert F.allclose(F.tensor(feat_ndata, dtype=F.float32),
                                      g.nodes[ntype].data['feat'])
-                assert np.array_equal(label_ndata,
+                assert np.allclose(label_ndata,
                                       F.asnumpy(g.nodes[ntype].data['label']))
             for etype in g.etypes:
                 assert g.num_edges(etype) == num_edges
-                assert F.array_equal(F.tensor(feat_edata, dtype=F.float32),
+                assert F.allclose(F.tensor(feat_edata, dtype=F.float32),
                                      g.edges[etype].data['feat'])
-                assert np.array_equal(label_edata,
+                assert np.allclose(label_edata,
                                       F.asnumpy(g.edges[etype].data['label']))
 
 
@@ -954,23 +954,23 @@ def _test_CSVDataset_multiple():
             assert len(csv_dataset.data) == 2
             assert 'feat' in csv_dataset.data
             assert 'label' in csv_dataset.data
-            assert F.array_equal(F.tensor(feat_gdata, dtype=F.float32),
+            assert F.allclose(F.tensor(feat_gdata, dtype=F.float32),
                                  csv_dataset.data['feat'])
             for i, (g, g_data) in enumerate(csv_dataset):
                 assert not g.is_homogeneous
                 assert F.asnumpy(g_data['label']) == label_gdata[i]
-                assert F.array_equal(g_data['feat'], F.tensor(feat_gdata[i], dtype=F.float32))
+                assert F.allclose(g_data['feat'], F.tensor(feat_gdata[i], dtype=F.float32))
                 for ntype in g.ntypes:
                     assert g.num_nodes(ntype) == num_nodes
-                    assert F.array_equal(F.tensor(feat_ndata[i*num_nodes:(i+1)*num_nodes], dtype=F.float32),
+                    assert F.allclose(F.tensor(feat_ndata[i*num_nodes:(i+1)*num_nodes], dtype=F.float32),
                                          g.nodes[ntype].data['feat'])
-                    assert np.array_equal(label_ndata[i*num_nodes:(i+1)*num_nodes],
+                    assert np.allclose(label_ndata[i*num_nodes:(i+1)*num_nodes],
                                           F.asnumpy(g.nodes[ntype].data['label']))
                 for etype in g.etypes:
                     assert g.num_edges(etype) == num_edges
-                    assert F.array_equal(F.tensor(feat_edata[i*num_edges:(i+1)*num_edges], dtype=F.float32),
+                    assert F.allclose(F.tensor(feat_edata[i*num_edges:(i+1)*num_edges], dtype=F.float32),
                                          g.edges[etype].data['feat'])
-                    assert np.array_equal(label_edata[i*num_edges:(i+1)*num_edges],
+                    assert np.allclose(label_edata[i*num_edges:(i+1)*num_edges],
                                           F.asnumpy(g.edges[etype].data['label']))
 
 
@@ -1048,12 +1048,12 @@ def _test_CSVDataset_customized_data_parser():
             for ntype in g.ntypes:
                 assert g.num_nodes(ntype) == num_nodes
                 offset = 2 if ntype == 'user' else 0
-                assert np.array_equal(label_ndata[i*num_nodes:(i+1)*num_nodes]+offset,
+                assert np.allclose(label_ndata[i*num_nodes:(i+1)*num_nodes]+offset,
                                     F.asnumpy(g.nodes[ntype].data['label']))
             for etype in g.etypes:
                 assert g.num_edges(etype) == num_edges
                 offset = 2 if etype == 'like' else 0
-                assert np.array_equal(label_edata[i*num_edges:(i+1)*num_edges]+offset,
+                assert np.allclose(label_edata[i*num_edges:(i+1)*num_edges]+offset,
                                     F.asnumpy(g.edges[etype].data['label']))
         # specify via callable
         csv_dataset = data.CSVDataset(
@@ -1068,12 +1068,12 @@ def _test_CSVDataset_customized_data_parser():
             for ntype in g.ntypes:
                 assert g.num_nodes(ntype) == num_nodes
                 offset = 2
-                assert np.array_equal(label_ndata[i*num_nodes:(i+1)*num_nodes]+offset,
+                assert np.allclose(label_ndata[i*num_nodes:(i+1)*num_nodes]+offset,
                                     F.asnumpy(g.nodes[ntype].data['label']))
             for etype in g.etypes:
                 assert g.num_edges(etype) == num_edges
                 offset = 2
-                assert np.array_equal(label_edata[i*num_edges:(i+1)*num_edges]+offset,
+                assert np.allclose(label_edata[i*num_edges:(i+1)*num_edges]+offset,
                                     F.asnumpy(g.edges[etype].data['label']))
 
 
@@ -1083,20 +1083,20 @@ def _test_NodeEdgeGraphData():
     num_nodes = 100
     node_ids = np.arange(num_nodes, dtype=np.float)
     ndata = NodeData(node_ids, {})
-    assert np.array_equal(ndata.id, node_ids)
+    assert np.allclose(ndata.id, node_ids)
     assert len(ndata.data) == 0
     assert ndata.type == '_V'
-    assert np.array_equal(ndata.graph_id, np.full(num_nodes, 0))
+    assert np.allclose(ndata.graph_id, np.full(num_nodes, 0))
     # NodeData more
     data = {'feat': np.random.rand(num_nodes, 3)}
     graph_id = np.arange(num_nodes)
     ndata = NodeData(node_ids, data, type='user', graph_id=graph_id)
     assert ndata.type == 'user'
-    assert np.array_equal(ndata.graph_id, graph_id)
+    assert np.allclose(ndata.graph_id, graph_id)
     assert len(ndata.data) == len(data)
     for k, v in data.items():
         assert k in ndata.data
-        assert np.array_equal(ndata.data[k], v)
+        assert np.allclose(ndata.data[k], v)
     # NodeData except
     expect_except = False
     try:
@@ -1112,11 +1112,11 @@ def _test_NodeEdgeGraphData():
     src_ids = np.random.randint(num_nodes, size=num_edges)
     dst_ids = np.random.randint(num_nodes, size=num_edges)
     edata = EdgeData(src_ids, dst_ids, {})
-    assert np.array_equal(edata.src, src_ids)
-    assert np.array_equal(edata.dst, dst_ids)
+    assert np.allclose(edata.src, src_ids)
+    assert np.allclose(edata.dst, dst_ids)
     assert edata.type == ('_V', '_E', '_V')
     assert len(edata.data) == 0
-    assert np.array_equal(edata.graph_id, np.full(num_edges, 0))
+    assert np.allclose(edata.graph_id, np.full(num_edges, 0))
     # EdageData more
     src_ids = np.random.randint(num_nodes, size=num_edges).astype(np.float)
     dst_ids = np.random.randint(num_nodes, size=num_edges).astype(np.float)
@@ -1125,14 +1125,14 @@ def _test_NodeEdgeGraphData():
     graph_ids = np.arange(num_edges)
     edata = EdgeData(src_ids, dst_ids, data,
                             type=etype, graph_id=graph_ids)
-    assert np.array_equal(edata.src, src_ids)
-    assert np.array_equal(edata.dst, dst_ids)
+    assert np.allclose(edata.src, src_ids)
+    assert np.allclose(edata.dst, dst_ids)
     assert edata.type == etype
     assert len(edata.data) == len(data)
     for k, v in data.items():
         assert k in edata.data
-        assert np.array_equal(edata.data[k], v)
-    assert np.array_equal(edata.graph_id, graph_ids)
+        assert np.allclose(edata.data[k], v)
+    assert np.allclose(edata.graph_id, graph_ids)
     # EdgeData except
     expect_except = False
     try:
@@ -1146,17 +1146,17 @@ def _test_NodeEdgeGraphData():
     num_graphs = 10
     graph_ids = np.arange(num_graphs)
     gdata = GraphData(graph_ids, {})
-    assert np.array_equal(gdata.graph_id, graph_ids)
+    assert np.allclose(gdata.graph_id, graph_ids)
     assert len(gdata.data) == 0
     # GraphData more
     graph_ids = np.arange(num_graphs).astype(np.float)
     data = {'feat': np.random.rand(num_graphs, 3)}
     gdata = GraphData(graph_ids, data)
-    assert np.array_equal(gdata.graph_id, graph_ids)
+    assert np.allclose(gdata.graph_id, graph_ids)
     assert len(gdata.data) == len(data)
     for k, v in data.items():
         assert k in gdata.data
-        assert np.array_equal(gdata.data[k], v)
+        assert np.allclose(gdata.data[k], v)
 
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
@@ -1196,11 +1196,11 @@ def test_as_nodepred1():
     assert new_ds[0].num_nodes() == ds[0].num_nodes()
     assert new_ds[0].num_edges() == ds[0].num_edges()
     assert 'train_mask' in new_ds[0].ndata
-    assert F.array_equal(new_ds.train_idx, F.nonzero_1d(
+    assert F.allclose(new_ds.train_idx, F.nonzero_1d(
         new_ds[0].ndata['train_mask']))
-    assert F.array_equal(new_ds.val_idx, F.nonzero_1d(
+    assert F.allclose(new_ds.val_idx, F.nonzero_1d(
         new_ds[0].ndata['val_mask']))
-    assert F.array_equal(new_ds.test_idx, F.nonzero_1d(
+    assert F.allclose(new_ds.test_idx, F.nonzero_1d(
         new_ds[0].ndata['test_mask']))
 
     ds = data.AIFBDataset()
@@ -1210,11 +1210,11 @@ def test_as_nodepred1():
     assert new_ds[0].ntypes == ds[0].ntypes
     assert new_ds[0].canonical_etypes == ds[0].canonical_etypes
     assert 'train_mask' in new_ds[0].nodes['Personen'].data
-    assert F.array_equal(new_ds.train_idx, F.nonzero_1d(
+    assert F.allclose(new_ds.train_idx, F.nonzero_1d(
         new_ds[0].nodes['Personen'].data['train_mask']))
-    assert F.array_equal(new_ds.val_idx, F.nonzero_1d(
+    assert F.allclose(new_ds.val_idx, F.nonzero_1d(
         new_ds[0].nodes['Personen'].data['val_mask']))
-    assert F.array_equal(new_ds.test_idx, F.nonzero_1d(
+    assert F.allclose(new_ds.test_idx, F.nonzero_1d(
         new_ds[0].nodes['Personen'].data['test_mask']))
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
@@ -1253,9 +1253,9 @@ def test_as_nodepred_ogb():
     ds = data.AsNodePredDataset(DglNodePropPredDataset("ogbn-arxiv"), split_ratio=None, verbose=True)
     split = DglNodePropPredDataset("ogbn-arxiv").get_idx_split()
     train_idx, val_idx, test_idx = split['train'], split['valid'], split['test']
-    assert F.array_equal(ds.train_idx, F.tensor(train_idx))
-    assert F.array_equal(ds.val_idx, F.tensor(val_idx))
-    assert F.array_equal(ds.test_idx, F.tensor(test_idx))
+    assert F.allclose(ds.train_idx, F.tensor(train_idx))
+    assert F.allclose(ds.val_idx, F.tensor(val_idx))
+    assert F.allclose(ds.test_idx, F.tensor(test_idx))
     # force generate new split
     ds = data.AsNodePredDataset(DglNodePropPredDataset("ogbn-arxiv"), split_ratio=[0.7, 0.2, 0.1], verbose=True)
 

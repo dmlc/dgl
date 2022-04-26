@@ -45,7 +45,6 @@ def test_batch_setter_autograd(idtype=F.int32):
     # partial set
     v = F.tensor([1, 2, 8], g.idtype)
     hh = F.zeros((len(v), D))
-    print(hh)
 
     def f(hh, g=g):
         g.nodes[v].data['h'] = hh

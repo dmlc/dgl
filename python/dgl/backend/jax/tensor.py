@@ -42,12 +42,14 @@ def tensor(data, dtype=None):
         data = [data]
     if not is_tensor(data):
         data = jnp.array(data, dtype=dtype)
+    if dtype is not None:
+        if data.dtype != dtype:
+            data = data.astype(dtype)
     # data.device_buffer.block_host_until_ready()
     return data
 
 def as_scalar(data):
-    return data.squeeze()
-
+    return data.item()
 
 class SparseMatrix(abc.ABC):
     """ Base class for sparse matrix. """
@@ -332,8 +334,9 @@ def ones(shape, dtype, ctx):
     # TODO: no device here
     return jnp.ones(shape, dtype=dtype,) + 0 # eval lazy
 
-def uniform(shape, dtype, *, low, high):
-    key = jax.random.PRNGKey(2666)
+def uniform(shape, dtype, ctx, low, high):
+    import time
+    key = jax.random.PRNGKey(int(time.time_ns()))
     return jax.random.uniform(
         key=key,
         shape=shape,
@@ -342,8 +345,9 @@ def uniform(shape, dtype, *, low, high):
         dtype=dtype,
     )
 
-def randint(shape, dtype, *, low, high):
-    key = jax.random.PRNGKey(2666)
+def randint(shape, dtype, ctx, low, high):
+    import time
+    key = jax.random.PRNGKey(int(time.time_ns()))
     return jax.random.randint(
         key=key,
         shape=shape,
@@ -411,10 +415,10 @@ def replace_inf_with_zero(x):
         neginf=0.0,
     )
 
-def unique(input):
+def unique(input, return_inverse=False, return_counts=False):
     if input.dtype == jnp.bool_:
         input = input.type(jnp.int8)
-    return jnp.unique(input)
+    return jnp.unique(input, return_inverse=return_inverse, return_counts=return_counts)
 
 def full_1d(length, fill_value, dtype, ctx):
     return jnp.full((length,), fill_value, dtype=dtype)
