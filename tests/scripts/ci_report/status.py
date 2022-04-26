@@ -8,7 +8,7 @@ BUILD_ID = os.getenv("BUILD_ID")
 job_link = os.environ["BUILD_URL"]
 response = requests.get('{}wfapi'.format(job_link)).json()
 # IN_PROGRESS is expected, sincce the pipeline is not finished when executing this script
-success = response["result"] in ['SUCCESS', 'IN_PROGRESS']
+success = response["status"] in ['SUCCESS', 'IN_PROGRESS']
 print(success)
 print(response)
 if success:
