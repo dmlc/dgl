@@ -1707,6 +1707,7 @@ def test_remove_selfloop(idtype):
 
 @parametrize_dtype
 def test_reorder_graph(idtype):
+    assert False
     g = dgl.graph(([0, 1, 2, 3, 4], [2, 2, 3, 2, 3]),
                   idtype=idtype, device=F.ctx())
     g.ndata['h'] = F.copy_to(F.randn((g.num_nodes(), 3)), ctx=F.ctx())
