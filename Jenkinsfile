@@ -480,8 +480,8 @@ pipeline {
             sh("rm -rf ci_tmp")
             dir('ci_tmp') {
               sh("curl -o cireport.log ${BUILD_URL}consoleText")
-              sh("cp tests/scripts/ci_report/report.py report.py")
-              sh("cp tests/scripts/ci_report/status.py status.py")
+              sh("wget https://github.com/Rhett-Ying/dgl/blob/ci_refine/tests/scripts/ci_report/report.py")
+              sh("wget https://github.com/Rhett-Ying/dgl/blob/ci_refine/tests/scripts/ci_report/status.py")
               sh("curl -L ${BUILD_URL}wfapi")
               sh("cat status.py")
               sh("pytest --html=report.html --self-contained-html report.py || true")
