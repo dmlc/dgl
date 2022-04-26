@@ -12,6 +12,7 @@ for v in response['stages']:
     if 'FAILED' in v['status']:
         status = "❌ CI test failed in Stage[{}].".format(v['name'])
         break
+print(status)
 print(response)
 
 comment = f""" {JOB_NAME}
