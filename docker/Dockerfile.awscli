@@ -4,12 +4,13 @@ FROM ubuntu:latest
 # and install (with the yes flag `-y`)
 # Python and Pip
 RUN apt-get update && apt-get install -y \
-    python3.8 \
+    python3-dev \
     python3-pip
 
 RUN apt-get install -y \
         unzip \
         curl \
+        wget \
     && apt-get clean \
     && curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" \
     && unzip awscliv2.zip \
