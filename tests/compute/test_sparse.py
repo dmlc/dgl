@@ -257,6 +257,9 @@ def test_edge_softmax(g, norm_by, shp, idtype):
 
         if F.backend_name != "jax":
             F.backward(F.reduce_sum(score2))
+            print("-------")
+            print(F.grad(e2))
+            print(grad_edata)
             assert F.allclose(F.grad(e2), grad_edata)
             print('backward passed')
 

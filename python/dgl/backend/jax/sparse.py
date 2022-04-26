@@ -1,9 +1,11 @@
+import numpy as onp
 import jax
 import jax.numpy as jnp
 from functools import partial
 import torch as th
 from distutils.version import LooseVersion
 from ...base import is_all, ALL
+from ...sparse import infer_broadcast_shape
 from ...sparse import _gspmm, _gspmm_hetero, _gsddmm, _gsddmm_hetero, _segment_reduce, _bwd_segment_cmp
 from ...sparse import _csrmm, _csrsum, _csrmask, _scatter_add, _update_grad_minmax_hetero
 from ...sparse import _gather_mm, _gather_mm_scatter, _segment_mm, _segment_mm_backward_B
@@ -40,6 +42,71 @@ __all__ = ['gspmm', 'gsddmm', 'edge_softmax', 'segment_reduce', 'scatter_add',
            'csrmm', 'csrsum', 'csrmask']
 
 
+from ... import utils as dgl_utils
+from ... import heterograph_index
+from ...heterograph_index import HeteroGraphIndex
+#
+def _flatten_HeteroGraphIndex(gidx):
+    adj, _ = gidx.adjacency_matrix(
+        etype=0,
+        transpose=False,
+        ctx=jax.devices('cpu')[0],
+    )
+
+    srctype, dsttype = gidx.metagraph.find_edge(0)
+    num_src = gidx.number_of_nodes(srctype)
+    num_dst = gidx.number_of_nodes(dsttype)
+
+    idx = adj.index
+
+    u = idx[0, :]
+    v = idx[1, :]
+    return ((u, v, num_src, num_dst), None)
+
+def _unflatten_HeteroGraphIndex(_, children):
+    u, v, num_src, num_dst = children
+    if u is None or v is None:
+        return None
+
+    return heterograph_index.create_unitgraph_from_coo(
+        1, num_src, num_dst, u, v, ["coo"],
+    )
+
+jax.tree_util.register_pytree_node(
+    HeteroGraphIndex,
+    _flatten_HeteroGraphIndex,
+    _unflatten_HeteroGraphIndex,
+)
+
+@jax.jit
+def scatter_add(x, index, source):
+    pointers = jnp.meshgrid(*[jnp.arange(axis) for axis in x.shape], sparse=True, indexing="ij")
+    pointers[0] = index
+    x = x.at[tuple(pointers)].add(source)
+    return x
+
+@jax.jit
+def _gather(x, index):
+    pointers = jnp.meshgrid(*[jnp.arange(axis) for axis in x.shape], sparse=True, indexing="ij")
+    pointers[0] = index
+    return x[tuple(pointers)]
+
+
+# def scatter(input, dim, index, src, reduce=None):
+#   idx = jnp.meshgrid(*(jnp.arange(n) for n in input.shape), sparse=True)
+#   idx[dim] = index
+#   return getattr(input.at[tuple(idx)], reduce or "set")(src)
+#
+# def ndenumerate(shape):
+#     from itertools import product
+#     return product(*(range(axis) for axis in shape))
+#
+# def scatter_add(x, index, source):
+#     pointers = ndenumerate(x.shape)
+#     for pointer in pointers:
+#         x = x.at[(int(index[pointer]), ) + pointer[1:]].add(source[pointer])
+#     return x
+
 def _reduce_grad(grad, shape):
     """Reduce gradient on the broadcast dimension
     If there is broadcast in forward pass, gradients need to be reduced on
@@ -65,11 +132,11 @@ def _reduce_grad(grad, shape):
     num_to_squeeze = len(grad_shape) - len(in_shape)
     # pad inshape
     in_shape = (1,) * num_to_squeeze + in_shape
-    reduce_idx = jnp.nonzero(jnp.tensor(grad_shape) - jnp.tensor(in_shape))
+    reduce_idx = jnp.nonzero(jnp.array(grad_shape) - jnp.array(in_shape))[0]
     reduce_idx += 1  # skip batch dim
     if len(reduce_idx) > 0:
-        grad = grad.sum(dim=tuple(reduce_idx), keepdim=True)
-    return grad.view(-1, *shape[1:])
+        grad = grad.sum(axis=tuple(reduce_idx), keepdims=True)
+    return grad.reshape((-1, *shape[1:]))
 
 
 def _need_reduce_last_dim(ufeat, efeat):
@@ -84,8 +151,8 @@ def _need_reduce_last_dim(ufeat, efeat):
 
 
 def _expand(x, shape):
-    return x.expand(-1, *shape)
-
+    # return x.expand(-1, *shape)
+    return jnp.broadcast_to(x, (x.shape[0], *shape))
 
 def spmm_cache_X(binary_op, reduce_op, req_grad_X, req_grad_Y):
     """Rules to identify whether to cache X in SpMM forward stage."""
@@ -125,7 +192,6 @@ def spmm_cache_argY(binary_op, reduce_op, req_grad_X, req_grad_Y):
             return True
     return False
 
-
 @partial(jax.custom_vjp, nondiff_argnums=(0, 1, 2))
 def GSpMM(gidx, op, reduce_op, X, Y):
     out, (argX, argY) = _gspmm(gidx, op, reduce_op, X, Y)
@@ -136,10 +202,8 @@ def GSpMM_fwd(gidx, op, reduce_op, X, Y):
     reduce_last = _need_reduce_last_dim(X, Y)
     X_shape = X.shape if X is not None else None
     Y_shape = Y.shape if Y is not None else None
-    dtype = X.dtype if X is not None else Y.dtype
-    device = X.device if X is not None else Y.device
-    req_grad_X = X.requires_grad if X is not None else False
-    req_grad_Y = Y.requires_grad if Y is not None else False
+    req_grad_X = True # X.requires_grad if X is not None else False
+    req_grad_Y = True # Y.requires_grad if Y is not None else False
     if not spmm_cache_X(op, reduce_op, req_grad_X, req_grad_Y):
         X = None
     if not spmm_cache_Y(op, reduce_op, req_grad_X, req_grad_Y):
@@ -148,12 +212,16 @@ def GSpMM_fwd(gidx, op, reduce_op, X, Y):
         argX = None
     if not spmm_cache_argY(op, reduce_op, req_grad_X, req_grad_Y):
         argY = None
-    cache = (gidx, op, reduce_op, X_shape, Y_shape, dtype, device, reduce_last, X, Y, argX, argY)
+    cache = (X, Y, argX, argY, X_shape, Y_shape)
     return out, cache
 
-def GSpMM_bwd(cache, dZ):
-    gidx, op, reduce_op, X_shape, Y_shape, dtype, device, reduce_last, X, Y, argX, argY = cache
-    if op != 'copy_rhs' and ctx.needs_input_grad[3]:
+def GSpMM_bwd(gidx, op, reduce_op, cache, dZ):
+    X, Y, argX, argY, X_shape, Y_shape = cache
+    dtype, device = dZ.dtype, dZ.device
+    reduce_last = _need_reduce_last_dim(X, Y)
+    req_grad_X = True # X.requires_grad if X is not None else False
+    req_grad_Y = True # Y.requires_grad if Y is not None else False
+    if op != 'copy_rhs':
         g_rev = gidx.reverse()
         if reduce_op == 'sum':
             if op == 'mul':
@@ -163,18 +231,33 @@ def GSpMM_bwd(cache, dZ):
             elif op == 'copy_lhs':
                 dX = gspmm(g_rev, 'copy_lhs', 'sum', dZ, None)
         else:  # max/min
-            dX = th.zeros((X_shape[0],) + dZ.shape[1:],
-                          dtype=dtype, device=device)
+            dX = jnp.zeros((X_shape[0],) + dZ.shape[1:], dtype=dtype)
             if op == 'mul':
-                grad = _expand(Y, dZ.shape[1:]).gather(
-                    0, argY.long()) * dZ
-                dX.scatter_add_(0, argX.long(), grad)
+                # grad = _expand(Y, dZ.shape[1:]).gather(
+                #     0, argY.long()) * dZ
+
+                # grad = jnp.take(
+                #     _expand(Y, dZ.shape[1:]),
+                #     argY,
+                #     axis=0
+                # ) * dZ
+
+                grad = _gather(
+                    _expand(Y, dZ.shape[1:]),
+                    argY,
+                ) * dZ
+
+                # dX.scatter_add_(0, argX.long(), grad)
+                dX = scatter_add(dX, argX, grad)
             elif op in ['add', 'copy_lhs']:
-                dX.scatter_add_(0, argX.long(), dZ)
+                # dX.scatter_add_(0, argX.long(), dZ)
+                dX = scatter_add(dX, argX, dZ)
+
+
         dX = _reduce_grad(dX, X_shape)
     else:  # X has not gradient
         dX = None
-    if op != 'copy_lhs' and ctx.needs_input_grad[4]:
+    if op != 'copy_lhs':
         if reduce_op == 'sum':
             if op == 'mul' and reduce_last:
                 dY = gsddmm(gidx, 'dot', X, dZ)
@@ -183,18 +266,23 @@ def GSpMM_bwd(cache, dZ):
             elif op in ['add', 'copy_rhs']:
                 dY = gsddmm(gidx, 'copy_rhs', X, dZ)
         else:  # max/min
-            dY = th.zeros((Y_shape[0],) + dZ.shape[1:],
-                          dtype=dtype, device=device)
+            dY = jnp.zeros((Y_shape[0],) + dZ.shape[1:], dtype=dtype)
             if op == 'mul':
-                grad = _expand(X, dZ.shape[1:]).gather(
-                    0, argX.long()) * dZ
-                dY.scatter_add_(0, argY.long(), grad)
+
+                grad = _gather(
+                    _expand(X, dZ.shape[1:]),
+                    argX,
+                ) * dZ
+
+                # dY.scatter_add_(0, argY.long(), grad)
+                dY = scatter_add(dY, argY, grad)
             elif op in ['add', 'copy_rhs']:
-                dY.scatter_add_(0, argY.long(), dZ)
+                # dY.scatter_add_(0, argY.long(), dZ)
+                dY = scatter_add(dY, argY, dZ)
         dY = _reduce_grad(dY, Y_shape)
     else:  # Y has no gradient
         dY = None
-    return None, None, None, dX, dY
+    return dX, dY
 
 GSpMM.defvjp(GSpMM_fwd, GSpMM_bwd)
 
@@ -226,11 +314,11 @@ def GSDDMM_fwd(gidx, op, X, Y, lhs_target, rhs_target):
         X = None
     if not sddmm_cache_Y(op, req_grad_X, req_grad_Y):
         Y = None
-    cache = gidx, op, lhs_target, rhs_target, X_shape, Y_shape, X, Y
+    cache = X, Y, X_shape, Y_shape
     return out, cache
 
-def GSDDMM_bwd(cache, dZ):
-    gidx, op, lhs_target, rhs_target, X_shape, Y_shape, X, Y = cache
+def GSDDMM_bwd(gidx, op, lhs_target, rhs_target, cache, dZ):
+    X, Y, X_shape, Y_shape = cache
     if op != 'copy_rhs':
         if lhs_target in ['u', 'v']:
             _gidx = gidx if lhs_target == 'v' else gidx.reverse()
@@ -271,7 +359,7 @@ def GSDDMM_bwd(cache, dZ):
         dY = _reduce_grad(dY, Y_shape)
     else:
         dY = None
-    return None, None, dX, dY, None, None
+    return dX, dY
 
 GSDDMM.defvjp(GSDDMM_fwd, GSDDMM_bwd)
 
@@ -338,10 +426,10 @@ def EdgeSoftmax_fwd(gidx, score, eids, norm_by):
     else:
         out = _edge_softmax_forward(gidx, score, 'copy_rhs')
 
-    cache = (gidx, out)
+    cache = (out,)
     return out, cache
 
-def EdgeSoftmax_bwd(cache, grad_out):
+def EdgeSoftmax_bwd(gidx, eids, norm_by, cache, grad_out):
     """Backward function.
 
     Pseudo-code:
@@ -356,41 +444,51 @@ def EdgeSoftmax_bwd(cache, grad_out):
         grad_score = sds - out * sds_sum  # multiple expressions
         return grad_score.data
     """
-    gidx, out = cache
+    if norm_by == "src":
+        gidx = gidx.reverse()
+    out = cache[0]
     sds = out * grad_out
+    # print(out)
+    # print(sds)
     #Note: Now _edge_softmax_backward op only supports CPU
     #TODO(Zhejiang): We will support GPU in the future
     if jax.devices()[0].platform == "gpu":
         accum = gspmm(gidx, 'copy_rhs', 'sum', None, sds)
-
         grad_score = sds - gsddmm(gidx, 'mul', out, accum, 'e', 'v')
     else:
         grad_score = _edge_softmax_backward(gidx, out, sds)
-    return None, grad_score, None, None
+    # print(grad_score)
+    return (grad_score, )
 
 EdgeSoftmax.defvjp(EdgeSoftmax_fwd, EdgeSoftmax_bwd)
 
-@partial(jax.custom_vjp, nondiff_argnums=(0, 2))
+@partial(jax.custom_vjp, nondiff_argnums=(0,))
 def SegmentReduce(op, x, offsets):
     y, arg = _segment_reduce(op, x, offsets)
     return y
 
 def SegmentReduce_fwd(op, x, offsets):
     y, arg = _segment_reduce(op, x, offsets)
-    cache = (arg, offsets, op)
+    cache = (arg, )
     return y, cache
 
 def SegmentReduce_bwd(cache, dy):
-    (arg, offsets, op) = cache
+    arg = cache[0]
     m = offsets[-1].item()
     if op == 'sum':
         offsets = offsets[1:]
         # To address the issue of trailing zeros, related issue:
         # https://github.com/dmlc/dgl/pull/2610
-        indices = th.zeros(
-            (m + 1,), device=offsets.device, dtype=offsets.dtype)
-        indices.scatter_add_(0, offsets, th.ones_like(offsets))
-        indices = th.cumsum(indices, -1)[:-1]
+        indices = jnp.zeros(
+            (m + 1,), dtype=offsets.dtype)
+
+        indices = scatter_add(
+            indices,
+            offsets,
+            jnp.ones_like(offsets),
+        )
+
+        indices = jnp.cumsum(indices, -1)[:-1]
         dx = dy[indices]
     else:
         dx = _bwd_segment_cmp(dy, arg, m)
@@ -398,27 +496,13 @@ def SegmentReduce_bwd(cache, dy):
 
 SegmentReduce.defvjp(SegmentReduce_fwd, SegmentReduce_bwd)
 
-@partial(jax.custom_vjp, nondiff_argnums=(1, 2))
-def ScatterAdd(x, idx, m):
-    y = _scatter_add(x, idx, m)
-    return y
-
-def ScatterAdd_fwd(x, idx, m):
-    y = _scatter_add(x, idx, m)
-    cache = idx
-    return y, cache
-
-def ScatterAdd_bwd(cache, dy):
-    idx = cache
-    return dy[idx], None, None
-
 @partial(jax.custom_vjp, nondiff_argnums=(0, 2, 4))
 def CSRMM(gidxA, A_weights, gidxB, B_weights, num_vtypes):
     gidxC, C_weights = _csrmm(gidxA, A_weights, gidxB, B_weights, num_vtypes)
     nrows, ncols, C_indptr, C_indices, C_eids = gidxC.adjacency_matrix_tensors(0, False, 'csr')
     # Note: the returned C_indptr, C_indices and C_eids tensors MUST be the same
     # as the underlying tensors of the created graph gidxC.
-    return th.tensor(nrows), th.tensor(ncols), C_indptr, C_indices, C_eids, C_weights
+    return jnp.array(nrows), jnp.array(ncols), C_indptr, C_indices, C_eids, C_weights
 
 def CSRMM_fwd(gidxA, A_weights, gidxB, B_weights, num_vtypes):
     gidxC, C_weights = _csrmm(gidxA, A_weights, gidxB, B_weights, num_vtypes)
@@ -426,7 +510,7 @@ def CSRMM_fwd(gidxA, A_weights, gidxB, B_weights, num_vtypes):
     # Note: the returned C_indptr, C_indices and C_eids tensors MUST be the same
     # as the underlying tensors of the created graph gidxC.
     cache = gidxA, gidxB, gidxC, A_weights, B_weights
-    return (th.tensor(nrows), th.tensor(ncols), C_indptr, C_indices, C_eids, C_weights), cache
+    return (jnp.array(nrows), jnp.array(ncols), C_indptr, C_indices, C_eids, C_weights), cache
 
 def CSRMM_bwd(cache, dnrows, dncols, dC_indptr, dC_indices, dC_eids, dC_weights):
     gidxA, gidxB, gidxC, A_weights, B_weights = cache
@@ -436,7 +520,7 @@ def CSRMM_bwd(cache, dnrows, dncols, dC_indptr, dC_indices, dC_eids, dC_weights)
         gidxA.reverse(), A_weights, gidxC, dC_weights, gidxB.number_of_ntypes())
     dA_weights = csrmask(dgidxA, dA_weights, gidxA)
     dB_weights = csrmask(dgidxB, dB_weights, gidxB)
-    return None, dA_weights, None, dB_weights, None
+    return dA_weights, dB_weights
 
 CSRMM.defvjp(CSRMM_fwd, CSRMM_bwd)
 
@@ -485,6 +569,7 @@ def gspmm(gidx, op, reduce_op, lhs_data, rhs_data):
     if op == 'div':
         op = 'mul'
         rhs_data = 1. / rhs_data
+
     return GSpMM(gidx, op, reduce_op, lhs_data, rhs_data)
 
 def gsddmm(gidx, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
@@ -502,8 +587,8 @@ def edge_softmax(gidx, logits, eids=ALL, norm_by='dst'):
 def segment_reduce(op, x, offsets):
     return SegmentReduce(op, x, offsets)
 
-def scatter_add(x, idx, m):
-    return ScatterAdd(x, idx, m)
+# def scatter_add(x, idx, m):
+#     return ScatterAdd(x, idx, m)
 
 def csrmm(gidxA, A_weights, gidxB, B_weights, num_vtypes):
     nrows, ncols, C_indptr, C_indices, C_eids, C_weights = \

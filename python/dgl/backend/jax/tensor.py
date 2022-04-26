@@ -67,7 +67,7 @@ class SparseMatrix2D(SparseMatrix):
         self._shape = shape
 
     def __hash__(self):
-        return hash((self.index, self.data, self.shape))
+        return hash((self.index.tobytes(), self.data.tobytes(), self.shape))
 
     def to_dense(self):
         dense = jnp.zeros(self.shape, self.dtype)
@@ -138,12 +138,12 @@ def _flatten_SparseMatrix2D(x):
 
 def _unflatten_SparseMatrix2D(aux_data, children):
     return SparseMatrix2D(*children)
-
-jax.tree_util.register_pytree_node(
-    SparseMatrix2D,
-    _flatten_SparseMatrix2D,
-    _unflatten_SparseMatrix2D
-)
+#
+# jax.tree_util.register_pytree_node(
+#     SparseMatrix2D,
+#     _flatten_SparseMatrix2D,
+#     _unflatten_SparseMatrix2D
+# )
 
 def get_preferred_sparse_format():
     return "coo"
