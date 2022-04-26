@@ -8,8 +8,9 @@ BUILD_ID = os.getenv("BUILD_ID")
 job_link = os.environ["BUILD_URL"]
 response = requests.get('{}wfapi'.format(job_link)).json()
 # IN_PROGRESS is expected, sincce the pipeline is not finished when executing this script
-success = response["status"] in ['SUCCESS', 'IN_PROGRESS']
-
+success = response["result"] in ['SUCCESS', 'IN_PROGRESS']
+print(success)
+print(response)
 if success:
     status = "✅ CI test succeeded"
 else:
@@ -17,7 +18,6 @@ else:
 
 
 comment = f""" {JOB_NAME}
-{response}
 {status} \n
 Report at [link](https://dgl-ci-result.s3.us-west-2.amazonaws.com/{JOB_NAME}/{BUILD_NUMBER}/{BUILD_ID}/logs/report.html) \n
 Full logs at [link](https://dgl-ci-result.s3.us-west-2.amazonaws.com/{JOB_NAME}/{BUILD_NUMBER}/{BUILD_ID}/logs/cireport.log)
