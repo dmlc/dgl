@@ -476,12 +476,12 @@ pipeline {
     always {
       script {
         node("linux-core-worker") {
-          docker.image('dgllib/dgl-ci-awscli:v220418').inside("--pull always --entrypoint=''") {
+          docker.image('dgllib/dgl-ci-awscli:v220426').inside("--pull always --entrypoint=''") {
             sh("rm -rf ci_tmp")
             dir('ci_tmp') {
               sh("curl -o cireport.log ${BUILD_URL}consoleText")
-              sh("curl -o report.py https://github.com/Rhett-Ying/dgl/blob/ci_refine/tests/scripts/ci_report/report.py")
-              sh("curl -o status.py https://github.com/Rhett-Ying/dgl/blob/ci_refine/tests/scripts/ci_report/status.py")
+              sh("wget https://github.com/Rhett-Ying/dgl/blob/ci_refine/tests/scripts/ci_report/report.py")
+              sh("wget https://github.com/Rhett-Ying/dgl/blob/ci_refine/tests/scripts/ci_report/status.py")
               sh("curl -L ${BUILD_URL}wfapi")
               sh("cat status.py")
               sh("pytest --html=report.html --self-contained-html report.py || true")
