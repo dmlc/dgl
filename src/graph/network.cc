@@ -250,19 +250,19 @@ DGL_REGISTER_GLOBAL("network._CAPI_DGLSenderAddReceiver")
     int recv_id = args[3];
     network::Sender* sender = static_cast<network::Sender*>(chandle);
     std::string addr;
-    if (sender->Type() == "socket") {
+    if (sender->NetType() == "socket") {
       addr = StringPrintf("socket://%s:%d", ip.c_str(), port);
     } else {
-      LOG(FATAL) << "Unknown communicator type: " << sender->Type();
+      LOG(FATAL) << "Unknown communicator type: " << sender->NetType();
     }
-    sender->AddReceiver(addr.c_str(), recv_id);
+    sender->ConnectReceiver(addr.c_str(), recv_id);
   });
 
 DGL_REGISTER_GLOBAL("network._CAPI_DGLSenderConnect")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     CommunicatorHandle chandle = args[0];
     network::Sender* sender = static_cast<network::Sender*>(chandle);
-    if (sender->Connect() == false) {
+    if (sender->ConnectReceiverFinalize() == false) {
       LOG(FATAL) << "Sender connection failed.";
     }
   });
@@ -275,10 +275,10 @@ DGL_REGISTER_GLOBAL("network._CAPI_DGLReceiverWait")
     int num_sender = args[3];
     network::Receiver* receiver = static_cast<network::SocketReceiver*>(chandle);
     std::string addr;
-    if (receiver->Type() == "socket") {
+    if (receiver->NetType() == "socket") {
       addr = StringPrintf("socket://%s:%d", ip.c_str(), port);
     } else {
-      LOG(FATAL) << "Unknown communicator type: " << receiver->Type();
+      LOG(FATAL) << "Unknown communicator type: " << receiver->NetType();
     }
     if (receiver->Wait(addr.c_str(), num_sender) == false) {
       LOG(FATAL) << "Wait sender socket failed.";
