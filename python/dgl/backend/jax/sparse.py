@@ -34,19 +34,21 @@ def _flatten_HeteroGraphIndex(gidx):
     num_src = gidx.number_of_nodes(srctype)
     num_dst = gidx.number_of_nodes(dsttype)
 
+    num_ntypes = 2 - int(srctype == dsttype)
+
     idx = adj.index
 
     u = idx[0, :]
     v = idx[1, :]
-    return ((u, v, num_src, num_dst), None)
+    return ((u, v, num_src, num_dst, num_ntypes), None)
 
 def _unflatten_HeteroGraphIndex(_, children):
-    u, v, num_src, num_dst = children
+    u, v, num_src, num_dst, num_ntypes = children
     if u is None or v is None:
         return None
 
     return heterograph_index.create_unitgraph_from_coo(
-        1, num_src, num_dst, u, v, ["coo"],
+        num_ntypes, num_src, num_dst, u, v, ["coo", "csr"],
     )
 
 jax.tree_util.register_pytree_node(
@@ -486,11 +488,12 @@ def CSRMM_fwd(gidxA, A_weights, gidxB, B_weights, num_vtypes):
     nrows, ncols, C_indptr, C_indices, C_eids = gidxC.adjacency_matrix_tensors(0, False, 'csr')
     # Note: the returned C_indptr, C_indices and C_eids tensors MUST be the same
     # as the underlying tensors of the created graph gidxC.
-    cache = gidxA, gidxB, gidxC, A_weights, B_weights
+    cache = A_weights, B_weights, gidxC
     return (jnp.array(nrows), jnp.array(ncols), C_indptr, C_indices, C_eids, C_weights), cache
 
-def CSRMM_bwd(cache, dnrows, dncols, dC_indptr, dC_indices, dC_eids, dC_weights):
-    gidxA, gidxB, gidxC, A_weights, B_weights = cache
+def CSRMM_bwd(gidxA, gidxB, num_vtypes, cache, dZ):
+    dnrows, dncols, dC_indptr, dC_indices, dC_eids, dC_weights = dZ
+    A_weights, B_weights, gidxC = cache
     dgidxA, dA_weights = csrmm(
         gidxC, dC_weights, gidxB.reverse(), B_weights, gidxA.number_of_ntypes())
     dgidxB, dB_weights = csrmm(
@@ -501,15 +504,14 @@ def CSRMM_bwd(cache, dnrows, dncols, dC_indptr, dC_indices, dC_eids, dC_weights)
 
 CSRMM.defvjp(CSRMM_fwd, CSRMM_bwd)
 
-@partial(jax.custom_vjp, nondiff_argnums=(0))
-def CSRSum(gidx, *weights):
+@partial(jax.custom_vjp, nondiff_argnums=(0,))
+def CSRSum(gidxs, *weights):
     gidxC, C_weights = _csrsum(gidxs, weights)
     nrows, ncols, C_indptr, C_indices, C_eids = gidxC.adjacency_matrix_tensors(
         0, False, 'csr')
     # Note: the returned C_indptr, C_indices and C_eids tensors MUST be the same
     # as the underlying tensors of the created graph gidxC.
-    cache = gidxs, gidxC
-    return th.tensor(nrows), th.tensor(ncols), C_indptr, C_indices, C_eids, C_weights
+    return jnp.array(nrows), jnp.array(ncols), C_indptr, C_indices, C_eids, C_weights
 
 def CSRSum_fwd(gidxs, *weights):
     # PyTorch tensors must be explicit arguments of the forward function
@@ -518,12 +520,13 @@ def CSRSum_fwd(gidxs, *weights):
         0, False, 'csr')
     # Note: the returned C_indptr, C_indices and C_eids tensors MUST be the same
     # as the underlying tensors of the created graph gidxC.
-    cache = gidxs, gidxC
-    return (th.tensor(nrows), th.tensor(ncols), C_indptr, C_indices, C_eids, C_weights), cache
+    cache = (gidxC, )
+    return (jnp.tensor(nrows), jnp.tensor(ncols), C_indptr, C_indices, C_eids, C_weights), cache
 
-def CSRSum_bwd(cache, dnrows, dncols, dC_indptr, dC_indices, dC_eids, dC_weights):
-    gidxs, gidxC = cache
-    return (None,) + tuple(csrmask(gidxC, dC_weights, gidx) for gidx in gidxs)
+def CSRSum_bwd(gidx, cache, dZ):
+    dnrows, dncols, dC_indptr, dC_indices, dC_eids, dC_weights = dZ
+    gidxC = cache[0]
+    return tuple(csrmask(gidxC, dC_weights, gidx) for gidx in gidxs)
 
 CSRSum.defvjp(CSRMM_fwd, CSRMM_bwd)
 
@@ -532,12 +535,14 @@ def CSRMask(gidxA, A_weights, gidxB):
     return _csrmask(gidxA, A_weights, gidxB)
 
 def CSRMask_fwd(gidxA, A_weights, gidxB):
-    cache = gidxA, gidxB
+    cache = None
     return _csrmask(gidxA, A_weights, gidxB), cache
 
-def CSRMask_bwd(cache, dB_weights):
+def CSRMask_bwd(gidxA, gidxB, cache, dB_weights):
     gidxA, gidxB = cache
-    return None, csrmask(gidxB, dB_weights, gidxA), None
+    return csrmask(gidxB, dB_weights, gidxA)
+
+CSRMask.defvjp(CSRMask_fwd, CSRMask_bwd)
 
 def gspmm(gidx, op, reduce_op, lhs_data, rhs_data):
     if op == 'sub':
