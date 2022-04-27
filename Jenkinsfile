@@ -351,27 +351,25 @@ pipeline {
                   alwaysPull true
                 }
               }
-              stages {
-                stage('Torch CPU Unit test') {
+              stage('Torch CPU Unit test') {
+                steps {
+                  unit_test_linux('pytorch', 'cpu')
+                }
+              }
+              parallel {
+                stage('Torch CPU Example test') {
                   steps {
-                    unit_test_linux('pytorch', 'cpu')
+                    example_test_linux('pytorch', 'cpu')
                   }
                 }
-                parallel {
-                  stage('Torch CPU Example test') {
-                    steps {
-                      example_test_linux('pytorch', 'cpu')
-                    }
+                stage('Torch CPU Tutorial test') {
+                  steps {
+                    tutorial_test_linux('pytorch')
                   }
-                  stage('Torch CPU Tutorial test') {
-                    steps {
-                      tutorial_test_linux('pytorch')
-                    }
-                  }
-                  stage('DGL-Go test') {
-                    steps {
-                      go_test_linux()
-                    }
+                }
+                stage('DGL-Go test') {
+                  steps {
+                    go_test_linux()
                   }
                 }
               }
