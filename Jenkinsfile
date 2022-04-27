@@ -95,7 +95,11 @@ def tutorial_test_linux(backend) {
 }
 
 def go_test_linux() {
-
+  init_git()
+  unpack_lib('dgl-cpu-linux', dgl_linux_libs)
+  timeout(time: 20, unit: 'MINUTES') {
+    sh "bash tests/scripts/task_go_test.sh"
+  }
 }
 
 def is_authorized(name) {
