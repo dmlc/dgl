@@ -845,7 +845,7 @@ class DataLoader(torch.utils.data.DataLoader):
             self.cpu_cores = (cpu_worker_affinity_cores
                                 if len(cpu_worker_affinity_cores)
                                 else range(0, nw_work))
-            worker_init_fn = self.worker_init_function
+            worker_init_fn = WorkerInitWrapper(self.worker_init_function)
 
         super().__init__(
             self.dataset,
