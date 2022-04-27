@@ -31,7 +31,7 @@ popd
 
 pushd python
 for backend in pytorch mxnet tensorflow
-do 
+do
 conda activate "${backend}-ci"
 rm -rf build *.egg-info dist
 pip uninstall -y dgl
@@ -40,4 +40,12 @@ python3 setup.py install
 # test inplace build (for cython)
 python3 setup.py build_ext --inplace
 done
+popd
+
+# install DGL-Go
+pushd dglgo
+conda activate "pytorch-ci"
+rm -rf build *.egg-info dist
+pip uninstall -y dglgo
+python3 setup.py install
 popd
