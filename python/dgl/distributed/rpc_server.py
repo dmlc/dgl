@@ -96,9 +96,9 @@ def start_server(server_id, ip_config, num_servers, num_clients, server_state, \
                 while not rpc.connect_receiver(client_ip, client_port, client_id, group_id):
                     try_times += 1
                     if try_times >= max_try_times:
-                        raise DGLError("Failed to connect receiver[{}:{}] after retry {} times. "
-                                       "Please check availability of target receiver or change max "
-                                       "try times via env 'DGL_DIST_MAX_TRY_TIMES'.".format(
+                        raise DGLError("Failed to connect to receiver [{}:{}] after {} retries. "
+                                       "Please check availability of this target receiver or change "
+                                       "the max retry times via 'DGL_DIST_MAX_TRY_TIMES'..".format(
                             client_ip, client_port, max_try_times))
                     time.sleep(1)
             rpc.connect_receiver_finalize()
