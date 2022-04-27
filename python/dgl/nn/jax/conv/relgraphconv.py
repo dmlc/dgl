@@ -217,11 +217,7 @@ class RelGraphConv(nn.Module):
                 w = weight[etype]
                 src = edges.src['h'][loc]
                 sub_msg = jnp.matmul(src, w)
-                msg = jax.ops.index_update(
-                    msg,
-                    loc,
-                    sub_msg
-                )
+                msg = msg.at[loc].set(sub_msg)
         else:
             # put W_r into edges then do msg @ W_r
             msg = utils.bmm_maybe_select(edges.src['h'], weight, edges.data['type'])

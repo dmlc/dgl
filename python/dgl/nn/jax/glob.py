@@ -9,6 +9,8 @@ from ...backend import jax as F
 from ...readout import sum_nodes, mean_nodes, max_nodes, broadcast_nodes,\
     softmax_nodes, topk_nodes
 
+from functools import partial
+
 
 __all__ = ['SumPooling', 'AvgPooling', 'MaxPooling', 'SortPooling',
            'GlobalAttentionPooling', 'Set2Set',
@@ -477,6 +479,7 @@ class MultiHeadAttention(nn.Module):
     d_ff: int
     dropouth: float = 0.0
     dropouta: float = 0.0
+    train: bool = True
 
     def setup(self):
         self.proj_q = nn.Dense(self.num_heads * self.d_head, use_bias=False)
@@ -503,6 +506,8 @@ class MultiHeadAttention(nn.Module):
         lengths_mem : list
             The array of node numbers, used to segment mem.
         """
+
+
         batch_size = len(lengths_x)
         max_len_x = max(lengths_x)
         max_len_mem = max(lengths_mem)
@@ -524,11 +529,8 @@ class MultiHeadAttention(nn.Module):
         # generate mask
         mask = jnp.zeros((batch_size, max_len_x, max_len_mem))
         for i in range(batch_size):
-            mask = jax.ops.index_update(
-                mask,
-                jax.ops.index[i, :lengths_x[i], :lengths_mem[i]],
-                1,
-            )
+            mask = mask.at[i, :lengths_x[i], :lengths_mem[i]].set(1)
+
         mask = jnp.expand_dims(mask, 1)
 
         e = jnp.where(
@@ -553,8 +555,9 @@ class MultiHeadAttention(nn.Module):
         # inter norm
         ffn_x = nn.Dense(self.d_model)(
             nn.relu(
-                nn.Dropout(self.dropouth)(
-                    nn.Dense(self.d_ff)(x)
+                nn.Dropout(rate=self.dropouth)(
+                    nn.Dense(self.d_ff)(x),
+                    deterministic=not self.train,
                 )
             )
         )
@@ -657,6 +660,7 @@ class PMALayer(nn.Module):
     d_ff: int
     dropouth: float = 0.0
     dropouta: float = 0.0
+    train: bool=False
 
     def setup(self):
         self.seed_vectors = self.param(
@@ -690,8 +694,9 @@ class PMALayer(nn.Module):
 
         ffn_feat = nn.Dense(self.d_model)(
             nn.relu(
-                nn.Dropout(self.dropouth)(
-                    nn.Dense(self.d_ff)(feat)
+                nn.Dropout(rate=self.dropouth)(
+                    nn.Dense(self.d_ff)(feat),
+                    deterministic=not self.train,
                 )
             )
         )

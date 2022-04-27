@@ -245,14 +245,23 @@ def test_set_trans():
 
     # test#1: basic
     h0 = F.randn((g.number_of_nodes(), 50))
-    init_params = st_enc_0.init(jax.random.PRNGKey(2666), g, h0)
+    init_params = st_enc_0.init(
+        {'params': jax.random.PRNGKey(2666), 'dropout': jax.random.PRNGKey(2666)},
+        g, h0
+    )
     h1 = st_enc_0.apply(init_params, g, h0)
     assert h1.shape == h0.shape
 
-    init_params = st_enc_1.init(jax.random.PRNGKey(2666), g, h0)
+    init_params = st_enc_1.init(
+        {'params': jax.random.PRNGKey(2666), 'dropout': jax.random.PRNGKey(2666)},
+        g, h0
+    )
     h1 = st_enc_1.apply(init_params, g, h0)
     assert h1.shape == h0.shape
-    init_params = st_dec.init(jax.random.PRNGKey(2666), g, h1)
+    init_params = st_dec.init(
+        {'params': jax.random.PRNGKey(2666), 'dropout': jax.random.PRNGKey(2666)},
+        g, h0
+    )
     h2 = st_dec.apply(init_params, g, h1)
     assert h2.shape[0] == 1 and h2.shape[1] == 200 and h2.ndim == 2
 
@@ -286,7 +295,7 @@ def test_rgcn():
     rgc_basis = nn.RelGraphConv(I, O, R, "basis", B)
     rgc_basis_low = nn.RelGraphConv(I, O, R, "basis", B, low_mem=True)
     h = F.randn((100, I))
-    r = F.tensor(etype)
+    r = F.tensor(etype, jnp.int32)
     init_params = rgc_basis.init(jax.random.PRNGKey(2666), g, h, r)
     h_new = rgc_basis.apply(init_params, g, h, r)
     init_params = rgc_basis_low.init(jax.random.PRNGKey(2666), g, h, r)
@@ -353,7 +362,7 @@ def test_gat_conv(g, idtype):
     h = gat.apply(init_params, g, feat)
     assert h.shape == (g.number_of_nodes(), 4, 2)
 
-    init_params = gat.init(jax.random.PRNGKey(2666), g, feat, get_attention=True)
+    init_params = gat.init({'params': jax.random.PRNGKey(2666), 'dropout': jax.random.PRNGKey(2666)}, g, feat, get_attention=True)
     _, a = gat.apply(init_params, g, feat, get_attention=True)
     assert a.shape == (g.number_of_edges(), 4, 1)
 

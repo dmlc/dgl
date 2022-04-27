@@ -143,6 +143,7 @@ class GATConv(nn.Module):
     residual: bool = False
     activation: bool = None
     allow_zero_in_degree: bool = False
+    train: bool = True
 
     def setup(self):
         if isinstance(self.in_feats, tuple):
@@ -182,7 +183,7 @@ class GATConv(nn.Module):
 
         if not hasattr(self, 'fc_src'):
             self.fc_src = lambda x: self.fc(x)
-            self.fc_dst = lambda x: self.fc(x) 
+            self.fc_dst = lambda x: self.fc(x)
 
     def set_allow_zero_in_degree(self, set_value):
         r"""
@@ -248,13 +249,15 @@ class GATConv(nn.Module):
                                    'suppress the check and let the code run.')
 
             if isinstance(feat, tuple):
-                h_src = nn.Dropout(self.feat_drop)(feat[0])
-                h_dst = nn.Dropout(self.feat_drop)(feat[1])
+                h_src = nn.Dropout(self.feat_drop)(feat[0], deterministic=not self.train)
+                h_dst = nn.Dropout(self.feat_drop)(feat[1], deterministic=not self.train)
 
                 feat_src = self.fc_src(h_src).reshape((-1, self.num_heads, self.out_feats))
                 feat_dst = self.fc_dst(h_dst).reshape((-1, self.num_heads, self.out_feats))
             else:
-                h_src = h_dst = nn.Dropout(self.feat_drop)(feat)
+                h_src = h_dst = nn.Dropout(rate=self.feat_drop)(
+                    feat, deterministic=not self.train,
+                )
                 feat_src = feat_dst = self.fc(h_src).reshape((
                     -1, self.num_heads, self.out_feats))
                 if graph.is_block:
@@ -277,7 +280,7 @@ class GATConv(nn.Module):
             graph.apply_edges(fn.u_add_v('el', 'er', 'e'))
             e = nn.leaky_relu(graph.edata.pop('e'), self.negative_slop)
             # compute softmax
-            graph.edata['a'] = nn.Dropout(self.attn_drop)(edge_softmax(graph, e))
+            graph.edata['a'] = nn.Dropout(self.attn_drop)(edge_softmax(graph, e), deterministic=not self.train)
             # message passing
             graph.update_all(fn.u_mul_e('ft', 'a', 'm'),
                              fn.sum('m', 'ft'))
