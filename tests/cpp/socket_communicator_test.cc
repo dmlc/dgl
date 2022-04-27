@@ -66,7 +66,7 @@ void start_client() {
   for (int i = 0; i < kNumReceiver; ++i) {
     sender.ConnectReceiver(ip_addr[i], i);
   }
-  sender.Connect();
+  sender.ConnectReceiverFinalize();
   for (int i = 0; i < kNumMessage; ++i) {
     for (int n = 0; n < kNumReceiver; ++n) {
       char* str_data = new char[9];

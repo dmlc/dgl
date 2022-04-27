@@ -46,12 +46,17 @@ class TPSender : public RPCSender {
   ~TPSender() { Finalize(); }
 
   /*!
-   * \brief Connect to receiver with address and ID
+   * \brief Connect to a receiver.
+   * 
+   * When there are multiple receivers to be connected, application will call `ConnectReceiver`
+   * for each and then call `ConnectReceiverFinalize` to make sure that either all the connections are
+   * successfully established or some of them fail.
+   * 
    * \param addr Networking address, e.g., 'tcp://127.0.0.1:50091'
    * \param recv_id receiver's ID
    * \return True for success and False for fail
    *
-   * ConnectReceiver() is not thread-safe and only one thread can invoke this API.
+   * The function is *not* thread-safe; only one thread can invoke this API.
    */
   bool ConnectReceiver(const std::string& addr, int recv_id) override;
 

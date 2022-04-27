@@ -15,7 +15,7 @@ from .. import backend as F
 
 __all__ = ['set_rank', 'get_rank', 'Request', 'Response', 'register_service', \
 'create_sender', 'create_receiver', 'finalize_sender', 'finalize_receiver', \
-'receiver_wait', 'connect_receiver', 'read_ip_config', 'get_group_id', \
+'wait_for_senders', 'connect_receiver', 'read_ip_config', 'get_group_id', \
 'get_num_machines', 'set_num_machines', 'get_machine_id', 'set_machine_id', \
 'send_request', 'recv_request', 'send_response', 'recv_response', 'remote_call', \
 'send_request_to_machine', 'remote_call_to_machine', 'fast_pull', \
@@ -140,7 +140,7 @@ def finalize_receiver():
     """
     _CAPI_DGLRPCFinalizeReceiver()
 
-def receiver_wait(ip_addr, port, num_senders, blocking=True):
+def wait_for_senders(ip_addr, port, num_senders, blocking=True):
     """Wait all of the senders' connections.
 
     This api will be blocked until all the senders connect to the receiver.
@@ -156,7 +156,7 @@ def receiver_wait(ip_addr, port, num_senders, blocking=True):
     blocking : bool
         whether to wait blockingly
     """
-    _CAPI_DGLRPCReceiverWait(ip_addr, int(port), int(num_senders), blocking)
+    _CAPI_DGLRPCWaitForSenders(ip_addr, int(port), int(num_senders), blocking)
 
 def connect_receiver(ip_addr, port, recv_id, group_id=-1):
     """Connect to target receiver
@@ -175,9 +175,14 @@ def connect_receiver(ip_addr, port, recv_id, group_id=-1):
         raise DGLError("Invalid target id: {}".format(target_id))
     return _CAPI_DGLRPCConnectReceiver(ip_addr, int(port), int(target_id))
 
-def sender_connect():
-    """Connect to target socket receivers"""
-    _CAPI_DGLRPCSenderConnect()
+def connect_receiver_finalize():
+    """Finalize the action to connect to receivers. Make sure that either all connections are
+    successfully established or connection fails.
+
+    When "socket" network backend is in use, the function issues actual requests to receiver
+    sockets to establish connections.
+    """
+    _CAPI_DGLRPCConnectReceiverFinalize()
 
 def set_rank(rank):
     """Set the rank of this process.

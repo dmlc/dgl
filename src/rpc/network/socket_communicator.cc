@@ -55,7 +55,7 @@ bool SocketSender::ConnectReceiver(const std::string& addr, int recv_id) {
   return true;
 }
 
-bool SocketSender::Connect() {
+bool SocketSender::ConnectReceiverFinalize() {
   // Create N sockets for Receiver
   int receiver_count = static_cast<int>(receiver_addrs_.size());
   if (max_thread_count_ == 0 || max_thread_count_ > receiver_count) {

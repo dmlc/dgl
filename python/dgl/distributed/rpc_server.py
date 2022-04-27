@@ -73,8 +73,8 @@ def start_server(server_id, ip_config, num_servers, num_clients, server_state, \
     # accept new sender's connection
     print(
         "Server is waiting for connections on [{}:{}]...".format(ip_addr, port))
-    rpc.receiver_wait(ip_addr, port, num_clients,
-                      blocking=net_type == 'socket')
+    rpc.wait_for_senders(ip_addr, port, num_clients,
+                         blocking=net_type == 'socket')
     rpc.set_num_client(num_clients)
     recv_clients = {}
     while True:
@@ -101,9 +101,7 @@ def start_server(server_id, ip_config, num_servers, num_clients, server_state, \
                                        "try times via env 'DGL_DIST_MAX_TRY_TIMES'.".format(
                             client_ip, client_port, max_try_times))
                     time.sleep(1)
-            if net_type == 'socket':
-                # In 'socket' mode, 'connect_receiver' just adds receivers only.
-                rpc.sender_connect()
+            rpc.connect_receiver_finalize()
             if rpc.get_rank() == 0:  # server_0 send all the IDs
                 for client_id, _ in client_namebook.items():
                     register_res = rpc.ClientRegisterResponse(client_id)

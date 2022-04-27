@@ -170,9 +170,7 @@ def connect_to_server(ip_config, num_servers, max_queue_size=MAX_QUEUE_SIZE,
         server_port = addr[2]
         while not rpc.connect_receiver(server_ip, server_port, server_id):
             time.sleep(3)
-    if net_type == 'socket':
-        # In 'socket' mode, 'connect_receiver' just adds receivers only.
-        rpc.sender_connect()
+    rpc.connect_receiver_finalize()
     # Get local usable IP address and port
     ip_addr = get_local_usable_addr(server_ip)
     client_ip, client_port = ip_addr.split(':')
@@ -181,8 +179,8 @@ def connect_to_server(ip_config, num_servers, max_queue_size=MAX_QUEUE_SIZE,
     for server_id in range(num_servers):
         rpc.send_request(server_id, register_req)
     # wait server connect back
-    rpc.receiver_wait(client_ip, client_port, num_servers,
-                      blocking=net_type == 'socket')
+    rpc.wait_for_senders(client_ip, client_port, num_servers,
+                         blocking=net_type == 'socket')
     print("Client [{}] waits on {}:{}".format(
         os.getpid(), client_ip, client_port))
     # recv client ID from server

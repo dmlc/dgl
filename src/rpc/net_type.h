@@ -28,22 +28,28 @@ struct RPCBase {
 
 struct RPCSender : RPCBase {
   /*!
-   * \brief Add receiver's address and ID to the sender's namebook and connect
-   * \param addr Networking address, e.g., 'tcp://127.0.0.1:50091', 'mpi://0'
-   * \param id receiver's ID
+   * \brief Connect to a receiver.
+   * 
+   * When there are multiple receivers to be connected, application will call `ConnectReceiver`
+   * for each and then call `ConnectReceiverFinalize` to make sure that either all the connections are
+   * successfully established or some of them fail.
+   * 
+   * \param addr Networking address, e.g., 'tcp://127.0.0.1:50091'
+   * \param recv_id receiver's ID
    * \return True for success and False for fail
    *
-   * ConnectReceiver() is not thread-safe and only one thread can invoke this API.
+   * The function is *not* thread-safe; only one thread can invoke this API.
    */
   virtual bool ConnectReceiver(const std::string &addr, int recv_id) = 0;
 
   /*!
-   * \brief Connect with all the Receivers
+   * \brief Finalize the action to connect to receivers. Make sure that either
+   *        all connections are successfully established or connection fails.
    * \return True for success and False for fail
    *
-   * Connect() is not thread-safe and only one thread can invoke this API.
+   * The function is *not* thread-safe; only one thread can invoke this API.
    */
-  virtual bool Connect() { return true; }
+  virtual bool ConnectReceiverFinalize() { return true; }
 
   /*!
    * \brief Send RPCMessage to specified Receiver.
