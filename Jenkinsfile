@@ -351,12 +351,12 @@ pipeline {
                   alwaysPull true
                 }
               }
-              stage('Torch CPU Unit test') {
-                steps {
-                  unit_test_linux('pytorch', 'cpu')
+              stages {
+                stage('Torch CPU Unit test') {
+                  steps {
+                    unit_test_linux('pytorch', 'cpu')
+                  }
                 }
-              }
-              parallel {
                 stage('Torch CPU Example test') {
                   steps {
                     example_test_linux('pytorch', 'cpu')
@@ -367,7 +367,7 @@ pipeline {
                     tutorial_test_linux('pytorch')
                   }
                 }
-                stage('DGL-Go test') {
+                stage('DGL-Go CPU test') {
                   steps {
                     go_test_linux()
                   }
