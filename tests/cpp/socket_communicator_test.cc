@@ -171,7 +171,7 @@ static void start_client() {
   t.close();
   SocketSender sender(kQueueSize, kThreadNum);
   sender.ConnectReceiver(ip_addr.c_str(), 0);
-  sender.Connect();
+  sender.ConnectReceiverFinalize();
   char* str_data = new char[9];
   memcpy(str_data, "123456789", 9);
   Message msg = {str_data, 9};
