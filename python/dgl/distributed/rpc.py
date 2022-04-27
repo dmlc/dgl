@@ -15,7 +15,7 @@ from .. import backend as F
 
 __all__ = ['set_rank', 'get_rank', 'Request', 'Response', 'register_service', \
 'create_sender', 'create_receiver', 'finalize_sender', 'finalize_receiver', \
-'receiver_wait', 'connect_receiver', 'read_ip_config', 'get_group_id', \
+'wait_for_senders', 'connect_receiver', 'read_ip_config', 'get_group_id', \
 'get_num_machines', 'set_num_machines', 'get_machine_id', 'set_machine_id', \
 'send_request', 'recv_request', 'send_response', 'recv_response', 'remote_call', \
 'send_request_to_machine', 'remote_call_to_machine', 'fast_pull', \
@@ -112,7 +112,7 @@ def create_sender(max_queue_size, net_type):
     max_queue_size : int
         Maximal size (bytes) of network queue buffer.
     net_type : str
-        Networking type. Current options are: 'socket'.
+        Networking type. Current options are: 'socket', 'tensorpipe'.
     """
     max_thread_count = int(os.getenv('DGL_SOCKET_MAX_THREAD_COUNT', '0'))
     _CAPI_DGLRPCCreateSender(int(max_queue_size), net_type, max_thread_count)
@@ -125,7 +125,7 @@ def create_receiver(max_queue_size, net_type):
     max_queue_size : int
         Maximal size (bytes) of network queue buffer.
     net_type : str
-        Networking type. Current options are: 'socket'.
+        Networking type. Current options are: 'socket', 'tensorpipe'.
     """
     max_thread_count = int(os.getenv('DGL_SOCKET_MAX_THREAD_COUNT', '0'))
     _CAPI_DGLRPCCreateReceiver(int(max_queue_size), net_type, max_thread_count)
@@ -140,7 +140,7 @@ def finalize_receiver():
     """
     _CAPI_DGLRPCFinalizeReceiver()
 
-def receiver_wait(ip_addr, port, num_senders, blocking=True):
+def wait_for_senders(ip_addr, port, num_senders, blocking=True):
     """Wait all of the senders' connections.
 
     This api will be blocked until all the senders connect to the receiver.
@@ -156,7 +156,7 @@ def receiver_wait(ip_addr, port, num_senders, blocking=True):
     blocking : bool
         whether to wait blockingly
     """
-    _CAPI_DGLRPCReceiverWait(ip_addr, int(port), int(num_senders), blocking)
+    _CAPI_DGLRPCWaitForSenders(ip_addr, int(port), int(num_senders), blocking)
 
 def connect_receiver(ip_addr, port, recv_id, group_id=-1):
     """Connect to target receiver
@@ -174,6 +174,15 @@ def connect_receiver(ip_addr, port, recv_id, group_id=-1):
     if target_id < 0:
         raise DGLError("Invalid target id: {}".format(target_id))
     return _CAPI_DGLRPCConnectReceiver(ip_addr, int(port), int(target_id))
+
+def connect_receiver_finalize():
+    """Finalize the action to connect to receivers. Make sure that either all connections are
+    successfully established or connection fails.
+
+    When "socket" network backend is in use, the function issues actual requests to receiver
+    sockets to establish connections.
+    """
+    _CAPI_DGLRPCConnectReceiverFinalize()
 
 def set_rank(rank):
     """Set the rank of this process.
