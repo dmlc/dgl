@@ -1,6 +1,7 @@
 """Functions used by server."""
 
 import time
+import os
 from ..base import DGLError
 from . import rpc
 from .constants import MAX_QUEUE_SIZE, SERVER_EXIT, SERVER_KEEP_ALIVE
@@ -72,7 +73,8 @@ def start_server(server_id, ip_config, num_servers, num_clients, server_state, \
     # accept new sender's connection
     print(
         "Server is waiting for connections on [{}:{}]...".format(ip_addr, port))
-    rpc.receiver_wait(ip_addr, port, num_clients)
+    rpc.receiver_wait(ip_addr, port, num_clients,
+                      blocking=net_type == 'socket')
     rpc.set_num_client(num_clients)
     recv_clients = {}
     while True:
@@ -87,10 +89,17 @@ def start_server(server_id, ip_config, num_servers, num_clients, server_state, \
             ips.sort()
             client_namebook = dict(enumerate(ips))
             time.sleep(3) # wait for clients' receivers ready
+            max_try_times = int(os.environ.get('DGL_DIST_MAX_TRY_TIMES', 120))
             for client_id, addr in client_namebook.items():
                 client_ip, client_port = addr.split(':')
-                # TODO[Rhett]: server should not be blocked endlessly.
+                try_times = 0
                 while not rpc.connect_receiver(client_ip, client_port, client_id, group_id):
+                    try_times += 1
+                    if try_times >= max_try_times:
+                        raise DGLError("Failed to connect receiver[{}:{}] after retry {} times. "
+                                       "Please check availability of target receiver or change max "
+                                       "try times via env 'DGL_DIST_MAX_TRY_TIMES'.".format(
+                            client_ip, client_port, max_try_times))
                     time.sleep(1)
             if net_type == 'socket':
                 # In 'socket' mode, 'connect_receiver' just adds receivers only.

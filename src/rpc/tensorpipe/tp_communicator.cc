@@ -94,7 +94,7 @@ void TPReceiver::Finalize() {
   pipes_.clear();
 }
 
-bool TPReceiver::Wait(const std::string &addr, int num_sender) {
+bool TPReceiver::Wait(const std::string &addr, int num_sender, bool blocking) {
   if (listener_) {
     LOG(WARNING) << "TPReceiver::Wait() has been called already. Ignoring...";
     return true;
@@ -104,6 +104,8 @@ bool TPReceiver::Wait(const std::string &addr, int num_sender) {
   listener_->accept([this](const Error &error, std::shared_ptr<Pipe> pipe) {
     OnAccepted(error, pipe);
   });
+  while (blocking && (num_sender != num_connected_)) {
+  }
   return true;
 }
 

@@ -124,7 +124,7 @@ class TPReceiver : public RPCReceiver {
    *
    * Wait() is not thread-safe and only one thread can invoke this API.
    */
-  bool Wait(const std::string &addr, int num_sender) override;
+  bool Wait(const std::string &addr, int num_sender, bool blocking=true) override;
 
   /*!
    * \brief Recv RPCMessage from Sender. Actually removing data from queue.

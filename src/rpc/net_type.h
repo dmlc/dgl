@@ -58,11 +58,12 @@ struct RPCReceiver : RPCBase {
    * \brief Wait for all the Senders to connect
    * \param addr Networking address, e.g., 'tcp://127.0.0.1:50051', 'mpi://0'
    * \param num_sender total number of Senders
+   * \param blocking whether wait blockingly
    * \return True for success and False for fail
    *
    * Wait() is not thread-safe and only one thread can invoke this API.
    */
-  virtual bool Wait(const std::string &addr, int num_sender) = 0;
+  virtual bool Wait(const std::string &addr, int num_sender, bool blocking=true) = 0;
 
   /*!
    * \brief Recv RPCMessage from Sender. Actually removing data from queue.
