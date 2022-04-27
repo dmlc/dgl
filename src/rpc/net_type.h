@@ -69,7 +69,8 @@ struct RPCReceiver : RPCBase {
    *
    * Wait() is not thread-safe and only one thread can invoke this API.
    */
-  virtual bool Wait(const std::string &addr, int num_sender, bool blocking=true) = 0;
+  virtual bool Wait(const std::string &addr, int num_sender,
+                    bool blocking = true) = 0;
 
   /*!
    * \brief Recv RPCMessage from Sender. Actually removing data from queue.
