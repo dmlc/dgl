@@ -11,6 +11,7 @@ from ...sparse import _gather_mm, _gather_mm_scatter, _segment_mm, _segment_mm_b
 from ...sparse import _gspmm, _gspmm_hetero, _gsddmm, _gsddmm_hetero, _segment_reduce, _bwd_segment_cmp, _edge_softmax_forward, _edge_softmax_backward
 from ...sparse import _csrmm, _csrsum, _csrmask, _scatter_add, _update_grad_minmax_hetero
 from ...heterograph_index import create_unitgraph_from_csr
+from jax.experimental import host_callback as hcb
 
 # __all__ = ['gspmm', 'gsddmm', 'gspmm_hetero', 'gsddmm_hetero', 'edge_softmax', 'edge_softmax_hetero',
 #            'segment_reduce', 'scatter_add', 'csrmm', 'csrsum', 'csrmask', 'gather_mm', 'segment_mm']
@@ -69,22 +70,6 @@ def _gather(x, index):
     pointers = jnp.meshgrid(*[jnp.arange(axis) for axis in x.shape], sparse=True, indexing="ij")
     pointers[0] = index
     return x[tuple(pointers)]
-
-
-# def scatter(input, dim, index, src, reduce=None):
-#   idx = jnp.meshgrid(*(jnp.arange(n) for n in input.shape), sparse=True)
-#   idx[dim] = index
-#   return getattr(input.at[tuple(idx)], reduce or "set")(src)
-#
-# def ndenumerate(shape):
-#     from itertools import product
-#     return product(*(range(axis) for axis in shape))
-#
-# def scatter_add(x, index, source):
-#     pointers = ndenumerate(x.shape)
-#     for pointer in pointers:
-#         x = x.at[(int(index[pointer]), ) + pointer[1:]].add(source[pointer])
-#     return x
 
 def _reduce_grad(grad, shape):
     """Reduce gradient on the broadcast dimension
