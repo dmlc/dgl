@@ -98,6 +98,7 @@ class SAGEConv(nn.Module):
     bias: bool = True
     norm: Union[None, str] = None
     activation: Union[None, callable] = None
+    train: bool = False
 
     def setup(self):
         if isinstance(self.in_feats, tuple):
@@ -132,10 +133,10 @@ class SAGEConv(nn.Module):
         """
         with graph.local_scope():
             if isinstance(feat, tuple):
-                feat_src = nn.Dropout(self.feat_drop)(feat[0])
-                feat_dst = nn.Dropout(self.feat_drop)(feat[1])
+                feat_src = nn.Dropout(self.feat_drop)(feat[0], deterministic=not self.train)
+                feat_dst = nn.Dropout(self.feat_drop)(feat[1], deterministic=not self.train)
             else:
-                feat_src = feat_dst = nn.Dropout(self.feat_drop)(feat)
+                feat_src = feat_dst = nn.Dropout(self.feat_drop, deterministic=not self.train)(feat)
                 if graph.is_block:
                     feat_dst = feat_src[:graph.number_of_dst_nodes()]
 

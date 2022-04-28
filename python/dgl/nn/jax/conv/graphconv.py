@@ -241,7 +241,6 @@ class GraphConv(nn.Module):
                                    ' create the module with flag weight=False.')
             else:
                 weight = self._weight
-
             if self.in_feats > self.out_feats:
                 # mult W first to reduce the feature size for aggregation.
                 if weight is not None:

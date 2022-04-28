@@ -680,7 +680,6 @@ class CSRSum(th.autograd.Function):
         ctx.backward_cache = None
         return (None,) + tuple(csrmask(gidxC, dC_weights, gidx) for gidx in gidxs)
 
-
 class CSRMask(th.autograd.Function):
     @staticmethod
     def forward(ctx, gidxA, A_weights, gidxB):

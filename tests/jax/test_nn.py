@@ -342,7 +342,7 @@ def test_rgcn():
     # id input
     rgc_basis = nn.RelGraphConv(I, O, R, "basis", B)
     rgc_basis_low = nn.RelGraphConv(I, O, R, "basis", B, low_mem=True)
-    h = F.randint(low=0, high=I, shape=(100,), dtype=jnp.int64)
+    h = F.randint(low=0, high=I, shape=(100,), dtype=jnp.int64, ctx=None)
     r = F.tensor(etype)
     init_params = rgc_basis.init(jax.random.PRNGKey(2666), g, h, r)
     h_new = rgc_basis.apply(init_params, g, h, r)
@@ -356,11 +356,13 @@ def test_rgcn():
 def test_gat_conv(g, idtype):
     g = g.astype(idtype)
     gat = nn.GATConv(5, 2, 4)
-    feat = F.randn((g.number_of_nodes(), 5))
+    feat = F.randn((g.number_of_src_nodes(), 5))
+
+    # print(g, feat.shape)
 
     init_params = gat.init(jax.random.PRNGKey(2666), g, feat)
     h = gat.apply(init_params, g, feat)
-    assert h.shape == (g.number_of_nodes(), 4, 2)
+    assert h.shape == (g.number_of_dst_nodes(), 4, 2)
 
     init_params = gat.init({'params': jax.random.PRNGKey(2666), 'dropout': jax.random.PRNGKey(2666)}, g, feat, get_attention=True)
     _, a = gat.apply(init_params, g, feat, get_attention=True)
@@ -385,7 +387,7 @@ def test_gat_conv_bi(g, idtype):
 @pytest.mark.parametrize('aggre_type', ['mean', 'pool', 'gcn',])
 def test_sage_conv(idtype, g, aggre_type):
     sage = nn.SAGEConv(5, 10, aggre_type)
-    feat = F.randn((g.number_of_nodes(), 5))
+    feat = F.randn((g.number_of_src_nodes(), 5))
     init_params = sage.init(jax.random.PRNGKey(2666), g, feat)
     h = sage.apply(init_params, g, feat)
     assert h.shape[-1] == 10
@@ -631,7 +633,7 @@ def test_edge_conv(g, idtype):
     g = g.astype(idtype)
     edge_conv = nn.EdgeConv(5, 2)
     print(edge_conv)
-    h0 = F.randn((g.number_of_nodes(), 5))
+    h0 = F.randn((g.number_of_src_nodes(), 5))
     init_params = edge_conv.init(jax.random.PRNGKey(2666), g, h0)
     h1 = edge_conv.apply(init_params, g, h0)
     assert h1.shape == (g.number_of_nodes(), 2)

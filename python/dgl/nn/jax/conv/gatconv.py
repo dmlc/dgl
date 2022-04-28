@@ -281,6 +281,7 @@ class GATConv(nn.Module):
             e = nn.leaky_relu(graph.edata.pop('e'), self.negative_slop)
             # compute softmax
             graph.edata['a'] = nn.Dropout(self.attn_drop)(edge_softmax(graph, e), deterministic=not self.train)
+            graph.edata['a'] = graph.edata['a'].astype(feat_src.dtype)
             # message passing
             graph.update_all(fn.u_mul_e('ft', 'a', 'm'),
                              fn.sum('m', 'ft'))

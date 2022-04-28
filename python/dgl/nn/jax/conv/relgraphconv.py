@@ -241,11 +241,8 @@ class RelGraphConv(nn.Module):
                 src = edges.src['h'][loc].reshape((-1, self.num_bases, self.submat_in))
                 sub_msg = jnp.einsum('abc,bcd->abd', src, w)
                 sub_msg = sub_msg.reshape((-1, self.out_feat))
-                msg = jax.ops.index_update(
-                    msg,
-                    loc,
-                    sub_msg
-                )
+                msg = msg.at[loc].set(sub_msg)
+
         else:
             weight = jnp.take(
                 self.weight,
@@ -256,6 +253,7 @@ class RelGraphConv(nn.Module):
             )
 
             node = edges.src['h'].reshape((-1, 1, self.submat_in))
+            node = node.astype(weight.dtype)
             msg = jax.lax.batch_matmul(node, weight).reshape((-1, self.out_feat))
         if 'norm' in edges.data:
             msg = msg * edges.data['norm']

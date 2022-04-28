@@ -90,6 +90,7 @@ def bmm_maybe_select(A, B, index):
         return jnp.take(B, flatidx, 0)
 
     else:
+        A = A.astype(B.dtype)
         BB = jnp.take(B, index, 0)
         return jax.lax.batch_matmul(jnp.expand_dims(A, 1), BB).squeeze()
 

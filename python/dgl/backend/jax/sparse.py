@@ -19,7 +19,6 @@ from jax.experimental import host_callback as hcb
 __all__ = ['gspmm', 'gsddmm', 'edge_softmax', 'segment_reduce', 'scatter_add',
            'csrmm', 'csrsum', 'csrmask']
 
-
 from ... import utils as dgl_utils
 from ... import heterograph_index
 from ...heterograph_index import HeteroGraphIndex
