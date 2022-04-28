@@ -34,9 +34,9 @@ const int kNumReceiver = 3;
 const int kNumMessage = 10;
 
 const char* ip_addr[] = {
-  "socket://127.0.0.1:50091",
-  "socket://127.0.0.1:50092",
-  "socket://127.0.0.1:50093"
+  "tcp://127.0.0.1:50091",
+  "tcp://127.0.0.1:50092",
+  "tcp://127.0.0.1:50093"
 };
 
 static void start_client();
@@ -64,9 +64,9 @@ TEST(SocketCommunicatorTest, SendAndRecv) {
 void start_client() {
   SocketSender sender(kQueueSize, kThreadNum);
   for (int i = 0; i < kNumReceiver; ++i) {
-    sender.AddReceiver(ip_addr[i], i);
+    sender.ConnectReceiver(ip_addr[i], i);
   }
-  sender.Connect();
+  sender.ConnectReceiverFinalize();
   for (int i = 0; i < kNumMessage; ++i) {
     for (int n = 0; n < kNumReceiver; ++n) {
       char* str_data = new char[9];
@@ -140,7 +140,7 @@ TEST(SocketCommunicatorTest, SendAndRecv) {
 
   srand((unsigned)time(NULL));
   int port = (rand() % (5000-3000+1))+ 3000;
-  std::string ip_addr = "socket://127.0.0.1:" + std::to_string(port);
+  std::string ip_addr = "tcp://127.0.0.1:" + std::to_string(port);
   std::ofstream out("addr.txt");
   out << ip_addr;
   out.close();
@@ -170,8 +170,8 @@ static void start_client() {
                        std::istreambuf_iterator<char>());
   t.close();
   SocketSender sender(kQueueSize, kThreadNum);
-  sender.AddReceiver(ip_addr.c_str(), 0);
-  sender.Connect();
+  sender.ConnectReceiver(ip_addr.c_str(), 0);
+  sender.ConnectReceiverFinalize();
   char* str_data = new char[9];
   memcpy(str_data, "123456789", 9);
   Message msg = {str_data, 9};

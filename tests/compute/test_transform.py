@@ -2241,9 +2241,6 @@ def test_module_heat_kernel(idtype):
     assert new_g.idtype == g.idtype
     assert new_g.device == g.device
     assert new_g.num_nodes() == g.num_nodes()
-    src, dst = new_g.edges()
-    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
-    assert eset == {(0, 2), (0, 4), (1, 3), (1, 5), (2, 3), (2, 4), (3, 5), (4, 5)}
     assert F.allclose(g.ndata['h'], new_g.ndata['h'])
     assert 'w' in new_g.edata
 

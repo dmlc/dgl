@@ -377,6 +377,8 @@ def track_time(data):
     num_workers = 0
     hidden_dims = 16
     lr = 3e-5
+    iter_start = 3
+    iter_count = 10
 
     g = dataset[0]
     # Sampler
@@ -403,23 +405,8 @@ def track_time(data):
     opt = torch.optim.Adam(model.parameters(), lr=lr)
 
     model.train()
-    for batch_id, (pos_graph, neg_graph, blocks) in enumerate(dataloader):
-        # Copy to GPU
-        for i in range(len(blocks)):
-            blocks[i] = blocks[i].to(device)
-        pos_graph = pos_graph.to(device)
-        neg_graph = neg_graph.to(device)
-
-        loss = model(pos_graph, neg_graph, blocks).mean()
-        opt.zero_grad()
-        loss.backward()
-        opt.step()
-
-        if batch_id >= 3:
-            break
 
     print("start training...")
-    t0 = time.time()
     # For each batch of head-tail-negative triplets...
     for batch_id, (pos_graph, neg_graph, blocks) in enumerate(dataloader):
         # Copy to GPU
@@ -433,9 +420,12 @@ def track_time(data):
         loss.backward()
         opt.step()
 
-        if batch_id >= 10:  # time 10 loops
+        # start timer at before iter_start
+        if batch_id == iter_start - 1:
+            t0 = time.time()
+        elif batch_id == iter_count + iter_start - 1:  # time iter_count iterations
             break
 
     t1 = time.time()
 
-    return (t1 - t0) / (batch_id + 1)
+    return (t1 - t0) / iter_count
