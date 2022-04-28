@@ -513,8 +513,9 @@ class CollateWrapper(object):
         self.device = device
 
     def __call__(self, items):
-        if self.use_uva:
-            # Only copy the indices to the given device if in UVA mode.
+        if self.use_uva or (self.g.device != torch.device('cpu')):
+            # Only copy the indices to the given device if in UVA mode or the graph is not on
+            # CPU.
             items = recursive_apply(items, lambda x: x.to(self.device))
         batch = self.sample_func(self.g, items)
         return recursive_apply(batch, remove_parent_storage_columns, self.g)
