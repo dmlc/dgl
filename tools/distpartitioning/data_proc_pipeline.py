@@ -1,18 +1,16 @@
 import argparse
 import numpy as np
 import torch.multiprocessing as mp
-
 from initialize import proc_exec, init_process 
 
 def log_params(params): 
-    """
-    Print all the arguments for debugging purposes.
+    """ Print all the command line arguments for debugging purposes.
 
     Parameters:
     -----------
-    params: Argument Parser structure listing all the pre-defined parameters
+    params: argparse object
+        Argument Parser structure listing all the pre-defined parameters
     """
-
     print('Input Dir: ', params.input_dir)
     print('Graph Name: ', params.graph_name)
     print('Schema File: ', params.schema)
@@ -30,17 +28,15 @@ def log_params(params):
     print('Edge feats: ', params.edge_feats_file)
     print('Metis partitions: ', params.metis_partitions)
 
-
 def start_local_run(params): 
-    """
-    Function designed to run distributed implementation on a single machine
+    """ Main function for distributed implementation on a single machine
 
     Parameters:
     -----------
-    params : Argument Parser structure with pre-determined arguments as defined
-             at the bottom of this file.
+    params : argparser object
+        Argument Parser structure with pre-determined arguments as defined
+        at the bottom of this file.
     """
-
     log_params(params)
     processes = []
     mp.set_start_method("spawn")
@@ -55,10 +51,8 @@ def start_local_run(params):
     for p in processes:
         p.join()
 
-
 if __name__ == "__main__":
-    """
-    Start of execution from this point. 
+    """ Start of execution from this point. 
     Invoke the appropriate function to begin execution
     """
     #arguments which are already needed by the existing implementation of convert_partition.py
@@ -99,4 +93,5 @@ if __name__ == "__main__":
                     default=None, type=str)
     params = parser.parse_args()
 
+    #invoke the starting function here.
     start_local_run(params)
