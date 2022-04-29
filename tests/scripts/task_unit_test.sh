@@ -32,7 +32,7 @@ fi
 
 conda activate ${DGLBACKEND}-ci
 
-python3 -m pip install pytest pyyaml pandas pydantic rdflib ogb || fail "pip install"
+python3 -m pip install pytest psutil pyyaml pandas pydantic rdflib ogb || fail "pip install"
 python3 -m pytest -v --junitxml=pytest_compute.xml tests/compute || fail "compute"
 python3 -m pytest -v --junitxml=pytest_backend.xml tests/$DGLBACKEND || fail "backend-specific"
 
