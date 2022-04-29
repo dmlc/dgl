@@ -490,6 +490,7 @@ pipeline {
 
               def comment = sh(returnStdout: true, script: "python3 status.py").trim()
               echo(comment)
+              echo("--------- ${env.BRANCH_NAME}")
               pullRequest.comment(comment)
             }
           }
