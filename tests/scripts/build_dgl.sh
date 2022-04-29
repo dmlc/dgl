@@ -41,11 +41,3 @@ python3 setup.py install
 python3 setup.py build_ext --inplace
 done
 popd
-
-# install DGL-Go
-pushd dglgo
-conda activate "pytorch-ci"
-rm -rf build *.egg-info dist
-pip uninstall -y dglgo
-python3 setup.py install
-popd

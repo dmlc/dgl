@@ -14,6 +14,12 @@ export DGL_DOWNLOAD_DIR=${PWD}
 
 conda activate pytorch-ci
 
+pushd dglgo
+rm -rf build *.egg-info dist
+pip uninstall -y dglgo
+python3 setup.py install
+popd
+
 python3 -m pytest -v --junitxml=pytest_go.xml tests/go || fail "go"
 
 export PYTHONUNBUFFERED=1

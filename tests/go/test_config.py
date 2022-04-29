@@ -1,9 +1,6 @@
 import os
 import pytest
 
-def test_import():
-    import dglgo
-
 @pytest.mark.parametrize('data', ['cora', 'citeseer', 'pubmed', 'csv', 'reddit',
                                   'co-buy-computer', 'ogbn-arxiv', 'ogbn-products'])
 @pytest.mark.parametrize('model', ['gcn', 'gat', 'sage', 'sgc', 'gin'])
