@@ -2,6 +2,11 @@
 
 . /opt/conda/etc/profile.d/conda.sh
 
+function fail {
+    echo FAIL: $@
+    exit -1
+}
+
 export DGLBACKEND=pytorch
 export DGL_LIBRARY_PATH=${PWD}/build
 export PYTHONPATH=tests:${PWD}/python:$PYTHONPATH
