@@ -490,8 +490,9 @@ pipeline {
 
               def comment = sh(returnStdout: true, script: "python3 status.py").trim()
               echo(comment)
-              echo("--------- ${env.BRANCH_NAME}")
-              pullRequest.comment(comment)
+              if ((env.BRANCH_NAME).startsWith('PR-')) {
+                pullRequest.comment(comment)
+              }
             }
           }
         }
