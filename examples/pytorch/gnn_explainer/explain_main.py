@@ -52,7 +52,7 @@ def main(args):
                                     node_feat_dim=feat_dim)
 
     # define optimizer
-    optim = th.optim.Adam(explainer.parameters(), lr=args.lr, weight_decay=args.wd)
+    optim = th.optim.Adam([explainer.edge_mask, explainer.node_feat_mask], lr=args.lr, weight_decay=args.wd)
 
     # train the explainer for the given node
     dummy_model.eval()

@@ -249,6 +249,8 @@ def track_time(data):
     dropout = 0.5
     use_self_loop = True
     lr = 0.01
+    iter_start = 3
+    iter_count = 10
 
     hg = dataset[0]
     category = dataset.predict_category
@@ -283,31 +285,13 @@ def track_time(data):
         hg, {category: train_idx}, sampler,
         batch_size=batch_size, shuffle=True, num_workers=4)
 
-    # dry run
-    for i, (input_nodes, seeds, blocks) in enumerate(loader):
-        blocks = [blk.to(device) for blk in blocks]
-        seeds = seeds[category]     # we only predict the nodes with type "category"
-        batch_tic = time.time()
-        emb = embed_layer(blocks[0])
-        lbl = labels[seeds].to(device)
-        emb = {k : e.to(device) for k, e in emb.items()}
-        logits = model(emb, blocks)[category]
-        loss = F.cross_entropy(logits, lbl)
-        loss.backward()
-        optimizer.step()
-        sparse_optimizer.step()
-
-        if i >= 3:
-            break
-
     print("start training...")
     model.train()
     embed_layer.train()
     optimizer.zero_grad()
     sparse_optimizer.zero_grad()
 
-    t0 = time.time()
-    for i, (input_nodes, seeds, blocks) in enumerate(loader):
+    for step, (input_nodes, seeds, blocks) in enumerate(loader):
         blocks = [blk.to(device) for blk in blocks]
         seeds = seeds[category]     # we only predict the nodes with type "category"
         batch_tic = time.time()
@@ -320,9 +304,12 @@ def track_time(data):
         optimizer.step()
         sparse_optimizer.step()
 
-        if i >= 9:  # time 10 loops
+        # start timer at before iter_start
+        if step == iter_start - 1:
+            t0 = time.time()
+        elif step == iter_count + iter_start - 1:  # time iter_count iterations
             break
 
     t1 = time.time()
 
-    return (t1 - t0) / (i + 1)
+    return (t1 - t0) / iter_count
