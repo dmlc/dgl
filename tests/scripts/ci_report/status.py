@@ -8,7 +8,7 @@ job_link = os.environ["BUILD_URL"]
 response = requests.get('{}wfapi'.format(job_link)).json()
 status = "✅ CI test succeeded"
 for v in response['stages']:
-    if v['status'] not in ['SUCCESS', 'IN_PROGRESS']:
+    if v['status'] in ['FAILED', 'ABORTED']:
         status = "❌ CI test failed in Stage [{}].".format(v['name'])
         break
 
