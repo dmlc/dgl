@@ -84,3 +84,9 @@ def test_recipe(recipe):
 
     os.system('dgl recipe get {}'.format(recipe))
     assert os.path.exists(recipe)
+
+def test_node_cora():
+    os.system('dgl configure nodepred --data cora --model gcn')
+    os.system('dgl train --cfg nodepred_cora_gcn.yaml')
+    assert os.path.exists('checkpoint.pth')
+    assert os.path.exists('model.pth')
