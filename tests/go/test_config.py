@@ -32,4 +32,12 @@ def test_nodepred_ns(data, model):
 @pytest.mark.parametrize('edge_model', ['ele', 'bilinear'])
 @pytest.mark.parametrize('neg_sampler', ['global', 'persource'])
 def test_linkpred(data, node_model, edge_model, neg_sampler):
-    pass
+    custom_config_file = '_'.join([data, node_model, edge_model, neg_sampler]) + '.yaml'
+    os.system('dgl configure linkpred --data {} --node-model {} --edge-model {} --neg-sampler {} --cfg {}'.format(
+        data, node_model, edge_model, neg_sampler, custom_config_file))
+    assert os.path.exists(custom_config_file)
+
+    custom_config_file = '_'.join([data, node_model, edge_model]) + '.yaml'
+    os.system('dgl configure linkpred --data {} --node-model {} --edge-model {} --cfg {}'.format(
+        data, node_model, edge_model, custom_config_file))
+    assert os.path.exists(custom_config_file)
