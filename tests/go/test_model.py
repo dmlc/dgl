@@ -1,10 +1,10 @@
 import pytest
+import torch
+from dglgo.model import *
 from test_utils.graph_cases import get_cases
 
 @pytest.mark.parametrize('g', get_cases(['has_scalar_e_feature']))
 def test_gcn(g):
-    from dglgo.model import GCN
-
     data_info = {
         'num_nodes': g.num_nodes(),
         'out_size': 7
@@ -30,3 +30,21 @@ def test_gcn(g):
     # node feat + use_edge_weight
     model = GCN(data_info, embed_size=-1, use_edge_weight=True)
     model(g, node_feat, edge_feat)
+
+@pytest.mark.parametrize('g', get_cases(['block-bipartite']))
+def test_gcn_block(g):
+    data_info = {
+        'in_size': 10,
+        'out_size': 7
+    }
+
+    blocks = [g]
+    node_feat = torch.randn(g.num_src_nodes(), data_info['in_size'])
+    edge_feat = torch.abs(torch.randn(g.num_edges()))
+    # not use_edge_weight
+    model = GCN(data_info, use_edge_weight=False)
+    model.forward_block(blocks, node_feat)
+
+    # use_edge_weight
+    model = GCN(data_info, use_edge_weight=True)
+    model.forward_block(blocks, node_feat, edge_feat)
