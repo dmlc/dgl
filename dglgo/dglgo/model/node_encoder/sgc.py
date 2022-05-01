@@ -39,7 +39,7 @@ class SGC(nn.Module):
 
     def forward(self, g, node_feat, edge_feat=None):
         if self.embed_size > 0:
-            dgl_warning("The embedding for node feature is used, and input node_feat is ignored, due to the provided embed_size.", norepeat=True)
+            dgl_warning("The embedding for node feature is used, and input node_feat is ignored, due to the provided embed_size.")
             h = self.embed.weight
         else:
             h = node_feat
