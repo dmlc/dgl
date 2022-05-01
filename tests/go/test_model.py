@@ -129,8 +129,8 @@ def test_sage_block(g):
     node_feat = torch.randn(g.num_src_nodes(), data_info['in_size'])
     edge_feat = torch.abs(torch.randn(g.num_edges()))
     model = GraphSAGE(data_info, embed_size=-1)
-    model(blocks, node_feat)
-    model(blocks, node_feat, edge_feat)
+    model.forward_block(blocks, node_feat)
+    model.forward_block(blocks, node_feat, edge_feat)
 
 @pytest.mark.parametrize('g', get_cases(['has_scalar_e_feature']))
 def test_sgc(g):
@@ -159,14 +159,6 @@ def test_bilinear():
     num_pairs = 10
     h_src = torch.randn(num_pairs, data_info['in_size'])
     h_dst = torch.randn(num_pairs, data_info['in_size'])
-    model(h_src, h_dst)
-
-def test_dot():
-    in_size = 10
-    model = DotPredictor(in_size=in_size, out_size=1)
-    num_pairs = 10
-    h_src = torch.randn(num_pairs, in_size)
-    h_dst = torch.randn(num_pairs, in_size)
     model(h_src, h_dst)
 
 def test_ele():
