@@ -30,3 +30,5 @@ dgl.transforms
     AddEdge
     RandomWalkPE
     LaplacianPE
+    NodeFeatureMasking
+    NormalizeFeatures

@@ -31,6 +31,8 @@ except ImportError:
 
 __all__ = [
     'BaseTransform',
+    'NormalizeFeatures',
+    'NodeFeatureMasking',
     'RandomWalkPE',
     'LaplacianPE',
     'AddSelfLoop',
@@ -97,6 +99,162 @@ class BaseTransform:
 
     def __repr__(self):
         return self.__class__.__name__ + '()'
+
+class NormalizeFeatures(BaseTransform):
+    r"""
+    Row-normalizes the features given in `node_feat_names` and `edge_feat_names` to sum-up to one.
+
+    Parameters
+    ----------
+    node_feat_names : list of str, optional
+        The names of the node features to be normalized. If None, all node features will be normalized.
+        Default: `None`.
+    edge_feat_names : list of str, optional
+        The names of the edge features to be normalized. If None, all edge features will be normalized.
+        Default: `None`.
+
+    Example
+    -------
+
+    >>> import dgl
+    >>> import torch
+    >>> from dgl import NormalizeFeatures
+
+    Case1: Normalize features of a homogenous graph.
+
+    >>> transform = NormalizeFeatures()
+    >>> g = dgl.rand_graph(5, 20)
+    >>> g.ndata['h'] = torch.randn((g.num_nodes(), 5))
+    >>> print(g.ndata['h'].sum(1))
+    tensor([-3.0586,  3.4974,  3.1509,  1.5805,  0.4890])
+    >>> g.edata['w'] = torch.randn((g.num_edges, 5))
+    >>> print(g.edata['w'].sum(1))
+    tensor([ 2.9284, -3.8341,  1.5087,  0.8673, -2.5115,  2.4751,  0.1427,  1.7180,
+            2.7705,  1.0600, -0.7126,  0.1072, -0.8159,  1.2082,  2.0327, -2.3323,
+            -1.2495,  1.9458, -1.4240, -1.3575])
+    >>> new_g = transform(g)
+    >>> print(new_g.ndata['h'].sum(1))
+    tensor([1.0000, 1.0000, 1.0000, 1.0000, 1.0000])
+    >>> print(new_g.edata['w'].sum(1))
+    tensor([1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000,
+            1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000,
+            1.0000, 1.0000])
+
+    Case2: Normalize features of a heterogeneous graph.
+
+    >>> transform = NormalizeFeatures()
+    >>> g = dgl.heterograph({
+    ...     ('user', 'follows', 'user'): (torch.tensor([1, 2]), torch.tensor([3, 4])),
+    ...     ('player', 'plays', 'game'): (torch.tensor([2, 2]), torch.tensor([1, 1]))
+    ... })
+    >>> g.ndata['h'] = {'game': torch.randn(2, 5), 'player': torch.randn(3, 5)}
+    >>> print(g.ndata['h']['game'].sum(1), g.ndata['h']['player'].sum(1))
+    tensor([ 4.4201, -4.0683]) tensor([-2.2460, -1.1204, -2.0254])
+    >>> g.edata['w'] = {('user', 'follows', 'user'): torch.randn(2, 5), ('player', 'plays', 'game'): torch.randn(2, 5)}
+    >>> print(g.edata['w'][('user', 'follows', 'user')].sum(1), g.edata['w'][('player', 'plays', 'game')].sum(1))
+    tensor([-1.2663,  3.3789]) tensor([4.1371, 1.4743])
+    >>> new_g = transform(g)
+    >>> print(new_g.ndata['h']['game'].sum(1), new_g.ndata['h']['player'].sum(1))
+    tensor([1.0000, 1.0000]) tensor([1.0000, 1.0000, 1.0000])
+    >>> print(new_g.edata['w'][('user', 'follows', 'user')].sum(1), new_g.edata['w'][('player', 'plays', 'game')].sum(1))
+    tensor([1.0000, 1.0000]) tensor([1.0000, 1.0000])
+    """
+    def __init__(self, node_feat_names=None, edge_feat_names=None):
+        self.node_feat_names = node_feat_names
+        self.edge_feat_names = edge_feat_names
+
+    def __call__(self, g):
+        def normalize(feat):
+            feat = feat - feat.min()
+            feat.div_(feat.sum(dim=-1, keepdim=True).clamp_(min=1.))
+            return feat
+
+        if self.node_feat_names is None:
+            self.node_feat_names = g.ndata.keys()
+
+        if self.edge_feat_names is None:
+            self.edge_feat_names = g.edata.keys()
+
+        for node_feat_name in self.node_feat_names:
+            if isinstance(g.ndata[node_feat_name], torch.Tensor):
+                g.ndata[node_feat_name] = normalize(g.ndata[node_feat_name])
+            else:
+                for ntype in g.ndata[node_feat_name].keys():
+                    g.nodes[ntype].data[node_feat_name] = normalize(g.nodes[ntype].data[node_feat_name])
+
+        for edge_feat_name in self.edge_feat_names:
+            if isinstance(g.edata[edge_feat_name], torch.Tensor):
+                g.edata[edge_feat_name] = normalize(g.edata[edge_feat_name])
+            else:
+                for etype in g.edata[edge_feat_name].keys():
+                    g.edges[etype].data[edge_feat_name] = normalize(g.edges[etype].data[edge_feat_name])
+
+        return g
+
+class NodeFeatureMasking(BaseTransform):
+    r"""Randomly mask node features, as described in `An Empirical Study of Graph Contrastive Learning
+    <https://arxiv.org/abs/2109.01116>`__.
+
+    Parameters
+    ----------
+    p : float, optional
+        Probability of masking a node feature. Default: `0.5`.
+
+    Example
+    -------
+
+    >>> import dgl
+    >>> import torch
+    >>> from dgl import NodeFeatureMasking
+
+    Case1 : Mask node features of a homogenous graph.
+
+    >>> transform = NodeFeatureMasking()
+    >>> g = dgl.rand_graph(5, 20)
+    >>> g.ndata['h'] = torch.ones((g.num_nodes(), 10))
+
+    >>> new_g = transform(g)
+    >>> print(new_g.ndata['h'])
+    tensor([[0., 1., 1., 1., 0., 1., 1., 1., 1., 0.],
+            [0., 1., 1., 1., 0., 1., 1., 1., 1., 0.],
+            [0., 1., 1., 1., 0., 1., 1., 1., 1., 0.],
+            [0., 1., 1., 1., 0., 1., 1., 1., 1., 0.],
+            [0., 1., 1., 1., 0., 1., 1., 1., 1., 0.]])
+
+    Case2 : Mask node features of a heterogeneous graph.
+
+    >>> transform = NodeFeatureMasking()
+    >>> g = dgl.heterograph({
+    ...     ('user', 'follows', 'user'): (torch.tensor([1, 2]), torch.tensor([3, 4])),
+    ...     ('player', 'plays', 'game'): (torch.tensor([2, 2]), torch.tensor([1, 1]))
+    ... })
+    >>> g.ndata['h'] = {'game': torch.ones(2, 5), 'player': torch.ones(3, 5)}
+    >>> print(g.ndata['h']['game'], g.ndata['h']['player'])
+    tensor([[1., 1., 1., 1., 1.],
+        [1., 1., 1., 1., 1.]]) tensor([[1., 1., 1., 1., 1.],
+        [1., 1., 1., 1., 1.],
+        [1., 1., 1., 1., 1.]])
+    >>> new_g = transform(g)
+    >>> print(new_g.ndata['h']['game'], new_g.ndata['h']['player'])
+    tensor([[1., 1., 0., 1., 0.],
+        [1., 1., 0., 1., 0.]]) tensor([[0., 0., 0., 0., 1.],
+        [0., 0., 0., 0., 1.],
+        [0., 0., 0., 0., 1.]])
+    """
+    def __init__(self, p=0.5):
+        self.p = p
+        self.dist = Bernoulli(p)
+
+    def __call__(self, g):
+        # Fast path
+        if self.p == 0:
+            return g
+
+        for ntype in g.ntypes:
+            for key in g.nodes[ntype].data.keys():
+                feat_mask = self.dist.sample(torch.Size([g.nodes[ntype].data[key].shape[-1], ])).bool().to(g.device)
+                g.nodes[ntype].data[key][:, feat_mask] = 0
+        return g
 
 class RandomWalkPE(BaseTransform):
     r"""Random Walk Positional Encoding, as introduced in

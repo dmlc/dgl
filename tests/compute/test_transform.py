@@ -2350,6 +2350,58 @@ def test_module_laplacian_pe(idtype):
     else:
         assert F.allclose(new_g.ndata['lappe'].abs(), tgt)
 
+@parametrize_dtype
+def test_module_normalize_features(idtype):
+    transform = dgl.NormalizeFeatures()
+
+    # Case1: Normalize features of a homogenous graph.
+    g = dgl.rand_graph(5, 10, idtype=idtype, device=F.ctx())
+    g.ndata['h'] = F.randn((g.num_nodes(), 3))
+    g.edata['w'] = F.randn((g.num_edges(), 2))
+    new_g = transform(g)
+    assert F.allclose(new_g.ndata['h'].sum(1), F.tensor([1.0, 1.0, 1.0]))
+    assert F.allclose(new_g.edata['w'].sum(1), F.tensor([1.0, 1.0]))
+
+    # Case2: Normalize features of a heterogeneous graph.
+    g = dgl.heterograph({
+        ('user', 'follows', 'user'): (F.tensor([1, 2]), F.tensor([3, 4])),
+        ('player', 'plays', 'game'): (F.tensor([2, 2]), F.tensor([1, 1]))
+    })
+    g.ndata['h'] = {'game': F.randn(2, 5), 'player': F.randn(3, 5)}
+    g.edata['w'] = {('user', 'follows', 'user'): F.randn(2, 5), ('player', 'plays', 'game'): F.randn(2, 5)}
+    new_g = transform(g)
+    assert F.allclose(new_g.ndata['h']['game'].sum(1), F.tensor([1.0, 1.0, 1.0, 1.0, 1.0]))
+    assert F.allclose(new_g.ndata['h']['player'].sum(1), F.tensor([1.0, 1.0, 1.0, 1.0, 1.0]))
+    assert F.allclose(new_g.edata['w'][('user', 'follows', 'user')].sum(1), F.tensor([1.0, 1.0, 1.0, 1.0, 1.0]))
+    assert F.allclose(new_g.edata['w'][('player', 'plays', 'game')].sum(1), F.tensor([1.0, 1.0, 1.0, 1.0, 1.0]))
+
+@parametrize_dtype
+def test_module_node_feature_masking(idtype):
+    transform = dgl.NodeFeatureMasking()
+
+    # Case1: Mask node features of a homogenous graph.
+    g = dgl.rand_graph(5, 20)
+    g.ndata['h'] = F.ones((g.num_nodes(), 10))
+    new_g = transform(g)
+    assert new_g.device == g.device
+    assert new_g.idtype == g.idtype
+    assert g.ntypes == new_g.ntypes
+    assert new_g.ndata['h'].shape == (g.num_nodes(), 10)
+
+    # Case2: Mask node features of a heterogeneous graph.
+    g = dgl.heterograph({
+        ('user', 'follows', 'user'): (F.tensor([1, 2]), F.tensor([3, 4])),
+        ('player', 'plays', 'game'): (F.tensor([2, 2]), F.tensor([1, 1]))
+    })
+    g.ndata['h'] = {'game': F.randn(2, 5), 'player': F.randn(3, 5)}
+    new_g = transform(g)
+    assert new_g.device == g.device
+    assert new_g.idtype == g.idtype
+    assert g.ntypes == new_g.ntypes
+    assert new_g.ndata['h']['game'].shape == (2, 5)
+    assert new_g.ndata['h']['player'].shape == (3, 5)
+
+
 if __name__ == '__main__':
     test_partition_with_halo()
     test_module_heat_kernel(F.int32)
