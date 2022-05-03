@@ -122,7 +122,7 @@ class FeatNormalizer(BaseTransform):
 
     Case1: Normalize features of a homogeneous graph.
 
-    >>> transform = NormalizeFeatures()
+    >>> transform = FeatNormalizer()
     >>> g = dgl.rand_graph(5, 20)
     >>> g.ndata['h'] = torch.randn((g.num_nodes(), 5))
     >>> print(g.ndata['h'].sum(1))
@@ -142,7 +142,7 @@ class FeatNormalizer(BaseTransform):
 
     Case2: Normalize features of a heterogeneous graph.
 
-    >>> transform = NormalizeFeatures()
+    >>> transform = FeatNormalizer()
     >>> g = dgl.heterograph({
     ...     ('user', 'follows', 'user'): (torch.tensor([1, 2]), torch.tensor([3, 4])),
     ...     ('player', 'plays', 'game'): (torch.tensor([2, 2]), torch.tensor([1, 1]))
@@ -168,12 +168,12 @@ class FeatNormalizer(BaseTransform):
         self.node_feat_names = node_feat_names
         self.edge_feat_names = edge_feat_names
 
-    def __call__(self, g):
-        def normalize(feat):
-            feat = feat - feat.min()
-            feat.div_(feat.sum(dim=-1, keepdim=True).clamp_(min=1.))
-            return feat
+    def normalize(self, feat):
+        feat = feat - feat.min()
+        feat.div_(feat.sum(dim=-1, keepdim=True).clamp_(min=1.))
+        return feat
 
+    def __call__(self, g):
         if self.node_feat_names is None:
             self.node_feat_names = g.ndata.keys()
 
@@ -182,19 +182,19 @@ class FeatNormalizer(BaseTransform):
 
         for node_feat_name in self.node_feat_names:
             if isinstance(g.ndata[node_feat_name], torch.Tensor):
-                g.ndata[node_feat_name] = normalize(g.ndata[node_feat_name])
+                g.ndata[node_feat_name] = self.normalize(g.ndata[node_feat_name])
             else:
                 for ntype in g.ndata[node_feat_name].keys():
                     g.nodes[ntype].data[node_feat_name] = \
-                        normalize(g.nodes[ntype].data[node_feat_name])
+                        self.normalize(g.nodes[ntype].data[node_feat_name])
 
         for edge_feat_name in self.edge_feat_names:
             if isinstance(g.edata[edge_feat_name], torch.Tensor):
-                g.edata[edge_feat_name] = normalize(g.edata[edge_feat_name])
+                g.edata[edge_feat_name] = self.normalize(g.edata[edge_feat_name])
             else:
                 for etype in g.edata[edge_feat_name].keys():
                     g.edges[etype].data[edge_feat_name] = \
-                        normalize(g.edges[etype].data[edge_feat_name])
+                        self.normalize(g.edges[etype].data[edge_feat_name])
 
         return g
 
