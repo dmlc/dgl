@@ -31,7 +31,7 @@ except ImportError:
 
 __all__ = [
     'BaseTransform',
-    'NormalizeFeatures',
+    'FeatNormalizer',
     'FeatMask',
     'RandomWalkPE',
     'LaplacianPE',
@@ -100,7 +100,7 @@ class BaseTransform:
     def __repr__(self):
         return self.__class__.__name__ + '()'
 
-class NormalizeFeatures(BaseTransform):
+class FeatNormalizer(BaseTransform):
     r"""
     Row-normalizes the features given in `node_feat_names` and `edge_feat_names` to sum-up to one.
 
@@ -118,7 +118,7 @@ class NormalizeFeatures(BaseTransform):
 
     >>> import dgl
     >>> import torch
-    >>> from dgl import NormalizeFeatures
+    >>> from dgl import FeatNormalizer
 
     Case1: Normalize features of a homogeneous graph.
 

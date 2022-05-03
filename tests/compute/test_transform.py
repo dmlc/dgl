@@ -2351,8 +2351,8 @@ def test_module_laplacian_pe(idtype):
         assert F.allclose(new_g.ndata['lappe'].abs(), tgt)
 
 @parametrize_dtype
-def test_module_normalize_features(idtype):
-    transform = dgl.NormalizeFeatures()
+def test_module_feat_normalizer(idtype):
+    transform = dgl.FeatNormalizer()
 
     # Case1: Normalize features of a homogeneous graph.
     g = dgl.rand_graph(5, 10, idtype=idtype, device=F.ctx())
@@ -2378,7 +2378,7 @@ def test_module_normalize_features(idtype):
     assert F.allclose(g.edata['w'][('player', 'plays', 'game')].sum(1), F.tensor([1.0, 1.0, 1.0, 1.0, 1.0]))
 
 @parametrize_dtype
-def test_module_node_feature_masking(idtype):
+def test_module_feat_mask(idtype):
     transform = dgl.FeatMask()
 
     # Case1: Mask node and edge feature tensors of a homogeneous graph.
