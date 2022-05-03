@@ -116,6 +116,8 @@ class FeatNormalizer(BaseTransform):
     Example
     -------
 
+    The following example uses PyTorch backend.
+
     >>> import dgl
     >>> import torch
     >>> from dgl import FeatNormalizer
@@ -233,6 +235,8 @@ class FeatMask(BaseTransform):
 
     Example
     -------
+
+    The following example uses PyTorch backend.
 
     >>> import dgl
     >>> import torch

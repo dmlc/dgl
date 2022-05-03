@@ -2350,6 +2350,7 @@ def test_module_laplacian_pe(idtype):
     else:
         assert F.allclose(new_g.ndata['lappe'].abs(), tgt)
 
+@unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
 @parametrize_dtype
 def test_module_feat_normalizer(idtype):
     # Case1: Normalize features of a homogeneous graph.
@@ -2377,6 +2378,7 @@ def test_module_feat_normalizer(idtype):
     assert F.allclose(g.edata['w'][('user', 'follows', 'user')].sum(1), F.tensor([1.0, 1.0]))
     assert F.allclose(g.edata['w'][('player', 'plays', 'game')].sum(1), F.tensor([1.0, 1.0]))
 
+@unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
 @parametrize_dtype
 def test_module_feat_mask(idtype):
     # Case1: Mask node and edge feature tensors of a homogeneous graph.
