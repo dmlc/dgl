@@ -169,6 +169,22 @@ class FeatNormalizer(BaseTransform):
         self.edge_feat_names = edge_feat_names
 
     def normalize(self, feat):
+        r"""
+
+        Description
+        -----------
+        Row-normalize the given feature to sum-up to one.
+
+        Parameters
+        ----------
+        feat : Tensor
+            The feature to be normalized.
+
+        Returns
+        -------
+        Tensor
+            The normalized feature.
+        """
         feat = feat - feat.min()
         feat.div_(feat.sum(dim=-1, keepdim=True).clamp_(min=1.))
         return feat
