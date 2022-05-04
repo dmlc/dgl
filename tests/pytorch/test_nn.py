@@ -683,6 +683,29 @@ def test_gin_conv(g, idtype, aggregator_type):
     h = gin(g, feat)
 
 @parametrize_dtype
+@pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite']))
+def test_gine_conv(g, idtype):
+    ctx = F.ctx()
+    g = g.astype(idtype).to(ctx)
+    gine = nn.GINEConv(
+        th.nn.Linear(5, 12)
+    )
+    th.save(gine, tmp_buffer)
+    nfeat = F.randn((g.number_of_src_nodes(), 5))
+    efeat = F.randn((g.num_edges(), 5))
+    gine = gine.to(ctx)
+    h = gine(g, nfeat, efeat)
+
+    # test pickle
+    th.save(gine, tmp_buffer)
+    assert h.shape == (g.number_of_dst_nodes(), 12)
+
+    gine = nn.GINEConv(None)
+    th.save(gine, tmp_buffer)
+    gine = gine.to(ctx)
+    h = gine(g, nfeat, efeat)
+
+@parametrize_dtype
 @pytest.mark.parametrize('g', get_cases(['bipartite'], exclude=['zero-degree']))
 @pytest.mark.parametrize('aggregator_type', ['mean', 'max', 'sum'])
 def test_gin_conv_bi(g, idtype, aggregator_type):
@@ -1308,7 +1331,7 @@ def test_hgt(idtype, in_size, num_heads):
     etype = th.tensor([i % num_etypes for i in range(g.num_edges())]).to(dev)
     ntype = th.tensor([i % num_ntypes for i in range(g.num_nodes())]).to(dev)
     x = th.randn(g.num_nodes(), in_size).to(dev)
-    
+
     m = nn.HGTConv(in_size, head_size, num_heads, num_ntypes, num_etypes).to(dev)
 
     y = m(g, x, ntype, etype)
@@ -1329,3 +1352,134 @@ def test_hgt(idtype, in_size, num_heads):
     assert sorted_y.shape == (g.num_nodes(), head_size * num_heads)
     # TODO(minjie): enable the following check
     #assert th.allclose(y, sorted_y[rev_idx], atol=1e-4, rtol=1e-4)
+
+@pytest.mark.parametrize('self_loop', [True, False])
+@pytest.mark.parametrize('get_distances', [True, False])
+def test_radius_graph(self_loop, get_distances):
+    pos = th.tensor([[0.1, 0.3, 0.4],
+                     [0.5, 0.2, 0.1],
+                     [0.7, 0.9, 0.5],
+                     [0.3, 0.2, 0.5],
+                     [0.2, 0.8, 0.2],
+                     [0.9, 0.2, 0.1],
+                     [0.7, 0.4, 0.4],
+                     [0.2, 0.1, 0.6],
+                     [0.5, 0.3, 0.5],
+                     [0.4, 0.2, 0.6]])
+
+    rg = nn.RadiusGraph(0.3, self_loop=self_loop)
+
+    if get_distances:
+        g, dists = rg(pos, get_distances=get_distances)
+    else:
+        g = rg(pos)
+
+    if self_loop:
+        src_target = th.tensor([0, 0, 1, 2, 3, 3, 3, 3, 3, 4, 5, 6, 6, 7, 7, 7,
+                                8, 8, 8, 8, 9, 9, 9, 9])
+        dst_target = th.tensor([0, 3, 1, 2, 0, 3, 7, 8, 9, 4, 5, 6, 8, 3, 7, 9,
+                                3, 6, 8, 9, 3, 7, 8, 9])
+
+        if get_distances:
+            dists_target = th.tensor([[0.0000],
+                                      [0.2449],
+                                      [0.0000],
+                                      [0.0000],
+                                      [0.2449],
+                                      [0.0000],
+                                      [0.1732],
+                                      [0.2236],
+                                      [0.1414],
+                                      [0.0000],
+                                      [0.0000],
+                                      [0.0000],
+                                      [0.2449],
+                                      [0.1732],
+                                      [0.0000],
+                                      [0.2236],
+                                      [0.2236],
+                                      [0.2449],
+                                      [0.0000],
+                                      [0.1732],
+                                      [0.1414],
+                                      [0.2236],
+                                      [0.1732],
+                                      [0.0000]])
+    else:
+        src_target = th.tensor([0, 3, 3, 3, 3, 6, 7, 7, 8, 8, 8, 9, 9, 9])
+        dst_target = th.tensor([3, 0, 7, 8, 9, 8, 3, 9, 3, 6, 9, 3, 7, 8])
+
+        if get_distances:
+            dists_target = th.tensor([[0.2449],
+                                      [0.2449],
+                                      [0.1732],
+                                      [0.2236],
+                                      [0.1414],
+                                      [0.2449],
+                                      [0.1732],
+                                      [0.2236],
+                                      [0.2236],
+                                      [0.2449],
+                                      [0.1732],
+                                      [0.1414],
+                                      [0.2236],
+                                      [0.1732]])
+
+    src, dst = g.edges()
+
+    assert th.equal(src, src_target)
+    assert th.equal(dst, dst_target)
+
+    if get_distances:
+        assert th.allclose(dists, dists_target, rtol=1e-03)
+
+@parametrize_dtype
+def test_group_rev_res(idtype):
+    dev = F.ctx()
+
+    num_nodes = 5
+    num_edges = 20
+    feats = 32
+    groups = 2
+    g = dgl.rand_graph(num_nodes, num_edges).to(dev)
+    h = th.randn(num_nodes, feats).to(dev)
+    conv = nn.GraphConv(feats // groups, feats // groups)
+    model = nn.GroupRevRes(conv, groups).to(dev)
+    model(g, h)
+
+@pytest.mark.parametrize('in_size', [16, 32])
+@pytest.mark.parametrize('hidden_size', [16, 32])
+@pytest.mark.parametrize('out_size', [16, 32])
+@pytest.mark.parametrize('edge_feat_size', [16, 10, 0])
+def test_egnn_conv(in_size, hidden_size, out_size, edge_feat_size):
+    dev = F.ctx()
+    num_nodes = 5
+    num_edges = 20
+    g = dgl.rand_graph(num_nodes, num_edges).to(dev)
+    h = th.randn(num_nodes, in_size).to(dev)
+    x = th.randn(num_nodes, 3).to(dev)
+    e = th.randn(num_edges, edge_feat_size).to(dev)
+    model = nn.EGNNConv(in_size, hidden_size, out_size, edge_feat_size).to(dev)
+    model(g, h, x, e)
+
+@pytest.mark.parametrize('in_size', [16, 32])
+@pytest.mark.parametrize('out_size', [16, 32])
+@pytest.mark.parametrize('aggregators',
+    [['mean', 'max', 'sum'], ['min', 'std', 'var'], ['moment3', 'moment4', 'moment5']])
+@pytest.mark.parametrize('scalers', [['identity'], ['amplification', 'attenuation']])
+@pytest.mark.parametrize('delta', [2.5, 7.4])
+@pytest.mark.parametrize('dropout', [0., 0.1])
+@pytest.mark.parametrize('num_towers', [1, 4])
+@pytest.mark.parametrize('edge_feat_size', [16, 0])
+@pytest.mark.parametrize('residual', [True, False])
+def test_pna_conv(in_size, out_size, aggregators, scalers, delta,
+    dropout, num_towers, edge_feat_size, residual):
+    dev = F.ctx()
+    num_nodes = 5
+    num_edges = 20
+    g = dgl.rand_graph(num_nodes, num_edges).to(dev)
+    h = th.randn(num_nodes, in_size).to(dev)
+    e = th.randn(num_edges, edge_feat_size).to(dev)
+    model = nn.PNAConv(in_size, out_size, aggregators, scalers, delta, dropout,
+        num_towers, edge_feat_size, residual).to(dev)
+    model(g, h, edge_feat=e)

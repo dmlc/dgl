@@ -41,7 +41,11 @@ class RGCN(nn.Module):
 def track_time(data, use_type_count):
     # args
     if data == 'aifb':
-        num_bases = -1
+        if dgl.__version__.startswith("0.8"):
+            num_bases = None
+        else:
+            num_bases = -1
+            
         l2norm = 0.
     elif data == 'am':
         num_bases = 40

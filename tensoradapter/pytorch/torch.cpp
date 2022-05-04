@@ -4,11 +4,17 @@
  * \brief Implementation of PyTorch adapter library.
  */
 
-#include <tensoradapter.h>
+#include <tensoradapter_exports.h>
 #include <torch/torch.h>
 #include <ATen/DLConvertor.h>
 #include <vector>
 #include <iostream>
+
+#if DLPACK_VERSION > 040
+// Compatibility across DLPack - note that this assumes that the ABI stays the same.
+#define kDLGPU kDLCUDA
+#define DLContext DLDevice
+#endif
 
 namespace tensoradapter {
 
@@ -29,7 +35,7 @@ static at::Device get_device(DLContext ctx) {
 
 extern "C" {
 
-DLManagedTensor* TAempty(
+TA_EXPORTS DLManagedTensor* TAempty(
     std::vector<int64_t> shape,
     DLDataType dtype,
     DLContext ctx) {

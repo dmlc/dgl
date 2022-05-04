@@ -55,14 +55,14 @@ if [[ $DEVICE == "cpu" ]]; then
         --rm \
         $DOCKER_MOUNT_OPT \
         $DOCKER_ENV_OPT \
-        --shm-size="4g" \
+        --shm-size="16g" \
         --hostname=$MACHINE -dit public.ecr.aws/s1o7b3d9/benchmakrk_pyg_dgl:cu111_torch181_pyg170 /bin/bash
 else
     docker run --name dgl-reg \
         --rm --gpus all \
         $DOCKER_MOUNT_OPT \
         $DOCKER_ENV_OPT \
-        --shm-size="4g" \
+        --shm-size="16g" \
         --hostname=$MACHINE -dit public.ecr.aws/s1o7b3d9/benchmakrk_pyg_dgl:cu111_torch181_pyg170 /bin/bash
 fi
 
