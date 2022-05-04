@@ -229,7 +229,14 @@ class SparseAdagrad(DistSparseGradOptimizer):
         """
         eps = self._eps
         clr = self._lr
+
+        state_dev = th.device('cpu')
         exec_dev = grad.device
+        
+        # only perform async copies cpu -> gpu, or gpu-> gpu, but block
+        # when copying to the cpu, so as to ensure the copy is finished
+        # before operating on the data on the cpu
+        state_block = state_dev == th.device('cpu') and exec_dev != state_dev
 
         # the update is non-linear so indices must be unique
         grad_indices, inverse, cnt = th.unique(idx, return_inverse=True, return_counts=True)
@@ -239,14 +246,32 @@ class SparseAdagrad(DistSparseGradOptimizer):
         grad_sum = (grad_values * grad_values)
 
         # update grad state
-        grad_state = self._state[emb.name][grad_indices].to(exec_dev, non_blocking=True)
+        grad_state = self._state[emb.name][grad_indices].to(exec_dev)
         grad_state += grad_sum
-        self._state[emb.name][grad_indices] = grad_state.to(th.device('cpu'), non_blocking=True)
+        grad_state_dst = grad_state.to(state_dev, non_blocking=True)
+        if state_block:
+            # use events to try and overlap CPU and GPU as much as possible
+            update_event = th.cuda.Event()
+            update_event.record()
 
         # update emb
         std_values = grad_state.add_(eps).sqrt_()
         tmp = clr * grad_values / std_values
-        emb._tensor[grad_indices] -= tmp.to(th.device('cpu'), non_blocking=True)
+        tmp_dst = tmp.to(state_dev, non_blocking=True)
+        
+        if state_block:
+            std_event = th.cuda.Event()
+            std_event.record()
+            # wait for our transfers from exec_dev to state_dev to finish
+            # before we can use them
+            update_event.wait()
+        self._state[emb.name][grad_indices] = grad_state_dst
+        
+        if state_block:
+            # wait for the transfer of std_values to finish before we
+            # can use it
+            std_event.wait()
+        emb._tensor[grad_indices] -= tmp_dst
 
 class SparseAdam(DistSparseGradOptimizer):
     r''' Distributed Node embedding optimizer using the Adam algorithm.
