@@ -47,6 +47,8 @@ Datasets for node classification/regression tasks
     FraudDataset
     FraudYelpDataset
     FraudAmazonDataset
+    BAShapes
+    BACommunity
 
 Edge Prediction Datasets
 ---------------------------------------
