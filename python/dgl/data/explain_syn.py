@@ -139,7 +139,8 @@ class BAShapes(DGLBuiltinDataset):
             'perturb_ratio cannot exceed {:.4f}'.format(max_ratio)
         num_random_edges = int(num_real_edges * self.perturb_ratio)
 
-        np.random.seed(self.seed)
+        if self.seed is not None:
+            np.random.seed(self.seed)
         for _ in range(num_random_edges):
             while True:
                 u = np.random.randint(0, n)
@@ -272,30 +273,31 @@ class BACommunity(DGLBuiltinDataset):
         pass
 
     def process(self):
-        random.seed(self.seed)
-        np.random.seed(self.seed)
+        if self.seed is not None:
+            random.seed(self.seed)
+            np.random.seed(self.seed)
 
         # Construct two BA-SHAPES graphs
         g1 = BAShapes(self.num_base_nodes,
                       self.num_base_edges_per_node,
                       self.num_motifs,
                       self.perturb_ratio,
-                      seed=self.seed,
                       force_reload=True,
                       verbose=False)[0]
         g2 = BAShapes(self.num_base_nodes,
                       self.num_base_edges_per_node,
                       self.num_motifs,
                       self.perturb_ratio,
-                      seed=self.seed + 1 if self.seed is not None else None,
                       force_reload=True,
                       verbose=False)[0]
 
         # Join them and randomly add edges between them
         g = batch([g1, g2])
         num_nodes = g.num_nodes() // 2
-        src = F.randint((self.num_inter_edges,), g.idtype, g.device, 0, num_nodes)
-        dst = F.randint((self.num_inter_edges,), g.idtype, g.device, num_nodes, 2 * num_nodes)
+        src = np.random.randint(0, num_nodes, (self.num_inter_edges,))
+        dst = np.random.randint(num_nodes, 2 * num_nodes, (self.num_inter_edges,))
+        src = F.zerocopy_from_numpy(src)
+        dst = F.zerocopy_from_numpy(dst)
         g.add_edges(src, dst)
         g.ndata['label'] = F.cat([g1.ndata['label'], g2.ndata['label'] + 4], dim=0)
 
