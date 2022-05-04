@@ -8,7 +8,7 @@ import random
 from .dgl_dataset import DGLBuiltinDataset
 from .utils import save_graphs, load_graphs
 from .. import backend as F
-from .. import batch
+from ..batch import batch
 from ..convert import graph
 from ..transforms import reorder_graph
 
@@ -234,6 +234,14 @@ class BACommunity(DGLBuiltinDataset):
 
     Examples
     --------
+
+    >>> from dgl.data import BACommunity
+    >>> dataset = BACommunity()
+    >>> dataset.num_classes
+    4
+    >>> g = dataset[0]
+    >>> label = g.ndata['label']
+    >>> feat = g.ndata['feat']
     """
     def __init__(self,
                  num_base_nodes=300,
