@@ -287,7 +287,7 @@ class BACommunity(DGLBuiltinDataset):
                       self.num_base_edges_per_node,
                       self.num_motifs,
                       self.perturb_ratio,
-                      seed=self.seed+1,
+                      seed=self.seed + 1 if self.seed is not None else None,
                       force_reload=True,
                       verbose=False)[0]
 
