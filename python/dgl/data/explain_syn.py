@@ -238,7 +238,7 @@ class BACommunity(DGLBuiltinDataset):
     >>> from dgl.data import BACommunity
     >>> dataset = BACommunity()
     >>> dataset.num_classes
-    4
+    8
     >>> g = dataset[0]
     >>> label = g.ndata['label']
     >>> feat = g.ndata['feat']
@@ -280,12 +280,16 @@ class BACommunity(DGLBuiltinDataset):
                       self.num_base_edges_per_node,
                       self.num_motifs,
                       self.perturb_ratio,
-                      force_reload=True)[0]
+                      seed=self.seed,
+                      force_reload=True,
+                      verbose=False)[0]
         g2 = BAShapes(self.num_base_nodes,
                       self.num_base_edges_per_node,
                       self.num_motifs,
                       self.perturb_ratio,
-                      force_reload=True)[0]
+                      seed=self.seed+1,
+                      force_reload=True,
+                      verbose=False)[0]
 
         # Join them and randomly add edges between them
         g = batch([g1, g2])
