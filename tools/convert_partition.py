@@ -9,233 +9,121 @@ import pyarrow
 import pandas as pd
 from pyarrow import csv
 
-def read_feats(file_name):
-    attrs = csv.read_csv(file_name, read_options=pyarrow.csv.ReadOptions(autogenerate_column_names=True),
-                         parse_options=pyarrow.csv.ParseOptions(delimiter=' '))
-    num_cols = len(attrs.columns)
-    return np.stack([attrs.columns[i].to_numpy() for i in range(num_cols)], 1)
+def create_dgl_object(input_dir, graph_name, num_parts, \
+                        output_dir, schema, part_id, node_data, node_feats, \
+                        edge_data, edge_feats, nodeid_offset, edgeid_offset):
+    """
+    This function creates dgl objects for a given graph partition, as in function
+    arguments. 
 
-def create_dgl_object(input_dir, graph_name, num_parts, num_node_weights, node_attr_dtype, \
-                            edge_attr_dtype, workspace_dir, output_dir, removed_edges, schema, \
-                            part_id, node_data, node_attrs, node_feats, \
-                            edge_data, edge_attrs, edge_feats, num_nodes, num_edges, \
-                            node_map_val, edge_map_val, ntypes_map, etypes_map):
+    Parameters:
+    -----------
+    input_dir : string
+        directory where the input graph files are located. 
+    graph_name : string
+        name of the graph
+    num_parts : int
+        total no. of partitions (of the original graph)
+    output_dir : string
+        directory where the output files are to be stored
+    schame : json object
+        json object created by reading the graph metadata json file
+    part_id : int
+        partition id of the graph partition for which dgl object is to be created
+    node_data : numpy ndarray
+        node_data, where each row is of the following format:
+        <global_nid> <ntype_id> <global_type_nid>
+    node_feats : dictionary
+        dictionary where keys are ntypes and values are tensors
+    edge_data : numpy ndarray
+        edge_data, where each row is of the following format: 
+        <global_src_id> <global_dst_id> <etype_id> <global_type_eid>
+    edge_feats : dictionary
+        dictionary where keys are etypes and values are tensors
+    nodeid_offset : int
+        offset to be used when assigning node global ids in the current partition
+    edgeid_offset : int
+        offset to be used when assigning edge global ids in the current partition
 
-    #common functionality repeated here for concise code
-    self_loop_edges = None
-    duplicate_edges = None
-    if removed_edges is not None:
-        removed_file = '{}/{}'.format(input_dir, removed_edges)
-        removed_df = csv.read_csv(removed_file, read_options=pyarrow.csv.ReadOptions(autogenerate_column_names=True),
-                              parse_options=pyarrow.csv.ParseOptions(delimiter=' '))
-        assert removed_df.num_columns == 4
-        src_id = removed_df['f0'].to_numpy()
-        dst_id = removed_df['f1'].to_numpy()
-        orig_id = removed_df['f2'].to_numpy()
-        etype = removed_df['f3'].to_numpy()
-        self_loop_idx = src_id == dst_id
-        not_self_loop_idx = src_id != dst_id
-        self_loop_edges = [src_id[self_loop_idx], dst_id[self_loop_idx],
-                           orig_id[self_loop_idx], etype[self_loop_idx]]
-        duplicate_edges = [src_id[not_self_loop_idx], dst_id[not_self_loop_idx],
-                           orig_id[not_self_loop_idx], etype[not_self_loop_idx]]
-        print('There are {} self-loops and {} duplicated edges in the removed edges'.format(len(self_loop_edges[0]),
-                                                                                            len(duplicate_edges[0])))
-    with open(schema) as json_file:
-        schema = json.load(json_file)
-    nid_ranges = schema['nid']
-    eid_ranges = schema['eid']
-    nid_ranges = {key: np.array(nid_ranges[key]).reshape(
-        1, 2) for key in nid_ranges}
-    eid_ranges = {key: np.array(eid_ranges[key]).reshape(
-        1, 2) for key in eid_ranges}
-    id_map = dgl.distributed.id_map.IdMap(nid_ranges)
+    Returns: 
+    --------
+    int
+        no. of nodes in the current partition
+    int
+        no. of edges in the current partition
+    dictionary
+        map between node types and the range of global node ids used
+    dictionary
+        map between edge types and the range of global edge ids used
+    dictionary
+        map between node type(string)  and node_type_id(int)
+    dictionary
+        map between edge type(string)  and edge_type_id(int)
+    """
 
-    ntypes = [(key, nid_ranges[key][0, 0]) for key in nid_ranges]
+    #create auxiliary data structures from the schema object
+    global_nid_ranges = schema['nid']
+    global_eid_ranges = schema['eid']
+    global_nid_ranges = {key: np.array(global_nid_ranges[key]).reshape(
+        1, 2) for key in global_nid_ranges}
+    global_eid_ranges = {key: np.array(global_eid_ranges[key]).reshape(
+        1, 2) for key in global_eid_ranges}
+    id_map = dgl.distributed.id_map.IdMap(global_nid_ranges)
+
+    ntypes = [(key, global_nid_ranges[key][0, 0]) for key in global_nid_ranges]
     ntypes.sort(key=lambda e: e[1])
     ntype_offset_np = np.array([e[1] for e in ntypes])
     ntypes = [e[0] for e in ntypes]
-    ntypes_map = {e: i for i, e in enumerate(ntypes)} if ntypes_map is None else ntypes_map
-    etypes = [(key, eid_ranges[key][0, 0]) for key in eid_ranges]
+    ntypes_map = {e: i for i, e in enumerate(ntypes)}
+    etypes = [(key, global_eid_ranges[key][0, 0]) for key in global_eid_ranges]
     etypes.sort(key=lambda e: e[1])
     etype_offset_np = np.array([e[1] for e in etypes])
     etypes = [e[0] for e in etypes]
-    etypes_map = {e: i for i, e in enumerate(etypes)} if etypes_map is None else etypes_map
+    etypes_map = {e: i for i, e in enumerate(etypes)}
 
     max_nid = np.iinfo(np.int32).max
-    #num_edges = 0
-    #num_nodes = 0
-    node_map_val = {ntype: [] for ntype in ntypes} if node_map_val is None else node_map_val
-    edge_map_val = {etype: [] for etype in etypes} if edge_map_val is None else edge_mal_val
-    #end of common functionality here
+    node_map_val = {ntype: [] for ntype in ntypes}
+    edge_map_val = {etype: [] for etype in etypes}
 
     part_dir = output_dir + '/part' + str(part_id)
     os.makedirs(part_dir, exist_ok=True)
 
-    """
-    node_file = 'p{:03}-{}_nodes.txt'.format(part_id, graph_name)
-    # The format of each line in the node file:
-    # <node_id> <node_type> <weight1> ... <orig_type_node_id> <attributes>
-    # The node file contains nodes that belong to a partition. It doesn't include HALO nodes.
-    orig_type_nid_col = 3 + num_node_weights
-    first_attr_col = 4 + num_node_weights
+    shuffle_global_nids, ntype_ids, global_type_nid = node_data[:,0], node_data[:,1], node_data[:,2]
 
-    # Get the first two columns which is the node ID and node type.
-    tmp_output = workspace_dir + '/' + node_file + '.tmp'
-    os.system('awk \'{print $1, $2, $' + str(orig_type_nid_col) + '}\''
-              + ' {} > {}'.format(input_dir + '/' + node_file, tmp_output))
-    nodes = csv.read_csv(tmp_output, read_options=pyarrow.csv.ReadOptions(autogenerate_column_names=True),
-                         parse_options=pyarrow.csv.ParseOptions(delimiter=' '))
-    """
-    if isinstance(node_data, pyarrow.Table): 
-        nids, ntype_ids, orig_type_nid = nodes.columns[0].to_numpy(), nodes.columns[1].to_numpy(), \
-            nodes.columns[2].to_numpy()
-    else: 
-        nids, ntype_ids, orig_type_nid = nodes[:,0], nodes[:,1], nodes[:,2]
+    global_homo_nid = ntype_offset_np[ntype_ids] + global_type_nid
+    assert np.all(shuffle_global_nids[1:] - shuffle_global_nids[:-1] == 1)
+    shuffle_global_nid_range = (shuffle_global_nids[0], shuffle_global_nids[-1])
 
-    orig_homo_nid = ntype_offset_np[ntype_ids] + orig_type_nid
-    assert np.all(nids[1:] - nids[:-1] == 1)
-    nid_range = (nids[0], nids[-1])
-    num_nodes += len(nodes)
-
-    if node_attr_dtype is not None:
-        """
-        # Get node attributes
-        # Here we just assume all nodes have the same attributes.
-        # In practice, this is not the same, in which we need more complex solution to
-        # encode and decode node attributes.
-        os.system('cut -d\' \' -f {}- {} > {}'.format(first_attr_col,
-                                                      input_dir + '/' + node_file,
-                                                      tmp_output))
-        node_attrs = read_feats(tmp_output)
-        """
-        if node_attrs is not None: 
-            assert(node_feats == None)
-            node_feats = {}
-            # nodes in a partition has been sorted based on node types.
-            for ntype_name in nid_ranges:
-                ntype_id = ntypes_map[ntype_name]
-                type_nids = nids[ntype_ids == ntype_id]
-                assert np.all(type_nids == np.arange(
-                    type_nids[0], type_nids[-1] + 1))
-                node_feats[ntype_name +
-                            '/feat'] = th.as_tensor(node_attrs[ntype_ids == ntype_id])
-        else: 
-            assert(node_feats != None)
+    if node_feats != None:
         dgl.data.utils.save_tensors(os.path.join(
                 part_dir, "node_feat.dgl"), node_feats)
 
     # Determine the node ID ranges of different node types.
-    for ntype_name in nid_ranges:
+    for ntype_name in global_nid_ranges:
         ntype_id = ntypes_map[ntype_name]
-        type_nids = nids[ntype_ids == ntype_id]
+        type_nids = shuffle_global_nids[ntype_ids == ntype_id]
         node_map_val[ntype_name].append(
             [int(type_nids[0]), int(type_nids[-1]) + 1])
 
-    """
-    edge_file = 'p{:03}-{}_edges.txt'.format(part_id, graph_name)
-    # The format of each line in the edge file:
-    # <src_id> <dst_id> <orig_src_id> <orig_dst_id> <orig_edge_id> <edge_type> <attributes>
-
-    tmp_output = workspace_dir + '/' + edge_file + '.tmp'
-    os.system('awk \'{print $1, $2, $3, $4, $5, $6}\'' + ' {} > {}'.format(input_dir + '/' + edge_file,
-                                                                           tmp_output))
-    edges = csv.read_csv(tmp_output, read_options=pyarrow.csv.ReadOptions(autogenerate_column_names=True),
-                         parse_options=pyarrow.csv.ParseOptions(delimiter=' '))
-    """
-    if isinstance(edges, pyarrow.Table): 
-        num_cols = len(edges.columns)
-        src_id, dst_id, orig_src_id, orig_dst_id, orig_edge_id, etype_ids = [
-            edges.columns[i].to_numpy() for i in range(num_cols)]
-    else: 
-        num_cols = edges.shape[1]
-        src_id, dst_id, orig_src_id, orig_dst_id, etype_ids = [ edges[:,i] for i in range(num_cols) ]
-
-
-    # Let's merge the self-loops and duplicated edges to the partition.
-    src_id_list, dst_id_list = [src_id], [dst_id]
-    orig_src_id_list, orig_dst_id_list = [orig_src_id], [orig_dst_id]
-    orig_edge_id_list, etype_id_list = [orig_edge_id], [etype_ids]
-    if self_loop_edges is not None and len(self_loop_edges[0]) > 0:
-        uniq_orig_nids, idx = np.unique(orig_dst_id, return_index=True)
-        common_nids, common_idx1, common_idx2 = np.intersect1d(
-            uniq_orig_nids, self_loop_edges[0], return_indices=True)
-        idx = idx[common_idx1]
-        # the IDs after ID assignment
-        src_id_list.append(dst_id[idx])
-        dst_id_list.append(dst_id[idx])
-        # homogeneous IDs in the input graph.
-        orig_src_id_list.append(self_loop_edges[0][common_idx2])
-        orig_dst_id_list.append(self_loop_edges[0][common_idx2])
-        # edge IDs and edge type.
-        orig_edge_id_list.append(self_loop_edges[2][common_idx2])
-        etype_id_list.append(self_loop_edges[3][common_idx2])
-        print('Add {} self-loops in partition {}'.format(len(idx), part_id))
-    if duplicate_edges is not None and len(duplicate_edges[0]) > 0:
-        part_ids = orig_src_id.astype(
-            np.int64) * max_nid + orig_dst_id.astype(np.int64)
-        uniq_orig_ids, idx = np.unique(part_ids, return_index=True)
-        duplicate_ids = duplicate_edges[0].astype(
-            np.int64) * max_nid + duplicate_edges[1].astype(np.int64)
-        common_nids, common_idx1, common_idx2 = np.intersect1d(
-            uniq_orig_ids, duplicate_ids, return_indices=True)
-        idx = idx[common_idx1]
-        # the IDs after ID assignment
-        src_id_list.append(src_id[idx])
-        dst_id_list.append(dst_id[idx])
-        # homogeneous IDs in the input graph.
-        orig_src_id_list.append(duplicate_edges[0][common_idx2])
-        orig_dst_id_list.append(duplicate_edges[1][common_idx2])
-        # edge IDs and edge type.
-        orig_edge_id_list.append(duplicate_edges[2][common_idx2])
-        etype_id_list.append(duplicate_edges[3][common_idx2])
-        print('Add {} duplicated edges in partition {}'.format(len(idx), part_id))
-    src_id = np.concatenate(src_id_list) if len(
-        src_id_list) > 1 else src_id_list[0]
-    dst_id = np.concatenate(dst_id_list) if len(
-        dst_id_list) > 1 else dst_id_list[0]
-    orig_src_id = np.concatenate(orig_src_id_list) if len(
-        orig_src_id_list) > 1 else orig_src_id_list[0]
-    orig_dst_id = np.concatenate(orig_dst_id_list) if len(
-        orig_dst_id_list) > 1 else orig_dst_id_list[0]
-    orig_edge_id = np.concatenate(orig_edge_id_list) if len(
-        orig_edge_id_list) > 1 else orig_edge_id_list[0]
-    etype_ids = np.concatenate(etype_id_list) if len(
-        etype_id_list) > 1 else etype_id_list[0]
-    print('There are {} edges in partition {}'.format(len(src_id), part_id))
+    #process edges
+    shuffle_global_src_id, shuffle_global_dst_id, global_src_id, global_dst_id, global_edge_id, etype_ids = \
+                [ edge_data[:,i] for i in [0, 1, 2, 3, 4, 5] ]
+    print('There are {} edges in partition {}'.format(len(shuffle_global_src_id), part_id))
 
     # It's not guaranteed that the edges are sorted based on edge type.
     # Let's sort edges and all attributes on the edges.
     sort_idx = np.argsort(etype_ids)
-    src_id, dst_id, orig_src_id, orig_dst_id, orig_edge_id, etype_ids = src_id[sort_idx], dst_id[sort_idx], \
-        orig_src_id[sort_idx], orig_dst_id[sort_idx], orig_edge_id[sort_idx], etype_ids[sort_idx]
+    shuffle_global_src_id, shuffle_global_dst_id, global_src_id, global_dst_id, global_edge_id, etype_ids = shuffle_global_src_id[sort_idx], \
+        shuffle_global_dst_id[sort_idx], global_src_id[sort_idx], global_dst_id[sort_idx], global_edge_id[sort_idx], etype_ids[sort_idx]
     assert np.all(np.diff(etype_ids) >= 0)
 
-    if edge_attr_dtype is not None:
-        """
-        # Get edge attributes
-        # Here we just assume all edges have the same attributes.
-        # In practice, this is not the same, in which we need more complex solution to
-        # encode and decode edge attributes.
-        os.system('cut -d\' \' -f 7- {} > {}'.format(input_dir +
-                  '/' + edge_file, tmp_output))
-        edge_attrs = th.as_tensor(read_feats(tmp_output))[sort_idx]
-        """
-        if edge_attrs is not None: 
-            asssert(edge_feats == None)
-            edge_feats = {}
-            for etype_name in eid_ranges:
-                etype_id = etypes_map[etype_name]
-                edge_feats[etype_name +
-                            '/feat'] = th.as_tensor(edge_attrs[etype_ids == etype_id])
-        else: 
-            assert(edge_feats != None)
+    if (edge_feats != None):
         dgl.data.utils.save_tensors(os.path.join(
             part_dir, "edge_feat.dgl"), edge_feats)
 
     # Determine the edge ID range of different edge types.
-    edge_id_start = num_edges
-    for etype_name in eid_ranges:
+    edge_id_start = edgeid_offset 
+    for etype_name in global_eid_ranges:
         etype_id = etypes_map[etype_name]
         edge_map_val[etype_name].append([int(edge_id_start),
                                          int(edge_id_start + np.sum(etype_ids == etype_id))])
@@ -249,31 +137,31 @@ def create_dgl_object(input_dir, graph_name, num_parts, num_node_weights, node_a
     # To avoid this kind of nodes being removed from the graph, we add node IDs that
     # belong to this partition.
     ids = np.concatenate(
-        [src_id, dst_id, np.arange(nid_range[0], nid_range[1] + 1)])
+        [shuffle_global_src_id, shuffle_global_dst_id, np.arange(shuffle_global_nid_range[0], shuffle_global_nid_range[1] + 1)])
     uniq_ids, idx, inverse_idx = np.unique(
         ids, return_index=True, return_inverse=True)
     assert len(uniq_ids) == len(idx)
     # We get the edge list with their node IDs mapped to a contiguous ID range.
-    local_src_id, local_dst_id = np.split(inverse_idx[:len(src_id) * 2], 2)
-    compact_g = dgl.graph((local_src_id, local_dst_id))
-    compact_g.edata['orig_id'] = th.as_tensor(orig_edge_id)
+    part_local_src_id, part_local_dst_id = np.split(inverse_idx[:len(shuffle_global_src_id) * 2], 2)
+    compact_g = dgl.graph((part_local_src_id, part_local_dst_id))
+    compact_g.edata['orig_id'] = th.as_tensor(global_edge_id)
     compact_g.edata[dgl.ETYPE] = th.as_tensor(etype_ids)
     compact_g.edata['inner_edge'] = th.ones(
         compact_g.number_of_edges(), dtype=th.bool)
 
     # The original IDs are homogeneous IDs.
     # Similarly, we need to add the original homogeneous node IDs
-    orig_ids = np.concatenate([orig_src_id, orig_dst_id, orig_homo_nid])
-    orig_homo_ids = orig_ids[idx]
-    ntype, per_type_ids = id_map(orig_homo_ids)
+    global_nids = np.concatenate([global_src_id, global_dst_id, global_homo_nid])
+    global_homo_ids = global_nids[idx]
+    ntype, per_type_ids = id_map(global_homo_ids)
     compact_g.ndata['orig_id'] = th.as_tensor(per_type_ids)
     compact_g.ndata[dgl.NTYPE] = th.as_tensor(ntype)
     compact_g.ndata[dgl.NID] = th.as_tensor(uniq_ids)
     compact_g.ndata['inner_node'] = th.as_tensor(np.logical_and(
-        uniq_ids >= nid_range[0], uniq_ids <= nid_range[1]))
-    local_nids = compact_g.ndata[dgl.NID][compact_g.ndata['inner_node'].bool()]
-    assert np.all((local_nids == th.arange(
-        local_nids[0], local_nids[-1] + 1)).numpy())
+        uniq_ids >= shuffle_global_nid_range[0], uniq_ids <= shuffle_global_nid_range[1]))
+    part_local_nids = compact_g.ndata[dgl.NID][compact_g.ndata['inner_node'].bool()]
+    assert np.all((part_local_nids == th.arange(
+        part_local_nids[0], part_local_nids[-1] + 1)).numpy())
     print('|V|={}'.format(compact_g.number_of_nodes()))
     print('|E|={}'.format(compact_g.number_of_edges()))
 
@@ -304,15 +192,45 @@ def create_dgl_object(input_dir, graph_name, num_parts, num_node_weights, node_a
     compact_g2.edata[dgl.ETYPE] = compact_g1.edata[dgl.ETYPE][idx]
     compact_g2.edata['inner_edge'] = compact_g1.edata['inner_edge'][idx]
     compact_g2.edata[dgl.EID] = th.arange(
-        num_edges, num_edges + compact_g2.number_of_edges())
-    num_edges += compact_g2.number_of_edges()
+        edgeid_offset, edgeid_offset + compact_g2.number_of_edges(), dtype=th.int64)
+    edgeid_offset += compact_g2.number_of_edges()
 
     dgl.save_graphs(part_dir + '/graph.dgl', [compact_g2])
 
-    return len(nodes), compact_g2.number_of_edges()
+    return node_data.shape[0], compact_g2.number_of_edges(), node_map_val, edge_map_val, ntypes_map, etypes_map
 
 def create_metadata_json(graph_name, num_nodes, num_edges, num_parts, node_map_val, \
-        edge_map_val, ntypes_map, etypes_map, output_dir, create_file):
+                            edge_map_val, ntypes_map, etypes_map, output_dir ):
+    """
+    Auxiliary function to create json file for the graph partition metadata
+
+    Parameters:
+    -----------
+    graph_name : string
+        name of the graph
+    num_nodes : int
+        no. of nodes in the graph partition
+    num_edges : int
+        no. of edges in the graph partition
+    num_parts : int
+        total no. of partitions of the original graph
+    node_map_val : dictionary
+        map between node types and the range of global node ids used
+    edge_map_val : dictionary
+        map between edge types and the range of global edge ids used
+    ntypes_map : dictionary
+        map between node type(string)  and node_type_id(int)
+    etypes_map : dictionary
+        map between edge type(string)  and edge_type_id(int)
+    output_dir : string
+        directory where the output files are to be stored 
+
+    Returns:
+    --------
+    dictionary
+        map describing the graph information
+
+    """
     part_metadata = {'graph_name': graph_name,
                      'num_nodes': num_nodes,
                      'num_edges': num_edges,
@@ -332,117 +250,4 @@ def create_metadata_json(graph_name, num_nodes, num_edges, num_parts, node_map_v
         part_metadata['part-{}'.format(part_id)] = {'node_feats': node_feat_file,
                                                 'edge_feats': edge_feat_file,
                                                 'part_graph': part_graph_file}
-    if create_file == True: 
-        with open('{}/{}.json'.format(output_dir, graph_name), 'w') as outfile:
-            json.dump(part_metadata, outfile, sort_keys=True, indent=4)
-
     return part_metadata
-
-if __name__ == "__main__":
-
-    parser = argparse.ArgumentParser(description='Construct graph partitions')
-    parser.add_argument('--input-dir', required=True, type=str,
-                 help='The directory path that contains the partition results.')
-    parser.add_argument('--graph-name', required=True, type=str,
-                    help='The graph name')
-    parser.add_argument('--schema', required=True, type=str,
-                    help='The schema of the graph')
-    parser.add_argument('--num-parts', required=True, type=int,
-                    help='The number of partitions')
-    parser.add_argument('--num-node-weights', required=True, type=int,
-                    help='The number of node weights used by METIS.')
-    parser.add_argument('--workspace', type=str, default='/tmp',
-                    help='The directory to store the intermediate results')
-    parser.add_argument('--node-attr-dtype', type=str, default=None,
-                    help='The data type of the node attributes')
-    parser.add_argument('--edge-attr-dtype', type=str, default=None,
-                    help='The data type of the edge attributes')
-    parser.add_argument('--output', required=True, type=str,
-                    help='The output directory of the partitioned results')
-    parser.add_argument('--removed-edges', help='a file that contains the removed self-loops and duplicated edges',
-                    default=None, type=str)
-
-    args = parser.parse_args()
-
-    input_dir = args.input_dir
-    graph_name = args.graph_name
-    num_parts = args.num_parts
-    num_node_weights = args.num_node_weights
-    node_attr_dtype = args.node_attr_dtype
-    edge_attr_dtype = args.edge_attr_dtype
-    workspace_dir = args.workspace
-    output_dir = args.output
-    schema = args.schema
-    removed_edges = args.removed_edges
-
-    num_nodes = 0
-    num_edges = 0
-    node_map_val = {}
-    edge_mal_val = {}
-
-    for part_id in range(num_parts): 
-
-        # Read xxx_nodes.txt
-        node_file = 'p{:03}-{}_nodes.txt'.format(part_id, graph_name)
-        # The format of each line in the node file:
-        # <node_id> <node_type> <weight1> ... <orig_type_node_id> <attributes>
-        # The node file contains nodes that belong to a partition. It doesn't include HALO nodes.
-        orig_type_nid_col = 3 + num_node_weights
-        first_attr_col = 4 + num_node_weights
-
-        # Get the first two columns which is the node ID and node type.
-        tmp_output = workspace_dir + '/' + node_file + '.tmp'
-        os.system('awk \'{print $1, $2, $' + str(orig_type_nid_col) + '}\''
-              + ' {} > {}'.format(input_dir + '/' + node_file, tmp_output))
-        node_data = csv.read_csv(tmp_output, read_options=pyarrow.csv.ReadOptions(autogenerate_column_names=True),
-                         parse_options=pyarrow.csv.ParseOptions(delimiter=' '))
-        nids, ntype_ids, orig_type_nid = nodes.columns[0].to_numpy(), nodes.columns[1].to_numpy(), \
-                                            nodes.columns[2].to_numpy()
-
-        #read node features
-        node_attr = None
-        if node_attr_dtype is not None: 
-            # Get node attributes
-            # Here we just assume all nodes have the same attributes.
-            # In practice, this is not the same, in which we need more complex solution to
-            # encode and decode node attributes.
-            os.system('cut -d\' \' -f {}- {} > {}'.format(first_attr_col,
-                                                      input_dir + '/' + node_file,
-                                                      tmp_output))
-            node_attrs = read_feats(tmp_output)
-
-        #read xxx_edges.txt
-        edge_file = 'p{:03}-{}_edges.txt'.format(part_id, graph_name)
-        # The format of each line in the edge file:
-        # <src_id> <dst_id> <orig_src_id> <orig_dst_id> <orig_edge_id> <edge_type> <attributes>
-
-        tmp_output = workspace_dir + '/' + edge_file + '.tmp'
-        os.system('awk \'{print $1, $2, $3, $4, $5, $6}\'' + ' {} > {}'.format(input_dir + '/' + edge_file,
-                                                                           tmp_output))
-        edge_data = csv.read_csv(tmp_output, read_options=pyarrow.csv.ReadOptions(autogenerate_column_names=True),
-                         parse_options=pyarrow.csv.ParseOptions(delimiter=' '))
-
-        #read edge features
-        edge_attr = None
-        node_map_val = None
-        edge_map_val = None
-        ntypes_map = None
-        etypes_map = None
-        if edge_attr_dtype is not None:
-            # Get edge attributes
-            # Here we just assume all edges have the same attributes.
-            # In practice, this is not the same, in which we need more complex solution to
-            # encode and decode edge attributes.
-            os.system('cut -d\' \' -f 7- {} > {}'.format(input_dir +
-                      '/' + edge_file, tmp_output))
-            edge_attrs = th.as_tensor(read_feats(tmp_output))[sort_idx]
-
-        inc_nodes, inc_edges = create_dgl_object(input_dir, graph_name, num_parts, num_node_weights, node_attr_dtype, \
-                            edge_attr_dtype, workspace_dir, output_dir, removed_edges, schema, \
-                            part_id, node_data, node_attr, edge_data, edge_attr, num_nodes, num_edges, \
-                            node_map_val, edge_map_val, ntypes_map, etypes_map)
-        num_nodes += inc_nodes
-        num_edges += inc_edges
-
-    create_metadata_json(graph_name, num_nodes, num_edges, num_parts, node_map_val, \
-                            edge_map_val, ntypes_map, etypes_map, output_dir, True)

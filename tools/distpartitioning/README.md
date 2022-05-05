@@ -13,10 +13,10 @@ This file is used to provide edge information to this framework. Following is th
 where global_src_id and global_dst_id are two end points of an edge, global_type_edge_id is the unique edge_id assigned to each edge and are contiguous, and starting from 0, for each edge_type. And attributes can be any number of columns at the end of each line. 
 
 ###Naming convention 
-`global_` prefix (for any node or edge ids) indicate that these ids are read from graph input files. These ids are allocated to nodes and edges before `data shuffling`. These ids are globally unique across all ranks.
-`shuffle_global_` prefix (for any node or edge ids) indicate that these ids are assigned after the `data shuffling` is completed. These ids are globally unique across all ranks.
-`part_local_` prefix (for any node or edge ids) indicate that these ids are assigned after the `data shuffling` and are unique within a given rank.
-For instance, if a variable is named as `global_src_id` it means that this id is read from the graph input file and is assumed to be globally unique across all ranks. Similarly if a variable is named `part_local_node_id`  then it means that this node_id is assigned after the data shuffling is complete and is unique with a given rank.
+`global_` prefix (for any node or edge ids) indicate that these ids are read from graph input files. These ids are allocated to nodes and edges before `data shuffling`. These ids are globally unique across all partitions.
+`shuffle_global_` prefix (for any node or edge ids) indicate that these ids are assigned after the `data shuffling` is completed. These ids are globally unique across all partitions.
+`part_local_` prefix (for any node or edge ids) indicate that these ids are assigned after the `data shuffling` and are unique within a given partition.
+For instance, if a variable is named as `global_src_id` it means that this id is read from the graph input file and is assumed to be globally unique across all partitions. Similarly if a variable is named `part_local_node_id`  then it means that this node_id is assigned after the data shuffling is complete and is unique with a given partition.
 
 ###High level description of the algorithm
 ####Single file format for graph input files

@@ -3,7 +3,8 @@ import torch
 import torch.distributed as dist
 
 def allgather_sizes(send_data, world_size):
-    """ Perform all gather on list lengths, used to compute prefix sums
+    """ 
+    Perform all gather on list lengths, used to compute prefix sums
     to determine the offsets on each ranks. This is used to allocate
     global ids for edges/nodes on each ranks.
 
@@ -39,8 +40,10 @@ def allgather_sizes(send_data, world_size):
     return rank_sizes
 
 def alltoall_cpu(rank, world_size, output_tensor_list, input_tensor_list):
-    """Each process scatters list of input tensors to all processes in a cluster
+    """
+    Each process scatters list of input tensors to all processes in a cluster
     and return gathered list of tensors in output list. The tensors should have the same shape.
+
     Parameters
     ----------
     rank : int
@@ -57,8 +60,10 @@ def alltoall_cpu(rank, world_size, output_tensor_list, input_tensor_list):
         dist.scatter(output_tensor_list[i], input_tensor_list if i == rank else [], src=i)
 
 def alltoallv_cpu(rank, world_size, output_tensor_list, input_tensor_list):
-    """Each process scatters list of input tensors to all processes in a cluster
+    """
+    Each process scatters list of input tensors to all processes in a cluster
     and return gathered list of tensors in output list.
+
     Parameters
     ----------
     rank : int
@@ -87,7 +92,8 @@ def alltoallv_cpu(rank, world_size, output_tensor_list, input_tensor_list):
     torch.distributed.barrier()
 
 def gather_metadata_json(metadata, rank, world_size): 
-    """ Gather an object (json schema on `rank`)
+    """ 
+    Gather an object (json schema on `rank`)
     Parameters:
     -----------
     metadata : json dictionary object

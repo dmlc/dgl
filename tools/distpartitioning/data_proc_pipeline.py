@@ -1,7 +1,8 @@
 import argparse
 import numpy as np
 import torch.multiprocessing as mp
-from initialize import proc_exec, init_process 
+from initialize import proc_exec, single_dev_init
+from multi_data_initialize import multi_dev_init
 
 def log_params(params): 
     """ Print all the command line arguments for debugging purposes.
@@ -26,7 +27,8 @@ def log_params(params):
     print('Edges File: ', params.edges_file)
     print('Node feats: ', params.node_feats_file)
     print('Edge feats: ', params.edge_feats_file)
-    print('Metis partitions: ', params.metis_partitions)
+    print('Metis partitions: ', params.partitions_file)
+    print('Exec Type: ', params.exec_type)
 
 def start_local_run(params): 
     """ Main function for distributed implementation on a single machine
@@ -44,7 +46,7 @@ def start_local_run(params):
     #Invoke `target` function from each of the spawned process for distributed 
     #implementation
     for rank in range(params.world_size):
-        p = mp.Process(target=init_process, args=(rank, params.world_size, proc_exec, params))
+        p = mp.Process(target=single_dev_init, args=(rank, params.world_size, proc_exec, params))
         p.start()
         processes.append(p)
 
@@ -52,7 +54,8 @@ def start_local_run(params):
         p.join()
 
 if __name__ == "__main__":
-    """ Start of execution from this point. 
+    """ 
+    Start of execution from this point. 
     Invoke the appropriate function to begin execution
     """
     #arguments which are already needed by the existing implementation of convert_partition.py
@@ -77,6 +80,8 @@ if __name__ == "__main__":
                     help='The output directory of the partitioned results')
     parser.add_argument('--removed-edges', help='a file that contains the removed self-loops and duplicated edges',
                     default=None, type=str)
+    parser.add_argument('--exec-type', type=int, default=0,
+                    help='Use 1 for single machine run and 2 for distributed execution')
 
     #arguments needed for the distributed implementation
     parser.add_argument('--world-size', help='no. of processes to spawn',
@@ -89,9 +94,12 @@ if __name__ == "__main__":
                     default=None, type=str, required=True)
     parser.add_argument('--edge-feats-file', help='filename of the nodes metadata', 
                     default=None, type=str )
-    parser.add_argument('--metis-partitions', help='filename of the output of dgl_part2 (metis partitions)',
+    parser.add_argument('--partitions-file', help='filename of the output of dgl_part2 (metis partitions)',
                     default=None, type=str)
     params = parser.parse_args()
 
     #invoke the starting function here.
-    start_local_run(params)
+    if(params.exec_type == 0):
+        start_local_run(params)
+    else:
+        multi_dev_init(params)

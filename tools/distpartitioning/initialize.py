@@ -1,6 +1,7 @@
 import os
 import sys
 import math
+import json
 import numpy as np
 import torch
 import torch.distributed as dist
@@ -11,15 +12,17 @@ from datetime import timedelta
 from utils import augment_node_data, augment_edge_data,\
                   read_nodes_file, read_edges_file,\
                   read_node_features_file, read_edge_features_file,\
-                  read_metis_partitions, read_json,\
+                  read_partitions_file, read_json,\
                   get_node_types, write_metadata_json
 from globalids import assign_shuffle_global_nids_nodes, assign_shuffle_global_nids_edges,\
                       get_shuffle_global_nids_edges
 from gloo_wrapper import gather_metadata_json
-from convert_partition import create_dgl_object
+from convert_partition import create_dgl_object, create_metadata_json
 
 def send_node_data(rank, node_data, part_ids):
-    """ Function to send node_data to non-rank-0 processes. 
+    """ 
+    Function to send node_data to non-rank-0 processes. 
+    
     Parameters:
     -----------
     rank : integer
@@ -42,10 +45,7 @@ def send_node_data(rank, node_data, part_ids):
 
         #prepare tensor to send
         send_size = filt_send_data.shape
-        #TODO: check if send_tensor = th.tensor(filt_send_data.shape, dtype=th.int64)
-        send_tensor = torch.zeros(len(send_size), dtype=torch.int64)
-        for idx in range(len(send_size)): 
-            send_tensor[idx] = send_size[idx]
+        send_tensor = torch.tensor(filt_send_data.shape, dtype=torch.int64)
 
         # Send size first, so that the part-id (rank)
         # can create appropriately sized buffers
@@ -56,11 +56,12 @@ def send_node_data(rank, node_data, part_ids):
         send_tensor = torch.from_numpy(filt_send_data.astype(np.int64))
         dist.send(send_tensor, dst=part_id)
         end = timer()
-        print('Rank: ', rank, ' Sent data size: ', filtered_send_data.shape, \
+        print('Rank: ', rank, ' Sent data size: ', filt_send_data.shape, \
                 ', to Process: ', part_id, 'in: ', timedelta(seconds = end - start))
 
 def send_edge_data(rank, edge_data, part_ids): 
-    """ Function to send edge data to non-rank-0 processes
+    """ 
+    Function to send edge data to non-rank-0 processes
 
     Parameters:
     -----------
@@ -82,17 +83,13 @@ def send_edge_data(rank, edge_data, part_ids):
 
         #send shape
         send_size = filt_send_data.shape
-        #TODO: test send_tensor = th.tensor(filt_send_data.shape, dtype=th.int64)
-        send_tensor = torch.zeros(len(send_size), dtype=torch.int64)
-        for idx in range(len(send_size)): 
-            send_tensor[idx] = send_size[idx]
+        send_tensor = torch.tensor(filt_send_data.shape, dtype=torch.int64)
 
         # Send size first, so that the rProc can create appropriately sized tensor
         dist.send(send_tensor, dst=part_id)
 
         start = timer()
-        #TODO: remove type-casting again. data is already in np.int64 form.
-        send_tensor = torch.from_numpy(filt_send_data.astype(np.int64))
+        send_tensor = torch.from_numpy(filt_send_data)
         dist.send(send_tensor, dst=part_id)
         end = timer()
 
@@ -100,15 +97,21 @@ def send_edge_data(rank, edge_data, part_ids):
                 ' is : ', timedelta(seconds = end - start))
 
 def send_node_features(rank, node_data, node_features, part_ids, ntype_map):
-    """ Function to send node_features data to non-rank-0 processes.
+    """ 
+    Function to send node_features data to non-rank-0 processes.
+    
     Parameters:
     -----------
     rank : integer
         rank of the process
+    node_data : numpy ndarray of int64
+        node_data, read from the xxx_nodes.txt file
     node_features : numpy ndarray of floats 
         node_features, data from the node_feats.dgl
-    ranks_list : list of unique ranks/partition-ids
-    ntype_map : dictionary of mappings between ntype_name -> ntype
+    part_ids : list
+        list of unique ranks/partition-ids
+    ntype_map : dictionary 
+        mappings between ntype_name -> ntype
     """
 
     node_features_out = []
@@ -145,8 +148,10 @@ def send_node_features(rank, node_data, node_features, part_ids, ntype_map):
     print('Rank: ', rank, ', Done sending Node Features to: ', part_id, \
             ' in: ', timedelta(seconds = end - start))
 
-def send_data(rank, node_data, node_features, edge_data, metis_partitions, ntypes_map): 
-    """ Wrapper function to send graph data to non-rank-0 processes.
+def send_data(rank, node_data, node_features, edge_data, node_part_ids, ntypes_map): 
+    """ 
+    Wrapper function to send graph data to non-rank-0 processes.
+    
     Parameters:
     -----------
     rank : integer
@@ -157,13 +162,13 @@ def send_data(rank, node_data, node_features, edge_data, metis_partitions, ntype
         node_features, data from the node_feats.dgl
     edge_data : numpy ndarray
         edge_data, augmented, from xxx_edges.txt file
-    metis_partitions : dictionary
-        orig_node_id -> partition_id mappings as defined by METIS
+    node_part_ids : ndarray  
+        array of part_ids indexed by global_nid
     ntype_map : dictionary 
         mappings between ntype_name -> ntype_id
     """
 
-    part_ids = np.unique(list(metis_partitions.values()))
+    part_ids = np.unique(node_part_ids)
     part_ids.sort ()
     print('Rank: ', rank, ', Unique partitions: ', part_ids)
 
@@ -172,8 +177,10 @@ def send_data(rank, node_data, node_features, edge_data, metis_partitions, ntype
     send_node_features(rank, node_data, node_features, part_ids, ntypes_map)
 
 def recv_data(rank, shape, dtype): 
-    """ Auxiliary function to receive a multi-dimensional tensor, used by the
+    """ 
+    Auxiliary function to receive a multi-dimensional tensor, used by the
     non-rank-0 processes. 
+
     Parameters:
     -----------
     rank : integer
@@ -182,6 +189,7 @@ def recv_data(rank, shape, dtype):
         shape of the received data
     dtype : integer
         type of the received data
+
     Returns: 
     --------
     numpy array
@@ -199,7 +207,9 @@ def recv_data(rank, shape, dtype):
     return recv_tensor_data.numpy()
 
 def recv_node_data(rank, shape, dtype): 
-    """ Function to receive node_data, used by non-rank-0 processes.
+    """ 
+    Function to receive node_data, used by non-rank-0 processes.
+
     Parameters:
     -----------
     rank : integer
@@ -208,6 +218,7 @@ def recv_node_data(rank, shape, dtype):
         shape of the received data
     dtype : integer
         type of the received data
+
     Returns:
     --------
     numpy array
@@ -216,7 +227,9 @@ def recv_node_data(rank, shape, dtype):
     return recv_data(rank, shape, dtype)
 
 def recv_edge_data(rank, shape, dtype): 
-    """Function to receive edge_data, used by non-rank0 processes. 
+    """
+    Function to receive edge_data, used by non-rank0 processes. 
+
     Parameters:
     -----------
     rank : integer
@@ -225,6 +238,7 @@ def recv_edge_data(rank, shape, dtype):
         shape of the received data
     dtype : integer
         type of the received data
+
     Returns:
     --------
     numpy array
@@ -233,14 +247,17 @@ def recv_edge_data(rank, shape, dtype):
     return recv_data(rank, shape, dtype)
 
 def recv_node_features_obj(rank, world_size): 
-    """Function to receive node_feautres as an object, as read from the node_feats.dgl file.
+    """
+    Function to receive node_feautres as an object, as read from the node_feats.dgl file.
     This is used by non-rank-0 processes. 
+
     Parameters:
     -----------
     rank : integer
         rank of the process
     world_size : integer
         no. of processes used
+
     Returns:
     --------
     numpy ndarray
@@ -253,8 +270,9 @@ def recv_node_features_obj(rank, world_size):
     node_features = recv_obj[0]
     return node_features
 
-def read_graph_files(rank, params, metis_partitions): 
-    """Read the files and return the data structures
+def read_graph_files(rank, params, node_part_ids): 
+    """
+    Read the files and return the data structures
     Node data as read from files, which is in the following format: 
         <node_type> <weight1> <weight2> <weight3> <weight4> <global_type_nid> <attributes>
     is converted to 
@@ -263,14 +281,16 @@ def read_graph_files(rank, params, metis_partitions):
         <global_src_id> <global_dst_id> <global_type_eid> <edge_type> <attributes>
     is converted to the following format in this function:
         <global_src_id> <global_dst_id> <global_type_eid> <edge_type> <recv_proc>
+
     Parameters:
     -----------
     rank : integer
         rank of the process
     params : argparser object
         argument parser data structure to access command line arguments
-    metis_partisions : dictionary
-        global_node_id -> partition_id/rank mappings as determined by METIS
+    node_part_ids : numpy array 
+        array of part_ids indexed by global_nid
+
     Returns:
     --------
     numpy ndarray
@@ -284,28 +304,30 @@ def read_graph_files(rank, params, metis_partitions):
     """
     augmted_node_data = []
     node_data = read_nodes_file(params.input_dir+'/'+params.nodes_file)
-    augmted_node_data = augment_node_data(node_data, metis_partitions)
+    augmted_node_data = augment_node_data(node_data, node_part_ids)
     print('Rank: ', rank, ', Completed loading nodes data: ', augmted_node_data.shape)
 
     augmted_edge_data = []
     edge_data = read_edges_file(params.input_dir+'/'+params.edges_file)
     removed_edge_data = read_edges_file(params.input_dir+'/'+params.removed_edges)
     edge_data = np.vstack((edge_data, removed_edge_data))
-    augmted_edge_data = augment_edge_data(edge_data, metis_partitions)
+    augmted_edge_data = augment_edge_data(edge_data, node_part_ids)
     print('Rank: ', rank, ', Completed loading edges data: ', augmted_edge_data.shape)
 
-    node_features = []
+    node_features = {}
     node_features = read_node_features_file( params.input_dir+'/'+params.node_feats_file )
     print('Rank: ', rank, ', Completed loading node features reading from file ', len(node_features))
 
-    edge_features = []
+    edge_features = {}
     #edge_features = read_edge_features_file( params.input_dir+'/'+params.edge_feats_file )
     #print( 'Rank: ', rank, ', Completed edge features reading from file ', len(edge_features) )
 
     return augmted_node_data, node_features, augmted_edge_data, edge_features
 
 def proc_exec(rank, world_size, params):
-    """ `main` function for each rank in the distributed implementation.
+    """ 
+    `main` function for each rank in the distributed implementation.
+
     Parameters: 
     -----------
     rank : integer
@@ -317,8 +339,8 @@ def proc_exec(rank, world_size, params):
     """
 
     #Read METIS partitions
-    metis_partitions = read_metis_partitions(params.input_dir+'/'+params.metis_partitions)
-    print('Rank: ', rank, ', Completed loading metis partitions: ', len(metis_partitions))
+    node_part_ids = read_partitions_file(params.input_dir+'/'+params.partitions_file)
+    print('Rank: ', rank, ', Completed loading metis partitions: ', len(node_part_ids))
 
     #read graph schema, get ntype_map(dict for ntype to ntype-id lookups) and ntypes list
     schema_map = read_json(params.input_dir+'/'+params.schema)
@@ -326,7 +348,7 @@ def proc_exec(rank, world_size, params):
 
     if rank == 0: 
         #read input graph files
-        node_data, node_features, edge_data, edge_features = read_graph_files(rank, params, metis_partitions)
+        node_data, node_features, edge_data, edge_features = read_graph_files(rank, params, node_part_ids)
 
         # order node_data by node_type before extracting node features. 
         # once this is ordered, node_features are automatically ordered and 
@@ -337,10 +359,10 @@ def proc_exec(rank, world_size, params):
         print('Rank: ', rank, ', node_features: ', len(node_features))
         print('Rank: ', rank, ', edge_data: ', edge_data.shape)
         #print('Rank: ', rank, ', edge_features : ',len( edge_features))
-        print('Rank: ', rank, ', partitions : ', len(metis_partitions))
+        print('Rank: ', rank, ', partitions : ', len(node_part_ids))
 
         # shuffle data
-        send_data(rank, node_data, node_features, edge_data, metis_partitions, ntypes_map)
+        send_data(rank, node_data, node_features, edge_data, node_part_ids, ntypes_map)
 
         #extract features here for rank-0
         for name, ntype_id in ntypes_map.items(): 
@@ -361,9 +383,11 @@ def proc_exec(rank, world_size, params):
         node_data = recv_node_data(rank, 2, torch.int64)
         edge_data = recv_edge_data(rank, 2, torch.int64)
         node_features = recv_node_features_obj(rank, world_size)
+        edge_features = {}
 
     #syncronize
     dist.barrier()
+
 
     #determine ntypes present in the graph
     ntypes = np.unique(node_data[:,0])
@@ -395,39 +419,39 @@ def proc_exec(rank, world_size, params):
     edge_data, shuffle_global_eid_start = assign_shuffle_global_nids_edges(rank, world_size, etype_counts, edge_data)
     print('Rank: ', rank, ' Done assign Global ids to edges...')
 
-    edge_data = get_shuffle_globalids_edges(rank, world_size, edge_data, metis_partitions, node_data)
+    edge_data = get_shuffle_global_nids_edges(rank, world_size, edge_data, node_part_ids, node_data)
     print('Rank: ', rank, ' Done retrieving Global Node Ids for non-local nodes... ')
 
     #call convert_parititio.py for serialization 
     print('Rank: ', rank, ' Creating DGL objects for all partitions')
     #json_metadata, output_dir, graph_name = gen_dgl_objs(False, pipeline_args, params)
     num_nodes = 0
-    num_edges = 0
-    ntypes_map = None
-    ntypes_map_val = None
-    etypes_map = None
-    etypes_map_val = None
+    num_edges = shuffle_global_eid_start
 
     #create dgl objects
-    create_dgl_object(params.input_dir, params.graph_name, params.num_parts, params.num_node_weights, params.node_attr_dtype, \
-                            params.edge_attr_dtype, params.workspace_dir, params.output_dir, params.removed_edges, params.schema, \
-                            rank, node_data, node_features, edge_data, edge_features, num_nodes, num_edges, \
-                            ntypes_map_val, etypes_map_val, ntypes_map, etypes_map)
+    with open('{}/{}'.format(params.input_dir, params.schema)) as json_file: 
+        schema = json.load(json_file)
+    num_nodes, num_edges, ntypes_map_val, etypes_map_val, ntypes_map, etypes_map = create_dgl_object(params.input_dir, \
+            params.graph_name, params.num_parts, \
+            params.output, schema, rank, node_data, node_features, edge_data, edge_features, num_nodes, num_edges)
+
     #get the meta-data 
     json_metadata = create_metadata_json(params.graph_name, num_nodes, num_edges, params.num_parts, ntypes_map_val, \
-                            etypes_map_val, ntypes_map, etypes_map, params.output_dir, False)
+                            etypes_map_val, ntypes_map, etypes_map, params.output)
 
     if (rank == 0): 
         #get meta-data from all partitions and merge them on rank-0
         metadata_list = gather_metadata_json(json_metadata, rank, world_size)
         metadata_list[0] = json_metadata
-        write_metadata_json(metadata_list, output_dir, graph_name)
+        write_metadata_json(metadata_list, params.output, params.graph_name)
     else: 
         #send meta-data to Rank-0 process
         gather_metadata_json(json_metadata, rank, world_size)
 
-def init_process(rank, world_size, proc_exec, params, backend="gloo"):
-    """Init. function which is run by each process in the Gloo ProcessGroup
+def single_dev_init(rank, world_size, func_exec, params, backend="gloo"):
+    """
+    Init. function which is run by each process in the Gloo ProcessGroup
+
     Parameters:
     -----------
     rank : integer
@@ -447,4 +471,4 @@ def init_process(rank, world_size, proc_exec, params, backend="gloo"):
     #create Gloo Process Group
     dist.init_process_group(backend, rank=rank, world_size=world_size)
     #Invoke the main function to kick-off each process
-    proc_exec(rank, world_size, params)
+    func_exec(rank, world_size, params)

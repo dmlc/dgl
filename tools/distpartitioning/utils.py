@@ -3,7 +3,7 @@ import numpy as np
 import json
 import dgl
 
-def read_metis_partitions(part_file):
+def read_partitions_file(part_file):
     """Utility method to read metis partitions, which is the output of 
     pm_dglpart2
 
@@ -12,13 +12,19 @@ def read_metis_partitions(part_file):
     part_file : string
         file name which is the output of metis partitioning
         algorithm (pm_dglpart2, in the METIS installation).
+        This function expects each line in `part_file` to be formatted as 
+        <global_nid> <part_id>
+        and the contents of this file are sorted by <global_nid>. 
 
     Returns:
     --------
-    dictionary, mapping between global_nid <-> partition_id
+    numpy array
+        array of part_ids and the idx is the <global_nid>
     """
-    metis_map = np.loadtxt(part_file, delimiter=' ', dtype=np.int64)
-    return dict(metis_map)
+    partitions_map = np.loadtxt(part_file, delimiter=' ', dtype=np.int64)
+    #as a precaution sort the lines based on the <global_nid>
+    partitions_map = partitions_map[partitions_map[:,0].argsort()]
+    return partitions_map[:,1]
 
 def read_json(json_file):
     """Utility method to read a json file schema
@@ -118,44 +124,45 @@ def write_metadata_json(metadata_list, output_dir, graph_name):
     with open('{}/{}.json'.format(output_dir, graph_name), 'w') as outfile: 
         json.dump(graph_metadata, outfile, sort_keys=True, indent=4)
 
-def augment_edge_data(edge_data, partitions):
+def augment_edge_data(edge_data, part_ids):
     """Add partition-id (rank which owns an edge) column to the edge_data.
     
     Parameters:
     -----------
     edge_data : numpy ndarray
         Edge information as read from the xxx_edges.txt file
-    partitions : dictionary
-        METIS assigned partitions to each of the nodes in the input graph
-
+    part_ids : numpy array
+        array of part_ids indexed by global_nid
     Returns:
     --------
     numpy ndarray
         original edge_data with one additional column
     """
-    tgtrank = [partitions[x[1]] for x in edge_data]
-    return np.c_[edge_data, tgtrank]
+    #tgtrank = [partitions[x[1]] for x in edge_data]
+    proc_ids = part_ids[edge_data[:,1]]
+    return np.c_[edge_data, proc_ids]
 
-def augment_node_data(node_data, partitions): 
+def augment_node_data(node_data, part_ids): 
     """Utility function to add auxilary columns to the node_data numpy ndarray.
 
     Parameters:
     -----------
     node_data : numpy ndarray
         Node information as read from xxx_nodes.txt file
-    partitions : dictionary 
-        METIS assigned partitions for a graph
+    part_ids : numpy array 
+        array of part_ids indexed by global_nid
 
     Returns:
     --------
     numpy ndarray
         original node_data, numpy ndarray, with two additional columns
     """
-    global_nids = np.arange(node_data.shape[0])
+    global_nids = np.arange(node_data.shape[0], dtype=np.int64)
     node_data_aug = np.c_[node_data, global_nids]
 
-    tgtrank = [partitions[x[6]] for x in node_data_aug]
-    return np.c_[node_data_aug, tgtrank]
+    #proc_id = [partitions[x[6]] for x in node_data_aug]
+    proc_ids = part_ids[node_data_aug[:,6]]
+    return np.c_[node_data_aug, proc_ids]
 
 def read_nodes_file(nodes_file):
     """Utility function to read xxx_nodes.txt file
@@ -207,7 +214,7 @@ def read_edges_file(edge_file):
     edge_data = np.loadtxt(edge_file , delimiter=' ', dtype = 'int64')
     return edge_data
 
-def read_node_features_file (nodes_features_file):
+def read_node_features_file(nodes_features_file):
     """Utility function to load tensors from a file
 
     Parameters:
@@ -224,7 +231,7 @@ def read_node_features_file (nodes_features_file):
     node_features = dgl.data.utils.load_tensors(nodes_features_file, False)
     return node_features
 
-def read_edge_features_file( edge_features_file ):
+def read_edge_features_file(edge_features_file):
     """ Utility function to load tensors from a file
 
     Parameters:
