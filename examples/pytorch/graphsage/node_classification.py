@@ -85,7 +85,7 @@ sampler = dgl.dataloading.NeighborSampler(
 train_dataloader = dgl.dataloading.DataLoader(
         graph, train_idx, sampler, device=device, batch_size=1024, shuffle=True,
         drop_last=False, num_workers=0, use_uva=not args.pure_gpu)
-valid_dataloader = dgl.dataloading.NodeDataLoader(
+valid_dataloader = dgl.dataloading.DataLoader(
         graph, valid_idx, sampler, device=device, batch_size=1024, shuffle=True,
         drop_last=False, num_workers=0, use_uva=not args.pure_gpu)
 
