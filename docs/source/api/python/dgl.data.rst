@@ -49,6 +49,8 @@ Datasets for node classification/regression tasks
     FraudAmazonDataset
     BAShapes
     BACommunity
+    TreeCycles
+    TreeGrids
 
 Edge Prediction Datasets
 ---------------------------------------
