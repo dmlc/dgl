@@ -218,6 +218,19 @@ def test_explain_syn():
     assert F.allclose(src1, src2)
     assert F.allclose(dst1, dst2)
 
+    dataset = data.BACommunity()
+    assert dataset.num_classes == 8
+    g = dataset[0]
+    assert 'label' in g.ndata
+    assert 'feat' in g.ndata
+
+    g1 = data.BACommunity(force_reload=True, seed=0)
+    src1, dst1 = g1.edges()
+    g2 = data.BACommunity(force_reload=True, seed=0)
+    src2, dst2 = g2.edges()
+    assert F.allclose(src1, src2)
+    assert F.allclose(dst1, dst2)
+
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
 def test_extract_archive():
     # gzip
