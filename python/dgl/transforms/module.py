@@ -31,7 +31,7 @@ except ImportError:
 
 __all__ = [
     'BaseTransform',
-    'FeatNormalizer',
+    'RowFeatNormalizer',
     'FeatMask',
     'RandomWalkPE',
     'LaplacianPE',
@@ -100,12 +100,20 @@ class BaseTransform:
     def __repr__(self):
         return self.__class__.__name__ + '()'
 
-class FeatNormalizer(BaseTransform):
+class RowFeatNormalizer(BaseTransform):
     r"""
-    Row-normalizes the features given in `node_feat_names` and `edge_feat_names` to sum-up to one.
+    Row-normalizes the features given in `node_feat_names` and `edge_feat_names`.
+    The row normalization term is:
+
+    :math:`x = \frac{x}{\sum_i x_i}`
+
+    where :math:`x` denotes the one row of the features.
 
     Parameters
     ----------
+    subtract_min: bool
+        If True, the minimum value of the feature tensors will be subtracted. Default: False.
+        The subtraction will make all values non-negative.
     node_feat_names : list of str, optional
         The names of the node features to be normalized. Default: `None`.
         If None, all node features will be normalized.
@@ -120,11 +128,11 @@ class FeatNormalizer(BaseTransform):
 
     >>> import dgl
     >>> import torch
-    >>> from dgl import FeatNormalizer
+    >>> from dgl import RowFeatNormalizer
 
-    Case1: Normalize features of a homogeneous graph.
+    Case1: Row normalize features of a homogeneous graph.
 
-    >>> transform = FeatNormalizer()
+    >>> transform = RowFeatNormalizer()
     >>> g = dgl.rand_graph(5, 20)
     >>> g.ndata['h'] = torch.randn((g.num_nodes(), 5))
     >>> print(g.ndata['h'].sum(1))
@@ -142,9 +150,9 @@ class FeatNormalizer(BaseTransform):
             1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000,
             1.0000, 1.0000])
 
-    Case2: Normalize features of a heterogeneous graph.
+    Case2: Row normalize features of a heterogeneous graph.
 
-    >>> transform = FeatNormalizer()
+    >>> transform = RowFeatNormalizer()
     >>> g = dgl.heterograph({
     ...     ('user', 'follows', 'user'): (torch.tensor([1, 2]), torch.tensor([3, 4])),
     ...     ('player', 'plays', 'game'): (torch.tensor([2, 2]), torch.tensor([1, 1]))
@@ -166,16 +174,17 @@ class FeatNormalizer(BaseTransform):
     ...     g.edata['w'][('player', 'plays', 'game')].sum(1))
     tensor([1.0000, 1.0000]) tensor([1.0000, 1.0000])
     """
-    def __init__(self, node_feat_names=None, edge_feat_names=None):
+    def __init__(self, subtract_min=False, node_feat_names=None, edge_feat_names=None):
         self.node_feat_names = node_feat_names
         self.edge_feat_names = edge_feat_names
+        self.subtract_min = subtract_min
 
-    def normalize(self, feat):
+    def row_normalize(self, feat):
         r"""
 
         Description
         -----------
-        Row-normalize the given feature to sum-up to one.
+        Row-normalize the given feature.
 
         Parameters
         ----------
@@ -187,7 +196,8 @@ class FeatNormalizer(BaseTransform):
         Tensor
             The normalized feature.
         """
-        feat = feat - feat.min()
+        if self.subtract_min:
+            feat = feat - feat.min()
         feat.div_(feat.sum(dim=-1, keepdim=True).clamp_(min=1.))
         return feat
 
@@ -200,19 +210,19 @@ class FeatNormalizer(BaseTransform):
 
         for node_feat_name in self.node_feat_names:
             if isinstance(g.ndata[node_feat_name], torch.Tensor):
-                g.ndata[node_feat_name] = self.normalize(g.ndata[node_feat_name])
+                g.ndata[node_feat_name] = self.row_normalize(g.ndata[node_feat_name])
             else:
                 for ntype in g.ndata[node_feat_name].keys():
                     g.nodes[ntype].data[node_feat_name] = \
-                        self.normalize(g.nodes[ntype].data[node_feat_name])
+                        self.row_normalize(g.nodes[ntype].data[node_feat_name])
 
         for edge_feat_name in self.edge_feat_names:
             if isinstance(g.edata[edge_feat_name], torch.Tensor):
-                g.edata[edge_feat_name] = self.normalize(g.edata[edge_feat_name])
+                g.edata[edge_feat_name] = self.row_normalize(g.edata[edge_feat_name])
             else:
                 for etype in g.edata[edge_feat_name].keys():
                     g.edges[etype].data[edge_feat_name] = \
-                        self.normalize(g.edges[etype].data[edge_feat_name])
+                        self.row_normalize(g.edges[etype].data[edge_feat_name])
 
         return g
 

@@ -31,4 +31,4 @@ dgl.transforms
     RandomWalkPE
     LaplacianPE
     FeatMask
-    FeatNormalizer
+    RowFeatNormalizer

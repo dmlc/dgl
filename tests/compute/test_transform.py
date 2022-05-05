@@ -2352,9 +2352,9 @@ def test_module_laplacian_pe(idtype):
 
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
 @parametrize_dtype
-def test_module_feat_normalizer(idtype):
+def test_module_row_feat_normalizer(idtype):
     # Case1: Normalize features of a homogeneous graph.
-    transform = dgl.FeatNormalizer()
+    transform = dgl.RowFeatNormalizer()
     g = dgl.rand_graph(5, 5, idtype=idtype, device=F.ctx())
     g.ndata['h'] = F.randn((g.num_nodes(), 128))
     g.edata['w'] = F.randn((g.num_edges(), 128))
@@ -2363,7 +2363,7 @@ def test_module_feat_normalizer(idtype):
     assert F.allclose(g.edata['w'].sum(1), F.tensor([1.0, 1.0, 1.0, 1.0, 1.0]))
 
     # Case2: Normalize features of a heterogeneous graph.
-    transform = dgl.FeatNormalizer()
+    transform = dgl.RowFeatNormalizer()
     g = dgl.heterograph({
         ('user', 'follows', 'user'): (F.tensor([1, 2]), F.tensor([3, 4])),
         ('player', 'plays', 'game'): (F.tensor([2, 2]), F.tensor([1, 1]))
