@@ -475,7 +475,7 @@ pipeline {
   post {
     always {
       script {
-        node("linux-core-worker") {
+        node("dglci-post-linux") {
           docker.image('dgllib/dgl-ci-awscli:v220418').inside("--pull always --entrypoint=''") {
             sh("rm -rf ci_tmp")
             dir('ci_tmp') {
