@@ -102,22 +102,25 @@ class BaseTransform:
 
 class RowFeatNormalizer(BaseTransform):
     r"""
-    Row-normalizes the features given in `node_feat_names` and `edge_feat_names`.
-    The row normalization term is:
+    Row-normalizes the features given in ``node_feat_names`` and ``edge_feat_names``.
 
-    :math:`x = \frac{x}{\sum_i x_i}`
+    The row normalization formular is:
 
-    where :math:`x` denotes the one row of the features.
+    .. math::
+      x = \frac{x}{\sum_i x_i}
+
+    where :math:`x` denotes the one row of the feature tensor.
 
     Parameters
     ----------
     subtract_min: bool
-        If True, the minimum value of the feature tensors will be subtracted. Default: False.
+        If True, the minimum value of the feature tensor will be subtracted before normalization.
+        Default: False.
         The subtraction will make all values non-negative.
-    node_feat_names : list of str, optional
+    node_feat_names : list[str], optional
         The names of the node features to be normalized. Default: `None`.
         If None, all node features will be normalized.
-    edge_feat_names : list of str, optional
+    edge_feat_names : list[str], optional
         The names of the edge features to be normalized. Default: `None`.
         If None, all edge features will be normalized.
 
@@ -227,21 +230,21 @@ class RowFeatNormalizer(BaseTransform):
         return g
 
 class FeatMask(BaseTransform):
-    r"""Randomly mask columns of the feature tensor, as described in `An Empirical Study of Graph
-    Contrastive Learning <https://arxiv.org/abs/2109.01116>`__.
+    r"""Randomly mask columns of the node and edge feature tensors, as described in `An Empirical
+    Study of Graph Contrastive Learning <https://arxiv.org/abs/2109.01116>`__.
 
     Parameters
     ----------
     p : float, optional
         Probability of masking a column of a feature tensor. Default: `0.5`.
-    node_feat_names : list of str, optional
+    node_feat_names : list[str], optional
         The names of the node feature tensors to be masked. Default: `None`.
         If None, all node feature tensors will be randomly mask some columns according to
-        probability `p`.
-    edge_feat_names : list of str, optional
+        probability :attr:`p`.
+    edge_feat_names : list[str], optional
         The names of the edge features to be masked. Default: `None`.
         If None, all edge feature tensors will be randomly mask some columns according to
-        probability `p`.
+        probability :attr:`p`.
 
     Example
     -------
