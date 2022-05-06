@@ -109,7 +109,7 @@ class RowFeatNormalizer(BaseTransform):
     .. math::
       x = \frac{x}{\sum_i x_i}
 
-    where :math:`x` denotes the one row of the feature tensor.
+    where :math:`x` denotes a row of the feature tensor.
 
     Parameters
     ----------
