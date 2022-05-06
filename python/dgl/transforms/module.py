@@ -114,9 +114,10 @@ class RowFeatNormalizer(BaseTransform):
     Parameters
     ----------
     subtract_min: bool
-        If True, the minimum value of the feature tensor will be subtracted before normalization.
+        If True, the minimum value of whole feature tensor will be subtracted before normalization.
         Default: False.
-        The subtraction will make all values non-negative.
+        Subtraction will make all values non-negative. If all values are negative, after
+        normalisation, the sum of each row of the feature tensor will be 1.
     node_feat_names : list[str], optional
         The names of the node features to be normalized. Default: `None`.
         If None, all node features will be normalized.
