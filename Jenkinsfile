@@ -94,6 +94,14 @@ def tutorial_test_linux(backend) {
   }
 }
 
+def go_test_linux() {
+  init_git()
+  unpack_lib('dgl-cpu-linux', dgl_linux_libs)
+  timeout(time: 20, unit: 'MINUTES') {
+    sh "bash tests/scripts/task_go_test.sh"
+  }
+}
+
 def is_authorized(name) {
   def authorized_user = ['VoVAllen', 'BarclayII', 'jermainewang', 'zheng-da', 'mufeili', 'Rhett-Ying', 'isratnisa']
   return (name in authorized_user)
@@ -177,7 +185,7 @@ pipeline {
           agent {
             docker {
               label "linux-cpu-node"
-              image "dgllib/dgl-ci-lint"  
+              image "dgllib/dgl-ci-lint"
               alwaysPull true
             }
           }
@@ -191,14 +199,14 @@ pipeline {
             }
           }
         }
-        
+
         stage('Build') {
           parallel {
             stage('CPU Build') {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:cu101_v220217"  
+                  image "dgllib/dgl-ci-cpu:cu101_v220217"
                   args "-u root"
                   alwaysPull true
                 }
@@ -216,7 +224,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-gpu:cu101_v220217"  
+                  image "dgllib/dgl-ci-gpu:cu101_v220217"
                   args "-u root"
                   alwaysPull true
                 }
@@ -253,7 +261,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:cu101_v220217"  
+                  image "dgllib/dgl-ci-cpu:cu101_v220217"
                   alwaysPull true
                 }
               }
@@ -270,7 +278,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-gpu-node"
-                  image "dgllib/dgl-ci-gpu:cu101_v220217"  
+                  image "dgllib/dgl-ci-gpu:cu101_v220217"
                   args "--runtime nvidia"
                   alwaysPull true
                 }
@@ -299,7 +307,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:cu101_v220217"  
+                  image "dgllib/dgl-ci-cpu:cu101_v220217"
                   alwaysPull true
                 }
               }
@@ -320,7 +328,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-gpu-node"
-                  image "dgllib/dgl-ci-gpu:cu101_v220217"  
+                  image "dgllib/dgl-ci-gpu:cu101_v220217"
                   args "--runtime nvidia"
                   alwaysPull true
                 }
@@ -342,7 +350,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:cu101_v220217"  
+                  image "dgllib/dgl-ci-cpu:cu101_v220217"
                   args "--shm-size=4gb"
                   alwaysPull true
                 }
@@ -361,6 +369,11 @@ pipeline {
                 stage('Torch CPU Tutorial test') {
                   steps {
                     tutorial_test_linux('pytorch')
+                  }
+                }
+                stage('DGL-Go CPU test') {
+                  steps {
+                    go_test_linux()
                   }
                 }
               }
@@ -394,7 +407,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-gpu-node"
-                  image "dgllib/dgl-ci-gpu:cu101_v220217"  
+                  image "dgllib/dgl-ci-gpu:cu101_v220217"
                   args "--runtime nvidia --shm-size=8gb"
                   alwaysPull true
                 }
@@ -422,7 +435,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:cu101_v220217"  
+                  image "dgllib/dgl-ci-cpu:cu101_v220217"
                   alwaysPull true
                 }
               }
@@ -448,7 +461,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-gpu-node"
-                  image "dgllib/dgl-ci-gpu:cu101_v220217"  
+                  image "dgllib/dgl-ci-gpu:cu101_v220217"
                   args "--runtime nvidia"
                   alwaysPull true
                 }
