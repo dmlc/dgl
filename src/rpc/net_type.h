@@ -27,6 +27,8 @@ struct RPCBase {
 };
 
 struct RPCSender : RPCBase {
+  static constexpr int kMaxTryCount = 1024;
+
   /*!
    * \brief Connect to a receiver.
    * 
@@ -49,7 +51,9 @@ struct RPCSender : RPCBase {
    *
    * The function is *not* thread-safe; only one thread can invoke this API.
    */
-  virtual bool ConnectReceiverFinalize() { return true; }
+  virtual bool ConnectReceiverFinalize(const int max_try_times = kMaxTryCount) {
+    return true;
+  }
 
   /*!
    * \brief Send RPCMessage to specified Receiver.
