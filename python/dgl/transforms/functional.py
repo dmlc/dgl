@@ -17,11 +17,11 @@
 
 from collections.abc import Iterable, Mapping
 from collections import defaultdict
+import copy
 import numpy as np
 import scipy.sparse as sparse
 import scipy.sparse.linalg
 import torch as th
-import copy
 
 from .._ffi.function import _init_api
 from ..base import dgl_warning, DGLError, NID, EID

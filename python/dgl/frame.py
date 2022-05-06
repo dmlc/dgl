@@ -870,4 +870,3 @@ class Frame(MutableMapping):
         """ Return a new frame with all floating-point columns converted
         to double-precision (float64) """
         return self.__astype_float(F.float64)
-
