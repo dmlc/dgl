@@ -1952,11 +1952,11 @@ def test_float_cast():
             g.edges['plays'].data[name] = F.copy_to(F.tensor(pvalues, dtype=type), ctx=F.ctx())
 
         if t == F.float16:
-            g.half_()
+            g = dgl.transforms.functional.to_half(g)
         if t == F.float32:
-            g.float_()
+            g = dgl.transforms.functional.to_float(g)
         if t == F.float64:
-            g.double_()
+            g = dgl.transforms.functional.to_double(g)
 
         for name,origType in dataNamesTypes:
             # integer tensors shouldn't be converted

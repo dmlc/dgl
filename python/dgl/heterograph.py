@@ -6039,60 +6039,6 @@ class DGLHeteroGraph(object):
         """
         return self.astype(F.int32)
 
-    def half_(self):
-        """Cast this graph to use float16 (half-precision) for any
-        floating-point edge and node feature data.
-
-        The graph is modified in-place.  Feature tensors that are
-        not floating-point will not be modified.
-
-        Returns
-        -------
-        DGLHeteroGraph
-            Graph with the feature data converted to float16.
-        """
-        for frame in self._edge_frames:
-            frame.half_()
-        for frame in self._node_frames:
-            frame.half_()
-        return self
-
-    def float_(self):
-        """Cast this graph to use float32 (single-precision) for any
-        floating-point edge and node feature data.
-
-        The graph is modified in-place.  Feature tensors that are
-        not floating-point will not be modified.
-
-        Returns
-        -------
-        DGLHeteroGraph
-            Graph with the feature data converted to float32.
-        """
-        for frame in self._edge_frames:
-            frame.float_()
-        for frame in self._node_frames:
-            frame.float_()
-        return self
-
-    def double_(self):
-        """Cast this graph to use float64 (double-precision) for any
-        floating-point edge and node feature data.
-
-        The graph is modified in-place.  Feature tensors that are
-        not floating-point will not be modified.
-
-        Returns
-        -------
-        DGLHeteroGraph
-            Graph with the feature data converted to float64.
-        """
-        for frame in self._edge_frames:
-            frame.double_()
-        for frame in self._node_frames:
-            frame.double_()
-        return self
-
     #################################################################
     # DEPRECATED: from the old DGLGraph
     #################################################################

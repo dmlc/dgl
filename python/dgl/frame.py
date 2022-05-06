@@ -845,19 +845,29 @@ class Frame(MutableMapping):
     def __astype_float(self, new_type):
         assert new_type in [F.float64, F.float32, F.float16], \
             "'new_type' must be floating-point type: %s" % str(new_type)
+        newframe = self.clone()
+        new_columns = {}
         for name, column in self._columns.items():
             dtype = column.dtype
             if dtype != new_type and dtype in [F.float64, F.float32, F.float16]:
-                self._columns[name] = column.astype(new_type)
+                new_columns[name] = column.astype(new_type)
+            else:
+                new_columns[name] = column
+        newframe._columns = new_columns
+        return newframe
 
-    def half_(self):
-        """Converts all floating-point columns to half-precision (float16)"""
-        self.__astype_float(F.float16)
+    def half(self):
+        """ Return a new frame with all floating-point columns converted
+        to half-precision (float16) """
+        return self.__astype_float(F.float16)
 
-    def float_(self):
-        """Converts all floating-point columns to single-precision (float32)"""
-        self.__astype_float(F.float32)
+    def float(self):
+        """ Return a new frame with all floating-point columns converted
+        to single-precision (float32) """
+        return self.__astype_float(F.float32)
 
-    def double_(self):
-        """Converts all floating-point columns to double-precision (float64)"""
-        self.__astype_float(F.float64)
+    def double(self):
+        """ Return a new frame with all floating-point columns converted
+        to double-precision (float64) """
+        return self.__astype_float(F.float64)
+
