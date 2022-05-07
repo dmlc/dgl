@@ -49,21 +49,48 @@ class SocketSender : public Sender {
     : Sender(queue_size, max_thread_count) {}
 
   /*!
-   * \brief Add receiver's address and ID to the sender's namebook
-   * \param addr Networking address, e.g., 'socket://127.0.0.1:50091', 'mpi://0'
-   * \param id receiver's ID
-   *
-   * AddReceiver() is not thread-safe and only one thread can invoke this API.
-   */
-  void AddReceiver(const char* addr, int recv_id);
-
-  /*!
-   * \brief Connect with all the Receivers
+   * \brief Connect to a receiver.
+   * 
+   * When there are multiple receivers to be connected, application will call `ConnectReceiver`
+   * for each and then call `ConnectReceiverFinalize` to make sure that either all the connections are
+   * successfully established or some of them fail.
+   * 
+   * \param addr Networking address, e.g., 'tcp://127.0.0.1:50091'
+   * \param recv_id receiver's ID
    * \return True for success and False for fail
    *
-   * Connect() is not thread-safe and only one thread can invoke this API.
+   * The function is *not* thread-safe; only one thread can invoke this API.
    */
-  bool Connect();
+  bool ConnectReceiver(const std::string& addr, int recv_id) override;
+
+  /*!
+   * \brief Finalize the action to connect to receivers. Make sure that either
+   *        all connections are successfully established or connection fails.
+   * \return True for success and False for fail
+   *
+   * The function is *not* thread-safe; only one thread can invoke this API.
+   */
+  bool ConnectReceiverFinalize() override;
+
+  /*!
+   * \brief Send RPCMessage to specified Receiver.
+   * \param msg data message 
+   * \param recv_id receiver's ID
+   */
+  void Send(const rpc::RPCMessage& msg, int recv_id) override;
+
+  /*!
+   * \brief Finalize TPSender
+   */
+  void Finalize() override;
+
+  /*!
+   * \brief Communicator type: 'socket'
+   */
+  const std::string &NetType() const override {
+    static const std::string net_type = "socket";
+    return net_type;
+  }
 
   /*!
    * \brief Send data to specified Receiver. Actually pushing message to message queue.
@@ -78,19 +105,7 @@ class SocketSender : public Sender {
    * (4) Messages sent to the same receiver are guaranteed to be received in the same order. 
    *     There is no guarantee for messages sent to different receivers.
    */
-  STATUS Send(Message msg, int recv_id);
-
-  /*!
-   * \brief Finalize SocketSender
-   *
-   * Finalize() is not thread-safe and only one thread can invoke this API.
-   */
-  void Finalize();
-
-  /*!
-   * \brief Communicator type: 'socket'
-   */
-  inline std::string Type() const { return std::string("socket"); }
+  STATUS Send(Message msg, int recv_id) override;
 
  private:
   /*!
@@ -145,13 +160,21 @@ class SocketReceiver : public Receiver {
 
   /*!
    * \brief Wait for all the Senders to connect
-   * \param addr Networking address, e.g., 'socket://127.0.0.1:50051', 'mpi://0'
+   * \param addr Networking address, e.g., 'tcp://127.0.0.1:50051', 'mpi://0'
    * \param num_sender total number of Senders
+   * \param blocking whether wait blockingly
    * \return True for success and False for fail
    *
    * Wait() is not thread-safe and only one thread can invoke this API.
    */
-  bool Wait(const char* addr, int num_sender);
+  bool Wait(const std::string &addr, int num_sender,
+            bool blocking = true) override;
+
+  /*!
+   * \brief Recv RPCMessage from Sender. Actually removing data from queue.
+   * \param msg pointer of RPCmessage
+   */
+  void Recv(rpc::RPCMessage* msg) override;
 
   /*!
    * \brief Recv data from Sender. Actually removing data from msg_queue.
@@ -164,7 +187,7 @@ class SocketReceiver : public Receiver {
    * (2) The Recv() API is thread-safe.
    * (3) Memory allocated by communicator but will not own it after the function returns.
    */
-  STATUS Recv(Message* msg, int* send_id);
+  STATUS Recv(Message* msg, int* send_id) override;
 
   /*!
    * \brief Recv data from a specified Sender. Actually removing data from msg_queue.
@@ -177,19 +200,22 @@ class SocketReceiver : public Receiver {
    * (2) The RecvFrom() API is thread-safe.
    * (3) Memory allocated by communicator but will not own it after the function returns.
    */
-  STATUS RecvFrom(Message* msg, int send_id);
+  STATUS RecvFrom(Message* msg, int send_id) override;
 
   /*!
    * \brief Finalize SocketReceiver
    *
    * Finalize() is not thread-safe and only one thread can invoke this API.
    */
-  void Finalize();
+  void Finalize() override;
 
   /*!
    * \brief Communicator type: 'socket'
    */
-  inline std::string Type() const { return std::string("socket"); }
+  const std::string &NetType() const override {
+    static const std::string net_type = "socket";
+    return net_type;
+  }
 
  private:
   struct RecvContext {
