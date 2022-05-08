@@ -49,7 +49,8 @@ __all__ = [
     'NodeShuffle',
     'DropNode',
     'DropEdge',
-    'AddEdge'
+    'AddEdge',
+    'SIGNDiffusion'
 ]
 
 def update_graph_structure(g, data_dict, copy_edata=True):
@@ -1289,6 +1290,18 @@ class SIGNDiffusion(BaseTransform):
 
     Example
     -------
+
+    >>> import dgl
+    >>> import torch
+    >>> from dgl import SIGNDiffusion
+
+    >>> transform = SIGNDiffusion(k=2, eweight_name='w')
+    >>> num_nodes = 5
+    >>> num_edges = 20
+    >>> g = dgl.rand_graph(num_nodes, num_edges)
+    >>> g.ndata['feat'] = torch.randn(num_nodes, 10)
+    >>> g.edata['w'] = torch.randn(num_edges)
+    >>> transform(g)
     """
     def __init__(self,
                  k,
