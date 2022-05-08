@@ -6,7 +6,7 @@ import os
 import random
 
 from .dgl_dataset import DGLBuiltinDataset
-from .utils import save_graphs, load_graphs, _get_dgl_url
+from .utils import save_graphs, load_graphs, _get_dgl_url, download
 from .. import backend as F
 from ..batch import batch
 from ..convert import graph
@@ -716,3 +716,8 @@ class BA2Motifs(DGLBuiltinDataset):
                                         force_reload=force_reload,
                                         verbose=verbose,
                                         transform=transform)
+
+    def download(self):
+        r""" Automatically download data."""
+        file_path = os.path.join(self.raw_dir, self.name + '.pkl')
+        download(self.url, path=file_path)
