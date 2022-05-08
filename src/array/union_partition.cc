@@ -9,66 +9,6 @@
 namespace dgl {
 namespace aten {
 ///////////////////////// COO Based Operations/////////////////////////
-COOMatrix DisjointUnionCoo(const std::vector<COOMatrix>& coos) {
-  uint64_t src_offset = 0, dst_offset = 0;
-  int64_t edge_data_offset = 0;
-  bool has_data = false;
-  bool row_sorted = true;
-  bool col_sorted = true;
-
-  // check if data index array
-  for (size_t i = 0; i < coos.size(); ++i) {
-    CHECK_SAME_DTYPE(coos[0].row, coos[i].row);
-    CHECK_SAME_CONTEXT(coos[0].row, coos[i].row);
-    has_data |= COOHasData(coos[i]);
-  }
-
-  std::vector<IdArray> res_src;
-  std::vector<IdArray> res_dst;
-  std::vector<IdArray> res_data;
-  res_src.resize(coos.size());
-  res_dst.resize(coos.size());
-
-  for (size_t i = 0; i < coos.size(); ++i) {
-    const aten::COOMatrix &coo = coos[i];
-    row_sorted &= coo.row_sorted;
-    col_sorted &= coo.col_sorted;
-    IdArray edges_src = coo.row + src_offset;
-    IdArray edges_dst = coo.col + dst_offset;
-    res_src[i] = edges_src;
-    res_dst[i] = edges_dst;
-    src_offset += coo.num_rows;
-    dst_offset += coo.num_cols;
-
-    // any one of input coo has data index array
-    if (has_data) {
-      IdArray edges_data;
-      if (COOHasData(coo) == false) {
-        edges_data = Range(edge_data_offset,
-                           edge_data_offset + coo.row->shape[0],
-                           coo.row->dtype.bits,
-                           coo.row->ctx);
-      } else {
-        edges_data = coo.data + edge_data_offset;
-      }
-      res_data.push_back(edges_data);
-      edge_data_offset += coo.row->shape[0];
-    }
-  }
-
-  IdArray result_src = Concat(res_src);
-  IdArray result_dst = Concat(res_dst);
-  IdArray result_data = has_data ? Concat(res_data) : NullArray();
-
-  return COOMatrix(
-    src_offset, dst_offset,
-    result_src,
-    result_dst,
-    result_data,
-    row_sorted,
-    col_sorted);
-}
-
 std::vector<COOMatrix> DisjointPartitionCooBySizes(
   const COOMatrix &coo,
   const uint64_t batch_size,
