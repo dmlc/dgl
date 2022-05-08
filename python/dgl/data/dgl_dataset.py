@@ -313,6 +313,7 @@ class DGLBuiltinDataset(DGLDataset):
     def download(self):
         r""" Automatically download data and extract it.
         """
-        zip_file_path = os.path.join(self.raw_dir, self.name + '.zip')
-        download(self.url, path=zip_file_path)
-        extract_archive(zip_file_path, self.raw_path)
+        if self.url is not None:
+            zip_file_path = os.path.join(self.raw_dir, self.name + '.zip')
+            download(self.url, path=zip_file_path)
+            extract_archive(zip_file_path, self.raw_path)
