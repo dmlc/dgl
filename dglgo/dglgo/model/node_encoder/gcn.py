@@ -44,7 +44,7 @@ class GCN(nn.Module):
             in_size = embed_size
         else:
             in_size = data_info["in_size"]
-        
+
         for i in range(num_layers):
             in_hidden = hidden_size if i > 0 else in_size
             out_hidden = hidden_size if i < num_layers - 1 else data_info["out_size"]
@@ -56,7 +56,7 @@ class GCN(nn.Module):
 
     def forward(self, g, node_feat, edge_feat = None):
         if self.embed_size > 0:
-            dgl_warning("The embedding for node feature is used, and input node_feat is ignored, due to the provided embed_size.", norepeat=True)
+            dgl_warning("The embedding for node feature is used, and input node_feat is ignored, due to the provided embed_size.")
             h = self.embed.weight
         else:
             h = node_feat
