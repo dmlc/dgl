@@ -1302,6 +1302,9 @@ class SIGNDiffusion(BaseTransform):
     >>> g.ndata['feat'] = torch.randn(num_nodes, 10)
     >>> g.edata['w'] = torch.randn(num_edges)
     >>> transform(g)
+    Graph(num_nodes=5, num_edges=20,
+          ndata_schemes={'feat': Scheme(shape=(10,), dtype=torch.float32), 'feat_1': Scheme(shape=(10,), dtype=torch.float32), 'feat_2': Scheme(shape=(10,), dtype=torch.float32)}
+          edata_schemes={'w': Scheme(shape=(), dtype=torch.float32)})
     """
     def __init__(self,
                  k,

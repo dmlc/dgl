@@ -24,6 +24,8 @@ import dgl.partition
 import backend as F
 import unittest
 import math
+import pytest
+from test_utils.graph_cases import get_cases
 from utils import parametrize_dtype
 
 from test_heterograph import create_test_heterograph3, create_test_heterograph4, create_test_heterograph5
@@ -2349,6 +2351,14 @@ def test_module_laplacian_pe(idtype):
     # pytorch & mxnet
     else:
         assert F.allclose(new_g.ndata['lappe'].abs(), tgt)
+
+@pytest.mark.parametrize('g', get_cases(['has_scalar_e_feature']))
+@pytest.mark.parametrize('op', ['raw', 'rw', 'gcn', 'ppr'])
+def test_module_sign(g, op):
+    transform = dgl.SIGNDiffusion(k=2, feat_name='h', diffuse_op=op)
+    transform(g)
+    transform = dgl.SIGNDiffusion(k=2, feat_name='h', eweight_name='scalar_w', diffuse_op=op)
+    transform(g)
 
 if __name__ == '__main__':
     test_partition_with_halo()
