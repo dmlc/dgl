@@ -31,7 +31,7 @@ from .fraud import FraudDataset, FraudYelpDataset, FraudAmazonDataset
 from .fakenews import FakeNewsDataset
 from .csv_dataset import CSVDataset
 from .adapter import AsNodePredDataset, AsLinkPredDataset
-from .explain_syn import BAShapes, BACommunity, TreeCycles, TreeGrids
+from .explain_syn import BAShapes, BACommunity, TreeCycles, TreeGrids, BA2Motif
 
 def register_data_args(parser):
     parser.add_argument(
