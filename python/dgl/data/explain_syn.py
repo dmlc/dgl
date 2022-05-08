@@ -689,6 +689,9 @@ class BA2Motifs(DGLBuiltinDataset):
 
     Examples
     --------
+
+    >>> from dgl.data import BA2Motifs
+    >>> dataset = BA2Motifs()
     """
     def __init__(self,
                  raw_dir=None,
@@ -717,7 +720,7 @@ class BA2Motifs(DGLBuiltinDataset):
 
         for i in range(len(adjs)):
             g = graph(adjs[i].nonzero())
-            g.ndata['feat'] = F.zerocopy_from_numpy(features[i])
+            g.ndata['feat'] = F.tensor(features[i], F.float32)
             self.graphs.append(g)
             self.labels.append(F.tensor(labels[i], F.int64))
 
@@ -733,8 +736,7 @@ class BA2Motifs(DGLBuiltinDataset):
         return os.path.exists(self.graph_path)
 
     def load(self):
-        graphs, label_dict = load_graphs(str(self.graph_path))
-        self.graphs = graphs
+        self.graphs, label_dict = load_graphs(str(self.graph_path))
         self.labels = label_dict['labels']
 
     def __getitem__(self, idx):
