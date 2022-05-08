@@ -30,3 +30,4 @@ dgl.transforms
     AddEdge
     RandomWalkPE
     LaplacianPE
+    SIGNDiffusion

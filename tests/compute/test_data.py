@@ -257,6 +257,11 @@ def test_explain_syn():
     assert F.allclose(src1, src2)
     assert F.allclose(dst1, dst2)
 
+    dataset = data.BA2Motifs()
+    assert dataset.num_classes == 2
+    g, label = dataset[0]
+    assert 'feat' in g.ndata
+
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
 def test_extract_archive():
     # gzip

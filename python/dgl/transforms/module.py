@@ -21,6 +21,7 @@ from scipy.linalg import expm
 from .. import convert
 from .. import backend as F
 from .. import function as fn
+from ..base import DGLError
 from . import functional
 
 try:
@@ -1241,3 +1242,144 @@ class AddEdge(BaseTransform):
             dst = F.randint([num_edges_to_add], idtype, device, low=0, high=g.num_nodes(vtype))
             g.add_edges(src, dst, etype=c_etype)
         return g
+
+class SIGNDiffusion(BaseTransform):
+    r"""The diffusion operator from `SIGN: Scalable Inception Graph Neural Networks
+    <https://arxiv.org/abs/2004.11198>`__
+
+    It performs node feature diffusion with :math:`TX, \cdots, T^{k}X`, where :math:`T`
+    is a diffusion matrix and :math:`X` is the input node features.
+
+    Specifically, this module provides four options for :math:`T`.
+
+    **raw**: raw adjacency matrix :math:`A`
+
+    **rw**: random walk (row-normalized) adjacency matrix :math:`D^{-1}A`, where
+    :math:`D` is the degree matrix.
+
+    **gcn**: symmetrically normalized adjacency matrix used by
+    `GCN <https://arxiv.org/abs/1609.02907>`__, :math:`D^{-1/2}AD^{-1/2}`
+
+    **ppr**: approximate personalized PageRank used by
+    `APPNP <https://arxiv.org/abs/1810.05997>`__
+
+    .. math::
+        H^{0} &= X
+
+        H^{l+1} &= (1-\alpha)\left(D^{-1/2}AD^{-1/2} H^{l}\right) + \alpha X
+
+    This module only works for homogeneous graphs.
+
+    Parameters
+    ----------
+    k : int
+        The maximum number of times for node feature diffusion.
+    feat_name : str, optional
+        :attr:`g.ndata[{feat_name}]` should store the input node features.
+        :attr:`g.ndata[{feat_name}_i]` will store the result of diffusing
+        input node features for i times.
+    eweight_name : str, optional
+        Name to retrieve edge weights from :attr:`g.edata`. Default: None,
+        treating the graph as unweighted.
+    diffuse_op : str, optional
+        The diffusion operator to use, which can be 'raw', 'rw', 'gcn', or 'ppr'.
+    alpha : float, optional
+        Restart probability if :attr:`diffuse_op` is :attr:`'ppr'`,
+        which commonly lies in :math:`[0.05, 0.2]`.
+
+    Example
+    -------
+    """
+    def __init__(self,
+                 k,
+                 feat_name='feat',
+                 eweight_name=None,
+                 diffuse_op='raw',
+                 alpha=0.2):
+        self.k = k
+        self.feat_name = feat_name
+        self.eweight_name = eweight_name
+        self.diffuse_op = diffuse_op
+        self.alpha = alpha
+
+        if diffuse_op == 'raw':
+            self.diffuse = self.raw
+        elif diffuse_op == 'rw':
+            self.diffuse = self.rw
+        elif diffuse_op == 'gcn':
+            self.diffuse = self.gcn
+        elif diffuse_op == 'ppr':
+            self.diffuse = self.ppr
+        else:
+            raise DGLError("Expect diffuse_op to be from ['raw', 'rw', 'gcn', 'ppr'], \
+                got {}".format(diffuse_op))
+
+    def __call__(self, g):
+        use_eweight = False
+        if (self.eweight_name is not None) and self.eweight_name in g.edata:
+            use_eweight = True
+        feat_list = self.diffuse(g, use_eweight)
+
+        for i in range(1, self.k + 1):
+            g.ndata[self.feat_name + '_' + str(i)] = feat_list[i - 1]
+
+    def raw(self, g, use_eweight):
+        feat_list = []
+        with g.local_scope():
+            if use_eweight:
+                message_func = fn.u_mul_e(self.feat_name, self.eweight_name, 'm')
+            else:
+                message_func = fn.copy_u(self.feat_name, 'm')
+            for _ in range(self.k):
+                g.update_all(message_func, fn.sum('m', self.feat_name))
+                feat_list.append(g.ndata[self.feat_name])
+        return feat_list
+
+    def rw(self, g, use_eweight):
+        feat_list = []
+        with g.local_scope():
+            g.ndata['h'] = g.ndata[self.feat_name]
+            if use_eweight:
+                message_func = fn.u_mul_e('h', self.eweight_name, 'm')
+                reduce_func = fn.sum('m', 'h')
+                # Compute the diagonal entries of D from the weighted A
+                g.update_all(fn.copy_e(self.eweight_name, 'm'), fn.sum('m', 'z'))
+            else:
+                message_func = fn.copy_u('h', 'm')
+                reduce_func = fn.mean('m', 'h')
+
+            for _ in range(self.k):
+                g.update_all(message_func, reduce_func)
+                if use_eweight:
+                    g.ndata['h'] = g.ndata['h'] / g.ndata['z']
+                feat_list.append(g.ndata['h'])
+        return feat_list
+
+    def gcn(self, g, use_eweight):
+        feat_list = []
+        with g.local_scope():
+            eweight_name = 'w' if self.eweight_name is None else self.eweight_name
+            transform = GCNNorm(eweight_name=eweight_name)
+            transform(g)
+
+            for _ in range(self.k):
+                g.update_all(fn.u_mul_e(self.feat_name, eweight_name, 'm'),
+                             fn.sum('m', self.feat_name))
+                feat_list.append(g.ndata[self.feat_name])
+        return feat_list
+
+    def ppr(self, g, use_eweight):
+        feat_list = []
+        with g.local_scope():
+            eweight_name = 'w' if self.eweight_name is None else self.eweight_name
+            transform = GCNNorm(eweight_name=eweight_name)
+            transform(g)
+
+            in_feat = g.ndata[self.feat_name]
+            for _ in range(self.k):
+                g.update_all(fn.u_mul_e(self.feat_name, eweight_name, 'm'),
+                             fn.sum('m', self.feat_name))
+                g.ndata[self.feat_name] = (1 - self.alpha) * g.ndata[self.feat_name] +\
+                    self.alpha * in_feat
+                feat_list.append(g.ndata[self.feat_name])
+        return feat_list

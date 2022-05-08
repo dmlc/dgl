@@ -692,6 +692,11 @@ class BA2Motifs(DGLBuiltinDataset):
 
     >>> from dgl.data import BA2Motifs
     >>> dataset = BA2Motifs()
+    >>> dataset.num_classes
+    2
+    >>> # Get the first graph and its label
+    >>> g, label = dataset[0]
+    >>> feat = g.ndata['feat']
     """
     def __init__(self,
                  raw_dir=None,
