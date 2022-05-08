@@ -51,7 +51,7 @@ Datasets for node classification/regression tasks
     BACommunity
     TreeCycles
     TreeGrids
-    BA2Motif
+    BA2Motifs
 
 Edge Prediction Datasets
 ---------------------------------------

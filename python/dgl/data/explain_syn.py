@@ -672,7 +672,7 @@ class TreeGrids(DGLBuiltinDataset):
     def num_classes(self):
         return 2
 
-class BA2Motif(DGLBuiltinDataset):
+class BA2Motifs(DGLBuiltinDataset):
     r"""BA-2motifs dataset from `Parameterized Explainer for Graph Neural Network
     <https://arxiv.org/abs/2011.04573>`__
 
@@ -710,9 +710,9 @@ class BA2Motif(DGLBuiltinDataset):
                  force_reload=False,
                  verbose=True,
                  transform=None):
-        super(BA2Motif, self).__init__(name='BA-2motifs',
-                                       url=_get_dgl_url('dataset/BA-2motif.pkl'),
-                                       raw_dir=raw_dir,
-                                       force_reload=force_reload,
-                                       verbose=verbose,
-                                       transform=transform)
+        super(BA2Motifs, self).__init__(name='BA-2motifs',
+                                        url=_get_dgl_url('dataset/BA-2motif.pkl'),
+                                        raw_dir=raw_dir,
+                                        force_reload=force_reload,
+                                        verbose=verbose,
+                                        transform=transform)
