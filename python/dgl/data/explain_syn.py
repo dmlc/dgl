@@ -716,13 +716,12 @@ class BA2Motifs(DGLBuiltinDataset):
             adjs, features, labels = pickle.load(f)
 
         self.graphs = []
-        self.labels = []
+        self.labels = F.tensor(labels, F.int64)
 
         for i in range(len(adjs)):
             g = graph(adjs[i].nonzero())
-            g.ndata['feat'] = F.tensor(features[i], F.float32)
+            g.ndata['feat'] = F.zerocopy_from_numpy(features[i])
             self.graphs.append(g)
-            self.labels.append(F.tensor(labels[i], F.int64))
 
     @property
     def graph_path(self):
