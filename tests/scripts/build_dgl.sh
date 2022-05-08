@@ -31,7 +31,7 @@ popd
 
 pushd python
 for backend in pytorch mxnet tensorflow
-do 
+do
 conda activate "${backend}-ci"
 rm -rf build *.egg-info dist
 pip uninstall -y dgl

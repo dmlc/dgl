@@ -2350,6 +2350,74 @@ def test_module_laplacian_pe(idtype):
     else:
         assert F.allclose(new_g.ndata['lappe'].abs(), tgt)
 
+@unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
+@parametrize_dtype
+def test_module_row_feat_normalizer(idtype):
+    # Case1: Normalize features of a homogeneous graph.
+    transform = dgl.RowFeatNormalizer(subtract_min=True)
+    g = dgl.rand_graph(5, 5, idtype=idtype, device=F.ctx())
+    g.ndata['h'] = F.randn((g.num_nodes(), 128))
+    g.edata['w'] = F.randn((g.num_edges(), 128))
+    g = transform(g)
+    assert g.ndata['h'].shape == (g.num_nodes(), 128)
+    assert g.edata['w'].shape == (g.num_edges(), 128)
+    assert F.allclose(g.ndata['h'].sum(1), F.tensor([1.0, 1.0, 1.0, 1.0, 1.0]))
+    assert F.allclose(g.edata['w'].sum(1), F.tensor([1.0, 1.0, 1.0, 1.0, 1.0]))
+
+    # Case2: Normalize features of a heterogeneous graph.
+    transform = dgl.RowFeatNormalizer(subtract_min=True)
+    g = dgl.heterograph({
+        ('user', 'follows', 'user'): (F.tensor([1, 2]), F.tensor([3, 4])),
+        ('player', 'plays', 'game'): (F.tensor([2, 2]), F.tensor([1, 1]))
+    }, idtype=idtype, device=F.ctx())
+    g.ndata['h'] = {'game': F.randn((2, 128)), 'player': F.randn((3, 128))}
+    g.ndata['h2'] = {'user': F.randn((5, 128))}
+    g.edata['w'] = {('user', 'follows', 'user'): F.randn((2, 128)), ('player', 'plays', 'game'): F.randn((2, 128))}
+    g = transform(g)
+    assert g.ndata['h']['game'].shape == (2, 128)
+    assert g.ndata['h']['player'].shape == (3, 128)
+    assert g.ndata['h2']['user'].shape == (5, 128)
+    assert g.edata['w'][('user', 'follows', 'user')].shape == (2, 128)
+    assert g.edata['w'][('player', 'plays', 'game')].shape == (2, 128)
+    assert F.allclose(g.ndata['h']['game'].sum(1), F.tensor([1.0, 1.0]))
+    assert F.allclose(g.ndata['h']['player'].sum(1), F.tensor([1.0, 1.0, 1.0]))
+    assert F.allclose(g.ndata['h2']['user'].sum(1), F.tensor([1.0, 1.0, 1.0, 1.0, 1.0]))
+    assert F.allclose(g.edata['w'][('user', 'follows', 'user')].sum(1), F.tensor([1.0, 1.0]))
+    assert F.allclose(g.edata['w'][('player', 'plays', 'game')].sum(1), F.tensor([1.0, 1.0]))
+
+@unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
+@parametrize_dtype
+def test_module_feat_mask(idtype):
+    # Case1: Mask node and edge feature tensors of a homogeneous graph.
+    transform = dgl.FeatMask()
+    g = dgl.rand_graph(5, 20, idtype=idtype, device=F.ctx())
+    g.ndata['h'] = F.ones((g.num_nodes(), 10))
+    g.edata['w'] = F.ones((g.num_edges(), 20))
+    g = transform(g)
+    assert g.device == g.device
+    assert g.idtype == g.idtype
+    assert g.ndata['h'].shape == (g.num_nodes(), 10)
+    assert g.edata['w'].shape == (g.num_edges(), 20)
+
+    # Case2: Mask node and edge feature tensors of a heterogeneous graph.
+    transform = dgl.FeatMask()
+    g = dgl.heterograph({
+        ('user', 'follows', 'user'): (F.tensor([1, 2]), F.tensor([3, 4])),
+        ('player', 'plays', 'game'): (F.tensor([2, 2]), F.tensor([1, 1]))
+    }, idtype=idtype, device=F.ctx())
+    g.ndata['h'] = {'game': F.randn((2, 5)), 'player': F.randn((3, 5))}
+    g.edata['w'] = {('user', 'follows', 'user'): F.randn((2, 5)),
+                    ('player', 'plays', 'game'): F.randn((2, 5))}
+    g = transform(g)
+    assert g.device == g.device
+    assert g.idtype == g.idtype
+    assert g.ndata['h']['game'].shape == (2, 5)
+    assert g.ndata['h']['player'].shape == (3, 5)
+    assert g.edata['w'][('user', 'follows', 'user')].shape == (2, 5)
+    assert g.edata['w'][('player', 'plays', 'game')].shape == (2, 5)
+
+
+
 if __name__ == '__main__':
     test_partition_with_halo()
     test_module_heat_kernel(F.int32)
